@@ -1,0 +1,77 @@
+/**
+ * zh-CN — 简体中文语言包
+ */
+
+import { I18nStrings } from './types';
+
+const zhCN: I18nStrings = {
+    'panel.title': '⏱ 工作区计时',
+    'panel.stat.today': '今日',
+    'panel.stat.week': '本周',
+    'panel.stat.total': '累计',
+    'panel.stat.sessions': '会话数',
+    'panel.stat.status': '状态',
+    'panel.section.weekly': '📊 周报',
+    'panel.section.basic': '基本设置',
+    'panel.section.storage': '⚙️ 存储设置',
+    'panel.section.actions': '🔧 操作',
+    'panel.chart.empty': '暂无数据，开始编程后会自动记录',
+    'panel.chart.weekTotal': '本周合计：',
+
+    'setting.enabled': '工作区计时',
+    'setting.enabled.desc': '启用/禁用当前工作区的计时',
+    'setting.enabled.help': '启用后，当前 VS Code 窗口打开即开始累计时长；\n禁用后完全停止计时和记录',
+    'setting.globalDisabled': '全局禁用',
+    'setting.globalDisabled.desc': '禁用所有工作区的计时（优先级最高）',
+    'setting.globalDisabled.help': '全局禁用后所有工作区均不计时，\n优先级高于工作区独立开关',
+    'setting.statusBar': '状态栏显示',
+    'setting.statusBar.desc': '在底部状态栏显示计时',
+    'setting.statusBar.help': '状态栏显示今日时长和累计时长；\n点击可循环切换显示模式',
+
+    'setting.journal': '崩溃保护',
+    'setting.journal.desc': '启用 journal 文件防止崩溃数据丢失',
+    'setting.journal.help': '每 10 秒将时间片写入 .journal 文件；\nVS Code 崩溃后重启时可回放恢复，\n最多丢失约 10 秒数据',
+    'setting.backup': 'JSON 备份',
+    'setting.backup.desc': '额外写入 .vscode/workspace-timing.json',
+    'setting.backup.help': '额外写入 .vscode/workspace-timing.json；\n用户可见、可版本控制、可移植',
+    'setting.ringBuffer': 'RingBuffer 容量',
+    'setting.ringBuffer.desc': '环形缓冲区条目数 (64~65536)',
+    'setting.ringBuffer.help': '内存中缓存的时间片数量；\n越大则 UI 可查询的历史越久，\n但占用内存越多（推荐 1024 ≈ 17 分钟）',
+    'setting.journalInterval': 'Journal 写入间隔',
+    'setting.journalInterval.desc': '毫秒 (1000~300000)',
+    'setting.journalInterval.help': '内存缓存写入 journal 文件的频率；\n间隔越短丢失越少，但磁盘写入越频繁',
+    'setting.fullSaveInterval': '全量存盘间隔',
+    'setting.fullSaveInterval.desc': '毫秒 (5000~600000)',
+    'setting.fullSaveInterval.help': '将完整计时数据写入 workspaceState 和 JSON 文件的频率；\n间隔越短数据越安全，但写入越频繁',
+    'setting.maxSessions': '会话保留上限',
+    'setting.maxSessions.desc': '0 = 不限',
+    'setting.maxSessions.help': '最多保留的会话记录条数；\n超出时自动删除最旧记录；\n设为 0 表示不限（注意内存占用）',
+
+    'action.newPeriod': '新建计时周期',
+    'action.exportCSV': '导出 CSV',
+    'action.reset': '重置所有数据',
+    'action.newPeriod.hint': '累计归零，历史保留在会话记录中',
+    'action.reset.hint': '清空所有计时数据和历史，不可撤销',
+
+    'status.running': '运行中',
+    'status.globalDisabled': '全局禁用',
+    'status.disabled': '已禁用',
+
+    'statusBar.todayTotal': '今日 {0} · 累计 {1}',
+    'statusBar.totalToday': '累计 {0} · 今日 {1}',
+    'statusBar.tooltip': '工作区计时 — 点击切换显示模式',
+
+    'toast.newPeriod': '已请求新建计时周期',
+    'toast.exportCSV': '已请求导出 CSV',
+    'toast.reset': '已请求重置数据',
+    'toast.configUpdated': '配置已更新',
+
+    'confirm.newPeriod': '确定要新建计时周期？累计时长将归零，历史记录保留。',
+    'confirm.newPeriod.title': '确认新建',
+    'confirm.reset': '确定要重置所有计时数据？此操作不可撤销！',
+    'confirm.reset.title': '确认重置',
+
+    'cmd.modeSwitched': '已切换至「{0}」模式',
+};
+
+export default zhCN;

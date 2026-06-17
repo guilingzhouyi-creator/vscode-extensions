@@ -1,0 +1,148 @@
+{
+    "name": "workspace-timing",
+    "displayName": "Workspace Timing",
+    "description": "⏱ 轻量化工作区时长追踪 — 自动计时、周报图表、跨工作区聚合、崩溃保护；环形缓冲区 + Journal 双写入架构，预留多工作区对比与云端同步扩展 | Lightweight cross-workspace time tracker with RingBuffer+Journal storage, weekly charts, and extensible architecture",
+    "version": "0.1.0",
+    "publisher": "guilingzhouyi",
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "*"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "workspaceTiming.enable",
+                "title": "Workspace Timing: Enable Timing"
+            },
+            {
+                "command": "workspaceTiming.disable",
+                "title": "Workspace Timing: Disable Timing"
+            },
+            {
+                "command": "workspaceTiming.toggleGlobal",
+                "title": "Workspace Timing: Toggle Global Timing"
+            },
+            {
+                "command": "workspaceTiming.showStatus",
+                "title": "Workspace Timing: Toggle Status Bar"
+            },
+            {
+                "command": "workspaceTiming.reset",
+                "title": "Workspace Timing: Reset Timing Data"
+            },
+            {
+                "command": "workspaceTiming.debugSave",
+                "title": "Workspace Timing: Debug — Force Save Now"
+            },
+            {
+                "command": "workspaceTiming.openDashboard",
+                "title": "Workspace Timing: Open Dashboard"
+            },
+            {
+                "command": "workspaceTiming.newPeriod",
+                "title": "Workspace Timing: New Counting Period"
+            }
+        ],
+        "configuration": {
+            "title": "Workspace Timing",
+            "properties": {
+                "workspaceTiming.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable timing for the current workspace"
+                },
+                "workspaceTiming.globalDisabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Globally disable timing for all workspaces"
+                },
+                "workspaceTiming.statusBar.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show timing in the status bar"
+                },
+                "workspaceTiming.statusBar.format": {
+                    "type": "string",
+                    "enum": [
+                        "compact",
+                        "detailed"
+                    ],
+                    "default": "compact",
+                    "description": "Status bar display format"
+                },
+                "workspaceTiming.storage.backupToFile": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable JSON file backup in .vscode/"
+                },
+                "workspaceTiming.storage.journalEnabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable journal file for crash protection"
+                },
+                "workspaceTiming.storage.ringBufferCapacity": {
+                    "type": "number",
+                    "default": 1024,
+                    "minimum": 64,
+                    "maximum": 65536,
+                    "description": "RingBuffer capacity (number of time slices)"
+                },
+                "workspaceTiming.storage.journalFlushInterval": {
+                    "type": "number",
+                    "default": 10000,
+                    "minimum": 1000,
+                    "maximum": 300000,
+                    "description": "Journal flush interval in ms"
+                },
+                "workspaceTiming.storage.fullSaveInterval": {
+                    "type": "number",
+                    "default": 60000,
+                    "minimum": 5000,
+                    "maximum": 600000,
+                    "description": "Full save interval in ms"
+                },
+                "workspaceTiming.storage.maxSessions": {
+                    "type": "number",
+                    "default": 1000,
+                    "minimum": 0,
+                    "description": "Max session history entries (0 = unlimited)"
+                }
+            }
+        },
+        "keybindings": [
+            {
+                "command": "workspaceTiming.toggleGlobal",
+                "key": "ctrl+shift+t t"
+            },
+            {
+                "command": "workspaceTiming.reset",
+                "key": "ctrl+shift+t r"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile",
+        "test": "node ./out/test/runTest.js",
+        "lint": "eslint src --ext ts"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.85.0",
+        "@types/node": "^20.11.0",
+        "@types/mocha": "^10.0.6",
+        "typescript": "^5.3.3",
+        "eslint": "^8.56.0",
+        "@typescript-eslint/eslint-plugin": "^6.19.0",
+        "@typescript-eslint/parser": "^6.19.0",
+        "mocha": "^10.3.0"
+    }
+}
