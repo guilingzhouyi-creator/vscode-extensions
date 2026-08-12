@@ -2,7 +2,7 @@
     "name": "workspace-timing",
     "displayName": "Workspace Timing",
     "description": "⏱ 全本地工作区时长追踪 — 自动计时 · 效率转化 · 闲置检测 · 每日目标 · 周报图表 · 跨工作区聚合 · 崩溃保护 · CSV导出 | Fully local workspace time tracker — auto timing, efficiency ratio, idle detection, daily goal, weekly charts, cross-workspace, crash protection, CSV export",
-    "version": "0.3.7",
+    "version": "0.3.8",
     "publisher": "guilingzhouyi",
     "license": "MIT",
     "icon": "images/icon.png",
@@ -148,6 +148,35 @@
                     "minimum": 0,
                     "maximum": 1440,
                     "description": "Daily goal in minutes — show notification when reached (0 = disabled)"
+                },
+                "workspaceTiming.autoExport": {
+                    "type": "object",
+                    "description": "Scheduled auto-export of timing reports (CSV / JSON / weekly / monthly)",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable scheduled auto-export"
+                        },
+                        "intervalMinutes": {
+                            "type": "number",
+                            "default": 60,
+                            "minimum": 5,
+                            "maximum": 10080,
+                            "description": "Export interval in minutes"
+                        },
+                        "format": {
+                            "type": "string",
+                            "default": "weekly",
+                            "enum": ["csv", "json", "weekly", "monthly"],
+                            "description": "Export format"
+                        },
+                        "targetPath": {
+                            "type": "string",
+                            "default": "",
+                            "description": "Target directory for auto-exported files (empty = workspace root)"
+                        }
+                    }
                 }
             }
         },

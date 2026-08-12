@@ -67,6 +67,8 @@ export interface I18nStrings {
     'toast.diagnosticExported': string;
     'toast.exportFailed': string;
     'toast.goalReached': string;
+    'toast.streak': string;
+    'toast.autoExported': string;
     'confirm.newPeriod': string;
     'confirm.newPeriod.title': string;
     'confirm.reset': string;

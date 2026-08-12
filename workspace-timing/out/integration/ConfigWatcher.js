@@ -87,6 +87,13 @@ class ConfigWatcher {
             activityTrackingEnabled: cfg.get('efficiency.enabled', models_1.DEFAULT_CONFIG.activityTrackingEnabled),
             idleTimeoutMs: cfg.get('idleTimeoutMinutes', models_1.DEFAULT_CONFIG.idleTimeoutMs / 60000) * 60000,
             dailyGoalMs: cfg.get('dailyGoalMinutes', models_1.DEFAULT_CONFIG.dailyGoalMs / 60000) * 60000,
+            weeklyGoalMs: models_1.DEFAULT_CONFIG.weeklyGoalMs,
+            autoExport: {
+                enabled: cfg.get('autoExport.enabled', models_1.DEFAULT_CONFIG.autoExport?.enabled ?? false),
+                intervalMinutes: cfg.get('autoExport.intervalMinutes', models_1.DEFAULT_CONFIG.autoExport?.intervalMinutes ?? 60),
+                format: cfg.get('autoExport.format', models_1.DEFAULT_CONFIG.autoExport?.format ?? 'weekly'),
+                targetPath: cfg.get('autoExport.targetPath', models_1.DEFAULT_CONFIG.autoExport?.targetPath ?? ''),
+            },
         };
     }
     /** 应用配置到各模块 */
@@ -105,6 +112,8 @@ class ConfigWatcher {
             fullSaveIntervalMs: config.fullSaveIntervalMs,
         });
         this.orchestrator.onDisableStateChanged(this.orchestrator.disable.resolveState());
+        // ★ 同步定时自动导出配置
+        this.orchestrator.setAutoExportConfig(config.autoExport);
     }
     /** 停止监听 */
     stop() {

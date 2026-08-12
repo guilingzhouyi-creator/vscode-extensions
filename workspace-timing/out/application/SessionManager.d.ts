@@ -6,7 +6,7 @@
  */
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
 import { WorkspaceTimingData } from '../domain/models';
-import { DailyChartEntry } from '../domain/dashboard-types';
+import { DailyChartEntry, HeatmapDay } from '../domain/dashboard-types';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 export interface SessionResult {
@@ -54,6 +54,14 @@ export declare class SessionManager {
     getWeekDailyStats(fullWeek?: boolean): DailyChartEntry[];
     /** 获取上一自然周累计时长 (ms) — 复用已结束会话缓存 */
     getLastWeekMs(): number;
+    /** 获取本月累计时长 (ms) — 复用已结束会话缓存 */
+    getThisMonthMs(): number;
+    /** 获取上一自然月累计时长 (ms) — 复用已结束会话缓存 */
+    getLastMonthMs(): number;
+    /** 获取自然月每日明细（本月 1 号起；fullMonth=true 含至月末）— 复用已结束会话缓存 */
+    getMonthDailyStats(fullMonth?: boolean): DailyChartEntry[];
+    /** 活动时间线热力图（近 weeks 周，含本周）— 复用已结束会话缓存 */
+    getHeatmap(weeks?: number): HeatmapDay[];
     /**
      * 仅保存当前状态（不结束会话）
      * 由 Scheduler 周期性调用。

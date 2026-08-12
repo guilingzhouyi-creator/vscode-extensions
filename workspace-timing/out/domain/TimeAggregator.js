@@ -47,6 +47,16 @@ function startOfMondayMs() {
     monday.setHours(0, 0, 0, 0);
     return monday.getTime();
 }
+/** 取本月 1 号 00:00:00 本地时间戳 */
+function startOfMonthMs() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+}
+/** 取上月 1 号 00:00:00 本地时间戳 */
+function startOfLastMonthMs() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+}
 /**
  * 计算 [startMs, endMs] 与 [winStart, winEnd] 两区间的交集毫秒数。
  * 这是所有「按日 / 按周」统计的单一事实来源，保证口径一致。
@@ -55,6 +65,18 @@ function overlapMs(startMs, endMs, winStart, winEnd) {
     const s = Math.max(winStart, startMs);
     const e = Math.min(winEnd, endMs);
     return e > s ? e - s : 0;
+}
+/** 热力图着色等级：基于当日累计时长分 5 档 */
+function heatmapLevel(ms) {
+    if (ms <= 0)
+        return 0;
+    if (ms < 3600000)
+        return 1; // < 1h
+    if (ms < 2 * 3600000)
+        return 2; // 1h ~ 2h
+    if (ms < 4 * 3600000)
+        return 3; // 2h ~ 4h
+    return 4; // ≥ 4h
 }
 /**
  * 单次遍历，将「已结束会话」按时长归属拆分到对应自然日，返回 dateStr → ms 的 map。
@@ -188,6 +210,101 @@ class TimeAggregator {
             }
         }
         return total;
+    }
+    /**
+     * 本月累计时长 (ms) — 本月 1 号 00:00 → 此刻（复用已结束会话分桶缓存）
+     */
+    static thisMonthMsFromFinished(finishedByDate, currentSessionStartMs) {
+        const now = Date.now();
+        const monthStart = startOfMonthMs();
+        let total = 0;
+        for (const [dateStr, ms] of finishedByDate) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dayStart = new Date(y, m - 1, d).getTime();
+            if (dayStart >= monthStart && dayStart <= startOfDayMs(now)) {
+                total += ms;
+            }
+        }
+        if (currentSessionStartMs > 0) {
+            total += overlapMs(currentSessionStartMs, now, monthStart, now);
+        }
+        return total;
+    }
+    /** 上一自然月累计时长 (ms)（复用已结束会话分桶缓存） */
+    static lastMonthMsFromFinished(finishedByDate) {
+        const monthStart = startOfMonthMs();
+        const lastMonthStart = startOfLastMonthMs();
+        let total = 0;
+        for (const [dateStr, ms] of finishedByDate) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dayStart = new Date(y, m - 1, d).getTime();
+            if (dayStart >= lastMonthStart && dayStart < monthStart) {
+                total += ms;
+            }
+        }
+        return total;
+    }
+    /**
+     * 自然月每日明细（用于「月报」面板与导出）。
+     * - fullMonth=false（默认）：本月 1 号 → 今日（本月至今）。
+     * - fullMonth=true：本月 1 号 → 本月最后一天（未来天时长 0）。
+     */
+    static monthDailyFromFinished(finishedByDate, currentSessionStartMs, fullMonth = false) {
+        const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
+        const now = new Date();
+        const todayStart = startOfDayMs(now.getTime());
+        const monthStart = startOfMonthMs();
+        const lastDay = fullMonth
+            ? new Date(now.getFullYear(), now.getMonth() + 1, 0).getTime()
+            : todayStart;
+        const result = [];
+        let cursor = monthStart;
+        let guard = 0;
+        while (cursor <= lastDay && guard++ < 32) {
+            const dateStr = localDateStr(new Date(cursor));
+            const d = new Date(cursor);
+            let totalMs = finishedByDate.get(dateStr) ?? 0;
+            if (currentSessionStartMs > 0) {
+                totalMs += overlapMs(currentSessionStartMs, Date.now(), cursor, cursor + models_1.MS_PER_DAY);
+            }
+            result.push({
+                label: dateStr.slice(5),
+                weekday: weekdayNames[d.getDay()],
+                totalMs,
+                dateStr,
+            });
+            cursor += models_1.MS_PER_DAY;
+        }
+        return result;
+    }
+    /**
+     * 活动时间线热力图：返回以「今日所在周」结尾的 weeks 个完整自然周（含本周）的按日格子。
+     * 网格按「周一为每周首行」排布，共 weeks×7 个格子；当前周尚未到达的天标记为 future。
+     * 复用已结束会话分桶结果，活跃会话仅叠加到今日格，零额外采集成本。
+     */
+    static heatmapDays(finishedByDate, currentSessionStartMs, weeks = 12) {
+        const todayStart = startOfDayMs(Date.now());
+        const todayDow = (new Date(todayStart).getDay() + 6) % 7; // 0=周一 … 6=周日
+        const lastColMonday = todayStart - todayDow * models_1.MS_PER_DAY;
+        const firstMonday = lastColMonday - (weeks - 1) * 7 * models_1.MS_PER_DAY;
+        const total = weeks * 7;
+        const result = [];
+        for (let i = 0; i < total; i++) {
+            const cursor = firstMonday + i * models_1.MS_PER_DAY;
+            const date = new Date(cursor);
+            const dateStr = localDateStr(date);
+            const weekday = (date.getDay() + 6) % 7;
+            const future = cursor > todayStart;
+            let totalMs = 0;
+            if (!future) {
+                totalMs = finishedByDate.get(dateStr) ?? 0;
+                if (currentSessionStartMs > 0 && cursor === todayStart) {
+                    totalMs += overlapMs(currentSessionStartMs, Date.now(), cursor, cursor + models_1.MS_PER_DAY);
+                }
+            }
+            result.push({ dateStr, weekday, totalMs, level: heatmapLevel(totalMs), future });
+        }
+        return result;
     }
     /**
      * 格式化毫秒为人类可读字符串

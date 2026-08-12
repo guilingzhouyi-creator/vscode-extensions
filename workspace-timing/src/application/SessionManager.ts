@@ -8,7 +8,7 @@
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
 import { WorkspaceTimingData, DEFAULT_MAX_SESSIONS } from '../domain/models';
 import { TimeAggregator, finishedSessionsByDate, nextMidnightMs } from '../domain/TimeAggregator';
-import { DailyChartEntry } from '../domain/dashboard-types';
+import { DailyChartEntry, HeatmapDay } from '../domain/dashboard-types';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { LogLevel, log } from '../integration/Logger';
@@ -161,6 +161,30 @@ export class SessionManager {
     getLastWeekMs(): number {
         this.ensureFinishedCache();
         return TimeAggregator.lastWeekMsFromFinished(this._finishedByDate);
+    }
+
+    /** 获取本月累计时长 (ms) — 复用已结束会话缓存 */
+    getThisMonthMs(): number {
+        this.ensureFinishedCache();
+        return TimeAggregator.thisMonthMsFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs);
+    }
+
+    /** 获取上一自然月累计时长 (ms) — 复用已结束会话缓存 */
+    getLastMonthMs(): number {
+        this.ensureFinishedCache();
+        return TimeAggregator.lastMonthMsFromFinished(this._finishedByDate);
+    }
+
+    /** 获取自然月每日明细（本月 1 号起；fullMonth=true 含至月末）— 复用已结束会话缓存 */
+    getMonthDailyStats(fullMonth = false): DailyChartEntry[] {
+        this.ensureFinishedCache();
+        return TimeAggregator.monthDailyFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs, fullMonth);
+    }
+
+    /** 活动时间线热力图（近 weeks 周，含本周）— 复用已结束会话缓存 */
+    getHeatmap(weeks = 12): HeatmapDay[] {
+        this.ensureFinishedCache();
+        return TimeAggregator.heatmapDays(this._finishedByDate, this.timer.data.currentSessionStartMs, weeks);
     }
 
     /**

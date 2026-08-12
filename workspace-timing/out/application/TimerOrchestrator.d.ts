@@ -12,8 +12,11 @@ import { TimerEngine } from '../domain/TimerEngine';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager, SessionResult } from './SessionManager';
+import { TimingConfig } from '../domain/models';
 import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
+import { PeriodKind, PeriodReportInput } from './exporters/PeriodReportExporter';
+import { ExportBundle } from './exporters/JsonExporter';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
 import { ActivityTracker } from './ActivityTracker';
@@ -47,6 +50,9 @@ export declare class TimerOrchestrator {
     get disable(): DisableManager;
     /** 状态变更回调 */
     onStateChange(cb: (state: OrchestratorState) => void): void;
+    /** 连续打卡里程碑回调（由上层负责弹出桌面通知） */
+    private _onStreakMilestone;
+    onStreakMilestone(cb: (count: number) => void): void;
     /**
      * 启动计时流程
      * 调用链：崩溃恢复 → 禁用判定 → 开始会话 → 启动调度器
@@ -81,6 +87,17 @@ export declare class TimerOrchestrator {
      */
     buildWeeklyReport(workspaceName: string): Promise<WeeklyReportInput>;
     /**
+     * 评估「连续打卡」：当今日累计达到每日目标，且今日尚未计入时，连续天数 +1。
+     * - 仅在进行中（running）状态评估；
+     * - 当日已计入则直接返回，避免重复落库/通知；
+     * - 跨天中断（上次记录在更早的日期）则从 1 重新计数；
+     * - 仅在状态真正变化时写盘（workspaceState + JSON 备份）并触发里程碑回调。
+     * 返回当前连续天数。
+     */
+    evaluateStreak(): Promise<number>;
+    /** 清除连续打卡状态（重置/新建周期时调用） */
+    clearStreak(): Promise<void>;
+    /**
      * 立即手动存盘（调试用）
      */
     saveNow(): Promise<string>;
@@ -91,4 +108,23 @@ export declare class TimerOrchestrator {
      * 历史会话记录保留在 sessions[] 中
      */
     newPeriod(): Promise<void>;
+    /**
+     * 装配「周期报告」（周报 / 月报）数据。
+     * 周报复用 weeklyGoalMs 作为周期目标；月报暂不设周期目标（periodGoalMs=0）。
+     */
+    buildPeriodReport(workspaceName: string, kind: PeriodKind): Promise<PeriodReportInput>;
+    /** 装配「全量数据 JSON 导出」所需的完整数据束 */
+    buildExportBundle(workspaceName: string): Promise<ExportBundle>;
+    private _autoExportCfg;
+    private _lastAutoExportAt;
+    private _onAutoExport;
+    /** 注册定时自动导出回调（由上层执行实际写盘） */
+    onAutoExport(cb: (cfg: NonNullable<TimingConfig['autoExport']>) => void): void;
+    /** 更新自动导出配置（来自 VS Code 设置） */
+    setAutoExportConfig(cfg: TimingConfig['autoExport']): void;
+    /**
+     * 触发条件检查：仅在「已启用 + 运行中 + 距上次导出超过间隔」时回调一次。
+     * 由 Scheduler 的全量存盘周期（每 60s）驱动，无需独立定时器。
+     */
+    maybeAutoExport(): Promise<void>;
 }

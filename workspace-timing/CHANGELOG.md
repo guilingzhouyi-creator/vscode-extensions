@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.8] — 2026-08-12
+
+### Added (P1 功能批次)
+- **活动时间线热力图**：面板新增 GitHub 风格热力图，展示近 12 周（按周一为周首、含本周）每日累计时长的 5 档着色；零额外采集成本——直接复用已结束会话的按日分桶缓存（`finishedSessionsByDate`），活跃会话仅叠加至「今日」格；hover 显示日期与时长，含图例与周范围副标题。中英文面板同步
+- **周目标 + 连续打卡（streak）**：在每日目标之外新增「每周目标」（小时，面板设置，0 = 关闭），周报/月报展示周期目标进度；新增「连续打卡」——当今日累计达到每日目标且今日尚未计入时连续天数 +1，跨天中断从 1 重新计数，结果持久化于工作区状态（`WorkspaceTimingData.streak`），达成时弹出桌面通知（🔥 N 天）。中英文面板同步
+- **月报 + 周期报告泛化**：新增 `PeriodReportExporter`，周报/月报共用一套生成器；面板新增「导出月报」（Markdown），含本月总时长、日均、达标天数、与上月对比
+- **全量 JSON 导出**：面板新增「导出 JSON」，输出包含累计/目标/连续打卡/每日·每月明细/热力图/原始会话列表的完整数据束，便于二次分析或迁移
+- **定时自动导出**：新增 `workspaceTiming.autoExport` 设置（`enabled` / `intervalMinutes` / `format` / `targetPath`），由全量存盘周期（每 60s）驱动 `maybeAutoExport`，按间隔自动写盘 CSV / JSON / 周报 / 月报至目标目录（默认工作区根目录），无需手动操作
+
+### Changed
+- `DashboardData` 新增 `heatmap` / `monthTotalMs` / `weeklyGoalMs` / `streak` 字段；`TimingConfig` 新增 `weeklyGoalMs` 与 `autoExport`；`WorkspaceTimingData` 新增可选的 `streak` 持久化字段（旧数据缺失时按 0 处理，向后兼容）
+
 ## [0.3.7] — 2026-08-12
 
 ### Fixed

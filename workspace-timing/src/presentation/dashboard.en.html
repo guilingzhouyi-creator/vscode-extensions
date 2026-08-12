@@ -110,6 +110,64 @@
       margin-top: 2px;
     }
 
+    /* Heatmap (Activity Timeline) */
+    .heatmap-wrap {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+    }
+    .heatmap-weekdays {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 10px;
+      color: var(--description);
+      padding-top: 0;
+    }
+    .heatmap-weekdays span {
+      height: 12px;
+      line-height: 12px;
+      display: block;
+    }
+    .heatmap {
+      display: flex;
+      gap: 3px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .heatmap-week {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .hm-cell {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: color-mix(in srgb, var(--fg) 12%, transparent);
+    }
+    .hm-cell.l1 { background: #9be9a8; }
+    .hm-cell.l2 { background: #40c463; }
+    .hm-cell.l3 { background: #30a14e; }
+    .hm-cell.l4 { background: #216e39; }
+    .hm-cell.future { opacity: 0.35; }
+    .hm-cell:hover {
+      outline: 1px solid var(--focus);
+      outline-offset: 1px;
+    }
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--description);
+    }
+    .heatmap-legend .hm-cell {
+      width: 11px;
+      height: 11px;
+    }
+
     .setting-row {
       display: flex;
       justify-content: space-between;
@@ -494,6 +552,10 @@
       <div class="label">Sessions</div>
     </div>
     <div class="stat-card">
+      <div class="value" id="statStreak">0</div>
+      <div class="label">Streak</div>
+    </div>
+    <div class="stat-card">
       <div class="value" id="statStatus">--</div>
       <div class="label">Status</div>
     </div>
@@ -509,6 +571,35 @@
       <div id="weekTotal" class="week-total" style="display:none"></div>
       <div id="weekEfficiency" class="week-total" style="display:none;color:var(--success)"></div>
       <div class="week-eff-note">Efficiency reflects edit activity in the current session; resets after restart</div>
+      <div id="weekGoalWrap" style="display:none;margin-top:10px">
+        <div class="week-total" id="weekGoalText"></div>
+        <div style="height:4px;background:var(--input-bg);border-radius:2px;margin-top:4px;overflow:hidden">
+          <div id="weekGoalBar" style="height:100%;background:var(--success);width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity Timeline -->
+  <div class="section">
+    <h2>🟩 Activity Timeline</h2>
+    <div class="week-range" id="heatmapRange"></div>
+    <div class="chart-container">
+      <div class="heatmap-wrap">
+        <div class="heatmap-weekdays">
+          <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+        </div>
+        <div id="heatmap" class="heatmap"></div>
+      </div>
+      <div class="heatmap-legend">
+        <span>Less</span>
+        <span class="hm-cell l0"></span>
+        <span class="hm-cell l1"></span>
+        <span class="hm-cell l2"></span>
+        <span class="hm-cell l3"></span>
+        <span class="hm-cell l4"></span>
+        <span>More</span>
+      </div>
     </div>
   </div>
 
@@ -667,6 +758,16 @@
       </div>
       <input class="number-input" type="number" id="numDailyGoal" data-key="dailyGoalMs" min="0" max="1440" step="30">
     </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-header-row">
+          <span>Weekly Goal</span>
+          <span class="help-icon">?<span class="tooltip">设定每周工作时长目标（周一至今同比）；<br>0 关闭目标提醒</span></span>
+        </div>
+        <div class="desc">hours (0 = disabled)</div>
+      </div>
+      <input class="number-input" type="number" id="numWeeklyGoal" data-key="weeklyGoalMs" min="0" max="168" step="1">
+    </div>
   </div>
 
   <!-- Actions -->
@@ -676,6 +777,8 @@
       <button class="btn btn-primary" id="btnNewPeriod">New Period</button>
       <button class="btn btn-secondary" id="btnExportCSV">Export CSV</button>
       <button class="btn btn-secondary" id="btnExportWeekly">Weekly Report</button>
+      <button class="btn btn-secondary" id="btnExportMonthly">Monthly Report</button>
+      <button class="btn btn-secondary" id="btnExportJson">Export JSON</button>
       <button class="btn btn-secondary" id="btnDiagnostic">Diagnostics</button>
       <button class="btn btn-danger" id="btnReset">Reset All</button>
     </div>
@@ -709,6 +812,7 @@
         document.getElementById('statTotal').textContent = formatDuration(data.totalMs);
         document.getElementById('statGlobalTotal').textContent = formatDuration(data.globalTotalMs || 0);
         document.getElementById('statSessions').textContent = String(data.sessionsCount);
+        document.getElementById('statStreak').textContent = String(data.streak ?? 0);
 
         const statusEl = document.getElementById('statStatus');
         if (data.globalDisabled) {
@@ -731,12 +835,35 @@
         setValue('numMaxSessions', data.maxSessions);
         setChecked('chkEfficiency', data.efficiencyEnabled);
         setValue('numDailyGoal', data.dailyGoalMs / 60000);
+        setValue('numWeeklyGoal', (data.weeklyGoalMs ?? 0) / 3600000);
+
+        // Weekly goal progress
+        const wgWrap = document.getElementById('weekGoalWrap');
+        if (wgWrap) {
+          if (data.weeklyGoalMs > 0) {
+            wgWrap.style.display = 'block';
+            const pct = Math.min((data.weekTotalMs / data.weeklyGoalMs) * 100, 100);
+            const bar = document.getElementById('weekGoalBar');
+            if (bar) bar.style.width = pct + '%';
+            const txt = document.getElementById('weekGoalText');
+            if (txt) txt.innerHTML = 'Weekly goal: <strong>' + formatDuration(data.weekTotalMs) + ' / ' + formatDuration(data.weeklyGoalMs) + '</strong>';
+          } else {
+            wgWrap.style.display = 'none';
+          }
+        }
 
         // Cross-Workspace列表
         renderWorkspaceList(data.workspaceList, data.workspaceCount);
 
         // 柱状图
         renderChart(data.dailyStats, data.weekTotalMs, data.weekEfficiency);
+
+        // 活动时间线热力图
+        renderHeatmap(data.heatmap);
+        const hr = document.getElementById('heatmapRange');
+        if (hr && data.heatmap && data.heatmap.length) {
+          hr.textContent = data.heatmap[0].dateStr + ' ~ ' + data.heatmap[data.heatmap.length - 1].dateStr;
+        }
 
         // 周范围副标题（自然周：本周一 ~ 今日）
         const wr = document.getElementById('weekRange');
@@ -908,6 +1035,23 @@
         return Math.max((totalMs / maxVal) * 100, 4);
       }
 
+      // ---- Heatmap rendering (Activity Timeline) ----
+      function renderHeatmap(days) {
+        const el = document.getElementById('heatmap');
+        if (!el) return;
+        if (!days || !days.length) { el.innerHTML = ''; return; }
+        // Group into 7-day "week" columns (Monday as first row)
+        const weeks = [];
+        for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+        el.innerHTML = weeks.map(week =>
+          '<div class="heatmap-week">' + week.map(d => {
+            const cls = 'hm-cell l' + d.level + (d.future ? ' future' : '');
+            const tip = d.future ? d.dateStr : (d.dateStr + ' · ' + formatDuration(d.totalMs));
+            return '<div class="' + cls + '" title="' + tip + '"></div>';
+          }).join('') + '</div>'
+        ).join('');
+      }
+
       // ---- 消息通信 ----
       window.addEventListener('message', event => {
         const msg = event.data;
@@ -958,6 +1102,16 @@
       document.getElementById('btnExportWeekly').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportWeeklyReport' });
         showToast('Weekly report export requested');
+      });
+
+      document.getElementById('btnExportMonthly').addEventListener('click', () => {
+        vscode.postMessage({ type: 'exportMonthlyReport' });
+        showToast('Monthly report export requested');
+      });
+
+      document.getElementById('btnExportJson').addEventListener('click', () => {
+        vscode.postMessage({ type: 'exportJson' });
+        showToast('JSON export requested');
       });
 
       // Language toggle

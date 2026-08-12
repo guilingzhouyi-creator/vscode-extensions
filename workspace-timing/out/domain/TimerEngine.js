@@ -96,6 +96,10 @@ class TimerEngine {
     replaceData(data) {
         this._data = { ...data };
     }
+    /** 更新连续打卡状态（持久化于 _data，随存盘落库） */
+    setStreak(streak) {
+        this._data.streak = streak;
+    }
     /** 重置所有计时数据 */
     reset() {
         this._data = (0, models_1.createEmptyTimingData)();

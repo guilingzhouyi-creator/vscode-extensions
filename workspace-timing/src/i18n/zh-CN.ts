@@ -69,6 +69,8 @@ const zhCN: I18nStrings = {
     'toast.diagnosticExported': '诊断报告已导出: {0}',
     'toast.exportFailed': '导出失败',
     'toast.goalReached': '🎯 今日目标达成！{0}h {1}m',
+    'toast.streak': '🔥 连续打卡 {0} 天！',
+    'toast.autoExported': '已自动导出: {0}',
 
     'confirm.newPeriod': '确定要新建计时周期？累计时长将归零，历史记录保留。',
     'confirm.newPeriod.title': '确认新建',

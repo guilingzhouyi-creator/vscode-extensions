@@ -53,5 +53,7 @@ exports.DEFAULT_CONFIG = {
     activityTrackingEnabled: true,
     idleTimeoutMs: exports.DEFAULT_IDLE_TIMEOUT_MS,
     dailyGoalMs: exports.DEFAULT_DAILY_GOAL_MS,
+    weeklyGoalMs: 0,
+    autoExport: { enabled: false, intervalMinutes: 60, format: 'weekly', targetPath: '' },
 };
 //# sourceMappingURL=models.js.map

@@ -119,6 +119,26 @@ class SessionManager {
         this.ensureFinishedCache();
         return TimeAggregator_1.TimeAggregator.lastWeekMsFromFinished(this._finishedByDate);
     }
+    /** 获取本月累计时长 (ms) — 复用已结束会话缓存 */
+    getThisMonthMs() {
+        this.ensureFinishedCache();
+        return TimeAggregator_1.TimeAggregator.thisMonthMsFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs);
+    }
+    /** 获取上一自然月累计时长 (ms) — 复用已结束会话缓存 */
+    getLastMonthMs() {
+        this.ensureFinishedCache();
+        return TimeAggregator_1.TimeAggregator.lastMonthMsFromFinished(this._finishedByDate);
+    }
+    /** 获取自然月每日明细（本月 1 号起；fullMonth=true 含至月末）— 复用已结束会话缓存 */
+    getMonthDailyStats(fullMonth = false) {
+        this.ensureFinishedCache();
+        return TimeAggregator_1.TimeAggregator.monthDailyFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs, fullMonth);
+    }
+    /** 活动时间线热力图（近 weeks 周，含本周）— 复用已结束会话缓存 */
+    getHeatmap(weeks = 12) {
+        this.ensureFinishedCache();
+        return TimeAggregator_1.TimeAggregator.heatmapDays(this._finishedByDate, this.timer.data.currentSessionStartMs, weeks);
+    }
     /**
      * 仅保存当前状态（不结束会话）
      * 由 Scheduler 周期性调用。

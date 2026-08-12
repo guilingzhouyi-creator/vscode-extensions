@@ -15,7 +15,7 @@
  *     避免每次刷新重复 O(n) 扫描。
  */
 import { TimeSession } from './models';
-import { DailyChartEntry } from './dashboard-types';
+import { DailyChartEntry, HeatmapDay } from './dashboard-types';
 /**
  * 获取本地时区的日期字符串 (YYYY-MM-DD)
  * 禁止使用 toISOString() — 它返回 UTC，在中国 (UTC+8) 早上 8 点前会错位一天
@@ -63,6 +63,24 @@ export declare class TimeAggregator {
     static lastWeekMs(sessions: TimeSession[]): number;
     /** 基于已结束会话分桶结果计算上一自然周累计（供缓存层复用） */
     static lastWeekMsFromFinished(finishedByDate: Map<string, number>): number;
+    /**
+     * 本月累计时长 (ms) — 本月 1 号 00:00 → 此刻（复用已结束会话分桶缓存）
+     */
+    static thisMonthMsFromFinished(finishedByDate: Map<string, number>, currentSessionStartMs: number): number;
+    /** 上一自然月累计时长 (ms)（复用已结束会话分桶缓存） */
+    static lastMonthMsFromFinished(finishedByDate: Map<string, number>): number;
+    /**
+     * 自然月每日明细（用于「月报」面板与导出）。
+     * - fullMonth=false（默认）：本月 1 号 → 今日（本月至今）。
+     * - fullMonth=true：本月 1 号 → 本月最后一天（未来天时长 0）。
+     */
+    static monthDailyFromFinished(finishedByDate: Map<string, number>, currentSessionStartMs: number, fullMonth?: boolean): DailyChartEntry[];
+    /**
+     * 活动时间线热力图：返回以「今日所在周」结尾的 weeks 个完整自然周（含本周）的按日格子。
+     * 网格按「周一为每周首行」排布，共 weeks×7 个格子；当前周尚未到达的天标记为 future。
+     * 复用已结束会话分桶结果，活跃会话仅叠加到今日格，零额外采集成本。
+     */
+    static heatmapDays(finishedByDate: Map<string, number>, currentSessionStartMs: number, weeks?: number): HeatmapDay[];
     /**
      * 格式化毫秒为人类可读字符串
      * @example formatDuration(3661000) => "1h 1m 1s"

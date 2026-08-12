@@ -80,6 +80,8 @@ export interface I18nStrings {
     'toast.diagnosticExported': string;
     'toast.exportFailed': string;
     'toast.goalReached': string;
+    'toast.streak': string;
+    'toast.autoExported': string;
 
     // 确认弹窗
     'confirm.newPeriod': string;

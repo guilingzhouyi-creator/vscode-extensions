@@ -45,6 +45,11 @@ export declare class TimerEngine {
     snapshot(): TimerSnapshot;
     /** 替换内部数据（用于崩溃恢复后加载） */
     replaceData(data: WorkspaceTimingData): void;
+    /** 更新连续打卡状态（持久化于 _data，随存盘落库） */
+    setStreak(streak: {
+        dateStr: string;
+        count: number;
+    } | undefined): void;
     /** 重置所有计时数据 */
     reset(): void;
     /** 裁剪会话列表到最大数量 */

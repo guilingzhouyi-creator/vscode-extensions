@@ -62,6 +62,8 @@ const en = {
     'toast.diagnosticExported': 'Diagnostic report exported: {0}',
     'toast.exportFailed': 'Export failed',
     'toast.goalReached': '🎯 Daily goal reached! {0}h {1}m',
+    'toast.streak': '🔥 {0}-day streak!',
+    'toast.autoExported': 'Auto-exported: {0}',
     'confirm.newPeriod': 'Start a new counting period? The counter will reset to zero, but history will be preserved.',
     'confirm.newPeriod.title': 'Confirm New Period',
     'confirm.reset': 'Reset all timing data? This action cannot be undone!',

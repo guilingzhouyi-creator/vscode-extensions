@@ -118,6 +118,11 @@ export class TimerEngine {
         this._data = { ...data };
     }
 
+    /** 更新连续打卡状态（持久化于 _data，随存盘落库） */
+    setStreak(streak: { dateStr: string; count: number } | undefined): void {
+        this._data.streak = streak;
+    }
+
     /** 重置所有计时数据 */
     reset(): void {
         this._data = createEmptyTimingData();

@@ -31,6 +31,9 @@ import { ActivityTracker } from './application/ActivityTracker';
 import { IdleDetector } from './application/IdleDetector';
 import { CsvExporter } from './application/exporters/CsvExporter';
 import { WeeklyReportExporter } from './application/exporters/WeeklyReportExporter';
+import { PeriodReportExporter, PeriodKind } from './application/exporters/PeriodReportExporter';
+import { JsonExporter } from './application/exporters/JsonExporter';
+import * as path from 'path';
 
 // Presentation
 import { StatusBarController } from './presentation/StatusBarController';
@@ -148,12 +151,49 @@ export function activate(context: vscode.ExtensionContext): void {
                 }
             });
 
+            // ★ 连续打卡里程碑通知（达成每日目标且连续天数更新时）
+            orchestrator.onStreakMilestone((count) => {
+                vscode.window.showInformationMessage(
+                    format(t()['toast.streak'], String(count)));
+            });
+
+            // ★ 定时自动导出：由全量存盘周期驱动 maybeAutoExport，回调内执行实际写盘
+            orchestrator.onAutoExport((cfg) => {
+                (async () => {
+                    if (!orchestrator) return;
+                    const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+                    let content = '';
+                    let ext = 'txt';
+                    if (cfg.format === 'csv') {
+                        content = new CsvExporter().exportDashboard(await orchestrator.getDashboardData(), wsName);
+                        ext = 'csv';
+                    } else if (cfg.format === 'json') {
+                        content = new JsonExporter().exportBundle(await orchestrator.buildExportBundle(wsName));
+                        ext = 'json';
+                    } else if (cfg.format === 'monthly') {
+                        content = new PeriodReportExporter().generate(await orchestrator.buildPeriodReport(wsName, 'month' as PeriodKind));
+                        ext = 'md';
+                    } else {
+                        content = new PeriodReportExporter().generate(await orchestrator.buildPeriodReport(wsName, 'week' as PeriodKind));
+                        ext = 'md';
+                    }
+                    const dir = cfg.targetPath
+                        || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+                        || '.';
+                    const fileName = `${wsName}-auto-${new Date().toISOString().slice(0, 10)}.${ext}`;
+                    const uri = vscode.Uri.file(path.join(dir, fileName));
+                    await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf-8'));
+                    vscode.window.showInformationMessage(format(t()['toast.autoExported'], uri.fsPath));
+                })().catch(err => log(LogLevel.Error, 'auto export failed', err as Error));
+            });
+
             // ★ 每次全量存盘后同步跨工作区全局累计
             scheduler.onFullSave(async () => {
                 const snap = orchestrator?.session.snapshot;
                 if (snap) {
                     await globalAggregator.sync(snap.currentTotalMs);
                 }
+                await orchestrator?.maybeAutoExport();
             });
 
             // Dashboard 面板消息路由
@@ -174,6 +214,7 @@ export function activate(context: vscode.ExtensionContext): void {
                             storage?.deleteAll();
                             globalStorage?.delete();
                             statusBar?.updateTime(0, 0);
+                            orchestrator?.clearStreak().catch(() => { /* no-op */ });
                             vscode.window.showInformationMessage(t()['toast.reset']);
                         }).catch(err =>
                             log(LogLevel.Error, 'reset failed', err as Error)
@@ -210,6 +251,38 @@ export function activate(context: vscode.ExtensionContext): void {
                                 vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
                             }
                         })().catch(err => log(LogLevel.Error, 'Weekly report export failed', err as Error));
+                        break;
+                    case 'exportMonthlyReport':
+                        (async () => {
+                            if (!orchestrator) return;
+                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+                            const input = await orchestrator.buildPeriodReport(wsName, 'month');
+                            const md = new PeriodReportExporter().generate(input);
+                            const uri = await vscode.window.showSaveDialog({
+                                defaultUri: vscode.Uri.file(`${wsName}-monthly-report.md`),
+                                filters: { 'Markdown Files': ['md'] },
+                            });
+                            if (uri) {
+                                await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf-8'));
+                                vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
+                            }
+                        })().catch(err => log(LogLevel.Error, 'Monthly report export failed', err as Error));
+                        break;
+                    case 'exportJson':
+                        (async () => {
+                            if (!orchestrator) return;
+                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+                            const bundle = await orchestrator.buildExportBundle(wsName);
+                            const json = new JsonExporter().exportBundle(bundle);
+                            const uri = await vscode.window.showSaveDialog({
+                                defaultUri: vscode.Uri.file(`${wsName}-timing.json`),
+                                filters: { 'JSON Files': ['json'] },
+                            });
+                            if (uri) {
+                                await vscode.workspace.fs.writeFile(uri, Buffer.from(json, 'utf-8'));
+                                vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
+                            }
+                        })().catch(err => log(LogLevel.Error, 'JSON export failed', err as Error));
                         break;
                     case 'exportDiagnostic':
                         (async () => {
