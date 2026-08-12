@@ -120,6 +120,41 @@
       margin-top: 2px;
     }
 
+    /* Collapsible cross-workspace panel */
+    .collapsible-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .collapsible-header .collapse-arrow {
+      font-size: 12px;
+      line-height: 1;
+      transition: transform 0.15s ease;
+    }
+    .section.collapsed .collapsible-header .collapse-arrow {
+      transform: rotate(-90deg);
+    }
+    .section.collapsed .collapsible-body {
+      display: none;
+    }
+    .global-more-row {
+      text-align: right;
+      margin-top: 4px;
+    }
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--btn-bg);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 0;
+    }
+    .link-btn:hover {
+      text-decoration: underline;
+    }
+
     /* Toggle switch */
     .toggle {
       position: relative;
@@ -465,9 +500,14 @@
 
   <!-- Cross-Workspace -->
   <div class="section" id="globalSection">
-    <h2>🌐 Cross-Workspace</h2>
-    <div id="workspaceList" style="margin-bottom:8px">
-      <div class="chart-empty" id="globalEmpty">No other workspace data</div>
+    <h2 class="collapsible-header" id="globalHeader">
+      <span>🌐 Cross-Workspace</span>
+      <span class="collapse-arrow">▾</span>
+    </h2>
+    <div class="collapsible-body" id="globalBody">
+      <div id="workspaceList" style="margin-bottom:8px">
+        <div class="chart-empty" id="globalEmpty">No other workspace data</div>
+      </div>
     </div>
   </div>
 
@@ -714,26 +754,51 @@
         return sec + 's';
       }
 
-      // ---- Cross-Workspace列表渲染 ----
+      // ---- Cross-Workspace list rendering (Top N + expand all) ----
+      let _globalListExpanded = false;
+      let _lastWorkspaces = null;
+      let _lastWorkspaceCount = 0;
+
       function renderWorkspaceList(workspaces, count) {
+        _lastWorkspaces = workspaces;
+        _lastWorkspaceCount = count;
         const container = document.getElementById('workspaceList');
-        const emptyEl = document.getElementById('globalEmpty');
 
         if (!workspaces || workspaces.length <= 1) {
           container.innerHTML = '<div class="chart-empty">No other workspace data</div>';
           return;
         }
 
+        const TOP_N = 10;
+        const total = workspaces.length;
+        const showAll = _globalListExpanded || total <= TOP_N;
+        const visible = showAll ? workspaces : workspaces.slice(0, TOP_N);
+
         let html = '';
-        for (const ws of workspaces) {
+        for (const ws of visible) {
           html += '<div class="setting-row">' +
-            '<div class="setting-label">' +
-            '<div>' + escapeHtml(ws.name) + '</div>' +
-            '</div>' +
+            '<div class="setting-label"><div>' + escapeHtml(ws.name) + '</div></div>' +
             '<div style="font-family:monospace;font-size:12px">' + formatDuration(ws.totalMs) + '</div>' +
             '</div>';
         }
+
+        if (total > TOP_N) {
+          if (showAll) {
+            html += '<div class="global-more-row"><button class="link-btn" id="globalExpandBtn">Collapse</button></div>';
+          } else {
+            html += '<div class="global-more-row"><button class="link-btn" id="globalExpandBtn">Expand all (' + total + ')</button></div>';
+          }
+        }
+
         container.innerHTML = html;
+
+        const btn = document.getElementById('globalExpandBtn');
+        if (btn) {
+          btn.addEventListener('click', () => {
+            _globalListExpanded = !_globalListExpanded;
+            renderWorkspaceList(_lastWorkspaces, _lastWorkspaceCount);
+          });
+        }
       }
 
       function escapeHtml(str) {
@@ -886,6 +951,20 @@
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 2000);
       }
+
+      // ---- Cross-workspace panel collapse-state memory ----
+      (function initGlobalCollapse() {
+        const header = document.getElementById('globalHeader');
+        const section = document.getElementById('globalSection');
+        if (!header || !section) return;
+        if (localStorage.getItem('wt-global-collapsed') === '1') {
+          section.classList.add('collapsed');
+        }
+        header.addEventListener('click', () => {
+          const collapsed = section.classList.toggle('collapsed');
+          localStorage.setItem('wt-global-collapsed', collapsed ? '1' : '0');
+        });
+      })();
     })();
   </script>
 </body>

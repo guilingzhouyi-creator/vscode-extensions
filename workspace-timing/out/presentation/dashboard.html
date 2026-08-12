@@ -120,6 +120,41 @@
       margin-top: 2px;
     }
 
+    /* 跨工作区面板可折叠 */
+    .collapsible-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .collapsible-header .collapse-arrow {
+      font-size: 12px;
+      line-height: 1;
+      transition: transform 0.15s ease;
+    }
+    .section.collapsed .collapsible-header .collapse-arrow {
+      transform: rotate(-90deg);
+    }
+    .section.collapsed .collapsible-body {
+      display: none;
+    }
+    .global-more-row {
+      text-align: right;
+      margin-top: 4px;
+    }
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--btn-bg);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 0;
+    }
+    .link-btn:hover {
+      text-decoration: underline;
+    }
+
     /* Toggle switch */
     .toggle {
       position: relative;
@@ -465,9 +500,14 @@
 
   <!-- 跨工作区 -->
   <div class="section" id="globalSection">
-    <h2>🌐 跨工作区</h2>
-    <div id="workspaceList" style="margin-bottom:8px">
-      <div class="chart-empty" id="globalEmpty">暂无其他工作区数据</div>
+    <h2 class="collapsible-header" id="globalHeader">
+      <span>🌐 跨工作区</span>
+      <span class="collapse-arrow">▾</span>
+    </h2>
+    <div class="collapsible-body" id="globalBody">
+      <div id="workspaceList" style="margin-bottom:8px">
+        <div class="chart-empty" id="globalEmpty">暂无其他工作区数据</div>
+      </div>
     </div>
   </div>
 
@@ -728,26 +768,51 @@
         return sec + 's';
       }
 
-      // ---- 跨工作区列表渲染 ----
+      // ---- 跨工作区列表渲染（支持 Top N + 展开全部）----
+      let _globalListExpanded = false;
+      let _lastWorkspaces = null;
+      let _lastWorkspaceCount = 0;
+
       function renderWorkspaceList(workspaces, count) {
+        _lastWorkspaces = workspaces;
+        _lastWorkspaceCount = count;
         const container = document.getElementById('workspaceList');
-        const emptyEl = document.getElementById('globalEmpty');
 
         if (!workspaces || workspaces.length <= 1) {
           container.innerHTML = '<div class="chart-empty">暂无其他工作区数据</div>';
           return;
         }
 
+        const TOP_N = 10;
+        const total = workspaces.length;
+        const showAll = _globalListExpanded || total <= TOP_N;
+        const visible = showAll ? workspaces : workspaces.slice(0, TOP_N);
+
         let html = '';
-        for (const ws of workspaces) {
+        for (const ws of visible) {
           html += '<div class="setting-row">' +
-            '<div class="setting-label">' +
-            '<div>' + escapeHtml(ws.name) + '</div>' +
-            '</div>' +
+            '<div class="setting-label"><div>' + escapeHtml(ws.name) + '</div></div>' +
             '<div style="font-family:monospace;font-size:12px">' + formatDuration(ws.totalMs) + '</div>' +
             '</div>';
         }
+
+        if (total > TOP_N) {
+          if (showAll) {
+            html += '<div class="global-more-row"><button class="link-btn" id="globalExpandBtn">收起</button></div>';
+          } else {
+            html += '<div class="global-more-row"><button class="link-btn" id="globalExpandBtn">展开全部（' + total + '）</button></div>';
+          }
+        }
+
         container.innerHTML = html;
+
+        const btn = document.getElementById('globalExpandBtn');
+        if (btn) {
+          btn.addEventListener('click', () => {
+            _globalListExpanded = !_globalListExpanded;
+            renderWorkspaceList(_lastWorkspaces, _lastWorkspaceCount);
+          });
+        }
       }
 
       function escapeHtml(str) {
@@ -903,6 +968,20 @@
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 2000);
       }
+
+      // ---- 跨工作区面板折叠状态记忆 ----
+      (function initGlobalCollapse() {
+        const header = document.getElementById('globalHeader');
+        const section = document.getElementById('globalSection');
+        if (!header || !section) return;
+        if (localStorage.getItem('wt-global-collapsed') === '1') {
+          section.classList.add('collapsed');
+        }
+        header.addEventListener('click', () => {
+          const collapsed = section.classList.toggle('collapsed');
+          localStorage.setItem('wt-global-collapsed', collapsed ? '1' : '0');
+        });
+      })();
     })();
   </script>
 </body>
