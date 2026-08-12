@@ -104,6 +104,12 @@
       margin-bottom: 8px;
     }
 
+    .week-eff-note {
+      font-size: 11px;
+      color: var(--description);
+      margin-top: 2px;
+    }
+
     .setting-row {
       display: flex;
       justify-content: space-between;
@@ -502,6 +508,7 @@
       <div id="chartBars" class="chart-bars" style="display:none"></div>
       <div id="weekTotal" class="week-total" style="display:none"></div>
       <div id="weekEfficiency" class="week-total" style="display:none;color:var(--success)"></div>
+      <div class="week-eff-note">Efficiency reflects edit activity in the current session; resets after restart</div>
     </div>
   </div>
 
@@ -743,7 +750,7 @@
         const weekEffEl = document.getElementById('weekEfficiency');
         if (data.weekEfficiency !== undefined && data.weekEfficiency !== null) {
           weekEffEl.style.display = 'block';
-          weekEffEl.innerHTML = 'Week效率：<strong>' + (data.weekEfficiency * 100).toFixed(0) + '%</strong>';
+          weekEffEl.innerHTML = 'Week efficiency: <strong>' + (data.weekEfficiency * 100).toFixed(0) + '%</strong>';
         } else {
           weekEffEl.style.display = 'none';
         }
