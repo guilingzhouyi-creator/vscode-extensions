@@ -1,0 +1,188 @@
+# =============================================================================
+# Release — 自动识别版本提交 → 打 Tag → 构建打包 → 创建 GitHub Release
+# -----------------------------------------------------------------------------
+# 标签命名规则：  vMAJOR.MINOR.PATCH  （语义化版本，小写 v 前缀，如 v0.3.8）
+#                版本号取自「提交信息前缀」或 workflow_dispatch 手动输入。
+#
+# 触发条件（全部满足才进入发布）：
+#   1) 事件：push 到 RELEASE_BRANCH（默认 main）
+#       或   手动 workflow_dispatch（可填 version，如 0.4.0）
+#   2) 路径：本次变更触及 EXT_DIR/**  （默认 workspace-timing/**）
+#   3) 提交信息匹配 ^v\d+\.\d+\.\d+  （沿用仓库既有规范 "vX.Y.Z — 标题 | 英文副标题"）
+#       或   workflow_dispatch 显式提供了 version
+#   4) 目标 Tag 在远端尚不存在（幂等，重复推送不重复发布）
+#
+# 防误触发：以上四重门控叠加。常规提交（如 "fix: typo"、普通 PR 合并、
+#           仅改根 README）不会满足 (3)，流水线会在「解析版本」步骤安全跳过，
+#           不会打 Tag、不会建 Release。
+#
+# 推荐流程：在 fix/* 分支完成开发 → 以 squash-merge 合入 main，
+#           且 PR 的提交信息以版本号开头（例如 "v0.4.0 — ..."），
+#           合入即触发本流水线自动发布。
+#
+# 打包产物类型及输出存储位置：
+#   - 主产物：workspace-timing-<version>.vsix  （VS Code 扩展安装包）
+#       · 作为 GitHub Release（tag v<version>）的附件
+#       · 同时上传到 Actions Artifacts（保留 90 天，便于回溯）
+#   - 副产物：out/ 构建目录压缩包（同名 artifact）
+#
+# 注意：本流水线仅产出可发布产物，不会自动上架 VS Code Marketplace
+#       （上架需发布者 PAT，可后续在 release 步骤追加 vsce publish）。
+# =============================================================================
+name: Release (auto-tag & package)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workspace-timing/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without leading "v", e.g. 0.4.0. Leave empty to read from the commit message.'
+        required: false
+
+permissions:
+  contents: write   # 用于推送 Tag 与创建 GitHub Release
+
+env:
+  RELEASE_BRANCH: main
+  EXT_DIR: workspace-timing
+
+jobs:
+  release:
+    name: Tag, build & publish
+    runs-on: ubuntu-latest
+    steps:
+      # -----------------------------------------------------------------------
+      # 1) 检出（fetch-depth: 0 以便 git 历史/打 Tag 操作；保留凭据用于后续 push）
+      # -----------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # 2) 解析版本：来自 workflow_dispatch 输入 或 提交信息前缀 ^vX.Y.Z
+      #    不满足则输出 skip=true 并安全退出（整条发布链路被门控跳过）
+      # -----------------------------------------------------------------------
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          MSG="${{ github.event.head_commit.message }}"
+          INPUT="${{ github.event.inputs.version }}"
+          VERSION=""
+          if [[ -n "$INPUT" ]]; then
+            VERSION="${INPUT#v}"
+          elif [[ "$MSG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+          fi
+          if [[ -z "$VERSION" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::No version detected (commit='${MSG}', no dispatch version) → skipping release."
+            exit 0
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved release version: v$VERSION"
+
+      # -----------------------------------------------------------------------
+      # 3) 防重复：远端已存在该 Tag 则跳过（幂等保护）
+      # -----------------------------------------------------------------------
+      - name: Check tag existence
+        id: tagcheck
+        if: steps.version.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          if git ls-remote --tags --exit-code origin "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Tag $TAG already exists on remote → skipping to avoid duplicate release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 4) 构建环境
+      # -----------------------------------------------------------------------
+      - name: Setup Node.js
+        if: steps.version.outputs.skip != 'true' && steps.tagcheck.outputs.exists != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: workspace-timing/package-lock.json
+
+      - name: Install dependencies
+        if: steps.version.outputs.skip != 'true' && steps.tagcheck.outputs.exists != 'true'
+        working-directory: ${{ env.EXT_DIR }}
+        run: npm ci
+
+      # -----------------------------------------------------------------------
+      # 5) 构建并打包 VSIX（vscode:prepublish 会重新 compile + copy-assets）
+      # -----------------------------------------------------------------------
+      - name: Build & package VSIX
+        id: package
+        if: steps.version.outputs.skip != 'true' && steps.tagcheck.outputs.exists != 'true'
+        working-directory: ${{ env.EXT_DIR }}
+        run: |
+          set -euo pipefail
+          npm run compile
+          npm run copy-assets
+          npx --yes @vscode/vsce package
+          VSIX_NAME=$(ls workspace-timing-*.vsix | head -n1)
+          echo "vsix=$PWD/$VSIX_NAME" >> "$GITHUB_OUTPUT"
+          echo "Built artifact: $VSIX_NAME"
+
+      # -----------------------------------------------------------------------
+      # 6) 打 annotated Tag 并推送到远端
+      # -----------------------------------------------------------------------
+      - name: Create git tag
+        if: steps.version.outputs.skip != 'true' && steps.tagcheck.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      # -----------------------------------------------------------------------
+      # 7) 创建 GitHub Release 并附加 VSIX（使用默认 GITHUB_TOKEN）
+      # -----------------------------------------------------------------------
+      - name: Create GitHub Release
+        if: steps.version.outputs.skip != 'true' && steps.tagcheck.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          VSIX="${{ steps.package.outputs.vsix }}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "Automated release **$TAG** for \`workspace-timing\`.
+
+          - Built from: \`${{ github.sha }}\`
+          - Artifact: \`$(basename "$VSIX")\`
+
+          See \`workspace-timing/CHANGELOG.md\` for the change details." \
+            "$VSIX"
+
+      # -----------------------------------------------------------------------
+      # 8) 上传构建产物到 Actions Artifacts（VSIX + out/ 压缩包，保留 90 天）
+      # -----------------------------------------------------------------------
+      - name: Upload artifacts
+        if: steps.version.outputs.skip != 'true' && steps.tagcheck.outputs.exists != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-timing-${{ steps.version.outputs.version }}
+          path: |
+            workspace-timing/*.vsix
+            workspace-timing/out/
+          retention-days: 90

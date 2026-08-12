@@ -1,0 +1,50 @@
+# =============================================================================
+# CI — 构建校验流水线（仅校验，永不打 Tag / 永不发布）
+# -----------------------------------------------------------------------------
+# 触发：任意分支 push 或 PR，只要改动落在 workspace-timing/ 下。
+# 作用：保证代码可编译、可打包，给开发者快速反馈。
+# 设计要点：本流水线不解析版本、不创建 Tag、不创建 Release，
+#           因此「常规提交」只过一道构建检查，绝不会误触发发布。
+# =============================================================================
+name: CI
+
+on:
+  push:
+    paths:
+      - 'workspace-timing/**'
+  pull_request:
+    paths:
+      - 'workspace-timing/**'
+
+jobs:
+  build-check:
+    name: Build & package check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workspace-timing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: workspace-timing/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Copy web assets
+        run: npm run copy-assets
+
+      - name: Package (verify only, not published)
+        run: npx --yes @vscode/vsce package --allow-missing-repository
