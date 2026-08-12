@@ -61,32 +61,57 @@ export class StorageCoordinator {
             log(LogLevel.Info, `StorageCoordinator: loaded from ${source}, totalMs=${data.totalMs}`);
         }
 
-        // Step 2: 回放 journal
+        const hadActiveBoundary = data.currentSessionStartMs > 0;
+
+        // Step 2: 回放 journal —— 仅当「无活跃会话边界」时作为兜底。
+        //   若存在边界，活跃会话将由 Step 3 完整收尾，journal 不再 replay，避免重复计。
         const journalExists = await this.journal.exists();
         if (journalExists) {
             const slices = await this.journal.readJournal();
             if (slices.length > 0) {
-                const journalDelta = slices.reduce((sum, s) => sum + s.deltaMs, 0);
-                data.totalMs += journalDelta;
-                log(LogLevel.Info,
-                    `StorageCoordinator: replayed ${slices.length} journal entries, +${journalDelta}ms`);
+                if (!hadActiveBoundary) {
+                    const journalDelta = slices.reduce((sum, s) => sum + s.deltaMs, 0);
+                    data.totalMs += journalDelta;
+                    // ★ 兜底：把 journal 跨度合成为一条 finished 会话，
+                    //   保证该时段时长能归并到正确自然日（而非仅膨胀 totalMs）。
+                    const first = slices[0];
+                    const last = slices[slices.length - 1];
+                    data.sessions.push({
+                        startMs: first.timestamp - first.deltaMs,
+                        endMs: last.timestamp,
+                        durationMs: journalDelta,
+                    });
+                    log(LogLevel.Info,
+                        `StorageCoordinator: replayed ${slices.length} journal entries, +${journalDelta}ms (synthesized session)`);
+                } else {
+                    log(LogLevel.Debug,
+                        `StorageCoordinator: active boundary present, skipping journal replay (avoid double-count)`);
+                }
             }
             await this.journal.truncate();
         }
 
-        // Step 3: 补偿未完成会话
-        if (data.currentSessionStartMs > 0) {
+        // Step 3: 活跃会话收尾（边界优先）
+        //   将进行中会话收尾为 finished TimeSession 并入 sessions[] 与 totalMs，
+        //   使「会话数」与「日报/周报按日归并」在重载后即可正确反映昨日/跨天时长。
+        //   最多补偿 24h，防止异常数据导致计时暴涨。
+        if (hadActiveBoundary) {
             const now = Date.now();
             const elapsed = now - data.currentSessionStartMs;
-            if (elapsed > 0 && elapsed < MS_PER_DAY) { // 最多补偿 24h，防止异常
+            if (elapsed > 0 && elapsed < MS_PER_DAY) {
                 data.totalMs += elapsed;
+                data.sessions.push({
+                    startMs: data.currentSessionStartMs,
+                    endMs: now,
+                    durationMs: elapsed,
+                });
                 log(LogLevel.Info,
-                    `StorageCoordinator: compensated unfinished session: +${elapsed}ms`);
+                    `StorageCoordinator: closed unfinished session: +${elapsed}ms`);
             }
+            // 收尾后清除活跃边界（新会话由 startSession → timer.start() 重新开启）
+            data.currentSessionStartMs = 0;
         }
 
-        // 重置会话状态
-        data.currentSessionStartMs = 0;
         data.lastSavedAtMs = Date.now();
         data.version = LATEST_VERSION;
 

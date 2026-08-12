@@ -18,6 +18,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimeAggregator = void 0;
 exports.localDateStr = localDateStr;
+exports.nextMidnightMs = nextMidnightMs;
 exports.finishedSessionsByDate = finishedSessionsByDate;
 const models_1 = require("./models");
 /**
@@ -31,6 +32,10 @@ function localDateStr(d) {
 function startOfDayMs(ts) {
     const d = new Date(ts);
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+/** 取某时间戳之后「下一个」本地 00:00:00 时间戳（供午夜切分定位边界） */
+function nextMidnightMs(ts) {
+    return startOfDayMs(ts) + models_1.MS_PER_DAY;
 }
 /** 取本周一 00:00:00 本地时间戳 */
 function startOfMondayMs() {

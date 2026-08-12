@@ -7,7 +7,7 @@
 
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
 import { WorkspaceTimingData, DEFAULT_MAX_SESSIONS } from '../domain/models';
-import { TimeAggregator, finishedSessionsByDate } from '../domain/TimeAggregator';
+import { TimeAggregator, finishedSessionsByDate, nextMidnightMs } from '../domain/TimeAggregator';
 import { DailyChartEntry } from '../domain/dashboard-types';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
@@ -73,6 +73,15 @@ export class SessionManager {
         // 3. 开始计时
         this.timer.start();
         this._sessionActive = true;
+
+        // ★ 立即持久化进行中会话的起始边界（currentSessionStartMs）。
+        //   即便在首个全量存盘（60s）前崩溃，recover() 也能凭此边界把会话收尾为
+        //   finished TimeSession，而非依赖 journal 近似，从而避免「会话数归零 / 昨日时长丢失」。
+        try {
+            await this.saveCheckpoint();
+        } catch (err) {
+            log(LogLevel.Warn, 'SessionManager: initial boundary save failed', err as Error);
+        }
 
         log(LogLevel.Info, `SessionManager: session started, base totalMs=${data.totalMs}`);
         return data;
@@ -146,20 +155,22 @@ export class SessionManager {
      * 仅保存当前状态（不结束会话）
      * 由 Scheduler 周期性调用。
      *
-     * ⚠️ 必须创建数据副本，不能修改计时器内部 totalMs，
-     *    否则会与 stop() 中的累加逻辑产生重复计时。
+     * ★ 设计约定（与 0.1.x 的零边界方案相反，但消除了重复计与归属丢失）：
+     *   - totalMs 始终等于「已结束会话」的累加和（权威源），此处不做任何折叠；
+     *   - currentSessionStartMs 原样保留，使进行中会话的真实起始日存续到磁盘；
+     *   - 进行中会话由 TimeAggregator 在今日/本周交集计算时叠加，
+     *     并由 recover() 在重载时收尾为 finished TimeSession。
+     *   这样既不会与 recover 的边界补偿重复计（边界优先于 journal），
+     *   又保证日报/周报能按真实自然日归并（含跨午夜自动切分）。
      */
     async saveCheckpoint(): Promise<void> {
-        const snap = this.timer.snapshot();
+        // 跨午夜则先把进行中会话切分为当日独立段，使 sessions[] 含按日粒度记录
+        this.splitActiveSessionAtMidnight();
 
         const data: WorkspaceTimingData = {
             ...this.timer.data,
-            totalMs: snap.currentTotalMs,
             lastSavedAtMs: Date.now(),
-            // ★ 置零 currentSessionStartMs，防止崩溃恢复时 Step 3 重复补偿
-            //    totalMs 已包含截至此刻的会话时长，journal 覆盖增量间隙，
-            //    再次补偿会导致计时翻倍
-            currentSessionStartMs: 0,
+            // 创建数据副本，避免与计时器内部引用共享（stop() 累加逻辑据此独立）
             sessions: [...this.timer.data.sessions],
         };
 
@@ -170,7 +181,32 @@ export class SessionManager {
         //    崩溃恢复时 replay 不会重复计入已持久化的时长
         await this.journal.truncate();
 
-        log(LogLevel.Debug, `SessionManager: checkpoint saved, totalMs=${snap.currentTotalMs}`);
+        log(LogLevel.Debug,
+            `SessionManager: checkpoint saved, totalMs=${data.totalMs}, activeStart=${data.currentSessionStartMs}`);
+    }
+
+    /**
+     * 若进行中会话跨越了自然日 00:00，则在午夜边界处将其切分为两段。
+     * 供 saveCheckpoint 周期调用，确保每一个自然日都拥有独立 finished TimeSession，
+     * 使日报/周报的每日柱子能精确反映当天时长。
+     */
+    private splitActiveSessionAtMidnight(): void {
+        if (!this._sessionActive) return;
+        const start = this.timer.data.currentSessionStartMs;
+        if (start <= 0) return;
+
+        const now = Date.now();
+        let boundary = nextMidnightMs(start);
+        let guard = 0;
+        while (boundary < now && guard++ < 400) {
+            this.timer.splitAt(boundary);
+            // splitAt 已把 currentSessionStartMs 推进到 boundary，继续向后找下一个午夜
+            boundary = nextMidnightMs(boundary);
+        }
+
+        if (guard > 0) {
+            this.invalidateFinishedCache();
+        }
     }
 
     // ─── 已结束会话缓存 ────────────────────────────────

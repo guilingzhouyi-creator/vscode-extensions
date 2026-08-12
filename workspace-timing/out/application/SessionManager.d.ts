@@ -54,10 +54,21 @@ export declare class SessionManager {
      * 仅保存当前状态（不结束会话）
      * 由 Scheduler 周期性调用。
      *
-     * ⚠️ 必须创建数据副本，不能修改计时器内部 totalMs，
-     *    否则会与 stop() 中的累加逻辑产生重复计时。
+     * ★ 设计约定（与 0.1.x 的零边界方案相反，但消除了重复计与归属丢失）：
+     *   - totalMs 始终等于「已结束会话」的累加和（权威源），此处不做任何折叠；
+     *   - currentSessionStartMs 原样保留，使进行中会话的真实起始日存续到磁盘；
+     *   - 进行中会话由 TimeAggregator 在今日/本周交集计算时叠加，
+     *     并由 recover() 在重载时收尾为 finished TimeSession。
+     *   这样既不会与 recover 的边界补偿重复计（边界优先于 journal），
+     *   又保证日报/周报能按真实自然日归并（含跨午夜自动切分）。
      */
     saveCheckpoint(): Promise<void>;
+    /**
+     * 若进行中会话跨越了自然日 00:00，则在午夜边界处将其切分为两段。
+     * 供 saveCheckpoint 周期调用，确保每一个自然日都拥有独立 finished TimeSession，
+     * 使日报/周报的每日柱子能精确反映当天时长。
+     */
+    private splitActiveSessionAtMidnight;
     /** 标记缓存失效（会话列表变化时调用） */
     private invalidateFinishedCache;
     /**

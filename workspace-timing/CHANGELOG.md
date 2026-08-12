@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.3] — 2026-08-12
+
+### Fixed
+- **进行中会话边界丢失（持久化根因）**: `saveCheckpoint()` 此前把 active 会话时长折叠进 `totalMs` 并清零 `currentSessionStartMs`，导致进行中会话的真实起始日无法存续到磁盘。一旦窗口未走 `stop()`（崩溃 / 强杀 / 扩展卸载竞态）即丢失，重载后 `sessions` 为空、`今日=本周` 退化、昨日时长不计入图表。现改为：`totalMs` 恒等于「已结束会话」累加和（权威源），`currentSessionStartMs` 原样保留，进行中会话由 `TimeAggregator` 在今日/本周交集计算时叠加
+- **重载不收尾活跃会话**: `recover()` 此前仅把未完成会话时长累加进 `totalMs` 后清零边界，从不生成 `TimeSession`，导致崩溃恢复后「会话数」恒为 0、按日归并缺失。现改为边界优先——将活跃会话收尾为 finished `TimeSession` 并入 `sessions[]` 与 `totalMs`；journal 回放仅在无边界时兜底，并合成一条 finished 会话，杜绝重复计
+- **跨午夜进行中会话无按日记录**: 新增 `TimerEngine.splitAt(splitMs)`，由 `SessionManager.saveCheckpoint` 在每次全量存盘前检测午夜跨越并切分进行中会话，使每个自然日都拥有独立 `TimeSession`，日报/周报每日柱子精确反映当天时长
+- **首个全量存盘前崩溃丢会话**: `startSession()` 在 `timer.start()` 后立即 `saveCheckpoint()` 持久化边界，确保即便在首个 60s 全量存盘前崩溃，recover 也能凭边界收尾该会话
+
+### Changed
+- **计时口径契约**: 自 0.1.x 的「零边界防翻倍」方案，调整为「边界存续 + 边界优先收尾」方案，在消除重复计的同时修复归属丢失（详见 StorageCoordinator / SessionManager 注释）
+
 ## [0.3.2] — 2026-08-12
 
 ### Fixed

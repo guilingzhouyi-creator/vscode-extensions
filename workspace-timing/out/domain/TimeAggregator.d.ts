@@ -21,6 +21,8 @@ import { DailyChartEntry } from './dashboard-types';
  * 禁止使用 toISOString() — 它返回 UTC，在中国 (UTC+8) 早上 8 点前会错位一天
  */
 export declare function localDateStr(d: Date): string;
+/** 取某时间戳之后「下一个」本地 00:00:00 时间戳（供午夜切分定位边界） */
+export declare function nextMidnightMs(ts: number): number;
 /**
  * 单次遍历，将「已结束会话」按时长归属拆分到对应自然日，返回 dateStr → ms 的 map。
  *

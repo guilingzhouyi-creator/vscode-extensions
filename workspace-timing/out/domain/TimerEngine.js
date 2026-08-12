@@ -50,6 +50,37 @@ class TimerEngine {
         });
         return elapsed;
     }
+    /**
+     * 在指定时间戳将「进行中」会话切分为两段。
+     *
+     * 用于「跨午夜自动切分」：让每一个自然日都拥有独立的 finished TimeSession，
+     * 使日报 / 周报能按真实自然日归并时长（而非把跨天时长全算到起始日）。
+     *
+     * 前置条件：计时器处于运行态，且 splitMs 落在 (sessionStart, now) 之间。
+     * 调用后：第一段 [sessionStart, splitMs] 入 sessions[] 并累加到 totalMs；
+     *        第二段立即从 splitMs 续接（currentSessionStartMs = splitMs），继续计时。
+     *
+     * ⚠️ totalMs 始终只累加「已结束段」，进行中的第二段由 snapshot() 在读取时叠加，
+     *    不会与 recover()/stop() 的累加产生重复计。
+     */
+    splitAt(splitMs) {
+        if (!this._running)
+            return;
+        const now = Date.now();
+        if (splitMs <= this._sessionStartMs || splitMs >= now)
+            return;
+        const elapsed = splitMs - this._sessionStartMs;
+        // 第一段：收尾并入历史
+        this._data.totalMs += elapsed;
+        this._data.sessions.push({
+            startMs: this._sessionStartMs,
+            endMs: splitMs,
+            durationMs: elapsed,
+        });
+        // 第二段：从切分点立即续接
+        this._sessionStartMs = splitMs;
+        this._data.currentSessionStartMs = splitMs;
+    }
     /** 获取当前快照（不停止计时） */
     snapshot() {
         const sessionElapsed = this._running

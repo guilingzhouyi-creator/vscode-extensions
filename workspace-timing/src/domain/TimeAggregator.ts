@@ -32,6 +32,11 @@ function startOfDayMs(ts: number): number {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+/** 取某时间戳之后「下一个」本地 00:00:00 时间戳（供午夜切分定位边界） */
+export function nextMidnightMs(ts: number): number {
+    return startOfDayMs(ts) + MS_PER_DAY;
+}
+
 /** 取本周一 00:00:00 本地时间戳 */
 function startOfMondayMs(): number {
     const now = new Date();
