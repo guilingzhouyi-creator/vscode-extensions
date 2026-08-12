@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.7] — 2026-08-12
+
+### Fixed
+- **`GlobalAggregator.refreshInBackground` 防重入**：新增 `_refreshing` 标志，避免 globalStorage 永久失效且 `sync` 一直失败导致每 5s 重复触发一次后台加载（非泄漏，仅杜绝多余异步调用）；`reset()` 同步清空该标志
+
 ## [0.3.6] — 2026-08-12
 
 ### Performance

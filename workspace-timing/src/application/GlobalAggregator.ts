@@ -26,6 +26,8 @@ export class GlobalAggregator {
     private _cached: GlobalTimingData | null = null;
     /** 上次已同步的本工作区 totalMs；相等则跳过整轮读写（增量守卫） */
     private _lastSyncedTotalMs: number | null = null;
+    /** 后台刷新进行中标志：防止 globalStorage 失效时 refreshInBackground 被反复触发 */
+    private _refreshing = false;
 
     constructor(storage: GlobalStorageProvider) {
         this.storage = storage;
@@ -94,6 +96,7 @@ export class GlobalAggregator {
         await this.storage.delete();
         this._cached = null;
         this._lastSyncedTotalMs = null;
+        this._refreshing = false;
         log(LogLevel.Info, 'GlobalAggregator: reset');
     }
 
@@ -114,8 +117,11 @@ export class GlobalAggregator {
 
     /** 后台刷新缓存（fire-and-forget），不阻塞调用方 */
     refreshInBackground(): void {
+        if (this._refreshing) return;
+        this._refreshing = true;
         this.storage.load()
             .then(g => { this._cached = g; })
-            .catch(() => { /* 保持现有缓存 */ });
+            .catch(() => { /* 保持现有缓存 */ })
+            .finally(() => { this._refreshing = false; });
     }
 }

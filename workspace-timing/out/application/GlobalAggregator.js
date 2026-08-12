@@ -50,6 +50,8 @@ class GlobalAggregator {
         this._cached = null;
         /** 上次已同步的本工作区 totalMs；相等则跳过整轮读写（增量守卫） */
         this._lastSyncedTotalMs = null;
+        /** 后台刷新进行中标志：防止 globalStorage 失效时 refreshInBackground 被反复触发 */
+        this._refreshing = false;
         this.storage = storage;
     }
     /**
@@ -105,6 +107,7 @@ class GlobalAggregator {
         await this.storage.delete();
         this._cached = null;
         this._lastSyncedTotalMs = null;
+        this._refreshing = false;
         (0, Logger_1.log)(Logger_1.LogLevel.Info, 'GlobalAggregator: reset');
     }
     /**
@@ -124,9 +127,13 @@ class GlobalAggregator {
     }
     /** 后台刷新缓存（fire-and-forget），不阻塞调用方 */
     refreshInBackground() {
+        if (this._refreshing)
+            return;
+        this._refreshing = true;
         this.storage.load()
             .then(g => { this._cached = g; })
-            .catch(() => { });
+            .catch(() => { })
+            .finally(() => { this._refreshing = false; });
     }
 }
 exports.GlobalAggregator = GlobalAggregator;

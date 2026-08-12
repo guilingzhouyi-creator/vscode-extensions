@@ -23,6 +23,8 @@ export declare class GlobalAggregator {
     private _cached;
     /** 上次已同步的本工作区 totalMs；相等则跳过整轮读写（增量守卫） */
     private _lastSyncedTotalMs;
+    /** 后台刷新进行中标志：防止 globalStorage 失效时 refreshInBackground 被反复触发 */
+    private _refreshing;
     constructor(storage: GlobalStorageProvider);
     /**
      * 将当前工作区的计时同步到全局存储
