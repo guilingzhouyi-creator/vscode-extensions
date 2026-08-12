@@ -145,10 +145,22 @@ export class SessionManager {
         return TimeAggregator.thisWeekMsFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs);
     }
 
-    /** 获取近 7 天每日统计（供柱状图）— 复用已结束会话缓存 */
+    /** 获取本周每日统计（自然周，本周一→今日，供「周报」柱状图）— 复用已结束会话缓存 */
     getDailyStats(): DailyChartEntry[] {
         this.ensureFinishedCache();
-        return TimeAggregator.last7DaysFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs);
+        return TimeAggregator.weekDailyFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs, false);
+    }
+
+    /** 获取自然周每日明细（fullWeek=true 时含本周日至周日，供周报导出）— 复用已结束会话缓存 */
+    getWeekDailyStats(fullWeek = false): DailyChartEntry[] {
+        this.ensureFinishedCache();
+        return TimeAggregator.weekDailyFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs, fullWeek);
+    }
+
+    /** 获取上一自然周累计时长 (ms) — 复用已结束会话缓存 */
+    getLastWeekMs(): number {
+        this.ensureFinishedCache();
+        return TimeAggregator.lastWeekMsFromFinished(this._finishedByDate);
     }
 
     /**

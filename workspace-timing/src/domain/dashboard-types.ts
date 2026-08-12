@@ -63,5 +63,6 @@ export type DashboardMessage =
     | { type: 'newPeriod' }
     | { type: 'reset' }
     | { type: 'exportCSV' }
+    | { type: 'exportWeeklyReport' }
     | { type: 'exportDiagnostic' }
     | { type: 'langToggle' };

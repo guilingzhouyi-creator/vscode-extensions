@@ -30,6 +30,7 @@ import { Scheduler } from './application/Scheduler';
 import { ActivityTracker } from './application/ActivityTracker';
 import { IdleDetector } from './application/IdleDetector';
 import { CsvExporter } from './application/exporters/CsvExporter';
+import { WeeklyReportExporter } from './application/exporters/WeeklyReportExporter';
 
 // Presentation
 import { StatusBarController } from './presentation/StatusBarController';
@@ -192,6 +193,22 @@ export function activate(context: vscode.ExtensionContext): void {
                                 vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
                             }
                         })().catch(err => log(LogLevel.Error, 'CSV export failed', err as Error));
+                        break;
+                    case 'exportWeeklyReport':
+                        (async () => {
+                            if (!orchestrator) return;
+                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+                            const input = await orchestrator.buildWeeklyReport(wsName);
+                            const md = new WeeklyReportExporter().generate(input);
+                            const uri = await vscode.window.showSaveDialog({
+                                defaultUri: vscode.Uri.file(`${wsName}-weekly-report.md`),
+                                filters: { 'Markdown Files': ['md'] },
+                            });
+                            if (uri) {
+                                await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf-8'));
+                                vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
+                            }
+                        })().catch(err => log(LogLevel.Error, 'Weekly report export failed', err as Error));
                         break;
                     case 'exportDiagnostic':
                         (async () => {

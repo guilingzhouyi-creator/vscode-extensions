@@ -104,10 +104,20 @@ class SessionManager {
         this.ensureFinishedCache();
         return TimeAggregator_1.TimeAggregator.thisWeekMsFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs);
     }
-    /** 获取近 7 天每日统计（供柱状图）— 复用已结束会话缓存 */
+    /** 获取本周每日统计（自然周，本周一→今日，供「周报」柱状图）— 复用已结束会话缓存 */
     getDailyStats() {
         this.ensureFinishedCache();
-        return TimeAggregator_1.TimeAggregator.last7DaysFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs);
+        return TimeAggregator_1.TimeAggregator.weekDailyFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs, false);
+    }
+    /** 获取自然周每日明细（fullWeek=true 时含本周日至周日，供周报导出）— 复用已结束会话缓存 */
+    getWeekDailyStats(fullWeek = false) {
+        this.ensureFinishedCache();
+        return TimeAggregator_1.TimeAggregator.weekDailyFromFinished(this._finishedByDate, this.timer.data.currentSessionStartMs, fullWeek);
+    }
+    /** 获取上一自然周累计时长 (ms) — 复用已结束会话缓存 */
+    getLastWeekMs() {
+        this.ensureFinishedCache();
+        return TimeAggregator_1.TimeAggregator.lastWeekMsFromFinished(this._finishedByDate);
     }
     /**
      * 仅保存当前状态（不结束会话）

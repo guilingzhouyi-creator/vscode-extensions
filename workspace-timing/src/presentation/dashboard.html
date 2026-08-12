@@ -98,6 +98,12 @@
       margin-bottom: var(--gap);
     }
 
+    .week-range {
+      font-size: 11px;
+      color: var(--description);
+      margin-bottom: 8px;
+    }
+
     .setting-row {
       display: flex;
       justify-content: space-between;
@@ -490,6 +496,7 @@
   <!-- 周报 + 柱状图 -->
   <div class="section">
     <h2>📊 周报</h2>
+    <div class="week-range" id="weekRange"></div>
     <div class="chart-container">
       <div id="chartEmpty" class="chart-empty">暂无数据，开始编程后会自动记录</div>
       <div id="chartBars" class="chart-bars" style="display:none"></div>
@@ -674,6 +681,7 @@
     <div class="btn-row">
       <button class="btn btn-primary" id="btnNewPeriod">新建计时周期</button>
       <button class="btn btn-secondary" id="btnExportCSV">导出 CSV</button>
+      <button class="btn btn-secondary" id="btnExportWeekly">导出周报</button>
       <button class="btn btn-secondary" id="btnDiagnostic">诊断报告</button>
       <button class="btn btn-danger" id="btnReset">重置所有数据</button>
     </div>
@@ -736,6 +744,14 @@
 
         // 柱状图
         renderChart(data.dailyStats, data.weekTotalMs, data.weekEfficiency);
+
+        // 周范围副标题（自然周：本周一 ~ 今日）
+        const wr = document.getElementById('weekRange');
+        if (wr && data.dailyStats && data.dailyStats.length) {
+          const a = data.dailyStats[0].label;
+          const b = data.dailyStats[data.dailyStats.length - 1].label;
+          wr.textContent = a + ' ~ ' + b + '（本周）';
+        }
 
         // 效率统计
         const weekEffEl = document.getElementById('weekEfficiency');
@@ -947,6 +963,11 @@
       document.getElementById('btnDiagnostic').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportDiagnostic' });
         showToast('已请求导出诊断报告');
+      });
+
+      document.getElementById('btnExportWeekly').addEventListener('click', () => {
+        vscode.postMessage({ type: 'exportWeeklyReport' });
+        showToast('已请求导出周报');
       });
 
       // 语言切换

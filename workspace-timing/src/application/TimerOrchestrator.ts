@@ -14,13 +14,14 @@ import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager, SessionResult } from './SessionManager';
 import { WorkspaceTimingData, TimingConfig, DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS, DEFAULT_FULL_SAVE_MS, DEFAULT_MAX_SESSIONS } from '../domain/models';
-import { DashboardData } from '../domain/dashboard-types';
+import { DashboardData, DailyChartEntry } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
 import { ActivityTracker } from './ActivityTracker';
 import { IdleDetector } from './IdleDetector';
 import { LogLevel, log } from '../integration/Logger';
+import { WeeklyReportInput } from './exporters/WeeklyReportExporter';
 
 export type OrchestratorState = 'idle' | 'running' | 'disabled' | 'saving';
 
@@ -183,32 +184,12 @@ export class TimerOrchestrator {
         const cfg = this.disable.config;
         const sessions = this.timer.data.sessions;
 
-        // 最近 7 天每日统计（用于柱状图——复用 SessionManager 的已结束会话缓存，避免每次刷新重复扫描）
+        // 本周每日统计（自然周：本周一→今日，供「周报」柱状图——复用 SessionManager 的已结束会话缓存）
         const dailyStats = this.sessionManager.getDailyStats();
         // ★ 本周卡片使用独立周累加器，不再从 dailyStats 累加
         const weekTotalMs = thisWeekMs;
-        // ★ 柱状图 7 天合计（供效率计算使用，与 dailyStats 时间范围一致）
-        const chartSumMs = dailyStats.reduce((sum, d) => sum + d.totalMs, 0);
-
-        // 效率数据（叠加活跃编辑时长，扣除闲置）
-        let weekEfficiency: number | undefined;
-        let weekIdleMs = 0;
-        if (cfg.activityTrackingEnabled) {
-            let totalActiveMs = 0;
-            for (const d of dailyStats) {
-                const activeMs = this.activityTracker.getDailyActiveMs(d.dateStr);
-                const idleMs = this.idleDetector.getDailyIdleMs(d.dateStr);
-                d.activeMs = activeMs;
-                d.idleMs = idleMs;
-                // 效率 = 活跃编辑 / (总时长 - 闲置)
-                const effectiveMs = d.totalMs - idleMs;
-                d.efficiency = effectiveMs > 0 ? activeMs / effectiveMs : 0;
-                totalActiveMs += activeMs;
-                weekIdleMs += idleMs;
-            }
-            const effectiveWeekMs = chartSumMs - weekIdleMs;
-            weekEfficiency = effectiveWeekMs > 0 ? totalActiveMs / effectiveWeekMs : 0;
-        }
+        // 效率数据（叠加活跃编辑时长，扣除闲置）—— 与 dailyStats 时间范围一致（均为本周）
+        const weekEfficiency = this.computeWeekEfficiency(dailyStats);
 
         // 跨工作区累计（从缓存读取，不额外 I/O）
         const globalSnap = await this.global.snapshot();
@@ -235,6 +216,53 @@ export class TimerOrchestrator {
             efficiencyEnabled: cfg.activityTrackingEnabled ?? true,
             dailyGoalMs: cfg.dailyGoalMs ?? 0,
             statusBarClickAction: cfg.statusBarClickAction ?? 'cycle',
+        };
+    }
+
+    /**
+     * 计算「本周效率」：遍历每日明细，叠加活跃编辑时长、扣除闲置，
+     * 返回 活跃/(总时长−闲置)。效率仅"本次会话内"可信（ActivityTracker/IdleDetector
+     * 为内存态，重启归零），历史天恒为 0%——属已知限制，调用方应标注。
+     */
+    private computeWeekEfficiency(dailyStats: DailyChartEntry[]): number | undefined {
+        const cfg = this.disable.config;
+        if (!cfg.activityTrackingEnabled) return undefined;
+        let totalActiveMs = 0;
+        let weekIdleMs = 0;
+        let chartSumMs = 0;
+        for (const d of dailyStats) {
+            const activeMs = this.activityTracker.getDailyActiveMs(d.dateStr);
+            const idleMs = this.idleDetector.getDailyIdleMs(d.dateStr);
+            d.activeMs = activeMs;
+            d.idleMs = idleMs;
+            const effectiveMs = d.totalMs - idleMs;
+            d.efficiency = effectiveMs > 0 ? activeMs / effectiveMs : 0;
+            totalActiveMs += activeMs;
+            weekIdleMs += idleMs;
+            chartSumMs += d.totalMs;
+        }
+        const effectiveWeekMs = chartSumMs - weekIdleMs;
+        return effectiveWeekMs > 0 ? totalActiveMs / effectiveWeekMs : 0;
+    }
+
+    /**
+     * 装配「周报」所需的全部数据（供 WeeklyReportExporter 生成 Markdown）。
+     * 每日明细为完整自然周（本周一→本周日，未来天时长为 0）。
+     */
+    async buildWeeklyReport(workspaceName: string): Promise<WeeklyReportInput> {
+        const fullWeek = this.sessionManager.getWeekDailyStats(true);
+        const weekTotalMs = this.sessionManager.getThisWeekMs();
+        const dailyGoalMs = this.disable.config.dailyGoalMs ?? 0;
+        const lastWeekTotalMs = this.sessionManager.getLastWeekMs();
+        const weekEfficiency = this.computeWeekEfficiency(fullWeek);
+        return {
+            workspaceName,
+            daily: fullWeek,
+            weekTotalMs,
+            dailyGoalMs,
+            lastWeekTotalMs,
+            weekEfficiency,
+            generatedAt: new Date(),
         };
     }
 

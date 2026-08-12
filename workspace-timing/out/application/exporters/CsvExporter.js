@@ -36,7 +36,7 @@ class CsvExporter {
     exportDashboard(data, workspaceName) {
         const lines = [];
         lines.push(`# Workspace Timing Export: ${workspaceName}`);
-        lines.push(`# Generated: ${new Date().toISOString()}`);
+        lines.push(`# Generated: ${localDateTime(Date.now())}`);
         lines.push(`# Total: ${TimeAggregator_1.TimeAggregator.formatDuration(data.totalMs)}`);
         lines.push(`# Today: ${TimeAggregator_1.TimeAggregator.formatDuration(data.todayMs)}`);
         lines.push(`# Week Total: ${TimeAggregator_1.TimeAggregator.formatDuration(data.weekTotalMs)}`);

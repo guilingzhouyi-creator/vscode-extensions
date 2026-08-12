@@ -18,6 +18,7 @@ import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
 import { ActivityTracker } from './ActivityTracker';
 import { IdleDetector } from './IdleDetector';
+import { WeeklyReportInput } from './exporters/WeeklyReportExporter';
 export type OrchestratorState = 'idle' | 'running' | 'disabled' | 'saving';
 export declare class TimerOrchestrator {
     private readonly timer;
@@ -68,6 +69,17 @@ export declare class TimerOrchestrator {
     onDisableStateChanged(newState: DisableState): Promise<void>;
     /** 获取面板数据快照 */
     getDashboardData(): Promise<DashboardData>;
+    /**
+     * 计算「本周效率」：遍历每日明细，叠加活跃编辑时长、扣除闲置，
+     * 返回 活跃/(总时长−闲置)。效率仅"本次会话内"可信（ActivityTracker/IdleDetector
+     * 为内存态，重启归零），历史天恒为 0%——属已知限制，调用方应标注。
+     */
+    private computeWeekEfficiency;
+    /**
+     * 装配「周报」所需的全部数据（供 WeeklyReportExporter 生成 Markdown）。
+     * 每日明细为完整自然周（本周一→本周日，未来天时长为 0）。
+     */
+    buildWeeklyReport(workspaceName: string): Promise<WeeklyReportInput>;
     /**
      * 立即手动存盘（调试用）
      */

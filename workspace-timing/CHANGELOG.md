@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.5] — 2026-08-12
+
+### Added
+- **周报体系完善**：
+  - 新增「导出周报」（Markdown）：本周总时长、日均（按本周至今天数）、达标天数（对比每日目标）、本周效率（附"仅本次会话内可信"标注）、每日明细表、与上周对比（环比）。经 `showSaveDialog` 存为 `.md`；中英文面板同步
+  - 「周报」面板与柱状图对齐**自然周**（本周一 → 今日），标题下增加周范围副标题（如 `08-10 ~ 08-12（本周）`）；中英文面板同步实现
+  - CSV 导出改用自然周每日明细（原为「近 7 天」滚动窗口，与"本周"口径不一致），并修复 `exportDashboard` 的 `Generated` 时间戳误用 `toISOString()`（UTC），改为本地时区
+
+### Changed
+- 面板每日统计底层由 `last7Days` 切换为 `weekDailyBreakdown`（自然周口径），移除废弃的 `last7Days` / `last7DaysFromFinished`；`TimeAggregator` 新增 `weekDailyBreakdown(fullWeek)` 与 `lastWeekMs`（上一自然周）
+- 本周效率分母与「本周合计」口径一致（均为本周一 → 现在），修复此前"效率按 7 天、周合计按自然周"的错配
+
 ## [0.3.4] — 2026-08-12
 
 ### Added

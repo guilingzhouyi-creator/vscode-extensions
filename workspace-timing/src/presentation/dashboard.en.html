@@ -98,6 +98,12 @@
       margin-bottom: var(--gap);
     }
 
+    .week-range {
+      font-size: 11px;
+      color: var(--description);
+      margin-bottom: 8px;
+    }
+
     .setting-row {
       display: flex;
       justify-content: space-between;
@@ -490,6 +496,7 @@
   <!-- Weekly Report + 柱状图 -->
   <div class="section">
     <h2>📊 Weekly Report</h2>
+    <div class="week-range" id="weekRange"></div>
     <div class="chart-container">
       <div id="chartEmpty" class="chart-empty">No data yet. Start coding to begin tracking.</div>
       <div id="chartBars" class="chart-bars" style="display:none"></div>
@@ -661,6 +668,7 @@
     <div class="btn-row">
       <button class="btn btn-primary" id="btnNewPeriod">New Period</button>
       <button class="btn btn-secondary" id="btnExportCSV">Export CSV</button>
+      <button class="btn btn-secondary" id="btnExportWeekly">Weekly Report</button>
       <button class="btn btn-secondary" id="btnDiagnostic">Diagnostics</button>
       <button class="btn btn-danger" id="btnReset">Reset All</button>
     </div>
@@ -722,6 +730,14 @@
 
         // 柱状图
         renderChart(data.dailyStats, data.weekTotalMs, data.weekEfficiency);
+
+        // 周范围副标题（自然周：本周一 ~ 今日）
+        const wr = document.getElementById('weekRange');
+        if (wr && data.dailyStats && data.dailyStats.length) {
+          const a = data.dailyStats[0].label;
+          const b = data.dailyStats[data.dailyStats.length - 1].label;
+          wr.textContent = a + ' ~ ' + b + ' (this week)';
+        }
 
         // 效率统计
         const weekEffEl = document.getElementById('weekEfficiency');
@@ -930,6 +946,11 @@
       document.getElementById('btnDiagnostic').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportDiagnostic' });
         showToast('Diagnostic export requested');
+      });
+
+      document.getElementById('btnExportWeekly').addEventListener('click', () => {
+        vscode.postMessage({ type: 'exportWeeklyReport' });
+        showToast('Weekly report export requested');
       });
 
       // Language toggle

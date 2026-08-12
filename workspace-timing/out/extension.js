@@ -62,6 +62,7 @@ const Scheduler_1 = require("./application/Scheduler");
 const ActivityTracker_1 = require("./application/ActivityTracker");
 const IdleDetector_1 = require("./application/IdleDetector");
 const CsvExporter_1 = require("./application/exporters/CsvExporter");
+const WeeklyReportExporter_1 = require("./application/exporters/WeeklyReportExporter");
 // Presentation
 const StatusBarController_1 = require("./presentation/StatusBarController");
 const CommandRegistrar_1 = require("./presentation/CommandRegistrar");
@@ -197,6 +198,23 @@ function activate(context) {
                                 vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['toast.exported'], uri.fsPath));
                             }
                         })().catch(err => (0, Logger_1.log)(Logger_1.LogLevel.Error, 'CSV export failed', err));
+                        break;
+                    case 'exportWeeklyReport':
+                        (async () => {
+                            if (!orchestrator)
+                                return;
+                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+                            const input = await orchestrator.buildWeeklyReport(wsName);
+                            const md = new WeeklyReportExporter_1.WeeklyReportExporter().generate(input);
+                            const uri = await vscode.window.showSaveDialog({
+                                defaultUri: vscode.Uri.file(`${wsName}-weekly-report.md`),
+                                filters: { 'Markdown Files': ['md'] },
+                            });
+                            if (uri) {
+                                await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf-8'));
+                                vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['toast.exported'], uri.fsPath));
+                            }
+                        })().catch(err => (0, Logger_1.log)(Logger_1.LogLevel.Error, 'Weekly report export failed', err));
                         break;
                     case 'exportDiagnostic':
                         (async () => {

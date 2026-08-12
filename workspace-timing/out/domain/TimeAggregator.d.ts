@@ -49,12 +49,20 @@ export declare class TimeAggregator {
     /** 基于已结束会话分桶结果计算本周累计（供缓存层复用） */
     static thisWeekMsFromFinished(finishedByDate: Map<string, number>, currentSessionStartMs: number): number;
     /**
-     * 最近 7 天每日统计（用于柱状图）。
-     * 单次遍历完成分桶后，仅对 7 个窗口做廉价叠加，避免 7×O(n) 重复扫描。
+     * 自然周每日明细（用于「周报」面板与周报导出）。
+     * - fullWeek=false（默认）：本周一 00:00 → 今日（本周至今，随周中增长）。
+     * - fullWeek=true：本周一 00:00 → 本周日 24:00（完整自然周，未来天时长为 0）。
      */
-    static last7Days(sessions: TimeSession[], currentSessionStartMs: number): DailyChartEntry[];
-    /** 基于已结束会话分桶结果生成近 7 天统计（供缓存层复用） */
-    static last7DaysFromFinished(finishedByDate: Map<string, number>, currentSessionStartMs: number): DailyChartEntry[];
+    static weekDailyBreakdown(sessions: TimeSession[], currentSessionStartMs: number, fullWeek?: boolean): DailyChartEntry[];
+    /** 基于已结束会话分桶结果生成自然周每日明细（供缓存层复用） */
+    static weekDailyFromFinished(finishedByDate: Map<string, number>, currentSessionStartMs: number, fullWeek?: boolean): DailyChartEntry[];
+    /**
+     * 上一自然周（上周一 00:00 → 上周日 24:00）累计时长 (ms)。
+     * 活跃会话属于本周，上周不计入活跃部分，仅汇总已结束会话分桶。
+     */
+    static lastWeekMs(sessions: TimeSession[]): number;
+    /** 基于已结束会话分桶结果计算上一自然周累计（供缓存层复用） */
+    static lastWeekMsFromFinished(finishedByDate: Map<string, number>): number;
     /**
      * 格式化毫秒为人类可读字符串
      * @example formatDuration(3661000) => "1h 1m 1s"

@@ -133,25 +133,29 @@ class TimeAggregator {
         return total;
     }
     /**
-     * 最近 7 天每日统计（用于柱状图）。
-     * 单次遍历完成分桶后，仅对 7 个窗口做廉价叠加，避免 7×O(n) 重复扫描。
+     * 自然周每日明细（用于「周报」面板与周报导出）。
+     * - fullWeek=false（默认）：本周一 00:00 → 今日（本周至今，随周中增长）。
+     * - fullWeek=true：本周一 00:00 → 本周日 24:00（完整自然周，未来天时长为 0）。
      */
-    static last7Days(sessions, currentSessionStartMs) {
-        return this.last7DaysFromFinished(finishedSessionsByDate(sessions), currentSessionStartMs);
+    static weekDailyBreakdown(sessions, currentSessionStartMs, fullWeek = false) {
+        return this.weekDailyFromFinished(finishedSessionsByDate(sessions), currentSessionStartMs, fullWeek);
     }
-    /** 基于已结束会话分桶结果生成近 7 天统计（供缓存层复用） */
-    static last7DaysFromFinished(finishedByDate, currentSessionStartMs) {
+    /** 基于已结束会话分桶结果生成自然周每日明细（供缓存层复用） */
+    static weekDailyFromFinished(finishedByDate, currentSessionStartMs, fullWeek = false) {
         const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
         const now = new Date();
         const todayStart = startOfDayMs(now.getTime());
+        const weekStart = startOfMondayMs();
+        const lastDay = fullWeek ? weekStart + 6 * models_1.MS_PER_DAY : todayStart;
         const result = [];
-        for (let i = 6; i >= 0; i--) {
-            const dayStart = todayStart - i * models_1.MS_PER_DAY;
-            const dateStr = localDateStr(new Date(dayStart));
-            const d = new Date(dayStart);
+        let cursor = weekStart;
+        let guard = 0;
+        while (cursor <= lastDay && guard++ < 10) {
+            const dateStr = localDateStr(new Date(cursor));
+            const d = new Date(cursor);
             let totalMs = finishedByDate.get(dateStr) ?? 0;
             if (currentSessionStartMs > 0) {
-                totalMs += overlapMs(currentSessionStartMs, Date.now(), dayStart, dayStart + models_1.MS_PER_DAY);
+                totalMs += overlapMs(currentSessionStartMs, Date.now(), cursor, cursor + models_1.MS_PER_DAY);
             }
             result.push({
                 label: dateStr.slice(5),
@@ -159,8 +163,31 @@ class TimeAggregator {
                 totalMs,
                 dateStr,
             });
+            cursor += models_1.MS_PER_DAY;
         }
         return result;
+    }
+    /**
+     * 上一自然周（上周一 00:00 → 上周日 24:00）累计时长 (ms)。
+     * 活跃会话属于本周，上周不计入活跃部分，仅汇总已结束会话分桶。
+     */
+    static lastWeekMs(sessions) {
+        return this.lastWeekMsFromFinished(finishedSessionsByDate(sessions));
+    }
+    /** 基于已结束会话分桶结果计算上一自然周累计（供缓存层复用） */
+    static lastWeekMsFromFinished(finishedByDate) {
+        const weekStart = startOfMondayMs();
+        const lastWeekStart = weekStart - 7 * models_1.MS_PER_DAY;
+        const lastWeekEnd = weekStart; // 本周一 00:00 = 上周日 24:00（上周结束边界，不含）
+        let total = 0;
+        for (const [dateStr, ms] of finishedByDate) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dayStart = new Date(y, m - 1, d).getTime();
+            if (dayStart >= lastWeekStart && dayStart < lastWeekEnd) {
+                total += ms;
+            }
+        }
+        return total;
     }
     /**
      * 格式化毫秒为人类可读字符串

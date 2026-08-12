@@ -39,7 +39,7 @@ export class CsvExporter implements IDataExporter {
     exportDashboard(data: DashboardData, workspaceName: string): string {
         const lines: string[] = [];
         lines.push(`# Workspace Timing Export: ${workspaceName}`);
-        lines.push(`# Generated: ${new Date().toISOString()}`);
+        lines.push(`# Generated: ${localDateTime(Date.now())}`);
         lines.push(`# Total: ${TimeAggregator.formatDuration(data.totalMs)}`);
         lines.push(`# Today: ${TimeAggregator.formatDuration(data.todayMs)}`);
         lines.push(`# Week Total: ${TimeAggregator.formatDuration(data.weekTotalMs)}`);

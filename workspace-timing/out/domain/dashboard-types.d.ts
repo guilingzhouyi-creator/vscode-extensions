@@ -68,6 +68,8 @@ export type DashboardMessage = {
 } | {
     type: 'exportCSV';
 } | {
+    type: 'exportWeeklyReport';
+} | {
     type: 'exportDiagnostic';
 } | {
     type: 'langToggle';
