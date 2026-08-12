@@ -18,6 +18,7 @@ const models_1 = require("../domain/models");
 const Logger_1 = require("../integration/Logger");
 class StorageCoordinator {
     constructor(primary, fileBackup, journal) {
+        this._fileBackupCount = 0;
         this.primary = primary;
         this.fileBackup = fileBackup;
         this.journal = journal;
@@ -96,15 +97,18 @@ class StorageCoordinator {
         data.lastSavedAtMs = Date.now();
         data.version = models_1.LATEST_VERSION;
         // 写回存储
-        await this.save(data);
+        await this.save(data, true);
         (0, Logger_1.log)(Logger_1.LogLevel.Info, `StorageCoordinator: recovery complete, totalMs=${data.totalMs}`);
         return data;
     }
     /**
      * 级联写入：主存储 + JSON 备份
-     * 主存储失败时不影响备份写入
+     * 主存储失败时不影响备份写入。
+     * ★ 文件备份降频：主存 workspaceState 每次都写（主恢复源，需新鲜）；
+     *   JSON 备份为二级兜底，每 FILE_BACKUP_EVERY_N 次才落盘一次（或关键事件强制），
+     *   以降低磁盘 I/O 抖动。forceFileBackup 用于会话结束/重置/恢复等必须落盘的场景。
      */
-    async save(data) {
+    async save(data, forceFileBackup = false) {
         // 更新最后保存时间
         data.lastSavedAtMs = Date.now();
         const errors = [];
@@ -114,11 +118,16 @@ class StorageCoordinator {
         catch (err) {
             errors.push(`primary: ${err.message}`);
         }
-        try {
-            await this.fileBackup.save(data);
-        }
-        catch (err) {
-            errors.push(`fileBackup: ${err.message}`);
+        this._fileBackupCount++;
+        const doBackup = forceFileBackup
+            || (this._fileBackupCount % StorageCoordinator.FILE_BACKUP_EVERY_N === 0);
+        if (doBackup) {
+            try {
+                await this.fileBackup.save(data);
+            }
+            catch (err) {
+                errors.push(`fileBackup: ${err.message}`);
+            }
         }
         if (errors.length > 0) {
             (0, Logger_1.log)(Logger_1.LogLevel.Warn, `StorageCoordinator: save partially failed: ${errors.join('; ')}`);
@@ -160,4 +169,6 @@ class StorageCoordinator {
     }
 }
 exports.StorageCoordinator = StorageCoordinator;
+/** 文件备份降频：每 N 次全量存盘才写一次 JSON 备份（主存 workspaceState 仍每次写，保证主恢复源新鲜） */
+StorageCoordinator.FILE_BACKUP_EVERY_N = 3;
 //# sourceMappingURL=StorageCoordinator.js.map

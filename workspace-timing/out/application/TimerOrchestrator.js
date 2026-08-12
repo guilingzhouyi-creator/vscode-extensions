@@ -134,8 +134,12 @@ class TimerOrchestrator {
         const weekTotalMs = thisWeekMs;
         // 效率数据（叠加活跃编辑时长，扣除闲置）—— 与 dailyStats 时间范围一致（均为本周）
         const weekEfficiency = this.computeWeekEfficiency(dailyStats);
-        // 跨工作区累计（从缓存读取，不额外 I/O）
-        const globalSnap = await this.global.snapshot();
+        // 跨工作区累计：同步读缓存，避免每 5s tick 一次 async 往返；
+        // 缓存为空时回退空快照并后台拉取一次（activate 时也会预热，通常已就绪）
+        const cachedGlobal = this.global.getCached();
+        if (!cachedGlobal)
+            this.global.refreshInBackground();
+        const globalSnap = cachedGlobal ?? { totalMs: 0, workspaceCount: 0, workspaces: [] };
         return {
             totalMs: snap.currentTotalMs,
             todayMs,
@@ -268,7 +272,7 @@ class TimerOrchestrator {
         await this.global.sync(0);
         // 4. 新建空数据存盘
         const freshData = { ...this.timer.data, sessions: [...this.timer.data.sessions] };
-        await this.storage.save(freshData);
+        await this.storage.save(freshData, true);
         // 5. 重新启动
         await this.start();
     }

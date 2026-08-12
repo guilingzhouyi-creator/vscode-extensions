@@ -98,6 +98,7 @@ export function activate(context: vscode.ExtensionContext): void {
             const idleDetector = new IdleDetector();
             globalStorage = new GlobalStorageProvider(context);
             const globalAggregator = new GlobalAggregator(globalStorage);
+            void globalAggregator.snapshot(); // 预热全局缓存：面板首次打开即有跨工作区数据，且免去首帧 async 等待
             orchestrator = new TimerOrchestrator(
                 timer, storage, journal, sessionManager, disableManager, scheduler, globalAggregator, activityTracker, idleDetector,
             );

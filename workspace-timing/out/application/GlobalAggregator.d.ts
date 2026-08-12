@@ -21,6 +21,8 @@ export interface GlobalSnapshot {
 export declare class GlobalAggregator {
     private readonly storage;
     private _cached;
+    /** 上次已同步的本工作区 totalMs；相等则跳过整轮读写（增量守卫） */
+    private _lastSyncedTotalMs;
     constructor(storage: GlobalStorageProvider);
     /**
      * 将当前工作区的计时同步到全局存储
@@ -31,4 +33,11 @@ export declare class GlobalAggregator {
     snapshot(): Promise<GlobalSnapshot>;
     /** 清空全局数据 */
     reset(): Promise<void>;
+    /**
+     * 同步读取已缓存的全局快照（供高频面板刷新，避免每 tick 一次 async 往返）。
+     * 缓存为空时返回 null——调用方应回退到空快照并触发一次后台刷新。
+     */
+    getCached(): GlobalSnapshot | null;
+    /** 后台刷新缓存（fire-and-forget），不阻塞调用方 */
+    refreshInBackground(): void;
 }

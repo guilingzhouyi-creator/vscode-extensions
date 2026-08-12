@@ -113,6 +113,7 @@ function activate(context) {
             const idleDetector = new IdleDetector_1.IdleDetector();
             globalStorage = new GlobalStorageProvider_1.GlobalStorageProvider(context);
             const globalAggregator = new GlobalAggregator_1.GlobalAggregator(globalStorage);
+            void globalAggregator.snapshot(); // 预热全局缓存：面板首次打开即有跨工作区数据，且免去首帧 async 等待
             orchestrator = new TimerOrchestrator_1.TimerOrchestrator(timer, storage, journal, sessionManager, disableManager, scheduler, globalAggregator, activityTracker, idleDetector);
             // ★ 活动追踪 + 闲置检测 — 启动监听
             activityTracker.start();

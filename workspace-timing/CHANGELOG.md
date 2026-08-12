@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.6] — 2026-08-12
+
+### Performance
+- **`GlobalAggregator.sync` 增量守卫**：本工作区 `totalMs` 未变（如持续活跃会话未产生新 finished 会话）时，跳过整轮 globalState 读→改→写，避免每 60s 一次冗余往返
+- **文件备份降频**：`StorageCoordinator` 主存 `workspaceState` 仍每次全量存盘（保证主恢复源新鲜），JSON 文件备份改为每 3 次全量存盘才落盘一次（关键事件——会话结束 / 新建周期 / 恢复——仍强制落盘），降低磁盘 I/O 抖动
+- **面板全局快照同步读取**：`getDashboardData` 改为同步读全局缓存（`getCached()`），去掉每 5s tick 一次 `global.snapshot()` 的 async 往返；`activate` 时预热缓存，面板首开即有跨工作区数据
+
 ## [0.3.5] — 2026-08-12
 
 ### Added

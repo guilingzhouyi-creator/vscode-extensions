@@ -117,7 +117,7 @@ export class SessionManager {
             ...this.timer.data,
             sessions: [...this.timer.data.sessions],
         };
-        await this.storage.save(finalData);
+        await this.storage.save(finalData, true);
 
         // 5. 清空 journal
         await this.journal.truncate();

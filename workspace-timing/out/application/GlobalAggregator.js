@@ -48,6 +48,8 @@ const Logger_1 = require("../integration/Logger");
 class GlobalAggregator {
     constructor(storage) {
         this._cached = null;
+        /** 上次已同步的本工作区 totalMs；相等则跳过整轮读写（增量守卫） */
+        this._lastSyncedTotalMs = null;
         this.storage = storage;
     }
     /**
@@ -60,6 +62,11 @@ class GlobalAggregator {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceRoot)
             return;
+        // ★ 增量守卫：本工作区 totalMs 未变（如持续活跃会话未产生新 finished 会话）时，
+        //   全局累计与本地条目均无需改动，跳过整轮 globalState 读→改→写。
+        if (this._lastSyncedTotalMs === localTotalMs)
+            return;
+        this._lastSyncedTotalMs = localTotalMs;
         const wsId = (0, global_types_1.normalizeWorkspaceId)(workspaceRoot.uri.toString());
         const wsName = workspaceRoot.name;
         try {
@@ -97,7 +104,29 @@ class GlobalAggregator {
     async reset() {
         await this.storage.delete();
         this._cached = null;
+        this._lastSyncedTotalMs = null;
         (0, Logger_1.log)(Logger_1.LogLevel.Info, 'GlobalAggregator: reset');
+    }
+    /**
+     * 同步读取已缓存的全局快照（供高频面板刷新，避免每 tick 一次 async 往返）。
+     * 缓存为空时返回 null——调用方应回退到空快照并触发一次后台刷新。
+     */
+    getCached() {
+        if (!this._cached)
+            return null;
+        return {
+            totalMs: this._cached.totalMs,
+            workspaceCount: Object.keys(this._cached.workspaces).length,
+            workspaces: Object.values(this._cached.workspaces)
+                .map(w => ({ name: w.name, totalMs: w.totalMs }))
+                .sort((a, b) => b.totalMs - a.totalMs),
+        };
+    }
+    /** 后台刷新缓存（fire-and-forget），不阻塞调用方 */
+    refreshInBackground() {
+        this.storage.load()
+            .then(g => { this._cached = g; })
+            .catch(() => { });
     }
 }
 exports.GlobalAggregator = GlobalAggregator;
