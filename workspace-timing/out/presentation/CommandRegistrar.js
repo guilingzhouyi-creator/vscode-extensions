@@ -81,19 +81,24 @@ class CommandRegistrar {
             const msg = !current ? '工作区计时: 已全局禁用' : '工作区计时: 已全局启用';
             vscode.window.showInformationMessage(msg);
         });
-        // 切换状态栏显示模式
+        // 状态栏点击行为（可配置：切换模式 / 打开面板）
         this.registerCommand('workspaceTiming.showStatus', () => {
             if (!statusBar) {
                 this.noWorkspaceMsg();
                 return;
             }
-            const newMode = statusBar.cycleMode();
-            const label = {
-                'today-total': '今日优先',
-                'total-today': '累计优先',
-                'compact': '紧凑',
-            };
-            vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['cmd.modeSwitched'], label[newMode] ?? newMode));
+            if (statusBar.clickAction === 'dashboard') {
+                DashboardPanel_1.DashboardPanel.createOrShow(context.extensionUri);
+            }
+            else {
+                const newMode = statusBar.cycleMode();
+                const label = {
+                    'today-total': '今日优先',
+                    'total-today': '累计优先',
+                    'compact': '紧凑',
+                };
+                vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['cmd.modeSwitched'], label[newMode] ?? newMode));
+            }
         });
         // 打开配置面板
         this.registerCommand('workspaceTiming.openDashboard', () => {

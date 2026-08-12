@@ -16,6 +16,8 @@ import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
+import { ActivityTracker } from './ActivityTracker';
+import { IdleDetector } from './IdleDetector';
 export type OrchestratorState = 'idle' | 'running' | 'disabled' | 'saving';
 export declare class TimerOrchestrator {
     private readonly timer;
@@ -25,9 +27,17 @@ export declare class TimerOrchestrator {
     private readonly disableManager;
     private readonly scheduler;
     private readonly global;
+    private readonly activityTracker;
+    private readonly idleDetector;
     private _state;
     private _onStateChange;
-    constructor(timer: TimerEngine, storage: StorageCoordinator, journal: JournalWriter, sessionManager: SessionManager, disableManager: DisableManager, scheduler: Scheduler, globalAggregator: GlobalAggregator);
+    constructor(timer: TimerEngine, storage: StorageCoordinator, journal: JournalWriter, sessionManager: SessionManager, disableManager: DisableManager, scheduler: Scheduler, globalAggregator: GlobalAggregator, activityTracker: ActivityTracker, idleDetector: IdleDetector);
+    /** 活动追踪器 */
+    get activity(): ActivityTracker;
+    /** 闲置检测器 */
+    get idle(): IdleDetector;
+    /** 调度器（供 ConfigWatcher 热更新间隔）*/
+    get schedulerInstance(): Scheduler;
     /** 当前状态 */
     get state(): OrchestratorState;
     /** 会话管理器引用（供 UI 层获取快照） */

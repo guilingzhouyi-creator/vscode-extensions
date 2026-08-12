@@ -9,6 +9,23 @@
 /** 数据格式当前版本 */
 export const LATEST_VERSION = 1;
 
+// ─── 时间常量（唯一来源，禁止下游硬编码）──────────────
+export const MS_PER_SECOND = 1000;
+export const MS_PER_MINUTE = 60000;
+export const MS_PER_HOUR = 3600000;
+export const MS_PER_DAY = 86400000;
+
+// ─── 调度器默认间隔（引用时间常量）────────────────────
+export const DEFAULT_HEARTBEAT_MS = MS_PER_SECOND;        // 1s — 心跳推入 RingBuffer
+export const DEFAULT_STATUS_BAR_MS = 5 * MS_PER_SECOND;   // 5s — 状态栏刷新
+export const DEFAULT_JOURNAL_FLUSH_MS = 10 * MS_PER_SECOND; // 10s — journal 落盘
+export const DEFAULT_FULL_SAVE_MS = MS_PER_MINUTE;          // 60s — 全量存盘
+export const DEFAULT_RING_BUFFER_CAP = 1024;
+export const DEFAULT_MAX_SESSIONS = 1000;
+export const DEFAULT_IDLE_TIMEOUT_MS = 5 * MS_PER_MINUTE;  // 5 分钟
+export const DEFAULT_DAILY_GOAL_MS = 6 * MS_PER_HOUR;        // 6 小时
+export const CRASH_COMPENSATION_CAP_MS = MS_PER_DAY;        // 崩溃补偿上限 24h
+
 /** 一条原子时间片 — 用于缓存层和 journal */
 export interface TimeSlice {
     /** 时间片结束时间戳 (Date.now()) */
@@ -83,8 +100,16 @@ export interface TimingConfig {
     fullSaveIntervalMs: number;
     /** 状态栏显示格式 */
     statusBarFormat: 'compact' | 'detailed';
+    /** 状态栏点击行为 */
+    statusBarClickAction: 'cycle' | 'dashboard';
     /** 历史会话保留上限（0 = 不限） */
     maxSessions: number;
+    /** 编辑活跃度追踪（效率转化） */
+    activityTrackingEnabled: boolean;
+    /** 闲置超时 (ms)，0 = 禁用闲置检测 */
+    idleTimeoutMs: number;
+    /** 每日目标时长 (ms)，0 = 不设目标 */
+    dailyGoalMs: number;
 }
 
 /** 默认配置 */
@@ -94,9 +119,13 @@ export const DEFAULT_CONFIG: TimingConfig = {
     statusBarEnabled: true,
     backupToFile: true,
     journalEnabled: true,
-    ringBufferCapacity: 1024,
-    journalFlushIntervalMs: 10000,
-    fullSaveIntervalMs: 60000,
+    ringBufferCapacity: DEFAULT_RING_BUFFER_CAP,
+    journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
+    fullSaveIntervalMs: DEFAULT_FULL_SAVE_MS,
     statusBarFormat: 'compact',
-    maxSessions: 1000,
+    statusBarClickAction: 'cycle',
+    maxSessions: DEFAULT_MAX_SESSIONS,
+    activityTrackingEnabled: true,
+    idleTimeoutMs: DEFAULT_IDLE_TIMEOUT_MS,
+    dailyGoalMs: DEFAULT_DAILY_GOAL_MS,
 };

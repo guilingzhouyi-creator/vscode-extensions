@@ -1,49 +1,37 @@
-# Workspace Timing  ⏱
+# Workspace Timing ⏱
 
-> 🪶 轻量化 · 高可扩展 — 环形缓冲区 + Journal 双写入架构；预留多工作区对比、云端同步、团队看板扩展点。  
-> Lightweight & extensible — RingBuffer + Journal dual-write architecture; ready for multi-workspace comparison, cloud sync, and team dashboard.
+> 全本地工作区时长追踪 — 零配置、零上传、零隐私风险
+> Fully local workspace time tracker — no account, no cloud, no privacy risk
 
-## 功能亮点 | Features
+## 功能 | Features
 
-- ⏱ **自动计时** · Auto-timing — 打开工作区即开始计时
-- 📊 **周报图表** · Weekly chart — 最近 7 天柱状图
-- 🌐 **跨工作区** · Cross-workspace — 聚合所有工作区的时长
-- 🛡️ **崩溃保护** · Crash-safe — Journal 文件防止数据丢失
-- 🎨 **仪表板** · Dashboard — 实时统计、设置、图表
-- 📅 **日/累计分离** · Daily & total — 今日和累计分别显示
+| 功能 Feature | 说明 Description |
+|------|------|
+| ⏱ 自动计时 Auto-timing | 打开工作区即开始，关闭自动存盘 / Starts on open, saves on close |
+| 📊 周报柱状图 Weekly chart | 最近 7 天每日时长 + 效率百分比 / Last 7 days with efficiency % |
+| ⚡ 效率转化 Efficiency | 编辑活跃度 / 在桌时长 = 真实效率 / Active typing / desk time |
+| 💤 闲置检测 Idle detection | 失焦超时自动剔除 / Auto-exclude away time |
+| 🎯 每日目标 Daily goal | 达成桌面通知 + 进度条 / Desktop notification + progress bar |
+| 🌐 跨工作区 Cross-workspace | 聚合所有项目的累计时长 / Aggregate all projects |
+| 🛡 崩溃保护 Crash-safe | Journal + 环形缓冲区 双写入 / Journal + RingBuffer dual-write |
+| 📥 CSV 导出 CSV export | 每日明细 + 效率 + 闲置 / Daily detail + efficiency + idle |
+| 🔧 诊断报告 Diagnostics | 200条日志 + 配置快照 / 200 log entries + config snapshot |
+| 🌍 双语支持 Bilingual | 中文/English Dashboard一键切换 / One-click language toggle |
 
-## Usage
+## 数据存储 | Storage
 
-| Command | 说明 | Description |
-|---------|------|-------------|
-| `Workspace Timing: Open Dashboard` | 打开统计面板 | Open the stats & settings panel |
-| `Workspace Timing: Enable Timing` | 启用计时 | Enable timing for current workspace |
-| `Workspace Timing: Disable Timing` | 禁用计时 | Disable timing for current workspace |
-| `Workspace Timing: Toggle Global Timing` | 全局开关 | Global on/off switch |
-| `Workspace Timing: New Counting Period` | 新建周期（保留历史） | Reset counter, keep history |
-| `Workspace Timing: Reset Timing Data` | 重置全部数据（不可恢复） | Delete all data (irreversible) |
+所有数据完全本地，不发送任何信息到外部
+All data is fully local — nothing is sent anywhere:
 
-点击状态栏计时器可在三种显示模式间切换 | Click the timer in the status bar to cycle display modes：
-`今日 · 累计` → `累计 · 今日` → `仅今日`
+- workspaceState — VS Code 内部 KV 主存储 / internal KV primary storage
+- .workspace-timing-data/data.json — 文件备份 / file backup
+- .workspace-timing-data/journal — 崩溃保护 / crash protection
 
-## 存储 | Storage
+## 安装 | Install
 
-计时数据存放在：
-- `workspaceState` — 主存储（VS Code 内部 KV）
-- `.vscode/workspace-timing.json` — 文件备份（项目可见，可版本控制）
-- `.vscode/workspace-timing.journal` — 崩溃保护（自动清理）
-- `ExtensionContext.globalState` — 跨工作区聚合
+VS Code Marketplace 搜索 **Workspace Timing**，或 / or:
 
-## 要求 | Requirements
-
-- VS Code 1.85.0 及以上
-
-## 扩展设置 | Extension Settings
-
-* `workspaceTiming.enabled`: 启用/禁用计时
-* `workspaceTiming.globalDisabled`: 全局禁用
-* `workspaceTiming.statusBar.*`: 状态栏显示选项
-* `workspaceTiming.storage.*`: 存储与崩溃保护设置
+    code --install-extension guilingzhouyi.workspace-timing
 
 ## 许可证 | License
 

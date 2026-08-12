@@ -55,8 +55,14 @@ class ConfigWatcher {
         this.disposables.push(vscode.workspace.onDidChangeConfiguration(e => {
             if (!e.affectsConfiguration(CONFIG_SECTION))
                 return;
-            const config = this.readConfig();
-            this.applyConfig(config);
+            try {
+                const config = this.readConfig();
+                this.applyConfig(config);
+            }
+            catch (err) {
+                // 配置应用失败不应冒泡为未捕获异常，阻塞其他配置监听器
+                (0, Logger_1.log)(Logger_1.LogLevel.Error, 'ConfigWatcher: failed to apply configuration', err);
+            }
         }));
         // 读取初始配置
         const config = this.readConfig();
@@ -76,22 +82,29 @@ class ConfigWatcher {
             journalFlushIntervalMs: cfg.get('storage.journalFlushInterval', models_1.DEFAULT_CONFIG.journalFlushIntervalMs),
             fullSaveIntervalMs: cfg.get('storage.fullSaveInterval', models_1.DEFAULT_CONFIG.fullSaveIntervalMs),
             statusBarFormat: cfg.get('statusBar.format', models_1.DEFAULT_CONFIG.statusBarFormat),
+            statusBarClickAction: cfg.get('statusBar.clickAction', models_1.DEFAULT_CONFIG.statusBarClickAction),
             maxSessions: cfg.get('storage.maxSessions', models_1.DEFAULT_CONFIG.maxSessions),
+            activityTrackingEnabled: cfg.get('efficiency.enabled', models_1.DEFAULT_CONFIG.activityTrackingEnabled),
+            idleTimeoutMs: cfg.get('idleTimeoutMinutes', models_1.DEFAULT_CONFIG.idleTimeoutMs / 60000) * 60000,
+            dailyGoalMs: cfg.get('dailyGoalMinutes', models_1.DEFAULT_CONFIG.dailyGoalMs / 60000) * 60000,
         };
     }
     /** 应用配置到各模块 */
     applyConfig(config) {
-        // 1. 更新 DisableManager
         this.orchestrator.disable.updateConfig({
             enabled: config.enabled,
             globalDisabled: config.globalDisabled,
         });
-        // 2. 更新 StatusBar
         this.statusBar.updateConfig({
             enabled: config.statusBarEnabled,
+            clickAction: config.statusBarClickAction,
+        });
+        // ★ 热更新调度器间隔
+        this.orchestrator.schedulerInstance.updateIntervals({
+            journalFlushIntervalMs: config.journalFlushIntervalMs,
+            fullSaveIntervalMs: config.fullSaveIntervalMs,
         });
         this.orchestrator.onDisableStateChanged(this.orchestrator.disable.resolveState());
-        (0, Logger_1.log)(Logger_1.LogLevel.Debug, `ConfigWatcher: config applied (enabled=${config.enabled}, globalDisabled=${config.globalDisabled})`);
     }
     /** 停止监听 */
     stop() {

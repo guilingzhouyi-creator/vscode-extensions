@@ -28,6 +28,8 @@ export declare class DashboardPanel {
     private _updateContent;
     /** 释放资源 */
     dispose(): void;
-    /** 生成 HTML */
+    /** 生成 HTML — 按标志或 VS Code 语言选择 */
     private _getHtml;
+    /** 语言切换标志 */
+    static _useEnglish: boolean;
 }

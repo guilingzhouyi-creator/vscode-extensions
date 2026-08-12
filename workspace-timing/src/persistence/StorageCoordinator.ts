@@ -12,7 +12,7 @@
  *   Step 3: 如果 sessionStartMs > 0，补偿未完成会话的历时
  */
 
-import { WorkspaceTimingData, createEmptyTimingData, LATEST_VERSION } from '../domain/models';
+import { WorkspaceTimingData, createEmptyTimingData, LATEST_VERSION, MS_PER_DAY } from '../domain/models';
 import { WorkspaceStateProvider } from './WorkspaceStateProvider';
 import { FileStorageProvider } from './FileStorageProvider';
 import { JournalStorageProvider } from './JournalStorageProvider';
@@ -78,7 +78,7 @@ export class StorageCoordinator {
         if (data.currentSessionStartMs > 0) {
             const now = Date.now();
             const elapsed = now - data.currentSessionStartMs;
-            if (elapsed > 0 && elapsed < 86400000) { // 最多补偿 24h，防止异常
+            if (elapsed > 0 && elapsed < MS_PER_DAY) { // 最多补偿 24h，防止异常
                 data.totalMs += elapsed;
                 log(LogLevel.Info,
                     `StorageCoordinator: compensated unfinished session: +${elapsed}ms`);

@@ -2,127 +2,158 @@
 /**
  * TimeAggregator — 时间聚合器
  *
- * 职责：对 TimeSlice[] 进行统计聚合
+ * 职责：对 TimeSession[] 进行统计聚合
  * 边界：纯计算，不关心数据来源和存储
- * 依赖：仅依赖 models.ts
+ * 依赖：仅依赖 models.ts 与 dashboard-types.ts
+ *
+ * ⚠️ 所有日期计算统一使用本地时区，禁止使用 toISOString()（UTC）
+ *
+ * 关键修正（0.3.2）：
+ *   - 已结束的「跨午夜会话」此前被整段计入其起始日（todayMs / last7Days），
+ *     导致当日/近 7 天数值虚高、跨日部分丢失。现已统一改用会话与目标日
+ *     窗口的「交集」计算，与 thisWeekMs 的口径一致。
+ *   - 新增 finishedSessionsByDate() 单次遍历完成分桶，供上层做结果缓存，
+ *     避免每次刷新重复 O(n) 扫描。
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimeAggregator = void 0;
+exports.localDateStr = localDateStr;
+exports.finishedSessionsByDate = finishedSessionsByDate;
+const models_1 = require("./models");
 /**
- * 获取今天的日期字符串 (YYYY-MM-DD)
+ * 获取本地时区的日期字符串 (YYYY-MM-DD)
+ * 禁止使用 toISOString() — 它返回 UTC，在中国 (UTC+8) 早上 8 点前会错位一天
  */
-function todayDateStr() {
-    return new Date().toISOString().slice(0, 10);
+function localDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+/** 取某时间戳所在自然日的 00:00:00 本地时间戳 */
+function startOfDayMs(ts) {
+    const d = new Date(ts);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+/** 取本周一 00:00:00 本地时间戳 */
+function startOfMondayMs() {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=周日, 1=周一, ..., 6=周六
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - daysSinceMonday);
+    monday.setHours(0, 0, 0, 0);
+    return monday.getTime();
+}
+/**
+ * 计算 [startMs, endMs] 与 [winStart, winEnd] 两区间的交集毫秒数。
+ * 这是所有「按日 / 按周」统计的单一事实来源，保证口径一致。
+ */
+function overlapMs(startMs, endMs, winStart, winEnd) {
+    const s = Math.max(winStart, startMs);
+    const e = Math.min(winEnd, endMs);
+    return e > s ? e - s : 0;
+}
+/**
+ * 单次遍历，将「已结束会话」按时长归属拆分到对应自然日，返回 dateStr → ms 的 map。
+ *
+ * 一个会话最多跨数天；循环按「天」步进，仅累加与目标日有交集的部分，
+ * 因此整体复杂度为 O(会话总跨度天数)，对常见短会话近似 O(n)，远优于逐日 × O(n)。
+ * 活跃（进行中）会话不在此处处理，由调用方叠加活跃交集。
+ */
+function finishedSessionsByDate(sessions) {
+    const map = new Map();
+    if (sessions.length === 0)
+        return map;
+    for (const s of sessions) {
+        if (s.startMs <= 0 || s.endMs <= s.startMs)
+            continue;
+        let cursor = startOfDayMs(s.startMs);
+        const lastDay = startOfDayMs(s.endMs);
+        // 安全上限：单会话最多跨 400 天，避免异常数据导致死循环
+        let guard = 0;
+        while (cursor <= lastDay && guard++ < 400) {
+            const dayEnd = cursor + models_1.MS_PER_DAY;
+            const ov = overlapMs(s.startMs, s.endMs, cursor, dayEnd);
+            if (ov > 0) {
+                const key = localDateStr(new Date(cursor));
+                map.set(key, (map.get(key) ?? 0) + ov);
+            }
+            cursor += models_1.MS_PER_DAY;
+        }
+    }
+    return map;
 }
 class TimeAggregator {
     /**
-     * 将 TimeSlice 数组累加为总时长 (ms)
-     */
-    static sumSlices(slices) {
-        return slices.reduce((sum, s) => sum + s.deltaMs, 0);
-    }
-    /**
-     * 将 journal 中的 TimeSlice 合并到 WorkspaceTimingData
-     */
-    static mergeJournal(data, slices) {
-        const totalDelta = TimeAggregator.sumSlices(slices);
-        data.totalMs += totalDelta;
-    }
-    /**
      * 计算今日累计时长 (ms)
-     * = 今日已结束会话的总和 + 当前活跃会话已历时
+     * = 已结束会话在今日的交集之和 + 活跃会话在今日内的部分
      *
-     * @param sessions 历史会话列表（含今日已结束的会话）
-     * @param currentSessionStartMs 当前活跃会话开始时间，0 表示无活跃会话
+     * ★ 跨日连续会话自动拆分：取 max(今日 00:00, 会话区间) 作为计时区间
      */
     static todayMs(sessions, currentSessionStartMs) {
-        const today = todayDateStr();
-        let total = 0;
-        // 今日已结束的会话
-        for (const s of sessions) {
-            const date = new Date(s.startMs).toISOString().slice(0, 10);
-            if (date === today) {
-                total += s.durationMs;
-            }
-        }
-        // 当前活跃会话（如果是从今天开始的）
+        return this.todayMsFromFinished(finishedSessionsByDate(sessions), currentSessionStartMs);
+    }
+    /** 基于已结束会话分桶结果计算今日累计（供缓存层复用） */
+    static todayMsFromFinished(finishedByDate, currentSessionStartMs) {
+        const dayStart = startOfDayMs(Date.now());
+        const todayKey = localDateStr(new Date(dayStart));
+        let total = finishedByDate.get(todayKey) ?? 0;
         if (currentSessionStartMs > 0) {
-            const sessionDate = new Date(currentSessionStartMs).toISOString().slice(0, 10);
-            if (sessionDate === today) {
-                total += Date.now() - currentSessionStartMs;
-            }
+            total += overlapMs(currentSessionStartMs, Date.now(), dayStart, dayStart + models_1.MS_PER_DAY);
         }
         return total;
     }
     /**
-     * 按日聚合会话列表
+     * 计算本周累计时长 (ms) — 独立于每日明细
+     * 本周 = 本周一 00:00:00（本地）到此刻，对每条会话取 [startMs, endMs] ∩ [周一00:00, now]
      */
-    static dailyStats(sessions) {
-        const map = new Map();
-        for (const s of sessions) {
-            const date = new Date(s.startMs).toISOString().slice(0, 10); // "2026-06-16"
-            const entry = map.get(date) ?? { totalMs: 0, count: 0 };
-            entry.totalMs += s.durationMs;
-            entry.count++;
-            map.set(date, entry);
+    static thisWeekMs(sessions, currentSessionStartMs) {
+        return this.thisWeekMsFromFinished(finishedSessionsByDate(sessions), currentSessionStartMs);
+    }
+    /** 基于已结束会话分桶结果计算本周累计（供缓存层复用） */
+    static thisWeekMsFromFinished(finishedByDate, currentSessionStartMs) {
+        const now = Date.now();
+        const weekStart = startOfMondayMs();
+        // 已结束会话：汇总落在 [周一, 今日] 日期范围内的分桶
+        let total = 0;
+        for (const [dateStr, ms] of finishedByDate) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dayStart = new Date(y, m - 1, d).getTime();
+            if (dayStart >= weekStart && dayStart <= startOfDayMs(now)) {
+                total += ms;
+            }
         }
-        return Array.from(map.entries())
-            .map(([date, v]) => ({ date, totalMs: v.totalMs, sessionCount: v.count }))
-            .sort((a, b) => a.date.localeCompare(b.date));
+        // 活跃会话在本周内的部分
+        if (currentSessionStartMs > 0) {
+            total += overlapMs(currentSessionStartMs, now, weekStart, now);
+        }
+        return total;
     }
     /**
-     * 按周聚合会话列表
-     */
-    static weeklyStats(sessions) {
-        const map = new Map();
-        for (const s of sessions) {
-            const d = new Date(s.startMs);
-            // 计算周一日期
-            const day = d.getDay();
-            const diff = day === 0 ? -6 : 1 - day; // 周日特殊处理
-            const monday = new Date(d);
-            monday.setDate(d.getDate() + diff);
-            const weekStart = monday.toISOString().slice(0, 10);
-            const entry = map.get(weekStart) ?? { totalMs: 0, count: 0 };
-            entry.totalMs += s.durationMs;
-            entry.count++;
-            map.set(weekStart, entry);
-        }
-        return Array.from(map.entries())
-            .map(([weekStart, v]) => ({ weekStart, totalMs: v.totalMs, sessionCount: v.count }))
-            .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
-    }
-    /**
-     * 最近 7 天每日统计（用于柱状图）
-     *
-     * @param sessions 历史会话列表
-     * @param currentSessionStartMs 当前活跃会话开始时间
-     * @returns 最近 7 天的 DailyChartEntry 数组，按日期升序
+     * 最近 7 天每日统计（用于柱状图）。
+     * 单次遍历完成分桶后，仅对 7 个窗口做廉价叠加，避免 7×O(n) 重复扫描。
      */
     static last7Days(sessions, currentSessionStartMs) {
+        return this.last7DaysFromFinished(finishedSessionsByDate(sessions), currentSessionStartMs);
+    }
+    /** 基于已结束会话分桶结果生成近 7 天统计（供缓存层复用） */
+    static last7DaysFromFinished(finishedByDate, currentSessionStartMs) {
         const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
-        const today = new Date();
+        const now = new Date();
+        const todayStart = startOfDayMs(now.getTime());
         const result = [];
-        // 生成本周各日期的 dateStr
         for (let i = 6; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            const dateStr = d.toISOString().slice(0, 10);
-            const label = dateStr.slice(5); // "06-16"
-            const weekday = weekdayNames[d.getDay()];
-            let totalMs = 0;
-            // 累加当日已结束会话
-            for (const s of sessions) {
-                const sDate = new Date(s.startMs).toISOString().slice(0, 10);
-                if (sDate === dateStr) {
-                    totalMs += s.durationMs;
-                }
+            const dayStart = todayStart - i * models_1.MS_PER_DAY;
+            const dateStr = localDateStr(new Date(dayStart));
+            const d = new Date(dayStart);
+            let totalMs = finishedByDate.get(dateStr) ?? 0;
+            if (currentSessionStartMs > 0) {
+                totalMs += overlapMs(currentSessionStartMs, Date.now(), dayStart, dayStart + models_1.MS_PER_DAY);
             }
-            // 累加当前活跃会话（如果是今天开始的）
-            if (dateStr === today.toISOString().slice(0, 10) && currentSessionStartMs > 0) {
-                totalMs += Date.now() - currentSessionStartMs;
-            }
-            result.push({ label, weekday, totalMs });
+            result.push({
+                label: dateStr.slice(5),
+                weekday: weekdayNames[d.getDay()],
+                totalMs,
+                dateStr,
+            });
         }
         return result;
     }

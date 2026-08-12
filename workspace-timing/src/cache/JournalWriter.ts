@@ -7,6 +7,7 @@
  */
 
 import { TimeSlice } from '../domain/models';
+import { DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS } from '../domain/models';
 import { RingBuffer } from './RingBuffer';
 import { ICacheStrategy, TimeBasedCacheStrategy } from './ICacheStrategy';
 import { JournalStorageProvider } from '../persistence/JournalStorageProvider';
@@ -20,12 +21,12 @@ export class JournalWriter {
 
     constructor(
         storage: JournalStorageProvider,
-        capacity: number = 1024,
+        capacity: number = DEFAULT_RING_BUFFER_CAP,
         strategy?: ICacheStrategy,
     ) {
         this.ringBuffer = new RingBuffer<TimeSlice>(capacity);
         this.storage = storage;
-        this.strategy = strategy ?? new TimeBasedCacheStrategy(10000);
+        this.strategy = strategy ?? new TimeBasedCacheStrategy(DEFAULT_JOURNAL_FLUSH_MS);
     }
 
     /** 获取内部 RingBuffer 引用（供 UI 读取最近数据） */

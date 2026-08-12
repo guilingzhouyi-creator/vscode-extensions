@@ -26,6 +26,7 @@ const MODE_CYCLE: StatusBarMode[] = ['today-total', 'total-today', 'compact'];
 
 export interface StatusBarConfig {
     enabled: boolean;
+    clickAction?: 'cycle' | 'dashboard';
 }
 
 export class StatusBarController {
@@ -34,6 +35,9 @@ export class StatusBarController {
     private _mode: StatusBarMode = 'today-total';
     private _todayMs: number = 0;
     private _totalMs: number = 0;
+    private _visible: boolean = false;
+    private _lastText: string = '';
+    private _clickAction: 'cycle' | 'dashboard' = 'cycle';
 
     constructor() {
         this.statusBarItem = vscode.window.createStatusBarItem(
@@ -44,9 +48,15 @@ export class StatusBarController {
         this.statusBarItem.tooltip = t()['statusBar.tooltip'];
     }
 
+    /** 获取当前点击行为 */
+    get clickAction(): 'cycle' | 'dashboard' {
+        return this._clickAction;
+    }
+
     /** 更新配置 */
     updateConfig(config: Partial<StatusBarConfig>): void {
         if (config.enabled !== undefined) this._enabled = config.enabled;
+        if (config.clickAction !== undefined) this._clickAction = config.clickAction;
         this.refresh();
     }
 
@@ -60,7 +70,11 @@ export class StatusBarController {
     /** 刷新状态栏显示 */
     private refresh(): void {
         if (!this._enabled) {
-            this.statusBarItem.hide();
+            if (this._visible) {
+                this.statusBarItem.hide();
+                this._visible = false;
+                this._lastText = '';
+            }
             return;
         }
 
@@ -77,9 +91,21 @@ export class StatusBarController {
                 break;
         }
 
-        this.statusBarItem.text = `$(watch) ${text}`;
+        const displayText = `$(watch) ${text}`;
+
+        // ★ 仅在文本实际变化时更新，避免每秒触发 VS Code 状态栏重绘
+        if (displayText !== this._lastText) {
+            this.statusBarItem.text = displayText;
+            this._lastText = displayText;
+        }
+
+        // ★ 仅在首次或从隐藏恢复时调用 .show()，避免冗余重排
+        if (!this._visible) {
+            this.statusBarItem.show();
+            this._visible = true;
+        }
+
         this.statusBarItem.tooltip = `${t()['statusBar.tooltip']}（${MODE_LABELS[this._mode]}）`;
-        this.statusBarItem.show();
     }
 
     /** 循环切换显示模式 */
@@ -98,7 +124,11 @@ export class StatusBarController {
 
     /** 隐藏状态栏 */
     hide(): void {
-        this.statusBarItem.hide();
+        if (this._visible) {
+            this.statusBarItem.hide();
+            this._visible = false;
+            this._lastText = '';
+        }
     }
 
     /** 获取当前模式 */

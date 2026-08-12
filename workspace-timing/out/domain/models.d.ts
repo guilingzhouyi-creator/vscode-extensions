@@ -7,6 +7,19 @@
  */
 /** 数据格式当前版本 */
 export declare const LATEST_VERSION = 1;
+export declare const MS_PER_SECOND = 1000;
+export declare const MS_PER_MINUTE = 60000;
+export declare const MS_PER_HOUR = 3600000;
+export declare const MS_PER_DAY = 86400000;
+export declare const DEFAULT_HEARTBEAT_MS = 1000;
+export declare const DEFAULT_STATUS_BAR_MS: number;
+export declare const DEFAULT_JOURNAL_FLUSH_MS: number;
+export declare const DEFAULT_FULL_SAVE_MS = 60000;
+export declare const DEFAULT_RING_BUFFER_CAP = 1024;
+export declare const DEFAULT_MAX_SESSIONS = 1000;
+export declare const DEFAULT_IDLE_TIMEOUT_MS: number;
+export declare const DEFAULT_DAILY_GOAL_MS: number;
+export declare const CRASH_COMPENSATION_CAP_MS = 86400000;
 /** 一条原子时间片 — 用于缓存层和 journal */
 export interface TimeSlice {
     /** 时间片结束时间戳 (Date.now()) */
@@ -62,8 +75,16 @@ export interface TimingConfig {
     fullSaveIntervalMs: number;
     /** 状态栏显示格式 */
     statusBarFormat: 'compact' | 'detailed';
+    /** 状态栏点击行为 */
+    statusBarClickAction: 'cycle' | 'dashboard';
     /** 历史会话保留上限（0 = 不限） */
     maxSessions: number;
+    /** 编辑活跃度追踪（效率转化） */
+    activityTrackingEnabled: boolean;
+    /** 闲置超时 (ms)，0 = 禁用闲置检测 */
+    idleTimeoutMs: number;
+    /** 每日目标时长 (ms)，0 = 不设目标 */
+    dailyGoalMs: number;
 }
 /** 默认配置 */
 export declare const DEFAULT_CONFIG: TimingConfig;

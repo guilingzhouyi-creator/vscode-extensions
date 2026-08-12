@@ -63,9 +63,16 @@ export interface I18nStrings {
     'toast.exportCSV': string;
     'toast.reset': string;
     'toast.configUpdated': string;
+    'toast.exported': string;
+    'toast.diagnosticExported': string;
+    'toast.exportFailed': string;
+    'toast.goalReached': string;
     'confirm.newPeriod': string;
     'confirm.newPeriod.title': string;
     'confirm.reset': string;
     'confirm.reset.title': string;
     'cmd.modeSwitched': string;
+    'cmd.exported': string;
 }
+/** 字符串格式化：替换 {0} {1} ... */
+export declare function format(template: string, ...args: string[]): string;

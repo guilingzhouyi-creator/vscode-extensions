@@ -65,6 +65,10 @@ const en: I18nStrings = {
     'toast.exportCSV': 'CSV export requested',
     'toast.reset': 'Reset requested',
     'toast.configUpdated': 'Configuration updated',
+    'toast.exported': 'Exported: {0}',
+    'toast.diagnosticExported': 'Diagnostic report exported: {0}',
+    'toast.exportFailed': 'Export failed',
+    'toast.goalReached': '🎯 Daily goal reached! {0}h {1}m',
 
     'confirm.newPeriod': 'Start a new counting period? The counter will reset to zero, but history will be preserved.',
     'confirm.newPeriod.title': 'Confirm New Period',
@@ -72,6 +76,7 @@ const en: I18nStrings = {
     'confirm.reset.title': 'Confirm Reset',
 
     'cmd.modeSwitched': 'Switched to "{0}" mode',
+    'cmd.exported': 'Exported: {0}',
 };
 
 export default en;

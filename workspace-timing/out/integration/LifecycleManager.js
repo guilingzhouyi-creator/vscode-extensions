@@ -15,8 +15,9 @@ class LifecycleManager {
     }
     /** 挂载所有事件监听 */
     start() {
-        // 窗口焦点变化（预留：后续可作为可选策略）
-        // 当前需求"窗口打开即计"，不依赖焦点
+        // 当前目标 VS Code 版本未暴露 onWillSaveState 等关闭钩子，
+        // 优雅存盘由 extension.deactivate() 经 onVSCodeClose() 统一负责（见 activation 层）。
+        // 预留扩展点：后续版本可在此订阅窗口/焦点事件做增量保存。
         (0, Logger_1.log)(Logger_1.LogLevel.Info, 'LifecycleManager: started');
     }
     /** 停止所有监听 */

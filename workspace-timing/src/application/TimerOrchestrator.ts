@@ -13,12 +13,13 @@ import { TimerEngine } from '../domain/TimerEngine';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager, SessionResult } from './SessionManager';
-import { WorkspaceTimingData, TimingConfig } from '../domain/models';
-import { TimeAggregator } from '../domain/TimeAggregator';
+import { WorkspaceTimingData, TimingConfig, DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS, DEFAULT_FULL_SAVE_MS, DEFAULT_MAX_SESSIONS } from '../domain/models';
 import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
+import { ActivityTracker } from './ActivityTracker';
+import { IdleDetector } from './IdleDetector';
 import { LogLevel, log } from '../integration/Logger';
 
 export type OrchestratorState = 'idle' | 'running' | 'disabled' | 'saving';
@@ -31,6 +32,8 @@ export class TimerOrchestrator {
     private readonly disableManager: DisableManager;
     private readonly scheduler: Scheduler;
     private readonly global: GlobalAggregator;
+    private readonly activityTracker: ActivityTracker;
+    private readonly idleDetector: IdleDetector;
 
     private _state: OrchestratorState = 'idle';
     private _onStateChange: ((state: OrchestratorState) => void) | null = null;
@@ -43,6 +46,8 @@ export class TimerOrchestrator {
         disableManager: DisableManager,
         scheduler: Scheduler,
         globalAggregator: GlobalAggregator,
+        activityTracker: ActivityTracker,
+        idleDetector: IdleDetector,
     ) {
         this.timer = timer;
         this.storage = storage;
@@ -51,6 +56,23 @@ export class TimerOrchestrator {
         this.disableManager = disableManager;
         this.scheduler = scheduler;
         this.global = globalAggregator;
+        this.activityTracker = activityTracker;
+        this.idleDetector = idleDetector;
+    }
+
+    /** 活动追踪器 */
+    get activity(): ActivityTracker {
+        return this.activityTracker;
+    }
+
+    /** 闲置检测器 */
+    get idle(): IdleDetector {
+        return this.idleDetector;
+    }
+
+    /** 调度器（供 ConfigWatcher 热更新间隔）*/
+    get schedulerInstance(): Scheduler {
+        return this.scheduler;
     }
 
     /** 当前状态 */
@@ -93,9 +115,8 @@ export class TimerOrchestrator {
             await this.sessionManager.startSession();
 
             // 启动调度器
-            this.scheduler.onStatusBarUpdate((totalMs) => {
-                // 状态栏更新委托给 Presentation 层
-                this._onTick?.(totalMs);
+            this.scheduler.onStatusBarUpdate((data) => {
+                this._onTick?.(data);
             });
             this.scheduler.start();
 
@@ -158,12 +179,36 @@ export class TimerOrchestrator {
     async getDashboardData(): Promise<DashboardData> {
         const snap = this.sessionManager.snapshot;
         const todayMs = this.sessionManager.getTodayMs();
+        const thisWeekMs = this.sessionManager.getThisWeekMs();
         const cfg = this.disable.config;
         const sessions = this.timer.data.sessions;
 
-        // 最近 7 天每日统计
-        const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs);
-        const weekTotalMs = dailyStats.reduce((sum, d) => sum + d.totalMs, 0);
+        // 最近 7 天每日统计（用于柱状图——复用 SessionManager 的已结束会话缓存，避免每次刷新重复扫描）
+        const dailyStats = this.sessionManager.getDailyStats();
+        // ★ 本周卡片使用独立周累加器，不再从 dailyStats 累加
+        const weekTotalMs = thisWeekMs;
+        // ★ 柱状图 7 天合计（供效率计算使用，与 dailyStats 时间范围一致）
+        const chartSumMs = dailyStats.reduce((sum, d) => sum + d.totalMs, 0);
+
+        // 效率数据（叠加活跃编辑时长，扣除闲置）
+        let weekEfficiency: number | undefined;
+        let weekIdleMs = 0;
+        if (cfg.activityTrackingEnabled) {
+            let totalActiveMs = 0;
+            for (const d of dailyStats) {
+                const activeMs = this.activityTracker.getDailyActiveMs(d.dateStr);
+                const idleMs = this.idleDetector.getDailyIdleMs(d.dateStr);
+                d.activeMs = activeMs;
+                d.idleMs = idleMs;
+                // 效率 = 活跃编辑 / (总时长 - 闲置)
+                const effectiveMs = d.totalMs - idleMs;
+                d.efficiency = effectiveMs > 0 ? activeMs / effectiveMs : 0;
+                totalActiveMs += activeMs;
+                weekIdleMs += idleMs;
+            }
+            const effectiveWeekMs = chartSumMs - weekIdleMs;
+            weekEfficiency = effectiveWeekMs > 0 ? totalActiveMs / effectiveWeekMs : 0;
+        }
 
         // 跨工作区累计（从缓存读取，不额外 I/O）
         const globalSnap = await this.global.snapshot();
@@ -174,6 +219,7 @@ export class TimerOrchestrator {
             sessionsCount: sessions.length,
             dailyStats,
             weekTotalMs,
+            weekEfficiency,
             globalTotalMs: globalSnap.totalMs,
             workspaceCount: globalSnap.workspaceCount,
             workspaceList: globalSnap.workspaces,
@@ -182,10 +228,13 @@ export class TimerOrchestrator {
             statusBarEnabled: cfg.statusBarEnabled,
             journalEnabled: cfg.journalEnabled ?? true,
             backupToFile: cfg.backupToFile ?? true,
-            ringBufferCapacity: cfg.ringBufferCapacity ?? 1024,
-            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? 10000,
-            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? 60000,
-            maxSessions: cfg.maxSessions ?? 1000,
+            ringBufferCapacity: cfg.ringBufferCapacity ?? DEFAULT_RING_BUFFER_CAP,
+            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
+            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? DEFAULT_FULL_SAVE_MS,
+            maxSessions: cfg.maxSessions ?? DEFAULT_MAX_SESSIONS,
+            efficiencyEnabled: cfg.activityTrackingEnabled ?? true,
+            dailyGoalMs: cfg.dailyGoalMs ?? 0,
+            statusBarClickAction: cfg.statusBarClickAction ?? 'cycle',
         };
     }
 
@@ -220,6 +269,9 @@ export class TimerOrchestrator {
         if (partial.journalFlushIntervalMs !== undefined) cfg.journalFlushIntervalMs = partial.journalFlushIntervalMs;
         if (partial.fullSaveIntervalMs !== undefined) cfg.fullSaveIntervalMs = partial.fullSaveIntervalMs;
         if (partial.maxSessions !== undefined) cfg.maxSessions = partial.maxSessions;
+        if (partial.efficiencyEnabled !== undefined) cfg.activityTrackingEnabled = partial.efficiencyEnabled;
+        if (partial.dailyGoalMs !== undefined) cfg.dailyGoalMs = partial.dailyGoalMs * 60000;
+        if (partial.statusBarClickAction !== undefined) cfg.statusBarClickAction = partial.statusBarClickAction as 'cycle' | 'dashboard';
         this.disable.updateConfig(cfg);
     }
 

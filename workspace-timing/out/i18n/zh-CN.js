@@ -58,11 +58,16 @@ const zhCN = {
     'toast.exportCSV': '已请求导出 CSV',
     'toast.reset': '已请求重置数据',
     'toast.configUpdated': '配置已更新',
+    'toast.exported': '已导出: {0}',
+    'toast.diagnosticExported': '诊断报告已导出: {0}',
+    'toast.exportFailed': '导出失败',
+    'toast.goalReached': '🎯 今日目标达成！{0}h {1}m',
     'confirm.newPeriod': '确定要新建计时周期？累计时长将归零，历史记录保留。',
     'confirm.newPeriod.title': '确认新建',
     'confirm.reset': '确定要重置所有计时数据？此操作不可撤销！',
     'confirm.reset.title': '确认重置',
     'cmd.modeSwitched': '已切换至「{0}」模式',
+    'cmd.exported': '已导出: {0}',
 };
 exports.default = zhCN;
 //# sourceMappingURL=zh-CN.js.map

@@ -62,7 +62,7 @@ class StorageCoordinator {
         if (data.currentSessionStartMs > 0) {
             const now = Date.now();
             const elapsed = now - data.currentSessionStartMs;
-            if (elapsed > 0 && elapsed < 86400000) { // 最多补偿 24h，防止异常
+            if (elapsed > 0 && elapsed < models_1.MS_PER_DAY) { // 最多补偿 24h，防止异常
                 data.totalMs += elapsed;
                 (0, Logger_1.log)(Logger_1.LogLevel.Info, `StorageCoordinator: compensated unfinished session: +${elapsed}ms`);
             }

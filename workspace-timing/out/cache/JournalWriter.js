@@ -8,15 +8,16 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JournalWriter = void 0;
+const models_1 = require("../domain/models");
 const RingBuffer_1 = require("./RingBuffer");
 const ICacheStrategy_1 = require("./ICacheStrategy");
 const Logger_1 = require("../integration/Logger");
 class JournalWriter {
-    constructor(storage, capacity = 1024, strategy) {
+    constructor(storage, capacity = models_1.DEFAULT_RING_BUFFER_CAP, strategy) {
         this.lastFlushTime = Date.now();
         this.ringBuffer = new RingBuffer_1.RingBuffer(capacity);
         this.storage = storage;
-        this.strategy = strategy ?? new ICacheStrategy_1.TimeBasedCacheStrategy(10000);
+        this.strategy = strategy ?? new ICacheStrategy_1.TimeBasedCacheStrategy(models_1.DEFAULT_JOURNAL_FLUSH_MS);
     }
     /** 获取内部 RingBuffer 引用（供 UI 读取最近数据） */
     get buffer() {

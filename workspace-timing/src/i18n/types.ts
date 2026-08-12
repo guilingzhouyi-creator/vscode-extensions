@@ -76,6 +76,10 @@ export interface I18nStrings {
     'toast.exportCSV': string;
     'toast.reset': string;
     'toast.configUpdated': string;
+    'toast.exported': string;
+    'toast.diagnosticExported': string;
+    'toast.exportFailed': string;
+    'toast.goalReached': string;
 
     // 确认弹窗
     'confirm.newPeriod': string;
@@ -85,4 +89,10 @@ export interface I18nStrings {
 
     // 命令
     'cmd.modeSwitched': string;
+    'cmd.exported': string;
+}
+
+/** 字符串格式化：替换 {0} {1} ... */
+export function format(template: string, ...args: string[]): string {
+    return template.replace(/\{(\d+)\}/g, (_, i) => args[parseInt(i)] ?? '');
 }
