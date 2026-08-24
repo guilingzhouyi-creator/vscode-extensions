@@ -38,7 +38,8 @@ if ($Name) {
 
 foreach ($ext in $exts) {
     $dir = Join-Path $root $ext
-    $pkg = Get-Content (Join-Path $dir 'package.json') -Raw | ConvertFrom-Json
+    # 显式 UTF-8 读取：PS5.1 的 Get-Content 默认按 ANSI 解码，中文描述会破坏 JSON 解析
+    $pkg = [System.IO.File]::ReadAllText((Join-Path $dir 'package.json'), [System.Text.UTF8Encoding]::new($false)) | ConvertFrom-Json
     $ver = $pkg.version
     $outDir = Join-Path $root "dist\$ext"
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
@@ -48,7 +49,17 @@ foreach ($ext in $exts) {
     if (-not $SkipBuild) {
         Push-Location $dir
         try {
-            if (-not (Test-Path (Join-Path $dir 'node_modules'))) {
+            $lock = Join-Path $dir 'package-lock.json'
+            $nm = Join-Path $dir 'node_modules'
+            # 依赖一致性：lockfile 比 node_modules 新（依赖变更后）或缺失时强制 npm ci，
+            # 避免用陈旧依赖构建出与 CI 不同的产物
+            $needCi = -not (Test-Path $nm)
+            if (-not $needCi -and (Test-Path $lock)) {
+                $lockTime = (Get-Item $lock).LastWriteTimeUtc
+                $nmTime = (Get-Item $nm).LastWriteTimeUtc
+                if ($lockTime -gt $nmTime) { $needCi = $true; Write-Host '  检测到 lockfile 比 node_modules 新 → 重新 npm ci' }
+            }
+            if ($needCi) {
                 Write-Host '  npm ci ...'; npm ci
                 if ($LASTEXITCODE -ne 0) { throw "npm ci 失败 ($ext)" }
             }
@@ -69,15 +80,18 @@ foreach ($ext in $exts) {
     $hash = (Get-FileHash $vsix -Algorithm SHA256).Hash.ToLowerInvariant()
     "$hash  $(Split-Path $vsix -Leaf)" | Set-Content (Join-Path $outDir 'SHA256SUMS.txt') -Encoding ascii
 
-    # ─── 清理旧版本：按版本号排序保留最近 $Keep 个 ───
-    Get-ChildItem $outDir -Filter "$ext-*.vsix" |
-        Sort-Object {
-            $v = $_.BaseName -replace "^$([regex]::Escape($ext))-", ''
-            $parsed = $null
-            if ([version]::TryParse($v, [ref]$parsed)) { $parsed } else { [version]'0.0' }
-        } -Descending |
-        Select-Object -Skip $Keep |
-        Remove-Item -Force -ErrorAction SilentlyContinue
+    # ─── 清理旧版本：语义化版本排序保留最近 $Keep 个 ───
+    # 预发布版本（如 0.4.1-beta）按"同版本号的更早形态"参与排序，不会被当作 0.0 误清理
+    $stale = Get-ChildItem $outDir -Filter "$ext-*.vsix" | ForEach-Object {
+        $v = $_.BaseName -replace "^$([regex]::Escape($ext))-", ''
+        $core = $v -replace '-.*$', ''            # 0.4.1-beta → 0.4.1
+        $pre = if ($v -match '-(.+)$') { $Matches[1] } else { '' }
+        $parsed = [version]'0.0'
+        if (-not [version]::TryParse($core, [ref]$parsed)) { $parsed = [version]'0.0' }
+        [pscustomobject]@{ File = $_; V = $parsed; IsRelease = [bool](-not $pre); Pre = $pre }
+    } | Sort-Object -Property V, IsRelease, Pre -Descending |
+        Select-Object -Skip $Keep
+    $stale | ForEach-Object { Remove-Item $_.File.FullName -Force -ErrorAction SilentlyContinue }
 
     $count = (Get-ChildItem $outDir -Filter "$ext-*.vsix").Count
     Write-Host "  ✔ 完成（保留 $count 个版本）→ $vsix" -ForegroundColor Green

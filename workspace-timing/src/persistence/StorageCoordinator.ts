@@ -78,7 +78,22 @@ export class StorageCoordinator {
         let journalReplayed = false;
         const journalExists = await this.journal.exists();
         if (journalExists) {
-            const slices = await this.journal.readJournal();
+            let slices = await this.journal.readJournal();
+
+            // ★ 幂等水位线：truncate 失败时 journal 会残留已回放过的切片，
+            //   下次恢复若不拦截就会重复累计（数据翻倍）。上次恢复成功时会把
+            //   已回放的最大时间戳记入 metadata.lastJournalTs，此处据此跳过旧切片。
+            const watermark = Number(data.metadata?.['lastJournalTs'] ?? 0);
+            if (watermark > 0) {
+                const before = slices.length;
+                slices = slices.filter(s => s.timestamp > watermark);
+                if (slices.length < before) {
+                    log(LogLevel.Warn,
+                        `StorageCoordinator: skipped ${before - slices.length} already-replayed journal slice(s) ` +
+                        `(watermark=${watermark}) — previous truncate likely failed`);
+                }
+            }
+
             if (slices.length > 0) {
                 const journalDelta = slices.reduce((sum, s) => sum + s.deltaMs, 0);
                 data.totalMs += journalDelta;
@@ -105,7 +120,23 @@ export class StorageCoordinator {
                     `StorageCoordinator: replayed ${slices.length} journal entries, +${journalDelta}ms, ` +
                     `synthesized ${synthesized} session segment(s)`);
             }
-            await this.journal.truncate();
+
+            // 记录回放水位线（无论本次是否有新切片，都推进到 journal 最新时间戳），
+            // 即使下方 truncate 失败，下次恢复也能据此去重。
+            const maxTs = slices.reduce((max, s) => Math.max(max, s.timestamp), 0);
+            if (maxTs > 0) {
+                data.metadata = { ...data.metadata, lastJournalTs: String(maxTs) };
+            }
+
+            // truncate 失败会抛出（IJournalStore 契约）：捕获告警但继续激活——
+            // 水位线已写入 data 并将随本次 save 持久化，残留切片不会造成重复累计。
+            try {
+                await this.journal.truncate();
+            } catch (err) {
+                log(LogLevel.Error,
+                    'StorageCoordinator: journal truncate FAILED — residual slices will be ' +
+                    'deduplicated via metadata.lastJournalTs on next recovery', err as Error);
+            }
         }
 
         // Step 3: 补偿未完成会话

@@ -30,10 +30,10 @@ class GlobalAggregator {
      * 将当前工作区的计时同步到全局存储
      * 由 Scheduler 周期全量存盘回调与 TimerOrchestrator.saveNow() 调用
      */
-    async sync(localTotalMs) {
+    async sync(localTotalMs, force = false) {
         if (this._syncing)
             return; // 上一轮尚未完成，跳过本轮（下轮 checkpoint 会再同步）
-        if (this._lastSyncedTotalMs === localTotalMs)
+        if (!force && this._lastSyncedTotalMs === localTotalMs)
             return; // 未变化，跳过整轮读写
         this._syncing = true;
         try {

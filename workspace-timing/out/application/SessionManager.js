@@ -27,6 +27,15 @@ class SessionManager {
     setMaxSessions(maxSessions) {
         this.maxSessions = maxSessions;
     }
+    /**
+     * 使今日累计缓存失效。
+     * reset/newPeriod/崩溃恢复等数据清空或替换场景必须调用，
+     * 否则 3s TTL 内 getTodayMs 会返回基于旧 sessions 的过期值。
+     */
+    invalidateTodayCache() {
+        this._todayCacheAt = 0;
+        this._todayCacheValue = 0;
+    }
     /** 获取计时器快照 */
     get snapshot() {
         return this.timer.snapshot();
@@ -41,6 +50,8 @@ class SessionManager {
         const data = await this.storage.recover();
         // 2. 替换计时器数据
         this.timer.replaceData(data);
+        // 数据被恢复结果整体替换，今日缓存必须失效
+        this.invalidateTodayCache();
         // 3. 开始计时
         this.timer.start();
         this._sessionActive = true;

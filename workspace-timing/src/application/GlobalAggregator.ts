@@ -67,9 +67,9 @@ export class GlobalAggregator {
      * 将当前工作区的计时同步到全局存储
      * 由 Scheduler 周期全量存盘回调与 TimerOrchestrator.saveNow() 调用
      */
-    async sync(localTotalMs: number): Promise<void> {
+    async sync(localTotalMs: number, force = false): Promise<void> {
         if (this._syncing) return; // 上一轮尚未完成，跳过本轮（下轮 checkpoint 会再同步）
-        if (this._lastSyncedTotalMs === localTotalMs) return; // 未变化，跳过整轮读写
+        if (!force && this._lastSyncedTotalMs === localTotalMs) return; // 未变化，跳过整轮读写
         this._syncing = true;
         try {
             // ★ 仅在真正写成功后才记账：doSync 内部吞掉的失败返回 false，

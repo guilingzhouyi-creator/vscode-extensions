@@ -15,6 +15,10 @@ export interface MessageRouterContext {
     getOrchestrator(): TimerOrchestrator | null;
     /** reset 完成后用于状态栏归零 */
     getStatusBar(): StatusBarController | null;
+    /** reset 完成后用于立即回推最新面板数据（注入而非静态单例，保持可测性） */
+    getDashboard(): {
+        updateData(data: unknown): void;
+    } | null;
 }
 export type DashboardMessageHandler = (msg: DashboardMessage) => void;
 /** 创建面板消息处理器（每次 activate 构造一次） */

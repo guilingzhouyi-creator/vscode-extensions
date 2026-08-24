@@ -140,7 +140,9 @@ if [[ -z "$RELEASE_NAME" || -z "$RELEASE_VERSION" ]]; then
   [[ -z "$RELEASE_VERSION" ]] && RELEASE_VERSION=$(grep '"version"' "$PKG_JSON" | head -1 | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')
 fi
 
-TAG_NAME="v${RELEASE_VERSION}"
+# Tag 规范与 GitHub 体系对齐：<模块名>-vX.Y.Z（如 workspace-timing-v0.4.1），避免两平台对同一发布打出不同 Tag
+MODULE_NAME="$(basename "$MODULE_DIR")"
+TAG_NAME="${MODULE_NAME}-v${RELEASE_VERSION}"
 echo "发布模块 : ${RELEASE_NAME:-（未解析）}"
 echo "发布版本 : ${RELEASE_VERSION}"
 echo "目标标签 : ${TAG_NAME}"

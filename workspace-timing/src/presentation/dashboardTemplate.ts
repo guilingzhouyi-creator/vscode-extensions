@@ -886,8 +886,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           return '<div class="chart-bar-wrapper">' +
             '<div class="chart-bar-value">' + valStr + '</div>' +
             '<div class="chart-bar" style="height:' + pct + '%"></div>' +
-            '<div class="chart-bar-label">' + d.weekday + '</div>' +
-            '<div class="chart-bar-label" style="font-size:9px">' + d.label + '</div>' +
+            '<div class="chart-bar-label">' + escapeHtml(d.weekday) + '</div>' +
+            '<div class="chart-bar-label" style="font-size:9px">' + escapeHtml(d.label) + '</div>' +
             '</div>';
         }).join('');
 
@@ -920,7 +920,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           document.getElementById('trendList').innerHTML = trend.map(w => {
             const pct = Math.max((w.totalMs / maxVal) * 100, 2);
             return '<div class="trend-row">' +
-              '<div class="trend-label" title="' + w.weekStart + '">' + w.label + '</div>' +
+              '<div class="trend-label" title="' + escapeHtml(w.weekStart) + '">' + escapeHtml(w.label) + '</div>' +
               '<div class="trend-track"><div class="trend-fill" style="width:' + pct + '%"></div></div>' +
               '<div class="trend-value">' + formatDuration(w.totalMs) + '</div>' +
               '</div>';
@@ -951,7 +951,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           listEl.style.display = 'block';
           listEl.innerHTML = detail.sessions.map(s =>
             '<div class="session-row">' +
-              '<div class="session-time">' + s.startLabel + ' → ' + s.endLabel + '</div>' +
+              '<div class="session-time">' + escapeHtml(s.startLabel) + ' → ' + escapeHtml(s.endLabel) + '</div>' +
               '<div class="session-dur">' + formatDuration(s.durationMs) + '</div>' +
             '</div>'
           ).join('');

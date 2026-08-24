@@ -22,6 +22,12 @@ class TimerOrchestrator {
         this._onStateChange = null;
         /** 状态栏 tick 回调（由 Scheduler 驱动） */
         this._onTick = null;
+        /**
+         * 重操作串行队列：newPeriod / resetAllData / 禁用切换等重编排必须串行执行，
+         * 防止用户连点按钮触发并发 stop→reset→start 交错（会话数错乱、二次重置）。
+         * 队列中前序操作失败不阻断后续（catch 后继续）。
+         */
+        this._opQueue = Promise.resolve();
         this.timer = timer;
         this.storage = storage;
         this.journal = journal;
@@ -296,6 +302,11 @@ class TimerOrchestrator {
      */
     async newPeriod() {
         (0, Logger_1.log)(Logger_1.LogLevel.Info, 'TimerOrchestrator: new period requested');
+        await this.enqueue(async () => {
+            await this.doNewPeriod();
+        });
+    }
+    async doNewPeriod() {
         // 1. 结束当前会话（记录 sessions、存盘）
         await this.stop();
         // 2. 重置计时器数据（保留 history，totalMs 归零）
@@ -310,8 +321,11 @@ class TimerOrchestrator {
             isEnabled: prevData.isEnabled,
             sessions: historySessions,
         });
-        // 3. 同步全局（重置为 0）
-        await this.global.sync(0);
+        this.sessionManager.invalidateTodayCache();
+        // 3. 同步全局（重置为 0）。
+        //    force：绕过"值未变化"守卫——若上一轮周期恰好也同步过 0，
+        //    守卫会吞掉本次清零，全局聚合中本工作区残留旧累计。
+        await this.global.sync(0, true);
         // 4. 新建空数据存盘（关键事件，强制 JSON 备份）
         const freshData = { ...this.timer.data, sessions: [...this.timer.data.sessions] };
         await this.storage.save(freshData, true);
@@ -331,18 +345,27 @@ class TimerOrchestrator {
      */
     async resetAllData(purgeGlobal = true) {
         (0, Logger_1.log)(Logger_1.LogLevel.Info, 'TimerOrchestrator: resetAllData requested');
-        // 1. 结束当前会话并存盘
-        await this.stop();
-        // 2. 清空工作区本地数据（workspaceState + JSON 备份 + journal）
-        await this.storage.deleteAll();
-        // 3. 级联清全局聚合
-        if (purgeGlobal) {
-            await this.global.reset();
-        }
-        // 4. 从零重新开始计时
-        await this.start();
-        // 5. 返回归零后的最新面板数据
-        return this.getDashboardData();
+        return this.enqueue(async () => {
+            // 1. 结束当前会话并存盘
+            await this.stop();
+            // 2. 清空工作区本地数据（workspaceState + JSON 备份 + journal）
+            await this.storage.deleteAll();
+            // 3. 级联清全局聚合
+            if (purgeGlobal) {
+                await this.global.reset();
+            }
+            // 4. 从零重新开始计时
+            await this.start();
+            // 5. 返回归零后的最新面板数据
+            return this.getDashboardData();
+        });
+    }
+    enqueue(fn) {
+        const run = this._opQueue.then(fn, fn); // 前序失败也执行本操作
+        this._opQueue = run.catch(err => {
+            (0, Logger_1.log)(Logger_1.LogLevel.Error, 'TimerOrchestrator: queued operation failed', err);
+        });
+        return run;
     }
 }
 exports.TimerOrchestrator = TimerOrchestrator;

@@ -90,6 +90,7 @@ export declare class TimerOrchestrator {
      * 历史会话记录保留在 sessions[] 中
      */
     newPeriod(): Promise<void>;
+    private doNewPeriod;
     /**
      * 重置本工作区计时数据并立即重新开始计时（UI 层唯一 reset 入口）。
      *
@@ -102,4 +103,11 @@ export declare class TimerOrchestrator {
      * @returns 重置后的最新面板数据，供调用方立即推送（不等下一个刷新周期）
      */
     resetAllData(purgeGlobal?: boolean): Promise<DashboardData>;
+    /**
+     * 重操作串行队列：newPeriod / resetAllData / 禁用切换等重编排必须串行执行，
+     * 防止用户连点按钮触发并发 stop→reset→start 交错（会话数错乱、二次重置）。
+     * 队列中前序操作失败不阻断后续（catch 后继续）。
+     */
+    private _opQueue;
+    private enqueue;
 }

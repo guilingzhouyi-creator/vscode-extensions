@@ -85,6 +85,7 @@ function getRouterContext() {
     return {
         getOrchestrator: () => orchestrator,
         getStatusBar: () => statusBar,
+        getDashboard: () => DashboardPanel_1.DashboardPanel.currentPanel ?? null,
     };
 }
 function activate(context) {

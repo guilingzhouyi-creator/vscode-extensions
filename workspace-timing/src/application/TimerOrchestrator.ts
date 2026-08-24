@@ -360,6 +360,12 @@ export class TimerOrchestrator {
     async newPeriod(): Promise<void> {
         log(LogLevel.Info, 'TimerOrchestrator: new period requested');
 
+        await this.enqueue(async () => {
+            await this.doNewPeriod();
+        });
+    }
+
+    private async doNewPeriod(): Promise<void> {
         // 1. 结束当前会话（记录 sessions、存盘）
         await this.stop();
 
@@ -375,9 +381,12 @@ export class TimerOrchestrator {
             isEnabled: prevData.isEnabled,
             sessions: historySessions,
         });
+        this.sessionManager.invalidateTodayCache();
 
-        // 3. 同步全局（重置为 0）
-        await this.global.sync(0);
+        // 3. 同步全局（重置为 0）。
+        //    force：绕过"值未变化"守卫——若上一轮周期恰好也同步过 0，
+        //    守卫会吞掉本次清零，全局聚合中本工作区残留旧累计。
+        await this.global.sync(0, true);
 
         // 4. 新建空数据存盘（关键事件，强制 JSON 备份）
         const freshData: WorkspaceTimingData = { ...this.timer.data, sessions: [...this.timer.data.sessions] };
@@ -401,21 +410,38 @@ export class TimerOrchestrator {
     async resetAllData(purgeGlobal = true): Promise<DashboardData> {
         log(LogLevel.Info, 'TimerOrchestrator: resetAllData requested');
 
-        // 1. 结束当前会话并存盘
-        await this.stop();
+        return this.enqueue(async () => {
+            // 1. 结束当前会话并存盘
+            await this.stop();
 
-        // 2. 清空工作区本地数据（workspaceState + JSON 备份 + journal）
-        await this.storage.deleteAll();
+            // 2. 清空工作区本地数据（workspaceState + JSON 备份 + journal）
+            await this.storage.deleteAll();
 
-        // 3. 级联清全局聚合
-        if (purgeGlobal) {
-            await this.global.reset();
-        }
+            // 3. 级联清全局聚合
+            if (purgeGlobal) {
+                await this.global.reset();
+            }
 
-        // 4. 从零重新开始计时
-        await this.start();
+            // 4. 从零重新开始计时
+            await this.start();
 
-        // 5. 返回归零后的最新面板数据
-        return this.getDashboardData();
+            // 5. 返回归零后的最新面板数据
+            return this.getDashboardData();
+        });
+    }
+
+    /**
+     * 重操作串行队列：newPeriod / resetAllData / 禁用切换等重编排必须串行执行，
+     * 防止用户连点按钮触发并发 stop→reset→start 交错（会话数错乱、二次重置）。
+     * 队列中前序操作失败不阻断后续（catch 后继续）。
+     */
+    private _opQueue: Promise<unknown> = Promise.resolve();
+
+    private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+        const run = this._opQueue.then(fn, fn); // 前序失败也执行本操作
+        this._opQueue = run.catch(err => {
+            log(LogLevel.Error, 'TimerOrchestrator: queued operation failed', err as Error);
+        });
+        return run;
     }
 }

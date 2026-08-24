@@ -46,17 +46,20 @@ exports.createDashboardMessageHandler = createDashboardMessageHandler;
 exports.exportTimingToFile = exportTimingToFile;
 exports.exportReportToFile = exportReportToFile;
 const vscode = __importStar(require("vscode"));
-const DashboardPanel_1 = require("./DashboardPanel");
 const TimeAggregator_1 = require("../domain/TimeAggregator");
 const Logger_1 = require("../integration/Logger");
 const index_1 = require("../i18n/index");
+/** 清洗文件名中的非法字符（工作区名可能含 /\:*?"<>| 等） */
+function sanitizeFileName(name) {
+    return name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'workspace';
+}
 /** 创建面板消息处理器（每次 activate 构造一次） */
 function createDashboardMessageHandler(ctx) {
     return (msg) => {
         switch (msg.type) {
             case 'updateConfig':
+                // 静默应用：面板自身已有视觉反馈，每次变更都弹系统 toast 过于嘈杂
                 ctx.getOrchestrator()?.applyDashboardConfig(msg.payload);
-                vscode.window.showInformationMessage((0, index_1.t)()['toast.configUpdated']);
                 break;
             case 'newPeriod':
                 ctx.getOrchestrator()?.newPeriod().catch(err => (0, Logger_1.log)(Logger_1.LogLevel.Error, 'newPeriod failed', err));
@@ -67,7 +70,7 @@ function createDashboardMessageHandler(ctx) {
                 ctx.getOrchestrator()?.resetAllData().then(data => {
                     ctx.getStatusBar()?.updateTime(0, 0);
                     // 立即推送归零后的最新数据，不等下一个刷新周期
-                    DashboardPanel_1.DashboardPanel.currentPanel?.updateData(data);
+                    ctx.getDashboard()?.updateData(data);
                     vscode.window.showInformationMessage((0, index_1.t)()['toast.reset']);
                 }).catch(err => (0, Logger_1.log)(Logger_1.LogLevel.Error, 'reset failed', err));
                 break;
@@ -92,7 +95,7 @@ async function exportTimingToFile(ctx) {
             vscode.window.showWarningMessage((0, index_1.t)()['toast.exportNoWorkspace']);
             return;
         }
-        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+        const workspaceName = sanitizeFileName(vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace');
         const defaultUri = vscode.Uri.file(`${workspaceName}-timing-${TimeAggregator_1.TimeAggregator.todayStr()}.csv`);
         const uri = await vscode.window.showSaveDialog({
             defaultUri,
@@ -123,7 +126,7 @@ async function exportReportToFile(ctx, kind) {
             vscode.window.showWarningMessage((0, index_1.t)()['toast.exportNoWorkspace']);
             return;
         }
-        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+        const workspaceName = sanitizeFileName(vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace');
         const today = TimeAggregator_1.TimeAggregator.todayStr();
         const prefix = kind === 'daily'
             ? (0, index_1.t)()['export.filename.daily']

@@ -59,7 +59,7 @@ export declare class GlobalAggregator {
      * 将当前工作区的计时同步到全局存储
      * 由 Scheduler 周期全量存盘回调与 TimerOrchestrator.saveNow() 调用
      */
-    sync(localTotalMs: number): Promise<void>;
+    sync(localTotalMs: number, force?: boolean): Promise<void>;
     /** 执行一轮同步；返回是否成功（无可做之事/失败均返回 false，由调用方决定是否记账） */
     private doSync;
     /** 获取全局快照 */

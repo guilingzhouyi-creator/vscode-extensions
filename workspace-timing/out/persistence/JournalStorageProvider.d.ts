@@ -25,12 +25,21 @@ export declare class JournalStorageProvider implements IStorageProvider, IJourna
     delete(): Promise<void>;
     /** 检查 journal 文件是否存在 */
     exists(): Promise<boolean>;
-    /** 批量追加时间片到 journal */
+    /**
+     * 批量追加时间片到 journal。
+     * ★ 失败语义（IJournalStore 契约）：写入失败时**抛出异常**，绝不静默吞掉——
+     *   调用方（JournalWriter）依赖抛错把切片退回内存缓冲，否则数据两头落空。
+     */
     appendBatch(slices: TimeSlice[]): Promise<void>;
-    /** 实际执行文件追加 */
+    /** 实际执行文件追加（失败向上抛出） */
     private doAppend;
     /** 读取 journal 中所有时间片 */
     readJournal(): Promise<TimeSlice[]>;
-    /** 清空 journal 文件 */
+    /**
+     * 清空 journal 文件。
+     * ★ 失败语义（IJournalStore 契约）：清空失败时**抛出异常**——
+     *   truncate 失败意味着 journal 残留已回放过的切片，若静默则下次恢复会重复累计。
+     *   recover() 依赖 metadata.lastJournalTs 水位线兜底（见 StorageCoordinator）。
+     */
     truncate(): Promise<void>;
 }

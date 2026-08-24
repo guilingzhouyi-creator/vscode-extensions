@@ -63,7 +63,11 @@ export class JournalStorageProvider implements IStorageProvider, IJournalStore {
         }
     }
 
-    /** 批量追加时间片到 journal */
+    /**
+     * 批量追加时间片到 journal。
+     * ★ 失败语义（IJournalStore 契约）：写入失败时**抛出异常**，绝不静默吞掉——
+     *   调用方（JournalWriter）依赖抛错把切片退回内存缓冲，否则数据两头落空。
+     */
     async appendBatch(slices: TimeSlice[]): Promise<void> {
         if (slices.length === 0) return;
 
@@ -74,31 +78,28 @@ export class JournalStorageProvider implements IStorageProvider, IJournalStore {
 
             await this.doAppend(bytes);
         } catch (err) {
-            log(LogLevel.Warn, 'JournalStorageProvider: appendBatch failed', err as Error);
             this._available = false;
+            log(LogLevel.Error, 'JournalStorageProvider: appendBatch failed', err as Error);
+            throw err;
         }
     }
 
-    /** 实际执行文件追加 */
+    /** 实际执行文件追加（失败向上抛出） */
     private async doAppend(bytes: Buffer): Promise<void> {
+        // 确保 .vscode 目录存在（用 fsPath + path.dirname 正确解析父目录，
+        // 而非 joinPath(uri,'..')——后者不解析 `..` 而是追加字面路径段）
+        const dotVscode = vscode.Uri.file(path.dirname(this.journalUri.fsPath));
         try {
-            // 确保 .vscode 目录存在（用 fsPath + path.dirname 正确解析父目录，
-            // 而非 joinPath(uri,'..')——后者不解析 `..` 而是追加字面路径段）
-            const dotVscode = vscode.Uri.file(path.dirname(this.journalUri.fsPath));
-            try {
-                await vscode.workspace.fs.createDirectory(dotVscode);
-            } catch {
-                // 目录已存在
-            }
-
-            // 修复 O(n) 全量重写：改用 Node fs.appendFile 直接追加（O(1)）。
-            // 原实现每次"读全文件+合并+写回"，journal 增长后每次 flush 都会全量重写，
-            // 日志越大越慢。Node 的 appendFile 追加为 O(1)，小写入通常原子完成。
-            // VS Code 的 workspace.fs 无追加 API，故通过 fsPath 使用 Node fs。
-            await fs.promises.appendFile(this.journalUri.fsPath, bytes);
-        } catch (err) {
-            log(LogLevel.Error, 'JournalStorageProvider: append failed', err as Error);
+            await vscode.workspace.fs.createDirectory(dotVscode);
+        } catch {
+            // 目录已存在
         }
+
+        // 修复 O(n) 全量重写：改用 Node fs.appendFile 直接追加（O(1)）。
+        // 原实现每次"读全文件+合并+写回"，journal 增长后每次 flush 都会全量重写，
+        // 日志越大越慢。Node 的 appendFile 追加为 O(1)，小写入通常原子完成。
+        // VS Code 的 workspace.fs 无追加 API，故通过 fsPath 使用 Node fs。
+        await fs.promises.appendFile(this.journalUri.fsPath, bytes);
     }
 
     /** 读取 journal 中所有时间片 */
@@ -120,10 +121,11 @@ export class JournalStorageProvider implements IStorageProvider, IJournalStore {
 
                 try {
                     const parsed = JSON.parse(trimmed);
-                    // 数值合法性校验：拒绝负值/非有限数（时钟回拨、脏数据、损坏行），
-                    // 防止回放时把异常 delta 累加进 totalMs
+                    // 数值合法性校验：拒绝负值/非有限数/异常大 delta（delta 必须 < timestamp，
+                    // 否则回放时 start = timestamp - deltaMs 为负），防止脏数据污染恢复结果
                     if (typeof parsed.t === 'number' && Number.isFinite(parsed.t) && parsed.t > 0
-                        && typeof parsed.d === 'number' && Number.isFinite(parsed.d) && parsed.d > 0) {
+                        && typeof parsed.d === 'number' && Number.isFinite(parsed.d)
+                        && parsed.d > 0 && parsed.d < parsed.t) {
                         slices.push({ timestamp: parsed.t, deltaMs: parsed.d });
                     }
                 } catch {
@@ -139,16 +141,17 @@ export class JournalStorageProvider implements IStorageProvider, IJournalStore {
         }
     }
 
-    /** 清空 journal 文件 */
+    /**
+     * 清空 journal 文件。
+     * ★ 失败语义（IJournalStore 契约）：清空失败时**抛出异常**——
+     *   truncate 失败意味着 journal 残留已回放过的切片，若静默则下次恢复会重复累计。
+     *   recover() 依赖 metadata.lastJournalTs 水位线兜底（见 StorageCoordinator）。
+     */
     async truncate(): Promise<void> {
-        try {
-            const exists = await this.exists();
-            if (!exists) return;
+        const exists = await this.exists();
+        if (!exists) return;
 
-            await vscode.workspace.fs.writeFile(this.journalUri, Buffer.alloc(0));
-            log(LogLevel.Debug, 'JournalStorageProvider: journal truncated');
-        } catch (err) {
-            log(LogLevel.Warn, 'JournalStorageProvider: truncate failed', err as Error);
-        }
+        await vscode.workspace.fs.writeFile(this.journalUri, Buffer.alloc(0));
+        log(LogLevel.Debug, 'JournalStorageProvider: journal truncated');
     }
 }

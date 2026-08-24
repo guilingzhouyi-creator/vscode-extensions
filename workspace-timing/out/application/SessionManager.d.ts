@@ -27,6 +27,12 @@ export declare class SessionManager {
     get isSessionActive(): boolean;
     /** 运行期热更新会话历史上限（0 = 不限） */
     setMaxSessions(maxSessions: number): void;
+    /**
+     * 使今日累计缓存失效。
+     * reset/newPeriod/崩溃恢复等数据清空或替换场景必须调用，
+     * 否则 3s TTL 内 getTodayMs 会返回基于旧 sessions 的过期值。
+     */
+    invalidateTodayCache(): void;
     /** 获取计时器快照 */
     get snapshot(): TimerSnapshot;
     /**

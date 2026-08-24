@@ -11,7 +11,6 @@
 import * as vscode from 'vscode';
 import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { StatusBarController } from './StatusBarController';
-import { DashboardPanel } from './DashboardPanel';
 import { DashboardMessage } from '../domain/dashboard-types';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
@@ -22,6 +21,13 @@ export interface MessageRouterContext {
     getOrchestrator(): TimerOrchestrator | null;
     /** reset 完成后用于状态栏归零 */
     getStatusBar(): StatusBarController | null;
+    /** reset 完成后用于立即回推最新面板数据（注入而非静态单例，保持可测性） */
+    getDashboard(): { updateData(data: unknown): void } | null;
+}
+
+/** 清洗文件名中的非法字符（工作区名可能含 /\:*?"<>| 等） */
+function sanitizeFileName(name: string): string {
+    return name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'workspace';
 }
 
 export type DashboardMessageHandler = (msg: DashboardMessage) => void;
@@ -31,8 +37,8 @@ export function createDashboardMessageHandler(ctx: MessageRouterContext): Dashbo
     return (msg: DashboardMessage) => {
         switch (msg.type) {
             case 'updateConfig':
+                // 静默应用：面板自身已有视觉反馈，每次变更都弹系统 toast 过于嘈杂
                 ctx.getOrchestrator()?.applyDashboardConfig(msg.payload);
-                vscode.window.showInformationMessage(t()['toast.configUpdated']);
                 break;
 
             case 'newPeriod':
@@ -47,7 +53,7 @@ export function createDashboardMessageHandler(ctx: MessageRouterContext): Dashbo
                 ctx.getOrchestrator()?.resetAllData().then(data => {
                     ctx.getStatusBar()?.updateTime(0, 0);
                     // 立即推送归零后的最新数据，不等下一个刷新周期
-                    DashboardPanel.currentPanel?.updateData(data);
+                    ctx.getDashboard()?.updateData(data);
                     vscode.window.showInformationMessage(t()['toast.reset']);
                 }).catch(err =>
                     log(LogLevel.Error, 'reset failed', err as Error)
@@ -78,7 +84,9 @@ export async function exportTimingToFile(ctx: MessageRouterContext): Promise<voi
             return;
         }
 
-        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+        const workspaceName = sanitizeFileName(
+            vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace',
+        );
 
         const defaultUri = vscode.Uri.file(
             `${workspaceName}-timing-${TimeAggregator.todayStr()}.csv`,
@@ -121,7 +129,9 @@ export async function exportReportToFile(
             return;
         }
 
-        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+        const workspaceName = sanitizeFileName(
+            vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace',
+        );
         const today = TimeAggregator.todayStr();
         const prefix = kind === 'daily'
             ? t()['export.filename.daily']

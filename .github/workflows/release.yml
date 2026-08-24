@@ -38,16 +38,21 @@ on:
   workflow_dispatch:
     inputs:
       extension:
-        description: '扩展目录名（留空 = 自动检测变更的扩展）'
+        description: '扩展目录名（留空 = 发布全部已发现的扩展）'
         required: false
         type: string
       version:
-        description: '版本号（不带 v 前缀，如 0.4.1；留空 = 从提交信息解析）'
+        description: '版本号（不带 v，如 0.4.1；留空 = 逐扩展读各自 package.json，或取提交信息 vX.Y.Z）'
         required: false
         type: string
 
 permissions:
   contents: write   # 推送 Tag 与创建 GitHub Release
+
+# 同一 ref 的发布串行化：防止两个 run 同时通过幂等检查后竞态打 Tag / 重复创建 Release
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   RELEASE_BRANCH: main
@@ -98,6 +103,9 @@ jobs:
               echo "::error::指定的扩展 '$EXT' 不存在（可用: $ALL_EXTS）"
               exit 1
             fi
+          elif [[ "$EVENT" == "workflow_dispatch" ]]; then
+            # ── 手动触发未指定扩展：发布全部已发现的扩展（可预测，不做 HEAD~1 猜测）──
+            TARGETS="$ALL_EXTS"
           else
             # ── 分支推送：本次变更触及的扩展目录 ──
             BEFORE="${{ github.event.before }}"
@@ -156,11 +164,16 @@ jobs:
             echo "═══════════════ Release: $EXT ═══════════════"
 
             # ── 4.1 解析版本 ──
+            #   优先级：Tag 本身 > 手动输入 > 提交信息前缀 vX.Y.Z >
+            #   （仅手动触发时）该扩展自身 package.json 的版本
+            PKG_VER=$(node -p "require('./$EXT/package.json').version")
             VERSION=""
             if $IS_TAG_PUSH; then
               VERSION="${GITHUB_REF#refs/tags/$EXT-v}"
             elif [[ -n "$INPUT_VERSION" ]]; then
               VERSION="${INPUT_VERSION#v}"
+            elif [[ "$EVENT" == "workflow_dispatch" ]]; then
+              VERSION="$PKG_VER"
             elif [[ "$MSG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
               VERSION="${BASH_REMATCH[1]}"
             fi
@@ -170,7 +183,6 @@ jobs:
             fi
 
             # ── 4.2 版本一致性校验（package.json 为准，仅警告不阻断）──
-            PKG_VER=$(node -p "require('./$EXT/package.json').version")
             if [[ "$PKG_VER" != "$VERSION" ]]; then
               echo "::warning::[$EXT] 解析版本 v$VERSION 与 package.json 的 $PKG_VER 不一致，产物将按 v$VERSION 命名。"
             fi
@@ -242,7 +254,7 @@ jobs:
         if: steps.detect.outputs.targets != ''
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-${{ github.ref_name }}-${{ github.run_id }}
           path: dist/
           retention-days: 90
           if-no-files-found: ignore

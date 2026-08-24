@@ -61,6 +61,7 @@ function getRouterContext(): MessageRouterContext {
     return {
         getOrchestrator: () => orchestrator,
         getStatusBar: () => statusBar,
+        getDashboard: () => DashboardPanel.currentPanel ?? null,
     };
 }
 
