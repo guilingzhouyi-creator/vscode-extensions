@@ -98,4 +98,15 @@ export interface I18nStrings {
 
     // 命令
     'cmd.modeSwitched': string;
+    'cmd.enabled': string;
+    'cmd.disabled': string;
+    'cmd.globalEnabled': string;
+    'cmd.globalDisabled': string;
+    'cmd.noWorkspace': string;
+    'cmd.debugSaved': string;
+
+    // 状态栏显示模式名（命令提示与 tooltip 共用）
+    'statusBar.mode.today-total': string;
+    'statusBar.mode.total-today': string;
+    'statusBar.mode.compact': string;
 }

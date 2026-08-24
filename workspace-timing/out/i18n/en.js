@@ -74,6 +74,15 @@ const en = {
     'confirm.clearGlobal.title': 'Confirm Clear',
     'toast.clearGlobal': 'Cross-workspace total cleared',
     'cmd.modeSwitched': 'Switched to "{0}" mode',
+    'cmd.enabled': 'Workspace Timing: enabled',
+    'cmd.disabled': 'Workspace Timing: disabled',
+    'cmd.globalEnabled': 'Workspace Timing: globally enabled',
+    'cmd.globalDisabled': 'Workspace Timing: globally disabled',
+    'cmd.noWorkspace': 'Workspace Timing: open a workspace folder first',
+    'cmd.debugSaved': '[Debug] {0}',
+    'statusBar.mode.today-total': 'Today first',
+    'statusBar.mode.total-today': 'Total first',
+    'statusBar.mode.compact': 'Compact',
 };
 exports.default = en;
 //# sourceMappingURL=en.js.map

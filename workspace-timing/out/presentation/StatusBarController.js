@@ -44,15 +44,21 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StatusBarController = void 0;
+exports.statusBarModeLabel = statusBarModeLabel;
 const vscode = __importStar(require("vscode"));
 const TimeAggregator_1 = require("../domain/TimeAggregator");
 const Logger_1 = require("../integration/Logger");
 const index_1 = require("../i18n/index");
-const MODE_LABELS = {
-    'today-total': '今日优先',
-    'total-today': '累计优先',
-    'compact': '紧凑',
+/** 模式名 i18n key（命令提示与 tooltip 共用，杜绝硬编码中文双轨） */
+const MODE_LABEL_KEYS = {
+    'today-total': 'statusBar.mode.today-total',
+    'total-today': 'statusBar.mode.total-today',
+    'compact': 'statusBar.mode.compact',
 };
+/** 获取模式显示名（本地化） */
+function statusBarModeLabel(mode) {
+    return (0, index_1.t)()[MODE_LABEL_KEYS[mode]];
+}
 const MODE_CYCLE = ['today-total', 'total-today', 'compact'];
 class StatusBarController {
     constructor() {
@@ -95,7 +101,8 @@ class StatusBarController {
                 text = TimeAggregator_1.TimeAggregator.formatDual(this._todayMs, this._totalMs);
                 break;
             case 'total-today':
-                text = `累计 ${TimeAggregator_1.TimeAggregator.formatDurationCompact(this._totalMs)} · 今日 ${TimeAggregator_1.TimeAggregator.formatDurationCompact(this._todayMs)}`;
+                // 复用既有 i18n 模板（zh: 累计 {0} · 今日 {1}），不再硬编码中文
+                text = (0, index_1.format)((0, index_1.t)()['statusBar.totalToday'], TimeAggregator_1.TimeAggregator.formatDurationCompact(this._totalMs), TimeAggregator_1.TimeAggregator.formatDurationCompact(this._todayMs));
                 break;
             case 'compact':
                 text = TimeAggregator_1.TimeAggregator.formatDurationCompact(this._todayMs);
@@ -105,7 +112,7 @@ class StatusBarController {
         // 仅在文本实际变化时更新，避免每秒触发 VS Code 状态栏重绘
         if (displayText !== this._lastText) {
             this.statusBarItem.text = displayText;
-            this.statusBarItem.tooltip = `${(0, index_1.t)()['statusBar.tooltip']}（${MODE_LABELS[this._mode]}）`;
+            this.statusBarItem.tooltip = `${(0, index_1.t)()['statusBar.tooltip']}（${statusBarModeLabel(this._mode)}）`;
             this._lastText = displayText;
         }
         // 仅在首次或从隐藏恢复时调用 .show()，避免冗余重排

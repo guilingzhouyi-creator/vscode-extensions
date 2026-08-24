@@ -10,7 +10,7 @@
  * 崩溃恢复算法（三步走）：
  *   Step 1: 从 workspaceState 加载；若不可用则 fallback 到 JSON 文件
  *   Step 2: 如果 journal 存在，回放所有未提交的 TimeSlice
- *   Step 3: 仅当 journal 无有效回放且 sessionStartMs > 0 时，补偿未完成会话的历时（兕底）
+ *   Step 3: 仅当 journal 无有效回放且 sessionStartMs > 0 时，补偿未完成会话的历时（兜底）
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StorageCoordinator = void 0;

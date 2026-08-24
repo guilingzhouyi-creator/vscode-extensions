@@ -90,4 +90,16 @@ export declare class TimerOrchestrator {
      * 历史会话记录保留在 sessions[] 中
      */
     newPeriod(): Promise<void>;
+    /**
+     * 重置本工作区计时数据并立即重新开始计时（UI 层唯一 reset 入口）。
+     *
+     * 统一此前命令面板与面板消息两条 reset 路径的编排：
+     *   stop → 清工作区数据 → (可选)清全局聚合 → start 从零起步。
+     * 全局清空走 GlobalAggregator.reset()：同时清内存缓存与增量同步守卫，
+     * 确保当前工作区下次 checkpoint 会回填（否则会被"值未变化"守卫跳过）。
+     *
+     * @param purgeGlobal 是否级联清除跨工作区累计中本工作区的条目
+     * @returns 重置后的最新面板数据，供调用方立即推送（不等下一个刷新周期）
+     */
+    resetAllData(purgeGlobal?: boolean): Promise<DashboardData>;
 }

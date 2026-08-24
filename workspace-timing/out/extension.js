@@ -66,7 +66,8 @@ const DashboardPanel_1 = require("./presentation/DashboardPanel");
 const GlobalStorageProvider_1 = require("./persistence/GlobalStorageProvider");
 const GlobalAggregator_1 = require("./application/GlobalAggregator");
 const ICacheStrategy_1 = require("./cache/ICacheStrategy");
-const TimeAggregator_1 = require("./domain/TimeAggregator");
+const global_types_1 = require("./domain/global-types");
+const dashboardMessages_1 = require("./presentation/dashboardMessages");
 const index_1 = require("./i18n/index");
 // Integration
 const LifecycleManager_1 = require("./integration/LifecycleManager");
@@ -77,10 +78,15 @@ let commandRegistrar = null;
 let lifecycleManager = null;
 let configWatcher = null;
 let scheduler = null;
-// 存储引用提升到模块级：命令注册（如 reset）与面板消息处理都需要在
-// activate 作用域之外访问；此前作为块级局部变量传出 null 导致命令失效。
-let storageRef = null;
+// 全局聚合器提升到模块级：命令注册（clearGlobal）需要在 activate 作用域之外访问。
 let globalAggregatorRef = null;
+/** 面板消息路由依赖（延迟解引用模块级变量，兼容无工作区降级模式） */
+function getRouterContext() {
+    return {
+        getOrchestrator: () => orchestrator,
+        getStatusBar: () => statusBar,
+    };
+}
 function activate(context) {
     const startTime = Date.now();
     // 初始化 i18n
@@ -102,8 +108,7 @@ function activate(context) {
             const workspaceStateProvider = new WorkspaceStateProvider_1.WorkspaceStateProvider(context);
             const fileStorageProvider = new FileStorageProvider_1.FileStorageProvider(workspaceRoot);
             const journalStorageProvider = new JournalStorageProvider_1.JournalStorageProvider(workspaceRoot);
-            storageRef = new StorageCoordinator_1.StorageCoordinator(workspaceStateProvider, fileStorageProvider, journalStorageProvider);
-            const storage = storageRef;
+            const storage = new StorageCoordinator_1.StorageCoordinator(workspaceStateProvider, fileStorageProvider, journalStorageProvider);
             // 缓存层：capacity 与 flush 策略从配置读取（此前被忽略，形同虚设）
             const journal = new JournalWriter_1.JournalWriter(journalStorageProvider, cfg.ringBufferCapacity, new ICacheStrategy_1.TimeBasedCacheStrategy(cfg.journalFlushIntervalMs));
             // Application 层
@@ -115,7 +120,17 @@ function activate(context) {
                 journalEnabled: cfg.journalEnabled ?? true,
             });
             const globalStorage = new GlobalStorageProvider_1.GlobalStorageProvider(context);
-            const globalAggregator = new GlobalAggregator_1.GlobalAggregator(globalStorage);
+            // 工作区信息经解析器注入（依赖倒置）：GlobalAggregator 不再直连 vscode API
+            const globalAggregator = new GlobalAggregator_1.GlobalAggregator(globalStorage, () => {
+                const root = vscode.workspace.workspaceFolders?.[0];
+                if (!root)
+                    return undefined;
+                return {
+                    id: (0, global_types_1.normalizeWorkspaceId)(root.uri.toString()),
+                    name: root.name,
+                    uri: root.uri.toString(),
+                };
+            });
             globalAggregatorRef = globalAggregator;
             orchestrator = new TimerOrchestrator_1.TimerOrchestrator(timer, storage, journal, sessionManager, disableManager, scheduler, globalAggregator);
             // Presentation 层
@@ -145,45 +160,8 @@ function activate(context) {
                     statusBar?.updateTime(0, 0);
                 }
             });
-            // Dashboard 面板消息路由
-            const dashboardMessageHandler = (msg) => {
-                switch (msg.type) {
-                    case 'updateConfig':
-                        orchestrator?.applyDashboardConfig(msg.payload);
-                        vscode.window.showInformationMessage((0, index_1.t)()['toast.configUpdated']);
-                        break;
-                    case 'newPeriod':
-                        orchestrator?.newPeriod().catch(err => (0, Logger_1.log)(Logger_1.LogLevel.Error, 'newPeriod failed', err));
-                        vscode.window.showInformationMessage((0, index_1.t)()['toast.newPeriod']);
-                        break;
-                    case 'reset': {
-                        const orch = orchestrator;
-                        orch?.stop().then(async () => {
-                            await storageRef?.deleteAll();
-                            // 走 reset()：同时清空缓存与增量守卫，确保当前工作区下次同步回填
-                            await globalAggregatorRef?.reset();
-                            statusBar?.updateTime(0, 0);
-                            // 修复：清空后重新开始计时（此前只 stop，计时永久停摆、面板数据陈旧）
-                            await orch.start();
-                            // 立即推送归零后的最新数据，不等下一个 5s 刷新周期
-                            if (DashboardPanel_1.DashboardPanel.currentPanel) {
-                                DashboardPanel_1.DashboardPanel.currentPanel.updateData(await orch.getDashboardData());
-                            }
-                            vscode.window.showInformationMessage((0, index_1.t)()['toast.reset']);
-                        }).catch(err => (0, Logger_1.log)(Logger_1.LogLevel.Error, 'reset failed', err));
-                        break;
-                    }
-                    case 'exportCSV':
-                        exportTimingToFile();
-                        break;
-                    case 'exportReport':
-                        exportReportToFile(msg.payload.kind);
-                        break;
-                }
-            };
-            // 设置全局面板消息处理器
-            DashboardPanel_1.DashboardPanel.setMessageHandler(dashboardMessageHandler);
-            // 面板数据同步已合并到上方 onTick 中
+            // Dashboard 面板消息路由（分发逻辑见 presentation/dashboardMessages.ts）
+            DashboardPanel_1.DashboardPanel.setMessageHandler((0, dashboardMessages_1.createDashboardMessageHandler)(getRouterContext()));
             // Integration 层
             lifecycleManager = new LifecycleManager_1.LifecycleManager(orchestrator);
             lifecycleManager.start();
@@ -200,11 +178,11 @@ function activate(context) {
         // ─── 无论有无工作区，命令必须注册 ───
         commandRegistrar = new CommandRegistrar_1.CommandRegistrar();
         // 修复：此前此处传入 null，导致 reset 命令永远命中"无工作区"守卫而失效。
-        // globalAggregatorRef 一并传入：命令面板 reset/clearGlobal 与面板 reset 语义对齐（都清全局聚合）。
-        commandRegistrar.register(context, orchestrator, statusBar, storageRef, globalAggregatorRef);
+        // globalAggregatorRef 传入：命令面板 reset/clearGlobal 与面板 reset 语义对齐（都清全局聚合）。
+        commandRegistrar.register(context, orchestrator, statusBar, globalAggregatorRef);
         // 导出命令：可从命令面板触发，与 Dashboard 导出按钮共用逻辑
         context.subscriptions.push(vscode.commands.registerCommand('workspaceTiming.export', () => {
-            exportTimingToFile();
+            void (0, dashboardMessages_1.exportTimingToFile)(getRouterContext());
         }));
         // 注册订阅
         context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
@@ -242,71 +220,5 @@ async function deactivate() {
         (0, Logger_1.log)(Logger_1.LogLevel.Error, 'WorkspaceTiming: deactivation error', err);
     }
     (0, Logger_1.log)(Logger_1.LogLevel.Info, 'WorkspaceTiming: deactivated');
-}
-/**
- * 将当前工作区计时数据导出为 CSV 文件
- * 供 Dashboard 导出按钮与 workspaceTiming.export 命令共用。
- */
-async function exportTimingToFile() {
-    try {
-        if (!orchestrator) {
-            vscode.window.showWarningMessage((0, index_1.t)()['toast.exportNoWorkspace']);
-            return;
-        }
-        // 获取工作区名称
-        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-        // 用户选择保存路径（默认 .csv）
-        const defaultUri = vscode.Uri.file(`${workspaceName}-timing-${TimeAggregator_1.TimeAggregator.todayStr()}.csv`);
-        const uri = await vscode.window.showSaveDialog({
-            defaultUri,
-            filters: { 'CSV 文件 (*.csv)': ['csv'] },
-            saveLabel: (0, index_1.t)()['toast.exportSaveLabel'],
-        });
-        if (!uri) {
-            // 用户取消
-            vscode.window.showInformationMessage((0, index_1.t)()['toast.exportCancelled']);
-            return;
-        }
-        const csv = await orchestrator.exportCSV(workspaceName);
-        await vscode.workspace.fs.writeFile(uri, Buffer.from(csv, 'utf8'));
-        vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['toast.exportSuccess'], uri.fsPath));
-    }
-    catch (err) {
-        (0, Logger_1.log)(Logger_1.LogLevel.Error, 'WorkspaceTiming: export CSV failed', err);
-        vscode.window.showErrorMessage((0, index_1.t)()['toast.exportFailed']);
-    }
-}
-/**
- * 将日报 / 周报导出为 Markdown 文件
- * 供 Dashboard 导出按钮与命令面板触发。
- */
-async function exportReportToFile(kind) {
-    try {
-        if (!orchestrator) {
-            vscode.window.showWarningMessage((0, index_1.t)()['toast.exportNoWorkspace']);
-            return;
-        }
-        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-        const today = TimeAggregator_1.TimeAggregator.todayStr();
-        const prefix = kind === 'daily' ? '日报' : '周报';
-        const defaultUri = vscode.Uri.file(`${workspaceName}-${prefix}-${today}.md`);
-        const uri = await vscode.window.showSaveDialog({
-            defaultUri,
-            filters: { 'Markdown 文件 (*.md)': ['md'] },
-            saveLabel: (0, index_1.t)()['toast.exportSaveLabel'],
-        });
-        if (!uri) {
-            vscode.window.showInformationMessage((0, index_1.t)()['toast.exportCancelled']);
-            return;
-        }
-        const md = await orchestrator.exportReport(kind);
-        await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf8'));
-        const key = kind === 'daily' ? 'toast.exportReportDaily' : 'toast.exportReportWeekly';
-        vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()[key], uri.fsPath));
-    }
-    catch (err) {
-        (0, Logger_1.log)(Logger_1.LogLevel.Error, 'WorkspaceTiming: export report failed', err);
-        vscode.window.showErrorMessage((0, index_1.t)()['toast.exportFailed']);
-    }
 }
 //# sourceMappingURL=extension.js.map

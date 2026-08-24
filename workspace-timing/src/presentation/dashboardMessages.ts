@@ -1,0 +1,153 @@
+/**
+ * dashboardMessages — 面板消息路由与导出流程
+ *
+ * 职责：接收 DashboardPanel 的 postMessage 并分发到 application 层；
+ *       CSV / 日报 / 周报导出的「选路径 → 写文件 → 提示」流程集中于此。
+ * 边界：只做消息分发与导出编排，不直接操作存储；
+ *       业务入口一律委托 TimerOrchestrator（如 reset 走 resetAllData）。
+ *       依赖经 MessageRouterContext 注入，避免模块级可变状态。
+ */
+
+import * as vscode from 'vscode';
+import { TimerOrchestrator } from '../application/TimerOrchestrator';
+import { StatusBarController } from './StatusBarController';
+import { DashboardPanel } from './DashboardPanel';
+import { DashboardMessage } from '../domain/dashboard-types';
+import { TimeAggregator } from '../domain/TimeAggregator';
+import { LogLevel, log } from '../integration/Logger';
+import { t, format } from '../i18n/index';
+
+/** 路由依赖（组合根注入） */
+export interface MessageRouterContext {
+    getOrchestrator(): TimerOrchestrator | null;
+    /** reset 完成后用于状态栏归零 */
+    getStatusBar(): StatusBarController | null;
+}
+
+export type DashboardMessageHandler = (msg: DashboardMessage) => void;
+
+/** 创建面板消息处理器（每次 activate 构造一次） */
+export function createDashboardMessageHandler(ctx: MessageRouterContext): DashboardMessageHandler {
+    return (msg: DashboardMessage) => {
+        switch (msg.type) {
+            case 'updateConfig':
+                ctx.getOrchestrator()?.applyDashboardConfig(msg.payload);
+                vscode.window.showInformationMessage(t()['toast.configUpdated']);
+                break;
+
+            case 'newPeriod':
+                ctx.getOrchestrator()?.newPeriod().catch(err =>
+                    log(LogLevel.Error, 'newPeriod failed', err as Error)
+                );
+                vscode.window.showInformationMessage(t()['toast.newPeriod']);
+                break;
+
+            case 'reset': {
+                // 编排统一走 orchestrator.resetAllData：清数据 → 清全局 → 重启计时
+                ctx.getOrchestrator()?.resetAllData().then(data => {
+                    ctx.getStatusBar()?.updateTime(0, 0);
+                    // 立即推送归零后的最新数据，不等下一个刷新周期
+                    DashboardPanel.currentPanel?.updateData(data);
+                    vscode.window.showInformationMessage(t()['toast.reset']);
+                }).catch(err =>
+                    log(LogLevel.Error, 'reset failed', err as Error)
+                );
+                break;
+            }
+
+            case 'exportCSV':
+                void exportTimingToFile(ctx);
+                break;
+
+            case 'exportReport':
+                void exportReportToFile(ctx, msg.payload.kind);
+                break;
+        }
+    };
+}
+
+/**
+ * 将当前工作区计时数据导出为 CSV 文件
+ * 供 Dashboard 导出按钮与 workspaceTiming.export 命令共用。
+ */
+export async function exportTimingToFile(ctx: MessageRouterContext): Promise<void> {
+    try {
+        const orch = ctx.getOrchestrator();
+        if (!orch) {
+            vscode.window.showWarningMessage(t()['toast.exportNoWorkspace']);
+            return;
+        }
+
+        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+
+        const defaultUri = vscode.Uri.file(
+            `${workspaceName}-timing-${TimeAggregator.todayStr()}.csv`,
+        );
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri,
+            filters: { 'CSV 文件 (*.csv)': ['csv'] },
+            saveLabel: t()['toast.exportSaveLabel'],
+        });
+
+        if (!uri) {
+            vscode.window.showInformationMessage(t()['toast.exportCancelled']);
+            return;
+        }
+
+        const csv = await orch.exportCSV(workspaceName);
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(csv, 'utf8'));
+
+        vscode.window.showInformationMessage(
+            format(t()['toast.exportSuccess'], uri.fsPath),
+        );
+    } catch (err) {
+        log(LogLevel.Error, 'WorkspaceTiming: export CSV failed', err as Error);
+        vscode.window.showErrorMessage(t()['toast.exportFailed']);
+    }
+}
+
+/**
+ * 将日报 / 周报导出为 Markdown 文件
+ * 供 Dashboard 导出按钮与命令面板触发。
+ */
+export async function exportReportToFile(
+    ctx: MessageRouterContext,
+    kind: 'daily' | 'weekly',
+): Promise<void> {
+    try {
+        const orch = ctx.getOrchestrator();
+        if (!orch) {
+            vscode.window.showWarningMessage(t()['toast.exportNoWorkspace']);
+            return;
+        }
+
+        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+        const today = TimeAggregator.todayStr();
+        const prefix = kind === 'daily' ? '日报' : '周报';
+        const defaultUri = vscode.Uri.file(
+            `${workspaceName}-${prefix}-${today}.md`,
+        );
+
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri,
+            filters: { 'Markdown 文件 (*.md)': ['md'] },
+            saveLabel: t()['toast.exportSaveLabel'],
+        });
+
+        if (!uri) {
+            vscode.window.showInformationMessage(t()['toast.exportCancelled']);
+            return;
+        }
+
+        const md = await orch.exportReport(kind);
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf8'));
+
+        const key = kind === 'daily' ? 'toast.exportReportDaily' : 'toast.exportReportWeekly';
+        vscode.window.showInformationMessage(
+            format(t()[key], uri.fsPath),
+        );
+    } catch (err) {
+        log(LogLevel.Error, 'WorkspaceTiming: export report failed', err as Error);
+        vscode.window.showErrorMessage(t()['toast.exportFailed']);
+    }
+}

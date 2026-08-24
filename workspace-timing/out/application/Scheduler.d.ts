@@ -2,9 +2,14 @@
  * Scheduler — 周期任务调度器
  *
  * 职责：
- *   1. 每 N 秒从 RingBuffer flush 到 journal
- *   2. 每 M 秒执行全量存盘 + journal truncate
- *   3. 每秒通知 StatusBar 更新
+ *   1. 每 journalFlushIntervalMs 从 RingBuffer flush 到 journal
+ *   2. 每 fullSaveIntervalMs 执行全量存盘（checkpoint 只固化历史累计，不清 journal；
+ *      journal 截断发生在会话结束/崩溃恢复路径）
+ *   3. 每秒更新 StatusBar，并顺带推入 1 条时间片到 RingBuffer
+ *
+ * ⚠️ 显式契约：journal 时间片粒度 = statusBarUpdateIntervalMs（默认 1s），
+ *    二者共用同一定时器属有意设计（减少定时器数量）。若未来允许单独配置
+ *    状态栏刷新间隔，必须同步把切片推送拆为独立定时器。
  *
  * 所有间隔可通过 TimingConfig 配置。
  */

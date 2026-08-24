@@ -74,6 +74,15 @@ const zhCN = {
     'confirm.clearGlobal.title': '确认清除',
     'toast.clearGlobal': '跨工作区累计已清除',
     'cmd.modeSwitched': '已切换至「{0}」模式',
+    'cmd.enabled': '工作区计时: 已启用',
+    'cmd.disabled': '工作区计时: 已禁用',
+    'cmd.globalEnabled': '工作区计时: 已全局启用',
+    'cmd.globalDisabled': '工作区计时: 已全局禁用',
+    'cmd.noWorkspace': '工作区计时: 请先打开一个工作区文件夹',
+    'cmd.debugSaved': '[调试] {0}',
+    'statusBar.mode.today-total': '今日优先',
+    'statusBar.mode.total-today': '累计优先',
+    'statusBar.mode.compact': '紧凑',
 };
 exports.default = zhCN;
 //# sourceMappingURL=zh-CN.js.map

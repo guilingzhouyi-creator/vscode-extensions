@@ -14,3 +14,14 @@ dist/
 
 # 版本归档（历史快照 / 备份 / 演示材料，统一集中管理）
 archive/
+
+# 密钥与凭证文件（防将来误提交）
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+id_rsa*
+.npmrc

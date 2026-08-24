@@ -33,6 +33,6 @@ export declare class DashboardPanel {
     private _updateContent;
     /** 释放资源（幂等，防 onDidDispose 递归） */
     dispose(): void;
-    /** 生成 HTML（含 CSP + nonce 安全加固） */
+    /** 生成 HTML（含 CSP + nonce 安全加固；模板本体见 ./dashboardTemplate.ts） */
     private _getHtml;
 }

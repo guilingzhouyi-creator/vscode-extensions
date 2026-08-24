@@ -4,13 +4,32 @@
  * 职责：在每次 fullSave 后将当前工作区的计时数据同步到 globalState。
  * 实现跨工作区时长汇总。
  *
+ * 边界：不直接依赖 VS Code API —— 工作区信息由构造函数注入
+ *       （workspaceInfo 解析器），因此可脱离 VS Code 做纯 Node 单测。
+ *
  * 调用方：Scheduler 周期全量存盘回调（onFullSaved）、TimerOrchestrator.saveNow()/newPeriod()
  */
 
-import * as vscode from 'vscode';
-import { GlobalStorageProvider } from '../persistence/GlobalStorageProvider';
-import { normalizeWorkspaceId, GlobalTimingData } from '../domain/global-types';
+import { GlobalTimingData } from '../domain/global-types';
 import { LogLevel, log } from '../integration/Logger';
+
+/** 当前工作区标识（由组合根注入，替代直读 vscode.workspace） */
+export interface WorkspaceInfo {
+    /** 归一化工作区 id（normalizeWorkspaceId 结果） */
+    id: string;
+    /** 显示名 */
+    name: string;
+    /** 完整 URI 字符串 */
+    uri: string;
+}
+
+/** 全局存储端口（结构化最小接口；GlobalStorageProvider 天然满足） */
+interface GlobalStore {
+    isAvailable(): boolean;
+    load(): Promise<GlobalTimingData>;
+    save(data: GlobalTimingData): Promise<void>;
+    delete(): Promise<void>;
+}
 
 export interface GlobalSnapshot {
     /** 所有工作区累计时长 (ms) */
@@ -22,7 +41,8 @@ export interface GlobalSnapshot {
 }
 
 export class GlobalAggregator {
-    private readonly storage: GlobalStorageProvider;
+    private readonly storage: GlobalStore;
+    private readonly workspaceInfo: () => WorkspaceInfo | undefined;
     private _cached: GlobalTimingData | null = null;
     /** sync 进行中标志（防重入：并发 load→modify→save 会互相覆盖丢失写入） */
     private _syncing = false;
@@ -38,8 +58,9 @@ export class GlobalAggregator {
      */
     private static readonly STALE_TTL_MS = 30 * 24 * 3600_000;
 
-    constructor(storage: GlobalStorageProvider) {
+    constructor(storage: GlobalStore, workspaceInfo: () => WorkspaceInfo | undefined) {
         this.storage = storage;
+        this.workspaceInfo = workspaceInfo;
     }
 
     /**
@@ -51,21 +72,22 @@ export class GlobalAggregator {
         if (this._lastSyncedTotalMs === localTotalMs) return; // 未变化，跳过整轮读写
         this._syncing = true;
         try {
-            await this.doSync(localTotalMs);
-            this._lastSyncedTotalMs = localTotalMs;
+            // ★ 仅在真正写成功后才记账：doSync 内部吞掉的失败返回 false，
+            //   守卫保持旧值，下轮 checkpoint 会用同值重试（否则会永久卡住不回填）。
+            if (await this.doSync(localTotalMs)) {
+                this._lastSyncedTotalMs = localTotalMs;
+            }
         } finally {
             this._syncing = false;
         }
     }
 
-    private async doSync(localTotalMs: number): Promise<void> {
-        if (!this.storage.isAvailable()) return;
+    /** 执行一轮同步；返回是否成功（无可做之事/失败均返回 false，由调用方决定是否记账） */
+    private async doSync(localTotalMs: number): Promise<boolean> {
+        if (!this.storage.isAvailable()) return false;
 
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceRoot) return;
-
-        const wsId = normalizeWorkspaceId(workspaceRoot.uri.toString());
-        const wsName = workspaceRoot.name;
+        const info = this.workspaceInfo();
+        if (!info) return false;
 
         try {
             const global = await this.storage.load();
@@ -86,9 +108,9 @@ export class GlobalAggregator {
             }
 
             // 更新/添加当前工作区记录
-            global.workspaces[wsId] = {
-                name: wsName,
-                uri: workspaceRoot.uri.toString(),
+            global.workspaces[info.id] = {
+                name: info.name,
+                uri: info.uri,
                 totalMs: localTotalMs,
                 lastSyncedAt: Date.now(),
             };
@@ -102,10 +124,12 @@ export class GlobalAggregator {
             this._cached = global;
 
             log(LogLevel.Debug,
-                `GlobalAggregator: synced (workspace=${wsName}, totalMs=${localTotalMs}, global=${global.totalMs})`);
+                `GlobalAggregator: synced (workspace=${info.name}, totalMs=${localTotalMs}, global=${global.totalMs})`);
         } catch (err) {
             log(LogLevel.Warn, 'GlobalAggregator: sync failed', err as Error);
+            return false;
         }
+        return true;
     }
 
     /** 获取全局快照 */

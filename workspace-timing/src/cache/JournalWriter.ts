@@ -2,24 +2,24 @@
  * JournalWriter — 日志写入器
  *
  * 职责：将 RingBuffer 中的 TimeSlice 批量追加到 journal 文件
- * 边界：只写日志，不关心完整存储；文件操作通过 IStorageProvider 抽象
- * 依赖：domain/models.ts, cache/RingBuffer.ts, persistence/IStorageProvider.ts
+ * 边界：只写日志，不关心完整存储；落盘细节通过 IJournalStore 端口抽象（依赖倒置）
+ * 依赖：domain/models.ts, cache/RingBuffer.ts, cache/IJournalStore.ts
  */
 
 import { TimeSlice, DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS } from '../domain/models';
 import { RingBuffer } from './RingBuffer';
 import { ICacheStrategy, TimeBasedCacheStrategy } from './ICacheStrategy';
-import { JournalStorageProvider } from '../persistence/JournalStorageProvider';
+import { IJournalStore } from './IJournalStore';
 import { LogLevel, log } from '../integration/Logger';
 
 export class JournalWriter {
     private readonly ringBuffer: RingBuffer<TimeSlice>;
-    private readonly storage: JournalStorageProvider;
+    private readonly storage: IJournalStore;
     private readonly strategy: ICacheStrategy;
     private lastFlushTime: number = Date.now();
 
     constructor(
-        storage: JournalStorageProvider,
+        storage: IJournalStore,
         capacity: number = DEFAULT_RING_BUFFER_CAP,
         strategy?: ICacheStrategy,
     ) {

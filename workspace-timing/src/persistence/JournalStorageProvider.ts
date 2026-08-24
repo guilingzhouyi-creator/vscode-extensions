@@ -16,11 +16,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TimeSlice, WorkspaceTimingData } from '../domain/models';
 import { IStorageProvider } from './IStorageProvider';
+import { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/Logger';
 
 const JOURNAL_FILE = 'workspace-timing.journal';
 
-export class JournalStorageProvider implements IStorageProvider {
+export class JournalStorageProvider implements IStorageProvider, IJournalStore {
     readonly id = 'journal-storage';
 
     private readonly journalUri: vscode.Uri;

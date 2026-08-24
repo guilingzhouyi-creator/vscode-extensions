@@ -312,11 +312,37 @@ class TimerOrchestrator {
         });
         // 3. 同步全局（重置为 0）
         await this.global.sync(0);
-        // 4. 新建空数据存盘
+        // 4. 新建空数据存盘（关键事件，强制 JSON 备份）
         const freshData = { ...this.timer.data, sessions: [...this.timer.data.sessions] };
-        await this.storage.save(freshData);
+        await this.storage.save(freshData, true);
         // 5. 重新启动
         await this.start();
+    }
+    /**
+     * 重置本工作区计时数据并立即重新开始计时（UI 层唯一 reset 入口）。
+     *
+     * 统一此前命令面板与面板消息两条 reset 路径的编排：
+     *   stop → 清工作区数据 → (可选)清全局聚合 → start 从零起步。
+     * 全局清空走 GlobalAggregator.reset()：同时清内存缓存与增量同步守卫，
+     * 确保当前工作区下次 checkpoint 会回填（否则会被"值未变化"守卫跳过）。
+     *
+     * @param purgeGlobal 是否级联清除跨工作区累计中本工作区的条目
+     * @returns 重置后的最新面板数据，供调用方立即推送（不等下一个刷新周期）
+     */
+    async resetAllData(purgeGlobal = true) {
+        (0, Logger_1.log)(Logger_1.LogLevel.Info, 'TimerOrchestrator: resetAllData requested');
+        // 1. 结束当前会话并存盘
+        await this.stop();
+        // 2. 清空工作区本地数据（workspaceState + JSON 备份 + journal）
+        await this.storage.deleteAll();
+        // 3. 级联清全局聚合
+        if (purgeGlobal) {
+            await this.global.reset();
+        }
+        // 4. 从零重新开始计时
+        await this.start();
+        // 5. 返回归零后的最新面板数据
+        return this.getDashboardData();
     }
 }
 exports.TimerOrchestrator = TimerOrchestrator;

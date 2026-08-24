@@ -12,15 +12,21 @@
 import * as vscode from 'vscode';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
-import { t } from '../i18n/index';
+import { t, format } from '../i18n/index';
 
 export type StatusBarMode = 'today-total' | 'total-today' | 'compact';
 
-const MODE_LABELS: Record<StatusBarMode, string> = {
-    'today-total': '今日优先',
-    'total-today': '累计优先',
-    'compact': '紧凑',
+/** 模式名 i18n key（命令提示与 tooltip 共用，杜绝硬编码中文双轨） */
+const MODE_LABEL_KEYS: Record<StatusBarMode, 'statusBar.mode.today-total' | 'statusBar.mode.total-today' | 'statusBar.mode.compact'> = {
+    'today-total': 'statusBar.mode.today-total',
+    'total-today': 'statusBar.mode.total-today',
+    'compact': 'statusBar.mode.compact',
 };
+
+/** 获取模式显示名（本地化） */
+export function statusBarModeLabel(mode: StatusBarMode): string {
+    return t()[MODE_LABEL_KEYS[mode]];
+}
 
 const MODE_CYCLE: StatusBarMode[] = ['today-total', 'total-today', 'compact'];
 
@@ -77,7 +83,10 @@ export class StatusBarController {
                 text = TimeAggregator.formatDual(this._todayMs, this._totalMs);
                 break;
             case 'total-today':
-                text = `累计 ${TimeAggregator.formatDurationCompact(this._totalMs)} · 今日 ${TimeAggregator.formatDurationCompact(this._todayMs)}`;
+                // 复用既有 i18n 模板（zh: 累计 {0} · 今日 {1}），不再硬编码中文
+                text = format(t()['statusBar.totalToday'],
+                    TimeAggregator.formatDurationCompact(this._totalMs),
+                    TimeAggregator.formatDurationCompact(this._todayMs));
                 break;
             case 'compact':
                 text = TimeAggregator.formatDurationCompact(this._todayMs);
@@ -89,7 +98,7 @@ export class StatusBarController {
         // 仅在文本实际变化时更新，避免每秒触发 VS Code 状态栏重绘
         if (displayText !== this._lastText) {
             this.statusBarItem.text = displayText;
-            this.statusBarItem.tooltip = `${t()['statusBar.tooltip']}（${MODE_LABELS[this._mode]}）`;
+            this.statusBarItem.tooltip = `${t()['statusBar.tooltip']}（${statusBarModeLabel(this._mode)}）`;
             this._lastText = displayText;
         }
 

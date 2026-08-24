@@ -79,4 +79,13 @@ export interface I18nStrings {
     'confirm.clearGlobal.title': string;
     'toast.clearGlobal': string;
     'cmd.modeSwitched': string;
+    'cmd.enabled': string;
+    'cmd.disabled': string;
+    'cmd.globalEnabled': string;
+    'cmd.globalDisabled': string;
+    'cmd.noWorkspace': string;
+    'cmd.debugSaved': string;
+    'statusBar.mode.today-total': string;
+    'statusBar.mode.total-today': string;
+    'statusBar.mode.compact': string;
 }

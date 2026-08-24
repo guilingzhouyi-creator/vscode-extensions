@@ -3,7 +3,8 @@
  * CommandRegistrar — 命令注册中心
  *
  * 职责：管理所有 VS Code command 的注册与释放
- * 边界：只负责注册/注销，不执行业务逻辑
+ * 边界：只负责注册/注销与交互确认；业务编排一律委托 application 层
+ *       （如 reset 走 TimerOrchestrator.resetAllData，不在此处拼装存储操作）
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -41,6 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CommandRegistrar = void 0;
 const vscode = __importStar(require("vscode"));
+const StatusBarController_1 = require("./StatusBarController");
 const DashboardPanel_1 = require("./DashboardPanel");
 const Logger_1 = require("../integration/Logger");
 const index_1 = require("../i18n/index");
@@ -48,7 +50,7 @@ class CommandRegistrar {
     constructor() {
         this.disposables = [];
     }
-    register(context, orchestrator, statusBar, storage, globalAggregator) {
+    register(context, orchestrator, statusBar, globalAggregator) {
         // 启用
         this.registerCommand('workspaceTiming.enable', async () => {
             if (!orchestrator) {
@@ -57,7 +59,7 @@ class CommandRegistrar {
             }
             orchestrator.disable.updateConfig({ enabled: true, globalDisabled: false });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
-            vscode.window.showInformationMessage('工作区计时: 已启用');
+            vscode.window.showInformationMessage((0, index_1.t)()['cmd.enabled']);
         });
         // 禁用
         this.registerCommand('workspaceTiming.disable', async () => {
@@ -67,7 +69,7 @@ class CommandRegistrar {
             }
             orchestrator.disable.updateConfig({ enabled: false });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
-            vscode.window.showInformationMessage('工作区计时: 已禁用');
+            vscode.window.showInformationMessage((0, index_1.t)()['cmd.disabled']);
         });
         // 全局开关
         this.registerCommand('workspaceTiming.toggleGlobal', async () => {
@@ -78,8 +80,7 @@ class CommandRegistrar {
             const current = orchestrator.disable.config.globalDisabled;
             orchestrator.disable.updateConfig({ globalDisabled: !current });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
-            const msg = !current ? '工作区计时: 已全局禁用' : '工作区计时: 已全局启用';
-            vscode.window.showInformationMessage(msg);
+            vscode.window.showInformationMessage(!current ? (0, index_1.t)()['cmd.globalDisabled'] : (0, index_1.t)()['cmd.globalEnabled']);
         });
         // 切换状态栏显示模式
         this.registerCommand('workspaceTiming.showStatus', () => {
@@ -88,12 +89,7 @@ class CommandRegistrar {
                 return;
             }
             const newMode = statusBar.cycleMode();
-            const label = {
-                'today-total': '今日优先',
-                'total-today': '累计优先',
-                'compact': '紧凑',
-            };
-            vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['cmd.modeSwitched'], label[newMode] ?? newMode));
+            vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['cmd.modeSwitched'], (0, StatusBarController_1.statusBarModeLabel)(newMode)));
         });
         // 打开配置面板
         this.registerCommand('workspaceTiming.openDashboard', () => {
@@ -106,7 +102,7 @@ class CommandRegistrar {
                 return;
             }
             const result = await orchestrator.saveNow();
-            vscode.window.showInformationMessage(`[调试] ${result}`);
+            vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['cmd.debugSaved'], result));
         });
         // 新建计时周期（重置累计，保留历史）
         this.registerCommand('workspaceTiming.newPeriod', async () => {
@@ -122,9 +118,9 @@ class CommandRegistrar {
                 vscode.window.showInformationMessage((0, index_1.t)()['toast.newPeriod']);
             }
         });
-        // 重置数据
+        // 重置数据（业务编排委托 orchestrator.resetAllData：清数据→清全局→重启计时）
         this.registerCommand('workspaceTiming.reset', async () => {
-            if (!orchestrator || !statusBar || !storage) {
+            if (!orchestrator || !statusBar) {
                 this.noWorkspaceMsg();
                 return;
             }
@@ -132,23 +128,8 @@ class CommandRegistrar {
             const title = (0, index_1.t)()['confirm.reset.title'];
             const confirm = await vscode.window.showWarningMessage(msg, { modal: true }, title);
             if (confirm === title) {
-                await orchestrator.stop();
-                await storage.deleteAll();
-                // 与面板 reset 路径语义对齐：同步清除跨工作区全局聚合中本工作区的累计。
-                // 走 GlobalAggregator.reset()：同时清空内存缓存与增量同步守卫，
-                // 否则下次 checkpoint 会因"值未变化"被跳过，当前工作区不再回填。
-                if (globalAggregator) {
-                    try {
-                        await globalAggregator.reset();
-                    }
-                    catch (err) {
-                        (0, Logger_1.log)(Logger_1.LogLevel.Warn, 'reset: global storage delete failed', err);
-                    }
-                }
+                await orchestrator.resetAllData();
                 statusBar.updateTime(0, 0);
-                // 修复：此前 reset 后只 stop 不重启，计时永久停摆、面板数据陈旧。
-                // 清空后立即重新开始会话（从零起步），恢复状态栏与面板刷新。
-                await orchestrator.start();
                 vscode.window.showInformationMessage((0, index_1.t)()['toast.reset']);
             }
         });
@@ -178,7 +159,7 @@ class CommandRegistrar {
     }
     /** 降级模式提示：当前未打开工作区 */
     noWorkspaceMsg() {
-        vscode.window.showWarningMessage('工作区计时: 请先打开一个工作区文件夹');
+        vscode.window.showWarningMessage((0, index_1.t)()['cmd.noWorkspace']);
     }
     dispose() {
         for (const d of this.disposables) {

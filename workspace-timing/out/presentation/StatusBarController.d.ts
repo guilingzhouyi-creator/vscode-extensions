@@ -9,6 +9,8 @@
  * 边界：不关心计时逻辑，只负责显示
  */
 export type StatusBarMode = 'today-total' | 'total-today' | 'compact';
+/** 获取模式显示名（本地化） */
+export declare function statusBarModeLabel(mode: StatusBarMode): string;
 export interface StatusBarConfig {
     enabled: boolean;
 }

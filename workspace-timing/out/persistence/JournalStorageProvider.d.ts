@@ -13,7 +13,8 @@
 import * as vscode from 'vscode';
 import { TimeSlice, WorkspaceTimingData } from '../domain/models';
 import { IStorageProvider } from './IStorageProvider';
-export declare class JournalStorageProvider implements IStorageProvider {
+import { IJournalStore } from '../cache/IJournalStore';
+export declare class JournalStorageProvider implements IStorageProvider, IJournalStore {
     readonly id = "journal-storage";
     private readonly journalUri;
     private _available;
