@@ -175,9 +175,19 @@ jobs:
               echo "::warning::[$EXT] 解析版本 v$VERSION 与 package.json 的 $PKG_VER 不一致，产物将按 v$VERSION 命名。"
             fi
 
-            # ── 4.3 幂等：远端 Tag 已存在则跳过 ──
+            # ── 4.3 幂等门控 ──
+            #   分支/手动触发：远端 Tag 已存在 → 跳过（防重复发布）
+            #   Tag 推送触发：Tag 本身就是发布请求，以「Release 是否已存在」为准；
+            #     不重复建 Tag（本地检出即在该 Tag 上），仅补建缺失的 Release。
             TAG="$EXT-v$VERSION"
-            if git ls-remote --tags --exit-code origin "$TAG" >/dev/null 2>&1; then
+            CREATE_TAG=true
+            if $IS_TAG_PUSH; then
+              CREATE_TAG=false
+              if gh release view "$TAG" --json name >/dev/null 2>&1; then
+                echo "::warning::[$EXT] Release $TAG 已存在 → 跳过（防重复发布）。"
+                continue
+              fi
+            elif git ls-remote --tags --exit-code origin "$TAG" >/dev/null 2>&1; then
               echo "::warning::[$EXT] Tag $TAG 已存在 → 跳过（防重复发布）。"
               continue
             fi
@@ -212,9 +222,11 @@ jobs:
               fi
             fi
 
-            # ── 4.6 打 Tag（构建成功后才打，失败不留死 Tag）──
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
+            # ── 4.6 打 Tag（构建成功后才打，失败不留死 Tag；Tag 推送触发时跳过）──
+            if $CREATE_TAG; then
+              git tag -a "$TAG" -m "Release $TAG"
+              git push origin "$TAG"
+            fi
 
             # ── 4.7 创建 GitHub Release（附加 VSIX + 校验和）──
             gh release create "$TAG" \
