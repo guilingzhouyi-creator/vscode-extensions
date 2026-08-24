@@ -2,8 +2,6 @@
  * ICacheStrategy — 缓存策略接口
  *
  * 决定 flush 的触发时机，支持可插拔策略。
- * 当前仅 TimeBasedCacheStrategy 被使用，
- * SizeBasedCacheStrategy / HybridCacheStrategy 为预留扩展点。
  */
 export interface FlushContext {
     /** 当前缓存条目数 */

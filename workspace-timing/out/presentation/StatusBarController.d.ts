@@ -11,7 +11,6 @@
 export type StatusBarMode = 'today-total' | 'total-today' | 'compact';
 export interface StatusBarConfig {
     enabled: boolean;
-    clickAction?: 'cycle' | 'dashboard';
 }
 export declare class StatusBarController {
     private readonly statusBarItem;
@@ -19,12 +18,7 @@ export declare class StatusBarController {
     private _mode;
     private _todayMs;
     private _totalMs;
-    private _visible;
-    private _lastText;
-    private _clickAction;
     constructor();
-    /** 获取当前点击行为 */
-    get clickAction(): 'cycle' | 'dashboard';
     /** 更新配置 */
     updateConfig(config: Partial<StatusBarConfig>): void;
     /** 更新计时数据并刷新显示 */

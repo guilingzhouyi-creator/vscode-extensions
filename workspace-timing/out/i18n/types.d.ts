@@ -63,18 +63,17 @@ export interface I18nStrings {
     'toast.exportCSV': string;
     'toast.reset': string;
     'toast.configUpdated': string;
-    'toast.exported': string;
-    'toast.diagnosticExported': string;
+    'toast.exportSaveLabel': string;
+    'toast.exportCancelled': string;
+    'toast.exportSuccess': string;
     'toast.exportFailed': string;
-    'toast.goalReached': string;
-    'toast.streak': string;
-    'toast.autoExported': string;
+    'toast.exportNoWorkspace': string;
+    'toast.exportReportDaily': string;
+    'toast.exportReportWeekly': string;
+    'toast.cloudSyncPlaceholder': string;
     'confirm.newPeriod': string;
     'confirm.newPeriod.title': string;
     'confirm.reset': string;
     'confirm.reset.title': string;
     'cmd.modeSwitched': string;
-    'cmd.exported': string;
 }
-/** 字符串格式化：替换 {0} {1} ... */
-export declare function format(template: string, ...args: string[]): string;

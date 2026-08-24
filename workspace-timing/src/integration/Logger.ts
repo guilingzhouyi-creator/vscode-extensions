@@ -2,7 +2,6 @@
  * Logger — 跨层日志工具
  *
  * 按等级分层输出，生产环境可关闭 Debug 级别。
- * 内置环形缓冲区保留最近 N 条日志，供崩溃诊断导出。
  * 不依赖 VS Code API，可在 Domain/Persistence 等下层使用。
  */
 
@@ -34,39 +33,6 @@ const levelLabels: Record<LogLevel, string> = {
     [LogLevel.None]: 'NONE',
 };
 
-// ─── 内存环形缓冲区 — 崩溃诊断用 ──────────────────────
-const DIAG_BUFFER_CAP = 200;
-
-export interface LogEntry {
-    level: LogLevel;
-    message: string;
-    timestamp: number;
-    stack?: string;
-}
-
-const diagBuffer: LogEntry[] = [];
-let diagWriteIdx = 0;
-
-function pushDiag(level: LogLevel, message: string, stack?: string): void {
-    const entry: LogEntry = { level, message, timestamp: Date.now(), stack };
-    if (diagBuffer.length < DIAG_BUFFER_CAP) {
-        diagBuffer.push(entry);
-    } else {
-        diagBuffer[diagWriteIdx % DIAG_BUFFER_CAP] = entry;
-        diagWriteIdx++;
-    }
-}
-
-/** 导出诊断日志（最近 200 条，用于生成诊断报告）*/
-export function exportDiagnostics(): LogEntry[] {
-    if (diagBuffer.length < DIAG_BUFFER_CAP) {
-        return [...diagBuffer];
-    }
-    // 环形缓冲区重组为时间顺序
-    const start = diagWriteIdx % DIAG_BUFFER_CAP;
-    return [...diagBuffer.slice(start), ...diagBuffer.slice(0, start)];
-}
-
 /**
  * 输出日志。
  * Debug 级别仅在非生产环境输出。
@@ -78,19 +44,16 @@ export function log(level: LogLevel, message: string, ...args: unknown[]): void 
     const timestamp = new Date().toISOString().slice(11, 23);
     const prefix = `[WSTiming][${label}][${timestamp}]`;
 
-    let errorStack: string | undefined;
-
     if (args.length > 0) {
+        // 是否包含 Error 对象
         const errorArg = args.find(a => a instanceof Error);
         if (errorArg) {
             const err = errorArg as Error;
-            errorStack = err.stack;
             if (level >= LogLevel.Warn) {
                 console.warn(prefix, message, err.message, err.stack);
             } else {
                 console.log(prefix, message, err.message);
             }
-            pushDiag(level, `${message} | ${err.message}`, errorStack);
             return;
         }
     }
@@ -106,8 +69,6 @@ export function log(level: LogLevel, message: string, ...args: unknown[]): void 
             console.log(prefix, message);
             break;
     }
-
-    pushDiag(level, message, errorStack);
 }
 
 /** 便捷方法 */

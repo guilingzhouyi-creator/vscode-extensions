@@ -13,6 +13,4 @@ export declare class LifecycleManager {
     start(): void;
     /** 停止所有监听 */
     stop(): void;
-    /** VS Code 关闭前的清理 */
-    onVSCodeClose(): Promise<void>;
 }

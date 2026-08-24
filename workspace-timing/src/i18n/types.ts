@@ -76,12 +76,16 @@ export interface I18nStrings {
     'toast.exportCSV': string;
     'toast.reset': string;
     'toast.configUpdated': string;
-    'toast.exported': string;
-    'toast.diagnosticExported': string;
+    // 导出相关
+    'toast.exportSaveLabel': string;
+    'toast.exportCancelled': string;
+    'toast.exportSuccess': string;
     'toast.exportFailed': string;
-    'toast.goalReached': string;
-    'toast.streak': string;
-    'toast.autoExported': string;
+    'toast.exportNoWorkspace': string;
+    'toast.exportReportDaily': string;
+    'toast.exportReportWeekly': string;
+    // 云端同步占位
+    'toast.cloudSyncPlaceholder': string;
 
     // 确认弹窗
     'confirm.newPeriod': string;
@@ -91,10 +95,4 @@ export interface I18nStrings {
 
     // 命令
     'cmd.modeSwitched': string;
-    'cmd.exported': string;
-}
-
-/** 字符串格式化：替换 {0} {1} ... */
-export function format(template: string, ...args: string[]): string {
-    return template.replace(/\{(\d+)\}/g, (_, i) => args[parseInt(i)] ?? '');
 }

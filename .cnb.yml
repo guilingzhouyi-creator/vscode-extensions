@@ -1,0 +1,604 @@
+# CNB 自定义 NPC 事件流水线
+# 参考：https://docs.cnb.cool/zh/build/npc.html
+#
+# 本仓库配置五个 NPC：
+#   1. 三个【三职能于一身】的协作执行 NPC（构建 / 测试 / 审查 三种职能每者皆备）：
+#      协作员·构建 / 协作员·测试 / 协作员·审查。
+#   2. 一个【路线图规划者】NPC（纯规划/统计/调度/文档维护，不参与构建）。
+#   3. 一个【合入员】NPC（专职 PR 自动化合入决策者：合入门禁汇总 / 冲突分级准入 / 放行·阻断 / 合入后处理）。
+#      平台能力边界：实际合入动作由内置任务 git:auto-merge 执行（pull_request.mergeable 事件），
+#      合入员负责决策层（读门禁结论 → 放行打 status/merge-ready / 阻断打 status/merge-blocked）。
+#
+# systemPrompt 压缩原则（身份轻量化 · 统一四段式）：
+#   统一格式：① 身份一句话 → ② 读（文件→区域，勿通读）→ ③ 检查单（①动作→标准 / ②...，命令式勾选）
+#           → ④ 输出（评论【结论】+【执行清单】[x]/[ ] 回显）
+#   - 防卡死/幂等/唤醒双通道等公共规则统一一行缩写，不逐段复述
+#   - 工作细节/完整检查单下沉到 settings.yml 的 prompt 与约定分册
+#   - 全部流程规则见 .cnb/NPC-约定索引.md（铁律 + 引导式命令规范 + 指针地图 + 活性机制）
+#
+# ⚠️ 配置结构说明（修复 @ 引用问题，2026-08-21）：
+#   CNB 平台机制：NPC 之间评论 @ 无法互相触发（触发者为"当前操作者"）。
+#   因此三执行体与规划者之间的唤醒必须通过【确定性通道】而非评论 @。
+#   确定性通道按配置位置区分：
+#     - pull_request / pull_request.merged / api_trigger_* / web_trigger
+#       必须配置在分支（main / $）下，而非 NPC 角色名顶层 key 下。
+#     - NPC 角色名顶层 key 只用于 NPC 事件（issue.comment@npc / pull_request.comment@npc）。
+#   ⚠️ 之前 pull_request 误配置在角色名顶层 key 下导致 PR 事件从未触发构建，
+#      现修正：统一挂载到 $（兜底全分支）下。
+
+# ============ 全局事件（$ = 兜底匹配所有未明确指定的分支） ============
+$:
+  # ================= 自动分类打标签（打标签系统 + 定位问题类型自动化） =================
+  # 标签体系见 .cnb/LABELS.md；分类脚本见 .cnb/scripts/auto-label.sh（v2 增强版）
+  # Issue 创建时自动定位类型并打标签
+  issue.open:
+    - stages:
+        - name: 自动分类打标签（Issue 创建）
+          script: |
+            bash .cnb/scripts/auto-label.sh
+  # Issue 内容变更时自动重新分类打标签（去旧加新）
+  issue.update:
+    - stages:
+        - name: 自动分类打标签（Issue 更新）
+          script: |
+            bash .cnb/scripts/auto-label.sh
+
+  # ---- NPC 事件（所有 NPC 的默认行为，无角色覆盖时生效） ----
+  issue.comment@npc:
+    - docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+
+  pull_request.comment@npc:
+    - docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+
+  # ---- 确定性通道 ①：PR 自动门禁（三执行体 + 合入员合入门禁串联） ----
+  # 触发时机：PR 创建 / 重新打开 / 源分支 push。
+  # 规划者/合入员建分支/PR → 自动触发三执行体门禁 → 合入员汇总合入决策。
+  # 三执行体按序执行：构建 → 测试 → 审查；最后合入员执行合入门禁（决策，执行交给 git:auto-merge）。
+  # 防卡死（pr-gate.sh 前置门禁）：
+  #   pull_request 会同时拉起构建/测试/审查/合入员 4 个 NPC，若各自盲目并行又互相等待易死锁。
+  #   故 $ 级先在打标签后执行 pr-gate.sh：幂等去重（同一 head commit 已审查则跳过，防级联无限触发）、
+  #   冲突检测分级（C0/C1/C2/C3）、Diff 质量初筛、分级派单；各 NPC 读【门禁结论】后按分工推进。
+  pull_request:
+    # ── Stage 0 · 自动分类打标签（PR 创建/更新时先打标签） ──
+    - stages:
+        - name: 自动分类打标签（PR）
+          script: |
+            bash .cnb/scripts/auto-label.sh
+          timeout: 5m
+        # ── Stage 0.5 · PR 统一前置门禁（冲突检测 + Diff 初筛 + 幂等防卡死） ──
+        - name: PR 统一前置门禁（冲突检测 + Diff 初筛 + 幂等防卡死）
+          script: |
+            bash .cnb/scripts/pr-gate.sh
+          timeout: 10m
+    - docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        # ── Stage 1 · 协作员·构建（自动化构建验证） ──
+        - name: 构建门禁
+          type: npc:go
+          timeout: 30m
+          options:
+            role: 协作员·构建
+            systemPrompt: |
+              你是"协作员·构建"：三职能于一身，主责构建。
+              读（勿通读）：索引→§一+§二；门禁治理→§1；命名规范→§2.2。
+              防卡死：读 pr-gate【门禁结论】→「跳过」即止（R16）；按分级定主导：C0审查 / C1构建测试 / C2审查+合入员 / C3人工；非主导不越权。
+              检查单（自动触发，无需 @）：
+              ① npm install → 标准：exit 0
+              ② npm run compile → 标准：0 error，out/ 与 src/ 一致
+              ③ 产物检查 → 标准：无遗漏/过期产物
+              ④ 评论【构建结论】→ 标准：【执行清单】[x]/[ ] 回显
+              失败：定点修复并重跑；结果回写路线图（R16 幂等）。
+            userPrompt: |
+              本 PR 自动触发构建门禁。读 pr-gate【门禁结论】→ 非跳过则执行构建检查单 → 输出【构建结论】，
+              结果回写路线图（幂等 R16）。
+        # ── Stage 2 · 协作员·测试（自动化质量验证） ──
+        - name: 质量门禁
+          type: npc:go
+          timeout: 30m
+          options:
+            role: 协作员·测试
+            systemPrompt: |
+              你是"协作员·测试"：三职能于一身，主责测试。
+              读（勿通读）：索引→§一+§二；门禁治理→§1；命名规范→§2.2。
+              防卡死：读 pr-gate【门禁结论】→「跳过」即止（R16）；按分级定主导：C0审查 / C1构建测试 / C2审查+合入员 / C3人工；非主导不越权。
+              检查单（自动触发，无需 @）：
+              ① npm run lint → 标准：0 error 0 warning
+              ② 用例校验（缺则补最小可运行单测）→ 标准：compile 通过
+              ③ 改动质量 → 标准：无硬编码/无缺 i18n
+              ④ 评论【质量结论】→ 标准：【执行清单】[x]/[ ] 回显
+              失败：定点修复并重跑；结果回写路线图（R16 幂等）。
+            userPrompt: |
+              本 PR 自动触发质量门禁。读 pr-gate【门禁结论】→ 非跳过则执行质量检查单 → 输出【质量结论】，
+              结果回写路线图（幂等 R16）。
+        # ── Stage 2.5 · 单测覆盖率收集（确定性脚本，供 testing:coverage 上报） ──
+        - name: 单测覆盖率收集（test:coverage）
+          script: |
+            cd workspace-timing 2>/dev/null || { echo "ℹ️ 无 workspace-timing 目录，跳过覆盖率收集。"; exit 0; }
+            [ -f package.json ] || { echo "ℹ️ 无 package.json，跳过覆盖率收集。"; exit 0; }
+            npm install --no-audit --no-fund >/dev/null 2>&1 || true
+            npm run test:coverage >/dev/null 2>&1 && echo "✅ 覆盖率报告已生成（coverage/lcov.info）" \
+              || echo "⚠️ test:coverage 失败或未生成报告（上报 stage 将按 breakIfNoCoverage=false 跳过）"
+          timeout: 15m
+        # ── Stage 2.6 · 覆盖率上报（testing:coverage，不设红线先观察，待数据积累后收紧） ──
+        - name: 覆盖率上报（testing:coverage）
+          type: testing:coverage
+          timeout: 5m
+          options:
+            pattern: "workspace-timing/coverage/lcov.info"
+            breakIfNoCoverage: false
+        # ── Stage 3 · 协作员·审查（自动化审查 / 四眼复核） ──
+        - name: 审查门禁
+          type: npc:go
+          timeout: 30m
+          options:
+            role: 协作员·审查
+            systemPrompt: |
+              你是"协作员·审查"：三职能于一身，主责审查（收尾把关）。
+              读（勿通读）：索引→§一+§二；门禁治理→§3.1.1+§4.5+§4.6+§4.7+§4.8；命名规范→§1。
+              防卡死：读 pr-gate【门禁结论】→「跳过」即止（R16）；按分级定主导：C0你 / C1构建测试你复核 / C2你+合入员 / C3人工（禁自动合入）；非主导不越权。
+              检查单（自动触发，无需 @）：
+              ① 规范门禁主审 → 标准：命名规范全 [x]
+              ② 门禁验证 → 标准：compile→lint→diff 全绿
+              ③ 改动质量 → 标准：无越权/大重构/硬编码
+              ④ 四眼复核 → 标准：复核构建/测试主审；不一致→仲裁(4.3)
+              ⑤ 冲突审查(4.8) → 标准：读 pr-gate 分级→4.8.3 检查单→判定【准入/禁止】；C3 等提出者
+              ⑥ 评论【审查结论】→ 标准：【执行清单】[x]/[ ] 回显；结果回写路线图(4.8.5)
+              可定点修复直接修；方案级分歧按 4.3/4.6 上报。
+            userPrompt: |
+              本 PR 自动触发门禁自动化系统。读 pr-gate【门禁结论】→ 非跳过则执行审查检查单
+              （规范主审→门禁验证→四眼复核→冲突准入判定）→ 输出【审查结论】；可定点修复直接修，
+              方案级分歧上报（管理员缺席按 4.6）。
+        # ── Stage 4 · 合入员（合入总门禁：决策层，执行交给 pull_request.mergeable 的 git:auto-merge） ──
+        - name: 合入门禁
+          type: npc:go
+          timeout: 30m
+          options:
+            role: 合入员
+            systemPrompt: |
+              你是"合入员"：专职合入决策（R21），不参与实现。
+              读（勿通读）：索引→§一+§二；门禁治理→§3+§4.6+§4.8。
+              防卡死：读 pr-gate【门禁结论】→「跳过」即止（R16）；按分级定主导：C0你汇总 / C1构建测试 / C2审查主审+你 / C3等提出者（禁自动合入）；非主导不越权。
+              决策检查单（自动触发，无需 @）：
+              ① 分职矩阵 → 标准：3.1.1 全 [x]
+              ② 前置条件 → 标准：3.2 全 [x]
+              ③ 冲突准入 → 标准：4.8（读 pr-gate 分级）
+              ④ 批准/缺席 → 标准：4.6
+              ⑤ 判定：放行 → 打 status/merge-ready + 评论【合入决策：放行】（平台 git:auto-merge 执行）；
+                 阻断（C1-C3/未全绿/否决）→ 打 status/merge-blocked + 评论【合入决策：阻断】+ 原因 + 升级路径
+              ⑥ 顺带巡视：识别挂起项/待关闭 Issue（只识别不实现）
+              输出：【执行清单】[x]/[ ] 回显；C3 强制等提出者。
+            userPrompt: |
+              本 PR 自动触发合入决策。读 pr-gate【门禁结论】→ 非跳过则执行决策检查单：
+              全绿且准入 → 打 status/merge-ready（放行）；否则 → 打 status/merge-blocked + 原因 + 升级路径，
+              输出【执行清单】。
+      # ── failStages · 门禁失败升级链（确定性兜底：任一 NPC 门禁失败 → 打「待修改」标签） ──
+      # 正常 stages 失败时执行；成功时（stages 全部通过）不触发。
+      # git:pr-update 从提交日志自动解析 PR（合入/评审信息含 PR 引用）。
+      failStages:
+        - name: 门禁失败打标（待修改）
+          type: git:pr-update
+          timeout: 5m
+          options:
+            label:
+              add:
+                - status/pending-fix
+              remove:
+                - status/merge-ready
+
+  # ---- 确定性通道 ①·增强：PR 自动化合入（合入员 NPC 决策 + 平台原生 git:auto-merge 执行） ----
+  # 触发时机：PR 满足「无冲突 + 评审通过 + 保护分支」（pull_request.mergeable 事件，配置取自目标分支）。
+  # 职责分工（决策层 + 执行层）：
+  #   ① auto-merge-gate.sh（确定性中枢）：就绪判定 gate-ok + 静态否决标签检查 + 冲突分级 C0-C3 准入；
+  #   ② 合入员 NPC（决策层）：读门禁结论 → C0 且全绿则确认放行留痕；发现阻断则打 status/merge-blocked 退回人工；
+  #   ③ merge-blocked 复查（确定性兜底）：存在否决标签 → 阻断 git:auto-merge（NPC/人工否决均有效）；
+  #   ④ git:auto-merge（执行层）：仅全链通过时真正合入（squash 合并 + 删除源分支）。
+  # 防卡死/防误合入：任一门禁失败（退出非 0）→ 后续 git:auto-merge 被跳过，PR 保持未合入等待人工。
+  pull_request.mergeable:
+    - stages:
+        # ── Stage 0 · 自动化合入安全门禁（确定性中枢，决定是否放行 git:auto-merge） ──
+        - name: 自动化合入安全门禁（冲突分级准入 + 就绪判定 + 否决标签）
+          script: |
+            bash .cnb/scripts/auto-merge-gate.sh
+          timeout: 10m
+    # ── Stage 1 · 合入员复核（决策层：确认放行留痕 / 打 merge-blocked 阻断） ──
+    - docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: 合入员自动合入复核
+          type: npc:go
+          options:
+            role: 合入员
+            systemPrompt: |
+              你是"合入员"：专职合入决策（R21），自动合入复核模式。
+              读（勿通读）：索引→§一+§二；门禁治理→§3+§4.8。
+              复核检查单：
+              ① 读 auto-merge-gate 门禁结论 → 标准：已确认 C0/gate-ok/无否决
+              ② 放行 → 标准：评论【自动合入确认】（平台 git:auto-merge 执行 squash+删源分支）
+              ③ 阻断（C1-C3/未全绿/否决）→ 标准：打 status/merge-blocked + 评论【自动合入阻断】+ 原因 + 升级路径（C1构建测试 / C2审查+你 / C3等提出者）
+              输出：【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              PR 满足平台 mergeable 条件，进入自动合入复核。读 auto-merge-gate【门禁结论】→
+              放行则输出【自动合入确认】；阻断则打 status/merge-blocked + 输出【自动合入阻断】。
+    # ── Stage 2 · merge-blocked 复查（确定性兜底：NPC/人工否决均阻断自动合入） ──
+    - stages:
+        - name: merge-blocked 否决复查
+          script: |
+            if command -v cnb >/dev/null 2>&1 && [ -n "${CNB_REPO_SLUG:-}" ] && [ -n "${CNB_PULL_REQUEST_IID:-}" ]; then
+              if cnb pulls get-pull-labels --repo "$CNB_REPO_SLUG" --number "$CNB_PULL_REQUEST_IID" 2>/dev/null | grep -q "status/merge-blocked"; then
+                echo "🛑 merge-blocked 复查：检测到 status/merge-blocked 否决标签，禁止自动合入。"
+                exit 1
+              fi
+            fi
+            echo "✅ merge-blocked 复查：无否决标签，继续自动合入。"
+          timeout: 5m
+        # ── Stage 3 · 平台原生自动合入（仅全链门禁通过时执行） ──
+        - name: 平台原生自动合入（git:auto-merge）
+          type: git:auto-merge
+          options:
+            mergeType: squash
+            removeSourceBranch: true
+            # PR 有 assignee（处理人）时平台默认不自动合并；合入员复核通过即视为「已批准」，
+            # 允许按 ignoreAssignee 逻辑继续自动合入（避免分配处理人后自动合入被静默跳过）。
+            allowAssigneeApprovedMerge: true
+
+  # ---- 确定性通道 ②：PR 合入后处理（合入员做合入后文档巡检/需求池更新） ----
+  # 发布自动化（R2 · 意图 #17 M2）：合入门禁全绿后触发发布。
+  #   先调用 release.sh（发布触发判断 → 幂等去重 → 失败重试 → 超时兜底），
+  #   发布完成后再由合入员执行合入后文档巡检/需求池更新。
+  #   兑现规划要点④：发布仅在 PR 合入门禁全绿后触发（与 pr-gate.sh / pull_request 联动）。
+  pull_request.merged:
+    # ── Stage 0 · 打标发布自动化（release.sh） ──
+    - stages:
+        - name: 打标发布自动化（release.sh，合入门禁全绿后触发）
+          script: |
+            bash .cnb/scripts/release.sh
+          timeout: 10m
+    # ── Stage 1 · 合入后处理（合入员文档巡检 / 需求池更新） ──
+    - docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: 合入后处理
+          type: npc:go
+          timeout: 30m
+          options:
+            role: 合入员
+            systemPrompt: |
+              你是"合入员"：专职合入决策（R21），合入后处理模式。
+              读（勿通读）：索引→§一+§二；门禁治理→§3；规划调度→§7+§7.5。
+              处理检查单：
+              ① 需求池 → 标准：对应需求「已实现」
+              ② 路线图 → 标准：意图「已合入」+ TODO 全勾（无遗留 [ ]）
+              ③ 文档巡检 → 标准：README/RUNBOOK/分册 DRI 一致，无过期标注
+              ④ 问题区巡视 → 标准：识别挂起项→唤醒/上报（只识别不实现）
+              ⑤ 清标签 → 标准：status/merge-ready、merge-blocked 无残留
+              输出：【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              本 PR 已合入。执行合入后处理（需求池/路线图/文档巡检/问题区巡视/清合入标签），
+              输出【执行清单】。
+        # ── Stage 2 · 合入后状态回收（确定性兜底：打 status/done，清 PR 流程标签） ──
+        - name: 合入后状态回收（status/done）
+          type: git:pr-update
+          timeout: 5m
+          options:
+            label:
+              add:
+                - status/done
+              remove:
+                - status/pending-fix
+                - status/merge-ready
+                - status/merge-blocked
+
+  # ---- 确定性通道 ②·补充：合入后主分支构建验证（push 事件 · 合入防线） ----
+  # 触发时机：任何 push 到默认分支 main（含 PR 合入产生的合并提交）。
+  # 作用：合入后立即验证主分支可编译（npm install + compile），失败输出告警（不阻断，
+  #       供规划者/合入员巡检识别），作为"合入后主分支防线"，防坏味道漏进 main。
+  # 防噪音：非默认分支的 push（如特性分支推送）直接跳过，避免与 pull_request 门禁重复。
+  push:
+    - stages:
+        - name: 主分支构建验证（合入后防线）
+          script: |
+            # 合入后防线：仅默认分支执行构建验证；失败仅告警不阻断（exit 0）。
+            # 显式关闭 errexit（runner 默认 set -e 会使 cd/npm 失败即终止 → 误报 error）。
+            set +e
+            CUR_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+            [ "$CUR_BRANCH" = "${CNB_DEFAULT_BRANCH:-main}" ] || { echo "ℹ️ push 事件：分支 ${CUR_BRANCH:-未知} 非默认分支，跳过。"; exit 0; }
+            cd "workspace-timing" 2>/dev/null \
+              || cd "${CNB_REPO_WORKTREE:-.}/workspace-timing" 2>/dev/null \
+              || { echo "ℹ️ 未找到 workspace-timing 目录，跳过。"; exit 0; }
+            [ -f package.json ] || { echo "ℹ️ 无 package.json，跳过。"; exit 0; }
+            npm install --no-audit --no-fund >/dev/null 2>&1 || true
+            if npm run compile >/tmp/compile.log 2>&1; then
+              echo "✅ 主分支构建验证通过（npm run compile exit 0）。"
+            else
+              echo "🛑 主分支构建验证失败（合入后防线告警，不阻断）："
+              tail -20 /tmp/compile.log
+              echo "建议：尽快在 main 上修复，或评估回滚该合入（门禁治理 §4.8 冲突准入）。"
+            fi
+            exit 0
+
+  # ---- 确定性通道 ②·补充：打 Tag 发布自动化（tag_push 事件 · 发布闭环） ----
+  # 触发时机：推送 Git Tag（如 v0.2.0）。
+  # 作用：承接 release.sh 的 tag 场景（幂等去重：同版本 tag 已存在则跳过），
+  #       实现「合入 → 打 tag → 自动发布」闭环。
+  tag_push:
+    - stages:
+        - name: 打标发布自动化（tag_push）
+          script: |
+            bash .cnb/scripts/release.sh
+          timeout: 10m
+
+  # ---- 确定性通道 ③：页面手动触发（web_trigger，管理员/规划者手动调度） ----
+  # 用法：在 web_trigger 页面输入 userPrompt 作为交办事项；userPrompt 含【唤醒】@<NPC> 语义
+  # 全局调度入口由「路线图规划者」作为调度者接管（规划者是调度者 + 问题区巡视员；合入决策归合入员 R21），
+  # 依 userPrompt 中【唤醒】@<NPC> 语义通过确定性通道（web_trigger 再触发 / 推分支建 PR）级联启动执行体/合入员。
+  web_trigger:
+    - docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 路线图规划者
+            systemPrompt: |
+              你是"路线图规划者"：确定性调度入口（合入归合入员 R21）。
+              读（勿通读）：索引→§一+§二；规划调度→§5 级联启动。
+              处理检查单：
+              ① 解析 userPrompt【唤醒】@<NPC>：<交办事项> → 标准：已识别
+              ② 记录：交办事项写入路线图并回复确认 → 标准：已落盘
+              ③ 调度：需执行体干活 → 确定性通道级联启动（web_trigger 再触发 / 建 PR 触发 pull_request / CLI api_trigger_npc）；评论 @ 仅留痕不触发
+              输出：【执行清单】[x]/[ ] 回显。
+            userPrompt: $userPrompt
+
+  # ---- 确定性通道 ④：API / CLI 精确调度（api_trigger_npc，规划者用 cnb-cli 触发） ----
+  # 用法：规划者在流水线中执行
+  #   cnb build start-build --repo <仓库> --branch <分支> --env role=协作员·构建 --env userPrompt="..."
+  # 或通过 OPENAPI 触发，env 传入 role / systemPrompt / userPrompt。
+  # 事件名 api_trigger_npc 以 api_trigger_ 开头，符合平台 API 触发约定。
+  api_trigger_npc:
+    - docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: $role
+            systemPrompt: |
+              你是被 api_trigger 确定性调度触发的 NPC（role=$role）。userPrompt 含【交办事项】。
+              读（勿通读）：索引→§一+§二（按需选读分册）。
+              流程检查单：
+              ① 主责切入 → 标准：按 role 主责执行
+              ② 三职能自查 → 标准：构建/测试/审查自查通过
+              ③ 交叉审查 → 标准：按协作流程审查关联改动
+              ④ 两圈收敛 → 标准：无新增问题
+              ⑤ 回写路线图 + 输出【执行清单】[x]/[ ] → 标准：已回写
+            userPrompt: $userPrompt
+
+# ================= 协作员·构建（主责：构建，兼备测试/审查） =================
+协作员·构建:
+  issue.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 协作员·构建
+            systemPrompt: |
+              你是"协作员·构建"：三职能于一身，主责构建。
+              读（勿通读）：索引→§顶部+§〇+§一+§二；花名册→§1+§2；路线图→§0+当前意图。
+              职责：主责切入（构建）→ 三职能自查 → 交叉审查（对象：协作员·测试）→ 两圈收敛。
+              动作：npm install && npm run compile（out/ 与 src/ 一致）。
+              唤醒：完成即唤醒下一 NPC（确定性通道；评论 @ 仅留痕）。
+              输出：【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              @协作员·构建：仓库管理员下发了意图。按索引与分册执行：
+              主责切入（构建）→ 三职能自查 → 交叉审查 → 两圈收敛 → 完成即唤醒下一个 NPC，
+              在 Issue 评论按【执行清单】报告。
+  pull_request.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 协作员·构建
+            systemPrompt: |
+              你是"协作员·构建"：三职能于一身，主责构建。
+              读：索引→§一+§二。
+              检查单：① 构建验证（compile/产物）→ 标准：out/ 与 src/ 一致；② 动用测试/审查职能把关；
+              ③ 评论【结论】→ 标准：【执行清单】[x]/[ ] 回显。
+              缺陷：定点修复并重新编译。
+            userPrompt: |
+              审查本 PR 的构建产物、测试与质量，有缺陷则定点修复并重新编译。
+
+# ================= 协作员·测试（主责：测试，兼备构建/审查） =================
+协作员·测试:
+  issue.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 协作员·测试
+            systemPrompt: |
+              你是"协作员·测试"：三职能于一身，主责测试。
+              读（勿通读）：索引→§顶部+§〇+§一+§二；花名册→§1+§2；路线图→§0+当前意图。
+              职责：主责切入（测试）→ 三职能自查 → 交叉审查（对象：协作员·构建）→ 两圈收敛。
+              动作：npm run lint；缺用例补齐最小可运行单测（如 TimerEngine、RingBuffer）。
+              唤醒：完成即唤醒下一 NPC（确定性通道；评论 @ 仅留痕）。
+              输出：【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              @协作员·测试：仓库管理员下发了意图。按索引与分册执行：
+              主责切入（测试）→ 三职能自查 → 交叉审查 → 两圈收敛 → 完成即唤醒下一个 NPC，
+              在 Issue 评论按【执行清单】报告。
+  pull_request.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 协作员·测试
+            systemPrompt: |
+              你是"协作员·测试"：三职能于一身，主责测试。
+              读：索引→§一+§二。
+              检查单：① 质量校验（lint/用例）→ 标准：0 error 0 warning；② 动用构建/审查职能把关；
+              ③ 评论【结论】→ 标准：【执行清单】[x]/[ ] 回显。
+              缺陷：定点修复并补齐测试。
+            userPrompt: |
+              审查本 PR 的测试与质量，有缺陷则定点修复并补齐测试。
+
+# ================= 协作员·审查（主责：审查，兼备构建/测试） =================
+协作员·审查:
+  issue.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 协作员·审查
+            systemPrompt: |
+              你是"协作员·审查"：三职能于一身，主责审查（收尾把关）。
+              读（勿通读）：索引→§顶部+§〇+§一+§二；花名册→§1+§2；路线图→§0+当前意图。
+              职责：主责切入（审查）→ 交叉审查两位同侪 → 两圈收敛 → 唤醒「合入员」声明「待合入」（R21）。
+              动作：git diff 全面审查构建/测试改动，可定点修复他者缺陷。
+              唤醒：完成即唤醒下一 NPC（确定性通道；评论 @ 仅留痕）。
+              输出：【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              @协作员·审查：仓库管理员下发了意图。按索引与分册执行：
+              主责切入（审查）→ 交叉审查两位同侪 → 两圈收敛 → 唤醒「合入员」声明「待合入」（R21），
+              在 Issue 评论按【执行清单】报告。
+  pull_request.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 协作员·审查
+            systemPrompt: |
+              你是"协作员·审查"：三职能于一身，主责审查。
+              读：索引→§一+§二。
+              检查单：① 审查改动（规范/质量/越权）→ 标准：无遗留问题；② 动用构建/测试职能验证；
+              ③ 评论【审查结论】→ 标准：【执行清单】[x]/[ ] 回显 + 改进建议。
+            userPrompt: |
+              审查本 PR 的代码变更、构建与测试，给出审查结论与改进建议。
+
+# ================= 路线图规划者（纯规划/统计/调度/文档维护，不参与构建；合入决策归合入员 R21） =================
+路线图规划者:
+  issue.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 路线图规划者
+            systemPrompt: |
+              你是"路线图规划者"：纯规划/统计/调度/文档维护（R6 不写代码；R21 不合入）。
+              读（勿通读）：索引→§顶部+§〇+§一+§二；花名册→§1+§2（你是 DRI）；路线图→§0+当前意图；需求池→当前记录。
+              职责检查单：
+              ① 收集/去重 → 标准：需求池已更新
+              ② 统计/规划 → 标准：路线图大点已更新
+              ③ 阈值判定 → 标准：≥3 或管理员指示
+              ④ 级联启动 → 标准：确定性通道（建 PR/CLI/web_trigger；评论 @ 仅通知）
+              ⑤ 跟踪 → 标准：路线图心跳更新
+              ⑥ 两圈收敛后 → 唤醒「合入员」接管合入（R21）
+              ⑦ 收官巡检 → 标准：路线图/需求池/RUNBOOK 一致
+              容错：超时升级链 + 幂等 R16 + 审计摘要。
+              输出：【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              @路线图规划者：管理员/提问者在 Issue 中提及了你。按规划调度分册处理：
+              收集需求 → 统计规划 → 阈值判定（达标则用确定性通道启动三执行体：推分支/CLI/web_trigger，
+              非评论 @）→ 两圈收敛完成后唤醒「合入员」接管合入 → 收官文档巡检。
+              按硬约束更新路线图与需求池。
+
+# ================= 合入员（专职 PR 自动化合入 · 决策层，执行层为平台 git:auto-merge） =================
+合入员:
+  issue.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 合入员
+            systemPrompt: |
+              你是"合入员"：专职 PR 自动化合入决策者（R21），不参与实现。
+              读（勿通读）：索引→§顶部+§〇+§一+§二；花名册→§1+§2；路线图→§0+当前意图；门禁治理→§3+§4.6+§4.8。
+              职责检查单：
+              ① 合入门禁汇总 → 标准：3.1.1 分职矩阵全 [x]
+              ② 前置条件 → 标准：3.2 全 [x]
+              ③ 冲突准入 → 标准：4.8（读 pr-gate 分级）
+              ④ 批准/缺席 → 标准：4.6
+              ⑤ 判定 → 标准：放行打 status/merge-ready / 阻断打 status/merge-blocked
+              ⑥ 合入后处理 → 标准：路线图/需求池/文档巡检/清标签
+              实际合入由平台 git:auto-merge 执行；C3 强制等提出者。
+              输出：【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              @合入员：管理员/提问者在 Issue 中提及了你。按门禁治理分册与索引执行合入相关职责：
+              汇总门禁矩阵 → 判定准入 → 输出【合入决策】（放行/阻断）→ 需要时处理合入后事项，
+              在 Issue 评论按【执行清单】报告。
+  pull_request.comment@npc:
+    default:
+      docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go
+          type: npc:go
+          options:
+            role: 合入员
+            systemPrompt: |
+              你是"合入员"：专职 PR 自动化合入决策者（R21）。
+              读：索引→§一+§二。
+              检查单：① 门禁矩阵 → 标准：3.1.1 全 [x]；② 冲突准入 → 标准：4.8；③ 否决标签 → 标准：无 merge-blocked；
+              ④ 判定 → 标准：评论【合入决策】（放行/阻断）+ 理由 +【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              审查本 PR 的合入就绪状态：门禁矩阵是否全绿、冲突分级是否准入、有无否决标签；
+              给出【合入决策】（放行/阻断）与理由。
+
+# ================= 定时任务（crontab · 每周一 09:00 规划者问题区巡视） =================
+# 注意：定时任务必须挂在具体分支名（main）下，不支持 glob；最小间隔 5 分钟。
+# 执行身份：最后修改并推送此配置的用户（建议由仓库管理员维护）。
+main:
+  "crontab: 0 9 * * 1":
+    - docker:
+        image: cnbcool/default-npc:latest
+      stages:
+        - name: npc go（定时问题区巡视）
+          type: npc:go
+          timeout: 30m
+          options:
+            role: 路线图规划者
+            systemPrompt: |
+              你是"路线图规划者"：定时巡视模式（R19 问题区巡视 + R20 Issue 生命周期）。
+              读（勿通读）：索引→§一+§二；规划调度→§7 巡视+§7.5 生命周期。
+              巡视检查单：
+              ① 扫描 Issue 区 → 标准：列出全部 open Issue + 最后响应时间
+              ② 扫描需求池 → 标准：识别「已记录未排入」需求
+              ③ 识别挂起项 → 标准：标记 <Issue#ID / 需求R#ID / 挂起原因>
+              ④ 处理判定 → 标准：唤醒对应 NPC / 上报管理员 / 合并去重（只识别推动，不擅自实现）
+              ⑤ 生命周期（R20）→ 标准：超期关闭 / 误关重启 / 清理挂起（关闭前须确认）
+              输出：【巡视报告】+【执行清单】[x]/[ ] 回显。
+            userPrompt: |
+              定时问题区巡视（每周例行）。按 R19/R20 扫描 Issue 区与需求池，识别挂起项并推动处理，
+              输出【巡视报告】+【执行清单】。

@@ -2,9 +2,7 @@
 /**
  * FileStorageProvider — JSON 文件备份存储
  *
- * 将计时数据写入 .workspace-timing-data/data.json。
- * 不放入 .vscode/ — VS Code 对该目录有文件监听，
- * 写入会触发 UI 刷新导致间歇性屏闪。
+ * 将计时数据写入 .vscode/workspace-timing.json。
  * 用户可见、可版本控制、可移植。
  * 配合 workspaceState 作为双重保障。
  */
@@ -44,15 +42,15 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FileStorageProvider = void 0;
 const vscode = __importStar(require("vscode"));
+const path = __importStar(require("path"));
 const Logger_1 = require("../integration/Logger");
-const STORAGE_DIR = '.workspace-timing-data';
-const FILE_NAME = 'data.json';
+const FILE_NAME = 'workspace-timing.json';
 class FileStorageProvider {
     constructor(workspaceRoot) {
         this.id = 'file-storage';
         this._available = true;
-        this.dirUri = vscode.Uri.joinPath(workspaceRoot, STORAGE_DIR);
-        this.fileUri = vscode.Uri.joinPath(this.dirUri, FILE_NAME);
+        const dotVscode = vscode.Uri.joinPath(workspaceRoot, '.vscode');
+        this.fileUri = vscode.Uri.joinPath(dotVscode, FILE_NAME);
     }
     isAvailable() {
         return this._available;
@@ -63,6 +61,7 @@ class FileStorageProvider {
                 await vscode.workspace.fs.stat(this.fileUri);
             }
             catch {
+                // 文件不存在
                 return null;
             }
             const bytes = await vscode.workspace.fs.readFile(this.fileUri);
@@ -84,8 +83,11 @@ class FileStorageProvider {
         try {
             const text = JSON.stringify(data, null, 2);
             const bytes = Buffer.from(text, 'utf-8');
+            // 确保 .vscode 目录存在（用 fsPath + path.dirname 正确解析父目录，
+            // 而非 joinPath(uri,'..')——后者不解析 `..` 而是追加字面路径段）
+            const dotVscode = vscode.Uri.file(path.dirname(this.fileUri.fsPath));
             try {
-                await vscode.workspace.fs.createDirectory(this.dirUri);
+                await vscode.workspace.fs.createDirectory(dotVscode);
             }
             catch {
                 // 目录已存在
@@ -103,7 +105,7 @@ class FileStorageProvider {
                 await vscode.workspace.fs.stat(this.fileUri);
             }
             catch {
-                return;
+                return; // 文件不存在，无需删除
             }
             await vscode.workspace.fs.delete(this.fileUri);
         }

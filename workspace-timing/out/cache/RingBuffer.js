@@ -64,7 +64,11 @@ class RingBuffer {
             return [];
         const items = new Array(this._count);
         let idx = 0;
-        while (this.tail !== this.head) {
+        // 依据 _count 迭代，而非 tail !== head。
+        // 满缓冲时 head === tail（环形指针重合），用 while(tail!==head) 会立即退出，
+        // 导致满缓冲区的条目全部丢失。改用 _count 精确控制迭代次数可避免该缺陷。
+        const n = this._count;
+        for (let i = 0; i < n; i++) {
             const item = this.buffer[this.tail];
             if (item !== undefined) {
                 items[idx++] = item;
@@ -90,6 +94,19 @@ class RingBuffer {
             srcIdx = (srcIdx + 1) % this._capacity;
         }
         return result;
+    }
+    /** 读取最旧的一条（不取出），O(1)。空缓冲区返回 undefined */
+    peekOldest() {
+        if (this._count === 0)
+            return undefined;
+        return this.buffer[this.tail];
+    }
+    /** 读取最新的一条（不取出），O(1)。空缓冲区返回 undefined */
+    peekNewest() {
+        if (this._count === 0)
+            return undefined;
+        const idx = (this.head - 1 + this._capacity) % this._capacity;
+        return this.buffer[idx];
     }
     /** 清空缓冲区 */
     clear() {

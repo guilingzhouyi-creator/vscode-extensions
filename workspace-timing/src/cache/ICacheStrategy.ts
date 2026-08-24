@@ -2,11 +2,7 @@
  * ICacheStrategy — 缓存策略接口
  *
  * 决定 flush 的触发时机，支持可插拔策略。
- * 当前仅 TimeBasedCacheStrategy 被使用，
- * SizeBasedCacheStrategy / HybridCacheStrategy 为预留扩展点。
  */
-
-import { DEFAULT_JOURNAL_FLUSH_MS } from '../domain/models';
 
 export interface FlushContext {
     /** 当前缓存条目数 */
@@ -37,7 +33,7 @@ export class TimeBasedCacheStrategy implements ICacheStrategy {
     readonly name = 'time-based';
     private readonly intervalMs: number;
 
-    constructor(intervalMs: number = DEFAULT_JOURNAL_FLUSH_MS) {
+    constructor(intervalMs: number = 10000) {
         this.intervalMs = intervalMs;
     }
 
@@ -81,7 +77,7 @@ export class HybridCacheStrategy implements ICacheStrategy {
     private readonly timeBased: TimeBasedCacheStrategy;
     private readonly sizeBased: SizeBasedCacheStrategy;
 
-    constructor(intervalMs: number = DEFAULT_JOURNAL_FLUSH_MS, thresholdRatio: number = 0.5) {
+    constructor(intervalMs: number = 10000, thresholdRatio: number = 0.5) {
         this.timeBased = new TimeBasedCacheStrategy(intervalMs);
         this.sizeBased = new SizeBasedCacheStrategy(thresholdRatio);
     }

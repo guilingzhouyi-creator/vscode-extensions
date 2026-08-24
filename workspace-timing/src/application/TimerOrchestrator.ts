@@ -13,18 +13,15 @@ import { TimerEngine } from '../domain/TimerEngine';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager, SessionResult } from './SessionManager';
-import { WorkspaceTimingData, TimingConfig, MS_PER_DAY, DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS, DEFAULT_FULL_SAVE_MS, DEFAULT_MAX_SESSIONS } from '../domain/models';
-import { DashboardData, DailyChartEntry } from '../domain/dashboard-types';
-import { localDateStr } from '../domain/TimeAggregator';
+import { WorkspaceTimingData, TimingConfig, TimeSession } from '../domain/models';
+import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
+import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
-import { PeriodKind, PeriodReportInput } from './exporters/PeriodReportExporter';
-import { ExportBundle } from './exporters/JsonExporter';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
-import { ActivityTracker } from './ActivityTracker';
-import { IdleDetector } from './IdleDetector';
+import { CsvExporter } from './exporters/CsvExporter';
+import { ReportExporter, ReportKind } from './exporters/ReportExporter';
 import { LogLevel, log } from '../integration/Logger';
-import { WeeklyReportInput } from './exporters/WeeklyReportExporter';
 
 export type OrchestratorState = 'idle' | 'running' | 'disabled' | 'saving';
 
@@ -36,8 +33,6 @@ export class TimerOrchestrator {
     private readonly disableManager: DisableManager;
     private readonly scheduler: Scheduler;
     private readonly global: GlobalAggregator;
-    private readonly activityTracker: ActivityTracker;
-    private readonly idleDetector: IdleDetector;
 
     private _state: OrchestratorState = 'idle';
     private _onStateChange: ((state: OrchestratorState) => void) | null = null;
@@ -50,8 +45,6 @@ export class TimerOrchestrator {
         disableManager: DisableManager,
         scheduler: Scheduler,
         globalAggregator: GlobalAggregator,
-        activityTracker: ActivityTracker,
-        idleDetector: IdleDetector,
     ) {
         this.timer = timer;
         this.storage = storage;
@@ -60,23 +53,6 @@ export class TimerOrchestrator {
         this.disableManager = disableManager;
         this.scheduler = scheduler;
         this.global = globalAggregator;
-        this.activityTracker = activityTracker;
-        this.idleDetector = idleDetector;
-    }
-
-    /** 活动追踪器 */
-    get activity(): ActivityTracker {
-        return this.activityTracker;
-    }
-
-    /** 闲置检测器 */
-    get idle(): IdleDetector {
-        return this.idleDetector;
-    }
-
-    /** 调度器（供 ConfigWatcher 热更新间隔）*/
-    get schedulerInstance(): Scheduler {
-        return this.scheduler;
     }
 
     /** 当前状态 */
@@ -99,12 +75,6 @@ export class TimerOrchestrator {
         this._onStateChange = cb;
     }
 
-    /** 连续打卡里程碑回调（由上层负责弹出桌面通知） */
-    private _onStreakMilestone: ((count: number) => void) | null = null;
-    onStreakMilestone(cb: (count: number) => void): void {
-        this._onStreakMilestone = cb;
-    }
-
     /**
      * 启动计时流程
      * 调用链：崩溃恢复 → 禁用判定 → 开始会话 → 启动调度器
@@ -125,10 +95,14 @@ export class TimerOrchestrator {
             await this.sessionManager.startSession();
 
             // 启动调度器
-            this.scheduler.onStatusBarUpdate((data) => {
-                this._onTick?.(data);
-                // 每次状态栏刷新时评估连续打卡（仅当日首次达标时落库 + 通知）
-                void this.evaluateStreak();
+            this.scheduler.onStatusBarUpdate((totalMs) => {
+                // 状态栏更新委托给 Presentation 层
+                this._onTick?.(totalMs);
+            });
+            // 周期全量存盘完成后同步跨工作区累计（此前未接线，聚合长期陈旧）
+            this.scheduler.onFullSaved(async () => {
+                const snap = this.sessionManager.snapshot;
+                await this.global.sync(snap.totalMs);
             });
             this.scheduler.start();
 
@@ -191,41 +165,47 @@ export class TimerOrchestrator {
     async getDashboardData(): Promise<DashboardData> {
         const snap = this.sessionManager.snapshot;
         const todayMs = this.sessionManager.getTodayMs();
-        const thisWeekMs = this.sessionManager.getThisWeekMs();
-        const thisMonthMs = this.sessionManager.getThisMonthMs();
         const cfg = this.disable.config;
         const sessions = this.timer.data.sessions;
 
-        // 本周每日统计（自然周：本周一→今日，供「周报」柱状图——复用 SessionManager 的已结束会话缓存）
-        const dailyStats = this.sessionManager.getDailyStats();
-        // ★ 本周卡片使用独立周累加器，不再从 dailyStats 累加
-        const weekTotalMs = thisWeekMs;
-        // 效率数据（叠加活跃编辑时长，扣除闲置）—— 与 dailyStats 时间范围一致（均为本周）
-        const weekEfficiency = this.computeWeekEfficiency(dailyStats);
+        // 本周合计（自然周一至今，含进行中会话）
+        const weeklySummary: WeeklySummary = TimeAggregator.weeklySummary(
+            sessions,
+            this.timer.data.currentSessionStartMs,
+        );
 
-        // 跨工作区累计：同步读缓存，避免每 5s tick 一次 async 往返；
-        // 缓存为空时回退空快照并后台拉取一次（activate 时也会预热，通常已就绪）
-        const cachedGlobal = this.global.getCached();
-        if (!cachedGlobal) this.global.refreshInBackground();
-        const globalSnap = cachedGlobal ?? { totalMs: 0, workspaceCount: 0, workspaces: [] };
+        // 最近 7 天每日统计（柱状图）
+        const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs);
 
-        // 活动时间线热力图（近 12 周，含本周）—— 复用已结束会话分桶缓存
-        const heatmap = this.sessionManager.getHeatmap(12);
+        // 周报多周趋势（近 4 周）+ 今日明细
+        const weeklyTrend = TimeAggregator.weeklyTrend(sessions, 4)
+            .map((w) => ({
+                weekStart: w.weekStart,
+                label: w.weekStart.slice(5),
+                totalMs: w.totalMs,
+                sessionCount: w.sessionCount,
+            }));
+        const todayDetail = this.buildTodayDetail(sessions);
 
-        // 连续打卡天数（持久化于工作区状态）
-        const streak = this.timer.data.streak?.count ?? 0;
-        // 本周目标（来自配置）
-        const weeklyGoalMs = cfg.weeklyGoalMs ?? 0;
+        // 跨工作区累计（从缓存读取，不额外 I/O）
+        const globalSnap = await this.global.snapshot();
 
         return {
             totalMs: snap.currentTotalMs,
             todayMs,
             sessionsCount: sessions.length,
             dailyStats,
-            heatmap,
-            weekTotalMs,
-            monthTotalMs: thisMonthMs,
-            weekEfficiency,
+            weekTotalMs: weeklySummary.totalMs,
+            weeklyTrend,
+            weeklySummary: {
+                totalMs: weeklySummary.totalMs,
+                sessionCount: weeklySummary.sessionCount,
+                avgDailyMs: weeklySummary.avgDailyMs,
+                peakDate: weeklySummary.peakDate,
+                peakDateMs: weeklySummary.peakDateMs,
+                activeDays: weeklySummary.activeDays,
+            },
+            todayDetail,
             globalTotalMs: globalSnap.totalMs,
             workspaceCount: globalSnap.workspaceCount,
             workspaceList: globalSnap.workspaces,
@@ -234,114 +214,68 @@ export class TimerOrchestrator {
             statusBarEnabled: cfg.statusBarEnabled,
             journalEnabled: cfg.journalEnabled ?? true,
             backupToFile: cfg.backupToFile ?? true,
-            ringBufferCapacity: cfg.ringBufferCapacity ?? DEFAULT_RING_BUFFER_CAP,
-            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
-            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? DEFAULT_FULL_SAVE_MS,
-            maxSessions: cfg.maxSessions ?? DEFAULT_MAX_SESSIONS,
-            efficiencyEnabled: cfg.activityTrackingEnabled ?? true,
-            dailyGoalMs: cfg.dailyGoalMs ?? 0,
-            weeklyGoalMs,
-            streak,
-            statusBarClickAction: cfg.statusBarClickAction ?? 'cycle',
+            ringBufferCapacity: cfg.ringBufferCapacity ?? 1024,
+            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? 10000,
+            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? 60000,
+            maxSessions: cfg.maxSessions ?? 1000,
         };
     }
 
-    /**
-     * 计算「本周效率」：遍历每日明细，叠加活跃编辑时长、扣除闲置，
-     * 返回 活跃/(总时长−闲置)。效率仅"本次会话内"可信（ActivityTracker/IdleDetector
-     * 为内存态，重启归零），历史天恒为 0%——属已知限制，调用方应标注。
-     */
-    private computeWeekEfficiency(dailyStats: DailyChartEntry[]): number | undefined {
-        const cfg = this.disable.config;
-        if (!cfg.activityTrackingEnabled) return undefined;
-        let totalActiveMs = 0;
-        let weekIdleMs = 0;
-        let chartSumMs = 0;
-        for (const d of dailyStats) {
-            const activeMs = this.activityTracker.getDailyActiveMs(d.dateStr);
-            const idleMs = this.idleDetector.getDailyIdleMs(d.dateStr);
-            d.activeMs = activeMs;
-            d.idleMs = idleMs;
-            const effectiveMs = d.totalMs - idleMs;
-            d.efficiency = effectiveMs > 0 ? activeMs / effectiveMs : 0;
-            totalActiveMs += activeMs;
-            weekIdleMs += idleMs;
-            chartSumMs += d.totalMs;
-        }
-        const effectiveWeekMs = chartSumMs - weekIdleMs;
-        return effectiveWeekMs > 0 ? totalActiveMs / effectiveWeekMs : 0;
-    }
-
-    /**
-     * 装配「周报」所需的全部数据（供 WeeklyReportExporter 生成 Markdown）。
-     * 每日明细为完整自然周（本周一→本周日，未来天时长为 0）。
-     */
-    async buildWeeklyReport(workspaceName: string): Promise<WeeklyReportInput> {
-        const fullWeek = this.sessionManager.getWeekDailyStats(true);
-        const weekTotalMs = this.sessionManager.getThisWeekMs();
-        const dailyGoalMs = this.disable.config.dailyGoalMs ?? 0;
-        const lastWeekTotalMs = this.sessionManager.getLastWeekMs();
-        const weekEfficiency = this.computeWeekEfficiency(fullWeek);
+    /** 构建今日会话明细（供面板展示） */
+    private buildTodayDetail(sessions: TimeSession[]): DashboardData['todayDetail'] {
+        const detail = TimeAggregator.dailyDetail(
+            sessions,
+            TimeAggregator.todayStr(),
+            this.timer.data.currentSessionStartMs,
+        );
+        if (detail.sessionCount === 0) return null;
         return {
-            workspaceName,
-            daily: fullWeek,
-            weekTotalMs,
-            dailyGoalMs,
-            lastWeekTotalMs,
-            weekEfficiency,
-            generatedAt: new Date(),
+            date: detail.date,
+            totalMs: detail.totalMs,
+            sessionCount: detail.sessionCount,
+            sessions: detail.sessions.map((s) => ({
+                startLabel: s.startLabel,
+                endLabel: s.endLabel,
+                durationMs: s.durationMs,
+            })),
+            peakHour: detail.peakHour,
+            activeWindow: detail.activeWindow,
         };
     }
 
     /**
-     * 评估「连续打卡」：当今日累计达到每日目标，且今日尚未计入时，连续天数 +1。
-     * - 仅在进行中（running）状态评估；
-     * - 当日已计入则直接返回，避免重复落库/通知；
-     * - 跨天中断（上次记录在更早的日期）则从 1 重新计数；
-     * - 仅在状态真正变化时写盘（workspaceState + JSON 备份）并触发里程碑回调。
-     * 返回当前连续天数。
+     * 导出日报 / 周报为 Markdown 文本
+     * @param kind 报告类型：'daily' 日报 / 'weekly' 周报
      */
-    async evaluateStreak(): Promise<number> {
-        if (this._state !== 'running') return this.timer.data.streak?.count ?? 0;
+    async exportReport(kind: ReportKind): Promise<string> {
+        const sessions = this.timer.data.sessions;
+        const today = TimeAggregator.todayStr();
 
-        const dailyGoalMs = this.disable.config.dailyGoalMs ?? 0;
-        if (dailyGoalMs <= 0) return this.timer.data.streak?.count ?? 0;
-
-        const todayMs = this.sessionManager.getTodayMs();
-        if (todayMs < dailyGoalMs) return this.timer.data.streak?.count ?? 0;
-
-        const data = this.timer.data;
-        const todayStr = localDateStr(new Date());
-        const prev = data.streak;
-        if (prev && prev.dateStr === todayStr) {
-            return prev.count; // 今日已计入，不重复
+        if (kind === 'daily') {
+            const detail = TimeAggregator.dailyDetail(
+                sessions,
+                today,
+                this.timer.data.currentSessionStartMs,
+            );
+            log(LogLevel.Info, `TimerOrchestrator: exported daily report (${detail.date})`);
+            return ReportExporter.buildDailyReport(detail);
         }
 
-        const yesterdayStr = localDateStr(new Date(Date.now() - MS_PER_DAY));
-        const newCount = (prev && prev.dateStr === yesterdayStr) ? prev.count + 1 : 1;
-        this.timer.setStreak({ dateStr: todayStr, count: newCount });
-
-        try {
-            await this.storage.save(data, true);
-            log(LogLevel.Info, `TimerOrchestrator: streak updated to ${newCount} (${todayStr})`);
-        } catch (err) {
-            log(LogLevel.Warn, 'TimerOrchestrator: streak save failed', err as Error);
-        }
-
-        this._onStreakMilestone?.(newCount);
-        return newCount;
-    }
-
-    /** 清除连续打卡状态（重置/新建周期时调用） */
-    async clearStreak(): Promise<void> {
-        if (this.timer.data.streak) {
-            this.timer.setStreak(undefined);
-            try {
-                await this.storage.save(this.timer.data, true);
-            } catch (err) {
-                log(LogLevel.Warn, 'TimerOrchestrator: clear streak failed', err as Error);
-            }
-        }
+        // weekly
+        const summary = TimeAggregator.weeklySummary(
+            sessions,
+            this.timer.data.currentSessionStartMs,
+        );
+        const trend = TimeAggregator.weeklyTrend(sessions, 4)
+            .map((w) => ({
+                weekStart: w.weekStart,
+                label: w.weekStart.slice(5),
+                totalMs: w.totalMs,
+                sessionCount: w.sessionCount,
+            }));
+        const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs);
+        log(LogLevel.Info, `TimerOrchestrator: exported weekly report (${summary.weekStart})`);
+        return ReportExporter.buildWeeklyReport(summary, trend, dailyStats);
     }
 
     /**
@@ -354,10 +288,12 @@ export class TimerOrchestrator {
         try {
             const flushed = await this.journal.tryFlush();
             await this.sessionManager.saveCheckpoint();
-            // 同步到全局跨工作区累计
+            // 同步到全局跨工作区累计。
+            // ⚠️ 口径与 checkpoint 一致：使用 snap.totalMs（不含进行中会话），
+            // 进行中增量由 journal 体系负责，避免全局累计与本地累计漂移。
             const snap = this.sessionManager.snapshot;
-            await this.global.sync(snap.currentTotalMs);
-            return `已存盘: totalMs=${snap.currentTotalMs}, globalSynced, journalFlushed=${flushed}`;
+            await this.global.sync(snap.totalMs);
+            return `已存盘: totalMs=${snap.totalMs}, globalSynced, journalFlushed=${flushed}`;
         } catch (err) {
             return `存盘失败: ${(err as Error).message}`;
         }
@@ -375,11 +311,44 @@ export class TimerOrchestrator {
         if (partial.journalFlushIntervalMs !== undefined) cfg.journalFlushIntervalMs = partial.journalFlushIntervalMs;
         if (partial.fullSaveIntervalMs !== undefined) cfg.fullSaveIntervalMs = partial.fullSaveIntervalMs;
         if (partial.maxSessions !== undefined) cfg.maxSessions = partial.maxSessions;
-        if (partial.efficiencyEnabled !== undefined) cfg.activityTrackingEnabled = partial.efficiencyEnabled;
-        if (partial.dailyGoalMs !== undefined) cfg.dailyGoalMs = partial.dailyGoalMs * 60000;
-        if (partial.weeklyGoalMs !== undefined) cfg.weeklyGoalMs = partial.weeklyGoalMs * 3600000;
-        if (partial.statusBarClickAction !== undefined) cfg.statusBarClickAction = partial.statusBarClickAction as 'cycle' | 'dashboard';
         this.disable.updateConfig(cfg);
+        // 间隔/会话上限支持运行期热更新；journalEnabled/capacity 等需重启生效
+        this.applyRuntimeConfig(cfg);
+    }
+
+    /**
+     * 运行期热更新可变配置：调度间隔、会话历史上限。
+     * 由 ConfigWatcher 与 applyDashboardConfig 共用。
+     */
+    applyRuntimeConfig(cfg: Partial<TimingConfig>): void {
+        if (cfg.journalFlushIntervalMs !== undefined || cfg.fullSaveIntervalMs !== undefined) {
+            this.scheduler.updateIntervals({
+                journalFlushIntervalMs: cfg.journalFlushIntervalMs,
+                fullSaveIntervalMs: cfg.fullSaveIntervalMs,
+            });
+        }
+        if (cfg.maxSessions !== undefined) {
+            this.sessionManager.setMaxSessions(cfg.maxSessions);
+        }
+    }
+
+    /**
+     * 导出当前工作区计时数据为 CSV 字符串
+     * 配合 CsvExporter 使用，供 UI / 命令面板触发导出。
+     *
+     * @param workspaceName 工作区名称（用于 CSV 头部注释）
+     */
+    async exportCSV(workspaceName: string): Promise<string> {
+        // 取当前计时数据的只读快照，避免导出时与计时器内部状态耦合
+        const data: WorkspaceTimingData = {
+            ...this.timer.data,
+            sessions: [...this.timer.data.sessions],
+        };
+
+        const exporter = new CsvExporter();
+        const csv = await exporter.export(data, workspaceName);
+        log(LogLevel.Info, `TimerOrchestrator: exported CSV (${csv.length} bytes)`);
+        return csv;
     }
 
     /**
@@ -393,120 +362,26 @@ export class TimerOrchestrator {
         await this.stop();
 
         // 2. 重置计时器数据（保留 history，totalMs 归零）
+        //    修复：原实现直接 timer.reset() 会清空 sessions[]，与注释"历史会话记录保留"
+        //    相矛盾。此处先保存历史会话，reset 后再恢复，实现"累计归零、历史保留"。
+        //    同时保留用户的启用/禁用状态（reset 会把 isEnabled 恢复为默认 true）。
+        const prevData = this.timer.data;
+        const historySessions = prevData.sessions;
         this.timer.reset();
-        // 新建周期：连续打卡中断归零
-        this.timer.setStreak(undefined);
+        this.timer.replaceData({
+            ...this.timer.data,
+            isEnabled: prevData.isEnabled,
+            sessions: historySessions,
+        });
 
         // 3. 同步全局（重置为 0）
         await this.global.sync(0);
 
         // 4. 新建空数据存盘
         const freshData: WorkspaceTimingData = { ...this.timer.data, sessions: [...this.timer.data.sessions] };
-        await this.storage.save(freshData, true);
+        await this.storage.save(freshData);
 
         // 5. 重新启动
         await this.start();
-    }
-
-    /**
-     * 装配「周期报告」（周报 / 月报）数据。
-     * 周报复用 weeklyGoalMs 作为周期目标；月报暂不设周期目标（periodGoalMs=0）。
-     */
-    async buildPeriodReport(workspaceName: string, kind: PeriodKind): Promise<PeriodReportInput> {
-        const now = new Date();
-        const dailyGoalMs = this.disable.config.dailyGoalMs ?? 0;
-        const weeklyGoalMs = this.disable.config.weeklyGoalMs ?? 0;
-
-        if (kind === 'month') {
-            const daily = this.sessionManager.getMonthDailyStats(true);
-            const firstStr = daily.length ? daily[0].dateStr : localDateStr(now);
-            const lastStr = daily.length ? daily[daily.length - 1].dateStr : firstStr;
-            return {
-                workspaceName,
-                kind: 'month',
-                periodLabel: '本月',
-                rangeLabel: `${firstStr} ~ ${lastStr}`,
-                daily,
-                periodTotalMs: this.sessionManager.getThisMonthMs(),
-                lastPeriodTotalMs: this.sessionManager.getLastMonthMs(),
-                dailyGoalMs,
-                periodGoalMs: 0,
-                efficiency: undefined,
-                generatedAt: new Date(),
-            };
-        }
-
-        const daily = this.sessionManager.getWeekDailyStats(true);
-        const firstStr = daily.length ? daily[0].dateStr : localDateStr(now);
-        const lastStr = daily.length ? daily[daily.length - 1].dateStr : firstStr;
-        return {
-            workspaceName,
-            kind: 'week',
-            periodLabel: '本周',
-            rangeLabel: `${firstStr} ~ ${lastStr}`,
-            daily,
-            periodTotalMs: this.sessionManager.getThisWeekMs(),
-            lastPeriodTotalMs: this.sessionManager.getLastWeekMs(),
-            dailyGoalMs,
-            periodGoalMs: weeklyGoalMs,
-            efficiency: this.computeWeekEfficiency(daily),
-            generatedAt: new Date(),
-        };
-    }
-
-    /** 装配「全量数据 JSON 导出」所需的完整数据束 */
-    async buildExportBundle(workspaceName: string): Promise<ExportBundle> {
-        const data = await this.getDashboardData();
-        const monthDaily = this.sessionManager.getMonthDailyStats(true);
-        return {
-            workspaceName,
-            exportedAt: new Date().toISOString(),
-            totals: {
-                todayMs: data.todayMs,
-                thisWeekMs: data.weekTotalMs,
-                thisMonthMs: data.monthTotalMs,
-                totalMs: data.totalMs,
-                globalTotalMs: data.globalTotalMs,
-            },
-            streak: data.streak,
-            goals: { dailyGoalMs: data.dailyGoalMs, weeklyGoalMs: data.weeklyGoalMs },
-            dailyStats: data.dailyStats,
-            monthDailyStats: monthDaily,
-            heatmap: data.heatmap,
-            sessions: this.timer.data.sessions,
-        };
-    }
-
-    // ─── 定时自动导出 ────────────────────────────────
-
-    private _autoExportCfg: NonNullable<TimingConfig['autoExport']> = {
-        enabled: false, intervalMinutes: 60, format: 'weekly', targetPath: '',
-    };
-    private _lastAutoExportAt = 0;
-    private _onAutoExport: ((cfg: NonNullable<TimingConfig['autoExport']>) => void) | null = null;
-
-    /** 注册定时自动导出回调（由上层执行实际写盘） */
-    onAutoExport(cb: (cfg: NonNullable<TimingConfig['autoExport']>) => void): void {
-        this._onAutoExport = cb;
-    }
-
-    /** 更新自动导出配置（来自 VS Code 设置） */
-    setAutoExportConfig(cfg: TimingConfig['autoExport']): void {
-        if (cfg) this._autoExportCfg = { ...this._autoExportCfg, ...cfg };
-    }
-
-    /**
-     * 触发条件检查：仅在「已启用 + 运行中 + 距上次导出超过间隔」时回调一次。
-     * 由 Scheduler 的全量存盘周期（每 60s）驱动，无需独立定时器。
-     */
-    async maybeAutoExport(): Promise<void> {
-        const cfg = this._autoExportCfg;
-        if (!cfg.enabled) return;
-        if (this._state !== 'running') return;
-        const now = Date.now();
-        const intervalMs = Math.max(cfg.intervalMinutes, 1) * 60000;
-        if (now - this._lastAutoExportAt < intervalMs) return;
-        this._lastAutoExportAt = now;
-        this._onAutoExport?.(cfg);
     }
 }

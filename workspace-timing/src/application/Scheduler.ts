@@ -7,31 +7,21 @@
  *   3. 每秒通知 StatusBar 更新
  *
  * 所有间隔可通过 TimingConfig 配置。
- *
- * ★ 修复（0.3.2）：updateIntervals 此前会「无脑重建全部 4 个定时器」，
- *   即便只是改了 enabled 这类与间隔无关的配置，也会打断所有定时器的相位并重建。
- *   现改为仅重启「间隔确实发生变化」的定时器，避免无谓的定时器抖动。
  */
 
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager } from './SessionManager';
 import { LogLevel, log } from '../integration/Logger';
-import {
-    DEFAULT_HEARTBEAT_MS,
-    DEFAULT_STATUS_BAR_MS,
-    DEFAULT_JOURNAL_FLUSH_MS,
-    DEFAULT_FULL_SAVE_MS,
-} from '../domain/models';
 
 export interface SchedulerOptions {
     /** journal flush 间隔 (ms) */
     journalFlushIntervalMs: number;
     /** 全量存盘间隔 (ms) */
     fullSaveIntervalMs: number;
-    /** 状态栏更新间隔 (ms) — 独立于心跳计时器，通常 5s 足够 */
+    /** 状态栏更新间隔 (ms) */
     statusBarUpdateIntervalMs: number;
-    /** 心跳间隔 (ms) — 每秒推入时间片到 RingBuffer */
-    heartbeatIntervalMs: number;
+    /** 是否启用 journal 崩溃保护（false 时不写 RingBuffer/journal） */
+    journalEnabled: boolean;
 }
 
 export interface StatusBarDisplayData {
@@ -40,9 +30,9 @@ export interface StatusBarDisplayData {
 }
 
 export type StatusBarUpdateCallback = (data: StatusBarDisplayData) => void;
-export type FullSaveCallback = () => void | Promise<void>;
-/** 每秒心跳回调 — 供 ActivityTracker / IdleDetector 等消费 */
-export type HeartbeatCallback = () => void;
+
+/** 周期全量存盘完成回调（用于跨工作区全局同步） */
+export type FullSavedCallback = () => void | Promise<void>;
 
 export class Scheduler {
     private readonly journal: JournalWriter;
@@ -51,13 +41,15 @@ export class Scheduler {
 
     private journalTimer: ReturnType<typeof setInterval> | null = null;
     private fullSaveTimer: ReturnType<typeof setInterval> | null = null;
-    private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     private statusBarTimer: ReturnType<typeof setInterval> | null = null;
     private statusBarCallback: StatusBarUpdateCallback | null = null;
-    private fullSaveCallback: FullSaveCallback | null = null;
-    private heartbeatCallback: HeartbeatCallback | null = null;
+    private fullSavedCallback: FullSavedCallback | null = null;
 
     private _running: boolean = false;
+    /** 全量存盘进行中标志（防重入：上一轮未完成时跳过本轮） */
+    private _saving: boolean = false;
+    /** journal flush 进行中标志 */
+    private _flushing: boolean = false;
 
     constructor(
         journal: JournalWriter,
@@ -67,10 +59,10 @@ export class Scheduler {
         this.journal = journal;
         this.sessionManager = sessionManager;
         this.options = {
-            journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
-            fullSaveIntervalMs: DEFAULT_FULL_SAVE_MS,
-            heartbeatIntervalMs: DEFAULT_HEARTBEAT_MS,
-            statusBarUpdateIntervalMs: DEFAULT_STATUS_BAR_MS,
+            journalFlushIntervalMs: 10000,
+            fullSaveIntervalMs: 60000,
+            statusBarUpdateIntervalMs: 1000,
+            journalEnabled: true,
             ...options,
         };
     }
@@ -85,137 +77,131 @@ export class Scheduler {
         this.statusBarCallback = cb;
     }
 
-    /** 注册全量存盘后回调 */
-    onFullSave(cb: FullSaveCallback): void {
-        this.fullSaveCallback = cb;
-    }
-
-    /** 注册心跳回调（每秒）*/
-    onHeartbeat(cb: HeartbeatCallback): void {
-        this.heartbeatCallback = cb;
+    /** 注册周期全量存盘完成回调 */
+    onFullSaved(cb: FullSavedCallback): void {
+        this.fullSavedCallback = cb;
     }
 
     /**
-     * ★ 配置热更新 — 仅重启间隔发生变化的定时器。
-     * 无变化的定时器保持原相位，避免无关配置变更引起的抖动。
+     * 运行期热更新调度间隔（journalEnabled 不支持热切换，需重启）
+     * 运行中会重建对应定时器使新间隔立即生效。
      */
-    updateIntervals(partial: Partial<SchedulerOptions>): void {
-        const prev = this.options;
-        const next: SchedulerOptions = { ...prev, ...partial };
+    updateIntervals(patch: Partial<Pick<SchedulerOptions, 'journalFlushIntervalMs' | 'fullSaveIntervalMs'>>): void {
+        const journalChanged = patch.journalFlushIntervalMs !== undefined
+            && patch.journalFlushIntervalMs !== this.options.journalFlushIntervalMs;
+        const fullSaveChanged = patch.fullSaveIntervalMs !== undefined
+            && patch.fullSaveIntervalMs !== this.options.fullSaveIntervalMs;
 
-        const changed = {
-            journal: next.journalFlushIntervalMs !== prev.journalFlushIntervalMs,
-            fullSave: next.fullSaveIntervalMs !== prev.fullSaveIntervalMs,
-            heartbeat: next.heartbeatIntervalMs !== prev.heartbeatIntervalMs,
-            statusBar: next.statusBarUpdateIntervalMs !== prev.statusBarUpdateIntervalMs,
-        };
+        if (!journalChanged && !fullSaveChanged) return;
 
-        const anyChanged = changed.journal || changed.fullSave || changed.heartbeat || changed.statusBar;
-        this.options = next;
+        this.options = { ...this.options, ...patch };
+        if (!this._running) return;
 
-        if (!anyChanged) return;
-        if (!this._running) return; // 未运行则仅更新配置，待 start() 时生效
+        if (journalChanged && this.options.journalEnabled) {
+            if (this.journalTimer) clearInterval(this.journalTimer);
+            this.journalTimer = setInterval(() => void this.flushOnce(), this.options.journalFlushIntervalMs);
+        }
+        if (fullSaveChanged) {
+            if (this.fullSaveTimer) clearInterval(this.fullSaveTimer);
+            this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
+        }
 
-        if (changed.journal) this.restartJournalTimer();
-        if (changed.fullSave) this.restartFullSaveTimer();
-        if (changed.heartbeat) this.restartHeartbeatTimer();
-        if (changed.statusBar) this.restartStatusBarTimer();
+        log(LogLevel.Debug, `Scheduler: intervals updated (journal=${this.options.journalFlushIntervalMs}ms, fullSave=${this.options.fullSaveIntervalMs}ms)`);
     }
 
     /** 启动所有周期任务 */
     start(): void {
         if (this._running) return;
         this._running = true;
-        this.startJournalTimer();
-        this.startFullSaveTimer();
-        this.startHeartbeatTimer();
-        this.startStatusBarTimer();
-        log(LogLevel.Info, 'Scheduler: started');
-    }
 
-    private startJournalTimer(): void {
-        this.journalTimer = setInterval(async () => {
-            try {
-                await this.journal.tryFlush();
-            } catch (err) {
-                log(LogLevel.Error, 'Scheduler: journal flush failed', err as Error);
-            }
-        }, this.options.journalFlushIntervalMs);
-    }
+        // 1. Journal flush 定时器（仅在 journalEnabled 时启用）
+        if (this.options.journalEnabled) {
+            this.journalTimer = setInterval(() => void this.flushOnce(), this.options.journalFlushIntervalMs);
+        }
 
-    private startFullSaveTimer(): void {
-        this.fullSaveTimer = setInterval(async () => {
-            try {
-                await this.sessionManager.saveCheckpoint();
-                await this.fullSaveCallback?.();
-            } catch (err) {
-                log(LogLevel.Error, 'Scheduler: full save failed', err as Error);
-            }
-        }, this.options.fullSaveIntervalMs);
-    }
+        // 2. 全量存盘定时器
+        this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
 
-    private startHeartbeatTimer(): void {
-        this.heartbeatTimer = setInterval(() => {
-            this.journal.push({
-                timestamp: Date.now(),
-                deltaMs: this.options.heartbeatIntervalMs,
-            });
-            this.heartbeatCallback?.();
-        }, this.options.heartbeatIntervalMs);
-    }
-
-    private startStatusBarTimer(): void {
+        // 3. 心跳定时器：每秒推入时间片（仅 journalEnabled）+ 更新状态栏
         this.statusBarTimer = setInterval(() => {
             try {
+                // 推入时间片到 RingBuffer（仅当 journal 启用时）
+                if (this.options.journalEnabled) {
+                    this.journal.push({
+                        timestamp: Date.now(),
+                        deltaMs: this.options.statusBarUpdateIntervalMs, // 1000ms = 1s
+                    });
+                }
+
+                // 更新状态栏（含今日时长和累计时长）
                 if (this.statusBarCallback) {
                     const snap = this.sessionManager.snapshot;
                     const todayMs = this.sessionManager.getTodayMs();
                     this.statusBarCallback({ totalMs: snap.currentTotalMs, todayMs });
                 }
             } catch {
-                // no-op
+                // 状态栏更新失败不抛异常
             }
         }, this.options.statusBarUpdateIntervalMs);
+
+        log(LogLevel.Info, 'Scheduler: started');
     }
 
-    private restartJournalTimer(): void {
-        if (this.journalTimer) { clearInterval(this.journalTimer); this.journalTimer = null; }
-        this.startJournalTimer();
+    /**
+     * 单次 journal flush（带防重入守卫）
+     */
+    private async flushOnce(): Promise<void> {
+        if (this._flushing) return;
+        this._flushing = true;
+        try {
+            await this.journal.tryFlush();
+        } catch (err) {
+            log(LogLevel.Error, 'Scheduler: journal flush failed', err as Error);
+        } finally {
+            this._flushing = false;
+        }
     }
 
-    private restartFullSaveTimer(): void {
-        if (this.fullSaveTimer) { clearInterval(this.fullSaveTimer); this.fullSaveTimer = null; }
-        this.startFullSaveTimer();
-    }
-
-    private restartHeartbeatTimer(): void {
-        if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
-        this.startHeartbeatTimer();
-    }
-
-    private restartStatusBarTimer(): void {
-        if (this.statusBarTimer) { clearInterval(this.statusBarTimer); this.statusBarTimer = null; }
-        this.startStatusBarTimer();
+    /**
+     * 单次全量存盘（带防重入守卫），完成后触发 onFullSaved 回调
+     */
+    private async saveOnce(): Promise<void> {
+        if (this._saving) return;
+        this._saving = true;
+        try {
+            await this.sessionManager.saveCheckpoint();
+            await this.fullSavedCallback?.();
+        } catch (err) {
+            log(LogLevel.Error, 'Scheduler: full save failed', err as Error);
+        } finally {
+            this._saving = false;
+        }
     }
 
     /** 停止所有周期任务 */
     stop(): void {
         this._running = false;
-        this.clearAllTimers();
-        log(LogLevel.Info, 'Scheduler: stopped');
-    }
 
-    private clearAllTimers(): void {
-        if (this.journalTimer) { clearInterval(this.journalTimer); this.journalTimer = null; }
-        if (this.fullSaveTimer) { clearInterval(this.fullSaveTimer); this.fullSaveTimer = null; }
-        if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
-        if (this.statusBarTimer) { clearInterval(this.statusBarTimer); this.statusBarTimer = null; }
+        if (this.journalTimer) {
+            clearInterval(this.journalTimer);
+            this.journalTimer = null;
+        }
+        if (this.fullSaveTimer) {
+            clearInterval(this.fullSaveTimer);
+            this.fullSaveTimer = null;
+        }
+        if (this.statusBarTimer) {
+            clearInterval(this.statusBarTimer);
+            this.statusBarTimer = null;
+        }
+
+        log(LogLevel.Info, 'Scheduler: stopped');
     }
 
     /** 触发一次立即存盘 */
     async saveNow(): Promise<void> {
         try {
-            this.journal.flushAll();
+            await this.journal.flushAll();
             await this.sessionManager.saveCheckpoint();
             log(LogLevel.Debug, 'Scheduler: manual save completed');
         } catch (err) {

@@ -7,19 +7,6 @@
  */
 /** 数据格式当前版本 */
 export declare const LATEST_VERSION = 1;
-export declare const MS_PER_SECOND = 1000;
-export declare const MS_PER_MINUTE = 60000;
-export declare const MS_PER_HOUR = 3600000;
-export declare const MS_PER_DAY = 86400000;
-export declare const DEFAULT_HEARTBEAT_MS = 1000;
-export declare const DEFAULT_STATUS_BAR_MS: number;
-export declare const DEFAULT_JOURNAL_FLUSH_MS: number;
-export declare const DEFAULT_FULL_SAVE_MS = 60000;
-export declare const DEFAULT_RING_BUFFER_CAP = 1024;
-export declare const DEFAULT_MAX_SESSIONS = 1000;
-export declare const DEFAULT_IDLE_TIMEOUT_MS: number;
-export declare const DEFAULT_DAILY_GOAL_MS: number;
-export declare const CRASH_COMPENSATION_CAP_MS = 86400000;
 /** 一条原子时间片 — 用于缓存层和 journal */
 export interface TimeSlice {
     /** 时间片结束时间戳 (Date.now()) */
@@ -50,13 +37,6 @@ export interface WorkspaceTimingData {
     isEnabled: boolean;
     /** 历史会话列表 */
     sessions: TimeSession[];
-    /** 连续打卡状态（持久化）— 仅内存/工作区状态，重启后保留 */
-    streak?: {
-        /** 最后评定的日期 YYYY-MM-DD */
-        dateStr: string;
-        /** 连续达标天数（截至 dateStr） */
-        count: number;
-    };
     /** 扩展元数据容器 — 供插件/第三方使用 */
     metadata?: Record<string, string>;
 }
@@ -82,31 +62,8 @@ export interface TimingConfig {
     fullSaveIntervalMs: number;
     /** 状态栏显示格式 */
     statusBarFormat: 'compact' | 'detailed';
-    /** 状态栏点击行为 */
-    statusBarClickAction: 'cycle' | 'dashboard';
     /** 历史会话保留上限（0 = 不限） */
     maxSessions: number;
-    /** 编辑活跃度追踪（效率转化） */
-    activityTrackingEnabled: boolean;
-    /** 闲置超时 (ms)，0 = 禁用闲置检测 */
-    idleTimeoutMs: number;
-    /** 每日目标时长 (ms)，0 = 不设目标 */
-    dailyGoalMs: number;
-    /** 每周目标时长 (ms)，0 = 不设目标 */
-    weeklyGoalMs: number;
-    /** 定时自动导出配置（可选；未设置则禁用） */
-    autoExport?: AutoExportConfig;
-}
-/** 定时自动导出配置 */
-export interface AutoExportConfig {
-    /** 是否启用定时自动导出 */
-    enabled: boolean;
-    /** 导出间隔（分钟） */
-    intervalMinutes: number;
-    /** 导出格式 */
-    format: 'csv' | 'json' | 'weekly' | 'monthly';
-    /** 目标目录路径；空 = 工作区根目录 */
-    targetPath: string;
 }
 /** 默认配置 */
 export declare const DEFAULT_CONFIG: TimingConfig;

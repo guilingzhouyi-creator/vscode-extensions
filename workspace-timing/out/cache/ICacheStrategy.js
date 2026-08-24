@@ -3,18 +3,15 @@
  * ICacheStrategy — 缓存策略接口
  *
  * 决定 flush 的触发时机，支持可插拔策略。
- * 当前仅 TimeBasedCacheStrategy 被使用，
- * SizeBasedCacheStrategy / HybridCacheStrategy 为预留扩展点。
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HybridCacheStrategy = exports.SizeBasedCacheStrategy = exports.TimeBasedCacheStrategy = void 0;
-const models_1 = require("../domain/models");
 /**
  * 基于时间的缓存策略。
  * 固定时间间隔触发 flush。
  */
 class TimeBasedCacheStrategy {
-    constructor(intervalMs = models_1.DEFAULT_JOURNAL_FLUSH_MS) {
+    constructor(intervalMs = 10000) {
         this.name = 'time-based';
         this.intervalMs = intervalMs;
     }
@@ -50,7 +47,7 @@ exports.SizeBasedCacheStrategy = SizeBasedCacheStrategy;
  * 混合策略：时间和大小双重条件，谁先触发用谁。
  */
 class HybridCacheStrategy {
-    constructor(intervalMs = models_1.DEFAULT_JOURNAL_FLUSH_MS, thresholdRatio = 0.5) {
+    constructor(intervalMs = 10000, thresholdRatio = 0.5) {
         this.name = 'hybrid';
         this.timeBased = new TimeBasedCacheStrategy(intervalMs);
         this.sizeBased = new SizeBasedCacheStrategy(thresholdRatio);

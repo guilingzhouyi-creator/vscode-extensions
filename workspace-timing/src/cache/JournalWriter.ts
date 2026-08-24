@@ -7,7 +7,6 @@
  */
 
 import { TimeSlice } from '../domain/models';
-import { DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS } from '../domain/models';
 import { RingBuffer } from './RingBuffer';
 import { ICacheStrategy, TimeBasedCacheStrategy } from './ICacheStrategy';
 import { JournalStorageProvider } from '../persistence/JournalStorageProvider';
@@ -21,12 +20,12 @@ export class JournalWriter {
 
     constructor(
         storage: JournalStorageProvider,
-        capacity: number = DEFAULT_RING_BUFFER_CAP,
+        capacity: number = 1024,
         strategy?: ICacheStrategy,
     ) {
         this.ringBuffer = new RingBuffer<TimeSlice>(capacity);
         this.storage = storage;
-        this.strategy = strategy ?? new TimeBasedCacheStrategy(DEFAULT_JOURNAL_FLUSH_MS);
+        this.strategy = strategy ?? new TimeBasedCacheStrategy(10000);
     }
 
     /** 获取内部 RingBuffer 引用（供 UI 读取最近数据） */
@@ -91,12 +90,14 @@ export class JournalWriter {
     }
 
     private getOldestTimestamp(): number {
-        const items = this.ringBuffer.peekLast(this.ringBuffer.count);
-        return items.length > 0 ? items[0].timestamp : 0;
+        // O(1)：直接读最旧一条，避免此前 peekLast(count) 全量拷贝缓冲
+        const oldest = this.ringBuffer.peekOldest();
+        return oldest ? oldest.timestamp : 0;
     }
 
     private getNewestTimestamp(): number {
-        const items = this.ringBuffer.peekLast(this.ringBuffer.count);
-        return items.length > 0 ? items[items.length - 1].timestamp : 0;
+        // O(1)：直接读最新一条，避免此前 peekLast(count) 全量拷贝缓冲
+        const newest = this.ringBuffer.peekNewest();
+        return newest ? newest.timestamp : 0;
     }
 }

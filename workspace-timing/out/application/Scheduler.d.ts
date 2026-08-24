@@ -7,10 +7,6 @@
  *   3. 每秒通知 StatusBar 更新
  *
  * 所有间隔可通过 TimingConfig 配置。
- *
- * ★ 修复（0.3.2）：updateIntervals 此前会「无脑重建全部 4 个定时器」，
- *   即便只是改了 enabled 这类与间隔无关的配置，也会打断所有定时器的相位并重建。
- *   现改为仅重启「间隔确实发生变化」的定时器，避免无谓的定时器抖动。
  */
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager } from './SessionManager';
@@ -19,58 +15,56 @@ export interface SchedulerOptions {
     journalFlushIntervalMs: number;
     /** 全量存盘间隔 (ms) */
     fullSaveIntervalMs: number;
-    /** 状态栏更新间隔 (ms) — 独立于心跳计时器，通常 5s 足够 */
+    /** 状态栏更新间隔 (ms) */
     statusBarUpdateIntervalMs: number;
-    /** 心跳间隔 (ms) — 每秒推入时间片到 RingBuffer */
-    heartbeatIntervalMs: number;
+    /** 是否启用 journal 崩溃保护（false 时不写 RingBuffer/journal） */
+    journalEnabled: boolean;
 }
 export interface StatusBarDisplayData {
     totalMs: number;
     todayMs: number;
 }
 export type StatusBarUpdateCallback = (data: StatusBarDisplayData) => void;
-export type FullSaveCallback = () => void | Promise<void>;
-/** 每秒心跳回调 — 供 ActivityTracker / IdleDetector 等消费 */
-export type HeartbeatCallback = () => void;
+/** 周期全量存盘完成回调（用于跨工作区全局同步） */
+export type FullSavedCallback = () => void | Promise<void>;
 export declare class Scheduler {
     private readonly journal;
     private readonly sessionManager;
     private options;
     private journalTimer;
     private fullSaveTimer;
-    private heartbeatTimer;
     private statusBarTimer;
     private statusBarCallback;
-    private fullSaveCallback;
-    private heartbeatCallback;
+    private fullSavedCallback;
     private _running;
+    /** 全量存盘进行中标志（防重入：上一轮未完成时跳过本轮） */
+    private _saving;
+    /** journal flush 进行中标志 */
+    private _flushing;
     constructor(journal: JournalWriter, sessionManager: SessionManager, options?: Partial<SchedulerOptions>);
     /** 是否正在运行 */
     get isRunning(): boolean;
     /** 注册状态栏更新回调 */
     onStatusBarUpdate(cb: StatusBarUpdateCallback): void;
-    /** 注册全量存盘后回调 */
-    onFullSave(cb: FullSaveCallback): void;
-    /** 注册心跳回调（每秒）*/
-    onHeartbeat(cb: HeartbeatCallback): void;
+    /** 注册周期全量存盘完成回调 */
+    onFullSaved(cb: FullSavedCallback): void;
     /**
-     * ★ 配置热更新 — 仅重启间隔发生变化的定时器。
-     * 无变化的定时器保持原相位，避免无关配置变更引起的抖动。
+     * 运行期热更新调度间隔（journalEnabled 不支持热切换，需重启）
+     * 运行中会重建对应定时器使新间隔立即生效。
      */
-    updateIntervals(partial: Partial<SchedulerOptions>): void;
+    updateIntervals(patch: Partial<Pick<SchedulerOptions, 'journalFlushIntervalMs' | 'fullSaveIntervalMs'>>): void;
     /** 启动所有周期任务 */
     start(): void;
-    private startJournalTimer;
-    private startFullSaveTimer;
-    private startHeartbeatTimer;
-    private startStatusBarTimer;
-    private restartJournalTimer;
-    private restartFullSaveTimer;
-    private restartHeartbeatTimer;
-    private restartStatusBarTimer;
+    /**
+     * 单次 journal flush（带防重入守卫）
+     */
+    private flushOnce;
+    /**
+     * 单次全量存盘（带防重入守卫），完成后触发 onFullSaved 回调
+     */
+    private saveOnce;
     /** 停止所有周期任务 */
     stop(): void;
-    private clearAllTimers;
     /** 触发一次立即存盘 */
     saveNow(): Promise<void>;
 }

@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.4.0] — 2026-08-24
+
+### ⚠️ Breaking（架构精简）
+本版本是一次大规模**减法重构**：移除闲置检测、效率统计、每日目标、周目标/连续打卡、热力图、月报、JSON 导出与定时自动导出等功能，回归「轻量、可靠、零噪音」的计时内核。
+
+- **移除模块**：`ActivityTracker` / `IdleDetector` / `JsonExporter` / `WeeklyReportExporter` / `PeriodReportExporter`；对应配置项（`idleTimeoutMinutes`、`efficiency.enabled`、`dailyGoalMinutes`、`autoExport.*` 等）一并删除
+- **导出器收敛**：新增统一 `ReportExporter`（日报/周报 Markdown），CSV 导出保留
+- **面板内联化**：Dashboard HTML/CSS/JS 内联进 `DashboardPanel.ts`，移除独立 html 资源与 copy-assets 构建步骤
+- **存储路径迁移**：数据文件由 `.workspace-timing-data/` 迁至 `.vscode/`（旧目录文件不再读取，可手动删除）
+- **命令面板文案**：移除 nls 占位机制，改为直接英文字符串
+
+### Fixed
+- **reset 命令失效**（critical）：`extension.ts` 向 `CommandRegistrar` 传入 `storage=null`，导致「重置数据」永远命中无工作区守卫；现将存储引用提升为模块级并传入真实引用
+- **时区口径统一**（critical）：聚合层此前混用 UTC（`toISOString`）与本地时区，UTC+8 用户早晨 8 点前的会话被归到前一天、周起始标签错位；现全模块统一本地时区归桶
+- **跨午夜会话切分恢复**（critical）：回归 v0.3.2 已修复的缺陷——跨午夜会话整段计入开始日；现按自然日切分片段归属（日报/今日统计/7 日图/周报全链路口径一致），DST 安全
+- **跨工作区聚合接线修复**（major）：`global.sync` 此前仅在手动存盘触发，周期存盘路径未接入，聚合长期陈旧；现挂载到 Scheduler 全量存盘回调并加防重入守卫
+- **saveNow 口径漂移**：全局同步改用与 checkpoint 一致的 `totalMs`（不含进行中会话），消除全局累计与本地累计永久漂移
+- **Scheduler 并发加固**：journal flush 与全量存盘回调增加防重入守卫；`flushAll` 补 await；`saveNow` 存盘时序修正
+- **checkpoint 会话裁剪**：周期存盘时同步执行 `trimSessions(maxSessions)`（此前仅会话结束时裁剪，长期不关窗口会无限增长）
+- **newPeriod 状态保留**：新建周期不再意外重置用户的启用/禁用状态
+- **hourly 分布失真**：小时分布按会话实际经过时间分摊（原整段记入开始小时）；活跃时段改为按累计时长选取（原按跨度）
+
+### Changed
+- **配置热更新补齐**：调度间隔（journal flush / 全量存盘）与会话历史上限支持运行期生效，无需重载窗口；仍需重启的项在面板标注「重启窗口后生效」
+- **Webview 安全加固**：面板注入 CSP（nonce 脚本白名单），符合 VS Code Webview 安全指南
+- ConfigWatcher 配置变更处理补回 try/catch；移除死代码 `LifecycleManager.onVSCodeClose`
+- 清理 out/ 中已删源码对应的孤儿编译产物（不再打进发布包）
+
+### Added
+- 单元测试扩充至 20 例：本地时区归桶、跨午夜切分、hourly 分摊、activeWindow 口径、周界切分、TimerEngine 边界
+
 ## [0.3.8] — 2026-08-12
 
 ### Added (P1 功能批次)
@@ -7,122 +38,7 @@
 - **周目标 + 连续打卡（streak）**：在每日目标之外新增「每周目标」（小时，面板设置，0 = 关闭），周报/月报展示周期目标进度；新增「连续打卡」——当今日累计达到每日目标且今日尚未计入时连续天数 +1，跨天中断从 1 重新计数，结果持久化于工作区状态（`WorkspaceTimingData.streak`），达成时弹出桌面通知（🔥 N 天）。中英文面板同步
 - **月报 + 周期报告泛化**：新增 `PeriodReportExporter`，周报/月报共用一套生成器；面板新增「导出月报」（Markdown），含本月总时长、日均、达标天数、与上月对比
 - **全量 JSON 导出**：面板新增「导出 JSON」，输出包含累计/目标/连续打卡/每日·每月明细/热力图/原始会话列表的完整数据束，便于二次分析或迁移
-- **定时自动导出**：新增 `workspaceTiming.autoExport` 设置（`enabled` / `intervalMinutes` / `format` / `targetPath`），由全量存盘周期（每 60s）驱动 `maybeAutoExport`，按间隔自动写盘 CSV / JSON / 周报 / 月报至目标目录（默认工作区根目录），无需手动操作
+- **定时自动导出**：新增 `workspaceTiming.autoExport` 设置（`enabled` / `intervalMinutes` / `format` / `targetPath`），由全量存盘周期（≈60s）驱动 `maybeAutoExport`，按间隔自动写盘 CSV / JSON / 周报 / 月报至目标目录（默认工作区根目录），无需手动操作
 
 ### Changed
 - `DashboardData` 新增 `heatmap` / `monthTotalMs` / `weeklyGoalMs` / `streak` 字段；`TimingConfig` 新增 `weeklyGoalMs` 与 `autoExport`；`WorkspaceTimingData` 新增可选的 `streak` 持久化字段（旧数据缺失时按 0 处理，向后兼容）
-
-## [0.3.7] — 2026-08-12
-
-### Fixed
-- **`GlobalAggregator.refreshInBackground` 防重入**：新增 `_refreshing` 标志，避免 globalStorage 永久失效且 `sync` 一直失败导致每 5s 重复触发一次后台加载（非泄漏，仅杜绝多余异步调用）；`reset()` 同步清空该标志
-
-## [0.3.6] — 2026-08-12
-
-### Performance
-- **`GlobalAggregator.sync` 增量守卫**：本工作区 `totalMs` 未变（如持续活跃会话未产生新 finished 会话）时，跳过整轮 globalState 读→改→写，避免每 60s 一次冗余往返
-- **文件备份降频**：`StorageCoordinator` 主存 `workspaceState` 仍每次全量存盘（保证主恢复源新鲜），JSON 文件备份改为每 3 次全量存盘才落盘一次（关键事件——会话结束 / 新建周期 / 恢复——仍强制落盘），降低磁盘 I/O 抖动
-- **面板全局快照同步读取**：`getDashboardData` 改为同步读全局缓存（`getCached()`），去掉每 5s tick 一次 `global.snapshot()` 的 async 往返；`activate` 时预热缓存，面板首开即有跨工作区数据
-
-## [0.3.5] — 2026-08-12
-
-### Added
-- **周报体系完善**：
-  - 新增「导出周报」（Markdown）：本周总时长、日均（按本周至今天数）、达标天数（对比每日目标）、本周效率（附"仅本次会话内可信"标注）、每日明细表、与上周对比（环比）。经 `showSaveDialog` 存为 `.md`；中英文面板同步
-  - 「周报」面板与柱状图对齐**自然周**（本周一 → 今日），标题下增加周范围副标题（如 `08-10 ~ 08-12（本周）`）；中英文面板同步实现
-  - CSV 导出改用自然周每日明细（原为「近 7 天」滚动窗口，与"本周"口径不一致），并修复 `exportDashboard` 的 `Generated` 时间戳误用 `toISOString()`（UTC），改为本地时区
-
-### Changed
-- 面板每日统计底层由 `last7Days` 切换为 `weekDailyBreakdown`（自然周口径），移除废弃的 `last7Days` / `last7DaysFromFinished`；`TimeAggregator` 新增 `weekDailyBreakdown(fullWeek)` 与 `lastWeekMs`（上一自然周）
-- 本周效率分母与「本周合计」口径一致（均为本周一 → 现在），修复此前"效率按 7 天、周合计按自然周"的错配
-
-## [0.3.4] — 2026-08-12
-
-### Added
-- **跨工作区面板可折叠**: 「🌐 跨工作区」标题改为可点击折叠头，点标题收起/展开整个列表；折叠状态经 `localStorage` 记忆（`wt-global-collapsed`），重开面板保持上次状态
-- **跨工作区长列表 Top N + 展开全部**: 工作区数量超过 10 个时仅显示前 10 条并附「展开全部（N）」按钮，点击展开全部后按钮变为「收起」，避免长列表刷屏；中英文面板同步实现
-
-### Changed
-- 版本号由 0.3.2 补正至 0.3.4（0.3.3 提交遗漏 `package.json` 版本自增，本次一并补齐）
-
-## [0.3.3] — 2026-08-12
-
-### Fixed
-- **进行中会话边界丢失（持久化根因）**: `saveCheckpoint()` 此前把 active 会话时长折叠进 `totalMs` 并清零 `currentSessionStartMs`，导致进行中会话的真实起始日无法存续到磁盘。一旦窗口未走 `stop()`（崩溃 / 强杀 / 扩展卸载竞态）即丢失，重载后 `sessions` 为空、`今日=本周` 退化、昨日时长不计入图表。现改为：`totalMs` 恒等于「已结束会话」累加和（权威源），`currentSessionStartMs` 原样保留，进行中会话由 `TimeAggregator` 在今日/本周交集计算时叠加
-- **重载不收尾活跃会话**: `recover()` 此前仅把未完成会话时长累加进 `totalMs` 后清零边界，从不生成 `TimeSession`，导致崩溃恢复后「会话数」恒为 0、按日归并缺失。现改为边界优先——将活跃会话收尾为 finished `TimeSession` 并入 `sessions[]` 与 `totalMs`；journal 回放仅在无边界时兜底，并合成一条 finished 会话，杜绝重复计
-- **跨午夜进行中会话无按日记录**: 新增 `TimerEngine.splitAt(splitMs)`，由 `SessionManager.saveCheckpoint` 在每次全量存盘前检测午夜跨越并切分进行中会话，使每个自然日都拥有独立 `TimeSession`，日报/周报每日柱子精确反映当天时长
-- **首个全量存盘前崩溃丢会话**: `startSession()` 在 `timer.start()` 后立即 `saveCheckpoint()` 持久化边界，确保即便在首个 60s 全量存盘前崩溃，recover 也能凭边界收尾该会话
-
-### Changed
-- **计时口径契约**: 自 0.1.x 的「零边界防翻倍」方案，调整为「边界存续 + 边界优先收尾」方案，在消除重复计的同时修复归属丢失（详见 StorageCoordinator / SessionManager 注释）
-
-## [0.3.2] — 2026-08-12
-
-### Fixed
-- **跨午夜已结束会话按日错算**: `todayMs` / `last7Days` 此前把「跨午夜的已结束会话」整段时长计入其起始日，导致当日/近 7 天数值虚高、跨日部分丢失（活跃会话此前已修复，已结束会话未修复）。现统一改用「会话区间与目标日窗口交集」计算，与 `thisWeekMs` 口径一致
-- **闲置检测形同虚设**: `IdleDetector.lastActivityMs` 被写入却从未读取（死代码），且闲置仅在「失焦→重新聚焦且超时」时判定，聚焦但长时间不操作（阅读/思考）不会被计入。现改为每秒心跳驱动判定，聚焦态下距上次活动超时即判定为闲置（回溯至最后一次活动时刻起算）
-- **关闭流程未等待落盘**: `deactivate()` 为同步调用、`orchestrator.stop()` 未被 await，窗口关闭/扩展卸载时最后一次写可能丢失。现改为 `async deactivate` 并 `await` 优雅存盘
-- **CSV 导出时区不一致**: `CsvExporter` 会话起止时间使用 `toISOString()`（UTC），与全局「按本地日期统计」口径冲突。现改用本地时区格式化
-- **配置应用无异常兜底**: `ConfigWatcher` 的配置变更回调缺少 try/catch，单条配置异常会冒泡为未捕获异常阻塞其他监听器。现补充异常捕获
-
-### Changed
-- **LifecycleManager**: `onVSCodeClose` 此前从未被任何事件触发（死代码），现由 `deactivate()` 经其执行 await 优雅存盘
-
-### Perf
-- **JournalStorageProvider 写入**: 每次 flush 都 readFile 整份 journal → 拼接 → writeFile 整份（O(文件大小)，多次叠加为 O(n²)）。现维护与磁盘内容等价的「内存镜像」，doAppend 仅做内存拼接后整写，不再每次回读磁盘
-- **Scheduler 热更新**: `updateIntervals` 此前「无脑重建全部 4 个定时器」，改个无关配置也会打断所有定时器相位。现仅重启间隔真正变化的定时器
-- **聚合计算去重**: `SessionManager` 新增「已结束会话按日分桶」结果缓存，仅在会话列表变化时重建；状态栏与面板每次刷新只需叠加当日活跃增量，消除重复 O(n) 扫描（`last7Days` 改为单次遍历分桶，避免 7×O(n)）
-
-## [0.3.1] — 2026-06-25
-
-### Fixed
-- **本周卡片数值耦合今日**: `weekTotalMs` 原为 `sum(last7Days)` 派生值，任何历史日 session 丢失即退化为今日值。改为独立 `thisWeekMs()` 累加器，直接按周一 00:00 截断计算，与今日、累计并列为三种独立计数器
-- **柱状图全部柱子同步缩放**: 差分路径原更新全部 7 根柱——今日值增长导致 `maxVal` 变大，历史柱同比缩小。改为仅更新今日柱（最后一根），历史柱高度锁定。比例尺 `_cachedMaxVal` 仅在日期变化时重算
-- **跨午夜新日柱子不可见**: 新天值远小于历史 max → 百分比高度被 `Math.max(…, 2)` 钳制为 2px。改为 `calcBarPct()` 取 `max(pct, 4)` + 比例尺下限 `DAILY_CAP_MS`(8h) 确保小值日有可辨识柱高
-- **差分更新逻辑名不副实**: 注释写"仅更新今日柱"但代码更新全部柱子 → 修正为 `todayIdx` 单柱更新
-- **Dashboard 命令不可用**: `_getHtml()` 路径多嵌套一层 `'presentation'` → 运行时 `__dirname` 已是 `out/presentation/`，再加子目录导致 `ENOENT`。移除冗余的 `'presentation'` 参数
-
-### Changed
-- Dashboard 柱状图 CSS `min-height` 保持不变（2px），JS 层 `calcBarPct()` 接管最小值控制
-- `weekEfficiency` 计算改用 `chartSumMs`（7 日柱状图合计），与 idle/active 数据时间范围一致
-
-## [0.3.0] — 2026-06-24
-
-### Added
-- **闲置检测**: 窗口失焦超时自动计为离开，效率 = 打字/(总长-闲置)（`idleTimeoutMinutes`）
-- **每日目标**: 设定目标时长，达成桌面通知 + Dashboard 进度条（`dailyGoalMinutes`）
-- **诊断系统**: Logger 环形缓冲区 → Dashboard 一键导出诊断报告（日志+配置+统计）
-- **配置热更新**: Dashboard/VS Code 设置变更即时生效（Scheduler.updateIntervals）
-- **双语支持**: Dashboard 🌐 按钮切换 + `package.nls` 命令双语 + toast 双语
-- **状态栏点击**: 可配切换模式 / 打开面板（`statusBar.clickAction`）
-- **HTML 抽离**: Dashboard 从 837 行 TS 模板 → 独立 `dashboard.html` + `dashboard.en.html`
-
-### Fixed
-- Reset 命令死链（storage=null）
-- 全链审查：清除死代码（unused methods/ICacheStrategy/lint warnings）
-- `DailyChartEntry` 补齐 `dateStr` / 参数命名修正
-- Toast 硬编码字符串 → i18n 迁移
-
-## [0.2.0] — 2026-06-24
-
-### Added
-- **CSV 导出**: Dashboard 按钮一键导出会话记录 + 每日统计 + 效率数据
-- **效率追踪**: 监听编辑活跃度，计算实际打字时间 ÷ 计时器时长 = 工作效率比（可开关 `workspaceTiming.efficiency.enabled`）
-- **周报效率**: 柱状图每根柱子标注效率百分比，本周汇总效率
-- **配置常量化**: 所有硬编码数字/时间间隔抽离至 `models.ts` 统一管理（`MS_PER_SECOND` 等 8 个常量，`localDateStr` 去重）
-
-## [0.1.1] — 2026-06-23
-
-### Fixed
-- **屏闪**: 状态栏每秒冗余 `.show()` → 仅文本变化时更新；心跳计时 (1s) 与 UI 刷新 (5s) 解耦；存储文件从 `.vscode/` 移至 `.workspace-timing-data/`
-- **数据丢失**: `saveCheckpoint()` 后截断 journal，防止文件无限增长导致扩展主机崩溃
-- **计时翻倍**: 持久化时置零 `currentSessionStartMs`，防止崩溃恢复 Step 3 重复补偿
-- **时区**: 全部日期计算从 `toISOString()`(UTC) 改为 `localDateStr()`(本地)，解决中国 UTC+8 日期错位 + 柱状图仅显示周五
-- **跨日拆分**: 活跃会话按午夜自动拆分到每日（`activeSessionMsOnDate`），解决连续运行多日时今天显示 0
-- **崩溃保护**: 面板更新/newPeriod/reset 3 处未处理 Promise 追加 `.catch()`
-- **柱状图优化**: 差分更新（指纹比对），仅跨日时重建 DOM
-- **关闭存盘**: `deactivate()` 中 `journal.truncate()` 改为 `await`
-
-## [0.1.0] — 初始版本
-
-- 工作区自动计时 / 状态栏实时显示 / Dashboard 面板 / RingBuffer+Journal 双写入 / 崩溃恢复 / 全局禁用策略 / 中英文支持

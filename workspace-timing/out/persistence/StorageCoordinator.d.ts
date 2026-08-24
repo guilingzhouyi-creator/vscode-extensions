@@ -9,7 +9,7 @@
  * 崩溃恢复算法（三步走）：
  *   Step 1: 从 workspaceState 加载；若不可用则 fallback 到 JSON 文件
  *   Step 2: 如果 journal 存在，回放所有未提交的 TimeSlice
- *   Step 3: 如果 sessionStartMs > 0，补偿未完成会话的历时
+ *   Step 3: 仅当 journal 无有效回放且 sessionStartMs > 0 时，补偿未完成会话的历时（兕底）
  */
 import { WorkspaceTimingData } from '../domain/models';
 import { WorkspaceStateProvider } from './WorkspaceStateProvider';
@@ -19,9 +19,6 @@ export declare class StorageCoordinator {
     private readonly primary;
     private readonly fileBackup;
     private readonly journal;
-    /** 文件备份降频：每 N 次全量存盘才写一次 JSON 备份（主存 workspaceState 仍每次写，保证主恢复源新鲜） */
-    private static readonly FILE_BACKUP_EVERY_N;
-    private _fileBackupCount;
     constructor(primary: WorkspaceStateProvider, fileBackup: FileStorageProvider, journal: JournalStorageProvider);
     /**
      * 完整崩溃恢复 + 数据加载
@@ -34,12 +31,9 @@ export declare class StorageCoordinator {
     recover(): Promise<WorkspaceTimingData>;
     /**
      * 级联写入：主存储 + JSON 备份
-     * 主存储失败时不影响备份写入。
-     * ★ 文件备份降频：主存 workspaceState 每次都写（主恢复源，需新鲜）；
-     *   JSON 备份为二级兜底，每 FILE_BACKUP_EVERY_N 次才落盘一次（或关键事件强制），
-     *   以降低磁盘 I/O 抖动。forceFileBackup 用于会话结束/重置/恢复等必须落盘的场景。
+     * 主存储失败时不影响备份写入
      */
-    save(data: WorkspaceTimingData, forceFileBackup?: boolean): Promise<void>;
+    save(data: WorkspaceTimingData): Promise<void>;
     /** 读取数据（不执行恢复，仅加载当前持久化状态） */
     load(): Promise<WorkspaceTimingData | null>;
     /** 删除所有存储数据 */

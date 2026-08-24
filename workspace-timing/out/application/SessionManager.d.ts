@@ -6,7 +6,6 @@
  */
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
 import { WorkspaceTimingData } from '../domain/models';
-import { DailyChartEntry, HeatmapDay } from '../domain/dashboard-types';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 export interface SessionResult {
@@ -21,17 +20,13 @@ export declare class SessionManager {
     private readonly timer;
     private readonly storage;
     private readonly journal;
+    private maxSessions;
     private _sessionActive;
-    /**
-     * 已结束会话的「按日分桶」结果缓存。
-     * 仅在会话列表发生变化（结束会话 / 裁剪 / 恢复 / 重置）时重建，
-     * 避免状态栏与面板每次刷新重复扫描全量会话（O(n)）。
-     */
-    private _finishedCacheKey;
-    private _finishedByDate;
-    constructor(timer: TimerEngine, storage: StorageCoordinator, journal: JournalWriter);
+    constructor(timer: TimerEngine, storage: StorageCoordinator, journal: JournalWriter, maxSessions?: number);
     /** 是否处于活跃会话中 */
     get isSessionActive(): boolean;
+    /** 运行期热更新会话历史上限（0 = 不限） */
+    setMaxSessions(maxSessions: number): void;
     /** 获取计时器快照 */
     get snapshot(): TimerSnapshot;
     /**
@@ -44,49 +39,21 @@ export declare class SessionManager {
      * 执行最终存盘并清空 journal
      */
     endSession(): Promise<SessionResult>;
-    /** 获取今日累计时长 (ms) — 复用已结束会话缓存 */
+    /** 获取今日累计时长 (ms) */
     getTodayMs(): number;
-    /** 获取本周累计时长 (ms) — 复用已结束会话缓存 */
-    getThisWeekMs(): number;
-    /** 获取本周每日统计（自然周，本周一→今日，供「周报」柱状图）— 复用已结束会话缓存 */
-    getDailyStats(): DailyChartEntry[];
-    /** 获取自然周每日明细（fullWeek=true 时含本周日至周日，供周报导出）— 复用已结束会话缓存 */
-    getWeekDailyStats(fullWeek?: boolean): DailyChartEntry[];
-    /** 获取上一自然周累计时长 (ms) — 复用已结束会话缓存 */
-    getLastWeekMs(): number;
-    /** 获取本月累计时长 (ms) — 复用已结束会话缓存 */
-    getThisMonthMs(): number;
-    /** 获取上一自然月累计时长 (ms) — 复用已结束会话缓存 */
-    getLastMonthMs(): number;
-    /** 获取自然月每日明细（本月 1 号起；fullMonth=true 含至月末）— 复用已结束会话缓存 */
-    getMonthDailyStats(fullMonth?: boolean): DailyChartEntry[];
-    /** 活动时间线热力图（近 weeks 周，含本周）— 复用已结束会话缓存 */
-    getHeatmap(weeks?: number): HeatmapDay[];
     /**
      * 仅保存当前状态（不结束会话）
      * 由 Scheduler 周期性调用。
      *
-     * ★ 设计约定（与 0.1.x 的零边界方案相反，但消除了重复计与归属丢失）：
-     *   - totalMs 始终等于「已结束会话」的累加和（权威源），此处不做任何折叠；
-     *   - currentSessionStartMs 原样保留，使进行中会话的真实起始日存续到磁盘；
-     *   - 进行中会话由 TimeAggregator 在今日/本周交集计算时叠加，
-     *     并由 recover() 在重载时收尾为 finished TimeSession。
-     *   这样既不会与 recover 的边界补偿重复计（边界优先于 journal），
-     *   又保证日报/周报能按真实自然日归并（含跨午夜自动切分）。
+     * ⚠️ 必须创建数据副本，不能修改计时器内部 totalMs，
+     *    否则会与 stop() 中的累加逻辑产生重复计时。
+     *
+     * ⚠️ 崩溃恢复"三重计数"修复：主存储的 totalMs 只固化**已结束会话的累计**
+     *   （snap.totalMs，不含进行中会话的实时时长）。进行中会话的时长由 journal 增量
+     *   完整记录（checkpoint 不清空 journal），崩溃恢复时通过回放 journal 重建；
+     *   journal 无有效回放时才用"补偿未完成会话"兜底。
+     *   这避免了原实现（固化 currentTotalMs + journal 回放 + 补偿三者叠加）对同一
+     *   会话时段重复累计的缺陷。
      */
     saveCheckpoint(): Promise<void>;
-    /**
-     * 若进行中会话跨越了自然日 00:00，则在午夜边界处将其切分为两段。
-     * 供 saveCheckpoint 周期调用，确保每一个自然日都拥有独立 finished TimeSession，
-     * 使日报/周报的每日柱子能精确反映当天时长。
-     */
-    private splitActiveSessionAtMidnight;
-    /** 标记缓存失效（会话列表变化时调用） */
-    private invalidateFinishedCache;
-    /**
-     * 惰性重建已结束会话的分桶缓存。
-     * 键由「会话数量 + 首/尾会话时间戳」构成：新增/裁剪/恢复/重置都会改变键，
-     * 从而自然失效；运行中的活跃会话变化不会影响键，因此高频刷新时命中缓存。
-     */
-    private ensureFinishedCache;
 }

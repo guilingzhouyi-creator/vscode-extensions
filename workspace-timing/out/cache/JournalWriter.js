@@ -8,16 +8,15 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JournalWriter = void 0;
-const models_1 = require("../domain/models");
 const RingBuffer_1 = require("./RingBuffer");
 const ICacheStrategy_1 = require("./ICacheStrategy");
 const Logger_1 = require("../integration/Logger");
 class JournalWriter {
-    constructor(storage, capacity = models_1.DEFAULT_RING_BUFFER_CAP, strategy) {
+    constructor(storage, capacity = 1024, strategy) {
         this.lastFlushTime = Date.now();
         this.ringBuffer = new RingBuffer_1.RingBuffer(capacity);
         this.storage = storage;
-        this.strategy = strategy ?? new ICacheStrategy_1.TimeBasedCacheStrategy(models_1.DEFAULT_JOURNAL_FLUSH_MS);
+        this.strategy = strategy ?? new ICacheStrategy_1.TimeBasedCacheStrategy(10000);
     }
     /** 获取内部 RingBuffer 引用（供 UI 读取最近数据） */
     get buffer() {
@@ -71,12 +70,14 @@ class JournalWriter {
         return this.ringBuffer.peekLast(n);
     }
     getOldestTimestamp() {
-        const items = this.ringBuffer.peekLast(this.ringBuffer.count);
-        return items.length > 0 ? items[0].timestamp : 0;
+        // O(1)：直接读最旧一条，避免此前 peekLast(count) 全量拷贝缓冲
+        const oldest = this.ringBuffer.peekOldest();
+        return oldest ? oldest.timestamp : 0;
     }
     getNewestTimestamp() {
-        const items = this.ringBuffer.peekLast(this.ringBuffer.count);
-        return items.length > 0 ? items[items.length - 1].timestamp : 0;
+        // O(1)：直接读最新一条，避免此前 peekLast(count) 全量拷贝缓冲
+        const newest = this.ringBuffer.peekNewest();
+        return newest ? newest.timestamp : 0;
     }
 }
 exports.JournalWriter = JournalWriter;

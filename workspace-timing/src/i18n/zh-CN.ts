@@ -65,12 +65,15 @@ const zhCN: I18nStrings = {
     'toast.exportCSV': '已请求导出 CSV',
     'toast.reset': '已请求重置数据',
     'toast.configUpdated': '配置已更新',
-    'toast.exported': '已导出: {0}',
-    'toast.diagnosticExported': '诊断报告已导出: {0}',
-    'toast.exportFailed': '导出失败',
-    'toast.goalReached': '🎯 今日目标达成！{0}h {1}m',
-    'toast.streak': '🔥 连续打卡 {0} 天！',
-    'toast.autoExported': '已自动导出: {0}',
+
+    'toast.exportSaveLabel': '导出',
+    'toast.exportCancelled': '已取消导出',
+    'toast.exportSuccess': 'CSV 已导出至：{0}',
+    'toast.exportFailed': 'CSV 导出失败，请查看输出日志',
+    'toast.exportNoWorkspace': '请先打开一个工作区再导出',
+    'toast.exportReportDaily': '日报已导出至：{0}',
+    'toast.exportReportWeekly': '周报已导出至：{0}',
+    'toast.cloudSyncPlaceholder': '☁️ 云端同步即将推出（Cloud sync coming soon）——当前为扩展点占位。',
 
     'confirm.newPeriod': '确定要新建计时周期？累计时长将归零，历史记录保留。',
     'confirm.newPeriod.title': '确认新建',
@@ -78,7 +81,6 @@ const zhCN: I18nStrings = {
     'confirm.reset.title': '确认重置',
 
     'cmd.modeSwitched': '已切换至「{0}」模式',
-    'cmd.exported': '已导出: {0}',
 };
 
 export default zhCN;

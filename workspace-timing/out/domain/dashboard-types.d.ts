@@ -8,31 +8,43 @@
 export interface DailyChartEntry {
     /** 显示标签，如 "06-10" */
     label: string;
-    /** 完整日期，如 "2026-06-10" */
-    dateStr: string;
     /** 星期，如 "一" */
     weekday: string;
     /** 当日毫秒数 */
     totalMs: number;
-    /** 活跃编辑时长 (ms) — ActivityTracker 提供 */
-    activeMs?: number;
-    /** 闲置时长 (ms) — IdleDetector 提供 */
-    idleMs?: number;
-    /** 效率比 (0-1) — activeMs / (totalMs - idleMs) */
-    efficiency?: number;
 }
-/** 热力图单个格子（活动时间线） */
-export interface HeatmapDay {
-    /** 完整日期 YYYY-MM-DD */
-    dateStr: string;
-    /** 星期索引：0=周一 … 6=周日 */
-    weekday: number;
-    /** 当日累计毫秒 */
+/** 周报趋势一条（每周） */
+export interface WeeklyTrendEntry {
+    /** 周起始日期 YYYY-MM-DD（周一） */
+    weekStart: string;
+    /** 显示标签，如 "06-10" */
+    label: string;
+    /** 本周时长 (ms) */
     totalMs: number;
-    /** 着色等级 0~4（0=无记录） */
-    level: 0 | 1 | 2 | 3 | 4;
-    /** 是否为未来日期（当前周尚未到达的天） */
-    future: boolean;
+    /** 本周会话数 */
+    sessionCount: number;
+}
+/** 单日会话明细（供面板展示） */
+export interface DailyDetail {
+    date: string;
+    totalMs: number;
+    sessionCount: number;
+    sessions: Array<{
+        startLabel: string;
+        endLabel: string;
+        durationMs: number;
+    }>;
+    peakHour: number;
+    activeWindow: string;
+}
+/** 周报文字摘要 */
+export interface WeeklySummary {
+    totalMs: number;
+    sessionCount: number;
+    avgDailyMs: number;
+    peakDate: string;
+    peakDateMs: number;
+    activeDays: number;
 }
 /** 面板展示数据 */
 export interface DashboardData {
@@ -41,19 +53,19 @@ export interface DashboardData {
     sessionsCount: number;
     /** 最近 7 天每日数据，用于柱状图 */
     dailyStats: DailyChartEntry[];
-    /** 活动时间线热力图（近 12 周，按日） */
-    heatmap: HeatmapDay[];
     /** 本周合计 (ms) */
     weekTotalMs: number;
-    /** 本月合计 (ms) */
-    monthTotalMs: number;
-    /** 本周效率 (0-1) */
-    weekEfficiency?: number;
-    /** 跨工作区累计 */
+    /** 周报多周趋势（近 4 周）★ */
+    weeklyTrend: WeeklyTrendEntry[];
+    /** 周报文字摘要 ★ */
+    weeklySummary: WeeklySummary | null;
+    /** 今日会话明细 ★ */
+    todayDetail: DailyDetail | null;
+    /** 跨工作区累计 ★ */
     globalTotalMs: number;
-    /** 工作区数量 */
+    /** 工作区数量 ★ */
     workspaceCount: number;
-    /** 各工作区列表 */
+    /** 各工作区列表 ★ */
     workspaceList: Array<{
         name: string;
         totalMs: number;
@@ -67,16 +79,6 @@ export interface DashboardData {
     journalFlushIntervalMs: number;
     fullSaveIntervalMs: number;
     maxSessions: number;
-    /** 效率追踪开关 */
-    efficiencyEnabled: boolean;
-    /** 每日目标 (ms) */
-    dailyGoalMs: number;
-    /** 每周目标 (ms) */
-    weeklyGoalMs: number;
-    /** 连续打卡天数（每日目标达成连续计数） */
-    streak: number;
-    /** 状态栏点击行为 */
-    statusBarClickAction: 'cycle' | 'dashboard';
 }
 /** 面板消息协议 */
 export type DashboardMessage = {
@@ -89,13 +91,8 @@ export type DashboardMessage = {
 } | {
     type: 'exportCSV';
 } | {
-    type: 'exportWeeklyReport';
-} | {
-    type: 'exportMonthlyReport';
-} | {
-    type: 'exportJson';
-} | {
-    type: 'exportDiagnostic';
-} | {
-    type: 'langToggle';
+    type: 'exportReport';
+    payload: {
+        kind: 'daily' | 'weekly';
+    };
 };

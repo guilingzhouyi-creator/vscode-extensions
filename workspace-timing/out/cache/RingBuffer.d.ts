@@ -37,6 +37,10 @@ export declare class RingBuffer<T> {
      * 用于 UI 查询活跃曲线数据。
      */
     peekLast(n: number): T[];
+    /** 读取最旧的一条（不取出），O(1)。空缓冲区返回 undefined */
+    peekOldest(): T | undefined;
+    /** 读取最新的一条（不取出），O(1)。空缓冲区返回 undefined */
+    peekNewest(): T | undefined;
     /** 清空缓冲区 */
     clear(): void;
 }

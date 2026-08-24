@@ -49,22 +49,18 @@ export class CommandRegistrar {
             vscode.window.showInformationMessage(msg);
         });
 
-        // 状态栏点击行为（可配置：切换模式 / 打开面板）
+        // 切换状态栏显示模式
         this.registerCommand('workspaceTiming.showStatus', () => {
             if (!statusBar) { this.noWorkspaceMsg(); return; }
-            if (statusBar.clickAction === 'dashboard') {
-                DashboardPanel.createOrShow(context.extensionUri);
-            } else {
-                const newMode = statusBar.cycleMode();
-                const label: Record<string, string> = {
-                    'today-total': '今日优先',
-                    'total-today': '累计优先',
-                    'compact': '紧凑',
-                };
-                vscode.window.showInformationMessage(
-                    format(t()['cmd.modeSwitched'], label[newMode] ?? newMode)
-                );
-            }
+            const newMode = statusBar.cycleMode();
+            const label: Record<string, string> = {
+                'today-total': '今日优先',
+                'total-today': '累计优先',
+                'compact': '紧凑',
+            };
+            vscode.window.showInformationMessage(
+                format(t()['cmd.modeSwitched'], label[newMode] ?? newMode)
+            );
         });
 
         // 打开配置面板

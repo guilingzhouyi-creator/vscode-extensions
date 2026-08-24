@@ -11,7 +11,7 @@ import * as vscode from 'vscode';
 
 // Domain
 import { TimerEngine } from './domain/TimerEngine';
-import { LogLevel, setLogLevel, log, exportDiagnostics } from './integration/Logger';
+import { LogLevel, setLogLevel, log } from './integration/Logger';
 
 // Cache
 import { JournalWriter } from './cache/JournalWriter';
@@ -27,13 +27,6 @@ import { TimerOrchestrator } from './application/TimerOrchestrator';
 import { SessionManager } from './application/SessionManager';
 import { DisableManager } from './application/DisableManager';
 import { Scheduler } from './application/Scheduler';
-import { ActivityTracker } from './application/ActivityTracker';
-import { IdleDetector } from './application/IdleDetector';
-import { CsvExporter } from './application/exporters/CsvExporter';
-import { WeeklyReportExporter } from './application/exporters/WeeklyReportExporter';
-import { PeriodReportExporter, PeriodKind } from './application/exporters/PeriodReportExporter';
-import { JsonExporter } from './application/exporters/JsonExporter';
-import * as path from 'path';
 
 // Presentation
 import { StatusBarController } from './presentation/StatusBarController';
@@ -42,11 +35,12 @@ import { DashboardPanel } from './presentation/DashboardPanel';
 import { DashboardMessage } from './domain/dashboard-types';
 import { GlobalStorageProvider } from './persistence/GlobalStorageProvider';
 import { GlobalAggregator } from './application/GlobalAggregator';
+import { TimeBasedCacheStrategy } from './cache/ICacheStrategy';
 import { init as initI18n, t, format } from './i18n/index';
 
 // Integration
 import { LifecycleManager } from './integration/LifecycleManager';
-import { ConfigWatcher } from './integration/ConfigWatcher';
+import { ConfigWatcher, readTimingConfig } from './integration/ConfigWatcher';
 
 let orchestrator: TimerOrchestrator | null = null;
 let statusBar: StatusBarController | null = null;
@@ -54,10 +48,10 @@ let commandRegistrar: CommandRegistrar | null = null;
 let lifecycleManager: LifecycleManager | null = null;
 let configWatcher: ConfigWatcher | null = null;
 let scheduler: Scheduler | null = null;
-let storage: StorageCoordinator | null = null;
-let globalStorage: GlobalStorageProvider | null = null;
-let _goalNotifiedToday = false;     // 每日目标达成仅通知一次
-let _lastGoalCheckDate = '';
+// 存储引用提升到模块级：命令注册（如 reset）与面板消息处理都需要在
+// activate 作用域之外访问；此前作为块级局部变量传出 null 导致命令失效。
+let storageRef: StorageCoordinator | null = null;
+let globalStorageRef: GlobalStorageProvider | null = null;
 
 export function activate(context: vscode.ExtensionContext): void {
     const startTime = Date.now();
@@ -80,68 +74,59 @@ export function activate(context: vscode.ExtensionContext): void {
             // ═══ 有工作区：完整模式（计时 + 存储 + 状态栏）═══
             const timer = new TimerEngine();
 
+            // 读取用户配置（复用 ConfigWatcher 的 readTimingConfig，保证初始化/运行期配置同源）
+            const cfg = readTimingConfig();
+
             // Persistence 层
             const workspaceStateProvider = new WorkspaceStateProvider(context);
             const fileStorageProvider = new FileStorageProvider(workspaceRoot);
             const journalStorageProvider = new JournalStorageProvider(workspaceRoot);
-            storage = new StorageCoordinator(
+            storageRef = new StorageCoordinator(
                 workspaceStateProvider,
                 fileStorageProvider,
                 journalStorageProvider,
             );
+            const storage = storageRef;
 
-            // 缓存层
-            const journal = new JournalWriter(journalStorageProvider);
-
-            // Application 层
-            const disableManager = new DisableManager();
-            const sessionManager = new SessionManager(timer, storage, journal);
-            scheduler = new Scheduler(journal, sessionManager);
-            const activityTracker = new ActivityTracker();
-            const idleDetector = new IdleDetector();
-            globalStorage = new GlobalStorageProvider(context);
-            const globalAggregator = new GlobalAggregator(globalStorage);
-            void globalAggregator.snapshot(); // 预热全局缓存：面板首次打开即有跨工作区数据，且免去首帧 async 等待
-            orchestrator = new TimerOrchestrator(
-                timer, storage, journal, sessionManager, disableManager, scheduler, globalAggregator, activityTracker, idleDetector,
+            // 缓存层：capacity 与 flush 策略从配置读取（此前被忽略，形同虚设）
+            const journal = new JournalWriter(
+                journalStorageProvider,
+                cfg.ringBufferCapacity,
+                new TimeBasedCacheStrategy(cfg.journalFlushIntervalMs),
             );
 
-            // ★ 活动追踪 + 闲置检测 — 启动监听
-            activityTracker.start();
-            idleDetector.start();
-            scheduler.onHeartbeat(() => {
-                activityTracker.tick();
-                idleDetector.tick();
+            // Application 层
+            const disableManager = new DisableManager(cfg);
+            const sessionManager = new SessionManager(timer, storage, journal, cfg.maxSessions);
+            scheduler = new Scheduler(journal, sessionManager, {
+                journalFlushIntervalMs: cfg.journalFlushIntervalMs,
+                fullSaveIntervalMs: cfg.fullSaveIntervalMs,
+                journalEnabled: cfg.journalEnabled ?? true,
             });
+            const globalStorage = new GlobalStorageProvider(context);
+            globalStorageRef = globalStorage;
+            const globalAggregator = new GlobalAggregator(globalStorage);
+            orchestrator = new TimerOrchestrator(
+                timer, storage, journal, sessionManager, disableManager, scheduler, globalAggregator,
+            );
 
             // Presentation 层
             statusBar = new StatusBarController();
             statusBar.show();
 
             // 状态栏 + 面板 tick（今日 + 累计）
+            // 面板数据刷新节流：状态栏每秒更新，但 getDashboardData() 含全量 sessions 聚合（O(N)），
+            // 面板不可见/无面板时跳过，且每秒刷新会造成 CPU/内存压力。面板数据降为每 5 秒刷新。
+            let lastPanelUpdateMs = 0;
+            const PANEL_REFRESH_INTERVAL_MS = 5000;
             orchestrator.onTick(({ totalMs, todayMs }) => {
                 statusBar?.updateTime(todayMs, totalMs);
-
-                // ★ 每日目标达成通知（仅一次）
-                const cfg = orchestrator!.disable.config;
-                if (cfg.dailyGoalMs > 0 && todayMs >= cfg.dailyGoalMs) {
-                    const today = new Date().toDateString();
-                    if (today !== _lastGoalCheckDate) { _lastGoalCheckDate = today; _goalNotifiedToday = false; }
-                    if (!_goalNotifiedToday) {
-                        _goalNotifiedToday = true;
-                        const h = Math.floor(todayMs / 3600000);
-                        const m = Math.floor((todayMs % 3600000) / 60000);
-                        vscode.window.showInformationMessage(
-                            format(t()['toast.goalReached'], String(h), String(m)));
-                    }
-                }
-
-                if (DashboardPanel.currentPanel && orchestrator) {
+                const now = Date.now();
+                if (DashboardPanel.currentPanel && orchestrator
+                    && now - lastPanelUpdateMs >= PANEL_REFRESH_INTERVAL_MS) {
+                    lastPanelUpdateMs = now;
                     orchestrator.getDashboardData().then(data => {
                         DashboardPanel.currentPanel?.updateData(data);
-                    }).catch(err => {
-                        // 面板更新失败不应导致扩展主机崩溃
-                        log(LogLevel.Warn, 'Dashboard update failed', err as Error);
                     });
                 }
             });
@@ -149,51 +134,6 @@ export function activate(context: vscode.ExtensionContext): void {
                 if (state === 'disabled') {
                     statusBar?.updateTime(0, 0);
                 }
-            });
-
-            // ★ 连续打卡里程碑通知（达成每日目标且连续天数更新时）
-            orchestrator.onStreakMilestone((count) => {
-                vscode.window.showInformationMessage(
-                    format(t()['toast.streak'], String(count)));
-            });
-
-            // ★ 定时自动导出：由全量存盘周期驱动 maybeAutoExport，回调内执行实际写盘
-            orchestrator.onAutoExport((cfg) => {
-                (async () => {
-                    if (!orchestrator) return;
-                    const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-                    let content = '';
-                    let ext = 'txt';
-                    if (cfg.format === 'csv') {
-                        content = new CsvExporter().exportDashboard(await orchestrator.getDashboardData(), wsName);
-                        ext = 'csv';
-                    } else if (cfg.format === 'json') {
-                        content = new JsonExporter().exportBundle(await orchestrator.buildExportBundle(wsName));
-                        ext = 'json';
-                    } else if (cfg.format === 'monthly') {
-                        content = new PeriodReportExporter().generate(await orchestrator.buildPeriodReport(wsName, 'month' as PeriodKind));
-                        ext = 'md';
-                    } else {
-                        content = new PeriodReportExporter().generate(await orchestrator.buildPeriodReport(wsName, 'week' as PeriodKind));
-                        ext = 'md';
-                    }
-                    const dir = cfg.targetPath
-                        || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-                        || '.';
-                    const fileName = `${wsName}-auto-${new Date().toISOString().slice(0, 10)}.${ext}`;
-                    const uri = vscode.Uri.file(path.join(dir, fileName));
-                    await vscode.workspace.fs.writeFile(uri, Buffer.from(content, 'utf-8'));
-                    vscode.window.showInformationMessage(format(t()['toast.autoExported'], uri.fsPath));
-                })().catch(err => log(LogLevel.Error, 'auto export failed', err as Error));
-            });
-
-            // ★ 每次全量存盘后同步跨工作区全局累计
-            scheduler.onFullSave(async () => {
-                const snap = orchestrator?.session.snapshot;
-                if (snap) {
-                    await globalAggregator.sync(snap.currentTotalMs);
-                }
-                await orchestrator?.maybeAutoExport();
             });
 
             // Dashboard 面板消息路由
@@ -204,107 +144,22 @@ export function activate(context: vscode.ExtensionContext): void {
                         vscode.window.showInformationMessage(t()['toast.configUpdated']);
                         break;
                     case 'newPeriod':
-                        orchestrator?.newPeriod().catch(err =>
-                            log(LogLevel.Error, 'newPeriod failed', err as Error)
-                        );
+                        orchestrator?.newPeriod();
                         vscode.window.showInformationMessage(t()['toast.newPeriod']);
                         break;
                     case 'reset':
                         orchestrator?.stop().then(() => {
-                            storage?.deleteAll();
-                            globalStorage?.delete();
+                            storageRef?.deleteAll();
+                            globalStorageRef?.delete();
                             statusBar?.updateTime(0, 0);
-                            orchestrator?.clearStreak().catch(() => { /* no-op */ });
                             vscode.window.showInformationMessage(t()['toast.reset']);
-                        }).catch(err =>
-                            log(LogLevel.Error, 'reset failed', err as Error)
-                        );
+                        });
                         break;
                     case 'exportCSV':
-                        (async () => {
-                            if (!orchestrator) return;
-                            const data = await orchestrator.getDashboardData();
-                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-                            const csv = new CsvExporter().exportDashboard(data, wsName);
-                            const uri = await vscode.window.showSaveDialog({
-                                defaultUri: vscode.Uri.file(`${wsName}-timing.csv`),
-                                filters: { 'CSV Files': ['csv'] },
-                            });
-                            if (uri) {
-                                await vscode.workspace.fs.writeFile(uri, Buffer.from(csv, 'utf-8'));
-                                vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
-                            }
-                        })().catch(err => log(LogLevel.Error, 'CSV export failed', err as Error));
+                        exportTimingToFile();
                         break;
-                    case 'exportWeeklyReport':
-                        (async () => {
-                            if (!orchestrator) return;
-                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-                            const input = await orchestrator.buildWeeklyReport(wsName);
-                            const md = new WeeklyReportExporter().generate(input);
-                            const uri = await vscode.window.showSaveDialog({
-                                defaultUri: vscode.Uri.file(`${wsName}-weekly-report.md`),
-                                filters: { 'Markdown Files': ['md'] },
-                            });
-                            if (uri) {
-                                await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf-8'));
-                                vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
-                            }
-                        })().catch(err => log(LogLevel.Error, 'Weekly report export failed', err as Error));
-                        break;
-                    case 'exportMonthlyReport':
-                        (async () => {
-                            if (!orchestrator) return;
-                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-                            const input = await orchestrator.buildPeriodReport(wsName, 'month');
-                            const md = new PeriodReportExporter().generate(input);
-                            const uri = await vscode.window.showSaveDialog({
-                                defaultUri: vscode.Uri.file(`${wsName}-monthly-report.md`),
-                                filters: { 'Markdown Files': ['md'] },
-                            });
-                            if (uri) {
-                                await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf-8'));
-                                vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
-                            }
-                        })().catch(err => log(LogLevel.Error, 'Monthly report export failed', err as Error));
-                        break;
-                    case 'exportJson':
-                        (async () => {
-                            if (!orchestrator) return;
-                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-                            const bundle = await orchestrator.buildExportBundle(wsName);
-                            const json = new JsonExporter().exportBundle(bundle);
-                            const uri = await vscode.window.showSaveDialog({
-                                defaultUri: vscode.Uri.file(`${wsName}-timing.json`),
-                                filters: { 'JSON Files': ['json'] },
-                            });
-                            if (uri) {
-                                await vscode.workspace.fs.writeFile(uri, Buffer.from(json, 'utf-8'));
-                                vscode.window.showInformationMessage(format(t()['toast.exported'], uri.fsPath));
-                            }
-                        })().catch(err => log(LogLevel.Error, 'JSON export failed', err as Error));
-                        break;
-                    case 'exportDiagnostic':
-                        (async () => {
-                            if (!orchestrator) return;
-                            const data = await orchestrator.getDashboardData();
-                            const diags = exportDiagnostics();
-                            const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-                            const report = buildDiagnosticReport(data, diags, wsName);
-                            const uri = await vscode.window.showSaveDialog({
-                                defaultUri: vscode.Uri.file(`${wsName}-diagnostic.txt`),
-                                filters: { 'Text Files': ['txt'] },
-                            });
-                            if (uri) {
-                                await vscode.workspace.fs.writeFile(uri, Buffer.from(report, 'utf-8'));
-                                vscode.window.showInformationMessage(format(t()['toast.diagnosticExported'], uri.fsPath));
-                            }
-                        })().catch(err => log(LogLevel.Error, 'Diagnostic export failed', err as Error));
-                        break;
-                    case 'langToggle':
-                        DashboardPanel._useEnglish = !DashboardPanel._useEnglish;
-                        DashboardPanel.currentPanel?.dispose();
-                        DashboardPanel.createOrShow(context.extensionUri);
+                    case 'exportReport':
+                        exportReportToFile(msg.payload.kind);
                         break;
                 }
             };
@@ -334,7 +189,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
         // ─── 无论有无工作区，命令必须注册 ───
         commandRegistrar = new CommandRegistrar();
-        commandRegistrar.register(context, orchestrator, statusBar, storage);
+        // 修复：此前此处传入 null，导致 reset 命令永远命中"无工作区"守卫而失效。
+        commandRegistrar.register(context, orchestrator, statusBar, storageRef);
+
+        // 导出命令：可从命令面板触发，与 Dashboard 导出按钮共用逻辑
+        context.subscriptions.push(
+            vscode.commands.registerCommand('workspaceTiming.export', () => {
+                exportTimingToFile();
+            }),
+        );
 
         // 注册订阅
         context.subscriptions.push(
@@ -358,27 +221,26 @@ export async function deactivate(): Promise<void> {
         // 停止配置监听
         configWatcher?.stop();
 
-        // 停止计时并存盘（优雅落盘，必须等待完成）
-        if (orchestrator) {
-            orchestrator.activity.stop();
-            orchestrator.idle.stop();
-            // ★ 0.3.2：经 LifecycleManager.onVSCodeClose 执行 await 优雅存盘，
-            //   确保扩展卸载/窗口关闭前数据落盘完成（旧实现为同步非等待，可能丢失最后一次写）。
-            if (lifecycleManager) {
-                await lifecycleManager.onVSCodeClose();
-            } else {
-                await orchestrator.stop();
-            }
-        }
+        // 停止生命周期监听
+        lifecycleManager?.stop();
 
-        // 停止调度器
+        // 停止调度器（同步清理定时器）
         scheduler?.stop();
+
+        // 停止计时并存盘（await 确保数据完整落盘，避免扩展卸载时丢数据）
+        if (orchestrator) {
+            await orchestrator.stop();
+        }
 
         // 释放命令
         commandRegistrar?.dispose();
 
         // 释放状态栏
         statusBar?.dispose();
+
+        // 关闭 Dashboard 面板并清除全局消息处理器（释放闭包引用，防泄漏）
+        DashboardPanel.disposeCurrent();
+        DashboardPanel.setMessageHandler(null);
 
     } catch (err) {
         log(LogLevel.Error, 'WorkspaceTiming: deactivation error', err as Error);
@@ -387,66 +249,86 @@ export async function deactivate(): Promise<void> {
     log(LogLevel.Info, 'WorkspaceTiming: deactivated');
 }
 
-// ─── 诊断报告生成器 ────────────────────────────────────
-
-import { DashboardData } from './domain/dashboard-types';
-import { LogEntry } from './integration/Logger';
-
-function buildDiagnosticReport(data: DashboardData, diags: LogEntry[], wsName: string): string {
-    const lines: string[] = [];
-    const now = new Date().toISOString();
-
-    lines.push('========================================');
-    lines.push('Workspace Timing — Diagnostic Report');
-    lines.push('========================================');
-    lines.push(`Generated: ${now}`);
-    lines.push(`Workspace: ${wsName}`);
-    lines.push(`Extension Version: 0.3.0`);
-    lines.push('');
-
-    lines.push('--- Config ---');
-    lines.push(`Enabled: ${data.isEnabled}`);
-    lines.push(`Global Disabled: ${data.globalDisabled}`);
-    lines.push(`Status Bar: ${data.statusBarEnabled}`);
-    lines.push(`Efficiency Tracking: ${data.efficiencyEnabled}`);
-    lines.push(`Journal Enabled: ${data.journalEnabled}`);
-    lines.push(`Backup to File: ${data.backupToFile}`);
-    lines.push(`Ring Buffer Cap: ${data.ringBufferCapacity}`);
-    lines.push(`Journal Flush: ${data.journalFlushIntervalMs}ms`);
-    lines.push(`Full Save: ${data.fullSaveIntervalMs}ms`);
-    lines.push(`Max Sessions: ${data.maxSessions}`);
-    lines.push('');
-
-    lines.push('--- Stats ---');
-    lines.push(`Total: ${data.totalMs}ms (${Math.floor(data.totalMs / 3600000)}h ${Math.floor((data.totalMs % 3600000) / 60000)}m)`);
-    lines.push(`Today: ${data.todayMs}ms`);
-    lines.push(`Week Total: ${data.weekTotalMs}ms`);
-    lines.push(`Sessions: ${data.sessionsCount}`);
-    lines.push(`Global Total: ${data.globalTotalMs}ms (${data.workspaceCount} workspaces)`);
-    if (data.weekEfficiency !== undefined) {
-        lines.push(`Week Efficiency: ${(data.weekEfficiency * 100).toFixed(1)}%`);
-    }
-    lines.push('');
-
-    lines.push('--- Daily Breakdown ---');
-    for (const d of data.dailyStats) {
-        const parts = [`${d.label}(${d.weekday})`, `total=${d.totalMs}ms`];
-        if (d.activeMs !== undefined) parts.push(`active=${d.activeMs}ms`);
-        if (d.idleMs !== undefined) parts.push(`idle=${d.idleMs}ms`);
-        if (d.efficiency !== undefined) parts.push(`eff=${(d.efficiency * 100).toFixed(0)}%`);
-        lines.push(parts.join(' '));
-    }
-    lines.push('');
-
-    lines.push('--- Recent Logs (last 200) ---');
-    const levelNames = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
-    for (const entry of diags) {
-        const ts = new Date(entry.timestamp).toISOString();
-        lines.push(`[${levelNames[entry.level] ?? '?'}][${ts}] ${entry.message}`);
-        if (entry.stack) {
-            lines.push(`  Stack: ${entry.stack.split('\n').slice(0, 3).join('\n  ')}`);
+/**
+ * 将当前工作区计时数据导出为 CSV 文件
+ * 供 Dashboard 导出按钮与 workspaceTiming.export 命令共用。
+ */
+async function exportTimingToFile(): Promise<void> {
+    try {
+        if (!orchestrator) {
+            vscode.window.showWarningMessage(t()['toast.exportNoWorkspace']);
+            return;
         }
-    }
 
-    return lines.join('\n');
+        // 获取工作区名称
+        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+
+        // 用户选择保存路径（默认 .csv）
+        const defaultUri = vscode.Uri.file(
+            `${workspaceName}-timing-${new Date().toISOString().slice(0, 10)}.csv`,
+        );
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri,
+            filters: { 'CSV 文件 (*.csv)': ['csv'] },
+            saveLabel: t()['toast.exportSaveLabel'],
+        });
+
+        if (!uri) {
+            // 用户取消
+            vscode.window.showInformationMessage(t()['toast.exportCancelled']);
+            return;
+        }
+
+        const csv = await orchestrator.exportCSV(workspaceName);
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(csv, 'utf8'));
+
+        vscode.window.showInformationMessage(
+            format(t()['toast.exportSuccess'], uri.fsPath),
+        );
+    } catch (err) {
+        log(LogLevel.Error, 'WorkspaceTiming: export CSV failed', err as Error);
+        vscode.window.showErrorMessage(t()['toast.exportFailed']);
+    }
+}
+
+/**
+ * 将日报 / 周报导出为 Markdown 文件
+ * 供 Dashboard 导出按钮与命令面板触发。
+ */
+async function exportReportToFile(kind: 'daily' | 'weekly'): Promise<void> {
+    try {
+        if (!orchestrator) {
+            vscode.window.showWarningMessage(t()['toast.exportNoWorkspace']);
+            return;
+        }
+
+        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
+        const today = new Date().toISOString().slice(0, 10);
+        const prefix = kind === 'daily' ? '日报' : '周报';
+        const defaultUri = vscode.Uri.file(
+            `${workspaceName}-${prefix}-${today}.md`,
+        );
+
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri,
+            filters: { 'Markdown 文件 (*.md)': ['md'] },
+            saveLabel: t()['toast.exportSaveLabel'],
+        });
+
+        if (!uri) {
+            vscode.window.showInformationMessage(t()['toast.exportCancelled']);
+            return;
+        }
+
+        const md = await orchestrator.exportReport(kind);
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(md, 'utf8'));
+
+        const key = kind === 'daily' ? 'toast.exportReportDaily' : 'toast.exportReportWeekly';
+        vscode.window.showInformationMessage(
+            format(t()[key], uri.fsPath),
+        );
+    } catch (err) {
+        log(LogLevel.Error, 'WorkspaceTiming: export report failed', err as Error);
+        vscode.window.showErrorMessage(t()['toast.exportFailed']);
+    }
 }

@@ -4,8 +4,14 @@
  * 职责：监听 VS Code 设置变更，同步到 DisableManager 和其他模块
  * 边界：只做配置变更通知，不做业务决策
  */
+import { TimingConfig } from '../domain/models';
 import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { StatusBarController } from '../presentation/StatusBarController';
+/**
+ * 读取当前用户配置（唯一入口，避免多处重复实现导致配置漂移）。
+ * 供 ConfigWatcher 与 extension.ts 初始化共用，保证初始化/运行期配置同源。
+ */
+export declare function readTimingConfig(): TimingConfig;
 export declare class ConfigWatcher {
     private readonly disposables;
     private readonly orchestrator;
@@ -17,6 +23,12 @@ export declare class ConfigWatcher {
     private readConfig;
     /** 应用配置到各模块 */
     private applyConfig;
+    /**
+     * 云端同步占位检测：
+     * 用户尝试开启 cloudSync.enabled 时给出「即将推出」提示。
+     * v0.2.0 阶段仅为扩展点占位，不实现真实同步。
+     */
+    private checkCloudSyncPlaceholder;
     /** 停止监听 */
     stop(): void;
 }

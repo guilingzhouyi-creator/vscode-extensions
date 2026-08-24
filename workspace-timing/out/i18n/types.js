@@ -9,9 +9,4 @@
  *   common.xxx  → 通用
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.format = format;
-/** 字符串格式化：替换 {0} {1} ... */
-function format(template, ...args) {
-    return template.replace(/\{(\d+)\}/g, (_, i) => args[parseInt(i)] ?? '');
-}
 //# sourceMappingURL=types.js.map

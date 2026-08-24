@@ -9,3 +9,5 @@ tsconfig.json
 .eslintrc.json
 **/*.ts
 **/*.map
+.workspace-timing-data/**
+coverage/**
