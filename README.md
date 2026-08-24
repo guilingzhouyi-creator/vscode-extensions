@@ -19,7 +19,7 @@
 
 | 插件 | 版本 | 状态 | 简介 |
 |------|------|:--:|------|
-| **[Workspace Timing](./workspace-timing)** | v0.1.0 | 🟢 已发布 | ⏱ 轻量化工作区时长追踪：自动计时、跨工作区聚合、周报图表、仪表板、日/累计分离；环形缓冲区 + Journal 双写入，崩溃保护 |
+| **[Workspace Timing](./workspace-timing)** | v0.4.1 | 🟢 已发布 | ⏱ 轻量化工作区时长追踪：自动计时、跨工作区聚合、周报图表、仪表板、日/累计分离；环形缓冲区 + Journal 双写入，崩溃保护 |
 
 ---
 
@@ -39,8 +39,50 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 │   ├── package.json
 │   ├── README.md
 │   └── LICENSE
-└── (future extensions...)      ← 更多插件即将加入
+├── <future-extension>/         ← 新扩展预留位：建目录 + 放 package.json 即自动接入 CI/发布
+├── scripts/
+│   └── package.ps1             ← 本地统一打包入口（输出到 dist/）
+├── dist/                       ← ★ 统一包输出目录（gitignore，不入库）
+│   └── <扩展名>/
+│       ├── <扩展名>-<版本>.vsix    # 主产物（按扩展名分类）
+│       └── SHA256SUMS.txt         # 校验和
+└── .github/workflows/          ← CI 校验 + 自动发布流水线
 ```
+
+> 📐 **新增扩展零配置接入**：在仓库顶层新建 `<扩展名>/` 目录并放入 `package.json`，
+> CI 与发布流水线会自动发现并纳入（自动发现逻辑见两个 workflow 的「Detect extensions」步骤）。
+
+---
+
+## 🏷️ 打包与发布 | Packaging & Release
+
+### 标记系统（Tag 规范）
+
+```
+<扩展名>-vMAJOR.MINOR.PATCH      例：workspace-timing-v0.4.1
+```
+
+每个扩展独立的 Tag 命名空间，互不冲突；旧全局 Tag（如 `v0.3.8`）仅作历史参考。
+
+### 发布方式（三选一）
+
+| 方式 | 操作 | 版本来源 |
+|------|------|----------|
+| **版本提交自动发布**（推荐） | push 到 main，提交信息以 `vX.Y.Z` 开头，且改动触及扩展目录 | 提交信息前缀 |
+| **Tag 触发** | push 标签 `<扩展名>-vX.Y.Z` | Tag 本身 |
+| **手动触发** | Actions → Release → Run workflow，可填扩展名与版本号 | 手动输入 |
+
+发布产物自动附加到 [GitHub Releases](https://github.com/guilingzhouyi-creator/vscode-extensions/releases)（VSIX + SHA256 校验和），Release Notes 自动提取自扩展 `CHANGELOG.md` 对应版本段落。
+
+### 本地打包
+
+```powershell
+.\scripts\package.ps1                          # 打包全部扩展
+.\scripts\package.ps1 -Name workspace-timing   # 只打包指定扩展
+.\scripts\package.ps1 -Keep 3                  # dist 中每扩展保留最近 3 个版本
+```
+
+产物输出到 `dist/<扩展名>/`（不入库），与 CI 产出结构完全同构。
 
 ---
 
@@ -93,7 +135,7 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 
 ```bash
 # 克隆
-git clone https://cnb.cool/OriginalTC/vscode-extensions.git
+git clone https://github.com/guilingzhouyi-creator/vscode-extensions.git
 cd vscode-extensions/workspace-timing
 
 # 安装依赖
@@ -102,8 +144,11 @@ npm install
 # 编译
 npm run compile
 
-# 打包
-vsce package
+# 单元测试（需先 compile，用例断言编译产物 out/）
+npm run test:unit
+
+# lint
+npm run lint
 ```
 
 ---

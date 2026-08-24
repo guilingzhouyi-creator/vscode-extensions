@@ -3,6 +3,9 @@
 .vscode-test/
 .cnb/.cache/
 
+# 统一打包输出目录（本地构建产物，不入库；正式产物发布到 GitHub Releases）
+dist/
+
 # 本地运行时数据与工具目录（不入库）
 .workspace-timing-data/
 .workbuddy/

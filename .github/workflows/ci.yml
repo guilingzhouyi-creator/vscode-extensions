@@ -1,28 +1,39 @@
 # =============================================================================
 # CI — 构建校验流水线（仅校验，永不打 Tag / 永不发布）
 # -----------------------------------------------------------------------------
-# 触发：任意分支 push 或 PR，只要改动落在 workspace-timing/ 下。
-# 作用：保证代码可编译、可打包，给开发者快速反馈。
+# 触发：任意分支 push 或 PR，只要改动触及扩展目录（自动发现，见下）。
+# 校验链：npm ci → compile → 单元测试 → lint → vsce 打包验证。
 # 设计要点：本流水线不解析版本、不创建 Tag、不创建 Release，
-#           因此「常规提交」只过一道构建检查，绝不会误触发发布。
+#           「常规提交」只过一道构建检查，绝不会误触发发布。
+#
+# 多扩展预留：顶层含 package.json 的目录自动纳入校验（与 release.yml
+#             同一套发现逻辑）。push 仅校验变更触及的扩展；PR 全量校验。
 # =============================================================================
 name: CI
 
 on:
   push:
-    paths:
-      - 'workspace-timing/**'
+    branches: ['**']
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'dist/**'
+      - 'archive/**'
+      - '.github/**'
   pull_request:
-    paths:
-      - 'workspace-timing/**'
 
 jobs:
-  build-check:
-    name: Build & package check
+  ci:
+    name: Build & test (${{ matrix.ext }})
     runs-on: ubuntu-latest
+    needs: discover
+    strategy:
+      fail-fast: false
+      matrix:
+        ext: ${{ fromJSON(needs.discover.outputs.matrix) }}
     defaults:
       run:
-        working-directory: workspace-timing
+        working-directory: ${{ matrix.ext }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,19 +43,78 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: workspace-timing/package-lock.json
+          cache-dependency-path: ${{ matrix.ext }}/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
       - name: Compile
         run: npm run compile
 
-      - name: Copy web assets
-        run: npm run copy-assets
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Lint
+        run: npm run lint
 
       - name: Package (verify only, not published)
-        run: npx --yes @vscode/vsce package --allow-missing-repository
+        run: npx --yes @vscode/vsce package -o "../dist/${{ matrix.ext }}/"
+
+      - name: Upload package artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-${{ matrix.ext }}
+          path: dist/${{ matrix.ext }}/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ─── 扩展发现：顶层含 package.json 的目录 → matrix ───
+  discover:
+    name: Discover extensions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 变更检测需要与 before SHA 做 diff
+
+      - name: Detect changed extensions
+        id: set
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 仓库顶层所有扩展目录（含 package.json 即为扩展，自动预留未来扩展）
+          ALL_EXTS=$(find . -maxdepth 2 -name package.json -not -path '*/node_modules/*' \
+                      -printf '%h\n' | sed 's|^\./||' | sort -u)
+          echo "Discovered extensions: ${ALL_EXTS:-<none>}"
+
+          FILTERED=""
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # PR：全量校验所有扩展
+            FILTERED="$ALL_EXTS"
+          else
+            # push：仅校验变更触及的扩展
+            BEFORE="${{ github.event.before }}"
+            if [[ -z "$BEFORE" || "$BEFORE" == 0000000000000000000000000000000000000000 ]]; then
+              BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "$GITHUB_SHA")
+            fi
+            CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" || true)
+            for EXT in $ALL_EXTS; do
+              if echo "$CHANGED" | grep -q "^${EXT}/"; then
+                FILTERED="$FILTERED $EXT"
+              fi
+            done
+            FILTERED=$(echo "$FILTERED" | tr ' ' '\n' | sed '/^$/d' | sort -u)
+          fi
+
+          if [[ -z "$FILTERED" ]]; then
+            echo "::notice::无变更触及扩展目录 → CI 空跑跳过。"
+            FILTERED="__none__"
+          fi
+
+          # 生成 matrix JSON：["ext1","ext2"]；__none__ → 空数组（matrix 零作业）
+          MATRIX=$(echo "$FILTERED" | grep -v '^__none__$' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
