@@ -125,7 +125,9 @@ async function exportReportToFile(ctx, kind) {
         }
         const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
         const today = TimeAggregator_1.TimeAggregator.todayStr();
-        const prefix = kind === 'daily' ? '日报' : '周报';
+        const prefix = kind === 'daily'
+            ? (0, index_1.t)()['export.filename.daily']
+            : (0, index_1.t)()['export.filename.weekly'];
         const defaultUri = vscode.Uri.file(`${workspaceName}-${prefix}-${today}.md`);
         const uri = await vscode.window.showSaveDialog({
             defaultUri,

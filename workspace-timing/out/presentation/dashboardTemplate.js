@@ -501,41 +501,41 @@ function buildDashboardHtml(args) {
 </head>
 <body>
 
-  <h1>⏱ 工作区计时</h1>
+  <h1>${args.labels['panel.title']}</h1>
 
   <!-- 统计卡片 -->
   <div class="stats-grid">
     <div class="stat-card">
       <div class="value" id="statToday">--</div>
-      <div class="label">今日</div>
+      <div class="label">${args.labels['panel.label.today']}</div>
     </div>
     <div class="stat-card">
       <div class="value" id="statWeek">--</div>
-      <div class="label">本周</div>
+      <div class="label">${args.labels['panel.label.week']}</div>
     </div>
     <div class="stat-card">
       <div class="value" id="statTotal">--</div>
-      <div class="label">累计（本工作区）</div>
+      <div class="label">${args.labels['panel.label.totalWs']}</div>
     </div>
     <div class="stat-card">
       <div class="value" id="statGlobalTotal">--</div>
-      <div class="label">跨工作区累计</div>
+      <div class="label">${args.labels['panel.label.global']}</div>
     </div>
     <div class="stat-card">
       <div class="value" id="statSessions">--</div>
-      <div class="label">会话数</div>
+      <div class="label">${args.labels['panel.label.sessions']}</div>
     </div>
     <div class="stat-card">
       <div class="value" id="statStatus">--</div>
-      <div class="label">状态</div>
+      <div class="label">${args.labels['panel.label.status']}</div>
     </div>
   </div>
 
   <!-- 周报 + 柱状图 -->
   <div class="section">
-    <h2>📊 周报</h2>
+    <h2>${args.labels['panel.weekly.title']}</h2>
     <div class="chart-container">
-      <div id="chartEmpty" class="chart-empty">暂无数据，开始编程后会自动记录</div>
+      <div id="chartEmpty" class="chart-empty">${args.labels['panel.weekly.emptyChart']}</div>
       <div id="chartBars" class="chart-bars" style="display:none"></div>
       <div id="weekTotal" class="week-total" style="display:none"></div>
     </div>
@@ -544,80 +544,80 @@ function buildDashboardHtml(args) {
       <div class="summary-grid">
         <div class="summary-item">
           <div class="value" id="sumTotal">--</div>
-          <div class="label">本周总时长</div>
+          <div class="label">${args.labels['panel.weekly.totalLabel']}</div>
         </div>
         <div class="summary-item">
           <div class="value" id="sumAvg">--</div>
-          <div class="label">日均</div>
+          <div class="label">${args.labels['panel.weekly.avgDaily']}</div>
         </div>
         <div class="summary-item">
           <div class="value" id="sumActiveDays">--</div>
-          <div class="label">活跃天数</div>
+          <div class="label">${args.labels['panel.weekly.activeDays']}</div>
         </div>
         <div class="summary-item">
           <div class="value" id="sumPeakDate">--</div>
-          <div class="label">最活跃日期</div>
+          <div class="label">${args.labels['panel.weekly.peakDate']}</div>
         </div>
         <div class="summary-item">
           <div class="value" id="sumSessions">--</div>
-          <div class="label">会话数</div>
+          <div class="label">${args.labels['panel.label.sessions']}</div>
         </div>
       </div>
       <div class="btn-row">
-        <button class="btn btn-secondary" id="btnExportWeekly">导出周报</button>
+        <button class="btn btn-secondary" id="btnExportWeekly">${args.labels['panel.weekly.exportBtn']}</button>
       </div>
     </div>
     <!-- 多周趋势 -->
     <div id="weeklyTrend" class="report-block" style="display:none">
-      <h3>近 4 周趋势</h3>
+      <h3>${args.labels['panel.weekly.trendTitle']}</h3>
       <div id="trendList"></div>
     </div>
   </div>
 
   <!-- 今日明细 -->
   <div class="section" id="todaySection" style="display:none">
-    <h2>📅 今日明细</h2>
+    <h2>${args.labels['panel.today.title']}</h2>
     <div class="report-block">
       <div class="summary-grid">
         <div class="summary-item">
           <div class="value" id="todayDetailTotal">--</div>
-          <div class="label">今日时长</div>
+          <div class="label">${args.labels['panel.today.duration']}</div>
         </div>
         <div class="summary-item">
           <div class="value" id="todayDetailCount">--</div>
-          <div class="label">会话数</div>
+          <div class="label">${args.labels['panel.label.sessions']}</div>
         </div>
         <div class="summary-item">
           <div class="value" id="todayDetailWindow">--</div>
-          <div class="label">活跃时段</div>
+          <div class="label">${args.labels['panel.today.activeWindow']}</div>
         </div>
       </div>
       <div id="sessionList" class="session-list" style="display:none"></div>
-      <div class="empty-hint" id="sessionEmpty" style="display:none">今日暂无会话</div>
+      <div class="empty-hint" id="sessionEmpty" style="display:none">${args.labels['panel.today.empty']}</div>
       <div class="btn-row">
-        <button class="btn btn-secondary" id="btnExportDaily">导出日报</button>
+        <button class="btn btn-secondary" id="btnExportDaily">${args.labels['panel.today.exportBtn']}</button>
       </div>
     </div>
   </div>
 
   <!-- 跨工作区 -->
   <div class="section" id="globalSection">
-    <h2>🌐 跨工作区</h2>
+    <h2>${args.labels['panel.global.title']}</h2>
     <div id="workspaceList" style="margin-bottom:8px">
-      <div class="chart-empty" id="globalEmpty">暂无其他工作区数据</div>
+      <div class="chart-empty" id="globalEmpty">${args.labels['panel.global.empty']}</div>
     </div>
   </div>
 
   <!-- 基本设置 -->
   <div class="section">
-    <h2>基本设置</h2>
+    <h2>${args.labels['panel.section.basic']}</h2>
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>工作区计时</span>
-          <span class="help-icon">?<span class="tooltip">启用后，当前 VS Code 窗口打开即开始累计时长；<br>禁用后完全停止计时和记录</span></span>
+          <span>${args.labels['panel.set.enabled.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">启用/禁用当前工作区的计时</div>
+        <div class="desc">${args.labels['panel.set.enabled.desc']}</div>
       </div>
       <label class="toggle">
         <input type="checkbox" id="chkEnabled" data-key="isEnabled">
@@ -627,10 +627,10 @@ function buildDashboardHtml(args) {
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>全局禁用</span>
-          <span class="help-icon">?<span class="tooltip">全局禁用后所有工作区均不计时，<br>优先级高于工作区独立开关</span></span>
+          <span>${args.labels['panel.set.globalDisabled.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">禁用所有工作区的计时（优先级最高）</div>
+        <div class="desc">${args.labels['panel.set.globalDisabled.desc']}</div>
       </div>
       <label class="toggle">
         <input type="checkbox" id="chkGlobalDisabled" data-key="globalDisabled">
@@ -640,10 +640,10 @@ function buildDashboardHtml(args) {
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>状态栏显示</span>
-          <span class="help-icon">?<span class="tooltip">状态栏显示今日时长和累计时长；<br>点击可循环切换显示模式</span></span>
+          <span>${args.labels['panel.set.statusBar.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">在底部状态栏显示计时</div>
+        <div class="desc">${args.labels['panel.set.statusBar.desc']}</div>
       </div>
       <label class="toggle">
         <input type="checkbox" id="chkStatusBar" data-key="statusBarEnabled">
@@ -654,14 +654,14 @@ function buildDashboardHtml(args) {
 
   <!-- 存储设置 -->
   <div class="section">
-    <h2>⚙️ 存储设置</h2>
+    <h2>${args.labels['panel.section.storage']}</h2>
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>崩溃保护</span>
-          <span class="help-icon">?<span class="tooltip">每 10 秒将时间片写入 .journal 文件；<br>VS Code 崩溃后重启时可回放恢复，<br>最多丢失约 10 秒数据</span></span>
+          <span>${args.labels['panel.set.journal.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">启用 journal 文件防止崩溃数据丢失（重启窗口后生效）</div>
+        <div class="desc">${args.labels['panel.set.journal.desc']}</div>
       </div>
       <label class="toggle">
         <input type="checkbox" id="chkJournal" data-key="journalEnabled">
@@ -671,10 +671,10 @@ function buildDashboardHtml(args) {
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>JSON 备份</span>
-          <span class="help-icon">?<span class="tooltip">额外写入 .vscode/workspace-timing.json；<br>用户可见、可版本控制、可移植</span></span>
+          <span>${args.labels['panel.set.backup.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">额外写入 .vscode/workspace-timing.json（重启窗口后生效）</div>
+        <div class="desc">${args.labels['panel.set.backup.desc']}</div>
       </div>
       <label class="toggle">
         <input type="checkbox" id="chkBackup" data-key="backupToFile">
@@ -684,40 +684,40 @@ function buildDashboardHtml(args) {
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>RingBuffer 容量</span>
-          <span class="help-icon">?<span class="tooltip">内存中缓存的时间片数量；<br>越大则 UI 可查询的历史越久，<br>但占用内存越多（推荐 1024 ≈ 17 分钟）</span></span>
+          <span>${args.labels['panel.set.ringBuffer.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">环形缓冲区条目数 (64~65536，重启窗口后生效)</div>
+        <div class="desc">${args.labels['panel.set.ringBuffer.desc']}</div>
       </div>
       <input class="number-input" type="number" id="numRingBuffer" data-key="ringBufferCapacity" min="64" max="65536">
     </div>
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>Journal 写入间隔</span>
-          <span class="help-icon">?<span class="tooltip">内存缓存写入 journal 文件的频率；<br>间隔越短丢失越少，但磁盘写入越频繁</span></span>
+          <span>${args.labels['panel.set.journalInterval.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">毫秒 (1000~300000)</div>
+        <div class="desc">${args.labels['panel.set.journalInterval.desc']}</div>
       </div>
       <input class="number-input" type="number" id="numJournalInterval" data-key="journalFlushIntervalMs" min="1000" max="300000">
     </div>
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>全量存盘间隔</span>
-          <span class="help-icon">?<span class="tooltip">将完整计时数据写入 workspaceState 和 JSON 文件的频率；<br>间隔越短数据越安全，但写入越频繁</span></span>
+          <span>${args.labels['panel.set.fullSaveInterval.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">毫秒 (5000~600000)</div>
+        <div class="desc">${args.labels['panel.set.fullSaveInterval.desc']}</div>
       </div>
       <input class="number-input" type="number" id="numFullSaveInterval" data-key="fullSaveIntervalMs" min="5000" max="600000">
     </div>
     <div class="setting-row">
       <div class="setting-label">
         <div class="setting-header-row">
-          <span>会话保留上限</span>
-          <span class="help-icon">?<span class="tooltip">最多保留的会话记录条数；<br>超出时自动删除最旧记录；<br>设为 0 表示不限（注意内存占用）</span></span>
+          <span>${args.labels['panel.set.maxSessions.name']}</span>
+          <span class="help-icon">?<span class="tooltip"></span></span>
         </div>
-        <div class="desc">0 = 不限</div>
+        <div class="desc">${args.labels['panel.set.maxSessions.desc']}</div>
       </div>
       <input class="number-input" type="number" id="numMaxSessions" data-key="maxSessions" min="0">
     </div>
@@ -725,15 +725,15 @@ function buildDashboardHtml(args) {
 
   <!-- 操作 -->
   <div class="section">
-    <h2>🔧 操作</h2>
+    <h2>${args.labels['panel.section.actions']}</h2>
     <div class="btn-row">
-      <button class="btn btn-primary" id="btnNewPeriod">新建计时周期</button>
-      <button class="btn btn-secondary" id="btnExportCSV">导出 CSV</button>
-      <button class="btn btn-danger" id="btnReset">重置所有数据</button>
+      <button class="btn btn-primary" id="btnNewPeriod">${args.labels['panel.actions.newPeriod']}</button>
+      <button class="btn btn-secondary" id="btnExportCSV">${args.labels['panel.actions.exportCsv']}</button>
+      <button class="btn btn-danger" id="btnReset">${args.labels['panel.actions.reset']}</button>
     </div>
     <div style="margin-top:8px;font-size:11px;color:var(--description)">
-      <strong>新建计时周期</strong>：累计归零，历史保留在会话记录中<br>
-      <strong>重置所有数据</strong>：清空所有计时数据和历史，不可撤销
+      <strong>${args.labels['panel.actions.newPeriod']}</strong>${args.labels['panel.actions.hintPeriodDesc']}<br>
+      <strong>${args.labels['panel.actions.reset']}</strong>${args.labels['panel.actions.hintResetDesc']}
     </div>
   </div>
 
@@ -742,6 +742,10 @@ function buildDashboardHtml(args) {
   <script nonce="${args.nonce}">
     (function() {
       const vscode = acquireVsCodeApi();
+      // 词条表（渲染时由扩展宿主按当前语言序列化注入）
+      const L = ${JSON.stringify(args.labels)};
+      // {0} 占位符格式化（词条中的可变部分）
+      function fmt(tpl, v) { return String(tpl).replace('{0}', String(v)); }
       let pendingData = null;
 
       // ---- 更新 UI ----
@@ -755,11 +759,11 @@ function buildDashboardHtml(args) {
 
         const statusEl = document.getElementById('statStatus');
         if (data.globalDisabled) {
-          statusEl.innerHTML = '<span class="status-badge status-disabled">全局禁用</span>';
+          statusEl.innerHTML = '<span class="status-badge status-disabled">' + L['panel.js.badgeGlobalDisabled'] + '</span>';
         } else if (!data.isEnabled) {
-          statusEl.innerHTML = '<span class="status-badge status-disabled">已禁用</span>';
+          statusEl.innerHTML = '<span class="status-badge status-disabled">' + L['panel.js.badgeDisabled'] + '</span>';
         } else {
-          statusEl.innerHTML = '<span class="status-badge status-running">运行中</span>';
+          statusEl.innerHTML = '<span class="status-badge status-running">' + L['panel.js.badgeRunning'] + '</span>';
         }
 
         // 设置项
@@ -810,7 +814,7 @@ function buildDashboardHtml(args) {
         const container = document.getElementById('workspaceList');
 
         if (!workspaces || workspaces.length <= 1) {
-          container.innerHTML = '<div class="chart-empty">暂无其他工作区数据</div>';
+          container.innerHTML = '<div class="chart-empty">' + L['panel.global.empty'] + '</div>';
           return;
         }
 
@@ -835,8 +839,8 @@ function buildDashboardHtml(args) {
         }
 
         html +=
-          '<div class="ws-compare-total">总时长：<strong>' + formatDuration(grandTotal) +
-          '</strong><span class="ws-compare-count">（' + count + ' 个工作区）</span></div>';
+          '<div class="ws-compare-total">' + L['panel.js.grandTotalPrefix'] + '<strong>'' + formatDuration(grandTotal) +
+          '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], count) + '' + count + ')</span></div>';
 
         container.innerHTML = html;
       }
@@ -877,7 +881,7 @@ function buildDashboardHtml(args) {
             '</div>';
         }).join('');
 
-        weekTotalEl.innerHTML = '本周合计：<strong>' + formatDuration(weekTotalMs || 0) + '</strong>';
+        weekTotalEl.innerHTML = L['panel.js.weekTotalPrefix'] + '<strong>' + formatDuration(weekTotalMs || 0) + '</strong>';
       }
 
       // ---- 周报摘要 + 多周趋势渲染 ----
@@ -895,7 +899,7 @@ function buildDashboardHtml(args) {
         sumEl.style.display = 'block';
         document.getElementById('sumTotal').textContent = formatDuration(summary.totalMs);
         document.getElementById('sumAvg').textContent = formatDuration(summary.avgDailyMs);
-        document.getElementById('sumActiveDays').textContent = summary.activeDays + ' 天';
+        document.getElementById('sumActiveDays').textContent = fmt(L['panel.js.daysFmt'], summary.activeDays);
         document.getElementById('sumPeakDate').textContent = summary.peakDate || '--';
         document.getElementById('sumSessions').textContent = String(summary.sessionCount);
 
@@ -981,29 +985,29 @@ function buildDashboardHtml(args) {
       // ---- 操作按钮 ----
       document.getElementById('btnNewPeriod').addEventListener('click', () => {
         vscode.postMessage({ type: 'newPeriod' });
-        showToast('已请求新建计时周期');
+        showToast(L['panel.toast.newPeriodRequested']);
       });
 
       document.getElementById('btnExportCSV').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportCSV' });
-        showToast('已请求导出 CSV');
+        showToast(L['panel.toast.exportCsvRequested']);
       });
 
       document.getElementById('btnReset').addEventListener('click', () => {
-        if (confirm('确定要重置所有计时数据？此操作不可撤销！')) {
+        if (confirm(L['confirm.reset'])) {
           vscode.postMessage({ type: 'reset' });
-          showToast('已请求重置数据');
+          showToast(L['panel.toast.resetRequested']);
         }
       });
 
       // 导出日报 / 周报
       document.getElementById('btnExportDaily').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportReport', payload: { kind: 'daily' } });
-        showToast('已请求导出日报');
+        showToast(L['panel.toast.exportDailyRequested']);
       });
       document.getElementById('btnExportWeekly').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportReport', payload: { kind: 'weekly' } });
-        showToast('已请求导出周报');
+        showToast(L['panel.toast.exportWeeklyRequested']);
       });
 
       // ---- Toast 提示 ----

@@ -24,48 +24,63 @@
         "commands": [
             {
                 "command": "workspaceTiming.enable",
-                "title": "Workspace Timing: Enable Timing"
+                "title": "%workspaceTiming.enable%"
             },
             {
                 "command": "workspaceTiming.disable",
-                "title": "Workspace Timing: Disable Timing"
+                "title": "%workspaceTiming.disable%"
             },
             {
                 "command": "workspaceTiming.toggleGlobal",
-                "title": "Workspace Timing: Toggle Global Timing"
+                "title": "%workspaceTiming.toggleGlobal%"
             },
             {
                 "command": "workspaceTiming.showStatus",
-                "title": "Workspace Timing: Toggle Status Bar"
+                "title": "%workspaceTiming.showStatus%"
             },
             {
                 "command": "workspaceTiming.reset",
-                "title": "Workspace Timing: Reset Timing Data"
+                "title": "%workspaceTiming.reset%"
             },
             {
                 "command": "workspaceTiming.clearGlobal",
-                "title": "Workspace Timing: Clear Cross-Workspace Total"
+                "title": "%workspaceTiming.clearGlobal%"
             },
             {
                 "command": "workspaceTiming.debugSave",
-                "title": "Workspace Timing: Debug — Force Save Now"
+                "title": "%workspaceTiming.debugSave%"
             },
             {
                 "command": "workspaceTiming.openDashboard",
-                "title": "Workspace Timing: Open Dashboard"
+                "title": "%workspaceTiming.openDashboard%"
             },
             {
                 "command": "workspaceTiming.export",
-                "title": "Workspace Timing: Export CSV"
+                "title": "%workspaceTiming.export%"
             },
             {
                 "command": "workspaceTiming.newPeriod",
-                "title": "Workspace Timing: New Counting Period"
+                "title": "%workspaceTiming.newPeriod%"
             }
         ],
         "configuration": {
             "title": "Workspace Timing",
             "properties": {
+                "workspaceTiming.locale": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "zh-CN",
+                        "en"
+                    ],
+                    "enumDescriptions": [
+                        "Follow VS Code display language",
+                        "简体中文",
+                        "English"
+                    ],
+                    "default": "auto",
+                    "description": "UI language for notifications and the dashboard panel. Takes effect immediately for the panel; command palette titles require a window reload."
+                },
                 "workspaceTiming.enabled": {
                     "type": "boolean",
                     "default": true,

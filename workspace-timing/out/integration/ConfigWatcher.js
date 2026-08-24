@@ -43,6 +43,7 @@ exports.ConfigWatcher = void 0;
 exports.readTimingConfig = readTimingConfig;
 const vscode = __importStar(require("vscode"));
 const models_1 = require("../domain/models");
+const DashboardPanel_1 = require("../presentation/DashboardPanel");
 const Logger_1 = require("./Logger");
 const index_1 = require("../i18n/index");
 const CONFIG_SECTION = 'workspaceTiming';
@@ -55,6 +56,7 @@ function readTimingConfig() {
     return {
         enabled: cfg.get('enabled', models_1.DEFAULT_CONFIG.enabled),
         globalDisabled: cfg.get('globalDisabled', models_1.DEFAULT_CONFIG.globalDisabled),
+        locale: cfg.get('locale', models_1.DEFAULT_CONFIG.locale),
         statusBarEnabled: cfg.get('statusBar.enabled', models_1.DEFAULT_CONFIG.statusBarEnabled),
         backupToFile: cfg.get('storage.backupToFile', models_1.DEFAULT_CONFIG.backupToFile),
         journalEnabled: cfg.get('storage.journalEnabled', models_1.DEFAULT_CONFIG.journalEnabled),
@@ -66,10 +68,13 @@ function readTimingConfig() {
     };
 }
 class ConfigWatcher {
-    constructor(orchestrator, statusBar) {
+    constructor(orchestrator, statusBar, extensionUri) {
         this.disposables = [];
+        /** 上次应用的语言设置（undefined=尚未应用过首轮） */
+        this._lastLocale = undefined;
         this.orchestrator = orchestrator;
         this.statusBar = statusBar;
+        this.extensionUri = extensionUri;
     }
     /** 开始监听配置变更 */
     start() {
@@ -98,6 +103,18 @@ class ConfigWatcher {
     }
     /** 应用配置到各模块 */
     applyConfig(config) {
+        // 0. 语言切换：热生效（面板重建 + 状态栏重渲染）；命令标题需窗口重载（VS Code 限制）
+        if (config.locale !== undefined && config.locale !== this._lastLocale) {
+            const isFirstApply = this._lastLocale === undefined;
+            this._lastLocale = config.locale;
+            (0, index_1.setLocale)((0, index_1.resolveLocale)(config.locale));
+            if (!isFirstApply && DashboardPanel_1.DashboardPanel.currentPanel) {
+                // 面板开着 → 按新语言重建
+                DashboardPanel_1.DashboardPanel.disposeCurrent();
+                DashboardPanel_1.DashboardPanel.createOrShow(this.extensionUri);
+                (0, Logger_1.log)(Logger_1.LogLevel.Info, 'ConfigWatcher: locale changed, dashboard recreated');
+            }
+        }
         // 1. 更新 DisableManager
         this.orchestrator.disable.updateConfig({
             enabled: config.enabled,

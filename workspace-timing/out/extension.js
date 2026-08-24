@@ -89,8 +89,8 @@ function getRouterContext() {
 }
 function activate(context) {
     const startTime = Date.now();
-    // 初始化 i18n
-    (0, index_1.init)();
+    // 初始化 i18n（先按 VS Code 语言；进入完整模式后按用户 locale 配置覆盖）
+    (0, index_1.init)(undefined, vscode.env.language);
     // 设置日志等级
     (0, Logger_1.setLogLevel)(context.extensionMode === vscode.ExtensionMode.Development
         ? Logger_1.LogLevel.Debug
@@ -104,6 +104,8 @@ function activate(context) {
             const timer = new TimerEngine_1.TimerEngine();
             // 读取用户配置（复用 ConfigWatcher 的 readTimingConfig，保证初始化/运行期配置同源）
             const cfg = (0, ConfigWatcher_1.readTimingConfig)();
+            // 按配置覆盖语言（auto=跟随 VS Code 显示语言）
+            (0, index_1.init)(cfg.locale, vscode.env.language);
             // Persistence 层
             const workspaceStateProvider = new WorkspaceStateProvider_1.WorkspaceStateProvider(context);
             const fileStorageProvider = new FileStorageProvider_1.FileStorageProvider(workspaceRoot);
@@ -165,7 +167,7 @@ function activate(context) {
             // Integration 层
             lifecycleManager = new LifecycleManager_1.LifecycleManager(orchestrator);
             lifecycleManager.start();
-            configWatcher = new ConfigWatcher_1.ConfigWatcher(orchestrator, statusBar);
+            configWatcher = new ConfigWatcher_1.ConfigWatcher(orchestrator, statusBar, context.extensionUri);
             configWatcher.start();
             // 启动计时
             orchestrator.start();

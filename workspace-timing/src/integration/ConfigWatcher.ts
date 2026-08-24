@@ -9,8 +9,9 @@ import * as vscode from 'vscode';
 import { TimingConfig, DEFAULT_CONFIG } from '../domain/models';
 import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { StatusBarController } from '../presentation/StatusBarController';
+import { DashboardPanel } from '../presentation/DashboardPanel';
 import { LogLevel, log } from './Logger';
-import { t } from '../i18n/index';
+import { t, setLocale, resolveLocale } from '../i18n/index';
 
 const CONFIG_SECTION = 'workspaceTiming';
 
@@ -24,6 +25,7 @@ export function readTimingConfig(): TimingConfig {
     return {
         enabled: cfg.get<boolean>('enabled', DEFAULT_CONFIG.enabled),
         globalDisabled: cfg.get<boolean>('globalDisabled', DEFAULT_CONFIG.globalDisabled),
+        locale: cfg.get<'auto' | 'zh-CN' | 'en'>('locale', DEFAULT_CONFIG.locale),
         statusBarEnabled: cfg.get<boolean>('statusBar.enabled', DEFAULT_CONFIG.statusBarEnabled),
         backupToFile: cfg.get<boolean>('storage.backupToFile', DEFAULT_CONFIG.backupToFile),
         journalEnabled: cfg.get<boolean>('storage.journalEnabled', DEFAULT_CONFIG.journalEnabled),
@@ -39,10 +41,14 @@ export class ConfigWatcher {
     private readonly disposables: vscode.Disposable[] = [];
     private readonly orchestrator: TimerOrchestrator;
     private readonly statusBar: StatusBarController;
+    private readonly extensionUri: vscode.Uri;
+    /** 上次应用的语言设置（undefined=尚未应用过首轮） */
+    private _lastLocale: string | undefined = undefined;
 
-    constructor(orchestrator: TimerOrchestrator, statusBar: StatusBarController) {
+    constructor(orchestrator: TimerOrchestrator, statusBar: StatusBarController, extensionUri: vscode.Uri) {
         this.orchestrator = orchestrator;
         this.statusBar = statusBar;
+        this.extensionUri = extensionUri;
     }
 
     /** 开始监听配置变更 */
@@ -78,6 +84,19 @@ export class ConfigWatcher {
 
     /** 应用配置到各模块 */
     private applyConfig(config: TimingConfig): void {
+        // 0. 语言切换：热生效（面板重建 + 状态栏重渲染）；命令标题需窗口重载（VS Code 限制）
+        if (config.locale !== undefined && config.locale !== this._lastLocale) {
+            const isFirstApply = this._lastLocale === undefined;
+            this._lastLocale = config.locale;
+            setLocale(resolveLocale(config.locale));
+            if (!isFirstApply && DashboardPanel.currentPanel) {
+                // 面板开着 → 按新语言重建
+                DashboardPanel.disposeCurrent();
+                DashboardPanel.createOrShow(this.extensionUri);
+                log(LogLevel.Info, 'ConfigWatcher: locale changed, dashboard recreated');
+            }
+        }
+
         // 1. 更新 DisableManager
         this.orchestrator.disable.updateConfig({
             enabled: config.enabled,

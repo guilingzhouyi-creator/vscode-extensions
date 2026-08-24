@@ -83,6 +83,8 @@ export interface TimingConfig {
     enabled: boolean;
     /** 全局禁用开关 */
     globalDisabled: boolean;
+    /** 界面语言：auto=跟随 VS Code 显示语言 */
+    locale: 'auto' | 'zh-CN' | 'en';
     /** 状态栏显示开关 */
     statusBarEnabled: boolean;
     /** 是否启用 JSON 文件备份 */
@@ -105,6 +107,7 @@ export interface TimingConfig {
 export const DEFAULT_CONFIG: TimingConfig = {
     enabled: true,
     globalDisabled: false,
+    locale: 'auto',
     statusBarEnabled: true,
     backupToFile: true,
     journalEnabled: true,

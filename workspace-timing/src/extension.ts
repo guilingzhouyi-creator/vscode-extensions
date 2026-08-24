@@ -67,8 +67,8 @@ function getRouterContext(): MessageRouterContext {
 export function activate(context: vscode.ExtensionContext): void {
     const startTime = Date.now();
 
-    // 初始化 i18n
-    initI18n();
+    // 初始化 i18n（先按 VS Code 语言；进入完整模式后按用户 locale 配置覆盖）
+    initI18n(undefined, vscode.env.language);
 
     // 设置日志等级
     setLogLevel(context.extensionMode === vscode.ExtensionMode.Development
@@ -87,6 +87,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
             // 读取用户配置（复用 ConfigWatcher 的 readTimingConfig，保证初始化/运行期配置同源）
             const cfg = readTimingConfig();
+            // 按配置覆盖语言（auto=跟随 VS Code 显示语言）
+            initI18n(cfg.locale, vscode.env.language);
 
             // Persistence 层
             const workspaceStateProvider = new WorkspaceStateProvider(context);
@@ -164,7 +166,7 @@ export function activate(context: vscode.ExtensionContext): void {
             lifecycleManager = new LifecycleManager(orchestrator);
             lifecycleManager.start();
 
-            configWatcher = new ConfigWatcher(orchestrator, statusBar);
+            configWatcher = new ConfigWatcher(orchestrator, statusBar, context.extensionUri);
             configWatcher.start();
 
             // 启动计时

@@ -11,60 +11,6 @@
 export type Locale = 'zh-CN' | 'en';
 
 export interface I18nStrings {
-    // 面板
-    'panel.title': string;
-    'panel.stat.today': string;
-    'panel.stat.week': string;
-    'panel.stat.total': string;
-    'panel.stat.sessions': string;
-    'panel.stat.status': string;
-    'panel.section.weekly': string;
-    'panel.section.basic': string;
-    'panel.section.storage': string;
-    'panel.section.actions': string;
-    'panel.chart.empty': string;
-    'panel.chart.weekTotal': string;
-
-    // 设置项
-    'setting.enabled': string;
-    'setting.enabled.desc': string;
-    'setting.enabled.help': string;
-    'setting.globalDisabled': string;
-    'setting.globalDisabled.desc': string;
-    'setting.globalDisabled.help': string;
-    'setting.statusBar': string;
-    'setting.statusBar.desc': string;
-    'setting.statusBar.help': string;
-    'setting.journal': string;
-    'setting.journal.desc': string;
-    'setting.journal.help': string;
-    'setting.backup': string;
-    'setting.backup.desc': string;
-    'setting.backup.help': string;
-    'setting.ringBuffer': string;
-    'setting.ringBuffer.desc': string;
-    'setting.ringBuffer.help': string;
-    'setting.journalInterval': string;
-    'setting.journalInterval.desc': string;
-    'setting.journalInterval.help': string;
-    'setting.fullSaveInterval': string;
-    'setting.fullSaveInterval.desc': string;
-    'setting.fullSaveInterval.help': string;
-    'setting.maxSessions': string;
-    'setting.maxSessions.desc': string;
-    'setting.maxSessions.help': string;
-
-    // 操作按钮
-    'action.newPeriod': string;
-    'action.exportCSV': string;
-    'action.reset': string;
-    'action.newPeriod.hint': string;
-    'action.reset.hint': string;
-
-    // 状态
-    'status.running': string;
-    'status.globalDisabled': string;
-    'status.disabled': string;
 
     // 状态栏
     'statusBar.todayTotal': string;
@@ -84,6 +30,9 @@ export interface I18nStrings {
     'toast.exportNoWorkspace': string;
     'toast.exportReportDaily': string;
     'toast.exportReportWeekly': string;
+    // 导出文件名前缀（随语言变化）
+    'export.filename.daily': string;
+    'export.filename.weekly': string;
     // 云端同步占位
     'toast.cloudSyncPlaceholder': string;
 
@@ -109,4 +58,77 @@ export interface I18nStrings {
     'statusBar.mode.today-total': string;
     'statusBar.mode.total-today': string;
     'statusBar.mode.compact': string;
+
+    // ─── 面板（DashboardPanel webview）───
+    'panel.title': string;
+    'panel.label.today': string;
+    'panel.label.week': string;
+    'panel.label.totalWs': string;
+    'panel.label.global': string;
+    'panel.label.sessions': string;
+    'panel.label.status': string;
+    'panel.weekly.title': string;
+    'panel.weekly.emptyChart': string;
+    'panel.weekly.totalLabel': string;
+    'panel.weekly.avgDaily': string;
+    'panel.weekly.activeDays': string;
+    'panel.weekly.peakDate': string;
+    'panel.weekly.exportBtn': string;
+    'panel.weekly.trendTitle': string;
+    'panel.today.title': string;
+    'panel.today.duration': string;
+    'panel.today.activeWindow': string;
+    'panel.today.empty': string;
+    'panel.today.exportBtn': string;
+    'panel.global.title': string;
+    'panel.global.empty': string;
+    'panel.section.basic': string;
+    'panel.section.storage': string;
+    'panel.section.actions': string;
+    'panel.set.enabled.name': string;
+    'panel.set.enabled.tip': string;
+    'panel.set.enabled.desc': string;
+    'panel.set.globalDisabled.name': string;
+    'panel.set.globalDisabled.tip': string;
+    'panel.set.globalDisabled.desc': string;
+    'panel.set.statusBar.name': string;
+    'panel.set.statusBar.tip': string;
+    'panel.set.statusBar.desc': string;
+    'panel.set.journal.name': string;
+    'panel.set.journal.tip': string;
+    'panel.set.journal.desc': string;
+    'panel.set.backup.name': string;
+    'panel.set.backup.tip': string;
+    'panel.set.backup.desc': string;
+    'panel.set.ringBuffer.name': string;
+    'panel.set.ringBuffer.tip': string;
+    'panel.set.ringBuffer.desc': string;
+    'panel.set.journalInterval.name': string;
+    'panel.set.journalInterval.tip': string;
+    'panel.set.journalInterval.desc': string;
+    'panel.set.fullSaveInterval.name': string;
+    'panel.set.fullSaveInterval.tip': string;
+    'panel.set.fullSaveInterval.desc': string;
+    'panel.set.maxSessions.name': string;
+    'panel.set.maxSessions.tip': string;
+    'panel.set.maxSessions.desc': string;
+    'panel.actions.newPeriod': string;
+    'panel.actions.exportCsv': string;
+    'panel.actions.reset': string;
+    'panel.actions.hintPeriod': string;
+    'panel.actions.hintPeriodDesc': string;
+    'panel.actions.hintReset': string;
+    'panel.actions.hintResetDesc': string;
+    'panel.js.badgeGlobalDisabled': string;
+    'panel.js.badgeDisabled': string;
+    'panel.js.badgeRunning': string;
+    'panel.js.grandTotalPrefix': string;
+    'panel.js.workspaceCountFmt': string;
+    'panel.js.weekTotalPrefix': string;
+    'panel.js.daysFmt': string;
+    'panel.toast.newPeriodRequested': string;
+    'panel.toast.exportCsvRequested': string;
+    'panel.toast.resetRequested': string;
+    'panel.toast.exportDailyRequested': string;
+    'panel.toast.exportWeeklyRequested': string;
 }

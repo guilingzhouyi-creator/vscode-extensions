@@ -9,5 +9,10 @@ export interface DashboardTemplateArgs {
     nonce: string;
     /** webview 资源源（panel.webview.cspSource） */
     cspSource: string;
+    /**
+     * 面板词条表（panel.* 与 confirm.* 子集，由 i18n/labelsWithPrefix 构建）。
+     * 静态 HTML 用 ${args.labels['key']} 插值；webview 脚本经 JSON 注入为常量 L。
+     */
+    labels: Record<string, string>;
 }
 export declare function buildDashboardHtml(args: DashboardTemplateArgs): string;

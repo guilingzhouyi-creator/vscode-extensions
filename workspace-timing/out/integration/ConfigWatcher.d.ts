@@ -4,6 +4,7 @@
  * 职责：监听 VS Code 设置变更，同步到 DisableManager 和其他模块
  * 边界：只做配置变更通知，不做业务决策
  */
+import * as vscode from 'vscode';
 import { TimingConfig } from '../domain/models';
 import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { StatusBarController } from '../presentation/StatusBarController';
@@ -16,7 +17,10 @@ export declare class ConfigWatcher {
     private readonly disposables;
     private readonly orchestrator;
     private readonly statusBar;
-    constructor(orchestrator: TimerOrchestrator, statusBar: StatusBarController);
+    private readonly extensionUri;
+    /** 上次应用的语言设置（undefined=尚未应用过首轮） */
+    private _lastLocale;
+    constructor(orchestrator: TimerOrchestrator, statusBar: StatusBarController, extensionUri: vscode.Uri);
     /** 开始监听配置变更 */
     start(): void;
     /** 读取当前配置 */

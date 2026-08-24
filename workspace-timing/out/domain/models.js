@@ -38,6 +38,7 @@ function createEmptyTimingData() {
 exports.DEFAULT_CONFIG = {
     enabled: true,
     globalDisabled: false,
+    locale: 'auto',
     statusBarEnabled: true,
     backupToFile: true,
     journalEnabled: true,

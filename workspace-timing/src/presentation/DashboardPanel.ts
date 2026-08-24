@@ -9,6 +9,7 @@ import * as vscode from 'vscode';
 
 import { DashboardData, DashboardMessage } from '../domain/dashboard-types';
 import { buildDashboardHtml } from './dashboardTemplate';
+import { labelsWithPrefix } from '../i18n/index';
 export type { DashboardData, DashboardMessage }; // 重新导出以便其他文件引用
 
 export class DashboardPanel {
@@ -122,6 +123,10 @@ export class DashboardPanel {
     /** 生成 HTML（含 CSP + nonce 安全加固；模板本体见 ./dashboardTemplate.ts） */
     private _getHtml(): string {
         const nonce = DashboardPanel.getNonce();
-        return buildDashboardHtml({ nonce, cspSource: this._panel.webview.cspSource });
+        return buildDashboardHtml({
+            nonce,
+            cspSource: this._panel.webview.cspSource,
+            labels: labelsWithPrefix(['panel.', 'confirm.']),
+        });
     }
 }

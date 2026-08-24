@@ -42,6 +42,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardPanel = void 0;
 const vscode = __importStar(require("vscode"));
 const dashboardTemplate_1 = require("./dashboardTemplate");
+const index_1 = require("../i18n/index");
 class DashboardPanel {
     /** 设置全局消息处理器 */
     static setMessageHandler(handler) {
@@ -124,7 +125,11 @@ class DashboardPanel {
     /** 生成 HTML（含 CSP + nonce 安全加固；模板本体见 ./dashboardTemplate.ts） */
     _getHtml() {
         const nonce = DashboardPanel.getNonce();
-        return (0, dashboardTemplate_1.buildDashboardHtml)({ nonce, cspSource: this._panel.webview.cspSource });
+        return (0, dashboardTemplate_1.buildDashboardHtml)({
+            nonce,
+            cspSource: this._panel.webview.cspSource,
+            labels: (0, index_1.labelsWithPrefix)(['panel.', 'confirm.']),
+        });
     }
 }
 exports.DashboardPanel = DashboardPanel;

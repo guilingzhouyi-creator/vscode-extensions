@@ -1,0 +1,12 @@
+{
+    "workspaceTiming.enable": "Workspace Timing: Enable Timing",
+    "workspaceTiming.disable": "Workspace Timing: Disable Timing",
+    "workspaceTiming.toggleGlobal": "Workspace Timing: Toggle Global Timing",
+    "workspaceTiming.showStatus": "Workspace Timing: Toggle Status Bar",
+    "workspaceTiming.reset": "Workspace Timing: Reset Timing Data",
+    "workspaceTiming.clearGlobal": "Workspace Timing: Clear Cross-Workspace Total",
+    "workspaceTiming.debugSave": "Workspace Timing: Debug — Force Save Now",
+    "workspaceTiming.openDashboard": "Workspace Timing: Open Dashboard",
+    "workspaceTiming.export": "Workspace Timing: Export CSV",
+    "workspaceTiming.newPeriod": "Workspace Timing: New Counting Period"
+}

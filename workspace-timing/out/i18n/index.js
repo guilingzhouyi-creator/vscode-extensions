@@ -2,50 +2,22 @@
 /**
  * i18n — 国际化入口
  *
- * 根据 VS Code 语言设置自动选择语言包。
- * 通过 workspaceTiming.locale 设置可强制指定。
+ * 纯模块：不依赖 VS Code API（可被纯 Node 单测加载）。
+ * 语言来源由调用方注入：默认根据 VS Code 显示语言自动选择；
+ * 支持通过 workspaceTiming.locale 设置强制指定（auto / zh-CN / en），
+ * 运行期变更由 ConfigWatcher 调 setLocale 热切换（面板重建后生效）。
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.t = t;
+exports.resolveLocale = resolveLocale;
 exports.init = init;
+exports.setLocale = setLocale;
+exports.currentLocale = currentLocale;
+exports.labelsWithPrefix = labelsWithPrefix;
 exports.format = format;
-const vscode = __importStar(require("vscode"));
 const zh_CN_1 = __importDefault(require("./zh-CN"));
 const en_1 = __importDefault(require("./en"));
 const locales = {
@@ -57,11 +29,38 @@ let _current = zh_CN_1.default;
 function t() {
     return _current;
 }
-/** 根据 VS Code 语言设置初始化 */
-function init() {
-    const vsLocale = vscode.env.language; // "zh-CN", "en", "ja", etc.
-    const locale = vsLocale.startsWith('zh') ? 'zh-CN' : 'en';
+/**
+ * 解析最终语言：显式指定优先，否则跟随 VS Code 显示语言。
+ * @param override 配置项 workspaceTiming.locale 的值
+ * @param vsLanguage VS Code 显示语言（组合根注入 vscode.env.language）
+ */
+function resolveLocale(override, vsLanguage = 'en') {
+    if (override === 'zh-CN' || override === 'en')
+        return override;
+    return vsLanguage.startsWith('zh') ? 'zh-CN' : 'en';
+}
+/** 根据 VS Code 语言设置（或显式覆盖值）初始化 */
+function init(override, vsLanguage) {
+    const locale = resolveLocale(override, vsLanguage);
     _current = locales[locale] ?? en_1.default;
+}
+/** 运行期热切换语言包（面板需由调用方重建以刷新静态文案） */
+function setLocale(locale) {
+    _current = locales[locale] ?? en_1.default;
+}
+/** 当前生效语言 */
+function currentLocale() {
+    return _current === en_1.default ? 'en' : 'zh-CN';
+}
+/** 提取面板词条子集（key 以给定前缀开头），供 dashboardTemplate 注入 */
+function labelsWithPrefix(prefixes) {
+    const dict = t();
+    const out = {};
+    for (const key of Object.keys(dict)) {
+        if (prefixes.some(p => key.startsWith(p)))
+            out[key] = dict[key];
+    }
+    return out;
 }
 /** 格式化字符串：替换 {0}, {1} ... 占位符 */
 function format(template, ...args) {
