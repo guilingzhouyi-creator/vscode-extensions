@@ -88,6 +88,12 @@ export declare class TimeAggregator {
      * 使用 Date(y, m, d+1) 归一化，天然兼容 DST。
      */
     private static eachDaySegment;
+    /**
+     * 将区间 [startMs, endMs) 按**本地自然日**切分为 TimeSession 片段。
+     * 供崩溃恢复把「进行中会话」落成按日粒度的历史记录，保证恢复后
+     * 日报/周报口径与正常运行一致（跨午夜自动拆分）。
+     */
+    static splitByNaturalDay(startMs: number, endMs: number): TimeSession[];
     /** 时间戳所在自然日的周一日期字符串（本地时区） */
     private static weekKeyOf;
     /**

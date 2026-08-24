@@ -9,6 +9,20 @@
 /** 数据格式当前版本 */
 export const LATEST_VERSION = 1;
 
+// ─── 时间常量（唯一来源，禁止下游硬编码）──────────────
+export const MS_PER_SECOND = 1000;
+export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
+export const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+export const MS_PER_DAY = 24 * MS_PER_HOUR;
+
+// ─── 默认值（引用时间常量）──────────────
+export const DEFAULT_RING_BUFFER_CAP = 1024;
+export const DEFAULT_JOURNAL_FLUSH_MS = 10 * MS_PER_SECOND;  // 10s — journal 落盘
+export const DEFAULT_FULL_SAVE_MS = MS_PER_MINUTE;           // 60s — 全量存盘
+export const DEFAULT_MAX_SESSIONS = 1000;
+/** 崩溃补偿上限 24h，防止异常数据导致计时暴涨 */
+export const CRASH_COMPENSATION_CAP_MS = MS_PER_DAY;
+
 /** 一条原子时间片 — 用于缓存层和 journal */
 export interface TimeSlice {
     /** 时间片结束时间戳 (Date.now()) */
@@ -94,9 +108,9 @@ export const DEFAULT_CONFIG: TimingConfig = {
     statusBarEnabled: true,
     backupToFile: true,
     journalEnabled: true,
-    ringBufferCapacity: 1024,
-    journalFlushIntervalMs: 10000,
-    fullSaveIntervalMs: 60000,
+    ringBufferCapacity: DEFAULT_RING_BUFFER_CAP,
+    journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
+    fullSaveIntervalMs: DEFAULT_FULL_SAVE_MS,
     statusBarFormat: 'compact',
-    maxSessions: 1000,
+    maxSessions: DEFAULT_MAX_SESSIONS,
 };

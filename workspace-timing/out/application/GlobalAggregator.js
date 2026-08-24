@@ -5,7 +5,7 @@
  * 职责：在每次 fullSave 后将当前工作区的计时数据同步到 globalState。
  * 实现跨工作区时长汇总。
  *
- * 调用方：TimerOrchestrator.saveCheckpoint() 结束后触发
+ * 调用方：Scheduler 周期全量存盘回调（onFullSaved）、TimerOrchestrator.saveNow()/newPeriod()
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -50,6 +50,11 @@ class GlobalAggregator {
         this._cached = null;
         /** sync 进行中标志（防重入：并发 load→modify→save 会互相覆盖丢失写入） */
         this._syncing = false;
+        /**
+         * 上次已成功同步的本工作区 totalMs；相等则跳过整轮读→改→写。
+         * ★ 在 doSync 成功后才记账：失败不更新，下轮 checkpoint 会重试（避免旧值卡死跳过）。
+         */
+        this._lastSyncedTotalMs = null;
         this.storage = storage;
     }
     /**
@@ -59,9 +64,12 @@ class GlobalAggregator {
     async sync(localTotalMs) {
         if (this._syncing)
             return; // 上一轮尚未完成，跳过本轮（下轮 checkpoint 会再同步）
+        if (this._lastSyncedTotalMs === localTotalMs)
+            return; // 未变化，跳过整轮读写
         this._syncing = true;
         try {
             await this.doSync(localTotalMs);
+            this._lastSyncedTotalMs = localTotalMs;
         }
         finally {
             this._syncing = false;
@@ -77,6 +85,19 @@ class GlobalAggregator {
         const wsName = workspaceRoot.name;
         try {
             const global = await this.storage.load();
+            // 回收陈旧条目：长期未同步的工作区（缺 lastSyncedAt 视为最陈旧）不再计入。
+            // 当前工作区条目随后会被刷新，不受影响。
+            const now = Date.now();
+            const pruned = [];
+            for (const [id, w] of Object.entries(global.workspaces)) {
+                if (now - (w.lastSyncedAt ?? 0) > GlobalAggregator.STALE_TTL_MS) {
+                    delete global.workspaces[id];
+                    pruned.push(`${w.name}(${Math.round((w.totalMs ?? 0) / 3600000)}h)`);
+                }
+            }
+            if (pruned.length > 0) {
+                (0, Logger_1.log)(Logger_1.LogLevel.Info, `GlobalAggregator: pruned ${pruned.length} stale workspace entr(y/ies): ${pruned.join(', ')}`);
+            }
             // 更新/添加当前工作区记录
             global.workspaces[wsId] = {
                 name: wsName,
@@ -110,8 +131,15 @@ class GlobalAggregator {
     async reset() {
         await this.storage.delete();
         this._cached = null;
+        this._lastSyncedTotalMs = null;
         (0, Logger_1.log)(Logger_1.LogLevel.Info, 'GlobalAggregator: reset');
     }
 }
 exports.GlobalAggregator = GlobalAggregator;
+/**
+ * 陈旧条目回收阈值：超过该天数未同步的工作区不再计入跨工作区累计。
+ * 背景：globalState 跨版本持久共享，历史遗留的失联工作区（已删除/改道的项目、
+ * 旧双计数 bug 时代的膨胀值）会永远计入总和，导致"跨工作区累计"虚高失真。
+ */
+GlobalAggregator.STALE_TTL_MS = 30 * 24 * 3600_000;
 //# sourceMappingURL=GlobalAggregator.js.map

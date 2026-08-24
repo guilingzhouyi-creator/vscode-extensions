@@ -36,6 +36,7 @@ import { DashboardMessage } from './domain/dashboard-types';
 import { GlobalStorageProvider } from './persistence/GlobalStorageProvider';
 import { GlobalAggregator } from './application/GlobalAggregator';
 import { TimeBasedCacheStrategy } from './cache/ICacheStrategy';
+import { TimeAggregator } from './domain/TimeAggregator';
 import { init as initI18n, t, format } from './i18n/index';
 
 // Integration
@@ -51,7 +52,7 @@ let scheduler: Scheduler | null = null;
 // 存储引用提升到模块级：命令注册（如 reset）与面板消息处理都需要在
 // activate 作用域之外访问；此前作为块级局部变量传出 null 导致命令失效。
 let storageRef: StorageCoordinator | null = null;
-let globalStorageRef: GlobalStorageProvider | null = null;
+let globalAggregatorRef: GlobalAggregator | null = null;
 
 export function activate(context: vscode.ExtensionContext): void {
     const startTime = Date.now();
@@ -104,8 +105,8 @@ export function activate(context: vscode.ExtensionContext): void {
                 journalEnabled: cfg.journalEnabled ?? true,
             });
             const globalStorage = new GlobalStorageProvider(context);
-            globalStorageRef = globalStorage;
             const globalAggregator = new GlobalAggregator(globalStorage);
+            globalAggregatorRef = globalAggregator;
             orchestrator = new TimerOrchestrator(
                 timer, storage, journal, sessionManager, disableManager, scheduler, globalAggregator,
             );
@@ -127,6 +128,9 @@ export function activate(context: vscode.ExtensionContext): void {
                     lastPanelUpdateMs = now;
                     orchestrator.getDashboardData().then(data => {
                         DashboardPanel.currentPanel?.updateData(data);
+                    }).catch(err => {
+                        // 面板更新失败不应导致扩展主机崩溃（未处理的 Promise 拒绝）
+                        log(LogLevel.Warn, 'Dashboard update failed', err as Error);
                     });
                 }
             });
@@ -144,17 +148,30 @@ export function activate(context: vscode.ExtensionContext): void {
                         vscode.window.showInformationMessage(t()['toast.configUpdated']);
                         break;
                     case 'newPeriod':
-                        orchestrator?.newPeriod();
+                        orchestrator?.newPeriod().catch(err =>
+                            log(LogLevel.Error, 'newPeriod failed', err as Error)
+                        );
                         vscode.window.showInformationMessage(t()['toast.newPeriod']);
                         break;
-                    case 'reset':
-                        orchestrator?.stop().then(() => {
-                            storageRef?.deleteAll();
-                            globalStorageRef?.delete();
+                    case 'reset': {
+                        const orch = orchestrator;
+                        orch?.stop().then(async () => {
+                            await storageRef?.deleteAll();
+                            // 走 reset()：同时清空缓存与增量守卫，确保当前工作区下次同步回填
+                            await globalAggregatorRef?.reset();
                             statusBar?.updateTime(0, 0);
+                            // 修复：清空后重新开始计时（此前只 stop，计时永久停摆、面板数据陈旧）
+                            await orch.start();
+                            // 立即推送归零后的最新数据，不等下一个 5s 刷新周期
+                            if (DashboardPanel.currentPanel) {
+                                DashboardPanel.currentPanel.updateData(await orch.getDashboardData());
+                            }
                             vscode.window.showInformationMessage(t()['toast.reset']);
-                        });
+                        }).catch(err =>
+                            log(LogLevel.Error, 'reset failed', err as Error)
+                        );
                         break;
+                    }
                     case 'exportCSV':
                         exportTimingToFile();
                         break;
@@ -190,7 +207,8 @@ export function activate(context: vscode.ExtensionContext): void {
         // ─── 无论有无工作区，命令必须注册 ───
         commandRegistrar = new CommandRegistrar();
         // 修复：此前此处传入 null，导致 reset 命令永远命中"无工作区"守卫而失效。
-        commandRegistrar.register(context, orchestrator, statusBar, storageRef);
+        // globalAggregatorRef 一并传入：命令面板 reset/clearGlobal 与面板 reset 语义对齐（都清全局聚合）。
+        commandRegistrar.register(context, orchestrator, statusBar, storageRef, globalAggregatorRef);
 
         // 导出命令：可从命令面板触发，与 Dashboard 导出按钮共用逻辑
         context.subscriptions.push(
@@ -265,7 +283,7 @@ async function exportTimingToFile(): Promise<void> {
 
         // 用户选择保存路径（默认 .csv）
         const defaultUri = vscode.Uri.file(
-            `${workspaceName}-timing-${new Date().toISOString().slice(0, 10)}.csv`,
+            `${workspaceName}-timing-${TimeAggregator.todayStr()}.csv`,
         );
         const uri = await vscode.window.showSaveDialog({
             defaultUri,
@@ -303,7 +321,7 @@ async function exportReportToFile(kind: 'daily' | 'weekly'): Promise<void> {
         }
 
         const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace';
-        const today = new Date().toISOString().slice(0, 10);
+        const today = TimeAggregator.todayStr();
         const prefix = kind === 'daily' ? '日报' : '周报';
         const defaultUri = vscode.Uri.file(
             `${workspaceName}-${prefix}-${today}.md`,

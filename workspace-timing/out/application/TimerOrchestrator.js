@@ -11,6 +11,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimerOrchestrator = void 0;
+const models_1 = require("../domain/models");
 const TimeAggregator_1 = require("../domain/TimeAggregator");
 const CsvExporter_1 = require("./exporters/CsvExporter");
 const ReportExporter_1 = require("./exporters/ReportExporter");
@@ -139,7 +140,9 @@ class TimerOrchestrator {
         return {
             totalMs: snap.currentTotalMs,
             todayMs,
-            sessionsCount: sessions.length,
+            // 会话数口径与周报摘要一致：已结束会话 + 进行中会话（此前只数已结束，
+            // 与周报区"会话数"同屏不一致，如 0 vs 1）
+            sessionsCount: sessions.length + (this.timer.data.currentSessionStartMs > 0 ? 1 : 0),
             dailyStats,
             weekTotalMs: weeklySummary.totalMs,
             weeklyTrend,
@@ -160,10 +163,10 @@ class TimerOrchestrator {
             statusBarEnabled: cfg.statusBarEnabled,
             journalEnabled: cfg.journalEnabled ?? true,
             backupToFile: cfg.backupToFile ?? true,
-            ringBufferCapacity: cfg.ringBufferCapacity ?? 1024,
-            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? 10000,
-            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? 60000,
-            maxSessions: cfg.maxSessions ?? 1000,
+            ringBufferCapacity: cfg.ringBufferCapacity ?? models_1.DEFAULT_RING_BUFFER_CAP,
+            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? models_1.DEFAULT_JOURNAL_FLUSH_MS,
+            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? models_1.DEFAULT_FULL_SAVE_MS,
+            maxSessions: cfg.maxSessions ?? models_1.DEFAULT_MAX_SESSIONS,
         };
     }
     /** 构建今日会话明细（供面板展示） */

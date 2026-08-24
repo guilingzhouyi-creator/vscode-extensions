@@ -75,5 +75,8 @@ export interface I18nStrings {
     'confirm.newPeriod.title': string;
     'confirm.reset': string;
     'confirm.reset.title': string;
+    'confirm.clearGlobal': string;
+    'confirm.clearGlobal.title': string;
+    'toast.clearGlobal': string;
     'cmd.modeSwitched': string;
 }

@@ -100,12 +100,12 @@ export class SessionManager {
         // 3. 裁剪会话列表（使用用户配置的 maxSessions，0=不限）
         this.timer.trimSessions(this.maxSessions);
 
-        // 4. 全量存盘（数据已由 timer.stop() 更新，创建副本避免引用问题）
+        // 4. 全量存盘（数据已由 timer.stop() 更新，创建副本避免引用问题；会话结束属关键事件，强制 JSON 备份）
         const finalData: WorkspaceTimingData = {
             ...this.timer.data,
             sessions: [...this.timer.data.sessions],
         };
-        await this.storage.save(finalData);
+        await this.storage.save(finalData, true);
 
         // 5. 清空 journal（await 确保退出路径上 truncate 落盘）
         await this.journal.truncate();
@@ -121,12 +121,25 @@ export class SessionManager {
         return result;
     }
 
-    /** 获取今日累计时长 (ms) */
+    /** 今日累计缓存的刷新间隔：状态栏每秒读取，聚合为 O(全部会话) 扫描，用短 TTL 抑制重复计算 */
+    private static readonly TODAY_CACHE_TTL_MS = 3000;
+    private _todayCacheAt = 0;
+    private _todayCacheValue = 0;
+
+    /**
+     * 获取今日累计时长 (ms)
+     * 带 3s TTL 缓存：跨午夜时缓存值最多滞后 3 秒自然切换（对秒级展示无感知）。
+     */
     getTodayMs(): number {
-        return TimeAggregator.todayMs(
-            this.timer.data.sessions,
-            this.timer.data.currentSessionStartMs,
-        );
+        const now = Date.now();
+        if (now - this._todayCacheAt >= SessionManager.TODAY_CACHE_TTL_MS) {
+            this._todayCacheValue = TimeAggregator.todayMs(
+                this.timer.data.sessions,
+                this.timer.data.currentSessionStartMs,
+            );
+            this._todayCacheAt = now;
+        }
+        return this._todayCacheValue;
     }
 
     /**

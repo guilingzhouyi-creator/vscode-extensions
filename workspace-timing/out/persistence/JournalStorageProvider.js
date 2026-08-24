@@ -138,7 +138,10 @@ class JournalStorageProvider {
                     continue;
                 try {
                     const parsed = JSON.parse(trimmed);
-                    if (typeof parsed.t === 'number' && typeof parsed.d === 'number') {
+                    // 数值合法性校验：拒绝负值/非有限数（时钟回拨、脏数据、损坏行），
+                    // 防止回放时把异常 delta 累加进 totalMs
+                    if (typeof parsed.t === 'number' && Number.isFinite(parsed.t) && parsed.t > 0
+                        && typeof parsed.d === 'number' && Number.isFinite(parsed.d) && parsed.d > 0) {
                         slices.push({ timestamp: parsed.t, deltaMs: parsed.d });
                     }
                 }

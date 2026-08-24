@@ -6,12 +6,13 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HybridCacheStrategy = exports.SizeBasedCacheStrategy = exports.TimeBasedCacheStrategy = void 0;
+const models_1 = require("../domain/models");
 /**
  * 基于时间的缓存策略。
  * 固定时间间隔触发 flush。
  */
 class TimeBasedCacheStrategy {
-    constructor(intervalMs = 10000) {
+    constructor(intervalMs = models_1.DEFAULT_JOURNAL_FLUSH_MS) {
         this.name = 'time-based';
         this.intervalMs = intervalMs;
     }
@@ -47,7 +48,7 @@ exports.SizeBasedCacheStrategy = SizeBasedCacheStrategy;
  * 混合策略：时间和大小双重条件，谁先触发用谁。
  */
 class HybridCacheStrategy {
-    constructor(intervalMs = 10000, thresholdRatio = 0.5) {
+    constructor(intervalMs = models_1.DEFAULT_JOURNAL_FLUSH_MS, thresholdRatio = 0.5) {
         this.name = 'hybrid';
         this.timeBased = new TimeBasedCacheStrategy(intervalMs);
         this.sizeBased = new SizeBasedCacheStrategy(thresholdRatio);

@@ -13,7 +13,7 @@ import { TimerEngine } from '../domain/TimerEngine';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager, SessionResult } from './SessionManager';
-import { WorkspaceTimingData, TimingConfig, TimeSession } from '../domain/models';
+import { WorkspaceTimingData, TimingConfig, TimeSession, DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS, DEFAULT_FULL_SAVE_MS, DEFAULT_MAX_SESSIONS } from '../domain/models';
 import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
 import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
@@ -193,7 +193,9 @@ export class TimerOrchestrator {
         return {
             totalMs: snap.currentTotalMs,
             todayMs,
-            sessionsCount: sessions.length,
+            // 会话数口径与周报摘要一致：已结束会话 + 进行中会话（此前只数已结束，
+            // 与周报区"会话数"同屏不一致，如 0 vs 1）
+            sessionsCount: sessions.length + (this.timer.data.currentSessionStartMs > 0 ? 1 : 0),
             dailyStats,
             weekTotalMs: weeklySummary.totalMs,
             weeklyTrend,
@@ -214,10 +216,10 @@ export class TimerOrchestrator {
             statusBarEnabled: cfg.statusBarEnabled,
             journalEnabled: cfg.journalEnabled ?? true,
             backupToFile: cfg.backupToFile ?? true,
-            ringBufferCapacity: cfg.ringBufferCapacity ?? 1024,
-            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? 10000,
-            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? 60000,
-            maxSessions: cfg.maxSessions ?? 1000,
+            ringBufferCapacity: cfg.ringBufferCapacity ?? DEFAULT_RING_BUFFER_CAP,
+            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
+            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? DEFAULT_FULL_SAVE_MS,
+            maxSessions: cfg.maxSessions ?? DEFAULT_MAX_SESSIONS,
         };
     }
 

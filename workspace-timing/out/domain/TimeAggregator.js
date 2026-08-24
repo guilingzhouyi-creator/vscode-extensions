@@ -43,13 +43,30 @@ class TimeAggregator {
      */
     static eachDaySegment(startMs, endMs, fn) {
         let cursor = startMs;
-        while (cursor < endMs) {
+        // 安全上限：异常数据（时钟跳变/脏数据导致 endMs 遥远未来）时停止展开，
+        // 避免被每秒一次的状态栏统计放大为 CPU 热点。4000 段 ≈ 11 年。
+        let guard = 0;
+        while (cursor < endMs && guard++ < 4000) {
             const d = new Date(cursor);
             const nextDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
             const segEnd = Math.min(endMs, nextDayStart);
             fn(localDateStr(cursor), cursor, segEnd);
             cursor = segEnd;
         }
+    }
+    /**
+     * 将区间 [startMs, endMs) 按**本地自然日**切分为 TimeSession 片段。
+     * 供崩溃恢复把「进行中会话」落成按日粒度的历史记录，保证恢复后
+     * 日报/周报口径与正常运行一致（跨午夜自动拆分）。
+     */
+    static splitByNaturalDay(startMs, endMs) {
+        const out = [];
+        if (!(startMs > 0) || !(endMs > startMs))
+            return out;
+        TimeAggregator.eachDaySegment(startMs, endMs, (_date, segStart, segEnd) => {
+            out.push({ startMs: segStart, endMs: segEnd, durationMs: segEnd - segStart });
+        });
+        return out;
     }
     /** 时间戳所在自然日的周一日期字符串（本地时区） */
     static weekKeyOf(ms) {
@@ -297,13 +314,14 @@ class TimeAggregator {
     static weeklyTrend(sessions, weeks = 4) {
         const result = [];
         const currentWeek = TimeAggregator.weekStartStr(new Date());
-        // 预生成 N 周的周桶（纯本地日期运算，不经 UTC 解析）
+        // 预生成 N 周的周桶（用 Date(y,m,d-n) 构造回退，跨 DST 也稳定落在目标日）
         const weekMap = new Map();
         {
-            const baseMs = parseLocalDate(currentWeek);
+            const base = parseLocalDate(currentWeek);
+            const bd = new Date(base);
             for (let i = weeks - 1; i >= 0; i--) {
-                const key = localDateStr(baseMs - i * 7 * 24 * 3600_000);
-                weekMap.set(key, { totalMs: 0, count: 0 });
+                const dt = new Date(bd.getFullYear(), bd.getMonth(), bd.getDate() - 7 * i);
+                weekMap.set(localDateStr(dt.getTime()), { totalMs: 0, count: 0 });
             }
         }
         // 遍历会话：按自然日切分片段，再归入片段所属的周桶
@@ -331,7 +349,9 @@ class TimeAggregator {
         const now = Date.now();
         const weekStart = TimeAggregator.weekStartStr(new Date(now));
         const weekStartMs = parseLocalDate(weekStart);
-        const weekEndMs = weekStartMs + 7 * 24 * 3600_000;
+        // 周窗口终点 = 下周一本地零点（Date 归一化，DST 周与 7*24h 相差 ±1h，不能用固定毫秒数）
+        const wsDate = new Date(weekStartMs);
+        const weekEndMs = new Date(wsDate.getFullYear(), wsDate.getMonth(), wsDate.getDate() + 7).getTime();
         let totalMs = 0;
         let sessionCount = 0;
         // 活跃天数与最活跃日期（按自然日切分后的片段归属）

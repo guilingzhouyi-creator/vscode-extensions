@@ -12,6 +12,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Scheduler = void 0;
 const Logger_1 = require("../integration/Logger");
+const models_1 = require("../domain/models");
 class Scheduler {
     constructor(journal, sessionManager, options) {
         this.journalTimer = null;
@@ -27,9 +28,9 @@ class Scheduler {
         this.journal = journal;
         this.sessionManager = sessionManager;
         this.options = {
-            journalFlushIntervalMs: 10000,
-            fullSaveIntervalMs: 60000,
-            statusBarUpdateIntervalMs: 1000,
+            journalFlushIntervalMs: models_1.DEFAULT_JOURNAL_FLUSH_MS,
+            fullSaveIntervalMs: models_1.DEFAULT_FULL_SAVE_MS,
+            statusBarUpdateIntervalMs: models_1.MS_PER_SECOND,
             journalEnabled: true,
             ...options,
         };

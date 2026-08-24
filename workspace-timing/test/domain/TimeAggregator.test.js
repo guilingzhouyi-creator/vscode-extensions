@@ -31,8 +31,10 @@ function makeSession(dayOffset, durationMs, hourOffset = 0) {
 }
 
 describe('TimeAggregator（日报/周报聚合）', () => {
-    // 周一的日期字符串（UTC）
-    const mondayStr = new Date(BASE_WEEK).toISOString().slice(0, 10);
+    // 周一的日期字符串（★ 与被测实现同口径：本地时区派生。
+    // 此前用 toISOString()（UTC）构造期望值，UTC+12~+14 时区下 BASE_WEEK 会落到周二，
+    // 导致断言失败。localDateStrOf 为函数声明（提升），此处可用）
+    const mondayStr = localDateStrOf(BASE_WEEK);
 
     it('weeklyTrend：生成近 4 周按周聚合（含当前周，降序）', () => {
         const sessions = [
@@ -217,6 +219,30 @@ describe('TimeAggregator：本地时区与跨午夜口径', () => {
     it('last7Days：7 个桶、今日桶含进行中会话增量', () => {
         const chart = TimeAggregator.last7Days([], todayStartMs + 3600000);
         assert.strictEqual(chart.length, 7);
+    });
+
+    it('splitByNaturalDay：跨午夜区间切分为两段且时长守恒', () => {
+        const start = localMs(Y, M, D - 1, 23, 30);
+        const end = localMs(Y, M, D, 0, 30);
+        const segs = TimeAggregator.splitByNaturalDay(start, end);
+        assert.strictEqual(segs.length, 2);
+        assert.deepStrictEqual(segs.map(x => x.durationMs), [1800000, 1800000]);
+        assert.strictEqual(segs.reduce((s, x) => s + x.durationMs, 0), end - start);
+        // 首段归属起始日、次段归属次日（崩溃恢复合成会话的归属依据）
+        assert.strictEqual(localDateStrOf(segs[0].startMs), yesterdayStr);
+        assert.strictEqual(localDateStrOf(segs[1].endMs), todayStr);
+    });
+
+    it('splitByNaturalDay：异常远期区间受安全上限保护', () => {
+        const start = todayStartMs;
+        const segs = TimeAggregator.splitByNaturalDay(start, start + 20 * 365 * 86400000);
+        assert.ok(segs.length <= 4000, `应受 eachDaySegment 护栏限制，实际 ${segs.length} 段`);
+    });
+
+    it('splitByNaturalDay：非法区间返回空数组', () => {
+        assert.deepStrictEqual(TimeAggregator.splitByNaturalDay(1000, 1000), []);
+        assert.deepStrictEqual(TimeAggregator.splitByNaturalDay(2000, 1000), []);
+        assert.deepStrictEqual(TimeAggregator.splitByNaturalDay(0, 1000), []);
     });
 });
 

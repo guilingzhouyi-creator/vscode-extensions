@@ -1,12 +1,23 @@
 /**
- * CsvExporter — CSV 导出器（预留）
+ * CsvExporter — CSV 导出器
  *
- * 将 WorkspaceTimingData 导出为 CSV 格式。
- * 后续配合 "workspaceTiming.export" 命令使用。
+ * 将 WorkspaceTimingData 导出为 CSV：会话记录 + 按日统计。
+ *
+ * ⚠️ 时间戳统一使用**本地时区**格式化（YYYY-MM-DD HH:MM:SS），
+ *    与聚合层的本地时区归桶口径一致——禁止使用 toISOString()（UTC），
+ *    否则 UTC+8 用户早上 8 点前的会话会被归到前一天。
  */
 
 import { WorkspaceTimingData } from '../../domain/models';
+import { TimeAggregator } from '../../domain/TimeAggregator';
 import { IDataExporter } from './IDataExporter';
+
+/** 本地时区日期时间（YYYY-MM-DD HH:MM:SS） */
+function localDateTime(ts: number): string {
+    const d = new Date(ts);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
 
 export class CsvExporter implements IDataExporter {
     readonly formatName = 'csv';
@@ -16,18 +27,23 @@ export class CsvExporter implements IDataExporter {
 
         // 头部
         lines.push(`# Workspace Timing Export: ${workspaceName}`);
-        lines.push(`# Generated: ${new Date().toISOString()}`);
+        lines.push(`# Generated: ${localDateTime(Date.now())}`);
         lines.push(`# Total: ${data.totalMs}ms`);
         lines.push('');
 
-        // 表头
+        // 会话记录
         lines.push('Session Start,Session End,Duration (ms)');
-
-        // 数据行
         for (const session of data.sessions) {
-            const start = new Date(session.startMs).toISOString();
-            const end = new Date(session.endMs).toISOString();
+            const start = localDateTime(session.startMs);
+            const end = localDateTime(session.endMs);
             lines.push(`${start},${end},${session.durationMs}`);
+        }
+
+        // 按日统计（与面板日报同源，跨午夜会话已按自然日切分归桶）
+        lines.push('');
+        lines.push('Date,Total (ms),Sessions');
+        for (const d of TimeAggregator.dailyStats(data.sessions)) {
+            lines.push(`${d.date},${d.totalMs},${d.sessionCount}`);
         }
 
         return lines.join('\n');

@@ -12,6 +12,11 @@
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager } from './SessionManager';
 import { LogLevel, log } from '../integration/Logger';
+import {
+    DEFAULT_JOURNAL_FLUSH_MS,
+    DEFAULT_FULL_SAVE_MS,
+    MS_PER_SECOND,
+} from '../domain/models';
 
 export interface SchedulerOptions {
     /** journal flush 间隔 (ms) */
@@ -59,9 +64,9 @@ export class Scheduler {
         this.journal = journal;
         this.sessionManager = sessionManager;
         this.options = {
-            journalFlushIntervalMs: 10000,
-            fullSaveIntervalMs: 60000,
-            statusBarUpdateIntervalMs: 1000,
+            journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
+            fullSaveIntervalMs: DEFAULT_FULL_SAVE_MS,
+            statusBarUpdateIntervalMs: MS_PER_SECOND,
             journalEnabled: true,
             ...options,
         };

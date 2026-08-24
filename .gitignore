@@ -6,7 +6,8 @@
 # 本地运行时数据与工具目录（不入库）
 .workspace-timing-data/
 .workbuddy/
-agent-refactor-demo/
-stale_local_backup_v0.3.8/
 .vscode/workspace-timing.json
 .vscode/workspace-timing.journal
+
+# 版本归档（历史快照 / 备份 / 演示材料，统一集中管理）
+archive/

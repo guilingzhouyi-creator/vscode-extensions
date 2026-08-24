@@ -2,7 +2,7 @@
     "name": "workspace-timing",
     "displayName": "Workspace Timing",
     "description": "⏱ 轻量化工作区时长追踪 — 自动计时、周报图表、跨工作区聚合、崩溃保护；环形缓冲区 + Journal 双写入架构，预留多工作区对比与云端同步扩展 | Lightweight cross-workspace time tracker with RingBuffer+Journal storage, weekly charts, and extensible architecture",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "publisher": "guilingzhouyi",
     "repository": {
         "type": "git",
@@ -41,6 +41,10 @@
             {
                 "command": "workspaceTiming.reset",
                 "title": "Workspace Timing: Reset Timing Data"
+            },
+            {
+                "command": "workspaceTiming.clearGlobal",
+                "title": "Workspace Timing: Clear Cross-Workspace Total"
             },
             {
                 "command": "workspaceTiming.debugSave",
@@ -155,8 +159,8 @@
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile",
         "test": "node ./out/test/runTest.js",
-        "test:unit": "mocha --reporter spec test/domain/*.test.js",
-        "test:coverage": "c8 --reporter=lcov --reporter=json-summary --report-dir=coverage mocha --reporter spec test/domain/*.test.js",
+        "test:unit": "npm run compile && mocha --reporter spec test/domain/*.test.js",
+        "test:coverage": "npm run compile && c8 --reporter=lcov --reporter=json-summary --report-dir=coverage mocha --reporter spec test/domain/*.test.js",
         "lint": "eslint src --ext ts"
     },
     "c8": {

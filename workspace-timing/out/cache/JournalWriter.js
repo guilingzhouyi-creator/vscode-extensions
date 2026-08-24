@@ -8,15 +8,16 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JournalWriter = void 0;
+const models_1 = require("../domain/models");
 const RingBuffer_1 = require("./RingBuffer");
 const ICacheStrategy_1 = require("./ICacheStrategy");
 const Logger_1 = require("../integration/Logger");
 class JournalWriter {
-    constructor(storage, capacity = 1024, strategy) {
+    constructor(storage, capacity = models_1.DEFAULT_RING_BUFFER_CAP, strategy) {
         this.lastFlushTime = Date.now();
         this.ringBuffer = new RingBuffer_1.RingBuffer(capacity);
         this.storage = storage;
-        this.strategy = strategy ?? new ICacheStrategy_1.TimeBasedCacheStrategy(10000);
+        this.strategy = strategy ?? new ICacheStrategy_1.TimeBasedCacheStrategy(models_1.DEFAULT_JOURNAL_FLUSH_MS);
     }
     /** 获取内部 RingBuffer 引用（供 UI 读取最近数据） */
     get buffer() {
@@ -51,9 +52,13 @@ class JournalWriter {
         (0, Logger_1.log)(Logger_1.LogLevel.Debug, `JournalWriter: flushed ${slices.length} slices`);
         return slices.length;
     }
-    /** 清空 journal 文件（全量存盘成功后调用） */
-    truncate() {
-        this.storage.truncate();
+    /**
+     * 清空 journal 文件（全量存盘成功后调用）。
+     * ★ 返回 Promise：此前为 fire-and-forget，调用方 await 无效，
+     *   存在 truncate 未完成时后续 append 先落盘的竞态（数据复活/丢失）。
+     */
+    async truncate() {
+        await this.storage.truncate();
         (0, Logger_1.log)(Logger_1.LogLevel.Debug, 'JournalWriter: journal truncated');
     }
     /** 强制 flush 所有未写入数据 */

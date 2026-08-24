@@ -6,7 +6,7 @@
  * 依赖：domain/models.ts, cache/RingBuffer.ts, persistence/IStorageProvider.ts
  */
 
-import { TimeSlice } from '../domain/models';
+import { TimeSlice, DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS } from '../domain/models';
 import { RingBuffer } from './RingBuffer';
 import { ICacheStrategy, TimeBasedCacheStrategy } from './ICacheStrategy';
 import { JournalStorageProvider } from '../persistence/JournalStorageProvider';
@@ -20,12 +20,12 @@ export class JournalWriter {
 
     constructor(
         storage: JournalStorageProvider,
-        capacity: number = 1024,
+        capacity: number = DEFAULT_RING_BUFFER_CAP,
         strategy?: ICacheStrategy,
     ) {
         this.ringBuffer = new RingBuffer<TimeSlice>(capacity);
         this.storage = storage;
-        this.strategy = strategy ?? new TimeBasedCacheStrategy(10000);
+        this.strategy = strategy ?? new TimeBasedCacheStrategy(DEFAULT_JOURNAL_FLUSH_MS);
     }
 
     /** 获取内部 RingBuffer 引用（供 UI 读取最近数据） */
@@ -68,9 +68,13 @@ export class JournalWriter {
         return slices.length;
     }
 
-    /** 清空 journal 文件（全量存盘成功后调用） */
-    truncate(): void {
-        this.storage.truncate();
+    /**
+     * 清空 journal 文件（全量存盘成功后调用）。
+     * ★ 返回 Promise：此前为 fire-and-forget，调用方 await 无效，
+     *   存在 truncate 未完成时后续 append 先落盘的竞态（数据复活/丢失）。
+     */
+    async truncate(): Promise<void> {
+        await this.storage.truncate();
         log(LogLevel.Debug, 'JournalWriter: journal truncated');
     }
 

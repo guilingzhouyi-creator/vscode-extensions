@@ -37,7 +37,8 @@ class TimerEngine {
             return 0;
         this._running = false;
         const now = Date.now();
-        const elapsed = now - this._sessionStartMs;
+        // 时钟回拨防御：elapsed 不允许为负（否则 totalMs 会被扣减、sessions 出现负时长）
+        const elapsed = Math.max(0, now - this._sessionStartMs);
         // 累加到 total
         this._data.totalMs += elapsed;
         this._data.currentSessionStartMs = 0;
@@ -52,8 +53,9 @@ class TimerEngine {
     }
     /** 获取当前快照（不停止计时） */
     snapshot() {
+        // 时钟回拨防御：进行中会话历时不为负
         const sessionElapsed = this._running
-            ? Date.now() - this._sessionStartMs
+            ? Math.max(0, Date.now() - this._sessionStartMs)
             : 0;
         return {
             totalMs: this._data.totalMs,

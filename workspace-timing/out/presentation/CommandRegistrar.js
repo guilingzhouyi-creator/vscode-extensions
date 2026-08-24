@@ -48,7 +48,7 @@ class CommandRegistrar {
     constructor() {
         this.disposables = [];
     }
-    register(context, orchestrator, statusBar, storage) {
+    register(context, orchestrator, statusBar, storage, globalAggregator) {
         // 启用
         this.registerCommand('workspaceTiming.enable', async () => {
             if (!orchestrator) {
@@ -134,8 +134,36 @@ class CommandRegistrar {
             if (confirm === title) {
                 await orchestrator.stop();
                 await storage.deleteAll();
+                // 与面板 reset 路径语义对齐：同步清除跨工作区全局聚合中本工作区的累计。
+                // 走 GlobalAggregator.reset()：同时清空内存缓存与增量同步守卫，
+                // 否则下次 checkpoint 会因"值未变化"被跳过，当前工作区不再回填。
+                if (globalAggregator) {
+                    try {
+                        await globalAggregator.reset();
+                    }
+                    catch (err) {
+                        (0, Logger_1.log)(Logger_1.LogLevel.Warn, 'reset: global storage delete failed', err);
+                    }
+                }
                 statusBar.updateTime(0, 0);
+                // 修复：此前 reset 后只 stop 不重启，计时永久停摆、面板数据陈旧。
+                // 清空后立即重新开始会话（从零起步），恢复状态栏与面板刷新。
+                await orchestrator.start();
                 vscode.window.showInformationMessage((0, index_1.t)()['toast.reset']);
+            }
+        });
+        // 清除跨工作区累计（仅清全局聚合，不影响各工作区本地计时）
+        this.registerCommand('workspaceTiming.clearGlobal', async () => {
+            if (!globalAggregator) {
+                this.noWorkspaceMsg();
+                return;
+            }
+            const msg = (0, index_1.t)()['confirm.clearGlobal'];
+            const title = (0, index_1.t)()['confirm.clearGlobal.title'];
+            const confirm = await vscode.window.showWarningMessage(msg, { modal: true }, title);
+            if (confirm === title) {
+                await globalAggregator.reset();
+                vscode.window.showInformationMessage((0, index_1.t)()['toast.clearGlobal']);
             }
         });
         // 将 disposables 注册到 context.subscriptions

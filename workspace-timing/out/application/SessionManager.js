@@ -12,6 +12,8 @@ const Logger_1 = require("../integration/Logger");
 class SessionManager {
     constructor(timer, storage, journal, maxSessions = 1000) {
         this._sessionActive = false;
+        this._todayCacheAt = 0;
+        this._todayCacheValue = 0;
         this.timer = timer;
         this.storage = storage;
         this.journal = journal;
@@ -64,12 +66,12 @@ class SessionManager {
         this._sessionActive = false;
         // 3. 裁剪会话列表（使用用户配置的 maxSessions，0=不限）
         this.timer.trimSessions(this.maxSessions);
-        // 4. 全量存盘（数据已由 timer.stop() 更新，创建副本避免引用问题）
+        // 4. 全量存盘（数据已由 timer.stop() 更新，创建副本避免引用问题；会话结束属关键事件，强制 JSON 备份）
         const finalData = {
             ...this.timer.data,
             sessions: [...this.timer.data.sessions],
         };
-        await this.storage.save(finalData);
+        await this.storage.save(finalData, true);
         // 5. 清空 journal（await 确保退出路径上 truncate 落盘）
         await this.journal.truncate();
         const result = {
@@ -80,9 +82,17 @@ class SessionManager {
         (0, Logger_1.log)(Logger_1.LogLevel.Info, `SessionManager: session ended, elapsed=${elapsed}ms, total=${this.timer.data.totalMs}ms`);
         return result;
     }
-    /** 获取今日累计时长 (ms) */
+    /**
+     * 获取今日累计时长 (ms)
+     * 带 3s TTL 缓存：跨午夜时缓存值最多滞后 3 秒自然切换（对秒级展示无感知）。
+     */
     getTodayMs() {
-        return TimeAggregator_1.TimeAggregator.todayMs(this.timer.data.sessions, this.timer.data.currentSessionStartMs);
+        const now = Date.now();
+        if (now - this._todayCacheAt >= SessionManager.TODAY_CACHE_TTL_MS) {
+            this._todayCacheValue = TimeAggregator_1.TimeAggregator.todayMs(this.timer.data.sessions, this.timer.data.currentSessionStartMs);
+            this._todayCacheAt = now;
+        }
+        return this._todayCacheValue;
     }
     /**
      * 仅保存当前状态（不结束会话）
@@ -114,4 +124,6 @@ class SessionManager {
     }
 }
 exports.SessionManager = SessionManager;
+/** 今日累计缓存的刷新间隔：状态栏每秒读取，聚合为 O(全部会话) 扫描，用短 TTL 抑制重复计算 */
+SessionManager.TODAY_CACHE_TTL_MS = 3000;
 //# sourceMappingURL=SessionManager.js.map

@@ -18,6 +18,9 @@ export declare class StatusBarController {
     private _mode;
     private _todayMs;
     private _totalMs;
+    /** 上次渲染的文本（变更检测，避免每秒无谓重绘） */
+    private _lastText;
+    private _visible;
     constructor();
     /** 更新配置 */
     updateConfig(config: Partial<StatusBarConfig>): void;

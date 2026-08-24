@@ -70,6 +70,9 @@ const zhCN = {
     'confirm.newPeriod.title': '确认新建',
     'confirm.reset': '确定要重置所有计时数据？此操作不可撤销！',
     'confirm.reset.title': '确认重置',
+    'confirm.clearGlobal': '确定要清除跨工作区累计？仅清空全局聚合数据，不影响各工作区本地计时。此操作不可撤销！',
+    'confirm.clearGlobal.title': '确认清除',
+    'toast.clearGlobal': '跨工作区累计已清除',
     'cmd.modeSwitched': '已切换至「{0}」模式',
 };
 exports.default = zhCN;

@@ -39,7 +39,14 @@ export declare class SessionManager {
      * 执行最终存盘并清空 journal
      */
     endSession(): Promise<SessionResult>;
-    /** 获取今日累计时长 (ms) */
+    /** 今日累计缓存的刷新间隔：状态栏每秒读取，聚合为 O(全部会话) 扫描，用短 TTL 抑制重复计算 */
+    private static readonly TODAY_CACHE_TTL_MS;
+    private _todayCacheAt;
+    private _todayCacheValue;
+    /**
+     * 获取今日累计时长 (ms)
+     * 带 3s TTL 缓存：跨午夜时缓存值最多滞后 3 秒自然切换（对秒级展示无感知）。
+     */
     getTodayMs(): number;
     /**
      * 仅保存当前状态（不结束会话）

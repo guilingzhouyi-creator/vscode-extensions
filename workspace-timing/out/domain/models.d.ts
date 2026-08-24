@@ -7,6 +7,16 @@
  */
 /** 数据格式当前版本 */
 export declare const LATEST_VERSION = 1;
+export declare const MS_PER_SECOND = 1000;
+export declare const MS_PER_MINUTE: number;
+export declare const MS_PER_HOUR: number;
+export declare const MS_PER_DAY: number;
+export declare const DEFAULT_RING_BUFFER_CAP = 1024;
+export declare const DEFAULT_JOURNAL_FLUSH_MS: number;
+export declare const DEFAULT_FULL_SAVE_MS: number;
+export declare const DEFAULT_MAX_SESSIONS = 1000;
+/** 崩溃补偿上限 24h，防止异常数据导致计时暴涨 */
+export declare const CRASH_COMPENSATION_CAP_MS: number;
 /** 一条原子时间片 — 用于缓存层和 journal */
 export interface TimeSlice {
     /** 时间片结束时间戳 (Date.now()) */

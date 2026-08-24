@@ -25,8 +25,12 @@ export declare class JournalWriter {
      * @returns 本次 flush 的条目数，0 表示未触发
      */
     tryFlush(): Promise<number>;
-    /** 清空 journal 文件（全量存盘成功后调用） */
-    truncate(): void;
+    /**
+     * 清空 journal 文件（全量存盘成功后调用）。
+     * ★ 返回 Promise：此前为 fire-and-forget，调用方 await 无效，
+     *   存在 truncate 未完成时后续 append 先落盘的竞态（数据复活/丢失）。
+     */
+    truncate(): Promise<void>;
     /** 强制 flush 所有未写入数据 */
     flushAll(): Promise<number>;
     /** 获取最近 N 条时间片（用于 UI 活跃曲线） */

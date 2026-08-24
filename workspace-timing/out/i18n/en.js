@@ -70,6 +70,9 @@ const en = {
     'confirm.newPeriod.title': 'Confirm New Period',
     'confirm.reset': 'Reset all timing data? This action cannot be undone!',
     'confirm.reset.title': 'Confirm Reset',
+    'confirm.clearGlobal': 'Clear the cross-workspace total? Only global aggregate data is cleared; local timing of each workspace is unaffected. This action cannot be undone!',
+    'confirm.clearGlobal.title': 'Confirm Clear',
+    'toast.clearGlobal': 'Cross-workspace total cleared',
     'cmd.modeSwitched': 'Switched to "{0}" mode',
 };
 exports.default = en;
