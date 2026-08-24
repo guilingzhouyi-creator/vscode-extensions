@@ -11,6 +11,7 @@
  *   Step 2: 如果 journal 存在，回放所有未提交的 TimeSlice
  *   Step 3: 仅当 journal 无有效回放且 sessionStartMs > 0 时，补偿未完成会话的历时（兜底）
  */
+import * as vscode from 'vscode';
 import { WorkspaceTimingData } from '../domain/models';
 import { WorkspaceStateProvider } from './WorkspaceStateProvider';
 import { FileStorageProvider } from './FileStorageProvider';
@@ -26,12 +27,13 @@ export declare class StorageCoordinator {
     /**
      * 完整崩溃恢复 + 数据加载
      *
-     * 三步走：
+     * 四步走：
      *   1. 加载主存储 → fallback JSON
-     *   2. 回放 journal
-     *   3. 补偿未完成会话
+     *   2. v1→v2 迁移 + 过期会话折叠进 dailyTotals（幂等）
+     *   3. 回放 journal（合成段同步入桶）
+     *   4. 补偿未完成会话
      */
-    recover(): Promise<WorkspaceTimingData>;
+    recover(retentionDays?: number): Promise<WorkspaceTimingData>;
     /**
      * 级联写入：主存储 + JSON 备份
      * 主存储失败时不影响备份写入。
@@ -41,6 +43,18 @@ export declare class StorageCoordinator {
     save(data: WorkspaceTimingData, forceFileBackup?: boolean): Promise<void>;
     /** 读取数据（不执行恢复，仅加载当前持久化状态） */
     load(): Promise<WorkspaceTimingData | null>;
+    /**
+     * 还原：以外部数据整体替换三级存储中的两级（主存 + JSON 备份），
+     * 并截断 journal（旧增量对新数据无效）。调用方需已完成校验与迁移。
+     */
+    restore(data: WorkspaceTimingData): Promise<void>;
+    /**
+     * 破坏性操作前的安全快照：把当前 JSON 备份复制为 .vscode/workspace-timing.before-<op>.json
+     * （固定名轮转覆盖，不累积）。静默失败——快照属尽力而为，不阻塞主流程。
+     */
+    snapshotBeforeDestructive(op: string): Promise<void>;
+    /** 主备份文件 URI（供还原命令默认定位文件对话框） */
+    getBackupUri(): vscode.Uri;
     /** 删除所有存储数据 */
     deleteAll(): Promise<void>;
     /** 获取 journal 存储引用（供 Scheduler/JournalWriter 使用） */

@@ -8,5 +8,8 @@
     "workspaceTiming.debugSave": "工作区计时: 调试 — 立即强制存盘",
     "workspaceTiming.openDashboard": "工作区计时: 打开面板",
     "workspaceTiming.export": "工作区计时: 导出 CSV",
-    "workspaceTiming.newPeriod": "工作区计时: 新建计时周期"
+    "workspaceTiming.newPeriod": "工作区计时: 新建计时周期",
+    "workspaceTiming.clearHistory": "工作区计时: 清除历史明细（保留累计）",
+    "workspaceTiming.restore": "工作区计时: 从备份还原数据",
+    "workspaceTiming.exportAggregated": "工作区计时: 导出聚合数据 (CSV)"
 }

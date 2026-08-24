@@ -6,8 +6,9 @@
  */
 
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
-import { WorkspaceTimingData } from '../domain/models';
+import { WorkspaceTimingData, TimeSession } from '../domain/models';
 import { TimeAggregator } from '../domain/TimeAggregator';
+import { migrateToFolded } from '../domain/HistoryFolder';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { LogLevel, log } from '../integration/Logger';
@@ -26,6 +27,10 @@ export class SessionManager {
     private readonly storage: StorageCoordinator;
     private readonly journal: JournalWriter;
     private maxSessions: number;
+    /** 原始会话保留窗（天）；0=永不折叠 */
+    private readonly _rawRetentionDays: number;
+    /** checkpoint 计数：折叠按低频节流执行 */
+    private _checkpointCount = 0;
     private _sessionActive: boolean = false;
 
     constructor(
@@ -33,11 +38,39 @@ export class SessionManager {
         storage: StorageCoordinator,
         journal: JournalWriter,
         maxSessions: number = 1000,
+        historyRawRetentionDays: number = 45,
     ) {
         this.timer = timer;
         this.storage = storage;
         this.journal = journal;
         this.maxSessions = maxSessions;
+        this._rawRetentionDays = historyRawRetentionDays;
+    }
+
+    /** 原始会话保留窗（供 orchestrator 迁移/还原路径复用同一参数） */
+    get rawRetentionDays(): number {
+        return this._rawRetentionDays;
+    }
+
+    /**
+     * 折叠过期会话进 dailyTotals 沉淀层（幂等）。
+     * 无过期会话时不写回、不触发任何存盘。
+     */
+    foldIfNeeded(): void {
+        const data = this.timer.data;
+        const res = migrateToFolded(
+            { sessions: data.sessions as TimeSession[], dailyTotals: data.dailyTotals },
+            this._rawRetentionDays,
+        );
+        if (res.foldedSessionCount === 0) return;
+        this.timer.replaceData({
+            ...data,
+            sessions: res.sessions,
+            dailyTotals: res.dailyTotals,
+        });
+        log(LogLevel.Info,
+            `SessionManager: folded ${res.foldedSessionCount} expired session(s) into ` +
+            `${Object.keys(res.dailyTotals).length} daily bucket(s)`);
     }
 
     /** 是否处于活跃会话中 */
@@ -72,8 +105,8 @@ export class SessionManager {
     async startSession(): Promise<WorkspaceTimingData> {
         log(LogLevel.Info, 'SessionManager: starting session');
 
-        // 1. 崩溃恢复
-        const data = await this.storage.recover();
+        // 1. 崩溃恢复（含 v1→v2 迁移与过期会话折叠）
+        const data = await this.storage.recover(this._rawRetentionDays);
 
         // 2. 替换计时器数据
         this.timer.replaceData(data);
@@ -111,6 +144,9 @@ export class SessionManager {
 
         // 3. 裁剪会话列表（使用用户配置的 maxSessions，0=不限）
         this.timer.trimSessions(this.maxSessions);
+
+        // 3.5 折叠过期会话进日桶（历史治理）
+        this.foldIfNeeded();
 
         // 4. 全量存盘（数据已由 timer.stop() 更新，创建副本避免引用问题；会话结束属关键事件，强制 JSON 备份）
         const finalData: WorkspaceTimingData = {
@@ -173,6 +209,11 @@ export class SessionManager {
 
         // 周期性裁剪会话历史（此前仅在 endSession 时裁剪，长期不结束会话会无限增长）
         this.timer.trimSessions(this.maxSessions);
+
+        // 低频折叠：每 50 次 checkpoint（≈50 分钟）执行一次过期会话折叠
+        if (++this._checkpointCount % 50 === 0) {
+            this.foldIfNeeded();
+        }
 
         const data: WorkspaceTimingData = {
             ...this.timer.data,

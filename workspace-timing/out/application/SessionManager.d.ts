@@ -21,8 +21,19 @@ export declare class SessionManager {
     private readonly storage;
     private readonly journal;
     private maxSessions;
+    /** 原始会话保留窗（天）；0=永不折叠 */
+    private readonly _rawRetentionDays;
+    /** checkpoint 计数：折叠按低频节流执行 */
+    private _checkpointCount;
     private _sessionActive;
-    constructor(timer: TimerEngine, storage: StorageCoordinator, journal: JournalWriter, maxSessions?: number);
+    constructor(timer: TimerEngine, storage: StorageCoordinator, journal: JournalWriter, maxSessions?: number, historyRawRetentionDays?: number);
+    /** 原始会话保留窗（供 orchestrator 迁移/还原路径复用同一参数） */
+    get rawRetentionDays(): number;
+    /**
+     * 折叠过期会话进 dailyTotals 沉淀层（幂等）。
+     * 无过期会话时不写回、不触发任何存盘。
+     */
+    foldIfNeeded(): void;
     /** 是否处于活跃会话中 */
     get isSessionActive(): boolean;
     /** 运行期热更新会话历史上限（0 = 不限） */

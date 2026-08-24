@@ -116,7 +116,7 @@ function activate(context) {
             const journal = new JournalWriter_1.JournalWriter(journalStorageProvider, cfg.ringBufferCapacity, new ICacheStrategy_1.TimeBasedCacheStrategy(cfg.journalFlushIntervalMs));
             // Application 层
             const disableManager = new DisableManager_1.DisableManager(cfg);
-            const sessionManager = new SessionManager_1.SessionManager(timer, storage, journal, cfg.maxSessions);
+            const sessionManager = new SessionManager_1.SessionManager(timer, storage, journal, cfg.maxSessions, cfg.historyRawRetentionDays);
             scheduler = new Scheduler_1.Scheduler(journal, sessionManager, {
                 journalFlushIntervalMs: cfg.journalFlushIntervalMs,
                 fullSaveIntervalMs: cfg.fullSaveIntervalMs,

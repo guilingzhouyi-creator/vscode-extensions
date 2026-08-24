@@ -20,6 +20,7 @@ const en = {
     'toast.exportReportWeekly': 'Weekly report exported to: {0}',
     'export.filename.daily': 'daily-report',
     'export.filename.weekly': 'weekly-report',
+    'export.filename.aggregated': 'aggregated',
     'toast.cloudSyncPlaceholder': '☁️ Cloud sync coming soon — placeholder extension point.',
     'confirm.newPeriod': 'Start a new counting period? The counter will reset to zero, but history will be preserved.',
     'confirm.newPeriod.title': 'Confirm New Period',
@@ -28,6 +29,12 @@ const en = {
     'confirm.clearGlobal': 'Clear the cross-workspace total? Only global aggregate data is cleared; local timing of each workspace is unaffected. This action cannot be undone!',
     'confirm.clearGlobal.title': 'Confirm Clear',
     'toast.clearGlobal': 'Cross-workspace total cleared',
+    'confirm.clearHistory': 'Clear all session details and daily history? The cumulative total number is KEPT. This cannot be undone!',
+    'confirm.clearHistory.title': 'Confirm Clear History',
+    'toast.clearHistoryDone': 'History details cleared — cumulative total kept',
+    'confirm.restore': 'Restore timing data from the selected file?\nCurrent: total {0}, {1} sessions\nFile: total {2}, {3} sessions\nExisting data will be overwritten (a safety snapshot is written first).',
+    'confirm.restore.title': 'Confirm Restore',
+    'toast.restored': 'Timing data restored from: {0}',
     'cmd.modeSwitched': 'Switched to "{0}" mode',
     'cmd.enabled': 'Workspace Timing: enabled',
     'cmd.disabled': 'Workspace Timing: disabled',
@@ -94,6 +101,8 @@ const en = {
     'panel.actions.newPeriod': 'New Period',
     'panel.actions.exportCsv': 'Export CSV',
     'panel.actions.reset': 'Reset All Data',
+    'panel.actions.clearHistory': 'Clear History',
+    'panel.actions.exportAggregated': 'Export Aggregated CSV',
     'panel.actions.hintPeriod': '<strong>New Period</strong>: counter resets to zero; history stays in session records.',
     'panel.actions.hintPeriodDesc': ': counter resets to zero; history stays in session records.',
     'panel.actions.hintReset': '<strong>Reset All Data</strong>: clears all timing data and history. This cannot be undone.',
@@ -110,6 +119,7 @@ const en = {
     'panel.toast.resetRequested': 'Reset requested',
     'panel.toast.exportDailyRequested': 'Daily report export requested',
     'panel.toast.exportWeeklyRequested': 'Weekly report export requested',
+    'panel.toast.exportAggregatedRequested': 'Aggregated CSV export requested',
 };
 exports.default = en;
 //# sourceMappingURL=en.js.map

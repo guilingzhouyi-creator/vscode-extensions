@@ -34,6 +34,8 @@ export function readTimingConfig(): TimingConfig {
         fullSaveIntervalMs: cfg.get<number>('storage.fullSaveInterval', DEFAULT_CONFIG.fullSaveIntervalMs),
         statusBarFormat: cfg.get<'compact' | 'detailed'>('statusBar.format', DEFAULT_CONFIG.statusBarFormat),
         maxSessions: cfg.get<number>('storage.maxSessions', DEFAULT_CONFIG.maxSessions),
+        historyRawRetentionDays: cfg.get<number>('storage.historyRawRetentionDays', DEFAULT_CONFIG.historyRawRetentionDays),
+        safetySnapshot: cfg.get<boolean>('storage.safetySnapshot', DEFAULT_CONFIG.safetySnapshot),
     };
 }
 

@@ -61,6 +61,18 @@
             {
                 "command": "workspaceTiming.newPeriod",
                 "title": "%workspaceTiming.newPeriod%"
+            },
+            {
+                "command": "workspaceTiming.clearHistory",
+                "title": "%workspaceTiming.clearHistory%"
+            },
+            {
+                "command": "workspaceTiming.restore",
+                "title": "%workspaceTiming.restore%"
+            },
+            {
+                "command": "workspaceTiming.exportAggregated",
+                "title": "%workspaceTiming.exportAggregated%"
             }
         ],
         "configuration": {
@@ -138,9 +150,21 @@
                 },
                 "workspaceTiming.storage.maxSessions": {
                     "type": "number",
-                    "default": 1000,
+                    "default": 5000,
                     "minimum": 0,
                     "description": "Max session history entries (0 = unlimited)"
+                },
+                "workspaceTiming.storage.historyRawRetentionDays": {
+                    "type": "number",
+                    "default": 45,
+                    "minimum": 0,
+                    "maximum": 3650,
+                    "description": "Keep raw sessions for N days; older ones are folded into daily totals (0 = never fold)"
+                },
+                "workspaceTiming.storage.safetySnapshot": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Write a safety snapshot before destructive operations (reset/clear/restore)"
                 },
                 "workspaceTiming.cloudSync.enabled": {
                     "type": "boolean",

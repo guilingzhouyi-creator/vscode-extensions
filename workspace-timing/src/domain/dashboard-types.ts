@@ -84,5 +84,7 @@ export type DashboardMessage =
     | { type: 'updateConfig'; payload: Partial<DashboardData> }
     | { type: 'newPeriod' }
     | { type: 'reset' }
+    | { type: 'clearHistory' }
     | { type: 'exportCSV' }
+    | { type: 'exportAggregated' }
     | { type: 'exportReport'; payload: { kind: 'daily' | 'weekly' } };

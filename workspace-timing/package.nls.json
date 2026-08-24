@@ -8,5 +8,8 @@
     "workspaceTiming.debugSave": "Workspace Timing: Debug — Force Save Now",
     "workspaceTiming.openDashboard": "Workspace Timing: Open Dashboard",
     "workspaceTiming.export": "Workspace Timing: Export CSV",
-    "workspaceTiming.newPeriod": "Workspace Timing: New Counting Period"
+    "workspaceTiming.newPeriod": "Workspace Timing: New Counting Period",
+    "workspaceTiming.clearHistory": "Workspace Timing: Clear History (Keep Total)",
+    "workspaceTiming.restore": "Workspace Timing: Restore from Backup",
+    "workspaceTiming.exportAggregated": "Workspace Timing: Export Aggregated CSV"
 }

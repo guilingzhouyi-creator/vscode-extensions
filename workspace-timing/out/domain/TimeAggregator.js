@@ -310,6 +310,34 @@ class TimeAggregator {
         const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
         return localDateStr(monday.getTime());
     }
+    /**
+     * 全历史日报序列（聚合导出/长程视图用）：折叠桶打底 + 保留窗原始计算覆盖。
+     *
+     * - dailyTotals：折叠沉淀桶（覆盖窗外的历史日期）；
+     * - sessions/currentSessionStartMs：保留窗内的原始计算（口径更精确，含进行中会话），
+     *   同日并存时**以原始计算为准**——两源不重不漏；
+     * - 输出按日期升序。
+     */
+    static fullDailySeries(sessions, currentSessionStartMs = 0, dailyTotals) {
+        const map = new Map();
+        for (const [date, v] of Object.entries(dailyTotals ?? {})) {
+            map.set(date, { totalMs: v.totalMs, sessionCount: v.sessionCount });
+        }
+        for (const d of TimeAggregator.dailyStats(sessions)) {
+            map.set(d.date, { totalMs: d.totalMs, sessionCount: d.sessionCount });
+        }
+        if (currentSessionStartMs > 0) {
+            const now = Date.now();
+            TimeAggregator.eachDaySegment(currentSessionStartMs, now, (date, segStart, segEnd) => {
+                const b = map.get(date) ?? { totalMs: 0, sessionCount: 0 };
+                b.totalMs += segEnd - segStart;
+                map.set(date, b);
+            });
+        }
+        return Array.from(map.entries())
+            .map(([date, v]) => ({ date, totalMs: v.totalMs, sessionCount: v.sessionCount }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+    }
     /** 近 N 周按周聚合趋势（含当前周，降序） */
     static weeklyTrend(sessions, weeks = 4) {
         const result = [];

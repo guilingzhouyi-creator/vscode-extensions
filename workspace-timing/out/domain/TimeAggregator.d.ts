@@ -5,7 +5,7 @@
  * 边界：纯计算，不关心数据来源和存储
  * 依赖：仅依赖 models.ts
  */
-import { TimeSlice, TimeSession, WorkspaceTimingData } from './models';
+import { TimeSlice, TimeSession, WorkspaceTimingData, DailyTotalsMap } from './models';
 /** 按日聚合统计 */
 export interface DailyStats {
     date: string;
@@ -150,6 +150,15 @@ export declare class TimeAggregator {
     static dailyDetail(sessions: TimeSession[], dateStr: string, currentSessionStartMs?: number): DailyDetail;
     /** 计算时间戳所在周的起始日（周一）本地日期字符串 */
     private static weekStartStr;
+    /**
+     * 全历史日报序列（聚合导出/长程视图用）：折叠桶打底 + 保留窗原始计算覆盖。
+     *
+     * - dailyTotals：折叠沉淀桶（覆盖窗外的历史日期）；
+     * - sessions/currentSessionStartMs：保留窗内的原始计算（口径更精确，含进行中会话），
+     *   同日并存时**以原始计算为准**——两源不重不漏；
+     * - 输出按日期升序。
+     */
+    static fullDailySeries(sessions: TimeSession[], currentSessionStartMs?: number, dailyTotals?: DailyTotalsMap): DailyStats[];
     /** 近 N 周按周聚合趋势（含当前周，降序） */
     static weeklyTrend(sessions: TimeSession[], weeks?: number): WeeklyStats[];
     /** 周报文字摘要 */

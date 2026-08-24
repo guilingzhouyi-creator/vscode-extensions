@@ -109,7 +109,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
             // Application 层
             const disableManager = new DisableManager(cfg);
-            const sessionManager = new SessionManager(timer, storage, journal, cfg.maxSessions);
+            const sessionManager = new SessionManager(timer, storage, journal, cfg.maxSessions, cfg.historyRawRetentionDays);
             scheduler = new Scheduler(journal, sessionManager, {
                 journalFlushIntervalMs: cfg.journalFlushIntervalMs,
                 fullSaveIntervalMs: cfg.fullSaveIntervalMs,

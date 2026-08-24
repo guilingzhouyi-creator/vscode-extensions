@@ -46,6 +46,11 @@ const StatusBarController_1 = require("./StatusBarController");
 const DashboardPanel_1 = require("./DashboardPanel");
 const Logger_1 = require("../integration/Logger");
 const index_1 = require("../i18n/index");
+const TimeAggregator_1 = require("../domain/TimeAggregator");
+/** 清洗文件名中的非法字符（与 dashboardMessages 同规则） */
+function sanitizeFileName(name) {
+    return name.replace(/[\\/:*?"<>|]/g, '_');
+}
 class CommandRegistrar {
     constructor() {
         this.disposables = [];
@@ -145,6 +150,96 @@ class CommandRegistrar {
             if (confirm === title) {
                 await globalAggregator.reset();
                 vscode.window.showInformationMessage((0, index_1.t)()['toast.clearGlobal']);
+            }
+        });
+        // 清除历史明细（保留累计数字；编排委托 orchestrator.clearHistory）
+        this.registerCommand('workspaceTiming.clearHistory', async () => {
+            if (!orchestrator || !statusBar) {
+                this.noWorkspaceMsg();
+                return;
+            }
+            const msg = (0, index_1.t)()['confirm.clearHistory'];
+            const title = (0, index_1.t)()['confirm.clearHistory.title'];
+            const confirm = await vscode.window.showWarningMessage(msg, { modal: true }, title);
+            if (confirm === title) {
+                const data = await orchestrator.clearHistory();
+                statusBar.updateTime(data.todayMs, data.totalMs);
+                vscode.window.showInformationMessage((0, index_1.t)()['toast.clearHistoryDone']);
+            }
+        });
+        // 从备份文件还原（默认定位 .vscode/workspace-timing.json；还原前自动安全快照）
+        this.registerCommand('workspaceTiming.restore', async () => {
+            if (!orchestrator || !statusBar) {
+                this.noWorkspaceMsg();
+                return;
+            }
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+            if (!workspaceRoot) {
+                this.noWorkspaceMsg();
+                return;
+            }
+            const defaultUri = vscode.Uri.joinPath(workspaceRoot, '.vscode', 'workspace-timing.json');
+            const picked = await vscode.window.showOpenDialog({
+                defaultUri,
+                canSelectMany: false,
+                filters: { 'JSON Files (*.json)': ['json'], 'All Files': ['*'] },
+                openLabel: (0, index_1.t)()['toast.exportSaveLabel'],
+            });
+            if (!picked || picked.length === 0)
+                return;
+            let raw;
+            try {
+                const bytes = await vscode.workspace.fs.readFile(picked[0]);
+                raw = JSON.parse(Buffer.from(bytes).toString('utf-8'));
+            }
+            catch (err) {
+                vscode.window.showErrorMessage(`${(0, index_1.t)()['toast.exportFailed']} (${err.message})`);
+                return;
+            }
+            // 双侧摘要确认（当前 vs 文件）
+            const dash = await orchestrator.getDashboardData();
+            const fileData = (raw && typeof raw === 'object') ? raw : undefined;
+            const fileTotal = fileData && typeof fileData.totalMs === 'number' ? fileData.totalMs : 0;
+            const fileSessions = Array.isArray(fileData?.sessions) ? fileData.sessions.length : 0;
+            // 占位顺序：{0}=当前累计 {1}=当前会话数 {2}=文件累计 {3}=文件会话数
+            const summary = (0, index_1.format)((0, index_1.t)()['confirm.restore'], TimeAggregator_1.TimeAggregator.formatDurationCompact(dash.totalMs), String(dash.sessionsCount), TimeAggregator_1.TimeAggregator.formatDurationCompact(fileTotal), String(fileSessions));
+            const title = (0, index_1.t)()['confirm.restore.title'];
+            const confirm = await vscode.window.showWarningMessage(summary, { modal: true }, title);
+            if (confirm !== title)
+                return;
+            try {
+                const data = await orchestrator.restoreFrom(raw);
+                statusBar.updateTime(data.todayMs, data.totalMs);
+                vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['toast.restored'], picked[0].fsPath));
+            }
+            catch (err) {
+                (0, Logger_1.log)(Logger_1.LogLevel.Error, 'restore failed', err);
+                vscode.window.showErrorMessage(`Restore failed: ${err.message}`);
+            }
+        });
+        // 导出全历史聚合日报 CSV
+        this.registerCommand('workspaceTiming.exportAggregated', async () => {
+            if (!orchestrator) {
+                this.noWorkspaceMsg();
+                return;
+            }
+            const workspaceName = sanitizeFileName(vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace');
+            const defaultUri = vscode.Uri.file(`${workspaceName}-timing-${(0, index_1.t)()['export.filename.aggregated']}-${TimeAggregator_1.TimeAggregator.todayStr()}.csv`);
+            const uri = await vscode.window.showSaveDialog({
+                defaultUri,
+                filters: { 'CSV Files (*.csv)': ['csv'] },
+                saveLabel: (0, index_1.t)()['toast.exportSaveLabel'],
+            });
+            if (!uri)
+                return;
+            try {
+                const csv = await orchestrator.exportAggregatedCSV(workspaceName);
+                await vscode.workspace.fs.writeFile(uri, Buffer.from(csv, 'utf8'));
+                vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['toast.exportSuccess'], uri.fsPath));
+            }
+            catch (err) {
+                (0, Logger_1.log)(Logger_1.LogLevel.Error, 'aggregated export failed', err);
+                vscode.window.showErrorMessage((0, index_1.t)()['toast.exportFailed']);
             }
         });
         // 将 disposables 注册到 context.subscriptions

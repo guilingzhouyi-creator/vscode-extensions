@@ -28,6 +28,8 @@ export declare class TimerOrchestrator {
     private readonly scheduler;
     private readonly global;
     private _state;
+    /** 破坏性操作前自动安全快照开关（workspaceTiming.safetySnapshot） */
+    private _safetySnapshotEnabled;
     private _onStateChange;
     constructor(timer: TimerEngine, storage: StorageCoordinator, journal: JournalWriter, sessionManager: SessionManager, disableManager: DisableManager, scheduler: Scheduler, globalAggregator: GlobalAggregator);
     /** 当前状态 */
@@ -110,4 +112,26 @@ export declare class TimerOrchestrator {
      */
     private _opQueue;
     private enqueue;
+    /**
+     * 清除历史明细（保留累计数字）：删除 sessions/dailyTotals 并截断 journal，
+     * totalMs 计数器与全局聚合保持不变。
+     * 适用场景：隐私清理（不留下"何时在哪个项目干了什么"），但保住累计时长。
+     *
+     * @returns 清除后的最新面板数据，供调用方立即推送
+     */
+    clearHistory(): Promise<DashboardData>;
+    /**
+     * 从外部 JSON 还原计时数据（整体替换主存 + JSON 备份，并截断 journal）。
+     *
+     * 流程：校验净化 → stop → v1/v2 标准化折叠 → restore → start → 返回面板数据。
+     * 校验失败抛错且**不触碰现网数据**；执行前自动写安全快照
+     * （workspace-timing.before-restore.json，受 safetySnapshot 开关控制）。
+     *
+     * @param raw 未解析的外部 JSON 内容
+     */
+    restoreFrom(raw: unknown): Promise<DashboardData>;
+    /**
+     * 导出全历史聚合日报序列 CSV（折叠桶 ∪ 当期原始计算，日期升序）。
+     */
+    exportAggregatedCSV(workspaceName: string): Promise<string>;
 }

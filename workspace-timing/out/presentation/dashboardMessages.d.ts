@@ -33,3 +33,8 @@ export declare function exportTimingToFile(ctx: MessageRouterContext): Promise<v
  * 供 Dashboard 导出按钮与命令面板触发。
  */
 export declare function exportReportToFile(ctx: MessageRouterContext, kind: 'daily' | 'weekly'): Promise<void>;
+/**
+ * 导出全历史聚合日报序列 CSV（折叠桶 ∪ 当期原始计算）
+ * 供 Dashboard 导出按钮与 workspaceTiming.exportAggregated 命令共用。
+ */
+export declare function exportAggregatedToFile(ctx: MessageRouterContext): Promise<void>;

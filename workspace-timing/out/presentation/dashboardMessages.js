@@ -45,6 +45,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createDashboardMessageHandler = createDashboardMessageHandler;
 exports.exportTimingToFile = exportTimingToFile;
 exports.exportReportToFile = exportReportToFile;
+exports.exportAggregatedToFile = exportAggregatedToFile;
 const vscode = __importStar(require("vscode"));
 const TimeAggregator_1 = require("../domain/TimeAggregator");
 const Logger_1 = require("../integration/Logger");
@@ -75,8 +76,20 @@ function createDashboardMessageHandler(ctx) {
                 }).catch(err => (0, Logger_1.log)(Logger_1.LogLevel.Error, 'reset failed', err));
                 break;
             }
+            case 'clearHistory': {
+                // 清除历史明细（保留累计数字），编排委托 orchestrator.clearHistory
+                ctx.getOrchestrator()?.clearHistory().then(data => {
+                    ctx.getStatusBar()?.updateTime(data.todayMs, data.totalMs);
+                    ctx.getDashboard()?.updateData(data);
+                    vscode.window.showInformationMessage((0, index_1.t)()['toast.clearHistoryDone']);
+                }).catch(err => (0, Logger_1.log)(Logger_1.LogLevel.Error, 'clearHistory failed', err));
+                break;
+            }
             case 'exportCSV':
                 void exportTimingToFile(ctx);
+                break;
+            case 'exportAggregated':
+                void exportAggregatedToFile(ctx);
                 break;
             case 'exportReport':
                 void exportReportToFile(ctx, msg.payload.kind);
@@ -148,6 +161,37 @@ async function exportReportToFile(ctx, kind) {
     }
     catch (err) {
         (0, Logger_1.log)(Logger_1.LogLevel.Error, 'WorkspaceTiming: export report failed', err);
+        vscode.window.showErrorMessage((0, index_1.t)()['toast.exportFailed']);
+    }
+}
+/**
+ * 导出全历史聚合日报序列 CSV（折叠桶 ∪ 当期原始计算）
+ * 供 Dashboard 导出按钮与 workspaceTiming.exportAggregated 命令共用。
+ */
+async function exportAggregatedToFile(ctx) {
+    try {
+        const orch = ctx.getOrchestrator();
+        if (!orch) {
+            vscode.window.showWarningMessage((0, index_1.t)()['toast.exportNoWorkspace']);
+            return;
+        }
+        const workspaceName = sanitizeFileName(vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace');
+        const defaultUri = vscode.Uri.file(`${workspaceName}-timing-${(0, index_1.t)()['export.filename.aggregated']}-${TimeAggregator_1.TimeAggregator.todayStr()}.csv`);
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri,
+            filters: { 'CSV Files (*.csv)': ['csv'] },
+            saveLabel: (0, index_1.t)()['toast.exportSaveLabel'],
+        });
+        if (!uri) {
+            vscode.window.showInformationMessage((0, index_1.t)()['toast.exportCancelled']);
+            return;
+        }
+        const csv = await orch.exportAggregatedCSV(workspaceName);
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(csv, 'utf8'));
+        vscode.window.showInformationMessage((0, index_1.format)((0, index_1.t)()['toast.exportSuccess'], uri.fsPath));
+    }
+    catch (err) {
+        (0, Logger_1.log)(Logger_1.LogLevel.Error, 'WorkspaceTiming: aggregated export failed', err);
         vscode.window.showErrorMessage((0, index_1.t)()['toast.exportFailed']);
     }
 }

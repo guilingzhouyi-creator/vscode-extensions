@@ -89,7 +89,11 @@ export type DashboardMessage = {
 } | {
     type: 'reset';
 } | {
+    type: 'clearHistory';
+} | {
     type: 'exportCSV';
+} | {
+    type: 'exportAggregated';
 } | {
     type: 'exportReport';
     payload: {

@@ -12,6 +12,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimerOrchestrator = void 0;
 const models_1 = require("../domain/models");
+const DataValidator_1 = require("../persistence/DataValidator");
+const HistoryFolder_1 = require("../domain/HistoryFolder");
+const AggregatedCsvExporter_1 = require("./exporters/AggregatedCsvExporter");
 const TimeAggregator_1 = require("../domain/TimeAggregator");
 const CsvExporter_1 = require("./exporters/CsvExporter");
 const ReportExporter_1 = require("./exporters/ReportExporter");
@@ -19,6 +22,8 @@ const Logger_1 = require("../integration/Logger");
 class TimerOrchestrator {
     constructor(timer, storage, journal, sessionManager, disableManager, scheduler, globalAggregator) {
         this._state = 'idle';
+        /** 破坏性操作前自动安全快照开关（workspaceTiming.safetySnapshot） */
+        this._safetySnapshotEnabled = true;
         this._onStateChange = null;
         /** 状态栏 tick 回调（由 Scheduler 驱动） */
         this._onTick = null;
@@ -278,6 +283,9 @@ class TimerOrchestrator {
         if (cfg.maxSessions !== undefined) {
             this.sessionManager.setMaxSessions(cfg.maxSessions);
         }
+        if (cfg.safetySnapshot !== undefined) {
+            this._safetySnapshotEnabled = cfg.safetySnapshot;
+        }
     }
     /**
      * 导出当前工作区计时数据为 CSV 字符串
@@ -346,6 +354,10 @@ class TimerOrchestrator {
     async resetAllData(purgeGlobal = true) {
         (0, Logger_1.log)(Logger_1.LogLevel.Info, 'TimerOrchestrator: resetAllData requested');
         return this.enqueue(async () => {
+            // 0. 安全快照（可配置关闭）
+            if (this._safetySnapshotEnabled) {
+                await this.storage.snapshotBeforeDestructive('reset');
+            }
             // 1. 结束当前会话并存盘
             await this.stop();
             // 2. 清空工作区本地数据（workspaceState + JSON 备份 + journal）
@@ -366,6 +378,86 @@ class TimerOrchestrator {
             (0, Logger_1.log)(Logger_1.LogLevel.Error, 'TimerOrchestrator: queued operation failed', err);
         });
         return run;
+    }
+    /**
+     * 清除历史明细（保留累计数字）：删除 sessions/dailyTotals 并截断 journal，
+     * totalMs 计数器与全局聚合保持不变。
+     * 适用场景：隐私清理（不留下"何时在哪个项目干了什么"），但保住累计时长。
+     *
+     * @returns 清除后的最新面板数据，供调用方立即推送
+     */
+    async clearHistory() {
+        (0, Logger_1.log)(Logger_1.LogLevel.Info, 'TimerOrchestrator: clearHistory requested');
+        return this.enqueue(async () => {
+            if (this._safetySnapshotEnabled) {
+                await this.storage.snapshotBeforeDestructive('clear-history');
+            }
+            await this.stop();
+            // 明细清空；totalMs 等其余字段保持
+            const d = this.timer.data;
+            this.timer.replaceData({
+                ...d,
+                currentSessionStartMs: 0,
+                sessions: [],
+                dailyTotals: {},
+            });
+            this.sessionManager.invalidateTodayCache();
+            // 强制落盘（关键事件）并截断 journal
+            const fresh = { ...this.timer.data, sessions: [] };
+            await this.storage.save(fresh, true);
+            try {
+                await this.journal.truncate();
+            }
+            catch (err) {
+                (0, Logger_1.log)(Logger_1.LogLevel.Warn, 'clearHistory: journal truncate failed', err);
+            }
+            await this.start();
+            return this.getDashboardData();
+        });
+    }
+    /**
+     * 从外部 JSON 还原计时数据（整体替换主存 + JSON 备份，并截断 journal）。
+     *
+     * 流程：校验净化 → stop → v1/v2 标准化折叠 → restore → start → 返回面板数据。
+     * 校验失败抛错且**不触碰现网数据**；执行前自动写安全快照
+     * （workspace-timing.before-restore.json，受 safetySnapshot 开关控制）。
+     *
+     * @param raw 未解析的外部 JSON 内容
+     */
+    async restoreFrom(raw) {
+        const validation = (0, DataValidator_1.validateTimingData)(raw);
+        if (!validation.ok || !validation.data) {
+            throw new Error(`invalid timing data: ${validation.error ?? 'unknown'}`);
+        }
+        let data = validation.data;
+        (0, Logger_1.log)(Logger_1.LogLevel.Info, `TimerOrchestrator: restore requested (file totalMs=${data.totalMs}, sessions=${data.sessions.length})`);
+        return this.enqueue(async () => {
+            if (this._safetySnapshotEnabled) {
+                await this.storage.snapshotBeforeDestructive('restore');
+            }
+            await this.stop();
+            // 版本标准化 + 按当前保留窗折叠（幂等；v1 文件在此完成迁移）
+            const migrated = (0, HistoryFolder_1.migrateToFolded)(data, this.sessionManager.rawRetentionDays);
+            data = {
+                ...data,
+                version: models_1.LATEST_VERSION,
+                sessions: migrated.sessions,
+                dailyTotals: migrated.dailyTotals,
+            };
+            await this.storage.restore(data);
+            await this.start();
+            return this.getDashboardData();
+        });
+    }
+    /**
+     * 导出全历史聚合日报序列 CSV（折叠桶 ∪ 当期原始计算，日期升序）。
+     */
+    async exportAggregatedCSV(workspaceName) {
+        const data = this.timer.data;
+        const series = TimeAggregator_1.TimeAggregator.fullDailySeries(data.sessions, data.currentSessionStartMs, data.dailyTotals);
+        const csv = new AggregatedCsvExporter_1.AggregatedCsvExporter().build(series, workspaceName);
+        (0, Logger_1.log)(Logger_1.LogLevel.Info, `TimerOrchestrator: exported aggregated CSV (${series.length} days, ${csv.length} bytes)`);
+        return csv;
     }
 }
 exports.TimerOrchestrator = TimerOrchestrator;

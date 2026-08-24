@@ -16,9 +16,29 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.StorageCoordinator = void 0;
 const models_1 = require("../domain/models");
 const TimeAggregator_1 = require("../domain/TimeAggregator");
+const HistoryFolder_1 = require("../domain/HistoryFolder");
 const Logger_1 = require("../integration/Logger");
 /** journal 片段分组断点阈值：相邻片段起始间隔超过该值视为中断（如系统休眠） */
 const JOURNAL_RUN_GAP_MS = 60000;
+/** 本地日期 key（与 TimeAggregator 归桶口径一致） */
+function dateKeyOf(ms) {
+    const d = new Date(ms);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+}
+/** 合成会话段累入日桶（每段视为一条独立记录，计数记入段起始日） */
+function addSegsToDaily(totals, segs) {
+    const map = totals ? { ...totals } : {};
+    for (const seg of segs) {
+        const key = dateKeyOf(seg.startMs);
+        const bucket = map[key] ?? { totalMs: 0, sessionCount: 0 };
+        bucket.totalMs += seg.durationMs;
+        bucket.sessionCount += 1;
+        map[key] = bucket;
+    }
+    return map;
+}
 class StorageCoordinator {
     constructor(primary, fileBackup, journal) {
         this._fileBackupCount = 0;
@@ -29,12 +49,13 @@ class StorageCoordinator {
     /**
      * 完整崩溃恢复 + 数据加载
      *
-     * 三步走：
+     * 四步走：
      *   1. 加载主存储 → fallback JSON
-     *   2. 回放 journal
-     *   3. 补偿未完成会话
+     *   2. v1→v2 迁移 + 过期会话折叠进 dailyTotals（幂等）
+     *   3. 回放 journal（合成段同步入桶）
+     *   4. 补偿未完成会话
      */
-    async recover() {
+    async recover(retentionDays = 45) {
         (0, Logger_1.log)(Logger_1.LogLevel.Info, 'StorageCoordinator: crash recovery started');
         // Step 1: 加载主数据
         let data = await this.primary.load();
@@ -51,6 +72,14 @@ class StorageCoordinator {
         else {
             (0, Logger_1.log)(Logger_1.LogLevel.Info, `StorageCoordinator: loaded from ${source}, totalMs=${data.totalMs}`);
         }
+        // Step 1.5: v1→v2 迁移 + 过期会话折叠（幂等，retention<=0 时仅补空表）
+        const migrated = (0, HistoryFolder_1.migrateToFolded)(data, retentionDays);
+        if (migrated.foldedSessionCount > 0) {
+            (0, Logger_1.log)(Logger_1.LogLevel.Info, `StorageCoordinator: folded ${migrated.foldedSessionCount} expired session(s) ` +
+                `into ${Object.keys(migrated.dailyTotals).length} daily bucket(s)`);
+        }
+        data.sessions = migrated.sessions;
+        data.dailyTotals = migrated.dailyTotals;
         // Step 2: 回放 journal
         // 进行中会话的增量由 journal 完整记录（checkpoint 只固化历史累计、不清空 journal）。
         // ★ 修复：回放时长必须落成按自然日切分的 finished TimeSession 并入 sessions[]，
@@ -92,6 +121,8 @@ class StorageCoordinator {
                 for (const run of runs) {
                     const segs = TimeAggregator_1.TimeAggregator.splitByNaturalDay(run.startMs, run.endMs);
                     data.sessions.push(...segs);
+                    // ★ 合成段同步入日桶：折叠层与原始层口径一致
+                    data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
                     synthesized += segs.length;
                 }
                 (0, Logger_1.log)(Logger_1.LogLevel.Info, `StorageCoordinator: replayed ${slices.length} journal entries, +${journalDelta}ms, ` +
@@ -121,10 +152,10 @@ class StorageCoordinator {
             const elapsed = now - data.currentSessionStartMs;
             if (elapsed > 0 && elapsed < models_1.CRASH_COMPENSATION_CAP_MS) { // 最多补偿 24h，防止异常
                 data.totalMs += elapsed;
-                // ★ 补偿时长同样落成按日会话，保证日报/周报口径一致
-                for (const seg of TimeAggregator_1.TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, now)) {
-                    data.sessions.push(seg);
-                }
+                // ★ 补偿时长同样落成按日会话，保证日报/周报口径一致（并同步入日桶）
+                const segs = TimeAggregator_1.TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, now);
+                data.sessions.push(...segs);
+                data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
                 (0, Logger_1.log)(Logger_1.LogLevel.Info, `StorageCoordinator: compensated unfinished session: +${elapsed}ms`);
             }
         }
@@ -173,6 +204,40 @@ class StorageCoordinator {
             data = await this.fileBackup.load();
         }
         return data;
+    }
+    /**
+     * 还原：以外部数据整体替换三级存储中的两级（主存 + JSON 备份），
+     * 并截断 journal（旧增量对新数据无效）。调用方需已完成校验与迁移。
+     */
+    async restore(data) {
+        await this.save(data, true);
+        try {
+            await this.journal.truncate();
+        }
+        catch (err) {
+            (0, Logger_1.log)(Logger_1.LogLevel.Warn, 'StorageCoordinator: journal truncate after restore failed', err);
+        }
+        (0, Logger_1.log)(Logger_1.LogLevel.Info, `StorageCoordinator: data restored (totalMs=${data.totalMs}, sessions=${data.sessions.length})`);
+    }
+    /**
+     * 破坏性操作前的安全快照：把当前 JSON 备份复制为 .vscode/workspace-timing.before-<op>.json
+     * （固定名轮转覆盖，不累积）。静默失败——快照属尽力而为，不阻塞主流程。
+     */
+    async snapshotBeforeDestructive(op) {
+        try {
+            const current = await this.fileBackup.load();
+            if (!current)
+                return; // 无现网数据则无需快照
+            await this.fileBackup.saveAs(current, `workspace-timing.before-${op}.json`);
+            (0, Logger_1.log)(Logger_1.LogLevel.Info, `StorageCoordinator: safety snapshot written (op=${op})`);
+        }
+        catch (err) {
+            (0, Logger_1.log)(Logger_1.LogLevel.Warn, `StorageCoordinator: safety snapshot failed (op=${op})`, err);
+        }
+    }
+    /** 主备份文件 URI（供还原命令默认定位文件对话框） */
+    getBackupUri() {
+        return this.fileBackup.uri;
     }
     /** 删除所有存储数据 */
     async deleteAll() {

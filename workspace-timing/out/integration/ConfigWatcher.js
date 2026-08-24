@@ -65,6 +65,8 @@ function readTimingConfig() {
         fullSaveIntervalMs: cfg.get('storage.fullSaveInterval', models_1.DEFAULT_CONFIG.fullSaveIntervalMs),
         statusBarFormat: cfg.get('statusBar.format', models_1.DEFAULT_CONFIG.statusBarFormat),
         maxSessions: cfg.get('storage.maxSessions', models_1.DEFAULT_CONFIG.maxSessions),
+        historyRawRetentionDays: cfg.get('storage.historyRawRetentionDays', models_1.DEFAULT_CONFIG.historyRawRetentionDays),
+        safetySnapshot: cfg.get('storage.safetySnapshot', models_1.DEFAULT_CONFIG.safetySnapshot),
     };
 }
 class ConfigWatcher {

@@ -729,10 +729,13 @@ function buildDashboardHtml(args) {
     <div class="btn-row">
       <button class="btn btn-primary" id="btnNewPeriod">${args.labels['panel.actions.newPeriod']}</button>
       <button class="btn btn-secondary" id="btnExportCSV">${args.labels['panel.actions.exportCsv']}</button>
+      <button class="btn btn-secondary" id="btnExportAggregated">${args.labels['panel.actions.exportAggregated']}</button>
+      <button class="btn btn-danger" id="btnClearHistory">${args.labels['panel.actions.clearHistory']}</button>
       <button class="btn btn-danger" id="btnReset">${args.labels['panel.actions.reset']}</button>
     </div>
     <div style="margin-top:8px;font-size:11px;color:var(--description)">
       <strong>${args.labels['panel.actions.newPeriod']}</strong>${args.labels['panel.actions.hintPeriodDesc']}<br>
+      <strong>${args.labels['panel.actions.clearHistory']}</strong>${args.labels['confirm.clearHistory']}<br>
       <strong>${args.labels['panel.actions.reset']}</strong>${args.labels['panel.actions.hintResetDesc']}
     </div>
   </div>
@@ -998,6 +1001,20 @@ function buildDashboardHtml(args) {
           vscode.postMessage({ type: 'reset' });
           showToast(L['panel.toast.resetRequested']);
         }
+      });
+
+      // 清除历史（保留累计数字）
+      document.getElementById('btnClearHistory').addEventListener('click', () => {
+        if (confirm(L['confirm.clearHistory'])) {
+          vscode.postMessage({ type: 'clearHistory' });
+          showToast(L['toast.clearHistoryDone']);
+        }
+      });
+
+      // 导出聚合数据（全历史日报 CSV）
+      document.getElementById('btnExportAggregated').addEventListener('click', () => {
+        vscode.postMessage({ type: 'exportAggregated' });
+        showToast(L['panel.toast.exportAggregatedRequested']);
       });
 
       // 导出日报 / 周报

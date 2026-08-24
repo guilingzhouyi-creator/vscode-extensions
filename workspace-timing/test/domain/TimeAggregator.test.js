@@ -279,3 +279,43 @@ describe('TimerEngine：边界补充', () => {
         assert.strictEqual(engine.data.sessions.length, 3);
     });
 });
+
+describe('TimeAggregator：fullDailySeries 双源合并', () => {
+    const now = new Date();
+    const Y = now.getFullYear(), M = now.getMonth(), D = now.getDate();
+
+    it('折叠桶 + 当期原始计算不重不漏，同日以原始为准', () => {
+        // 折叠桶：60 天前（仅桶）+ 昨天（与原始同日，应被覆盖）
+        const buckets = {
+            [localDateStrOf(new Date(Y, M, D - 60).getTime())]: { totalMs: 60000, sessionCount: 1 },
+            [localDateStrOf(new Date(Y, M, D - 1).getTime())]: { totalMs: 999999, sessionCount: 99 },
+        };
+        // 原始会话：昨天 30 分钟
+        const sessions = [{
+            startMs: new Date(Y, M, D - 1, 10).getTime(),
+            endMs: new Date(Y, M, D - 1, 10, 30).getTime(),
+            durationMs: 1800000,
+        }];
+        const series = TimeAggregator.fullDailySeries(sessions, 0, buckets);
+        assert.strictEqual(series.length, 2);
+        assert.strictEqual(series[0].date, localDateStrOf(new Date(Y, M, D - 60).getTime()));
+        assert.strictEqual(series[0].totalMs, 60000);
+        // 按日期查找（不依赖排序位置）
+        const byDate = new Map(series.map(s => [s.date, s]));
+        assert.strictEqual(byDate.get(localDateStrOf(new Date(Y, M, D - 1).getTime())).totalMs, 1800000,
+            '同日并存时以原始计算覆盖折叠桶');
+        // 升序
+        for (let i = 1; i < series.length; i++) {
+            assert.ok(series[i].date > series[i - 1].date, '应按日期升序');
+        }
+    });
+
+    it('进行中会话时长并入今日桶', () => {
+        // 今天本地零点起（now 必然 >= 零点，区间确定非空）
+        const start = new Date(Y, M, D).getTime();
+        const series = TimeAggregator.fullDailySeries([], start);
+        assert.strictEqual(series.length, 1);
+        assert.strictEqual(series[0].date, localDateStrOf(start));
+        assert.ok(series[0].totalMs >= 0);
+    });
+});

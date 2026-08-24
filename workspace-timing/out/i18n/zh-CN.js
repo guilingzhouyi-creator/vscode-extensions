@@ -20,6 +20,7 @@ const zhCN = {
     'toast.exportReportWeekly': '周报已导出至：{0}',
     'export.filename.daily': '日报',
     'export.filename.weekly': '周报',
+    'export.filename.aggregated': '聚合',
     'toast.cloudSyncPlaceholder': '☁️ 云端同步即将推出（Cloud sync coming soon）——当前为扩展点占位。',
     'confirm.newPeriod': '确定要新建计时周期？累计时长将归零，历史记录保留。',
     'confirm.newPeriod.title': '确认新建',
@@ -28,6 +29,12 @@ const zhCN = {
     'confirm.clearGlobal': '确定要清除跨工作区累计？仅清空全局聚合数据，不影响各工作区本地计时。此操作不可撤销！',
     'confirm.clearGlobal.title': '确认清除',
     'toast.clearGlobal': '跨工作区累计已清除',
+    'confirm.clearHistory': '确定清除全部会话明细与历史日表？累计数字将保留。此操作不可撤销！',
+    'confirm.clearHistory.title': '确认清除历史',
+    'toast.clearHistoryDone': '历史明细已清除，累计数字保留',
+    'confirm.restore': '确定用所选文件还原计时数据？\n当前：累计 {0}，{1} 条会话\n文件：累计 {2}，{3} 条会话\n现有数据将被覆盖（已自动生成安全快照）。',
+    'confirm.restore.title': '确认还原',
+    'toast.restored': '计时数据已还原自：{0}',
     'cmd.modeSwitched': '已切换至「{0}」模式',
     'cmd.enabled': '工作区计时: 已启用',
     'cmd.disabled': '工作区计时: 已禁用',
@@ -94,6 +101,8 @@ const zhCN = {
     'panel.actions.newPeriod': '新建计时周期',
     'panel.actions.exportCsv': '导出 CSV',
     'panel.actions.reset': '重置所有数据',
+    'panel.actions.clearHistory': '清除历史',
+    'panel.actions.exportAggregated': '导出聚合数据',
     'panel.actions.hintPeriod': '<strong>新建计时周期</strong>：累计归零，历史保留在会话记录中',
     'panel.actions.hintPeriodDesc': '：累计归零，历史保留在会话记录中',
     'panel.actions.hintReset': '<strong>重置所有数据</strong>：清空所有计时数据和历史，不可撤销',
@@ -110,6 +119,7 @@ const zhCN = {
     'panel.toast.resetRequested': '已请求重置数据',
     'panel.toast.exportDailyRequested': '已请求导出日报',
     'panel.toast.exportWeeklyRequested': '已请求导出周报',
+    'panel.toast.exportAggregatedRequested': '已请求导出聚合数据',
 };
 exports.default = zhCN;
 //# sourceMappingURL=zh-CN.js.map

@@ -33,6 +33,7 @@ export interface I18nStrings {
     // 导出文件名前缀（随语言变化）
     'export.filename.daily': string;
     'export.filename.weekly': string;
+    'export.filename.aggregated': string;
     // 云端同步占位
     'toast.cloudSyncPlaceholder': string;
 
@@ -44,6 +45,13 @@ export interface I18nStrings {
     'confirm.clearGlobal': string;
     'confirm.clearGlobal.title': string;
     'toast.clearGlobal': string;
+    // 清除历史 / 还原
+    'confirm.clearHistory': string;
+    'confirm.clearHistory.title': string;
+    'toast.clearHistoryDone': string;
+    'confirm.restore': string;
+    'confirm.restore.title': string;
+    'toast.restored': string;
 
     // 命令
     'cmd.modeSwitched': string;
@@ -115,6 +123,8 @@ export interface I18nStrings {
     'panel.actions.newPeriod': string;
     'panel.actions.exportCsv': string;
     'panel.actions.reset': string;
+    'panel.actions.clearHistory': string;
+    'panel.actions.exportAggregated': string;
     'panel.actions.hintPeriod': string;
     'panel.actions.hintPeriodDesc': string;
     'panel.actions.hintReset': string;
@@ -131,4 +141,5 @@ export interface I18nStrings {
     'panel.toast.resetRequested': string;
     'panel.toast.exportDailyRequested': string;
     'panel.toast.exportWeeklyRequested': string;
+    'panel.toast.exportAggregatedRequested': string;
 }
