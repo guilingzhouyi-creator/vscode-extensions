@@ -27,6 +27,8 @@
 
 ```
 vscode-extensions/              ← 本仓库（VS Code 插件专用）
+├── .vscode/                    ← 仓库级调试与设置（launch.json / tasks.json / settings.json）
+│   └── workspace-timing.json / .journal  ← 运行时数据（gitignore，不入库）
 ├── workspace-timing/           ← 工作区时长追踪
 │   ├── src/
 │   │   ├── application/        ← 应用业务逻辑
@@ -36,17 +38,24 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 │   │   ├── integration/        ← VS Code API 集成 + 命令注册
 │   │   ├── persistence/        ← 持久化层（Journal + JSON + GlobalState）
 │   │   └── presentation/       ← 表现层（Dashboard + StatusBar + Toast）
+│   ├── .vscode/                ← 单扩展独立打开时的调试配置（备用）
 │   ├── package.json
 │   ├── README.md
 │   └── LICENSE
 ├── <future-extension>/         ← 新扩展预留位：建目录 + 放 package.json 即自动接入 CI/发布
 ├── scripts/
-│   └── package.ps1             ← 本地统一打包入口（输出到 dist/）
+│   ├── package.ps1             ← 本地统一打包入口（Windows / PowerShell）
+│   ├── package.sh              ← 同构入口（Linux / macOS / CI bash）
+│   └── check-display-assets.sh ← 展示资产校验（icon / images 打包验证）
 ├── dist/                       ← ★ 统一包输出目录（gitignore，不入库）
 │   └── <扩展名>/
 │       ├── <扩展名>-<版本>.vsix    # 主产物（按扩展名分类）
 │       └── SHA256SUMS.txt         # 校验和
-└── .github/workflows/          ← CI 校验 + 自动发布流水线
+├── archive/                    ← 版本归档（gitignore，不入库；已清理冗余 node_modules/dist）
+├── .github/workflows/          ← CI 校验 + 自动发布流水线
+├── .cnb/ + .cnb.yml            ← CNB 协作流水线（与 GitHub 双轨）
+├── .node-version               ← Node 版本锁定（20）
+└── .editorconfig / .gitattributes ← 换行与编码统一
 ```
 
 > 📐 **新增扩展零配置接入**：在仓库顶层新建 `<扩展名>/` 目录并放入 `package.json`，
@@ -77,12 +86,24 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 ### 本地打包
 
 ```powershell
+# Windows
 .\scripts\package.ps1                          # 打包全部扩展
 .\scripts\package.ps1 -Name workspace-timing   # 只打包指定扩展
 .\scripts\package.ps1 -Keep 3                  # dist 中每扩展保留最近 3 个版本
+
+# Linux / macOS / CI（同构）
+bash scripts/package.sh                        # 打包全部
+bash scripts/package.sh --name workspace-timing --keep 3
+bash scripts/package.sh --skip-build           # 跳过编译仅打包
 ```
 
 产物输出到 `dist/<扩展名>/`（不入库），与 CI 产出结构完全同构。
+
+### 目录规范
+
+- **根目录不散乱**：运行时数据（`.vscode/workspace-timing.*`）与工具缓存（`.cnb/.cache`、`dist/`、`archive/`）均 `gitignore`；根 `.vscode/` 仅放调试/设置，单扩展 `.vscode/` 为备用
+- **归档集中**：历史快照统一 `archive/`，已清理 `archive/**/node_modules` 与 `dist` 冗余
+- **换行统一**：`.gitattributes` 强制 `*.sh LF` / `*.ps1 CRLF` / `*.png binary`，配合 `.editorconfig`
 
 ---
 

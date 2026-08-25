@@ -1,8 +1,10 @@
 {
+    // 单扩展直接打开调试（以 workspace-timing 为 workspaceFolder 时生效）
+    // 仓库根调试请用根 .vscode/launch.json（Run workspace-timing）
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Extension",
+            "name": "Run Extension (single-folder)",
             "type": "extensionHost",
             "request": "launch",
             "args": [

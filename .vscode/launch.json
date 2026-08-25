@@ -1,0 +1,19 @@
+{
+    // Monorepo 调试入口（以仓库根为 workspaceFolder）
+    // 每个扩展独立调试，默认启动 workspace-timing
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run workspace-timing",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/workspace-timing"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/workspace-timing/out/**/*.js"
+            ],
+            "preLaunchTask": "npm: watch - workspace-timing"
+        }
+    ]
+}

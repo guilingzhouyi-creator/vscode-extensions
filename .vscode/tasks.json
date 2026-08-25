@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "npm: watch - workspace-timing",
+            "type": "npm",
+            "script": "watch",
+            "path": "workspace-timing",
+            "problemMatcher": "$tsc-watch",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "never"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "npm: compile - workspace-timing",
+            "type": "npm",
+            "script": "compile",
+            "path": "workspace-timing",
+            "problemMatcher": "$tsc",
+            "group": "build"
+        }
+    ]
+}

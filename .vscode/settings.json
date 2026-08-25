@@ -1,0 +1,26 @@
+{
+    // 仓库级开发设置（不影响扩展运行时）
+    "files.exclude": {
+        "**/node_modules": true,
+        "**/out": true,
+        "**/dist": true,
+        "**/.vscode-test": true,
+        "**/coverage": true,
+        "**/archive": false
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/archive/agent-refactor-demo/shared/artifacts/refactored/node_modules": true,
+        "**/.vscode/workspace-timing.json": true,
+        "**/.vscode/workspace-timing.journal": true
+    },
+    // 统一换行与编码（配合 .editorconfig / .gitattributes）
+    "files.eol": "\n",
+    "files.encoding": "utf8",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.detectIndentation": false,
+    // 扩展开发：TS 校验
+    "typescript.tsdk": "workspace-timing/node_modules/typescript/lib"
+}

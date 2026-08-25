@@ -133,12 +133,12 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      # ─── 3) 构建环境 ───
+      # ─── 3) 构建环境（Node 版本以 .node-version 为唯一源） ───
       - name: Setup Node.js
         if: steps.detect.outputs.targets != ''
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: '**/package-lock.json'
 
