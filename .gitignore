@@ -6,6 +6,10 @@
 # 统一打包输出目录（本地构建产物，不入库；正式产物发布到 GitHub Releases）
 dist/
 
+# 各扩展编译产物与覆盖率报告（根级零配置覆盖：任何顶层扩展的 out/、coverage/ 均不入库）
+out/
+coverage/
+
 # 本地运行时数据与工具目录（不入库）
 .workspace-timing-data/
 .workbuddy/

@@ -1,0 +1,10 @@
+# 二进制资产（图片 / 打包产物）：不做行尾处理，防损坏
+*.png binary
+*.vsix binary
+*.ico binary
+
+# shell 脚本强制 LF —— Linux CI / CNB 容器中执行必需，防 Windows CRLF 破坏脚本
+*.sh text eol=lf
+
+# PowerShell 脚本保持 CRLF（Windows 原生体验）
+*.ps1 text eol=crlf

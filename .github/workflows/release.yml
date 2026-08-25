@@ -205,6 +205,8 @@ jobs:
             fi
 
             # ── 4.4 构建（输出到统一 dist/<ext>/ 布局）──
+            # 展示资产预检：icon / README 图片须入库（缺失时 vsce 报错含糊，这里提前明确报错）
+            bash scripts/check-display-assets.sh "$EXT" pre
             mkdir -p "dist/$EXT"
             ( cd "$EXT"
               npm ci
@@ -213,6 +215,9 @@ jobs:
             )
             VSIX="dist/$EXT/$EXT-$VERSION.vsix"
             test -f "$VSIX" || { echo "::error::[$EXT] 产物缺失: $VSIX"; exit 1; }
+
+            # 产物校验：展示资产必须真实打进 vsix（防 .vscodeignore 误排除导致市场挂图）
+            bash scripts/check-display-assets.sh "$EXT" post "$VSIX"
 
             # SHA256 校验和
             HASH=$(sha256sum "$VSIX" | awk '{print $1}')

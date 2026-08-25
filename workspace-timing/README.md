@@ -1,5 +1,7 @@
 # Workspace Timing  ⏱
 
+![Workspace Timing banner](images/banner.png)
+
 > 🪶 轻量化 · 高可扩展 — 环形缓冲区 + Journal 双写入架构；预留多工作区对比、云端同步、团队看板扩展点。  
 > Lightweight & extensible — RingBuffer + Journal dual-write architecture; ready for multi-workspace comparison, cloud sync, and team dashboard.
 

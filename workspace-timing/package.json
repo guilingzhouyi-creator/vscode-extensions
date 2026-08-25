@@ -10,8 +10,14 @@
     },
     "homepage": "https://github.com/guilingzhouyi-creator/vscode-extensions/tree/main/workspace-timing#readme",
     "license": "MIT",
+    "icon": "images/icon.png",
+    "galleryBanner": {
+        "color": "#1e1e1e",
+        "theme": "dark"
+    },
     "engines": {
-        "vscode": "^1.85.0"
+        "vscode": "^1.85.0",
+        "node": ">=20"
     },
     "categories": [
         "Other"
@@ -196,8 +202,7 @@
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile",
-        "test": "node ./out/test/runTest.js",
+        "test": "npm run test:unit",
         "test:unit": "npm run compile && mocha --reporter spec test/**/*.test.js",
         "test:coverage": "npm run compile && c8 --reporter=lcov --reporter=json-summary --report-dir=coverage mocha --reporter spec test/**/*.test.js",
         "lint": "eslint src --ext ts"
