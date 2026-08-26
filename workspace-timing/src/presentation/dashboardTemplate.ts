@@ -967,7 +967,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       // {0}/{1} 占位符格式化（与宿主 i18n format 语义一致；curveSegTip 等词条含双占位符）
       function fmt(tpl) {
         const args = Array.prototype.slice.call(arguments, 1);
-        return String(tpl).replace(/\{(\d+)\}/g, (_, idx) => {
+        return String(tpl).replace(/{([0-9]+)}/g, (_, idx) => {
           const i = parseInt(idx, 10);
           return args[i] !== undefined ? String(args[i]) : '{' + idx + '}';
         });
@@ -1019,10 +1019,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         // 活动时间线热力图
         renderHeatmap(data.heatmap);
 
-        // 活跃曲线模式下随数据刷新同步拉取最新曲线
-        if (chartMode === 'curve') {
-          vscode.postMessage({ type: 'getActiveCurve' });
-        }
+        // 周报曲线（与柱状图同源：dailyStats 含今日实时增量，尾端随刷新移动）
+        renderActiveCurve(data.dailyStats);
 
         pendingData = data;
       }
@@ -1079,9 +1077,15 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
             '</div>';
         }
 
+        // ★ 兜底：count 必须为有限数字，否则 fmt 会输出字面量占位符（如 "（{0} 个工作区）"）。
+        //   宿主数据异常（旧版 globalState 缺 workspaces 字段）时以实际列表长度兜底。
+        const wsCount = typeof count === 'number' && Number.isFinite(count)
+            ? count
+            : (Array.isArray(workspaces) ? workspaces.length : 0);
+
         html +=
           '<div class="ws-compare-total">' + L['panel.js.grandTotalPrefix'] + '<strong>' + formatDuration(grandTotal) +
-          '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], count) + '</span></div>';
+          '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], wsCount) + '</span></div>';
 
         container.innerHTML = html;
       }
@@ -1133,34 +1137,25 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         weekTotalEl.innerHTML = L['panel.js.weekTotalPrefix'] + '<strong>' + formatDuration(weekTotalMs || 0) + '</strong>';
       }
 
-      // ---- 实时活跃曲线渲染 ----
-      // 数据：宿主按消息请求回推的最近时间片（1 条 ≈ 1 秒，最多近 3 分钟）。
-      // 渲染：5 秒一桶聚合（近 3 分钟 = 36 桶），SVG 光滑曲线（Catmull-Rom→Bezier）
-      //       + 面积填充；峰值圆角，空闲段自然下探，直观呈现"是否在持续活跃"。
-      function renderActiveCurve(slices) {
+      // ---- 周报曲线渲染（与柱状图同源）----
+      // 数据：与柱状图完全同源（data.dailyStats = last7Days，含今日实时增量），
+      //       曲线落差与柱状图一致；今日格随 updateData 周期增长 → 曲线尾端实时移动。
+      function renderActiveCurve(dailyStats) {
         const el = document.getElementById('activeCurve');
         if (!el) return;
-        const data = slices || [];
-        if (data.length === 0) {
+        const data = dailyStats || [];
+        const hasData = data.length > 0 && data.some(d => d.totalMs > 0);
+        if (!hasData) {
           el.innerHTML = '<div class="chart-empty">' + L['panel.js.curveEmpty'] + '</div>';
           return;
         }
-        const BUCKET_MS = 5000;
-        const BUCKETS = 36;
-        const now = Date.now();
-        const buckets = new Array(BUCKETS).fill(0);
-        for (const s of data) {
-          const age = now - s.t;
-          const idx = Math.floor(age / BUCKET_MS);
-          if (idx >= 0 && idx < BUCKETS) buckets[BUCKETS - 1 - idx] += 1;
-        }
-        const maxVal = Math.max(...buckets, 1);
 
-        // 归一化点集：x 从左到右、y 值越大越高（留 4px 上下内边距）
+        // 归一化点集：x 从左到右（7 天）、y 值越大越高（留 4px 上下内边距）
         const W = 600, H = 60, PAD = 4;
-        const pts = buckets.map((v, i) => {
-          const x = (i / (BUCKETS - 1)) * W;
-          const y = H - PAD - (v / maxVal) * (H - 2 * PAD);
+        const maxVal = Math.max(...data.map(d => d.totalMs), 1);
+        const pts = data.map((d, i) => {
+          const x = (i / (data.length - 1)) * W;
+          const y = H - PAD - (d.totalMs / maxVal) * (H - 2 * PAD);
           return [x, y];
         });
 
@@ -1187,15 +1182,25 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         const base = H - PAD;
         const area = line + 'L' + W.toFixed(1) + ',' + base.toFixed(1) + 'L0,' + base.toFixed(1) + 'Z';
 
-        // 悬停总览：近 3 分钟活跃秒数
-        const activeSec = buckets.reduce((s, v) => s + v, 0);
-        const tip = fmt(L['panel.js.curveSegTip'], BUCKETS * BUCKET_MS / 1000, activeSec);
+        // 悬停总览：最近 7 天总时长（与柱状图周合计同口径）
+        const totalMs = data.reduce((s, d) => s + d.totalMs, 0);
+        const tip = L['panel.js.weekTotalPrefix'] + formatDuration(totalMs);
+
+        // 数据点悬停提示（每格日期 + 时长）
+        const dots = data.map((d, i) => {
+          const cx = (i / (data.length - 1)) * W;
+          const cy = H - PAD - (d.totalMs / maxVal) * (H - 2 * PAD);
+          const t = d.label + ' ' + formatDuration(d.totalMs);
+          return '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="2.5">' +
+            '<title>' + t + '</title></circle>';
+        }).join('');
 
         el.innerHTML =
           '<svg class="ac-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
             '<title>' + tip + '</title>' +
             '<path class="ac-area" d="' + area + '"></path>' +
             '<path class="ac-line" d="' + line + '"></path>' +
+            dots +
           '</svg>';
       }
 
@@ -1346,8 +1351,6 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         const msg = event.data;
         if (msg.type === 'updateData' && msg.payload) {
           updateUI(msg.payload);
-        } else if (msg.type === 'activeCurve' && msg.payload) {
-          renderActiveCurve(msg.payload.slices);
         }
       });
 
@@ -1405,7 +1408,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       document.getElementById('btnClearHistory').addEventListener('click', () => {
         if (confirm(L['confirm.clearHistory'])) {
           vscode.postMessage({ type: 'clearHistory' });
-          showToast(L['toast.clearHistoryDone']);
+          showToast(L['panel.toast.clearHistoryRequested']);
         }
       });
 
@@ -1445,8 +1448,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           if (barsEl) barsEl.style.display = 'none';
           if (emptyEl) emptyEl.style.display = 'none';
           if (weekEl) weekEl.style.display = 'none';
-          // 立即拉取一次（后续随 updateData 周期刷新）
-          vscode.postMessage({ type: 'getActiveCurve' });
+          // 用已有数据立即渲染（曲线与柱状图同源，后续随 updateData 周期刷新）
+          if (pendingData) renderActiveCurve(pendingData.dailyStats);
         } else {
           btn.textContent = L['panel.js.chartModeCurve'];
           label.textContent = L['panel.js.chartModeBars'];

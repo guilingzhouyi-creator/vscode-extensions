@@ -112,13 +112,6 @@ export class DashboardPanel {
         return this._panel.visible;
     }
 
-    /** 主动推送任意消息到 webview（如活跃曲线回推；隐藏时丢弃） */
-    postMessage(msg: unknown): void {
-        if (this._panel.visible) {
-            this._panel.webview.postMessage(msg);
-        }
-    }
-
     /** 刷新数据显示 */
     updateData(data: DashboardData): void {
         if (this._panel.visible) {

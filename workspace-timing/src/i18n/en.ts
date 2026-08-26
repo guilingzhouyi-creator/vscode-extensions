@@ -145,6 +145,7 @@ const en: I18nStrings = {
     'panel.toast.exportDailyRequested': 'Daily report export requested',
     'panel.toast.exportWeeklyRequested': 'Weekly report export requested',
     'panel.toast.exportAggregatedRequested': 'Aggregated CSV export requested',
+    'panel.toast.clearHistoryRequested': 'Clear history requested',
 };
 
 export default en;

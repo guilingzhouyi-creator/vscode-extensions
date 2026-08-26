@@ -384,4 +384,24 @@ describe('TimeAggregator：heatmapDays 活动热力图', () => {
         const total = days.reduce((s, d) => s + d.totalMs, 0);
         assert.strictEqual(total, 0, '窗口外会话不计入');
     });
+
+    it('last7Days：生成按升序排列的 7 天日期序列，支持中英文星期', () => {
+        const todayStart = new Date(Y, M, D, 10, 0).getTime();
+        const s = [{
+            startMs: todayStart,
+            endMs: todayStart + 3600000,
+            durationMs: 3600000,
+        }];
+
+        // 中文（默认）
+        const statsZh = TimeAggregator.last7Days(s, 0, 'zh-CN');
+        assert.strictEqual(statsZh.length, 7);
+        assert.strictEqual(statsZh[6].totalMs, 3600000);
+        assert.ok(['日', '一', '二', '三', '四', '五', '六'].includes(statsZh[6].weekday));
+
+        // 英文
+        const statsEn = TimeAggregator.last7Days(s, 0, 'en');
+        assert.strictEqual(statsEn.length, 7);
+        assert.ok(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].includes(statsEn[6].weekday));
+    });
 });

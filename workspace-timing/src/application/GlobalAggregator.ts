@@ -10,7 +10,7 @@
  * 调用方：Scheduler 周期全量存盘回调（onFullSaved）、TimerOrchestrator.saveNow()/newPeriod()
  */
 
-import { GlobalTimingData } from '../domain/global-types';
+import { GlobalTimingData, WorkspaceRecord } from '../domain/global-types';
 import { LogLevel, log } from '../integration/Logger';
 
 /** 当前工作区标识（由组合根注入，替代直读 vscode.workspace） */
@@ -137,10 +137,17 @@ export class GlobalAggregator {
         const global = this._cached ?? await this.storage.load();
         this._cached = global;
 
+        // ★ 防御：旧版 globalState 数据可能缺少 workspaces 字段（跨版本持久共享），
+        //   Object.keys(undefined) 会抛 TypeError，导致面板数据整体失败。
+        const workspaces = (global.workspaces && typeof global.workspaces === 'object')
+            ? global.workspaces
+            : {};
+
         return {
-            totalMs: global.totalMs,
-            workspaceCount: Object.keys(global.workspaces).length,
-            workspaces: Object.values(global.workspaces)
+            totalMs: typeof global.totalMs === 'number' ? global.totalMs : 0,
+            workspaceCount: Object.keys(workspaces).length,
+            workspaces: Object.values(workspaces)
+                .filter((w): w is WorkspaceRecord => !!w && typeof w === 'object')
                 .map(w => ({ name: w.name, totalMs: w.totalMs }))
                 .sort((a, b) => b.totalMs - a.totalMs),
         };

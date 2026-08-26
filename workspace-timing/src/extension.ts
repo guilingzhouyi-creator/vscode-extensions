@@ -38,7 +38,6 @@ import { TimeBasedCacheStrategy } from './cache/ICacheStrategy';
 import { normalizeWorkspaceId } from './domain/global-types';
 import {
     createDashboardMessageHandler,
-    exportTimingToFile,
     MessageRouterContext,
 } from './presentation/dashboardMessages';
 import { init as initI18n } from './i18n/index';
@@ -187,13 +186,6 @@ export function activate(context: vscode.ExtensionContext): void {
         // 修复：此前此处传入 null，导致 reset 命令永远命中"无工作区"守卫而失效。
         // globalAggregatorRef 传入：命令面板 reset/clearGlobal 与面板 reset 语义对齐（都清全局聚合）。
         commandRegistrar.register(context, orchestrator, statusBar, globalAggregatorRef);
-
-        // 导出命令：可从命令面板触发，与 Dashboard 导出按钮共用逻辑
-        context.subscriptions.push(
-            vscode.commands.registerCommand('workspaceTiming.export', () => {
-                void exportTimingToFile(getRouterContext());
-            }),
-        );
 
         // 注册订阅
         context.subscriptions.push(

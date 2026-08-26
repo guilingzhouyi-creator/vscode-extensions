@@ -107,12 +107,4 @@ export type DashboardMessage =
     | { type: 'clearHistory' }
     | { type: 'exportCSV' }
     | { type: 'exportAggregated' }
-    | { type: 'exportReport'; payload: { kind: 'daily' | 'weekly' } }
-    /** webview → 宿主：请求实时活跃曲线（最近 N 条时间片） */
-    | { type: 'getActiveCurve' };
-
-/** 实时活跃曲线数据（宿主 → webview 回推） */
-export interface ActiveCurveData {
-    /** 最近 N 条时间片（按时间升序，1 条 ≈ 1 秒） */
-    slices: Array<{ t: number; ms: number }>;
-}
+    | { type: 'exportReport'; payload: { kind: 'daily' | 'weekly' } };

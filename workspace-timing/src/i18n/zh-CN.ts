@@ -145,6 +145,7 @@ const zhCN: I18nStrings = {
     'panel.toast.exportDailyRequested': '已请求导出日报',
     'panel.toast.exportWeeklyRequested': '已请求导出周报',
     'panel.toast.exportAggregatedRequested': '已请求导出聚合数据',
+    'panel.toast.clearHistoryRequested': '已请求清除历史明细',
 };
 
 export default zhCN;

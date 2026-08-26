@@ -18,7 +18,7 @@ import { validateTimingData } from '../persistence/DataValidator';
 import { migrateToFolded } from '../domain/HistoryFolder';
 import { AggregatedCsvExporter } from './exporters/AggregatedCsvExporter';
 import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
-import { DashboardData, ActiveCurveData } from '../domain/dashboard-types';
+import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
@@ -178,8 +178,9 @@ export class TimerOrchestrator {
             this.timer.data.currentSessionStartMs,
         );
 
-        // 最近 7 天每日统计（柱状图）
-        const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs);
+        // 最近 7 天每日统计（柱状图，跟随界面语言）
+        const locale = cfg.locale === 'en' ? 'en' : 'zh-CN';
+        const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs, locale);
 
         // 活动时间线热力图（近 12 周，含本周；窗口化聚合，复用按日口径）
         const heatmap = TimeAggregator.heatmapDays(
@@ -234,17 +235,6 @@ export class TimerOrchestrator {
             journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
             fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? DEFAULT_FULL_SAVE_MS,
             maxSessions: cfg.maxSessions ?? DEFAULT_MAX_SESSIONS,
-        };
-    }
-
-    /**
-     * 读取最近 N 条实时时间片（面板「活跃曲线」数据源）。
-     * 数据来自 JournalWriter 保留窗（1 条 ≈ 1 秒，不受 flush 清空影响）。
-     * @param n 最多返回条数（默认 180 ≈ 近 3 分钟）
-     */
-    getActiveCurve(n = 180): ActiveCurveData {
-        return {
-            slices: this.journal.getRecent(n).map((s) => ({ t: s.timestamp, ms: s.deltaMs })),
         };
     }
 
@@ -305,7 +295,8 @@ export class TimerOrchestrator {
                 totalMs: w.totalMs,
                 sessionCount: w.sessionCount,
             }));
-        const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs);
+        const locale = this.disable.config.locale === 'en' ? 'en' : 'zh-CN';
+        const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs, locale);
         log(LogLevel.Info, `TimerOrchestrator: exported weekly report (${summary.weekStart})`);
         return ReportExporter.buildWeeklyReport(summary, trend, dailyStats);
     }

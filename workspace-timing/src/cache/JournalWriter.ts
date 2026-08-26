@@ -17,13 +17,6 @@ export class JournalWriter {
     private readonly storage: IJournalStore;
     private readonly strategy: ICacheStrategy;
     private lastFlushTime: number = Date.now();
-    /**
-     * UI 活跃曲线保留窗：最近 N 条时间片（独立于 RingBuffer，flush 清空不影响）。
-     * RingBuffer 每次 flush 会清空，直接 peekLast 只能看到最近 ~10s；
-     * 此窗口按 1s/条 保留约 5 分钟供面板渲染实时曲线。
-     */
-    private readonly _recentSlices: TimeSlice[] = [];
-    private static readonly RECENT_SLICE_CAP = 300;
 
     constructor(
         storage: IJournalStore,
@@ -43,19 +36,6 @@ export class JournalWriter {
     /** 写入一条时间片 */
     push(slice: TimeSlice): void {
         this.ringBuffer.push(slice);
-        this._recentSlices.push(slice);
-        if (this._recentSlices.length > JournalWriter.RECENT_SLICE_CAP) {
-            this._recentSlices.shift();
-        }
-    }
-
-    /**
-     * 读取最近 N 条时间片（UI 活跃曲线用）。
-     * 不受 flush 清空影响：从保留窗返回，按时间升序。
-     */
-    getRecent(n: number): TimeSlice[] {
-        if (n <= 0) return [];
-        return this._recentSlices.slice(-n);
     }
 
     /**

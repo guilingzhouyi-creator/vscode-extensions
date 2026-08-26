@@ -23,7 +23,7 @@ export interface MessageRouterContext {
     /** reset 完成后用于状态栏归零 */
     getStatusBar(): StatusBarController | null;
     /** reset 完成后用于立即回推最新面板数据（注入而非静态单例，保持可测性） */
-    getDashboard(): { updateData(data: unknown): void; postMessage(msg: unknown): void } | null;
+    getDashboard(): { updateData(data: unknown): void } | null;
 }
 
 /** 清洗文件名中的非法字符（工作区名可能含 /\:*?"<>| 等） */
@@ -90,16 +90,6 @@ export function createDashboardMessageHandler(ctx: MessageRouterContext): Dashbo
             case 'exportReport':
                 void exportReportToFile(ctx, msg.payload.kind);
                 break;
-
-            case 'getActiveCurve': {
-                // webview 请求实时活跃曲线：从保留窗读取并回推
-                const orch = ctx.getOrchestrator();
-                const dash = ctx.getDashboard();
-                if (orch && dash) {
-                    dash.postMessage({ type: 'activeCurve', payload: orch.getActiveCurve() });
-                }
-                break;
-            }
         }
     };
 }

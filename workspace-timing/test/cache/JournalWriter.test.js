@@ -94,35 +94,3 @@ describe('JournalWriter（IJournalStore 端口）', () => {
         await assert.rejects(() => w.flushAll(), /disk full/);
     });
 });
-
-describe('JournalWriter：getRecent 活跃曲线保留窗', () => {
-    it('返回最近 N 条，不受 flush 清空影响', async () => {
-        const store = new FakeJournalStore();
-        const w = new JournalWriter(store, 16, new TimeBasedCacheStrategy(0));
-        for (let i = 0; i < 10; i++) w.push(slice(1000 + i, 1000));
-        await w.tryFlush(); // 清空 RingBuffer
-        const recent = w.getRecent(5);
-        assert.strictEqual(recent.length, 5);
-        assert.strictEqual(recent[0].timestamp, 1005, '保留最近 5 条中的最旧');
-        assert.strictEqual(recent[4].timestamp, 1009, '最新一条保留');
-        assert.strictEqual(store.appendCalls.length, 1, 'flush 确已执行');
-    });
-
-    it('条数超过上限时按 FIFO 淘汰，最多保留 300 条', () => {
-        const store = new FakeJournalStore();
-        const w = new JournalWriter(store, 16, new TimeBasedCacheStrategy(60_000));
-        for (let i = 0; i < 301; i++) w.push(slice(1000 + i, 1000));
-        const all = w.getRecent(1000);
-        assert.strictEqual(all.length, 300, '保留窗上限 300');
-        assert.strictEqual(all[0].timestamp, 1001, '最旧一条被淘汰');
-        assert.strictEqual(all[299].timestamp, 1300, '最新一条保留');
-    });
-
-    it('n<=0 或空窗返回空数组', () => {
-        const store = new FakeJournalStore();
-        const w = new JournalWriter(store, 16, new TimeBasedCacheStrategy(0));
-        assert.deepStrictEqual(w.getRecent(0), []);
-        assert.deepStrictEqual(w.getRecent(-1), []);
-        assert.deepStrictEqual(w.getRecent(5), []);
-    });
-});

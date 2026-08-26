@@ -14,6 +14,7 @@ import { DashboardPanel } from './DashboardPanel';
 import { LogLevel, log } from '../integration/Logger';
 import { t, format } from '../i18n/index';
 import { TimeAggregator } from '../domain/TimeAggregator';
+import { exportTimingToFile } from './dashboardMessages';
 
 /** 清洗文件名中的非法字符（与 dashboardMessages 同规则） */
 function sanitizeFileName(name: string): string {
@@ -68,6 +69,15 @@ export class CommandRegistrar {
         // 打开配置面板
         this.registerCommand('workspaceTiming.openDashboard', () => {
             DashboardPanel.createOrShow(context.extensionUri);
+        });
+
+        // 导出 CSV（与 Dashboard 导出按钮共用逻辑）
+        this.registerCommand('workspaceTiming.export', () => {
+            void exportTimingToFile({
+                getOrchestrator: () => orchestrator,
+                getStatusBar: () => statusBar,
+                getDashboard: () => DashboardPanel.currentPanel ?? null,
+            });
         });
 
         // 调试：手动存盘

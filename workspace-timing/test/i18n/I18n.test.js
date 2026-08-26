@@ -27,7 +27,7 @@ function extractTemplateLabelKeys() {
     const file = path.join(__dirname, '../../out/presentation/dashboardTemplate.js');
     const src = fs.readFileSync(file, 'utf8');
     const keys = new Set();
-    for (const m of src.matchAll(/\[(?:'|")((?:panel|confirm)\.[^'"]+)(?:'|")\]/g)) {
+    for (const m of src.matchAll(/(?:labels|L)\[(?:'|")([^'"]+)(?:'|")\]/g)) {
         keys.add(m[1]);
     }
     return [...keys];

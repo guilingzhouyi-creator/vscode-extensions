@@ -159,4 +159,5 @@ export interface I18nStrings {
     'panel.toast.exportDailyRequested': string;
     'panel.toast.exportWeeklyRequested': string;
     'panel.toast.exportAggregatedRequested': string;
+    'panel.toast.clearHistoryRequested': string;
 }

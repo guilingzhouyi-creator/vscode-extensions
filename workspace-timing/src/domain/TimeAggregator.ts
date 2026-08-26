@@ -257,13 +257,17 @@ export class TimeAggregator {
      *
      * @param sessions 历史会话列表
      * @param currentSessionStartMs 当前活跃会话开始时间
+     * @param locale 语言代码 ('zh-CN' | 'en')，默认 'zh-CN'
      * @returns 最近 7 天的 DailyChartEntry 数组，按日期升序
      */
     static last7Days(
         sessions: TimeSession[],
         currentSessionStartMs: number,
+        locale: 'zh-CN' | 'en' = 'zh-CN',
     ): { label: string; weekday: string; totalMs: number }[] {
-        const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
+        const weekdayNames = locale === 'en'
+            ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+            : ['日', '一', '二', '三', '四', '五', '六'];
         const today = new Date();
 
         // 预生成 7 天日期桶（本地日期，插入顺序即日期升序）
