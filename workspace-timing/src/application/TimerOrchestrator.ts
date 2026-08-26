@@ -226,6 +226,7 @@ export class TimerOrchestrator {
             workspaceList: globalSnap.workspaces,
             isEnabled: cfg.enabled,
             globalDisabled: cfg.globalDisabled,
+            locale: cfg.locale ?? 'auto',
             statusBarEnabled: cfg.statusBarEnabled,
             journalEnabled: cfg.journalEnabled ?? true,
             backupToFile: cfg.backupToFile ?? true,
@@ -335,6 +336,7 @@ export class TimerOrchestrator {
         const cfg: Partial<TimingConfig> = {};
         if (partial.isEnabled !== undefined) cfg.enabled = partial.isEnabled;
         if (partial.globalDisabled !== undefined) cfg.globalDisabled = partial.globalDisabled;
+        if (partial.locale !== undefined) cfg.locale = partial.locale;
         if (partial.statusBarEnabled !== undefined) cfg.statusBarEnabled = partial.statusBarEnabled;
         if (partial.journalEnabled !== undefined) cfg.journalEnabled = partial.journalEnabled;
         if (partial.backupToFile !== undefined) cfg.backupToFile = partial.backupToFile;

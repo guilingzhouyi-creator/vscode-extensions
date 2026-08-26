@@ -109,6 +109,12 @@ export interface I18nStrings {
     'panel.set.statusBar.name': string;
     'panel.set.statusBar.tip': string;
     'panel.set.statusBar.desc': string;
+    'panel.set.locale.name': string;
+    'panel.set.locale.tip': string;
+    'panel.set.locale.desc': string;
+    'panel.set.locale.auto': string;
+    'panel.set.locale.zhCN': string;
+    'panel.set.locale.en': string;
     'panel.set.journal.name': string;
     'panel.set.journal.tip': string;
     'panel.set.journal.desc': string;

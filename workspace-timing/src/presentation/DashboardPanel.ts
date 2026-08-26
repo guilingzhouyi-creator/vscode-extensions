@@ -30,6 +30,18 @@ export class DashboardPanel {
         }
     }
 
+    /**
+     * 语言热切换后重建面板：用当前面板已持有的 extensionUri 重建，
+     * 使新语言词条渲染生效（webview 静态文案在渲染时注入，必须重建）。
+     */
+    static recreateForLocale(): void {
+        const existing = DashboardPanel.currentPanel;
+        if (!existing) return;
+        const uri = existing._extensionUri;
+        DashboardPanel.disposeCurrent();
+        DashboardPanel.createOrShow(uri);
+    }
+
     /** 生成 CSP nonce（每次渲染 HTML 时唯一） */
     private static getNonce(): string {
         let text = '';

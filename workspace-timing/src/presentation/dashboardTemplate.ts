@@ -181,6 +181,21 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       border-color: var(--focus);
     }
 
+    /* 下拉选择（语言切换等） */
+    .select-input {
+      padding: 4px 8px;
+      background: var(--input-bg);
+      color: var(--input-fg);
+      border: 1px solid var(--input-border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-family: var(--vscode-font-family, inherit);
+    }
+    .select-input:focus {
+      outline: none;
+      border-color: var(--focus);
+    }
+
     /* Buttons */
     .btn-row {
       display: flex;
@@ -438,24 +453,28 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     }
     .chart-mode-btn:hover { border-color: var(--focus); }
     .active-curve {
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
+      display: block;
       height: 60px;
       margin: 8px 0 4px 0;
       padding: 4px 2px;
       background: var(--input-bg);
       border-radius: var(--radius);
     }
-    .ac-bar {
-      flex: 1;
-      min-width: 2px;
-      border-radius: 2px 2px 0 0;
-      background: var(--success);
-      opacity: 0.8;
-      transition: height 0.3s ease;
+    .ac-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
-    .ac-bar:hover { opacity: 1; }
+    .ac-line {
+      fill: none;
+      stroke: var(--success);
+      stroke-width: 2;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+    }
+    .ac-area {
+      fill: color-mix(in srgb, var(--success) 22%, transparent);
+    }
 
     /* 活动时间线热力图 */
     .heatmap-wrap {
@@ -818,6 +837,20 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         <span class="slider"></span>
       </label>
     </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <div class="setting-header-row">
+          <span>${args.labels['panel.set.locale.name']}</span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.locale.tip']}</span></span>
+        </div>
+        <div class="desc">${args.labels['panel.set.locale.desc']}</div>
+      </div>
+      <select class="select-input" id="selLocale" data-key="locale">
+        <option value="auto">${args.labels['panel.set.locale.auto']}</option>
+        <option value="zh-CN">${args.labels['panel.set.locale.zhCN']}</option>
+        <option value="en">${args.labels['panel.set.locale.en']}</option>
+      </select>
+    </div>
   </div>
 
   <!-- 存储设置 -->
@@ -949,6 +982,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         setChecked('chkEnabled', data.isEnabled);
         setChecked('chkGlobalDisabled', data.globalDisabled);
         setChecked('chkStatusBar', data.statusBarEnabled);
+        setValue('selLocale', data.locale || 'auto');
         setChecked('chkJournal', data.journalEnabled);
         setChecked('chkBackup', data.backupToFile);
         setValue('numRingBuffer', data.ringBufferCapacity);
@@ -1085,8 +1119,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
 
       // ---- 实时活跃曲线渲染 ----
       // 数据：宿主按消息请求回推的最近时间片（1 条 ≈ 1 秒，最多近 3 分钟）。
-      // 渲染：5 秒一桶聚合（近 3 分钟 = 36 桶），柱高 = 桶内活跃秒数，
-      //       空闲段自然变矮，直观呈现"是否在持续活跃"。
+      // 渲染：5 秒一桶聚合（近 3 分钟 = 36 桶），SVG 光滑曲线（Catmull-Rom→Bezier）
+      //       + 面积填充；峰值圆角，空闲段自然下探，直观呈现"是否在持续活跃"。
       function renderActiveCurve(slices) {
         const el = document.getElementById('activeCurve');
         if (!el) return;
@@ -1105,12 +1139,48 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           if (idx >= 0 && idx < BUCKETS) buckets[BUCKETS - 1 - idx] += 1;
         }
         const maxVal = Math.max(...buckets, 1);
-        el.innerHTML = buckets.map((v, i) => {
-          const pct = v > 0 ? Math.max((v / maxVal) * 100, 4) : 0;
-          const startSec = (BUCKETS - i) * (BUCKET_MS / 1000);
-          const tip = fmt(L['panel.js.curveSegTip'], startSec, v);
-          return '<div class="ac-bar" style="height:' + pct + '%" title="' + tip + '"></div>';
-        }).join('');
+
+        // 归一化点集：x 从左到右、y 值越大越高（留 4px 上下内边距）
+        const W = 600, H = 60, PAD = 4;
+        const pts = buckets.map((v, i) => {
+          const x = (i / (BUCKETS - 1)) * W;
+          const y = H - PAD - (v / maxVal) * (H - 2 * PAD);
+          return [x, y];
+        });
+
+        // Catmull-Rom → 三次贝塞尔：过全部采样点的光滑曲线
+        function smoothPath(p) {
+          if (p.length < 2) return '';
+          let d = 'M' + p[0][0].toFixed(1) + ',' + p[0][1].toFixed(1);
+          for (let i = 0; i < p.length - 1; i++) {
+            const p0 = p[i - 1] || p[i];
+            const p1 = p[i];
+            const p2 = p[i + 1];
+            const p3 = p[i + 2] || p2;
+            const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+            const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+            const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+            const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+            d += 'C' + c1x.toFixed(1) + ',' + c1y.toFixed(1)
+              + ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1)
+              + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+          }
+          return d;
+        }
+        const line = smoothPath(pts);
+        const base = H - PAD;
+        const area = line + 'L' + W.toFixed(1) + ',' + base.toFixed(1) + 'L0,' + base.toFixed(1) + 'Z';
+
+        // 悬停总览：近 3 分钟活跃秒数
+        const activeSec = buckets.reduce((s, v) => s + v, 0);
+        const tip = fmt(L['panel.js.curveSegTip'], BUCKETS * BUCKET_MS / 1000, activeSec);
+
+        el.innerHTML =
+          '<svg class="ac-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+            '<title>' + tip + '</title>' +
+            '<path class="ac-area" d="' + area + '"></path>' +
+            '<path class="ac-line" d="' + line + '"></path>' +
+          '</svg>';
       }
 
       // ---- 活动时间线热力图渲染 ----
@@ -1266,6 +1336,11 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         });
       });
 
+      // 语言选择变更（显式 i18n 切换；宿主收到后热生效并重建面板）
+      document.getElementById('selLocale').addEventListener('change', (e) => {
+        sendUpdate('locale', e.target.value);
+      });
+
       // 数字输入变更（按输入框 min/max 钳制；空/非法输入不发送，宿主端亦有下限兜底）
       document.querySelectorAll('.number-input').forEach(el => {
         let timeout = null;
@@ -1335,6 +1410,14 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           btn.textContent = L['panel.js.chartModeBars'];
           label.textContent = L['panel.js.chartModeCurve'];
           curveEl.style.display = 'flex';
+          // ★ 立即隐藏柱状图区域，避免切换瞬间旧柱状图残留几帧
+          //   （此前依赖下一轮 updateData 的 renderChart 守卫才隐藏，产生闪烁）
+          const barsEl = document.getElementById('chartBars');
+          const emptyEl = document.getElementById('chartEmpty');
+          const weekEl = document.getElementById('weekTotal');
+          if (barsEl) barsEl.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'none';
+          if (weekEl) weekEl.style.display = 'none';
           // 立即拉取一次（后续随 updateData 周期刷新）
           vscode.postMessage({ type: 'getActiveCurve' });
         } else {

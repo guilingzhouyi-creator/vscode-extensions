@@ -88,6 +88,8 @@ export interface DashboardData {
     workspaceList: Array<{ name: string; totalMs: number }>;
     isEnabled: boolean;
     globalDisabled: boolean;
+    /** 界面语言（auto=跟随 VS Code 显示语言） */
+    locale: 'auto' | 'zh-CN' | 'en';
     statusBarEnabled: boolean;
     journalEnabled: boolean;
     backupToFile: boolean;
