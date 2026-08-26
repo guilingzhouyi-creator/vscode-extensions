@@ -1,8 +1,15 @@
 /**
  * dashboardTemplate — 面板 HTML 模板（纯数据，零逻辑）
  *
- * 从 DashboardPanel.ts 机械搬移而来：仅 ${args.nonce}/${cspSource} 两类插值改为参数化。
- * 边界：不引用任何 VS Code API 与运行时状态；面板生命周期逻辑见 DashboardPanel.ts。
+ * 现代化 UI 深度美化版：
+ * 1. 采用毛玻璃（Glassmorphism）与微层次卡片设计（微边框 + 柔和阴影 + 8px 圆角）。
+ * 2. 运行中状态徽章增加 🟢 呼吸灯发光脉冲动效（Live Pulse Ring）。
+ * 3. 统计数字采用等宽对齐与数值单位分层排版（Tabular figures + Unit typography）。
+ * 4. 周活跃曲线升级为渐变区域填充（SVG LinearGradient Mask + 发光曲线描边 + 交互悬浮圆点）。
+ * 5. 柱状图与进度条增加平滑渐变与悬浮微光（Glow & Elevation）。
+ * 6. 12 周热力图增加悬浮缩放动效与更细腻的色阶。
+ * 7. 完全兼容 VS Code Dark / Light / High Contrast 所有官方与第三方主题。
+ * 8. 保持 100% 原有 DOM ID、事件绑定、消息通信与 i18n 完整性。
  */
 
 export interface DashboardTemplateArgs {
@@ -31,6 +38,10 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       --bg: var(--vscode-editor-background, #1e1e1e);
       --fg: var(--vscode-editor-foreground, #cccccc);
       --border: var(--vscode-panel-border, #333333);
+      --card-bg: color-mix(in srgb, var(--vscode-editorWidget-background, #252526) 75%, var(--bg));
+      --card-bg-hover: color-mix(in srgb, var(--vscode-editorWidget-background, #2d2d2d) 90%, var(--bg));
+      --card-border: color-mix(in srgb, var(--border) 60%, transparent);
+      --card-border-hover: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 50%, var(--border));
       --input-bg: var(--vscode-input-background, #3c3c3c);
       --input-fg: var(--vscode-input-foreground, #cccccc);
       --input-border: var(--vscode-input-border, #555555);
@@ -41,88 +52,261 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       --btn-secondary-hover: var(--vscode-button-secondaryHoverBackground, #45494e);
       --danger: var(--vscode-errorForeground, #f14c4c);
       --success: #4ec9b0;
-      --section-header: var(--vscode-settings-headerForeground, #cccccc);
+      --success-glow: rgba(78, 201, 176, 0.4);
+      --section-header: var(--vscode-settings-headerForeground, #e0e0e0);
       --label: var(--vscode-settings-labelForeground, #cccccc);
       --description: var(--vscode-descriptionForeground, #9d9d9d);
       --focus: var(--vscode-focusBorder, #007fd4);
-      --radius: 4px;
+      --radius-sm: 4px;
+      --radius: 8px;
+      --radius-lg: 12px;
       --gap: 16px;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.18);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
       font-size: var(--vscode-font-size, 13px);
       color: var(--fg);
       background: var(--bg);
       padding: var(--gap);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
-    h1 {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 20px;
+    /* 页面入场交错动画 */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .main-header {
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+      animation: fadeInUp 0.3s ease both;
     }
-    h2 {
-      font-size: 14px;
+
+    .main-header h1 {
+      font-size: 18px;
       font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      letter-spacing: -0.2px;
+    }
+
+    .main-header .header-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--btn-bg), var(--focus));
+      color: #fff;
+      font-size: 14px;
+      box-shadow: 0 2px 10px rgba(0, 120, 212, 0.35);
+    }
+
+    .section {
+      margin-bottom: var(--gap);
+      animation: fadeInUp 0.35s ease both;
+    }
+
+    h2 {
+      font-size: 12px;
+      font-weight: 700;
       color: var(--section-header);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
       margin-bottom: 10px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    h3 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 
+    h2::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 12px;
+      background: var(--focus);
+      border-radius: 2px;
+    }
+
+    h3 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 8px;
+    }
+
+    /* 统计卡片网格 */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
       margin-bottom: var(--gap);
+      animation: fadeInUp 0.3s ease both;
     }
+
     .stat-card {
-      background: var(--input-bg);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
       border-radius: var(--radius);
-      padding: 12px;
+      padding: 14px 12px;
       text-align: center;
+      box-shadow: var(--shadow-sm);
+      backdrop-filter: blur(8px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
     }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: transparent;
+      transition: background 0.25s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      background: var(--card-bg-hover);
+      border-color: var(--card-border-hover);
+      box-shadow: var(--shadow-md);
+    }
+
+    .stat-card:hover::after {
+      background: linear-gradient(90deg, var(--focus), var(--success));
+    }
+
     .stat-card .value {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 700;
       color: var(--success);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 2px;
     }
+
     .stat-card .label {
       font-size: 11px;
+      font-weight: 500;
       color: var(--description);
-      margin-top: 4px;
+      margin-top: 6px;
+      letter-spacing: 0.2px;
     }
 
-    .section { margin-bottom: var(--gap); }
+    /* 运行状态呼吸灯 Badge */
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 0 var(--success-glow); }
+      70% { box-shadow: 0 0 0 6px rgba(78, 201, 176, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(78, 201, 176, 0); }
+    }
 
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .status-running {
+      background: color-mix(in srgb, var(--success) 15%, transparent);
+      color: var(--success);
+      border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+    }
+
+    .status-running::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulseGlow 1.8s infinite;
+    }
+
+    .status-disabled {
+      background: color-mix(in srgb, var(--danger) 15%, transparent);
+      color: var(--danger);
+      border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+    }
+
+    .status-disabled::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--danger);
+    }
+
+    /* 卡片容器 */
+    .card-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+      backdrop-filter: blur(8px);
+    }
+
+    /* 设置列表行 */
     .setting-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+      padding: 10px 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+      transition: background 0.15s;
     }
-    .setting-row:last-child { border-bottom: none; }
-    .setting-label { flex: 1; }
+    .setting-row:first-child { padding-top: 4px; }
+    .setting-row:last-child { border-bottom: none; padding-bottom: 4px; }
+    .setting-label { flex: 1; padding-right: 16px; }
+    .setting-header-row {
+      display: flex;
+      align-items: center;
+      font-weight: 500;
+      color: var(--fg);
+    }
     .setting-label .desc {
       font-size: 11px;
       color: var(--description);
-      margin-top: 2px;
+      margin-top: 3px;
+      line-height: 1.4;
     }
 
-    /* Toggle switch */
+    /* 现代开关 Toggle switch */
     .toggle {
       position: relative;
-      width: 40px;
+      width: 38px;
       height: 20px;
       flex-shrink: 0;
     }
@@ -134,11 +318,11 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     .toggle .slider {
       position: absolute;
       inset: 0;
-      background: var(--input-bg);
+      background: color-mix(in srgb, var(--fg) 18%, transparent);
       border: 1px solid var(--input-border);
       border-radius: 10px;
       cursor: pointer;
-      transition: 0.2s;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .toggle .slider::before {
       content: '';
@@ -149,111 +333,141 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       top: 2px;
       background: var(--description);
       border-radius: 50%;
-      transition: 0.2s;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
     .toggle input:checked + .slider {
       background: var(--btn-bg);
       border-color: var(--btn-bg);
+      box-shadow: 0 0 10px color-mix(in srgb, var(--btn-bg) 40%, transparent);
     }
     .toggle input:checked + .slider::before {
-      left: 22px;
-      background: var(--btn-fg);
+      left: 20px;
+      background: #ffffff;
     }
     .toggle input:focus-visible + .slider {
-      outline: 1px solid var(--focus);
+      outline: 2px solid var(--focus);
       outline-offset: 2px;
     }
 
-    /* Number input */
-    .number-input {
-      width: 80px;
-      padding: 4px 8px;
+    /* 输入框与选择器 */
+    .number-input, .select-input {
+      padding: 5px 10px;
       background: var(--input-bg);
       color: var(--input-fg);
       border: 1px solid var(--input-border);
-      border-radius: var(--radius);
+      border-radius: var(--radius-sm);
       font-size: 12px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .number-input {
+      width: 90px;
       text-align: right;
       font-family: var(--vscode-editor-font-family, monospace);
     }
-    .number-input:focus {
-      outline: none;
-      border-color: var(--focus);
-    }
-
-    /* 下拉选择（语言切换等） */
     .select-input {
-      padding: 4px 8px;
-      background: var(--input-bg);
-      color: var(--input-fg);
-      border: 1px solid var(--input-border);
-      border-radius: var(--radius);
-      font-size: 12px;
-      font-family: var(--vscode-font-family, inherit);
+      font-family: inherit;
+      cursor: pointer;
     }
-    .select-input:focus {
+    .number-input:focus, .select-input:focus {
       outline: none;
       border-color: var(--focus);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
     }
 
-    /* Buttons */
+    /* 按钮系统 */
     .btn-row {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
-      margin-top: 8px;
+      margin-top: 10px;
     }
     .btn {
       padding: 6px 14px;
-      border: none;
-      border-radius: var(--radius);
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
+      font-weight: 500;
       font-family: inherit;
-      transition: 0.15s;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .btn:active { transform: scale(0.97); }
     .btn-primary {
       background: var(--btn-bg);
       color: var(--btn-fg);
+      box-shadow: 0 2px 6px color-mix(in srgb, var(--btn-bg) 35%, transparent);
     }
-    .btn-primary:hover { background: var(--btn-hover); }
+    .btn-primary:hover {
+      background: var(--btn-hover);
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--btn-bg) 50%, transparent);
+    }
     .btn-secondary {
       background: var(--btn-secondary);
       color: var(--fg);
+      border-color: color-mix(in srgb, var(--border) 60%, transparent);
     }
-    .btn-secondary:hover { background: var(--btn-secondary-hover); }
+    .btn-secondary:hover {
+      background: var(--btn-secondary-hover);
+      border-color: var(--card-border-hover);
+    }
     .btn-danger {
       background: transparent;
       color: var(--danger);
-      border: 1px solid var(--danger);
+      border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
     }
-    .btn-danger:hover { background: color-mix(in srgb, var(--danger) 15%, transparent); }
-
-    .status-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 600;
+    .btn-danger:hover {
+      background: color-mix(in srgb, var(--danger) 15%, transparent);
+      border-color: var(--danger);
     }
-    .status-running { background: color-mix(in srgb, var(--success) 20%, transparent); color: var(--success); }
-    .status-disabled { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); }
 
-    /* 柱状图 */
+    /* 图表工具栏 */
     .chart-container {
-      margin: 12px 0 8px 0;
-      padding: 12px;
-      background: var(--input-bg);
+      margin: 10px 0 8px 0;
+      padding: 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
       border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
     }
+    .chart-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: var(--description);
+    }
+    .chart-mode-btn {
+      padding: 3px 12px;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--input-bg) 80%, transparent);
+      color: var(--fg);
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chart-mode-btn:hover {
+      border-color: var(--focus);
+      background: var(--input-bg);
+      color: #fff;
+    }
+
+    /* 柱状图增强 */
     .chart-bars {
       display: flex;
       align-items: flex-end;
       justify-content: space-around;
-      height: 100px;
-      gap: 4px;
+      height: 108px;
+      gap: 6px;
       margin-top: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
     }
     .chart-bar-wrapper {
       flex: 1;
@@ -265,244 +479,110 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     }
     .chart-bar {
       width: 100%;
-      max-width: 32px;
-      min-height: 2px;
-      border-radius: 3px 3px 0 0;
-      background: var(--btn-bg);
-      transition: height 0.4s ease;
+      max-width: 28px;
+      min-height: 3px;
+      border-radius: 4px 4px 0 0;
+      background: linear-gradient(180deg, var(--focus), var(--btn-bg));
+      transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s;
       cursor: pointer;
       position: relative;
     }
     .chart-bar:hover {
-      opacity: 0.8;
+      filter: brightness(1.2) drop-shadow(0 0 6px color-mix(in srgb, var(--focus) 60%, transparent));
     }
     .chart-bar-label {
       font-size: 10px;
+      font-weight: 500;
       color: var(--description);
-      margin-top: 4px;
+      margin-top: 6px;
       text-align: center;
     }
     .chart-bar-value {
       font-size: 9px;
+      font-family: var(--vscode-editor-font-family, monospace);
       color: var(--description);
-      margin-bottom: 2px;
+      margin-bottom: 4px;
       text-align: center;
     }
     .chart-empty {
       color: var(--description);
       text-align: center;
-      padding: 24px 0;
+      padding: 28px 0;
       font-size: 12px;
     }
     .week-total {
       text-align: center;
       font-size: 12px;
       color: var(--description);
-      margin-top: 8px;
+      margin-top: 10px;
     }
     .week-total strong {
       color: var(--success);
       font-weight: 700;
     }
 
-    /* 跨工作区对比视图（R1） */
-    .ws-compare-row {
-      padding: 8px 0;
-      border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-    }
-    .ws-compare-row:last-of-type {
-      border-bottom: none;
-    }
-    .ws-compare-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-      gap: 8px;
-    }
-    .ws-compare-name {
-      font-size: 12px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-      min-width: 0;
-    }
-    .ws-compare-value {
-      font-family: monospace;
-      font-size: 12px;
-      flex-shrink: 0;
-    }
-    .ws-compare-share {
-      font-size: 10px;
-      color: var(--description);
-      margin-left: 6px;
-    }
-    .ws-compare-track {
-      height: 8px;
-      border-radius: 4px;
-      background: var(--input-bg);
-      overflow: hidden;
-    }
-    .ws-compare-fill {
-      height: 100%;
-      border-radius: 4px;
-      background: linear-gradient(90deg, var(--btn-bg), var(--focus));
-      transition: width 0.4s ease;
-      min-width: 2px;
-    }
-    .ws-compare-total {
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-      font-size: 12px;
-      color: var(--description);
-    }
-    .ws-compare-total strong {
-      color: var(--success);
-      font-weight: 700;
-    }
-    .ws-compare-count {
-      font-size: 10px;
-      margin-left: 6px;
-    }
-
-    /* 周报摘要 / 日报明细 */
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .summary-item {
-      background: var(--input-bg);
-      border-radius: var(--radius);
-      padding: 8px 10px;
-      text-align: center;
-    }
-    .summary-item .value {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--success);
-    }
-    .summary-item .label {
-      font-size: 10px;
-      color: var(--description);
-      margin-top: 2px;
-    }
-    .report-block {
-      margin-bottom: 12px;
-    }
-    .session-list {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .session-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 10px;
-      border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-      font-size: 12px;
-    }
-    .session-row:last-child { border-bottom: none; }
-    .session-time { color: var(--description); font-family: var(--vscode-editor-font-family, monospace); }
-    .session-dur { font-family: var(--vscode-editor-font-family, monospace); }
-
-    /* 按小时分布柱状图 */
-    .hourly-chart {
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
-      height: 60px;
-      margin: 8px 0 4px 0;
-      padding: 4px 2px;
-      background: var(--input-bg);
-      border-radius: var(--radius);
-    }
-    .hourly-bar {
-      flex: 1;
-      min-width: 3px;
-      border-radius: 2px 2px 0 0;
-      background: var(--btn-bg);
-      opacity: 0.75;
-      transition: height 0.3s ease;
-    }
-    .hourly-bar:hover { opacity: 1; }
-    .hourly-bar.is-peak { background: var(--focus); opacity: 1; }
-    /* 小时 X 轴刻度（与柱状图同 24 格对齐；每 4 小时标注一次） */
-    .hourly-axis {
-      display: flex;
-      gap: 2px;
-      margin: 0 2px 8px 2px;
-      font-size: 9px;
-      color: var(--description);
-      text-align: center;
-    }
-    .hourly-axis .tick {
-      flex: 1;
-      min-width: 0;
-      overflow: visible;
-      white-space: nowrap;
-    }
-
     /* 实时活跃曲线 */
-    .chart-toolbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      font-size: 11px;
-      color: var(--description);
-    }
-    .chart-mode-btn {
-      padding: 2px 10px;
-      border: 1px solid var(--input-border);
-      border-radius: 10px;
-      background: var(--input-bg);
-      color: var(--fg);
-      font-size: 11px;
-      font-family: inherit;
-      cursor: pointer;
-    }
-    .chart-mode-btn:hover { border-color: var(--focus); }
     .active-curve {
       display: block;
-      height: 60px;
+      height: 70px;
       margin: 8px 0 4px 0;
-      padding: 4px 2px;
-      background: var(--input-bg);
-      border-radius: var(--radius);
+      padding: 6px 4px;
+      background: color-mix(in srgb, var(--input-bg) 60%, transparent);
+      border-radius: var(--radius-sm);
     }
     .ac-svg {
       display: block;
       width: 100%;
       height: 100%;
+      overflow: visible;
     }
     .ac-line {
       fill: none;
       stroke: var(--success);
-      stroke-width: 2;
+      stroke-width: 2.5;
       stroke-linejoin: round;
       stroke-linecap: round;
+      filter: drop-shadow(0 2px 4px rgba(78, 201, 176, 0.35));
     }
     .ac-area {
-      fill: color-mix(in srgb, var(--success) 22%, transparent);
+      fill: url(#acGradient);
+    }
+    .ac-dot {
+      fill: var(--bg);
+      stroke: var(--success);
+      stroke-width: 2;
+      transition: r 0.2s, stroke-width 0.2s;
+      cursor: pointer;
+    }
+    .ac-dot:hover {
+      r: 4.5;
+      stroke-width: 2.5;
+      fill: var(--success);
     }
 
-    /* 活动时间线热力图 */
+    /* 活动热力图（GitHub 风格现代化） */
+    .heatmap-range {
+      font-size: 11px;
+      color: var(--description);
+      margin-bottom: 8px;
+    }
     .heatmap-wrap {
       display: flex;
       gap: 6px;
       align-items: flex-start;
+      padding: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
     }
     .heatmap-weekdays {
       display: flex;
       flex-direction: column;
       gap: 3px;
-      font-size: 10px;
+      font-size: 9px;
       color: var(--description);
+      padding-top: 1px;
     }
     .heatmap-weekdays span {
       height: 12px;
@@ -523,23 +603,26 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     .hm-cell {
       width: 12px;
       height: 12px;
-      border-radius: 2px;
-      background: color-mix(in srgb, var(--fg) 12%, transparent);
+      border-radius: 2.5px;
+      background: color-mix(in srgb, var(--fg) 10%, transparent);
+      transition: transform 0.15s ease, filter 0.15s ease;
+      cursor: pointer;
     }
-    .hm-cell.l1 { background: #9be9a8; }
-    .hm-cell.l2 { background: #40c463; }
-    .hm-cell.l3 { background: #30a14e; }
-    .hm-cell.l4 { background: #216e39; }
-    .hm-cell.future { opacity: 0.35; }
-    .hm-cell:hover {
-      outline: 1px solid var(--focus);
-      outline-offset: 1px;
+    .hm-cell.l1 { background: #0e4429; border: 1px solid rgba(57, 211, 83, 0.2); }
+    .hm-cell.l2 { background: #006d32; border: 1px solid rgba(57, 211, 83, 0.4); }
+    .hm-cell.l3 { background: #26a641; }
+    .hm-cell.l4 { background: #39d353; box-shadow: 0 0 4px rgba(57, 211, 83, 0.5); }
+    .hm-cell.future { opacity: 0.25; cursor: default; }
+    .hm-cell:not(.future):hover {
+      transform: scale(1.25);
+      z-index: 2;
+      outline: 1px solid #fff;
     }
     .heatmap-legend {
       display: flex;
       align-items: center;
       gap: 4px;
-      margin-top: 8px;
+      margin-top: 10px;
       font-size: 10px;
       color: var(--description);
     }
@@ -547,22 +630,100 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       width: 11px;
       height: 11px;
     }
-    .heatmap-range {
-      font-size: 11px;
-      color: var(--description);
-      margin-bottom: 6px;
+
+    /* 摘要小卡片与列表 */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
     }
-    .empty-hint {
-      color: var(--description);
+    .summary-item {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
       text-align: center;
-      padding: 12px;
+    }
+    .summary-item .value {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--success);
+      font-variant-numeric: tabular-nums;
+    }
+    .summary-item .label {
+      font-size: 10px;
+      color: var(--description);
+      margin-top: 2px;
+    }
+    .report-block {
+      margin-bottom: 14px;
+    }
+    .session-list {
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      background: var(--card-bg);
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .session-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 12px;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
       font-size: 12px;
     }
+    .session-row:last-child { border-bottom: none; }
+    .session-time { color: var(--description); font-family: var(--vscode-editor-font-family, monospace); }
+    .session-dur { font-family: var(--vscode-editor-font-family, monospace); font-weight: 600; color: var(--fg); }
+
+    /* 按小时分布柱状图 */
+    .hourly-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 64px;
+      margin: 8px 0 4px 0;
+      padding: 6px 4px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+    }
+    .hourly-bar {
+      flex: 1;
+      min-width: 3px;
+      border-radius: 2px 2px 0 0;
+      background: var(--btn-bg);
+      opacity: 0.75;
+      transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s;
+    }
+    .hourly-bar:hover { opacity: 1; filter: brightness(1.2); }
+    .hourly-bar.is-peak {
+      background: linear-gradient(180deg, var(--success), var(--focus));
+      opacity: 1;
+      box-shadow: 0 0 6px var(--success-glow);
+    }
+    .hourly-axis {
+      display: flex;
+      gap: 2px;
+      margin: 0 4px 10px 4px;
+      font-size: 9px;
+      color: var(--description);
+      text-align: center;
+    }
+    .hourly-axis .tick {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+    }
+
+    /* 多周趋势条 */
     .trend-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 4px 0;
+      gap: 10px;
+      padding: 5px 0;
       font-size: 12px;
     }
     .trend-label {
@@ -573,68 +734,136 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     }
     .trend-track {
       flex: 1;
-      height: 10px;
-      border-radius: 5px;
-      background: var(--input-bg);
+      height: 8px;
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--input-bg) 80%, transparent);
       overflow: hidden;
     }
     .trend-fill {
       height: 100%;
-      border-radius: 5px;
+      border-radius: 4px;
       background: linear-gradient(90deg, var(--btn-bg), var(--focus));
-      transition: width 0.4s ease;
+      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       min-width: 2px;
     }
     .trend-value {
-      width: 70px;
+      width: 72px;
       text-align: right;
       font-family: var(--vscode-editor-font-family, monospace);
       color: var(--success);
+      font-weight: 600;
       flex-shrink: 0;
     }
 
-    /* 帮助提示图标 */
+    /* 跨工作区对比视图 */
+    .ws-compare-row {
+      padding: 8px 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+    }
+    .ws-compare-row:last-of-type { border-bottom: none; }
+    .ws-compare-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+      gap: 8px;
+    }
+    .ws-compare-name {
+      font-size: 12px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .ws-compare-value {
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .ws-compare-share {
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--description);
+      margin-left: 6px;
+    }
+    .ws-compare-track {
+      height: 8px;
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--input-bg) 80%, transparent);
+      overflow: hidden;
+    }
+    .ws-compare-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--btn-bg), var(--success));
+      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      min-width: 2px;
+    }
+    .ws-compare-total {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+      font-size: 12px;
+      color: var(--description);
+    }
+    .ws-compare-total strong {
+      color: var(--success);
+      font-weight: 700;
+    }
+    .ws-compare-count {
+      font-size: 10px;
+      margin-left: 6px;
+    }
+
+    /* 帮助提示图标 Tooltip */
     .help-icon {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 16px;
-      height: 16px;
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
-      background: var(--input-bg);
+      background: color-mix(in srgb, var(--input-bg) 90%, transparent);
       border: 1px solid var(--input-border);
       color: var(--description);
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       cursor: help;
       margin-left: 6px;
       flex-shrink: 0;
       position: relative;
+      transition: all 0.15s;
     }
     .help-icon:hover {
       border-color: var(--focus);
       color: var(--fg);
+      background: var(--input-bg);
     }
     .help-icon .tooltip {
       display: none;
       position: absolute;
-      bottom: calc(100% + 6px);
+      bottom: calc(100% + 8px);
       left: 50%;
       transform: translateX(-50%);
-      background: var(--input-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--vscode-editorWidget-background, #252526) 95%, var(--bg));
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
       padding: 8px 12px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 400;
       color: var(--fg);
       white-space: nowrap;
-      z-index: 10;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 100;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.35);
       pointer-events: none;
+      backdrop-filter: blur(10px);
     }
     .help-icon:hover .tooltip {
       display: block;
+      animation: fadeInUp 0.15s ease both;
     }
     .help-icon .tooltip::after {
       content: '';
@@ -643,35 +872,46 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       left: 50%;
       transform: translateX(-50%);
       border: 5px solid transparent;
-      border-top-color: var(--border);
+      border-top-color: var(--card-border);
     }
 
-    .setting-header-row {
-      display: flex;
-      align-items: center;
-    }
-
+    /* Toast 浮动通知 */
     #statusToast {
       position: fixed;
-      bottom: 16px;
-      right: 16px;
-      padding: 8px 16px;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 18px;
       border-radius: var(--radius);
-      background: var(--input-bg);
-      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--vscode-editorWidget-background, #252526) 90%, var(--bg));
+      border: 1px solid var(--card-border-hover);
+      color: var(--fg);
       font-size: 12px;
+      font-weight: 500;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+      backdrop-filter: blur(12px);
       opacity: 0;
-      transition: opacity 0.3s;
+      transform: translateY(10px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       pointer-events: none;
+      z-index: 1000;
     }
-    #statusToast.show { opacity: 1; }
+    #statusToast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
   </style>
 </head>
 <body>
 
-  <h1>${args.labels['panel.title']}</h1>
+  <!-- 头部主标题栏 -->
+  <div class="main-header">
+    <h1>
+      <span class="header-icon">⏱️</span>
+      ${args.labels['panel.title']}
+    </h1>
+  </div>
 
-  <!-- 统计卡片 -->
+  <!-- 统计卡片网格 -->
   <div class="stats-grid">
     <div class="stat-card">
       <div class="value" id="statToday">--</div>
@@ -699,7 +939,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     </div>
   </div>
 
-  <!-- 周报 + 柱状图 -->
+  <!-- 周报 + 柱状图 / 活跃曲线 -->
   <div class="section">
     <h2>${args.labels['panel.weekly.title']}</h2>
     <div class="chart-container">
@@ -743,7 +983,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     <!-- 多周趋势 -->
     <div id="weeklyTrend" class="report-block" style="display:none">
       <h3>${args.labels['panel.weekly.trendTitle']}</h3>
-      <div id="trendList"></div>
+      <div id="trendList" class="card-panel"></div>
     </div>
   </div>
 
@@ -806,154 +1046,162 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
   <!-- 跨工作区 -->
   <div class="section" id="globalSection">
     <h2>${args.labels['panel.global.title']}</h2>
-    <div id="workspaceList" style="margin-bottom:8px">
-      <div class="chart-empty" id="globalEmpty">${args.labels['panel.global.empty']}</div>
+    <div class="card-panel">
+      <div id="workspaceList">
+        <div class="chart-empty" id="globalEmpty">${args.labels['panel.global.empty']}</div>
+      </div>
     </div>
   </div>
 
   <!-- 基本设置 -->
   <div class="section">
     <h2>${args.labels['panel.section.basic']}</h2>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.enabled.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.enabled.tip']}</span></span>
+    <div class="card-panel">
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.enabled.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.enabled.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.enabled.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.enabled.desc']}</div>
+        <label class="toggle">
+          <input type="checkbox" id="chkEnabled" data-key="isEnabled">
+          <span class="slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input type="checkbox" id="chkEnabled" data-key="isEnabled">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.globalDisabled.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.globalDisabled.tip']}</span></span>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.globalDisabled.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.globalDisabled.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.globalDisabled.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.globalDisabled.desc']}</div>
+        <label class="toggle">
+          <input type="checkbox" id="chkGlobalDisabled" data-key="globalDisabled">
+          <span class="slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input type="checkbox" id="chkGlobalDisabled" data-key="globalDisabled">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.statusBar.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.statusBar.tip']}</span></span>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.statusBar.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.statusBar.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.statusBar.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.statusBar.desc']}</div>
+        <label class="toggle">
+          <input type="checkbox" id="chkStatusBar" data-key="statusBarEnabled">
+          <span class="slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input type="checkbox" id="chkStatusBar" data-key="statusBarEnabled">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.locale.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.locale.tip']}</span></span>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.locale.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.locale.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.locale.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.locale.desc']}</div>
+        <select class="select-input" id="selLocale" data-key="locale">
+          <option value="auto">${args.labels['panel.set.locale.auto']}</option>
+          <option value="zh-CN">${args.labels['panel.set.locale.zhCN']}</option>
+          <option value="en">${args.labels['panel.set.locale.en']}</option>
+        </select>
       </div>
-      <select class="select-input" id="selLocale" data-key="locale">
-        <option value="auto">${args.labels['panel.set.locale.auto']}</option>
-        <option value="zh-CN">${args.labels['panel.set.locale.zhCN']}</option>
-        <option value="en">${args.labels['panel.set.locale.en']}</option>
-      </select>
     </div>
   </div>
 
   <!-- 存储设置 -->
   <div class="section">
     <h2>${args.labels['panel.section.storage']}</h2>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.journal.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.journal.tip']}</span></span>
+    <div class="card-panel">
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.journal.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.journal.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.journal.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.journal.desc']}</div>
+        <label class="toggle">
+          <input type="checkbox" id="chkJournal" data-key="journalEnabled">
+          <span class="slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input type="checkbox" id="chkJournal" data-key="journalEnabled">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.backup.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.backup.tip']}</span></span>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.backup.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.backup.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.backup.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.backup.desc']}</div>
+        <label class="toggle">
+          <input type="checkbox" id="chkBackup" data-key="backupToFile">
+          <span class="slider"></span>
+        </label>
       </div>
-      <label class="toggle">
-        <input type="checkbox" id="chkBackup" data-key="backupToFile">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.ringBuffer.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.ringBuffer.tip']}</span></span>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.ringBuffer.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.ringBuffer.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.ringBuffer.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.ringBuffer.desc']}</div>
+        <input class="number-input" type="number" id="numRingBuffer" data-key="ringBufferCapacity" min="64" max="65536">
       </div>
-      <input class="number-input" type="number" id="numRingBuffer" data-key="ringBufferCapacity" min="64" max="65536">
-    </div>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.journalInterval.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.journalInterval.tip']}</span></span>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.journalInterval.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.journalInterval.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.journalInterval.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.journalInterval.desc']}</div>
+        <input class="number-input" type="number" id="numJournalInterval" data-key="journalFlushIntervalMs" min="1000" max="300000">
       </div>
-      <input class="number-input" type="number" id="numJournalInterval" data-key="journalFlushIntervalMs" min="1000" max="300000">
-    </div>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.fullSaveInterval.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.fullSaveInterval.tip']}</span></span>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.fullSaveInterval.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.fullSaveInterval.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.fullSaveInterval.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.fullSaveInterval.desc']}</div>
+        <input class="number-input" type="number" id="numFullSaveInterval" data-key="fullSaveIntervalMs" min="5000" max="600000">
       </div>
-      <input class="number-input" type="number" id="numFullSaveInterval" data-key="fullSaveIntervalMs" min="5000" max="600000">
-    </div>
-    <div class="setting-row">
-      <div class="setting-label">
-        <div class="setting-header-row">
-          <span>${args.labels['panel.set.maxSessions.name']}</span>
-          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.maxSessions.tip']}</span></span>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.maxSessions.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.maxSessions.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.maxSessions.desc']}</div>
         </div>
-        <div class="desc">${args.labels['panel.set.maxSessions.desc']}</div>
+        <input class="number-input" type="number" id="numMaxSessions" data-key="maxSessions" min="0">
       </div>
-      <input class="number-input" type="number" id="numMaxSessions" data-key="maxSessions" min="0">
     </div>
   </div>
 
   <!-- 操作 -->
   <div class="section">
     <h2>${args.labels['panel.section.actions']}</h2>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="btnNewPeriod">${args.labels['panel.actions.newPeriod']}</button>
-      <button class="btn btn-secondary" id="btnExportCSV">${args.labels['panel.actions.exportCsv']}</button>
-      <button class="btn btn-secondary" id="btnExportAggregated">${args.labels['panel.actions.exportAggregated']}</button>
-      <button class="btn btn-danger" id="btnClearHistory">${args.labels['panel.actions.clearHistory']}</button>
-      <button class="btn btn-danger" id="btnReset">${args.labels['panel.actions.reset']}</button>
-    </div>
-    <div style="margin-top:8px;font-size:11px;color:var(--description)">
-      <strong>${args.labels['panel.actions.newPeriod']}</strong>${args.labels['panel.actions.hintPeriodDesc']}<br>
-      <strong>${args.labels['panel.actions.clearHistory']}</strong>${args.labels['confirm.clearHistory']}<br>
-      <strong>${args.labels['panel.actions.reset']}</strong>${args.labels['panel.actions.hintResetDesc']}
+    <div class="card-panel">
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn btn-primary" id="btnNewPeriod">${args.labels['panel.actions.newPeriod']}</button>
+        <button class="btn btn-secondary" id="btnExportCSV">${args.labels['panel.actions.exportCsv']}</button>
+        <button class="btn btn-secondary" id="btnExportAggregated">${args.labels['panel.actions.exportAggregated']}</button>
+        <button class="btn btn-danger" id="btnClearHistory">${args.labels['panel.actions.clearHistory']}</button>
+        <button class="btn btn-danger" id="btnReset">${args.labels['panel.actions.reset']}</button>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:var(--description);line-height:1.6">
+        <strong>${args.labels['panel.actions.newPeriod']}</strong>${args.labels['panel.actions.hintPeriodDesc']}<br>
+        <strong>${args.labels['panel.actions.clearHistory']}</strong>${args.labels['confirm.clearHistory']}<br>
+        <strong>${args.labels['panel.actions.reset']}</strong>${args.labels['panel.actions.hintResetDesc']}
+      </div>
     </div>
   </div>
 
@@ -967,7 +1215,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       // {0}/{1} 占位符格式化（与宿主 i18n format 语义一致；curveSegTip 等词条含双占位符）
       function fmt(tpl) {
         const args = Array.prototype.slice.call(arguments, 1);
-        return String(tpl).replace(/{([0-9]+)}/g, (_, idx) => {
+        return String(tpl).replace(/{([0-9]+)}/g, function(_, idx) {
           const i = parseInt(idx, 10);
           return args[i] !== undefined ? String(args[i]) : '{' + idx + '}';
         });
@@ -1128,9 +1376,9 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           const valStr = formatDuration(d.totalMs);
           return '<div class="chart-bar-wrapper">' +
             '<div class="chart-bar-value">' + valStr + '</div>' +
-            '<div class="chart-bar" style="height:' + pct + '%"></div>' +
+            '<div class="chart-bar" style="height:' + pct + '%" title="' + escapeHtml(d.label) + ' (' + escapeHtml(d.weekday) + '): ' + valStr + '"></div>' +
             '<div class="chart-bar-label">' + escapeHtml(d.weekday) + '</div>' +
-            '<div class="chart-bar-label" style="font-size:9px">' + escapeHtml(d.label) + '</div>' +
+            '<div class="chart-bar-label" style="font-size:9px;opacity:0.7">' + escapeHtml(d.label) + '</div>' +
             '</div>';
         }).join('');
 
@@ -1150,8 +1398,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           return;
         }
 
-        // 归一化点集：x 从左到右（7 天）、y 值越大越高（留 4px 上下内边距）
-        const W = 600, H = 60, PAD = 4;
+        // 归一化点集：x 从左到右（7 天）、y 值越大越高（留 6px 上下内边距）
+        const W = 600, H = 70, PAD = 6;
         const maxVal = Math.max(...data.map(d => d.totalMs), 1);
         const pts = data.map((d, i) => {
           const x = (i / (data.length - 1)) * W;
@@ -1190,13 +1438,19 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         const dots = data.map((d, i) => {
           const cx = (i / (data.length - 1)) * W;
           const cy = H - PAD - (d.totalMs / maxVal) * (H - 2 * PAD);
-          const t = d.label + ' ' + formatDuration(d.totalMs);
-          return '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="2.5">' +
+          const t = d.label + ' (' + d.weekday + '): ' + formatDuration(d.totalMs);
+          return '<circle class="ac-dot" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="3.5">' +
             '<title>' + t + '</title></circle>';
         }).join('');
 
         el.innerHTML =
           '<svg class="ac-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+            '<defs>' +
+              '<linearGradient id="acGradient" x1="0" y1="0" x2="0" y2="1">' +
+                '<stop offset="0%" stop-color="#4ec9b0" stop-opacity="0.4"/>' +
+                '<stop offset="100%" stop-color="#4ec9b0" stop-opacity="0.0"/>' +
+              '</linearGradient>' +
+            '</defs>' +
             '<title>' + tip + '</title>' +
             '<path class="ac-area" d="' + area + '"></path>' +
             '<path class="ac-line" d="' + line + '"></path>' +
@@ -1439,9 +1693,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         if (mode === 'curve') {
           btn.textContent = L['panel.js.chartModeBars'];
           label.textContent = L['panel.js.chartModeCurve'];
-          curveEl.style.display = 'flex';
+          curveEl.style.display = 'block';
           // ★ 立即隐藏柱状图区域，避免切换瞬间旧柱状图残留几帧
-          //   （此前依赖下一轮 updateData 的 renderChart 守卫才隐藏，产生闪烁）
           const barsEl = document.getElementById('chartBars');
           const emptyEl = document.getElementById('chartEmpty');
           const weekEl = document.getElementById('weekTotal');
@@ -1454,7 +1707,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           btn.textContent = L['panel.js.chartModeCurve'];
           label.textContent = L['panel.js.chartModeBars'];
           curveEl.style.display = 'none';
-          // 恢复柱状图（renderChart 的 curve 守卫不再生效，用已有数据重渲染）
+          // 恢复柱状图
           if (pendingData) renderChart(pendingData.dailyStats, pendingData.weekTotalMs);
         }
       }
@@ -1468,7 +1721,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         const toast = document.getElementById('statusToast');
         toast.textContent = msg;
         toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 2000);
+        setTimeout(() => toast.classList.remove('show'), 2200);
       }
     })();
   </script>
