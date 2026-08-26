@@ -431,6 +431,21 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     }
     .hourly-bar:hover { opacity: 1; }
     .hourly-bar.is-peak { background: var(--focus); opacity: 1; }
+    /* 小时 X 轴刻度（与柱状图同 24 格对齐；每 4 小时标注一次） */
+    .hourly-axis {
+      display: flex;
+      gap: 2px;
+      margin: 0 2px 8px 2px;
+      font-size: 9px;
+      color: var(--description);
+      text-align: center;
+    }
+    .hourly-axis .tick {
+      flex: 1;
+      min-width: 0;
+      overflow: visible;
+      white-space: nowrap;
+    }
 
     /* 实时活跃曲线 */
     .chart-toolbar {
@@ -781,6 +796,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="empty-hint" id="sessionEmpty" style="display:none">${args.labels['panel.today.empty']}</div>
       <h3 id="hourlyTitle" style="display:none;margin-top:12px">${args.labels['panel.today.hourlyTitle']}</h3>
       <div id="hourlyChart" class="hourly-chart" style="display:none"></div>
+      <div id="hourlyAxis" class="hourly-axis" style="display:none"></div>
       <div class="btn-row">
         <button class="btn btn-secondary" id="btnExportDaily">${args.labels['panel.today.exportBtn']}</button>
       </div>
@@ -1258,6 +1274,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         const emptyEl = document.getElementById('sessionEmpty');
         const hourlyEl = document.getElementById('hourlyChart');
         const hourlyTitle = document.getElementById('hourlyTitle');
+        const hourlyAxis = document.getElementById('hourlyAxis');
 
         if (!detail || detail.sessionCount === 0) {
           section.style.display = 'none';
@@ -1284,16 +1301,17 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         }
 
         // 按小时分布（24 根柱，峰值小时高亮）
-        renderHourly(detail.hourly, detail.peakHour, hourlyEl, hourlyTitle);
+        renderHourly(detail.hourly, detail.peakHour, hourlyEl, hourlyTitle, hourlyAxis);
       }
 
       // ---- 按小时分布柱状图 ----
-      function renderHourly(hourly, peakHour, el, titleEl) {
+      function renderHourly(hourly, peakHour, el, titleEl, axisEl) {
         if (!el || !titleEl) return;
         const buckets = hourly || [];
         if (buckets.length === 0) {
           el.style.display = 'none';
           titleEl.style.display = 'none';
+          if (axisEl) axisEl.style.display = 'none';
           return;
         }
         titleEl.style.display = 'block';
@@ -1312,6 +1330,15 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           const tip = String(h).padStart(2, '0') + ':00 ' + formatDuration(ms);
           return '<div class="hourly-bar' + isPeak + '" style="height:' + pct + '%" title="' + tip + '"></div>';
         }).join('');
+
+        // X 轴刻度：与柱状图同 24 格对齐，每 4 小时标注一次（0/4/8/12/16/20）
+        if (axisEl) {
+          axisEl.style.display = 'flex';
+          axisEl.innerHTML = hours.map((_, h) => {
+            const label = h % 4 === 0 ? String(h).padStart(2, '0') + ':00' : '';
+            return '<div class="tick">' + label + '</div>';
+          }).join('');
+        }
       }
 
       // ---- 消息通信 ----
