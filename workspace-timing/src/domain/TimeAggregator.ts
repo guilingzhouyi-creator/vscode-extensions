@@ -6,7 +6,8 @@
  * 依赖：仅依赖 models.ts
  */
 
-import { TimeSlice, TimeSession, WorkspaceTimingData, DailyTotalsMap } from './models';
+import { TimeSlice, TimeSession, WorkspaceTimingData, DailyTotalsMap, MS_PER_DAY } from './models';
+import { HeatmapDay } from './dashboard-types';
 
 /** 按日聚合统计 */
 export interface DailyStats {
@@ -100,6 +101,15 @@ function localDateStr(ms: number): string {
 function parseLocalDate(dateStr: string): number {
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, d).getTime();
+}
+
+/** 热力图着色等级：基于当日累计时长分 5 档（与历史 v0.3.8 口径一致） */
+function heatmapLevel(ms: number): 0 | 1 | 2 | 3 | 4 {
+    if (ms <= 0) return 0;
+    if (ms < 3600000) return 1;          // < 1h
+    if (ms < 2 * 3600000) return 2;      // 1h ~ 2h
+    if (ms < 4 * 3600000) return 3;      // 2h ~ 4h
+    return 4;                            // ≥ 4h
 }
 
 export class TimeAggregator {
@@ -455,6 +465,92 @@ export class TimeAggregator {
             .sort((a, b) => a.date.localeCompare(b.date));
     }
 
+    /**
+     * 活动时间线热力图：返回以「今日所在周」结尾的 weeks 个完整自然周（含本周）的按日格子。
+     * 网格按「周一为每周首行」排布，共 weeks×7 个格子；当前周尚未到达的天标记为 future。
+     * 着色档位由 heatmapLevel 决定（0 无记录 / 1 <1h / 2 1~2h / 3 2~4h / 4 ≥4h）。
+     *
+     * ★ 窗口化优化：只遍历窗口内的日期（weeks×7 天），
+     *   不调用 fullDailySeries（后者会遍历并排序全历史 dailyTotals 桶，历史越长越浪费）。
+     * ★ DST 安全：窗口日期用 Date(y,m,d±n) 构造（本地归一化），
+     *   不用固定 24h 毫秒步进（秋季回拨 25h 天会致连续两格落在同一日期、列错位）。
+     */
+    static heatmapDays(
+        sessions: TimeSession[],
+        currentSessionStartMs = 0,
+        dailyTotals?: DailyTotalsMap,
+        weeks = 12,
+    ): HeatmapDay[] {
+        // 以「今日所在周一」为最后一列起点，向前取 weeks 个完整周（Date 构造，DST 安全）
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayStart = today.getTime();
+        const todayDow = (now.getDay() + 6) % 7; // 0=周一 … 6=周日
+        const lastColMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - todayDow);
+        const firstMonday = new Date(
+            lastColMonday.getFullYear(),
+            lastColMonday.getMonth(),
+            lastColMonday.getDate() - (weeks - 1) * 7,
+        );
+        const total = weeks * 7;
+
+        // 预生成窗口内各格子的日期串（同时得到窗口起止时间戳用于粗筛会话）
+        const windowDates = new Set<string>();
+        const cells: { dateStr: string; weekday: number; future: boolean }[] = [];
+        let windowStartMs = 0;
+        let windowEndMs = 0;
+        for (let i = 0; i < total; i++) {
+            const d = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + i);
+            const dateStr = localDateStr(d.getTime());
+            const ms = d.getTime();
+            if (i === 0) windowStartMs = ms;
+            windowEndMs = ms;
+            windowDates.add(dateStr);
+            cells.push({ dateStr, weekday: (d.getDay() + 6) % 7, future: ms > todayStart });
+        }
+        windowEndMs += MS_PER_DAY;
+
+        // 1) 折叠桶：只取窗口内的日期（O(窗口) 查表，不遍历全历史）作为基底
+        const byDate = new Map<string, number>();
+        if (dailyTotals) {
+            for (const date of windowDates) {
+                const v = dailyTotals[date];
+                if (v && v.totalMs > 0) byDate.set(date, v.totalMs);
+            }
+        }
+
+        // 2) 原始会话：先按时间范围粗筛（完全在窗口外直接跳过），
+        //    再按自然日切分归桶——同日**覆盖**折叠桶（与 fullDailySeries 口径一致，不重不漏）。
+        //    ★ 不能用 += 累加进 byDate：否则折叠桶 + 原始会话对同一时段重复累计。
+        const rawByDate = new Map<string, number>();
+        for (const s of sessions) {
+            if (s.endMs <= windowStartMs || s.startMs >= windowEndMs) continue;
+            TimeAggregator.eachDaySegment(s.startMs, s.endMs, (date, segStart, segEnd) => {
+                if (windowDates.has(date)) {
+                    rawByDate.set(date, (rawByDate.get(date) ?? 0) + (segEnd - segStart));
+                }
+            });
+        }
+        for (const [date, ms] of rawByDate) {
+            byDate.set(date, ms);
+        }
+
+        // 3) 进行中会话：叠加到今日格（与日报口径一致；今日已结束会话为基底，增量累加）
+        if (currentSessionStartMs > 0) {
+            TimeAggregator.eachDaySegment(currentSessionStartMs, Date.now(), (date, segStart, segEnd) => {
+                if (windowDates.has(date)) {
+                    byDate.set(date, (byDate.get(date) ?? 0) + (segEnd - segStart));
+                }
+            });
+        }
+
+        // 组装格子（future 天不计时长）
+        return cells.map((c) => {
+            const totalMs = c.future ? 0 : (byDate.get(c.dateStr) ?? 0);
+            return { dateStr: c.dateStr, weekday: c.weekday, totalMs, level: heatmapLevel(totalMs), future: c.future };
+        });
+    }
+
     /** 近 N 周按周聚合趋势（含当前周，降序） */
     static weeklyTrend(sessions: TimeSession[], weeks = 4): WeeklyStats[] {
         const result: WeeklyStats[] = [];
@@ -587,13 +683,5 @@ export class TimeAggregator {
         if (hours > 0) return `${hours}h ${minutes}m`;
         if (minutes > 0) return `${minutes}m ${seconds}s`;
         return `${seconds}s`;
-    }
-
-    /**
-     * 双段格式：今日 + 累计
-     * @example formatDual(1800000, 7200000) => "今日 30m · 累计 2h"
-     */
-    static formatDual(todayMs: number, totalMs: number): string {
-        return `今日 ${TimeAggregator.formatDurationCompact(todayMs)} · 累计 ${TimeAggregator.formatDurationCompact(totalMs)}`;
     }
 }

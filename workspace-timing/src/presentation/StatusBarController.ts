@@ -80,7 +80,10 @@ export class StatusBarController {
         let text: string;
         switch (this._mode) {
             case 'today-total':
-                text = TimeAggregator.formatDual(this._todayMs, this._totalMs);
+                // 复用既有 i18n 模板（zh: 今日 {0} · 累计 {1}），不硬编码中文
+                text = format(t()['statusBar.todayTotal'],
+                    TimeAggregator.formatDurationCompact(this._todayMs),
+                    TimeAggregator.formatDurationCompact(this._totalMs));
                 break;
             case 'total-today':
                 // 复用既有 i18n 模板（zh: 累计 {0} · 今日 {1}），不再硬编码中文

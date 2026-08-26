@@ -95,16 +95,29 @@ export class Scheduler {
     /**
      * 运行期热更新调度间隔（journalEnabled 不支持热切换，需重启）
      * 运行中会重建对应定时器使新间隔立即生效。
+     *
+     * ★ 间隔钳制下限 1000ms：面板/配置写入 0 或负数时，
+     *   setInterval 会以 ~1ms 触发，journal flush / 全量存盘变成 CPU+I/O 热点。
      */
     updateIntervals(patch: Partial<Pick<SchedulerOptions, 'journalFlushIntervalMs' | 'fullSaveIntervalMs'>>): void {
-        const journalChanged = patch.journalFlushIntervalMs !== undefined
-            && patch.journalFlushIntervalMs !== this.options.journalFlushIntervalMs;
-        const fullSaveChanged = patch.fullSaveIntervalMs !== undefined
-            && patch.fullSaveIntervalMs !== this.options.fullSaveIntervalMs;
+        const MIN_INTERVAL_MS = 1000;
+        const clamped = {
+            ...(patch.journalFlushIntervalMs !== undefined
+                ? { journalFlushIntervalMs: Math.max(MIN_INTERVAL_MS, patch.journalFlushIntervalMs) }
+                : {}),
+            ...(patch.fullSaveIntervalMs !== undefined
+                ? { fullSaveIntervalMs: Math.max(MIN_INTERVAL_MS, patch.fullSaveIntervalMs) }
+                : {}),
+        };
+
+        const journalChanged = clamped.journalFlushIntervalMs !== undefined
+            && clamped.journalFlushIntervalMs !== this.options.journalFlushIntervalMs;
+        const fullSaveChanged = clamped.fullSaveIntervalMs !== undefined
+            && clamped.fullSaveIntervalMs !== this.options.fullSaveIntervalMs;
 
         if (!journalChanged && !fullSaveChanged) return;
 
-        this.options = { ...this.options, ...patch };
+        this.options = { ...this.options, ...clamped };
         if (!this._running) return;
 
         if (journalChanged && this.options.journalEnabled) {

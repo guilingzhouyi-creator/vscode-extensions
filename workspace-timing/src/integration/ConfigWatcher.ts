@@ -16,6 +16,15 @@ import { t, setLocale, resolveLocale } from '../i18n/index';
 const CONFIG_SECTION = 'workspaceTiming';
 
 /**
+ * 配置数值下限钳制（面板/JSON 手写越界防护）：
+ * - ringBufferCapacity < 1 会使 RingBuffer 构造抛异常，导致扩展激活失败；
+ * - flush/save 间隔 <= 0 会让 setInterval 以 ~1ms 疯狂触发（CPU/I/O 热点）。
+ * 与面板输入框的 min 属性保持一致口径。
+ */
+const MIN_RING_BUFFER_CAP = 1;
+const MIN_INTERVAL_MS = 1000;
+
+/**
  * 读取当前用户配置（唯一入口，避免多处重复实现导致配置漂移）。
  * 供 ConfigWatcher 与 extension.ts 初始化共用，保证初始化/运行期配置同源。
  */
@@ -29,12 +38,18 @@ export function readTimingConfig(): TimingConfig {
         statusBarEnabled: cfg.get<boolean>('statusBar.enabled', DEFAULT_CONFIG.statusBarEnabled),
         backupToFile: cfg.get<boolean>('storage.backupToFile', DEFAULT_CONFIG.backupToFile),
         journalEnabled: cfg.get<boolean>('storage.journalEnabled', DEFAULT_CONFIG.journalEnabled),
-        ringBufferCapacity: cfg.get<number>('storage.ringBufferCapacity', DEFAULT_CONFIG.ringBufferCapacity),
-        journalFlushIntervalMs: cfg.get<number>('storage.journalFlushInterval', DEFAULT_CONFIG.journalFlushIntervalMs),
-        fullSaveIntervalMs: cfg.get<number>('storage.fullSaveInterval', DEFAULT_CONFIG.fullSaveIntervalMs),
+        ringBufferCapacity: Math.max(MIN_RING_BUFFER_CAP, Math.floor(
+            cfg.get<number>('storage.ringBufferCapacity', DEFAULT_CONFIG.ringBufferCapacity),
+        )),
+        journalFlushIntervalMs: Math.max(MIN_INTERVAL_MS,
+            cfg.get<number>('storage.journalFlushInterval', DEFAULT_CONFIG.journalFlushIntervalMs)),
+        fullSaveIntervalMs: Math.max(MIN_INTERVAL_MS,
+            cfg.get<number>('storage.fullSaveInterval', DEFAULT_CONFIG.fullSaveIntervalMs)),
         statusBarFormat: cfg.get<'compact' | 'detailed'>('statusBar.format', DEFAULT_CONFIG.statusBarFormat),
-        maxSessions: cfg.get<number>('storage.maxSessions', DEFAULT_CONFIG.maxSessions),
-        historyRawRetentionDays: cfg.get<number>('storage.historyRawRetentionDays', DEFAULT_CONFIG.historyRawRetentionDays),
+        maxSessions: Math.max(0,
+            cfg.get<number>('storage.maxSessions', DEFAULT_CONFIG.maxSessions)),
+        historyRawRetentionDays: Math.max(0,
+            cfg.get<number>('storage.historyRawRetentionDays', DEFAULT_CONFIG.historyRawRetentionDays)),
         safetySnapshot: cfg.get<boolean>('storage.safetySnapshot', DEFAULT_CONFIG.safetySnapshot),
     };
 }

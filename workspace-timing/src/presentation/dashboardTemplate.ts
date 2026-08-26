@@ -394,6 +394,130 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     .session-row:last-child { border-bottom: none; }
     .session-time { color: var(--description); font-family: var(--vscode-editor-font-family, monospace); }
     .session-dur { font-family: var(--vscode-editor-font-family, monospace); }
+
+    /* 按小时分布柱状图 */
+    .hourly-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 60px;
+      margin: 8px 0 4px 0;
+      padding: 4px 2px;
+      background: var(--input-bg);
+      border-radius: var(--radius);
+    }
+    .hourly-bar {
+      flex: 1;
+      min-width: 3px;
+      border-radius: 2px 2px 0 0;
+      background: var(--btn-bg);
+      opacity: 0.75;
+      transition: height 0.3s ease;
+    }
+    .hourly-bar:hover { opacity: 1; }
+    .hourly-bar.is-peak { background: var(--focus); opacity: 1; }
+
+    /* 实时活跃曲线 */
+    .chart-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: var(--description);
+    }
+    .chart-mode-btn {
+      padding: 2px 10px;
+      border: 1px solid var(--input-border);
+      border-radius: 10px;
+      background: var(--input-bg);
+      color: var(--fg);
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .chart-mode-btn:hover { border-color: var(--focus); }
+    .active-curve {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 60px;
+      margin: 8px 0 4px 0;
+      padding: 4px 2px;
+      background: var(--input-bg);
+      border-radius: var(--radius);
+    }
+    .ac-bar {
+      flex: 1;
+      min-width: 2px;
+      border-radius: 2px 2px 0 0;
+      background: var(--success);
+      opacity: 0.8;
+      transition: height 0.3s ease;
+    }
+    .ac-bar:hover { opacity: 1; }
+
+    /* 活动时间线热力图 */
+    .heatmap-wrap {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+    }
+    .heatmap-weekdays {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 10px;
+      color: var(--description);
+    }
+    .heatmap-weekdays span {
+      height: 12px;
+      line-height: 12px;
+      display: block;
+    }
+    .heatmap {
+      display: flex;
+      gap: 3px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .heatmap-week {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .hm-cell {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: color-mix(in srgb, var(--fg) 12%, transparent);
+    }
+    .hm-cell.l1 { background: #9be9a8; }
+    .hm-cell.l2 { background: #40c463; }
+    .hm-cell.l3 { background: #30a14e; }
+    .hm-cell.l4 { background: #216e39; }
+    .hm-cell.future { opacity: 0.35; }
+    .hm-cell:hover {
+      outline: 1px solid var(--focus);
+      outline-offset: 1px;
+    }
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--description);
+    }
+    .heatmap-legend .hm-cell {
+      width: 11px;
+      height: 11px;
+    }
+    .heatmap-range {
+      font-size: 11px;
+      color: var(--description);
+      margin-bottom: 6px;
+    }
     .empty-hint {
       color: var(--description);
       text-align: center;
@@ -545,8 +669,13 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
   <div class="section">
     <h2>${args.labels['panel.weekly.title']}</h2>
     <div class="chart-container">
+      <div class="chart-toolbar">
+        <span id="chartModeLabel">${args.labels['panel.js.chartModeBars']}</span>
+        <button class="chart-mode-btn" id="btnToggleChartMode">${args.labels['panel.js.chartModeCurve']}</button>
+      </div>
       <div id="chartEmpty" class="chart-empty">${args.labels['panel.weekly.emptyChart']}</div>
       <div id="chartBars" class="chart-bars" style="display:none"></div>
+      <div id="activeCurve" class="active-curve" style="display:none"></div>
       <div id="weekTotal" class="week-total" style="display:none"></div>
     </div>
     <!-- 周报文字摘要 -->
@@ -584,6 +713,33 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     </div>
   </div>
 
+  <!-- 活动时间线热力图 -->
+  <div class="section" id="heatmapSection">
+    <h2>${args.labels['panel.heatmap.title']}</h2>
+    <div class="heatmap-range" id="heatmapRange"></div>
+    <div class="heatmap-wrap">
+      <div class="heatmap-weekdays">
+        <span>${args.labels['panel.heatmap.mon']}</span>
+        <span></span>
+        <span>${args.labels['panel.heatmap.wed']}</span>
+        <span></span>
+        <span>${args.labels['panel.heatmap.fri']}</span>
+        <span></span>
+        <span></span>
+      </div>
+      <div id="heatmap" class="heatmap"></div>
+    </div>
+    <div class="heatmap-legend">
+      <span>${args.labels['panel.heatmap.less']}</span>
+      <div class="hm-cell"></div>
+      <div class="hm-cell l1"></div>
+      <div class="hm-cell l2"></div>
+      <div class="hm-cell l3"></div>
+      <div class="hm-cell l4"></div>
+      <span>${args.labels['panel.heatmap.more']}</span>
+    </div>
+  </div>
+
   <!-- 今日明细 -->
   <div class="section" id="todaySection" style="display:none">
     <h2>${args.labels['panel.today.title']}</h2>
@@ -604,6 +760,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       </div>
       <div id="sessionList" class="session-list" style="display:none"></div>
       <div class="empty-hint" id="sessionEmpty" style="display:none">${args.labels['panel.today.empty']}</div>
+      <h3 id="hourlyTitle" style="display:none;margin-top:12px">${args.labels['panel.today.hourlyTitle']}</h3>
+      <div id="hourlyChart" class="hourly-chart" style="display:none"></div>
       <div class="btn-row">
         <button class="btn btn-secondary" id="btnExportDaily">${args.labels['panel.today.exportBtn']}</button>
       </div>
@@ -625,7 +783,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.enabled.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.enabled.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.enabled.desc']}</div>
       </div>
@@ -638,7 +796,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.globalDisabled.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.globalDisabled.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.globalDisabled.desc']}</div>
       </div>
@@ -651,7 +809,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.statusBar.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.statusBar.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.statusBar.desc']}</div>
       </div>
@@ -669,7 +827,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.journal.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.journal.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.journal.desc']}</div>
       </div>
@@ -682,7 +840,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.backup.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.backup.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.backup.desc']}</div>
       </div>
@@ -695,7 +853,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.ringBuffer.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.ringBuffer.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.ringBuffer.desc']}</div>
       </div>
@@ -705,7 +863,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.journalInterval.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.journalInterval.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.journalInterval.desc']}</div>
       </div>
@@ -715,7 +873,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.fullSaveInterval.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.fullSaveInterval.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.fullSaveInterval.desc']}</div>
       </div>
@@ -725,7 +883,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       <div class="setting-label">
         <div class="setting-header-row">
           <span>${args.labels['panel.set.maxSessions.name']}</span>
-          <span class="help-icon">?<span class="tooltip"></span></span>
+          <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.maxSessions.tip']}</span></span>
         </div>
         <div class="desc">${args.labels['panel.set.maxSessions.desc']}</div>
       </div>
@@ -757,9 +915,17 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       const vscode = acquireVsCodeApi();
       // 词条表（渲染时由扩展宿主按当前语言序列化注入）
       const L = ${JSON.stringify(args.labels)};
-      // {0} 占位符格式化（词条中的可变部分）
-      function fmt(tpl, v) { return String(tpl).replace('{0}', String(v)); }
+      // {0}/{1} 占位符格式化（与宿主 i18n format 语义一致；curveSegTip 等词条含双占位符）
+      function fmt(tpl) {
+        const args = Array.prototype.slice.call(arguments, 1);
+        return String(tpl).replace(/\{(\d+)\}/g, (_, idx) => {
+          const i = parseInt(idx, 10);
+          return args[i] !== undefined ? String(args[i]) : '{' + idx + '}';
+        });
+      }
       let pendingData = null;
+      // 图表区域显示模式：'bars' 周柱状图 / 'curve' 实时活跃曲线
+      let chartMode = 'bars';
 
       // ---- 更新 UI ----
       function updateUI(data) {
@@ -800,6 +966,14 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         renderWeeklySummary(data.weeklySummary, data.weeklyTrend);
         renderTodayDetail(data.todayDetail);
 
+        // 活动时间线热力图
+        renderHeatmap(data.heatmap);
+
+        // 活跃曲线模式下随数据刷新同步拉取最新曲线
+        if (chartMode === 'curve') {
+          vscode.postMessage({ type: 'getActiveCurve' });
+        }
+
         pendingData = data;
       }
 
@@ -831,7 +1005,11 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           return;
         }
 
-        const maxVal = Math.max(...workspaces.map(ws => ws.totalMs), 1);
+        // 大数组防护：workspaces 数量无上限，用循环求最大而非 Math.max(...spread)（防栈溢出）
+        let maxVal = 1;
+        for (const ws of workspaces) {
+          if (ws.totalMs > maxVal) maxVal = ws.totalMs;
+        }
         const grandTotal = globalTotalMs || workspaces.reduce((sum, ws) => sum + (ws.totalMs || 0), 0);
 
         let html = '';
@@ -852,8 +1030,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         }
 
         html +=
-          '<div class="ws-compare-total">' + L['panel.js.grandTotalPrefix'] + '<strong>'' + formatDuration(grandTotal) +
-          '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], count) + '' + count + ')</span></div>';
+          '<div class="ws-compare-total">' + L['panel.js.grandTotalPrefix'] + '<strong>' + formatDuration(grandTotal) +
+          '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], count) + '</span></div>';
 
         container.innerHTML = html;
       }
@@ -869,6 +1047,14 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         const container = document.getElementById('chartBars');
         const emptyEl = document.getElementById('chartEmpty');
         const weekTotalEl = document.getElementById('weekTotal');
+
+        // 活跃曲线模式下隐藏柱状图区域（显示由 activeCurve 接管）
+        if (chartMode === 'curve') {
+          container.style.display = 'none';
+          weekTotalEl.style.display = 'none';
+          emptyEl.style.display = 'none';
+          return;
+        }
 
         if (!dailyStats || dailyStats.length === 0 || dailyStats.every(d => d.totalMs === 0)) {
           container.style.display = 'none';
@@ -895,6 +1081,68 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         }).join('');
 
         weekTotalEl.innerHTML = L['panel.js.weekTotalPrefix'] + '<strong>' + formatDuration(weekTotalMs || 0) + '</strong>';
+      }
+
+      // ---- 实时活跃曲线渲染 ----
+      // 数据：宿主按消息请求回推的最近时间片（1 条 ≈ 1 秒，最多近 3 分钟）。
+      // 渲染：5 秒一桶聚合（近 3 分钟 = 36 桶），柱高 = 桶内活跃秒数，
+      //       空闲段自然变矮，直观呈现"是否在持续活跃"。
+      function renderActiveCurve(slices) {
+        const el = document.getElementById('activeCurve');
+        if (!el) return;
+        const data = slices || [];
+        if (data.length === 0) {
+          el.innerHTML = '<div class="chart-empty">' + L['panel.js.curveEmpty'] + '</div>';
+          return;
+        }
+        const BUCKET_MS = 5000;
+        const BUCKETS = 36;
+        const now = Date.now();
+        const buckets = new Array(BUCKETS).fill(0);
+        for (const s of data) {
+          const age = now - s.t;
+          const idx = Math.floor(age / BUCKET_MS);
+          if (idx >= 0 && idx < BUCKETS) buckets[BUCKETS - 1 - idx] += 1;
+        }
+        const maxVal = Math.max(...buckets, 1);
+        el.innerHTML = buckets.map((v, i) => {
+          const pct = v > 0 ? Math.max((v / maxVal) * 100, 4) : 0;
+          const startSec = (BUCKETS - i) * (BUCKET_MS / 1000);
+          const tip = fmt(L['panel.js.curveSegTip'], startSec, v);
+          return '<div class="ac-bar" style="height:' + pct + '%" title="' + tip + '"></div>';
+        }).join('');
+      }
+
+      // ---- 活动时间线热力图渲染 ----
+      // 数据：近 12 周按日格子（周一为首行，current 周未到的天标 future）
+      function renderHeatmap(days) {
+        const el = document.getElementById('heatmap');
+        const rangeEl = document.getElementById('heatmapRange');
+        if (!el) return;
+        const data = days || [];
+        if (data.length === 0) {
+          el.innerHTML = '';
+          if (rangeEl) rangeEl.textContent = '';
+          return;
+        }
+
+        // 按 7 天一组切成「周」列（数据已按周一为首行排布）
+        const weeks = [];
+        for (let i = 0; i < data.length; i += 7) {
+          weeks.push(data.slice(i, i + 7));
+        }
+        el.innerHTML = weeks.map(week =>
+          '<div class="heatmap-week">' + week.map(d => {
+            const cls = 'hm-cell l' + d.level + (d.future ? ' future' : '');
+            const tip = d.future ? d.dateStr : (d.dateStr + ' · ' + formatDuration(d.totalMs));
+            return '<div class="' + cls + '" title="' + tip + '"></div>';
+          }).join('') + '</div>'
+        ).join('');
+
+        // 日期范围（首日 ~ 末日）
+        if (rangeEl) {
+          rangeEl.textContent = data[0].dateStr + ' ~ ' + data[data.length - 1].dateStr;
+        }
       }
 
       // ---- 周报摘要 + 多周趋势渲染 ----
@@ -938,6 +1186,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         const section = document.getElementById('todaySection');
         const listEl = document.getElementById('sessionList');
         const emptyEl = document.getElementById('sessionEmpty');
+        const hourlyEl = document.getElementById('hourlyChart');
+        const hourlyTitle = document.getElementById('hourlyTitle');
 
         if (!detail || detail.sessionCount === 0) {
           section.style.display = 'none';
@@ -962,6 +1212,36 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           listEl.style.display = 'none';
           emptyEl.style.display = 'block';
         }
+
+        // 按小时分布（24 根柱，峰值小时高亮）
+        renderHourly(detail.hourly, detail.peakHour, hourlyEl, hourlyTitle);
+      }
+
+      // ---- 按小时分布柱状图 ----
+      function renderHourly(hourly, peakHour, el, titleEl) {
+        if (!el || !titleEl) return;
+        const buckets = hourly || [];
+        if (buckets.length === 0) {
+          el.style.display = 'none';
+          titleEl.style.display = 'none';
+          return;
+        }
+        titleEl.style.display = 'block';
+        el.style.display = 'flex';
+
+        // 展开为 0..23 的数组（缺省小时为 0）
+        const hours = new Array(24).fill(0);
+        for (const b of buckets) {
+          if (b.hour >= 0 && b.hour <= 23) hours[b.hour] = b.totalMs;
+        }
+        const maxVal = Math.max(...hours, 1);
+
+        el.innerHTML = hours.map((ms, h) => {
+          const pct = ms > 0 ? Math.max((ms / maxVal) * 100, 4) : 0;
+          const isPeak = ms > 0 && h === peakHour ? ' is-peak' : '';
+          const tip = String(h).padStart(2, '0') + ':00 ' + formatDuration(ms);
+          return '<div class="hourly-bar' + isPeak + '" style="height:' + pct + '%" title="' + tip + '"></div>';
+        }).join('');
       }
 
       // ---- 消息通信 ----
@@ -969,6 +1249,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         const msg = event.data;
         if (msg.type === 'updateData' && msg.payload) {
           updateUI(msg.payload);
+        } else if (msg.type === 'activeCurve' && msg.payload) {
+          renderActiveCurve(msg.payload.slices);
         }
       });
 
@@ -984,13 +1266,17 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         });
       });
 
-      // 数字输入变更
+      // 数字输入变更（按输入框 min/max 钳制；空/非法输入不发送，宿主端亦有下限兜底）
       document.querySelectorAll('.number-input').forEach(el => {
         let timeout = null;
         el.addEventListener('input', () => {
           clearTimeout(timeout);
           timeout = setTimeout(() => {
-            sendUpdate(el.dataset.key, parseInt(el.value) || 0);
+            const raw = parseInt(el.value, 10);
+            if (Number.isNaN(raw)) return;
+            const min = el.min ? parseInt(el.min, 10) : 0;
+            const max = el.max ? parseInt(el.max, 10) : Number.MAX_SAFE_INTEGER;
+            sendUpdate(el.dataset.key, Math.min(Math.max(raw, min), max));
           }, 500);
         });
       });
@@ -1035,6 +1321,33 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       document.getElementById('btnExportWeekly').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportReport', payload: { kind: 'weekly' } });
         showToast(L['panel.toast.exportWeeklyRequested']);
+      });
+
+      // ---- 图表模式切换（周柱状图 ↔ 活跃曲线）----
+      function setChartMode(mode) {
+        chartMode = mode;
+        const btn = document.getElementById('btnToggleChartMode');
+        const label = document.getElementById('chartModeLabel');
+        const curveEl = document.getElementById('activeCurve');
+        if (!btn || !label || !curveEl) return;
+
+        if (mode === 'curve') {
+          btn.textContent = L['panel.js.chartModeBars'];
+          label.textContent = L['panel.js.chartModeCurve'];
+          curveEl.style.display = 'flex';
+          // 立即拉取一次（后续随 updateData 周期刷新）
+          vscode.postMessage({ type: 'getActiveCurve' });
+        } else {
+          btn.textContent = L['panel.js.chartModeCurve'];
+          label.textContent = L['panel.js.chartModeBars'];
+          curveEl.style.display = 'none';
+          // 恢复柱状图（renderChart 的 curve 守卫不再生效，用已有数据重渲染）
+          if (pendingData) renderChart(pendingData.dailyStats, pendingData.weekTotalMs);
+        }
+      }
+
+      document.getElementById('btnToggleChartMode').addEventListener('click', () => {
+        setChartMode(chartMode === 'bars' ? 'curve' : 'bars');
       });
 
       // ---- Toast 提示 ----

@@ -319,3 +319,69 @@ describe('TimeAggregator：fullDailySeries 双源合并', () => {
         assert.ok(series[0].totalMs >= 0);
     });
 });
+
+describe('TimeAggregator：heatmapDays 活动热力图', () => {
+    const now = new Date();
+    const Y = now.getFullYear(), M = now.getMonth(), D = now.getDate();
+    const dow = (now.getDay() + 6) % 7; // 0=周一 … 6=周日
+
+    it('生成 12 周 × 7 天网格，首格为窗口起始周一，future 天不计时长', () => {
+        const days = TimeAggregator.heatmapDays([], 0, undefined, 12);
+        assert.strictEqual(days.length, 84, '12 周 × 7 天 = 84 格');
+
+        // 首格必须是「今日所在周一」往前 11 周的周一（与实现同口径：Date 构造）
+        const firstMonday = new Date(Y, M, D - dow - 11 * 7);
+        assert.strictEqual(days[0].weekday, 0, '首格为周一');
+        assert.strictEqual(days[0].dateStr, localDateStrOf(firstMonday.getTime()));
+
+        // 每列 7 天、周一为首行
+        for (let i = 0; i < days.length; i++) {
+            assert.strictEqual(days[i].weekday, i % 7, `第 ${i} 格星期错位`);
+        }
+
+        // future 天 = 本周尚未到达的天数（周日 dow=6 → 0；周一 dow=0 → 6）
+        const futureCount = days.filter(d => d.future).length;
+        assert.strictEqual(futureCount, 6 - dow);
+        for (const d of days) {
+            if (d.future) assert.strictEqual(d.totalMs, 0, 'future 天不计时长');
+            else assert.ok(d.totalMs >= 0);
+        }
+    });
+
+    it('按日聚合：折叠桶 + 原始会话同日以原始为准，档位着色正确', () => {
+        const todayStart = new Date(Y, M, D).getTime();
+        const yesterdayStart = new Date(Y, M, D - 1).getTime();
+        const buckets = {
+            [localDateStrOf(yesterdayStart)]: { totalMs: 7200000, sessionCount: 1 }, // 2h → l3
+        };
+        const sessions = [{
+            startMs: yesterdayStart,
+            endMs: yesterdayStart + 1800000, // 30m → l1
+            durationMs: 1800000,
+        }];
+        // currentSessionStartMs = 今天零点：验证进行中会话并入今日格
+        const days = TimeAggregator.heatmapDays(sessions, todayStart, buckets, 12);
+        const byDate = new Map(days.map(d => [d.dateStr, d]));
+        const yest = byDate.get(localDateStrOf(yesterdayStart));
+        assert.ok(yest, '窗口含昨天');
+        assert.strictEqual(yest.totalMs, 1800000, '同日原始会话覆盖折叠桶');
+        assert.strictEqual(yest.level, 1, '<1h → l1');
+
+        // 进行中会话（今天零点起）并入今日格
+        const today = byDate.get(localDateStrOf(todayStart));
+        assert.ok(today && today.totalMs > 0, '进行中会话并入今日格');
+    });
+
+    it('窗口化：窗口之外的会话不参与聚合（性能边界）', () => {
+        // 90 天前（超出 12 周窗口）的会话
+        const oldStart = new Date(Y, M, D - 90, 10).getTime();
+        const sessions = [{
+            startMs: oldStart,
+            endMs: oldStart + 3600000,
+            durationMs: 3600000,
+        }];
+        const days = TimeAggregator.heatmapDays(sessions, 0, undefined, 12);
+        const total = days.reduce((s, d) => s + d.totalMs, 0);
+        assert.strictEqual(total, 0, '窗口外会话不计入');
+    });
+});

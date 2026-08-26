@@ -18,7 +18,7 @@ import { validateTimingData } from '../persistence/DataValidator';
 import { migrateToFolded } from '../domain/HistoryFolder';
 import { AggregatedCsvExporter } from './exporters/AggregatedCsvExporter';
 import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
-import { DashboardData } from '../domain/dashboard-types';
+import { DashboardData, ActiveCurveData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
@@ -140,15 +140,14 @@ export class TimerOrchestrator {
         // 停止调度器
         this.scheduler.stop();
 
-        // 结束会话
-        const result = await this.sessionManager.endSession();
-
-        this._state = 'idle';
-        this._onStateChange?.(this._state);
-
-        log(LogLevel.Info,
-            `TimerOrchestrator: stopped, elapsed=${result.elapsedMs}ms, total=${result.totalMs}ms`);
-        return result;
+        // 结束会话；endSession 抛异常时也必须恢复状态，
+        // 否则 _state 永久卡在 'saving'（saveNow 等依赖 running 态的路径全部失效）
+        try {
+            return await this.sessionManager.endSession();
+        } finally {
+            this._state = 'idle';
+            this._onStateChange?.(this._state);
+        }
     }
 
     /**
@@ -182,6 +181,14 @@ export class TimerOrchestrator {
         // 最近 7 天每日统计（柱状图）
         const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs);
 
+        // 活动时间线热力图（近 12 周，含本周；窗口化聚合，复用按日口径）
+        const heatmap = TimeAggregator.heatmapDays(
+            sessions,
+            this.timer.data.currentSessionStartMs,
+            this.timer.data.dailyTotals,
+            12,
+        );
+
         // 周报多周趋势（近 4 周）+ 今日明细
         const weeklyTrend = TimeAggregator.weeklyTrend(sessions, 4)
             .map((w) => ({
@@ -202,6 +209,7 @@ export class TimerOrchestrator {
             // 与周报区"会话数"同屏不一致，如 0 vs 1）
             sessionsCount: sessions.length + (this.timer.data.currentSessionStartMs > 0 ? 1 : 0),
             dailyStats,
+            heatmap,
             weekTotalMs: weeklySummary.totalMs,
             weeklyTrend,
             weeklySummary: {
@@ -228,6 +236,17 @@ export class TimerOrchestrator {
         };
     }
 
+    /**
+     * 读取最近 N 条实时时间片（面板「活跃曲线」数据源）。
+     * 数据来自 JournalWriter 保留窗（1 条 ≈ 1 秒，不受 flush 清空影响）。
+     * @param n 最多返回条数（默认 180 ≈ 近 3 分钟）
+     */
+    getActiveCurve(n = 180): ActiveCurveData {
+        return {
+            slices: this.journal.getRecent(n).map((s) => ({ t: s.timestamp, ms: s.deltaMs })),
+        };
+    }
+
     /** 构建今日会话明细（供面板展示） */
     private buildTodayDetail(sessions: TimeSession[]): DashboardData['todayDetail'] {
         const detail = TimeAggregator.dailyDetail(
@@ -244,6 +263,11 @@ export class TimerOrchestrator {
                 startLabel: s.startLabel,
                 endLabel: s.endLabel,
                 durationMs: s.durationMs,
+            })),
+            hourly: detail.hourly.map((h) => ({
+                hour: h.hour,
+                totalMs: h.totalMs,
+                sessionCount: h.sessionCount,
             })),
             peakHour: detail.peakHour,
             activeWindow: detail.activeWindow,
@@ -335,7 +359,7 @@ export class TimerOrchestrator {
             });
         }
         if (cfg.maxSessions !== undefined) {
-            this.sessionManager.setMaxSessions(cfg.maxSessions);
+            this.sessionManager.setMaxSessions(Math.max(0, cfg.maxSessions));
         }
         if (cfg.safetySnapshot !== undefined) {
             this._safetySnapshotEnabled = cfg.safetySnapshot;

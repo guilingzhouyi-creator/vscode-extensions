@@ -95,6 +95,18 @@ export class DashboardPanel {
         return DashboardPanel.currentPanel;
     }
 
+    /** 面板当前是否可见（隐藏时跳过昂贵的聚合刷新） */
+    get isVisible(): boolean {
+        return this._panel.visible;
+    }
+
+    /** 主动推送任意消息到 webview（如活跃曲线回推；隐藏时丢弃） */
+    postMessage(msg: unknown): void {
+        if (this._panel.visible) {
+            this._panel.webview.postMessage(msg);
+        }
+    }
+
     /** 刷新数据显示 */
     updateData(data: DashboardData): void {
         if (this._panel.visible) {

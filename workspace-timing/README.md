@@ -8,7 +8,9 @@
 ## 功能亮点 | Features
 
 - ⏱ **自动计时** · Auto-timing — 打开工作区即开始计时
-- 📊 **周报图表** · Weekly chart — 最近 7 天柱状图
+- 📊 **周报图表** · Weekly chart — 最近 7 天柱状图 / 实时活跃曲线可切换
+- 🔥 **活动热力图** · Activity heatmap — 近 12 周每日活跃度一目了然
+- ⏰ **按小时分布** · Hourly breakdown — 今日 24 小时活跃分布，峰值小时高亮
 - 🌐 **跨工作区** · Cross-workspace — 聚合所有工作区的时长
 - 🛡️ **崩溃保护** · Crash-safe — Journal 文件防止数据丢失
 - 🎨 **仪表板** · Dashboard — 实时统计、设置、图表

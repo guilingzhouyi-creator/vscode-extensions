@@ -143,7 +143,8 @@ export function activate(context: vscode.ExtensionContext): void {
             orchestrator.onTick(({ totalMs, todayMs }) => {
                 statusBar?.updateTime(todayMs, totalMs);
                 const now = Date.now();
-                if (DashboardPanel.currentPanel && orchestrator
+                // 面板必须存在且可见才聚合：隐藏面板的 updateData 本就空转，聚合纯属浪费
+                if (DashboardPanel.currentPanel?.isVisible && orchestrator
                     && now - lastPanelUpdateMs >= PANEL_REFRESH_INTERVAL_MS) {
                     lastPanelUpdateMs = now;
                     orchestrator.getDashboardData().then(data => {
