@@ -37,6 +37,31 @@ export interface I18nStrings {
     // 云端同步占位
     'toast.cloudSyncPlaceholder': string;
 
+    // 报表导出（Markdown）
+    'report.daily.title': string;
+    'report.daily.todayDuration': string;
+    'report.daily.sessionCount': string;
+    'report.daily.activeWindow': string;
+    'report.weekly.title': string;
+    'report.weekly.summary': string;
+    'report.weekly.totalDuration': string;
+    'report.weekly.avgDaily': string;
+    'report.weekly.activeDays': string;
+    'report.weekly.activeDaysFmt': string;
+    'report.weekly.peakDate': string;
+    'report.weekly.sessionCount': string;
+    'report.weekly.distribution': string;
+    'report.weekly.trend': string;
+    'report.table.sessions': string;
+    'report.table.start': string;
+    'report.table.end': string;
+    'report.table.duration': string;
+    'report.table.date': string;
+    'report.table.weekday': string;
+    'report.table.weekStart': string;
+    'report.table.sessionCount': string;
+    'report.generatedAt': string;
+
     // 确认弹窗
     'confirm.newPeriod': string;
     'confirm.newPeriod.title': string;
