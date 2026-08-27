@@ -8,8 +8,6 @@
 import * as vscode from 'vscode';
 import { TimingConfig, DEFAULT_CONFIG } from '../domain/models';
 import { TimerOrchestrator } from '../application/TimerOrchestrator';
-import { StatusBarController } from '../presentation/StatusBarController';
-import { DashboardPanel } from '../presentation/DashboardPanel';
 import { LogLevel, log } from './Logger';
 import { t, setLocale, resolveLocale } from '../i18n/index';
 
@@ -54,18 +52,28 @@ export function readTimingConfig(): TimingConfig {
     };
 }
 
+/** 状态栏最小端口（integration 层不依赖 presentation 具体类） */
+export interface StatusBarLike {
+    updateConfig(config: { enabled?: boolean }): void;
+}
+
 export class ConfigWatcher {
     private readonly disposables: vscode.Disposable[] = [];
     private readonly orchestrator: TimerOrchestrator;
-    private readonly statusBar: StatusBarController;
-    private readonly extensionUri: vscode.Uri;
+    private readonly statusBar: StatusBarLike;
+    /** 面板按新语言重建策略（由组合根注入，无面板打开时静默跳过） */
+    private readonly recreatePanel: () => void;
     /** 上次应用的语言设置（undefined=尚未应用过首轮） */
     private _lastLocale: string | undefined = undefined;
 
-    constructor(orchestrator: TimerOrchestrator, statusBar: StatusBarController, extensionUri: vscode.Uri) {
+    constructor(
+        orchestrator: TimerOrchestrator,
+        statusBar: StatusBarLike,
+        recreatePanel: () => void,
+    ) {
         this.orchestrator = orchestrator;
         this.statusBar = statusBar;
-        this.extensionUri = extensionUri;
+        this.recreatePanel = recreatePanel;
     }
 
     /** 开始监听配置变更 */
@@ -106,10 +114,9 @@ export class ConfigWatcher {
             const isFirstApply = this._lastLocale === undefined;
             this._lastLocale = config.locale;
             setLocale(resolveLocale(config.locale));
-            if (!isFirstApply && DashboardPanel.currentPanel) {
-                // 面板开着 → 按新语言重建
-                DashboardPanel.disposeCurrent();
-                DashboardPanel.createOrShow(this.extensionUri);
+            if (!isFirstApply) {
+                // 面板开着 → 按新语言重建（重建策略由组合根注入，含面板存在性判断）
+                this.recreatePanel();
                 log(LogLevel.Info, 'ConfigWatcher: locale changed, dashboard recreated');
             }
         }

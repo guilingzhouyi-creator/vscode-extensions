@@ -31,6 +31,7 @@ graph TD
         APP_FACADE[Orchestrator / Facade<br/>核心门面协调器]
         APP_SESSION[Session Manager<br/>业务会话状态机管理]
         APP_SCHED[Scheduler<br/>异步定时调度编排]
+        APP_REC[Recovery Service<br/>崩溃恢复编排]
         APP_EXP[Data Exporters<br/>多格式报告生成与导出]
         APP_GLOBAL[Cross-Workspace Aggregator<br/>跨上下文聚合服务]
     end
@@ -109,6 +110,7 @@ export interface IJournalStore {
 
 ### 3.3 持久化层（Persistence Layer）—— 多级存储与防御自愈
 - **核心定位**：数据的可靠落地、读取、迁移与防御校验。
+- **约束准则**：持久化层**只提供原始读写原语**（load / save / restore / snapshot / deleteAll），不持有业务编排——崩溃恢复的编排算法（journal 分组回放、水位线去重、未完成会话补偿）属于应用层职责，由 `RecoveryService`（Application）经 `IRecoveryStore` / `IJournalStore` 端口注入驱动。
 - **四级协同存储模型（Tiered Fallback Architecture）**：
   1. **L1（运行时内存）**：极速读取，瞬时响应。
   2. **L2（WorkspaceState / GlobalState）**：IDE 本地快速持久化。
@@ -146,7 +148,8 @@ sequenceDiagram
     participant Engine as TimerEngine (Domain)
     participant Writer as JournalWriter (Cache)
     participant Disk as JournalStore (Persistence)
-    participant Coord as StorageCoordinator
+    participant Coord as RecoveryService (Application)
+    participant Store as StorageCoordinator (Persistence)
 
     Note over Engine, Disk: 正常运行阶段：秒级切片写入内存缓冲
     Engine->>Writer: pushSlice(startMs, endMs)
@@ -157,11 +160,15 @@ sequenceDiagram
     end
 
     Note over Engine, Disk: 发生意外崩溃 / 强行关闭 VS Code
-    Note over Coord, Disk: 下次启动时：崩溃恢复流
-    Coord->>Disk: loadJournal() (读取未归档切片)
+    Note over Coord, Store: 下次启动时：崩溃恢复流（应用层编排）
+    Coord->>Store: load() (主存 → 文件兜底)
+    Store-->>Coord: 返回主数据与来源
+    Coord->>Coord: v1→v2 迁移 + 过期会话折叠
+    Coord->>Disk: readJournal() (读取未归档切片)
     Disk-->>Coord: 返回残留切片列表
-    Coord->>Coord: 计算补偿时长并合并至总计时
+    Coord->>Coord: 按连续性分组回放 + 水位线去重 + 补偿时长
     Coord->>Disk: truncate() (清空旧日志)
+    Coord->>Store: save(recoveredData, force)
     Coord->>Engine: replaceData(recoveredData)
 ```
 

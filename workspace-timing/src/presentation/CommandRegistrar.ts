@@ -15,11 +15,7 @@ import { LogLevel, log } from '../integration/Logger';
 import { t, format } from '../i18n/index';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { exportTimingToFile } from './dashboardMessages';
-
-/** 清洗文件名中的非法字符（与 dashboardMessages 同规则） */
-function sanitizeFileName(name: string): string {
-    return name.replace(/[\\/:*?"<>|]/g, '_');
-}
+import { sanitizeFileName } from './fileUtils';
 
 export class CommandRegistrar {
     private readonly disposables: vscode.Disposable[] = [];

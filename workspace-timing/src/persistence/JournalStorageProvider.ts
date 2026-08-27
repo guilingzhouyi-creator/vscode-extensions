@@ -14,44 +14,33 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TimeSlice, WorkspaceTimingData } from '../domain/models';
-import { IStorageProvider } from './IStorageProvider';
+import { TimeSlice } from '../domain/models';
 import { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/Logger';
 
 const JOURNAL_FILE = 'workspace-timing.journal';
 
-export class JournalStorageProvider implements IStorageProvider, IJournalStore {
+/**
+ * 仅实现 IJournalStore 窄端口（cache 层消费方定义的依赖倒置接口）。
+ * 不再实现 IStorageProvider——journal 不支持全量 load/save，此前以
+ * 空实现/恒 null 满足该接口属于接口隔离违反（LSP 反模式）。
+ */
+export class JournalStorageProvider implements IJournalStore {
     readonly id = 'journal-storage';
 
     private readonly journalUri: vscode.Uri;
-    private _available: boolean = true;
 
     constructor(workspaceRoot: vscode.Uri) {
         const dotVscode = vscode.Uri.joinPath(workspaceRoot, '.vscode');
         this.journalUri = vscode.Uri.joinPath(dotVscode, JOURNAL_FILE);
     }
 
-    // IStorageProvider 方法（journal 不支持完整 load/save，
-    // 这些方法通过 StorageCoordinator 委托给主存储）
+    // ---- journal 专有方法 ----
 
-    isAvailable(): boolean {
-        return this._available;
-    }
-
-    async load(): Promise<null> {
-        return null;
-    }
-
-    async save(_data: WorkspaceTimingData): Promise<void> {
-        // journal 不支持全量 save，参数保留以满足接口契约
-    }
-
+    /** 删除 journal 文件（deleteAll 级联路径复用 truncate 语义） */
     async delete(): Promise<void> {
         await this.truncate();
     }
-
-    // ---- journal 专有方法 ----
 
     /** 检查 journal 文件是否存在 */
     async exists(): Promise<boolean> {
@@ -78,7 +67,6 @@ export class JournalStorageProvider implements IStorageProvider, IJournalStore {
 
             await this.doAppend(bytes);
         } catch (err) {
-            this._available = false;
             log(LogLevel.Error, 'JournalStorageProvider: appendBatch failed', err as Error);
             throw err;
         }

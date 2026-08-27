@@ -11,6 +11,7 @@ import { TimeAggregator } from '../domain/TimeAggregator';
 import { migrateToFolded } from '../domain/HistoryFolder';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
+import { RecoveryService } from './RecoveryService';
 import { LogLevel, log } from '../integration/Logger';
 
 export interface SessionResult {
@@ -26,6 +27,7 @@ export class SessionManager {
     private readonly timer: TimerEngine;
     private readonly storage: StorageCoordinator;
     private readonly journal: JournalWriter;
+    private readonly recovery: RecoveryService;
     private maxSessions: number;
     /** 原始会话保留窗（天）；0=永不折叠 */
     private readonly _rawRetentionDays: number;
@@ -37,12 +39,14 @@ export class SessionManager {
         timer: TimerEngine,
         storage: StorageCoordinator,
         journal: JournalWriter,
+        recovery: RecoveryService,
         maxSessions: number = 1000,
         historyRawRetentionDays: number = 45,
     ) {
         this.timer = timer;
         this.storage = storage;
         this.journal = journal;
+        this.recovery = recovery;
         this.maxSessions = maxSessions;
         this._rawRetentionDays = historyRawRetentionDays;
     }
@@ -105,8 +109,8 @@ export class SessionManager {
     async startSession(): Promise<WorkspaceTimingData> {
         log(LogLevel.Info, 'SessionManager: starting session');
 
-        // 1. 崩溃恢复（含 v1→v2 迁移与过期会话折叠）
-        const data = await this.storage.recover(this._rawRetentionDays);
+        // 1. 崩溃恢复（含 v1→v2 迁移与过期会话折叠），算法编排见 RecoveryService
+        const data = await this.recovery.recover(this._rawRetentionDays);
 
         // 2. 替换计时器数据
         this.timer.replaceData(data);

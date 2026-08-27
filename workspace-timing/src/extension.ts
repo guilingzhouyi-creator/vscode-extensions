@@ -27,6 +27,7 @@ import { TimerOrchestrator } from './application/TimerOrchestrator';
 import { SessionManager } from './application/SessionManager';
 import { DisableManager } from './application/DisableManager';
 import { Scheduler } from './application/Scheduler';
+import { RecoveryService } from './application/RecoveryService';
 
 // Presentation
 import { StatusBarController } from './presentation/StatusBarController';
@@ -108,7 +109,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
             // Application 层
             const disableManager = new DisableManager(cfg);
-            const sessionManager = new SessionManager(timer, storage, journal, cfg.maxSessions, cfg.historyRawRetentionDays);
+            // 崩溃恢复编排（应用层）经端口注入存储与 journal，持久化层只留原始读写原语
+            const recovery = new RecoveryService(storage, journalStorageProvider);
+            const sessionManager = new SessionManager(timer, storage, journal, recovery, cfg.maxSessions, cfg.historyRawRetentionDays);
             scheduler = new Scheduler(journal, sessionManager, {
                 journalFlushIntervalMs: cfg.journalFlushIntervalMs,
                 fullSaveIntervalMs: cfg.fullSaveIntervalMs,
@@ -167,7 +170,17 @@ export function activate(context: vscode.ExtensionContext): void {
             lifecycleManager = new LifecycleManager(orchestrator);
             lifecycleManager.start();
 
-            configWatcher = new ConfigWatcher(orchestrator, statusBar, context.extensionUri);
+            configWatcher = new ConfigWatcher(
+                orchestrator,
+                statusBar,
+                // 语言热切换的面板重建策略注入（integration 层不感知 presentation 具体类）
+                () => {
+                    if (DashboardPanel.currentPanel) {
+                        DashboardPanel.disposeCurrent();
+                        DashboardPanel.createOrShow(context.extensionUri);
+                    }
+                },
+            );
             configWatcher.start();
 
             // 启动计时

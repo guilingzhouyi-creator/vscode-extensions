@@ -2,14 +2,16 @@
  * Scheduler — 周期任务调度器
  *
  * 职责：
- *   1. 每 journalFlushIntervalMs 从 RingBuffer flush 到 journal
+ *   1. 每秒心跳：推入 1 条时间片到 RingBuffer + 尝试 journal flush + 更新状态栏
+ *      —— flush 只是"尝试"，是否真正落盘由 JournalWriter 的缓存策略（时间/容量）
+ *      裁决，避免调度器与策略双重控流；
  *   2. 每 fullSaveIntervalMs 执行全量存盘（checkpoint 只固化历史累计，不清 journal；
- *      journal 截断发生在会话结束/崩溃恢复路径）
- *   3. 每秒更新 StatusBar，并顺带推入 1 条时间片到 RingBuffer
+ *      journal 截断发生在会话结束/崩溃恢复路径）；
  *
  * ⚠️ 显式契约：journal 时间片粒度 = statusBarUpdateIntervalMs（默认 1s），
  *    二者共用同一定时器属有意设计（减少定时器数量）。若未来允许单独配置
  *    状态栏刷新间隔，必须同步把切片推送拆为独立定时器。
+ *    心跳频率（1s）恒小于等于 flush 间隔（≥1s），策略裁决不会失效。
  *
  * 所有间隔可通过 TimingConfig 配置。
  */
@@ -49,7 +51,6 @@ export class Scheduler {
     private readonly sessionManager: SessionManager;
     private options: SchedulerOptions;
 
-    private journalTimer: ReturnType<typeof setInterval> | null = null;
     private fullSaveTimer: ReturnType<typeof setInterval> | null = null;
     private statusBarTimer: ReturnType<typeof setInterval> | null = null;
     private statusBarCallback: StatusBarUpdateCallback | null = null;
@@ -97,7 +98,8 @@ export class Scheduler {
      * 运行中会重建对应定时器使新间隔立即生效。
      *
      * ★ 间隔钳制下限 1000ms：面板/配置写入 0 或负数时，
-     *   setInterval 会以 ~1ms 触发，journal flush / 全量存盘变成 CPU+I/O 热点。
+     *   setInterval 会以 ~1ms 触发，全量存盘变成 CPU+I/O 热点。
+     *   journal flush 间隔经 JournalWriter.updateFlushInterval 同步给缓存策略。
      */
     updateIntervals(patch: Partial<Pick<SchedulerOptions, 'journalFlushIntervalMs' | 'fullSaveIntervalMs'>>): void {
         const MIN_INTERVAL_MS = 1000;
@@ -118,13 +120,12 @@ export class Scheduler {
         if (!journalChanged && !fullSaveChanged) return;
 
         this.options = { ...this.options, ...clamped };
-        if (!this._running) return;
 
-        if (journalChanged && this.options.journalEnabled) {
-            if (this.journalTimer) clearInterval(this.journalTimer);
-            this.journalTimer = setInterval(() => void this.flushOnce(), this.options.journalFlushIntervalMs);
+        if (journalChanged) {
+            // 无独立 flush 定时器：新间隔直接同步给缓存策略，心跳尝试时按新节奏落盘
+            this.journal.updateFlushInterval(this.options.journalFlushIntervalMs);
         }
-        if (fullSaveChanged) {
+        if (fullSaveChanged && this._running) {
             if (this.fullSaveTimer) clearInterval(this.fullSaveTimer);
             this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
         }
@@ -137,15 +138,10 @@ export class Scheduler {
         if (this._running) return;
         this._running = true;
 
-        // 1. Journal flush 定时器（仅在 journalEnabled 时启用）
-        if (this.options.journalEnabled) {
-            this.journalTimer = setInterval(() => void this.flushOnce(), this.options.journalFlushIntervalMs);
-        }
-
-        // 2. 全量存盘定时器
+        // 1. 全量存盘定时器
         this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
 
-        // 3. 心跳定时器：每秒推入时间片（仅 journalEnabled）+ 更新状态栏
+        // 2. 心跳定时器：每秒推入时间片 + 尝试 flush（落盘节奏由缓存策略裁决）+ 更新状态栏
         this.statusBarTimer = setInterval(() => {
             try {
                 // 推入时间片到 RingBuffer（仅当 journal 启用时）
@@ -154,6 +150,8 @@ export class Scheduler {
                         timestamp: Date.now(),
                         deltaMs: this.options.statusBarUpdateIntervalMs, // 1000ms = 1s
                     });
+                    // 尝试 flush：策略未到时间/无数据时为空操作，I/O 零成本
+                    void this.flushOnce();
                 }
 
                 // 更新状态栏（含今日时长和累计时长）
@@ -205,10 +203,6 @@ export class Scheduler {
     stop(): void {
         this._running = false;
 
-        if (this.journalTimer) {
-            clearInterval(this.journalTimer);
-            this.journalTimer = null;
-        }
         if (this.fullSaveTimer) {
             clearInterval(this.fullSaveTimer);
             this.fullSaveTimer = null;

@@ -16,14 +16,7 @@
  */
 
 import { TimeSession, DailyTotalsMap } from './models';
-import { TimeAggregator } from './TimeAggregator';
-
-function localDateStr(ms: number): string {
-    const d = new Date(ms);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${d.getFullYear()}-${mm}-${dd}`;
-}
+import { TimeAggregator, localDateStr } from './TimeAggregator';
 
 /**
  * 计算折叠截止点：今天本地零点 - retentionDays 天。

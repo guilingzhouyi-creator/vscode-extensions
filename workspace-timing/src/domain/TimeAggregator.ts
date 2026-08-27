@@ -88,8 +88,11 @@ export interface WeeklySummary {
  *
  * ⚠️ 全模块统一使用本地时区归桶，禁止使用 toISOString()（UTC）——
  * 否则 UTC+8 用户在早晨 8 点前的会话会被归到前一天。
+ *
+ * 作为领域层唯一日期格式化入口导出，供 HistoryFolder / RecoveryService 等
+ * 复用，杜绝跨层重复实现导致口径漂移。
  */
-function localDateStr(ms: number): string {
+export function localDateStr(ms: number): string {
     const d = new Date(ms);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -189,9 +192,13 @@ export class TimeAggregator {
      */
     static todayMs(sessions: TimeSession[], currentSessionStartMs: number): number {
         const today = localDateStr(Date.now());
+        const todayStartMs = parseLocalDate(today);
         let total = 0;
 
         for (const s of sessions) {
+            // 窗口粗筛：本日零点前已结束的会话不可能贡献今日时长。
+            // 跨午夜会话（startMs 在昨日、endMs 在今日）不受影响，不会被误筛。
+            if (s.endMs <= todayStartMs) continue;
             TimeAggregator.eachDaySegment(s.startMs, s.endMs, (date, segStart, segEnd) => {
                 if (date === today) total += segEnd - segStart;
             });
@@ -284,7 +291,10 @@ export class TimeAggregator {
 
         // 单次遍历 sessions，按自然日切分片段后归入对应日期桶，复杂度 O(N)。
         // 跨午夜会话（如昨日 23:30→今日 00:30）的两段会分别计入两天的桶。
+        // 窗口粗筛：首日零点前已结束的会话不可能落入 7 天窗口。
+        const firstDayStartMs = parseLocalDate(dayMap.keys().next().value as string);
         for (const s of sessions) {
+            if (s.endMs <= firstDayStartMs) continue;
             TimeAggregator.eachDaySegment(s.startMs, s.endMs, (date, segStart, segEnd) => {
                 const bucket = dayMap.get(date);
                 if (bucket) bucket.totalMs += segEnd - segStart;
@@ -366,6 +376,9 @@ export class TimeAggregator {
         };
 
         for (const s of sessions) {
+            // 窗口粗筛：完全落在目标日之外的会话直接跳过（clipToDay 内部虽已有
+            // 区间守卫，但避免对全历史逐条做 Math.max/min 与格式化分配）
+            if (s.endMs <= dayStartMs || s.startMs >= dayEndMs) continue;
             clipToDay(s.startMs, s.endMs, false);
         }
         if (currentSessionStartMs > 0) {
@@ -571,8 +584,13 @@ export class TimeAggregator {
             }
         }
 
-        // 遍历会话：按自然日切分片段，再归入片段所属的周桶
+        // 遍历会话：按自然日切分片段，再归入片段所属的周桶。
+        // 窗口粗筛：完全落在 N 周窗口之外的会话直接跳过（周界过滤用日零点，
+        // 上下界 ±1 小时的 DST 偏差对筛选结果无影响——归桶仍以 weekKeyOf 为准）。
+        const firstWeekStartMs = parseLocalDate(weekMap.keys().next().value as string);
+        const lastWeekEndMs = parseLocalDate(currentWeek) + MS_PER_DAY * 7;
         for (const s of sessions) {
+            if (s.endMs <= firstWeekStartMs || s.startMs >= lastWeekEndMs) continue;
             let counted = false;
             TimeAggregator.eachDaySegment(s.startMs, s.endMs, (_date, segStart, segEnd) => {
                 const bucket = weekMap.get(TimeAggregator.weekKeyOf(segStart));

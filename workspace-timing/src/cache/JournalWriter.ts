@@ -15,7 +15,7 @@ import { LogLevel, log } from '../integration/Logger';
 export class JournalWriter {
     private readonly ringBuffer: RingBuffer<TimeSlice>;
     private readonly storage: IJournalStore;
-    private readonly strategy: ICacheStrategy;
+    private strategy: ICacheStrategy;
     private lastFlushTime: number = Date.now();
 
     constructor(
@@ -28,14 +28,17 @@ export class JournalWriter {
         this.strategy = strategy ?? new TimeBasedCacheStrategy(DEFAULT_JOURNAL_FLUSH_MS);
     }
 
-    /** 获取内部 RingBuffer 引用（供 UI 读取最近数据） */
-    get buffer(): RingBuffer<TimeSlice> {
-        return this.ringBuffer;
-    }
-
     /** 写入一条时间片 */
     push(slice: TimeSlice): void {
         this.ringBuffer.push(slice);
+    }
+
+    /**
+     * 运行期热更新 flush 间隔（替换策略实例；Scheduler 心跳不再持有独立定时器，
+     * flush 节奏完全由策略裁决——见 Scheduler.start 的契约说明）。
+     */
+    updateFlushInterval(ms: number): void {
+        this.strategy = new TimeBasedCacheStrategy(Math.max(1000, ms));
     }
 
     /**
@@ -108,19 +111,14 @@ export class JournalWriter {
         return this.flushNow();
     }
 
-    /** 获取最近 N 条时间片（用于 UI 活跃曲线） */
-    peekLast(n: number): TimeSlice[] {
-        return this.ringBuffer.peekLast(n);
-    }
-
     private getOldestTimestamp(): number {
-        // O(1)：直接读最旧一条，避免此前 peekLast(count) 全量拷贝缓冲
+        // O(1)：直接读最旧一条，避免全量拷贝缓冲
         const oldest = this.ringBuffer.peekOldest();
         return oldest ? oldest.timestamp : 0;
     }
 
     private getNewestTimestamp(): number {
-        // O(1)：直接读最新一条，避免此前 peekLast(count) 全量拷贝缓冲
+        // O(1)：直接读最新一条，避免全量拷贝缓冲
         const newest = this.ringBuffer.peekNewest();
         return newest ? newest.timestamp : 0;
     }

@@ -16,6 +16,7 @@ import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
 import { t, format, setLocale, resolveLocale } from '../i18n/index';
 import { DashboardPanel } from './DashboardPanel';
+import { sanitizeFileName } from './fileUtils';
 
 /** 路由依赖（组合根注入） */
 export interface MessageRouterContext {
@@ -24,11 +25,6 @@ export interface MessageRouterContext {
     getStatusBar(): StatusBarController | null;
     /** reset 完成后用于立即回推最新面板数据（注入而非静态单例，保持可测性） */
     getDashboard(): { updateData(data: unknown): void } | null;
-}
-
-/** 清洗文件名中的非法字符（工作区名可能含 /\:*?"<>| 等） */
-function sanitizeFileName(name: string): string {
-    return name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'workspace';
 }
 
 export type DashboardMessageHandler = (msg: DashboardMessage) => void;
