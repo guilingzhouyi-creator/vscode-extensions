@@ -16,7 +16,7 @@ import { projectHashFor, pipeNameFor, writeRegistry, clearRegistry, logFilePath,
 import { createDaemonContext, handleScan, handleScanDiff, DaemonScanContext } from './scanHandler';
 
 /**
- * Persistent daemon (docs/warm-scan-design.md §A1/A3).
+ * Persistent daemon (docs/01-architecture/02-pipeline-and-caching.md §A1/A3).
  *
  * Lifecycle:
  *   - started via `daemon start` or CLI `--daemon` (detached child); also `--stdio` embedded

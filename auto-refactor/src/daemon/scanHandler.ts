@@ -5,7 +5,7 @@ import { CacheStore } from '../core/cache';
 import { Logger } from '../core/logger';
 
 /**
- * Daemon-side warm scan (docs/warm-scan-design.md §B5 / Part C).
+ * Daemon-side warm scan (docs/01-architecture/02-pipeline-and-caching.md §B5 / Part C).
  *
  * The daemon keeps three cross-scan assets:
  *   - pools:     persistent worker pools sharded by config fingerprint (T03)

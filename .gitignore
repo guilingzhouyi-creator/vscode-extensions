@@ -17,12 +17,13 @@ coverage/
 .vscode/workspace-timing.journal
 
 # auto-refactor 运行时缓存、测试语料与基准临时文件（不入库）
-.auto-refactor-cache/
-.auto-refactor-cache-*/
-.bench-corpus/
-.*-corpus/
-scripts/.corpus/
-scripts/.*-corpus/
+**/.auto-refactor-cache/
+**/.auto-refactor-cache-*/
+**/.bench-corpus/
+**/.*-corpus/
+**/.corpus/
+**/.t04-keypoints-*/
+**/.t04-keypoints-*
 *.log
 err.txt
 out.txt

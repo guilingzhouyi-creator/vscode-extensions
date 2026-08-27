@@ -5,7 +5,7 @@ import { TOOL_VERSION } from './config';
 import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cacheKey';
 
 /**
- * Two-level incremental cache (docs/warm-scan-design.md Part B).
+ * Two-level incremental cache (docs/01-architecture/02-pipeline-and-caching.md Part B).
  *
  * Layout (project-local by default; `--cache-dir` overrides):
  *   <dir>/

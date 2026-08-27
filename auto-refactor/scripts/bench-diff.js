@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// bench-diff.js — diff interface A/B benchmark (T04, docs/diff-interface-spec.md).
+// bench-diff.js — diff interface A/B benchmark (T04, docs/03-incremental-and-diff/02-diff-interface-spec.md).
 //
 // Measures, on a big-file small-change corpus:
 //   A. cold full scan            (scan, no cache, no daemon)

@@ -5,7 +5,7 @@ import { projectHashFor, readRegistry, clearRegistry, pipeNameFor } from '../dae
 import { DaemonClient } from '../daemon/client';
 
 /**
- * `auto-refactor daemon start|stop|status` (docs/warm-scan-design.md §A4.2).
+ * `auto-refactor daemon start|stop|status` (docs/01-architecture/02-pipeline-and-caching.md §A4.2).
  *
  *   start  — spawn a detached daemon server process for --root (or cwd), wait until it is
  *            registered + answering ping, then print status.

@@ -127,7 +127,7 @@ export class ConstantsAnalyzer implements Analyzer {
 
       const suggested = this.suggestName(lit.value, 'number');
       out.push({
-        id: `constants:magic-number:${ctx.filePath}:${lit.node.start.line}`,
+        id: `constants:magic-number:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
         analyzer: 'constants',
         rule: 'magic-number',
         severity: 'warning',
@@ -155,7 +155,7 @@ export class ConstantsAnalyzer implements Analyzer {
 
       const suggested = this.suggestName(inner, 'string');
       out.push({
-        id: `constants:hardcoded-string:${ctx.filePath}:${lit.node.start.line}`,
+        id: `constants:hardcoded-string:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
         analyzer: 'constants',
         rule: 'hardcoded-string',
         severity: 'warning',
@@ -194,7 +194,7 @@ export class ConstantsAnalyzer implements Analyzer {
       const first = arr[0];
       const suggested = this.suggestName(first.value, first.numeric ? 'number' : 'string');
       out.push({
-        id: `constants:duplicate-literal:${ctx.filePath}:${first.node.start.line}`,
+        id: `constants:duplicate-literal:${ctx.filePath}:${first.node.start?.line ?? 1}`,
         analyzer: 'constants',
         rule: 'duplicate-literal',
         severity: 'warning',
@@ -204,7 +204,7 @@ export class ConstantsAnalyzer implements Analyzer {
           value: first.value,
           numeric: first.numeric,
           occurrences: arr.length,
-          lines: arr.map((l) => l.node.start.line),
+          lines: arr.map((l) => l.node.start?.line ?? 1),
           suggestedName: suggested,
         },
         suggestion: `const ${suggested} = ${first.value}; // used ${arr.length}x`,

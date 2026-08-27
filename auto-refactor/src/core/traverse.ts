@@ -195,7 +195,7 @@ export class FileMetricCollector {
 }
 
 // ---------------------------------------------------------------------------
-// P1-1: lazy-projection fast path (see docs/p1-1-design.md §2.3, §2.6).
+// P1-1: lazy-projection fast path (see docs/02-parsers-and-ast/03-lazy-projection.md §2.3, §2.6).
 // traverse.ts stays ts-free: it drives the projector through the language-agnostic
 // NodeProjector interface only, so the oxc worker's lazy-typescript benefit is preserved.
 // ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ export class FileMetricCollector {
  *   - runStreaming:        adapter.children(normalizedNode)   (materialized children arrays)
  *   - runStreamingProjected: projector.forEachChild(raw)      (raw-driven lazy/subtree descent)
  *
- * Contract (docs/p1-1-design.md §2.3):
+ * Contract (docs/02-parsers-and-ast/03-lazy-projection.md §2.3):
  *   - `projector.project(raw, parentRaw, grandparentRaw)` is called ONCE per visit and may
  *     return the shared OTHER_PLACEHOLDER singleton (or, in Mode B, a cached subtree node).
  *   - `projector.forEachChild(raw)` yields raw children in materialized order with the same
@@ -314,13 +314,13 @@ export function runStreamingProjected(
 
 /**
  * Built-in streaming analyzers eligible for the lazy-projection fast path
- * (docs/p1-1-design.md §2.6). Custom/legacy analyzers (pure `analyze()` contract, or a streaming
+ * (docs/02-parsers-and-ast/03-lazy-projection.md §2.6). Custom/legacy analyzers (pure `analyze()` contract, or a streaming
  * analyzer outside this set) force the materialized path — they may need the full tree.
  */
 export const FAST_PATH_ANALYZERS = new Set(['constants', 'large-file', 'complexity']);
 
 /**
- * AR_FASTPATH gate (docs/p1-1-design.md §2.6, T05: default flipped ON).
+ * AR_FASTPATH gate (docs/02-parsers-and-ast/03-lazy-projection.md §2.6, T05: default flipped ON).
  * The lazy-projection fast path is the DEFAULT; `AR_FASTPATH=0` remains the explicit
  * safety-valve / A-B-baseline switch back to the materialized path.
  */
@@ -330,7 +330,7 @@ export function fastPathEnabled(): boolean {
 
 /**
  * Derive the projection policy from the ENABLED streaming analyzer names
- * (docs/p1-1-design.md §2.2 consumption matrix). FileMetricCollector always runs, so
+ * (docs/02-parsers-and-ast/03-lazy-projection.md §2.2 consumption matrix). FileMetricCollector always runs, so
  * topLevel/exported are unconditionally projected by the adapters.
  */
 export function policyFromAnalyzers(names: string[]): ProjectionPolicy {

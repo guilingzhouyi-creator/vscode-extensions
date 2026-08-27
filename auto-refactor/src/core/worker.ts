@@ -292,7 +292,7 @@ function runOne(
         issues.push(...runStreaming(adapter, ast.root, freshEntries));
       }
     } else {
-      issues.push(...runStreaming(adapter, ast.root!, entries));
+      issues.push(...runStreaming(adapter, ast!.root!, entries));
     }
   }
   const tStream1 = AR_TIMING ? nowMs() : 0;
@@ -303,7 +303,7 @@ function runOne(
     const ctx: AnalyzerContext = {
       filePath: file,
       content: c,
-      root: ast.root,
+      root: ast?.root || rootForCtx,
       adapter,
       sourceFile: sf,
       config: cfg,

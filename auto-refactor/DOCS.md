@@ -1,46 +1,52 @@
-# 📚 文档索引 | Docs Index
+# 📚 auto-refactor 文档索引 | Docs Index
 
-> auto-refactor 全部设计 / 规格 / 调研文档统一索引。路径均相对本仓库 `auto-refactor/`。
-> 文档命名统一 kebab-case；mermaid 图为设计配套示意图。
+> auto-refactor 全部规范化设计与技术文档集合。
+> 历史原始设计讨论与调研底稿已统一封存至工作区归档目录：`archive/auto-refactor/docs-legacy/`。
 
 ---
 
-## 设计文档 | Design Docs
+## 🏛️ 1. 核心架构与调度 (Architecture)
 
 | 文档 | 主题 | 状态 |
-|------|------|------|
-| [docs/p1-1-design.md](./docs/p1-1-design.md) | P1-1 懒投影（Lazy Projection）—— 投影模式等价门 + 性能收益 | ✅ 已实施（T01–T05 落地，默认已翻） |
-| [docs/warm-scan-design.md](./docs/warm-scan-design.md) | warm-scan 基础设施 —— 持久 worker 池 + 两级增量缓存 + daemon | ✅ 已实施（validate-warm W1–W9 全绿，默认关） |
-| [docs/system-design.md](./docs/system-design.md) | 行级增量（Line-level Incremental）—— 大文件小改动子树复用 | 📝 设计稿（只读调研 + 量化 + 设计） |
-| [docs/multilang-architecture.md](./docs/multilang-architecture.md) | 多语言架构 —— TS/JS + Rust 每语言独立适配器 | ✅ 已实现 |
-| [docs/oxc-feasibility.md](./docs/oxc-feasibility.md) | oxc-parser 替换可行性调研 —— 字节等价 | ✅ 结论 A 已按本文档实现 |
+|------|------|:---:|
+| [docs/01-architecture/01-system-overview.md](./docs/01-architecture/01-system-overview.md) | 系统整体架构、执行模式、并发 Worker 调度与 RSS 自愈 | ✅ 已落地 |
+| [docs/01-architecture/02-pipeline-and-caching.md](./docs/01-architecture/02-pipeline-and-caching.md) | L1/L2 两级增量缓存与配置指纹隔离机制 | ✅ 已落地 |
+| [docs/01-architecture/03-daemon-and-ipc.md](./docs/01-architecture/03-daemon-and-ipc.md) | 跨平台 Daemon 守护进程、NDJSON 通信与生命周期 | ✅ 已落地 |
 
-## 规格文档 | Specs
+## 🌲 2. 语法解析与 AST 适配 (Parsers & AST)
 
 | 文档 | 主题 | 状态 |
-|------|------|------|
-| [docs/diff-interface-spec.md](./docs/diff-interface-spec.md) | Diff 系统接口接入规格 —— scanDiff / scanDiffDelta | 📝 设计稿（接口规格） |
-| [docs/bench-baselines-spec.md](./docs/bench-baselines-spec.md) | 统一性能基准脚本规格（scripts/bench-baselines.js） | ✅ 规格定稿 |
+|------|------|:---:|
+| [docs/02-parsers-and-ast/01-multilang-abstraction.md](./docs/02-parsers-and-ast/01-multilang-abstraction.md) | NormalizedNode 统一抽象与 Rust (Tree-Sitter) 语言适配 | ✅ 已落地 |
+| [docs/02-parsers-and-ast/02-oxc-fastpath.md](./docs/02-parsers-and-ast/02-oxc-fastpath.md) | Rust oxc-parser 快速解析与字节等价性补偿 | ✅ 已落地 |
+| [docs/02-parsers-and-ast/03-lazy-projection.md](./docs/02-parsers-and-ast/03-lazy-projection.md) | 零物化懒投影技术与稀疏消费遍历 | ✅ 已落地 |
 
-## 性能分析与方案 | Performance
+## ⚡ 3. 增量计算与 Diff 接入 (Incremental & Diff)
 
 | 文档 | 主题 | 状态 |
-|------|------|------|
-| [docs/perf-boundary.md](./docs/perf-boundary.md) | 优化边界分析 —— 各维度收益上限 | ✅ 分析定稿（只分析不实现） |
-| [docs/perf-optimization-plan.md](./docs/perf-optimization-plan.md) | 跨域性能优化方案 | 📝 方案设计（不实现） |
-| [docs/feed-bottleneck-design.md](./docs/feed-bottleneck-design.md) | oxc 主线程 feed 瓶颈 —— 精确诊断 + ROI 裁决 | 📝 只读分析 + 设计 |
-| [docs/p2-5-protocol-flatten-design.md](./docs/p2-5-protocol-flatten-design.md) | P2-5 协议压平 —— 数据先行 + ROI 裁决 | 📝 只读分析 + 设计 |
+|------|------|:---:|
+| [docs/03-incremental-and-diff/01-line-level-incremental.md](./docs/03-incremental-and-diff/01-line-level-incremental.md) | 行级增量子树复用 (reuseSubtree) 与坐标平移 | ✅ 已落地 |
+| [docs/03-incremental-and-diff/02-diff-interface-spec.md](./docs/03-incremental-and-diff/02-diff-interface-spec.md) | Diff 接入规格、UTF-8 字节转码与双通道 API | ✅ 已落地 |
 
-## 图 | Diagrams (mermaid)
+## 🔍 4. 规则引擎与内置分析器 (Analyzers & Rules)
 
-| 图 | 内容 |
+| 文档 | 主题 | 状态 |
+|------|------|:---:|
+| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 常量提取、圈复杂度、大文件等内置分析规则 | ✅ 已落地 |
+| [docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md](./docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md) | 第三方自定义分析器插件契约与生命周期钩子 | ✅ 已落地 |
+
+## 📊 5. 规范与性能基准 (Specs & Benchmarks)
+
+| 文档 | 主题 | 状态 |
+|------|------|:---:|
+| [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | config.schema 规则配置与 JSON / SARIF / Text 报告格式 | ✅ 已落地 |
+| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 基准性能矩阵、吞吐量 Benchmark 与理论性能边界 | ✅ 已落地 |
+
+## 📐 6. 架构图表 (Mermaid)
+
+| 架构图 | 内容 |
 |------|------|
-| [docs/class-diagram.mermaid](./docs/class-diagram.mermaid) | 核心类图（含增量投影器） |
-| [docs/sequence-diagram.mermaid](./docs/sequence-diagram.mermaid) | 扫描时序图 |
-| [docs/diff-class-diagram.mermaid](./docs/diff-class-diagram.mermaid) | Diff 系统类图 |
-| [docs/diff-sequence-diagram.mermaid](./docs/diff-sequence-diagram.mermaid) | Diff 扫描时序图 |
-
----
-
-> 🔗 代码内引用约定：`src/` 注释与 `config.schema.json` 中指向本文档的路径均为 `docs/<name>.md`。
-> 🗑 已清理历史规划文档（NEXT_OPTIMIZATIONS / P3_DESIGN / REFACTOR_VALIDATION_REPORT / ARCHITECTURE_REPORT / PROJECT_REVIEW），如有溯源需求请查 git 历史。
+| [docs/diagrams/class-diagram.mermaid](./docs/diagrams/class-diagram.mermaid) | 核心系统类图 |
+| [docs/diagrams/sequence-diagram.mermaid](./docs/diagrams/sequence-diagram.mermaid) | 扫描分析时序图 |
+| [docs/diagrams/diff-class-diagram.mermaid](./docs/diagrams/diff-class-diagram.mermaid) | Diff 系统类图 |
+| [docs/diagrams/diff-sequence-diagram.mermaid](./docs/diagrams/diff-sequence-diagram.mermaid) | Diff 增量扫描时序图 |

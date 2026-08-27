@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// validate-diff.js — diff interface equivalence gate (T04, docs/diff-interface-spec.md).
+// validate-diff.js — diff interface equivalence gate (T04, docs/03-incremental-and-diff/02-diff-interface-spec.md).
 //
 // Oracle = COLD scan (scan(), no daemon, no cache, AR_INCREMENTAL=0 semantics).
 // Under test = scanDiff (full) / scanDiffDelta (subset) with AR_INCREMENTAL=1, across both the

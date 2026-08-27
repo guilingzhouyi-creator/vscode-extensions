@@ -113,7 +113,7 @@ export class ComplexityAnalyzer implements Analyzer {
     const startNode = first && first.rawKind === 'FunctionKeyword' ? first : node;
 
     this.issues.push({
-      id: `complexity:high-complexity:${ctx.filePath}:${node.start.line}`,
+      id: `complexity:high-complexity:${ctx.filePath}:${node.start?.line ?? 1}`,
       analyzer: 'complexity',
       rule: 'high-complexity',
       severity,

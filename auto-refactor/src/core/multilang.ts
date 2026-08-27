@@ -7,7 +7,7 @@
  * tree-sitter-rust, ...) — it produces the normalized tree and answers the question the
  * engine needs while descending: "what are this node's children".
  *
- * Design note vs. docs/multilang-architecture.md: the original draft proposed
+ * Design note vs. docs/02-parsers-and-ast/01-multilang-abstraction.md: the original draft proposed
  * `scopeOf(node, parent, grandparent)` then `childScope(node, className, binding)`. In
  * practice scope derivation needs the *threaded* ancestor className/binding (the engine
  * maintains those while descending, like the old TS-only traversal did), and — since both
@@ -128,7 +128,7 @@ export interface NormalizedAst {
 }
 
 // ---------------------------------------------------------------------------
-// P1-1: lazy projection (fast path) — see docs/p1-1-design.md §2.
+// P1-1: lazy projection (fast path) — see docs/02-parsers-and-ast/03-lazy-projection.md §2.
 //
 // The materialized path (`parse` → `runStreaming`) builds the ENTIRE normalized tree
 // before analyzers run. The projection path instead asks the adapter for a `NodeProjector`
@@ -139,7 +139,7 @@ export interface NormalizedAst {
 
 /**
  * Projection strategy derived once per file from the set of ENABLED streaming analyzers
- * (docs/p1-1-design.md §2.2). Every boolean drives which normalized fields the projector may
+ * (docs/02-parsers-and-ast/03-lazy-projection.md §2.2). Every boolean drives which normalized fields the projector may
  * skip constructing — a field with zero consumers is never built on the fast path.
  */
 export interface ProjectionPolicy {
@@ -195,7 +195,7 @@ export const OTHER_PLACEHOLDER: NormalizedNode = Object.freeze({ kind: NodeKind.
 
 /**
  * Position + source text of a function subtree — the INC-Mode-1 reuse key
- * (docs/system-design.md §3.3). Reuse requires the function's START LINE and START COLUMN
+ * (docs/03-incremental-and-diff/01-line-level-incremental.md §3.3). Reuse requires the function's START LINE and START COLUMN
  * to be unchanged (its own byte interval is untouched) AND its source text byte-identical;
  * a line/column-stable function keeps every embedded position stable even when a SAME-LINE
  * edit elsewhere shifted its absolute byte offset. Both adapters compute this from their
@@ -211,7 +211,7 @@ export interface ReusedSpan {
 
 /**
  * Optional seed threaded into `LanguageAdapter.parse()` for line-level incremental
- * (docs/system-design.md §3). When present, the adapter may reuse a previously-materialized
+ * (docs/03-incremental-and-diff/01-line-level-incremental.md §3). When present, the adapter may reuse a previously-materialized
  * function subtree (`reuseSubtree`) instead of re-projecting it, and must record every
  * function subtree it builds (`cacheSubtree`) for the NEXT scan. Absent ⇒ zero behavior
  * change (full materialization, byte-identical to the historical path).

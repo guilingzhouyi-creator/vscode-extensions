@@ -4,7 +4,7 @@ import * as path from 'path';
 import { sha256Hex } from '../core/cacheKey';
 
 /**
- * Daemon discovery registry (docs/warm-scan-design.md §A1.3).
+ * Daemon discovery registry (docs/01-architecture/02-pipeline-and-caching.md §A1.3).
  *
  * One daemon instance serves ONE project (identified by a hash of the canonical root path).
  * Its endpoint + pid are recorded in a per-project registry file so any CLI process can find
@@ -14,7 +14,7 @@ import { sha256Hex } from '../core/cacheKey';
  *   posix: ~/.cache/auto-refactor/daemon-<projectHash>.json
  *
  * The registry only ever holds daemon metadata (pid/pipe/startedAt/version/protocol/logFile) —
- * business caches live in the project itself (.auto-refactor-cache, docs/warm-scan-design §B3).
+ * business caches live in the project itself (.auto-refactor-cache, docs/01-architecture/02-pipeline-and-caching.md §B3).
  */
 
 export interface RegistryInfo {

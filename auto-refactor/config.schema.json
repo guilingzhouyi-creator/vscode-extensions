@@ -131,18 +131,18 @@
       "type": "string",
       "enum": ["typescript", "oxc"],
       "default": "typescript",
-      "description": "TS/JS-family parser: 'typescript' (default, ts.createSourceFile) or 'oxc' (Rust oxc-parser engine). The oxc parser produces byte-equivalent normalized output (see docs/oxc-feasibility.md) with ~3x faster parsing. Rust files are unaffected."
+      "description": "TS/JS-family parser: 'typescript' (default, ts.createSourceFile) or 'oxc' (Rust oxc-parser engine). The oxc parser produces byte-equivalent normalized output (see docs/02-parsers-and-ast/02-oxc-fastpath.md) with ~3x faster parsing. Rust files are unaffected."
     },
     "incremental": {
       "type": "boolean",
       "default": false,
-      "description": "Line-level incremental switch (docs/system-design.md). Default OFF. The runtime gate AR_INCREMENTAL=1 (environment) wins; this field is the declarative equivalent used by the daemon warm path. Only affects big-file-small-change rescans (daemon-only)."
+      "description": "Line-level incremental switch (docs/03-incremental-and-diff/01-line-level-incremental.md). Default OFF. The runtime gate AR_INCREMENTAL=1 (environment) wins; this field is the declarative equivalent used by the daemon warm path. Only affects big-file-small-change rescans (daemon-only)."
     },
     "incrementalMinLines": {
       "type": "integer",
       "minimum": 1,
       "default": 1000,
-      "description": "Minimum file line count to attempt line-level incremental (docs/system-design.md). Files below this threshold use the existing file-level L2 path (diff/cache-management would be net-negative)."
+      "description": "Minimum file line count to attempt line-level incremental (docs/03-incremental-and-diff/01-line-level-incremental.md). Files below this threshold use the existing file-level L2 path (diff/cache-management would be net-negative)."
     },
     "cache": {
       "type": "boolean",

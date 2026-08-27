@@ -138,7 +138,7 @@ function bindingName(node: ts.Node, sf: ts.SourceFile): string | null {
 // ---------------------------------------------------------------------------
 // Normalized-node predicate layer. These were the TypeScriptAdapter's private methods;
 // extracted to module level (logic unchanged) so BOTH the materializing mapNode and the
-// lazy TsNodeProjector reuse the exact same implementation (docs/p1-1-design.md §7: predicates
+// lazy TsNodeProjector reuse the exact same implementation (docs/02-parsers-and-ast/03-lazy-projection.md §7: predicates
 // are reused as-is, never rewritten).
 // ---------------------------------------------------------------------------
 
@@ -531,7 +531,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
 // ---------------------------------------------------------------------------
 
 /**
- * Lazy projection source for TypeScript-family files (docs/p1-1-design.md §2.5).
+ * Lazy projection source for TypeScript-family files (docs/02-parsers-and-ast/03-lazy-projection.md §2.5).
  *
  * Mode A (complexity disabled): `project()` returns T0 placeholders for non-consumed nodes
  * and real projections only for literals / scope / top-level / binding / function-like

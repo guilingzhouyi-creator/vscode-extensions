@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// validate-warm.js — warm-scan equivalence regression (docs/warm-scan-design.md Part D).
+// validate-warm.js — warm-scan equivalence regression (docs/01-architecture/02-pipeline-and-caching.md Part D).
 //
 // Proves the warm path (daemon + two-level cache) produces output BYTE-IDENTICAL to the
 // fresh path, per scenario W1-W9. Corpus generation + normalize are reused from

@@ -1,7 +1,7 @@
 /**
  * Old↔New line/byte mapping (ts-free pure logic).
  *
- * Part of the line-level incremental infrastructure (docs/system-design.md §3.2).
+ * Part of the line-level incremental infrastructure (docs/03-incremental-and-diff/01-line-level-incremental.md §3.2).
  * Given the OLD and NEW contents plus their byte-level `EditRange[]`, a `LineMap`
  * answers the position-translation questions an incremental projector needs:
  *   - `mapLine(oldLine)`   → the new 1-based line an old line moved to (or -1 if deleted)

@@ -18,7 +18,7 @@ import {
  * `NormalizedNode` tree contract the TypeScriptAdapter produces, so the engine and
  * analyzers (which only consume normalized semantic flags) are byte-equivalent.
  *
- * The mapping/compensation rules below are the verified plan from docs/oxc-feasibility.md §5
+ * The mapping/compensation rules below are the verified plan from docs/02-parsers-and-ast/02-oxc-fastpath.md §5
  * (POC: 18/18 engine-level byte compares PASS against the TypeScriptAdapter):
  *   §5.1  parseSync entry (lang by extension, sourceType 'unambiguous', preserveParens)
  *   §5.2  kindOf mapping table (Logical/Assignment -> BinaryExpr, no-sub template ->
@@ -242,7 +242,7 @@ function computeLineStarts(content: string): number[] {
 // ---------------------------------------------------------------------------
 // Module-level predicates — the SINGLE implementation shared by the materializing
 // mapNode (via the OxcAdapter private delegates below) and the lazy OxcProjector
-// (docs/p1-1-design.md §7: predicates are reused as-is, never rewritten).
+// (docs/02-parsers-and-ast/03-lazy-projection.md §7: predicates are reused as-is, never rewritten).
 // ---------------------------------------------------------------------------
 
 /** §5.2 kindOf mapping table. */
@@ -769,7 +769,7 @@ export class OxcAdapter implements LanguageAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// P1-1 (T04): oxc lazy projector (Mode A + Mode B). See docs/p1-1-design.md §2.7.
+// P1-1 (T04): oxc lazy projector (Mode A + Mode B). See docs/02-parsers-and-ast/03-lazy-projection.md §2.7.
 //
 // The materialized path's reflection `pushChild` turns every compensation rule into a
 // "push a normalized child" branch; here the SAME rules are expressed as "yield a raw

@@ -11,7 +11,7 @@
 //   node scripts/bench-baselines.js --files=150 --iterations=3       # 可缩放
 //   node scripts/bench-baselines.js --update                         # 覆盖历史最近一条（同口径重跑）
 //
-// 硬约束（见 docs/bench-baselines-spec.md §0）：
+// 硬约束（见 docs/05-specs-and-benchmarks/02-performance-benchmarks.md §0）：
 //   - 不改 validate-equivalence.js / benchmark.js / scripts/baselines/*
 //   - 阶段1 用 spawnSync 调用 validate（其末尾 process.exit() 会杀死 require 它的父进程）
 //   - MIXED dist 内部 require('typescript') 依赖本仓库 node_modules → NODE_PATH 必须在

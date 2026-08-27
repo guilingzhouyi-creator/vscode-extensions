@@ -75,7 +75,7 @@ export type OutputFormat = 'json' | 'sarif' | 'text';
 /**
  * TS/JS-family parser selection. 'typescript' is the default (historical `ts.createSourceFile`
  * path); 'oxc' uses the Rust `oxc-parser` engine (byte-equivalent normalized output — see
- * docs/oxc-feasibility.md). Non-TS/JS languages (Rust) are unaffected by this option.
+ * docs/02-parsers-and-ast/02-oxc-fastpath.md). Non-TS/JS languages (Rust) are unaffected by this option.
  */
 export type ParserKind = 'typescript' | 'oxc';
 
@@ -270,13 +270,13 @@ export interface ScanConfig {
   failOnAnalyzerError: boolean;
   /**
    * TS/JS-family parser: 'typescript' (default) or 'oxc' (Rust oxc-parser, byte-equivalent
-   * normalized output — see docs/oxc-feasibility.md). Rust files are unaffected.
+   * normalized output — see docs/02-parsers-and-ast/02-oxc-fastpath.md). Rust files are unaffected.
    */
   parser: ParserKind;
   /** Write the rendered report to this file instead of stdout (machine-readable output). */
   out?: string;
   /**
-   * Line-level incremental switch (docs/system-design.md). Default OFF. The runtime gate is
+   * Line-level incremental switch (docs/03-incremental-and-diff/01-line-level-incremental.md). Default OFF. The runtime gate is
    * `AR_INCREMENTAL=1` (environment wins); this field is the declarative equivalent used by
    * the daemon warm path when the env var is unset.
    */
@@ -305,7 +305,7 @@ export interface ScanReport {
 }
 
 /**
- * Warm-scan statistics (docs/warm-scan-design.md §A2.2). Deliberately NOT part of ScanReport —
+ * Warm-scan statistics (docs/01-architecture/02-pipeline-and-caching.md §A2.2). Deliberately NOT part of ScanReport —
  * stats are returned as a sibling field of scanWarm() so the report bytes stay identical
  * between cold and warm paths.
  */
@@ -333,7 +333,7 @@ export interface WarmStats {
 }
 
 /**
- * A single changed file fed to `scanDiff` / `scanDiffDelta` (docs/diff-interface-spec.md §1.2).
+ * A single changed file fed to `scanDiff` / `scanDiffDelta` (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.2).
  * Discriminated union: `kind:'full'` supplies both old+new content (Myers runs internally);
  * `kind:'ranges'` supplies the new content plus the diff system's edit ranges (Myers skipped).
  * For `kind:'ranges'`, the three byte fields are UTF-8 byte offsets into the NEW content's
@@ -364,7 +364,7 @@ export type DiffInput =
     };
 
 /**
- * Diff-scan statistics (docs/diff-interface-spec.md §1.3). Deliberately NOT part of any
+ * Diff-scan statistics (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.3). Deliberately NOT part of any
  * report — a sibling field of `scanDiff`/`scanDiffDelta` so report bytes never change.
  */
 export interface DiffStats extends WarmStats {
@@ -387,7 +387,7 @@ export interface DiffStats extends WarmStats {
 }
 
 /**
- * `scanDiffDelta` report — the changed-file SUBSET of a full scan (docs/diff-interface-spec.md
+ * `scanDiffDelta` report — the changed-file SUBSET of a full scan (docs/03-incremental-and-diff/02-diff-interface-spec.md
  * §1.5). Not byte-equivalent to a cold scan by itself (it is a subset); its contract is
  * `delta.report ≡ filter(scanDiff.report, changed-file set)` per issue/metric, in the same
  * relative order.

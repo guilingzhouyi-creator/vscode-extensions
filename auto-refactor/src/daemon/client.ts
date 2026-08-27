@@ -10,7 +10,7 @@ import {
 } from './protocol';
 
 /**
- * Daemon client (docs/warm-scan-design.md §A2.4).
+ * Daemon client (docs/01-architecture/02-pipeline-and-caching.md §A2.4).
  *
  * Discover → connect → hello handshake → scan. ANY failure (registry missing, connect error,
  * handshake timeout, version/protocol drift, scan timeout, mid-scan socket death) rejects —

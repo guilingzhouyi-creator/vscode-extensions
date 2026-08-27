@@ -129,7 +129,7 @@ Options:
  * CLI entry point. Delegates all work to the shared API (scanAndRender),
  * so script/CI and CLI share identical behavior.
  *
- * Defaults (docs/warm-scan-design.md §A4.3): cache ON; daemon 'auto' (probe an EXISTING daemon
+ * Defaults (docs/01-architecture/02-pipeline-and-caching.md §A4.3): cache ON; daemon 'auto' (probe an EXISTING daemon
  * only — <5ms, never auto-starts). `--daemon` opts into auto-start; `--no-daemon` opts out.
  */
 async function main(): Promise<void> {

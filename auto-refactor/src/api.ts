@@ -18,14 +18,14 @@ import { Logger, AutoRefactorError } from './core/logger';
 import { decodeContent } from './core/utf8';
 // NOTE: daemon client / daemonCmd are imported LAZILY inside scanWarm/scanAndRender so the
 // default scan() path (and CLI boot) never pays for the daemon module graph (net, child_process).
-// This preserves the "single-run zero cost" guarantee (docs/warm-scan-design.md §A4.3).
+// This preserves the "single-run zero cost" guarantee (docs/01-architecture/02-pipeline-and-caching.md §A4.3).
 
 /**
  * Options accepted by the programmatic API. A strict subset of ScanConfig — everything not
  * provided falls back to the layered defaults (built-in → config file → these overrides).
  * This is the single entry point for both CLI and script/Node consumers.
  *
- * WARM-SCAN (docs/warm-scan-design.md §A4.1): all warm options default OFF so `scan()` keeps its
+ * WARM-SCAN (docs/01-architecture/02-pipeline-and-caching.md §A4.1): all warm options default OFF so `scan()` keeps its
  * historical semantics — no daemon connection, no cache writes, zero implicit disk I/O for
  * library callers.
  */
@@ -147,7 +147,7 @@ export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
 }
 
 /**
- * Explicit warm-scan session (docs/warm-scan-design.md §A4.1): attempts a daemon scan and, on ANY
+ * Explicit warm-scan session (docs/01-architecture/02-pipeline-and-caching.md §A4.1): attempts a daemon scan and, on ANY
  * failure, degrades to a cold scan — returning `{ report, stats: { daemonUsed: false, ... } }`.
  * The report is byte-identical between warm and cold; stats are a sibling field (never part
  * of ScanReport) so output bytes never change.
@@ -197,7 +197,7 @@ export async function scanWarm(options: ScanOptions = {}): Promise<{ report: Sca
 }
 
 /**
- * Options for the diff-scan APIs (docs/diff-interface-spec.md §1.4). Inherits `ScanOptions`;
+ * Options for the diff-scan APIs (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.4). Inherits `ScanOptions`;
  * adds the disk-content verification toggle.
  */
 export interface ScanDiffOptions extends ScanOptions {
@@ -267,7 +267,7 @@ async function runDiff(
 }
 
 /**
- * Full diff scan (docs/diff-interface-spec.md §1.4): returns a report over ALL discovered files
+ * Full diff scan (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.4): returns a report over ALL discovered files
  * that is byte-identical to a cold rescan, using the diff inputs only to accelerate the changed
  * files. Changed files are routed byteEqual/incremental/full; unchanged files keep the L1/L2 path.
  */
@@ -280,7 +280,7 @@ export async function scanDiff(
 }
 
 /**
- * Delta diff scan (docs/diff-interface-spec.md §1.5): returns only the changed-file SUBSET.
+ * Delta diff scan (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.5): returns only the changed-file SUBSET.
  * Its contract is `delta.report ≡ filter(scanDiff.report, changed-file set)` — every issue/metric
  * is byte-identical to the full report's corresponding entry, in the same relative order. Not
  * byte-equivalent to a cold scan by itself (it is a subset).

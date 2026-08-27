@@ -1,7 +1,7 @@
 /**
  * Line-level Myers diff + edit-range computation (ts-free pure functions).
  *
- * Part of the line-level incremental infrastructure (docs/system-design.md §3.2).
+ * Part of the line-level incremental infrastructure (docs/03-incremental-and-diff/01-line-level-incremental.md §3.2).
  * Produces `EditRange[]` — LSP didChange-style old/new byte spans — by diffing the
  * OLD and NEW file contents at LINE granularity, then mapping each changed line run
  * to its byte offsets. This module NEVER imports `typescript` (it sits on the
@@ -232,7 +232,7 @@ export function computeEditRanges(oldContent: string, newContent: string): EditR
 }
 
 /**
- * Incremental-worthiness gate (docs/system-design.md §1/§8): only a LARGE file with a
+ * Incremental-worthiness gate (docs/03-incremental-and-diff/01-line-level-incremental.md §1/§8): only a LARGE file with a
  * SMALL change pays for the diff + cache-management overhead. `minLines` gates on the new
  * file's line count; `maxChangedLines` gates on the sum of deleted+inserted lines.
  */

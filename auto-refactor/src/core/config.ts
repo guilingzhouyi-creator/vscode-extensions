@@ -94,7 +94,7 @@ export function defaultConfig(root: string): ScanConfig {
     respectGitignore: true,
     failOnAnalyzerError: false,
     parser: 'typescript',
-    // Line-level incremental (docs/system-design.md): default OFF (env AR_INCREMENTAL wins).
+    // Line-level incremental (docs/03-incremental-and-diff/01-line-level-incremental.md): default OFF (env AR_INCREMENTAL wins).
     // `incrementalMinLines` is left unset here so the env `AR_INCREMENTAL_MIN_LINES`
     // (default 1000) takes precedence; a config file may still override it explicitly.
     incremental: false,
@@ -162,9 +162,9 @@ export function resolveConfig(
   }
 
   const customAnalyzers: CustomAnalyzerDeclaration[] =
-    fileCfg.customAnalyzers && fileCfg.customAnalyzers.length
+    (fileCfg.customAnalyzers && fileCfg.customAnalyzers.length
       ? fileCfg.customAnalyzers
-      : base.customAnalyzers;
+      : base.customAnalyzers) || [];
 
   const merged: ScanConfig = {
     root,

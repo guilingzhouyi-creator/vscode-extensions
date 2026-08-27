@@ -5,13 +5,13 @@
     "moduleResolution": "node",
     "outDir": "dist",
     "rootDir": "src",
-    "strict": false,
-    "noImplicitAny": false,
+    "strict": true,
+    "noImplicitAny": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
-    "sourceMap": false,
+    "sourceMap": true,
     "resolveJsonModule": true
   },
   "include": ["src/**/*.ts"]

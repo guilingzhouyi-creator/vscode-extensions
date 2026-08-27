@@ -1,5 +1,5 @@
 /**
- * Daemon IPC protocol (docs/warm-scan-design.md §A2).
+ * Daemon IPC protocol (docs/01-architecture/02-pipeline-and-caching.md §A2).
  *
  * Transport: NDJSON (one JSON object per line, UTF-8, `\n` separated) over a `net` socket
  * (Windows named pipe / POSIX Unix socket) or over stdio in embedded mode (`--stdio`).
@@ -53,7 +53,7 @@ export interface ScanMessage {
   };
 }
 
-/** Diff scan request (docs/diff-interface-spec.md §3.4). Same `scan_done` response as `scan`. */
+/** Diff scan request (docs/03-incremental-and-diff/02-diff-interface-spec.md §3.4). Same `scan_done` response as `scan`. */
 export interface ScanDiffMessage {
   v: number;
   id: number;

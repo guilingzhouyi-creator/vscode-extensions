@@ -6,7 +6,7 @@ import { TOOL_VERSION } from './config';
 import { policyFromAnalyzers, fastPathEnabled, FAST_PATH_ANALYZERS } from './traverse';
 
 /**
- * Warm-scan cache key construction (docs/warm-scan-design.md §B2).
+ * Warm-scan cache key construction (docs/01-architecture/02-pipeline-and-caching.md §B2).
  *
  * The L2 cache key is `v1:<fpHash>:<contentHash>` where:
  *   - contentHash = sha256 of the file's RAW bytes (not the utf8 string)
@@ -47,7 +47,7 @@ const BUILTIN_MODULE_PATHS: Record<string, string> = {
 
 /**
  * Stable JSON serialization: object keys sorted lexicographically, no whitespace.
- * This is the shared canonicalization used by cache keys AND tests (docs/warm-scan-design.md
+ * This is the shared canonicalization used by cache keys AND tests (docs/01-architecture/02-pipeline-and-caching.md
  * Appendix A). `undefined` values are dropped; non-finite numbers serialize as null
  * (matching JSON.stringify semantics, which is what the report itself produces).
  */
@@ -140,7 +140,7 @@ export function adapterIdFor(rel: string, parser: ParserKind = 'typescript'): st
   return 'typescript';
 }
 
-/** Custom-analyzer content hash (docs/warm-scan-design.md §B7): sha256 of ordered concat of
+/** Custom-analyzer content hash (docs/01-architecture/02-pipeline-and-caching.md §B7): sha256 of ordered concat of
  *  module absolute path + module file content hash + plugin options. Returns null when any
  *  module file cannot be read (caller must then treat L2 as disabled for safety). */
 export function computeCustomHash(descs: FingerprintAnalyzerDesc[]): string | null {
@@ -161,7 +161,7 @@ export function computeCustomHash(descs: FingerprintAnalyzerDesc[]): string | nu
   return sha256Hex(parts.join('\u0000'));
 }
 
-/** Fingerprint payload — the exact field list from docs/warm-scan-design.md Appendix A. */
+/** Fingerprint payload — the exact field list from docs/01-architecture/02-pipeline-and-caching.md Appendix A. */
 export interface FingerprintPayload {
   formatVersion: number;
   toolVersion: string;
@@ -244,7 +244,7 @@ export function l2Key(fpHashValue: string, contentHash: string): string {
 }
 
 /**
- * Config-level pool fingerprint (docs/warm-scan-design.md §A3.1): identifies the analyzer
+ * Config-level pool fingerprint (docs/01-architecture/02-pipeline-and-caching.md §A3.1): identifies the analyzer
  * configuration a worker pool was built for. Intentionally adapter/file agnostic — a pool
  * serves every file of a scan; per-file adapter differences are resolved inside the worker.
  */

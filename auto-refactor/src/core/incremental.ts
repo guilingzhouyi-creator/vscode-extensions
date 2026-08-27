@@ -93,7 +93,7 @@ export function route(
 export { shouldUseIncremental, changedLineCount, computeEditRanges, countLines };
 export type { EditRange };
 
-// Diff-input routing surface (docs/diff-interface-spec.md §2.1): single entry point for the
+// Diff-input routing surface (docs/03-incremental-and-diff/02-diff-interface-spec.md §2.1): single entry point for the
 // scanner to resolve a DiffInput into byteEqual/incremental/full. Pure ts-free logic lives in
 // diff.ts; this module only re-exports so consumers import from `./incremental`.
 export { resolveDiff as routeDiff, resolveDiff } from './diff';

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// bench-warm.js — warm-scan benchmark (docs/warm-scan-design.md Part E).
+// bench-warm.js — warm-scan benchmark (docs/01-architecture/02-pipeline-and-caching.md Part E).
 //
 // 1001 light files. S1-S5 measure the SCAN PIPELINE (the design's own methodology — its
 // cold/warm numbers of ~150ms/<30ms are API-level, excluding the ~180ms CLI process boot):

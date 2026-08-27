@@ -763,7 +763,7 @@ async function dispatchBatches(opts: DispatchOpts): Promise<{ issues: Issue[]; m
 }
 
 /**
- * Cold-path worker pool (docs/warm-scan-design.md §C1): spawns fresh workers, runs the batch
+ * Cold-path worker pool (docs/01-architecture/02-pipeline-and-caching.md §C1): spawns fresh workers, runs the batch
  * dispatcher with the parser-aware hybrid K, and terminates them at the end. This is the
  * EXACT legacy execution path — byte-identical output, only the scheduling differs.
  */
@@ -798,7 +798,7 @@ async function runWorkerPool(
 }
 
 /**
- * Persistent worker-pool manager (docs/warm-scan-design.md §A3).
+ * Persistent worker-pool manager (docs/01-architecture/02-pipeline-and-caching.md §A3).
  *
  * - Pools are sharded by configuration fingerprint (`Map<fp, Worker[]>`); a config change
  *   (parser / analyzer set / thresholds) creates a NEW pool while old pools are LRU-pruned
@@ -870,7 +870,7 @@ export class WorkerPoolManager {
   }
 
   /**
-   * RSS self-heal (docs/warm-scan-design.md §A3.4): >512MB → drop idle (non-warm) pools and keep
+   * RSS self-heal (docs/01-architecture/02-pipeline-and-caching.md §A3.4): >512MB → drop idle (non-warm) pools and keep
    * at most the most-recent pool; >768MB → log + graceful exit (the client's next connect
    * auto-restarts it under --daemon).
    */
@@ -931,12 +931,12 @@ export interface ScanWithCacheOptions {
   session?: WarmSession;
   /** Persistent pool manager (daemon). Absent → cold create/terminate pool per scan. */
   pool?: WorkerPoolManager;
-  /** Enable L2 for custom analyzers by hashing their module content (docs/warm-scan-design §B7). */
+  /** Enable L2 for custom analyzers by hashing their module content (docs/01-architecture/02-pipeline-and-caching.md §B7). */
   cacheCustom?: boolean;
 }
 
 /**
- * Diff-scan options (docs/diff-interface-spec.md §1.7). Additive to `ScanWithCacheOptions`:
+ * Diff-scan options (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.7). Additive to `ScanWithCacheOptions`:
  * the scanner pre-routes changed files from `diffHints` (byteEqual/incremental/full) before
  * the L1/L2 decision, while unchanged files keep the normal warm path.
  */
@@ -955,7 +955,7 @@ const CACHE_READ_CONCURRENCY = 32;
 
 /**
  * Re-map a cached per-file result from the path it was originally computed for to the
- * CURRENT rel path (docs/warm-scan-design.md §B2/B5). L2 entries are keyed by content hash —
+ * CURRENT rel path (docs/01-architecture/02-pipeline-and-caching.md §B2/B5). L2 entries are keyed by content hash —
  * identical files SHARE one entry, but issue ids/locations/metric.file embed the source
  * path, so a reuse across files must rewrite those fields. Built-in analyzer messages and
  * detail payloads do not embed the path (only ids + locations do), which is exactly what
@@ -1115,7 +1115,7 @@ export class Scanner {
   }
 
   /**
-   * Warm-scan pipeline (docs/warm-scan-design.md §B5): the SAME aggregation as `scan()` but with
+   * Warm-scan pipeline (docs/01-architecture/02-pipeline-and-caching.md §B5): the SAME aggregation as `scan()` but with
    * L1 stat skip + L2 content-hash reuse before the worker pool dispatch. Only L2-miss files
    * are analyzed. Cached per-file results are placed into the SAME index-aligned perFile
    * array, then `issues.sort` + `buildReport` run unchanged → byte-identical output.
@@ -1153,7 +1153,7 @@ export class Scanner {
     const payloadByAdapter = new Map<string, string>(); // "adapterId|ext" -> fpHash
     const fpHashFor = (rel: string): string => {
       const adapterId = adapterIdFor(rel, cfg.parser);
-      // Defensive redundancy: distinguish .d.ts from .ts in the key (docs/warm-scan-design §B7).
+      // Defensive redundancy: distinguish .d.ts from .ts in the key (docs/01-architecture/02-pipeline-and-caching.md §B7).
       const fileExt = rel.toLowerCase().endsWith('.d.ts') ? '.d.ts' : path.extname(rel).toLowerCase();
       const key = adapterId + '|' + fileExt;
       let h = payloadByAdapter.get(key);
@@ -1253,7 +1253,7 @@ export class Scanner {
         l2Refresh.push({ fpHash: fph, contentHash, rel, result, fp: s.fp || undefined });
         continue;
       }
-      // ---- line-level incremental routing (docs/system-design.md §4/§7) ----
+      // ---- line-level incremental routing (docs/03-incremental-and-diff/01-line-level-incremental.md §4/§7) ----
       // Only big files are candidates; small files keep the file-level L2 path (diff + cache
       // management would be net-negative). A big-file candidate is ALWAYS analyzed in-process
       // (never via the worker pool) so its `IncrementalFileState` subtree caches (with parsed
@@ -1443,7 +1443,7 @@ export class Scanner {
   }
 
   /**
-   * Diff-scan pipeline (docs/diff-interface-spec.md §1.7 / §3). Additive to `scanWithCache`:
+   * Diff-scan pipeline (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.7 / §3). Additive to `scanWithCache`:
    * changed files from `diffHints` are pre-routed (byteEqual → L2 reuse, incremental → subtree
    * reuse, full → plain rescan) BEFORE the L1/L2 decision; unchanged files keep the normal warm
    * path. `deltaOnly=true` (scanDiffDelta) restricts the report to the diff files and skips the
@@ -1972,7 +1972,7 @@ export class Scanner {
           issues.push(...runStreaming(adapter, ast.root, freshEntries));
         }
       } else {
-        issues.push(...runStreaming(adapter, ast.root!, entries));
+        issues.push(...runStreaming(adapter, ast!.root!, entries));
       }
     }
 
@@ -1982,7 +1982,7 @@ export class Scanner {
       const ctx: AnalyzerContext = {
         filePath: rel,
         content,
-        root: ast.root,
+        root: ast?.root || rootForCtx,
         adapter,
         sourceFile: sf,
         config: cfg,
