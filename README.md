@@ -21,7 +21,7 @@
 |------|------|:--:|------|
 | **[Workspace Timing](./workspace-timing)** | v0.4.4 | 🟢 已发布 | ⏱ 轻量化工作区时长追踪：自动计时、跨工作区聚合对比、12周热力图、24小时分布、双语界面热切换；RingBuffer + Journal 双写入，崩溃保护 |
 
-> 🧰 **非扩展模块**：[auto-refactor](./auto-refactor) — 独立的可配置静态分析 CLI（常量提取 / 大文件拆分 / 圈复杂度），多语言适配（TS/JS/Rust）、warm daemon、行级增量、CI 就绪结构化输出（JSON / SARIF / text）。**不含 `engines.vscode`，不会被 CI/打包/发布自动发现**，仅作为工具模块与本仓库并存。
+> 🧰 **非扩展模块**：[auto-refactor](./auto-refactor) — 高性能、声明式、项目无关的自动化代码重构与静态质量分析引擎（常量提取 / 大文件拆分 / 圈复杂度），面向 CI/CD 与 IDE。能力：多语言适配（TS / JS / Rust，内置 oxc 快速路径）、warm daemon（IPC 常驻进程）、行级增量（reuseSubtree 子树复用）、**高性能自定义 Diff 基座（SWAR + BPM 向量化 + AST 语义）**、三级回滚（3-tier rollback）、Praxis 集成与分形 Git 工作树/门禁规范、CI 就绪结构化输出（JSON / SARIF / text），支持自定义分析器插件。**不含 `engines.vscode`，不会被 CI/打包/发布自动发现**，仅作为工具模块与本仓库并存。
 
 ---
 
@@ -44,11 +44,11 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 │   ├── package.json
 │   ├── README.md
 │   └── LICENSE
-├── auto-refactor/              ← 独立 Node CLI 静态分析工具（非扩展，不参与打包/发布）
-│   ├── src/                    ← 分析器 + core + daemon + cli + utils
+├── auto-refactor/              ← 独立 Node CLI 静态分析引擎（非扩展，不参与打包/发布）
+│   ├── src/                    ← analyzers / core（含 diff、praxis、rollback、swar）/ daemon / cli / utils
 │   ├── scripts/                ← 基准 / 等价性 / 增量验证脚本
 │   ├── testdata/               ← 语义化命名的投影边界夹具
-│   ├── docs/                   ← 设计 / 规格 / 性能文档（kebab-case 统一命名）
+│   ├── docs/                   ← 6 大主题分节设计/规格/性能文档（01-architecture … 05-specs-and-benchmarks + diagrams）
 │   ├── DOCS.md                 ← 文档索引
 │   └── package.json
 ├── <future-extension>/         ← 新扩展预留位：建目录 + 放 package.json（需声明 engines.vscode）即自动接入 CI/发布
@@ -127,6 +127,13 @@ bash scripts/package.sh --skip-build           # 跳过编译仅打包
 | ✅ v0.1.0 ~ v0.4.4 | **Workspace Timing** 功能迭代：自动计时、跨工作区对比、热力图、小时分布、双语支持、崩溃保护 | 已发布 |
 | 🎯 下一插件 | **待定选题**（见下方「下一步规划」） | 规划中 |
 
+### 🧰 工具模块线（本仓库，非扩展）
+
+| 阶段 | 目标 | 状态 |
+|------|------|:--:|
+| ✅ v0.1.0 | **auto-refactor** 静态分析引擎：内置规则（常量提取/大文件/圈复杂度）+ 多语言适配 + 自定义 diff 基座（SWAR/BPM/AST） | 已落地 |
+| 🚧 演进中 | diff/Praxis 集成、三级回滚、分形 Git 工作树与门禁规范（`docs/01-architecture/04-*`） | 持续迭代 |
+
 ### 🧊 Windows 工具链线（独立仓库）
 
 | 阶段 | 目标 | 状态 |
@@ -151,12 +158,21 @@ bash scripts/package.sh --skip-build           # 跳过编译仅打包
 
 ## 🔧 技术栈 | Tech Stack
 
+**Workspace Timing（扩展）**
 - **语言**：TypeScript
 - **目标**：VS Code ≥ 1.85.0
 - **架构**：五层分层（Domain → Cache → Persistence → Application → Presentation）
 - **存储**：RingBuffer(1024) → Journal(NDJSON) → FullSave(JSON) 三级写入
 - **国际化**：i18n 模块，zh-CN / en 双语
 - **跨工作区**：ExtensionContext.globalState 全局聚合
+
+**auto-refactor（工具模块）**
+- **语言**：TypeScript，Node ≥ 20（`bin: auto-refactor`，CLI 可执行）
+- **多语言解析**：TS / JS（TypeScript AST）+ Rust（`rustAdapter`）+ oxc 快速路径（`oxcAdapter`）
+- **性能基座**：SWAR 位运算 + BPM 字节级向量化 + AST 语义的**自定义 Diff 基座**；懒投影零物化遍历；行级增量子树复用
+- **架构**：分析器（analyzers）+ 规则引擎 + core（cache / config / dependencyGraph / rollback / praxis）+ daemon（IPC 常驻）+ cli + utils
+- **输出**：JSON / SARIF / text，`config.schema.json` + `report.schema.json` 双 Schema
+- **扩展**：自定义分析器插件契约 + 生命周期钩子（custom-analyzer-plugin）
 
 ---
 
