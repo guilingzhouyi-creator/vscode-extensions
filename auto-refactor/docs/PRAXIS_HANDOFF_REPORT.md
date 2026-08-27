@@ -1,7 +1,8 @@
 # Praxis 定制高性能 Diff 底座交付与接入技术报告 (Index)
 
-完整技术报告已归档至系统架构文档中心：
-👉 **[docs/03-incremental-and-diff/03-praxis-integration-guide.md](03-incremental-and-diff/03-praxis-integration-guide.md)**
+完整技术报告与系统设计规范已归档至系统架构文档中心：
+👉 **[1. Praxis 底座接入与接口改造指南 (docs/03-incremental-and-diff/03-praxis-integration-guide.md)](03-incremental-and-diff/03-praxis-integration-guide.md)**  
+👉 **[2. Praxis 分形 Git 门禁工作树与生命周期规范 (docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md)](01-architecture/04-praxis-git-fractal-and-gating-spec.md)**  
 
 ---
 
