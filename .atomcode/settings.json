@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "(Edit|Write)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd workspace-timing && npx eslint src --ext ts --fix"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "(Edit|Write)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'case \"$ATOMCODE_TOOL_INPUT\" in *package-lock.json*) echo \"Blocked: use npm install instead\"; exit 1;; esac; exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}
