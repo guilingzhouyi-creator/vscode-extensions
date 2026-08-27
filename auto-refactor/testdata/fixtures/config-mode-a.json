@@ -1,0 +1,47 @@
+{
+  "format": "json",
+  "failOnIssue": false,
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    "out",
+    "coverage"
+  ],
+  "thresholds": {
+    "magicNumberMin": 2,
+    "duplicateLiteralThreshold": 3,
+    "hardcodedStringMinLength": 3,
+    "fileLinesWarn": 60,
+    "fileLinesFail": 120,
+    "fileFunctionsWarn": 6,
+    "complexityWarn": 8,
+    "complexityFail": 12
+  },
+  "customAnalyzers": [],
+  "logLevel": "silent",
+  "concurrency": 1,
+  "workers": 1,
+  "respectGitignore": false,
+  "failOnAnalyzerError": false,
+  "$schema": "../../config.schema.json",
+  "analyzers": {
+    "constants": {
+      "enabled": true,
+      "options": {}
+    },
+    "large-file": {
+      "enabled": true,
+      "options": {}
+    },
+    "complexity": {
+      "enabled": false
+    }
+  }
+}

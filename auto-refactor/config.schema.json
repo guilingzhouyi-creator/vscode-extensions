@@ -1,0 +1,184 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/guilingzhouyi-creator/auto-refactor/config.schema.json",
+  "title": "auto-refactor declarative configuration",
+  "description": "Declarative registry for the auto-refactor static-analysis toolchain. Analyzers are registered purely by configuration; no engine code change is needed to add or enable one. All fields are optional — omitted values fall back to documented defaults.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "format": {
+      "type": "string",
+      "enum": ["json", "sarif", "text"],
+      "default": "text",
+      "description": "Output format. 'sarif' is compatible with GitHub code scanning / CI dashboards; 'json' is the canonical machine-readable ScanReport; 'text' is human-readable."
+    },
+    "failOnIssue": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, the process exits non-zero when any 'error' issue is found (CI gate)."
+    },
+    "include": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+      "description": "Glob patterns (relative to root); a file must match at least one to be scanned."
+    },
+    "exclude": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": ["node_modules", ".git", "dist", "build", "out", "coverage", ".next", ".vscode-test"],
+      "description": "Glob patterns or directory names to skip."
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "Global default thresholds; merged into every analyzer's ctx.options and overridable per-analyzer via analyzers.<name>.options.",
+      "default": {
+        "magicNumberMin": 2,
+        "duplicateLiteralThreshold": 3,
+        "hardcodedStringMinLength": 3,
+        "fileLinesWarn": 400,
+        "fileLinesFail": 800,
+        "fileFunctionsWarn": 15,
+        "complexityWarn": 10,
+        "complexityFail": 20
+      },
+      "properties": {
+        "magicNumberMin": { "type": "number", "default": 2, "description": "constants: numeric literals with abs(value) < this are ignored." },
+        "duplicateLiteralThreshold": { "type": "number", "default": 3, "description": "constants: a literal repeated >= this many times in a file becomes a duplicate-literal finding." },
+        "hardcodedStringMinLength": { "type": "number", "default": 3, "description": "constants: minimum string length to be a hardcoded-string candidate." },
+        "fileLinesWarn": { "type": "number", "default": 400, "description": "large-file: lines at/above this => warning." },
+        "fileLinesFail": { "type": "number", "default": 800, "description": "large-file: lines at/above this => error (split candidate)." },
+        "fileFunctionsWarn": { "type": "number", "default": 15, "description": "large-file: top-level function count at/above this => warning." },
+        "complexityWarn": { "type": "number", "default": 10, "description": "complexity: cyclomatic complexity at/above this => warning." },
+        "complexityFail": { "type": "number", "default": 20, "description": "complexity: cyclomatic complexity at/above this => error." }
+      }
+    },
+    "analyzers": {
+      "type": "object",
+      "description": "DECLARATIVE REGISTRY. Each key is an analyzer id (built-in name or custom name). Presence here = registered; enabled:false disables without removing. Per-analyzer `options` override global thresholds.",
+      "default": {
+        "constants": { "enabled": true },
+        "large-file": { "enabled": true },
+        "complexity": { "enabled": true }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "options": {
+            "type": "object",
+            "description": "Per-analyzer options, deep-merged on top of global thresholds into ctx.options. Allowed keys mirror thresholds above plus analyzer-specific tunables."
+          }
+        }
+      },
+      "examples": [
+        {
+          "analyzers": {
+            "constants": { "enabled": true, "options": { "duplicateLiteralThreshold": 2 } },
+            "large-file": { "enabled": false },
+            "no-console": { "enabled": true }
+          }
+        }
+      ]
+    },
+    "customAnalyzers": {
+      "type": "array",
+      "description": "EXTERNAL PLUG-INS. Each entry loads a module at runtime via require(module); the module must export a class/object implementing analyze(sf, ctx). No engine change needed.",
+      "items": {
+        "type": "object",
+        "required": ["name", "module"],
+        "properties": {
+          "name": { "type": "string", "description": "Analyzer id; must match a key in analyzers to be enabled." },
+          "module": { "type": "string", "description": "Module path (relative to this config file) or package specifier." },
+          "enabled": { "type": "boolean", "default": true },
+          "options": { "type": "object" }
+        }
+      }
+    },
+    "logLevel": {
+      "type": "string",
+      "enum": ["silent", "error", "warn", "info", "debug"],
+      "default": "info",
+      "description": "Log verbosity. Logs go to stderr so stdout stays machine-readable; with logFile they also append to a file."
+    },
+    "logFile": {
+      "type": "string",
+      "description": "Optional log file (append). When set, logs mirror there in addition to stderr."
+    },
+    "concurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 4,
+      "description": "File-level parallelism: max files analyzed concurrently. Default = min(4, os.cpus().length)."
+    },
+    "workers": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 1,
+      "description": "Worker-thread parallelism for the parse+analyze stage. 1 = in-process single thread (default; fastest for typical repos, since parsing is already cheap once parent pointers are disabled). 0 = auto (spawn min(os.cpus().length, 8) worker threads when the repo is large). N > 1 = spawn exactly N worker threads — useful on many-core CI machines scanning very large codebases, where the fixed cost of loading TypeScript per worker is amortized. Files are independent so this parallelizes across cores."
+    },
+    "respectGitignore": {
+      "type": "boolean",
+      "default": true,
+      "description": "If true, honor a root-level .gitignore when discovering files, in addition to the exclude list. Prevents scanning generated/ignored artifacts (correctness + performance)."
+    },
+    "failOnAnalyzerError": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, an analyzer that throws is reported as an 'error' Issue (can fail CI via failOnIssue). If false, such faults are reported as 'info' and never fail the build."
+    },
+    "parser": {
+      "type": "string",
+      "enum": ["typescript", "oxc"],
+      "default": "typescript",
+      "description": "TS/JS-family parser: 'typescript' (default, ts.createSourceFile) or 'oxc' (Rust oxc-parser engine). The oxc parser produces byte-equivalent normalized output (see docs/oxc-feasibility.md) with ~3x faster parsing. Rust files are unaffected."
+    },
+    "incremental": {
+      "type": "boolean",
+      "default": false,
+      "description": "Line-level incremental switch (docs/system-design.md). Default OFF. The runtime gate AR_INCREMENTAL=1 (environment) wins; this field is the declarative equivalent used by the daemon warm path. Only affects big-file-small-change rescans (daemon-only)."
+    },
+    "incrementalMinLines": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1000,
+      "description": "Minimum file line count to attempt line-level incremental (docs/system-design.md). Files below this threshold use the existing file-level L2 path (diff/cache-management would be net-negative)."
+    },
+    "cache": {
+      "type": "boolean",
+      "default": false,
+      "description": "CLI/API warm-scan flag (NOT a ScanConfig field — accepted for CLI symmetry). Enables the two-level incremental cache (<root>/.auto-refactor-cache). CLI defaults to --cache; the scan() API defaults to off (zero implicit disk writes)."
+    },
+    "cacheDir": {
+      "type": "string",
+      "description": "CLI/API warm-scan flag. Cache directory; default <root>/.auto-refactor-cache. A shared --cache-dir is namespaced per project by root-path hash."
+    },
+    "cacheCustom": {
+      "type": "boolean",
+      "default": false,
+      "description": "CLI/API warm-scan flag. When custom analyzers are present, L2 result caching is disabled by default (their purity cannot be proven). Set true to enable L2 by hashing each custom module's path + content + options into the cache key."
+    },
+    "daemon": {
+      "type": "string",
+      "enum": ["auto", "on", "off"],
+      "default": "off",
+      "description": "CLI/API warm-scan mode (NOT a ScanConfig field). 'off' (API default) never connects; 'auto' probes an EXISTING daemon only (CLI default, <5ms, no auto-start); 'on' auto-starts the daemon when missing (CLI --daemon)."
+    }
+  },
+  "examples": [
+    {
+      "format": "sarif",
+      "failOnIssue": true,
+      "analyzers": {
+        "constants": { "enabled": true },
+        "complexity": { "enabled": true },
+        "no-console": { "enabled": true }
+      },
+      "customAnalyzers": [
+        { "name": "no-console", "module": "./analyzers/noConsole.js", "enabled": true }
+      ],
+      "logLevel": "warn",
+      "concurrency": 8
+    }
+  ]
+}

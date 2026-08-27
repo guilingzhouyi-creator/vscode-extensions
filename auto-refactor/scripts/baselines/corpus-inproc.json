@@ -1,0 +1,2034 @@
+{
+  "filesScanned": 26,
+  "issuesTotal": 68,
+  "byAnalyzer": {
+    "large-file": 5,
+    "constants": 50,
+    "no-console": 5,
+    "complexity": 8
+  },
+  "bySeverity": {
+    "info": 0,
+    "warning": 64,
+    "error": 4
+  },
+  "issues": [
+    {
+      "id": "complexity:high-complexity:src/unit_cls_0.ts:6",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "warning",
+      "message": "Function \"Widget.heavy\" has cyclomatic complexity 5 (threshold 5).",
+      "location": {
+        "file": "src/unit_cls_0.ts",
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 10,
+          "column": 4
+        }
+      },
+      "detail": {
+        "function": "Widget.heavy",
+        "cyclomaticComplexity": 5,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "complexity:high-complexity:src/unit_cls_1.ts:6",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "warning",
+      "message": "Function \"Widget.heavy\" has cyclomatic complexity 5 (threshold 5).",
+      "location": {
+        "file": "src/unit_cls_1.ts",
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 10,
+          "column": 4
+        }
+      },
+      "detail": {
+        "function": "Widget.heavy",
+        "cyclomaticComplexity": 5,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "complexity:high-complexity:src/unit_cls_2.ts:6",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "warning",
+      "message": "Function \"Widget.heavy\" has cyclomatic complexity 5 (threshold 5).",
+      "location": {
+        "file": "src/unit_cls_2.ts",
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 10,
+          "column": 4
+        }
+      },
+      "detail": {
+        "function": "Widget.heavy",
+        "cyclomaticComplexity": 5,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "complexity:high-complexity:src/unit_cls_3.ts:6",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "warning",
+      "message": "Function \"Widget.heavy\" has cyclomatic complexity 5 (threshold 5).",
+      "location": {
+        "file": "src/unit_cls_3.ts",
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 10,
+          "column": 4
+        }
+      },
+      "detail": {
+        "function": "Widget.heavy",
+        "cyclomaticComplexity": 5,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "complexity:high-complexity:src/unit_complex_0.ts:1",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "error",
+      "message": "Function \"decide\" has cyclomatic complexity 14 (threshold 5).",
+      "location": {
+        "file": "src/unit_complex_0.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 12,
+          "column": 2
+        }
+      },
+      "detail": {
+        "function": "decide",
+        "cyclomaticComplexity": 14,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "complexity:high-complexity:src/unit_complex_1.ts:1",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "error",
+      "message": "Function \"decide\" has cyclomatic complexity 14 (threshold 5).",
+      "location": {
+        "file": "src/unit_complex_1.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 12,
+          "column": 2
+        }
+      },
+      "detail": {
+        "function": "decide",
+        "cyclomaticComplexity": 14,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "complexity:high-complexity:src/unit_complex_2.ts:1",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "error",
+      "message": "Function \"decide\" has cyclomatic complexity 14 (threshold 5).",
+      "location": {
+        "file": "src/unit_complex_2.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 12,
+          "column": 2
+        }
+      },
+      "detail": {
+        "function": "decide",
+        "cyclomaticComplexity": 14,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "complexity:high-complexity:src/unit_complex_3.ts:1",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "error",
+      "message": "Function \"decide\" has cyclomatic complexity 14 (threshold 5).",
+      "location": {
+        "file": "src/unit_complex_3.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 12,
+          "column": 2
+        }
+      },
+      "detail": {
+        "function": "decide",
+        "cyclomaticComplexity": 14,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:15",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 2 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 15,
+          "column": 11
+        },
+        "end": {
+          "line": 15,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          15,
+          15,
+          16,
+          16,
+          17
+        ],
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:21",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 3 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 21,
+          "column": 11
+        },
+        "end": {
+          "line": 21,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "3",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          21,
+          21,
+          22,
+          22,
+          23
+        ],
+        "suggestedName": "CONST_3"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:27",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 4 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 27,
+          "column": 11
+        },
+        "end": {
+          "line": 27,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "4",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          27,
+          27,
+          28,
+          28,
+          29
+        ],
+        "suggestedName": "CONST_4"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:33",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 5 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 33,
+          "column": 11
+        },
+        "end": {
+          "line": 33,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "5",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          33,
+          33,
+          34,
+          34,
+          35
+        ],
+        "suggestedName": "CONST_5"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:39",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 6 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 39,
+          "column": 11
+        },
+        "end": {
+          "line": 39,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "6",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          39,
+          39,
+          40,
+          40,
+          41
+        ],
+        "suggestedName": "CONST_6"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:45",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 7 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 45,
+          "column": 11
+        },
+        "end": {
+          "line": 45,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "7",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          45,
+          45,
+          46,
+          46,
+          47
+        ],
+        "suggestedName": "CONST_7"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:51",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 8 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 51,
+          "column": 11
+        },
+        "end": {
+          "line": 51,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "8",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          51,
+          51,
+          52,
+          52,
+          53
+        ],
+        "suggestedName": "CONST_8"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:57",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 9 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 57,
+          "column": 11
+        },
+        "end": {
+          "line": 57,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "9",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          57,
+          57,
+          58,
+          58,
+          59
+        ],
+        "suggestedName": "CONST_9"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:63",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 10 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 63,
+          "column": 11
+        },
+        "end": {
+          "line": 63,
+          "column": 13
+        }
+      },
+      "detail": {
+        "value": "10",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          63,
+          63,
+          64,
+          64,
+          65
+        ],
+        "suggestedName": "CONST_10"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/bigfile.ts:69",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 11 is repeated 5 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 69,
+          "column": 11
+        },
+        "end": {
+          "line": 69,
+          "column": 13
+        }
+      },
+      "detail": {
+        "value": "11",
+        "numeric": true,
+        "occurrences": 5,
+        "lines": [
+          69,
+          69,
+          70,
+          70,
+          71
+        ],
+        "suggestedName": "CONST_11"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_complex_0.ts:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 2 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_complex_0.ts",
+        "start": {
+          "line": 3,
+          "column": 43
+        },
+        "end": {
+          "line": 3,
+          "column": 44
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          3,
+          4,
+          5,
+          8
+        ],
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_complex_0.ts:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 3 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_complex_0.ts",
+        "start": {
+          "line": 3,
+          "column": 73
+        },
+        "end": {
+          "line": 3,
+          "column": 74
+        }
+      },
+      "detail": {
+        "value": "3",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          3,
+          4,
+          5,
+          9
+        ],
+        "suggestedName": "CONST_3"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_complex_1.ts:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 2 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_complex_1.ts",
+        "start": {
+          "line": 3,
+          "column": 43
+        },
+        "end": {
+          "line": 3,
+          "column": 44
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          3,
+          4,
+          5,
+          8
+        ],
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_complex_1.ts:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 3 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_complex_1.ts",
+        "start": {
+          "line": 3,
+          "column": 73
+        },
+        "end": {
+          "line": 3,
+          "column": 74
+        }
+      },
+      "detail": {
+        "value": "3",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          3,
+          4,
+          5,
+          9
+        ],
+        "suggestedName": "CONST_3"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_complex_2.ts:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 2 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_complex_2.ts",
+        "start": {
+          "line": 3,
+          "column": 43
+        },
+        "end": {
+          "line": 3,
+          "column": 44
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          3,
+          4,
+          5,
+          8
+        ],
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_complex_2.ts:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 3 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_complex_2.ts",
+        "start": {
+          "line": 3,
+          "column": 73
+        },
+        "end": {
+          "line": 3,
+          "column": 74
+        }
+      },
+      "detail": {
+        "value": "3",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          3,
+          4,
+          5,
+          9
+        ],
+        "suggestedName": "CONST_3"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_complex_3.ts:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 2 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_complex_3.ts",
+        "start": {
+          "line": 3,
+          "column": 43
+        },
+        "end": {
+          "line": 3,
+          "column": 44
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          3,
+          4,
+          5,
+          8
+        ],
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_complex_3.ts:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 3 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_complex_3.ts",
+        "start": {
+          "line": 3,
+          "column": 73
+        },
+        "end": {
+          "line": 3,
+          "column": 74
+        }
+      },
+      "detail": {
+        "value": "3",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          3,
+          4,
+          5,
+          9
+        ],
+        "suggestedName": "CONST_3"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_magicNum_0.ts:2",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 100 is repeated 7 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_magicNum_0.ts",
+        "start": {
+          "line": 2,
+          "column": 11
+        },
+        "end": {
+          "line": 2,
+          "column": 14
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "occurrences": 7,
+        "lines": [
+          2,
+          2,
+          3,
+          3,
+          9,
+          9,
+          9
+        ],
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_magicNum_1.ts:2",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 100 is repeated 7 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_magicNum_1.ts",
+        "start": {
+          "line": 2,
+          "column": 11
+        },
+        "end": {
+          "line": 2,
+          "column": 14
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "occurrences": 7,
+        "lines": [
+          2,
+          2,
+          3,
+          3,
+          9,
+          9,
+          9
+        ],
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_magicNum_2.ts:2",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 100 is repeated 7 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_magicNum_2.ts",
+        "start": {
+          "line": 2,
+          "column": 11
+        },
+        "end": {
+          "line": 2,
+          "column": 14
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "occurrences": 7,
+        "lines": [
+          2,
+          2,
+          3,
+          3,
+          9,
+          9,
+          9
+        ],
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/unit_magicNum_3.ts:2",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 100 is repeated 7 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/unit_magicNum_3.ts",
+        "start": {
+          "line": 2,
+          "column": 11
+        },
+        "end": {
+          "line": 2,
+          "column": 14
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "occurrences": 7,
+        "lines": [
+          2,
+          2,
+          3,
+          3,
+          9,
+          9,
+          9
+        ],
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/legacy.js:5",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.js",
+        "start": {
+          "line": 5,
+          "column": 13
+        },
+        "end": {
+          "line": 5,
+          "column": 27
+        }
+      },
+      "detail": {
+        "value": "'legacy start'",
+        "length": 12,
+        "suggestedName": "LEGACYSTART_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_binding_0.ts:2",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_0.ts",
+        "start": {
+          "line": 2,
+          "column": 31
+        },
+        "end": {
+          "line": 2,
+          "column": 38
+        }
+      },
+      "detail": {
+        "value": "'inner'",
+        "length": 5,
+        "suggestedName": "INNER_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_binding_1.ts:2",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_1.ts",
+        "start": {
+          "line": 2,
+          "column": 31
+        },
+        "end": {
+          "line": 2,
+          "column": 38
+        }
+      },
+      "detail": {
+        "value": "'inner'",
+        "length": 5,
+        "suggestedName": "INNER_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_binding_2.ts:2",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_2.ts",
+        "start": {
+          "line": 2,
+          "column": 31
+        },
+        "end": {
+          "line": 2,
+          "column": 38
+        }
+      },
+      "detail": {
+        "value": "'inner'",
+        "length": 5,
+        "suggestedName": "INNER_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_binding_3.ts:2",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_3.ts",
+        "start": {
+          "line": 2,
+          "column": 31
+        },
+        "end": {
+          "line": 2,
+          "column": 38
+        }
+      },
+      "detail": {
+        "value": "'inner'",
+        "length": 5,
+        "suggestedName": "INNER_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_0.ts:3",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_0.ts",
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 28
+        }
+      },
+      "detail": {
+        "value": "'hello world'",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_0.ts:4",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_0.ts",
+        "start": {
+          "line": 4,
+          "column": 10
+        },
+        "end": {
+          "line": 4,
+          "column": 24
+        }
+      },
+      "detail": {
+        "value": "'hello world '",
+        "length": 12,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_0.ts:7",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_0.ts",
+        "start": {
+          "line": 7,
+          "column": 10
+        },
+        "end": {
+          "line": 7,
+          "column": 23
+        }
+      },
+      "detail": {
+        "value": "'hello world'",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_1.ts:3",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_1.ts",
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 28
+        }
+      },
+      "detail": {
+        "value": "'hello world'",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_1.ts:4",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_1.ts",
+        "start": {
+          "line": 4,
+          "column": 10
+        },
+        "end": {
+          "line": 4,
+          "column": 24
+        }
+      },
+      "detail": {
+        "value": "'hello world '",
+        "length": 12,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_1.ts:7",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_1.ts",
+        "start": {
+          "line": 7,
+          "column": 10
+        },
+        "end": {
+          "line": 7,
+          "column": 23
+        }
+      },
+      "detail": {
+        "value": "'hello world'",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_2.ts:3",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_2.ts",
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 28
+        }
+      },
+      "detail": {
+        "value": "'hello world'",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_2.ts:4",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_2.ts",
+        "start": {
+          "line": 4,
+          "column": 10
+        },
+        "end": {
+          "line": 4,
+          "column": 24
+        }
+      },
+      "detail": {
+        "value": "'hello world '",
+        "length": 12,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_2.ts:7",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_2.ts",
+        "start": {
+          "line": 7,
+          "column": 10
+        },
+        "end": {
+          "line": 7,
+          "column": 23
+        }
+      },
+      "detail": {
+        "value": "'hello world'",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_3.ts:3",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_3.ts",
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 28
+        }
+      },
+      "detail": {
+        "value": "'hello world'",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_3.ts:4",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_3.ts",
+        "start": {
+          "line": 4,
+          "column": 10
+        },
+        "end": {
+          "line": 4,
+          "column": 24
+        }
+      },
+      "detail": {
+        "value": "'hello world '",
+        "length": 12,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/unit_hardStr_3.ts:7",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_hardStr_3.ts",
+        "start": {
+          "line": 7,
+          "column": 10
+        },
+        "end": {
+          "line": 7,
+          "column": 23
+        }
+      },
+      "detail": {
+        "value": "'hello world'",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/legacy.js:2",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 5 should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.js",
+        "start": {
+          "line": 2,
+          "column": 11
+        },
+        "end": {
+          "line": 2,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "5",
+        "numeric": true,
+        "suggestedName": "CONST_5"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/legacy.js:2",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 100 should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.js",
+        "start": {
+          "line": 2,
+          "column": 27
+        },
+        "end": {
+          "line": 2,
+          "column": 30
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/legacy.js:3",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 100 should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.js",
+        "start": {
+          "line": 3,
+          "column": 14
+        },
+        "end": {
+          "line": 3,
+          "column": 17
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/unit_binding_0.ts:4",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 42 should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_0.ts",
+        "start": {
+          "line": 4,
+          "column": 23
+        },
+        "end": {
+          "line": 4,
+          "column": 25
+        }
+      },
+      "detail": {
+        "value": "42",
+        "numeric": true,
+        "suggestedName": "CONST_42"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/unit_binding_0.ts:5",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 7 should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_0.ts",
+        "start": {
+          "line": 5,
+          "column": 38
+        },
+        "end": {
+          "line": 5,
+          "column": 39
+        }
+      },
+      "detail": {
+        "value": "7",
+        "numeric": true,
+        "suggestedName": "CONST_7"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/unit_binding_1.ts:4",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 42 should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_1.ts",
+        "start": {
+          "line": 4,
+          "column": 23
+        },
+        "end": {
+          "line": 4,
+          "column": 25
+        }
+      },
+      "detail": {
+        "value": "42",
+        "numeric": true,
+        "suggestedName": "CONST_42"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/unit_binding_1.ts:5",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 7 should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_1.ts",
+        "start": {
+          "line": 5,
+          "column": 38
+        },
+        "end": {
+          "line": 5,
+          "column": 39
+        }
+      },
+      "detail": {
+        "value": "7",
+        "numeric": true,
+        "suggestedName": "CONST_7"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/unit_binding_2.ts:4",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 42 should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_2.ts",
+        "start": {
+          "line": 4,
+          "column": 23
+        },
+        "end": {
+          "line": 4,
+          "column": 25
+        }
+      },
+      "detail": {
+        "value": "42",
+        "numeric": true,
+        "suggestedName": "CONST_42"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/unit_binding_2.ts:5",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 7 should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_2.ts",
+        "start": {
+          "line": 5,
+          "column": 38
+        },
+        "end": {
+          "line": 5,
+          "column": 39
+        }
+      },
+      "detail": {
+        "value": "7",
+        "numeric": true,
+        "suggestedName": "CONST_7"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/unit_binding_3.ts:4",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 42 should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_3.ts",
+        "start": {
+          "line": 4,
+          "column": 23
+        },
+        "end": {
+          "line": 4,
+          "column": 25
+        }
+      },
+      "detail": {
+        "value": "42",
+        "numeric": true,
+        "suggestedName": "CONST_42"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/unit_binding_3.ts:5",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 7 should be extracted into a named constant.",
+      "location": {
+        "file": "src/unit_binding_3.ts",
+        "start": {
+          "line": 5,
+          "column": 38
+        },
+        "end": {
+          "line": 5,
+          "column": 39
+        }
+      },
+      "detail": {
+        "value": "7",
+        "numeric": true,
+        "suggestedName": "CONST_7"
+      }
+    },
+    {
+      "id": "large-file:large-file:src/bigfile.ts:1",
+      "analyzer": "large-file",
+      "rule": "large-file",
+      "severity": "warning",
+      "message": "File is large; consider splitting (lines 82 >= warn threshold 50; functions 12 >= warn threshold 5).",
+      "location": {
+        "file": "src/bigfile.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      },
+      "detail": {
+        "file": "src/bigfile.ts",
+        "lines": 82,
+        "nonBlankLines": 81,
+        "functions": 12,
+        "maxNestingDepth": 2,
+        "topLevelDeclarations": 21,
+        "exportedSymbols": 21,
+        "reasons": [
+          "lines 82 >= warn threshold 50",
+          "functions 12 >= warn threshold 5"
+        ],
+        "inferredModules": [
+          "fn"
+        ]
+      }
+    },
+    {
+      "id": "large-file:large-file:src/unit_binding_0.ts:1",
+      "analyzer": "large-file",
+      "rule": "large-file",
+      "severity": "warning",
+      "message": "File is large; consider splitting (functions 5 >= warn threshold 5).",
+      "location": {
+        "file": "src/unit_binding_0.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      },
+      "detail": {
+        "file": "src/unit_binding_0.ts",
+        "lines": 8,
+        "nonBlankLines": 7,
+        "functions": 5,
+        "maxNestingDepth": 2,
+        "topLevelDeclarations": 1,
+        "exportedSymbols": 1,
+        "reasons": [
+          "functions 5 >= warn threshold 5"
+        ],
+        "inferredModules": []
+      }
+    },
+    {
+      "id": "large-file:large-file:src/unit_binding_1.ts:1",
+      "analyzer": "large-file",
+      "rule": "large-file",
+      "severity": "warning",
+      "message": "File is large; consider splitting (functions 5 >= warn threshold 5).",
+      "location": {
+        "file": "src/unit_binding_1.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      },
+      "detail": {
+        "file": "src/unit_binding_1.ts",
+        "lines": 8,
+        "nonBlankLines": 7,
+        "functions": 5,
+        "maxNestingDepth": 2,
+        "topLevelDeclarations": 1,
+        "exportedSymbols": 1,
+        "reasons": [
+          "functions 5 >= warn threshold 5"
+        ],
+        "inferredModules": []
+      }
+    },
+    {
+      "id": "large-file:large-file:src/unit_binding_2.ts:1",
+      "analyzer": "large-file",
+      "rule": "large-file",
+      "severity": "warning",
+      "message": "File is large; consider splitting (functions 5 >= warn threshold 5).",
+      "location": {
+        "file": "src/unit_binding_2.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      },
+      "detail": {
+        "file": "src/unit_binding_2.ts",
+        "lines": 8,
+        "nonBlankLines": 7,
+        "functions": 5,
+        "maxNestingDepth": 2,
+        "topLevelDeclarations": 1,
+        "exportedSymbols": 1,
+        "reasons": [
+          "functions 5 >= warn threshold 5"
+        ],
+        "inferredModules": []
+      }
+    },
+    {
+      "id": "large-file:large-file:src/unit_binding_3.ts:1",
+      "analyzer": "large-file",
+      "rule": "large-file",
+      "severity": "warning",
+      "message": "File is large; consider splitting (functions 5 >= warn threshold 5).",
+      "location": {
+        "file": "src/unit_binding_3.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      },
+      "detail": {
+        "file": "src/unit_binding_3.ts",
+        "lines": 8,
+        "nonBlankLines": 7,
+        "functions": 5,
+        "maxNestingDepth": 2,
+        "topLevelDeclarations": 1,
+        "exportedSymbols": 1,
+        "reasons": [
+          "functions 5 >= warn threshold 5"
+        ],
+        "inferredModules": []
+      }
+    },
+    {
+      "id": "no-console:no-console-call:src/legacy.js:5",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "src/legacy.js",
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 28
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:src/unit_hardStr_0.ts:3",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "src/unit_hardStr_0.ts",
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:src/unit_hardStr_1.ts:3",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "src/unit_hardStr_1.ts",
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:src/unit_hardStr_2.ts:3",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "src/unit_hardStr_2.ts",
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:src/unit_hardStr_3.ts:3",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "src/unit_hardStr_3.ts",
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    }
+  ],
+  "fileMetrics": [
+    {
+      "file": "src/bigfile.ts",
+      "lines": 82,
+      "nonBlankLines": 81,
+      "functions": 12,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 21,
+      "exportedSymbols": 21
+    },
+    {
+      "file": "src/legacy.js",
+      "lines": 8,
+      "nonBlankLines": 7,
+      "functions": 1,
+      "maxNestingDepth": 3,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 0
+    },
+    {
+      "file": "src/unit_binding_0.ts",
+      "lines": 8,
+      "nonBlankLines": 7,
+      "functions": 5,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_binding_1.ts",
+      "lines": 8,
+      "nonBlankLines": 7,
+      "functions": 5,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_binding_2.ts",
+      "lines": 8,
+      "nonBlankLines": 7,
+      "functions": 5,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_binding_3.ts",
+      "lines": 8,
+      "nonBlankLines": 7,
+      "functions": 5,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_cls_0.ts",
+      "lines": 12,
+      "nonBlankLines": 11,
+      "functions": 4,
+      "maxNestingDepth": 6,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_cls_1.ts",
+      "lines": 12,
+      "nonBlankLines": 11,
+      "functions": 4,
+      "maxNestingDepth": 6,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_cls_2.ts",
+      "lines": 12,
+      "nonBlankLines": 11,
+      "functions": 4,
+      "maxNestingDepth": 6,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_cls_3.ts",
+      "lines": 12,
+      "nonBlankLines": 11,
+      "functions": 4,
+      "maxNestingDepth": 6,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_complex_0.ts",
+      "lines": 13,
+      "nonBlankLines": 12,
+      "functions": 1,
+      "maxNestingDepth": 4,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_complex_1.ts",
+      "lines": 13,
+      "nonBlankLines": 12,
+      "functions": 1,
+      "maxNestingDepth": 4,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_complex_2.ts",
+      "lines": 13,
+      "nonBlankLines": 12,
+      "functions": 1,
+      "maxNestingDepth": 4,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_complex_3.ts",
+      "lines": 13,
+      "nonBlankLines": 12,
+      "functions": 1,
+      "maxNestingDepth": 4,
+      "topLevelDeclarations": 1,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_hardStr_0.ts",
+      "lines": 9,
+      "nonBlankLines": 8,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 2
+    },
+    {
+      "file": "src/unit_hardStr_1.ts",
+      "lines": 9,
+      "nonBlankLines": 8,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 2
+    },
+    {
+      "file": "src/unit_hardStr_2.ts",
+      "lines": 9,
+      "nonBlankLines": 8,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 2
+    },
+    {
+      "file": "src/unit_hardStr_3.ts",
+      "lines": 9,
+      "nonBlankLines": 8,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 2
+    },
+    {
+      "file": "src/unit_i18n_0.ts",
+      "lines": 7,
+      "nonBlankLines": 6,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_i18n_1.ts",
+      "lines": 7,
+      "nonBlankLines": 6,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_i18n_2.ts",
+      "lines": 7,
+      "nonBlankLines": 6,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_i18n_3.ts",
+      "lines": 7,
+      "nonBlankLines": 6,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 1
+    },
+    {
+      "file": "src/unit_magicNum_0.ts",
+      "lines": 11,
+      "nonBlankLines": 10,
+      "functions": 2,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 3,
+      "exportedSymbols": 3
+    },
+    {
+      "file": "src/unit_magicNum_1.ts",
+      "lines": 11,
+      "nonBlankLines": 10,
+      "functions": 2,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 3,
+      "exportedSymbols": 3
+    },
+    {
+      "file": "src/unit_magicNum_2.ts",
+      "lines": 11,
+      "nonBlankLines": 10,
+      "functions": 2,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 3,
+      "exportedSymbols": 3
+    },
+    {
+      "file": "src/unit_magicNum_3.ts",
+      "lines": 11,
+      "nonBlankLines": 10,
+      "functions": 2,
+      "maxNestingDepth": 2,
+      "topLevelDeclarations": 3,
+      "exportedSymbols": 3
+    }
+  ]
+}

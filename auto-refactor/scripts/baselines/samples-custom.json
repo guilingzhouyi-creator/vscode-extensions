@@ -1,0 +1,1437 @@
+{
+  "filesScanned": 3,
+  "issuesTotal": 60,
+  "byAnalyzer": {
+    "constants": 47,
+    "no-console": 12,
+    "complexity": 1
+  },
+  "bySeverity": {
+    "info": 0,
+    "warning": 60,
+    "error": 0
+  },
+  "issues": [
+    {
+      "id": "complexity:high-complexity:sample.ts:17",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "warning",
+      "message": "Function \"addUser\" has cyclomatic complexity 10 (threshold 10).",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 17,
+          "column": 1
+        },
+        "end": {
+          "line": 36,
+          "column": 2
+        }
+      },
+      "detail": {
+        "function": "addUser",
+        "cyclomaticComplexity": 10,
+        "warn": 10,
+        "fail": 20
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:sample.ts:22",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 100 is repeated 4 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 22,
+          "column": 24
+        },
+        "end": {
+          "line": 22,
+          "column": 27
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "occurrences": 4,
+        "lines": [
+          22,
+          51,
+          64,
+          74
+        ],
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:sample.ts:26",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 'admin' is repeated 3 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 26,
+          "column": 16
+        },
+        "end": {
+          "line": 26,
+          "column": 23
+        }
+      },
+      "detail": {
+        "value": "'admin'",
+        "numeric": false,
+        "occurrences": 3,
+        "lines": [
+          26,
+          52,
+          64
+        ],
+        "suggestedName": "ADMIN_TEXT"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:sample.ts:26",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 'user' is repeated 3 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 26,
+          "column": 36
+        },
+        "end": {
+          "line": 26,
+          "column": 42
+        }
+      },
+      "detail": {
+        "value": "'user'",
+        "numeric": false,
+        "occurrences": 3,
+        "lines": [
+          26,
+          54,
+          65
+        ],
+        "suggestedName": "USER_TEXT"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:sample.ts:30",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 'CN' is repeated 3 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 30,
+          "column": 19
+        },
+        "end": {
+          "line": 30,
+          "column": 23
+        }
+      },
+      "detail": {
+        "value": "'CN'",
+        "numeric": false,
+        "occurrences": 3,
+        "lines": [
+          30,
+          53,
+          68
+        ],
+        "suggestedName": "CN_TEXT"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:sample.ts:43",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 'user not found' is repeated 7 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 43,
+          "column": 15
+        },
+        "end": {
+          "line": 43,
+          "column": 31
+        }
+      },
+      "detail": {
+        "value": "'user not found'",
+        "numeric": false,
+        "occurrences": 7,
+        "lines": [
+          43,
+          49,
+          50,
+          51,
+          74,
+          75,
+          76
+        ],
+        "suggestedName": "USERNOTFOUND_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:analyzers/noConsole.js:20",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "analyzers/noConsole.js",
+        "start": {
+          "line": 20,
+          "column": 10
+        },
+        "end": {
+          "line": 20,
+          "column": 22
+        }
+      },
+      "detail": {
+        "value": "'no-console'",
+        "length": 10,
+        "suggestedName": "NOCONSOLE_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:analyzers/noConsole.js:30",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "analyzers/noConsole.js",
+        "start": {
+          "line": 30,
+          "column": 45
+        },
+        "end": {
+          "line": 30,
+          "column": 54
+        }
+      },
+      "detail": {
+        "value": "'console'",
+        "length": 7,
+        "suggestedName": "CONSOLE_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:analyzers/noConsole.js:36",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "analyzers/noConsole.js",
+        "start": {
+          "line": 36,
+          "column": 23
+        },
+        "end": {
+          "line": 36,
+          "column": 35
+        }
+      },
+      "detail": {
+        "value": "'no-console'",
+        "length": 10,
+        "suggestedName": "NOCONSOLE_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:analyzers/noConsole.js:37",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "analyzers/noConsole.js",
+        "start": {
+          "line": 37,
+          "column": 19
+        },
+        "end": {
+          "line": 37,
+          "column": 36
+        }
+      },
+      "detail": {
+        "value": "'no-console-call'",
+        "length": 15,
+        "suggestedName": "NOCONSOLECALL_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:analyzers/noConsole.js:38",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "analyzers/noConsole.js",
+        "start": {
+          "line": 38,
+          "column": 47
+        },
+        "end": {
+          "line": 38,
+          "column": 56
+        }
+      },
+      "detail": {
+        "value": "'warning'",
+        "length": 7,
+        "suggestedName": "WARNING_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:analyzers/noConsole.js:8",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "analyzers/noConsole.js",
+        "start": {
+          "line": 8,
+          "column": 20
+        },
+        "end": {
+          "line": 8,
+          "column": 32
+        }
+      },
+      "detail": {
+        "value": "'typescript'",
+        "length": 10,
+        "suggestedName": "TYPESCRIPT_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:18",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 18,
+          "column": 22
+        },
+        "end": {
+          "line": 18,
+          "column": 28
+        }
+      },
+      "detail": {
+        "value": "'path'",
+        "length": 4,
+        "suggestedName": "PATH_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:19",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 19,
+          "column": 48
+        },
+        "end": {
+          "line": 19,
+          "column": 54
+        }
+      },
+      "detail": {
+        "value": "'dist'",
+        "length": 4,
+        "suggestedName": "DIST_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:19",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 19,
+          "column": 56
+        },
+        "end": {
+          "line": 19,
+          "column": 61
+        }
+      },
+      "detail": {
+        "value": "'api'",
+        "length": 3,
+        "suggestedName": "API_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:24",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 24,
+          "column": 38
+        },
+        "end": {
+          "line": 24,
+          "column": 65
+        }
+      },
+      "detail": {
+        "value": "'auto-refactor.config.json'",
+        "length": 25,
+        "suggestedName": "AUTOREFACTORCONFIGJSON_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:25",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 25,
+          "column": 13
+        },
+        "end": {
+          "line": 25,
+          "column": 19
+        }
+      },
+      "detail": {
+        "value": "'json'",
+        "length": 4,
+        "suggestedName": "JSON_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:28",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 28,
+          "column": 15
+        },
+        "end": {
+          "line": 28,
+          "column": 21
+        }
+      },
+      "detail": {
+        "value": "'warn'",
+        "length": 4,
+        "suggestedName": "WARN_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:31",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 31,
+          "column": 15
+        },
+        "end": {
+          "line": 31,
+          "column": 34
+        }
+      },
+      "detail": {
+        "value": "'tool            :'",
+        "length": 17,
+        "suggestedName": "TOOL_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:32",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 32,
+          "column": 15
+        },
+        "end": {
+          "line": 32,
+          "column": 34
+        }
+      },
+      "detail": {
+        "value": "'files scanned   :'",
+        "length": 17,
+        "suggestedName": "FILESSCANNED_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:33",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 33,
+          "column": 15
+        },
+        "end": {
+          "line": 33,
+          "column": 34
+        }
+      },
+      "detail": {
+        "value": "'issues total    :'",
+        "length": 17,
+        "suggestedName": "ISSUESTOTAL_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:34",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 34,
+          "column": 15
+        },
+        "end": {
+          "line": 34,
+          "column": 34
+        }
+      },
+      "detail": {
+        "value": "'by severity     :'",
+        "length": 17,
+        "suggestedName": "BYSEVERITY_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:35",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 35,
+          "column": 15
+        },
+        "end": {
+          "line": 35,
+          "column": 34
+        }
+      },
+      "detail": {
+        "value": "'by analyzer     :'",
+        "length": 17,
+        "suggestedName": "BYANALYZER_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:36",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 36,
+          "column": 15
+        },
+        "end": {
+          "line": 36,
+          "column": 34
+        }
+      },
+      "detail": {
+        "value": "'duration (ms)   :'",
+        "length": 17,
+        "suggestedName": "DURATIONMS_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:40",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 40,
+          "column": 19
+        },
+        "end": {
+          "line": 40,
+          "column": 74
+        }
+      },
+      "detail": {
+        "value": "'CI GATE: error-severity issues found -> non-zero exit'",
+        "length": 53,
+        "suggestedName": "CIGATEERRORSEVERITY_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:43",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 43,
+          "column": 15
+        },
+        "end": {
+          "line": 43,
+          "column": 32
+        }
+      },
+      "detail": {
+        "value": "'CI GATE: passed'",
+        "length": 15,
+        "suggestedName": "CIGATEPASSED_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:run-from-script.js:47",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 47,
+          "column": 17
+        },
+        "end": {
+          "line": 47,
+          "column": 33
+        }
+      },
+      "detail": {
+        "value": "'script failed:'",
+        "length": 14,
+        "suggestedName": "SCRIPTFAILED_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:19",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 19,
+          "column": 17
+        },
+        "end": {
+          "line": 19,
+          "column": 31
+        }
+      },
+      "detail": {
+        "value": "'invalid name'",
+        "length": 12,
+        "suggestedName": "INVALIDNAME_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:23",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 23,
+          "column": 17
+        },
+        "end": {
+          "line": 23,
+          "column": 30
+        }
+      },
+      "detail": {
+        "value": "'invalid age'",
+        "length": 11,
+        "suggestedName": "INVALIDAGE_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:26",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 26,
+          "column": 55
+        },
+        "end": {
+          "line": 26,
+          "column": 62
+        }
+      },
+      "detail": {
+        "value": "'guest'",
+        "length": 5,
+        "suggestedName": "GUEST_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:27",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 27,
+          "column": 17
+        },
+        "end": {
+          "line": 27,
+          "column": 31
+        }
+      },
+      "detail": {
+        "value": "'invalid role'",
+        "length": 12,
+        "suggestedName": "INVALIDROLE_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:31",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 31,
+          "column": 17
+        },
+        "end": {
+          "line": 31,
+          "column": 34
+        }
+      },
+      "detail": {
+        "value": "'invalid country'",
+        "length": 15,
+        "suggestedName": "INVALIDCOUNTRY_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:53",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 53,
+          "column": 41
+        },
+        "end": {
+          "line": 53,
+          "column": 59
+        }
+      },
+      "detail": {
+        "value": "'admin must be CN'",
+        "length": 16,
+        "suggestedName": "ADMINMUSTBECN_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:55",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 55,
+          "column": 33
+        },
+        "end": {
+          "line": 55,
+          "column": 49
+        }
+      },
+      "detail": {
+        "value": "'user too young'",
+        "length": 14,
+        "suggestedName": "USERTOOYOUNG_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:57",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 57,
+          "column": 17
+        },
+        "end": {
+          "line": 57,
+          "column": 31
+        }
+      },
+      "detail": {
+        "value": "'unknown role'",
+        "length": 12,
+        "suggestedName": "UNKNOWNROLE_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:74",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 74,
+          "column": 27
+        },
+        "end": {
+          "line": 74,
+          "column": 35
+        }
+      },
+      "detail": {
+        "value": "'high: '",
+        "length": 6,
+        "suggestedName": "HIGH_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:75",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 75,
+          "column": 26
+        },
+        "end": {
+          "line": 75,
+          "column": 33
+        }
+      },
+      "detail": {
+        "value": "'mid: '",
+        "length": 5,
+        "suggestedName": "MID_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:sample.ts:76",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 76,
+          "column": 10
+        },
+        "end": {
+          "line": 76,
+          "column": 17
+        }
+      },
+      "detail": {
+        "value": "'low: '",
+        "length": 5,
+        "suggestedName": "LOW_TEXT"
+      }
+    },
+    {
+      "id": "constants:magic-number:run-from-script.js:26",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 4 should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 26,
+          "column": 18
+        },
+        "end": {
+          "line": 26,
+          "column": 19
+        }
+      },
+      "detail": {
+        "value": "4",
+        "numeric": true,
+        "suggestedName": "CONST_4"
+      }
+    },
+    {
+      "id": "constants:magic-number:run-from-script.js:48",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 2 should be extracted into a named constant.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 48,
+          "column": 16
+        },
+        "end": {
+          "line": 48,
+          "column": 17
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:magic-number:sample.ts:18",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 2 should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 18,
+          "column": 21
+        },
+        "end": {
+          "line": 18,
+          "column": 22
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:magic-number:sample.ts:55",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 18 should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 55,
+          "column": 17
+        },
+        "end": {
+          "line": 55,
+          "column": 19
+        }
+      },
+      "detail": {
+        "value": "18",
+        "numeric": true,
+        "suggestedName": "CONST_18"
+      }
+    },
+    {
+      "id": "constants:magic-number:sample.ts:65",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 50 should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 65,
+          "column": 40
+        },
+        "end": {
+          "line": 65,
+          "column": 42
+        }
+      },
+      "detail": {
+        "value": "50",
+        "numeric": true,
+        "suggestedName": "CONST_50"
+      }
+    },
+    {
+      "id": "constants:magic-number:sample.ts:66",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 10 should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 66,
+          "column": 17
+        },
+        "end": {
+          "line": 66,
+          "column": 19
+        }
+      },
+      "detail": {
+        "value": "10",
+        "numeric": true,
+        "suggestedName": "CONST_10"
+      }
+    },
+    {
+      "id": "constants:magic-number:sample.ts:67",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 18 should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 67,
+          "column": 15
+        },
+        "end": {
+          "line": 67,
+          "column": 17
+        }
+      },
+      "detail": {
+        "value": "18",
+        "numeric": true,
+        "suggestedName": "CONST_18"
+      }
+    },
+    {
+      "id": "constants:magic-number:sample.ts:67",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 3600 should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 67,
+          "column": 28
+        },
+        "end": {
+          "line": 67,
+          "column": 32
+        }
+      },
+      "detail": {
+        "value": "3600",
+        "numeric": true,
+        "suggestedName": "EXTRACTED_NUMBER"
+      }
+    },
+    {
+      "id": "constants:magic-number:sample.ts:68",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 86400 should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 68,
+          "column": 36
+        },
+        "end": {
+          "line": 68,
+          "column": 41
+        }
+      },
+      "detail": {
+        "value": "86400",
+        "numeric": true,
+        "suggestedName": "EXTRACTED_NUMBER"
+      }
+    },
+    {
+      "id": "constants:magic-number:sample.ts:75",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 50 should be extracted into a named constant.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 75,
+          "column": 15
+        },
+        "end": {
+          "line": 75,
+          "column": 17
+        }
+      },
+      "detail": {
+        "value": "50",
+        "numeric": true,
+        "suggestedName": "CONST_50"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:run-from-script.js:31",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 31,
+          "column": 3
+        },
+        "end": {
+          "line": 31,
+          "column": 64
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:run-from-script.js:32",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 32,
+          "column": 3
+        },
+        "end": {
+          "line": 32,
+          "column": 64
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:run-from-script.js:33",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 33,
+          "column": 3
+        },
+        "end": {
+          "line": 33,
+          "column": 63
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:run-from-script.js:34",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 34,
+          "column": 3
+        },
+        "end": {
+          "line": 34,
+          "column": 78
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:run-from-script.js:35",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 35,
+          "column": 3
+        },
+        "end": {
+          "line": 35,
+          "column": 78
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:run-from-script.js:36",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 36,
+          "column": 3
+        },
+        "end": {
+          "line": 36,
+          "column": 62
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:run-from-script.js:43",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "run-from-script.js",
+        "start": {
+          "line": 43,
+          "column": 3
+        },
+        "end": {
+          "line": 43,
+          "column": 33
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:sample.ts:19",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 19,
+          "column": 5
+        },
+        "end": {
+          "line": 19,
+          "column": 32
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:sample.ts:23",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 23,
+          "column": 5
+        },
+        "end": {
+          "line": 23,
+          "column": 31
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:sample.ts:27",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 27,
+          "column": 5
+        },
+        "end": {
+          "line": 27,
+          "column": 32
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:sample.ts:31",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 31,
+          "column": 5
+        },
+        "end": {
+          "line": 31,
+          "column": 35
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    },
+    {
+      "id": "no-console:no-console-call:sample.ts:43",
+      "analyzer": "no-console",
+      "rule": "no-console-call",
+      "severity": "warning",
+      "message": "Avoid console.log() in committed code.",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 43,
+          "column": 3
+        },
+        "end": {
+          "line": 43,
+          "column": 32
+        }
+      },
+      "detail": {
+        "method": "log"
+      }
+    }
+  ],
+  "fileMetrics": [
+    {
+      "file": "analyzers/noConsole.js",
+      "lines": 54,
+      "nonBlankLines": 48,
+      "functions": 3,
+      "maxNestingDepth": 6,
+      "topLevelDeclarations": 3,
+      "exportedSymbols": 0
+    },
+    {
+      "file": "run-from-script.js",
+      "lines": 50,
+      "nonBlankLines": 45,
+      "functions": 2,
+      "maxNestingDepth": 3,
+      "topLevelDeclarations": 3,
+      "exportedSymbols": 0
+    },
+    {
+      "file": "sample.ts",
+      "lines": 105,
+      "nonBlankLines": 95,
+      "functions": 7,
+      "maxNestingDepth": 7,
+      "topLevelDeclarations": 9,
+      "exportedSymbols": 7
+    }
+  ]
+}

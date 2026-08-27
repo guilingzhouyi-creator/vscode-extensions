@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 *.vsix
 .vscode-test/
 .cnb/.cache/
@@ -15,6 +15,17 @@ coverage/
 .workbuddy/
 .vscode/workspace-timing.json
 .vscode/workspace-timing.journal
+
+# auto-refactor 运行时缓存、测试语料与基准临时文件（不入库）
+.auto-refactor-cache/
+.auto-refactor-cache-*/
+.bench-corpus/
+.*-corpus/
+scripts/.corpus/
+scripts/.*-corpus/
+*.log
+err.txt
+out.txt
 
 # 版本归档（历史快照 / 备份 / 演示材料，统一集中管理）
 archive/

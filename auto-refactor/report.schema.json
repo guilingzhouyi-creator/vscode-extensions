@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://auto-refactor.dev/schemas/report.schema.json",
+  "title": "auto-refactor ScanReport (output format specification)",
+  "description": "Canonical output schema for the auto-refactor toolchain. One ScanReport is produced per scan run, regardless of --format (json|sarif|text all derive from this structure; sarif is a convertible projection).",
+  "type": "object",
+  "required": ["tool", "version", "generatedAt", "root", "config", "summary", "issues", "fileMetrics"],
+  "properties": {
+    "tool": { "type": "string", "const": "auto-refactor", "description": "Tool identifier." },
+    "version": { "type": "string", "description": "Tool version, mirrors package.json (semver)." },
+    "generatedAt": { "type": "string", "format": "date-time", "description": "ISO-8601 timestamp of report generation." },
+    "root": { "type": "string", "description": "Absolute root path that was scanned." },
+    "config": { "$ref": "#/definitions/ConfigRef", "description": "Echo of the effective resolved config used for this run." },
+    "summary": {
+      "type": "object",
+      "required": ["filesScanned", "issuesTotal", "bySeverity", "byAnalyzer", "durationMs"],
+      "properties": {
+        "filesScanned": { "type": "integer", "minimum": 0 },
+        "issuesTotal": { "type": "integer", "minimum": 0 },
+        "bySeverity": {
+          "type": "object",
+          "properties": {
+            "info": { "type": "integer", "minimum": 0 },
+            "warning": { "type": "integer", "minimum": 0 },
+            "error": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "byAnalyzer": {
+          "type": "object",
+          "description": "Map of analyzerId -> issue count.",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "durationMs": { "type": "integer", "minimum": 0, "description": "Wall-clock scan duration in milliseconds." }
+      },
+      "additionalProperties": false
+    },
+    "issues": {
+      "type": "array",
+      "description": "All findings, sorted deterministically by file, line, analyzer, rule.",
+      "items": { "$ref": "#/definitions/Issue" }
+    },
+    "fileMetrics": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/FileMetric" }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Issue": {
+      "type": "object",
+      "required": ["id", "analyzer", "rule", "severity", "message", "location", "detail"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable within a run: `${analyzer}:${rule}:${file}:${line}`." },
+        "analyzer": { "type": "string", "description": "Analyzer id that emitted this issue." },
+        "rule": { "type": "string", "description": "Rule key within the analyzer, e.g. magic-number / high-complexity." },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string" },
+        "location": {
+          "type": "object",
+          "required": ["file", "start", "end"],
+          "properties": {
+            "file": { "type": "string", "description": "Relative path as scanned." },
+            "start": { "$ref": "#/definitions/Position" },
+            "end": { "$ref": "#/definitions/Position" }
+          },
+          "additionalProperties": false
+        },
+        "detail": { "type": "object", "description": "Machine-readable payload (values, counts, metrics, names...)." },
+        "suggestion": { "type": "string", "description": "Optional refactoring hint." }
+      },
+      "additionalProperties": false,
+      "examples": [
+        {
+          "id": "constants:magic-number:src/foo.ts:12",
+          "analyzer": "constants",
+          "rule": "magic-number",
+          "severity": "warning",
+          "message": "Magic number 86400000 should be extracted to a named constant.",
+          "location": { "file": "src/foo.ts", "start": { "line": 12, "column": 20 }, "end": { "line": 12, "column": 28 } },
+          "detail": { "value": "86400000", "suggestedName": "ONE_DAY_MS" },
+          "suggestion": "const ONE_DAY_MS = 86400000;"
+        }
+      ]
+    },
+    "Position": {
+      "type": "object",
+      "required": ["line", "column"],
+      "properties": {
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "FileMetric": {
+      "type": "object",
+      "required": ["file", "lines", "nonBlankLines", "functions", "maxNestingDepth", "topLevelDeclarations", "exportedSymbols"],
+      "properties": {
+        "file": { "type": "string" },
+        "lines": { "type": "integer", "minimum": 0 },
+        "nonBlankLines": { "type": "integer", "minimum": 0 },
+        "functions": { "type": "integer", "minimum": 0 },
+        "maxNestingDepth": { "type": "integer", "minimum": 0 },
+        "topLevelDeclarations": { "type": "integer", "minimum": 0 },
+        "exportedSymbols": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "ConfigRef": {
+      "type": "object",
+      "description": "Subset echo of ScanConfig (structure mirrors config.schema.json).",
+      "properties": {
+        "root": { "type": "string" },
+        "include": { "type": "array", "items": { "type": "string" } },
+        "exclude": { "type": "array", "items": { "type": "string" } },
+        "analyzers": { "type": "object" },
+        "thresholds": { "type": "object" },
+        "format": { "type": "string", "enum": ["json", "sarif", "text"] },
+        "failOnIssue": { "type": "boolean" },
+        "logLevel": { "type": "string", "enum": ["silent", "error", "warn", "info", "debug"] },
+        "concurrency": { "type": "integer", "minimum": 1 },
+        "failOnAnalyzerError": { "type": "boolean" }
+      }
+    }
+  }
+}

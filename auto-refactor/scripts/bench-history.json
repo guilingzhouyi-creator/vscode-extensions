@@ -1,0 +1,479 @@
+{
+  "entries": [
+    {
+      "date": "2026-08-13T05:23:00.314Z",
+      "commit": null,
+      "new300": 143.0033999999996,
+      "mixed300": null,
+      "newBig": 389.41100000000006,
+      "mixedBig": null,
+      "createSourceFile": 5.533789999999863,
+      "parseTs": 17.410719999999493,
+      "mapTs": 11.87692999999963,
+      "parseOxc": 1.7489099999998872,
+      "mapOxc": 14.036580000000686,
+      "runStreaming": 4.71349999999984,
+      "materializationRatio": 0.682161909444295,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32",
+        "cpu": "32 logical"
+      },
+      "flags": {
+        "files": 300,
+        "iterations": 5,
+        "workers": 1,
+        "bigFiles": 12,
+        "bigLines": 2600,
+        "parser": "typescript"
+      }
+    },
+    {
+      "date": "2026-08-13T05:23:25.143Z",
+      "commit": null,
+      "new300": 123.71029999999973,
+      "mixed300": null,
+      "newBig": 316.15329999999994,
+      "mixedBig": null,
+      "createSourceFile": 3.8505800000000816,
+      "parseTs": 15.843489999999838,
+      "mapTs": 11.992909999999757,
+      "parseOxc": 1.480880000000252,
+      "mapOxc": 11.160539999999493,
+      "runStreaming": 4.153919999999926,
+      "materializationRatio": 0.756961376565383,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32",
+        "cpu": "32 logical"
+      },
+      "flags": {
+        "files": 300,
+        "iterations": 5,
+        "workers": 1,
+        "bigFiles": 12,
+        "bigLines": 2600,
+        "parser": "typescript"
+      }
+    },
+    {
+      "date": "2026-08-13T05:23:59.130Z",
+      "commit": null,
+      "new300": 133.46279999999933,
+      "mixed300": 120.51080000000002,
+      "newBig": 428.23989999999867,
+      "mixedBig": 478.14210000000094,
+      "createSourceFile": 6.028389999999854,
+      "parseTs": 19.36885000000002,
+      "mapTs": 13.340460000000165,
+      "parseOxc": 1.7603900000005523,
+      "mapOxc": 15.407389999999214,
+      "runStreaming": 6.506839999999647,
+      "materializationRatio": 0.6887584962452676,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32",
+        "cpu": "32 logical"
+      },
+      "flags": {
+        "files": 300,
+        "iterations": 5,
+        "workers": 1,
+        "bigFiles": 12,
+        "bigLines": 2600,
+        "parser": "typescript"
+      }
+    },
+    {
+      "date": "2026-08-13T05:24:19.188Z",
+      "commit": null,
+      "new300": 127.51549999999952,
+      "mixed300": 114.36409999999978,
+      "newBig": 402.1887999999999,
+      "mixedBig": 486.34029999999984,
+      "createSourceFile": 5.587630000000172,
+      "parseTs": 18.964910000000053,
+      "mapTs": 13.377279999999882,
+      "parseOxc": 1.3146400000003269,
+      "mapOxc": 17.274069999999302,
+      "runStreaming": 6.193839999999727,
+      "materializationRatio": 0.7053700755764116,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32",
+        "cpu": "32 logical"
+      },
+      "flags": {
+        "files": 300,
+        "iterations": 5,
+        "workers": 1,
+        "bigFiles": 12,
+        "bigLines": 2600,
+        "parser": "typescript"
+      }
+    }
+  ],
+  "benchWarm": [
+    {
+      "date": "2026-08-13T13:32:17.587Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 1901.6,
+      "s2warm1st": 2033.9,
+      "s3warm2nd": 297,
+      "s4warm3rd": 285.9,
+      "s5mixed": 376.1,
+      "s6cold2nd": 1289.2,
+      "speedupS3": 6.4,
+      "speedupS4": 6.7,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:32:30.529Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 547.5,
+      "s2warm1st": 683.8,
+      "s3warm2nd": 173.8,
+      "s4warm3rd": 155.6,
+      "s5mixed": 236.5,
+      "s6cold2nd": 383.6,
+      "speedupS3": 3.1,
+      "speedupS4": 3.5,
+      "accept": false,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:41:26.965Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 1579,
+      "s2warm1st": 2102.3,
+      "s3warm2nd": 315,
+      "s4warm3rd": 312.5,
+      "s5mixed": 404.9,
+      "s6cold2nd": 1525,
+      "speedupS3": 5,
+      "speedupS4": 5.1,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:41:40.819Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 632.5,
+      "s2warm1st": 734.4,
+      "s3warm2nd": 197.4,
+      "s4warm3rd": 182.1,
+      "s5mixed": 251,
+      "s6cold2nd": 419.8,
+      "speedupS3": 3.2,
+      "speedupS4": 3.5,
+      "accept": false,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:42:57.965Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 198.2,
+      "s2warm1st": 1149.5,
+      "s3warm2nd": 30.6,
+      "s4warm3rd": 27.4,
+      "s5mixed": 50,
+      "s6cold2nd": 1435.4,
+      "speedupS3": 6.5,
+      "speedupS4": 7.2,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:43:13.053Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 181.5,
+      "s2warm1st": 428.1,
+      "s3warm2nd": 29.7,
+      "s4warm3rd": 26.8,
+      "s5mixed": 50.4,
+      "s6cold2nd": 395.5,
+      "speedupS3": 6.1,
+      "speedupS4": 6.8,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:45:26.438Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 155.3,
+      "s2warm1st": 1195.5,
+      "s3warm2nd": 31.5,
+      "s4warm3rd": 25.9,
+      "s5mixed": 57.1,
+      "s6cold2nd": 1339.6,
+      "speedupS3": 4.9,
+      "speedupS4": 6,
+      "accept": false,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:45:50.622Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 194.3,
+      "s2warm1st": 396,
+      "s3warm2nd": 34.2,
+      "s4warm3rd": 26.4,
+      "s5mixed": 44.4,
+      "s6cold2nd": 436.1,
+      "speedupS3": 5.7,
+      "speedupS4": 7.4,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:48:58.536Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 199.5,
+      "s2warm1st": 1262.4,
+      "s3warm2nd": 32.5,
+      "s4warm3rd": 28.1,
+      "s5mixed": 54.2,
+      "s6cold2nd": 1472.9,
+      "speedupS3": 6.1,
+      "speedupS4": 7.1,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:49:09.704Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 172.5,
+      "s2warm1st": 463.6,
+      "s3warm2nd": 29.5,
+      "s4warm3rd": 26.6,
+      "s5mixed": 54.9,
+      "s6cold2nd": 493.7,
+      "speedupS3": 5.8,
+      "speedupS4": 6.5,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:51:51.123Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 166.2,
+      "s2warm1st": 1325.7,
+      "s3warm2nd": 30.6,
+      "s4warm3rd": 27.9,
+      "s5mixed": 61.9,
+      "s6cold2nd": 1270.7,
+      "speedupS3": 5.4,
+      "speedupS4": 6,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:52:08.311Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 191.6,
+      "s2warm1st": 481.1,
+      "s3warm2nd": 31.6,
+      "s4warm3rd": 26.8,
+      "s5mixed": 59.5,
+      "s6cold2nd": 326.3,
+      "speedupS3": 6.1,
+      "speedupS4": 7.2,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:58:51.209Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 219.9,
+      "s2warm1st": 1336.5,
+      "s3warm2nd": 34.9,
+      "s4warm3rd": 32.8,
+      "s5mixed": 62.6,
+      "s6cold2nd": 1462.2,
+      "speedupS3": 6.3,
+      "speedupS4": 6.7,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:59:01.792Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 198.5,
+      "s2warm1st": 496.5,
+      "s3warm2nd": 31.6,
+      "s4warm3rd": 25,
+      "s5mixed": 57.9,
+      "s6cold2nd": 349.1,
+      "speedupS3": 6.3,
+      "speedupS4": 7.9,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:59:23.898Z",
+      "parser": "typescript",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 620.8,
+      "s2warm1st": 1683.4,
+      "s3warm2nd": 34.4,
+      "s4warm3rd": 29.2,
+      "s5mixed": 67.4,
+      "s6cold2nd": 1424.1,
+      "speedupS3": 18,
+      "speedupS4": 21.2,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T13:59:35.047Z",
+      "parser": "typescript",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 489.1,
+      "s2warm1st": 833.5,
+      "s3warm2nd": 30.7,
+      "s4warm3rd": 27.5,
+      "s5mixed": 60.9,
+      "s6cold2nd": 332.8,
+      "speedupS3": 16,
+      "speedupS4": 17.8,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-13T14:19:53.436Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 164.3,
+      "s2warm1st": 1364.2,
+      "s3warm2nd": 30.3,
+      "s4warm3rd": 27,
+      "s5mixed": 52.5,
+      "s6cold2nd": 1234.3,
+      "speedupS3": 5.4,
+      "speedupS4": 6.1,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    },
+    {
+      "date": "2026-08-15T14:48:10.310Z",
+      "parser": "oxc",
+      "workers": 4,
+      "files": 1001,
+      "mixed": 100,
+      "s1cold": 720,
+      "s2warm1st": 3856.6,
+      "s3warm2nd": 49.7,
+      "s4warm3rd": 46.4,
+      "s5mixed": 104.8,
+      "s6cold2nd": 2907.4,
+      "speedupS3": 14.5,
+      "speedupS4": 15.5,
+      "accept": true,
+      "env": {
+        "node": "v22.22.2",
+        "os": "win32"
+      }
+    }
+  ],
+  "schemaVersion": 1
+}

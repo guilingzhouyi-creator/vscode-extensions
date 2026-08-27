@@ -1,0 +1,54 @@
+{
+  "name": "auto-refactor",
+  "version": "0.1.0",
+  "description": "Configurable, extensible automated code-refactoring analyzer: constant extraction, large-file splitting, and cyclomatic complexity — with CI-ready structured output (JSON / SARIF / text). Declarative, pluggable, project-agnostic.",
+  "bin": {
+    "auto-refactor": "dist/index.js"
+  },
+  "main": "dist/api.js",
+  "types": "dist/api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/api.d.ts",
+      "require": "./dist/api.js"
+    },
+    "./config.schema.json": "./config.schema.json",
+    "./report.schema.json": "./report.schema.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "demo": "node dist/index.js scan --root samples --format text",
+    "validate": "node scripts/validate-equivalence.js",
+    "validate-warm": "node scripts/validate-warm.js",
+    "validate-oxc": "node scripts/validate-oxc-keypoints.js",
+    "validate-diff": "node scripts/validate-diff.js",
+    "benchmark": "node scripts/benchmark.js",
+    "bench-baselines": "node scripts/bench-baselines.js",
+    "bench-warm": "node scripts/bench-warm.js",
+    "bench-diff": "node scripts/bench-diff.js",
+    "bench-oxc-modea": "node scripts/bench-oxc-modea.js",
+    "fastpath-check": "node scripts/bench-fastpath.js --check",
+    "fastpath-bench": "node scripts/bench-fastpath.js",
+    "test-codec": "node scripts/test-result-codec.js"
+  },
+  "keywords": [
+    "refactoring",
+    "static-analysis",
+    "cyclomatic-complexity",
+    "magic-number",
+    "code-quality",
+    "ci",
+    "declarative"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "oxc-parser": "0.144.0",
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-rust": "^0.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.0"
+  }
+}

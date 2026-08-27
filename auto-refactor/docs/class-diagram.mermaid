@@ -1,0 +1,153 @@
+classDiagram
+    %% ============ 既有核心接口（P1-1，保持不变，ts-free） ============
+    class LanguageAdapter {
+        <<interface>>
+        +id: string
+        +extensions: string[]
+        +parse(content, filePath): NormalizedAst
+        +root(ast): NormalizedNode
+        +children(node): NormalizedNode[]
+        +project?(content, filePath, policy): NodeProjector
+    }
+
+    class NodeProjector {
+        <<interface>>
+        +root: unknown
+        +project(raw, parentRaw, grandparentRaw): NormalizedNode
+        +forEachChild(raw): Iterable~unknown~
+        +isSourceFile(raw): boolean
+    }
+
+    class ProjectionPolicy {
+        +needComplexity: boolean
+        +needLiterals: boolean
+        +needNames: boolean
+        +needPositions: boolean
+    }
+
+    class NormalizedNode {
+        +kind: NodeKind
+        +rawKind?: string
+        +text?: string
+        +start?: Position
+        +end?: Position
+        +name?: string
+        +branchWeight?: number
+        +children?: NormalizedNode[]
+        +functionLike?: boolean
+        +isClassDefining?: boolean
+        +introducesBinding?: boolean
+        +bindingName?: string
+        +increasesNesting?: boolean
+        +topLevel?: boolean
+        +exported?: boolean
+        +isConstBound?: boolean
+        +tolerated?: boolean
+        +isConstructor?: boolean
+    }
+
+    class Position {
+        +line: number
+        +column: number
+    }
+
+    %% ============ 新增：diff / 位置映射 / 增量状态（ts-free 纯函数） ============
+    class EditRange {
+        +startByte: number
+        +oldEndByte: number
+        +newEndByte: number
+        +startLine: number
+        +oldEndLine: number
+        +newEndLine: number
+    }
+
+    class LineMap {
+        +oldLines: string[]
+        +newLines: string[]
+        +mapLine(oldLine: number): number
+        +mapByte(oldByte: number): number
+        +lineDeltaAt(line: number): number
+        +isUnchangedRange(startByte, endByte): boolean
+    }
+
+    class EditDiff {
+        <<module>>
+        +computeEditRanges(oldContent, newContent): EditRange[]
+        +myersDiff(a: string[], b: string[]): EditRange[]
+        +shouldUseIncremental(oldContent, newContent, minLines, maxChangedLines): boolean
+    }
+
+    class IncrementalFileState {
+        +content: string
+        +contentHash: string
+        +lineStarts: number[]
+        +subtrees: Map~string, CachedSubtree~
+        +complexityMemo: Map~string, Issue[]~
+        +literalRecords: LiteralRecord[]
+        +functionsMemo: Map~string, number~
+        +evict(): void
+    }
+
+    class CachedSubtree {
+        +fnKey: string
+        +startLine: number
+        +endLine: number
+        +sourceText: string
+        +children: NormalizedNode[]
+        +rawChildren: unknown[]
+        +valid: boolean
+    }
+
+    class LiteralRecord {
+        +value: string
+        +numeric: boolean
+        +node: NormalizedNode
+        +parent?: NormalizedNode
+        +isConstBound: boolean
+        +tolerated: boolean
+        +line: number
+    }
+
+    %% ============ 新增：增量投影器（实现 NodeProjector） ============
+    class IncrementalProjector {
+        +root: unknown
+        -inner: NodeProjector
+        -state: IncrementalFileState
+        -editRanges: EditRange[]
+        -lineMap: LineMap
+        +project(raw, parentRaw, grandparentRaw): NormalizedNode
+        +forEachChild(raw): Iterable~unknown~
+        +isSourceFile(raw): boolean
+        -reuseOrRebuild(fnRaw): CachedSubtree | null
+        -sourceTextOf(raw): string
+    }
+
+    class IncrementalRouter {
+        <<module>>
+        +incrementalEnabled(): boolean
+        +incrementalMinLines(): number
+        +route(rel, oldContent, newContent, state): 'reuse' | 'incremental' | 'full'
+    }
+
+    %% ============ 关系 ============
+    LanguageAdapter ..> NodeProjector : project?() 返回
+    TypeScriptAdapter ..|> LanguageAdapter : implements
+    OxcAdapter ..|> LanguageAdapter : implements
+    IncrementalProjector ..|> NodeProjector : implements
+    IncrementalProjector o-- NodeProjector : 包一层 fresh projector
+    IncrementalProjector o-- IncrementalFileState : 复用源
+    IncrementalProjector o-- EditRange : 依据
+    IncrementalProjector o-- LineMap : 位置判定
+    IncrementalFileState o-- CachedSubtree : 子树缓存
+    IncrementalFileState o-- LiteralRecord : 字面量记录
+    EditDiff ..> EditRange : 产出
+    EditDiff ..> LineMap : 构建
+    NormalizedNode o-- Position : start/end
+    CachedSubtree o-- NormalizedNode : children
+
+    class TypeScriptAdapter {
+        +project(content, filePath, policy): NodeProjector
+    }
+    class OxcAdapter {
+        +project(content, filePath, policy): NodeProjector
+    }

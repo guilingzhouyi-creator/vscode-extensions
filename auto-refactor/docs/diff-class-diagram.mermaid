@@ -1,0 +1,77 @@
+classDiagram
+    class EditRange {
+        +number startLine
+        +number oldEndLine
+        +number newEndLine
+        +number startByte
+        +number oldEndByte
+        +number newEndByte
+    }
+
+    class DiffInput_Full {
+        +string kind = "full"
+        +string filePath
+        +string oldContent
+        +string newContent
+        +string oldContentHash
+        +string newContentHash
+    }
+
+    class DiffInput_Ranges {
+        +string kind = "ranges"
+        +string filePath
+        +string newContent
+        +EditRange[] editRanges
+        +string oldContent
+        +string oldContentHash
+        +string newContentHash
+    }
+
+    class DiffStats {
+        +number diffFiles
+        +number diffIgnored
+        +number byteEqual
+        +number diffIncremental
+        +number diffFull
+        +number rangesProvided
+        +number rangesFallback
+        +number oldContentFromDaemon
+    }
+
+    class ResolvedDiff {
+        +string mode
+        +EditRange[] edits
+        +string oldContent
+        +string newContent
+    }
+
+    class diff_routeDiff {
+        +resolveDiff(input, state) ResolvedDiff
+        +normalizeEditRanges(ranges) EditRange[]
+        +validateEditRanges(ranges) boolean
+    }
+
+    class Scanner {
+        +scanWithDiff(opts) Promise
+        +scanWithCache(opts) Promise
+    }
+
+    class DaemonClient {
+        +scanDiff(diffs, options) Promise
+        +scan(config, options) Promise
+    }
+
+    class handleScanDiff {
+        +handleScanDiff(ctx, config, diffs, options) Promise
+    }
+
+    DiffInput_Full ..> EditRange
+    DiffInput_Ranges ..> EditRange
+    ResolvedDiff ..> EditRange
+    diff_routeDiff ..> ResolvedDiff
+    diff_routeDiff ..> EditRange
+    Scanner ..> diff_routeDiff : 调用
+    Scanner ..> ResolvedDiff
+    handleScanDiff ..> Scanner : 装配 session/pools/cache + diffHints
+    DaemonClient ..> handleScanDiff : scan_diff 消息
+    DaemonClient ..> DiffStats : 返回

@@ -1,0 +1,413 @@
+{
+  "filesScanned": 4,
+  "issuesTotal": 15,
+  "byAnalyzer": {
+    "constants": 15
+  },
+  "bySeverity": {
+    "info": 0,
+    "warning": 15,
+    "error": 0
+  },
+  "issues": [
+    {
+      "id": "constants:duplicate-literal:src/magic.rs:2",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 100 is repeated 7 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/magic.rs",
+        "start": {
+          "line": 2,
+          "column": 12
+        },
+        "end": {
+          "line": 2,
+          "column": 15
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "occurrences": 7,
+        "lines": [
+          2,
+          2,
+          3,
+          3,
+          10,
+          10,
+          10
+        ],
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/order.rs:12",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 2 is repeated 3 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/order.rs",
+        "start": {
+          "line": 12,
+          "column": 44
+        },
+        "end": {
+          "line": 12,
+          "column": 45
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "occurrences": 3,
+        "lines": [
+          12,
+          43,
+          44
+        ],
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/greet.rs:2",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/greet.rs",
+        "start": {
+          "line": 2,
+          "column": 15
+        },
+        "end": {
+          "line": 2,
+          "column": 28
+        }
+      },
+      "detail": {
+        "value": "\"hello world\"",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/greet.rs:8",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/greet.rs",
+        "start": {
+          "line": 8,
+          "column": 5
+        },
+        "end": {
+          "line": 8,
+          "column": 18
+        }
+      },
+      "detail": {
+        "value": "\"hello world\"",
+        "length": 11,
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/legacy.rs:11",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.rs",
+        "start": {
+          "line": 11,
+          "column": 16
+        },
+        "end": {
+          "line": 11,
+          "column": 29
+        }
+      },
+      "detail": {
+        "value": "\"legacy name\"",
+        "length": 11,
+        "suggestedName": "LEGACYNAME_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/order.rs:19",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/order.rs",
+        "start": {
+          "line": 19,
+          "column": 13
+        },
+        "end": {
+          "line": 19,
+          "column": 20
+        }
+      },
+      "detail": {
+        "value": "\"large\"",
+        "length": 5,
+        "suggestedName": "LARGE_TEXT"
+      }
+    },
+    {
+      "id": "constants:hardcoded-string:src/order.rs:23",
+      "analyzer": "constants",
+      "rule": "hardcoded-string",
+      "severity": "warning",
+      "message": "Hardcoded string should be extracted into a named constant.",
+      "location": {
+        "file": "src/order.rs",
+        "start": {
+          "line": 23,
+          "column": 13
+        },
+        "end": {
+          "line": 23,
+          "column": 20
+        }
+      },
+      "detail": {
+        "value": "\"empty\"",
+        "length": 5,
+        "suggestedName": "EMPTY_TEXT"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/legacy.rs:12",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 21 should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.rs",
+        "start": {
+          "line": 12,
+          "column": 31
+        },
+        "end": {
+          "line": 12,
+          "column": 33
+        }
+      },
+      "detail": {
+        "value": "21",
+        "numeric": true,
+        "suggestedName": "CONST_21"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/legacy.rs:2",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 5 should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.rs",
+        "start": {
+          "line": 2,
+          "column": 12
+        },
+        "end": {
+          "line": 2,
+          "column": 13
+        }
+      },
+      "detail": {
+        "value": "5",
+        "numeric": true,
+        "suggestedName": "CONST_5"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/legacy.rs:3",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 100 should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.rs",
+        "start": {
+          "line": 3,
+          "column": 20
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/legacy.rs:5",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 100 should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.rs",
+        "start": {
+          "line": 5,
+          "column": 9
+        },
+        "end": {
+          "line": 5,
+          "column": 12
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "suggestedName": "CONST_100"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/legacy.rs:9",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 2 should be extracted into a named constant.",
+      "location": {
+        "file": "src/legacy.rs",
+        "start": {
+          "line": 9,
+          "column": 32
+        },
+        "end": {
+          "line": 9,
+          "column": 33
+        }
+      },
+      "detail": {
+        "value": "2",
+        "numeric": true,
+        "suggestedName": "CONST_2"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/order.rs:12",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 50 should be extracted into a named constant.",
+      "location": {
+        "file": "src/order.rs",
+        "start": {
+          "line": 12,
+          "column": 19
+        },
+        "end": {
+          "line": 12,
+          "column": 21
+        }
+      },
+      "detail": {
+        "value": "50",
+        "numeric": true,
+        "suggestedName": "CONST_50"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/order.rs:13",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 20 should be extracted into a named constant.",
+      "location": {
+        "file": "src/order.rs",
+        "start": {
+          "line": 13,
+          "column": 19
+        },
+        "end": {
+          "line": 13,
+          "column": 21
+        }
+      },
+      "detail": {
+        "value": "20",
+        "numeric": true,
+        "suggestedName": "CONST_20"
+      }
+    },
+    {
+      "id": "constants:magic-number:src/order.rs:44",
+      "analyzer": "constants",
+      "rule": "magic-number",
+      "severity": "warning",
+      "message": "Magic number 3 should be extracted into a named constant.",
+      "location": {
+        "file": "src/order.rs",
+        "start": {
+          "line": 44,
+          "column": 14
+        },
+        "end": {
+          "line": 44,
+          "column": 15
+        }
+      },
+      "detail": {
+        "value": "3",
+        "numeric": true,
+        "suggestedName": "CONST_3"
+      }
+    }
+  ],
+  "fileMetrics": [
+    {
+      "file": "src/greet.rs",
+      "lines": 10,
+      "nonBlankLines": 8,
+      "functions": 2,
+      "maxNestingDepth": 1,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 2
+    },
+    {
+      "file": "src/legacy.rs",
+      "lines": 14,
+      "nonBlankLines": 12,
+      "functions": 3,
+      "maxNestingDepth": 3,
+      "topLevelDeclarations": 2,
+      "exportedSymbols": 0
+    },
+    {
+      "file": "src/magic.rs",
+      "lines": 12,
+      "nonBlankLines": 9,
+      "functions": 2,
+      "maxNestingDepth": 3,
+      "topLevelDeclarations": 3,
+      "exportedSymbols": 3
+    },
+    {
+      "file": "src/order.rs",
+      "lines": 48,
+      "nonBlankLines": 43,
+      "functions": 4,
+      "maxNestingDepth": 7,
+      "topLevelDeclarations": 3,
+      "exportedSymbols": 2
+    }
+  ]
+}

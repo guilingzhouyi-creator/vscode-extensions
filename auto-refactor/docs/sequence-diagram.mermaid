@@ -1,0 +1,54 @@
+sequenceDiagram
+    autonumber
+    actor D as daemon handleScan
+    participant S as Scanner.scanWithCache
+    participant C as CacheStore (L1/L2)
+    participant R as IncrementalRouter
+    participant ED as EditDiff
+    participant A as adapter (TypeScript/Oxc)
+    participant IP as IncrementalProjector
+    participant E as runStreamingProjected (traverse.ts)
+    participant V as analyzers (complexity/constants/large-file/FileMetricCollector)
+
+    Note over D,S: 文件发现后，逐文件 L1/L2 判定（未变文件走 L2，不变）
+    S->>C: lookupL1(rel) / lookupL2(fpHash, contentHash)
+    alt L1/L2 命中（文件未变）
+        C-->>S: 缓存结果（remap path）
+        Note over S: 0ms 复用，行级不介入
+    else L2 miss（文件变更）
+        S->>R: route(rel, oldContent, newContent, state)
+        R-->>S: 'full'（未过阈值/无旧树）| 'incremental'
+        alt 'full'（文件小/改动大/无旧树/门关）
+            Note over S: 走当前全量重扫路径（parse + runStreamingProjected）
+        else 'incremental'（大文件 + 小改动 + 旧树常驻）
+            R->>ED: computeEditRanges(oldContent, newContent)
+            ED-->>R: EditRange[] + LineMap（Myers）
+            Note over R: 全量重解析（不换解析器，零语义分歧）
+            R->>A: project?(newContent, file, policy)  // fresh projector
+            A-->>R: NodeProjector
+            R->>IP: new IncrementalProjector(fresh, state, editRanges, lineMap)
+            loop 每个函数子树（raw）
+                IP->>IP: reuseOrRebuild(fnRaw)
+                alt 子树源文本一致 且 起始行未变（INC-Mode-1）
+                    Note over IP: 复用 state.subtrees 的归一化子树（跳过 predicate + 分配）
+                    IP-->>IP: CachedSubtree（位置可信）
+                else 子树变更/行漂移
+                    Note over IP: 委托 inner.project 重投影该子树
+                    IP-->>IP: 新子树（写回缓存）
+                end
+            end
+            R->>E: runStreamingProjected(IP, entries)
+            E->>IP: forEachChild(root) → 下降（读复用子树 children）
+            loop 每个 raw 节点
+                E->>IP: project(raw, parentRaw, grandparentRaw)
+                IP-->>E: NormalizedNode（复用/新投影）
+                E->>V: visit(node, parent, grandparent, depth, className, binding)
+                Note over V: complexity 对未变函数走 functionsMemo<br/>constants 对未变字面量走 literalRecords<br/>duplicate/large-file 用「复用+新」重组（全局聚合）
+            end
+            E->>V: finalize(ctx)
+            V-->>E: issues[] + metric
+            E-->>R: 字节一致结果
+            R->>C: writeL2（写回结果）+ 更新 IncrementalFileState
+        end
+    end
+    S-->>D: report + stats（含 incrementalHit 计数）

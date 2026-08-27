@@ -93,9 +93,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # 仓库顶层所有扩展目录（含 package.json 即为扩展，自动预留未来扩展）
+          # 仓库顶层所有扩展目录（含 package.json 且声明 engines.vscode 的才是 VS Code 扩展；
+          #   auto-refactor 等纯工具目录虽带 package.json 但无 engines.vscode，自动排除）
           ALL_EXTS=$(find . -maxdepth 2 -name package.json -not -path '*/node_modules/*' \
-                      -printf '%h\n' | sed 's|^\./||' | sort -u)
+                      -printf '%h\n' | sed 's|^\./||' | sort -u \
+                      | while read -r d; do \
+                          if jq -e '.engines.vscode' "$d/package.json" >/dev/null 2>&1; then echo "$d"; fi; \
+                        done)
           echo "Discovered extensions: ${ALL_EXTS:-<none>}"
 
           FILTERED=""

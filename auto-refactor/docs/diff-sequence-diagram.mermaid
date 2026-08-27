@@ -1,0 +1,44 @@
+sequenceDiagram
+    participant D as DiffSystem
+    participant C as Client(api.scanDiff)
+    participant S as Daemon(server)
+    participant H as handleScanDiff
+    participant SC as Scanner.scanWithDiff
+    participant R as routeDiff(diff.ts)
+    participant A as runAnalyzers
+
+    Note over C,S: 基线：daemon 冷扫描填充 L1/L2 + 大文件 IncrementalFileState
+
+    D->>C: DiffInput[] (full | ranges)
+    C->>S: scan_diff { config, diffs, options }
+    S->>H: handleScanDiff(ctx, config, diffs, options)
+    H->>H: 归一化 filePath + 过滤未 discover 文件
+    H->>SC: scanWithDiff({ cache, session, pool, diffHints, verifyDiskContent })
+
+    SC->>SC: collectFiles + L1 stat
+
+    loop 每个文件
+        alt rel 在 diffHints 中 (变更文件)
+            SC->>SC: 读磁盘 content + sha256 校验 (verifyDiskContent)
+            SC->>R: resolveDiff(input, oldState=incBucket.get(rel))
+            alt byteEqual
+                R-->>SC: mode=byteEqual (复用旧结果, 0 parse)
+            else incremental
+                R-->>SC: mode=incremental + edits
+                SC->>A: runAnalyzers(rel, newContent, seed=oldState)
+                A-->>SC: { issues, metric }
+            else full
+                R-->>SC: mode=full
+                SC->>A: runAnalyzers(rel, newContent) (无 seed)
+                A-->>SC: { issues, metric }
+            end
+        else 未变文件
+            SC->>SC: L1/L2 命中 or 现有 analyze 路径
+        end
+    end
+
+    SC->>SC: aggregate + issues.sort + buildReport (与冷扫描逐字节一致)
+    SC-->>H: { report, stats: DiffStats }
+    H-->>S: scan_done { report, stats }
+    S-->>C: { report, stats }
+    C-->>D: { report, stats }

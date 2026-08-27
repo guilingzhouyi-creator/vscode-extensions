@@ -1,0 +1,29 @@
+{
+  "$schema": "./config.schema.json",
+  "format": "text",
+  "failOnIssue": false,
+  "thresholds": {
+    "magicNumberMin": 2,
+    "duplicateLiteralThreshold": 3,
+    "hardcodedStringMinLength": 3,
+    "fileLinesWarn": 60,
+    "fileLinesFail": 120,
+    "fileFunctionsWarn": 6,
+    "complexityWarn": 8,
+    "complexityFail": 12
+  },
+  "analyzers": {
+    "constants": { "enabled": true, "options": {} },
+    "large-file": { "enabled": false, "options": {} },
+    "complexity": { "enabled": true, "options": {} },
+    "no-console": { "enabled": true, "options": { "severity": "warning", "allowed": ["error"] } }
+  },
+  "customAnalyzers": [
+    {
+      "name": "no-console",
+      "module": "./analyzers/noConsole.js",
+      "enabled": true,
+      "options": { "severity": "warning", "allowed": ["error"] }
+    }
+  ]
+}

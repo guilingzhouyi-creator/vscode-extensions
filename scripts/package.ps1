@@ -24,9 +24,16 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 
-# ─── 发现扩展：顶层含 package.json 的目录 ───
+# ─── 发现扩展：顶层含 package.json 且声明 engines.vscode 的目录 ───
+#   （engines.vscode 是 VS Code 扩展的强标识；auto-refactor 等纯工具目录
+#     虽带 package.json 但无此字段，自动排除，避免被误打包为 .vsix）
 $exts = @(Get-ChildItem $root -Directory -Exclude 'dist', 'scripts', 'node_modules' |
-    Where-Object { Test-Path (Join-Path $_.FullName 'package.json') } |
+    Where-Object {
+        $pkgPath = Join-Path $_.FullName 'package.json'
+        if (-not (Test-Path $pkgPath)) { return $false }
+        $pkg = [System.IO.File]::ReadAllText($pkgPath, [System.Text.UTF8Encoding]::new($false)) | ConvertFrom-Json
+        return ($null -ne $pkg.engines -and $null -ne $pkg.engines.vscode)
+    } |
     Select-Object -ExpandProperty Name)
 
 if ($exts.Count -eq 0) { Write-Warning '未发现任何扩展目录（顶层含 package.json）'; exit 1 }

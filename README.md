@@ -7,7 +7,7 @@
 
 ## 📌 仓库定位 | Scope
 
-本仓库**仅收录 VS Code 插件**相关代码与文档。
+本仓库以 **VS Code 插件**为主体，另收录一个独立的 **Node CLI 静态分析工具**（`auto-refactor`，非 VS Code 扩展，不参与扩展打包/发布）。
 
 > ⚠️ **Windows 工具链**（PowerShell 脚本、环境配置、桌面工具等）属于**另一条独立线**，不在本仓库内混放。请移步对应的 Windows 项目仓库。
 >
@@ -20,6 +20,8 @@
 | 插件 | 版本 | 状态 | 简介 |
 |------|------|:--:|------|
 | **[Workspace Timing](./workspace-timing)** | v0.4.4 | 🟢 已发布 | ⏱ 轻量化工作区时长追踪：自动计时、跨工作区聚合对比、12周热力图、24小时分布、双语界面热切换；RingBuffer + Journal 双写入，崩溃保护 |
+
+> 🧰 **非扩展模块**：[auto-refactor](./auto-refactor) — 独立的可配置静态分析 CLI（常量提取 / 大文件拆分 / 圈复杂度），多语言适配（TS/JS/Rust）、warm daemon、行级增量、CI 就绪结构化输出（JSON / SARIF / text）。**不含 `engines.vscode`，不会被 CI/打包/发布自动发现**，仅作为工具模块与本仓库并存。
 
 ---
 
@@ -42,7 +44,14 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 │   ├── package.json
 │   ├── README.md
 │   └── LICENSE
-├── <future-extension>/         ← 新扩展预留位：建目录 + 放 package.json 即自动接入 CI/发布
+├── auto-refactor/              ← 独立 Node CLI 静态分析工具（非扩展，不参与打包/发布）
+│   ├── src/                    ← 分析器 + core + daemon + cli + utils
+│   ├── scripts/                ← 基准 / 等价性 / 增量验证脚本
+│   ├── testdata/               ← 语义化命名的投影边界夹具
+│   ├── docs/                   ← 设计 / 规格 / 性能文档（kebab-case 统一命名）
+│   ├── DOCS.md                 ← 文档索引
+│   └── package.json
+├── <future-extension>/         ← 新扩展预留位：建目录 + 放 package.json（需声明 engines.vscode）即自动接入 CI/发布
 ├── scripts/
 │   ├── package.ps1             ← 本地统一打包入口（Windows / PowerShell）
 │   ├── package.sh              ← 同构入口（Linux / macOS / CI bash）
@@ -58,7 +67,7 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 └── .editorconfig / .gitattributes ← 换行与编码统一
 ```
 
-> 📐 **新增扩展零配置接入**：在仓库顶层新建 `<扩展名>/` 目录并放入 `package.json`，
+> 📐 **新增扩展零配置接入**：在仓库顶层新建 `<扩展名>/` 目录并放入 `package.json`（**须声明 `engines.vscode`**，以此与 auto-refactor 等纯工具目录区分），
 > CI 与发布流水线会自动发现并纳入（自动发现逻辑见两个 workflow 的「Detect extensions」步骤）。
 
 ---
