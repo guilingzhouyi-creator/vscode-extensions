@@ -12,40 +12,55 @@
  * This module NEVER imports `typescript`.
  */
 
-import { DiffInput, EditRange } from './types';
-import { computeEditRanges, countLines, changedLineCount } from './editDiff';
-import { normalizeEditRanges } from './utf8';
+import {
+  EditRange,
+  computeEditRangesWithOps,
+  computeDetailedHunks,
+  changedLineCount,
+  countLines,
+  DiffOp,
+} from './editDiff';
+import { normalizeEditRanges, decodeContent } from './utf8';
 import type { IncrementalFileState } from './incrementalState';
+import { DiffInput } from './types';
+import type { ReviewDiffHunk, PraxisVerdict, PraxisPluginHooks } from './praxis/contracts';
 
 export type DiffMode = 'byteEqual' | 'incremental' | 'full';
 
-export interface ResolvedDiff {
-  mode: DiffMode;
-  /** Normalized edit ranges (UTF-16 code-unit byte offsets; empty for byteEqual/full). */
-  edits: EditRange[];
-  /** The OLD content when known (kind:'full' or ranges+input/state). */
-  oldContent?: string;
-  /** The canonical NEW content (disk-verified UTF-16 string). */
-  newContent: string;
-  /** kind:'ranges' input. */
-  rangesProvided: boolean;
-  /** ranges input that could not be normalized (→ full fallback). */
-  rangesFallback: boolean;
-  /** ranges input whose oldContent came from the resident state (not the input). */
-  oldContentFromState: boolean;
-}
-
+/** Options accepted by `resolveDiff`. */
 export interface ResolveDiffOpts {
-  /** `incrementalEnabled() || cfg.incremental === true`. */
-  enabled: boolean;
+  state?: IncrementalFileState;
+  /** Legacy alias for incremental gating */
+  enabled?: boolean;
+  /** When true, `incremental` mode is gated off entirely (returns `full` or `byteEqual`). */
+  incrementalDisabled?: boolean;
   minLines: number;
   maxChangedLines: number;
-  /** Resident per-file incremental state (may be null on a first scan). */
-  state: IncrementalFileState | null | undefined;
-  /** Canonical disk content (UTF-16 string). */
+  /** Optional pre-read newContent */
+  newContent?: string;
+  /** Raw file bytes, when available (used by the UTF-8 normalization path). */
+  buf?: Uint8Array;
+  /** Optional file path for Praxis review context */
+  filePath?: string;
+  /** Optional Praxis integration SPI hooks */
+  praxisHooks?: PraxisPluginHooks;
+}
+
+/** Output of `resolveDiff`. */
+export interface ResolvedDiff {
+  mode: DiffMode;
+  edits: EditRange[];
+  hunks?: ReviewDiffHunk[];
+  oldContent?: string;
   newContent: string;
-  /** Canonical disk buffer (used only for ranges UTF-8→UTF-16 conversion). */
-  buf: Uint8Array;
+  /** True when the caller provided ranges upfront (`DiffInput.kind === 'ranges'`). */
+  rangesProvided: boolean;
+  /** True when caller provided ranges, but validation rejected them and fell back to `full`. */
+  rangesFallback: boolean;
+  /** True when `oldContent` was taken from `opts.state.content` rather than `input.oldContent`. */
+  oldContentFromState: boolean;
+  /** Praxis review verdict if evaluated */
+  praxisVerdict?: PraxisVerdict;
 }
 
 function fullResult(
@@ -65,37 +80,27 @@ function fullResult(
 }
 
 /**
- * Resolve one diff input into a routing decision.
- *
- * Routing (short-circuit order):
- *   1. gate disabled → full
- *   2. no edits (full: old===new; ranges: empty edit set) → byteEqual
- *   3. newContent line count < minLines → full
- *   4. changed line count > maxChangedLines → full
- *   5. no resident state → full
- *   6. (kind:'full') baseline drift: input.oldContent !== state.content → full (drop state)
- *   7. otherwise → incremental
- *
- * For `kind:'ranges'`, the three byte fields are converted UTF-8 → UTF-16 against the disk
- * buffer. `oldContent` is resolved from the input, else the resident state's previous content
- * (read BEFORE `prepare()` overwrites it). Without either, `oldContent` is unknown — but that
- * only matters for the (non-existent) Mode-2 line translation, so it stays full-free here.
+ * Resolve a diff input into an action:
+ *   - 'byteEqual'   → contents identical, return empty edits (0 files to scan).
+ *   - 'full'        → file must be rescanned in full (gate rejected, ranges invalid, or disabled).
+ *   - 'incremental' → file meets every gate; `edits` contains the normalized byte ranges.
  */
 export function resolveDiff(input: DiffInput, opts: ResolveDiffOpts): ResolvedDiff {
-  const newContent = opts.newContent;
-  const rangesProvided = input.kind === 'ranges';
+  const newContent = decodeContent(input.newContent);
+  let oldContent: string | undefined;
+  let rangesProvided = input.kind === 'ranges';
   let rangesFallback = false;
   let oldContentFromState = false;
 
-  if (!opts.enabled) {
-    return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
-  }
+  let edits: EditRange[] = [];
+  let diffOps: DiffOp[] | undefined;
+  let startsOld: number[] | undefined;
+  let startsNew: number[] | undefined;
+  let newLinesCount: number | undefined;
 
-  let edits: EditRange[];
-  let oldContent: string | undefined;
-
+  // Invariant 0: Exact byte equality ALWAYS short-circuits to byteEqual (0 files to scan)
   if (input.kind === 'full') {
-    oldContent = input.oldContent;
+    oldContent = decodeContent(input.oldContent);
     if (oldContent === newContent) {
       return {
         mode: 'byteEqual',
@@ -107,10 +112,10 @@ export function resolveDiff(input: DiffInput, opts: ResolveDiffOpts): ResolvedDi
         oldContentFromState,
       };
     }
-    edits = computeEditRanges(oldContent, newContent);
   } else {
+    rangesProvided = true;
     try {
-      edits = normalizeEditRanges(input.editRanges, opts.buf);
+      edits = normalizeEditRanges(input.editRanges, opts.buf || Buffer.from(newContent, 'utf8'));
     } catch {
       rangesFallback = true;
       return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
@@ -126,7 +131,6 @@ export function resolveDiff(input: DiffInput, opts: ResolveDiffOpts): ResolvedDi
         oldContentFromState,
       };
     }
-    // oldContent source (kind:'ranges'): input first, else resident state (pre-prepare).
     if (typeof input.oldContent === 'string') {
       oldContent = input.oldContent;
     } else if (opts.state) {
@@ -135,30 +139,75 @@ export function resolveDiff(input: DiffInput, opts: ResolveDiffOpts): ResolvedDi
     }
   }
 
+  // Gate 1: incremental feature disabled entirely.
+  if (opts.incrementalDisabled || opts.enabled === false) {
+    return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
+  }
+
+  if (input.kind === 'full') {
+    const diffRes = computeEditRangesWithOps(oldContent!, newContent);
+    edits = diffRes.edits;
+    diffOps = diffRes.ops;
+    startsOld = diffRes.oldIndex.starts;
+    startsNew = diffRes.newIndex.starts;
+    newLinesCount = diffRes.newIndex.starts.length;
+  }
+
   // Gate 3/4: big-file small-change thresholds.
-  if (countLines(newContent) < opts.minLines) {
+  const lineCount = newLinesCount ?? countLines(newContent);
+  if (lineCount < opts.minLines) {
     return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
   }
   if (changedLineCount(edits) > opts.maxChangedLines) {
     return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
   }
 
-  // Gate 5/6: need a resident state, and (for 'full') it must track the SAME baseline.
+  // Gate 5/6: resident state baseline check (P2-2: length pre-check before string equality).
   const state = opts.state;
   if (!state) {
     return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
   }
-  if (input.kind === 'full' && oldContent !== state.content) {
+  if (
+    input.kind === 'full' &&
+    oldContent !== undefined &&
+    (oldContent.length !== state.content.length || oldContent !== state.content)
+  ) {
     return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
+  }
+
+  let hunks: ReviewDiffHunk[] | undefined;
+  let praxisVerdict: PraxisVerdict | undefined;
+
+  // P1-2: Reuse precomputed diffOps and line starts to eliminate duplicate diff!
+  if (oldContent && opts.praxisHooks) {
+    hunks = computeDetailedHunks(oldContent, newContent, 3, diffOps, startsOld, startsNew);
+    if (opts.praxisHooks.thresholdPolicy && hunks.length > 0) {
+      const enriched = opts.praxisHooks.contextEnricher
+        ? opts.praxisHooks.contextEnricher.enrichHunk(opts.filePath || '', hunks[0])
+        : { suggestedAction: 'auto_fix' as const };
+
+      const verdict = opts.praxisHooks.thresholdPolicy.evaluateChange(
+        opts.filePath || '',
+        hunks[0],
+        enriched as any
+      );
+      if (!(verdict instanceof Promise)) {
+        praxisVerdict = verdict;
+      } else if (process.env.NODE_ENV === 'development' || process.env.DEBUG_PRAXIS) {
+        console.warn('[Praxis] Async threshold policy evaluated during sync resolveDiff; consider scanDiffStream for full async streaming.');
+      }
+    }
   }
 
   return {
     mode: 'incremental',
     edits,
+    hunks,
     oldContent,
     newContent,
     rangesProvided,
     rangesFallback,
     oldContentFromState,
+    praxisVerdict,
   };
 }

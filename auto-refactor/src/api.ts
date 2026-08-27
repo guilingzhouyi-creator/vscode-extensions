@@ -9,6 +9,7 @@ import {
   DiffInput,
   DiffStats,
   DiffDeltaReport,
+  ScanDiffOptions,
 } from './core/types';
 import { resolveConfig } from './core/config';
 import { Scanner } from './core/analyzer';
@@ -196,14 +197,7 @@ export async function scanWarm(options: ScanOptions = {}): Promise<{ report: Sca
   };
 }
 
-/**
- * Options for the diff-scan APIs (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.4). Inherits `ScanOptions`;
- * adds the disk-content verification toggle.
- */
-export interface ScanDiffOptions extends ScanOptions {
-  /** Verify each changed file's newContent against disk bytes (default true). */
-  verifyDiskContent?: boolean;
-}
+
 
 /** Decode any Buffer content fields in DiffInput[] to UTF-16 strings (JSON-safe for daemon). */
 function decodeDiffs(diffs: DiffInput[]): DiffInput[] {
@@ -365,4 +359,27 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
 }
 
 export { resolveConfig, Scanner, Logger, AutoRefactorError, render, CacheStore };
+export { scanDiffStream } from './core/stream';
+export { CircularDiffBuffer } from './core/ringBuffer';
+export { PraxisRollbackEngine, revertDiffHunk, revertTaskCard } from './core/rollback';
+export {
+  fnv1a32,
+  hashLines,
+  hashLinesDirect,
+  computeLineStartsAndHashes,
+  myersDiff,
+  histogramDiff,
+  fastDiff,
+  computeDetailedHunks,
+  formatUnifiedDiff,
+  computeEditRanges,
+  computeEditRangesWithOps,
+  computeLineStarts,
+  linesOf,
+  getLine,
+  countLines,
+} from './core/editDiff';
+export { ModuleDependencyGraph } from './core/dependencyGraph';
+export * from './core/swar';
+export * from './core/praxis';
 export * from './core/types';

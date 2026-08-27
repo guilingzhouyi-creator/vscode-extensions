@@ -23,6 +23,17 @@ export function decodeContent(input: string | Buffer | Uint8Array): string {
   return Buffer.from(input as Uint8Array).toString('utf8');
 }
 
+import { isPureAsciiSWAR64 } from './swar';
+
+/**
+ * Fast-path check: is the buffer 100% ASCII (all bytes <= 0x7f)?
+ * In ASCII, UTF-8 byte offset === UTF-16 code-unit offset (identity map).
+ * Uses 64-bit SWAR vector scanning for maximum speed (8 bytes per CPU cycle).
+ */
+export function isPureAscii(buf: Uint8Array): boolean {
+  return isPureAsciiSWAR64(buf);
+}
+
 /**
  * Build the byte→code-unit mapping for a UTF-8 buffer, following the WHATWG UTF-8 decoder
  * (the same algorithm `Buffer#toString('utf8')` uses) with `fatal:false` → lossy U+FFFD
@@ -142,6 +153,25 @@ export function utf8ToUtf16Offset(map: number[], byteOffset: number): number {
 export function normalizeEditRanges(editRanges: EditRange[], buf: Uint8Array): EditRange[] {
   // Validate raw UTF-8 byte offsets against the buffer length BEFORE conversion.
   validateEditRanges(editRanges, buf.length);
+
+  // Fast-path: pure ASCII files avoid 4.4MB Array allocation and map lookups!
+  if (isPureAscii(buf)) {
+    const out: EditRange[] = [];
+    for (const e of editRanges) {
+      if (e.oldEndByte === e.startByte && e.newEndByte === e.startByte) continue;
+      out.push({
+        startLine: e.startLine,
+        oldEndLine: e.oldEndLine,
+        newEndLine: e.newEndLine,
+        startByte: e.startByte,
+        oldEndByte: e.oldEndByte,
+        newEndByte: e.newEndByte,
+      });
+    }
+    out.sort((a, b) => a.startByte - b.startByte || a.startLine - b.startLine);
+    return out;
+  }
+
   const map = utf8ToUtf16Offsets(buf);
   const out: EditRange[] = [];
   for (const e of editRanges) {

@@ -18,7 +18,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "pretest": "npm run build",
-    "test": "npm run validate && npm run validate-warm && npm run validate-oxc && npm run validate-diff && npm run test-codec",
+    "test": "npm run validate && npm run validate-warm && npm run validate-oxc && npm run validate-diff && npm run validate-praxis && npm run test-codec",
+    "validate-praxis": "node scripts/validate-praxis-foundation.js",
     "start": "node dist/index.js",
     "demo": "node dist/index.js scan --root samples --format text",
     "validate": "node scripts/validate-equivalence.js",
@@ -29,6 +30,7 @@
     "bench-baselines": "node scripts/bench-baselines.js",
     "bench-warm": "node scripts/bench-warm.js",
     "bench-diff": "node scripts/bench-diff.js",
+    "bench-quant": "node scripts/bench-quant.js",
     "bench-oxc-modea": "node scripts/bench-oxc-modea.js",
     "fastpath-check": "node scripts/bench-fastpath.js --check",
     "fastpath-bench": "node scripts/bench-fastpath.js",

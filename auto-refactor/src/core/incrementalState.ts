@@ -16,10 +16,15 @@
 import type { NormalizedNode, ReusedSpan } from './multilang';
 import { NodeKind } from './multilang';
 
+/** Compute safe 64-bit safe numeric key from (line, column) avoiding 16-bit truncation */
+export function makeFnKey(line: number, col: number): number {
+  return line * 1000000 + col;
+}
+
 /** A cached function subtree (Mode B's materialized normalized children). */
 export interface CachedSubtree {
-  /** Stable identity within a scan — `"<startLine>:<startColumn>"`. */
-  fnKey: string;
+  /** Stable identity within a scan — `"<startLine>:<startColumn>"` or numeric key. */
+  fnKey: number | string;
   startLine: number;
   startColumn: number;
   startByte: number;
@@ -79,15 +84,15 @@ export class IncrementalFileState {
   content: string;
   contentHash: string;
   lineStarts: number[];
-  subtrees: Map<string, CachedSubtree>;
+  subtrees: Map<number | string, CachedSubtree>;
   /** Current scan's per-function cyclomatic-complexity memo (for the NEXT scan's reuse). */
-  complexityMemo: Map<string, number>;
+  complexityMemo: Map<number | string, number>;
   /** Current scan's full literal record list (for the NEXT scan's reuse). */
   literalRecords: LiteralRecord[];
   /** Number of function subtrees reused during the most recent incremental pass. */
   reuseHits = 0;
-  private prevSubtrees: Map<string, CachedSubtree> | null = null;
-  private prevComplexityMemo: Map<string, number> | null = null;
+  private prevSubtrees: Map<number | string, CachedSubtree> | null = null;
+  private prevComplexityMemo: Map<number | string, number> | null = null;
   private prevLiteralRecords: LiteralRecord[] = [];
   /** Function nodes whose subtree was reused THIS pass (memo signal for analyzers). */
   private reusedFnNodes = new Set<NormalizedNode>();
@@ -132,9 +137,13 @@ export class IncrementalFileState {
   reuseSubtree(span: ReusedSpan): NormalizedNode[] | null {
     const prev = this.prevSubtrees;
     if (!prev) return null;
-    const key = `${span.startLine}:${span.startColumn}`;
-    const cached = prev.get(key);
-    if (cached && cached.sourceText === span.sourceText) {
+    const key = makeFnKey(span.startLine, span.startColumn);
+    const cached = prev.get(key) || prev.get(`${span.startLine}:${span.startColumn}`);
+    if (
+      cached &&
+      cached.endByte - cached.startByte === span.endByte - span.startByte &&
+      cached.sourceText === span.sourceText
+    ) {
       this.reuseHits++;
       return cached.children;
     }
@@ -143,9 +152,13 @@ export class IncrementalFileState {
 
   /** Record a (reused or freshly-built) function subtree into the next scan's map. */
   cacheSubtree(span: ReusedSpan, children: NormalizedNode[]): void {
-    const key = `${span.startLine}:${span.startColumn}`;
+    const key = makeFnKey(span.startLine, span.startColumn);
     const existing = this.subtrees.get(key);
-    if (existing && existing.sourceText === span.sourceText) {
+    if (
+      existing &&
+      existing.endByte - existing.startByte === span.endByte - span.startByte &&
+      existing.sourceText === span.sourceText
+    ) {
       existing.children = children;
       existing.valid = true;
       return;
@@ -194,12 +207,12 @@ export class IncrementalFileState {
   }
 
   /** Read a cc memo value written by the PREVIOUS scan (reused subtrees only). */
-  getComplexity(fnKey: string): number | undefined {
+  getComplexity(fnKey: string | number): number | undefined {
     return this.prevComplexityMemo ? this.prevComplexityMemo.get(fnKey) : undefined;
   }
 
   /** Record this scan's cc value (fresh or reused) for the next scan's reuse. */
-  setComplexity(fnKey: string, cc: number): void {
+  setComplexity(fnKey: string | number, cc: number): void {
     this.complexityMemo.set(fnKey, cc);
   }
 

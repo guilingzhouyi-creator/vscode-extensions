@@ -285,24 +285,75 @@ export interface ScanConfig {
   incrementalMinLines?: number;
 }
 
+export interface ScanSummary {
+  filesScanned: number;
+  issuesTotal: number;
+  bySeverity: Record<Severity, number>;
+  byAnalyzer: Record<string, number>;
+  durationMs: number;
+}
+
 export interface ScanReport {
   tool: string;
-  /** Tool version (mirrors package.json). */
   version: string;
   generatedAt: string;
   root: string;
   config: ScanConfig;
-  summary: {
-    filesScanned: number;
-    issuesTotal: number;
-    bySeverity: Record<Severity, number>;
-    byAnalyzer: Record<string, number>;
-    /** Wall-clock duration of the scan in milliseconds. */
-    durationMs: number;
-  };
+  summary: ScanSummary;
   issues: Issue[];
   fileMetrics: FileMetric[];
 }
+
+import type { PraxisPluginHooks, ReviewDiffHunk } from './praxis/contracts';
+export * from './praxis/contracts';
+export interface ScanDiffOptions {
+  root?: string;
+  configFile?: string;
+  format?: OutputFormat;
+  analyzers?: string[];
+  failOnIssue?: boolean;
+  include?: string[];
+  exclude?: string[];
+  logLevel?: LogLevel;
+  logFile?: string;
+  concurrency?: number;
+  workers?: number;
+  respectGitignore?: boolean;
+  failOnAnalyzerError?: boolean;
+  cache?: boolean;
+  cacheDir?: string;
+  cacheCustom?: boolean;
+  daemon?: 'auto' | 'on' | 'off';
+  parser?: ParserKind;
+  verifyDiskContent?: boolean;
+  praxisHooks?: PraxisPluginHooks;
+  /** Optional module dependency graph for cross-file impact analysis */
+  dependencyGraph?: any;
+  /** Streaming control mode: 'full' | 'issues_only' | 'summary_only' | 'disabled' (default 'full') */
+  streamingMode?: 'full' | 'issues_only' | 'summary_only' | 'disabled';
+  /** Max streaming events before rate-limiting suppression (default unlimited) */
+  maxStreamEvents?: number;
+  /** Toggle emitting individual hunk events (default true) */
+  emitHunks?: boolean;
+}
+
+export interface RefactoringPatch {
+  ruleId: string;
+  title: string;
+  edits: Array<{
+    range: { startLine: number; startCol: number; endLine: number; endCol: number };
+    newText: string;
+  }>;
+  unifiedPatch?: string;
+}
+
+export type DiffStreamEvent =
+  | { type: 'file_start'; filePath: string; oldHash?: string; newHash?: string }
+  | { type: 'hunk_ready'; filePath: string; hunk: ReviewDiffHunk }
+  | { type: 'issue_found'; filePath: string; issue: Issue; fix?: RefactoringPatch }
+  | { type: 'file_done'; filePath: string; stats: { durationMs: number; issuesCount: number } }
+  | { type: 'stream_end'; totalSummary: ScanSummary };
+
 
 /**
  * Warm-scan statistics (docs/01-architecture/02-pipeline-and-caching.md §A2.2). Deliberately NOT part of ScanReport —
@@ -408,3 +459,4 @@ export interface DiffDeltaReport {
   issues: Issue[];
   fileMetrics: FileMetric[];
 }
+
