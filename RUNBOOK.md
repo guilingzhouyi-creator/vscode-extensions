@@ -22,10 +22,10 @@
 | `.cnb/settings.yml` | 定义四个 NPC 角色（必需） |
 | `.cnb.yml` | 各角色事件流水线（触发行为） |
 | `.cnb/LABELS.md` | 标签体系文档（type/priority/status/module/scope 维度，自动打标签配套） |
-| `.cnb/scripts/auto-label.sh` | 自动分类打标签程序（issue.open / issue.update / pull_request 触发） |
-| `.cnb/scripts/pr-gate.sh` | PR 统一前置门禁程序（冲突检测 + Diff 初筛 + 幂等去重，防卡死） |
-| `.cnb/scripts/release.sh` | 打标后发布自动化骨架（触发判断 + 幂等去重 + 失败重试 + 超时兑底，R2） |
-| `.cnb/scripts/test-release.sh` | release.sh 异常兜底用例脚本（幂等去重/失败重试/超时升级链，16 断言，R2 测试域产物） |
+| `scripts/sh/auto-label.sh` | 自动分类打标签程序（issue.open / issue.update / pull_request 触发） |
+| `scripts/sh/pr-gate.sh` | PR 统一前置门禁程序（冲突检测 + Diff 初筛 + 幂等去重，防卡死） |
+| `scripts/sh/release.sh` | 打标后发布自动化骨架（触发判断 + 幂等去重 + 失败重试 + 超时兑底，R2） |
+| `scripts/sh/test-release.sh` | release.sh 异常兜底用例脚本（幂等去重/失败重试/超时升级链，16 断言，R2 测试域产物） |
 | `.cnb/NPC-约定索引.md` | 必读：铁律 + 文档指针地图 + 完成即唤醒/讨论修订机制 |
 | `.cnb/NPC-约定-*.md` | 分册（角色领域/协作流程/门禁治理/并行拓扑/规划调度/命名项目规范/容错兜底），按需加载 |
 | `.cnb/NPC-路线图.md` | 执行状态（分层：路线图→大点→TODO表→任务）+ 大点规划 |
@@ -121,7 +121,7 @@
 > 对应执行体入口 / 推分支建 PR 触发 pull_request）级联启动，评论 @ 仅通知不触发。
 
 **自动分类打标签（v2）**：`issue.open` / `issue.update` / `pull_request` 事件自动执行
-`.cnb/scripts/auto-label.sh`，对 Issue/PR 自动定位类型（type/*）并打多维标签；
+`scripts/sh/auto-label.sh`，对 Issue/PR 自动定位类型（type/*）并打多维标签；
 `issue.update` 内容变更时**去旧加新**重分类。脚本输出【打标签结论】+【唤醒提示】，
 供规划者确定性通道接手巡视（识别挂起项：无响应/未排入/过期/重复/阻塞）。
 
@@ -134,7 +134,7 @@ PR 打开或推送新提交时，`pull_request` 事件**自动**触发协作员�
 
 ### PR 统一前置门禁（防卡死）
 
-`$` 级 `pull_request` 事件在打标签后、拉起任何 NPC 前，**先执行 `.cnb/scripts/pr-gate.sh`**：
+`$` 级 `pull_request` 事件在打标签后、拉起任何 NPC 前，**先执行 `scripts/sh/pr-gate.sh`**：
 - **幂等去重（防卡死核心）**：同一 head commit 已审查（`status/gate-ok` 标签/缓存）则直接跳过，避免 4 个 NPC 重复拉起、重复修复、级联无限触发。
 - **冲突检测**：git merge 预演目标分支 → 判定 C0/C1/C2/C3 冲突等级。
 - **Diff 质量初筛**：统计变更规模，扫描硬编码/TODO/console.log/大重构信号。
@@ -145,7 +145,7 @@ PR 打开或推送新提交时，`pull_request` 事件**自动**触发协作员�
 
 `$` 级 `pull_request.mergeable` 事件（PR 满足「无冲突 + 评审通过 + 保护分支」时触发）实现**平台原生自动合入**，链路：
 `auto-merge-gate.sh 确定性门禁 → 合入员 NPC 复核（决策层）→ merge-blocked 否决复查 → git:auto-merge 执行`。
-- **安全门禁**：先执行 `.cnb/scripts/auto-merge-gate.sh`（gate-ok 就绪判定 + `status/merge-blocked` 否决标签检查 + git merge 预演冲突分级 C0-C3 准入）。
+- **安全门禁**：先执行 `scripts/sh/auto-merge-gate.sh`（gate-ok 就绪判定 + `status/merge-blocked` 否决标签检查 + git merge 预演冲突分级 C0-C3 准入）。
 - **退出码语义**：`exit 0`（C0 无冲突 + 已过前置门禁 + 无否决标签）→ 放行后续流程；`exit 非 0`（C1/C2/C3 或 **UNKNOWN**（无法确定性判定：目标分支缺失 / 无 git 仓库 / 预演回退异常）或未过门禁或有否决标签）→ 保守阻断自动合入，PR 保持未合入等待人工/审查（fail-safe 原则：无法确证无冲突时绝不降级放行）。
 - **合入员复核（决策层）**：读取门禁结论 → 确认放行（输出【自动合入确认】）或发现阻断项打 `status/merge-blocked` 退回人工/审查（铁律 R21：合入决策唯一责任 NPC）。
 - **否决复查**：`merge-blocked` 标签（NPC 或人工打标）存在 → 一律阻断 `git:auto-merge`。

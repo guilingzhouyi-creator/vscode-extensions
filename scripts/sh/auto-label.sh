@@ -20,7 +20,7 @@
 #   - 流水线接入：.cnb.yml（$ 下的 issue.open / issue.update / pull_request 事件）
 #
 # 用法：
-#   bash .cnb/scripts/auto-label.sh
+#   bash scripts/sh/auto-label.sh
 #   （依赖 CNB 流水线注入的环境变量 + cnb-cli，仅应在流水线内运行）
 #
 # 环境变量（由 CNB 流水线自动注入）：
@@ -297,7 +297,7 @@ done
 if [[ "$RELEASE_TRIGGER" == "true" ]]; then
   echo "【发布触发】${MODE} #${NUM} 命中发布类标签（${DEDUP[*]}）。"
   if [[ "$EVENT" == "pull_request.merged" || "$EVENT" == "tag_push" || "$EVENT" == "web_trigger" ]]; then
-    echo "   事件为 ${EVENT}，门禁全绿后可串联发布：bash .cnb/scripts/release.sh（幂等去重 + 失败重试 + 超时兜底）。"
+    echo "   事件为 ${EVENT}，门禁全绿后可串联发布：bash scripts/sh/release.sh（幂等去重 + 失败重试 + 超时兜底）。"
   else
     echo "   当前事件为 ${EVENT}（PR 未合入门禁），发布不触发；待 PR 合入门禁全绿后由 release.sh 判断。"
   fi

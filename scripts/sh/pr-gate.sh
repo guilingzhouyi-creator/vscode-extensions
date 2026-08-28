@@ -28,7 +28,7 @@
 #   - 流水线接入：.cnb.yml（$ 下 pull_request 事件，置于 auto-label.sh 之后、拉起 NPC 之前）
 #
 # 用法：
-#   bash .cnb/scripts/pr-gate.sh
+#   bash scripts/sh/pr-gate.sh
 #   （依赖 CNB 流水线注入的环境变量 + cnb-cli + git，仅应在流水线内运行）
 #
 # 环境变量（由 CNB 流水线自动注入）：

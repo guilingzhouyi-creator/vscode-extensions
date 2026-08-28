@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 统一扩展打包入口（bash 同构版，与 scripts/package.ps1 同约定）
+# 统一扩展打包入口（bash 同构版，与 scripts/ps1/package.ps1 同约定）
 # -----------------------------------------------------------------------------
 # 仓库约定（本地与 CI 同构）：
 #   dist/<扩展名>/<扩展名>-<版本>.vsix      # 主产物
@@ -10,10 +10,10 @@
 # - GitHub CI（.github/workflows/release.yml）产出相同结构并发布到 Releases
 #
 # 用法：
-#   bash scripts/package.sh                              # 打包全部扩展
-#   bash scripts/package.sh --name workspace-timing      # 只打包指定扩展
-#   bash scripts/package.sh --keep 3                     # 每扩展只保留最近 3 个版本
-#   bash scripts/package.sh --skip-build                 # 跳过 compile，直接 vsce 打包
+#   bash scripts/sh/package.sh                              # 打包全部扩展
+#   bash scripts/sh/package.sh --name workspace-timing      # 只打包指定扩展
+#   bash scripts/sh/package.sh --keep 3                     # 每扩展只保留最近 3 个版本
+#   bash scripts/sh/package.sh --skip-build                 # 跳过 compile，直接 vsce 打包
 # =============================================================================
 set -euo pipefail
 
@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
     --keep|-k) KEEP="$2"; shift 2 ;;
     --skip-build) SKIP_BUILD=true; shift ;;
     --help|-h)
-      echo "Usage: bash scripts/package.sh [--name <ext>] [--keep <n>] [--skip-build]"
+      echo "Usage: bash scripts/sh/package.sh [--name <ext>] [--keep <n>] [--skip-build]"
       exit 0
       ;;
     *) echo "未知参数: $1" >&2; exit 1 ;;

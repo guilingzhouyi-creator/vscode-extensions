@@ -52,10 +52,11 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 │   ├── DOCS.md                 ← 文档索引
 │   └── package.json
 ├── <future-extension>/         ← 新扩展预留位：建目录 + 放 package.json（需声明 engines.vscode）即自动接入 CI/发布
-├── scripts/
-│   ├── package.ps1             ← 本地统一打包入口（Windows / PowerShell）
-│   ├── package.sh              ← 同构入口（Linux / macOS / CI bash）
-│   └── check-display-assets.sh ← 展示资产校验（icon / images 打包验证）
+├── scripts/                    ← 仓库级脚本库（按语言域分类：sh / ps1 / py，规范见 scripts/README.md）
+│   ├── sh/                     ← Bash：package.sh（打包）、check-display-assets.sh（CI 资产校验）、
+│   │                             auto-label / pr-gate / auto-merge-gate / release / test-release（CNB 门禁与发布）
+│   ├── ps1/                    ← PowerShell：package.ps1（Windows 打包同构实现）
+│   └── py/                     ← Python（预留域）
 ├── dist/                       ← ★ 统一包输出目录（gitignore，不入库）
 │   └── <扩展名>/
 │       ├── <扩展名>-<版本>.vsix    # 主产物（按扩展名分类）
@@ -101,9 +102,9 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 .\scripts\package.ps1 -Keep 3                  # dist 中每扩展保留最近 3 个版本
 
 # Linux / macOS / CI（同构）
-bash scripts/package.sh                        # 打包全部
-bash scripts/package.sh --name workspace-timing --keep 3
-bash scripts/package.sh --skip-build           # 跳过编译仅打包
+bash scripts/sh/package.sh                        # 打包全部
+bash scripts/sh/package.sh --name workspace-timing --keep 3
+bash scripts/sh/package.sh --skip-build           # 跳过编译仅打包
 ```
 
 产物输出到 `dist/<扩展名>/`（不入库），与 CI 产出结构完全同构。

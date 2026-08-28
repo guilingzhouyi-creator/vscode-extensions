@@ -29,19 +29,19 @@
 # ============ 全局事件（$ = 兜底匹配所有未明确指定的分支） ============
 $:
   # ================= 自动分类打标签（打标签系统 + 定位问题类型自动化） =================
-  # 标签体系见 .cnb/LABELS.md；分类脚本见 .cnb/scripts/auto-label.sh（v2 增强版）
+  # 标签体系见 .cnb/LABELS.md；分类脚本见 scripts/sh/auto-label.sh（v2 增强版）
   # Issue 创建时自动定位类型并打标签
   issue.open:
     - stages:
         - name: 自动分类打标签（Issue 创建）
           script: |
-            bash .cnb/scripts/auto-label.sh
+            bash scripts/sh/auto-label.sh
   # Issue 内容变更时自动重新分类打标签（去旧加新）
   issue.update:
     - stages:
         - name: 自动分类打标签（Issue 更新）
           script: |
-            bash .cnb/scripts/auto-label.sh
+            bash scripts/sh/auto-label.sh
 
   # ---- NPC 事件（所有 NPC 的默认行为，无角色覆盖时生效） ----
   issue.comment@npc:
@@ -71,12 +71,12 @@ $:
     - stages:
         - name: 自动分类打标签（PR）
           script: |
-            bash .cnb/scripts/auto-label.sh
+            bash scripts/sh/auto-label.sh
           timeout: 5m
         # ── Stage 0.5 · PR 统一前置门禁（冲突检测 + Diff 初筛 + 幂等防卡死） ──
         - name: PR 统一前置门禁（冲突检测 + Diff 初筛 + 幂等防卡死）
           script: |
-            bash .cnb/scripts/pr-gate.sh
+            bash scripts/sh/pr-gate.sh
           timeout: 10m
     - docker:
         image: cnbcool/default-npc:latest
@@ -207,7 +207,7 @@ $:
         # ── Stage 0 · 自动化合入安全门禁（确定性中枢，决定是否放行 git:auto-merge） ──
         - name: 自动化合入安全门禁（冲突分级准入 + 就绪判定 + 否决标签）
           script: |
-            bash .cnb/scripts/auto-merge-gate.sh
+            bash scripts/sh/auto-merge-gate.sh
           timeout: 10m
     # ── Stage 1 · 合入员复核（决策层：确认放行留痕 / 打 merge-blocked 阻断） ──
     - docker:
@@ -260,7 +260,7 @@ $:
     - stages:
         - name: 打标发布自动化（release.sh，合入门禁全绿后触发）
           script: |
-            bash .cnb/scripts/release.sh
+            bash scripts/sh/release.sh
           timeout: 10m
     # ── Stage 1 · 合入后处理（合入员文档巡检 / 需求池更新） ──
     - docker:
@@ -333,7 +333,7 @@ $:
     - stages:
         - name: 打标发布自动化（tag_push）
           script: |
-            bash .cnb/scripts/release.sh
+            bash scripts/sh/release.sh
           timeout: 10m
 
   # ---- 确定性通道 ③：页面手动触发（web_trigger，管理员/规划者手动调度） ----

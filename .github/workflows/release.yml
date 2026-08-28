@@ -6,7 +6,7 @@
 #   - 每个扩展独立 Tag 命名空间，互不冲突（为多扩展 monorepo 预留）
 #   - 旧的全局 Tag（如 v0.3.8）保留不动，仅历史参考
 #
-# ★ 产物布局（与本地 scripts/package.ps1 同构）：
+# ★ 产物布局（与本地 scripts/ps1/package.ps1 同构）：
 #     dist/<扩展名>/<扩展名>-<版本>.vsix      # 主产物
 #     dist/<扩展名>/SHA256SUMS.txt            # 校验和
 #   - 附加到 GitHub Release（正式产物存储）
@@ -210,7 +210,7 @@ jobs:
 
             # ── 4.4 构建（输出到统一 dist/<ext>/ 布局）──
             # 展示资产预检：icon / README 图片须入库（缺失时 vsce 报错含糊，这里提前明确报错）
-            bash scripts/check-display-assets.sh "$EXT" pre
+            bash scripts/sh/check-display-assets.sh "$EXT" pre
             mkdir -p "dist/$EXT"
             ( cd "$EXT"
               npm ci
@@ -221,7 +221,7 @@ jobs:
             test -f "$VSIX" || { echo "::error::[$EXT] 产物缺失: $VSIX"; exit 1; }
 
             # 产物校验：展示资产必须真实打进 vsix（防 .vscodeignore 误排除导致市场挂图）
-            bash scripts/check-display-assets.sh "$EXT" post "$VSIX"
+            bash scripts/sh/check-display-assets.sh "$EXT" post "$VSIX"
 
             # SHA256 校验和
             HASH=$(sha256sum "$VSIX" | awk '{print $1}')

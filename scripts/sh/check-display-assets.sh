@@ -5,8 +5,8 @@
 # 职责：确保扩展的展示资产（package.json 的 icon 字段 + README 中相对引用的
 #       images/* 图片）已入库且真实打进 vsix —— 防打包半途失败 / 市场挂图。
 # 用法：
-#   scripts/check-display-assets.sh <扩展目录> pre              # 打包前：资产必须存在
-#   scripts/check-display-assets.sh <扩展目录> post <vsix路径>   # 打包后：资产必须打进 vsix
+#   scripts/sh/check-display-assets.sh <扩展目录> pre              # 打包前：资产必须存在
+#   scripts/sh/check-display-assets.sh <扩展目录> post <vsix路径>   # 打包后：资产必须打进 vsix
 # 说明：零配置——不硬编码资产清单，自动从 package.json / README.md 提取引用，
 #       未来扩展无需改脚本即可接入。
 # =============================================================================

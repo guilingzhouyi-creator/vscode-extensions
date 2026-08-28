@@ -16,7 +16,7 @@
 #   - 流水线接入：.cnb.yml（pull_request.merged / web_trigger / tag_push 事件）
 #
 # 用法：
-#   bash .cnb/scripts/release.sh
+#   bash scripts/sh/release.sh
 #   （依赖 CNB 流水线注入的环境变量 + cnb-cli，仅应在流水线内运行）
 #
 # 环境变量（由 CNB 流水线自动注入）：

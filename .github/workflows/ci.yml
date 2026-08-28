@@ -57,7 +57,7 @@ jobs:
         run: npm run lint
 
       - name: Verify display assets (pre-package)
-        run: bash ../scripts/check-display-assets.sh . pre
+        run: bash ../scripts/sh/check-display-assets.sh . pre
 
       - name: Package (verify only, not published)
         run: npx --yes @vscode/vsce package -o "../dist/${{ matrix.ext }}/"
@@ -65,7 +65,7 @@ jobs:
       - name: Verify display assets (post-package)
         run: |
           VSIX=$(ls ../dist/${{ matrix.ext }}/*.vsix 2>/dev/null | head -1)
-          bash ../scripts/check-display-assets.sh . post "$VSIX"
+          bash ../scripts/sh/check-display-assets.sh . post "$VSIX"
 
       - name: Upload package artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

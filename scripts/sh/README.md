@@ -1,13 +1,14 @@
-# 📂 .cnb/scripts — 自动化脚本集
+# 📂 scripts/sh — 自动化脚本集（Shell）
 
-> 仓库自动化 NPC 配套脚本，由 `.cnb.yml` 事件流水线自动触发。
+> 仓库自动化配套脚本（原 `.cnb/scripts/`），由 `.cnb.yml` 事件流水线自动触发。
+> 归属 `scripts/sh/`（仓库级脚本库 · Shell 语言域），分类矩阵见 [`../README.md`](../README.md)。
 
 ---
 
 # 1️⃣ auto-label.sh — 自动分类打标签程序
 
 仓库 Issue/PR 创建或内容变更时，自动分析内容判定问题类型并打标签。
-标签体系见 [`.cnb/LABELS.md`](../LABELS.md)。
+标签体系见 [`.cnb/LABELS.md`](../../.cnb/LABELS.md)。
 
 ## 一、功能
 
@@ -121,7 +122,7 @@ bug → security → feature → performance → enhancement → refactor → te
 ## 二、运行
 
 ```bash
-bash .cnb/scripts/test-release.sh
+bash scripts/sh/test-release.sh
 # 退出码 0 = 全部用例通过；非 0 = 存在失败用例
 ```
 

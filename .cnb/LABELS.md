@@ -1,7 +1,7 @@
 # 🏷️ 标签体系 | Label System
 
 > 本仓库的**统一标签体系**文档：定义标签分类、命名规范与自动打标签规则。
-> 配套自动化程序：`.cnb/scripts/auto-label.sh`（Issue/PR 创建时自动定位类型并打标签）。
+> 配套自动化程序：`scripts/sh/auto-label.sh`（Issue/PR 创建时自动定位类型并打标签）。
 > **DRI（主维护责任人）：路线图规划者**（按 `.cnb/NPC-约定索引.md` 指针加载）。
 
 ---
@@ -100,7 +100,7 @@ Issue 创建 / 内容变更 / PR 创建·更新
 自动触发 .cnb.yml 中 issue.open / issue.update / pull_request 事件
     │
     ▼
-执行 .cnb/scripts/auto-label.sh（v2 增强版）
+执行 scripts/sh/auto-label.sh（v2 增强版）
     │
     ├─ 1. 读取 CNB_ISSUE_TITLE / CNB_ISSUE_DESCRIPTION
     ├─ 2. 规则引擎关键词匹配 → 判定 type/*（主类型，必选）
@@ -119,8 +119,8 @@ Issue 创建 / 内容变更 / PR 创建·更新
 
 - **人工打标签**：可在页面手动添加/移除任意维度标签。
 - **自动化**：Issue 创建、PR 创建/更新时自动执行分类脚本（见 `.cnb.yml` 配置）。
-- **规则扩展**：新增关键词 / 标签时，修改 `.cnb/scripts/auto-label.sh` 中的映射表即可，无需改流水线。
-- **版本记录**：本文件与脚本同步维护，变更需在 `.cnb/scripts/README.md` 变更日志登记。
+- **规则扩展**：新增关键词 / 标签时，修改 `scripts/sh/auto-label.sh` 中的映射表即可，无需改流水线。
+- **版本记录**：本文件与脚本同步维护，变更需在 `scripts/sh/README.md` 变更日志登记。
 
 ---
 

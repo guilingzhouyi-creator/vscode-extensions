@@ -333,7 +333,7 @@
   ### 大点 M1：专职「合入员」NPC + 平台 git:auto-merge 自动化合入系统
   - 状态：已合入（PR #30 已合入，main 89400cc）
   - 说明：现有仓库 NPC 体系中没有专职负责 PR 自动化合入的角色——合入总门禁 + 合入后处理压在「路线图规划者」身上（角色膨胀），且实际自动合入由纯脚本完成、无人决策留痕。本大点建立**专职「合入员」NPC（决策层）** + **平台 git:auto-merge（执行层）** 的自动化合入系统：合入员汇总分职门禁矩阵 → 前置条件 → 冲突准入 → 批准/缺席裁决 → 放行打 `status/merge-ready` / 阻断打 `status/merge-blocked`；平台 `git:auto-merge` 执行实际合入。对应需求 R4 的深化增强。
-  - 变更清单（11 文件）：`.cnb/settings.yml`（新增合入员角色）、`.cnb.yml`（Stage 4 合入门禁 → 合入员；pull_request.mergeable 增加合入员复核 + merge-blocked 否决复查；pull_request.merged 后处理 → 合入员）、`.cnb/scripts/auto-merge-gate.sh`（merge-blocked 否决标签检查）、`.cnb/scripts/pr-gate.sh`（输出合入状态 + 陈旧否决识别）、`.cnb/NPC-花名册.md`（登记合入员）、`.cnb/NPC-约定-门禁治理.md`（合入责任归属）、`.cnb/NPC-约定索引.md`（新铁律 R21）、`.cnb/NPC-约定-规划调度.md`（规划者合入职责移交）、`.cnb/LABELS.md`（merge-ready/merge-blocked）、`.cnb/scripts/README.md`、`RUNBOOK.md`（五 NPC 说明）
+  - 变更清单（11 文件）：`.cnb/settings.yml`（新增合入员角色）、`.cnb.yml`（Stage 4 合入门禁 → 合入员；pull_request.mergeable 增加合入员复核 + merge-blocked 否决复查；pull_request.merged 后处理 → 合入员）、`scripts/sh/auto-merge-gate.sh`（merge-blocked 否决标签检查）、`scripts/sh/pr-gate.sh`（输出合入状态 + 陈旧否决识别）、`.cnb/NPC-花名册.md`（登记合入员）、`.cnb/NPC-约定-门禁治理.md`（合入责任归属）、`.cnb/NPC-约定索引.md`（新铁律 R21）、`.cnb/NPC-约定-规划调度.md`（规划者合入职责移交）、`.cnb/LABELS.md`（merge-ready/merge-blocked）、`scripts/sh/README.md`、`RUNBOOK.md`（五 NPC 说明）
   - TODO 表：
     #### TODO 表 TB-M1 · 合入员系统建设（归零-真渡 / CodeBuddy 主责）
     | 任务 | 依赖 | 状态 | 负责 | 产物 |
@@ -371,7 +371,7 @@
 | 2026-08-21 16:45 | v15 | 路线图规划者 | 意图 #17 M1 合入后处理：PR #19 已合入（main a170664 平行 pr-gate 实现 + 2ecd4f8 api_trigger role 修复），pr-gate.sh 落地，#13 挂起项闭环；需求池 R3→已实现；M2（R2 打标发布自动化）待管理员推进指令 |
 | 2026-08-21 17:05 | v16 | 路线图规划者 | 意图 #17 M2 级联启动：归零-真渡「继续后续你的路线图」授权推进 M2（打标发布自动化 R2）。规划大点 M2（发布触发入口/发布联动/异常兜底/与门禁联动），建立 TODO 表 TB-M2-B/T/M；待级联启动三执行体执行 |
 | 2026-08-21 17:15 | v17 | 协作员·构建 | 意图 #17 M2：主责构建域落地——新增 release.sh 发布自动化骨架（触发判断/幂等去重/失败重试/超时兜底 + 门禁全绿联动）；auto-label.sh 打标后发布触发联动；门禁自查 compile→lint→diff 全绿，PR #20 已推送；TB-M2-B T2-B1/B2/B3 完成 |
-| 2026-08-21 17:12 | v18 | 协作员·测试 | 意图 #17 M2：主责测试域落地——新增 .cnb/scripts/test-release.sh 异常兜底用例（幂等去重/失败重试/超时升级链，16 断言全过）；补齐 TimerEngine 最小可运行单测 6 例（test/domain）；lint 0 error/warning + compile 通过 + out/src 产物一致；门禁全绿；TB-M2-T T2-T1/T2-T2 完成（分支 feat/int17-m2-test 待推 PR） |
+| 2026-08-21 17:12 | v18 | 协作员·测试 | 意图 #17 M2：主责测试域落地——新增 scripts/sh/test-release.sh 异常兜底用例（幂等去重/失败重试/超时升级链，16 断言全过）；补齐 TimerEngine 最小可运行单测 6 例（test/domain）；lint 0 error/warning + compile 通过 + out/src 产物一致；门禁全绿；TB-M2-T T2-T1/T2-T2 完成（分支 feat/int17-m2-test 待推 PR） |
 | 2026-08-21 17:30 | v18 | 路线图规划者 | 意图 #17 M2 合入后处理：PR #20 已合入（main 62078d7），release.sh 发布自动化骨架 + auto-label.sh 打标发布联动已落地；TB-M2-B T2-B3→已交接；RUNBOOK 补充 release.sh 前置文件清单；待测试域 TB-M2-T 与审查域 TB-M2-R 执行（级联启动） |
 | 2026-08-21 17:45 | v19 | CodeBuddy | Issue #22 交办「解决在现有基础上的 PR 自动化合入」→ 意图 #17 M2 延伸大点（需求 R4）：新增 auto-merge-gate.sh 安全门禁（gate-ok 就绪判定 + 冲突分级 C0-C3 准入）+ 接入 $ pull_request.mergeable 事件（auto-merge-gate → git:auto-merge，squash 合并 + 删源分支）；实现「安全的全自动合入」，C2/C3 强制退回人工（门禁治理 §4.8）；TB-M2-A A1/A2 完成，待审查复核（A3/T2-R1） |
 | 2026-08-21 17:50 | v19 | 协作员·审查 | 意图 #17 M2：审查域 TB-M2-R T2-R1 完成——git diff 全面审查 M2 全部改动（release.sh/auto-label 联动/test-release.sh/TimerEngine 单测/文档同步）；四眼复核全绿，两圈收敛无 L1 缺陷；发现 2 项方案级缺口上报：① release.sh 声称接入流水线但 .cnb.yml 未实际调用 ② release.sh 依赖 CNB_EVENT 环境变量名待平台核实。未擅自修改（R2/R3），TB-M2-R T2-R1 完成·待回并 |
