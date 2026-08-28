@@ -619,7 +619,7 @@ export class TimeAggregator {
         return result;
     }
 
-    /** 周报文字摘要（按自然日严格切分，含 dailyTotals 折叠层与进行中会话） */
+    /** 周报文字摘要（窗口化 O(1) 本周聚合，按自然日严格切分，含 dailyTotals 折叠层与进行中会话） */
     static weeklySummary(
         sessions: TimeSession[],
         currentSessionStartMs = 0,
@@ -632,24 +632,79 @@ export class TimeAggregator {
         const wsDate = new Date(weekStartMs);
         const weekEndMs = new Date(wsDate.getFullYear(), wsDate.getMonth(), wsDate.getDate() + 7).getTime();
 
-        const series = TimeAggregator.fullDailySeries(sessions, currentSessionStartMs, dailyTotals);
+        // 1. 预生成本周 7 天的日期集合
+        const weekDates = new Set<string>();
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(wsDate.getFullYear(), wsDate.getMonth(), wsDate.getDate() + i);
+            weekDates.add(localDateStr(d.getTime()));
+        }
+
+        // 2. 折叠桶打底（仅查本周 7 个日期，O(7) = O(1)）
+        const dayMap = new Map<string, { totalMs: number; sessionCount: number }>();
+        if (dailyTotals) {
+            for (const date of weekDates) {
+                const b = dailyTotals[date];
+                if (b && b.totalMs > 0) {
+                    dayMap.set(date, { totalMs: b.totalMs, sessionCount: b.sessionCount || 1 });
+                }
+            }
+        }
+
+        // 3. 原始会话：窗口范围粗筛（完全在周窗口外直接跳过），按自然日切分并覆盖同日折叠桶
+        const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
+        for (const s of sessions) {
+            if (s.endMs <= weekStartMs || s.startMs >= weekEndMs) continue;
+            let counted = false;
+            TimeAggregator.eachDaySegment(
+                Math.max(s.startMs, weekStartMs),
+                Math.min(s.endMs, weekEndMs),
+                (date, segStart, segEnd) => {
+                    if (weekDates.has(date)) {
+                        const entry = rawDayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
+                        entry.totalMs += segEnd - segStart;
+                        if (!counted) entry.sessionCount++;
+                        counted = true;
+                        rawDayMap.set(date, entry);
+                    }
+                },
+            );
+        }
+        for (const [date, v] of rawDayMap) {
+            dayMap.set(date, v);
+        }
+
+        // 4. 进行中会话：叠加到今日
+        if (currentSessionStartMs > 0 && currentSessionStartMs < weekEndMs) {
+            const segStartClamped = Math.max(currentSessionStartMs, weekStartMs);
+            if (now > segStartClamped) {
+                let counted = false;
+                TimeAggregator.eachDaySegment(segStartClamped, now, (date, segStart, segEnd) => {
+                    if (weekDates.has(date)) {
+                        const entry = dayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
+                        entry.totalMs += segEnd - segStart;
+                        if (!counted) entry.sessionCount++;
+                        counted = true;
+                        dayMap.set(date, entry);
+                    }
+                });
+            }
+        }
+
+        // 5. 聚合本周 7 天指标
         let totalMs = 0;
         let sessionCount = 0;
         let activeDays = 0;
         let peakDate = '';
         let peakDateMs = 0;
 
-        for (const d of series) {
-            const dMs = parseLocalDate(d.date);
-            if (dMs >= weekStartMs && dMs < weekEndMs) {
-                totalMs += d.totalMs;
-                sessionCount += d.sessionCount;
-                if (d.totalMs > 0) {
-                    activeDays++;
-                    if (d.totalMs > peakDateMs) {
-                        peakDateMs = d.totalMs;
-                        peakDate = d.date;
-                    }
+        for (const [date, v] of dayMap) {
+            totalMs += v.totalMs;
+            sessionCount += v.sessionCount;
+            if (v.totalMs > 0) {
+                activeDays++;
+                if (v.totalMs > peakDateMs) {
+                    peakDateMs = v.totalMs;
+                    peakDate = date;
                 }
             }
         }

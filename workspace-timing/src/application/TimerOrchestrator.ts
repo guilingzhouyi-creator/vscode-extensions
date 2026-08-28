@@ -417,21 +417,25 @@ export class TimerOrchestrator {
 
         const now = new Date();
         const currentWeek = TimeAggregator.weekStartStr(now);
-        const limitMs = cfg.weeklyLimitHours * MS_PER_HOUR;
+        // 本周已提醒过则零开销立即退出
+        if (this._weeklyLimitNotifiedWeek === currentWeek) {
+            return;
+        }
+
+        const limitMs = limitHours * MS_PER_HOUR;
         const weekTotalMs = TimeAggregator.weeklySummary(
             this.timer.data.sessions,
             this.timer.data.currentSessionStartMs,
+            this.timer.data.dailyTotals,
         ).totalMs;
 
         if (weekTotalMs >= limitMs) {
-            if (this._weeklyLimitNotifiedWeek !== currentWeek) {
-                this._weeklyLimitNotifiedWeek = currentWeek;
-                const durStr = TimeAggregator.formatDuration(weekTotalMs);
-                const limitStr = `${cfg.weeklyLimitHours}h`;
-                const message = format(t()['notify.weeklyLimitExceeded'], durStr, limitStr);
-                log(LogLevel.Warn, `TimerOrchestrator: weekly work limit exceeded (${durStr} >= ${limitStr})`);
-                this._onWeeklyLimitExceeded?.(message);
-            }
+            this._weeklyLimitNotifiedWeek = currentWeek;
+            const durStr = TimeAggregator.formatDuration(weekTotalMs);
+            const limitStr = `${limitHours}h`;
+            const message = format(t()['notify.weeklyLimitExceeded'], durStr, limitStr);
+            log(LogLevel.Warn, `TimerOrchestrator: weekly work limit exceeded (${durStr} >= ${limitStr})`);
+            this._onWeeklyLimitExceeded?.(message);
         }
     }
 
