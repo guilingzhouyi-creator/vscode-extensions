@@ -5,6 +5,20 @@
 
 ---
 
+## 🆕 变更记录 | Changelog
+
+### v0.1.1 (2026-08-28) — 缺陷修复（字节等价与性能基准零回归）
+
+| 修复项 | 说明 | 影响 |
+|--------|------|------|
+| **CLI 无值 flag 吞参修复** | `parseArgs` 重构：布尔 flag（`--fail-on-issue` / `--cache` / `--daemon` / `--respect-gitignore` 等）默认置 `true`，仅显式 `=false` 或紧跟独立 token `true|false` 时才消费下一参数；带值 flag 才取下一 token | 修复 `--fail-on-issue --format json` 中 `--format` 被吞、输出格式静默丢失的问题 |
+| **glob `**/` 段边界修复** | `globToRegExp`：`**/` 改为 `(?:.*/)?`（零或多个完整路径段），不再用 `.*` 吞掉分隔符边界 | 修复 `a/**/b.ts` 误匹配 `a/xxb.ts`，include/exclude 语义与标准 glob 一致 |
+| **坏配置显式告警** | `resolveConfig`：配置文件存在但解析失败时 `console.warn` 告警并回退默认值，不再静默忽略 | 用户配置写错（如尾逗号）时 CI 可即时发现 |
+
+验证：`npm test` 全套 validate（等价性/暖缓存/oxc 关键点/diff/praxis/codec）通过；`bench-fastpath.js --check` 字节等价通过；`benchmark.js` 300 文件 median ≈103ms，与历史基线持平。
+
+---
+
 ## 🏛️ 1. 核心架构与调度 (Architecture)
 
 | 文档 | 主题 | 状态 |

@@ -138,8 +138,14 @@ export function resolveConfig(
         baseDir = path.dirname(path.resolve(c));
         break;
       }
-    } catch {
-      /* ignore unreadable config */
+    } catch (e) {
+      // ★ 修复：坏配置不得静默忽略——解析失败会被当成"无配置文件"回退默认值，
+      //   用户改的阈值/分析器开关全部失效且毫无提示（CI 里极难排查）。
+      //   此处仅告警（不抛错，保持"坏配置降级"语义），显式区分"文件不存在"与"文件损坏"。
+      console.warn(
+        `[auto-refactor] config file exists but is invalid/unreadable, falling back to defaults: ${c} ` +
+        `(${e instanceof Error ? e.message : String(e)})`,
+      );
     }
   }
 

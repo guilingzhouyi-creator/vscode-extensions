@@ -219,9 +219,17 @@ function globToRegExp(glob: string): RegExp {
     const c = glob[i];
     if (c === '*') {
       if (glob[i + 1] === '*') {
-        re += '.*';
         i += 2;
-        if (glob[i] === '/') i++; // consume separator after **
+        if (glob[i] === '/') {
+          // **/：匹配零个或多个完整路径段（含尾部分隔符）。★ 修复：此前的 `.*`
+          // 会吞掉分隔符边界，导致 `a/**/b.ts` 误匹配 `a/xxb.ts`（`.*` 吃掉 `x` 后
+          // 直接命中字面量 `b.ts`）。`(?:.*/)?` 强制段间分隔符存在，边界语义正确。
+          re += '(?:.*/)?';
+          i++;
+        } else {
+          // 裸 **（非段边界）：匹配任意字符，可跨分隔符
+          re += '.*';
+        }
       } else {
         re += '[^/]*';
         i++;

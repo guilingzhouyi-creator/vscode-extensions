@@ -250,6 +250,13 @@ export class SessionManager {
         this.invalidateTodayCache();
         this.foldIfNeeded();
 
+        // ★ 崩溃恢复双重计数修复：封存段已计入 totalMs 并即将随本次落盘固化，但
+        //   journal 仍保留封存段对应的时间片（journal 仅在会话结束/恢复时截断）。
+        //   若不推进水位线，崩溃恢复回放 journal 会把封存段再次累加（totalMs 双计，
+        //   跨午夜/休眠后崩溃恢复时长虚高）。此处将水位线推进到轮转边界：
+        //   恢复时跳过 timestamp ≤ 边界的旧切片，仅回放新会话段的增量。
+        this.advanceJournalWatermark(todayZeroMs);
+
         const snap = this.timer.snapshot();
         const data: WorkspaceTimingData = {
             ...this.timer.data,
@@ -273,6 +280,11 @@ export class SessionManager {
         this.invalidateTodayCache();
         this.foldIfNeeded();
 
+        // ★ 崩溃恢复双重计数修复（同 rotateSessionAtMidnight）：休眠前封存段已计入
+        //   totalMs 并即将落盘，但 journal 仍保留其时间片。推进水位线到唤醒时刻，
+        //   恢复时跳过 ≤ resumeMs 的旧切片，避免封存段在崩溃恢复回放时被再次累计。
+        this.advanceJournalWatermark(resumeMs);
+
         const snap = this.timer.snapshot();
         const data: WorkspaceTimingData = {
             ...this.timer.data,
@@ -281,5 +293,22 @@ export class SessionManager {
             sessions: [...this.timer.data.sessions],
         };
         await this.storage.save(data);
+    }
+
+    /**
+     * 推进 journal 回放水位线到新会话段起点（跨午夜轮转边界 / 休眠唤醒时刻）。
+     *
+     * 背景：journal 仅在会话结束 / 崩溃恢复 / 还原时截断。跨午夜轮转与休眠恢复会把
+     * 封存段累入 totalMs 并落盘，但 journal 中对应时间片仍然保留——若水位线不推进，
+     * 崩溃恢复回放时会把封存段再次累加（双重计数，时长虚高）。
+     *
+     * ⚠️ 必须同时写回 timer.data：后续 saveCheckpoint 从 timer.data 重建数据并落盘，
+     * 若只改局部 data 对象，下一次全量存盘会把推进后的水位线覆盖丢失。
+     */
+    private advanceJournalWatermark(boundaryMs: number): void {
+        this.timer.replaceData({
+            ...this.timer.data,
+            metadata: { ...this.timer.data.metadata, lastJournalTs: String(boundaryMs) },
+        });
     }
 }

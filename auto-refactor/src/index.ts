@@ -25,61 +25,91 @@ interface CliOptions extends ScanOptions {
 function parseArgs(argv: string[]): CliOptions {
   const opt: CliOptions = { cache: true, daemon: 'auto' };
   const listFlags = new Set(['include', 'exclude']);
+  // 无值（布尔）flag：默认置 true；仅当显式 `=false` 或紧跟独立 token `true|false` 时取值。
+  // ★ 修复：无值 flag 不再无条件吞掉下一个 token——此前 `--fail-on-issue --format json`
+  //   会把 `--format` 误当布尔值消费、`json` 沦为裸参数被忽略，静默丢失输出格式配置。
+  const boolFlags = new Set([
+    'fail-on-issue',
+    'fail-on-analyzer-error',
+    'respect-gitignore',
+    'cache',
+    'daemon',
+  ]);
+
   for (let i = 0; i < argv.length; i++) {
     let arg = argv[i];
     if (!arg.startsWith('--')) continue;
     arg = arg.slice(2);
+
     let value = '';
+    let hasInline = false;
     if (arg.includes('=')) {
       [arg, value] = arg.split('=', 2);
-    } else {
-      value = argv[i + 1] || '';
-      i++;
+      hasInline = true;
     }
+
+    if (boolFlags.has(arg)) {
+      let enabled = true;
+      if (hasInline) {
+        enabled = value !== 'false';
+      } else {
+        const nxt = argv[i + 1];
+        // 仅当下一个 token 是显式布尔值时才消费（`--cache false` 形式）；否则视为开启
+        if (nxt === 'true' || nxt === 'false') {
+          enabled = nxt !== 'false';
+          i++;
+        }
+      }
+      if (arg === 'fail-on-issue') opt.failOnIssue = enabled;
+      else if (arg === 'fail-on-analyzer-error') opt.failOnAnalyzerError = enabled;
+      else if (arg === 'respect-gitignore') opt.respectGitignore = enabled;
+      else if (arg === 'cache') opt.cache = enabled;
+      else if (arg === 'daemon') opt.daemon = enabled ? 'on' : 'off';
+      continue;
+    }
+
+    // 带值 flag：`--key=value` 优先；否则消费下一个 token（且不得是另一个 flag）
+    const takeValue = (): string => {
+      if (hasInline) return value;
+      const nxt = argv[i + 1];
+      if (nxt === undefined || nxt.startsWith('--')) return '';
+      i++;
+      return nxt;
+    };
+
     if (listFlags.has(arg)) {
+      const v = takeValue();
       (opt as any)[arg] = (opt as any)[arg]
-        ? [...(opt as any)[arg], ...value.split(',').map((s) => s.trim()).filter(Boolean)]
-        : value.split(',').map((s) => s.trim()).filter(Boolean);
+        ? [...(opt as any)[arg], ...v.split(',').map((s) => s.trim()).filter(Boolean)]
+        : v.split(',').map((s) => s.trim()).filter(Boolean);
     } else if (arg === 'analyzers') {
-      opt.analyzers = value.split(',').map((s) => s.trim()).filter(Boolean);
+      opt.analyzers = takeValue().split(',').map((s) => s.trim()).filter(Boolean);
     } else if (arg === 'format') {
-      opt.format = value as any;
+      opt.format = takeValue() as any;
     } else if (arg === 'log-level') {
-      opt.logLevel = value as LogLevel;
+      opt.logLevel = takeValue() as LogLevel;
     } else if (arg === 'log-file') {
-      opt.logFile = value;
+      opt.logFile = takeValue();
     } else if (arg === 'concurrency') {
-      opt.concurrency = Number(value);
+      opt.concurrency = Number(takeValue());
     } else if (arg === 'workers') {
-      opt.workers = Number(value);
-    } else if (arg === 'respect-gitignore') {
-      opt.respectGitignore = value !== 'false';
-    } else if (arg === 'no-respect-gitignore') {
-      opt.respectGitignore = false;
+      opt.workers = Number(takeValue());
     } else if (arg === 'out') {
-      opt.out = value;
-    } else if (arg === 'fail-on-issue') {
-      opt.failOnIssue = value !== 'false';
-    } else if (arg === 'fail-on-analyzer-error') {
-      opt.failOnAnalyzerError = value !== 'false';
+      opt.out = takeValue();
     } else if (arg === 'parser') {
-      opt.parser = value === 'oxc' ? 'oxc' : 'typescript';
+      opt.parser = takeValue() === 'oxc' ? 'oxc' : 'typescript';
     } else if (arg === 'root') {
-      opt.root = value;
+      opt.root = takeValue();
     } else if (arg === 'config') {
-      opt.configFile = value;
-    } else if (arg === 'cache') {
-      opt.cache = value !== 'false';
+      opt.configFile = takeValue();
     } else if (arg === 'no-cache') {
       opt.cache = false;
     } else if (arg === 'cache-dir') {
-      opt.cacheDir = value;
+      opt.cacheDir = takeValue();
     } else if (arg === 'cache-clear') {
       opt.cacheClear = true;
     } else if (arg === 'cache-custom') {
       opt.cacheCustom = true;
-    } else if (arg === 'daemon') {
-      opt.daemon = 'on';
     } else if (arg === 'no-daemon') {
       opt.daemon = 'off';
     } else if (arg === 'help' || arg === 'h') {

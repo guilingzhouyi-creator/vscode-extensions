@@ -8,6 +8,7 @@
 
 const assert = require('assert');
 const { SessionManager } = require('../../out/application/SessionManager.js');
+const { RecoveryService } = require('../../out/application/RecoveryService.js');
 const { TimerEngine } = require('../../out/domain/TimerEngine.js');
 const { TimeAggregator, parseLocalDate, localDateStr } = require('../../out/domain/TimeAggregator.js');
 
@@ -46,6 +47,19 @@ class FakeRecoveryService {
             dailyTotals: {},
         };
     }
+}
+
+/** 假 journal store（IJournalStore 端口）：可注入切片，供真实 RecoveryService 回放 */
+class FakeJournalStore {
+    constructor(slices = []) {
+        this.slices = slices;
+        this.truncateCalls = 0;
+    }
+    async exists() { return true; }
+    async readJournal() { return [...this.slices]; }
+    async truncate() { this.slices = []; this.truncateCalls++; }
+    async delete() { this.slices = []; }
+    async appendBatch(batch) { this.slices.push(...batch); }
 }
 
 describe('SessionManager（跨午夜与休眠管理）', () => {
@@ -96,6 +110,11 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         assert.strictEqual(timer.data.sessions[0].durationMs, 3600000);
         assert.strictEqual(timer.data.totalMs, 3600000);
 
+        // 验证：journal 水位线推进到今日零点（崩溃恢复时跳过封存段，防双重计数）
+        assert.strictEqual(timer.data.metadata.lastJournalTs, String(todayZero));
+        assert.strictEqual(storage.saved[storage.saved.length - 1].metadata.lastJournalTs, String(todayZero),
+            '水位线必须随落盘持久化');
+
         // 验证：今日会话新起点为今日零点，昨日 1 小时不计入今日
         assert.strictEqual(timer.data.currentSessionStartMs, todayZero);
         sessionManager.invalidateTodayCache();
@@ -120,6 +139,9 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         assert.strictEqual(timer.data.sessions.length, 1);
         assert.strictEqual(timer.data.sessions[0].durationMs, 1800000);
         assert.strictEqual(timer.data.currentSessionStartMs, resumeMs, '新起点设为唤醒时刻');
+
+        // 验证：journal 水位线推进到唤醒时刻（崩溃恢复时跳过休眠前封存段，防双重计数）
+        assert.strictEqual(timer.data.metadata.lastJournalTs, String(resumeMs));
     });
 
     it('setMaxSessions / saveCheckpoint：容量超限时自动触发无损折叠回收入 dailyTotals', async () => {
@@ -150,5 +172,40 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         const res = await sessionManager.endSession();
         assert.strictEqual(res.sessionCount, 6);
         assert.strictEqual(res.totalMs, 50000);
+    });
+
+    it('跨午夜轮转后崩溃恢复：封存段不双计（双重计数回归）', async () => {
+        // 真实 RecoveryService + 可回放 journal，验证"跨午夜轮转 → 崩溃 → 重启恢复"全链路：
+        // 昨夜封存段已计入 totalMs 并落盘，journal 回放必须跳过水位线之前的切片，只补今日增量。
+        const journalStore = new FakeJournalStore();
+        const realRecovery = new RecoveryService(storage, journalStore);
+        const sm = new SessionManager(timer, storage, journal, realRecovery, 1000, 45);
+
+        // 1. 启动会话（全新启动）
+        await sm.startSession();
+
+        // 2. 模拟昨晚 23:00 开始的会话，并写入昨夜 journal 切片（每 5 分钟一片，共 12 片 = 1h）
+        const today = TimeAggregator.todayStr();
+        const todayZero = parseLocalDate(today);
+        const yesterday23h = todayZero - 3600000;
+        timer._sessionStartMs = yesterday23h;
+        timer.data.currentSessionStartMs = yesterday23h;
+        for (let t = yesterday23h + 300000; t <= todayZero; t += 300000) {
+            journalStore.slices.push({ timestamp: t, deltaMs: 300000 });
+        }
+
+        // 3. 跨午夜轮转：昨夜 1h 封存进 totalMs 并落盘，水位线推进到今日零点
+        await sm.rotateSessionAtMidnight();
+        assert.strictEqual(timer.data.totalMs, 3600000);
+
+        // 4. 崩溃前：journal 又写入了今日凌晨 30 分钟的切片（新会话段增量）
+        for (let t = todayZero + 300000; t <= todayZero + 1800000; t += 300000) {
+            journalStore.slices.push({ timestamp: t, deltaMs: 300000 });
+        }
+
+        // 5. 重启恢复：昨夜封存段已在 totalMs 中，回放必须跳过 ≤ 水位线的切片
+        const recovered = await realRecovery.recover(45, 1000);
+        assert.strictEqual(recovered.totalMs, 3600000 + 1800000,
+            '封存段只计一次，仅追加今日 30 分钟增量');
     });
 });

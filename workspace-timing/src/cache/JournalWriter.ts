@@ -78,8 +78,11 @@ export class JournalWriter {
             await this.storage.appendBatch(slices);
         } catch (err) {
             // 数据不落盘就绝不丢弃：退回缓冲（若期间有新切片入队，
-            // 退回切片会排在其后，时序轻微错位但优于丢失；缓冲满时覆盖最旧）
-            for (let i = slices.length - 1; i >= 0; i--) {
+            // 退回切片会排在其后，时序轻微错位但优于丢失；缓冲满时覆盖最旧）。
+            // ★ 必须按原顺序正序回退：flush() 按 tail→head 取出（旧→新），
+            //   若倒序 push，缓冲内整批切片顺序反转（最新变最旧），
+            //   下次 flush 后 journal 中时间片顺序错乱，回放分组会误判断点。
+            for (let i = 0; i < slices.length; i++) {
                 this.ringBuffer.push(slices[i]);
             }
             log(LogLevel.Error,

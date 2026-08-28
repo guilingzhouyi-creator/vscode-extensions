@@ -1,6 +1,6 @@
 {
   "name": "auto-refactor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Configurable, extensible automated code-refactoring analyzer: constant extraction, large-file splitting, and cyclomatic complexity — with CI-ready structured output (JSON / SARIF / text). Declarative, pluggable, project-agnostic.",
   "bin": {
     "auto-refactor": "dist/index.js"
