@@ -59,6 +59,7 @@ export interface I18nStrings {
     'report.table.date': string;
     'report.table.weekday': string;
     'report.table.weekStart': string;
+    'report.table.weekRange': string;
     'report.table.sessionCount': string;
     'report.generatedAt': string;
 
@@ -158,6 +159,14 @@ export interface I18nStrings {
     'panel.set.maxSessions.name': string;
     'panel.set.maxSessions.tip': string;
     'panel.set.maxSessions.desc': string;
+    'panel.set.weeklyLimit.name': string;
+    'panel.set.weeklyLimit.tip': string;
+    'panel.set.weeklyLimit.desc': string;
+    'panel.set.weeklyLimitHours.name': string;
+    'panel.set.weeklyLimitHours.tip': string;
+    'panel.set.weeklyLimitHours.desc': string;
+    'panel.trend.limitMarker': string;
+    'notify.weeklyLimitExceeded': string;
     'panel.actions.newPeriod': string;
     'panel.actions.exportCsv': string;
     'panel.actions.reset': string;

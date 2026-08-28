@@ -7,7 +7,7 @@
 'use strict';
 
 const assert = require('assert');
-const { TimeAggregator } = require('../../out/domain/TimeAggregator.js');
+const { TimeAggregator, parseLocalDate } = require('../../out/domain/TimeAggregator.js');
 
 /**
  * 计算当前周周一的 UTC 中午时间戳。
@@ -47,6 +47,8 @@ describe('TimeAggregator（日报/周报聚合）', () => {
         assert.strictEqual(trend.length, 4);
         // 降序：最近在前
         assert.ok(trend[0].weekStart >= trend[1].weekStart);
+        // 包含 weekEnd
+        assert.ok(trend[0].weekEnd > trend[0].weekStart, 'weekEnd 应晚于 weekStart');
         // 当前周（最近）应含 2 个会话
         assert.strictEqual(trend[0].sessionCount, 2);
         assert.strictEqual(trend[0].totalMs, 5400000);
@@ -403,5 +405,23 @@ describe('TimeAggregator：heatmapDays 活动热力图', () => {
         const statsEn = TimeAggregator.last7Days(s, 0, 'en');
         assert.strictEqual(statsEn.length, 7);
         assert.ok(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].includes(statsEn[6].weekday));
+    });
+
+    it('weeklySummary：跨周日界跨午夜会话仅计入本周部分，且支持 dailyTotals 折叠层', () => {
+        const mondayMs = parseLocalDate(TimeAggregator.weekStartStr(new Date()));
+        const mDate = new Date(mondayMs);
+        // 上周日 23:00 -> 本周一 02:00（共 3 小时，跨周自然日界）
+        const sundayNightStart = new Date(mDate.getFullYear(), mDate.getMonth(), mDate.getDate() - 1, 23, 0).getTime();
+        const mondayMorningEnd = new Date(mDate.getFullYear(), mDate.getMonth(), mDate.getDate(), 2, 0).getTime();
+
+        const s = [{
+            startMs: sundayNightStart,
+            endMs: mondayMorningEnd,
+            durationMs: 3 * 3600000,
+        }];
+
+        // 本周一应只计入 00:00~02:00 的 2 小时
+        const summary = TimeAggregator.weeklySummary(s, 0);
+        assert.strictEqual(summary.totalMs, 2 * 3600000, '上周日 1h 被剔除，仅本周一 2h 计入本周摘要');
     });
 });

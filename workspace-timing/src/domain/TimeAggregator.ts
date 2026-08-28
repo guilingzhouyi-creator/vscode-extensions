@@ -19,6 +19,7 @@ export interface DailyStats {
 /** 按周聚合统计 */
 export interface WeeklyStats {
     weekStart: string;   // "2026-06-15" (周一)
+    weekEnd: string;     // "2026-06-21" (周日)
     totalMs: number;
     sessionCount: number;
 }
@@ -101,7 +102,7 @@ export function localDateStr(ms: number): string {
 }
 
 /** 解析 "YYYY-MM-DD" 为该日本地零点时间戳 */
-function parseLocalDate(dateStr: string): number {
+export function parseLocalDate(dateStr: string): number {
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, d).getTime();
 }
@@ -255,7 +256,12 @@ export class TimeAggregator {
         }
 
         return Array.from(map.entries())
-            .map(([weekStart, v]) => ({ weekStart, totalMs: v.totalMs, sessionCount: v.count }))
+            .map(([weekStart, v]) => {
+                const [y, m, d] = weekStart.split('-').map(Number);
+                const endDt = new Date(y, m - 1, d + 6);
+                const weekEnd = localDateStr(endDt.getTime());
+                return { weekStart, weekEnd, totalMs: v.totalMs, sessionCount: v.count };
+            })
             .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
     }
 
@@ -356,7 +362,8 @@ export class TimeAggregator {
      */
     static dailyDetail(sessions: TimeSession[], dateStr: string, currentSessionStartMs = 0): DailyDetail {
         const dayStartMs = parseLocalDate(dateStr);
-        const dayEndMs = parseLocalDate(localDateStr(dayStartMs + 24 * 3600_000));
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const dayEndMs = new Date(y, m - 1, d + 1).getTime();
 
         type ClippedEntry = DailySessionEntry & { isRunningTail: boolean };
         const entries: ClippedEntry[] = [];
@@ -442,7 +449,7 @@ export class TimeAggregator {
     }
 
     /** 计算时间戳所在周的起始日（周一）本地日期字符串 */
-    private static weekStartStr(d: Date): string {
+    static weekStartStr(d: Date): string {
         const day = d.getDay();
         const diff = day === 0 ? -6 : 1 - day; // 周日归上一周一
         const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
@@ -569,91 +576,81 @@ export class TimeAggregator {
     }
 
     /** 近 N 周按周聚合趋势（含当前周，降序） */
-    static weeklyTrend(sessions: TimeSession[], weeks = 4): WeeklyStats[] {
+    static weeklyTrend(
+        sessions: TimeSession[],
+        weeks = 4,
+        currentSessionStartMs = 0,
+        dailyTotals?: DailyTotalsMap,
+    ): WeeklyStats[] {
         const result: WeeklyStats[] = [];
         const currentWeek = TimeAggregator.weekStartStr(new Date());
 
         // 预生成 N 周的周桶（用 Date(y,m,d-n) 构造回退，跨 DST 也稳定落在目标日）
-        const weekMap = new Map<string, { totalMs: number; count: number }>();
+        const weekMap = new Map<string, { weekEnd: string; totalMs: number; count: number }>();
         {
             const base = parseLocalDate(currentWeek);
             const bd = new Date(base);
             for (let i = weeks - 1; i >= 0; i--) {
                 const dt = new Date(bd.getFullYear(), bd.getMonth(), bd.getDate() - 7 * i);
-                weekMap.set(localDateStr(dt.getTime()), { totalMs: 0, count: 0 });
+                const weekStart = localDateStr(dt.getTime());
+                const endDt = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + 6);
+                const weekEnd = localDateStr(endDt.getTime());
+                weekMap.set(weekStart, { weekEnd, totalMs: 0, count: 0 });
             }
         }
 
-        // 遍历会话：按自然日切分片段，再归入片段所属的周桶。
-        // 窗口粗筛：完全落在 N 周窗口之外的会话直接跳过（周界过滤用日零点，
-        // 上下界 ±1 小时的 DST 偏差对筛选结果无影响——归桶仍以 weekKeyOf 为准）。
-        const firstWeekStartMs = parseLocalDate(weekMap.keys().next().value as string);
-        const lastWeekEndMs = parseLocalDate(currentWeek) + MS_PER_DAY * 7;
-        for (const s of sessions) {
-            if (s.endMs <= firstWeekStartMs || s.startMs >= lastWeekEndMs) continue;
-            let counted = false;
-            TimeAggregator.eachDaySegment(s.startMs, s.endMs, (_date, segStart, segEnd) => {
-                const bucket = weekMap.get(TimeAggregator.weekKeyOf(segStart));
-                if (bucket) {
-                    bucket.totalMs += segEnd - segStart;
-                    if (!counted) bucket.count++;
-                    counted = true;
-                }
-            });
+        // 使用全历史日报序列（含 dailyTotals + 原始会话 + 进行中会话）对各周桶进行累加
+        const series = TimeAggregator.fullDailySeries(sessions, currentSessionStartMs, dailyTotals);
+        for (const d of series) {
+            const dMs = parseLocalDate(d.date);
+            const weekKey = TimeAggregator.weekKeyOf(dMs);
+            const bucket = weekMap.get(weekKey);
+            if (bucket) {
+                bucket.totalMs += d.totalMs;
+                bucket.count += d.sessionCount;
+            }
         }
 
         for (const [weekStart, v] of weekMap.entries()) {
-            result.push({ weekStart, totalMs: v.totalMs, sessionCount: v.count });
+            result.push({ weekStart, weekEnd: v.weekEnd, totalMs: v.totalMs, sessionCount: v.count });
         }
         // 按周起始降序（最近在前）
         result.sort((a, b) => b.weekStart.localeCompare(a.weekStart));
         return result;
     }
 
-    /** 周报文字摘要 */
-    static weeklySummary(sessions: TimeSession[], currentSessionStartMs = 0): WeeklySummary {
+    /** 周报文字摘要（按自然日严格切分，含 dailyTotals 折叠层与进行中会话） */
+    static weeklySummary(
+        sessions: TimeSession[],
+        currentSessionStartMs = 0,
+        dailyTotals?: DailyTotalsMap,
+    ): WeeklySummary {
         const now = Date.now();
         const weekStart = TimeAggregator.weekStartStr(new Date(now));
         const weekStartMs = parseLocalDate(weekStart);
-        // 周窗口终点 = 下周一本地零点（Date 归一化，DST 周与 7*24h 相差 ±1h，不能用固定毫秒数）
+        // 周窗口终点 = 下周一本地零点（Date 归一化，DST 安全）
         const wsDate = new Date(weekStartMs);
         const weekEndMs = new Date(wsDate.getFullYear(), wsDate.getMonth(), wsDate.getDate() + 7).getTime();
 
+        const series = TimeAggregator.fullDailySeries(sessions, currentSessionStartMs, dailyTotals);
         let totalMs = 0;
         let sessionCount = 0;
-
-        // 活跃天数与最活跃日期（按自然日切分后的片段归属）
-        const dayMap = new Map<string, number>();
-        const accumulate = (startMs: number, endMs: number): void => {
-            if (startMs >= weekEndMs || endMs <= weekStartMs) return;
-            TimeAggregator.eachDaySegment(
-                Math.max(startMs, weekStartMs),
-                Math.min(endMs, weekEndMs),
-                (date, segStart, segEnd) => {
-                    const ms = segEnd - segStart;
-                    totalMs += ms;
-                    dayMap.set(date, (dayMap.get(date) ?? 0) + ms);
-                },
-            );
-        };
-
-        for (const s of sessions) {
-            if (s.startMs >= weekEndMs || s.endMs <= weekStartMs) continue;
-            sessionCount++;
-            accumulate(s.startMs, s.endMs);
-        }
-        if (currentSessionStartMs > 0 && currentSessionStartMs < weekEndMs) {
-            sessionCount++;
-            accumulate(currentSessionStartMs, now);
-        }
-
-        const activeDays = dayMap.size;
+        let activeDays = 0;
         let peakDate = '';
         let peakDateMs = 0;
-        for (const [date, ms] of dayMap.entries()) {
-            if (ms > peakDateMs) {
-                peakDateMs = ms;
-                peakDate = date;
+
+        for (const d of series) {
+            const dMs = parseLocalDate(d.date);
+            if (dMs >= weekStartMs && dMs < weekEndMs) {
+                totalMs += d.totalMs;
+                sessionCount += d.sessionCount;
+                if (d.totalMs > 0) {
+                    activeDays++;
+                    if (d.totalMs > peakDateMs) {
+                        peakDateMs = d.totalMs;
+                        peakDate = d.date;
+                    }
+                }
             }
         }
 

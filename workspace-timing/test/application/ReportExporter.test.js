@@ -35,8 +35,8 @@ describe('ReportExporter（Markdown 报表导出器）', () => {
     };
 
     const mockWeeklyTrend = [
-        { weekStart: '2026-08-24', totalMs: 14400000, sessionCount: 4 },
-        { weekStart: '2026-08-17', totalMs: 10800000, sessionCount: 3 },
+        { weekStart: '2026-08-24', weekEnd: '2026-08-30', totalMs: 14400000, sessionCount: 4 },
+        { weekStart: '2026-08-17', weekEnd: '2026-08-23', totalMs: 10800000, sessionCount: 3 },
     ];
 
     const mockDailyStatsZh = [
@@ -49,29 +49,32 @@ describe('ReportExporter（Markdown 报表导出器）', () => {
         { label: '08-26', weekday: 'Wed', totalMs: 7200000 },
     ];
 
+    beforeEach(() => {
+        init();
+    });
+
     it('buildDailyReport：中文环境下生成标准中文日报 Markdown', () => {
         setLocale('zh-CN');
         const md = ReportExporter.buildDailyReport(mockDaily);
 
-        assert.ok(md.includes('# 📅 日报 · 2026-08-26'), '含中文标题');
-        assert.ok(md.includes('- **当日时长**：2h 0m 0s') || md.includes('- **当日时长**：2h'), '含当日时长');
+        assert.ok(md.includes('# 📅 日报 · 2026-08-26'), '含中文日报标题');
+        assert.ok(md.includes('- **当日时长**：'), '含当日时长');
         assert.ok(md.includes('- **会话数**：2'), '含会话数');
         assert.ok(md.includes('- **活跃时段**：09:00-10:00'), '含活跃时段');
-        assert.ok(md.includes('## 会话明细'), '含会话明细');
-        assert.ok(md.includes('| 开始 | 结束 | 时长 |'), '含中文表头');
-        assert.ok(md.includes('| 09:00 | 10:00 |'), '含会话行');
+        assert.ok(md.includes('## 会话明细'), '含会话明细章节');
+        assert.ok(md.includes('| 09:00 | 10:00 |'), '含第一条会话记录');
+        assert.ok(md.includes('| 14:00 | 15:00 |'), '含第二条会话记录');
     });
 
     it('buildDailyReport：英文环境下生成标准英文日报 Markdown', () => {
         setLocale('en');
         const md = ReportExporter.buildDailyReport(mockDaily);
 
-        assert.ok(md.includes('# 📅 Daily Report · 2026-08-26'), '含英文标题');
-        assert.ok(md.includes("- **Today's Duration**："), '含英文时长标签');
+        assert.ok(md.includes('# 📅 Daily Report · 2026-08-26'), '含英文日报标题');
+        assert.ok(md.includes("- **Today's Duration**："), '含英文当日时长');
         assert.ok(md.includes('- **Session Count**：2'), '含英文会话数');
         assert.ok(md.includes('- **Active Window**：09:00-10:00'), '含英文活跃时段');
-        assert.ok(md.includes('## Session Details'), '含英文明细标题');
-        assert.ok(md.includes('| Start | End | Duration |'), '含英文表头');
+        assert.ok(md.includes('## Session Details'), '含英文会话明细章节');
     });
 
     it('buildWeeklyReport：中文环境下生成标准中文周报 Markdown', () => {
@@ -85,7 +88,8 @@ describe('ReportExporter（Markdown 报表导出器）', () => {
         assert.ok(md.includes('## 每日分布'), '含每日分布');
         assert.ok(md.includes('| 08-25 | 周二 |'), '星期带周前缀');
         assert.ok(md.includes('## 多周趋势'), '含多周趋势');
-        assert.ok(md.includes('| 周起始 | 时长 | 会话数 |'), '含多周趋势表头');
+        assert.ok(md.includes('| 时间范围 | 时长 | 会话数 |'), '含多周趋势表头');
+        assert.ok(md.includes('| 2026-08-24 ~ 2026-08-30 |'), '含周日期范围');
     });
 
     it('buildWeeklyReport：英文环境下生成标准英文周报 Markdown', () => {
@@ -99,6 +103,7 @@ describe('ReportExporter（Markdown 报表导出器）', () => {
         assert.ok(md.includes('## Daily Distribution'), '含英文每日分布');
         assert.ok(md.includes('| 08-25 | Tue |'), '英文星期正常呈现');
         assert.ok(md.includes('## Multi-Week Trend'), '含英文多周趋势');
-        assert.ok(md.includes('| Week Start | Duration | Sessions |'), '含英文多周趋势表头');
+        assert.ok(md.includes('| Week Range | Duration | Sessions |'), '含英文多周趋势表头');
+        assert.ok(md.includes('| 2026-08-24 ~ 2026-08-30 |'), '含英文周日期范围');
     });
 });

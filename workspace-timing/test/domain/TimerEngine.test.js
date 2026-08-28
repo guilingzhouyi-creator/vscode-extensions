@@ -69,4 +69,34 @@ describe('TimerEngine（计时核心）', () => {
     assert.strictEqual(eng.data.sessions.length, 2);
     assert.strictEqual(eng.data.sessions[0].startMs, 2, '应保留最近会话');
   });
+
+  it('rotateSession 跨午夜切分：封存昨日会话段并无缝切换起点', () => {
+    const eng = new TimerEngine();
+    eng.start();
+    const startMs = eng.data.currentSessionStartMs;
+    const midnight = startMs + 3600000;
+    const elapsed = eng.rotateSession(midnight);
+    assert.strictEqual(elapsed, 3600000);
+    assert.strictEqual(eng.isRunning, true);
+    assert.strictEqual(eng.data.totalMs, 3600000);
+    assert.strictEqual(eng.data.sessions.length, 1);
+    assert.strictEqual(eng.data.sessions[0].startMs, startMs);
+    assert.strictEqual(eng.data.sessions[0].endMs, midnight);
+    assert.strictEqual(eng.data.currentSessionStartMs, midnight);
+  });
+
+  it('resumeFromSleep 挂起恢复：封存休眠前会话段，休眠期间不计入时长', () => {
+    const eng = new TimerEngine();
+    eng.start();
+    const startMs = eng.data.currentSessionStartMs;
+    const sleepStart = startMs + 1800000; // 30 分钟后睡眠
+    const resumeMs = startMs + 28800000;  // 8 小时后唤醒
+    const elapsed = eng.resumeFromSleep(sleepStart, resumeMs);
+    assert.strictEqual(elapsed, 1800000, '只计入睡眠前 30 分钟');
+    assert.strictEqual(eng.isRunning, true);
+    assert.strictEqual(eng.data.totalMs, 1800000, '总时长不含休眠 7.5 小时');
+    assert.strictEqual(eng.data.sessions.length, 1);
+    assert.strictEqual(eng.data.sessions[0].endMs, sleepStart);
+    assert.strictEqual(eng.data.currentSessionStartMs, resumeMs, '新起点为唤醒时刻');
+  });
 });

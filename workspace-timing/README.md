@@ -10,6 +10,7 @@
 ## ✨ 功能亮点 | Features
 
 - ⏱ **自动计时** · Auto-timing — 打开工作区即自动开始计时，无缝记录编码时间
+- 🎯 **周工作上限与健康提醒** · Weekly limit & rest reminders — 自定义周工时阈值，动态渐变进度条与阈值分割线，超限贴心提醒休息
 - 📊 **周报图表** · Weekly chart — 最近 7 天柱状图与实时活跃曲线一键切换
 - 🔥 **活动热力图** · Activity heatmap — 近 12 周 GitHub 风格每日活跃时间线，5 档着色一目了然
 - ⏰ **按小时分布** · Hourly breakdown — 今日 24 小时活跃分布与 X 轴刻度，峰值小时高亮
@@ -64,6 +65,8 @@
 | `workspaceTiming.globalDisabled` | `false` | 全局禁用所有工作区的时长追踪 |
 | `workspaceTiming.statusBar.enabled` | `true` | 是否在状态栏右侧显示计时器 |
 | `workspaceTiming.statusBar.format` | `compact` | 状态栏显示格式 |
+| `workspaceTiming.weeklyLimit.enabled` | `false` | 是否启用周工作上限监控与休息提醒 |
+| `workspaceTiming.weeklyLimit.hours` | `40` | 周工作上限时长（小时，范围 1~168） |
 | `workspaceTiming.storage.backupToFile` | `true` | 启用 `.vscode/workspace-timing.json` 文件备份 |
 | `workspaceTiming.storage.journalEnabled` | `true` | 启用 journal 崩溃保护日志 |
 | `workspaceTiming.storage.ringBufferCapacity` | `1024` | 环形缓冲区时间片容量上限 |
@@ -85,6 +88,7 @@
 | **v0.4.2** | 12 周活动热力图、今日 24 小时明细、实时平滑曲线、多工作区对比图表 | ✅ 已完成 |
 | **v0.4.3** | 界面语言运行期热切换（zh-CN / en）、Catmull-Rom 贝塞尔曲线平滑 | ✅ 已完成 |
 | **v0.4.4** | 24 格 X 轴刻度逐格对齐、命令体系统一、RingBuffer 全面单测 | ✅ 已完成 |
+| **v0.4.5** | 跨午夜与休眠防漂移、周工作上限模块、动态渐变分割线与健康提醒 | ✅ 已完成 |
 | **v0.5.0** | ☁️ 云端同步与多端聚合支持（WebDAV / GitHub Gist） | 🚧 规划中 |
 
 ---

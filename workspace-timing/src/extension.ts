@@ -162,6 +162,9 @@ export function activate(context: vscode.ExtensionContext): void {
                     statusBar?.updateTime(0, 0);
                 }
             });
+            orchestrator.onWeeklyLimitExceeded((msg) => {
+                void vscode.window.showWarningMessage(msg);
+            });
 
             // Dashboard 面板消息路由（分发逻辑见 presentation/dashboardMessages.ts）
             DashboardPanel.setMessageHandler(createDashboardMessageHandler(getRouterContext()));

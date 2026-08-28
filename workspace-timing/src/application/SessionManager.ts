@@ -7,7 +7,7 @@
 
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
 import { WorkspaceTimingData, TimeSession } from '../domain/models';
-import { TimeAggregator } from '../domain/TimeAggregator';
+import { TimeAggregator, parseLocalDate } from '../domain/TimeAggregator';
 import { migrateToFolded } from '../domain/HistoryFolder';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
@@ -229,5 +229,56 @@ export class SessionManager {
         // 进行中会话增量保留在 journal（供崩溃恢复回放），这里不清空
         await this.storage.save(data);
         log(LogLevel.Debug, `SessionManager: checkpoint saved, totalMs=${snap.totalMs}`);
+    }
+
+    /**
+     * 跨午夜自然日会话切分与轮转：
+     * 状态栏/心跳检测到自然日更替时调用，将昨日部分封存，今日部分清零起计，
+     * 保证状态栏今日时长、今日明细与 Windows 本地操作系统时间绝对对齐。
+     */
+    async rotateSessionAtMidnight(): Promise<void> {
+        if (!this._sessionActive) return;
+
+        const today = TimeAggregator.todayStr();
+        const todayZeroMs = parseLocalDate(today);
+
+        log(LogLevel.Info, `SessionManager: rotating session at midnight (${today})`);
+        this.timer.rotateSession(todayZeroMs);
+        this.invalidateTodayCache();
+        this.timer.trimSessions(this.maxSessions);
+        this.foldIfNeeded();
+
+        const snap = this.timer.snapshot();
+        const data: WorkspaceTimingData = {
+            ...this.timer.data,
+            totalMs: snap.totalMs,
+            lastSavedAtMs: Date.now(),
+            sessions: [...this.timer.data.sessions],
+        };
+        await this.storage.save(data);
+    }
+
+    /**
+     * 系统休眠/挂起恢复处理：
+     * 当检测到心跳间隔异常（系统曾休眠/盒盖），封存休眠前时长，休眠期间不计入时长，
+     * 并将唤醒时刻作为新会话起点，彻底消除夜间休眠导致次日今日时长虚高的问题。
+     */
+    async handleSystemResume(sleepStartMs: number, resumeMs: number): Promise<void> {
+        if (!this._sessionActive) return;
+
+        log(LogLevel.Info, `SessionManager: handling system resume (gap=${resumeMs - sleepStartMs}ms)`);
+        this.timer.resumeFromSleep(sleepStartMs, resumeMs);
+        this.invalidateTodayCache();
+        this.timer.trimSessions(this.maxSessions);
+        this.foldIfNeeded();
+
+        const snap = this.timer.snapshot();
+        const data: WorkspaceTimingData = {
+            ...this.timer.data,
+            totalMs: snap.totalMs,
+            lastSavedAtMs: resumeMs,
+            sessions: [...this.timer.data.sessions],
+        };
+        await this.storage.save(data);
     }
 }

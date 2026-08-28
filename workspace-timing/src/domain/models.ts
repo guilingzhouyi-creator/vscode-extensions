@@ -27,6 +27,34 @@ export const DEFAULT_RAW_RETENTION_DAYS = 45;
 export const JOURNAL_WARN_BYTES = 5 * 1024 * 1024;
 /** 崩溃补偿上限 24h，防止异常数据导致计时暴涨 */
 export const CRASH_COMPENSATION_CAP_MS = MS_PER_DAY;
+/** 周工作时长上限下限 (1h) */
+export const MIN_WEEKLY_LIMIT_HOURS = 1;
+/** 周工作时长上限上限 (168h = 7天*24小时) */
+export const MAX_WEEKLY_LIMIT_HOURS = 168;
+/** 周工作时长上限默认值 (40h) */
+export const DEFAULT_WEEKLY_LIMIT_HOURS = 40;
+
+/** 校验并钳制周工作时长上限（小时），非法输入（非数字/NaN/Infinity/越界）自动纠偏到 [1, 168] */
+export function sanitizeWeeklyLimitHours(val: unknown): number {
+    let n: number;
+    if (typeof val === 'number') {
+        n = val;
+    } else if (typeof val === 'string') {
+        n = parseInt(val, 10);
+    } else {
+        return DEFAULT_WEEKLY_LIMIT_HOURS;
+    }
+    if (!Number.isFinite(n) || Number.isNaN(n)) {
+        return DEFAULT_WEEKLY_LIMIT_HOURS;
+    }
+    const rounded = Math.round(n);
+    return Math.min(MAX_WEEKLY_LIMIT_HOURS, Math.max(MIN_WEEKLY_LIMIT_HOURS, rounded));
+}
+
+/** 校验周工作时长上限开关 */
+export function sanitizeWeeklyLimitEnabled(val: unknown): boolean {
+    return val === true || val === 'true';
+}
 
 /** 单日聚合沉淀（折叠层）：某自然日的时长与会话数 */
 export interface DailyTotal {
@@ -127,6 +155,10 @@ export interface TimingConfig {
     historyRawRetentionDays: number;
     /** 破坏性操作（重置/清除历史/还原）前自动写安全快照 */
     safetySnapshot: boolean;
+    /** 周工作时长上限开关（默认不开启） */
+    weeklyLimitEnabled: boolean;
+    /** 周工作时长上限（小时，默认 40h） */
+    weeklyLimitHours: number;
 }
 
 /** 默认配置 */
@@ -136,6 +168,8 @@ export const DEFAULT_CONFIG: TimingConfig = {
     locale: 'auto',
     historyRawRetentionDays: DEFAULT_RAW_RETENTION_DAYS,
     safetySnapshot: true,
+    weeklyLimitEnabled: false,
+    weeklyLimitHours: 40,
     statusBarEnabled: true,
     backupToFile: true,
     journalEnabled: true,

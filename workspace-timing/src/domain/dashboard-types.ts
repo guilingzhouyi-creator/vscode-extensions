@@ -19,7 +19,9 @@ export interface DailyChartEntry {
 export interface WeeklyTrendEntry {
     /** 周起始日期 YYYY-MM-DD（周一） */
     weekStart: string;
-    /** 显示标签，如 "06-10" */
+    /** 周截止日期 YYYY-MM-DD（周日） */
+    weekEnd: string;
+    /** 显示标签，如 "06-10 ~ 06-16" */
     label: string;
     /** 本周时长 (ms) */
     totalMs: number;
@@ -97,6 +99,10 @@ export interface DashboardData {
     journalFlushIntervalMs: number;
     fullSaveIntervalMs: number;
     maxSessions: number;
+    /** 周工作时长上限开关 */
+    weeklyLimitEnabled: boolean;
+    /** 周工作时长上限（小时） */
+    weeklyLimitHours: number;
 }
 
 /** 面板消息协议 */

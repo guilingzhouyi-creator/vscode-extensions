@@ -169,17 +169,25 @@ export class RecoveryService {
         // Step 3: 补偿未完成会话
         // 仅当 journal 无有效回放且存在进行中会话时，才用起止时间差兜底补偿，
         // 避免与 journal 回放对同一时段重复累计（"三重计数"修复）。
+        // 补偿上限：取 data.lastSavedAtMs + 60s 与 now 的较小值，避免开机时将关机/休眠整夜时间误算入今日。
         if (!journalReplayed && data.currentSessionStartMs > 0) {
             const now = Date.now();
-            const elapsed = now - data.currentSessionStartMs;
-            if (elapsed > 0 && elapsed < CRASH_COMPENSATION_CAP_MS) { // 最多补偿 24h，防止异常
-                data.totalMs += elapsed;
-                // ★ 补偿时长同样落成按日会话，保证日报/周报口径一致（并同步入日桶）
-                const segs = TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, now);
-                data.sessions.push(...segs);
-                data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
-                log(LogLevel.Info,
-                    `RecoveryService: compensated unfinished session: +${elapsed}ms`);
+            const totalElapsed = now - data.currentSessionStartMs;
+            if (totalElapsed > 0 && totalElapsed < CRASH_COMPENSATION_CAP_MS) { // 最多补偿 24h，防止异常
+                const lastSaved = data.lastSavedAtMs > data.currentSessionStartMs
+                    ? data.lastSavedAtMs
+                    : data.currentSessionStartMs;
+                const maxCompensatedEnd = Math.min(now, lastSaved + 60000);
+                const elapsed = maxCompensatedEnd - data.currentSessionStartMs;
+                if (elapsed > 0) {
+                    data.totalMs += elapsed;
+                    // ★ 补偿时长同样落成按日会话，保证日报/周报口径一致（并同步入日桶）
+                    const segs = TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, maxCompensatedEnd);
+                    data.sessions.push(...segs);
+                    data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
+                    log(LogLevel.Info,
+                        `RecoveryService: compensated unfinished session: +${elapsed}ms`);
+                }
             }
         }
 

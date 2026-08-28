@@ -2,7 +2,7 @@
     "name": "workspace-timing",
     "displayName": "Workspace Timing",
     "description": "⏱ 轻量化工作区时长追踪 — 自动计时、周报图表、跨工作区聚合、崩溃保护；环形缓冲区 + Journal 双写入架构，预留多工作区对比与云端同步扩展 | Lightweight cross-workspace time tracker with RingBuffer+Journal storage, weekly charts, and extensible architecture",
-    "version": "0.4.4",
+    "version": "0.4.5",
     "publisher": "guilingzhouyi",
     "repository": {
         "type": "git",
@@ -171,6 +171,18 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Write a safety snapshot before destructive operations (reset/clear/restore)"
+                },
+                "workspaceTiming.weeklyLimit.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable weekly work limit and rest notification"
+                },
+                "workspaceTiming.weeklyLimit.hours": {
+                    "type": "number",
+                    "default": 40,
+                    "minimum": 1,
+                    "maximum": 168,
+                    "description": "Weekly work limit in hours (default: 40h)"
                 },
                 "workspaceTiming.cloudSync.enabled": {
                     "type": "boolean",

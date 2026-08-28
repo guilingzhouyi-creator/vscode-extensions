@@ -79,11 +79,12 @@ export class ReportExporter {
         if (trend.length > 0) {
             lines.push(`## ${dict['report.weekly.trend']}`);
             lines.push('');
-            lines.push(`| ${dict['report.table.weekStart']} | ${dict['report.table.duration']} | ${dict['report.table.sessionCount']} |`);
-            lines.push('|--------|------|--------|');
+            lines.push(`| ${dict['report.table.weekRange']} | ${dict['report.table.duration']} | ${dict['report.table.sessionCount']} |`);
+            lines.push('|-----------------------|------|--------|');
             for (const w of trend) {
+                const rangeLabel = w.weekEnd ? `${w.weekStart} ~ ${w.weekEnd}` : w.weekStart;
                 lines.push(
-                    `| ${w.weekStart} | ${TimeAggregator.formatDuration(w.totalMs)} | ${w.sessionCount} |`,
+                    `| ${rangeLabel} | ${TimeAggregator.formatDuration(w.totalMs)} | ${w.sessionCount} |`,
                 );
             }
             lines.push('');

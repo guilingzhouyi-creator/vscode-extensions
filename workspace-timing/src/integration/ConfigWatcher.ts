@@ -6,7 +6,12 @@
  */
 
 import * as vscode from 'vscode';
-import { TimingConfig, DEFAULT_CONFIG } from '../domain/models';
+import {
+    TimingConfig,
+    DEFAULT_CONFIG,
+    sanitizeWeeklyLimitHours,
+    sanitizeWeeklyLimitEnabled,
+} from '../domain/models';
 import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { LogLevel, log } from './Logger';
 import { t, setLocale, resolveLocale } from '../i18n/index';
@@ -49,6 +54,8 @@ export function readTimingConfig(): TimingConfig {
         historyRawRetentionDays: Math.max(0,
             cfg.get<number>('storage.historyRawRetentionDays', DEFAULT_CONFIG.historyRawRetentionDays)),
         safetySnapshot: cfg.get<boolean>('storage.safetySnapshot', DEFAULT_CONFIG.safetySnapshot),
+        weeklyLimitEnabled: sanitizeWeeklyLimitEnabled(cfg.get('weeklyLimit.enabled', DEFAULT_CONFIG.weeklyLimitEnabled)),
+        weeklyLimitHours: sanitizeWeeklyLimitHours(cfg.get('weeklyLimit.hours', DEFAULT_CONFIG.weeklyLimitHours)),
     };
 }
 

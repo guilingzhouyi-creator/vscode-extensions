@@ -727,24 +727,40 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       font-size: 12px;
     }
     .trend-label {
-      width: 56px;
+      width: 96px;
       color: var(--description);
       flex-shrink: 0;
       font-family: var(--vscode-editor-font-family, monospace);
     }
     .trend-track {
+      position: relative;
       flex: 1;
       height: 8px;
       border-radius: 4px;
       background: color-mix(in srgb, var(--input-bg) 80%, transparent);
       overflow: hidden;
     }
+    .trend-divider-mark {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #f43f5e;
+      box-shadow: 0 0 5px rgba(244, 63, 94, 0.9);
+      border-radius: 1px;
+      z-index: 3;
+      pointer-events: none;
+      transform: translateX(-50%);
+    }
     .trend-fill {
       height: 100%;
       border-radius: 4px;
       background: linear-gradient(90deg, var(--btn-bg), var(--focus));
-      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
       min-width: 2px;
+    }
+    .trend-fill.is-over {
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.55);
     }
     .trend-value {
       width: 72px;
@@ -753,6 +769,11 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       color: var(--success);
       font-weight: 600;
       flex-shrink: 0;
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+    }
+    .trend-value.is-over {
+      color: #ef4444;
+      text-shadow: 0 0 6px rgba(239, 68, 68, 0.35);
     }
 
     /* 跨工作区对比视图 */
@@ -1110,6 +1131,29 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           <option value="en">${args.labels['panel.set.locale.en']}</option>
         </select>
       </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.weeklyLimit.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.weeklyLimit.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.weeklyLimit.desc']}</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="chkWeeklyLimit" data-key="weeklyLimitEnabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span>${args.labels['panel.set.weeklyLimitHours.name']}</span>
+            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.weeklyLimitHours.tip']}</span></span>
+          </div>
+          <div class="desc">${args.labels['panel.set.weeklyLimitHours.desc']}</div>
+        </div>
+        <input class="number-input" type="number" id="numWeeklyLimitHours" data-key="weeklyLimitHours" min="1" max="168">
+      </div>
     </div>
   </div>
 
@@ -1253,6 +1297,8 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         setValue('numJournalInterval', data.journalFlushIntervalMs);
         setValue('numFullSaveInterval', data.fullSaveIntervalMs);
         setValue('numMaxSessions', data.maxSessions);
+        setChecked('chkWeeklyLimit', data.weeklyLimitEnabled);
+        setValue('numWeeklyLimitHours', data.weeklyLimitHours || 40);
 
         // 跨工作区对比视图
         renderWorkspaceCompare(data.workspaceList, data.workspaceCount, data.globalTotalMs);
@@ -1261,7 +1307,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         renderChart(data.dailyStats, data.weekTotalMs);
 
         // 周报摘要 + 多周趋势 + 今日明细
-        renderWeeklySummary(data.weeklySummary, data.weeklyTrend);
+        renderWeeklySummary(data.weeklySummary, data.weeklyTrend, data.weeklyLimitEnabled, data.weeklyLimitHours);
         renderTodayDetail(data.todayDetail);
 
         // 活动时间线热力图
@@ -1491,7 +1537,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       }
 
       // ---- 周报摘要 + 多周趋势渲染 ----
-      function renderWeeklySummary(summary, trend) {
+      function renderWeeklySummary(summary, trend, weeklyLimitEnabled, weeklyLimitHours) {
         const sumEl = document.getElementById('weeklySummary');
         const trendEl = document.getElementById('weeklyTrend');
 
@@ -1512,13 +1558,52 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         // 多周趋势
         if (trend && trend.length > 0) {
           trendEl.style.display = 'block';
-          const maxVal = Math.max(...trend.map(w => w.totalMs), 1);
+          const isLimitOn = Boolean(weeklyLimitEnabled) && typeof weeklyLimitHours === 'number' && Number.isFinite(weeklyLimitHours) && weeklyLimitHours >= 1 && weeklyLimitHours <= 168;
+          const safeLimitHours = isLimitOn ? Math.min(168, Math.max(1, Math.round(weeklyLimitHours))) : 40;
+          const limitMs = isLimitOn ? safeLimitHours * 3600000 : 0;
+          const maxVal = isLimitOn
+            ? Math.max(limitMs, ...trend.map(w => (Number.isFinite(w.totalMs) ? w.totalMs : 0)), 1)
+            : Math.max(...trend.map(w => (Number.isFinite(w.totalMs) ? w.totalMs : 0)), 1);
+          const dividerPct = isLimitOn ? Math.min(100, Math.max(0, (limitMs / maxVal) * 100)) : 0;
+
           document.getElementById('trendList').innerHTML = trend.map(w => {
-            const pct = Math.max((w.totalMs / maxVal) * 100, 2);
+            const rawMs = (typeof w.totalMs === 'number' && Number.isFinite(w.totalMs) && w.totalMs > 0) ? w.totalMs : 0;
+            const pct = Math.min(100, Math.max((rawMs / maxVal) * 100, rawMs > 0 ? 2 : 0));
+            const tooltip = w.weekEnd ? (w.weekStart + ' ~ ' + w.weekEnd) : w.weekStart;
+
+            let fillClass = 'trend-fill';
+            let fillStyle = 'width:' + pct.toFixed(2) + '%;';
+            let valueClass = 'trend-value';
+
+            if (isLimitOn && rawMs > 0) {
+              const ratio = rawMs / limitMs;
+              if (ratio > 1.0) {
+                // 越过分割线：红阶加深，高亮并外发光
+                fillClass += ' is-over';
+                valueClass += ' is-over';
+                // 动态计算分割点在 fill 内部的相对百分比
+                const splitAt = Math.min(95, Math.max(10, Math.round((1.0 / ratio) * 100)));
+                fillStyle += 'background: linear-gradient(90deg, #38bdf8 0%, #f59e0b ' + Math.round(splitAt * 0.75) + '%, #ef4444 ' + splitAt + '%, #dc2626 100%);';
+              } else if (ratio >= 0.7) {
+                // 靠近分割线（70% ~ 100%）：朝分割线方向平滑变红
+                fillStyle += 'background: linear-gradient(90deg, #38bdf8 0%, #3b82f6 40%, #f59e0b 75%, #ef4444 100%);';
+              } else {
+                // 安全区：现代清爽青蓝渐变
+                fillStyle += 'background: linear-gradient(90deg, #38bdf8, #0ea5e9);';
+              }
+            }
+
+            const dividerHtml = isLimitOn && dividerPct > 0
+              ? '<div class="trend-divider-mark" style="left:' + dividerPct.toFixed(2) + '%" title="' + escapeHtml(fmt(L['panel.trend.limitMarker'], safeLimitHours + 'h')) + '"></div>'
+              : '';
+
             return '<div class="trend-row">' +
-              '<div class="trend-label" title="' + escapeHtml(w.weekStart) + '">' + escapeHtml(w.label) + '</div>' +
-              '<div class="trend-track"><div class="trend-fill" style="width:' + pct + '%"></div></div>' +
-              '<div class="trend-value">' + formatDuration(w.totalMs) + '</div>' +
+              '<div class="trend-label" title="' + escapeHtml(tooltip) + '">' + escapeHtml(w.label) + '</div>' +
+              '<div class="trend-track">' +
+                '<div class="' + fillClass + '" style="' + fillStyle + '"></div>' +
+                dividerHtml +
+              '</div>' +
+              '<div class="' + valueClass + '">' + formatDuration(rawMs) + '</div>' +
               '</div>';
           }).join('');
         } else {

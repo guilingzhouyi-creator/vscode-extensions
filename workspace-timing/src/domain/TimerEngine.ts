@@ -68,6 +68,60 @@ export class TimerEngine {
         return elapsed;
     }
 
+    /**
+     * 跨午夜自然日会话切分与轮转：
+     * 将当前运行中会话截至 boundaryMs（昨日 23:59:59.999/次日零点）封存入 sessions[] 并累加 totalMs，
+     * 同时无缝开启从 boundaryMs 起算的新会话段。
+     * @returns 封存的昨日会话段时长 (ms)
+     */
+    rotateSession(boundaryMs: number): number {
+        if (!this._running) return 0;
+
+        const elapsed = Math.max(0, boundaryMs - this._sessionStartMs);
+        this._data.totalMs += elapsed;
+
+        if (elapsed > 0) {
+            this._data.sessions.push({
+                startMs: this._sessionStartMs,
+                endMs: boundaryMs,
+                durationMs: elapsed,
+            });
+        }
+
+        this._sessionStartMs = boundaryMs;
+        this._data.currentSessionStartMs = boundaryMs;
+        this._data.lastSavedAtMs = boundaryMs;
+
+        return elapsed;
+    }
+
+    /**
+     * 系统休眠/挂起恢复处理：
+     * 将休眠前的会话段封存截至 sleepStartMs，休眠时间不计入时长，
+     * 并在唤醒时刻 resumeMs 重新开启活跃会话段。
+     * @returns 封存的休眠前会话段时长 (ms)
+     */
+    resumeFromSleep(sleepStartMs: number, resumeMs: number): number {
+        if (!this._running) return 0;
+
+        const elapsed = Math.max(0, sleepStartMs - this._sessionStartMs);
+        this._data.totalMs += elapsed;
+
+        if (elapsed > 0) {
+            this._data.sessions.push({
+                startMs: this._sessionStartMs,
+                endMs: sleepStartMs,
+                durationMs: elapsed,
+            });
+        }
+
+        this._sessionStartMs = resumeMs;
+        this._data.currentSessionStartMs = resumeMs;
+        this._data.lastSavedAtMs = resumeMs;
+
+        return elapsed;
+    }
+
     /** 获取当前快照（不停止计时） */
     snapshot(): TimerSnapshot {
         // 时钟回拨防御：进行中会话历时不为负

@@ -18,6 +18,7 @@
 
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager } from './SessionManager';
+import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
 import {
     DEFAULT_JOURNAL_FLUSH_MS,
@@ -61,6 +62,10 @@ export class Scheduler {
     private _saving: boolean = false;
     /** journal flush 进行中标志 */
     private _flushing: boolean = false;
+    /** 上次心跳时间戳（用于检测系统休眠/挂起恢复） */
+    private _lastTickMs: number = Date.now();
+    /** 当前日期字符串（用于检测跨午夜自然日更替） */
+    private _currentDayStr: string = TimeAggregator.todayStr();
 
     constructor(
         journal: JournalWriter,
@@ -137,17 +142,38 @@ export class Scheduler {
     start(): void {
         if (this._running) return;
         this._running = true;
+        this._lastTickMs = Date.now();
+        this._currentDayStr = TimeAggregator.todayStr();
 
         // 1. 全量存盘定时器
         this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
 
-        // 2. 心跳定时器：每秒推入时间片 + 尝试 flush（落盘节奏由缓存策略裁决）+ 更新状态栏
+        // 2. 心跳定时器：每秒推入时间片 + 跨午夜与休眠检测 + 尝试 flush + 更新状态栏
         this.statusBarTimer = setInterval(() => {
             try {
+                const now = Date.now();
+                const gap = now - this._lastTickMs;
+
+                // 1. 休眠/挂起恢复检测（时钟跳变超过 15 秒）
+                if (gap >= 15000) {
+                    const sleepStart = this._lastTickMs + 1000;
+                    this._lastTickMs = now;
+                    this._currentDayStr = TimeAggregator.todayStr();
+                    void this.sessionManager.handleSystemResume(sleepStart, now);
+                } else {
+                    this._lastTickMs = now;
+                    // 2. 跨午夜自然日切换检测
+                    const todayStr = TimeAggregator.todayStr();
+                    if (todayStr !== this._currentDayStr) {
+                        this._currentDayStr = todayStr;
+                        void this.sessionManager.rotateSessionAtMidnight();
+                    }
+                }
+
                 // 推入时间片到 RingBuffer（仅当 journal 启用时）
                 if (this.options.journalEnabled) {
                     this.journal.push({
-                        timestamp: Date.now(),
+                        timestamp: now,
                         deltaMs: this.options.statusBarUpdateIntervalMs, // 1000ms = 1s
                     });
                     // 尝试 flush：策略未到时间/无数据时为空操作，I/O 零成本

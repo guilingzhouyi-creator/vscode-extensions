@@ -13,7 +13,21 @@ import { TimerEngine } from '../domain/TimerEngine';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager, SessionResult } from './SessionManager';
-import { WorkspaceTimingData, TimingConfig, TimeSession, DEFAULT_RING_BUFFER_CAP, DEFAULT_JOURNAL_FLUSH_MS, DEFAULT_FULL_SAVE_MS, DEFAULT_MAX_SESSIONS, LATEST_VERSION } from '../domain/models';
+import {
+    WorkspaceTimingData,
+    TimingConfig,
+    TimeSession,
+    DEFAULT_RING_BUFFER_CAP,
+    DEFAULT_JOURNAL_FLUSH_MS,
+    DEFAULT_FULL_SAVE_MS,
+    DEFAULT_MAX_SESSIONS,
+    MS_PER_HOUR,
+    MIN_WEEKLY_LIMIT_HOURS,
+    MAX_WEEKLY_LIMIT_HOURS,
+    sanitizeWeeklyLimitHours,
+    sanitizeWeeklyLimitEnabled,
+    LATEST_VERSION,
+} from '../domain/models';
 import { validateTimingData } from '../persistence/DataValidator';
 import { migrateToFolded } from '../domain/HistoryFolder';
 import { AggregatedCsvExporter } from './exporters/AggregatedCsvExporter';
@@ -25,6 +39,7 @@ import { Scheduler } from './Scheduler';
 import { CsvExporter } from './exporters/CsvExporter';
 import { ReportExporter, ReportKind } from './exporters/ReportExporter';
 import { LogLevel, log } from '../integration/Logger';
+import { t, format } from '../i18n/index';
 
 export type OrchestratorState = 'idle' | 'running' | 'disabled' | 'saving';
 
@@ -41,6 +56,10 @@ export class TimerOrchestrator {
     /** 破坏性操作前自动安全快照开关（workspaceTiming.safetySnapshot） */
     private _safetySnapshotEnabled: boolean = true;
     private _onStateChange: ((state: OrchestratorState) => void) | null = null;
+    /** 已发送超限休息提醒的周标识（YYYY-MM-DD，防单周重复轰炸） */
+    private _weeklyLimitNotifiedWeek: string | null = null;
+    /** 超限提醒回调 */
+    private _onWeeklyLimitExceeded: ((message: string) => void) | null = null;
 
     constructor(
         timer: TimerEngine,
@@ -80,6 +99,11 @@ export class TimerOrchestrator {
         this._onStateChange = cb;
     }
 
+    /** 注册超限健康休息提醒回调 */
+    onWeeklyLimitExceeded(cb: (message: string) => void): void {
+        this._onWeeklyLimitExceeded = cb;
+    }
+
     /**
      * 启动计时流程
      * 调用链：崩溃恢复 → 禁用判定 → 开始会话 → 启动调度器
@@ -100,9 +124,10 @@ export class TimerOrchestrator {
             await this.sessionManager.startSession();
 
             // 启动调度器
-            this.scheduler.onStatusBarUpdate((totalMs) => {
+            this.scheduler.onStatusBarUpdate((data) => {
                 // 状态栏更新委托给 Presentation 层
-                this._onTick?.(totalMs);
+                this._onTick?.(data);
+                this.checkWeeklyLimit();
             });
             // 周期全量存盘完成后同步跨工作区累计（此前未接线，聚合长期陈旧）
             this.scheduler.onFullSaved(async () => {
@@ -172,10 +197,11 @@ export class TimerOrchestrator {
         const cfg = this.disable.config;
         const sessions = this.timer.data.sessions;
 
-        // 本周合计（自然周一至今，含进行中会话）
+        // 本周合计（自然周一至今，含进行中会话与折叠层）
         const weeklySummary: WeeklySummary = TimeAggregator.weeklySummary(
             sessions,
             this.timer.data.currentSessionStartMs,
+            this.timer.data.dailyTotals,
         );
 
         // 最近 7 天每日统计（柱状图，跟随界面语言）
@@ -191,13 +217,18 @@ export class TimerOrchestrator {
         );
 
         // 周报多周趋势（近 4 周）+ 今日明细
-        const weeklyTrend = TimeAggregator.weeklyTrend(sessions, 4)
-            .map((w) => ({
-                weekStart: w.weekStart,
-                label: w.weekStart.slice(5),
-                totalMs: w.totalMs,
-                sessionCount: w.sessionCount,
-            }));
+        const weeklyTrend = TimeAggregator.weeklyTrend(
+            sessions,
+            4,
+            this.timer.data.currentSessionStartMs,
+            this.timer.data.dailyTotals,
+        ).map((w) => ({
+            weekStart: w.weekStart,
+            weekEnd: w.weekEnd,
+            label: `${w.weekStart.slice(5)} ~ ${w.weekEnd.slice(5)}`,
+            totalMs: w.totalMs,
+            sessionCount: w.sessionCount,
+        }));
         const todayDetail = this.buildTodayDetail(sessions);
 
         // 跨工作区累计（从缓存读取，不额外 I/O）
@@ -235,6 +266,8 @@ export class TimerOrchestrator {
             journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
             fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? DEFAULT_FULL_SAVE_MS,
             maxSessions: cfg.maxSessions ?? DEFAULT_MAX_SESSIONS,
+            weeklyLimitEnabled: cfg.weeklyLimitEnabled ?? false,
+            weeklyLimitHours: cfg.weeklyLimitHours ?? 40,
         };
     }
 
@@ -288,13 +321,18 @@ export class TimerOrchestrator {
             sessions,
             this.timer.data.currentSessionStartMs,
         );
-        const trend = TimeAggregator.weeklyTrend(sessions, 4)
-            .map((w) => ({
-                weekStart: w.weekStart,
-                label: w.weekStart.slice(5),
-                totalMs: w.totalMs,
-                sessionCount: w.sessionCount,
-            }));
+        const trend = TimeAggregator.weeklyTrend(
+            sessions,
+            4,
+            this.timer.data.currentSessionStartMs,
+            this.timer.data.dailyTotals,
+        ).map((w) => ({
+            weekStart: w.weekStart,
+            weekEnd: w.weekEnd,
+            label: `${w.weekStart.slice(5)} ~ ${w.weekEnd.slice(5)}`,
+            totalMs: w.totalMs,
+            sessionCount: w.sessionCount,
+        }));
         const locale = this.disable.config.locale === 'en' ? 'en' : 'zh-CN';
         const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs, locale);
         log(LogLevel.Info, `TimerOrchestrator: exported weekly report (${summary.weekStart})`);
@@ -335,13 +373,19 @@ export class TimerOrchestrator {
         if (partial.journalFlushIntervalMs !== undefined) cfg.journalFlushIntervalMs = partial.journalFlushIntervalMs;
         if (partial.fullSaveIntervalMs !== undefined) cfg.fullSaveIntervalMs = partial.fullSaveIntervalMs;
         if (partial.maxSessions !== undefined) cfg.maxSessions = partial.maxSessions;
+        if (partial.weeklyLimitEnabled !== undefined) {
+            cfg.weeklyLimitEnabled = sanitizeWeeklyLimitEnabled(partial.weeklyLimitEnabled);
+        }
+        if (partial.weeklyLimitHours !== undefined) {
+            cfg.weeklyLimitHours = sanitizeWeeklyLimitHours(partial.weeklyLimitHours);
+        }
         this.disable.updateConfig(cfg);
         // 间隔/会话上限支持运行期热更新；journalEnabled/capacity 等需重启生效
         this.applyRuntimeConfig(cfg);
     }
 
     /**
-     * 运行期热更新可变配置：调度间隔、会话历史上限。
+     * 运行期热更新可变配置：调度间隔、会话历史上限、周工作上限。
      * 由 ConfigWatcher 与 applyDashboardConfig 共用。
      */
     applyRuntimeConfig(cfg: Partial<TimingConfig>): void {
@@ -356,6 +400,38 @@ export class TimerOrchestrator {
         }
         if (cfg.safetySnapshot !== undefined) {
             this._safetySnapshotEnabled = cfg.safetySnapshot;
+        }
+        if (cfg.weeklyLimitHours !== undefined || cfg.weeklyLimitEnabled !== undefined) {
+            this.checkWeeklyLimit();
+        }
+    }
+
+    /** 检测周工作时长是否超限并按需触发健康休息提醒（每周仅提醒一次，严格校验上下界与跨周边界） */
+    checkWeeklyLimit(): void {
+        const cfg = this.disable.config;
+        const isEnabled = sanitizeWeeklyLimitEnabled(cfg.weeklyLimitEnabled);
+        const limitHours = sanitizeWeeklyLimitHours(cfg.weeklyLimitHours);
+        if (!isEnabled || limitHours < MIN_WEEKLY_LIMIT_HOURS || limitHours > MAX_WEEKLY_LIMIT_HOURS) {
+            return;
+        }
+
+        const now = new Date();
+        const currentWeek = TimeAggregator.weekStartStr(now);
+        const limitMs = cfg.weeklyLimitHours * MS_PER_HOUR;
+        const weekTotalMs = TimeAggregator.weeklySummary(
+            this.timer.data.sessions,
+            this.timer.data.currentSessionStartMs,
+        ).totalMs;
+
+        if (weekTotalMs >= limitMs) {
+            if (this._weeklyLimitNotifiedWeek !== currentWeek) {
+                this._weeklyLimitNotifiedWeek = currentWeek;
+                const durStr = TimeAggregator.formatDuration(weekTotalMs);
+                const limitStr = `${cfg.weeklyLimitHours}h`;
+                const message = format(t()['notify.weeklyLimitExceeded'], durStr, limitStr);
+                log(LogLevel.Warn, `TimerOrchestrator: weekly work limit exceeded (${durStr} >= ${limitStr})`);
+                this._onWeeklyLimitExceeded?.(message);
+            }
         }
     }
 
