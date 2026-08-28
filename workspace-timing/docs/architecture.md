@@ -1,70 +1,71 @@
-# VS Code 现代化扩展分层架构与高可靠设计实践指南
-> **Modern VS Code Extension Layered Architecture & High-Reliability Design Guide**
+# 现代 IDE 扩展通用分层架构与高可靠工程设计指南
+> **Universal Layered Architecture & High-Reliability Engineering Guide for Modern IDE Extensions**
 
 ---
 
 ## 1. 架构愿景与设计哲学
 
-在构建复杂的 VS Code 插件或现代化 IDE 扩展系统时，开发者往往面临以下核心挑战：
-1. **宿主 API 高度耦合**：业务逻辑与 `vscode` 命名空间强绑定，导致无法编写快速脱机单元测试。
-2. **IO 阻塞与数据丢失**：频繁写入磁盘导致界面卡顿，而延迟写入又可能在 IDE 异常关闭时丢失数据。
-3. **Webview 状态混乱**：前端 Webview 与宿主扩展进程通信职责不清，缺乏严格的契约与安全隔离。
-4. **国际化碎片化**：界面硬编码字符串散落各处，缺乏编译期与测试期的防遗漏保障。
+在构建复杂的 VS Code / Theia / JetBrains 等现代化 IDE 扩展系统时，开发者往往面临以下核心工程挑战：
+1. **宿主 API 强耦合**：业务逻辑与宿主环境（如 `vscode` 命名空间）深度绑定，导致无法在纯脱机环境（如纯 Node.js 或轻量运行时）下编写毫秒级单元测试。
+2. **IO 阻塞与数据丢失**：高频业务状态频繁写入磁盘会导致界面掉帧与卡顿；而纯内存延迟写入又可能在 IDE 异常关闭、崩溃或断电时丢失关键数据。
+3. **Webview 与宿主状态撕裂**：前端 Webview 视图与宿主进程通信职责不清，缺乏严格的类型契约、安全隔离与防抖机制。
+4. **历史数据膨胀与内存泄漏**：长久运行累积的海量细粒度数据无约束常驻内存，或采用粗暴的截断丢弃导致历史统计失真。
+5. **宿主生命周期突变**：操作系统跨自然日、笔记本盒盖休眠/挂起、进程被任务管理器强杀等时钟与生命周期突变缺乏自愈机制。
 
-为了解决上述问题，本架构体系融合了 **洋葱圈架构（Onion Architecture）**、**依赖反转原则（DIP）** 与 **预写日志（WAL）机制**，建立了一套适用于各类型 IDE 插件的通用五层解耦架构模型。
+为了彻底解决上述痛点，本指南提出了一套**通用的现代 IDE 扩展五层解耦与高可靠工程架构体系**。本架构融合了 **洋葱圈架构（Onion Architecture）**、**依赖反转原则（DIP）**、**预写日志（WAL）** 与 **双阈值无损数据治理（Dual-Threshold Compaction）**，适用于**代码分析、性能监控、协作看板、版本控制辅助、AI 编程助手**等各类复杂 IDE 扩展。
 
 ---
 
-## 2. 通用五层分层架构模型
+## 2. 通用五层分层架构拓扑模型
 
 ```mermaid
 graph TD
     subgraph Presentation ["1. 展现层 (Presentation Layer)"]
-        UI_CMD[Command Registrar<br/>命令注册与调度]
-        UI_STATUS[Status Bar Controller<br/>状态栏控制器]
-        UI_WV[Webview Panel Manager<br/>面板生命周期与单例]
-        UI_MSG[Message Dispatcher<br/>双向消息契约分发]
-        UI_TPL[Stateless Template<br/>无状态 HTML/CSS/JS 渲染]
+        UI_CMD[Command Registrar<br/>统一命令注册与调度中心]
+        UI_STATUS[Host UI Controller<br/>状态栏/侧边栏控制器]
+        UI_WV[Webview Container<br/>面板生命周期与单例容器]
+        UI_MSG[Message Dispatcher<br/>双向类型安全消息契约分发]
+        UI_TPL[Stateless Template<br/>无状态 HTML/CSS/JS 纯渲染模板]
     end
 
-    subgraph Application ["2. 应用服务层 (Application Layer)"]
+    subgraph Application ["2. 应用服务层 (Application Layer - 业务流程编排)"]
         APP_FACADE[Orchestrator / Facade<br/>核心门面协调器]
-        APP_SESSION[Session Manager<br/>业务会话状态机管理]
-        APP_SCHED[Scheduler<br/>异步定时调度编排]
-        APP_REC[Recovery Service<br/>崩溃恢复编排]
-        APP_EXP[Data Exporters<br/>多格式报告生成与导出]
-        APP_GLOBAL[Cross-Workspace Aggregator<br/>跨上下文聚合服务]
+        APP_MGR[Lifecycle Manager<br/>业务生命周期与状态机管理]
+        APP_SCHED[Scheduler<br/>异步定时调度与心跳编排]
+        APP_REC[Recovery Service<br/>崩溃检测与前向恢复编排]
+        APP_EXP[Data Exporters<br/>多格式报告生成与数据导出]
+        APP_GLOBAL[Cross-Context Aggregator<br/>跨工作区/跨项目上下文聚合]
     end
 
-    subgraph Cache ["3. 缓存与预写日志层 (Cache Layer)"]
+    subgraph Cache ["3. 缓存与预写日志层 (Cache & WAL Layer)"]
         CACHE_RB[RingBuffer &lt;T&gt;<br/>泛型定长环形内存缓冲]
-        CACHE_JW[Journal Writer<br/>预写日志切片调度器]
-        CACHE_STRAT[Cache Strategy<br/>容量与时间窗口刷盘策略]
-        CACHE_PORT[IJournalStore<br/>预写日志存储端口契约]
+        CACHE_JW[Journal Writer<br/>预写日志切片与刷盘调度器]
+        CACHE_STRAT[Flushing Strategy<br/>容量与时间窗口批量刷盘策略]
+        CACHE_PORT[IJournalStore<br/>预写日志存储端口契约 (SPI)]
     end
 
-    subgraph Persistence ["4. 持久化层 (Persistence Layer)"]
-        PERS_COORD[Storage Coordinator<br/>多级存储协调器]
-        PERS_VAL[Data Validator<br/>数据防御校验与脏数据自愈]
-        PERS_L1[L1/L2 WorkspaceState<br/>内存缓存与本地上下文]
-        PERS_L3[L3 FileStorage<br/>项目级持久化文件]
-        PERS_L4[L4 JournalStorage<br/>WAL 崩溃前向恢复日志]
+    subgraph Persistence ["4. 持久化层 (Persistence Layer - 存储原语与防御校验)"]
+        PERS_COORD[Storage Coordinator<br/>多级存储协同调度器]
+        PERS_VAL[Data Validator<br/>数据防御校验与脏数据自愈清洗]
+        PERS_L1[L1/L2 Host State<br/>运行时内存与宿主环境本地存储]
+        PERS_L3[L3 Project File<br/>项目级持久化文件 (.vscode / .idea)]
+        PERS_L4[L4 Journal Storage<br/>WAL 崩溃前向恢复日志存储]
     end
 
-    subgraph Domain ["5. 领域层 (Domain Layer - 100% 纯逻辑)"]
-        DOM_ENGINE[State Machine Engine<br/>纯内存状态机]
-        DOM_AGG[Data Aggregator<br/>纯统计与时间桶切分算法]
-        DOM_FOLD[Retention Folder<br/>滑动窗口折叠引擎]
-        DOM_MODELS[Domain Models<br/>实体、值对象与类型定义]
+    subgraph Domain ["5. 领域层 (Domain Layer - 100% 纯业务规则与算法)"]
+        DOM_ENGINE[State Machine Engine<br/>纯内存状态机引擎]
+        DOM_AGG[Data Aggregator<br/>纯统计、区间切分与指标聚合算法]
+        DOM_FOLD[Compaction Folder<br/>双阈值无损数据折叠与沉淀引擎]
+        DOM_MODELS[Domain Models<br/>实体、值对象、上下界约束与纯校验]
     end
 
-    subgraph Infra ["基础设施与支撑服务 (Cross-Cutting & Infra)"]
-        INF_I18N[i18n Kernel<br/>类型安全多语言内核]
-        INF_LOG[Unified Logger<br/>统一诊断与追踪日志]
-        INF_CFG[Config Watcher<br/>配置变更响应器]
+    subgraph Infra ["横切基础设施与支撑服务 (Cross-Cutting & Infra)"]
+        INF_I18N[i18n Kernel<br/>类型安全双向国际化内核]
+        INF_LOG[Unified Logger<br/>分级诊断与追踪日志]
+        INF_CFG[Config Watcher<br/>宿主配置响应与参数清洗]
     end
 
-    %% 依赖约束：单向由外向内
+    %% 依赖约束：严格单向由外向内
     Presentation --> Application
     Application --> Domain
     Application --> Cache
@@ -77,101 +78,98 @@ graph TD
 
 ---
 
-## 3. 各层职责与解耦规范
+## 3. 各层职责与通用设计规范
 
-### 3.1 领域层（Domain Layer）—— 100% 纯逻辑核心
+### 3.1 领域层（Domain Layer）—— 100% 纯业务核心
 - **核心定位**：系统的业务规则核心。定义所有实体（Entities）、值对象（Value Objects）及领域算法。
 - **约束准则**：
   - **严禁引入外部框架**：绝不能出现 `import * as vscode from 'vscode'` 或 Node.js 文件系统模块 `fs`。
-  - **无副作用与纯函数优先**：所有数据聚合、时间切分、滑动窗口计算均设计为纯函数。
-- **示例落地（`workspace-timing`）**：
-  - `TimerEngine`：纯内存累加时长与起止时间戳状态机，支持跨午夜原子切分与休眠恢复时间轴无损重置。
-  - `TimeAggregator`：纯算法聚合（跨午夜与跨周区间原子切割、自然日归桶、24 小时分布、12 周热力图网格、窗口化 $O(1)$ 本周周报聚合）。
-  - `HistoryFolder`：**双阈值无损历史折叠引擎（Dual-Threshold Folding Engine）**。同时接受时间保留窗（`retentionDays`）与条数容量（`maxSessions`）双重约束，溢出会话先进先出（FIFO）按自然日拆解折叠入 `dailyTotals` 沉淀层，总时长与会话数绝对守恒。
-  - `models.ts`：纯数据模型与严格上下界常量（`MIN_WEEKLY_LIMIT_HOURS = 1`, `MAX_WEEKLY_LIMIT_HOURS = 168`）与防脏数据安全清洗函数（`sanitizeWeeklyLimitHours`, `sanitizeWeeklyLimitEnabled`）。
+  - **无副作用与纯函数优先**：所有数据聚合、时间切分、滑动窗口折叠计算均设计为纯函数。
+  - **严格物理/业务边界防御**：在领域层常量中定义业务的严格上下界（如 `MIN_VALUE`, `MAX_VALUE`），并提供纯校验函数对所有入参进行防脏防空纠偏。
 
 ---
 
-### 3.2 缓存与预写日志层（Cache & WAL Layer）—— 高吞吐防崩溃
+### 3.2 缓存与预写日志层（Cache & WAL Layer）—— 高吞吐与崩溃兜底
 - **核心定位**：解决高频业务更新与低频磁盘 IO 之间的性能矛盾，并提供进程崩溃保护。
-- **关键设计**：
+- **关键通用组件**：
   - **泛型环形缓冲区（`RingBuffer<T>`）**：定长数组实现，提供 $O(1)$ 时间复杂度的入队与窥探，容量满时自动覆盖最旧条目或触发无损 `flush()`。
-  - **端口契约解耦（`IJournalStore`）**：缓存层只依赖存储接口契约，不感知实际物理写入逻辑。
-  - **预写日志写入器（`JournalWriter`）**：采用增量分片（Time Slice）追加机制，将秒级产生的数据切片暂存，定时批量刷盘。
+  - **预写日志写入器（`JournalWriter`）**：采用增量分片（Time Slice / Operation Slice）追加机制，将秒级产生的数据切片暂存，定时批量刷盘。
+  - **端口契约解耦（`IJournalStore`）**：缓存层只依赖存储接口契约（SPI），不感知实际物理写入介质（无论是文件、IndexedDB 还是宿主存储）。
 
 ```typescript
-// 典型的预写日志端口抽象
-export interface IJournalStore {
-    append(slices: TimeSlice[]): Promise<void>;
+/** 通用预写日志存储端口契约 */
+export interface IJournalStore<T> {
+    append(slices: T[]): Promise<void>;
+    readJournal(): Promise<T[]>;
     truncate(): Promise<void>;
+    exists(): Promise<boolean>;
 }
 ```
 
 ---
 
-### 3.3 持久化层（Persistence Layer）—— 多级存储与防御自愈
+### 3.3 持久化层（Persistence Layer）—— 多级协同与防御自愈
 - **核心定位**：数据的可靠落地、读取、迁移与防御校验。
-- **约束准则**：持久化层**只提供原始读写原语**（load / save / restore / snapshot / deleteAll），不持有业务编排——崩溃恢复的编排算法（journal 分组回放、水位线去重、未完成会话补偿）属于应用层职责，由 `RecoveryService`（Application）经 `IRecoveryStore` / `IJournalStore` 端口注入驱动。
+- **约束准则**：持久化层**只提供原始读写原语**（load / save / restore / snapshot / deleteAll），不持有业务流程——崩溃恢复的编排算法属于应用层职责。
 - **四级协同存储模型（Tiered Fallback Architecture）**：
   1. **L1（运行时内存）**：极速读取，瞬时响应。
-  2. **L2（WorkspaceState / GlobalState）**：IDE 本地快速持久化。
-  3. **L3（项目配置文件）**：如 `.vscode/settings.json` 或 `.vscode/plugin-data.json`，便于 Git 跟踪或跨设备同步。
-  4. **L4（WAL Journal 预写日志）**：追加式写入，作为 IDE 异常退出或断电时的前向恢复数据源。
+  2. **L2（宿主环境 Storage / WorkspaceState）**：IDE 本地快速持久化。
+  3. **L3（项目配置文件）**：如 `.vscode/data.json`，便于 Git 跟踪或跨设备同步。
+  4. **L4（WAL Journal 增量预写日志）**：追加式写入，作为 IDE 异常退出或断电时的前向恢复数据源。
 - **防御性清洗（Data Sanitization）**：
   - 数据在从磁盘读入领域层之前，必须经过 `DataValidator`。对非法类型、脏区间、负数累加值进行自动清洗与补齐，防止坏数据破坏系统逻辑。
 
 ---
 
-### 3.4 应用服务层（Application Layer）—— 业务流程门面
+### 3.4 应用服务层（Application Layer）—— 业务流程编排与门面
 - **核心定位**：连接展现层与底层领域的协调枢纽。负责事务编排、定时调度与多服务聚合。
 - **关键特征**：
   - **脱离宿主环境**：应用层依然不依赖 `vscode` API，使其完全可以在纯 Node.js 测试环境中完整运行业务流。
-  - **门面模式（Facade Pattern）**：`TimerOrchestrator` 作为对外单一门面，聚合 `SessionManager`（会话）、`Scheduler`（调度器）、`GlobalAggregator`（全局聚合）与 `ReportExporter`（报表生成）。
-  - **全生命周期无损回收（Lifecycle Compaction）**：在 `SessionManager` 中协调会话结束、跨午夜切换、休眠恢复、周期存盘与配置热更，废除暴力截断，统一驱动双阈值无损回收。
-  - **健康工作限制编排（Weekly Limit Inversion）**：`TimerOrchestrator` 编排周时长超限检测与单周防重复打扰锁，通过 `onWeeklyLimitExceeded` 回调向展现层派发通知需求，保持宿主 UI 依赖反转。
-  - **会话数全局聚合统一**：统一口径为 $\sum \text{dailyTotals.sessionCount} + \text{rawSessions.length} + (\text{currentActive} ? 1 : 0)$。
+  - **门面模式（Facade Pattern）**：`Orchestrator` 作为对外单一门面，聚合生命周期管理、调度器、数据导出等服务。
+  - **全生命周期无损数据治理**：在生命周期事件中统一调用双阈值折叠算法，杜绝暴力截断。
+  - **依赖反转事件通知**：业务超限或关键事件通过统一回调向展现层派发，由展现层调用宿主 UI API 弹窗，应用层保持纯粹。
 
 ---
 
 ### 3.5 展现层（Presentation Layer）—— 现代化交互与安全隔离
-- **核心定位**：负责 VS Code 原生界面（StatusBar、Command Palette）与 Webview Dashboard 的渲染及事件监听。
+- **核心定位**：负责 IDE 原生界面（StatusBar、Treeview、Commands）与 Webview Dashboard 的渲染及事件监听。
 - **设计规范**：
   - **单一职责命令中心（CommandRegistrar）**：所有命令在此集中注册并统一管理 `Disposable`，避免入口文件（`extension.ts`）膨胀。
   - **无状态模板（Stateless Template）**：Webview 的 HTML/CSS/JS 保持为纯数据渲染模板，由宿主注入动态参数（CSP Nonce、i18n 词条、初始状态）。
-  - **动态进度条与阈值线**：多周趋势栏支持阈值分割线（`.trend-divider-mark`）与多阶动态色彩渐变（青蓝→琥珀橙→珊瑚红→深红发光）。
   - **CSP（内容安全策略）防护**：禁止内联未经签名的危险脚本，动态脚本全部通过 `nonce-${args.nonce}` 校验。
+  - **前端防抖与双向契约**：Webview 内部交互采用防抖处理，并通过类型安全的消息契约与宿主扩展进程通信。
 
 ---
 
 ## 4. 关键可靠性与工程化机制
 
-### 4.1 崩溃补偿与预写日志恢复时序
+### 4.1 WAL 崩溃补偿与幂等前向回放模型
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Engine as TimerEngine (Domain)
-    participant Writer as JournalWriter (Cache)
-    participant Disk as JournalStore (Persistence)
-    participant Coord as RecoveryService (Application)
-    participant Store as StorageCoordinator (Persistence)
+    participant Engine as Domain Engine (领域状态机)
+    participant Writer as Journal Writer (内存切片缓冲)
+    participant Disk as Journal Store (WAL 磁盘存储)
+    participant Coord as Recovery Service (应用恢复编排)
+    participant Store as Storage Coordinator (多级主存储)
 
-    Note over Engine, Disk: 正常运行阶段：秒级切片写入内存缓冲
-    Engine->>Writer: pushSlice(startMs, endMs)
+    Note over Engine, Disk: 正常运行阶段：高频切片批量刷盘
+    Engine->>Writer: pushSlice(slice)
     Writer->>Writer: 写入 RingBuffer (O(1))
     
     loop 周期刷盘 (如每 5 秒)
         Writer->>Disk: append(slices)
     end
 
-    Note over Engine, Disk: 发生意外崩溃 / 强行关闭 VS Code
+    Note over Engine, Disk: 发生意外崩溃 / 强行关闭 IDE
     Note over Coord, Store: 下次启动时：崩溃恢复流（应用层编排）
     Coord->>Store: load() (主存 → 文件兜底)
     Store-->>Coord: 返回主数据与来源
-    Coord->>Coord: v1→v2 迁移 + 双阈值会话折叠
-    Coord->>Disk: readJournal() (读取未归档切片)
+    Coord->>Coord: 数据标准化 + 双阈值无损折叠
+    Coord->>Disk: readJournal() (读取未归档增量切片)
     Disk-->>Coord: 返回残留切片列表
-    Coord->>Coord: 按连续性分组回放 + 水位线去重 + 补偿时长
+    Coord->>Coord: 按连续性分组回放 + 幂等水位线去重 + 补偿未完成片段
     Coord->>Disk: truncate() (清空旧日志)
     Coord->>Store: save(recoveredData, force)
     Coord->>Engine: replaceData(recoveredData)
@@ -179,47 +177,76 @@ sequenceDiagram
 
 ---
 
-### 4.2 类型安全且零遗漏的 i18n 架构
+### 4.2 双阈值无损自动回收与全历史守恒机制 (Dual-Threshold Compaction)
 
-1. **类型定义接口（`I18nStrings`）**：
-   在 `types.ts` 中定义全量 Key。新增词条若在 `zh-CN.ts` 或 `en.ts` 中缺失，TypeScript 编译期立即报错。
-2. **模板静态扫描测试（Static Template Scan Test）**：
-   在单元测试中利用正则静态扫描所有 Webview 模板中的 `L[...]` 与 `labels[...]`，自动化比对字典完整性，防止任何运行时 `undefined` 弹窗。
+传统的会话/日志列表裁剪常使用 `.slice(-maxLimit)` 暴力抛弃最旧记录，导致历史数据与计数永久丢失。通用架构提出**双阈值多层沉淀模型**：
 
----
+```mermaid
+graph LR
+    RAW[原始高精细明细列表<br/>Fine-Grained Sessions / Events] --> CHECK{双阈值检测}
+    CHECK -->|超出时间窗 retentionDays| FOLD[按自然周期拆解聚合]
+    CHECK -->|条数超出 maxCapacity| FOLD
+    FOLD --> BUCKET[(自然周期日桶沉淀层<br/>Daily / Weekly Aggregates)]
+    CHECK -->|保留期内且未超限| KEPT[内存活动明细<br/>Active In-Memory Items]
+    
+    BUCKET -.-> TOTAL[全局指标绝对守恒<br/>Total Value & Count Conserved]
+    KEPT -.-> TOTAL
+```
 
-### 4.3 双阈值无损自动回收与全历史守恒机制 (Dual-Threshold Non-destructive Auto-Compaction)
-
-传统的会话裁剪常使用 `.slice(-maxSessions)` 暴力抛弃最旧记录，导致历史数据与会话数永久丢失。本项目提出**双阈值日桶沉淀架构**：
-1. **时间窗阈值**：超出 `retentionDays`（默认 45 天）的会话判定为过期。
-2. **条数容量阈值**：未过期会话数超出 `maxSessions`（默认 1000/5000 条）的部分按 FIFO 溢出。
-3. **原子化沉淀**：过期与溢出会话按自然日拆解，累加至 `dailyTotals[date].totalMs` 与 `dailyTotals[date].sessionCount`。
-4. **守恒保证**：$\text{TotalMs}_{\text{after}} \equiv \text{TotalMs}_{\text{before}}$ 且 $\text{SessionsCount}_{\text{after}} \equiv \text{SessionsCount}_{\text{before}}$，实现内存常驻有界与全历史统计无损守恒。
-
----
-
-### 4.4 跨午夜时钟轮转与休眠防漂移体系 (Midnight Clock Rollover & Sleep Resume)
-
-- **跨午夜自然日轮转（`rotateSessionAtMidnight`）**：00:00:00 时原子化封存昨日会话段并以今日零点作为新起点，确保今日时长与 OS 本地自然日严格对齐。
-- **系统休眠防漂移（`handleSystemResume`）**：检测心跳突变（休眠挂起 >15s），自动封存休眠前时长，休眠跨度不计入工时，彻底解决夜间盒盖休眠导致次日工时虚高。
-
----
-
-## 5. 架构效益与工程对照表
-
-| 架构维度 | 传统耦合式扩展做法 | 本指南推荐的解耦架构 | 本项目（`workspace-timing`）落地效果 |
-|---------|-------------------|-------------------|-----------------------------------|
-| **单元测试** | 强依赖 `@vscode/test-electron`，耗时数秒且需启动完整窗口 | 领域层与应用层 100% 纯 TS，脱机极速运行 | **92 项单测全部通过，耗时仅 ~110ms** |
-| **数据安全** | 仅在关闭时保存，容易导致崩盘时全量数据丢失 | 环形缓冲 + WAL 增量预写日志 + 崩溃补偿 | **即使任务管理器强杀进程，最多仅丢失 5 秒增量** |
-| **历史治理** | 暴力丢弃旧会话导致历史工时/会话数失真 | 双阈值无损回收（时间窗 + 条数容量） | **内存常驻严格有界，全历史工时/会话数绝对守恒** |
-| **跨日与休眠** | 跨午夜今日概念漂移，休眠整夜虚高工时 | 00:00 自动轮转 + 时钟跳变断点切分 | **今日时长与 Windows/Linux/macOS 系统时钟 100% 对齐** |
-| **UI 扩展性** | 界面逻辑、CSS 与宿主通信混在一起，难以重构 | 展现层无状态模板 + 毛玻璃/动态渐变独立渲染 | **全套现代 UI 升级时，0 业务功能回退** |
-| **国际化管理** | 硬编码字符串散布在各处，缺乏静态检查 | 统一命名空间契约 + 编译与单测双重门禁 | **100% 中英词条覆盖，支持运行期热切换** |
-| **代码组织** | `extension.ts` 超过千行，充斥命令与存储逻辑 | `extension.ts` 仅作依赖组装，各层严格单向依赖 | **`extension.ts` 精简纯粹，职责明确** |
+1. **时间窗阈值（Retention Threshold）**：超出保留天数的明细记录判定为过期。
+2. **条数容量阈值（Capacity Threshold）**：未过期明细条数超出容量上限时，按先进先出（FIFO）自动溢出。
+3. **原子化沉淀**：过期与溢出记录按自然周期拆解，累加至持久化聚合日桶（Bucket）。
+4. **守恒保证**：
+   $$\text{TotalValue}_{\text{after}} \equiv \text{TotalValue}_{\text{before}}$$
+   $$\text{TotalCount}_{\text{after}} \equiv \sum \text{Bucket.Count} + \text{Kept.Count}$$
+   实现内存常驻严格有界（$O(1)$ 或严格受限），同时全历史统计数据 100% 绝对守恒。
 
 ---
 
-## 6. 结语
+### 4.3 跨自然周期轮转与宿主休眠防时钟漂移体系
 
-通过将业务领域、存储策略、缓冲日志与界面展现进行严格解耦，VS Code 扩展开发能够达到与现代企业级后端/前端同等的架构严谨度。该通用架构不仅适用于时间统计类工具，更可直接泛化到**代码分析器、协作插件、版本控制辅助、任务流看板**等各类复杂 IDE 扩展中。
+- **跨周期原子轮转（Cycle Rollover）**：在自然日/周切换临界点（如 00:00:00），系统自动原子化封存上一周期数据段，并将当前周期起点归零重置，确保统计与 OS 本地自然时钟绝对对齐。
+- **系统休眠/挂起防漂移（Sleep Resume Guard）**：检测心跳时钟突变（如心跳间隔异常增大），自动判定为宿主系统休眠/盒盖挂起，封存休眠前有效数据，休眠跨度不计入有效工作量，消除夜间休眠导致数据虚高的问题。
 
+---
+
+### 4.4 类型安全且零遗漏的双向 i18n 架构
+
+1. **编译期强契约校验**：
+   在 `types.ts` 中定义全量 Key 接口 `I18nStrings`。任何语言字典缺失 Key 或类型不匹配，TypeScript 编译期立即报错。
+2. **模板静态扫描门禁（Static Template Scan Test）**：
+   在脱机单元测试中利用正则静态扫描所有前端模板中的词条引用，自动化比对字典完整性，防止任何运行时 `undefined` 渲染或遗漏。
+
+---
+
+## 5. 多领域扩展落地映射范例 (Domain Mapping Table)
+
+本架构可无缝泛化至不同类型的 IDE 扩展中：
+
+| 架构层级 | 时间工时分析扩展（本项目范例） | 静态代码分析器 / Linter | AI 辅助编码 Agent | 团队任务看板 / Git 协同 |
+|---|---|---|---|---|
+| **展现层** | 状态栏、Webview 图表仪表盘 | 诊断面板 (Problems)、代码高亮装饰 | 侧边栏 Chat、代码生成 Diff 视图 | 看板 Webview、任务树状图 (Treeview) |
+| **应用层** | 计时调度、周上限告警、报表导出 | 批量扫描调度、增量 Lint 编排 | 对话上下文构建、工具调用调度 | 任务同步、冲突检测、Webhook 通知 |
+| **缓存/WAL** | 秒级时间切片 RingBuffer + WAL | 变更文件 AST 增量缓存 + 日志 | Token 流式切片缓冲 + 会话 WAL | 远程事件拉取缓冲 + 离线操作 WAL |
+| **持久化层** | L1 内存 + L2 宿主 + L3 JSON + L4 日志 | 诊断缓存 + 规则配置 + 忽略清单 | 会话历史 + 向量索引 + 鉴权令牌 | 任务缓存 + 本地修改 + 离线队列 |
+| **领域层** | 纯状态机、自然日切割、双阈值折叠 | AST 节点遍历规则、复杂度算法 | Prompt 模板引擎、上下文折叠算法 | 状态流转机、优先级排期算法 |
+
+---
+
+## 6. 架构效益与工程对照表
+
+| 架构维度 | 传统耦合式扩展做法 | 本指南推荐的解耦架构 | 典型工程落地效果 |
+|---|---|---|---|
+| **单元测试** | 强依赖 `@vscode/test-electron`，耗时数秒且需启动完整窗口 | 领域层与应用层 100% 纯 TS，脱机极速运行 | **90+ 项全量单测 100% 通过，耗时仅 ~100ms** |
+| **数据安全** | 仅在关闭时保存，容易导致 IDE 崩溃时全量丢失 | 环形缓冲 + WAL 增量预写日志 + 崩溃补偿 | **即使进程被强杀，最多仅丢失数秒增量切片** |
+| **历史治理** | 暴力丢弃旧记录导致统计失真，或无界内存暴涨 | 双阈值无损回收（时间窗 + 条数容量） | **内存常驻严格有界，全历史指标与计数绝对守恒** |
+| **跨日与休眠** | 跨自然日数据漂移，休眠整夜数据虚高 | 00:00 自动轮转 + 时钟跳变断点切分 | **业务指标与 Windows/macOS/Linux 本地时钟绝对对齐** |
+| **UI 扩展性** | 界面逻辑、CSS 与宿主通信混在一起，难以维护 | 展现层无状态模板 + 独立渲染与类型安全通信 | **全套现代 UI 改造升级时，业务逻辑 0 回退** |
+| **国际化管理** | 硬编码字符串散布各处，缺乏静态检查 | 统一契约接口 + 编译期与单测双重门禁 | **100% 词条覆盖，支持运行时热切换** |
+| **代码组织** | `extension.ts` 超过千行，充斥各类底层逻辑 | `extension.ts` 仅作依赖装配，严格单向依赖 | **入口文件精简纯粹，各模块高度可复用** |
+
+---
+
+## 7. 结语
+
+通过将**业务领域、存储策略、缓冲日志与界面展现**进行严格解耦，IDE 扩展开发能够达到与现代企业级微服务/高可靠系统同等的工程严谨度。无论是面对简单的工具类扩展还是高复杂度的协作/AI 插件，遵循本架构准则均可实现极高的开发效率、卓越的系统可靠性与极佳的脱机测试体验。
