@@ -85,9 +85,10 @@ graph TD
   - **严禁引入外部框架**：绝不能出现 `import * as vscode from 'vscode'` 或 Node.js 文件系统模块 `fs`。
   - **无副作用与纯函数优先**：所有数据聚合、时间切分、滑动窗口计算均设计为纯函数。
 - **示例落地（`workspace-timing`）**：
-  - `TimerEngine`：只维护内存中的累加时长与起止时间戳状态机。
-  - `TimeAggregator`：纯算法计算（跨午夜区间切割、自然日归桶、24 小时分布、12 周热力图网格）。
-  - `HistoryFolder`：会话数据按保留天数（Retention Days）折叠入桶，保持总时长严格守恒。
+  - `TimerEngine`：纯内存累加时长与起止时间戳状态机，支持跨午夜原子切分与休眠恢复时间轴无损重置。
+  - `TimeAggregator`：纯算法聚合（跨午夜与跨周区间原子切割、自然日归桶、24 小时分布、12 周热力图网格、窗口化 $O(1)$ 本周周报聚合）。
+  - `HistoryFolder`：**双阈值无损历史折叠引擎（Dual-Threshold Folding Engine）**。同时接受时间保留窗（`retentionDays`）与条数容量（`maxSessions`）双重约束，溢出会话先进先出（FIFO）按自然日拆解折叠入 `dailyTotals` 沉淀层，总时长与会话数绝对守恒。
+  - `models.ts`：纯数据模型与严格上下界常量（`MIN_WEEKLY_LIMIT_HOURS = 1`, `MAX_WEEKLY_LIMIT_HOURS = 168`）与防脏数据安全清洗函数（`sanitizeWeeklyLimitHours`, `sanitizeWeeklyLimitEnabled`）。
 
 ---
 
@@ -126,6 +127,9 @@ export interface IJournalStore {
 - **关键特征**：
   - **脱离宿主环境**：应用层依然不依赖 `vscode` API，使其完全可以在纯 Node.js 测试环境中完整运行业务流。
   - **门面模式（Facade Pattern）**：`TimerOrchestrator` 作为对外单一门面，聚合 `SessionManager`（会话）、`Scheduler`（调度器）、`GlobalAggregator`（全局聚合）与 `ReportExporter`（报表生成）。
+  - **全生命周期无损回收（Lifecycle Compaction）**：在 `SessionManager` 中协调会话结束、跨午夜切换、休眠恢复、周期存盘与配置热更，废除暴力截断，统一驱动双阈值无损回收。
+  - **健康工作限制编排（Weekly Limit Inversion）**：`TimerOrchestrator` 编排周时长超限检测与单周防重复打扰锁，通过 `onWeeklyLimitExceeded` 回调向展现层派发通知需求，保持宿主 UI 依赖反转。
+  - **会话数全局聚合统一**：统一口径为 $\sum \text{dailyTotals.sessionCount} + \text{rawSessions.length} + (\text{currentActive} ? 1 : 0)$。
 
 ---
 
@@ -134,6 +138,7 @@ export interface IJournalStore {
 - **设计规范**：
   - **单一职责命令中心（CommandRegistrar）**：所有命令在此集中注册并统一管理 `Disposable`，避免入口文件（`extension.ts`）膨胀。
   - **无状态模板（Stateless Template）**：Webview 的 HTML/CSS/JS 保持为纯数据渲染模板，由宿主注入动态参数（CSP Nonce、i18n 词条、初始状态）。
+  - **动态进度条与阈值线**：多周趋势栏支持阈值分割线（`.trend-divider-mark`）与多阶动态色彩渐变（青蓝→琥珀橙→珊瑚红→深红发光）。
   - **CSP（内容安全策略）防护**：禁止内联未经签名的危险脚本，动态脚本全部通过 `nonce-${args.nonce}` 校验。
 
 ---
@@ -163,7 +168,7 @@ sequenceDiagram
     Note over Coord, Store: 下次启动时：崩溃恢复流（应用层编排）
     Coord->>Store: load() (主存 → 文件兜底)
     Store-->>Coord: 返回主数据与来源
-    Coord->>Coord: v1→v2 迁移 + 过期会话折叠
+    Coord->>Coord: v1→v2 迁移 + 双阈值会话折叠
     Coord->>Disk: readJournal() (读取未归档切片)
     Disk-->>Coord: 返回残留切片列表
     Coord->>Coord: 按连续性分组回放 + 水位线去重 + 补偿时长
@@ -183,13 +188,32 @@ sequenceDiagram
 
 ---
 
+### 4.3 双阈值无损自动回收与全历史守恒机制 (Dual-Threshold Non-destructive Auto-Compaction)
+
+传统的会话裁剪常使用 `.slice(-maxSessions)` 暴力抛弃最旧记录，导致历史数据与会话数永久丢失。本项目提出**双阈值日桶沉淀架构**：
+1. **时间窗阈值**：超出 `retentionDays`（默认 45 天）的会话判定为过期。
+2. **条数容量阈值**：未过期会话数超出 `maxSessions`（默认 1000/5000 条）的部分按 FIFO 溢出。
+3. **原子化沉淀**：过期与溢出会话按自然日拆解，累加至 `dailyTotals[date].totalMs` 与 `dailyTotals[date].sessionCount`。
+4. **守恒保证**：$\text{TotalMs}_{\text{after}} \equiv \text{TotalMs}_{\text{before}}$ 且 $\text{SessionsCount}_{\text{after}} \equiv \text{SessionsCount}_{\text{before}}$，实现内存常驻有界与全历史统计无损守恒。
+
+---
+
+### 4.4 跨午夜时钟轮转与休眠防漂移体系 (Midnight Clock Rollover & Sleep Resume)
+
+- **跨午夜自然日轮转（`rotateSessionAtMidnight`）**：00:00:00 时原子化封存昨日会话段并以今日零点作为新起点，确保今日时长与 OS 本地自然日严格对齐。
+- **系统休眠防漂移（`handleSystemResume`）**：检测心跳突变（休眠挂起 >15s），自动封存休眠前时长，休眠跨度不计入工时，彻底解决夜间盒盖休眠导致次日工时虚高。
+
+---
+
 ## 5. 架构效益与工程对照表
 
 | 架构维度 | 传统耦合式扩展做法 | 本指南推荐的解耦架构 | 本项目（`workspace-timing`）落地效果 |
 |---------|-------------------|-------------------|-----------------------------------|
-| **单元测试** | 强依赖 `@vscode/test-electron`，耗时数秒且需启动完整窗口 | 领域层与应用层 100% 纯 TS，脱机极速运行 | **68 项单测全部通过，耗时仅 ~100ms** |
+| **单元测试** | 强依赖 `@vscode/test-electron`，耗时数秒且需启动完整窗口 | 领域层与应用层 100% 纯 TS，脱机极速运行 | **92 项单测全部通过，耗时仅 ~110ms** |
 | **数据安全** | 仅在关闭时保存，容易导致崩盘时全量数据丢失 | 环形缓冲 + WAL 增量预写日志 + 崩溃补偿 | **即使任务管理器强杀进程，最多仅丢失 5 秒增量** |
-| **UI 扩展性** | 界面逻辑、CSS 与宿主通信混在一起，难以重构 | 展现层无状态模板 + 毛玻璃/呼吸灯独立渲染 | **全套现代 UI 升级时，0 业务功能回退** |
+| **历史治理** | 暴力丢弃旧会话导致历史工时/会话数失真 | 双阈值无损回收（时间窗 + 条数容量） | **内存常驻严格有界，全历史工时/会话数绝对守恒** |
+| **跨日与休眠** | 跨午夜今日概念漂移，休眠整夜虚高工时 | 00:00 自动轮转 + 时钟跳变断点切分 | **今日时长与 Windows/Linux/macOS 系统时钟 100% 对齐** |
+| **UI 扩展性** | 界面逻辑、CSS 与宿主通信混在一起，难以重构 | 展现层无状态模板 + 毛玻璃/动态渐变独立渲染 | **全套现代 UI 升级时，0 业务功能回退** |
 | **国际化管理** | 硬编码字符串散布在各处，缺乏静态检查 | 统一命名空间契约 + 编译与单测双重门禁 | **100% 中英词条覆盖，支持运行期热切换** |
 | **代码组织** | `extension.ts` 超过千行，充斥命令与存储逻辑 | `extension.ts` 仅作依赖组装，各层严格单向依赖 | **`extension.ts` 精简纯粹，职责明确** |
 
@@ -198,3 +222,4 @@ sequenceDiagram
 ## 6. 结语
 
 通过将业务领域、存储策略、缓冲日志与界面展现进行严格解耦，VS Code 扩展开发能够达到与现代企业级后端/前端同等的架构严谨度。该通用架构不仅适用于时间统计类工具，更可直接泛化到**代码分析器、协作插件、版本控制辅助、任务流看板**等各类复杂 IDE 扩展中。
+
