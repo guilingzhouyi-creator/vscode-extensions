@@ -121,4 +121,34 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         assert.strictEqual(timer.data.sessions[0].durationMs, 1800000);
         assert.strictEqual(timer.data.currentSessionStartMs, resumeMs, '新起点设为唤醒时刻');
     });
+
+    it('setMaxSessions / saveCheckpoint：容量超限时自动触发无损折叠回收入 dailyTotals', async () => {
+        await sessionManager.startSession();
+
+        const t0 = Date.now();
+        // 构造 5 个已完成会话
+        timer.data.sessions = [
+            { startMs: t0 - 50000, endMs: t0 - 40000, durationMs: 10000 },
+            { startMs: t0 - 40000, endMs: t0 - 30000, durationMs: 10000 },
+            { startMs: t0 - 30000, endMs: t0 - 20000, durationMs: 10000 },
+            { startMs: t0 - 20000, endMs: t0 - 10000, durationMs: 10000 },
+            { startMs: t0 - 10000, endMs: t0, durationMs: 10000 },
+        ];
+        timer.data.totalMs = 50000;
+
+        // 设置上限为 2，应立即触发自动折叠
+        sessionManager.setMaxSessions(2);
+
+        // 验证：内存中仅保留最新的 2 条，最旧的 3 条折叠进 dailyTotals
+        assert.strictEqual(timer.data.sessions.length, 2);
+        const foldedCount = Object.values(timer.data.dailyTotals).reduce((sum, b) => sum + b.sessionCount, 0);
+        assert.strictEqual(foldedCount, 3);
+        const foldedMs = Object.values(timer.data.dailyTotals).reduce((sum, b) => sum + b.totalMs, 0);
+        assert.strictEqual(foldedMs, 30000);
+
+        // 验证 endSession 返回的总会话数为 6（3+1 条折叠 + 2 条内存，包含 startSession 开启并结束的会话）
+        const res = await sessionManager.endSession();
+        assert.strictEqual(res.sessionCount, 6);
+        assert.strictEqual(res.totalMs, 50000);
+    });
 });

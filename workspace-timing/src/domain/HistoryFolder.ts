@@ -18,6 +18,15 @@
 import { TimeSession, DailyTotalsMap } from './models';
 import { TimeAggregator, localDateStr } from './TimeAggregator';
 
+export interface FoldOptions {
+    /** 原始会话保留天数（0 = 不限天数） */
+    retentionDays: number;
+    /** 原始会话最大保留条数（0 = 不限条数） */
+    maxSessions?: number;
+    /** 当前时间戳，默认 Date.now() */
+    now?: number;
+}
+
 /**
  * 计算折叠截止点：今天本地零点 - retentionDays 天。
  * @returns 0 表示不折叠（retentionDays <= 0）
@@ -30,7 +39,7 @@ export function foldCutoffStartMs(retentionDays: number, now = Date.now()): numb
 }
 
 export interface FoldResult {
-    /** 保留在原始层的会话（未过期） */
+    /** 保留在原始层的会话（未过期且未超容量） */
     keptSessions: TimeSession[];
     /** 合并后的完整日桶表（既有桶 + 本次折叠增量） */
     updatedDailyTotals: DailyTotalsMap;
@@ -38,59 +47,100 @@ export interface FoldResult {
     foldedSessionCount: number;
 }
 
+/** 将一组会话按自然日拆分累加进日桶表，返回成功折叠条数 */
+function foldSessionsIntoTotals(sessions: TimeSession[], totals: DailyTotalsMap): number {
+    let count = 0;
+    for (const s of sessions) {
+        if (!(s.endMs > s.startMs) || s.startMs <= 0) continue; // 脏数据清除
+        const segs = TimeAggregator.splitByNaturalDay(s.startMs, s.endMs);
+        for (let i = 0; i < segs.length; i++) {
+            const key = localDateStr(segs[i].startMs);
+            const bucket = totals[key] ?? { totalMs: 0, sessionCount: 0 };
+            bucket.totalMs += segs[i].durationMs;
+            if (i === 0) bucket.sessionCount += 1;
+            totals[key] = bucket;
+        }
+        count++;
+    }
+    return count;
+}
+
 /**
- * 将过期会话折叠进日桶。
+ * 将过期及超容量会话折叠进日桶（双阈值无损回收）。
  * @param sessions 当前全部原始会话
  * @param existingTotals 既有沉淀桶（可为 undefined）
- * @param cutoffStartMs 折叠截止点（当日零点时刻戳）；0 = 不折叠
+ * @param cutoffStartMs 折叠截止点（当日零点时刻戳）；0 = 不按时间折叠
+ * @param maxSessions 原始会话最大保留条数；0 = 不按条数折叠
  */
 export function foldExpiredSessions(
     sessions: TimeSession[],
     existingTotals: DailyTotalsMap | undefined,
     cutoffStartMs: number,
+    maxSessions: number = 0,
 ): FoldResult {
-    const kept: TimeSession[] = [];
+    let kept: TimeSession[] = [];
     const totals: DailyTotalsMap = {};
     for (const [k, v] of Object.entries(existingTotals ?? {})) {
         totals[k] = { totalMs: v.totalMs, sessionCount: v.sessionCount };
     }
     let foldedCount = 0;
 
+    // 1. 时间窗阈值过滤（retentionDays）
     if (cutoffStartMs > 0) {
+        const toFold: TimeSession[] = [];
         for (const s of sessions) {
             if (!(s.endMs > s.startMs) || s.startMs <= 0) continue; // 脏数据清除
             if (s.endMs >= cutoffStartMs) {
                 kept.push(s);
-                continue;
+            } else {
+                toFold.push(s);
             }
-            const segs = TimeAggregator.splitByNaturalDay(s.startMs, s.endMs);
-            for (let i = 0; i < segs.length; i++) {
-                const key = localDateStr(segs[i].startMs);
-                const bucket = totals[key] ?? { totalMs: 0, sessionCount: 0 };
-                bucket.totalMs += segs[i].durationMs;
-                if (i === 0) bucket.sessionCount += 1;
-                totals[key] = bucket;
-            }
-            foldedCount++;
         }
+        foldedCount += foldSessionsIntoTotals(toFold, totals);
     } else {
-        kept.push(...sessions);
+        for (const s of sessions) {
+            if (s.endMs > s.startMs && s.startMs > 0) {
+                kept.push(s);
+            }
+        }
+    }
+
+    // 2. 条数容量阈值截断（maxSessions）
+    // 若剩余会话仍超出 maxSessions 容量，将最旧的超出部分按 FIFO 折叠入日桶
+    if (maxSessions > 0 && kept.length > maxSessions) {
+        const excessCount = kept.length - maxSessions;
+        const excessSessions = kept.slice(0, excessCount);
+        kept = kept.slice(excessCount);
+        foldedCount += foldSessionsIntoTotals(excessSessions, totals);
     }
 
     return { keptSessions: kept, updatedDailyTotals: totals, foldedSessionCount: foldedCount };
 }
 
 /**
- * 迁移到当前版本语义（v1→v2 或任意来源数据的标准化）：补齐 dailyTotals 并执行一次折叠。
- * 幂等：对同一数据重复调用结果不变；retentionDays<=0 时仅补空表。
+ * 迁移与标准化（v1→v2、启动恢复、还原或运行期回收）：
+ * 补齐 dailyTotals 并执行时间与容量双阈值折叠。
+ * 幂等：对同一数据重复调用结果不变。
  */
 export function migrateToFolded(
     data: { sessions?: TimeSession[]; dailyTotals?: DailyTotalsMap },
-    retentionDays: number,
+    options: number | FoldOptions,
     now = Date.now(),
 ): { sessions: TimeSession[]; dailyTotals: DailyTotalsMap; foldedSessionCount: number } {
-    const cutoff = foldCutoffStartMs(retentionDays, now);
-    const res = foldExpiredSessions(data.sessions ?? [], data.dailyTotals, cutoff);
+    let retentionDays = 0;
+    let maxSessions = 0;
+    let timeNow = now;
+
+    if (typeof options === 'number') {
+        retentionDays = options;
+    } else if (typeof options === 'object' && options !== null) {
+        retentionDays = options.retentionDays || 0;
+        maxSessions = options.maxSessions || 0;
+        if (options.now !== undefined) timeNow = options.now;
+    }
+
+    const cutoff = foldCutoffStartMs(retentionDays, timeNow);
+    const res = foldExpiredSessions(data.sessions ?? [], data.dailyTotals, cutoff, maxSessions);
     return {
         sessions: res.keptSessions,
         dailyTotals: res.updatedDailyTotals,

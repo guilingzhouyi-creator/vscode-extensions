@@ -186,4 +186,20 @@ describe('TimerOrchestrator（周工作上限模块）', () => {
         orchestrator.checkWeeklyLimit();
         assert.strictEqual(notified, false, '上周的历史时长绝不应触发本周上限提醒');
     });
+
+    it('会话数统计口径统一：包含 dailyTotals 折叠层与内存原始会话数', async () => {
+        timer.data.dailyTotals = {
+            '2026-08-01': { totalMs: 3600000, sessionCount: 5 },
+            '2026-08-02': { totalMs: 7200000, sessionCount: 10 },
+        };
+        timer.data.sessions = [
+            { startMs: 1000, endMs: 2000, durationMs: 1000 },
+            { startMs: 3000, endMs: 4000, durationMs: 1000 },
+        ];
+        timer.data.currentSessionStartMs = 5000;
+
+        const data = await orchestrator.getDashboardData();
+        // 5 + 10 (folded) + 2 (raw) + 1 (active) = 18
+        assert.strictEqual(data.sessionsCount, 18, '会话数应包含折叠日桶会话、原始会话与进行中会话');
+    });
 });

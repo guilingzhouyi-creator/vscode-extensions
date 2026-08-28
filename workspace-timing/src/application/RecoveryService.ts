@@ -62,15 +62,14 @@ export class RecoveryService {
     }
 
     /**
-     * 完整崩溃恢复 + 数据加载
-     *
-     * 四步走：
-     *   1. 加载主存储 → fallback JSON
-     *   2. v1→v2 迁移 + 过期会话折叠进 dailyTotals（幂等）
+     * 执行崩溃恢复流程：
+     *   1. 读取主存储（内存/文件）
+     *   1.5. v1→v2 迁移 + 双阈值会话折叠（时间窗 + 容量上限）
+     *   2. 读取 journal 并做幂等水位线去重
      *   3. 回放 journal（合成段同步入桶）
      *   4. 补偿未完成会话
      */
-    async recover(retentionDays = 45): Promise<WorkspaceTimingData> {
+    async recover(retentionDays = 45, maxSessions = 1000): Promise<WorkspaceTimingData> {
         log(LogLevel.Info, 'RecoveryService: crash recovery started');
 
         // Step 1: 加载主数据
@@ -84,11 +83,11 @@ export class RecoveryService {
             log(LogLevel.Info, `RecoveryService: loaded from ${source}, totalMs=${data.totalMs}`);
         }
 
-        // Step 1.5: v1→v2 迁移 + 过期会话折叠（幂等，retention<=0 时仅补空表）
-        const migrated = migrateToFolded(data, retentionDays);
+        // Step 1.5: v1→v2 迁移 + 双阈值会话折叠（幂等）
+        const migrated = migrateToFolded(data, { retentionDays, maxSessions });
         if (migrated.foldedSessionCount > 0) {
             log(LogLevel.Info,
-                `RecoveryService: folded ${migrated.foldedSessionCount} expired session(s) ` +
+                `RecoveryService: folded ${migrated.foldedSessionCount} expired/overflow session(s) ` +
                 `into ${Object.keys(migrated.dailyTotals).length} daily bucket(s)`);
         }
         data.sessions = migrated.sessions;
@@ -189,6 +188,13 @@ export class RecoveryService {
                         `RecoveryService: compensated unfinished session: +${elapsed}ms`);
                 }
             }
+        }
+
+        // 若回放或补偿后会话超出容量上限，再次执行折叠收敛
+        if (maxSessions > 0 && data.sessions.length > maxSessions) {
+            const finalFold = migrateToFolded(data, { retentionDays, maxSessions });
+            data.sessions = finalFold.sessions;
+            data.dailyTotals = finalFold.dailyTotals;
         }
 
         // Step 4: 重置会话状态并写回存储（恢复属关键事件，强制落 JSON 备份）

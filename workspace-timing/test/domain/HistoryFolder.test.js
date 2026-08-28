@@ -132,4 +132,53 @@ describe('HistoryFolder（历史折叠引擎）', () => {
         assert.strictEqual(res.updatedDailyTotals[existingKey].totalMs, 123456);
         assert.strictEqual(res.foldedSessionCount, 1);
     });
+
+    it('容量阈值（maxSessions）：超出上限的最旧会话按 FIFO 自动折叠进日桶', () => {
+        const s1 = session(t0 + 1000, t0 + 2000);
+        const s2 = session(t0 + 3000, t0 + 4000);
+        const s3 = session(t0 + 5000, t0 + 6000);
+        const s4 = session(t0 + 7000, t0 + 8000);
+        const s5 = session(t0 + 9000, t0 + 10000);
+
+        // cutoff = 0（不按时间折叠），maxSessions = 2
+        const res = foldExpiredSessions([s1, s2, s3, s4, s5], undefined, 0, 2);
+        assert.strictEqual(res.keptSessions.length, 2);
+        assert.deepStrictEqual(res.keptSessions, [s4, s5]);
+        assert.strictEqual(res.foldedSessionCount, 3);
+
+        const todayKey = localDateStr(t0);
+        assert.strictEqual(res.updatedDailyTotals[todayKey].sessionCount, 3);
+        assert.strictEqual(res.updatedDailyTotals[todayKey].totalMs, 3000);
+    });
+
+    it('双阈值复合折叠（FoldOptions）：时间窗与条数上限复合触发，总时长与会话数严格守恒', () => {
+        const old1 = session(t0 - 100 * 86400000 + 1000, t0 - 100 * 86400000 + 3000); // 2000ms
+        const old2 = session(t0 - 50 * 86400000 + 1000, t0 - 50 * 86400000 + 4000);  // 3000ms
+        const recent1 = session(t0 + 1000, t0 + 5000);                                  // 4000ms
+        const recent2 = session(t0 + 6000, t0 + 11000);                                 // 5000ms
+        const recent3 = session(t0 + 12000, t0 + 18000);                                // 6000ms
+
+        const data = {
+            sessions: [old1, old2, recent1, recent2, recent3],
+            dailyTotals: {},
+        };
+
+        // 保留 30 天，且最多保留 2 条原始记录
+        const res = migrateToFolded(data, { retentionDays: 30, maxSessions: 2, now: t0 });
+
+        // old1, old2 因过期被折叠（2 条），recent1 因容量溢出被折叠（1 条），共折叠 3 条，保留 recent2, recent3
+        assert.strictEqual(res.foldedSessionCount, 3);
+        assert.strictEqual(res.sessions.length, 2);
+        assert.deepStrictEqual(res.sessions, [recent2, recent3]);
+
+        // 验证总时长与会话数完全守恒
+        const foldedTotalMs = Object.values(res.dailyTotals).reduce((sum, b) => sum + b.totalMs, 0);
+        const keptTotalMs = res.sessions.reduce((sum, s) => sum + s.durationMs, 0);
+        const totalDuration = foldedTotalMs + keptTotalMs;
+        assert.strictEqual(totalDuration, 2000 + 3000 + 4000 + 5000 + 6000);
+
+        const foldedCount = Object.values(res.dailyTotals).reduce((sum, b) => sum + b.sessionCount, 0);
+        const totalCount = foldedCount + res.sessions.length;
+        assert.strictEqual(totalCount, 5);
+    });
 });

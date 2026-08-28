@@ -51,20 +51,25 @@ export class SessionManager {
         this._rawRetentionDays = historyRawRetentionDays;
     }
 
+    /** 运行期热更新会话历史上限（0 = 不限） */
+    get maxSessionsLimit(): number {
+        return this.maxSessions;
+    }
+
     /** 原始会话保留窗（供 orchestrator 迁移/还原路径复用同一参数） */
     get rawRetentionDays(): number {
         return this._rawRetentionDays;
     }
 
     /**
-     * 折叠过期会话进 dailyTotals 沉淀层（幂等）。
-     * 无过期会话时不写回、不触发任何存盘。
+     * 双阈值折叠过期与溢出容量的会话进 dailyTotals 沉淀层（无损回收、幂等）。
+     * 无过期或溢出会话时不写回、不触发任何存盘。
      */
     foldIfNeeded(): void {
         const data = this.timer.data;
         const res = migrateToFolded(
             { sessions: data.sessions as TimeSession[], dailyTotals: data.dailyTotals },
-            this._rawRetentionDays,
+            { retentionDays: this._rawRetentionDays, maxSessions: this.maxSessions },
         );
         if (res.foldedSessionCount === 0) return;
         this.timer.replaceData({
@@ -73,7 +78,7 @@ export class SessionManager {
             dailyTotals: res.dailyTotals,
         });
         log(LogLevel.Info,
-            `SessionManager: folded ${res.foldedSessionCount} expired session(s) into ` +
+            `SessionManager: folded ${res.foldedSessionCount} expired/overflow session(s) into ` +
             `${Object.keys(res.dailyTotals).length} daily bucket(s)`);
     }
 
@@ -82,9 +87,10 @@ export class SessionManager {
         return this._sessionActive;
     }
 
-    /** 运行期热更新会话历史上限（0 = 不限） */
+    /** 运行期热更新会话历史上限（0 = 不限），立即触发容量自动回收 */
     setMaxSessions(maxSessions: number): void {
         this.maxSessions = maxSessions;
+        this.foldIfNeeded();
     }
 
     /**
@@ -109,8 +115,8 @@ export class SessionManager {
     async startSession(): Promise<WorkspaceTimingData> {
         log(LogLevel.Info, 'SessionManager: starting session');
 
-        // 1. 崩溃恢复（含 v1→v2 迁移与过期会话折叠），算法编排见 RecoveryService
-        const data = await this.recovery.recover(this._rawRetentionDays);
+        // 1. 崩溃恢复（含 v1→v2 迁移与双阈值会话折叠），算法编排见 RecoveryService
+        const data = await this.recovery.recover(this._rawRetentionDays, this.maxSessions);
 
         // 2. 替换计时器数据
         this.timer.replaceData(data);
@@ -146,10 +152,7 @@ export class SessionManager {
         const elapsed = this.timer.stop();
         this._sessionActive = false;
 
-        // 3. 裁剪会话列表（使用用户配置的 maxSessions，0=不限）
-        this.timer.trimSessions(this.maxSessions);
-
-        // 3.5 折叠过期会话进日桶（历史治理）
+        // 3. 自动折叠（双阈值无损回收：时间保留窗 + 容量上限）
         this.foldIfNeeded();
 
         // 4. 全量存盘（数据已由 timer.stop() 更新，创建副本避免引用问题；会话结束属关键事件，强制 JSON 备份）
@@ -162,10 +165,12 @@ export class SessionManager {
         // 5. 清空 journal（await 确保退出路径上 truncate 落盘）
         await this.journal.truncate();
 
+        const foldedCount = Object.values(this.timer.data.dailyTotals ?? {})
+            .reduce((sum, b) => sum + (b.sessionCount || 0), 0);
         const result: SessionResult = {
             elapsedMs: elapsed,
             totalMs: this.timer.data.totalMs,
-            sessionCount: this.timer.data.sessions.length,
+            sessionCount: foldedCount + this.timer.data.sessions.length,
         };
 
         log(LogLevel.Info,
@@ -211,11 +216,9 @@ export class SessionManager {
     async saveCheckpoint(): Promise<void> {
         const snap = this.timer.snapshot();
 
-        // 周期性裁剪会话历史（此前仅在 endSession 时裁剪，长期不结束会话会无限增长）
-        this.timer.trimSessions(this.maxSessions);
-
-        // 低频折叠：每 50 次 checkpoint（≈50 分钟）执行一次过期会话折叠
-        if (++this._checkpointCount % 50 === 0) {
+        // 周期性双阈值自动折叠回收（会话溢出容量时立即折叠，或每 50 次检查点 ≈50 分钟执行一次）
+        if ((this.maxSessions > 0 && this.timer.data.sessions.length > this.maxSessions) ||
+            ++this._checkpointCount % 50 === 0) {
             this.foldIfNeeded();
         }
 
@@ -245,7 +248,6 @@ export class SessionManager {
         log(LogLevel.Info, `SessionManager: rotating session at midnight (${today})`);
         this.timer.rotateSession(todayZeroMs);
         this.invalidateTodayCache();
-        this.timer.trimSessions(this.maxSessions);
         this.foldIfNeeded();
 
         const snap = this.timer.snapshot();
@@ -269,7 +271,6 @@ export class SessionManager {
         log(LogLevel.Info, `SessionManager: handling system resume (gap=${resumeMs - sleepStartMs}ms)`);
         this.timer.resumeFromSleep(sleepStartMs, resumeMs);
         this.invalidateTodayCache();
-        this.timer.trimSessions(this.maxSessions);
         this.foldIfNeeded();
 
         const snap = this.timer.snapshot();

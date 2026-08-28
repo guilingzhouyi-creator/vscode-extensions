@@ -234,12 +234,16 @@ export class TimerOrchestrator {
         // 跨工作区累计（从缓存读取，不额外 I/O）
         const globalSnap = await this.global.snapshot();
 
+        const foldedSessionCount = Object.values(this.timer.data.dailyTotals ?? {})
+            .reduce((sum, b) => sum + (b.sessionCount || 0), 0);
+        const currentSessionActive = this.timer.data.currentSessionStartMs > 0 ? 1 : 0;
+        const totalSessionsCount = foldedSessionCount + sessions.length + currentSessionActive;
+
         return {
             totalMs: snap.currentTotalMs,
             todayMs,
-            // 会话数口径与周报摘要一致：已结束会话 + 进行中会话（此前只数已结束，
-            // 与周报区"会话数"同屏不一致，如 0 vs 1）
-            sessionsCount: sessions.length + (this.timer.data.currentSessionStartMs > 0 ? 1 : 0),
+            // 会话数口径统一：折叠层会话数 + 未折叠原始会话数 + 进行中会话（1）
+            sessionsCount: totalSessionsCount,
             dailyStats,
             heatmap,
             weekTotalMs: weeklySummary.totalMs,
@@ -621,8 +625,11 @@ export class TimerOrchestrator {
 
             await this.stop();
 
-            // 版本标准化 + 按当前保留窗折叠（幂等；v1 文件在此完成迁移）
-            const migrated = migrateToFolded(data, this.sessionManager.rawRetentionDays);
+            // 版本标准化 + 双阈值折叠（幂等；v1 文件在此完成迁移）
+            const migrated = migrateToFolded(data, {
+                retentionDays: this.sessionManager.rawRetentionDays,
+                maxSessions: this.sessionManager.maxSessionsLimit,
+            });
             data = {
                 ...data,
                 version: LATEST_VERSION,
