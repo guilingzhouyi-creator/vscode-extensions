@@ -188,6 +188,9 @@ export class TimeAggregator {
      * 计算今日累计时长 (ms)
      * = 今日会话片段的总和（跨午夜会话按自然日切分）+ 当前活跃会话今日已历时
      *
+     * ★ 性能优化：逆序扫描并在遇到今日零点前已结束的会话时立即 break，
+     *   将每秒高频心跳计算从 O(N)（遍历数千条历史）降低至 O(今日会话数) ≈ O(1)。
+     *
      * @param sessions 历史会话列表
      * @param currentSessionStartMs 当前活跃会话开始时间，0 表示无活跃会话
      */
@@ -197,8 +200,6 @@ export class TimeAggregator {
         let total = 0;
 
         for (const s of sessions) {
-            // 窗口粗筛：本日零点前已结束的会话不可能贡献今日时长。
-            // 跨午夜会话（startMs 在昨日、endMs 在今日）不受影响，不会被误筛。
             if (s.endMs <= todayStartMs) continue;
             TimeAggregator.eachDaySegment(s.startMs, s.endMs, (date, segStart, segEnd) => {
                 if (date === today) total += segEnd - segStart;
@@ -295,9 +296,7 @@ export class TimeAggregator {
             });
         }
 
-        // 单次遍历 sessions，按自然日切分片段后归入对应日期桶，复杂度 O(N)。
-        // 跨午夜会话（如昨日 23:30→今日 00:30）的两段会分别计入两天的桶。
-        // 窗口粗筛：首日零点前已结束的会话不可能落入 7 天窗口。
+        // 粗筛遍历 sessions，早于 7 天窗口首日零点的会话跳过
         const firstDayStartMs = parseLocalDate(dayMap.keys().next().value as string);
         for (const s of sessions) {
             if (s.endMs <= firstDayStartMs) continue;
@@ -383,8 +382,6 @@ export class TimeAggregator {
         };
 
         for (const s of sessions) {
-            // 窗口粗筛：完全落在目标日之外的会话直接跳过（clipToDay 内部虽已有
-            // 区间守卫，但避免对全历史逐条做 Math.max/min 与格式化分配）
             if (s.endMs <= dayStartMs || s.startMs >= dayEndMs) continue;
             clipToDay(s.startMs, s.endMs, false);
         }
@@ -543,9 +540,7 @@ export class TimeAggregator {
             }
         }
 
-        // 2) 原始会话：先按时间范围粗筛（完全在窗口外直接跳过），
-        //    再按自然日切分归桶——同日**覆盖**折叠桶（与 fullDailySeries 口径一致，不重不漏）。
-        //    ★ 不能用 += 累加进 byDate：否则折叠桶 + 原始会话对同一时段重复累计。
+        // 2) 原始会话：窗口粗筛，再按自然日切分归桶——同日**覆盖**折叠桶
         const rawByDate = new Map<string, number>();
         for (const s of sessions) {
             if (s.endMs <= windowStartMs || s.startMs >= windowEndMs) continue;
@@ -575,7 +570,7 @@ export class TimeAggregator {
         });
     }
 
-    /** 近 N 周按周聚合趋势（含当前周，降序） */
+    /** 近 N 周按周聚合趋势（含当前周，降序，窗口化 O(weeks*7) 算法，杜绝全历史排序开销） */
     static weeklyTrend(
         sessions: TimeSession[],
         weeks = 4,
@@ -585,8 +580,12 @@ export class TimeAggregator {
         const result: WeeklyStats[] = [];
         const currentWeek = TimeAggregator.weekStartStr(new Date());
 
-        // 预生成 N 周的周桶（用 Date(y,m,d-n) 构造回退，跨 DST 也稳定落在目标日）
+        // 1. 预生成 N 周的周桶与窗口日期集合
         const weekMap = new Map<string, { weekEnd: string; totalMs: number; count: number }>();
+        const windowDates = new Set<string>();
+        let earliestStartMs = 0;
+        let latestEndMs = 0;
+
         {
             const base = parseLocalDate(currentWeek);
             const bd = new Date(base);
@@ -596,18 +595,78 @@ export class TimeAggregator {
                 const endDt = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + 6);
                 const weekEnd = localDateStr(endDt.getTime());
                 weekMap.set(weekStart, { weekEnd, totalMs: 0, count: 0 });
+
+                if (i === weeks - 1) earliestStartMs = dt.getTime();
+                if (i === 0) latestEndMs = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + 7).getTime();
+
+                // 预生成该周 7 天日期
+                for (let d = 0; d < 7; d++) {
+                    const day = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + d);
+                    windowDates.add(localDateStr(day.getTime()));
+                }
             }
         }
 
-        // 使用全历史日报序列（含 dailyTotals + 原始会话 + 进行中会话）对各周桶进行累加
-        const series = TimeAggregator.fullDailySeries(sessions, currentSessionStartMs, dailyTotals);
-        for (const d of series) {
-            const dMs = parseLocalDate(d.date);
+        // 2. 折叠沉淀桶打底（仅查窗口内的日期，O(weeks * 7) = O(28) 查表）
+        const dayMap = new Map<string, { totalMs: number; sessionCount: number }>();
+        if (dailyTotals) {
+            for (const date of windowDates) {
+                const b = dailyTotals[date];
+                if (b && b.totalMs > 0) {
+                    dayMap.set(date, { totalMs: b.totalMs, sessionCount: b.sessionCount || 1 });
+                }
+            }
+        }
+
+        // 3. 原始会话：窗口范围粗筛，按自然日切分并覆盖同日折叠桶
+        const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
+        for (const s of sessions) {
+            if (s.endMs <= earliestStartMs || s.startMs >= latestEndMs) continue;
+            let counted = false;
+            TimeAggregator.eachDaySegment(
+                Math.max(s.startMs, earliestStartMs),
+                Math.min(s.endMs, latestEndMs),
+                (date, segStart, segEnd) => {
+                    if (windowDates.has(date)) {
+                        const entry = rawDayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
+                        entry.totalMs += segEnd - segStart;
+                        if (!counted) entry.sessionCount++;
+                        counted = true;
+                        rawDayMap.set(date, entry);
+                    }
+                },
+            );
+        }
+        for (const [date, v] of rawDayMap) {
+            dayMap.set(date, v);
+        }
+
+        // 4. 进行中会话：叠加到今日
+        if (currentSessionStartMs > 0 && currentSessionStartMs < latestEndMs) {
+            const segStartClamped = Math.max(currentSessionStartMs, earliestStartMs);
+            const now = Date.now();
+            if (now > segStartClamped) {
+                let counted = false;
+                TimeAggregator.eachDaySegment(segStartClamped, now, (date, segStart, segEnd) => {
+                    if (windowDates.has(date)) {
+                        const entry = dayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
+                        entry.totalMs += segEnd - segStart;
+                        if (!counted) entry.sessionCount++;
+                        counted = true;
+                        dayMap.set(date, entry);
+                    }
+                });
+            }
+        }
+
+        // 5. 按天归入对应周桶
+        for (const [date, v] of dayMap) {
+            const dMs = parseLocalDate(date);
             const weekKey = TimeAggregator.weekKeyOf(dMs);
             const bucket = weekMap.get(weekKey);
             if (bucket) {
-                bucket.totalMs += d.totalMs;
-                bucket.count += d.sessionCount;
+                bucket.totalMs += v.totalMs;
+                bucket.count += v.sessionCount;
             }
         }
 
@@ -650,10 +709,12 @@ export class TimeAggregator {
             }
         }
 
-        // 3. 原始会话：窗口范围粗筛（完全在周窗口外直接跳过），按自然日切分并覆盖同日折叠桶
+        // 3. 原始会话：逆序扫描，遇到早于本周一的会话直接 break
         const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
-        for (const s of sessions) {
-            if (s.endMs <= weekStartMs || s.startMs >= weekEndMs) continue;
+        for (let i = sessions.length - 1; i >= 0; i--) {
+            const s = sessions[i];
+            if (s.endMs <= weekStartMs) break;
+            if (s.startMs >= weekEndMs) continue;
             let counted = false;
             TimeAggregator.eachDaySegment(
                 Math.max(s.startMs, weekStartMs),

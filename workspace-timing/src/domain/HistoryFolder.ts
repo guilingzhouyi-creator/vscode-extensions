@@ -78,6 +78,17 @@ export function foldExpiredSessions(
     cutoffStartMs: number,
     maxSessions: number = 0,
 ): FoldResult {
+    // 空会话快退
+    if (sessions.length === 0) {
+        const totals: DailyTotalsMap = {};
+        if (existingTotals) {
+            for (const [k, v] of Object.entries(existingTotals)) {
+                totals[k] = { totalMs: v.totalMs, sessionCount: v.sessionCount };
+            }
+        }
+        return { keptSessions: [], updatedDailyTotals: totals, foldedSessionCount: 0 };
+    }
+
     let kept: TimeSession[] = [];
     const totals: DailyTotalsMap = {};
     for (const [k, v] of Object.entries(existingTotals ?? {})) {

@@ -7,7 +7,7 @@
 'use strict';
 
 const assert = require('assert');
-const { TimeAggregator, parseLocalDate } = require('../../out/domain/TimeAggregator.js');
+const { TimeAggregator, parseLocalDate, localDateStr } = require('../../out/domain/TimeAggregator.js');
 
 /**
  * 计算当前周周一的 UTC 中午时间戳。
@@ -464,5 +464,28 @@ describe('TimeAggregator：heatmapDays 活动热力图', () => {
         const r4 = computeTrendScale([10 * 3600000, 5 * 3600000], 40, false);
         assert.strictEqual(r4.dividerPct, 0, '未开启时无分割线');
         assert.strictEqual(r4.pcts[0], 100.0, '未开启时最大工时为 100%');
+    });
+
+    it('weeklyTrend 窗口化聚合：同时支持原始会话与折叠沉淀桶 dailyTotals', () => {
+        const mondayMs = parseLocalDate(TimeAggregator.weekStartStr(new Date()));
+        const mDate = new Date(mondayMs);
+        // 上上周一
+        const twoWeeksAgoMonday = new Date(mDate.getFullYear(), mDate.getMonth(), mDate.getDate() - 14);
+        const twoWeeksAgoStr = localDateStr(twoWeeksAgoMonday.getTime());
+
+        const dailyTotals = {
+            [twoWeeksAgoStr]: { totalMs: 5 * 3600000, sessionCount: 2 },
+        };
+
+        const currentWeekSession = [{
+            startMs: mondayMs + 3600000,
+            endMs: mondayMs + 2 * 3600000,
+            durationMs: 3600000,
+        }];
+
+        const trend = TimeAggregator.weeklyTrend(currentWeekSession, 4, 0, dailyTotals);
+        assert.strictEqual(trend.length, 4, '应生成 4 周趋势');
+        assert.strictEqual(trend[0].totalMs, 3600000, '本周包含原始会话 1h');
+        assert.strictEqual(trend[2].totalMs, 5 * 3600000, '上上周包含折叠桶 5h');
     });
 });
