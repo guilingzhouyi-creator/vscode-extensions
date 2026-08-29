@@ -12,6 +12,7 @@ import { GlobalAggregator } from '../application/GlobalAggregator';
 import { StatusBarController, statusBarModeLabel } from './StatusBarController';
 import { DashboardPanel } from './DashboardPanel';
 import { LogLevel, log } from '../integration/Logger';
+import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format } from '../i18n/index';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { exportTimingToFile } from './dashboardMessages';
@@ -31,6 +32,9 @@ export class CommandRegistrar {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             orchestrator.disable.updateConfig({ enabled: true, globalDisabled: false });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
+            persistTimingConfig({ enabled: true, globalDisabled: false }).catch(err =>
+                log(LogLevel.Error, 'enable persist failed', err as Error)
+            );
             vscode.window.showInformationMessage(t()['cmd.enabled']);
         });
 
@@ -39,6 +43,9 @@ export class CommandRegistrar {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             orchestrator.disable.updateConfig({ enabled: false });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
+            persistTimingConfig({ enabled: false }).catch(err =>
+                log(LogLevel.Error, 'disable persist failed', err as Error)
+            );
             vscode.window.showInformationMessage(t()['cmd.disabled']);
         });
 
@@ -48,6 +55,9 @@ export class CommandRegistrar {
             const current = orchestrator.disable.config.globalDisabled;
             orchestrator.disable.updateConfig({ globalDisabled: !current });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
+            persistTimingConfig({ globalDisabled: !current }).catch(err =>
+                log(LogLevel.Error, 'toggleGlobal persist failed', err as Error)
+            );
 
             vscode.window.showInformationMessage(
                 !current ? t()['cmd.globalDisabled'] : t()['cmd.globalEnabled']);

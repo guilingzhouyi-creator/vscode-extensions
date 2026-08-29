@@ -14,6 +14,7 @@ import { StatusBarController } from './StatusBarController';
 import { DashboardMessage } from '../domain/dashboard-types';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
+import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format, setLocale, resolveLocale } from '../i18n/index';
 import { DashboardPanel } from './DashboardPanel';
 import { sanitizeFileName } from './fileUtils';
@@ -34,9 +35,13 @@ export function createDashboardMessageHandler(ctx: MessageRouterContext): Dashbo
     return (msg: DashboardMessage) => {
         switch (msg.type) {
             case 'updateConfig':
-                // 静默应用：面板自身已有视觉反馈，每次变更都弹系统 toast 过于嘈杂
+                // 1. 内存即时应用：面板与调度器即时生效
                 ctx.getOrchestrator()?.applyDashboardConfig(msg.payload);
-                // locale 显式切换：热生效 i18n + 重建面板（webview 静态词条在渲染时注入）
+                // 2. 持久化写入 VS Code settings.json，防止重载窗口后失效
+                persistTimingConfig(msg.payload).catch(err =>
+                    log(LogLevel.Error, 'updateConfig persist failed', err as Error)
+                );
+                // 3. locale 显式切换：热生效 i18n + 重建面板（webview 静态词条在渲染时注入）
                 if (msg.payload.locale !== undefined) {
                     setLocale(resolveLocale(msg.payload.locale));
                     DashboardPanel.recreateForLocale();

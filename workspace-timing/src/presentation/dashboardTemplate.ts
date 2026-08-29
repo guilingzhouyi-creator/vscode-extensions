@@ -1561,14 +1561,24 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           const isLimitOn = Boolean(weeklyLimitEnabled) && typeof weeklyLimitHours === 'number' && Number.isFinite(weeklyLimitHours) && weeklyLimitHours >= 1 && weeklyLimitHours <= 168;
           const safeLimitHours = isLimitOn ? Math.min(168, Math.max(1, Math.round(weeklyLimitHours))) : 40;
           const limitMs = isLimitOn ? safeLimitHours * 3600000 : 0;
-          const maxVal = isLimitOn
-            ? Math.max(limitMs, ...trend.map(w => (Number.isFinite(w.totalMs) ? w.totalMs : 0)), 1)
-            : Math.max(...trend.map(w => (Number.isFinite(w.totalMs) ? w.totalMs : 0)), 1);
-          const dividerPct = isLimitOn ? Math.min(100, Math.max(0, (limitMs / maxVal) * 100)) : 0;
+          const maxTrendMs = Math.max(...trend.map(w => (Number.isFinite(w.totalMs) && w.totalMs > 0 ? w.totalMs : 0)), 0);
+
+          // 达标点比例：居中靠右，默认处于总轨道宽度的 75% 处，右侧留出 25% 的超限预警缓冲空间
+          const TARGET_DIVIDER_RATIO = 0.75;
+
+          // 刻度上限计算：
+          // 1. 开启周上限时：基准刻度按 limitMs / TARGET_DIVIDER_RATIO 缩放；若有超限周则按 maxTrendMs * 1.15 动态延展头部空间
+          // 2. 未开启周上限时：按常规最大值 maxTrendMs 缩放
+          const scaleMax = isLimitOn
+            ? Math.max(limitMs / TARGET_DIVIDER_RATIO, maxTrendMs * 1.15, 1)
+            : Math.max(maxTrendMs, 1);
+
+          // 分割线百分比：未超限时精确位于 75%，超限时等比向左收敛
+          const dividerPct = isLimitOn ? Math.min(95, Math.max(10, (limitMs / scaleMax) * 100)) : 0;
 
           document.getElementById('trendList').innerHTML = trend.map(w => {
             const rawMs = (typeof w.totalMs === 'number' && Number.isFinite(w.totalMs) && w.totalMs > 0) ? w.totalMs : 0;
-            const pct = Math.min(100, Math.max((rawMs / maxVal) * 100, rawMs > 0 ? 2 : 0));
+            const pct = Math.min(100, Math.max((rawMs / scaleMax) * 100, rawMs > 0 ? 2 : 0));
             const tooltip = w.weekEnd ? (w.weekStart + ' ~ ' + w.weekEnd) : w.weekStart;
 
             let fillClass = 'trend-fill';

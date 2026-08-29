@@ -99,6 +99,10 @@ export interface DashboardData {
     journalFlushIntervalMs: number;
     fullSaveIntervalMs: number;
     maxSessions: number;
+    /** 原始会话保留天数（超出自动折叠入日统计） */
+    historyRawRetentionDays?: number;
+    /** 危险操作前是否自动生成安全快照 */
+    safetySnapshot?: boolean;
     /** 周工作时长上限开关 */
     weeklyLimitEnabled: boolean;
     /** 周工作时长上限（小时） */

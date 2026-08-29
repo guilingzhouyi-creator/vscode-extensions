@@ -12,6 +12,7 @@ import {
     sanitizeWeeklyLimitHours,
     sanitizeWeeklyLimitEnabled,
 } from '../domain/models';
+import { DashboardData } from '../domain/dashboard-types';
 import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { LogLevel, log } from './Logger';
 import { t, setLocale, resolveLocale } from '../i18n/index';
@@ -57,6 +58,73 @@ export function readTimingConfig(): TimingConfig {
         weeklyLimitEnabled: sanitizeWeeklyLimitEnabled(cfg.get('weeklyLimit.enabled', DEFAULT_CONFIG.weeklyLimitEnabled)),
         weeklyLimitHours: sanitizeWeeklyLimitHours(cfg.get('weeklyLimit.hours', DEFAULT_CONFIG.weeklyLimitHours)),
     };
+}
+
+/**
+ * 将面板或命令修改的配置持久化写入 VS Code settings.json (默认 ConfigurationTarget.Global)
+ */
+export async function persistTimingConfig(
+    partial: Partial<DashboardData> | Partial<TimingConfig>,
+    target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global,
+): Promise<void> {
+    const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+    const promises: Thenable<void>[] = [];
+
+    if ('isEnabled' in partial && partial.isEnabled !== undefined) {
+        promises.push(config.update('enabled', partial.isEnabled, target));
+    }
+    if ('enabled' in partial && partial.enabled !== undefined) {
+        promises.push(config.update('enabled', partial.enabled, target));
+    }
+    if ('globalDisabled' in partial && partial.globalDisabled !== undefined) {
+        promises.push(config.update('globalDisabled', partial.globalDisabled, target));
+    }
+    if ('locale' in partial && partial.locale !== undefined) {
+        promises.push(config.update('locale', partial.locale, target));
+    }
+    if ('statusBarEnabled' in partial && partial.statusBarEnabled !== undefined) {
+        promises.push(config.update('statusBar.enabled', partial.statusBarEnabled, target));
+    }
+    if ('statusBarFormat' in partial && partial.statusBarFormat !== undefined) {
+        promises.push(config.update('statusBar.format', partial.statusBarFormat, target));
+    }
+    if ('journalEnabled' in partial && partial.journalEnabled !== undefined) {
+        promises.push(config.update('storage.journalEnabled', partial.journalEnabled, target));
+    }
+    if ('backupToFile' in partial && partial.backupToFile !== undefined) {
+        promises.push(config.update('storage.backupToFile', partial.backupToFile, target));
+    }
+    if ('ringBufferCapacity' in partial && partial.ringBufferCapacity !== undefined) {
+        promises.push(config.update('storage.ringBufferCapacity', partial.ringBufferCapacity, target));
+    }
+    if ('journalFlushIntervalMs' in partial && partial.journalFlushIntervalMs !== undefined) {
+        promises.push(config.update('storage.journalFlushInterval', partial.journalFlushIntervalMs, target));
+    }
+    if ('fullSaveIntervalMs' in partial && partial.fullSaveIntervalMs !== undefined) {
+        promises.push(config.update('storage.fullSaveInterval', partial.fullSaveIntervalMs, target));
+    }
+    if ('maxSessions' in partial && partial.maxSessions !== undefined) {
+        promises.push(config.update('storage.maxSessions', partial.maxSessions, target));
+    }
+    if ('historyRawRetentionDays' in partial && partial.historyRawRetentionDays !== undefined) {
+        promises.push(config.update('storage.historyRawRetentionDays', partial.historyRawRetentionDays, target));
+    }
+    if ('safetySnapshot' in partial && partial.safetySnapshot !== undefined) {
+        promises.push(config.update('storage.safetySnapshot', partial.safetySnapshot, target));
+    }
+    if ('weeklyLimitEnabled' in partial && partial.weeklyLimitEnabled !== undefined) {
+        promises.push(config.update('weeklyLimit.enabled', sanitizeWeeklyLimitEnabled(partial.weeklyLimitEnabled), target));
+    }
+    if ('weeklyLimitHours' in partial && partial.weeklyLimitHours !== undefined) {
+        promises.push(config.update('weeklyLimit.hours', sanitizeWeeklyLimitHours(partial.weeklyLimitHours), target));
+    }
+
+    try {
+        await Promise.all(promises);
+        log(LogLevel.Debug, `ConfigWatcher: persisted config update (${Object.keys(partial).join(', ')})`);
+    } catch (err) {
+        log(LogLevel.Error, 'ConfigWatcher: failed to persist configuration to VS Code settings', err as Error);
+    }
 }
 
 /** 状态栏最小端口（integration 层不依赖 presentation 具体类） */

@@ -424,4 +424,45 @@ describe('TimeAggregator：heatmapDays 活动热力图', () => {
         const summary = TimeAggregator.weeklySummary(s, 0);
         assert.strictEqual(summary.totalMs, 2 * 3600000, '上周日 1h 被剔除，仅本周一 2h 计入本周摘要');
     });
+
+    it('多周趋势周上限比例计算：未超限时达标分割线恒定居中靠右 75%，超限时等比向左收敛', () => {
+        // 模拟面板中的 scaleMax 与 dividerPct 核心计算逻辑
+        const computeTrendScale = (trendMsList, limitHours, limitEnabled) => {
+            const isLimitOn = Boolean(limitEnabled) && typeof limitHours === 'number' && Number.isFinite(limitHours) && limitHours >= 1 && limitHours <= 168;
+            const safeLimitHours = isLimitOn ? Math.min(168, Math.max(1, Math.round(limitHours))) : 40;
+            const limitMs = isLimitOn ? safeLimitHours * 3600000 : 0;
+            const maxTrendMs = Math.max(...trendMsList.map(v => (Number.isFinite(v) && v > 0 ? v : 0)), 0);
+
+            const TARGET_DIVIDER_RATIO = 0.75;
+            const scaleMax = isLimitOn
+                ? Math.max(limitMs / TARGET_DIVIDER_RATIO, maxTrendMs * 1.15, 1)
+                : Math.max(maxTrendMs, 1);
+
+            const dividerPct = isLimitOn ? Math.min(95, Math.max(10, (limitMs / scaleMax) * 100)) : 0;
+            const pcts = trendMsList.map(rawMs => Math.min(100, Math.max((rawMs / scaleMax) * 100, rawMs > 0 ? 2 : 0)));
+
+            return { scaleMax, dividerPct, pcts };
+        };
+
+        // 场景 1：用户截图场景（设定 40h，本周 2h 40m，其余周 0s）
+        const r1 = computeTrendScale([2 * 3600000 + 40 * 60000, 0, 0, 0], 40, true);
+        assert.strictEqual(r1.dividerPct, 75.0, '未超限时达标线必须精确位于 75% 居中偏右位置');
+        assert.ok(r1.pcts[0] > 4.9 && r1.pcts[0] < 5.1, '2h40m 占 53.33h 刻度应约 5.0%');
+        assert.strictEqual(r1.pcts[1], 0);
+
+        // 场景 2：恰好达到 40h 上限
+        const r2 = computeTrendScale([40 * 3600000, 20 * 3600000, 0, 0], 40, true);
+        assert.strictEqual(r2.dividerPct, 75.0, '达标时分割线依然处于 75%');
+        assert.strictEqual(r2.pcts[0], 75.0, '40h 工时条恰好触及 75% 分割线');
+
+        // 场景 3：某周严重超限（50h > 40h）
+        const r3 = computeTrendScale([50 * 3600000, 30 * 3600000, 0, 0], 40, true);
+        assert.ok(r3.dividerPct < 75.0, '超限时分割线等比向左收敛留出头部');
+        assert.ok(r3.pcts[0] > r3.dividerPct, '50h 进度条必须明显跨越分割线向右延伸');
+
+        // 场景 4：未开启周上限
+        const r4 = computeTrendScale([10 * 3600000, 5 * 3600000], 40, false);
+        assert.strictEqual(r4.dividerPct, 0, '未开启时无分割线');
+        assert.strictEqual(r4.pcts[0], 100.0, '未开启时最大工时为 100%');
+    });
 });
