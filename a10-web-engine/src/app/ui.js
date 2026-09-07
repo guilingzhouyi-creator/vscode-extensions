@@ -4,6 +4,7 @@
  */
 import { ASSEMBLIES, PART_REGISTRY } from '../spec/partTree.js';
 import { LOADOUTS } from '../spec/storesSpec.js';
+import { generateSVG } from './designSheet.js';
 import * as THREE from 'three';
 
 const $ = (s) => document.querySelector(s);
@@ -293,8 +294,21 @@ export function createUI({ model, viewer, rig, exploded, picker, cutaway, damage
     model.materials.setLivery(e.target.value);
     toast(`涂装：${e.target.value}`);
   });
-  $('#btn-sheet').addEventListener('click', () => $('#sheet-modal').classList.add('show'));
+  let sheetSVG = null;
+  $('#btn-sheet').addEventListener('click', () => {
+    if (!sheetSVG) {
+      try { sheetSVG = generateSVG(); } catch (e) { sheetSVG = `<pre>sheet error: ${e.message}</pre>`; }
+      document.getElementById('sheet-contents').innerHTML = sheetSVG;
+    }
+    $('#sheet-modal').classList.add('show');
+  });
   $('#btn-sheet-close').addEventListener('click', () => $('#sheet-modal').classList.remove('show'));
+  $('#btn-sheet-dl')?.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([sheetSVG || generateSVG()], { type: 'image/svg+xml' }));
+    a.download = 'A-10C-design-sheet.svg';
+    a.click();
+  });
   $('#btn-shot').addEventListener('click', () => {
     viewer.render();
     const a = document.createElement('a');
