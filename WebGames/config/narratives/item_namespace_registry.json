@@ -1,0 +1,12 @@
+{
+  "invalid_id_format": "物品 ID 未遵循 KALAR:[MAJOR]:[MINOR]:[TAG] 命名空间规范",
+  "id_collision": "物品 ID 冲突: %s 已存在",
+  "numeric_id_collision": "物品数字 ID 冲突: %d 已被占用",
+  "name_key_collision": "物品展示名键冲突: %s 已被占用",
+  "english_name_collision": "物品统一英文名冲突: %s 已被占用",
+  "english_name_missing": "物品缺少统一英文名: %s（english_name 必填）",
+  "english_name_invalid": "物品统一英文名非法: %s（仅允许小写字母/数字/下划线）",
+  "not_found": "物品不存在: %s",
+  "sample_display_name": "秘银剑",
+  "sample_alias": "蓝晶长刃"
+}

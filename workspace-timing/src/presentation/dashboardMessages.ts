@@ -49,10 +49,12 @@ export function createDashboardMessageHandler(ctx: MessageRouterContext): Dashbo
                 break;
 
             case 'newPeriod':
-                ctx.getOrchestrator()?.newPeriod().catch(err =>
+                // 与 reset 路径时序一致：编排完成后提示，失败不打成功扰
+                ctx.getOrchestrator()?.newPeriod().then(() => {
+                    vscode.window.showInformationMessage(t()['toast.newPeriod']);
+                }).catch(err =>
                     log(LogLevel.Error, 'newPeriod failed', err as Error)
                 );
-                vscode.window.showInformationMessage(t()['toast.newPeriod']);
                 break;
 
             case 'reset': {
@@ -116,7 +118,7 @@ export async function exportTimingToFile(ctx: MessageRouterContext): Promise<voi
         );
         const uri = await vscode.window.showSaveDialog({
             defaultUri,
-            filters: { 'CSV 文件 (*.csv)': ['csv'] },
+            filters: { [t()['export.filter.csv']]: ['csv'] },
             saveLabel: t()['toast.exportSaveLabel'],
         });
 
@@ -165,7 +167,7 @@ export async function exportReportToFile(
 
         const uri = await vscode.window.showSaveDialog({
             defaultUri,
-            filters: { 'Markdown 文件 (*.md)': ['md'] },
+            filters: { [t()['export.filter.md']]: ['md'] },
             saveLabel: t()['toast.exportSaveLabel'],
         });
 
@@ -208,7 +210,7 @@ export async function exportAggregatedToFile(ctx: MessageRouterContext): Promise
 
         const uri = await vscode.window.showSaveDialog({
             defaultUri,
-            filters: { 'CSV Files (*.csv)': ['csv'] },
+            filters: { [t()['export.filter.csv']]: ['csv'] },
             saveLabel: t()['toast.exportSaveLabel'],
         });
 

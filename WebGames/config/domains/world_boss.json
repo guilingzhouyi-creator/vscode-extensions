@@ -1,0 +1,31 @@
+{
+  "entity_defaults": {
+    "boss_uid": "BOSS_WORLD_LEVIATHAN_01",
+    "boss_title": "【天灾灭世者 · 灭烬巨龙】",
+    "species_name": "灭烬巨龙",
+    "total_phases": 3,
+    "current_phase_index": 1,
+    "phase_max_hp": 10000.0,
+    "phase_current_hp": 10000.0,
+    "mechanism_shield_hp": 0.0,
+    "is_invulnerable": false,
+    "is_channeling_wipe_spell": false,
+    "physiology": {
+      "lifespan_scale": 10.0,
+      "str_level": 5,
+      "con_level": 6,
+      "vit_level": 6
+    }
+  },
+  "phase_transition": {
+    "str_multiplier": 1.25,
+    "shield_hp": 1000.0
+  },
+  "contribution": {
+    "weights": {
+      "damage": 1.0,
+      "tanking": 0.5,
+      "heal": 0.8
+    }
+  }
+}

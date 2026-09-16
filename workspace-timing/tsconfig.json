@@ -16,7 +16,9 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "declaration": true,
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "incremental": true,
+        "tsBuildInfoFile": "out/.tsbuildinfo"
     },
     "include": [
         "src/**/*"

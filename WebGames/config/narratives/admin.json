@@ -1,0 +1,20 @@
+{
+  "permission_elevated": "【GM权限认证】权限提权成功！当前位阶: Level %d",
+  "god_mode": "【GM沙盒】上帝模式已激活，全属性提升至 %d！",
+  "give_gold": "【GM沙盒】发放金币: +%d 金币！",
+  "give_item": "【GM沙盒】生成道具: 【%s】已存入背包！",
+  "give_item_not_found": "【GM沙盒】未找到统一英文名物品: %s（仅接受英文名，如 mithril_longsword）",
+  "give_item_no_inventory": "【GM沙盒】缺少背包上下文，无法发放物品",
+  "give_item_no_registry": "【GM沙盒】缺少物品注册表上下文，无法按统一英文名发放",
+  "advance_time": "【GM沙盒】世界时钟快进 %d 个月！",
+  "insufficient_permission": "Insufficient GM permissions.",
+  "unknown_command": "Unknown GM command: %s",
+  "not_a_command": "Not a command",
+  "unknown_chat_command": "Unknown command: /%s",
+  "permission_denied": "Permission denied for command: /%s",
+  "audit_log": "GM Audit: Admin [%s] executed [%s]",
+  "clawback_offline_forbidden": "【追缴】仅限联机模式可用（单机沙盒一律拒绝）",
+  "clawback_permission_denied": "【追缴】无追缴权限（需 LEVEL_GAME_MASTER）",
+  "clawback_nothing_to_claw": "【追缴】无资产可追缴",
+  "clawback_invalid_target": "【追缴】追缴目标或参数非法"
+}

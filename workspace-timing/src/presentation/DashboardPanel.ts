@@ -9,7 +9,7 @@ import * as vscode from 'vscode';
 
 import { DashboardData, DashboardMessage } from '../domain/dashboard-types';
 import { buildDashboardHtml } from './dashboardTemplate';
-import { labelsWithPrefix } from '../i18n/index';
+import { labelsWithPrefix, t, currentLocale } from '../i18n/index';
 export type { DashboardData, DashboardMessage }; // 重新导出以便其他文件引用
 
 export class DashboardPanel {
@@ -93,7 +93,7 @@ export class DashboardPanel {
 
         const panel = vscode.window.createWebviewPanel(
             'workspaceTiming.dashboard',
-            '工作区计时',
+            t()['panel.title'],
             column ?? vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -144,6 +144,8 @@ export class DashboardPanel {
             nonce,
             cspSource: this._panel.webview.cspSource,
             labels: labelsWithPrefix(['panel.', 'confirm.']),
+            // 文档语言随界面语言（语言热切换经面板重建生效）
+            lang: currentLocale(),
         });
     }
 }

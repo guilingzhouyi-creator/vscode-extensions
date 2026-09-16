@@ -1,0 +1,5 @@
+{
+    "type": "module",
+    "private": true,
+    "description": "scripts/ 子包清单：仅声明本目录编译产物为 ESM（dist/**/*.js），与根包（VS Code 扩展，commonjs）隔离"
+}

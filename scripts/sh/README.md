@@ -1,6 +1,6 @@
 # 📂 scripts/sh — 自动化脚本集（Shell）
 
-> 仓库自动化配套脚本（原 `.cnb/scripts/`），由 `.cnb.yml` 事件流水线自动触发。
+> 仓库自动化配套脚本（gate/release 系列），可手动执行或接入 CI。
 > 归属 `scripts/sh/`（仓库级脚本库 · Shell 语言域），分类矩阵见 [`../README.md`](../README.md)。
 
 ---
@@ -8,7 +8,7 @@
 # 1️⃣ auto-label.sh — 自动分类打标签程序
 
 仓库 Issue/PR 创建或内容变更时，自动分析内容判定问题类型并打标签。
-标签体系见 [`.cnb/LABELS.md`](../../.cnb/LABELS.md)。
+标签体系见仓库 labels（type/priority/status/module 维度）。
 
 ## 一、功能
 
@@ -63,8 +63,8 @@ bug → security → feature → performance → enhancement → refactor → te
 
 ## 三、配套流水线接入
 
-`.cnb.yml` 的 `$` 级 `pull_request` 事件中，`pr-gate.sh` 在 `auto-label.sh` 之后、拉起任何 NPC 之前执行；
-各 NPC 的 `pull_request` userPrompt 已加入「先读 pr-gate【门禁结论】→ 幂等跳过 → 按分级分工」的防卡死引导。
+CI 的 `pull_request` 事件中，`pr-gate.sh` 建议置于 `auto-label.sh` 之后、拉起任何审查之前执行；
+后续审查流程可先读 pr-gate【门禁结论】→ 幂等跳过 → 按分级分工。
 
 ## 四、环境变量
 
@@ -95,7 +95,7 @@ bug → security → feature → performance → enhancement → refactor → te
 
 - **auto-label.sh v2**：输出【打标签结论】+【发布触发】判断，据此决定是否串联 release.sh
 - **pr-gate.sh**：输出【门禁结论】并打 status/gate-ok（门禁全绿标志）
-- **流水线接入**：.cnb.yml（pull_request.merged / web_trigger / tag_push 事件）
+- **流水线接入**：可手动执行或接入 CI（pull_request.merged / tag_push 事件）
 
 ## 三、环境变量
 
@@ -163,8 +163,8 @@ C2（需审查判断）/C3（高危）禁止自动合入。本脚本在 auto-mer
 
 ## 三、配套流水线接入
 
-`.cnb.yml` 的 `$` 级 `pull_request.mergeable` 事件：
-`auto-merge-gate.sh`（Stage 0 确定性门禁）→ 「合入员」NPC 复核（Stage 1 决策层，可打 `status/merge-blocked` 否决）→ `merge-blocked 否决复查`（Stage 2 兜底）→ `git:auto-merge`（Stage 3，仅全链通过时执行，squash 合并 + 删源分支）。
+CI 的 `pull_request.mergeable` 事件可编排为：
+`auto-merge-gate.sh`（Stage 0 确定性门禁）→ 人工复核（Stage 1 决策层，可打 `status/merge-blocked` 否决）→ `merge-blocked 否决复查`（Stage 2 兜底）→ `git:auto-merge`（Stage 3，仅全链通过时执行，squash 合并 + 删源分支）。
 
 ## 四、环境变量
 
@@ -178,10 +178,76 @@ C2（需审查判断）/C3（高危）禁止自动合入。本脚本在 auto-mer
 
 ---
 
+# 6️⃣ version-bump.sh — 语义化版本递增 + CHANGELOG 段落迁移（本地发布工具链）
+
+> **目的**：为扩展发布提供**严格门禁**的版本递增工具，产出与 `.github/workflows/release.yml`
+> 自动发布门禁完全兼容的提交信息前缀（`vX.Y.Z`），杜绝手改版本号的漂移与回退。
+
+## 一、严格契约
+
+| 门禁 | 规则 | 失败语义 |
+|------|------|---------|
+| 扩展身份 | 仅接受声明 `engines.vscode` 的目录（与 CI 发现逻辑同源） | 拒绝（exit 1） |
+| 干净工作树 | 发布前工作树必须干净，防止漏打包 | 拒绝（exit 1） |
+| 版本单调 | 新版本必须**严格大于**现版本（含显式版本路径） | 拒绝（exit 1） |
+| CHANGELOG | keep-a-changelog：`[Unreleased]` 内容整体迁入新版本段落，`[Unreleased]` 置空保留 | 无 Unreleased 段则报错（exit 1） |
+
+## 二、用法
+
+```bash
+bash scripts/sh/version-bump.sh <扩展目录> <major|minor|patch>          # 语义递增
+bash scripts/sh/version-bump.sh <扩展目录> X.Y.Z                        # 显式版本（须大于现版本）
+bash scripts/sh/version-bump.sh <扩展目录> patch --dry-run              # 只打印计划，不落盘
+bash scripts/sh/version-bump.sh <扩展目录> patch --root <fixture>       # 夹具自检（跳过 git 门禁）
+```
+
+## 三、配套
+
+- 提交信息必须以 `vX.Y.Z` 开头（可带 conventional-commit 前缀），release.yml 分支自动发布门禁据此识别；
+- CI hygiene 作业内置夹具自检（递增/迁移/回退拦截/非法模式/非扩展拒绝 5 项），防行为漂移。
+
+---
+
+# 7️⃣ release-tag.sh — 本地发布闭环（bump → 构建 → 打包 → 提交 → Tag → 推送）
+
+> **目的**：把「版本递增 → 构建验证 → 打包 → 资产校验 → 提交 → 打 Tag → 推送」串成
+> 一条可复现的本地闭环，产物与 `release.yml` 完全同构；构建验证全部通过后才允许
+> 提交与打 Tag——失败不留半成品、不留死 Tag。
+
+## 一、严格契约（比 CI 流水线更严，全流程本地可复现）
+
+1. 干净树门禁 + 版本单调 + 扩展身份（同 version-bump.sh）
+2. `npm ci`（与 CI 同依赖树）+ `compile` + `vsce package` 先于提交
+3. 展示资产 pre/post 双阶段校验（icon 与 README 图片必须真实打进 vsix）
+4. 提交信息形如 `vX.Y.Z — 标题 | 英文副标题`，且与产物版本严格一致（自产合规提交）
+5. 提交仅含 `package.json` + `CHANGELOG.md` 两个文件（发布提交最小化）
+6. Tag `<扩展名>-vX.Y.Z` 已存在 → 拒绝（幂等防重复，与 release.yml 同源）
+7. 推送先分支后 Tag；`--no-push` 全部本地留痕
+
+## 二、用法
+
+```bash
+bash scripts/sh/release-tag.sh workspace-timing patch \
+  --message "v0.5.0 — 标题 | English subtitle"
+bash scripts/sh/release-tag.sh workspace-timing patch \
+  --message "v0.5.0 — 标题 | English subtitle" --no-push    # 本地留痕
+bash scripts/sh/release-tag.sh workspace-timing patch \
+  --message "v0.5.0 — 标题 | English subtitle" --dry-run    # 只打印计划
+```
+
+## 三、配套
+
+- Tag 推送后 `release.yml` 的 Tag 触发路径自动补建 GitHub Release（跳过提交信息门控）；
+- 产物 `dist/<扩展名>/<扩展名>-<版本>.vsix` + `SHA256SUMS.txt` 与 CI 布局同构。
+
+---
+
 # 变更日志
 
 | 时间 | 操作者 | 变更摘要 |
 |------|--------|---------|
+| 2026-09-13 | 工程整改 | 脚本库完备性与性能审查治理：① 修复 release-tag.sh dry-run 的 --no-push 提示恒显缺陷；release-tag 构建步骤补 lockfile 新旧判定触发 npm ci（与 package.sh 同规）② 新增 gate-common.sh 冲突分级单源规则库，pr-gate.sh / auto-merge-gate.sh 统一接入（两侧高危模式漂移治理，非高危多文件冲突统一收紧为 C2）③ pr-gate.sh 收敛为单次 `git diff --numstat` + 全量 diff 单次落盘三信号复用 + 标签清单单次拉取复用；硬编码扫描正则改变量传参（去 \x27 可移植性隐患）④ auto-label.sh 关键词匹配改 Bash4 内建小写化（消除约 140 次 tr 子进程）⑤ version-bump.sh 未知旗标显式报错（防拼写错误静默吞掉）⑥ check-display-assets.sh post 模式 zip 清单单次解包复用 ⑦ 修正 2026-08-21 变更日志中「release.sh 附件上传」的不实登记（该实现从未入库，见下行批注） |
+| 2026-09-09 | 工程整改 | 新增 version-bump.sh（语义递增 + CHANGELOG 迁移，三门禁）与 release-tag.sh（本地发布闭环，与 release.yml 同规）；修复 package.sh/package.ps1 语言分域重构后的根路径失效（P1）；修复 check-display-assets.sh 的 icon 校验静默禁用（P2，require 缺 ./ 前缀）；ci.yml 增补 hygiene 作业永久看守三类回归 |
 | 2026-08-21 | CodeBuddy | 建立 auto-label.sh（5 维度规则引擎，幂等打标签） |
 | 2026-08-21 | CodeBuddy | auto-label.sh v2：支持 issue.update 去旧加新；新增 security/epic 类型；容错重试 + 唤醒提示 |
 | 2026-08-21 | CodeBuddy | 新增 pr-gate.sh：PR 统一前置门禁（冲突检测 + Diff 初筛 + 幂等去重 + 分级派单），解决自动监听 PR 卡死问题 |
@@ -189,8 +255,8 @@ C2（需审查判断）/C3（高危）禁止自动合入。本脚本在 auto-mer
 | 2026-08-21 | 协作员·测试 | 新增 test-release.sh：release.sh 异常兜底用例（幂等去重/失败重试/超时升级链，16 断言） |
 | 2026-08-21 | CodeBuddy | 新增 auto-merge-gate.sh：PR 自动化合入安全门禁（gate-ok 就绪判定 + 冲突分级 C0-C3 准入），配合平台原生 git:auto-merge 实现「安全的全自动合入」 |
 | 2026-08-21 | CodeBuddy | auto-merge-gate.sh fail-safe 加固：目标分支缺失 / 无 git 仓库 / 预演回退异常 → 判 UNKNOWN 保守禁止合入（原降级放行 C0）；移除 git reset --hard 破坏性兑底，仅用 merge --abort 回退 |
-| 2026-08-21 | CodeBuddy | 建立专职「合入员」NPC 自动化合入系统：settings.yml/.cnb.yml 新增合入员角色；pull_request Stage 4 合入门禁与 pull_request.merged 后处理移交合入员；pull_request.mergeable 增加合入员复核 + merge-blocked 否决复查；auto-merge-gate.sh 增加 status/merge-blocked 否决标签检查 |
+| 2026-08-21 | CodeBuddy | 建立专职「合入员」自动化合入系统：pull_request Stage 4 合入门禁与 pull_request.merged 后处理移交合入员；pull_request.mergeable 增加合入员复核 + merge-blocked 否决复查；auto-merge-gate.sh 增加 status/merge-blocked 否决标签检查 |
 | 2026-08-21 | CodeBuddy | 自动化增强：git:auto-merge 增加 allowAssigneeApprovedMerge（避免有 assignee 时自动合入被跳过）；新增 $ push 事件「主分支构建验证」（合入后防线）；pr-gate.sh 增加合入状态读取（merge-ready/merge-blocked）+ 陈旧否决识别（提示合入员复核，不自动清除人工否决） |
 | 2026-08-21 | CodeBuddy | 自动化进阶：① failStages 失败升级链（门禁失败自动打 status/pending-fix、移除 merge-ready）② 合入后状态回收（git:pr-update 打 status/done、清 pending-fix/merge-ready/merge-blocked）③ 全流水线 timeout（NPC 30m / 脚本 5-10m / 发布 10m）④ 新增 tag_push 发布闭环 ⑤ main 分支 crontab 每周一定时巡视 |
-| 2026-08-21 | CodeBuddy | 发布工具链落地：新增 version-bump.sh（语义版本递增+CHANGELOG）与 release-tag.sh（bump+vsce 打包+打 tag 推送）；release.sh 增强 Release 附件上传（.vsix 两段式 upload-url→PUT→confirmation，失败仅告警）；web_trigger 增加【发布】指令引导；.cnb/dist 产物不入库 |
-| 2026-08-21 | CodeBuddy | 覆盖率门禁接入：workspace-timing 用 c8 替代 nyc（Node22 兼容），test:coverage 生成 lcov.info（当前行覆盖率 64.26%）；.cnb.yml 质量门禁后接 testing:coverage（breakIfNoCoverage=false 先上报，待数据积累后收紧红线） |
+| 2026-08-21 | CodeBuddy | 发布工具链规划登记：version-bump.sh / release-tag.sh 首次写入变更日志（⚠️ 当日未实际入库，2026-09-09 由工程整改补建落地，见顶部行）；release.sh 增强 Release 附件上传（.vsix 两段式 upload-url→PUT→confirmation，失败仅告警）（⚠️ 附件上传实现实际未随当日提交入库，当前 release.sh 仅有 post-release 占位——2026-09-13 核实修正；如需附件上传须重新立项）；dist 产物不入库 |
+| 2026-08-21 | CodeBuddy | 覆盖率门禁接入：workspace-timing 用 c8 替代 nyc（Node22 兼容），test:coverage 生成 lcov.info（当前行覆盖率 64.26%）；CI 质量门禁后接 testing:coverage（breakIfNoCoverage=false 先上报，待数据积累后收紧红线） |

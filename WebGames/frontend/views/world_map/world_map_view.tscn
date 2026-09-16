@@ -1,0 +1,614 @@
+[gd_scene load_steps=2 format=3 uid="uid://cworldmapview10"]
+
+[ext_resource type="Script" path="res://frontend/views/world_map/world_map_view.gd" id="1_worldmap"]
+
+[node name="WorldMapView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_worldmap")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.06, 0.1, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+; ==============================================================================
+; 顶部标题栏
+; ==============================================================================
+
+[node name="TopBar" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = ""
+
+[node name="TitleSubLabel" type="Label" parent="MarginContainer/VBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+; ==============================================================================
+; 主 Tab 容器（6 个子界面）
+; ==============================================================================
+
+[node name="MainTabContainer" type="TabContainer" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+tab_align = 0
+
+; ------------------------------------------------------------------------------
+; Tab 0: WORLD_MAP 大地图探索
+; ------------------------------------------------------------------------------
+
+[node name="WorldMapTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 500
+
+[node name="WmapPanel" type="PanelContainer" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="WmapLandmarkContainer" type="Control" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="WmapPlaceholderLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapPanel/WmapLandmarkContainer"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 200.0
+offset_top = 150.0
+offset_right = 400.0
+offset_bottom = 180.0
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="WmapRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(200, 0)
+
+[node name="WmapZoomSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="WmapZoomBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="WmapZoomOutBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel/WmapZoomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "−"
+custom_minimum_size = Vector2(36, 0)
+
+[node name="WmapZoomLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel/WmapZoomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="WmapZoomInBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel/WmapZoomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+custom_minimum_size = Vector2(36, 0)
+
+[node name="WmapDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel"]
+layout_mode = 2
+
+[node name="WmapCoordLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="WmapDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel"]
+layout_mode = 2
+
+[node name="WmapLegendLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="WmapLegendList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/WorldMapTab/WmapRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+
+; ------------------------------------------------------------------------------
+; Tab 1: TOWN_VIEW 城镇详情
+; ------------------------------------------------------------------------------
+
+[node name="TownViewTab" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_vertical = 3
+
+[node name="TownHeader" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/TownViewTab"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TownNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="TownTypeLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = ""
+
+[node name="TownDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/TownViewTab"]
+layout_mode = 2
+
+[node name="TownSplit" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer/TownViewTab"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 260
+
+[node name="TownLeftPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownSplit"]
+layout_mode = 2
+theme_override_constants/separation = 6
+size_flags_horizontal = 3
+
+[node name="TownFacilitySectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownSplit/TownLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="TownFacilityList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownSplit/TownLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 140)
+
+[node name="TownNpcSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownSplit/TownLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="TownNpcList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownSplit/TownLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 140)
+
+[node name="TownRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownSplit"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="TownDetailSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownSplit/TownRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="TownFacilityDetailLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TownViewTab/TownSplit/TownRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+size_flags_vertical = 3
+
+; ------------------------------------------------------------------------------
+; Tab 2: MARCHING 行军探索
+; ------------------------------------------------------------------------------
+
+[node name="MarchingTab" type="ScrollContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/MarchingTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="MarchSectionLabel1" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="MarchFromRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarchFromLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox/MarchFromRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="MarchFromOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox/MarchFromRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarchToRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MarchToLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox/MarchToRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="MarchToOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox/MarchToRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarchDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+layout_mode = 2
+
+[node name="MarchSectionLabel2" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="MarchRoutePreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="MarchEtaLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MarchTerrainLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+text = ""
+
+[node name="MarchDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+layout_mode = 2
+
+[node name="MarchSectionLabel3" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="MarchBtnBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="MarchStartBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox/MarchBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+[node name="MarchStopBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox/MarchBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+[node name="MarchDivider3" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+layout_mode = 2
+
+[node name="MarchSectionLabel4" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="MarchPartyStatusLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MarchingTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+
+; ------------------------------------------------------------------------------
+; Tab 3: SOVEREIGNTY 主权建国
+; ------------------------------------------------------------------------------
+
+[node name="SovereigntyTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 280
+
+[node name="SovLeftPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="SovTerritorySectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="SovTerritoryList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SovRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="SovNationSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="SovNationNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="SovMonarchLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="SovPopulationLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="SovTerritoryCountLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="SovLevelLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="SovDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+layout_mode = 2
+
+[node name="SovEstablishBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 36)
+
+[node name="SovSpacer" type="Control" parent="MarginContainer/VBox/MainTabContainer/SovereigntyTab/SovRightPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+; ------------------------------------------------------------------------------
+; Tab 4: TERRITORY 领地管理
+; ------------------------------------------------------------------------------
+
+[node name="TerritoryTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 240
+
+[node name="TerrLeftPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="TerrListSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="TerritoryList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TerrRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="TerrDetailSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="TerrResourceLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+
+[node name="TerrDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+layout_mode = 2
+
+[node name="TerrConstructionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="TerrConstructionBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+value = 0.0
+
+[node name="TerrDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+layout_mode = 2
+
+[node name="TerrGarrisonLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TerrSpacer" type="Control" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TerrUpgradeBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/TerritoryTab/TerrRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 36)
+
+; ------------------------------------------------------------------------------
+; Tab 5: PATHFINDING 寻路规划
+; ------------------------------------------------------------------------------
+
+[node name="PathfindingTab" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_vertical = 3
+
+[node name="PfHeaderSection" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PfStartRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab/PfHeaderSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PfStartLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab/PfHeaderSection/PfStartRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = ""
+
+[node name="PfStartOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab/PfHeaderSection/PfStartRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PfEndRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab/PfHeaderSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PfEndLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab/PfHeaderSection/PfEndRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = ""
+
+[node name="PfEndOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab/PfHeaderSection/PfEndRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PfCalcBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab/PfHeaderSection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 32)
+
+[node name="PfDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab"]
+layout_mode = 2
+
+[node name="PfRoutesSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="PfRouteList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+
+[node name="PfDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab"]
+layout_mode = 2
+
+[node name="PfRouteDetailLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+custom_minimum_size = Vector2(0, 80)
+
+[node name="PfAutoBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PathfindingTab"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 36)
+
+; ==============================================================================
+; 底部操作栏（右下角返回按钮）
+; ==============================================================================
+
+[node name="BottomBar" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BottomSpacer" type="Control" parent="MarginContainer/VBox/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BackBtn" type="Button" parent="MarginContainer/VBox/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)

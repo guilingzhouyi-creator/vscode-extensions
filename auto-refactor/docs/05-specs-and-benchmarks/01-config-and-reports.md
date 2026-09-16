@@ -30,6 +30,14 @@
 }
 ```
 
+**跨语言覆盖的 fail-closed 开关**：`unsupportedLanguage`（`error` | `warning` | `off`，默认 `error`）。当扫描范围内出现没有任何语言适配器认领的扩展名（如 `.py`/`.sh`/`.ps1`）时，引擎会产生 `LANG-UNSUPPORTED` 诊断而非静默回退 TypeScript 解析器——默认档会直接让 CI 失败，避免"零发现等于没问题"的假安全。详见 [内置分析器与规则 §10](../04-analyzers-and-rules/01-builtin-rules.md)。
+
+**阈值优先级（三层）**：每个分析器读取的调谐值按 `内置分析器默认值 < 全局 thresholds < 分析器自身 options` 合并，且只级联该分析器在 `defaultAnalyzerOptions()` 中声明过的键名，互不串扰。因此全局 `thresholds.complexityWarn` 会真正作用于复杂度分析器，而显式 `analyzers.complexity.options.complexityWarn` 始终最高优先。
+
+**字面量豁免策略**：`ignoreLiterals`（数组，默认 `[]`）让项目把结构性 token（`/`、`..`、`}`、`//`、`\n` 一类）从 `hardcoded-string` 与 `duplicate-literal` 两趟检查中豁免——这些 token 重复出现是语法使然，提取成常量只会增加噪声。匹配时带引号与不带引号两种写法都接受（`"/"` 与 `/` 等价）。它同样受三层优先级管辖：全局 `thresholds.ignoreLiterals` 提供项目级基线，`analyzers.constants.options.ignoreLiterals` 逐分析器覆盖。默认值为空数组是刻意设计——升级引擎不会静默减少消费方已有的门禁发现。
+
+**良性字面量分类（`classifyLiterals`）**：打开后，`magic-number`、`hardcoded-string`、`duplicate-literal` 三趟检查统一跳过 `classifyLiteral()` 判为 benign 的字面量——分隔符、空白与转义序列（含 `\n` 转义写法）、编码名（`utf8`/`base64`）、HTTP 动词、Python docstring 围栏（`"""`）。这些字面量重复出现是「词汇表」使然，本身不承载可提取语义；分类器关闭时引擎行为与旧版逐字节一致，因此默认值为 `false`。
+
 ---
 
 ## 2. 输出报告格式 (Output Formats)
@@ -42,3 +50,13 @@
 | **`sarif`** | OASIS 标准静态分析结果交换格式 (SARIF v2.1.0)。 | GitHub Code Scanning / 安全面板直接展示 |
 | **`text`** | 彩色终端高亮排版，附带文件名、行号、代码建议与摘要表格。 | 开发者本地 CLI 手动执行 |
 | **`compact`** | 单行精简格式 (`file:line:col: [severity] rule: message`)。 | 类 Unix 管道过滤 (`grep` / `awk`) |
+
+> **suppressions 匹配语义**：`matchFile` 接受**精确路径或 glob**（`scripts/**`、`app/cli/*.py`），
+> 与 `matchAnalyzer` / `matchRule` / `matchSymbol` 可组合，`reason` 必填；命中的发现**仍留在报告里**
+> 并标记 suppression（可审计），只是不再计入门禁阻断。
+
+`summary` 除计数外还带两个**自检字段**，用于区分「真零违规」与「规则没跑」：
+
+- `summary.disabledAnalyzers`：被有效配置关闭的分析器清单（`enabled === false`）；`text` 输出打印为 `skipped (disabled) analyzers: …`。
+- `summary.warnings`：配置自检提示——include 命中 0 文件、缓存回退重读建图、**语言包关闭却扫到了该语言的文件**（`.py` + `python-modern` 关闭、`.md` + `docs` 关闭）时的 `analyzer coverage:` 提示，以及增量口径下跳过跨文件通道的 `incremental scope:` 说明。
+- `summary.postScanPasses`：本报告实际执行的后处理通道（`suppressions` / `dependency-graph` / `baseline`，按执行顺序）。全量扫描含跨文件通道，增量扫描不含——消费方据此判断「这份报告能不能回答跨文件问题」。

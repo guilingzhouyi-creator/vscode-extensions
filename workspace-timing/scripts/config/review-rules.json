@@ -1,0 +1,314 @@
+{
+    "schema": "wt-review-rules/v1",
+    "name": "workspace-timing 自动化审查规则注册表（唯一事实源）",
+    "version": 7,
+    "description": "L0语法构建 / L1代码质量(由tsc+eslint承载) / L2结构 / L3工程治理 / L4性能 / L5重构审查。规则ID命名空间：LAY-结构 HC-硬编码 SCR-脚本规范 RCFG-审查配置 PERF-性能 TB-测试预算 ARF-auto-refactor 映射",
+    "gate": {
+        "blockOnSeverity": "error",
+        "strict": "ALL 非 PASS 状态（含 SKIP/NOT_AVAILABLE）一律阻断，供 CI 使用",
+        "default": "FAIL/CONFIG_ERROR/TIMEOUT 阻断；SKIP/NOT_AVAILABLE 降级放行但必须在报告中显式标注"
+    },
+    "execution": {
+        "maxConcurrency": 4,
+        "defaultTimeoutMs": 180000
+    },
+    "checkers": [
+        {
+            "id": "L0-COMPILE",
+            "layer": "L0",
+            "title": "TypeScript 编译零错误（tsc）",
+            "checker": "build/compile.ts",
+            "stage": 1,
+            "enabled": true,
+            "timeoutMs": 180000,
+            "origin": "native",
+            "ruleIds": [
+                "L0-COMPILE"
+            ]
+        },
+        {
+            "id": "L1-LINT",
+            "layer": "L1",
+            "title": "代码质量（eslint 全量：命名/未用/错误处理等规则族）",
+            "checker": "audit/code-quality.ts",
+            "stage": 1,
+            "enabled": true,
+            "timeoutMs": 120000,
+            "origin": "native",
+            "ruleIds": [
+                "L1-*"
+            ]
+        },
+        {
+            "id": "L2-LAYERS",
+            "layer": "L2",
+            "title": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明）",
+            "checker": "audit/layer-boundary.ts",
+            "stage": 1,
+            "enabled": true,
+            "timeoutMs": 60000,
+            "origin": "native",
+            "ruleIds": [
+                "LAY-IMPORT",
+                "LAY-CYCLE",
+                "LAY-UNRESOLVED"
+            ]
+        },
+        {
+            "id": "L3-HARDCODE",
+            "layer": "L3",
+            "title": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定",
+            "checker": "audit/hardcode.ts",
+            "stage": 1,
+            "enabled": true,
+            "timeoutMs": 60000,
+            "origin": "native",
+            "ruleIds": [
+                "HC-ABS-PATH",
+                "HC-UI-STRING",
+                "HC-CJK-LITERAL",
+                "HC-SECRET",
+                "HC-MAGIC-NUM"
+            ]
+        },
+        {
+            "id": "L3-SCRIPT-STANDARD",
+            "layer": "L3",
+            "title": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断）",
+            "checker": "audit/script-standard.ts",
+            "stage": 1,
+            "enabled": true,
+            "timeoutMs": 60000,
+            "origin": "webgames-derived",
+            "ruleIds": [
+                "SCR-NAMING",
+                "SCR-HEADER",
+                "SCR-ORPHAN",
+                "SCR-DANGLING"
+            ]
+        },
+        {
+            "id": "L3-DOC-LAYOUT",
+            "layer": "L3",
+            "title": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步",
+            "checker": "audit/text-layout.ts",
+            "stage": 1,
+            "enabled": true,
+            "timeoutMs": 60000,
+            "origin": "native",
+            "ruleIds": [
+                "DOC-CL-001",
+                "DOC-CL-002",
+                "DOC-CL-003",
+                "DOC-CL-004",
+                "DOC-CL-005",
+                "DOC-CL-006",
+                "DOC-RD-001",
+                "DOC-RD-002"
+            ]
+        },
+        {
+            "id": "L3-REVIEW-CONFIG",
+            "layer": "L3",
+            "title": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康",
+            "checker": "audit/review-config.ts",
+            "stage": 1,
+            "enabled": true,
+            "timeoutMs": 60000,
+            "origin": "webgames-derived",
+            "ruleIds": [
+                "RCFG-SCHEMA",
+                "RCFG-MATRIX",
+                "RCFG-RULE-DRIFT",
+                "RCFG-GLOBS",
+                "RCFG-TOOL-PATH"
+            ]
+        },
+        {
+            "id": "L0-TEST",
+            "layer": "L0",
+            "title": "单元测试全绿（mocha 全量）",
+            "checker": "test/unit.ts",
+            "stage": 2,
+            "enabled": true,
+            "timeoutMs": 300000,
+            "origin": "native",
+            "ruleIds": [
+                "L0-TEST"
+            ]
+        },
+        {
+            "id": "L4-TEST-BUDGET",
+            "layer": "L4",
+            "title": "测试套件时长预算回归（基线棘轮）",
+            "checker": "benchmark/test-budget.ts",
+            "stage": 2,
+            "enabled": true,
+            "timeoutMs": 300000,
+            "origin": "webgames-derived",
+            "ruleIds": [
+                "TB-REGRESSION",
+                "TB-NO-BASELINE"
+            ],
+            "consumeFrom": "L0-TEST",
+            "consumeNote": "编排器将 L0-TEST 的实测时长经 --consume-duration 复用，避免同一套件在同轮审查中重复执行"
+        },
+        {
+            "id": "L5-REFACTOR",
+            "layer": "L5",
+            "title": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级）",
+            "checker": "tooling/refactor-adapter.ts",
+            "stage": 1,
+            "enabled": true,
+            "timeoutMs": 600000,
+            "origin": "native",
+            "ruleIds": [
+                "ARF-*"
+            ]
+        }
+    ],
+    "layers": {
+        "comment": "依赖矩阵：src/ 五层 + i18n + 入口的 import 许可。语义见 scripts/README.md。集成层禁止依赖应用层/展现层（2026-09 审查修复项已固化）。",
+        "layerOf": {
+            "domain": "src/domain/",
+            "cache": "src/cache/",
+            "persistence": "src/persistence/",
+            "application": "src/application/",
+            "presentation": "src/presentation/",
+            "integration": "src/integration/",
+            "i18n": "src/i18n/",
+            "entry": "src/extension.ts"
+        },
+        "rules": {
+            "domain": {
+                "mayImportLayers": [
+                    "domain"
+                ],
+                "mayImportExternal": [],
+                "externalModules": []
+            },
+            "i18n": {
+                "mayImportLayers": [
+                    "i18n"
+                ],
+                "mayImportExternal": [],
+                "externalModules": []
+            },
+            "cache": {
+                "mayImportLayers": [
+                    "cache",
+                    "domain"
+                ],
+                "mayImportExternal": [
+                    "src/integration/Logger"
+                ],
+                "externalModules": []
+            },
+            "persistence": {
+                "mayImportLayers": [
+                    "persistence",
+                    "domain"
+                ],
+                "mayImportExternal": [
+                    "src/integration/Logger",
+                    "src/cache/IJournalStore"
+                ],
+                "externalModules": [
+                    "vscode",
+                    "fs",
+                    "path",
+                    "node:*"
+                ]
+            },
+            "application": {
+                "mayImportLayers": [
+                    "application",
+                    "domain",
+                    "cache",
+                    "persistence"
+                ],
+                "mayImportExternal": [
+                    "src/integration/Logger",
+                    "i18n"
+                ],
+                "externalModules": [
+                    "fs",
+                    "path",
+                    "node:*"
+                ]
+            },
+            "presentation": {
+                "mayImportLayers": [
+                    "presentation",
+                    "application",
+                    "domain"
+                ],
+                "mayImportExternal": [
+                    "src/integration/*",
+                    "i18n"
+                ],
+                "externalModules": [
+                    "vscode",
+                    "fs",
+                    "path",
+                    "node:*"
+                ]
+            },
+            "integration": {
+                "mayImportLayers": [
+                    "integration",
+                    "domain"
+                ],
+                "mayImportExternal": [
+                    "i18n"
+                ],
+                "externalModules": [
+                    "vscode"
+                ]
+            },
+            "entry": {
+                "mayImportLayers": [
+                    "*"
+                ],
+                "mayImportExternal": [
+                    "*"
+                ],
+                "externalModules": [
+                    "*"
+                ]
+            }
+        },
+        "matchingSemantics": "mayImportExternal 条目：'src/x/*' 前缀匹配文件；'src/integration/Logger' 精确文件；'i18n'（无/无*）整层匹配。persistence→src/cache/IJournalStore 为依赖倒置端口实现（消费方接口），属许可的例外。"
+    },
+    "hardcode": {
+        "magicNumber": {
+            "comment": "结构性常量豁免：domain/models.ts 是项目唯一常量家园；模板文件与测试不在扫描面；0/1/2 等计数基元不判违规",
+            "exemptPaths": [
+                "src/domain/",
+                "src/presentation/dashboardTemplate.ts",
+                "src/i18n/"
+            ],
+            "exemptValues": [
+                0,
+                1,
+                2,
+                -1
+            ]
+        },
+        "uiString": {
+            "scanPaths": [
+                "src/presentation/"
+            ],
+            "exemptPaths": [
+                "src/presentation/dashboardTemplate.ts"
+            ]
+        },
+        "secretPatterns": [
+            "BEGIN (RSA |EC )?PRIVATE KEY",
+            "ghp_[A-Za-z0-9]{20,}",
+            "github_pat_[A-Za-z0-9_]{20,}",
+            "sk-[A-Za-z0-9]{20,}",
+            "AKIA[0-9A-Z]{16}"
+        ]
+    }
+}

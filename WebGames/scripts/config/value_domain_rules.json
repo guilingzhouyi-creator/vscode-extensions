@@ -1,0 +1,482 @@
+{
+  "$schema": "scripts/config/value_domain_rules.schema.json",
+  "schema_version": 1,
+  "description": "卡拉尔世界引擎全域配置表值域与拓扑完整性声明式规则库（Phase 63 自动化脚本库泛化治理）",
+  "primitive_types": [
+    "required_sections",
+    "positive_num",
+    "bounded_range",
+    "range_ordered",
+    "enum_whitelist",
+    "array_elements_schema",
+    "unique_key",
+    "cross_field_dependency",
+    "foreign_key_reference",
+    "condition_tree",
+    "weights_sum"
+  ],
+  "rules": [
+    {
+      "rule_id": "VD_POTENTIAL_TIER_SIZE",
+      "primitive": "positive_num",
+      "target_file": "domains/potential.json",
+      "key_path": "point_cost/tier_size",
+      "params": { "allow_float": false, "min_exclusive": 0 },
+      "severity": "ERROR",
+      "description": "潜能突破阶梯尺寸必须为正整数，防止除零崩溃"
+    },
+    {
+      "rule_id": "VD_TELEMETRY_SALT_MODULUS",
+      "primitive": "positive_num",
+      "target_file": "domains/telemetry_account_lifecycle.json",
+      "key_path": "event_id/salt_modulus",
+      "params": { "allow_float": false, "min_exclusive": 0 },
+      "severity": "ERROR",
+      "description": "遥测事件加盐取模底数必须为正整数，防止取模除零崩溃"
+    },
+    {
+      "rule_id": "VD_LATTICE_LEARNER_NORMALIZE",
+      "primitive": "positive_num",
+      "target_file": "domains/lattice.json",
+      "key_path": "decompiler/learner_normalize",
+      "params": { "allow_float": true, "min_exclusive": 0.0 },
+      "severity": "ERROR",
+      "description": "晶格学习器归一化分母必须为正浮点数"
+    },
+    {
+      "rule_id": "VD_TRADING_SAFE_SUPPLY_FLOOR",
+      "primitive": "positive_num",
+      "target_file": "domains/trading.json",
+      "key_path": "market/safe_supply_floor",
+      "params": { "allow_float": true, "min_exclusive": 0.0 },
+      "severity": "ERROR",
+      "description": "交易市场安全供给下限必须为正浮点数，防止供需比除零"
+    },
+    {
+      "rule_id": "VD_HARDWARE_STICK_DEADZONE",
+      "primitive": "range_ordered",
+      "target_file": "domains/hardware_input.json",
+      "key_path_left": "stick_deadzone/inner",
+      "key_path_right": "stick_deadzone/outer",
+      "params": { "strict_less": true },
+      "severity": "ERROR",
+      "description": "手柄摇杆内死区必须严格小于外死区，防止死区倒置"
+    },
+    {
+      "rule_id": "VD_CHAR_DICE_DROP_LOWEST",
+      "primitive": "bounded_range",
+      "target_file": "domains/character_creation.json",
+      "key_path": "attribute_init/dice/drop_lowest",
+      "params": { "min_val": 0, "max_val_reference": "attribute_init/dice/count", "max_val_offset": -1, "inclusive": true },
+      "severity": "ERROR",
+      "description": "角色生成摇骰抛弃最低骰数必须在 [0, dice/count-1] 范围内"
+    },
+    {
+      "rule_id": "VD_CT_SCHEMA",
+      "primitive": "required_sections",
+      "target_file": "infrastructure/contracts.json",
+      "params": {
+        "sections": {
+          "entries": "list"
+        }
+      },
+      "severity": "ERROR",
+      "description": "契约注册表必须包含 entries 数组"
+    },
+    {
+      "rule_id": "VD_CT_CONTRACT_ID_UNIQUENESS",
+      "primitive": "unique_key",
+      "target_file": "infrastructure/contracts.json",
+      "array_path": "entries",
+      "item_key_path": "contract_id",
+      "params": {},
+      "severity": "ERROR",
+      "description": "契约条目 contract_id 必须全表唯一"
+    },
+    {
+      "rule_id": "VD_CT_ELEMENTS_SCHEMA",
+      "primitive": "array_elements_schema",
+      "target_file": "infrastructure/contracts.json",
+      "array_path": "entries",
+      "params": {
+        "required_fields": {
+          "contract_id": "non_empty_str",
+          "domain_name": "non_empty_str",
+          "view_name": "non_empty_str",
+          "endpoint_kind": "str"
+        }
+      },
+      "severity": "ERROR",
+      "description": "契约条目字段完整性规范"
+    },
+    {
+      "rule_id": "VD_CT_ENDPOINT_KIND",
+      "primitive": "enum_whitelist",
+      "target_file": "infrastructure/contracts.json",
+      "array_path": "entries",
+      "item_key_path": "endpoint_kind",
+      "params": { "whitelist": ["DTO", "EVENT", "COMMAND", "GM_READONLY"] },
+      "severity": "ERROR",
+      "description": "契约端点类型必须属于合法白名单枚举"
+    },
+    {
+      "rule_id": "VD_CT_INFRA_EXEMPT_CONSISTENCY",
+      "primitive": "cross_field_dependency",
+      "target_file": "infrastructure/contracts.json",
+      "array_path": "entries",
+      "params": {
+        "type": "infra_exempt_matches_infra_domains",
+        "infra_domains_path": "infra_domains",
+        "domain_field": "domain_name",
+        "exempt_field": "infra_exempt"
+      },
+      "severity": "ERROR",
+      "description": "条目 infra_exempt 必须与 infra_domains 集合一致"
+    },
+    {
+      "rule_id": "VD_LC_SCHEMA",
+      "primitive": "required_sections",
+      "target_file": "infrastructure/lifecycle.json",
+      "params": {
+        "sections": {
+          "timeouts": "dict"
+        }
+      },
+      "severity": "ERROR",
+      "description": "生命周期配置表必须包含 timeouts 对象"
+    },
+    {
+      "rule_id": "VD_LC_01",
+      "primitive": "range_ordered",
+      "target_file": "infrastructure/lifecycle.json",
+      "key_path_left": "timeouts/save_flush_timeout_seconds",
+      "key_path_right": "timeouts/shutdown_timeout_seconds",
+      "params": { "strict_less": true },
+      "severity": "ERROR",
+      "description": "停机总超时 shutdown_timeout_seconds 必须大于存盘超时 save_flush_timeout_seconds"
+    },
+    {
+      "rule_id": "VD_LC_02",
+      "primitive": "bounded_range",
+      "target_file": "infrastructure/lifecycle.json",
+      "key_path": "timeouts/force_kill_timeout_seconds",
+      "params": { "min_val": 1.0, "max_val": 10.0, "inclusive": true },
+      "severity": "ERROR",
+      "description": "强制杀进程超时 force_kill_timeout_seconds 必须在 [1.0, 10.0] 秒合理区间内"
+    },
+    {
+      "rule_id": "VD_LC_03",
+      "primitive": "bounded_range",
+      "target_file": "infrastructure/lifecycle.json",
+      "key_path": "timeouts/poll_interval_ms",
+      "params": { "min_val": 10, "max_val": 1000, "allow_float": false, "inclusive": true },
+      "severity": "ERROR",
+      "description": "停机轮询间隔 poll_interval_ms 必须在 [10, 1000] 毫秒整数区间内"
+    },
+    {
+      "rule_id": "VD_CDKEY_ELIGIBILITY",
+      "primitive": "array_elements_schema",
+      "target_file": "domains/cdkey_voucher.json",
+      "array_path": "eligibility_rules/rules",
+      "params": {
+        "required_fields": {
+          "rule_id": "non_empty_str",
+          "metric_key": "non_empty_str",
+          "operator": "str",
+          "value": "any"
+        },
+        "operator_whitelist": ["gte", "lte", "eq", "neq", "contains"]
+      },
+      "severity": "ERROR",
+      "description": "CDKey 兑换门槛规则结构合规校验"
+    },
+    {
+      "rule_id": "VD_ECONOMY_DYNAMIC_MARKET",
+      "primitive": "bounded_range",
+      "target_file": "domains/economy.json",
+      "key_path": "dynamic_market/time_decay_factor",
+      "params": { "min_val": 0.0, "max_val": 1.0, "inclusive": true },
+      "severity": "ERROR",
+      "description": "动态市场衰减系数必须在 [0.0, 1.0] 区间内"
+    },
+    {
+      "rule_id": "VD_ECONOMY_TIME_CYCLE_TICKS",
+      "primitive": "positive_num",
+      "target_file": "domains/economy.json",
+      "key_path": "dynamic_market/time_cycle_ticks",
+      "params": { "allow_float": false, "min_exclusive": 0 },
+      "severity": "ERROR",
+      "description": "动态市场时间周期 ticks 必须为正整数"
+    },
+    {
+      "rule_id": "VD_MAGIC_REQUIRED_SECTIONS",
+      "primitive": "required_sections",
+      "target_file": "domains/magic_rules.json",
+      "params": {
+        "sections": {
+          "attribute_schools": "dict",
+          "attributes": "dict",
+          "variants": "dict",
+          "multi_cast": "dict",
+          "seal": "dict",
+          "ascension": "dict",
+          "delay": "dict",
+          "combo_semantics": "dict"
+        }
+      },
+      "severity": "ERROR",
+      "description": "魔法规则表必需段齐全且为对象"
+    },
+    {
+      "rule_id": "VD_MAGIC_ATTR_SCHOOL_REF",
+      "primitive": "foreign_key_reference",
+      "target_file": "domains/magic_rules.json",
+      "source_dict_path": "attributes",
+      "source_item_key": "school",
+      "target_dict_path": "attribute_schools",
+      "params": {},
+      "severity": "ERROR",
+      "description": "属性所属体系必须在 attribute_schools 中登记"
+    },
+    {
+      "rule_id": "VD_MAGIC_SCHOOL_MEMBERS_REF",
+      "primitive": "foreign_key_reference",
+      "target_file": "domains/magic_rules.json",
+      "source_dict_path": "attribute_schools",
+      "source_item_key": "members",
+      "target_dict_path": "attributes",
+      "params": {},
+      "severity": "ERROR",
+      "description": "体系成员必须登记于 attributes"
+    },
+    {
+      "rule_id": "VD_MAGIC_SCHOOL_NORMATIVE_FORM",
+      "primitive": "enum_whitelist",
+      "target_file": "domains/magic_rules.json",
+      "array_path": "",
+      "item_key_path": "attribute_schools/*/normative_form",
+      "params": { "whitelist": ["LIGHT", "DARK"] },
+      "severity": "ERROR",
+      "description": "法式规范形态必须 ∈ {LIGHT, DARK}"
+    },
+    {
+      "rule_id": "VD_MAGIC_VARIANT_SOURCE_SCHOOLS",
+      "primitive": "foreign_key_reference",
+      "target_file": "domains/magic_rules.json",
+      "source_dict_path": "variants",
+      "source_item_key": "source_schools",
+      "target_dict_path": "attribute_schools",
+      "params": {},
+      "severity": "ERROR",
+      "description": "变体源体系必须登记于 attribute_schools"
+    },
+    {
+      "rule_id": "VD_MAGIC_VARIANT_OF_FORM",
+      "primitive": "enum_whitelist",
+      "target_file": "domains/magic_rules.json",
+      "item_key_path": "variants/*/variant_of_form",
+      "params": { "whitelist": [1, 2, 3, 4] },
+      "severity": "ERROR",
+      "description": "变体位阶形态必须 ∈ {1, 2, 3, 4}"
+    },
+    {
+      "rule_id": "VD_MAGIC_VARIANT_RANKED_BRANCH",
+      "primitive": "enum_whitelist",
+      "target_file": "domains/magic_rules.json",
+      "item_key_path": "variants/*/ranked_form_branch",
+      "params": { "whitelist": ["HOLY", "ABYSSAL"] },
+      "severity": "ERROR",
+      "description": "变体阶位分支必须 ∈ {HOLY, ABYSSAL}"
+    },
+    {
+      "rule_id": "VD_MAGIC_VARIANT_FUSION_CONDITIONS",
+      "primitive": "condition_tree",
+      "target_file": "domains/magic_rules.json",
+      "key_path": "variants/*/fusion_conditions",
+      "params": {},
+      "severity": "ERROR",
+      "description": "变体融合条件树合规校验"
+    },
+    {
+      "rule_id": "VD_MAGIC_COMBO_SEMANTICS",
+      "primitive": "enum_whitelist",
+      "target_file": "domains/magic_rules.json",
+      "item_key_path": "combo_semantics/*",
+      "params": { "whitelist": ["DEFINED", "PARTIAL", "BND_NOT_DEFINED"] },
+      "severity": "ERROR",
+      "description": "组合语义必须 ∈ {DEFINED, PARTIAL, BND_NOT_DEFINED}"
+    },
+    {
+      "rule_id": "VD_MAGIC_MULTI_CAST_BOUND",
+      "primitive": "bounded_range",
+      "target_file": "domains/magic_rules.json",
+      "key_path": "multi_cast/max_casts",
+      "params": { "min_val": 1, "max_val": 10, "allow_float": false, "inclusive": true },
+      "severity": "ERROR",
+      "description": "几重化上限必须在 1~10 整数范围内"
+    },
+    {
+      "rule_id": "VD_MAGIC_ASCENSION_MAX_RANK",
+      "primitive": "bounded_range",
+      "target_file": "domains/magic_rules.json",
+      "key_path": "ascension/max_rank",
+      "params": { "min_val": 1, "max_val": 11, "allow_float": false, "inclusive": true },
+      "severity": "ERROR",
+      "description": "位阶跃迁上限必须在 1~11 整数范围内"
+    },
+    {
+      "rule_id": "VD_MAGIC_ASCENSION_CONDITIONS",
+      "primitive": "condition_tree",
+      "target_file": "domains/magic_rules.json",
+      "key_path": "ascension/conditions",
+      "params": {},
+      "severity": "ERROR",
+      "description": "位阶跃迁条件树合规校验"
+    },
+    {
+      "rule_id": "VD_MAGIC_DELAY_ORDER",
+      "primitive": "range_ordered",
+      "target_file": "domains/magic_rules.json",
+      "key_path_left": "delay/min_steps",
+      "key_path_right": "delay/max_steps",
+      "params": { "strict_less": false },
+      "severity": "ERROR",
+      "description": "施法延时 min_steps 不得大于 max_steps"
+    },
+    {
+      "rule_id": "VD_COMBAT_REQUIRED_SECTIONS",
+      "primitive": "required_sections",
+      "target_file": "domains/combat.json",
+      "params": {
+        "sections": {
+          "card_pool_defaults": "dict",
+          "round_hand": "dict",
+          "draw_algorithm": "dict",
+          "ap_axis": "dict",
+          "guard_verbs": "list"
+        }
+      },
+      "severity": "ERROR",
+      "description": "战斗配置必需段齐全"
+    },
+    {
+      "rule_id": "VD_COMBAT_CARD_POOL_DEFAULTS",
+      "primitive": "array_elements_schema",
+      "target_file": "domains/combat.json",
+      "array_path": "card_pool_defaults",
+      "params": {
+        "required_fields": {
+          "card_category": "non_empty_str",
+          "magic_ref": "str",
+          "effects": "list"
+        },
+        "single_object": true
+      },
+      "severity": "ERROR",
+      "description": "战斗卡池默认值结构合规"
+    },
+    {
+      "rule_id": "VD_COMBAT_CARD_POOL_KIND",
+      "primitive": "enum_whitelist",
+      "target_file": "domains/combat.json",
+      "key_path": "card_pool_defaults/card_pool",
+      "params": { "whitelist": ["random", "skill", "ultimate"] },
+      "severity": "ERROR",
+      "description": "战斗卡池类型必须 ∈ {random, skill, ultimate}"
+    },
+    {
+      "rule_id": "VD_COMBAT_ROUND_HAND_CAP",
+      "primitive": "positive_num",
+      "target_file": "domains/combat.json",
+      "key_path": "round_hand/hand_cap",
+      "params": { "allow_float": false, "min_exclusive": 0 },
+      "severity": "ERROR",
+      "description": "战斗回合手牌上限必须为 >= 1 整数"
+    },
+    {
+      "rule_id": "VD_COMBAT_DRAW_PER_ROUND",
+      "primitive": "positive_num",
+      "target_file": "domains/combat.json",
+      "key_path": "round_hand/draw_per_round",
+      "params": { "allow_float": false, "min_exclusive": 0 },
+      "severity": "ERROR",
+      "description": "战斗每回合抽牌数必须为 >= 1 整数"
+    },
+    {
+      "rule_id": "VD_COMBAT_DRAW_POLICY",
+      "primitive": "enum_whitelist",
+      "target_file": "domains/combat.json",
+      "key_path": "round_hand/end_of_round_policy",
+      "params": { "whitelist": ["DISCARD", "KEEP"] },
+      "severity": "ERROR",
+      "description": "战斗回合末手牌处理策略必须 ∈ {DISCARD, KEEP}"
+    },
+    {
+      "rule_id": "VD_COMBAT_DRAW_MODE",
+      "primitive": "enum_whitelist",
+      "target_file": "domains/combat.json",
+      "key_path": "draw_algorithm/mode",
+      "params": { "whitelist": ["PURE", "PRD", "HYBRID"] },
+      "severity": "ERROR",
+      "description": "抽卡算法模式必须 ∈ {PURE, PRD, HYBRID}"
+    },
+    {
+      "rule_id": "VD_COMBAT_AP_AXIS_ORDER",
+      "primitive": "range_ordered",
+      "target_file": "domains/combat.json",
+      "key_path_left": "ap_axis/init_min",
+      "key_path_right": "ap_axis/init_max",
+      "params": { "strict_less": false },
+      "severity": "ERROR",
+      "description": "行动力 AP 轴 init_min 不得大于 init_max"
+    },
+    {
+      "rule_id": "VD_COMBAT_CARD_WEIGHTS_SUM",
+      "primitive": "weights_sum",
+      "target_file": "domains/combat.json",
+      "key_path": "card_pool_weights",
+      "params": { "target_sum": 1.0, "tolerance": 0.01 },
+      "severity": "ERROR",
+      "description": "卡池权重合计应约等于 1.0"
+    },
+    {
+      "rule_id": "VD_COMBAT_ULTIMATE_TRIGGER",
+      "primitive": "condition_tree",
+      "target_file": "domains/combat.json",
+      "key_path": "ultimate_slot/trigger",
+      "params": {},
+      "severity": "ERROR",
+      "description": "大招槽触发条件树合规校验"
+    },
+    {
+      "rule_id": "VD_COMBAT_HAND_DISTRIBUTION_SUM",
+      "primitive": "weights_sum",
+      "target_file": "domains/combat.json",
+      "key_path": "round_hand/hand_count_distribution",
+      "params": { "target_sum": 1.0, "tolerance": 0.01 },
+      "severity": "ERROR",
+      "description": "手牌数量离散概率权重合计必须近似为 1.0"
+    },
+    {
+      "rule_id": "VD_COMBAT_TIMELINE_EVENT_WEIGHTS_SUM",
+      "primitive": "weights_sum",
+      "target_file": "domains/combat.json",
+      "key_path": "tertiary_timeline/event_type_weights",
+      "params": { "target_sum": 1.0, "tolerance": 0.01 },
+      "severity": "ERROR",
+      "description": "第三时间轴事件类型权重合计必须近似为 1.0"
+    },
+    {
+      "rule_id": "VD_ERRORS_CATALOG_SECTIONS",
+      "primitive": "required_sections",
+      "target_file": "infrastructure/errors_catalog.json",
+      "params": {
+        "sections": {
+          "errors": "dict"
+        }
+      },
+      "severity": "ERROR",
+      "description": "全域错误码注册表顶层必需节结构校验"
+    }
+  ]
+}

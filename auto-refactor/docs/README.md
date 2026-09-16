@@ -11,6 +11,7 @@
 * [01-system-overview.md](./01-architecture/01-system-overview.md)：系统整体架构、多执行模式、并发 Worker 调度与 RSS 内存自愈。
 * [02-pipeline-and-caching.md](./01-architecture/02-pipeline-and-caching.md)：L1 内存缓存 + L2 磁盘持久缓存架构与配置指纹隔离机制。
 * [03-daemon-and-ipc.md](./01-architecture/03-daemon-and-ipc.md)：跨平台 Daemon 守护进程、NDJSON 通信协议与进程自愈。
+* [04-praxis-git-fractal-and-gating-spec.md](./01-architecture/04-praxis-git-fractal-and-gating-spec.md)：Praxis 分形 Git 工作树、两级门禁、三层联动回滚与智能体生命周期规范（v1.0.0-PROD-SPEC）。
 
 ### 🌲 02. 语法解析与 AST 适配 (Parsers & AST)
 * [01-multilang-abstraction.md](./02-parsers-and-ast/01-multilang-abstraction.md)：`NormalizedNode` 统一通用抽象与 Rust (Tree-Sitter) 语言适配。
@@ -20,6 +21,7 @@
 ### ⚡ 03. 增量计算与 Diff 接入 (Incremental & Diff)
 * [01-line-level-incremental.md](./03-incremental-and-diff/01-line-level-incremental.md)：行级增量子树复用 (`reuseSubtree`) 与 LineMap 坐标平移。
 * [02-diff-interface-spec.md](./03-incremental-and-diff/02-diff-interface-spec.md)：Diff 接入规格、UTF-8 字节转码与 `scanDiff` / `scanDiffDelta` 双 API。
+* [03-praxis-integration-guide.md](./03-incremental-and-diff/03-praxis-integration-guide.md)：Praxis 团队接口改造、五大 SPI 扩展插槽与定制 Diff 底座接入报告（另见 [PRAXIS_HANDOFF_REPORT.md](./PRAXIS_HANDOFF_REPORT.md) 交付摘要）。
 
 ### 🔍 04. 规则引擎与内置分析器 (Analyzers & Rules)
 * [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：常量提取 (`constants`)、圈复杂度 (`complexity`)、大文件拆分 (`fileSize`) 内置规则。
@@ -28,6 +30,10 @@
 ### 📊 05. 规范、配置与性能基准 (Specs & Benchmarks)
 * [01-config-and-reports.md](./05-specs-and-benchmarks/01-config-and-reports.md)：`config.schema.json` 规则配置与 JSON / SARIF / Text 报告格式。
 * [02-performance-benchmarks.md](./05-specs-and-benchmarks/02-performance-benchmarks.md)：基准性能矩阵、吞吐量 Benchmark 与理论性能边界。
+* [03-comment-and-header-standard.md](./05-specs-and-benchmarks/03-comment-and-header-standard.md)：注释与文件头工业契约 v1.0.0（六字段模板、公有 API JSDoc、ESLint/Prettier/strict 门禁与棘轮纪律）。
+* [04-cross-language-generalization.md](./05-specs-and-benchmarks/04-cross-language-generalization.md)：跨语言泛化审查方法与能力矩阵——四层边界、中立性不变量、新项目接入流程与已登记缺口。
+* [05-consumer-integration.md](./05-specs-and-benchmarks/05-consumer-integration.md)：消费方接入规范——配置模板、通用 runner、基线棘轮、退出码契约与 CI 样例。
+* [06-modernization-program.md](./05-specs-and-benchmarks/06-modernization-program.md)：六域现代化改造计划——常量化、规则集集中管理、性能再优化、命名规范、多语言规范化、现代化写法检测。
 
 ### 📐 06. 架构图表 (Diagrams)
 * [class-diagram.mermaid](./diagrams/class-diagram.mermaid)：核心系统类图

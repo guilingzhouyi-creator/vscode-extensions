@@ -1,0 +1,668 @@
+{
+  "fe01_account_entry": {
+    "default_server_id": "LOCAL_OFFLINE",
+    "default_race": "HUMAN",
+    "min_username_len": 3,
+    "default_servers": [
+      {
+        "id": "LOCAL_OFFLINE",
+        "name": "单机离线·瓦尔兰大陆",
+        "status": "ONLINE",
+        "ping_ms": 0
+      },
+      {
+        "id": "SERVER_01",
+        "name": "启蒙之森 [电信]",
+        "status": "ONLINE",
+        "ping_ms": 18
+      }
+    ],
+    "err_empty_username": "用户名不能为空",
+    "err_username_too_short": "用户名长度需大于等于3"
+  },
+  "fe02_main_hud": {
+    "max_terminal_lines": 100,
+    "default_hp": 100.0,
+    "default_mp": 50.0,
+    "default_ap": 10.0,
+    "default_action_slots": [
+      {
+        "slot": 1,
+        "skill_id": "SKILL_SLASH",
+        "cd_remain": 0.0,
+        "icon": "res://icon.svg"
+      },
+      {
+        "slot": 2,
+        "skill_id": "SKILL_FIREBALL",
+        "cd_remain": 3.5,
+        "icon": "res://icon.svg"
+      }
+    ],
+    "chat_input_placeholder": "输入聊天或 / 命令…",
+    "completion_no_match": "无匹配命令",
+    "completion_page_hint": "第 %d/%d 页 · Tab 应用最近匹配"
+  },
+  "fe03_character_progression": {
+    "base_attributes": {
+      "STR": 10,
+      "AGI": 10,
+      "CON": 10,
+      "INT": 10,
+      "WIS": 10,
+      "CHA": 10
+    },
+    "default_potential_points": 5,
+    "default_equipped_slots": {
+      "MAIN_HAND": null,
+      "CHEST": null,
+      "LEGS": null
+    },
+    "mock_inventory_items": [
+      {
+        "id": "ITEM_SWORD_MITHRIL",
+        "name": "ui.fe03.mock.item.sword_mithril",
+        "category": "WEAPON",
+        "qty": 1,
+        "weight": 3.5
+      },
+      {
+        "id": "ITEM_SWORD_IRON",
+        "name": "ui.fe03.mock.item.sword_iron",
+        "category": "WEAPON",
+        "qty": 1,
+        "weight": 2.8
+      },
+      {
+        "id": "ITEM_STAFF_MAGIC",
+        "name": "ui.fe03.mock.item.staff_magic",
+        "category": "WEAPON",
+        "qty": 1,
+        "weight": 1.5
+      },
+      {
+        "id": "ITEM_ARMOR_LEATHER",
+        "name": "ui.fe03.mock.item.armor_leather",
+        "category": "ARMOR",
+        "qty": 1,
+        "weight": 4.0
+      },
+      {
+        "id": "ITEM_HELM_IRON",
+        "name": "ui.fe03.mock.item.helm_iron",
+        "category": "ARMOR",
+        "qty": 1,
+        "weight": 2.0
+      },
+      {
+        "id": "ITEM_LEGS_CHAIN",
+        "name": "ui.fe03.mock.item.legs_chain",
+        "category": "ARMOR",
+        "qty": 1,
+        "weight": 3.5
+      },
+      {
+        "id": "ITEM_POTION_HP",
+        "name": "ui.fe03.mock.item.potion_hp",
+        "category": "CONSUMABLE",
+        "qty": 5,
+        "weight": 0.5
+      },
+      {
+        "id": "ITEM_POTION_MP",
+        "name": "ui.fe03.mock.item.potion_mp",
+        "category": "CONSUMABLE",
+        "qty": 3,
+        "weight": 0.5
+      },
+      {
+        "id": "ITEM_HERB_ANTIDOTE",
+        "name": "ui.fe03.mock.item.herb_antidote",
+        "category": "CONSUMABLE",
+        "qty": 2,
+        "weight": 0.1
+      },
+      {
+        "id": "ITEM_ORE_MITHRIL",
+        "name": "ui.fe03.mock.item.ore_mithril",
+        "category": "MATERIAL",
+        "qty": 3,
+        "weight": 1.0
+      },
+      {
+        "id": "ITEM_SCALE_DRAGON",
+        "name": "ui.fe03.mock.item.scale_dragon",
+        "category": "MATERIAL",
+        "qty": 1,
+        "weight": 0.8
+      },
+      {
+        "id": "ITEM_HERB_MAGIC",
+        "name": "ui.fe03.mock.item.herb_magic",
+        "category": "MATERIAL",
+        "qty": 4,
+        "weight": 0.2
+      }
+    ],
+    "mock_skill_nodes": [
+      {
+        "id": "SKILL_SLASH",
+        "name": "ui.fe03.mock.skill.slash",
+        "level": 3,
+        "status": "LEARNED",
+        "desc": "ui.fe03.mock.skill.slash.desc"
+      },
+      {
+        "id": "SKILL_FIREBALL",
+        "name": "ui.fe03.mock.skill.fireball",
+        "level": 2,
+        "status": "LEARNED",
+        "desc": "ui.fe03.mock.skill.fireball.desc"
+      },
+      {
+        "id": "SKILL_DASH",
+        "name": "ui.fe03.mock.skill.dash",
+        "level": 1,
+        "status": "LEARNED",
+        "desc": "ui.fe03.mock.skill.dash.desc"
+      },
+      {
+        "id": "SKILL_FORGE",
+        "name": "ui.fe03.mock.skill.forge",
+        "level": 0,
+        "status": "LOCKED",
+        "desc": "ui.fe03.mock.skill.forge.desc"
+      },
+      {
+        "id": "SKILL_DRAGON",
+        "name": "ui.fe03.mock.skill.dragon",
+        "level": 0,
+        "status": "LOCKED",
+        "desc": "ui.fe03.mock.skill.dragon.desc"
+      }
+    ],
+    "mock_titles": [
+      {
+        "id": "TITLE_SWORD_MASTER",
+        "name": "ui.fe03.mock.title.sword_master",
+        "rank": "ui.fe03.title.rank.heroic",
+        "equipped": true
+      },
+      {
+        "id": "TITLE_ARCH_MAGE",
+        "name": "ui.fe03.mock.title.arch_mage",
+        "rank": "ui.fe03.title.rank.heroic",
+        "equipped": false
+      },
+      {
+        "id": "TITLE_MAGIC_SWORD",
+        "name": "ui.fe03.mock.title.magic_sword",
+        "rank": "ui.fe03.title.rank.heroic",
+        "equipped": false
+      },
+      {
+        "id": "TITLE_DRAGON_SLAYER",
+        "name": "ui.fe03.mock.title.dragon_slayer",
+        "rank": "ui.fe03.title.rank.legendary",
+        "equipped": false
+      },
+      {
+        "id": "TITLE_EXPLORER",
+        "name": "ui.fe03.mock.title.explorer",
+        "rank": "ui.fe03.title.rank.mortal",
+        "equipped": false
+      }
+    ]
+  },
+  "fe04_combat_view": {
+    "default_text_lifetime": 1.0
+  },
+  "fe05_economy_trade": {
+    "default_shop_title": "瓦尔兰老铁匠杂货铺",
+    "gold_to_copper": 10000,
+    "silver_to_copper": 100,
+    "crystal_to_copper": 12000,
+    "sell_back_ratio": 0.7,
+    "commodity_prices": {},
+    "default_shop_items": [
+      {
+        "id": "IRON_SWORD",
+        "name": "ui.fe05.mock.shop.iron_sword",
+        "price_copper": 5000,
+        "stock": 12
+      },
+      {
+        "id": "HEALTH_POTION",
+        "name": "ui.fe05.mock.shop.health_potion",
+        "price_copper": 800,
+        "stock": 45
+      },
+      {
+        "id": "MANA_CRYSTAL_S",
+        "name": "ui.fe05.mock.shop.mana_crystal_s",
+        "price_copper": 12000,
+        "stock": 3
+      }
+    ],
+    "auction_items_mock": [
+      {
+        "name": "ui.fe05.mock.auction.mithril_ingot",
+        "category": "ui.fe05.auction.cat_material",
+        "current_bid": 8500,
+        "buyout": 12000,
+        "seller": "ui.fe05.mock.seller.iron_forge"
+      },
+      {
+        "name": "ui.fe05.mock.auction.ancient_scroll",
+        "category": "ui.fe05.auction.cat_scroll",
+        "current_bid": 15000,
+        "buyout": 25000,
+        "seller": "ui.fe05.mock.seller.arcane_academy"
+      },
+      {
+        "name": "ui.fe05.mock.auction.dragon_scale",
+        "category": "ui.fe05.auction.cat_material",
+        "current_bid": 22000,
+        "buyout": 35000,
+        "seller": "ui.fe05.mock.seller.dragon_slayer"
+      },
+      {
+        "name": "ui.fe05.mock.auction.wind_bow",
+        "category": "ui.fe05.auction.cat_weapon",
+        "current_bid": 6800,
+        "buyout": 10000,
+        "seller": "ui.fe05.mock.seller.ranger_camp"
+      }
+    ],
+    "auction_my_listings_mock": [
+      {
+        "name": "ui.fe05.mock.listing.iron_ore",
+        "ask_price": 900,
+        "status": "ui.fe05.auction.status_selling",
+        "expires": "ui.fe05.mock.listing.expires_2d"
+      },
+      {
+        "name": "ui.fe05.mock.listing.old_leather",
+        "ask_price": 300,
+        "status": "ui.fe05.auction.status_sold",
+        "expires": "ui.fe05.mock.listing.expires_none"
+      }
+    ],
+    "caravan_list_mock": [
+      {
+        "name": "ui.fe05.mock.caravan.silver_grove",
+        "route": "ui.fe05.mock.route.silver_to_valan",
+        "status": "ui.fe05.logistics.status_transit",
+        "cargo": "ui.fe05.mock.cargo.herbs",
+        "freight": 500,
+        "escort": "ui.fe05.logistics.escort_done"
+      },
+      {
+        "name": "ui.fe05.mock.caravan.iron_freight",
+        "route": "ui.fe05.mock.route.iron_to_valan",
+        "status": "ui.fe05.logistics.status_waiting",
+        "cargo": "ui.fe05.mock.cargo.iron_ore",
+        "freight": 800,
+        "escort": "ui.fe05.logistics.escort_pending"
+      },
+      {
+        "name": "ui.fe05.mock.caravan.dragon_expedition",
+        "route": "ui.fe05.mock.route.dragon_to_iron",
+        "status": "ui.fe05.logistics.status_escort",
+        "cargo": "ui.fe05.mock.cargo.mana_stone",
+        "freight": 2000,
+        "escort": "ui.fe05.logistics.escort_mercenary"
+      }
+    ],
+    "resource_pools_mock": [
+      {
+        "name": "ui.fe05.commodity.wood",
+        "current": 1200,
+        "max": 2000,
+        "rate": 15
+      },
+      {
+        "name": "ui.fe05.commodity.iron_ore",
+        "current": 800,
+        "max": 1500,
+        "rate": 8
+      },
+      {
+        "name": "ui.fe05.commodity.mana_crystal",
+        "current": 45,
+        "max": 100,
+        "rate": 2
+      },
+      {
+        "name": "ui.fe05.commodity.herbs",
+        "current": 320,
+        "max": 500,
+        "rate": 5
+      }
+    ]
+  },
+  "fe06_gacha_wish": {
+    "default_banner_id": "BANNER_LIMITED_WARRIOR",
+    "default_pity_counter": 45,
+    "cost_single_pull": 160,
+    "cost_ten_pull": 1600,
+    "banners_mock": [
+      {
+        "banner_id": "BANNER_LIMITED_WARRIOR",
+        "title": "ui.fe06.mock.banner.limited_warrior.title",
+        "subtitle": "ui.fe06.mock.banner.limited_warrior.subtitle",
+        "remaining_time": "ui.fe06.mock.banner.limited_warrior.remaining",
+        "up_items": [
+          {
+            "name": "ui.fe06.mock.item.flame_knight",
+            "rarity": "5",
+            "is_new": true
+          },
+          {
+            "name": "ui.fe06.mock.item.dragon_spine_greatsword",
+            "rarity": "5",
+            "is_new": false
+          },
+          {
+            "name": "ui.fe06.mock.item.wind_shortbow",
+            "rarity": "4",
+            "is_new": false
+          }
+        ]
+      },
+      {
+        "banner_id": "BANNER_PERMANENT",
+        "title": "ui.fe06.mock.banner.permanent.title",
+        "subtitle": "ui.fe06.mock.banner.permanent.subtitle",
+        "remaining_time": "ui.fe06.mock.banner.permanent.remaining",
+        "up_items": [
+          {
+            "name": "ui.fe06.mock.item.mithril_guardian",
+            "rarity": "5",
+            "is_new": false
+          },
+          {
+            "name": "ui.fe06.mock.item.arcane_staff",
+            "rarity": "4",
+            "is_new": true
+          },
+          {
+            "name": "ui.fe06.mock.item.healing_potion_l",
+            "rarity": "3",
+            "is_new": false
+          }
+        ]
+      }
+    ]
+  },
+  "fe07_quest_causality": {
+    "default_filter": 0
+  },
+  "fe08_mail_system": {
+    "max_mailbox_capacity": 100
+  },
+  "fe09_guild_social": {
+    "manage_roles": [
+      "LEADER",
+      "OFFICER"
+    ],
+    "guild_name": "ui.fe09.mock.guild_name",
+    "guild_announcement": "ui.fe09.mock.guild_announcement",
+    "guild_leader": "ui.fe09.mock.guild_leader",
+    "guild_level": 7,
+    "guild_funds": 128500,
+    "max_guild_members": 50,
+    "max_chat_lines": 200,
+    "local_player_name": "ui.fe09.mock.local_player_name",
+    "trade_partner": "ui.fe09.mock.trade_partner"
+  },
+  "fe10_world_map": {
+    "default_town_id": "TOWN_VALAN",
+    "min_zoom": 0.5,
+    "max_zoom": 3.0,
+    "default_zoom": 1.0
+  },
+  "fe11_monster_ecology": {
+    "max_risk_pct": 100.0
+  },
+  "fe12_crafting_workshop": {
+    "success_rate_decay_per_level": 0.05,
+    "min_success_rate": 0.1,
+    "max_success_rate": 1.0,
+    "dismantle_items_mock": [
+      {
+        "name": "ui.fe12.mock.dismantle.old_sword",
+        "rarity": "COMMON",
+        "category": "weapon",
+        "qty": 2,
+        "yield": [
+          {
+            "name": "ui.fe12.mock.material.iron_ore",
+            "qty": 3
+          }
+        ]
+      },
+      {
+        "name": "ui.fe12.mock.dismantle.old_leather",
+        "rarity": "COMMON",
+        "category": "armor",
+        "qty": 1,
+        "yield": [
+          {
+            "name": "ui.fe12.mock.material.leather",
+            "qty": 2
+          }
+        ]
+      },
+      {
+        "name": "ui.fe12.mock.dismantle.broken_staff",
+        "rarity": "RARE",
+        "category": "weapon",
+        "qty": 1,
+        "yield": [
+          {
+            "name": "ui.fe12.mock.material.mana_shard",
+            "qty": 2
+          },
+          {
+            "name": "ui.fe12.mock.material.wood",
+            "qty": 2
+          }
+        ]
+      },
+      {
+        "name": "ui.fe12.mock.dismantle.excess_mithril",
+        "rarity": "RARE",
+        "category": "material",
+        "qty": 5,
+        "yield": [
+          {
+            "name": "ui.fe12.mock.material.mana_shard",
+            "qty": 1
+          }
+        ]
+      }
+    ],
+    "forge_recipes_mock": [
+      {
+        "name": "ui.fe12.mock.forge.mithril_sword",
+        "rarity": "RARE",
+        "category": "weapon",
+        "materials": [
+          {
+            "name": "ui.fe12.mock.material.mithril_ingot",
+            "qty": 3
+          },
+          {
+            "name": "ui.fe12.mock.material.iron_ore",
+            "qty": 2
+          }
+        ],
+        "enhancement_level": 0,
+        "learned": true
+      },
+      {
+        "name": "ui.fe12.mock.forge.leather_armor",
+        "rarity": "COMMON",
+        "category": "armor",
+        "materials": [
+          {
+            "name": "ui.fe12.mock.material.leather",
+            "qty": 4
+          },
+          {
+            "name": "ui.fe12.mock.material.thread",
+            "qty": 2
+          }
+        ],
+        "enhancement_level": 2,
+        "learned": true
+      },
+      {
+        "name": "ui.fe12.mock.forge.wind_bow",
+        "rarity": "RARE",
+        "category": "weapon",
+        "materials": [
+          {
+            "name": "ui.fe12.mock.material.wood",
+            "qty": 5
+          },
+          {
+            "name": "ui.fe12.mock.material.thread",
+            "qty": 1
+          }
+        ],
+        "enhancement_level": 0,
+        "learned": false
+      },
+      {
+        "name": "ui.fe12.mock.forge.arcane_staff",
+        "rarity": "EPIC",
+        "category": "weapon",
+        "materials": [
+          {
+            "name": "ui.fe12.mock.material.mana_shard",
+            "qty": 6
+          },
+          {
+            "name": "ui.fe12.mock.material.wood",
+            "qty": 3
+          }
+        ],
+        "enhancement_level": 0,
+        "learned": true
+      },
+      {
+        "name": "ui.fe12.mock.forge.dragon_armor",
+        "rarity": "LEGENDARY",
+        "category": "armor",
+        "materials": [
+          {
+            "name": "ui.fe12.mock.material.dragon_scale",
+            "qty": 8
+          },
+          {
+            "name": "ui.fe12.mock.material.mithril_ingot",
+            "qty": 4
+          }
+        ],
+        "enhancement_level": 0,
+        "learned": false
+      }
+    ],
+    "materials_mock": [
+      {
+        "name": "ui.fe12.mock.material.iron_ore",
+        "rarity": "COMMON",
+        "category": "ore",
+        "qty": 25,
+        "desc": "ui.fe12.mock.material.iron_ore.desc",
+        "source": "ui.fe12.mock.material.iron_ore.source"
+      },
+      {
+        "name": "ui.fe12.mock.material.mithril_ingot",
+        "rarity": "RARE",
+        "category": "ore",
+        "qty": 8,
+        "desc": "ui.fe12.mock.material.mithril_ingot.desc",
+        "source": "ui.fe12.mock.material.mithril_ingot.source"
+      },
+      {
+        "name": "ui.fe12.mock.material.mana_shard",
+        "rarity": "EPIC",
+        "category": "crystal",
+        "qty": 12,
+        "desc": "ui.fe12.mock.material.mana_shard.desc",
+        "source": "ui.fe12.mock.material.mana_shard.source"
+      },
+      {
+        "name": "ui.fe12.mock.material.dragon_scale",
+        "rarity": "LEGENDARY",
+        "category": "misc",
+        "qty": 2,
+        "desc": "ui.fe12.mock.material.dragon_scale.desc",
+        "source": "ui.fe12.mock.material.dragon_scale.source"
+      },
+      {
+        "name": "ui.fe12.mock.material.herb",
+        "rarity": "COMMON",
+        "category": "herb",
+        "qty": 30,
+        "desc": "ui.fe12.mock.material.herb.desc",
+        "source": "ui.fe12.mock.material.herb.source"
+      },
+      {
+        "name": "ui.fe12.mock.material.leather",
+        "rarity": "COMMON",
+        "category": "leather",
+        "qty": 15,
+        "desc": "ui.fe12.mock.material.leather.desc",
+        "source": "ui.fe12.mock.material.leather.source"
+      },
+      {
+        "name": "ui.fe12.mock.material.wood",
+        "rarity": "COMMON",
+        "category": "wood",
+        "qty": 40,
+        "desc": "ui.fe12.mock.material.wood.desc",
+        "source": "ui.fe12.mock.material.wood.source"
+      },
+      {
+        "name": "ui.fe12.mock.material.thread",
+        "rarity": "COMMON",
+        "category": "misc",
+        "qty": 18,
+        "desc": "ui.fe12.mock.material.thread.desc",
+        "source": "ui.fe12.mock.material.thread.source"
+      }
+    ]
+  },
+  "fe13_grimoire_authoring": {
+    "default_author": "PLAYER_01"
+  },
+  "fe14_notification_bulletin": {
+    "default_toast_duration": 3.0
+  },
+  "fe15_settings_center": {
+    "default_volume_master": 1.0,
+    "default_volume_bgm": 0.8,
+    "default_volume_se": 1.0,
+    "default_resolution": "1920x1080",
+    "revert_timeout_seconds": 15.0,
+    "default_locale": "zh_CN"
+  },
+  "fe16_system_save": {
+    "default_slot_prefix": "SLOT_"
+  },
+  "fe17_misc_edge": {
+    "default_real_name": "真实姓名·亚瑟"
+  },
+  "rarity_labels": {
+    "common": "普通",
+    "uncommon": "精良",
+    "rare": "稀有",
+    "epic": "史诗",
+    "legendary": "传说",
+    "unknown": "未知"
+  }
+}

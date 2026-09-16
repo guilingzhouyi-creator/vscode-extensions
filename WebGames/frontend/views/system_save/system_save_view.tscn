@@ -1,0 +1,529 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8systemsave016"]
+
+[ext_resource type="Script" path="res://frontend/views/system_save/system_save_view.gd" id="1_syssave"]
+
+[node name="SystemSaveView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_syssave")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TabContainer" type="TabContainer" parent="MainLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+; =========================================================================
+; Tab 1: 存档槽位
+; =========================================================================
+[node name="存档槽位" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+split_offset = 320
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/存档槽位"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/存档槽位/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/存档槽位/LeftPanel"]
+layout_mode = 2
+
+[node name="ItemListSaveSlots" type="ItemList" parent="MainLayout/TabContainer/存档槽位/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/存档槽位"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+layout_mode = 2
+
+[node name="PanelSlotThumbnail" type="PanelContainer" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 160)
+
+[node name="ThumbnailPlaceholder" type="VBoxContainer" parent="MainLayout/TabContainer/存档槽位/RightPanel/PanelSlotThumbnail"]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/存档槽位/RightPanel/PanelSlotThumbnail/ThumbnailPlaceholder"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelSlotCharName" type="Label" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="LabelSlotLevel" type="Label" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelSlotPlaytime" type="Label" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelSlotSaveDate" type="Label" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="ActionButtons" type="HBoxContainer" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BtnSaveToSlot" type="Button" parent="MainLayout/TabContainer/存档槽位/RightPanel/ActionButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnLoadFromSlot" type="Button" parent="MainLayout/TabContainer/存档槽位/RightPanel/ActionButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnDeleteSlot" type="Button" parent="MainLayout/TabContainer/存档槽位/RightPanel/ActionButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnExportSlot" type="Button" parent="MainLayout/TabContainer/存档槽位/RightPanel/ActionButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="SaveSpacer" type="Control" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CheckAutoSave" type="CheckBox" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = ""
+
+[node name="CloudRow" type="HBoxContainer" parent="MainLayout/TabContainer/存档槽位/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LabelCloudStatus" type="Label" parent="MainLayout/TabContainer/存档槽位/RightPanel/CloudRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnCloudSync" type="Button" parent="MainLayout/TabContainer/存档槽位/RightPanel/CloudRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; =========================================================================
+; Tab 2: 确定性回放
+; =========================================================================
+[node name="确定性回放" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+split_offset = 340
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/确定性回放"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/确定性回放/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/确定性回放/LeftPanel"]
+layout_mode = 2
+
+[node name="ItemListReplays" type="ItemList" parent="MainLayout/TabContainer/确定性回放/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/确定性回放"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+layout_mode = 2
+
+[node name="LabelReplayTitle" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="LabelReplayScene" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelReplayLevel" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelReplayDuration" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelReplayDate" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="ReplaySpacer" type="Control" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ControlLabel" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="SliderReplayProgress" type="HSlider" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.001
+value = 0.0
+
+[node name="LabelFrameInfo" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="PlaybackBtns" type="HBoxContainer" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BtnPlayReplay" type="Button" parent="MainLayout/TabContainer/确定性回放/RightPanel/PlaybackBtns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnPauseReplay" type="Button" parent="MainLayout/TabContainer/确定性回放/RightPanel/PlaybackBtns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnStopReplay" type="Button" parent="MainLayout/TabContainer/确定性回放/RightPanel/PlaybackBtns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="FrameSpeedBtns" type="HBoxContainer" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BtnFramePrev" type="Button" parent="MainLayout/TabContainer/确定性回放/RightPanel/FrameSpeedBtns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnFrameNext" type="Button" parent="MainLayout/TabContainer/确定性回放/RightPanel/FrameSpeedBtns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="SpeedRow" type="HBoxContainer" parent="MainLayout/TabContainer/确定性回放/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BtnSpeedDown" type="Button" parent="MainLayout/TabContainer/确定性回放/RightPanel/SpeedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelSpeedVal" type="Label" parent="MainLayout/TabContainer/确定性回放/RightPanel/SpeedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = "1.0x"
+
+[node name="BtnSpeedUp" type="Button" parent="MainLayout/TabContainer/确定性回放/RightPanel/SpeedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; =========================================================================
+; Tab 3: GM沙盒
+; =========================================================================
+[node name="GM沙盒" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PermissionRow" type="HBoxContainer" parent="MainLayout/TabContainer/GM沙盒"]
+layout_mode = 2
+
+[node name="LabelGMPermission" type="Label" parent="MainLayout/TabContainer/GM沙盒/PermissionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="GMContent" type="HSplitContainer" parent="MainLayout/TabContainer/GM沙盒"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 500
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/GM沙盒/GMContent"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel"]
+layout_mode = 2
+
+[node name="InputRow" type="HBoxContainer" parent="MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LineEditGMInput" type="LineEdit" parent="MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel/InputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="BtnGMExecute" type="Button" parent="MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel/InputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="OutputLabel" type="Label" parent="MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RichGMOutput" type="RichTextLabel" parent="MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+scroll_following = true
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/GM沙盒/GMContent"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HistoryLabel" type="Label" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+layout_mode = 2
+
+[node name="ItemListGMHistory" type="ItemList" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="QuickLabel" type="Label" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="HSeparator2" type="HSeparator" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+layout_mode = 2
+
+[node name="BtnGMGodMode" type="Button" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnGMGiveItem" type="Button" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnGMTeleport" type="Button" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnGMSpawnMob" type="Button" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnGMSetTime" type="Button" parent="MainLayout/TabContainer/GM沙盒/GMContent/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; =========================================================================
+; Tab 4: CDK兑换
+; =========================================================================
+[node name="CDK兑换" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+split_offset = 400
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/CDK兑换"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/CDK兑换/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/CDK兑换/LeftPanel"]
+layout_mode = 2
+
+[node name="InputRow" type="HBoxContainer" parent="MainLayout/TabContainer/CDK兑换/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LineEditCDKeyInput" type="LineEdit" parent="MainLayout/TabContainer/CDK兑换/LeftPanel/InputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="BtnCDKeyRedeem" type="Button" parent="MainLayout/TabContainer/CDK兑换/LeftPanel/InputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelCDKeyResult" type="Label" parent="MainLayout/TabContainer/CDK兑换/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="PanelRewardPreview" type="PanelContainer" parent="MainLayout/TabContainer/CDK兑换/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RewardVBox" type="VBoxContainer" parent="MainLayout/TabContainer/CDK兑换/LeftPanel/PanelRewardPreview"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelRewardTitle" type="Label" parent="MainLayout/TabContainer/CDK兑换/LeftPanel/PanelRewardPreview/RewardVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LabelRewardDesc" type="Label" parent="MainLayout/TabContainer/CDK兑换/LeftPanel/PanelRewardPreview/RewardVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+autowrap_mode = 3
+text = ""
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/CDK兑换"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/CDK兑换/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/CDK兑换/RightPanel"]
+layout_mode = 2
+
+[node name="ItemListCDKeyHistory" type="ItemList" parent="MainLayout/TabContainer/CDK兑换/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3

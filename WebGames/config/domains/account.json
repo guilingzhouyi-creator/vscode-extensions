@@ -1,0 +1,78 @@
+{
+  "auth": {
+    "session": {
+      "ttl_seconds": 86400,
+      "allow_future_clock_skew_seconds": 0,
+      "bind_device": true
+    },
+    "salt": "KALAR_REALM_2026_SALT",
+    "default_username": "Adventurer",
+    "guest_prefix": "ACC_GUEST_",
+    "guest_name_prefix": "ROGUE_",
+    "guest_name_range": [
+      1000,
+      9999
+    ],
+    "guest_password": "GUEST_NO_PASS",
+    "default_fingerprint": "DEV_LOCAL_FP",
+    "token_prefix": "TOKEN_",
+    "token_ttl_seconds": 86400,
+    "account_id_prefix": "ACC_USR_",
+    "rules": {
+      "min_username_length": 3,
+      "max_username_length": 24
+    },
+    "errors": {
+      "account_not_found": "ERR_ACCOUNT_NOT_FOUND",
+      "invalid_credentials": "ERR_INVALID_CREDENTIALS",
+      "device_mismatch": "ERR_DEVICE_MISMATCH",
+      "account_already_exists": "ERR_ACCOUNT_ALREADY_EXISTS",
+      "invalid_username_length": "ERR_INVALID_USERNAME_LENGTH",
+      "ok": "OK"
+    },
+    "channels": {
+      "registered": "account.registered",
+      "login_succeeded": "account.login_succeeded",
+      "session_revoked": "account.session_revoked"
+    }
+  },
+  "save_slot": {
+    "max_slots": 3,
+    "id_prefix": "SLOT_",
+    "defaults": {
+      "slot_id": "SLOT_01",
+      "character_name": "Nameless Wanderer",
+      "title_prefix": "Apprentice Adventurer",
+      "profession_tier_name": "Novice Walker Tier 1",
+      "apparent_age": 20,
+      "current_location_name": "中洲·卡拉尔圣城",
+      "play_time_seconds": 0,
+      "is_permadeath_mode": false,
+      "is_fallen": false,
+      "last_saved_time_utc": 0,
+      "save_file_sha256": ""
+    }
+  },
+  "entitlements": {
+    "default": [],
+    "encrypted": false,
+    "allowed": []
+  },
+  "cdkeys": {
+    "KALAR666": {
+      "gold": 500,
+      "crystals": 2,
+      "item_name": "【初出茅庐·玄铁剑】"
+    },
+    "KALAR888": {
+      "gold": 1000,
+      "crystals": 5,
+      "item_name": "【开服特典·圣痕吊坠】"
+    },
+    "VIP999": {
+      "gold": 5000,
+      "crystals": 20,
+      "item_name": "【始源之光·极光神符】"
+    }
+  }
+}

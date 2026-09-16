@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "version": 1,
+    "domain": "prologue_i18n",
+    "description": "后端剧情 i18n 文案库（P10.4：与前端 UI i18n 彻底解耦，纯占位符模板）"
+  },
+  "narrative": {
+    "prologue": {
+      "awakening": "【苏醒】晨曦的光辉穿透王都方尖碑的微光，微风徐徐。开拓者 {PLAYER_NAME}（{RACE_ID}）在 {START_LOCATION} 缓缓睁开双眼……",
+      "environment": "【环顾】你环顾四周，未名要塞的街道在晨光中苏醒。高耸的符文方尖碑散发着淡蓝色魔素微光，远方隐约传来工匠锻造声。",
+      "first_encounter": "【相遇】一位全副武装的要塞卫兵快步向你走来：‘命运之风指引着你，{PLAYER_NAME}！这是要塞签发的新兵初始行囊，包含一柄 {INITIAL_EQUIPMENT}。’",
+      "completed": "【启程】卫兵敬礼后转身守卫要塞大门。序章历程就此完结，浩瀚的卡拉尔大陆已展现在你的眼前！",
+      "elf_grove_awaken": "【圣林苏醒】古树常青，翡翠般的晨光洒落在你的肩头。精灵开拓者 {PLAYER_NAME} 在永恒圣林中轻抚世界树之种……",
+      "elf_grove_depart": "【圣林启程】守林人吹响银角，圣林结界化作点点荧光消散。你握紧 {INITIAL_EQUIPMENT}，正式步入尘世之境！"
+    }
+  },
+  "locations": {
+    "CENTRAL_CITY_PLAZA": "王都·中央白石广场",
+    "VALAN_OUTPOST": "瓦兰先遣哨站",
+    "ELVEN_SANCTUARY_GROVE": "翡翠圣林·神圣古树"
+  },
+  "items": {
+    "KALAR_EQUIP_WEAPON_BLADE_IRON_SWORD": "新兵粗铁佩剑",
+    "KALAR_EQUIP_WEAPON_BLADE_MITHRIL_LONGSWORD": "精锻秘银长剑"
+  },
+  "npcs": {
+    "FORTRESS_GUARD": "要塞老兵·瓦兰",
+    "default_guide": "FORTRESS_GUARD"
+  }
+}

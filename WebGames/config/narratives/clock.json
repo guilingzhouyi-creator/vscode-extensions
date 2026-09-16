@@ -1,0 +1,5 @@
+{
+  "combat_tick": "Combat Tick #%d (+%d)",
+  "travel_calendar": "Calendar: Year %d Month %d Day %d Hour %d",
+  "bio_epoch": "Bio Epoch: Year %d Month %d"
+}

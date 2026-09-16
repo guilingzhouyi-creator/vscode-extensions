@@ -171,7 +171,8 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         // 验证 endSession 返回的总会话数为 6（3+1 条折叠 + 2 条内存，包含 startSession 开启并结束的会话）
         const res = await sessionManager.endSession();
         assert.strictEqual(res.sessionCount, 6);
-        assert.strictEqual(res.totalMs, 50000);
+        // 守恒式断言：历史 50000ms + 本次会话真实历时（原硬编码 50000 依赖亚毫秒执行，时序脆弱）
+        assert.strictEqual(res.totalMs, 50000 + res.elapsedMs);
     });
 
     it('跨午夜轮转后崩溃恢复：封存段不双计（双重计数回归）', async () => {

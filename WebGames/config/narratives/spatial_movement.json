@@ -1,0 +1,10 @@
+{
+  "dir_north": "北",
+  "dir_south": "南",
+  "dir_east": "东",
+  "dir_west": "西",
+  "dir_northeast": "东北",
+  "dir_northwest": "西北",
+  "dir_southeast": "东南",
+  "dir_southwest": "西南"
+}

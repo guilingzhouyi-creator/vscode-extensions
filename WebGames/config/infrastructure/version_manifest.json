@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "version": "2.0.0",
+    "description": "卡拉尔引擎发行版本与增量补丁元数据事实表"
+  },
+  "releases": {
+    "1.0.0": {
+      "version_code": 10000,
+      "patch_type": "FULL_RELEASE",
+      "min_supported_version": "1.0.0",
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "payload_size_bytes": 0,
+      "pck_mount_priority": 10
+    },
+    "1.8.0": {
+      "version_code": 10800,
+      "patch_type": "INCREMENTAL_PCK",
+      "min_supported_version": "1.0.0",
+      "payload_sha256": "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e",
+      "payload_size_bytes": 524288,
+      "download_url": "user://patches/patch_v1.8.0.pck",
+      "pck_mount_priority": 100
+    }
+  }
+}

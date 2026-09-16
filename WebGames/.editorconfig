@@ -1,0 +1,32 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = tab
+indent_size = 4
+max_line_length = 120
+
+# GDScript：官方风格为 Tab 缩进（Godot 编辑器默认）
+[*.{gd,gdscript}]
+indent_style = tab
+indent_size = 4
+
+# Godot 场景/资源/项目文件
+[*.{tscn,tres,godot,cfg,uid}]
+indent_style = tab
+indent_size = 4
+
+# 配置与文档：使用空格缩进，便于阅读与 diff
+[*.{json,md,yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.{py,sh}]
+indent_style = space
+indent_size = 4
+
+[Makefile]
+indent_style = tab

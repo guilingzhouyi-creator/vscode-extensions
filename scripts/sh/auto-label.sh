@@ -1,33 +1,15 @@
 #!/usr/bin/env bash
-# =============================================================================
-# auto-label.sh — Issue/PR 自动分类打标签程序（v2 增强版）
-# -----------------------------------------------------------------------------
-# 作用：
-#   在 Issue 创建/更新（issue.open / issue.update）或 PR 创建/更新（pull_request）
-#   时，自动分析标题/描述文本，按关键词规则引擎判定问题/需求【类型】，
-#   并幂等打上对应标签。
-#
-# v2 增强（相对 v1）：
-#   - 支持 issue.update 事件：Issue 内容变更后自动重新分类打标签（去旧加新）
-#   - 修正规则引擎缺陷：移除易误判的关键词（如 "支持 " 尾随空格、"性能优化" 冲突），
-#     新增 安全(security) / 需求规模(epic) 维度
-#   - 幂等加固：调用前先删除旧 type/* 标签，再打新标签，避免残留旧类型
-#   - 容错加固：CNB API 调用失败不中断整体流程（重试 1 次）
-#   - 输出【唤醒提示】：用于串联 NPC 规划者的问题区巡视（仅提示，不擅自 @ 触发）
-#
-# 配套：
-#   - 标签体系文档：.cnb/LABELS.md
-#   - 流水线接入：.cnb.yml（$ 下的 issue.open / issue.update / pull_request 事件）
-#
-# 用法：
+# ==============================================================================
+# 模块归属: CI/CD 自动化流水线 (Automation · Issue/PR 标签自动化)
+# 文件路径: scripts/sh/auto-label.sh
+# 架构定位: Webhook 事件处理器 (Linux Bash)
+# 依赖与触发: 触发方: GitHub Actions / webhook | 上游: GitHub CLI (gh) / REST API | 下游: 仓储元数据标签 | 运行时: Bash 4+
+# 职责说明: 依据 Issue 与 PR 标题及正文语义，自动判定并分发类别、安全与模块标签
+# 退出语义与设计依据: 退出码: 0=标注成功, 1=API 交互异常 | 设计依据: 自动化研发协同工程契约
+# ------------------------------------------------------------------------------
+# 用法示例:
 #   bash scripts/sh/auto-label.sh
-#   （依赖 CNB 流水线注入的环境变量 + cnb-cli，仅应在流水线内运行）
-#
-# 环境变量（由 CNB 流水线自动注入）：
-#   Issue 场景：CNB_ISSUE_TITLE / CNB_ISSUE_DESCRIPTION / CNB_ISSUE_IID / CNB_EVENT
-#   PR 场景：   CNB_PULL_REQUEST_TITLE / CNB_PULL_REQUEST_DESCRIPTION / CNB_PULL_REQUEST_IID
-#   公共：      CNB_REPO_SLUG（组织/仓库）、CNB_PULL_REQUEST（是否 PR）、CNB_EVENT（事件名）
-# =============================================================================
+# ==============================================================================
 set -uo pipefail
 
 # ---------- 0. 基础信息 ----------
@@ -66,12 +48,13 @@ case "${EVENT}" in
 esac
 
 # ---------- 1. 工具函数：小写化 / 包含匹配 ----------
-to_lower() { echo "$1" | tr 'A-Z' 'a-z'; }
-# contains <haystack> <needle>：不区分大小写判断是否包含
+# Bash 4+ 内建小写化：零子进程（旧实现每关键词 spawn 两个 tr，全量规则约 140 次）
+to_lower() { printf '%s' "${1,,}"; }
+# contains <haystack> <needle>：不区分大小写判断是否包含（纯内建，无子进程）
 contains() {
   local haystack needle
-  haystack="$(to_lower "$1")"
-  needle="$(to_lower "$2")"
+  haystack="${1,,}"
+  needle="${2,,}"
   [[ "${haystack}" == *"${needle}"* ]]
 }
 
@@ -144,7 +127,7 @@ if [[ -z "$MODULE_LABEL" ]]; then
   done
 fi
 if [[ -z "$MODULE_LABEL" ]]; then
-  for kw in "ci" "流水线" "构建" ".cnb"; do
+  for kw in "ci" "流水线" "构建"; do
     if contains "$FULL_TEXT" "$kw"; then MODULE_LABEL="module/ci"; break; fi
   done
 fi

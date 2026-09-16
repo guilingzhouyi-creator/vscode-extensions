@@ -1,0 +1,10 @@
+{
+  "enhance_max_level": "Item reached max enhance level (+15)",
+  "insufficient_resources": "Insufficient resources for enhancement.",
+  "enhance_success": "【天工开物·神兵出世】装备【%s】强化成功！晋升至 +%d 阶！",
+  "enhance_fail": "锻造火候未足！【%s】强化失败 (当前等级: +%d)！",
+  "reforge_success": "【工坊淬炼·词条重铸】装备【%s】完成洗练，重塑 %d 条天地法则词缀！",
+  "salvage_success": "分解装备【%s】，获得熔铸铜币 %d，返还魔单晶 %d 枚！",
+  "no_socket": "No available sockets on item.",
+  "inscribe_success": "工坊铭文: 将符文【%s】镶嵌至装备【%s】(%d/%d 孔位)！"
+}

@@ -15,6 +15,36 @@ const { Scheduler } = require('../../out/application/Scheduler.js');
 const { GlobalAggregator } = require('../../out/application/GlobalAggregator.js');
 const { init, setLocale } = require('../../out/i18n/index.js');
 
+/**
+ * 在固定时刻内运行回调：冻结 `Date`（同时覆盖 `Date.now()` 与 `new Date()`）。
+ *
+ * 「本周超限」类用例若以 `Date.now() - 42h` 构造会话，会随运行时的星期几漂移——
+ * 42 小时前可能落在上一周，本周累计不足阈值，用例随机失败。冻结到周中固定时刻后，
+ * 该用例在任何时刻运行都表达同一语义。
+ *
+ * @param iso - 本地时区固定时刻（不带偏移的 ISO 串按本地时间解析）。
+ * @param fn - 冻结期间执行的回调。
+ * @returns 回调返回值。
+ */
+function withFixedNow(iso, fn) {
+    const RealDate = Date;
+    const fixedMs = new RealDate(iso).getTime();
+    class FixedDate extends RealDate {
+        constructor(...args) {
+            super(...(args.length ? args : [fixedMs]));
+        }
+        static now() {
+            return fixedMs;
+        }
+    }
+    global.Date = FixedDate;
+    try {
+        return fn();
+    } finally {
+        global.Date = RealDate;
+    }
+}
+
 class FakeStorageCoordinator {
     constructor(initialData = null) {
         this.data = initialData;
@@ -110,10 +140,13 @@ describe('TimerOrchestrator（周工作上限模块）', () => {
 
         // 本周会话 50 小时（> 40h），但开关为 false
         const now = Date.now();
-        timer.data.sessions.push({
-            startMs: now - 50 * 3600_000,
-            endMs: now,
-            durationMs: 50 * 3600_000,
+        timer.replaceData({
+            ...timer.data,
+            sessions: [...timer.data.sessions, {
+                startMs: now - 50 * 3600_000,
+                endMs: now,
+                durationMs: 50 * 3600_000,
+            }],
         });
 
         orchestrator.checkWeeklyLimit();
@@ -121,34 +154,39 @@ describe('TimerOrchestrator（周工作上限模块）', () => {
     });
 
     it('checkWeeklyLimit：开启且超限时触发提醒，且每周仅提醒一次', () => {
-        let notificationCount = 0;
-        let lastMsg = null;
-        orchestrator.onWeeklyLimitExceeded((msg) => {
-            notificationCount++;
-            lastMsg = msg;
+        withFixedNow('2026-09-16T12:00:00', () => {
+            let notificationCount = 0;
+            let lastMsg = null;
+            orchestrator.onWeeklyLimitExceeded((msg) => {
+                notificationCount++;
+                lastMsg = msg;
+            });
+
+            orchestrator.applyDashboardConfig({
+                weeklyLimitEnabled: true,
+                weeklyLimitHours: 40,
+            });
+
+            // 构造本周 42 小时工时（周三中午冻结 → 42 小时前仍在同一周内）
+            const now = Date.now();
+            timer.replaceData({
+                ...timer.data,
+                sessions: [...timer.data.sessions, {
+                    startMs: now - 42 * 3600_000,
+                    endMs: now,
+                    durationMs: 42 * 3600_000,
+                }],
+            });
+
+            // 首次检查：触发提醒
+            orchestrator.checkWeeklyLimit();
+            assert.strictEqual(notificationCount, 1, '超限应触发 1 次提醒');
+            assert.ok(lastMsg && lastMsg.includes('超过设定的周工作上限（40h）'), '提示词条包含上限与休息');
+
+            // 第二次检查（模拟心跳继续推进）：不重复提醒
+            orchestrator.checkWeeklyLimit();
+            assert.strictEqual(notificationCount, 1, '同周内不应重复轰炸提醒');
         });
-
-        orchestrator.applyDashboardConfig({
-            weeklyLimitEnabled: true,
-            weeklyLimitHours: 40,
-        });
-
-        // 构造本周 42 小时工时
-        const now = Date.now();
-        timer.data.sessions.push({
-            startMs: now - 42 * 3600_000,
-            endMs: now,
-            durationMs: 42 * 3600_000,
-        });
-
-        // 首次检查：触发提醒
-        orchestrator.checkWeeklyLimit();
-        assert.strictEqual(notificationCount, 1, '超限应触发 1 次提醒');
-        assert.ok(lastMsg && lastMsg.includes('超过设定的周工作上限（40h）'), '提示词条包含上限与休息');
-
-        // 第二次检查（模拟心跳继续推进）：不重复提醒
-        orchestrator.checkWeeklyLimit();
-        assert.strictEqual(notificationCount, 1, '同周内不应重复轰炸提醒');
     });
 
     it('周时长上下界与非法输入约束：0/负数/超出 168h/非数字自动安全纠偏', async () => {
@@ -177,10 +215,13 @@ describe('TimerOrchestrator（周工作上限模块）', () => {
 
         // 构造上周 100 小时的超级会话（7 天前）
         const twoWeeksAgo = Date.now() - 14 * 86400_000;
-        timer.data.sessions.push({
-            startMs: twoWeeksAgo,
-            endMs: twoWeeksAgo + 100 * 3600_000,
-            durationMs: 100 * 3600_000,
+        timer.replaceData({
+            ...timer.data,
+            sessions: [...timer.data.sessions, {
+                startMs: twoWeeksAgo,
+                endMs: twoWeeksAgo + 100 * 3600_000,
+                durationMs: 100 * 3600_000,
+            }],
         });
 
         orchestrator.checkWeeklyLimit();

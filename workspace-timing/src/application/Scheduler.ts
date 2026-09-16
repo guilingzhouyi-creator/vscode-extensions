@@ -24,6 +24,8 @@ import {
     DEFAULT_JOURNAL_FLUSH_MS,
     DEFAULT_FULL_SAVE_MS,
     MS_PER_SECOND,
+    sanitizeJournalFlushIntervalMs,
+    sanitizeFullSaveIntervalMs,
 } from '../domain/models';
 
 export interface SchedulerOptions {
@@ -102,18 +104,19 @@ export class Scheduler {
      * 运行期热更新调度间隔（journalEnabled 不支持热切换，需重启）
      * 运行中会重建对应定时器使新间隔立即生效。
      *
-     * ★ 间隔钳制下限 1000ms：面板/配置写入 0 或负数时，
-     *   setInterval 会以 ~1ms 触发，全量存盘变成 CPU+I/O 热点。
+     * ★ 间隔钳制：与 models.ts 配置边界单一真源一致（journal ≥1000ms、
+     *   fullSave ≥5000ms 且均带上限）——面板/配置写入 0 或负数时，
+     *   setInterval 会以 ~1ms 触发，全量存盘变成 CPU+I/O 热点；
+     *   越界上值（手写配置）同样钳回合法域。
      *   journal flush 间隔经 JournalWriter.updateFlushInterval 同步给缓存策略。
      */
     updateIntervals(patch: Partial<Pick<SchedulerOptions, 'journalFlushIntervalMs' | 'fullSaveIntervalMs'>>): void {
-        const MIN_INTERVAL_MS = 1000;
         const clamped = {
             ...(patch.journalFlushIntervalMs !== undefined
-                ? { journalFlushIntervalMs: Math.max(MIN_INTERVAL_MS, patch.journalFlushIntervalMs) }
+                ? { journalFlushIntervalMs: sanitizeJournalFlushIntervalMs(patch.journalFlushIntervalMs) }
                 : {}),
             ...(patch.fullSaveIntervalMs !== undefined
-                ? { fullSaveIntervalMs: Math.max(MIN_INTERVAL_MS, patch.fullSaveIntervalMs) }
+                ? { fullSaveIntervalMs: sanitizeFullSaveIntervalMs(patch.fullSaveIntervalMs) }
                 : {}),
         };
 
@@ -239,16 +242,5 @@ export class Scheduler {
         }
 
         log(LogLevel.Info, 'Scheduler: stopped');
-    }
-
-    /** 触发一次立即存盘 */
-    async saveNow(): Promise<void> {
-        try {
-            await this.journal.flushAll();
-            await this.sessionManager.saveCheckpoint();
-            log(LogLevel.Debug, 'Scheduler: manual save completed');
-        } catch (err) {
-            log(LogLevel.Error, 'Scheduler: manual save failed', err as Error);
-        }
     }
 }

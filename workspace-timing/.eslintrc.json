@@ -16,6 +16,9 @@
             }
         ],
         "@typescript-eslint/no-explicit-any": "warn",
-        "no-console": "off"
+        "no-console": "off",
+        "no-tabs": "error",
+        "no-trailing-spaces": "error",
+        "eol-last": "error"
     }
 }

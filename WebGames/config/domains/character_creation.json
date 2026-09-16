@@ -1,0 +1,261 @@
+{
+  "origins": {
+    "IMPERIAL_NOBLE": {
+      "name": "帝国贵族后裔",
+      "race": "HUMAN",
+      "desc": "生于繁华行省贵族世家，自幼接受皇家剑术与宫廷礼仪培养，家族资助丰厚。",
+      "initial_gold": 500,
+      "initial_reputation": 100,
+      "base_factions": {
+        "HOLY_EMPIRE": 50,
+        "MAGE_COUNCIL": 20
+      },
+      "attribute_bonus": {
+        "INT": 2,
+        "STR": 1
+      }
+    },
+    "ELVEN_SCHOLAR": {
+      "name": "精灵秘术学徒",
+      "race": "HIGH_ELF",
+      "desc": "来自世界之树庇护的精灵古城，拥有天生的魔素感知力与悠长寿命。",
+      "initial_gold": 80,
+      "initial_reputation": 40,
+      "base_factions": {
+        "FOREST_ENCLAVE": 60,
+        "HOLY_EMPIRE": 0
+      },
+      "attribute_bonus": {
+        "INT": 3,
+        "SPR": 1
+      }
+    },
+    "DWARVEN_BLACKSMITH": {
+      "name": "矮人锻造学徒",
+      "race": "MOUNTAIN_DWARF",
+      "desc": "生长于地下熔岩巨构城邦，体格极其强健，熟悉各种金属硬度与武器工艺。",
+      "initial_gold": 150,
+      "initial_reputation": 20,
+      "base_factions": {
+        "IRON_FORGE_LEAGUE": 60
+      },
+      "attribute_bonus": {
+        "CON": 3,
+        "STR": 1
+      }
+    },
+    "SHADOW_OUTCAST": {
+      "name": "黑市暗影游侠",
+      "race": "TIEFLING_OR_HUMAN",
+      "desc": "生长于大陆地下黑市与盗贼公会，擅长潜行暗杀与黑市违禁品销赃。",
+      "initial_gold": 120,
+      "initial_reputation": 0,
+      "base_factions": {
+        "THIEVES_GUILD": 50,
+        "HOLY_EMPIRE": -30
+      },
+      "attribute_bonus": {
+        "AGI": 3,
+        "INT": 1
+      }
+    }
+  },
+  "birth_regions": {
+    "CENTRAL_CONTINENT": {
+      "name": "中洲·卡拉尔圣城",
+      "climate": "TEMPERATE",
+      "mana_density": 1.0
+    },
+    "SILVER_FOREST": {
+      "name": "东洲·银月密林",
+      "climate": "MYSTIC_FOREST",
+      "mana_density": 1.4
+    },
+    "SCORCHED_CANYON": {
+      "name": "南洲·烈阳熔岩峡谷",
+      "climate": "VOLCANIC",
+      "mana_density": 1.8
+    },
+    "HOWLING_TUNDRA": {
+      "name": "北洲·狂风永冻苔原",
+      "climate": "TUNDRA",
+      "mana_density": 1.2
+    },
+    "VOID_ARCHIPELAGO": {
+      "name": "西洲·虚空破碎群岛",
+      "climate": "VOID_OCEAN",
+      "mana_density": 2.0
+    }
+  },
+  "defaults": {
+    "default_race_id": "HUMAN",
+    "fallback_origin": "IMPERIAL_NOBLE",
+    "fallback_region": "CENTRAL_CONTINENT",
+    "baseline_stat_level": 3,
+    "starting_location": "CENTRAL_CITY_PLAZA",
+    "initial_quest_line": "QUEST_PROLOGUE_01",
+    "trait_coef_scale": 0.1,
+    "heart_core_clamp_min": 0.1,
+    "heart_core_clamp_max": 1.0,
+    "initial_gold_fallback": 50,
+    "lifespan_scales": {
+      "HUMAN": 1.0,
+      "HIGH_ELF": 3.5,
+      "MOUNTAIN_DWARF": 2.0,
+      "TIEFLING_OR_HUMAN": 1.2,
+      "DEFAULT": 1.0
+    }
+  },
+  "rules": {
+    "min_name_length": 2,
+    "max_name_length": 16,
+    "disallowed_name_characters": [
+      "\n",
+      "\r",
+      "\t",
+      "@",
+      "#",
+      "$",
+      "%"
+    ],
+    "allow_duplicate_names_across_accounts": false
+  },
+  "races_catalog": {
+    "HUMAN": {
+      "race_id": "HUMAN",
+      "canonical_name_key": "race.human.name",
+      "is_enabled": true,
+      "canary_feature_tag": "",
+      "base_stat_modifiers": {
+        "STR": 0,
+        "CON": 0,
+        "INT": 0,
+        "AGI": 0,
+        "SPR": 0,
+        "VIT": 0
+      },
+      "innate_traits": [
+        "ADAPTABILITY"
+      ],
+      "allowed_genders": [
+        "MALE",
+        "FEMALE"
+      ]
+    },
+    "ELF": {
+      "race_id": "ELF",
+      "canonical_name_key": "race.elf.name",
+      "is_enabled": false,
+      "canary_feature_tag": "FEATURE_RACE_EXPANSION",
+      "base_stat_modifiers": {
+        "STR": -1,
+        "CON": -1,
+        "INT": 1,
+        "AGI": 1,
+        "SPR": 1,
+        "VIT": -1
+      },
+      "innate_traits": [
+        "NIGHT_VISION",
+        "MANA_SENSITIVITY"
+      ],
+      "allowed_genders": [
+        "MALE",
+        "FEMALE"
+      ]
+    }
+  },
+  "creation_fields_schema": {
+    "name": {
+      "required": true,
+      "type": "STRING"
+    },
+    "gender": {
+      "required": true,
+      "type": "ENUM",
+      "options": [
+        "MALE",
+        "FEMALE"
+      ]
+    },
+    "race_id": {
+      "required": true,
+      "type": "ENUM",
+      "options": [
+        "HUMAN"
+      ]
+    }
+  },
+  "traits": {
+    "PRIMORDIAL_RESONANCE": {
+      "name": "始源魔素共鸣",
+      "cost": 3,
+      "type": "POSITIVE",
+      "modifiers": {
+        "INT": 2,
+        "mana_efficiency": 0.15
+      },
+      "desc": "对天地初始灵能具备超凡亲和力，法术能损降低 15%。"
+    },
+    "GIANT_MIGHT": {
+      "name": "巨人之力",
+      "cost": 2,
+      "type": "POSITIVE",
+      "modifiers": {
+        "STR": 3,
+        "max_carry_weight_boost": 20.0
+      },
+      "desc": "天生神力，动量侵彻伤害与负重上限显著提升。"
+    },
+    "IRON_WILL": {
+      "name": "钢铁心智",
+      "cost": 1,
+      "type": "POSITIVE",
+      "modifiers": {
+        "SPR": 2,
+        "mental_stress_resistance": 0.2
+      },
+      "desc": "神智坚如磐石，极难陷入狂暴或精神崩溃。"
+    },
+    "HEART_CORE_FISSURE": {
+      "name": "心核裂隙",
+      "cost": -3,
+      "type": "NEGATIVE",
+      "modifiers": {
+        "heart_core_max": -0.15,
+        "VIT": -2
+      },
+      "desc": "先天心核残缺，初始生理机能上限受到压制。"
+    },
+    "MANA_INSULATED": {
+      "name": "魔素绝缘体",
+      "cost": -2,
+      "type": "NEGATIVE",
+      "modifiers": {
+        "INT": -3,
+        "magic_damage_reduction": 0.2
+      },
+      "desc": "经络晦涩难引灵能，无法自如施法，但对魔法伤害有天然抗性。"
+    }
+  },
+  "attribute_init": {
+    "dice": {
+      "count": 4,
+      "sides": 6,
+      "drop_lowest": 1
+    },
+    "point_buy": {
+      "min": 1,
+      "max": 6,
+      "total_points": 21,
+      "required_keys": [
+        "STR",
+        "CON",
+        "INT",
+        "AGI",
+        "SPR",
+        "VIT"
+      ]
+    }
+  }
+}

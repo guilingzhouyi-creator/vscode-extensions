@@ -267,18 +267,21 @@ describe('TimerEngine：边界补充', () => {
         assert.strictEqual(engine.stop(), 0, '未运行时 stop 返回 0');
     });
 
-    it('trimSessions(0) 表示不限，不裁剪', () => {
+    it('data 只读视图：sessions 冻结，越权突变不生效', () => {
         const engine = new TimerEngine();
         engine.replaceData({
             version: 1, totalMs: 0, currentSessionStartMs: 0, lastSavedAtMs: 0, isEnabled: true,
-            sessions: [
-                { startMs: 1, endMs: 2, durationMs: 1 },
-                { startMs: 2, endMs: 3, durationMs: 1 },
-                { startMs: 3, endMs: 4, durationMs: 1 },
-            ],
+            sessions: [{ startMs: 1, endMs: 2, durationMs: 1 }],
         });
-        engine.trimSessions(0);
-        assert.strictEqual(engine.data.sessions.length, 3);
+        assert.strictEqual(Object.isFrozen(engine.data.sessions), true, 'sessions 视图应被冻结');
+        // strict 模式下 push 抛 TypeError；sloppy 模式静默失败——两种模式下长度都不变
+        try {
+            engine.data.sessions.push({ startMs: 2, endMs: 3, durationMs: 1 });
+        } catch (err) {
+            assert.ok(err instanceof TypeError, '冻结数组突变应抛 TypeError');
+        }
+        assert.strictEqual(engine.data.sessions.length, 1, '越权 push 不得生效');
+        assert.strictEqual(engine.data.sessions[0].startMs, 1);
     });
 });
 

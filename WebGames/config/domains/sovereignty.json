@@ -1,0 +1,49 @@
+{
+  "promotion_thresholds": {
+    "duke": {
+      "reputation": 5000.0,
+      "battle_merits": 10000.0
+    },
+    "count": {
+      "reputation": 1000.0,
+      "battle_merits": 2500.0
+    },
+    "baron": {
+      "reputation": 200.0,
+      "battle_merits": 500.0
+    },
+    "knight": {
+      "reputation": 50.0,
+      "battle_merits": 100.0
+    }
+  },
+  "title_names": {
+    "monarch": "帝王",
+    "duke": "公爵",
+    "count": "伯爵",
+    "baron": "男爵",
+    "knight": "骑士",
+    "commoner": "平民"
+  },
+  "nation_defaults": {
+    "canonical_nation_name": "卡拉尔至高神圣帝国",
+    "sovereign_ruler_id": "RULER_EMPEROR",
+    "national_treasury_gold": 100000,
+    "stability_percent": 85.0,
+    "tax_rate": 0.15,
+    "nation_id_prefix": "NATION_",
+    "founding_treasury_gold": 20000,
+    "founding_stability_percent": 100.0
+  },
+  "coup": {
+    "default_success_chance": 0.8,
+    "success_stability_floor": 20.0,
+    "success_stability_drop": 35.0,
+    "failure_stability_floor": 40.0,
+    "failure_stability_drop": 15.0
+  },
+  "fief_defaults": {
+    "lord_tax_rate": 0.1,
+    "title_rank": 2
+  }
+}

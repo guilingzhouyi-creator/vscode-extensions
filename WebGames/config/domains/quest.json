@@ -1,0 +1,31 @@
+{
+  "node_defaults": {
+    "solution_type": "COMBAT_FORCE"
+  },
+  "quest_defaults": {
+    "quest_title": "净化古老遗迹",
+    "faction_reputation_rewards": {
+      "EMPIRE": 50,
+      "REBELS": -25
+    },
+    "gold_reward": 500
+  },
+  "graph_validation": {
+    "prerequisite_check_enabled": true,
+    "max_path_length": 8,
+    "unknown_node_policy": "reject"
+  },
+  "bounty": {
+    "trigger_threshold": -50
+  },
+  "reward_items": [
+    {
+      "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+      "count": 1
+    },
+    {
+      "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+      "count": 2
+    }
+  ]
+}

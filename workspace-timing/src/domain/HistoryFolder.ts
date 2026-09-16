@@ -48,7 +48,7 @@ export interface FoldResult {
 }
 
 /** 将一组会话按自然日拆分累加进日桶表，返回成功折叠条数 */
-function foldSessionsIntoTotals(sessions: TimeSession[], totals: DailyTotalsMap): number {
+function foldSessionsIntoTotals(sessions: readonly TimeSession[], totals: DailyTotalsMap): number {
     let count = 0;
     for (const s of sessions) {
         if (!(s.endMs > s.startMs) || s.startMs <= 0) continue; // 脏数据清除
@@ -73,7 +73,7 @@ function foldSessionsIntoTotals(sessions: TimeSession[], totals: DailyTotalsMap)
  * @param maxSessions 原始会话最大保留条数；0 = 不按条数折叠
  */
 export function foldExpiredSessions(
-    sessions: TimeSession[],
+    sessions: readonly TimeSession[],
     existingTotals: DailyTotalsMap | undefined,
     cutoffStartMs: number,
     maxSessions: number = 0,
@@ -134,7 +134,7 @@ export function foldExpiredSessions(
  * 幂等：对同一数据重复调用结果不变。
  */
 export function migrateToFolded(
-    data: { sessions?: TimeSession[]; dailyTotals?: DailyTotalsMap },
+    data: { sessions?: readonly TimeSession[]; dailyTotals?: DailyTotalsMap },
     options: number | FoldOptions,
     now = Date.now(),
 ): { sessions: TimeSession[]; dailyTotals: DailyTotalsMap; foldedSessionCount: number } {

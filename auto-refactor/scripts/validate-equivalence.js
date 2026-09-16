@@ -1,17 +1,23 @@
 #!/usr/bin/env node
-// Reusable equivalence regression for the single-pass AST multiplexing refactor.
-//
-// Runs the 4 canonical scenarios against the CURRENT build (dist/api) and diffs
-// the normalized output, byte-for-byte, against committed golden baselines in
-// scripts/baselines/. The golden baselines were captured from the MIXED build
-// (NEW orchestration + OLD analyzer logic via legacy analyze), which reproduces
-// the pre-refactor output. Byte-identical => refactor is behavior-preserving.
-//
-// Usage:
-//   node scripts/validate-equivalence.js            # assert equivalence (CI gate)
-//   node scripts/validate-equivalence.js --update   # (re)capture golden baselines
-//
-// Exit code 0 = PASS, 1 = FAIL.
+/**
+ * Module: Verification Harness — Single-Pass AST Multiplexing Equivalence Gate
+ * File Path: scripts/validate-equivalence.js
+ * Architecture Role: Behavioral lock for the refactor: normalizes scan() reports from the
+ *   current dist build and compares them byte-for-byte with committed golden baselines.
+ * Dependencies & Triggers: Requires scan from ../dist/api plus node fs/path; reads samples/
+ *   (default and custom configs), the generated scripts/.corpus TS corpus, scripts/.rust-corpus
+ *   and scripts/baselines; run manually/CI, or with --update to recapture goldens.
+ * Responsibilities: Materializes the TS and Rust corpora plus configs (including the
+ *   gitignored fixture and the custom no-console analyzer used by samples); runs the scenario
+ *   matrix samples-default/custom, corpus-inproc/workers, rust-inproc/workers and three oxc
+ *   parser runs compared against the shared TS goldens; normalizes reports to
+ *   id/analyzer/rule/severity/message/location/detail plus metrics, sorted by id/file; writes
+ *   a per-scenario .actual.json file next to the script on mismatch; honors --update capture.
+ * Exit Semantics & Design Rationale: Exits 1 if any scenario is missing a baseline or differs
+ *   from it, 0 only when all match; --update captures then skips comparison. Byte-identical
+ *   output is the oracle because the refactor must be behavior-preserving while the legacy
+ *   mixed build used for capture is no longer runnable in the current tree.
+ */
 
 const { scan } = require('../dist/api');
 const fs = require('fs');
@@ -31,7 +37,9 @@ const TEMPLATES = {
   if (v < -100) return -100;
   return v;
 }
+/** Exported numeric boundary used by the magic-number fixture. */\
 export const LIMIT = 100;
+/** Exported scoring helper that repeats 100 for duplicate-literal detection. */\
 export function rate(x: number): number {
   // 100 repeated several times -> duplicate-literal
   return x * 100 + 100 - 100;
@@ -42,11 +50,13 @@ export function rate(x: number): number {
   console.log('hello world');
   return 'hello world ' + name;
 }
+/** Exported no-argument helper returning the repeated hardcoded string. */\
 export function bye(): string {
   return 'hello world';
 }
 `,
   i18n: `function t(s: string): string { return s; }
+/** Exported page helper that concatenates two i18n strings through t(). */\
 export function page(): string {
   const a = t('welcome message');
   const b = t('goodbye message');
@@ -92,10 +102,8 @@ function writeCorpus() {
   fs.mkdirSync(path.join(CORPUS, 'src'), { recursive: true });
   fs.mkdirSync(path.join(CORPUS, 'ignored'), { recursive: true });
   const w = (p, c) => fs.writeFileSync(path.join(CORPUS, p), c);
-  let i = 0;
   for (const [name, content] of Object.entries(TEMPLATES)) {
     for (let k = 0; k < 4; k++) w(`src/unit_${name}_${k}.ts`, content);
-    i++;
   }
   let big = '';
   for (let n = 0; n < 12; n++) {
@@ -104,17 +112,24 @@ function writeCorpus() {
   big += `export const TAG = 'shared token';\n`;
   for (let n = 0; n < 8; n++) big += `export const TOKEN${n} = 'shared token';\n`;
   w('src/bigfile.ts', big);
-  w('src/legacy.js', `function compute(a, b) {
+  w(
+    'src/legacy.js',
+    `function compute(a, b) {
   if (a > 5) { return b * 100; }
   return a + 100;
 }
 console.log('legacy start');
 const NAME = 'legacy name';
 module.exports = { compute };
-`);
-  w('ignored/skip.ts', `export const SECRET = 'should not be scanned';
+`,
+  );
+  w(
+    'ignored/skip.ts',
+    `export const SECRET = 'should not be scanned';
+/** Exported fixture in an ignored directory; proves gitignore excludes it. */\
 export function hidden(): number { return 999; }
-`);
+`,
+  );
   w('.gitignore', 'ignored/\n');
   const config = {
     $schema: './config.schema.json',
@@ -123,18 +138,34 @@ export function hidden(): number { return 999; }
     include: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     exclude: ['node_modules', '.git', 'dist', 'build', 'out', 'coverage'],
     thresholds: {
-      magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3,
-      fileLinesWarn: 400, fileLinesFail: 800, fileFunctionsWarn: 15,
-      complexityWarn: 8, complexityFail: 12,
+      magicNumberMin: 2,
+      duplicateLiteralThreshold: 3,
+      hardcodedStringMinLength: 3,
+      fileLinesWarn: 400,
+      fileLinesFail: 800,
+      fileFunctionsWarn: 15,
+      complexityWarn: 8,
+      complexityFail: 12,
     },
     analyzers: {
-      constants: { enabled: true, options: { magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 } },
-      'large-file': { enabled: true, options: { fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 } },
+      constants: {
+        enabled: true,
+        options: { magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 },
+      },
+      'large-file': {
+        enabled: true,
+        options: { fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 },
+      },
       complexity: { enabled: true, options: { complexityWarn: 5, complexityFail: 10 } },
       'no-console': { enabled: true, options: { severity: 'warning', allowed: ['error'] } },
     },
     customAnalyzers: [
-      { name: 'no-console', module: path.join(SAMPLES, 'analyzers', 'noConsole.js'), enabled: true, options: { severity: 'warning', allowed: ['error'] } },
+      {
+        name: 'no-console',
+        module: path.join(SAMPLES, 'analyzers', 'noConsole.js'),
+        enabled: true,
+        options: { severity: 'warning', allowed: ['error'] },
+      },
     ],
     logLevel: 'info',
     workers: 1,
@@ -154,6 +185,7 @@ const RUST_TEMPLATES = {
 
 pub const LIMIT: i32 = 100;
 
+/** Public Rust scorer that repeats 100 for duplicate-literal coverage. */\
 pub fn rate(x: i32) -> i32 {
     x * 100 + 100 - 100
 }
@@ -164,6 +196,7 @@ pub fn rate(x: i32) -> i32 {
     format!("{} {}", msg, name)
 }
 
+/** Public Rust helper returning the shared hardcoded greeting. */\
 pub fn bye() -> String {
     "hello world".to_string()
 }
@@ -174,16 +207,19 @@ pub fn bye() -> String {
 }
 
 impl Order {
+    /** Constructs an Order with the given id and total for the method fixtures. */\
     pub fn new(id: u64, total: i64) -> Self {
         Order { id, total }
     }
 
+    /** Applies a percentage-based discount to the order total for complexity coverage. */\
     pub fn apply_discount(&self, rate: i64) -> i64 {
         if rate > 50 { return self.total / 2; }
         if rate > 20 { return self.total - rate; }
         self.total
     }
 
+    /** Classifies the order total relative to a threshold as large, ok, or empty. */\
     pub fn status(&self, threshold: i64) -> &'static str {
         if self.total > threshold {
             "large"
@@ -195,6 +231,7 @@ impl Order {
     }
 }
 
+/** Public nesting-heavy helper that exercises Rust complexity measurement. */\
 pub fn heavy(a: i32, b: i32, c: i32) -> i32 {
     let mut out = 0;
     if a > 0 {
@@ -244,9 +281,14 @@ function writeRustCorpus() {
     include: ['**/*.rs'],
     exclude: ['node_modules', 'target', '.git', 'dist'],
     thresholds: {
-      magicNumberMin: 2, duplicateLiteralThreshold: 2, hardcodedStringMinLength: 3,
-      fileLinesWarn: 40, fileLinesFail: 80, fileFunctionsWarn: 6,
-      complexityWarn: 5, complexityFail: 10,
+      magicNumberMin: 2,
+      duplicateLiteralThreshold: 2,
+      hardcodedStringMinLength: 3,
+      fileLinesWarn: 40,
+      fileLinesFail: 80,
+      fileFunctionsWarn: 6,
+      complexityWarn: 5,
+      complexityFail: 10,
     },
     analyzers: {
       constants: { enabled: true },
@@ -263,34 +305,115 @@ function writeRustCorpus() {
 
 function normalize(r) {
   const issues = r.issues
-    .map((x) => ({ id: x.id, analyzer: x.analyzer, rule: x.rule, severity: x.severity, message: x.message, location: x.location, detail: x.detail }))
+    .map((x) => ({
+      id: x.id,
+      analyzer: x.analyzer,
+      rule: x.rule,
+      severity: x.severity,
+      message: x.message,
+      location: x.location,
+      detail: x.detail,
+    }))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const fileMetrics = r.fileMetrics.map((m) => ({ ...m })).sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
-  return { filesScanned: r.summary.filesScanned, issuesTotal: r.summary.issuesTotal, byAnalyzer: r.summary.byAnalyzer, bySeverity: r.summary.bySeverity, issues, fileMetrics };
+  const fileMetrics = r.fileMetrics
+    .map((m) => ({ ...m }))
+    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+  return {
+    filesScanned: r.summary.filesScanned,
+    issuesTotal: r.summary.issuesTotal,
+    byAnalyzer: r.summary.byAnalyzer,
+    bySeverity: r.summary.bySeverity,
+    issues,
+    fileMetrics,
+  };
 }
 
 const SCENARIOS = [
-  { name: 'samples-default', root: SAMPLES, config: path.join(SAMPLES, 'auto-refactor.config.json'), workers: 1 },
-  { name: 'samples-custom', root: SAMPLES, config: path.join(SAMPLES, 'auto-refactor.custom.config.json'), workers: 1 },
-  { name: 'corpus-inproc', root: CORPUS, config: path.join(CORPUS, 'auto-refactor.config.json'), workers: 1 },
-  { name: 'corpus-workers', root: CORPUS, config: path.join(CORPUS, 'auto-refactor.config.json'), workers: 4 },
-  { name: 'rust-inproc', root: RUST_CORPUS, config: path.join(RUST_CORPUS, 'auto-refactor.config.json'), workers: 1 },
-  { name: 'rust-workers', root: RUST_CORPUS, config: path.join(RUST_CORPUS, 'auto-refactor.config.json'), workers: 4 },
+  {
+    name: 'samples-default',
+    root: SAMPLES,
+    config: path.join(SAMPLES, 'auto-refactor.config.json'),
+    workers: 1,
+  },
+  {
+    name: 'samples-custom',
+    root: SAMPLES,
+    config: path.join(SAMPLES, 'auto-refactor.custom.config.json'),
+    workers: 1,
+  },
+  {
+    name: 'corpus-inproc',
+    root: CORPUS,
+    config: path.join(CORPUS, 'auto-refactor.config.json'),
+    workers: 1,
+  },
+  {
+    name: 'corpus-workers',
+    root: CORPUS,
+    config: path.join(CORPUS, 'auto-refactor.config.json'),
+    workers: 4,
+  },
+  {
+    name: 'rust-inproc',
+    root: RUST_CORPUS,
+    config: path.join(RUST_CORPUS, 'auto-refactor.config.json'),
+    workers: 1,
+  },
+  {
+    name: 'rust-workers',
+    root: RUST_CORPUS,
+    config: path.join(RUST_CORPUS, 'auto-refactor.config.json'),
+    workers: 4,
+  },
   // oxc parser scenarios: the oxc adapter must produce byte-identical output to the
   // TypeScript adapter, so they compare against the EXISTING TS baselines (no --update
   // needed; the `baseline` field points at the shared golden file). Any difference means
   // a bug in the oxc adapter mapping/compensation.
-  { name: 'samples-default-oxc', root: SAMPLES, config: path.join(SAMPLES, 'auto-refactor.config.json'), workers: 1, parser: 'oxc', baseline: 'samples-default' },
-  { name: 'corpus-inproc-oxc', root: CORPUS, config: path.join(CORPUS, 'auto-refactor.config.json'), workers: 1, parser: 'oxc', baseline: 'corpus-inproc' },
-  { name: 'corpus-workers-oxc', root: CORPUS, config: path.join(CORPUS, 'auto-refactor.config.json'), workers: 4, parser: 'oxc', baseline: 'corpus-workers' },
+  {
+    name: 'samples-default-oxc',
+    root: SAMPLES,
+    config: path.join(SAMPLES, 'auto-refactor.config.json'),
+    workers: 1,
+    parser: 'oxc',
+    baseline: 'samples-default',
+  },
+  {
+    name: 'corpus-inproc-oxc',
+    root: CORPUS,
+    config: path.join(CORPUS, 'auto-refactor.config.json'),
+    workers: 1,
+    parser: 'oxc',
+    baseline: 'corpus-inproc',
+  },
+  {
+    name: 'corpus-workers-oxc',
+    root: CORPUS,
+    config: path.join(CORPUS, 'auto-refactor.config.json'),
+    workers: 4,
+    parser: 'oxc',
+    baseline: 'corpus-workers',
+  },
 ];
 
+/**
+ * Run every equivalence scenario and exit non-zero if any baseline is missing or drifts.
+ *
+ * The driver is deliberately single-threaded: each `await scan(...)` settles before the next
+ * scenario starts, so baseline writes and comparisons never race with a later scan.
+ */
 async function main() {
   writeCorpus();
   writeRustCorpus();
   let failed = 0;
   for (const s of SCENARIOS) {
-    const r = await scan({ root: s.root, configFile: s.config, workers: s.workers, format: 'json', logLevel: 'silent', parser: s.parser });
+    const r = await scan({
+      root: s.root,
+      configFile: s.config,
+      workers: s.workers,
+      format: 'json',
+      logLevel: 'silent',
+      parser: s.parser,
+    });
     const json = JSON.stringify(normalize(r), null, 2);
     const bp = path.join(BASELINES, (s.baseline || s.name) + '.json');
     if (UPDATE) {
@@ -304,7 +427,9 @@ async function main() {
       continue;
     }
     if (fs.readFileSync(bp, 'utf8') === json) {
-      console.log(`PASS ${s.name}  files=${r.summary.filesScanned} issues=${r.summary.issuesTotal}`);
+      console.log(
+        `PASS ${s.name}  files=${r.summary.filesScanned} issues=${r.summary.issuesTotal}`,
+      );
     } else {
       failed++;
       const actual = path.join(__dirname, `.${s.name}.actual.json`);
@@ -316,4 +441,7 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

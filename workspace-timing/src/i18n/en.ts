@@ -25,6 +25,11 @@ const en: I18nStrings = {
     'export.filename.daily': 'daily-report',
     'export.filename.weekly': 'weekly-report',
     'export.filename.aggregated': 'aggregated',
+    // Export dialog file type filter labels
+    'export.filter.csv': 'CSV Files (*.csv)',
+    'export.filter.md': 'Markdown Files (*.md)',
+    'export.filter.json': 'JSON Files (*.json)',
+    'export.filter.all': 'All Files',
     'toast.cloudSyncPlaceholder': '☁️ Cloud sync coming soon — placeholder extension point.',
 
     // 报表导出（Markdown）
@@ -66,6 +71,7 @@ const en: I18nStrings = {
     'confirm.restore': 'Restore timing data from the selected file?\nCurrent: total {0}, {1} sessions\nFile: total {2}, {3} sessions\nExisting data will be overwritten (a safety snapshot is written first).',
     'confirm.restore.title': 'Confirm Restore',
     'toast.restored': 'Timing data restored from: {0}',
+    'toast.restoreFailed': 'Restore failed: {0}',
 
     'cmd.modeSwitched': 'Switched to "{0}" mode',
     'cmd.enabled': 'Workspace Timing: enabled',
@@ -74,6 +80,9 @@ const en: I18nStrings = {
     'cmd.globalDisabled': 'Workspace Timing: globally disabled',
     'cmd.noWorkspace': 'Workspace Timing: open a workspace folder first',
     'cmd.debugSaved': '[Debug] {0}',
+    'debugSave.notRunning': 'Timing is not running — nothing to save',
+    'debugSave.done': 'Saved: {0}',
+    'debugSave.failed': 'Save failed: {0}',
 
     'statusBar.mode.today-total': 'Today first',
     'statusBar.mode.total-today': 'Total first',

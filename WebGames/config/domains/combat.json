@@ -1,0 +1,208 @@
+{
+  "participant_defaults": {
+    "name": "战士",
+    "hp": 100.0,
+    "max_hp": 100.0,
+    "ap": 0,
+    "weapon_mass_kg": 2.5,
+    "weapon_velocity": 6.0,
+    "edge_sharpness": 1.2,
+    "armor_rating": 5.0,
+    "is_staggered": false,
+    "is_monster": false
+  },
+  "card_defaults": {
+    "verb_type": "SLASH",
+    "magic_form": 1,
+    "ap_cost": -2,
+    "base_potency": 20.0,
+    "required_weapon_category": "WEAPON_BLADE"
+  },
+  "verbs": {
+    "STAB": {
+      "name": "刺",
+      "k_mom": 1.0,
+      "k_edge": 1.8,
+      "base_ap": -2,
+      "desc": "高侵彻压强点贯穿"
+    },
+    "SLASH": {
+      "name": "劈",
+      "k_mom": 1.5,
+      "k_edge": 1.2,
+      "base_ap": -3,
+      "desc": "大动量下压剪切"
+    },
+    "UPPER": {
+      "name": "撩",
+      "k_mom": 1.1,
+      "k_edge": 1.4,
+      "base_ap": -2,
+      "desc": "自下而上斜挑破防"
+    },
+    "PARRY": {
+      "name": "挂",
+      "k_mom": 0.3,
+      "k_edge": 0.1,
+      "base_ap": 2,
+      "desc": "侧向偏角卸力防反打断"
+    },
+    "BLOCK": {
+      "name": "架",
+      "k_mom": 0.5,
+      "k_edge": 0.05,
+      "base_ap": 1,
+      "desc": "正面纯防御吸收动能"
+    },
+    "CRUSH": {
+      "name": "崩",
+      "k_mom": 2.0,
+      "k_edge": 0.2,
+      "base_ap": -4,
+      "desc": "强冲击钝击内伤震荡"
+    },
+    "INTER": {
+      "name": "截",
+      "k_mom": 0.8,
+      "k_edge": 0.9,
+      "base_ap": 3,
+      "desc": "中途打断蓄力硬直"
+    },
+    "TWIST": {
+      "name": "搅",
+      "k_mom": 1.3,
+      "k_edge": 1.5,
+      "base_ap": -3,
+      "desc": "多段回旋持续撕裂"
+    },
+    "_fallback": {
+      "name": "击",
+      "k_mom": 1.0,
+      "k_edge": 1.0,
+      "base_ap": -1,
+      "desc": "常规攻击"
+    }
+  },
+  "interrupt_verbs": [
+    "PARRY",
+    "INTER"
+  ],
+  "interrupt": {
+    "ap_penalty": 2
+  },
+  "defense_multipliers": {
+    "block": 0.35,
+    "parry": 0.5
+  },
+  "kinetic": {
+    "energy_coef": 0.5,
+    "mass_floor": 0.1,
+    "velocity_floor": 0.1
+  },
+  "phase_transition": {
+    "primordial_min_loss_floor": 0.001,
+    "primordial_step1_loss": 0.03,
+    "incantation_step1_base": 0.25,
+    "incantation_step1_per_sentence": 0.03,
+    "incantation_step1_min": 0.25,
+    "incantation_step1_max": 0.5,
+    "step2_base": 0.1,
+    "step2_per_meter": 0.01,
+    "step2_min": 0.1,
+    "step2_max": 0.3
+  },
+  "card_pool_defaults": {
+    "card_category": "ATTACK",
+    "magic_ref": "",
+    "effects": [],
+    "card_pool": "random"
+  },
+  "round_hand": {
+    "hand_cap": 5,
+    "draw_per_round": 3,
+    "first_encounter_min": 3,
+    "first_encounter_max": 4,
+    "hand_count_distribution": {
+      "1": 0.25,
+      "2": 0.5,
+      "3": 0.2,
+      "4": 0.05
+    },
+    "mulligan_stamina_cost": 1,
+    "mulligan_max_per_round": 1,
+    "end_of_round_policy": "DISCARD"
+  },
+  "draw_algorithm": {
+    "mode": "PRD",
+    "prd_compensation_step": 0.02,
+    "guarantee_pity": 0
+  },
+  "card_pool_weights": {
+    "random_attack": 0.5,
+    "random_buff": 0.15,
+    "random_debuff": 0.1,
+    "random_recover": 0.15,
+    "random_item": 0.1
+  },
+  "ap_axis": {
+    "init_min": -10,
+    "init_max": 10,
+    "stagger_min": -10,
+    "even_state_policy": "AGI_TIEBREAK"
+  },
+  "guard_verbs": [
+    "PARRY",
+    "BLOCK",
+    "INTER"
+  ],
+  "ultimate_slot": {
+    "enabled": true,
+    "trigger": {
+      "op": "LEAF",
+      "kind": "rage_gte",
+      "args": {
+        "min_rage": 100.0
+      }
+    }
+  },
+  "initiative_model": {
+    "weight_agility": 1.0,
+    "weight_perception": 0.8,
+    "weight_level": 0.5,
+    "jitter_min": -2,
+    "jitter_max": 2,
+    "lead_ap_bonus": 2,
+    "even_tiebreaker_mode": "DETERMINISTIC_50_50"
+  },
+  "tertiary_timeline": {
+    "enabled": true,
+    "time_scale": 1.0,
+    "dispatch_interval_min_ms": 1200,
+    "dispatch_interval_max_ms": 2800,
+    "tension_interval_min_ms": 4500,
+    "tension_interval_max_ms": 8500,
+    "events_per_round_min": 2,
+    "events_per_round_max": 4,
+    "min_event_spacing_ms": 1500,
+    "event_type_weights": {
+      "NORMAL_DRAW": 0.5,
+      "ADD_DRAW": 0.25,
+      "TENSION_PULSE": 0.25
+    },
+    "tension_types": [
+      "PRESSURE_SURGE",
+      "ENVIRONMENT_PULSE",
+      "FORCE_ROUND_ADVANCE"
+    ]
+  },
+  "staging_bar": {
+    "max_capacity": 5,
+    "overflow_policy": "DISCARD_OLDEST",
+    "overflow_ap_bonus": 1
+  },
+  "round_lifecycle": {
+    "max_round_duration_ms": 10000,
+    "auto_pass_on_ap_exhausted": true,
+    "auto_pass_on_hand_empty": true
+  }
+}

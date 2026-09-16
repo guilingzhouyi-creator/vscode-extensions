@@ -1,0 +1,43 @@
+{
+  "rate_limit": {
+    "max_failed_attempts": 5,
+    "lockout_duration_seconds": 60
+  },
+  "records": {
+    "retention_count": 1000
+  },
+  "defaults": {
+    "valid_from_utc": 0,
+    "valid_to_utc": 4102444800,
+    "max_global_redemptions": -1,
+    "current_global_redemptions": 0,
+    "required_character_level": 1,
+    "is_active": true
+  },
+  "reward_payload": {
+    "mana_monocrystals": 0,
+    "gold_coins": 0,
+    "silver_coins": 0,
+    "copper_coins": 0
+  },
+  "eligibility_rules": {
+    "combinator": "AND",
+    "example_only": true,
+    "example_description": "最低累计游玩时长门槛——仅用于验证复合门槛框架能力，非游戏实际业务默认条件；example_only=true 时引擎不参与判定",
+    "rules": [
+      {
+        "rule_id": "min_play_seconds",
+        "metric_key": "accumulated_play_seconds",
+        "operator": "gte",
+        "value": 3600
+      }
+    ]
+  },
+  "redemption": {
+    "compensation": {
+      "enabled": true,
+      "ttl_seconds": 180,
+      "max_retry": 3
+    }
+  }
+}

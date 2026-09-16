@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "version": 1,
+    "domain": "world_gateway",
+    "description": "世界栏网关与单联机模式隔离配置表"
+  },
+  "gateway_policy": {
+    "auto_enter_gateway_on_login": true,
+    "allow_direct_world_bypass": false,
+    "session_timeout_seconds": 3600
+  },
+  "single_player": {
+    "default_world_id": "WORLD_DEFAULT_SP_01",
+    "default_slot_id": "SLOT_SP_01",
+    "max_slots_baseline": 1,
+    "max_worlds_baseline": 1
+  },
+  "canary_features": {
+    "FEATURE_MULTI_SLOT": {
+      "strategy": "PERCENTAGE_CANARY",
+      "rollout_percentage": 0,
+      "whitelist": [
+        "DEV_TESTER_01",
+        "QA_AUDITOR_02"
+      ]
+    },
+    "FEATURE_MULTI_WORLD": {
+      "strategy": "GLOBAL_DISABLED",
+      "rollout_percentage": 0,
+      "whitelist": []
+    },
+    "FEATURE_MULTIPLAYER_GATEWAY": {
+      "strategy": "WHITELIST_ONLY",
+      "rollout_percentage": 0,
+      "whitelist": [
+        "MP_TESTER_01"
+      ]
+    }
+  },
+  "worlds_catalog": {
+    "WORLD_DEFAULT_SP_01": {
+      "world_id": "WORLD_DEFAULT_SP_01",
+      "world_name": "卡拉尔大陆·起源界",
+      "mode": 1,
+      "seed_value": 20260901,
+      "world_version": "1.0.0",
+      "is_active": true,
+      "max_concurrent_players": 1,
+      "canary_feature_tag": ""
+    },
+    "WORLD_CANARY_MP_01": {
+      "world_id": "WORLD_CANARY_MP_01",
+      "world_name": "卡拉尔公网·测试界域",
+      "mode": 2,
+      "seed_value": 88888888,
+      "world_version": "0.1.0-alpha",
+      "is_active": false,
+      "max_concurrent_players": 16,
+      "canary_feature_tag": "FEATURE_MULTIPLAYER_GATEWAY"
+    }
+  }
+}

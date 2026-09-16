@@ -1,0 +1,11 @@
+{
+  "mailbox": {
+    "max_capacity": 100,
+    "max_attachment_count": 100
+  },
+  "attachment_defaults": {
+    "template_id": "ITEM_ATTACHMENT",
+    "mass_kg": 0.5,
+    "volume_slots": 1
+  }
+}

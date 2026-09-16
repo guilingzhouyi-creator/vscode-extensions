@@ -63,10 +63,13 @@ export class CommandRegistrar {
                 !current ? t()['cmd.globalDisabled'] : t()['cmd.globalEnabled']);
         });
 
-        // 切换状态栏显示模式
+        // 切换状态栏显示模式（循环切换后持久化，重载窗口后保持用户选择）
         this.registerCommand('workspaceTiming.showStatus', () => {
             if (!statusBar) { this.noWorkspaceMsg(); return; }
             const newMode = statusBar.cycleMode();
+            persistTimingConfig({ statusBarMode: newMode }).catch(err =>
+                log(LogLevel.Error, 'showStatus persist failed', err as Error)
+            );
             vscode.window.showInformationMessage(
                 format(t()['cmd.modeSwitched'], statusBarModeLabel(newMode))
             );
@@ -154,7 +157,7 @@ export class CommandRegistrar {
             const picked = await vscode.window.showOpenDialog({
                 defaultUri,
                 canSelectMany: false,
-                filters: { 'JSON Files (*.json)': ['json'], 'All Files': ['*'] },
+                filters: { [t()['export.filter.json']]: ['json'], [t()['export.filter.all']]: ['*'] },
                 openLabel: t()['toast.exportSaveLabel'],
             });
             if (!picked || picked.length === 0) return;
@@ -164,7 +167,7 @@ export class CommandRegistrar {
                 const bytes = await vscode.workspace.fs.readFile(picked[0]);
                 raw = JSON.parse(Buffer.from(bytes).toString('utf-8'));
             } catch (err) {
-                vscode.window.showErrorMessage(`${t()['toast.exportFailed']} (${(err as Error).message})`);
+                vscode.window.showErrorMessage(format(t()['toast.restoreFailed'], (err as Error).message));
                 return;
             }
 
@@ -187,7 +190,8 @@ export class CommandRegistrar {
                 vscode.window.showInformationMessage(format(t()['toast.restored'], picked[0].fsPath));
             } catch (err) {
                 log(LogLevel.Error, 'restore failed', err as Error);
-                vscode.window.showErrorMessage(`Restore failed: ${(err as Error).message}`);
+                vscode.window.showErrorMessage(
+                    format(t()['toast.restoreFailed'], (err as Error).message));
             }
         });
 
@@ -200,7 +204,7 @@ export class CommandRegistrar {
             );
             const uri = await vscode.window.showSaveDialog({
                 defaultUri,
-                filters: { 'CSV Files (*.csv)': ['csv'] },
+                filters: { [t()['export.filter.csv']]: ['csv'] },
                 saveLabel: t()['toast.exportSaveLabel'],
             });
             if (!uri) return;

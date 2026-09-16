@@ -1,0 +1,14 @@
+{
+  "rate_limited": "连续错误次数过多，请等待 %d 秒后再试",
+  "invalid_code": "兑换码不存在或格式错误",
+  "voucher_revoked": "该兑换码已被官方停用",
+  "expired": "兑换码未在有效时段内",
+  "level_too_low": "角色等级未达到领取要求 (需 Lv.%d)",
+  "global_limit_reached": "该礼包全服发放名额已领完",
+  "already_redeemed": "当前账户已领取过该礼包",
+  "already_used_globally": "该激活码已被他人使用",
+  "redeem_success": "兑换成功",
+  "item_dispatch_fallback_name": "物品",
+  "mail_title": "兑换码礼包",
+  "mail_body": "您的兑换码礼包已送达，请查收附件奖励。"
+}

@@ -1,0 +1,68 @@
+{
+  "tiers": {
+    "common": {
+      "tier": 1,
+      "level": 1,
+      "name_key": "quality.common",
+      "strength_weight": 1.0,
+      "rarity_weight": 1.0,
+      "color_token": "tier_1_common"
+    },
+    "fine": {
+      "tier": 2,
+      "level": 2,
+      "name_key": "quality.fine",
+      "strength_weight": 1.5,
+      "rarity_weight": 2.0,
+      "color_token": "tier_2_fine"
+    },
+    "epic": {
+      "tier": 3,
+      "level": 3,
+      "name_key": "quality.epic",
+      "strength_weight": 2.2,
+      "rarity_weight": 4.0,
+      "color_token": "tier_3_epic"
+    },
+    "legendary": {
+      "tier": 4,
+      "level": 4,
+      "name_key": "quality.legendary",
+      "strength_weight": 3.0,
+      "rarity_weight": 8.0,
+      "color_token": "tier_4_legendary"
+    },
+    "mythic": {
+      "tier": 5,
+      "level": 5,
+      "name_key": "quality.mythic",
+      "strength_weight": 4.0,
+      "rarity_weight": 16.0,
+      "color_token": "tier_5_mythic"
+    },
+    "ancient": {
+      "tier": 6,
+      "level": 6,
+      "name_key": "quality.ancient",
+      "strength_weight": 5.0,
+      "rarity_weight": 32.0,
+      "color_token": "tier_6_ancient"
+    }
+  },
+  "mythic_intervals": {
+    "quasi_artifact": {
+      "interval": 1,
+      "name_key": "quality.mythic.quasi_artifact",
+      "strength_weight": 4.0,
+      "rarity_weight": 16.0,
+      "color_token": "mythic_quasi"
+    },
+    "true_artifact": {
+      "interval": 2,
+      "name_key": "quality.mythic.true_artifact",
+      "strength_weight": 4.8,
+      "rarity_weight": 24.0,
+      "color_token": "mythic_true"
+    }
+  }
+}

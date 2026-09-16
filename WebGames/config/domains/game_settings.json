@@ -1,0 +1,50 @@
+{
+  "apply": {
+    "revert_timeout_seconds": 15.0
+  },
+  "audio": {
+    "min_volume": 0.0,
+    "max_volume": 1.0
+  },
+  "ui": {
+    "min_scale": 0.75,
+    "max_scale": 2.0,
+    "default_scale": 1.0
+  },
+  "render": {
+    "default_width": 1920,
+    "default_height": 1080,
+    "min_width": 640,
+    "min_height": 480,
+    "fallback_width": 1280,
+    "fallback_height": 720
+  },
+  "defaults": {
+    "audio": {
+      "master_volume": 1.0,
+      "bgm_volume": 0.8,
+      "sfx_volume": 0.9,
+      "ui_volume": 0.8,
+      "ambience_volume": 0.7,
+      "is_master_muted": false
+    },
+    "ui_visual": {
+      "ui_scale": 1.0,
+      "language": "zh_CN",
+      "show_damage_numbers": true,
+      "damage_text_scale": 1.0,
+      "screen_shake_intensity": 1.0
+    },
+    "render": {
+      "window_mode": "EXCLUSIVE_FULLSCREEN",
+      "resolution_width": 1920,
+      "resolution_height": 1080,
+      "vsync_mode": "ENABLED",
+      "target_fps_cap": 60,
+      "msaa_level": "MSAA_4X",
+      "shadow_quality": "HIGH",
+      "glow_bloom_enabled": true,
+      "particle_density": 1.0
+    }
+  }
+}

@@ -1,0 +1,53 @@
+# ==============================================================================
+# 卡拉尔世界引擎 (Kalar World Engine) - Pre-commit 工业级质量门禁规范
+# 官方规范: https://pre-commit.com/
+# 用法:
+#   1. 安装 pre-commit: pip install pre-commit
+#   2. 激活 Git 钩子: pre-commit install (或执行 pwsh scripts/ps1/install-hooks.ps1)
+#   3. 手动全量审查: pre-commit run --all-files
+# ==============================================================================
+default_stages: [pre-commit]
+fail_fast: true
+
+repos:
+  - repo: local
+    hooks:
+      # 1. 技术文档四域规范与死链审查
+      - id: audit-docs
+        name: audit-docs (文档四域与死链棘轮)
+        entry: python scripts/py/audit_docs.py --json
+        language: system
+        files: ^docs/.*\.md$
+        pass_filenames: false
+
+      # 2. GDScript 质量治理统一审查 (命名/高级规范/简化)
+      - id: audit-gd
+        name: audit-gd (GDScript质量规范治理)
+        entry: python scripts/py/audit_gd.py
+        language: system
+        files: ^backend/.*\.gd$
+        pass_filenames: false
+
+      # 3. 零硬编码与调试残留扫描
+      - id: audit-hardcode
+        name: audit-hardcode (零硬编码/调试残留)
+        entry: python scripts/py/audit_hardcode.py
+        language: system
+        files: ^backend/.*\.gd$
+        pass_filenames: false
+
+      # 4. 凭证与敏感密钥扫描
+      - id: audit-secrets
+        name: audit-secrets (凭证泄漏扫描)
+        entry: python scripts/py/audit_secrets.py
+        language: system
+        files: \.(gd|json|md|sh|ps1|py)$
+        pass_filenames: false
+
+      # 5. 性能热点与瞬态堆分配扫描 (提示级)
+      - id: audit-perf
+        name: audit-perf (循环热点与堆分配审查)
+        entry: python scripts/py/audit_perf_hotspots.py
+        language: system
+        files: ^backend/.*\.gd$
+        pass_filenames: false

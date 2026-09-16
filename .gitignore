@@ -2,7 +2,6 @@ node_modules/
 *.vsix
 *.tgz
 .vscode-test/
-.cnb/.cache/
 
 # 统一打包输出目录（本地构建产物，不入库；正式产物发布到 GitHub Releases）
 dist/
@@ -10,6 +9,9 @@ dist/
 # 各扩展编译产物与覆盖率报告（根级零配置覆盖：任何顶层扩展的 out/、coverage/ 均不入库）
 out/
 coverage/
+
+# 门禁 SARIF 报告产物（本地与 CI 运行 audit-all --sarif-out 生成，不入库）
+sarif/
 
 # 本地运行时数据与工具目录（不入库）
 .workspace-timing-data/
@@ -23,6 +25,7 @@ coverage/
 **/.bench-corpus/
 **/.*-corpus/
 **/.corpus/
+**/.corpus-*.actual.json
 **/.t04-keypoints-*/
 **/.t04-keypoints-*
 *.log
@@ -30,15 +33,64 @@ err.txt
 out.txt
 
 # 版本归档（历史快照 / 备份 / 演示材料，统一集中管理）
-archive/
+/archive/
 
-# 密钥与凭证文件（防将来误提交）
+# ============ 密钥与凭证（防误提交泄露；示例模板与公钥除外） ============
+# 环境变量 / 本地覆盖配置（.env.example 等示例模板仍可提交）
 .env
 .env.*
-*.pem
+*.env
+!.env.example
+!*.env.example
+*.local
+*.local.json
+*.local.yaml
+*.local.yml
+config.local.*
+settings.local.json
+
+# 私钥 / 密钥库（*.pub 公钥与 *.crt 证书可正常提交）
 *.key
+*.pem
 *.pfx
 *.p12
-*.jks
+*.ppk
 id_rsa*
+id_ed25519*
+id_ecdsa*
+id_dsa*
+!*.pub
+*.jks
+*.jceks
+*.keystore
+debug.keystore
+
+# 云平台 / OAuth 服务账号凭证
+.aws/
+.azure/
+credentials.json
+service_account*.json
+service-account*.json
+client_secret*.json
+client_secrets*.json
+
+# 通用密钥环 / 凭证库
+*.secret
+*.token
+.git-credentials
+.netrc
+_netrc
+.pgpass
+.my.cnf
+.htpasswd
+*.keychain
+
+# 包管理器认证
 .npmrc
+.pypirc
+.gem/credentials
+
+# 操作系统杂物
+.DS_Store
+Thumbs.db
+desktop.ini

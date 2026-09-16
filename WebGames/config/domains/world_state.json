@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "domain": "world_state",
+    "extensions_note": "MP、等级经验、ap_max 实值等无权威源的展示项，本卷不入快照，留待演进02 前端契约 / 等级域 / 法力域闭环扩展"
+  },
+  "hud": {
+    "channels": {
+      "snapshot": "world_state.snapshot_published",
+      "stat_mutated": "world_state.stat_mutated",
+      "wallet_mutated": "world_state.wallet_mutated"
+    }
+  },
+  "hud_defaults": {
+    "ap_max": 10.0,
+    "snapshot_of": {
+      "hp_max": "domains.combat/participant_defaults/max_hp"
+    }
+  }
+}

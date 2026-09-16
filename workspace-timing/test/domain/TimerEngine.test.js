@@ -60,14 +60,14 @@ describe('TimerEngine（计时核心）', () => {
     assert.strictEqual(eng.data.sessions.length, 1);
   });
 
-  it('trimSessions 裁剪会话列表到上限', () => {
+  it('data 视图冻结：连续两次 stop 各自记录会话且视图不受外部突变影响', () => {
     const eng = new TimerEngine();
-    const data = createEmptyTimingData();
-    data.sessions = [0, 1, 2, 3].map((i) => ({ startMs: i, endMs: i + 1, durationMs: 1 }));
-    eng.replaceData(data);
-    eng.trimSessions(2);
-    assert.strictEqual(eng.data.sessions.length, 2);
-    assert.strictEqual(eng.data.sessions[0].startMs, 2, '应保留最近会话');
+    eng.start();
+    eng.stop();
+    eng.start();
+    eng.stop();
+    assert.strictEqual(eng.data.sessions.length, 2, '两段会话都应入列');
+    assert.strictEqual(Object.isFrozen(eng.data.sessions), true, 'sessions 对外视图应冻结');
   });
 
   it('rotateSession 跨午夜切分：封存昨日会话段并无缝切换起点', () => {
@@ -99,4 +99,36 @@ describe('TimerEngine（计时核心）', () => {
     assert.strictEqual(eng.data.sessions[0].endMs, sleepStart);
     assert.strictEqual(eng.data.currentSessionStartMs, resumeMs, '新起点为唤醒时刻');
   });
+
+  it('今日累计增量：stop 后 getTodayMs 精确等于今日已结束段', () => {
+    const eng = new TimerEngine();
+    eng.start();
+    eng._sessionStartMs = Date.now() - 600000; // 10 分钟前开始
+    const elapsed = eng.stop();
+    assert.strictEqual(eng.getTodayMs(), 600000, '今日已结束段应精确累加');
+    assert.strictEqual(elapsed, 600000);
+  });
+
+  it('今日累计：昨日会话不计入今日（replaceData 后惰性重算）', () => {
+    const eng = new TimerEngine();
+    const now = Date.now();
+    eng.replaceData({
+      version: 2, totalMs: 7200000, currentSessionStartMs: 0, lastSavedAtMs: 0, isEnabled: true,
+      sessions: [{ startMs: now - 86400000 - 3600000, endMs: now - 86400000, durationMs: 3600000 }],
+    });
+    assert.strictEqual(eng.getTodayMs(), 0, '昨日会话不得计入今日');
+  });
+
+  it('今日累计：rotate 密封段计入今日已结束累计（真实跨日归零由日键重算保证）', () => {
+    const eng = new TimerEngine();
+    const now = Date.now();
+    eng.start();
+    eng._sessionStartMs = now - 1800000; // 今日 30 分钟
+    eng.rotateSession(now);              // 封存进今日 sessions
+    assert.strictEqual(eng.getTodayEndedMs(), 1800000, '密封段今日部分计入已结束累计');
+    // rotate 后会话仍进行中（起点=now），getTodayMs 含实时残段 ≥ 0；
+    // 精确相等存在毫秒边界竞态，故断言下限而非严格相等（见评审 P3-5）。
+    assert.ok(eng.getTodayMs() >= 1800000, '进行中会话残段叠加在已结束累计之上');
+  });
+
 });

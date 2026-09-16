@@ -1,0 +1,92 @@
+{
+    "$schema": "../../../auto-refactor/config.schema.json",
+    "_comment": "auto-refactor 工具配置（经 scripts/tooling/refactor-adapter.mjs --config 传入）。阈值单一来源声明在 analyzers.*.options——该引擎的合并语义是『分析器 options 覆盖全局 thresholds，options 缺省时回填内置默认值』，因此仅在权威生效位置声明一次（全局 thresholds 故意留空，避免双处声明口径漂移）。exclude 说明：src/i18n 为词条数据、dashboardTemplate 为纯展示模板，其字符串长度/魔法数字/行数阈值不具语义，已在扫描面排除（排除决策记录于 scripts/README.md 与审查报告）。",
+    "include": [
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "src/i18n/**",
+        "src/presentation/dashboardTemplate.ts"
+    ],
+    "analyzers": {
+        "constants": {
+            "enabled": true,
+            "options": {
+                "magicNumberMin": 4,
+                "duplicateLiteralThreshold": 4,
+                "hardcodedStringMinLength": 24
+            }
+        },
+        "complexity": {
+            "enabled": true,
+            "options": {
+                "complexityWarn": 12,
+                "complexityFail": 20
+            }
+        },
+        "large-file": {
+            "enabled": true,
+            "options": {
+                "fileLinesWarn": 500,
+                "fileLinesFail": 1000,
+                "fileFunctionsWarn": 40
+            }
+        },
+        "governance": {
+            "enabled": true
+        },
+        "dependency-graph": {
+            "enabled": true,
+            "options": {
+                "detectCycles": true,
+                "cycleSeverity": "error",
+                "maxCyclesReported": 20,
+                "detectUnusedExports": true,
+                "entryGlobs": [
+                    "src/extension.ts"
+                ],
+                "unusedSeverity": "warning"
+            }
+        },
+        "secrets": {
+            "enabled": true
+        }
+    },
+    "suppressions": [
+        {
+            "matchAnalyzer": "governance",
+            "matchRule": "GOV-EXC-001",
+            "downgradeTo": "warning",
+            "reason": "空 catch 为本项目有意的幂等/尽力而为语义（目录已存在、可选快照、清理路径），意图以相邻注释声明；storage 崩溃保护路径另有 fail-closed 检查器覆盖（JournalWriter 退回/水位线）"
+        },
+        {
+            "matchAnalyzer": "complexity",
+            "matchRule": "high-complexity",
+            "matchSymbol": "validateTimingData",
+            "downgradeTo": "warning",
+            "reason": "还原校验器的防御性逐字段净化（fail-closed 边界），复杂度源于安全需求本身；分支覆盖率 89%+"
+        },
+        {
+            "matchAnalyzer": "complexity",
+            "matchRule": "high-complexity",
+            "matchSymbol": "recover",
+            "downgradeTo": "warning",
+            "reason": "崩溃恢复编排主体：水位线去重/按日切段/补偿三分支为算法固有分支，行覆盖 98.1%；再拆分会切断事务语义"
+        },
+        {
+            "matchAnalyzer": "complexity",
+            "matchRule": "high-complexity",
+            "matchSymbol": "weeklyTrend",
+            "downgradeTo": "warning",
+            "reason": "多周趋势窗口化聚合（O(weeks*7) 查表）为性能优化后的形态（v0.4.7 CHANGELOG），拆分会破坏窗口粗筛结构"
+        },
+        {
+            "matchFile": "src/persistence/JournalStorageProvider.ts",
+            "matchAnalyzer": "governance",
+            "matchRule": "GOV-PRF-001",
+            "downgradeTo": "info",
+            "reason": "NDJSON 回放设计：JSON.parse 参数为逐行变化的内容，非循环不变量——GOV-PRF-001 行级启发式无法判定参数不变性，属已知误报场景（规则局限记录）"
+        }
+    ],
+    "_comment_dg": "dependency-graph 只启用全局循环依赖检测（引擎 0.2.0 post-scan 管线段，真 parser 图谱）；跨组导入矩阵仍由本地 L2 layer-boundary 承载（引擎不可用时的独立兜底），两者互补不重复：本配置不声明 groups，引擎不做分组规则检查。suppressions 为引擎 0.2.0 原生声明式豁免（带理由、可降级、报告留痕），自适配层迁移至此。"
+}

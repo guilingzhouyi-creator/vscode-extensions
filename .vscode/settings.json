@@ -22,5 +22,22 @@
     "editor.tabSize": 2,
     "editor.detectIndentation": false,
     // 扩展开发：TS 校验
-    "typescript.tsdk": "workspace-timing/node_modules/typescript/lib"
+    "typescript.tsdk": "workspace-timing/node_modules/typescript/lib",
+    // Godot 引擎文件类型与语法高亮关联
+    "files.associations": {
+        "*.gd": "gdscript",
+        "*.tscn": "gdscene",
+        "*.tres": "gdresource",
+        "*.gdshader": "gdshader",
+        "project.godot": "ini"
+    },
+    "godotTools.editorPath.godot4": "godot",
+    "godotTools.lsp.serverPort": 6005,
+    "workbench.iconTheme": "vscode-icons",
+    "editor.semanticHighlighting.enabled": true,
+    // Codex / OpenAI 插件 API 代理与脱敏环境变量映射
+    "codex.apiKey": "${env:CODEX_API_KEY}",
+    "codex.apiBaseUrl": "${env:CODEX_BASE_URL}",
+    "openai.apiKey": "${env:OPENAI_API_KEY}",
+    "openai.apiBase": "${env:OPENAI_BASE_URL}"
 }

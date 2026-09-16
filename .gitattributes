@@ -8,3 +8,8 @@
 
 # PowerShell 脚本保持 CRLF（Windows 原生体验）
 *.ps1 text eol=crlf
+
+# GDScript / Markdown / JSON 统一 LF —— 与 sh 同口径，防 Windows CRLF 污染源码与文档
+*.gd text eol=lf
+*.md text eol=lf
+*.json text eol=lf

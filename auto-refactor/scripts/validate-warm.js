@@ -1,19 +1,27 @@
 #!/usr/bin/env node
-// validate-warm.js — warm-scan equivalence regression (docs/01-architecture/02-pipeline-and-caching.md Part D).
-//
-// Proves the warm path (daemon + two-level cache) produces output BYTE-IDENTICAL to the
-// fresh path, per scenario W1-W9. Corpus generation + normalize are reused from
-// validate-equivalence.js (same templates, same normalization: excludes generatedAt /
-// durationMs / config, issues sorted by id, fileMetrics sorted by file).
-//
-//   fresh = scan()                — no daemon, no cache (exact cold semantics)
-//   warm  = scanWarm(daemon:'on') — daemon + cache (empty cache on W1, hot thereafter)
-//
-// Every warm scenario additionally asserts stats.daemonUsed so a silent degrade-to-cold
-// cannot fake a pass. Exit code 0 = PASS, 1 = FAIL (CI gate).
-//
-// Usage:
-//   node scripts/validate-warm.js
+/**
+ * Module: Verification Harness — Warm-Scan Equivalence Regression
+ * File Path: scripts/validate-warm.js
+ * Architecture Role: End-to-end regression gate comparing the warm path (daemon + two-level
+ *                     cache via scanWarm) with the fresh path (scan, no daemon, no cache)
+ *                     across scenarios W1-W9; documented in docs/01-architecture/
+ *                     02-pipeline-and-caching.md Part D.
+ * Dependencies & Triggers: Run manually via `node scripts/validate-warm.js` or from CI after
+ *                     `npm run build`; imports scan/scanWarm from ../dist/api plus
+ *                     child_process.spawnSync, fs, and path, and reuses the corpus templates
+ *                     and normalize() conventions of validate-equivalence.js.
+ * Responsibilities: Regenerate TS/JS and Rust corpora with configs, clear stale caches and
+ *                     daemons, drive cold-start/rescan/partial-change/touch/config-change/
+ *                     parser-switch/custom-analyzer/daemon-crash/rust scenarios, normalize each
+ *                     report (drop generatedAt, durationMs and config; sort issues by id and
+ *                     fileMetrics by file), and assert byte-identical output while requiring
+ *                     stats.daemonUsed so a silent degrade to cold cannot fake a pass.
+ * Exit Semantics & Design Rationale: Exits 0 only when every scenario passes and 1 otherwise;
+ *                     thrown errors are logged after a best-effort daemon stop and also exit 1
+ *                     for CI. Byte-identical warm vs fresh output is the property that makes
+ *                     caching safe, and asserting daemonUsed prevents cached results from
+ *                     masking a broken daemon path.
+ */
 
 const { scan, scanWarm } = require('../dist/api');
 const { spawnSync } = require('child_process');
@@ -36,7 +44,9 @@ const TEMPLATES = {
   if (v < -100) return -100;
   return v;
 }
+/** Exported numeric boundary used by the magic-number fixture. */\
 export const LIMIT = 100;
+/** Exported scoring helper that repeats 100 for duplicate-literal detection. */\
 export function rate(x: number): number {
   // 100 repeated several times -> duplicate-literal
   return x * 100 + 100 - 100;
@@ -47,11 +57,13 @@ export function rate(x: number): number {
   console.log('hello world');
   return 'hello world ' + name;
 }
+/** Exported no-argument helper returning the repeated hardcoded string. */\
 export function bye(): string {
   return 'hello world';
 }
 `,
   i18n: `function t(s: string): string { return s; }
+/** Exported page helper that concatenates two i18n strings through t(). */\
 export function page(): string {
   const a = t('welcome message');
   const b = t('goodbye message');
@@ -107,14 +119,17 @@ function writeCorpus() {
   big += `export const TAG = 'shared token';\n`;
   for (let n = 0; n < 8; n++) big += `export const TOKEN${n} = 'shared token';\n`;
   w('src/bigfile.ts', big);
-  w('src/legacy.js', `function compute(a, b) {
+  w(
+    'src/legacy.js',
+    `function compute(a, b) {
   if (a > 5) { return b * 100; }
   return a + 100;
 }
 console.log('legacy start');
 const NAME = 'legacy name';
 module.exports = { compute };
-`);
+`,
+  );
   w('ignored/skip.ts', `export const SECRET = 'should not be scanned';\n`);
   w('.gitignore', 'ignored/\n');
 }
@@ -128,9 +143,14 @@ function baseConfig(overrides = {}) {
     include: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     exclude: ['node_modules', '.git', 'dist', 'build', 'out', 'coverage'],
     thresholds: {
-      magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3,
-      fileLinesWarn: 400, fileLinesFail: 800, fileFunctionsWarn: 15,
-      complexityWarn: 8, complexityFail: 12,
+      magicNumberMin: 2,
+      duplicateLiteralThreshold: 3,
+      hardcodedStringMinLength: 3,
+      fileLinesWarn: 400,
+      fileLinesFail: 800,
+      fileFunctionsWarn: 15,
+      complexityWarn: 8,
+      complexityFail: 12,
     },
     analyzers: {
       constants: { enabled: true },
@@ -160,6 +180,7 @@ const RUST_TEMPLATES = {
 
 pub const LIMIT: i32 = 100;
 
+/** Public Rust scorer that repeats 100 for duplicate-literal coverage. */\
 pub fn rate(x: i32) -> i32 {
     x * 100 + 100 - 100
 }
@@ -170,6 +191,7 @@ pub fn rate(x: i32) -> i32 {
     format!("{} {}", msg, name)
 }
 
+/** Public Rust helper returning the shared hardcoded greeting. */\
 pub fn bye() -> String {
     "hello world".to_string()
 }
@@ -180,16 +202,19 @@ pub fn bye() -> String {
 }
 
 impl Order {
+    /** Constructs an Order with the given id and total for the method fixtures. */\
     pub fn new(id: u64, total: i64) -> Self {
         Order { id, total }
     }
 
+    /** Applies a percentage-based discount to the order total for complexity coverage. */\
     pub fn apply_discount(&self, rate: i64) -> i64 {
         if rate > 50 { return self.total / 2; }
         if rate > 20 { return self.total - rate; }
         self.total
     }
 
+    /** Classifies the order total relative to a threshold as large, ok, or empty. */\
     pub fn status(&self, threshold: i64) -> &'static str {
         if self.total > threshold {
             "large"
@@ -201,6 +226,7 @@ impl Order {
     }
 }
 
+/** Public nesting-heavy helper that exercises Rust complexity measurement. */\
 pub fn heavy(a: i32, b: i32, c: i32) -> i32 {
     let mut out = 0;
     if a > 0 {
@@ -250,11 +276,20 @@ function writeRustCorpus() {
     include: ['**/*.rs'],
     exclude: ['node_modules', 'target', '.git', 'dist'],
     thresholds: {
-      magicNumberMin: 2, duplicateLiteralThreshold: 2, hardcodedStringMinLength: 3,
-      fileLinesWarn: 40, fileLinesFail: 80, fileFunctionsWarn: 6,
-      complexityWarn: 5, complexityFail: 10,
+      magicNumberMin: 2,
+      duplicateLiteralThreshold: 2,
+      hardcodedStringMinLength: 3,
+      fileLinesWarn: 40,
+      fileLinesFail: 80,
+      fileFunctionsWarn: 6,
+      complexityWarn: 5,
+      complexityFail: 10,
     },
-    analyzers: { constants: { enabled: true }, 'large-file': { enabled: true }, complexity: { enabled: true } },
+    analyzers: {
+      constants: { enabled: true },
+      'large-file': { enabled: true },
+      complexity: { enabled: true },
+    },
     customAnalyzers: [],
     logLevel: 'silent',
     workers: 1,
@@ -267,10 +302,27 @@ function writeRustCorpus() {
 /** Same normalize as validate-equivalence.js (excludes runtime/config fields). */
 function normalize(r) {
   const issues = r.issues
-    .map((x) => ({ id: x.id, analyzer: x.analyzer, rule: x.rule, severity: x.severity, message: x.message, location: x.location, detail: x.detail }))
+    .map((x) => ({
+      id: x.id,
+      analyzer: x.analyzer,
+      rule: x.rule,
+      severity: x.severity,
+      message: x.message,
+      location: x.location,
+      detail: x.detail,
+    }))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const fileMetrics = r.fileMetrics.map((m) => ({ ...m })).sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
-  return { filesScanned: r.summary.filesScanned, issuesTotal: r.summary.issuesTotal, byAnalyzer: r.summary.byAnalyzer, bySeverity: r.summary.bySeverity, issues, fileMetrics };
+  const fileMetrics = r.fileMetrics
+    .map((m) => ({ ...m }))
+    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+  return {
+    filesScanned: r.summary.filesScanned,
+    issuesTotal: r.summary.issuesTotal,
+    byAnalyzer: r.summary.byAnalyzer,
+    bySeverity: r.summary.bySeverity,
+    issues,
+    fileMetrics,
+  };
 }
 
 function rmRetry(p) {
@@ -287,12 +339,22 @@ function rmRetry(p) {
 
 function daemonStop(root) {
   try {
-    spawnSync(process.execPath, [path.join(ROOT, 'dist', 'index.js'), 'daemon', 'stop', '--root', root], { stdio: 'ignore' });
+    spawnSync(
+      process.execPath,
+      [path.join(ROOT, 'dist', 'index.js'), 'daemon', 'stop', '--root', root],
+      { stdio: 'ignore' },
+    );
   } catch {
     /* best-effort */
   }
 }
 
+/**
+ * Drive every warm-vs-fresh scenario and exit non-zero if any comparison fails.
+ *
+ * The driver is intentionally single-threaded: each fresh/warm pair is awaited to completion
+ * before the next scenario mutates shared corpus files, so concurrent scenarios cannot race.
+ */
 async function main() {
   // Fresh corpora + empty caches + no daemon.
   rmRetry(CORPUS);
@@ -333,7 +395,11 @@ async function main() {
     const f = await freshScan();
     const w = await warmScan();
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W1 cold-start-empty-cache', eq && w.stats.daemonUsed === true, `warm analyzed=${w.stats.analyzed} daemonUsed=${w.stats.daemonUsed}`);
+    check(
+      'W1 cold-start-empty-cache',
+      eq && w.stats.daemonUsed === true,
+      `warm analyzed=${w.stats.analyzed} daemonUsed=${w.stats.daemonUsed}`,
+    );
   }
 
   // ---- W2: immediate rescan (warm-2nd: hot pool + hot cache, all cached) ----
@@ -341,21 +407,38 @@ async function main() {
     const f = await freshScan();
     const w = await warmScan();
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W2 immediate-rescan', eq && w.stats.daemonUsed === true && w.stats.cacheHit > 0, `cacheHit=${w.stats.cacheHit}/${w.stats.cacheTotal} analyzed=${w.stats.analyzed}`);
+    check(
+      'W2 immediate-rescan',
+      eq && w.stats.daemonUsed === true && w.stats.cacheHit > 0,
+      `cacheHit=${w.stats.cacheHit}/${w.stats.cacheTotal} analyzed=${w.stats.analyzed}`,
+    );
   }
 
   // ---- W3: partial change (modify 3 files) ----
   {
     const mod = [
-      ['src/unit_magicNum_0.ts', 'export function clamp(v: number): number {\n  if (v > 200) return 200;\n  if (v < -200) return -200;\n  return v + 1;\n}\n'],
-      ['src/unit_hardStr_1.ts', 'export function greet(name: string): string {\n  const msg = "hello warm world";\n  return msg + name;\n}\n'],
-      ['src/unit_cls_2.ts', 'export class Widget {\n  private count = 0;\n  inc(): void { this.count = this.count + 2; }\n  get(): number { return this.count; }\n}\n'],
+      [
+        'src/unit_magicNum_0.ts',
+        'export function clamp(v: number): number {\n  if (v > 200) return 200;\n  if (v < -200) return -200;\n  return v + 1;\n}\n',
+      ],
+      [
+        'src/unit_hardStr_1.ts',
+        'export function greet(name: string): string {\n  const msg = "hello warm world";\n  return msg + name;\n}\n',
+      ],
+      [
+        'src/unit_cls_2.ts',
+        'export class Widget {\n  private count = 0;\n  inc(): void { this.count = this.count + 2; }\n  get(): number { return this.count; }\n}\n',
+      ],
     ];
     for (const [p, c] of mod) fs.writeFileSync(path.join(CORPUS, p), c);
     const f = await freshScan();
     const w = await warmScan();
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W3 partial-change', eq && w.stats.daemonUsed === true, `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`);
+    check(
+      'W3 partial-change',
+      eq && w.stats.daemonUsed === true,
+      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+    );
     writeCorpus(); // restore original content for W4+
   }
 
@@ -367,22 +450,35 @@ async function main() {
     const f = await freshScan();
     const w = await warmScan();
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W4 touch-no-content-change', eq && w.stats.daemonUsed === true, `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`);
+    check(
+      'W4 touch-no-content-change',
+      eq && w.stats.daemonUsed === true,
+      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+    );
   }
 
   // ---- W5: config change (new thresholds → fpHash changes → full invalidation) ----
   {
     writeConfig({
       thresholds: {
-        magicNumberMin: 3, duplicateLiteralThreshold: 2, hardcodedStringMinLength: 4,
-        fileLinesWarn: 300, fileLinesFail: 600, fileFunctionsWarn: 10,
-        complexityWarn: 6, complexityFail: 9,
+        magicNumberMin: 3,
+        duplicateLiteralThreshold: 2,
+        hardcodedStringMinLength: 4,
+        fileLinesWarn: 300,
+        fileLinesFail: 600,
+        fileFunctionsWarn: 10,
+        complexityWarn: 6,
+        complexityFail: 9,
       },
     });
     const f = await freshScan();
     const w = await warmScan();
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W5 config-change', eq && w.stats.daemonUsed === true, `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`);
+    check(
+      'W5 config-change',
+      eq && w.stats.daemonUsed === true,
+      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+    );
     writeConfig(); // restore
   }
 
@@ -391,7 +487,11 @@ async function main() {
     const f = await freshScan({ parser: 'oxc' });
     const w = await warmScan({ parser: 'oxc' });
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W6 parser-switch-oxc', eq && w.stats.daemonUsed === true, `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`);
+    check(
+      'W6 parser-switch-oxc',
+      eq && w.stats.daemonUsed === true,
+      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+    );
   }
 
   // ---- W7: customAnalyzer (L2 disabled by default; output still byte-equal) ----
@@ -404,13 +504,22 @@ async function main() {
         'no-console': { enabled: true },
       },
       customAnalyzers: [
-        { name: 'no-console', module: path.join(SAMPLES, 'analyzers', 'noConsole.js'), enabled: true, options: { severity: 'warning', allowed: ['error'] } },
+        {
+          name: 'no-console',
+          module: path.join(SAMPLES, 'analyzers', 'noConsole.js'),
+          enabled: true,
+          options: { severity: 'warning', allowed: ['error'] },
+        },
       ],
     });
     const f = await freshScan();
     const w = await warmScan();
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W7 custom-analyzer-l2-disabled', eq && w.stats.daemonUsed === true, `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`);
+    check(
+      'W7 custom-analyzer-l2-disabled',
+      eq && w.stats.daemonUsed === true,
+      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+    );
     writeConfig(); // restore
   }
 
@@ -428,12 +537,21 @@ async function main() {
       cacheDir: CACHE_DIR,
     });
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W8 daemon-crash-degrade', eq && w.stats.daemonUsed === false, `daemonUsed=${w.stats.daemonUsed} cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`);
+    check(
+      'W8 daemon-crash-degrade',
+      eq && w.stats.daemonUsed === false,
+      `daemonUsed=${w.stats.daemonUsed} cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+    );
   }
 
   // ---- W9: rust corpus (rust cache-key path) ----
   {
-    const f = await scan({ root: RUST_CORPUS, configFile: RUST_CFG, format: 'json', logLevel: 'silent' });
+    const f = await scan({
+      root: RUST_CORPUS,
+      configFile: RUST_CFG,
+      format: 'json',
+      logLevel: 'silent',
+    });
     const w = await scanWarm({
       root: RUST_CORPUS,
       configFile: RUST_CFG,
@@ -444,7 +562,11 @@ async function main() {
       cacheDir: CACHE_DIR_RUST,
     });
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check('W9 rust-corpus', eq && w.stats.daemonUsed === true, `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`);
+    check(
+      'W9 rust-corpus',
+      eq && w.stats.daemonUsed === true,
+      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+    );
   }
 
   daemonStop(CORPUS);

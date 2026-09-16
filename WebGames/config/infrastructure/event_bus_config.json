@@ -1,0 +1,123 @@
+{
+  "_meta": {
+    "version": "2.0.0",
+    "description": "EventBus 2.0 空间分发与分级分频配置表（唯一真源：默认值以本表为准）"
+  },
+  "pool": {
+    "capacity": 512
+  },
+  "presentation": {
+    "active_adapter": "HEADLESS_API",
+    "supported_adapters": [
+      "HEADLESS_API",
+      "2D_SPRITE_PROXY",
+      "3D_FORWARD_PLUS_PROXY"
+    ],
+    "enable_visual_cue_throttling": true
+  },
+  "spatial_routing": {
+    "cell_size_meters": 16.0,
+    "max_audible_radius_meters": 64.0,
+    "max_vfx_visibility_radius_meters": 128.0,
+    "max_dispatch_radius_meters": 256.0,
+    "spatial_hash_prime_x": 73856093,
+    "spatial_hash_prime_y": 19349663,
+    "spatial_hash_prime_z": 83492791
+  },
+  "frame_batching": {
+    "ring_buffer_capacity": 4096,
+    "flush_timing": "PRE_RENDER_FLUSH",
+    "drop_on_overflow": true,
+    "disallowed_categories": [
+      "CORE_STATE"
+    ]
+  },
+  "circuit_breaker": {
+    "max_dispatch_depth": 16,
+    "enable_recursion_warning": true
+  },
+  "metrics": {
+    "enable_profiling_hooks": true,
+    "high_frequency_warning_threshold_ops": 10000
+  },
+  "channel_registry": [
+    {
+      "id": 769,
+      "name": "HUD_STATUS_SNAPSHOT",
+      "legacy": "world_state.snapshot_published",
+      "category": "CORE_STATE"
+    },
+    {
+      "id": 770,
+      "name": "HUD_STAT_MUTATED",
+      "legacy": "world_state.stat_mutated",
+      "category": "CORE_STATE"
+    },
+    {
+      "id": 771,
+      "name": "HUD_WALLET_MUTATED",
+      "legacy": "world_state.wallet_mutated",
+      "category": "CORE_STATE"
+    },
+    {
+      "id": 1025,
+      "name": "AUTH_REGISTERED",
+      "legacy": "account.registered",
+      "category": "CORE_STATE"
+    },
+    {
+      "id": 1026,
+      "name": "AUTH_LOGIN_SUCCEEDED",
+      "legacy": "account.login_succeeded",
+      "category": "CORE_STATE"
+    },
+    {
+      "id": 1281,
+      "name": "SYSTEM_HEARTBEAT_TICK",
+      "legacy": "",
+      "category": "SYSTEM_TELEMETRY"
+    },
+    {
+      "id": 516,
+      "name": "SPATIAL_EXPLOSION_IMPACT",
+      "legacy": "",
+      "category": "SPATIAL_VFX"
+    },
+    {
+      "id": 1283,
+      "name": "LOG_RECORD_POSTED",
+      "legacy": "EventBus.log_record_emitted",
+      "category": "SYSTEM_TELEMETRY"
+    },
+    {
+      "id": 1537,
+      "name": "NARRATIVE_EVENT_TEXT",
+      "legacy": "EventBus.narrative_event_emitted",
+      "category": "NARRATIVE_TEXT"
+    },
+    {
+      "id": 1538,
+      "name": "DOMAIN_EVENT_GENERIC",
+      "legacy": "EventBus.domain_event",
+      "category": "NARRATIVE_TEXT"
+    },
+    {
+      "id": 1539,
+      "name": "WORLD_CLOCK_ADVANCED",
+      "legacy": "EventBus.world_clock_advanced",
+      "category": "NARRATIVE_TEXT"
+    },
+    {
+      "id": 1540,
+      "name": "PROFESSION_PROMOTED",
+      "legacy": "EventBus.profession_promoted",
+      "category": "CORE_STATE"
+    }
+  ],
+  "errors": {
+    "reentrancy_guard": "event_bus2_reentrancy_guard",
+    "core_state_in_frame_queue": "event_bus2_core_state_in_frame_queue",
+    "frame_queue_overflow": "event_bus2_frame_queue_overflow",
+    "pool_overflow": "event_bus2_pool_overflow"
+  }
+}

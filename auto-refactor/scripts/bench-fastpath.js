@@ -1,33 +1,25 @@
 #!/usr/bin/env node
-// bench-fastpath.js — P1-1 lazy-projection equivalence gate + A/B benchmark (T05).
-//
-//   node scripts/bench-fastpath.js --check    # fixture equivalence gate (CI-friendly)
-//   node scripts/bench-fastpath.js            # dual-corpus w4 wall A/B + per-file table
-//   node scripts/bench-fastpath.js --iters=5 --corpus=light|heavy
-//   node scripts/bench-fastpath.js --check --oxc   # same gate with parser='oxc' (T04)
-//   node scripts/bench-fastpath.js --oxc --corpus=light  # oxc A/B (T04)
-//
-// --check (fixture equivalence gate):
-//   Scans testdata/fixtures under BOTH canonical configs — ModeA (constants + large-file,
-//   complexity explicitly disabled) and ModeB (all three built-ins) — once with
-//   AR_FASTPATH=0 (materialized baseline) and once with AR_FASTPATH=1 (projection), and
-//   asserts normalize(issues+fileMetrics) is byte-identical. Exit 1 on any diff.
-//   With --oxc the same comparison runs through parser='oxc' (OxcProjector vs materialized
-//   OxcAdapter); the ts mode is unchanged.
-//
-// default (A/B benchmark):
-//   Builds a 1001-file lightweight (~2.5KB) and a 1001-file heavy (~6.5KB) TS corpus under
-//   C:/tmp/ar-fp-bench/, then runs a STRICTLY INTERLEAVED workers=4 A/B (AR_FASTPATH=0 vs
-//   =1, --iters runs each, alternating so machine-load drift hits both modes equally) and
-//   prints a wall table (median) plus an in-process per-file table measured directly on the
-//   adapter (parse+runStreaming vs project+runStreamingProjected).
-//   With --oxc the same A/B runs parser='oxc' (OxcAdapter materialized vs OxcProjector).
-//
-// Does NOT touch scripts/validate-equivalence.js / bench-baselines.js / baselines/*.
+/**
+ * Module: Verification Harness — Fastpath Projection Equivalence Gate & A/B Benchmark
+ * File Path: scripts/bench-fastpath.js
+ * Architecture Role: Dual-mode entry point: a CI-friendly equivalence gate for the
+ *     AR_FASTPATH projection path and a standalone wall-clock/per-file benchmark.
+ * Dependencies & Triggers: `npm run fastpath-check`/`fastpath-bench` or manual
+ *     `node scripts/bench-fastpath.js [--check] [--oxc] [--iters=N]
+ *     [--corpus=light|heavy]`
+ *     on a built dist; reads testdata/fixtures, spawns worker scans, and generates
+ *     1001-file corpora under C:/tmp/ar-fp-bench.
+ * Responsibilities: In --check mode compare normalized issue+fileMetric output of
+ *     AR_FASTPATH=0/1 scans under the ModeA and ModeB configs for the ts or oxc parser;
+ *     otherwise build the light/heavy corpora, report strictly interleaved workers=4 wall
+ *     medians, and time materialized parse+runStreaming vs projected runStreamingProjected.
+ * Exit Semantics & Design Rationale: --check exits 1 on any fixture divergence and 0 on
+ *     equality; benchmark failures reject and exit 1. Equivalence is gated hard while
+ *     timings stay advisory, so machine-load noise cannot break CI.
+ */
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
@@ -58,11 +50,28 @@ function median(arr) {
 
 function normalize(r) {
   const issues = r.issues
-    .map((x) => ({ id: x.id, analyzer: x.analyzer, rule: x.rule, severity: x.severity, message: x.message, location: x.location, detail: x.detail }))
+    .map((x) => ({
+      id: x.id,
+      analyzer: x.analyzer,
+      rule: x.rule,
+      severity: x.severity,
+      message: x.message,
+      location: x.location,
+      detail: x.detail,
+    }))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const fileMetrics = r.fileMetrics.map((m) => ({ ...m })).sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+  const fileMetrics = r.fileMetrics
+    .map((m) => ({ ...m }))
+    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
   return JSON.stringify(
-    { filesScanned: r.summary.filesScanned, issuesTotal: r.summary.issuesTotal, byAnalyzer: r.summary.byAnalyzer, bySeverity: r.summary.bySeverity, issues, fileMetrics },
+    {
+      filesScanned: r.summary.filesScanned,
+      issuesTotal: r.summary.issuesTotal,
+      byAnalyzer: r.summary.byAnalyzer,
+      bySeverity: r.summary.bySeverity,
+      issues,
+      fileMetrics,
+    },
     null,
     2,
   );
@@ -84,15 +93,28 @@ async function checkFixtures() {
     if (!ok) failed++;
     const n0 = JSON.parse(out0).issuesTotal;
     const n1 = JSON.parse(out1).issuesTotal;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  fixtures ${fullLabel}: fast=0 issues=${n0}  fast=1 issues=${n1}  byteIdentical=${ok}`);
+    console.log(
+      `${ok ? 'PASS' : 'FAIL'}  fixtures ${fullLabel}: fast=0 issues=${n0}  fast=1 issues=${n1}  byteIdentical=${ok}`,
+    );
   }
-  console.log(failed === 0 ? `\nfastpath-check (${PARSER}): ALL FIXTURE CLASSES EQUIVALENT` : `\nfastpath-check (${PARSER}): ${failed} FAILED`);
+  console.log(
+    failed === 0
+      ? `\nfastpath-check (${PARSER}): ALL FIXTURE CLASSES EQUIVALENT`
+      : `\nfastpath-check (${PARSER}): ${failed} FAILED`,
+  );
   return failed === 0;
 }
 
 async function scanOnce(scan, root, configFile, fast) {
   process.env.AR_FASTPATH = fast;
-  const r = await scan({ root, configFile, workers: 1, format: 'json', logLevel: 'silent', parser: PARSER });
+  const r = await scan({
+    root,
+    configFile,
+    workers: 1,
+    format: 'json',
+    logLevel: 'silent',
+    parser: PARSER,
+  });
   return normalize(r);
 }
 
@@ -107,13 +129,24 @@ function writeBenchConfig(dir) {
     include: ['**/*.ts'],
     exclude: ['node_modules', '.git', 'dist'],
     thresholds: {
-      magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3,
-      fileLinesWarn: 400, fileLinesFail: 800, fileFunctionsWarn: 15,
-      complexityWarn: 8, complexityFail: 12,
+      magicNumberMin: 2,
+      duplicateLiteralThreshold: 3,
+      hardcodedStringMinLength: 3,
+      fileLinesWarn: 400,
+      fileLinesFail: 800,
+      fileFunctionsWarn: 15,
+      complexityWarn: 8,
+      complexityFail: 12,
     },
     analyzers: {
-      constants: { enabled: true, options: { magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 } },
-      'large-file': { enabled: true, options: { fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 } },
+      constants: {
+        enabled: true,
+        options: { magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 },
+      },
+      'large-file': {
+        enabled: true,
+        options: { fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 },
+      },
       complexity: { enabled: true, options: { complexityWarn: 5, complexityFail: 10 } },
     },
     customAnalyzers: [],
@@ -127,7 +160,10 @@ function writeBenchConfig(dir) {
 
 function lightFile(i) {
   const seed = i % 7;
-  const parts = [`import { foo } from './dep${i % 13}';`, `export interface Opts${i} { mode: string; limit: number; flag?: boolean }`];
+  const parts = [
+    `import { foo } from './dep${i % 13}';`,
+    `export interface Opts${i} { mode: string; limit: number; flag?: boolean }`,
+  ];
   for (let k = 0; k < 8; k++) {
     parts.push(`export function fn${i}_${k}(x: number, y: string): number {`);
     parts.push(`  let acc = ${seed};`);
@@ -154,13 +190,15 @@ function heavyFile(i) {
     parts.push(`    acc += ${a};`);
     parts.push(`    if (x > ${b}) { acc -= ${b}; } else { acc += ${b}; }`);
     parts.push(`  }`);
-    parts.push(`  for (let j = 0; j < ${k % 5 + 2}; j++) {`);
+    parts.push(`  for (let j = 0; j < ${(k % 5) + 2}; j++) {`);
     parts.push(`    acc += j * ${c};`);
     parts.push(`    if (j > 2 && y === ${s}) { acc -= ${c}; }`);
     parts.push(`  }`);
     parts.push(`  while (acc > 100000) { acc -= 1000; }`);
     parts.push(`  const msg = ${s};`);
-    parts.push(`  switch (acc % 4) { case 0: acc += ${a}; break; case 1: acc -= ${b}; break; default: acc += 1; }`);
+    parts.push(
+      `  switch (acc % 4) { case 0: acc += ${a}; break; case 1: acc -= ${b}; break; default: acc += 1; }`,
+    );
     parts.push(`  return acc > 0 ? acc : -acc;`);
     parts.push(`}`);
   }
@@ -191,12 +229,19 @@ function buildCorpus(dir, gen, count) {
 
 function runScan(dir, fast) {
   const t0 = performance.now();
-  const r = spawnSync(process.execPath, ['-e', `
+  const r = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      `
     const { scan } = require(${JSON.stringify(path.join(ROOT, 'dist', 'api'))});
     scan({ root: ${JSON.stringify(dir)}, configFile: ${JSON.stringify(path.join(dir, 'auto-refactor.config.json'))}, workers: 4, format: 'json', logLevel: 'silent', parser: ${JSON.stringify(PARSER)} })
       .then((rep) => process.stdout.write(JSON.stringify({ files: rep.summary.filesScanned, issues: rep.summary.issuesTotal })))
       .catch((e) => { console.error(e); process.exit(1); });
-  `], { env: { ...process.env, AR_FASTPATH: fast }, cwd: ROOT, encoding: 'utf8' });
+  `,
+    ],
+    { env: { ...process.env, AR_FASTPATH: fast }, cwd: ROOT, encoding: 'utf8' },
+  );
   if (r.status !== 0) throw new Error(`scan failed (AR_FASTPATH=${fast}): ${r.stderr}`);
   return { wall: performance.now() - t0, summary: r.stdout.trim() };
 }
@@ -205,9 +250,9 @@ function runScan(dir, fast) {
 function perFileTable(dir, label) {
   const content = fs.readFileSync(path.join(dir, 'f0.ts'), 'utf8');
   const { [ADAPTER_CLASS]: AdapterCls } = require(path.join(ROOT, 'dist', 'core', ADAPTER_MODULE));
-  const {
-    runStreaming, runStreamingProjected, FileMetricCollector, tryCreateProjector,
-  } = require(path.join(ROOT, 'dist', 'core', 'traverse'));
+  const { runStreaming, runStreamingProjected, FileMetricCollector, tryCreateProjector } = require(
+    path.join(ROOT, 'dist', 'core', 'traverse'),
+  );
   const { ConstantsAnalyzer } = require(path.join(ROOT, 'dist', 'analyzers', 'constants'));
   const { LargeFileAnalyzer } = require(path.join(ROOT, 'dist', 'analyzers', 'largeFile'));
   const { ComplexityAnalyzer } = require(path.join(ROOT, 'dist', 'analyzers', 'complexity'));
@@ -216,13 +261,27 @@ function perFileTable(dir, label) {
   const adapter = new AdapterCls();
   const cfg = { failOnAnalyzerError: false };
   const lineStats = countLineStats(content);
-  const mkCtx = (o) => ({ filePath: 'f0.ts', content, root: null, adapter, config: cfg, options: o, lineStats });
+  const mkCtx = (o) => ({
+    filePath: 'f0.ts',
+    content,
+    root: null,
+    adapter,
+    config: cfg,
+    options: o,
+    lineStats,
+  });
   // Fresh analyzer instances PER iteration — streaming analyzers accumulate visit state
   // (constants' literals, complexity's issues), so sharing instances across iterations
   // would inflate later iterations and skew the per-file numbers.
   const buildEntries = () => [
-    { analyzer: new ConstantsAnalyzer(), ctx: mkCtx({ magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 }) },
-    { analyzer: new LargeFileAnalyzer(), ctx: mkCtx({ fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 }) },
+    {
+      analyzer: new ConstantsAnalyzer(),
+      ctx: mkCtx({ magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 }),
+    },
+    {
+      analyzer: new LargeFileAnalyzer(),
+      ctx: mkCtx({ fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 }),
+    },
     { analyzer: new ComplexityAnalyzer(), ctx: mkCtx({ complexityWarn: 5, complexityFail: 10 }) },
     { analyzer: new FileMetricCollector(), ctx: mkCtx({}) },
   ];
@@ -261,14 +320,18 @@ async function benchCorpus(dir, label, count) {
     for (const mode of [k % 2 === 0 ? '0' : '1', k % 2 === 0 ? '1' : '0']) {
       const { wall, summary } = runScan(dir, mode);
       times[mode].push(wall);
-      process.stderr.write(`  [${label}] round ${k + 1} AR_FASTPATH=${mode}: ${wall.toFixed(1)}ms (${summary})\n`);
+      process.stderr.write(
+        `  [${label}] round ${k + 1} AR_FASTPATH=${mode}: ${wall.toFixed(1)}ms (${summary})\n`,
+      );
     }
   }
   const m0 = median(times['0']);
   const m1 = median(times['1']);
   const delta = ((m1 - m0) / m0) * 100;
   console.log(`\n[bench-fastpath] ${label} (${count} files, w4, ${ITERS} interleaved runs):`);
-  console.log(`  AR_FASTPATH=0 median: ${m0.toFixed(1)}ms   AR_FASTPATH=1 median: ${m1.toFixed(1)}ms   Δ=${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`);
+  console.log(
+    `  AR_FASTPATH=0 median: ${m0.toFixed(1)}ms   AR_FASTPATH=1 median: ${m1.toFixed(1)}ms   Δ=${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`,
+  );
   return { m0, m1, delta };
 }
 
@@ -280,8 +343,10 @@ async function main() {
 
   const lightAvg = CORPUS_ONLY !== 'heavy' ? buildCorpus(LIGHT, lightFile, 1001) : null;
   const heavyAvg = CORPUS_ONLY !== 'light' ? buildCorpus(HEAVY, heavyFile, 1001) : null;
-  if (lightAvg) console.log(`[bench-fastpath] corpus light (${PARSER}): 1001 files, avg ~${lightAvg}B`);
-  if (heavyAvg) console.log(`[bench-fastpath] corpus heavy (${PARSER}): 1001 files, avg ~${heavyAvg}B`);
+  if (lightAvg)
+    console.log(`[bench-fastpath] corpus light (${PARSER}): 1001 files, avg ~${lightAvg}B`);
+  if (heavyAvg)
+    console.log(`[bench-fastpath] corpus heavy (${PARSER}): 1001 files, avg ~${heavyAvg}B`);
 
   console.log(`\n[bench-fastpath] per-file (in-process, Mode B, ${PARSER}):`);
   if (lightAvg) perFileTable(LIGHT, 'light');

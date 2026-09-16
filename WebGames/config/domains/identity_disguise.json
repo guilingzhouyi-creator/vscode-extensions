@@ -1,0 +1,12 @@
+{
+  "defaults": {
+    "disguise_quality_score": 50.0
+  },
+  "insight_formula": {
+    "int_weight": 1.5,
+    "perception_bonus_weight": 1.0,
+    "deception_quality_weight": 1.0,
+    "agi_weight": 0.5,
+    "reveal_threshold": 15.0
+  }
+}

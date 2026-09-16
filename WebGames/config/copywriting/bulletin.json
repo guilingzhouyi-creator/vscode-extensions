@@ -1,0 +1,11 @@
+{
+  "maintenance_notice": {
+    "base": "服务器正在进行例行维护，请稍后重试。"
+  },
+  "entry_allowed": {
+    "base": "允许进入世界"
+  },
+  "remaining_minutes": {
+    "base": "{server} 预计剩余维护时间: {minutes} 分钟"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "ast_defaults": {
+    "skill_name": "破空连斩",
+    "deserialize_skill_name": "自创式",
+    "sentence_count": 4,
+    "deserialize_sentence_count": 1
+  },
+  "manuscript_defaults": {
+    "custom_name": "古老剑谱残卷",
+    "category": "MANUSCRIPT_GRIMOIRE",
+    "royalty_percent": 0.15,
+    "market_base_price": 50,
+    "copy_circulation_count": 1,
+    "item_id_prefix": "MANUSCRIPT_",
+    "display_name_prefix": "【著书】",
+    "default_price": 100,
+    "default_royalty_rate": 0.2
+  },
+  "decompiler": {
+    "path_reduction": 0.35,
+    "loss_coefficient": 0.4,
+    "learner_normalize": 50.0,
+    "min_sentences": 1,
+    "hash_preview_len": 8,
+    "signature_prefix": "AST:",
+    "signature_title_sep": ":",
+    "signature_node_format": "%s:%s;"
+  }
+}

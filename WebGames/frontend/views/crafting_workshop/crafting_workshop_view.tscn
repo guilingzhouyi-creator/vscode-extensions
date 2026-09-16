@@ -1,0 +1,435 @@
+[gd_scene load_steps=2 format=3 uid="uid://ccraftingworkshop12"]
+
+[ext_resource type="Script" path="res://frontend/views/crafting_workshop/crafting_workshop_view.gd" id="1_craft"]
+
+[node name="CraftingWorkshopView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_craft")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TabContainer" type="TabContainer" parent="MainLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+; =========================================================================
+; Tab 1: 锻造工坊 (FORGE)
+; =========================================================================
+[node name="锻造工坊" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+split_offset = 300
+theme_override_constants/separation = 12
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/锻造工坊"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/锻造工坊/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="FilterRow" type="HBoxContainer" parent="MainLayout/TabContainer/锻造工坊/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OptionForgeCategory" type="OptionButton" parent="MainLayout/TabContainer/锻造工坊/LeftPanel/FilterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+
+[node name="LineForgeSearch" type="LineEdit" parent="MainLayout/TabContainer/锻造工坊/LeftPanel/FilterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="ForgeRecipeList" type="ItemList" parent="MainLayout/TabContainer/锻造工坊/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/锻造工坊"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="DetailSectionLabel" type="Label" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+layout_mode = 2
+
+[node name="ItemNamePanel" type="PanelContainer" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+layout_mode = 2
+
+[node name="LabelForgeItemName" type="Label" parent="MainLayout/TabContainer/锻造工坊/RightPanel/ItemNamePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="LabelForgeRarity" type="Label" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="MaterialSectionLabel" type="Label" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="ForgeMaterialList" type="ItemList" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+
+[node name="LabelForgeSuccessRate" type="Label" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="QuantityRow" type="HBoxContainer" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="QtyLabel" type="Label" parent="MainLayout/TabContainer/锻造工坊/RightPanel/QuantityRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = ""
+
+[node name="SpinForgeQuantity" type="SpinBox" parent="MainLayout/TabContainer/锻造工坊/RightPanel/QuantityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 99.0
+value = 1.0
+
+[node name="CraftRow" type="HBoxContainer" parent="MainLayout/TabContainer/锻造工坊/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LabelForgeResult" type="Label" parent="MainLayout/TabContainer/锻造工坊/RightPanel/CraftRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="BtnForgeCraft" type="Button" parent="MainLayout/TabContainer/锻造工坊/RightPanel/CraftRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+disabled = true
+text = ""
+
+; =========================================================================
+; Tab 2: 配方图鉴 (RECIPES)
+; =========================================================================
+[node name="配方图鉴" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TopRow" type="HBoxContainer" parent="MainLayout/TabContainer/配方图鉴"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/配方图鉴/TopRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/TabContainer/配方图鉴/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LabelRecipeProgress" type="Label" parent="MainLayout/TabContainer/配方图鉴/TopRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""
+
+[node name="RecipeTabBar" type="TabBar" parent="MainLayout/TabContainer/配方图鉴"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ScrollRecipes" type="ScrollContainer" parent="MainLayout/TabContainer/配方图鉴"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RecipeGrid" type="GridContainer" parent="MainLayout/TabContainer/配方图鉴/ScrollRecipes"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 5
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="DetailPanel" type="PanelContainer" parent="MainLayout/TabContainer/配方图鉴"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 200)
+
+[node name="DetailVBox" type="VBoxContainer" parent="MainLayout/TabContainer/配方图鉴/DetailPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelRecipeName" type="Label" parent="MainLayout/TabContainer/配方图鉴/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="LabelRecipeRarity" type="Label" parent="MainLayout/TabContainer/配方图鉴/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelRecipeStatus" type="Label" parent="MainLayout/TabContainer/配方图鉴/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelRecipeUnlockCondition" type="Label" parent="MainLayout/TabContainer/配方图鉴/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="MaterialLabel" type="Label" parent="MainLayout/TabContainer/配方图鉴/DetailPanel/DetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RecipeMaterialList" type="ItemList" parent="MainLayout/TabContainer/配方图鉴/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 60)
+
+; =========================================================================
+; Tab 3: 物品分解 (DISMANTLE)
+; =========================================================================
+[node name="物品分解" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+split_offset = 300
+theme_override_constants/separation = 12
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/物品分解"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/物品分解/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="FilterRow" type="HBoxContainer" parent="MainLayout/TabContainer/物品分解/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OptionDismantleFilter" type="OptionButton" parent="MainLayout/TabContainer/物品分解/LeftPanel/FilterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DismantleItemList" type="ItemList" parent="MainLayout/TabContainer/物品分解/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/物品分解"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="DetailSectionLabel" type="Label" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+layout_mode = 2
+
+[node name="LabelDismantleItemName" type="Label" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="PreviewLabel" type="Label" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DismantlePreviewList" type="ItemList" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+
+[node name="QuantityRow" type="HBoxContainer" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="QtyLabel" type="Label" parent="MainLayout/TabContainer/物品分解/RightPanel/QuantityRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = ""
+
+[node name="SpinDismantleQuantity" type="SpinBox" parent="MainLayout/TabContainer/物品分解/RightPanel/QuantityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 99.0
+value = 1.0
+
+[node name="BtnDismantleConfirm" type="Button" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="HistoryLabel" type="Label" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DismantleHistoryList" type="ItemList" parent="MainLayout/TabContainer/物品分解/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+; =========================================================================
+; Tab 4: 材料仓库 (MATERIALS)
+; =========================================================================
+[node name="材料仓库" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/材料仓库"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="MaterialCategoryHBox" type="HBoxContainer" parent="MainLayout/TabContainer/材料仓库"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="GridScroll" type="ScrollContainer" parent="MainLayout/TabContainer/材料仓库"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MaterialGrid" type="GridContainer" parent="MainLayout/TabContainer/材料仓库/GridScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 6
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="DetailPanel" type="PanelContainer" parent="MainLayout/TabContainer/材料仓库"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 160)
+
+[node name="DetailVBox" type="VBoxContainer" parent="MainLayout/TabContainer/材料仓库/DetailPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LabelMaterialName" type="Label" parent="MainLayout/TabContainer/材料仓库/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="Row1" type="HBoxContainer" parent="MainLayout/TabContainer/材料仓库/DetailPanel/DetailVBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LabelMaterialRarity" type="Label" parent="MainLayout/TabContainer/材料仓库/DetailPanel/DetailVBox/Row1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelMaterialQuantity" type="Label" parent="MainLayout/TabContainer/材料仓库/DetailPanel/DetailVBox/Row1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelMaterialDescription" type="Label" parent="MainLayout/TabContainer/材料仓库/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+autowrap_mode = 2
+
+[node name="LabelMaterialSource" type="Label" parent="MainLayout/TabContainer/材料仓库/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""

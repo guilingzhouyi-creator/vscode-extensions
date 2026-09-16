@@ -1,0 +1,606 @@
+[gd_scene load_steps=2 format=3 uid="uid://cgrimauthview13"]
+
+[ext_resource type="Script" path="res://frontend/views/grimoire_authoring/grimoire_authoring_view.gd" id="1_grimauth"]
+
+[node name="GrimoireAuthoringView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_grimauth")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.06, 0.1, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+; ==============================================================================
+; 顶部标题栏
+; ==============================================================================
+
+[node name="TopBar" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBox/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = ""
+
+[node name="TitleSubLabel" type="Label" parent="MarginContainer/VBox/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+; ==============================================================================
+; 主 Tab 容器（5 个子界面）
+; ==============================================================================
+
+[node name="MainTabContainer" type="TabContainer" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+tab_align = 0
+
+; ------------------------------------------------------------------------------
+; Tab 0: LIBRARY 魔典书库
+; ------------------------------------------------------------------------------
+
+[node name="LibraryTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 180
+
+[node name="LibCategoryPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/LibraryTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="LibCategoryLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibCategoryPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LibCategoryList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibCategoryPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+
+[node name="LibMidPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/LibraryTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="LibGrimoireLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibMidPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LibGrimoireList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibMidPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LibDetailPanel" type="PanelContainer" parent="MarginContainer/VBox/MainTabContainer/LibraryTab"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(280, 0)
+
+[node name="LibDetailVBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="LibDetailSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel/LibDetailVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LibDetailTitleLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel/LibDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="LibDetailAuthorLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel/LibDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LibDetailRarityLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel/LibDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LibDetailDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel/LibDetailVBox"]
+layout_mode = 2
+
+[node name="LibDetailDescLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel/LibDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+size_flags_vertical = 3
+
+[node name="LibDetailClassLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel/LibDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = ""
+
+[node name="LibLearnBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/LibraryTab/LibDetailPanel/LibDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 32)
+
+; ------------------------------------------------------------------------------
+; Tab 1: AST_EDITOR AST编辑器
+; ------------------------------------------------------------------------------
+
+[node name="AstEditorTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 220
+
+[node name="AstLeftPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="AstToolboxLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstLeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="AstNodeToolbox" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AstCanvasPanel" type="PanelContainer" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AstCanvasPlaceholder" type="Label" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstCanvasPanel"]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="AstRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(240, 0)
+
+[node name="AstPropLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="AstPropNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="AstPropTypeLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="AstPropDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel"]
+layout_mode = 2
+
+[node name="AstPropDescLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+size_flags_vertical = 3
+
+[node name="AstBtnBar" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="AstSaveBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel/AstBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 28)
+
+[node name="AstCompileBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel/AstBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 28)
+
+[node name="AstTestBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/AstEditorTab/AstRightPanel/AstBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 28)
+
+; ------------------------------------------------------------------------------
+; Tab 2: AUTHORING 著书立说
+; ------------------------------------------------------------------------------
+
+[node name="AuthoringTab" type="ScrollContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AuthVBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab"]
+layout_mode = 2
+theme_override_constants/separation = 12
+size_flags_horizontal = 3
+
+[node name="AuthSectionLabel1" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="AuthTitleRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="AuthTitleNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthTitleRow"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="AuthTitleInput" type="LineEdit" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthTitleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="AuthCoverRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="AuthCoverNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthCoverRow"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="AuthCoverOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthCoverRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 0)
+
+[node name="AuthDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+
+[node name="AuthSectionLabel2" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="AuthContentEdit" type="TextEdit" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 180)
+
+[node name="AuthDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+
+[node name="AuthSectionLabel3" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="AuthAudienceRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="AuthAudienceNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthAudienceRow"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="AuthAudienceOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthAudienceRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 0)
+
+[node name="AuthRoyaltyRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="AuthRoyaltyNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthRoyaltyRow"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="AuthRoyaltyModeOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthRoyaltyRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 0)
+
+[node name="AuthPublisherRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="AuthPublisherNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthPublisherRow"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="AuthPublisherOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthPublisherRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(280, 0)
+
+[node name="AuthDivider3" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+
+[node name="AuthSectionLabel4" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="AuthEstimatePanel" type="PanelContainer" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+
+[node name="AuthEstimateLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthEstimatePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+text = ""
+
+[node name="AuthSubmitRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="AuthSubmitBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/AuthoringTab/AuthVBox/AuthSubmitRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(160, 36)
+
+; ------------------------------------------------------------------------------
+; Tab 3: ROYALTY 版税结算
+; ------------------------------------------------------------------------------
+
+[node name="RoyaltyTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 320
+
+[node name="RoyLeftPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="RoyBookListLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyLeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RoyBookList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RoyRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="RoyDetailSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RoySalesLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = ""
+
+[node name="RoyRankLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="RoyIncomeLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="RoyDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel"]
+layout_mode = 2
+
+[node name="RoyChartContainer" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+
+[node name="RoyDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel"]
+layout_mode = 2
+
+[node name="RoySummarySection" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RoyTotalIncomeLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel/RoySummarySection"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+text = ""
+
+[node name="RoyPeriodLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel/RoySummarySection"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RoyClaimBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/RoyaltyTab/RoyRightPanel/RoySummarySection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 36)
+
+; ------------------------------------------------------------------------------
+; Tab 4: DECOMPILE 魔典反编译
+; ------------------------------------------------------------------------------
+
+[node name="DecompileTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 340
+
+[node name="DecLeftPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/DecompileTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="DecSectionLabel1" type="Label" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="DecTargetRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="DecTargetNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel/DecTargetRow"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="DecTargetOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel/DecTargetRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DecDifficultyLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="DecSuccessRow" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="DecSuccessLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel/DecSuccessRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DecSuccessBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel/DecSuccessRow"]
+unique_name_in_owner = true
+layout_mode = 2
+max_value = 1.0
+value = 0.65
+
+[node name="DecDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel"]
+layout_mode = 2
+
+[node name="DecSectionLabel2" type="Label" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="DecMaterialList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+
+[node name="DecRiskLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+text = ""
+autowrap_mode = 3
+
+[node name="DecRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/DecompileTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="DecSectionLabel3" type="Label" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecRightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="DecPreviewPanel" type="PanelContainer" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecRightPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DecPreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecRightPanel/DecPreviewPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+
+[node name="DecDecompileBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/DecompileTab/DecRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+text = ""
+custom_minimum_size = Vector2(0, 40)
+
+; ==============================================================================
+; 底部操作栏（右下角返回按钮）
+; ==============================================================================
+
+[node name="BottomBar" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BottomSpacer" type="Control" parent="MarginContainer/VBox/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BackBtn" type="Button" parent="MarginContainer/VBox/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)

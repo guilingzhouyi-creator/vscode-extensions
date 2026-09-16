@@ -1,0 +1,26 @@
+{
+  "commodity_defaults": {
+    "item_name": "精炼秘银",
+    "base_price": 100,
+    "supply_units": 50.0,
+    "demand_units": 50.0,
+    "elasticity_coef": 0.5
+  },
+  "caravan_defaults": {
+    "origin_town_id": "TOWN_A",
+    "destination_town_id": "TOWN_B",
+    "guards_count": 10
+  },
+  "market": {
+    "safe_supply_floor": 1.0,
+    "price_mult_min": 0.2,
+    "price_mult_max": 5.0,
+    "min_price": 1
+  },
+  "caravan": {
+    "max_progress": 1.0,
+    "danger_coefficient": 0.5,
+    "guard_protection": 0.02,
+    "ambush_chance_max": 0.8
+  }
+}

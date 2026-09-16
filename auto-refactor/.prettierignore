@@ -1,0 +1,22 @@
+# Build & dependency artifacts
+node_modules/
+dist/
+coverage/
+
+# Analyzer runtime cache
+.auto-refactor-cache/
+.t04-keypoints-*
+
+# Fixture corpora are intentional-violation samples, never reformatted
+scripts/.corpus/
+testdata/
+samples/
+
+# Documentation is maintained by hand (CJK tables must not be reflowed)
+docs/
+*.md
+
+# Lockfile & packaged artifacts
+package-lock.json
+*.tgz
+CHANGELOG.md

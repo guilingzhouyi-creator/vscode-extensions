@@ -34,6 +34,11 @@ export interface I18nStrings {
     'export.filename.daily': string;
     'export.filename.weekly': string;
     'export.filename.aggregated': string;
+    // 导出对话框文件类型过滤器标签
+    'export.filter.csv': string;
+    'export.filter.md': string;
+    'export.filter.json': string;
+    'export.filter.all': string;
     // 云端同步占位
     'toast.cloudSyncPlaceholder': string;
 
@@ -78,6 +83,7 @@ export interface I18nStrings {
     'confirm.restore': string;
     'confirm.restore.title': string;
     'toast.restored': string;
+    'toast.restoreFailed': string;
 
     // 命令
     'cmd.modeSwitched': string;
@@ -87,6 +93,10 @@ export interface I18nStrings {
     'cmd.globalDisabled': string;
     'cmd.noWorkspace': string;
     'cmd.debugSaved': string;
+    // 手动存盘结果文案（saveNow 返回值经 cmd.debugSaved 直出 toast）
+    'debugSave.notRunning': string;
+    'debugSave.done': string;
+    'debugSave.failed': string;
 
     // 状态栏显示模式名（命令提示与 tooltip 共用）
     'statusBar.mode.today-total': string;

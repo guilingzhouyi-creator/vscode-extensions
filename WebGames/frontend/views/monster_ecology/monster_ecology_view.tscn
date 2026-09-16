@@ -1,0 +1,421 @@
+[gd_scene load_steps=2 format=3 uid="uid://cmonsterecologyview11"]
+
+[ext_resource type="Script" path="res://frontend/views/monster_ecology/monster_ecology_view.gd" id="1_monster_eco"]
+
+[node name="MonsterEcologyView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_monster_eco")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TabContainer" type="TabContainer" parent="MainLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+; =========================================================================
+; Tab 1: 怪物图鉴 (BESTIARY)
+; =========================================================================
+[node name="怪物图鉴" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+split_offset = 380
+theme_override_constants/separation = 12
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/怪物图鉴"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/怪物图鉴/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="TopRow" type="HBoxContainer" parent="MainLayout/TabContainer/怪物图鉴/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BestiaryCategoryHBox" type="HBoxContainer" parent="MainLayout/TabContainer/怪物图鉴/LeftPanel/TopRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="LineBestiarySearch" type="LineEdit" parent="MainLayout/TabContainer/怪物图鉴/LeftPanel/TopRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(160, 0)
+placeholder_text = ""
+
+[node name="LabelBestiaryProgress" type="Label" parent="MainLayout/TabContainer/怪物图鉴/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+[node name="BestiaryScroll" type="ScrollContainer" parent="MainLayout/TabContainer/怪物图鉴/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BestiaryGrid" type="GridContainer" parent="MainLayout/TabContainer/怪物图鉴/LeftPanel/BestiaryScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 4
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/怪物图鉴"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="DetailSectionLabel" type="Label" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+layout_mode = 2
+
+[node name="NamePanel" type="PanelContainer" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+layout_mode = 2
+
+[node name="LabelMonsterName" type="Label" parent="MainLayout/TabContainer/怪物图鉴/RightPanel/NamePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="InfoRow1" type="HBoxContainer" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LabelMonsterLevel" type="Label" parent="MainLayout/TabContainer/怪物图鉴/RightPanel/InfoRow1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelMonsterCategory" type="Label" parent="MainLayout/TabContainer/怪物图鉴/RightPanel/InfoRow1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelMonsterHabitat" type="Label" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelMonsterDescription" type="Label" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+autowrap_mode = 2
+
+[node name="DropsLabel" type="Label" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="BestiaryDropList" type="ItemList" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 60)
+
+[node name="WeaknessLabel" type="Label" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="BestiaryWeaknessList" type="ItemList" parent="MainLayout/TabContainer/怪物图鉴/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 60)
+
+; =========================================================================
+; Tab 2: 世界BOSS (WORLD_BOSS)
+; =========================================================================
+[node name="世界BOSS" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+split_offset = 360
+theme_override_constants/separation = 12
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/世界BOSS"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/世界BOSS/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="BossScroll" type="ScrollContainer" parent="MainLayout/TabContainer/世界BOSS/LeftPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BossCardList" type="VBoxContainer" parent="MainLayout/TabContainer/世界BOSS/LeftPanel/BossScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/世界BOSS"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="DetailSectionLabel" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+layout_mode = 2
+
+[node name="NamePanel" type="PanelContainer" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+layout_mode = 2
+
+[node name="LabelBossName" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel/NamePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="InfoRow1" type="HBoxContainer" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LabelBossLevel" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel/InfoRow1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelBossStatus" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel/InfoRow1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelBossRespawnTime" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelBossMap" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelBossCountdown" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+text = ""
+
+[node name="RewardsLabel" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="BossRewardList" type="ItemList" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 80)
+
+[node name="LabelBossParticipants" type="Label" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""
+
+[node name="BtnBossChallenge" type="Button" parent="MainLayout/TabContainer/世界BOSS/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+; =========================================================================
+; Tab 3: 兽潮调度 (BEAST_TIDE)
+; =========================================================================
+[node name="兽潮调度" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="StatusPanel" type="PanelContainer" parent="MainLayout/TabContainer/兽潮调度"]
+layout_mode = 2
+
+[node name="StatusVBox" type="VBoxContainer" parent="MainLayout/TabContainer/兽潮调度/StatusPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TopRow" type="HBoxContainer" parent="MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LabelTideStatus" type="Label" parent="MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox/TopRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LabelTideCountdown" type="Label" parent="MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox/TopRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DefenseRow" type="HBoxContainer" parent="MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="DefenseLabel" type="Label" parent="MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox/DefenseRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="TideDefenseBar" type="ProgressBar" parent="MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox/DefenseRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 0.0
+show_percentage = false
+
+[node name="LabelTideDefense" type="Label" parent="MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox/DefenseRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""
+
+[node name="WaveSectionLabel" type="Label" parent="MainLayout/TabContainer/兽潮调度"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="WaveScroll" type="ScrollContainer" parent="MainLayout/TabContainer/兽潮调度"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TideWaveList" type="VBoxContainer" parent="MainLayout/TabContainer/兽潮调度/WaveScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="BottomSection" type="HBoxContainer" parent="MainLayout/TabContainer/兽潮调度"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 140)
+theme_override_constants/separation = 12
+
+[node name="RewardsPanel" type="VBoxContainer" parent="MainLayout/TabContainer/兽潮调度/BottomSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="RewardsSectionLabel" type="Label" parent="MainLayout/TabContainer/兽潮调度/BottomSection/RewardsPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="TideRewardList" type="ItemList" parent="MainLayout/TabContainer/兽潮调度/BottomSection/RewardsPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ButtonPanel" type="VBoxContainer" parent="MainLayout/TabContainer/兽潮调度/BottomSection"]
+layout_mode = 2
+custom_minimum_size = Vector2(160, 0)
+theme_override_constants/separation = 8
+
+[node name="BtnTideJoin" type="Button" parent="MainLayout/TabContainer/兽潮调度/BottomSection/ButtonPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 48)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="BtnTideLeave" type="Button" parent="MainLayout/TabContainer/兽潮调度/BottomSection/ButtonPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 48)
+theme_override_font_sizes/font_size = 14
+visible = false
+text = ""

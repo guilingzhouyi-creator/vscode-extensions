@@ -7,7 +7,7 @@
 
 ## 📌 仓库定位 | Scope
 
-本仓库以 **VS Code 插件**为主体，另收录一个独立的 **Node CLI 静态分析工具**（`auto-refactor`，非 VS Code 扩展，不参与扩展打包/发布）。
+本仓库以 **VS Code 插件**为主体，另收录一个独立的 **Node CLI 静态分析工具**（`auto-refactor`，非 VS Code 扩展，不参与扩展打包/发布）与 **Godot 游戏引擎工程**（[`WebGames`](./WebGames)，卡拉尔世界引擎，独立三项目之一，详见其 [`docs/README.md`](./WebGames/docs/README.md) 操作契约）。
 
 > ⚠️ **Windows 工具链**（PowerShell 脚本、环境配置、桌面工具等）属于**另一条独立线**，不在本仓库内混放。请移步对应的 Windows 项目仓库。
 >
@@ -19,7 +19,7 @@
 
 | 插件 | 版本 | 状态 | 简介 |
 |------|------|:--:|------|
-| **[Workspace Timing](./workspace-timing)** | v0.4.4 | 🟢 已发布 | ⏱ 轻量化工作区时长追踪：自动计时、跨工作区聚合对比、12周热力图、24小时分布、双语界面热切换；RingBuffer + Journal 双写入，崩溃保护 |
+| **[Workspace Timing](./workspace-timing)** | v0.4.9 | 🟢 已发布 | ⏱ 轻量化工作区时长追踪：自动计时、跨工作区聚合对比、12周热力图、24小时分布、双语界面热切换、周上限健康提醒；RingBuffer + Journal 双写入，崩溃保护 |
 
 > 🧰 **非扩展模块**：[auto-refactor](./auto-refactor) — 高性能、声明式、项目无关的自动化代码重构与静态质量分析引擎（常量提取 / 大文件拆分 / 圈复杂度），面向 CI/CD 与 IDE。能力：多语言适配（TS / JS / Rust，内置 oxc 快速路径）、warm daemon（IPC 常驻进程）、行级增量（reuseSubtree 子树复用）、**高性能自定义 Diff 基座（SWAR + BPM 向量化 + AST 语义）**、三级回滚（3-tier rollback）、Praxis 集成与分形 Git 工作树/门禁规范、CI 就绪结构化输出（JSON / SARIF / text），支持自定义分析器插件。**不含 `engines.vscode`，不会被 CI/打包/发布自动发现**，仅作为工具模块与本仓库并存。
 
@@ -48,12 +48,14 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 │   ├── src/                    ← analyzers / core（含 diff、praxis、rollback、swar）/ daemon / cli / utils
 │   ├── scripts/                ← 基准 / 等价性 / 增量验证脚本
 │   ├── testdata/               ← 语义化命名的投影边界夹具
-│   ├── docs/                   ← 6 大主题分节设计/规格/性能文档（01-architecture … 05-specs-and-benchmarks + diagrams）
+│   ├── docs/                   ← 7 大主题分节设计/规格/性能文档（01-architecture … 05-specs-and-benchmarks + 03-praxis 接入 + diagrams）
 │   ├── DOCS.md                 ← 文档索引
 │   └── package.json
+├── WebGames/                   ← Godot 卡拉尔世界引擎（独立项目，含 backend/frontend/config/docs/scripts，契约见 AGENTS.md）
 ├── <future-extension>/         ← 新扩展预留位：建目录 + 放 package.json（需声明 engines.vscode）即自动接入 CI/发布
 ├── scripts/                    ← 仓库级脚本库（按语言域分类：sh / ps1 / py，规范见 scripts/README.md）
 │   ├── sh/                     ← Bash：package.sh（打包）、check-display-assets.sh（CI 资产校验）、
+│   │                             version-bump.sh / release-tag.sh（本地发布闭环）、
 │   │                             auto-label / pr-gate / auto-merge-gate / release / test-release（CNB 门禁与发布）
 │   ├── ps1/                    ← PowerShell：package.ps1（Windows 打包同构实现）
 │   └── py/                     ← Python（预留域）
@@ -63,7 +65,6 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 │       └── SHA256SUMS.txt         # 校验和
 ├── archive/                    ← 版本归档（gitignore，不入库；已清理冗余 node_modules/dist）
 ├── .github/workflows/          ← CI 校验 + 自动发布流水线
-├── .cnb/ + .cnb.yml            ← CNB 协作流水线（与 GitHub 双轨）
 ├── .node-version               ← Node 版本锁定（20）
 └── .editorconfig / .gitattributes ← 换行与编码统一
 ```
@@ -97,9 +98,9 @@ vscode-extensions/              ← 本仓库（VS Code 插件专用）
 
 ```powershell
 # Windows
-.\scripts\package.ps1                          # 打包全部扩展
-.\scripts\package.ps1 -Name workspace-timing   # 只打包指定扩展
-.\scripts\package.ps1 -Keep 3                  # dist 中每扩展保留最近 3 个版本
+.\scripts\ps1\package.ps1                          # 打包全部扩展
+.\scripts\ps1\package.ps1 -Name workspace-timing   # 只打包指定扩展
+.\scripts\ps1\package.ps1 -Keep 3                  # dist 中每扩展保留最近 3 个版本
 
 # Linux / macOS / CI（同构）
 bash scripts/sh/package.sh                        # 打包全部
@@ -109,9 +110,30 @@ bash scripts/sh/package.sh --skip-build           # 跳过编译仅打包
 
 产物输出到 `dist/<扩展名>/`（不入库），与 CI 产出结构完全同构。
 
+### 发布工具链（本地闭环，与 release.yml 同规）
+
+> 提交信息前缀门禁：**分支自动发布要求提交信息以 `vX.Y.Z` 开头**（可带
+> `feat(<scope>): ` 约定式前缀，见 `.github/workflows/release.yml`）；
+> 常规提交安全跳过，不会误发布。以下工具自产合规提交与 Tag：
+
+```bash
+# ① 版本递增 + CHANGELOG 段落迁移（干净树门禁 / 版本单调 / dry-run）
+bash scripts/sh/version-bump.sh workspace-timing patch --dry-run   # 先预览
+bash scripts/sh/version-bump.sh workspace-timing patch             # 执行
+
+# ② 发布闭环：bump → npm ci+compile → vsce 打包 → 资产校验 → 提交 → Tag → 推送
+bash scripts/sh/release-tag.sh workspace-timing patch \
+  --message "v0.5.0 — 标题 | English subtitle"
+bash scripts/sh/release-tag.sh workspace-timing patch \
+  --message "v0.5.0 — 标题 | English subtitle" --no-push   # 本地留痕，人工复核
+```
+
+Tag 推送后 `.github/workflows/release.yml` 的 Tag 触发路径自动补建 GitHub Release
+（产物 `dist/<扩展名>/SHA256SUMS.txt` 与 Release 附件同构）。
+
 ### 目录规范
 
-- **根目录不散乱**：运行时数据（`.vscode/workspace-timing.*`）与工具缓存（`.cnb/.cache`、`dist/`、`archive/`）均 `gitignore`；根 `.vscode/` 仅放调试/设置，单扩展 `.vscode/` 为备用
+- **根目录不散乱**：运行时数据（`.vscode/workspace-timing.*`）与工具缓存（`dist/`、`archive/`）均 `gitignore`；根 `.vscode/` 仅放调试/设置，单扩展 `.vscode/` 为备用
 - **归档集中**：历史快照统一 `archive/`，已清理 `archive/**/node_modules` 与 `dist` 冗余
 - **换行统一**：`.gitattributes` 强制 `*.sh LF` / `*.ps1 CRLF` / `*.png binary`，配合 `.editorconfig`
 
@@ -132,7 +154,7 @@ bash scripts/sh/package.sh --skip-build           # 跳过编译仅打包
 
 | 阶段 | 目标 | 状态 |
 |------|------|:--:|
-| ✅ v0.1.0 | **auto-refactor** 静态分析引擎：内置规则（常量提取/大文件/圈复杂度）+ 多语言适配 + 自定义 diff 基座（SWAR/BPM/AST） | 已落地 |
+| ✅ v0.3.0 | **auto-refactor** 静态分析引擎：内置规则（常量提取/大文件/圈复杂度/secrets/unused-export/cycles）+ 多语言适配 + 自定义 diff 基座（SWAR/BPM/AST）+ Praxis 门禁规范 | 已落地 |
 | 🚧 演进中 | diff/Praxis 集成、三级回滚、分形 Git 工作树与门禁规范（`docs/01-architecture/04-*`） | 持续迭代 |
 
 ### 🧊 Windows 工具链线（独立仓库）

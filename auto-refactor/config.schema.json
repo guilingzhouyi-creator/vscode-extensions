@@ -8,7 +8,11 @@
   "properties": {
     "format": {
       "type": "string",
-      "enum": ["json", "sarif", "text"],
+      "enum": [
+        "json",
+        "sarif",
+        "text"
+      ],
       "default": "text",
       "description": "Output format. 'sarif' is compatible with GitHub code scanning / CI dashboards; 'json' is the canonical machine-readable ScanReport; 'text' is human-readable."
     },
@@ -19,14 +23,32 @@
     },
     "include": {
       "type": "array",
-      "items": { "type": "string" },
-      "default": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "**/*.ts",
+        "**/*.tsx",
+        "**/*.js",
+        "**/*.jsx"
+      ],
       "description": "Glob patterns (relative to root); a file must match at least one to be scanned."
     },
     "exclude": {
       "type": "array",
-      "items": { "type": "string" },
-      "default": ["node_modules", ".git", "dist", "build", "out", "coverage", ".next", ".vscode-test"],
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        "out",
+        "coverage",
+        ".next",
+        ".vscode-test"
+      ],
       "description": "Glob patterns or directory names to skip."
     },
     "thresholds": {
@@ -43,61 +65,124 @@
         "complexityFail": 20
       },
       "properties": {
-        "magicNumberMin": { "type": "number", "default": 2, "description": "constants: numeric literals with abs(value) < this are ignored." },
-        "duplicateLiteralThreshold": { "type": "number", "default": 3, "description": "constants: a literal repeated >= this many times in a file becomes a duplicate-literal finding." },
-        "hardcodedStringMinLength": { "type": "number", "default": 3, "description": "constants: minimum string length to be a hardcoded-string candidate." },
-        "fileLinesWarn": { "type": "number", "default": 400, "description": "large-file: lines at/above this => warning." },
-        "fileLinesFail": { "type": "number", "default": 800, "description": "large-file: lines at/above this => error (split candidate)." },
-        "fileFunctionsWarn": { "type": "number", "default": 15, "description": "large-file: top-level function count at/above this => warning." },
-        "complexityWarn": { "type": "number", "default": 10, "description": "complexity: cyclomatic complexity at/above this => warning." },
-        "complexityFail": { "type": "number", "default": 20, "description": "complexity: cyclomatic complexity at/above this => error." }
+        "magicNumberMin": {
+          "type": "number",
+          "default": 2,
+          "description": "constants: numeric literals with abs(value) < this are ignored."
+        },
+        "duplicateLiteralThreshold": {
+          "type": "number",
+          "default": 3,
+          "description": "constants: a literal repeated >= this many times in a file becomes a duplicate-literal finding."
+        },
+        "hardcodedStringMinLength": {
+          "type": "number",
+          "default": 3,
+          "description": "constants: minimum string length to be a hardcoded-string candidate."
+        },
+        "fileLinesWarn": {
+          "type": "number",
+          "default": 400,
+          "description": "large-file: lines at/above this => warning."
+        },
+        "fileLinesFail": {
+          "type": "number",
+          "default": 800,
+          "description": "large-file: lines at/above this => error (split candidate)."
+        },
+        "fileFunctionsWarn": {
+          "type": "number",
+          "default": 15,
+          "description": "large-file: top-level function count at/above this => warning."
+        },
+        "complexityWarn": {
+          "type": "number",
+          "default": 10,
+          "description": "complexity: cyclomatic complexity at/above this => warning."
+        },
+        "complexityFail": {
+          "type": "number",
+          "default": 20,
+          "description": "complexity: cyclomatic complexity at/above this => error."
+        },
+        "maxFunctionLines": {
+          "type": "number",
+          "default": 60,
+          "description": "simplify: physical function span above this many lines => warning (SIM-LONG-001)."
+        },
+        "maxNestingDepth": {
+          "type": "number",
+          "default": 5,
+          "description": "governance: control flow nesting depth at/above this => warning."
+        },
+        "maxInheritanceDepth": {
+          "type": "number",
+          "default": 2,
+          "description": "governance: class inheritance depth at/above this => warning."
+        },
+        "ignoreLiterals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "constants: literal texts exempt from the hardcoded-string and duplicate-literal passes, matched with or without quotes (e.g. `\"/\"`, `\"..\"`). Cascades only because the constants analyzer declares the key; the per-analyzer `options.ignoreLiterals` wins over this global layer."
+        }
       }
     },
     "analyzers": {
       "type": "object",
-      "description": "DECLARATIVE REGISTRY. Each key is an analyzer id (built-in name or custom name). Presence here = registered; enabled:false disables without removing. Per-analyzer `options` override global thresholds.",
-      "default": {
-        "constants": { "enabled": true },
-        "large-file": { "enabled": true },
-        "complexity": { "enabled": true }
-      },
+      "description": "Declarative registry of enabled analyzers and per-analyzer options. Every built-in analyzer runs by default, so an entry is only needed to disable one (`enabled: false`) or to override its options.",
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "enabled": { "type": "boolean", "default": true },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
           "options": {
-            "type": "object",
-            "description": "Per-analyzer options, deep-merged on top of global thresholds into ctx.options. Allowed keys mirror thresholds above plus analyzer-specific tunables."
+            "type": "object"
           }
         }
-      },
-      "examples": [
-        {
-          "analyzers": {
-            "constants": { "enabled": true, "options": { "duplicateLiteralThreshold": 2 } },
-            "large-file": { "enabled": false },
-            "no-console": { "enabled": true }
-          }
-        }
-      ]
+      }
     },
     "customAnalyzers": {
       "type": "array",
       "description": "EXTERNAL PLUG-INS. Each entry loads a module at runtime via require(module); the module must export a class/object implementing analyze(sf, ctx). No engine change needed.",
       "items": {
         "type": "object",
-        "required": ["name", "module"],
+        "required": [
+          "name",
+          "module"
+        ],
         "properties": {
-          "name": { "type": "string", "description": "Analyzer id; must match a key in analyzers to be enabled." },
-          "module": { "type": "string", "description": "Module path (relative to this config file) or package specifier." },
-          "enabled": { "type": "boolean", "default": true },
-          "options": { "type": "object" }
+          "name": {
+            "type": "string",
+            "description": "Analyzer id; must match a key in analyzers to be enabled."
+          },
+          "module": {
+            "type": "string",
+            "description": "Module path (relative to this config file) or package specifier."
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "options": {
+            "type": "object"
+          }
         }
       }
     },
     "logLevel": {
       "type": "string",
-      "enum": ["silent", "error", "warn", "info", "debug"],
+      "enum": [
+        "silent",
+        "error",
+        "warn",
+        "info",
+        "debug"
+      ],
       "default": "info",
       "description": "Log verbosity. Logs go to stderr so stdout stays machine-readable; with logFile they also append to a file."
     },
@@ -114,8 +199,8 @@
     "workers": {
       "type": "integer",
       "minimum": 0,
-      "default": 1,
-      "description": "Worker-thread parallelism for the parse+analyze stage. 1 = in-process single thread (default; fastest for typical repos, since parsing is already cheap once parent pointers are disabled). 0 = auto (spawn min(os.cpus().length, 8) worker threads when the repo is large). N > 1 = spawn exactly N worker threads — useful on many-core CI machines scanning very large codebases, where the fixed cost of loading TypeScript per worker is amortized. Files are independent so this parallelizes across cores."
+      "default": 0,
+      "description": "Worker-thread parallelism for the parse+analyze stage. 0 = auto (default): threads scale with the batch size (files / 24, capped at min(cores, 8)), so small scans stay in-process and many-file scans spread across cores — measured 26–29% faster on a 300-file corpus, while 12 large files correctly stay in-process. 1 = force the in-process path. N > 1 = exactly N worker threads. Files are independent, so this parallelizes across cores without changing findings."
     },
     "respectGitignore": {
       "type": "boolean",
@@ -129,7 +214,10 @@
     },
     "parser": {
       "type": "string",
-      "enum": ["typescript", "oxc"],
+      "enum": [
+        "typescript",
+        "oxc"
+      ],
       "default": "typescript",
       "description": "TS/JS-family parser: 'typescript' (default, ts.createSourceFile) or 'oxc' (Rust oxc-parser engine). The oxc parser produces byte-equivalent normalized output (see docs/02-parsers-and-ast/02-oxc-fastpath.md) with ~3x faster parsing. Rust files are unaffected."
     },
@@ -160,9 +248,176 @@
     },
     "daemon": {
       "type": "string",
-      "enum": ["auto", "on", "off"],
+      "enum": [
+        "auto",
+        "on",
+        "off"
+      ],
       "default": "off",
       "description": "CLI/API warm-scan mode (NOT a ScanConfig field). 'off' (API default) never connects; 'auto' probes an EXISTING daemon only (CLI default, <5ms, no auto-start); 'on' auto-starts the daemon when missing (CLI --daemon)."
+    },
+    "failOnSeverity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ],
+      "description": "Generalized severity gate: exit non-zero when any blocking issue has severity >= this level. With a baseline, applies to NEW issues only."
+    },
+    "suppressions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "matchFile": {
+            "type": "string",
+            "description": "Issue file path to match: an exact repository-relative path, or a glob (e.g. `scripts/**`, `app/cli/*.py`). Suppressed findings stay in the report with their reason."
+          },
+          "matchAnalyzer": {
+            "type": "string"
+          },
+          "matchRule": {
+            "type": "string"
+          },
+          "matchSymbol": {
+            "type": "string"
+          },
+          "downgradeTo": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Declarative, reason-carrying suppressions applied post-scan. Matched issues stay in the report (auditable); downgradeTo lowers severity, otherwise excluded from gate counting."
+    },
+    "baselineGranularity": {
+      "type": "string",
+      "enum": [
+        "id",
+        "grouped"
+      ],
+      "default": "id",
+      "description": "Baseline ratchet granularity: id = exact issue ids (line-sensitive); grouped = analyzer|rule|file counts (tolerant to line shifts)."
+    },
+    "commentLevel": {
+      "type": "string",
+      "enum": [
+        "off",
+        "basic",
+        "standard",
+        "strict"
+      ],
+      "default": "standard",
+      "description": "Comment audit strictness level: 'off' (skip all), 'basic' (header & symbols), 'standard' (JSDoc/Docstring intent), 'strict' (6-field industrial contract & concurrency annotations)."
+    },
+    "securityLevel": {
+      "type": "string",
+      "enum": [
+        "off",
+        "basic",
+        "full"
+      ],
+      "default": "basic",
+      "description": "Three-level systemic security audit gate: 'off' (disable security checks), 'basic' (hardcoded tokens/keys, severe vulnerabilities, and core architecture leaks), 'full' (entropy scan, weak crypto/pseudo-randomness, prototype pollution, command/path injection, and strict layer boundary data leaks)."
+    },
+    "unsupportedLanguage": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warning",
+        "off"
+      ],
+      "default": "error",
+      "description": "Fail-closed guard for source files whose extension no language adapter claims (e.g. .py/.sh before an adapter exists). 'error' (default) fails the scan loudly, 'warning' reports without blocking, 'off' restores the historic silent fallback to the TypeScript parser."
+    },
+    "autoTune": {
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically adjust complexity, file size, and rule thresholds based on detected project scale (micro -> enterprise)."
+    },
+    "profile": {
+      "type": "object",
+      "description": "Optional project profile and architecture layer overrides.",
+      "properties": {
+        "primaryLanguage": {
+          "type": "string"
+        },
+        "buildSystems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "frameworks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "directorySemantics": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "application",
+              "infrastructure",
+              "interface",
+              "test",
+              "tooling",
+              "shared"
+            ]
+          }
+        }
+      }
+    },
+    "memory": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable Review Memory, fingerprint indexing and semantic domain reuse."
+    },
+    "agentUid": {
+      "type": "string",
+      "description": "Executing Agent UID for multi-agent evolution and trajectory tracking."
+    },
+    "scoringWeights": {
+      "type": "object",
+      "description": "Configurable weights for the 10 transparent quality dimensions.",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "maturityTier": {
+      "type": "string",
+      "enum": [
+        "demo",
+        "prototype",
+        "production",
+        "industrial"
+      ],
+      "description": "Governance maturity tier. 'demo' relaxes constraints for speed; 'industrial' enforces mission-critical zero-tolerance gates."
+    },
+    "classifyLiterals": {
+      "type": "boolean",
+      "default": false,
+      "description": "Classify raw literals into specialized semantic domains (URLs, ports, HTTP status, paths, SVGs) and suppress benign delimiters in all three constants passes — magic-number, hardcoded-string and duplicate-literal."
+    },
+    "granularRules": {
+      "type": "boolean",
+      "default": false,
+      "description": "Emit granular rule IDs (e.g. literal-url, literal-port) instead of generic magic-number or hardcoded-string."
     }
   },
   "examples": [
@@ -170,12 +425,22 @@
       "format": "sarif",
       "failOnIssue": true,
       "analyzers": {
-        "constants": { "enabled": true },
-        "complexity": { "enabled": true },
-        "no-console": { "enabled": true }
+        "constants": {
+          "enabled": true
+        },
+        "complexity": {
+          "enabled": true
+        },
+        "no-console": {
+          "enabled": true
+        }
       },
       "customAnalyzers": [
-        { "name": "no-console", "module": "./analyzers/noConsole.js", "enabled": true }
+        {
+          "name": "no-console",
+          "module": "./analyzers/noConsole.js",
+          "enabled": true
+        }
       ],
       "logLevel": "warn",
       "concurrency": 8

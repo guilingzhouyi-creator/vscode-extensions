@@ -1,0 +1,19 @@
+{
+  "command_defaults": {
+    "volume_scale": 1.0,
+    "pitch_scale": 1.0,
+    "max_audible_distance": 20.0,
+    "fade_duration_seconds": 0.0
+  },
+  "bus": {
+    "default": "SE",
+    "tracks": {
+      "BGM": "BGM",
+      "BGS": "BGS",
+      "ME": "ME"
+    }
+  },
+  "concurrency": {
+    "max_per_sound": 4
+  }
+}

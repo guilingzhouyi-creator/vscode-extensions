@@ -1,0 +1,106 @@
+{
+  "prologue_routing_rules": [
+    {
+      "match_condition": {
+        "race_id": "ELF"
+      },
+      "target_dag_id": "DAG_PROLOGUE_ELF_SANCTUARY"
+    },
+    {
+      "match_condition": {
+        "race_id": "HUMAN"
+      },
+      "target_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"
+    },
+    {
+      "match_condition": {
+        "is_default": true
+      },
+      "target_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"
+    }
+  ],
+  "dag_graphs": {
+    "DAG_PROLOGUE_HUMAN_CAPITAL": {
+      "entry_node_id": "NODE_AWAKEN_PLAZA",
+      "terminal_node_id": "NODE_DEPART_WORLD",
+      "nodes": {
+        "NODE_AWAKEN_PLAZA": {
+          "node_type": "START_ENTRY",
+          "narrative_key": "narrative.prologue.awakening",
+          "required_prerequisites": []
+        },
+        "NODE_BRANCH_EXPLORE": {
+          "node_type": "BRANCH_CHOICE",
+          "narrative_key": "narrative.prologue.environment",
+          "required_prerequisites": [
+            "NODE_AWAKEN_PLAZA"
+          ]
+        },
+        "NODE_TALK_GUARD": {
+          "node_type": "STANDARD_STEP",
+          "narrative_key": "narrative.prologue.first_encounter",
+          "required_prerequisites": [
+            "NODE_BRANCH_EXPLORE"
+          ]
+        },
+        "NODE_DEPART_WORLD": {
+          "node_type": "TERMINAL_EXIT",
+          "narrative_key": "narrative.prologue.completed",
+          "required_prerequisites": [
+            "NODE_TALK_GUARD"
+          ],
+          "mutations_on_complete": [
+            {
+              "type": "PrologueCompleted",
+              "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"
+            }
+          ]
+        }
+      },
+      "edges": [
+        {
+          "from": "NODE_AWAKEN_PLAZA",
+          "to": "NODE_BRANCH_EXPLORE"
+        },
+        {
+          "from": "NODE_BRANCH_EXPLORE",
+          "to": "NODE_TALK_GUARD"
+        },
+        {
+          "from": "NODE_TALK_GUARD",
+          "to": "NODE_DEPART_WORLD"
+        }
+      ]
+    },
+    "DAG_PROLOGUE_ELF_SANCTUARY": {
+      "entry_node_id": "NODE_AWAKEN_GROVE",
+      "terminal_node_id": "NODE_DEPART_SANCTUARY",
+      "nodes": {
+        "NODE_AWAKEN_GROVE": {
+          "node_type": "START_ENTRY",
+          "narrative_key": "narrative.prologue.elf_grove_awaken",
+          "required_prerequisites": []
+        },
+        "NODE_DEPART_SANCTUARY": {
+          "node_type": "TERMINAL_EXIT",
+          "narrative_key": "narrative.prologue.elf_grove_depart",
+          "required_prerequisites": [
+            "NODE_AWAKEN_GROVE"
+          ],
+          "mutations_on_complete": [
+            {
+              "type": "PrologueCompleted",
+              "dag_id": "DAG_PROLOGUE_ELF_SANCTUARY"
+            }
+          ]
+        }
+      },
+      "edges": [
+        {
+          "from": "NODE_AWAKEN_GROVE",
+          "to": "NODE_DEPART_SANCTUARY"
+        }
+      ]
+    }
+  }
+}

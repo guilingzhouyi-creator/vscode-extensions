@@ -1,0 +1,31 @@
+{
+  "physiology_defaults": {
+    "heart_core_integrity": 1.0,
+    "somatic_function": 100.0,
+    "mental_stress_factor": 0.0,
+    "raw_chronological_age": 20.0,
+    "lifespan_scale": 1.0,
+    "constitution_type": 1,
+    "mana_aptitude": 1
+  },
+  "sf_formula": {
+    "scale_floor": 0.1,
+    "age_normalize": 100.0,
+    "sf_max": 100.0,
+    "decay_exponent": 1.8
+  },
+  "backfire": {
+    "threshold_manadaptor": 1,
+    "threshold_wordspeaker": 3,
+    "threshold_awakened": 6,
+    "threshold_heavenruler": 9,
+    "stress_base": 50.0,
+    "risk_coefficient": 0.2
+  },
+  "lifecycle": {
+    "eol_ratio": 90.0,
+    "death_ratio": 100.0,
+    "rejuvenation_heart_core_gain": 0.1,
+    "min_age": 0.0
+  }
+}

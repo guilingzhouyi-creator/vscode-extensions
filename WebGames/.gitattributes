@@ -1,0 +1,42 @@
+# 换行符归一化：仓库内统一存储 LF，检出时按平台处理
+# 二进制与已明确的文本类型显式声明，避免 Git 自动猜测导致 diff 污染
+
+* text=auto eol=lf
+
+# Godot 资源与脚本
+*.gd        text eol=lf
+*.gdscript  text eol=lf
+*.tscn      text eol=lf
+*.tres      text eol=lf
+*.godot     text eol=lf
+*.uid       text eol=lf
+
+# 配置与文档
+*.json      text eol=lf
+*.md        text eol=lf
+*.cfg       text eol=lf
+*.ini       text eol=lf
+
+# 二进制资源：禁止任何换行与 diff 处理
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.webp      binary
+*.svg       text eol=lf
+*.ico       binary
+*.wav       binary
+*.mp3       binary
+*.ogg       binary
+*.ttf       binary
+*.otf       binary
+*.woff      binary
+*.woff2     binary
+*.gltf      text eol=lf
+*.glb       binary
+*.blend     binary
+
+# 脚本
+*.sh        text eol=lf
+*.py        text eol=lf
+*.bat       text eol=crlf
+*.ps1       text eol=crlf

@@ -520,7 +520,7 @@
       "analyzer": "constants",
       "rule": "duplicate-literal",
       "severity": "warning",
-      "message": "Literal 2 is repeated 4 times in this file; extract it into a shared constant.",
+      "message": "Literal 2 is repeated 3 times in this file; extract it into a shared constant.",
       "location": {
         "file": "src/unit_complex_0.ts",
         "start": {
@@ -535,12 +535,11 @@
       "detail": {
         "value": "2",
         "numeric": true,
-        "occurrences": 4,
+        "occurrences": 3,
         "lines": [
           3,
           4,
-          5,
-          8
+          5
         ],
         "suggestedName": "CONST_2"
       }
@@ -550,7 +549,7 @@
       "analyzer": "constants",
       "rule": "duplicate-literal",
       "severity": "warning",
-      "message": "Literal 3 is repeated 4 times in this file; extract it into a shared constant.",
+      "message": "Literal 3 is repeated 3 times in this file; extract it into a shared constant.",
       "location": {
         "file": "src/unit_complex_0.ts",
         "start": {
@@ -565,12 +564,11 @@
       "detail": {
         "value": "3",
         "numeric": true,
-        "occurrences": 4,
+        "occurrences": 3,
         "lines": [
           3,
           4,
-          5,
-          9
+          5
         ],
         "suggestedName": "CONST_3"
       }
@@ -580,7 +578,7 @@
       "analyzer": "constants",
       "rule": "duplicate-literal",
       "severity": "warning",
-      "message": "Literal 2 is repeated 4 times in this file; extract it into a shared constant.",
+      "message": "Literal 2 is repeated 3 times in this file; extract it into a shared constant.",
       "location": {
         "file": "src/unit_complex_1.ts",
         "start": {
@@ -595,12 +593,11 @@
       "detail": {
         "value": "2",
         "numeric": true,
-        "occurrences": 4,
+        "occurrences": 3,
         "lines": [
           3,
           4,
-          5,
-          8
+          5
         ],
         "suggestedName": "CONST_2"
       }
@@ -610,7 +607,7 @@
       "analyzer": "constants",
       "rule": "duplicate-literal",
       "severity": "warning",
-      "message": "Literal 3 is repeated 4 times in this file; extract it into a shared constant.",
+      "message": "Literal 3 is repeated 3 times in this file; extract it into a shared constant.",
       "location": {
         "file": "src/unit_complex_1.ts",
         "start": {
@@ -625,12 +622,11 @@
       "detail": {
         "value": "3",
         "numeric": true,
-        "occurrences": 4,
+        "occurrences": 3,
         "lines": [
           3,
           4,
-          5,
-          9
+          5
         ],
         "suggestedName": "CONST_3"
       }
@@ -640,7 +636,7 @@
       "analyzer": "constants",
       "rule": "duplicate-literal",
       "severity": "warning",
-      "message": "Literal 2 is repeated 4 times in this file; extract it into a shared constant.",
+      "message": "Literal 2 is repeated 3 times in this file; extract it into a shared constant.",
       "location": {
         "file": "src/unit_complex_2.ts",
         "start": {
@@ -655,12 +651,11 @@
       "detail": {
         "value": "2",
         "numeric": true,
-        "occurrences": 4,
+        "occurrences": 3,
         "lines": [
           3,
           4,
-          5,
-          8
+          5
         ],
         "suggestedName": "CONST_2"
       }
@@ -670,7 +665,7 @@
       "analyzer": "constants",
       "rule": "duplicate-literal",
       "severity": "warning",
-      "message": "Literal 3 is repeated 4 times in this file; extract it into a shared constant.",
+      "message": "Literal 3 is repeated 3 times in this file; extract it into a shared constant.",
       "location": {
         "file": "src/unit_complex_2.ts",
         "start": {
@@ -685,12 +680,11 @@
       "detail": {
         "value": "3",
         "numeric": true,
-        "occurrences": 4,
+        "occurrences": 3,
         "lines": [
           3,
           4,
-          5,
-          9
+          5
         ],
         "suggestedName": "CONST_3"
       }
@@ -700,7 +694,7 @@
       "analyzer": "constants",
       "rule": "duplicate-literal",
       "severity": "warning",
-      "message": "Literal 2 is repeated 4 times in this file; extract it into a shared constant.",
+      "message": "Literal 2 is repeated 3 times in this file; extract it into a shared constant.",
       "location": {
         "file": "src/unit_complex_3.ts",
         "start": {
@@ -715,12 +709,11 @@
       "detail": {
         "value": "2",
         "numeric": true,
-        "occurrences": 4,
+        "occurrences": 3,
         "lines": [
           3,
           4,
-          5,
-          8
+          5
         ],
         "suggestedName": "CONST_2"
       }
@@ -730,7 +723,7 @@
       "analyzer": "constants",
       "rule": "duplicate-literal",
       "severity": "warning",
-      "message": "Literal 3 is repeated 4 times in this file; extract it into a shared constant.",
+      "message": "Literal 3 is repeated 3 times in this file; extract it into a shared constant.",
       "location": {
         "file": "src/unit_complex_3.ts",
         "start": {
@@ -745,12 +738,11 @@
       "detail": {
         "value": "3",
         "numeric": true,
-        "occurrences": 4,
+        "occurrences": 3,
         "lines": [
           3,
           4,
-          5,
-          9
+          5
         ],
         "suggestedName": "CONST_3"
       }

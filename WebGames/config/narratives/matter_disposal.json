@@ -1,0 +1,9 @@
+{
+  "item_not_in_inventory": "目标物品不在随身背包中",
+  "slag_ash_name": "熔炼炉渣",
+  "mana_dust_name": "魔素尘埃",
+  "vanish_forbidden": "严禁在背包中凭空湮灭物质，请前往铁匠熔炉或使用强酸溶剂",
+  "facility_too_far": "距离处置设施过远 (需在 %.1fm 内)",
+  "safety_locked": "该高阶强化装备受安全锁保护，需输入确认口令",
+  "capacity_insufficient": "随身背包容量不足以容纳处置产物，物质守恒拦截"
+}

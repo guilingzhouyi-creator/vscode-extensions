@@ -1,0 +1,74 @@
+{
+  "levels": {
+    "min": 1,
+    "max": 6
+  },
+  "dead_ratio": 0.5,
+  "human_base": {
+    "STR": 100.0,
+    "AGI": 10.0,
+    "INT": 1000.0,
+    "SPR": 100.0,
+    "CON": 10.0,
+    "VIT": 1000.0
+  },
+  "attribute_coefficients": {
+    "STR": 1.0,
+    "AGI": 1.0,
+    "INT": 1.0,
+    "SPR": 1.0,
+    "CON": 1.0,
+    "VIT": 1.0
+  },
+  "race_coefficients": {
+    "HUMAN": {
+      "STR": 1.0,
+      "AGI": 1.0,
+      "INT": 1.0,
+      "SPR": 1.0,
+      "CON": 1.0,
+      "VIT": 1.0
+    },
+    "HIGH_ELF": {
+      "STR": 0.9,
+      "AGI": 1.1,
+      "INT": 1.2,
+      "SPR": 1.1,
+      "CON": 0.9,
+      "VIT": 1.0
+    },
+    "MOUNTAIN_DWARF": {
+      "STR": 1.2,
+      "AGI": 0.9,
+      "INT": 0.9,
+      "SPR": 1.0,
+      "CON": 1.3,
+      "VIT": 1.1
+    },
+    "TIEFLING_OR_HUMAN": {
+      "STR": 1.0,
+      "AGI": 1.15,
+      "INT": 1.0,
+      "SPR": 0.9,
+      "CON": 1.0,
+      "VIT": 0.95
+    },
+    "DEFAULT": {
+      "STR": 1.0,
+      "AGI": 1.0,
+      "INT": 1.0,
+      "SPR": 1.0,
+      "CON": 1.0,
+      "VIT": 1.0
+    }
+  },
+  "segment_increments": {
+    "1": 0.8,
+    "2": 0.9,
+    "3": 1.0,
+    "4": 1.1,
+    "5": 1.2,
+    "6": 1.0
+  },
+  "experience_reshape_default": 1.0
+}

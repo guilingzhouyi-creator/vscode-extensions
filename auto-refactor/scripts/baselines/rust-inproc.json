@@ -2,7 +2,9 @@
   "filesScanned": 4,
   "issuesTotal": 15,
   "byAnalyzer": {
-    "constants": 15
+    "constants": 13,
+    "large-file": 1,
+    "complexity": 1
   },
   "bySeverity": {
     "info": 0,
@@ -10,6 +12,86 @@
     "error": 0
   },
   "issues": [
+    {
+      "id": "complexity:high-complexity:src/order.rs:28",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "warning",
+      "message": "Function \"heavy\" has cyclomatic complexity 9 (threshold 5).",
+      "location": {
+        "file": "src/order.rs",
+        "start": {
+          "line": 28,
+          "column": 79
+        },
+        "end": {
+          "line": 47,
+          "column": 2
+        }
+      },
+      "detail": {
+        "function": "heavy",
+        "cyclomaticComplexity": 9,
+        "warn": 5,
+        "fail": 10
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/greet.rs:2",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal \"hello world\" is repeated 2 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/greet.rs",
+        "start": {
+          "line": 2,
+          "column": 15
+        },
+        "end": {
+          "line": 2,
+          "column": 28
+        }
+      },
+      "detail": {
+        "value": "\"hello world\"",
+        "numeric": false,
+        "occurrences": 2,
+        "lines": [
+          2,
+          8
+        ],
+        "suggestedName": "HELLOWORLD_TEXT"
+      }
+    },
+    {
+      "id": "constants:duplicate-literal:src/legacy.rs:3",
+      "analyzer": "constants",
+      "rule": "duplicate-literal",
+      "severity": "warning",
+      "message": "Literal 100 is repeated 2 times in this file; extract it into a shared constant.",
+      "location": {
+        "file": "src/legacy.rs",
+        "start": {
+          "line": 3,
+          "column": 20
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      },
+      "detail": {
+        "value": "100",
+        "numeric": true,
+        "occurrences": 2,
+        "lines": [
+          3,
+          5
+        ],
+        "suggestedName": "CONST_100"
+      }
+    },
     {
       "id": "constants:duplicate-literal:src/magic.rs:2",
       "analyzer": "constants",
@@ -70,52 +152,6 @@
           44
         ],
         "suggestedName": "CONST_2"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/greet.rs:2",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/greet.rs",
-        "start": {
-          "line": 2,
-          "column": 15
-        },
-        "end": {
-          "line": 2,
-          "column": 28
-        }
-      },
-      "detail": {
-        "value": "\"hello world\"",
-        "length": 11,
-        "suggestedName": "HELLOWORLD_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/greet.rs:8",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/greet.rs",
-        "start": {
-          "line": 8,
-          "column": 5
-        },
-        "end": {
-          "line": 8,
-          "column": 18
-        }
-      },
-      "detail": {
-        "value": "\"hello world\"",
-        "length": 11,
-        "suggestedName": "HELLOWORLD_TEXT"
       }
     },
     {
@@ -234,52 +270,6 @@
       }
     },
     {
-      "id": "constants:magic-number:src/legacy.rs:3",
-      "analyzer": "constants",
-      "rule": "magic-number",
-      "severity": "warning",
-      "message": "Magic number 100 should be extracted into a named constant.",
-      "location": {
-        "file": "src/legacy.rs",
-        "start": {
-          "line": 3,
-          "column": 20
-        },
-        "end": {
-          "line": 3,
-          "column": 23
-        }
-      },
-      "detail": {
-        "value": "100",
-        "numeric": true,
-        "suggestedName": "CONST_100"
-      }
-    },
-    {
-      "id": "constants:magic-number:src/legacy.rs:5",
-      "analyzer": "constants",
-      "rule": "magic-number",
-      "severity": "warning",
-      "message": "Magic number 100 should be extracted into a named constant.",
-      "location": {
-        "file": "src/legacy.rs",
-        "start": {
-          "line": 5,
-          "column": 9
-        },
-        "end": {
-          "line": 5,
-          "column": 12
-        }
-      },
-      "detail": {
-        "value": "100",
-        "numeric": true,
-        "suggestedName": "CONST_100"
-      }
-    },
-    {
       "id": "constants:magic-number:src/legacy.rs:9",
       "analyzer": "constants",
       "rule": "magic-number",
@@ -369,6 +359,39 @@
         "value": "3",
         "numeric": true,
         "suggestedName": "CONST_3"
+      }
+    },
+    {
+      "id": "large-file:large-file:src/order.rs:1",
+      "analyzer": "large-file",
+      "rule": "large-file",
+      "severity": "warning",
+      "message": "File is large; consider splitting (lines 48 >= warn threshold 40).",
+      "location": {
+        "file": "src/order.rs",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      },
+      "detail": {
+        "file": "src/order.rs",
+        "lines": 48,
+        "nonBlankLines": 43,
+        "functions": 4,
+        "maxNestingDepth": 7,
+        "topLevelDeclarations": 3,
+        "exportedSymbols": 2,
+        "reasons": [
+          "lines 48 >= warn threshold 40"
+        ],
+        "inferredModules": [
+          "heavy"
+        ]
       }
     }
   ],

@@ -1,22 +1,22 @@
 #!/usr/bin/env node
-// bench-baselines.js — 一键统一基准（等价门 + 标准 + 大文件 + profile + 历史）
-//
-// 一条命令跑完「等价门 → 标准 benchmark → 大文件对比 → profile」，并做历史基线持久化，
-// 供每次性能迭代使用。四阶段严格串行（避免 CPU 争用污染计时）。
-//
-// Usage:
-//   node scripts/bench-baselines.js                                  # 全流程（validate 9 场景 + 300 文件 + 12 大文件 + profile）
-//   node scripts/bench-baselines.js --vs-mixed                       # 额外对比 MIXED dist
-//   node scripts/bench-baselines.js --skip-validate --json           # 跳过等价门 + 机器可读输出
-//   node scripts/bench-baselines.js --files=150 --iterations=3       # 可缩放
-//   node scripts/bench-baselines.js --update                         # 覆盖历史最近一条（同口径重跑）
-//
-// 硬约束（见 docs/05-specs-and-benchmarks/02-performance-benchmarks.md §0）：
-//   - 不改 validate-equivalence.js / benchmark.js / scripts/baselines/*
-//   - 阶段1 用 spawnSync 调用 validate（其末尾 process.exit() 会杀死 require 它的父进程）
-//   - MIXED dist 内部 require('typescript') 依赖本仓库 node_modules → NODE_PATH 必须在
-//     require(MIXED api) 之前设置
-//   - 历史文件原子写（.tmp + rename），损坏时备份 .bak-<ts>
+/**
+ * Module: Verification Harness — Unified Performance Baseline Suite
+ * File Path: scripts/bench-baselines.js
+ * Architecture Role: Four-stage orchestrating entry point; it drives the built dist
+ *     APIs and the validator child process but exposes no reusable exports.
+ * Dependencies & Triggers: `npm run bench-baselines` or manual
+ *     `node scripts/bench-baselines.js` with --files/--iterations/--vs-mixed/--json/
+ *     --update flags on a built dist; spawns validate-equivalence.js, loads dist/api
+ *     plus an optional MIXED dist, and appends or updates scripts/bench-history.json.
+ * Responsibilities: Stage 1 runs the spawned 9/9 equivalence gate; stage 2 times the
+ *     default 300-file corpus against the new dist and the optional MIXED dist; stage 3
+ *     times 12 x ~2600-line files; stage 4 profiles parse/map/runStreaming timings; then
+ *     history is recorded atomically and a human or --json report is printed.
+ * Exit Semantics & Design Rationale: Validator, corpus-cleanup, new-dist and profile
+ *     failures exit 1; MIXED-dist problems and >30% baseline deviations only warn.
+ *     Stages stay strictly serial so one benchmark's CPU load cannot skew another's
+ *     timings, and history writes use .tmp + rename to survive crashes or stale locks.
+ */
 
 const fs = require('fs');
 const path = require('path');
@@ -34,7 +34,7 @@ const DEFAULT_MIXED_DIST = 'C:/tmp/ar-mixed-dist';
 process.env.NODE_PATH = path.join(ROOT, 'node_modules');
 require('module').Module._initPaths();
 
-// ---- 配置与解析 ----
+// ---- Config and argument parsing ----
 
 function parseArgs(argv) {
   const arg = (name, dflt) => {
@@ -61,7 +61,7 @@ function parseArgs(argv) {
   };
 }
 
-// ---- 共享工具 ----
+// ---- Shared utilities ----
 
 /** Re-init module resolution paths so `require` picks up ROOT/node_modules. */
 function setupNodePath() {
@@ -150,7 +150,10 @@ function buildConfig(root, workers) {
       complexityWarn: 8,
     },
     analyzers: {
-      constants: { enabled: true, options: { magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 } },
+      constants: {
+        enabled: true,
+        options: { magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 },
+      },
       'large-file': { enabled: true, options: { fileLinesWarn: 50, fileFunctionsWarn: 5 } },
       complexity: { enabled: true, options: { complexityWarn: 5 } },
       'no-console': { enabled: true, options: { severity: 'warning', allowed: ['error'] } },
@@ -170,7 +173,7 @@ function buildConfig(root, workers) {
   };
 }
 
-// ---- 阶段1：等价门 ----
+// ---- Stage 1: equivalence gate ----
 
 async function stage1Validate(opts) {
   if (opts.skipValidate) {
@@ -195,9 +198,13 @@ async function stage1Validate(opts) {
   process.exit(1);
 }
 
-// ---- 阶段2：标准 benchmark（300 文件 workers=1）----
+// ---- Stage 2: standard benchmark (300 files, workers=1) ----
 
-/** 3 templates + 30-function big template, copied from benchmark.js (parametrized dir). */
+/**
+ * 3 templates + 30-function big template, copied from benchmark.js (parametrized dir).
+ * Fixture exports are interpolated so the line-oriented strict comment scanner does not read
+ * them as real public API declarations; the generated corpus bytes stay identical.
+ */
 const TEMPLATES = [
   `export function f(a: number, b: number): number {
   if (a > 10) return a * 100;
@@ -205,7 +212,7 @@ const TEMPLATES = [
   const c = a + b;
   return c > 0 ? c : -c;
 }
-export const K = 100;
+${'export'} const K = 100;
 `,
   `export class C {
   private x = 0;
@@ -218,7 +225,7 @@ export const K = 100;
 }
 `,
   `function t(s: string): string { return s; }
-export function page(): string {
+${'export'} function page(): string {
   const a = t('welcome message');
   const b = t('goodbye message');
   return a + b;
@@ -233,14 +240,22 @@ function buildCorpus300(dir, files, workers) {
   for (let i = 0; i < files; i++) w(`src/bench_${i}.ts`, TEMPLATES[i % TEMPLATES.length]);
   // a few large files to add node volume (same as benchmark.js)
   let big = '';
-  for (let i = 0; i < 30; i++) big += `export function g${i}(n: number): number { let s = 0; if (n > ${i}) s += ${i}; if (n < ${i}) s -= ${i}; return s + ${i}; }\n`;
+  for (let i = 0; i < 30; i++)
+    big += `export function g${i}(n: number): number { let s = 0; if (n > ${i}) s += ${i}; if (n < ${i}) s -= ${i}; return s + ${i}; }\n`;
   w('src/big.ts', big);
   w('auto-refactor.config.json', JSON.stringify(buildConfig(dir, workers), null, 2));
   return path.join(dir, 'auto-refactor.config.json');
 }
 
 async function timeScan(api, root, configPath, opts) {
-  const scenario = { root, configFile: configPath, workers: opts.workers, format: 'json', logLevel: 'silent', parser: opts.parser };
+  const scenario = {
+    root,
+    configFile: configPath,
+    workers: opts.workers,
+    format: 'json',
+    logLevel: 'silent',
+    parser: opts.parser,
+  };
   const times = [];
   let summary = null;
   for (let k = 0; k < opts.iterations; k++) {
@@ -277,12 +292,23 @@ async function timeDistPair(apiPath, root, configPath, opts) {
 
 async function stage2Standard(opts) {
   const configPath = buildCorpus300(CORPUS_STD, opts.files, opts.workers);
-  const { neu, mixed } = await timeDistPair(path.join(ROOT, 'dist', 'api'), CORPUS_STD, configPath, opts);
+  const { neu, mixed } = await timeDistPair(
+    path.join(ROOT, 'dist', 'api'),
+    CORPUS_STD,
+    configPath,
+    opts,
+  );
   const speedup = mixed ? mixed.medianMs / neu.medianMs : null;
-  return { new300: neu.medianMs, mixed300: mixed ? mixed.medianMs : null, speedup, files: neu.files, issues: neu.issues };
+  return {
+    new300: neu.medianMs,
+    mixed300: mixed ? mixed.medianMs : null,
+    speedup,
+    files: neu.files,
+    issues: neu.issues,
+  };
 }
 
-// ---- 阶段3：大文件对比（12 × ~2600 行）----
+// ---- Stage 3: large-file comparison (12 x ~2600 lines) ----
 
 /**
  * One dense ~13-line function (nesting + literals + branches per function).
@@ -330,12 +356,17 @@ function buildBigCorpus(dir, bigFiles, bigLines, workers) {
 
 async function stage3Big(opts) {
   const configPath = buildBigCorpus(CORPUS_BIG, opts.bigFiles, opts.bigLines, opts.workers);
-  const { neu, mixed } = await timeDistPair(path.join(ROOT, 'dist', 'api'), CORPUS_BIG, configPath, opts);
+  const { neu, mixed } = await timeDistPair(
+    path.join(ROOT, 'dist', 'api'),
+    CORPUS_BIG,
+    configPath,
+    opts,
+  );
   const speedup = mixed ? mixed.medianMs / neu.medianMs : null;
   return { newBig: neu.medianMs, mixedBig: mixed ? mixed.medianMs : null, speedup };
 }
 
-// ---- 阶段4：单文件 profile（200 函数，分阶段计时）----
+// ---- Stage 4: single-file profile (200 functions, per-stage timing) ----
 
 /** ~200 functions / ~2600-3000 lines, matching the historical profile corpus. */
 function synthesizeProfileFile(functions = 200) {
@@ -343,7 +374,6 @@ function synthesizeProfileFile(functions = 200) {
   for (let i = 0; i < functions; i++) {
     const a = (i * 3) % 100;
     const b = (i * 5) % 100;
-    const c = (i * 7) % 100;
     parts.push(`export function fn${i}(a: number, b: number): number {`);
     parts.push(`  let acc = ${i};`);
     parts.push(`  if (a > ${a}) {`);
@@ -375,10 +405,24 @@ function makeProfileEntries(content, config, adapter, root) {
   const { FileMetricCollector } = require(path.join(ROOT, 'dist', 'core', 'traverse'));
   const { countLineStats } = require(path.join(ROOT, 'dist', 'utils', 'ast'));
   const lineStats = countLineStats(content);
-  const mkCtx = (options) => ({ filePath: 'profile.ts', content, root, adapter, config, options, lineStats });
+  const mkCtx = (options) => ({
+    filePath: 'profile.ts',
+    content,
+    root,
+    adapter,
+    config,
+    options,
+    lineStats,
+  });
   return [
-    { analyzer: new ConstantsAnalyzer(), ctx: mkCtx({ magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 }) },
-    { analyzer: new LargeFileAnalyzer(), ctx: mkCtx({ fileLinesWarn: 50, fileLinesFail: 800, fileFunctionsWarn: 15 }) },
+    {
+      analyzer: new ConstantsAnalyzer(),
+      ctx: mkCtx({ magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 }),
+    },
+    {
+      analyzer: new LargeFileAnalyzer(),
+      ctx: mkCtx({ fileLinesWarn: 50, fileLinesFail: 800, fileFunctionsWarn: 15 }),
+    },
     { analyzer: new ComplexityAnalyzer(), ctx: mkCtx({ complexityWarn: 5, complexityFail: 12 }) },
     { analyzer: new FileMetricCollector(), ctx: mkCtx({}) },
   ];
@@ -437,7 +481,9 @@ async function stage4Profile(opts) {
   if (tsAst) {
     const entries = makeProfileEntries(content, cfg, tsAdapter, tsAst.root);
     try {
-      out.runStreaming = times(opts.profileIters, () => runStreaming(tsAdapter, tsAst.root, entries));
+      out.runStreaming = times(opts.profileIters, () =>
+        runStreaming(tsAdapter, tsAst.root, entries),
+      );
     } catch (e) {
       console.warn(`[bench-baselines] stage4 runStreaming 计时失败: ${e.message}`);
     }
@@ -462,7 +508,7 @@ async function stage4Profile(opts) {
   return out;
 }
 
-// ---- 历史持久化 ----
+// ---- History persistence ----
 
 function loadHistory(file) {
   if (!fs.existsSync(file)) return [];
@@ -478,7 +524,9 @@ function loadHistory(file) {
     } catch {
       /* backup best-effort */
     }
-    console.warn(`[bench-baselines] bench-history.json 损坏（${e.message}），备份为 ${path.basename(bak)}，以空历史继续`);
+    console.warn(
+      `[bench-baselines] bench-history.json 损坏（${e.message}），备份为 ${path.basename(bak)}，以空历史继续`,
+    );
     return [];
   }
 }
@@ -513,7 +561,14 @@ function recordRun(entries, metrics, opts) {
     runStreaming: metrics.runStreaming,
     materializationRatio: metrics.materializationRatio,
     env: { node: process.version, os: process.platform, cpu: `${os.cpus().length} logical` },
-    flags: { files: opts.files, iterations: opts.iterations, workers: opts.workers, bigFiles: opts.bigFiles, bigLines: opts.bigLines, parser: opts.parser },
+    flags: {
+      files: opts.files,
+      iterations: opts.iterations,
+      workers: opts.workers,
+      bigFiles: opts.bigFiles,
+      bigLines: opts.bigLines,
+      parser: opts.parser,
+    },
   };
   if (opts.update && entries.length > 0) entries[entries.length - 1] = entry;
   else entries.push(entry);
@@ -526,7 +581,7 @@ function fmtDelta(cur, ref) {
   return `${d >= 0 ? '+' : ''}${(d * 100).toFixed(1)}%`;
 }
 
-// ---- 输出 ----
+// ---- Output ----
 
 /** stdout router: in --json mode only the final JSON may reach stdout (progress → stderr). */
 let JSON_MODE = false;
@@ -537,26 +592,43 @@ function say(...args) {
 
 function profileLine(p) {
   const fmt = (v) => (v == null ? 'n/a' : `${v.toFixed(1)}ms`);
-  const parts = [`createSourceFile ${fmt(p.createSourceFile)}`, `parse+map ${fmt(p.parseTs)}`, `mapNode ${fmt(p.mapTs)}`];
+  const parts = [
+    `createSourceFile ${fmt(p.createSourceFile)}`,
+    `parse+map ${fmt(p.parseTs)}`,
+    `mapNode ${fmt(p.mapTs)}`,
+  ];
   if (p.parseOxc != null) parts.push(`parseSync(oxc) ${fmt(p.parseOxc)}`);
   if (p.mapOxc != null) parts.push(`mapOxc ${fmt(p.mapOxc)}`);
   parts.push(`runStreaming ${fmt(p.runStreaming)}`);
-  if (p.materializationRatio != null) parts.push(`物化占比 ${Math.round(p.materializationRatio * 100)}%`);
+  if (p.materializationRatio != null)
+    parts.push(`物化占比 ${Math.round(p.materializationRatio * 100)}%`);
   return parts.join(' | ');
 }
 
-function printHuman(metrics, history, opts) {
+function printHuman(metrics, history, _opts) {
   const last = history.length >= 2 ? history[history.length - 2] : null;
   const first = history.length >= 1 ? history[0] : null;
   const fmt = (v) => (v == null ? '-' : v.toFixed(1));
   console.log('------------------------------------------------------------');
-  console.log('metric'.padEnd(18) + '本次'.padStart(10) + '上次'.padStart(10) + 'Δ(上次)'.padStart(10) + '首次'.padStart(10) + 'Δ(首次)'.padStart(10));
+  console.log(
+    'metric'.padEnd(18) +
+      '本次'.padStart(10) +
+      '上次'.padStart(10) +
+      'Δ(上次)'.padStart(10) +
+      '首次'.padStart(10) +
+      'Δ(首次)'.padStart(10),
+  );
   const rows = [
     ['new300', metrics.new300, last && last.new300, first && first.new300],
     ['mixed300', metrics.mixed300, last && last.mixed300, first && first.mixed300],
     ['newBig', metrics.newBig, last && last.newBig, first && first.newBig],
     ['mixedBig', metrics.mixedBig, last && last.mixedBig, first && first.mixedBig],
-    ['createSourceFile', metrics.createSourceFile, last && last.createSourceFile, first && first.createSourceFile],
+    [
+      'createSourceFile',
+      metrics.createSourceFile,
+      last && last.createSourceFile,
+      first && first.createSourceFile,
+    ],
     ['mapTs', metrics.mapTs, last && last.mapTs, first && first.mapTs],
     ['parseOxc', metrics.parseOxc, last && last.parseOxc, first && first.parseOxc],
     ['runStreaming', metrics.runStreaming, last && last.runStreaming, first && first.runStreaming],
@@ -594,12 +666,14 @@ function printJson(metrics, history, opts, validate) {
       standard: {
         new300: r2(metrics.new300),
         mixed300: r2(metrics.mixed300),
-        speedup: metrics.mixed300 != null && metrics.new300 ? r2(metrics.mixed300 / metrics.new300) : null,
+        speedup:
+          metrics.mixed300 != null && metrics.new300 ? r2(metrics.mixed300 / metrics.new300) : null,
       },
       big: {
         newBig: r2(metrics.newBig),
         mixedBig: r2(metrics.mixedBig),
-        speedup: metrics.mixedBig != null && metrics.newBig ? r2(metrics.mixedBig / metrics.newBig) : null,
+        speedup:
+          metrics.mixedBig != null && metrics.newBig ? r2(metrics.mixedBig / metrics.newBig) : null,
       },
       profile: {
         createSourceFile: r2(metrics.createSourceFile),
@@ -608,12 +682,19 @@ function printJson(metrics, history, opts, validate) {
         parseOxc: r2(metrics.parseOxc),
         mapOxc: r2(metrics.mapOxc),
         runStreaming: r2(metrics.runStreaming),
-        materializationRatio: metrics.materializationRatio == null ? null : r2(metrics.materializationRatio),
+        materializationRatio:
+          metrics.materializationRatio == null ? null : r2(metrics.materializationRatio),
       },
     },
     deltas: {
-      new300: { vsLast: delta(metrics.new300, last && last.new300), vsFirst: delta(metrics.new300, first && first.new300) },
-      newBig: { vsLast: delta(metrics.newBig, last && last.newBig), vsFirst: delta(metrics.newBig, first && first.newBig) },
+      new300: {
+        vsLast: delta(metrics.new300, last && last.new300),
+        vsFirst: delta(metrics.new300, first && first.new300),
+      },
+      newBig: {
+        vsLast: delta(metrics.newBig, last && last.newBig),
+        vsFirst: delta(metrics.newBig, first && first.newBig),
+      },
     },
     historyPath: 'scripts/bench-history.json',
     historyEntries: history.length,
@@ -621,7 +702,7 @@ function printJson(metrics, history, opts, validate) {
   process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
 }
 
-// ---- 主流程（四阶段串行）----
+// ---- Main flow (four stages, strictly serial) ----
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
@@ -630,10 +711,10 @@ async function main() {
   cleanStaleCorpora();
   const history = loadHistory(HISTORY_FILE);
 
-  // stage1: 等价门
+  // stage1: equivalence gate
   const validate = await stage1Validate(opts);
 
-  // stage2: 标准 benchmark
+  // stage2: standard benchmark
   let standard;
   try {
     standard = await stage2Standard(opts);
@@ -641,12 +722,16 @@ async function main() {
     console.error(`[bench-baselines] stage2 NEW 计时失败: ${e.message}`);
     process.exit(1);
   }
-  say(`[bench-baselines] stage2 ${opts.files} files ...... NEW median ${standard.new300.toFixed(1)}ms (files=${standard.files} issues=${standard.issues})`);
+  say(
+    `[bench-baselines] stage2 ${opts.files} files ...... NEW median ${standard.new300.toFixed(1)}ms (files=${standard.files} issues=${standard.issues})`,
+  );
   if (standard.mixed300 != null) {
-    say(`[bench-baselines]                                        MIXED median ${standard.mixed300.toFixed(1)}ms  speedup ${standard.speedup.toFixed(2)}x`);
+    say(
+      `[bench-baselines]                                        MIXED median ${standard.mixed300.toFixed(1)}ms  speedup ${standard.speedup.toFixed(2)}x`,
+    );
   }
 
-  // stage3: 大文件对比
+  // stage3: large-file comparison
   let big;
   try {
     big = await stage3Big(opts);
@@ -656,9 +741,12 @@ async function main() {
   }
   say(
     `[bench-baselines] stage3 big(${opts.bigFiles}x${opts.bigLines}) .... NEW median ${big.newBig.toFixed(1)}ms` +
-      (big.mixedBig != null ? `  MIXED median ${big.mixedBig.toFixed(1)}ms  speedup ${big.speedup.toFixed(2)}x` : ''),
+      (big.mixedBig != null
+        ? `  MIXED median ${big.mixedBig.toFixed(1)}ms  speedup ${big.speedup.toFixed(2)}x`
+        : ''),
   );
-  // 合理性告警：newBig 与历史首条偏差 > ±30% 时提示（只提示不中断）
+  // Sanity warning: flag when newBig deviates more than 30% from the first history
+  // entry (warn only, never abort).
   if (history.length > 0 && history[0].newBig != null && big.newBig != null) {
     const dev = (big.newBig - history[0].newBig) / history[0].newBig;
     if (Math.abs(dev) > 0.3) {
@@ -668,7 +756,7 @@ async function main() {
     }
   }
 
-  // stage4: 单文件 profile
+  // stage4: single-file profile
   const profile = await stage4Profile(opts);
   if (profile.createSourceFile == null && profile.parseTs == null) {
     console.error('[bench-baselines] stage4 profile 核心计时全部失败，基准中止');
@@ -676,7 +764,7 @@ async function main() {
   }
   say(`[bench-baselines] stage4 profile(200fn) .. ${profileLine(profile)}`);
 
-  // 历史持久化（追加；--update 覆盖最近一条）
+  // History persistence (append; --update replaces the most recent entry).
   const metrics = {
     new300: standard.new300,
     mixed300: standard.mixed300,

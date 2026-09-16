@@ -25,6 +25,11 @@ const zhCN: I18nStrings = {
     'export.filename.daily': '日报',
     'export.filename.weekly': '周报',
     'export.filename.aggregated': '聚合',
+    // 导出对话框文件类型过滤器标签
+    'export.filter.csv': 'CSV 文件 (*.csv)',
+    'export.filter.md': 'Markdown 文件 (*.md)',
+    'export.filter.json': 'JSON 文件 (*.json)',
+    'export.filter.all': '所有文件',
     'toast.cloudSyncPlaceholder': '☁️ 云端同步即将推出（Cloud sync coming soon）——当前为扩展点占位。',
 
     // 报表导出（Markdown）
@@ -66,6 +71,7 @@ const zhCN: I18nStrings = {
     'confirm.restore': '确定用所选文件还原计时数据？\n当前：累计 {0}，{1} 条会话\n文件：累计 {2}，{3} 条会话\n现有数据将被覆盖（已自动生成安全快照）。',
     'confirm.restore.title': '确认还原',
     'toast.restored': '计时数据已还原自：{0}',
+    'toast.restoreFailed': '还原失败: {0}',
 
     'cmd.modeSwitched': '已切换至「{0}」模式',
     'cmd.enabled': '工作区计时: 已启用',
@@ -74,6 +80,9 @@ const zhCN: I18nStrings = {
     'cmd.globalDisabled': '工作区计时: 已全局禁用',
     'cmd.noWorkspace': '工作区计时: 请先打开一个工作区文件夹',
     'cmd.debugSaved': '[调试] {0}',
+    'debugSave.notRunning': '计时未运行，无需存盘',
+    'debugSave.done': '已存盘: {0}',
+    'debugSave.failed': '存盘失败: {0}',
 
     'statusBar.mode.today-total': '今日优先',
     'statusBar.mode.total-today': '累计优先',

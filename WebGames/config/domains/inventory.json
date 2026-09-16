@@ -1,0 +1,103 @@
+{
+  "transaction": {
+    "max_item_quantity": 1000,
+    "max_batch_quantity": 10000
+  },
+  "item_defaults": {
+    "custom_name": "未命名物品",
+    "deserialize_name": "未知物品",
+    "category": "QUEST_MISC",
+    "mass_kg": 1.0,
+    "volume_slots": 1,
+    "durability": 100.0,
+    "material_hardness": 10.0,
+    "market_base_price": 10,
+    "total_sockets": 2,
+    "combat_metrics": {
+      "edge_sharpness": 1.0,
+      "reach_meters": 1.0,
+      "effective_armor": 0.0
+    }
+  },
+  "wearable": {
+    "max_carry_weight_kg": 50.0,
+    "slots": [
+      "HEAD",
+      "CHEST",
+      "LEGS",
+      "FEET",
+      "MAIN_HAND",
+      "OFF_HAND",
+      "BACKPACK"
+    ],
+    "armor_category": "ARMOR_EQUIPMENT",
+    "capacity_slots": [
+      "BACKPACK"
+    ]
+  },
+  "formula": {
+    "alpha_rep": 2.5,
+    "beta_growth": 1.8,
+    "gamma_age": 1.2,
+    "delta_mastery": 0.05,
+    "age_normalize": 100.0,
+    "forget_base_rate": 0.05,
+    "int_coefficient": 0.1
+  },
+  "profession": {
+    "phys_threshold": 10,
+    "magic_threshold": 10,
+    "spellblade_phys_threshold": 8,
+    "spellblade_magic_threshold": 8,
+    "rank_divisor": 10,
+    "spellblade_rank_tier": 2,
+    "node_types": {
+      "physical": "PHYSICAL_VERB",
+      "magic": "MAGIC_RUNE"
+    },
+    "symbols": {
+      "physical": [
+        "STAB",
+        "SLASH",
+        "PARRY",
+        "BLOCK",
+        "LUNGE",
+        "CLEAVE"
+      ],
+      "magic": [
+        "FLAME",
+        "FROST",
+        "ARCANE",
+        "BOLT",
+        "HEAL"
+      ]
+    },
+    "titles": {
+      "sword_master": {
+        "id": "SWORD_MASTER",
+        "name": "Sword Master",
+        "modifiers": {
+          "str_bonus": 1.25,
+          "slash_boost": 0.3
+        }
+      },
+      "archmage": {
+        "id": "ARCHMAGE",
+        "name": "Holy Archmage",
+        "modifiers": {
+          "int_bonus": 1.3,
+          "mana_efficiency": 0.25
+        }
+      },
+      "spellblade": {
+        "id": "SPELLBLADE",
+        "name": "Spellblade",
+        "modifiers": {
+          "str_bonus": 1.15,
+          "int_bonus": 1.15,
+          "dual_strike": true
+        }
+      }
+    }
+  }
+}

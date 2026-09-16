@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "version": 1,
+    "domain": "world_gateway",
+    "description": "世界栏网关事件与通知文案表"
+  },
+  "gateway_welcome": "欢迎进入世界网关，请选择游戏模式与进入世界。",
+  "mode_selected": "已选择模式: {mode_name}，世界准备就绪。",
+  "character_pending": "当前档位暂无角色，请先创建属于你的卡拉尔冒险者。",
+  "world_entry_permitted": "角色身份已核验通过，准许进入世界。",
+  "invalid_transition": "状态机流转非法: {detail}",
+  "cross_mode_blocked": "跨模式状态写入被拦截，会话模式与目标模式不匹配。",
+  "multiplayer_canary_restricted": "联机模式当前处于灰度封测阶段，未向当前账号开放。"
+}

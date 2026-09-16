@@ -1,0 +1,8 @@
+{
+  "treasury_permission_denied": "权限不足，仅会长与长老可动用金库",
+  "treasury_insufficient": "公会金库储备不足",
+  "treasury_invalid_amount": "取款金额必须为非负值",
+  "diplomacy_permission_denied": "仅会长可修改公会外交状态",
+  "tech_permission_denied": "权限不足，仅长老以上可升级公会科技",
+  "tech_funds_insufficient": "金库资金不足，升级需 %d 金币与 %d 魔单晶"
+}

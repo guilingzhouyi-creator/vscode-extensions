@@ -20,6 +20,9 @@
 # 版本解析优先级：dispatch 输入 > 提交信息前缀 ^vX.Y.Z > （Tag 推送时）Tag 本身。
 #   分支推送必须满足「提交信息以 vX.Y.Z 开头」才会发布（沿用仓库
 #   "vX.Y.Z — 标题 | 英文副标题" 规范），常规提交安全跳过，不会误发布。
+#   兼容两种前缀形态（与 scripts/sh/release-tag.sh 自产提交同规）：
+#     ① 裸前缀：  v0.5.0 — 标题 ...
+#     ② 约定式：  feat(workspace-timing): v0.5.0 - 标题 ...（scope 形式历史提交）
 #
 # 扩展自动发现：仓库顶层含 package.json 的目录即视为一个扩展。
 #   新增扩展零配置接入——建目录、放 package.json、push 即可（预留位置）。
@@ -172,14 +175,21 @@ jobs:
             #   （仅手动触发时）该扩展自身 package.json 的版本
             PKG_VER=$(node -p "require('./$EXT/package.json').version")
             VERSION=""
+            # 注意：正则存入变量再用于 [[ =~ ]]（括号/竖线内联会被解析为条件运算符）
+            RE_BARE='^v([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]'
+            RE_CONV='^(feat|fix|refactor|perf|chore|docs|test|style|build|ci|revert)\([^)]*\):[[:space:]]*v([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]'
             if $IS_TAG_PUSH; then
               VERSION="${GITHUB_REF#refs/tags/$EXT-v}"
             elif [[ -n "$INPUT_VERSION" ]]; then
               VERSION="${INPUT_VERSION#v}"
             elif [[ "$EVENT" == "workflow_dispatch" ]]; then
               VERSION="$PKG_VER"
-            elif [[ "$MSG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            elif [[ "$MSG" =~ $RE_BARE ]]; then
+              # ① 裸前缀：vX.Y.Z — 标题
               VERSION="${BASH_REMATCH[1]}"
+            elif [[ "$MSG" =~ $RE_CONV ]]; then
+              # ② 约定式前缀：feat(workspace-timing): vX.Y.Z - 标题
+              VERSION="${BASH_REMATCH[2]}"
             fi
             if [[ -z "$VERSION" ]]; then
               echo "::notice::[$EXT] 提交信息未以 vX.Y.Z 开头且无手动版本 → 跳过。"

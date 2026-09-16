@@ -1,0 +1,31 @@
+# Godot 4 缓存/导入产物
+.godot/
+*.translation
+
+# 一次性分析脚本与中间产物（scratch/ 目录及根级 *analysis.json，不入库）
+scratch/
+scratch_*analysis.json
+
+# 本地运行数据
+user/
+
+# ============ 量化工具链运行时产物（scripts/ + benchmarks/ + tests/） ============
+# Python 字节码缓存（py_compile / 运行 py 脚本产生）
+__pycache__/
+*.pyc
+
+# bench-sweep 临时单次报告（--keep 保留时也无需入库）
+.bench_sweep_run_*
+
+# test-run.sh 测试结果汇总（机器生成，不入库）
+tests/reports/
+
+# 基准时间戳快照（本地历史，不入库）；仅 golden 基线入库
+benchmarks/reports/*
+!benchmarks/reports/baseline.json
+!benchmarks/reports/baseline.md
+!benchmarks/reports/docs_baseline.json
+
+# WebGames 打包构建产物目录（始终位于 WebGames 项目内，不入库）
+dist/
+*.pck

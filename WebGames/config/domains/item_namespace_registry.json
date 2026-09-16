@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "category_minor": "WEAPON_BLADE",
+    "tier_rank": 1,
+    "default_mass_kg": 1.5,
+    "default_volume_slots": 2,
+    "base_market_value": 100
+  },
+  "uid": {
+    "prefixes": [
+      "GM_",
+      "CDK_",
+      "GAC_",
+      "MAIL_",
+      "SRV_",
+      "DRP_",
+      "QST_"
+    ],
+    "legacy_prefixes": [
+      "LGC_"
+    ],
+    "count_width": 8,
+    "start_count": 0
+  },
+  "server_grant": {
+    "enabled": false,
+    "default_source": "SERVER",
+    "max_entries": 10000
+  }
+}

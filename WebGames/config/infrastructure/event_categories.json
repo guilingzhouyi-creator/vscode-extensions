@@ -1,0 +1,83 @@
+{
+  "_default": {
+    "name": "DEFAULT",
+    "color": "#94a3b8",
+    "error_color": "#e57373"
+  },
+  "combat": {
+    "name": "COMBAT",
+    "color": "#f87171"
+  },
+  "travel": {
+    "name": "TRAVEL",
+    "color": "#34d399"
+  },
+  "bio": {
+    "name": "BIO",
+    "color": "#94a3b8"
+  },
+  "info": {
+    "name": "INFO",
+    "color": "#94a3b8"
+  },
+  "lifecycle": {
+    "name": "LIFECYCLE",
+    "color": "#fbbf24"
+  },
+  "economy": {
+    "name": "ECONOMY",
+    "color": "#facc15"
+  },
+  "grimoire": {
+    "name": "GRIMOIRE",
+    "color": "#c084fc"
+  },
+  "sovereignty": {
+    "name": "SOVEREIGNTY",
+    "color": "#60a5fa"
+  },
+  "eco_swarm": {
+    "name": "ECO_SWARM",
+    "color": "#ef4444"
+  },
+  "bounty": {
+    "name": "BOUNTY",
+    "color": "#f43f5e"
+  },
+  "caravan": {
+    "name": "CARAVAN",
+    "color": "#34d399"
+  },
+  "network": {
+    "name": "NETWORK",
+    "color": "#94a3b8"
+  },
+  "profession": {
+    "name": "PROFESSION",
+    "color": "#f472b6"
+  },
+  "quest": {
+    "name": "QUEST",
+    "color": "#a3e635"
+  },
+  "society": {
+    "name": "SOCIETY",
+    "color": "#94a3b8"
+  },
+  "gacha": {
+    "name": "GACHA",
+    "color": "#f472b6"
+  },
+  "system": {
+    "name": "SYSTEM",
+    "color": "#38bdf8"
+  },
+  "auth": {
+    "name": "AUTH",
+    "color": "#4A90E2"
+  },
+  "hud": {
+    "name": "HUD",
+    "color": "#50E3C2"
+  }
+}

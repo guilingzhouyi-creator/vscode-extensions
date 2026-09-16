@@ -1,0 +1,745 @@
+[gd_scene load_steps=2 format=3 uid="uid://ccharprogview03"]
+
+[ext_resource type="Script" path="res://frontend/views/character_progression/character_progression_view.gd" id="1_charprog"]
+
+[node name="CharacterProgressionView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_charprog")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.06, 0.1, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+; ==============================================================================
+; 顶部标题栏
+; ==============================================================================
+
+[node name="TopBar" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBox/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = ""
+
+[node name="TitleSubLabel" type="Label" parent="MarginContainer/VBox/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+; ==============================================================================
+; 主 Tab 容器（8 个子界面）
+; ==============================================================================
+
+[node name="MainTabContainer" type="TabContainer" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+tab_align = 0
+
+; ------------------------------------------------------------------------------
+; Tab 0: ATTRIBUTES 属性总览
+; ------------------------------------------------------------------------------
+
+[node name="AttributesTab" type="ScrollContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/AttributesTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="AttrCharNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.98, 0.8, 0.2, 1)
+text = ""
+
+[node name="AttrTitleLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = ""
+
+[node name="AttrDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+layout_mode = 2
+
+[node name="AttrSectionLabel1" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="AttrGrid" type="GridContainer" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 32
+theme_override_constants/v_separation = 6
+
+[node name="AttrStrLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="AttrAgiLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="AttrConLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="AttrIntLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="AttrWisLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="AttrChaLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="AttrDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+layout_mode = 2
+
+[node name="AttrSectionLabel2" type="Label" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="AttrHpBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+value = 100.0
+
+[node name="AttrMpBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+value = 50.0
+
+[node name="AttrStaminaBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/AttributesTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+value = 80.0
+
+; ------------------------------------------------------------------------------
+; Tab 1: POTENTIAL 潜能加点
+; ------------------------------------------------------------------------------
+
+[node name="PotentialTab" type="ScrollContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/PotentialTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="PotTopBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PotPointsLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotTopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="PotSpacer" type="Control" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotTopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PotModeOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotTopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(140, 0)
+
+[node name="PotDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox"]
+layout_mode = 2
+
+[node name="PotSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="PotGrid" type="GridContainer" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox"]
+layout_mode = 2
+columns = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 8
+
+[node name="PotStrNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="PotStrAddBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+custom_minimum_size = Vector2(40, 0)
+
+[node name="PotStrPreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="PotAgiNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="PotAgiAddBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+custom_minimum_size = Vector2(40, 0)
+
+[node name="PotAgiPreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="PotConNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="PotConAddBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+custom_minimum_size = Vector2(40, 0)
+
+[node name="PotConPreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="PotIntNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="PotIntAddBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+custom_minimum_size = Vector2(40, 0)
+
+[node name="PotIntPreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="PotWisNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="PotWisAddBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+custom_minimum_size = Vector2(40, 0)
+
+[node name="PotWisPreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="PotChaNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="PotChaAddBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+custom_minimum_size = Vector2(40, 0)
+
+[node name="PotChaPreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="PotDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox"]
+layout_mode = 2
+
+[node name="PotBtnBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="PotConfirmBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+[node name="PotResetBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/PotentialTab/VBox/PotBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+; ------------------------------------------------------------------------------
+; Tab 2: VITALITY 生命体质
+; ------------------------------------------------------------------------------
+
+[node name="VitalityTab" type="ScrollContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/VitalityTab"]
+layout_mode = 2
+theme_override_constants/separation = 12
+size_flags_horizontal = 3
+
+[node name="VitSectionLabel1" type="Label" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="VitAgeLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = ""
+
+[node name="VitAgeSlider" type="HSlider" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+value = 20.0
+step = 1.0
+
+[node name="VitDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+layout_mode = 2
+
+[node name="VitSectionLabel2" type="Label" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="VitSfLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="VitMsfLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="VitDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+layout_mode = 2
+
+[node name="VitSectionLabel3" type="Label" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="VitHungerLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+layout_mode = 2
+text = ""
+
+[node name="VitHungerBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+value = 80.0
+
+[node name="VitEnergyLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+layout_mode = 2
+text = ""
+
+[node name="VitEnergyBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/VitalityTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+value = 65.0
+
+; ------------------------------------------------------------------------------
+; Tab 3: SKILL_TREE 技能树
+; ------------------------------------------------------------------------------
+
+[node name="SkillTreeTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 300
+
+[node name="SkillAstPanel" type="PanelContainer" parent="MarginContainer/VBox/MainTabContainer/SkillTreeTab"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AstPlaceholderLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SkillTreeTab/SkillAstPanel"]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="SkillRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/SkillTreeTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="SkillListLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SkillTreeTab/SkillRightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="SkillNodeList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/SkillTreeTab/SkillRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 180)
+
+[node name="SkillDetailLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/SkillTreeTab/SkillRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+custom_minimum_size = Vector2(0, 80)
+
+; ------------------------------------------------------------------------------
+; Tab 4: EQUIPMENT 装备栏
+; ------------------------------------------------------------------------------
+
+[node name="EquipmentTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 280
+
+[node name="EquipSlotsPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="EquipSlotsLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="EquipGrid" type="GridContainer" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel"]
+layout_mode = 2
+columns = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+size_flags_vertical = 3
+
+[node name="EquipMainHandBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipOffHandBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipHeadBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipChestBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipLegsBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipFeetBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipNeckBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipRingLBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipRingRBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipSlotsPanel/EquipGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 60)
+text = ""
+
+[node name="EquipDetailPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="EquipDetailLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipDetailPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="EquipDetailNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipDetailPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="EquipDetailRarityLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipDetailPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="EquipDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipDetailPanel"]
+layout_mode = 2
+
+[node name="EquipAffixLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/EquipmentTab/EquipDetailPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+size_flags_vertical = 3
+
+; ------------------------------------------------------------------------------
+; Tab 5: INVENTORY 背包物品栏
+; ------------------------------------------------------------------------------
+
+[node name="InventoryTab" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_vertical = 3
+
+[node name="InvFilterTabs" type="TabContainer" parent="MarginContainer/VBox/MainTabContainer/InventoryTab"]
+unique_name_in_owner = true
+layout_mode = 2
+tab_align = 0
+custom_minimum_size = Vector2(0, 40)
+
+[node name="InvFilterAll" type="Control" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvFilterTabs"]
+layout_mode = 2
+
+[node name="InvFilterWeapon" type="Control" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvFilterTabs"]
+layout_mode = 2
+
+[node name="InvFilterArmor" type="Control" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvFilterTabs"]
+layout_mode = 2
+
+[node name="InvFilterConsumable" type="Control" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvFilterTabs"]
+layout_mode = 2
+
+[node name="InvFilterMaterial" type="Control" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvFilterTabs"]
+layout_mode = 2
+
+[node name="InvScroll" type="ScrollContainer" parent="MarginContainer/VBox/MainTabContainer/InventoryTab"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="InvGridPanel" type="GridContainer" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+columns = 6
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
+
+[node name="InvStatusBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/InventoryTab"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="InvCapacityLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvStatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="InvWeightLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvStatusBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="InvWeightBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/InventoryTab/InvStatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+value = 0.0
+custom_minimum_size = Vector2(0, 16)
+
+; ------------------------------------------------------------------------------
+; Tab 6: TITLES 称号系统
+; ------------------------------------------------------------------------------
+
+[node name="TitlesTab" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_vertical = 3
+
+[node name="TitleSectionLabel1" type="Label" parent="MarginContainer/VBox/MainTabContainer/TitlesTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="TitleEquippedLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TitlesTab"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="TitleRankLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/TitlesTab"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="TitleDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/TitlesTab"]
+layout_mode = 2
+
+[node name="TitleSectionLabel2" type="Label" parent="MarginContainer/VBox/MainTabContainer/TitlesTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="TitleList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/TitlesTab"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+; ------------------------------------------------------------------------------
+; Tab 7: LORE 角色传记
+; ------------------------------------------------------------------------------
+
+[node name="LoreTab" type="ScrollContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/LoreTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="LoreSectionLabel1" type="Label" parent="MarginContainer/VBox/MainTabContainer/LoreTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LoreBackgroundLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/LoreTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+
+[node name="LoreDivider1" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/LoreTab/VBox"]
+layout_mode = 2
+
+[node name="LoreSectionLabel2" type="Label" parent="MarginContainer/VBox/MainTabContainer/LoreTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LoreMilestoneList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/LoreTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+
+[node name="LoreDivider2" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/LoreTab/VBox"]
+layout_mode = 2
+
+[node name="LoreSectionLabel3" type="Label" parent="MarginContainer/VBox/MainTabContainer/LoreTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LoreAchievementList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/LoreTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+
+; ==============================================================================
+; 底部操作栏（右下角返回按钮）
+; ==============================================================================
+
+[node name="BottomBar" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BottomSpacer" type="Control" parent="MarginContainer/VBox/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BackBtn" type="Button" parent="MarginContainer/VBox/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)

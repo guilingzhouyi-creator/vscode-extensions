@@ -1,0 +1,489 @@
+[gd_scene load_steps=2 format=3 uid="uid://cmiscedgeview17"]
+
+[ext_resource type="Script" path="res://frontend/views/misc_edge/misc_edge_view.gd" id="1_miscedge"]
+
+[node name="MiscEdgeView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_miscedge")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.06, 0.1, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+; ==============================================================================
+; 顶部标题栏
+; ==============================================================================
+
+[node name="TopBar" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBox/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = ""
+
+[node name="TitleSubLabel" type="Label" parent="MarginContainer/VBox/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = "Misc & Edge Systems"
+
+; ==============================================================================
+; 主 Tab 容器（4 个子界面）
+; ==============================================================================
+
+[node name="MainTabContainer" type="TabContainer" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+tab_align = 0
+
+; ------------------------------------------------------------------------------
+; Tab 0: DISGUISE 身份伪装
+; ------------------------------------------------------------------------------
+
+[node name="DisguiseTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 340
+
+[node name="DisguiseLeftPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="DisguiseIdentityCard" type="PanelContainer" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="IdentityVBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseIdentityCard"]
+layout_mode = 2
+theme_override_constants/separation = 4
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="DisguiseCurrentNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseIdentityCard/IdentityVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="DisguiseCurrentRaceLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseIdentityCard/IdentityVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="DisguiseCurrentClassLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseIdentityCard/IdentityVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="DisguiseCurrentLevelLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseIdentityCard/IdentityVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="DisguiseStatusLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseIdentityCard/IdentityVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+text = ""
+
+[node name="DisguiseDurationLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = ""
+
+[node name="DisguiseDurationBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+value = 0.0
+custom_minimum_size = Vector2(0, 14)
+
+[node name="DisguiseDetectRiskLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = ""
+
+[node name="DisguiseDetectRiskBar" type="ProgressBar" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+value = 0.0
+custom_minimum_size = Vector2(0, 14)
+
+[node name="DisguiseMaskListLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DisguiseMaskList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DisguiseRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="DisguiseDetailSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DisguiseDetailNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="DisguiseDetailOriginLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DisguiseDetailDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel"]
+layout_mode = 2
+
+[node name="DisguiseDetailDescLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+size_flags_vertical = 3
+
+[node name="DisguiseBtnBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="DisguiseCancelBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel/DisguiseBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+[node name="DisguiseSwitchBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel/DisguiseBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+; ------------------------------------------------------------------------------
+; Tab 1: MUTATION 精英突变
+; ------------------------------------------------------------------------------
+
+[node name="MutationTab" type="HSplitContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 320
+
+[node name="MutationLeftPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/MutationTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="MutationFilterTabs" type="TabContainer" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+tab_align = 0
+custom_minimum_size = Vector2(0, 36)
+
+[node name="MutFilterActive" type="Control" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationLeftPanel/MutationFilterTabs"]
+layout_mode = 2
+
+[node name="MutFilterAvailable" type="Control" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationLeftPanel/MutationFilterTabs"]
+layout_mode = 2
+
+[node name="MutFilterLocked" type="Control" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationLeftPanel/MutationFilterTabs"]
+layout_mode = 2
+
+[node name="MutationListLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationLeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="MutationList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MutationRightPanel" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/MutationTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="MutationDetailSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="MutationDetailNameLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="MutationDetailQualityLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MutationDetailEffectLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = ""
+autowrap_mode = 3
+
+[node name="MutationDetailSourceLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="MutationDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+layout_mode = 2
+
+[node name="MutationComboSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="MutationComboPreviewLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+text = "已激活突变 (0 / 3):
+  （暂无激活的突变）"
+autowrap_mode = 3
+size_flags_vertical = 3
+
+[node name="MutationBtnBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="MutationReplaceBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel/MutationBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="MutationActivateBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel/MutationBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+; ------------------------------------------------------------------------------
+; Tab 2: GROUND_DROP 地面掉落
+; ------------------------------------------------------------------------------
+
+[node name="GroundDropTab" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_vertical = 3
+
+[node name="GroundFilterTabs" type="TabContainer" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab"]
+unique_name_in_owner = true
+layout_mode = 2
+tab_align = 0
+custom_minimum_size = Vector2(0, 36)
+
+[node name="GroundFilterAll" type="Control" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundFilterTabs"]
+layout_mode = 2
+
+[node name="GroundFilterEquipment" type="Control" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundFilterTabs"]
+layout_mode = 2
+
+[node name="GroundFilterMaterial" type="Control" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundFilterTabs"]
+layout_mode = 2
+
+[node name="GroundFilterConsumable" type="Control" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundFilterTabs"]
+layout_mode = 2
+
+[node name="GroundStatusBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="GroundRangeLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundStatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="GroundRangeSpacer" type="Control" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundStatusBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GroundItemCountLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundStatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="GroundLootList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="GroundBtnBar" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="GroundPickupAllBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(120, 0)
+
+[node name="GroundPickupBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/GroundDropTab/GroundBtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+; ------------------------------------------------------------------------------
+; Tab 3: NAME_REGISTRY 命名注册
+; ------------------------------------------------------------------------------
+
+[node name="NameRegistryTab" type="ScrollContainer" parent="MarginContainer/VBox/MainTabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab"]
+layout_mode = 2
+theme_override_constants/separation = 10
+size_flags_horizontal = 3
+
+[node name="NameTypeSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="NameTypeOption" type="OptionButton" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(160, 0)
+
+[node name="NameInputDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+layout_mode = 2
+
+[node name="NameInputSectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="NameInputRow" type="HBoxContainer" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="NameInput" type="LineEdit" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox/NameInputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="NameCheckBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox/NameInputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(80, 0)
+
+[node name="NameCheckResultLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="NameFeeDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+layout_mode = 2
+
+[node name="NameFeeLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="NameRegisterBtn" type="Button" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(0, 32)
+size_flags_horizontal = 3
+
+[node name="NameHistoryDivider" type="HSeparator" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+layout_mode = 2
+
+[node name="NameHistorySectionLabel" type="Label" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="NameHistoryList" type="ItemList" parent="MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 160)
+
+; ==============================================================================
+; 底部操作栏（右下角返回按钮）
+; ==============================================================================
+
+[node name="BottomBar" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BottomSpacer" type="Control" parent="MarginContainer/VBox/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BackBtn" type="Button" parent="MarginContainer/VBox/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)

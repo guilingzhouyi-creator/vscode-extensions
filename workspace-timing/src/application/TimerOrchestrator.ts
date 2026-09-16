@@ -16,11 +16,6 @@ import { SessionManager, SessionResult } from './SessionManager';
 import {
     WorkspaceTimingData,
     TimingConfig,
-    TimeSession,
-    DEFAULT_RING_BUFFER_CAP,
-    DEFAULT_JOURNAL_FLUSH_MS,
-    DEFAULT_FULL_SAVE_MS,
-    DEFAULT_MAX_SESSIONS,
     MS_PER_HOUR,
     MIN_WEEKLY_LIMIT_HOURS,
     MAX_WEEKLY_LIMIT_HOURS,
@@ -31,13 +26,14 @@ import {
 import { validateTimingData } from '../persistence/DataValidator';
 import { migrateToFolded } from '../domain/HistoryFolder';
 import { AggregatedCsvExporter } from './exporters/AggregatedCsvExporter';
-import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
+import { TimeAggregator } from '../domain/TimeAggregator';
 import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
 import { CsvExporter } from './exporters/CsvExporter';
 import { ReportExporter, ReportKind } from './exporters/ReportExporter';
+import { buildDashboardData, buildWeeklyTrendEntries } from './DashboardDataAssembler';
 import { LogLevel, log } from '../integration/Logger';
 import { t, format } from '../i18n/index';
 
@@ -190,116 +186,21 @@ export class TimerOrchestrator {
         }
     }
 
-    /** 获取面板数据快照 */
+    /**
+     * 获取面板数据快照。
+     * DTO 组装委托给 DashboardDataAssembler（纯函数），本类只负责采集各源快照。
+     */
     async getDashboardData(): Promise<DashboardData> {
         const snap = this.sessionManager.snapshot;
-        const todayMs = this.sessionManager.getTodayMs();
-        const cfg = this.disable.config;
-        const sessions = this.timer.data.sessions;
-
-        // 本周合计（自然周一至今，含进行中会话与折叠层）
-        const weeklySummary: WeeklySummary = TimeAggregator.weeklySummary(
-            sessions,
-            this.timer.data.currentSessionStartMs,
-            this.timer.data.dailyTotals,
-        );
-
-        // 最近 7 天每日统计（柱状图，跟随界面语言）
-        const locale = cfg.locale === 'en' ? 'en' : 'zh-CN';
-        const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs, locale);
-
-        // 活动时间线热力图（近 12 周，含本周；窗口化聚合，复用按日口径）
-        const heatmap = TimeAggregator.heatmapDays(
-            sessions,
-            this.timer.data.currentSessionStartMs,
-            this.timer.data.dailyTotals,
-            12,
-        );
-
-        // 周报多周趋势（近 4 周）+ 今日明细
-        const weeklyTrend = TimeAggregator.weeklyTrend(
-            sessions,
-            4,
-            this.timer.data.currentSessionStartMs,
-            this.timer.data.dailyTotals,
-        ).map((w) => ({
-            weekStart: w.weekStart,
-            weekEnd: w.weekEnd,
-            label: `${w.weekStart.slice(5)} ~ ${w.weekEnd.slice(5)}`,
-            totalMs: w.totalMs,
-            sessionCount: w.sessionCount,
-        }));
-        const todayDetail = this.buildTodayDetail(sessions);
-
-        // 跨工作区累计（从缓存读取，不额外 I/O）
         const globalSnap = await this.global.snapshot();
 
-        const foldedSessionCount = Object.values(this.timer.data.dailyTotals ?? {})
-            .reduce((sum, b) => sum + (b.sessionCount || 0), 0);
-        const currentSessionActive = this.timer.data.currentSessionStartMs > 0 ? 1 : 0;
-        const totalSessionsCount = foldedSessionCount + sessions.length + currentSessionActive;
-
-        return {
-            totalMs: snap.currentTotalMs,
-            todayMs,
-            // 会话数口径统一：折叠层会话数 + 未折叠原始会话数 + 进行中会话（1）
-            sessionsCount: totalSessionsCount,
-            dailyStats,
-            heatmap,
-            weekTotalMs: weeklySummary.totalMs,
-            weeklyTrend,
-            weeklySummary: {
-                totalMs: weeklySummary.totalMs,
-                sessionCount: weeklySummary.sessionCount,
-                avgDailyMs: weeklySummary.avgDailyMs,
-                peakDate: weeklySummary.peakDate,
-                peakDateMs: weeklySummary.peakDateMs,
-                activeDays: weeklySummary.activeDays,
-            },
-            todayDetail,
-            globalTotalMs: globalSnap.totalMs,
-            workspaceCount: globalSnap.workspaceCount,
-            workspaceList: globalSnap.workspaces,
-            isEnabled: cfg.enabled,
-            globalDisabled: cfg.globalDisabled,
-            locale: cfg.locale ?? 'auto',
-            statusBarEnabled: cfg.statusBarEnabled,
-            journalEnabled: cfg.journalEnabled ?? true,
-            backupToFile: cfg.backupToFile ?? true,
-            ringBufferCapacity: cfg.ringBufferCapacity ?? DEFAULT_RING_BUFFER_CAP,
-            journalFlushIntervalMs: cfg.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
-            fullSaveIntervalMs: cfg.fullSaveIntervalMs ?? DEFAULT_FULL_SAVE_MS,
-            maxSessions: cfg.maxSessions ?? DEFAULT_MAX_SESSIONS,
-            weeklyLimitEnabled: cfg.weeklyLimitEnabled ?? false,
-            weeklyLimitHours: cfg.weeklyLimitHours ?? 40,
-        };
-    }
-
-    /** 构建今日会话明细（供面板展示） */
-    private buildTodayDetail(sessions: TimeSession[]): DashboardData['todayDetail'] {
-        const detail = TimeAggregator.dailyDetail(
-            sessions,
-            TimeAggregator.todayStr(),
-            this.timer.data.currentSessionStartMs,
-        );
-        if (detail.sessionCount === 0) return null;
-        return {
-            date: detail.date,
-            totalMs: detail.totalMs,
-            sessionCount: detail.sessionCount,
-            sessions: detail.sessions.map((s) => ({
-                startLabel: s.startLabel,
-                endLabel: s.endLabel,
-                durationMs: s.durationMs,
-            })),
-            hourly: detail.hourly.map((h) => ({
-                hour: h.hour,
-                totalMs: h.totalMs,
-                sessionCount: h.sessionCount,
-            })),
-            peakHour: detail.peakHour,
-            activeWindow: detail.activeWindow,
-        };
+        return buildDashboardData({
+            data: this.timer.data,
+            currentTotalMs: snap.currentTotalMs,
+            todayMs: this.sessionManager.getTodayMs(),
+            config: this.disable.config,
+            global: globalSnap,
+        });
     }
 
     /**
@@ -320,23 +221,17 @@ export class TimerOrchestrator {
             return ReportExporter.buildDailyReport(detail);
         }
 
-        // weekly
+        // weekly（趋势组装复用 DashboardDataAssembler，与面板口径一致）
         const summary = TimeAggregator.weeklySummary(
             sessions,
             this.timer.data.currentSessionStartMs,
         );
-        const trend = TimeAggregator.weeklyTrend(
+        const trend = buildWeeklyTrendEntries(
             sessions,
             4,
             this.timer.data.currentSessionStartMs,
             this.timer.data.dailyTotals,
-        ).map((w) => ({
-            weekStart: w.weekStart,
-            weekEnd: w.weekEnd,
-            label: `${w.weekStart.slice(5)} ~ ${w.weekEnd.slice(5)}`,
-            totalMs: w.totalMs,
-            sessionCount: w.sessionCount,
-        }));
+        );
         const locale = this.disable.config.locale === 'en' ? 'en' : 'zh-CN';
         const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs, locale);
         log(LogLevel.Info, `TimerOrchestrator: exported weekly report (${summary.weekStart})`);
@@ -344,11 +239,12 @@ export class TimerOrchestrator {
     }
 
     /**
-     * 立即手动存盘（调试用）
+     * 立即手动存盘（调试用）。
+     * 返回面向用户的提示文案（经 i18n；{0} 明细段为调试字段保持英文键值对）。
      */
     async saveNow(): Promise<string> {
         if (this._state !== 'running') {
-            return '计时未运行，无需存盘';
+            return t()['debugSave.notRunning'];
         }
         try {
             const flushed = await this.journal.tryFlush();
@@ -358,9 +254,10 @@ export class TimerOrchestrator {
             // 进行中增量由 journal 体系负责，避免全局累计与本地累计漂移。
             const snap = this.sessionManager.snapshot;
             await this.global.sync(snap.totalMs);
-            return `已存盘: totalMs=${snap.totalMs}, globalSynced, journalFlushed=${flushed}`;
+            return format(t()['debugSave.done'],
+                `totalMs=${snap.totalMs}, globalSynced, journalFlushed=${flushed}`);
         } catch (err) {
-            return `存盘失败: ${(err as Error).message}`;
+            return format(t()['debugSave.failed'], (err as Error).message);
         }
     }
 
@@ -386,6 +283,20 @@ export class TimerOrchestrator {
         this.disable.updateConfig(cfg);
         // 间隔/会话上限支持运行期热更新；journalEnabled/capacity 等需重启生效
         this.applyRuntimeConfig(cfg);
+    }
+
+    /**
+     * 运行期配置热应用统一入口（integration 层 ConfigWatcher 经此窄端口注入，
+     * 无需感知门面内部的禁用策略/调度器/会话上限结构）。
+     * 内部依次：更新禁用策略 → 分发可变配置 → 触发禁用状态变更编排。
+     */
+    applyConfig(config: TimingConfig): void {
+        this.disableManager.updateConfig({
+            enabled: config.enabled,
+            globalDisabled: config.globalDisabled,
+        });
+        this.applyRuntimeConfig(config);
+        void this.onDisableStateChanged(this.disableManager.resolveState());
     }
 
     /**
@@ -483,7 +394,7 @@ export class TimerOrchestrator {
         //    相矛盾。此处先保存历史会话，reset 后再恢复，实现"累计归零、历史保留"。
         //    同时保留用户的启用/禁用状态（reset 会把 isEnabled 恢复为默认 true）。
         const prevData = this.timer.data;
-        const historySessions = prevData.sessions;
+        const historySessions = [...prevData.sessions];
         this.timer.reset();
         this.timer.replaceData({
             ...this.timer.data,
@@ -649,7 +560,7 @@ export class TimerOrchestrator {
     async exportAggregatedCSV(workspaceName: string): Promise<string> {
         const data = this.timer.data;
         const series = TimeAggregator.fullDailySeries(
-            data.sessions as TimeSession[],
+            data.sessions,
             data.currentSessionStartMs,
             data.dailyTotals,
         );

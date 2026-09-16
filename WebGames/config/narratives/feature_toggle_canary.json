@@ -1,0 +1,3 @@
+{
+  "circuit_breaker_tripped": "特性 [%s] 崩溃次数超标 (%d)，已触发自动熔断回滚！"
+}

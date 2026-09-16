@@ -1,0 +1,421 @@
+[gd_scene load_steps=2 format=3 uid="uid://cquestcausality07"]
+
+[ext_resource type="Script" path="res://frontend/views/quest_causality/quest_causality_view.gd" id="1_quest"]
+
+[node name="QuestCausalityView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_quest")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderTitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TabContainer" type="TabContainer" parent="MainLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+; =========================================================================
+; Tab 1: 任务列表 (QUEST_LIST)
+; =========================================================================
+[node name="任务列表" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="QuestListSectionLabel" type="Label" parent="MainLayout/TabContainer/任务列表"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/任务列表"]
+layout_mode = 2
+
+[node name="FilterRow" type="HBoxContainer" parent="MainLayout/TabContainer/任务列表"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FilterLabel" type="Label" parent="MainLayout/TabContainer/任务列表/FilterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="QuestStatusFilter" type="OptionButton" parent="MainLayout/TabContainer/任务列表/FilterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+
+[node name="FilterSpacer" type="Control" parent="MainLayout/TabContainer/任务列表/FilterRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LabelQuestCount" type="Label" parent="MainLayout/TabContainer/任务列表/FilterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="QuestSplit" type="HSplitContainer" parent="MainLayout/TabContainer/任务列表"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 180
+
+[node name="QuestCategoryList" type="ItemList" parent="MainLayout/TabContainer/任务列表/QuestSplit"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="QuestItemList" type="ItemList" parent="MainLayout/TabContainer/任务列表/QuestSplit"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+; =========================================================================
+; Tab 2: 任务详情 (QUEST_DETAIL)
+; =========================================================================
+[node name="任务详情" type="ScrollContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+
+[node name="DetailVBox" type="VBoxContainer" parent="MainLayout/TabContainer/任务详情"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="LabelQuestTitle" type="Label" parent="MainLayout/TabContainer/任务详情/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="MetaRow" type="HBoxContainer" parent="MainLayout/TabContainer/任务详情/DetailVBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LabelQuestGiver" type="Label" parent="MainLayout/TabContainer/任务详情/DetailVBox/MetaRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="MetaSpacer" type="Control" parent="MainLayout/TabContainer/任务详情/DetailVBox/MetaRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LabelQuestLevel" type="Label" parent="MainLayout/TabContainer/任务详情/DetailVBox/MetaRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="DescPanel" type="PanelContainer" parent="MainLayout/TabContainer/任务详情/DetailVBox"]
+layout_mode = 2
+
+[node name="LabelQuestDesc" type="Label" parent="MainLayout/TabContainer/任务详情/DetailVBox/DescPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+text = ""
+
+[node name="ObjectivesLabel" type="Label" parent="MainLayout/TabContainer/任务详情/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="ObjectivesVBox" type="VBoxContainer" parent="MainLayout/TabContainer/任务详情/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="RewardsLabel" type="Label" parent="MainLayout/TabContainer/任务详情/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="RewardsVBox" type="VBoxContainer" parent="MainLayout/TabContainer/任务详情/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ActionRow" type="HBoxContainer" parent="MainLayout/TabContainer/任务详情/DetailVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnQuestAccept" type="Button" parent="MainLayout/TabContainer/任务详情/DetailVBox/ActionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnQuestAbandon" type="Button" parent="MainLayout/TabContainer/任务详情/DetailVBox/ActionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnQuestSubmit" type="Button" parent="MainLayout/TabContainer/任务详情/DetailVBox/ActionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+; =========================================================================
+; Tab 3: 因果环DAG (CAUSALITY_DAG)
+; =========================================================================
+[node name="因果环DAG" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+split_offset = 400
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/因果环DAG"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="DagSectionLabel" type="Label" parent="MainLayout/TabContainer/因果环DAG/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/因果环DAG/LeftPanel"]
+layout_mode = 2
+
+[node name="DagVisualPanel" type="PanelContainer" parent="MainLayout/TabContainer/因果环DAG/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DagPlaceholderVBox" type="VBoxContainer" parent="MainLayout/TabContainer/因果环DAG/LeftPanel/DagVisualPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DagPlaceholderLabel" type="Label" parent="MainLayout/TabContainer/因果环DAG/LeftPanel/DagVisualPanel/DagPlaceholderVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ToggleRow" type="HBoxContainer" parent="MainLayout/TabContainer/因果环DAG/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ChkShowCompleted" type="CheckBox" parent="MainLayout/TabContainer/因果环DAG/LeftPanel/ToggleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+button_pressed = true
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/因果环DAG"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="NodeListLabel" type="Label" parent="MainLayout/TabContainer/因果环DAG/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="DagNodeList" type="ItemList" parent="MainLayout/TabContainer/因果环DAG/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="NodeDetailPanel" type="PanelContainer" parent="MainLayout/TabContainer/因果环DAG/RightPanel"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 120)
+
+[node name="NodeDetailVBox" type="VBoxContainer" parent="MainLayout/TabContainer/因果环DAG/RightPanel/NodeDetailPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelDagNodeName" type="Label" parent="MainLayout/TabContainer/因果环DAG/RightPanel/NodeDetailPanel/NodeDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LabelDagNodeStatus" type="Label" parent="MainLayout/TabContainer/因果环DAG/RightPanel/NodeDetailPanel/NodeDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""
+
+[node name="LabelDagChainDesc" type="Label" parent="MainLayout/TabContainer/因果环DAG/RightPanel/NodeDetailPanel/NodeDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+autowrap_mode = 3
+text = ""
+
+; =========================================================================
+; Tab 4: 悬赏通缉 (BOUNTY)
+; =========================================================================
+[node name="悬赏通缉" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BountySectionLabel" type="Label" parent="MainLayout/TabContainer/悬赏通缉"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/悬赏通缉"]
+layout_mode = 2
+
+[node name="BountyTierTab" type="TabContainer" parent="MainLayout/TabContainer/悬赏通缉"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 80)
+current_tab = 0
+
+[node name="Tier 1" type="VBoxContainer" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Tier1Desc" type="Label" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab/Tier 1"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="Tier 2" type="VBoxContainer" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Tier2Desc" type="Label" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab/Tier 2"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="Tier 3" type="VBoxContainer" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Tier3Desc" type="Label" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab/Tier 3"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="Tier 4" type="VBoxContainer" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Tier4Desc" type="Label" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab/Tier 4"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="Tier 5" type="VBoxContainer" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Tier5Desc" type="Label" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab/Tier 5"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="BountyTargetListLabel" type="Label" parent="MainLayout/TabContainer/悬赏通缉"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="BountyTargetList" type="ItemList" parent="MainLayout/TabContainer/悬赏通缉"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BountyDetailPanel" type="PanelContainer" parent="MainLayout/TabContainer/悬赏通缉"]
+layout_mode = 2
+
+[node name="BountyDetailVBox" type="VBoxContainer" parent="MainLayout/TabContainer/悬赏通缉/BountyDetailPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelBountyTarget" type="Label" parent="MainLayout/TabContainer/悬赏通缉/BountyDetailPanel/BountyDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="LabelBountyReward" type="Label" parent="MainLayout/TabContainer/悬赏通缉/BountyDetailPanel/BountyDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="LabelBountyTime" type="Label" parent="MainLayout/TabContainer/悬赏通缉/BountyDetailPanel/BountyDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="BtnBountyAccept" type="Button" parent="MainLayout/TabContainer/悬赏通缉"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""

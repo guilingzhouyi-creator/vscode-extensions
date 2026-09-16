@@ -1,0 +1,82 @@
+{
+  "player": {
+    "name": "阿尔托莉雅",
+    "display_name": "阿尔托莉雅 (玩家同构体)",
+    "title": "Dynamic Title Ranks: [Sword Master / Holy Archmage / Spellblade] (Dual)",
+    "wallet": {
+      "gold": 50,
+      "silver": 20,
+      "copper": 500,
+      "mana_monocrystals": 5
+    }
+  },
+  "dummy_enemy": {
+    "id": "ENEMY_ORC_01",
+    "name": "荒原狂兽人",
+    "hp": 120.0,
+    "armor": 3.0
+  },
+  "player_combat": {
+    "weapon_mass_kg": 3.5,
+    "weapon_velocity": 8.0,
+    "edge_sharpness": 1.5
+  },
+  "magic_demo": {
+    "mana_input": 100.0,
+    "phase_count": 10.0,
+    "primordial_steps": 1,
+    "incantation_steps": 4
+  },
+  "march_demo": {
+    "hours": 6,
+    "node_id": "TOWN_ROCK",
+    "node_name": "铁岩要塞",
+    "terrain": "PLAINS",
+    "speed": 30.0
+  },
+  "age_demo": {
+    "months": 12,
+    "years": 5.0
+  },
+  "book_demo": {
+    "skill_name": "极光湮灭式",
+    "sentence_count": 5,
+    "n1_symbol": "STAB",
+    "n2_symbol": "FLAME",
+    "base_price": 150,
+    "royalty_rate": 0.2,
+    "settle_qty": 25
+  },
+  "demo_ids": {
+    "player_id": "PLAYER_01"
+  },
+  "parry_demo": {
+    "enemy_ap": -2
+  },
+  "demo_verbs": {
+    "slash": "SLASH",
+    "block": "BLOCK",
+    "parry": "PARRY"
+  },
+  "domain_event_routes": {
+    "_comment": "泛化领域事件 channel -> event_categories.json 的分类键（表现层取色）。新增通道只需加一行，无需改视图代码；未登记的通道回落到 payload.category_key，再回落到 system。",
+    "gacha_wish.pull_resolved": "gacha",
+    "world_boss.phase_transition": "eco_swarm"
+  },
+  "formats": {
+    "age": "历法年轮: %.1f 岁 (标准等效: %.1f 岁)",
+    "sf": "%.1f / 100.0",
+    "stats": "力量(STR): %.1f | 体质(CON): %.1f | 智力(INT): %.1f\n敏捷(AGI): %.1f | 精神(SPR): %.1f | 活力(VIT): %.1f",
+    "wallet": "金币: %d | 银币: %d | 铜币: %d | 魔单晶: %d (负重: %.2f kg)"
+  },
+  "ui": {
+    "banner_title": "[color=#38bdf8][b]>>> KALAR WORLD ENGINE 1.0 (卡拉尔世界引擎·无头母机宿主) 已就绪 <<<[/b][/color]\n",
+    "banner_body": "[color=#94a3b8]• 表现层 (Frontend) 与后端无头母机 (Backend) 100%% 物理与逻辑解耦\n• 实时推流结构化文字战报与因果律状态事件\n• 全域 %d 套测试套件数学方程与状态机就绪[/color]\n\n",
+    "test_start": "[color=#38bdf8][b]正在执行卡拉尔世界引擎全域 %d 套单元测试套件...[/b][/color]\n\n",
+    "test_summary": "测试验收通过率: %d / %d (%.1f%%) — 全域 %d 套测试套件 100%% 通过！",
+    "badge_pass": "[color=#34d399][PASS][/color]",
+    "badge_fail": "[color=#f87171][FAIL][/color]",
+    "test_pass_line": "   [color=#34d399]✓[/color] %s\n",
+    "test_fail_line": "   [color=#f87171]✗[/color] %s [FAILED]\n"
+  }
+}

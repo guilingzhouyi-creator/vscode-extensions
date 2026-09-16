@@ -1,0 +1,149 @@
+{
+  "_meta": {
+    "sample_note": "示例数值非默认业务，正式默认值定版后收敛"
+  },
+  "attribute_schools": {
+    "LIGHT_SCHOOL": {
+      "name_key": "magic.school.light",
+      "normative_form": "LIGHT",
+      "members": [
+        "GOLD",
+        "WOOD",
+        "WATER",
+        "FIRE",
+        "EARTH"
+      ]
+    },
+    "DARK_SCHOOL": {
+      "name_key": "magic.school.dark",
+      "normative_form": "DARK",
+      "members": [
+        "WIND",
+        "THUNDER"
+      ]
+    }
+  },
+  "attributes": {
+    "GOLD": {
+      "name_key": "magic.attr.gold",
+      "school": "LIGHT_SCHOOL"
+    },
+    "WOOD": {
+      "name_key": "magic.attr.wood",
+      "school": "LIGHT_SCHOOL"
+    },
+    "WATER": {
+      "name_key": "magic.attr.water",
+      "school": "LIGHT_SCHOOL"
+    },
+    "FIRE": {
+      "name_key": "magic.attr.fire",
+      "school": "LIGHT_SCHOOL"
+    },
+    "EARTH": {
+      "name_key": "magic.attr.earth",
+      "school": "LIGHT_SCHOOL"
+    },
+    "WIND": {
+      "name_key": "magic.attr.wind",
+      "school": "DARK_SCHOOL"
+    },
+    "THUNDER": {
+      "name_key": "magic.attr.thunder",
+      "school": "DARK_SCHOOL"
+    }
+  },
+  "variants": {
+    "HOLY": {
+      "fusion_conditions": {
+        "op": "AND",
+        "terms": [
+          {
+            "args": {
+              "min_count": 1,
+              "school": "LIGHT_SCHOOL"
+            },
+            "kind": "school_attrs_learned",
+            "op": "LEAF"
+          }
+        ]
+      },
+      "fusion_mode": "ANY",
+      "name_key": "magic.variant.holy",
+      "ranked_form_branch": "HOLY",
+      "source_schools": [
+        "LIGHT_SCHOOL"
+      ],
+      "variant_of_form": 2
+    },
+    "ABYSSAL": {
+      "fusion_conditions": {
+        "op": "AND",
+        "terms": [
+          {
+            "args": {
+              "min_count": 1,
+              "school": "DARK_SCHOOL"
+            },
+            "kind": "school_attrs_learned",
+            "op": "LEAF"
+          }
+        ]
+      },
+      "fusion_mode": "ANY",
+      "name_key": "magic.variant.abyssal",
+      "ranked_form_branch": "ABYSSAL",
+      "source_schools": [
+        "DARK_SCHOOL"
+      ],
+      "variant_of_form": 2
+    }
+  },
+  "multi_cast": {
+    "allow_with_delay": true,
+    "cost_per_cast": 0,
+    "default_casts_per_play": 1,
+    "max_casts": 5,
+    "snapshot_per_play": false,
+    "target_mode": "SAME"
+  },
+  "seal": {
+    "allow_repeat_seal": false,
+    "default_duration_seconds": 0,
+    "max_seals_per_holder": 3,
+    "on_holder_lost": "DISCARD",
+    "sealed_magic_unplayable": true
+  },
+  "ascension": {
+    "allow_consecutive": false,
+    "conditions": {
+      "op": "AND",
+      "terms": []
+    },
+    "consume_on_max": false,
+    "max_rank": 11,
+    "max_steps_per_play": 1,
+    "permanent": true,
+    "temp_duration_steps": 3
+  },
+  "delay": {
+    "allow_repeat": false,
+    "attribute_snapshot": "AT_RELEASE",
+    "max_steps": 10,
+    "min_steps": 1,
+    "on_battle_end": "CANCEL",
+    "on_owner_death": "CANCEL",
+    "overflow_policy": "ACCUMULATE",
+    "release_fail_policy": "CANCEL",
+    "target_policy": "FAIL_ON_MISSING"
+  },
+  "combo_semantics": {
+    "ascend_x_delay": "DEFINED",
+    "delay_x_multi": "DEFINED",
+    "fusion_x_rank": "PARTIAL",
+    "multi_x_ascend": "DEFINED",
+    "seal_x_ascend": "DEFINED",
+    "seal_x_delay": "DEFINED",
+    "seal_x_multi": "DEFINED"
+  }
+}

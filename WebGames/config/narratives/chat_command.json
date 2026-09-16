@@ -1,0 +1,10 @@
+{
+  "not_a_command": "Not a command",
+  "unknown_chat_command": "Unknown command: /%s",
+  "permission_denied": "Permission denied for command: /%s",
+  "cdkey_invalid": "Invalid or expired CDKey: %s",
+  "cdkey_redeemed": "CDKey already redeemed by this account.",
+  "cdkey_item_id_missing": "Reward item_id missing for CDKey: %s",
+  "cdkey_item_not_found": "Reward item not registered: %s",
+  "cdkey_inventory_full": "Inventory full, reward not granted: %s"
+}

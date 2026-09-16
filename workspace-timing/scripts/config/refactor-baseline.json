@@ -1,0 +1,399 @@
+{
+  "version": "1.1.0",
+  "granularity": "grouped",
+  "timestamp": "2026-09-05T08:34:47.427Z",
+  "groups": [
+    {
+      "key": "governance|GOV-FIL-001|src/application/DashboardDataAssembler.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/application/DashboardDataAssembler.ts",
+      "count": 5
+    },
+    {
+      "key": "complexity|high-complexity|src/application/DashboardDataAssembler.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/DisableManager.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/GlobalAggregator.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/application/GlobalAggregator.ts",
+      "count": 3
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/application/GlobalAggregator.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/GlobalAggregator.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/RecoveryService.ts",
+      "count": 1
+    },
+    {
+      "key": "complexity|high-complexity|src/application/RecoveryService.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/application/RecoveryService.ts",
+      "count": 3
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/application/RecoveryService.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/RecoveryService.ts",
+      "count": 4
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/Scheduler.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/application/Scheduler.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/application/Scheduler.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-EXC-001|src/application/Scheduler.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/Scheduler.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/SessionManager.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/application/SessionManager.ts",
+      "count": 4
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/SessionManager.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/TimerOrchestrator.ts",
+      "count": 1
+    },
+    {
+      "key": "large-file|large-file|src/application/TimerOrchestrator.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|duplicate-literal|src/application/TimerOrchestrator.ts",
+      "count": 2
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/TimerOrchestrator.ts",
+      "count": 11
+    },
+    {
+      "key": "constants|magic-number|src/application/TimerOrchestrator.ts",
+      "count": 1
+    },
+    {
+      "key": "complexity|high-complexity|src/application/TimerOrchestrator.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/exporters/AggregatedCsvExporter.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/exporters/AggregatedCsvExporter.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/exporters/CsvExporter.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/exporters/CsvExporter.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/exporters/IDataExporter.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/application/exporters/ReportExporter.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/exporters/ReportExporter.ts",
+      "count": 10
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/cache/ICacheStrategy.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/cache/IJournalStore.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/cache/JournalWriter.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/cache/JournalWriter.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/cache/JournalWriter.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/cache/JournalWriter.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/cache/RingBuffer.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/cache/RingBuffer.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/domain/HistoryFolder.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/domain/HistoryFolder.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/domain/HistoryFolder.ts",
+      "count": 2
+    },
+    {
+      "key": "complexity|high-complexity|src/domain/HistoryFolder.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/domain/TimeAggregator.ts",
+      "count": 1
+    },
+    {
+      "key": "large-file|large-file|src/domain/TimeAggregator.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|duplicate-literal|src/domain/TimeAggregator.ts",
+      "count": 6
+    },
+    {
+      "key": "constants|magic-number|src/domain/TimeAggregator.ts",
+      "count": 8
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/domain/TimeAggregator.ts",
+      "count": 4
+    },
+    {
+      "key": "complexity|high-complexity|src/domain/TimeAggregator.ts",
+      "count": 3
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/domain/TimerEngine.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/domain/models.ts",
+      "count": 9
+    },
+    {
+      "key": "constants|hardcoded-string|src/extension.ts",
+      "count": 6
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/integration/ConfigWatcher.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|duplicate-literal|src/integration/ConfigWatcher.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/integration/ConfigWatcher.ts",
+      "count": 15
+    },
+    {
+      "key": "complexity|high-complexity|src/integration/ConfigWatcher.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/integration/Logger.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/integration/Logger.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/integration/Logger.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-DBG-001|src/integration/Logger.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/persistence/DataValidator.ts",
+      "count": 1
+    },
+    {
+      "key": "complexity|high-complexity|src/persistence/DataValidator.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/persistence/DataValidator.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|duplicate-literal|src/persistence/DataValidator.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/DataValidator.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/persistence/FileStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/persistence/FileStorageProvider.ts",
+      "count": 3
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/FileStorageProvider.ts",
+      "count": 4
+    },
+    {
+      "key": "governance|GOV-EXC-001|src/persistence/FileStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/persistence/GlobalStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/GlobalStorageProvider.ts",
+      "count": 3
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/persistence/IStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/persistence/JournalStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/JournalStorageProvider.ts",
+      "count": 3
+    },
+    {
+      "key": "governance|GOV-EXC-001|src/persistence/JournalStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "complexity|high-complexity|src/persistence/JournalStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/persistence/JournalStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-PRF-001|src/persistence/JournalStorageProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/persistence/StorageCoordinator.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/persistence/StorageCoordinator.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/StorageCoordinator.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-EXC-001|src/persistence/StorageCoordinator.ts",
+      "count": 3
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/persistence/WorkspaceStateProvider.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/WorkspaceStateProvider.ts",
+      "count": 4
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/presentation/CommandRegistrar.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/presentation/CommandRegistrar.ts",
+      "count": 16
+    },
+    {
+      "key": "complexity|high-complexity|src/presentation/CommandRegistrar.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/presentation/DashboardPanel.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/presentation/DashboardPanel.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/presentation/DashboardPanel.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/presentation/StatusBarController.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/presentation/StatusBarController.ts",
+      "count": 5
+    },
+    {
+      "key": "constants|duplicate-literal|src/presentation/StatusBarController.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/presentation/StatusBarController.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/presentation/dashboardMessages.ts",
+      "count": 6
+    }
+  ]
+}

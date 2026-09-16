@@ -1,6 +1,6 @@
 {
   "name": "auto-refactor",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "description": "Configurable, extensible automated code-refactoring analyzer: constant extraction, large-file splitting, and cyclomatic complexity — with CI-ready structured output (JSON / SARIF / text). Declarative, pluggable, project-agnostic.",
   "bin": {
     "auto-refactor": "dist/index.js"
@@ -17,8 +17,40 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\" \"scripts/*.js\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"scripts/*.js\" --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"scripts/*.js\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"scripts/*.js\"",
+    "gate:comments": "node scripts/gate-comments.js",
+    "gate:comments:update": "node scripts/gate-comments.js --update",
+    "gate:self": "node scripts/gate-self.js",
+    "gate:self:update": "node scripts/gate-self.js --update",
+    "gate": "npm run build && npm run format:check && npm run lint && npm run gate:comments && npm run gate:self && npm test",
     "pretest": "npm run build",
-    "test": "npm run validate && npm run validate-warm && npm run validate-oxc && npm run validate-diff && npm run validate-praxis && npm run test-codec",
+    "test": "npm run validate && npm run validate-warm && npm run validate-oxc && npm run validate-diff && npm run validate-praxis && npm run validate-governance && npm run validate-generalized && npm run validate-review-memory && npm run validate-asymmetric && npm run validate-security && npm run validate-capabilities && npm run validate-language-support && npm run validate-language-matrix && npm run validate-python && npm run validate-comment-hygiene && npm run validate-simplify && npm run validate-python-modern && npm run validate-ts-modern && npm run validate-modern-packs && npm run validate-python-imports && npm run validate-postscan-parity && npm run validate-literal-policy && npm run validate-diff-interface && npm run validate-rules-registry && npm run validate-symbol-index && npm run validate-rule-aliases && npm run validate-docs && npm run validate-project-neutrality && npm run validate-consumer-runner && npm run test-codec && npm run validate-compression && npm run validate-data-flow && npm run validate-self-norms && npm run validate-marker-scope",
+    "validate-data-flow": "node scripts/validate-data-flow.js",
+    "validate-self-norms": "node scripts/validate-self-norms.js",
+    "validate-marker-scope": "node scripts/validate-marker-scope.js",
+    "validate-compression": "node scripts/validate-compression-bounds.js",
+    "validate-language-support": "node scripts/validate-language-support.js",
+    "validate-python": "node scripts/validate-python.js",
+    "validate-comment-hygiene": "node scripts/validate-comment-hygiene.js",
+    "validate-simplify": "node scripts/validate-simplify.js",
+    "validate-python-modern": "node scripts/validate-python-modern.js",
+    "validate-python-imports": "node scripts/validate-python-imports.js",
+    "validate-postscan-parity": "node scripts/validate-postscan-parity.js",
+    "validate-diff-interface": "node scripts/validate-diff-interface.js",
+    "validate-rules-registry": "node scripts/validate-rules-registry.js",
+    "validate-docs": "node scripts/validate-docs.js",
+    "validate-project-neutrality": "node scripts/validate-project-neutrality.js",
+    "validate-consumer-runner": "node scripts/validate-consumer-runner.js",
+    "validate-capabilities": "node scripts/validate-capabilities.js",
+    "validate-security": "node scripts/validate-security-levels.js",
+    "validate-asymmetric": "node scripts/validate-asymmetric-routing.js",
+    "bench-asymmetric": "node scripts/bench-asymmetric.js",
+    "validate-review-memory": "node scripts/validate-review-memory.js",
+    "validate-generalized": "node scripts/validate-generalized.js",
+    "validate-governance": "node scripts/validate-governance.js",
     "validate-praxis": "node scripts/validate-praxis-foundation.js",
     "start": "node dist/index.js",
     "demo": "node dist/index.js scan --root samples --format text",
@@ -27,6 +59,9 @@
     "validate-oxc": "node scripts/validate-oxc-keypoints.js",
     "validate-diff": "node scripts/validate-diff.js",
     "benchmark": "node scripts/benchmark.js",
+    "hotpath-bench": "node scripts/bench-hot-paths.js",
+    "hotpath-ablate": "node scripts/bench-hot-paths.js --ablate",
+    "hotpath-baseline:update": "node scripts/bench-hot-paths.js --update",
     "bench-baselines": "node scripts/bench-baselines.js",
     "bench-warm": "node scripts/bench-warm.js",
     "bench-diff": "node scripts/bench-diff.js",
@@ -34,7 +69,14 @@
     "bench-oxc-modea": "node scripts/bench-oxc-modea.js",
     "fastpath-check": "node scripts/bench-fastpath.js --check",
     "fastpath-bench": "node scripts/bench-fastpath.js",
-    "test-codec": "node scripts/test-result-codec.js"
+    "test-codec": "node scripts/test-result-codec.js",
+    "validate-literal-policy": "node scripts/validate-literal-policy.js",
+    "validate-ts-modern": "node scripts/validate-ts-modern.js",
+    "validate-modern-packs": "node scripts/validate-modern-packs.js",
+    "validate-language-matrix": "node scripts/validate-language-matrix.js",
+    "validate-rule-aliases": "node scripts/validate-rule-aliases.js",
+    "validate-error-flow": "node scripts/validate-error-flow.js",
+    "validate-symbol-index": "node scripts/validate-symbol-index.js && node scripts/validate-literal-index.js && node scripts/validate-call-graph.js && node scripts/validate-error-flow.js"
   },
   "keywords": [
     "refactoring",
@@ -49,10 +91,17 @@
   "dependencies": {
     "oxc-parser": "0.144.0",
     "tree-sitter": "^0.22.4",
+    "tree-sitter-python": "^0.23.6",
     "tree-sitter-rust": "^0.24.0"
   },
   "devDependencies": {
+    "@types/node": "^20.11.0",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^62.9.0",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
     "typescript": "^5.3.3",
-    "@types/node": "^20.11.0"
+    "typescript-eslint": "^8.70.0"
   }
 }

@@ -1,0 +1,39 @@
+{
+    "schema": "wt-refactor-adapter/v1",
+    "name": "auto-refactor 接入适配配置（工具配置，与审查规则配置分离）",
+    "version": 1,
+    "tool": {
+        "name": "auto-refactor",
+        "minVersion": "0.1.0",
+        "failOnVersionMismatch": false,
+        "resolve": {
+            "comment": "外部工具路径参数化：环境变量优先，其次项目相对候选路径（禁止绝对盘符路径入库）。路径全部相对项目根解析。",
+            "envOverride": "WT_REFACTOR_CLI",
+            "candidates": ["../auto-refactor/dist/index.js"]
+        }
+    },
+    "scan": {
+        "root": ".",
+        "toolConfig": "scripts/config/auto-refactor.config.json",
+        "cacheDir": "reports/.refactor-cache",
+        "timeoutMs": 600000,
+        "extraArgs": ["--no-daemon", "--log-level", "error"]
+    },
+    "gate": {
+        "blockOnSeverity": "error",
+        "whenUnavailable": "skip",
+        "whenTimeout": "skip",
+        "comment": "外部能力故障不得摧毁本项目基础设施：工具缺失/超时降级为 NOT_AVAILABLE/TIMEOUT 并留痕；但『引擎有输出而解析失败』fail-closed 阻断（损坏输出比无输出更危险，此语义继承自 WebGames 审查实践）"
+    },
+    "ratchet": {
+        "baseline": "scripts/config/refactor-baseline.json",
+        "granularity": "grouped",
+        "blockOnNewSeverity": "warning",
+        "comment": "棘轮经引擎原生能力透传（--baseline/--update-baseline --baseline-granularity grouped，0.2.0+）：按（分析器|规则|文件）分组比对，仅【新增】发现阻断，存量警告保持提示级——『存量只许消化不许增长』。--update-baseline 由引擎写入基线，禁止用于消音"
+    },
+    "mapping": {
+        "ruleNamespace": "ARF",
+        "source": "auto-refactor",
+        "comment": "豁免清单已迁移至 auto-refactor.config.json 的 suppressions（引擎 0.2.0 原生能力，带理由/可降级/留痕），适配器只消费引擎标注"
+    }
+}

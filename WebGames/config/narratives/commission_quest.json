@@ -1,0 +1,6 @@
+{
+  "already_accepted": "该委托已被接取或已失效",
+  "tier_insufficient": "冒险者阶位资质不足，无法接取高阶委托",
+  "deposit_insufficient": "保证金不足，需押付 %d 金币",
+  "invalid_settle_state": "委托当前状态无法执行结算"
+}

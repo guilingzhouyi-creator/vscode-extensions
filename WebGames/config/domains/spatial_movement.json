@@ -1,0 +1,63 @@
+{
+  "movement": {
+    "base_move_speed_mps": 4.5,
+    "agi_reference_stat": 10.0,
+    "agi_factor_per_point": 0.005,
+    "agi_factor_min": 0.5,
+    "load_penalty_base": 1.0,
+    "load_threshold_kg": 30.0,
+    "load_excess_divisor": 100.0,
+    "load_penalty_min": 0.2,
+    "impedance_floor": 0.1,
+    "facing_threshold_sq": 0.0001,
+    "direction_aliases": {
+      "north": [
+        "NORTH",
+        "N",
+        "北"
+      ],
+      "south": [
+        "SOUTH",
+        "S",
+        "南"
+      ],
+      "east": [
+        "EAST",
+        "E",
+        "东"
+      ],
+      "west": [
+        "WEST",
+        "W",
+        "西"
+      ],
+      "northeast": [
+        "NORTHEAST",
+        "NE",
+        "东北"
+      ],
+      "northwest": [
+        "NORTHWEST",
+        "NW",
+        "西北"
+      ],
+      "southeast": [
+        "SOUTHEAST",
+        "SE",
+        "东南"
+      ],
+      "southwest": [
+        "SOUTHWEST",
+        "SW",
+        "西南"
+      ]
+    }
+  },
+  "trigger": {
+    "default_radius": 5.0
+  },
+  "location_defaults": {
+    "continent_id": "CONTINENT_CENTRAL",
+    "interior_subgraph_id": "MAIN_STREET"
+  }
+}

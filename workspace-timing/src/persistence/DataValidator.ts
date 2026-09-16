@@ -53,6 +53,10 @@ export function validateTimingData(raw: unknown): ValidationResult {
         sessions.push({ startMs, endMs, durationMs });
     }
 
+    // 排序不变量固化：按起始时间升序。内部路径天然有序，外部文件不保证——
+    // weeklySummary 的逆序 break 提前退出与折叠 FIFO 溢出语义均依赖有序输入。
+    sessions.sort((a, b) => a.startMs - b.startMs);
+
     // 日桶校验：非对象忽略；单桶非法值跳过该桶
     let dailyTotals: DailyTotalsMap | undefined;
     if (typeof o.dailyTotals === 'object' && o.dailyTotals !== null && !Array.isArray(o.dailyTotals)) {

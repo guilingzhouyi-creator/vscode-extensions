@@ -1,0 +1,453 @@
+[gd_scene load_steps=2 format=3 uid="uid://ccombatview04"]
+
+[ext_resource type="Script" path="res://frontend/views/combat_view/combat_view.gd" id="1_combat"]
+
+[node name="CombatView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_combat")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.06, 0.1, 1)
+
+; ==============================================================================
+; 子界面 1: 战斗主界面 — 顶部 BOSS 血条
+; ==============================================================================
+
+[node name="BossBarPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 11
+anchor_right = 1.0
+offset_left = 280.0
+offset_top = 12.0
+offset_right = -280.0
+offset_bottom = 72.0
+grow_horizontal = 2
+
+[node name="VBox" type="VBoxContainer" parent="BossBarPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BossNameLabel" type="Label" parent="BossBarPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+text = ""
+horizontal_alignment = 1
+
+[node name="BossHPBar" type="ProgressBar" parent="BossBarPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = true
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+value = 100.0
+
+; ==============================================================================
+; 子界面 1: 战斗主界面 — 左侧战报滚动区
+; ==============================================================================
+
+[node name="BattleLogPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 100.0
+offset_right = 316.0
+offset_bottom = 380.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="BattleLogPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BattleLogTitle" type="Label" parent="BattleLogPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.52, 0.99, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+[node name="BattleLogRich" type="RichTextLabel" parent="BattleLogPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(270, 240)
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true
+
+; ==============================================================================
+; 子界面 1: 战斗主界面 — 中央战斗场景占位
+; ==============================================================================
+
+[node name="BattleScenePlaceholder" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 340.0
+offset_top = 100.0
+offset_right = 320.0
+offset_bottom = 220.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SceneBg" type="ColorRect" parent="BattleScenePlaceholder"]
+layout_mode = 2
+color = Color(0.06, 0.1, 0.16, 1)
+
+[node name="BattleSceneLabel" type="Label" parent="BattleScenePlaceholder"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 0.6)
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+
+; ==============================================================================
+; 子界面 3: BOSS 多部位血条面板 — 右上角
+; ==============================================================================
+
+[node name="BossPartsPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -300.0
+offset_top = 100.0
+offset_right = -16.0
+offset_bottom = 320.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="BossPartsPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BossPartsNameLabel" type="Label" parent="BossPartsPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+horizontal_alignment = 1
+
+[node name="BossPartsTotalBar" type="ProgressBar" parent="BossPartsPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+value = 100.0
+
+[node name="PartsDivider" type="HSeparator" parent="BossPartsPanel/VBox"]
+layout_mode = 2
+
+[node name="PartsTitleLabel" type="Label" parent="BossPartsPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="BossPartsList" type="VBoxContainer" parent="BossPartsPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+; ==============================================================================
+; 子界面 1: 战斗主界面 — 底部玩家状态栏 + 技能栏
+; ==============================================================================
+
+[node name="BottomPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = -160.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 2
+
+[node name="VBox" type="VBoxContainer" parent="BottomPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PlayerStatusHBox" type="HBoxContainer" parent="BottomPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PlayerNameLabel" type="Label" parent="BottomPanel/VBox/PlayerStatusHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.98, 0.8, 0.2, 1)
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="StatsVBox" type="VBoxContainer" parent="BottomPanel/VBox/PlayerStatusHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 3
+
+[node name="PlayerHPBar" type="ProgressBar" parent="BottomPanel/VBox/PlayerStatusHBox/StatsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+value = 100.0
+
+[node name="PlayerMPBar" type="ProgressBar" parent="BottomPanel/VBox/PlayerStatusHBox/StatsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+value = 50.0
+
+[node name="PlayerAPBar" type="ProgressBar" parent="BottomPanel/VBox/PlayerStatusHBox/StatsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+value = 10.0
+
+[node name="SkillBarCenter" type="HBoxContainer" parent="BottomPanel/VBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="SkillBar" type="HBoxContainer" parent="BottomPanel/VBox/SkillBarCenter"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Skill1Btn" type="Button" parent="BottomPanel/VBox/SkillBarCenter/SkillBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "1"
+custom_minimum_size = Vector2(64, 64)
+
+[node name="Skill2Btn" type="Button" parent="BottomPanel/VBox/SkillBarCenter/SkillBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "2"
+custom_minimum_size = Vector2(64, 64)
+
+[node name="Skill3Btn" type="Button" parent="BottomPanel/VBox/SkillBarCenter/SkillBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "3"
+custom_minimum_size = Vector2(64, 64)
+
+[node name="Skill4Btn" type="Button" parent="BottomPanel/VBox/SkillBarCenter/SkillBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "4"
+custom_minimum_size = Vector2(64, 64)
+
+[node name="Skill5Btn" type="Button" parent="BottomPanel/VBox/SkillBarCenter/SkillBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "5"
+custom_minimum_size = Vector2(64, 64)
+
+[node name="Skill6Btn" type="Button" parent="BottomPanel/VBox/SkillBarCenter/SkillBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "6"
+custom_minimum_size = Vector2(64, 64)
+
+; ==============================================================================
+; 子界面 2: 伤害飘字层（代码动态创建 Label）
+; ==============================================================================
+
+[node name="FloatingTextLayer" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+; ==============================================================================
+; 子界面 4: 战斗结算面板（默认隐藏，居中叠加）
+; ==============================================================================
+
+[node name="SettlementPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -220.0
+offset_right = 180.0
+offset_bottom = 220.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="SettlementPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SettlementResultLabel" type="Label" parent="SettlementPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+horizontal_alignment = 1
+
+[node name="SettleDivider1" type="HSeparator" parent="SettlementPanel/VBox"]
+layout_mode = 2
+
+[node name="RewardsTitle" type="Label" parent="SettlementPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = ""
+horizontal_alignment = 1
+
+[node name="SettlementGoldLabel" type="Label" parent="SettlementPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="SettlementExpLabel" type="Label" parent="SettlementPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+text = ""
+
+[node name="SettlementItemsLabel" type="Label" parent="SettlementPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="SettleDivider2" type="HSeparator" parent="SettlementPanel/VBox"]
+layout_mode = 2
+
+[node name="SettlementMvpLabel" type="Label" parent="SettlementPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.52, 0.99, 1)
+text = "MVP: -"
+
+[node name="SettlementTimeLabel" type="Label" parent="SettlementPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="SettlementBackBtn" type="Button" parent="SettlementPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; ==============================================================================
+; 子界面 5: 部位破坏详情面板（默认隐藏，居中叠加）
+; ==============================================================================
+
+[node name="PartBreakPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -140.0
+offset_right = 160.0
+offset_bottom = 140.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="PartBreakPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PartBreakNameLabel" type="Label" parent="PartBreakPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+horizontal_alignment = 1
+
+[node name="PartBreakStatusLabel" type="Label" parent="PartBreakPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+text = ""
+horizontal_alignment = 1
+
+[node name="PartBreakDivider" type="HSeparator" parent="PartBreakPanel/VBox"]
+layout_mode = 2
+
+[node name="PartBreakEffectLabel" type="Label" parent="PartBreakPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 12
+text = ""
+
+[node name="PartBreakWeaknessLabel" type="Label" parent="PartBreakPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+text = ""
+
+[node name="PartBreakCloseBtn" type="Button" parent="PartBreakPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; ==============================================================================
+; 右下角返回按钮
+; ==============================================================================
+
+[node name="BackBtn" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -100.0
+offset_top = -176.0
+offset_right = -16.0
+offset_bottom = -168.0
+grow_horizontal = 0
+grow_vertical = 0
+text = ""

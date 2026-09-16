@@ -1,0 +1,6 @@
+{
+  "birth_narrative": "【天道轮回·降世新生】冒险者 [%s] 降生于【%s】，身具【%s】血脉！",
+  "karma_exceed": "Karma cost %d exceeds allowance %d",
+  "point_buy_out_of_range": "Attribute %s out of range [%d, %d]: %d",
+  "point_buy_exceed": "Total points spent %d exceeds limit %d"
+}

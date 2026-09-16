@@ -1,0 +1,35 @@
+name: CI
+
+# 说明：本文件置于项目目录内。若 WebGames 目录本身即为 Git 仓库根，
+# GitHub 会自动识别；若其位于上层仓库的子目录中，请将本目录移动至仓库根。
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: 全域单元测试（Godot headless）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Godot 4
+        run: |
+          GODOT_VERSION="${GODOT_VERSION:-4.2.2}"
+          curl -sSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      - name: 导入工程（生成 .godot 缓存）
+        working-directory: ./WebGames
+        run: godot --headless --import || true
+
+      - name: 运行全域单元测试
+        working-directory: ./WebGames
+        run: godot --headless -s res://tests/test_runner.gd

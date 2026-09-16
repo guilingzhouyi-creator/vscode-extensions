@@ -1,0 +1,243 @@
+{
+  "engine": "KalarWorldEngine",
+  "tool": "report_sweep.py (median of 2 runs)",
+  "source_runs": [
+    ".bench_sweep_run_20260830-212239_1.json",
+    ".bench_sweep_run_20260830-212239_2.json"
+  ],
+  "godot_version": "4.7.2-stable (official)",
+  "timestamp": "2026-08-30T21:23:10",
+  "categories": [
+    {
+      "category": "基础设施 (Infrastructure)",
+      "metrics": [
+        {
+          "name": "GameConfig.get_int 热路径读取",
+          "iterations": 200000,
+          "elapsed_us": 268798.5,
+          "ops_per_sec": 745830.939005772,
+          "runs": [
+            709403.498068649,
+            782258.379942895
+          ]
+        },
+        {
+          "name": "GameConfig.get_float 热路径读取",
+          "iterations": 200000,
+          "elapsed_us": 290509.5,
+          "ops_per_sec": 688508.897954464,
+          "runs": [
+            681909.619699005,
+            695108.176209923
+          ]
+        },
+        {
+          "name": "GameConfig.get_string 热路径读取",
+          "iterations": 100000,
+          "elapsed_us": 116032.0,
+          "ops_per_sec": 862668.5651091919,
+          "runs": [
+            889545.17555174,
+            835791.954666644
+          ]
+        },
+        {
+          "name": "GameConfig.get_dict 整表读取",
+          "iterations": 50000,
+          "elapsed_us": 44262.0,
+          "ops_per_sec": 1132254.28969152,
+          "runs": [
+            1186690.08401766,
+            1077818.49536538
+          ]
+        },
+        {
+          "name": "GameConfig 全量加载+热重载",
+          "iterations": 20,
+          "elapsed_us": 38600.0,
+          "ops_per_sec": 518.1851997917975,
+          "runs": [
+            513.070470229086,
+            523.299929354509
+          ]
+        },
+        {
+          "name": "EventBus.emit_narrative_by_key 叙事广播",
+          "iterations": 50000,
+          "elapsed_us": 464777.0,
+          "ops_per_sec": 107629.92510554599,
+          "runs": [
+            109983.172574596,
+            105276.677636496
+          ]
+        },
+        {
+          "name": "EventBus.render_narrative 模板渲染",
+          "iterations": 100000,
+          "elapsed_us": 297759.0,
+          "ops_per_sec": 336094.053534635,
+          "runs": [
+            326891.393603389,
+            345296.713465881
+          ]
+        },
+        {
+          "name": "EventBus.emit_log 日志广播",
+          "iterations": 50000,
+          "elapsed_us": 111051.5,
+          "ops_per_sec": 450292.0080183915,
+          "runs": [
+            455058.429502348,
+            445525.586534435
+          ]
+        },
+        {
+          "name": "WorldClock.tick_combat 战斗滴答",
+          "iterations": 100000,
+          "elapsed_us": 457342.0,
+          "ops_per_sec": 218660.6353879015,
+          "runs": [
+            219795.19483745,
+            217526.075938353
+          ]
+        },
+        {
+          "name": "WorldClock.advance_travel_hours 行军推进",
+          "iterations": 20000,
+          "elapsed_us": 163887.5,
+          "ops_per_sec": 122313.5922242985,
+          "runs": [
+            116475.452798323,
+            128151.731650274
+          ]
+        }
+      ]
+    },
+    {
+      "category": "持久化 (Persistence)",
+      "metrics": [
+        {
+          "name": "JSON.stringify 存档信封序列化",
+          "iterations": 20000,
+          "elapsed_us": 2063381.0,
+          "ops_per_sec": 9708.05657194824,
+          "runs": [
+            10092.5384853724,
+            9323.57465852408
+          ]
+        },
+        {
+          "name": "JSON.parse 存档信封反序列化",
+          "iterations": 20000,
+          "elapsed_us": 2416904.0,
+          "ops_per_sec": 8276.58528308615,
+          "runs": [
+            8389.33212526951,
+            8163.83844090279
+          ]
+        },
+        {
+          "name": "SaveManager.compute_sha256 完整性签名",
+          "iterations": 20000,
+          "elapsed_us": 342740.0,
+          "ops_per_sec": 59172.290627970055,
+          "runs": [
+            66133.8482955654,
+            52210.7329603747
+          ]
+        },
+        {
+          "name": "SaveManager save+load 往返",
+          "iterations": 30,
+          "elapsed_us": 347029.0,
+          "ops_per_sec": 88.06161112442265,
+          "runs": [
+            99.9816700271617,
+            76.1415522216836
+          ]
+        }
+      ]
+    },
+    {
+      "category": "领域求解器 (Domain Solvers)",
+      "metrics": [
+        {
+          "name": "Currency.wallet.get_total_copper_value 换算",
+          "iterations": 200000,
+          "elapsed_us": 1775503.0,
+          "ops_per_sec": 112717.769237409,
+          "runs": [
+            109836.82092699,
+            115598.717547828
+          ]
+        },
+        {
+          "name": "Currency.wallet 物理质量计算",
+          "iterations": 100000,
+          "elapsed_us": 1042006.5,
+          "ops_per_sec": 95990.295630813,
+          "runs": [
+            97430.3713850897,
+            94550.2198765363
+          ]
+        },
+        {
+          "name": "Currency.mana 魔单晶换金",
+          "iterations": 100000,
+          "elapsed_us": 368459.0,
+          "ops_per_sec": 271433.297934057,
+          "runs": [
+            274411.661397963,
+            268454.934470151
+          ]
+        },
+        {
+          "name": "Currency.arbitrage 跨大陆套利",
+          "iterations": 50000,
+          "elapsed_us": 41243.0,
+          "ops_per_sec": 1212933.11557768,
+          "runs": [
+            1185817.62124985,
+            1240048.60990551
+          ]
+        },
+        {
+          "name": "Currency.sink 刚性回收水池",
+          "iterations": 50000,
+          "elapsed_us": 1090246.5,
+          "ops_per_sec": 45864.1488918901,
+          "runs": [
+            45495.6569845843,
+            46232.6407991959
+          ]
+        },
+        {
+          "name": "Authority.audit_input_continuity 时序审计",
+          "iterations": 100000,
+          "elapsed_us": 465958.0,
+          "ops_per_sec": 214678.7851066605,
+          "runs": [
+            210881.484605652,
+            218476.085607669
+          ]
+        },
+        {
+          "name": "Authority.transition_mode 模式流转",
+          "iterations": 100000,
+          "elapsed_us": 1273343.0,
+          "ops_per_sec": 78578.7255017556,
+          "runs": [
+            76692.2333008414,
+            80465.2177026698
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_metrics": 21,
+    "runs": 2
+  },
+  "promoted_from": "bench_latest.json",
+  "promoted_at": "2026-08-30T21:25:37"
+}

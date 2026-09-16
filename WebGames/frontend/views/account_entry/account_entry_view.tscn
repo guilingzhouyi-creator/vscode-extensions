@@ -1,0 +1,630 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8accountentry01"]
+
+[ext_resource type="Script" path="res://frontend/views/account_entry/account_entry_view.gd" id="1_acc_entry"]
+
+[node name="AccountEntryView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_acc_entry")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+; ==============================================================================
+; SPLASH 启动加载页
+; ==============================================================================
+
+[node name="SplashPanel" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="SplashPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="SplashPanel/CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(480, 320)
+
+[node name="VBox" type="VBoxContainer" parent="SplashPanel/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/separation = 16
+offset_left = 32.0
+offset_top = 32.0
+offset_right = -32.0
+offset_bottom = -32.0
+
+[node name="SplashLogoLabel" type="Label" parent="SplashPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+text = ""
+
+[node name="SpacerTop" type="Control" parent="SplashPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 20)
+
+[node name="SplashProgress" type="ProgressBar" parent="SplashPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+value = 65.0
+
+[node name="SplashStatusLabel" type="Label" parent="SplashPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+horizontal_alignment = 1
+text = ""
+
+[node name="SpacerMid" type="Control" parent="SplashPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 30)
+
+[node name="SplashVersionLabel" type="Label" parent="SplashPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+horizontal_alignment = 1
+text = ""
+
+[node name="SplashEnterBtn" type="Button" parent="SplashPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = ""
+
+; ==============================================================================
+; LOGIN 登录页
+; ==============================================================================
+
+[node name="LoginPanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="LoginPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="LoginPanel/CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(420, 420)
+
+[node name="VBox" type="VBoxContainer" parent="LoginPanel/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+offset_left = 28.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = -28.0
+
+[node name="LoginTitleLabel" type="Label" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+text = ""
+
+[node name="Spacer1" type="Control" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 10)
+
+[node name="LoginUsernameEdit" type="LineEdit" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = ""
+
+[node name="LoginPasswordEdit" type="LineEdit" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = ""
+secret = true
+
+[node name="LoginRememberCheck" type="CheckBox" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LoginErrorLabel" type="Label" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+horizontal_alignment = 1
+text = ""
+
+[node name="LoginSubmitBtn" type="Button" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = ""
+
+[node name="Spacer2" type="Control" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 20)
+
+[node name="LinkBar" type="HBoxContainer" parent="LoginPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="LoginGotoRegisterBtn" type="Button" parent="LoginPanel/CenterContainer/PanelContainer/VBox/LinkBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+flat = true
+
+[node name="LoginForgotBtn" type="Button" parent="LoginPanel/CenterContainer/PanelContainer/VBox/LinkBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+flat = true
+
+; ==============================================================================
+; REGISTER 注册页
+; ==============================================================================
+
+[node name="RegisterPanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="RegisterPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="RegisterPanel/CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(420, 520)
+
+[node name="VBox" type="VBoxContainer" parent="RegisterPanel/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+offset_left = 28.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = -28.0
+
+[node name="RegisterTitleLabel" type="Label" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+text = ""
+
+[node name="Spacer1" type="Control" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 8)
+
+[node name="RegisterUsernameEdit" type="LineEdit" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = ""
+
+[node name="RegisterPasswordEdit" type="LineEdit" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = ""
+secret = true
+
+[node name="RegisterConfirmEdit" type="LineEdit" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = ""
+secret = true
+
+[node name="ModeLabel" type="Label" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RegisterModeOption" type="OptionButton" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="RegisterAgreeCheck" type="CheckBox" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="RegisterErrorLabel" type="Label" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+horizontal_alignment = 1
+text = ""
+
+[node name="RegisterSubmitBtn" type="Button" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = ""
+
+[node name="Spacer2" type="Control" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 10)
+
+[node name="RegisterBackBtn" type="Button" parent="RegisterPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+flat = true
+
+; ==============================================================================
+; SERVER_SELECT 服务器选择页
+; ==============================================================================
+
+[node name="ServerSelectPanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="ServerSelectPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="ServerSelectPanel/CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(500, 400)
+
+[node name="VBox" type="VBoxContainer" parent="ServerSelectPanel/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+offset_left = 28.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = -28.0
+
+[node name="ServerTitleLabel" type="Label" parent="ServerSelectPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+text = ""
+
+[node name="ServerListItem" type="ItemList" parent="ServerSelectPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 220)
+
+[node name="BtnBar" type="HBoxContainer" parent="ServerSelectPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="ServerConfirmBtn" type="Button" parent="ServerSelectPanel/CenterContainer/PanelContainer/VBox/BtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+[node name="ServerBackBtn" type="Button" parent="ServerSelectPanel/CenterContainer/PanelContainer/VBox/BtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+; ==============================================================================
+; CHARACTER_SELECT 角色选择页
+; ==============================================================================
+
+[node name="CharacterSelectPanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="CharacterSelectPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="CharacterSelectPanel/CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(640, 440)
+
+[node name="VBox" type="VBoxContainer" parent="CharacterSelectPanel/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+offset_left = 28.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = -28.0
+
+[node name="CharSelectTitleLabel" type="Label" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+text = ""
+
+[node name="SlotBar" type="HBoxContainer" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="CharSlot0Btn" type="Button" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/SlotBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 100)
+text = ""
+toggle_mode = true
+
+[node name="CharSlot1Btn" type="Button" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/SlotBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 100)
+text = ""
+toggle_mode = true
+
+[node name="CharSlot2Btn" type="Button" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/SlotBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 100)
+text = ""
+toggle_mode = true
+
+[node name="CharInfoPanel" type="PanelContainer" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CharInfoLabel" type="Label" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/CharInfoPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+offset_left = 12.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = -12.0
+text = ""
+autowrap_mode = 3
+
+[node name="ActionBar" type="HBoxContainer" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="CharEnterBtn" type="Button" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(90, 0)
+
+[node name="CharCreateBtn" type="Button" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(90, 0)
+
+[node name="CharDeleteBtn" type="Button" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(90, 0)
+
+[node name="CharBackBtn" type="Button" parent="CharacterSelectPanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+flat = true
+
+; ==============================================================================
+; CHARACTER_CREATE 角色创建页
+; ==============================================================================
+
+[node name="CharacterCreatePanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="CharacterCreatePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="CharacterCreatePanel/CenterContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(560, 560)
+
+[node name="VBox" type="VBoxContainer" parent="CharacterCreatePanel/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+offset_left = 28.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = -28.0
+
+[node name="CharCreateTitleLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+text = ""
+
+[node name="OriginLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="CharOriginOption" type="OptionButton" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="AttrTitle" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="AttrGrid" type="GridContainer" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 4
+
+[node name="CharAttrStrLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="CharAttrAgiLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="CharAttrConLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="CharAttrIntLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="CharAttrWisLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="CharAttrChaLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/AttrGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="CharRerollBtn" type="Button" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TalentLabel" type="Label" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="CharTalentList" type="ItemList" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 100)
+
+[node name="CharNameEdit" type="LineEdit" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = ""
+
+[node name="BtnBar" type="HBoxContainer" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="CharCreateConfirmBtn" type="Button" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/BtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+[node name="CharCreateBackBtn" type="Button" parent="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/BtnBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+custom_minimum_size = Vector2(100, 0)
+
+; ==============================================================================
+; 信号连接
+; ==============================================================================
+
+[connection signal="pressed" from="SplashPanel/CenterContainer/PanelContainer/VBox/SplashEnterBtn" to="." method="_on_splash_enter_pressed"]
+
+[connection signal="pressed" from="LoginPanel/CenterContainer/PanelContainer/VBox/LoginSubmitBtn" to="." method="_on_login_submit_pressed"]
+[connection signal="pressed" from="LoginPanel/CenterContainer/PanelContainer/VBox/LinkBar/LoginGotoRegisterBtn" to="." method="_on_login_goto_register_pressed"]
+[connection signal="pressed" from="LoginPanel/CenterContainer/PanelContainer/VBox/LinkBar/LoginForgotBtn" to="." method="_on_login_forgot_pressed"]
+
+[connection signal="pressed" from="RegisterPanel/CenterContainer/PanelContainer/VBox/RegisterSubmitBtn" to="." method="_on_register_submit_pressed"]
+[connection signal="pressed" from="RegisterPanel/CenterContainer/PanelContainer/VBox/RegisterBackBtn" to="." method="_on_register_back_pressed"]
+
+[connection signal="pressed" from="ServerSelectPanel/CenterContainer/PanelContainer/VBox/BtnBar/ServerConfirmBtn" to="." method="_on_server_confirm_pressed"]
+[connection signal="pressed" from="ServerSelectPanel/CenterContainer/PanelContainer/VBox/BtnBar/ServerBackBtn" to="." method="_on_server_back_pressed"]
+
+[connection signal="pressed" from="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/SlotBar/CharSlot0Btn" to="." method="_on_char_slot_0_pressed"]
+[connection signal="pressed" from="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/SlotBar/CharSlot1Btn" to="." method="_on_char_slot_1_pressed"]
+[connection signal="pressed" from="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/SlotBar/CharSlot2Btn" to="." method="_on_char_slot_2_pressed"]
+[connection signal="pressed" from="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/ActionBar/CharEnterBtn" to="." method="_on_char_enter_pressed"]
+[connection signal="pressed" from="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/ActionBar/CharCreateBtn" to="." method="_on_char_create_pressed"]
+[connection signal="pressed" from="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/ActionBar/CharDeleteBtn" to="." method="_on_char_delete_pressed"]
+[connection signal="pressed" from="CharacterSelectPanel/CenterContainer/PanelContainer/VBox/CharBackBtn" to="." method="_on_char_back_pressed"]
+
+[connection signal="pressed" from="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/CharRerollBtn" to="." method="_on_char_reroll_pressed"]
+[connection signal="pressed" from="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/BtnBar/CharCreateConfirmBtn" to="." method="_on_char_create_confirm_pressed"]
+[connection signal="pressed" from="CharacterCreatePanel/CenterContainer/PanelContainer/VBox/BtnBar/CharCreateBackBtn" to="." method="_on_char_create_back_pressed"]

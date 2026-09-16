@@ -1,0 +1,1528 @@
+{
+  "$schema_version": 1,
+  "$schema_description": "卡拉尔世界引擎契约注册表 schema v1",
+  "$schema_supported_since": "Phase 57",
+  "entry_count_expected": 49,
+  "infra_domains": [
+    "world_state",
+    "feature_toggle_canary",
+    "telemetry_account_lifecycle",
+    "event_extractor"
+  ],
+  "reverse_orphans": [
+    {
+      "view_name": "world_map",
+      "reason": "view exists but no corresponding backend domain (historical reverse orphan)"
+    }
+  ],
+  "entries": [
+    {
+      "contract_id": "CT-ACCO-ACCO-01",
+      "contract_version": 1,
+      "domain_name": "account",
+      "view_name": "account_entry",
+      "endpoint_kind": "DTO",
+      "source_path": "account.summary_dto",
+      "target_path": "account_entry.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "account.updated",
+      "signal_name": "_on_account_updated",
+      "event_filter": {
+        "domain": "account"
+      },
+      "service_path": "account_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "account_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-GACH-GACH-02",
+      "contract_version": 1,
+      "domain_name": "gacha_wish",
+      "view_name": "gacha_wish",
+      "endpoint_kind": "DTO",
+      "source_path": "gacha_wish.summary_dto",
+      "target_path": "gacha_wish.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "gacha_wish.updated",
+      "signal_name": "_on_gacha_wish_updated",
+      "event_filter": {
+        "domain": "gacha_wish"
+      },
+      "service_path": "gacha_wish_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "gacha_wish_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-MAIL-MAIL-03",
+      "contract_version": 1,
+      "domain_name": "mail_system",
+      "view_name": "mail_system",
+      "endpoint_kind": "DTO",
+      "source_path": "mail_system.summary_dto",
+      "target_path": "mail_system.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "mail_system.updated",
+      "signal_name": "_on_mail_system_updated",
+      "event_filter": {
+        "domain": "mail_system"
+      },
+      "service_path": "mail_system_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "mail_system_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-MONS-MONS-04",
+      "contract_version": 1,
+      "domain_name": "monster_ecology",
+      "view_name": "monster_ecology",
+      "endpoint_kind": "DTO",
+      "source_path": "monster_ecology.summary_dto",
+      "target_path": "monster_ecology.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "monster_ecology.updated",
+      "signal_name": "_on_monster_ecology_updated",
+      "event_filter": {
+        "domain": "monster_ecology"
+      },
+      "service_path": "monster_ecology_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "monster_ecology_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-WORL-MONS-05",
+      "contract_version": 1,
+      "domain_name": "world_boss",
+      "view_name": "monster_ecology",
+      "endpoint_kind": "DTO",
+      "source_path": "world_boss.summary_dto",
+      "target_path": "monster_ecology.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "world_boss.updated",
+      "signal_name": "_on_world_boss_updated",
+      "event_filter": {
+        "domain": "world_boss"
+      },
+      "service_path": "world_boss_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "world_boss_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-WORK-CRAF-06",
+      "contract_version": 1,
+      "domain_name": "workshop_forge",
+      "view_name": "crafting_workshop",
+      "endpoint_kind": "DTO",
+      "source_path": "workshop_forge.summary_dto",
+      "target_path": "crafting_workshop.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "workshop_forge.updated",
+      "signal_name": "_on_workshop_forge_updated",
+      "event_filter": {
+        "domain": "workshop_forge"
+      },
+      "service_path": "workshop_forge_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "workshop_forge_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-LATT-GRIM-07",
+      "contract_version": 1,
+      "domain_name": "lattice_skill_book",
+      "view_name": "grimoire_authoring",
+      "endpoint_kind": "DTO",
+      "source_path": "lattice_skill_book.summary_dto",
+      "target_path": "grimoire_authoring.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "lattice_skill_book.updated",
+      "signal_name": "_on_lattice_skill_book_updated",
+      "event_filter": {
+        "domain": "lattice_skill_book"
+      },
+      "service_path": "lattice_skill_book_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "lattice_skill_book_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-NOTI-NOTI-08",
+      "contract_version": 1,
+      "domain_name": "notification_red_dot",
+      "view_name": "notification_bulletin",
+      "endpoint_kind": "DTO",
+      "source_path": "notification_red_dot.summary_dto",
+      "target_path": "notification_bulletin.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "notification_red_dot.updated",
+      "signal_name": "_on_notification_red_dot_updated",
+      "event_filter": {
+        "domain": "notification_red_dot"
+      },
+      "service_path": "notification_red_dot_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "notification_red_dot_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-GAME-SETT-09",
+      "contract_version": 1,
+      "domain_name": "game_settings",
+      "view_name": "settings_center",
+      "endpoint_kind": "DTO",
+      "source_path": "game_settings.summary_dto",
+      "target_path": "settings_center.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "game_settings.updated",
+      "signal_name": "_on_game_settings_updated",
+      "event_filter": {
+        "domain": "game_settings"
+      },
+      "service_path": "game_settings_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "game_settings_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-HARD-SETT-10",
+      "contract_version": 1,
+      "domain_name": "hardware_input",
+      "view_name": "settings_center",
+      "endpoint_kind": "DTO",
+      "source_path": "hardware_input.summary_dto",
+      "target_path": "settings_center.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "hardware_input.updated",
+      "signal_name": "_on_hardware_input_updated",
+      "event_filter": {
+        "domain": "hardware_input"
+      },
+      "service_path": "hardware_input_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "hardware_input_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-LOCA-SETT-11",
+      "contract_version": 1,
+      "domain_name": "localization_i18n",
+      "view_name": "settings_center",
+      "endpoint_kind": "DTO",
+      "source_path": "localization_i18n.summary_dto",
+      "target_path": "settings_center.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "localization_i18n.updated",
+      "signal_name": "_on_localization_i18n_updated",
+      "event_filter": {
+        "domain": "localization_i18n"
+      },
+      "service_path": "localization_i18n_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "localization_i18n_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-EVEN-SETT-12",
+      "contract_version": 1,
+      "domain_name": "event_driven_audio",
+      "view_name": "settings_center",
+      "endpoint_kind": "DTO",
+      "source_path": "event_driven_audio.summary_dto",
+      "target_path": "settings_center.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "event_driven_audio.updated",
+      "signal_name": "_on_event_driven_audio_updated",
+      "event_filter": {
+        "domain": "event_driven_audio"
+      },
+      "service_path": "event_driven_audio_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "event_driven_audio_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-CURR-ECON-13",
+      "contract_version": 1,
+      "domain_name": "currency_economy",
+      "view_name": "economy_trade",
+      "endpoint_kind": "DTO",
+      "source_path": "currency_economy.summary_dto",
+      "target_path": "economy_trade.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "currency_economy.updated",
+      "signal_name": "_on_currency_economy_updated",
+      "event_filter": {
+        "domain": "currency_economy"
+      },
+      "service_path": "currency_economy_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "currency_economy_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-CHAT-MAIN-14",
+      "contract_version": 1,
+      "domain_name": "chat_command",
+      "view_name": "main_hud",
+      "endpoint_kind": "DTO",
+      "source_path": "chat_command.summary_dto",
+      "target_path": "main_hud.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "chat_command.updated",
+      "signal_name": "_on_chat_command_updated",
+      "event_filter": {
+        "domain": "chat_command"
+      },
+      "service_path": "chat_command_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "chat_command_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-WORL-WORL-15",
+      "contract_version": 1,
+      "domain_name": "world_navigation",
+      "view_name": "world_map",
+      "endpoint_kind": "DTO",
+      "source_path": "world_navigation.summary_dto",
+      "target_path": "world_map.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "world_navigation.updated",
+      "signal_name": "_on_world_navigation_updated",
+      "event_filter": {
+        "domain": "world_navigation"
+      },
+      "service_path": "world_navigation_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "world_navigation_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-IDEN-MISC-16",
+      "contract_version": 1,
+      "domain_name": "identity_disguise",
+      "view_name": "misc_edge",
+      "endpoint_kind": "DTO",
+      "source_path": "identity_disguise.summary_dto",
+      "target_path": "misc_edge.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "identity_disguise.updated",
+      "signal_name": "_on_identity_disguise_updated",
+      "event_filter": {
+        "domain": "identity_disguise"
+      },
+      "service_path": "identity_disguise_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "identity_disguise_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-ELIT-MISC-17",
+      "contract_version": 1,
+      "domain_name": "elite_mutation",
+      "view_name": "misc_edge",
+      "endpoint_kind": "DTO",
+      "source_path": "elite_mutation.summary_dto",
+      "target_path": "misc_edge.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "elite_mutation.updated",
+      "signal_name": "_on_elite_mutation_updated",
+      "event_filter": {
+        "domain": "elite_mutation"
+      },
+      "service_path": "elite_mutation_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "elite_mutation_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-GROU-MISC-18",
+      "contract_version": 1,
+      "domain_name": "ground_loot",
+      "view_name": "misc_edge",
+      "endpoint_kind": "DTO",
+      "source_path": "ground_loot.summary_dto",
+      "target_path": "misc_edge.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "ground_loot.updated",
+      "signal_name": "_on_ground_loot_updated",
+      "event_filter": {
+        "domain": "ground_loot"
+      },
+      "service_path": "ground_loot_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "ground_loot_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-ITEM-MISC-19",
+      "contract_version": 1,
+      "domain_name": "item_namespace_registry",
+      "view_name": "misc_edge",
+      "endpoint_kind": "DTO",
+      "source_path": "item_namespace_registry.summary_dto",
+      "target_path": "misc_edge.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "item_namespace_registry.updated",
+      "signal_name": "_on_item_namespace_registry_updated",
+      "event_filter": {
+        "domain": "item_namespace_registry"
+      },
+      "service_path": "item_namespace_registry_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "item_namespace_registry_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-QUES-QUES-20",
+      "contract_version": 1,
+      "domain_name": "quest_causality",
+      "view_name": "quest_causality",
+      "endpoint_kind": "DTO",
+      "source_path": "quest_causality.summary_dto",
+      "target_path": "quest_causality.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "quest_causality.updated",
+      "signal_name": "_on_quest_causality_updated",
+      "event_filter": {
+        "domain": "quest_causality"
+      },
+      "service_path": "quest_causality_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "quest_causality_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-ITEM-MISC-21",
+      "contract_version": 1,
+      "domain_name": "item_quality",
+      "view_name": "misc_edge",
+      "endpoint_kind": "DTO",
+      "source_path": "item_quality.summary_dto",
+      "target_path": "misc_edge.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "item_quality.updated",
+      "signal_name": "_on_item_quality_updated",
+      "event_filter": {
+        "domain": "item_quality"
+      },
+      "service_path": "item_quality_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "item_quality_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-MAGI-COMB-22",
+      "contract_version": 1,
+      "domain_name": "magic_tier",
+      "view_name": "combat_view",
+      "endpoint_kind": "DTO",
+      "source_path": "magic_tier.summary_dto",
+      "target_path": "combat_view.data_model",
+      "field_mapping": [
+        {
+          "backend_field": "id",
+          "view_field": "item_id",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "magic_tier.updated",
+      "signal_name": "_on_magic_tier_updated",
+      "event_filter": {
+        "domain": "magic_tier"
+      },
+      "service_path": "magic_tier_service",
+      "method_name": "get_state",
+      "params_schema": [],
+      "response_dto": "magic_tier_dto",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-CHAR-ACCO-23",
+      "contract_version": 1,
+      "domain_name": "character_creation",
+      "view_name": "account_entry",
+      "endpoint_kind": "DTO",
+      "source_path": "character_creation.partial_dto",
+      "target_path": "account_entry.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "character_creation.state_changed",
+      "signal_name": "_on_character_creation_state_changed",
+      "event_filter": {
+        "domain": "character_creation"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-PHYS-COMB-24",
+      "contract_version": 1,
+      "domain_name": "physics_thermodynamics",
+      "view_name": "combat_view",
+      "endpoint_kind": "DTO",
+      "source_path": "physics_thermodynamics.partial_dto",
+      "target_path": "combat_view.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "physics_thermodynamics.state_changed",
+      "signal_name": "_on_physics_thermodynamics_state_changed",
+      "event_filter": {
+        "domain": "physics_thermodynamics"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-MAGI-COMB-25",
+      "contract_version": 1,
+      "domain_name": "magic_system",
+      "view_name": "combat_view",
+      "endpoint_kind": "DTO",
+      "source_path": "magic_system.partial_dto",
+      "target_path": "combat_view.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "magic_system.state_changed",
+      "signal_name": "_on_magic_system_state_changed",
+      "event_filter": {
+        "domain": "magic_system"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-INVE-CHAR-26",
+      "contract_version": 1,
+      "domain_name": "inventory",
+      "view_name": "character_progression",
+      "endpoint_kind": "DTO",
+      "source_path": "inventory.partial_dto",
+      "target_path": "character_progression.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "inventory.state_changed",
+      "signal_name": "_on_inventory_state_changed",
+      "event_filter": {
+        "domain": "inventory"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-PERS-SYST-27",
+      "contract_version": 1,
+      "domain_name": "persistence_protocol",
+      "view_name": "system_save",
+      "endpoint_kind": "DTO",
+      "source_path": "persistence_protocol.partial_dto",
+      "target_path": "system_save.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "persistence_protocol.state_changed",
+      "signal_name": "_on_persistence_protocol_state_changed",
+      "event_filter": {
+        "domain": "persistence_protocol"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-NARR-QUES-28",
+      "contract_version": 1,
+      "domain_name": "narrative_orchestration",
+      "view_name": "quest_causality",
+      "endpoint_kind": "DTO",
+      "source_path": "narrative_orchestration.partial_dto",
+      "target_path": "quest_causality.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "narrative_orchestration.state_changed",
+      "signal_name": "_on_narrative_orchestration_state_changed",
+      "event_filter": {
+        "domain": "narrative_orchestration"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-SPAT-ECON-29",
+      "contract_version": 1,
+      "domain_name": "spatial_merchant",
+      "view_name": "economy_trade",
+      "endpoint_kind": "DTO",
+      "source_path": "spatial_merchant.partial_dto",
+      "target_path": "economy_trade.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "spatial_merchant.state_changed",
+      "signal_name": "_on_spatial_merchant_state_changed",
+      "event_filter": {
+        "domain": "spatial_merchant"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-TRAD-ECON-30",
+      "contract_version": 1,
+      "domain_name": "trading_logistics",
+      "view_name": "economy_trade",
+      "endpoint_kind": "DTO",
+      "source_path": "trading_logistics.partial_dto",
+      "target_path": "economy_trade.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "trading_logistics.state_changed",
+      "signal_name": "_on_trading_logistics_state_changed",
+      "event_filter": {
+        "domain": "trading_logistics"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-POTE-CHAR-31",
+      "contract_version": 1,
+      "domain_name": "potential_growth",
+      "view_name": "character_progression",
+      "endpoint_kind": "DTO",
+      "source_path": "potential_growth.partial_dto",
+      "target_path": "character_progression.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "potential_growth.state_changed",
+      "signal_name": "_on_potential_growth_state_changed",
+      "event_filter": {
+        "domain": "potential_growth"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-DETE-SYST-32",
+      "contract_version": 1,
+      "domain_name": "deterministic_sandbox",
+      "view_name": "system_save",
+      "endpoint_kind": "DTO",
+      "source_path": "deterministic_sandbox.partial_dto",
+      "target_path": "system_save.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "deterministic_sandbox.state_changed",
+      "signal_name": "_on_deterministic_sandbox_state_changed",
+      "event_filter": {
+        "domain": "deterministic_sandbox"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-EQUI-CHAR-33",
+      "contract_version": 1,
+      "domain_name": "equipment_loadout",
+      "view_name": "character_progression",
+      "endpoint_kind": "DTO",
+      "source_path": "equipment_loadout.partial_dto",
+      "target_path": "character_progression.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "equipment_loadout.state_changed",
+      "signal_name": "_on_equipment_loadout_state_changed",
+      "event_filter": {
+        "domain": "equipment_loadout"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-COMM-QUES-34",
+      "contract_version": 1,
+      "domain_name": "commission_quest",
+      "view_name": "quest_causality",
+      "endpoint_kind": "DTO",
+      "source_path": "commission_quest.partial_dto",
+      "target_path": "quest_causality.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "commission_quest.state_changed",
+      "signal_name": "_on_commission_quest_state_changed",
+      "event_filter": {
+        "domain": "commission_quest"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-ORGA-GUIL-35",
+      "contract_version": 1,
+      "domain_name": "organization_guild",
+      "view_name": "guild_social",
+      "endpoint_kind": "DTO",
+      "source_path": "organization_guild.partial_dto",
+      "target_path": "guild_social.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "organization_guild.state_changed",
+      "signal_name": "_on_organization_guild_state_changed",
+      "event_filter": {
+        "domain": "organization_guild"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-NPC_-GUIL-36",
+      "contract_version": 1,
+      "domain_name": "npc_simulation",
+      "view_name": "guild_social",
+      "endpoint_kind": "DTO",
+      "source_path": "npc_simulation.partial_dto",
+      "target_path": "guild_social.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "npc_simulation.state_changed",
+      "signal_name": "_on_npc_simulation_state_changed",
+      "event_filter": {
+        "domain": "npc_simulation"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-SOVE-WORL-37",
+      "contract_version": 1,
+      "domain_name": "sovereignty_realm",
+      "view_name": "world_map",
+      "endpoint_kind": "DTO",
+      "source_path": "sovereignty_realm.partial_dto",
+      "target_path": "world_map.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "sovereignty_realm.state_changed",
+      "signal_name": "_on_sovereignty_realm_state_changed",
+      "event_filter": {
+        "domain": "sovereignty_realm"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-CDKE-SYST-38",
+      "contract_version": 1,
+      "domain_name": "cdkey_voucher",
+      "view_name": "system_save",
+      "endpoint_kind": "DTO",
+      "source_path": "cdkey_voucher.partial_dto",
+      "target_path": "system_save.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "cdkey_voucher.state_changed",
+      "signal_name": "_on_cdkey_voucher_state_changed",
+      "event_filter": {
+        "domain": "cdkey_voucher"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-ADMI-SYST-39",
+      "contract_version": 1,
+      "domain_name": "admin_sandbox",
+      "view_name": "system_save",
+      "endpoint_kind": "DTO",
+      "source_path": "admin_sandbox.partial_dto",
+      "target_path": "system_save.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "admin_sandbox.state_changed",
+      "signal_name": "_on_admin_sandbox_state_changed",
+      "event_filter": {
+        "domain": "admin_sandbox"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-MATT-CRAF-40",
+      "contract_version": 1,
+      "domain_name": "matter_disposal",
+      "view_name": "crafting_workshop",
+      "endpoint_kind": "DTO",
+      "source_path": "matter_disposal.partial_dto",
+      "target_path": "crafting_workshop.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "matter_disposal.state_changed",
+      "signal_name": "_on_matter_disposal_state_changed",
+      "event_filter": {
+        "domain": "matter_disposal"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-BULL-NOTI-41",
+      "contract_version": 1,
+      "domain_name": "bulletin_board_maintenance",
+      "view_name": "notification_bulletin",
+      "endpoint_kind": "DTO",
+      "source_path": "bulletin_board_maintenance.partial_dto",
+      "target_path": "notification_bulletin.panel_model",
+      "field_mapping": [
+        {
+          "backend_field": "status",
+          "view_field": "status_label",
+          "transform_kind": "identity"
+        }
+      ],
+      "transform_kind": "identity",
+      "event_name": "bulletin_board_maintenance.state_changed",
+      "signal_name": "_on_bulletin_board_maintenance_state_changed",
+      "event_filter": {
+        "domain": "bulletin_board_maintenance"
+      },
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-WORL-WORL-42",
+      "contract_version": 1,
+      "domain_name": "world_gateway",
+      "view_name": "world_map",
+      "endpoint_kind": "DTO",
+      "source_path": "world_gateway.placeholder_dto",
+      "target_path": "world_map.placeholder",
+      "field_mapping": [],
+      "transform_kind": "identity",
+      "event_name": "",
+      "signal_name": "",
+      "event_filter": {},
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "MISSING domain placeholder for Phase 58",
+      "coverage_marker": "MISSING",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-SPAT-WORL-43",
+      "contract_version": 1,
+      "domain_name": "spatial_movement",
+      "view_name": "world_map",
+      "endpoint_kind": "DTO",
+      "source_path": "spatial_movement.placeholder_dto",
+      "target_path": "world_map.placeholder",
+      "field_mapping": [],
+      "transform_kind": "identity",
+      "event_name": "",
+      "signal_name": "",
+      "event_filter": {},
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "MISSING domain placeholder for Phase 58",
+      "coverage_marker": "MISSING",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-LIFE-CHAR-44",
+      "contract_version": 1,
+      "domain_name": "lifecycle_physiology",
+      "view_name": "character_progression",
+      "endpoint_kind": "DTO",
+      "source_path": "lifecycle_physiology.placeholder_dto",
+      "target_path": "character_progression.placeholder",
+      "field_mapping": [],
+      "transform_kind": "identity",
+      "event_name": "",
+      "signal_name": "",
+      "event_filter": {},
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "MISSING domain placeholder for Phase 58",
+      "coverage_marker": "MISSING",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-ITEM-SYST-45",
+      "contract_version": 1,
+      "domain_name": "item_statistics",
+      "view_name": "system_save",
+      "endpoint_kind": "DTO",
+      "source_path": "item_statistics.placeholder_dto",
+      "target_path": "system_save.placeholder",
+      "field_mapping": [],
+      "transform_kind": "identity",
+      "event_name": "",
+      "signal_name": "",
+      "event_filter": {},
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "MISSING domain placeholder for Phase 58",
+      "coverage_marker": "MISSING",
+      "infra_exempt": false,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-WORL-DASH-46",
+      "contract_version": 1,
+      "domain_name": "world_state",
+      "view_name": "system_save",
+      "endpoint_kind": "GM_READONLY",
+      "source_path": "world_state.telemetry",
+      "target_path": "system_save.admin_tab",
+      "field_mapping": [],
+      "transform_kind": "identity",
+      "event_name": "",
+      "signal_name": "",
+      "event_filter": {},
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": true,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-FEAT-DASH-47",
+      "contract_version": 1,
+      "domain_name": "feature_toggle_canary",
+      "view_name": "system_save",
+      "endpoint_kind": "GM_READONLY",
+      "source_path": "feature_toggle_canary.telemetry",
+      "target_path": "system_save.admin_tab",
+      "field_mapping": [],
+      "transform_kind": "identity",
+      "event_name": "",
+      "signal_name": "",
+      "event_filter": {},
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": true,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-TELE-DASH-48",
+      "contract_version": 1,
+      "domain_name": "telemetry_account_lifecycle",
+      "view_name": "system_save",
+      "endpoint_kind": "GM_READONLY",
+      "source_path": "telemetry_account_lifecycle.telemetry",
+      "target_path": "system_save.admin_tab",
+      "field_mapping": [],
+      "transform_kind": "identity",
+      "event_name": "",
+      "signal_name": "",
+      "event_filter": {},
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": true,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    },
+    {
+      "contract_id": "CT-EVEN-DASH-49",
+      "contract_version": 1,
+      "domain_name": "event_extractor",
+      "view_name": "system_save",
+      "endpoint_kind": "GM_READONLY",
+      "source_path": "event_extractor.telemetry",
+      "target_path": "system_save.admin_tab",
+      "field_mapping": [],
+      "transform_kind": "identity",
+      "event_name": "",
+      "signal_name": "",
+      "event_filter": {},
+      "service_path": "",
+      "method_name": "",
+      "params_schema": [],
+      "response_dto": "",
+      "breaking_change_note": "",
+      "infra_exempt": true,
+      "deprecated": false,
+      "replacement_contract_id": "",
+      "created_at": "2026-09-05",
+      "last_reviewed_at": "2026-09-05"
+    }
+  ]
+}

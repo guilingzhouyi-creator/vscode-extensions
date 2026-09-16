@@ -1,0 +1,622 @@
+[gd_scene load_steps=2 format=3 uid="uid://cguildsocialview09"]
+
+[ext_resource type="Script" path="res://frontend/views/guild_social/guild_social_view.gd" id="1_guild_social"]
+
+[node name="GuildSocialView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_guild_social")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderTitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TabContainer" type="TabContainer" parent="MainLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+; =========================================================================
+; Tab 1: 公会信息 (GUILD_INFO)
+; =========================================================================
+[node name="公会信息" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LabelGuildName" type="Label" parent="MainLayout/TabContainer/公会信息"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 22
+text = ""
+
+[node name="GuildInfoGrid" type="GridContainer" parent="MainLayout/TabContainer/公会信息"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 32
+theme_override_constants/v_separation = 4
+
+[node name="LabelGuildLevel" type="Label" parent="MainLayout/TabContainer/公会信息/GuildInfoGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelGuildLeader" type="Label" parent="MainLayout/TabContainer/公会信息/GuildInfoGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelGuildMembers" type="Label" parent="MainLayout/TabContainer/公会信息/GuildInfoGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelGuildFunds" type="Label" parent="MainLayout/TabContainer/公会信息/GuildInfoGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/公会信息"]
+layout_mode = 2
+
+[node name="AnnouncementLabel" type="Label" parent="MainLayout/TabContainer/公会信息"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RichtextAnnouncement" type="RichTextLabel" parent="MainLayout/TabContainer/公会信息"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 150)
+bbcode_enabled = true
+
+[node name="ButtonRow" type="HBoxContainer" parent="MainLayout/TabContainer/公会信息"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnLeaveGuild" type="Button" parent="MainLayout/TabContainer/公会信息/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnGuildManage" type="Button" parent="MainLayout/TabContainer/公会信息/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+; =========================================================================
+; Tab 2: 成员列表 (GUILD_MEMBERS)
+; =========================================================================
+[node name="成员列表" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 400
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainLayout/TabContainer/成员列表"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="MemberListLabel" type="Label" parent="MainLayout/TabContainer/成员列表/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="GuildMemberList" type="ItemList" parent="MainLayout/TabContainer/成员列表/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RightPanel" type="VBoxContainer" parent="MainLayout/TabContainer/成员列表"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="MemberDetailLabel" type="Label" parent="MainLayout/TabContainer/成员列表/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DetailPanel" type="PanelContainer" parent="MainLayout/TabContainer/成员列表/RightPanel"]
+layout_mode = 2
+
+[node name="DetailVBox" type="VBoxContainer" parent="MainLayout/TabContainer/成员列表/RightPanel/DetailPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelMemberDetailName" type="Label" parent="MainLayout/TabContainer/成员列表/RightPanel/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = ""
+
+[node name="LabelMemberDetailClass" type="Label" parent="MainLayout/TabContainer/成员列表/RightPanel/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelMemberDetailLevel" type="Label" parent="MainLayout/TabContainer/成员列表/RightPanel/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelMemberDetailRole" type="Label" parent="MainLayout/TabContainer/成员列表/RightPanel/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelMemberDetailOnline" type="Label" parent="MainLayout/TabContainer/成员列表/RightPanel/DetailPanel/DetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="DetailSpacer" type="Control" parent="MainLayout/TabContainer/成员列表/RightPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BtnManageRoles" type="Button" parent="MainLayout/TabContainer/成员列表/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnInviteMember" type="Button" parent="MainLayout/TabContainer/成员列表/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnKickMember" type="Button" parent="MainLayout/TabContainer/成员列表/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; =========================================================================
+; Tab 3: 聊天频道 (CHAT_CHANNELS)
+; =========================================================================
+[node name="聊天频道" type="HSplitContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 180
+
+[node name="ChannelPanel" type="VBoxContainer" parent="MainLayout/TabContainer/聊天频道"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="ChannelListLabel" type="Label" parent="MainLayout/TabContainer/聊天频道/ChannelPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="ChannelList" type="ItemList" parent="MainLayout/TabContainer/聊天频道/ChannelPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BtnChannelSettings" type="Button" parent="MainLayout/TabContainer/聊天频道/ChannelPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="ChatPanel" type="VBoxContainer" parent="MainLayout/TabContainer/聊天频道"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="ChatMessagesLabel" type="Label" parent="MainLayout/TabContainer/聊天频道/ChatPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RichtextChatMessages" type="RichTextLabel" parent="MainLayout/TabContainer/聊天频道/ChatPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_active = true
+
+[node name="InputRow" type="HBoxContainer" parent="MainLayout/TabContainer/聊天频道/ChatPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LineChatInput" type="LineEdit" parent="MainLayout/TabContainer/聊天频道/ChatPanel/InputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="BtnChatSend" type="Button" parent="MainLayout/TabContainer/聊天频道/ChatPanel/InputRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+; =========================================================================
+; Tab 4: 好友系统 (FRIENDS)
+; =========================================================================
+[node name="好友系统" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SearchRow" type="HBoxContainer" parent="MainLayout/TabContainer/好友系统"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SearchLabel" type="Label" parent="MainLayout/TabContainer/好友系统/SearchRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = ""
+
+[node name="LineFriendSearch" type="LineEdit" parent="MainLayout/TabContainer/好友系统/SearchRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="FriendTabContainer" type="TabContainer" parent="MainLayout/TabContainer/好友系统"]
+unique_name_in_owner = true
+layout_mode = 2
+tab_align = 0
+custom_minimum_size = Vector2(0, 40)
+
+[node name="好友Tab" type="Control" parent="MainLayout/TabContainer/好友系统/FriendTabContainer"]
+layout_mode = 2
+
+[node name="黑名单Tab" type="Control" parent="MainLayout/TabContainer/好友系统/FriendTabContainer"]
+layout_mode = 2
+
+[node name="陌生人Tab" type="Control" parent="MainLayout/TabContainer/好友系统/FriendTabContainer"]
+layout_mode = 2
+
+[node name="MainSplit" type="HSplitContainer" parent="MainLayout/TabContainer/好友系统"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 350
+
+[node name="FriendListPanel" type="VBoxContainer" parent="MainLayout/TabContainer/好友系统/MainSplit"]
+layout_mode = 2
+theme_override_constants/separation = 6
+size_flags_horizontal = 3
+
+[node name="FriendListLabel" type="Label" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendListPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="FriendList" type="ItemList" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendListPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="FriendDetailPanel" type="VBoxContainer" parent="MainLayout/TabContainer/好友系统/MainSplit"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_horizontal = 3
+
+[node name="FriendDetailTitleLabel" type="Label" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="DetailInfoPanel" type="PanelContainer" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel"]
+layout_mode = 2
+
+[node name="DetailInfoVBox" type="VBoxContainer" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel/DetailInfoPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelFriendDetailName" type="Label" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel/DetailInfoPanel/DetailInfoVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+text = ""
+
+[node name="LabelFriendDetailLocation" type="Label" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel/DetailInfoPanel/DetailInfoVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelFriendDetailOnline" type="Label" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel/DetailInfoPanel/DetailInfoVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="DetailSpacer" type="Control" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BtnAddFriend" type="Button" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnDeleteFriend" type="Button" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnWhisperFriend" type="Button" parent="MainLayout/TabContainer/好友系统/MainSplit/FriendDetailPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; =========================================================================
+; Tab 5: NPC对话 (NPC_DIALOG)
+; =========================================================================
+[node name="NPC对话" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="NpcHeaderRow" type="HBoxContainer" parent="MainLayout/TabContainer/NPC对话"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="NpcAvatarPanel" type="PanelContainer" parent="MainLayout/TabContainer/NPC对话/NpcHeaderRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(64, 64)
+
+[node name="NpcAvatarLabel" type="Label" parent="MainLayout/TabContainer/NPC对话/NpcHeaderRow/NpcAvatarPanel"]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 28
+text = "👤"
+
+[node name="NpcInfoVBox" type="VBoxContainer" parent="MainLayout/TabContainer/NPC对话/NpcHeaderRow"]
+layout_mode = 2
+theme_override_constants/separation = 2
+size_flags_horizontal = 3
+
+[node name="LabelNpcName" type="Label" parent="MainLayout/TabContainer/NPC对话/NpcHeaderRow/NpcInfoVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="NpcTitleLabel" type="Label" parent="MainLayout/TabContainer/NPC对话/NpcHeaderRow/NpcInfoVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/NPC对话"]
+layout_mode = 2
+
+[node name="DialogLabel" type="Label" parent="MainLayout/TabContainer/NPC对话"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="RichtextNpcDialog" type="RichTextLabel" parent="MainLayout/TabContainer/NPC对话"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 180)
+bbcode_enabled = true
+
+[node name="OptionsLabel" type="Label" parent="MainLayout/TabContainer/NPC对话"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="VBoxDialogOptions" type="VBoxContainer" parent="MainLayout/TabContainer/NPC对话"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HSeparator2" type="HSeparator" parent="MainLayout/TabContainer/NPC对话"]
+layout_mode = 2
+
+[node name="QuickActionsRow" type="HBoxContainer" parent="MainLayout/TabContainer/NPC对话"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnNpcQuest" type="Button" parent="MainLayout/TabContainer/NPC对话/QuickActionsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnNpcShop" type="Button" parent="MainLayout/TabContainer/NPC对话/QuickActionsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnNpcLeave" type="Button" parent="MainLayout/TabContainer/NPC对话/QuickActionsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+; =========================================================================
+; Tab 6: 玩家交易 (PLAYER_TRADE)
+; =========================================================================
+[node name="玩家交易" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LabelTradePartner" type="Label" parent="MainLayout/TabContainer/玩家交易"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="TradeMainRow" type="HBoxContainer" parent="MainLayout/TabContainer/玩家交易"]
+layout_mode = 2
+theme_override_constants/separation = 12
+size_flags_vertical = 3
+
+; --- 左侧：我的物品 ---
+[node name="MySidePanel" type="VBoxContainer" parent="MainLayout/TabContainer/玩家交易/TradeMainRow"]
+layout_mode = 2
+theme_override_constants/separation = 6
+size_flags_horizontal = 3
+
+[node name="MyInvLabel" type="Label" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MySidePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="MyInventoryList" type="ItemList" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MySidePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 100)
+
+[node name="MyTradeLabel" type="Label" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MySidePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""
+
+[node name="MyTradeList" type="ItemList" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MySidePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+
+[node name="MyGoldRow" type="HBoxContainer" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MySidePanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MyGoldLabel" type="Label" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MySidePanel/MyGoldRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="SpinMyTradeGold" type="SpinBox" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MySidePanel/MyGoldRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 999999.0
+value = 0.0
+
+; --- 中间：交易控制 ---
+[node name="MiddleControlPanel" type="VBoxContainer" parent="MainLayout/TabContainer/玩家交易/TradeMainRow"]
+layout_mode = 2
+theme_override_constants/separation = 8
+custom_minimum_size = Vector2(140, 0)
+
+[node name="LabelTradeStatus" type="Label" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MiddleControlPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = ""
+autowrap_mode = 2
+horizontal_alignment = 1
+
+[node name="MiddleSpacer" type="Control" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MiddleControlPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BtnTradeLock" type="Button" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MiddleControlPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnTradeConfirm" type="Button" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MiddleControlPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnTradeCancel" type="Button" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MiddleControlPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MiddleSpacer2" type="Control" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/MiddleControlPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+; --- 右侧：对方物品 ---
+[node name="PartnerSidePanel" type="VBoxContainer" parent="MainLayout/TabContainer/玩家交易/TradeMainRow"]
+layout_mode = 2
+theme_override_constants/separation = 6
+size_flags_horizontal = 3
+
+[node name="PartnerInvLabel" type="Label" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/PartnerSidePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="PartnerTradeList" type="ItemList" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/PartnerSidePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 100)
+
+[node name="PartnerSpacer" type="Control" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/PartnerSidePanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LabelPartnerGold" type="Label" parent="MainLayout/TabContainer/玩家交易/TradeMainRow/PartnerSidePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""

@@ -130,3 +130,204 @@ jobs:
           # 用 jq 单步过滤，不依赖 grep -v 的退出码语义（set -e 脆弱性）。
           MATRIX=$(echo "$FILTERED" | jq -R -s -c 'split("\n") | map(select(length > 0 and . != "__none__"))')
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  # ─── 仓库卫生与脚本系统自检（独立于扩展矩阵；scripts/ 与 .github/ 变更即触发）───
+  # 回归守卫：P1（打包脚本根路径失效）/ P2（icon 资产校验静默禁用）/
+  # P3（version-bump 工具缺失或行为漂移）在本作业中永久看守，杜绝复发。
+  hygiene:
+    name: Repo hygiene (scripts & packaging)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Script line endings & encoding
+        run: |
+          set -euo pipefail
+          # .gitattributes 声明 *.sh 一律 LF；防工具回写 CRLF 后被 text 属性掩盖为"干净"而静默失效
+          BAD_CRLF=$(grep -rl $'\r' scripts/ --include='*.sh' 2>/dev/null || true)
+          if [[ -n "$BAD_CRLF" ]]; then
+            echo "::error::以下 sh 脚本含 CRLF（.gitattributes 要求 LF）:"
+            echo "$BAD_CRLF"
+            exit 1
+          fi
+          BAD_BOM=$(grep -rl $'^\xEF\xBB\xBF' scripts/ --include='*.sh' --include='*.ps1' 2>/dev/null || true)
+          if [[ -n "$BAD_BOM" ]]; then
+            echo "::error::以下脚本含 UTF-8 BOM:"
+            echo "$BAD_BOM"
+            exit 1
+          fi
+          BAD_WS=$(grep -rn '[[:blank:]]$' scripts/sh scripts/ps1 2>/dev/null || true)
+          if [[ -n "$BAD_WS" ]]; then
+            echo "::error::以下脚本存在尾随空白:"
+            echo "$BAD_WS"
+            exit 1
+          fi
+
+      - name: Shell syntax check
+        run: |
+          set -euo pipefail
+          for f in scripts/sh/*.sh; do bash -n "$f"; done
+
+      - name: package.sh discovery self-test
+        run: |
+          set -euo pipefail
+          # 零网络：以不存在的扩展名触发"未找到"分支，验证根路径解析与扩展发现机制
+          OUT=$(bash scripts/sh/package.sh --name __nonexistent__ 2>&1 || true)
+          echo "$OUT"
+          echo "$OUT" | grep -q 'workspace-timing' || { echo "::error::package.sh 扩展发现失效（根路径解析回归）"; exit 1; }
+          echo "$OUT" | grep -q '__nonexistent__' || { echo "::error::package.sh 未命中未找到分支"; exit 1; }
+
+      - name: check-display-assets icon validation self-test
+        run: |
+          set -euo pipefail
+          # icon 必须真实参与校验（此前 require 缺 ./ 前缀被静默吞掉）
+          OUT=$(bash scripts/sh/check-display-assets.sh workspace-timing pre 2>&1)
+          echo "$OUT"
+          echo "$OUT" | grep -q 'images/icon.png' || { echo "::error::icon 资产未参与校验（回归）"; exit 1; }
+          echo "$OUT" | grep -q 'images/banner.png' || { echo "::error::banner 资产未参与校验"; exit 1; }
+
+      - name: version-bump.sh fixture self-test
+        run: |
+          set -euo pipefail
+          FIX=$(mktemp -d)
+          trap 'rm -rf "$FIX"' EXIT
+          FIX_DIR="$FIX" node -e '
+            const fs = require("fs");
+            const d = process.env.FIX_DIR;
+            fs.mkdirSync(d + "/demo-ext", { recursive: true });
+            fs.writeFileSync(d + "/demo-ext/package.json",
+              JSON.stringify({ name: "demo-ext", version: "1.2.3", engines: { vscode: "^1.85.0" } }, null, 4));
+            fs.writeFileSync(d + "/demo-ext/CHANGELOG.md",
+              "# Changelog\n\n## [Unreleased]\n\n### Added\n- 新功能条目\n\n## [1.2.3] — 2026-09-01\n");
+          '
+          # ① patch 递增 + Unreleased 内容迁移
+          bash scripts/sh/version-bump.sh demo-ext patch --root "$FIX" >/dev/null
+          node -e "const v=require(process.env.FIX + '/demo-ext/package.json').version; if (v !== '1.2.4') { console.error('version=' + v); process.exit(1); }"
+          grep -q '## \[1.2.4\]' "$FIX/demo-ext/CHANGELOG.md" || { echo "::error::新版本段落未生成"; exit 1; }
+          grep -q '新功能条目' "$FIX/demo-ext/CHANGELOG.md" || { echo "::error::Unreleased 内容未迁移"; exit 1; }
+          # ② 显式版本 + 单调门禁（回退必须被拦截）
+          bash scripts/sh/version-bump.sh demo-ext 1.2.5 --root "$FIX" >/dev/null
+          node -e "const v=require(process.env.FIX + '/demo-ext/package.json').version; if (v !== '1.2.5') { console.error('version=' + v); process.exit(1); }"
+          if bash scripts/sh/version-bump.sh demo-ext 1.2.4 --root "$FIX" >/dev/null 2>&1; then
+            echo "::error::版本回退未被拦截"; exit 1
+          fi
+          # ③ 非法模式 → exit 2
+          bash scripts/sh/version-bump.sh demo-ext banana --root "$FIX" >/dev/null 2>&1
+          if [[ $? -ne 2 ]]; then echo "::error::非法模式应 exit 2"; exit 1; fi
+          # ④ 非扩展目录拒绝
+          FIX_DIR="$FIX" node -e '
+            const fs = require("fs");
+            const d = process.env.FIX_DIR;
+            fs.mkdirSync(d + "/not-ext", { recursive: true });
+            fs.writeFileSync(d + "/not-ext/package.json",
+              JSON.stringify({ name: "not-ext", version: "0.1.0" }));
+          '
+          if bash scripts/sh/version-bump.sh not-ext patch --root "$FIX" >/dev/null 2>&1; then
+            echo "::error::非扩展目录未被拒绝"; exit 1
+          fi
+          echo "✔ version-bump.sh 夹具自检全部通过"
+
+      - name: release-tag.sh fixture self-test (dry-run gates)
+        run: |
+          set -euo pipefail
+          FIX=$(mktemp -d)
+          trap 'rm -rf "$FIX"' EXIT
+          mkdir -p "$FIX/scripts/sh" "$FIX/demo-ext"
+          cp scripts/sh/release-tag.sh scripts/sh/version-bump.sh scripts/sh/check-display-assets.sh "$FIX/scripts/sh/"
+          FIX_DIR="$FIX" node -e '
+            const fs = require("fs");
+            const d = process.env.FIX_DIR;
+            fs.writeFileSync(d + "/demo-ext/package.json",
+              JSON.stringify({ name: "demo-ext", version: "1.2.3", engines: { vscode: "^1.85.0" } }, null, 4));
+            fs.writeFileSync(d + "/demo-ext/CHANGELOG.md",
+              "# Changelog\n\n## [Unreleased]\n\n### Engineering Infrastructure（工程基础设施）\n- 测试条目\n\n## [1.2.3] — 2026-09-01\n");
+          '
+          cd "$FIX"
+          git init -q
+          git config user.email "ci@example.com"
+          git config user.name "CI"
+          git add -A
+          git commit -qm "init"
+          # ① 干净树 dry-run：bare 前缀通过
+          bash scripts/sh/release-tag.sh demo-ext patch --message "v1.2.4 — Test | Test" --dry-run >/dev/null
+          # ② conventional 前缀通过
+          bash scripts/sh/release-tag.sh demo-ext patch --message "feat(demo-ext): v1.2.4 - Test" --dry-run >/dev/null
+          # ③ 无版本前缀 → exit 2
+          bash scripts/sh/release-tag.sh demo-ext patch --message "no-version-here" --dry-run >/dev/null 2>&1 && { echo "::error::非法信息未拦截"; exit 1; }
+          # ④ 版本回退 → exit 1
+          bash scripts/sh/release-tag.sh demo-ext patch --message "v1.2.3 — 回退" --dry-run >/dev/null 2>&1 && { echo "::error::版本回退未拦截"; exit 1; }
+          # ⑤ Tag 幂等 → exit 1
+          git tag demo-ext-v1.2.4
+          bash scripts/sh/release-tag.sh demo-ext patch --message "v1.2.4 — Test | Test" --dry-run >/dev/null 2>&1 && { echo "::error::Tag 幂等未拦截"; exit 1; }
+          git tag -d demo-ext-v1.2.4 >/dev/null
+          # ⑥ 脏树 → exit 1
+          echo "dirty" > dirty.txt
+          bash scripts/sh/release-tag.sh demo-ext patch --message "v1.2.4 — Test | Test" --dry-run >/dev/null 2>&1 && { echo "::error::脏树门禁未拦截"; exit 1; }
+          # ⑦ 无 CHANGELOG → exit 1
+          git rm -q dirty.txt
+          git commit -qm "clean" >/dev/null
+          mkdir -p no-cl
+          FIX_DIR="$PWD" node -e '
+            const fs = require("fs");
+            fs.writeFileSync(process.env.FIX_DIR + "/no-cl/package.json",
+              JSON.stringify({ name: "no-cl", version: "0.1.0", engines: { vscode: "^1.85.0" } }));
+          '
+          bash scripts/sh/release-tag.sh no-cl patch --message "v0.2.0 — X | Y" --dry-run >/dev/null 2>&1 && { echo "::error::缺 CHANGELOG 未拦截"; exit 1; }
+          echo "✔ release-tag.sh 夹具自检全部通过"
+
+  # ─── auto-refactor 工具门禁（与扩展矩阵解耦；仅改动 auto-refactor/ 时执行）───
+  # 该目录不是 VS Code 扩展（无 engines.vscode），故不参与上方扩展矩阵。
+  # 四道防线：Prettier 格式 → ESLint 结构/JSDoc → 自举 strict 注释棘轮 → 全量验证套件。
+  auto-refactor:
+    name: auto-refactor gate (format/lint/comments/tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 变更检测需要与 before SHA 做 diff
+
+      - name: Detect auto-refactor changes
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          # PR：全量执行；push：仅当变更触及 auto-refactor/ 时执行
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BEFORE="${{ github.event.before }}"
+          if [[ -z "$BEFORE" || "$BEFORE" == 0000000000000000000000000000000000000000 ]]; then
+            BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "$GITHUB_SHA")
+          fi
+          if git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -q '^auto-refactor/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::auto-refactor/ 无变更 → 门禁空跑跳过。"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: auto-refactor/package-lock.json
+
+      - name: Install dependencies
+        if: steps.scope.outputs.run == 'true'
+        working-directory: auto-refactor
+        run: npm ci
+
+      - name: Gate (format + lint + strict comments + full test suite)
+        if: steps.scope.outputs.run == 'true'
+        working-directory: auto-refactor
+        run: npm run gate

@@ -1,0 +1,7 @@
+{
+  "equip_success": "战备更迭: 在【%s】槽位装备【%s】！",
+  "unequip_success": "卸下【%s】槽位装备【%s】收纳回背包！",
+  "invalid_slot": "Invalid equipment slot: %s",
+  "no_item_in_slot": "No item equipped in slot: %s",
+  "capacity_exceeded": "背包容量不足或超重，无法容纳【%s】！"
+}

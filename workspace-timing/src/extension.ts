@@ -44,13 +44,11 @@ import {
 import { init as initI18n } from './i18n/index';
 
 // Integration
-import { LifecycleManager } from './integration/LifecycleManager';
 import { ConfigWatcher, readTimingConfig } from './integration/ConfigWatcher';
 
 let orchestrator: TimerOrchestrator | null = null;
 let statusBar: StatusBarController | null = null;
 let commandRegistrar: CommandRegistrar | null = null;
-let lifecycleManager: LifecycleManager | null = null;
 let configWatcher: ConfigWatcher | null = null;
 let scheduler: Scheduler | null = null;
 // 全局聚合器提升到模块级：命令注册（clearGlobal）需要在 activate 作用域之外访问。
@@ -169,20 +167,11 @@ export function activate(context: vscode.ExtensionContext): void {
             // Dashboard 面板消息路由（分发逻辑见 presentation/dashboardMessages.ts）
             DashboardPanel.setMessageHandler(createDashboardMessageHandler(getRouterContext()));
 
-            // Integration 层
-            lifecycleManager = new LifecycleManager(orchestrator);
-            lifecycleManager.start();
-
+            // Integration 层（配置变更监听；语言热切换时按新语言重建面板）
             configWatcher = new ConfigWatcher(
                 orchestrator,
                 statusBar,
-                // 语言热切换的面板重建策略注入（integration 层不感知 presentation 具体类）
-                () => {
-                    if (DashboardPanel.currentPanel) {
-                        DashboardPanel.disposeCurrent();
-                        DashboardPanel.createOrShow(context.extensionUri);
-                    }
-                },
+                () => DashboardPanel.recreateForLocale(),
             );
             configWatcher.start();
 
@@ -203,13 +192,6 @@ export function activate(context: vscode.ExtensionContext): void {
         // globalAggregatorRef 传入：命令面板 reset/clearGlobal 与面板 reset 语义对齐（都清全局聚合）。
         commandRegistrar.register(context, orchestrator, statusBar, globalAggregatorRef);
 
-        // 注册订阅
-        context.subscriptions.push(
-            vscode.workspace.onDidChangeWorkspaceFolders(() => {
-                // 工作区变化时不做特殊处理
-            }),
-        );
-
         const elapsed = Date.now() - startTime;
         log(LogLevel.Info, `WorkspaceTiming: activated in ${elapsed}ms`);
 
@@ -224,9 +206,6 @@ export async function deactivate(): Promise<void> {
     try {
         // 停止配置监听
         configWatcher?.stop();
-
-        // 停止生命周期监听
-        lifecycleManager?.stop();
 
         // 停止调度器（同步清理定时器）
         scheduler?.stop();

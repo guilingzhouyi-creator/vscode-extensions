@@ -1,28 +1,39 @@
-﻿<#
-.SYNOPSIS
-    统一扩展打包入口：构建 VSIX 并集中输出到 dist/<扩展名>/。
-
-.DESCRIPTION
-    仓库约定（本地与 CI 同构）：
-        dist/<扩展名>/<扩展名>-<版本>.vsix     # 主产物
-        dist/<扩展名>/SHA256SUMS.txt           # 最新版本的校验和
-    - 扩展自动发现：仓库顶层含 package.json 的目录（为后续扩展预留，无需改脚本）
-    - 每个扩展目录默认保留最近 5 个版本，更旧的自动清理
-    - GitHub CI（.github/workflows/release.yml）产出相同结构并发布到 GitHub Releases
-
-.EXAMPLE
-    .\scripts\package.ps1                          # 打包全部扩展
-    .\scripts\package.ps1 -Name workspace-timing   # 只打包指定扩展
-    .\scripts\package.ps1 -Keep 3                  # 每扩展只保留最近 3 个版本
-#>
+# ==============================================================================
+# 模块归属: 跨平台构建工具链 (Build · VS Code 扩展打包流水线)
+# 文件路径: scripts/ps1/package.ps1
+# 架构定位: 扩展打包 Runner (Windows PowerShell)
+# 依赖与触发: 触发方: 发布闭环 / 本地打包 | 上游: vsce / npm build | 下游: dist/<ext>/ | 运行时: PowerShell 7+
+# 职责说明: 打包 workspace-timing 等 VS Code 扩展至 dist 目录，执行依赖编译与 vsce package
+# 退出语义与设计依据: 退出码: 0=打包完成, 1=编译或打包失败 | 设计依据: AGENTS.md 统一发布工具链
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   .\scripts\ps1\package.ps1
+#   .\scripts\ps1\package.ps1 -Extension workspace-timing
+# ==============================================================================
+[CmdletBinding()]
 param(
     [string]$Name,
     [int]$Keep = 5,
     [switch]$SkipBuild
 )
+Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
-$root = Split-Path $PSScriptRoot -Parent
+
+# ─── 根目录解析：本脚本位于 <根>/scripts/ps1/，上溯两级 ───
+# 不变量自检：脚本被移动到新目录（如 scripts/ 重构为 scripts/ps1/）时，
+# 根路径解析与存在性断言必须同步更新，否则立即显式失败而非静默失效。
+$root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$invariants = @(
+    @{ Path = Join-Path $root 'scripts\ps1\package.ps1'; Label = '本脚本自身位置（根解析自证）' }
+    @{ Path = Join-Path $root 'scripts\sh\package.sh'; Label = '同构双实现 package.sh' }
+    @{ Path = Join-Path $root '.github\workflows\release.yml'; Label = 'CI 发布流水线（同构约定）' }
+)
+foreach ($iv in $invariants) {
+    if (-not (Test-Path $iv.Path)) {
+        throw "根目录解析失效：找不到 $($iv.Label)（期望路径: $($iv.Path)）。脚本位置变更后必须同步根解析。"
+    }
+}
 
 # ─── 发现扩展：顶层含 package.json 且声明 engines.vscode 的目录 ───
 #   （engines.vscode 是 VS Code 扩展的强标识；auto-refactor 等纯工具目录

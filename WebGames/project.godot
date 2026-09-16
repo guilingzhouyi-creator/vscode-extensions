@@ -1,0 +1,20 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; but it can also be edited by text editors.
+
+config_version=5
+
+[application]
+
+config/name="KalarWorldEngine"
+config/description="卡拉尔世界引擎 (Kalar World Engine) - 第一性原理全域确定性母机与解耦宿主"
+run/main_scene="res://frontend/app/app_root.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=800
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"

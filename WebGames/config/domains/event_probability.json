@@ -1,0 +1,46 @@
+{
+  "events": {
+    "EVT_BEAST_TIDE": {
+      "base_probability": 0.15,
+      "conditions": [
+        {
+          "id": "town_border",
+          "when": {
+            "kind": "TOWN_EQUALS",
+            "val": "TOWN_VALAN"
+          },
+          "factor": 1.5
+        },
+        {
+          "id": "high_level",
+          "when": {
+            "kind": "MIN_LEVEL",
+            "val": 20
+          },
+          "factor": 1.2
+        }
+      ],
+      "adjustments": [
+        {
+          "id": "reputation_buff",
+          "when": {
+            "kind": "REPUTATION_GREATER",
+            "faction": "VALAN_GUARD",
+            "val": 50
+          },
+          "delta": 0.05
+        }
+      ],
+      "links": [
+        {
+          "linked_event_id": "EVT_MARKET_CRASH",
+          "factor": 1.3
+        }
+      ]
+    },
+    "EVT_MARKET_CRASH": {
+      "base_probability": 0.08,
+      "links": []
+    }
+  }
+}

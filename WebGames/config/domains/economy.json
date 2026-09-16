@@ -1,0 +1,10 @@
+{
+  "dynamic_market": {
+    "enabled": true,
+    "time_cycle_ticks": 20,
+    "time_decay_factor": 0.02,
+    "volume_feedback_strength": 0.1,
+    "price_change_rate_max": 0.25,
+    "mean_reversion_strength": 0.05
+  }
+}

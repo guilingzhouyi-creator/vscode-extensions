@@ -1,0 +1,72 @@
+{
+  "levels": {
+    "debug": "DEBUG",
+    "info": "INFO",
+    "warn": "WARN",
+    "error": "ERROR"
+  },
+  "default_level": "info",
+  "format": "[%s] %s",
+  "export": {
+    "enabled": false,
+    "directory": "user://logs",
+    "file_prefix": "kalar",
+    "max_bytes": 5242880,
+    "max_files": 5,
+    "min_level": "info",
+    "include_channels": []
+  },
+  "structured": {
+    "enabled": true,
+    "ring_buffer_capacity": 1000,
+    "json_indent": 0
+  },
+  "redaction": {
+    "enabled": true,
+    "rules": [
+      {
+        "field_pattern": "token|session_token",
+        "mask_mode": "mask",
+        "mask_prefix_len": 4,
+        "mask_suffix_len": 4,
+        "replace_with": "****"
+      },
+      {
+        "field_pattern": "fingerprint|device_fingerprint",
+        "mask_mode": "mask",
+        "mask_prefix_len": 4,
+        "mask_suffix_len": 0,
+        "replace_with": "****"
+      },
+      {
+        "field_pattern": "password|password_hash|secret|seal_key",
+        "mask_mode": "drop"
+      },
+      {
+        "field_pattern": "account_id",
+        "mask_mode": "hash"
+      }
+    ],
+    "default_mode": "mask"
+  },
+  "telemetry": {
+    "enabled": true,
+    "window_seconds": 60,
+    "sample_size": 256
+  },
+  "retention": {
+    "enabled": true,
+    "max_days": 7,
+    "cleanup_interval_seconds": 3600
+  },
+  "events": {
+    "LOG_RES_LIFECYCLE_TRACKED": "Resource '{resource_id}' tracked under category '{category}' by owner '{owner}'.",
+    "LOG_RES_LIFECYCLE_DISPOSED": "Resource '{resource_id}' disposed cleanly. Memory reclaimed.",
+    "LOG_CACHE_EVICTED": "Cache '{cache_name}' evicted key '{key}' according to policy '{policy}'.",
+    "LOG_CACHE_HOT_RELOAD_FLUSH": "Cache '{cache_name}' flushed all entries upon hot reload trigger.",
+    "LOG_EVENT_SUBSCRIBER_CLEARED": "Scoped subscriber cleared {count} active subscriptions for owner '{owner}'.",
+    "LOG_IDEMPOTENT_REJECT": "Operation with token '{token}' was already processed. Duplicate execution skipped.",
+    "LOG_DATA_SANITIZED": "Parameter '{param_name}' sanitized from raw value '{raw}' to safe value '{clean}'.",
+    "LOG_RPC_ISOLATION_BLOCKED": "Standalone local log or state blocked from multiplayer synchronization."
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "global_limits": {
+    "max_special_affixes_per_item": 3,
+    "enforce_lower_bound_zero": true,
+    "max_stat_upper_bound": 99999.0
+  },
+  "quality_upgrade_thresholds": {
+    "tier_2": 50.0,
+    "tier_3": 120.0,
+    "tier_4": 260.0,
+    "tier_5": 500.0,
+    "tier_6": 1000.0
+  },
+  "appraisal_rules": {
+    "base_stamina_cost": 1,
+    "anti_spoof_salt": "KALAR_AFFIX_AUDIT_SALT_V1"
+  },
+  "attributes": {
+    "ATTR_INC_ATK_T1": {
+      "canonical_id": "attribute.attack_bonus_t1",
+      "category": "INCREMENT",
+      "target_stat": "attack",
+      "calculation_type": "FLAT_ADD",
+      "base_value": 15.0,
+      "value_min": 0.0,
+      "value_max": 50.0,
+      "affix_score": 10.0,
+      "conflict_tags": [],
+      "synergy_tags": [
+        "sharpness"
+      ]
+    },
+    "ATTR_INC_DEF_T1": {
+      "canonical_id": "attribute.defense_bonus_t1",
+      "category": "INCREMENT",
+      "target_stat": "defense",
+      "calculation_type": "FLAT_ADD",
+      "base_value": 10.0,
+      "value_min": 0.0,
+      "value_max": 40.0,
+      "affix_score": 10.0,
+      "conflict_tags": [],
+      "synergy_tags": [
+        "fortitude"
+      ]
+    },
+    "ATTR_DEC_DEF_CURSE_T1": {
+      "canonical_id": "attribute.defense_curse_t1",
+      "category": "DECREMENT",
+      "target_stat": "defense",
+      "calculation_type": "FLAT_ADD",
+      "base_value": 10.0,
+      "value_min": 0.0,
+      "value_max": 30.0,
+      "affix_score": -5.0,
+      "conflict_tags": [
+        "blessed"
+      ],
+      "synergy_tags": [
+        "dark_magic"
+      ]
+    },
+    "ATTR_SPECIAL_VAMPIRE_T1": {
+      "canonical_id": "attribute.special_vampiric_touch",
+      "category": "SPECIAL_AFFIX",
+      "target_stat": "life_steal_rate",
+      "calculation_type": "PERCENT_ADD",
+      "base_value": 0.15,
+      "value_min": 0.0,
+      "value_max": 0.5,
+      "affix_score": 180.0,
+      "appraisal_requirement": {
+        "min_skill_level": 3,
+        "required_lore": "BLOOD_ALCHEMY"
+      },
+      "conflict_tags": [
+        "holy_pure"
+      ],
+      "synergy_tags": [
+        "dark_magic"
+      ]
+    },
+    "ATTR_SPECIAL_HOLY_GLOW_T1": {
+      "canonical_id": "attribute.special_holy_radiance",
+      "category": "SPECIAL_AFFIX",
+      "target_stat": "magic_potency",
+      "calculation_type": "FLAT_ADD",
+      "base_value": 45.0,
+      "value_min": 0.0,
+      "value_max": 100.0,
+      "affix_score": 280.0,
+      "appraisal_requirement": {
+        "min_skill_level": 4,
+        "required_lore": "DIVINE_SCRIPTURE"
+      },
+      "conflict_tags": [
+        "dark_magic",
+        "holy_pure"
+      ],
+      "synergy_tags": [
+        "sun_domain"
+      ]
+    }
+  }
+}

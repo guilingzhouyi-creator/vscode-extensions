@@ -1,0 +1,24 @@
+{
+  "$schema": "../schemas/lifecycle.schema.json",
+  "version": 1,
+  "timeouts": {
+    "shutdown_timeout_seconds": 5.0,
+    "force_kill_timeout_seconds": 2.0,
+    "save_flush_timeout_seconds": 3.0,
+    "network_disconnect_timeout_seconds": 1.5,
+    "poll_interval_ms": 100
+  },
+  "policies": {
+    "auto_save_on_exit": true,
+    "allow_cancel_exit": true,
+    "confirm_dialog_required": true,
+    "force_kill_on_deadlock": true,
+    "backup_corrupted_saves": true
+  },
+  "errors": {
+    "ERR_ALREADY_STOPPING": "系统正在执行停机流程，请勿重复操作",
+    "ERR_SHUTDOWN_TIMEOUT": "安全停机超时，已触发强制保护性退出",
+    "ERR_SAVE_FLUSH_FAILED": "退出存盘失败，已生成紧急恢复快照",
+    "ERR_INVALID_TRANSITION": "生命周期状态机发生非法跃迁尝试"
+  }
+}

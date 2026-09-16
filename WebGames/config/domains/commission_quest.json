@@ -1,0 +1,8 @@
+{
+  "defaults": {
+    "reward_gold": 100,
+    "reward_mana_crystals": 0,
+    "org_tax_rate": 0.05,
+    "security_deposit_required": 10
+  }
+}

@@ -57,3 +57,5 @@ export interface LanguageAdapter {
 
 * **TypeScript 适配器** (`typescriptAdapter.ts`)：基于 TypeScript 原生 AST，支持 TSX/JSX、全套装饰器及顶级导出。
 * **Rust 适配器** (`rustAdapter.ts`)：基于 `tree-sitter-rust`，自动解析 `fn`、`impl`、`match` 分支、宏声明与字面量，无缝支持 Rust 语言的常量提取与复杂度分析。
+* **Python 适配器** (`pythonAdapter.ts`)：基于 `tree-sitter-python`，映射 `def`/`class`/`lambda`/赋值/分支/字面量节点；`def` 在类体内识别为方法、`__init__` 保持 `Class.__init__` 命名、模块级 `UPPER_SNAKE_CASE` 赋值视为常量绑定，docstring/装饰器参数/下标/字典键等字面量按容忍上下文豁免，`and`/`or`/`elif`/`except`/推导式条件均计入圈复杂度。
+* **扩展入口**：新增语言只需实现 `LanguageAdapter` 并在 `adapters.ts` 注册工厂；未被任何适配器认领的扩展名会触发 [引擎级 fail-closed 诊断](../04-analyzers-and-rules/01-builtin-rules.md)（`LANG-UNSUPPORTED`），不再静默回退 TypeScript 解析器。

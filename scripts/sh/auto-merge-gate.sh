@@ -1,45 +1,19 @@
 #!/usr/bin/env bash
-# =============================================================================
-# auto-merge-gate.sh — PR 自动化合入安全门禁（配合平台原生 git:auto-merge）
-# -----------------------------------------------------------------------------
-# 作用：
-#   在 `pull_request.mergeable` 事件（PR 满足「无冲突 + 评审通过」）触发时，
-#   作为【自动化合入前的最后一道确定性门禁】，判定该 PR 是否允许平台自动合入：
-#     ① 幂等/就绪判定：确认该 PR 已通过前置门禁（status/gate-ok 标签或缓存）。
-#     ② 否决标签检查：存在 status/merge-blocked（合入员 NPC / 人工提前否决）→ 禁止自动合入。
-#     ③ 冲突安全判定：仅允许 C0（无冲突）或 C1（已由构建/测试化解）级别自动合入；
-#        C2/C3（需审查/高危）强制退回人工，绝不自动合入。
-#     ④ 高危保护：检测高危文件（数据迁移/核心逻辑/依赖/越权）时强制禁止自动合入，
-#        避免自动化在关键改动上盲目放行。
-#
-# 退出语义（配合流水线 stages 顺序执行）：
-#   - 退出码 0  → 允许自动合入 → 后续 `git:auto-merge` 任务继续执行。
-#   - 退出码非 0 → 禁止自动合入 → 当前 stage 失败，后续 `git:auto-merge` 被跳过
-#                 （stages 中断并跳转到 failStages），PR 保持未合入等待人工。
-#   - fail-safe：目标分支缺失 / 无 git 仓库 / 预演回退异常 → 判为 UNKNOWN 保守禁止合入，绝不降级放行。
-#
-# 解决的问题：
-#   平台 `git:auto-merge` 会在 PR mergeable（无冲突+评审通过）时直接合入，
-#   但仓库存在多级冲突分级（C0-C3）与门禁机制，直接裸用会绕过门禁治理 §4.8
-#   的冲突准入判断（C2 需审查判断、C3 高危禁止自动合入）。
-#   本脚本在 auto-merge 前插入确定性判定，把「平台原生能力」与「仓库门禁治理」
-#   衔接起来，实现"安全的全自动合入"。
-#
-# 配套：
-#   - pr-gate.sh（$ pull_request 前置门禁：冲突检测分级 C0-C3 + 幂等 gate-ok）
-#   - 门禁治理分册 §4.8 合入冲突自动审查（C0-C3 准入规则）
-#   - 流水线接入：.cnb.yml（$ 下 pull_request.mergeable 事件，置于 git:auto-merge 之前）
-#
-# 用法：
+# ==============================================================================
+# 模块归属: CI/CD 自动化流水线 (Automation · 自动化合流门禁)
+# 文件路径: scripts/sh/auto-merge-gate.sh
+# 架构定位: 合流守卫 Runner (Linux Bash)
+# 依赖与触发: 触发方: GitHub Actions (pull_request) | 上游: pr-gate.sh | 下游: 自动合并决策 | 运行时: Bash 4+
+# 职责说明: 验证 PR 无冲突、状态就绪与权限门禁，对低风险变更执行平台安全合流
+# 退出语义与设计依据: 退出码: 0=放行合流, 1=阻断合流 | 设计依据: 自动化持续集成守卫契约
+# ------------------------------------------------------------------------------
+# 用法示例:
 #   bash scripts/sh/auto-merge-gate.sh
-#   （依赖 CNB 流水线注入的环境变量 + cnb-cli + git，仅应在流水线内运行）
-#
-# 环境变量（由 CNB 流水线自动注入）：
-#   PR 场景：CNB_PULL_REQUEST_TITLE / CNB_PULL_REQUEST_DESCRIPTION / CNB_PULL_REQUEST_IID
-#   Git：    CNB_REPO_SLUG（组织/仓库）、CNB_DEFAULT_BRANCH（目标分支）、CNB_COMMIT（head commit）
-#   公共：    CNB_PULL_REQUEST（是否 PR）、CNB_EVENT（事件名）、CNB_REPO_WORKTREE（可选工作区路径）
-# =============================================================================
+# ==============================================================================
 set -uo pipefail
+
+# 冲突分级单源规则（与 pr-gate.sh 共享，防两道门禁规则漂移）
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-common.sh"
 
 # ---------- 0. 基础信息 ----------
 REPO_SLUG="${CNB_REPO_SLUG:-}"
@@ -66,7 +40,7 @@ echo "事件      : ${EVENT}"
 # 才认为该 PR 已通过前置门禁（冲突检测 + Diff 初筛）。
 # 防呆：即使本仓库 pull_request 门禁未跑完，也绝不裸自动合入。
 GATE_OK_LABEL="status/gate-ok"
-CACHE_DIR="${REPO_ROOT}/.cnb/.cache"
+CACHE_DIR="${REPO_ROOT}/.workbuddy/pr-gate-cache"
 CACHE_FILE="${CACHE_DIR}/pr-gate-${PR_NUM}.last"
 
 gate_passed="false"
@@ -135,16 +109,9 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
     else
       CONFLICT_FILES="$(git diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ')"
       git merge --abort >/dev/null 2>&1 || true
-      # 存在冲突 → 分级：按 pr-gate 规则简化判定
+      # 存在冲突 → 分级（单源规则，见 gate-common.sh；无文件名按 C2 需审查）
       if [[ -n "$CONFLICT_FILES" ]]; then
-        HIGH_RISK_PATTERNS="package.json|package-lock.json|\.sql$|migration|schema|data.?migrat"
-        if echo "$CONFLICT_FILES" | grep -Eq "$HIGH_RISK_PATTERNS"; then
-          CONFLICT_LEVEL="C3"
-        elif [[ "$(echo "$CONFLICT_FILES" | wc -w)" -le 2 ]]; then
-          CONFLICT_LEVEL="C1"
-        else
-          CONFLICT_LEVEL="C2"
-        fi
+        CONFLICT_LEVEL=$(gate_classify_conflicts "$CONFLICT_FILES")
       else
         CONFLICT_LEVEL="C2"
       fi

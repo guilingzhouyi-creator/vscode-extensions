@@ -1,0 +1,93 @@
+{
+  "save_dir": "user://saves/",
+  "save_extension": ".kalar_save",
+  "format_version": "1.0.0",
+  "min_supported_version": "1.0.0",
+  "engine": "KalarWorldEngine_Godot4",
+  "hash_preview_len": 8,
+  "command_defaults": {
+    "command_type": "EXECUTE_COMBAT_ACTION",
+    "tick": 0
+  },
+  "event_defaults": {
+    "event_type": "STATE_UPDATE",
+    "sequence_number": 0
+  },
+  "reconciliation": {
+    "default_hp": 100.0,
+    "default_ap": 0,
+    "default_verb": "SLASH",
+    "base_ap_fallback": -2
+  },
+  "messages": {
+    "open_write_fail": "Failed to open file for write: %s",
+    "save_success": "Game saved successfully to: %s [Hash: %s]",
+    "file_not_exist": "Save file does not exist: %s",
+    "open_read_fail": "Failed to open save file for read.",
+    "json_parse_fail": "JSON parse failed at line %d: %s",
+    "invalid_envelope": "Invalid save envelope structure.",
+    "checksum_mismatch": "Save file integrity check failed! Checksum mismatch.",
+    "load_success": "Game loaded successfully from: %s",
+    "invalid_save_name": "Invalid save name (path traversal or illegal characters): %s",
+    "atomic_replace_fail": "Atomic replace failed (original preserved): %s",
+    "legacy_unverified": "Legacy save without data_json; integrity check skipped.",
+    "backup_corrupt": "Backup corrupted or unparseable; primary save kept intact: %s",
+    "version_too_new": "Save format version %s is newer than this engine supports.",
+    "version_too_old": "Save format version %s is older than the minimum supported version.",
+    "backup_failed": "Failed to back up previous save (continuing): %s",
+    "auto_restored": "Primary save was corrupt; automatically restored from backup: %s",
+    "orphan_tmp_cleaned": "Cleaned %d orphan temp save file(s) at startup."
+  },
+  "recovery": {
+    "auto_restore_enabled": true,
+    "orphan_tmp_cleanup": true
+  },
+  "atomic_write": {
+    "enabled": true,
+    "tmp_suffix": ".tmp",
+    "backup_suffix": ".bak",
+    "backup_fail_policy": "abort",
+    "max_save_name_length": 64
+  },
+  "schema_version": 1,
+  "save_layout": {
+    "root_sections": [
+      "metadata",
+      "account",
+      "character",
+      "inventory",
+      "item",
+      "lattice",
+      "world",
+      "progress",
+      "economy",
+      "quest",
+      "lifecycle",
+      "settings"
+    ],
+    "high_frequency_domains": [
+      "inventory",
+      "item",
+      "economy"
+    ],
+    "atomic_policy": "envelope"
+  },
+  "migration_rules": {
+    "enabled": true,
+    "registry": "persistence_protocol",
+    "save_version_chain": [
+      "1.0.0"
+    ]
+  },
+  "validation_rules": {
+    "missing_field": "use_default",
+    "type_mismatch": "coerce_or_drop",
+    "unknown_domain": "warn_and_skip"
+  },
+  "hot_reload": {
+    "enabled": true,
+    "mode": "single_player_only",
+    "hash_check": "content_sha256",
+    "failure_policy": "rollback_and_keep_old_hash"
+  }
+}

@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
-# =============================================================================
-# 统一扩展打包入口（bash 同构版，与 scripts/ps1/package.ps1 同约定）
-# -----------------------------------------------------------------------------
-# 仓库约定（本地与 CI 同构）：
-#   dist/<扩展名>/<扩展名>-<版本>.vsix      # 主产物
-#   dist/<扩展名>/SHA256SUMS.txt            # 最新版本的校验和
-# - 扩展自动发现：仓库顶层含 package.json 的目录（为后续扩展预留，无需改脚本）
-# - 每个扩展目录默认保留最近 5 个版本，更旧的自动清理
-# - GitHub CI（.github/workflows/release.yml）产出相同结构并发布到 Releases
-#
-# 用法：
-#   bash scripts/sh/package.sh                              # 打包全部扩展
-#   bash scripts/sh/package.sh --name workspace-timing      # 只打包指定扩展
-#   bash scripts/sh/package.sh --keep 3                     # 每扩展只保留最近 3 个版本
-#   bash scripts/sh/package.sh --skip-build                 # 跳过 compile，直接 vsce 打包
-# =============================================================================
-set -euo pipefail
+# ==============================================================================
+# 模块归属: 跨平台构建工具链 (Build · VS Code 扩展打包流水线)
+# 文件路径: scripts/sh/package.sh
+# 架构定位: 扩展打包 Runner (Linux Bash)
+# 依赖与触发: 触发方: 发布闭环 / 本地打包 | 上游: vsce / npm build | 下游: dist/<ext>/ | 运行时: Bash 4+
+# 职责说明: 打包 workspace-timing 等 VS Code 扩展至 dist 目录，执行依赖编译、生成校验和与历史版本轮转
+# 退出语义与设计依据: 退出码: 0=打包完成, 1=编译或打包失败 | 设计依据: AGENTS.md 统一发布工具链
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   bash scripts/sh/package.sh
+#   bash scripts/sh/package.sh --name workspace-timing
+#   bash scripts/sh/package.sh --keep 3
+# ==============================================================================
+set -uo pipefail
 
 KEEP=5
 NAME=""
@@ -34,7 +31,16 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# ─── 根目录解析：本脚本位于 <根>/scripts/sh/，上溯两级 ───
+# 不变量自检：脚本被移动到新目录（如 scripts/ 重构为 scripts/sh/）时，
+# 根路径解析与存在性断言必须同步更新，否则立即显式失败而非静默失效。
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+for iv_path in "$ROOT/scripts/sh/package.sh" "$ROOT/scripts/ps1/package.ps1" "$ROOT/.github/workflows/release.yml"; do
+  if [[ ! -f "$iv_path" ]]; then
+    echo "::error::根目录解析失效：找不到 $iv_path。脚本位置变更后必须同步根解析。" >&2
+    exit 1
+  fi
+done
 
 # ─── 发现扩展：顶层含 package.json 且声明 engines.vscode 的目录 ───
 #   （engines.vscode 是 VS Code 扩展的强标识；auto-refactor 等纯工具目录
@@ -67,7 +73,8 @@ fi
 
 for EXT in "${EXTS[@]}"; do
   DIR="$ROOT/$EXT"
-  PKG_VER=$(node -p "require('./$EXT/package.json').version" 2>/dev/null || echo "")
+  # 绝对路径经 argv 传入：CWD 无关 + MSYS 自动转换为 Windows 路径
+  PKG_VER=$(node -e "const v=require(process.argv[1]).version; process.stdout.write(v||'')" "$DIR/package.json" 2>/dev/null || echo "")
   if [[ -z "$PKG_VER" ]]; then
     echo "跳过 $EXT：无法读取 package.json version" >&2
     continue

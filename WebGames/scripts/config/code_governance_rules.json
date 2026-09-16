@@ -1,0 +1,166 @@
+{
+  "version": "1.1.0",
+  "name": "卡拉尔世界引擎代码规范与简化治理规则库",
+  "description": "定义高级代码规范、防止过度工程化与代码简化的双向钳制规则集与豁免清单",
+  "advanced_rules": {
+    "ADV-TYP-001": {
+      "level": "WARN",
+      "name": "显式强类型与类型推断规范",
+      "description": "属性变量必须显式声明类型，局部变量推荐使用 := 静态推断或显式声明类型，避免裸写无类型 var",
+      "fix_suggestion": "为属性变量补充强类型注解（如 var count: int = 0），局部变量改用 := 静态推断（如 var item := ...）"
+    },
+    "ADV-TYP-002": {
+      "level": "ERROR",
+      "name": "函数签名参数与返回值类型完整性",
+      "description": "所有业务函数定义必须标注参数类型与返回值类型（如 func foo(p_val: int) -> bool），严禁裸参数或无返回值签名",
+      "fix_suggestion": "为所有函数参数补充类型标注并显式声明返回值类型（无返回值声明 -> void）"
+    },
+    "ADV-NAM-001": {
+      "level": "ERROR",
+      "name": "标识符全域统一命名规范",
+      "description": "类名与枚举名须为 PascalCase，变量/函数/参数为 snake_case，常量为 UPPER_SNAKE_CASE，私有成员必须加 _ 前缀，static var 严禁 UPPER_SNAKE",
+      "fix_suggestion": "调整标识符命名以符合 GD老练风格硬性规范标准"
+    },
+    "ADV-CFG-001": {
+      "level": "ERROR",
+      "name": "零硬编码与安全配置读取",
+      "description": "所有业务阈值、枚举、文案与数值一律经 GameConfig.get_* 读取并带安全默认值，绝对禁止外部裸调用 get_value()",
+      "fix_suggestion": "将硬编码常量转移至 config/<层>/<域>.json，并通过 GameConfig.get_int/get_float/get_string 类型化读取"
+    },
+    "ADV-RNG-001": {
+      "level": "ERROR",
+      "name": "单机确定性随机与伪随机沙盒",
+      "description": "严禁裸调用 Godot 全局随机函数 randf()、randi()、randomize()，必须统一经 DeterministicRNG 派发",
+      "fix_suggestion": "将全局随机调用替换为 DeterministicRNG.resolve(rng).randf() 或受控种子发生器"
+    },
+    "ADV-DEC-001": {
+      "level": "ERROR",
+      "name": "纯领域模型与场景树解耦防腐",
+      "description": "backend/domains/ 纯领域模型与求解器必须继承 RefCounted/Object，严禁继承 Node、Control、Node2D 或引用场景树",
+      "fix_suggestion": "将领域类基类修改为 RefCounted，通过 EventBus 事件广播或 DTO 参数与表现层进行解耦交互"
+    },
+    "ADV-PRF-001": {
+      "level": "WARN",
+      "name": "热路径与循环内零开销准则",
+      "description": "循环体内禁止重复读取配置 GameConfig.get_*、禁止高频字符串格式化与高频线性查找 Array.find()",
+      "fix_suggestion": "在循环前将配置或查找集提前缓存为局部变量，高频查找使用 Dictionary 哈希表优化至 O(1)"
+    },
+    "ADV-LAM-001": {
+      "level": "WARN",
+      "name": "Lambda 捕获作用域与生命周期安全",
+      "description": "GDScript 4 中 lambda 表达式捕获基础类型为值传递、捕获对象可能引发生命周期循环引用，严禁在闭包中直接修改捕获的基本类型局部变量",
+      "fix_suggestion": "使用 Callable 或将状态封装于 RefCounted 容器对象中传递引用"
+    },
+    "ADV-BND-001": {
+      "level": "ERROR",
+      "name": "纯领域模型跨域私有成员访问禁令",
+      "description": "backend/domains/ 下不同子域之间严禁跨域直接读写以 '_' 开头的私有属性或调用私有方法，必须使用公有契约方法或 EventBus 进行交互",
+      "fix_suggestion": "通过公开的公共方法、DTO 传输载荷或发布领域事件解耦交互"
+    },
+    "ADV-TYP-003": {
+      "level": "WARN",
+      "name": "不可控 Variant 返回值盲目静态推断防范",
+      "description": "严禁对可能返回 null、Variant 或动态字典查询结果使用 := 进行强类型绑定（如 var x := dict.get(k) 会推断为 Variant 并隐藏类型缺陷）",
+      "fix_suggestion": "显式声明期望类型并进行空值卫语句守卫：var x: Type = dict.get(k, default)"
+    },
+    "ADV-SIG-001": {
+      "level": "ERROR",
+      "name": "信号发射参数完整性契约",
+      "description": "emit_signal() 或 signal.emit() 传入的参数数量和类型必须与 signal 声明完全匹配",
+      "fix_suggestion": "核对信号声明签名并确保发射传参一一对应"
+    },
+    "ADV-PRF-002": {
+      "level": "WARN",
+      "name": "热路径与循环内瞬态堆分配守卫",
+      "description": "逐帧/万次高频热路径的循环体内禁止频繁执行瞬态堆分配（.new() 或 .duplicate(true)），避免高频垃圾回收停顿与内存碎片；回合级/事件驱动/装载期等有界低频调用豁免（需在注释注明量级上界）",
+      "fix_suggestion": "将高频对象接入 ObjectPool 池化复用，或在循环前预分配局部重用容器"
+    },
+    "ADV-POOL-001": {
+      "level": "ERROR",
+      "name": "对象池生命周期契约守卫",
+      "description": "接入 ObjectPool 的类必须实现 reset_state() 接口，借出时必须彻底重置状态，归还时校验所有权防双重归还",
+      "fix_suggestion": "为可池化对象实现 reset_state() -> void 方法以确保状态彻底复位"
+    },
+    "ADV-EVT-001": {
+      "level": "ERROR",
+      "name": "EventBus 频道命名硬约定",
+      "description": "频道必须形如 <domain_id>.<event_name> 且首段必须是 domains.json 已登记领域 id（event_bus_config.json channel_registry 约定），禁止 auth/hud 等非域前缀或裸字符串散落",
+      "fix_suggestion": "频道值统一经 HudEventContract/配置表登记并按 <domain_id>.<event_name> 命名"
+    },
+    "ADV-EVT-002": {
+      "level": "ERROR",
+      "name": "频道叙事键对齐契约",
+      "description": "频道 event_name 必须在该域叙事表（narratives.<映射表>）存在对应模板键；纯结构化事件须在 channel_registry 显式声明 narrative:false 豁免",
+      "fix_suggestion": "补充 narratives.<域> 模板键或显式声明 narrative:false"
+    },
+    "ADV-EVT-003": {
+      "level": "ERROR",
+      "name": "信道注册表与常量表单一真源对齐",
+      "description": "event_bus_config.channel_registry 的 id 必须与 EventChannelDefinition 常量值一致，禁止双真源漂移",
+      "fix_suggestion": "同步修正 channel_registry.id 或 EventChannelDefinition 常量"
+    },
+    "ADV-EVT-004": {
+      "level": "WARN",
+      "name": "广播载荷叙事契约完备",
+      "description": "emit_domain_event 字面量载荷建议携带 category_key（取色）与 args（模板占位填充）；纯结构化事件可省略 args 但应显式声明",
+      "fix_suggestion": "为广播载荷补充 category_key 与 args 键"
+    }
+  },
+  "simplification_rules": {
+    "SIM-INH-001": {
+      "level": "ERROR",
+      "name": "继承深度约束（最大深度 ≤ 2）",
+      "description": "类继承链深度不得超过 2 层（即直接继承 RefCounted 或继承 1 层业务基类），禁止 Java 式多重冗长继承树，提倡组合优先",
+      "fix_suggestion": "将多层继承关系重构为单一领域类 + 组合策略模式（Composition over Inheritance）"
+    },
+    "SIM-WRP-001": {
+      "level": "WARN",
+      "name": "空层转发与虚假包装类治理",
+      "description": "禁止无实际业务价值的空包装类（类中仅 1-2 个单行透传方法且无任何数据转换、校验或拦截逻辑）",
+      "fix_suggestion": "直接使用底层领域服务或将无意义中间包装类内联简化"
+    },
+    "SIM-DED-001": {
+      "level": "WARN",
+      "name": "冗余代码与死代码消除",
+      "description": "检测无意义的空 pass（在已有有效语句或 docstring 之后）、布尔冗余判断（如 if x: return true else: return false 可简化为 return x）",
+      "fix_suggestion": "移除无用 pass 语句，简化布尔逻辑表达式"
+    },
+    "SIM-CMP-001": {
+      "level": "WARN",
+      "name": "单函数过深控制流与复杂度控制",
+      "description": "单函数内控制流嵌套层级不得超过 5 层，避免深层 if 嵌套认知负荷",
+      "fix_suggestion": "采用卫语句（Guard Clauses）进行前置校验早期返回，或将复杂分支提炼为子函数"
+    }
+  },
+  "exemptions": {
+    "by_path_prefix": {
+      "tests/": [
+        "ADV-DEC-001",
+        "ADV-BND-001",
+        "ADV-LAM-001",
+        "ADV-TYP-003",
+        "ADV-SIG-001",
+        "SIM-WRP-001",
+        "SIM-CMP-001"
+      ],
+      "benchmarks/": [
+        "ADV-BND-001",
+        "ADV-LAM-001",
+        "ADV-TYP-003",
+        "ADV-SIG-001",
+        "SIM-CMP-001"
+      ]
+    },
+    "by_file": {
+      "backend/infrastructure/deterministic_rng.gd": [
+        "ADV-RNG-001"
+      ],
+      "backend/infrastructure/game_bootstrap.gd": [
+        "SIM-CMP-001"
+      ],
+      "backend/domains/spatial_movement/spatial_math.gd": [
+        "SIM-WRP-001"
+      ]
+    }
+  }
+}

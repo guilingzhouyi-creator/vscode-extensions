@@ -64,7 +64,7 @@
 | `workspaceTiming.enabled` | `true` | 是否启用当前工作区的时长追踪 |
 | `workspaceTiming.globalDisabled` | `false` | 全局禁用所有工作区的时长追踪 |
 | `workspaceTiming.statusBar.enabled` | `true` | 是否在状态栏右侧显示计时器 |
-| `workspaceTiming.statusBar.format` | `compact` | 状态栏显示格式 |
+| `workspaceTiming.statusBar.mode` | `today-total` | 状态栏初始显示模式（点击状态栏循环切换并自动保存） |
 | `workspaceTiming.weeklyLimit.enabled` | `false` | 是否启用周工作上限监控与休息提醒 |
 | `workspaceTiming.weeklyLimit.hours` | `40` | 周工作上限时长（小时，范围 1~168） |
 | `workspaceTiming.storage.backupToFile` | `true` | 启用 `.vscode/workspace-timing.json` 文件备份 |
@@ -90,6 +90,8 @@
 | **v0.4.4** | 24 格 X 轴刻度逐格对齐、命令体系统一、RingBuffer 全面单测 | ✅ 已完成 |
 | **v0.4.5** | 跨午夜与休眠防漂移、周工作上限模块、动态渐变分割线与健康提醒 | ✅ 已完成 |
 | **v0.4.6** | 崩溃恢复双重计数修复（跨午夜/休眠封存段 journal 水位线去重）、journal 失败回退时序修复、覆盖率口径修正 | ✅ 已完成 |
+| **v0.4.7** | 性能与开销优化：多周趋势窗口化轻量聚合、历史折叠引擎零拷贝快退、高频聚合时间窗提前过滤（GC 压力削减） | ✅ 已完成 |
+| **v0.4.9** | 工程治理基建：自动化审查系统（L0~L5 六层门禁）+ 脚本库 TypeScript 化 + auto-refactor 0.3.0 联动（secrets/unused-export/cycles）；表驱动配置持久化 | ✅ |
 | **v0.5.0** | ☁️ 云端同步与多端聚合支持（WebDAV / GitHub Gist） | 🚧 规划中 |
 
 ---

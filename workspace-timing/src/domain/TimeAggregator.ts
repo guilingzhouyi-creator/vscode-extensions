@@ -6,8 +6,11 @@
  * 依赖：仅依赖 models.ts
  */
 
-import { TimeSlice, TimeSession, WorkspaceTimingData, DailyTotalsMap, MS_PER_DAY } from './models';
+import { TimeSession, DailyTotalsMap, MS_PER_DAY, MS_PER_SECOND } from './models';
 import { HeatmapDay } from './dashboard-types';
+
+/** 周趋势默认窗口：近 N 周（含当前周） */
+const DEFAULT_TREND_WEEKS = 4;
 
 /** 按日聚合统计 */
 export interface DailyStats {
@@ -170,31 +173,18 @@ export class TimeAggregator {
     }
 
     /**
-     * 将 TimeSlice 数组累加为总时长 (ms)
-     */
-    static sumSlices(slices: TimeSlice[]): number {
-        return slices.reduce((sum, s) => sum + s.deltaMs, 0);
-    }
-
-    /**
-     * 将 journal 中的 TimeSlice 合并到 WorkspaceTimingData
-     */
-    static mergeJournal(data: WorkspaceTimingData, slices: TimeSlice[]): void {
-        const totalDelta = TimeAggregator.sumSlices(slices);
-        data.totalMs += totalDelta;
-    }
-
-    /**
      * 计算今日累计时长 (ms)
      * = 今日会话片段的总和（跨午夜会话按自然日切分）+ 当前活跃会话今日已历时
      *
-     * ★ 性能优化：逆序扫描并在遇到今日零点前已结束的会话时立即 break，
-     *   将每秒高频心跳计算从 O(N)（遍历数千条历史）降低至 O(今日会话数) ≈ O(1)。
+     * ★ 性能口径：正向扫描 + 今日零点前会话先行跳过，配合 SessionManager 的
+     *   3s TTL 缓存抑制调用频率（每 3 秒至多一次全量扫描，N ≤ maxSessions）。
+     *   刻意不做逆序 break 提前退出：sessions 排序不变量仅在内部路径成立，
+     *   还原文件（DataValidator）无法保证有序，逆序 break 会漏计乱序尾部会话。
      *
      * @param sessions 历史会话列表
      * @param currentSessionStartMs 当前活跃会话开始时间，0 表示无活跃会话
      */
-    static todayMs(sessions: TimeSession[], currentSessionStartMs: number): number {
+    static todayMs(sessions: readonly TimeSession[], currentSessionStartMs: number): number {
         const today = localDateStr(Date.now());
         const todayStartMs = parseLocalDate(today);
         let total = 0;
@@ -219,7 +209,7 @@ export class TimeAggregator {
     /**
      * 按日聚合会话列表（跨午夜会话按自然日切分归桶）
      */
-    static dailyStats(sessions: TimeSession[]): DailyStats[] {
+    static dailyStats(sessions: readonly TimeSession[]): DailyStats[] {
         const map = new Map<string, { totalMs: number; count: number }>();
 
         for (const s of sessions) {
@@ -241,7 +231,7 @@ export class TimeAggregator {
     /**
      * 按周聚合会话列表（跨午夜/跨周日界的会话按切分后的片段归属）
      */
-    static weeklyStats(sessions: TimeSession[]): WeeklyStats[] {
+    static weeklyStats(sessions: readonly TimeSession[]): WeeklyStats[] {
         const map = new Map<string, { totalMs: number; count: number }>();
 
         for (const s of sessions) {
@@ -275,7 +265,7 @@ export class TimeAggregator {
      * @returns 最近 7 天的 DailyChartEntry 数组，按日期升序
      */
     static last7Days(
-        sessions: TimeSession[],
+        sessions: readonly TimeSession[],
         currentSessionStartMs: number,
         locale: 'zh-CN' | 'en' = 'zh-CN',
     ): { label: string; weekday: string; totalMs: number }[] {
@@ -359,7 +349,7 @@ export class TimeAggregator {
      * 昨日 23:30→今日 00:30 的会话，在昨日明细中显示 23:30–23:59(30m)，
      * 在今日明细中显示 00:00–00:30(30m)，时长与日累计口径一致。
      */
-    static dailyDetail(sessions: TimeSession[], dateStr: string, currentSessionStartMs = 0): DailyDetail {
+    static dailyDetail(sessions: readonly TimeSession[], dateStr: string, currentSessionStartMs = 0): DailyDetail {
         const dayStartMs = parseLocalDate(dateStr);
         const [y, m, d] = dateStr.split('-').map(Number);
         const dayEndMs = new Date(y, m - 1, d + 1).getTime();
@@ -462,7 +452,7 @@ export class TimeAggregator {
      * - 输出按日期升序。
      */
     static fullDailySeries(
-        sessions: TimeSession[],
+        sessions: readonly TimeSession[],
         currentSessionStartMs = 0,
         dailyTotals?: DailyTotalsMap,
     ): DailyStats[] {
@@ -497,7 +487,7 @@ export class TimeAggregator {
      *   不用固定 24h 毫秒步进（秋季回拨 25h 天会致连续两格落在同一日期、列错位）。
      */
     static heatmapDays(
-        sessions: TimeSession[],
+        sessions: readonly TimeSession[],
         currentSessionStartMs = 0,
         dailyTotals?: DailyTotalsMap,
         weeks = 12,
@@ -572,8 +562,8 @@ export class TimeAggregator {
 
     /** 近 N 周按周聚合趋势（含当前周，降序，窗口化 O(weeks*7) 算法，杜绝全历史排序开销） */
     static weeklyTrend(
-        sessions: TimeSession[],
-        weeks = 4,
+        sessions: readonly TimeSession[],
+        weeks = DEFAULT_TREND_WEEKS,
         currentSessionStartMs = 0,
         dailyTotals?: DailyTotalsMap,
     ): WeeklyStats[] {
@@ -680,7 +670,7 @@ export class TimeAggregator {
 
     /** 周报文字摘要（窗口化 O(1) 本周聚合，按自然日严格切分，含 dailyTotals 折叠层与进行中会话） */
     static weeklySummary(
-        sessions: TimeSession[],
+        sessions: readonly TimeSession[],
         currentSessionStartMs = 0,
         dailyTotals?: DailyTotalsMap,
     ): WeeklySummary {
@@ -709,7 +699,9 @@ export class TimeAggregator {
             }
         }
 
-        // 3. 原始会话：逆序扫描，遇到早于本周一的会话直接 break
+        // 3. 原始会话：逆序扫描，遇到早于本周一的会话直接 break。
+        //    依赖 sessions 按起始时间升序的排序不变量：内部路径天然有序，
+        //    还原路径由 DataValidator 排序后固化（乱序外部文件不可信）。
         const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
         for (let i = sessions.length - 1; i >= 0; i--) {
             const s = sessions[i];
@@ -791,7 +783,7 @@ export class TimeAggregator {
      * @example formatDuration(3661000) => "1h 1m 1s"
      */
     static formatDuration(ms: number): string {
-        const totalSeconds = Math.floor(ms / 1000);
+        const totalSeconds = Math.floor(ms / MS_PER_SECOND);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
@@ -810,7 +802,7 @@ export class TimeAggregator {
      * @example formatDurationCompact(60000) => "1m 0s"
      */
     static formatDurationCompact(ms: number): string {
-        const totalSeconds = Math.floor(ms / 1000);
+        const totalSeconds = Math.floor(ms / MS_PER_SECOND);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;

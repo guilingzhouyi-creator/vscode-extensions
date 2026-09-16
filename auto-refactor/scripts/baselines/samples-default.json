@@ -1,13 +1,14 @@
 {
   "filesScanned": 3,
-  "issuesTotal": 48,
+  "issuesTotal": 50,
   "byAnalyzer": {
     "constants": 47,
-    "complexity": 1
+    "large-file": 1,
+    "complexity": 2
   },
   "bySeverity": {
     "info": 0,
-    "warning": 48,
+    "warning": 50,
     "error": 0
   },
   "issues": [
@@ -16,7 +17,7 @@
       "analyzer": "complexity",
       "rule": "high-complexity",
       "severity": "warning",
-      "message": "Function \"addUser\" has cyclomatic complexity 10 (threshold 10).",
+      "message": "Function \"addUser\" has cyclomatic complexity 10 (threshold 8).",
       "location": {
         "file": "sample.ts",
         "start": {
@@ -31,8 +32,32 @@
       "detail": {
         "function": "addUser",
         "cyclomaticComplexity": 10,
-        "warn": 10,
-        "fail": 20
+        "warn": 8,
+        "fail": 12
+      }
+    },
+    {
+      "id": "complexity:high-complexity:sample.ts:47",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "warning",
+      "message": "Function \"validateUser\" has cyclomatic complexity 8 (threshold 8).",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 47,
+          "column": 1
+        },
+        "end": {
+          "line": 60,
+          "column": 2
+        }
+      },
+      "detail": {
+        "function": "validateUser",
+        "cyclomaticComplexity": 8,
+        "warn": 8,
+        "fail": 12
       }
     },
     {
@@ -1149,6 +1174,46 @@
         "value": "50",
         "numeric": true,
         "suggestedName": "CONST_50"
+      }
+    },
+    {
+      "id": "large-file:large-file:sample.ts:1",
+      "analyzer": "large-file",
+      "rule": "large-file",
+      "severity": "warning",
+      "message": "File is large; consider splitting (lines 105 >= warn threshold 60; functions 7 >= warn threshold 6).",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      },
+      "detail": {
+        "file": "sample.ts",
+        "lines": 105,
+        "nonBlankLines": 95,
+        "functions": 7,
+        "maxNestingDepth": 7,
+        "topLevelDeclarations": 9,
+        "exportedSymbols": 7,
+        "reasons": [
+          "lines 105 >= warn threshold 60",
+          "functions 7 >= warn threshold 6"
+        ],
+        "inferredModules": [
+          "add",
+          "find",
+          "validate",
+          "compute",
+          "format",
+          "process",
+          "weird"
+        ]
       }
     }
   ],

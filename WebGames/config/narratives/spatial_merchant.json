@@ -1,0 +1,8 @@
+{
+  "roaming_merchant_name": "地脉游荡秘宝商人",
+  "shop_too_far": "离商铺距离过远，无法进行交易 (需在 %.1fm 内)",
+  "goods_not_found": "货架商品不存在",
+  "stock_insufficient": "商品库存不足 (仅余 %d 件)",
+  "funds_insufficient": "钱包余额不足以支付货款",
+  "inventory_full": "背包已满，无法存放所购商品"
+}

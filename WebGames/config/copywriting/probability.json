@@ -1,0 +1,6 @@
+{
+  "EVT_BEAST_TIDE": {
+    "base": "兽潮触发概率当前为 {probability_pct}%（受 {modifier_count} 项条件修正）。",
+    "success": "兽潮平息：触发概率 {probability_pct}%，关联事件影响 {adjusted_count} 项。"
+  }
+}

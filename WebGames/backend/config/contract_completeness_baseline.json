@@ -1,0 +1,75 @@
+{
+  "generated_at": "2026-09-05",
+  "by_status": {
+    "FULL": [
+      "account",
+      "gacha_wish",
+      "mail_system",
+      "monster_ecology",
+      "world_boss",
+      "workshop_forge",
+      "lattice_skill_book",
+      "notification_red_dot",
+      "game_settings",
+      "hardware_input",
+      "localization_i18n",
+      "event_driven_audio",
+      "currency_economy",
+      "chat_command",
+      "world_navigation",
+      "identity_disguise",
+      "elite_mutation",
+      "ground_loot",
+      "item_namespace_registry",
+      "quest_causality",
+      "item_quality",
+      "magic_tier"
+    ],
+    "PARTIAL": [
+      "character_creation",
+      "physics_thermodynamics",
+      "magic_system",
+      "inventory",
+      "persistence_protocol",
+      "narrative_orchestration",
+      "spatial_merchant",
+      "trading_logistics",
+      "potential_growth",
+      "deterministic_sandbox",
+      "equipment_loadout",
+      "commission_quest",
+      "organization_guild",
+      "npc_simulation",
+      "sovereignty_realm",
+      "cdkey_voucher",
+      "admin_sandbox",
+      "matter_disposal",
+      "bulletin_board_maintenance"
+    ],
+    "MISSING": [
+      "world_gateway",
+      "spatial_movement",
+      "lifecycle_physiology",
+      "item_statistics"
+    ],
+    "INFRA": [
+      "world_state",
+      "feature_toggle_canary",
+      "telemetry_account_lifecycle",
+      "event_extractor"
+    ]
+  },
+  "reverse_orphans": [
+    {
+      "view_name": "world_map",
+      "reason": "view exists but no corresponding backend domain (historical reverse orphan)"
+    }
+  ],
+  "infra_exempt_list": [
+    "world_state",
+    "feature_toggle_canary",
+    "telemetry_account_lifecycle",
+    "event_extractor"
+  ],
+  "breaking_changes_pending": []
+}

@@ -1,0 +1,413 @@
+[gd_scene load_steps=2 format=3 uid="uid://cgachawishview06"]
+
+[ext_resource type="Script" path="res://frontend/views/gacha_wish/gacha_wish_view.gd" id="1_gacha_wish"]
+
+[node name="GachaWishView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_gacha_wish")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+; =========================================================================
+; 主布局
+; =========================================================================
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+; -------------------------------------------------------------------------
+; 顶部标题栏
+; -------------------------------------------------------------------------
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnToggleHistory" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = ""
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; -------------------------------------------------------------------------
+; 主体内容区:祈愿主界面 + 历史侧面板
+; -------------------------------------------------------------------------
+[node name="BodyRow" type="HBoxContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+; =========================================================================
+; WISH_MAIN: 祈愿主界面(左侧/中间)
+; =========================================================================
+[node name="WishMainPanel" type="VBoxContainer" parent="MainLayout/BodyRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+; --- 卡池切换 ---
+[node name="BannerSwitchLabel" type="Label" parent="MainLayout/BodyRow/WishMainPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="BannerSwitchHBox" type="HBoxContainer" parent="MainLayout/BodyRow/WishMainPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+; --- 卡池封面 ---
+[node name="BannerCoverPanel" type="PanelContainer" parent="MainLayout/BodyRow/WishMainPanel"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 220)
+
+[node name="CoverVBox" type="VBoxContainer" parent="MainLayout/BodyRow/WishMainPanel/BannerCoverPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelBannerTitle" type="Label" parent="MainLayout/BodyRow/WishMainPanel/BannerCoverPanel/CoverVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 22
+text = ""
+
+[node name="LabelBannerSubtitle" type="Label" parent="MainLayout/BodyRow/WishMainPanel/BannerCoverPanel/CoverVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = ""
+
+[node name="BannerCoverRect" type="TextureRect" parent="MainLayout/BodyRow/WishMainPanel/BannerCoverPanel/CoverVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+stretch_mode = 5
+
+[node name="LabelCoverPlaceholder" type="Label" parent="MainLayout/BodyRow/WishMainPanel/BannerCoverPanel/CoverVBox/BannerCoverRect"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelRemainingTime" type="Label" parent="MainLayout/BodyRow/WishMainPanel/BannerCoverPanel/CoverVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+; --- UP 物品展示 ---
+[node name="UpItemsLabel" type="Label" parent="MainLayout/BodyRow/WishMainPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="UpItemsGrid" type="GridContainer" parent="MainLayout/BodyRow/WishMainPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+columns = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 8
+
+; --- 保底进度 ---
+[node name="PitySection" type="VBoxContainer" parent="MainLayout/BodyRow/WishMainPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PityLabelTitle" type="Label" parent="MainLayout/BodyRow/WishMainPanel/PitySection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="Pity5StarRow" type="HBoxContainer" parent="MainLayout/BodyRow/WishMainPanel/PitySection"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Pity5StarBar" type="ProgressBar" parent="MainLayout/BodyRow/WishMainPanel/PitySection/Pity5StarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 90.0
+value = 0.0
+show_percentage = false
+
+[node name="LabelPity5Star" type="Label" parent="MainLayout/BodyRow/WishMainPanel/PitySection/Pity5StarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+[node name="Pity4StarRow" type="HBoxContainer" parent="MainLayout/BodyRow/WishMainPanel/PitySection"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Pity4StarBar" type="ProgressBar" parent="MainLayout/BodyRow/WishMainPanel/PitySection/Pity4StarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 10.0
+value = 0.0
+show_percentage = false
+
+[node name="LabelPity4Star" type="Label" parent="MainLayout/BodyRow/WishMainPanel/PitySection/Pity4StarRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+theme_override_colors/font_color = Color(0.60, 0.45, 0.95, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+; --- 抽卡按钮区 ---
+[node name="PullSection" type="VBoxContainer" parent="MainLayout/BodyRow/WishMainPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LabelCurrency" type="Label" parent="MainLayout/BodyRow/WishMainPanel/PullSection"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="PullButtonsRow" type="HBoxContainer" parent="MainLayout/BodyRow/WishMainPanel/PullSection"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="SinglePullPanel" type="VBoxContainer" parent="MainLayout/BodyRow/WishMainPanel/PullSection/PullButtonsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="BtnSinglePull" type="Button" parent="MainLayout/BodyRow/WishMainPanel/PullSection/PullButtonsRow/SinglePullPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="LabelSingleCost" type="Label" parent="MainLayout/BodyRow/WishMainPanel/PullSection/PullButtonsRow/SinglePullPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+[node name="TenPullPanel" type="VBoxContainer" parent="MainLayout/BodyRow/WishMainPanel/PullSection/PullButtonsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="BtnTenPull" type="Button" parent="MainLayout/BodyRow/WishMainPanel/PullSection/PullButtonsRow/TenPullPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="LabelTenCost" type="Label" parent="MainLayout/BodyRow/WishMainPanel/PullSection/PullButtonsRow/TenPullPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+; =========================================================================
+; PITY_HISTORY: 保底与历史侧面板(右侧,默认由脚本控制显示/隐藏)
+; =========================================================================
+[node name="HistoryPanel" type="PanelContainer" parent="MainLayout/BodyRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+custom_minimum_size = Vector2(320, 0)
+
+[node name="HistoryVBox" type="VBoxContainer" parent="MainLayout/BodyRow/HistoryPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HistoryHeaderRow" type="HBoxContainer" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HistoryTitleLabel" type="Label" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox/HistoryHeaderRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HistorySpacer" type="Control" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox/HistoryHeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnHistoryClose" type="Button" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox/HistoryHeaderRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(32, 0)
+text = ""
+
+[node name="HSepHist1" type="HSeparator" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox"]
+layout_mode = 2
+
+[node name="LabelTotalPulls" type="Label" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""
+
+[node name="LabelRarityStats" type="Label" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 2
+text = ""
+
+[node name="LabelProbability" type="Label" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="HSepHist2" type="HSeparator" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox"]
+layout_mode = 2
+
+[node name="HistoryListLabel" type="Label" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="HistoryItemList" type="ItemList" parent="MainLayout/BodyRow/HistoryPanel/HistoryVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+; =========================================================================
+; WISH_RESULT: 抽卡结果弹窗(全屏遮罩 + 居中面板,默认隐藏)
+; =========================================================================
+[node name="ResultOverlay" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="ResultDim" type="ColorRect" parent="ResultOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="ResultCenter" type="CenterContainer" parent="ResultOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ResultPanel" type="PanelContainer" parent="ResultOverlay/ResultCenter"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(600, 400)
+
+[node name="ResultVBox" type="VBoxContainer" parent="ResultOverlay/ResultCenter/ResultPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="LabelResultTitle" type="Label" parent="ResultOverlay/ResultCenter/ResultPanel/ResultVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="ResultItemsGrid" type="GridContainer" parent="ResultOverlay/ResultCenter/ResultPanel/ResultVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+columns = 5
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+
+[node name="ResultButtonsRow" type="HBoxContainer" parent="ResultOverlay/ResultCenter/ResultPanel/ResultVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BtnResultSkip" type="Button" parent="ResultOverlay/ResultCenter/ResultPanel/ResultVBox/ResultButtonsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnResultDetail" type="Button" parent="ResultOverlay/ResultCenter/ResultPanel/ResultVBox/ResultButtonsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnResultPullAgain" type="Button" parent="ResultOverlay/ResultCenter/ResultPanel/ResultVBox/ResultButtonsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""

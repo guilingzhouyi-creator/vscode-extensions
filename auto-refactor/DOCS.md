@@ -7,6 +7,16 @@
 
 ## 🆕 变更记录 | Changelog
 
+### v0.3.0 (2026-09-05) — 联动 workspace-timing v0.4.9 工程审查系统
+
+| 变更项 | 说明 | 影响 |
+|--------|------|------|
+| **新增三类内置分析器** | `secrets`（密钥泄露扫描）/ `unused-export`（未使用导出）/ `cycles`（循环依赖）随 v0.4.9 联动纳入 workspace-timing 六层门禁（L0~L5） | 与 `docs/04-analyzers-and-rules/01-builtin-rules.md` 规则清单对齐 |
+| **Praxis 门禁与回滚规范文档化** | `docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md`（v1.0.0-PROD-SPEC）与 `docs/03-incremental-and-diff/03-praxis-integration-guide.md` 落地 | 分形 Git 工作树 / 两级门禁 / 三层回滚 / 五大 SPI 契约有据可查 |
+
+> 注：v0.2.x 未发布独立 tag/tgz（0.1.1 后直接进入 0.3.0），中间改动并入本版。
+> 本文件历史原始设计讨论与调研底稿已统一封存至工作区归档目录：`archive/auto-refactor/docs-legacy/`。
+
 ### v0.1.1 (2026-08-28) — 缺陷修复（字节等价与性能基准零回归）
 
 | 修复项 | 说明 | 影响 |
@@ -26,6 +36,7 @@
 | [docs/01-architecture/01-system-overview.md](./docs/01-architecture/01-system-overview.md) | 系统整体架构、执行模式、并发 Worker 调度与 RSS 自愈 | ✅ 已落地 |
 | [docs/01-architecture/02-pipeline-and-caching.md](./docs/01-architecture/02-pipeline-and-caching.md) | L1/L2 两级增量缓存与配置指纹隔离机制 | ✅ 已落地 |
 | [docs/01-architecture/03-daemon-and-ipc.md](./docs/01-architecture/03-daemon-and-ipc.md) | 跨平台 Daemon 守护进程、NDJSON 通信与生命周期 | ✅ 已落地 |
+| [docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md](./docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md) | Praxis 分形 Git 工作树、两级门禁、三层联动回滚与智能体生命周期（v1.0.0-PROD-SPEC） | ✅ 已落地 |
 
 ## 🌲 2. 语法解析与 AST 适配 (Parsers & AST)
 
@@ -41,6 +52,8 @@
 |------|------|:---:|
 | [docs/03-incremental-and-diff/01-line-level-incremental.md](./docs/03-incremental-and-diff/01-line-level-incremental.md) | 行级增量子树复用 (reuseSubtree) 与坐标平移 | ✅ 已落地 |
 | [docs/03-incremental-and-diff/02-diff-interface-spec.md](./docs/03-incremental-and-diff/02-diff-interface-spec.md) | Diff 接入规格、UTF-8 字节转码与双通道 API | ✅ 已落地 |
+| [docs/03-incremental-and-diff/03-praxis-integration-guide.md](./docs/03-incremental-and-diff/03-praxis-integration-guide.md) | Praxis 团队接口改造、五大 SPI 扩展插槽与定制 Diff 底座接入 | ✅ 已落地 |
+| [PRAXIS_HANDOFF_REPORT.md](./docs/PRAXIS_HANDOFF_REPORT.md) | Praxis 定制高性能 Diff 底座交付摘要与索引（引向 01-architecture/04 与 03-incremental-and-diff/03） | ✅ 已落地 |
 
 ## 🔍 4. 规则引擎与内置分析器 (Analyzers & Rules)
 

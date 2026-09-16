@@ -1,0 +1,43 @@
+{
+  "enabled": true,
+  "batch_size": 200,
+  "failure_isolation": {
+    "enabled": true,
+    "group_retry": true
+  },
+  "processed_key_version": 1,
+  "projection_commit_order": "materialize_then_project",
+  "grouping_rules": [
+    {
+      "rule_id": "rule_cdkey_redeem",
+      "source_event": "item.granted",
+      "group_key": "transaction_id",
+      "composite_event": "transaction.cdkey_redeemed",
+      "projection": "account_summary"
+    },
+    {
+      "rule_id": "rule_gacha_pull",
+      "source_event": "item.granted",
+      "group_key": "transaction_id",
+      "composite_event": "transaction.gacha_pull",
+      "projection": "account_summary"
+    },
+    {
+      "rule_id": "rule_disposal",
+      "source_event": "item.destroyed",
+      "group_key": "transaction_id",
+      "composite_event": "transaction.disposal",
+      "projection": "account_summary"
+    }
+  ],
+  "projections": {
+    "account_summary": {
+      "scope": "account",
+      "include": [
+        "current_quantity",
+        "total_gained",
+        "total_destroyed"
+      ]
+    }
+  }
+}

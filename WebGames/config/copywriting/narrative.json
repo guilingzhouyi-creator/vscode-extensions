@@ -1,0 +1,12 @@
+{
+  "EVT_BEAST_TIDE": {
+    "base": "{town} 爆发了兽潮！{beast_count} 头魔物逼近城墙。",
+    "success": "英勇的守卫击退了兽潮，{reward_gold} 金币入库，损失 {loss_soldiers} 名卫士。",
+    "failure": "兽潮冲破城门！{town} 陷入火海，伤亡 {loss_soldiers} 人。",
+    "partial": "兽潮被遏制但未肃清，{town} 城墙破损，{reward_gold} 金币作为守城赏金。"
+  },
+  "EVT_MARKET_CRASH": {
+    "base": "{town} 市集遭遇商路断绝，物价剧烈波动，{loss_gold} 金币化为泡影。",
+    "success": "商会紧急调度物资，{town} 市集平稳渡劫，{gain_gold} 金币入账。"
+  }
+}

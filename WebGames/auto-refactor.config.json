@@ -1,0 +1,86 @@
+{
+  "$schema": "../auto-refactor/config.schema.json",
+  "_comment": "Phase 61/88：WebGames .gd 专用阈值与多维审查配置（唯一声明源）。引擎按 {全局thresholds, 分析器options后者覆盖前者} 合并，故阈值在两处同值声明。",
+  "maturityTier": "industrial",
+  "classifyLiterals": true,
+  "include": ["backend/**/*.gd", "frontend/**/*.gd", "tests/**/*.gd"],
+  "exclude": ["node_modules", ".git", "dist", "out", ".godot", ".auto-refactor-cache"],
+  "thresholds": {
+    "magicNumberMin": 10,
+    "hardcodedStringMinLength": 8,
+    "duplicateLiteralThreshold": 5,
+    "complexityWarn": 15,
+    "complexityFail": 25,
+    "fileLinesWarn": 500,
+    "fileLinesFail": 1000,
+    "fileFunctionsWarn": 20
+  },
+  "analyzers": {
+    "constants": {
+      "enabled": true,
+      "options": {
+        "magicNumberMin": 10,
+        "hardcodedStringMinLength": 8,
+        "duplicateLiteralThreshold": 5
+      }
+    },
+    "complexity": {
+      "enabled": true,
+      "options": { "complexityWarn": 15, "complexityFail": 25 }
+    },
+    "large-file": {
+      "enabled": true,
+      "options": { "fileLinesWarn": 500, "fileLinesFail": 1000, "fileFunctionsWarn": 20 }
+    },
+    "governance": {
+      "enabled": true,
+      "options": { "maxNestingDepth": 5, "maxInheritanceDepth": 2 }
+    },
+    "architecture": {
+      "enabled": true,
+      "options": {
+        "enforceCleanLayers": true,
+        "layers": {
+          "backend/domains/": "domain",
+          "backend/infrastructure/": "infrastructure",
+          "frontend/": "interface",
+          "tests/": "test"
+        }
+      }
+    },
+    "performance": {
+      "enabled": true,
+      "options": {
+        "maxLoopNesting": 3,
+        "checkBlockingIO": true,
+        "checkTransientAllocations": true
+      }
+    },
+    "security": {
+      "enabled": true,
+      "options": {
+        "level": "basic",
+        "checkCodeExecution": true,
+        "checkCommandInjection": true
+      }
+    },
+    "secrets": {
+      "enabled": true,
+      "options": {
+        "ignoreInTests": true
+      }
+    },
+    "hygiene": {
+      "enabled": true,
+      "options": {
+        "checkNaming": true,
+        "checkDeadCode": true,
+        "checkTemporaryStubs": true,
+        "checkDuplicateBlocks": false
+      }
+    },
+    "comments": {
+      "enabled": false
+    }
+  }
+}

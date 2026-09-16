@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "global_query_min_level": 2,
+  "telemetry": {
+    "record_to_sidecar": true
+  }
+}

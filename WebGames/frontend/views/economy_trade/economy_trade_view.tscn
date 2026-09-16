@@ -1,0 +1,509 @@
+[gd_scene load_steps=2 format=3 uid="uid://ceconomytrade05"]
+
+[ext_resource type="Script" path="res://frontend/views/economy_trade/economy_trade_view.gd" id="1_econ"]
+
+[node name="EconomyTradeView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_econ")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TabContainer" type="TabContainer" parent="MainLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+; =========================================================================
+; Tab 1: 钱包资产 (WALLET)
+; =========================================================================
+[node name="钱包资产" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/钱包资产"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/钱包资产"]
+layout_mode = 2
+
+[node name="CurrencyGrid" type="GridContainer" parent="MainLayout/TabContainer/钱包资产"]
+layout_mode = 2
+columns = 4
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 8
+
+[node name="GoldCard" type="PanelContainer" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid"]
+layout_mode = 2
+
+[node name="GoldVBox" type="VBoxContainer" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/GoldCard"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="GoldName" type="Label" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/GoldCard/GoldVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LabelGoldVal" type="Label" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/GoldCard/GoldVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "0"
+
+[node name="SilverCard" type="PanelContainer" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid"]
+layout_mode = 2
+
+[node name="SilverVBox" type="VBoxContainer" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/SilverCard"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="SilverName" type="Label" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/SilverCard/SilverVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.78, 0.82, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LabelSilverVal" type="Label" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/SilverCard/SilverVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "0"
+
+[node name="CopperCard" type="PanelContainer" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid"]
+layout_mode = 2
+
+[node name="CopperVBox" type="VBoxContainer" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/CopperCard"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="CopperName" type="Label" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/CopperCard/CopperVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.80, 0.55, 0.35, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LabelCopperVal" type="Label" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/CopperCard/CopperVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "0"
+
+[node name="CrystalCard" type="PanelContainer" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid"]
+layout_mode = 2
+
+[node name="CrystalVBox" type="VBoxContainer" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/CrystalCard"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="CrystalName" type="Label" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/CrystalCard/CrystalVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.60, 0.45, 0.95, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LabelCrystalVal" type="Label" parent="MainLayout/TabContainer/钱包资产/CurrencyGrid/CrystalCard/CrystalVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "0"
+
+[node name="TotalValuePanel" type="PanelContainer" parent="MainLayout/TabContainer/钱包资产"]
+layout_mode = 2
+
+[node name="LabelTotalValue" type="Label" parent="MainLayout/TabContainer/钱包资产/TotalValuePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="DetailLabel" type="Label" parent="MainLayout/TabContainer/钱包资产"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="WalletItemList" type="ItemList" parent="MainLayout/TabContainer/钱包资产"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="WalletSpacer" type="Control" parent="MainLayout/TabContainer/钱包资产"]
+layout_mode = 2
+size_flags_vertical = 3
+
+; =========================================================================
+; Tab 2: 商店交易 (SHOP)
+; =========================================================================
+[node name="商店交易" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LabelShopTitle" type="Label" parent="MainLayout/TabContainer/商店交易"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="ShopModeRow" type="HBoxContainer" parent="MainLayout/TabContainer/商店交易"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnModeBuy" type="Button" parent="MainLayout/TabContainer/商店交易/ShopModeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnModeSell" type="Button" parent="MainLayout/TabContainer/商店交易/ShopModeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="ShopItemList" type="ItemList" parent="MainLayout/TabContainer/商店交易"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ShopBottomPanel" type="PanelContainer" parent="MainLayout/TabContainer/商店交易"]
+layout_mode = 2
+
+[node name="ShopBottomHBox" type="HBoxContainer" parent="MainLayout/TabContainer/商店交易/ShopBottomPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="QtyLabel" type="Label" parent="MainLayout/TabContainer/商店交易/ShopBottomPanel/ShopBottomHBox"]
+layout_mode = 2
+text = ""
+
+[node name="SpinShopQuantity" type="SpinBox" parent="MainLayout/TabContainer/商店交易/ShopBottomPanel/ShopBottomHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 99.0
+value = 1.0
+
+[node name="LabelShopTotal" type="Label" parent="MainLayout/TabContainer/商店交易/ShopBottomPanel/ShopBottomHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="BtnShopConfirm" type="Button" parent="MainLayout/TabContainer/商店交易/ShopBottomPanel/ShopBottomHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = ""
+
+; =========================================================================
+; Tab 3: 拍卖行 (AUCTION)
+; =========================================================================
+[node name="拍卖行" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/拍卖行"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/拍卖行"]
+layout_mode = 2
+
+[node name="SearchRow" type="HBoxContainer" parent="MainLayout/TabContainer/拍卖行"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LineAuctionSearch" type="LineEdit" parent="MainLayout/TabContainer/拍卖行/SearchRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="OptionAuctionCategory" type="OptionButton" parent="MainLayout/TabContainer/拍卖行/SearchRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+
+[node name="AuctionItemList" type="ItemList" parent="MainLayout/TabContainer/拍卖行"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ActionRow" type="HBoxContainer" parent="MainLayout/TabContainer/拍卖行"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnAuctionBid" type="Button" parent="MainLayout/TabContainer/拍卖行/ActionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnAuctionBuyout" type="Button" parent="MainLayout/TabContainer/拍卖行/ActionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="MyListingsLabel" type="Label" parent="MainLayout/TabContainer/拍卖行"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="AuctionMyList" type="ItemList" parent="MainLayout/TabContainer/拍卖行"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+
+; =========================================================================
+; Tab 4: 商队物流 (LOGISTICS)
+; =========================================================================
+[node name="商队物流" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/商队物流"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/商队物流"]
+layout_mode = 2
+
+[node name="CaravanList" type="ItemList" parent="MainLayout/TabContainer/商队物流"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StatusPanel" type="PanelContainer" parent="MainLayout/TabContainer/商队物流"]
+layout_mode = 2
+
+[node name="StatusVBox" type="VBoxContainer" parent="MainLayout/TabContainer/商队物流/StatusPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelEscortStatus" type="Label" parent="MainLayout/TabContainer/商队物流/StatusPanel/StatusVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+text = ""
+
+[node name="LabelFreightEstimate" type="Label" parent="MainLayout/TabContainer/商队物流/StatusPanel/StatusVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+; =========================================================================
+; Tab 5: 物价波动 (PRICE_TREND)
+; =========================================================================
+[node name="物价波动" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/物价波动"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/物价波动"]
+layout_mode = 2
+
+[node name="CommodityRow" type="HBoxContainer" parent="MainLayout/TabContainer/物价波动"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/物价波动/CommodityRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="OptionPriceCommodity" type="OptionButton" parent="MainLayout/TabContainer/物价波动/CommodityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PriceBarsVBox" type="VBoxContainer" parent="MainLayout/TabContainer/物价波动"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="TrendHintLabel" type="Label" parent="MainLayout/TabContainer/物价波动"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+; =========================================================================
+; Tab 6: 货币兑换 (EXCHANGE)
+; =========================================================================
+[node name="货币兑换" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/货币兑换"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/货币兑换"]
+layout_mode = 2
+
+[node name="ExchangePanel" type="PanelContainer" parent="MainLayout/TabContainer/货币兑换"]
+layout_mode = 2
+
+[node name="ExchangeVBox" type="VBoxContainer" parent="MainLayout/TabContainer/货币兑换/ExchangePanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SourceRow" type="HBoxContainer" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SourceLabel" type="Label" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox/SourceRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = ""
+
+[node name="OptionExchangeSource" type="OptionButton" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox/SourceRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TargetRow" type="HBoxContainer" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TargetLabel" type="Label" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox/TargetRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = ""
+
+[node name="OptionExchangeTarget" type="OptionButton" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox/TargetRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AmountRow" type="HBoxContainer" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AmountLabel" type="Label" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox/AmountRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = ""
+
+[node name="SpinExchangeAmount" type="SpinBox" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox/AmountRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 9999.0
+value = 1.0
+
+[node name="LabelExchangeRate" type="Label" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelExchangeResult" type="Label" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.20, 0.83, 0.60, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="BtnExchangeConfirm" type="Button" parent="MainLayout/TabContainer/货币兑换/ExchangePanel/ExchangeVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="ExchangeSpacer" type="Control" parent="MainLayout/TabContainer/货币兑换"]
+layout_mode = 2
+size_flags_vertical = 3
+
+; =========================================================================
+; Tab 7: 资源水池 (RESOURCE_POOL)
+; =========================================================================
+[node name="资源水池" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/资源水池"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator1" type="HSeparator" parent="MainLayout/TabContainer/资源水池"]
+layout_mode = 2
+
+[node name="ScrollPools" type="ScrollContainer" parent="MainLayout/TabContainer/资源水池"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ResourcePoolVBox" type="VBoxContainer" parent="MainLayout/TabContainer/资源水池/ScrollPools"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8

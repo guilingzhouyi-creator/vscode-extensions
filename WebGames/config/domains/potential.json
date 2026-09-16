@@ -1,0 +1,35 @@
+{
+  "respec": {
+    "base_gold": 100,
+    "gold_exp_base": 2.0,
+    "max_history_exponent": 5,
+    "crystal_divisor": 20.0
+  },
+  "point_cost": {
+    "base": 1,
+    "tier_size": 2
+  },
+  "dynamic_adjust": {
+    "floor": 0,
+    "channels": {
+      "monster.killed": {
+        "STR": 1
+      },
+      "world_boss.boss_defeated": {
+        "SPR": 2,
+        "VIT": -1
+      }
+    }
+  },
+  "growth": {
+    "default_reason": "ENLIGHTENMENT",
+    "stat_list": [
+      "STR",
+      "CON",
+      "INT",
+      "AGI",
+      "SPR",
+      "VIT"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "defaults": {
+    "rollout_percentage": 0
+  },
+  "canary": {
+    "bucket_size": 100
+  },
+  "circuit_breaker": {
+    "max_tolerable_failures": 3
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "combat_tick_delta_sec": 0.02,
+  "hours_per_day": 24,
+  "days_per_month": 30,
+  "months_per_year": 12
+}

@@ -1,0 +1,53 @@
+{
+  "terrain_impedance": {
+    "PLAINS": 1.0,
+    "SWAMP": 2.5,
+    "SNOW_MOUNTAIN": 3.8,
+    "VOID_OCEAN": 5.0
+  },
+  "astar": {
+    "infinity": 99999999.0,
+    "default_distance": 10.0,
+    "impedance_min": 0.1,
+    "impedance_max": 10.0
+  },
+  "swarm_risk": {
+    "mana_baseline": 1.0,
+    "mana_coefficient": 0.2,
+    "order_normalize": 100.0,
+    "order_coefficient": 0.3
+  },
+  "marching": {
+    "base_speed_kmh": 5.0,
+    "ration_per_person_hour": 0.1,
+    "default_ration_units": 50.0,
+    "default_party_size": 4,
+    "max_distance_km": 500.0,
+    "empty_party_policy": "reject"
+  },
+  "node_defaults": {
+    "continent_id": "CENTRAL_CONTINENT",
+    "terrain_type": "PLAINS",
+    "regional_mana_density": 1.0,
+    "town_id": "TOWN_VALAN"
+  },
+  "town_defaults": {
+    "town_name": "未名要塞",
+    "governing_nation_id": "NATION_EMPIRE",
+    "population_count": 5000,
+    "public_order_percent": 85.0,
+    "food_reserve_days": 30.0,
+    "town_treasury_gold": 1500
+  },
+  "continuity": {
+    "enabled": false,
+    "max_history_fragments": 64,
+    "ticks_per_day": 20
+  },
+  "default_template": {
+    "world_id": "WORLD_DEFAULT",
+    "starting_tick": 0,
+    "starting_day": 1,
+    "region_mana_density": 1.0
+  }
+}

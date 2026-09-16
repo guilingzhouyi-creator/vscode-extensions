@@ -1,6 +1,24 @@
+/**
+ * Module: Core Engine — Language Adapter Registry
+ * File Path: src/core/adapters.ts
+ * Architecture Role: Extension/parser-to-adapter resolution boundary; owns adapter
+ *   registration and lazy construction for every scanned language.
+ * Dependencies & Triggers: Imports `path`, `LanguageAdapter` from ./multilang, and
+ *   `ParserKind` from ./types; `adapterFor` is called per file by the scan engine, while
+ *   `registerAdapter` lets runtime adapters (e.g. Rust/tree-sitter) register themselves.
+ * Responsibilities: Keep the built-in factory map (`typescript`, `rust`, `oxc`, `gdscript`);
+ *   lazily `require` and cache adapter modules on first use; expose `registerAdapter` to add
+ *   or override adapters; resolve a file by lowercased extension, honoring parser='oxc'
+ *   first, then built-in factory order, then runtime registrations, and finally falling
+ *   back to the TypeScript adapter.
+ * Exit Semantics & Design Rationale: `adapterFor` always returns a LanguageAdapter and never
+ *   throws for unknown extensions, preserving historical fallback behavior; lazy loading
+ *   keeps the heavy TypeScript stack out of oxc-only workers; deleting the cache entry in
+ *   `registerAdapter` makes runtime adapters win over built-ins.
+ */
 import * as path from 'path';
-import { LanguageAdapter } from './multilang';
-import { ParserKind } from './types';
+import type { LanguageAdapter } from './multilang';
+import type { ParserKind } from './types';
 
 /**
  * Language adapter registry.
@@ -18,44 +36,134 @@ import { ParserKind } from './types';
  * consulted AFTER the built-ins (matching the old insertion-order precedence).
  */
 
+/** Adapter-registry id of the default TypeScript-family adapter, also the fallback resolution. */
+const ADAPTER_ID_TYPESCRIPT = 'typescript';
+
+/** Adapter-registry id of the Rust `oxc-parser` TS/JS adapter (`parser: 'oxc'`). */
+const ADAPTER_ID_OXC = 'oxc';
+
+/**
+ * Extension -> built-in adapter id.
+ *
+ * Resolving an extension through this table keeps a scan from CONSTRUCTING every adapter just to
+ * learn which one claims the file: construction order used to load the TypeScript compiler and
+ * tree-sitter even for a Python-only scan. The table is asserted against each adapter's own
+ * `extensions` list by scripts/validate-language-support.js, so it cannot drift silently; anything
+ * not listed here (including runtime-registered adapters) takes the historical
+ * construction-order path.
+ */
+export const EXTENSION_ADAPTER_IDS: Readonly<Record<string, string>> = {
+    '.ts': ADAPTER_ID_TYPESCRIPT,
+    '.tsx': ADAPTER_ID_TYPESCRIPT,
+    '.js': ADAPTER_ID_TYPESCRIPT,
+    '.jsx': ADAPTER_ID_TYPESCRIPT,
+    '.mjs': ADAPTER_ID_TYPESCRIPT,
+    '.cjs': ADAPTER_ID_TYPESCRIPT,
+    '.rs': 'rust',
+    '.gd': 'gdscript',
+    '.py': 'python',
+    '.md': 'markdown',
+};
+
 const cache: Record<string, LanguageAdapter> = {};
 const registered: Record<string, LanguageAdapter> = {};
 
 const factories: Record<string, () => LanguageAdapter> = {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  typescript: () => new (require('./typescriptAdapter').TypeScriptAdapter)(),
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  rust: () => new (require('./rustAdapter').RustAdapter)(),
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  oxc: () => new (require('./oxcAdapter').OxcAdapter)(),
+    typescript: () => new (require('./typescriptAdapter').TypeScriptAdapter)(),
+
+    rust: () => new (require('./rustAdapter').RustAdapter)(),
+
+    oxc: () => new (require('./oxcAdapter').OxcAdapter)(),
+
+    gdscript: () => new (require('./gdscriptAdapter').GDScriptAdapter)(),
+
+    python: () => new (require('./pythonAdapter').PythonAdapter)(),
+
+    markdown: () => new (require('./markdownAdapter').MarkdownAdapter)(),
 };
 
 function getAdapter(id: string): LanguageAdapter {
-  return (cache[id] ??= factories[id]());
+    if (registered[id]) return registered[id];
+    return (cache[id] ??= factories[id]());
 }
 
+/**
+ * Register a runtime language adapter, replacing any built-in or previously registered adapter
+ * with the same `id`.
+ *
+ * The adapter is stored by `adapter.id`, and any lazily cached instance under that id is
+ * evicted so the next `adapterFor` call resolves to this registration. Registration is
+ * synchronous, process-local and last-writer-wins; a later registration always shadows an
+ * earlier one for the same id.
+ *
+ * @param adapter - Adapter instance to register; its `id` becomes the lookup key and its
+ *   `extensions` decide which files it claims. Stored by reference, so it must remain usable
+ *   for the lifetime of the process.
+ */
 export function registerAdapter(adapter: LanguageAdapter): void {
-  registered[adapter.id] = adapter;
-  delete cache[adapter.id]; // a registered adapter always wins over a lazily-built built-in
+    registered[adapter.id] = adapter;
+    delete cache[adapter.id]; // a registered adapter always wins over a lazily-built built-in
 }
 
 /**
  * Pick the adapter for a file. `parser` selects between the two TS/JS-family parsers
  * ('typescript' — default, historical behavior — or 'oxc' — Rust parser). Non-TS/JS files
  * (e.g. .rs) always resolve by extension regardless of `parser`.
+ *
+ * @param filePath - Path to classify; only its lower-cased extension participates in the
+ *   lookup, so the file does not need to exist on disk.
+ * @param parser - Parser family preference for TS/JS-family extensions: 'oxc' consults the oxc
+ *   adapter first, while 'typescript' follows built-in factory order and then runtime
+ *   registrations.
+ * @returns The matching LanguageAdapter; unknown extensions fall back to the TypeScript
+ *   adapter, so the result is never undefined.
  */
 export function adapterFor(filePath: string, parser: ParserKind = 'typescript'): LanguageAdapter {
-  const ext = path.extname(filePath).toLowerCase();
-  if (parser === 'oxc') {
-    const oxc = getAdapter('oxc');
-    if (oxc.extensions.includes(ext)) return oxc;
-  }
-  for (const id of Object.keys(factories)) {
-    const a = getAdapter(id);
-    if (a.extensions.includes(ext)) return a;
-  }
-  for (const a of Object.values(registered)) {
-    if (a.extensions.includes(ext)) return a;
-  }
-  return getAdapter('typescript');
+    const ext = path.extname(filePath).toLowerCase();
+    if (parser === ADAPTER_ID_OXC) {
+        const oxc = getAdapter(ADAPTER_ID_OXC);
+        if (oxc.extensions.includes(ext)) return oxc;
+    }
+    const known = EXTENSION_ADAPTER_IDS[ext];
+    if (known && !registered[known]) {
+        const adapter = getAdapter(known);
+        if (adapter.extensions.includes(ext)) return adapter;
+    }
+    for (const id of Object.keys(factories)) {
+        const a = getAdapter(id);
+        if (a.extensions.includes(ext)) return a;
+    }
+    for (const a of Object.values(registered)) {
+        if (a.extensions.includes(ext)) return a;
+    }
+    return getAdapter(ADAPTER_ID_TYPESCRIPT);
+}
+
+/**
+ * Report whether a real language adapter claims this file's extension.
+ *
+ * `adapterFor` never fails: unknown extensions fall back to the TypeScript adapter for backward
+ * compatibility. Callers that must distinguish "parsed by a language adapter" from "silently
+ * parsed as TypeScript" use this predicate to fail closed instead of reporting zero findings.
+ *
+ * @param filePath - File path whose extension is inspected (case-insensitive).
+ * @param parser - Selected TS-family parser; only changes which adapter is consulted first.
+ * @returns True when an adapter explicitly declares the extension, false for the fallback case.
+ */
+export function hasAdapterFor(filePath: string, parser: ParserKind = 'typescript'): boolean {
+    const ext = path.extname(filePath).toLowerCase();
+    if (parser === ADAPTER_ID_OXC && getAdapter(ADAPTER_ID_OXC).extensions.includes(ext)) {
+        return true;
+    }
+    const known = EXTENSION_ADAPTER_IDS[ext];
+    if (known && !registered[known]) {
+        if (getAdapter(known).extensions.includes(ext)) return true;
+    }
+    for (const id of Object.keys(factories)) {
+        if (getAdapter(id).extensions.includes(ext)) return true;
+    }
+    for (const a of Object.values(registered)) {
+        if (a.extensions.includes(ext)) return true;
+    }
+    return false;
 }

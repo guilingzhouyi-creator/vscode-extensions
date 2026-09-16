@@ -1,0 +1,13 @@
+{
+  "transaction": {
+    "max_buy_count": 100
+  },
+  "shop": {
+    "interaction_radius_meters": 3.5
+  },
+  "goods": {
+    "fallback_template_id": "ITEM_GOODS",
+    "mass_per_unit_kg": 0.5,
+    "volume_per_unit": 1
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "config_version": 2,
+  "security": {
+    "seal_key_id": "kalar-dev-seal-v1",
+    "seal_key_env": "KALAR_ENTITLEMENT_KEY",
+    "allow_future_clock_skew_seconds": 0
+  },
+  "session": {
+    "ttl_seconds": 86400,
+    "bind_device": true,
+    "max_entries": 1000
+  },
+  "admin": {
+    "max_level": 4,
+    "permissions": [
+      "CLAWBACK",
+      "AUDIT",
+      "CONFIG_RELOAD"
+    ]
+  },
+  "clawback": {
+    "allowed_mode": "online",
+    "audit_fields": [
+      "admin_id",
+      "action",
+      "reason",
+      "currency_delta",
+      "item_delta",
+      "audit_id"
+    ]
+  },
+  "salt": "KALAR_GM_SALT",
+  "passkeys": [
+    "a52662cab5471da9969bc64b5136797b20a7bb6f6b68e6e8d2543c779e769efe",
+    "81fd86a6bf971908efcd416617c69aac97461758de663dbd2ccf4c33cc658ab8"
+  ],
+  "sandbox": {
+    "give_gold_default": 10000,
+    "give_item_default_name": "【GM创世神器】",
+    "give_item_id_prefix": "GM_ITEM_",
+    "item_metrics": {
+      "edge_sharpness": 5.0,
+      "effective_armor": 50.0,
+      "volume_slots": 1
+    },
+    "advance_time_default_months": 12,
+    "errors": {
+      "insufficient_permission": "Insufficient GM permissions.",
+      "unknown_command": "Unknown GM command: "
+    }
+  },
+  "run": {
+    "mode": "online"
+  },
+  "sync": {
+    "mode": "offline_text"
+  },
+  "audit": {
+    "recent_limit": 20,
+    "max_entries": 500
+  },
+  "idempotency": {
+    "max_records": 1000,
+    "retention_seconds": 3600
+  }
+}

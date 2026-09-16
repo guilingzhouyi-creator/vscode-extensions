@@ -1,0 +1,8 @@
+{
+  "cdkey_invalid": "Invalid or expired CDKey: %s",
+  "cdkey_redeemed": "CDKey already redeemed by this account.",
+  "cdkey_success": "【天赐福泽·兑换成功】核销礼包码 [%s]，获得金币 +%d、魔单晶 +%d、道具【%s】！",
+  "registered": "【鉴权】开拓者 %s 成功在卡拉尔世界建立身份档案。",
+  "login_succeeded": "【鉴权】欢迎归来，开拓者 %s！",
+  "session_revoked": "【鉴权】开拓者 %s 的会话已安全注销。"
+}

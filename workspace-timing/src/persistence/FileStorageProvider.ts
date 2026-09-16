@@ -88,7 +88,11 @@ export class FileStorageProvider implements IStorageProvider {
                 // 目录已存在
             }
 
-            await vscode.workspace.fs.writeFile(target, bytes);
+            // 原子写：先写同目录临时文件再 rename 覆盖，避免崩溃/断电留下半截 JSON
+            // （备份文件被截断会让 L3 兜底失效；load 校验虽可拒读，但数据就真丢了）
+            const tmpUri = target.with({ path: `${target.path}.tmp` });
+            await vscode.workspace.fs.writeFile(tmpUri, bytes);
+            await vscode.workspace.fs.rename(tmpUri, target, { overwrite: true });
         } catch (err) {
             log(LogLevel.Error, 'FileStorageProvider: write failed', err as Error);
             throw err;

@@ -1,0 +1,31 @@
+{
+  "rbac": {
+    "actions": {
+      "guild_master_only": [
+        "DISBAND_GUILD",
+        "DECLARE_WAR",
+        "TRANSFER_LEADERSHIP"
+      ],
+      "officer_and_above": [
+        "WITHDRAW_TREASURY",
+        "UPGRADE_TECH",
+        "KICK_MEMBER"
+      ],
+      "member_and_above": [
+        "ACCEPT_COMMISSION",
+        "DEPOSIT_TREASURY"
+      ]
+    }
+  },
+  "treasury": {
+    "default_gold": 0,
+    "default_crystals": 0
+  },
+  "tech": {
+    "upgrade_cost_gold_per_level": 500,
+    "upgrade_cost_crystals_per_level": 10,
+    "potion_recovery_bonus_ratio_per_level": 0.05,
+    "durability_loss_reduction_per_level": 0.04,
+    "combat_exp_gain_ratio_per_level": 0.03
+  }
+}

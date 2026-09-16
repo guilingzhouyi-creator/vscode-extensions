@@ -1,0 +1,580 @@
+{
+  "_meta": {
+    "version": 1,
+    "description": "卡拉尔世界引擎 · 业务领域清单（唯一事实来源）。新增领域必须在此登记，架构护栏 tests/unit/test_architecture_guard.gd 依据本表校验「目录 / 配置表 / 测试注册 / 确定性约定 / 文档计数」五方一致。",
+    "field_notes": {
+      "id": "必须等于 backend/domains/ 下的目录名（TC-ARCH-01 双向差集校验）",
+      "config": "业务数值表名（config/<层>/<名>.json -> <层>.<名>）；允许别名复用他域表",
+      "narrative": "用户可见文案表名；允许别名复用他域表",
+      "test": "该领域测试脚本的 res:// 路径（TC-ARCH-03 校验存在且已注册）",
+      "test_symbol": "测试脚本的 class_name（TC-ARCH-03 校验出现在 get_all_test_classes()）",
+      "phase": "演进批次 1~4，与 tests/test_registry.gd 的分组顺序一致",
+      "depends_on": "配置表借用关系：本域代码直接读取了哪个他域的 config 表（不含本域自有表与基础设施层表），必须是本清单中已登记的 id",
+      "config_exempt": "为 true 时表示本域属基础设施层，复用 infrastructure.* 表为合法设计，不做 domains.* 归属要求",
+      "exempt_reason": "豁免理由（config_exempt 为 true 时必填）",
+      "shared_tables": "跨域共享数值表豁免契约（P2-1）：domains.attribute / domains.economy / domains.event_probability / domains.magic_tiers / domains.quality_tiers 为无单一属主域的共享数值表，借用方无需声明 depends_on；该豁免与基础设施层 infrastructure.* 豁免同构"
+    },
+    "naming_aliases": "目录名与表名允许不同（历史演进产物）。已知别名：physics_thermodynamics->combat、world_navigation->world、gacha_wish->gacha、currency_economy->currency、elite_mutation->elite、equipment_loadout->equipment、lattice_skill_book->lattice、lifecycle_physiology->lifecycle、monster_ecology->monster、npc_simulation->npc、potential_growth->potential、quest_causality->quest、sovereignty_realm->sovereignty、trading_logistics->trading、workshop_forge->workshop、deterministic_sandbox->deterministic",
+    "infra_dirs_exempt": "全域基础设施目录豁免声明（TC-ARCH-01 双向差集校验按此豁免）：contract_registry（契约注册表）、lifecycle（生命周期治理）、version_governance（版本治理与灰度流水线）为横跨多域的基础设施目录，非单一业务领域，故不登记为领域；与 persistence_protocol / admin_sandbox 的 config_exempt 同构，复用 infrastructure.* 配置为分层规范所要求"
+  },
+  "domains": [
+    {
+      "id": "inventory",
+      "config": "domains.inventory",
+      "narrative": "narratives.inventory",
+      "test": "res://tests/unit/domains/test_inventory.gd",
+      "test_symbol": "TestInventoryDomain",
+      "phase": 1,
+      "depends_on": [],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "WearableInventoryAggregate",
+        "strategy": "dirty",
+        "hot_reload": {
+          "allow": false,
+          "requires_rebuild": false
+        }
+      }
+    },
+    {
+      "id": "physics_thermodynamics",
+      "config": "domains.combat",
+      "narrative": "narratives.combat",
+      "test": "res://tests/unit/domains/test_physics_thermodynamics.gd",
+      "test_symbol": "TestPhysicsDomain",
+      "phase": 1,
+      "depends_on": []
+    },
+    {
+      "id": "world_navigation",
+      "config": "domains.world",
+      "narrative": "narratives.world",
+      "test": "res://tests/unit/domains/test_world_navigation.gd",
+      "test_symbol": "TestWorldNavigationDomain",
+      "phase": 1,
+      "depends_on": [],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "WorldGatewayModel",
+        "strategy": "full",
+        "hot_reload": {
+          "allow": false,
+          "requires_rebuild": true
+        }
+      }
+    },
+    {
+      "id": "lattice_skill_book",
+      "config": "domains.lattice",
+      "narrative": "narratives.lattice",
+      "test": "res://tests/unit/domains/test_lattice_skill_book.gd",
+      "test_symbol": "TestLatticeDomain",
+      "phase": 1,
+      "depends_on": [],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "SkillSubgraphAST",
+        "strategy": "full",
+        "hot_reload": {
+          "allow": false,
+          "requires_rebuild": true
+        }
+      }
+    },
+    {
+      "id": "deterministic_sandbox",
+      "config": "domains.deterministic",
+      "narrative": "narratives.deterministic",
+      "test": "res://tests/unit/domains/test_deterministic_sandbox.gd",
+      "test_symbol": "TestDeterministicDomain",
+      "phase": 1,
+      "depends_on": []
+    },
+    {
+      "id": "persistence_protocol",
+      "config": "infrastructure.persistence",
+      "narrative": "narratives.persistence",
+      "test": "res://tests/unit/domains/test_persistence_protocol.gd",
+      "test_symbol": "TestPersistenceDomain",
+      "phase": 1,
+      "depends_on": [],
+      "config_exempt": true,
+      "exempt_reason": "存档协议属基础设施层，复用 infrastructure.persistence 为分层规范所要求，非漏建领域表",
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "ReconciliationSolver",
+        "strategy": "full",
+        "hot_reload": {
+          "allow": false,
+          "requires_rebuild": false
+        }
+      }
+    },
+    {
+      "id": "lifecycle_physiology",
+      "config": "domains.lifecycle",
+      "narrative": "narratives.lifecycle",
+      "test": "res://tests/unit/domains/test_lifecycle_physiology.gd",
+      "test_symbol": "TestLifecycleDomain",
+      "phase": 1,
+      "depends_on": [],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "GameLifecycleModel",
+        "strategy": "full",
+        "hot_reload": {
+          "allow": false,
+          "requires_rebuild": false
+        }
+      }
+    },
+    {
+      "id": "monster_ecology",
+      "config": "domains.monster",
+      "narrative": "narratives.monster",
+      "test": "res://tests/unit/domains/test_monster_ecology.gd",
+      "test_symbol": "TestMonsterDomain",
+      "phase": 1,
+      "depends_on": []
+    },
+    {
+      "id": "quest_causality",
+      "config": "domains.quest",
+      "narrative": "narratives.quest",
+      "test": "res://tests/unit/domains/test_quest_causality.gd",
+      "test_symbol": "TestQuestDomain",
+      "phase": 1,
+      "depends_on": [
+        "inventory"
+      ],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "QuestCausalityAggregate",
+        "strategy": "full",
+        "hot_reload": {
+          "allow": true,
+          "requires_rebuild": false
+        }
+      }
+    },
+    {
+      "id": "currency_economy",
+      "config": "domains.currency",
+      "narrative": "narratives.currency",
+      "test": "res://tests/unit/domains/test_currency_economy.gd",
+      "test_symbol": "TestCurrencyDomain",
+      "phase": 1,
+      "depends_on": [],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "CurrencyEconomyEntity",
+        "strategy": "dirty",
+        "hot_reload": {
+          "allow": false,
+          "requires_rebuild": true
+        }
+      }
+    },
+    {
+      "id": "trading_logistics",
+      "config": "domains.trading",
+      "narrative": "narratives.trading",
+      "test": "res://tests/unit/domains/test_trading_logistics.gd",
+      "test_symbol": "TestTradingDomain",
+      "phase": 1,
+      "depends_on": []
+    },
+    {
+      "id": "npc_simulation",
+      "config": "domains.npc",
+      "narrative": "narratives.npc",
+      "test": "res://tests/unit/domains/test_npc_simulation.gd",
+      "test_symbol": "TestNPCDomain",
+      "phase": 1,
+      "depends_on": []
+    },
+    {
+      "id": "sovereignty_realm",
+      "config": "domains.sovereignty",
+      "narrative": "narratives.sovereignty",
+      "test": "res://tests/unit/domains/test_sovereignty_realm.gd",
+      "test_symbol": "TestSovereigntyDomain",
+      "phase": 1,
+      "depends_on": []
+    },
+    {
+      "id": "account",
+      "config": "domains.account",
+      "narrative": "narratives.account",
+      "test": "res://tests/unit/domains/test_account.gd",
+      "test_symbol": "TestAccountDomain",
+      "phase": 2,
+      "depends_on": [
+        "world_navigation"
+      ],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "AccountProfileAggregate",
+        "strategy": "full",
+        "hot_reload": {
+          "allow": false,
+          "requires_rebuild": false
+        }
+      }
+    },
+    {
+      "id": "character_creation",
+      "config": "domains.character_creation",
+      "narrative": "narratives.character_creation",
+      "test": "res://tests/unit/domains/test_character_creation.gd",
+      "test_symbol": "TestCharacterCreationDomain",
+      "phase": 2,
+      "depends_on": [],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "CharacterPrologueContext",
+        "strategy": "full",
+        "hot_reload": {
+          "allow": false,
+          "requires_rebuild": true
+        }
+      }
+    },
+    {
+      "id": "potential_growth",
+      "config": "domains.potential",
+      "narrative": "narratives.potential",
+      "test": "res://tests/unit/domains/test_potential_growth.gd",
+      "test_symbol": "TestPotentialGrowthDomain",
+      "phase": 2,
+      "depends_on": []
+    },
+    {
+      "id": "gacha_wish",
+      "config": "domains.gacha",
+      "narrative": "narratives.gacha",
+      "test": "res://tests/unit/domains/test_gacha_wish.gd",
+      "test_symbol": "TestGachaDomain",
+      "phase": 2,
+      "depends_on": [
+        "currency_economy",
+        "inventory"
+      ]
+    },
+    {
+      "id": "equipment_loadout",
+      "config": "domains.equipment",
+      "narrative": "narratives.equipment",
+      "test": "res://tests/unit/domains/test_equipment_loadout.gd",
+      "test_symbol": "TestEquipmentLoadoutDomain",
+      "phase": 2,
+      "depends_on": []
+    },
+    {
+      "id": "workshop_forge",
+      "config": "domains.workshop",
+      "narrative": "narratives.workshop",
+      "test": "res://tests/unit/domains/test_workshop_forge.gd",
+      "test_symbol": "TestWorkshopForgeDomain",
+      "phase": 2,
+      "depends_on": [
+        "currency_economy"
+      ]
+    },
+    {
+      "id": "admin_sandbox",
+      "config": "infrastructure.admin",
+      "narrative": "narratives.admin",
+      "test": "res://tests/unit/domains/test_admin_sandbox.gd",
+      "test_symbol": "TestAdminSandboxDomain",
+      "phase": 2,
+      "depends_on": [
+        "currency_economy"
+      ],
+      "config_exempt": true,
+      "exempt_reason": "GM 沙盒属基础设施层，复用 infrastructure.admin（权限盐/口令/审计阈值）为分层规范所要求"
+    },
+    {
+      "id": "chat_command",
+      "config": "domains.chat_command",
+      "narrative": "narratives.chat_command",
+      "test": "res://tests/unit/domains/test_chat_command.gd",
+      "test_symbol": "TestChatCommandDomain",
+      "phase": 2,
+      "depends_on": []
+    },
+    {
+      "id": "elite_mutation",
+      "config": "domains.elite",
+      "narrative": "narratives.elite",
+      "test": "res://tests/unit/domains/test_elite_mutation.gd",
+      "test_symbol": "TestEliteMutationDomain",
+      "phase": 2,
+      "depends_on": []
+    },
+    {
+      "id": "world_boss",
+      "config": "domains.world_boss",
+      "narrative": "narratives.world_boss",
+      "test": "res://tests/unit/domains/test_world_boss.gd",
+      "test_symbol": "TestWorldBossDomain",
+      "phase": 2,
+      "depends_on": []
+    },
+    {
+      "id": "cdkey_voucher",
+      "config": "domains.cdkey_voucher",
+      "narrative": "narratives.cdkey_voucher",
+      "test": "res://tests/unit/domains/test_cdkey_voucher.gd",
+      "test_symbol": "TestCDKeyVoucherDomain",
+      "phase": 3,
+      "depends_on": []
+    },
+    {
+      "id": "mail_system",
+      "config": "domains.mail_system",
+      "narrative": "narratives.mail_system",
+      "test": "res://tests/unit/domains/test_mail_system.gd",
+      "test_symbol": "TestMailSystemDomain",
+      "phase": 3,
+      "depends_on": [
+        "inventory"
+      ]
+    },
+    {
+      "id": "game_settings",
+      "config": "domains.game_settings",
+      "narrative": "narratives.game_settings",
+      "test": "res://tests/unit/domains/test_game_settings.gd",
+      "test_symbol": "TestGameSettingsDomain",
+      "phase": 3,
+      "depends_on": [],
+      "save": {
+        "enabled": true,
+        "domain_version": 1,
+        "serializer": "SettingsPersistenceService",
+        "strategy": "full",
+        "hot_reload": {
+          "allow": true,
+          "requires_rebuild": false
+        }
+      }
+    },
+    {
+      "id": "organization_guild",
+      "config": "domains.organization_guild",
+      "narrative": "narratives.organization_guild",
+      "test": "res://tests/unit/domains/test_organization_guild.gd",
+      "test_symbol": "TestOrganizationGuildDomain",
+      "phase": 3,
+      "depends_on": [
+        "world_navigation"
+      ]
+    },
+    {
+      "id": "commission_quest",
+      "config": "domains.commission_quest",
+      "narrative": "narratives.commission_quest",
+      "test": "res://tests/unit/domains/test_commission_quest.gd",
+      "test_symbol": "TestCommissionQuestDomain",
+      "phase": 3,
+      "depends_on": []
+    },
+    {
+      "id": "identity_disguise",
+      "config": "domains.identity_disguise",
+      "narrative": "narratives.identity_disguise",
+      "test": "res://tests/unit/domains/test_identity_disguise.gd",
+      "test_symbol": "TestIdentityDisguiseDomain",
+      "phase": 3,
+      "depends_on": []
+    },
+    {
+      "id": "spatial_merchant",
+      "config": "domains.spatial_merchant",
+      "narrative": "narratives.spatial_merchant",
+      "test": "res://tests/unit/domains/test_spatial_merchant.gd",
+      "test_symbol": "TestSpatialMerchantDomain",
+      "phase": 3,
+      "depends_on": [
+        "world_navigation"
+      ]
+    },
+    {
+      "id": "spatial_movement",
+      "config": "domains.spatial_movement",
+      "narrative": "narratives.spatial_movement",
+      "test": "res://tests/unit/domains/test_spatial_movement.gd",
+      "test_symbol": "TestSpatialMovementDomain",
+      "phase": 3,
+      "depends_on": [
+        "world_navigation"
+      ]
+    },
+    {
+      "id": "hardware_input",
+      "config": "domains.hardware_input",
+      "narrative": "narratives.hardware_input",
+      "test": "res://tests/unit/domains/test_hardware_input.gd",
+      "test_symbol": "TestHardwareInputDomain",
+      "phase": 3,
+      "depends_on": []
+    },
+    {
+      "id": "ground_loot",
+      "config": "domains.ground_loot",
+      "narrative": "narratives.ground_loot",
+      "test": "res://tests/unit/domains/test_ground_loot.gd",
+      "test_symbol": "TestGroundLootDomain",
+      "phase": 3,
+      "depends_on": [
+        "world_navigation"
+      ]
+    },
+    {
+      "id": "matter_disposal",
+      "config": "domains.matter_disposal",
+      "narrative": "narratives.matter_disposal",
+      "test": "res://tests/unit/domains/test_matter_disposal.gd",
+      "test_symbol": "TestMatterDisposalDomain",
+      "phase": 3,
+      "depends_on": [
+        "world_navigation"
+      ]
+    },
+    {
+      "id": "narrative_orchestration",
+      "config": "domains.narrative_orchestration",
+      "narrative": "narratives.narrative_orchestration",
+      "test": "res://tests/unit/domains/test_narrative_orchestration.gd",
+      "test_symbol": "TestNarrativeOrchestrationDomain",
+      "phase": 3,
+      "depends_on": []
+    },
+    {
+      "id": "item_namespace_registry",
+      "config": "domains.item_namespace_registry",
+      "narrative": "narratives.item_namespace_registry",
+      "test": "res://tests/unit/domains/test_item_namespace_registry.gd",
+      "test_symbol": "TestItemNamespaceRegistryDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "feature_toggle_canary",
+      "config": "domains.feature_toggle_canary",
+      "narrative": "narratives.feature_toggle_canary",
+      "test": "res://tests/unit/domains/test_feature_toggle_canary.gd",
+      "test_symbol": "TestFeatureToggleCanaryDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "localization_i18n",
+      "config": "domains.localization_i18n",
+      "narrative": "narratives.localization_i18n",
+      "test": "res://tests/unit/domains/test_localization_i18n.gd",
+      "test_symbol": "TestLocalizationI18nDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "event_driven_audio",
+      "config": "domains.event_driven_audio",
+      "narrative": "narratives.event_driven_audio",
+      "test": "res://tests/unit/domains/test_event_driven_audio.gd",
+      "test_symbol": "TestEventDrivenAudioDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "notification_red_dot",
+      "config": "domains.notification_red_dot",
+      "narrative": "narratives.notification_red_dot",
+      "test": "res://tests/unit/domains/test_notification_red_dot.gd",
+      "test_symbol": "TestNotificationRedDotDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "bulletin_board_maintenance",
+      "config": "domains.bulletin_board_maintenance",
+      "narrative": "narratives.bulletin_board_maintenance",
+      "test": "res://tests/unit/domains/test_bulletin_board_maintenance.gd",
+      "test_symbol": "TestBulletinBoardMaintenanceDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "telemetry_account_lifecycle",
+      "config": "domains.telemetry_account_lifecycle",
+      "narrative": "narratives.telemetry_account_lifecycle",
+      "test": "res://tests/unit/domains/test_telemetry_account_lifecycle.gd",
+      "test_symbol": "TestTelemetryAccountLifecycleDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "world_state",
+      "config": "domains.world_state",
+      "narrative": "narratives.world_state",
+      "test": "res://tests/unit/domains/test_world_state.gd",
+      "test_symbol": "TestWorldStateDomain",
+      "phase": 4,
+      "depends_on": [
+        "world_navigation"
+      ]
+    },
+    {
+      "id": "event_extractor",
+      "config": "domains.event_extractor",
+      "narrative": "narratives.admin",
+      "test": "res://tests/unit/domains/test_event_extractor.gd",
+      "test_symbol": "TestEventExtractorDomain",
+      "phase": 4,
+      "depends_on": [
+        "item_statistics",
+        "telemetry_account_lifecycle"
+      ]
+    },
+    {
+      "id": "item_statistics",
+      "config": "domains.item_statistics",
+      "narrative": "narratives.admin",
+      "test": "res://tests/unit/domains/test_item_statistics.gd",
+      "test_symbol": "TestItemStatisticsDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "magic_system",
+      "config": "domains.magic_rules",
+      "narrative": "narratives.item_namespace_registry",
+      "test": "res://tests/unit/domains/test_magic_system.gd",
+      "test_symbol": "TestMagicRuleSystemDomain",
+      "phase": 4,
+      "depends_on": []
+    },
+    {
+      "id": "world_gateway",
+      "config": "domains.world_gateway",
+      "narrative": "narratives.world_gateway",
+      "test": "res://tests/unit/domains/test_world_gateway.gd",
+      "test_symbol": "TestWorldGatewayAndModeIsolation",
+      "phase": 4,
+      "depends_on": [
+        "account",
+        "feature_toggle_canary"
+      ]
+    }
+  ]
+}

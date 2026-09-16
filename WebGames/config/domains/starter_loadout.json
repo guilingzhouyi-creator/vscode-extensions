@@ -1,0 +1,45 @@
+{
+  "_meta": {
+    "version": 1,
+    "domain": "starter_loadout",
+    "description": "新手装备与初始资源配置（P10.5：配置驱动发放，严禁代码写死）"
+  },
+  "race_kit_map": {
+    "HUMAN": "KIT_HUMAN_DEFAULT",
+    "ELF": "KIT_ELF_DEFAULT"
+  },
+  "starter_kits": {
+    "KIT_HUMAN_DEFAULT": {
+      "initial_gold": 50,
+      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+      "initial_items": [
+        {
+          "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+          "count": 1
+        },
+        {
+          "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+          "count": 3
+        }
+      ]
+    },
+    "KIT_ELF_DEFAULT": {
+      "initial_gold": 60,
+      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+      "initial_items": [
+        {
+          "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+          "count": 1
+        },
+        {
+          "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+          "count": 2
+        }
+      ]
+    }
+  },
+  "defaults": {
+    "initial_gold": 50,
+    "fallback_kit": "KIT_HUMAN_DEFAULT"
+  }
+}

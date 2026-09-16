@@ -1,0 +1,53 @@
+{
+  "$schema": "../config.schema.json",
+  "_comment": "语言级通用预设：Python 严格审查（所有 Python 适用分析器开启，引擎默认阈值）。本预设只表达「语言 + 严格度」——不含任何项目路径、层映射、阈值覆盖或豁免；项目差异请在该项目自己的配置里叠加（suppressions 必填 reason），或复制本预设后按需扩展。用法：node dist/index.js scan --root <project> --config presets/python-strict.config.json --format json --out report.json。架构层与注释门禁需项目侧配置（层映射与文件头约定均属项目政策），故本预设不启用 architecture/comments；Markdown 文档面请另配 --include '**/*.md' 并启用 docs。",
+  "include": [
+    "**/*.py"
+  ],
+  "exclude": [
+    "**/__pycache__/**",
+    "**/.venv/**",
+    "**/venv/**",
+    "**/site-packages/**",
+    "**/build/**",
+    "**/dist/**"
+  ],
+  "analyzers": {
+    "constants": {
+      "enabled": true
+    },
+    "large-file": {
+      "enabled": true
+    },
+    "complexity": {
+      "enabled": true
+    },
+    "dependency-graph": {
+      "enabled": true,
+      "options": {
+        "detectCycles": true
+      }
+    },
+    "secrets": {
+      "enabled": true
+    },
+    "governance": {
+      "enabled": true
+    },
+    "performance": {
+      "enabled": true
+    },
+    "hygiene": {
+      "enabled": true
+    },
+    "simplify": {
+      "enabled": true
+    },
+    "python-modern": {
+      "enabled": true
+    },
+    "security": {
+      "enabled": true
+    }
+  }
+}

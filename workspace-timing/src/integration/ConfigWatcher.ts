@@ -8,29 +8,33 @@
 import * as vscode from 'vscode';
 import {
     TimingConfig,
+    StatusBarMode,
     DEFAULT_CONFIG,
     sanitizeWeeklyLimitHours,
     sanitizeWeeklyLimitEnabled,
+    sanitizeRingBufferCapacity,
+    sanitizeJournalFlushIntervalMs,
+    sanitizeFullSaveIntervalMs,
+    sanitizeHistoryRawRetentionDays,
+    sanitizeMaxSessions,
+    sanitizeStatusBarMode,
+    sanitizeLocale,
 } from '../domain/models';
 import { DashboardData } from '../domain/dashboard-types';
-import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { LogLevel, log } from './Logger';
 import { t, setLocale, resolveLocale } from '../i18n/index';
 
 const CONFIG_SECTION = 'workspaceTiming';
 
 /**
- * 配置数值下限钳制（面板/JSON 手写越界防护）：
- * - ringBufferCapacity < 1 会使 RingBuffer 构造抛异常，导致扩展激活失败；
- * - flush/save 间隔 <= 0 会让 setInterval 以 ~1ms 疯狂触发（CPU/I/O 热点）。
- * 与面板输入框的 min 属性保持一致口径。
- */
-const MIN_RING_BUFFER_CAP = 1;
-const MIN_INTERVAL_MS = 1000;
-
-/**
  * 读取当前用户配置（唯一入口，避免多处重复实现导致配置漂移）。
  * 供 ConfigWatcher 与 extension.ts 初始化共用，保证初始化/运行期配置同源。
+ *
+ * 所有数值型配置经 domain/models 的净化器钳制（与 package.json 的
+ * minimum/maximum、面板输入框 min/max 属性三方一致，见 models.ts 边界单一真源）：
+ * - ringBufferCapacity < 1 会使 RingBuffer 构造抛异常，导致扩展激活失败；
+ * - flush/save 间隔 <= 0 会让 setInterval 以 ~1ms 疯狂触发（CPU/I/O 热点）；
+ * - 超出上界的值一律钳回合法域，杜绝手写配置越界。
  */
 export function readTimingConfig(): TimingConfig {
     const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
@@ -38,27 +42,56 @@ export function readTimingConfig(): TimingConfig {
     return {
         enabled: cfg.get<boolean>('enabled', DEFAULT_CONFIG.enabled),
         globalDisabled: cfg.get<boolean>('globalDisabled', DEFAULT_CONFIG.globalDisabled),
-        locale: cfg.get<'auto' | 'zh-CN' | 'en'>('locale', DEFAULT_CONFIG.locale),
+        locale: sanitizeLocale(cfg.get('locale', DEFAULT_CONFIG.locale)),
         statusBarEnabled: cfg.get<boolean>('statusBar.enabled', DEFAULT_CONFIG.statusBarEnabled),
         backupToFile: cfg.get<boolean>('storage.backupToFile', DEFAULT_CONFIG.backupToFile),
         journalEnabled: cfg.get<boolean>('storage.journalEnabled', DEFAULT_CONFIG.journalEnabled),
-        ringBufferCapacity: Math.max(MIN_RING_BUFFER_CAP, Math.floor(
-            cfg.get<number>('storage.ringBufferCapacity', DEFAULT_CONFIG.ringBufferCapacity),
-        )),
-        journalFlushIntervalMs: Math.max(MIN_INTERVAL_MS,
+        ringBufferCapacity: sanitizeRingBufferCapacity(
+            cfg.get<number>('storage.ringBufferCapacity', DEFAULT_CONFIG.ringBufferCapacity)),
+        journalFlushIntervalMs: sanitizeJournalFlushIntervalMs(
             cfg.get<number>('storage.journalFlushInterval', DEFAULT_CONFIG.journalFlushIntervalMs)),
-        fullSaveIntervalMs: Math.max(MIN_INTERVAL_MS,
+        fullSaveIntervalMs: sanitizeFullSaveIntervalMs(
             cfg.get<number>('storage.fullSaveInterval', DEFAULT_CONFIG.fullSaveIntervalMs)),
-        statusBarFormat: cfg.get<'compact' | 'detailed'>('statusBar.format', DEFAULT_CONFIG.statusBarFormat),
-        maxSessions: Math.max(0,
+        statusBarMode: sanitizeStatusBarMode(cfg.get('statusBar.mode', DEFAULT_CONFIG.statusBarMode)),
+        maxSessions: sanitizeMaxSessions(
             cfg.get<number>('storage.maxSessions', DEFAULT_CONFIG.maxSessions)),
-        historyRawRetentionDays: Math.max(0,
+        historyRawRetentionDays: sanitizeHistoryRawRetentionDays(
             cfg.get<number>('storage.historyRawRetentionDays', DEFAULT_CONFIG.historyRawRetentionDays)),
         safetySnapshot: cfg.get<boolean>('storage.safetySnapshot', DEFAULT_CONFIG.safetySnapshot),
         weeklyLimitEnabled: sanitizeWeeklyLimitEnabled(cfg.get('weeklyLimit.enabled', DEFAULT_CONFIG.weeklyLimitEnabled)),
         weeklyLimitHours: sanitizeWeeklyLimitHours(cfg.get('weeklyLimit.hours', DEFAULT_CONFIG.weeklyLimitHours)),
     };
 }
+
+/**
+ * 持久化字段映射表（声明式单一事实源）。
+ *   field    → 入参触达名（TimingConfig / DashboardData 历史双轨名，如 isEnabled=enabled）
+ *   key      → VS Code settings 键（相对 workspaceTiming 段）
+ *   sanitize → 写入前净化器（可选）
+ * 新增可持久化字段只需在此登记，不再增长 if 链。
+ */
+const PERSIST_FIELDS: ReadonlyArray<{
+    field: string;
+    key: string;
+    sanitize?: (v: unknown) => unknown;
+}> = [
+    { field: 'isEnabled', key: 'enabled' },   // DashboardData 历史触达名
+    { field: 'enabled', key: 'enabled' },     // TimingConfig 本名
+    { field: 'globalDisabled', key: 'globalDisabled' },
+    { field: 'locale', key: 'locale' },
+    { field: 'statusBarEnabled', key: 'statusBar.enabled' },
+    { field: 'statusBarMode', key: 'statusBar.mode' },
+    { field: 'journalEnabled', key: 'storage.journalEnabled' },
+    { field: 'backupToFile', key: 'storage.backupToFile' },
+    { field: 'ringBufferCapacity', key: 'storage.ringBufferCapacity' },
+    { field: 'journalFlushIntervalMs', key: 'storage.journalFlushInterval' },
+    { field: 'fullSaveIntervalMs', key: 'storage.fullSaveInterval' },
+    { field: 'maxSessions', key: 'storage.maxSessions' },
+    { field: 'historyRawRetentionDays', key: 'storage.historyRawRetentionDays' },
+    { field: 'safetySnapshot', key: 'storage.safetySnapshot' },
+    { field: 'weeklyLimitEnabled', key: 'weeklyLimit.enabled', sanitize: sanitizeWeeklyLimitEnabled },
+    { field: 'weeklyLimitHours', key: 'weeklyLimit.hours', sanitize: sanitizeWeeklyLimitHours },
+];
 
 /**
  * 将面板或命令修改的配置持久化写入 VS Code settings.json (默认 ConfigurationTarget.Global)
@@ -68,60 +101,19 @@ export async function persistTimingConfig(
     target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global,
 ): Promise<void> {
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-    const promises: Thenable<void>[] = [];
-
-    if ('isEnabled' in partial && partial.isEnabled !== undefined) {
-        promises.push(config.update('enabled', partial.isEnabled, target));
-    }
-    if ('enabled' in partial && partial.enabled !== undefined) {
-        promises.push(config.update('enabled', partial.enabled, target));
-    }
-    if ('globalDisabled' in partial && partial.globalDisabled !== undefined) {
-        promises.push(config.update('globalDisabled', partial.globalDisabled, target));
-    }
-    if ('locale' in partial && partial.locale !== undefined) {
-        promises.push(config.update('locale', partial.locale, target));
-    }
-    if ('statusBarEnabled' in partial && partial.statusBarEnabled !== undefined) {
-        promises.push(config.update('statusBar.enabled', partial.statusBarEnabled, target));
-    }
-    if ('statusBarFormat' in partial && partial.statusBarFormat !== undefined) {
-        promises.push(config.update('statusBar.format', partial.statusBarFormat, target));
-    }
-    if ('journalEnabled' in partial && partial.journalEnabled !== undefined) {
-        promises.push(config.update('storage.journalEnabled', partial.journalEnabled, target));
-    }
-    if ('backupToFile' in partial && partial.backupToFile !== undefined) {
-        promises.push(config.update('storage.backupToFile', partial.backupToFile, target));
-    }
-    if ('ringBufferCapacity' in partial && partial.ringBufferCapacity !== undefined) {
-        promises.push(config.update('storage.ringBufferCapacity', partial.ringBufferCapacity, target));
-    }
-    if ('journalFlushIntervalMs' in partial && partial.journalFlushIntervalMs !== undefined) {
-        promises.push(config.update('storage.journalFlushInterval', partial.journalFlushIntervalMs, target));
-    }
-    if ('fullSaveIntervalMs' in partial && partial.fullSaveIntervalMs !== undefined) {
-        promises.push(config.update('storage.fullSaveInterval', partial.fullSaveIntervalMs, target));
-    }
-    if ('maxSessions' in partial && partial.maxSessions !== undefined) {
-        promises.push(config.update('storage.maxSessions', partial.maxSessions, target));
-    }
-    if ('historyRawRetentionDays' in partial && partial.historyRawRetentionDays !== undefined) {
-        promises.push(config.update('storage.historyRawRetentionDays', partial.historyRawRetentionDays, target));
-    }
-    if ('safetySnapshot' in partial && partial.safetySnapshot !== undefined) {
-        promises.push(config.update('storage.safetySnapshot', partial.safetySnapshot, target));
-    }
-    if ('weeklyLimitEnabled' in partial && partial.weeklyLimitEnabled !== undefined) {
-        promises.push(config.update('weeklyLimit.enabled', sanitizeWeeklyLimitEnabled(partial.weeklyLimitEnabled), target));
-    }
-    if ('weeklyLimitHours' in partial && partial.weeklyLimitHours !== undefined) {
-        promises.push(config.update('weeklyLimit.hours', sanitizeWeeklyLimitHours(partial.weeklyLimitHours), target));
-    }
+    const record = partial as Record<string, unknown>;
+    const touched: string[] = [];
+    const promises = PERSIST_FIELDS
+        .filter(({ field }) => record[field] !== undefined)
+        .map(({ field, key, sanitize }) => {
+            touched.push(key);
+            const raw = record[field];
+            return config.update(key, sanitize ? sanitize(raw) : raw, target);
+        });
 
     try {
         await Promise.all(promises);
-        log(LogLevel.Debug, `ConfigWatcher: persisted config update (${Object.keys(partial).join(', ')})`);
+        log(LogLevel.Debug, `ConfigWatcher: persisted config update (${touched.join(', ')})`);
     } catch (err) {
         log(LogLevel.Error, 'ConfigWatcher: failed to persist configuration to VS Code settings', err as Error);
     }
@@ -129,12 +121,21 @@ export async function persistTimingConfig(
 
 /** 状态栏最小端口（integration 层不依赖 presentation 具体类） */
 export interface StatusBarLike {
-    updateConfig(config: { enabled?: boolean }): void;
+    updateConfig(config: { enabled?: boolean; mode?: StatusBarMode }): void;
+}
+
+/**
+ * 运行期配置热应用端口（消费方定义，依赖倒置）：
+ * integration 层只要求"给我一份配置你能热应用"，
+ * 不感知 TimerOrchestrator 内部的禁用策略/调度器/会话上限结构。
+ */
+export interface RuntimeConfigPort {
+    applyConfig(config: TimingConfig): void;
 }
 
 export class ConfigWatcher {
     private readonly disposables: vscode.Disposable[] = [];
-    private readonly orchestrator: TimerOrchestrator;
+    private readonly orchestrator: RuntimeConfigPort;
     private readonly statusBar: StatusBarLike;
     /** 面板按新语言重建策略（由组合根注入，无面板打开时静默跳过） */
     private readonly recreatePanel: () => void;
@@ -142,7 +143,7 @@ export class ConfigWatcher {
     private _lastLocale: string | undefined = undefined;
 
     constructor(
-        orchestrator: TimerOrchestrator,
+        orchestrator: RuntimeConfigPort,
         statusBar: StatusBarLike,
         recreatePanel: () => void,
     ) {
@@ -196,21 +197,14 @@ export class ConfigWatcher {
             }
         }
 
-        // 1. 更新 DisableManager
-        this.orchestrator.disable.updateConfig({
-            enabled: config.enabled,
-            globalDisabled: config.globalDisabled,
-        });
+        // 1. 更新 DisableManager + 可变配置分发 + 禁用状态编排（经窄端口，门面内聚处理）
+        this.orchestrator.applyConfig(config);
 
-        // 2. 更新 StatusBar
+        // 2. 更新 StatusBar（显示开关 + 初始显示模式）
         this.statusBar.updateConfig({
             enabled: config.statusBarEnabled,
+            mode: config.statusBarMode,
         });
-
-        // 3. 热更新调度间隔与会话历史上限（journalEnabled/capacity 需重启生效）
-        this.orchestrator.applyRuntimeConfig(config);
-
-        this.orchestrator.onDisableStateChanged(this.orchestrator.disable.resolveState());
 
         log(LogLevel.Debug,
             `ConfigWatcher: config applied (enabled=${config.enabled}, globalDisabled=${config.globalDisabled})`);

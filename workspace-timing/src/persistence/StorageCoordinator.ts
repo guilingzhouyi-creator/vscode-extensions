@@ -48,13 +48,13 @@ export class StorageCoordinator {
      * 会话结束/重置/恢复等关键事件用 forceFileBackup 强制写入。
      */
     async save(data: WorkspaceTimingData, forceFileBackup = false): Promise<void> {
-        // 更新最后保存时间
-        data.lastSavedAtMs = Date.now();
+        // 以副本盖时间戳：协调器不原地改写调用方数据（保持无副作用边界）
+        const stamped: WorkspaceTimingData = { ...data, lastSavedAtMs: Date.now() };
 
         const errors: string[] = [];
 
         try {
-            await this.primary.save(data);
+            await this.primary.save(stamped);
         } catch (err) {
             errors.push(`primary: ${(err as Error).message}`);
         }
@@ -62,7 +62,7 @@ export class StorageCoordinator {
         this._fileBackupCount++;
         if (forceFileBackup || this._fileBackupCount % StorageCoordinator.FILE_BACKUP_EVERY_N === 0) {
             try {
-                await this.fileBackup.save(data);
+                await this.fileBackup.save(stamped);
             } catch (err) {
                 errors.push(`fileBackup: ${(err as Error).message}`);
             }

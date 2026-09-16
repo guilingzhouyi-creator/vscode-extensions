@@ -1,42 +1,19 @@
 #!/usr/bin/env bash
-# =============================================================================
-# pr-gate.sh — PR 统一前置门禁程序（冲突检测 + Diff 质量初筛 + 幂等去重防卡死）
-# -----------------------------------------------------------------------------
-# 作用：
-#   在 PR 创建/更新（pull_request 事件）时，作为**第一道确定性中枢**，在拉起任何
-#   NPC 之前先执行：
-#     ① 幂等去重（防卡死核心）：同一 PR 的 head commit 已审查过则直接跳过，
-#        避免 4 个 NPC 被重复拉起、重复修复、级联无限触发。
-#     ② 冲突检测：git merge --no-commit 预演目标分支 → 判定冲突等级 C0/C1/C2/C3。
-#     ③ Diff 质量初筛：统计改动规模、检测明显质量信号（临时文件/硬编码/大重构）。
-#     ④ 冲突分级派单（防卡死核心）：按分级输出唤醒建议，避免 4 个 NPC 全部并行
-#        互相等待（构建等测试、测试等审查、审查等构建 → 死锁）。
-#     ⑤ 输出结构化【门禁结论】给后续 NPC 读取，避免各自盲目重扫同一 PR。
-#     ⑥ 合入状态读取（专职合入员配套）：读取 status/merge-ready / status/merge-blocked
-#        标签，识别「陈旧否决」（head commit 已更新但仍被否决），提示合入员复核。
-#
-# 解决的问题（"卡死"根因）：
-#   - 多重触发互相等待：一个 PR 出现，构建/测试/审查/合入员 4 个 NPC 被同时拉起，
-#     但各自 userPrompt 要求"等/复核他人结论" → 并行拉起 + 串行依赖 = 死锁。
-#   - 修复即再次触发的无限循环：任何执行体定点修复 push 后再次触发 pull_request，
-#     又拉起 4 个 NPC，又可能再"修复" → 级联无限触发。
-#   - 缺少统一前置判断：冲突分级（C1/C2/C3）与 diff 质量全靠各 NPC 自行解读，
-#     职责不清、重复劳动、无人推进。
-#
-# 配套：
-#   - 门禁治理分册 §4.7 PR 门禁自动化 / §4.8 合入冲突自动审查
-#   - 流水线接入：.cnb.yml（$ 下 pull_request 事件，置于 auto-label.sh 之后、拉起 NPC 之前）
-#
-# 用法：
+# ==============================================================================
+# 模块归属: CI/CD 自动化流水线 (Automation · PR 统一前置门禁)
+# 文件路径: scripts/sh/pr-gate.sh
+# 架构定位: PR 门禁调度 Runner (Linux Bash)
+# 依赖与触发: 触发方: GitHub Actions (pull_request) | 上游: git diff | 下游: 门禁检查状态 | 运行时: Bash 4+
+# 职责说明: 执行 PR 差异预审、黑名单关键字过滤与自动化门禁调度，保障合流前质量
+# 退出语义与设计依据: 退出码: 0=门禁通过, 1=存在阻断违规 | 设计依据: AGENTS.md 构建门禁通用契约
+# ------------------------------------------------------------------------------
+# 用法示例:
 #   bash scripts/sh/pr-gate.sh
-#   （依赖 CNB 流水线注入的环境变量 + cnb-cli + git，仅应在流水线内运行）
-#
-# 环境变量（由 CNB 流水线自动注入）：
-#   PR 场景：CNB_PULL_REQUEST_TITLE / CNB_PULL_REQUEST_DESCRIPTION / CNB_PULL_REQUEST_IID
-#   Git：    CNB_REPO_SLUG（组织/仓库）、CNB_DEFAULT_BRANCH（目标分支）、CNB_COMMIT（head commit）
-#   公共：    CNB_PULL_REQUEST（是否 PR）、CNB_EVENT（事件名）、CNB_REPO_WORKTREE（可选工作区路径）
-# =============================================================================
+# ==============================================================================
 set -uo pipefail
+
+# 冲突分级单源规则（与 auto-merge-gate.sh 共享，防两道门禁规则漂移）
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-common.sh"
 
 # ---------- 0. 基础信息 ----------
 REPO_SLUG="${CNB_REPO_SLUG:-}"
@@ -72,7 +49,7 @@ echo "事件      : ${EVENT}"
 #   a) 检查 PR 标签是否含 status/gate-ok（脚本上次通过时打上）
 #   b) 本地缓存文件记录上次 head commit（二次防重）
 GATE_OK_LABEL="status/gate-ok"
-CACHE_DIR="${REPO_ROOT}/.cnb/.cache"
+CACHE_DIR="${REPO_ROOT}/.workbuddy/pr-gate-cache"
 CACHE_FILE="${CACHE_DIR}/pr-gate-${PR_NUM}.last"
 
 already_gated="false"
@@ -90,6 +67,8 @@ if [[ "$already_gated" == "true" ]]; then
 fi
 
 # 附加标签校验（尽力而为，CNB CLI 不可用时不阻断）
+# 标签清单只拉取一次：幂等检查与 5.4 合入状态读取共用，避免重复 API 调用
+CUR_LABELS=""
 if command -v cnb >/dev/null 2>&1; then
   CUR_LABELS=$(cnb pulls list-pull-labels --repo "$REPO_SLUG" --number "$PR_NUM" 2>/dev/null || true)
   if echo "$CUR_LABELS" | grep -q "$GATE_OK_LABEL"; then
@@ -134,29 +113,20 @@ else
   echo "ℹ️ pr-gate: 当前环境无 git 仓库或无法预演合并，默认按无冲突（C0）处理。"
 fi
 
-# 冲突分级细化（尽力而为）：
-#   - 冲突文件涉及 核心逻辑/数据迁移/破坏性变更 → 升 C3 高危
-#   - 冲突文件数量多 / 涉及越权 → C2（需审查判断）
-#   - 简单文件 → C1（冲突双方可自动化解，交由构建/测试主责处理）
-case "$CONFLICT_LEVEL" in
-  C2)
-    HI_RISK_HINT="false"
-    for f in ${CONFLICT_FILES:-}; do
-      case "$f" in
-        *migrat*|*schema*|*database*|*data*|src/core*|src/main*|package.json|package-lock.json) HI_RISK_HINT="true"; break ;;
-      esac
-    done
-    if [[ "$HI_RISK_HINT" == "true" ]]; then
-      CONFLICT_LEVEL="C3"
-      echo "⚠️ pr-gate: 冲突涉及高危文件（数据迁移/核心逻辑/依赖），升级为 C3 高危。"
-    elif [[ -z "${CONFLICT_FILES:-}" ]]; then
-      CONFLICT_LEVEL="C2"
-    else
-      CONFLICT_LEVEL="C1"
-      echo "ℹ️ pr-gate: 冲突文件较少且非高危，判定为 C1（可自动化解）。"
-    fi
-    ;;
-esac
+# 冲突分级细化（单源规则，见 gate-common.sh）：
+#   - 高危文件（数据迁移/核心逻辑/依赖） → C3 高危
+#   - 冲突文件少 → C1（冲突双方可自动化解，交由构建/测试主责处理）
+#   - 其余 → C2（需审查判断）
+if [[ "$CONFLICT_LEVEL" == "C2" ]]; then
+  NEW_LEVEL=$(gate_classify_conflicts "$CONFLICT_FILES")
+  if [[ "$NEW_LEVEL" == "C3" ]]; then
+    CONFLICT_LEVEL="C3"
+    echo "⚠️ pr-gate: 冲突涉及高危文件（数据迁移/核心逻辑/依赖），升级为 C3 高危。"
+  elif [[ "$NEW_LEVEL" == "C1" ]]; then
+    CONFLICT_LEVEL="C1"
+    echo "ℹ️ pr-gate: 冲突文件较少且非高危，判定为 C1（可自动化解）。"
+  fi
+fi
 
 # ---------- 3. Diff 质量初筛（对应门禁治理分册 §4.5 自动化审查范围） ----------
 DIFF_STATS=""
@@ -178,32 +148,33 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   fi
 
   if [[ -n "$DIFF_BASE" ]]; then
-    DIFF_STATS="$(git diff --stat "${DIFF_BASE}...HEAD" 2>/dev/null || true)"
-    CHANGED_FILES_CNT="$(git diff --name-only "${DIFF_BASE}...HEAD" 2>/dev/null | grep -c '^' || true)"
-    ADDED_LINES="$(git diff --numstat "${DIFF_BASE}...HEAD" 2>/dev/null | awk '$1 ~ /^[0-9]+$/ {s+=$1} END{print s+0}' || echo "0")"
-    DELETED_LINES="$(git diff --numstat "${DIFF_BASE}...HEAD" 2>/dev/null | awk '$2 ~ /^[0-9]+$/ {s+=$2} END{print s+0}' || echo "0")"
-    CHANGED_FILES_CNT="$(echo "$CHANGED_FILES_CNT" | tr -d '[:space:]')"
-    ADDED_LINES="$(echo "$ADDED_LINES" | tr -d '[:space:]')"
-    DELETED_LINES="$(echo "$DELETED_LINES" | tr -d '[:space:]')"
+    # 单次 git diff --numstat 同时取文件数与增删行（每文件一行，二进制行以 "-" 计入文件数不计量）
+    read -r CHANGED_FILES_CNT ADDED_LINES DELETED_LINES <<< "$(git diff --numstat "${DIFF_BASE}...HEAD" 2>/dev/null | awk '$1 ~ /^[0-9]+$/ {a+=$1} $2 ~ /^[0-9]+$/ {d+=$2} END{print NR, a+0, d+0}')"
+    DIFF_STATS="${CHANGED_FILES_CNT} 文件 / +${ADDED_LINES} -${DELETED_LINES}"
   else
     DIFF_STATS="（无可用 diff 基准，跳过统计）"
     CHANGED_FILES_CNT=0; ADDED_LINES=0; DELETED_LINES=0
   fi
 
-  # 质量信号初筛（简单关键词扫描 diff 文本，供审查聚焦；不替代正式审查）
-  DIFF_TEXT=""
+  # 质量信号初筛（关键词扫描 diff 文本，供审查聚焦；不替代正式审查）
+  # 全量 diff 落临时文件一次，三类信号共用，避免重复生成 diff
+  QUALITY_TMP=$(mktemp)
+  trap 'rm -f "$QUALITY_TMP"' EXIT
   if [[ -n "$DIFF_BASE" ]]; then
-    DIFF_TEXT="$(git diff "${DIFF_BASE}...HEAD" 2>/dev/null || true)"
+    git diff "${DIFF_BASE}...HEAD" > "$QUALITY_TMP" 2>/dev/null || true
   fi
-  if echo "$DIFF_TEXT" | grep -qE '^\+\s*(const|let|var).{0,20}=["\x27][0-9a-zA-Z_./]{3,}["\x27]'; then
+  # 硬编码扫描：字符串字面量（单引号以变量传入正则，避免 \x27 转义在不同 grep 间的可移植差异）
+  HC_QUOTE="'"
+  if grep -qE "^\+\s*(const|let|var).{0,20}=[\"${HC_QUOTE}][0-9a-zA-Z_./]{3,}[\"${HC_QUOTE}]" "$QUALITY_TMP"; then
     QUALITY_FLAGS+=("疑似硬编码（字符串字面量，建议抽配置/常量）")
   fi
-  if echo "$DIFF_TEXT" | grep -qE '^\+\s*(TODO|FIXME|HACK)\b'; then
+  if grep -qE '^\+\s*(TODO|FIXME|HACK)\b' "$QUALITY_TMP"; then
     QUALITY_FLAGS+=("新增 TODO/FIXME 待办（需确认是否遗留）")
   fi
-  if echo "$DIFF_TEXT" | grep -qE '^\+\s*console\.(log|debug)\b'; then
+  if grep -qE '^\+\s*console\.(log|debug)\b' "$QUALITY_TMP"; then
     QUALITY_FLAGS+=("新增调试输出 console.log（生产代码建议移除）")
   fi
+  rm -f "$QUALITY_TMP"
   if [[ "${CHANGED_FILES_CNT:-0}" -gt 30 ]]; then
     QUALITY_FLAGS+=("改动文件数大（${CHANGED_FILES_CNT} 个）——疑似大重构/越权，需审查确认 R2")
   fi
@@ -283,13 +254,12 @@ echo "  已打 ${GATE_OK_LABEL} 标签用于幂等防重（同一 head commit �
 # 陈旧否决识别：本 PR 有新提交（已过幂等检查 = head commit 更新）却仍带 merge-blocked，
 # 说明否决可能针对旧 commit → 提示合入员复核；人工否决不自动清除（保否决权）。
 MERGE_STATE_LINE="无合入决策标签（尚未由合入员判定）"
-if command -v cnb >/dev/null 2>&1; then
-  CUR_LABELS2=$(cnb pulls list-pull-labels --repo "$REPO_SLUG" --number "$PR_NUM" 2>/dev/null || true)
-  if echo "$CUR_LABELS2" | grep -q "status/merge-blocked"; then
+if [[ -n "$CUR_LABELS" ]]; then
+  if echo "$CUR_LABELS" | grep -q "status/merge-blocked"; then
     MERGE_STATE_LINE="status/merge-blocked（存在否决 → 自动合入被阻断）"
     echo "⚠️ 陈旧否决提示：PR #${PR_NUM} 存在 status/merge-blocked 否决标签，但本次为新提交（head ${HEAD_COMMIT:-未知}）。"
     echo "  请【合入员】在 Stage 4 合入门禁复核该否决是否仍有效；人工否决需人工确认解除，脚本不自动清除。"
-  elif echo "$CUR_LABELS2" | grep -q "status/merge-ready"; then
+  elif echo "$CUR_LABELS" | grep -q "status/merge-ready"; then
     MERGE_STATE_LINE="status/merge-ready（已放行 → 满足条件可自动合入）"
   fi
 fi

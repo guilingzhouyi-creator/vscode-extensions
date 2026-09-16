@@ -1,0 +1,173 @@
+{
+  "items": [
+    {
+      "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+      "english_name": "mithril_longsword",
+      "loc_name_key": "item.mithril_longsword.name",
+      "category_major": "EQUIPMENT",
+      "category_minor": "WEAPON_BLADE",
+      "tier_rank": 3,
+      "default_mass_kg": 1.5,
+      "default_volume_slots": 2,
+      "base_market_value": 350,
+      "search_aliases": [
+        "秘银剑",
+        "蓝晶长刃",
+        "mithril_blade"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:EQUIP:ARMOR:IRON_CHEST",
+      "english_name": "iron_chest",
+      "loc_name_key": "item.iron_chest.name",
+      "category_major": "EQUIPMENT",
+      "category_minor": "ARMOR_PLATE",
+      "tier_rank": 1,
+      "default_mass_kg": 8.0,
+      "default_volume_slots": 6,
+      "base_market_value": 120,
+      "search_aliases": [
+        "铁质胸甲",
+        "iron_plate"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+      "english_name": "potion_mana",
+      "loc_name_key": "item.potion_mana.name",
+      "category_major": "CONSUMABLE",
+      "category_minor": "ALCHEMY",
+      "tier_rank": 1,
+      "default_mass_kg": 0.5,
+      "default_volume_slots": 1,
+      "base_market_value": 25,
+      "search_aliases": [
+        "魔力药剂",
+        "蓝瓶",
+        "mana_potion"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:CONSUM:FOOD:HEARTY_STEW",
+      "english_name": "hearty_stew",
+      "loc_name_key": "item.hearty_stew.name",
+      "category_major": "CONSUMABLE",
+      "category_minor": "FOOD",
+      "tier_rank": 1,
+      "default_mass_kg": 1.0,
+      "default_volume_slots": 1,
+      "base_market_value": 40,
+      "search_aliases": [
+        "丰盛炖肉",
+        "hearty_stew"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:MATERIAL:ORE:MITHRIL_ORE",
+      "english_name": "mithril_ore",
+      "loc_name_key": "item.mithril_ore.name",
+      "category_major": "MATERIAL",
+      "category_minor": "ORE",
+      "tier_rank": 2,
+      "default_mass_kg": 2.0,
+      "default_volume_slots": 1,
+      "base_market_value": 15,
+      "search_aliases": [
+        "秘银矿石",
+        "mithril_ore"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:QUEST:ARTIFACT:RELIC_FRAGMENT",
+      "english_name": "relic_fragment",
+      "loc_name_key": "item.relic_fragment.name",
+      "category_major": "QUEST",
+      "category_minor": "ARTIFACT",
+      "tier_rank": 2,
+      "default_mass_kg": 0.2,
+      "default_volume_slots": 1,
+      "base_market_value": 0,
+      "search_aliases": [
+        "遗迹碎片",
+        "relic_fragment"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+      "english_name": "iron_sword",
+      "loc_name_key": "item.iron_sword.name",
+      "category_major": "EQUIPMENT",
+      "category_minor": "WEAPON_BLADE",
+      "tier_rank": 1,
+      "default_mass_kg": 2.0,
+      "default_volume_slots": 2,
+      "base_market_value": 60,
+      "search_aliases": [
+        "铁剑",
+        "iron_sword"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:ELVEN_BOW",
+      "english_name": "elven_bow",
+      "loc_name_key": "item.elven_bow.name",
+      "category_major": "EQUIPMENT",
+      "category_minor": "WEAPON_BLADE",
+      "tier_rank": 3,
+      "default_mass_kg": 1.2,
+      "default_volume_slots": 3,
+      "base_market_value": 280,
+      "search_aliases": [
+        "精灵长弓",
+        "elven_bow"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:EQUIP:ARMOR:RUNIC_SHIELD",
+      "english_name": "runic_shield",
+      "loc_name_key": "item.runic_shield.name",
+      "category_major": "EQUIPMENT",
+      "category_minor": "ARMOR_PLATE",
+      "tier_rank": 3,
+      "default_mass_kg": 4.5,
+      "default_volume_slots": 4,
+      "base_market_value": 320,
+      "search_aliases": [
+        "符文盾",
+        "runic_shield"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:MATERIAL:DISPOSAL:SLAG_ASH",
+      "english_name": "material_slag_ash",
+      "loc_name_key": "item.material_slag_ash.name",
+      "category_major": "MATERIAL",
+      "category_minor": "DISPOSAL",
+      "tier_rank": 1,
+      "default_mass_kg": 0.2,
+      "default_volume_slots": 1,
+      "base_market_value": 1,
+      "search_aliases": [
+        "炉渣灰烬",
+        "slag_ash",
+        "MATERIAL_SLAG_ASH"
+      ]
+    },
+    {
+      "canonical_id": "KALAR:MATERIAL:DISPOSAL:MANA_DUST",
+      "english_name": "material_mana_dust",
+      "loc_name_key": "item.material_mana_dust.name",
+      "category_major": "MATERIAL",
+      "category_minor": "DISPOSAL",
+      "tier_rank": 1,
+      "default_mass_kg": 0.05,
+      "default_volume_slots": 1,
+      "base_market_value": 5,
+      "search_aliases": [
+        "魔素尘埃",
+        "mana_dust",
+        "MATERIAL_MANA_DUST"
+      ]
+    }
+  ]
+}

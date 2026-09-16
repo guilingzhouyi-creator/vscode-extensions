@@ -1,14 +1,14 @@
 {
   "filesScanned": 3,
-  "issuesTotal": 60,
+  "issuesTotal": 61,
   "byAnalyzer": {
     "constants": 47,
     "no-console": 12,
-    "complexity": 1
+    "complexity": 2
   },
   "bySeverity": {
     "info": 0,
-    "warning": 60,
+    "warning": 61,
     "error": 0
   },
   "issues": [
@@ -17,7 +17,7 @@
       "analyzer": "complexity",
       "rule": "high-complexity",
       "severity": "warning",
-      "message": "Function \"addUser\" has cyclomatic complexity 10 (threshold 10).",
+      "message": "Function \"addUser\" has cyclomatic complexity 10 (threshold 8).",
       "location": {
         "file": "sample.ts",
         "start": {
@@ -32,8 +32,32 @@
       "detail": {
         "function": "addUser",
         "cyclomaticComplexity": 10,
-        "warn": 10,
-        "fail": 20
+        "warn": 8,
+        "fail": 12
+      }
+    },
+    {
+      "id": "complexity:high-complexity:sample.ts:47",
+      "analyzer": "complexity",
+      "rule": "high-complexity",
+      "severity": "warning",
+      "message": "Function \"validateUser\" has cyclomatic complexity 8 (threshold 8).",
+      "location": {
+        "file": "sample.ts",
+        "start": {
+          "line": 47,
+          "column": 1
+        },
+        "end": {
+          "line": 60,
+          "column": 2
+        }
+      },
+      "detail": {
+        "function": "validateUser",
+        "cyclomaticComplexity": 8,
+        "warn": 8,
+        "fail": 12
       }
     },
     {

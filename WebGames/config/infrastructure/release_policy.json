@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "version": "2.0.0",
+    "description": "卡拉尔引擎多维灰度发布与放量规则事实表"
+  },
+  "active_policies": [
+    {
+      "policy_id": "POL_20260908_V180",
+      "target_version": "1.8.0",
+      "target_version_code": 10800,
+      "rollout_percentage": 20,
+      "allowed_rings": [
+        2,
+        3
+      ],
+      "target_channels": [
+        "official",
+        "steam"
+      ],
+      "target_regions": [
+        "GLOBAL"
+      ],
+      "explicit_user_whitelist": [
+        "TESTER_ALPHA_01",
+        "TESTER_ALPHA_02"
+      ],
+      "explicit_user_blacklist": [
+        "BANNED_USER_99"
+      ],
+      "is_active": true,
+      "rollback_version": "1.7.0"
+    }
+  ]
+}

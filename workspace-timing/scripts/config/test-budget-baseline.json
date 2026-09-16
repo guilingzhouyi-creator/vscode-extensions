@@ -1,0 +1,7 @@
+{
+    "schema": "wt-test-budget/v1",
+    "recordedAt": "2026-09-05T06:17:07.856Z",
+    "durationMs": 1276,
+    "budgetPercent": 50,
+    "node": "v24.16.0"
+}

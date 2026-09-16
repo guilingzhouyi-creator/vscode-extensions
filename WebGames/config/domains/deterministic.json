@@ -1,0 +1,46 @@
+{
+  "snapshot_defaults": {
+    "action_command": "SLASH",
+    "rng_seed": 12345
+  },
+  "replay_defaults": {
+    "validation_status": "PENDING",
+    "max_inputs": 10000,
+    "seed_min": 0,
+    "seed_max": 2147483647
+  },
+  "lcg": {
+    "multiplier": 1103515245,
+    "increment": 12345,
+    "mask": 2147483647,
+    "modulus": 1000,
+    "global_default_seed": 20240917
+  },
+  "combat": {
+    "base_damage": 25.0,
+    "random_coefficient": 0.2
+  },
+  "fingerprint": {
+    "format": "T%d:HP%.1f:AP%d:D%.1f",
+    "summary_separator": ";",
+    "schema_version": 1,
+    "algorithm_version": 1
+  },
+  "conservation": {
+    "tolerance": 0.001
+  },
+  "authority": {
+    "last_verified_server_tick": 0,
+    "max_allowed_desync_ticks": 5,
+    "ap_overflow_threshold": -10,
+    "status": {
+      "desync": "DESYNC_DETECTED",
+      "cheat": "CHEAT_DETECTED",
+      "valid": "VERIFIED_VALID"
+    },
+    "reasons": {
+      "desync": "Tick gap exceeds maximum threshold",
+      "cheat": "AP exhaustion overflow"
+    }
+  }
+}

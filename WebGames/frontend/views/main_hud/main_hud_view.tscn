@@ -1,0 +1,516 @@
+[gd_scene load_steps=2 format=3 uid="uid://cmainhudview02"]
+
+[ext_resource type="Script" path="res://frontend/views/main_hud/main_hud_view.gd" id="1_mainhud"]
+
+[node name="MainHUDView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_mainhud")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.06, 0.1, 1)
+
+; ==============================================================================
+; 1. 顶栏状态栏 (Top Status Bar) - 全宽顶部
+; ==============================================================================
+
+[node name="TopBar" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 11
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 64.0
+grow_horizontal = 2
+
+[node name="HBox" type="HBoxContainer" parent="TopBar"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="CharNameLabel" type="Label" parent="TopBar/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.98, 0.8, 0.2, 1)
+text = ""
+
+[node name="HSeparator1" type="VSeparator" parent="TopBar/HBox"]
+layout_mode = 2
+
+[node name="StatsVBox" type="VBoxContainer" parent="TopBar/HBox"]
+layout_mode = 2
+theme_override_constants/separation = 3
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="HPBar" type="ProgressBar" parent="TopBar/HBox/StatsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+value = 100.0
+
+[node name="MPBar" type="ProgressBar" parent="TopBar/HBox/StatsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+value = 50.0
+
+[node name="APBar" type="ProgressBar" parent="TopBar/HBox/StatsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+value = 10.0
+
+[node name="HSeparator2" type="VSeparator" parent="TopBar/HBox"]
+layout_mode = 2
+
+[node name="GoldLabel" type="Label" parent="TopBar/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="HSeparator3" type="VSeparator" parent="TopBar/HBox"]
+layout_mode = 2
+
+[node name="ClockLabel" type="Label" parent="TopBar/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+; ==============================================================================
+; 2. 小地图 (Mini Map) - 右上角
+; ==============================================================================
+
+[node name="MiniMapPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -236.0
+offset_top = 80.0
+offset_right = -16.0
+offset_bottom = 290.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="MiniMapPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="MiniMapTitle" type="Label" parent="MiniMapPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+[node name="MiniMapArea" type="ColorRect" parent="MiniMapPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(200, 150)
+color = Color(0.08, 0.12, 0.18, 1)
+
+[node name="MiniMapCoordsLabel" type="Label" parent="MiniMapPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="ZoomHBox" type="HBoxContainer" parent="MiniMapPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="MiniMapZoomOutBtn" type="Button" parent="MiniMapPanel/VBox/ZoomHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "−"
+custom_minimum_size = Vector2(32, 24)
+
+[node name="MiniMapZoomInBtn" type="Button" parent="MiniMapPanel/VBox/ZoomHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+"
+custom_minimum_size = Vector2(32, 24)
+
+; ==============================================================================
+; 3. 战报日志终端 (Battle Log Terminal) - 左侧中部
+; ==============================================================================
+
+[node name="BattleLogPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 80.0
+offset_right = 366.0
+offset_bottom = 360.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="BattleLogPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BattleLogTitle" type="Label" parent="BattleLogPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.52, 0.99, 1)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+[node name="BattleLogRich" type="RichTextLabel" parent="BattleLogPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(320, 220)
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true
+
+; ==============================================================================
+; 4. 聊天框 (Chat Box) - 左下角
+; ==============================================================================
+
+[node name="ChatPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -300.0
+offset_right = 416.0
+offset_bottom = -88.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="ChatPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ChatTabs" type="TabContainer" parent="ChatPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_font_sizes/font_size = 11
+
+[node name="世界" type="Control" parent="ChatPanel/VBox/ChatTabs"]
+layout_mode = 2
+
+[node name="公会" type="Control" parent="ChatPanel/VBox/ChatTabs"]
+layout_mode = 2
+
+[node name="队伍" type="Control" parent="ChatPanel/VBox/ChatTabs"]
+layout_mode = 2
+
+[node name="系统" type="Control" parent="ChatPanel/VBox/ChatTabs"]
+layout_mode = 2
+
+[node name="战斗" type="Control" parent="ChatPanel/VBox/ChatTabs"]
+layout_mode = 2
+
+[node name="ChatScroll" type="ScrollContainer" parent="ChatPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+
+[node name="ChatRichLabel" type="RichTextLabel" parent="ChatPanel/VBox/ChatScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true
+custom_minimum_size = Vector2(360, 160)
+
+[node name="ChatInput" type="LineEdit" parent="ChatPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = ""
+clear_button_enabled = true
+
+[node name="CompletionPanel" type="PanelContainer" parent="ChatPanel/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="CompletionVBox" type="VBoxContainer" parent="ChatPanel/VBox/CompletionPanel"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="CompletionRichLabel" type="RichTextLabel" parent="ChatPanel/VBox/CompletionPanel/CompletionVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(360, 100)
+bbcode_enabled = true
+scroll_following = false
+selection_enabled = false
+
+[node name="CompletionPageLabel" type="Label" parent="ChatPanel/VBox/CompletionPanel/CompletionVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+theme_override_font_sizes/font_size = 10
+text = ""
+
+; ==============================================================================
+; 5. 快捷动作栏 (Quick Action Bar) - 底部中央
+; ==============================================================================
+
+[node name="ActionBarBg" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = -72.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 2
+
+[node name="ActionBarCenter" type="HBoxContainer" parent="ActionBarBg"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="ActionBar" type="HBoxContainer" parent="ActionBarBg/ActionBarCenter"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Slot1Btn" type="Button" parent="ActionBarBg/ActionBarCenter/ActionBar"]
+layout_mode = 2
+text = "1"
+custom_minimum_size = Vector2(56, 56)
+
+[node name="Slot2Btn" type="Button" parent="ActionBarBg/ActionBarCenter/ActionBar"]
+layout_mode = 2
+text = "2"
+custom_minimum_size = Vector2(56, 56)
+
+[node name="Slot3Btn" type="Button" parent="ActionBarBg/ActionBarCenter/ActionBar"]
+layout_mode = 2
+text = "3"
+custom_minimum_size = Vector2(56, 56)
+
+[node name="Slot4Btn" type="Button" parent="ActionBarBg/ActionBarCenter/ActionBar"]
+layout_mode = 2
+text = "4"
+custom_minimum_size = Vector2(56, 56)
+
+[node name="Slot5Btn" type="Button" parent="ActionBarBg/ActionBarCenter/ActionBar"]
+layout_mode = 2
+text = "5"
+custom_minimum_size = Vector2(56, 56)
+
+[node name="Slot6Btn" type="Button" parent="ActionBarBg/ActionBarCenter/ActionBar"]
+layout_mode = 2
+text = "6"
+custom_minimum_size = Vector2(56, 56)
+
+[node name="Slot7Btn" type="Button" parent="ActionBarBg/ActionBarCenter/ActionBar"]
+layout_mode = 2
+text = "7"
+custom_minimum_size = Vector2(56, 56)
+
+[node name="Slot8Btn" type="Button" parent="ActionBarBg/ActionBarCenter/ActionBar"]
+layout_mode = 2
+text = "8"
+custom_minimum_size = Vector2(56, 56)
+
+; ==============================================================================
+; 6. 任务追踪栏 (Quest Tracker) - 右侧
+; ==============================================================================
+
+[node name="QuestTracker" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -270.0
+offset_top = 300.0
+offset_right = -16.0
+offset_bottom = -100.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="QuestTracker"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="QuestTitleLabel" type="Label" parent="QuestTracker/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+theme_override_font_sizes/font_size = 13
+text = ""
+
+[node name="QuestEntry1" type="VBoxContainer" parent="QuestTracker/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="Quest1Title" type="Label" parent="QuestTracker/VBox/QuestEntry1"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.53, 0.53, 1)
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="Quest1Desc" type="Label" parent="QuestTracker/VBox/QuestEntry1"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+theme_override_font_sizes/font_size = 10
+autowrap_mode = 2
+text = ""
+
+[node name="Quest1Progress" type="ProgressBar" parent="QuestTracker/VBox/QuestEntry1"]
+layout_mode = 2
+show_percentage = true
+value = 0.0
+
+[node name="QuestEntry2" type="VBoxContainer" parent="QuestTracker/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="Quest2Title" type="Label" parent="QuestTracker/VBox/QuestEntry2"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.83, 0.6, 1)
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="Quest2Desc" type="Label" parent="QuestTracker/VBox/QuestEntry2"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+theme_override_font_sizes/font_size = 10
+autowrap_mode = 2
+text = ""
+
+[node name="Quest2Progress" type="ProgressBar" parent="QuestTracker/VBox/QuestEntry2"]
+layout_mode = 2
+show_percentage = true
+value = 0.0
+
+[node name="QuestEntry3" type="VBoxContainer" parent="QuestTracker/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="Quest3Title" type="Label" parent="QuestTracker/VBox/QuestEntry3"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="Quest3Desc" type="Label" parent="QuestTracker/VBox/QuestEntry3"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.91, 0.95, 1)
+theme_override_font_sizes/font_size = 10
+autowrap_mode = 2
+text = ""
+
+[node name="Quest3Progress" type="ProgressBar" parent="QuestTracker/VBox/QuestEntry3"]
+layout_mode = 2
+show_percentage = true
+value = 0.0
+
+; ==============================================================================
+; 7. 主菜单 (Main Menu) - ESC 呼出，默认隐藏
+; ==============================================================================
+
+[node name="MainMenuPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -240.0
+offset_right = 150.0
+offset_bottom = 240.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="MainMenuPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MenuTitle" type="Label" parent="MainMenuPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 18
+text = ""
+horizontal_alignment = 1
+
+[node name="MenuDivider" type="HSeparator" parent="MainMenuPanel/VBox"]
+layout_mode = 2
+
+[node name="MenuBtnCharacter" type="Button" parent="MainMenuPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MenuBtnInventory" type="Button" parent="MainMenuPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MenuBtnSkills" type="Button" parent="MainMenuPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MenuBtnMap" type="Button" parent="MainMenuPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MenuBtnQuests" type="Button" parent="MainMenuPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MenuBtnMail" type="Button" parent="MainMenuPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MenuBtnSettings" type="Button" parent="MainMenuPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="MenuBtnExit" type="Button" parent="MainMenuPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""

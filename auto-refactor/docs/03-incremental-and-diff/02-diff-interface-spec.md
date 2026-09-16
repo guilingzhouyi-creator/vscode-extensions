@@ -24,6 +24,18 @@ export async function scanDiffDelta(
 ): Promise<{ report: DiffDeltaReport; stats: DiffStats }>;
 ```
 
+> **后处理管线契约（2026-09-15）**：所有入口共享**同一套终态语义**，差异只在能否使用跨文件事实，并由 `summary.postScanPasses` 显式声明：
+>
+> | 入口 | suppressions | baseline 棘轮 | 依赖图（环 / 未使用导出） | `postScanPasses` |
+> | :--- | :---: | :---: | :---: | :--- |
+> | `scan()` / `scanWarm()` / CLI 全量 | ✅ | ✅ | ✅（`detectCycles`/`detectUnusedExports` 开启时） | `['dependency-graph','suppressions','baseline']`（按实际执行项） |
+> | `scanDiff()` / `scanDiffDelta()` | ✅ | ✅ | ⛔ 跳过 | `['suppressions','baseline']` |
+> | CLI `scan --diff`（`git status` 变更集） | ✅ | ✅ | ⛔ 跳过 | `['suppressions','baseline']` |
+>
+> 增量口径**必须**跳过跨文件通道：图只覆盖部分文件时会凭空造环、也会漏掉真实环；跳过事实会写入 `summary.warnings`（`incremental scope: cross-file passes … skipped`）。`scanDiff`（全文件集）与 `scanDiffDelta`（变更子集）因此保持 `delta ≡ filter(diff)` 的契约——两者都不含跨文件发现。
+>
+> `scan()`/`scanWarm()` 与 CLI 全量逐字段一致，由 `validate-postscan-parity` 锁定；增量三入口的语义由 `validate-diff-interface` 锁定。
+
 ---
 
 ## 2. 联合输入模型 (`DiffInput`)

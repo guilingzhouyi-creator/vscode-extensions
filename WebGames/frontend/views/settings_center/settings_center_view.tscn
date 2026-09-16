@@ -1,0 +1,545 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8settingscenter01"]
+
+[ext_resource type="Script" path="res://frontend/views/settings_center/settings_center_view.gd" id="1_settings"]
+
+[node name="SettingsCenterView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_settings")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="Spacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="TabContainer" type="TabContainer" parent="MainLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+; =========================================================================
+; Tab 1: 音频设置
+; =========================================================================
+[node name="音频设置" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/音频设置"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/音频设置"]
+layout_mode = 2
+
+[node name="MasterRow" type="HBoxContainer" parent="MainLayout/TabContainer/音频设置"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/音频设置/MasterRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="SliderMasterVolume" type="HSlider" parent="MainLayout/TabContainer/音频设置/MasterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="LabelMasterVal" type="Label" parent="MainLayout/TabContainer/音频设置/MasterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(48, 0)
+text = "100%"
+
+[node name="CheckMuteMaster" type="CheckBox" parent="MainLayout/TabContainer/音频设置/MasterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BGMRow" type="HBoxContainer" parent="MainLayout/TabContainer/音频设置"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/音频设置/BGMRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="SliderBGMVolume" type="HSlider" parent="MainLayout/TabContainer/音频设置/BGMRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.8
+
+[node name="LabelBGMVal" type="Label" parent="MainLayout/TabContainer/音频设置/BGMRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(48, 0)
+text = "80%"
+
+[node name="CheckMuteBGM" type="CheckBox" parent="MainLayout/TabContainer/音频设置/BGMRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="SERow" type="HBoxContainer" parent="MainLayout/TabContainer/音频设置"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/音频设置/SERow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="SliderSEVolume" type="HSlider" parent="MainLayout/TabContainer/音频设置/SERow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="LabelSEVal" type="Label" parent="MainLayout/TabContainer/音频设置/SERow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(48, 0)
+text = "100%"
+
+[node name="CheckMuteSE" type="CheckBox" parent="MainLayout/TabContainer/音频设置/SERow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="AudioSpacer" type="Control" parent="MainLayout/TabContainer/音频设置"]
+layout_mode = 2
+size_flags_vertical = 3
+
+; =========================================================================
+; Tab 2: 画质设置
+; =========================================================================
+[node name="画质设置" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/画质设置"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/画质设置"]
+layout_mode = 2
+
+[node name="ResolutionRow" type="HBoxContainer" parent="MainLayout/TabContainer/画质设置"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/画质设置/ResolutionRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="OptionResolution" type="OptionButton" parent="MainLayout/TabContainer/画质设置/ResolutionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="QualityRow" type="HBoxContainer" parent="MainLayout/TabContainer/画质设置"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/画质设置/QualityRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="OptionQuality" type="OptionButton" parent="MainLayout/TabContainer/画质设置/QualityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CheckFullscreen" type="CheckBox" parent="MainLayout/TabContainer/画质设置"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="CheckVSync" type="CheckBox" parent="MainLayout/TabContainer/画质设置"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="BtnApplyGraphics" type="Button" parent="MainLayout/TabContainer/画质设置"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="PanelRevertPopup" type="PanelContainer" parent="MainLayout/TabContainer/画质设置"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="RevertVBox" type="VBoxContainer" parent="MainLayout/TabContainer/画质设置/PanelRevertPopup"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LabelRevertCountdown" type="Label" parent="MainLayout/TabContainer/画质设置/PanelRevertPopup/RevertVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.78, 0.26, 1)
+text = ""
+
+[node name="RevertBtns" type="HBoxContainer" parent="MainLayout/TabContainer/画质设置/PanelRevertPopup/RevertVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnConfirmResolution" type="Button" parent="MainLayout/TabContainer/画质设置/PanelRevertPopup/RevertVBox/RevertBtns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnRevertResolution" type="Button" parent="MainLayout/TabContainer/画质设置/PanelRevertPopup/RevertVBox/RevertBtns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="GraphicsSpacer" type="Control" parent="MainLayout/TabContainer/画质设置"]
+layout_mode = 2
+size_flags_vertical = 3
+
+; =========================================================================
+; Tab 3: 按键设置
+; =========================================================================
+[node name="按键设置" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/按键设置"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/按键设置"]
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MainLayout/TabContainer/按键设置"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="KeyList" type="VBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="KeyRow1" type="HBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow1"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="KeyBtn" type="Button" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow1"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "W"
+
+[node name="KeyRow2" type="HBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow2"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="KeyBtn" type="Button" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow2"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "S"
+
+[node name="KeyRow3" type="HBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow3"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="KeyBtn" type="Button" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow3"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "A"
+
+[node name="KeyRow4" type="HBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow4"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="KeyBtn" type="Button" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow4"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "D"
+
+[node name="KeyRow5" type="HBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow5"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="KeyBtn" type="Button" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow5"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="KeyRow6" type="HBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow6"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="KeyBtn" type="Button" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow6"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Space"
+
+[node name="KeyRow7" type="HBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow7"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="KeyBtn" type="Button" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow7"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Shift"
+
+[node name="KeyRow8" type="HBoxContainer" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow8"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+text = ""
+
+[node name="KeyBtn" type="Button" parent="MainLayout/TabContainer/按键设置/ScrollContainer/KeyList/KeyRow8"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "E"
+
+[node name="BtnResetKeys" type="Button" parent="MainLayout/TabContainer/按键设置"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LabelGamepadHint" type="Label" parent="MainLayout/TabContainer/按键设置"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+; =========================================================================
+; Tab 4: 语言设置
+; =========================================================================
+[node name="语言设置" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/语言设置"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/语言设置"]
+layout_mode = 2
+
+[node name="LanguageRow" type="HBoxContainer" parent="MainLayout/TabContainer/语言设置"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/TabContainer/语言设置/LanguageRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 0)
+text = ""
+
+[node name="OptionLanguage" type="OptionButton" parent="MainLayout/TabContainer/语言设置/LanguageRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnApplyLanguage" type="Button" parent="MainLayout/TabContainer/语言设置"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="LanguageSpacer" type="Control" parent="MainLayout/TabContainer/语言设置"]
+layout_mode = 2
+size_flags_vertical = 3
+
+; =========================================================================
+; Tab 5: 功能开关
+; =========================================================================
+[node name="功能开关" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/功能开关"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/功能开关"]
+layout_mode = 2
+
+[node name="ScrollToggles" type="ScrollContainer" parent="MainLayout/TabContainer/功能开关"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TogglesVBox" type="VBoxContainer" parent="MainLayout/TabContainer/功能开关/ScrollToggles"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="CheckCombatNumbers" type="CheckBox" parent="MainLayout/TabContainer/功能开关/ScrollToggles/TogglesVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = ""
+
+[node name="CheckFloatingText" type="CheckBox" parent="MainLayout/TabContainer/功能开关/ScrollToggles/TogglesVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = ""
+
+[node name="CheckVibration" type="CheckBox" parent="MainLayout/TabContainer/功能开关/ScrollToggles/TogglesVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = ""
+
+[node name="CheckAutoSave" type="CheckBox" parent="MainLayout/TabContainer/功能开关/ScrollToggles/TogglesVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = ""
+
+[node name="CheckBloom" type="CheckBox" parent="MainLayout/TabContainer/功能开关/ScrollToggles/TogglesVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="CheckMotionBlur" type="CheckBox" parent="MainLayout/TabContainer/功能开关/ScrollToggles/TogglesVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; =========================================================================
+; Tab 6: 关于
+; =========================================================================
+[node name="关于" type="VBoxContainer" parent="MainLayout/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SectionLabel" type="Label" parent="MainLayout/TabContainer/关于"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/TabContainer/关于"]
+layout_mode = 2
+
+[node name="LabelVersion" type="Label" parent="MainLayout/TabContainer/关于"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="LabelEngine" type="Label" parent="MainLayout/TabContainer/关于"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelCopyright" type="Label" parent="MainLayout/TabContainer/关于"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="AboutSpacer" type="Control" parent="MainLayout/TabContainer/关于"]
+layout_mode = 2
+size_flags_vertical = 3

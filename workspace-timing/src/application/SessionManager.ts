@@ -6,7 +6,7 @@
  */
 
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
-import { WorkspaceTimingData, TimeSession } from '../domain/models';
+import { WorkspaceTimingData } from '../domain/models';
 import { TimeAggregator, parseLocalDate } from '../domain/TimeAggregator';
 import { migrateToFolded } from '../domain/HistoryFolder';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
@@ -68,7 +68,7 @@ export class SessionManager {
     foldIfNeeded(): void {
         const data = this.timer.data;
         const res = migrateToFolded(
-            { sessions: data.sessions as TimeSession[], dailyTotals: data.dailyTotals },
+            { sessions: data.sessions, dailyTotals: data.dailyTotals },
             { retentionDays: this._rawRetentionDays, maxSessions: this.maxSessions },
         );
         if (res.foldedSessionCount === 0) return;
@@ -94,13 +94,11 @@ export class SessionManager {
     }
 
     /**
-     * 使今日累计缓存失效。
-     * reset/newPeriod/崩溃恢复等数据清空或替换场景必须调用，
-     * 否则 3s TTL 内 getTodayMs 会返回基于旧 sessions 的过期值。
+     * 兼容占位（0.4.9 起今日累计由 TimerEngine 增量计数器维护，
+     * replaceData/reset 已自动置脏）——保留方法避免调用方连锁改动。
      */
     invalidateTodayCache(): void {
-        this._todayCacheAt = 0;
-        this._todayCacheValue = 0;
+        /* no-op：计数器失效已内建于 TimerEngine */
     }
 
     /** 获取计时器快照 */
@@ -178,25 +176,12 @@ export class SessionManager {
         return result;
     }
 
-    /** 今日累计缓存的刷新间隔：状态栏每秒读取，聚合为 O(全部会话) 扫描，用短 TTL 抑制重复计算 */
-    private static readonly TODAY_CACHE_TTL_MS = 3000;
-    private _todayCacheAt = 0;
-    private _todayCacheValue = 0;
-
     /**
-     * 获取今日累计时长 (ms)
-     * 带 3s TTL 缓存：跨午夜时缓存值最多滞后 3 秒自然切换（对秒级展示无感知）。
+     * 获取今日累计时长 (ms)——O(1)：直接读 TimerEngine 增量计数器
+     * （已结束会话今日段事件式维护 + 进行中残段实时计算，状态栏每秒读取零扫描）。
      */
     getTodayMs(): number {
-        const now = Date.now();
-        if (now - this._todayCacheAt >= SessionManager.TODAY_CACHE_TTL_MS) {
-            this._todayCacheValue = TimeAggregator.todayMs(
-                this.timer.data.sessions,
-                this.timer.data.currentSessionStartMs,
-            );
-            this._todayCacheAt = now;
-        }
-        return this._todayCacheValue;
+        return this.timer.getTodayMs();
     }
 
     /**
@@ -308,6 +293,7 @@ export class SessionManager {
     private advanceJournalWatermark(boundaryMs: number): void {
         this.timer.replaceData({
             ...this.timer.data,
+            sessions: [...this.timer.data.sessions],
             metadata: { ...this.timer.data.metadata, lastJournalTs: String(boundaryMs) },
         });
     }

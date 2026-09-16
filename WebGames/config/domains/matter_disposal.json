@@ -1,0 +1,18 @@
+{
+  "facility": {
+    "max_operate_radius": 3.0
+  },
+  "yield_ratio": {
+    "slag_ash": 0.8,
+    "mana_dust": 0.2
+  },
+  "safety": {
+    "valuable_enhance_threshold": 7,
+    "confirm_passcode": "CONFIRM_DESTROY"
+  },
+  "conversion": {
+    "slag_per_kg": 2.0,
+    "dust_per_kg": 5.0,
+    "min_yield": 1
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "stick_deadzone": {
+    "inner": 0.15,
+    "outer": 0.95
+  },
+  "mouse": {
+    "sensitivity_scalar": 1.0,
+    "click_hot_area_expand_ratio": 0.1
+  },
+  "keyboard_shortcuts": {
+    "move_north": [
+      "Key_W",
+      "Key_Up"
+    ],
+    "move_south": [
+      "Key_S",
+      "Key_Down"
+    ],
+    "move_east": [
+      "Key_D",
+      "Key_Right"
+    ],
+    "move_west": [
+      "Key_A",
+      "Key_Left"
+    ],
+    "interact": [
+      "Key_E",
+      "Key_Enter"
+    ],
+    "open_inventory": [
+      "Key_I",
+      "Key_Tab"
+    ],
+    "cast_spell": [
+      "Key_Q",
+      "Key_Space"
+    ],
+    "quick_save": [
+      "Key_F5"
+    ],
+    "quick_load": [
+      "Key_F9"
+    ]
+  },
+  "tab_double_tap": {
+    "window_ms": 300
+  }
+}

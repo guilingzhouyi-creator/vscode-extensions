@@ -1,0 +1,280 @@
+{
+  "rank_gradient": {
+    "rank_1": {
+      "rank": 1,
+      "level": 1,
+      "name_key": "magic.rank.rank_1",
+      "strength_weight": 1.0
+    },
+    "rank_2": {
+      "rank": 2,
+      "level": 2,
+      "name_key": "magic.rank.rank_2",
+      "strength_weight": 1.2
+    },
+    "rank_3": {
+      "rank": 3,
+      "level": 3,
+      "name_key": "magic.rank.rank_3",
+      "strength_weight": 1.5
+    },
+    "rank_4": {
+      "rank": 4,
+      "level": 4,
+      "name_key": "magic.rank.rank_4",
+      "strength_weight": 1.9
+    },
+    "rank_5": {
+      "rank": 5,
+      "level": 5,
+      "name_key": "magic.rank.rank_5",
+      "strength_weight": 2.4
+    },
+    "rank_6": {
+      "rank": 6,
+      "level": 6,
+      "name_key": "magic.rank.rank_6",
+      "strength_weight": 3.0
+    },
+    "rank_7": {
+      "rank": 7,
+      "level": 7,
+      "name_key": "magic.rank.rank_7",
+      "strength_weight": 3.8
+    },
+    "rank_8": {
+      "rank": 8,
+      "level": 8,
+      "name_key": "magic.rank.rank_8",
+      "strength_weight": 4.7
+    },
+    "rank_9": {
+      "rank": 9,
+      "level": 9,
+      "name_key": "magic.rank.rank_9",
+      "strength_weight": 5.8
+    },
+    "rank_10": {
+      "rank": 10,
+      "level": 10,
+      "name_key": "magic.rank.rank_10",
+      "strength_weight": 7.0
+    },
+    "rank_11": {
+      "rank": 11,
+      "level": 11,
+      "name_key": "magic.rank.rank_11",
+      "strength_weight": 8.5
+    }
+  },
+  "ability_tiers": {
+    "ESP": {
+      "tier": 1,
+      "reference_interval": [
+        1,
+        3
+      ],
+      "weight": 1.0,
+      "name_key": "magic.ability_tier.esp",
+      "reference_label": "magic.ability_tier.esp_ref"
+    },
+    "HEROIC": {
+      "tier": 2,
+      "reference_interval": [
+        3,
+        6
+      ],
+      "weight": 1.6,
+      "name_key": "magic.ability_tier.heroic",
+      "reference_label": "magic.ability_tier.heroic_ref"
+    },
+    "DIVINE": {
+      "tier": 3,
+      "reference_interval": [
+        6,
+        9
+      ],
+      "weight": 2.5,
+      "name_key": "magic.ability_tier.divine",
+      "reference_label": "magic.ability_tier.divine_ref"
+    },
+    "GOD": {
+      "tier": 4,
+      "reference_interval": [
+        9,
+        11
+      ],
+      "weight": 4.0,
+      "name_key": "magic.ability_tier.god",
+      "reference_label": "magic.ability_tier.god_ref"
+    },
+    "SUPERTIER": {
+      "tier": 5,
+      "reference_interval": [
+        11,
+        11
+      ],
+      "weight": 6.0,
+      "name_key": "magic.ability_tier.supertier",
+      "reference_label": "magic.ability_tier.supertier_ref",
+      "allow_break": true
+    }
+  },
+  "rank_bands": {
+    "LOW": {
+      "band": 1,
+      "interval": [
+        1,
+        3
+      ],
+      "name_key": "magic.rank_band.low"
+    },
+    "MID": {
+      "band": 2,
+      "interval": [
+        4,
+        6
+      ],
+      "name_key": "magic.rank_band.mid"
+    },
+    "HIGH": {
+      "band": 3,
+      "interval": [
+        7,
+        9
+      ],
+      "name_key": "magic.rank_band.high"
+    },
+    "SUPERTIER": {
+      "band": 4,
+      "interval": [
+        10,
+        11
+      ],
+      "name_key": "magic.rank_band.supertier"
+    }
+  },
+  "mana_aptitudes": {
+    "man_adaptor": {
+      "aptitude": 1,
+      "name_key": "magic.aptitude.man_adaptor",
+      "backfire_threshold": 1,
+      "mana_gate": true,
+      "rarity": "1_in_100"
+    },
+    "word_speaker": {
+      "aptitude": 2,
+      "name_key": "magic.aptitude.word_speaker",
+      "backfire_threshold": 3,
+      "mana_gate": false,
+      "rarity": "1_in_10000"
+    },
+    "awakened": {
+      "aptitude": 3,
+      "name_key": "magic.aptitude.awakened",
+      "backfire_threshold": 6,
+      "mana_gate": false,
+      "rarity": "1_in_1000000"
+    },
+    "heaven_ruler": {
+      "aptitude": 4,
+      "name_key": "magic.aptitude.heaven_ruler",
+      "backfire_threshold": 9,
+      "mana_gate": false,
+      "rarity": "unspecified"
+    }
+  },
+  "magic_forms": {
+    "primordial": {
+      "form": 1,
+      "name_key": "magic.form.primordial",
+      "phase_loss_min": 0.01,
+      "phase_loss_max": 0.05
+    },
+    "incantation": {
+      "form": 2,
+      "name_key": "magic.form.incantation",
+      "phase_loss_min": 0.25,
+      "phase_loss_max": 0.5
+    },
+    "integrated": {
+      "form": 3,
+      "name_key": "magic.form.integrated",
+      "phase_loss_min": 0.1,
+      "phase_loss_max": 0.3
+    },
+    "supertier": {
+      "form": 4,
+      "name_key": "magic.form.supertier",
+      "phase_loss_min": 0.01,
+      "phase_loss_max": 0.05
+    }
+  },
+  "profession_ranks": {
+    "third_rate_trickster": {
+      "rank": 1,
+      "name_key": "magic.profession_rank.third_rate_trickster",
+      "magic_domain": false
+    },
+    "second_rate_trickster": {
+      "rank": 2,
+      "name_key": "magic.profession_rank.second_rate_trickster",
+      "magic_domain": false
+    },
+    "quasi_magic_user": {
+      "rank": 3,
+      "name_key": "magic.profession_rank.quasi_magic_user",
+      "magic_domain": true
+    },
+    "novice_mage": {
+      "rank": 4,
+      "name_key": "magic.profession_rank.novice_mage",
+      "magic_domain": true
+    },
+    "intermediate_mage": {
+      "rank": 5,
+      "name_key": "magic.profession_rank.intermediate_mage",
+      "magic_domain": true
+    },
+    "senior_mage": {
+      "rank": 6,
+      "name_key": "magic.profession_rank.senior_mage",
+      "magic_domain": true
+    },
+    "platinum_mage": {
+      "rank": 7,
+      "name_key": "magic.profession_rank.platinum_mage",
+      "magic_domain": true
+    },
+    "gold_mage": {
+      "rank": 8,
+      "name_key": "magic.profession_rank.gold_mage",
+      "magic_domain": true
+    },
+    "stellar_mage": {
+      "rank": 9,
+      "name_key": "magic.profession_rank.stellar_mage",
+      "magic_domain": true
+    },
+    "legion_magistrate": {
+      "rank": 10,
+      "name_key": "magic.profession_rank.legion_magistrate",
+      "magic_domain": true
+    },
+    "royal_magistrate": {
+      "rank": 11,
+      "name_key": "magic.profession_rank.royal_magistrate",
+      "magic_domain": true
+    },
+    "holy_archmage": {
+      "rank": 12,
+      "name_key": "magic.profession_rank.holy_archmage",
+      "magic_domain": true
+    },
+    "primordial_archdemon": {
+      "rank": 13,
+      "name_key": "magic.profession_rank.primordial_archdemon",
+      "magic_domain": true
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "enhancement": {
+    "max_level": 15,
+    "fallback_rate": 0.05,
+    "success_rates": {
+      "1": 1.0,
+      "2": 1.0,
+      "3": 0.95,
+      "4": 0.9,
+      "5": 0.8,
+      "6": 0.7,
+      "7": 0.6,
+      "8": 0.5,
+      "9": 0.4,
+      "10": 0.3,
+      "11": 0.25,
+      "12": 0.2,
+      "13": 0.15,
+      "14": 0.1,
+      "15": 0.05
+    },
+    "cost_formula": {
+      "gold_base": 50,
+      "gold_exp": 2.0,
+      "crystal_threshold_level": 7,
+      "crystal_cost_above_threshold": 1
+    },
+    "stat_multipliers": {
+      "edge_sharpness": 1.1,
+      "effective_armor": 1.1,
+      "market_price": 1.3
+    },
+    "penalty": {
+      "degrade_threshold": 10,
+      "min_level": 0
+    }
+  },
+  "reforge": {
+    "affix_count": 2,
+    "lock_cost_mana_monocrystals": 1,
+    "pool": [
+      {
+        "bonus_str": [
+          2.0,
+          8.0
+        ]
+      },
+      {
+        "bonus_int": [
+          2.0,
+          8.0
+        ]
+      },
+      {
+        "bonus_agi": [
+          2.0,
+          8.0
+        ]
+      },
+      {
+        "slash_boost": [
+          0.05,
+          0.2
+        ]
+      },
+      {
+        "mana_efficiency": [
+          0.05,
+          0.15
+        ]
+      }
+    ]
+  },
+  "salvage": {
+    "refund_rate": 0.5,
+    "crystal_divisor": 3.0
+  },
+  "socket": {
+    "default_total_sockets": 2,
+    "max_limit": 4
+  }
+}

@@ -1,0 +1,135 @@
+# =============================================================================
+# Godot CI — 卡拉尔世界引擎（WebGames）构建校验与架构门禁
+# -----------------------------------------------------------------------------
+# 为什么单独一个文件：GitHub Actions 的 paths / paths-ignore 过滤是
+# workflow 级、不是 job 级。本作业需要独立的 paths: 'WebGames/**' 触发语义
+# （含 .md 文档改动也要触发，以拦截文档计数漂移），若并进根目录的 ci.yml，
+# 会把 VS Code 扩展作业的触发条件一起改掉。独立文件对既有流水线零影响。
+#
+# 触发：
+#   push       —— 仅当改动触及 WebGames/**（含纯文档改动，故不设 paths-ignore）
+#   pull_request / workflow_dispatch —— 全量校验
+#
+# 校验链：Godot 导入 → 全域单元测试 → 架构护栏 → 配置一致性审查 → 全量审查聚合
+# 设计要点：
+#   1. 任一步失败即整条流水线变红；导入步骤不设 || true
+#      （一道永远不会失败的门禁比没有门禁更糟）。
+#   2. 各审查步骤外套「失败重试一次」，用于规避读取撞上他人写入窗口造成的
+#      瞬时假红；真实违规会连续两次失败，仍然红。
+#   3. 导入步骤不重试：编译失败是确定性的，重试无意义。
+# =============================================================================
+name: Godot CI
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'WebGames/**'
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # 与 WebGames/project.godot 的 config/features ("4.7") 对齐；
+  # 取本机实测引擎版本 4.7.2.stable 的精确发布 tag，避免 4.7 这类不存在的 tag 404
+  GODOT_VERSION: '4.7.2'
+  RETRY_SLEEP: '5'
+
+defaults:
+  run:
+    working-directory: WebGames
+
+jobs:
+  godot:
+    name: 卡拉尔世界引擎（Godot headless）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装 Godot ${{ env.GODOT_VERSION }}
+        run: |
+          set -euo pipefail
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      # Phase 87：门禁脚本头声明「运行时: Python 3.10+」，必须显式固定解释器版本。
+      # 缺失本步骤时 runner 默认 Python 随镜像漂移，配置审查/全量聚合会因语法与
+      # 注解求值差异恒红——形成"一道永远失败的门禁"，比没有门禁更糟。
+      - name: 固定 Python 版本（门禁脚本运行时契约）
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 不重试：脚本编译失败是确定性的，重跑一次不会变绿
+      - name: 导入工程（生成 .godot 类缓存，失败即中断）
+        run: godot --headless --import
+
+      - name: 运行全域单元测试（DoD 验收，失败重试一次）
+        run: |
+          for i in 1 2; do
+            if bash scripts/sh/test-run.sh; then
+              exit 0
+            fi
+            echo "[retry] test-run.sh 第 $i 次失败，${RETRY_SLEEP} 秒后重试"
+            if [ "$i" -eq 2 ]; then
+              echo "[retry] 两次均失败，判定为真实问题"
+              exit 1
+            fi
+            sleep "$RETRY_SLEEP"
+          done
+
+      - name: 架构护栏审查（领域清单/配置表/测试注册/确定性/文档计数/键级漂移，失败重试一次）
+        run: |
+          for i in 1 2; do
+            if bash scripts/sh/audit-arch.sh; then
+              exit 0
+            fi
+            echo "[retry] audit-arch.sh 第 $i 次失败，${RETRY_SLEEP} 秒后重试"
+            if [ "$i" -eq 2 ]; then
+              echo "[retry] 两次均失败，判定为真实架构违规"
+              exit 1
+            fi
+            sleep "$RETRY_SLEEP"
+          done
+
+      - name: 配置一致性审查（JSON 可解析/键命名/必需表齐全，失败重试一次）
+        run: |
+          for i in 1 2; do
+            if python3 scripts/py/audit_config.py --strict; then
+              exit 0
+            fi
+            echo "[retry] audit_config.py 第 $i 次失败，${RETRY_SLEEP} 秒后重试"
+            if [ "$i" -eq 2 ]; then
+              echo "[retry] 两次均失败，判定为真实配置问题"
+              exit 1
+            fi
+            sleep "$RETRY_SLEEP"
+          done
+
+      - name: 全量审查聚合（20 项静态门禁 + 文档四域基线棘轮门禁 + SARIF 导出；失败重试一次）
+        run: |
+          mkdir -p ../sarif
+          for i in 1 2; do
+            if bash scripts/sh/audit-all.sh --sarif-out ../sarif/webgames-audit.sarif; then
+              exit 0
+            fi
+            echo "[retry] audit-all.sh 第 $i 次失败，${RETRY_SLEEP} 秒后重试"
+            if [ "$i" -eq 2 ]; then
+              echo "[retry] 两次均失败，判定为真实审查问题"
+              exit 1
+            fi
+            sleep "$RETRY_SLEEP"
+          done
+
+      # SARIF 上传独立于审查结果（if: always()）：即便门禁失败也上传报告，
+      # 使 GitHub code scanning 能展示失败任务的定位信息
+      - name: 上传 SARIF 至 GitHub code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif/webgames-audit.sarif
+          category: webgames-audit

@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "description": "ErrorReporter统一爆错通道错误码登记源（经EventBus结构化日志底座遥测；i18n键见message_key）。业务return-dict错误码由各域契约自行治理，不在此登记；新增reporter通道码必须先登记再使用",
+  "errors": {
+    "ERR_UNKNOWN": {
+      "severity": "error",
+      "message_key": "errors/unknown",
+      "domain": "infrastructure"
+    },
+    "CONFIG_FILE_NOT_FOUND": {
+      "severity": "error",
+      "message_key": "errors/config_file_not_found",
+      "domain": "infrastructure"
+    },
+    "CONFIG_FILE_READ_FAIL": {
+      "severity": "error",
+      "message_key": "errors/config_file_read_fail",
+      "domain": "infrastructure"
+    },
+    "CONFIG_JSON_PARSE_FAIL": {
+      "severity": "error",
+      "message_key": "errors/config_json_parse_fail",
+      "domain": "infrastructure"
+    },
+    "CONFIG_ROOT_NOT_DICT": {
+      "severity": "error",
+      "message_key": "errors/config_root_not_dict",
+      "domain": "infrastructure"
+    },
+    "CONFIG_SCHEMA_UNSUPPORTED": {
+      "severity": "error",
+      "message_key": "errors/config_schema_unsupported",
+      "domain": "infrastructure"
+    },
+    "CONFIG_VALIDATION_FAILED": {
+      "severity": "error",
+      "message_key": "errors/config_validation_failed",
+      "domain": "infrastructure"
+    },
+    "CONFIG_FALLBACK_USED": {
+      "severity": "warn",
+      "message_key": "errors/config_fallback_used",
+      "domain": "infrastructure"
+    },
+    "SEAL_KEY_MISSING": {
+      "severity": "warn",
+      "message_key": "errors/seal_key_missing",
+      "domain": "account"
+    },
+    "AUDIT_KEY_MISSING": {
+      "severity": "warn",
+      "message_key": "errors/audit_key_missing",
+      "domain": "admin"
+    },
+    "REQUIRED_TABLE_MISSING": {
+      "severity": "warn",
+      "message_key": "errors/required_table_missing",
+      "domain": "infrastructure"
+    },
+    "ERR_ACCOUNT_NOT_FOUND": {
+      "severity": "error",
+      "message_key": "errors/account_not_found",
+      "domain": "account"
+    },
+    "ERR_INVALID_CREDENTIALS": {
+      "severity": "error",
+      "message_key": "errors/invalid_credentials",
+      "domain": "account"
+    },
+    "ERR_DEVICE_MISMATCH": {
+      "severity": "error",
+      "message_key": "errors/device_mismatch",
+      "domain": "account"
+    },
+    "TOKEN_UNKNOWN": {
+      "severity": "warn",
+      "message_key": "errors/token_unknown",
+      "domain": "account"
+    },
+    "TOKEN_REVOKED": {
+      "severity": "warn",
+      "message_key": "errors/token_revoked",
+      "domain": "account"
+    },
+    "TOKEN_EXPIRED": {
+      "severity": "warn",
+      "message_key": "errors/token_expired",
+      "domain": "account"
+    },
+    "TOKEN_FUTURE": {
+      "severity": "warn",
+      "message_key": "errors/token_future",
+      "domain": "account"
+    },
+    "TOKEN_ACCOUNT_MISMATCH": {
+      "severity": "error",
+      "message_key": "errors/token_account_mismatch",
+      "domain": "account"
+    },
+    "RACE_NOT_FOUND": {
+      "severity": "error",
+      "message_key": "errors/race_not_found",
+      "domain": "character_creation"
+    },
+    "RACE_CANARY_RESTRICTED": {
+      "severity": "warn",
+      "message_key": "errors/race_canary_restricted",
+      "domain": "character_creation"
+    },
+    "INVALID_NAME_LENGTH": {
+      "severity": "error",
+      "message_key": "errors/invalid_name_length",
+      "domain": "character_creation"
+    },
+    "GENDER_NOT_ALLOWED": {
+      "severity": "error",
+      "message_key": "errors/gender_not_allowed",
+      "domain": "character_creation"
+    },
+    "STEP_MISMATCH": {
+      "severity": "error",
+      "message_key": "errors/step_mismatch",
+      "domain": "character_creation"
+    },
+    "SLOT_ALREADY_OCCUPIED": {
+      "severity": "error",
+      "message_key": "errors/slot_already_occupied",
+      "domain": "character_creation"
+    },
+    "INVALID_SLOT_ID": {
+      "severity": "error",
+      "message_key": "errors/invalid_slot_id",
+      "domain": "character_creation"
+    },
+    "GATEWAY_ERR_NO_MODE_SELECTED": {
+      "severity": "warn",
+      "message_key": "errors/gateway_no_mode",
+      "domain": "world_gateway"
+    },
+    "GATEWAY_ERR_MULTIPLAYER_DISABLED": {
+      "severity": "warn",
+      "message_key": "errors/gateway_mp_disabled",
+      "domain": "world_gateway"
+    },
+    "GATEWAY_ERR_DEFAULT_WORLD_NOT_FOUND": {
+      "severity": "error",
+      "message_key": "errors/gateway_world_missing",
+      "domain": "world_gateway"
+    },
+    "DIRECT_WORLD_BYPASS_BLOCKED": {
+      "severity": "error",
+      "message_key": "errors/direct_bypass",
+      "domain": "world_gateway"
+    },
+    "INVALID_TRANSITION": {
+      "severity": "error",
+      "message_key": "errors/invalid_transition",
+      "domain": "lifecycle"
+    },
+    "ALREADY_STOPPING": {
+      "severity": "warn",
+      "message_key": "errors/already_stopping",
+      "domain": "lifecycle"
+    },
+    "ALREADY_STOPPED": {
+      "severity": "info",
+      "message_key": "errors/already_stopped",
+      "domain": "lifecycle"
+    },
+    "INVALID_SAVE_NAME": {
+      "severity": "error",
+      "message_key": "errors/invalid_save_name",
+      "domain": "persistence"
+    },
+    "FILE_NOT_EXIST": {
+      "severity": "error",
+      "message_key": "errors/file_not_exist",
+      "domain": "persistence"
+    },
+    "JSON_PARSE_FAIL": {
+      "severity": "error",
+      "message_key": "errors/json_parse_fail",
+      "domain": "persistence"
+    },
+    "VERSION_TOO_NEW": {
+      "severity": "error",
+      "message_key": "errors/version_too_new",
+      "domain": "persistence"
+    },
+    "EMPTY_SAVE_BLOCKED": {
+      "severity": "error",
+      "message_key": "errors/empty_save_blocked",
+      "domain": "persistence"
+    },
+    "MIGRATION_PATH_BROKEN": {
+      "severity": "error",
+      "message_key": "errors/migration_path_broken",
+      "domain": "persistence"
+    },
+    "MIGRATION_VALIDATION_FAIL": {
+      "severity": "error",
+      "message_key": "errors/migration_validation_fail",
+      "domain": "persistence"
+    },
+    "HOT_RELOAD_BLOCKED_IN_ONLINE": {
+      "severity": "warn",
+      "message_key": "errors/hot_reload_blocked_in_online",
+      "domain": "persistence"
+    },
+    "HOT_RELOAD_DENIED": {
+      "severity": "warn",
+      "message_key": "errors/hot_reload_denied",
+      "domain": "persistence"
+    },
+    "REQUIRES_RUNTIME_REBUILD": {
+      "severity": "warn",
+      "message_key": "errors/requires_runtime_rebuild",
+      "domain": "persistence"
+    },
+    "DOMAIN_MIGRATION_PATH_BROKEN": {
+      "severity": "error",
+      "message_key": "errors/domain_migration_path_broken",
+      "domain": "persistence"
+    },
+    "ONLINE_SAVE_RESTRICTED": {
+      "severity": "error",
+      "message_key": "errors/online_save_restricted",
+      "domain": "persistence"
+    },
+    "ONLINE_LOAD_RESTRICTED": {
+      "severity": "error",
+      "message_key": "errors/online_load_restricted",
+      "domain": "persistence"
+    },
+    "event_bus2_reentrancy_guard": {
+      "severity": "warn",
+      "message_key": "errors/event_bus2_reentrancy_guard",
+      "domain": "infrastructure"
+    },
+    "event_bus2_core_state_in_frame_queue": {
+      "severity": "error",
+      "message_key": "errors/event_bus2_core_state_in_frame_queue",
+      "domain": "infrastructure"
+    },
+    "event_bus2_frame_queue_overflow": {
+      "severity": "warn",
+      "message_key": "errors/event_bus2_frame_queue_overflow",
+      "domain": "infrastructure"
+    },
+    "event_bus2_pool_overflow": {
+      "severity": "warn",
+      "message_key": "errors/event_bus2_pool_overflow",
+      "domain": "infrastructure"
+    },
+    "version_state_machine_illegal_transition": {
+      "severity": "error",
+      "message_key": "errors/version_state_machine_illegal_transition",
+      "domain": "infrastructure"
+    }
+  }
+}

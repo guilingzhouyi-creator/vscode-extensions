@@ -1,0 +1,10 @@
+{
+  "name": "webgames-doc-tooling",
+  "private": true,
+  "type": "module",
+  "description": "WebGames 文档工具链：mermaid 全量真解析校验。安装：npm install --prefix scripts/js",
+  "dependencies": {
+    "jsdom": "^30.0.1",
+    "mermaid": "^11.17.2"
+  }
+}

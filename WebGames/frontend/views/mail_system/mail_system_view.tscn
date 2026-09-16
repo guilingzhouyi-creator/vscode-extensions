@@ -1,0 +1,323 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8mailsystemview01"]
+
+[ext_resource type="Script" path="res://frontend/views/mail_system/mail_system_view.gd" id="1_mail"]
+
+[node name="MailSystemView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_mail")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="MainLayout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+; =========================================================================
+; 顶部标题栏
+; =========================================================================
+[node name="HeaderPanel" type="PanelContainer" parent="MainLayout"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="MainLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+
+[node name="CapacitySpacer" type="Control" parent="MainLayout/HeaderPanel/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnBack" type="Button" parent="MainLayout/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+; =========================================================================
+; 主体左右分栏
+; =========================================================================
+[node name="ContentSplit" type="HSplitContainer" parent="MainLayout"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 400
+theme_override_constants/separation = 12
+
+; -------------------------------------------------------------------------
+; 左侧：邮件列表面板（约 40%）
+; -------------------------------------------------------------------------
+[node name="LeftPanel" type="PanelContainer" parent="MainLayout/ContentSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LeftVBox" type="VBoxContainer" parent="MainLayout/ContentSplit/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CategoryTabBar" type="TabBar" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+tab_alignment = 1
+
+[node name="SearchRow" type="HBoxContainer" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SearchEdit" type="LineEdit" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox/SearchRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="MailItemList" type="ItemList" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+select_mode = 1
+
+[node name="CapacityRow" type="HBoxContainer" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LabelCapacity" type="Label" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox/CapacityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="CapacitySpacerRight" type="Control" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox/CapacityRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ActionBar" type="HBoxContainer" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BtnSelectAll" type="Button" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnBatchDelete" type="Button" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnClaimAll" type="Button" parent="MainLayout/ContentSplit/LeftPanel/LeftVBox/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+; -------------------------------------------------------------------------
+; 右侧：详情 / 写邮件 面板（约 60%）
+; -------------------------------------------------------------------------
+[node name="RightPanel" type="PanelContainer" parent="MainLayout/ContentSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightTabContainer" type="TabContainer" parent="MainLayout/ContentSplit/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+current_tab = 0
+
+; =========================================================================
+; Tab 1: 邮件详情
+; =========================================================================
+[node name="邮件详情" type="VBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="DetailHeader" type="VBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelDetailSubject" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/DetailHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="DetailMetaRow" type="HBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/DetailHeader"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="LabelDetailSender" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/DetailHeader/DetailMetaRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelDetailRecipient" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/DetailHeader/DetailMetaRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="LabelDetailTime" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/DetailHeader/DetailMetaRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.62, 0.72, 1)
+text = ""
+
+[node name="HSeparator" type="HSeparator" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情"]
+layout_mode = 2
+
+[node name="RichTextBody" type="RichTextLabel" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = false
+text = ""
+
+[node name="AttachmentSection" type="VBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LabelAttachmentTitle" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/AttachmentSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+
+[node name="AttachmentListContainer" type="HBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/AttachmentSection"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DetailActionBar" type="HBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnClaimAttachment" type="Button" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/DetailActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = ""
+
+[node name="BtnReply" type="Button" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/DetailActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = ""
+
+[node name="BtnDeleteMail" type="Button" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/DetailActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = ""
+
+; =========================================================================
+; Tab 2: 写邮件
+; =========================================================================
+[node name="写邮件" type="VBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ComposeTitle" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 0.98, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="RecipientRow" type="HBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/RecipientRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = ""
+
+[node name="LineEditRecipient" type="LineEdit" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/RecipientRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="SubjectRow" type="HBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/SubjectRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = ""
+
+[node name="LineEditSubject" type="LineEdit" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/SubjectRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = ""
+
+[node name="BodyLabel" type="Label" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件"]
+layout_mode = 2
+text = ""
+
+[node name="TextEditBody" type="TextEdit" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+placeholder_text = ""
+
+[node name="AttachmentComposeRow" type="HBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnAddAttachment" type="Button" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/AttachmentComposeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(100, 0)
+text = ""
+
+[node name="ComposeAttachmentList" type="HBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/AttachmentComposeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="ComposeActionBar" type="HBoxContainer" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnSend" type="Button" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/ComposeActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""
+
+[node name="BtnSaveDraft" type="Button" parent="MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/ComposeActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = ""

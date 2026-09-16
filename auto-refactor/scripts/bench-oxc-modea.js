@@ -1,6 +1,20 @@
-// t04-modeA-compare.js — Mode A (constants+large-file, NO complexity) per-file mat vs proj
-// under parser='oxc'. Mode A should show a larger projection win (no function-subtree
-// materialization on the projection path).
+/**
+ * Module: Verification Harness — Oxc Mode A Per-File Projection Micro-Benchmark
+ * File Path: scripts/bench-oxc-modea.js
+ * Architecture Role: Standalone micro-benchmark that drives the OxcAdapter and the
+ *     projection traversal directly instead of going through the scan CLI or dist/api.
+ * Dependencies & Triggers: `npm run bench-oxc-modea` or manual
+ *     `node scripts/bench-oxc-modea.js` on a built dist; reads the light/heavy f0.ts
+ *     fixtures under C:/tmp/ar-fp-bench and patches NODE_PATH so dist modules resolve
+ *     the repository's node_modules.
+ * Responsibilities: Under AR_FASTPATH=1, warm both paths, then time 80 materialized
+ *     parse+runStreaming rounds against tryCreateProjector+runStreamingProjected rounds
+ *     for ConstantsAnalyzer and LargeFileAnalyzer only (complexity disabled); print the
+ *     per-fixture milliseconds and projection delta; return { mat, proj, delta }.
+ * Exit Semantics & Design Rationale: No catch handler and no explicit exit code: a
+ *     missing fixture or unavailable native binding throws and exits non-zero, while a
+ *     complete run exits 0. Fixtures are a precondition, so failing loudly is correct.
+ */
 const fs = require('fs');
 const path = require('path');
 
@@ -10,7 +24,9 @@ require('module').Module._initPaths();
 
 function bench(content, label) {
   const { OxcAdapter } = require(path.join(ROOT, 'dist', 'core', 'oxcAdapter'));
-  const { runStreaming, runStreamingProjected, FileMetricCollector, tryCreateProjector } = require(path.join(ROOT, 'dist', 'core', 'traverse'));
+  const { runStreaming, runStreamingProjected, FileMetricCollector, tryCreateProjector } = require(
+    path.join(ROOT, 'dist', 'core', 'traverse'),
+  );
   const { ConstantsAnalyzer } = require(path.join(ROOT, 'dist', 'analyzers', 'constants'));
   const { LargeFileAnalyzer } = require(path.join(ROOT, 'dist', 'analyzers', 'largeFile'));
   const { countLineStats } = require(path.join(ROOT, 'dist', 'utils', 'linestats'));
@@ -18,10 +34,24 @@ function bench(content, label) {
   const adapter = new OxcAdapter();
   const cfg = { failOnAnalyzerError: false };
   const lineStats = countLineStats(content);
-  const mkCtx = (o) => ({ filePath: 'f0.ts', content, root: null, adapter, config: cfg, options: o, lineStats });
+  const mkCtx = (o) => ({
+    filePath: 'f0.ts',
+    content,
+    root: null,
+    adapter,
+    config: cfg,
+    options: o,
+    lineStats,
+  });
   const buildEntries = () => [
-    { analyzer: new ConstantsAnalyzer(), ctx: mkCtx({ magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 }) },
-    { analyzer: new LargeFileAnalyzer(), ctx: mkCtx({ fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 }) },
+    {
+      analyzer: new ConstantsAnalyzer(),
+      ctx: mkCtx({ magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 }),
+    },
+    {
+      analyzer: new LargeFileAnalyzer(),
+      ctx: mkCtx({ fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 }),
+    },
     { analyzer: new FileMetricCollector(), ctx: mkCtx({}) },
   ];
   const names = ['constants', 'large-file'];
@@ -48,7 +78,9 @@ function bench(content, label) {
   }
   const proj = (performance.now() - t1) / N;
   const delta = ((proj - mat) / mat) * 100;
-  console.log(`  ${label.padEnd(8)} ${String(content.length).padStart(6)}B  mat=${mat.toFixed(3)}ms  proj=${proj.toFixed(3)}ms  Δ=${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`);
+  console.log(
+    `  ${label.padEnd(8)} ${String(content.length).padStart(6)}B  mat=${mat.toFixed(3)}ms  proj=${proj.toFixed(3)}ms  Δ=${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`,
+  );
   return { mat, proj, delta };
 }
 

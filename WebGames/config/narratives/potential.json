@@ -1,0 +1,9 @@
+{
+  "grant_points": "【阅历突破】(%s)！获得 %d 点后天潜能点（当前未分配: %d）",
+  "respec_success": "【心核逆转·潜能重构】消耗 %d 金币与 %d 魔单晶，全额返还 %d 点潜能点！",
+  "insufficient_gold_crystal": "Insufficient gold or mana crystals for respec.",
+  "invalid_stat": "Invalid stat name: %s",
+  "not_enough_points": "Not enough potential points. Need %d, have %d",
+  "max_level_reached": "Attribute %s already at max level %d",
+  "dynamic_adjusted": "【命运显影】%s：系统调整 %+d 点属性（永久，洗点不逆转）"
+}

@@ -1,0 +1,43 @@
+{
+  "_note": "本表为 chat_command 领域专属。cdkeys 的 item_id 必填且须为 config/items/*.json 已登记的 canonical_id（物品注册表三元组：ID/英文名/i18n），发放按原型属性实例化，无效配置严格拒绝；item_defaults/custom_name 是兑换礼包的兜底名，刻意与 config/domains/inventory.json 的同路径键（未命名物品）取不同值——不要为了「对齐」把它改成 inventory 表的值。Godot 的 JSON.parse 不支持注释，故以 _note 键承载说明。",
+  "cdkeys": {
+    "KALAR666": {
+      "gold": 500,
+      "crystals": 2,
+      "item_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+      "item_name": "【初出茅庐·玄铁剑】"
+    },
+    "KALAR888": {
+      "gold": 1000,
+      "crystals": 5,
+      "item_id": "KALAR:QUEST:ARTIFACT:RELIC_FRAGMENT",
+      "item_name": "【开服特典·圣痕吊坠】"
+    },
+    "VIP999": {
+      "gold": 5000,
+      "crystals": 20,
+      "item_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+      "item_name": "【始源之光·极光神符】"
+    }
+  },
+  "item_defaults": {
+    "custom_name": "神秘礼包"
+  },
+  "reward": {
+    "item_id_prefix": "CDKEY_REWARD_"
+  },
+  "gm_index": {
+    "window_size": 20,
+    "page_size": 5,
+    "max_pages": 4,
+    "default_commands": [
+      "give",
+      "gold",
+      "god",
+      "time"
+    ]
+  },
+  "redeemed": {
+    "max_entries": 2000
+  }
+}

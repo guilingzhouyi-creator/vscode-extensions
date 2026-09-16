@@ -1,0 +1,41 @@
+{
+  "transaction": {
+    "max_pull_count": 10,
+    "min_rarity": 1
+  },
+  "rates": {
+    "base_5star": 0.006,
+    "base_4star": 0.051,
+    "up_rate": 0.5
+  },
+  "pity": {
+    "soft_threshold": 70,
+    "hard_threshold": 90,
+    "soft_increment_per_pull": 0.05,
+    "hard_guaranteed_rate": 1.0
+  },
+  "banner_defaults": {
+    "banner_id": "BANNER_LEGENDARY_HERO",
+    "banner_title": "【始源神兵 · 极光湮灭】限时祈愿",
+    "cost_per_pull_gold": 100,
+    "cost_per_pull_crystals": 1,
+    "fallback_title": "限时祈愿",
+    "up_5star_item_ids": [
+      "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
+    ],
+    "standard_5star_item_ids": [
+      "KALAR:EQUIP:ARMOR:IRON_CHEST",
+      "KALAR:MATERIAL:ORE:MITHRIL_ORE"
+    ],
+    "standard_4star_item_ids": [
+      "KALAR:EQUIP:WEAPON_BLADE:ELVEN_BOW",
+      "KALAR:EQUIP:ARMOR:RUNIC_SHIELD",
+      "KALAR:CONSUM:ALCHEMY:POTION_MANA"
+    ],
+    "standard_3star_item_ids": [
+      "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+      "KALAR:CONSUM:FOOD:HEARTY_STEW",
+      "KALAR:QUEST:ARTIFACT:RELIC_FRAGMENT"
+    ]
+  }
+}

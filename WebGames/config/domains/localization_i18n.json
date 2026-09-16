@@ -1,0 +1,6 @@
+{
+  "defaults": {
+    "current_locale": "zh_CN",
+    "fallback_locale": "en_US"
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "$schema": "./config.schema.json",
+  "format": "text",
+  "failOnIssue": false,
+  "commentLevel": "standard",
+  "autoTune": true,
+  "include": [
+    "src/**/*.ts",
+    "scripts/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    "coverage",
+    "testdata"
+  ],
+  "thresholds": {
+    "magicNumberMin": 3,
+    "duplicateLiteralThreshold": 4,
+    "hardcodedStringMinLength": 4,
+    "fileLinesWarn": 400,
+    "fileLinesFail": 900,
+    "fileFunctionsWarn": 20,
+    "complexityWarn": 12,
+    "complexityFail": 25,
+    "blockingIoAllowPatterns": [
+      "scripts/**",
+      "src/cli/**"
+    ]
+  },
+  "analyzers": {
+    "constants": {
+      "enabled": true
+    },
+    "complexity": {
+      "enabled": true
+    },
+    "large-file": {
+      "enabled": true
+    },
+    "governance": {
+      "enabled": true
+    },
+    "architecture": {
+      "enabled": true
+    },
+    "performance": {
+      "enabled": true
+    },
+    "comments": {
+      "enabled": true
+    },
+    "hygiene": {
+      "enabled": true
+    },
+    "simplify": {
+      "enabled": true
+    }
+  },
+  "logLevel": "info",
+  "workers": 1,
+  "respectGitignore": true,
+  "failOnAnalyzerError": false,
+  "suppressions": [
+    {
+      "matchAnalyzer": "constants",
+      "matchRule": "hardcoded-string",
+      "downgradeTo": "info",
+      "reason": "本仓库是消息/规则描述密集的工具库：字面量多为报告文案与规则说明，逐条提取为常量只增噪声不增安全；保留 info 供抽查"
+    },
+    {
+      "matchFile": "scripts/validate-capabilities.js",
+      "matchRule": "secret-detected",
+      "reason": "该文件是密钥扫描器的夹具：内含形如 ghp_ 的假样本用于断言 SEC 规则命中，并非真实凭据"
+    },
+    {
+      "matchFile": "scripts/validate-security-levels.js",
+      "matchRule": "secret-detected",
+      "reason": "该文件是密钥扫描器的夹具：内含形如 ghp_ 的假样本用于断言 SEC 规则命中，并非真实凭据"
+    },
+    {
+      "matchFile": "scripts/validate-governance.js",
+      "matchRule": "GOV-EXC-001",
+      "reason": "该文件承载「故意违规」的验证夹具/自检语料：字符串里必须保留未记录的空 catch 才能断言规则命中；GOV-EXC-001 按行扫描不解析字符串边界，属已登记的精度限制"
+    },
+    {
+      "matchFile": "src/cli/selfTestCmd.ts",
+      "matchRule": "GOV-EXC-001",
+      "reason": "该文件承载「故意违规」的验证夹具/自检语料：字符串里必须保留未记录的空 catch 才能断言规则命中；GOV-EXC-001 按行扫描不解析字符串边界，属已登记的精度限制"
+    },
+    {
+      "matchFile": "src/core/governance/semanticLiterals.ts",
+      "matchRule": "magic-number",
+      "reason": "该文件承载「已知值表」（常用端口/HTTP 状态码/时长毫秒），表项本身即数据而非魔法数；拆成数百个具名标量只会降低可读性。真实比较阈值已提取为 MS_PER_SECOND/EPHEMERAL_PORT_MIN/PORT_MAX。"
+    },
+    {
+      "matchFile": "scripts/**",
+      "matchRule": "magic-number",
+      "reason": "脚本目录是校验器与基准夹具：其中的数字多为被构造的输入、期望值与基准参数（种子、行数、期望分数），不是产品里的魔法数；按 glob 统一登记，产品代码仍逐条要求具名常量"
+    },
+    {
+      "matchFile": "scripts/validate-marker-scope.js",
+      "matchRule": "HYG-STB-002",
+      "reason": "该文件是词汇表判据的样本夹具：SAMPLES 里必须逐字保留 wip/pN 等标记才能断言「应用标签仍上报、清单条目仍豁免」两个方向；HYG-STB-002 是注释检查器，按设计必须读原文而非掩码，因此样本字符串必然命中，属夹具自身的固有代价"
+    },
+    {
+      "matchFile": "scripts/**",
+      "matchRule": "duplicate-literal",
+      "reason": "同上：校验器/基准夹具里的重复字面量是夹具数据（输入路径、期望值、基准参数），不是可共享的语义常量；把 'f0.ts'、'src/a.ts'、10/100 这类夹具值提成 CONST_* 只会掩盖它们只是样例。产品代码（src/**）仍逐条要求提取"
+    }
+  ],
+  "classifyLiterals": true,
+  "_comment": "自审策略：blockingIoAllowPatterns 把「CLI/校验器/基准脚本的同步 IO」与「库代码的阻塞热点」分开——前者是设计使然（进程式工具天然同步），后者仍按 PRF-IO-001 / GOV-PRF-004 报；该键同时下发给 performance 与 governance 两个分析器，属单一策略源。 常量化策略（L4）：magicNumberMin=3 —— 0/1/2 属结构性计数（偏移、长度、布尔边界），强制具名只增噪声；≥3 的语义数值必须具名或进已知值表（见表类文件的 reason 抑制）。 classifyLiterals=true 打开语义分类：三趟检查（magic-number / hardcoded-string / duplicate-literal）统一跳过 classifyLiteral 判为 benign 的字面量（分隔符、编码名、HTTP 动词、转义序列、Python docstring 围栏），它们重复出现是词汇表使然，提取成常量反而是假信号。"
+}

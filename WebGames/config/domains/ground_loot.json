@@ -1,0 +1,15 @@
+{
+  "defaults": {
+    "pickup_radius_meters": 2.0,
+    "protection_remain_seconds": 60.0,
+    "total_lifespan_seconds": 7200.0,
+    "elapsed_alive_seconds": 0.0,
+    "max_delta_seconds": 3600.0
+  },
+  "lifespan": {
+    "organic_perishable_seconds": 1800.0,
+    "standard_mineral_seconds": 7200.0,
+    "eternal_legendary_seconds": -1.0,
+    "recycle_policy": "keep_reference"
+  }
+}

@@ -17,6 +17,8 @@ export interface DashboardTemplateArgs {
     nonce: string;
     /** webview 资源源（panel.webview.cspSource） */
     cspSource: string;
+    /** 文档语言（currentLocale()，如 'zh-CN' / 'en'） */
+    lang: string;
     /**
      * 面板词条表（panel.* 与 confirm.* 子集，由 i18n/labelsWithPrefix 构建）。
      * 静态 HTML 用 ${args.labels['key']} 插值；webview 脚本经 JSON 注入为常量 L。
@@ -27,7 +29,7 @@ export interface DashboardTemplateArgs {
 export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     return /* html */ `
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${args.lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

@@ -10,11 +10,12 @@
  */
 
 import * as vscode from 'vscode';
+import { StatusBarMode } from '../domain/models';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
 import { t, format } from '../i18n/index';
 
-export type StatusBarMode = 'today-total' | 'total-today' | 'compact';
+export type { StatusBarMode };
 
 /** 模式名 i18n key（命令提示与 tooltip 共用，杜绝硬编码中文双轨） */
 const MODE_LABEL_KEYS: Record<StatusBarMode, 'statusBar.mode.today-total' | 'statusBar.mode.total-today' | 'statusBar.mode.compact'> = {
@@ -31,7 +32,9 @@ export function statusBarModeLabel(mode: StatusBarMode): string {
 const MODE_CYCLE: StatusBarMode[] = ['today-total', 'total-today', 'compact'];
 
 export interface StatusBarConfig {
-    enabled: boolean;
+    enabled?: boolean;
+    /** 显示模式（workspaceTiming.statusBar.mode 初始值；点击状态栏循环切换后由调用方持久化） */
+    mode?: StatusBarMode;
 }
 
 export class StatusBarController {
@@ -53,9 +56,10 @@ export class StatusBarController {
         this.statusBarItem.tooltip = t()['statusBar.tooltip'];
     }
 
-    /** 更新配置 */
+    /** 更新配置（显示开关 / 显示模式；由 ConfigWatcher 配置热应用与命令循环切换共用） */
     updateConfig(config: Partial<StatusBarConfig>): void {
         if (config.enabled !== undefined) this._enabled = config.enabled;
+        if (config.mode !== undefined && config.mode !== this._mode) this._mode = config.mode;
         this.refresh();
     }
 

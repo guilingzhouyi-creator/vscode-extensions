@@ -1,0 +1,44 @@
+{
+  "body_part_defaults": {
+    "part_id": "HEAD",
+    "part_name": "头颅",
+    "durability": 100.0,
+    "ap_penalty_on_break": 2
+  },
+  "species_defaults": {
+    "species_name": "双足飞龙",
+    "str_level": 3,
+    "con_level": 2,
+    "vit_level": 4
+  },
+  "devour": {
+    "capacity_multiplier": 15.0,
+    "overload_threshold": 1.5,
+    "overload_self_damage": 9999.0,
+    "core_part_id": "HEART_CORE",
+    "status_overload_explosion": "OVERLOAD_EXPLOSION",
+    "status_evolved": "EVOLVED",
+    "overload_desc": "异兽吞噬过载灵能，经络爆裂自毁！"
+  },
+  "ai": {
+    "guard_low_ap": -2,
+    "guard_high_ap": 0,
+    "rage_crush_threshold": 50.0,
+    "verbs": {
+      "BLOCK": "BLOCK",
+      "PARRY": "PARRY",
+      "CRUSH": "CRUSH",
+      "SLASH": "SLASH"
+    }
+  },
+  "swarm": {
+    "rage_increment": 30.0,
+    "rage_max": 100.0
+  },
+  "loot": {
+    "default_drop_canonical_ids": [
+      "KALAR:MATERIAL:ORE:MITHRIL_ORE",
+      "KALAR:CONSUM:FOOD:HEARTY_STEW"
+    ]
+  }
+}

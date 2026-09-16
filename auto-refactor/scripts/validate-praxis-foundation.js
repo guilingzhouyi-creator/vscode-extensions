@@ -1,18 +1,25 @@
 #!/usr/bin/env node
 /**
- * Validation Suite for Praxis Foundation & High-Performance Diff System.
- *
- * Tests:
- * 1. Hash-accelerated Myers diff line hashing and operation correctness
- * 2. Detailed ReviewDiffHunk computation with line-level context
- * 3. Praxis SPI hooks injection & threshold escalation
- * 4. Human-facing CircularDiffBuffer capacity, snapshot, and R4 binary eviction
- * 5. scanDiffStream async event streaming pipeline
- * 6. Atomic Hunk reversal and multi-file TaskCard rollback engine
+ * Module: Verification Harness — Praxis Foundation & High-Performance Diff Suite
+ * File Path: scripts/validate-praxis-foundation.js
+ * Architecture Role: Public-API integration suite for the Praxis diff and rollback stack,
+ *   exercising ../dist/api exports without CLI plumbing.
+ * Dependencies & Triggers: Imports myersDiff, fnv1a32, hashLines, computeDetailedHunks,
+ *   scanDiffStream, CircularDiffBuffer, revertDiffHunk, revertTaskCard, PraxisRollbackEngine
+ *   and createDefaultPraxisHooks from ../dist/api; uses node:assert/node:path; run manually
+ *   or from the validation gate after a build.
+ * Responsibilities: Verifies FNV-1a and hashLines stability plus Myers diff operation counts;
+ *   computes ReviewDiffHunk headers and attributed lines; exercises CircularDiffBuffer
+ *   capacity, Uint8Array R4 eviction, disposal and the onEvictToR4 callback; checks Praxis
+ *   hook enrichment and L3A escalation for a 150-line change; consumes the scanDiffStream
+ *   async generator and asserts file_start/hunk_ready/file_done/stream_end are emitted; tests
+ *   atomic hunk reversal plus TaskCard and PraxisRollbackEngine multi-file rollback.
+ * Exit Semantics & Design Rationale: Exits 0 only when all six test blocks pass, 1 on any
+ *   assertion failure or rejected main(), so CI blocks regressions. Direct API-level tests were
+ *   chosen over snapshot files so a failure points at the exact primitive that regressed.
  */
 
 const assert = require('node:assert');
-const path = require('node:path');
 
 const {
   myersDiff,
@@ -36,8 +43,16 @@ async function main() {
     const lineB = 'function calculateTotal(items) {';
     const lineC = 'function calculateTotal(records) {';
 
-    assert.strictEqual(fnv1a32(lineA), fnv1a32(lineB), 'Identical strings must have identical FNV-1a hash');
-    assert.notStrictEqual(fnv1a32(lineA), fnv1a32(lineC), 'Different strings must produce different hashes');
+    assert.strictEqual(
+      fnv1a32(lineA),
+      fnv1a32(lineB),
+      'Identical strings must have identical FNV-1a hash',
+    );
+    assert.notStrictEqual(
+      fnv1a32(lineA),
+      fnv1a32(lineC),
+      'Different strings must produce different hashes',
+    );
 
     const linesA = ['const a = 1;', 'const b = 2;', 'const c = 3;'];
     const linesB = ['const a = 1;', 'const b = 20;', 'const c = 3;', 'const d = 4;'];
@@ -105,7 +120,10 @@ async function main() {
     // Push 4th element -> triggers eviction of hunk-1
     ring.push(makeDummyHunk(4));
     assert.strictEqual(ring.size(), 3);
-    assert.ok(r4EvictedPayload instanceof Uint8Array, 'Evicted item must be serialized to Uint8Array for R4');
+    assert.ok(
+      r4EvictedPayload instanceof Uint8Array,
+      'Evicted item must be serialized to Uint8Array for R4',
+    );
     assert.strictEqual(r4ArchiveId, 'r4-test-archive-001');
 
     const activeHunks = ring.toArray();
@@ -135,7 +153,11 @@ async function main() {
     const verdict = hooks.thresholdPolicy.evaluateChange('test.ts', hunk, enriched);
 
     assert.strictEqual(verdict.isMajorChange, true, 'Large change must be flagged as major');
-    assert.strictEqual(verdict.shouldEscalateToL3A, true, 'Major change must trigger L3A escalation');
+    assert.strictEqual(
+      verdict.shouldEscalateToL3A,
+      true,
+      'Major change must trigger L3A escalation',
+    );
     console.log('PASS 4: Praxis SPI hooks & bypass threshold escalation');
   }
 
@@ -153,7 +175,9 @@ async function main() {
     ];
 
     const events = [];
-    for await (const ev of scanDiffStream(diffInputs, { praxisHooks: createDefaultPraxisHooks() })) {
+    for await (const ev of scanDiffStream(diffInputs, {
+      praxisHooks: createDefaultPraxisHooks(),
+    })) {
       events.push(ev);
     }
 
@@ -173,7 +197,11 @@ async function main() {
 
     const revertRes = revertDiffHunk(modifiedContent, hunk);
     assert.strictEqual(revertRes.success, true);
-    assert.strictEqual(revertRes.updatedContent, originalContent, 'Reverting hunk must restore exact original content');
+    assert.strictEqual(
+      revertRes.updatedContent,
+      originalContent,
+      'Reverting hunk must restore exact original content',
+    );
 
     // Test Multi-File TaskCard Rollback
     const cardId = 'card-task-42';

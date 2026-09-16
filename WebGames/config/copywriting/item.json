@@ -1,0 +1,42 @@
+{
+  "mithril_longsword": {
+    "base": "{name}：{tier_rank} 阶品质的秘银长刃，基础市场价 {market_value}，质量 {mass_kg}kg。",
+    "conditions": [
+      {
+        "when": {
+          "quantity": 2
+        },
+        "text": "（持有 {quantity} 件）"
+      },
+      {
+        "when": {
+          "durability": 30
+        },
+        "text": "耐久将尽，剑刃已有缺口。"
+      },
+      {
+        "when": {
+          "enchant": "FLAME"
+        },
+        "text": "附魔烈焰，剑身泛红。"
+      }
+    ]
+  },
+  "iron_chest": {
+    "base": "{name}：{tier_rank} 阶品质的铁制胸甲，基础市场价 {market_value}，质量 {mass_kg}kg。",
+    "conditions": [
+      {
+        "when": {
+          "quantity": 2
+        },
+        "text": "（持有 {quantity} 件）"
+      },
+      {
+        "when": {
+          "enchant": "FROST"
+        },
+        "text": "附魔寒霜，甲面凝霜。"
+      }
+    ]
+  }
+}

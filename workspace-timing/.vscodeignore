@@ -9,5 +9,18 @@ tsconfig.json
 .eslintrc.json
 **/*.ts
 **/*.map
+**/*.tsbuildinfo
 .workspace-timing-data/**
 coverage/**
+# ── 工程治理基建与运行期产物不随发（0.4.9 起）──
+scripts/**
+docs/**
+reports/**
+**/*.vsix
+**/.eslintcache
+# ── 本地审查/工具缓存严禁打进发布包（实测曾混入 ~820KB）──
+**/.auto-refactor-cache/**
+**/.auto-refactor-cache-*/
+**/.bench-corpus/**
+**/.*-corpus/**
+**/.corpus*/

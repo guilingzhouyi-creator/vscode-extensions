@@ -1,0 +1,40 @@
+{
+  "$schema": "../../config.schema.json",
+  "_comment": "消费方配置模板：复制到 <project>/.auto-refactor/config.json 并按项目实际情况填写。include/exclude 用项目自己的路径 glob；层映射（architecture.options.layers）与文件头约定属项目政策，本项目不适用就保持关闭；所有 suppressions 必须带 reason。跑法与 CI 样例见 docs/05-specs-and-benchmarks/05-consumer-integration.md。",
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**"
+  ],
+  "thresholds": {},
+  "analyzers": {
+    "constants": {
+      "enabled": true
+    },
+    "large-file": {
+      "enabled": true
+    },
+    "complexity": {
+      "enabled": true
+    },
+    "hygiene": {
+      "enabled": true
+    },
+    "simplify": {
+      "enabled": true
+    },
+    "security": {
+      "enabled": true
+    },
+    "dependency-graph": {
+      "enabled": true,
+      "options": {
+        "detectCycles": true
+      }
+    }
+  },
+  "suppressions": []
+}
