@@ -271,7 +271,12 @@ glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后
 
 补充（收口）： 域实测再降 173 条；剩余 3692 条经分布核查主要落在 （规则目录文案与短标识），并按既有策略为  登记了 hardcoded-string 夹具豁免（带 reason，与 magic-number/duplicate-literal 同口径）。产品代码保持逐条严格，不做无理由的全局豁免。
 
-**更正与待查（同批交付内自检发现）**：
-1. 上一条补充的正文中 ``conventional-token`` 一词因命令行反引号被吞，此处更正为：conventional-token 域实测仅再降 173 条。
-2. 分布核查（实测）：剩余 hardcoded-string 3692 条 = `src/**` 2258 + `scripts/**` 1434。**新登记的 `scripts/**` hardcoded-string 夹具豁免并没有让计数下降**（登记前后 scripts 侧仍为 1434），说明该豁免未生效或被更高优先规则覆盖；这是未解决项，不得据此声称 scripts 侧已收敛。待查方向：该条缺 `matchAnalyzer` 是否被匹配器跳过、`matchFile` glob 与路径规范化是否一致、以及 suppression 是否只影响基线统计而不作用于 issue 列表。
-3. 产品口径不变：`src/**` 2258 条仍逐条按严格标准处理（下一步按文件收敛，Top：`oxcAdapter.ts` 179、`projectProfiler.ts` 121、`hygiene.ts` 84、`api.ts` 84）。
+**更正（含一次错误判断的纠正）**：
+
+1. 正文中 ``conventional-token`` 一词因命令行反引号被吞，此处更正为：conventional-token 域实测仅再降 173 条。
+2. **撤回"scripts/** 豁免未生效"的结论——那是我的度量错误**。引擎的压制语义是"标记 `issue.suppression` +
+   计入 `summary.suppressedCount`"，**不会从 `report.issues` 移除**；我此前直接统计 rule 计数，把已压制项也算进去了。
+   正确口径下（active = 无 `issue.suppression`）：`hardcoded-string` scripts 侧已压制、`magic-number` 与
+   `duplicate-literal` 的 `scripts/**` 豁免同样生效，既有政策成立。
+3. 结论：产品代码 `src/**` 仍按严格口径逐条处理（未被任何 glob 豁免覆盖），scripts 侧为带 reason 的夹具豁免；
+   今后所有"残留量"汇报必须区分 total / suppressed / active，避免再次误判。
