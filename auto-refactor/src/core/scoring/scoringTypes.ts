@@ -135,4 +135,9 @@ export interface QualityScoreBreakdown {
     notEvaluated?: QualityDimension[];
     /** Share of the total weight that was actually measured (0.0-1.0). */
     coverage?: number;
+    /**
+     * Enabled analyzers that witness each dimension, so "security disabled but secrets enabled"
+     * reconciles instead of reading as a contradiction; empty means the dimension was not measured.
+     */
+    evaluatedBy?: Partial<Record<QualityDimension, string[]>>;
 }

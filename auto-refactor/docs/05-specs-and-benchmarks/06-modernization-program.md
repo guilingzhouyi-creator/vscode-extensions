@@ -246,5 +246,7 @@ error 51）；Top：`hardcoded-string` 6156、`magic-number` 444、`GOV-LOG-001`
    替代仓库级 glob 抑制）；
 2. 架构/性能维度与 `GOV-*`/`PRF-*`/`CMP-*` 的量化映射（公式/阈值 + 消费 `computeIncrementalMetrics`）；
 3. 自扫清账批次（按 warning+error 降序）；
-4. 待核实：`summary.disabledAnalyzers` 把 `security` 列为 disabled，而 `DIMENSION_ANALYZERS` 判定其
-   已启用（`codeSecurity` 未进 notEvaluated）——两处口径需对齐后再调权重策略。
+4. ~~待核实：`disabledAnalyzers` 与打分口径不一致~~ **已查清并闭合**：`security` 包默认禁用，但
+   `secrets` 分析器默认启用且实测能命中（探针 `secret-detected`），故 `codeSecurity` 属真实评估；
+   现以 `qualityScore.evaluatedBy` 公开"谁作证"（自审实测 `codeSecurity=["secrets"] -> 0`、
+   `modernity=[] -> N/A`），口径矛盾消除。

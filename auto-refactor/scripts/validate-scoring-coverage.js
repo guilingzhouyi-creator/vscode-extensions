@@ -120,6 +120,20 @@ function expectedComposite(indices, evaluated) {
     );
     assert.ok(narrow.coverage < 1, `coverage must drop below one, got ${narrow.coverage}`);
     const evaluated = ALL_QUALITY_DIMENSIONS.filter((dim) => !narrow.notEvaluated.includes(dim));
+    for (const dim of evaluated) {
+      assert.deepStrictEqual(
+        narrow.evaluatedBy[dim],
+        ['constants'],
+        `${dim} must name the enabled analyzer that measured it`,
+      );
+    }
+    for (const dim of narrow.notEvaluated) {
+      assert.deepStrictEqual(
+        narrow.evaluatedBy[dim],
+        [],
+        `${dim} must expose that it had no enabled analyzer`,
+      );
+    }
     assert.strictEqual(
       narrow.compositeScore,
       expectedComposite(narrow.indices, evaluated),
@@ -133,6 +147,12 @@ function expectedComposite(indices, evaluated) {
     // ── Control scan: every analyzer runs ─────────────────────────────────────────────────────
     const full = (await scanWith(rootB, ALL_ANALYZERS)).qualityScore;
     assert.deepStrictEqual(full.notEvaluated, [], 'a full scan must leave nothing unmeasured');
+    for (const dim of ALL_QUALITY_DIMENSIONS) {
+      assert.ok(
+        (full.evaluatedBy[dim] ?? []).length > 0,
+        `${dim} must have at least one witness in the control scan`,
+      );
+    }
     assert.strictEqual(full.coverage, 1, `full coverage expected, got ${full.coverage}`);
     assert.strictEqual(
       full.compositeScore,

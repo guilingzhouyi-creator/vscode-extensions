@@ -523,12 +523,16 @@ export class QualityScorer {
         // Evaluability: a dimension whose analyzers are absent from the scan configuration was not
         // measured, so scoring it (0 or 100) would fabricate quality. It is excluded from the
         // weighted composite and published instead; confidence shrinks with the measured share.
-        const notEvaluated = ALL_QUALITY_DIMENSIONS.filter((dim) =>
-            DIMENSION_ANALYZERS[dim].every((id) => {
-                if (config === undefined) return false;
+        const evaluatedBy: Partial<Record<QualityDimension, string[]>> = {};
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            evaluatedBy[dim] = DIMENSION_ANALYZERS[dim].filter((id) => {
+                if (config === undefined) return true;
                 const declaration = config.analyzers?.[id];
-                return declaration === undefined || declaration.enabled === false;
-            }),
+                return declaration !== undefined && declaration.enabled !== false;
+            });
+        }
+        const notEvaluated = ALL_QUALITY_DIMENSIONS.filter(
+            (dim) => (evaluatedBy[dim] ?? []).length === 0,
         );
         const evaluatedDimensions = ALL_QUALITY_DIMENSIONS.filter(
             (dim) => !notEvaluated.includes(dim),
@@ -589,6 +593,7 @@ export class QualityScorer {
             weights: { ...this.weights },
             notEvaluated,
             coverage,
+            evaluatedBy,
             rationales,
             evaluatedAt: Date.now(),
         };

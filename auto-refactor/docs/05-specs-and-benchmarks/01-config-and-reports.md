@@ -78,3 +78,12 @@
 
 回归锁：`scripts/validate-scoring-coverage.js`（门禁链内）——窄配置 8 个维度判 N/A 且 composite
 只按 2 个已测维度重归一；全量配置 `coverage=1`、`notEvaluated=[]` 且 confidence 不低于窄扫描。
+
+### 维度作证者（evaluatedBy）
+
+`qualityScore.evaluatedBy[dimension]` 列出**本次真正启用的分析器**，空数组即"该维度无作证者、判 N/A"。
+它解决了一类看起来自相矛盾的报告：`summary.disabledAnalyzers` 里出现 `security`，而 `codeSecurity`
+仍然被评估——因为该维度的作证者是**默认启用的 `secrets`**（`DIMENSION_ANALYZERS.codeSecurity =
+['security','secrets']`）。自审实测：`codeSecurity witnesses=["secrets"] -> 0`（真实扣分，非未测），
+`modernity witnesses=[]`（4 个语言包未启用，判 N/A）。任何维度只要 `evaluatedBy` 非空就必须有真实证据，
+为空则不得进入加权——两者由同一份启用状态推导，不会漂移。
