@@ -29,7 +29,7 @@
     "pretest": "npm run build",
     "test": "npm run validate && npm run validate-warm && npm run validate-oxc && npm run validate-diff && npm run validate-praxis && npm run validate-governance && npm run validate-generalized && npm run validate-review-memory && npm run validate-asymmetric && npm run validate-security && npm run validate-capabilities && npm run validate-language-support && npm run validate-language-matrix && npm run validate-python && npm run validate-comment-hygiene && npm run validate-simplify && npm run validate-python-modern && npm run validate-ts-modern && npm run validate-modern-packs && npm run validate-python-imports && npm run validate-postscan-parity && npm run validate-literal-policy && npm run validate-diff-interface && npm run validate-rules-registry && npm run validate-symbol-index && npm run validate-rule-aliases && npm run validate-docs && npm run validate-project-neutrality && npm run validate-consumer-runner && npm run test-codec && npm run validate-compression && npm run validate-data-flow && npm run validate-self-norms && npm run validate-marker-scope",
     "validate-data-flow": "node scripts/validate-data-flow.js && node scripts/validate-context-slice.js",
-    "validate-self-norms": "node scripts/validate-self-norms.js",
+    "validate-self-norms": "node scripts/validate-self-norms.js && node scripts/validate-scoring-coverage.js",
     "validate-marker-scope": "node scripts/validate-marker-scope.js",
     "validate-compression": "node scripts/validate-compression-bounds.js",
     "validate-language-support": "node scripts/validate-language-support.js",

@@ -38,6 +38,13 @@ export type QualityDimension =
  * visited (for example index initialization in `qualityScorer` and `anomalyDetector`); it
  * must stay in exact sync with the `QualityDimension` union.
  */
+
+/**
+ * Canonical ordered enumeration of all quality dimensions, used whenever every axis must be
+ * visited (for example index initialization in `qualityScorer` and `anomalyDetector`); it must
+ * stay in exact sync with the `QualityDimension` union, and `DIMENSION_ANALYZERS` below must
+ * cover every member.
+ */
 export const ALL_QUALITY_DIMENSIONS: readonly QualityDimension[] = [
     'architectureConsistency',
     'semanticPurity',
@@ -50,6 +57,24 @@ export const ALL_QUALITY_DIMENSIONS: readonly QualityDimension[] = [
     'duplication',
     'techDebtRisk',
 ] as const;
+
+/**
+ * Analyzers whose evidence feeds each quality dimension. A dimension is *not evaluated* when none
+ * of its analyzers is enabled in the scan configuration, so the model never scores an axis that
+ * was not actually measured (see `QualityScoreBreakdown.notEvaluated` / `coverage`).
+ */
+export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = {
+    architectureConsistency: ['architecture', 'dependency-graph'],
+    semanticPurity: ['constants', 'simplify'],
+    codeSecurity: ['security', 'secrets'],
+    performanceEfficiency: ['performance'],
+    standardization: ['hygiene', 'comments'],
+    modernity: ['ts-modern', 'python-modern', 'rust-modern', 'gdscript-modern'],
+    maintainability: ['complexity', 'large-file'],
+    commentQuality: ['comments'],
+    duplication: ['constants', 'simplify'],
+    techDebtRisk: ['governance'],
+};
 
 /** Dimension weights for the composite Quality Index (default balanced) */
 export type QualityWeights = Record<QualityDimension, number>;
@@ -105,5 +130,9 @@ export interface QualityScoreBreakdown {
     /** Complete transparent audit trail explaining all deductions */
     rationales: QualityScoreRationale[];
     /** Evaluation timestamp (epoch ms) */
-    evaluatedAt: number;
+    evaluatedAt: number; /** Dimensions whose analyzers did not run; excluded from the weighted
+        composite. */
+    notEvaluated?: QualityDimension[];
+    /** Share of the total weight that was actually measured (0.0-1.0). */
+    coverage?: number;
 }

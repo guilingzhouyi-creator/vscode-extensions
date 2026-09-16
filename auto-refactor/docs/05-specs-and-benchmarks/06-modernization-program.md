@@ -229,3 +229,22 @@
 | 性能优化破坏确定性 | 缓存/增量结果漂移 | 每项独立提交 + bench + 等价金标 + `validate-warm` |
 | 现代化规则与项目 linter 重叠 | 双源冲突 | 默认 info / 文档标注二选一；三项目实测 |
 | 语言包膨胀 | 维护成本 | 语言包默认关闭、矩阵登记、脚手架模板化 |
+
+### 量化标准硬化（第 1 项，已交付）
+
+`qualityScore` 增加 `notEvaluated[] + coverage`：未启用的维度不再以 0/100 混入加权，
+confidence 乘以覆盖率因子；自审实测 composite 43.5→**38.6**、confidence 0.67→**0.60**、
+coverage 0.90、`notEvaluated=["modernity"]`；回归锁 `validate-scoring-coverage`（门禁内）。
+
+**本轮从零复测到的自扫口径（取代旧叙述）**：181 文件 / 7716 issues（info 6284 / warning 1381 /
+error 51）；Top：`hardcoded-string` 6156、`magic-number` 444、`GOV-LOG-001` 183、`high-complexity`
+136（含 42 error）、`SIM-LONG-001` 134、`duplicate-literal` 129。旧文"magic-number 792→0"与当前
+实测不符（历史重建后基线失效），以本节数字为准。
+
+**剩余计划（未完成，不得声称已交付）**：
+1. `hardcoded-string` 语义提纯（把"报告文案/消息字面量"做成与 `classifyLiterals` 同级的语义分类，
+   替代仓库级 glob 抑制）；
+2. 架构/性能维度与 `GOV-*`/`PRF-*`/`CMP-*` 的量化映射（公式/阈值 + 消费 `computeIncrementalMetrics`）；
+3. 自扫清账批次（按 warning+error 降序）；
+4. 待核实：`summary.disabledAnalyzers` 把 `security` 列为 disabled，而 `DIMENSION_ANALYZERS` 判定其
+   已启用（`codeSecurity` 未进 notEvaluated）——两处口径需对齐后再调权重策略。

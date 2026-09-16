@@ -60,3 +60,21 @@
 - `summary.disabledAnalyzers`：被有效配置关闭的分析器清单（`enabled === false`）；`text` 输出打印为 `skipped (disabled) analyzers: …`。
 - `summary.warnings`：配置自检提示——include 命中 0 文件、缓存回退重读建图、**语言包关闭却扫到了该语言的文件**（`.py` + `python-modern` 关闭、`.md` + `docs` 关闭）时的 `analyzer coverage:` 提示，以及增量口径下跳过跨文件通道的 `incremental scope:` 说明。
 - `summary.postScanPasses`：本报告实际执行的后处理通道（`suppressions` / `dependency-graph` / `baseline`，按执行顺序）。全量扫描含跨文件通道，增量扫描不含——消费方据此判断「这份报告能不能回答跨文件问题」。
+
+## 质量分的可评估性契约（notEvaluated / coverage）
+
+量化分数只有在"测了什么"被如实披露时才可信。该契约现在由代码强制，而不是靠文档承诺：
+
+- 维度→分析器映射单一事实源：`DIMENSION_ANALYZERS`（`src/core/scoring/scoringTypes.ts`）。
+- 判定规则：某维度的分析器在本次扫描配置中**全部未启用** → 该维度进入 `qualityScore.notEvaluated[]`，
+  **不参与加权**（既不当 0 也不当满分）；`compositeScore` 只在已测权重上重归一。
+- `qualityScore.coverage = 已测权重 / 总权重`；`confidence = 行数基线 × coverage`，
+  即"读了 40% 权重"的扫描不能宣称全量扫描的置信度。
+- 未测维度仍会出现在 `indices` 里（保留原始值便于对比），但调用方应以 `notEvaluated` 为准。
+
+自审实测（本仓库，181 文件）：修复前 `composite=43.5 / confidence=0.67`，其中 `modernity=100`、
+`codeSecurity=0` 属"未测却打分"；修复后 `composite=38.6 / coverage=0.90 / confidence=0.60`，
+`notEvaluated=["modernity"]`（4 个语言包在自审配置中未启用）。
+
+回归锁：`scripts/validate-scoring-coverage.js`（门禁链内）——窄配置 8 个维度判 N/A 且 composite
+只按 2 个已测维度重归一；全量配置 `coverage=1`、`notEvaluated=[]` 且 confidence 不低于窄扫描。

@@ -26,7 +26,11 @@ import type {
     QualityScoreRationale,
     QualityWeights,
 } from './scoringTypes';
-import { ALL_QUALITY_DIMENSIONS, DEFAULT_QUALITY_WEIGHTS } from './scoringTypes';
+import {
+    ALL_QUALITY_DIMENSIONS,
+    DEFAULT_QUALITY_WEIGHTS,
+    DIMENSION_ANALYZERS,
+} from './scoringTypes';
 
 // ── Scoring policy (weights, grade cut-offs, confidence model) ──
 /** Penalty points deducted from the architecture index per finding. */
@@ -134,7 +138,7 @@ export class QualityScorer {
         filePath: string,
         issues: Issue[],
         metric?: FileMetric | null,
-        _config?: ScanConfig,
+        config?: ScanConfig,
     ): QualityScoreBreakdown {
         const rawScores: Record<QualityDimension, number> = {
             architectureConsistency: DIMENSION_MAX_SCORE,
@@ -516,16 +520,38 @@ export class QualityScorer {
             }
         }
 
-        // Compute weighted composite score
+        // Evaluability: a dimension whose analyzers are absent from the scan configuration was not
+        // measured, so scoring it (0 or 100) would fabricate quality. It is excluded from the
+        // weighted composite and published instead; confidence shrinks with the measured share.
+        const notEvaluated = ALL_QUALITY_DIMENSIONS.filter((dim) =>
+            DIMENSION_ANALYZERS[dim].every((id) => {
+                if (config === undefined) return false;
+                const declaration = config.analyzers?.[id];
+                return declaration === undefined || declaration.enabled === false;
+            }),
+        );
+        const evaluatedDimensions = ALL_QUALITY_DIMENSIONS.filter(
+            (dim) => !notEvaluated.includes(dim),
+        );
+
+        // Compute weighted composite score over the measured weights only
         let totalWeightedScore = 0;
         let totalWeight = 0;
+        let overallWeight = 0;
         for (const dim of ALL_QUALITY_DIMENSIONS) {
+            overallWeight += this.weights[dim];
+        }
+        for (const dim of evaluatedDimensions) {
             const w = this.weights[dim];
             totalWeightedScore += rawScores[dim] * w;
             totalWeight += w;
         }
         const compositeScore =
             Math.round((totalWeightedScore / (totalWeight || 1)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+        const coverage =
+            overallWeight === 0
+                ? 1
+                : Math.round((totalWeight / overallWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
 
         // Determine letter grade
         let grade: QualityGrade = 'F';
@@ -537,7 +563,7 @@ export class QualityScorer {
 
         // Statistical confidence calculation (scaled by non-blank lines & issue density)
         const lines = metric?.nonBlankLines ?? DEFAULT_METRIC_LINES;
-        const confidence = Math.min(
+        const baseConfidence = Math.min(
             1.0,
             Math.max(
                 CONFIDENCE_FLOOR,
@@ -548,6 +574,12 @@ export class QualityScorer {
                 ) / PERCENT_SCALE,
             ),
         );
+        // Measured-coverage factor: a scan that measured 40% of the model weight cannot claim
+        // the confidence of a full scan, regardless of how many lines it read.
+        const confidence =
+            Math.round(
+                Math.max(CONFIDENCE_FLOOR, Number(baseConfidence) * coverage) * PERCENT_SCALE,
+            ) / PERCENT_SCALE;
 
         return {
             indices: rawScores,
@@ -555,6 +587,8 @@ export class QualityScorer {
             grade,
             confidence,
             weights: { ...this.weights },
+            notEvaluated,
+            coverage,
             rationales,
             evaluatedAt: Date.now(),
         };
