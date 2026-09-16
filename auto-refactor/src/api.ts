@@ -1183,6 +1183,9 @@ export async function querySymbols(
  * @param intent - Task intent in natural language or identifier form.
  * @param options - Scan options (root/config/workers/...) plus optional slice caps.
  * @returns The bounded context slice with its constraints and truncation flag.
+ *
+ * Concurrency: reentrant and idempotent - it owns its scanner, reads no shared mutable state and
+ * needs no external synchronization; concurrent calls simply scan in parallel.
  */
 export async function queryContextSlice(
     intent: string,

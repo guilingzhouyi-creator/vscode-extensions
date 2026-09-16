@@ -250,3 +250,21 @@ error 51）；Top：`hardcoded-string` 6156、`magic-number` 444、`GOV-LOG-001`
    `secrets` 分析器默认启用且实测能命中（探针 `secret-detected`），故 `codeSecurity` 属真实评估；
    现以 `qualityScore.evaluatedBy` 公开"谁作证"（自审实测 `codeSecurity=["secrets"] -> 0`、
    `modernity=[] -> N/A`），口径矛盾消除。
+
+### 第 2 项进展：`hardcoded-string` 语义提纯（部分交付）
+
+旧做法是本仓库用一条 glob suppression 把 `hardcoded-string` 全量降级为 info（6199 条），规则本身照旧误报。
+现在改为在分类器里新增两个**良性语义域**（`classifyLiterals` 开启时生效，三趟检查统一跳过）：
+
+- `message-text`：报告文案/规则说明/ASCII 横幅（含空白或 CJK，长度 ≥8；单字符重复 ≥8 视为横幅）；
+- `glob-pattern`：glob 与相对模块说明符（`src/**/*.ts`、`**/node_modules/**`、`../dist/api`）。
+
+**安全护栏**：凭据形态（`ghp_`/`sk-`/`AKIA`/`xox[baprs]-`/`-----BEGIN`/`Bearer `）**永不豁免**，
+先于良性判定返回不可接受，`secrets` 分析器与 `hardcoded-string` 都会继续报。
+
+实测：自扫 `hardcoded-string` **6199 → 3865**（-38%），`validate-literal-policy` 全绿；同时撤掉了那条仓库级
+glob 压制，剩余 3865 条如实以 warning 呈现（此前被降到 info 后不可见）。总 issues 7716 → 5414。
+
+**剩余（下一轮）**：4078 条多为短结构记号（编码名、单段标识、扩展名、CLI 开关等），需要新增
+`conventional-token` 域（显式白名单：编码/哈希/MIME/CLI 开关）或按项目策略调整
+`hardcodedStringMinLength`；在完成前不得声称该项已全部交付。

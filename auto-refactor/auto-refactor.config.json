@@ -4,18 +4,8 @@
   "failOnIssue": false,
   "commentLevel": "standard",
   "autoTune": true,
-  "include": [
-    "src/**/*.ts",
-    "scripts/*.js"
-  ],
-  "exclude": [
-    "node_modules",
-    ".git",
-    "dist",
-    "build",
-    "coverage",
-    "testdata"
-  ],
+  "include": ["src/**/*.ts", "scripts/*.js"],
+  "exclude": ["node_modules", ".git", "dist", "build", "coverage", "testdata"],
   "thresholds": {
     "magicNumberMin": 3,
     "duplicateLiteralThreshold": 4,
@@ -25,10 +15,7 @@
     "fileFunctionsWarn": 20,
     "complexityWarn": 12,
     "complexityFail": 25,
-    "blockingIoAllowPatterns": [
-      "scripts/**",
-      "src/cli/**"
-    ]
+    "blockingIoAllowPatterns": ["scripts/**", "src/cli/**"]
   },
   "analyzers": {
     "constants": {
@@ -64,12 +51,6 @@
   "respectGitignore": true,
   "failOnAnalyzerError": false,
   "suppressions": [
-    {
-      "matchAnalyzer": "constants",
-      "matchRule": "hardcoded-string",
-      "downgradeTo": "info",
-      "reason": "本仓库是消息/规则描述密集的工具库：字面量多为报告文案与规则说明，逐条提取为常量只增噪声不增安全；保留 info 供抽查"
-    },
     {
       "matchFile": "scripts/validate-capabilities.js",
       "matchRule": "secret-detected",

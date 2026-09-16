@@ -35,7 +35,8 @@ const GENERAL_LITERAL_KIND = 'general';
  * Semantic domains a hardcoded literal can be classified into.
  *
  * The kind drives grouping and reporting only and carries no severity of its own; `general`
- * means no specialized domain matched and is the only kind that can still be reasonable.
+ * means no specialized domain matched. Several kinds are reasonable by design (delimiters,
+ * paths, globs and report prose); see `classifyLiteral`.
  */
 export type LiteralSemanticKind =
     | 'url'
@@ -44,6 +45,8 @@ export type LiteralSemanticKind =
     | 'port'
     | 'http-status'
     | 'time-ms'
+    | 'glob-pattern'
+    | 'message-text'
     | typeof GENERAL_LITERAL_KIND;
 
 /**
@@ -176,6 +179,42 @@ const REASONABLE_STRINGS = new Set([
     'staging',
 ]);
 
+/** Minimum length before a spaced/CJK string counts as report prose rather than a value. */
+const MIN_MESSAGE_LENGTH = 8;
+
+/** Longest path-like specifier still treated as a structural pattern. */
+const MAX_PATTERN_LENGTH = 256;
+
+/** Decorative run: one character repeated at least this many times (ASCII banners). */
+const MIN_BANNER_RUN = 8;
+const BANNER_RE = new RegExp(`^(.)\\1{${MIN_BANNER_RUN - 1},}$`);
+const GLOB_META_RE = /[*?{}[\]]/;
+const RELATIVE_SPECIFIER_RE = /^(?:\.{1,2}\/|[A-Za-z0-9_@.-]+\/)/;
+const CJK_RE = /[　-〿一-鿿＀-￯]/;
+const CREDENTIAL_RE =
+    /(?:ghp_|gho_|github_pat_|sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{12,}|xox[baprs]-|-----BEGIN|Bearer\s)/i;
+
+/**
+ * Detect report/specifier vocabulary that must not be treated as extractable literal values.
+ *
+ * @param raw - Raw literal spelling.
+ * @returns The benign semantic kind, or null when the value carries real payload.
+ */
+function reportVocabularyKind(raw: string): LiteralSemanticKind | null {
+    if (raw.length === 0) return null;
+    if (BANNER_RE.test(raw)) return 'message-text';
+    if (raw.length >= MIN_MESSAGE_LENGTH && (/\s/.test(raw) || CJK_RE.test(raw)))
+        return 'message-text';
+    if (
+        raw.length <= MAX_PATTERN_LENGTH &&
+        !/\s/.test(raw) &&
+        (GLOB_META_RE.test(raw) || RELATIVE_SPECIFIER_RE.test(raw))
+    ) {
+        return 'glob-pattern';
+    }
+    return null;
+}
+
 /**
  * Classifies a raw literal into its semantic domain.
  *
@@ -281,6 +320,26 @@ export function classifyLiteral(rawVal: string, numeric: boolean): SemanticClass
             suggestedConstPrefix: 'FILE_PATH',
             rationale:
                 'Filesystem path should be managed via path configuration or resource loader',
+        };
+    }
+
+    // Vocabulary is checked last so specialised domains keep their identity (an inline SVG is
+    // still an SVG, not prose), while credential-shaped values are vetoed first.
+    if (CREDENTIAL_RE.test(unquoted)) {
+        return {
+            kind: GENERAL_LITERAL_KIND,
+            isReasonable: false,
+            suggestedConstPrefix: 'SECRET_VALUE',
+            rationale: 'Credential-shaped literal must be externalized, never exempted',
+        };
+    }
+    const vocabulary = reportVocabularyKind(unquoted);
+    if (vocabulary !== null) {
+        return {
+            kind: vocabulary,
+            isReasonable: true,
+            suggestedConstPrefix: 'TEXT',
+            rationale: 'Report prose / structural specifier: not extractable vocabulary',
         };
     }
 
