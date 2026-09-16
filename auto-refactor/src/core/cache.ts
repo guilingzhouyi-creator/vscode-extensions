@@ -210,24 +210,65 @@ export class CacheStore {
         } catch {
             return false;
         }
-        // Probe writability (a read-only project must degrade silently). A FIXED probe name so
-        // failed unlinks (transient Windows file-lock) cannot accumulate per-pid files; the
-        // leftover 2-byte probe is harmless and overwritten next init.
+        if (!this.probeWritable()) return false;
+        return this.rebuildOrAdoptManifest();
+    }
+
+    /**
+     * Verify the cache directory is writable, using a FIXED probe name so failed unlinks
+     * (transient Windows file-lock) cannot accumulate per-pid files; the leftover 2-byte probe
+     * is harmless and overwritten next init.
+     *
+     * @returns True when the probe write succeeded (cleanup is best-effort).
+     */
+    private probeWritable(): boolean {
         try {
             const probe = path.join(this.dir, '.probe');
-            try {
-                fs.writeFileSync(probe, 'ok', 'utf8');
-            } catch {
-                return false;
-            }
-            try {
-                fs.rmSync(probe, { force: true });
-            } catch {
-                /* probe cleanup is best-effort */
-            }
+            // Write first, clean up only after a successful write: a failed write must not spend a
+            // syscall on cleanup, and the probe file is overwritten on the next init anyway.
+            return this.writeProbe(probe) && this.removeProbe(probe);
         } catch {
             return false;
         }
+    }
+
+    /**
+     * Write the fixed probe file.
+     *
+     * @param probe - Absolute probe path.
+     * @returns True when the write succeeded.
+     */
+    private writeProbe(probe: string): boolean {
+        try {
+            fs.writeFileSync(probe, 'ok', 'utf8');
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Remove the probe file, best-effort.
+     *
+     * @param probe - Absolute probe path.
+     * @returns Always true: a failed unlink must never fail the caller.
+     */
+    private removeProbe(probe: string): boolean {
+        try {
+            fs.rmSync(probe, { force: true });
+        } catch {
+            /* probe cleanup is best-effort */
+        }
+        return true;
+    }
+
+    /**
+     * Read the manifest and adopt its limits, rebuilding it when absent, invalid or older-format
+     * (an empty cache is never a correctness issue).
+     *
+     * @returns True once a usable manifest is in place.
+     */
+    private rebuildOrAdoptManifest(): boolean {
         try {
             const raw = fs.readFileSync(this.manifestPath, 'utf8');
             const m = JSON.parse(raw);
@@ -238,14 +279,11 @@ export class CacheStore {
                 typeof m.maxEntries === TYPEOF_NUMBER &&
                 typeof m.maxAgeDays === TYPEOF_NUMBER
             ) {
-                // Manifest valid — adopt its limits (defensive defaults on any mismatch).
                 return true;
             }
-            // Manifest invalid or older format → rebuild (empty cache, never a correctness issue).
             this.rebuildManifest();
             return true;
         } catch {
-            // No manifest yet → create it.
             this.rebuildManifest();
             return true;
         }

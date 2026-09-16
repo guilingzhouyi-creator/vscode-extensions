@@ -344,3 +344,18 @@ glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后
 
 **工序纪律**：每批 = 改代码 → `npx tsc`/`npm run build` → 相关校验器 → **复跑自扫核对 active 下降** →
 `npm run gate` 全绿 → 提交；基线只允许收缩，且所有残留量必须区分 total / suppressed / active。
+
+### 第 5 项第 2 批：`cache.ts` 嵌套提取（含一次"深度守恒"教训）
+
+`CacheStore.init()`（depth 6）拆为 `init → probeWritable / rebuildOrAdoptManifest`；**第一次复跑自扫计数没降**
+（182 → 182、cache.ts 5 → 5）——`init` 确实消失了，但新助手 `probeWritable` **继承了 depth 6**，等于把问题挪了个
+位置。这正是"每批必须复跑自扫核对 **净** active 下降"这条纪律要拦的情况。
+
+于是继续把探测块拆为 `writeProbe`（写失败即 false）与 `removeProbe`（尽力删除、恒返回 true），行为不变
+（写成功后才清理；探测文件固定名、下次 init 覆盖）：
+
+- 自扫 `GOV-LOG-001` **182 → 181**，`cache.ts` **5 → 4**；
+- `validate-warm`、`validate-review-memory` 全绿，`tsc`/`build` 通过。
+
+**方法论沉淀**：提取方法只会把深度"搬走"，不会自动消掉——只有当被提取的函数本身降到阈值内，计数才会下降；
+因此批量作业应以"净 active 下降"为准入，而不是以"看起来更清晰"为准入。
