@@ -303,3 +303,16 @@ glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后
   `techDebtRisk` 26075 → 24840（不再混入）；composite 39.0 → **27.0**（架构/性能首次计入总分）。
 - **仍未完成**：① 扣分尚未消费 `computeIncrementalMetrics`（有效 LOC 增量/耦合增量/复杂度代理）——
   这是"带公式的量"的下一半；② 饱和缺陷在路由后更明显（三个维度 0 分），修复需曲线+评分锁+基线协调批次。
+
+### 第 3–4 轮进展：量化标准闭环 + 规范页
+
+- 第 3 轮（`c0a15a0` + `0a797c9`）：`src/core/scoring/diffScore.ts` + `api.scoreDiff` + 门禁内
+  `validate-diff-score`——消费 B7 的 `computeIncrementalMetrics`，把耦合/复杂度/有效 LOC/重复行增量
+  映射到 `architectureConsistency/performanceEfficiency/maintainability/duplication`，公式与权重随结果发布；
+  `verdict` 原样透传 B7（不重复裁决）。实测"删 500 行但耦合上升" → `FAILED`，架构 −16 且可维护性 +24 同时出现。
+  过程中修正两处自身问题：把 fixture 属性当契约的断言（改为公式恒等式）、`git add` 静默漏文件（已补提交）。
+- 第 4 轮：新增规范页 `docs/05-specs-and-benchmarks/07-quantified-quality-standard.md`（十维定义、快照公式、
+  可评估性/作证者、扣分来源、族路由、diff 层公式、阈值与门禁策略、单一事实源与回归锁一览），
+  `01-config-and-reports.md` 增加指向该页的交叉引用。
+- 第 3 项目标的四处源码要求已全部落地（族映射 / 扣分来源 / 公式发布 / 消费增量指标）；仍留在册的是
+  **饱和缺陷**（曲线+评分锁+基线协调批次）与第 2/5 项清账。

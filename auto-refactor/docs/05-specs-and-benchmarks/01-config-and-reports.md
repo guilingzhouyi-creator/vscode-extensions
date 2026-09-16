@@ -146,3 +146,5 @@
 裁决;只发布可观测的四项维度;公式与权重随结果发布,校验器断言"每个增量 = 其发布公式作用于对应 metric"。
 "删 500 行但耦合上升"因此在维度语言里同时呈现**架构分下降 + 可维护性上升**——行数少 ≠ 更好。
 回归锁 `scripts/validate-diff-score.js`(门禁内)。
+
+> 规范性定义（十维模型、公式、阈值、族映射、diff 层公式、单一事实源）见 [`07-quantified-quality-standard.md`](./07-quantified-quality-standard.md)；本文只记录操作细节，两者冲突时以 07 为准。
