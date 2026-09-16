@@ -1044,6 +1044,8 @@ import type {
     DualTrackOptions,
 } from './core/pipeline/dualTrackPipeline';
 import { executeDualTrack } from './core/pipeline/dualTrackPipeline';
+import { buildContextSlice } from './core/intelligence/contextSlice';
+import type { ContextSlice, ContextSliceOptions } from './core/intelligence/contextSlice';
 
 /**
  * Evaluate the transparent quality score for an entire scan report using optional dimension
@@ -1173,6 +1175,38 @@ export async function querySymbols(
 }
 
 /**
+ * Build a bounded semantic context slice for one task intent from a real scan.
+ *
+ * The slice reuses the shared symbol and call-graph indexes, so it never re-reads the repository;
+ * it is the Agent-facing entry for "which regions do I need for this task, and why".
+ *
+ * @param intent - Task intent in natural language or identifier form.
+ * @param options - Scan options (root/config/workers/...) plus optional slice caps.
+ * @returns The bounded context slice with its constraints and truncation flag.
+ */
+export async function queryContextSlice(
+    intent: string,
+    options: ScanOptions & ContextSliceOptions = {},
+): Promise<ContextSlice> {
+    const config = resolveConfig(options);
+    const logger = new Logger(config.logLevel, config.logFile);
+    const scanner = new Scanner(config, logger);
+    try {
+        await scanner.scan();
+        return buildContextSlice(intent, scanner.getSymbolIndex(), scanner.getCallGraph(), {
+            ...(options.maxRegions === undefined ? {} : { maxRegions: options.maxRegions }),
+            ...(options.maxDependencies === undefined
+                ? {}
+                : { maxDependencies: options.maxDependencies }),
+            ...(options.maxImpacts === undefined ? {} : { maxImpacts: options.maxImpacts }),
+            ...(options.stopWords === undefined ? {} : { stopWords: options.stopWords }),
+        });
+    } finally {
+        logger.close();
+    }
+}
+
+/**
  * Build localized engineering constraints for an agent about to modify a file, blending review
  * memory with that file's recorded change trajectory.
  *
@@ -1261,3 +1295,9 @@ export {
     IncrementalMetrics,
     IncrementalOptions,
 } from './core/intelligence/dataFlow';
+export { buildContextSlice } from './core/intelligence/contextSlice';
+export type {
+    ContextSlice,
+    ContextSliceRegion,
+    ContextSliceOptions,
+} from './core/intelligence/contextSlice';

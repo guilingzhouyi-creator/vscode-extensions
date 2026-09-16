@@ -242,3 +242,27 @@ same fixture. `validate-symbol-index` and `validate-literal-index` stay green.
 
 
 
+
+## B7 closed: semantic region slice + honest status re-measurement
+
+The batch table still said B7 was "待做" while `dataFlow.ts`, `incrementalMetrics.ts`,
+`PRF-LEAK-001` and the consumer coupling gate were already shipped — the docs were stale, not the
+code. Re-measured from scratch instead of trusting narration:
+
+- `node scripts/validate-data-flow.js` → **5/5 sections pass**: 7-stage lifecycle, O(t)/O(n)
+  unbounded growth (8 positive/boundary/negative fixtures), the "deleted 500 lines but coupling up"
+  rejection, `templates/consumer/run.mjs --coupling-gate` CLI contract, and lexical metric semantics.
+- `PRF-LEAK-001` is registered (`src/core/rules/entries/analyzers.ts`) and documented as opt-in.
+- `samples` projection scan: defs=12 / refs=44 / callGraph edges=44 (42 attributed) /
+  literalIndex 85 occurrences, 48 values, 3 cross-file — the B2 row claiming "调用点仍为 0" was
+  describing a pre-B2b state and has been corrected.
+
+The one genuinely missing piece was the **semantic region slice** required by the audit's area 8
+(Task Intent → Semantic Region → Minimal Context Slice → Dependencies → Engineering Constraints).
+`src/core/intelligence/contextSlice.ts` + `api.queryContextSlice(intent, options)` now provide it:
+intent tokens resolve against the shared `SymbolIndex`, regions carry `definition` / `dependency` /
+`impact` roles with the call-graph evidence behind each, the budget (`maxRegions` / `maxDependencies`
+/ `maxImpacts`) is enforced, truncation and unmatched tokens are reported rather than hidden, and the
+constraints line states the static-only nature of the edges. Verified by
+`scripts/validate-context-slice.js` (unit roles/budget/unresolved + real-scan integration where every
+region resolves to an existing file).

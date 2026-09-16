@@ -1059,6 +1059,15 @@ export class Scanner {
      *
      * @returns The call graph instance.
      */
+    /**
+     * Shared literal store filled by the scan traversal (read-only).
+     *
+     * @returns The cross-file literal index.
+     */
+    getLiteralIndex(): LiteralIndex {
+        return this.literalIndex;
+    }
+
     getCallGraph(): CallGraph {
         return new CallGraph(this.symbolIndex);
     }
