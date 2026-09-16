@@ -238,8 +238,7 @@ coverage 0.90、`notEvaluated=["modernity"]`；回归锁 `validate-scoring-cover
 
 **本轮从零复测到的自扫口径（取代旧叙述）**：181 文件 / 7716 issues（info 6284 / warning 1381 /
 error 51）；Top：`hardcoded-string` 6156、`magic-number` 444、`GOV-LOG-001` 183、`high-complexity`
-136（含 42 error）、`SIM-LONG-001` 134、`duplicate-literal` 129。旧文"magic-number 792→0"与当前
-实测不符（历史重建后基线失效），以本节数字为准。
+136（含 42 error）、`SIM-LONG-001` 134、`duplicate-literal` 129。该处曾被写成"与实测不符"——同样是计数口径错误：`magic-number` 的 446 条里 443 条为已压制夹具项，**active 仅 3 条**（均在 `src/**`），旧文"792→0"在产品口径上成立。
 
 **剩余计划（未完成，不得声称已交付）**：
 1. `hardcoded-string` 语义提纯（把"报告文案/消息字面量"做成与 `classifyLiterals` 同级的语义分类，

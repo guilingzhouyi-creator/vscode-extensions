@@ -87,3 +87,18 @@
 ['security','secrets']`）。自审实测：`codeSecurity witnesses=["secrets"] -> 0`（真实扣分，非未测），
 `modernity witnesses=[]`（4 个语言包未启用，判 N/A）。任何维度只要 `evaluatedBy` 非空就必须有真实证据，
 为空则不得进入加权——两者由同一份启用状态推导，不会漂移。
+
+### 量化标准的机器可读定义（qualityScore.formulas）
+
+分数不再是"看着像"的标签：报告同时发布它所依据的公式与阈值，调用方可自行复算。
+
+- `formulas.composite`：`sum(indices[d] * weights[d] for d in evaluated) / sum(weights[d] for d in evaluated)`
+  ——**只对已测维度**加权（未测维度见 `notEvaluated` / `evaluatedBy`）。
+- `formulas.coverage`：已测权重 / 全部权重；`formulas.confidence`：`clamp(行数基线 × coverage, floor, 1)`。
+- `formulas.gradeCutoffs`：`A+ ≥95 / A ≥85 / B ≥75 / C ≥65 / D ≥50`，否则 `F`；`formulas.dimensionWeights`
+  即实际参与计算的权重（security 1.5 最高、techDebt 1.3、architecture 1.2、maintainability 1.2…）。
+
+回归锁 `scripts/validate-scoring-coverage.js` 断言：发布的权重必须等于实际权重、用发布的阈值复算出的等级
+必须等于发布的等级、且公式必须声明"按已测维度加权"。自审实测：`grade=F`、`composite=39`、`coverage=0.90`，
+按上述阈值复算仍为 `F`——分数与标签一致，且能解释"为什么是 F"（`performanceEfficiency=0`、
+`maintainability=0`、`duplication=0`、`techDebtRisk=0`、`codeSecurity=0` 均为已测维度的真实扣分）。

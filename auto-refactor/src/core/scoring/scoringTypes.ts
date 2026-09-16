@@ -140,4 +140,16 @@ export interface QualityScoreBreakdown {
      * reconciles instead of reading as a contradiction; empty means the dimension was not measured.
      */
     evaluatedBy?: Partial<Record<QualityDimension, string[]>>;
+    /**
+     * Machine-readable definition of the quantified standard this score was produced under:
+     * the composite/coverage/confidence formulas, the per-dimension weights and the grade
+     * cut-offs, so a consumer can re-derive the grade instead of trusting the label.
+     */
+    formulas?: {
+        composite: string;
+        coverage: string;
+        confidence: string;
+        gradeCutoffs: { grade: string; min: number }[];
+        dimensionWeights: Record<string, number>;
+    };
 }

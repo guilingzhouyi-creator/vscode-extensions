@@ -163,6 +163,21 @@ function expectedComposite(indices, evaluated) {
       full.confidence >= narrow.confidence,
       `confidence must not drop when more is measured (${full.confidence} vs ${narrow.confidence})`,
     );
+    assert.deepStrictEqual(
+      full.formulas.dimensionWeights,
+      full.weights,
+      'the published formula weights must be the applied weights',
+    );
+    const cutoff = full.formulas.gradeCutoffs.find((entry) => full.compositeScore >= entry.min);
+    assert.strictEqual(
+      cutoff ? cutoff.grade : 'F',
+      full.grade,
+      'the published cut-offs must reproduce the published grade',
+    );
+    assert.ok(
+      full.formulas.composite.includes('evaluated') && full.formulas.coverage.includes('evaluated'),
+      'the published formulas must describe the evaluated-dimension weighting',
+    );
     console.log(
       `  [PASS] control scan: coverage=${full.coverage}, confidence=${full.confidence} ` +
         `>= narrow confidence=${narrow.confidence}`,

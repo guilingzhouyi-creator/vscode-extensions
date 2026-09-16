@@ -591,6 +591,20 @@ export class QualityScorer {
             grade,
             confidence,
             weights: { ...this.weights },
+            formulas: {
+                composite:
+                    'sum(indices[d] * weights[d] for d in evaluated) / sum(weights[d] for d in evaluated)',
+                coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
+                confidence: 'clamp(baseConfidenceFromLines * coverage, floor, 1)',
+                gradeCutoffs: [
+                    { grade: 'A+', min: GRADE_A_PLUS_MIN },
+                    { grade: 'A', min: GRADE_A_MIN },
+                    { grade: 'B', min: GRADE_B_MIN },
+                    { grade: 'C', min: GRADE_C_MIN },
+                    { grade: 'D', min: GRADE_D_MIN },
+                ],
+                dimensionWeights: { ...this.weights },
+            },
             notEvaluated,
             coverage,
             evaluatedBy,
