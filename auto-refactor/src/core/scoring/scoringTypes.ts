@@ -145,6 +145,14 @@ export interface QualityScoreBreakdown {
      * the composite/coverage/confidence formulas, the per-dimension weights and the grade
      * cut-offs, so a consumer can re-derive the grade instead of trusting the label.
      */
+    /**
+     * Per-dimension deduction audit: which rules took how many points and why, so an index of 0 can
+     * be traced to the exact rules instead of being an unexplained number.
+     */
+    deductionsByDimension?: Record<
+        QualityDimension,
+        { points: number; entries: { rule: string; points: number; reason: string }[] }
+    >;
     formulas?: {
         composite: string;
         coverage: string;

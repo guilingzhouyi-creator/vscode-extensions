@@ -155,6 +155,14 @@ export class QualityScorer {
 
         const rationales: QualityScoreRationale[] = [];
 
+        // Net points per dimension: the only state the index curve reads, so deductions that go
+        // through the funnel stay comparable while direct rawScores adjustments elsewhere remain
+        // untouched (the previous subtraction semantics are preserved for mixed cases).
+        const deductionPoints = {} as Record<QualityDimension, number>;
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            deductionPoints[dim] = 0;
+        }
+
         const applyDeduction = (
             dim: QualityDimension,
             points: number,
@@ -162,6 +170,7 @@ export class QualityScorer {
             rule?: string,
             line?: number,
         ) => {
+            deductionPoints[dim] += points;
             rawScores[dim] = Math.max(0, rawScores[dim] - points);
             rationales.push({
                 dimension: dim,
@@ -538,6 +547,25 @@ export class QualityScorer {
             (dim) => !notEvaluated.includes(dim),
         );
 
+        const deductionsByDimension = {} as Record<
+            QualityDimension,
+            { points: number; entries: { rule: string; points: number; reason: string }[] }
+        >;
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            deductionsByDimension[dim] = { points: 0, entries: [] };
+        }
+        for (const entry of rationales) {
+            const bucket = deductionsByDimension[entry.dimension];
+            const points = -entry.delta;
+            bucket.points += points;
+            bucket.entries.push({ rule: entry.rule ?? 'metric', points, reason: entry.reason });
+        }
+        // The curve is applied inside applyDeduction, so direct rawScores paths keep their effect;
+        // `deductionsByDimension` is the audit trail over the same funnel.
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            deductionsByDimension[dim].points = deductionPoints[dim];
+        }
+
         // Compute weighted composite score over the measured weights only
         let totalWeightedScore = 0;
         let totalWeight = 0;
@@ -607,6 +635,7 @@ export class QualityScorer {
             },
             notEvaluated,
             coverage,
+            deductionsByDimension,
             evaluatedBy,
             rationales,
             evaluatedAt: Date.now(),

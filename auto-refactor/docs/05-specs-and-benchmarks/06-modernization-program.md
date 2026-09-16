@@ -279,3 +279,14 @@ glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后
    `duplicate-literal` 的 `scripts/**` 豁免同样生效，既有政策成立。
 3. 结论：产品代码 `src/**` 仍按严格口径逐条处理（未被任何 glob 豁免覆盖），scripts 侧为带 reason 的夹具豁免；
    今后所有"残留量"汇报必须区分 total / suppressed / active，避免再次误判。
+
+### 第 3 项进展（本轮）：扣分来源可审计 + 指数曲线去饱和
+
+- 发布 `qualityScore.deductionsByDimension`（每维度：总点数 + 逐条 `{rule, points, reason}`），
+  `applyDeduction` 既有的 `rule`/`line` 字段终于被消费，低分可追到具体规则。
+- 实测暴露真实缺陷：`techDebtRisk` 被 `hardcoded-string`(18475 点)+`magic-number`(2235 点) 灌爆到 clamp 0，
+  与其他维度不可比。改为曲线 `100×250/(250+points)`，回归锁断言"已测维度不得为 0"。
+  自审实测等级 `F(39.0) → D(53.5)`。
+- **仍未完成（下一轮）**：目标要求的显式族映射尚未成立——实测 `performanceEfficiency` 只有 `PRF-*` 扣分，
+  `GOV-PRF-*` 落在 `techDebtRisk`；`architectureConsistency` 当前 **0 扣分（无规则命中）**，
+  `GOV-TYP-*`/`ARCH-*` 未归入该维度；且扣分尚未消费 `computeIncrementalMetrics`（有效 LOC/耦合增量）。

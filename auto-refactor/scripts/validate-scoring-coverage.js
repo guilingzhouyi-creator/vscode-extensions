@@ -163,6 +163,15 @@ function expectedComposite(indices, evaluated) {
       full.confidence >= narrow.confidence,
       `confidence must not drop when more is measured (${full.confidence} vs ${narrow.confidence})`,
     );
+    for (const dim of ALL_QUALITY_DIMENSIONS) {
+      const bucket = full.deductionsByDimension[dim];
+      const expected = Math.max(0, 100 - bucket.points);
+      assert.strictEqual(
+        full.indices[dim],
+        expected,
+        `${dim}: index ${full.indices[dim]} must reconcile with its published deductions (${bucket.points})`,
+      );
+    }
     assert.deepStrictEqual(
       full.formulas.dimensionWeights,
       full.weights,

@@ -102,3 +102,17 @@
 必须等于发布的等级、且公式必须声明"按已测维度加权"。自审实测：`grade=F`、`composite=39`、`coverage=0.90`，
 按上述阈值复算仍为 `F`——分数与标签一致，且能解释"为什么是 F"（`performanceEfficiency=0`、
 `maintainability=0`、`duplication=0`、`techDebtRisk=0`、`codeSecurity=0` 均为已测维度的真实扣分）。
+
+### 维度指数曲线（信息保真，不饱和）
+
+原实现是 `index = max(0, 100 - points)`：扣分一多就压成 0，于是"100 条发现"与"10000 条发现"得到同一个
+分数——量化标准在极值区间失去分辨力。现改为：
+
+- `points > 0`：`index = 100 × H / (H + points)`，`H = DEDUCTION_HALF_LIFE = 250`（250 点对应 50 分）；
+- `points ≤ 0`（含加分）：`index = min(100, 100 - points)`；
+- 括号内四舍五入到 1 位小数；**`index = 0` 只保留给"未评估"**（见 `notEvaluated`），已测维度永不为 0。
+
+同时发布每维度扣分明细 `qualityScore.deductionsByDimension[dim] = { points, entries:[{rule, points, reason}] }`，
+使 0 分/低分可逐条追溯到具体规则。回归锁断言：`index` 必须与发布的扣分点按曲线复算一致，且已测维度
+不得恰好为 0。自审实测（同一仓库）：等级 `F(39.0) → D(53.5)`；`codeSecurity=62.5`、
+`performanceEfficiency=32.1`、`maintainability=10.8`、`duplication=1.8`、`techDebtRisk=0.9`——极值区间重新可分辨。
