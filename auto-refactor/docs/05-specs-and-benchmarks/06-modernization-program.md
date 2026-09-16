@@ -280,13 +280,15 @@ glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后
 3. 结论：产品代码 `src/**` 仍按严格口径逐条处理（未被任何 glob 豁免覆盖），scripts 侧为带 reason 的夹具豁免；
    今后所有"残留量"汇报必须区分 total / suppressed / active，避免再次误判。
 
-### 第 3 项进展（本轮）：扣分来源可审计 + 指数曲线去饱和
+### 第 3 项进展（本轮）：扣分来源已可审计（去饱和曲线回退）
 
-- 发布 `qualityScore.deductionsByDimension`（每维度：总点数 + 逐条 `{rule, points, reason}`），
-  `applyDeduction` 既有的 `rule`/`line` 字段终于被消费，低分可追到具体规则。
-- 实测暴露真实缺陷：`techDebtRisk` 被 `hardcoded-string`(18475 点)+`magic-number`(2235 点) 灌爆到 clamp 0，
-  与其他维度不可比。改为曲线 `100×250/(250+points)`，回归锁断言"已测维度不得为 0"。
-  自审实测等级 `F(39.0) → D(53.5)`。
-- **仍未完成（下一轮）**：目标要求的显式族映射尚未成立——实测 `performanceEfficiency` 只有 `PRF-*` 扣分，
-  `GOV-PRF-*` 落在 `techDebtRisk`；`architectureConsistency` 当前 **0 扣分（无规则命中）**，
-  `GOV-TYP-*`/`ARCH-*` 未归入该维度；且扣分尚未消费 `computeIncrementalMetrics`（有效 LOC/耦合增量）。
+- 已交付：发布 `qualityScore.deductionsByDimension`（每维度总点数 + 逐条 `{rule, points, reason}`），
+  低分可追到具体规则；评分锁断言"指数 = 现行算法复算值"。
+- **尝试后回退**：曲线 `100×250/(250+points)` 在漏斗内实现时改变了可观测评分行为，被
+  `validate-review-memory` 的架构扣分断言拦下；按纪律回退，不带着红门禁交付。
+- **带证据的未修缺陷**：`techDebtRisk` 累计 26075 点被 clamp 为 0（100 条与 10000 条发现不可区分）；
+  修复需曲线 + 评分锁 + 冻结基线协调变更，作为独立批次。
+- **仍未完成（下一轮）**：目标要求的显式族映射尚未成立——实测 `performanceEfficiency` 仅由 `PRF-*` 扣分，
+  `GOV-PRF-*` 落在 `techDebtRisk`；`architectureConsistency` 当前 0 扣分（无规则命中）；
+  扣分尚未消费 `computeIncrementalMetrics`（有效 LOC/耦合增量）。
+
