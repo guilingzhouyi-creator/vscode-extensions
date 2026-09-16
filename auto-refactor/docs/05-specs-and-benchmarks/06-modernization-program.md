@@ -316,3 +316,31 @@ glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后
   `01-config-and-reports.md` 增加指向该页的交叉引用。
 - 第 3 项目标的四处源码要求已全部落地（族映射 / 扣分来源 / 公式发布 / 消费增量指标）；仍留在册的是
   **饱和缺陷**（曲线+评分锁+基线协调批次）与第 2/5 项清账。
+
+### 第 5 项第 1 批：`GOV-LOG-001`（控制流嵌套）清账启动
+
+**口径更正**：该规则的语义是**控制流嵌套过深**（消息为 `excessive control flow nesting depth of N`），
+不是日志规范；此前队列里记的 "src 164" 未区分 total/suppressed/active，**实测 active = 183**
+（含 `scripts/**`）。
+
+**深度直方图（active 182，修复 1 条后）**：`6:64 / 7:54 / 8:23 / 9:20 / 11:11 / 13:2 / 19:1 / 29:1`。
+
+**本批已修**：`src/core/editDiff.ts::formatUnifiedDiff`（depth 6）——把 `if/else-if/else` 前缀链折叠为
+`isChanged + 三元前缀`，行为逐字保持不变（未变更行仍不带 attribution 后缀），`validate-diff` 全绿；
+自扫 `GOV-LOG-001` **183 → 182**，该文件 **6 → 5**。
+
+**极值待办（下一批优先，按杠杆排序）**：
+
+| 位置 | 函数 | 深度 |
+| :--- | :--- | ---: |
+| `src/analyzers/comments.ts:428` | `auditPublicApi` | **19** |
+| `src/analyzers/performance.ts:102` | `analyze` | 11 |
+| `src/core/cache.ts:596` | `clear` | 11 |
+| `src/core/dependencyGraph.ts:209` | `registerFromContent` | 11 |
+| `src/core/dependencyGraph.ts:599` | `runCyclePass` | 11 |
+| `src/api.ts:510` | `scanAndRender` | 10 |
+| `src/core/cache.ts:266` | `load` | 10 |
+| `src/analyzers/hygiene.ts:438` | `auditLineHygiene` | 10 |
+
+**工序纪律**：每批 = 改代码 → `npx tsc`/`npm run build` → 相关校验器 → **复跑自扫核对 active 下降** →
+`npm run gate` 全绿 → 提交；基线只允许收缩，且所有残留量必须区分 total / suppressed / active。

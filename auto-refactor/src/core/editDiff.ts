@@ -797,10 +797,10 @@ export function formatUnifiedDiff(
             options?.showAttribution && line.attribution
                 ? `  # [${line.attribution.agentUid || 'Agent'}]`
                 : '';
-        if (line.type === DIFF_OP_DELETE) {
-            lines.push(`-${line.content}${attr}`);
-        } else if (line.type === DIFF_OP_INSERT) {
-            lines.push(`+${line.content}${attr}`);
+        const isChanged = line.type === DIFF_OP_DELETE || line.type === DIFF_OP_INSERT;
+        if (isChanged) {
+            const prefix = line.type === DIFF_OP_DELETE ? '-' : '+';
+            lines.push(`${prefix}${line.content}${attr}`);
         } else {
             lines.push(` ${line.content}`);
         }
