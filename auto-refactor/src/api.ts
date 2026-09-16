@@ -1304,3 +1304,5 @@ export type {
     ContextSliceRegion,
     ContextSliceOptions,
 } from './core/intelligence/contextSlice';
+export { scoreDiff } from './core/scoring/diffScore';
+export type { DiffScore, DiffScoreOptions, DiffScoreWeights } from './core/scoring/diffScore';

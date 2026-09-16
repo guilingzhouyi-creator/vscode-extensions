@@ -135,3 +135,14 @@
 | `architectureConsistency` | **0 点、index 100（无信号）** | **555 点（GOV-TYP）、index 0** |
 | `techDebtRisk` | 26075 点（混入性能/类型族） | 24840 点（不再混入） |
 | composite | 39.0 | **27.0**（架构/性能信号首次计入） |
+
+### 增量（diff 层）评分：`scoreDiff()`
+
+快照层评分回答"这个仓库现在多好",diff 层评分回答"这次改动是变好还是变坏"。
+`src/core/scoring/diffScore.ts` 消费 B7 的 `computeIncrementalMetrics`(有效 LOC / 复杂度代理 / 耦合 /
+重复行),把增量映射到**同一套十维**:`architectureConsistency = -couplingDelta×2`、
+`performanceEfficiency = -complexityDelta×3`、`maintainability = -effectiveLocDelta×0.5`、
+`duplication = -duplicationDelta×1`。契约:增量带符号(负 = 变差);`verdict` 原样透传 B7,本模块不重新
+裁决;只发布可观测的四项维度;公式与权重随结果发布,校验器断言"每个增量 = 其发布公式作用于对应 metric"。
+"删 500 行但耦合上升"因此在维度语言里同时呈现**架构分下降 + 可维护性上升**——行数少 ≠ 更好。
+回归锁 `scripts/validate-diff-score.js`(门禁内)。
