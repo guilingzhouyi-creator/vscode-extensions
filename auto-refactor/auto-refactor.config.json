@@ -90,6 +90,11 @@
       "matchFile": "scripts/**",
       "matchRule": "duplicate-literal",
       "reason": "同上：校验器/基准夹具里的重复字面量是夹具数据（输入路径、期望值、基准参数），不是可共享的语义常量；把 'f0.ts'、'src/a.ts'、10/100 这类夹具值提成 CONST_* 只会掩盖它们只是样例。产品代码（src/**）仍逐条要求提取"
+    },
+    {
+      "matchFile": "scripts/**",
+      "matchRule": "hardcoded-string",
+      "reason": "脚本目录是校验器与基准夹具：其中的路径、期望值与横幅是构造输入和断言文本，不是产品里应外部化的配置。分类器已先在语义层提纯（报告文案/glob/常规记号），此处只兜住夹具残留；产品代码（src/**）仍逐条要求提取。"
     }
   ],
   "classifyLiterals": true,

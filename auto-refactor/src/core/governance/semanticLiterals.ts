@@ -47,6 +47,7 @@ export type LiteralSemanticKind =
     | 'time-ms'
     | 'glob-pattern'
     | 'message-text'
+    | 'conventional'
     | typeof GENERAL_LITERAL_KIND;
 
 /**
@@ -194,6 +195,47 @@ const CJK_RE = /[　-〿一-鿿＀-￯]/;
 const CREDENTIAL_RE =
     /(?:ghp_|gho_|github_pat_|sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{12,}|xox[baprs]-|-----BEGIN|Bearer\s)/i;
 
+/** Conventional tokens that are vocabulary rather than payload: encodings, formats, keywords. */
+const CONVENTIONAL_TOKENS = new Set([
+    'utf8',
+    'utf-8',
+    'ascii',
+    'latin1',
+    'binary',
+    'base64',
+    'hex',
+    'ucs2',
+    'utf16le',
+    'utf-16le',
+    'md5',
+    'sha1',
+    'sha256',
+    'sha384',
+    'sha512',
+    'json',
+    'yaml',
+    'toml',
+    'xml',
+    'html',
+    'csv',
+    'true',
+    'false',
+    'null',
+]);
+
+/** Command-line switches such as `--root` / `-v` are interface vocabulary, not configuration. */
+const CLI_FLAG_RE = /^--?[A-Za-z][A-Za-z0-9-]*$/;
+
+/** Registered MIME types (`application/json`, `text/plain`) are protocol vocabulary. */
+const MIME_TYPE_RE =
+    /^(?:application|text|image|audio|video|font|multipart|message)\/[a-z0-9.+-]+$/;
+
+/** Bare file extensions (`.ts`, `.mjs`) carry no payload on their own. */
+const FILE_EXTENSION_RE = /^\.[A-Za-z0-9]{1,6}$/;
+
+/** Locale tags (`en`, `zh-cn`) are standard identifiers rather than project values. */
+const LOCALE_TAG_RE = /^[a-z]{2}(?:-[A-Za-z]{2})?$/;
+
 /**
  * Detect report/specifier vocabulary that must not be treated as extractable literal values.
  *
@@ -212,6 +254,12 @@ function reportVocabularyKind(raw: string): LiteralSemanticKind | null {
     ) {
         return 'glob-pattern';
     }
+    const lowered = raw.toLowerCase();
+    if (CONVENTIONAL_TOKENS.has(lowered)) return 'conventional';
+    if (CLI_FLAG_RE.test(raw)) return 'conventional';
+    if (MIME_TYPE_RE.test(lowered)) return 'conventional';
+    if (FILE_EXTENSION_RE.test(raw)) return 'conventional';
+    if (LOCALE_TAG_RE.test(raw)) return 'conventional';
     return null;
 }
 

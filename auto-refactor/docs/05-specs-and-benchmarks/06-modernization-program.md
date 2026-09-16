@@ -262,9 +262,11 @@ error 51）；Top：`hardcoded-string` 6156、`magic-number` 444、`GOV-LOG-001`
 **安全护栏**：凭据形态（`ghp_`/`sk-`/`AKIA`/`xox[baprs]-`/`-----BEGIN`/`Bearer `）**永不豁免**，
 先于良性判定返回不可接受，`secrets` 分析器与 `hardcoded-string` 都会继续报。
 
-实测：自扫 `hardcoded-string` **6199 → 3865**（-38%），`validate-literal-policy` 全绿；同时撤掉了那条仓库级
-glob 压制，剩余 3865 条如实以 warning 呈现（此前被降到 info 后不可见）。总 issues 7716 → 5414。
+实测：自扫 `hardcoded-string` **6199 → 3692**（-40%），`validate-literal-policy` 全绿；同时撤掉了那条仓库级
+glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后不可见）。总 issues 7716 → 5238。
 
 **剩余（下一轮）**：4078 条多为短结构记号（编码名、单段标识、扩展名、CLI 开关等），需要新增
 `conventional-token` 域（显式白名单：编码/哈希/MIME/CLI 开关）或按项目策略调整
 `hardcodedStringMinLength`；在完成前不得声称该项已全部交付。
+
+补充（收口）： 域实测再降 173 条；剩余 3692 条经分布核查主要落在 （规则目录文案与短标识），并按既有策略为  登记了 hardcoded-string 夹具豁免（带 reason，与 magic-number/duplicate-literal 同口径）。产品代码保持逐条严格，不做无理由的全局豁免。
