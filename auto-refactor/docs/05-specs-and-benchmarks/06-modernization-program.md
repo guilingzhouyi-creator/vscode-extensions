@@ -270,3 +270,8 @@ glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后
 `hardcodedStringMinLength`；在完成前不得声称该项已全部交付。
 
 补充（收口）： 域实测再降 173 条；剩余 3692 条经分布核查主要落在 （规则目录文案与短标识），并按既有策略为  登记了 hardcoded-string 夹具豁免（带 reason，与 magic-number/duplicate-literal 同口径）。产品代码保持逐条严格，不做无理由的全局豁免。
+
+**更正与待查（同批交付内自检发现）**：
+1. 上一条补充的正文中 ``conventional-token`` 一词因命令行反引号被吞，此处更正为：conventional-token 域实测仅再降 173 条。
+2. 分布核查（实测）：剩余 hardcoded-string 3692 条 = `src/**` 2258 + `scripts/**` 1434。**新登记的 `scripts/**` hardcoded-string 夹具豁免并没有让计数下降**（登记前后 scripts 侧仍为 1434），说明该豁免未生效或被更高优先规则覆盖；这是未解决项，不得据此声称 scripts 侧已收敛。待查方向：该条缺 `matchAnalyzer` 是否被匹配器跳过、`matchFile` glob 与路径规范化是否一致、以及 suppression 是否只影响基线统计而不作用于 issue 列表。
+3. 产品口径不变：`src/**` 2258 条仍逐条按严格标准处理（下一步按文件收敛，Top：`oxcAdapter.ts` 179、`projectProfiler.ts` 121、`hygiene.ts` 84、`api.ts` 84）。
