@@ -159,5 +159,6 @@ export interface QualityScoreBreakdown {
         confidence: string;
         gradeCutoffs: { grade: string; min: number }[];
         dimensionWeights: Record<string, number>;
+        familyDimensions: Record<string, string>;
     };
 }

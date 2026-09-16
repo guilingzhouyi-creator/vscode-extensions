@@ -183,6 +183,16 @@ function expectedComposite(indices, evaluated) {
       full.grade,
       'the published cut-offs must reproduce the published grade',
     );
+    assert.strictEqual(
+      full.formulas.familyDimensions['GOV-PRF'],
+      'performanceEfficiency',
+      'GOV-PRF rules must route to performanceEfficiency',
+    );
+    assert.strictEqual(
+      full.formulas.familyDimensions['GOV-TYP'],
+      'architectureConsistency',
+      'GOV-TYP rules must route to architectureConsistency',
+    );
     assert.ok(
       full.formulas.composite.includes('evaluated') && full.formulas.coverage.includes('evaluated'),
       'the published formulas must describe the evaluated-dimension weighting',

@@ -292,3 +292,14 @@ glob 压制，剩余 3692 条如实以 warning 呈现（此前被降到 info 后
   `GOV-PRF-*` 落在 `techDebtRisk`；`architectureConsistency` 当前 0 扣分（无规则命中）；
   扣分尚未消费 `computeIncrementalMetrics`（有效 LOC/耦合增量）。
 
+
+### 第 3 项进展（第 2 轮）：族路由使架构/性能维度首次有信号
+
+- 已交付：`FAMILY_DIMENSIONS` + `familyDimensionOf()` 把严重度债务信号按族路由到
+  `performanceEfficiency`（GOV-PRF/PRF-MEM/PRF-IO/PRF-ALG/PRF-LEAK/CMP）与
+  `architectureConsistency`（GOV-TYP/ARCH），并随 `qualityScore.formulas.familyDimensions` 发布，
+  回归锁断言映射值。
+- 实测：`architectureConsistency` 0 点/index 100 → **555 点/index 0**；`performanceEfficiency` 530 → **1230 点**；
+  `techDebtRisk` 26075 → 24840（不再混入）；composite 39.0 → **27.0**（架构/性能首次计入总分）。
+- **仍未完成**：① 扣分尚未消费 `computeIncrementalMetrics`（有效 LOC 增量/耦合增量/复杂度代理）——
+  这是"带公式的量"的下一半；② 饱和缺陷在路由后更明显（三个维度 0 分），修复需曲线+评分锁+基线协调批次。

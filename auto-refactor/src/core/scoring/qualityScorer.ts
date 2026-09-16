@@ -55,6 +55,41 @@ const DIMENSION_MAX_SCORE = 100;
 const DIMENSION_ARCHITECTURE_CONSISTENCY = 'architectureConsistency';
 /** Dimension key for the code-security index. */
 const DIMENSION_CODE_SECURITY = 'codeSecurity';
+/**
+ * Explicit rule-family -> quality dimension routing for the quantified standard.
+ *
+ * The severity-based debt signal (`techDebtRisk`) is generic; for these families the objective is
+ * sharper, so the signal is routed to the dimension that owns the family instead of being mixed
+ * into generic debt. Longest prefix wins, and the same table is published as
+ * `qualityScore.formulas.familyDimensions` so a consumer can audit the routing.
+ */
+const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
+    'GOV-PRF': 'performanceEfficiency',
+    'PRF-MEM': 'performanceEfficiency',
+    'PRF-IO': 'performanceEfficiency',
+    'PRF-ALG': 'performanceEfficiency',
+    'PRF-LEAK': 'performanceEfficiency',
+    CMP: 'performanceEfficiency',
+    'GOV-TYP': 'architectureConsistency',
+    ARCH: 'architectureConsistency',
+};
+
+/**
+ * Resolve a rule id to its explicitly routed dimension.
+ *
+ * @param rule - Emitted rule id.
+ * @returns The routed dimension, or null when the family has no explicit owner.
+ */
+function familyDimensionOf(rule: string): QualityDimension | null {
+    let best: string | null = null;
+    for (const prefix of Object.keys(FAMILY_DIMENSIONS)) {
+        if (rule.startsWith(prefix + '-') && (best === null || prefix.length > best.length)) {
+            best = prefix;
+        }
+    }
+    return best === null ? null : FAMILY_DIMENSIONS[best];
+}
+
 /** Deduction applied to both affected indices for an ARCH-LEAK-002 DTO credential leak. */
 const DEDUCTION_DTO_CREDENTIAL_LEAK = 30;
 /** Deduction from the security index for a SEC-VUL-006 path-traversal risk. */
@@ -492,9 +527,10 @@ export class QualityScorer {
             }
 
             // 10. Technical Debt Risk
+            const debtDimension = familyDimensionOf(r) ?? 'techDebtRisk';
             if (issue.severity === 'error') {
                 applyDeduction(
-                    'techDebtRisk',
+                    debtDimension,
                     DEDUCTION_ERROR_TECH_DEBT,
                     ScoringRationales.ERROR_TECH_DEBT(msg),
                     r,
@@ -502,7 +538,7 @@ export class QualityScorer {
                 );
             } else if (issue.severity === 'warning') {
                 applyDeduction(
-                    'techDebtRisk',
+                    debtDimension,
                     DEDUCTION_WARNING_TECH_DEBT,
                     ScoringRationales.WARNING_TECH_DEBT(msg),
                     r,
@@ -632,6 +668,7 @@ export class QualityScorer {
                     { grade: 'D', min: GRADE_D_MIN },
                 ],
                 dimensionWeights: { ...this.weights },
+                familyDimensions: { ...FAMILY_DIMENSIONS },
             },
             notEvaluated,
             coverage,

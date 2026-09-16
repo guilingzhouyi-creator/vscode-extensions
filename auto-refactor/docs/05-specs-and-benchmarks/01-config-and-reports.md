@@ -115,3 +115,23 @@
 路径，在漏斗内改曲线会改变可观测评分行为，超出本批可重新验证的范围；修复需要曲线 + 评分锁 + 冻结基线
 三处协调变更，作为独立批次进行。
 
+
+### 规则族 → 维度的显式路由（familyDimensions）
+
+严重度产生的"债务信号"原本一律进 `techDebtRisk`，于是 `GOV-PRF-*` 这类性能规则从不扣性能维度，
+`architectureConsistency` 也长期拿不到任何扣分（永远 100 分 = 无信号）。现在：
+
+- 单一事实源 `FAMILY_DIMENSIONS`（`qualityScorer.ts`）：`GOV-PRF`/`PRF-MEM`/`PRF-IO`/`PRF-ALG`/`PRF-LEAK`/
+  `CMP` → `performanceEfficiency`；`GOV-TYP`/`ARCH` → `architectureConsistency`；最长前缀优先。
+- 路由作用于**严重度债务信号**：命中所属族的规则把该信号记到目标维度，不再混入通用 `techDebtRisk`；
+  各分析器原有的主扣分保持不变（不重复计分）。
+- 映射随报告发布：`qualityScore.formulas.familyDimensions`，回归锁断言关键族必须指向预期维度。
+
+自审实测（同一仓库、同一配置）：
+
+| 维度 | 路由前 | 路由后 |
+|---|---|---|
+| `performanceEfficiency` | 530 点、1 条规则 | **1230 点**（GOV-PRF 510 / PRF-IO 390 / PRF-MEM 170 / PRF-ALG 150） |
+| `architectureConsistency` | **0 点、index 100（无信号）** | **555 点（GOV-TYP）、index 0** |
+| `techDebtRisk` | 26075 点（混入性能/类型族） | 24840 点（不再混入） |
+| composite | 39.0 | **27.0**（架构/性能信号首次计入） |
