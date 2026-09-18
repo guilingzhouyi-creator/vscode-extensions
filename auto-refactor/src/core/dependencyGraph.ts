@@ -577,6 +577,194 @@ export function findImportCycles(edges: Map<string, Set<string>>): string[][] {
 }
 
 /**
+ * Analyzer configuration options for import cycle and unused export detection.
+ */
+interface CyclePassOptions {
+    detectCycles?: boolean;
+    cycleSeverity?: Severity;
+    maxCyclesReported?: number;
+    detectUnusedExports?: boolean;
+    entryGlobs?: string[];
+    unusedSeverity?: Severity;
+}
+
+async function populateGraphFromFiles(
+    files: string[],
+    rootDir: string,
+    graph: ModuleDependencyGraph,
+    contents: Map<string, string>,
+    warnings: string[],
+): Promise<void> {
+    const PARALLEL_THRESHOLD = 500;
+    const READ_WINDOW = 64;
+    let readFailures = 0;
+    if (files.length <= PARALLEL_THRESHOLD) {
+        for (const f of files) {
+            try {
+                const c = await fs.promises.readFile(path.join(rootDir, f), 'utf8');
+                contents.set(f, c);
+                graph.registerFromContent(f, c);
+            } catch (_readErr) {
+                readFailures++;
+            }
+        }
+    } else {
+        for (let i = 0; i < files.length; i += READ_WINDOW) {
+            const chunk = files.slice(i, i + READ_WINDOW);
+            const results = await Promise.all(
+                chunk.map((f) =>
+                    fs.promises
+                        .readFile(path.join(rootDir, f), 'utf8')
+                        .then((c) => [f, c] as const)
+                        .catch(() => null),
+                ),
+            );
+            for (const r of results) {
+                if (r === null) {
+                    readFailures++;
+                    continue;
+                }
+                contents.set(r[0], r[1]);
+                graph.registerFromContent(r[0], r[1]);
+            }
+        }
+    }
+    if (readFailures > 0) {
+        warnings.push(
+            `dependency-graph: ${readFailures} file(s) unreadable, excluded from cycle analysis`,
+        );
+    }
+}
+
+function buildImportersMap(forward: Map<string, Set<string>>): Map<string, Set<string>> {
+    const importers = new Map<string, Set<string>>();
+    for (const [from, nexts] of forward) {
+        for (const n of nexts) {
+            const set = importers.get(n) ?? new Set<string>();
+            set.add(from);
+            importers.set(n, set);
+        }
+    }
+    return importers;
+}
+
+function auditModuleSymbols(
+    mod: { file: string; exportedSymbols: string[] },
+    importerFiles: string[],
+    contents: Map<string, string>,
+    severity: Severity,
+    issues: Issue[],
+): number {
+    let flagged = 0;
+    for (const sym of mod.exportedSymbols) {
+        if (flagged >= MAX_UNUSED_EXPORTS_PER_MODULE) break;
+        const wordRe = new RegExp(`\\b${escapeRe(sym)}\\b`);
+        const used = importerFiles.some((f) => {
+            const c = contents.get(f);
+            return c === undefined ? true : wordRe.test(c);
+        });
+        if (!used) {
+            issues.push({
+                id: `dependency-graph:unused-export:${mod.file}:${sym}`,
+                analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
+                rule: 'unused-export',
+                severity,
+                message: `导出符号 "${sym}" 未被任何导入方引用（${mod.file}）`,
+                location: {
+                    file: mod.file,
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 1 },
+                },
+                detail: {
+                    symbol: sym,
+                    importers: importerFiles.slice(0, IMPORTER_DETAIL_LIMIT),
+                },
+                suggestion:
+                    '删除该导出，或确认其为对外 API（如是，加入 entryGlobs 白名单并说明理由）',
+            });
+            flagged++;
+        }
+    }
+    return flagged;
+}
+
+function auditUnusedExports(
+    graph: ModuleDependencyGraph,
+    contents: Map<string, string>,
+    opts: CyclePassOptions,
+    issues: Issue[],
+    logger?: { info: (msg: string) => void },
+): void {
+    const entryRes = (opts.entryGlobs ?? []).map(globToRegex);
+    const importers = buildImportersMap(graph.getForwardEdges());
+    const ENTRY_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+    const isEntry = (f: string): boolean =>
+        entryRes.some((re) => ENTRY_EXTS.some((ext) => re.test(f + ext)));
+    let unusedFlagged = 0;
+    const unusedSeverity: Severity = opts.unusedSeverity ?? 'warning';
+
+    for (const mod of graph.getModules()) {
+        if (mod.exportedSymbols.length === 0) continue;
+        if (isEntry(mod.file) || mod.file.endsWith('.d.ts')) continue;
+        const importerFiles = [...(importers.get(mod.file) ?? [])];
+
+        if (importerFiles.length === 0) {
+            issues.push({
+                id: `dependency-graph:unused-module:${mod.file}:1`,
+                analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
+                rule: 'unused-module',
+                severity: unusedSeverity,
+                message: `模块未被任何文件导入且导出 ${mod.exportedSymbols.length} 个符号（死模块候选）`,
+                location: {
+                    file: mod.file,
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 1 },
+                },
+                detail: {
+                    exportedSymbols: mod.exportedSymbols.slice(0, EXPORTED_SYMBOL_DETAIL_LIMIT),
+                },
+                suggestion: '确认是否为遗留代码：删除、归档，或加入 entryGlobs 白名单并说明理由',
+            });
+            unusedFlagged++;
+            continue;
+        }
+
+        unusedFlagged += auditModuleSymbols(mod, importerFiles, contents, unusedSeverity, issues);
+    }
+    if (unusedFlagged > 0 && logger) {
+        logger.info(`dependency-graph: ${unusedFlagged} unused module/export issue(s)`);
+    }
+}
+
+function auditImportCycles(
+    graph: ModuleDependencyGraph,
+    opts: CyclePassOptions,
+    issues: Issue[],
+    warnings: string[],
+): void {
+    const cycles = findImportCycles(graph.getForwardEdges());
+    const cap = opts.maxCyclesReported ?? DEFAULT_MAX_CYCLES_REPORTED;
+    const cycleSeverity: Severity = opts.cycleSeverity ?? 'error';
+    for (const cyc of cycles.slice(0, cap)) {
+        issues.push({
+            id: `dependency-graph:import-cycle:${cyc[0]}:1`,
+            analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
+            rule: 'import-cycle',
+            severity: cycleSeverity,
+            message: `循环依赖: ${cyc.join(' → ')}`,
+            location: { file: cyc[0], start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
+            detail: { cycle: cyc, length: cyc.length },
+            suggestion: '提取共享逻辑到被共同依赖的下层模块，或经接口反转断开环',
+        });
+    }
+    if (cycles.length > cap) {
+        warnings.push(
+            `dependency-graph: ${cycles.length - cap} additional cycle(s) beyond report cap (${cap})`,
+        );
+    }
+}
+
+/**
  * Post-scan pass that reports import cycles and, when enabled, unused modules/exports.
  *
  * It builds or reuses a dependency graph from the report's file list, reads source contents
@@ -604,161 +792,25 @@ export async function runCyclePass(
 ): Promise<{ issues: Issue[]; warnings: string[] }> {
     const issues: Issue[] = [];
     const warnings: string[] = [];
-    const opts = (config.analyzers[DEPENDENCY_GRAPH_ANALYZER_ID]?.options || {}) as {
-        detectCycles?: boolean;
-        cycleSeverity?: Severity;
-        maxCyclesReported?: number;
-        detectUnusedExports?: boolean;
-        entryGlobs?: string[];
-        unusedSeverity?: Severity;
-    };
+    const opts = (config.analyzers[DEPENDENCY_GRAPH_ANALYZER_ID]?.options ||
+        {}) as CyclePassOptions;
     if (opts.detectCycles === false) return { issues, warnings };
 
     // Prebuilt graph reuse requires caller-verified full coverage and unused-export off.
     const files = report.fileMetrics.map((m) => m.file);
     const usePrebuilt = prebuilt != null && opts.detectUnusedExports !== true;
     const graph = usePrebuilt ? prebuilt : new ModuleDependencyGraph();
-    const PARALLEL_THRESHOLD = 500;
-    const READ_WINDOW = 64;
-    let readFailures = 0;
     const contents = new Map<string, string>();
+
     if (!usePrebuilt) {
-        if (files.length <= PARALLEL_THRESHOLD) {
-            for (const f of files) {
-                try {
-                    const c = await fs.promises.readFile(path.join(config.root, f), 'utf8');
-                    contents.set(f, c);
-                    graph.registerFromContent(f, c);
-                } catch (_readErr) {
-                    readFailures++;
-                }
-            }
-        } else {
-            for (let i = 0; i < files.length; i += READ_WINDOW) {
-                const chunk = files.slice(i, i + READ_WINDOW);
-                const results = await Promise.all(
-                    chunk.map((f) =>
-                        fs.promises
-                            .readFile(path.join(config.root, f), 'utf8')
-                            .then((c) => [f, c] as const)
-                            .catch(() => null),
-                    ),
-                );
-                for (const r of results) {
-                    if (r === null) {
-                        readFailures++;
-                        continue;
-                    }
-                    contents.set(r[0], r[1]);
-                    graph.registerFromContent(r[0], r[1]);
-                }
-            }
-        }
-        if (readFailures > 0)
-            warnings.push(
-                `dependency-graph: ${readFailures} file(s) unreadable, excluded from cycle analysis`,
-            );
+        await populateGraphFromFiles(files, config.root, graph, contents, warnings);
     }
 
-    // ---- Unused-export detection (opt-in: detectUnusedExports + entryGlobs) ----
     if (opts.detectUnusedExports === true) {
-        const entryRes = (opts.entryGlobs ?? []).map(globToRegex);
-        const forward = graph.getForwardEdges();
-        const importers = new Map<string, Set<string>>();
-        for (const [from, nexts] of forward) {
-            for (const n of nexts) {
-                const set = importers.get(n) ?? new Set<string>();
-                set.add(from);
-                importers.set(n, set);
-            }
-        }
-        const ENTRY_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
-        const isEntry = (f: string): boolean =>
-            entryRes.some((re) => ENTRY_EXTS.some((ext) => re.test(f + ext)));
-        let unusedFlagged = 0;
-        for (const mod of graph.getModules()) {
-            if (mod.exportedSymbols.length === 0) continue;
-            if (isEntry(mod.file) || mod.file.endsWith('.d.ts')) continue;
-            const importerFiles = [...(importers.get(mod.file) ?? [])];
-
-            if (importerFiles.length === 0) {
-                issues.push({
-                    id: `dependency-graph:unused-module:${mod.file}:1`,
-                    analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
-                    rule: 'unused-module',
-                    severity: opts.unusedSeverity ?? 'warning',
-                    message: `模块未被任何文件导入且导出 ${mod.exportedSymbols.length} 个符号（死模块候选）`,
-                    location: {
-                        file: mod.file,
-                        start: { line: 1, column: 1 },
-                        end: { line: 1, column: 1 },
-                    },
-                    detail: {
-                        exportedSymbols: mod.exportedSymbols.slice(0, EXPORTED_SYMBOL_DETAIL_LIMIT),
-                    },
-                    suggestion:
-                        '确认是否为遗留代码：删除、归档，或加入 entryGlobs 白名单并说明理由',
-                });
-                unusedFlagged++;
-                continue;
-            }
-
-            let flagged = 0;
-            for (const sym of mod.exportedSymbols) {
-                if (flagged >= MAX_UNUSED_EXPORTS_PER_MODULE) break;
-                const wordRe = new RegExp(`\\b${escapeRe(sym)}\\b`);
-                const used = importerFiles.some((f) => {
-                    const c = contents.get(f);
-                    return c === undefined ? true : wordRe.test(c);
-                });
-                if (!used) {
-                    issues.push({
-                        id: `dependency-graph:unused-export:${mod.file}:${sym}`,
-                        analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
-                        rule: 'unused-export',
-                        severity: opts.unusedSeverity ?? 'warning',
-                        message: `导出符号 "${sym}" 未被任何导入方引用（${mod.file}）`,
-                        location: {
-                            file: mod.file,
-                            start: { line: 1, column: 1 },
-                            end: { line: 1, column: 1 },
-                        },
-                        detail: {
-                            symbol: sym,
-                            importers: importerFiles.slice(0, IMPORTER_DETAIL_LIMIT),
-                        },
-                        suggestion:
-                            '删除该导出，或确认其为对外 API（如是，加入 entryGlobs 白名单并说明理由）',
-                    });
-                    flagged++;
-                    unusedFlagged++;
-                }
-            }
-        }
-        if (unusedFlagged > 0 && logger)
-            logger.info(`dependency-graph: ${unusedFlagged} unused module/export issue(s)`);
+        auditUnusedExports(graph, contents, opts, issues, logger);
     }
 
-    const cycles = findImportCycles(graph.getForwardEdges());
+    auditImportCycles(graph, opts, issues, warnings);
 
-    const cap = opts.maxCyclesReported ?? DEFAULT_MAX_CYCLES_REPORTED;
-    const cycleSeverity: Severity = opts.cycleSeverity ?? 'error';
-    for (const cyc of cycles.slice(0, cap)) {
-        issues.push({
-            id: `dependency-graph:import-cycle:${cyc[0]}:1`,
-            analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
-            rule: 'import-cycle',
-            severity: cycleSeverity,
-            message: `循环依赖: ${cyc.join(' → ')}`,
-            location: { file: cyc[0], start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
-            detail: { cycle: cyc, length: cyc.length },
-            suggestion: '提取共享逻辑到被共同依赖的下层模块，或经接口反转断开环',
-        });
-    }
-    if (cycles.length > cap) {
-        warnings.push(
-            `dependency-graph: ${cycles.length - cap} additional cycle(s) beyond report cap (${cap})`,
-        );
-    }
     return { issues, warnings };
 }
