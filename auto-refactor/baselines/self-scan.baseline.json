@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T13:17:59.442Z",
+  "timestamp": "2026-09-18T13:21:25.335Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2836,27 +2836,31 @@
       "count": 3
     },
     {
-      "key": "complexity|high-complexity|src/core/trajectory/anomalyDetector.ts",
+      "key": "governance|GOV-TYP-003|src/core/trajectory/anomalyDetector.ts",
       "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/trajectory/anomalyDetector.ts",
+      "count": 8
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/trajectory/anomalyDetector.ts",
+      "count": 2
     },
     {
       "key": "governance|GOV-LOG-001|src/core/trajectory/anomalyDetector.ts",
       "count": 1
     },
     {
-      "key": "simplify|SIM-LONG-001|src/core/trajectory/anomalyDetector.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/trajectory/anomalyDetector.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/trajectory/anomalyDetector.ts",
-      "count": 14
-    },
-    {
       "key": "governance|GOV-PRF-002|src/core/trajectory/anomalyDetector.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-DED-001|src/core/trajectory/anomalyDetector.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/trajectory/anomalyDetector.ts",
       "count": 1
     },
     {
