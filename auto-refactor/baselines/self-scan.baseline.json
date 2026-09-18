@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T11:36:15.367Z",
+  "timestamp": "2026-09-18T11:58:43.189Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2724,6 +2724,38 @@
       "count": 1
     },
     {
+      "key": "governance|GOV-TYP-003|src/core/tsPredicates.ts",
+      "count": 3
+    },
+    {
+      "key": "complexity|high-complexity|src/core/tsPredicates.ts",
+      "count": 2
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/tsPredicates.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/tsPredicates.ts",
+      "count": 1
+    },
+    {
+      "key": "large-file|large-file|src/core/tsProjector.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/tsProjector.ts",
+      "count": 3
+    },
+    {
+      "key": "complexity|high-complexity|src/core/tsProjector.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/tsProjector.ts",
+      "count": 1
+    },
+    {
       "key": "large-file|large-file|src/core/types.ts",
       "count": 1
     },
@@ -2736,32 +2768,12 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/typescriptAdapter.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/typescriptAdapter.ts",
-      "count": 3
-    },
-    {
-      "key": "complexity|high-complexity|src/core/typescriptAdapter.ts",
-      "count": 8
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/typescriptAdapter.ts",
-      "count": 3
+      "key": "constants|hardcoded-string|src/core/typescriptAdapter.ts",
+      "count": 4
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/typescriptAdapter.ts",
       "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/typescriptAdapter.ts",
-      "count": 6
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/typescriptAdapter.ts",
-      "count": 3
     },
     {
       "key": "constants|hardcoded-string|src/core/utf8.ts",
