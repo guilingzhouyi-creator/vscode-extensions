@@ -19,6 +19,11 @@
 
 /** Mutation category for a hunk whose only change is a literal value. */
 const LITERAL_ONLY_CATEGORY = 'LITERAL_ONLY';
+const CONTROL_FLOW_CATEGORY = 'CONTROL_FLOW';
+const INTERFACE_SIGNATURE_CATEGORY = 'INTERFACE_SIGNATURE';
+const IMPORT_EXPORT_CATEGORY = 'IMPORT_EXPORT';
+const COMMENT_DOC_ONLY_CATEGORY = 'COMMENT_DOC_ONLY';
+const GENERAL_CODE_CATEGORY = 'GENERAL_CODE';
 
 /**
  * Closed vocabulary of mutation categories emitted by {@link classifyDiff}.
@@ -29,11 +34,11 @@ const LITERAL_ONLY_CATEGORY = 'LITERAL_ONLY';
  */
 export type DiffSemanticCategory =
     | typeof LITERAL_ONLY_CATEGORY
-    | 'CONTROL_FLOW'
-    | 'INTERFACE_SIGNATURE'
-    | 'IMPORT_EXPORT'
-    | 'COMMENT_DOC_ONLY'
-    | 'GENERAL_CODE';
+    | typeof CONTROL_FLOW_CATEGORY
+    | typeof INTERFACE_SIGNATURE_CATEGORY
+    | typeof IMPORT_EXPORT_CATEGORY
+    | typeof COMMENT_DOC_ONLY_CATEGORY
+    | typeof GENERAL_CODE_CATEGORY;
 
 /**
  * Outcome of one diff classification: matched categories plus per-dimension flags.
@@ -58,6 +63,156 @@ const INTERFACE_SIG_RE =
 const IMPORT_EXPORT_RE = /\b(import\b|export\s+(?:\*|\{)|from\s+['"]|require\s*\()/;
 const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*|#)/;
 
+interface DiffLineObservation {
+    allComments: boolean;
+    hasControlFlow: boolean;
+    hasInterface: boolean;
+    hasImportExport: boolean;
+    hasLiteral: boolean;
+    hasGeneralCode: boolean;
+}
+
+/**
+ * Extract changed lines from old and new text when explicit changed lines are omitted.
+ */
+function extractChangedLines(
+    oldContent: string,
+    newContent: string,
+    changedLines?: string[],
+): string[] {
+    if (changedLines) {
+        return changedLines;
+    }
+    const linesToInspect: string[] = [];
+    const oldLines = new Set(oldContent.split(/\r?\n/));
+    const newL = newContent.split(/\r?\n/);
+    for (const l of newL) {
+        if (!oldLines.has(l) && l.trim()) {
+            linesToInspect.push(l);
+        }
+    }
+    return linesToInspect;
+}
+
+/**
+ * Check whether a trimmed code line is predominantly literal definitions or assignments.
+ */
+function isPredominantlyLiteralLine(trimmed: string): boolean {
+    return (
+        /^['"][^'"]*['"][,;]?$/.test(trimmed) ||
+        /^[0-9]+[LUlu]?[,;]?$/.test(trimmed) ||
+        /^(?:const|let|var)\s+[A-Za-z0-9_$]+\s*=\s*(?:['"][^'"]*['"]|[0-9]+)[,;]?$/.test(trimmed)
+    );
+}
+
+/**
+ * Inspect individual changed lines to collect semantic mutation indicators.
+ */
+function inspectLines(lines: string[]): DiffLineObservation {
+    let allComments = true;
+    let hasControlFlow = false;
+    let hasInterface = false;
+    let hasImportExport = false;
+    let hasLiteral = false;
+    let hasGeneralCode = false;
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (COMMENT_LINE_RE.test(trimmed)) {
+            continue;
+        }
+        allComments = false;
+
+        if (IMPORT_EXPORT_RE.test(trimmed)) {
+            hasImportExport = true;
+        }
+        if (INTERFACE_SIG_RE.test(trimmed)) {
+            hasInterface = true;
+        }
+        if (CONTROL_FLOW_RE.test(trimmed)) {
+            hasControlFlow = true;
+        }
+
+        if (isPredominantlyLiteralLine(trimmed)) {
+            hasLiteral = true;
+        } else {
+            hasGeneralCode = true;
+        }
+    }
+
+    return {
+        allComments,
+        hasControlFlow,
+        hasInterface,
+        hasImportExport,
+        hasLiteral,
+        hasGeneralCode,
+    };
+}
+
+/**
+ * Determine if observed changes qualify exclusively as a literal mutation.
+ */
+function isLiteralOnlyObservation(obs: DiffLineObservation): boolean {
+    if (!obs.hasLiteral || obs.hasGeneralCode) return false;
+    if (obs.hasControlFlow || obs.hasInterface || obs.hasImportExport) return false;
+    return true;
+}
+
+/**
+ * Construct empty classification result for zero inspected lines.
+ */
+function buildEmptyClassificationResult(): DiffClassificationResult {
+    return {
+        categories: new Set([LITERAL_ONLY_CATEGORY]),
+        hasLiteralChange: false,
+        hasControlFlowChange: false,
+        hasInterfaceChange: false,
+        hasImportExportChange: false,
+        isDocOnly: true,
+    };
+}
+
+/**
+ * Construct final DiffClassificationResult from aggregated line observations.
+ */
+function buildClassificationResult(obs: DiffLineObservation): DiffClassificationResult {
+    const categories = new Set<DiffSemanticCategory>();
+
+    if (obs.allComments) {
+        categories.add(COMMENT_DOC_ONLY_CATEGORY);
+        return {
+            categories,
+            hasLiteralChange: false,
+            hasControlFlowChange: false,
+            hasInterfaceChange: false,
+            hasImportExportChange: false,
+            isDocOnly: true,
+        };
+    }
+
+    if (obs.hasImportExport) categories.add(IMPORT_EXPORT_CATEGORY);
+    if (obs.hasInterface) categories.add(INTERFACE_SIGNATURE_CATEGORY);
+    if (obs.hasControlFlow) categories.add(CONTROL_FLOW_CATEGORY);
+    if (isLiteralOnlyObservation(obs)) {
+        categories.add(LITERAL_ONLY_CATEGORY);
+    }
+    if (categories.size === 0 || obs.hasGeneralCode) {
+        categories.add(GENERAL_CODE_CATEGORY);
+    }
+
+    return {
+        categories,
+        hasLiteralChange: obs.hasLiteral || categories.has(LITERAL_ONLY_CATEGORY),
+        hasControlFlowChange: obs.hasControlFlow,
+        hasInterfaceChange: obs.hasInterface,
+        hasImportExportChange: obs.hasImportExport,
+        isDocOnly: false,
+    };
+}
+
 /**
  * Classify semantic categories from old and new content snippets or changed lines.
  *
@@ -78,100 +233,11 @@ export function classifyDiff(
     newContent: string,
     changedLines?: string[],
 ): DiffClassificationResult {
-    // If changed lines not provided, extract non-identical lines
-    const linesToInspect: string[] = changedLines || [];
-    if (!changedLines) {
-        const oldLines = new Set(oldContent.split(/\r?\n/));
-        const newL = newContent.split(/\r?\n/);
-        for (const l of newL) {
-            if (!oldLines.has(l) && l.trim()) {
-                linesToInspect.push(l);
-            }
-        }
-    }
-
-    const categories = new Set<DiffSemanticCategory>();
-
+    const linesToInspect = extractChangedLines(oldContent, newContent, changedLines);
     if (linesToInspect.length === 0) {
-        return {
-            categories: new Set([LITERAL_ONLY_CATEGORY]),
-            hasLiteralChange: false,
-            hasControlFlowChange: false,
-            hasInterfaceChange: false,
-            hasImportExportChange: false,
-            isDocOnly: true,
-        };
+        return buildEmptyClassificationResult();
     }
 
-    let allComments = true;
-    let hasControlFlow = false;
-    let hasInterface = false;
-    let hasImportExport = false;
-    let hasLiteral = false;
-    let hasGeneralCode = false;
-
-    for (const line of linesToInspect) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        if (COMMENT_LINE_RE.test(trimmed)) {
-            continue;
-        }
-        allComments = false;
-
-        if (IMPORT_EXPORT_RE.test(trimmed)) {
-            hasImportExport = true;
-        }
-        if (INTERFACE_SIG_RE.test(trimmed)) {
-            hasInterface = true;
-        }
-        if (CONTROL_FLOW_RE.test(trimmed)) {
-            hasControlFlow = true;
-        }
-
-        // Check if line is predominantly literals
-        const isLiteralOnlyLine =
-            /^['"][^'"]*['"][,;]?$/.test(trimmed) ||
-            /^[0-9]+[LUlu]?[,;]?$/.test(trimmed) ||
-            /^(?:const|let|var)\s+[A-Za-z0-9_$]+\s*=\s*(?:['"][^'"]*['"]|[0-9]+)[,;]?$/.test(
-                trimmed,
-            );
-
-        if (isLiteralOnlyLine) {
-            hasLiteral = true;
-        } else {
-            hasGeneralCode = true;
-        }
-    }
-
-    if (allComments) {
-        categories.add('COMMENT_DOC_ONLY');
-        return {
-            categories,
-            hasLiteralChange: false,
-            hasControlFlowChange: false,
-            hasInterfaceChange: false,
-            hasImportExportChange: false,
-            isDocOnly: true,
-        };
-    }
-
-    if (hasImportExport) categories.add('IMPORT_EXPORT');
-    if (hasInterface) categories.add('INTERFACE_SIGNATURE');
-    if (hasControlFlow) categories.add('CONTROL_FLOW');
-    if (hasLiteral && !hasGeneralCode && !hasControlFlow && !hasInterface && !hasImportExport) {
-        categories.add(LITERAL_ONLY_CATEGORY);
-    }
-    if (categories.size === 0 || hasGeneralCode) {
-        categories.add('GENERAL_CODE');
-    }
-
-    return {
-        categories,
-        hasLiteralChange: hasLiteral || categories.has(LITERAL_ONLY_CATEGORY),
-        hasControlFlowChange: hasControlFlow,
-        hasInterfaceChange: hasInterface,
-        hasImportExportChange: hasImportExport,
-        isDocOnly: false,
-    };
+    const obs = inspectLines(linesToInspect);
+    return buildClassificationResult(obs);
 }
