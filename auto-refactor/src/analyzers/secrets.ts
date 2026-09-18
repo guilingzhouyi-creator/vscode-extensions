@@ -111,6 +111,47 @@ function shannonEntropy(s: string): number {
     return h;
 }
 
+interface CompiledSecretPattern {
+    name: string;
+    re: RegExp;
+}
+
+interface ResolvedEntropyConfig {
+    enabled: boolean;
+    minLength: number;
+    threshold: number;
+    severity: Severity;
+}
+
+function shouldSkipSecrets(normPath: string, level: SecurityLevel, opts: SecretsOptions): boolean {
+    if (level === 'off') return true;
+    const isTestOrFixture = /(?:tests?|specs?|fixtures?|mocks?|benchmark)[\\/]/i.test(normPath);
+    const ignoreInTests = opts.ignoreInTests !== undefined ? opts.ignoreInTests : level !== 'full';
+    return isTestOrFixture && ignoreInTests;
+}
+
+function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
+    const base = opts.patterns
+        ? opts.patterns.map((source, i) => ({ name: `custom-${i + 1}`, source }))
+        : DEFAULT_PATTERNS;
+    return [
+        ...base.map((p) => ({ name: p.name, re: new RegExp(p.source) })),
+        ...(opts.extraPatterns ?? []).map((source) => ({
+            name: 'custom-extra',
+            re: new RegExp(source),
+        })),
+    ];
+}
+
+function resolveEntropyConfig(opts: SecretsOptions, level: SecurityLevel): ResolvedEntropyConfig {
+    return {
+        enabled: opts.entropy?.enabled !== undefined ? opts.entropy.enabled : level === 'full',
+        minLength: opts.entropy?.minLength ?? DEFAULT_ENTROPY_MIN_LENGTH,
+        threshold: opts.entropy?.threshold ?? DEFAULT_ENTROPY_THRESHOLD,
+        severity: (opts.entropy?.severity ?? 'warning') as Severity,
+    };
+}
+
 /**
  * Line-oriented analyzer for hardcoded credentials and optional high-entropy tokens.
  *
@@ -132,103 +173,29 @@ export class SecretsAnalyzer implements Analyzer {
     analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
         const opts = (ctx.options || {}) as SecretsOptions & { level?: SecurityLevel };
         const level: SecurityLevel = opts.level || ctx.config.securityLevel || 'basic';
-        if (level === 'off') {
-            return [];
-        }
-
         const normPath = ctx.filePath.replace(/\\/g, '/');
-        const isTestOrFixture = /(?:tests?|specs?|fixtures?|mocks?|benchmark)[\\/]/i.test(normPath);
-        const ignoreInTests =
-            opts.ignoreInTests !== undefined ? opts.ignoreInTests : level !== 'full';
-        if (isTestOrFixture && ignoreInTests) {
+        if (shouldSkipSecrets(normPath, level, opts)) {
             return [];
         }
 
-        const base = opts.patterns
-            ? opts.patterns.map((source, i) => ({ name: `custom-${i + 1}`, source }))
-            : DEFAULT_PATTERNS;
-        const patterns = [
-            ...base.map((p) => ({ name: p.name, re: new RegExp(p.source) })),
-            ...(opts.extraPatterns ?? []).map((source) => ({
-                name: 'custom-extra',
-                re: new RegExp(source),
-            })),
-        ];
-        const entropy = {
-            enabled: opts.entropy?.enabled !== undefined ? opts.entropy.enabled : level === 'full',
-            minLength: opts.entropy?.minLength ?? DEFAULT_ENTROPY_MIN_LENGTH,
-            threshold: opts.entropy?.threshold ?? DEFAULT_ENTROPY_THRESHOLD,
-            severity: (opts.entropy?.severity ?? 'warning') as Severity,
-        };
+        const patterns = compileSecretPatterns(opts);
+        const entropy = resolveEntropyConfig(opts, level);
         const cap = opts.maxIssuesPerFile ?? DEFAULT_MAX_ISSUES_PER_FILE;
 
         const content = ctx.content || '';
         const len = content.length;
         const issues: Issue[] = [];
-        const TOKEN_RE = /[A-Za-z0-9_\-=]{16,}/g;
 
         let lineStart = 0;
         let line = 1;
 
         while (lineStart < len) {
             if (issues.length >= cap) break;
-            let lineEnd = content.indexOf('\n', lineStart);
-            let nextStart: number;
-            if (lineEnd === -1) {
-                lineEnd = len;
-                nextStart = len;
-            } else {
-                nextStart = lineEnd + 1;
-                if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
-                    lineEnd--;
-                }
-            }
+            const { lineText, nextStart } = this.extractNextLine(content, lineStart, len);
 
-            const lineText = content.slice(lineStart, lineEnd);
-            let matchedSecret = false;
-            for (const p of patterns) {
-                if (p.re.test(lineText)) {
-                    const desc = SecretMessages.HARDCODED_SECRET(
-                        p.name,
-                        p.re.source.slice(0, REGEX_SOURCE_PREVIEW_LENGTH),
-                    );
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            line,
-                            'secret-detected',
-                            desc.message,
-                            { kind: p.name },
-                            'error',
-                            desc.suggestion,
-                        ),
-                    );
-                    matchedSecret = true;
-                    break; // At most one issue per line
-                }
-            }
-
+            const matchedSecret = this.checkSecretPatterns(lineText, patterns, line, ctx, issues);
             if (!matchedSecret && entropy.enabled) {
-                TOKEN_RE.lastIndex = 0;
-                let t: RegExpExecArray | null;
-                while ((t = TOKEN_RE.exec(lineText)) !== null) {
-                    const h = shannonEntropy(t[0]);
-                    if (h >= entropy.threshold && t[0].length >= entropy.minLength) {
-                        const desc = SecretMessages.HIGH_ENTROPY_TOKEN(h, t[0].length);
-                        issues.push(
-                            this.mkIssue(
-                                ctx,
-                                line,
-                                'high-entropy-token',
-                                desc.message,
-                                { entropy: Number(h.toFixed(2)), length: t[0].length },
-                                entropy.severity,
-                                desc.suggestion,
-                            ),
-                        );
-                        break;
-                    }
-                }
+                this.checkEntropyTokens(lineText, entropy, line, ctx, issues);
             }
 
             line++;
@@ -236,6 +203,79 @@ export class SecretsAnalyzer implements Analyzer {
         }
 
         return issues;
+    }
+
+    private extractNextLine(
+        content: string,
+        lineStart: number,
+        len: number,
+    ): { lineText: string; nextStart: number } {
+        let lineEnd = content.indexOf('\n', lineStart);
+        if (lineEnd === -1) return { lineText: content.slice(lineStart, len), nextStart: len };
+        const nextStart = lineEnd + 1;
+        if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
+            lineEnd--;
+        }
+        return { lineText: content.slice(lineStart, lineEnd), nextStart };
+    }
+
+    private checkSecretPatterns(
+        lineText: string,
+        patterns: CompiledSecretPattern[],
+        line: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): boolean {
+        for (const p of patterns) {
+            if (p.re.test(lineText)) {
+                const desc = SecretMessages.HARDCODED_SECRET(
+                    p.name,
+                    p.re.source.slice(0, REGEX_SOURCE_PREVIEW_LENGTH),
+                );
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        line,
+                        'secret-detected',
+                        desc.message,
+                        { kind: p.name },
+                        'error',
+                        desc.suggestion,
+                    ),
+                );
+                return true; // At most one issue per line
+            }
+        }
+        return false;
+    }
+
+    private checkEntropyTokens(
+        lineText: string,
+        entropy: ResolvedEntropyConfig,
+        line: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const TOKEN_RE = /[A-Za-z0-9_\-=]{16,}/g;
+        let t: RegExpExecArray | null;
+        while ((t = TOKEN_RE.exec(lineText)) !== null) {
+            const h = shannonEntropy(t[0]);
+            if (h >= entropy.threshold && t[0].length >= entropy.minLength) {
+                const desc = SecretMessages.HIGH_ENTROPY_TOKEN(h, t[0].length);
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        line,
+                        'high-entropy-token',
+                        desc.message,
+                        { entropy: Number(h.toFixed(2)), length: t[0].length },
+                        entropy.severity,
+                        desc.suggestion,
+                    ),
+                );
+                break;
+            }
+        }
     }
 
     /**

@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T06:44:17.968Z",
+  "timestamp": "2026-09-18T06:47:24.366Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1226,22 +1226,6 @@
     {
       "key": "constants|hardcoded-string|src/analyzers/secrets.ts",
       "count": 17
-    },
-    {
-      "key": "complexity|high-complexity|src/analyzers/secrets.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/analyzers/secrets.ts",
-      "count": 1
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/secrets.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/analyzers/secrets.ts",
-      "count": 1
     },
     {
       "key": "governance|GOV-TYP-003|src/analyzers/secrets.ts",
