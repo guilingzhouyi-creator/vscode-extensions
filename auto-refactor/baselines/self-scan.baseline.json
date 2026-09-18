@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T13:21:25.335Z",
+  "timestamp": "2026-09-18T13:24:53.642Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1900,20 +1900,12 @@
       "count": 1
     },
     {
-      "key": "complexity|high-complexity|src/core/guidance/agentConstraintGenerator.ts",
-      "count": 1
+      "key": "constants|hardcoded-string|src/core/guidance/agentConstraintGenerator.ts",
+      "count": 4
     },
     {
       "key": "governance|GOV-LOG-001|src/core/guidance/agentConstraintGenerator.ts",
       "count": 1
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/guidance/agentConstraintGenerator.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/guidance/agentConstraintGenerator.ts",
-      "count": 4
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/histogramDiff.ts",
