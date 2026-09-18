@@ -61,6 +61,223 @@ export function createPatchForIssue(filePath: string, issue: Issue): Refactoring
         unifiedPatch: `--- a/${filePath}\n+++ b/${filePath}\n@@ -${start.line},1 +${start.line},1 @@\n-${val}\n+${issue.suggestion}\n`,
     };
 }
+const STREAM_MODE_FULL = 'full';
+const STREAM_MODE_SUMMARY_ONLY = 'summary_only';
+const STREAM_MODE_DISABLED = 'disabled';
+const STREAM_MODE_ISSUES_ONLY = 'issues_only';
+
+const EVENT_FILE_START = 'file_start';
+const EVENT_HUNK_READY = 'hunk_ready';
+const EVENT_FILE_DONE = 'file_done';
+const EVENT_STREAM_END = 'stream_end';
+
+const VERDICT_PASSED = 'passed';
+const DIFF_LINE_DELETE = 'delete';
+const DIFF_LINE_INSERT = 'insert';
+
+interface StreamControlPolicy {
+    emitHunks: boolean;
+    emitFiles: boolean;
+    maxEvents: number;
+    mode: 'full' | 'issues_only' | 'summary_only' | 'disabled';
+}
+
+interface StreamEventTracker {
+    emittedCount: number;
+}
+
+interface DependencyGraphLike {
+    getAffectedFiles(filePath: string): string[] | undefined;
+}
+
+/**
+ * Resolve streaming emission and filtering options into a unified policy struct.
+ */
+function resolveStreamControlPolicy(options: ScanDiffOptions): StreamControlPolicy {
+    const mode = options.streamingMode || STREAM_MODE_FULL;
+    const emitHunks =
+        options.emitHunks !== false &&
+        mode !== STREAM_MODE_SUMMARY_ONLY &&
+        mode !== STREAM_MODE_DISABLED;
+    const emitFiles = mode !== STREAM_MODE_DISABLED;
+    const maxEvents = options.maxStreamEvents ?? Number.POSITIVE_INFINITY;
+    return { emitHunks, emitFiles, maxEvents, mode };
+}
+
+/**
+ * Determine if a file lifecycle event should be yielded under the active policy and event budget.
+ */
+function shouldEmitFileEvent(policy: StreamControlPolicy, emittedCount: number): boolean {
+    return policy.emitFiles && emittedCount < policy.maxEvents;
+}
+
+/**
+ * Determine if an individual hunk event should be yielded under the active policy and event
+ * budget.
+ */
+function shouldEmitHunkEvent(
+    policy: StreamControlPolicy,
+    isIssue: boolean,
+    emittedCount: number,
+): boolean {
+    return (
+        policy.emitHunks &&
+        (policy.mode !== STREAM_MODE_ISSUES_ONLY || isIssue) &&
+        emittedCount < policy.maxEvents
+    );
+}
+
+/**
+ * Instantiate the human-facing circular diff buffer if storage hooks are configured.
+ */
+function createHumanBuffer(hooks?: ScanDiffOptions['praxisHooks']): CircularDiffBuffer | undefined {
+    if (hooks?.humanStorage) {
+        return new CircularDiffBuffer({ storageAdapter: hooks.humanStorage });
+    }
+    return undefined;
+}
+
+/**
+ * Compute detailed review hunks from diff input contents.
+ */
+function computeInputHunks(diff: DiffInput): ReviewDiffHunk[] {
+    if (diff.kind === 'full') {
+        return computeDetailedHunks(diff.oldContent, diff.newContent);
+    }
+    if (diff.oldContent) {
+        return computeDetailedHunks(diff.oldContent, diff.newContent);
+    }
+    return [];
+}
+
+/**
+ * Apply Praxis attribution resolver to diff hunk lines.
+ */
+async function applyPraxisAttribution(
+    hunk: ReviewDiffHunk,
+    filePath: string,
+    hooks?: ScanDiffOptions['praxisHooks'],
+): Promise<void> {
+    if (!hooks?.attributionResolver) return;
+    const attr = await hooks.attributionResolver.resolveAttribution(filePath, {
+        startLine: hunk.oldSpan.startLine,
+        endLine: hunk.oldSpan.startLine + hunk.oldSpan.lineCount,
+    });
+    if (!attr) return;
+    for (const line of hunk.lines) {
+        line.attribution = attr;
+    }
+}
+
+/**
+ * Apply Praxis context enricher and threshold policy to a review hunk.
+ */
+async function applyPraxisContextAndPolicy(
+    hunk: ReviewDiffHunk,
+    filePath: string,
+    hooks?: ScanDiffOptions['praxisHooks'],
+): Promise<void> {
+    if (!hooks?.contextEnricher) return;
+    const enriched = await hooks.contextEnricher.enrichHunk(filePath, hunk);
+    if (enriched.enclosingSymbol || enriched.impactFiles) {
+        hunk.astContext = {
+            enclosingSymbol: enriched.enclosingSymbol,
+            symbolKind: enriched.symbolKind,
+            scopeRange: enriched.scopeRange,
+            impactFiles: enriched.impactFiles,
+        };
+    }
+    if (hooks.thresholdPolicy) {
+        hunk.reviewVerdict = await hooks.thresholdPolicy.evaluateChange(filePath, hunk, enriched);
+    }
+}
+
+/**
+ * Auto-populate impact files from the dependency graph if available and missing on the hunk
+ * context.
+ */
+function populateDependencyImpact(
+    hunk: ReviewDiffHunk,
+    filePath: string,
+    dependencyGraph?: unknown,
+): void {
+    if (!dependencyGraph) return;
+    if (hunk.astContext?.impactFiles) return;
+    const dg = dependencyGraph as DependencyGraphLike;
+    if (typeof dg.getAffectedFiles === 'function') {
+        const affected = dg.getAffectedFiles(filePath);
+        if (affected && affected.length > 0) {
+            hunk.astContext = {
+                ...(hunk.astContext || {}),
+                impactFiles: affected,
+            };
+        }
+    }
+}
+
+/**
+ * Evaluate whether a review hunk qualifies as a detected issue based on verdict or line changes.
+ */
+function isHunkAnIssue(hunk: ReviewDiffHunk): boolean {
+    if (hunk.reviewVerdict) {
+        return hunk.reviewVerdict.status !== VERDICT_PASSED;
+    }
+    return hunk.lines.some(
+        (l: AttributedDiffLine) => l.type === DIFF_LINE_DELETE || l.type === DIFF_LINE_INSERT,
+    );
+}
+
+/**
+ * Perform attribution, AST enrichment, dependency graph propagation, and buffer update for a
+ * hunk.
+ */
+async function processStreamHunk(
+    hunk: ReviewDiffHunk,
+    filePath: string,
+    options: ScanDiffOptions,
+    humanBuffer?: CircularDiffBuffer,
+): Promise<boolean> {
+    await applyPraxisAttribution(hunk, filePath, options.praxisHooks);
+    await applyPraxisContextAndPolicy(hunk, filePath, options.praxisHooks);
+    populateDependencyImpact(hunk, filePath, options.dependencyGraph);
+    const isIssue = isHunkAnIssue(hunk);
+    if (humanBuffer) {
+        humanBuffer.push(hunk);
+    }
+    return isIssue;
+}
+
+/**
+ * Asynchronously stream hunk-level events for a single diff file while counting issues.
+ */
+async function* streamHunksForFile(
+    diff: DiffInput,
+    options: ScanDiffOptions,
+    policy: StreamControlPolicy,
+    tracker: StreamEventTracker,
+    humanBuffer?: CircularDiffBuffer,
+): AsyncGenerator<DiffStreamEvent, number> {
+    const hunks = computeInputHunks(diff);
+    let fileIssueCount = 0;
+
+    for (const hunk of hunks) {
+        const isIssue = await processStreamHunk(hunk, diff.filePath, options, humanBuffer);
+        if (isIssue) {
+            fileIssueCount++;
+        }
+
+        if (shouldEmitHunkEvent(policy, isIssue, tracker.emittedCount)) {
+            tracker.emittedCount++;
+            yield {
+                type: EVENT_HUNK_READY,
+                filePath: diff.filePath,
+                hunk,
+            };
+        }
+    }
+
+    return fileIssueCount;
+}
 
 /**
  * Stream fine-grained, per-file diff events as an async generator.
@@ -88,125 +305,40 @@ export async function* scanDiffStream(
     options: ScanDiffOptions = {},
 ): AsyncIterable<DiffStreamEvent> {
     const startTime = Date.now();
-    const humanBuffer = options.praxisHooks?.humanStorage
-        ? new CircularDiffBuffer({ storageAdapter: options.praxisHooks.humanStorage })
-        : undefined;
+    const humanBuffer = createHumanBuffer(options.praxisHooks);
 
     let totalIssues = 0;
     let totalFilesScanned = 0;
-
-    const mode = options.streamingMode || 'full';
-    const emitHunks = options.emitHunks !== false && mode !== 'summary_only' && mode !== 'disabled';
-    const emitFiles = mode !== 'disabled';
-    const maxEvents = options.maxStreamEvents ?? Number.POSITIVE_INFINITY;
-    let emittedCount = 0;
+    const policy = resolveStreamControlPolicy(options);
+    const tracker: StreamEventTracker = { emittedCount: 0 };
 
     for (const diff of diffs) {
         const fileStartTime = Date.now();
         totalFilesScanned++;
 
-        if (emitFiles && emittedCount < maxEvents) {
-            emittedCount++;
+        if (shouldEmitFileEvent(policy, tracker.emittedCount)) {
+            tracker.emittedCount++;
             yield {
-                type: 'file_start',
+                type: EVENT_FILE_START,
                 filePath: diff.filePath,
                 oldHash: diff.oldContentHash,
                 newHash: diff.newContentHash,
             };
         }
 
-        let hunks: ReviewDiffHunk[] = [];
-        if (diff.kind === 'full') {
-            hunks = computeDetailedHunks(diff.oldContent, diff.newContent);
-        } else if (diff.oldContent) {
-            hunks = computeDetailedHunks(diff.oldContent, diff.newContent);
-        }
+        const fileIssueCount = yield* streamHunksForFile(
+            diff,
+            options,
+            policy,
+            tracker,
+            humanBuffer,
+        );
+        totalIssues += fileIssueCount;
 
-        let fileIssueCount = 0;
-
-        for (const hunk of hunks) {
-            // Attribute hunk with Praxis attribution resolver if present
-            if (options.praxisHooks?.attributionResolver) {
-                const attr = await options.praxisHooks.attributionResolver.resolveAttribution(
-                    diff.filePath,
-                    {
-                        startLine: hunk.oldSpan.startLine,
-                        endLine: hunk.oldSpan.startLine + hunk.oldSpan.lineCount,
-                    },
-                );
-                if (attr) {
-                    for (const line of hunk.lines) {
-                        line.attribution = attr;
-                    }
-                }
-            }
-
-            // Enrich hunk with AST/LSP context if present
-            if (options.praxisHooks?.contextEnricher) {
-                const enriched = await options.praxisHooks.contextEnricher.enrichHunk(
-                    diff.filePath,
-                    hunk,
-                );
-                if (enriched.enclosingSymbol || enriched.impactFiles) {
-                    hunk.astContext = {
-                        enclosingSymbol: enriched.enclosingSymbol,
-                        symbolKind: enriched.symbolKind,
-                        scopeRange: enriched.scopeRange,
-                        impactFiles: enriched.impactFiles,
-                    };
-                }
-                if (options.praxisHooks.thresholdPolicy) {
-                    hunk.reviewVerdict = await options.praxisHooks.thresholdPolicy.evaluateChange(
-                        diff.filePath,
-                        hunk,
-                        enriched,
-                    );
-                }
-            }
-
-            // Auto-populate impactFiles from dependencyGraph if available and not yet populated
-            if (options.dependencyGraph && (!hunk.astContext || !hunk.astContext.impactFiles)) {
-                const affected = options.dependencyGraph.getAffectedFiles(diff.filePath);
-                if (affected && affected.length > 0) {
-                    hunk.astContext = {
-                        ...(hunk.astContext || {}),
-                        impactFiles: affected,
-                    };
-                }
-            }
-
-            // Count detected change issues
-            const isIssue = hunk.reviewVerdict
-                ? hunk.reviewVerdict.status !== 'passed'
-                : hunk.lines.some(
-                      (l: AttributedDiffLine) => l.type === 'delete' || l.type === 'insert',
-                  );
-            if (isIssue) {
-                fileIssueCount++;
-                totalIssues++;
-            }
-
-            // Push to human-facing ring buffer if active
-            if (humanBuffer) {
-                humanBuffer.push(hunk);
-            }
-
-            const shouldYieldHunk =
-                emitHunks && (mode !== 'issues_only' || isIssue) && emittedCount < maxEvents;
-            if (shouldYieldHunk) {
-                emittedCount++;
-                yield {
-                    type: 'hunk_ready',
-                    filePath: diff.filePath,
-                    hunk,
-                };
-            }
-        }
-
-        if (emitFiles && emittedCount < maxEvents) {
-            emittedCount++;
+        if (shouldEmitFileEvent(policy, tracker.emittedCount)) {
+            tracker.emittedCount++;
             yield {
-                type: 'file_done',
+                type: EVENT_FILE_DONE,
                 filePath: diff.filePath,
                 stats: {
                     durationMs: Date.now() - fileStartTime,
@@ -221,7 +353,7 @@ export async function* scanDiffStream(
     }
 
     yield {
-        type: 'stream_end',
+        type: EVENT_STREAM_END,
         totalSummary: {
             filesScanned: totalFilesScanned,
             issuesTotal: totalIssues,
