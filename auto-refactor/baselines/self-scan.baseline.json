@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T11:58:43.189Z",
+  "timestamp": "2026-09-18T12:16:16.937Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1301,7 +1301,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/api.ts",
-      "count": 86
+      "count": 72
     },
     {
       "key": "hygiene|HYG-CLN-001|src/api.ts",
@@ -1313,27 +1313,23 @@
     },
     {
       "key": "simplify|SIM-LONG-001|src/api.ts",
-      "count": 3
+      "count": 1
     },
     {
       "key": "governance|GOV-TYP-003|src/api.ts",
-      "count": 10
-    },
-    {
-      "key": "complexity|high-complexity|src/api.ts",
-      "count": 2
+      "count": 8
     },
     {
       "key": "governance|GOV-LOG-001|src/api.ts",
-      "count": 2
+      "count": 1
     },
     {
       "key": "governance|GOV-PRF-002|src/api.ts",
       "count": 1
     },
     {
-      "key": "governance|GOV-PRF-004|src/api.ts",
-      "count": 3
+      "key": "complexity|high-complexity|src/api.ts",
+      "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/cli/daemonCmd.ts",
@@ -1948,6 +1944,14 @@
       "count": 1
     },
     {
+      "key": "constants|hardcoded-string|src/core/intelligence/apiQueries.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-PRF-004|src/core/intelligence/apiQueries.ts",
+      "count": 1
+    },
+    {
       "key": "constants|hardcoded-string|src/core/intelligence/callGraph.ts",
       "count": 1
     },
@@ -2433,6 +2437,38 @@
     },
     {
       "key": "hygiene|HYG-DED-001|src/core/reporters/reporterRegistry.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/reporting/baselineManager.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-PRF-004|src/core/reporting/baselineManager.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-TYP-003|src/core/reporting/baselineManager.ts",
+      "count": 2
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/reporting/reportFinalizer.ts",
+      "count": 13
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/reporting/reportFinalizer.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/reporting/reportFinalizer.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-TYP-003|src/core/reporting/reportFinalizer.ts",
+      "count": 3
+    },
+    {
+      "key": "governance|GOV-PRF-004|src/core/reporting/reportFinalizer.ts",
       "count": 1
     },
     {
