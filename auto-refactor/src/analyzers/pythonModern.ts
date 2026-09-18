@@ -123,6 +123,15 @@ interface Block {
     kind: BlockKind;
 }
 
+type PyEmitter = (
+    lineIdx: number,
+    rule: string,
+    message: string,
+    severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
+    suggestion: string,
+    detail: Record<string, unknown>,
+) => void;
+
 /**
  * Python modernization analyzer.
  *
@@ -160,7 +169,38 @@ export class PythonModernAnalyzer implements Analyzer {
         const blocks: Block[] = [];
         const importRecords: ImportRecord[] = [];
         const issues: Issue[] = [];
-        const emit = (
+        const emit = this.createIssueEmitter(file, issues);
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            if (line.endsWith('\r')) line = line.slice(0, -1);
+            const trimmed = line.trim();
+            if (trimmed === '' || trimmed.startsWith('#')) continue;
+
+            const indent = line.length - line.trimStart().length;
+            while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) blocks.pop();
+
+            const inAsync = this.hasKind(blocks, PYTHON_ASYNC_KEYWORD);
+            const inExcept = this.hasKind(blocks, 'except');
+            const inWith = this.hasKind(blocks, 'with');
+
+            this.auditModernSyntax(line, trimmed, i, emit);
+            this.auditModernTyping(line, trimmed, i, emit);
+            this.auditControlFlow(line, trimmed, i, lines, inExcept, inWith, inAsync, emit);
+            this.auditDataclassSlots(trimmed, i, lines, emit);
+            this.recordModuleImports(trimmed, indent, blocks, file, i, importRecords);
+
+            if (BLOCK_OPEN_RE.test(trimmed)) {
+                blocks.push({ indent, kind: this.kindOf(trimmed) });
+            }
+        }
+
+        this.checkImportOrder(importRecords, emit);
+        return issues;
+    }
+
+    private createIssueEmitter(file: string, issues: Issue[]): PyEmitter {
+        return (
             lineIdx: number,
             rule: string,
             message: string,
@@ -183,202 +223,213 @@ export class PythonModernAnalyzer implements Analyzer {
                 suggestion,
             });
         };
+    }
 
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i];
-            if (line.endsWith('\r')) line = line.slice(0, -1);
-            const trimmed = line.trim();
-            if (trimmed === '' || trimmed.startsWith('#')) continue;
-            const indent = line.length - line.trimStart().length;
-            while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) blocks.pop();
-            const inAsync = this.hasKind(blocks, PYTHON_ASYNC_KEYWORD);
-            const inExcept = this.hasKind(blocks, 'except');
-            const inWith = this.hasKind(blocks, 'with');
-
-            if (line.includes('os.path.')) {
-                emit(
-                    i,
-                    'PYM-PATH-001',
-                    'os.path usage: prefer pathlib.Path for path manipulation.',
-                    SEVERITY_WARNING,
-                    'Build paths with pathlib.Path (`Path(...) / name`), which is OS-neutral and self-documenting.',
-                    { line: trimmed },
-                );
-            }
-
-            // Trailing comments must not masquerade as the raised expression: a bare `raise`
-            // followed by a comment is a deliberate re-raise and carries no new exception.
-            const codeOnly = trimmed.split('#')[0].trim();
-            const hasCauseAhead =
-                RAISE_FROM_RE.test(codeOnly) ||
-                this.followingLinesContain(i, lines, /\bfrom\b/, RAISE_CAUSE_LOOKAHEAD_LINES);
-            if (inExcept && RAISE_RE.test(codeOnly) && !hasCauseAhead) {
-                emit(
-                    i,
-                    'PYM-RAISE-001',
-                    '`raise` inside an except block without `from` drops the original exception chain.',
-                    SEVERITY_WARNING,
-                    'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
-                    { line: trimmed },
-                );
-            }
-
-            const isAsyncDef = ASYNC_DEF_RE.test(line);
-            const isDef = isAsyncDef || DEF_RE.test(line) || CLASS_RE.test(line);
-            const signature = line.includes('(') ? line.slice(line.indexOf('(') + 1) : '';
-            if (isDef && signature !== '' && MUTABLE_DEFAULT_RE.test(signature)) {
-                emit(
-                    i,
-                    'PYM-DEFAULT-001',
-                    'Mutable default argument detected: the default is created once and shared by every call.',
-                    SEVERITY_WARNING,
-                    'Use a `None` sentinel and build the list/dict/set inside the body.',
-                    { line: trimmed },
-                );
-            }
-
-            if (inAsync && !ASYNC_DEF_RE.test(line)) {
-                if (BLOCKING_CALL_RE.test(line)) {
-                    emit(
-                        i,
-                        'PYM-ASYNC-001',
-                        'Blocking call inside an async function blocks the event loop.',
-                        SEVERITY_ERROR,
-                        'Use the async equivalent (asyncio.sleep, httpx, async repository) or run the blocking call in a thread.',
-                        { line: trimmed },
-                    );
-                } else if (!AWAITED_ORM_CALL_RE.test(line) && SYNC_ORM_CALL_RE.test(line)) {
-                    emit(
-                        i,
-                        'PYM-ASYNC-001',
-                        'Synchronous ORM call inside an async function is not awaited.',
-                        SEVERITY_ERROR,
-                        'Await the async session (`await session.execute(...)`) or use the async repository API.',
-                        { line: trimmed },
-                    );
-                }
-            }
-
-            if (PERCENT_FORMAT_RE.test(line)) {
-                emit(
-                    i,
-                    'PYM-FSTRING-001',
-                    'Percent-formatting is legacy: f-strings are faster and harder to misalign.',
-                    SEVERITY_WARNING,
-                    'Rewrite as an f-string (`f"...{value}"`).',
-                    { line: trimmed },
-                );
-            }
-
-            if (/\bopen\s*\(/.test(line) && !inWith && !WITH_RE.test(line)) {
-                emit(
-                    i,
-                    'PYM-OPEN-001',
-                    '`open()` without a `with` block leaks the file handle on error paths.',
-                    SEVERITY_WARNING,
-                    'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
-                    { line: trimmed },
-                );
-            }
-
-            if (PY_PEP585_RE.test(line)) {
-                const hit = PY_PEP585_RE.exec(line)?.[1] ?? '';
-                emit(
-                    i,
-                    'PYM-GENERIC-001',
-                    `typing.${hit}[...] is legacy: PEP 585 parameterizes the builtin instead.`,
-                    SEVERITY_ERROR,
-                    `Use \`${hit.toLowerCase()}[...]\` rather than typing.${hit}.`,
-                    { line: trimmed, name: hit },
-                );
-            }
-
-            const abcImport = ABC_IMPORT_RE.exec(trimmed);
-            if (abcImport) {
-                const offenders = abcImport[1]
-                    .replace(/[()]/g, '')
-                    .split(',')
-                    .map((part) =>
-                        part
-                            .trim()
-                            .split(/\s+as\s+/)[0]
-                            .trim(),
-                    )
-                    .filter((name) => PY_ABC_TYPING_NAMES.has(name));
-                if (offenders.length > 0) {
-                    emit(
-                        i,
-                        'PYM-ABC-001',
-                        `Abstract type(s) ${offenders.join(', ')} belong to collections.abc, not typing.`,
-                        SEVERITY_ERROR,
-                        'Import these names from collections.abc (the typing aliases are deprecated).',
-                        { names: offenders },
-                    );
-                }
-            }
-
-            if (/\btimezone\.utc\b/.test(line)) {
-                emit(
-                    i,
-                    'PYM-DATETIME-001',
-                    'timezone.utc is superseded by the datetime.UTC singleton.',
-                    SEVERITY_ERROR,
-                    'Use `datetime.UTC` (PEP 615 / ruff UP017).',
-                    { line: trimmed },
-                );
-            }
-
-            if (PY_PEP604_ANN_ASSIGN_RE.test(line) || PY_PEP604_ALIAS_RE.test(line)) {
-                emit(
-                    i,
-                    'PYM-UNION-001',
-                    'Optional/Union in an annotation or alias: PEP 604 unions read better.',
-                    SEVERITY_ERROR,
-                    'Write `X | None` / `X | Y` instead of Optional/Union.',
-                    { line: trimmed },
-                );
-            }
-
-            if (PY_DATACLASS_RE.test(trimmed)) {
-                let j = i + 1;
-                while (
-                    j < lines.length &&
-                    (lines[j].trim().startsWith('@') || lines[j].trim() === '')
-                )
-                    j++;
-                const next = j < lines.length ? lines[j].trim() : '';
-                if (/^class\s+[A-Za-z_]\w*\s*:/.test(next) && !/\bslots\s*=/.test(trimmed)) {
-                    emit(
-                        i,
-                        'PYM-SLOTS-001',
-                        'Dataclass without slots=True: instances carry a __dict__ and typos create silent attributes.',
-                        SEVERITY_WARNING,
-                        'Add `slots=True` (or an explicit `slots=False` when __dict__ is genuinely required).',
-                        { line: trimmed },
-                    );
-                }
-            }
-
-            const moduleLevel =
-                indent === 0 &&
-                !this.hasKind(blocks, 'def') &&
-                !this.hasKind(blocks, PYTHON_ASYNC_KEYWORD) &&
-                !this.hasKind(blocks, 'class');
-            if (moduleLevel && /^(?:import|from)\s+/.test(trimmed)) {
-                importRecords.push({
-                    line: i + 1,
-                    text: trimmed,
-                    section: this.importSection(trimmed, file),
-                });
-            }
-
-            if (BLOCK_OPEN_RE.test(trimmed)) {
-                blocks.push({ indent, kind: this.kindOf(trimmed) });
-            }
+    private auditModernSyntax(line: string, trimmed: string, i: number, emit: PyEmitter): void {
+        if (line.includes('os.path.')) {
+            emit(
+                i,
+                'PYM-PATH-001',
+                'os.path usage: prefer pathlib.Path for path manipulation.',
+                SEVERITY_WARNING,
+                'Build paths with pathlib.Path (`Path(...) / name`), which is OS-neutral and self-documenting.',
+                { line: trimmed },
+            );
         }
 
-        this.checkImportOrder(importRecords, emit);
-        return issues;
+        if (PERCENT_FORMAT_RE.test(line)) {
+            emit(
+                i,
+                'PYM-FSTRING-001',
+                'Percent-formatting is legacy: f-strings are faster and harder to misalign.',
+                SEVERITY_WARNING,
+                'Rewrite as an f-string (`f"...{value}"`).',
+                { line: trimmed },
+            );
+        }
+
+        if (/\btimezone\.utc\b/.test(line)) {
+            emit(
+                i,
+                'PYM-DATETIME-001',
+                'timezone.utc is superseded by the datetime.UTC singleton.',
+                SEVERITY_ERROR,
+                'Use `datetime.UTC` (PEP 615 / ruff UP017).',
+                { line: trimmed },
+            );
+        }
+
+        if (PY_PEP604_ANN_ASSIGN_RE.test(line) || PY_PEP604_ALIAS_RE.test(line)) {
+            emit(
+                i,
+                'PYM-UNION-001',
+                'Optional/Union in an annotation or alias: PEP 604 unions read better.',
+                SEVERITY_ERROR,
+                'Write `X | None` / `X | Y` instead of Optional/Union.',
+                { line: trimmed },
+            );
+        }
+    }
+
+    private auditModernTyping(line: string, trimmed: string, i: number, emit: PyEmitter): void {
+        if (PY_PEP585_RE.test(line)) {
+            const hit = PY_PEP585_RE.exec(line)?.[1] ?? '';
+            emit(
+                i,
+                'PYM-GENERIC-001',
+                `typing.${hit}[...] is legacy: PEP 585 parameterizes the builtin instead.`,
+                SEVERITY_ERROR,
+                `Use \`${hit.toLowerCase()}[...]\` rather than typing.${hit}.`,
+                { line: trimmed, name: hit },
+            );
+        }
+
+        const abcImport = ABC_IMPORT_RE.exec(trimmed);
+        if (abcImport) {
+            const offenders = abcImport[1]
+                .replace(/[()]/g, '')
+                .split(',')
+                .map((part) =>
+                    part
+                        .trim()
+                        .split(/\s+as\s+/)[0]
+                        .trim(),
+                )
+                .filter((name) => PY_ABC_TYPING_NAMES.has(name));
+            if (offenders.length > 0) {
+                emit(
+                    i,
+                    'PYM-ABC-001',
+                    `Abstract type(s) ${offenders.join(', ')} belong to collections.abc, not typing.`,
+                    SEVERITY_ERROR,
+                    'Import these names from collections.abc (the typing aliases are deprecated).',
+                    { names: offenders },
+                );
+            }
+        }
+    }
+
+    private auditControlFlow(
+        line: string,
+        trimmed: string,
+        i: number,
+        lines: string[],
+        inExcept: boolean,
+        inWith: boolean,
+        inAsync: boolean,
+        emit: PyEmitter,
+    ): void {
+        const codeOnly = trimmed.split('#')[0].trim();
+        const hasCauseAhead =
+            RAISE_FROM_RE.test(codeOnly) ||
+            this.followingLinesContain(i, lines, /\bfrom\b/, RAISE_CAUSE_LOOKAHEAD_LINES);
+        if (inExcept && RAISE_RE.test(codeOnly) && !hasCauseAhead) {
+            emit(
+                i,
+                'PYM-RAISE-001',
+                '`raise` inside an except block without `from` drops the original exception chain.',
+                SEVERITY_WARNING,
+                'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
+                { line: trimmed },
+            );
+        }
+
+        const isAsyncDef = ASYNC_DEF_RE.test(line);
+        const isDef = isAsyncDef || DEF_RE.test(line) || CLASS_RE.test(line);
+        const signature = line.includes('(') ? line.slice(line.indexOf('(') + 1) : '';
+        if (isDef && signature !== '' && MUTABLE_DEFAULT_RE.test(signature)) {
+            emit(
+                i,
+                'PYM-DEFAULT-001',
+                'Mutable default argument detected: the default is created once and shared by every call.',
+                SEVERITY_WARNING,
+                'Use a `None` sentinel and build the list/dict/set inside the body.',
+                { line: trimmed },
+            );
+        }
+
+        if (inAsync && !ASYNC_DEF_RE.test(line)) {
+            this.auditAsyncCalls(line, trimmed, i, emit);
+        }
+
+        if (/\bopen\s*\(/.test(line) && !inWith && !WITH_RE.test(line)) {
+            emit(
+                i,
+                'PYM-OPEN-001',
+                '`open()` without a `with` block leaks the file handle on error paths.',
+                SEVERITY_WARNING,
+                'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
+                { line: trimmed },
+            );
+        }
+    }
+
+    private auditAsyncCalls(line: string, trimmed: string, i: number, emit: PyEmitter): void {
+        if (BLOCKING_CALL_RE.test(line)) {
+            emit(
+                i,
+                'PYM-ASYNC-001',
+                'Blocking call inside an async function blocks the event loop.',
+                SEVERITY_ERROR,
+                'Use the async equivalent (asyncio.sleep, httpx, async repository) or run the blocking call in a thread.',
+                { line: trimmed },
+            );
+        } else if (!AWAITED_ORM_CALL_RE.test(line) && SYNC_ORM_CALL_RE.test(line)) {
+            emit(
+                i,
+                'PYM-ASYNC-001',
+                'Synchronous ORM call inside an async function is not awaited.',
+                SEVERITY_ERROR,
+                'Await the async session (`await session.execute(...)`) or use the async repository API.',
+                { line: trimmed },
+            );
+        }
+    }
+
+    private auditDataclassSlots(
+        trimmed: string,
+        i: number,
+        lines: string[],
+        emit: PyEmitter,
+    ): void {
+        if (!PY_DATACLASS_RE.test(trimmed)) return;
+        let j = i + 1;
+        while (j < lines.length && (lines[j].trim().startsWith('@') || lines[j].trim() === '')) {
+            j++;
+        }
+        const next = j < lines.length ? lines[j].trim() : '';
+        if (/^class\s+[A-Za-z_]\w*\s*:/.test(next) && !/\bslots\s*=/.test(trimmed)) {
+            emit(
+                i,
+                'PYM-SLOTS-001',
+                'Dataclass without slots=True: instances carry a __dict__ and typos create silent attributes.',
+                SEVERITY_WARNING,
+                'Add `slots=True` (or an explicit `slots=False` when __dict__ is genuinely required).',
+                { line: trimmed },
+            );
+        }
+    }
+
+    private recordModuleImports(
+        trimmed: string,
+        indent: number,
+        blocks: Block[],
+        file: string,
+        i: number,
+        importRecords: ImportRecord[],
+    ): void {
+        const moduleLevel =
+            indent === 0 &&
+            !this.hasKind(blocks, 'def') &&
+            !this.hasKind(blocks, PYTHON_ASYNC_KEYWORD) &&
+            !this.hasKind(blocks, 'class');
+        if (moduleLevel && /^(?:import|from)\s+/.test(trimmed)) {
+            importRecords.push({
+                line: i + 1,
+                text: trimmed,
+                section: this.importSection(trimmed, file),
+            });
+        }
     }
 
     /**
