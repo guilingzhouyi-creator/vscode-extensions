@@ -30,6 +30,12 @@ interface ArchitectureOptions {
     checkDtoCredentialLeakage?: boolean;
 }
 
+interface SpecifierInfo {
+    raw: string;
+    isExternal: boolean;
+    resolvedPath?: string;
+}
+
 const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = [
     // Web & UI frameworks
     'express',
@@ -237,14 +243,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         }
     }
 
-    private extractSpecifiers(
-        lineText: string,
-        trimmed: string,
-        file: string,
-    ): Array<{ raw: string; isExternal: boolean; resolvedPath?: string }> {
-        const specifiers: Array<{ raw: string; isExternal: boolean; resolvedPath?: string }> = [];
-
-        // 1. TS/JS imports
+    private extractJsSpecifiers(lineText: string, file: string, specifiers: SpecifierInfo[]): void {
         JS_IMPORT_RE.lastIndex = 0;
         let m: RegExpExecArray | null;
         while ((m = JS_IMPORT_RE.exec(lineText)) !== null) {
@@ -261,9 +260,11 @@ export class ArchitectureAnalyzer implements Analyzer {
                 });
             }
         }
+    }
 
-        // 2. GDScript imports
+    private extractGdScriptSpecifiers(lineText: string, specifiers: SpecifierInfo[]): void {
         GDSCRIPT_IMPORT_RE.lastIndex = 0;
+        let m: RegExpExecArray | null;
         while ((m = GDSCRIPT_IMPORT_RE.exec(lineText)) !== null) {
             const raw = m[1] || m[2];
             if (raw) {
@@ -274,89 +275,101 @@ export class ArchitectureAnalyzer implements Analyzer {
                 });
             }
         }
+    }
 
-        // 3. Python imports
+    private extractPythonSpecifiers(
+        trimmed: string,
+        file: string,
+        specifiers: SpecifierInfo[],
+    ): void {
+        const pyMatch = trimmed.match(PYTHON_FROM_IMPORT_RE);
+        if (!pyMatch) return;
+        const mod = pyMatch[1] || pyMatch[2];
+        if (!mod) return;
+        const isRelative = mod.startsWith('.');
+        const cleanMod = mod.replace(/^\.+/, '').replace(/\./g, '/');
+        specifiers.push({
+            raw: mod,
+            isExternal:
+                !isRelative &&
+                !mod.startsWith('app') &&
+                !mod.startsWith(ARCHITECTURE_LAYER_DOMAIN) &&
+                !mod.startsWith('infra'),
+            resolvedPath: isRelative
+                ? path.posix.normalize(path.posix.join(path.posix.dirname(file), cleanMod))
+                : cleanMod,
+        });
+    }
+
+    private extractRustSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
+        const rustMatch = trimmed.match(RUST_USE_RE);
+        if (rustMatch && rustMatch[1]) {
+            specifiers.push({
+                raw: rustMatch[1],
+                isExternal: false,
+                resolvedPath: rustMatch[1].replace(/::/g, '/'),
+            });
+        }
+    }
+
+    private extractGoSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
+        const goMatch = trimmed.match(GO_IMPORT_RE);
+        if (goMatch && goMatch[1]) {
+            specifiers.push({
+                raw: goMatch[1],
+                isExternal: !goMatch[1].includes('.'),
+                resolvedPath: goMatch[1],
+            });
+        }
+    }
+
+    private extractJvmSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
+        const jvmMatch = trimmed.match(JAVA_IMPORT_RE);
+        if (jvmMatch && jvmMatch[1]) {
+            specifiers.push({
+                raw: jvmMatch[1],
+                isExternal:
+                    jvmMatch[1].startsWith('java.') ||
+                    jvmMatch[1].startsWith('javax.') ||
+                    jvmMatch[1].startsWith('kotlin.'),
+                resolvedPath: jvmMatch[1].replace(/\./g, '/'),
+            });
+        }
+    }
+
+    private extractCSharpSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
+        const csMatch = trimmed.match(CSHARP_USING_RE);
+        if (csMatch && csMatch[1]) {
+            specifiers.push({
+                raw: csMatch[1],
+                isExternal: csMatch[1].startsWith('System.') || csMatch[1].startsWith('Microsoft.'),
+                resolvedPath: csMatch[1].replace(/\./g, '/'),
+            });
+        }
+    }
+
+    private extractSpecifiers(lineText: string, trimmed: string, file: string): SpecifierInfo[] {
+        const specifiers: SpecifierInfo[] = [];
+        this.extractJsSpecifiers(lineText, file, specifiers);
+        this.extractGdScriptSpecifiers(lineText, specifiers);
+
         if (file.endsWith('.py')) {
-            const pyMatch = trimmed.match(PYTHON_FROM_IMPORT_RE);
-            if (pyMatch) {
-                const mod = pyMatch[1] || pyMatch[2];
-                if (mod) {
-                    const isRelative = mod.startsWith('.');
-                    const cleanMod = mod.replace(/^\.+/, '').replace(/\./g, '/');
-                    specifiers.push({
-                        raw: mod,
-                        isExternal:
-                            !isRelative &&
-                            !mod.startsWith('app') &&
-                            !mod.startsWith(ARCHITECTURE_LAYER_DOMAIN) &&
-                            !mod.startsWith('infra'),
-                        resolvedPath: isRelative
-                            ? path.posix.normalize(
-                                  path.posix.join(path.posix.dirname(file), cleanMod),
-                              )
-                            : cleanMod,
-                    });
-                }
-            }
-        }
-
-        // 4. Rust uses
-        if (file.endsWith('.rs')) {
-            const rustMatch = trimmed.match(RUST_USE_RE);
-            if (rustMatch && rustMatch[1]) {
-                specifiers.push({
-                    raw: rustMatch[1],
-                    isExternal: false,
-                    resolvedPath: rustMatch[1].replace(/::/g, '/'),
-                });
-            }
-        }
-
-        // 5. Go imports
-        if (file.endsWith('.go')) {
-            const goMatch = trimmed.match(GO_IMPORT_RE);
-            if (goMatch && goMatch[1]) {
-                specifiers.push({
-                    raw: goMatch[1],
-                    isExternal: !goMatch[1].includes('.'),
-                    resolvedPath: goMatch[1],
-                });
-            }
-        }
-
-        // 6. Java & Kotlin imports
-        if (file.endsWith('.java') || file.endsWith('.kt') || file.endsWith('.kts')) {
-            const jvmMatch = trimmed.match(JAVA_IMPORT_RE);
-            if (jvmMatch && jvmMatch[1]) {
-                specifiers.push({
-                    raw: jvmMatch[1],
-                    isExternal:
-                        jvmMatch[1].startsWith('java.') ||
-                        jvmMatch[1].startsWith('javax.') ||
-                        jvmMatch[1].startsWith('kotlin.'),
-                    resolvedPath: jvmMatch[1].replace(/\./g, '/'),
-                });
-            }
-        }
-
-        // 7. C# usings
-        if (file.endsWith('.cs')) {
-            const csMatch = trimmed.match(CSHARP_USING_RE);
-            if (csMatch && csMatch[1]) {
-                specifiers.push({
-                    raw: csMatch[1],
-                    isExternal:
-                        csMatch[1].startsWith('System.') || csMatch[1].startsWith('Microsoft.'),
-                    resolvedPath: csMatch[1].replace(/\./g, '/'),
-                });
-            }
+            this.extractPythonSpecifiers(trimmed, file, specifiers);
+        } else if (file.endsWith('.rs')) {
+            this.extractRustSpecifiers(trimmed, specifiers);
+        } else if (file.endsWith('.go')) {
+            this.extractGoSpecifiers(trimmed, specifiers);
+        } else if (file.endsWith('.java') || file.endsWith('.kt') || file.endsWith('.kts')) {
+            this.extractJvmSpecifiers(trimmed, specifiers);
+        } else if (file.endsWith('.cs')) {
+            this.extractCSharpSpecifiers(trimmed, specifiers);
         }
 
         return specifiers;
     }
 
     private auditSpecifiers(
-        specifiers: Array<{ raw: string; isExternal: boolean; resolvedPath?: string }>,
+        specifiers: SpecifierInfo[],
         file: string,
         currentLayer: ArchitectureLayer,
         lineIdx: number,

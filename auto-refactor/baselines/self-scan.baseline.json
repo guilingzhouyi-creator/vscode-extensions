@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T06:35:00.672Z",
+  "timestamp": "2026-09-18T06:39:29.436Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -973,7 +973,7 @@
     },
     {
       "key": "complexity|high-complexity|src/analyzers/architecture.ts",
-      "count": 3
+      "count": 2
     },
     {
       "key": "governance|GOV-LOG-001|src/analyzers/architecture.ts",
@@ -981,7 +981,7 @@
     },
     {
       "key": "simplify|SIM-LONG-001|src/analyzers/architecture.ts",
-      "count": 3
+      "count": 2
     },
     {
       "key": "governance|GOV-PRF-002|src/analyzers/architecture.ts",
