@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T15:28:41.681Z",
+  "timestamp": "2026-09-18T15:39:37.233Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2632,24 +2632,32 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/scanner/cacheScanner.ts",
-      "count": 1
+      "key": "complexity|high-complexity|src/core/scanner/cacheProbe.ts",
+      "count": 2
     },
     {
-      "key": "complexity|high-complexity|src/core/scanner/cacheScanner.ts",
+      "key": "governance|GOV-LOG-001|src/core/scanner/cacheProbe.ts",
       "count": 3
     },
     {
-      "key": "governance|GOV-LOG-001|src/core/scanner/cacheScanner.ts",
-      "count": 3
+      "key": "simplify|SIM-LONG-001|src/core/scanner/cacheProbe.ts",
+      "count": 2
     },
     {
-      "key": "simplify|SIM-LONG-001|src/core/scanner/cacheScanner.ts",
+      "key": "constants|hardcoded-string|src/core/scanner/cacheProbe.ts",
       "count": 3
     },
     {
       "key": "constants|hardcoded-string|src/core/scanner/cacheScanner.ts",
-      "count": 3
+      "count": 1
+    },
+    {
+      "key": "complexity|high-complexity|src/core/scanner/cacheScanner.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/scanner/cacheScanner.ts",
+      "count": 1
     },
     {
       "key": "performance|PRF-ALG-001|src/core/scanner/cacheScanner.ts",
