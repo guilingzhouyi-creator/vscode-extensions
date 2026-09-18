@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T15:46:46.989Z",
+  "timestamp": "2026-09-18T15:51:37.771Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2604,16 +2604,12 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/scanner/analyzerRunner.ts",
+      "key": "comments|CMT-DOC-001|src/core/scanner/analyzerRunner.ts",
       "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/scanner/analyzerRunner.ts",
-      "count": 9
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/scanner/analyzerRunner.ts",
-      "count": 1
+      "count": 4
     },
     {
       "key": "constants|hardcoded-string|src/core/scanner/cacheKeyHelper.ts",
@@ -2709,6 +2705,14 @@
     },
     {
       "key": "performance|PRF-ALG-001|src/core/scanner/diffScanner.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/scanner/legacyAnalyzers.ts",
+      "count": 5
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/scanner/legacyAnalyzers.ts",
       "count": 1
     },
     {
