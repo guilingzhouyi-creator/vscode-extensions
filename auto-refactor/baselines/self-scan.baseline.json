@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T15:17:57.305Z",
+  "timestamp": "2026-09-18T15:28:41.681Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -577,7 +577,7 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-language-support.js",
-      "count": 27
+      "count": 30
     },
     {
       "key": "governance|GOV-PRF-002|scripts/validate-language-support.js",
@@ -2656,32 +2656,48 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/scanner/diffScanner.ts",
+      "key": "complexity|high-complexity|src/core/scanner/diffHints.ts",
+      "count": 2
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/scanner/diffHints.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-TYP-003|src/core/scanner/diffHints.ts",
       "count": 1
     },
     {
-      "key": "complexity|high-complexity|src/core/scanner/diffScanner.ts",
-      "count": 4
+      "key": "constants|hardcoded-string|src/core/scanner/diffHints.ts",
+      "count": 3
     },
     {
-      "key": "simplify|SIM-LONG-001|src/core/scanner/diffScanner.ts",
-      "count": 4
+      "key": "hygiene|HYG-CLN-001|src/core/scanner/diffHints.ts",
+      "count": 1
     },
     {
-      "key": "governance|GOV-TYP-003|src/core/scanner/diffScanner.ts",
+      "key": "governance|GOV-LOG-001|src/core/scanner/diffHints.ts",
       "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/scanner/diffScanner.ts",
-      "count": 5
+      "count": 3
+    },
+    {
+      "key": "complexity|high-complexity|src/core/scanner/diffScanner.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/scanner/diffScanner.ts",
+      "count": 2
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/scanner/diffScanner.ts",
+      "count": 2
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/scanner/diffScanner.ts",
       "count": 1
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/scanner/diffScanner.ts",
-      "count": 3
     },
     {
       "key": "performance|PRF-ALG-001|src/core/scanner/diffScanner.ts",
