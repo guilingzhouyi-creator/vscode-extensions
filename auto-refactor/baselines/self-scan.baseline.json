@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T12:37:05.424Z",
+  "timestamp": "2026-09-18T13:13:53.262Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2348,12 +2348,48 @@
       "count": 13
     },
     {
+      "key": "complexity|high-complexity|src/core/profiler/manifestDetector.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/profiler/manifestDetector.ts",
+      "count": 50
+    },
+    {
+      "key": "governance|GOV-PRF-004|src/core/profiler/manifestDetector.ts",
+      "count": 23
+    },
+    {
+      "key": "performance|PRF-IO-001|src/core/profiler/manifestDetector.ts",
+      "count": 4
+    },
+    {
+      "key": "complexity|high-complexity|src/core/profiler/maturityClassifier.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/profiler/maturityClassifier.ts",
+      "count": 13
+    },
+    {
+      "key": "governance|GOV-PRF-004|src/core/profiler/maturityClassifier.ts",
+      "count": 6
+    },
+    {
+      "key": "performance|PRF-IO-001|src/core/profiler/maturityClassifier.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/profiler/maturityClassifier.ts",
+      "count": 1
+    },
+    {
       "key": "large-file|large-file|src/core/profiler/projectProfiler.ts",
       "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/profiler/projectProfiler.ts",
-      "count": 121
+      "count": 54
     },
     {
       "key": "hygiene|HYG-DED-001|src/core/profiler/projectProfiler.ts",
@@ -2361,23 +2397,19 @@
     },
     {
       "key": "complexity|high-complexity|src/core/profiler/projectProfiler.ts",
-      "count": 3
+      "count": 2
     },
     {
       "key": "governance|GOV-LOG-001|src/core/profiler/projectProfiler.ts",
-      "count": 3
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/profiler/projectProfiler.ts",
-      "count": 3
+      "count": 2
     },
     {
       "key": "governance|GOV-PRF-004|src/core/profiler/projectProfiler.ts",
-      "count": 36
+      "count": 5
     },
     {
       "key": "performance|PRF-IO-001|src/core/profiler/projectProfiler.ts",
-      "count": 7
+      "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/profiler/scaleTuner.ts",
