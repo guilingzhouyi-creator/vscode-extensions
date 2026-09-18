@@ -36,6 +36,170 @@ const SWALLOWED_EXCEPTION_RULE_ID = 'GOV-EXC-001';
 const SWALLOWED_EXCEPTION_SUGGESTION = 'Handle, log, or explicitly re-throw the caught exception.';
 
 /**
+ * Inspects a multi-line Python except block to detect if all contained statements are swallowed.
+ */
+function inspectPythonExceptBlock(
+    lines: string[],
+    startIndex: number,
+    indent: number,
+): { hasStatements: boolean; allSwallowed: boolean; lastIndex: number } {
+    let allSwallowed = true;
+    let hasStatements = false;
+    let j = startIndex;
+
+    while (j < lines.length) {
+        const nextLine = lines[j];
+        const nextTrimmed = nextLine.trim();
+        if (!nextTrimmed || nextTrimmed.startsWith('#')) {
+            j++;
+            continue;
+        }
+
+        const nextIndent = nextLine.search(/\S/);
+        if (nextIndent <= indent) {
+            // Exited the except block
+            break;
+        }
+
+        hasStatements = true;
+        if (nextTrimmed !== 'pass' && nextTrimmed !== '...') {
+            allSwallowed = false;
+            break;
+        }
+        j++;
+    }
+
+    return { hasStatements, allSwallowed, lastIndex: j };
+}
+
+/**
+ * Checks Python lines for bare excepts and single- or multi-line swallowed exceptions.
+ */
+function checkPythonExceptions(lines: string[]): GovernanceViolation[] {
+    const violations: GovernanceViolation[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (trimmed.startsWith('#')) continue;
+
+        // 1. Bare except:
+        if (PY_BARE_EXCEPT_RE.test(trimmed)) {
+            violations.push({
+                ruleId: SWALLOWED_EXCEPTION_RULE_ID,
+                message:
+                    'Bare `except:` clause catches all exceptions including SystemExit; specify explicit exception types.',
+                line: i + 1,
+                column: line.indexOf('except') + 1,
+                suggestion:
+                    'Catch specific exceptions like `except Exception as e:` or specific error types.',
+                fixable: false,
+            });
+        }
+
+        // 2. Swallowed exception (single-line or multi-line pass/...)
+        if (SINGLE_LINE_SWALLOW.test(trimmed)) {
+            violations.push({
+                ruleId: SWALLOWED_EXCEPTION_RULE_ID,
+                message:
+                    'Empty or swallowed `except` block with no active handling statements.',
+                line: i + 1,
+                column: line.indexOf('except') + 1,
+                suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
+                fixable: false,
+            });
+            continue;
+        }
+
+        // Multi-line swallowed:
+        if (PY_EXCEPT_LINE_RE.test(trimmed) && trimmed.endsWith(':')) {
+            const indent = line.search(/\S/);
+            const block = inspectPythonExceptBlock(lines, i + 1, indent);
+
+            if (block.hasStatements && block.allSwallowed) {
+                violations.push({
+                    ruleId: SWALLOWED_EXCEPTION_RULE_ID,
+                    message:
+                        'Empty or swallowed `except` block with no active handling statements.',
+                    line: i + 1,
+                    column: line.indexOf('except') + 1,
+                    suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
+                    fixable: false,
+                });
+                i = block.lastIndex - 1; // Jump cursor over swallowed statements
+            }
+        }
+    }
+    return violations;
+}
+
+/**
+ * Inspects a multi-line JS/TS catch block for active statements and documented rationale markers.
+ */
+function inspectJsCatchBlock(
+    lines: string[],
+    startIndex: number,
+): { empty: boolean; documented: boolean; isClosed: boolean } {
+    let j = startIndex;
+    let empty = true;
+    let documented = false;
+    while (j < lines.length) {
+        const next = lines[j].trim();
+        if (next === '}') break;
+        if (
+            next &&
+            !next.startsWith('//') &&
+            !next.startsWith('/*') &&
+            !next.startsWith('*')
+        ) {
+            empty = false;
+            break;
+        }
+        if (next && DOCUMENTED_CATCH_RE.test(next)) documented = true;
+        j++;
+    }
+    const isClosed = j < lines.length && lines[j].trim() === '}';
+    return { empty, documented, isClosed };
+}
+
+/**
+ * Checks JS/TS lines for empty catch blocks lacking documented rationale markers.
+ */
+function checkJsTsExceptions(lines: string[]): GovernanceViolation[] {
+    const violations: GovernanceViolation[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
+
+        if (EMPTY_CATCH_SINGLE_RE.test(line)) {
+            violations.push({
+                ruleId: SWALLOWED_EXCEPTION_RULE_ID,
+                message: 'Empty `catch` block silently swallows exceptions.',
+                line: i + 1,
+                column: line.indexOf('catch') + 1,
+                suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
+                fixable: false,
+            });
+            continue;
+        }
+
+        if (CATCH_HEAD_RE.test(line.trim()) && i + 1 < lines.length) {
+            const block = inspectJsCatchBlock(lines, i + 1);
+            if (block.empty && !block.documented && block.isClosed) {
+                violations.push({
+                    ruleId: SWALLOWED_EXCEPTION_RULE_ID,
+                    message: 'Empty `catch` block with no active handling statements.',
+                    line: i + 1,
+                    column: lines[i].indexOf('catch') + 1,
+                    suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
+                    fixable: false,
+                });
+            }
+        }
+    }
+    return violations;
+}
+
+/**
  * GOV-EXC-001: Swallowed Exception Governance.
  * Flags empty `catch` blocks in TypeScript/JavaScript and bare/swallowed except in Python.
  */
@@ -50,141 +214,14 @@ export const SwallowedExceptionRule: GovernanceRule = {
     isFixable: false,
     languages: ['typescript', 'javascript', 'python'],
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        const violations: GovernanceViolation[] = [];
         // RAW view on purpose: this rule exempts a catch whose handling is DOCUMENTED by a
         // rationale marker in the comment, so the comment is evidence rather than noise. Masking
         // it removed the exemption and multiplied the findings (1 -> 45 on this repository).
         const lines = ctx.lines;
         const lang = ctx.capabilities.languageId;
 
-        if (lang === 'python') {
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const trimmed = line.trim();
-                if (trimmed.startsWith('#')) continue;
-
-                // 1. Bare except:
-                if (PY_BARE_EXCEPT_RE.test(trimmed)) {
-                    violations.push({
-                        ruleId: SWALLOWED_EXCEPTION_RULE_ID,
-                        message:
-                            'Bare `except:` clause catches all exceptions including SystemExit; specify explicit exception types.',
-                        line: i + 1,
-                        column: line.indexOf('except') + 1,
-                        suggestion:
-                            'Catch specific exceptions like `except Exception as e:` or specific error types.',
-                        fixable: false,
-                    });
-                }
-
-                // 2. Swallowed exception (single-line or multi-line pass/...)
-                if (SINGLE_LINE_SWALLOW.test(trimmed)) {
-                    violations.push({
-                        ruleId: SWALLOWED_EXCEPTION_RULE_ID,
-                        message:
-                            'Empty or swallowed `except` block with no active handling statements.',
-                        line: i + 1,
-                        column: line.indexOf('except') + 1,
-                        suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
-                        fixable: false,
-                    });
-                    continue;
-                }
-
-                // Multi-line swallowed:
-                if (PY_EXCEPT_LINE_RE.test(trimmed) && trimmed.endsWith(':')) {
-                    const indent = line.search(/\S/);
-                    let allSwallowed = true;
-                    let hasStatements = false;
-                    let j = i + 1;
-
-                    while (j < lines.length) {
-                        const nextLine = lines[j];
-                        const nextTrimmed = nextLine.trim();
-                        if (!nextTrimmed || nextTrimmed.startsWith('#')) {
-                            j++;
-                            continue;
-                        }
-
-                        const nextIndent = nextLine.search(/\S/);
-                        if (nextIndent <= indent) {
-                            // Exited the except block
-                            break;
-                        }
-
-                        hasStatements = true;
-                        if (nextTrimmed !== 'pass' && nextTrimmed !== '...') {
-                            allSwallowed = false;
-                            break;
-                        }
-                        j++;
-                    }
-
-                    if (hasStatements && allSwallowed) {
-                        violations.push({
-                            ruleId: SWALLOWED_EXCEPTION_RULE_ID,
-                            message:
-                                'Empty or swallowed `except` block with no active handling statements.',
-                            line: i + 1,
-                            column: line.indexOf('except') + 1,
-                            suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
-                            fixable: false,
-                        });
-                        i = j - 1; // Jump cursor over swallowed statements
-                    }
-                }
-            }
-
-            return violations.length > 0 ? violations : null;
-        }
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
-
-            if (EMPTY_CATCH_SINGLE_RE.test(line)) {
-                violations.push({
-                    ruleId: SWALLOWED_EXCEPTION_RULE_ID,
-                    message: 'Empty `catch` block silently swallows exceptions.',
-                    line: i + 1,
-                    column: line.indexOf('catch') + 1,
-                    suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
-                    fixable: false,
-                });
-                continue;
-            }
-
-            if (CATCH_HEAD_RE.test(line.trim()) && i + 1 < lines.length) {
-                let j = i + 1;
-                let empty = true;
-                let documented = false;
-                while (j < lines.length) {
-                    const next = lines[j].trim();
-                    if (next === '}') break;
-                    if (
-                        next &&
-                        !next.startsWith('//') &&
-                        !next.startsWith('/*') &&
-                        !next.startsWith('*')
-                    ) {
-                        empty = false;
-                        break;
-                    }
-                    if (next && DOCUMENTED_CATCH_RE.test(next)) documented = true;
-                    j++;
-                }
-                if (empty && !documented && j < lines.length && lines[j].trim() === '}') {
-                    violations.push({
-                        ruleId: SWALLOWED_EXCEPTION_RULE_ID,
-                        message: 'Empty `catch` block with no active handling statements.',
-                        line: i + 1,
-                        column: lines[i].indexOf('catch') + 1,
-                        suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
-                        fixable: false,
-                    });
-                }
-            }
-        }
+        const violations =
+            lang === 'python' ? checkPythonExceptions(lines) : checkJsTsExceptions(lines);
 
         return violations.length > 0 ? violations : null;
     },

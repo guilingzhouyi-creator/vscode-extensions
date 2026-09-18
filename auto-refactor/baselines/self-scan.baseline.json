@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T13:41:59.916Z",
+  "timestamp": "2026-09-18T13:52:32.957Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1712,20 +1712,12 @@
       "count": 23
     },
     {
-      "key": "complexity|high-complexity|src/core/governance/rules/exceptionSafety.ts",
-      "count": 1
-    },
-    {
       "key": "governance|GOV-LOG-001|src/core/governance/rules/exceptionSafety.ts",
-      "count": 1
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/governance/rules/exceptionSafety.ts",
-      "count": 1
+      "count": 2
     },
     {
       "key": "governance|GOV-PRF-002|src/core/governance/rules/exceptionSafety.ts",
-      "count": 5
+      "count": 6
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/governance/rules/exceptionSafety.ts",
