@@ -304,96 +304,118 @@ export class CacheStore {
     private load(): void {
         if (this.loaded) return;
         this.loaded = true;
-        // L1 fingerprints are tiny — always load.
+        this.loadFingerprints();
+        this.loadResults();
+        this.loadPaths();
+    }
+
+    private readLinesSafe(filePath: string): string[] {
         try {
-            const lines = fs.readFileSync(this.fingerprintsPath, 'utf8').split('\n');
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const o = JSON.parse(line);
-                    if (
-                        o &&
-                        o.t === 'f' &&
-                        typeof o.p === TYPEOF_STRING &&
-                        typeof o.m === TYPEOF_NUMBER &&
-                        typeof o.s === TYPEOF_NUMBER
-                    ) {
-                        this.l1.set(o.p, {
-                            mtimeMs: o.m,
-                            size: o.s,
-                            ino: typeof o.i === TYPEOF_NUMBER ? o.i : undefined,
-                        });
-                    }
-                } catch {
-                    /* Best-effort: skip corrupt line */
-                }
-            }
+            return fs.readFileSync(filePath, 'utf8').split('\n');
         } catch {
-            /* Expected: missing or empty fingerprints file */
+            return [];
         }
-        // L2 results can be large — guard the load so a huge cache never regresses cold starts.
+    }
+
+    private loadFingerprints(): void {
+        const lines = this.readLinesSafe(this.fingerprintsPath);
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            this.parseL1Line(line);
+        }
+    }
+
+    private parseL1Line(line: string): void {
+        try {
+            const o = JSON.parse(line);
+            if (!this.isValidL1(o)) return;
+            this.l1.set(o.p, {
+                mtimeMs: o.m,
+                size: o.s,
+                ino: typeof o.i === TYPEOF_NUMBER ? o.i : undefined,
+            });
+        } catch {
+            /* Best-effort: skip corrupt line */
+        }
+    }
+
+    private isValidL1(o: any): boolean {
+        return Boolean(
+            o &&
+            o.t === 'f' &&
+            typeof o.p === TYPEOF_STRING &&
+            typeof o.m === TYPEOF_NUMBER &&
+            typeof o.s === TYPEOF_NUMBER,
+        );
+    }
+
+    private loadResults(): void {
         try {
             const st = fs.statSync(this.resultsPath);
-            if (st.size > this.maxL2LoadBytes) return; // degrade to L2-miss (correct, just slower)
+            if (st.size > this.maxL2LoadBytes) return;
         } catch {
             return;
         }
-        try {
-            const lines = fs.readFileSync(this.resultsPath, 'utf8').split('\n');
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const o = JSON.parse(line);
-                    if (
-                        o &&
-                        o.t === 'r' &&
-                        typeof o.k === TYPEOF_STRING &&
-                        typeof o.p === TYPEOF_STRING &&
-                        Array.isArray(o.issues)
-                    ) {
-                        const entry: L2Entry = {
-                            k: o.k,
-                            p: o.p,
-                            issues: o.issues,
-                            metric: o.metric || null,
-                            ts: typeof o.ts === TYPEOF_NUMBER ? o.ts : 0,
-                            fm: typeof o.fm === TYPEOF_NUMBER ? o.fm : undefined,
-                            fs: typeof o.fs === TYPEOF_NUMBER ? o.fs : undefined,
-                        };
-                        this.l2.set(o.k, entry);
-                        this.indexL2ByPath(entry);
-                    }
-                } catch {
-                    /* Best-effort: skip corrupt line */
-                }
-            }
-        } catch {
-            /* Expected: missing or empty results file */
+        const lines = this.readLinesSafe(this.resultsPath);
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            this.parseL2Line(line);
         }
-        // L3: rebuild the exact per-rel byPath map from paths.jsonl (full coverage for identical
-        // content files that share one L2 key).
+    }
+
+    private parseL2Line(line: string): void {
         try {
-            const lines = fs.readFileSync(this.pathsPath, 'utf8').split('\n');
-            for (const line of lines) {
-                if (!line.trim()) continue;
-                try {
-                    const o = JSON.parse(line);
-                    if (
-                        o &&
-                        o.t === 'x' &&
-                        typeof o.pk === TYPEOF_STRING &&
-                        typeof o.k === TYPEOF_STRING
-                    ) {
-                        const e = this.l2.get(o.k);
-                        if (e) this.l2ByPath.set(o.pk, e);
-                    }
-                } catch {
-                    /* Best-effort: skip corrupt line */
-                }
-            }
+            const o = JSON.parse(line);
+            if (!this.isValidL2(o)) return;
+            const entry: L2Entry = {
+                k: o.k,
+                p: o.p,
+                issues: o.issues,
+                metric: o.metric || null,
+                ts: typeof o.ts === TYPEOF_NUMBER ? o.ts : 0,
+                fm: typeof o.fm === TYPEOF_NUMBER ? o.fm : undefined,
+                fs: typeof o.fs === TYPEOF_NUMBER ? o.fs : undefined,
+            };
+            this.l2.set(o.k, entry);
+            this.indexL2ByPath(entry);
         } catch {
-            /* Expected: missing or empty paths file */
+            /* Best-effort: skip corrupt line */
         }
+    }
+
+    private isValidL2(o: any): boolean {
+        return Boolean(
+            o &&
+            o.t === 'r' &&
+            typeof o.k === TYPEOF_STRING &&
+            typeof o.p === TYPEOF_STRING &&
+            Array.isArray(o.issues),
+        );
+    }
+
+    private loadPaths(): void {
+        const lines = this.readLinesSafe(this.pathsPath);
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            this.parsePathLine(line);
+        }
+    }
+
+    private parsePathLine(line: string): void {
+        try {
+            const o = JSON.parse(line);
+            if (!this.isValidPathEntry(o)) return;
+            const e = this.l2.get(o.k);
+            if (e) this.l2ByPath.set(o.pk, e);
+        } catch {
+            /* Best-effort: skip corrupt line */
+        }
+    }
+
+    private isValidPathEntry(o: any): boolean {
+        return Boolean(
+            o && o.t === 'x' && typeof o.pk === TYPEOF_STRING && typeof o.k === TYPEOF_STRING,
+        );
     }
 
     /** Atomic write: .tmp-<pid>-<rand> + rename (Windows MoveFileEx(REPLACE_EXISTING)). */
@@ -403,12 +425,16 @@ export class CacheStore {
         try {
             fs.renameSync(tmp, file);
         } catch (e) {
-            try {
-                fs.rmSync(tmp, { force: true });
-            } catch {
-                /* ignore */
-            }
+            this.cleanupTmpFile(tmp);
             throw e;
+        }
+    }
+
+    private cleanupTmpFile(tmp: string): void {
+        try {
+            fs.rmSync(tmp, { force: true });
+        } catch {
+            /* ignore */
         }
     }
 
@@ -596,30 +622,39 @@ export class CacheStore {
 
     /** Lazy LRU+TTL trim: drop entries past maxAgeDays, then oldest-hit entries past maxEntries. */
     cleanupIfNeeded(): void {
-        if (!this.enabled) return;
-        if (this.l2.size <= this.maxEntries) return;
-        const now = Date.now();
-        const maxAgeMs = this.maxAgeDays * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
-        const remove = (e: L2Entry) => {
-            this.l2.delete(e.k);
-            const pathKey = this.pathKeyFor(e.k, e.p, e.fm, e.fs);
-            if (this.l2ByPath.get(pathKey) === e) this.l2ByPath.delete(pathKey);
-        };
-        // 1) TTL trim.
+        if (!this.enabled || this.l2.size <= this.maxEntries) return;
         if (this.maxAgeDays > 0) {
-            for (const e of this.l2.values()) {
-                if (now - e.ts > maxAgeMs) remove(e);
+            const maxAgeMs = this.maxAgeDays * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
+            this.trimTtlEntries(Date.now(), maxAgeMs);
+        }
+        this.trimLruExcess();
+    }
+
+    private removeL2Entry(e: L2Entry): void {
+        this.l2.delete(e.k);
+        const pathKey = this.pathKeyFor(e.k, e.p, e.fm, e.fs);
+        if (this.l2ByPath.get(pathKey) === e) {
+            this.l2ByPath.delete(pathKey);
+        }
+    }
+
+    private trimTtlEntries(now: number, maxAgeMs: number): void {
+        for (const e of this.l2.values()) {
+            if (now - e.ts > maxAgeMs) {
+                this.removeL2Entry(e);
             }
         }
-        // 2) LRU trim to maxEntries (oldest last-hit first).
+    }
+
+    private trimLruExcess(): void {
         let excess = this.l2.size - this.maxEntries;
-        if (excess > 0) {
-            const sorted = [...this.l2.values()].sort((a, b) => a.ts - b.ts);
-            for (const e of sorted) {
-                if (excess <= 0) break;
-                remove(e);
-                excess--;
-            }
+        if (excess <= 0) return;
+
+        const sorted = [...this.l2.values()].sort((a, b) => a.ts - b.ts);
+        for (const e of sorted) {
+            if (excess <= 0) break;
+            this.removeL2Entry(e);
+            excess--;
         }
     }
 
@@ -633,32 +668,45 @@ export class CacheStore {
      */
     clear(): boolean {
         try {
-            if (fs.existsSync(this.dir)) {
-                try {
-                    fs.rmSync(this.dir, { recursive: true, force: true });
-                } catch {
-                    try {
-                        const stale = path.join(
-                            path.dirname(this.dir),
-                            `.auto-refactor-cache-clear-${Date.now()}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, CACHE_CLEAR_SUFFIX_END_INDEX)}`,
-                        );
-                        fs.renameSync(this.dir, stale);
-                    } catch {
-                        return false;
-                    }
-                }
-            }
-            this.l1.clear();
-            this.l2.clear();
-            this.l2ByPath.clear();
-            this.dirtyL1.clear();
-            this.dirtyL2.clear();
+            if (!this.removeCacheDir(this.dir)) return false;
+            this.resetMemoryMaps();
             this.enabled = this.init();
             if (this.enabled) this.rebuildManifest();
             return this.enabled;
         } catch {
             return false;
         }
+    }
+
+    private removeCacheDir(dir: string): boolean {
+        if (!fs.existsSync(dir)) return true;
+        try {
+            fs.rmSync(dir, { recursive: true, force: true });
+            return true;
+        } catch {
+            return this.renameStaleCacheDir(dir);
+        }
+    }
+
+    private renameStaleCacheDir(dir: string): boolean {
+        try {
+            const stale = path.join(
+                path.dirname(dir),
+                `.auto-refactor-cache-clear-${Date.now()}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, CACHE_CLEAR_SUFFIX_END_INDEX)}`,
+            );
+            fs.renameSync(dir, stale);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private resetMemoryMaps(): void {
+        this.l1.clear();
+        this.l2.clear();
+        this.l2ByPath.clear();
+        this.dirtyL1.clear();
+        this.dirtyL2.clear();
     }
 
     /**
