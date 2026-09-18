@@ -89,6 +89,79 @@ const LANGUAGE_SAMPLE_MAX_FILES = 500;
  */
 const LANGUAGE_SAMPLE_MAX_DEPTH = 4;
 
+/** Architecture layer constant for domain models and business logic. */
+export const LAYER_DOMAIN: ArchitectureLayer = 'domain';
+
+/** Architecture layer constant for application use cases and orchestrators. */
+export const LAYER_APPLICATION: ArchitectureLayer = 'application';
+
+/** Architecture layer constant for infrastructure, persistence, and external adapters. */
+export const LAYER_INFRASTRUCTURE: ArchitectureLayer = 'infrastructure';
+
+/** Architecture layer constant for presentation, API routes, and user interfaces. */
+export const LAYER_INTERFACE: ArchitectureLayer = 'interface';
+
+/** Architecture layer constant for automated test suites and test fixtures. */
+export const LAYER_TEST: ArchitectureLayer = 'test';
+
+/** Architecture layer constant for build scripts, developer tools, and deployment. */
+export const LAYER_TOOLING: ArchitectureLayer = 'tooling';
+
+/** Architecture layer constant for cross-cutting shared utilities and common types. */
+export const LAYER_SHARED: ArchitectureLayer = 'shared';
+
+/** Project archetype constant for tutorial, sample, or starter projects. */
+export const ARCHETYPE_DEMO: ProjectArchetype = 'demo';
+
+/** Project archetype constant for game engine and graphics applications. */
+export const ARCHETYPE_GAME: ProjectArchetype = 'game';
+
+/** Project archetype constant for web frontend and server applications. */
+export const ARCHETYPE_WEB: ProjectArchetype = 'web';
+
+/** Project archetype constant for standalone shared libraries and packages. */
+export const ARCHETYPE_LIBRARY: ProjectArchetype = 'library';
+
+interface LayerRule {
+    readonly pattern: RegExp;
+    readonly layer: ArchitectureLayer;
+}
+
+const LAYER_RULES: readonly LayerRule[] = [
+    { pattern: /^(domain|domains|entities|models|core|domain_model)$/i, layer: LAYER_DOMAIN },
+    {
+        pattern: /^(app|application|applications|usecases|services|workflows|commands|queries)$/i,
+        layer: LAYER_APPLICATION,
+    },
+    {
+        pattern:
+            /^(infra|infrastructure|infrastructures|persistence|repo|repositories|database|adapters|gateway)$/i,
+        layer: LAYER_INFRASTRUCTURE,
+    },
+    {
+        pattern: /^(interface|interfaces|presentation|api|controllers|frontend|ui|views|routes)$/i,
+        layer: LAYER_INTERFACE,
+    },
+    { pattern: /^(test|tests|spec|specs|fixtures|guards|unit|integration)$/i, layer: LAYER_TEST },
+    { pattern: /^(scripts|tools|tooling|build|ci|deploy)$/i, layer: LAYER_TOOLING },
+    { pattern: /^(shared|common|utils|support|types)$/i, layer: LAYER_SHARED },
+];
+
+/**
+ * Match a single path segment against architecture layer rules.
+ *
+ * @param segment - Individual path segment string.
+ * @returns Matching ArchitectureLayer or undefined when no rule matches.
+ */
+function matchSegmentLayer(segment: string): ArchitectureLayer | undefined {
+    for (const rule of LAYER_RULES) {
+        if (rule.pattern.test(segment)) {
+            return rule.layer;
+        }
+    }
+    return undefined;
+}
+
 /**
  * Infer the architectural layer that a directory path belongs to.
  *
@@ -103,30 +176,51 @@ export function inferDirectorySemantic(dirPath: string): ArchitectureLayer {
     const segments = norm.split('/').filter(Boolean);
 
     for (let i = segments.length - 1; i >= 0; i--) {
-        const s = segments[i];
-        if (/^(domain|domains|entities|models|core|domain_model)$/i.test(s)) return 'domain';
-        if (
-            /^(app|application|applications|usecases|services|workflows|commands|queries)$/i.test(s)
-        )
-            return 'application';
-        if (
-            /^(infra|infrastructure|infrastructures|persistence|repo|repositories|database|adapters|gateway)$/i.test(
-                s,
-            )
-        )
-            return 'infrastructure';
-        if (
-            /^(interface|interfaces|presentation|api|controllers|frontend|ui|views|routes)$/i.test(
-                s,
-            )
-        )
-            return 'interface';
-        if (/^(test|tests|spec|specs|fixtures|guards|unit|integration)$/i.test(s)) return 'test';
-        if (/^(scripts|tools|tooling|build|ci|deploy)$/i.test(s)) return 'tooling';
-        if (/^(shared|common|utils|support|types)$/i.test(s)) return 'shared';
+        const layer = matchSegmentLayer(segments[i]);
+        if (layer) return layer;
     }
 
-    return 'shared';
+    return LAYER_SHARED;
+}
+
+/**
+ * Inspect a directory entry to identify and record a subproject partition.
+ *
+ * @param ent - Directory entry from root readdir.
+ * @param rootResolved - Absolute path of project root directory.
+ * @param buildSystems - Set to accumulate discovered build systems.
+ * @param frameworks - Set to accumulate discovered frameworks.
+ * @param partitions - Array to append discovered partitions to.
+ * @param directorySemantics - Map to record directory semantics into.
+ */
+function inspectPartitionEntry(
+    ent: fs.Dirent,
+    rootResolved: string,
+    buildSystems: Set<string>,
+    frameworks: Set<string>,
+    partitions: ProjectPartition[],
+    directorySemantics: Record<string, ArchitectureLayer>,
+): void {
+    if (!ent.isDirectory() || IGNORED_DIRS.has(ent.name) || ent.name.startsWith('.')) {
+        return;
+    }
+
+    const subPath = path.join(rootResolved, ent.name);
+    const subStack = inspectDirectoryStack(subPath);
+
+    if (subStack.buildSystem || subStack.frameworks.length > 0) {
+        if (subStack.buildSystem) buildSystems.add(subStack.buildSystem);
+        for (const fw of subStack.frameworks) frameworks.add(fw);
+
+        partitions.push({
+            name: ent.name,
+            path: ent.name,
+            buildSystem: subStack.buildSystem,
+            frameworks: subStack.frameworks,
+        });
+    }
+
+    directorySemantics[ent.name] = inferDirectorySemantic(ent.name);
 }
 
 /**
@@ -154,27 +248,15 @@ function collectPartitions(
 
     try {
         const entries = fs.readdirSync(rootResolved, { withFileTypes: true });
-
         for (const ent of entries) {
-            if (!ent.isDirectory()) continue;
-            if (IGNORED_DIRS.has(ent.name) || ent.name.startsWith('.')) continue;
-
-            const subPath = path.join(rootResolved, ent.name);
-            const subStack = inspectDirectoryStack(subPath);
-
-            if (subStack.buildSystem || subStack.frameworks.length > 0) {
-                if (subStack.buildSystem) buildSystems.add(subStack.buildSystem);
-                for (const fw of subStack.frameworks) frameworks.add(fw);
-
-                partitions.push({
-                    name: ent.name,
-                    path: ent.name,
-                    buildSystem: subStack.buildSystem,
-                    frameworks: subStack.frameworks,
-                });
-            }
-
-            directorySemantics[ent.name] = inferDirectorySemantic(ent.name);
+            inspectPartitionEntry(
+                ent,
+                rootResolved,
+                buildSystems,
+                frameworks,
+                partitions,
+                directorySemantics,
+            );
         }
     } catch {
         // Best-effort: if readdir fails, proceed with rootStack
@@ -193,6 +275,145 @@ function collectPartitions(
 }
 
 /**
+ * Queue a discovered subdirectory for recursive sampling traversal.
+ *
+ * @param item - Dirent representing a subdirectory.
+ * @param currentDir - Absolute path of current directory.
+ * @param currentDepth - Current depth in directory hierarchy.
+ * @param rootResolved - Absolute path of project root.
+ * @param directorySemantics - Map to record inferred semantics into.
+ * @param dirQueue - Queue of directories scheduled for inspection.
+ */
+function queueSampledDirectory(
+    item: fs.Dirent,
+    currentDir: string,
+    currentDepth: number,
+    rootResolved: string,
+    directorySemantics: Record<string, ArchitectureLayer>,
+    dirQueue: Array<{ dir: string; depth: number }>,
+): void {
+    if (IGNORED_DIRS.has(item.name) || item.name.startsWith('.')) {
+        return;
+    }
+    const subDir = path.join(currentDir, item.name);
+    const relDir = path.relative(rootResolved, subDir);
+    if (!directorySemantics[relDir]) {
+        directorySemantics[relDir] = inferDirectorySemantic(relDir);
+    }
+    if (currentDepth + 1 <= LANGUAGE_SAMPLE_MAX_DEPTH) {
+        dirQueue.push({ dir: subDir, depth: currentDepth + 1 });
+    }
+}
+
+/**
+ * Record observed file extension for language distribution sampling.
+ *
+ * @param fileName - Inspected file name.
+ * @param languages - Map of language identifier to file count.
+ * @returns 1 if extension matches a recognized language, 0 otherwise.
+ */
+function recordSampledFile(fileName: string, languages: Record<string, number>): number {
+    const ext = path.extname(fileName).toLowerCase();
+    const lang = EXT_TO_LANG[ext];
+    if (lang) {
+        languages[lang] = (languages[lang] || 0) + 1;
+        return 1;
+    }
+    return 0;
+}
+
+/**
+ * Read directory entries safely with file types, returning an empty array on error.
+ *
+ * @param dir - Directory path to list.
+ * @returns Array of dirent items or empty array.
+ */
+function readDirectoryEntries(dir: string): fs.Dirent[] {
+    try {
+        return fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+        return [];
+    }
+}
+
+/** Queue item for directory traversal during language sampling. */
+interface DirectoryQueueItem {
+    dir: string;
+    depth: number;
+}
+
+/**
+ * Process a single sampled dirent item (directory or file).
+ *
+ * @param item - Dirent to evaluate.
+ * @param current - Current directory queue item.
+ * @param rootResolved - Project root path.
+ * @param directorySemantics - Directory semantics mapping.
+ * @param dirQueue - Directory queue.
+ * @param languages - Language count record.
+ * @returns 1 if a language file was sampled, 0 otherwise.
+ */
+function processSampledItem(
+    item: fs.Dirent,
+    current: DirectoryQueueItem,
+    rootResolved: string,
+    directorySemantics: Record<string, ArchitectureLayer>,
+    dirQueue: DirectoryQueueItem[],
+    languages: Record<string, number>,
+): number {
+    if (item.isDirectory()) {
+        queueSampledDirectory(
+            item,
+            current.dir,
+            current.depth,
+            rootResolved,
+            directorySemantics,
+            dirQueue,
+        );
+        return 0;
+    }
+    if (item.isFile()) {
+        return recordSampledFile(item.name, languages);
+    }
+    return 0;
+}
+
+/**
+ * Sample items within a single directory during language discovery.
+ *
+ * @param current - Current directory queue item.
+ * @param rootResolved - Absolute path of project root directory.
+ * @param directorySemantics - Map to record directory semantics into.
+ * @param dirQueue - Queue of directories scheduled for inspection.
+ * @param languages - Map of language identifier to observed count.
+ * @param currentSampled - Number of files sampled prior to this directory.
+ * @returns Number of new files sampled from this directory.
+ */
+function sampleItemsInDirectory(
+    current: DirectoryQueueItem,
+    rootResolved: string,
+    directorySemantics: Record<string, ArchitectureLayer>,
+    dirQueue: DirectoryQueueItem[],
+    languages: Record<string, number>,
+    currentSampled: number,
+): number {
+    let newlySampled = 0;
+    const items = readDirectoryEntries(current.dir);
+    for (const item of items) {
+        if (currentSampled + newlySampled >= LANGUAGE_SAMPLE_MAX_FILES) break;
+        newlySampled += processSampledItem(
+            item,
+            current,
+            rootResolved,
+            directorySemantics,
+            dirQueue,
+            languages,
+        );
+    }
+    return newlySampled;
+}
+
+/**
  * Iteratively sample directory files to determine language distribution.
  *
  * @param rootResolved - Absolute project root directory path.
@@ -205,39 +426,20 @@ function sampleDirectoryLanguages(
 ): Record<string, number> {
     const languages: Record<string, number> = {};
     let sampled = 0;
-    const dirQueue: Array<{ dir: string; depth: number }> = [{ dir: rootResolved, depth: 0 }];
+    const dirQueue: DirectoryQueueItem[] = [{ dir: rootResolved, depth: 0 }];
 
     while (dirQueue.length > 0 && sampled < LANGUAGE_SAMPLE_MAX_FILES) {
         const current = dirQueue.pop()!;
         if (current.depth > LANGUAGE_SAMPLE_MAX_DEPTH) continue;
 
-        try {
-            const items = fs.readdirSync(current.dir, { withFileTypes: true });
-            for (const item of items) {
-                if (sampled >= LANGUAGE_SAMPLE_MAX_FILES) break;
-                if (item.isDirectory()) {
-                    if (!IGNORED_DIRS.has(item.name) && !item.name.startsWith('.')) {
-                        const subDir = path.join(current.dir, item.name);
-                        const relDir = path.relative(rootResolved, subDir);
-                        if (!directorySemantics[relDir]) {
-                            directorySemantics[relDir] = inferDirectorySemantic(relDir);
-                        }
-                        if (current.depth + 1 <= LANGUAGE_SAMPLE_MAX_DEPTH) {
-                            dirQueue.push({ dir: subDir, depth: current.depth + 1 });
-                        }
-                    }
-                } else if (item.isFile()) {
-                    const ext = path.extname(item.name).toLowerCase();
-                    const lang = EXT_TO_LANG[ext];
-                    if (lang) {
-                        languages[lang] = (languages[lang] || 0) + 1;
-                        sampled++;
-                    }
-                }
-            }
-        } catch {
-            // ignore
-        }
+        sampled += sampleItemsInDirectory(
+            current,
+            rootResolved,
+            directorySemantics,
+            dirQueue,
+            languages,
+            sampled,
+        );
     }
 
     return languages;
@@ -394,8 +596,8 @@ export function detectProjectArchetype(
 ): ProjectArchetype {
     if (profile?.archetype) return profile.archetype;
     const packageData = readPackageData(root, pkg);
-    if (isDemoArchetype(root, packageData)) return 'demo';
-    if (isGameArchetype(root, profile)) return 'game';
-    if (isWebArchetype(profile, packageData)) return 'web';
-    return 'library';
+    if (isDemoArchetype(root, packageData)) return ARCHETYPE_DEMO;
+    if (isGameArchetype(root, profile)) return ARCHETYPE_GAME;
+    if (isWebArchetype(profile, packageData)) return ARCHETYPE_WEB;
+    return ARCHETYPE_LIBRARY;
 }

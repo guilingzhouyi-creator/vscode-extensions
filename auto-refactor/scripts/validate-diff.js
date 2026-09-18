@@ -23,13 +23,24 @@ const { scan, scanDiff, scanDiffDelta } = require('../dist/api');
 const { computeEditRanges } = require('../dist/core/editDiff');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.diff-corpus');
 const BIG = path.join(CORPUS, 'src', 'big.ts');
 const SMALL = path.join(CORPUS, 'src', 'small.ts');
-const CACHE_DIR = 'C:/tmp/ar-diff-validate-cache';
+
+const DEFAULT_TMP_DIR =
+  process.env.AUTO_REFACTOR_TMPDIR ||
+  (fs.existsSync('D:/') ? 'D:/temp' : path.join(os.tmpdir(), 'ar-temp'));
+try {
+  fs.mkdirSync(DEFAULT_TMP_DIR, { recursive: true });
+} catch {
+  // best-effort
+}
+
+const CACHE_DIR = path.join(DEFAULT_TMP_DIR, 'ar-diff-validate-cache');
 const CFG = path.join(CORPUS, 'auto-refactor.config.json');
 
 function baselineBig(lines) {
@@ -117,7 +128,7 @@ function rmRetry(p) {
       fs.renameSync(
         p,
         path.join(
-          'C:/tmp',
+          DEFAULT_TMP_DIR,
           `ar-diff-stale-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         ),
       );

@@ -12,6 +12,101 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { MaturityTier } from '../types';
 
+/** Maturity tier identifier for demo projects. */
+export const TIER_DEMO: MaturityTier = 'demo';
+
+/** Maturity tier identifier for prototype projects. */
+export const TIER_PROTOTYPE: MaturityTier = 'prototype';
+
+/** Maturity tier identifier for industrial projects. */
+export const TIER_INDUSTRIAL: MaturityTier = 'industrial';
+
+/** Maturity tier identifier for production projects. */
+export const TIER_PRODUCTION: MaturityTier = 'production';
+
+/** Manifest and CI file paths. */
+const MANIFEST_PACKAGE_JSON = 'package.json';
+const MANIFEST_CARGO_TOML = 'Cargo.toml';
+const CI_WORKFLOWS_DIR = path.join('.github', 'workflows');
+const CI_GITLAB_FILE = '.gitlab-ci.yml';
+
+/** Version and marker strings. */
+const VERSION_ZERO = '0.0.0';
+const VERSION_PREFIX_PROTO = '0.0.';
+const VERSION_PREFIX_V1 = '1.';
+const VERSION_PREFIX_V2 = '2.';
+const SCRIPT_KEY_TEST = 'test';
+const SCRIPT_KEY_TEST_UNIT = 'test:unit';
+const SCRIPT_KEY_LINT = 'lint';
+const SCRIPT_KEY_AUDIT = 'audit';
+const SCRIPT_KEY_CHECK = 'check';
+const CARGO_PROTO_MARKER = 'version = "0.0.';
+const CARGO_WORKSPACE_MARKER = '[workspace]';
+
+const DEMO_PATH_PATTERN = /(?:demo|samples?|examples?|tutorial|starter|playground)/i;
+const DEMO_NAME_PATTERN = /(?:demo|samples?|examples?|tutorial)/i;
+
+/**
+ * Check whether package name or version matches demo heuristics.
+ *
+ * @param name - Package name string.
+ * @param version - Package version string.
+ * @returns True when demo pattern or zero-version matches.
+ */
+function isDemoPackage(name: string, version: string): boolean {
+    return DEMO_NAME_PATTERN.test(name) || version === VERSION_ZERO;
+}
+
+/**
+ * Check whether package scripts define automated test gates.
+ *
+ * @param scripts - Parsed scripts map from package.json.
+ * @returns True if test or test:unit script exists.
+ */
+function hasTestGates(scripts: Record<string, unknown>): boolean {
+    return Boolean(scripts[SCRIPT_KEY_TEST] || scripts[SCRIPT_KEY_TEST_UNIT]);
+}
+
+/**
+ * Check whether package scripts define lint or audit gates.
+ *
+ * @param scripts - Parsed scripts map from package.json.
+ * @returns True if lint, audit, or check script exists.
+ */
+function hasAuditGates(scripts: Record<string, unknown>): boolean {
+    return Boolean(
+        scripts[SCRIPT_KEY_LINT] || scripts[SCRIPT_KEY_AUDIT] || scripts[SCRIPT_KEY_CHECK],
+    );
+}
+
+/**
+ * Check whether the project repository configures Continuous Integration pipelines.
+ *
+ * @param root - Project root directory path.
+ * @returns True if .github/workflows or .gitlab-ci.yml exists.
+ */
+function hasContinuousIntegration(root: string): boolean {
+    return (
+        fs.existsSync(path.join(root, CI_WORKFLOWS_DIR)) ||
+        fs.existsSync(path.join(root, CI_GITLAB_FILE))
+    );
+}
+
+/**
+ * Check whether versioning and package visibility qualify for industrial maturity.
+ *
+ * @param version - Package version string.
+ * @param isPrivate - Optional package private flag.
+ * @returns True when version >= 1.0 or non-private package.
+ */
+function isIndustrialQualified(version: string, isPrivate: boolean | undefined): boolean {
+    return (
+        version.startsWith(VERSION_PREFIX_V1) ||
+        version.startsWith(VERSION_PREFIX_V2) ||
+        isPrivate === false
+    );
+}
+
 /**
  * Evaluate maturity tier from parsed package.json data and root directory.
  *
@@ -25,33 +120,29 @@ export function evaluatePackageMaturity(
 ): MaturityTier | undefined {
     const name = String(packageData.name || '');
     const version = String(packageData.version || '');
-    if (/(?:demo|samples?|examples?|tutorial)/i.test(name) || version === '0.0.0') {
-        return 'demo';
+    if (isDemoPackage(name, version)) {
+        return TIER_DEMO;
     }
 
-    const scripts = packageData.scripts || {};
-    const hasTests = !!(scripts.test || scripts['test:unit']);
-    const hasLintOrAudit = !!(scripts.lint || scripts.audit || scripts.check);
-    const hasCi =
-        fs.existsSync(path.join(root, '.github', 'workflows')) ||
-        fs.existsSync(path.join(root, '.gitlab-ci.yml'));
+    const scripts = (packageData.scripts || {}) as Record<string, unknown>;
+    const hasTests = hasTestGates(scripts);
+    const hasLintOrAudit = hasAuditGates(scripts);
+    const hasCi = hasContinuousIntegration(root);
 
-    // Industrial: version >= 1.0.0 or 0.x with comprehensive CI, audit, and strict test gates
     if (
         hasCi &&
         hasTests &&
         hasLintOrAudit &&
-        (version.startsWith('1.') || version.startsWith('2.') || packageData.private === false)
+        isIndustrialQualified(version, packageData.private)
     ) {
-        return 'industrial';
+        return TIER_INDUSTRIAL;
     }
 
-    // Prototype: 0.0.x or no tests
-    if (version.startsWith('0.0.') || !hasTests) {
-        return 'prototype';
+    if (version.startsWith(VERSION_PREFIX_PROTO) || !hasTests) {
+        return TIER_PROTOTYPE;
     }
 
-    return 'production';
+    return TIER_PRODUCTION;
 }
 
 /**
@@ -61,13 +152,13 @@ export function evaluatePackageMaturity(
  * @returns Matching MaturityTier or undefined if Cargo.toml is absent or uninformative.
  */
 export function evaluateCargoMaturity(root: string): MaturityTier | undefined {
-    const cargoPath = path.join(root, 'Cargo.toml');
+    const cargoPath = path.join(root, MANIFEST_CARGO_TOML);
     if (!fs.existsSync(cargoPath)) return undefined;
 
     try {
         const content = fs.readFileSync(cargoPath, 'utf8');
-        if (content.includes('version = "0.0.')) return 'prototype';
-        if (content.includes('[workspace]')) return 'industrial';
+        if (content.includes(CARGO_PROTO_MARKER)) return TIER_PROTOTYPE;
+        if (content.includes(CARGO_WORKSPACE_MARKER)) return TIER_INDUSTRIAL;
     } catch {
         // ignore
     }
@@ -87,13 +178,13 @@ export function evaluateCargoMaturity(root: string): MaturityTier | undefined {
  */
 export function detectMaturityTier(root: string, pkg?: Record<string, any>): MaturityTier {
     const normRoot = root.replace(/\\/g, '/');
-    if (/(?:demo|samples?|examples?|tutorial|starter|playground)/i.test(normRoot)) {
-        return 'demo';
+    if (DEMO_PATH_PATTERN.test(normRoot)) {
+        return TIER_DEMO;
     }
 
     let packageData = pkg;
     if (!packageData) {
-        const pkgPath = path.join(root, 'package.json');
+        const pkgPath = path.join(root, MANIFEST_PACKAGE_JSON);
         if (fs.existsSync(pkgPath)) {
             try {
                 packageData = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
@@ -111,5 +202,5 @@ export function detectMaturityTier(root: string, pkg?: Record<string, any>): Mat
     const cargoTier = evaluateCargoMaturity(root);
     if (cargoTier) return cargoTier;
 
-    return 'production';
+    return TIER_PRODUCTION;
 }

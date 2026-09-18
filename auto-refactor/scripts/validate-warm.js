@@ -26,14 +26,25 @@
 const { scan, scanWarm } = require('../dist/api');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.corpus');
 const RUST_CORPUS = path.join(__dirname, '.rust-corpus');
 const SAMPLES = path.join(ROOT, 'samples');
-const CACHE_DIR = 'C:/tmp/ar-warm-validate-cache';
-const CACHE_DIR_RUST = 'C:/tmp/ar-warm-validate-cache-rust';
+
+const DEFAULT_TMP_DIR =
+  process.env.AUTO_REFACTOR_TMPDIR ||
+  (fs.existsSync('D:/') ? 'D:/temp' : path.join(os.tmpdir(), 'ar-temp'));
+try {
+  fs.mkdirSync(DEFAULT_TMP_DIR, { recursive: true });
+} catch {
+  // best-effort
+}
+
+const CACHE_DIR = path.join(DEFAULT_TMP_DIR, 'ar-warm-validate-cache');
+const CACHE_DIR_RUST = path.join(DEFAULT_TMP_DIR, 'ar-warm-validate-cache-rust');
 const CORPUS_CFG = path.join(CORPUS, 'auto-refactor.config.json');
 const RUST_CFG = path.join(RUST_CORPUS, 'auto-refactor.config.json');
 
@@ -330,7 +341,7 @@ function rmRetry(p) {
     fs.rmSync(p, { recursive: true, force: true });
   } catch {
     try {
-      fs.renameSync(p, path.join('C:/tmp', `ar-stale-${path.basename(p)}-${Date.now()}`));
+      fs.renameSync(p, path.join(DEFAULT_TMP_DIR, `ar-stale-${path.basename(p)}-${Date.now()}`));
     } catch {
       /* ignore */
     }

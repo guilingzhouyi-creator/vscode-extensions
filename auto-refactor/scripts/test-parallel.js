@@ -1,0 +1,316 @@
+#!/usr/bin/env node
+/**
+ * Module: Verification Harness — Parallel & Asynchronous Test Runner
+ * File Path: scripts/test-parallel.js
+ * Architecture Role: High-throughput concurrent test runner for the auto-refactor test suite;
+ *   replaces slow sequential execution with asynchronous worker-pool dispatch across CPU cores.
+ * Dependencies & Triggers: `npm run test:parallel` or `npm test`; imports child_process.spawn,
+ *   fs, os, and path. Runs across Node 18+.
+ * Responsibilities: Offload temporary caches to high-speed non-system drive (e.g. D:/temp) when
+ *   available, preventing C: disk thrashing; execute isolated test suites concurrently with bounded
+ *   concurrency; execute daemon/corpus stateful suites sequentially; buffer outputs and print
+ *   concise real-time progress and summary metrics.
+ * Exit Semantics & Design Rationale: Exits 0 if all test suites pass, 1 if any suite fails.
+ *   Concurrency is bounded to prevent CPU/IO starvation while maximizing multi-core utilization.
+ */
+'use strict';
+
+const { spawn } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const ROOT = path.join(__dirname, '..');
+
+// ── Offload temporary drive cache if D: drive exists to prevent C: I/O thrashing ──
+if (!process.env.AUTO_REFACTOR_TMPDIR && fs.existsSync('D:/')) {
+  const dTemp = 'D:/temp';
+  try {
+    fs.mkdirSync(dTemp, { recursive: true });
+    process.env.AUTO_REFACTOR_TMPDIR = dTemp;
+  } catch {
+    // ignore
+  }
+}
+
+// ── CLI Arguments ──
+const rawArgs = process.argv.slice(2);
+let concurrency = Math.min(8, Math.max(2, os.cpus().length || 4));
+let bail = false;
+let filter = '';
+
+for (let i = 0; i < rawArgs.length; i++) {
+  const arg = rawArgs[i];
+  if (arg === '--bail' || arg === '-b') {
+    bail = true;
+  } else if ((arg === '--concurrency' || arg === '-j') && i + 1 < rawArgs.length) {
+    concurrency = Math.max(1, parseInt(rawArgs[++i], 10) || concurrency);
+  } else if (!arg.startsWith('-')) {
+    filter = arg.toLowerCase();
+  }
+}
+
+// ── Test Suites Declaration ──
+// Phase 1: Isolated parallel test suites (no shared daemon or corpus disk state)
+const PARALLEL_SUITES = [
+  { name: 'validate-oxc', script: 'scripts/validate-oxc-keypoints.js' },
+  { name: 'validate-praxis', script: 'scripts/validate-praxis-foundation.js' },
+  { name: 'validate-governance', script: 'scripts/validate-governance.js' },
+  { name: 'validate-generalized', script: 'scripts/validate-generalized.js' },
+  { name: 'validate-review-memory', script: 'scripts/validate-review-memory.js' },
+  { name: 'validate-asymmetric', script: 'scripts/validate-asymmetric-routing.js' },
+  { name: 'validate-security', script: 'scripts/validate-security-levels.js' },
+  { name: 'validate-capabilities', script: 'scripts/validate-capabilities.js' },
+  { name: 'validate-language-support', script: 'scripts/validate-language-support.js' },
+  { name: 'validate-language-matrix', script: 'scripts/validate-language-matrix.js' },
+  { name: 'validate-python', script: 'scripts/validate-python.js' },
+  { name: 'validate-comment-hygiene', script: 'scripts/validate-comment-hygiene.js' },
+  { name: 'validate-simplify', script: 'scripts/validate-simplify.js' },
+  { name: 'validate-python-modern', script: 'scripts/validate-python-modern.js' },
+  { name: 'validate-ts-modern', script: 'scripts/validate-ts-modern.js' },
+  { name: 'validate-modern-packs', script: 'scripts/validate-modern-packs.js' },
+  { name: 'validate-python-imports', script: 'scripts/validate-python-imports.js' },
+  { name: 'validate-postscan-parity', script: 'scripts/validate-postscan-parity.js' },
+  { name: 'validate-literal-policy', script: 'scripts/validate-literal-policy.js' },
+  { name: 'validate-diff-interface', script: 'scripts/validate-diff-interface.js' },
+  { name: 'validate-rules-registry', script: 'scripts/validate-rules-registry.js' },
+  { name: 'validate-rule-aliases', script: 'scripts/validate-rule-aliases.js' },
+  { name: 'validate-docs', script: 'scripts/validate-docs.js' },
+  { name: 'validate-project-neutrality', script: 'scripts/validate-project-neutrality.js' },
+  { name: 'validate-consumer-runner', script: 'scripts/validate-consumer-runner.js' },
+  { name: 'test-codec', script: 'scripts/test-result-codec.js' },
+  { name: 'validate-compression', script: 'scripts/validate-compression-bounds.js' },
+  { name: 'validate-marker-scope', script: 'scripts/validate-marker-scope.js' },
+  {
+    name: 'validate-symbol-index-pack',
+    composite: [
+      'scripts/validate-symbol-index.js',
+      'scripts/validate-literal-index.js',
+      'scripts/validate-call-graph.js',
+      'scripts/validate-error-flow.js',
+    ],
+  },
+  {
+    name: 'validate-data-flow-pack',
+    composite: ['scripts/validate-data-flow.js', 'scripts/validate-context-slice.js'],
+  },
+  {
+    name: 'validate-self-norms-pack',
+    composite: [
+      'scripts/validate-self-norms.js',
+      'scripts/validate-scoring-coverage.js',
+      'scripts/validate-diff-score.js',
+    ],
+  },
+];
+
+// Phase 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)
+const SEQUENTIAL_SUITES = [
+  { name: 'validate-equivalence', script: 'scripts/validate-equivalence.js' },
+  { name: 'validate-warm', script: 'scripts/validate-warm.js' },
+  { name: 'validate-diff', script: 'scripts/validate-diff.js' },
+];
+
+/**
+ * Execute a single script asynchronously and capture its result.
+ *
+ * @param scriptRel - Script path relative to ROOT.
+ * @returns Object indicating success, exit code, stdout, stderr, and duration.
+ */
+function runScriptAsync(scriptRel) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const child = spawn(process.execPath, [path.join(ROOT, scriptRel)], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (d) => {
+      stdout += d;
+    });
+    child.stderr.on('data', (d) => {
+      stderr += d;
+    });
+
+    child.on('close', (code) => {
+      resolve({
+        ok: code === 0,
+        code,
+        stdout,
+        stderr,
+        durationMs: Date.now() - start,
+      });
+    });
+
+    child.on('error', (err) => {
+      resolve({
+        ok: false,
+        code: 1,
+        stdout,
+        stderr: stderr + '\n' + err.message,
+        durationMs: Date.now() - start,
+      });
+    });
+  });
+}
+
+/**
+ * Execute a test target (single script or composite scripts).
+ *
+ * @param suite - Suite descriptor to run.
+ * @returns Result object with status and captured outputs.
+ */
+async function executeSuite(suite) {
+  const start = Date.now();
+  if (suite.script) {
+    const res = await runScriptAsync(suite.script);
+    return { name: suite.name, ...res };
+  }
+
+  // Composite pack: run scripts sequentially within the pack
+  let combinedStdout = '';
+  let combinedStderr = '';
+  for (const script of suite.composite) {
+    const res = await runScriptAsync(script);
+    combinedStdout += res.stdout;
+    combinedStderr += res.stderr;
+    if (!res.ok) {
+      return {
+        name: suite.name,
+        ok: false,
+        code: res.code,
+        stdout: combinedStdout,
+        stderr: combinedStderr,
+        durationMs: Date.now() - start,
+      };
+    }
+  }
+
+  return {
+    name: suite.name,
+    ok: true,
+    code: 0,
+    stdout: combinedStdout,
+    stderr: combinedStderr,
+    durationMs: Date.now() - start,
+  };
+}
+
+/**
+ * Run a pool of tasks with bounded concurrency.
+ *
+ * @param items - Task items to process.
+ * @param maxConcurrency - Maximum concurrent workers.
+ * @param workerFn - Worker function to execute on each item.
+ * @returns Aggregated task results.
+ */
+async function runAsyncPool(items, maxConcurrency, workerFn) {
+  const results = [];
+  let index = 0;
+  let aborted = false;
+
+  async function worker() {
+    while (index < items.length && !aborted) {
+      const currentIndex = index++;
+      const item = items[currentIndex];
+      const res = await workerFn(item);
+      results[currentIndex] = res;
+      if (bail && !res.ok) {
+        aborted = true;
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(maxConcurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results.filter(Boolean);
+}
+
+// ── Main Runner ──
+async function main() {
+  const overallStart = Date.now();
+  console.log(`\n================================================================`);
+  console.log(`🚀 Auto-Refactor Parallel & Asynchronous Test Engine`);
+  console.log(`   CPUs: ${os.cpus().length} | Concurrency: ${concurrency} workers`);
+  console.log(`   Temp Directory: ${process.env.AUTO_REFACTOR_TMPDIR || 'default system temp'}`);
+  console.log(`================================================================\n`);
+
+  let parallelList = PARALLEL_SUITES;
+  let sequentialList = SEQUENTIAL_SUITES;
+
+  if (filter) {
+    parallelList = parallelList.filter((s) => s.name.toLowerCase().includes(filter));
+    sequentialList = sequentialList.filter((s) => s.name.toLowerCase().includes(filter));
+    console.log(`[filter] Running suites matching: "${filter}"\n`);
+  }
+
+  const passed = [];
+  const failed = [];
+
+  // Phase 1: Run isolated parallel suites
+  if (parallelList.length > 0) {
+    console.log(
+      `--- [Phase 1] Executing ${parallelList.length} Independent Suites in Parallel ---`,
+    );
+    await runAsyncPool(parallelList, concurrency, async (suite) => {
+      const res = await executeSuite(suite);
+      const sec = (res.durationMs / 1000).toFixed(2);
+      if (res.ok) {
+        passed.push(res);
+        console.log(`  ✔ [PASS] ${suite.name} (${sec}s)`);
+      } else {
+        failed.push(res);
+        console.log(`  ❌ [FAIL] ${suite.name} (${sec}s)`);
+        console.log(res.stdout);
+        if (res.stderr) console.error(res.stderr);
+      }
+      return res;
+    });
+  }
+
+  // Phase 2: Run sequential suites (if not bailed)
+  if (sequentialList.length > 0 && (!bail || failed.length === 0)) {
+    console.log(
+      `\n--- [Phase 2] Executing ${sequentialList.length} Stateful/Daemon Suites Sequentially ---`,
+    );
+    for (const suite of sequentialList) {
+      const res = await executeSuite(suite);
+      const sec = (res.durationMs / 1000).toFixed(2);
+      if (res.ok) {
+        passed.push(res);
+        console.log(`  ✔ [PASS] ${suite.name} (${sec}s)`);
+      } else {
+        failed.push(res);
+        console.log(`  ❌ [FAIL] ${suite.name} (${sec}s)`);
+        console.log(res.stdout);
+        if (res.stderr) console.error(res.stderr);
+        if (bail) break;
+      }
+    }
+  }
+
+  const totalTime = ((Date.now() - overallStart) / 1000).toFixed(2);
+  const total = passed.length + failed.length;
+
+  console.log(`\n================================================================`);
+  if (failed.length === 0) {
+    console.log(`🎉 ALL ${total}/${total} TEST SUITES PASSED in ${totalTime}s!`);
+    console.log(`================================================================\n`);
+    process.exit(0);
+  } else {
+    console.log(
+      `❌ TEST RUN FAILED: ${passed.length} passed, ${failed.length} failed in ${totalTime}s`,
+    );
+    console.log(`================================================================\n`);
+    process.exit(1);
+  }
+}
+
+main().catch((err) => {
+  console.error('Test runner fatal error:', err);
+  process.exit(1);
+});

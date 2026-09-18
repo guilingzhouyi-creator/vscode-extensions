@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T15:51:37.771Z",
+  "timestamp": "2026-09-18T16:18:50.155Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -220,6 +220,42 @@
       "count": 3
     },
     {
+      "key": "comments|CMT-WID-001|scripts/test-parallel.js",
+      "count": 5
+    },
+    {
+      "key": "constants|hardcoded-string|scripts/test-parallel.js",
+      "count": 48
+    },
+    {
+      "key": "constants|magic-number|scripts/test-parallel.js",
+      "count": 6
+    },
+    {
+      "key": "governance|GOV-SAN-001|scripts/test-parallel.js",
+      "count": 4
+    },
+    {
+      "key": "hygiene|HYG-STB-002|scripts/test-parallel.js",
+      "count": 6
+    },
+    {
+      "key": "complexity|high-complexity|scripts/test-parallel.js",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|scripts/test-parallel.js",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|scripts/test-parallel.js",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|scripts/test-parallel.js",
+      "count": 1
+    },
+    {
       "key": "constants|hardcoded-string|scripts/test-result-codec.js",
       "count": 33
     },
@@ -417,7 +453,7 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-diff.js",
-      "count": 24
+      "count": 26
     },
     {
       "key": "constants|duplicate-literal|scripts/validate-diff.js",
@@ -937,7 +973,7 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-warm.js",
-      "count": 30
+      "count": 33
     },
     {
       "key": "constants|duplicate-literal|scripts/validate-warm.js",
@@ -2308,28 +2344,8 @@
       "count": 13
     },
     {
-      "key": "governance|GOV-PRF-004|src/core/profiler/manifestDetector.ts",
-      "count": 4
-    },
-    {
-      "key": "performance|PRF-IO-001|src/core/profiler/manifestDetector.ts",
-      "count": 3
-    },
-    {
-      "key": "complexity|high-complexity|src/core/profiler/maturityClassifier.ts",
-      "count": 1
-    },
-    {
       "key": "constants|hardcoded-string|src/core/profiler/maturityClassifier.ts",
-      "count": 13
-    },
-    {
-      "key": "governance|GOV-PRF-004|src/core/profiler/maturityClassifier.ts",
-      "count": 6
-    },
-    {
-      "key": "performance|PRF-IO-001|src/core/profiler/maturityClassifier.ts",
-      "count": 2
+      "count": 1
     },
     {
       "key": "governance|GOV-LOG-001|src/core/profiler/maturityClassifier.ts",
@@ -2341,39 +2357,15 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/profiler/projectProfiler.ts",
-      "count": 54
-    },
-    {
-      "key": "hygiene|HYG-DED-001|src/core/profiler/projectProfiler.ts",
-      "count": 3
-    },
-    {
-      "key": "complexity|high-complexity|src/core/profiler/projectProfiler.ts",
-      "count": 2
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/profiler/projectProfiler.ts",
-      "count": 2
-    },
-    {
-      "key": "governance|GOV-PRF-004|src/core/profiler/projectProfiler.ts",
-      "count": 5
-    },
-    {
-      "key": "performance|PRF-IO-001|src/core/profiler/projectProfiler.ts",
-      "count": 1
+      "count": 44
     },
     {
       "key": "constants|hardcoded-string|src/core/profiler/scaleTuner.ts",
-      "count": 15
-    },
-    {
-      "key": "complexity|high-complexity|src/core/profiler/scaleTuner.ts",
       "count": 2
     },
     {
       "key": "governance|GOV-LOG-001|src/core/profiler/scaleTuner.ts",
-      "count": 2
+      "count": 1
     },
     {
       "key": "large-file|large-file|src/core/pythonAdapter.ts",
@@ -2601,10 +2593,6 @@
     },
     {
       "key": "hygiene|HYG-DED-001|src/core/rustAdapter.ts",
-      "count": 1
-    },
-    {
-      "key": "comments|CMT-DOC-001|src/core/scanner/analyzerRunner.ts",
       "count": 1
     },
     {

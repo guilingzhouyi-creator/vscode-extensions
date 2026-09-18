@@ -45,6 +45,26 @@ const SCALE_GRADE_ENTERPRISE = 'enterprise';
 const ANALYZER_ARCHITECTURE = 'architecture';
 /** Analyzer id for the comments analyzer's option tuning. */
 const ANALYZER_COMMENTS = 'comments';
+/** Analyzer id for governance option tuning. */
+const ANALYZER_GOVERNANCE = 'governance';
+/** Analyzer id for hygiene option tuning. */
+const ANALYZER_HYGIENE = 'hygiene';
+/** Analyzer id for performance option tuning. */
+const ANALYZER_PERFORMANCE = 'performance';
+
+/** Scale grade identifier for medium projects. */
+const SCALE_GRADE_MEDIUM = 'medium';
+
+/** Maturity tier identifiers. */
+const TIER_DEMO_NAME = 'demo';
+const TIER_PROTOTYPE_NAME = 'prototype';
+const TIER_PRODUCTION_NAME = 'production';
+const TIER_INDUSTRIAL_NAME = 'industrial';
+
+/** Comment level values. */
+const COMMENT_LEVEL_OFF = 'off';
+const COMMENT_LEVEL_BASIC = 'basic';
+const COMMENT_LEVEL_STRICT = 'strict';
 
 // ── Scale bands: inclusive ceilings, evaluated in order; enterprise is the fallback ──
 const MICRO_MAX_FILES = 10;
@@ -180,8 +200,33 @@ export function getTunedThresholds(grade: ScaleGrade, base: Thresholds): Thresho
 }
 
 /**
- * Layer scale-grade overrides onto analyzer options for governance, architecture and
- * comments. Only those three analyzers are adjusted: nesting/inheritance limits widen with
+ * Tune governance options by project scale grade.
+ *
+ * @param grade - Scale grade.
+ * @param tuned - Mutable options object to update.
+ */
+function tuneGovernanceByGrade(grade: ScaleGrade, tuned: Record<string, any>): void {
+    switch (grade) {
+        case SCALE_GRADE_MICRO:
+        case SCALE_GRADE_SMALL:
+            tuned.maxNestingDepth = SMALL_SCALE_MAX_NESTING;
+            tuned.maxInheritanceDepth = BASE_MAX_INHERITANCE;
+            break;
+        case SCALE_GRADE_MEDIUM:
+            tuned.maxNestingDepth = MEDIUM_SCALE_MAX_NESTING;
+            tuned.maxInheritanceDepth = BASE_MAX_INHERITANCE;
+            break;
+        case SCALE_GRADE_LARGE:
+        case SCALE_GRADE_ENTERPRISE:
+            tuned.maxNestingDepth = LARGE_SCALE_MAX_NESTING;
+            tuned.maxInheritanceDepth = LARGE_SCALE_MAX_INHERITANCE;
+            break;
+    }
+}
+
+/**
+ * Layer scale-grade overrides onto analyzer options.
+ * Governance nesting limits relax with scale, inheritance limits step from 2 to 3 at large
  * scale, clean-layer enforcement is disabled for micro/small projects, and public API docs
  * become mandatory for large/enterprise. Other analyzers pass through unchanged.
  *
@@ -197,23 +242,8 @@ export function getTunedAnalyzerOptions(
 ): Record<string, any> {
     const tuned = { ...baseOpts };
 
-    if (analyzerName === 'governance') {
-        switch (grade) {
-            case SCALE_GRADE_MICRO:
-            case SCALE_GRADE_SMALL:
-                tuned.maxNestingDepth = SMALL_SCALE_MAX_NESTING;
-                tuned.maxInheritanceDepth = BASE_MAX_INHERITANCE;
-                break;
-            case 'medium':
-                tuned.maxNestingDepth = MEDIUM_SCALE_MAX_NESTING;
-                tuned.maxInheritanceDepth = BASE_MAX_INHERITANCE;
-                break;
-            case SCALE_GRADE_LARGE:
-            case SCALE_GRADE_ENTERPRISE:
-                tuned.maxNestingDepth = LARGE_SCALE_MAX_NESTING;
-                tuned.maxInheritanceDepth = LARGE_SCALE_MAX_INHERITANCE;
-                break;
-        }
+    if (analyzerName === ANALYZER_GOVERNANCE) {
+        tuneGovernanceByGrade(grade, tuned);
     } else if (analyzerName === ANALYZER_ARCHITECTURE) {
         // Micro/small projects don't enforce strict multi-tier DDD separation by default
         tuned.enforceCleanLayers = grade !== SCALE_GRADE_MICRO && grade !== SCALE_GRADE_SMALL;
@@ -241,7 +271,7 @@ export function getMaturityTunedThresholds(tier: MaturityTier, base: Thresholds)
     const tuned: Thresholds = { ...base };
 
     switch (tier) {
-        case 'demo':
+        case TIER_DEMO_NAME:
             // Demos: allow relaxed thresholds, prototype scripting, and fast iteration
             tuned.fileLinesWarn = Math.max(base.fileLinesWarn, DEMO_FILE_LINES_WARN);
             tuned.fileLinesFail = Math.max(base.fileLinesFail, DEMO_FILE_LINES_FAIL);
@@ -249,18 +279,18 @@ export function getMaturityTunedThresholds(tier: MaturityTier, base: Thresholds)
             tuned.complexityFail = Math.max(base.complexityFail, DEMO_COMPLEXITY_FAIL);
             break;
 
-        case 'prototype':
+        case TIER_PROTOTYPE_NAME:
             tuned.fileLinesWarn = Math.max(base.fileLinesWarn, PROTOTYPE_FILE_LINES_WARN);
             tuned.fileLinesFail = Math.max(base.fileLinesFail, PROTOTYPE_FILE_LINES_FAIL);
             tuned.complexityWarn = Math.max(base.complexityWarn, PROTOTYPE_COMPLEXITY_WARN);
             tuned.complexityFail = Math.max(base.complexityFail, PROTOTYPE_COMPLEXITY_FAIL);
             break;
 
-        case 'production':
+        case TIER_PRODUCTION_NAME:
             // Production baseline standard
             break;
 
-        case 'industrial':
+        case TIER_INDUSTRIAL_NAME:
             // Industrial / Mission-critical: strict gates
             tuned.fileLinesWarn = Math.min(base.fileLinesWarn, INDUSTRIAL_FILE_LINES_WARN);
             tuned.fileLinesFail = Math.min(base.fileLinesFail, INDUSTRIAL_FILE_LINES_FAIL);
@@ -270,6 +300,64 @@ export function getMaturityTunedThresholds(tier: MaturityTier, base: Thresholds)
     }
 
     return tuned;
+}
+
+/**
+ * Tune analyzer options for demo-tier projects.
+ *
+ * @param analyzerName - Target analyzer identifier.
+ * @param tuned - Mutable options object to update.
+ */
+function tuneByDemoTier(analyzerName: string, tuned: Record<string, any>): void {
+    if (analyzerName === ANALYZER_COMMENTS) {
+        tuned.requireHeader = false;
+        tuned.level = COMMENT_LEVEL_OFF;
+    } else if (analyzerName === ANALYZER_ARCHITECTURE) {
+        tuned.enforceCleanLayers = false;
+        tuned.allowSkipLayers = true;
+        tuned.checkDtoCredentialLeakage = false;
+    } else if (analyzerName === ANALYZER_HYGIENE) {
+        tuned.checkDeadCode = false;
+        tuned.checkTemporaryStubs = false;
+    }
+}
+
+/**
+ * Tune analyzer options for prototype-tier projects.
+ *
+ * @param analyzerName - Target analyzer identifier.
+ * @param tuned - Mutable options object to update.
+ */
+function tuneByPrototypeTier(analyzerName: string, tuned: Record<string, any>): void {
+    if (analyzerName === ANALYZER_COMMENTS) {
+        tuned.requireHeader = false;
+        tuned.level = COMMENT_LEVEL_BASIC;
+    } else if (analyzerName === ANALYZER_ARCHITECTURE) {
+        tuned.allowSkipLayers = true;
+    } else if (analyzerName === ANALYZER_HYGIENE) {
+        tuned.checkTemporaryStubs = false;
+    }
+}
+
+/**
+ * Tune analyzer options for industrial-tier projects.
+ *
+ * @param analyzerName - Target analyzer identifier.
+ * @param tuned - Mutable options object to update.
+ */
+function tuneByIndustrialTier(analyzerName: string, tuned: Record<string, any>): void {
+    if (analyzerName === ANALYZER_COMMENTS) {
+        tuned.requireHeader = true;
+        tuned.level = COMMENT_LEVEL_STRICT;
+    } else if (analyzerName === ANALYZER_ARCHITECTURE) {
+        tuned.enforceCleanLayers = true;
+        tuned.allowSkipLayers = false;
+        tuned.checkDtoCredentialLeakage = true;
+    } else if (analyzerName === ANALYZER_PERFORMANCE) {
+        tuned.maxLoopNesting = INDUSTRIAL_MAX_LOOP_NESTING;
+        tuned.checkBlockingIO = true;
+        tuned.checkTransientAllocations = true;
+    }
 }
 
 /**
@@ -291,40 +379,16 @@ export function getMaturityTunedAnalyzerOptions(
 ): Record<string, any> {
     const tuned = { ...baseOpts };
 
-    if (tier === 'demo') {
-        if (analyzerName === ANALYZER_COMMENTS) {
-            tuned.requireHeader = false;
-            tuned.level = 'off';
-        } else if (analyzerName === ANALYZER_ARCHITECTURE) {
-            tuned.enforceCleanLayers = false;
-            tuned.allowSkipLayers = true;
-            tuned.checkDtoCredentialLeakage = false;
-        } else if (analyzerName === 'hygiene') {
-            tuned.checkDeadCode = false;
-            tuned.checkTemporaryStubs = false;
-        }
-    } else if (tier === 'prototype') {
-        if (analyzerName === ANALYZER_COMMENTS) {
-            tuned.requireHeader = false;
-            tuned.level = 'basic';
-        } else if (analyzerName === ANALYZER_ARCHITECTURE) {
-            tuned.allowSkipLayers = true;
-        } else if (analyzerName === 'hygiene') {
-            tuned.checkTemporaryStubs = false;
-        }
-    } else if (tier === 'industrial') {
-        if (analyzerName === ANALYZER_COMMENTS) {
-            tuned.requireHeader = true;
-            tuned.level = 'strict';
-        } else if (analyzerName === ANALYZER_ARCHITECTURE) {
-            tuned.enforceCleanLayers = true;
-            tuned.allowSkipLayers = false;
-            tuned.checkDtoCredentialLeakage = true;
-        } else if (analyzerName === 'performance') {
-            tuned.maxLoopNesting = INDUSTRIAL_MAX_LOOP_NESTING;
-            tuned.checkBlockingIO = true;
-            tuned.checkTransientAllocations = true;
-        }
+    switch (tier) {
+        case TIER_DEMO_NAME:
+            tuneByDemoTier(analyzerName, tuned);
+            break;
+        case TIER_PROTOTYPE_NAME:
+            tuneByPrototypeTier(analyzerName, tuned);
+            break;
+        case TIER_INDUSTRIAL_NAME:
+            tuneByIndustrialTier(analyzerName, tuned);
+            break;
     }
 
     return tuned;
