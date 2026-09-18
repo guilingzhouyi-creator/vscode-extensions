@@ -192,8 +192,8 @@ export function computeHybridK(config: ScanConfig, filesLen: number, n: number):
 /** Configuration and runtime parameters for worker thread batch dispatching. */
 export interface DispatchOpts {
     /** Pre-created workers (persistent pool). When absent, workers are spawned here (cold). */
-    workers?: any[];
-    workerIdx?: Map<any, number>;
+    workers?: Worker[];
+    workerIdx?: Map<Worker, number>;
     files: string[];
     absRoot: string;
     config: ScanConfig;
@@ -265,15 +265,15 @@ export async function dispatchBatches(
           }
         : null;
 
-    const workerIdx = opts.workerIdx || new Map<any, number>();
+    const workerIdx = opts.workerIdx || new Map<Worker, number>();
 
     return new Promise((resolve, reject) => {
-        const workers: any[] = opts.workers || [];
+        const workers: Worker[] = opts.workers || [];
         let nextIdx = 0;
         let completed = 0;
         let failed = false;
 
-        const fail = (e: any) => {
+        const fail = (e: unknown) => {
             if (failed) return;
             failed = true;
             for (const w of workers)
@@ -484,7 +484,7 @@ export async function dispatchBatches(
 
         let inflightRead: Promise<ReadyBatch> | null = null;
 
-        const dispatch = async (w: any) => {
+        const dispatch = async (w: Worker) => {
             if (failed) return;
             let ready: ReadyBatch | null = null;
             if (inflightRead) {
@@ -543,7 +543,7 @@ export async function dispatchBatches(
         }
         void processHybrid(hybridBatch);
 
-        const wire = (w: any, k: number, tSpawn0: number) => {
+        const wire = (w: Worker, k: number, tSpawn0: number) => {
             workerIdx.set(w, k);
             w.on('online', () => {
                 if (T) T.spawnMs[k] = nowMs() - tSpawn0;
@@ -604,7 +604,7 @@ export async function dispatchBatches(
             }
         } else {
             for (let k = 0; k < n; k++) {
-                let w: any;
+                let w: Worker;
                 const tSpawn0 = T ? nowMs() : 0;
                 try {
                     w = new Worker(workerPath, { workerData: { config, analyzerDescs: descs } });

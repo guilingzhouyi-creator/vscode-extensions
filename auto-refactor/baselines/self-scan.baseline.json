@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T15:39:37.233Z",
+  "timestamp": "2026-09-18T15:42:41.856Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2724,16 +2724,16 @@
       "count": 1
     },
     {
-      "key": "governance|GOV-TYP-003|src/core/scanner/workerScheduler.ts",
-      "count": 8
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/scanner/workerScheduler.ts",
       "count": 2
     },
     {
       "key": "governance|GOV-LOG-001|src/core/scanner/workerScheduler.ts",
       "count": 6
+    },
+    {
+      "key": "governance|GOV-TYP-003|src/core/scanner/workerScheduler.ts",
+      "count": 2
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/scanner/workerScheduler.ts",
