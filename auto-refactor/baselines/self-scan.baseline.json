@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T06:00:34.457Z",
+  "timestamp": "2026-09-18T06:05:00.030Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1180,24 +1180,20 @@
       "count": 1
     },
     {
+      "key": "large-file|large-file|src/analyzers/performance.ts",
+      "count": 1
+    },
+    {
       "key": "constants|hardcoded-string|src/analyzers/performance.ts",
       "count": 22
     },
     {
       "key": "complexity|high-complexity|src/analyzers/performance.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/analyzers/performance.ts",
-      "count": 1
+      "count": 2
     },
     {
       "key": "simplify|SIM-LONG-001|src/analyzers/performance.ts",
       "count": 1
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/analyzers/performance.ts",
-      "count": 2
     },
     {
       "key": "governance|GOV-TYP-003|src/analyzers/performance.ts",

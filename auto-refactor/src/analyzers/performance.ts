@@ -72,6 +72,11 @@ interface LoopScope {
     usesBrace: boolean;
 }
 
+interface LineScanState {
+    inAsyncFunction: boolean;
+    inBlockComment: boolean;
+}
+
 /**
  * Detect performance hazards in one source file with a single line-oriented pass: nested loops
  * (PRF-ALG-001), transient allocations inside loops (PRF-MEM-001) and blocking synchronous I/O
@@ -110,189 +115,241 @@ export class PerformanceAnalyzer implements Analyzer {
         const len = content.length;
         const file = ctx.filePath.replace(/\\/g, '/');
 
-        // One policy decision per file: CLI-style paths may legitimately use synchronous fs.
         const syncIoAllowPatterns = (opts.blockingIoAllowPatterns ?? []).map((g) =>
             globToRegExp(g),
         );
         const syncIoAllowlisted =
             syncIoAllowPatterns.length > 0 && matchAny(syncIoAllowPatterns, file);
-
-        // Detect indentation-based languages (Python, GDScript) vs brace-based languages
         const isIndentBased = file.endsWith('.py') || file.endsWith('.gd');
 
         let lineStart = 0;
         let lineIdx = 0;
-        let inAsyncFunction = false;
-        let inBlockComment = false;
+        const scanState: LineScanState = { inAsyncFunction: false, inBlockComment: false };
         const loopStack: LoopScope[] = [];
 
         while (lineStart < len) {
-            let lineEnd = content.indexOf('\n', lineStart);
-            let nextStart: number;
-            if (lineEnd === -1) {
-                lineEnd = len;
-                nextStart = len;
-            } else {
-                nextStart = lineEnd + 1;
-                if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
-                    lineEnd--;
-                }
-            }
+            const nextLine = this.extractNextLine(content, len, lineStart);
+            lineStart = nextLine.nextStart;
 
-            const lineText = content.slice(lineStart, lineEnd);
-            const trimmed = lineText.trim();
-
-            // Handle multiline comments (/* ... */, """ ... """)
-            if (inBlockComment) {
-                if (trimmed.includes('*/') || trimmed.includes('"""')) {
-                    inBlockComment = false;
-                }
+            if (this.handleComments(nextLine.trimmed, isIndentBased, scanState)) {
                 lineIdx++;
-                lineStart = nextStart;
-                continue;
-            }
-            if (trimmed.startsWith('/*') || (isIndentBased && trimmed.startsWith('"""'))) {
-                if (!trimmed.endsWith('*/') && !trimmed.endsWith('"""')) {
-                    inBlockComment = true;
-                }
-                lineIdx++;
-                lineStart = nextStart;
-                continue;
-            }
-            if (trimmed.startsWith('*')) {
-                // JSDoc continuation line
-                lineIdx++;
-                lineStart = nextStart;
                 continue;
             }
 
-            if (trimmed !== '' && !trimmed.startsWith('//') && !trimmed.startsWith('#')) {
-                // Calculate leading indentation whitespace
-                let indent = 0;
-                while (
-                    indent < lineText.length &&
-                    (lineText.charCodeAt(indent) === CHAR_CODE_SPACE ||
-                        lineText.charCodeAt(indent) === CHAR_CODE_TAB)
-                ) {
-                    indent++;
-                }
+            this.updateIndentLoops(nextLine.lineText, isIndentBased, loopStack);
+            if (this.isAsyncDeclaration(nextLine.trimmed)) {
+                scanState.inAsyncFunction = true;
+            }
 
-                // For indentation-based languages, exit loops when indent drops back
-                if (isIndentBased && loopStack.length > 0) {
-                    while (
-                        loopStack.length > 0 &&
-                        indent <= loopStack[loopStack.length - 1].indent
-                    ) {
-                        loopStack.pop();
-                    }
-                }
+            this.checkLoopNesting(
+                nextLine.trimmed,
+                nextLine.lineText,
+                maxNesting,
+                lineIdx,
+                ctx,
+                loopStack,
+                issues,
+            );
 
-                // Check async scope
-                if (
-                    /\basync\s+(?:function|[A-Za-z0-9_$]+\s*\(|\()/.test(trimmed) ||
-                    /^async\s+def\b/.test(trimmed)
-                ) {
-                    inAsyncFunction = true;
-                }
+            if (loopStack.length > 0 && checkAlloc) {
+                this.checkTransientAllocation(
+                    nextLine.trimmed,
+                    lineIdx,
+                    ctx,
+                    loopStack.length,
+                    issues,
+                );
+            }
 
-                // Check loop start
-                if (LOOP_KEYWORD_RE.test(trimmed)) {
-                    const currentDepth = loopStack.length + 1;
-                    loopStack.push({
-                        depth: currentDepth,
-                        indent,
-                        usesBrace: trimmed.includes('{'),
-                    });
+            if (checkIO && !syncIoAllowlisted) {
+                this.checkBlockingIo(
+                    nextLine.trimmed,
+                    nextLine.lineText,
+                    lineIdx,
+                    scanState.inAsyncFunction,
+                    ctx,
+                    issues,
+                );
+            }
 
-                    if (currentDepth >= maxNesting) {
-                        const desc = PerformanceMessages.NESTED_LOOP_COMPLEXITY(
-                            currentDepth,
-                            maxNesting,
-                        );
-                        issues.push(
-                            this.mkIssue(
-                                ctx,
-                                lineIdx,
-                                'PRF-ALG-001',
-                                desc.message,
-                                currentDepth >= LOOP_DEPTH_ERROR_THRESHOLD ? 'error' : 'warning',
-                                { loopDepth: currentDepth, threshold: maxNesting },
-                                desc.suggestion,
-                            ),
-                        );
-                    }
-                }
-
-                // Check transient allocations inside loop
-                if (loopStack.length > 0 && checkAlloc) {
-                    if (TRANSIENT_ALLOC_RE.test(trimmed)) {
-                        const desc = PerformanceMessages.TRANSIENT_LOOP_ALLOCATION(
-                            loopStack.length,
-                        );
-                        issues.push(
-                            this.mkIssue(
-                                ctx,
-                                lineIdx,
-                                'PRF-MEM-001',
-                                desc.message,
-                                'info',
-                                { loopDepth: loopStack.length },
-                                desc.suggestion,
-                            ),
-                        );
-                    }
-                }
-
-                // Check blocking I/O in async or game-loop routines
-                if (checkIO && !syncIoAllowlisted) {
-                    for (const io of BLOCKING_IO_PATTERNS) {
-                        if (io.pattern.test(trimmed)) {
-                            const isCriticalContext =
-                                inAsyncFunction ||
-                                /(_process|_physics_process|tick|render)/.test(lineText);
-                            const desc = PerformanceMessages.BLOCKING_SYNC_IO(
-                                io.name,
-                                inAsyncFunction,
-                            );
-                            issues.push(
-                                this.mkIssue(
-                                    ctx,
-                                    lineIdx,
-                                    'PRF-IO-001',
-                                    desc.message,
-                                    isCriticalContext ? 'error' : 'warning',
-                                    { api: io.name, inAsync: inAsyncFunction },
-                                    desc.suggestion,
-                                ),
-                            );
-                            break;
-                        }
-                    }
-                }
-
-                // For brace-based languages, decrease loop depth on closing brace
-                if (!isIndentBased && trimmed.includes('}')) {
-                    const closes = (trimmed.match(/\}/g) || []).length;
-                    for (let c = 0; c < closes; c++) {
-                        if (loopStack.length > 0) {
-                            loopStack.pop();
-                        }
-                    }
-                }
+            if (!isIndentBased) {
+                this.updateBraceLoops(nextLine.trimmed, loopStack);
             }
 
             lineIdx++;
-            lineStart = nextStart;
         }
 
-        // Opt-in, like every other new capability in this engine (crossFileLiteralClusters,
-        // errorPropagation, the language packs): a content-heuristic detector must not enter an
-        // existing consumer's gate merely because the analyzer itself is enabled.
         if (opts.checkUnboundedGrowth === true) {
             issues.push(...detectUnboundedGrowth(ctx.filePath, content));
         }
 
         return issues;
+    }
+
+    private extractNextLine(
+        content: string,
+        len: number,
+        lineStart: number,
+    ): { lineText: string; trimmed: string; nextStart: number } {
+        let lineEnd = content.indexOf('\n', lineStart);
+        let nextStart: number;
+        if (lineEnd === -1) {
+            lineEnd = len;
+            nextStart = len;
+        } else {
+            nextStart = lineEnd + 1;
+            if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
+                lineEnd--;
+            }
+        }
+        const lineText = content.slice(lineStart, lineEnd);
+        return { lineText, trimmed: lineText.trim(), nextStart };
+    }
+
+    private handleComments(trimmed: string, isIndentBased: boolean, state: LineScanState): boolean {
+        if (state.inBlockComment) {
+            if (trimmed.includes('*/') || trimmed.includes('"""')) {
+                state.inBlockComment = false;
+            }
+            return true;
+        }
+        if (trimmed.startsWith('/*') || (isIndentBased && trimmed.startsWith('"""'))) {
+            if (!trimmed.endsWith('*/') && !trimmed.endsWith('"""')) {
+                state.inBlockComment = true;
+            }
+            return true;
+        }
+        if (trimmed.startsWith('*')) {
+            return true;
+        }
+        return trimmed === '' || trimmed.startsWith('//') || trimmed.startsWith('#');
+    }
+
+    private calculateIndent(lineText: string): number {
+        let indent = 0;
+        while (
+            indent < lineText.length &&
+            (lineText.charCodeAt(indent) === CHAR_CODE_SPACE ||
+                lineText.charCodeAt(indent) === CHAR_CODE_TAB)
+        ) {
+            indent++;
+        }
+        return indent;
+    }
+
+    private updateIndentLoops(
+        lineText: string,
+        isIndentBased: boolean,
+        loopStack: LoopScope[],
+    ): void {
+        if (!isIndentBased || loopStack.length === 0) return;
+        const indent = this.calculateIndent(lineText);
+        while (loopStack.length > 0 && indent <= loopStack[loopStack.length - 1].indent) {
+            loopStack.pop();
+        }
+    }
+
+    private isAsyncDeclaration(trimmed: string): boolean {
+        return (
+            /\basync\s+(?:function|[A-Za-z0-9_$]+\s*\(|\()/.test(trimmed) ||
+            /^async\s+def\b/.test(trimmed)
+        );
+    }
+
+    private checkLoopNesting(
+        trimmed: string,
+        lineText: string,
+        maxNesting: number,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        loopStack: LoopScope[],
+        issues: Issue[],
+    ): void {
+        if (!LOOP_KEYWORD_RE.test(trimmed)) return;
+
+        const indent = this.calculateIndent(lineText);
+        const currentDepth = loopStack.length + 1;
+        loopStack.push({
+            depth: currentDepth,
+            indent,
+            usesBrace: trimmed.includes('{'),
+        });
+
+        if (currentDepth >= maxNesting) {
+            const desc = PerformanceMessages.NESTED_LOOP_COMPLEXITY(currentDepth, maxNesting);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'PRF-ALG-001',
+                    desc.message,
+                    currentDepth >= LOOP_DEPTH_ERROR_THRESHOLD ? 'error' : 'warning',
+                    { loopDepth: currentDepth, threshold: maxNesting },
+                    desc.suggestion,
+                ),
+            );
+        }
+    }
+
+    private checkTransientAllocation(
+        trimmed: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        loopDepth: number,
+        issues: Issue[],
+    ): void {
+        if (!TRANSIENT_ALLOC_RE.test(trimmed)) return;
+        const desc = PerformanceMessages.TRANSIENT_LOOP_ALLOCATION(loopDepth);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'PRF-MEM-001',
+                desc.message,
+                'info',
+                { loopDepth },
+                desc.suggestion,
+            ),
+        );
+    }
+
+    private checkBlockingIo(
+        trimmed: string,
+        lineText: string,
+        lineIdx: number,
+        inAsyncFunction: boolean,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        for (const io of BLOCKING_IO_PATTERNS) {
+            if (!io.pattern.test(trimmed)) continue;
+
+            const isCriticalContext =
+                inAsyncFunction || /(_process|_physics_process|tick|render)/.test(lineText);
+            const desc = PerformanceMessages.BLOCKING_SYNC_IO(io.name, inAsyncFunction);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'PRF-IO-001',
+                    desc.message,
+                    isCriticalContext ? 'error' : 'warning',
+                    { api: io.name, inAsync: inAsyncFunction },
+                    desc.suggestion,
+                ),
+            );
+            break;
+        }
+    }
+
+    private updateBraceLoops(trimmed: string, loopStack: LoopScope[]): void {
+        if (!trimmed.includes('}')) return;
+        const closes = (trimmed.match(/\}/g) || []).length;
+        for (let c = 0; c < closes; c++) {
+            if (loopStack.length > 0) {
+                loopStack.pop();
+            }
+        }
     }
 
     /**
