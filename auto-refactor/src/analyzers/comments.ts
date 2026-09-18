@@ -217,106 +217,167 @@ export class CommentAnalyzer implements Analyzer {
         for (let i = 0; i < lineCount; i++) {
             let line = lines[i];
             if (line.endsWith('\r')) line = line.slice(0, -1);
-            const lineNo = i + 1;
             const trimmed = line.trim();
 
-            if (MOJIBAKE_RE.test(line)) {
-                const desc = CommentMessages.MOJIBAKE(file);
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        i,
-                        'CMT-MOJI-001',
-                        desc.message,
-                        SEVERITY_ERROR,
-                        { file },
-                        desc.suggestion,
-                    ),
-                );
+            this.checkMojibake(line, i, file, ctx, issues);
+
+            const tripleResult = this.updateTripleQuoteState(trimmed, line, inTriple);
+            inTriple = tripleResult.inTriple;
+
+            if (!this.isCommentLine(trimmed, tripleResult.insideTriple)) {
+                continue;
             }
 
-            // Track Python docstring blocks so their physical lines count as comment lines.
-            let insideTriple = false;
-            if (inTriple) {
-                insideTriple = true;
-                const closers =
-                    inTriple === DOUBLE_QUOTE
-                        ? line.split('"""').length - 1
-                        : line.split("'''").length - 1;
-                if (closers > 0) inTriple = null;
-            } else if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
-                const marker = trimmed.startsWith('"""') ? DOUBLE_QUOTE : SINGLE_QUOTE;
-                const occurrences =
-                    marker === DOUBLE_QUOTE
-                        ? line.split('"""').length - 1
-                        : line.split("'''").length - 1;
-                if (occurrences < 2) inTriple = marker;
-            }
-
-            const isCommentLine =
-                trimmed.startsWith('//') ||
-                trimmed.startsWith('#') ||
-                trimmed.startsWith('/*') ||
-                trimmed.startsWith('*') ||
-                insideTriple ||
-                trimmed.startsWith('"""') ||
-                trimmed.startsWith("'''");
-            if (!isCommentLine) continue;
-
-            const body = this.commentBody(trimmed);
-            const isDirective = directiveRe.test(body);
-
-            if (level !== 'basic' && line.length > MAX_COMMENT_WIDTH && !isDirective) {
-                const desc = CommentMessages.COMMENT_WIDTH(line.length, MAX_COMMENT_WIDTH);
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        i,
-                        'CMT-WID-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        { file, width: line.length, limit: MAX_COMMENT_WIDTH },
-                        desc.suggestion,
-                    ),
-                );
-            }
-
-            if (level !== 'basic' && !BARE_SEPARATOR_RE.test(body)) {
-                if (SHORT_SEPARATOR_RE.test(body)) shortLines.push(lineNo);
-                else if (LONG_SEPARATOR_RE.test(body)) longLines.push(lineNo);
-            }
-
-            if (level !== 'basic' && lineCount < BANNER_LINE_LIMIT && body.startsWith('═')) {
-                const desc = CommentMessages.BANNER_SMALL_FILE(lineCount, BANNER_LINE_LIMIT);
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        i,
-                        'CMT-BAN-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        { file, lineCount, limit: BANNER_LINE_LIMIT },
-                        desc.suggestion,
-                    ),
-                );
-            }
+            this.auditCommentLine(
+                line,
+                trimmed,
+                i,
+                lineCount,
+                file,
+                level,
+                directiveRe,
+                ctx,
+                issues,
+                shortLines,
+                longLines,
+            );
         }
 
-        if (shortLines.length > 0 && longLines.length > 0) {
-            const desc = CommentMessages.MIXED_SEPARATORS(shortLines.length, longLines.length);
-            const first = Math.min(shortLines[0], longLines[0]);
+        this.auditSeparators(shortLines, longLines, file, ctx, issues);
+    }
+
+    private checkMojibake(
+        line: string,
+        lineIdx: number,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (!MOJIBAKE_RE.test(line)) return;
+        const desc = CommentMessages.MOJIBAKE(file);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'CMT-MOJI-001',
+                desc.message,
+                SEVERITY_ERROR,
+                { file },
+                desc.suggestion,
+            ),
+        );
+    }
+
+    private updateTripleQuoteState(
+        trimmed: string,
+        line: string,
+        inTriple: typeof DOUBLE_QUOTE | typeof SINGLE_QUOTE | null,
+    ): { inTriple: typeof DOUBLE_QUOTE | typeof SINGLE_QUOTE | null; insideTriple: boolean } {
+        if (inTriple) {
+            const closers =
+                inTriple === DOUBLE_QUOTE
+                    ? line.split('"""').length - 1
+                    : line.split("'''").length - 1;
+            return { inTriple: closers > 0 ? null : inTriple, insideTriple: true };
+        }
+        if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
+            const marker = trimmed.startsWith('"""') ? DOUBLE_QUOTE : SINGLE_QUOTE;
+            const occurrences =
+                marker === DOUBLE_QUOTE
+                    ? line.split('"""').length - 1
+                    : line.split("'''").length - 1;
+            return { inTriple: occurrences < 2 ? marker : null, insideTriple: false };
+        }
+        return { inTriple: null, insideTriple: false };
+    }
+
+    private isCommentLine(trimmed: string, insideTriple: boolean): boolean {
+        return (
+            insideTriple ||
+            trimmed.startsWith('//') ||
+            trimmed.startsWith('#') ||
+            trimmed.startsWith('/*') ||
+            trimmed.startsWith('*') ||
+            trimmed.startsWith('"""') ||
+            trimmed.startsWith("'''")
+        );
+    }
+
+    private auditCommentLine(
+        line: string,
+        trimmed: string,
+        lineIdx: number,
+        lineCount: number,
+        file: string,
+        level: CommentLevel,
+        directiveRe: RegExp,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+        shortLines: number[],
+        longLines: number[],
+    ): void {
+        const body = this.commentBody(trimmed);
+        const lineNo = lineIdx + 1;
+
+        if (level === 'basic') return;
+
+        if (line.length > MAX_COMMENT_WIDTH && !directiveRe.test(body)) {
+            const desc = CommentMessages.COMMENT_WIDTH(line.length, MAX_COMMENT_WIDTH);
             issues.push(
                 this.mkIssue(
                     ctx,
-                    first - 1,
-                    'CMT-SEP-001',
+                    lineIdx,
+                    'CMT-WID-001',
                     desc.message,
                     SEVERITY_WARNING,
-                    { file, short: shortLines.length, long: longLines.length },
+                    { file, width: line.length, limit: MAX_COMMENT_WIDTH },
                     desc.suggestion,
                 ),
             );
         }
+
+        if (!BARE_SEPARATOR_RE.test(body)) {
+            if (SHORT_SEPARATOR_RE.test(body)) shortLines.push(lineNo);
+            else if (LONG_SEPARATOR_RE.test(body)) longLines.push(lineNo);
+        }
+
+        if (lineCount < BANNER_LINE_LIMIT && body.startsWith('═')) {
+            const desc = CommentMessages.BANNER_SMALL_FILE(lineCount, BANNER_LINE_LIMIT);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'CMT-BAN-001',
+                    desc.message,
+                    SEVERITY_WARNING,
+                    { file, lineCount, limit: BANNER_LINE_LIMIT },
+                    desc.suggestion,
+                ),
+            );
+        }
+    }
+
+    private auditSeparators(
+        shortLines: number[],
+        longLines: number[],
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (shortLines.length === 0 || longLines.length === 0) return;
+        const desc = CommentMessages.MIXED_SEPARATORS(shortLines.length, longLines.length);
+        const first = Math.min(shortLines[0], longLines[0]);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                first - 1,
+                'CMT-SEP-001',
+                desc.message,
+                SEVERITY_WARNING,
+                { file, short: shortLines.length, long: longLines.length },
+                desc.suggestion,
+            ),
+        );
     }
 
     /**
@@ -342,32 +403,7 @@ export class CommentAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        let headerLinesCount = 0;
-        let headerCursor = 0;
-        let hasAnyHeaderComment = false;
-
-        while (headerCursor < len && headerLinesCount < HEADER_SCAN_LINES) {
-            const nextNl = content.indexOf('\n', headerCursor);
-            const lineEnd = nextNl === -1 ? len : nextNl;
-            let line = content.slice(headerCursor, lineEnd);
-            if (line.endsWith('\r')) line = line.slice(0, -1);
-            const trimmed = line.trim();
-
-            // Skip shebang lines: '#!/usr/bin/env' is NOT a doc comment
-            if (!trimmed.startsWith('#!')) {
-                if (/^\s*(\/\/|\/\*|\*|#|##|""")/.test(trimmed)) {
-                    hasAnyHeaderComment = true;
-                }
-            }
-
-            headerLinesCount++;
-            if (nextNl === -1) {
-                headerCursor = len;
-                break;
-            }
-            headerCursor = nextNl + 1;
-        }
-        const headerText = content.slice(0, headerCursor);
+        const { headerText, hasAnyHeaderComment } = this.extractHeaderText(content, len);
 
         if (!hasAnyHeaderComment) {
             const desc = CommentMessages.MISSING_FILE_HEADER(file);
@@ -382,47 +418,95 @@ export class CommentAnalyzer implements Analyzer {
                     desc.suggestion,
                 ),
             );
-        } else if (level === COMMENT_LEVEL_STRICT || opts.strictSixFields) {
-            // Check 6-field header contract (bilingual support)
-            for (let i = 0; i < SIX_FIELD_HEADERS_EN.length; i++) {
-                const enMarker = SIX_FIELD_HEADERS_EN[i];
-                const zhMarker = SIX_FIELD_HEADERS_ZH[i];
-                if (!headerText.includes(enMarker) && !headerText.includes(zhMarker)) {
-                    const desc = CommentMessages.MISSING_HEADER_FIELD(`${enMarker} / ${zhMarker}`);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            0,
-                            'CMT-HDR-002',
-                            desc.message,
-                            SEVERITY_WARNING,
-                            { file, missingField: `${enMarker} (${zhMarker})` },
-                            desc.suggestion,
-                        ),
-                    );
-                }
+            return;
+        }
+
+        if (level === COMMENT_LEVEL_STRICT || opts.strictSixFields) {
+            this.auditSixFields(headerText, file, ctx, issues);
+            this.auditDeclaredPath(headerText, file, ctx, issues);
+        }
+    }
+
+    private extractHeaderText(
+        content: string,
+        len: number,
+    ): { headerText: string; hasAnyHeaderComment: boolean } {
+        let headerLinesCount = 0;
+        let headerCursor = 0;
+        let hasAnyHeaderComment = false;
+
+        while (headerCursor < len && headerLinesCount < HEADER_SCAN_LINES) {
+            const nextNl = content.indexOf('\n', headerCursor);
+            const lineEnd = nextNl === -1 ? len : nextNl;
+            let line = content.slice(headerCursor, lineEnd);
+            if (line.endsWith('\r')) line = line.slice(0, -1);
+            const trimmed = line.trim();
+
+            if (!trimmed.startsWith('#!') && /^\s*(\/\/|\/\*|\*|#|##|""")/.test(trimmed)) {
+                hasAnyHeaderComment = true;
             }
 
-            // Check declared path alignment (bilingual support)
-            const pathMatch = headerText.match(/(?:文件路径|File Path):\s*([^\r\n]+)/i);
-            if (pathMatch) {
-                const declaredPath = pathMatch[1].trim().replace(/\\/g, '/');
-                if (!file.endsWith(declaredPath) && !declaredPath.endsWith(file)) {
-                    const desc = CommentMessages.HEADER_PATH_MISMATCH(declaredPath, file);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            0,
-                            'CMT-HDR-003',
-                            desc.message,
-                            SEVERITY_ERROR,
-                            { declaredPath, physicalPath: file },
-                            desc.suggestion,
-                        ),
-                    );
-                }
+            headerLinesCount++;
+            if (nextNl === -1) {
+                headerCursor = len;
+                break;
             }
+            headerCursor = nextNl + 1;
         }
+
+        return { headerText: content.slice(0, headerCursor), hasAnyHeaderComment };
+    }
+
+    private auditSixFields(
+        headerText: string,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        for (let i = 0; i < SIX_FIELD_HEADERS_EN.length; i++) {
+            const enMarker = SIX_FIELD_HEADERS_EN[i];
+            const zhMarker = SIX_FIELD_HEADERS_ZH[i];
+            if (headerText.includes(enMarker) || headerText.includes(zhMarker)) continue;
+
+            const desc = CommentMessages.MISSING_HEADER_FIELD(`${enMarker} / ${zhMarker}`);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    0,
+                    'CMT-HDR-002',
+                    desc.message,
+                    SEVERITY_WARNING,
+                    { file, missingField: `${enMarker} (${zhMarker})` },
+                    desc.suggestion,
+                ),
+            );
+        }
+    }
+
+    private auditDeclaredPath(
+        headerText: string,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const pathMatch = headerText.match(/(?:文件路径|File Path):\s*([^\r\n]+)/i);
+        if (!pathMatch) return;
+
+        const declaredPath = pathMatch[1].trim().replace(/\\/g, '/');
+        if (file.endsWith(declaredPath) || declaredPath.endsWith(file)) return;
+
+        const desc = CommentMessages.HEADER_PATH_MISMATCH(declaredPath, file);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                0,
+                'CMT-HDR-003',
+                desc.message,
+                SEVERITY_ERROR,
+                { declaredPath, physicalPath: file },
+                desc.suggestion,
+            ),
+        );
     }
 
     private auditPublicApi(
@@ -437,7 +521,7 @@ export class CommentAnalyzer implements Analyzer {
         let cursor = 0;
         let lineIdx = 0;
         const recentCommentLines: Array<{ line: number; text: string }> = [];
-        let hadBlankLineSinceComment = false;
+        const state = { hadBlankLineSinceComment: false };
 
         while (cursor < len) {
             const nextNl = content.indexOf('\n', cursor);
@@ -446,147 +530,237 @@ export class CommentAnalyzer implements Analyzer {
             if (line.endsWith('\r')) line = line.slice(0, -1);
             const trimmed = line.trim();
 
-            // Track comments vs blank lines
-            if (trimmed === '') {
-                hadBlankLineSinceComment = true;
-            } else if (trimmed.startsWith('@')) {
-                // Decorators: pass through, do not clear comments
-            } else if (/^\s*(\/\/|\/\*|\*|#|##|""")/.test(trimmed) && !trimmed.startsWith('#!')) {
-                if (hadBlankLineSinceComment) {
-                    recentCommentLines.length = 0;
-                    hadBlankLineSinceComment = false;
-                }
-                recentCommentLines.push({ line: lineIdx, text: trimmed });
-                if (recentCommentLines.length > MAX_RECENT_COMMENT_LINES)
-                    recentCommentLines.shift();
-            } else {
-                // Code line: test for public / exported declaration
-                const match = trimmed.match(EXPORT_RE);
-                if (match) {
-                    const symbol = match[1];
-                    const isPrivate = symbol.startsWith('_');
+            const isCode = this.collectRecentComments(trimmed, lineIdx, recentCommentLines, state);
 
-                    if (!isPrivate) {
-                        let foundDoc = false;
-                        let docText = '';
-                        let commentLine = lineIdx;
-
-                        // Check preceding comments (if not separated by empty line)
-                        if (!hadBlankLineSinceComment && recentCommentLines.length > 0) {
-                            foundDoc = true;
-                            commentLine = recentCommentLines[0].line;
-                            docText = recentCommentLines.map((c) => c.text).join('\n');
-                        }
-
-                        // If not found above, check for Python/GDScript
-                        // docstring directly inside body
-                        if (
-                            !foundDoc &&
-                            (file.endsWith('.py') || file.endsWith('.gd')) &&
-                            nextNl !== -1
-                        ) {
-                            let bodyPos = nextNl + 1;
-                            let scanLines = 0;
-                            while (bodyPos < len && scanLines < MAX_DOCSTRING_SCAN_LINES) {
-                                const nextNl2 = content.indexOf('\n', bodyPos);
-                                const rawLine = content
-                                    .slice(bodyPos, nextNl2 === -1 ? len : nextNl2)
-                                    .trim();
-                                if (rawLine === '') {
-                                    bodyPos = nextNl2 === -1 ? len : nextNl2 + 1;
-                                    scanLines++;
-                                    continue;
-                                }
-                                if (
-                                    rawLine.startsWith('"""') ||
-                                    rawLine.startsWith("'''") ||
-                                    rawLine.startsWith('##')
-                                ) {
-                                    foundDoc = true;
-                                    docText = rawLine;
-                                    commentLine = lineIdx + 1 + scanLines;
-                                }
-                                break;
-                            }
-                        }
-
-                        if (!foundDoc) {
-                            const desc = CommentMessages.MISSING_PUBLIC_DOC(symbol);
-                            issues.push(
-                                this.mkIssue(
-                                    ctx,
-                                    lineIdx,
-                                    'CMT-DOC-001',
-                                    desc.message,
-                                    level === COMMENT_LEVEL_STRICT
-                                        ? SEVERITY_WARNING
-                                        : SEVERITY_INFO,
-                                    { symbol, line: lineIdx + 1 },
-                                    desc.suggestion,
-                                ),
-                            );
-                        } else {
-                            // Quality checks on found comments in standard / strict modes
-                            if (level === 'standard' || level === COMMENT_LEVEL_STRICT) {
-                                const cleanDoc = docText
-                                    .replace(/[\/*#"]/g, '')
-                                    .trim()
-                                    .toLowerCase();
-                                if (cleanDoc === symbol.toLowerCase()) {
-                                    const desc = CommentMessages.TRIVIAL_COMMENT(symbol);
-                                    issues.push(
-                                        this.mkIssue(
-                                            ctx,
-                                            commentLine,
-                                            'CMT-DOC-002',
-                                            desc.message,
-                                            SEVERITY_WARNING,
-                                            { symbol },
-                                            desc.suggestion,
-                                        ),
-                                    );
-                                }
-
-                                // Strict mode: concurrency & thread-safety audit for
-                                // async/worker methods
-                                if (level === COMMENT_LEVEL_STRICT) {
-                                    const isAsync =
-                                        !TYPE_ONLY_DECLARATION_RE.test(trimmed) &&
-                                        ASYNC_DECLARATION_RE.test(trimmed);
-                                    if (
-                                        isAsync &&
-                                        !/(并发|thread|async|await|reentrant|idempotent|锁|race|单线程|lock|mutex|atomic|sync)/i.test(
-                                            docText,
-                                        )
-                                    ) {
-                                        const desc =
-                                            CommentMessages.MISSING_CONCURRENCY_NOTE(symbol);
-                                        issues.push(
-                                            this.mkIssue(
-                                                ctx,
-                                                lineIdx,
-                                                'CMT-CON-001',
-                                                desc.message,
-                                                SEVERITY_INFO,
-                                                { symbol },
-                                                desc.suggestion,
-                                            ),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Reset comment tracking after processing non-comment code
+            if (isCode) {
+                this.processCodeLineForPublicApi(
+                    content,
+                    len,
+                    file,
+                    nextNl,
+                    trimmed,
+                    lineIdx,
+                    level,
+                    ctx,
+                    issues,
+                    recentCommentLines,
+                    state.hadBlankLineSinceComment,
+                );
                 recentCommentLines.length = 0;
-                hadBlankLineSinceComment = false;
+                state.hadBlankLineSinceComment = false;
             }
 
             lineIdx++;
             if (nextNl === -1) break;
             cursor = nextNl + 1;
+        }
+    }
+
+    private collectRecentComments(
+        trimmed: string,
+        lineIdx: number,
+        recentCommentLines: Array<{ line: number; text: string }>,
+        state: { hadBlankLineSinceComment: boolean },
+    ): boolean {
+        if (trimmed === '') {
+            state.hadBlankLineSinceComment = true;
+            return false;
+        }
+        if (trimmed.startsWith('@')) {
+            return false;
+        }
+        if (/^\s*(\/\/|\/\*|\*|#|##|""")/.test(trimmed) && !trimmed.startsWith('#!')) {
+            if (state.hadBlankLineSinceComment) {
+                recentCommentLines.length = 0;
+                state.hadBlankLineSinceComment = false;
+            }
+            recentCommentLines.push({ line: lineIdx, text: trimmed });
+            if (recentCommentLines.length > MAX_RECENT_COMMENT_LINES) {
+                recentCommentLines.shift();
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private processCodeLineForPublicApi(
+        content: string,
+        len: number,
+        file: string,
+        nextNl: number,
+        trimmed: string,
+        lineIdx: number,
+        level: CommentLevel,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+        recentCommentLines: Array<{ line: number; text: string }>,
+        hadBlankLineSinceComment: boolean,
+    ): void {
+        const match = trimmed.match(EXPORT_RE);
+        if (!match) return;
+
+        const symbol = match[1];
+        if (symbol.startsWith('_')) return;
+
+        const docInfo = this.resolveSymbolDoc(
+            content,
+            len,
+            file,
+            nextNl,
+            lineIdx,
+            recentCommentLines,
+            hadBlankLineSinceComment,
+        );
+
+        if (!docInfo.foundDoc) {
+            this.emitMissingDoc(symbol, lineIdx, level, ctx, issues);
+            return;
+        }
+
+        this.auditDocQuality(symbol, docInfo, trimmed, lineIdx, level, ctx, issues);
+    }
+
+    private resolveSymbolDoc(
+        content: string,
+        len: number,
+        file: string,
+        nextNl: number,
+        lineIdx: number,
+        recentCommentLines: Array<{ line: number; text: string }>,
+        hadBlankLineSinceComment: boolean,
+    ): { foundDoc: boolean; docText: string; commentLine: number } {
+        if (!hadBlankLineSinceComment && recentCommentLines.length > 0) {
+            return {
+                foundDoc: true,
+                commentLine: recentCommentLines[0].line,
+                docText: recentCommentLines.map((c) => c.text).join('\n'),
+            };
+        }
+
+        if ((file.endsWith('.py') || file.endsWith('.gd')) && nextNl !== -1) {
+            return this.scanInlineDocstring(content, len, nextNl + 1, lineIdx);
+        }
+
+        return { foundDoc: false, docText: '', commentLine: lineIdx };
+    }
+
+    private scanInlineDocstring(
+        content: string,
+        len: number,
+        startPos: number,
+        lineIdx: number,
+    ): { foundDoc: boolean; docText: string; commentLine: number } {
+        let bodyPos = startPos;
+        let scanLines = 0;
+        while (bodyPos < len && scanLines < MAX_DOCSTRING_SCAN_LINES) {
+            const nextNl2 = content.indexOf('\n', bodyPos);
+            const rawLine = content.slice(bodyPos, nextNl2 === -1 ? len : nextNl2).trim();
+            if (rawLine === '') {
+                bodyPos = nextNl2 === -1 ? len : nextNl2 + 1;
+                scanLines++;
+                continue;
+            }
+            if (
+                rawLine.startsWith('"""') ||
+                rawLine.startsWith("'''") ||
+                rawLine.startsWith('##')
+            ) {
+                return {
+                    foundDoc: true,
+                    docText: rawLine,
+                    commentLine: lineIdx + 1 + scanLines,
+                };
+            }
+            break;
+        }
+        return { foundDoc: false, docText: '', commentLine: lineIdx };
+    }
+
+    private emitMissingDoc(
+        symbol: string,
+        lineIdx: number,
+        level: CommentLevel,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const desc = CommentMessages.MISSING_PUBLIC_DOC(symbol);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'CMT-DOC-001',
+                desc.message,
+                level === COMMENT_LEVEL_STRICT ? SEVERITY_WARNING : SEVERITY_INFO,
+                { symbol, line: lineIdx + 1 },
+                desc.suggestion,
+            ),
+        );
+    }
+
+    private auditDocQuality(
+        symbol: string,
+        docInfo: { docText: string; commentLine: number },
+        trimmed: string,
+        lineIdx: number,
+        level: CommentLevel,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (level !== 'standard' && level !== COMMENT_LEVEL_STRICT) return;
+
+        const cleanDoc = docInfo.docText
+            .replace(/[\/*#"]/g, '')
+            .trim()
+            .toLowerCase();
+        if (cleanDoc === symbol.toLowerCase()) {
+            const desc = CommentMessages.TRIVIAL_COMMENT(symbol);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    docInfo.commentLine,
+                    'CMT-DOC-002',
+                    desc.message,
+                    SEVERITY_WARNING,
+                    { symbol },
+                    desc.suggestion,
+                ),
+            );
+        }
+
+        if (level === COMMENT_LEVEL_STRICT) {
+            this.auditAsyncConcurrency(symbol, docInfo.docText, trimmed, lineIdx, ctx, issues);
+        }
+    }
+
+    private auditAsyncConcurrency(
+        symbol: string,
+        docText: string,
+        trimmed: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const isAsync =
+            !TYPE_ONLY_DECLARATION_RE.test(trimmed) && ASYNC_DECLARATION_RE.test(trimmed);
+        if (!isAsync) return;
+
+        const hasConcurrency =
+            /(并发|thread|async|await|reentrant|idempotent|锁|race|单线程|lock|mutex|atomic|sync)/i.test(
+                docText,
+            );
+        if (!hasConcurrency) {
+            const desc = CommentMessages.MISSING_CONCURRENCY_NOTE(symbol);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'CMT-CON-001',
+                    desc.message,
+                    SEVERITY_INFO,
+                    { symbol },
+                    desc.suggestion,
+                ),
+            );
         }
     }
 
