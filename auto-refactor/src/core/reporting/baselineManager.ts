@@ -10,7 +10,7 @@
 
 import * as fs from 'fs';
 import type { ScanReport, Issue } from '../types';
-import { Logger } from '../logger';
+import type { Logger } from '../logger';
 
 /** Baseline ratchet granularity that compares per-(analyzer|rule|file) counts. */
 export const BASELINE_GRANULARITY_GROUPED = 'grouped';

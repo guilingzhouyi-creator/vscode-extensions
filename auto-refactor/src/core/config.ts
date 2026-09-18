@@ -615,8 +615,12 @@ function applySemanticAndSecurityLevels(
         };
     }
 
-    const commentLevel: CommentLevel = (overrides.commentLevel || fileCfg.commentLevel || 'standard') as CommentLevel;
-    const securityLevel: SecurityLevel = (overrides.securityLevel || fileCfg.securityLevel || 'basic') as SecurityLevel;
+    const commentLevel: CommentLevel = (overrides.commentLevel ||
+        fileCfg.commentLevel ||
+        'standard') as CommentLevel;
+    const securityLevel: SecurityLevel = (overrides.securityLevel ||
+        fileCfg.securityLevel ||
+        'basic') as SecurityLevel;
 
     if (analyzers[ANALYZER_COMMENTS] && (overrides.commentLevel || fileCfg.commentLevel)) {
         analyzers[ANALYZER_COMMENTS].enabled = commentLevel !== 'off';
@@ -795,9 +799,7 @@ function applyCliAnalyzersFilter(
  * @returns The fully merged config; a malformed config file warns and degrades to defaults
  *   instead of throwing, so callers always receive a usable configuration object.
  */
-export function resolveConfig(
-    overrides: ConfigOverrides = {},
-): ScanConfig {
+export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {
     const root = overrides.root || process.cwd();
     const base = defaultConfig(root);
     const analyzerDefaults = defaultAnalyzerOptions();
@@ -856,4 +858,3 @@ export function resolveConfig(
 
     return merged;
 }
-

@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import type { ScanConfig, ScanReport, Issue, SuppressionRule } from '../types';
 import type { Scanner } from '../analyzer';
 import { summarizeUncertainty } from '../analyzer';
-import { Logger } from '../logger';
+import type { Logger } from '../logger';
 import { globToRegExp } from '../fileDiscovery';
 import { runCyclePass } from '../dependencyGraph';
 import {
@@ -251,6 +251,9 @@ async function finalizeBaseline(
  * @param report - Raw report to finalize in-place.
  * @param config - Resolved scan configuration.
  * @param options - API options providing baseline knobs.
+ * @param options.baseline - Baseline file to ratchet the report against, when supplied.
+ * @param options.updateBaseline - Baseline file to rewrite with the current report, when supplied.
+ * @param options.baselineGranularity - Grouping granularity used for baseline comparisons.
  * @param logger - Logger instance for operational telemetry.
  * @param reportScanner - Scanner that executed the scan, or null if warm/remote.
  * @param scope - Post-scan scope: full allows cross-file passes; incremental skips them.

@@ -159,7 +159,12 @@ const VALUE_FLAG_HANDLERS: Record<string, ValueFlagHandler> = {
         opt.cacheDir = val;
     },
     'comment-level': (opt, val) => {
-        if (val === COMMENT_LEVEL_OFF || val === 'basic' || val === 'standard' || val === 'strict') {
+        if (
+            val === COMMENT_LEVEL_OFF ||
+            val === 'basic' ||
+            val === 'standard' ||
+            val === 'strict'
+        ) {
             opt.commentLevel = val;
         }
     },
@@ -220,11 +225,7 @@ function resolveBooleanFlagValue(
 /**
  * Dispatches a non-boolean flag to either standalone or value-taking handlers.
  */
-function applyValueOrStandaloneFlag(
-    opt: CliOptions,
-    arg: string,
-    takeValue: () => string,
-): void {
+function applyValueOrStandaloneFlag(opt: CliOptions, arg: string, takeValue: () => string): void {
     const standalone = STANDALONE_FLAG_HANDLERS[arg];
     if (standalone) {
         standalone(opt);

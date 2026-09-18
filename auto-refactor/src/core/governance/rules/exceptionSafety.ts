@@ -100,8 +100,7 @@ function checkPythonExceptions(lines: string[]): GovernanceViolation[] {
         if (SINGLE_LINE_SWALLOW.test(trimmed)) {
             violations.push({
                 ruleId: SWALLOWED_EXCEPTION_RULE_ID,
-                message:
-                    'Empty or swallowed `except` block with no active handling statements.',
+                message: 'Empty or swallowed `except` block with no active handling statements.',
                 line: i + 1,
                 column: line.indexOf('except') + 1,
                 suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
@@ -145,12 +144,7 @@ function inspectJsCatchBlock(
     while (j < lines.length) {
         const next = lines[j].trim();
         if (next === '}') break;
-        if (
-            next &&
-            !next.startsWith('//') &&
-            !next.startsWith('/*') &&
-            !next.startsWith('*')
-        ) {
+        if (next && !next.startsWith('//') && !next.startsWith('/*') && !next.startsWith('*')) {
             empty = false;
             break;
         }

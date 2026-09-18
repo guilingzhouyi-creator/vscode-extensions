@@ -43,11 +43,7 @@ import {
 import { globToRegExp, collectFiles } from '../fileDiscovery';
 import { loadGitignore } from '../gitignore';
 import type { ScannerContext } from './scannerContext';
-import type {
-    WarmSession,
-    CacheFingerprintContext,
-    StatResultEntry,
-} from './cacheKeyHelper';
+import type { WarmSession, CacheFingerprintContext, StatResultEntry } from './cacheKeyHelper';
 import {
     createWarmSession,
     buildCacheFingerprintContext,
@@ -173,7 +169,18 @@ async function processChangedFileHint(
         if (sha256Hex(Buffer.from(provided, 'utf8')) !== contentHash) {
             scanner.logger.warn(`diff newContent mismatch on ${rel}; falling back to full rescan`);
             state.diffFull++;
-            routeFullFallback(fph, contentHash, rel, newContent, buf, i, incEnabled, incMinLines, incBucket, state);
+            routeFullFallback(
+                fph,
+                contentHash,
+                rel,
+                newContent,
+                buf,
+                i,
+                incEnabled,
+                incMinLines,
+                incBucket,
+                state,
+            );
             return;
         }
     }
@@ -216,12 +223,34 @@ async function processChangedFileHint(
             state.l2Refresh.push({ fpHash: fph, contentHash, rel, result, fp: s.fp || undefined });
             return;
         }
-        routeFullFallback(fph, contentHash, rel, newContent, buf, i, incEnabled, incMinLines, incBucket, state);
+        routeFullFallback(
+            fph,
+            contentHash,
+            rel,
+            newContent,
+            buf,
+            i,
+            incEnabled,
+            incMinLines,
+            incBucket,
+            state,
+        );
         return;
     }
 
     state.diffFull++;
-    routeFullFallback(fph, contentHash, rel, newContent, buf, i, incEnabled, incMinLines, incBucket, state);
+    routeFullFallback(
+        fph,
+        contentHash,
+        rel,
+        newContent,
+        buf,
+        i,
+        incEnabled,
+        incMinLines,
+        incBucket,
+        state,
+    );
 }
 
 async function processUnchangedFile(
@@ -251,7 +280,11 @@ async function processUnchangedFile(
             ? cache.lookupL2ByPath(fph, rel, s.fp.mtimeMs, s.fp.size)
             : null;
         if (byPath) {
-            const result = remapCachedResult({ issues: byPath.issues, metric: byPath.metric }, byPath.p, rel);
+            const result = remapCachedResult(
+                { issues: byPath.issues, metric: byPath.metric },
+                byPath.p,
+                rel,
+            );
             perFile[i] = result;
             sessionBucket.set(rel, result);
             state.l1Hit++;
@@ -386,7 +419,9 @@ async function executeDiffMissBatches(
                 preloaded,
             );
         } catch (e) {
-            scanner.logger.warn(`worker pool failed (${String(e)}); falling back to in-process scan`);
+            scanner.logger.warn(
+                `worker pool failed (${String(e)}); falling back to in-process scan`,
+            );
             results = await scanner.runInProcess(missFiles, absRoot, preloaded);
         }
     } else {
@@ -424,7 +459,9 @@ async function executeDiffIncrementalFiles(
         try {
             result = await scanner.runAnalyzers(t.rel, t.content, t.state);
         } catch (e) {
-            scanner.logger.warn(`line-level incremental failed on ${t.rel}: ${String(e)}; full rescan`);
+            scanner.logger.warn(
+                `line-level incremental failed on ${t.rel}: ${String(e)}; full rescan`,
+            );
             t.state.finalize();
             const fresh = new IncrementalFileState(t.content, t.contentHash);
             fresh.prepare(t.content, t.contentHash);
@@ -432,7 +469,9 @@ async function executeDiffIncrementalFiles(
             try {
                 result = await scanner.runAnalyzers(t.rel, t.content, fresh);
             } catch (e2) {
-                scanner.logger.warn(`seeded materialization failed on ${t.rel}: ${String(e2)}; unseeded rescan`);
+                scanner.logger.warn(
+                    `seeded materialization failed on ${t.rel}: ${String(e2)}; unseeded rescan`,
+                );
                 result = await scanner.runAnalyzers(t.rel, t.content);
             }
         }
@@ -453,6 +492,7 @@ async function executeDiffIncrementalFiles(
  *
  * @param scanner - Scanner execution context.
  * @param opts - Diff scan options including diffHints, cache, pool, and deltaOnly.
+ * @returns The full or delta report paired with diff-routing and cache stats.
  * Concurrency: asynchronous coordinator; safe for single-threaded caller.
  */
 export async function executeScanWithDiff(
@@ -490,7 +530,9 @@ export async function executeScanWithDiff(
     const session = opts.session || createWarmSession();
     const { sessionBucket, incBucket } = resolveSessionBuckets(session, fpContext.poolFp);
 
-    const perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[] = new Array(files.length);
+    const perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[] = new Array(
+        files.length,
+    );
     const incEnabled = incrementalEnabled() || cfg.incremental === true;
     const incMinLines = cfg.incrementalMinLines ?? incrementalMinLines();
 
@@ -583,14 +625,17 @@ export async function executeScanWithDiff(
     const incPruned = pruneIncrementalBucket(incBucket, incrementalMaxFiles());
     const incRssEvicted = incrementalRssGuard(session);
     if (incPruned > 0) {
-        scanner.logger.debug(`incremental LRU: evicted ${incPruned} file state(s) (bucket=${incBucket.size})`);
+        scanner.logger.debug(
+            `incremental LRU: evicted ${incPruned} file state(s) (bucket=${incBucket.size})`,
+        );
     }
     if (incRssEvicted > 0) {
         scanner.logger.warn(`incremental RSS guard: cleared ${incRssEvicted} file state(s)`);
     }
 
     for (const w of routingState.l1Fps) cache.writeL1(w.rel, w.fp);
-    for (const w of routingState.l2Refresh) cache.writeL2(w.fpHash, w.contentHash, w.rel, w.result, w.fp);
+    for (const w of routingState.l2Refresh)
+        cache.writeL2(w.fpHash, w.contentHash, w.rel, w.result, w.fp);
     cache.flush();
 
     const issues: Issue[] = [];

@@ -16,10 +16,10 @@ import type {
     ProjectProfile,
     ProjectPartition,
     ArchitectureLayer,
-    MaturityTier,
     ProjectArchetype,
 } from '../types';
-import { inspectDirectoryStack, DirectoryStack } from './manifestDetector';
+import type { DirectoryStack } from './manifestDetector';
+import { inspectDirectoryStack } from './manifestDetector';
 import { detectMaturityTier } from './maturityClassifier';
 
 export { ProjectArchetype, detectMaturityTier };

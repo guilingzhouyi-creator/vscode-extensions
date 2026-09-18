@@ -9,15 +9,10 @@
  *   dependencies on the concrete Scanner class definition.
  */
 
-import type {
-    ScanConfig,
-    ScanReport,
-    Issue,
-    FileMetric,
-} from '../types';
+import type { ScanConfig, ScanReport, Issue, FileMetric } from '../types';
 import type { ResolvedAnalyzer } from '../analyzerRegistry';
 import type { IncrementalFileState } from '../incrementalState';
-import { Logger } from '../logger';
+import type { Logger } from '../logger';
 
 /** Execution context exposing Scanner state and execution primitives to sub-pipelines. */
 export interface ScannerContext {

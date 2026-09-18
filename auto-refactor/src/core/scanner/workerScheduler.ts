@@ -14,13 +14,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { Worker } from 'worker_threads';
-import type {
-    ScanConfig,
-    Issue,
-    FileMetric,
-} from '../types';
+import type { ScanConfig, Issue, FileMetric } from '../types';
 import type { WorkerAnalyzerDesc } from '../analyzerRegistry';
-import { Logger } from '../logger';
+import type { Logger } from '../logger';
 import { decodeResults } from '../resultCodec';
 
 const DEFAULT_WORKER_FLUSH_TIMEOUT_MS = 3000;
@@ -73,7 +69,8 @@ const HYBRID_CONCURRENCY = 16;
 export const AR_TIMING = process.env.AR_TIMING === '1';
 
 /** High-resolution millisecond timestamp supplier for performance telemetry. */
-export const nowMs = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+export const nowMs = (): number =>
+    typeof performance !== 'undefined' ? performance.now() : Date.now();
 
 /**
  * Pick the worker count for one parse+analyze batch.
@@ -101,6 +98,7 @@ export function effectiveWorkers(requested: number, fileCount: number): number {
  * @param limit - Concurrency ceiling.
  * @param fn - Asynchronous mapping function.
  * @param signal - Optional AbortSignal to cancel in-flight work.
+ * @returns Results in the same index order as `items`.
  * Concurrency: bounded parallel async execution; safe for single-threaded runtime.
  */
 export async function pMap<T, U>(
@@ -220,6 +218,7 @@ export interface DispatchOpts {
  * Distribute the parse+analyze stage across `numWorkers` worker threads.
  *
  * @param opts - Dispatch configuration and collaborators.
+ * @returns One index-aligned `{ issues, metric }` entry per input file.
  * Concurrency: multi-threaded worker dispatch; safe for single-threaded coordinator.
  */
 export async function dispatchBatches(
@@ -631,6 +630,7 @@ export async function dispatchBatches(
  * @param logger - Operational logger.
  * @param runAnalyzersFn - Fallback in-process analyzer callback.
  * @param preloaded - Preloaded buffers for cache reuse.
+ * @returns One index-aligned `{ issues, metric }` entry per input file.
  * Concurrency: manages worker threads asynchronously; safe for single-threaded caller.
  */
 export async function runWorkerPool(

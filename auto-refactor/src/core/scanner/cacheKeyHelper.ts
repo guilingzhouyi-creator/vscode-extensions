@@ -124,8 +124,7 @@ export function buildCacheFingerprintContext(
     const customAnalyzers = (cfg.customAnalyzers || []).filter((c) => c.enabled !== false);
     const customHash =
         customAnalyzers.length > 0 && cacheCustom === true ? computeCustomHash(descs) : null;
-    const l2Enabled =
-        customAnalyzers.length === 0 || (cacheCustom === true && customHash !== null);
+    const l2Enabled = customAnalyzers.length === 0 || (cacheCustom === true && customHash !== null);
 
     const poolFp = buildPoolFingerprint(cfg, descs);
     const payloadByAdapter = new Map<string, string>();

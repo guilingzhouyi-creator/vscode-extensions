@@ -39,9 +39,8 @@ import type {
 // so an oxc + no-legacy scan never loads `typescript`. The only consumer is the
 // legacy plug-in branch below, which requires it lazily (same pattern as worker.ts).
 import { countLineStats } from '../utils/linestats';
-import type { ResolvedAnalyzer, WorkerAnalyzerDesc } from './analyzerRegistry';
+import type { ResolvedAnalyzer } from './analyzerRegistry';
 import { resolveAnalyzers } from './analyzerRegistry';
-import type { WorkerPoolManager } from './workerPool';
 import { ModuleDependencyGraph } from './dependencyGraph';
 import { Logger } from './logger';
 import { loadGitignore } from './gitignore';
@@ -98,18 +97,10 @@ import {
     AR_TIMING,
     nowMs,
 } from './scanner/workerScheduler';
-import {
-    WarmSession,
-    createWarmSession,
-} from './scanner/cacheKeyHelper';
-import {
-    executeScanWithCache,
-    ScanWithCacheOptions,
-} from './scanner/cacheScanner';
-import {
-    executeScanWithDiff,
-    ScanWithDiffOptions,
-} from './scanner/diffScanner';
+import type { ScanWithCacheOptions } from './scanner/cacheScanner';
+import { executeScanWithCache } from './scanner/cacheScanner';
+import type { ScanWithDiffOptions } from './scanner/diffScanner';
+import { executeScanWithDiff } from './scanner/diffScanner';
 import { summarizeUncertainty } from './scanner/uncertaintyHelper';
 import type { ScannerContext } from './scanner/scannerContext';
 

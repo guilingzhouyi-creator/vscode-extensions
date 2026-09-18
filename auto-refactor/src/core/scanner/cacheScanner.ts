@@ -12,22 +12,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type {
-    ScanConfig,
-    ScanReport,
-    Issue,
-    FileMetric,
-    WarmStats,
-} from '../types';
+import type { ScanConfig, ScanReport, Issue, FileMetric, WarmStats } from '../types';
 import type { CacheStore, CachedResult, Fingerprint } from '../cache';
 import type { WorkerPoolManager } from '../workerPool';
 import { sha256Hex } from '../cacheKey';
-import {
-    route,
-    incrementalEnabled,
-    incrementalMinLines,
-    countLines,
-} from '../incremental';
+import { route, incrementalEnabled, incrementalMinLines, countLines } from '../incremental';
 import {
     IncrementalFileState,
     touchIncremental,
@@ -38,11 +27,7 @@ import {
 import { globToRegExp, collectFiles } from '../fileDiscovery';
 import { loadGitignore } from '../gitignore';
 import type { ScannerContext } from './scannerContext';
-import type {
-    WarmSession,
-    CacheFingerprintContext,
-    StatResultEntry,
-} from './cacheKeyHelper';
+import type { WarmSession, CacheFingerprintContext, StatResultEntry } from './cacheKeyHelper';
 import {
     createWarmSession,
     buildCacheFingerprintContext,
@@ -143,11 +128,7 @@ async function probeSingleFileCache(
     const fph = fpContext.fpHashFor(rel);
     const l2 = fpContext.l2Enabled ? cache.lookupL2(fph, contentHash) : null;
     if (l2) {
-        const result = remapCachedResult(
-            { issues: l2.issues, metric: l2.metric },
-            l2.p,
-            rel,
-        );
+        const result = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, rel);
         perFile[i] = result;
         sessionBucket.set(rel, result);
         queue.l2Hit++;
@@ -337,6 +318,7 @@ async function executeIncrementalFiles(
  *
  * @param scanner - Scanner execution context.
  * @param opts - Cache scan options including cache store, pool, and session.
+ * @returns The assembled report paired with warm-scan stats (L1/L2 hits, analyzed, incremental).
  * Concurrency: asynchronous coordinator; safe for single-threaded caller.
  */
 export async function executeScanWithCache(

@@ -109,9 +109,7 @@ export function detectPythonStack(dir: string, frameworks: string[]): string | u
         const pyproject = fs.existsSync(pyprojectPath)
             ? fs.readFileSync(pyprojectPath, 'utf8')
             : '';
-        const reqs = fs.existsSync(reqsPath)
-            ? fs.readFileSync(reqsPath, 'utf8')
-            : '';
+        const reqs = fs.existsSync(reqsPath) ? fs.readFileSync(reqsPath, 'utf8') : '';
         const combined = pyproject + '\n' + reqs;
         if (/django/i.test(combined)) frameworks.push('django');
         if (/fastapi/i.test(combined)) frameworks.push('fastapi');

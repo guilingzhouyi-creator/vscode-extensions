@@ -57,8 +57,7 @@ function calculateDimensionDeltas(
         const prevScore = previous.qualityScore.indices[dim] ?? DEFAULT_QUALITY_SCORE;
         const currScore = current.qualityScore.indices[dim] ?? DEFAULT_QUALITY_SCORE;
         dimensionDeltas[dim] =
-            Math.round((currScore - prevScore) * SCORE_DELTA_ROUND_SCALE) /
-            SCORE_DELTA_ROUND_SCALE;
+            Math.round((currScore - prevScore) * SCORE_DELTA_ROUND_SCALE) / SCORE_DELTA_ROUND_SCALE;
     }
     return dimensionDeltas;
 }
@@ -149,10 +148,7 @@ function detectQualityRegressions(
                 kind: 'quality-regression',
                 dimension: dim,
                 severity: 'warning',
-                message: TrajectoryMessages.DIMENSION_QUALITY_REGRESSION(
-                    dim,
-                    Math.abs(delta),
-                ),
+                message: TrajectoryMessages.DIMENSION_QUALITY_REGRESSION(dim, Math.abs(delta)),
                 affectedAgents: [previous.agentUid, current.agentUid],
                 details: { dimension: dim, delta },
             });
@@ -210,10 +206,7 @@ function detectReintroducedIssues(
 
     for (const newId of newIssueIds) {
         for (const oldRev of history) {
-            if (
-                oldRev.revisionId !== previous.revisionId &&
-                oldRev.ruleHitIds.includes(newId)
-            ) {
+            if (oldRev.revisionId !== previous.revisionId && oldRev.ruleHitIds.includes(newId)) {
                 anomalies.push({
                     kind: 're-introduced-issue',
                     severity: 'error',

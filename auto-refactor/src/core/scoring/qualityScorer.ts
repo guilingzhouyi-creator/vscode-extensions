@@ -73,9 +73,7 @@ function calculateEvaluatedDimensions(config?: ScanConfig): {
     const notEvaluated = ALL_QUALITY_DIMENSIONS.filter(
         (dim) => (evaluatedBy[dim] ?? []).length === 0,
     );
-    const evaluatedDimensions = ALL_QUALITY_DIMENSIONS.filter(
-        (dim) => !notEvaluated.includes(dim),
-    );
+    const evaluatedDimensions = ALL_QUALITY_DIMENSIONS.filter((dim) => !notEvaluated.includes(dim));
     return { evaluatedBy, notEvaluated, evaluatedDimensions };
 }
 
@@ -89,7 +87,10 @@ function calculateEvaluatedDimensions(config?: ScanConfig): {
 function groupDeductionsByDimension(
     rationales: QualityScoreRationale[],
     deductionPoints: Record<QualityDimension, number>,
-): Record<QualityDimension, { points: number; entries: { rule: string; points: number; reason: string }[] }> {
+): Record<
+    QualityDimension,
+    { points: number; entries: { rule: string; points: number; reason: string }[] }
+> {
     const deductionsByDimension = {} as Record<
         QualityDimension,
         { points: number; entries: { rule: string; points: number; reason: string }[] }
@@ -171,16 +172,14 @@ function calculateConfidence(metric: FileMetric | null | undefined, coverage: nu
         Math.max(
             CONFIDENCE_FLOOR,
             Math.round(
-                (CONFIDENCE_FLOOR +
-                    Math.min(lines, CONFIDENCE_LINE_CAP) / CONFIDENCE_LINE_SCALE) *
+                (CONFIDENCE_FLOOR + Math.min(lines, CONFIDENCE_LINE_CAP) / CONFIDENCE_LINE_SCALE) *
                     PERCENT_SCALE,
             ) / PERCENT_SCALE,
         ),
     );
     return (
-        Math.round(
-            Math.max(CONFIDENCE_FLOOR, Number(baseConfidence) * coverage) * PERCENT_SCALE,
-        ) / PERCENT_SCALE
+        Math.round(Math.max(CONFIDENCE_FLOOR, Number(baseConfidence) * coverage) * PERCENT_SCALE) /
+        PERCENT_SCALE
     );
 }
 

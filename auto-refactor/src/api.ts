@@ -16,7 +16,6 @@
  *     stay identical, and lazy daemon imports keep the default cold path free of net/child_process.
  */
 import * as fs from 'fs';
-import * as path from 'path';
 import type {
     ScanConfig,
     ScanReport,
@@ -29,28 +28,22 @@ import type {
     DiffDeltaReport,
     ScanDiffOptions,
     Issue,
-    SuppressionRule,
     CommentLevel,
     SecurityLevel,
     UnsupportedLanguageSeverity,
     MaturityTier,
 } from './core/types';
 import { resolveConfig } from './core/config';
-import type {
-    SymbolDefinition,
-    SymbolReference,
-    SymbolIndexStats,
-} from './core/intelligence/symbolIndex';
 import { Scanner } from './core/analyzer';
 import { CacheStore } from './core/cache';
 import { render } from './core/reporters';
 import { Logger, AutoRefactorError } from './core/logger';
 import { decodeContent } from './core/utf8';
+import type { BASELINE_GRANULARITY_GROUPED } from './core/reporting/reportFinalizer';
 import {
     finalizeReport,
     POST_SCAN_SCOPE_FULL,
     POST_SCAN_SCOPE_INCREMENTAL,
-    BASELINE_GRANULARITY_GROUPED,
 } from './core/reporting/reportFinalizer';
 // NOTE: daemon client / daemonCmd are imported LAZILY inside scanWarm/scanAndRender so the
 // default scan() path (and CLI boot) never pays for the daemon module graph (net, child_process).
@@ -486,18 +479,11 @@ export async function scanDiffDelta(
 }
 
 /**
- * Convenience wrapper that scans AND renders. Returns the process exit code:
- *   0 = ok (or only info/warning when failOnIssue is false)
- *   1 = error-level issues found (and failOnIssue true)
- *   2 = configuration / runtime error before scan completed
- * Used by the CLI; scripts may also call it to reuse exit semantics.
+ * Print the resolved project stack profile to stdout: language, build systems, frameworks,
+ * scale grade, polyglot flag, and partition names.
  *
- * The CLI passes `daemon: 'auto'|'on'` (probe existing / auto-start) and `cache: true`
- * by default; library callers keep the conservative defaults (no daemon, no cache).
- *
- * @param options - Scan/render overrides; writes to stdout unless `out` is set.
- * @returns Exit code after awaiting scan, finalization, and render; this async wrapper never
- *          rejects because failures are mapped to 2.
+ * @param profile - Resolved project profile whose partitions are summarized.
+ * @param scaleGrade - Optional scale grade label; defaults to 'standard' when omitted.
  */
 function printProjectStackProfile(profile: any, scaleGrade?: string): void {
     process.stdout.write(`\n=== Project Stack Profile ===\n`);

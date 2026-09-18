@@ -76,9 +76,7 @@ function resolveTargetDomain(
         );
     }
     if (line !== undefined) {
-        return memory.codeDomains.find(
-            (d) => line >= d.span.startLine && line <= d.span.endLine,
-        );
+        return memory.codeDomains.find((d) => line >= d.span.startLine && line <= d.span.endLine);
     }
     return undefined;
 }
