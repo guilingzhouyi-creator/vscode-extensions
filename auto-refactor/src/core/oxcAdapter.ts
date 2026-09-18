@@ -1,3 +1,16 @@
+/**
+ * Module: Core Engine — Parser Adapters (oxc fast path)
+ * File Path: src/core/oxcAdapter.ts
+ * Architecture Role: Materializing LanguageAdapter plus lazy NodeProjector that map Rust
+ *   oxc-parser ESTree nodes onto the shared NormalizedNode contract.
+ * Dependencies & Triggers: Imports ./multilang, ./oxcTypes, ./oxcPredicates, ./oxcProjector,
+ *   and lazy require('oxc-parser'); selected by parser:'oxc' / fast-path routing.
+ * Responsibilities: Parse TS/TSX/JS/JSX/MJS/CJS and .d.ts files; map kinds, branch weights
+ *   and semantic flags; apply export/method/binding compensations; serve lazy projection.
+ * Exit Semantics & Design Rationale: Parse diagnostics are ignored so an AST is always
+ *   returned; loads oxc-parser ESM module lazily to avoid overhead when unused.
+ */
+
 import type {
     NormalizedNode,
     NormalizedAst,
@@ -8,304 +21,42 @@ import type {
     ProjectionSeed,
     ReusedSpan,
 } from './multilang';
-import { NodeKind, OTHER_PLACEHOLDER } from './multilang';
-
-/**
- * Module: Core Engine — Parser Adapters (oxc fast path)
- * File Path: src/core/oxcAdapter.ts
- * Architecture Role: Materializing LanguageAdapter plus lazy NodeProjector that map Rust
- *     oxc-parser ESTree nodes onto the shared NormalizedNode contract.
- * Dependencies & Triggers: ./multilang types and a lazy require('oxc-parser'); selected by
- *     parser:'oxc' / fast-path routing; consumed by traverse.ts, worker.ts, adapters.ts.
- * Responsibilities: Parse TS/TSX/JS/JSX/MJS/CJS and .d.ts; map kinds, branch weights and
- *     semantic flags; apply export/method/binding/const-bound/tolerated compensations that
- *     keep output byte-equivalent to TypeScriptAdapter; walk children reflectively; serve
- *     Mode A/B lazy projection with OxcProjector subtree caches.
- * Exit Semantics & Design Rationale: Parse diagnostics are ignored so an AST is always
- *     returned (mirrors ts.createSourceFile); the ESM-only binding loads lazily so the
- *     default TypeScript path never touches it, and a throwing project() is caught by the
- *     caller, which falls back to parse()+runStreaming().
- *
- * OxcAdapter — TypeScript/JavaScript parsing via the Rust `oxc-parser` engine.
- *
- * Replaces `ts.createSourceFile` with `oxc.parseSync` while producing the SAME
- * `NormalizedNode` tree contract the TypeScriptAdapter produces, so the engine and
- * analyzers (which only consume normalized semantic flags) are byte-equivalent.
- *
- * The mapping/compensation rules below are the verified plan from
- * docs/02-parsers-and-ast/02-oxc-fastpath.md §5
- * (POC: 18/18 engine-level byte compares PASS against the TypeScriptAdapter):
- *   §5.1  parseSync entry (lang by extension, sourceType 'unambiguous', preserveParens)
- *   §5.2  kindOf mapping table (Logical/Assignment -> BinaryExpr, no-sub template ->
- *         StringLiteral, interpolated template -> Other, Literal by typeof value)
- *   §5.3  structural/flag compensations 1-11 (export-wrapper flatten, method value
- *         inlining, introducesBinding 4 cases, isConstBound, exact tolerated predicates,
- *         SwitchCase default branchWeight 0, increasesNesting set, topLevel/exported,
- *         text rules, name rules)
- *   §5.4  reflection-based child traversal (skip identifiers/type nodes after collecting
- *         literals that live inside type positions, e.g. `type X = 5`)
- *
- * Lazy projection: `project()` builds an `OxcProjector` (no normalized tree)
- * that reuses the SAME module-level predicates as the materializing mapNode — kindOf /
- * branchWeightOf / introducesBinding / bindingNameOf / nameOf / posOf / isConstBoundOf /
- * isToleratedOf (zero reimplementation). `forEachChild` turns every compensation rule into
- * raw-child yielding: export flattening (Named/Default -> declaration + __exportStart
- * offset; All -> wrapper + its source literal), method value inlining, TYPE_SKIP literal
- * collection (via raw type-subtree descent so the literal's raw parent is a type node and
- * isToleratedOf computes identically to TS), TSEnumBody flattening, StaticBlock
- * increasesNesting, decorator argument descent.
- *
- * NOTE on loading oxc-parser: the package is ESM-only ("type":"module"). On Node
- * >= 22.12 (this project's runtime) `require(esm)` loads it synchronously. The import
- * is intentionally LAZY (inside parse) so the default `parser:'typescript'` path never
- * touches the native binding unless oxc is actually selected.
- */
-
-/** Loose structural view of an oxc ESTree-style node (reflection traversal). */
-interface OxcNode {
-    type: string;
-    /** UTF-16 code-unit offsets — identical to JS string indices and TS offsets. */
-    start: number;
-    end: number;
-    [key: string]: any;
-}
-
-interface OxcParseResult {
-    program: OxcNode;
-    comments: unknown[];
-    errors: unknown[];
-}
-
-type ParseSyncFn = (
-    filename: string,
-    sourceText: string,
-    options?: {
-        lang?: typeof OXC_LANGUAGE_JS | 'jsx' | typeof OXC_LANGUAGE_TS | 'tsx' | 'dts';
-        sourceType?: 'script' | 'module' | 'commonjs' | 'unambiguous';
-        astType?: typeof OXC_LANGUAGE_JS | typeof OXC_LANGUAGE_TS;
-        preserveParens?: boolean;
-    },
-) => OxcParseResult;
-
-// ---------------------------------------------------------------------------
-// oxc vocabulary: raw ESTree `type` names and reflection keys shared by the mapping
-// tables, predicates and lazy projector below. Named once so each repeated literal has
-// a single documented meaning instead of being an anonymous string at every use site.
-// ---------------------------------------------------------------------------
-
-/** oxc node type of a `function f() {}` declaration. */
-const NODE_KIND_FUNCTION_DECLARATION = 'FunctionDeclaration';
-
-/** oxc node type of a `class C {}` declaration. */
-const NODE_KIND_CLASS_DECLARATION = 'ClassDeclaration';
-
-/** oxc node type of a `const f = function () {}` expression. */
-const NODE_KIND_FUNCTION_EXPRESSION = 'FunctionExpression';
-
-/** oxc node type of a class member definition (`m() {}` / accessor). */
-const NODE_KIND_METHOD_DEFINITION = 'MethodDefinition';
-
-/** oxc node type of an object-literal property (key/value, shorthand or method). */
-const NODE_KIND_PROPERTY = 'Property';
-
-/** oxc node type of a `const C = class {}` expression. */
-const NODE_KIND_CLASS_EXPRESSION = 'ClassExpression';
-
-/** oxc node type of an assignment (`x = ...`), collapsed to BinaryExpr like TS. */
-const NODE_KIND_ASSIGNMENT_EXPRESSION = 'AssignmentExpression';
-
-/** oxc node type of a member access (`a.b` or `a['b']`). */
-const NODE_KIND_MEMBER_EXPRESSION = 'MemberExpression';
-
-/** oxc node type of `export const x = ...` / `export { x }` wrappers. */
-const NODE_KIND_EXPORT_NAMED_DECLARATION = 'ExportNamedDeclaration';
-
-/** oxc node type of an `export default ...` wrapper. */
-const NODE_KIND_EXPORT_DEFAULT_DECLARATION = 'ExportDefaultDeclaration';
-
-/** `typeof` tag for JS numbers; every numeric guard compares against this value. */
-const TYPEOF_NUMBER = 'number';
-
-/** `typeof` tag for JS strings; every string guard compares against this value. */
-const TYPEOF_STRING = 'string';
-
-/** `typeof` tag for non-null objects; used to spot nested raw AST nodes. */
-const TYPEOF_OBJECT = 'object';
-
-/** Raw oxc node key holding the traversal parent link — never an AST child. */
-const OXC_NODE_KEY_PARENT = 'parent';
-
-/** Raw oxc node key holding the node type name — never an AST child. */
-const OXC_NODE_KEY_TYPE = 'type';
-
-/** Raw oxc node key holding the start offset — never an AST child. */
-const OXC_NODE_KEY_START = 'start';
-
-/** Raw oxc node key holding the end offset — never an AST child. */
-const OXC_NODE_KEY_END = 'end';
-
-/** Raw oxc node metadata keys; the reflection child walk must skip every one of them. */
-const OXC_META_KEYS = new Set([
-    OXC_NODE_KEY_PARENT,
-    OXC_NODE_KEY_TYPE,
-    OXC_NODE_KEY_START,
-    OXC_NODE_KEY_END,
-]);
-
-/** oxc `lang` id for JavaScript; also the fallback mode when no suffix matches. */
-const OXC_LANGUAGE_JS = 'js';
-
-/** oxc `lang` id for TypeScript. */
-const OXC_LANGUAGE_TS = 'ts';
-
-/** Mirrors the old CONTROL_OR_BLOCK set (depth increment; NOT SwitchCase/CatchClause). */
-const CONTROL_OR_BLOCK = new Set([
-    'BlockStatement',
-    'IfStatement',
-    'ForStatement',
-    'ForInStatement',
-    'ForOfStatement',
-    'WhileStatement',
-    'DoWhileStatement',
-    'SwitchStatement',
-    'TryStatement',
-]);
-
-/** Mirrors the old isTopLevelDecl set (oxc type names). */
-const TOP_LEVEL_DECL = new Set([
-    NODE_KIND_FUNCTION_DECLARATION,
+import { NodeKind } from './multilang';
+import type { OxcNode, Ctx, ParseSyncFn, OxcParseResult } from './oxcTypes';
+import {
+    computeLineStarts,
     NODE_KIND_CLASS_DECLARATION,
-    'TSInterfaceDeclaration',
-    'TSEnumDeclaration',
-    'TSTypeAliasDeclaration',
-    'TSModuleDeclaration',
-    'TSDeclareFunction',
-    'VariableDeclaration',
-]);
-
-/** Function-like unit boundaries (independent functions / arrows / closures). */
-const FN_TYPES = new Set([
-    NODE_KIND_FUNCTION_DECLARATION,
     NODE_KIND_FUNCTION_EXPRESSION,
-    'ArrowFunctionExpression',
-]);
+    NODE_KIND_METHOD_DEFINITION,
+    NODE_KIND_PROPERTY,
+    NODE_KIND_CLASS_EXPRESSION,
+    NODE_KIND_EXPORT_NAMED_DECLARATION,
+    NODE_KIND_EXPORT_DEFAULT_DECLARATION,
+    TYPEOF_NUMBER,
+    TYPEOF_STRING,
+    TYPEOF_OBJECT,
+    OXC_META_KEYS,
+    OXC_LANGUAGE_JS,
+    OXC_LANGUAGE_TS,
+    CONTROL_OR_BLOCK,
+    TOP_LEVEL_DECL,
+    SKIP_TYPES,
+    TYPE_SKIP_TYPES,
+} from './oxcTypes';
+import {
+    oxcKindOf,
+    oxcBranchWeightOf,
+    oxcIntroducesBinding,
+    oxcBindingNameOf,
+    oxcNameOf,
+    oxcIsConstBoundOf,
+    oxcIsToleratedOf,
+    oxcPosOf,
+    oxcLiteralText,
+} from './oxcPredicates';
+import { OxcProjector } from './oxcProjector';
 
-/**
- * Nodes with no semantic value for the analyzers, skipped WITHOUT descending:
- * identifiers, template elements, hashbang, JSX text, and TS *statement* wrappers that
- * the TS adapter would not surface in a way that affects output (import equals, abstract
- * members, ...). Type-position nodes are NOT here — they are handled by TYPE_SKIP_TYPES
- * (literals inside them must still materialize).
- *
- * §2.8 Known Divergences: `StaticBlock` and `TSParameterProperty` are intentionally NOT
- * in this set — the TS adapter materializes their inner literals/functions (static-block
- * body children, parameter default-value literals), so oxc must descend into them too.
- *
- * NOTE: expression-wrapper nodes (TSAsExpression `x as T`, TSTypeAssertion `<T>x`,
- * TSNonNullExpression `x!`, TSSatisfiesExpression `x satisfies T`, TSInstantiationExpression
- * `f<T>()`) and Decorator are intentionally NOT in this set: they carry real expression
- * children whose literals TS materializes (e.g. `100 as any` reports a magic number,
- * `@factory(42)` reports 42). The reflection descent maps the wrapper to an Other node and
- * descends into `expression`; the type side is handled by TYPE_SKIP_TYPES.
- */
-const SKIP_TYPES = new Set([
-    'Identifier',
-    'TemplateElement',
-    'PrivateIdentifier',
-    'Hashbang',
-    'JSXIdentifier',
-    'JSXText',
-    'JSXNamespacedName',
-    'JSXMemberExpression',
-    'JSXOpeningFragment',
-    'JSXClosingFragment',
-    'JSXSpreadAttribute',
-    'JSXSpreadChild',
-    'ImportAttribute',
-    'Super',
-    'MetaProperty',
-    // TS statement/expression wrappers (kept out of the tree — output-equivalent to the
-    // TypeScriptAdapter's materialization for every analyzer/engine consumer).
-    'TSImportEqualsDeclaration',
-    'TSNamespaceExportDeclaration',
-    'TSExportAssignment',
-    'TSEmptyBodyFunctionExpression',
-    'TSAbstractMethodDefinition',
-    'TSAbstractPropertyDefinition',
-    'TSAbstractAccessorProperty',
-    'AccessorProperty',
-]);
-
-/**
- * TS *type-position* nodes: the node itself is not materialized (matching the TS adapter's
- * skippable-token semantics for keyword types), but any `Literal` inside it IS materialized
- * with tolerated=true — the TypeScript adapter materializes literals in type positions
- * (`type X = 5`, `const y: 42 = 42`), and tolerated literals still join duplicate-literal
- * grouping, so collecting them is required for byte-equivalence.
- */
-const TYPE_SKIP_TYPES = new Set([
-    'TSTypeAnnotation',
-    'TSTypeReference',
-    'TSNumberKeyword',
-    'TSStringKeyword',
-    'TSBooleanKeyword',
-    'TSAnyKeyword',
-    'TSUnknownKeyword',
-    'TSNullKeyword',
-    'TSUndefinedKeyword',
-    'TSVoidKeyword',
-    'TSNeverKeyword',
-    'TSObjectKeyword',
-    'TSBigIntKeyword',
-    'TSIntrinsicKeyword',
-    'TSSymbolKeyword',
-    'TSThisType',
-    'TSLiteralType',
-    'TSUnionType',
-    'TSIntersectionType',
-    'TSArrayType',
-    'TSTupleType',
-    'TSOptionalType',
-    'TSRestType',
-    'TSTypeOperator',
-    'TSIndexedAccessType',
-    'TSConditionalType',
-    'TSInferType',
-    'TSMappedType',
-    'TSNamedTupleMember',
-    'TSTemplateLiteralType',
-    'TSConstructorType',
-    'TSFunctionType',
-    'TSImportType',
-    'TSQualifiedName',
-    'TSTypeQuery',
-    'TSTypePredicate',
-    'TSParenthesizedType',
-    'TSJSDocNullableType',
-    'TSJSDocNonNullableType',
-    'TSJSDocUnknownType',
-    'TSTypeParameter',
-    'TSTypeParameterDeclaration',
-    'TSTypeParameterInstantiation',
-    'TSPropertySignature',
-    'TSMethodSignature',
-    'TSCallSignatureDeclaration',
-    'TSConstructSignatureDeclaration',
-    'TSIndexSignature',
-    'TSInterfaceBody',
-    'TSInterfaceHeritage',
-    'TSClassImplements',
-    'TSExternalModuleReference',
-]);
-
-/** ASCII code of the line-feed byte, used to derive 1-based line starts from source text. */
-const LINE_FEED_CHAR_CODE = 10;
-
-/** Parse context threaded through one file's mapping (adapter stays stateless between files). */
-interface Ctx {
-    src: string;
-    lineStarts: number[];
-}
+export { OxcProjector } from './oxcProjector';
 
 // oxc-parser is ESM-only; load lazily so the default TypeScript path never requires it.
 let _parseSync: ParseSyncFn | null = null;
@@ -322,250 +73,12 @@ function parseSyncSafe(
     return _parseSync(filename, sourceText, options);
 }
 
-/** §4: build the line-start table (\n -> next line start) used for 1-based positions. */
-function computeLineStarts(content: string): number[] {
-    const lineStarts: number[] = [];
-    for (let i = 0; i < content.length; i++) {
-        if (content.charCodeAt(i) === LINE_FEED_CHAR_CODE) lineStarts.push(i + 1);
-    }
-    return lineStarts;
-}
-
-// ---------------------------------------------------------------------------
-// Module-level predicates — the SINGLE implementation shared by the materializing
-// mapNode (via the OxcAdapter private delegates below) and the lazy OxcProjector
-// (docs/02-parsers-and-ast/03-lazy-projection.md §7: predicates are reused as-is,
-// never rewritten).
-// ---------------------------------------------------------------------------
-
-/** §5.2 kindOf mapping table. */
-function oxcKindOf(n: OxcNode): NodeKind {
-    switch (n.type) {
-        case 'Program':
-            return NodeKind.SourceFile;
-        case NODE_KIND_FUNCTION_DECLARATION:
-        case NODE_KIND_FUNCTION_EXPRESSION:
-        case 'ArrowFunctionExpression':
-        case 'TSDeclareFunction': // `declare function f(): void` — TS sees a FunctionDeclaration
-            return NodeKind.Function;
-        case NODE_KIND_METHOD_DEFINITION:
-        case NODE_KIND_PROPERTY: // object method shorthand m() {} -> TS MethodDeclaration
-            if (n.type === NODE_KIND_PROPERTY && n.method !== true) return NodeKind.Other;
-            return NodeKind.Method;
-        case NODE_KIND_CLASS_DECLARATION:
-        case NODE_KIND_CLASS_EXPRESSION:
-            return NodeKind.Class;
-        case 'TSInterfaceDeclaration':
-            return NodeKind.Interface;
-        case 'VariableDeclaration':
-            return NodeKind.Variable;
-        case 'Literal':
-            if (typeof n.value === TYPEOF_NUMBER) return NodeKind.NumericLiteral;
-            if (typeof n.value === TYPEOF_STRING) return NodeKind.StringLiteral;
-            return NodeKind.Other; // bigint / regex / null — matches TS BigIntLiteral -> Other
-        case 'TemplateLiteral':
-            return (n.expressions || []).length === 0 ? NodeKind.StringLiteral : NodeKind.Other;
-        case 'CallExpression':
-        case 'NewExpression':
-            return NodeKind.Call;
-        case 'BinaryExpression':
-        case 'LogicalExpression':
-        // && / || / ?? / = all collapse to BinaryExpr (TS parity)
-        case NODE_KIND_ASSIGNMENT_EXPRESSION:
-            return NodeKind.BinaryExpr;
-        case 'IfStatement':
-        case 'ForStatement':
-        case 'ForInStatement':
-        case 'ForOfStatement':
-        case 'WhileStatement':
-        case 'DoWhileStatement':
-        case 'SwitchStatement':
-        case 'SwitchCase':
-        case 'CatchClause':
-        case 'TryStatement':
-            return NodeKind.ControlFlow;
-        case 'BlockStatement':
-            return NodeKind.Block;
-        default:
-            return NodeKind.Other;
-    }
-}
-
-/** §5.3.7: cyclomatic decision-point weight (SwitchCase default -> 0). */
-function oxcBranchWeightOf(n: OxcNode): number {
-    switch (n.type) {
-        case 'IfStatement':
-        case 'ForStatement':
-        case 'ForInStatement':
-        case 'ForOfStatement':
-        case 'WhileStatement':
-        case 'DoWhileStatement':
-        case 'SwitchStatement':
-        case 'CatchClause':
-        case 'ConditionalExpression':
-            return 1;
-        case 'SwitchCase':
-            // TS DefaultClause (no test) carries branchWeight 0; real `case x:` = 1
-            return n.test ? 1 : 0;
-        case 'BinaryExpression':
-        case 'LogicalExpression': {
-            const op = n.operator;
-            if (op === '&&' || op === '||' || op === '??') return 1;
-            return 0;
-        }
-        default:
-            return 0;
-    }
-}
-
-/** §5.3.4: the four binding-source cases (init/right is function-like). */
-function oxcIntroducesBinding(n: OxcNode): boolean {
-    if (n.type === 'VariableDeclarator' && n.init && isFnLikeType(n.init.type)) return true;
-    if (n.type === NODE_KIND_PROPERTY && !n.method && isFnLikeType(n.value && n.value.type)) {
-        return true;
-    }
-    if (n.type === 'PropertyDefinition' && n.value && isFnLikeType(n.value.type)) return true;
-    if (
-        n.type === NODE_KIND_ASSIGNMENT_EXPRESSION &&
-        n.operator === '=' &&
-        isFnLikeType(n.right && n.right.type)
-    )
-        return true;
-    return false;
-}
-
-/** §5.3.11: binding names (id.name / key text / left MemberExpression property). */
-function oxcBindingNameOf(n: OxcNode, ctx: Ctx): string | null {
-    if (n.type === 'VariableDeclarator') {
-        return n.id && typeof n.id.name === TYPEOF_STRING ? n.id.name : null;
-    }
-    if (n.type === NODE_KIND_PROPERTY || n.type === 'PropertyDefinition') {
-        return n.key ? oxcKeyText(n.key, ctx) : null;
-    }
-    if (n.type === NODE_KIND_ASSIGNMENT_EXPRESSION) {
-        // TS uses the FULL left-hand-side text as the binding name ("exports.handler",
-        // "obj.run", "x" for identifiers) — `getText` of the whole left node.
-        if (
-            n.left &&
-            (n.left.type === NODE_KIND_MEMBER_EXPRESSION || n.left.type === 'Identifier')
-        ) {
-            return ctx.src.slice(n.left.start, n.left.end);
-        }
-        return null;
-    }
-    return null;
-}
-
-/** §5.3.11: display names (function/class id.name, method key text). */
-function oxcNameOf(n: OxcNode, ctx: Ctx): string | null {
-    if (
-        n.type === NODE_KIND_FUNCTION_DECLARATION ||
-        n.type === NODE_KIND_FUNCTION_EXPRESSION ||
-        n.type === 'TSDeclareFunction'
-    ) {
-        return n.id && typeof n.id.name === TYPEOF_STRING ? n.id.name : null;
-    }
-    if (n.type === 'ArrowFunctionExpression') return null;
-    if (
-        n.type === NODE_KIND_METHOD_DEFINITION ||
-        (n.type === NODE_KIND_PROPERTY && n.method === true)
-    ) {
-        return n.key ? oxcKeyText(n.key, ctx) : null;
-    }
-    if (n.type === NODE_KIND_CLASS_DECLARATION || n.type === NODE_KIND_CLASS_EXPRESSION) {
-        return n.id && typeof n.id.name === TYPEOF_STRING ? n.id.name : null;
-    }
-    return null;
-}
-
-function oxcKeyText(key: OxcNode, ctx: Ctx): string {
-    if (typeof key.name === TYPEOF_STRING && key.name.length > 0) return key.name;
-    return ctx.src.slice(key.start, key.end);
-}
-
-/** §5.3.5: isConstBound — const declarator init or enum member. */
-function oxcIsConstBoundOf(
-    node: OxcNode,
-    parent: OxcNode | undefined,
-    grandparent: OxcNode | undefined,
-): boolean {
-    if (
-        parent &&
-        parent.type === 'VariableDeclarator' &&
-        parent.init === node &&
-        grandparent &&
-        grandparent.type === 'VariableDeclaration' &&
-        grandparent.kind === 'const'
-    ) {
-        return true;
-    }
-    if (parent && parent.type === 'TSEnumMember') return true;
-    return false;
-}
-
-function oxcIsTypeNodeType(t: string): boolean {
-    return (
-        TYPE_SKIP_TYPES.has(t) ||
-        t === 'TSLiteralType' ||
-        t === 'TSTypeReference' ||
-        t === 'TSTypeAnnotation'
-    );
-}
-
-/** §5.3.6: exact tolerated-context predicates (numeric + string). */
-function oxcIsToleratedOf(node: OxcNode, p: OxcNode | undefined, ctx: Ctx): boolean {
-    if (!p) return false;
-    const isNumeric = typeof node.value === TYPEOF_NUMBER;
-    if (isNumeric) {
-        if (p.type === NODE_KIND_MEMBER_EXPRESSION && p.computed) return true;
-        if (p.type === NODE_KIND_MEMBER_EXPRESSION) return true;
-        if (p.type === NODE_KIND_PROPERTY && p.key === node) return true;
-        if (p.type === 'TSEnumMember') return true;
-        if (oxcIsTypeNodeType(p.type)) return true;
-        if (p.type === 'SwitchCase' && p.test === node) return true;
-        return false;
-    }
-    // string tolerations
-    if (p.type === 'ImportDeclaration' || p.type === 'TSImportEqualsDeclaration') return true;
-    if (p.type === NODE_KIND_PROPERTY && p.key === node) return true;
-    if (p.type === NODE_KIND_MEMBER_EXPRESSION && !p.computed) return true;
-    if (p.type === 'JSXAttribute' && p.name === node) return true;
-    if (p.type === 'JSXElement' || p.type === 'JSXOpeningElement') return false;
-    // i18n: t('...'), i18n.t('...'), translate('...')
-    if (p.type === 'CallExpression' && Array.isArray(p.arguments) && p.arguments.includes(node)) {
-        const callee = p.callee ? ctx.src.slice(p.callee.start, p.callee.end) : '';
-        if (/\b(t|i18n\.\w*|translate|fmt|formatMessage)\s*$/.test(callee)) return true;
-    }
-    return false;
-}
-
-/** Function-like unit boundary for the projection subtree (methods included). */
-function oxcIsFnLikeNode(n: OxcNode): boolean {
-    const kind = oxcKindOf(n);
-    return kind === NodeKind.Function || kind === NodeKind.Method;
-}
-
-/** §4: 1-based line/column from a UTF-16 offset (binary search over line starts). */
-function oxcPosOf(off: number, ctx: Ctx): Position {
-    const ls = ctx.lineStarts;
-    let lo = -1;
-    let hi = ls.length - 1;
-    while (lo < hi) {
-        const mid = (lo + hi + 1) >> 1;
-        if (ls[mid] <= off) lo = mid;
-        else hi = mid - 1;
-    }
-    return { line: lo + 2, column: off - (lo >= 0 ? ls[lo] : 0) + 1 };
-}
-
-/** §5.3.10: Literal text via `raw`; no-interpolation TemplateLiteral via span slice. */
-function oxcLiteralText(n: OxcNode, ctx: Ctx): string {
-    if (n.type === 'TemplateLiteral') return ctx.src.slice(n.start, n.end);
-    return n.raw != null ? String(n.raw) : ctx.src.slice(n.start, n.end);
-}
-
-function isFnLikeType(t: string | undefined): boolean {
-    return !!t && FN_TYPES.has(t);
+function resolveOxcLang(filePath: string): 'dts' | 'tsx' | 'jsx' | 'ts' | 'js' {
+    if (filePath.endsWith('.d.ts')) return 'dts';
+    if (/\.tsx$/i.test(filePath)) return 'tsx';
+    if (/\.ts$/i.test(filePath)) return OXC_LANGUAGE_TS;
+    if (/\.jsx$/i.test(filePath)) return 'jsx';
+    return OXC_LANGUAGE_JS;
 }
 
 /**
@@ -595,31 +108,15 @@ export class OxcAdapter implements LanguageAdapter {
      * @returns Normalized AST whose root is the source-file node.
      */
     parse(content: string, filePath: string, seed?: ProjectionSeed): NormalizedAst {
-        // §2.8 Known Divergence (.d.ts): the default `**/*.ts` include glob matches `.d.ts`
-        // files, so route them to oxc's dedicated `dts` language mode (TS parses them as
-        // ScriptKind.TS). Must be checked BEFORE the generic `.ts` suffix test.
-        const lang = filePath.endsWith('.d.ts')
-            ? 'dts'
-            : /\.tsx$/i.test(filePath)
-              ? 'tsx'
-              : /\.ts$/i.test(filePath)
-                ? OXC_LANGUAGE_TS
-                : /\.jsx$/i.test(filePath)
-                  ? 'jsx'
-                  : OXC_LANGUAGE_JS;
+        const lang = resolveOxcLang(filePath);
         const res = parseSyncSafe(filePath, content, {
             lang,
-            // aligns with TS createSourceFile auto module/script detection
             sourceType: 'unambiguous',
-            preserveParens: true, // must stay default: ParenthesizedExpression matches TS tree
+            preserveParens: true,
         });
-        // res.errors is intentionally ignored — the pipeline never consumed TS parseDiagnostics
-        // either (parse always yields an AST, matching createSourceFile's behavior).
         const ctx: Ctx = { src: content, lineStarts: computeLineStarts(content) };
         const program = res.program;
         const root = this.mapNode(program, undefined, undefined, undefined, ctx, seed);
-        // Top-level: flatten export wrappers so an export never materializes as a node
-        // (otherwise maxNestingDepth would be off by one vs the TS tree).
         const children: NormalizedNode[] = [];
         for (const stmt of program.body || []) {
             const mapped = this.mapTopStatement(stmt, program, ctx, seed);
@@ -640,15 +137,7 @@ export class OxcAdapter implements LanguageAdapter {
      * @returns An `OxcProjector` over the raw program; never `null` for supported extensions.
      */
     project(content: string, filePath: string, policy: ProjectionPolicy): NodeProjector | null {
-        const lang = filePath.endsWith('.d.ts')
-            ? 'dts'
-            : /\.tsx$/i.test(filePath)
-              ? 'tsx'
-              : /\.ts$/i.test(filePath)
-                ? OXC_LANGUAGE_TS
-                : /\.jsx$/i.test(filePath)
-                  ? 'jsx'
-                  : OXC_LANGUAGE_JS;
+        const lang = resolveOxcLang(filePath);
         const res = parseSyncSafe(filePath, content, {
             lang,
             sourceType: 'unambiguous',
@@ -677,31 +166,179 @@ export class OxcAdapter implements LanguageAdapter {
         return node.children || [];
     }
 
-    // ------------------------------------------------------------------ mapping
-
     private mapTopStatement(
         stmt: OxcNode,
         program: OxcNode,
         ctx: Ctx,
         seed?: ProjectionSeed,
     ): NormalizedNode | null {
-        if (stmt.type === NODE_KIND_EXPORT_NAMED_DECLARATION && stmt.declaration) {
+        if (
+            (stmt.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
+                stmt.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION) &&
+            stmt.declaration
+        ) {
             stmt.declaration.__exported = true;
             return this.mapNode(stmt.declaration, program, undefined, stmt, ctx, seed);
-        }
-        if (stmt.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION) {
-            stmt.declaration.__exported = true;
-            return this.mapNode(stmt.declaration, program, undefined, stmt, ctx, seed);
-        }
-        if (stmt.type === 'ExportAllDeclaration') {
-            // §2.8 Known Divergence (`export * from './mod'`): TS materializes the
-            // ExportDeclaration (Other) and descends into the moduleSpecifier StringLiteral.
-            // The literal is NOT tolerated (ExportDeclaration is absent from TS's string
-            // tolerated-context list) → it reports hardcoded-string. Materialize the wrapper +
-            // its source so oxc matches TS exactly (previously the whole node was skipped).
-            return this.mapNode(stmt, program, undefined, undefined, ctx, seed);
         }
         return this.mapNode(stmt, program, undefined, undefined, ctx, seed);
+    }
+
+    private resolveStartOffset(
+        n: OxcNode,
+        fnLike: boolean,
+        isClassDefining: boolean,
+        exportWrapper: OxcNode | undefined,
+    ): number {
+        if ((fnLike || isClassDefining) && n.__exported && exportWrapper) {
+            return exportWrapper.start;
+        }
+        return n.start;
+    }
+
+    private resolveNodePositions(
+        n: OxcNode,
+        startOff: number,
+        isLiteral: boolean,
+        fnLike: boolean,
+        ctx: Ctx,
+    ): { start?: Position; end?: Position } {
+        if (!isLiteral && !fnLike) return {};
+        return {
+            start: oxcPosOf(startOff, ctx),
+            end: oxcPosOf(n.end, ctx),
+        };
+    }
+
+    private resolveNodeName(
+        n: OxcNode,
+        fnLike: boolean,
+        isClassDefining: boolean,
+        isBinding: boolean,
+        ctx: Ctx,
+    ): string | undefined {
+        if (fnLike || isClassDefining || isBinding) {
+            return oxcNameOf(n, ctx) ?? undefined;
+        }
+        return undefined;
+    }
+
+    private buildNormalizedNode(
+        n: OxcNode,
+        kind: NodeKind,
+        fnLike: boolean,
+        isLiteral: boolean,
+        isClassDefining: boolean,
+        isBinding: boolean,
+        startOff: number,
+        ctx: Ctx,
+    ): NormalizedNode {
+        const t = n.type;
+        const pos = this.resolveNodePositions(n, startOff, isLiteral, fnLike, ctx);
+        const node: NormalizedNode = {
+            kind,
+            rawKind: t,
+            text: isLiteral ? oxcLiteralText(n, ctx) : undefined,
+            start: pos.start,
+            end: pos.end,
+            name: this.resolveNodeName(n, fnLike, isClassDefining, isBinding, ctx),
+            isNumeric: kind === NodeKind.NumericLiteral,
+            isString: kind === NodeKind.StringLiteral,
+            branchWeight: oxcBranchWeightOf(n),
+            functionLike: fnLike,
+            isClassDefining,
+            introducesBinding: isBinding,
+            bindingName: isBinding ? oxcBindingNameOf(n, ctx) : null,
+            hasFunctionInitializer: isBinding,
+            increasesNesting: CONTROL_OR_BLOCK.has(t) || t === 'StaticBlock',
+            isConstructor: t === NODE_KIND_METHOD_DEFINITION && n.kind === 'constructor',
+            children: [],
+        };
+        return node;
+    }
+
+    private applyNodeHierarchy(
+        node: NormalizedNode,
+        n: OxcNode,
+        parent: OxcNode | undefined,
+        grandparent: OxcNode | undefined,
+        isLiteral: boolean,
+        ctx: Ctx,
+    ): void {
+        const topLevel =
+            Boolean(parent) && parent!.type === 'Program' && TOP_LEVEL_DECL.has(n.type);
+        node.topLevel = topLevel;
+        node.exported = topLevel && (Boolean(n.__exported) || n.type === 'TSExportAssignment');
+        if (isLiteral) {
+            node.isConstBound = oxcIsConstBoundOf(n, parent, grandparent);
+            node.tolerated = oxcIsToleratedOf(n, parent, ctx);
+        }
+    }
+
+    private tryReuseSubtree(
+        node: NormalizedNode,
+        n: OxcNode,
+        fnLike: boolean,
+        ctx: Ctx,
+        seed?: ProjectionSeed,
+    ): boolean {
+        if (!seed || !fnLike) return false;
+        const startPos = oxcPosOf(n.start, ctx);
+        const span: ReusedSpan = {
+            startLine: startPos.line,
+            startColumn: startPos.column,
+            startByte: n.start,
+            endByte: n.end,
+            sourceText: ctx.src.slice(n.start, n.end),
+        };
+        const reused = seed.reuseSubtree(span);
+        if (reused) {
+            node.children = reused;
+            seed.cacheSubtree(span, reused);
+            if (seed.markReused) seed.markReused(node, span);
+            return true;
+        }
+        return false;
+    }
+
+    private recordSpanCache(
+        seed: ProjectionSeed | undefined,
+        fnLike: boolean,
+        n: OxcNode,
+        ctx: Ctx,
+        children: NormalizedNode[],
+    ): void {
+        if (!seed || !fnLike) return;
+        const startPos = oxcPosOf(n.start, ctx);
+        const span: ReusedSpan = {
+            startLine: startPos.line,
+            startColumn: startPos.column,
+            startByte: n.start,
+            endByte: n.end,
+            sourceText: ctx.src.slice(n.start, n.end),
+        };
+        seed.cacheSubtree(span, children);
+    }
+
+    private traverseOxcChildren(
+        node: NormalizedNode,
+        n: OxcNode,
+        parent: OxcNode | undefined,
+        isMethodSource: boolean,
+        ctx: Ctx,
+        seed?: ProjectionSeed,
+    ): void {
+        for (const key of Object.keys(n)) {
+            if (OXC_META_KEYS.has(key) || key === '__exported') continue;
+            const v = n[key];
+            if (v == null) continue;
+            if (Array.isArray(v)) {
+                for (const item of v) {
+                    this.pushChild(node, item, n, parent, isMethodSource, ctx, seed);
+                }
+            } else if (typeof v === TYPEOF_OBJECT && typeof (v as OxcNode).type === TYPEOF_STRING) {
+                this.pushChild(node, v as OxcNode, n, parent, isMethodSource, ctx, seed);
+            }
+        }
     }
 
     private mapNode(
@@ -721,89 +358,48 @@ export class OxcAdapter implements LanguageAdapter {
         const isClassDefining =
             t === NODE_KIND_CLASS_DECLARATION || t === NODE_KIND_CLASS_EXPRESSION;
         const isBinding = oxcIntroducesBinding(n);
-        // Positions are only materialized for nodes that can appear in an Issue
-        // (literals and function-like units). Everything else skips the conversions.
-        const needsPos = isLiteral || fnLike;
-        // Names only for the classes the analyzers/engine consume.
-        const needsName = fnLike || isClassDefining || isBinding;
 
-        // §3.2: an export-wrapped function/class must point at the wrapper's start (the
-        // `export` keyword) to match TS getStart() which includes modifiers.
-        let startOff = n.start;
-        const endOff = n.end;
-        if ((fnLike || isClassDefining) && n.__exported && exportWrapper) {
-            startOff = exportWrapper.start;
-        }
-
-        const node: NormalizedNode = {
+        const startOff = this.resolveStartOffset(n, fnLike, isClassDefining, exportWrapper);
+        const node = this.buildNormalizedNode(
+            n,
             kind,
-            rawKind: t,
-            text: isLiteral ? oxcLiteralText(n, ctx) : undefined,
-            start: needsPos ? oxcPosOf(startOff, ctx) : undefined,
-            end: needsPos ? oxcPosOf(endOff, ctx) : undefined,
-            name: needsName ? oxcNameOf(n, ctx) : undefined,
-            isNumeric: kind === NodeKind.NumericLiteral,
-            isString: kind === NodeKind.StringLiteral,
-            branchWeight: oxcBranchWeightOf(n),
-            functionLike: fnLike,
+            fnLike,
+            isLiteral,
             isClassDefining,
-            introducesBinding: isBinding,
-            bindingName: isBinding ? oxcBindingNameOf(n, ctx) : null,
-            hasFunctionInitializer: isBinding,
-            // §2.8 Known Divergence (StaticBlock): the TS tree wraps the static body in a
-            // `Block` (which IS in CONTROL_OR_BLOCK), so the body statements sit one nesting
-            // level deeper than the class members. oxc's StaticBlock exposes the statements
-            // directly (no BlockStatement wrapper), so flag the node itself to replicate the
-            // Block's depth increment — matching TS maxNestingDepth byte-for-byte.
-            increasesNesting: CONTROL_OR_BLOCK.has(t) || t === 'StaticBlock',
-            isConstructor: t === NODE_KIND_METHOD_DEFINITION && n.kind === 'constructor',
-            children: [],
-        };
+            isBinding,
+            startOff,
+            ctx,
+        );
+        this.applyNodeHierarchy(node, n, parent, grandparent, isLiteral, ctx);
 
-        const topLevel = !!parent && parent.type === 'Program' && TOP_LEVEL_DECL.has(t);
-        node.topLevel = topLevel;
-        node.exported = topLevel && (!!n.__exported || t === 'TSExportAssignment');
-
-        if (isLiteral) {
-            node.isConstBound = oxcIsConstBoundOf(n, parent, grandparent);
-            node.tolerated = oxcIsToleratedOf(n, parent, ctx);
+        if (this.tryReuseSubtree(node, n, fnLike, ctx, seed)) {
+            return node;
         }
 
-        // Reuse a previously-materialized function subtree when its byte span
-        // + source text are unchanged, skipping the reflection walk + allocation below.
-        let span: ReusedSpan | undefined;
-        if (seed && fnLike) {
-            const startPos = oxcPosOf(n.start, ctx);
-            span = {
-                startLine: startPos.line,
-                startColumn: startPos.column,
-                startByte: n.start,
-                endByte: n.end,
-                sourceText: ctx.src.slice(n.start, n.end),
-            };
-            const reused = seed.reuseSubtree(span);
-            if (reused) {
-                node.children = reused;
-                seed.cacheSubtree(span, reused);
-                if (seed.markReused) seed.markReused(node, span);
-                return node;
-            }
-        }
+        this.traverseOxcChildren(node, n, parent, isMethodSource, ctx, seed);
+        this.recordSpanCache(seed, fnLike, n, ctx, node.children || []);
+        return node;
+    }
 
-        // §5.4: reflection-based child traversal (objects/arrays whose entries are nodes).
-        for (const key of Object.keys(n)) {
-            if (OXC_META_KEYS.has(key) || key === '__exported') continue;
-            const v = n[key];
+    private pushMethodFunctionValue(
+        node: NormalizedNode,
+        item: OxcNode,
+        oxcParent: OxcNode,
+        ctx: Ctx,
+        seed?: ProjectionSeed,
+    ): void {
+        for (const key of Object.keys(item)) {
+            if (OXC_META_KEYS.has(key)) continue;
+            const v = item[key];
             if (v == null) continue;
             if (Array.isArray(v)) {
-                for (const item of v)
-                    this.pushChild(node, item, n, parent, isMethodSource, ctx, seed);
+                for (const sub of v) {
+                    this.pushChild(node, sub, item, oxcParent, false, ctx, seed);
+                }
             } else if (typeof v === TYPEOF_OBJECT && typeof (v as OxcNode).type === TYPEOF_STRING) {
-                this.pushChild(node, v as OxcNode, n, parent, isMethodSource, ctx, seed);
+                this.pushChild(node, v as OxcNode, item, oxcParent, false, ctx, seed);
             }
         }
-        if (seed && span) seed.cacheSubtree(span, node.children || []);
-        return node;
     }
 
     private pushChild(
@@ -816,37 +412,16 @@ export class OxcAdapter implements LanguageAdapter {
         seed?: ProjectionSeed,
     ): void {
         if (item == null) return;
-        // §3.4: a method's `value: FunctionExpression` is inlined — the TS tree has no nested
-        // FunctionExpression for methods (params/body are direct children of the method).
         if (inlineFnValue && item.type === NODE_KIND_FUNCTION_EXPRESSION) {
-            for (const key of Object.keys(item)) {
-                if (OXC_META_KEYS.has(key)) continue;
-                const v = item[key];
-                if (v == null) continue;
-                if (Array.isArray(v)) {
-                    for (const sub of v)
-                        this.pushChild(node, sub, item, oxcParent, false, ctx, seed);
-                } else if (
-                    typeof v === TYPEOF_OBJECT &&
-                    typeof (v as OxcNode).type === TYPEOF_STRING
-                ) {
-                    this.pushChild(node, v as OxcNode, item, oxcParent, false, ctx, seed);
-                }
-            }
+            this.pushMethodFunctionValue(node, item, oxcParent, ctx, seed);
             return;
         }
-        // Type-position nodes: materialize inner literals (tolerated), skip the type itself.
         if (TYPE_SKIP_TYPES.has(item.type)) {
             this.collectLiteralsInType(item, node, ctx);
             return;
         }
         if (SKIP_TYPES.has(item.type)) return;
-        // Nested export wrappers (e.g. inside namespace bodies): flatten like the top level.
-        // The wrapper is passed through so a directly-wrapped function/class points its start
-        // at the `export` keyword (TS getStart includes modifiers).
         if (item.type === 'ExportAllDeclaration') {
-            // §2.8 Known Divergence: a nested `export * from './mod'` — TS descends into the
-            // moduleSpecifier StringLiteral too (tolerated=false → hardcoded-string).
             if (item.source) {
                 node.children!.push(
                     this.mapNode(item.source, oxcParent, oxcGrandparent, item, ctx, seed),
@@ -866,24 +441,16 @@ export class OxcAdapter implements LanguageAdapter {
             }
             return;
         }
-        // TSEnumBody: members become direct children (TS EnumDeclaration has no body wrapper).
         if (item.type === 'TSEnumBody') {
-            for (const m of item.members || [])
+            for (const m of item.members || []) {
                 this.pushChild(node, m, oxcParent, oxcGrandparent, false, ctx, seed);
+            }
             return;
         }
         const child = this.mapNode(item, oxcParent, oxcGrandparent, undefined, ctx, seed);
         node.children!.push(child);
     }
 
-    /**
-     * Materialize Literal descendants of a type node, matching the TypeScript adapter's
-     * tolerated rules EXACTLY:
-     *   - numeric literals  -> tolerated=true  (TS isToleratedNumericContext has a
-     *     `ts.isTypeNode(parent)` branch)
-     *   - string literals   -> tolerated=false (TS isToleratedStringContext has NO
-     *     isTypeNode branch -> `type Role = 'admin' | ...` still reports hardcoded-string)
-     */
     private collectLiteralsInType(typeNode: OxcNode, container: NormalizedNode, ctx: Ctx): void {
         const stack: OxcNode[] = [typeNode];
         while (stack.length) {
@@ -919,409 +486,14 @@ export class OxcAdapter implements LanguageAdapter {
                 const v = cur[k];
                 if (v == null) continue;
                 if (Array.isArray(v)) {
-                    for (const x of v)
+                    for (const x of v) {
                         if (x && typeof x === TYPEOF_OBJECT) children.push(x as OxcNode);
+                    }
                 } else if (typeof v === TYPEOF_OBJECT) {
                     children.push(v as OxcNode);
                 }
             }
-            // Push in reverse so the LIFO stack pops them in source order — TS forEachChild
-            // visits literals left-to-right, and same-line findings must keep that order.
             for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Oxc lazy projector (Mode A + Mode B).
-// See docs/02-parsers-and-ast/03-lazy-projection.md §2.7.
-//
-// The materialized path's reflection `pushChild` turns every compensation rule into a
-// "push a normalized child" branch; here the SAME rules are expressed as "yield a raw
-// child" so the engine's descent (runStreamingProjected) sees the identical raw sequence
-// and per-node parent/grandparent chain the materialized mapNode produced:
-//   - export flattening  — ExportNamed/DefaultDeclaration yield their `declaration`
-//     (marked __exported + __exportStart so project() can offset fnLike/class starts);
-//     ExportAllDeclaration yields the wrapper, whose own forEachChild yields `source`.
-//   - method value inline — a method's FunctionExpression value yields ITS children
-//     (params/body) directly, never the FunctionExpression itself.
-//   - TYPE_SKIP literal collection — the type node is yielded (not collapsed); the engine
-//     descends it and the literal's raw parent is a type node, so isToleratedOf computes
-//     the same tolerated=true(numeric)/false(string) values as the materialized collector.
-//   - TSEnumBody — flattened to its members.
-//   - StaticBlock — yields body statements; project() flags increasesNesting=true.
-//   - decorators — not skipped; their expression subtrees (with literal args) are yielded.
-//
-// Mode B (complexity enabled): function-like nodes eagerly materialize their subtree via
-// cheapProject (same T5 shape as TsNodeProjector) and the engine's descent shares those
-// cached objects with complexity's re-walk — lowest drift risk.
-// ---------------------------------------------------------------------------
-/**
- * Lazy `NodeProjector` for oxc-backed files: projects raw ESTree nodes on demand and serves
- * raw child sequences to the engine, including Mode B subtree sharing with complexity.
- */
-export class OxcProjector implements NodeProjector {
-    /** Raw oxc Program node that roots every projection and child walk. */
-    readonly root: unknown;
-    private readonly ctx: Ctx;
-    private readonly policy: ProjectionPolicy;
-    /** Mode B: function raw node → its direct non-skippable RAW children (engine descent). */
-    private readonly functionSubtrees = new Map<OxcNode, OxcNode[]>();
-    /** Mode B: raw subtree node → projected subtree node (non-functionLike; engine + X share). */
-    private readonly subtreeCache = new Map<OxcNode, NormalizedNode>();
-    /** Mode B: raw subtree node → its non-skippable RAW children (built once by buildSubtree). */
-    private readonly rawChildrenCache = new Map<OxcNode, OxcNode[]>();
-
-    /**
-     * Wrap one raw oxc program in a lazy projector; no normalized tree is built here.
-     *
-     * @param program - Raw oxc Program node produced by `parseSync`.
-     * @param content - Source text used for line-start lookup and raw text slices.
-     * @param policy - Projection policy that gates which normalized fields are constructed.
-     */
-    constructor(program: OxcNode, content: string, policy: ProjectionPolicy) {
-        this.root = program;
-        this.ctx = { src: content, lineStarts: computeLineStarts(content) };
-        this.policy = policy;
-    }
-
-    /**
-     * Test whether a raw node is this projector's program root.
-     *
-     * @param raw - Raw parser node to test.
-     * @returns `true` only for the root Program node, `false` for nested nodes or `null`.
-     */
-    isSourceFile(raw: unknown): boolean {
-        return !!raw && (raw as OxcNode).type === 'Program';
-    }
-
-    /**
-     * Project one raw oxc node on demand, consulting the Mode B subtree cache first.
-     *
-     * @param raw - Raw oxc node to project; it must belong to this projector's program tree.
-     * @param parentRaw - Raw parent threaded by the engine, or `undefined` for the root.
-     * @param grandparentRaw - Raw grandparent threaded by the engine, or `undefined` near the
-     *   root; the engine's ancestry order is required for tolerated/const-bound predicates.
-     * @returns The projected normalized node, possibly the shared `OTHER_PLACEHOLDER` singleton
-     *   when the policy or node kind leaves no consumer-observable fields.
-     */
-    project(
-        raw: unknown,
-        parentRaw: unknown | undefined,
-        grandparentRaw: unknown | undefined,
-    ): NormalizedNode {
-        const n = raw as OxcNode;
-        // Mode B subtree nodes were projected once by buildSubtree; reuse the SAME object the
-        // complexity re-walk sees (the engine's visit and the re-walk cannot drift).
-        const cached = this.subtreeCache.get(n);
-        if (cached) return cached;
-
-        // The root must always be a real projection: L/M detect top-level children via
-        // parent.kind === SourceFile, so a placeholder root would zero all top-level metrics.
-        if (this.isSourceFile(n)) return { kind: NodeKind.SourceFile };
-
-        const t = n.type;
-        const kind = oxcKindOf(n);
-        const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
-        const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
-        const isClassDefining =
-            t === NODE_KIND_CLASS_DECLARATION || t === NODE_KIND_CLASS_EXPRESSION;
-        const isBinding = oxcIntroducesBinding(n);
-        const isScope = CONTROL_OR_BLOCK.has(t) || t === 'StaticBlock';
-
-        // T0 placeholder fast path — a kind with NO consumer-observable fields collapses to the
-        // shared frozen singleton (mirrors TsNodeProjector's special-kind gate). Literals are
-        // only projected when constants needs them; Binary/Logical are never binding sources.
-        if (isLiteral && !this.policy.needLiterals) return OTHER_PLACEHOLDER;
-        if (t === 'BinaryExpression' || t === 'LogicalExpression') return OTHER_PLACEHOLDER;
-        if (t === NODE_KIND_ASSIGNMENT_EXPRESSION && n.operator !== '=') return OTHER_PLACEHOLDER;
-        const topLevel = !!parentRaw && this.isSourceFile(parentRaw) && TOP_LEVEL_DECL.has(t);
-        if (!isLiteral && !fnLike && !isClassDefining && !isBinding && !isScope && !topLevel) {
-            return OTHER_PLACEHOLDER;
-        }
-
-        // §3.2 export compensation: the flattened declaration carries __exportStart (set by
-        // forEachChild's export branch) so fnLike/class starts point at the `export` keyword.
-        let startOff = n.start;
-        if (
-            (fnLike || isClassDefining) &&
-            n.__exported &&
-            typeof n.__exportStart === TYPEOF_NUMBER
-        ) {
-            startOff = n.__exportStart;
-        }
-
-        const needsPos = this.policy.needPositions && (isLiteral || fnLike);
-        const needsName = this.policy.needNames && (fnLike || isClassDefining || isBinding);
-
-        const node: NormalizedNode = {
-            kind,
-            text: isLiteral && this.policy.needLiterals ? oxcLiteralText(n, this.ctx) : undefined,
-            start: needsPos ? oxcPosOf(startOff, this.ctx) : undefined,
-            end: needsPos ? oxcPosOf(n.end, this.ctx) : undefined,
-            name: needsName ? oxcNameOf(n, this.ctx) : undefined,
-            branchWeight: oxcBranchWeightOf(n),
-            functionLike: fnLike,
-            isClassDefining,
-            introducesBinding: isBinding,
-            bindingName: isBinding && needsName ? oxcBindingNameOf(n, this.ctx) : undefined,
-            increasesNesting: isScope,
-            isConstructor:
-                this.policy.needComplexity &&
-                t === NODE_KIND_METHOD_DEFINITION &&
-                n.kind === 'constructor',
-        };
-        node.topLevel = topLevel;
-        node.exported = topLevel && (!!n.__exported || t === 'TSExportAssignment');
-        if (isLiteral && this.policy.needLiterals) {
-            node.isConstBound = oxcIsConstBoundOf(
-                n,
-                parentRaw as OxcNode | undefined,
-                grandparentRaw as OxcNode | undefined,
-            );
-            node.tolerated = oxcIsToleratedOf(n, parentRaw as OxcNode | undefined, this.ctx);
-        }
-        // Mode B: function-like nodes eagerly materialize their subtree (shared with X re-walk).
-        if (this.policy.needComplexity && fnLike) {
-            node.children = this.projectSubtree(
-                n,
-                parentRaw as OxcNode | undefined,
-                grandparentRaw as OxcNode | undefined,
-            );
-        }
-        return node;
-    }
-
-    /**
-     * Iterate a raw node's children in materialized order (the same skip/flatten rules the
-     * materialized mapNode+pushChild applied, expressed as raw-child yielding). Returns an
-     * ARRAY (not a generator — measured faster under the engine's recursive descent).
-     *
-     * Mode B: function-like nodes descend through their materialized subtree's RAW children;
-     * other subtree nodes return their CACHED raw children (built once by buildSubtree — the
-     * engine's descent never re-walks reflection). Ordinary (top-level / Mode A) nodes do a
-     * fresh reflection walk — same order + skip rules as materialization.
-     *
-     * @param raw - Raw parser node whose children the engine should descend next.
-     * @returns Raw children in materialized source order; function-like Mode B nodes reuse the
-     *   cached sequence so the engine and the complexity re-walk observe identical objects.
-     */
-    forEachChild(raw: unknown): Iterable<unknown> {
-        const n = raw as OxcNode;
-        // Program: top-level export flattening (mapTopStatement semantics).
-        if (this.isSourceFile(n)) {
-            const out: OxcNode[] = [];
-            for (const stmt of n.body || []) {
-                if (stmt.type === NODE_KIND_EXPORT_NAMED_DECLARATION && stmt.declaration) {
-                    stmt.declaration.__exported = true;
-                    stmt.declaration.__exportStart = stmt.start;
-                    out.push(stmt.declaration);
-                } else if (stmt.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION) {
-                    stmt.declaration.__exported = true;
-                    stmt.declaration.__exportStart = stmt.start;
-                    out.push(stmt.declaration);
-                } else {
-                    // ExportAllDeclaration (and every other statement) is yielded as-is; the
-                    // wrapper's own forEachChild surfaces its `source` StringLiteral.
-                    out.push(stmt);
-                }
-            }
-            return out;
-        }
-        if (this.policy.needComplexity && oxcIsFnLikeNode(n)) {
-            let kids = this.functionSubtrees.get(n);
-            if (!kids) {
-                // Defensive only: project() normally built the subtree before forEachChild() runs.
-                kids = this.rawChildrenOf(n);
-                this.functionSubtrees.set(n, kids);
-            }
-            return kids;
-        }
-        if (this.policy.needComplexity) {
-            const cached = this.rawChildrenCache.get(n);
-            if (cached) return cached;
-        }
-        const kids = this.rawChildrenOf(n);
-        if (this.policy.needComplexity && kids.length > 0) this.rawChildrenCache.set(n, kids);
-        return kids;
-    }
-
-    // ------------------------------------------------------------ raw child walk
-
-    /**
-     * Reflection-based raw child walk — the projection twin of mapNode's pushChild loop.
-     * Produces the exact raw sequence the materialized path turned into node.children.
-     */
-    private rawChildrenOf(n: OxcNode): OxcNode[] {
-        const out: OxcNode[] = [];
-        this.collectInto(n, out);
-        return out;
-    }
-
-    private collectInto(n: OxcNode, out: OxcNode[]): void {
-        const isMethodSource =
-            n.type === NODE_KIND_METHOD_DEFINITION ||
-            (n.type === NODE_KIND_PROPERTY && n.method === true);
-        for (const key of Object.keys(n)) {
-            if (OXC_META_KEYS.has(key) || key === '__exported' || key === '__exportStart') continue;
-            const v = n[key];
-            if (v == null) continue;
-            if (Array.isArray(v)) {
-                for (const item of v) this.pushRaw(out, item, isMethodSource);
-            } else if (typeof v === TYPEOF_OBJECT && typeof (v as OxcNode).type === TYPEOF_STRING) {
-                this.pushRaw(out, v as OxcNode, isMethodSource);
-            }
-        }
-    }
-
-    private pushRaw(
-        out: OxcNode[],
-        item: OxcNode | null | undefined,
-        inlineFnValue: boolean,
-    ): void {
-        if (item == null) return;
-        // §3.4 method value inlining: the FunctionExpression itself is never yielded — its
-        // params/body become direct children of the method (mirrors pushChild's inline branch).
-        if (inlineFnValue && item.type === NODE_KIND_FUNCTION_EXPRESSION) {
-            this.collectInto(item, out);
-            return;
-        }
-        // Type-position nodes: yield the type node itself; the engine descends it so the
-        // literal's raw parent is a type node and isToleratedOf computes the same values as
-        // the materialized collectLiteralsInType (numeric → tolerated, string → not).
-        if (TYPE_SKIP_TYPES.has(item.type)) {
-            out.push(item);
-            return;
-        }
-        if (SKIP_TYPES.has(item.type)) return;
-        // Nested export wrappers: same flattening as the top level (materialized pushChild).
-        if (item.type === 'ExportAllDeclaration') {
-            // `export * from './mod'` — the source StringLiteral is yielded (hardcoded-string).
-            if (item.source) out.push(item.source);
-            return;
-        }
-        if (
-            item.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
-            item.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION
-        ) {
-            if (item.declaration) {
-                item.declaration.__exported = true;
-                item.declaration.__exportStart = item.start;
-                out.push(item.declaration);
-            }
-            return;
-        }
-        // TSEnumBody: members become direct children (TS EnumDeclaration has no body wrapper).
-        if (item.type === 'TSEnumBody') {
-            for (const m of item.members || []) this.pushRaw(out, m, false);
-            return;
-        }
-        out.push(item);
-    }
-
-    // ------------------------------------------------------------ Mode B subtree
-
-    /**
-     * Eagerly materialize a function's subtree (cheap projections) and record the function's
-     * direct RAW children for the engine's descent. Nested function-like children are only
-     * projected as cheap self-nodes (no body recursion) — complexity's re-walk skips them and
-     * the engine builds their own subtree when it descends into them.
-     */
-    private projectSubtree(
-        fn: OxcNode,
-        parentRaw: OxcNode | undefined,
-        _grandparentRaw: OxcNode | undefined,
-    ): NormalizedNode[] {
-        const rawChildren: OxcNode[] = [];
-        const children = this.buildSubtree(fn, parentRaw, rawChildren);
-        this.functionSubtrees.set(fn, rawChildren);
-        return children;
-    }
-
-    private buildSubtree(
-        fn: OxcNode,
-        parentRaw: OxcNode | undefined,
-        rawOut: OxcNode[] | null,
-    ): NormalizedNode[] {
-        const children: NormalizedNode[] = [];
-        const rawChildren: OxcNode[] = [];
-        for (const c of this.rawChildrenOf(fn)) {
-            rawChildren.push(c);
-            if (rawOut) rawOut.push(c);
-            // A child c of fn has raw parent = fn and raw grandparent = parentRaw — the same
-            // (n, parentTs, grandparentTs) inputs mapNode uses, so isConstBoundOf/isToleratedOf
-            // (which need the literal's raw VariableDeclaration/DeclarationList/call ancestors)
-            // compute identically on the subtree path.
-            const proj = this.cheapProject(c, fn, parentRaw);
-            children.push(proj);
-            if (!oxcIsFnLikeNode(c)) {
-                proj.children = this.buildSubtree(c, fn, null);
-            }
-        }
-        // Cache the raw children so the engine's descent (forEachChild) never re-walks
-        // reflection over a subtree node — the walk cost moves to the one-time build.
-        if (rawChildren.length > 0) this.rawChildrenCache.set(fn, rawChildren);
-        return children;
-    }
-
-    /**
-     * Cheap projection for a Mode B subtree node. Fixed C6 field order
-     * `{kind, functionLike, branchWeight, increasesNesting, children}` — optional fields stay
-     * undefined placeholders so common expression nodes share one hidden class. Literals are
-     * T3-projected (constants still consumes them); scope/binding sources carry the engine's
-     * scope flags. Non-function-like nodes are cached so the engine's visit reuses the same
-     * object the complexity re-walk sees.
-     */
-    private cheapProject(
-        n: OxcNode,
-        parentRaw: OxcNode | undefined,
-        grandparentRaw: OxcNode | undefined,
-    ): NormalizedNode {
-        const t = n.type;
-        const kind = oxcKindOf(n);
-        const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
-        const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
-
-        // C6 core shape (fixed field order; optional fields are undefined placeholders).
-        const node: NormalizedNode = {
-            kind,
-            functionLike: fnLike,
-            branchWeight: oxcBranchWeightOf(n),
-            increasesNesting: CONTROL_OR_BLOCK.has(t) || t === 'StaticBlock',
-            children: undefined,
-        };
-
-        if (fnLike) {
-            // Nested function-like: self-only projection (no body recursion). X skips it during
-            // the re-walk; the engine builds its own subtree when it descends into it.
-            if (this.policy.needNames) node.name = oxcNameOf(n, this.ctx);
-            if (this.policy.needPositions) {
-                node.start = oxcPosOf(n.start, this.ctx);
-                node.end = oxcPosOf(n.end, this.ctx);
-            }
-            if (this.policy.needComplexity) {
-                node.isConstructor = t === NODE_KIND_METHOD_DEFINITION && n.kind === 'constructor';
-            }
-        } else {
-            if (t === NODE_KIND_CLASS_DECLARATION || t === NODE_KIND_CLASS_EXPRESSION) {
-                node.isClassDefining = true;
-                if (this.policy.needNames) node.name = oxcNameOf(n, this.ctx);
-            } else if (oxcIntroducesBinding(n)) {
-                node.introducesBinding = true;
-                if (this.policy.needNames) node.bindingName = oxcBindingNameOf(n, this.ctx);
-            }
-            if (isLiteral) {
-                if (this.policy.needLiterals) {
-                    node.text = oxcLiteralText(n, this.ctx);
-                    node.start = oxcPosOf(n.start, this.ctx);
-                    node.end = oxcPosOf(n.end, this.ctx);
-                    node.isConstBound = oxcIsConstBoundOf(n, parentRaw, grandparentRaw);
-                    node.tolerated = oxcIsToleratedOf(n, parentRaw, this.ctx);
-                }
-            }
-        }
-
-        if (!fnLike) this.subtreeCache.set(n, node);
-        return node;
     }
 }

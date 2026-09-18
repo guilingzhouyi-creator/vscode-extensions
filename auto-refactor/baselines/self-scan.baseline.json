@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T11:17:50.226Z",
+  "timestamp": "2026-09-18T11:36:15.367Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2248,36 +2248,56 @@
       "count": 1
     },
     {
-      "key": "governance|GOV-TYP-003|src/core/oxcAdapter.ts",
-      "count": 1
-    },
-    {
       "key": "constants|hardcoded-string|src/core/oxcAdapter.ts",
-      "count": 179
-    },
-    {
-      "key": "complexity|high-complexity|src/core/oxcAdapter.ts",
-      "count": 13
+      "count": 14
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/oxcAdapter.ts",
       "count": 1
     },
     {
-      "key": "hygiene|HYG-DED-001|src/core/oxcAdapter.ts",
-      "count": 1
-    },
-    {
       "key": "governance|GOV-LOG-001|src/core/oxcAdapter.ts",
-      "count": 6
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/oxcAdapter.ts",
       "count": 3
     },
     {
-      "key": "governance|CMP-EXP-001|src/core/oxcAdapter.ts",
+      "key": "complexity|high-complexity|src/core/oxcAdapter.ts",
+      "count": 2
+    },
+    {
+      "key": "complexity|high-complexity|src/core/oxcPredicates.ts",
+      "count": 7
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/oxcPredicates.ts",
+      "count": 57
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/oxcPredicates.ts",
       "count": 1
+    },
+    {
+      "key": "large-file|large-file|src/core/oxcProjector.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/oxcProjector.ts",
+      "count": 12
+    },
+    {
+      "key": "complexity|high-complexity|src/core/oxcProjector.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/oxcProjector.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-TYP-003|src/core/oxcTypes.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/oxcTypes.ts",
+      "count": 95
     },
     {
       "key": "large-file|large-file|src/core/pipeline/dualTrackPipeline.ts",
