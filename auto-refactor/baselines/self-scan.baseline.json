@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T13:57:02.463Z",
+  "timestamp": "2026-09-18T14:00:39.963Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -3101,10 +3101,10 @@
     },
     {
       "key": "constants|hardcoded-string|src/index.ts",
-      "count": 73
+      "count": 34
     },
     {
-      "key": "complexity|high-complexity|src/index.ts",
+      "key": "governance|GOV-TYP-003|src/index.ts",
       "count": 2
     },
     {
@@ -3112,16 +3112,16 @@
       "count": 2
     },
     {
-      "key": "simplify|SIM-LONG-001|src/index.ts",
-      "count": 2
-    },
-    {
       "key": "governance|GOV-PRF-002|src/index.ts",
       "count": 1
     },
     {
-      "key": "governance|GOV-TYP-003|src/index.ts",
-      "count": 4
+      "key": "complexity|high-complexity|src/index.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/index.ts",
+      "count": 1
     },
     {
       "key": "constants|duplicate-literal|src/index.ts",

@@ -59,27 +59,186 @@ interface CliOptions extends ScanOptions {
     cacheClear?: boolean;
 }
 
+type ValueFlagHandler = (opt: CliOptions, val: string) => void;
+
+/** Handler table for boolean flags mapping to their target property on CliOptions. */
+const BOOL_FLAG_SETTERS: Record<string, (opt: CliOptions, enabled: boolean) => void> = {
+    'fail-on-issue': (opt, v) => {
+        opt.failOnIssue = v;
+    },
+    'fail-on-analyzer-error': (opt, v) => {
+        opt.failOnAnalyzerError = v;
+    },
+    'respect-gitignore': (opt, v) => {
+        opt.respectGitignore = v;
+    },
+    cache: (opt, v) => {
+        opt.cache = v;
+    },
+    [DAEMON_FLAG]: (opt, v) => {
+        opt.daemon = v ? 'on' : DAEMON_MODE_OFF;
+    },
+    diff: (opt, v) => {
+        opt.diff = v;
+    },
+    'auto-tune': (opt, v) => {
+        opt.autoTuneScale = v;
+    },
+    profile: (opt, v) => {
+        opt.showProfile = v;
+    },
+    score: (opt, v) => {
+        opt.showScore = v;
+    },
+    memory: (opt, v) => {
+        opt.memory = v;
+    },
+};
+
+/**
+ * Appends comma-separated values to a list flag on CliOptions.
+ */
+function applyListFlag(opt: CliOptions, arg: 'include' | 'exclude', val: string): void {
+    const items = val
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    opt[arg] = opt[arg] ? [...opt[arg], ...items] : items;
+}
+
+/** Handler table for flags that take a string/number argument. */
+const VALUE_FLAG_HANDLERS: Record<string, ValueFlagHandler> = {
+    include: (opt, val) => applyListFlag(opt, 'include', val),
+    exclude: (opt, val) => applyListFlag(opt, 'exclude', val),
+    analyzers: (opt, val) => {
+        opt.analyzers = val
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+    },
+    'fail-on-severity': (opt, val) => {
+        if (val === 'info' || val === 'warning' || val === 'error') opt.failOnSeverity = val;
+    },
+    'baseline-granularity': (opt, val) => {
+        if (val === 'id' || val === 'grouped') opt.baselineGranularity = val;
+    },
+    format: (opt, val) => {
+        opt.format = val as any;
+    },
+    'log-level': (opt, val) => {
+        opt.logLevel = val as LogLevel;
+    },
+    'log-file': (opt, val) => {
+        opt.logFile = val;
+    },
+    concurrency: (opt, val) => {
+        opt.concurrency = Number(val);
+    },
+    workers: (opt, val) => {
+        opt.workers = Number(val);
+    },
+    out: (opt, val) => {
+        opt.out = val;
+    },
+    parser: (opt, val) => {
+        opt.parser = val === 'oxc' ? 'oxc' : 'typescript';
+    },
+    root: (opt, val) => {
+        opt.root = val;
+    },
+    config: (opt, val) => {
+        opt.configFile = val;
+    },
+    baseline: (opt, val) => {
+        opt.baseline = val;
+    },
+    'update-baseline': (opt, val) => {
+        opt.updateBaseline = val;
+    },
+    'cache-dir': (opt, val) => {
+        opt.cacheDir = val;
+    },
+    'comment-level': (opt, val) => {
+        if (val === COMMENT_LEVEL_OFF || val === 'basic' || val === 'standard' || val === 'strict') {
+            opt.commentLevel = val;
+        }
+    },
+    'security-level': (opt, val) => {
+        if (val === SECURITY_LEVEL_OFF || val === 'basic' || val === 'full') {
+            opt.securityLevel = val;
+        }
+    },
+    'agent-uid': (opt, val) => {
+        opt.agentUid = val;
+    },
+};
+
+/** Handler table for standalone zero-argument flags. */
+const STANDALONE_FLAG_HANDLERS: Record<string, (opt: CliOptions) => void> = {
+    'no-cache': (opt) => {
+        opt.cache = false;
+    },
+    'cache-clear': (opt) => {
+        opt.cacheClear = true;
+    },
+    'cache-custom': (opt) => {
+        opt.cacheCustom = true;
+    },
+    'no-daemon': (opt) => {
+        opt.daemon = DAEMON_MODE_OFF;
+    },
+    'no-memory': (opt) => {
+        opt.memory = false;
+    },
+    help: () => {
+        printUsage();
+        process.exit(0);
+    },
+    h: () => {
+        printUsage();
+        process.exit(0);
+    },
+};
+
+/**
+ * Resolves boolean flag value considering inline '=false' and explicit next token.
+ */
+function resolveBooleanFlagValue(
+    hasInline: boolean,
+    value: string,
+    nextToken: string | undefined,
+): { enabled: boolean; consumedNext: boolean } {
+    if (hasInline) {
+        return { enabled: value !== 'false', consumedNext: false };
+    }
+    if (nextToken === 'true' || nextToken === 'false') {
+        return { enabled: nextToken !== 'false', consumedNext: true };
+    }
+    return { enabled: true, consumedNext: false };
+}
+
+/**
+ * Dispatches a non-boolean flag to either standalone or value-taking handlers.
+ */
+function applyValueOrStandaloneFlag(
+    opt: CliOptions,
+    arg: string,
+    takeValue: () => string,
+): void {
+    const standalone = STANDALONE_FLAG_HANDLERS[arg];
+    if (standalone) {
+        standalone(opt);
+        return;
+    }
+    const handler = VALUE_FLAG_HANDLERS[arg];
+    if (handler) {
+        handler(opt, takeValue());
+    }
+}
+
 /** Minimal argv parser: supports `--key value`, `--key=value`, and repeated `--include`. */
 function parseArgs(argv: string[]): CliOptions {
     const opt: CliOptions = { cache: true, daemon: 'auto' };
-    const listFlags = new Set(['include', 'exclude']);
-    // Valueless (boolean) flag: defaults to true; it takes a value only for an explicit
-    // `=false` or a directly following standalone `true|false` token.
-    // A valueless flag must not unconditionally swallow the next token: previously
-    // `--fail-on-issue --format json` consumed `--format` as a boolean value and silently
-    // dropped `json` as a bare argument, losing the output-format configuration.
-    const boolFlags = new Set([
-        'fail-on-issue',
-        'fail-on-analyzer-error',
-        'respect-gitignore',
-        'cache',
-        DAEMON_FLAG,
-        'diff',
-        'auto-tune',
-        'profile',
-        'score',
-        'memory',
-    ]);
 
     for (let i = 0; i < argv.length; i++) {
         let arg = argv[i];
@@ -93,34 +252,18 @@ function parseArgs(argv: string[]): CliOptions {
             hasInline = true;
         }
 
-        if (boolFlags.has(arg)) {
-            let enabled = true;
-            if (hasInline) {
-                enabled = value !== 'false';
-            } else {
-                const nxt = argv[i + 1];
-                // Consume the next token only for an explicit boolean (`--cache false`);
-                // otherwise treat the flag as enabled.
-                if (nxt === 'true' || nxt === 'false') {
-                    enabled = nxt !== 'false';
-                    i++;
-                }
-            }
-            if (arg === 'fail-on-issue') opt.failOnIssue = enabled;
-            else if (arg === 'fail-on-analyzer-error') opt.failOnAnalyzerError = enabled;
-            else if (arg === 'respect-gitignore') opt.respectGitignore = enabled;
-            else if (arg === 'cache') opt.cache = enabled;
-            else if (arg === DAEMON_FLAG) opt.daemon = enabled ? 'on' : DAEMON_MODE_OFF;
-            else if (arg === 'diff') opt.diff = enabled;
-            else if (arg === 'auto-tune') opt.autoTuneScale = enabled;
-            else if (arg === 'profile') opt.showProfile = enabled;
-            else if (arg === 'score') opt.showScore = enabled;
-            else if (arg === 'memory') opt.memory = enabled;
+        const boolSetter = BOOL_FLAG_SETTERS[arg];
+        if (boolSetter) {
+            const { enabled, consumedNext } = resolveBooleanFlagValue(
+                hasInline,
+                value,
+                argv[i + 1],
+            );
+            if (consumedNext) i++;
+            boolSetter(opt, enabled);
             continue;
         }
 
-        // Value-taking flag: `--key=value` wins; otherwise consume the next token, which
-        // must not itself be another flag.
         const takeValue = (): string => {
             if (hasInline) return value;
             const nxt = argv[i + 1];
@@ -129,85 +272,7 @@ function parseArgs(argv: string[]): CliOptions {
             return nxt;
         };
 
-        if (listFlags.has(arg)) {
-            const v = takeValue();
-            (opt as any)[arg] = (opt as any)[arg]
-                ? [
-                      ...(opt as any)[arg],
-                      ...v
-                          .split(',')
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                  ]
-                : v
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean);
-        } else if (arg === 'analyzers') {
-            opt.analyzers = takeValue()
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean);
-        } else if (arg === 'fail-on-severity') {
-            // Leveled gate: info|warning|error — generalizes failOnIssue by blocking at a
-            // severity threshold.
-            const v = takeValue();
-            if (v === 'info' || v === 'warning' || v === 'error') opt.failOnSeverity = v;
-        } else if (arg === 'baseline-granularity') {
-            // Ratchet comparison granularity: id (exact issue id, line-number sensitive) |
-            // grouped (analyzer|rule|file counts, immune to line drift).
-            const v = takeValue();
-            if (v === 'id' || v === 'grouped') opt.baselineGranularity = v;
-        } else if (arg === 'format') {
-            opt.format = takeValue() as any;
-        } else if (arg === 'log-level') {
-            opt.logLevel = takeValue() as LogLevel;
-        } else if (arg === 'log-file') {
-            opt.logFile = takeValue();
-        } else if (arg === 'concurrency') {
-            opt.concurrency = Number(takeValue());
-        } else if (arg === 'workers') {
-            opt.workers = Number(takeValue());
-        } else if (arg === 'out') {
-            opt.out = takeValue();
-        } else if (arg === 'parser') {
-            opt.parser = takeValue() === 'oxc' ? 'oxc' : 'typescript';
-        } else if (arg === 'root') {
-            opt.root = takeValue();
-        } else if (arg === 'config') {
-            opt.configFile = takeValue();
-        } else if (arg === 'baseline') {
-            opt.baseline = takeValue();
-        } else if (arg === 'update-baseline') {
-            opt.updateBaseline = takeValue();
-        } else if (arg === 'no-cache') {
-            opt.cache = false;
-        } else if (arg === 'cache-dir') {
-            opt.cacheDir = takeValue();
-        } else if (arg === 'cache-clear') {
-            opt.cacheClear = true;
-        } else if (arg === 'cache-custom') {
-            opt.cacheCustom = true;
-        } else if (arg === 'no-daemon') {
-            opt.daemon = DAEMON_MODE_OFF;
-        } else if (arg === 'comment-level') {
-            const v = takeValue();
-            if (v === COMMENT_LEVEL_OFF || v === 'basic' || v === 'standard' || v === 'strict') {
-                opt.commentLevel = v;
-            }
-        } else if (arg === 'security-level') {
-            const v = takeValue();
-            if (v === SECURITY_LEVEL_OFF || v === 'basic' || v === 'full') {
-                opt.securityLevel = v;
-            }
-        } else if (arg === 'agent-uid') {
-            opt.agentUid = takeValue();
-        } else if (arg === 'no-memory') {
-            opt.memory = false;
-        } else if (arg === 'help' || arg === 'h') {
-            printUsage();
-            process.exit(0);
-        }
+        applyValueOrStandaloneFlag(opt, arg, takeValue);
     }
     return opt;
 }
