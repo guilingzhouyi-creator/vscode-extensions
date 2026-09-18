@@ -87,104 +87,190 @@ export function extractCodeDomains(
     return extractFromText(content, issues);
 }
 
+/**
+ * Resolve domain categorization and name from a normalized node and optional enclosing class.
+ *
+ * @param node - Inspected AST node.
+ * @param enclosingClass - Name of parent enclosing class if any.
+ * @returns Identity descriptor with domain status, class flag, kind, and full name.
+ */
+function resolveDomainIdentity(
+    node: NormalizedNode,
+    enclosingClass?: string,
+): { isDomain: boolean; isClass: boolean; kind: CodeDomainKind; fullName: string } {
+    const isFn = node.kind === NodeKind.Function || node.kind === NodeKind.Method;
+    const isClass =
+        node.kind === NodeKind.Class ||
+        node.kind === NodeKind.Struct ||
+        node.kind === NodeKind.Impl;
+
+    if (!isFn && !isClass) {
+        return { isDomain: false, isClass: false, kind: 'function', fullName: '' };
+    }
+
+    const kind: CodeDomainKind = isClass
+        ? node.kind === NodeKind.Struct
+            ? 'struct'
+            : 'class'
+        : enclosingClass
+          ? 'method'
+          : 'function';
+
+    const rawName = node.name || (enclosingClass ? `${enclosingClass}.anon` : 'anonymous');
+    const fullName =
+        enclosingClass && !rawName.startsWith(enclosingClass)
+            ? `${enclosingClass}.${rawName}`
+            : rawName;
+
+    return { isDomain: true, isClass, kind, fullName };
+}
+
+/**
+ * Calculate local cyclomatic complexity and structural semantic hash for an AST subtree.
+ *
+ * @param node - Root node of the code domain subtree.
+ * @param kind - Identified code domain kind.
+ * @param fullName - Qualified domain name.
+ * @returns Subtree cyclomatic complexity and deterministic semantic hash.
+ */
+function computeSubtreeComplexityAndHash(
+    node: NormalizedNode,
+    kind: CodeDomainKind,
+    fullName: string,
+): { cc: number; semanticHash: string } {
+    let cc = 1;
+    const structTokens: string[] = [kind, fullName];
+    const collectStack: NormalizedNode[] = [];
+    if (node.children) {
+        for (let i = node.children.length - 1; i >= 0; i--) {
+            collectStack.push(node.children[i]);
+        }
+    }
+    while (collectStack.length > 0) {
+        const child = collectStack.pop()!;
+        if (child.branchWeight) cc += child.branchWeight;
+        structTokens.push(child.kind);
+        if (child.name) structTokens.push(child.name);
+        if (child.children) {
+            for (let i = child.children.length - 1; i >= 0; i--) {
+                collectStack.push(child.children[i]);
+            }
+        }
+    }
+    const semanticHash = fastDigest(structTokens.join('|'));
+    return { cc, semanticHash };
+}
+
+/**
+ * Construct a CodeDomainFingerprint record from domain metadata and in-span issues.
+ *
+ * @param node - AST node representing the domain.
+ * @param kind - Domain kind.
+ * @param fullName - Full qualified name.
+ * @param cc - Cyclomatic complexity.
+ * @param semanticHash - Computed structural hash.
+ * @param issues - Scanned issues to filter for domain span.
+ * @returns Complete CodeDomainFingerprint.
+ */
+function buildDomainFingerprint(
+    node: NormalizedNode,
+    kind: CodeDomainKind,
+    fullName: string,
+    cc: number,
+    semanticHash: string,
+    issues: Issue[],
+): CodeDomainFingerprint {
+    const startLine = node.start?.line ?? 1;
+    const endLine = node.end?.line ?? startLine;
+    const startCol = node.start?.column ?? 1;
+    const endCol = node.end?.column ?? 1;
+    const domainId = `${kind}:${fullName}:${startLine}`;
+
+    const domainIssues = issues.filter(
+        (it) =>
+            it.location?.start &&
+            it.location.start.line >= startLine &&
+            it.location.start.line <= endLine,
+    );
+
+    return {
+        domainId,
+        kind,
+        name: fullName,
+        span: { startLine, endLine, startCol, endCol },
+        semanticHash,
+        cyclomaticComplexity: cc,
+        ruleViolations: domainIssues.map((it) => ({
+            rule: it.rule,
+            analyzer: it.analyzer,
+            severity: it.severity,
+            line: it.location.start.line,
+            message: it.message,
+        })),
+        metricSummary: {
+            lines: Math.max(1, endLine - startLine + 1),
+            maxNesting: 0,
+        },
+    };
+}
+
+/**
+ * Push child AST nodes onto the traversal stack in reverse order.
+ *
+ * @param stack - Active traversal stack.
+ * @param children - Optional child nodes list.
+ * @param enclosingClass - Optional enclosing class identifier.
+ */
+function pushChildNodes(
+    stack: Array<{ node: NormalizedNode; enclosingClass?: string }>,
+    children: NormalizedNode[] | undefined,
+    enclosingClass?: string,
+): void {
+    if (!children) return;
+    for (let i = children.length - 1; i >= 0; i--) {
+        stack.push({ node: children[i], enclosingClass });
+    }
+}
+
+/**
+ * Extract code domain fingerprints from a normalized AST.
+ *
+ * @param root - Normalized AST root node.
+ * @param issues - Issues to attribute to discovered domain spans.
+ * @returns Array of extracted domain fingerprints.
+ */
 function extractFromAst(root: NormalizedNode, issues: Issue[]): CodeDomainFingerprint[] {
     const domains: CodeDomainFingerprint[] = [];
     const stack: Array<{ node: NormalizedNode; enclosingClass?: string }> = [{ node: root }];
 
     while (stack.length > 0) {
         const { node, enclosingClass } = stack.pop()!;
-        const isFn = node.kind === NodeKind.Function || node.kind === NodeKind.Method;
-        const isClass =
-            node.kind === NodeKind.Class ||
-            node.kind === NodeKind.Struct ||
-            node.kind === NodeKind.Impl;
+        const identity = resolveDomainIdentity(node, enclosingClass);
 
-        if (isFn || isClass) {
-            const startLine = node.start?.line ?? 1;
-            const endLine = node.end?.line ?? startLine;
-            const startCol = node.start?.column ?? 1;
-            const endCol = node.end?.column ?? 1;
-
-            const kind: CodeDomainKind = isClass
-                ? node.kind === NodeKind.Struct
-                    ? 'struct'
-                    : 'class'
-                : enclosingClass
-                  ? 'method'
-                  : 'function';
-
-            const rawName = node.name || (enclosingClass ? `${enclosingClass}.anon` : 'anonymous');
-            const fullName =
-                enclosingClass && !rawName.startsWith(enclosingClass)
-                    ? `${enclosingClass}.${rawName}`
-                    : rawName;
-            const domainId = `${kind}:${fullName}:${startLine}`;
-
-            // Calculate local cyclomatic complexity & structural tokens iteratively
-            let cc = 1;
-            const structTokens: string[] = [kind, fullName];
-            const collectStack: NormalizedNode[] = [];
-            if (node.children) {
-                for (let i = node.children.length - 1; i >= 0; i--) {
-                    collectStack.push(node.children[i]);
-                }
-            }
-            while (collectStack.length > 0) {
-                const child = collectStack.pop()!;
-                if (child.branchWeight) cc += child.branchWeight;
-                structTokens.push(child.kind);
-                if (child.name) structTokens.push(child.name);
-                if (child.children) {
-                    for (let i = child.children.length - 1; i >= 0; i--) {
-                        collectStack.push(child.children[i]);
-                    }
-                }
-            }
-
-            const semanticHash = fastDigest(structTokens.join('|'));
-
-            // Find issues strictly within this domain's span
-            const domainIssues = issues.filter(
-                (it) =>
-                    it.location?.start &&
-                    it.location.start.line >= startLine &&
-                    it.location.start.line <= endLine,
+        if (identity.isDomain) {
+            const { cc, semanticHash } = computeSubtreeComplexityAndHash(
+                node,
+                identity.kind,
+                identity.fullName,
+            );
+            domains.push(
+                buildDomainFingerprint(
+                    node,
+                    identity.kind,
+                    identity.fullName,
+                    cc,
+                    semanticHash,
+                    issues,
+                ),
             );
 
-            domains.push({
-                domainId,
-                kind,
-                name: fullName,
-                span: { startLine, endLine, startCol, endCol },
-                semanticHash,
-                cyclomaticComplexity: cc,
-                ruleViolations: domainIssues.map((it) => ({
-                    rule: it.rule,
-                    analyzer: it.analyzer,
-                    severity: it.severity,
-                    line: it.location.start.line,
-                    message: it.message,
-                })),
-                metricSummary: {
-                    lines: Math.max(1, endLine - startLine + 1),
-                    maxNesting: 0,
-                },
-            });
-
-            // For classes, inspect child methods with updated enclosingClass
-            if (isClass && node.children) {
-                for (let i = node.children.length - 1; i >= 0; i--) {
-                    stack.push({ node: node.children[i], enclosingClass: fullName });
-                }
+            if (identity.isClass) {
+                pushChildNodes(stack, node.children, identity.fullName);
                 continue;
             }
         }
 
-        if (node.children) {
-            for (let i = node.children.length - 1; i >= 0; i--) {
-                stack.push({ node: node.children[i], enclosingClass });
-            }
-        }
+        pushChildNodes(stack, node.children, enclosingClass);
     }
 
     return domains;

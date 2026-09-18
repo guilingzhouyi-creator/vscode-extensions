@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T13:24:53.642Z",
+  "timestamp": "2026-09-18T13:41:59.916Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2116,16 +2116,16 @@
       "count": 1
     },
     {
+      "key": "constants|hardcoded-string|src/core/memory/domainFingerprint.ts",
+      "count": 7
+    },
+    {
       "key": "governance|GOV-LOG-001|src/core/memory/domainFingerprint.ts",
-      "count": 2
+      "count": 3
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/memory/domainFingerprint.ts",
-      "count": 2
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/memory/domainFingerprint.ts",
-      "count": 6
+      "count": 1
     },
     {
       "key": "performance|PRF-ALG-001|src/core/memory/domainFingerprint.ts",
