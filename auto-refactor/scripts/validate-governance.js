@@ -51,19 +51,9 @@ function assert(condition, message) {
 }
 
 /**
- * Execute the governance validation suite end to end.
- *
- * Writes one violating fixture per language into TMP_DIR, awaits the scan API, asserts every
- * expected finding and output-contract field, then removes TMP_DIR and exits non-zero when any
- * assertion failed. The routine is async only because it awaits scan(); it runs no concurrent
- * work of its own and is not reentrant, as it owns the shared temp directory and exit code.
+ * Set up sample files and configuration in TMP_DIR.
  */
-async function run() {
-  console.log('='.repeat(80));
-  console.log('🧪 Running Modern Governance & Cross-Language Quality Validation Suite');
-  console.log('='.repeat(80));
-
-  // 1. Setup sample files in TMP_DIR
+function setupFixtures() {
   // TypeScript Sample with violations across dimensions
   write(
     'src/domain/payment_service.ts',
@@ -216,23 +206,12 @@ def process_task(task_id: str):
     workers: 1,
   };
   write('auto-refactor.config.json', JSON.stringify(config, null, 2));
+}
 
-  // 2. Execute Scan
-  console.log('\n--- 1. Executing Governance Scan across TS, GDScript & Rust ---');
-  const report = await scan({
-    root: TMP_DIR,
-    configFile: path.join(TMP_DIR, 'auto-refactor.config.json'),
-    format: 'json',
-    logLevel: 'silent',
-  });
-
-  const issues = report.issues || [];
-  const govIssues = issues.filter((i) => i.analyzer === 'governance');
-  console.log(
-    `  Scanned files: ${report.summary?.totalFiles || 0}, Governance findings: ${govIssues.length} (total: ${issues.length})`,
-  );
-
-  // 3. Verify All 8 Categories Are Detected
+/**
+ * Verify that findings cover all 8 governance categories.
+ */
+function verifyCoreCategories(govIssues) {
   console.log('\n--- 2. Verifying 8 Core Governance Categories ---');
   const categoryCounts = {};
   for (const issue of govIssues) {
@@ -257,8 +236,12 @@ def process_task(task_id: str):
       `Category \`${cat}\` detected (findings: ${categoryCounts[cat] || 0})`,
     );
   }
+}
 
-  // 4. Verify the structured output contract
+/**
+ * Verify the diagnostic schema contract on every governance finding.
+ */
+function verifyOutputSchema(govIssues) {
   console.log('\n--- 3. Verifying the Diagnostic Output Schema ---');
   let contractValid = true;
   for (const issue of govIssues) {
@@ -290,8 +273,12 @@ def process_task(task_id: str):
     'All findings strictly comply with the diagnostic output schema (location -> ' +
       'category -> risk -> rationale -> suggestion -> fixable)',
   );
+}
 
-  // 5. Verify language adaptation (non-mechanical generalization)
+/**
+ * Verify language-specific adaptation and boundary rules across TS, GDScript, Rust, and Python.
+ */
+function verifyLanguageAdaptation(issues) {
   console.log('\n--- 4. Verifying Language Adaptation & Boundary Protection ---');
   const rustIssues = issues.filter((i) => i.location.file.endsWith('.rs'));
   const rustInheritanceIssues = rustIssues.filter((i) => i.rule === 'GOV-MNT-001');
@@ -352,8 +339,12 @@ def process_task(task_id: str):
     pyExceptIssues.length > 0,
     `Python file correctly detected bare/swallowed except violation (${pyExceptIssues.length})`,
   );
+}
 
-  // 6. Verify Auto-Fixability Annotations
+/**
+ * Verify auto-fixability flags on findings.
+ */
+function verifyAutoFixability(issues) {
   console.log('\n--- 5. Verifying Safe Auto-Fixability Annotations ---');
   const boolIssues = issues.filter((i) => i.rule === 'GOV-STD-001');
   assert(
@@ -366,8 +357,12 @@ def process_task(task_id: str):
     domainCouplingIssues.length > 0 && domainCouplingIssues[0].detail.fixable === false,
     'GOV-MNT-002 marked fixable: false (architectural change, only recommendation provided)',
   );
+}
 
-  // Clean up
+/**
+ * Clean up temporary test files and print final test summary.
+ */
+function cleanupAndExit() {
   try {
     fs.rmSync(TMP_DIR, { recursive: true, force: true });
   } catch (_e) {
@@ -382,6 +377,48 @@ def process_task(task_id: str):
     console.error(`❌ ${totalCount - passedCount}/${totalCount} CHECKS FAILED!`);
     process.exit(1);
   }
+}
+
+/**
+ * Execute the governance validation suite end to end.
+ */
+async function run() {
+  console.log('='.repeat(80));
+  console.log('🧪 Running Modern Governance & Cross-Language Quality Validation Suite');
+  console.log('='.repeat(80));
+
+  // 1. Setup sample files in TMP_DIR
+  setupFixtures();
+
+  // 2. Execute Scan
+  console.log('\n--- 1. Executing Governance Scan across TS, GDScript & Rust ---');
+  const report = await scan({
+    root: TMP_DIR,
+    configFile: path.join(TMP_DIR, 'auto-refactor.config.json'),
+    format: 'json',
+    logLevel: 'silent',
+  });
+
+  const issues = report.issues || [];
+  const govIssues = issues.filter((i) => i.analyzer === 'governance');
+  console.log(
+    `  Scanned files: ${report.summary?.totalFiles || 0}, Governance findings: ${govIssues.length} (total: ${issues.length})`,
+  );
+
+  // 3. Verify All 8 Categories Are Detected
+  verifyCoreCategories(govIssues);
+
+  // 4. Verify the structured output contract
+  verifyOutputSchema(govIssues);
+
+  // 5. Verify language adaptation
+  verifyLanguageAdaptation(issues);
+
+  // 6. Verify Auto-Fixability Annotations
+  verifyAutoFixability(issues);
+
+  // 7. Clean up and exit
+  cleanupAndExit();
 }
 
 run().catch((err) => {

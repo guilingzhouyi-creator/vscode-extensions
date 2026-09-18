@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T14:00:39.963Z",
+  "timestamp": "2026-09-18T14:03:39.018Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -528,16 +528,8 @@
       "count": 30
     },
     {
-      "key": "complexity|high-complexity|scripts/validate-governance.js",
-      "count": 1
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-governance.js",
-      "count": 1
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-governance.js",
-      "count": 4
+      "count": 2
     },
     {
       "key": "governance|GOV-MNT-001|scripts/validate-governance.js",
@@ -553,6 +545,14 @@
     },
     {
       "key": "hygiene|HYG-STB-002|scripts/validate-governance.js",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|scripts/validate-governance.js",
+      "count": 4
+    },
+    {
+      "key": "complexity|high-complexity|scripts/validate-governance.js",
       "count": 1
     },
     {
