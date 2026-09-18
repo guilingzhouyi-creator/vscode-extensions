@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T10:58:49.084Z",
+  "timestamp": "2026-09-18T11:03:47.221Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1564,10 +1564,6 @@
       "count": 1
     },
     {
-      "key": "comments|CMT-DOC-001|src/core/diff.ts",
-      "count": 1
-    },
-    {
       "key": "large-file|large-file|src/core/editDiff.ts",
       "count": 1
     },
@@ -1577,11 +1573,11 @@
     },
     {
       "key": "complexity|high-complexity|src/core/editDiff.ts",
-      "count": 4
+      "count": 5
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/editDiff.ts",
-      "count": 3
+      "count": 2
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/editDiff.ts",

@@ -328,15 +328,126 @@ export function fastDiff(a: string[], b: string[], hA?: Uint32Array, hB?: Uint32
 }
 
 /**
- * Compute a Myers O(ND) shortest edit script over two line arrays.
+ * Internal search result from Myers diagonal trace.
+ */
+interface MyersSearchResult {
+    trace: Int32Array;
+    d: number;
+    rowSize: number;
+    offset: number;
+}
+
+function computeMyersTrace(
+    midA: string[],
+    midB: string[],
+    midHA: Uint32Array,
+    midHB: Uint32Array,
+    midN: number,
+    midM: number,
+    max: number,
+): MyersSearchResult {
+    const offset = max;
+    const rowSize = 2 * max + 1;
+    const v = new Int32Array(rowSize);
+    const trace = new Int32Array((max + 1) * rowSize);
+    let d = 0;
+    let found = false;
+
+    for (d = 0; d <= max; d++) {
+        trace.set(v, d * rowSize);
+        for (let k = -d; k <= d; k += 2) {
+            let x: number;
+            if (k === -d || (k !== d && v[k - 1 + offset] < v[k + 1 + offset])) {
+                x = v[k + 1 + offset];
+            } else {
+                x = v[k - 1 + offset] + 1;
+            }
+            let y = x - k;
+            while (x < midN && y < midM && midHA[x] === midHB[y] && midA[x] === midB[y]) {
+                x++;
+                y++;
+            }
+            v[k + offset] = x;
+            if (x >= midN && y >= midM) {
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+    }
+    return { trace, d, rowSize, offset };
+}
+
+function backtrackMyersTrace(
+    search: MyersSearchResult,
+    midN: number,
+    midM: number,
+    prefix: number,
+): DiffOp[] {
+    const { trace, d, rowSize, offset } = search;
+    const midOps: DiffOp[] = [];
+    let x = midN;
+    let y = midM;
+    for (let di = d; di >= 0; di--) {
+        const rowOffset = di * rowSize;
+        const k = x - y;
+        const insertMove =
+            k === -di ||
+            (k !== di && trace[rowOffset + k - 1 + offset] < trace[rowOffset + k + 1 + offset]);
+        const prevK = insertMove ? k + 1 : k - 1;
+        const prevX = trace[rowOffset + prevK + offset];
+        const prevY = prevX - prevK;
+        while (x > prevX && y > prevY) {
+            midOps.push({ type: DIFF_OP_EQUAL, aIdx: prefix + x - 1, bIdx: prefix + y - 1 });
+            x--;
+            y--;
+        }
+        if (di > 0) {
+            if (insertMove) {
+                midOps.push({ type: DIFF_OP_INSERT, aIdx: prefix + x, bIdx: prefix + y - 1 });
+                y--;
+            } else {
+                midOps.push({ type: DIFF_OP_DELETE, aIdx: prefix + x - 1, bIdx: prefix + y });
+                x--;
+            }
+        }
+    }
+    midOps.reverse();
+    return midOps;
+}
+
+function assembleDiffOps(
+    prefix: number,
+    suffix: number,
+    n: number,
+    m: number,
+    midOps: DiffOp[],
+): DiffOp[] {
+    const fullOps: DiffOp[] = [];
+    for (let i = 0; i < prefix; i++) {
+        fullOps.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
+    }
+    for (const op of midOps) {
+        fullOps.push(op);
+    }
+    for (let i = 0; i < suffix; i++) {
+        const aIdx = n - suffix + i;
+        const bIdx = m - suffix + i;
+        fullOps.push({ type: DIFF_OP_EQUAL, aIdx, bIdx });
+    }
+    return fullOps;
+}
+
+/**
+ * Standard Myers O(ND) greedy diff algorithm with O(N) common prefix and suffix pruning.
  *
- * Common prefix/suffix trimming keeps the matrix small, 32-bit FNV-1a hashes avoid repeated
- * string comparisons, and a flat Int32Array trace buffer avoids per-round array copies. Spans
- * above 1500 lines or roughly 2M matrix cells fall back to `histogramDiff` instead of risking
- * an out-of-memory failure.
+ * For disjoint line changes where M*N > MYERS_MAX_MID_LINES, it degrades gracefully to
+ * `histogramDiff` to prevent O(N^2) memory consumption. When both inputs are non-empty and
+ * disjoint, the middle block is solved via Myers' diagonal-search algorithm and the result
+ * is spliced between the equal prefix and suffix ops.
  *
- * @param a - OLD lines to diff; aligned with `hA` when hashes are supplied.
- * @param b - NEW lines to diff; aligned with `hB` when hashes are supplied.
+ * @param a - Array of lines from the OLD content.
+ * @param b - Array of lines from the NEW content.
  * @param hA - Optional precomputed hashes for `a`; computed via `hashLines` when omitted.
  * @param hB - Optional precomputed hashes for `b`; computed via `hashLines` when omitted.
  * @returns Ordered edit script describing how `a` becomes `b`; may start or end with equal ops.
@@ -393,83 +504,41 @@ export function myersDiff(a: string[], b: string[], hA?: Uint32Array, hB?: Uint3
         return histogramDiff(a, b, hashA, hashB);
     }
 
-    const offset = max;
-    const rowSize = 2 * max + 1;
+    const search = computeMyersTrace(midA, midB, midHA, midHB, midN, midM, max);
+    const midOps = backtrackMyersTrace(search, midN, midM, prefix);
+    return assembleDiffOps(prefix, suffix, n, m, midOps);
+}
 
-    // Flat Int32Array trace buffer eliminates all trace.push(v.slice()) heap copies.
-    const v = new Int32Array(rowSize);
-    const trace = new Int32Array((max + 1) * rowSize);
-    let d = 0;
-    let found = false;
+function isNonFiniteNumber(val: unknown): boolean {
+    return typeof val !== TYPEOF_NUMBER || !Number.isFinite(val);
+}
 
-    for (d = 0; d <= max; d++) {
-        trace.set(v, d * rowSize);
-        for (let k = -d; k <= d; k += 2) {
-            let x: number;
-            if (k === -d || (k !== d && v[k - 1 + offset] < v[k + 1 + offset])) {
-                x = v[k + 1 + offset];
-            } else {
-                x = v[k - 1 + offset] + 1;
-            }
-            let y = x - k;
-            while (x < midN && y < midM && midHA[x] === midHB[y] && midA[x] === midB[y]) {
-                x++;
-                y++;
-            }
-            v[k + offset] = x;
-            if (x >= midN && y >= midM) {
-                found = true;
-                break;
-            }
-        }
-        if (found) break;
+function validateSingleEditRange(e: EditRange, maxByte?: number): void {
+    if (
+        !e ||
+        isNonFiniteNumber(e.startLine) ||
+        isNonFiniteNumber(e.oldEndLine) ||
+        isNonFiniteNumber(e.newEndLine) ||
+        isNonFiniteNumber(e.startByte) ||
+        isNonFiniteNumber(e.oldEndByte) ||
+        isNonFiniteNumber(e.newEndByte)
+    ) {
+        throw new Error('invalid edit range: non-numeric field');
     }
-
-    // Backtrack middle portion using flat trace
-    const midOps: DiffOp[] = [];
-    let x = midN;
-    let y = midM;
-    for (let di = d; di >= 0; di--) {
-        const rowOffset = di * rowSize;
-        const k = x - y;
-        const insertMove =
-            k === -di ||
-            (k !== di && trace[rowOffset + k - 1 + offset] < trace[rowOffset + k + 1 + offset]);
-        const prevK = insertMove ? k + 1 : k - 1;
-        const prevX = trace[rowOffset + prevK + offset];
-        const prevY = prevX - prevK;
-        while (x > prevX && y > prevY) {
-            midOps.push({ type: DIFF_OP_EQUAL, aIdx: prefix + x - 1, bIdx: prefix + y - 1 });
-            x--;
-            y--;
-        }
-        if (di > 0) {
-            if (insertMove) {
-                midOps.push({ type: DIFF_OP_INSERT, aIdx: prefix + x, bIdx: prefix + y - 1 });
-                y--;
-            } else {
-                midOps.push({ type: DIFF_OP_DELETE, aIdx: prefix + x - 1, bIdx: prefix + y });
-                x--;
-            }
-        }
+    if (e.startLine < 1) throw new Error('invalid edit range: startLine < 1');
+    if (e.oldEndLine < e.startLine || e.newEndLine < e.startLine) {
+        throw new Error('invalid edit range: end line before start line');
     }
-    midOps.reverse();
-
-    // Combine: prefix equals + middle edit ops + suffix equals
-    const fullOps: DiffOp[] = [];
-    for (let i = 0; i < prefix; i++) {
-        fullOps.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
+    if (e.startByte < 0) throw new Error('invalid edit range: negative byte offset');
+    if (e.oldEndByte < e.startByte || e.newEndByte < e.startByte) {
+        throw new Error('invalid edit range: end byte before start byte');
     }
-    for (const op of midOps) {
-        fullOps.push(op);
+    if (
+        maxByte !== undefined &&
+        (e.startByte > maxByte || e.oldEndByte > maxByte || e.newEndByte > maxByte)
+    ) {
+        throw new Error('invalid edit range: byte offset out of bounds');
     }
-    for (let i = 0; i < suffix; i++) {
-        const aIdx = n - suffix + i;
-        const bIdx = m - suffix + i;
-        fullOps.push({ type: DIFF_OP_EQUAL, aIdx, bIdx });
-    }
-
-    return fullOps;
 }
 
 /**
@@ -489,36 +558,7 @@ export function myersDiff(a: string[], b: string[], hA?: Uint32Array, hB?: Uint3
  */
 export function validateEditRanges(edits: EditRange[], maxByte?: number): void {
     for (const e of edits) {
-        if (
-            !e ||
-            typeof e.startLine !== TYPEOF_NUMBER ||
-            !Number.isFinite(e.startLine) ||
-            typeof e.oldEndLine !== TYPEOF_NUMBER ||
-            !Number.isFinite(e.oldEndLine) ||
-            typeof e.newEndLine !== TYPEOF_NUMBER ||
-            !Number.isFinite(e.newEndLine) ||
-            typeof e.startByte !== TYPEOF_NUMBER ||
-            !Number.isFinite(e.startByte) ||
-            typeof e.oldEndByte !== TYPEOF_NUMBER ||
-            !Number.isFinite(e.oldEndByte) ||
-            typeof e.newEndByte !== TYPEOF_NUMBER ||
-            !Number.isFinite(e.newEndByte)
-        ) {
-            throw new Error('invalid edit range: non-numeric field');
-        }
-        if (e.startLine < 1) throw new Error('invalid edit range: startLine < 1');
-        if (e.oldEndLine < e.startLine || e.newEndLine < e.startLine) {
-            throw new Error('invalid edit range: end line before start line');
-        }
-        if (e.startByte < 0) throw new Error('invalid edit range: negative byte offset');
-        if (e.oldEndByte < e.startByte || e.newEndByte < e.startByte) {
-            throw new Error('invalid edit range: end byte before start byte');
-        }
-        if (maxByte !== undefined) {
-            if (e.startByte > maxByte || e.oldEndByte > maxByte || e.newEndByte > maxByte) {
-                throw new Error('invalid edit range: byte offset out of bounds');
-            }
-        }
+        validateSingleEditRange(e, maxByte);
     }
 }
 
