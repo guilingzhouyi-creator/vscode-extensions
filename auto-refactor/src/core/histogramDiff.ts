@@ -80,6 +80,138 @@ export function histogramDiff(
         list.push(j);
     }
 
+    interface AnchorMatch {
+        anchorA: number;
+        anchorB: number;
+    }
+
+    function findBucketStart(bList: number[], curStartB: number): number {
+        const listLen = bList.length;
+        if (listLen <= BINARY_SEARCH_MIN_BUCKET_SIZE || bList[0] >= curStartB) {
+            return 0;
+        }
+        let low = 0;
+        let high = listLen - 1;
+        while (low < high) {
+            const mid = (low + high) >>> 1;
+            if (bList[mid] < curStartB) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        return low;
+    }
+
+    function findBestAnchor(
+        curStartA: number,
+        curEndA: number,
+        curStartB: number,
+        curEndB: number,
+        remA: number,
+        a: string[],
+        b: string[],
+        hA: Uint32Array,
+        bHashPositions: Map<number, number[]>,
+    ): AnchorMatch {
+        let anchorA = -1;
+        let anchorB = -1;
+        let minOccurrences = Number.POSITIVE_INFINITY;
+        let bestDistFromMid = Number.POSITIVE_INFINITY;
+        const midPointA = curStartA + Math.floor(remA / 2);
+
+        for (let i = curStartA; i < curEndA; i++) {
+            const hash = hA[i];
+            const bList = bHashPositions.get(hash);
+            if (!bList) continue;
+
+            const listLen = bList.length;
+            if (bList[0] >= curEndB || bList[listLen - 1] < curStartB) continue;
+
+            const startK = findBucketStart(bList, curStartB);
+            let countB = 0;
+            let matchedB = -1;
+            for (let k = startK; k < listLen; k++) {
+                const pos = bList[k];
+                if (pos >= curEndB) break;
+                countB++;
+                if (matchedB === -1 && a[i] === b[pos]) matchedB = pos;
+            }
+            if (countB === 0 || matchedB === -1) continue;
+
+            const dist = Math.abs(i - midPointA);
+            if (countB < minOccurrences || (countB === minOccurrences && dist < bestDistFromMid)) {
+                minOccurrences = countB;
+                bestDistFromMid = dist;
+                anchorA = i;
+                anchorB = matchedB;
+                if (countB === 1 && dist === 0) break;
+            }
+        }
+        return { anchorA, anchorB };
+    }
+
+    function handleMyersFallback(
+        curStartA: number,
+        curEndA: number,
+        curStartB: number,
+        curEndB: number,
+        a: string[],
+        b: string[],
+        hA: Uint32Array,
+        hB: Uint32Array,
+        ops: DiffOp[],
+    ): void {
+        const sliceA = a.slice(curStartA, curEndA);
+        const sliceB = b.slice(curStartB, curEndB);
+        const sliceHA = hA.subarray(curStartA, curEndA);
+        const sliceHB = hB.subarray(curStartB, curEndB);
+        const subOps = myersDiff(sliceA, sliceB, sliceHA, sliceHB);
+
+        for (const op of subOps) {
+            if (op.type === DIFF_OP_EQUAL) {
+                ops.push({
+                    type: DIFF_OP_EQUAL,
+                    aIdx: curStartA + op.aIdx,
+                    bIdx: curStartB + op.bIdx,
+                });
+            } else if (op.type === 'delete') {
+                ops.push({
+                    type: 'delete',
+                    aIdx: curStartA + op.aIdx,
+                    bIdx: curStartB + op.bIdx,
+                });
+            } else if (op.type === DIFF_OP_INSERT) {
+                ops.push({
+                    type: DIFF_OP_INSERT,
+                    aIdx: curStartA + op.aIdx,
+                    bIdx: curStartB + op.bIdx,
+                });
+            }
+        }
+    }
+
+    function emitDisjointOps(
+        curStartA: number,
+        curEndA: number,
+        curStartB: number,
+        curEndB: number,
+        ops: DiffOp[],
+    ): void {
+        for (let i = curStartA; i < curEndA; i++) {
+            ops.push({ type: 'delete', aIdx: i, bIdx: curStartB });
+        }
+        for (let j = curStartB; j < curEndB; j++) {
+            ops.push({ type: DIFF_OP_INSERT, aIdx: curEndA, bIdx: j });
+        }
+    }
+
+    function appendSuffixEquals(curEndA: number, curEndB: number, s: number, ops: DiffOp[]): void {
+        for (let i = 0; i < s; i++) {
+            ops.push({ type: DIFF_OP_EQUAL, aIdx: curEndA + i, bIdx: curEndB + i });
+        }
+    }
+
     function solve(span: Span, depth: number): void {
         const { startA, endA, startB, endB } = span;
         const lenA = endA - startA;
@@ -127,8 +259,7 @@ export function histogramDiff(
         const remB = curEndB - curStartB;
 
         if (remA === 0 && remB === 0) {
-            for (let i = 0; i < s; i++)
-                ops.push({ type: DIFF_OP_EQUAL, aIdx: curEndA + i, bIdx: curEndB + i });
+            appendSuffixEquals(curEndA, curEndB, s, ops);
             return;
         }
 
@@ -137,102 +268,26 @@ export function histogramDiff(
             remB <= FALLBACK_THRESHOLD ||
             depth >= MAX_RECURSION_DEPTH
         ) {
-            const sliceA = a.slice(curStartA, curEndA);
-            const sliceB = b.slice(curStartB, curEndB);
-            const sliceHA = hA.subarray(curStartA, curEndA);
-            const sliceHB = hB.subarray(curStartB, curEndB);
-            const subOps = myersDiff(sliceA, sliceB, sliceHA, sliceHB);
-
-            for (const op of subOps) {
-                if (op.type === DIFF_OP_EQUAL) {
-                    ops.push({
-                        type: DIFF_OP_EQUAL,
-                        aIdx: curStartA + op.aIdx,
-                        bIdx: curStartB + op.bIdx,
-                    });
-                } else if (op.type === 'delete') {
-                    ops.push({
-                        type: 'delete',
-                        aIdx: curStartA + op.aIdx,
-                        bIdx: curStartB + op.bIdx,
-                    });
-                } else if (op.type === DIFF_OP_INSERT) {
-                    ops.push({
-                        type: DIFF_OP_INSERT,
-                        aIdx: curStartA + op.aIdx,
-                        bIdx: curStartB + op.bIdx,
-                    });
-                }
-            }
-
-            for (let i = 0; i < s; i++)
-                ops.push({ type: DIFF_OP_EQUAL, aIdx: curEndA + i, bIdx: curEndB + i });
+            handleMyersFallback(curStartA, curEndA, curStartB, curEndB, a, b, hA, hB, ops);
+            appendSuffixEquals(curEndA, curEndB, s, ops);
             return;
         }
 
-        // Anchor search: pick low occurrence line closest to middle
-        let anchorA = -1;
-        let anchorB = -1;
-        let minOccurrences = Number.POSITIVE_INFINITY;
-        let bestDistFromMid = Number.POSITIVE_INFINITY;
-        const midPointA = curStartA + Math.floor(remA / 2);
-
-        for (let i = curStartA; i < curEndA; i++) {
-            const hash = hA[i];
-            const bList = bHashPositions.get(hash);
-            if (!bList) continue;
-
-            // Fast rejection: entirely outside current [curStartB, curEndB)
-            const listLen = bList.length;
-            if (bList[0] >= curEndB || bList[listLen - 1] < curStartB) continue;
-
-            // Binary search lower bound if bList is non-trivial and starts before curStartB
-            let startK = 0;
-            if (listLen > BINARY_SEARCH_MIN_BUCKET_SIZE && bList[0] < curStartB) {
-                let low = 0;
-                let high = listLen - 1;
-                while (low < high) {
-                    const mid = (low + high) >>> 1;
-                    if (bList[mid] < curStartB) {
-                        low = mid + 1;
-                    } else {
-                        high = mid;
-                    }
-                }
-                startK = low;
-            }
-
-            let countB = 0;
-            let matchedB = -1;
-            for (let k = startK; k < listLen; k++) {
-                const pos = bList[k];
-                if (pos >= curEndB) break;
-                countB++;
-                if (matchedB === -1 && a[i] === b[pos]) matchedB = pos;
-            }
-            if (countB === 0 || matchedB === -1) continue;
-
-            const dist = Math.abs(i - midPointA);
-            if (countB < minOccurrences || (countB === minOccurrences && dist < bestDistFromMid)) {
-                minOccurrences = countB;
-                bestDistFromMid = dist;
-                anchorA = i;
-                anchorB = matchedB;
-                if (countB === 1 && dist === 0) break; // Perfect midpoint anchor
-            }
-        }
+        const { anchorA, anchorB } = findBestAnchor(
+            curStartA,
+            curEndA,
+            curStartB,
+            curEndB,
+            remA,
+            a,
+            b,
+            hA,
+            bHashPositions,
+        );
 
         if (anchorA === -1 || anchorB === -1) {
-            // No common line anchor exists: all lines in A are deleted, all lines in B are
-            // inserted (O(N+M) linear time)
-            for (let i = curStartA; i < curEndA; i++) {
-                ops.push({ type: 'delete', aIdx: i, bIdx: curStartB });
-            }
-            for (let j = curStartB; j < curEndB; j++) {
-                ops.push({ type: DIFF_OP_INSERT, aIdx: curEndA, bIdx: j });
-            }
-            for (let i = 0; i < s; i++)
-                ops.push({ type: DIFF_OP_EQUAL, aIdx: curEndA + i, bIdx: curEndB + i });
+            emitDisjointOps(curStartA, curEndA, curStartB, curEndB, ops);
+            appendSuffixEquals(curEndA, curEndB, s, ops);
             return;
         }
 
@@ -246,8 +301,7 @@ export function histogramDiff(
             depth + 1,
         );
 
-        for (let i = 0; i < s; i++)
-            ops.push({ type: DIFF_OP_EQUAL, aIdx: curEndA + i, bIdx: curEndB + i });
+        appendSuffixEquals(curEndA, curEndB, s, ops);
     }
 
     solve({ startA: 0, endA: a.length, startB: 0, endB: b.length }, 0);
