@@ -28,6 +28,8 @@ import type {
     CustomAnalyzerDeclaration,
     AnalyzerId,
     LogLevel,
+    CommentLevel,
+    SecurityLevel,
 } from './types';
 
 import { detectProjectProfile, detectMaturityTier } from './profiler/projectProfiler';
@@ -371,37 +373,21 @@ export function defaultConfig(root: string): ScanConfig {
 }
 
 /**
- * Resolve a final config by layering (lowest -> highest precedence):
- *   1) built-in defaults (registry + thresholds + scheduling)
- *   2) optional config file (declarative, found via --config or auto-discovery)
- *   3) explicit CLI overrides
+ * Locate and read a JSON configuration file if present, degrading gracefully on parse errors.
  *
- * The `analyzers` map and `customAnalyzers` array are merged declaratively:
- *   - analyzer entries in the config file override enable/options per name
- *   - CLI `--analyzers a,b` becomes an explicit allow-list (enables those, disables the rest)
- *
- * Per-analyzer `options` are deep-merged with that analyzer's built-in defaults.
- *
- * @param overrides - CLI/API overrides; `analyzers` acts as an explicit allow-list, while
- *   omitted fields fall back to the config file and then to the built-in defaults.
- * @returns The fully merged config; a malformed config file warns and degrades to defaults
- *   instead of throwing, so callers always receive a usable configuration object.
+ * @param root - The scan root directory used for candidate config paths.
+ * @param configFile - Explicit config file path if specified via CLI or options.
+ * @returns An object containing the parsed config (or empty object) and the resolved base
+ *   directory.
  */
-export function resolveConfig(
-    overrides: Partial<Omit<ScanConfig, 'analyzers'>> & {
-        configFile?: string;
-        analyzers?: string[];
-    } = {},
-): ScanConfig {
-    const root = overrides.root || process.cwd();
-    const base = defaultConfig(root);
-    const analyzerDefaults = defaultAnalyzerOptions();
-
-    // ---- load config file (declarative source of truth) ----
+function loadConfigFile(
+    root: string,
+    configFile?: string,
+): { fileCfg: Partial<ScanConfig>; baseDir: string } {
     let fileCfg: Partial<ScanConfig> = {};
     let baseDir = root;
     const candidates = [
-        overrides.configFile,
+        configFile,
         path.join(root, 'auto-refactor.config.json'),
         path.join(process.cwd(), 'auto-refactor.config.json'),
     ].filter(Boolean) as string[];
@@ -424,19 +410,24 @@ export function resolveConfig(
             );
         }
     }
+    return { fileCfg, baseDir };
+}
 
-    // ---- merge analyzer registries (declarative) ----
-    // Global thresholds are the shared default layer for per-analyzer options (see
-    // `defaultAnalyzerOptions`): they must sit ABOVE the built-in analyzer defaults and BELOW
-    // an analyzer's explicit `options` block. Without this cascade the global `thresholds`
-    // block would be dead config for every analyzer that reads its tunables from `ctx.options`.
-    // Only keys the analyzer declares in `defaultAnalyzerOptions()` are copied, so unrelated
-    // tunables never leak across analyzers.
-    const globalThresholds = {
-        ...base.thresholds,
-        ...(fileCfg.thresholds || {}),
-        ...(overrides.thresholds || {}),
-    } as Record<string, unknown>;
+/**
+ * Merge declarative analyzer registries across defaults, config file, and global thresholds.
+ *
+ * @param baseAnalyzers - Base built-in analyzer registry declarations.
+ * @param fileCfgAnalyzers - Config-file supplied analyzer overrides if any.
+ * @param analyzerDefaults - Built-in default options for each analyzer.
+ * @param globalThresholds - Merged global thresholds to cascade into analyzer options.
+ * @returns Fully merged analyzer declarations map.
+ */
+function mergeAnalyzerDeclarations(
+    baseAnalyzers: Record<string, AnalyzerDeclaration>,
+    fileCfgAnalyzers: Record<string, Partial<AnalyzerDeclaration>> | undefined,
+    analyzerDefaults: Record<string, Record<string, unknown>>,
+    globalThresholds: Record<string, unknown>,
+): Record<string, AnalyzerDeclaration> {
     const globalThresholdLayer = (name: string): Record<string, unknown> => {
         const layer: Record<string, unknown> = {};
         for (const key of Object.keys(analyzerDefaults[name] || {})) {
@@ -445,9 +436,9 @@ export function resolveConfig(
         return layer;
     };
 
-    const analyzers: Record<string, AnalyzerDeclaration> = { ...base.analyzers };
-    if (fileCfg.analyzers) {
-        for (const [name, decl] of Object.entries(fileCfg.analyzers)) {
+    const analyzers: Record<string, AnalyzerDeclaration> = { ...baseAnalyzers };
+    if (fileCfgAnalyzers) {
+        for (const [name, decl] of Object.entries(fileCfgAnalyzers)) {
             const defaults = analyzerDefaults[name] || {};
             analyzers[name] = {
                 enabled: decl?.enabled !== false,
@@ -469,12 +460,42 @@ export function resolveConfig(
             };
         }
     }
+    return analyzers;
+}
 
-    // ---- project profile & scale auto-tune ----
+/** CLI, API, or caller overrides accepted by {@link resolveConfig}. */
+export type ConfigOverrides = Partial<Omit<ScanConfig, 'analyzers'>> & {
+    configFile?: string;
+    analyzers?: string[];
+};
+
+/**
+ * Auto-tune scale grades, maturity tiers, and corresponding thresholds/analyzer options.
+ *
+ * @param root - Project root directory.
+ * @param fileCfg - File-level configuration overrides.
+ * @param overrides - CLI/API overrides.
+ * @param baseThresholds - Base built-in thresholds.
+ * @param analyzers - Mutable analyzer declarations map to update with tuned options.
+ * @returns Object containing profile, autoTuneScale, scaleGrade, maturityTier, and tunedThresholds.
+ */
+function applyAutoTuning(
+    root: string,
+    fileCfg: Partial<ScanConfig>,
+    overrides: ConfigOverrides,
+    baseThresholds: Thresholds,
+    analyzers: Record<string, AnalyzerDeclaration>,
+): {
+    profile: ReturnType<typeof detectProjectProfile>;
+    autoTuneScale: boolean;
+    scaleGrade: any;
+    maturityTier: any;
+    tunedThresholds: Thresholds;
+} {
     const profile = fileCfg.profile || overrides.profile || detectProjectProfile(root);
     const autoTuneScale = overrides.autoTuneScale ?? fileCfg.autoTuneScale ?? false;
-    let tunedThresholds = {
-        ...base.thresholds,
+    let tunedThresholds: Thresholds = {
+        ...baseThresholds,
         ...(fileCfg.thresholds || {}),
         ...(overrides.thresholds || {}),
     };
@@ -494,7 +515,6 @@ export function resolveConfig(
         }
     }
 
-    // ---- maturity tier auto-detection & tuning ----
     const maturityTier =
         (overrides as any).maturityTier ||
         (fileCfg as any).maturityTier ||
@@ -508,7 +528,79 @@ export function resolveConfig(
         }
     }
 
-    // ---- semantic literal classification cascading ----
+    return { profile, autoTuneScale, scaleGrade, maturityTier, tunedThresholds };
+}
+
+/**
+ * Cascade security level settings to security, secrets, and architecture analyzers.
+ *
+ * @param securityLevel - Configured security level.
+ * @param overridesSecLevel - Security level specified in CLI/API overrides.
+ * @param fileCfgSecLevel - Security level specified in config file.
+ * @param analyzers - Analyzer declarations map.
+ */
+function cascadeSecurityLevel(
+    securityLevel: string,
+    overridesSecLevel: string | undefined,
+    fileCfgSecLevel: string | undefined,
+    analyzers: Record<string, AnalyzerDeclaration>,
+): void {
+    if (securityLevel === 'off') {
+        if (analyzers[ANALYZER_SECURITY]) analyzers[ANALYZER_SECURITY].enabled = false;
+        if (analyzers[ANALYZER_SECRETS]) analyzers[ANALYZER_SECRETS].enabled = false;
+        return;
+    }
+    if (!overridesSecLevel && !fileCfgSecLevel) return;
+
+    if (analyzers[ANALYZER_SECURITY]) {
+        analyzers[ANALYZER_SECURITY].enabled = true;
+        analyzers[ANALYZER_SECURITY].options = {
+            ...(analyzers[ANALYZER_SECURITY].options || {}),
+            level: securityLevel,
+        };
+    }
+    if (analyzers[ANALYZER_SECRETS]) {
+        analyzers[ANALYZER_SECRETS].enabled = true;
+        analyzers[ANALYZER_SECRETS].options = {
+            ...(analyzers[ANALYZER_SECRETS].options || {}),
+            level: securityLevel,
+            entropy:
+                securityLevel === 'full'
+                    ? {
+                          enabled: true,
+                          minLength: AUTO_TUNE_SECRET_MIN_LENGTH,
+                          threshold: AUTO_TUNE_SECRET_ENTROPY_THRESHOLD,
+                      }
+                    : analyzers[ANALYZER_SECRETS].options?.entropy || { enabled: false },
+        };
+    }
+    if (analyzers[ANALYZER_ARCHITECTURE]) {
+        analyzers[ANALYZER_ARCHITECTURE].options = {
+            ...(analyzers[ANALYZER_ARCHITECTURE].options || {}),
+            securityLevel,
+            checkDtoCredentialLeakage: securityLevel === 'full',
+        };
+    }
+}
+
+/**
+ * Cascade literal classification, comment levels, and security levels into analyzer declarations.
+ *
+ * @param fileCfg - File-level configuration overrides.
+ * @param overrides - CLI/API overrides.
+ * @param analyzers - Mutable analyzer declarations map to update with cascaded options.
+ * @returns Object with resolved commentLevel, securityLevel, classifyLiterals, and granularRules.
+ */
+function applySemanticAndSecurityLevels(
+    fileCfg: Partial<ScanConfig>,
+    overrides: ConfigOverrides,
+    analyzers: Record<string, AnalyzerDeclaration>,
+): {
+    commentLevel: CommentLevel;
+    securityLevel: SecurityLevel;
+    classifyLiterals: any;
+    granularRules: any;
+} {
     const classifyLiterals =
         (overrides as any).classifyLiterals ?? (fileCfg as any).classifyLiterals;
     const granularRules = (overrides as any).granularRules ?? (fileCfg as any).granularRules;
@@ -523,13 +615,9 @@ export function resolveConfig(
         };
     }
 
-    const commentLevel = overrides.commentLevel || fileCfg.commentLevel || 'standard';
-    const securityLevel = overrides.securityLevel || fileCfg.securityLevel || 'basic';
+    const commentLevel: CommentLevel = (overrides.commentLevel || fileCfg.commentLevel || 'standard') as CommentLevel;
+    const securityLevel: SecurityLevel = (overrides.securityLevel || fileCfg.securityLevel || 'basic') as SecurityLevel;
 
-    // Cascade commentLevel into the comments analyzer options. Without this, the analyzer's own
-    // default `options.level` (see defaultAnalyzerOptions) shadows `config.commentLevel`, so
-    // `--comment-level` and the config file's `commentLevel` would be silently ignored.
-    // Mirrors the securityLevel cascade below.
     if (analyzers[ANALYZER_COMMENTS] && (overrides.commentLevel || fileCfg.commentLevel)) {
         analyzers[ANALYZER_COMMENTS].enabled = commentLevel !== 'off';
         analyzers[ANALYZER_COMMENTS].options = {
@@ -538,41 +626,207 @@ export function resolveConfig(
         };
     }
 
-    // Cascade securityLevel to security, secrets, and architecture analyzers
-    if (securityLevel === 'off') {
-        if (analyzers[ANALYZER_SECURITY]) analyzers[ANALYZER_SECURITY].enabled = false;
-        if (analyzers[ANALYZER_SECRETS]) analyzers[ANALYZER_SECRETS].enabled = false;
-    } else if (overrides.securityLevel || fileCfg.securityLevel) {
-        if (analyzers[ANALYZER_SECURITY]) {
-            analyzers[ANALYZER_SECURITY].enabled = true;
-            analyzers[ANALYZER_SECURITY].options = {
-                ...(analyzers[ANALYZER_SECURITY].options || {}),
-                level: securityLevel,
-            };
-        }
-        if (analyzers[ANALYZER_SECRETS]) {
-            analyzers[ANALYZER_SECRETS].enabled = true;
-            analyzers[ANALYZER_SECRETS].options = {
-                ...(analyzers[ANALYZER_SECRETS].options || {}),
-                level: securityLevel,
-                entropy:
-                    securityLevel === 'full'
-                        ? {
-                              enabled: true,
-                              minLength: AUTO_TUNE_SECRET_MIN_LENGTH,
-                              threshold: AUTO_TUNE_SECRET_ENTROPY_THRESHOLD,
-                          }
-                        : analyzers[ANALYZER_SECRETS].options?.entropy || { enabled: false },
-            };
-        }
-        if (analyzers[ANALYZER_ARCHITECTURE]) {
-            analyzers[ANALYZER_ARCHITECTURE].options = {
-                ...(analyzers[ANALYZER_ARCHITECTURE].options || {}),
-                securityLevel,
-                checkDtoCredentialLeakage: securityLevel === 'full',
-            };
-        }
+    cascadeSecurityLevel(securityLevel, overrides.securityLevel, fileCfg.securityLevel, analyzers);
+
+    return { commentLevel, securityLevel, classifyLiterals, granularRules };
+}
+
+/**
+ * Assemble execution, concurrency, cache, and failure handling configuration flags.
+ *
+ * @param base - Base default configuration.
+ * @param fileCfg - Config-file specified overrides.
+ * @param overrides - Explicit CLI or runtime overrides.
+ * @returns Filtered execution and scheduling options.
+ */
+function assembleExecutionOptions(
+    base: ScanConfig,
+    fileCfg: Partial<ScanConfig>,
+    overrides: ConfigOverrides,
+): Pick<
+    ScanConfig,
+    | 'workers'
+    | 'concurrency'
+    | 'respectGitignore'
+    | 'failOnIssue'
+    | 'failOnSeverity'
+    | 'failOnAnalyzerError'
+    | 'parser'
+    | 'cacheEnabled'
+    | 'incremental'
+    | 'incrementalMinLines'
+> {
+    return {
+        concurrency: overrides.concurrency || fileCfg.concurrency || base.concurrency,
+        workers:
+            typeof overrides.workers === 'number'
+                ? overrides.workers
+                : (fileCfg.workers ?? base.workers),
+        respectGitignore: isBooleanFlag(overrides.respectGitignore)
+            ? overrides.respectGitignore
+            : (fileCfg.respectGitignore ?? base.respectGitignore),
+        failOnIssue: isBooleanFlag(overrides.failOnIssue)
+            ? overrides.failOnIssue
+            : (fileCfg.failOnIssue ?? base.failOnIssue),
+        failOnSeverity:
+            (overrides.failOnSeverity as ScanConfig['failOnSeverity']) ||
+            fileCfg.failOnSeverity ||
+            base.failOnSeverity,
+        failOnAnalyzerError: isBooleanFlag(overrides.failOnAnalyzerError)
+            ? overrides.failOnAnalyzerError
+            : (fileCfg.failOnAnalyzerError ?? base.failOnAnalyzerError),
+        parser: overrides.parser || fileCfg.parser || base.parser,
+        cacheEnabled: (overrides as any).cache === false ? false : base.cacheEnabled,
+        incremental: isBooleanFlag(overrides.incremental)
+            ? overrides.incremental
+            : (fileCfg.incremental ?? base.incremental),
+        incrementalMinLines:
+            typeof overrides.incrementalMinLines === 'number'
+                ? overrides.incrementalMinLines
+                : (fileCfg.incrementalMinLines ?? base.incrementalMinLines),
+    };
+}
+
+/**
+ * Assemble formatting, logging, baseline, and output destination options.
+ *
+ * @param base - Base default configuration.
+ * @param fileCfg - Config-file specified overrides.
+ * @param overrides - Explicit CLI or runtime overrides.
+ * @returns Filtered reporting and output options.
+ */
+function assembleReportingOptions(
+    base: ScanConfig,
+    fileCfg: Partial<ScanConfig>,
+    overrides: ConfigOverrides,
+): Pick<
+    ScanConfig,
+    'format' | 'logLevel' | 'logFile' | 'suppressions' | 'baselineGranularity' | 'out'
+> {
+    return {
+        format: overrides.format || fileCfg.format || base.format,
+        logLevel: (overrides.logLevel as LogLevel) || fileCfg.logLevel || base.logLevel,
+        logFile: overrides.logFile || fileCfg.logFile || base.logFile,
+        suppressions: fileCfg.suppressions ?? base.suppressions,
+        baselineGranularity: fileCfg.baselineGranularity ?? base.baselineGranularity,
+        out: overrides.out || fileCfg.out,
+    };
+}
+
+/**
+ * Assemble domain governance, memory, routing, and language support options.
+ *
+ * @param base - Base default configuration.
+ * @param fileCfg - Config-file specified overrides.
+ * @param overrides - Explicit CLI or runtime overrides.
+ * @returns Filtered domain options.
+ */
+function assembleDomainOptions(
+    base: ScanConfig,
+    fileCfg: Partial<ScanConfig>,
+    overrides: ConfigOverrides,
+): Pick<
+    ScanConfig,
+    | 'unsupportedLanguage'
+    | 'memory'
+    | 'agentUid'
+    | 'scoringWeights'
+    | 'archetype'
+    | 'sparseRouting'
+    | 'signal'
+> {
+    return {
+        unsupportedLanguage:
+            overrides.unsupportedLanguage ||
+            fileCfg.unsupportedLanguage ||
+            base.unsupportedLanguage,
+        memory: isBooleanFlag(overrides.memory)
+            ? overrides.memory
+            : (fileCfg.memory ?? base.memory),
+        agentUid: overrides.agentUid || fileCfg.agentUid || base.agentUid,
+        scoringWeights: overrides.scoringWeights || fileCfg.scoringWeights || base.scoringWeights,
+        archetype: (overrides as any).archetype || (fileCfg as any).archetype,
+        sparseRouting: isBooleanFlag((overrides as any).sparseRouting)
+            ? (overrides as any).sparseRouting
+            : ((fileCfg as any).sparseRouting ?? false),
+        signal: (overrides as any).signal,
+    };
+}
+
+/**
+ * Apply CLI `--analyzers` allow-list filter across all declared analyzers.
+ *
+ * @param analyzers - Declared analyzers map.
+ * @param allowList - Optional list of analyzer names to enable.
+ * @returns Filtered analyzer declarations.
+ */
+function applyCliAnalyzersFilter(
+    analyzers: Record<string, AnalyzerDeclaration>,
+    allowList?: string[],
+): Record<string, AnalyzerDeclaration> {
+    if (!allowList || allowList.length === 0) {
+        return analyzers;
     }
+    const set = new Set(allowList);
+    const next: Record<string, AnalyzerDeclaration> = {};
+    for (const [name, decl] of Object.entries(analyzers)) {
+        next[name] = { ...decl, enabled: set.has(name) };
+    }
+    for (const name of set) {
+        if (!next[name]) next[name] = { enabled: true };
+    }
+    return next;
+}
+
+/**
+ * Resolve a final config by layering (lowest -> highest precedence):
+ *   1) built-in defaults (registry + thresholds + scheduling)
+ *   2) optional config file (declarative, found via --config or auto-discovery)
+ *   3) explicit CLI overrides
+ *
+ * The `analyzers` map and `customAnalyzers` array are merged declaratively:
+ *   - analyzer entries in the config file override enable/options per name
+ *   - CLI `--analyzers a,b` becomes an explicit allow-list (enables those, disables the rest)
+ *
+ * Per-analyzer `options` are deep-merged with that analyzer's built-in defaults.
+ *
+ * @param overrides - CLI/API overrides; `analyzers` acts as an explicit allow-list, while
+ *   omitted fields fall back to the config file and then to the built-in defaults.
+ * @returns The fully merged config; a malformed config file warns and degrades to defaults
+ *   instead of throwing, so callers always receive a usable configuration object.
+ */
+export function resolveConfig(
+    overrides: ConfigOverrides = {},
+): ScanConfig {
+    const root = overrides.root || process.cwd();
+    const base = defaultConfig(root);
+    const analyzerDefaults = defaultAnalyzerOptions();
+
+    const { fileCfg, baseDir } = loadConfigFile(root, overrides.configFile);
+
+    const globalThresholds = {
+        ...base.thresholds,
+        ...(fileCfg.thresholds || {}),
+        ...(overrides.thresholds || {}),
+    } as Record<string, unknown>;
+
+    const analyzers = mergeAnalyzerDeclarations(
+        base.analyzers,
+        fileCfg.analyzers,
+        analyzerDefaults,
+        globalThresholds,
+    );
+
+    const { profile, autoTuneScale, scaleGrade, maturityTier, tunedThresholds } = applyAutoTuning(
+        root,
+        fileCfg,
+        overrides,
+        base.thresholds,
+        analyzers,
+    );
+
+    const { commentLevel, securityLevel, classifyLiterals, granularRules } =
+        applySemanticAndSecurityLevels(fileCfg, overrides, analyzers);
 
     const customAnalyzers: CustomAnalyzerDeclaration[] =
         (fileCfg.customAnalyzers && fileCfg.customAnalyzers.length
@@ -584,78 +838,22 @@ export function resolveConfig(
         baseDir,
         include: overrides.include || fileCfg.include || base.include,
         exclude: overrides.exclude || fileCfg.exclude || base.exclude,
-        analyzers,
+        analyzers: applyCliAnalyzersFilter(analyzers, overrides.analyzers),
         customAnalyzers,
         thresholds: tunedThresholds,
-        format: overrides.format || fileCfg.format || base.format,
-        failOnIssue: isBooleanFlag(overrides.failOnIssue)
-            ? overrides.failOnIssue
-            : (fileCfg.failOnIssue ?? base.failOnIssue),
-        failOnSeverity:
-            (overrides.failOnSeverity as ScanConfig['failOnSeverity']) ||
-            fileCfg.failOnSeverity ||
-            base.failOnSeverity,
-        suppressions: fileCfg.suppressions ?? base.suppressions,
-        baselineGranularity: fileCfg.baselineGranularity ?? base.baselineGranularity,
-        logLevel: (overrides.logLevel as LogLevel) || fileCfg.logLevel || base.logLevel,
-        logFile: overrides.logFile || fileCfg.logFile || base.logFile,
-        concurrency: overrides.concurrency || fileCfg.concurrency || base.concurrency,
-        workers:
-            typeof overrides.workers === 'number'
-                ? overrides.workers
-                : (fileCfg.workers ?? base.workers),
-        respectGitignore: isBooleanFlag(overrides.respectGitignore)
-            ? overrides.respectGitignore
-            : (fileCfg.respectGitignore ?? base.respectGitignore),
-        failOnAnalyzerError: isBooleanFlag(overrides.failOnAnalyzerError)
-            ? overrides.failOnAnalyzerError
-            : (fileCfg.failOnAnalyzerError ?? base.failOnAnalyzerError),
-        parser: overrides.parser || fileCfg.parser || base.parser,
-        // Only the explicit scan option disables caching: `cache: undefined` keeps the default, and
-        // `cache: true` is the opt-in for the L2 store (handled in api.ts).
-        cacheEnabled: (overrides as any).cache === false ? false : base.cacheEnabled,
-        incremental: isBooleanFlag(overrides.incremental)
-            ? overrides.incremental
-            : (fileCfg.incremental ?? base.incremental),
-        incrementalMinLines:
-            typeof overrides.incrementalMinLines === 'number'
-                ? overrides.incrementalMinLines
-                : (fileCfg.incrementalMinLines ?? base.incrementalMinLines),
         commentLevel,
         securityLevel,
-        unsupportedLanguage:
-            overrides.unsupportedLanguage ||
-            fileCfg.unsupportedLanguage ||
-            base.unsupportedLanguage,
         autoTuneScale,
         profile,
         scaleGrade,
         maturityTier,
-        signal: (overrides as any).signal,
         classifyLiterals,
         granularRules,
-        memory: isBooleanFlag(overrides.memory)
-            ? overrides.memory
-            : (fileCfg.memory ?? base.memory),
-        agentUid: overrides.agentUid || fileCfg.agentUid || base.agentUid,
-        scoringWeights: overrides.scoringWeights || fileCfg.scoringWeights || base.scoringWeights,
-        archetype: (overrides as any).archetype || (fileCfg as any).archetype,
-        sparseRouting: isBooleanFlag((overrides as any).sparseRouting)
-            ? (overrides as any).sparseRouting
-            : ((fileCfg as any).sparseRouting ?? false),
-        out: overrides.out || fileCfg.out,
+        ...assembleExecutionOptions(base, fileCfg, overrides),
+        ...assembleReportingOptions(base, fileCfg, overrides),
+        ...assembleDomainOptions(base, fileCfg, overrides),
     };
-
-    // ---- CLI --analyzers allow-list override (still declarative, just an explicit subset) ----
-    if (overrides.analyzers && overrides.analyzers.length) {
-        const set = new Set(overrides.analyzers);
-        const next: Record<string, AnalyzerDeclaration> = {};
-        for (const [name, decl] of Object.entries(merged.analyzers)) {
-            next[name] = { ...decl, enabled: set.has(name) };
-        }
-        for (const name of set) if (!next[name]) next[name] = { enabled: true };
-        merged.analyzers = next;
-    }
 
     return merged;
 }
+

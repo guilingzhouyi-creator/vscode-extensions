@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T14:03:39.018Z",
+  "timestamp": "2026-09-18T14:12:16.456Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1461,7 +1461,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/config.ts",
-      "count": 42
+      "count": 64
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/config.ts",
@@ -1470,10 +1470,6 @@
     {
       "key": "simplify|SIM-LONG-001|src/core/config.ts",
       "count": 2
-    },
-    {
-      "key": "complexity|high-complexity|src/core/config.ts",
-      "count": 1
     },
     {
       "key": "governance|GOV-LOG-001|src/core/config.ts",
@@ -1492,8 +1488,12 @@
       "count": 1
     },
     {
+      "key": "complexity|high-complexity|src/core/config.ts",
+      "count": 5
+    },
+    {
       "key": "governance|GOV-TYP-003|src/core/config.ts",
-      "count": 10
+      "count": 14
     },
     {
       "key": "large-file|large-file|src/core/dependencyGraph.ts",
