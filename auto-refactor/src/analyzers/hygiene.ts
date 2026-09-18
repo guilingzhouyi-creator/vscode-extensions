@@ -259,119 +259,195 @@ export class HygieneAnalyzer implements Analyzer {
     ): void {
         const lines = content.split('\n');
         const blocks: Array<{ indent: number; kind: 'class' | 'def' }> = [];
-        const flag = (
-            lineIdx: number,
-            rule: string,
-            message: string,
-            suggestion: string,
-            detail: Record<string, unknown>,
-        ): void => {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    rule,
-                    message,
-                    SEVERITY_WARNING,
-                    { file, ...detail },
-                    suggestion,
-                ),
-            );
-        };
-        const checkName = (
-            lineIdx: number,
-            name: string,
-            kind: typeof PY_BINDING_ASSIGNMENT | 'parameter',
-            inClassBody: boolean,
-        ): void => {
-            if (name === 'self' || name === 'cls') return;
-            const builtinExempt =
-                inClassBody || (kind === 'parameter' && PY_PROTOCOL_FIELDS.has(name));
-            if (!builtinExempt && PY_BUILTIN_NAMES.has(name)) {
-                flag(
-                    lineIdx,
-                    'HYG-BLT-001',
-                    `Name '${name}' shadows a Python builtin`,
-                    'Rename the binding (e.g. add a domain qualifier); shadowing builtins hides the standard meaning.',
-                    { name, kind },
-                );
-            }
-            if (name.length === 1 && !PY_SHORT_ALLOWED.has(name)) {
-                flag(
-                    lineIdx,
-                    'HYG-SGL-001',
-                    `Single-letter name '${name}' hurts readability`,
-                    "Use a descriptive name; only 'i'/'j'/'k' and '_' are tolerated as throwaways.",
-                    { name, kind },
-                );
-            }
-        };
-
         let inTriple: '"' | "'" | null = null;
         let bracketDepth = 0;
+
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i];
             if (line.endsWith('\r')) line = line.slice(0, -1);
             const trimmed = line.trim();
-            // Docstring bodies are prose: example code inside them is not the file's bindings.
-            if (inTriple) {
-                const closers =
-                    inTriple === '"' ? line.split('"""').length - 1 : line.split("'''").length - 1;
-                if (closers > 0) inTriple = null;
-                continue;
-            }
-            if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
-                const marker = trimmed.startsWith('"""') ? '"""' : "'''";
-                if (trimmed.split(marker).length - 1 < 2) inTriple = marker === '"""' ? '"' : "'";
-                continue;
-            }
-            if (trimmed === '' || trimmed.startsWith('#')) continue;
+
+            const docResult = this.updateDocstringState(line, trimmed, inTriple);
+            inTriple = docResult.inTriple;
+            if (docResult.skip || trimmed === '' || trimmed.startsWith('#')) continue;
+
             const depthAtStart = bracketDepth;
             const codeOnly = trimmed.split('#')[0];
             bracketDepth += this.bracketDelta(codeOnly);
+
             const indent = line.length - line.trimStart().length;
-            while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) blocks.pop();
-            const inClassBody = blocks.length > 0 && blocks[blocks.length - 1].kind === 'class';
+            const inClassBody = this.updateBlockNesting(indent, blocks);
+
             // Inside an open call/collection every `name=` is a keyword argument, not a binding.
             if (depthAtStart > 0) continue;
 
-            const exceptMatch = PY_EXCEPT_AS_RE.exec(trimmed);
-            if (exceptMatch && exceptMatch[1] !== PY_EXCEPT_NAME) {
-                flag(
-                    i,
-                    'HYG-EXC-001',
-                    `Exception variable '${exceptMatch[1]}' should be named '${PY_EXCEPT_NAME}'`,
-                    `Rename the handler binding to '${PY_EXCEPT_NAME}' so error-handling code reads uniformly.`,
-                    { name: exceptMatch[1] },
-                );
-            }
-
-            const defMatch = PY_DEF_LINE_RE.exec(trimmed);
-            if (defMatch) {
-                for (const rawArg of defMatch[1].split(',')) {
-                    const cleaned = rawArg.trim().replace(/^\*{0,2}/, '');
-                    const name = cleaned.split(/[:=]/)[0].trim();
-                    if (!name || name === '/') continue;
-                    checkName(i, name, 'parameter', false);
-                }
-            }
-
-            const assignMatch = PY_ASSIGN_RE.exec(trimmed);
-            if (assignMatch) checkName(i, assignMatch[1], PY_BINDING_ASSIGNMENT, inClassBody);
-
-            const forMatch = PY_FOR_RE.exec(trimmed);
-            if (forMatch) checkName(i, forMatch[1], PY_BINDING_ASSIGNMENT, inClassBody);
-
-            if (/^(?:async\s+)?with\b/.test(trimmed)) {
-                PY_WITH_AS_RE.lastIndex = 0;
-                let match: RegExpExecArray | null;
-                while ((match = PY_WITH_AS_RE.exec(trimmed)) !== null) {
-                    checkName(i, match[1], PY_BINDING_ASSIGNMENT, inClassBody);
-                }
-            }
+            this.auditPythonLineBindings(trimmed, i, inClassBody, file, ctx, issues);
 
             if (PY_CLASS_RE.test(trimmed)) blocks.push({ indent, kind: 'class' });
-            else if (defMatch) blocks.push({ indent, kind: 'def' });
+            else if (PY_DEF_LINE_RE.test(trimmed)) blocks.push({ indent, kind: 'def' });
+        }
+    }
+
+    private updateDocstringState(
+        line: string,
+        trimmed: string,
+        inTriple: '"' | "'" | null,
+    ): { inTriple: '"' | "'" | null; skip: boolean } {
+        if (inTriple) {
+            const closers =
+                inTriple === '"' ? line.split('"""').length - 1 : line.split("'''").length - 1;
+            return { inTriple: closers > 0 ? null : inTriple, skip: true };
+        }
+        if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
+            const marker = trimmed.startsWith('"""') ? '"""' : "'''";
+            const nextTriple =
+                trimmed.split(marker).length - 1 < 2 ? (marker === '"""' ? '"' : "'") : null;
+            return { inTriple: nextTriple, skip: true };
+        }
+        return { inTriple: null, skip: false };
+    }
+
+    private updateBlockNesting(
+        indent: number,
+        blocks: Array<{ indent: number; kind: 'class' | 'def' }>,
+    ): boolean {
+        while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) blocks.pop();
+        return blocks.length > 0 && blocks[blocks.length - 1].kind === 'class';
+    }
+
+    private checkPythonName(
+        lineIdx: number,
+        name: string,
+        kind: typeof PY_BINDING_ASSIGNMENT | 'parameter',
+        inClassBody: boolean,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (name === 'self' || name === 'cls') return;
+        const builtinExempt = inClassBody || (kind === 'parameter' && PY_PROTOCOL_FIELDS.has(name));
+        if (!builtinExempt && PY_BUILTIN_NAMES.has(name)) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'HYG-BLT-001',
+                    `Name '${name}' shadows a Python builtin`,
+                    SEVERITY_WARNING,
+                    { file, name, kind },
+                    'Rename the binding (e.g. add a domain qualifier); shadowing builtins hides the standard meaning.',
+                ),
+            );
+        }
+        if (name.length === 1 && !PY_SHORT_ALLOWED.has(name)) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'HYG-SGL-001',
+                    `Single-letter name '${name}' hurts readability`,
+                    SEVERITY_WARNING,
+                    { file, name, kind },
+                    "Use a descriptive name; only 'i'/'j'/'k' and '_' are tolerated as throwaways.",
+                ),
+            );
+        }
+    }
+
+    private auditPythonLineBindings(
+        trimmed: string,
+        lineIdx: number,
+        inClassBody: boolean,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const exceptMatch = PY_EXCEPT_AS_RE.exec(trimmed);
+        if (exceptMatch && exceptMatch[1] !== PY_EXCEPT_NAME) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'HYG-EXC-001',
+                    `Exception variable '${exceptMatch[1]}' should be named '${PY_EXCEPT_NAME}'`,
+                    SEVERITY_WARNING,
+                    { file, name: exceptMatch[1] },
+                    `Rename the handler binding to '${PY_EXCEPT_NAME}' so error-handling code reads uniformly.`,
+                ),
+            );
+        }
+
+        const defMatch = PY_DEF_LINE_RE.exec(trimmed);
+        if (defMatch) {
+            this.auditPythonDefParameters(defMatch[1], lineIdx, file, ctx, issues);
+        }
+
+        const assignMatch = PY_ASSIGN_RE.exec(trimmed);
+        if (assignMatch) {
+            this.checkPythonName(
+                lineIdx,
+                assignMatch[1],
+                PY_BINDING_ASSIGNMENT,
+                inClassBody,
+                file,
+                ctx,
+                issues,
+            );
+        }
+
+        const forMatch = PY_FOR_RE.exec(trimmed);
+        if (forMatch) {
+            this.checkPythonName(
+                lineIdx,
+                forMatch[1],
+                PY_BINDING_ASSIGNMENT,
+                inClassBody,
+                file,
+                ctx,
+                issues,
+            );
+        }
+
+        if (/^(?:async\s+)?with\b/.test(trimmed)) {
+            this.auditPythonWithBindings(trimmed, lineIdx, inClassBody, file, ctx, issues);
+        }
+    }
+
+    private auditPythonDefParameters(
+        rawArgsList: string,
+        lineIdx: number,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        for (const rawArg of rawArgsList.split(',')) {
+            const cleaned = rawArg.trim().replace(/^\*{0,2}/, '');
+            const name = cleaned.split(/[:=]/)[0].trim();
+            if (!name || name === '/') continue;
+            this.checkPythonName(lineIdx, name, 'parameter', false, file, ctx, issues);
+        }
+    }
+
+    private auditPythonWithBindings(
+        trimmed: string,
+        lineIdx: number,
+        inClassBody: boolean,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        PY_WITH_AS_RE.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = PY_WITH_AS_RE.exec(trimmed)) !== null) {
+            this.checkPythonName(
+                lineIdx,
+                match[1],
+                PY_BINDING_ASSIGNMENT,
+                inClassBody,
+                file,
+                ctx,
+                issues,
+            );
         }
     }
 
@@ -449,141 +525,26 @@ export class HygieneAnalyzer implements Analyzer {
         const jargonRe = buildJargonRe((ctx.options as HygieneOptions | undefined)?.jargonPatterns);
         let lineStart = 0;
         let lineIdx = 0;
-        let hadTerminalStmt = false;
-        let lastTerminalIndent = 0;
+        const deadState = { hadTerminalStmt: false, lastTerminalIndent: 0 };
 
         const lineHashes: number[] = [];
         const meaningfulLineIndices: number[] = [];
 
         while (lineStart < len) {
-            let lineEnd = content.indexOf('\n', lineStart);
-            let nextStart: number;
-            if (lineEnd === -1) {
-                lineEnd = len;
-                nextStart = len;
-            } else {
-                nextStart = lineEnd + 1;
-                if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
-                    lineEnd--;
-                }
-            }
-
-            const lineText = content.slice(lineStart, lineEnd);
+            const { lineText, nextStart } = this.extractLine(content, lineStart, len);
             const trimmed = lineText.trim();
-
-            let indent = 0;
-            while (
-                indent < lineText.length &&
-                (lineText.charCodeAt(indent) === CHAR_CODE_SPACE ||
-                    lineText.charCodeAt(indent) === CHAR_CODE_TAB)
-            ) {
-                indent++;
-            }
+            const indent = this.calculateIndent(lineText);
 
             if (checkDead) {
-                if (hadTerminalStmt) {
-                    // A line opening with `.` continues the previous statement. The terminal
-                    // detector below only inspects how the prior line ENDS, so a method chain
-                    // written as `return value` followed by `.map(...)` on the next line was
-                    // reported as unreachable code.
-                    if (
-                        trimmed.startsWith('.') ||
-                        trimmed.startsWith('}') ||
-                        trimmed.startsWith('case ') ||
-                        trimmed.startsWith('default:') ||
-                        trimmed.startsWith('else:') ||
-                        trimmed.startsWith('elif ') ||
-                        (isIndentBased && indent <= lastTerminalIndent)
-                    ) {
-                        hadTerminalStmt = false;
-                    } else if (
-                        trimmed !== '' &&
-                        !trimmed.startsWith('//') &&
-                        !trimmed.startsWith('#') &&
-                        trimmed !== '{' &&
-                        trimmed !== '}'
-                    ) {
-                        const desc = HygieneMessages.UNREACHABLE_CODE;
-                        issues.push(
-                            this.mkIssue(
-                                ctx,
-                                lineIdx,
-                                'HYG-DED-001',
-                                desc.message,
-                                SEVERITY_WARNING,
-                                {
-                                    line: lineIdx + 1,
-                                    snippet: trimmed.slice(0, UNREACHABLE_SNIPPET_MAX_CHARS),
-                                },
-                                desc.suggestion,
-                            ),
-                        );
-                        hadTerminalStmt = false;
-                    }
-                }
-
-                if (TERMINAL_STMT_RE.test(trimmed)) {
-                    const endsWithContinuation = /[({[,\\?:|&+\-*\/]\s*$/.test(trimmed);
-                    if (!endsWithContinuation) {
-                        hadTerminalStmt = true;
-                        lastTerminalIndent = indent;
-                    }
-                }
+                this.auditDeadCode(trimmed, indent, lineIdx, isIndentBased, deadState, ctx, issues);
             }
 
             if (checkStubs) {
-                if (TEMP_STUB_RE.test(trimmed)) {
-                    const match = trimmed.match(TEMP_STUB_RE);
-                    const marker = match ? match[0] : 'TODO';
-                    const desc = HygieneMessages.TEMPORARY_STUB(marker);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            lineIdx,
-                            'HYG-STB-001',
-                            desc.message,
-                            'info',
-                            { line: lineIdx + 1, marker },
-                            desc.suggestion,
-                        ),
-                    );
-                }
-
-                // A marker sitting next to a slash is a listing of the vocabulary itself, which
-                // is how this analyzer's own documentation and the GOV-SAN-001 message text
-                // describe it; only an applied tag is a finding.
-                const jargonMatch = trimmed.match(jargonRe);
-                if (
-                    jargonMatch &&
-                    !isVocabularyEnumeration(trimmed, jargonMatch.index ?? 0, jargonMatch[0])
-                ) {
-                    const jargon = jargonMatch[0];
-                    const desc = HygieneMessages.TRANSIENT_JARGON(jargon);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            lineIdx,
-                            'HYG-STB-002',
-                            desc.message,
-                            SEVERITY_WARNING,
-                            { line: lineIdx + 1, jargon },
-                            desc.suggestion,
-                        ),
-                    );
-                }
+                this.auditStubsAndJargon(trimmed, lineIdx, jargonRe, ctx, issues);
             }
 
             if (checkClones) {
-                if (
-                    trimmed &&
-                    !trimmed.startsWith('//') &&
-                    !trimmed.startsWith('#') &&
-                    trimmed !== '{' &&
-                    trimmed !== '}'
-                ) {
-                    lineHashes.push(hashString32(trimmed));
-                    meaningfulLineIndices.push(lineIdx);
-                }
+                this.recordCloneCandidate(trimmed, lineIdx, lineHashes, meaningfulLineIndices);
             }
 
             lineIdx++;
@@ -591,6 +552,175 @@ export class HygieneAnalyzer implements Analyzer {
         }
 
         return { lineHashes, meaningfulLineIndices };
+    }
+
+    private extractLine(
+        content: string,
+        lineStart: number,
+        len: number,
+    ): { lineText: string; nextStart: number } {
+        let lineEnd = content.indexOf('\n', lineStart);
+        let nextStart: number;
+        if (lineEnd === -1) {
+            lineEnd = len;
+            nextStart = len;
+        } else {
+            nextStart = lineEnd + 1;
+            if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
+                lineEnd--;
+            }
+        }
+        return { lineText: content.slice(lineStart, lineEnd), nextStart };
+    }
+
+    private calculateIndent(lineText: string): number {
+        let indent = 0;
+        while (
+            indent < lineText.length &&
+            (lineText.charCodeAt(indent) === CHAR_CODE_SPACE ||
+                lineText.charCodeAt(indent) === CHAR_CODE_TAB)
+        ) {
+            indent++;
+        }
+        return indent;
+    }
+
+    private isContinuationOrBoundary(
+        trimmed: string,
+        indent: number,
+        isIndentBased: boolean,
+        lastTerminalIndent: number,
+    ): boolean {
+        return (
+            trimmed.startsWith('.') ||
+            trimmed.startsWith('}') ||
+            trimmed.startsWith('case ') ||
+            trimmed.startsWith('default:') ||
+            trimmed.startsWith('else:') ||
+            trimmed.startsWith('elif ') ||
+            (isIndentBased && indent <= lastTerminalIndent)
+        );
+    }
+
+    private isMeaningfulDeadCodeSnippet(trimmed: string): boolean {
+        return (
+            trimmed !== '' &&
+            !trimmed.startsWith('//') &&
+            !trimmed.startsWith('#') &&
+            trimmed !== '{' &&
+            trimmed !== '}'
+        );
+    }
+
+    private auditDeadCode(
+        trimmed: string,
+        indent: number,
+        lineIdx: number,
+        isIndentBased: boolean,
+        state: { hadTerminalStmt: boolean; lastTerminalIndent: number },
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (state.hadTerminalStmt) {
+            if (
+                this.isContinuationOrBoundary(
+                    trimmed,
+                    indent,
+                    isIndentBased,
+                    state.lastTerminalIndent,
+                )
+            ) {
+                state.hadTerminalStmt = false;
+            } else if (this.isMeaningfulDeadCodeSnippet(trimmed)) {
+                const desc = HygieneMessages.UNREACHABLE_CODE;
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'HYG-DED-001',
+                        desc.message,
+                        SEVERITY_WARNING,
+                        {
+                            line: lineIdx + 1,
+                            snippet: trimmed.slice(0, UNREACHABLE_SNIPPET_MAX_CHARS),
+                        },
+                        desc.suggestion,
+                    ),
+                );
+                state.hadTerminalStmt = false;
+            }
+        }
+
+        if (TERMINAL_STMT_RE.test(trimmed)) {
+            const endsWithContinuation = /[({[,\\?:|&+\-*\/]\s*$/.test(trimmed);
+            if (!endsWithContinuation) {
+                state.hadTerminalStmt = true;
+                state.lastTerminalIndent = indent;
+            }
+        }
+    }
+
+    private auditStubsAndJargon(
+        trimmed: string,
+        lineIdx: number,
+        jargonRe: RegExp,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (TEMP_STUB_RE.test(trimmed)) {
+            const match = trimmed.match(TEMP_STUB_RE);
+            const marker = match ? match[0] : 'TODO';
+            const desc = HygieneMessages.TEMPORARY_STUB(marker);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'HYG-STB-001',
+                    desc.message,
+                    'info',
+                    { line: lineIdx + 1, marker },
+                    desc.suggestion,
+                ),
+            );
+        }
+
+        const jargonMatch = trimmed.match(jargonRe);
+        if (
+            jargonMatch &&
+            !isVocabularyEnumeration(trimmed, jargonMatch.index ?? 0, jargonMatch[0])
+        ) {
+            const jargon = jargonMatch[0];
+            const desc = HygieneMessages.TRANSIENT_JARGON(jargon);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'HYG-STB-002',
+                    desc.message,
+                    SEVERITY_WARNING,
+                    { line: lineIdx + 1, jargon },
+                    desc.suggestion,
+                ),
+            );
+        }
+    }
+
+    private recordCloneCandidate(
+        trimmed: string,
+        lineIdx: number,
+        lineHashes: number[],
+        meaningfulLineIndices: number[],
+    ): void {
+        if (
+            trimmed &&
+            !trimmed.startsWith('//') &&
+            !trimmed.startsWith('#') &&
+            trimmed !== '{' &&
+            trimmed !== '}'
+        ) {
+            lineHashes.push(hashString32(trimmed));
+            meaningfulLineIndices.push(lineIdx);
+        }
     }
 
     private auditCloneBlocks(
