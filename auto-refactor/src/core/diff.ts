@@ -124,6 +124,170 @@ function fullResult(
 }
 
 /**
+ * Intermediate state extracted while normalizing diff inputs.
+ */
+interface PreparedDiffState {
+    oldContent?: string;
+    newContent: string;
+    edits: EditRange[];
+    rangesProvided: boolean;
+    rangesFallback: boolean;
+    oldContentFromState: boolean;
+    earlyResult?: ResolvedDiff;
+}
+
+function prepareDiffInput(
+    input: DiffInput,
+    newContent: string,
+    opts: ResolveDiffOpts,
+): PreparedDiffState {
+    if (input.kind === DIFF_INPUT_KIND_FULL) {
+        const oldContent = decodeContent(input.oldContent);
+        if (oldContent === newContent) {
+            return {
+                oldContent,
+                newContent,
+                edits: [],
+                rangesProvided: false,
+                rangesFallback: false,
+                oldContentFromState: false,
+                earlyResult: {
+                    mode: 'byteEqual',
+                    edits: [],
+                    oldContent,
+                    newContent,
+                    rangesProvided: false,
+                    rangesFallback: false,
+                    oldContentFromState: false,
+                },
+            };
+        }
+        return {
+            oldContent,
+            newContent,
+            edits: [],
+            rangesProvided: false,
+            rangesFallback: false,
+            oldContentFromState: false,
+        };
+    }
+
+    let edits: EditRange[];
+    try {
+        edits = normalizeEditRanges(input.editRanges, opts.buf || Buffer.from(newContent, 'utf8'));
+    } catch {
+        return {
+            newContent,
+            edits: [],
+            rangesProvided: true,
+            rangesFallback: true,
+            oldContentFromState: false,
+            earlyResult: fullResult(newContent, true, true, false),
+        };
+    }
+
+    if (edits.length === 0) {
+        return {
+            newContent,
+            edits: [],
+            rangesProvided: true,
+            rangesFallback: false,
+            oldContentFromState: false,
+            earlyResult: {
+                mode: 'byteEqual',
+                edits: [],
+                oldContent: undefined,
+                newContent,
+                rangesProvided: true,
+                rangesFallback: false,
+                oldContentFromState: false,
+            },
+        };
+    }
+
+    let oldContent: string | undefined;
+    let oldContentFromState = false;
+    if (typeof input.oldContent === 'string') {
+        oldContent = input.oldContent;
+    } else if (opts.state) {
+        oldContent = opts.state.content;
+        oldContentFromState = true;
+    }
+
+    return {
+        oldContent,
+        newContent,
+        edits,
+        rangesProvided: true,
+        rangesFallback: false,
+        oldContentFromState,
+    };
+}
+
+function checkIncrementalGates(
+    opts: ResolveDiffOpts,
+    inputKind: string,
+    newContent: string,
+    oldContent: string | undefined,
+    edits: EditRange[],
+    newLinesCount: number | undefined,
+): boolean {
+    if (opts.incrementalDisabled || opts.enabled === false) return false;
+    const lineCount = newLinesCount ?? countLines(newContent);
+    if (lineCount < opts.minLines) return false;
+    if (changedLineCount(edits) > opts.maxChangedLines) return false;
+    const state = opts.state;
+    if (!state) return false;
+    if (
+        inputKind === DIFF_INPUT_KIND_FULL &&
+        oldContent !== undefined &&
+        (oldContent.length !== state.content.length || oldContent !== state.content)
+    ) {
+        return false;
+    }
+    return true;
+}
+
+function resolvePraxisVerdict(
+    oldContent: string,
+    newContent: string,
+    opts: ResolveDiffOpts,
+    diffOps?: DiffOp[],
+    startsOld?: number[],
+    startsNew?: number[],
+): { hunks?: ReviewDiffHunk[]; praxisVerdict?: PraxisVerdict } {
+    if (!opts.praxisHooks) return {};
+    const hunks = computeDetailedHunks(
+        oldContent,
+        newContent,
+        DIFF_CONTEXT_LINES,
+        diffOps,
+        startsOld,
+        startsNew,
+    );
+    let praxisVerdict: PraxisVerdict | undefined;
+    if (opts.praxisHooks.thresholdPolicy && hunks.length > 0) {
+        const enriched = opts.praxisHooks.contextEnricher
+            ? opts.praxisHooks.contextEnricher.enrichHunk(opts.filePath || '', hunks[0])
+            : { suggestedAction: 'auto_fix' as const };
+
+        const verdict = opts.praxisHooks.thresholdPolicy.evaluateChange(
+            opts.filePath || '',
+            hunks[0],
+            enriched as any,
+        );
+        if (!(verdict instanceof Promise)) {
+            praxisVerdict = verdict;
+        } else if (process.env.NODE_ENV === 'development' || process.env.DEBUG_PRAXIS) {
+            console.warn(
+                '[Praxis] Async threshold policy evaluated during sync resolveDiff; consider scanDiffStream for full async streaming.',
+            );
+        }
+    }
+    return { hunks, praxisVerdict };
+}
+
+/**
  * Resolve one diff input into an action:
  *   - 'byteEqual'   → contents identical, return empty edits (0 files to scan).
  *   - 'full'        → file must be rescanned in full (gate rejected, ranges invalid, or disabled).
@@ -144,65 +308,18 @@ function fullResult(
  */
 export function resolveDiff(input: DiffInput, opts: ResolveDiffOpts): ResolvedDiff {
     const newContent = decodeContent(input.newContent);
-    let oldContent: string | undefined;
-    let rangesProvided = input.kind === 'ranges';
-    let rangesFallback = false;
-    let oldContentFromState = false;
+    const prepared = prepareDiffInput(input, newContent, opts);
 
-    let edits: EditRange[] = [];
+    if (prepared.earlyResult) {
+        return prepared.earlyResult;
+    }
+
+    const { oldContent, rangesProvided, rangesFallback, oldContentFromState } = prepared;
+    let edits = prepared.edits;
     let diffOps: DiffOp[] | undefined;
     let startsOld: number[] | undefined;
     let startsNew: number[] | undefined;
     let newLinesCount: number | undefined;
-
-    // Invariant 0: Exact byte equality ALWAYS short-circuits to byteEqual (0 files to scan)
-    if (input.kind === DIFF_INPUT_KIND_FULL) {
-        oldContent = decodeContent(input.oldContent);
-        if (oldContent === newContent) {
-            return {
-                mode: 'byteEqual',
-                edits: [],
-                oldContent,
-                newContent,
-                rangesProvided,
-                rangesFallback,
-                oldContentFromState,
-            };
-        }
-    } else {
-        rangesProvided = true;
-        try {
-            edits = normalizeEditRanges(
-                input.editRanges,
-                opts.buf || Buffer.from(newContent, 'utf8'),
-            );
-        } catch {
-            rangesFallback = true;
-            return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
-        }
-        if (edits.length === 0) {
-            return {
-                mode: 'byteEqual',
-                edits: [],
-                oldContent,
-                newContent,
-                rangesProvided,
-                rangesFallback,
-                oldContentFromState,
-            };
-        }
-        if (typeof input.oldContent === 'string') {
-            oldContent = input.oldContent;
-        } else if (opts.state) {
-            oldContent = opts.state.content;
-            oldContentFromState = true;
-        }
-    }
-
-    // Gate 1: incremental feature disabled entirely.
-    if (opts.incrementalDisabled || opts.enabled === false) {
-        return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
-    }
 
     if (input.kind === DIFF_INPUT_KIND_FULL) {
         const diffRes = computeEditRangesWithOps(oldContent!, newContent);
@@ -213,61 +330,13 @@ export function resolveDiff(input: DiffInput, opts: ResolveDiffOpts): ResolvedDi
         newLinesCount = diffRes.newIndex.starts.length;
     }
 
-    // Gate 3/4: big-file small-change thresholds.
-    const lineCount = newLinesCount ?? countLines(newContent);
-    if (lineCount < opts.minLines) {
-        return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
-    }
-    if (changedLineCount(edits) > opts.maxChangedLines) {
+    if (!checkIncrementalGates(opts, input.kind, newContent, oldContent, edits, newLinesCount)) {
         return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
     }
 
-    // Gate 5/6: resident state baseline check — compare lengths before contents so a size
-    // mismatch short-circuits the full string equality test.
-    const state = opts.state;
-    if (!state) {
-        return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
-    }
-    if (
-        input.kind === DIFF_INPUT_KIND_FULL &&
-        oldContent !== undefined &&
-        (oldContent.length !== state.content.length || oldContent !== state.content)
-    ) {
-        return fullResult(newContent, rangesProvided, rangesFallback, oldContentFromState);
-    }
-
-    let hunks: ReviewDiffHunk[] | undefined;
-    let praxisVerdict: PraxisVerdict | undefined;
-
-    // Reuse the precomputed diffOps and line starts so hunks never trigger a duplicate diff.
-    if (oldContent && opts.praxisHooks) {
-        hunks = computeDetailedHunks(
-            oldContent,
-            newContent,
-            DIFF_CONTEXT_LINES,
-            diffOps,
-            startsOld,
-            startsNew,
-        );
-        if (opts.praxisHooks.thresholdPolicy && hunks.length > 0) {
-            const enriched = opts.praxisHooks.contextEnricher
-                ? opts.praxisHooks.contextEnricher.enrichHunk(opts.filePath || '', hunks[0])
-                : { suggestedAction: 'auto_fix' as const };
-
-            const verdict = opts.praxisHooks.thresholdPolicy.evaluateChange(
-                opts.filePath || '',
-                hunks[0],
-                enriched as any,
-            );
-            if (!(verdict instanceof Promise)) {
-                praxisVerdict = verdict;
-            } else if (process.env.NODE_ENV === 'development' || process.env.DEBUG_PRAXIS) {
-                console.warn(
-                    '[Praxis] Async threshold policy evaluated during sync resolveDiff; consider scanDiffStream for full async streaming.',
-                );
-            }
-        }
-    }
+    const { hunks, praxisVerdict } = oldContent
+        ? resolvePraxisVerdict(oldContent, newContent, opts, diffOps, startsOld, startsNew)
+        : {};
 
     return {
         mode: 'incremental',

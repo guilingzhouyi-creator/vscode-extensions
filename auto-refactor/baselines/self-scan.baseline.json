@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T10:54:31.908Z",
+  "timestamp": "2026-09-18T10:58:49.084Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1544,20 +1544,8 @@
       "count": 1
     },
     {
-      "key": "comments|CMT-DOC-001|src/core/dependencyGraph.ts",
-      "count": 1
-    },
-    {
       "key": "constants|hardcoded-string|src/core/diff.ts",
-      "count": 8
-    },
-    {
-      "key": "complexity|high-complexity|src/core/diff.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/diff.ts",
-      "count": 1
+      "count": 7
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/diff.ts",
@@ -1568,7 +1556,15 @@
       "count": 1
     },
     {
+      "key": "governance|GOV-LOG-001|src/core/diff.ts",
+      "count": 1
+    },
+    {
       "key": "governance|GOV-TYP-003|src/core/diff.ts",
+      "count": 1
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/diff.ts",
       "count": 1
     },
     {
