@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T14:12:16.456Z",
+  "timestamp": "2026-09-18T15:02:15.389Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1369,30 +1369,10 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/analyzer.ts",
-      "count": 24
+      "count": 9
     },
     {
       "key": "governance|GOV-TYP-003|src/core/analyzer.ts",
-      "count": 8
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/analyzer.ts",
-      "count": 3
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/analyzer.ts",
-      "count": 3
-    },
-    {
-      "key": "hygiene|HYG-DED-001|src/core/analyzer.ts",
-      "count": 2
-    },
-    {
-      "key": "complexity|high-complexity|src/core/analyzer.ts",
-      "count": 1
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/analyzer.ts",
       "count": 1
     },
     {
@@ -1469,7 +1449,7 @@
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/config.ts",
-      "count": 2
+      "count": 1
     },
     {
       "key": "governance|GOV-LOG-001|src/core/config.ts",
@@ -1718,10 +1698,6 @@
     {
       "key": "governance|GOV-PRF-002|src/core/governance/rules/exceptionSafety.ts",
       "count": 6
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/governance/rules/exceptionSafety.ts",
-      "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/fileStructure.ts",
@@ -2341,7 +2317,7 @@
     },
     {
       "key": "governance|GOV-PRF-004|src/core/profiler/manifestDetector.ts",
-      "count": 23
+      "count": 22
     },
     {
       "key": "performance|PRF-IO-001|src/core/profiler/manifestDetector.ts",
@@ -2457,6 +2433,10 @@
     },
     {
       "key": "governance|GOV-TYP-003|src/core/reporting/baselineManager.ts",
+      "count": 2
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/reporting/reportBuilder.ts",
       "count": 2
     },
     {
@@ -2632,6 +2612,18 @@
       "count": 1
     },
     {
+      "key": "large-file|large-file|src/core/scanner/analyzerRunner.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/scanner/analyzerRunner.ts",
+      "count": 9
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/scanner/analyzerRunner.ts",
+      "count": 1
+    },
+    {
       "key": "constants|hardcoded-string|src/core/scanner/cacheKeyHelper.ts",
       "count": 1
     },
@@ -2692,12 +2684,12 @@
       "count": 5
     },
     {
-      "key": "governance|GOV-LOG-001|src/core/scanner/diffScanner.ts",
-      "count": 3
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/core/scanner/diffScanner.ts",
       "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/scanner/diffScanner.ts",
+      "count": 3
     },
     {
       "key": "performance|PRF-ALG-001|src/core/scanner/diffScanner.ts",

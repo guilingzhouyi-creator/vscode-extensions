@@ -85,7 +85,7 @@ import type { ScannerContext } from './scanner/scannerContext';
 export { WarmSession, createWarmSession } from './scanner/cacheKeyHelper';
 export type { ScanWithCacheOptions } from './scanner/cacheScanner';
 export type { ScanWithDiffOptions } from './scanner/diffScanner';
-export { summarizeUncertainty } from './scanner/uncertaintyHelper';
+export { summarizeUncertainty } from './reporting/uncertaintySummary';
 
 /**
  * Facade for the scan pipeline: resolves analyzers once per instance and exposes cold,
@@ -385,7 +385,7 @@ export class Scanner implements ScannerContext {
     async scanWithDiff(
         opts: ScanWithDiffOptions & { deltaOnly?: boolean },
     ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats }> {
-        return executeScanWithDiff(this, opts) as Promise<{ report: any; stats: DiffStats }>;
+        return executeScanWithDiff(this, opts);
     }
 
     /**

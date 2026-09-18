@@ -14,7 +14,7 @@
 import * as fs from 'fs';
 import type { ScanConfig, ScanReport, Issue, SuppressionRule } from '../types';
 import type { Scanner } from '../analyzer';
-import { summarizeUncertainty } from '../analyzer';
+import { summarizeUncertainty } from './uncertaintySummary';
 import type { Logger } from '../logger';
 import { globToRegExp } from '../fileDiscovery';
 import { runCyclePass } from '../dependencyGraph';

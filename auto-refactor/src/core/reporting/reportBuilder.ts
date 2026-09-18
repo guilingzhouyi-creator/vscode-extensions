@@ -32,7 +32,7 @@ import type { ChangeTrajectoryManager } from '../trajectory/changeTrajectory';
 import type { SymbolIndex } from '../intelligence/symbolIndex';
 import type { LiteralIndex } from '../intelligence/literalIndex';
 import { CallGraph } from '../intelligence/callGraph';
-import { summarizeUncertainty } from '../scanner/uncertaintyHelper';
+import { summarizeUncertainty } from './uncertaintySummary';
 import { analyzerCoverage } from '../scanner/workerScheduler';
 
 /** Number of hex characters kept from a record hash to form the stored short revision id. */

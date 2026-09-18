@@ -1,10 +1,12 @@
 /**
- * Module: Core Engine — Uncertainty Summary Helper
- * File Path: src/core/scanner/uncertaintyHelper.ts
+ * Module: Core Engine — Uncertainty Summary
+ * File Path: src/core/reporting/uncertaintySummary.ts
  * Architecture Role: Aggregates issue uncertainty metrics for scan reporting.
- * Dependencies & Triggers: ../types; called by Scanner.buildReport and reportFinalizer.
- * Responsibilities: Calculate runtime evidence counts and average confidence across issues.
- * Exit Semantics & Design Rationale: Pure aggregation function returning structured metrics.
+ * Dependencies & Triggers: ../types; called by reportBuilder while assembling the summary and by
+ *   reportFinalizer when a post-scan pass rewrites the report.
+ * Responsibilities: Calculate runtime-evidence counts and the average evidence confidence.
+ * Exit Semantics & Design Rationale: Pure aggregation returning structured metrics; issues
+ *   without evidence are skipped so an empty report yields the neutral confidence of 1.0.
  */
 
 import type { Issue } from '../types';
