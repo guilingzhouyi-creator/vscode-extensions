@@ -28,18 +28,25 @@ import type {
     CustomAnalyzerDeclaration,
     AnalyzerId,
     LogLevel,
-    CommentLevel,
-    SecurityLevel,
 } from './types';
 
-import { detectProjectProfile, detectMaturityTier } from './profiler/projectProfiler';
 import {
-    evaluateScaleGrade,
-    getTunedThresholds,
-    getTunedAnalyzerOptions,
-    getMaturityTunedThresholds,
-    getMaturityTunedAnalyzerOptions,
-} from './profiler/scaleTuner';
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_COMMENTS,
+    ANALYZER_CONSTANTS,
+    ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_SECRETS,
+    ANALYZER_SECURITY,
+    ANALYZER_TYPESCRIPT_MODERN,
+    SPECIALIZED_ANALYZERS,
+    applyAutoTuning,
+    applySemanticAndSecurityLevels,
+} from './configTuning';
+import type { ConfigOverrides } from './configTuning';
+
+// Compatibility surface: callers historically imported ConfigOverrides from this module.
+export type { ConfigOverrides } from './configTuning';
 
 /** Public tool identity string that consumers can surface in banners, reports, and logs. */
 export const TOOL_NAME = 'auto-refactor';
@@ -49,52 +56,6 @@ export const TOOL_NAME = 'auto-refactor';
  * Keep it in sync with `package.json` whenever report or cache contracts change.
  */
 export const TOOL_VERSION = '0.3.0';
-
-/** Built-in `constants` analyzer id; keys its `analyzers.constants` declaration. */
-const ANALYZER_CONSTANTS = 'constants';
-
-/** Built-in `secrets` analyzer id; keys its `analyzers.secrets` declaration. */
-const ANALYZER_SECRETS = 'secrets';
-
-/** Built-in `architecture` analyzer id; keys its `analyzers.architecture` declaration. */
-const ANALYZER_ARCHITECTURE = 'architecture';
-
-/** Built-in `comments` analyzer id; keys its `analyzers.comments` declaration. */
-const ANALYZER_COMMENTS = 'comments';
-
-/** Built-in `security` analyzer id; keys its `analyzers.security` declaration. */
-const ANALYZER_SECURITY = 'security';
-
-/** Built-in `ts-modern` analyzer id; a specialized language pack, declared to be enabled. */
-const ANALYZER_TYPESCRIPT_MODERN = 'ts-modern';
-
-/** Built-in `rust-modern` analyzer id; a specialized language pack, declared to be enabled. */
-const ANALYZER_RUST_MODERN = 'rust-modern';
-
-/** Built-in `gdscript-modern` analyzer id; a specialized language pack, declared to be enabled. */
-const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
-
-/**
- * Analyzers that stay disabled until a config or CLI allow-list declares them.
- *
- * A Set keeps the lookup flat: the previous `name === 'x' || …` chain pushed the enclosing
- * function over the complexity threshold every time a pack was added, and the membership test is
- * the same question for every entry.
- */
-const SPECIALIZED_ANALYZERS = new Set<string>([
-    'governance',
-    ANALYZER_ARCHITECTURE,
-    'performance',
-    ANALYZER_COMMENTS,
-    'hygiene',
-    ANALYZER_SECURITY,
-    'simplify',
-    'python-modern',
-    ANALYZER_TYPESCRIPT_MODERN,
-    ANALYZER_RUST_MODERN,
-    ANALYZER_GDSCRIPT_MODERN,
-    'docs',
-]);
 
 /** Built-in analyzer names shipped with the engine (also usable as keys in `analyzers`). */
 export const BUILTIN_ANALYZERS = [
@@ -146,11 +107,6 @@ const DEFAULT_MAX_FUNCTION_LINES = 60;
 const DEFAULT_COMMENTED_CODE_MIN_LINES = 3;
 /** Scheduler default: in-process unless the repo is big enough to amortise worker threads. */
 const DEFAULT_MAX_CONCURRENCY = 4;
-/** Auto-tune estimate: source lines per profiled language entry. */
-const SLOC_PER_LANGUAGE_SAMPLE = 100;
-/** Auto-tune secret heuristics (securityLevel=full) are slightly looser than the defaults. */
-const AUTO_TUNE_SECRET_MIN_LENGTH = 24;
-const AUTO_TUNE_SECRET_ENTROPY_THRESHOLD = 4.2;
 
 /** `typeof` tag used to validate boolean overrides before they are layered into the config. */
 const TYPEOF_BOOLEAN = 'boolean';
@@ -463,176 +419,62 @@ function mergeAnalyzerDeclarations(
     return analyzers;
 }
 
-/** CLI, API, or caller overrides accepted by {@link resolveConfig}. */
-export type ConfigOverrides = Partial<Omit<ScanConfig, 'analyzers'>> & {
-    configFile?: string;
-    analyzers?: string[];
-};
-
 /**
- * Auto-tune scale grades, maturity tiers, and corresponding thresholds/analyzer options.
+ * Resolve a value by precedence: CLI/API override, then config file, then base default.
  *
- * @param root - Project root directory.
- * @param fileCfg - File-level configuration overrides.
- * @param overrides - CLI/API overrides.
- * @param baseThresholds - Base built-in thresholds.
- * @param analyzers - Mutable analyzer declarations map to update with tuned options.
- * @returns Object containing profile, autoTuneScale, scaleGrade, maturityTier, and tunedThresholds.
+ * Uses `||` (not `??`) to keep the historical layering semantics, where an empty value in a
+ * higher layer falls through to the next one instead of winning.
+ *
+ * @param override - CLI/API override value.
+ * @param fileValue - Config-file value.
+ * @param baseValue - Built-in default value.
+ * @returns The first set value, or undefined when no layer provides one.
  */
-function applyAutoTuning(
-    root: string,
-    fileCfg: Partial<ScanConfig>,
-    overrides: ConfigOverrides,
-    baseThresholds: Thresholds,
-    analyzers: Record<string, AnalyzerDeclaration>,
-): {
-    profile: ReturnType<typeof detectProjectProfile>;
-    autoTuneScale: boolean;
-    scaleGrade: any;
-    maturityTier: any;
-    tunedThresholds: Thresholds;
-} {
-    const profile = fileCfg.profile || overrides.profile || detectProjectProfile(root);
-    const autoTuneScale = overrides.autoTuneScale ?? fileCfg.autoTuneScale ?? false;
-    let tunedThresholds: Thresholds = {
-        ...baseThresholds,
-        ...(fileCfg.thresholds || {}),
-        ...(overrides.thresholds || {}),
-    };
-    let scaleGrade = fileCfg.scaleGrade || overrides.scaleGrade;
-
-    if (autoTuneScale) {
-        const sampleCount = Object.values(profile.languages).reduce((a, b) => a + b, 0);
-        scaleGrade ||= evaluateScaleGrade({
-            fileCount: sampleCount * 2,
-            sloc: sampleCount * 2 * SLOC_PER_LANGUAGE_SAMPLE,
-        });
-        if (!fileCfg.thresholds && !overrides.thresholds) {
-            tunedThresholds = getTunedThresholds(scaleGrade, tunedThresholds);
-        }
-        for (const [name, decl] of Object.entries(analyzers)) {
-            decl.options = getTunedAnalyzerOptions(scaleGrade, name, decl.options || {});
-        }
-    }
-
-    const maturityTier =
-        (overrides as any).maturityTier ||
-        (fileCfg as any).maturityTier ||
-        (autoTuneScale ? detectMaturityTier(root) : undefined);
-    if (maturityTier) {
-        if (!fileCfg.thresholds && !overrides.thresholds) {
-            tunedThresholds = getMaturityTunedThresholds(maturityTier, tunedThresholds);
-        }
-        for (const [name, decl] of Object.entries(analyzers)) {
-            decl.options = getMaturityTunedAnalyzerOptions(maturityTier, name, decl.options || {});
-        }
-    }
-
-    return { profile, autoTuneScale, scaleGrade, maturityTier, tunedThresholds };
+function resolveScalar<T>(override: T | undefined, fileValue: T | undefined, baseValue: T): T {
+    return override || fileValue || baseValue;
 }
 
 /**
- * Cascade security level settings to security, secrets, and architecture analyzers.
+ * Resolve a tri-state boolean flag: a genuine boolean override wins, else file, else base.
  *
- * @param securityLevel - Configured security level.
- * @param overridesSecLevel - Security level specified in CLI/API overrides.
- * @param fileCfgSecLevel - Security level specified in config file.
- * @param analyzers - Analyzer declarations map.
+ * @param override - Raw CLI/API override value (may be a stringified flag).
+ * @param fileValue - Config-file value.
+ * @param baseValue - Built-in default value.
+ * @returns The resolved flag, or undefined when no layer sets one.
  */
-function cascadeSecurityLevel(
-    securityLevel: string,
-    overridesSecLevel: string | undefined,
-    fileCfgSecLevel: string | undefined,
-    analyzers: Record<string, AnalyzerDeclaration>,
-): void {
-    if (securityLevel === 'off') {
-        if (analyzers[ANALYZER_SECURITY]) analyzers[ANALYZER_SECURITY].enabled = false;
-        if (analyzers[ANALYZER_SECRETS]) analyzers[ANALYZER_SECRETS].enabled = false;
-        return;
-    }
-    if (!overridesSecLevel && !fileCfgSecLevel) return;
-
-    if (analyzers[ANALYZER_SECURITY]) {
-        analyzers[ANALYZER_SECURITY].enabled = true;
-        analyzers[ANALYZER_SECURITY].options = {
-            ...(analyzers[ANALYZER_SECURITY].options || {}),
-            level: securityLevel,
-        };
-    }
-    if (analyzers[ANALYZER_SECRETS]) {
-        analyzers[ANALYZER_SECRETS].enabled = true;
-        analyzers[ANALYZER_SECRETS].options = {
-            ...(analyzers[ANALYZER_SECRETS].options || {}),
-            level: securityLevel,
-            entropy:
-                securityLevel === 'full'
-                    ? {
-                          enabled: true,
-                          minLength: AUTO_TUNE_SECRET_MIN_LENGTH,
-                          threshold: AUTO_TUNE_SECRET_ENTROPY_THRESHOLD,
-                      }
-                    : analyzers[ANALYZER_SECRETS].options?.entropy || { enabled: false },
-        };
-    }
-    if (analyzers[ANALYZER_ARCHITECTURE]) {
-        analyzers[ANALYZER_ARCHITECTURE].options = {
-            ...(analyzers[ANALYZER_ARCHITECTURE].options || {}),
-            securityLevel,
-            checkDtoCredentialLeakage: securityLevel === 'full',
-        };
-    }
+function resolveFlag<B extends boolean | undefined>(
+    override: unknown,
+    fileValue: boolean | undefined,
+    baseValue: B,
+): boolean | B {
+    return isBooleanFlag(override) ? override : (fileValue ?? baseValue);
 }
 
 /**
- * Cascade literal classification, comment levels, and security levels into analyzer declarations.
+ * Resolve a numeric option, ignoring non-numeric CLI strings.
  *
- * @param fileCfg - File-level configuration overrides.
- * @param overrides - CLI/API overrides.
- * @param analyzers - Mutable analyzer declarations map to update with cascaded options.
- * @returns Object with resolved commentLevel, securityLevel, classifyLiterals, and granularRules.
+ * @param override - Raw CLI/API override value (may be a stringified number).
+ * @param fileValue - Config-file value.
+ * @param baseValue - Built-in default value.
+ * @returns The resolved number, or undefined when no layer provides one.
  */
-function applySemanticAndSecurityLevels(
-    fileCfg: Partial<ScanConfig>,
-    overrides: ConfigOverrides,
-    analyzers: Record<string, AnalyzerDeclaration>,
-): {
-    commentLevel: CommentLevel;
-    securityLevel: SecurityLevel;
-    classifyLiterals: any;
-    granularRules: any;
-} {
-    const classifyLiterals =
-        (overrides as any).classifyLiterals ?? (fileCfg as any).classifyLiterals;
-    const granularRules = (overrides as any).granularRules ?? (fileCfg as any).granularRules;
-    if (
-        analyzers[ANALYZER_CONSTANTS] &&
-        (classifyLiterals !== undefined || granularRules !== undefined)
-    ) {
-        analyzers[ANALYZER_CONSTANTS].options = {
-            ...(analyzers[ANALYZER_CONSTANTS].options || {}),
-            ...(classifyLiterals !== undefined ? { classifyLiterals } : {}),
-            ...(granularRules !== undefined ? { granularRules } : {}),
-        };
-    }
+function resolveNumber<B extends number | undefined>(
+    override: unknown,
+    fileValue: number | undefined,
+    baseValue: B,
+): number | B {
+    return typeof override === 'number' ? override : (fileValue ?? baseValue);
+}
 
-    const commentLevel: CommentLevel = (overrides.commentLevel ||
-        fileCfg.commentLevel ||
-        'standard') as CommentLevel;
-    const securityLevel: SecurityLevel = (overrides.securityLevel ||
-        fileCfg.securityLevel ||
-        'basic') as SecurityLevel;
-
-    if (analyzers[ANALYZER_COMMENTS] && (overrides.commentLevel || fileCfg.commentLevel)) {
-        analyzers[ANALYZER_COMMENTS].enabled = commentLevel !== 'off';
-        analyzers[ANALYZER_COMMENTS].options = {
-            ...(analyzers[ANALYZER_COMMENTS].options || {}),
-            level: commentLevel,
-        };
-    }
-
-    cascadeSecurityLevel(securityLevel, overrides.securityLevel, fileCfg.securityLevel, analyzers);
-
-    return { commentLevel, securityLevel, classifyLiterals, granularRules };
+/**
+ * True when the caller explicitly passed `cache: false` (a scan flag that is not part of
+ * ScanConfig, so it is probed structurally instead of widening the override type).
+ *
+ * @param overrides - Explicit CLI or runtime overrides.
+ * @returns True when the override layer disabled the cache.
+ */
+function cacheOverrideDisabled(overrides: ConfigOverrides): boolean {
+    return (overrides as { cache?: boolean }).cache === false;
 }
 
 /**
@@ -661,33 +503,32 @@ function assembleExecutionOptions(
     | 'incrementalMinLines'
 > {
     return {
-        concurrency: overrides.concurrency || fileCfg.concurrency || base.concurrency,
-        workers:
-            typeof overrides.workers === 'number'
-                ? overrides.workers
-                : (fileCfg.workers ?? base.workers),
-        respectGitignore: isBooleanFlag(overrides.respectGitignore)
-            ? overrides.respectGitignore
-            : (fileCfg.respectGitignore ?? base.respectGitignore),
-        failOnIssue: isBooleanFlag(overrides.failOnIssue)
-            ? overrides.failOnIssue
-            : (fileCfg.failOnIssue ?? base.failOnIssue),
-        failOnSeverity:
-            (overrides.failOnSeverity as ScanConfig['failOnSeverity']) ||
-            fileCfg.failOnSeverity ||
+        concurrency: resolveScalar(overrides.concurrency, fileCfg.concurrency, base.concurrency),
+        workers: resolveNumber(overrides.workers, fileCfg.workers, base.workers),
+        respectGitignore: resolveFlag(
+            overrides.respectGitignore,
+            fileCfg.respectGitignore,
+            base.respectGitignore,
+        ),
+        failOnIssue: resolveFlag(overrides.failOnIssue, fileCfg.failOnIssue, base.failOnIssue),
+        failOnSeverity: resolveScalar(
+            overrides.failOnSeverity,
+            fileCfg.failOnSeverity,
             base.failOnSeverity,
-        failOnAnalyzerError: isBooleanFlag(overrides.failOnAnalyzerError)
-            ? overrides.failOnAnalyzerError
-            : (fileCfg.failOnAnalyzerError ?? base.failOnAnalyzerError),
-        parser: overrides.parser || fileCfg.parser || base.parser,
-        cacheEnabled: (overrides as any).cache === false ? false : base.cacheEnabled,
-        incremental: isBooleanFlag(overrides.incremental)
-            ? overrides.incremental
-            : (fileCfg.incremental ?? base.incremental),
-        incrementalMinLines:
-            typeof overrides.incrementalMinLines === 'number'
-                ? overrides.incrementalMinLines
-                : (fileCfg.incrementalMinLines ?? base.incrementalMinLines),
+        ),
+        failOnAnalyzerError: resolveFlag(
+            overrides.failOnAnalyzerError,
+            fileCfg.failOnAnalyzerError,
+            base.failOnAnalyzerError,
+        ),
+        parser: resolveScalar(overrides.parser, fileCfg.parser, base.parser),
+        cacheEnabled: cacheOverrideDisabled(overrides) ? false : base.cacheEnabled,
+        incremental: resolveFlag(overrides.incremental, fileCfg.incremental, base.incremental),
+        incrementalMinLines: resolveNumber(
+            overrides.incrementalMinLines,
+            fileCfg.incrementalMinLines,
+            base.incrementalMinLines,
+        ),
     };
 }
 
@@ -740,20 +581,21 @@ function assembleDomainOptions(
     | 'signal'
 > {
     return {
-        unsupportedLanguage:
-            overrides.unsupportedLanguage ||
-            fileCfg.unsupportedLanguage ||
+        unsupportedLanguage: resolveScalar(
+            overrides.unsupportedLanguage,
+            fileCfg.unsupportedLanguage,
             base.unsupportedLanguage,
-        memory: isBooleanFlag(overrides.memory)
-            ? overrides.memory
-            : (fileCfg.memory ?? base.memory),
-        agentUid: overrides.agentUid || fileCfg.agentUid || base.agentUid,
-        scoringWeights: overrides.scoringWeights || fileCfg.scoringWeights || base.scoringWeights,
-        archetype: (overrides as any).archetype || (fileCfg as any).archetype,
-        sparseRouting: isBooleanFlag((overrides as any).sparseRouting)
-            ? (overrides as any).sparseRouting
-            : ((fileCfg as any).sparseRouting ?? false),
-        signal: (overrides as any).signal,
+        ),
+        memory: resolveFlag(overrides.memory, fileCfg.memory, base.memory),
+        agentUid: resolveScalar(overrides.agentUid, fileCfg.agentUid, base.agentUid),
+        scoringWeights: resolveScalar(
+            overrides.scoringWeights,
+            fileCfg.scoringWeights,
+            base.scoringWeights,
+        ),
+        archetype: overrides.archetype || fileCfg.archetype,
+        sparseRouting: resolveFlag(overrides.sparseRouting, fileCfg.sparseRouting, false),
+        signal: overrides.signal,
     };
 }
 
