@@ -38,8 +38,8 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     'PRF-ALG': 'performanceEfficiency',
     'PRF-LEAK': 'performanceEfficiency',
     CMP: 'performanceEfficiency',
-    'GOV-TYP': 'architectureConsistency',
-    ARCH: 'architectureConsistency',
+    'GOV-TYP': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    ARCH: DIMENSION_ARCHITECTURE_CONSISTENCY,
 };
 
 /**
@@ -84,6 +84,72 @@ const DEDUCTION_WARNING_TECH_DEBT = 5;
 const MAX_NESTING_DEPTH = 5;
 const MAX_EXPORTED_SYMBOLS = 30;
 
+/** Analyzer ids matched by the deduction evaluators (named so no id literal is repeated). */
+const ANALYZER_ARCHITECTURE = 'architecture';
+const ANALYZER_DEPENDENCY_GRAPH = 'dependency-graph';
+const ANALYZER_GOVERNANCE = 'governance';
+const ANALYZER_HYGIENE = 'hygiene';
+const ANALYZER_SECURITY = 'security';
+const ANALYZER_SECRETS = 'secrets';
+const ANALYZER_PERFORMANCE = 'performance';
+const ANALYZER_LARGE_FILE = 'large-file';
+const ANALYZER_COMPLEXITY = 'complexity';
+const ANALYZER_COMMENTS = 'comments';
+const ANALYZER_CONSTANTS = 'constants';
+
+/** Quality dimensions written by the deduction evaluators. */
+const DIMENSION_SEMANTIC_PURITY = 'semanticPurity';
+const DIMENSION_STANDARDIZATION = 'standardization';
+const DIMENSION_MODERNITY = 'modernity';
+const DIMENSION_MAINTAINABILITY = 'maintainability';
+const DIMENSION_COMMENT_QUALITY = 'commentQuality';
+const DIMENSION_DUPLICATION = 'duplication';
+const DIMENSION_TECH_DEBT_RISK = 'techDebtRisk';
+
+/** Rule ids with a dedicated deduction. */
+const RULE_ARCH_LEAK_002 = 'ARCH-LEAK-002';
+const RULE_SEC_VUL_001 = 'SEC-VUL-001';
+const RULE_SEC_VUL_002 = 'SEC-VUL-002';
+const RULE_SEC_VUL_003 = 'SEC-VUL-003';
+const RULE_SEC_VUL_004 = 'SEC-VUL-004';
+const RULE_SEC_VUL_005 = 'SEC-VUL-005';
+const RULE_SEC_VUL_006 = 'SEC-VUL-006';
+const RULE_SEC_LEAK_001 = 'SEC-LEAK-001';
+
+/** Rule-id or message fragments the evaluators match on. */
+const FRAGMENT_PLACEHOLDER_MARKER = 'wip';
+const FRAGMENT_LAYER = 'layer';
+const FRAGMENT_BOUNDARY = 'boundary';
+const FRAGMENT_LEAK = 'LEAK';
+const FRAGMENT_CYCLE = 'cycle';
+const FRAGMENT_CIRCULAR = 'circular';
+const FRAGMENT_TYPE = 'type';
+const FRAGMENT_ESCAPE = 'escape';
+const FRAGMENT_DEAD = 'dead';
+const FRAGMENT_UNREACHABLE = 'unreachable';
+const FRAGMENT_UNUSED = 'unused';
+const FRAGMENT_SECRET = 'secret';
+const FRAGMENT_TOKEN = 'token';
+const FRAGMENT_EVAL = 'eval';
+const FRAGMENT_UNSAFE = 'unsafe';
+const FRAGMENT_SANITIZATION = 'sanitization';
+const FRAGMENT_LOOP = 'loop';
+const FRAGMENT_ALLOC = 'alloc';
+const FRAGMENT_UNBOUNDED = 'unbounded';
+const FRAGMENT_LEAK_ALT = 'leak';
+const FRAGMENT_NAMING = 'naming';
+const FRAGMENT_LINES = 'lines';
+const FRAGMENT_LEGACY = 'legacy';
+const FRAGMENT_DEPRECATED = 'deprecated';
+const FRAGMENT_NESTING = 'nesting';
+const FRAGMENT_BANNED = 'banned';
+const FRAGMENT_JARGON = 'jargon';
+const FRAGMENT_MISSING = 'missing';
+const FRAGMENT_DUPLICATE = 'duplicate';
+const FRAGMENT_MAGIC = 'magic';
+const FRAGMENT_ERROR = 'error';
+const FRAGMENT_WARNING = 'warning';
+
 /**
  * Callback signature for applying a deduction to a quality dimension.
  */
@@ -102,13 +168,14 @@ export type DeductionApplier = (
  * @param apply - Deduction callback function.
  */
 export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplier): void {
-    if (issue.analyzer !== 'architecture' && issue.analyzer !== 'dependency-graph') return;
+    if (issue.analyzer !== ANALYZER_ARCHITECTURE && issue.analyzer !== ANALYZER_DEPENDENCY_GRAPH)
+        return;
 
     const line = issue.location?.start?.line;
     const r = issue.rule;
     const msg = issue.message;
 
-    if (r === 'ARCH-LEAK-002' || r.includes('ARCH-LEAK-002')) {
+    if (r === RULE_ARCH_LEAK_002 || r.includes(RULE_ARCH_LEAK_002)) {
         apply(
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_DTO_CREDENTIAL_LEAK,
@@ -123,7 +190,11 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
             r,
             line,
         );
-    } else if (r.includes('layer') || r.includes('boundary') || r.includes('LEAK')) {
+    } else if (
+        r.includes(FRAGMENT_LAYER) ||
+        r.includes(FRAGMENT_BOUNDARY) ||
+        r.includes(FRAGMENT_LEAK)
+    ) {
         apply(
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_LAYER_CONSTRAINT_VIOLATION,
@@ -131,7 +202,7 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
             r,
             line,
         );
-    } else if (r.includes('cycle') || r.includes('circular')) {
+    } else if (r.includes(FRAGMENT_CYCLE) || r.includes(FRAGMENT_CIRCULAR)) {
         apply(
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_CIRCULAR_DEPENDENCY,
@@ -161,27 +232,33 @@ export function applySemanticPurityDeductions(issue: Issue, apply: DeductionAppl
     const r = issue.rule;
     const msg = issue.message;
 
-    if (issue.analyzer === 'governance' && (r.includes('type') || r.includes('escape'))) {
+    if (
+        issue.analyzer === ANALYZER_GOVERNANCE &&
+        (r.includes(FRAGMENT_TYPE) || r.includes(FRAGMENT_ESCAPE))
+    ) {
         apply(
-            'semanticPurity',
+            DIMENSION_SEMANTIC_PURITY,
             DEDUCTION_TYPE_SAFETY_ESCAPE,
             ScoringRationales.TYPE_SAFETY_ESCAPE(msg),
             r,
             line,
         );
     }
-    if (issue.analyzer === 'hygiene' && (r.includes('dead') || r.includes('unreachable'))) {
+    if (
+        issue.analyzer === ANALYZER_HYGIENE &&
+        (r.includes(FRAGMENT_DEAD) || r.includes(FRAGMENT_UNREACHABLE))
+    ) {
         apply(
-            'semanticPurity',
+            DIMENSION_SEMANTIC_PURITY,
             DEDUCTION_UNREACHABLE_DEAD_CODE,
             ScoringRationales.UNREACHABLE_DEAD_CODE(msg),
             r,
             line,
         );
     }
-    if (issue.analyzer === 'hygiene' && r.includes('unused')) {
+    if (issue.analyzer === ANALYZER_HYGIENE && r.includes(FRAGMENT_UNUSED)) {
         apply(
-            'semanticPurity',
+            DIMENSION_SEMANTIC_PURITY,
             DEDUCTION_UNUSED_BINDING,
             ScoringRationales.UNUSED_BINDING_OR_IMPORT(msg),
             r,
@@ -201,8 +278,8 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
     const r = issue.rule;
     const msg = issue.message;
 
-    if (issue.analyzer === 'security') {
-        if (r === 'SEC-VUL-001') {
+    if (issue.analyzer === ANALYZER_SECURITY) {
+        if (r === RULE_SEC_VUL_001) {
             apply(
                 DIMENSION_CODE_SECURITY,
                 DEDUCTION_CRITICAL_CODE_EXECUTION,
@@ -210,7 +287,7 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
                 r,
                 line,
             );
-        } else if (r === 'SEC-VUL-002') {
+        } else if (r === RULE_SEC_VUL_002) {
             apply(
                 DIMENSION_CODE_SECURITY,
                 DEDUCTION_CRITICAL_COMMAND_INJECTION,
@@ -218,7 +295,7 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
                 r,
                 line,
             );
-        } else if (r === 'SEC-VUL-003') {
+        } else if (r === RULE_SEC_VUL_003) {
             apply(
                 DIMENSION_CODE_SECURITY,
                 DEDUCTION_PROTOTYPE_POLLUTION,
@@ -226,7 +303,7 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
                 r,
                 line,
             );
-        } else if (r === 'SEC-VUL-004') {
+        } else if (r === RULE_SEC_VUL_004) {
             apply(
                 DIMENSION_CODE_SECURITY,
                 DEDUCTION_INSECURE_RANDOMNESS,
@@ -234,7 +311,7 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
                 r,
                 line,
             );
-        } else if (r === 'SEC-VUL-005') {
+        } else if (r === RULE_SEC_VUL_005) {
             apply(
                 DIMENSION_CODE_SECURITY,
                 DEDUCTION_BROKEN_HASH,
@@ -242,7 +319,7 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
                 r,
                 line,
             );
-        } else if (r === 'SEC-VUL-006') {
+        } else if (r === RULE_SEC_VUL_006) {
             apply(
                 DIMENSION_CODE_SECURITY,
                 DEDUCTION_PATH_TRAVERSAL,
@@ -250,7 +327,7 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
                 r,
                 line,
             );
-        } else if (r === 'SEC-LEAK-001') {
+        } else if (r === RULE_SEC_LEAK_001) {
             apply(
                 DIMENSION_CODE_SECURITY,
                 DEDUCTION_SENSITIVE_DATA_LOGGED,
@@ -268,9 +345,9 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
             );
         }
     } else if (
-        issue.analyzer === 'secrets' ||
-        r.includes('secret') ||
-        r.includes('token') ||
+        issue.analyzer === ANALYZER_SECRETS ||
+        r.includes(FRAGMENT_SECRET) ||
+        r.includes(FRAGMENT_TOKEN) ||
         r.includes('key')
     ) {
         apply(
@@ -280,7 +357,11 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
             r,
             line,
         );
-    } else if (r.includes('eval') || r.includes('unsafe') || r.includes('sanitization')) {
+    } else if (
+        r.includes(FRAGMENT_EVAL) ||
+        r.includes(FRAGMENT_UNSAFE) ||
+        r.includes(FRAGMENT_SANITIZATION)
+    ) {
         apply(
             DIMENSION_CODE_SECURITY,
             DEDUCTION_POTENTIAL_INJECTION,
@@ -298,13 +379,13 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
  * @param apply - Deduction callback function.
  */
 export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier): void {
-    if (issue.analyzer !== 'performance') return;
+    if (issue.analyzer !== ANALYZER_PERFORMANCE) return;
 
     const line = issue.location?.start?.line;
     const r = issue.rule;
     const msg = issue.message;
 
-    if (r.includes('loop') || r.includes('alloc')) {
+    if (r.includes(FRAGMENT_LOOP) || r.includes(FRAGMENT_ALLOC)) {
         apply(
             'performanceEfficiency',
             DEDUCTION_TRANSIENT_LOOP_ALLOCATION,
@@ -312,7 +393,7 @@ export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier
             r,
             line,
         );
-    } else if (r.includes('unbounded') || r.includes('leak')) {
+    } else if (r.includes(FRAGMENT_UNBOUNDED) || r.includes(FRAGMENT_LEAK_ALT)) {
         apply(
             'performanceEfficiency',
             DEDUCTION_MEMORY_LEAK_RISK,
@@ -343,18 +424,18 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
     const msg = issue.message;
 
     // Standardization
-    if (issue.analyzer === 'governance' && r.includes('naming')) {
+    if (issue.analyzer === ANALYZER_GOVERNANCE && r.includes(FRAGMENT_NAMING)) {
         apply(
-            'standardization',
+            DIMENSION_STANDARDIZATION,
             DEDUCTION_NAMING_VIOLATION,
             ScoringRationales.NAMING_CONVENTION_VIOLATION(msg),
             r,
             line,
         );
     }
-    if (issue.analyzer === 'large-file' && r.includes('lines')) {
+    if (issue.analyzer === ANALYZER_LARGE_FILE && r.includes(FRAGMENT_LINES)) {
         apply(
-            'standardization',
+            DIMENSION_STANDARDIZATION,
             DEDUCTION_LINE_COUNT_OVERFLOW,
             ScoringRationales.LINE_COUNT_OVERFLOW(msg),
             r,
@@ -364,11 +445,11 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
 
     // Modernity
     if (
-        issue.analyzer === 'governance' &&
-        (r.includes('var') || r.includes('legacy') || r.includes('deprecated'))
+        issue.analyzer === ANALYZER_GOVERNANCE &&
+        (r.includes('var') || r.includes(FRAGMENT_LEGACY) || r.includes(FRAGMENT_DEPRECATED))
     ) {
         apply(
-            'modernity',
+            DIMENSION_MODERNITY,
             DEDUCTION_DEPRECATED_FEATURE,
             ScoringRationales.DEPRECATED_LANGUAGE_FEATURE(msg),
             r,
@@ -377,18 +458,18 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
     }
 
     // Maintainability
-    if (issue.analyzer === 'complexity') {
+    if (issue.analyzer === ANALYZER_COMPLEXITY) {
         apply(
-            'maintainability',
+            DIMENSION_MAINTAINABILITY,
             DEDUCTION_CYCLOMATIC_COMPLEXITY,
             ScoringRationales.CYCLOMATIC_COMPLEXITY_HIGH(msg),
             r,
             line,
         );
     }
-    if (issue.analyzer === 'large-file' && r.includes('nesting')) {
+    if (issue.analyzer === ANALYZER_LARGE_FILE && r.includes(FRAGMENT_NESTING)) {
         apply(
-            'maintainability',
+            DIMENSION_MAINTAINABILITY,
             DEDUCTION_NESTING_DEPTH_OVERFLOW,
             ScoringRationales.NESTED_BLOCK_OVERFLOW(msg),
             r,
@@ -397,18 +478,22 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
     }
 
     // Comment Quality
-    if (issue.analyzer === 'comments') {
-        if (r.includes('banned') || r.includes('jargon') || r.includes('wip')) {
+    if (issue.analyzer === ANALYZER_COMMENTS) {
+        if (
+            r.includes(FRAGMENT_BANNED) ||
+            r.includes(FRAGMENT_JARGON) ||
+            r.includes(FRAGMENT_PLACEHOLDER_MARKER)
+        ) {
             apply(
-                'commentQuality',
+                DIMENSION_COMMENT_QUALITY,
                 DEDUCTION_BANNED_JARGON,
                 ScoringRationales.BANNED_JARGON_IN_COMMENT(msg),
                 r,
                 line,
             );
-        } else if (r.includes('missing')) {
+        } else if (r.includes(FRAGMENT_MISSING)) {
             apply(
-                'commentQuality',
+                DIMENSION_COMMENT_QUALITY,
                 DEDUCTION_MISSING_PUBLIC_API_DOC,
                 ScoringRationales.MISSING_PUBLIC_API_DOC(msg),
                 r,
@@ -416,7 +501,7 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
             );
         } else {
             apply(
-                'commentQuality',
+                DIMENSION_COMMENT_QUALITY,
                 DEDUCTION_SUBSTANDARD_COMMENT,
                 ScoringRationales.SUBSTANDARD_COMMENT_QUALITY(msg),
                 r,
@@ -426,18 +511,18 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
     }
 
     // Duplication
-    if (issue.analyzer === 'constants') {
-        if (r.includes('duplicate')) {
+    if (issue.analyzer === ANALYZER_CONSTANTS) {
+        if (r.includes(FRAGMENT_DUPLICATE)) {
             apply(
-                'duplication',
+                DIMENSION_DUPLICATION,
                 DEDUCTION_DUPLICATE_LITERAL,
                 ScoringRationales.DUPLICATE_LITERAL(msg),
                 r,
                 line,
             );
-        } else if (r.includes('magic')) {
+        } else if (r.includes(FRAGMENT_MAGIC)) {
             apply(
-                'duplication',
+                DIMENSION_DUPLICATION,
                 DEDUCTION_MAGIC_NUMBER,
                 ScoringRationales.MAGIC_NUMBER(msg),
                 r,
@@ -445,7 +530,7 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
             );
         } else {
             apply(
-                'duplication',
+                DIMENSION_DUPLICATION,
                 DEDUCTION_HARDCODED_STRING,
                 ScoringRationales.HARDCODED_STRING(msg),
                 r,
@@ -455,8 +540,8 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
     }
 
     // Technical Debt Risk
-    const debtDimension = familyDimensionOf(r) ?? 'techDebtRisk';
-    if (issue.severity === 'error') {
+    const debtDimension = familyDimensionOf(r) ?? DIMENSION_TECH_DEBT_RISK;
+    if (issue.severity === FRAGMENT_ERROR) {
         apply(
             debtDimension,
             DEDUCTION_ERROR_TECH_DEBT,
@@ -464,7 +549,7 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
             r,
             line,
         );
-    } else if (issue.severity === 'warning') {
+    } else if (issue.severity === FRAGMENT_WARNING) {
         apply(
             debtDimension,
             DEDUCTION_WARNING_TECH_DEBT,
@@ -498,7 +583,7 @@ export function applyIssueDeductions(issue: Issue, apply: DeductionApplier): voi
 export function applyMetricDeductions(metric: FileMetric, apply: DeductionApplier): void {
     if (metric.maxNestingDepth > MAX_NESTING_DEPTH) {
         apply(
-            'maintainability',
+            DIMENSION_MAINTAINABILITY,
             DEDUCTION_NESTING_DEPTH_OVERFLOW,
             ScoringRationales.MAX_NESTING_DEPTH_OVERFLOW(metric.maxNestingDepth),
         );

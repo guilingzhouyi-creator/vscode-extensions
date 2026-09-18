@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T15:02:15.389Z",
+  "timestamp": "2026-09-18T15:15:03.664Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1441,11 +1441,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/config.ts",
-      "count": 64
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/config.ts",
-      "count": 1
+      "count": 52
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/config.ts",
@@ -1468,12 +1464,16 @@
       "count": 1
     },
     {
-      "key": "complexity|high-complexity|src/core/config.ts",
-      "count": 5
+      "key": "large-file|large-file|src/core/configTuning.ts",
+      "count": 1
     },
     {
-      "key": "governance|GOV-TYP-003|src/core/config.ts",
-      "count": 14
+      "key": "constants|hardcoded-string|src/core/configTuning.ts",
+      "count": 18
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/configTuning.ts",
+      "count": 1
     },
     {
       "key": "large-file|large-file|src/core/dependencyGraph.ts",
@@ -2744,8 +2744,12 @@
       "count": 1
     },
     {
-      "key": "constants|hardcoded-string|src/core/scoring/dimensionDeductions.ts",
-      "count": 73
+      "key": "hygiene|HYG-STB-002|src/core/scoring/dimensionDeductions.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-DED-001|src/core/scoring/dimensionDeductions.ts",
+      "count": 1
     },
     {
       "key": "complexity|high-complexity|src/core/scoring/dimensionDeductions.ts",
@@ -2758,10 +2762,6 @@
     {
       "key": "simplify|SIM-LONG-001|src/core/scoring/dimensionDeductions.ts",
       "count": 2
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/core/scoring/dimensionDeductions.ts",
-      "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/scoring/qualityScorer.ts",
