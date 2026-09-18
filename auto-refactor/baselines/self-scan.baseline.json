@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T13:13:53.262Z",
+  "timestamp": "2026-09-18T13:17:59.442Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2760,35 +2760,39 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/scoring/qualityScorer.ts",
+      "key": "large-file|large-file|src/core/scoring/dimensionDeductions.ts",
       "count": 1
     },
     {
-      "key": "constants|duplicate-literal|src/core/scoring/qualityScorer.ts",
+      "key": "constants|duplicate-literal|src/core/scoring/dimensionDeductions.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/scoring/dimensionDeductions.ts",
+      "count": 73
+    },
+    {
+      "key": "complexity|high-complexity|src/core/scoring/dimensionDeductions.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/scoring/dimensionDeductions.ts",
+      "count": 2
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/scoring/dimensionDeductions.ts",
+      "count": 2
+    },
+    {
+      "key": "hygiene|HYG-STB-002|src/core/scoring/dimensionDeductions.ts",
       "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/scoring/qualityScorer.ts",
-      "count": 74
-    },
-    {
-      "key": "complexity|high-complexity|src/core/scoring/qualityScorer.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/scoring/qualityScorer.ts",
       "count": 1
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/scoring/qualityScorer.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/scoring/qualityScorer.ts",
-      "count": 20
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/core/scoring/qualityScorer.ts",
       "count": 1
     },
     {
