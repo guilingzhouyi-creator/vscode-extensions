@@ -38,6 +38,10 @@ import {
 /** `typeof` tag for callable visit/finalize analyzer methods (streaming vs legacy). */
 const TYPEOF_FUNCTION = 'function';
 
+export type { FileContextBase, ParseState, StreamingOutcome };
+
+import { materializeSourceFile, runLegacyPhase } from './legacyAnalyzers';
+
 /**
  * Host surface the runner needs from the Scanner: the resolved plan plus the cross-file stores
  * it seeds while the file content is in hand.
@@ -45,10 +49,6 @@ const TYPEOF_FUNCTION = 'function';
  * The stores are passed in rather than imported so this stage stays free of the concrete
  * Scanner class and of any import cycle back into analyzer.ts.
  */
-export type { FileContextBase, ParseState, StreamingOutcome };
-
-import { materializeSourceFile, runLegacyPhase } from './legacyAnalyzers';
-
 export interface AnalyzerHost {
     config: ScanConfig;
     plan: ResolvedAnalyzer[];
