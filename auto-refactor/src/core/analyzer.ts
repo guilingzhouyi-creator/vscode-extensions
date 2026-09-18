@@ -20,45 +20,28 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import type * as ts from 'typescript';
 import type {
     ScanConfig,
     ScanReport,
     Issue,
-    Severity,
     FileMetric,
-    AnalyzerContext,
     WarmStats,
     DiffStats,
     DiffDeltaReport,
     ProjectArchetype,
     ActivatedReviewersSummary,
 } from './types';
-// NOTE: `../utils/ast` (and therefore `typescript`) is intentionally NOT imported at the
-// top level — the worker side stays lazy, and the MAIN process follows the same rule
-// so an oxc + no-legacy scan never loads `typescript`. The only consumer is the
-// legacy plug-in branch below, which requires it lazily (same pattern as worker.ts).
-import { countLineStats } from '../utils/linestats';
+// NOTE: `../utils/ast` (and therefore `typescript`) stays lazily required so an oxc +
+// no-legacy scan never loads it; that require now lives in scanner/analyzerRunner.ts.
 import type { ResolvedAnalyzer } from './analyzerRegistry';
 import { resolveAnalyzers } from './analyzerRegistry';
 import { ModuleDependencyGraph } from './dependencyGraph';
 import { Logger } from './logger';
 import { loadGitignore } from './gitignore';
 import { globToRegExp, collectFiles } from './fileDiscovery';
-import type { StreamingEntry } from './traverse';
-import {
-    runStreaming,
-    runStreamingProjected,
-    FileMetricCollector,
-    tryCreateProjector,
-} from './traverse';
-import { adapterFor } from './adapters';
-import { unsupportedLanguageDiagnostic } from './languageSupport';
-import type { NodeProjector, NormalizedAst, NormalizedNode } from './multilang';
-import { sha256Hex } from './cacheKey';
 import type { IncrementalFileState } from './incrementalState';
 import { ReviewMemoryManager } from './memory/reviewMemory';
-import { SymbolIndex, collectSymbols } from './intelligence/symbolIndex';
+import { SymbolIndex } from './intelligence/symbolIndex';
 import { LiteralIndex } from './intelligence/literalIndex';
 import { CallGraph } from './intelligence/callGraph';
 import {
@@ -66,10 +49,8 @@ import {
     type LiteralClusterOptions,
 } from './intelligence/literalClusters';
 import { buildErrorFlowIssues, type ErrorFlowOptions } from './intelligence/errorFlow';
-import { extractCodeDomains, computeAstDigest } from './memory/domainFingerprint';
 import { QualityScorer } from './scoring/qualityScorer';
 import { ChangeTrajectoryManager } from './trajectory/changeTrajectory';
-import type { ReviewMemoryRecord } from './memory/types';
 import { detectProjectArchetype } from './profiler/projectProfiler';
 import { ALL_BUILTIN_ANALYZERS, routeArchetypeToAnalyzers } from './router/sparseRuleRouter';
 
@@ -86,22 +67,19 @@ export {
 } from './analyzerRegistry';
 export { WorkerPoolManager, WorkerPoolEntry } from './workerPool';
 
-const REVISION_ID_LENGTH = 16;
-const TYPEOF_FUNCTION = 'function';
-
+import { pMap, AR_TIMING, nowMs } from './scanner/workerScheduler';
+import { runFileAnalyzers } from './scanner/analyzerRunner';
 import {
-    effectiveWorkers,
-    pMap,
-    analyzerCoverage,
-    runWorkerPool,
-    AR_TIMING,
-    nowMs,
-} from './scanner/workerScheduler';
+    mergePerFileResults,
+    printScanTiming,
+    runParseAnalyzeStage,
+    sortIssues,
+} from './scanner/scanStage';
+import { buildScanReport } from './reporting/reportBuilder';
 import type { ScanWithCacheOptions } from './scanner/cacheScanner';
 import { executeScanWithCache } from './scanner/cacheScanner';
 import type { ScanWithDiffOptions } from './scanner/diffScanner';
 import { executeScanWithDiff } from './scanner/diffScanner';
-import { summarizeUncertainty } from './scanner/uncertaintyHelper';
 import type { ScannerContext } from './scanner/scannerContext';
 
 export { WarmSession, createWarmSession } from './scanner/cacheKeyHelper';
@@ -328,74 +306,18 @@ export class Scanner implements ScannerContext {
         const absRoot = path.resolve(cfg.root);
         const includeRx = cfg.include.map(globToRegExp);
         const excludeRx = cfg.exclude.map(globToRegExp);
-
         const giIgnore = cfg.respectGitignore ? loadGitignore(absRoot) : null;
         const files = collectFiles(absRoot, includeRx, excludeRx, giIgnore);
         this.logger.info(`discovered ${files.length} file(s) under ${absRoot}`);
         // AR_TIMING uses performance.now() (module-level nowMs) so all stage deltas share one base.
-        const ts0 = AR_TIMING ? nowMs() : 0;
-        const tDiscover = ts0;
+        const startAt = AR_TIMING ? nowMs() : 0;
 
-        // Descriptors for the worker pool: each analyzer's module path + its merged options.
-        // Unused in single-process mode. This is what lets workers reconstruct analyzers
-        // without sharing the main process's live instances.
-        const descs = this.plan.map((p) => ({
-            name: p.name,
-            modulePath: p.modulePath,
-            options: p.options,
-        }));
+        const perFile = await runParseAnalyzeStage(this, files, absRoot);
+        const parseAnalyzeAt = AR_TIMING ? nowMs() : 0;
 
-        // Choose execution strategy for the parse+analyze stage.
-        //   - workers === 1 (or auto with too few files)  -> single-process pMap
-        // - workers === 0 (auto)                         -> up to min(availableParallelism, 8);
-        // needs >= 8 files
-        //   - workers === N (>1)                           -> exactly N threads (any file count)
-        const effWorkers = effectiveWorkers(cfg.workers, files.length);
-        const useWorkers = effWorkers > 1;
-
-        let perFile: { issues: Issue[]; metric: FileMetric | null }[];
-        if (useWorkers) {
-            try {
-                perFile = await runWorkerPool(
-                    files,
-                    absRoot,
-                    cfg,
-                    descs,
-                    effWorkers,
-                    this.logger,
-                    this.runAnalyzers.bind(this),
-                );
-                this.logger.debug(
-                    `parse+analyze stage ran across ${effWorkers} worker thread(s) (in-process fallback available)`,
-                );
-            } catch (e) {
-                this.logger.warn(
-                    `worker pool failed (${String(e)}); falling back to in-process scan`,
-                );
-                perFile = await this.runInProcess(files, absRoot);
-            }
-        } else {
-            perFile = await this.runInProcess(files, absRoot);
-        }
-        const tParseAnalyze = AR_TIMING ? nowMs() : 0;
-
-        const issues: Issue[] = [];
-        const fileMetrics: FileMetric[] = [];
-        for (const r of perFile) {
-            issues.push(...r.issues);
-            if (r.metric) fileMetrics.push(r.metric);
-        }
-
-        // deterministic ordering: file, then line, then analyzer, then rule
-        issues.sort((a, b) => {
-            if (a.location.file !== b.location.file)
-                return a.location.file < b.location.file ? -1 : 1;
-            if (a.location.start.line !== b.location.start.line)
-                return a.location.start.line - b.location.start.line;
-            if (a.analyzer !== b.analyzer) return a.analyzer < b.analyzer ? -1 : 1;
-            return a.rule < b.rule ? -1 : 1;
-        });
-        const tSorted = AR_TIMING ? nowMs() : 0;
+        const { issues, fileMetrics } = mergePerFileResults(perFile);
+        sortIssues(issues);
+        const sortedAt = AR_TIMING ? nowMs() : 0;
 
         const durationMs = Date.now() - t0;
         const report = this.buildReport(files.length, issues, fileMetrics, durationMs);
@@ -403,14 +325,7 @@ export class Scanner implements ScannerContext {
             `done in ${durationMs}ms: ${report.summary.issuesTotal} issue(s) ` +
                 `[error=${report.summary.bySeverity.error}, warning=${report.summary.bySeverity.warning}, info=${report.summary.bySeverity.info}]`,
         );
-        if (AR_TIMING) {
-            console.error(
-                `[AR-TIMING scan] wall=${durationMs}ms discover=${(tDiscover - ts0).toFixed(1)}ms ` +
-                    `parseAnalyze=${(tParseAnalyze - tDiscover).toFixed(1)}ms ` +
-                    `merge+sort=${(tSorted - tParseAnalyze).toFixed(1)}ms ` +
-                    `report=${(nowMs() - tSorted).toFixed(1)}ms`,
-            );
-        }
+        printScanTiming({ startAt, discoverAt: startAt, parseAnalyzeAt, sortedAt, durationMs });
         return report;
     }
 
@@ -501,216 +416,20 @@ export class Scanner implements ScannerContext {
         seed?: IncrementalFileState,
         activeAnalyzers?: Set<string>,
     ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
-        const cfg = this.config;
-        const adapter = adapterFor(rel, cfg.parser);
-        const streaming = this.plan.filter((p) => {
-            if (activeAnalyzers && !activeAnalyzers.has(p.name)) return false;
-            return (
-                typeof (p.instance as any).visit === TYPEOF_FUNCTION ||
-                typeof (p.instance as any).finalize === TYPEOF_FUNCTION
-            );
-        });
-        const legacy = this.plan.filter((p) => {
-            if (activeAnalyzers && !activeAnalyzers.has(p.name)) return false;
-            return (
-                typeof (p.instance as any).visit !== TYPEOF_FUNCTION &&
-                typeof (p.instance as any).finalize !== TYPEOF_FUNCTION
-            );
-        });
-
-        // ── Dependency-graph seeding: register import edges while the content is in hand,
-        //    so the api-level post-scan cycle/unused pass can reuse them without a second
-        //    disk read. Only the in-process path seeds; worker and cache-hit paths never
-        //    pass through here, so the consumer checks coverage and rereads when short. ──
-        if (this.graph) {
-            try {
-                this.graph.registerFromContent(rel, content);
-            } catch {
-                /* Best-effort: a seeding failure must not abort the analysis */
-            }
-        }
-
-        // The ts.SourceFile is only needed by legacy TS-only plug-ins; materialize it lazily.
-        // Both TS-family adapters (typescript / oxc) parse TS/JS-family files, so legacy
-        // plug-ins keep working regardless of which parser is selected.
-        // Lazy require: `../utils/ast` (and therefore `typescript`) is only loaded when a legacy
-        // plug-in actually needs a real SourceFile — the oxc + built-in analyzers path (the
-        // common case) never triggers this require.
-        let sf: ts.SourceFile | undefined;
-        if (legacy.length > 0 && (adapter.id === 'typescript' || adapter.id === 'oxc'))
-            sf = require('../utils/ast').createSourceFile(rel, content);
-
-        // Lazy-projection fast path. When eligible, build a NodeProjector (no normalized
-        // tree) and run the shared traversal over it; on ANY projector failure fall back to the
-        // materialized path (never crashes). Gate is closed by default (AR_FASTPATH unset/0).
-        // When a line-level incremental seed is present we FORCE the materialized path —
-        // subtree reuse happens inside `adapter.parse(content, rel, seed)` (mapNode), which the
-        // raw-driven projector cannot do cross-parse (new raw nodes have no identity across scans).
-        let proj: NodeProjector | null = null;
-        if (!seed) {
-            proj = tryCreateProjector(
-                adapter,
-                content,
-                rel,
-                streaming.map((p) => p.name),
-                legacy.length,
-            );
-        }
-        let ast: NormalizedAst | null = null;
-        let rootForCtx: NormalizedNode;
-        if (proj) {
-            // ctx.root must be the REAL SourceFile projection (L/M detect top-level children via
-            // parent.kind === SourceFile) — never the placeholder.
-            rootForCtx = proj.project(proj.root, undefined, undefined);
-        } else {
-            ast = adapter.parse(content, rel, seed);
-            rootForCtx = ast.root;
-        }
-
-        // Compute line stats ONCE per file so every analyzer shares a single pass: the
-        // metric collector always needs them, and large-file reads them when enabled.
-        const lineStats = countLineStats(content);
-        // Entries are built through this closure so the projection-fallback path can
-        // rebuild them with FRESH analyzer instances (see the catch below). `metric` is the
-        // per-run FileMetricCollector — also rebuilt on fallback so its counters never
-        // accumulate partial state from an interrupted projected traversal.
-        let metricCollector = new FileMetricCollector();
-        const buildEntries = (
-            metric: FileMetricCollector,
-            rootForEntries: NormalizedNode,
-        ): StreamingEntry[] => {
-            const es: StreamingEntry[] = [];
-            for (const p of streaming) {
-                const fresh = p.factory();
-                es.push({
-                    analyzer: fresh as any,
-                    ctx: {
-                        filePath: rel,
-                        content,
-                        root: rootForEntries,
-                        adapter,
-                        sourceFile: sf,
-                        config: cfg,
-                        options: p.options,
-                        lineStats,
-                        incremental: seed,
-                    },
-                });
-            }
-            es.push({
-                analyzer: metric as any,
-                ctx: {
-                    filePath: rel,
-                    content,
-                    root: rootForEntries,
-                    adapter,
-                    sourceFile: sf,
-                    config: cfg,
-                    options: {},
-                    lineStats,
-                    incremental: seed,
-                },
-            });
-            return es;
-        };
-        const entries = buildEntries(metricCollector, rootForCtx);
-
-        const issues: Issue[] = [];
-        // Fail closed: when no adapter claims this extension the file is still analyzed by the
-        // line-based rules, but the scan must never look clean about the missing AST signal.
-        const languageIssue = unsupportedLanguageDiagnostic(rel, cfg);
-        if (languageIssue) issues.push(languageIssue);
-        if (entries.length > 0) {
-            if (proj) {
-                try {
-                    issues.push(
-                        ...runStreamingProjected(proj, entries, (node, caller) => {
-                            try {
-                                const collected = collectSymbols(node, rel, caller);
-                                this.symbolIndex.addDefinitions(collected.definitions);
-                                this.symbolIndex.addReferences(collected.references);
-                                this.literalIndex.addTree(rel, node);
-                                this.symbolIndex.markBuiltFrom('projection');
-                            } catch {
-                                /* Best-effort: index building must not abort the scan */
-                            }
-                        }),
-                    );
-                } catch (e) {
-                    // Projector failure → materialized fallback (mirrors worker-pool → in-process
-                    // fallback semantics): same output, only a performance regression.
-                    this.logger.warn(
-                        `lazy projection failed on ${rel}: ${String(e)}; falling back to materialized path`,
-                    );
-                    // NEVER reuse the outer entries — the interrupted projected traversal has
-                    // already accumulated state in those analyzer instances (constants' literals,
-                    // complexity's issues, the metric collector's counters). Rebuild FRESH
-                    // instances
-                    // (+ a fresh metric collector) so the fallback runStreaming sees a clean slate.
-                    ast = adapter.parse(content, rel);
-                    metricCollector = new FileMetricCollector();
-                    const freshEntries = buildEntries(metricCollector, ast.root);
-                    issues.push(...runStreaming(adapter, ast.root, freshEntries));
-                }
-            } else {
-                issues.push(...runStreaming(adapter, ast!.root!, entries));
-            }
-        }
-
-        // Legacy analyzers (no streaming hooks) keep the original per-analyzer `analyze` contract.
-        for (const p of legacy) {
-            if (!sf) continue; // external plug-ins cannot analyze non-TypeScript files
-            const ctx: AnalyzerContext = {
-                filePath: rel,
-                content,
-                root: ast?.root || rootForCtx,
-                adapter,
-                sourceFile: sf,
-                config: cfg,
-                options: p.options,
-                lineStats,
-            };
-            try {
-                issues.push(...p.instance.analyze(sf, ctx));
-            } catch (e) {
-                const sev: Severity = cfg.failOnAnalyzerError ? 'error' : 'info';
-                this.logger.error(`analyzer "${p.name}" threw on ${rel}: ${String(e)}`);
-                issues.push({
-                    id: `core:analyzer-error:${rel}:1`,
-                    analyzer: p.name,
-                    rule: 'analyzer-error',
-                    severity: sev,
-                    message: `Analyzer "${p.name}" threw: ${(e as Error).message}`,
-                    location: {
-                        file: rel,
-                        start: { line: 1, column: 1 },
-                        end: { line: 1, column: 1 },
-                    },
-                    detail: { error: String(e) },
-                });
-            }
-        }
-
-        // ── Symbol-index seeding runs AFTER the analyzers: on the lazy-projection path the
-        // tree only materializes its children while the shared traversal walks them, so
-        // collecting here sees the same nodes the analyzers did — and still without a second
-        // parse. The projection path records its provenance instead of implying the
-        // materialized completeness it never had. ──
-        try {
-            const collected =
-                proj === null
-                    ? collectSymbols(rootForCtx, rel)
-                    : { definitions: [], references: [] };
-            this.symbolIndex.addDefinitions(collected.definitions);
-            this.symbolIndex.addReferences(collected.references);
-            this.literalIndex.addTree(rel, rootForCtx);
-            if (proj !== null) this.symbolIndex.markBuiltFrom('projection');
-            this.literalIndex.markBuiltFrom(proj !== null ? 'projection' : 'materialized');
-        } catch {
-            /* Best-effort: index building must not abort the scan */
-        }
-
-        return { issues, metric: metricCollector.metric };
+        return runFileAnalyzers(
+            {
+                config: this.config,
+                plan: this.plan,
+                logger: this.logger,
+                graph: this.graph,
+                symbolIndex: this.symbolIndex,
+                literalIndex: this.literalIndex,
+            },
+            rel,
+            content,
+            seed,
+            activeAnalyzers,
+        );
     }
 
     /**
@@ -765,111 +484,20 @@ export class Scanner implements ScannerContext {
         fileMetrics: FileMetric[],
         durationMs: number,
     ): ScanReport {
-        const cfg = this.config;
-        const bySeverity: Record<Severity, number> = { info: 0, warning: 0, error: 0 };
-        const byAnalyzer: Record<string, number> = {};
-        for (const it of issues) {
-            bySeverity[it.severity]++;
-            byAnalyzer[it.analyzer] = (byAnalyzer[it.analyzer] || 0) + 1;
-        }
-
-        // ── Review Memory, Transparent Quality Scoring, and Trajectory Recording ──
-        const fileQualityScores: Record<
-            string,
-            import('./scoring/scoringTypes').QualityScoreBreakdown
-        > = {};
-        const issuesByFile = new Map<string, Issue[]>();
-        for (const it of issues) {
-            const f = it.location?.file;
-            if (f) {
-                let list = issuesByFile.get(f);
-                if (!list) {
-                    list = [];
-                    issuesByFile.set(f, list);
-                }
-                list.push(it);
-            }
-        }
-
-        for (const m of fileMetrics) {
-            const fIssues = issuesByFile.get(m.file) || [];
-            const score = this.scorer.evaluateFile(m.file, fIssues, m, cfg);
-            fileQualityScores[m.file] = score;
-
-            if (cfg.memory !== false) {
-                const domains = extractCodeDomains(undefined, '', fIssues);
-                const record: ReviewMemoryRecord = {
-                    filePath: m.file,
-                    fileHash: sha256Hex(m.file + ':' + m.lines),
-                    astDigest: computeAstDigest(undefined, m.file),
-                    codeDomains: domains,
-                    ruleHits: fIssues.map((it) => ({
-                        id: it.id,
-                        analyzer: it.analyzer,
-                        rule: it.rule,
-                        severity: it.severity,
-                        line: it.location?.start?.line ?? 1,
-                        message: it.message,
-                    })),
-                    qualityScores: score,
-                    lastAudited: Date.now(),
-                    revisionId: sha256Hex(
-                        m.file + ':' + score.compositeScore + ':' + Date.now(),
-                    ).slice(0, REVISION_ID_LENGTH),
-                    agentUid: cfg.agentUid || 'default-agent',
-                    contextWindows: {
-                        imports: [],
-                        exports: [],
-                        layer: cfg.profile?.directorySemantics?.[path.dirname(m.file)],
-                    },
-                    fixResults: [],
-                };
-                this.reviewMemory.saveRecord(record);
-                this.reviewMemory.evictStable(m.file);
-
-                // Register to Trajectory
-                this.trajectory.recordRevision(m.file, {
-                    revisionId: record.revisionId,
-                    timestamp: record.lastAudited,
-                    agentUid: record.agentUid || 'default-agent',
-                    fileHash: record.fileHash,
-                    astDigest: record.astDigest,
-                    qualityScore: score,
-                    ruleHitIds: record.ruleHits.map((h) => h.id),
-                });
-            }
-        }
-
-        const projectQualityScore = this.scorer.evaluateFile('PROJECT_OVERALL', issues, null, cfg);
-
-        // A scan is the natural durability boundary for review memory: the records are upserted
-        // while the report is assembled above, so the buffered audits are written (and the log
-        // compacted) exactly once here, at the end — flushing at the start of this method would
-        // have written the PREVIOUS scan's batch and left this one in memory.
-        this.reviewMemory.flush();
-        return {
-            tool: 'auto-refactor',
-            version: '0.3.0',
-            generatedAt: new Date().toISOString(),
-            root: path.resolve(cfg.root),
-            config: cfg,
-            summary: {
-                filesScanned,
-                issuesTotal: issues.length,
-                bySeverity,
-                byAnalyzer,
-                durationMs,
-                symbolIndex: this.symbolIndex.stats(),
-                literalIndex: this.literalIndex.stats(),
-                callGraph: new CallGraph(this.symbolIndex).stats(),
+        return buildScanReport(
+            {
+                config: this.config,
+                scorer: this.scorer,
+                reviewMemory: this.reviewMemory,
+                trajectory: this.trajectory,
+                symbolIndex: this.symbolIndex,
+                literalIndex: this.literalIndex,
                 activatedReviewers: this.activatedReviewersSummary,
-                uncertainty: summarizeUncertainty(issues),
-                ...analyzerCoverage(cfg, fileMetrics),
             },
+            filesScanned,
             issues,
             fileMetrics,
-            qualityScore: projectQualityScore,
-            fileQualityScores,
-        };
+            durationMs,
+        );
     }
 }
