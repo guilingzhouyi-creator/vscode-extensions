@@ -14,8 +14,10 @@ import {
 } from './traverse';
 import { adapterFor } from './adapters';
 import { unsupportedLanguageDiagnostic } from './languageSupport';
-import type { NodeProjector, NormalizedAst, NormalizedNode } from './multilang';
+import type { LanguageAdapter, NodeProjector, NormalizedAst, NormalizedNode } from './multilang';
 import { encodeResults, BINARY_RESULT_ENABLED } from './resultCodec';
+
+type LineStats = ReturnType<typeof countLineStats>;
 
 /**
  * Module: Core Engine — Parallel Parse/Analyze Worker Isolate
@@ -225,28 +227,30 @@ function printWorkerTable(): void {
     );
 }
 
-function runOne(
-    file: string,
-    absPath: string | undefined,
-    content: string | undefined,
-    cfg: ScanConfig,
-    instances: LoadedAnalyzer[],
-): { file: string; issues: Issue[]; metric: FileMetric | null } {
-    let c: string;
+/**
+ * Loads file content from the pre-read string buffer or reads directly from disk.
+ */
+function loadFileContent(absPath: string | undefined, content: string | undefined): string | null {
     if (content !== undefined) {
-        // The main thread pre-read the file and transferred the Buffer.
-        c = content;
-    } else {
-        try {
-            c = fs.readFileSync(absPath!, 'utf8');
-        } catch {
-            return { file, issues: [] as Issue[], metric: null as FileMetric | null };
-        }
+        return content;
     }
+    if (!absPath) {
+        return null;
+    }
+    try {
+        return fs.readFileSync(absPath, 'utf8');
+    } catch {
+        return null;
+    }
+}
 
-    const adapter = adapterFor(file, cfg.parser);
-
-    const tFilter0 = AR_TIMING ? nowMs() : 0;
+/**
+ * Splits loaded analyzer instances into streaming analyzers vs legacy SourceFile analyzers.
+ */
+function splitAnalyzers(instances: LoadedAnalyzer[]): {
+    streaming: LoadedAnalyzer[];
+    legacy: LoadedAnalyzer[];
+} {
     const streaming = instances.filter(
         (a) =>
             typeof (a.analyzer as any).visit === TYPEOF_FUNCTION ||
@@ -257,18 +261,26 @@ function runOne(
             typeof (a.analyzer as any).visit !== TYPEOF_FUNCTION &&
             typeof (a.analyzer as any).finalize !== TYPEOF_FUNCTION,
     );
-    const tFilter1 = AR_TIMING ? nowMs() : 0;
+    return { streaming, legacy };
+}
 
-    // Lazy-projection fast path — same routing gate as the in-process scanner
-    // (traverse.ts tryCreateProjector). Building the projector skips the normalized-tree
-    // materialization; any failure falls back to parse()+runStreaming() below.
+/**
+ * Initializes AST or lazy projector, attempting fast-path projection first.
+ */
+function initAstOrProjector(
+    adapter: LanguageAdapter,
+    content: string,
+    file: string,
+    streamingNames: string[],
+    legacyCount: number,
+): { proj: NodeProjector | null; ast: NormalizedAst | null; rootForCtx: NormalizedNode } {
     const tProj0 = AR_TIMING ? nowMs() : 0;
     const proj: NodeProjector | null = tryCreateProjector(
         adapter,
-        c,
+        content,
         file,
-        streaming.map((a) => a.name),
-        legacy.length,
+        streamingNames,
+        legacyCount,
     );
     let ast: NormalizedAst | null = null;
     let rootForCtx: NormalizedNode;
@@ -276,119 +288,144 @@ function runOne(
         rootForCtx = proj.project(proj.root, undefined, undefined);
         if (AR_TIMING) perf.adapterProject += nowMs() - tProj0;
     } else {
-        // Materialized path: adapter.parse() (createSourceFile + full normalized-tree mapNode).
         const tP0 = AR_TIMING ? nowMs() : 0;
-        ast = adapter.parse(c, file);
+        ast = adapter.parse(content, file);
         if (AR_TIMING) perf.adapterParse += nowMs() - tP0;
         rootForCtx = ast.root;
     }
-    const issues: Issue[] = [];
-    // Fail closed on unsupported languages — identical guard to the in-process path, so both
-    // execution modes report the same diagnostic for a file no adapter can parse.
-    const languageIssue = unsupportedLanguageDiagnostic(file, cfg);
-    if (languageIssue) issues.push(languageIssue);
+    return { proj, ast, rootForCtx };
+}
 
-    // Legacy TS-only plug-ins need a real SourceFile; materialize it lazily. Both TS-family
-    // adapters (typescript / oxc) parse TS/JS-family files, so legacy plug-ins keep working
-    // regardless of which parser is selected.
-    let sf: ts.SourceFile | undefined;
-    const tSf0 = AR_TIMING ? nowMs() : 0;
-    if (legacy.length > 0 && (adapter.id === 'typescript' || adapter.id === 'oxc'))
-        // Lazy: `../utils/ast` (and therefore `typescript`) is only required when a legacy
-        // plug-in actually needs a real SourceFile. The pure-oxc + built-in analyzers path
-        // (the common case) never triggers this require.
-
-        sf = require('../utils/ast').createSourceFile(file, c);
-    const tSf1 = AR_TIMING ? nowMs() : 0;
-
-    // Compute line stats ONCE per file so every analyzer shares a single pass.
-    const tLine0 = AR_TIMING ? nowMs() : 0;
-    const lineStats = countLineStats(c);
-    const tLine1 = AR_TIMING ? nowMs() : 0;
-    // Entries are built through this closure so the projection-fallback path can
-    // rebuild them with FRESH analyzer instances (see the catch below). `metricCollector`
-    // is also rebuilt on fallback so its counters never accumulate partial state from an
-    // interrupted projected traversal.
-    let metricCollector = new FileMetricCollector();
-    const buildEntries = (
-        metric: FileMetricCollector,
-        rootForEntries: NormalizedNode,
-    ): { analyzer: any; ctx: AnalyzerContext }[] => {
-        const tInst0 = AR_TIMING ? nowMs() : 0;
-        const es: { analyzer: any; ctx: AnalyzerContext }[] = [];
-        for (const a of streaming) {
-            const fresh = instantiateAnalyzer(a.mod, a.name);
-            es.push({
-                analyzer: fresh,
-                ctx: {
-                    filePath: file,
-                    content: c,
-                    root: rootForEntries,
-                    adapter,
-                    sourceFile: sf,
-                    config: cfg,
-                    options: a.options,
-                    lineStats,
-                },
-            });
-        }
+/**
+ * Builds analyzer execution entries binding each fresh analyzer instance to its context.
+ */
+function createAnalyzerEntries(
+    streaming: LoadedAnalyzer[],
+    metric: FileMetricCollector,
+    rootForEntries: NormalizedNode,
+    file: string,
+    content: string,
+    adapter: LanguageAdapter,
+    sourceFile: ts.SourceFile | undefined,
+    config: ScanConfig,
+    lineStats: LineStats,
+): { analyzer: any; ctx: AnalyzerContext }[] {
+    const tInst0 = AR_TIMING ? nowMs() : 0;
+    const es: { analyzer: any; ctx: AnalyzerContext }[] = [];
+    for (const a of streaming) {
+        const fresh = instantiateAnalyzer(a.mod, a.name);
         es.push({
-            analyzer: metric,
+            analyzer: fresh,
             ctx: {
                 filePath: file,
-                content: c,
+                content,
                 root: rootForEntries,
                 adapter,
-                sourceFile: sf,
-                config: cfg,
-                options: {},
+                sourceFile,
+                config,
+                options: a.options,
                 lineStats,
             },
         });
-        if (AR_TIMING) perf.instantiateTotal += nowMs() - tInst0;
-        return es;
-    };
-    const entries = buildEntries(metricCollector, rootForCtx);
-
-    const tStream0 = AR_TIMING ? nowMs() : 0;
-    if (entries.length > 0) {
-        if (proj) {
-            try {
-                issues.push(...runStreamingProjected(proj, entries));
-            } catch {
-                // Projector failure → materialized fallback (never crash, only a perf regression).
-                // NEVER reuse the outer entries — the interrupted projected traversal has
-                // already accumulated state in those analyzer instances (constants' literals,
-                // complexity's issues, the metric collector's counters). Rebuild FRESH instances
-                // (+ a fresh metric collector) so the fallback runStreaming sees a clean slate.
-                ast = adapter.parse(c, file);
-                metricCollector = new FileMetricCollector();
-                const freshEntries = buildEntries(metricCollector, ast.root);
-                issues.push(...runStreaming(adapter, ast.root, freshEntries));
-            }
-        } else {
-            issues.push(...runStreaming(adapter, ast!.root!, entries));
-        }
     }
-    const tStream1 = AR_TIMING ? nowMs() : 0;
+    es.push({
+        analyzer: metric,
+        ctx: {
+            filePath: file,
+            content,
+            root: rootForEntries,
+            adapter,
+            sourceFile,
+            config,
+            options: {},
+            lineStats,
+        },
+    });
+    if (AR_TIMING) perf.instantiateTotal += nowMs() - tInst0;
+    return es;
+}
 
-    const tLegacy0 = AR_TIMING ? nowMs() : 0;
+/**
+ * Runs streaming analyzers via lazy projector with transparent fallback to full parse.
+ */
+function executeStreamingAnalyzers(
+    proj: NodeProjector | null,
+    entries: { analyzer: any; ctx: AnalyzerContext }[],
+    adapter: LanguageAdapter,
+    ast: NormalizedAst | null,
+    content: string,
+    file: string,
+    streaming: LoadedAnalyzer[],
+    sourceFile: ts.SourceFile | undefined,
+    config: ScanConfig,
+    lineStats: LineStats,
+): { issues: Issue[]; metricCollector: FileMetricCollector } {
+    const issues: Issue[] = [];
+    let metricCollector = entries[entries.length - 1]?.analyzer as FileMetricCollector;
+
+    if (entries.length === 0) {
+        return { issues, metricCollector: metricCollector || new FileMetricCollector() };
+    }
+
+    if (proj) {
+        try {
+            issues.push(...runStreamingProjected(proj, entries));
+        } catch {
+            // Projector failure → materialized fallback (never crash, only a perf regression).
+            // Rebuild fresh instances (+ fresh metric collector) so fallback sees clean slate.
+            const fallbackAst = adapter.parse(content, file);
+            metricCollector = new FileMetricCollector();
+            const freshEntries = createAnalyzerEntries(
+                streaming,
+                metricCollector,
+                fallbackAst.root,
+                file,
+                content,
+                adapter,
+                sourceFile,
+                config,
+                lineStats,
+            );
+            issues.push(...runStreaming(adapter, fallbackAst.root, freshEntries));
+        }
+    } else {
+        issues.push(...runStreaming(adapter, (ast as NormalizedAst).root, entries));
+    }
+
+    return { issues, metricCollector };
+}
+
+/**
+ * Runs legacy TypeScript analyzers that require an explicit SourceFile AST.
+ */
+function executeLegacyAnalyzers(
+    legacy: LoadedAnalyzer[],
+    sourceFile: ts.SourceFile | undefined,
+    file: string,
+    content: string,
+    root: NormalizedNode,
+    adapter: LanguageAdapter,
+    config: ScanConfig,
+    lineStats: LineStats,
+): Issue[] {
+    const issues: Issue[] = [];
+    if (!sourceFile) return issues;
+
     for (const a of legacy) {
-        if (!sf) continue; // external plug-ins cannot analyze non-TypeScript files
         const ctx: AnalyzerContext = {
             filePath: file,
-            content: c,
-            root: ast?.root || rootForCtx,
+            content,
+            root,
             adapter,
-            sourceFile: sf,
-            config: cfg,
+            sourceFile,
+            config,
             options: a.options,
             lineStats,
         };
         try {
-            issues.push(...a.analyzer.analyze(sf, ctx));
+            issues.push(...a.analyzer.analyze(sourceFile, ctx));
         } catch (e) {
-            const sev: 'error' | 'info' = cfg.failOnAnalyzerError ? 'error' : 'info';
+            const sev: 'error' | 'info' = config.failOnAnalyzerError ? 'error' : 'info';
             issues.push({
                 id: `core:analyzer-error:${file}:1`,
                 analyzer: a.name,
@@ -400,24 +437,107 @@ function runOne(
             });
         }
     }
+
+    return issues;
+}
+
+function runOne(
+    file: string,
+    absPath: string | undefined,
+    content: string | undefined,
+    cfg: ScanConfig,
+    instances: LoadedAnalyzer[],
+): { file: string; issues: Issue[]; metric: FileMetric | null } {
+    const c = loadFileContent(absPath, content);
+    if (c === null) {
+        return { file, issues: [] as Issue[], metric: null as FileMetric | null };
+    }
+
+    const adapter = adapterFor(file, cfg.parser);
+
+    const tFilter0 = AR_TIMING ? nowMs() : 0;
+    const { streaming, legacy } = splitAnalyzers(instances);
+    const tFilter1 = AR_TIMING ? nowMs() : 0;
+
+    const { proj, ast, rootForCtx } = initAstOrProjector(
+        adapter,
+        c,
+        file,
+        streaming.map((a) => a.name),
+        legacy.length,
+    );
+
+    const issues: Issue[] = [];
+    const languageIssue = unsupportedLanguageDiagnostic(file, cfg);
+    if (languageIssue) issues.push(languageIssue);
+
+    let sf: ts.SourceFile | undefined;
+    const tSf0 = AR_TIMING ? nowMs() : 0;
+    if (legacy.length > 0 && (adapter.id === 'typescript' || adapter.id === 'oxc')) {
+        sf = require('../utils/ast').createSourceFile(file, c);
+    }
+    const tSf1 = AR_TIMING ? nowMs() : 0;
+
+    const tLine0 = AR_TIMING ? nowMs() : 0;
+    const lineStats = countLineStats(c);
+    const tLine1 = AR_TIMING ? nowMs() : 0;
+
+    const metricCollector = new FileMetricCollector();
+    const entries = createAnalyzerEntries(
+        streaming,
+        metricCollector,
+        rootForCtx,
+        file,
+        c,
+        adapter,
+        sf,
+        cfg,
+        lineStats,
+    );
+
+    const tStream0 = AR_TIMING ? nowMs() : 0;
+    const streamResult = executeStreamingAnalyzers(
+        proj,
+        entries,
+        adapter,
+        ast,
+        c,
+        file,
+        streaming,
+        sf,
+        cfg,
+        lineStats,
+    );
+    issues.push(...streamResult.issues);
+    const tStream1 = AR_TIMING ? nowMs() : 0;
+
+    const tLegacy0 = AR_TIMING ? nowMs() : 0;
+    issues.push(
+        ...executeLegacyAnalyzers(
+            legacy,
+            sf,
+            file,
+            c,
+            ast?.root || rootForCtx,
+            adapter,
+            cfg,
+            lineStats,
+        ),
+    );
     const tLegacy1 = AR_TIMING ? nowMs() : 0;
 
     if (AR_TIMING) {
         perf.files++;
-        // adapterParse/adapterProject are accumulated inside runOne at the parse/project site
-        // (see above) so the two fast-path modes are compared honestly.
         perf.countLineStats += tLine1 - tLine0;
         perf.filterTotal += tFilter1 - tFilter0;
         perf.filterCalls += 2;
         perf.createSourceFile += tSf1 - tSf0;
-        // instantiateTotal is accumulated INSIDE buildEntries (covers both the main path and
-        // the projection-fallback's fresh rebuild); instantiateCalls counts the main path.
         perf.instantiateCalls += streaming.length;
         perf.runStreaming += tStream1 - tStream0;
         perf.legacy += tLegacy1 - tLegacy0;
     }
 
-    const metric = metricCollector.metric;
+    const metric = streamResult.metricCollector.metric;
     return { file, issues, metric };
 }
 

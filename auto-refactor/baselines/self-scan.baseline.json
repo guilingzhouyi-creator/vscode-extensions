@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T13:52:32.957Z",
+  "timestamp": "2026-09-18T13:57:02.463Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2957,23 +2957,11 @@
     },
     {
       "key": "governance|GOV-TYP-003|src/core/worker.ts",
-      "count": 11
+      "count": 12
     },
     {
       "key": "constants|hardcoded-string|src/core/worker.ts",
       "count": 10
-    },
-    {
-      "key": "complexity|high-complexity|src/core/worker.ts",
-      "count": 2
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/worker.ts",
-      "count": 1
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/worker.ts",
-      "count": 1
     },
     {
       "key": "governance|GOV-PRF-004|src/core/worker.ts",
@@ -2985,6 +2973,18 @@
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/worker.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/worker.ts",
+      "count": 2
+    },
+    {
+      "key": "complexity|high-complexity|src/core/worker.ts",
+      "count": 2
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/worker.ts",
       "count": 1
     },
     {
