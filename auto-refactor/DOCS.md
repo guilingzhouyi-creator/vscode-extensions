@@ -69,7 +69,44 @@
 | [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | config.schema 规则配置与 JSON / SARIF / Text 报告格式 | ✅ 已落地 |
 | [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 基准性能矩阵、吞吐量 Benchmark 与理论性能边界 | ✅ 已落地 |
 
-## 📐 6. 架构图表 (Mermaid)
+## 🛡️ 6. 门禁与验证矩阵 (Gates & Verification Matrix)
+
+### 6.1 一站式门禁
+
+| 命令 | 覆盖范围 | 契约 |
+|------|----------|------|
+| `npm run gate` | build → format:check → lint → gate:comments → gate:self → gate:self:warning → test | 提交前唯一入口，任一环失败即阻断 |
+| `npm run gate:self` | 自扫棘轮（error 级） | `newBlocking(error)` 必须为 0 |
+| `npm run gate:self:warning` | 自扫棘轮（warning 级） | 新增 warning 同样阻断，防止"把告警搬进新文件"式改造 |
+| `npm run gate:self:update` | 重冻基线 | **仅在 findings 真实下降后执行**；禁止用它掩盖新增告警 |
+| `npm run gate:comments` | 注释/文档头一致性棘轮 | 新增注释违规即阻断 |
+
+**评审纪律（非自动化）**：新增文件不得携带 `large-file`/`high-complexity` 超标；改造提交应同时给出 findings 前后对照。
+
+### 6.2 可移植验证矩阵
+
+| 校验 | 运行依赖 | 受限环境（无命名管道 / 禁止子进程捕获） |
+|------|----------|------------------------------------------|
+| `validate-equivalence`、`validate-diff`、`validate-oxc-keypoints`、`fastpath-check` | 纯进程内 | ✅ 可运行，且是行为等价的硬门禁 |
+| `validate-warm`、`validate-diff` 的 daemon 回环场景 | Windows 命名管道 / Unix socket（daemon IPC） | ⚠️ 需在允许命名管道的终端补跑 |
+| `validate-diff-interface`、`validate-review-memory`、`validate-consumer-runner`、`validate-data-flow` | `spawnSync` 捕获子进程输出 | ⚠️ 报 EPERM / `exit=null`，属环境限制而非回归 |
+
+### 6.3 受限环境下的暖缓存等价验证
+
+daemon 不可用时，用进程内模式覆盖 `scanWithCache` 的 L1/L2 路径：
+
+```js
+const { scan, scanWarm } = require('./dist/api');
+const opts = { root: 'samples', format: 'json', logLevel: 'silent' };
+const fresh = await scan(opts);
+const w1 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   // 空缓存
+const w2 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   // 热缓存
+// 断言：两次 report 与新扫描逐字节一致；w2.stats.cacheHit > 0 且 analyzed === 0
+```
+
+---
+
+## 📐 7. 架构图表 (Mermaid)
 
 | 架构图 | 内容 |
 |------|------|

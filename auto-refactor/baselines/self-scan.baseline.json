@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T15:15:03.664Z",
+  "timestamp": "2026-09-18T15:17:57.305Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -2308,20 +2308,12 @@
       "count": 13
     },
     {
-      "key": "complexity|high-complexity|src/core/profiler/manifestDetector.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/profiler/manifestDetector.ts",
-      "count": 50
-    },
-    {
       "key": "governance|GOV-PRF-004|src/core/profiler/manifestDetector.ts",
-      "count": 22
+      "count": 4
     },
     {
       "key": "performance|PRF-IO-001|src/core/profiler/manifestDetector.ts",
-      "count": 4
+      "count": 3
     },
     {
       "key": "complexity|high-complexity|src/core/profiler/maturityClassifier.ts",

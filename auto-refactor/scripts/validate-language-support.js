@@ -209,12 +209,17 @@ async function run() {
     );
     console.log('  [PASS] cache fingerprint invalidates when the severity changes');
 
-    for (const modulePath of ['../dist/core/analyzer.js', '../dist/core/worker.js']) {
+    // The in-process path delegates per-file analysis to scanner/analyzerRunner, so the guard is
+    // asserted at BOTH ends: the delegation in analyzer.js and the guard call in the module that
+    // now owns it. Moving either one can no longer drop the fail-closed wiring silently.
+    const guardWiring = [
+      ['../dist/core/analyzer.js', 'runFileAnalyzers'],
+      ['../dist/core/scanner/analyzerRunner.js', 'unsupportedLanguageDiagnostic'],
+      ['../dist/core/worker.js', 'unsupportedLanguageDiagnostic'],
+    ];
+    for (const [modulePath, needle] of guardWiring) {
       const source = fs.readFileSync(path.join(__dirname, modulePath), 'utf8');
-      assert.ok(
-        source.includes('unsupportedLanguageDiagnostic'),
-        modulePath + ' must stay wired to the fail-closed guard',
-      );
+      assert.ok(source.includes(needle), modulePath + ' must stay wired to the fail-closed guard');
     }
     console.log('  [PASS] both execution paths remain wired to the guard');
 
