@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T15:42:41.856Z",
+  "timestamp": "2026-09-18T15:46:46.989Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1464,12 +1464,12 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/configTuning.ts",
-      "count": 1
+      "key": "constants|hardcoded-string|src/core/configCascades.ts",
+      "count": 4
     },
     {
       "key": "constants|hardcoded-string|src/core/configTuning.ts",
-      "count": 18
+      "count": 14
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/configTuning.ts",

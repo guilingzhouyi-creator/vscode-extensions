@@ -41,8 +41,8 @@ import {
     ANALYZER_TYPESCRIPT_MODERN,
     SPECIALIZED_ANALYZERS,
     applyAutoTuning,
-    applySemanticAndSecurityLevels,
 } from './configTuning';
+import { applySemanticAndSecurityLevels } from './configCascades';
 import type { ConfigOverrides } from './configTuning';
 
 // Compatibility surface: callers historically imported ConfigOverrides from this module.
