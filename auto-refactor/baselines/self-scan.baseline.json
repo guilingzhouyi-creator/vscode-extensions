@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T06:09:41.808Z",
+  "timestamp": "2026-09-18T06:12:39.990Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1022,6 +1022,10 @@
     {
       "key": "constants|hardcoded-string|src/analyzers/complexity.ts",
       "count": 15
+    },
+    {
+      "key": "large-file|large-file|src/analyzers/constants.ts",
+      "count": 1
     },
     {
       "key": "complexity|high-complexity|src/analyzers/constants.ts",

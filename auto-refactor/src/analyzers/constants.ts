@@ -202,53 +202,66 @@ export class ConstantsAnalyzer implements Analyzer {
         const granular = !!ctx.options.granularRules;
 
         for (const lit of this.literals) {
-            if (!lit.numeric || lit.isConstBound) continue;
-            if (suppress.has(lit.node)) continue;
-            const num = Number(lit.value);
-            if (!isFinite(num)) continue;
-            if (TRIVIAL_NUMBERS.has(lit.value)) continue;
-            if (Math.abs(num) < min) continue;
-            if (lit.tolerated) continue;
+            if (this.shouldSkipMagicNumber(lit, min, suppress)) continue;
 
-            const classification = classify ? classifyLiteral(lit.value, true) : null;
-            if (classify && classification && classification.isReasonable) {
-                continue;
-            }
-
-            const rule =
-                granular && classification && classification.kind !== LITERAL_KIND_GENERAL
-                    ? `literal-${classification.kind}`
-                    : 'magic-number';
-
-            const suggested =
-                classify && classification && classification.suggestedConstPrefix !== 'CONST'
-                    ? classification.suggestedConstPrefix
-                    : this.suggestName(lit.value, NUM_KIND);
-
-            const detail: Record<string, unknown> = {
-                value: lit.value,
-                numeric: true,
-                suggestedName: suggested,
-            };
-            if (classify && classification) {
-                detail.semanticKind = classification.kind;
-                detail.rationale = classification.rationale;
-            }
-
-            out.push({
-                id: `constants:${rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
-                analyzer: CONSTANTS_ANALYZER_NAME,
-                rule,
-                severity: 'warning',
-                message:
-                    classify && classification && classification.kind !== LITERAL_KIND_GENERAL
-                        ? `${classification.rationale}: ${lit.value} should be extracted.`
-                        : `Magic number ${lit.value} should be extracted into a named constant.`,
-                location: locN(lit.node, ctx.filePath),
-                detail,
-                suggestion: `const ${suggested} = ${lit.value};`,
-            });
+            const issue = this.buildMagicNumberIssue(lit, ctx, classify, granular);
+            if (issue) out.push(issue);
         }
+    }
+
+    private shouldSkipMagicNumber(
+        lit: LiteralRecord,
+        min: number,
+        suppress: Set<NormalizedNode>,
+    ): boolean {
+        if (!lit.numeric || lit.isConstBound || lit.tolerated) return true;
+        if (suppress.has(lit.node)) return true;
+        const num = Number(lit.value);
+        if (!isFinite(num) || TRIVIAL_NUMBERS.has(lit.value)) return true;
+        return Math.abs(num) < min;
+    }
+
+    private buildMagicNumberIssue(
+        lit: LiteralRecord,
+        ctx: AnalyzerContext,
+        classify: boolean,
+        granular: boolean,
+    ): Issue | null {
+        const classification = classify ? classifyLiteral(lit.value, true) : null;
+        if (classification && classification.isReasonable) return null;
+
+        const isGranular =
+            granular && classification && classification.kind !== LITERAL_KIND_GENERAL;
+        const rule = isGranular ? `literal-${classification!.kind}` : 'magic-number';
+
+        const suggested =
+            classification && classification.suggestedConstPrefix !== 'CONST'
+                ? classification.suggestedConstPrefix
+                : this.suggestName(lit.value, NUM_KIND);
+
+        const detail: Record<string, unknown> = {
+            value: lit.value,
+            numeric: true,
+            suggestedName: suggested,
+            ...(classification
+                ? { semanticKind: classification.kind, rationale: classification.rationale }
+                : {}),
+        };
+
+        const message = isGranular
+            ? `${classification!.rationale}: ${lit.value} should be extracted.`
+            : `Magic number ${lit.value} should be extracted into a named constant.`;
+
+        return {
+            id: `constants:${rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
+            analyzer: CONSTANTS_ANALYZER_NAME,
+            rule,
+            severity: 'warning',
+            message,
+            location: locN(lit.node, ctx.filePath),
+            detail,
+            suggestion: `const ${suggested} = ${lit.value};`,
+        };
     }
 
     private detectHardcodedStrings(
@@ -262,53 +275,70 @@ export class ConstantsAnalyzer implements Analyzer {
         const granular = !!ctx.options.granularRules;
 
         for (const lit of this.literals) {
-            if (lit.numeric || lit.isConstBound) continue;
-            if (suppress.has(lit.node)) continue;
-            const text = lit.value;
-            const inner = stripQuotes(text);
-            if (inner.length < minLen || inner.trim().length === 0) continue;
-            if (lit.tolerated) continue;
-            if (ignoreSet.has(text) || ignoreSet.has(inner)) continue;
+            if (this.shouldSkipHardcodedString(lit, minLen, ignoreSet, suppress)) continue;
 
-            const classification = classify ? classifyLiteral(text, false) : null;
-            if (classify && classification && classification.isReasonable) {
-                continue;
-            }
-
-            const rule =
-                granular && classification && classification.kind !== LITERAL_KIND_GENERAL
-                    ? `literal-${classification.kind}`
-                    : 'hardcoded-string';
-
-            const suggested =
-                classify && classification && classification.suggestedConstPrefix !== 'CONST_STR'
-                    ? `${classification.suggestedConstPrefix}_${this.suggestName(inner, STR_KIND)}`
-                    : this.suggestName(inner, STR_KIND);
-
-            const detail: Record<string, unknown> = {
-                value: text,
-                length: inner.length,
-                suggestedName: suggested,
-            };
-            if (classify && classification) {
-                detail.semanticKind = classification.kind;
-                detail.rationale = classification.rationale;
-            }
-
-            out.push({
-                id: `constants:${rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
-                analyzer: CONSTANTS_ANALYZER_NAME,
-                rule,
-                severity: 'warning',
-                message:
-                    classify && classification && classification.kind !== LITERAL_KIND_GENERAL
-                        ? `${classification.rationale}: ${text} should be extracted.`
-                        : `Hardcoded string should be extracted into a named constant.`,
-                location: locN(lit.node, ctx.filePath),
-                detail,
-                suggestion: `const ${suggested} = ${text};`,
-            });
+            const issue = this.buildHardcodedStringIssue(lit, ctx, classify, granular);
+            if (issue) out.push(issue);
         }
+    }
+
+    private shouldSkipHardcodedString(
+        lit: LiteralRecord,
+        minLen: number,
+        ignoreSet: Set<string>,
+        suppress: Set<NormalizedNode>,
+    ): boolean {
+        if (lit.numeric || lit.isConstBound || lit.tolerated) return true;
+        if (suppress.has(lit.node)) return true;
+        const text = lit.value;
+        const inner = stripQuotes(text);
+        if (inner.length < minLen || inner.trim().length === 0) return true;
+        return ignoreSet.has(text) || ignoreSet.has(inner);
+    }
+
+    private buildHardcodedStringIssue(
+        lit: LiteralRecord,
+        ctx: AnalyzerContext,
+        classify: boolean,
+        granular: boolean,
+    ): Issue | null {
+        const text = lit.value;
+        const inner = stripQuotes(text);
+        const classification = classify ? classifyLiteral(text, false) : null;
+        if (classification && classification.isReasonable) return null;
+
+        const isGranular =
+            granular && classification && classification.kind !== LITERAL_KIND_GENERAL;
+        const rule = isGranular ? `literal-${classification!.kind}` : 'hardcoded-string';
+
+        const suggested =
+            classification && classification.suggestedConstPrefix !== 'CONST_STR'
+                ? `${classification.suggestedConstPrefix}_${this.suggestName(inner, STR_KIND)}`
+                : this.suggestName(inner, STR_KIND);
+
+        const detail: Record<string, unknown> = {
+            value: text,
+            length: inner.length,
+            suggestedName: suggested,
+            ...(classification
+                ? { semanticKind: classification.kind, rationale: classification.rationale }
+                : {}),
+        };
+
+        const message = isGranular
+            ? `${classification!.rationale}: ${text} should be extracted.`
+            : `Hardcoded string should be extracted into a named constant.`;
+
+        return {
+            id: `constants:${rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
+            analyzer: CONSTANTS_ANALYZER_NAME,
+            rule,
+            severity: 'warning',
+            message,
+            location: locN(lit.node, ctx.filePath),
+            detail,
+            suggestion: `const ${suggested} = ${text};`,
+        };
     }
 
     private detectDuplicates(
