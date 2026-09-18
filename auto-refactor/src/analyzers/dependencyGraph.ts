@@ -58,6 +58,74 @@ function normalizeRel(p: string): string {
         .replace(/\.(ts|tsx|js|jsx|d\.ts|mts|cts|mjs|cjs)$/, '');
 }
 
+interface CompiledGroup {
+    group: string;
+    regexes: RegExp[];
+}
+
+interface RuleConstraints {
+    allowGroups: Set<string>;
+    compiledExceptionRegexes: RegExp[];
+    allowAllExternal: boolean;
+    allowExternalExact: Set<string>;
+    allowExternalPrefixes: string[];
+}
+
+function compileGroups(groups: Record<string, string[]>): CompiledGroup[] {
+    const compiled: CompiledGroup[] = [];
+    for (const [group, globs] of Object.entries(groups)) {
+        compiled.push({
+            group,
+            regexes: (globs ?? []).map(globToRegex),
+        });
+    }
+    return compiled;
+}
+
+function matchGroup(normPath: string, compiledGroups: CompiledGroup[]): string | null {
+    for (const { group, regexes } of compiledGroups) {
+        if (regexes.some((re) => re.test(normPath))) {
+            return group;
+        }
+    }
+    return null;
+}
+
+function classifyAllowedExternal(
+    entry: string,
+    target: { allowAll: boolean; exact: Set<string>; prefixes: string[] },
+): void {
+    if (entry === '*') {
+        target.allowAll = true;
+        return;
+    }
+    if (entry.endsWith(':*')) {
+        target.prefixes.push(entry.slice(0, -1));
+        return;
+    }
+    target.exact.add(entry);
+}
+
+function compileRuleConstraints(fromGroup: string, rule: GroupRules): RuleConstraints {
+    const allowGroups = new Set([fromGroup, ...(rule.allowGroups ?? [])]);
+    const compiledExceptionRegexes = (rule.allowImportGlobs ?? []).map((g) => {
+        return globToRegex(g.includes('/') ? g : `**/${g}`);
+    });
+
+    const target = { allowAll: false, exact: new Set<string>(), prefixes: [] as string[] };
+    for (const a of rule.allowExternal ?? []) {
+        classifyAllowedExternal(a, target);
+    }
+
+    return {
+        allowGroups,
+        compiledExceptionRegexes,
+        allowAllExternal: target.allowAll,
+        allowExternalExact: target.exact,
+        allowExternalPrefixes: target.prefixes,
+    };
+}
+
 const IMPORT_SPEC_RE =
     /(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|export\s+(?:[\s\S]*?from\s+)?|import\(|require\()['"]([^'"]+)['"]/g;
 
@@ -96,155 +164,174 @@ export class DependencyGraphAnalyzer implements Analyzer {
         const file = ctx.filePath.replace(/\\/g, '/');
         const normFile = normalizeRel(file);
 
-        // Pre-compile group regexes once per file
-        const compiledGroups: Array<{ group: string; regexes: RegExp[] }> = [];
-        for (const [group, globs] of Object.entries(groups)) {
-            compiledGroups.push({
-                group,
-                regexes: (globs ?? []).map(globToRegex),
-            });
-        }
-
-        // Which group does this file belong to? Unmatched files are unchecked.
-        let fromGroup: string | null = null;
-        for (const { group, regexes } of compiledGroups) {
-            if (regexes.some((re) => re.test(normFile))) {
-                fromGroup = group;
-                break;
-            }
-        }
+        const compiledGroups = compileGroups(groups);
+        const fromGroup = matchGroup(normFile, compiledGroups);
         if (!fromGroup) return [];
 
         const rule = rules[fromGroup];
-        if (!rule) return []; // unconstrained group
-        const allowGroups = new Set([fromGroup, ...(rule.allowGroups ?? [])]);
+        if (!rule) return [];
+        const constraints = compileRuleConstraints(fromGroup, rule);
 
-        // Pre-compile exception globs once
-        const compiledExceptionRegexes: RegExp[] = (rule.allowImportGlobs ?? []).map((g) => {
-            return globToRegex(g.includes('/') ? g : `**/${g}`);
-        });
-
-        // Pre-process allowExternal into O(1) Set + prefix list
-        let allowAllExternal = false;
-        const allowExternalExact = new Set<string>();
-        const allowExternalPrefixes: string[] = [];
-        for (const a of rule.allowExternal ?? []) {
-            if (a === '*') {
-                allowAllExternal = true;
-            } else if (a.endsWith(':*')) {
-                allowExternalPrefixes.push(a.slice(0, -1));
-            } else {
-                allowExternalExact.add(a);
-            }
-        }
-
-        // Memoized target group resolution within this file
         const targetGroupCache = new Map<string, string | null>();
         const resolveTargetGroup = (resolvedPath: string): string | null => {
             const cached = targetGroupCache.get(resolvedPath);
             if (cached !== undefined) return cached;
-            for (const { group, regexes } of compiledGroups) {
-                if (regexes.some((re) => re.test(resolvedPath))) {
-                    targetGroupCache.set(resolvedPath, group);
-                    return group;
-                }
-            }
-            targetGroupCache.set(resolvedPath, null);
-            return null;
+            const target = matchGroup(resolvedPath, compiledGroups);
+            targetGroupCache.set(resolvedPath, target);
+            return target;
         };
 
         const issues: Issue[] = [];
-
         const content = ctx.content || '';
         const len = content.length;
         let lineStart = 0;
         let idx = 0;
 
         while (lineStart < len) {
-            let lineEnd = content.indexOf('\n', lineStart);
-            let nextStart: number;
-            if (lineEnd === -1) {
-                lineEnd = len;
-                nextStart = len;
-            } else {
-                nextStart = lineEnd + 1;
-                if (
-                    lineEnd > lineStart &&
-                    content.charCodeAt(lineEnd - 1) === CARRIAGE_RETURN_CHAR_CODE
-                ) {
-                    lineEnd--;
-                }
-            }
-
-            const lineText = content.slice(lineStart, lineEnd);
-            IMPORT_SPEC_RE.lastIndex = 0;
-            let m: RegExpExecArray | null;
-            while ((m = IMPORT_SPEC_RE.exec(lineText)) !== null) {
-                const spec = m[1];
-                if (!spec) continue;
-
-                // External (bare) imports — but relative-looking specifiers
-                // always go to group logic
-                if (!spec.startsWith('.') && !spec.startsWith('/')) {
-                    const allowed =
-                        allowAllExternal ||
-                        allowExternalExact.has(spec) ||
-                        allowExternalPrefixes.some((prefix) => spec.startsWith(prefix));
-                    if (!allowed) {
-                        issues.push(
-                            this.mkIssue(
-                                ctx,
-                                idx,
-                                'disallowed-import',
-                                `External dependency '${spec}' is not permitted for group "${fromGroup}"`,
-                                { from: fromGroup, specifier: spec },
-                            ),
-                        );
-                    }
-                    continue;
-                }
-
-                // Relative import → resolved file (extension stripped, matching core graph norm)
-                const abs = path.posix.normalize(
-                    path.posix.join(path.posix.dirname(normFile), spec),
-                );
-                const resolved = normalizeRel(abs);
-
-                // Same-group import: always fine
-                const targetGroup = resolveTargetGroup(resolved);
-
-                if (targetGroup && allowGroups.has(targetGroup)) continue;
-
-                // Exact-file exceptions
-                // (e.g. consumer-side DIP port: persistence → cache/IJournalStore)
-                const globException = compiledExceptionRegexes.some((re) => {
-                    return (
-                        re.test(resolved) ||
-                        re.test(resolved + '.ts') ||
-                        re.test(resolved + '/index')
-                    );
-                });
-                if (globException) continue;
-
-                if (targetGroup) {
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            idx,
-                            'disallowed-import',
-                            `Cross-group dependency violation: "${fromGroup}" → "${targetGroup}" (${resolved} is not permitted)`,
-                            { from: fromGroup, to: targetGroup, resolved, specifier: spec },
-                        ),
-                    );
-                }
-                // Relative import to no-group files (e.g. build scripts) — unchecked by design
-            }
-
+            const { lineText, nextStart } = this.extractNextLine(content, lineStart, len);
+            this.auditLineImports(
+                lineText,
+                fromGroup,
+                normFile,
+                constraints,
+                resolveTargetGroup,
+                idx,
+                ctx,
+                issues,
+            );
             idx++;
             lineStart = nextStart;
         }
 
         return issues;
+    }
+
+    private extractNextLine(
+        content: string,
+        lineStart: number,
+        len: number,
+    ): { lineText: string; nextStart: number } {
+        let lineEnd = content.indexOf('\n', lineStart);
+        if (lineEnd === -1) return { lineText: content.slice(lineStart, len), nextStart: len };
+        const nextStart = lineEnd + 1;
+        if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CARRIAGE_RETURN_CHAR_CODE) {
+            lineEnd--;
+        }
+        return { lineText: content.slice(lineStart, lineEnd), nextStart };
+    }
+
+    private auditLineImports(
+        lineText: string,
+        fromGroup: string,
+        normFile: string,
+        constraints: RuleConstraints,
+        resolveTargetGroup: (resolvedPath: string) => string | null,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        IMPORT_SPEC_RE.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = IMPORT_SPEC_RE.exec(lineText)) !== null) {
+            const spec = m[1];
+            if (spec) {
+                this.auditImportSpecifier(
+                    spec,
+                    fromGroup,
+                    normFile,
+                    constraints,
+                    resolveTargetGroup,
+                    lineIdx,
+                    ctx,
+                    issues,
+                );
+            }
+        }
+    }
+
+    private auditImportSpecifier(
+        spec: string,
+        fromGroup: string,
+        normFile: string,
+        constraints: RuleConstraints,
+        resolveTargetGroup: (resolvedPath: string) => string | null,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (!spec.startsWith('.') && !spec.startsWith('/')) {
+            this.auditExternalImport(spec, fromGroup, constraints, lineIdx, ctx, issues);
+        } else {
+            this.auditRelativeImport(
+                spec,
+                fromGroup,
+                normFile,
+                constraints,
+                resolveTargetGroup,
+                lineIdx,
+                ctx,
+                issues,
+            );
+        }
+    }
+
+    private auditExternalImport(
+        spec: string,
+        fromGroup: string,
+        constraints: RuleConstraints,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const allowed =
+            constraints.allowAllExternal ||
+            constraints.allowExternalExact.has(spec) ||
+            constraints.allowExternalPrefixes.some((prefix) => spec.startsWith(prefix));
+        if (!allowed) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'disallowed-import',
+                    `External dependency '${spec}' is not permitted for group "${fromGroup}"`,
+                    { from: fromGroup, specifier: spec },
+                ),
+            );
+        }
+    }
+
+    private auditRelativeImport(
+        spec: string,
+        fromGroup: string,
+        normFile: string,
+        constraints: RuleConstraints,
+        resolveTargetGroup: (resolvedPath: string) => string | null,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const abs = path.posix.normalize(path.posix.join(path.posix.dirname(normFile), spec));
+        const resolved = normalizeRel(abs);
+        const targetGroup = resolveTargetGroup(resolved);
+
+        if (targetGroup && constraints.allowGroups.has(targetGroup)) return;
+
+        const globException = constraints.compiledExceptionRegexes.some((re) => {
+            return re.test(resolved) || re.test(resolved + '.ts') || re.test(resolved + '/index');
+        });
+        if (globException) return;
+
+        if (targetGroup) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'disallowed-import',
+                    `Cross-group dependency violation: "${fromGroup}" → "${targetGroup}" (${resolved} is not permitted)`,
+                    { from: fromGroup, to: targetGroup, resolved, specifier: spec },
+                ),
+            );
+        }
     }
 
     finalize(ctx: AnalyzerContext): Issue[] {

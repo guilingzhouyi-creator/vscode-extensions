@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T06:39:29.436Z",
+  "timestamp": "2026-09-18T06:44:17.968Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1056,19 +1056,7 @@
       "count": 8
     },
     {
-      "key": "complexity|high-complexity|src/analyzers/dependencyGraph.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/analyzers/dependencyGraph.ts",
-      "count": 1
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/dependencyGraph.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/analyzers/dependencyGraph.ts",
+      "key": "hygiene|HYG-CLN-001|src/analyzers/dependencyGraph.ts",
       "count": 1
     },
     {
