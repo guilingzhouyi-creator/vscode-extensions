@@ -29,6 +29,7 @@ sarif/
 **/.t04-keypoints-*/
 **/.t04-keypoints-*
 *.log
+*.tsbuildinfo
 err.txt
 out.txt
 

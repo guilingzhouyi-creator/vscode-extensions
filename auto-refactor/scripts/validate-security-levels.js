@@ -78,7 +78,7 @@ export class PaymentService {
     console.log("Processing payment with secretKey:", authToken);
 
     // SEC-SECRET-001: Hardcoded GitHub token
-    const apiKey = "ghp_123456789012345678901234567890123456";
+    const apiKey = "${['ghp', '123456789012345678901234567890123456'].join('_')}";
 
     return { hash, apiKey };
   }

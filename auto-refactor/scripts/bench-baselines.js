@@ -618,24 +618,22 @@ function printHuman(metrics, history, _opts) {
       '首次'.padStart(10) +
       'Δ(首次)'.padStart(10),
   );
-  const rows = [
-    ['new300', metrics.new300, last && last.new300, first && first.new300],
-    ['mixed300', metrics.mixed300, last && last.mixed300, first && first.mixed300],
-    ['newBig', metrics.newBig, last && last.newBig, first && first.newBig],
-    ['mixedBig', metrics.mixedBig, last && last.mixedBig, first && first.mixedBig],
-    [
-      'createSourceFile',
-      metrics.createSourceFile,
-      last && last.createSourceFile,
-      first && first.createSourceFile,
-    ],
-    ['mapTs', metrics.mapTs, last && last.mapTs, first && first.mapTs],
-    ['parseOxc', metrics.parseOxc, last && last.parseOxc, first && first.parseOxc],
-    ['runStreaming', metrics.runStreaming, last && last.runStreaming, first && first.runStreaming],
+  const metricKeys = [
+    'new300',
+    'mixed300',
+    'newBig',
+    'mixedBig',
+    'createSourceFile',
+    'mapTs',
+    'parseOxc',
+    'runStreaming',
   ];
-  for (const [label, cur, l, f] of rows) {
+  for (const key of metricKeys) {
+    const cur = metrics[key];
+    const l = last ? last[key] : null;
+    const f = first ? first[key] : null;
     console.log(
-      label.padEnd(18) +
+      key.padEnd(18) +
         fmt(cur).padStart(10) +
         fmt(l).padStart(10) +
         fmtDelta(cur, l).padStart(10) +
@@ -644,6 +642,11 @@ function printHuman(metrics, history, _opts) {
     );
   }
   console.log('------------------------------------------------------------');
+}
+
+function calcSpeedup(mixed, newer) {
+  if (mixed == null || !newer) return null;
+  return Math.round((mixed / newer) * 100) / 100;
 }
 
 function printJson(metrics, history, opts, validate) {
@@ -666,14 +669,12 @@ function printJson(metrics, history, opts, validate) {
       standard: {
         new300: r2(metrics.new300),
         mixed300: r2(metrics.mixed300),
-        speedup:
-          metrics.mixed300 != null && metrics.new300 ? r2(metrics.mixed300 / metrics.new300) : null,
+        speedup: calcSpeedup(metrics.mixed300, metrics.new300),
       },
       big: {
         newBig: r2(metrics.newBig),
         mixedBig: r2(metrics.mixedBig),
-        speedup:
-          metrics.mixedBig != null && metrics.newBig ? r2(metrics.mixedBig / metrics.newBig) : null,
+        speedup: calcSpeedup(metrics.mixedBig, metrics.newBig),
       },
       profile: {
         createSourceFile: r2(metrics.createSourceFile),
@@ -688,18 +689,29 @@ function printJson(metrics, history, opts, validate) {
     },
     deltas: {
       new300: {
-        vsLast: delta(metrics.new300, last && last.new300),
-        vsFirst: delta(metrics.new300, first && first.new300),
+        vsLast: delta(metrics.new300, last ? last.new300 : null),
+        vsFirst: delta(metrics.new300, first ? first.new300 : null),
       },
       newBig: {
-        vsLast: delta(metrics.newBig, last && last.newBig),
-        vsFirst: delta(metrics.newBig, first && first.newBig),
+        vsLast: delta(metrics.newBig, last ? last.newBig : null),
+        vsFirst: delta(metrics.newBig, first ? first.newBig : null),
       },
     },
     historyPath: 'scripts/bench-history.json',
     historyEntries: history.length,
   };
   process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
+}
+
+function checkHistoryDeviation(history, big) {
+  if (history.length > 0 && history[0].newBig != null && big.newBig != null) {
+    const dev = (big.newBig - history[0].newBig) / history[0].newBig;
+    if (Math.abs(dev) > 0.3) {
+      console.warn(
+        `[bench-baselines] WARN: 与历史基线偏差过大 (newBig ${(dev * 100).toFixed(1)}% vs 首次 ${history[0].newBig.toFixed(1)}ms)，注意机器负载/环境变化`,
+      );
+    }
+  }
 }
 
 // ---- Main flow (four stages, strictly serial) ----
@@ -747,14 +759,7 @@ async function main() {
   );
   // Sanity warning: flag when newBig deviates more than 30% from the first history
   // entry (warn only, never abort).
-  if (history.length > 0 && history[0].newBig != null && big.newBig != null) {
-    const dev = (big.newBig - history[0].newBig) / history[0].newBig;
-    if (Math.abs(dev) > 0.3) {
-      console.warn(
-        `[bench-baselines] WARN: 与历史基线偏差过大 (newBig ${(dev * 100).toFixed(1)}% vs 首次 ${history[0].newBig.toFixed(1)}ms)，注意机器负载/环境变化`,
-      );
-    }
-  }
+  checkHistoryDeviation(history, big);
 
   // stage4: single-file profile
   const profile = await stage4Profile(opts);

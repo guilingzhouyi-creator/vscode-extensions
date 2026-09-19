@@ -104,6 +104,14 @@ function run() {
       rule.remediation && rule.remediation.trim(),
       `${rule.id}: remediation must not be empty`,
     );
+    assert.ok(
+      !/<(?:TODO|FIXME|TBD|PLACEHOLDER|XXX)[^>]*>|^(?:TODO|FIXME|TBD):\s/im.test(rule.summary),
+      `${rule.id}: summary contains unfinished placeholder marker`,
+    );
+    assert.ok(
+      !/<(?:TODO|FIXME|TBD|PLACEHOLDER|XXX)[^>]*>|^(?:TODO|FIXME|TBD):\s/im.test(rule.remediation),
+      `${rule.id}: remediation contains unfinished placeholder marker`,
+    );
     assert.ok(rule.analyzer && rule.analyzer !== 'unknown', `${rule.id}: analyzer must be known`);
     assert.ok(rule.docsAnchor.includes('#'), `${rule.id}: docsAnchor must point at an anchor`);
     if (rule.canonical) {

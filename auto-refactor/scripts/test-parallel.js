@@ -84,6 +84,33 @@ const PARALLEL_SUITES = [
   { name: 'test-codec', script: 'scripts/test-result-codec.js' },
   { name: 'validate-compression', script: 'scripts/validate-compression-bounds.js' },
   { name: 'validate-marker-scope', script: 'scripts/validate-marker-scope.js' },
+  { name: 'validate-baseline-freeze', script: 'scripts/validate-phase0-baseline.js' },
+  { name: 'validate-semantic-ir', script: 'scripts/validate-phase1-semantic-ir.js' },
+  { name: 'validate-language-adapters', script: 'scripts/validate-phase2-language-adapters.js' },
+  { name: 'validate-universal-rules', script: 'scripts/validate-phase3-universal-rules.js' },
+  { name: 'validate-performance-rules', script: 'scripts/validate-phase4-performance-rules.js' },
+  { name: 'validate-data-architecture', script: 'scripts/validate-phase5-data-architecture.js' },
+  { name: 'validate-test-modernity', script: 'scripts/validate-phase6-test-modernity.js' },
+  {
+    name: 'validate-meta-architecture',
+    script: 'scripts/validate-phase7-meta-architecture.js',
+  },
+  {
+    name: 'validate-quality-quantification',
+    script: 'scripts/validate-phase8-quality-quantification.js',
+  },
+  {
+    name: 'validate-rule-generalization',
+    script: 'scripts/validate-phase11-rule-generalization.js',
+  },
+  {
+    name: 'validate-multi-agent',
+    script: 'scripts/validate-phase12-multi-agent.js',
+  },
+  {
+    name: 'validate-slice-audit',
+    script: 'scripts/validate-phase13-slice-audit.js',
+  },
   {
     name: 'validate-symbol-index-pack',
     composite: [
@@ -112,6 +139,8 @@ const SEQUENTIAL_SUITES = [
   { name: 'validate-equivalence', script: 'scripts/validate-equivalence.js' },
   { name: 'validate-warm', script: 'scripts/validate-warm.js' },
   { name: 'validate-diff', script: 'scripts/validate-diff.js' },
+  { name: 'validate-self-audit', script: 'scripts/validate-phase9-self-audit.js' },
+  { name: 'validate-self-refactor', script: 'scripts/validate-phase10-self-refactor.js' },
 ];
 
 /**
@@ -233,6 +262,27 @@ async function runAsyncPool(items, maxConcurrency, workerFn) {
   return results.filter(Boolean);
 }
 
+/**
+ * Record and log suite completion result.
+ *
+ * @param suite - Suite configuration.
+ * @param res - Execution result.
+ * @param passed - Array of passed results.
+ * @param failed - Array of failed results.
+ */
+function recordResult(suite, res, passed, failed) {
+  const sec = (res.durationMs / 1000).toFixed(2);
+  if (res.ok) {
+    passed.push(res);
+    console.log(`  ✔ [PASS] ${suite.name} (${sec}s)`);
+  } else {
+    failed.push(res);
+    console.log(`  ❌ [FAIL] ${suite.name} (${sec}s)`);
+    console.log(res.stdout);
+    if (res.stderr) console.error(res.stderr);
+  }
+}
+
 // ── Main Runner ──
 async function main() {
   const overallStart = Date.now();
@@ -254,45 +304,25 @@ async function main() {
   const passed = [];
   const failed = [];
 
-  // Phase 1: Run isolated parallel suites
   if (parallelList.length > 0) {
     console.log(
-      `--- [Phase 1] Executing ${parallelList.length} Independent Suites in Parallel ---`,
+      `--- [Isolated Suites] Executing ${parallelList.length} Independent Suites in Parallel ---`,
     );
     await runAsyncPool(parallelList, concurrency, async (suite) => {
       const res = await executeSuite(suite);
-      const sec = (res.durationMs / 1000).toFixed(2);
-      if (res.ok) {
-        passed.push(res);
-        console.log(`  ✔ [PASS] ${suite.name} (${sec}s)`);
-      } else {
-        failed.push(res);
-        console.log(`  ❌ [FAIL] ${suite.name} (${sec}s)`);
-        console.log(res.stdout);
-        if (res.stderr) console.error(res.stderr);
-      }
+      recordResult(suite, res, passed, failed);
       return res;
     });
   }
 
-  // Phase 2: Run sequential suites (if not bailed)
   if (sequentialList.length > 0 && (!bail || failed.length === 0)) {
     console.log(
-      `\n--- [Phase 2] Executing ${sequentialList.length} Stateful/Daemon Suites Sequentially ---`,
+      `\n--- [Serial Suites] Executing ${sequentialList.length} Stateful/Daemon Suites Sequentially ---`,
     );
     for (const suite of sequentialList) {
       const res = await executeSuite(suite);
-      const sec = (res.durationMs / 1000).toFixed(2);
-      if (res.ok) {
-        passed.push(res);
-        console.log(`  ✔ [PASS] ${suite.name} (${sec}s)`);
-      } else {
-        failed.push(res);
-        console.log(`  ❌ [FAIL] ${suite.name} (${sec}s)`);
-        console.log(res.stdout);
-        if (res.stderr) console.error(res.stderr);
-        if (bail) break;
-      }
+      recordResult(suite, res, passed, failed);
+      if (!res.ok && bail) break;
     }
   }
 

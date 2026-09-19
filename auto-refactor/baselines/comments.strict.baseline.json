@@ -1,6 +1,98 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-14T16:20:31.838Z",
-  "groups": []
+  "timestamp": "2026-09-19T14:20:47.585Z",
+  "groups": [
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-phase11-rule-generalization.js",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-phase2-language-adapters.js",
+      "count": 5,
+      "severities": {
+        "warning": 5
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-phase3-universal-rules.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-phase4-performance-rules.js",
+      "count": 9,
+      "severities": {
+        "warning": 9
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-phase5-data-architecture.js",
+      "count": 5,
+      "severities": {
+        "warning": 5
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-phase6-test-modernity.js",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-phase7-meta-architecture.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-CON-001|src/core/pipeline/dualTrackPipeline.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/rules/evolution/generalizationPipeline.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "comments|CMT-CON-001|src/core/scanner/analyzerRunner.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
+    },
+    {
+      "key": "comments|CMT-CON-001|src/core/scanner/cacheProbe.ts",
+      "count": 3,
+      "severities": {
+        "info": 3
+      }
+    },
+    {
+      "key": "comments|CMT-CON-001|src/core/scanner/diffHints.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
+    },
+    {
+      "key": "comments|CMT-CON-001|src/core/scanner/scanStage.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
+    }
+  ]
 }

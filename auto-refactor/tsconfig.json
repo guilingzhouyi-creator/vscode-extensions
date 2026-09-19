@@ -16,7 +16,9 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
-    "allowUnusedLabels": false
+    "allowUnusedLabels": false,
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo"
   },
   "include": [
     "src/**/*.ts"

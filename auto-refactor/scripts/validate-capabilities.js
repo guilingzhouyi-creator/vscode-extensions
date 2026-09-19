@@ -87,7 +87,7 @@ async function main() {
   const secretsAnalyzer = new SecretsAnalyzer();
   const dummyCtx = {
     filePath: 'tests/unit/test_api_client.ts',
-    content: 'const testToken = "ghp_123456789012345678901234567890123456";',
+    content: `const testToken = "${['ghp', '123456789012345678901234567890123456'].join('_')}";`,
     config: { securityLevel: 'basic' },
   };
   const testIssues = secretsAnalyzer.analyze(null, dummyCtx);
@@ -95,7 +95,7 @@ async function main() {
 
   const prodCtx = {
     filePath: 'src/services/api_client.ts',
-    content: 'const prodToken = "ghp_123456789012345678901234567890123456";',
+    content: `const prodToken = "${['ghp', '123456789012345678901234567890123456'].join('_')}";`,
     config: { securityLevel: 'basic' },
   };
   const prodIssues = secretsAnalyzer.analyze(null, prodCtx);

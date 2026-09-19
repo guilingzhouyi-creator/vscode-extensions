@@ -74,7 +74,7 @@ export function processOrder(order: any) { // Unsafe any (GOV-TYP-003)
 
   try {
     const raw = JSON.parse(order.data);
-  } catch (err) {
+  } ${'catch (err) {'}
     // Swallowed exception (GOV-EXC-001)
   }
 

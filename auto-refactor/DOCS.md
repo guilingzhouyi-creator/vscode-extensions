@@ -146,6 +146,19 @@ const w2 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   
 
 护栏：`gate:self` 只在**新增**上阻断，因此"把告警搬进新文件"或"重冻基线"都不会被误判为进展；每次重冻必须附逐键比对（新增键要么为零，要么全部落在已登记抑制内）。
 
+### 6.9 双轨文案分层契约（机读英文底座与人读中文规则解耦）
+
+系统确立**双轨文案分层架构（Dual-Track Wording Architecture）**，明确执行机读底座与人读界面的职责边界：
+
+| 层次轨道 | 物理目录与构件 | 语言底座 | 核心职责与消费方 |
+| :--- | :--- | :--- | :--- |
+| **机读/执行轨 (Machine / Agent Track)** | `src/core/messages/`<br/>`src/core/guidance/`<br/>`src/analyzers/` | **纯英文 (100% English Baseline)** | 提供高 Token 密度、确定性且高依从度的 LLM Agent 提示词（Guidance Prompts）、以及符合 SARIF 2.1.0 / CI 编译器标准的底层诊断（Issue Message / Suggestion / Rationale）。 |
+| **人读/展示轨 (Human / Governance Track)** | `src/core/rules/entries/`<br/>`docs/` 规则表 | **标准中文 (Chinese Guidance)** | 提供直观、详实、易于团队开发者理解与遵循的规则摘要（summary）与修复指引（remediation）。 |
+
+**门禁看守保证**：
+- `validate-self-norms.js` (Check 4 & 5)：严格断言 `src/core/messages/` 与 `src/core/guidance/` 中的字符串字面量、以及分析器发射的诊断信息绝不包含未授权汉字（仅 `comments.ts` 中的文件头六要素 AST 匹配靶标享有受限白名单豁免）；
+- `validate-rules-registry.js`：严格断言所有注册规则具备详尽指导，且严禁泄露 `<TODO...>`、`TBD` 等未决占位符。
+
 ---
 
 ## 📐 7. 架构图表 (Mermaid)

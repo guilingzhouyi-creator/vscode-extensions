@@ -129,12 +129,127 @@ function checkHardcodedPaths() {
   return violations;
 }
 
+/**
+ * Known white-listed constants allowed to contain specific Chinese literals in core messages.
+ * Only SIX_FIELD_HEADERS_ZH is permitted, as it defines AST regex matching targets for
+ * localized file-header specifications.
+ */
+const ALLOWED_ZH_LITERALS_IN_MESSAGES = new Set([
+  '模块归属',
+  '文件路径',
+  '架构定位',
+  '依赖与触发',
+  '职责说明',
+  '退出语义与设计依据',
+]);
+
+/**
+ * Scan a single line's string literals for unauthorized Chinese characters.
+ *
+ * @param rel - Repo-relative file path.
+ * @param lineNum - 1-based line number.
+ * @param line - Source line text.
+ * @param violations - Violations accumulator.
+ */
+function scanLineForChineseLiterals(rel, lineNum, line, violations) {
+  const codeOnly = line.replace(/\/\/.*$/, '');
+  const strRegex = /(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+  let match;
+  while ((match = strRegex.exec(codeOnly)) !== null) {
+    const literalContent = match[2];
+    if (!/[\u4e00-\u9fa5]/.test(literalContent)) continue;
+    if (
+      rel === 'src/core/messages/comments.ts' &&
+      ALLOWED_ZH_LITERALS_IN_MESSAGES.has(literalContent.trim())
+    ) {
+      continue;
+    }
+    violations.push(
+      `${rel}:${lineNum} non-English/Chinese text in message/prompt literal: '${literalContent.trim().slice(0, 50)}'`,
+    );
+  }
+}
+
+/**
+ * Check one message file for unauthorized Chinese characters.
+ *
+ * @param abs - Absolute file path.
+ * @param violations - Violations accumulator.
+ */
+function checkSingleMessageFile(abs, violations) {
+  const rel = path.relative(ROOT, abs).replace(/\\/g, '/');
+  const lines = fs.readFileSync(abs, 'utf8').split('\n');
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) continue;
+    if (!/[\u4e00-\u9fa5]/.test(line)) continue;
+    scanLineForChineseLiterals(rel, i + 1, line, violations);
+  }
+}
+
+/**
+ * Check 4: core messages and prompt catalogs must maintain a strict English baseline.
+ * String literals across src/core/messages and src/core/guidance must not leak Chinese text
+ * outside explicit AST matching target exemptions.
+ *
+ * @returns List of human-readable violations.
+ */
+function checkCoreMessageEnglishPurity() {
+  const violations = [];
+  const targetDirs = [path.join(ROOT, 'src/core/messages'), path.join(ROOT, 'src/core/guidance')];
+  const files = targetDirs.flatMap((dir) => (fs.existsSync(dir) ? tsFiles(dir) : []));
+
+  for (const abs of files) {
+    checkSingleMessageFile(abs, violations);
+  }
+  return violations;
+}
+
+/**
+ * Check one analyzer file for Chinese characters in issue message or suggestion.
+ *
+ * @param abs - Absolute file path.
+ * @param violations - Violations accumulator.
+ */
+function checkSingleAnalyzerFile(abs, violations) {
+  const rel = path.relative(ROOT, abs).replace(/\\/g, '/');
+  const lines = fs.readFileSync(abs, 'utf8').split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) continue;
+    if (/(?:message|suggestion)\s*:\s*[`'"].*[\u4e00-\u9fa5]/.test(line)) {
+      violations.push(
+        `${rel}:${i + 1} analyzer issue message/suggestion contains Chinese text: ${line.trim().slice(0, 70)}`,
+      );
+    }
+  }
+}
+
+/**
+ * Check 5: analyzer diagnostic issues (message, suggestion) must adhere to English baseline.
+ *
+ * @returns List of human-readable violations.
+ */
+function checkAnalyzerDiagnosticPurity() {
+  const violations = [];
+  const dir = path.join(ROOT, 'src/analyzers');
+  if (!fs.existsSync(dir)) return violations;
+
+  for (const abs of tsFiles(dir)) {
+    checkSingleAnalyzerFile(abs, violations);
+  }
+  return violations;
+}
+
 function main() {
   console.log('\n=== Self Norms: language and constant discipline ===');
   const groups = [
     ['ASCII-only at code positions', checkAsciiCodePositions()],
     ['no inline numeric thresholds in rules', checkInlineThresholds()],
     ['no new hardcoded path fragments', checkHardcodedPaths()],
+    ['pure English baseline in core messages & prompts', checkCoreMessageEnglishPurity()],
+    ['pure English baseline in analyzer diagnostics', checkAnalyzerDiagnosticPurity()],
   ];
 
   let failed = false;

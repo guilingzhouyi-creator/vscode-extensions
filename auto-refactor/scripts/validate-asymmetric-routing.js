@@ -36,6 +36,10 @@ const {
   EscalationChannel,
   LoadGovernor,
   detectDependencyCycles,
+  detectDependencyCyclesAsync,
+  SHARED_EXPERTS,
+  LANGUAGE_EXCLUSIVE_ANALYZERS,
+  ALL_LANGUAGE_SPECIFIC_ANALYZERS,
   ModuleDependencyGraph,
 } = require('../dist/api');
 
@@ -73,6 +77,15 @@ async function main() {
   assert(docClass.isDocOnly, 'Should classify as isDocOnly');
   assert(docClass.categories.has('COMMENT_DOC_ONLY'), 'Should contain COMMENT_DOC_ONLY');
 
+  // 5. Language inference and DSpark confidence tier
+  const tsClass = classifyDiff('const A = 1;', 'const A = 2;', undefined, 'src/index.ts');
+  assert.strictEqual(tsClass.language, 'typescript', 'Should infer typescript from .ts');
+  assert.strictEqual(tsClass.confidenceTier, 'HIGH', 'Literal change should be HIGH confidence');
+
+  const pyClass = classifyDiff('x = 1', 'import os\nx = 2', undefined, 'app/main.py');
+  assert.strictEqual(pyClass.language, 'python', 'Should infer python from .py');
+  assert.strictEqual(pyClass.confidenceTier, 'LOW', 'Import change should be LOW confidence');
+
   console.log('✔ Diff Semantic Classifier verified.\n');
 
   console.log('=== [2/5] Testing Sparse Rule MoE Router ===');
@@ -96,6 +109,51 @@ async function main() {
   assert(
     routeLit.activationRatio <= 0.25,
     `Literal activation ratio should be <= 25%, got ${routeLit.activationRatio}`,
+  );
+
+  // DeepSeek MoE Shared Experts assertions
+  assert(SHARED_EXPERTS.includes('hygiene'), 'SHARED_EXPERTS must include hygiene');
+  assert(SHARED_EXPERTS.includes('constants'), 'SHARED_EXPERTS must include constants');
+  assert(
+    routeLit.activeAnalyzers.has('hygiene'),
+    'Shared hygiene expert must be active on code mutation',
+  );
+
+  // DeepSeek MoE Language Gating Filter assertions
+  assert(
+    LANGUAGE_EXCLUSIVE_ANALYZERS.typescript.includes('ts-modern'),
+    'LANGUAGE_EXCLUSIVE_ANALYZERS must map typescript',
+  );
+  assert(
+    ALL_LANGUAGE_SPECIFIC_ANALYZERS.length >= 4,
+    'ALL_LANGUAGE_SPECIFIC_ANALYZERS must declare at least 4 modernizers',
+  );
+  const routeTs = routeDiffToAnalyzers(tsClass);
+  assert(
+    !routeTs.activeAnalyzers.has('python-modern'),
+    'Language gating must prune python-modern for TypeScript',
+  );
+  assert(
+    !routeTs.activeAnalyzers.has('rust-modern'),
+    'Language gating must prune rust-modern for TypeScript',
+  );
+  assert(
+    !routeTs.activeAnalyzers.has('gdscript-modern'),
+    'Language gating must prune gdscript-modern for TypeScript',
+  );
+
+  const routePy = routeDiffToAnalyzers(pyClass);
+  assert(
+    !routePy.activeAnalyzers.has('typescript-modern'),
+    'Language gating must prune typescript-modern for Python',
+  );
+  assert(
+    !routePy.activeAnalyzers.has('rust-modern'),
+    'Language gating must prune rust-modern for Python',
+  );
+  assert(
+    !routePy.activeAnalyzers.has('gdscript-modern'),
+    'Language gating must prune gdscript-modern for Python',
   );
 
   const routeDoc = routeDiffToAnalyzers(docClass);
@@ -208,10 +266,19 @@ async function main() {
   assert(escalationReceived, 'EscalationChannel listener must be invoked');
   assert(channel.hasBreaches(), 'EscalationChannel must report breaches');
 
-  // Verify ReviewMemory was downgraded due to escalation
+  // Verify detectDependencyCyclesAsync works identically to synchronous version
+  const asyncCycles = await detectDependencyCyclesAsync(graph, ['src/modA.ts']);
+  assert.strictEqual(
+    asyncCycles.length,
+    cycles.length,
+    'detectDependencyCyclesAsync must match sync detectDependencyCycles',
+  );
+
+  // Verify ReviewMemory was downgraded due to escalation and recorded contaminationReason
   const modARecord = scanner.getReviewMemory().get('src/modA.ts');
   assert(modARecord, 'Record for modA must exist');
   assert.strictEqual(modARecord.status, 'REJECTED', 'Memory record must be downgraded to REJECTED');
+  assert(modARecord.contaminationReason, 'Memory record must record contaminationReason');
 
   console.log('✔ DeepTrack cycle detection and escalation verified.\n');
 
@@ -245,91 +312,73 @@ async function main() {
   const gameRoute = routeArchetypeToAnalyzers('game');
   const libRoute = routeArchetypeToAnalyzers('library');
 
-  assert(demoRoute.activeAnalyzers.has('constants'), 'Demo must activate constants');
-  assert(!demoRoute.activeAnalyzers.has('architecture'), 'Demo must skip architecture');
-  assert(webRoute.activeAnalyzers.has('security'), 'Web must activate security');
-  assert(gameRoute.activeAnalyzers.has('gdscript-modern'), 'Game must activate gdscript-modern');
-  assert(libRoute.activeAnalyzers.has('architecture'), 'Library must activate architecture');
   assert(
-    libRoute.activeAnalyzers.has('dependency-graph'),
-    'Library must activate dependency-graph',
+    demoRoute.activeAnalyzers.has('constants') && !demoRoute.activeAnalyzers.has('architecture'),
+  );
+  assert(webRoute.activeAnalyzers.has('security'));
+  assert(gameRoute.activeAnalyzers.has('gdscript-modern'));
+  assert(
+    libRoute.activeAnalyzers.has('architecture') &&
+      libRoute.activeAnalyzers.has('dependency-graph'),
   );
 
   // All 4 active sets must be distinct
-  const demoSet = Array.from(demoRoute.activeAnalyzers).sort().join(',');
-  const webSet = Array.from(webRoute.activeAnalyzers).sort().join(',');
-  const gameSet = Array.from(gameRoute.activeAnalyzers).sort().join(',');
-  const libSet = Array.from(libRoute.activeAnalyzers).sort().join(',');
-  assert.notStrictEqual(demoSet, webSet, 'Demo and Web must have distinct active sets');
-  assert.notStrictEqual(webSet, gameSet, 'Web and Game must have distinct active sets');
-  assert.notStrictEqual(gameSet, libSet, 'Game and Library must have distinct active sets');
+  const toKey = (r) => Array.from(r.activeAnalyzers).sort().join(',');
+  assert.notStrictEqual(toKey(demoRoute), toKey(webRoute));
+  assert.notStrictEqual(toKey(webRoute), toKey(gameRoute));
+  assert.notStrictEqual(toKey(gameRoute), toKey(libRoute));
 
-  // Real data on main scan path: create temp test projects
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'archetype-scan-'));
+  // Helper to create and scan archetype test fixtures
+  const setupWs = (dirName, files) => {
+    const wsDir = path.join(tmpRoot, dirName);
+    for (const [rel, content] of Object.entries(files)) {
+      const full = path.join(wsDir, rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content);
+    }
+    return wsDir;
+  };
 
   try {
     // 1. Demo workspace (path contains sample_demo_project)
-    const demoDir = path.join(tmpRoot, 'sample_demo_project');
-    fs.mkdirSync(path.join(demoDir, 'src'), { recursive: true });
-    fs.writeFileSync(path.join(demoDir, 'src', 'index.ts'), 'export const DEMO = 1;\n');
-    const demoReport = await scan({ root: demoDir, cache: false, workers: 1 });
-    assert(demoReport.summary.activatedReviewers, 'Demo report must publish activatedReviewers');
-    assert.strictEqual(demoReport.summary.activatedReviewers.archetype, 'demo');
-    assert(demoReport.summary.activatedReviewers.active.includes('constants'));
-    assert(!demoReport.summary.activatedReviewers.active.includes('architecture'));
+    const demoDir = setupWs('sample_demo_project', { 'src/index.ts': 'export const DEMO = 1;\n' });
+    const demoRep = await scan({ root: demoDir, cache: false, workers: 1 });
+    assert.strictEqual(demoRep.summary.activatedReviewers?.archetype, 'demo');
+    assert(demoRep.summary.activatedReviewers.active.includes('constants'));
+    assert(!demoRep.summary.activatedReviewers.active.includes('architecture'));
 
     // 2. Web workspace (package.json has express)
-    const webDir = path.join(tmpRoot, 'web_app');
-    fs.mkdirSync(path.join(webDir, 'src'), { recursive: true });
-    fs.writeFileSync(
-      path.join(webDir, 'package.json'),
-      JSON.stringify({ name: 'web-app', dependencies: { express: '^4.18.0' } }),
-    );
-    fs.writeFileSync(path.join(webDir, 'src', 'server.ts'), 'export function app() {}\n');
-    const webReport = await scan({ root: webDir, cache: false, workers: 1 });
-    assert(webReport.summary.activatedReviewers, 'Web report must publish activatedReviewers');
-    assert.strictEqual(webReport.summary.activatedReviewers.archetype, 'web');
-    assert(webReport.summary.activatedReviewers.active.includes('security'));
+    const webDir = setupWs('web_app', {
+      'package.json': JSON.stringify({ name: 'web', dependencies: { express: '^4.18.0' } }),
+      'src/server.ts': 'export function app() {}\n',
+    });
+    const webRep = await scan({ root: webDir, cache: false, workers: 1 });
+    assert.strictEqual(webRep.summary.activatedReviewers?.archetype, 'web');
+    assert(webRep.summary.activatedReviewers.active.includes('security'));
 
     // 3. Game workspace (project.godot exists)
-    const gameDir = path.join(tmpRoot, 'game_project');
-    fs.mkdirSync(path.join(gameDir, 'scripts'), { recursive: true });
-    fs.writeFileSync(path.join(gameDir, 'project.godot'), 'config_version=5\n');
-    fs.writeFileSync(
-      path.join(gameDir, 'scripts', 'player.gd'),
-      'extends Node\nfunc _ready():\n\tpass\n',
-    );
-    const gameReport = await scan({ root: gameDir, cache: false, workers: 1 });
-    assert(gameReport.summary.activatedReviewers, 'Game report must publish activatedReviewers');
-    assert.strictEqual(gameReport.summary.activatedReviewers.archetype, 'game');
-    assert(gameReport.summary.activatedReviewers.active.includes('gdscript-modern'));
+    const gameDir = setupWs('game_project', {
+      'project.godot': 'config_version=5\n',
+      'scripts/player.gd': 'extends Node\nfunc _ready():\n\tpass\n',
+    });
+    const gameRep = await scan({ root: gameDir, cache: false, workers: 1 });
+    assert.strictEqual(gameRep.summary.activatedReviewers?.archetype, 'game');
+    assert(gameRep.summary.activatedReviewers.active.includes('gdscript-modern'));
 
     // 4. Library workspace (package.json has main/module)
-    const libDir = path.join(tmpRoot, 'my_lib');
-    fs.mkdirSync(path.join(libDir, 'src'), { recursive: true });
-    fs.writeFileSync(
-      path.join(libDir, 'package.json'),
-      JSON.stringify({ name: 'my-lib', main: 'dist/index.js' }),
-    );
-    fs.writeFileSync(path.join(libDir, 'src', 'index.ts'), 'export function lib() {}\n');
-    const libReport = await scan({ root: libDir, cache: false, workers: 1 });
-    assert(libReport.summary.activatedReviewers, 'Lib report must publish activatedReviewers');
-    assert.strictEqual(libReport.summary.activatedReviewers.archetype, 'library');
-    assert(libReport.summary.activatedReviewers.active.includes('architecture'));
-    assert(libReport.summary.activatedReviewers.active.includes('dependency-graph'));
+    const libDir = setupWs('my_lib', {
+      'package.json': JSON.stringify({ name: 'my-lib', main: 'dist/index.js' }),
+      'src/index.ts': 'export function lib() {}\n',
+    });
+    const libRep = await scan({ root: libDir, cache: false, workers: 1 });
+    assert.strictEqual(libRep.summary.activatedReviewers?.archetype, 'library');
+    assert(libRep.summary.activatedReviewers.active.includes('architecture'));
+    assert(libRep.summary.activatedReviewers.active.includes('dependency-graph'));
 
     // 5. Test sparseRouting=true filtering
-    const sparseDemoReport = await scan({
-      root: demoDir,
-      sparseRouting: true,
-      cache: false,
-      workers: 1,
-    });
-    assert(
-      sparseDemoReport.summary.activatedReviewers,
-      'Sparse report must have activatedReviewers',
-    );
-    assert.strictEqual(sparseDemoReport.summary.activatedReviewers.archetype, 'demo');
+    const sparseRep = await scan({ root: demoDir, sparseRouting: true, cache: false, workers: 1 });
+    assert.strictEqual(sparseRep.summary.activatedReviewers?.archetype, 'demo');
 
     console.log('Archetype activations verified across demo, web, game, library.');
   } finally {
@@ -337,10 +386,7 @@ async function main() {
   }
 
   console.log('✔ Archetype Sparse Reviewer Activation on Main Scan Path verified.\n');
-
-  console.log('================================================================');
   console.log('🎉 ALL ASYMMETRIC AUDIT SCANNING ENGINE CHECKS PASSED (6/6)!');
-  console.log('================================================================');
 }
 
 main().catch((err) => {
