@@ -158,7 +158,7 @@ export function verifyArchitectureBoundaries(
 }
 
 /**
- * Headless architecture violation (ARCH-HDL-001): a headless or domain file imports a presentation framework.
+ * Headless architecture violation (ARCH-HDL-001): a domain file imports a UI framework.
  *
  * @param file - Analyzed file descriptor whose imports are checked.
  * @param issues - Issue accumulator the violations are pushed into.
@@ -231,7 +231,7 @@ function checkHeadlessImports(
 }
 
 /**
- * Cross-domain internal boundary bypass (ARCH-BND-001): an import reaches into /internal/, /impl/, or /private/.
+ * Cross-domain boundary bypass (ARCH-BND-001): an import reaches into an internal path.
  *
  * @param file - Analyzed file descriptor whose imports are checked.
  * @param issues - Issue accumulator the violations are pushed into.
