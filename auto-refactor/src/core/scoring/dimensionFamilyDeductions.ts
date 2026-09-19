@@ -292,6 +292,11 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
     }
 }
 /**
+ * Quality dimension id scored for performance-efficiency findings.
+ */
+const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
+
+/**
  * Apply deductions for performance efficiency issues.
  *
  * @param issue - Analyzed issue finding.
@@ -306,7 +311,7 @@ export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier
 
     if (r.includes(FRAGMENT_LOOP) || r.includes(FRAGMENT_ALLOC)) {
         apply(
-            'performanceEfficiency',
+            DIMENSION_PERFORMANCE_EFFICIENCY,
             DEDUCTION_TRANSIENT_LOOP_ALLOCATION,
             ScoringRationales.TRANSIENT_LOOP_ALLOCATION(msg),
             r,
@@ -314,7 +319,7 @@ export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier
         );
     } else if (r.includes(FRAGMENT_UNBOUNDED) || r.includes(FRAGMENT_LEAK_ALT)) {
         apply(
-            'performanceEfficiency',
+            DIMENSION_PERFORMANCE_EFFICIENCY,
             DEDUCTION_MEMORY_LEAK_RISK,
             ScoringRationales.MEMORY_LEAK_RISK(msg),
             r,
@@ -322,7 +327,7 @@ export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier
         );
     } else {
         apply(
-            'performanceEfficiency',
+            DIMENSION_PERFORMANCE_EFFICIENCY,
             DEDUCTION_INEFFICIENT_ALGORITHM,
             ScoringRationales.INEFFICIENT_ALGORITHM_PATH(msg),
             r,
