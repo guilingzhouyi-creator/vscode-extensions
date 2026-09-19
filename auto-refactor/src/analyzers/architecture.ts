@@ -484,12 +484,11 @@ export class ArchitectureAnalyzer implements Analyzer {
     }
 
     /**
-     * External leaky dependency and headless boundary checks for a domain-layer file.
+     * auditDomainImports audit step.
      *
      * @param spec - Specifier being audited.
      * @param file - Repository-relative path of the importing file.
      * @param currentLayer - Layer inferred for the importing file.
-     * @param targetLayer - Layer inferred for the imported module.
      * @param lineIdx - Line index of the import statement.
      * @param ctx - Analyzer context of the current file.
      * @param opts - Architecture options resolved for this file.
@@ -549,16 +548,13 @@ export class ArchitectureAnalyzer implements Analyzer {
     }
 
     /**
-     * Cross-domain internal boundary bypass check (ARCH-BND-001).
+     * auditCrossDomainBypass audit step.
      *
      * @param spec - Specifier being audited.
      * @param file - Repository-relative path of the importing file.
-     * @param currentLayer - Layer inferred for the importing file.
-     * @param targetLayer - Layer inferred for the imported module.
      * @param lineIdx - Line index of the import statement.
      * @param ctx - Analyzer context of the current file.
      * @param opts - Architecture options resolved for this file.
-     * @param forbiddenModules - Forbidden module set from the options.
      * @param issues - Issue accumulator the violations are pushed into.
      */
     private auditCrossDomainBypass(
@@ -592,16 +588,16 @@ export class ArchitectureAnalyzer implements Analyzer {
     }
 
     /**
-     * Rule 1: a domain module must not depend on application, infrastructure, or interface layers.
+     * auditDomainDependency audit step.
      *
      * @param spec - Specifier being audited.
+     * @param resolvedPath - Resolved target path (narrowed by the caller).
      * @param file - Repository-relative path of the importing file.
      * @param currentLayer - Layer inferred for the importing file.
      * @param targetLayer - Layer inferred for the imported module.
      * @param lineIdx - Line index of the import statement.
      * @param ctx - Analyzer context of the current file.
      * @param opts - Architecture options resolved for this file.
-     * @param forbiddenModules - Forbidden module set from the options.
      * @param issues - Issue accumulator the violations are pushed into.
      */
     private auditDomainDependency(
@@ -670,16 +666,16 @@ export class ArchitectureAnalyzer implements Analyzer {
     }
 
     /**
-     * Rule 2: an application module must not depend on the interface layer.
+     * auditApplicationDependency audit step.
      *
      * @param spec - Specifier being audited.
+     * @param resolvedPath - Resolved target path (narrowed by the caller).
      * @param file - Repository-relative path of the importing file.
      * @param currentLayer - Layer inferred for the importing file.
      * @param targetLayer - Layer inferred for the imported module.
      * @param lineIdx - Line index of the import statement.
      * @param ctx - Analyzer context of the current file.
      * @param opts - Architecture options resolved for this file.
-     * @param forbiddenModules - Forbidden module set from the options.
      * @param issues - Issue accumulator the violations are pushed into.
      */
     private auditApplicationDependency(
@@ -718,16 +714,16 @@ export class ArchitectureAnalyzer implements Analyzer {
     }
 
     /**
-     * Rule 3: the interface layer must not skip the application layer.
+     * auditInterfaceSkipLayer audit step.
      *
      * @param spec - Specifier being audited.
+     * @param resolvedPath - Resolved target path (narrowed by the caller).
      * @param file - Repository-relative path of the importing file.
      * @param currentLayer - Layer inferred for the importing file.
      * @param targetLayer - Layer inferred for the imported module.
      * @param lineIdx - Line index of the import statement.
      * @param ctx - Analyzer context of the current file.
      * @param opts - Architecture options resolved for this file.
-     * @param forbiddenModules - Forbidden module set from the options.
      * @param issues - Issue accumulator the violations are pushed into.
      */
     private auditInterfaceSkipLayer(
