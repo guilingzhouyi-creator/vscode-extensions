@@ -425,71 +425,17 @@ export class ArchitectureAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         for (const spec of specifiers) {
-            // External leaky dependency check in Domain
-            if (currentLayer === ARCHITECTURE_LAYER_DOMAIN) {
-                const basePkg = spec.raw.startsWith('@')
-                    ? spec.raw.split('/').slice(0, 2).join('/')
-                    : spec.raw.split('/')[0];
-                if (forbiddenModules.has(basePkg) || forbiddenModules.has(spec.raw)) {
-                    const descriptor = ArchitectureMessages.DOMAIN_FRAMEWORK_LEAK(spec.raw);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            lineIdx,
-                            'ARCH-LEAK-001',
-                            descriptor.message,
-                            SEVERITY_ERROR,
-                            { file, layer: currentLayer, specifier: spec.raw },
-                            descriptor.suggestion,
-                        ),
-                    );
-                }
-
-                // Headless architecture boundary check (ARCH-HDL-001)
-                const enforceHeadless =
-                    opts.enforceHeadless ?? ctx.config.thresholds?.enforceHeadless ?? false;
-                if (
-                    enforceHeadless &&
-                    (FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
-                        FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw))
-                ) {
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            lineIdx,
-                            'ARCH-HDL-001',
-                            `Headless architecture violation: domain logic in '${file}' imports presentation framework '${spec.raw}'.`,
-                            SEVERITY_ERROR,
-                            { file, layer: currentLayer, specifier: spec.raw },
-                            'Decouple core domain logic from UI/IDE presentation frameworks.',
-                        ),
-                    );
-                }
-            }
-
-            // Cross-domain internal boundary bypass (ARCH-BND-001)
-            const flagBypass =
-                opts.flagCrossDomainBypass ?? ctx.config.thresholds?.flagCrossDomainBypass ?? false;
-            if (
-                flagBypass &&
-                (spec.raw.includes('/internal/') ||
-                    spec.raw.includes('/impl/') ||
-                    spec.raw.includes('/private/'))
-            ) {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'ARCH-BND-001',
-                        `Cross-domain internal boundary bypass: '${file}' imports private module '${spec.raw}'.`,
-                        SEVERITY_WARNING,
-                        { file, specifier: spec.raw },
-                        'Import through public module facade rather than private directories.',
-                    ),
-                );
-            }
-
-            // Internal dependency direction check
+            this.auditDomainImports(
+                spec,
+                file,
+                currentLayer,
+                lineIdx,
+                ctx,
+                opts,
+                forbiddenModules,
+                issues,
+            );
+            this.auditCrossDomainBypass(spec, file, lineIdx, ctx, opts, issues);
             if (spec.resolvedPath) {
                 const targetLayer = this.resolveLayer(spec.resolvedPath, opts, ctx);
                 if (
@@ -500,113 +446,324 @@ export class ArchitectureAnalyzer implements Analyzer {
                     continue;
                 }
 
-                // Rule 1: Domain cannot depend on Application, Infrastructure, or Interface
-                if (currentLayer === ARCHITECTURE_LAYER_DOMAIN) {
-                    if (
-                        targetLayer === 'application' ||
-                        targetLayer === 'infrastructure' ||
-                        targetLayer === ARCHITECTURE_LAYER_INTERFACE
-                    ) {
-                        const descriptor = ArchitectureMessages.DOMAIN_INVERSION_BREACH(
-                            currentLayer,
-                            targetLayer,
-                            spec.resolvedPath,
-                        );
-                        issues.push(
-                            this.mkIssue(
-                                ctx,
-                                lineIdx,
-                                'ARCH-DIR-001',
-                                descriptor.message,
-                                SEVERITY_ERROR,
-                                {
-                                    fromLayer: currentLayer,
-                                    toLayer: targetLayer,
-                                    targetPath: spec.resolvedPath,
-                                },
-                                descriptor.suggestion,
-                            ),
-                        );
+                this.auditDomainDependency(
+                    spec,
+                    spec.resolvedPath,
+                    file,
+                    currentLayer,
+                    targetLayer,
+                    lineIdx,
+                    ctx,
+                    opts,
+                    issues,
+                );
+                this.auditApplicationDependency(
+                    spec,
+                    spec.resolvedPath,
+                    file,
+                    currentLayer,
+                    targetLayer,
+                    lineIdx,
+                    ctx,
+                    opts,
+                    issues,
+                );
+                this.auditInterfaceSkipLayer(
+                    spec,
+                    spec.resolvedPath,
+                    file,
+                    currentLayer,
+                    targetLayer,
+                    lineIdx,
+                    ctx,
+                    opts,
+                    issues,
+                );
+            }
+        }
+    }
 
-                        // Structural layering illusion (ARCH-DIR-003)
-                        const flagIllusions =
-                            opts.flagLayeringIllusions ??
-                            ctx.config.thresholds?.flagLayeringIllusions ??
-                            false;
-                        if (flagIllusions && targetLayer === 'infrastructure') {
-                            issues.push(
-                                this.mkIssue(
-                                    ctx,
-                                    lineIdx,
-                                    'ARCH-DIR-003',
-                                    `Structural layering illusion: domain entity '${file}' directly imports infrastructure '${spec.resolvedPath}'.`,
-                                    SEVERITY_ERROR,
-                                    {
-                                        fromLayer: currentLayer,
-                                        toLayer: targetLayer,
-                                        targetPath: spec.resolvedPath,
-                                    },
-                                    'Invert dependency using interfaces defined in the domain.',
-                                ),
-                            );
-                        }
-                    }
-                }
+    /**
+     * External leaky dependency and headless boundary checks for a domain-layer file.
+     *
+     * @param spec - Specifier being audited.
+     * @param file - Repository-relative path of the importing file.
+     * @param currentLayer - Layer inferred for the importing file.
+     * @param targetLayer - Layer inferred for the imported module.
+     * @param lineIdx - Line index of the import statement.
+     * @param ctx - Analyzer context of the current file.
+     * @param opts - Architecture options resolved for this file.
+     * @param forbiddenModules - Forbidden module set from the options.
+     * @param issues - Issue accumulator the violations are pushed into.
+     */
+    private auditDomainImports(
+        spec: SpecifierInfo,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        forbiddenModules: Set<string>,
+        issues: Issue[],
+    ): void {
+        if (currentLayer === ARCHITECTURE_LAYER_DOMAIN) {
+            const basePkg = spec.raw.startsWith('@')
+                ? spec.raw.split('/').slice(0, 2).join('/')
+                : spec.raw.split('/')[0];
+            if (forbiddenModules.has(basePkg) || forbiddenModules.has(spec.raw)) {
+                const descriptor = ArchitectureMessages.DOMAIN_FRAMEWORK_LEAK(spec.raw);
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ARCH-LEAK-001',
+                        descriptor.message,
+                        SEVERITY_ERROR,
+                        { file, layer: currentLayer, specifier: spec.raw },
+                        descriptor.suggestion,
+                    ),
+                );
+            }
 
-                // Rule 2: Application cannot depend on Interface
-                if (
-                    currentLayer === 'application' &&
-                    targetLayer === ARCHITECTURE_LAYER_INTERFACE
-                ) {
-                    const descriptor = ArchitectureMessages.APPLICATION_LAYER_BREACH(
-                        targetLayer,
-                        spec.resolvedPath,
-                    );
+            // Headless architecture boundary check (ARCH-HDL-001)
+            const enforceHeadless =
+                opts.enforceHeadless ?? ctx.config.thresholds?.enforceHeadless ?? false;
+            if (
+                enforceHeadless &&
+                (FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
+                    FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw))
+            ) {
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ARCH-HDL-001',
+                        `Headless architecture violation: domain logic in '${file}' imports presentation framework '${spec.raw}'.`,
+                        SEVERITY_ERROR,
+                        { file, layer: currentLayer, specifier: spec.raw },
+                        'Decouple core domain logic from UI/IDE presentation frameworks.',
+                    ),
+                );
+            }
+        }
+    }
+
+    /**
+     * Cross-domain internal boundary bypass check (ARCH-BND-001).
+     *
+     * @param spec - Specifier being audited.
+     * @param file - Repository-relative path of the importing file.
+     * @param currentLayer - Layer inferred for the importing file.
+     * @param targetLayer - Layer inferred for the imported module.
+     * @param lineIdx - Line index of the import statement.
+     * @param ctx - Analyzer context of the current file.
+     * @param opts - Architecture options resolved for this file.
+     * @param forbiddenModules - Forbidden module set from the options.
+     * @param issues - Issue accumulator the violations are pushed into.
+     */
+    private auditCrossDomainBypass(
+        spec: SpecifierInfo,
+        file: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        issues: Issue[],
+    ): void {
+        const flagBypass =
+            opts.flagCrossDomainBypass ?? ctx.config.thresholds?.flagCrossDomainBypass ?? false;
+        if (
+            flagBypass &&
+            (spec.raw.includes('/internal/') ||
+                spec.raw.includes('/impl/') ||
+                spec.raw.includes('/private/'))
+        ) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'ARCH-BND-001',
+                    `Cross-domain internal boundary bypass: '${file}' imports private module '${spec.raw}'.`,
+                    SEVERITY_WARNING,
+                    { file, specifier: spec.raw },
+                    'Import through public module facade rather than private directories.',
+                ),
+            );
+        }
+    }
+
+    /**
+     * Rule 1: a domain module must not depend on application, infrastructure, or interface layers.
+     *
+     * @param spec - Specifier being audited.
+     * @param file - Repository-relative path of the importing file.
+     * @param currentLayer - Layer inferred for the importing file.
+     * @param targetLayer - Layer inferred for the imported module.
+     * @param lineIdx - Line index of the import statement.
+     * @param ctx - Analyzer context of the current file.
+     * @param opts - Architecture options resolved for this file.
+     * @param forbiddenModules - Forbidden module set from the options.
+     * @param issues - Issue accumulator the violations are pushed into.
+     */
+    private auditDomainDependency(
+        spec: SpecifierInfo,
+        resolvedPath: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        targetLayer: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        issues: Issue[],
+    ): void {
+        // Rule 1: Domain cannot depend on Application, Infrastructure, or Interface
+        if (currentLayer === ARCHITECTURE_LAYER_DOMAIN) {
+            if (
+                targetLayer === 'application' ||
+                targetLayer === 'infrastructure' ||
+                targetLayer === ARCHITECTURE_LAYER_INTERFACE
+            ) {
+                const descriptor = ArchitectureMessages.DOMAIN_INVERSION_BREACH(
+                    currentLayer,
+                    targetLayer,
+                    resolvedPath,
+                );
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ARCH-DIR-001',
+                        descriptor.message,
+                        SEVERITY_ERROR,
+                        {
+                            fromLayer: currentLayer,
+                            toLayer: targetLayer,
+                            targetPath: resolvedPath,
+                        },
+                        descriptor.suggestion,
+                    ),
+                );
+
+                // Structural layering illusion (ARCH-DIR-003)
+                const flagIllusions =
+                    opts.flagLayeringIllusions ??
+                    ctx.config.thresholds?.flagLayeringIllusions ??
+                    false;
+                if (flagIllusions && targetLayer === 'infrastructure') {
                     issues.push(
                         this.mkIssue(
                             ctx,
                             lineIdx,
-                            'ARCH-DIR-001',
-                            descriptor.message,
+                            'ARCH-DIR-003',
+                            `Structural layering illusion: domain entity '${file}' directly imports infrastructure '${resolvedPath}'.`,
                             SEVERITY_ERROR,
                             {
                                 fromLayer: currentLayer,
                                 toLayer: targetLayer,
-                                targetPath: spec.resolvedPath,
+                                targetPath: resolvedPath,
                             },
-                            descriptor.suggestion,
+                            'Invert dependency using interfaces defined in the domain.',
                         ),
                     );
                 }
+            }
+        }
+    }
 
-                // Rule 3: Interface should not directly bypass Application to Infrastructure
-                // (Skip-Layer)
-                if (
-                    currentLayer === ARCHITECTURE_LAYER_INTERFACE &&
-                    targetLayer === 'infrastructure'
-                ) {
-                    if (!opts.allowSkipLayers) {
-                        const descriptor = ArchitectureMessages.SKIP_LAYER_PENETRATION(
-                            targetLayer,
-                            spec.resolvedPath,
-                        );
-                        issues.push(
-                            this.mkIssue(
-                                ctx,
-                                lineIdx,
-                                'ARCH-DIR-002',
-                                descriptor.message,
-                                SEVERITY_WARNING,
-                                {
-                                    fromLayer: currentLayer,
-                                    toLayer: targetLayer,
-                                    targetPath: spec.resolvedPath,
-                                },
-                                descriptor.suggestion,
-                            ),
-                        );
-                    }
-                }
+    /**
+     * Rule 2: an application module must not depend on the interface layer.
+     *
+     * @param spec - Specifier being audited.
+     * @param file - Repository-relative path of the importing file.
+     * @param currentLayer - Layer inferred for the importing file.
+     * @param targetLayer - Layer inferred for the imported module.
+     * @param lineIdx - Line index of the import statement.
+     * @param ctx - Analyzer context of the current file.
+     * @param opts - Architecture options resolved for this file.
+     * @param forbiddenModules - Forbidden module set from the options.
+     * @param issues - Issue accumulator the violations are pushed into.
+     */
+    private auditApplicationDependency(
+        spec: SpecifierInfo,
+        resolvedPath: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        targetLayer: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        issues: Issue[],
+    ): void {
+        // Rule 2: Application cannot depend on Interface
+        if (currentLayer === 'application' && targetLayer === ARCHITECTURE_LAYER_INTERFACE) {
+            const descriptor = ArchitectureMessages.APPLICATION_LAYER_BREACH(
+                targetLayer,
+                resolvedPath,
+            );
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'ARCH-DIR-001',
+                    descriptor.message,
+                    SEVERITY_ERROR,
+                    {
+                        fromLayer: currentLayer,
+                        toLayer: targetLayer,
+                        targetPath: resolvedPath,
+                    },
+                    descriptor.suggestion,
+                ),
+            );
+        }
+    }
+
+    /**
+     * Rule 3: the interface layer must not skip the application layer.
+     *
+     * @param spec - Specifier being audited.
+     * @param file - Repository-relative path of the importing file.
+     * @param currentLayer - Layer inferred for the importing file.
+     * @param targetLayer - Layer inferred for the imported module.
+     * @param lineIdx - Line index of the import statement.
+     * @param ctx - Analyzer context of the current file.
+     * @param opts - Architecture options resolved for this file.
+     * @param forbiddenModules - Forbidden module set from the options.
+     * @param issues - Issue accumulator the violations are pushed into.
+     */
+    private auditInterfaceSkipLayer(
+        spec: SpecifierInfo,
+        resolvedPath: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        targetLayer: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        issues: Issue[],
+    ): void {
+        // Rule 3: Interface should not directly bypass Application to Infrastructure
+        // (Skip-Layer)
+        if (currentLayer === ARCHITECTURE_LAYER_INTERFACE && targetLayer === 'infrastructure') {
+            if (!opts.allowSkipLayers) {
+                const descriptor = ArchitectureMessages.SKIP_LAYER_PENETRATION(
+                    targetLayer,
+                    resolvedPath,
+                );
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ARCH-DIR-002',
+                        descriptor.message,
+                        SEVERITY_WARNING,
+                        {
+                            fromLayer: currentLayer,
+                            toLayer: targetLayer,
+                            targetPath: resolvedPath,
+                        },
+                        descriptor.suggestion,
+                    ),
+                );
             }
         }
     }
