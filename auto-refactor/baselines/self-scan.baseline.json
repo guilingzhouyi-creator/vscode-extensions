@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-19T05:44:42.856Z",
+  "timestamp": "2026-09-19T05:51:07.335Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -5530,21 +5530,14 @@
       "key": "large-file|large-file|src/core/types.ts",
       "count": 1,
       "severities": {
-        "error": 1
+        "warning": 1
       }
     },
     {
       "key": "constants|hardcoded-string|src/core/types.ts",
-      "count": 55,
+      "count": 43,
       "severities": {
-        "warning": 55
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/types.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 43
       }
     },
     {

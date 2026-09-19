@@ -1,7 +1,6 @@
 import type * as ts from 'typescript';
 import type { NormalizedNode, LanguageAdapter, Position } from './multilang';
 import type { IncrementalFileState } from './incrementalState';
-import type { EditRange } from './editDiff';
 
 /**
  * Module: Core Engine — Shared Type Contracts and Domain Model
@@ -11,14 +10,15 @@ import type { EditRange } from './editDiff';
  * Dependencies & Triggers: imports TypeScript's SourceFile type plus NormalizedNode /
  *   LanguageAdapter / Position from ./multilang, IncrementalFileState from
  *   ./incrementalState, EditRange from ./editDiff, and LogLevel from ./logger; re-exports
- *   Position, EditRange, and LogLevel plus the scoring, memory, trajectory, and Praxis type
- *   surfaces. Imported by analyzers, core modules, CLI/daemon code, and the api.ts barrel.
+ *   Position, EditRange, and LogLevel plus the scoring, memory, trajectory, Praxis and
+ *   diff (./diffTypes) type surfaces. Imported by analyzers, core modules, CLI/daemon code,
+ *   and the api.ts barrel.
  * Responsibilities: define the canonical Issue / IssueLocation / FileMetric records;
  *   threshold, output, comment, security, scale, maturity, and suppression knobs; Analyzer,
  *   AnalyzerContext, VisitFrame, and streaming visit/finalize contracts; AnalyzerDeclaration
- *   and CustomAnalyzerDeclaration registration; ScanConfig / ScanSummary / ScanReport;
- *   RefactoringPatch, ScanDiffOptions, DiffInput, DiffStreamEvent, WarmStats, DiffStats, and
- *   DiffDeltaReport for the diff API.
+ *   and CustomAnalyzerDeclaration registration; ScanConfig / ScanSummary / ScanReport.
+ *   The diff, warm-scan and streaming contracts live in ./diffTypes and are re-exported here
+ *   so this hub stays under the engine's own large-file fail threshold.
  * Exit Semantics & Design Rationale: this module performs no scanning or control flow; apart
  *   from re-export bindings it is erased at compile time, so importing it has no per-file
  *   cost. Keeping these declarations centralized prevents producer/consumer drift against
@@ -728,198 +728,17 @@ export interface ScanReport {
 export * from './scoring/scoringTypes';
 export * from './memory/types';
 export * from './trajectory/types';
-import type { PraxisPluginHooks, ReviewDiffHunk } from './praxis/contracts';
 export * from './praxis/contracts';
 /**
- * Options accepted by scanDiff and scanDiffDelta: the ScanOptions subset plus diff-specific
- * controls for disk verification, Praxis hooks, dependency graph, streaming, and memory.
+ * Diff, warm-scan and streaming contracts. Declared in ./diffTypes and re-exported here so the
+ * type hub stays a single import site for consumers without carrying the declarations itself.
  */
-export interface ScanDiffOptions {
-    root?: string;
-    configFile?: string;
-    format?: OutputFormat;
-    analyzers?: string[];
-    failOnIssue?: boolean;
-    include?: string[];
-    exclude?: string[];
-    logLevel?: LogLevel;
-    logFile?: string;
-    concurrency?: number;
-    workers?: number;
-    respectGitignore?: boolean;
-    failOnAnalyzerError?: boolean;
-    cache?: boolean;
-    cacheDir?: string;
-    cacheCustom?: boolean;
-    daemon?: 'auto' | 'on' | typeof DAEMON_MODE_OFF;
-    parser?: ParserKind;
-    verifyDiskContent?: boolean;
-    /** Path to baseline.json for ratchet comparison; mirrors ScanOptions so diff modes carry
-     * the same post-scan semantics as a full scan (suppressions + baseline annotations). */
-    baseline?: string;
-    /** Save current findings into a new baseline.json (grouped by default). */
-    updateBaseline?: string;
-    /** Baseline ratchet comparison granularity: id (exact issue id) | grouped. */
-    baselineGranularity?: 'id' | 'grouped';
-    praxisHooks?: PraxisPluginHooks;
-    /** Optional module dependency graph for cross-file impact analysis */
-    dependencyGraph?: any;
-    /**
-     * Streaming control mode: 'full' | 'issues_only' | 'summary_only' | 'disabled' (default 'full')
-     */
-    streamingMode?: 'full' | 'issues_only' | 'summary_only' | 'disabled';
-    /** Max streaming events before rate-limiting suppression (default unlimited) */
-    maxStreamEvents?: number;
-    /** Toggle emitting individual hunk events (default true) */
-    emitHunks?: boolean;
-    /** Active Agent UID performing or commanding this scan. */
-    agentUid?: string;
-    /** Enable review memory & semantic reuse (default true when caching is enabled). */
-    memory?: boolean;
-    /** Leveled security audit: 'off' | 'basic' (default) | 'full'. */
-    securityLevel?: SecurityLevel;
-    /**
-     * Evaluated or specified project maturity tier ('demo' | 'prototype' | 'production' |
-     * 'industrial').
-     */
-    maturityTier?: MaturityTier;
-    /** Optional AbortSignal for cooperative cancellation. */
-    signal?: AbortSignal;
-}
-
-/**
- * Self-contained refactoring proposal: the originating rule, a human-readable title, concrete
- * text edits with line/column ranges, and an optional ready-to-apply unified patch.
- */
-export interface RefactoringPatch {
-    ruleId: string;
-    title: string;
-    edits: Array<{
-        range: { startLine: number; startCol: number; endLine: number; endCol: number };
-        newText: string;
-    }>;
-    unifiedPatch?: string;
-}
-
-/**
- * Discriminated union of diff-stream events: file start, hunk ready, issue found (with an
- * optional fix), file done with per-file stats, and stream end with the total summary.
- */
-export type DiffStreamEvent =
-    | { type: 'file_start'; filePath: string; oldHash?: string; newHash?: string }
-    | { type: 'hunk_ready'; filePath: string; hunk: ReviewDiffHunk }
-    | { type: 'issue_found'; filePath: string; issue: Issue; fix?: RefactoringPatch }
-    | { type: 'file_done'; filePath: string; stats: { durationMs: number; issuesCount: number } }
-    | { type: 'stream_end'; totalSummary: ScanSummary };
-
-/**
- * Warm-scan statistics (docs/01-architecture/02-pipeline-and-caching.md §A2.2). Deliberately NOT
- * part of ScanReport —
- * stats are returned as a sibling field of scanWarm() so the report bytes stay identical
- * between cold and warm paths.
- */
-export interface WarmStats {
-    /** Whether the scan actually ran through the daemon (false ⇒ degraded to cold). */
-    daemonUsed: boolean;
-    /** L1 hits (file unchanged + session result reused, 0 reads). */
-    l1Hit: number;
-    /** L2 hits (content hash matched → cached issues/metric reused). */
-    l2Hit: number;
-    /** Files whose results came from any cache (L1+L2). */
-    cacheHit: number;
-    /** Files discovered. */
-    cacheTotal: number;
-    /** Files actually parsed+analyzed this scan. */
-    analyzed: number;
-    /** Whether the daemon worker pool was warm (hybrid startup disabled). */
-    poolWarm: boolean;
-    /** Wall-clock time spent inside the daemon (0 for degraded cold scans). */
-    daemonMs: number;
-    /** Files analyzed via the line-level incremental path this scan (0 when disabled). */
-    incrementalFiles: number;
-    /** Function-subtree reuse hits across incremental files this scan (0 when disabled). */
-    incrementalHit: number;
-}
-
-/**
- * A single changed file fed to `scanDiff` / `scanDiffDelta`
- * (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.2).
- * Discriminated union: `kind:'full'` supplies both old+new content (Myers runs internally);
- * `kind:'ranges'` supplies the new content plus the diff system's edit ranges (Myers skipped).
- * For `kind:'ranges'`, the three byte fields are UTF-8 byte offsets into the NEW content's
- * raw byte stream; the entry point converts them to UTF-16 code-unit offsets (src/core/utf8.ts).
- * Content fields accept a `string`; a `Buffer` may be passed at the API boundary and is decoded
- * with `buf.toString('utf8')` (BOM preserved) before reaching the engine.
- */
-export type DiffInput =
-    | {
-          kind: 'full';
-          /** Relative-to-root POSIX path (same convention as `collectFiles`, '/'-separated). */
-          filePath: string;
-          oldContent: string;
-          newContent: string;
-          oldContentHash?: string;
-          newContentHash?: string;
-      }
-    | {
-          kind: 'ranges';
-          filePath: string;
-          newContent: string;
-          /** startByte/oldEndByte/newEndByte are UTF-8 byte offsets (converted at entry). */
-          editRanges: EditRange[];
-          /** Optional; a resident daemon state may supply the previous content instead. */
-          oldContent?: string;
-          oldContentHash?: string;
-          newContentHash?: string;
-      };
-
-/**
- * Diff-scan statistics (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.3). Deliberately
- * NOT part of any
- * report — a sibling field of `scanDiff`/`scanDiffDelta` so report bytes never change.
- */
-export interface DiffStats extends WarmStats {
-    /** Diff inputs that actually participated (deduped + filtered to discovered files). */
-    diffFiles: number;
-    /** Diff inputs dropped (illegal path / not discovered / non-source extension). */
-    diffIgnored: number;
-    /** Changed files short-circuited as no-op (old===new or empty editRanges). */
-    byteEqual: number;
-    /** Changed files routed through the line-level incremental path. */
-    diffIncremental: number;
-    /** Changed files that fell back to a full rescan. */
-    diffFull: number;
-    /** `kind:'ranges'` inputs (Myers skipped). */
-    rangesProvided: number;
-    /** `kind:'ranges'` inputs that fell back to full (no state / no oldContent / invalid). */
-    rangesFallback: number;
-    /** `kind:'ranges'` inputs whose oldContent came from the resident daemon state. */
-    oldContentFromDaemon: number;
-}
-
-/**
- * `scanDiffDelta` report — the changed-file SUBSET of a full scan
- * (docs/03-incremental-and-diff/02-diff-interface-spec.md
- * §1.5). Not byte-equivalent to a cold scan by itself (it is a subset); its contract is
- * `delta.report ≡ filter(scanDiff.report, changed-file set)` per issue/metric, in the same
- * relative order.
- */
-export interface DiffDeltaReport {
-    tool: string;
-    version: string;
-    generatedAt: string;
-    root: string;
-    config: ScanConfig;
-    summary: {
-        filesScanned: number;
-        issuesTotal: number;
-        bySeverity: Record<Severity, number>;
-        byAnalyzer: Record<string, number>;
-        durationMs: number;
-        suppressedCount?: number;
-        warnings?: string[];
-        postScanPasses?: string[];
-    };
-    issues: Issue[];
-    fileMetrics: FileMetric[];
-}
+export type {
+    DiffDeltaReport,
+    DiffInput,
+    DiffStats,
+    DiffStreamEvent,
+    RefactoringPatch,
+    ScanDiffOptions,
+    WarmStats,
+} from './diffTypes';
