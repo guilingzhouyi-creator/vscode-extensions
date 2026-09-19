@@ -9,6 +9,7 @@
  * Exit Semantics & Design Rationale: Decomposes scanWithCache into focused sub-steps to guarantee
  *   low cyclomatic complexity and ensure byte-identical results with cold scans.
  */
+import { isFreshL1Hit } from './scanGuards';
 import { hasWorkerPool } from './scanGuards';
 
 import * as fs from 'fs';
@@ -102,7 +103,8 @@ export async function probeSingleFileCache(
     const rel = s.rel;
     if (s.fp) queue.l1Fps.push({ rel, fp: s.fp });
     const l1 = cache.lookupL1(rel);
-    if (s.fp && l1 && l1.mtimeMs === s.fp.mtimeMs && l1.size === s.fp.size) {
+    const fp = s.fp;
+    if (fp != null && isFreshL1Hit(fp.mtimeMs, fp.size, l1)) {
         const cached = sessionBucket.get(rel);
         if (cached) {
             perFile[i] = cached;
@@ -111,7 +113,7 @@ export async function probeSingleFileCache(
         }
         const fph = fpContext.fpHashFor(rel);
         const byPath = fpContext.l2Enabled
-            ? cache.lookupL2ByPath(fph, rel, s.fp.mtimeMs, s.fp.size)
+            ? cache.lookupL2ByPath(fph, rel, fp.mtimeMs, fp.size)
             : null;
         if (byPath) {
             const result = remapCachedResult(
