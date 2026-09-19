@@ -78,6 +78,36 @@ const NESTING_TYPES = new Set([
     'match_expression',
 ]);
 
+const RUST_NODE_KIND_MAP: Readonly<Record<string, NodeKind>> = {
+    source_file: NodeKind.SourceFile,
+    closure_expression: NodeKind.Function,
+    struct_item: NodeKind.Struct,
+    [NODE_KIND_IMPL_ITEM]: NodeKind.Impl,
+    trait_item: NodeKind.Trait,
+    let_declaration: NodeKind.Variable,
+    static_item: NodeKind.Variable,
+    const_item: NodeKind.Constant,
+    integer_literal: NodeKind.NumericLiteral,
+    float_literal: NodeKind.NumericLiteral,
+    string_literal: NodeKind.StringLiteral,
+    char_literal: NodeKind.Literal,
+    boolean_literal: NodeKind.Literal,
+    call_expression: NodeKind.Call,
+    binary_expression: NodeKind.BinaryExpr,
+    block: NodeKind.Block,
+};
+
+const NUMERIC_TOLERATED_PARENTS = new Set(['index_expression', 'tuple_index_expression']);
+const STRING_TOLERATED_PARENTS = new Set([
+    'macro_invocation',
+    'token_tree',
+    'attribute_item',
+    'attribute',
+    'use_declaration',
+    'use_wildcard',
+]);
+const CONST_BOUND_PARENTS = new Set(['const_item', 'static_item', 'enum_variant']);
+
 /**
  * Rust LanguageAdapter translating a tree-sitter-rust CST into the shared normalized AST.
  *
@@ -210,46 +240,17 @@ export class RustAdapter implements LanguageAdapter {
      * to `NodeKind.ControlFlow` for the branch types listed in BRANCH_TYPES.
      */
     private kindOf(sn: any, parent: any): NodeKind {
-        switch (sn.type) {
-            case 'source_file':
-                return NodeKind.SourceFile;
-            case 'function_item':
-                // A function declared inside an impl/trait block is a method.
-                return parent &&
-                    (parent.type === NODE_KIND_IMPL_ITEM || parent.type === 'trait_item')
-                    ? NodeKind.Method
-                    : NodeKind.Function;
-            case 'closure_expression':
-                return NodeKind.Function;
-            case 'struct_item':
-                return NodeKind.Struct;
-            case NODE_KIND_IMPL_ITEM:
-                return NodeKind.Impl;
-            case 'trait_item':
-                return NodeKind.Trait;
-            case 'let_declaration':
-            case 'static_item':
-                return NodeKind.Variable;
-            case 'const_item':
-                return NodeKind.Constant;
-            case 'integer_literal':
-            case 'float_literal':
-                return NodeKind.NumericLiteral;
-            case 'string_literal':
-                return NodeKind.StringLiteral;
-            case 'char_literal':
-            case 'boolean_literal':
-                return NodeKind.Literal;
-            case 'call_expression':
-                return NodeKind.Call;
-            case 'binary_expression':
-                return NodeKind.BinaryExpr;
-            case 'block':
-                return NodeKind.Block;
-            default:
-                if (BRANCH_TYPES.has(sn.type)) return NodeKind.ControlFlow;
-                return NodeKind.Other;
+        if (sn.type === 'function_item') {
+            return parent && (parent.type === NODE_KIND_IMPL_ITEM || parent.type === 'trait_item')
+                ? NodeKind.Method
+                : NodeKind.Function;
         }
+        const mapped = RUST_NODE_KIND_MAP[sn.type];
+        if (mapped !== undefined) {
+            return mapped;
+        }
+        if (BRANCH_TYPES.has(sn.type)) return NodeKind.ControlFlow;
+        return NodeKind.Other;
     }
 
     /**
@@ -270,6 +271,20 @@ export class RustAdapter implements LanguageAdapter {
     }
 
     /**
+     * Resolves binding identifier name from a let declaration pattern.
+     *
+     * @param sn - let declaration node.
+     * @returns identifier text or null.
+     */
+    private resolveLetPatternName(sn: any): string | null {
+        const pat = sn.childForFieldName && sn.childForFieldName('pattern');
+        if (!pat) return null;
+        if (pat.type === 'identifier') return pat.text;
+        const id = (pat.namedChildren || []).find((c: any) => c.type === 'identifier');
+        return id ? id.text : null;
+    }
+
+    /**
      * Resolve the declared name of a node for naming consumers.
      *
      * Handles function/struct/trait names, `let` patterns and the implemented type of an
@@ -281,16 +296,9 @@ export class RustAdapter implements LanguageAdapter {
     private nameOf(sn: any): string | null {
         const name = sn.childForFieldName && sn.childForFieldName('name');
         if (name && name.type === 'identifier') return name.text;
-        // `let x = ...` — the pattern is the binding name.
         if (sn.type === 'let_declaration') {
-            const pat = sn.childForFieldName && sn.childForFieldName('pattern');
-            if (pat) {
-                if (pat.type === 'identifier') return pat.text;
-                const id = (pat.namedChildren || []).find((c: any) => c.type === 'identifier');
-                if (id) return id.text;
-            }
+            return this.resolveLetPatternName(sn);
         }
-        // `impl Foo ...` — the implemented type is the class name.
         if (sn.type === NODE_KIND_IMPL_ITEM) {
             const ty = sn.childForFieldName && sn.childForFieldName('type');
             if (ty) return ty.text;
@@ -313,15 +321,13 @@ export class RustAdapter implements LanguageAdapter {
     /**
      * Resolve whether a literal is const-bound.
      *
-     * @param sn - literal node to classify.
+     * @param _sn - literal node to classify.
      * @param parent - raw parent; `undefined` means the literal has no parent context.
      * @returns `true` for literals under `const` / `static` items or enum variants.
      */
-    private isConstBoundOf(sn: any, parent: any): boolean {
+    private isConstBoundOf(_sn: any, parent: any): boolean {
         if (!parent) return false;
-        if (parent.type === 'const_item' || parent.type === 'static_item') return true;
-        if (parent.type === 'enum_variant') return true; // discriminant
-        return false;
+        return CONST_BOUND_PARENTS.has(parent.type);
     }
 
     /**
@@ -335,14 +341,8 @@ export class RustAdapter implements LanguageAdapter {
     private isToleratedOf(sn: any, parent: any): boolean {
         if (!parent) return false;
         if (sn.type === 'integer_literal' || sn.type === 'float_literal') {
-            if (parent.type === 'index_expression' || parent.type === 'tuple_index_expression')
-                return true;
-            return false;
+            return NUMERIC_TOLERATED_PARENTS.has(parent.type);
         }
-        // Strings: macros (println!/format!/panic!...) behave like i18n; attributes are config.
-        if (parent.type === 'macro_invocation' || parent.type === 'token_tree') return true;
-        if (parent.type === 'attribute_item' || parent.type === 'attribute') return true;
-        if (parent.type === 'use_declaration' || parent.type === 'use_wildcard') return true;
-        return false;
+        return STRING_TOLERATED_PARENTS.has(parent.type);
     }
 }
