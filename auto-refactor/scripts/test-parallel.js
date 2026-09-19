@@ -116,6 +116,10 @@ const PARALLEL_SUITES = [
     script: 'scripts/validate-phase14-trajectory-learning.js',
   },
   {
+    name: 'validate-e2e-stress',
+    script: 'scripts/validate-phase15-e2e-stress.js',
+  },
+  {
     name: 'validate-symbol-index-pack',
     composite: [
       'scripts/validate-symbol-index.js',
