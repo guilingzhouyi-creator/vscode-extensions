@@ -1,3 +1,6 @@
+export { categorizeImport, extractExemptionReason } from './dependencyLayoutHelpers';
+import type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
+export type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
 /**
  * Module: Core Intelligence — Import, Dependency & External Resource Layout
  * File Path: src/core/intelligence/dependencyLayout.ts
@@ -18,22 +21,6 @@ import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types
 /**
  * Kind of import statement categorized by origin.
  */
-export type ImportCategory = 'stdlib' | 'third-party' | 'internal-shared' | 'local';
-
-/**
- * Descriptor of an import or dependency reference in source code.
- */
-export interface ImportStatementInfo {
-    file: string;
-    line: number;
-    rawText: string;
-    moduleSpecifier: string;
-    category: ImportCategory;
-    isInsideFunction: boolean;
-    hasAuditExemption: boolean;
-    exemptionReason?: 'lazy' | 'optional' | 'platform' | 'cycle-breaker';
-    isWildcard: boolean;
-}
 
 /**
  * Descriptor of an external URL or resource reference.
@@ -54,93 +41,6 @@ export interface DependencyLayoutOptions {
     allowAuditedInFunctionImports?: boolean;
     flagUnmanagedResources?: boolean;
     flagWildcards?: boolean;
-}
-
-/**
- * Determine import category based on language and module specifier.
- *
- * @param specifier - Import target path or package name.
- * @param language - Target programming language.
- * @returns Categorized import classification.
- */
-export function categorizeImport(specifier: string, language: string): ImportCategory {
-    const nodeStdlib = new Set([
-        'fs',
-        'path',
-        'os',
-        'child_process',
-        'events',
-        'stream',
-        'util',
-        'crypto',
-        'http',
-        'https',
-        'url',
-        'net',
-        'assert',
-        'buffer',
-    ]);
-    const pyStdlib = new Set([
-        'sys',
-        'os',
-        're',
-        'json',
-        'math',
-        'typing',
-        'collections',
-        'itertools',
-        'pathlib',
-        'datetime',
-        'time',
-        'asyncio',
-        'logging',
-    ]);
-
-    if (language === 'typescript' || language === 'javascript') {
-        const clean = specifier.replace(/^node:/, '');
-        if (nodeStdlib.has(clean)) return 'stdlib';
-        if (specifier.startsWith('./') || specifier.startsWith('../')) return 'local';
-        if (specifier.startsWith('@shared/') || specifier.includes('/common/')) {
-            return 'internal-shared';
-        }
-        return 'third-party';
-    }
-
-    if (language === 'python') {
-        const firstSegment = specifier.split('.')[0];
-        if (pyStdlib.has(firstSegment)) return 'stdlib';
-        if (specifier.startsWith('.')) return 'local';
-        return 'third-party';
-    }
-
-    if (language === 'rust') {
-        if (specifier.startsWith('std::') || specifier.startsWith('core::')) return 'stdlib';
-        if (specifier.startsWith('crate::') || specifier.startsWith('super::')) return 'local';
-        return 'third-party';
-    }
-
-    if (language === 'gdscript') {
-        return 'local';
-    }
-
-    return 'third-party';
-}
-
-/**
- * Inspect in-function import comments for audited exemption tags.
- *
- * @param surroundingComment - Leading or inline comment text.
- * @returns Exemption reason when justified, or undefined.
- */
-export function extractExemptionReason(
-    surroundingComment: string,
-): 'lazy' | 'optional' | 'platform' | 'cycle-breaker' | undefined {
-    const lower = surroundingComment.toLowerCase();
-    if (lower.includes('@lazy') || lower.includes('deferred load')) return 'lazy';
-    if (lower.includes('@optional') || lower.includes('optional dependency')) return 'optional';
-    if (lower.includes('@platform') || lower.includes('platform-specific')) return 'platform';
-    if (lower.includes('cycle') || lower.includes('break circular')) return 'cycle-breaker';
-    return undefined;
 }
 
 /**
