@@ -132,6 +132,20 @@ const w2 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   
 
 `hardcoded-string` 对「已知值表」类文件按**文件+规则**粒度登记豁免，判据与 `semanticLiterals.ts` 一致：表项本身即数据（规则 id、分析器 id、维度 id），提成具名标量只会让表失去可读性。当前登记三处：`dimensionRuleTable.ts`、`dimensionFamilyDeductions.ts`、`scoringTypes.ts`。其余产品代码（`src/**`）的字面量仍逐条要求提取；新增豁免必须在配置里写明理由，并在提交信息中记录规则级前后对照。
 
+### 6.8 结构债台账（分类治理，禁再"按指标平推"）
+
+基线里现存的结构债**不是同一种债**，按解法分三类登记；未分类前禁止再用"行数/CC 一刀切"的方式平推（历史上出现过「文件变短但函数 CC 不变」的假进展）：
+
+| 类别 | 判据 | 当前规模（src） | 代表 | 正确解法 |
+|------|------|------|------|------|
+| A. 扁平派发表 | 同一形状的分支反复调用同一个回调/返回同一个结构 | 约 8 个 CC≥20 函数 | `applyQualityDimensionDeductions`（已在 22cb6eb 表化，CC 23→5）、`ConstantsAnalyzer.detectDuplicates`(23)、`RustAdapter.kindOf`(23)、`PythonAdapter.mapNode/kindOf`(20)、`inferSemanticLayer`(23)、`governance/rules/*.checkFile`(20-24) | **改数据表/查表**（键 → 结果），不是继续抽 helper |
+| B. 真算法 | 复杂度来自算法本身（差分/求解/图遍历），抽 helper 只会掩盖 | CC≥20 中约 5 个 | `editDiff.fastDiff`(23)、`histogramDiff.solve`(22)、`editDiff.myersDiff`(20) | **保留并具名说明**（在文件头/函数 JSDoc 写清复杂度来源）；**不**加抑制、**不**拆 |
+| C. 真缠绕 | 嵌套/早期返回缺失导致的深分支 | 其余 CC 13-19 多数 | `src/index.ts main`(24)、`dualTrackPipeline.executeDualTrack`(23)、`workerScheduler` 内匿名(21) | 抽 guard / 降嵌套 / 提前返回 |
+
+大文件（src 40 个 ≥400 行，前 10：types 926、editDiff 850、architecture 824、api 824、dependencyGraph 817、comments 796、hygiene 792、cache 741、config 706、dataFlow 673）按同一原则处理：**先按职责切**（A/B/C 里属于哪一类就按哪一类切），切完必须复核目标函数的 CC 是否真的下降——只降行数不算完成。
+
+护栏：`gate:self` 只在**新增**上阻断，因此"把告警搬进新文件"或"重冻基线"都不会被误判为进展；每次重冻必须附逐键比对（新增键要么为零，要么全部落在已登记抑制内）。
+
 ---
 
 ## 📐 7. 架构图表 (Mermaid)
