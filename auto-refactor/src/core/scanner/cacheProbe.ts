@@ -9,6 +9,7 @@
  * Exit Semantics & Design Rationale: Decomposes scanWithCache into focused sub-steps to guarantee
  *   low cyclomatic complexity and ensure byte-identical results with cold scans.
  */
+import { hasWorkerPool } from './diffHints';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -226,7 +227,7 @@ export async function executeCacheMisses(
     let results: { issues: Issue[]; metric: FileMetric | null }[];
     let poolWarm = false;
 
-    if (useWorkers && opts.pool) {
+    if (hasWorkerPool(useWorkers, opts)) {
         const entry = opts.pool.getOrCreate(poolFp, cfg, workerDescs, effWorkers);
         poolWarm = entry.warm;
         try {

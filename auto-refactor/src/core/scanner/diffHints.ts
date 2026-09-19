@@ -365,9 +365,9 @@ export async function processUnchangedFile(
  * @param opts - Diff scan options carrying the optional persistent pool manager.
  * @returns True when the batch should be handled by the worker pool.
  */
-export function hasWorkerPool(
+export function hasWorkerPool<T extends { pool?: WorkerPoolManager }>(
     useWorkers: boolean,
-    opts: ScanWithDiffOptions,
-): opts is ScanWithDiffOptions & { pool: WorkerPoolManager } {
+    opts: T,
+): opts is T & { pool: WorkerPoolManager } {
     return useWorkers && opts.pool !== undefined;
 }
