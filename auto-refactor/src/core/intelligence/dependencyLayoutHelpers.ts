@@ -23,6 +23,9 @@
  *   structured issues conforming to the Section VII result model.
  */
 
+/**
+ * Category an import specifier falls into for the dependency-layout report.
+ */
 export type ImportCategory = 'stdlib' | 'third-party' | 'internal-shared' | 'local';
 
 /**
