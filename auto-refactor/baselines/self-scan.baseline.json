@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-18T16:18:50.155Z",
+  "timestamp": "2026-09-19T03:26:07.312Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -218,10 +218,6 @@
     {
       "key": "constants|magic-number|scripts/gate-self.js",
       "count": 3
-    },
-    {
-      "key": "comments|CMT-WID-001|scripts/test-parallel.js",
-      "count": 5
     },
     {
       "key": "constants|hardcoded-string|scripts/test-parallel.js",
@@ -1005,23 +1001,23 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/architecture.ts",
-      "count": 57
+      "count": 69
     },
     {
       "key": "complexity|high-complexity|src/analyzers/architecture.ts",
-      "count": 2
+      "count": 1
     },
     {
       "key": "governance|GOV-LOG-001|src/analyzers/architecture.ts",
-      "count": 4
+      "count": 5
     },
     {
       "key": "simplify|SIM-LONG-001|src/analyzers/architecture.ts",
-      "count": 2
+      "count": 3
     },
     {
       "key": "governance|GOV-PRF-002|src/analyzers/architecture.ts",
-      "count": 3
+      "count": 4
     },
     {
       "key": "hygiene|HYG-CLN-001|src/analyzers/architecture.ts",
@@ -1088,6 +1084,26 @@
       "count": 1
     },
     {
+      "key": "constants|hardcoded-string|src/analyzers/dataArchitecture.ts",
+      "count": 11
+    },
+    {
+      "key": "complexity|high-complexity|src/analyzers/dataArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/analyzers/dataArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/analyzers/dataArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/analyzers/dataArchitecture.ts",
+      "count": 1
+    },
+    {
       "key": "constants|hardcoded-string|src/analyzers/dependencyGraph.ts",
       "count": 8
     },
@@ -1098,6 +1114,30 @@
     {
       "key": "governance|GOV-TYP-003|src/analyzers/dependencyGraph.ts",
       "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/analyzers/dependencyLayout.ts",
+      "count": 11
+    },
+    {
+      "key": "complexity|high-complexity|src/analyzers/dependencyLayout.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/analyzers/dependencyLayout.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/analyzers/dependencyLayout.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/analyzers/dependencyLayout.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/analyzers/dependencyLayout.ts",
+      "count": 4
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/docs.ts",
@@ -1320,6 +1360,14 @@
       "count": 1
     },
     {
+      "key": "constants|hardcoded-string|src/analyzers/testModernity.ts",
+      "count": 7
+    },
+    {
+      "key": "complexity|high-complexity|src/analyzers/testModernity.ts",
+      "count": 1
+    },
+    {
       "key": "large-file|large-file|src/analyzers/tsModern.ts",
       "count": 1
     },
@@ -1337,7 +1385,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/api.ts",
-      "count": 72
+      "count": 80
     },
     {
       "key": "hygiene|HYG-CLN-001|src/api.ts",
@@ -1417,7 +1465,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/analyzerRegistry.ts",
-      "count": 18
+      "count": 21
     },
     {
       "key": "performance|PRF-MEM-001|src/core/analyzerRegistry.ts",
@@ -1477,7 +1525,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/config.ts",
-      "count": 52
+      "count": 55
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/config.ts",
@@ -1505,7 +1553,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/configTuning.ts",
-      "count": 14
+      "count": 17
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/configTuning.ts",
@@ -1964,6 +2012,38 @@
       "count": 1
     },
     {
+      "key": "large-file|large-file|src/core/intelligence/dataArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/intelligence/dataArchitecture.ts",
+      "count": 35
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/core/intelligence/dataArchitecture.ts",
+      "count": 3
+    },
+    {
+      "key": "complexity|high-complexity|src/core/intelligence/dataArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/intelligence/dataArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/dataArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/intelligence/dataArchitecture.ts",
+      "count": 6
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/intelligence/dataArchitecture.ts",
+      "count": 1
+    },
+    {
       "key": "large-file|large-file|src/core/intelligence/dataFlow.ts",
       "count": 1
     },
@@ -1990,6 +2070,42 @@
     {
       "key": "governance|GOV-PRF-001|src/core/intelligence/dataFlow.ts",
       "count": 1
+    },
+    {
+      "key": "large-file|large-file|src/core/intelligence/dependencyLayout.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/intelligence/dependencyLayout.ts",
+      "count": 7
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayout.ts",
+      "count": 74
+    },
+    {
+      "key": "complexity|high-complexity|src/core/intelligence/dependencyLayout.ts",
+      "count": 2
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/dependencyLayout.ts",
+      "count": 2
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/intelligence/dependencyLayout.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/intelligence/dependencyLayout.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/core/intelligence/dependencyLayout.ts",
+      "count": 6
+    },
+    {
+      "key": "constants|magic-number|src/core/intelligence/dependencyLayout.ts",
+      "count": 2
     },
     {
       "key": "performance|PRF-MEM-001|src/core/intelligence/errorFlow.ts",
@@ -2052,6 +2168,66 @@
       "count": 1
     },
     {
+      "key": "large-file|large-file|src/core/intelligence/semanticArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/intelligence/semanticArchitecture.ts",
+      "count": 54
+    },
+    {
+      "key": "complexity|high-complexity|src/core/intelligence/semanticArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/intelligence/semanticArchitecture.ts",
+      "count": 7
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/intelligence/semanticArchitecture.ts",
+      "count": 2
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/semanticArchitecture.ts",
+      "count": 5
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/core/intelligence/semanticArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/intelligence/semanticArchitecture.ts",
+      "count": 1
+    },
+    {
+      "key": "large-file|large-file|src/core/intelligence/semanticComplexity.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/intelligence/semanticComplexity.ts",
+      "count": 3
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/semanticComplexity.ts",
+      "count": 4
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/intelligence/semanticComplexity.ts",
+      "count": 7
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/intelligence/semanticComplexity.ts",
+      "count": 20
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/core/intelligence/semanticComplexity.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/intelligence/semanticComplexity.ts",
+      "count": 1
+    },
+    {
       "key": "constants|hardcoded-string|src/core/intelligence/symbolIndex.ts",
       "count": 27
     },
@@ -2073,6 +2249,38 @@
     },
     {
       "key": "performance|PRF-ALG-001|src/core/intelligence/symbolIndex.ts",
+      "count": 1
+    },
+    {
+      "key": "large-file|large-file|src/core/intelligence/testModernity.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|magic-number|src/core/intelligence/testModernity.ts",
+      "count": 4
+    },
+    {
+      "key": "complexity|high-complexity|src/core/intelligence/testModernity.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/intelligence/testModernity.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/testModernity.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/intelligence/testModernity.ts",
+      "count": 15
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/intelligence/testModernity.ts",
+      "count": 7
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/intelligence/testModernity.ts",
       "count": 1
     },
     {
@@ -2497,7 +2705,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/router/sparseRuleRouter.ts",
-      "count": 21
+      "count": 24
     },
     {
       "key": "complexity|high-complexity|src/core/router/sparseRuleRouter.ts",
@@ -2525,7 +2733,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/entries/analyzers.ts",
-      "count": 82
+      "count": 58
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/rules/entries/analyzers.ts",
@@ -2544,6 +2752,18 @@
       "count": 2
     },
     {
+      "key": "large-file|large-file|src/core/rules/entries/analyzersModern.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/rules/entries/analyzersModern.ts",
+      "count": 43
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/rules/entries/analyzersModern.ts",
+      "count": 1
+    },
+    {
       "key": "constants|duplicate-literal|src/core/rules/entries/governance.ts",
       "count": 1
     },
@@ -2557,7 +2777,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/entries/platform.ts",
-      "count": 26
+      "count": 32
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/rules/entries/platform.ts",
@@ -2784,6 +3004,10 @@
       "count": 39
     },
     {
+      "key": "constants|hardcoded-string|src/core/semanticTypes.ts",
+      "count": 5
+    },
+    {
       "key": "large-file|large-file|src/core/sourceMask.ts",
       "count": 1
     },
@@ -2917,7 +3141,7 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/types.ts",
-      "count": 54
+      "count": 55
     },
     {
       "key": "governance|GOV-TYP-003|src/core/types.ts",
