@@ -17,6 +17,8 @@
  */
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import { ANALYZER_COMPLEXITY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
 import { locN } from '../utils/normalized';
@@ -28,21 +30,7 @@ import {
     detectComplexityAmplification,
     isBoundedCollection,
 } from '../core/intelligence/semanticComplexity';
-
-/**
- * Cyclomatic-complexity value at or above which the extraction hint is labelled critical.
- */
-const CRITICAL_COMPLEXITY_THRESHOLD = 30;
-
-/**
- * Cyclomatic-complexity value at or above which the extraction hint is labelled high.
- */
-const HIGH_COMPLEXITY_THRESHOLD = 20;
-
-/**
- * Number of leading extraction tips shown for the high-complexity hint tier.
- */
-const HIGH_COMPLEXITY_TIP_COUNT = 3;
+import { evaluateStructuredClarity, formatOptimizationHint } from './structuredClarity';
 
 /**
  * Maximum window of lines inside a loop body inspected for allocations and blocking I/O.
@@ -159,26 +147,46 @@ export class ComplexityAnalyzer implements Analyzer {
             cc = cyclomaticComplexity(node);
         }
         if (state) state.setComplexity(fnKey, cc);
-        if (cc < t.complexityWarn) return;
 
-        const severity: Severity = cc >= t.complexityFail ? 'error' : 'warning';
+        const clarity = evaluateStructuredClarity(node, ctx, t.complexityWarn, t.complexityFail);
+        if (cc < clarity.effectiveWarn) return;
+
+        const severity: Severity = cc >= clarity.effectiveFail ? SEVERITY_ERROR : SEVERITY_WARNING;
         const first = node.children && node.children[0];
         const startNode = first && first.rawKind === 'FunctionKeyword' ? first : node;
 
+        const message = clarity.isStructurallyClear
+            ? `Function "${name}" has cyclomatic complexity ${cc} (exceeds relaxed threshold ` +
+              `${clarity.effectiveWarn} for shallow structure).`
+            : `Function "${name}" has cyclomatic complexity ${cc} (threshold ${t.complexityWarn}).`;
+
+        const suggestion = clarity.isStructurallyClear
+            ? 'Function has flat control flow but high branching. ' +
+              'Consider a lookup table (map/strategy pattern) to eliminate branches.'
+            : formatOptimizationHint(cc);
+
+        const detail: Record<string, unknown> = {
+            function: name,
+            cyclomaticComplexity: cc,
+            warn: t.complexityWarn,
+            fail: t.complexityFail,
+        };
+        if (clarity.isStructurallyClear) {
+            detail.effectiveWarn = clarity.effectiveWarn;
+            detail.effectiveFail = clarity.effectiveFail;
+            detail.maxBranchDepth = clarity.maxDepth;
+            detail.structuredClarity = true;
+        }
+
         this.issues.push({
             id: `complexity:high-complexity:${ctx.filePath}:${node.start?.line ?? 1}`,
-            analyzer: 'complexity',
+            analyzer: ANALYZER_COMPLEXITY,
             rule: 'high-complexity',
             severity,
-            message: `Function "${name}" has cyclomatic complexity ${cc} (threshold ${t.complexityWarn}).`,
+            message,
             location: locN(startNode, ctx.filePath),
-            detail: {
-                function: name,
-                cyclomaticComplexity: cc,
-                warn: t.complexityWarn,
-                fail: t.complexityFail,
-            },
-            suggestion: this.optimizationHint(cc),
+            detail,
+            suggestion,
         });
     }
 
@@ -198,20 +206,6 @@ export class ComplexityAnalyzer implements Analyzer {
 
     getLoopSites(): Map<string, LoopSite[]> {
         return this.loopSites;
-    }
-
-    private optimizationHint(cc: number): string {
-        const tips = [
-            'Extract deeply nested branches into small, well-named helper functions.',
-            'Replace nested conditionals with early returns / guard clauses.',
-            'Replace long switch/if-else chains with a lookup table (map/object/strategy).',
-            'Decompose boolean expressions and repeated conditionals into named predicates.',
-        ];
-        if (cc >= CRITICAL_COMPLEXITY_THRESHOLD) return `Critical complexity. ${tips.join(' ')}`;
-        if (cc >= HIGH_COMPLEXITY_THRESHOLD) {
-            return `High complexity. ${tips.slice(0, HIGH_COMPLEXITY_TIP_COUNT).join(' ')}`;
-        }
-        return `Moderate complexity. ${tips.slice(0, 2).join(' ')}`;
     }
 }
 
