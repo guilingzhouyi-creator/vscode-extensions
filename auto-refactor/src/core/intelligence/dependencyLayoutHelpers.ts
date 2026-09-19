@@ -8,6 +8,67 @@
  * Exit Semantics & Design Rationale: Pure helpers with no I/O; the analyzer keeps traversal,
  *   option defaults, and severity policy.
  */
+/** Import category of a language standard-library module. */
+const CATEGORY_STDLIB = 'stdlib';
+/** Import category of a project-local module. */
+const CATEGORY_LOCAL = 'local';
+/** Import category of a module shared across internal packages. */
+const CATEGORY_INTERNAL_SHARED = 'internal-shared';
+/** Import category of an external dependency. */
+const CATEGORY_THIRD_PARTY = 'third-party';
+/** Exemption reason for a deferred (lazy) dependency. */
+const REASON_LAZY = 'lazy';
+/** Exemption reason for an optional dependency. */
+const REASON_OPTIONAL = 'optional';
+/** Exemption reason for a platform-specific dependency. */
+const REASON_PLATFORM = 'platform';
+/** Exemption reason for a dependency that breaks an import cycle. */
+const REASON_CYCLE_BREAKER = 'cycle-breaker';
+/** Language id of TypeScript sources. */
+const LANGUAGE_TYPESCRIPT = 'typescript';
+/** Language id of JavaScript sources. */
+const LANGUAGE_JAVASCRIPT = 'javascript';
+/** Language id of Python sources. */
+const LANGUAGE_PYTHON = 'python';
+/** Language id of Rust sources. */
+const LANGUAGE_RUST = 'rust';
+/** Language id of GDScript sources. */
+const LANGUAGE_GDSCRIPT = 'gdscript';
+/** Specifier prefix of a sibling module. */
+const PREFIX_RELATIVE = './';
+/** Specifier prefix of a parent-directory module. */
+const PREFIX_PARENT = '../';
+/** Specifier prefix of the shared internal package. */
+const PREFIX_SHARED = '@shared/';
+/** Path fragment marking a shared common directory. */
+const FRAGMENT_COMMON = '/common/';
+/** Specifier prefix of a relative import. */
+const PREFIX_DOT = '.';
+/** Rust standard-library path prefix. */
+const PREFIX_RUST_STD = 'std::';
+/** Rust core-library path prefix. */
+const PREFIX_RUST_CORE = 'core::';
+/** Rust crate-local path prefix. */
+const PREFIX_RUST_CRATE = 'crate::';
+/** Rust parent-module path prefix. */
+const PREFIX_RUST_SUPER = 'super::';
+/** Comment marker declaring a lazy dependency. */
+const MARKER_LAZY = '@lazy';
+/** Comment phrase declaring a deferred load. */
+const MARKER_DEFERRED = 'deferred load';
+/** Comment marker declaring an optional dependency. */
+const MARKER_OPTIONAL = '@optional';
+/** Comment phrase declaring an optional dependency. */
+const MARKER_OPTIONAL_DEP = 'optional dependency';
+/** Comment marker declaring a platform-specific dependency. */
+const MARKER_PLATFORM = '@platform';
+/** Comment phrase declaring a platform-specific dependency. */
+const MARKER_PLATFORM_SPECIFIC = 'platform-specific';
+/** Comment phrase indicating an import cycle. */
+const MARKER_CYCLE = 'cycle';
+/** Comment phrase declaring an intentional cycle break. */
+const MARKER_BREAK_CIRCULAR = 'break circular';
+
 /**
  * Module: Core Intelligence — Import, Dependency & External Resource Layout
  * File Path: src/core/intelligence/dependencyLayout.ts
@@ -83,34 +144,37 @@ export function categorizeImport(specifier: string, language: string): ImportCat
         'logging',
     ]);
 
-    if (language === 'typescript' || language === 'javascript') {
+    if (language === LANGUAGE_TYPESCRIPT || language === LANGUAGE_JAVASCRIPT) {
         const clean = specifier.replace(/^node:/, '');
-        if (nodeStdlib.has(clean)) return 'stdlib';
-        if (specifier.startsWith('./') || specifier.startsWith('../')) return 'local';
-        if (specifier.startsWith('@shared/') || specifier.includes('/common/')) {
-            return 'internal-shared';
+        if (nodeStdlib.has(clean)) return CATEGORY_STDLIB;
+        if (specifier.startsWith(PREFIX_RELATIVE) || specifier.startsWith(PREFIX_PARENT))
+            return CATEGORY_LOCAL;
+        if (specifier.startsWith(PREFIX_SHARED) || specifier.includes(FRAGMENT_COMMON)) {
+            return CATEGORY_INTERNAL_SHARED;
         }
-        return 'third-party';
+        return CATEGORY_THIRD_PARTY;
     }
 
-    if (language === 'python') {
+    if (language === LANGUAGE_PYTHON) {
         const firstSegment = specifier.split('.')[0];
-        if (pyStdlib.has(firstSegment)) return 'stdlib';
-        if (specifier.startsWith('.')) return 'local';
-        return 'third-party';
+        if (pyStdlib.has(firstSegment)) return CATEGORY_STDLIB;
+        if (specifier.startsWith(PREFIX_DOT)) return CATEGORY_LOCAL;
+        return CATEGORY_THIRD_PARTY;
     }
 
-    if (language === 'rust') {
-        if (specifier.startsWith('std::') || specifier.startsWith('core::')) return 'stdlib';
-        if (specifier.startsWith('crate::') || specifier.startsWith('super::')) return 'local';
-        return 'third-party';
+    if (language === LANGUAGE_RUST) {
+        if (specifier.startsWith(PREFIX_RUST_STD) || specifier.startsWith(PREFIX_RUST_CORE))
+            return CATEGORY_STDLIB;
+        if (specifier.startsWith(PREFIX_RUST_CRATE) || specifier.startsWith(PREFIX_RUST_SUPER))
+            return CATEGORY_LOCAL;
+        return CATEGORY_THIRD_PARTY;
     }
 
-    if (language === 'gdscript') {
-        return 'local';
+    if (language === LANGUAGE_GDSCRIPT) {
+        return CATEGORY_LOCAL;
     }
 
-    return 'third-party';
+    return CATEGORY_THIRD_PARTY;
 }
 /**
  * Inspect in-function import comments for audited exemption tags.
@@ -122,9 +186,12 @@ export function extractExemptionReason(
     surroundingComment: string,
 ): 'lazy' | 'optional' | 'platform' | 'cycle-breaker' | undefined {
     const lower = surroundingComment.toLowerCase();
-    if (lower.includes('@lazy') || lower.includes('deferred load')) return 'lazy';
-    if (lower.includes('@optional') || lower.includes('optional dependency')) return 'optional';
-    if (lower.includes('@platform') || lower.includes('platform-specific')) return 'platform';
-    if (lower.includes('cycle') || lower.includes('break circular')) return 'cycle-breaker';
+    if (lower.includes(MARKER_LAZY) || lower.includes(MARKER_DEFERRED)) return REASON_LAZY;
+    if (lower.includes(MARKER_OPTIONAL) || lower.includes(MARKER_OPTIONAL_DEP))
+        return REASON_OPTIONAL;
+    if (lower.includes(MARKER_PLATFORM) || lower.includes(MARKER_PLATFORM_SPECIFIC))
+        return REASON_PLATFORM;
+    if (lower.includes(MARKER_CYCLE) || lower.includes(MARKER_BREAK_CIRCULAR))
+        return REASON_CYCLE_BREAKER;
     return undefined;
 }
