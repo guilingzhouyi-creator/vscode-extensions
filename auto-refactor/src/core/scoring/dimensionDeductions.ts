@@ -9,24 +9,65 @@
  * Exit Semantics & Design Rationale: Pure functions with zero side effects beyond calling the
  *   provided deduction applier callback; swallows no errors and performs no I/O.
  */
+import {
+    DEDUCTION_MISSING_PUBLIC_API_DOC,
+    DEDUCTION_DUPLICATE_LITERAL,
+    DEDUCTION_MAGIC_NUMBER,
+    DEDUCTION_HARDCODED_STRING,
+    DIMENSION_ARCHITECTURE_CONSISTENCY,
+    DEDUCTION_LINE_COUNT_OVERFLOW,
+    DEDUCTION_CYCLOMATIC_COMPLEXITY,
+    DEDUCTION_BANNED_JARGON,
+    DEDUCTION_ERROR_TECH_DEBT,
+    DEDUCTION_DEPRECATED_FEATURE,
+    DEDUCTION_NESTING_DEPTH_OVERFLOW,
+    DEDUCTION_EXCESSIVE_EXPORTED_SYMBOLS,
+    DEDUCTION_NAMING_VIOLATION,
+    DEDUCTION_SUBSTANDARD_COMMENT,
+    DEDUCTION_WARNING_TECH_DEBT,
+    MAX_NESTING_DEPTH,
+    MAX_EXPORTED_SYMBOLS,
+    ANALYZER_GOVERNANCE,
+    ANALYZER_LARGE_FILE,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_COMMENTS,
+    ANALYZER_CONSTANTS,
+    DIMENSION_STANDARDIZATION,
+    DIMENSION_MODERNITY,
+    DIMENSION_MAINTAINABILITY,
+    DIMENSION_COMMENT_QUALITY,
+    DIMENSION_DUPLICATION,
+    DIMENSION_TECH_DEBT_RISK,
+    FRAGMENT_PLACEHOLDER_MARKER,
+    FRAGMENT_NAMING,
+    FRAGMENT_LINES,
+    FRAGMENT_LEGACY,
+    FRAGMENT_DEPRECATED,
+    FRAGMENT_NESTING,
+    FRAGMENT_BANNED,
+    FRAGMENT_JARGON,
+    FRAGMENT_MISSING,
+    FRAGMENT_DUPLICATE,
+    FRAGMENT_MAGIC,
+    FRAGMENT_ERROR,
+    FRAGMENT_WARNING,
+} from './dimensionLiterals';
+import {
+    applyArchitectureDeductions,
+    applySemanticPurityDeductions,
+    applySecurityDeductions,
+    applyPerformanceDeductions,
+} from './dimensionFamilyDeductions';
+export {
+    applyArchitectureDeductions,
+    applySemanticPurityDeductions,
+    applySecurityDeductions,
+    applyPerformanceDeductions,
+} from './dimensionFamilyDeductions';
+
 import type { Issue, FileMetric } from '../types';
 import { ScoringRationales } from '../messages';
 import type { QualityDimension } from './scoringTypes';
-
-const DEDUCTION_CIRCULAR_DEPENDENCY = 25;
-const DEDUCTION_CRITICAL_CODE_EXECUTION = 40;
-const DEDUCTION_CRITICAL_COMMAND_INJECTION = 40;
-const DEDUCTION_PROTOTYPE_POLLUTION = 35;
-const DEDUCTION_INSECURE_RANDOMNESS = 25;
-const DEDUCTION_GENERIC_SECURITY = 25;
-const DEDUCTION_HARDCODED_CREDENTIAL = 50;
-const DEDUCTION_MISSING_PUBLIC_API_DOC = 8;
-const DEDUCTION_DUPLICATE_LITERAL = 8;
-const DEDUCTION_MAGIC_NUMBER = 4;
-const DEDUCTION_HARDCODED_STRING = 3;
-
-const DIMENSION_ARCHITECTURE_CONSISTENCY = 'architectureConsistency';
-const DIMENSION_CODE_SECURITY = 'codeSecurity';
 
 /**
  * Explicit rule-family -> quality dimension routing for the quantified standard.
@@ -58,97 +99,13 @@ export function familyDimensionOf(rule: string): QualityDimension | null {
     return best === null ? null : FAMILY_DIMENSIONS[best];
 }
 
-const DEDUCTION_DTO_CREDENTIAL_LEAK = 30;
-const DEDUCTION_PATH_TRAVERSAL = 30;
-const DEDUCTION_POTENTIAL_INJECTION = 30;
-const DEDUCTION_LAYER_CONSTRAINT_VIOLATION = 20;
-const DEDUCTION_BROKEN_HASH = 20;
-const DEDUCTION_SENSITIVE_DATA_LOGGED = 20;
-const DEDUCTION_MEMORY_LEAK_RISK = 20;
-const DEDUCTION_ARCHITECTURE_DESIGN_VIOLATION = 15;
-const DEDUCTION_TRANSIENT_LOOP_ALLOCATION = 15;
-const DEDUCTION_LINE_COUNT_OVERFLOW = 15;
-const DEDUCTION_CYCLOMATIC_COMPLEXITY = 15;
-const DEDUCTION_BANNED_JARGON = 15;
-const DEDUCTION_ERROR_TECH_DEBT = 15;
-const DEDUCTION_TYPE_SAFETY_ESCAPE = 10;
-const DEDUCTION_UNREACHABLE_DEAD_CODE = 10;
-const DEDUCTION_INEFFICIENT_ALGORITHM = 10;
-const DEDUCTION_DEPRECATED_FEATURE = 10;
-const DEDUCTION_NESTING_DEPTH_OVERFLOW = 10;
-const DEDUCTION_EXCESSIVE_EXPORTED_SYMBOLS = 10;
-const DEDUCTION_UNUSED_BINDING = 5;
-const DEDUCTION_NAMING_VIOLATION = 5;
-const DEDUCTION_SUBSTANDARD_COMMENT = 5;
-const DEDUCTION_WARNING_TECH_DEBT = 5;
-const MAX_NESTING_DEPTH = 5;
-const MAX_EXPORTED_SYMBOLS = 30;
-
 /** Analyzer ids matched by the deduction evaluators (named so no id literal is repeated). */
-const ANALYZER_ARCHITECTURE = 'architecture';
-const ANALYZER_DEPENDENCY_GRAPH = 'dependency-graph';
-const ANALYZER_GOVERNANCE = 'governance';
-const ANALYZER_HYGIENE = 'hygiene';
-const ANALYZER_SECURITY = 'security';
-const ANALYZER_SECRETS = 'secrets';
-const ANALYZER_PERFORMANCE = 'performance';
-const ANALYZER_LARGE_FILE = 'large-file';
-const ANALYZER_COMPLEXITY = 'complexity';
-const ANALYZER_COMMENTS = 'comments';
-const ANALYZER_CONSTANTS = 'constants';
 
 /** Quality dimensions written by the deduction evaluators. */
-const DIMENSION_SEMANTIC_PURITY = 'semanticPurity';
-const DIMENSION_STANDARDIZATION = 'standardization';
-const DIMENSION_MODERNITY = 'modernity';
-const DIMENSION_MAINTAINABILITY = 'maintainability';
-const DIMENSION_COMMENT_QUALITY = 'commentQuality';
-const DIMENSION_DUPLICATION = 'duplication';
-const DIMENSION_TECH_DEBT_RISK = 'techDebtRisk';
 
 /** Rule ids with a dedicated deduction. */
-const RULE_ARCH_LEAK_002 = 'ARCH-LEAK-002';
-const RULE_SEC_VUL_001 = 'SEC-VUL-001';
-const RULE_SEC_VUL_002 = 'SEC-VUL-002';
-const RULE_SEC_VUL_003 = 'SEC-VUL-003';
-const RULE_SEC_VUL_004 = 'SEC-VUL-004';
-const RULE_SEC_VUL_005 = 'SEC-VUL-005';
-const RULE_SEC_VUL_006 = 'SEC-VUL-006';
-const RULE_SEC_LEAK_001 = 'SEC-LEAK-001';
 
 /** Rule-id or message fragments the evaluators match on. */
-const FRAGMENT_PLACEHOLDER_MARKER = 'wip';
-const FRAGMENT_LAYER = 'layer';
-const FRAGMENT_BOUNDARY = 'boundary';
-const FRAGMENT_LEAK = 'LEAK';
-const FRAGMENT_CYCLE = 'cycle';
-const FRAGMENT_CIRCULAR = 'circular';
-const FRAGMENT_TYPE = 'type';
-const FRAGMENT_ESCAPE = 'escape';
-const FRAGMENT_DEAD = 'dead';
-const FRAGMENT_UNREACHABLE = 'unreachable';
-const FRAGMENT_UNUSED = 'unused';
-const FRAGMENT_SECRET = 'secret';
-const FRAGMENT_TOKEN = 'token';
-const FRAGMENT_EVAL = 'eval';
-const FRAGMENT_UNSAFE = 'unsafe';
-const FRAGMENT_SANITIZATION = 'sanitization';
-const FRAGMENT_LOOP = 'loop';
-const FRAGMENT_ALLOC = 'alloc';
-const FRAGMENT_UNBOUNDED = 'unbounded';
-const FRAGMENT_LEAK_ALT = 'leak';
-const FRAGMENT_NAMING = 'naming';
-const FRAGMENT_LINES = 'lines';
-const FRAGMENT_LEGACY = 'legacy';
-const FRAGMENT_DEPRECATED = 'deprecated';
-const FRAGMENT_NESTING = 'nesting';
-const FRAGMENT_BANNED = 'banned';
-const FRAGMENT_JARGON = 'jargon';
-const FRAGMENT_MISSING = 'missing';
-const FRAGMENT_DUPLICATE = 'duplicate';
-const FRAGMENT_MAGIC = 'magic';
-const FRAGMENT_ERROR = 'error';
-const FRAGMENT_WARNING = 'warning';
 
 /**
  * Callback signature for applying a deduction to a quality dimension.
@@ -160,257 +117,6 @@ export type DeductionApplier = (
     rule?: string,
     line?: number,
 ) => void;
-
-/**
- * Apply deductions for architecture consistency issues.
- *
- * @param issue - Analyzed issue finding.
- * @param apply - Deduction callback function.
- */
-export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplier): void {
-    if (issue.analyzer !== ANALYZER_ARCHITECTURE && issue.analyzer !== ANALYZER_DEPENDENCY_GRAPH)
-        return;
-
-    const line = issue.location?.start?.line;
-    const r = issue.rule;
-    const msg = issue.message;
-
-    if (r === RULE_ARCH_LEAK_002 || r.includes(RULE_ARCH_LEAK_002)) {
-        apply(
-            DIMENSION_ARCHITECTURE_CONSISTENCY,
-            DEDUCTION_DTO_CREDENTIAL_LEAK,
-            ScoringRationales.DTO_CREDENTIAL_LEAK(msg),
-            r,
-            line,
-        );
-        apply(
-            DIMENSION_CODE_SECURITY,
-            DEDUCTION_DTO_CREDENTIAL_LEAK,
-            ScoringRationales.DTO_CREDENTIAL_LEAK(msg),
-            r,
-            line,
-        );
-    } else if (
-        r.includes(FRAGMENT_LAYER) ||
-        r.includes(FRAGMENT_BOUNDARY) ||
-        r.includes(FRAGMENT_LEAK)
-    ) {
-        apply(
-            DIMENSION_ARCHITECTURE_CONSISTENCY,
-            DEDUCTION_LAYER_CONSTRAINT_VIOLATION,
-            ScoringRationales.LAYER_CONSTRAINT_VIOLATION(msg),
-            r,
-            line,
-        );
-    } else if (r.includes(FRAGMENT_CYCLE) || r.includes(FRAGMENT_CIRCULAR)) {
-        apply(
-            DIMENSION_ARCHITECTURE_CONSISTENCY,
-            DEDUCTION_CIRCULAR_DEPENDENCY,
-            ScoringRationales.CIRCULAR_DEPENDENCY(msg),
-            r,
-            line,
-        );
-    } else {
-        apply(
-            DIMENSION_ARCHITECTURE_CONSISTENCY,
-            DEDUCTION_ARCHITECTURE_DESIGN_VIOLATION,
-            ScoringRationales.ARCHITECTURE_DESIGN_VIOLATION(msg),
-            r,
-            line,
-        );
-    }
-}
-
-/**
- * Apply deductions for semantic purity issues.
- *
- * @param issue - Analyzed issue finding.
- * @param apply - Deduction callback function.
- */
-export function applySemanticPurityDeductions(issue: Issue, apply: DeductionApplier): void {
-    const line = issue.location?.start?.line;
-    const r = issue.rule;
-    const msg = issue.message;
-
-    if (
-        issue.analyzer === ANALYZER_GOVERNANCE &&
-        (r.includes(FRAGMENT_TYPE) || r.includes(FRAGMENT_ESCAPE))
-    ) {
-        apply(
-            DIMENSION_SEMANTIC_PURITY,
-            DEDUCTION_TYPE_SAFETY_ESCAPE,
-            ScoringRationales.TYPE_SAFETY_ESCAPE(msg),
-            r,
-            line,
-        );
-    }
-    if (
-        issue.analyzer === ANALYZER_HYGIENE &&
-        (r.includes(FRAGMENT_DEAD) || r.includes(FRAGMENT_UNREACHABLE))
-    ) {
-        apply(
-            DIMENSION_SEMANTIC_PURITY,
-            DEDUCTION_UNREACHABLE_DEAD_CODE,
-            ScoringRationales.UNREACHABLE_DEAD_CODE(msg),
-            r,
-            line,
-        );
-    }
-    if (issue.analyzer === ANALYZER_HYGIENE && r.includes(FRAGMENT_UNUSED)) {
-        apply(
-            DIMENSION_SEMANTIC_PURITY,
-            DEDUCTION_UNUSED_BINDING,
-            ScoringRationales.UNUSED_BINDING_OR_IMPORT(msg),
-            r,
-            line,
-        );
-    }
-}
-
-/**
- * Apply deductions for code security and secrets issues.
- *
- * @param issue - Analyzed issue finding.
- * @param apply - Deduction callback function.
- */
-export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): void {
-    const line = issue.location?.start?.line;
-    const r = issue.rule;
-    const msg = issue.message;
-
-    if (issue.analyzer === ANALYZER_SECURITY) {
-        if (r === RULE_SEC_VUL_001) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_CRITICAL_CODE_EXECUTION,
-                ScoringRationales.CRITICAL_CODE_EXECUTION(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_002) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_CRITICAL_COMMAND_INJECTION,
-                ScoringRationales.CRITICAL_COMMAND_INJECTION(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_003) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_PROTOTYPE_POLLUTION,
-                ScoringRationales.PROTOTYPE_POLLUTION_RISK(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_004) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_INSECURE_RANDOMNESS,
-                ScoringRationales.INSECURE_RANDOMNESS_RISK(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_005) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_BROKEN_HASH,
-                ScoringRationales.BROKEN_HASH_ALGORITHM(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_006) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_PATH_TRAVERSAL,
-                ScoringRationales.PATH_TRAVERSAL_RISK(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_LEAK_001) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_SENSITIVE_DATA_LOGGED,
-                ScoringRationales.SENSITIVE_DATA_LOGGED(msg),
-                r,
-                line,
-            );
-        } else {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_GENERIC_SECURITY,
-                ScoringRationales.GENERIC_SECURITY_RISK(msg),
-                r,
-                line,
-            );
-        }
-    } else if (
-        issue.analyzer === ANALYZER_SECRETS ||
-        r.includes(FRAGMENT_SECRET) ||
-        r.includes(FRAGMENT_TOKEN) ||
-        r.includes('key')
-    ) {
-        apply(
-            DIMENSION_CODE_SECURITY,
-            DEDUCTION_HARDCODED_CREDENTIAL,
-            ScoringRationales.HARDCODED_CREDENTIAL(msg),
-            r,
-            line,
-        );
-    } else if (
-        r.includes(FRAGMENT_EVAL) ||
-        r.includes(FRAGMENT_UNSAFE) ||
-        r.includes(FRAGMENT_SANITIZATION)
-    ) {
-        apply(
-            DIMENSION_CODE_SECURITY,
-            DEDUCTION_POTENTIAL_INJECTION,
-            ScoringRationales.POTENTIAL_INJECTION_RISK(msg),
-            r,
-            line,
-        );
-    }
-}
-
-/**
- * Apply deductions for performance efficiency issues.
- *
- * @param issue - Analyzed issue finding.
- * @param apply - Deduction callback function.
- */
-export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier): void {
-    if (issue.analyzer !== ANALYZER_PERFORMANCE) return;
-
-    const line = issue.location?.start?.line;
-    const r = issue.rule;
-    const msg = issue.message;
-
-    if (r.includes(FRAGMENT_LOOP) || r.includes(FRAGMENT_ALLOC)) {
-        apply(
-            'performanceEfficiency',
-            DEDUCTION_TRANSIENT_LOOP_ALLOCATION,
-            ScoringRationales.TRANSIENT_LOOP_ALLOCATION(msg),
-            r,
-            line,
-        );
-    } else if (r.includes(FRAGMENT_UNBOUNDED) || r.includes(FRAGMENT_LEAK_ALT)) {
-        apply(
-            'performanceEfficiency',
-            DEDUCTION_MEMORY_LEAK_RISK,
-            ScoringRationales.MEMORY_LEAK_RISK(msg),
-            r,
-            line,
-        );
-    } else {
-        apply(
-            'performanceEfficiency',
-            DEDUCTION_INEFFICIENT_ALGORITHM,
-            ScoringRationales.INEFFICIENT_ALGORITHM_PATH(msg),
-            r,
-            line,
-        );
-    }
-}
 
 /**
  * Apply deductions for standardization, modernity, maintainability, comments, and duplication.
