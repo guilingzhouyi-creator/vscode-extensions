@@ -67,6 +67,23 @@ const LANGUAGE_RUST = 'rust';
 /** Language tag restricting a rule's applicability to GDScript sources. */
 const LANGUAGE_GDSCRIPT = 'gdscript';
 
+/** Rule-id family prefix for complexity semantic rules; ids start with `CPX-`. */
+const RULE_FAMILY_COMPLEXITY = 'CPX';
+/** Analyzer id owning complexity rules. */
+const ANALYZER_COMPLEXITY = 'complexity';
+/** Rule-id family prefix for data architecture rules; ids start with `DAT-`. */
+const RULE_FAMILY_DATA_ARCH = 'DAT';
+/** Analyzer id owning data architecture rules. */
+const ANALYZER_DATA_ARCH = 'data-architecture';
+/** Rule-id family prefix for test modernity rules; ids start with `TST-`. */
+const RULE_FAMILY_TEST_MODERNITY = 'TST';
+/** Analyzer id owning test modernity rules. */
+const ANALYZER_TEST_MODERNITY = 'test-modernity';
+/** Rule-id family prefix for dependency layout rules; ids start with `DEP-`. */
+const RULE_FAMILY_DEP_LAYOUT = 'DEP';
+/** Analyzer id owning dependency layout rules. */
+const ANALYZER_DEP_LAYOUT = 'dependency-layout';
+
 /** analyzer rules. */
 export const ANALYZER_RULES: readonly RuleDefinition[] = [
     defineRule({
@@ -880,5 +897,222 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         summary: '使用 remote/master/puppet/slave 函数修饰符。',
         remediation: '改用 @rpc 注解。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-rpc-001',
+    }),
+
+    // ── Complexity Semantic Rules ──
+    defineRule({
+        id: 'CPX-TIME-001',
+        family: RULE_FAMILY_COMPLEXITY,
+        analyzer: ANALYZER_COMPLEXITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '跨函数/跨文件无界多项式时间复杂度：嵌套迭代调用链引发高开销。',
+        remediation: '将内层数据预先构建为 Map/Set 索引，降低复合复杂度至 O(N)。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-time-001',
+    }),
+    defineRule({
+        id: 'CPX-SPACE-001',
+        family: RULE_FAMILY_COMPLEXITY,
+        analyzer: ANALYZER_COMPLEXITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '热点循环内无界瞬态内存分配与重复全量物化。',
+        remediation: '将对象/缓冲区分配提升到循环外，循环内执行就地重置与复用。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-space-001',
+    }),
+    defineRule({
+        id: 'CPX-REC-001',
+        family: RULE_FAMILY_COMPLEXITY,
+        analyzer: ANALYZER_COMPLEXITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary: '跨函数/跨文件无终止保障的递归或互递归调用链。',
+        remediation: '引入显式深度累加参数与终止保护，或改写为迭代工作列表。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-rec-001',
+    }),
+    defineRule({
+        id: 'CPX-AMP-001',
+        family: RULE_FAMILY_COMPLEXITY,
+        analyzer: ANALYZER_COMPLEXITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '复杂度放大陷阱：在迭代或热点调用链中隐式嵌套阻塞 I/O 或序列化。',
+        remediation: '将 I/O 与序列化批量汇聚在循环外部执行。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-amp-001',
+    }),
+
+    // ── Data Architecture Rules ──
+    defineRule({
+        id: 'DAT-QRY-001',
+        family: RULE_FAMILY_DATA_ARCH,
+        analyzer: ANALYZER_DATA_ARCH,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '在线请求链路中的无界数据读取或全表内存过滤。',
+        remediation: '增加游标分页或 Limit/Offset 条件，强制限制单次读取上限。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-qry-001',
+    }),
+    defineRule({
+        id: 'DAT-NPL-001',
+        family: RULE_FAMILY_DATA_ARCH,
+        analyzer: ANALYZER_DATA_ARCH,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary: '迭代与映射上下文中的 N+1 查询与重复存储调用。',
+        remediation: '将循环内查询提升至外层使用批量 IN 查询或 DataLoader 批量加载。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-npl-001',
+    }),
+    defineRule({
+        id: 'DAT-SER-001',
+        family: RULE_FAMILY_DATA_ARCH,
+        analyzer: ANALYZER_DATA_ARCH,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: 'info',
+        summary: '跨层调用链中的重复序列化与反序列化转换。',
+        remediation: '在内部调用链路传递强类型原生对象，仅在网络边界执行序列化。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-ser-001',
+    }),
+    defineRule({
+        id: 'DAT-DEF-001',
+        family: RULE_FAMILY_DATA_ARCH,
+        analyzer: ANALYZER_DATA_ARCH,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: 'info',
+        summary: '受信内部领域边界内的冗余重复防御性校验。',
+        remediation: '在信任边界执行一次性完整校验，内部领域对象依托不可变类型保证。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-def-001',
+    }),
+    defineRule({
+        id: 'DAT-LAY-001',
+        family: RULE_FAMILY_DATA_ARCH,
+        analyzer: ANALYZER_DATA_ARCH,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '数据访问抽象泄漏：业务核心直接操纵持久化驱动或底层存储细节。',
+        remediation: '将存储驱动调用封装在仓储接口实现内，领域层仅依赖仓储契约。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-lay-001',
+    }),
+
+    // ── Test Modernity Rules ──
+    defineRule({
+        id: 'TST-ILS-001',
+        family: RULE_FAMILY_TEST_MODERNITY,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '测试完整性幻觉：测试仅校验 Mock 配置或绑定已废弃业务契约。',
+        remediation: '将测试迁移至验证活跃业务契约与实际领域状态变化。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-ils-001',
+    }),
+    defineRule({
+        id: 'TST-SKP-001',
+        family: RULE_FAMILY_TEST_MODERNITY,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '核心业务域中长期滞留的跳过、隔离或未执行测试用例。',
+        remediation: '修复并恢复测试用例，或正式登记入测试债务清单并设定收敛里程碑。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-skp-001',
+    }),
+    defineRule({
+        id: 'TST-TAU-001',
+        family: RULE_FAMILY_TEST_MODERNITY,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '缺乏真实业务断言或包含恒真断言的无效测试。',
+        remediation: '替换恒真断言为针对业务实体输出和错误边界的有效验证。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-tau-001',
+    }),
+    defineRule({
+        id: 'TST-DEN-001',
+        family: RULE_FAMILY_TEST_MODERNITY,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: 'info',
+        summary: '关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。',
+        remediation: '补齐高风险语义单元的契约测试与边界测试，提高实际故障感知能力。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-den-001',
+    }),
+    defineRule({
+        id: 'TST-DBT-001',
+        family: RULE_FAMILY_TEST_MODERNITY,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: 'info',
+        summary: '未登记里程碑收敛计划或责任人的滞后测试技术债务。',
+        remediation: '在测试债务登记表中补全责任 Agent 及目标收敛里程碑。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-dbt-001',
+    }),
+
+    // ── Dependency Layout Rules ──
+    defineRule({
+        id: 'DEP-ORD-001',
+        family: RULE_FAMILY_DEP_LAYOUT,
+        analyzer: ANALYZER_DEP_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: 'info',
+        summary: '文件布局与导入分组不符合当前语言现代化工程规范。',
+        remediation: '调整导入顺序为 Stdlib -> ThirdParty -> InternalShared -> Local。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-ord-001',
+    }),
+    defineRule({
+        id: 'DEP-LAZ-001',
+        family: RULE_FAMILY_DEP_LAYOUT,
+        analyzer: ANALYZER_DEP_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '未提供审计声明或合规理由的函数内部临时导入。',
+        remediation: '将导入提升至文件顶部，或添加 @lazy/@optional 注释标注意图。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-laz-001',
+    }),
+    defineRule({
+        id: 'DEP-RES-001',
+        family: RULE_FAMILY_DEP_LAYOUT,
+        analyzer: ANALYZER_DEP_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。',
+        remediation: '将外部资源地址统一抽取至配置文件或服务资源注册中心。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-res-001',
+    }),
+    defineRule({
+        id: 'DEP-WLD-001',
+        family: RULE_FAMILY_DEP_LAYOUT,
+        analyzer: ANALYZER_DEP_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '使用通配符导入破坏显式依赖跟踪与树摇优化。',
+        remediation: '改用显式具名导入 (Named Imports)，明确模块依赖面。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-wld-001',
+    }),
+    defineRule({
+        id: 'DEP-INV-001',
+        family: RULE_FAMILY_DEP_LAYOUT,
+        analyzer: ANALYZER_DEP_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary: '依赖倒置违规：底层基础设施或公共模块反向依赖高层业务模块。',
+        remediation: '解除反向依赖，通过控制反转或事件总线进行解耦。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-inv-001',
     }),
 ];

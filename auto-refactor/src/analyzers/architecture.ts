@@ -20,6 +20,7 @@ import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue, ArchitectureLayer } from '../core/types';
 import { inferDirectorySemantic } from '../core/profiler/projectProfiler';
 import { ArchitectureMessages } from '../core/messages/architecture';
+import { FORBIDDEN_HEADLESS_IMPORTS } from '../core/intelligence/semanticArchitecture';
 
 interface ArchitectureOptions {
     enforceCleanLayers?: boolean;
@@ -28,6 +29,11 @@ interface ArchitectureOptions {
     allowSkipLayers?: boolean;
     securityLevel?: import('../core/types').SecurityLevel;
     checkDtoCredentialLeakage?: boolean;
+    enforceHeadless?: boolean;
+    flagCrossDomainBypass?: boolean;
+    flagMutableGlobalCoupling?: boolean;
+    flagLayeringIllusions?: boolean;
+    flagConfigLeakage?: boolean;
 }
 
 interface SpecifierInfo {
@@ -198,6 +204,46 @@ export class ArchitectureAnalyzer implements Analyzer {
                 forbiddenModules,
                 issues,
             );
+
+            // Check shared mutable global state (ARCH-GLB-001)
+            const flagGlobal =
+                opts.flagMutableGlobalCoupling ??
+                ctx.config.thresholds?.flagMutableGlobalCoupling ??
+                false;
+            if (flagGlobal && /^\s*export\s+let\s+[A-Za-z0-9_$]+/.test(lineText)) {
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ARCH-GLB-001',
+                        `Implicit shared mutable global state exported in '${file}'.`,
+                        SEVERITY_WARNING,
+                        { file, line: lineIdx + 1 },
+                        'Encapsulate mutable state in class instances via dependency injection.',
+                    ),
+                );
+            }
+
+            // Check direct environment or disk config access in domain (ARCH-CFG-001)
+            const flagConfig =
+                opts.flagConfigLeakage ?? ctx.config.thresholds?.flagConfigLeakage ?? false;
+            if (
+                flagConfig &&
+                currentLayer === ARCHITECTURE_LAYER_DOMAIN &&
+                (trimmed.includes('process.env') || trimmed.includes('fs.readFileSync'))
+            ) {
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ARCH-CFG-001',
+                        `Configuration leakage: domain model in '${file}' reads environment directly.`,
+                        'info',
+                        { file, line: lineIdx + 1 },
+                        'Inject strongly-typed configuration parameters into domain constructors.',
+                    ),
+                );
+            }
 
             lineIdx++;
             lineStart = nextStart;
@@ -398,6 +444,49 @@ export class ArchitectureAnalyzer implements Analyzer {
                         ),
                     );
                 }
+
+                // Headless architecture boundary check (ARCH-HDL-001)
+                const enforceHeadless =
+                    opts.enforceHeadless ?? ctx.config.thresholds?.enforceHeadless ?? false;
+                if (
+                    enforceHeadless &&
+                    (FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
+                        FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw))
+                ) {
+                    issues.push(
+                        this.mkIssue(
+                            ctx,
+                            lineIdx,
+                            'ARCH-HDL-001',
+                            `Headless architecture violation: domain logic in '${file}' imports presentation framework '${spec.raw}'.`,
+                            SEVERITY_ERROR,
+                            { file, layer: currentLayer, specifier: spec.raw },
+                            'Decouple core domain logic from UI/IDE presentation frameworks.',
+                        ),
+                    );
+                }
+            }
+
+            // Cross-domain internal boundary bypass (ARCH-BND-001)
+            const flagBypass =
+                opts.flagCrossDomainBypass ?? ctx.config.thresholds?.flagCrossDomainBypass ?? false;
+            if (
+                flagBypass &&
+                (spec.raw.includes('/internal/') ||
+                    spec.raw.includes('/impl/') ||
+                    spec.raw.includes('/private/'))
+            ) {
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ARCH-BND-001',
+                        `Cross-domain internal boundary bypass: '${file}' imports private module '${spec.raw}'.`,
+                        SEVERITY_WARNING,
+                        { file, specifier: spec.raw },
+                        'Import through public module facade rather than private directories.',
+                    ),
+                );
             }
 
             // Internal dependency direction check
@@ -438,6 +527,29 @@ export class ArchitectureAnalyzer implements Analyzer {
                                 descriptor.suggestion,
                             ),
                         );
+
+                        // Structural layering illusion (ARCH-DIR-003)
+                        const flagIllusions =
+                            opts.flagLayeringIllusions ??
+                            ctx.config.thresholds?.flagLayeringIllusions ??
+                            false;
+                        if (flagIllusions && targetLayer === 'infrastructure') {
+                            issues.push(
+                                this.mkIssue(
+                                    ctx,
+                                    lineIdx,
+                                    'ARCH-DIR-003',
+                                    `Structural layering illusion: domain entity '${file}' directly imports infrastructure '${spec.resolvedPath}'.`,
+                                    SEVERITY_ERROR,
+                                    {
+                                        fromLayer: currentLayer,
+                                        toLayer: targetLayer,
+                                        targetPath: spec.resolvedPath,
+                                    },
+                                    'Invert dependency using interfaces defined in the domain.',
+                                ),
+                            );
+                        }
                     }
                 }
 

@@ -60,6 +60,9 @@ export const ALL_BUILTIN_ANALYZERS = [
     'rust-modern',
     'gdscript-modern',
     'docs',
+    'data-architecture',
+    'test-modernity',
+    'dependency-layout',
 ] as const;
 
 /**

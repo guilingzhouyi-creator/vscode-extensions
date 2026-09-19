@@ -76,6 +76,9 @@ export const BUILTIN_ANALYZERS = [
     ANALYZER_RUST_MODERN,
     ANALYZER_GDSCRIPT_MODERN,
     'docs',
+    'data-architecture',
+    'test-modernity',
+    'dependency-layout',
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──

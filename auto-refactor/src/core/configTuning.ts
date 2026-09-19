@@ -73,6 +73,9 @@ export const SPECIALIZED_ANALYZERS = new Set<string>([
     ANALYZER_RUST_MODERN,
     ANALYZER_GDSCRIPT_MODERN,
     'docs',
+    'data-architecture',
+    'test-modernity',
+    'dependency-layout',
 ]);
 
 /** Auto-tune estimate: source lines per profiled language entry. */

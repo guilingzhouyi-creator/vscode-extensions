@@ -38,6 +38,9 @@ import { TsModernAnalyzer } from '../analyzers/tsModern';
 import { RustModernAnalyzer } from '../analyzers/rustModern';
 import { GdscriptModernAnalyzer } from '../analyzers/gdscriptModern';
 import { DocsAnalyzer } from '../analyzers/docs';
+import { DataArchitectureAnalyzer } from '../analyzers/dataArchitecture';
+import { TestModernityAnalyzer } from '../analyzers/testModernity';
+import { DependencyLayoutAnalyzer } from '../analyzers/dependencyLayout';
 
 /**
  * Resolved metadata and fresh instance factory for a declared analyzer.
@@ -90,6 +93,9 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
     'rust-modern': () => new RustModernAnalyzer(),
     'gdscript-modern': () => new GdscriptModernAnalyzer(),
     docs: () => new DocsAnalyzer(),
+    'data-architecture': () => new DataArchitectureAnalyzer(),
+    'test-modernity': () => new TestModernityAnalyzer(),
+    'dependency-layout': () => new DependencyLayoutAnalyzer(),
 };
 
 /**
@@ -121,6 +127,9 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     'rust-modern': '../analyzers/rustModern',
     'gdscript-modern': '../analyzers/gdscriptModern',
     docs: '../analyzers/docs',
+    'data-architecture': '../analyzers/dataArchitecture',
+    'test-modernity': '../analyzers/testModernity',
+    'dependency-layout': '../analyzers/dependencyLayout',
 };
 
 function loadExternalAnalyzer(

@@ -23,6 +23,7 @@ export type RuleFamily =
     | 'PRF'
     | 'SEC'
     | 'ARCH'
+    | 'ARC'
     | 'PYM'
     | 'DOC'
     | 'CONST'
@@ -31,6 +32,8 @@ export type RuleFamily =
     | 'BIG'
     | 'ERR'
     | 'CMP'
+    | 'DAT'
+    | 'TST'
     | 'LEGACY';
 
 /** Severity a rule carries by default; per-context escalation is described in `summary`. */

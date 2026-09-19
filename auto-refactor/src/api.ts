@@ -726,6 +726,14 @@ export { PerformanceAnalyzer } from './analyzers/performance';
 export { CommentAnalyzer } from './analyzers/comments';
 export { HygieneAnalyzer } from './analyzers/hygiene';
 export { SecurityAnalyzer } from './analyzers/security';
+export { DataArchitectureAnalyzer } from './analyzers/dataArchitecture';
+export { TestModernityAnalyzer } from './analyzers/testModernity';
+export { DependencyLayoutAnalyzer } from './analyzers/dependencyLayout';
+export * from './core/intelligence/semanticComplexity';
+export * from './core/intelligence/dataArchitecture';
+export * from './core/intelligence/testModernity';
+export * from './core/intelligence/dependencyLayout';
+export * from './core/intelligence/semanticArchitecture';
 export { detectProjectProfile, inferDirectorySemantic } from './core/profiler/projectProfiler';
 export {
     evaluateScaleGrade,

@@ -127,6 +127,86 @@
           },
           "default": [],
           "description": "constants: literal texts exempt from the hardcoded-string and duplicate-literal passes, matched with or without quotes (e.g. `\"/\"`, `\"..\"`). Cascades only because the constants analyzer declares the key; the per-analyzer `options.ignoreLiterals` wins over this global layer."
+        },
+        "checkCrossFunctionComplexity": {
+          "type": "boolean",
+          "default": true,
+          "description": "complexity: analyze composite polynomial complexity across multi-file call chains."
+        },
+        "distinguishBoundedCollections": {
+          "type": "boolean",
+          "default": true,
+          "description": "complexity: distinguish small bounded enum/config arrays from unbounded dynamic streams."
+        },
+        "checkUnboundedQueries": {
+          "type": "boolean",
+          "default": true,
+          "description": "data-architecture: flag unpaginated or unbounded queries on online request paths."
+        },
+        "checkNPlusOne": {
+          "type": "boolean",
+          "default": true,
+          "description": "data-architecture: flag N+1 database/storage queries inside loops."
+        },
+        "checkRedundantSerialization": {
+          "type": "boolean",
+          "default": true,
+          "description": "data-architecture: flag repeated serialization cycles in adjacent layers or iterations."
+        },
+        "checkDefensiveExcess": {
+          "type": "boolean",
+          "default": true,
+          "description": "data-architecture: flag excessive redundant defensive validation in trusted internal domains."
+        },
+        "minEmtd": {
+          "type": "number",
+          "default": 100,
+          "description": "test-modernity: minimum acceptable Effective Modern Test Density score."
+        },
+        "minCbcr": {
+          "type": "number",
+          "default": 0.7,
+          "description": "test-modernity: minimum acceptable Current Business Contract Coverage Rate."
+        },
+        "flagDeprecatedContractTests": {
+          "type": "boolean",
+          "default": true,
+          "description": "test-modernity: flag test suites asserting deprecated or mock-only stubs."
+        },
+        "flagTautologicalAssertions": {
+          "type": "boolean",
+          "default": true,
+          "description": "test-modernity: flag non-verifying or tautological assertions."
+        },
+        "enforceFileLayout": {
+          "type": "boolean",
+          "default": true,
+          "description": "dependency-layout: enforce language-specific file layout and import grouping ordering."
+        },
+        "allowAuditedInFunctionImports": {
+          "type": "boolean",
+          "default": true,
+          "description": "dependency-layout: allow in-function imports with explicit @lazy/@optional audit tag."
+        },
+        "flagUnmanagedResources": {
+          "type": "boolean",
+          "default": true,
+          "description": "dependency-layout: flag hardcoded remote URLs in business logic."
+        },
+        "enforceHeadless": {
+          "type": "boolean",
+          "default": true,
+          "description": "architecture: enforce headless decoupling of core domain from UI/IDE presentation."
+        },
+        "flagCrossDomainBypass": {
+          "type": "boolean",
+          "default": true,
+          "description": "architecture: flag cross-domain private module bypasses."
+        },
+        "flagMutableGlobalCoupling": {
+          "type": "boolean",
+          "default": true,
+          "description": "architecture: flag implicit shared mutable global state coupling decoupled domains."
         }
       }
     },
