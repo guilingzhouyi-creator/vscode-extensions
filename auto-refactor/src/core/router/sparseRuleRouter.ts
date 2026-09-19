@@ -192,6 +192,36 @@ export const ARCHETYPE_ANALYZER_MATRIX: Record<ProjectArchetype, readonly string
 };
 
 /**
+ * Shared Experts in DeepSeek-V4.1 MoE architecture.
+ *
+ * Core baseline analyzers that are always retained across any code mutation
+ * (hygiene and constants) to ensure ubiquitous code health without redundant activation.
+ */
+export const SHARED_EXPERTS: readonly string[] = [ANALYZER_HYGIENE, ANALYZER_CONSTANTS] as const;
+
+/**
+ * Mapping from detected programming language to the set of analyzers tailored exclusively for it.
+ */
+export const LANGUAGE_EXCLUSIVE_ANALYZERS: Record<string, readonly string[]> = {
+    typescript: [ANALYZER_TYPESCRIPT_MODERN],
+    javascript: [ANALYZER_TYPESCRIPT_MODERN],
+    python: [ANALYZER_PYTHON_MODERN],
+    rust: [ANALYZER_RUST_MODERN],
+    gdscript: [ANALYZER_GDSCRIPT_MODERN],
+};
+
+/**
+ * Union of all language-specific specialized modernizer analyzers.
+ * Used by the Language Gating Filter to prune non-matching language analyzers.
+ */
+export const ALL_LANGUAGE_SPECIFIC_ANALYZERS: readonly string[] = [
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_PYTHON_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_GDSCRIPT_MODERN,
+] as const;
+
+/**
  * Optional inputs steering routeDiffToAnalyzers; omitting the object keeps all built-ins.
  *
  * availableAnalyzers acts as an allow-list filter, customAnalyzers are always activated to keep
@@ -204,6 +234,57 @@ export interface RouterOptions {
     customAnalyzers?: string[];
     /** Whether to force full activation regardless of diff (e.g. for forced full audit). */
     forceFull?: boolean;
+    /** Project archetype to steer sparse general code routing instead of 100% full activation. */
+    archetype?: ProjectArchetype;
+}
+
+/**
+ * Resolve candidate analyzer targets for a single diff category, taking archetype into account.
+ *
+ * @param cat - Category of mutation.
+ * @param archetype - Optional project archetype for specialized general-code steering.
+ * @returns Analyzer identifiers targeted by this category.
+ */
+function resolveCategoryTargets(
+    cat: DiffSemanticCategory,
+    archetype?: ProjectArchetype,
+): readonly string[] {
+    if (cat === 'GENERAL_CODE' && archetype) {
+        return ARCHETYPE_ANALYZER_MATRIX[archetype] || ALL_BUILTIN_ANALYZERS;
+    }
+    return CATEGORY_ANALYZER_MATRIX[cat] || ALL_BUILTIN_ANALYZERS;
+}
+
+/**
+ * Filter out language-exclusive analyzers that do not match the detected language.
+ *
+ * @param active - Active analyzer set mutated in-place.
+ * @param language - Detected programming language identifier.
+ */
+function applyLanguageGating(active: Set<string>, language?: string): void {
+    if (!language) return;
+    const allowed = new Set(LANGUAGE_EXCLUSIVE_ANALYZERS[language] || []);
+    for (const spec of ALL_LANGUAGE_SPECIFIC_ANALYZERS) {
+        if (!allowed.has(spec)) {
+            active.delete(spec);
+        }
+    }
+}
+
+/**
+ * Activate shared baseline experts across all non-doc code changes.
+ *
+ * @param active - Active analyzer set mutated in-place.
+ * @param allSet - Allow-list of configured analyzers.
+ * @param isDocOnly - True if diff is strictly documentation / comments.
+ */
+function injectSharedExperts(active: Set<string>, allSet: Set<string>, isDocOnly: boolean): void {
+    if (isDocOnly) return;
+    for (const shared of SHARED_EXPERTS) {
+        if (allSet.has(shared)) {
+            active.add(shared);
+        }
+    }
 }
 
 /**
@@ -243,7 +324,7 @@ export function routeDiffToAnalyzers(
 
     for (const cat of classification.categories) {
         matchedCategories.push(cat);
-        const targets = CATEGORY_ANALYZER_MATRIX[cat] || ALL_BUILTIN_ANALYZERS;
+        const targets = resolveCategoryTargets(cat, options.archetype);
         for (const a of targets) {
             if (allSet.has(a)) {
                 active.add(a);
@@ -251,18 +332,21 @@ export function routeDiffToAnalyzers(
         }
     }
 
-    // Always include custom analyzers to guarantee zero false negatives on proprietary plugins
+    injectSharedExperts(active, allSet, classification.isDocOnly);
+
     if (options.customAnalyzers) {
         for (const ca of options.customAnalyzers) {
             active.add(ca);
         }
     }
 
-    // Safety fallback: if for any reason no analyzers were selected, fall back to all
+    applyLanguageGating(active, classification.language);
+
     if (active.size === 0) {
         for (const a of all) {
             active.add(a);
         }
+        applyLanguageGating(active, classification.language);
     }
 
     const skipped = new Set<string>();

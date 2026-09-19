@@ -642,6 +642,33 @@ function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
 }
 
 /**
+ * Emits warm scan statistics to logger if present.
+ *
+ * @param logger - Active logger instance.
+ * @param stats - Optional warm stats payload.
+ */
+function logWarmStats(logger: Logger, stats: any): void {
+    if (!stats) return;
+    logger.info(
+        `warm: daemonUsed=${stats.daemonUsed} cacheHit=${stats.cacheHit}/${stats.cacheTotal} ` +
+            `l1=${stats.l1Hit} l2=${stats.l2Hit} analyzed=${stats.analyzed} poolWarm=${stats.poolWarm} daemonMs=${stats.daemonMs}`,
+    );
+}
+
+/**
+ * Maps uncaught scan exceptions to formatted stderr output and exit code 2.
+ *
+ * @param e - Unknown thrown error.
+ * @returns Error exit code 2.
+ */
+function handleScanError(e: unknown): number {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code = e instanceof AutoRefactorError ? e.code : 'SCAN_FAILED';
+    process.stderr.write(`[auto-refactor] ERROR (${code}): ${msg}\n`);
+    return 2;
+}
+
+/**
  * Convenience wrapper that scans AND renders. Returns the process exit code:
  *   0 = ok (or only info/warning when failOnIssue is false)
  *   1 = error-level issues found (and failOnIssue true)
@@ -667,22 +694,10 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
             : await executeStandardScanMode(config, options, logger, mode);
 
         const { report, scanner } = scanResult;
-        const stats = (scanResult as any).stats;
-        if (stats) {
-            logger.info(
-                `warm: daemonUsed=${stats.daemonUsed} cacheHit=${stats.cacheHit}/${stats.cacheTotal} ` +
-                    `l1=${stats.l1Hit} l2=${stats.l2Hit} analyzed=${stats.analyzed} poolWarm=${stats.poolWarm} daemonMs=${stats.daemonMs}`,
-            );
-        }
+        logWarmStats(logger, (scanResult as any).stats);
 
-        await finalizeReport(
-            report,
-            config,
-            options,
-            logger,
-            scanner,
-            options.diff ? POST_SCAN_SCOPE_INCREMENTAL : POST_SCAN_SCOPE_FULL,
-        );
+        const scope = options.diff ? POST_SCAN_SCOPE_INCREMENTAL : POST_SCAN_SCOPE_FULL;
+        await finalizeReport(report, config, options, logger, scanner, scope);
 
         await outputRenderedReport(report, config, logger);
 
@@ -692,10 +707,7 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
         logger.close();
         return evaluateGateExitCode(report, config);
     } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        const code = e instanceof AutoRefactorError ? e.code : 'SCAN_FAILED';
-        process.stderr.write(`[auto-refactor] ERROR (${code}): ${msg}\n`);
-        return 2;
+        return handleScanError(e);
     }
 }
 
@@ -762,6 +774,7 @@ export * from './core/router/sparseRuleRouter';
 export * from './core/profiler/loadGovernor';
 export * from './core/pipeline/escalationChannel';
 export * from './core/pipeline/dualTrackPipeline';
+export * from './core/rules/registry';
 export * as messages from './core/messages';
 export * from './core/messages';
 
@@ -819,5 +832,33 @@ export type {
     ContextSliceRegion,
     ContextSliceOptions,
 } from './core/intelligence/contextSlice';
-export { scoreDiff } from './core/scoring/diffScore';
-export type { DiffScore, DiffScoreOptions, DiffScoreWeights } from './core/scoring/diffScore';
+export * from './core/intelligence/dataArchitecture';
+// ---- Quality Quantification & Scoring Engine ----
+export * from './core/scoring';
+
+// ---- Audit Snapshot & Sandbox Baseline Extensions ----
+export * from './core/snapshot/types';
+export * from './core/snapshot/snapshotManager';
+
+// ---- Unified Semantic IR & Topology Graph ----
+export * from './core/semantic/types';
+export * from './core/semantic/semanticGraph';
+export * from './core/semantic/adapters';
+
+// ---- Universal Rule Pyramid & Hierarchy ----
+export * from './core/rules/pyramid';
+
+// ---- Praxis Diff Governance Subsystem Facade & SPI ----
+export * from './core/praxis';
+
+// ---- Semantic Architecture Graph & Meta-Architecture Rules ----
+export * from './core/architecture';
+
+// ---- Change Trajectory & Multi-Agent Coordination ----
+export * from './core/trajectory';
+
+// ---- Fine-Grained AST Slice & Sparse MoE Router ----
+export * from './core/router/sliceTypes';
+export * from './core/router/sliceExtractor';
+export * from './core/router/sparseMoEGate';
+export * from './core/intelligence/callChainImpactTracer';

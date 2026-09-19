@@ -16,3 +16,7 @@
 
 export * from './contracts';
 export * from './defaults';
+export * from './semanticEnricher';
+export * from './diffGovernance';
+export * from './multiAgentGovernance';
+export * from './sliceAuditService';

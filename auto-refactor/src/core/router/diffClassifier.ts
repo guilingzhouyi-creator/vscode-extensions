@@ -18,12 +18,12 @@
  */
 
 /** Mutation category for a hunk whose only change is a literal value. */
-const LITERAL_ONLY_CATEGORY = 'LITERAL_ONLY';
-const CONTROL_FLOW_CATEGORY = 'CONTROL_FLOW';
-const INTERFACE_SIGNATURE_CATEGORY = 'INTERFACE_SIGNATURE';
-const IMPORT_EXPORT_CATEGORY = 'IMPORT_EXPORT';
-const COMMENT_DOC_ONLY_CATEGORY = 'COMMENT_DOC_ONLY';
-const GENERAL_CODE_CATEGORY = 'GENERAL_CODE';
+const LITERAL_ONLY_CATEGORY = 'LITERAL_ONLY' as const;
+const CONTROL_FLOW_CATEGORY = 'CONTROL_FLOW' as const;
+const INTERFACE_SIGNATURE_CATEGORY = 'INTERFACE_SIGNATURE' as const;
+const IMPORT_EXPORT_CATEGORY = 'IMPORT_EXPORT' as const;
+const COMMENT_DOC_ONLY_CATEGORY = 'COMMENT_DOC_ONLY' as const;
+const GENERAL_CODE_CATEGORY = 'GENERAL_CODE' as const;
 
 /**
  * Closed vocabulary of mutation categories emitted by {@link classifyDiff}.
@@ -54,6 +54,12 @@ export interface DiffClassificationResult {
     hasInterfaceChange: boolean;
     hasImportExportChange: boolean;
     isDocOnly: boolean;
+    /** DSpark confidence tier for speculative decoding and tiered verification bypass. */
+    confidenceTier: 'HIGH' | 'MEDIUM' | 'LOW';
+    /** Inferred target language (e.g. 'typescript', 'python', 'rust', 'gdscript'). */
+    language?: string;
+    /** Associated target file path when provided. */
+    filePath?: string;
 }
 
 const CONTROL_FLOW_RE =
@@ -162,24 +168,83 @@ function isLiteralOnlyObservation(obs: DiffLineObservation): boolean {
 }
 
 /**
+ * Infer source language from file path extension.
+ */
+function inferLanguageFromPath(filePath?: string): string | undefined {
+    if (!filePath) return undefined;
+    const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+    switch (ext) {
+        case '.ts':
+        case '.tsx':
+        case '.mts':
+        case '.cts':
+            return 'typescript';
+        case '.js':
+        case '.jsx':
+        case '.mjs':
+        case '.cjs':
+            return 'javascript';
+        case '.py':
+            return 'python';
+        case '.rs':
+            return 'rust';
+        case '.gd':
+            return 'gdscript';
+        case '.md':
+            return 'markdown';
+        default:
+            return undefined;
+    }
+}
+
+/**
+ * Compute DSpark confidence tier based on mutation categories.
+ * HIGH confidence indicates localized literal/doc modifications safe for speculative bypass.
+ */
+function computeConfidenceTier(
+    categories: Set<DiffSemanticCategory>,
+    isDocOnly: boolean,
+): 'HIGH' | 'MEDIUM' | 'LOW' {
+    if (isDocOnly || (categories.size === 1 && categories.has(LITERAL_ONLY_CATEGORY))) {
+        return 'HIGH';
+    }
+    if (
+        categories.has(IMPORT_EXPORT_CATEGORY) ||
+        categories.has(INTERFACE_SIGNATURE_CATEGORY) ||
+        categories.has(GENERAL_CODE_CATEGORY)
+    ) {
+        return 'LOW';
+    }
+    return 'MEDIUM';
+}
+
+/**
  * Construct empty classification result for zero inspected lines.
  */
-function buildEmptyClassificationResult(): DiffClassificationResult {
+function buildEmptyClassificationResult(filePath?: string): DiffClassificationResult {
+    const categories = new Set<DiffSemanticCategory>([LITERAL_ONLY_CATEGORY]);
     return {
-        categories: new Set([LITERAL_ONLY_CATEGORY]),
+        categories,
         hasLiteralChange: false,
         hasControlFlowChange: false,
         hasInterfaceChange: false,
         hasImportExportChange: false,
         isDocOnly: true,
+        confidenceTier: 'HIGH',
+        language: inferLanguageFromPath(filePath),
+        filePath,
     };
 }
 
 /**
  * Construct final DiffClassificationResult from aggregated line observations.
  */
-function buildClassificationResult(obs: DiffLineObservation): DiffClassificationResult {
+function buildClassificationResult(
+    obs: DiffLineObservation,
+    filePath?: string,
+): DiffClassificationResult {
     const categories = new Set<DiffSemanticCategory>();
+    const language = inferLanguageFromPath(filePath);
 
     if (obs.allComments) {
         categories.add(COMMENT_DOC_ONLY_CATEGORY);
@@ -190,6 +255,9 @@ function buildClassificationResult(obs: DiffLineObservation): DiffClassification
             hasInterfaceChange: false,
             hasImportExportChange: false,
             isDocOnly: true,
+            confidenceTier: 'HIGH',
+            language,
+            filePath,
         };
     }
 
@@ -210,6 +278,9 @@ function buildClassificationResult(obs: DiffLineObservation): DiffClassification
         hasInterfaceChange: obs.hasInterface,
         hasImportExportChange: obs.hasImportExport,
         isDocOnly: false,
+        confidenceTier: computeConfidenceTier(categories, false),
+        language,
+        filePath,
     };
 }
 
@@ -225,6 +296,7 @@ function buildClassificationResult(obs: DiffLineObservation): DiffClassification
  * @param newContent - Current file text whose lines are compared against `oldContent`.
  * @param changedLines - Optional pre-computed changed lines; when present the two contents are
  *   ignored and the supplied lines are classified verbatim.
+ * @param filePath - Optional path of target file used for language inference and metadata tracking.
  * @returns The matched category set and its boolean flags; never throws and always yields a
  *   result, falling back to `GENERAL_CODE` when a line resists narrower classification.
  */
@@ -232,12 +304,13 @@ export function classifyDiff(
     oldContent: string,
     newContent: string,
     changedLines?: string[],
+    filePath?: string,
 ): DiffClassificationResult {
     const linesToInspect = extractChangedLines(oldContent, newContent, changedLines);
     if (linesToInspect.length === 0) {
-        return buildEmptyClassificationResult();
+        return buildEmptyClassificationResult(filePath);
     }
 
     const obs = inspectLines(linesToInspect);
-    return buildClassificationResult(obs);
+    return buildClassificationResult(obs, filePath);
 }

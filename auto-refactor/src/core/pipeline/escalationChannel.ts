@@ -136,6 +136,7 @@ export class EscalationChannel {
                     );
                 }
                 record.status = 'REJECTED';
+                record.contaminationReason = event.message;
                 memory.put(record);
             }
         }

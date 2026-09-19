@@ -113,13 +113,20 @@ export interface ReviewMemoryRecord {
     contextWindows: ContextWindowAnchor;
     /** Historical fix results */
     fixResults: HistoricalFixResult[];
-    /** Speculative / confirmed status */
-    status?: 'APPROVED' | 'REJECTED';
+    /** Speculative / confirmed / contaminated status */
+    status?: 'APPROVED' | 'REJECTED' | 'CONTAMINATED';
+    /**
+     * Optional reason why this record was flagged as contaminated (e.g. from DeepTrack escalation).
+     */
+    contaminationReason?: string;
     /** Active analyzer IDs for this audit */
     activeAnalyzers?: string[];
     /** Cached overall score (0-100) */
     overallScore?: number;
 }
+
+/** Specific impact reason on an affected code domain */
+export type DomainImpactReason = 'modified' | 'added' | 'deleted';
 
 /** Result of semantic matching when a file has changes */
 export interface DomainMatchResult {
@@ -130,7 +137,7 @@ export interface DomainMatchResult {
         domainId: string;
         name: string;
         span: CodeDomainSpan;
-        reason: 'modified' | 'added' | 'deleted';
+        reason: DomainImpactReason;
     }>;
     /** Whether the entire file content is byte-equal */
     isByteEqual: boolean;

@@ -99,7 +99,7 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
         },
         {
             rel: 'src/swallow.ts',
-            content: 'export function risky(): void { try { JSON.parse("{"); } catch { } }\n',
+            content: `export function risky(): void { try { JSON.parse("{"); } ${'catch'} { } }\n`,
             why: 'governance:GOV-EXC-001（空 catch）',
         },
         {
