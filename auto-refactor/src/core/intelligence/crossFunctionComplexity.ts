@@ -29,6 +29,9 @@ import type { SymbolIndex } from './symbolIndex';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
 import type { LoopSite, SemanticComplexityOptions } from './semanticComplexity';
 
+/**
+ * Maximum call-chain depth the cross-function complexity walk follows before it stops.
+ */
 export const MAX_COMPLEXITY_TRACE_DEPTH = 6;
 
 /**
