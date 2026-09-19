@@ -1,3 +1,5 @@
+export { isOfflineOrMigrationContext } from './dataAccessContext';
+
 /**
  * Module: Core Intelligence — Data Architecture & Access Modernization
  * File Path: src/core/intelligence/dataArchitecture.ts
@@ -39,36 +41,6 @@ export interface DataArchitectureOptions {
     checkNPlusOne?: boolean;
     checkRedundantSerialization?: boolean;
     checkDefensiveExcess?: boolean;
-}
-
-/**
- * Identify whether a file or function belongs to an offline, migration, or admin task.
- *
- * @param filePath - Repository-relative file path.
- * @param symbol - Function or class symbol name.
- * @returns True when the context is an offline or migration job.
- */
-export function isOfflineOrMigrationContext(filePath: string, symbol: string): boolean {
-    const lowerPath = filePath.toLowerCase();
-    const lowerSymbol = symbol.toLowerCase();
-    const offlinePathHints = [
-        'migration',
-        'seed',
-        'fixture',
-        'batch',
-        'job',
-        'task',
-        'cron',
-        'cli',
-        'script',
-        'tool',
-    ];
-    for (const hint of offlinePathHints) {
-        if (lowerPath.includes(hint) || lowerSymbol.includes(hint)) {
-            return true;
-        }
-    }
-    return false;
 }
 
 /**
