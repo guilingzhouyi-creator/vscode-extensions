@@ -8,21 +8,40 @@
  * Exit Semantics & Design Rationale: Pure predicate over the supplied evidence strings; no I/O
  *   and no state, so it can be called per site without ordering constraints.
  */
-/**
- * Module: Core Intelligence — Data Architecture & Access Modernization
- * File Path: src/core/intelligence/dataArchitecture.ts
- * Architecture Role: Semantic analyzer for persistence, caching, query patterns, and trust
- *   boundaries across data access and domain orchestration layers.
- * Dependencies & Triggers: Core types (Issue, SemanticReviewDetail, SemanticEvidenceStep);
- *   invoked by DataArchitectureAnalyzer during file analysis and post-scan passes.
- * Responsibilities: Differentiate online request paths from offline/migration jobs; detect
- *   unbounded data queries (DAT-QRY-001); detect N+1 loop queries (DAT-NPL-001); detect
- *   redundant cross-layer serialization (DAT-SER-001); distinguish security perimeter defense
- *   from excessive internal defensive validation (DAT-DEF-001); flag persistence abstraction
- *   leaks in pure domain logic (DAT-LAY-001).
- * Exit Semantics & Design Rationale: Pure in-memory AST and pattern reasoning without external
- *   database dependencies; issues include full evidence chains and risk assessments.
- */
+/** Path/symbol fragment marking a schema migration entry point. */
+const HINT_MIGRATION = 'migration';
+/** Path/symbol fragment marking a data seeding entry point. */
+const HINT_SEED = 'seed';
+/** Path/symbol fragment marking a test fixture builder. */
+const HINT_FIXTURE = 'fixture';
+/** Path/symbol fragment marking a batch processing job. */
+const HINT_BATCH = 'batch';
+/** Path/symbol fragment marking a queued or scheduled job. */
+const HINT_JOB = 'job';
+/** Path/symbol fragment marking an administrative task. */
+const HINT_TASK = 'task';
+/** Path/symbol fragment marking a cron entry point. */
+const HINT_CRON = 'cron';
+/** Path/symbol fragment marking a command-line entry point. */
+const HINT_CLI = 'cli';
+/** Path/symbol fragment marking a maintenance script. */
+const HINT_SCRIPT = 'script';
+/** Path/symbol fragment marking an operator tool. */
+const HINT_TOOL = 'tool';
+
+/** Fragments whose presence in a path or symbol marks an offline or migration context. */
+const OFFLINE_CONTEXT_HINTS = [
+    HINT_MIGRATION,
+    HINT_SEED,
+    HINT_FIXTURE,
+    HINT_BATCH,
+    HINT_JOB,
+    HINT_TASK,
+    HINT_CRON,
+    HINT_CLI,
+    HINT_SCRIPT,
+    HINT_TOOL,
+];
 
 /**
  * Identify whether a file or function belongs to an offline, migration, or admin task.
@@ -34,19 +53,7 @@
 export function isOfflineOrMigrationContext(filePath: string, symbol: string): boolean {
     const lowerPath = filePath.toLowerCase();
     const lowerSymbol = symbol.toLowerCase();
-    const offlinePathHints = [
-        'migration',
-        'seed',
-        'fixture',
-        'batch',
-        'job',
-        'task',
-        'cron',
-        'cli',
-        'script',
-        'tool',
-    ];
-    for (const hint of offlinePathHints) {
+    for (const hint of OFFLINE_CONTEXT_HINTS) {
         if (lowerPath.includes(hint) || lowerSymbol.includes(hint)) {
             return true;
         }
