@@ -1,3 +1,8 @@
+export {
+    computeTestModernityMetrics,
+    evaluateTestModernityThresholds,
+} from './testModernityMetrics';
+
 /**
  * Module: Core Intelligence — Test Modernity & Contract Fulfillment
  * File Path: src/core/intelligence/testModernity.ts
@@ -13,13 +18,7 @@
  *   returns structured diagnostics and metrics.
  */
 
-import type {
-    Issue,
-    SemanticEvidenceStep,
-    SemanticReviewDetail,
-    TestDebtTicket,
-    TestModernityMetricSummary,
-} from '../types';
+import type { Issue, SemanticEvidenceStep, SemanticReviewDetail, TestDebtTicket } from '../types';
 
 /**
  * Descriptor of a test case or suite site.
@@ -59,50 +58,6 @@ export interface TestModernityOptions {
     flagDeprecatedContractTests?: boolean;
     flagTautologicalAssertions?: boolean;
     flagSkippedTests?: boolean;
-}
-
-/**
- * Calculate Effective Modern Test Density (EMTD) and Current Business Contract Coverage (CBCR).
- *
- * EMTD = 1000 * (sum(w_s * c_s * f_s * e_s * u_s)) / max(1, ActiveTestNLOC)
- * CBCR = sum(w_s * c_s * f_s) / sum(w_s)
- *
- * @param units - Set of active business semantic units.
- * @param activeTestNloc - Non-comment, non-fixture test lines of code.
- * @returns Computed metrics summary.
- */
-export function computeTestModernityMetrics(
-    units: ActiveSemanticUnit[],
-    activeTestNloc: number,
-): TestModernityMetricSummary {
-    let weightedQualitySum = 0;
-    let weightedFreshCoverageSum = 0;
-    let totalWeight = 0;
-    let coveredCount = 0;
-
-    for (const unit of units) {
-        totalWeight += unit.riskWeight;
-        if (unit.isCovered) {
-            coveredCount += 1;
-            const freshCoverage = unit.riskWeight * unit.freshness;
-            weightedFreshCoverageSum += freshCoverage;
-            const qualityTerm =
-                unit.riskWeight * unit.freshness * unit.effectiveness * unit.uniqueness;
-            weightedQualitySum += qualityTerm;
-        }
-    }
-
-    const nlocDivisor = Math.max(1, activeTestNloc);
-    const emtd = Math.round((1000 * weightedQualitySum) / nlocDivisor);
-    const cbcr = totalWeight > 0 ? weightedFreshCoverageSum / totalWeight : 1.0;
-
-    return {
-        emtd,
-        cbcr: Math.round(cbcr * 1000) / 1000,
-        activeTestNloc,
-        activeSemanticUnits: units.length,
-        coveredSemanticUnits: coveredCount,
-    };
 }
 
 /**
@@ -400,70 +355,6 @@ export function analyzeTestModernitySites(
                 },
             });
         }
-    }
-
-    return issues;
-}
-
-/**
- * Evaluate computed test metrics against thresholds and emit TST-DEN-001 if below minimum.
- *
- * @param metrics - Calculated EMTD and CBCR summary.
- * @param domain - Evaluated business domain name.
- * @param options - Modernity thresholds.
- * @returns Diagnostic issues for low test density or coverage.
- */
-export function evaluateTestModernityThresholds(
-    metrics: TestModernityMetricSummary,
-    domain: string,
-    options: TestModernityOptions = {},
-): Issue[] {
-    const minEmtd = options.minEmtd ?? 100;
-    const minCbcr = options.minCbcr ?? 0.7;
-    const issues: Issue[] = [];
-
-    if (metrics.emtd < minEmtd || metrics.cbcr < minCbcr) {
-        const detail: SemanticReviewDetail = {
-            language: 'typescript',
-            module: 'test-suite',
-            symbol: domain,
-            codeDomain: 'test-modernity',
-            currentBehavior: `Test suite achieves EMTD score ${metrics.emtd} (min ${minEmtd}) and CBCR rate ${metrics.cbcr} (min ${minCbcr}).`,
-            semanticEvidenceChain: [],
-            triggerCondition:
-                'Effective Modern Test Density (EMTD) or Current Contract Coverage (CBCR) below configured threshold',
-            risk: 'Critical business behaviors and state transitions lack effective modern fault-detecting test coverage.',
-            blastRadius: [domain],
-            isDeterministic: true,
-            requiresManualConfirm: false,
-            suggestedFix:
-                'Add contract tests and negative boundary verification for active domain semantic units.',
-            impactedCallers: [],
-            impactedTests: [],
-            verificationMethod: 'Recalculate EMTD and CBCR after augmenting test suites.',
-            ruleVersion: '1.0.0',
-            configVersion: '0.3.0',
-            canAutofix: false,
-        };
-
-        issues.push({
-            id: `test-modernity:TST-DEN-001:${domain}:1`,
-            analyzer: 'test-modernity',
-            rule: 'TST-DEN-001',
-            severity: 'info',
-            message: `Low test density in domain '${domain}': EMTD=${metrics.emtd} (min ${minEmtd}), CBCR=${metrics.cbcr} (min ${minCbcr}).`,
-            location: {
-                file: `tests/unit/${domain}.test.ts`,
-                start: { line: 1, column: 1 },
-                end: { line: 1, column: 80 },
-            },
-            detail,
-            suggestion: 'Increase effective contract assertions for active domain workflows.',
-            evidence: {
-                confidence: 0.9,
-                requiresRuntime: false,
-            },
-        });
     }
 
     return issues;
