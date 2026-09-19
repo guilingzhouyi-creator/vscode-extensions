@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-19T14:42:24.620Z",
+  "timestamp": "2026-09-19T15:10:12.131Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -425,9 +425,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/test-parallel.js",
-      "count": 65,
+      "count": 66,
       "severities": {
-        "warning": 65
+        "warning": 66
       }
     },
     {
@@ -446,9 +446,9 @@
     },
     {
       "key": "hygiene|HYG-STB-002|scripts/test-parallel.js",
-      "count": 16,
+      "count": 17,
       "severities": {
-        "warning": 16
+        "warning": 17
       }
     },
     {
@@ -1576,6 +1576,41 @@
       "count": 8,
       "severities": {
         "warning": 8
+      }
+    },
+    {
+      "key": "governance|GOV-SAN-001|scripts/validate-phase14-trajectory-learning.js",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "hygiene|HYG-STB-002|scripts/validate-phase14-trajectory-learning.js",
+      "count": 6,
+      "severities": {
+        "warning": 6
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|scripts/validate-phase14-trajectory-learning.js",
+      "count": 25,
+      "severities": {
+        "warning": 25
+      }
+    },
+    {
+      "key": "simplify|SIM-LONG-001|scripts/validate-phase14-trajectory-learning.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|magic-number|scripts/validate-phase14-trajectory-learning.js",
+      "count": 10,
+      "severities": {
+        "warning": 10
       }
     },
     {
@@ -5612,9 +5647,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/praxis/index.ts",
-      "count": 6,
+      "count": 7,
       "severities": {
-        "warning": 6
+        "warning": 7
       }
     },
     {
@@ -5671,6 +5706,20 @@
       "count": 9,
       "severities": {
         "warning": 9
+      }
+    },
+    {
+      "key": "hygiene|HYG-WRAP-001|src/core/praxis/trajectoryLearningService.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "constants|magic-number|src/core/praxis/trajectoryLearningService.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
       }
     },
     {
@@ -7467,9 +7516,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/trajectory/index.ts",
-      "count": 9,
+      "count": 12,
       "severities": {
-        "warning": 9
+        "warning": 12
       }
     },
     {
@@ -7547,6 +7596,55 @@
       "count": 1,
       "severities": {
         "warning": 1
+      }
+    },
+    {
+      "key": "constants|magic-number|src/core/trajectory/recipeExtractor.ts",
+      "count": 13,
+      "severities": {
+        "warning": 13
+      }
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/trajectory/recipeExtractor.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/trajectory/recipeExtractor.ts",
+      "count": 33,
+      "severities": {
+        "warning": 33
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/trajectory/recipeTypes.ts",
+      "count": 11,
+      "severities": {
+        "warning": 11
+      }
+    },
+    {
+      "key": "hygiene|HYG-WRAP-001|src/core/trajectory/regressionTrajectoryDetector.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "constants|magic-number|src/core/trajectory/regressionTrajectoryDetector.ts",
+      "count": 6,
+      "severities": {
+        "warning": 6
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/trajectory/regressionTrajectoryDetector.ts",
+      "count": 3,
+      "severities": {
+        "warning": 3
       }
     },
     {

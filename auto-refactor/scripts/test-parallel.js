@@ -112,6 +112,10 @@ const PARALLEL_SUITES = [
     script: 'scripts/validate-phase13-slice-audit.js',
   },
   {
+    name: 'validate-trajectory-learning',
+    script: 'scripts/validate-phase14-trajectory-learning.js',
+  },
+  {
     name: 'validate-symbol-index-pack',
     composite: [
       'scripts/validate-symbol-index.js',

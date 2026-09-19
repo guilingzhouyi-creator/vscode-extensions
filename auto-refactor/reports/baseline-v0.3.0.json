@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.3.0-1789828982356",
-  "timestamp": "2026-09-19T14:43:02.356Z",
+  "snapshotId": "snapshot-v0.3.0-1789830657978",
+  "timestamp": "2026-09-19T15:10:57.977Z",
   "versions": {
     "engineVersion": "0.3.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "642f0963de84cfd6d7ba6fcc7a07829d332b440db9b4a060a803657efb702dd1",
+  "rulesDigest": "f4e29dd072010710dd4684b36b28e8847d3db4abda27bd41a4833d2d610702ea",
   "configDigest": "0dab70dfd67cf93720953c6122883d8cdd4ac66e771123293a95b01694f21f75",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 145,
+    "ruleCount": 146,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -101,6 +101,7 @@
     "GOV-SLC-001",
     "GOV-STD-001",
     "GOV-STD-002",
+    "GOV-TRJ-001",
     "GOV-TYP-001",
     "GOV-TYP-002",
     "GOV-TYP-003",

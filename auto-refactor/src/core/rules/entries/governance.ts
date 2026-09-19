@@ -71,6 +71,19 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-slc-001',
     }),
     defineRule({
+        id: 'GOV-TRJ-001',
+        family: RULE_FAMILY_GOVERNANCE,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Historical trajectory exhibits cyclic regressions, flip-flop oscillations, or re-introduces previously eliminated architectural anti-patterns.',
+        remediation:
+            '确保演化轨迹保持单调质量提升，避免在后续修订中死灰复燃已被重构配方消除的架构反模式。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-trj-001',
+    }),
+    defineRule({
         id: 'GOV-DBG-001',
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,

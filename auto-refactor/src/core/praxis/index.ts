@@ -20,3 +20,4 @@ export * from './semanticEnricher';
 export * from './diffGovernance';
 export * from './multiAgentGovernance';
 export * from './sliceAuditService';
+export * from './trajectoryLearningService';

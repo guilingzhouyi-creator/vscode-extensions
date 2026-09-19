@@ -137,6 +137,7 @@ export function classifyRuleLayer(ruleId: string): RuleLayer {
         ruleId === 'HYG-WRAP-001' ||
         ruleId === 'GOV-AGN-001' ||
         ruleId === 'GOV-SLC-001' ||
+        ruleId === 'GOV-TRJ-001' ||
         ruleId.startsWith('ARCH-') ||
         ruleId.startsWith('RES-')
     ) {

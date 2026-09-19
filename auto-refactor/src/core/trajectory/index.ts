@@ -18,3 +18,6 @@ export * from './intentConflictDetector';
 export * from './duplicateWorkAuditor';
 export * from './patchArbiter';
 export * from './multiAgentCoordinator';
+export * from './recipeTypes';
+export * from './recipeExtractor';
+export * from './regressionTrajectoryDetector';
