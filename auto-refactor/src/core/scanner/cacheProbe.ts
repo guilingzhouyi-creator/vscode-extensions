@@ -351,11 +351,6 @@ export async function executeIncrementalFiles(
     return { incrementalFiles, incrementalHit };
 }
 
-/** L2 cache entry resolved by path, when L2 is enabled for this pool. */
-type L2ByPathHit = ReturnType<CacheStore['lookupL2ByPath']>;
-/** L2 cache entry resolved by content hash, when L2 is enabled for this pool. */
-type L2Hit = ReturnType<CacheStore['lookupL2']>;
-
 /**
  * Look up an L2 entry by path, honouring the per-pool L2 switch.
  *
@@ -374,7 +369,7 @@ function lookupFreshL2ByPath(
     rel: string,
     mtimeMs: number,
     size: number,
-): L2ByPathHit {
+) {
     return fpContext.l2Enabled ? cache.lookupL2ByPath(fph, rel, mtimeMs, size) : null;
 }
 
@@ -392,6 +387,6 @@ function lookupFreshL2(
     fpContext: CacheFingerprintContext,
     fph: string,
     contentHash: string,
-): L2Hit {
+) {
     return fpContext.l2Enabled ? cache.lookupL2(fph, contentHash) : null;
 }
