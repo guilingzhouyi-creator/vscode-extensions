@@ -19,6 +19,7 @@
  *   must fail loudly rather than be silently tolerated.
  */
 import type { Analyzer, AnalyzerContext, Issue, CommentLevel, IssueEvidence } from '../core/types';
+import { SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { CommentMessages, SIX_FIELD_HEADERS_EN, SIX_FIELD_HEADERS_ZH } from '../core/messages';
 
 interface CommentOptions {
@@ -117,15 +118,6 @@ const SHORT_SEPARATOR_RE = /^─{2}(?!─)/;
 const LONG_SEPARATOR_RE = /^─{3,}\s*[^\s─]/;
 /** File-level banners are only tolerated in substantial modules. */
 const BANNER_LINE_LIMIT = 150;
-
-/** Issue severity for informational findings (missing docs in standard mode). */
-const SEVERITY_INFO = 'info';
-
-/** Issue severity for advisory findings such as over-wide comments and banners. */
-const SEVERITY_WARNING = 'warning';
-
-/** Issue severity for hard contract violations, such as a stale declared file path. */
-const SEVERITY_ERROR = 'error';
 
 /** Comment level that enables the strictest audit set, including the concurrency notice. */
 const COMMENT_LEVEL_STRICT = 'strict';

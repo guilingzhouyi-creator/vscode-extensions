@@ -14,6 +14,7 @@
 
 import * as fs from 'fs';
 import type { ScanReport, Issue, Severity } from '../types';
+import { SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR } from '../types';
 import type { Logger } from '../logger';
 
 /** Baseline ratchet granularity that compares per-(analyzer|rule|file) counts. */
@@ -30,7 +31,11 @@ export const BASELINE_VERSION = '1.2.0';
 const UNKNOWN_SEVERITY = 'unknown';
 
 /** Severity ordering. A credit only absorbs findings at or below its own severity. */
-const SEVERITY_RANK: Record<string, number> = { info: 0, warning: 1, error: 2 };
+const SEVERITY_RANK: Record<string, number> = {
+    [SEVERITY_INFO]: 0,
+    [SEVERITY_WARNING]: 1,
+    [SEVERITY_ERROR]: 2,
+};
 
 /**
  * One grouped baseline row: the comparison key, how many findings it stood for, and how those

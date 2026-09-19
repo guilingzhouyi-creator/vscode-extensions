@@ -20,16 +20,9 @@
  *     report at info severity instead of demanding a mechanical rewrite.
  */
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import { ANALYZER_TYPESCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/sourceMask';
-
-/** Analyzer id; also the namespace of every emitted finding id. */
-const ANALYZER_ID = 'ts-modern';
-
-/** Severity for rewrites that are safe to apply mechanically. */
-const SEVERITY_WARNING: Severity = 'warning';
-
-/** Severity for heuristics that need a human decision (global intent, type-only usage). */
-const SEVERITY_INFO: Severity = 'info';
 
 /** Extensions the pack accepts: the content-only path sees every language, so gate on the path. */
 const SUPPORTED_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
@@ -169,8 +162,8 @@ function makeIssue(
 ): Issue {
     const line = lineIndex + 1;
     return {
-        id: `${ANALYZER_ID}:${rule}:${file}:${line}`,
-        analyzer: ANALYZER_ID,
+        id: `${ANALYZER_TYPESCRIPT_MODERN}:${rule}:${file}:${line}`,
+        analyzer: ANALYZER_TYPESCRIPT_MODERN,
         rule,
         severity,
         message,
@@ -207,7 +200,7 @@ function escapeRegExp(text: string): string {
 
 /** TypeScript/JavaScript modernization pack: ten rules over a masked view of the file. */
 export class TsModernAnalyzer implements Analyzer {
-    name = ANALYZER_ID;
+    name = ANALYZER_TYPESCRIPT_MODERN;
 
     /**
      * Streaming-path entry point: the engine invokes this once per file. Content-only analyzers

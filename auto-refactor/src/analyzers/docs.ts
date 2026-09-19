@@ -17,6 +17,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { globToRegExp } from '../core/fileDiscovery';
 
 const FENCE_RE = /^\s*(`{3,}|~{3,})/;
@@ -34,12 +35,6 @@ const DUP_MAX_REPORTED = 5;
 const DUP_MESSAGE_SAMPLE_CHARS = 60;
 /** Maximum characters of the duplicated prose sample stored in the DOC-DUP-001 issue detail. */
 const DUP_DETAIL_SAMPLE_CHARS = 120;
-
-/** Severity for dead links and duplicated prose that rot slowly. */
-const SEVERITY_WARNING = 'warning';
-
-/** Severity for defects that break rendering, such as an unbalanced code fence. */
-const SEVERITY_ERROR = 'error';
 
 const EXEMPT_MARKERS = [
     '不存在',

@@ -17,7 +17,8 @@
  *   gate.
  */
 import * as path from 'path';
-import type { Analyzer, AnalyzerContext, Issue, ArchitectureLayer } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, ArchitectureLayer, Severity } from '../core/types';
+import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { inferDirectorySemantic } from '../core/profiler/projectProfiler';
 import { ArchitectureMessages } from '../core/messages/architecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from '../core/intelligence/semanticArchitecture';
@@ -124,12 +125,6 @@ const ARCHITECTURE_LAYER_DOMAIN = 'domain';
 
 /** Clean Architecture layer name for interface/adapter code (the outermost layer). */
 const ARCHITECTURE_LAYER_INTERFACE = 'interface';
-
-/** Issue severity for hard boundary violations such as framework leaks and inversions. */
-const SEVERITY_ERROR = 'error';
-
-/** Issue severity for advisory boundary findings such as allowed skip-layer penetrations. */
-const SEVERITY_WARNING = 'warning';
 
 /**
  * Enforce declarative Clean Architecture boundaries for a single source file.
@@ -842,7 +837,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         lineIdx: number,
         rule: string,
         message: string,
-        severity: 'info' | typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
+        severity: Severity,
         detail: Record<string, any>,
         suggestion?: string,
     ): Issue {

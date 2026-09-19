@@ -16,6 +16,7 @@
  *     preferred over a wrong rewrite suggestion.
  */
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 
 const BLOCK_OPEN_RE = /:\s*(?:#.*)?$/;
 const ASYNC_DEF_RE = /^\s*async\s+def\b/;
@@ -38,12 +39,6 @@ const RAISE_CAUSE_LOOKAHEAD_LINES = 5;
 
 /** Block kind for an `async def` frame; mirrors the Python `async` keyword token. */
 const PYTHON_ASYNC_KEYWORD = 'async';
-
-/** Severity for advisory modernization findings that can be staged over time. */
-const SEVERITY_WARNING = 'warning';
-
-/** Severity for findings that indicate a functional or correctness defect. */
-const SEVERITY_ERROR = 'error';
 
 /** Python stdlib top-level modules (`sys.stdlib_module_names` + `__future__`). */
 const PY_STDLIB_NAMES = new Set(

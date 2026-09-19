@@ -18,16 +18,9 @@
  *     masked text proves the call is real code, the raw text proves the Godot 3 signature.
  */
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/sourceMask';
-
-/** Analyzer id; also the namespace of every emitted finding id. */
-const ANALYZER_ID = 'gdscript-modern';
-
-/** Severity for rewrites that are safe to apply mechanically. */
-const SEVERITY_WARNING: Severity = 'warning';
-
-/** Severity for patterns that need a judgement call about intent. */
-const SEVERITY_INFO: Severity = 'info';
 
 /** Extension the pack accepts; the content-only path sees every language. */
 const SOURCE_EXTENSION = '.gd';
@@ -144,8 +137,8 @@ function makeIssue(
 ): Issue {
     const line = lineIndex + 1;
     return {
-        id: `${ANALYZER_ID}:${rule}:${file}:${line}`,
-        analyzer: ANALYZER_ID,
+        id: `${ANALYZER_GDSCRIPT_MODERN}:${rule}:${file}:${line}`,
+        analyzer: ANALYZER_GDSCRIPT_MODERN,
         rule,
         severity,
         message,
@@ -157,7 +150,7 @@ function makeIssue(
 
 /** GDScript modernization pack: seven rules over a masked view of the file. */
 export class GdscriptModernAnalyzer implements Analyzer {
-    name = ANALYZER_ID;
+    name = ANALYZER_GDSCRIPT_MODERN;
 
     /**
      * Streaming-path entry point: the engine invokes this once per file. Content-only analyzers

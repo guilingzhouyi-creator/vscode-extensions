@@ -39,20 +39,16 @@ const MAX_SCORE_CAP = 80;
  */
 
 import type { Issue, SemanticReviewDetail, TestModernityMetricSummary } from '../types';
+import { SEVERITY_INFO, LANGUAGE_TYPESCRIPT } from '../types';
+import { ANALYZER_TEST_MODERNITY } from '../scoring/dimensionLiterals';
 import type { ActiveSemanticUnit, TestModernityOptions } from './testModernity';
 
-/** Language tag written into the semantic review detail. */
-const LANGUAGE_TYPESCRIPT = 'typescript';
 /** Module tag written into the semantic review detail. */
 const MODULE_TEST_SUITE = 'test-suite';
 /** Code-domain tag written into the semantic review detail. */
 const CODE_DOMAIN_TEST_MODERNITY = 'test-modernity';
-/** Analyzer id owning the test-modernity rules. */
-const ANALYZER_TEST_MODERNITY = 'test-modernity';
 /** Rule id of the low-test-density finding. */
 const RULE_TST_DEN_001 = 'TST-DEN-001';
-/** Advisory severity used for the density finding. */
-const SEVERITY_INFO = 'info';
 /** Rule contract version recorded on every emitted issue. */
 const RULE_VERSION = '1.0.0';
 /** Engine config version recorded on every emitted issue. */

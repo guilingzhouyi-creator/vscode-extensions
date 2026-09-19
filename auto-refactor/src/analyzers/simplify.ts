@@ -17,6 +17,8 @@
  *   code" suggestion is far more expensive than a missed smell.
  */
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import { SEVERITY_WARNING } from '../core/types';
+import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
 import { locN } from '../utils/normalized';
@@ -59,12 +61,6 @@ const BRACE_EMPTY_ONE_LINER_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\
 const BRACE_OPEN_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*$/;
 const BRACE_CLOSE_RE = /^\s*\}\s*;?\s*$/;
 const COMMENT_MARKERS = ['//', '#', '*'];
-
-/** Analyzer id; also the namespace of every emitted finding id. */
-const ANALYZER_SIMPLIFY = 'simplify';
-
-/** Severity for smell findings that should be addressed but do not fail the gate. */
-const SEVERITY_WARNING = 'warning';
 
 /**
  * Simplification and structure-smell analyzer (language-agnostic).

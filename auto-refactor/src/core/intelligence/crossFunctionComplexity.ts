@@ -32,6 +32,8 @@ const MAX_SCORE_CAP = 80;
 import type { CallGraph } from './callGraph';
 import type { SymbolIndex } from './symbolIndex';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
+import { SEVERITY_WARNING, LANGUAGE_TYPESCRIPT } from '../types';
+import { ANALYZER_COMPLEXITY } from '../scoring/dimensionLiterals';
 import type { LoopSite, SemanticComplexityOptions } from './semanticComplexity';
 /** Evidence-chain step kind for an iterating loop. */
 const KIND_LOOP = 'loop';
@@ -41,18 +43,12 @@ const KIND_CALL = 'call';
 const KIND_FILE = 'file';
 /** Boundary label used when the callee lives in the same file. */
 const KIND_FUNCTION = 'function';
-/** Language tag written into the semantic review detail. */
-const LANGUAGE_TYPESCRIPT = 'typescript';
 /** Module tag written into the semantic review detail. */
 const MODULE_CORE = 'core';
 /** Code-domain tag written into the semantic review detail. */
 const CODE_DOMAIN_ALGORITHMIC_COMPLEXITY = 'algorithmic-complexity';
-/** Analyzer id owning the cross-function complexity rule. */
-const ANALYZER_COMPLEXITY = 'complexity';
 /** Rule id of the cross-function complexity finding. */
 const RULE_CPX_TIME_001 = 'CPX-TIME-001';
-/** Severity of the cross-function complexity finding. */
-const SEVERITY_WARNING = 'warning';
 /** Rule contract version recorded on every emitted issue. */
 const RULE_VERSION = '1.0.0';
 /** Engine config version recorded on every emitted issue. */

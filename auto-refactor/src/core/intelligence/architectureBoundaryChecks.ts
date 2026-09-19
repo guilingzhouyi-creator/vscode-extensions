@@ -10,6 +10,7 @@
  *   accumulator and never throw; traversal and option defaults stay with the caller.
  */
 import type { Issue } from '../types';
+import { SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR } from '../types';
 import type { SemanticEvidenceStep, SemanticReviewDetail } from '../semanticTypes';
 import type { ArchitecturalFileInfo } from './semanticArchitecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from './semanticArchitecture';
@@ -19,12 +20,6 @@ const KIND_CALL = 'call';
 const KIND_VARIABLE = 'variable';
 /** Evidence-chain step kind for a guarded condition. */
 const KIND_CONDITION = 'condition';
-/** Severity used for boundary breaches. */
-const SEVERITY_ERROR = 'error';
-/** Severity used for advisory boundary signals. */
-const SEVERITY_WARNING = 'warning';
-/** Severity used for informational boundary signals. */
-const SEVERITY_INFO = 'info';
 /** Rule ids owned by this module. */
 const RULE_ARCH_HDL_001 = 'ARCH-HDL-001';
 const RULE_ARCH_BND_001 = 'ARCH-BND-001';

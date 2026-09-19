@@ -30,6 +30,7 @@
 import * as path from 'path';
 import type { Scanner } from '../analyzer';
 import type { Issue, FileMetric } from '../types';
+import { SEVERITY_ERROR } from '../types';
 import { classifyDiff } from '../router/diffClassifier';
 import type { SparseRouteResult } from '../router/sparseRuleRouter';
 import { routeDiffToAnalyzers } from '../router/sparseRuleRouter';
@@ -45,9 +46,6 @@ import type { FileRevision } from '../trajectory/types';
 
 /** Number of leading digest hex characters kept as the short revision identifier. */
 const REVISION_ID_LENGTH = 16;
-
-/** Severity value marking a blocking finding; rejects the file and raises escalations. */
-const SEVERITY_ERROR = 'error';
 
 /**
  * One file mutation handed to {@link executeDualTrack}: the two content snapshots plus the

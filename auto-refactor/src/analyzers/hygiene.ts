@@ -19,6 +19,7 @@
  */
 import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import { SEVERITY_WARNING } from '../core/types';
 import { HygieneMessages } from '../core/messages';
 import { isVocabularyEnumeration } from '../core/governance/markerScope';
 
@@ -57,9 +58,6 @@ const CHAR_CODE_TAB = 9;
 const UNREACHABLE_SNIPPET_MAX_CHARS = 40;
 /** Multiplier applied per meaningful line by the rolling clone-block hash. */
 const CLONE_ROLLING_HASH_MULTIPLIER = 31;
-
-/** Severity for hygiene findings that should be fixed but do not fail the gate. */
-const SEVERITY_WARNING = 'warning';
 
 /**
  * Build the transient-jargon matcher for one file scan.

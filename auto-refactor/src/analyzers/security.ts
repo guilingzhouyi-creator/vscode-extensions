@@ -30,6 +30,8 @@
  */
 
 import type { Analyzer, AnalyzerContext, Issue, SecurityLevel } from '../core/types';
+import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import { ANALYZER_SECURITY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
 import { SecurityMessages } from '../core/messages/security';
@@ -80,15 +82,6 @@ const SENSITIVE_LOG_RE =
 
 /** Default per-file finding cap used when `SecurityOptions.maxIssuesPerFile` is omitted. */
 const DEFAULT_MAX_ISSUES_PER_FILE = 50;
-
-/** Analyzer id; also the namespace of every emitted finding id. */
-const ANALYZER_SECURITY = 'security';
-
-/** Severity for exploitable vulnerabilities that must fail the gate. */
-const SEVERITY_ERROR = 'error';
-
-/** Severity for weaker full-level hygiene findings that should be fixed but do not block. */
-const SEVERITY_WARNING = 'warning';
 
 /**
  * Security analyzer for dynamic execution, injection, weak crypto, and data-leakage patterns.
