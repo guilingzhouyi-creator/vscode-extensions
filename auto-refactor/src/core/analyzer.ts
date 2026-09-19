@@ -136,12 +136,16 @@ export class Scanner implements ScannerContext {
         const sparseResult = routeArchetypeToAnalyzers(detectedArchetype, {
             customAnalyzers: config.customAnalyzers?.map((c) => c.name),
         });
+        // The routing decision is always computed so the report can explain the archetype, but it
+        // only changes the analyzer set when sparseRouting is on. The `applied` flag marks that
+        // difference so a reader never mistakes the advice for the set that actually ran.
         this.activatedReviewersSummary = {
             archetype: detectedArchetype,
             active: Array.from(sparseResult.activeAnalyzers).sort(),
             skipped: Array.from(sparseResult.skippedAnalyzers).sort(),
             activationRatio: sparseResult.activationRatio,
             reason: sparseResult.reason,
+            applied: config.sparseRouting === true,
         };
 
         if (config.sparseRouting === true) {

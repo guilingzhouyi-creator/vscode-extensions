@@ -94,11 +94,17 @@ export interface IssueEvidence {
  * A single, structured finding emitted by an analyzer.
  *
  * This is the **canonical output record** of the toolchain (see report.schema.json).
- * `id` is stable within a run: `${analyzer}:${rule}:${file}:${line}`.
+ * `id` is stable within a run: `${analyzer}:${rule}:${file}:${line}`. It is a grouping key,
+ * not a unique key: a line that carries several findings of the same rule repeats the id, so
+ * consumers that need one row per finding must key on `id` plus `location.start.column` (or
+ * count occurrences). The baseline ratchet relies on that multiplicity.
  * `detail` carries machine-readable payloads for CI / code-review integration.
  */
 export interface Issue {
-    /** Stable id, unique within a run: `${analyzer}:${rule}:${file}:${line}` */
+    /**
+     * Stable, repeatable grouping key: `${analyzer}:${rule}:${file}:${line}`. Unique per
+     * (rule, file, line) — not per finding.
+     */
     id: string;
     analyzer: AnalyzerId;
     /**
@@ -115,6 +121,19 @@ export interface Issue {
     suggestion?: string;
     /** Uncertainty and empirical evidence metadata (e.g. confidence score, runtime need). */
     evidence?: IssueEvidence;
+    /**
+     * Baseline ratchet verdict, set only when a baseline file was compared. True means this
+     * finding had no matching credit left in the baseline — a brand-new finding, an extra
+     * occurrence of a rule already reported on that line, or a severity escalation of a
+     * baselined finding.
+     */
+    isNew?: boolean;
+    /**
+     * Declarative suppression trail. Present when a config suppression matched this finding;
+     * `reason` is always carried so a silenced finding stays auditable, and `downgraded` marks
+     * a severity downgrade applied by the same rule.
+     */
+    suppression?: { reason: string; downgraded: boolean };
 }
 
 /**
@@ -262,7 +281,13 @@ export interface ProjectPartition {
 export type ProjectArchetype = 'demo' | 'web' | 'game' | 'library';
 
 /**
- * Summary of sparse reviewer activation published in ScanSummary.
+ * Sparse-routing decision for the detected archetype, published in ScanSummary.
+ *
+ * `active`/`skipped` are the **routing recommendation** (analyzers, not reviewers, despite the
+ * field name kept for compatibility). They describe what sparse routing would enable — not what
+ * actually ran — unless `applied` is true. What actually ran is reported by `disabledAnalyzers`
+ * (config-driven) and `byAnalyzer`, so a reader must never infer "this analyzer did not run"
+ * from `skipped` alone.
  */
 export interface ActivatedReviewersSummary {
     archetype: ProjectArchetype;
@@ -270,6 +295,12 @@ export interface ActivatedReviewersSummary {
     skipped: string[];
     activationRatio: number;
     reason: string;
+    /**
+     * True when sparse routing was actually applied to this scan (`sparseRouting: true`).
+     * When false, the lists above are advisory only and the effective analyzer set is the
+     * configured one.
+     */
+    applied: boolean;
 }
 
 /**
@@ -660,6 +691,13 @@ export interface ScanSummary {
     disabledAnalyzers?: string[];
     /** Config self-check notes (ineffective globs, disabled language packs, cache fallbacks). */
     warnings?: string[];
+    /**
+     * Findings matched by a declarative suppression. They stay in `issues` with their
+     * `suppression` trail attached, and are excluded from gate counting.
+     */
+    suppressedCount?: number;
+    /** True when a baseline file was read and per-issue `isNew` annotations were applied. */
+    ratchetBaselineUsed?: boolean;
     /**
      * Post-scan passes that actually ran for this report, in execution order: `suppressions`,
      * `dependency-graph` (full scans only — cross-file facts need the complete module set) and

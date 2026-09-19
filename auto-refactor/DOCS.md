@@ -87,7 +87,7 @@
 
 | 校验 | 运行依赖 | 受限环境（无命名管道 / 禁止子进程捕获） |
 |------|----------|------------------------------------------|
-| `validate-equivalence`、`validate-diff`、`validate-oxc-keypoints`、`fastpath-check` | 纯进程内 | ✅ 可运行，且是行为等价的硬门禁 |
+| `validate-equivalence`、`validate-diff`、`validate-oxc-keypoints`、`fastpath-check`、`validate-baseline-ratchet`、`validate-suppression-gate` | 纯进程内 | ✅ 可运行，且是行为等价的硬门禁 |
 | `validate-warm`、`validate-diff` 的 daemon 回环场景 | Windows 命名管道 / Unix socket（daemon IPC） | ⚠️ 需在允许命名管道的终端补跑 |
 | `validate-diff-interface`、`validate-review-memory`、`validate-consumer-runner`、`validate-data-flow` | `spawnSync` 捕获子进程输出 | ⚠️ 报 EPERM / `exit=null`，属环境限制而非回归 |
 
@@ -103,6 +103,24 @@ const w1 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   
 const w2 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   // 热缓存
 // 断言：两次 report 与新扫描逐字节一致；w2.stats.cacheHit > 0 且 analyzed === 0
 ```
+
+### 6.4 棘轮信用语义（baseline 1.2.0）
+
+棘轮把基线里的每一条记录当作**一次信用**，按报告顺序逐条消耗；某条发现消耗不到信用即判定为"新增"：
+
+| 情形 | 判定 | 依据 |
+|------|------|------|
+| 某个"分析器\|规则\|文件"组比基线多出同类发现 | **新增** | 基线只记录 N 次，第 N+1 次无信用可用 |
+| 同一行已有该规则的发现，再追加一条 | **新增** | id 为 `analyzer:rule:file:line`，一行多条共享同一 id，重数由严重度直方图承载，不再由"id 是否出现过"决定 |
+| 已知发现由 warning 升级为 error（如越过 `fileLinesFail`） | **新增** | 低严重度信用不能吸收更高严重度的发现 |
+| 已知发现由 error 降级为 warning | 不计新增 | 更高严重度的信用可吸收更低者——改进永远不算新增 |
+| 1.0.0 / 1.1.0 旧基线 | 仅按重数判定 | 旧基线不含严重度信息，升级检测需重冻后生效（运行日志会明确提示） |
+
+基线载荷：grouped 为 `{key, count, severities}`；id 为去重后的 `issues[]` 加 `severities{id: {severity: count}}`。重冻（`npm run gate:self:update`）的前提是**新增信用为零**——由 `gate:self` / `gate:self:warning` 与提交前的逐键比对（新增键必须落在已登记的抑制策略内）共同看守。
+
+### 6.5 抑制与门禁判定
+
+`--fail-on-severity` / `failOnIssue` 只统计**未抑制**的发现：被 `suppressions` 命中的发现保留在报告里（携带 `suppression.reason` 供审计），但不参与门禁计数。这与 `report.schema.json` 的字段说明、`gate-self.js` 的 `newBlocking` 统计保持一致；`validate-suppression-gate` 用一对仅相差抑制配置的夹具锁死该契约（抑制侧退出 0、对照侧退出 1）。
 
 ---
 

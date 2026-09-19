@@ -39,13 +39,7 @@
     },
     "summary": {
       "type": "object",
-      "required": [
-        "filesScanned",
-        "issuesTotal",
-        "bySeverity",
-        "byAnalyzer",
-        "durationMs"
-      ],
+      "required": ["filesScanned", "issuesTotal", "bySeverity", "byAnalyzer", "durationMs"],
       "properties": {
         "filesScanned": {
           "type": "integer",
@@ -126,6 +120,46 @@
             }
           },
           "description": "Uncertainty metrics summarizing findings requiring runtime verification and average confidence."
+        },
+        "ratchetBaselineUsed": {
+          "type": "boolean",
+          "description": "True when a baseline file was read and per-issue isNew annotations were applied."
+        },
+        "activatedReviewers": {
+          "type": "object",
+          "description": "Sparse-routing advice for the detected archetype. active/skipped are analyzers, and they describe what routing WOULD enable unless applied is true; what actually ran is disabledAnalyzers plus byAnalyzer.",
+          "required": ["archetype", "active", "skipped", "activationRatio", "reason", "applied"],
+          "properties": {
+            "archetype": {
+              "type": "string",
+              "enum": ["demo", "web", "game", "library"]
+            },
+            "active": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "skipped": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "activationRatio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "reason": {
+              "type": "string"
+            },
+            "applied": {
+              "type": "boolean",
+              "description": "True when sparseRouting actually replaced the analyzer set for this scan."
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -148,19 +182,11 @@
   "definitions": {
     "Issue": {
       "type": "object",
-      "required": [
-        "id",
-        "analyzer",
-        "rule",
-        "severity",
-        "message",
-        "location",
-        "detail"
-      ],
+      "required": ["id", "analyzer", "rule", "severity", "message", "location", "detail"],
       "properties": {
         "id": {
           "type": "string",
-          "description": "Stable within a run: `${analyzer}:${rule}:${file}:${line}`."
+          "description": "Repeatable grouping key: `${analyzer}:${rule}:${file}:${line}`. Several findings of one rule on one line share it; add location.start.column for a per-finding key."
         },
         "analyzer": {
           "type": "string",
@@ -172,22 +198,14 @@
         },
         "severity": {
           "type": "string",
-          "enum": [
-            "info",
-            "warning",
-            "error"
-          ]
+          "enum": ["info", "warning", "error"]
         },
         "message": {
           "type": "string"
         },
         "location": {
           "type": "object",
-          "required": [
-            "file",
-            "start",
-            "end"
-          ],
+          "required": ["file", "start", "end"],
           "properties": {
             "file": {
               "type": "string",
@@ -212,7 +230,7 @@
         },
         "isNew": {
           "type": "boolean",
-          "description": "True when the issue is not covered by the compared baseline (ratchet NEW)."
+          "description": "True when the issue has no baseline credit left: a new finding, an extra occurrence of a rule already baselined on that line, or a severity escalation above the baselined severity."
         },
         "suppression": {
           "type": "object",
@@ -242,9 +260,7 @@
               "type": "string"
             }
           },
-          "required": [
-            "confidence"
-          ],
+          "required": ["confidence"],
           "additionalProperties": true,
           "description": "Uncertainty and empirical evidence metadata (e.g. confidence score, runtime need)."
         }
@@ -278,10 +294,7 @@
     },
     "Position": {
       "type": "object",
-      "required": [
-        "line",
-        "column"
-      ],
+      "required": ["line", "column"],
       "properties": {
         "line": {
           "type": "integer",
@@ -363,24 +376,14 @@
         },
         "format": {
           "type": "string",
-          "enum": [
-            "json",
-            "sarif",
-            "text"
-          ]
+          "enum": ["json", "sarif", "text"]
         },
         "failOnIssue": {
           "type": "boolean"
         },
         "logLevel": {
           "type": "string",
-          "enum": [
-            "silent",
-            "error",
-            "warn",
-            "info",
-            "debug"
-          ]
+          "enum": ["silent", "error", "warn", "info", "debug"]
         },
         "concurrency": {
           "type": "integer",

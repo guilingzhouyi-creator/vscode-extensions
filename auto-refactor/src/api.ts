@@ -625,10 +625,13 @@ async function outputRenderedReport(
 }
 
 function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
-    const ratchetUsed = (report.summary as any).ratchetBaselineUsed === true;
-    const blockingPool: Issue[] = ratchetUsed
-        ? report.issues.filter((i) => (i as any).isNew === true)
-        : report.issues;
+    const ratchetUsed = report.summary.ratchetBaselineUsed === true;
+    // A suppressed finding stays in the report for auditing but never decides a gate: that is
+    // the documented contract of `suppression` (report.schema.json) and what gate-self.js
+    // already assumed, so the exit code must agree with it instead of counting the finding.
+    const blockingPool: Issue[] = report.issues.filter(
+        (i) => !i.suppression && (!ratchetUsed || i.isNew === true),
+    );
     const rank = { info: 0, warning: 1, error: 2 } as const;
     if (config.failOnIssue && blockingPool.some((i) => i.severity === 'error')) return 1;
     if (config.failOnSeverity) {

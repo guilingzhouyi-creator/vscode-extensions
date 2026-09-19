@@ -213,7 +213,7 @@ function applySuppressions(report: ScanReport, suppressions: SuppressionRule[]):
         const hit = matchSuppression(issue, index);
         if (hit) {
             suppressedCount++;
-            (issue as any).suppression = { reason: hit.reason, downgraded: !!hit.downgradeTo };
+            issue.suppression = { reason: hit.reason, downgraded: !!hit.downgradeTo };
             if (hit.downgradeTo) issue.severity = hit.downgradeTo;
         }
     }
@@ -300,9 +300,9 @@ export async function finalizeReport(
 
     postScanPasses.push('suppressions');
     const suppressedCount = applySuppressions(report, config.suppressions ?? []);
-    (report.summary as any).suppressedCount = suppressedCount;
+    report.summary.suppressedCount = suppressedCount;
     report.summary.postScanPasses = postScanPasses;
-    if (warnings.length > 0) (report.summary as any).warnings = warnings;
+    if (warnings.length > 0) report.summary.warnings = warnings;
 
     await finalizeBaseline(report, config, options, logger, postScanPasses);
 }
