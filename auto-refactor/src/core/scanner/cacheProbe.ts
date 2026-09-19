@@ -112,9 +112,7 @@ export async function probeSingleFileCache(
             return;
         }
         const fph = fpContext.fpHashFor(rel);
-        const byPath = fpContext.l2Enabled
-            ? cache.lookupL2ByPath(fph, rel, fp.mtimeMs, fp.size)
-            : null;
+        const byPath = lookupFreshL2ByPath(cache, fpContext, fph, rel, fp.mtimeMs, fp.size);
         if (byPath) {
             const result = remapCachedResult(
                 { issues: byPath.issues, metric: byPath.metric },
@@ -136,7 +134,7 @@ export async function probeSingleFileCache(
     }
     const contentHash = sha256Hex(buf);
     const fph = fpContext.fpHashFor(rel);
-    const l2 = fpContext.l2Enabled ? cache.lookupL2(fph, contentHash) : null;
+    const l2 = lookupFreshL2(cache, fpContext, fph, contentHash);
     if (l2) {
         const result = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, rel);
         perFile[i] = result;
@@ -351,4 +349,49 @@ export async function executeIncrementalFiles(
         }
     }
     return { incrementalFiles, incrementalHit };
+}
+
+/** L2 cache entry resolved by path, when L2 is enabled for this pool. */
+type L2ByPathHit = ReturnType<CacheStore['lookupL2ByPath']>;
+/** L2 cache entry resolved by content hash, when L2 is enabled for this pool. */
+type L2Hit = ReturnType<CacheStore['lookupL2']>;
+
+/**
+ * Look up an L2 entry by path, honouring the per-pool L2 switch.
+ *
+ * @param cache - Two-level cache store backing the lookup.
+ * @param fpContext - Pool fingerprint context carrying the L2 switch.
+ * @param fph - Pool fingerprint hash of the current scan.
+ * @param rel - Repository-relative path of the probed file.
+ * @param mtimeMs - Modification time recorded for the file.
+ * @param size - Byte size recorded for the file.
+ * @returns The cached entry, or null when L2 is disabled or misses.
+ */
+function lookupFreshL2ByPath(
+    cache: CacheStore,
+    fpContext: CacheFingerprintContext,
+    fph: string,
+    rel: string,
+    mtimeMs: number,
+    size: number,
+): L2ByPathHit {
+    return fpContext.l2Enabled ? cache.lookupL2ByPath(fph, rel, mtimeMs, size) : null;
+}
+
+/**
+ * Look up an L2 entry by content hash, honouring the per-pool L2 switch.
+ *
+ * @param cache - Two-level cache store backing the lookup.
+ * @param fpContext - Pool fingerprint context carrying the L2 switch.
+ * @param fph - Pool fingerprint hash of the current scan.
+ * @param contentHash - Content hash of the probed file.
+ * @returns The cached entry, or null when L2 is disabled or misses.
+ */
+function lookupFreshL2(
+    cache: CacheStore,
+    fpContext: CacheFingerprintContext,
+    fph: string,
+    contentHash: string,
+): L2Hit {
+    return fpContext.l2Enabled ? cache.lookupL2(fph, contentHash) : null;
 }
