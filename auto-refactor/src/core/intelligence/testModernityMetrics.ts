@@ -41,6 +41,23 @@ const MAX_SCORE_CAP = 80;
 import type { Issue, SemanticReviewDetail, TestModernityMetricSummary } from '../types';
 import type { ActiveSemanticUnit, TestModernityOptions } from './testModernity';
 
+/** Language tag written into the semantic review detail. */
+const LANGUAGE_TYPESCRIPT = 'typescript';
+/** Module tag written into the semantic review detail. */
+const MODULE_TEST_SUITE = 'test-suite';
+/** Code-domain tag written into the semantic review detail. */
+const CODE_DOMAIN_TEST_MODERNITY = 'test-modernity';
+/** Analyzer id owning the test-modernity rules. */
+const ANALYZER_TEST_MODERNITY = 'test-modernity';
+/** Rule id of the low-test-density finding. */
+const RULE_TST_DEN_001 = 'TST-DEN-001';
+/** Advisory severity used for the density finding. */
+const SEVERITY_INFO = 'info';
+/** Rule contract version recorded on every emitted issue. */
+const RULE_VERSION = '1.0.0';
+/** Engine config version recorded on every emitted issue. */
+const CONFIG_VERSION = '0.3.0';
+
 /**
  * Calculate Effective Modern Test Density (EMTD) and Current Business Contract Coverage (CBCR).
  *
@@ -103,10 +120,10 @@ export function evaluateTestModernityThresholds(
 
     if (metrics.emtd < minEmtd || metrics.cbcr < minCbcr) {
         const detail: SemanticReviewDetail = {
-            language: 'typescript',
-            module: 'test-suite',
+            language: LANGUAGE_TYPESCRIPT,
+            module: MODULE_TEST_SUITE,
             symbol: domain,
-            codeDomain: 'test-modernity',
+            codeDomain: CODE_DOMAIN_TEST_MODERNITY,
             currentBehavior: `Test suite achieves EMTD score ${metrics.emtd} (min ${minEmtd}) and CBCR rate ${metrics.cbcr} (min ${minCbcr}).`,
             semanticEvidenceChain: [],
             triggerCondition:
@@ -120,16 +137,16 @@ export function evaluateTestModernityThresholds(
             impactedCallers: [],
             impactedTests: [],
             verificationMethod: 'Recalculate EMTD and CBCR after augmenting test suites.',
-            ruleVersion: '1.0.0',
-            configVersion: '0.3.0',
+            ruleVersion: RULE_VERSION,
+            configVersion: CONFIG_VERSION,
             canAutofix: false,
         };
 
         issues.push({
             id: `test-modernity:TST-DEN-001:${domain}:1`,
-            analyzer: 'test-modernity',
-            rule: 'TST-DEN-001',
-            severity: 'info',
+            analyzer: ANALYZER_TEST_MODERNITY,
+            rule: RULE_TST_DEN_001,
+            severity: SEVERITY_INFO,
             message: `Low test density in domain '${domain}': EMTD=${metrics.emtd} (min ${minEmtd}), CBCR=${metrics.cbcr} (min ${minCbcr}).`,
             location: {
                 file: `tests/unit/${domain}.test.ts`,
