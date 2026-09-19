@@ -1,7 +1,7 @@
 {
   "version": "1.1.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-19T03:26:07.312Z",
+  "timestamp": "2026-09-19T04:06:17.110Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1988,6 +1988,30 @@
       "count": 1
     },
     {
+      "key": "large-file|large-file|src/core/intelligence/architectureBoundaryChecks.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/intelligence/architectureBoundaryChecks.ts",
+      "count": 13
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/intelligence/architectureBoundaryChecks.ts",
+      "count": 2
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/architectureBoundaryChecks.ts",
+      "count": 5
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/intelligence/architectureBoundaryChecks.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/core/intelligence/architectureBoundaryChecks.ts",
+      "count": 1
+    },
+    {
       "key": "constants|hardcoded-string|src/core/intelligence/callGraph.ts",
       "count": 1
     },
@@ -2012,16 +2036,24 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/intelligence/dataArchitecture.ts",
+      "key": "governance|GOV-LOG-001|src/core/intelligence/crossFunctionComplexity.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/crossFunctionComplexity.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/intelligence/crossFunctionComplexity.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/core/intelligence/dataAccessContext.ts",
       "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dataArchitecture.ts",
-      "count": 35
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/intelligence/dataArchitecture.ts",
-      "count": 3
+      "count": 28
     },
     {
       "key": "complexity|high-complexity|src/core/intelligence/dataArchitecture.ts",
@@ -2042,6 +2074,10 @@
     {
       "key": "hygiene|HYG-CLN-001|src/core/intelligence/dataArchitecture.ts",
       "count": 1
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/core/intelligence/dataArchitecture.ts",
+      "count": 2
     },
     {
       "key": "large-file|large-file|src/core/intelligence/dataFlow.ts",
@@ -2072,28 +2108,24 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/intelligence/dependencyLayout.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/intelligence/dependencyLayout.ts",
-      "count": 7
-    },
-    {
       "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayout.ts",
-      "count": 74
+      "count": 28
     },
     {
       "key": "complexity|high-complexity|src/core/intelligence/dependencyLayout.ts",
-      "count": 2
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/intelligence/dependencyLayout.ts",
-      "count": 2
+      "count": 1
     },
     {
       "key": "governance|GOV-LOG-001|src/core/intelligence/dependencyLayout.ts",
       "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/dependencyLayout.ts",
+      "count": 1
+    },
+    {
+      "key": "constants|duplicate-literal|src/core/intelligence/dependencyLayout.ts",
+      "count": 4
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/intelligence/dependencyLayout.ts",
@@ -2106,6 +2138,22 @@
     {
       "key": "constants|magic-number|src/core/intelligence/dependencyLayout.ts",
       "count": 2
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayoutHelpers.ts",
+      "count": 31
+    },
+    {
+      "key": "complexity|high-complexity|src/core/intelligence/dependencyLayoutHelpers.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/intelligence/dependencyLayoutHelpers.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-DED-001|src/core/intelligence/dependencyLayoutHelpers.ts",
+      "count": 6
     },
     {
       "key": "performance|PRF-MEM-001|src/core/intelligence/errorFlow.ts",
@@ -2168,56 +2216,24 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/intelligence/semanticArchitecture.ts",
-      "count": 1
-    },
-    {
       "key": "constants|hardcoded-string|src/core/intelligence/semanticArchitecture.ts",
-      "count": 54
+      "count": 30
     },
     {
       "key": "complexity|high-complexity|src/core/intelligence/semanticArchitecture.ts",
       "count": 1
     },
     {
-      "key": "constants|duplicate-literal|src/core/intelligence/semanticArchitecture.ts",
-      "count": 7
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/intelligence/semanticArchitecture.ts",
-      "count": 2
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/intelligence/semanticArchitecture.ts",
-      "count": 5
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/intelligence/semanticArchitecture.ts",
-      "count": 1
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/intelligence/semanticArchitecture.ts",
-      "count": 1
-    },
-    {
-      "key": "large-file|large-file|src/core/intelligence/semanticComplexity.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/intelligence/semanticComplexity.ts",
-      "count": 3
+      "key": "constants|hardcoded-string|src/core/intelligence/semanticComplexity.ts",
+      "count": 32
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/intelligence/semanticComplexity.ts",
-      "count": 4
+      "count": 3
     },
     {
-      "key": "constants|duplicate-literal|src/core/intelligence/semanticComplexity.ts",
-      "count": 7
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/intelligence/semanticComplexity.ts",
-      "count": 20
+      "key": "governance|GOV-LOG-001|src/core/intelligence/semanticComplexity.ts",
+      "count": 2
     },
     {
       "key": "governance|GOV-PRF-002|src/core/intelligence/semanticComplexity.ts",
@@ -2252,12 +2268,8 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/intelligence/testModernity.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|magic-number|src/core/intelligence/testModernity.ts",
-      "count": 4
+      "key": "constants|hardcoded-string|src/core/intelligence/testModernity.ts",
+      "count": 14
     },
     {
       "key": "complexity|high-complexity|src/core/intelligence/testModernity.ts",
@@ -2270,10 +2282,6 @@
     {
       "key": "simplify|SIM-LONG-001|src/core/intelligence/testModernity.ts",
       "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/intelligence/testModernity.ts",
-      "count": 15
     },
     {
       "key": "constants|duplicate-literal|src/core/intelligence/testModernity.ts",
@@ -2964,7 +2972,7 @@
       "count": 1
     },
     {
-      "key": "large-file|large-file|src/core/scoring/dimensionDeductions.ts",
+      "key": "constants|hardcoded-string|src/core/scoring/dimensionDeductions.ts",
       "count": 1
     },
     {
@@ -2972,24 +2980,40 @@
       "count": 1
     },
     {
-      "key": "hygiene|HYG-STB-002|src/core/scoring/dimensionDeductions.ts",
-      "count": 1
-    },
-    {
-      "key": "hygiene|HYG-DED-001|src/core/scoring/dimensionDeductions.ts",
-      "count": 1
-    },
-    {
       "key": "complexity|high-complexity|src/core/scoring/dimensionDeductions.ts",
-      "count": 2
+      "count": 1
     },
     {
       "key": "governance|GOV-LOG-001|src/core/scoring/dimensionDeductions.ts",
-      "count": 2
+      "count": 1
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/scoring/dimensionDeductions.ts",
-      "count": 2
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-DED-001|src/core/scoring/dimensionFamilyDeductions.ts",
+      "count": 1
+    },
+    {
+      "key": "complexity|high-complexity|src/core/scoring/dimensionFamilyDeductions.ts",
+      "count": 1
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/core/scoring/dimensionFamilyDeductions.ts",
+      "count": 1
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/core/scoring/dimensionFamilyDeductions.ts",
+      "count": 1
+    },
+    {
+      "key": "large-file|large-file|src/core/scoring/dimensionLiterals.ts",
+      "count": 1
+    },
+    {
+      "key": "hygiene|HYG-STB-002|src/core/scoring/dimensionLiterals.ts",
+      "count": 1
     },
     {
       "key": "constants|hardcoded-string|src/core/scoring/qualityScorer.ts",
