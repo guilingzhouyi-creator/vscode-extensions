@@ -329,6 +329,55 @@ const FILE_EXTENSION_RE = /^\.[A-Za-z0-9]{1,6}$/;
 const LOCALE_TAG_RE = /^[a-z]{2}(?:-[A-Za-z]{2})?$/;
 
 /**
+ * Checks whether a literal string matches conventional vocabulary or standard tokens.
+ *
+ * @param raw - Original raw token string.
+ * @param lowered - Lowercased token string.
+ * @returns True if matched as conventional token.
+ */
+function isConventionalVocabulary(raw: string, lowered: string): boolean {
+    if (
+        CONVENTIONAL_TOKENS.has(lowered) ||
+        TEST_FRAMEWORK_SYMBOLS.has(lowered) ||
+        FILENAME_PATTERN_TOKENS.has(lowered)
+    ) {
+        return true;
+    }
+    return (
+        RULE_ID_RE.test(raw) ||
+        TEST_PROBE_RE.test(raw) ||
+        CLI_FLAG_RE.test(raw) ||
+        MIME_TYPE_RE.test(lowered) ||
+        FILE_EXTENSION_RE.test(raw) ||
+        LOCALE_TAG_RE.test(raw)
+    );
+}
+
+/**
+ * Detects whether a string literal represents message or banner text.
+ *
+ * @param raw - Raw unquoted string.
+ * @returns True if string matches prose or banner patterns.
+ */
+function isMessageText(raw: string): boolean {
+    if (BANNER_RE.test(raw)) return true;
+    return raw.length >= MIN_MESSAGE_LENGTH && (/\s/.test(raw) || CJK_RE.test(raw));
+}
+
+/**
+ * Detects whether a string literal represents a glob or path pattern.
+ *
+ * @param raw - Raw unquoted string.
+ * @returns True if string matches glob or relative path specifiers.
+ */
+function isGlobPattern(raw: string): boolean {
+    if (raw.length > MAX_PATTERN_LENGTH || /\s/.test(raw)) return false;
+    return (
+        GLOB_META_RE.test(raw) || RELATIVE_SPECIFIER_RE.test(raw) || RUST_PATH_PREFIX_RE.test(raw)
+    );
+}
+
+/**
  * Detect report/specifier vocabulary that must not be treated as extractable literal values.
  *
  * @param raw - Raw literal spelling.
@@ -336,108 +385,76 @@ const LOCALE_TAG_RE = /^[a-z]{2}(?:-[A-Za-z]{2})?$/;
  */
 function reportVocabularyKind(raw: string): LiteralSemanticKind | null {
     if (raw.length === 0) return null;
-    if (BANNER_RE.test(raw)) return 'message-text';
-    if (raw.length >= MIN_MESSAGE_LENGTH && (/\s/.test(raw) || CJK_RE.test(raw)))
-        return 'message-text';
-    if (
-        raw.length <= MAX_PATTERN_LENGTH &&
-        !/\s/.test(raw) &&
-        (GLOB_META_RE.test(raw) || RELATIVE_SPECIFIER_RE.test(raw) || RUST_PATH_PREFIX_RE.test(raw))
-    ) {
-        return 'glob-pattern';
+    if (isMessageText(raw)) return 'message-text';
+    if (isGlobPattern(raw)) return 'glob-pattern';
+    if (isConventionalVocabulary(raw, raw.toLowerCase())) {
+        return 'conventional';
     }
-    const lowered = raw.toLowerCase();
-    if (RULE_ID_RE.test(raw)) return 'conventional';
-    if (CONVENTIONAL_TOKENS.has(lowered)) return 'conventional';
-    if (TEST_FRAMEWORK_SYMBOLS.has(lowered)) return 'conventional';
-    if (FILENAME_PATTERN_TOKENS.has(lowered)) return 'conventional';
-    if (TEST_PROBE_RE.test(raw)) return 'conventional';
-    if (CLI_FLAG_RE.test(raw)) return 'conventional';
-    if (MIME_TYPE_RE.test(lowered)) return 'conventional';
-    if (FILE_EXTENSION_RE.test(raw)) return 'conventional';
-    if (LOCALE_TAG_RE.test(raw)) return 'conventional';
     return null;
 }
 
 /**
- * Classifies a raw literal into its semantic domain.
+ * Classifies numeric literal into semantic domain.
  *
- * Numeric input is matched against the HTTP-status, duration and port sets before the generic
- * number rules apply; string input is stripped of surrounding quotes and matched against inline
- * SVG, URL, path and benign-delimiter sets. The function is total: anything unmatched falls
- * back to `kind: 'general'`, with `isReasonable` derived from the value instead of failing.
- *
- * @param rawVal - Literal text exactly as written in source, quotes included for strings; it is
- *   pattern-matched, never evaluated as code, so hostile text cannot execute here.
- * @param numeric - `true` when the literal is a numeric literal and the number rules should run;
- *   `false` selects the string rules and quote stripping.
- * @returns The matched domain, the reasonableness verdict, the recommended constant-name
- *   prefix and a rationale; never throws, so callers can classify every literal unconditionally.
+ * @param num - Finite or non-finite numeric value.
+ * @returns Semantic classification result.
  */
-export function classifyLiteral(rawVal: string, numeric: boolean): SemanticClassification {
-    if (numeric) {
-        const num = Number(rawVal);
-        if (!Number.isFinite(num)) {
-            return {
-                kind: GENERAL_LITERAL_KIND,
-                isReasonable: true,
-                suggestedConstPrefix: 'CONST',
-                rationale: 'Non-finite number',
-            };
-        }
-
-        if (HTTP_STATUS_CODES.has(num)) {
-            return {
-                kind: 'http-status',
-                isReasonable: false,
-                suggestedConstPrefix: `HTTP_STATUS_${num}`,
-                rationale: 'Standard HTTP status code should use shared enum or constants',
-            };
-        }
-
-        if (COMMON_TIME_MS.has(num)) {
-            const sec = num >= MS_PER_SECOND ? `${num / MS_PER_SECOND}S` : `${num}MS`;
-            return {
-                kind: 'time-ms',
-                isReasonable: false,
-                suggestedConstPrefix: `DURATION_${sec}`,
-                rationale: 'Time duration in milliseconds should use explicit duration constants',
-            };
-        }
-
-        if (
-            COMMON_PORTS.has(num) ||
-            (Number.isInteger(num) && num >= EPHEMERAL_PORT_MIN && num <= PORT_MAX)
-        ) {
-            return {
-                kind: 'port',
-                isReasonable: false,
-                suggestedConstPrefix: `PORT_${num}`,
-                rationale:
-                    'Network port should be configured via environment or server configuration',
-            };
-        }
-
-        return {
-            kind: GENERAL_LITERAL_KIND,
-            isReasonable: Math.abs(num) <= 1, // 0, 1, -1 are universally reasonable
-            suggestedConstPrefix: `CONST_${Math.abs(Math.round(num))}`,
-            rationale: 'Generic magic number',
-        };
-    }
-
-    // String literals
-    const unquoted = rawVal.replace(/^['"`]|['"`]$/g, '').trim();
-
-    if (REASONABLE_STRINGS.has(unquoted.toLowerCase())) {
+function classifyNumericLiteral(num: number): SemanticClassification {
+    if (!Number.isFinite(num)) {
         return {
             kind: GENERAL_LITERAL_KIND,
             isReasonable: true,
-            suggestedConstPrefix: 'LITERAL',
-            rationale: 'Standard delimiter, format keyword, or benign literal',
+            suggestedConstPrefix: 'CONST',
+            rationale: 'Non-finite number',
         };
     }
 
+    if (HTTP_STATUS_CODES.has(num)) {
+        return {
+            kind: 'http-status',
+            isReasonable: false,
+            suggestedConstPrefix: `HTTP_STATUS_${num}`,
+            rationale: 'Standard HTTP status code should use shared enum or constants',
+        };
+    }
+
+    if (COMMON_TIME_MS.has(num)) {
+        const sec = num >= MS_PER_SECOND ? `${num / MS_PER_SECOND}S` : `${num}MS`;
+        return {
+            kind: 'time-ms',
+            isReasonable: false,
+            suggestedConstPrefix: `DURATION_${sec}`,
+            rationale: 'Time duration in milliseconds should use explicit duration constants',
+        };
+    }
+
+    if (
+        COMMON_PORTS.has(num) ||
+        (Number.isInteger(num) && num >= EPHEMERAL_PORT_MIN && num <= PORT_MAX)
+    ) {
+        return {
+            kind: 'port',
+            isReasonable: false,
+            suggestedConstPrefix: `PORT_${num}`,
+            rationale: 'Network port should be configured via environment or server configuration',
+        };
+    }
+
+    return {
+        kind: GENERAL_LITERAL_KIND,
+        isReasonable: Math.abs(num) <= 1,
+        suggestedConstPrefix: `CONST_${Math.abs(Math.round(num))}`,
+        rationale: 'Generic magic number',
+    };
+}
+
+/**
+ * Classifies structural string literals such as SVGs, URLs, and file paths.
+ *
+ * @param unquoted - Trimmed string without surrounding quotes.
+ * @returns Classification if matched, otherwise null.
+ */
+function classifyStructuralString(unquoted: string): SemanticClassification | null {
     if (INLINE_SVG_RE.test(unquoted)) {
         return {
             kind: 'inline-svg',
@@ -467,8 +484,30 @@ export function classifyLiteral(rawVal: string, numeric: boolean): SemanticClass
         };
     }
 
-    // Vocabulary is checked last so specialised domains keep their identity (an inline SVG is
-    // still an SVG, not prose), while credential-shaped values are vetoed first.
+    return null;
+}
+
+/**
+ * Classifies string literal into semantic domain.
+ *
+ * @param unquoted - Trimmed string without surrounding quotes.
+ * @returns Semantic classification result.
+ */
+function classifyStringLiteral(unquoted: string): SemanticClassification {
+    if (REASONABLE_STRINGS.has(unquoted.toLowerCase())) {
+        return {
+            kind: GENERAL_LITERAL_KIND,
+            isReasonable: true,
+            suggestedConstPrefix: 'LITERAL',
+            rationale: 'Standard delimiter, format keyword, or benign literal',
+        };
+    }
+
+    const structural = classifyStructuralString(unquoted);
+    if (structural) {
+        return structural;
+    }
+
     if (CREDENTIAL_RE.test(unquoted)) {
         return {
             kind: GENERAL_LITERAL_KIND,
@@ -477,6 +516,7 @@ export function classifyLiteral(rawVal: string, numeric: boolean): SemanticClass
             rationale: 'Credential-shaped literal must be externalized, never exempted',
         };
     }
+
     const vocabulary = reportVocabularyKind(unquoted);
     if (vocabulary !== null) {
         return {
@@ -493,4 +533,19 @@ export function classifyLiteral(rawVal: string, numeric: boolean): SemanticClass
         suggestedConstPrefix: 'CONST_STR',
         rationale: 'General hardcoded string',
     };
+}
+
+/**
+ * Classifies a raw literal into its semantic domain.
+ *
+ * @param rawVal - Literal text exactly as written in source.
+ * @param numeric - True for numeric literal, false for string.
+ * @returns Matched classification descriptor.
+ */
+export function classifyLiteral(rawVal: string, numeric: boolean): SemanticClassification {
+    if (numeric) {
+        return classifyNumericLiteral(Number(rawVal));
+    }
+    const unquoted = rawVal.replace(/^['"`]|['"`]$/g, '').trim();
+    return classifyStringLiteral(unquoted);
 }

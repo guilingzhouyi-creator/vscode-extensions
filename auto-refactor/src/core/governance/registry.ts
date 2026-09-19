@@ -24,7 +24,11 @@ import {
     FunctionSignatureCompletenessRule,
     UnsafeAnyRule,
 } from './rules/typeSystem';
-import { SwallowedExceptionRule, NakedUnwrapRule } from './rules/exceptionSafety';
+import {
+    SwallowedExceptionRule,
+    NakedUnwrapRule,
+    SilentPseudoCatchRule,
+} from './rules/exceptionSafety';
 import { DiagnosticLeakRule } from './rules/debugLogging';
 import {
     LoopInvariantRule,
@@ -66,6 +70,7 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     // 5. Exception Safety
     SwallowedExceptionRule,
     NakedUnwrapRule,
+    SilentPseudoCatchRule,
     // 6. Debug & Logging
     DiagnosticLeakRule,
     // 7. Performance

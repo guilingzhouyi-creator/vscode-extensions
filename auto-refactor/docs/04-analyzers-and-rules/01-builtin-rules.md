@@ -80,6 +80,8 @@ $$\text{通用规范原则} \longrightarrow \text{语言能力适配层} \longri
 | **可维护性** | `GOV-MNT-001` | `warning` | 面向对象类多层继承约束（继承深度 $> 2$，推崇组合优于继承） | 建议组合重构 |
 | **可维护性** | `GOV-MNT-002` | `error` | 核心纯领域模型反向耦合外部框架/UI 依赖审查 | 建议端口适配 |
 | **可维护性** | `GOV-SAN-001` | `warning` | 词法卫生与临时批次黑话拦截 (注释中残留的 pXX/phaseXX/stXX/wip 临时工单标记) | 建议清理黑话 |
+| **协同治理** | `GOV-AGN-001` | `error` | 多 Agent 并发改动制造跨模块循环依赖、分层倒置或破坏公共契约审查 | 协调架构边界与依赖职责 |
+| **增量切片** | `GOV-SLC-001` | `error` | AST 切片改动引入破坏性签名漂移或向外部调用链扩散不可控副作用 | 确保切片向后兼容或同步重构调用者 |
 
 ### 治理规则明细（规则 ID 口径）
 
@@ -93,11 +95,13 @@ $$\text{通用规范原则} \longrightarrow \text{语言能力适配层} \longri
 | `GOV-FIL-002` | `info` | 关键生产模块缺少架构角色与职责边界声明，或头部声明路径与物理路径不一致。 | 修正文件头声明路径，或补齐缺失的头部字段。 |
 | `GOV-LOG-001` | `warning` | 控制流嵌套深度超过 5 层，认知负荷与缺陷风险升高。 | 降低嵌套：卫语句早返回、抽取子步骤或扁平化分支。 |
 | `GOV-LOG-002` | `info` | 空层转发：方法仅做直通式包装，没有校验或语义转换。 | 去掉直通式包装，让调用方直达目标或合并职责。 |
+| `GOV-GAM-001` | `warning` | 防刷分违规：检测到机械切分函数或恒真断言等虚假提升指标行为。 | 保持业务内聚并编写有实质断言的真实测试用例，杜绝空样板与假测试。 |
 | `GOV-TYP-001` | `warning` | 隐式弱类型赋值：变量或参数缺少类型注解，类型错误推迟到运行时才暴露。 | 为变量/参数补齐类型注解。 |
 | `GOV-TYP-002` | `warning` | 导出或公共函数签名缺少返回类型标注（GDScript/Python 未写 `-> Type`）。 | 为函数补齐返回类型注解。 |
 | `GOV-TYP-003` | `warning` | 类型位置出现危险裸 `any`，绕过编译器类型检查。 | 裸 any 换成 unknown 或具体联合；动态边界用受控断言并注释理由。 |
 | `GOV-EXC-001` | `error` | 空 `catch` / 裸 `except:` 静默吞异常；catch 内带理由标记（best-effort / ignore / intentional / expected）视为已记录决策，不再上报。 | 处理/记录/显式重抛；确属 best-effort 时在 catch 内写明理由标记。 |
 | `GOV-EXC-002` | `warning` | 生产路径裸 `.unwrap()` / `expect` 在 Err 或 None 时导致不可恢复 panic。 | 避免裸 unwrap/expect，改为显式错误分支或 Result/Option 传播。 |
+| `GOV-EXC-003` | `error` | 伪处理 catch/except 块：使用 `void 0`、无用变量赋值等 dummy 语句静默吞噬异常，未记日志也无 rationale 标记。 | 处理/记录/显式重抛；确属 best-effort 时在注释写明理由标记。 |
 | `GOV-DBG-001` | `warning` | 生产路径残留 `console.log` / `print()` / `println!` 等调试输出，污染标准输出、泄漏诊断信息并拖慢 I/O。 | 删除调试输出，或改用结构化日志并按级别输出。 |
 | `GOV-PRF-001` | `warning` | 循环体内执行不变量 I/O、正则构造或重复配置读取，造成 CPU/吞吐损耗。 | 循环不变量外提，把不变计算移出循环体。 |
 | `GOV-PRF-002` | `info` | 循环体内调用 `.find` / `.indexOf` / `.includes` 线性查找，复杂度退化为 O(N*M)。 | 用 Set/Map 承载查找，消除循环内线性扫描。 |
@@ -106,6 +110,8 @@ $$\text{通用规范原则} \longrightarrow \text{语言能力适配层} \longri
 | `GOV-MNT-001` | `warning` | 类继承深度超过 2 层，出现脆弱基类问题。 | 收敛继承层级：组合优先，或抽公共能力为独立模块。 |
 | `GOV-MNT-002` | `error` | 核心纯领域模型反向导入 UI/CLI 表现层框架，产生严重耦合。 | 反转依赖：内层定义端口/接口，由外层实现。 |
 | `GOV-SAN-001` | `warning` | 代码或注释残留临时工单/批次黑话（pXX、phaseXX、stXX、wip），损害架构寿命并造成文档漂移。 | 移除临时工单/批次黑话，改用长效领域术语。 |
+| `GOV-AGN-001` | `error` | 多 Agent 并发修改导致架构边界突破、跨模块循环依赖闭环或公共契约破坏。 | 协调并行 Agent 的架构边界与修改职责，消解跨模块并发循环依赖并维护单向分层契约。 |
+| `GOV-SLC-001` | `error` | AST 切片改动引入破坏性签名漂移或向外部调用链扩散不可控副作用。 | 确保切片改动向后兼容，或同步重构受影响调用链上的全部外部调用者。 |
 
 ### 统一结构化诊断契约
 
@@ -125,6 +131,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `ARCH-DIR-002` | `warning` | 越层穿透：接口层控制器绕过应用层直接直连基础设施实现。 | 引入用例服务 (Application Service) 统筹业务流。 |
 | `ARCH-LEAK-001` | `error` | 职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。 | 领域模型使用 POJO/原生实体，隔离外部框架专有类型。 |
 | `ARCH-LEAK-002` | `warning` | 分层越界：外层实现被内层直接反向引用（Clean/DDD 层序反转）。 | 把依赖改回单向（内层定义接口、外层实现），或把该文件移入正确层。 |
+| `ARCH-DISP-001` | `warning` | 巨石分支分发器：单一函数内 switch/if-else 分支过多 (≥ 8) 且紧耦合各分支业务逻辑。 | 重构为查表映射 (Table-driven) 或策略对象模式 (Strategy Pattern)。 |
 | `clean-layer-violation` | `error` | 增量管线中的分层越界（clean-layer 口径）。 | 按层序调整依赖方向或把实现下沉/上提到正确层。 |
 
 ### 依赖图与导入边界 (`dependency-graph`)
@@ -192,6 +199,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `HYG-BLT-001` | `warning` | Python：局部变量或函数参数遮蔽内建名。类体字段视为协议契约豁免；参数级 `id/type/help/format/input/next` 与 `self/cls` 豁免；docstring 示例不视为活代码。 | 重命名绑定（加领域限定词），避免掩盖内建语义。 |
 | `HYG-SGL-001` | `warning` | Python：赋值/循环/with/参数出现单字母名。仅 `i`/`j`/`k`/`_` 放行。 | 使用描述性命名。 |
 | `HYG-EXC-001` | `warning` | Python：`except ... as <name>` 的变量名不是 `exc`。 | 统一命名为 `exc`，让错误处理读起来一致。 |
+| `HYG-WRAP-001` | `warning` | 空层转发与无意义包装函数：单一函数仅透传参数至内部目标函数而无任何参数转换、校验、日志或错误处理。 | 直接调用目标方法，或为包装层补充数据校验、状态转换与上下文日志。 |
 | `ERR-PRP-001` | `warning` | 错误码跨声明重复抛出（分类法冲突）或沿调用链向上传播过多跳数。 | 统一错误分类法，使用具名错误类型并在边界层显式捕获转换。 |
 
 > **未内化**：外层作用域遮蔽需要引擎暴露作用域图（当前 `visit` 只提供 className/binding 线程化上下文），与「需语句序列/作用域分析」的简化类规则同属待办。

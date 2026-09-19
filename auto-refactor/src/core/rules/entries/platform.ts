@@ -23,6 +23,7 @@ import {
     RULE_FAMILY_LANG,
     RULE_FAMILY_COMPLEXITY,
     RULE_FAMILY_LARGE_FILE,
+    RULE_FAMILY_PERFORMANCE,
     LEGACY_REASON_ID_NOT_CANONICAL,
 } from '../types';
 import {
@@ -32,6 +33,7 @@ import {
     ANALYZER_COMPLEXITY,
     ANALYZER_SECRETS,
     ANALYZER_LARGE_FILE,
+    ANALYZER_PERFORMANCE,
 } from '../../scoring/dimensionLiterals';
 
 /** Built-in engine pseudo-analyzer identity for runtime/bootstrap errors. */
@@ -149,6 +151,19 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         summary: '环境配置泄漏：纯领域业务模型内部直接读取环境变量或底层磁盘配置。',
         remediation: '将环境配置提升到应用装配层解析，并以强类型参数注入领域对象。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-001',
+    }),
+    defineRule({
+        id: 'ARCH-DISP-001',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle.',
+        remediation:
+            '重构为基于字典/Map 的查表分发 (Table-Driven) 或策略模式 (Strategy Pattern)，解耦各分支业务逻辑。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-disp-001',
     }),
     defineRule({
         id: 'clean-layer-violation',
@@ -281,5 +296,41 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         summary: '模块无人导入（非入口白名单内）。',
         remediation: '删除该模块，或把入口 glob 加入 entryGlobs。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#unused-module',
+    }),
+    defineRule({
+        id: 'expensive-loop-operation',
+        family: RULE_FAMILY_PERFORMANCE,
+        analyzer: ANALYZER_PERFORMANCE,
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary: '循环体内执行昂贵深拷贝（.duplicate(true)）或阻塞式序列化与IO。',
+        remediation: '消除热路径内的深拷贝操作，改用只读视图或轻量引用。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#expensive-loop-operation',
+    }),
+    defineRule({
+        id: 'high-algorithmic-complexity',
+        family: RULE_FAMILY_PERFORMANCE,
+        analyzer: ANALYZER_PERFORMANCE,
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '循环多重嵌套引发潜在 O(N^2)/O(N^3) 复杂度热点或循环体内隐式线性查找。',
+        remediation: '重构循环嵌套或预先构建 Map/Set 索引将查找降为 O(1)。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#high-algorithmic-complexity',
+    }),
+    defineRule({
+        id: 'loop-transient-allocation',
+        family: RULE_FAMILY_PERFORMANCE,
+        analyzer: ANALYZER_PERFORMANCE,
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。',
+        remediation: '将对象实例化提升到循环外或使用对象池模式（ADV-POOL-001）。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#loop-transient-allocation',
     }),
 ];

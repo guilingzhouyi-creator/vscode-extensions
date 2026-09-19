@@ -17,6 +17,10 @@
  * Read-only shape of one diagnostic catalog entry: a mandatory `message` plus optional
  * remediation context and a bounded risk tier.
  *
+ * Core messages adhere strictly to the English baseline contract for uniform downstream
+ * consumption (SARIF reporting, CI parsers, and LLM Agent prompt injection). User-facing
+ * Chinese localized guidelines are decoupled at the rule registry layer.
+ *
  * The optional fields let every catalog share one render path, so consumers must tolerate
  * their absence. `risk` is deliberately narrowed to four literals, which validates severity
  * through the compiler instead of ad-hoc runtime checks.

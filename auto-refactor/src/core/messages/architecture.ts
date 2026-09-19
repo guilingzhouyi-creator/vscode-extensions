@@ -46,7 +46,7 @@ export const ArchitectureMessages = {
         toLayer: string,
         targetPath: string,
     ): DiagnosticDescriptor => ({
-        message: `Architectural dependency inversion violation: Domain model layer反向 depends on outer layer [${toLayer}] ('${targetPath}')`,
+        message: `Architectural dependency inversion violation: Domain model layer inversely depends on outer layer [${toLayer}] ('${targetPath}')`,
         suggestion:
             'Define domain abstractions/interfaces within the domain layer and inject concrete implementations from outer layers',
         rationale:

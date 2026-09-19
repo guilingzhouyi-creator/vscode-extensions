@@ -22,6 +22,7 @@ import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { inferDirectorySemantic } from '../core/profiler/projectProfiler';
 import { ArchitectureMessages } from '../core/messages/architecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from '../core/intelligence/semanticArchitecture';
+import { auditDispatchComplexity } from '../core/rules/evolution/dispatchComplexityRule';
 
 /**
  * Threshold keys the architecture rules additionally read from the global `thresholds` block.
@@ -45,6 +46,7 @@ interface ArchitectureOptions {
     flagLayeringIllusions?: boolean;
     flagConfigLeakage?: boolean;
     protectedConfigKeywords?: string[];
+    flagDispatchComplexity?: boolean;
 }
 
 interface SpecifierInfo {
@@ -224,6 +226,10 @@ export class ArchitectureAnalyzer implements Analyzer {
 
             lineIdx++;
             lineStart = nextStart;
+        }
+
+        if (opts.flagDispatchComplexity !== false) {
+            issues.push(...auditDispatchComplexity(content, file, ctx));
         }
 
         return issues;
@@ -817,7 +823,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         }
 
         // Check project profile directory semantics
-        if (ctx.config.profile?.directorySemantics) {
+        if (ctx.config?.profile?.directorySemantics) {
             for (const [dir, layer] of Object.entries(ctx.config.profile.directorySemantics)) {
                 if (norm.startsWith(dir + '/') || norm.includes('/' + dir + '/')) {
                     return layer;

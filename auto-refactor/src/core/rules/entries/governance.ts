@@ -46,6 +46,31 @@ const LANGUAGES_RUST: readonly string[] = [LANGUAGE_RUST];
 /** governance rules. */
 export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
     defineRule({
+        id: 'GOV-AGN-001',
+        family: RULE_FAMILY_GOVERNANCE,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Concurrent modifications by multiple agents produce architectural boundary breaches, cross-module dependency cycles, or contract incompatibilities.',
+        remediation:
+            '协调并行 Agent 的架构边界与修改职责，消解跨模块并发循环依赖并维护单向分层契约。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-agn-001',
+    }),
+    defineRule({
+        id: 'GOV-SLC-001',
+        family: RULE_FAMILY_GOVERNANCE,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'AST slice mutation introduces breaking signature drift or uncontained side-effects propagating across external call chains.',
+        remediation: '确保切片改动向后兼容，或同步重构受影响调用链上的全部外部调用者。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-slc-001',
+    }),
+    defineRule({
         id: 'GOV-DBG-001',
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,
@@ -80,6 +105,19 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'Naked `.unwrap()` causes unrecoverable process panics in production upon Err or None.',
         remediation: '避免裸 unwrap/expect，改为显式错误分支或 Result/Option 传播。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-exc-002',
+    }),
+    defineRule({
+        id: 'GOV-EXC-003',
+        family: RULE_FAMILY_GOVERNANCE,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: LANGUAGES_EXC_001,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Pseudo-catch blocks containing only dummy non-handling statements (void 0, dead assignment) silently swallow exceptions without logging or documented rationale.',
+        remediation:
+            '在 catch/except 块中补充结构化日志、错误重抛或在注释中显式标注 rationale 标记（如 best-effort, expected）。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-exc-003',
     }),
     defineRule({
         id: 'GOV-FIL-001',
@@ -128,6 +166,18 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'Vacuous wrapper methods that purely forward calls without validation or translation add unnecessary indirection.',
         remediation: '去掉直通式包装，让调用方直达目标或合并职责。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-log-002',
+    }),
+    defineRule({
+        id: 'GOV-GAM-001',
+        family: RULE_FAMILY_GOVERNANCE,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Anti-gaming violation: artificial function splitting, tautological test padding, or empty boilerplate gaming quality metrics.',
+        remediation: '保持业务内聚并编写有实质断言的真实测试用例，杜绝空样板与假测试。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-gam-001',
     }),
     defineRule({
         id: 'GOV-MNT-001',

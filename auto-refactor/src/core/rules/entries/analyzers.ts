@@ -210,6 +210,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-stb-002',
     }),
     defineRule({
+        id: 'HYG-WRAP-001',
+        family: RULE_FAMILY_HYGIENE,
+        analyzer: ANALYZER_HYGIENE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density.',
+        remediation:
+            '直接调用被封装的目标方法，或在封装层补充必要的数据校验、状态转换与上下文日志。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-wrap-001',
+    }),
+    defineRule({
         id: 'ERR-PRP-001',
         family: RULE_FAMILY_ERROR,
         analyzer: ANALYZER_HYGIENE,

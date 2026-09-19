@@ -117,11 +117,13 @@ function extractMemoryViolations(
 
     if (targetDomainObj) {
         for (const v of targetDomainObj.ruleViolations) {
-            frequentViolations.push(`规则 [${v.rule}] (严重度: ${v.severity}): ${v.message}`);
+            frequentViolations.push(
+                GuidanceMessages.FORMAT_VIOLATION_WITH_SEVERITY(v.rule, v.severity, v.message),
+            );
         }
     } else if (memory) {
         for (const h of memory.ruleHits.slice(0, MAX_MEMORY_RULE_HITS)) {
-            frequentViolations.push(`规则 [${h.rule}] (第 ${h.line} 行): ${h.message}`);
+            frequentViolations.push(GuidanceMessages.FORMAT_VIOLATION(h.rule, h.line, h.message));
         }
     }
 
@@ -144,7 +146,7 @@ function extractTrajectoryPitfalls(
 
     for (const a of trajectory.activeAnomalies) {
         if (!targetDomainObj || !a.domainId || a.domainId === targetDomainObj.domainId) {
-            historicalPitfalls.push(`历史教训 (${a.kind}): ${a.message}`);
+            historicalPitfalls.push(GuidanceMessages.FORMAT_PITFALL(a.kind, a.message));
         }
     }
 

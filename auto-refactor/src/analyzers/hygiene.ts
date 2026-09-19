@@ -22,12 +22,14 @@ import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import { HygieneMessages } from '../core/messages';
 import { isVocabularyEnumeration } from '../core/governance/markerScope';
+import { auditVacuousWrappers } from '../core/rules/evolution/wrapperRule';
 
 interface HygieneOptions {
     checkDeadCode?: boolean;
     checkNaming?: boolean;
     checkTemporaryStubs?: boolean;
     checkDuplicateBlocks?: boolean;
+    checkWrappers?: boolean;
     minCloneLines?: number;
     /**
      * Project vocabulary treated as transient process jargon: regex sources, word-bounded and
@@ -230,6 +232,10 @@ export class HygieneAnalyzer implements Analyzer {
 
         if (checkClones && lineHashes.length >= minCloneLines * 2) {
             this.auditCloneBlocks(lineHashes, meaningfulLineIndices, minCloneLines, ctx, issues);
+        }
+
+        if (opts.checkWrappers !== false) {
+            issues.push(...auditVacuousWrappers(content, file, ctx));
         }
 
         return issues;

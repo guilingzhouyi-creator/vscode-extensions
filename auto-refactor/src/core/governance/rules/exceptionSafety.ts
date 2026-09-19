@@ -14,6 +14,11 @@
  */
 import { fileNameEndsWith, pathHasSegment } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
+import {
+    checkJsTsSilentExceptions,
+    checkPythonSilentExceptions,
+    GOV_EXC_SILENT_RULE_ID,
+} from '../../rules/evolution/silentExceptionRule';
 
 const PY_BARE_EXCEPT_RE = /^\s*except\s*:/;
 const PY_EXCEPT_LINE_RE = /^\s*except(?:\s+[^:]*)?:/;
@@ -264,6 +269,32 @@ export const NakedUnwrapRule: GovernanceRule = {
             }
         }
 
+        return violations.length > 0 ? violations : null;
+    },
+};
+
+/**
+ * GOV-EXC-003: Silent Pseudo-Catch Exception Governance.
+ * Flags pseudo-catch blocks in TS/JS and Python containing only dummy statements.
+ */
+export const SilentPseudoCatchRule: GovernanceRule = {
+    id: GOV_EXC_SILENT_RULE_ID,
+    name: 'Silent Pseudo-Catch Block Governance',
+    category: 'exception_safety',
+    severity: 'error',
+    risk: 'critical',
+    rationale:
+        'Pseudo-catch blocks containing only dummy non-handling statements (void 0, dead ' +
+        'assignment) silently swallow exceptions without logging or documented rationale.',
+    isFixable: false,
+    languages: ['typescript', 'javascript', 'python'],
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        const lines = ctx.lines;
+        const lang = ctx.capabilities.languageId;
+        const violations =
+            lang === 'python'
+                ? checkPythonSilentExceptions(lines)
+                : checkJsTsSilentExceptions(lines);
         return violations.length > 0 ? violations : null;
     },
 };

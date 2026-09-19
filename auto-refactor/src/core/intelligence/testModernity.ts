@@ -18,7 +18,13 @@ export {
  *   returns structured diagnostics and metrics.
  */
 
-import type { Issue, SemanticEvidenceStep, SemanticReviewDetail, TestDebtTicket } from '../types';
+import type {
+    Issue,
+    SemanticEvidenceStep,
+    SemanticReviewDetail,
+    TestDebtTicket,
+    TestModernityMetricSummary,
+} from '../types';
 
 /**
  * Descriptor of a test case or suite site.
@@ -58,6 +64,19 @@ export interface TestModernityOptions {
     flagDeprecatedContractTests?: boolean;
     flagTautologicalAssertions?: boolean;
     flagSkippedTests?: boolean;
+    strict?: boolean;
+    tautologicalIsFatal?: boolean;
+    enforceTestDensity?: boolean;
+}
+
+/**
+ * Consolidated result of business symbol to test coverage mapping.
+ */
+export interface BusinessTestMappingResult {
+    metrics: TestModernityMetricSummary;
+    semanticUnits: ActiveSemanticUnit[];
+    issues: Issue[];
+    uncoveredSymbols: string[];
 }
 
 /**
@@ -359,3 +378,11 @@ export function analyzeTestModernitySites(
 
     return issues;
 }
+
+export {
+    isTestFilePath,
+    auditTestSource,
+    mapBusinessToTests,
+    TestModernityEvaluator,
+    defaultTestModernityEvaluator,
+} from './testModernityAuditor';

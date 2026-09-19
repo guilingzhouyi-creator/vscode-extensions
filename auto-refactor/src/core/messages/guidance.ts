@@ -90,6 +90,16 @@ export const GuidanceMessages = {
     FORMAT_VIOLATION: (rule: string, line: number | string, message: string) =>
         `Rule [${rule}] (line ${line}): ${message}`,
     /**
+     * Render one domain violation with rule and severity tier.
+     *
+     * @param rule - Rule identifier shown in square brackets.
+     * @param severity - Severity tier shown in parentheses.
+     * @param message - Analyzer-provided violation text inserted after the colon.
+     * @returns Markdown line pairing the rule, severity, and message.
+     */
+    FORMAT_VIOLATION_WITH_SEVERITY: (rule: string, severity: string, message: string) =>
+        `Rule [${rule}] (severity: ${severity}): ${message}`,
+    /**
      * Render one historical regression line for the pitfalls prompt section.
      *
      * @param kind - Regression category or kind label shown in parentheses.
