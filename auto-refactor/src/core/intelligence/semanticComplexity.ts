@@ -1,3 +1,6 @@
+export { analyzeCrossFunctionComplexity } from './crossFunctionComplexity';
+export { MAX_COMPLEXITY_TRACE_DEPTH } from './crossFunctionComplexity';
+
 /**
  * Module: Core Intelligence — Spatiotemporal Complexity Semantic Analyzer
  * File Path: src/core/intelligence/semanticComplexity.ts
@@ -15,11 +18,9 @@
  */
 
 import type { CallGraph } from './callGraph';
-import type { SymbolIndex } from './symbolIndex';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
 
 /** Threshold of call depth when tracing polynomial cross-function complexity. */
-const MAX_COMPLEXITY_TRACE_DEPTH = 6;
 
 /** Maximum collection size considered bounded/small-scale (e.g. enum/options). */
 export const BOUNDED_COLLECTION_MAX_SIZE = 16;
@@ -61,122 +62,6 @@ export function isBoundedCollection(expr: string): boolean {
         return true;
     }
     return false;
-}
-
-/**
- * Deduce cross-function and cross-file polynomial time complexity.
- *
- * @param callGraph - Shared cross-file call graph.
- * @param symbolIndex - Repository symbol index.
- * @param loopSites - Map of function symbol to its local loop characteristics.
- * @param options - Tunable analysis knobs.
- * @returns Structured issues for detected complexity hazards.
- */
-export function analyzeCrossFunctionComplexity(
-    callGraph: CallGraph,
-    symbolIndex: SymbolIndex,
-    loopSites: Map<string, LoopSite[]>,
-    options: SemanticComplexityOptions = {},
-): Issue[] {
-    const issues: Issue[] = [];
-    const maxDepth = options.maxTraceDepth ?? MAX_COMPLEXITY_TRACE_DEPTH;
-    void maxDepth;
-    void symbolIndex;
-
-    for (const [callerSymbol, callerLoops] of loopSites.entries()) {
-        const unboundedCallerLoops = callerLoops.filter((loop) => !loop.isBounded);
-        if (unboundedCallerLoops.length === 0) continue;
-
-        const reachableCallees = callGraph.reachableFrom(callerSymbol);
-        for (const callee of reachableCallees) {
-            const calleeLoops = loopSites.get(callee);
-            if (!calleeLoops || calleeLoops.length === 0) continue;
-
-            const unboundedCalleeLoops = calleeLoops.filter((loop) => !loop.isBounded);
-            if (unboundedCalleeLoops.length === 0) continue;
-
-            const primaryCallerLoop = unboundedCallerLoops[0];
-            const primaryCalleeLoop = unboundedCalleeLoops[0];
-
-            const edges = callGraph
-                .edges()
-                .filter((e) => e.caller === callerSymbol && e.callee === callee);
-            const callLine =
-                edges.length > 0
-                    ? (edges[0].line ?? primaryCallerLoop.line)
-                    : primaryCallerLoop.line;
-            const isCrossFile = edges.some((e) => e.crossFile);
-
-            const evidenceChain: SemanticEvidenceStep[] = [
-                {
-                    kind: 'loop',
-                    description: `Outer loop over dynamic input '${primaryCallerLoop.scaleVariable}'`,
-                    file: primaryCallerLoop.file,
-                    line: primaryCallerLoop.line,
-                    symbol: callerSymbol,
-                },
-                {
-                    kind: 'call',
-                    description: `Invokes '${callee}' across ${isCrossFile ? 'file' : 'function'} boundary`,
-                    file: primaryCallerLoop.file,
-                    line: callLine,
-                    symbol: callerSymbol,
-                },
-                {
-                    kind: 'loop',
-                    description: `Inner loop over dynamic stream '${primaryCalleeLoop.scaleVariable}' in '${callee}'`,
-                    file: primaryCalleeLoop.file,
-                    line: primaryCalleeLoop.line,
-                    symbol: callee,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'core',
-                symbol: callerSymbol,
-                codeDomain: 'algorithmic-complexity',
-                currentBehavior: `Nested iteration: '${callerSymbol}' iterates over '${primaryCallerLoop.scaleVariable}' and calls '${callee}' which iterates over '${primaryCalleeLoop.scaleVariable}'.`,
-                semanticEvidenceChain: evidenceChain,
-                triggerCondition: `Cross-function polynomial order O(${primaryCallerLoop.scaleVariable} * ${primaryCalleeLoop.scaleVariable}) with unbounded dynamic collections`,
-                risk: 'Quadratic latency degradation when processing large input payloads or database result sets under high traffic.',
-                blastRadius: [primaryCallerLoop.file, primaryCalleeLoop.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix: `Pre-index '${primaryCalleeLoop.scaleVariable}' into a Map/Set or pass a keyed lookup index to '${callee}' to reduce complexity to O(N).`,
-                impactedCallers: callGraph
-                    .callersOf(callerSymbol)
-                    .map((e) => e.caller ?? 'unknown'),
-                impactedTests: [],
-                verificationMethod:
-                    'Execute benchmark suite with scaled input sets (N=100, 1000, 10000) to verify linear execution time.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `complexity:CPX-TIME-001:${primaryCallerLoop.file}:${primaryCallerLoop.line}`,
-                analyzer: 'complexity',
-                rule: 'CPX-TIME-001',
-                severity: 'warning',
-                message: `Unbounded cross-function O(N*M) time complexity: '${callerSymbol}' calls '${callee}' containing an inner iteration.`,
-                location: {
-                    file: primaryCallerLoop.file,
-                    start: { line: primaryCallerLoop.line, column: 1 },
-                    end: { line: primaryCallerLoop.line, column: 80 },
-                },
-                detail,
-                suggestion: `Pre-index data into a hash lookup before calling '${callee}'.`,
-                evidence: {
-                    confidence: 0.95,
-                    requiresRuntime: false,
-                },
-            });
-        }
-    }
-
-    return issues;
 }
 
 /**
