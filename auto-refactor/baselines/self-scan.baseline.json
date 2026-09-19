@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-19T04:47:48.688Z",
+  "timestamp": "2026-09-19T05:44:42.856Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -1552,23 +1552,16 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-scoring-coverage.js",
-      "count": 18,
+      "count": 45,
       "severities": {
-        "warning": 18
+        "warning": 45
       }
     },
     {
       "key": "constants|magic-number|scripts/validate-scoring-coverage.js",
-      "count": 3,
+      "count": 5,
       "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|scripts/validate-scoring-coverage.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 5
       }
     },
     {
@@ -5226,24 +5219,10 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/scoring/dimensionDeductions.ts",
-      "count": 1,
+      "key": "constants|hardcoded-string|src/core/scoring/dimensionFamilyDeductions.ts",
+      "count": 5,
       "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/scoring/dimensionDeductions.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/scoring/dimensionDeductions.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 5
       }
     },
     {
@@ -5289,6 +5268,13 @@
       }
     },
     {
+      "key": "constants|hardcoded-string|src/core/scoring/dimensionRuleTable.ts",
+      "count": 26,
+      "severities": {
+        "warning": 26
+      }
+    },
+    {
       "key": "constants|hardcoded-string|src/core/scoring/qualityScorer.ts",
       "count": 1,
       "severities": {
@@ -5304,9 +5290,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scoring/scoringTypes.ts",
-      "count": 39,
+      "count": 41,
       "severities": {
-        "warning": 39
+        "warning": 41
       }
     },
     {

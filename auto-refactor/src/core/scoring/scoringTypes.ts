@@ -62,17 +62,23 @@ export const ALL_QUALITY_DIMENSIONS: readonly QualityDimension[] = [
  * Analyzers whose evidence feeds each quality dimension. A dimension is *not evaluated* when none
  * of its analyzers is enabled in the scan configuration, so the model never scores an axis that
  * was not actually measured (see `QualityScoreBreakdown.notEvaluated` / `coverage`).
+ *
+ * These lists mirror the deduction table in `scoring/dimensionDeductions.ts`, which is the single
+ * source of truth: every analyzer that can deduct a dimension must appear here, and
+ * `validate-scoring-coverage` fails the build when the two drift apart. `techDebtRisk` is the one
+ * documented exception — the severity fallback in that module lets *every* analyzer feed it, so
+ * its list names the analyzer that owns debt routing, not the whole set.
  */
 export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = {
     architectureConsistency: ['architecture', 'dependency-graph'],
-    semanticPurity: ['constants', 'simplify'],
-    codeSecurity: ['security', 'secrets'],
+    semanticPurity: ['governance', 'hygiene', 'dependency-graph'],
+    codeSecurity: ['architecture', 'security', 'secrets'],
     performanceEfficiency: ['performance'],
-    standardization: ['hygiene', 'comments'],
-    modernity: ['ts-modern', 'python-modern', 'rust-modern', 'gdscript-modern'],
+    standardization: ['hygiene', 'large-file'],
+    modernity: ['governance', 'ts-modern', 'python-modern', 'rust-modern', 'gdscript-modern'],
     maintainability: ['complexity', 'large-file'],
     commentQuality: ['comments'],
-    duplication: ['constants', 'simplify'],
+    duplication: ['constants'],
     techDebtRisk: ['governance'],
 };
 

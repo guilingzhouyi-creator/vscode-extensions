@@ -122,6 +122,16 @@ const w2 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   
 
 `--fail-on-severity` / `failOnIssue` 只统计**未抑制**的发现：被 `suppressions` 命中的发现保留在报告里（携带 `suppression.reason` 供审计），但不参与门禁计数。这与 `report.schema.json` 的字段说明、`gate-self.js` 的 `newBlocking` 统计保持一致；`validate-suppression-gate` 用一对仅相差抑制配置的夹具锁死该契约（抑制侧退出 0、对照侧退出 1）。
 
+### 6.6 量化标准的单一真源（评分扣除表）
+
+质量评分的「哪条规则扣哪个维度、扣多少分」不再散落在 if 链里，而是集中在 `src/core/scoring/dimensionRuleTable.ts`（数据模块）：每行 = 分析器 + 规则 id（自定义分析器可回退到片段匹配）+ 维度 + 分值 + 理由构造器；`dimensionDeductions` 只负责按「同一维度首个命中者胜出」执行该表，并叠加严重度技术债回退。架构/安全/性能三族仍由 `dimensionFamilyDeductions` 承担，但其扣除来源必须出现在 `scoringTypes.DIMENSION_ANALYZERS`（覆盖模型据此判定维度是否已测量）。
+
+`validate-scoring-coverage` 现在锁死两件事：① 9 条代表规则必须扣到表中声明的维度；② 扣除来源 ⊆ 已声明的证据分析器（`techDebtRisk` 为文档化例外——严重度回退让每个分析器都能喂它）。历史教训：这些判断曾写成「消息片段」，而片段与规范化后的规则 id（`GOV-STD-002`/`PRF-MEM-001`/`HYG-DED-001`…）永不匹配，导致 `modernity` 等维度**永远无法被扣除却仍显示为"已测量"**；表化 + 上述两条断言即为此设的护栏。
+
+### 6.7 数据表字面量策略（scoped suppression）
+
+`hardcoded-string` 对「已知值表」类文件按**文件+规则**粒度登记豁免，判据与 `semanticLiterals.ts` 一致：表项本身即数据（规则 id、分析器 id、维度 id），提成具名标量只会让表失去可读性。当前登记三处：`dimensionRuleTable.ts`、`dimensionFamilyDeductions.ts`、`scoringTypes.ts`。其余产品代码（`src/**`）的字面量仍逐条要求提取；新增豁免必须在配置里写明理由，并在提交信息中记录规则级前后对照。
+
 ---
 
 ## 📐 7. 架构图表 (Mermaid)

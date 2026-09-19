@@ -4,63 +4,34 @@
  * Architecture Role: Rule-to-dimension deduction evaluators for transparent quality scoring.
  * Dependencies & Triggers: Imports Issue, FileMetric from ../types, ScoringRationales from
  *   ../messages, and dimension types from ./scoringTypes; called by QualityScorer.
- * Responsibilities: Map individual issues to deductions across Architecture, Security,
- *   Performance, Maintainability, Comments, Duplication, and Technical Debt dimensions.
+ * Responsibilities: Run the declarative table from ./dimensionRuleTable (standardization,
+ *   modernity, semantic purity, maintainability, comments, duplication), add the severity debt
+ *   fallback, delegate architecture/security/performance families to
+ *   ./dimensionFamilyDeductions, and apply file-metric deductions (nesting, exported symbols).
  * Exit Semantics & Design Rationale: Pure functions with zero side effects beyond calling the
  *   provided deduction applier callback; swallows no errors and performs no I/O.
  */
 import {
-    DEDUCTION_MISSING_PUBLIC_API_DOC,
-    DEDUCTION_DUPLICATE_LITERAL,
-    DEDUCTION_MAGIC_NUMBER,
-    DEDUCTION_HARDCODED_STRING,
-    DIMENSION_ARCHITECTURE_CONSISTENCY,
-    DEDUCTION_LINE_COUNT_OVERFLOW,
-    DEDUCTION_CYCLOMATIC_COMPLEXITY,
-    DEDUCTION_BANNED_JARGON,
     DEDUCTION_ERROR_TECH_DEBT,
-    DEDUCTION_DEPRECATED_FEATURE,
     DEDUCTION_NESTING_DEPTH_OVERFLOW,
     DEDUCTION_EXCESSIVE_EXPORTED_SYMBOLS,
-    DEDUCTION_NAMING_VIOLATION,
-    DEDUCTION_SUBSTANDARD_COMMENT,
     DEDUCTION_WARNING_TECH_DEBT,
     MAX_NESTING_DEPTH,
     MAX_EXPORTED_SYMBOLS,
-    ANALYZER_GOVERNANCE,
-    ANALYZER_LARGE_FILE,
-    ANALYZER_COMPLEXITY,
-    ANALYZER_COMMENTS,
-    ANALYZER_CONSTANTS,
-    DIMENSION_STANDARDIZATION,
-    DIMENSION_MODERNITY,
+    DIMENSION_ARCHITECTURE_CONSISTENCY,
     DIMENSION_MAINTAINABILITY,
-    DIMENSION_COMMENT_QUALITY,
-    DIMENSION_DUPLICATION,
     DIMENSION_TECH_DEBT_RISK,
-    FRAGMENT_PLACEHOLDER_MARKER,
-    FRAGMENT_NAMING,
-    FRAGMENT_LINES,
-    FRAGMENT_LEGACY,
-    FRAGMENT_DEPRECATED,
-    FRAGMENT_NESTING,
-    FRAGMENT_BANNED,
-    FRAGMENT_JARGON,
-    FRAGMENT_MISSING,
-    FRAGMENT_DUPLICATE,
-    FRAGMENT_MAGIC,
     FRAGMENT_ERROR,
     FRAGMENT_WARNING,
 } from './dimensionLiterals';
+import { DIMENSION_RULES } from './dimensionRuleTable';
 import {
     applyArchitectureDeductions,
-    applySemanticPurityDeductions,
     applySecurityDeductions,
     applyPerformanceDeductions,
 } from './dimensionFamilyDeductions';
 export {
     applyArchitectureDeductions,
-    applySemanticPurityDeductions,
     applySecurityDeductions,
     applyPerformanceDeductions,
 } from './dimensionFamilyDeductions';
@@ -99,14 +70,6 @@ export function familyDimensionOf(rule: string): QualityDimension | null {
     return best === null ? null : FAMILY_DIMENSIONS[best];
 }
 
-/** Analyzer ids matched by the deduction evaluators (named so no id literal is repeated). */
-
-/** Quality dimensions written by the deduction evaluators. */
-
-/** Rule ids with a dedicated deduction. */
-
-/** Rule-id or message fragments the evaluators match on. */
-
 /**
  * Callback signature for applying a deduction to a quality dimension.
  */
@@ -119,148 +82,79 @@ export type DeductionApplier = (
 ) => void;
 
 /**
- * Apply deductions for standardization, modernity, maintainability, comments, and duplication.
+ * Apply the declarative dimension rules, then the severity-based technical-debt deduction.
+ *
+ * Each dimension is deducted at most once per finding: the first table row that covers the
+ * finding wins, and later rows for the same dimension are skipped, so the catch-all row can be
+ * written last without negating every specific rule.
  *
  * @param issue - Analyzed issue finding.
  * @param apply - Deduction callback function.
  */
 export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionApplier): void {
     const line = issue.location?.start?.line;
-    const r = issue.rule;
-    const msg = issue.message;
+    const claimed = new Set<QualityDimension>();
+    for (const rule of DIMENSION_RULES) {
+        if (rule.analyzer !== issue.analyzer) continue;
+        if (claimed.has(rule.dimension)) continue;
+        if (!rule.covers(issue)) continue;
+        claimed.add(rule.dimension);
+        apply(rule.dimension, rule.points, rule.rationale(issue.message), issue.rule, line);
+    }
+    applySeverityDeductions(issue, apply, line);
+}
 
-    // Standardization
-    if (issue.analyzer === ANALYZER_GOVERNANCE && r.includes(FRAGMENT_NAMING)) {
-        apply(
-            DIMENSION_STANDARDIZATION,
-            DEDUCTION_NAMING_VIOLATION,
-            ScoringRationales.NAMING_CONVENTION_VIOLATION(msg),
-            r,
-            line,
-        );
+/**
+ * List the analyzers that can deduct each dimension, derived from the rule table.
+ *
+ * The coverage model in `DIMENSION_ANALYZERS` decides which axes count as measured, so the two
+ * must agree: a deduction from an analyzer a dimension does not declare would be scored without
+ * being counted as measured. `techDebtRisk` is the documented exception — every analyzer feeds
+ * it through the severity fallback above.
+ *
+ * @returns Analyzer ids per dimension, one entry per table row (an id may repeat).
+ */
+export function dimensionDeductionSources(): Record<QualityDimension, string[]> {
+    // Accumulated as delimited text so the loop allocates nothing and runs no linear search.
+    const joined = new Map<QualityDimension, string>();
+    for (const rule of DIMENSION_RULES) {
+        joined.set(rule.dimension, (joined.get(rule.dimension) ?? '') + rule.analyzer + '|');
     }
-    if (issue.analyzer === ANALYZER_LARGE_FILE && r.includes(FRAGMENT_LINES)) {
-        apply(
-            DIMENSION_STANDARDIZATION,
-            DEDUCTION_LINE_COUNT_OVERFLOW,
-            ScoringRationales.LINE_COUNT_OVERFLOW(msg),
-            r,
-            line,
-        );
+    const result = {} as Record<QualityDimension, string[]>;
+    for (const [dimension, analyzers] of joined) {
+        result[dimension] = analyzers.split('|').filter(Boolean).sort();
     }
+    return result;
+}
 
-    // Modernity
-    if (
-        issue.analyzer === ANALYZER_GOVERNANCE &&
-        (r.includes('var') || r.includes(FRAGMENT_LEGACY) || r.includes(FRAGMENT_DEPRECATED))
-    ) {
-        apply(
-            DIMENSION_MODERNITY,
-            DEDUCTION_DEPRECATED_FEATURE,
-            ScoringRationales.DEPRECATED_LANGUAGE_FEATURE(msg),
-            r,
-            line,
-        );
-    }
-
-    // Maintainability
-    if (issue.analyzer === ANALYZER_COMPLEXITY) {
-        apply(
-            DIMENSION_MAINTAINABILITY,
-            DEDUCTION_CYCLOMATIC_COMPLEXITY,
-            ScoringRationales.CYCLOMATIC_COMPLEXITY_HIGH(msg),
-            r,
-            line,
-        );
-    }
-    if (issue.analyzer === ANALYZER_LARGE_FILE && r.includes(FRAGMENT_NESTING)) {
-        apply(
-            DIMENSION_MAINTAINABILITY,
-            DEDUCTION_NESTING_DEPTH_OVERFLOW,
-            ScoringRationales.NESTED_BLOCK_OVERFLOW(msg),
-            r,
-            line,
-        );
-    }
-
-    // Comment Quality
-    if (issue.analyzer === ANALYZER_COMMENTS) {
-        if (
-            r.includes(FRAGMENT_BANNED) ||
-            r.includes(FRAGMENT_JARGON) ||
-            r.includes(FRAGMENT_PLACEHOLDER_MARKER)
-        ) {
-            apply(
-                DIMENSION_COMMENT_QUALITY,
-                DEDUCTION_BANNED_JARGON,
-                ScoringRationales.BANNED_JARGON_IN_COMMENT(msg),
-                r,
-                line,
-            );
-        } else if (r.includes(FRAGMENT_MISSING)) {
-            apply(
-                DIMENSION_COMMENT_QUALITY,
-                DEDUCTION_MISSING_PUBLIC_API_DOC,
-                ScoringRationales.MISSING_PUBLIC_API_DOC(msg),
-                r,
-                line,
-            );
-        } else {
-            apply(
-                DIMENSION_COMMENT_QUALITY,
-                DEDUCTION_SUBSTANDARD_COMMENT,
-                ScoringRationales.SUBSTANDARD_COMMENT_QUALITY(msg),
-                r,
-                line,
-            );
-        }
-    }
-
-    // Duplication
-    if (issue.analyzer === ANALYZER_CONSTANTS) {
-        if (r.includes(FRAGMENT_DUPLICATE)) {
-            apply(
-                DIMENSION_DUPLICATION,
-                DEDUCTION_DUPLICATE_LITERAL,
-                ScoringRationales.DUPLICATE_LITERAL(msg),
-                r,
-                line,
-            );
-        } else if (r.includes(FRAGMENT_MAGIC)) {
-            apply(
-                DIMENSION_DUPLICATION,
-                DEDUCTION_MAGIC_NUMBER,
-                ScoringRationales.MAGIC_NUMBER(msg),
-                r,
-                line,
-            );
-        } else {
-            apply(
-                DIMENSION_DUPLICATION,
-                DEDUCTION_HARDCODED_STRING,
-                ScoringRationales.HARDCODED_STRING(msg),
-                r,
-                line,
-            );
-        }
-    }
-
-    // Technical Debt Risk
-    const debtDimension = familyDimensionOf(r) ?? DIMENSION_TECH_DEBT_RISK;
+/**
+ * Apply the severity-based technical-debt deduction that every analyzer feeds.
+ *
+ * The dimension is the finding's explicitly routed family dimension when it has one, so a rule
+ * with a dedicated axis is never double-counted as generic debt. `FRAGMENT_ERROR` and
+ * `FRAGMENT_WARNING` hold the severity literals themselves and are compared against
+ * `severity`, not against a rule id.
+ *
+ * @param issue - Analyzed issue finding.
+ * @param apply - Deduction callback function.
+ * @param line - Start line of the finding, when known.
+ */
+function applySeverityDeductions(issue: Issue, apply: DeductionApplier, line?: number): void {
+    const debtDimension = familyDimensionOf(issue.rule) ?? DIMENSION_TECH_DEBT_RISK;
     if (issue.severity === FRAGMENT_ERROR) {
         apply(
             debtDimension,
             DEDUCTION_ERROR_TECH_DEBT,
-            ScoringRationales.ERROR_TECH_DEBT(msg),
-            r,
+            ScoringRationales.ERROR_TECH_DEBT(issue.message),
+            issue.rule,
             line,
         );
     } else if (issue.severity === FRAGMENT_WARNING) {
         apply(
             debtDimension,
             DEDUCTION_WARNING_TECH_DEBT,
-            ScoringRationales.WARNING_TECH_DEBT(msg),
-            r,
+            ScoringRationales.WARNING_TECH_DEBT(issue.message),
+            issue.rule,
             line,
         );
     }
@@ -274,7 +168,6 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
  */
 export function applyIssueDeductions(issue: Issue, apply: DeductionApplier): void {
     applyArchitectureDeductions(issue, apply);
-    applySemanticPurityDeductions(issue, apply);
     applySecurityDeductions(issue, apply);
     applyPerformanceDeductions(issue, apply);
     applyQualityDimensionDeductions(issue, apply);

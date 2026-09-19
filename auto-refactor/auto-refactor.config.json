@@ -77,6 +77,21 @@
       "reason": "该文件承载「已知值表」（常用端口/HTTP 状态码/时长毫秒），表项本身即数据而非魔法数；拆成数百个具名标量只会降低可读性。真实比较阈值已提取为 MS_PER_SECOND/EPHEMERAL_PORT_MIN/PORT_MAX。"
     },
     {
+      "matchFile": "src/core/scoring/dimensionRuleTable.ts",
+      "matchRule": "hardcoded-string",
+      "reason": "该文件是量化标准的「规则表」：表项即数据（规则 id、分析器 id、维度 id），把 'GOV-TYP-003' 提成具名常量只会让表失去可读性，与 semanticLiterals.ts 的已知值表同一判据；其余产品代码的字面量仍逐条要求提取。"
+    },
+    {
+      "matchFile": "src/core/scoring/dimensionFamilyDeductions.ts",
+      "matchRule": "hardcoded-string",
+      "reason": "同上：该文件内的数组是架构层/边界规则的 id 清单，表项即数据而非可外化配置。"
+    },
+    {
+      "matchFile": "src/core/scoring/scoringTypes.ts",
+      "matchRule": "hardcoded-string",
+      "reason": "该文件的 DIMENSION_ANALYZERS 是「维度 ↔ 分析器」证据表，表项即分析器 id（与 config 中的键同名）；同一判据见 dimensionRuleTable.ts。"
+    },
+    {
       "matchFile": "scripts/**",
       "matchRule": "magic-number",
       "reason": "脚本目录是校验器与基准夹具：其中的数字多为被构造的输入、期望值与基准参数（种子、行数、期望分数），不是产品里的魔法数；按 glob 统一登记，产品代码仍逐条要求具名常量"

@@ -9,17 +9,6 @@
  * Exit Semantics & Design Rationale: Pure appliers that only invoke the injected callback, so they
  *   are reusable across scans and never mutate analyzer state.
  */
-/**
- * Module: Core Engine — Quality Dimension Deduction Rules
- * File Path: src/core/scoring/dimensionDeductions.ts
- * Architecture Role: Rule-to-dimension deduction evaluators for transparent quality scoring.
- * Dependencies & Triggers: Imports Issue, FileMetric from ../types, ScoringRationales from
- *   ../messages, and dimension types from ./scoringTypes; called by QualityScorer.
- * Responsibilities: Map individual issues to deductions across Architecture, Security,
- *   Performance, Maintainability, Comments, Duplication, and Technical Debt dimensions.
- * Exit Semantics & Design Rationale: Pure functions with zero side effects beyond calling the
- *   provided deduction applier callback; swallows no errors and performs no I/O.
- */
 import type { Issue } from '../types';
 import { ScoringRationales } from '../messages';
 import {
@@ -38,21 +27,14 @@ import {
     DEDUCTION_LAYER_CONSTRAINT_VIOLATION,
     DEDUCTION_BROKEN_HASH,
     DEDUCTION_SENSITIVE_DATA_LOGGED,
-    DEDUCTION_MEMORY_LEAK_RISK,
     DEDUCTION_ARCHITECTURE_DESIGN_VIOLATION,
     DEDUCTION_TRANSIENT_LOOP_ALLOCATION,
-    DEDUCTION_TYPE_SAFETY_ESCAPE,
-    DEDUCTION_UNREACHABLE_DEAD_CODE,
     DEDUCTION_INEFFICIENT_ALGORITHM,
-    DEDUCTION_UNUSED_BINDING,
     ANALYZER_ARCHITECTURE,
     ANALYZER_DEPENDENCY_GRAPH,
-    ANALYZER_GOVERNANCE,
-    ANALYZER_HYGIENE,
     ANALYZER_SECURITY,
     ANALYZER_SECRETS,
     ANALYZER_PERFORMANCE,
-    DIMENSION_SEMANTIC_PURITY,
     RULE_ARCH_LEAK_002,
     RULE_SEC_VUL_001,
     RULE_SEC_VUL_002,
@@ -61,27 +43,33 @@ import {
     RULE_SEC_VUL_005,
     RULE_SEC_VUL_006,
     RULE_SEC_LEAK_001,
-    FRAGMENT_LAYER,
-    FRAGMENT_BOUNDARY,
-    FRAGMENT_LEAK,
-    FRAGMENT_CYCLE,
-    FRAGMENT_CIRCULAR,
-    FRAGMENT_TYPE,
-    FRAGMENT_ESCAPE,
-    FRAGMENT_DEAD,
-    FRAGMENT_UNREACHABLE,
-    FRAGMENT_UNUSED,
     FRAGMENT_SECRET,
     FRAGMENT_TOKEN,
     FRAGMENT_EVAL,
     FRAGMENT_UNSAFE,
     FRAGMENT_SANITIZATION,
+    FRAGMENT_LAYER,
+    FRAGMENT_BOUNDARY,
+    FRAGMENT_LEAK,
+    FRAGMENT_CYCLE,
+    FRAGMENT_CIRCULAR,
     FRAGMENT_LOOP,
     FRAGMENT_ALLOC,
-    FRAGMENT_UNBOUNDED,
-    FRAGMENT_LEAK_ALT,
 } from './dimensionLiterals';
 import type { DeductionApplier } from './dimensionDeductions';
+
+/** Architecture rules that breach a declared layer or boundary. */
+const RULES_LAYER_CONSTRAINT = [
+    'ARCH-LEAK-001',
+    'ARCH-DIR-001',
+    'ARCH-DIR-002',
+    'ARCH-DIR-003',
+    'ARCH-BND-001',
+];
+/** Dependency-graph rule for an import cycle. */
+const RULE_IMPORT_CYCLE = 'import-cycle';
+/** Performance rule for a transient allocation inside a loop body. */
+const RULE_PRF_TRANSIENT_ALLOCATION = 'PRF-MEM-001';
 
 /**
  * Apply deductions for architecture consistency issues.
@@ -97,7 +85,7 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
     const r = issue.rule;
     const msg = issue.message;
 
-    if (r === RULE_ARCH_LEAK_002 || r.includes(RULE_ARCH_LEAK_002)) {
+    if (r === RULE_ARCH_LEAK_002) {
         apply(
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_DTO_CREDENTIAL_LEAK,
@@ -113,6 +101,9 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
             line,
         );
     } else if (
+        RULES_LAYER_CONSTRAINT.includes(r) ||
+        // Fragment fallback for custom architecture analyzers whose rule ids this engine cannot
+        // know; built-in rules match by id first so a rename cannot silently drop the deduction.
         r.includes(FRAGMENT_LAYER) ||
         r.includes(FRAGMENT_BOUNDARY) ||
         r.includes(FRAGMENT_LEAK)
@@ -124,7 +115,11 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
             r,
             line,
         );
-    } else if (r.includes(FRAGMENT_CYCLE) || r.includes(FRAGMENT_CIRCULAR)) {
+    } else if (
+        r === RULE_IMPORT_CYCLE ||
+        r.includes(FRAGMENT_CYCLE) ||
+        r.includes(FRAGMENT_CIRCULAR)
+    ) {
         apply(
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_CIRCULAR_DEPENDENCY,
@@ -137,51 +132,6 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_ARCHITECTURE_DESIGN_VIOLATION,
             ScoringRationales.ARCHITECTURE_DESIGN_VIOLATION(msg),
-            r,
-            line,
-        );
-    }
-}
-/**
- * Apply deductions for semantic purity issues.
- *
- * @param issue - Analyzed issue finding.
- * @param apply - Deduction callback function.
- */
-export function applySemanticPurityDeductions(issue: Issue, apply: DeductionApplier): void {
-    const line = issue.location?.start?.line;
-    const r = issue.rule;
-    const msg = issue.message;
-
-    if (
-        issue.analyzer === ANALYZER_GOVERNANCE &&
-        (r.includes(FRAGMENT_TYPE) || r.includes(FRAGMENT_ESCAPE))
-    ) {
-        apply(
-            DIMENSION_SEMANTIC_PURITY,
-            DEDUCTION_TYPE_SAFETY_ESCAPE,
-            ScoringRationales.TYPE_SAFETY_ESCAPE(msg),
-            r,
-            line,
-        );
-    }
-    if (
-        issue.analyzer === ANALYZER_HYGIENE &&
-        (r.includes(FRAGMENT_DEAD) || r.includes(FRAGMENT_UNREACHABLE))
-    ) {
-        apply(
-            DIMENSION_SEMANTIC_PURITY,
-            DEDUCTION_UNREACHABLE_DEAD_CODE,
-            ScoringRationales.UNREACHABLE_DEAD_CODE(msg),
-            r,
-            line,
-        );
-    }
-    if (issue.analyzer === ANALYZER_HYGIENE && r.includes(FRAGMENT_UNUSED)) {
-        apply(
-            DIMENSION_SEMANTIC_PURITY,
-            DEDUCTION_UNUSED_BINDING,
-            ScoringRationales.UNUSED_BINDING_OR_IMPORT(msg),
             r,
             line,
         );
@@ -309,7 +259,11 @@ export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier
     const r = issue.rule;
     const msg = issue.message;
 
-    if (r.includes(FRAGMENT_LOOP) || r.includes(FRAGMENT_ALLOC)) {
+    if (
+        r === RULE_PRF_TRANSIENT_ALLOCATION ||
+        r.includes(FRAGMENT_LOOP) ||
+        r.includes(FRAGMENT_ALLOC)
+    ) {
         apply(
             DIMENSION_PERFORMANCE_EFFICIENCY,
             DEDUCTION_TRANSIENT_LOOP_ALLOCATION,
@@ -317,15 +271,9 @@ export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier
             r,
             line,
         );
-    } else if (r.includes(FRAGMENT_UNBOUNDED) || r.includes(FRAGMENT_LEAK_ALT)) {
-        apply(
-            DIMENSION_PERFORMANCE_EFFICIENCY,
-            DEDUCTION_MEMORY_LEAK_RISK,
-            ScoringRationales.MEMORY_LEAK_RISK(msg),
-            r,
-            line,
-        );
     } else {
+        // Blocking-I/O and nested-loop findings both land here: the model has no dedicated I/O
+        // deduction, and an unlisted rule must still deduct rather than silently score 100.
         apply(
             DIMENSION_PERFORMANCE_EFFICIENCY,
             DEDUCTION_INEFFICIENT_ALGORITHM,
