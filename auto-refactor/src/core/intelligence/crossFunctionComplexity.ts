@@ -33,6 +33,30 @@ import type { CallGraph } from './callGraph';
 import type { SymbolIndex } from './symbolIndex';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
 import type { LoopSite, SemanticComplexityOptions } from './semanticComplexity';
+/** Evidence-chain step kind for an iterating loop. */
+const KIND_LOOP = 'loop';
+/** Evidence-chain step kind for a call site. */
+const KIND_CALL = 'call';
+/** Boundary label used when the callee lives in another file. */
+const KIND_FILE = 'file';
+/** Boundary label used when the callee lives in the same file. */
+const KIND_FUNCTION = 'function';
+/** Language tag written into the semantic review detail. */
+const LANGUAGE_TYPESCRIPT = 'typescript';
+/** Module tag written into the semantic review detail. */
+const MODULE_CORE = 'core';
+/** Code-domain tag written into the semantic review detail. */
+const CODE_DOMAIN_ALGORITHMIC_COMPLEXITY = 'algorithmic-complexity';
+/** Analyzer id owning the cross-function complexity rule. */
+const ANALYZER_COMPLEXITY = 'complexity';
+/** Rule id of the cross-function complexity finding. */
+const RULE_CPX_TIME_001 = 'CPX-TIME-001';
+/** Severity of the cross-function complexity finding. */
+const SEVERITY_WARNING = 'warning';
+/** Rule contract version recorded on every emitted issue. */
+const RULE_VERSION = '1.0.0';
+/** Engine config version recorded on every emitted issue. */
+const CONFIG_VERSION = '0.3.0';
 
 /**
  * Maximum call-chain depth the cross-function complexity walk follows before it stops.
@@ -85,21 +109,21 @@ export function analyzeCrossFunctionComplexity(
 
             const evidenceChain: SemanticEvidenceStep[] = [
                 {
-                    kind: 'loop',
+                    kind: KIND_LOOP,
                     description: `Outer loop over dynamic input '${primaryCallerLoop.scaleVariable}'`,
                     file: primaryCallerLoop.file,
                     line: primaryCallerLoop.line,
                     symbol: callerSymbol,
                 },
                 {
-                    kind: 'call',
-                    description: `Invokes '${callee}' across ${isCrossFile ? 'file' : 'function'} boundary`,
+                    kind: KIND_CALL,
+                    description: `Invokes '${callee}' across ${isCrossFile ? KIND_FILE : KIND_FUNCTION} boundary`,
                     file: primaryCallerLoop.file,
                     line: callLine,
                     symbol: callerSymbol,
                 },
                 {
-                    kind: 'loop',
+                    kind: KIND_LOOP,
                     description: `Inner loop over dynamic stream '${primaryCalleeLoop.scaleVariable}' in '${callee}'`,
                     file: primaryCalleeLoop.file,
                     line: primaryCalleeLoop.line,
@@ -108,10 +132,10 @@ export function analyzeCrossFunctionComplexity(
             ];
 
             const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'core',
+                language: LANGUAGE_TYPESCRIPT,
+                module: MODULE_CORE,
                 symbol: callerSymbol,
-                codeDomain: 'algorithmic-complexity',
+                codeDomain: CODE_DOMAIN_ALGORITHMIC_COMPLEXITY,
                 currentBehavior: `Nested iteration: '${callerSymbol}' iterates over '${primaryCallerLoop.scaleVariable}' and calls '${callee}' which iterates over '${primaryCalleeLoop.scaleVariable}'.`,
                 semanticEvidenceChain: evidenceChain,
                 triggerCondition: `Cross-function polynomial order O(${primaryCallerLoop.scaleVariable} * ${primaryCalleeLoop.scaleVariable}) with unbounded dynamic collections`,
@@ -126,16 +150,16 @@ export function analyzeCrossFunctionComplexity(
                 impactedTests: [],
                 verificationMethod:
                     'Execute benchmark suite with scaled input sets (N=100, 1000, 10000) to verify linear execution time.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
+                ruleVersion: RULE_VERSION,
+                configVersion: CONFIG_VERSION,
                 canAutofix: false,
             };
 
             issues.push({
                 id: `complexity:CPX-TIME-001:${primaryCallerLoop.file}:${primaryCallerLoop.line}`,
-                analyzer: 'complexity',
-                rule: 'CPX-TIME-001',
-                severity: 'warning',
+                analyzer: ANALYZER_COMPLEXITY,
+                rule: RULE_CPX_TIME_001,
+                severity: SEVERITY_WARNING,
                 message: `Unbounded cross-function O(N*M) time complexity: '${callerSymbol}' calls '${callee}' containing an inner iteration.`,
                 location: {
                     file: primaryCallerLoop.file,
