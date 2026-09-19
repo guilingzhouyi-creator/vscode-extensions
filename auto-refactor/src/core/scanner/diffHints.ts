@@ -11,6 +11,7 @@
  * Exit Semantics & Design Rationale: A malformed or stale hint never throws — it degrades to a
  *   full rescan, so routed results stay byte-identical to a cold scan.
  */
+import { isIncrementalCandidate } from './scanGuards';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -18,14 +19,13 @@ import type { Issue, FileMetric, DiffInput } from '../types';
 import type { CacheStore, CachedResult, Fingerprint } from '../cache';
 import type { WorkerPoolManager } from '../workerPool';
 import { sha256Hex } from '../cacheKey';
-import { route, incrementalMaxChangedLines, countLines } from '../incremental';
+import { route, incrementalMaxChangedLines } from '../incremental';
 import { resolveDiff } from '../diff';
 import { decodeContent } from '../utf8';
 import { IncrementalFileState, touchIncremental } from '../incrementalState';
 import type { ScannerContext } from './scannerContext';
 import type { WarmSession, CacheFingerprintContext, StatResultEntry } from './cacheKeyHelper';
 import { remapCachedResult } from './cacheKeyHelper';
-import {} from './workerScheduler';
 
 /** Options accepted by executeScanWithDiff. */
 export interface ScanWithDiffOptions {
@@ -353,40 +353,4 @@ export async function processUnchangedFile(
         return;
     }
     state.toAnalyze.push({ idx: i, rel, fpHash: fph, contentHash, buf });
-}
-
-/**
- * Report whether the diff miss batch should go to the persistent worker pool.
- *
- * A type predicate is used instead of a plain boolean so the caller keeps the narrowing of
- * `opts.pool` that the inline condition used to provide.
- *
- * @param useWorkers - Whether the effective worker count allows a pool at all.
- * @param opts - Diff scan options carrying the optional persistent pool manager.
- * @returns True when the batch should be handled by the worker pool.
- */
-export function hasWorkerPool<T extends { pool?: WorkerPoolManager }>(
-    useWorkers: boolean,
-    opts: T,
-): opts is T & { pool: WorkerPoolManager } {
-    return useWorkers && opts.pool !== undefined;
-}
-
-/**
- * Report whether a content payload qualifies for line-level incremental routing.
- *
- * Extracted so both routing stages ask the same question through one named predicate, keeping
- * the incremental eligibility rule (enabled flag plus minimum line count) in a single place.
- *
- * @param incEnabled - Whether incremental routing is enabled for this scan.
- * @param content - Raw file content to measure.
- * @param incMinLines - Minimum line count for incremental eligibility.
- * @returns True when the file qualifies for incremental reuse.
- */
-function isIncrementalCandidate(
-    incEnabled: boolean,
-    content: string,
-    incMinLines: number,
-): boolean {
-    return incEnabled && countLines(content) >= incMinLines;
 }

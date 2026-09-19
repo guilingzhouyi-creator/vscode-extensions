@@ -9,6 +9,7 @@
  * Exit Semantics & Design Rationale: Decomposes scanWithDiff into isolated processing steps;
  *   guarantees byte-equivalence with full cold scans and caps cyclomatic complexity under 12.
  */
+import { hasWorkerPool } from './scanGuards';
 
 import * as path from 'path';
 import type {
@@ -50,7 +51,6 @@ import {
 export type { ScanWithDiffOptions } from './diffHints';
 
 import {
-    hasWorkerPool,
     processChangedFileHint,
     processUnchangedFile,
     type DiffRoutingState,

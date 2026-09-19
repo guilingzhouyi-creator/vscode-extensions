@@ -9,7 +9,7 @@
  * Exit Semantics & Design Rationale: Decomposes scanWithCache into focused sub-steps to guarantee
  *   low cyclomatic complexity and ensure byte-identical results with cold scans.
  */
-import { hasWorkerPool } from './diffHints';
+import { hasWorkerPool } from './scanGuards';
 
 import * as fs from 'fs';
 import * as path from 'path';
