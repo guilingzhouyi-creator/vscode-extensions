@@ -354,3 +354,20 @@ export async function processUnchangedFile(
     }
     state.toAnalyze.push({ idx: i, rel, fpHash: fph, contentHash, buf });
 }
+
+/**
+ * Report whether the diff miss batch should go to the persistent worker pool.
+ *
+ * A type predicate is used instead of a plain boolean so the caller keeps the narrowing of
+ * `opts.pool` that the inline condition used to provide.
+ *
+ * @param useWorkers - Whether the effective worker count allows a pool at all.
+ * @param opts - Diff scan options carrying the optional persistent pool manager.
+ * @returns True when the batch should be handled by the worker pool.
+ */
+export function hasWorkerPool(
+    useWorkers: boolean,
+    opts: ScanWithDiffOptions,
+): opts is ScanWithDiffOptions & { pool: WorkerPoolManager } {
+    return useWorkers && opts.pool !== undefined;
+}

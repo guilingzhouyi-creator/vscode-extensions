@@ -9,7 +9,6 @@
  * Exit Semantics & Design Rationale: Decomposes scanWithDiff into isolated processing steps;
  *   guarantees byte-equivalence with full cold scans and caps cyclomatic complexity under 12.
  */
-import type { WorkerPoolManager } from '../workerPool';
 
 import * as path from 'path';
 import type {
@@ -51,6 +50,7 @@ import {
 export type { ScanWithDiffOptions } from './diffHints';
 
 import {
+    hasWorkerPool,
     processChangedFileHint,
     processUnchangedFile,
     type DiffRoutingState,
@@ -393,21 +393,4 @@ export async function executeScanWithDiff(
         oldContentFromDaemon: routingState.oldContentFromDaemon,
     };
     return { report: report as unknown as ScanReport | DiffDeltaReport, stats };
-}
-
-/**
- * Report whether the diff miss batch should go to the persistent worker pool.
- *
- * A type predicate is used instead of a plain boolean so the caller keeps the narrowing of
- * `opts.pool` that the inline condition used to provide.
- *
- * @param useWorkers - Whether the effective worker count allows a pool at all.
- * @param opts - Diff scan options carrying the optional persistent pool manager.
- * @returns True when the batch should be handled by the worker pool.
- */
-function hasWorkerPool(
-    useWorkers: boolean,
-    opts: ScanWithDiffOptions,
-): opts is ScanWithDiffOptions & { pool: WorkerPoolManager } {
-    return useWorkers && opts.pool !== undefined;
 }
