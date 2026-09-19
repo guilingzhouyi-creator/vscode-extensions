@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-19T15:10:12.131Z",
+  "timestamp": "2026-09-19T15:42:52.708Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -425,9 +425,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/test-parallel.js",
-      "count": 66,
+      "count": 67,
       "severities": {
-        "warning": 66
+        "warning": 67
       }
     },
     {
@@ -446,9 +446,9 @@
     },
     {
       "key": "hygiene|HYG-STB-002|scripts/test-parallel.js",
-      "count": 17,
+      "count": 18,
       "severities": {
-        "warning": 17
+        "warning": 18
       }
     },
     {
@@ -1611,6 +1611,48 @@
       "count": 10,
       "severities": {
         "warning": 10
+      }
+    },
+    {
+      "key": "large-file|large-file|scripts/validate-phase15-e2e-stress.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "governance|GOV-SAN-001|scripts/validate-phase15-e2e-stress.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "hygiene|HYG-STB-002|scripts/validate-phase15-e2e-stress.js",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|scripts/validate-phase15-e2e-stress.js",
+      "count": 21,
+      "severities": {
+        "warning": 21
+      }
+    },
+    {
+      "key": "constants|magic-number|scripts/validate-phase15-e2e-stress.js",
+      "count": 36,
+      "severities": {
+        "warning": 36
+      }
+    },
+    {
+      "key": "constants|duplicate-literal|scripts/validate-phase15-e2e-stress.js",
+      "count": 2,
+      "severities": {
+        "warning": 2
       }
     },
     {
