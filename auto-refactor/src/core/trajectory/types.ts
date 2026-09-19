@@ -19,7 +19,7 @@
  *   and the module deliberately imports nothing but type contracts to stay cycle-free.
  */
 import type { QualityDimension, QualityScoreBreakdown } from '../scoring/scoringTypes';
-import type { Severity } from '../types';
+import type { Issue, Severity } from '../types';
 
 /** Specific anomaly detected across revisions or between different agents */
 export type EvolutionAnomalyKind =
@@ -27,7 +27,10 @@ export type EvolutionAnomalyKind =
     | 'style-drift'
     | 'duplicate-fix'
     | 're-introduced-issue'
-    | 'logical-rollback';
+    | 'logical-rollback'
+    | 'agent-collision'
+    | 'intent-conflict'
+    | 'duplicate-work';
 
 /**
  * A single anomaly detected across revisions or between agents.
@@ -107,4 +110,90 @@ export interface FileChangeTrajectory {
     participatingAgents: string[];
     latestComparison?: TrajectoryComparison;
     activeAnomalies: EvolutionAnomaly[];
+}
+
+/** Atomic patch or diff slice submitted by an agent */
+export interface AgentPatchSlice {
+    agentUid: string;
+    patchId: string;
+    filePath: string;
+    timestamp: number;
+    oldContent?: string;
+    newContent?: string;
+    addedLines: number;
+    deletedLines: number;
+    importedSymbols?: string[];
+    exportedSymbols?: string[];
+    dependenciesAdded?: string[];
+    ruleHitIds?: string[];
+    compositeScore?: number;
+}
+
+/** Aggregated attribution summary for a single agent */
+export interface AgentAttribution {
+    agentUid: string;
+    totalPatches: number;
+    filesModified: string[];
+    linesAdded: number;
+    linesDeleted: number;
+    introducedIssues: string[];
+    resolvedIssues: string[];
+    netIssueDelta: number;
+    averageQualityScore: number;
+    scoreImpact: number;
+}
+
+/** Specific architectural collision detected between concurrent agent modifications */
+export interface AgentCollision {
+    collisionId: string;
+    kind: 'circular_dependency' | 'layer_inversion' | 'contract_breakage';
+    agents: string[];
+    files: string[];
+    description: string;
+    issue: Issue;
+    details?: Record<string, unknown>;
+}
+
+/** Intent conflict or regression detected across competing agent revisions */
+export interface AgentIntentConflict {
+    conflictId: string;
+    kind: 'reintroduced_defect' | 'opposing_refactor' | 'eroded_guard';
+    agents: [string, string];
+    filePath: string;
+    description: string;
+    details?: Record<string, unknown>;
+}
+
+/** Duplicate work metric quantifying blast radius overlap between agents */
+export interface DuplicateWorkMetric {
+    agentA: string;
+    agentB: string;
+    overlapRatio: number;
+    commonFiles: string[];
+    commonSymbols: string[];
+}
+
+/** Evaluated candidate patch in a multi-agent competition */
+export interface PatchArbitrationCandidate {
+    agentUid: string;
+    patchId: string;
+    filePath: string;
+    compositeScore: number;
+    deltaScore: number;
+    density: number;
+    issuesCount: number;
+    rank: number;
+    isRecommended: boolean;
+    reasons: string[];
+}
+
+/** Consolidated report of multi-agent governance */
+export interface MultiAgentGovernanceResult {
+    attributions: Record<string, AgentAttribution>;
+    collisions: AgentCollision[];
+    conflicts: AgentIntentConflict[];
+    duplicateWork: DuplicateWorkMetric[];
+    arbitrations: PatchArbitrationCandidate[];
+    issues: Issue[];
+    verdict: 'clean' | 'has_conflicts' | 'blocking_collisions';
 }
