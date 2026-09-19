@@ -13,6 +13,34 @@ import type { Issue } from '../types';
 import type { SemanticEvidenceStep, SemanticReviewDetail } from '../semanticTypes';
 import type { ArchitecturalFileInfo } from './semanticArchitecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from './semanticArchitecture';
+/** Evidence-chain step kind for a call site. */
+const KIND_CALL = 'call';
+/** Evidence-chain step kind for a mutable binding. */
+const KIND_VARIABLE = 'variable';
+/** Evidence-chain step kind for a guarded condition. */
+const KIND_CONDITION = 'condition';
+/** Severity used for boundary breaches. */
+const SEVERITY_ERROR = 'error';
+/** Severity used for advisory boundary signals. */
+const SEVERITY_WARNING = 'warning';
+/** Severity used for informational boundary signals. */
+const SEVERITY_INFO = 'info';
+/** Rule ids owned by this module. */
+const RULE_ARCH_HDL_001 = 'ARCH-HDL-001';
+const RULE_ARCH_BND_001 = 'ARCH-BND-001';
+const RULE_ARCH_GLB_001 = 'ARCH-GLB-001';
+const RULE_ARCH_DIR_003 = 'ARCH-DIR-003';
+const RULE_ARCH_CFG_001 = 'ARCH-CFG-001';
+
+/**
+ * Report whether an import reaches into a private internal subdirectory.
+ *
+ * @param spec - Import specifier being inspected.
+ * @returns True when the specifier targets /internal/, /impl/, or /private/.
+ */
+function isPrivateInternalImport(spec: string): boolean {
+    return spec.includes('/internal/') || spec.includes('/impl/') || spec.includes('/private/');
+}
 
 /** Analyzer id owning every architecture rule in this module. */
 const ANALYZER_ARCHITECTURE = 'architecture';
@@ -43,7 +71,7 @@ export function checkHeadlessImports(
             if (FORBIDDEN_HEADLESS_IMPORTS.has(imp)) {
                 const evidence: SemanticEvidenceStep[] = [
                     {
-                        kind: 'call',
+                        kind: KIND_CALL,
                         description: `Pure domain / headless file imports UI framework '${imp}'`,
                         file: file.filePath,
                         line: 1,
@@ -77,8 +105,8 @@ export function checkHeadlessImports(
                 issues.push({
                     id: `architecture:ARCH-HDL-001:${file.filePath}:1`,
                     analyzer: ANALYZER_ARCHITECTURE,
-                    rule: 'ARCH-HDL-001',
-                    severity: 'error',
+                    rule: RULE_ARCH_HDL_001,
+                    severity: SEVERITY_ERROR,
                     message: `Headless architecture violation: core logic in '${file.filePath}' imports presentation dependency '${imp}'.`,
                     location: {
                         file: file.filePath,
@@ -112,10 +140,10 @@ export function checkCrossDomainBypass(
     // 2. Cross-domain internal boundary bypass (ARCH-BND-001)
     if (flagBypass) {
         for (const imp of file.imports) {
-            if (imp.includes('/internal/') || imp.includes('/impl/') || imp.includes('/private/')) {
+            if (isPrivateInternalImport(imp)) {
                 const evidence: SemanticEvidenceStep[] = [
                     {
-                        kind: 'call',
+                        kind: KIND_CALL,
                         description: `Direct import of internal private implementation: '${imp}'`,
                         file: file.filePath,
                         line: 1,
@@ -149,8 +177,8 @@ export function checkCrossDomainBypass(
                 issues.push({
                     id: `architecture:ARCH-BND-001:${file.filePath}:1`,
                     analyzer: ANALYZER_ARCHITECTURE,
-                    rule: 'ARCH-BND-001',
-                    severity: 'warning',
+                    rule: RULE_ARCH_BND_001,
+                    severity: SEVERITY_WARNING,
                     message: `Cross-domain internal bypass: '${file.filePath}' imports private module '${imp}'.`,
                     location: {
                         file: file.filePath,
@@ -185,7 +213,7 @@ export function checkMutableGlobalCoupling(
     if (flagGlobal && file.hasGlobalMutableState && file.inferredLayer !== 'test') {
         const evidence: SemanticEvidenceStep[] = [
             {
-                kind: 'variable',
+                kind: KIND_VARIABLE,
                 description: `Module-level mutable global state detected in '${file.filePath}'`,
                 file: file.filePath,
                 line: 1,
@@ -219,8 +247,8 @@ export function checkMutableGlobalCoupling(
         issues.push({
             id: `architecture:ARCH-GLB-001:${file.filePath}:1`,
             analyzer: ANALYZER_ARCHITECTURE,
-            rule: 'ARCH-GLB-001',
-            severity: 'warning',
+            rule: RULE_ARCH_GLB_001,
+            severity: SEVERITY_WARNING,
             message: `Implicit shared mutable global state in '${file.filePath}'.`,
             location: {
                 file: file.filePath,
@@ -261,7 +289,7 @@ export function checkLayeringIllusion(
         if (hasInfraImport) {
             const evidence: SemanticEvidenceStep[] = [
                 {
-                    kind: 'condition',
+                    kind: KIND_CONDITION,
                     description: `Domain file '${file.filePath}' directly imports infrastructure layer`,
                     file: file.filePath,
                     line: 1,
@@ -295,8 +323,8 @@ export function checkLayeringIllusion(
             issues.push({
                 id: `architecture:ARCH-DIR-003:${file.filePath}:1`,
                 analyzer: ANALYZER_ARCHITECTURE,
-                rule: 'ARCH-DIR-003',
-                severity: 'error',
+                rule: RULE_ARCH_DIR_003,
+                severity: SEVERITY_ERROR,
                 message: `Structural layering illusion: domain file '${file.filePath}' directly imports infrastructure.`,
                 location: {
                     file: file.filePath,
@@ -329,7 +357,7 @@ export function checkConfigLeakage(
     if (flagConfig && file.inferredLayer === 'domain' && file.hasDirectConfigAccess) {
         const evidence: SemanticEvidenceStep[] = [
             {
-                kind: 'variable',
+                kind: KIND_VARIABLE,
                 description: `Direct environment or configuration access in pure domain file '${file.filePath}'`,
                 file: file.filePath,
                 line: 1,
@@ -363,8 +391,8 @@ export function checkConfigLeakage(
         issues.push({
             id: `architecture:ARCH-CFG-001:${file.filePath}:1`,
             analyzer: ANALYZER_ARCHITECTURE,
-            rule: 'ARCH-CFG-001',
-            severity: 'info',
+            rule: RULE_ARCH_CFG_001,
+            severity: SEVERITY_INFO,
             message: `Configuration leakage: domain file '${file.filePath}' reads environment or config directly.`,
             location: {
                 file: file.filePath,
