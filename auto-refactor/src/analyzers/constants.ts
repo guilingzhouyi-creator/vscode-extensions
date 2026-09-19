@@ -23,6 +23,11 @@
  *      import path).
  *   3. duplicate-literal — a value (number or string) repeated >= threshold times in a file.
  *
+ * A fourth pass reports redundant constant aliases (`const A = B`) as nested-constant. Object
+ * literal nesting is deliberately NOT reported: schema and document builders (the SARIF writer,
+ * scan-config fixtures) legitimately nest four or more levels, so the advice to flatten them
+ * would be wrong.
+ *
  * The heavy lifting happens in the engine's single shared traversal: `visit` collects every
  * literal (const-binding and tolerated flags are precomputed by the language adapter,
  * so no `ts.isXxx` predicates remain here), and `finalize` runs the three detection passes;
@@ -36,6 +41,7 @@ import type { LiteralRecord } from '../core/incrementalState';
 import { locN } from '../utils/normalized';
 import { runStreaming } from '../core/traverse';
 import { classifyLiteral } from '../core/governance/semanticLiterals';
+import { maskedLinesOfPath } from '../core/sourceMask';
 
 const TRIVIAL_NUMBERS = new Set(['0', '1', '-1']);
 
@@ -51,6 +57,8 @@ const SUGGESTED_NAME_INTEGER_LIMIT = 1000;
 const SUGGESTED_NAME_MAX_WORDS = 4;
 /** Analyzer id emitted on every finding and matched by the declarative `analyzers.constants`. */
 const CONSTANTS_ANALYZER_NAME = 'constants';
+/** Severity every constants finding carries: extraction advice never blocks a build by itself. */
+const CONSTANTS_SEVERITY = 'warning';
 /** Semantic literal kind used when no specialized category (URL, port, path, ...) applies. */
 const LITERAL_KIND_GENERAL = 'general';
 /** `suggestName` kind for numeric literals. */
@@ -189,6 +197,12 @@ export class ConstantsAnalyzer implements Analyzer {
         this.detectMagicNumbers(ctx, duplicateNodes, issues);
         this.detectHardcodedStrings(ctx, duplicateNodes, issues);
 
+        // Pass 4: detect nested constant anti-patterns and redundant constant aliasing.
+        const flagNested = ctx.options?.flagNestedConstants !== false;
+        if (flagNested && ctx.content) {
+            this.detectNestedConstants(ctx, issues);
+        }
+
         return issues;
     }
 
@@ -256,7 +270,7 @@ export class ConstantsAnalyzer implements Analyzer {
             id: `constants:${rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
             analyzer: CONSTANTS_ANALYZER_NAME,
             rule,
-            severity: 'warning',
+            severity: CONSTANTS_SEVERITY,
             message,
             location: locN(lit.node, ctx.filePath),
             detail,
@@ -333,7 +347,7 @@ export class ConstantsAnalyzer implements Analyzer {
             id: `constants:${rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
             analyzer: CONSTANTS_ANALYZER_NAME,
             rule,
-            severity: 'warning',
+            severity: CONSTANTS_SEVERITY,
             message,
             location: locN(lit.node, ctx.filePath),
             detail,
@@ -392,7 +406,7 @@ export class ConstantsAnalyzer implements Analyzer {
                 id: `constants:duplicate-literal:${ctx.filePath}:${first.node.start?.line ?? 1}`,
                 analyzer: CONSTANTS_ANALYZER_NAME,
                 rule: 'duplicate-literal',
-                severity: 'warning',
+                severity: CONSTANTS_SEVERITY,
                 message: `Literal ${first.value} is repeated ${arr.length} times in this file; extract it into a shared constant.`,
                 location: locN(first.node, ctx.filePath),
                 detail: {
@@ -423,5 +437,61 @@ export class ConstantsAnalyzer implements Analyzer {
             .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
             .join('');
         return cleaned ? `${cleaned.toUpperCase()}_TEXT` : 'EXTRACTED_STRING';
+    }
+
+    /**
+     * Detect redundant constant aliasing: a named constant whose value is another named
+     * constant, which adds an indirection layer without adding meaning.
+     *
+     * The pattern runs on the masked view, so a trailing comment cannot hide a declaration and a
+     * quoted value can never be mistaken for a constant reference.
+     */
+    private detectNestedConstants(ctx: AnalyzerContext, out: Issue[]): void {
+        const lines = ctx.content.split('\n');
+        const masked = maskedLinesOfPath(ctx.filePath, ctx.content);
+
+        for (let i = 0; i < lines.length; i++) {
+            const trimmed = (masked[i] ?? '').trim();
+            if (!trimmed || trimmed.startsWith('*')) continue;
+            this.checkConstantAlias(lines[i], trimmed, i + 1, ctx, out);
+        }
+    }
+
+    /**
+     * Check if a line defines a redundant constant alias (e.g. const FOO = BAR).
+     */
+    private checkConstantAlias(
+        line: string,
+        trimmed: string,
+        lineNum: number,
+        ctx: AnalyzerContext,
+        out: Issue[],
+    ): void {
+        const aliasMatch = trimmed.match(
+            /^(?:export\s+)?const\s+([A-Z][A-Z0-9_]{2,})\s*(?::\s*[^=]+)?\s*=\s*([A-Z][A-Z0-9_]{2,})\s*;?$/,
+        );
+        if (!aliasMatch) return;
+
+        const [, aliasName, targetName] = aliasMatch;
+        if (aliasName === targetName) return;
+
+        out.push({
+            id: `constants:nested-constant:${ctx.filePath}:${lineNum}`,
+            analyzer: CONSTANTS_ANALYZER_NAME,
+            rule: 'nested-constant',
+            severity: CONSTANTS_SEVERITY,
+            message: `Redundant constant alias: '${aliasName}' directly references '${targetName}'. Avoid constant nesting and indirection; use '${targetName}' directly.`,
+            location: {
+                file: ctx.filePath,
+                start: { line: lineNum, column: 1 },
+                end: { line: lineNum, column: line.length },
+            },
+            detail: {
+                pattern: 'alias',
+                alias: aliasName,
+                target: targetName,
+            },
+            suggestion: `Remove '${aliasName}' and reference '${targetName}' directly at call sites.`,
+        });
     }
 }

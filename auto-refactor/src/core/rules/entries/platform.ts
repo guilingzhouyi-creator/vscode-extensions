@@ -27,6 +27,8 @@ const SEVERITY_WARNING = 'warning';
 const SEVERITY_ERROR = 'error';
 /** Legacy reason for ids kept only for backward compatibility. */
 const LEGACY_REASON_ID_NOT_CANONICAL = 'id-not-canonical';
+/** Family marker for rule ids that predate the canonical naming scheme. */
+const RULE_FAMILY_LEGACY = 'LEGACY';
 
 /** platform rules. */
 export const PLATFORM_RULES: readonly RuleDefinition[] = [
@@ -167,7 +169,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'duplicate-literal',
-        family: 'LEGACY',
+        family: RULE_FAMILY_LEGACY,
         analyzer: 'constants',
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
@@ -176,6 +178,18 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         summary: '自动聚合多处行号并提示提取共享常量。',
         remediation: '同一文件内相同字面量出现频次超标（默认 ≥ 3 次）。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#duplicate-literal',
+    }),
+    defineRule({
+        id: 'nested-constant',
+        family: 'LEGACY',
+        analyzer: 'constants',
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '严禁常量化嵌套：禁止冗余常量别名引用、深层嵌套常量对象与作用域内部伪常量。',
+        remediation: '将常量直接内联或提升至模块顶层单源声明，消除无意义的间接别名与深层对象嵌套。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nested-constant',
     }),
     defineRule({
         id: 'high-complexity',

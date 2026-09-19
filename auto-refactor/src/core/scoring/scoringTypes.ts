@@ -70,13 +70,25 @@ export const ALL_QUALITY_DIMENSIONS: readonly QualityDimension[] = [
  * its list names the analyzer that owns debt routing, not the whole set.
  */
 export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = {
-    architectureConsistency: ['architecture', 'dependency-graph'],
+    architectureConsistency: [
+        'architecture',
+        'dependency-graph',
+        'dependency-layout',
+        'data-architecture',
+    ],
     semanticPurity: ['governance', 'hygiene', 'dependency-graph'],
     codeSecurity: ['architecture', 'security', 'secrets'],
-    performanceEfficiency: ['performance'],
-    standardization: ['hygiene', 'large-file'],
-    modernity: ['governance', 'ts-modern', 'python-modern', 'rust-modern', 'gdscript-modern'],
-    maintainability: ['complexity', 'large-file'],
+    performanceEfficiency: ['performance', 'data-architecture', 'complexity'],
+    standardization: ['hygiene', 'large-file', 'dependency-layout'],
+    modernity: [
+        'governance',
+        'ts-modern',
+        'python-modern',
+        'rust-modern',
+        'gdscript-modern',
+        'test-modernity',
+    ],
+    maintainability: ['complexity', 'large-file', 'test-modernity'],
     commentQuality: ['comments'],
     duplication: ['constants'],
     techDebtRisk: ['governance'],

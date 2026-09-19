@@ -34,12 +34,45 @@ import {
     ANALYZER_CONSTANTS,
     ANALYZER_HYGIENE,
     ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
+    RULE_CPX_TIME_001,
+    RULE_CPX_SPACE_001,
+    RULE_CPX_AMP_001,
+    RULE_CPX_REC_001,
+    RULE_DAT_QRY_001,
+    RULE_DAT_NPL_001,
+    RULE_DAT_SER_001,
+    RULE_DAT_LAY_001,
+    RULE_DAT_DEF_001,
+    RULE_DEP_LAZ_001,
+    RULE_DEP_RES_001,
+    RULE_DEP_INV_001,
+    RULE_DEP_ORD_001,
+    RULE_DEP_WLD_001,
+    RULE_TST_ILS_001,
+    RULE_TST_SKP_001,
+    RULE_TST_DEN_001,
+    RULE_TST_TAU_001,
+    RULE_TST_DBT_001,
+    DEDUCTION_POLYNOMIAL_TIME,
+    DEDUCTION_UNBOUNDED_DATA_QUERY,
+    DEDUCTION_DATA_LAYER_LEAK,
+    DEDUCTION_IN_FUNCTION_IMPORT,
+    DEDUCTION_TAUTOLOGICAL_ASSERTION,
+    DEDUCTION_MOCK_ONLY_TEST,
+    DEDUCTION_UNBOUNDED_RECURSION,
+    DEDUCTION_IMPORT_ORDER_VIOLATION,
+    RULE_NESTED_CONSTANT,
+    DEDUCTION_NESTED_CONSTANT,
     DIMENSION_STANDARDIZATION,
     DIMENSION_MODERNITY,
     DIMENSION_SEMANTIC_PURITY,
     DIMENSION_MAINTAINABILITY,
     DIMENSION_COMMENT_QUALITY,
     DIMENSION_DUPLICATION,
+    DIMENSION_ARCHITECTURE_CONSISTENCY,
     FRAGMENT_LINES,
     FRAGMENT_PLACEHOLDER_MARKER,
 } from './dimensionLiterals';
@@ -67,6 +100,16 @@ const RULE_MAGIC_NUMBER = 'magic-number';
  * is what the `modernity` axis is declared to measure in DIMENSION_ANALYZERS.
  */
 const MODERNITY_ANALYZERS = ['ts-modern', 'python-modern', 'rust-modern', 'gdscript-modern'];
+
+const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
+
+const RULES_CPX_TIME_SPACE = [RULE_CPX_TIME_001, RULE_CPX_SPACE_001, RULE_CPX_AMP_001];
+const RULES_DAT_PERF = [RULE_DAT_QRY_001, RULE_DAT_NPL_001, RULE_DAT_SER_001];
+const RULES_DAT_ARCH = [RULE_DAT_LAY_001, RULE_DAT_DEF_001];
+const RULES_DEP_ARCH = [RULE_DEP_LAZ_001, RULE_DEP_RES_001, RULE_DEP_INV_001];
+const RULES_DEP_STD = [RULE_DEP_ORD_001, RULE_DEP_WLD_001];
+const RULES_TST_MODERN = [RULE_TST_ILS_001, RULE_TST_SKP_001, RULE_TST_DEN_001];
+const RULES_TST_MAINTAIN = [RULE_TST_TAU_001, RULE_TST_DBT_001];
 
 /**
  * Probe matching a fragment of the finding message.
@@ -140,6 +183,13 @@ export const DIMENSION_RULES: DimensionRule[] = [
         points: DEDUCTION_LINE_COUNT_OVERFLOW,
         rationale: ScoringRationales.LINE_COUNT_OVERFLOW,
     },
+    {
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        covers: ruleMatches(RULES_DEP_STD, ['layout', 'wildcard']),
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_IMPORT_ORDER_VIOLATION,
+        rationale: ScoringRationales.NAMING_CONVENTION_VIOLATION,
+    },
     // Modernity — deprecated constructs in governance output plus every modernization pack.
     {
         analyzer: ANALYZER_GOVERNANCE,
@@ -155,6 +205,13 @@ export const DIMENSION_RULES: DimensionRule[] = [
         points: DEDUCTION_DEPRECATED_FEATURE,
         rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
     })),
+    {
+        analyzer: ANALYZER_TEST_MODERNITY,
+        covers: ruleMatches(RULES_TST_MODERN, ['mock', 'skipped', 'density']),
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_MOCK_ONLY_TEST,
+        rationale: ScoringRationales.TEST_INTEGRITY_ILLUSION,
+    },
     // Semantic purity — type-safety escapes, dead code and unused bindings.
     {
         analyzer: ANALYZER_GOVERNANCE,
@@ -177,7 +234,52 @@ export const DIMENSION_RULES: DimensionRule[] = [
         points: DEDUCTION_UNUSED_BINDING,
         rationale: ScoringRationales.UNUSED_BINDING_OR_IMPORT,
     },
-    // Maintainability — cyclomatic complexity (nesting depth is a metric deduction below).
+    // Performance efficiency — data architecture queries/n+1 and semantic complexity
+    {
+        analyzer: ANALYZER_COMPLEXITY,
+        covers: ruleMatches(RULES_CPX_TIME_SPACE, ['CPX']),
+        dimension: DIMENSION_PERFORMANCE_EFFICIENCY,
+        points: DEDUCTION_POLYNOMIAL_TIME,
+        rationale: ScoringRationales.CROSS_FUNCTION_COMPLEXITY,
+    },
+    {
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
+        covers: ruleMatches(RULES_DAT_PERF, ['query', 'nplusone', 'serialization']),
+        dimension: DIMENSION_PERFORMANCE_EFFICIENCY,
+        points: DEDUCTION_UNBOUNDED_DATA_QUERY,
+        rationale: ScoringRationales.UNBOUNDED_DATA_QUERY,
+    },
+    // Architecture consistency — data layer breaches, dependency layout leaks
+    // and unmanaged resources
+    {
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
+        covers: ruleMatches(RULES_DAT_ARCH, ['driver', 'defensive']),
+        dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+        points: DEDUCTION_DATA_LAYER_LEAK,
+        rationale: ScoringRationales.LAYER_CONSTRAINT_VIOLATION,
+    },
+    {
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        covers: ruleMatches(RULES_DEP_ARCH, ['in-function', 'unmanaged', 'inversion']),
+        dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+        points: DEDUCTION_IN_FUNCTION_IMPORT,
+        rationale: ScoringRationales.IN_FUNCTION_IMPORT,
+    },
+    // Maintainability — test tautology/debt, unbounded recursion, then CC fallback
+    {
+        analyzer: ANALYZER_TEST_MODERNITY,
+        covers: ruleMatches(RULES_TST_MAINTAIN, ['tautological', 'debt']),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_TAUTOLOGICAL_ASSERTION,
+        rationale: ScoringRationales.TAUTOLOGICAL_ASSERTION,
+    },
+    {
+        analyzer: ANALYZER_COMPLEXITY,
+        covers: ruleMatches([RULE_CPX_REC_001], ['recursion']),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_UNBOUNDED_RECURSION,
+        rationale: ScoringRationales.UNBOUNDED_RECURSION,
+    },
     {
         analyzer: ANALYZER_COMPLEXITY,
         covers: anyFinding,
@@ -211,7 +313,8 @@ export const DIMENSION_RULES: DimensionRule[] = [
         points: DEDUCTION_SUBSTANDARD_COMMENT,
         rationale: ScoringRationales.SUBSTANDARD_COMMENT_QUALITY,
     },
-    // Duplication — repeated literals, magic numbers, then any other constants finding.
+    // Duplication — repeated literals, magic numbers, nested constants,
+    // then any other constants finding.
     {
         analyzer: ANALYZER_CONSTANTS,
         covers: ruleMatches([RULE_DUPLICATE_LITERAL], ['duplicate']),
@@ -225,6 +328,13 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_DUPLICATION,
         points: DEDUCTION_MAGIC_NUMBER,
         rationale: ScoringRationales.MAGIC_NUMBER,
+    },
+    {
+        analyzer: ANALYZER_CONSTANTS,
+        covers: ruleMatches([RULE_NESTED_CONSTANT], ['nested']),
+        dimension: DIMENSION_DUPLICATION,
+        points: DEDUCTION_NESTED_CONSTANT,
+        rationale: ScoringRationales.NESTED_CONSTANT,
     },
     {
         analyzer: ANALYZER_CONSTANTS,

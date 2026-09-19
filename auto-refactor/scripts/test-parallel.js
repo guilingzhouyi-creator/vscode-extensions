@@ -75,6 +75,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-diff-interface', script: 'scripts/validate-diff-interface.js' },
   { name: 'validate-baseline-ratchet', script: 'scripts/validate-baseline-ratchet.js' },
   { name: 'validate-suppression-gate', script: 'scripts/validate-suppression-gate.js' },
+  { name: 'validate-five-core-capabilities', script: 'scripts/validate-five-core-capabilities.js' },
   { name: 'validate-rules-registry', script: 'scripts/validate-rules-registry.js' },
   { name: 'validate-rule-aliases', script: 'scripts/validate-rule-aliases.js' },
   { name: 'validate-docs', script: 'scripts/validate-docs.js' },

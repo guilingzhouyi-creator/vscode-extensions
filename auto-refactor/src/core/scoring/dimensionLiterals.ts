@@ -489,3 +489,103 @@ export const FRAGMENT_ERROR = 'error';
  * Rule-id or message fragment matched by the deduction evaluators.
  */
 export const FRAGMENT_WARNING = 'warning';
+
+/** Analyzer id for data architecture modernization. */
+export const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';
+/** Analyzer id for test code modernization and effectiveness. */
+export const ANALYZER_TEST_MODERNITY = 'test-modernity';
+/** Analyzer id for dependency layout and resource hygiene. */
+export const ANALYZER_DEPENDENCY_LAYOUT = 'dependency-layout';
+
+/** Rule id for cross-file polynomial time complexity amplification. */
+export const RULE_CPX_TIME_001 = 'CPX-TIME-001';
+/** Rule id for transient allocation in performance-critical loops. */
+export const RULE_CPX_SPACE_001 = 'CPX-SPACE-001';
+/** Rule id for blocking I/O and algorithmic amplification in loops. */
+export const RULE_CPX_AMP_001 = 'CPX-AMP-001';
+/** Rule id for unbounded or cyclic recursion without base case guarantee. */
+export const RULE_CPX_REC_001 = 'CPX-REC-001';
+
+/** Rule id for unbounded data fetch without pagination or cursor limit. */
+export const RULE_DAT_QRY_001 = 'DAT-QRY-001';
+/** Rule id for N+1 query execution within loop bodies. */
+export const RULE_DAT_NPL_001 = 'DAT-NPL-001';
+/** Rule id for redundant serialization roundtrips in hot paths. */
+export const RULE_DAT_SER_001 = 'DAT-SER-001';
+/** Rule id for presentation or domain layer leaking raw database drivers. */
+export const RULE_DAT_LAY_001 = 'DAT-LAY-001';
+/** Rule id for excessive defensive parameter checks past trusted perimeter. */
+export const RULE_DAT_DEF_001 = 'DAT-DEF-001';
+
+/** Rule id for tautological or self-affirming test assertions. */
+export const RULE_TST_TAU_001 = 'TST-TAU-001';
+/** Rule id for mock-only tests without state or business assertions. */
+export const RULE_TST_ILS_001 = 'TST-ILS-001';
+/** Rule id for silently skipped, pending or commented-out test cases. */
+export const RULE_TST_SKP_001 = 'TST-SKP-001';
+/** Rule id for insufficient test density relative to executable method count. */
+export const RULE_TST_DEN_001 = 'TST-DEN-001';
+/** Rule id for legacy test technical debt. */
+export const RULE_TST_DBT_001 = 'TST-DBT-001';
+
+/** Rule id for non-standard in-function dynamic imports. */
+export const RULE_DEP_LAZ_001 = 'DEP-LAZ-001';
+/** Rule id for hardcoded unmanaged remote resource URLs. */
+export const RULE_DEP_RES_001 = 'DEP-RES-001';
+/** Rule id for disordered external/internal import blocks. */
+export const RULE_DEP_ORD_001 = 'DEP-ORD-001';
+/** Rule id for wildcard or unbounded star imports. */
+export const RULE_DEP_WLD_001 = 'DEP-WLD-001';
+/** Rule id for dependency layer direction inversion. */
+export const RULE_DEP_INV_001 = 'DEP-INV-001';
+
+/** Rule id for domain logic coupling with UI/presentation frameworks. */
+export const RULE_ARCH_HDL_001 = 'ARCH-HDL-001';
+/** Rule id for domain logic leaking direct access to infrastructure config. */
+export const RULE_ARCH_CFG_001 = 'ARCH-CFG-001';
+
+/** Points deducted for polynomial time complexity amplification. */
+export const DEDUCTION_POLYNOMIAL_TIME = 15;
+/** Points deducted for transient loop allocations. */
+export const DEDUCTION_TRANSIENT_LOOP_ALLOC = 15;
+/** Points deducted for loop complexity amplification. */
+export const DEDUCTION_COMPLEXITY_AMPLIFICATION = 12;
+/** Points deducted for unbounded or cyclic recursion. */
+export const DEDUCTION_UNBOUNDED_RECURSION = 25;
+
+/** Points deducted for unbounded data queries on request paths. */
+export const DEDUCTION_UNBOUNDED_DATA_QUERY = 20;
+/** Points deducted for N+1 loop queries. */
+export const DEDUCTION_N_PLUS_ONE_QUERY = 15;
+/** Points deducted for database driver leaks across architectural boundaries. */
+export const DEDUCTION_DATA_LAYER_LEAK = 15;
+/** Points deducted for redundant serialization. */
+export const DEDUCTION_REDUNDANT_SERIALIZATION = 8;
+/** Points deducted for excessive defensive validation. */
+export const DEDUCTION_EXCESSIVE_DEFENSE = 10;
+
+/** Points deducted for tautological test assertions. */
+export const DEDUCTION_TAUTOLOGICAL_ASSERTION = 10;
+/** Points deducted for mock-only illusory tests. */
+export const DEDUCTION_MOCK_ONLY_TEST = 15;
+/** Points deducted for skipped or abandoned tests. */
+export const DEDUCTION_SKIPPED_TEST = 8;
+/** Points deducted for effective method test density deficit. */
+export const DEDUCTION_TEST_DENSITY_DEFICIT = 12;
+
+/** Points deducted for in-function dynamic imports. */
+export const DEDUCTION_IN_FUNCTION_IMPORT = 15;
+/** Points deducted for unmanaged remote resource URLs. */
+export const DEDUCTION_UNMANAGED_REMOTE_RESOURCE = 15;
+/** Points deducted for import layout ordering violation. */
+export const DEDUCTION_IMPORT_ORDER_VIOLATION = 5;
+
+/** Points deducted for headless architecture decoupling violation. */
+export const DEDUCTION_HEADLESS_DECOUPLING_VIOLATION = 20;
+/** Points deducted for direct configuration access violation. */
+export const DEDUCTION_CONFIG_LEAK_VIOLATION = 20;
+
+/** Rule id legacy form for nested constant anti-patterns. */
+export const RULE_NESTED_CONSTANT = 'nested-constant';
+/** Points deducted for nested constant anti-patterns and redundant aliases. */
+export const DEDUCTION_NESTED_CONSTANT = 5;

@@ -147,6 +147,34 @@ function applyErrorFlowPass(
     }
 }
 
+function applySemanticComplexityPass(
+    report: ScanReport,
+    config: ScanConfig,
+    logger: Logger,
+    reportScanner: Scanner | null,
+    scope: PostScanScope,
+    warnings: string[],
+    postScanPasses: string[],
+): void {
+    const cpxDecl = scope === POST_SCAN_SCOPE_FULL ? config.analyzers['complexity'] : undefined;
+    const cpxOpts = cpxDecl?.options as Record<string, unknown> | undefined;
+    if (!cpxDecl?.enabled || cpxOpts?.['checkCrossFunctionComplexity'] !== true) return;
+
+    postScanPasses.push('semantic-complexity');
+    if (reportScanner === null) {
+        warnings.push(
+            'semantic-complexity: 缓存命中路径没有共享调用图索引，跳过（请执行完整扫描）',
+        );
+        return;
+    }
+    const cpxIssues = reportScanner.getSemanticComplexityIssues(cpxOpts);
+    report.issues.push(...cpxIssues);
+    recomputeSummary(report);
+    if (cpxIssues.length > 0) {
+        logger.info(`semantic-complexity: ${cpxIssues.length} cross-function complexity issue(s)`);
+    }
+}
+
 interface SuppressionIndex {
     analyzerCandidates: Map<string, SuppressionRule[]>;
     generalOnly: SuppressionRule[];
@@ -297,6 +325,15 @@ export async function finalizeReport(
         postScanPasses,
     );
     applyErrorFlowPass(report, config, logger, reportScanner, scope, warnings, postScanPasses);
+    applySemanticComplexityPass(
+        report,
+        config,
+        logger,
+        reportScanner,
+        scope,
+        warnings,
+        postScanPasses,
+    );
 
     postScanPasses.push('suppressions');
     const suppressedCount = applySuppressions(report, config.suppressions ?? []);

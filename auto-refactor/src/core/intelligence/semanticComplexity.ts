@@ -59,6 +59,16 @@ export interface SemanticComplexityOptions {
  */
 export function isBoundedCollection(expr: string): boolean {
     const trimmed = expr.trim();
+    // A numeric literal bound cannot grow with the input, so the loop is bounded by definition;
+    // reporting it as an unbounded hot loop would contradict the message the rule prints.
+    if (/^\d[\d_]*(?:\.\d+)?$/.test(trimmed)) {
+        return true;
+    }
+    // A SCREAMING_CASE identifier is a module-level constant by convention (`CONFIG_*`, `MAX_*`,
+    // `*_LIMIT`), so a loop bounded by it cannot scale with the input either.
+    if (/^[A-Z][A-Z0-9_]{2,}$/.test(trimmed)) {
+        return true;
+    }
     if (/^(?:Object\.(?:keys|values|entries)|\[.*\]|enum|CONFIG_[A-Z0-9_]+)/.test(trimmed)) {
         return true;
     }
@@ -183,16 +193,26 @@ export function detectUnboundedRecursion(
  * Detect complexity amplification hazards where I/O or heavy allocations happen inside loops.
  *
  * @param loopSites - Map of function symbol to its local loop sites.
+ * @param ioAllowPatterns - Path patterns whose blocking I/O is by design (process-style tools),
+ *   mirroring the `blockingIoAllowPatterns` policy used by PRF-IO-001 / GOV-PRF-004.
+ * @param allocationAllowPatterns - Path patterns whose per-iteration allocation is by design,
+ *   the allocation counterpart of the same policy.
  * @returns Issues for complexity amplification (CPX-AMP-001 and CPX-SPACE-001).
  */
-export function detectComplexityAmplification(loopSites: Map<string, LoopSite[]>): Issue[] {
+export function detectComplexityAmplification(
+    loopSites: Map<string, LoopSite[]>,
+    ioAllowPatterns: RegExp[] = [],
+    allocationAllowPatterns: RegExp[] = [],
+): Issue[] {
     const issues: Issue[] = [];
 
     for (const [symbol, sites] of loopSites.entries()) {
         for (const site of sites) {
             if (site.isBounded) continue;
+            const ioExempt = ioAllowPatterns.some((re) => re.test(site.file));
+            const allocExempt = allocationAllowPatterns.some((re) => re.test(site.file));
 
-            if (site.hasBlockingIo) {
+            if (site.hasBlockingIo && !ioExempt) {
                 const evidence: SemanticEvidenceStep[] = [
                     {
                         kind: 'loop',
@@ -253,7 +273,7 @@ export function detectComplexityAmplification(loopSites: Map<string, LoopSite[]>
                 });
             }
 
-            if (site.hasTransientAllocation) {
+            if (site.hasTransientAllocation && !allocExempt) {
                 const evidence: SemanticEvidenceStep[] = [
                     {
                         kind: 'loop',

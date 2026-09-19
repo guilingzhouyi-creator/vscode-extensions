@@ -15,7 +15,8 @@
     "fileFunctionsWarn": 20,
     "complexityWarn": 12,
     "complexityFail": 25,
-    "blockingIoAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**"]
+    "blockingIoAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**"],
+    "allocationAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**"]
   },
   "analyzers": {
     "constants": {

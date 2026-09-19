@@ -9,6 +9,8 @@
  * Responsibilities: Classify numbers as http-status, time-ms, port, or general using
  *     HTTP_STATUS_CODES, COMMON_TIME_MS, COMMON_PORTS, and the inclusive 1024-65535 range;
  *     classify strings as inline-svg, url, file-path, or general using INLINE_SVG_RE, URL_RE,
+ *     PATH_PREFIX_RE and FILE_EXT_RE, and treat engine vocabulary (rule ids, test-framework
+ *     symbols, filename-pattern probes) as conventional rather than extractable,
  *     PATH_PREFIX_RE, and FILE_EXT_RE; suppress benign structural literals through
  *     REASONABLE_STRINGS; return kind, isReasonable, suggestedConstPrefix, and rationale.
  * Exit Semantics & Design Rationale: Total, side-effect-free function that always returns a
@@ -190,7 +192,11 @@ const MAX_PATTERN_LENGTH = 256;
 const MIN_BANNER_RUN = 8;
 const BANNER_RE = new RegExp(`^(.)\\1{${MIN_BANNER_RUN - 1},}$`);
 const GLOB_META_RE = /[*?{}[\]]/;
-const RELATIVE_SPECIFIER_RE = /^(?:\.{1,2}\/|[A-Za-z0-9_@.-]+\/)/;
+const RELATIVE_SPECIFIER_RE = /^(?:\.{1,2}\/|\/[A-Za-z0-9_@.-]+\/|[A-Za-z0-9_@.-]+\/)/;
+/** Rust path prefixes (`std::`, `crate::`) are module vocabulary, like a relative specifier. */
+const RUST_PATH_PREFIX_RE = /^(?:std|crate|core|super|self)::/;
+/** Assertion snippets the test rules compare against (`expect(`, `assert.`) are probe text. */
+const TEST_PROBE_RE = /^(?:expect|assert)[.(]?$/;
 const CJK_RE = /[　-〿一-鿿＀-￯]/;
 const CREDENTIAL_RE =
     /(?:ghp_|gho_|github_pat_|sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{12,}|xox[baprs]-|-----BEGIN|Bearer\s)/i;
@@ -221,10 +227,96 @@ const CONVENTIONAL_TOKENS = new Set([
     'true',
     'false',
     'null',
+    // Language ids and AST/type keyword names the engine compares against.
+    'typescript',
+    'javascript',
+    'python',
+    'rust',
+    'gdscript',
+    'string',
+    'function',
+    'while',
+    'unknown',
+    // Engine vocabulary: analyzer ids, quality dimensions, rule categories and detail tags.
+    'standardization',
+    'modernity',
+    'codesecurity',
+    'baseline',
+    'suppressions',
+    'complexity',
+    'data-architecture',
+    'test-modernity',
+    'dependency-layout',
+    'cycle',
+    'cycle-breaker',
+    'driver-call',
+    'query',
+    'serialization',
+    'validation',
+    'inline-url',
+    'anonymous',
+    'const_str',
+    'migration',
+    'seed',
+    'internal-shared',
+    'skip',
+    'lazy',
+    'assert',
+    '1===1',
+    '1==1',
 ]);
 
 /** Command-line switches such as `--root` / `-v` are interface vocabulary, not configuration. */
 const CLI_FLAG_RE = /^--?[A-Za-z][A-Za-z0-9-]*$/;
+
+/**
+ * Rule ids (`PREFIX-DOMAIN-NNN`, e.g. `CPX-SPACE-001`) are engine identifiers.
+ *
+ * They name a detection rule, so they can never be externalized into configuration: extracting
+ * one into a constant only moves the literal, and every analyzer that emits one would need the
+ * same constant. Treated as vocabulary, exactly like an encoding name.
+ */
+const RULE_ID_RE = /^[A-Z]{2,4}-[A-Z0-9]{2,6}-\d{3}$/;
+
+/**
+ * Test-framework symbols are the assertion vocabulary of the test runner, not payload.
+ *
+ * `toBe` / `expect` / `jest.fn` mean the same thing in every project; a constants table for
+ * them would be noise, and the modernity rules need to recognize them by name.
+ */
+const TEST_FRAMEWORK_SYMBOLS = new Set([
+    'expect',
+    'describe',
+    'it',
+    'test',
+    'jest',
+    'mock',
+    'stub',
+    'spy',
+    'tobe',
+    'toequal',
+    'tostrictequal',
+    'tohavebeencalled',
+    'tobecalled',
+    'jest.fn',
+]);
+
+/**
+ * Filename-pattern probes (`spec`, `__tests__`, `_test.py`) recognize a convention.
+ *
+ * They are matched against a path to classify a file, so extracting them would hide the
+ * convention behind a constant name rather than making it configurable.
+ */
+const FILENAME_PATTERN_TOKENS = new Set([
+    'spec',
+    '__tests__',
+    'test_',
+    '/test_',
+    '_test.py',
+    '_test.gd',
+    '.test.',
+    '.spec.',
+]);
 
 /** Registered MIME types (`application/json`, `text/plain`) are protocol vocabulary. */
 const MIME_TYPE_RE =
@@ -250,12 +342,16 @@ function reportVocabularyKind(raw: string): LiteralSemanticKind | null {
     if (
         raw.length <= MAX_PATTERN_LENGTH &&
         !/\s/.test(raw) &&
-        (GLOB_META_RE.test(raw) || RELATIVE_SPECIFIER_RE.test(raw))
+        (GLOB_META_RE.test(raw) || RELATIVE_SPECIFIER_RE.test(raw) || RUST_PATH_PREFIX_RE.test(raw))
     ) {
         return 'glob-pattern';
     }
     const lowered = raw.toLowerCase();
+    if (RULE_ID_RE.test(raw)) return 'conventional';
     if (CONVENTIONAL_TOKENS.has(lowered)) return 'conventional';
+    if (TEST_FRAMEWORK_SYMBOLS.has(lowered)) return 'conventional';
+    if (FILENAME_PATTERN_TOKENS.has(lowered)) return 'conventional';
+    if (TEST_PROBE_RE.test(raw)) return 'conventional';
     if (CLI_FLAG_RE.test(raw)) return 'conventional';
     if (MIME_TYPE_RE.test(lowered)) return 'conventional';
     if (FILE_EXTENSION_RE.test(raw)) return 'conventional';

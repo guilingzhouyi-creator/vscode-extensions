@@ -22,6 +22,14 @@ import { inferDirectorySemantic } from '../core/profiler/projectProfiler';
 import { ArchitectureMessages } from '../core/messages/architecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from '../core/intelligence/semanticArchitecture';
 
+/**
+ * Threshold keys the architecture rules additionally read from the global `thresholds` block.
+ */
+interface ArchitectureThresholds {
+    /** Extra package names the headless boundary check must reject. */
+    headlessDisallowedImports?: string[];
+}
+
 interface ArchitectureOptions {
     enforceCleanLayers?: boolean;
     layers?: Record<string, ArchitectureLayer>;
@@ -30,10 +38,12 @@ interface ArchitectureOptions {
     securityLevel?: import('../core/types').SecurityLevel;
     checkDtoCredentialLeakage?: boolean;
     enforceHeadless?: boolean;
+    headlessDisallowedImports?: string[];
     flagCrossDomainBypass?: boolean;
     flagMutableGlobalCoupling?: boolean;
     flagLayeringIllusions?: boolean;
     flagConfigLeakage?: boolean;
+    protectedConfigKeywords?: string[];
 }
 
 interface SpecifierInfo {
@@ -205,51 +215,76 @@ export class ArchitectureAnalyzer implements Analyzer {
                 issues,
             );
 
-            // Check shared mutable global state (ARCH-GLB-001)
-            const flagGlobal =
-                opts.flagMutableGlobalCoupling ??
-                ctx.config.thresholds?.flagMutableGlobalCoupling ??
-                false;
-            if (flagGlobal && /^\s*export\s+let\s+[A-Za-z0-9_$]+/.test(lineText)) {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'ARCH-GLB-001',
-                        `Implicit shared mutable global state exported in '${file}'.`,
-                        SEVERITY_WARNING,
-                        { file, line: lineIdx + 1 },
-                        'Encapsulate mutable state in class instances via dependency injection.',
-                    ),
-                );
-            }
-
-            // Check direct environment or disk config access in domain (ARCH-CFG-001)
-            const flagConfig =
-                opts.flagConfigLeakage ?? ctx.config.thresholds?.flagConfigLeakage ?? false;
-            if (
-                flagConfig &&
-                currentLayer === ARCHITECTURE_LAYER_DOMAIN &&
-                (trimmed.includes('process.env') || trimmed.includes('fs.readFileSync'))
-            ) {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'ARCH-CFG-001',
-                        `Configuration leakage: domain model in '${file}' reads environment directly.`,
-                        'info',
-                        { file, line: lineIdx + 1 },
-                        'Inject strongly-typed configuration parameters into domain constructors.',
-                    ),
-                );
-            }
+            // Check shared mutable global state and direct configuration access
+            this.checkGlobalAndConfigViolations(
+                lineText,
+                trimmed,
+                file,
+                currentLayer,
+                lineIdx,
+                ctx,
+                opts,
+                issues,
+            );
 
             lineIdx++;
             lineStart = nextStart;
         }
 
         return issues;
+    }
+
+    private checkGlobalAndConfigViolations(
+        lineText: string,
+        trimmed: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        issues: Issue[],
+    ): void {
+        // Check shared mutable global state (ARCH-GLB-001)
+        const flagGlobal =
+            opts.flagMutableGlobalCoupling ??
+            ctx.config.thresholds?.flagMutableGlobalCoupling ??
+            false;
+        if (flagGlobal && /^\s*export\s+let\s+[A-Za-z0-9_$]+/.test(lineText)) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'ARCH-GLB-001',
+                    `Implicit shared mutable global state exported in '${file}'.`,
+                    SEVERITY_WARNING,
+                    { file, line: lineIdx + 1 },
+                    'Encapsulate mutable state in class instances via dependency injection.',
+                ),
+            );
+        }
+
+        // Check direct environment or disk config access in domain (ARCH-CFG-001)
+        const flagConfig =
+            opts.flagConfigLeakage ?? ctx.config.thresholds?.flagConfigLeakage ?? false;
+        const customConfigKws =
+            opts.protectedConfigKeywords ?? (ctx.config.thresholds as any)?.protectedConfigKeywords;
+        const hasDirectConfigAccess =
+            trimmed.includes('process.env') ||
+            trimmed.includes('fs.readFileSync') ||
+            (customConfigKws && customConfigKws.some((kw: string) => trimmed.includes(kw)));
+        if (flagConfig && currentLayer === ARCHITECTURE_LAYER_DOMAIN && hasDirectConfigAccess) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'ARCH-CFG-001',
+                    `Configuration leakage: domain model in '${file}' reads environment directly.`,
+                    'info',
+                    { file, line: lineIdx + 1 },
+                    'Inject strongly-typed configuration parameters into domain constructors.',
+                ),
+            );
+        }
     }
 
     private checkDtoLeakage(
@@ -527,11 +562,15 @@ export class ArchitectureAnalyzer implements Analyzer {
             // Headless architecture boundary check (ARCH-HDL-001)
             const enforceHeadless =
                 opts.enforceHeadless ?? ctx.config.thresholds?.enforceHeadless ?? false;
-            if (
-                enforceHeadless &&
-                (FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
-                    FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw))
-            ) {
+            const thresholdHeadless = (ctx.config.thresholds as ArchitectureThresholds | undefined)
+                ?.headlessDisallowedImports;
+            const customHeadless = opts.headlessDisallowedImports ?? thresholdHeadless;
+            const isForbiddenHeadless =
+                FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
+                FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw) ||
+                (customHeadless &&
+                    (customHeadless.includes(basePkg) || customHeadless.includes(spec.raw)));
+            if (enforceHeadless && isForbiddenHeadless) {
                 issues.push(
                     this.mkIssue(
                         ctx,
@@ -765,7 +804,7 @@ export class ArchitectureAnalyzer implements Analyzer {
     }
 
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined as any, ctx);
+        return this.analyze(undefined as unknown as import('typescript').SourceFile, ctx);
     }
 
     private resolveLayer(

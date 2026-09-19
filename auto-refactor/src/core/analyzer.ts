@@ -49,10 +49,28 @@ import {
     type LiteralClusterOptions,
 } from './intelligence/literalClusters';
 import { buildErrorFlowIssues, type ErrorFlowOptions } from './intelligence/errorFlow';
+import {
+    analyzeCrossFunctionComplexity,
+    detectUnboundedRecursion,
+    type LoopSite,
+    type SemanticComplexityOptions,
+} from './intelligence/semanticComplexity';
 import { QualityScorer } from './scoring/qualityScorer';
 import { ChangeTrajectoryManager } from './trajectory/changeTrajectory';
 import { detectProjectArchetype } from './profiler/projectProfiler';
 import { ALL_BUILTIN_ANALYZERS, routeArchetypeToAnalyzers } from './router/sparseRuleRouter';
+
+/**
+ * Optional analyzer capability consumed by the semantic-complexity post-scan pass.
+ *
+ * The complexity analyzer records the loop sites it saw; the pass reads them through this
+ * narrow interface instead of casting the analyzer instance, so a missing capability is a
+ * runtime check rather than an `any` that hides every other misuse.
+ */
+interface LoopSiteProvider {
+    /** @returns Loop sites grouped by the function symbol that declares them. */
+    getLoopSites(): Map<string, LoopSite[]>;
+}
 
 // Re-export the analyzer contract so existing analyzer modules can keep importing
 // `Analyzer` / `AnalyzerContext` from this engine file (backward-compatible surface).
@@ -264,6 +282,39 @@ export class Scanner implements ScannerContext {
      */
     getErrorFlowIssues(options: ErrorFlowOptions = {}): ReturnType<typeof buildErrorFlowIssues> {
         return buildErrorFlowIssues(this.literalIndex, this.getCallGraph(), options);
+    }
+
+    /**
+     * Deduce cross-function polynomial complexity and unbounded recursion cycles
+     * from the call graph.
+     *
+     * @param options - Tunable knobs for cross-function complexity walk.
+     * @returns Issues for detected algorithmic complexity hazards.
+     */
+    getSemanticComplexityIssues(options: SemanticComplexityOptions = {}): Issue[] {
+        const callGraph = this.getCallGraph();
+        const issues: Issue[] = [];
+        const loopSites = new Map<string, LoopSite[]>();
+
+        for (const p of this.plan) {
+            if (p.name !== 'complexity') continue;
+            // Optional capability: analyzers declare the loop sites they collected, and the
+            // post-scan pass consumes them without depending on the concrete analyzer class.
+            const provider = p.instance as Partial<LoopSiteProvider>;
+            if (typeof provider.getLoopSites !== 'function') continue;
+            for (const [sym, sites] of provider.getLoopSites().entries()) {
+                loopSites.set(sym, sites);
+            }
+        }
+
+        if (loopSites.size > 0) {
+            issues.push(
+                ...analyzeCrossFunctionComplexity(callGraph, this.symbolIndex, loopSites, options),
+            );
+        }
+
+        issues.push(...detectUnboundedRecursion(callGraph, new Set()));
+        return issues;
     }
 
     /**

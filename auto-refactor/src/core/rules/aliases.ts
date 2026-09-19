@@ -35,6 +35,7 @@ export const LEGACY_RULE_ALIASES: Readonly<Record<string, string>> = Object.free
     'high-entropy-token': 'SEC-ENT-001',
     'import-cycle': 'DEP-CYC-001',
     'large-file': 'BIG-SIZE-001',
+    'nested-constant': 'CST-NST-001',
     'secret-detected': 'SEC-TOK-001',
     'unused-export': 'DEP-UNX-001',
     'unused-module': 'DEP-UNM-001',

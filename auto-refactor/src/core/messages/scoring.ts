@@ -307,4 +307,28 @@ export const ScoringRationales = {
      * @returns Deduction rationale for the technical-debt-risk dimension.
      */
     WARNING_TECH_DEBT: (msg: string) => `Potential technical debt risk (warning severity): ${msg}`,
+
+    // 11. Modern Review Capabilities
+    UNBOUNDED_DATA_QUERY: (msg: string) => `Unbounded data query on online request path: ${msg}`,
+    N_PLUS_ONE_QUERY: (msg: string) => `Iterative N+1 query pattern detected in loop: ${msg}`,
+    REDUNDANT_SERIALIZATION: (msg: string) => `Redundant data serialization cycle: ${msg}`,
+    TEST_INTEGRITY_ILLUSION: (msg: string) =>
+        `Test integrity illusion or obsolete contract: ${msg}`,
+    ORPHANED_SKIPPED_TEST: (msg: string) => `Orphaned skipped test in core business domain: ${msg}`,
+    TAUTOLOGICAL_ASSERTION: (msg: string) => `Tautological or non-verifying test assertion: ${msg}`,
+    LOW_TEST_DENSITY: (msg: string) =>
+        `Low effective modern test density or contract coverage: ${msg}`,
+    IN_FUNCTION_IMPORT: (msg: string) => `Unaudited ad-hoc in-function import: ${msg}`,
+    UNMANAGED_RESOURCE: (msg: string) => `Unmanaged hardcoded external resource or URL: ${msg}`,
+    HEADLESS_BOUNDARY_VIOLATION: (msg: string) =>
+        `UI framework leak in headless business domain: ${msg}`,
+    CROSS_DOMAIN_BYPASS: (msg: string) => `Cross-domain private implementation bypass: ${msg}`,
+    MUTABLE_GLOBAL_COUPLING: (msg: string) =>
+        `Implicit shared mutable global state coupling: ${msg}`,
+    CROSS_FUNCTION_COMPLEXITY: (msg: string) =>
+        `Unbounded cross-function polynomial time complexity: ${msg}`,
+    UNBOUNDED_RECURSION: (msg: string) =>
+        `Potential unbounded recursion without base-case guard: ${msg}`,
+    NESTED_CONSTANT: (msg: string) =>
+        `Nested constant anti-pattern or redundant constant aliasing: ${msg}`,
 } as const;

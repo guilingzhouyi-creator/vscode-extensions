@@ -41,6 +41,7 @@ export interface DependencyLayoutOptions {
     allowAuditedInFunctionImports?: boolean;
     flagUnmanagedResources?: boolean;
     flagWildcards?: boolean;
+    lazyImportExemptMarkers?: string[];
 }
 
 /**

@@ -20,6 +20,7 @@
 | `magic-number` | `warning` | 出现非琐碎（非 0, 1, -1 等）的未绑定数字字面量。 | `const CONST_<num> = <num>;` |
 | `hardcoded-string` | `warning` | 长度超过阈值（默认 ≥ 3）的硬编码字符串。 | `const EXTRACTED_STRING = "...";` |
 | `duplicate-literal` | `warning` | 同一文件内相同字面量出现频次超标（默认 ≥ 3 次）。 | 自动聚合多处行号并提示提取共享常量。 |
+| `nested-constant` | `warning` | 常量化定义出现别名套壳（`const A = B`）、深层嵌套结构或作用域内伪常量。 | 直接内联、单源声明或提升为模块顶层常量。 |
 
 ---
 

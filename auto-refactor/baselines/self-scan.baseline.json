@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-19T05:51:07.335Z",
+  "timestamp": "2026-09-19T09:04:22.425Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -40,9 +40,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/bench-baselines.js",
-      "count": 61,
+      "count": 58,
       "severities": {
-        "warning": 61
+        "warning": 58
       }
     },
     {
@@ -159,9 +159,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/bench-fastpath.js",
-      "count": 40,
+      "count": 37,
       "severities": {
-        "warning": 40
+        "warning": 37
       }
     },
     {
@@ -201,9 +201,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/bench-hot-paths.js",
-      "count": 17,
+      "count": 16,
       "severities": {
-        "warning": 17
+        "warning": 16
       }
     },
     {
@@ -460,9 +460,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-asymmetric-routing.js",
-      "count": 54,
+      "count": 51,
       "severities": {
-        "warning": 54
+        "warning": 51
       }
     },
     {
@@ -488,9 +488,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-baseline-ratchet.js",
-      "count": 22,
+      "count": 21,
       "severities": {
-        "warning": 22
+        "warning": 21
       }
     },
     {
@@ -509,9 +509,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-call-graph.js",
-      "count": 25,
+      "count": 23,
       "severities": {
-        "warning": 25
+        "warning": 23
       }
     },
     {
@@ -530,9 +530,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-capabilities.js",
-      "count": 54,
+      "count": 48,
       "severities": {
-        "warning": 54
+        "warning": 48
       }
     },
     {
@@ -579,9 +579,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-comment-hygiene.js",
-      "count": 18,
+      "count": 8,
       "severities": {
-        "warning": 18
+        "warning": 8
       }
     },
     {
@@ -593,9 +593,9 @@
     },
     {
       "key": "constants|duplicate-literal|scripts/validate-comment-hygiene.js",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -607,9 +607,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-compression-bounds.js",
-      "count": 14,
+      "count": 9,
       "severities": {
-        "warning": 14
+        "warning": 9
       }
     },
     {
@@ -649,9 +649,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-consumer-runner.js",
-      "count": 23,
+      "count": 22,
       "severities": {
-        "warning": 23
+        "warning": 22
       }
     },
     {
@@ -677,9 +677,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-context-slice.js",
-      "count": 23,
+      "count": 21,
       "severities": {
-        "warning": 23
+        "warning": 21
       }
     },
     {
@@ -712,9 +712,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-data-flow.js",
-      "count": 65,
+      "count": 60,
       "severities": {
-        "warning": 65
+        "warning": 60
       }
     },
     {
@@ -754,20 +754,13 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-diff-interface.js",
-      "count": 32,
+      "count": 28,
       "severities": {
-        "warning": 32
+        "warning": 28
       }
     },
     {
       "key": "simplify|SIM-LONG-001|scripts/validate-diff-interface.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|scripts/validate-diff-interface.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -782,9 +775,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-diff-score.js",
-      "count": 10,
+      "count": 8,
       "severities": {
-        "warning": 10
+        "warning": 8
       }
     },
     {
@@ -845,9 +838,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-docs.js",
-      "count": 22,
+      "count": 18,
       "severities": {
-        "warning": 22
+        "warning": 18
       }
     },
     {
@@ -894,9 +887,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-error-flow.js",
-      "count": 17,
+      "count": 15,
       "severities": {
-        "warning": 17
+        "warning": 15
       }
     },
     {
@@ -904,6 +897,34 @@
       "count": 1,
       "severities": {
         "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|scripts/validate-five-core-capabilities.js",
+      "count": 15,
+      "severities": {
+        "warning": 15
+      }
+    },
+    {
+      "key": "governance|GOV-LOG-001|scripts/validate-five-core-capabilities.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "simplify|SIM-LONG-001|scripts/validate-five-core-capabilities.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "performance|PRF-MEM-001|scripts/validate-five-core-capabilities.js",
+      "count": 1,
+      "severities": {
+        "info": 1
       }
     },
     {
@@ -915,9 +936,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-generalized.js",
-      "count": 65,
+      "count": 41,
       "severities": {
-        "warning": 65
+        "warning": 41
       }
     },
     {
@@ -992,9 +1013,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-governance.js",
-      "count": 30,
+      "count": 18,
       "severities": {
-        "warning": 30
+        "warning": 18
       }
     },
     {
@@ -1048,9 +1069,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-language-matrix.js",
-      "count": 29,
+      "count": 17,
       "severities": {
-        "warning": 29
+        "warning": 17
       }
     },
     {
@@ -1083,9 +1104,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-language-support.js",
-      "count": 30,
+      "count": 29,
       "severities": {
-        "warning": 30
+        "warning": 29
       }
     },
     {
@@ -1125,9 +1146,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-literal-index.js",
-      "count": 30,
+      "count": 28,
       "severities": {
-        "warning": 30
+        "warning": 28
       }
     },
     {
@@ -1153,9 +1174,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-literal-policy.js",
-      "count": 17,
+      "count": 16,
       "severities": {
-        "warning": 17
+        "warning": 16
       }
     },
     {
@@ -1195,9 +1216,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-modern-packs.js",
-      "count": 27,
+      "count": 14,
       "severities": {
-        "warning": 27
+        "warning": 14
       }
     },
     {
@@ -1251,9 +1272,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-postscan-parity.js",
-      "count": 23,
+      "count": 22,
       "severities": {
-        "warning": 23
+        "warning": 22
       }
     },
     {
@@ -1307,9 +1328,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-project-neutrality.js",
-      "count": 15,
+      "count": 13,
       "severities": {
-        "warning": 15
+        "warning": 13
       }
     },
     {
@@ -1335,9 +1356,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-python-imports.js",
-      "count": 17,
+      "count": 16,
       "severities": {
-        "warning": 17
+        "warning": 16
       }
     },
     {
@@ -1349,9 +1370,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-python-modern.js",
-      "count": 37,
+      "count": 28,
       "severities": {
-        "warning": 37
+        "warning": 28
       }
     },
     {
@@ -1377,9 +1398,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-python.js",
-      "count": 31,
+      "count": 27,
       "severities": {
-        "warning": 31
+        "warning": 27
       }
     },
     {
@@ -1426,9 +1447,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-review-memory.js",
-      "count": 106,
+      "count": 101,
       "severities": {
-        "warning": 106
+        "warning": 101
       }
     },
     {
@@ -1468,9 +1489,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-rule-aliases.js",
-      "count": 12,
+      "count": 7,
       "severities": {
-        "warning": 12
+        "warning": 7
       }
     },
     {
@@ -1489,9 +1510,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-rules-registry.js",
-      "count": 17,
+      "count": 13,
       "severities": {
-        "warning": 17
+        "warning": 13
       }
     },
     {
@@ -1552,9 +1573,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-scoring-coverage.js",
-      "count": 45,
+      "count": 33,
       "severities": {
-        "warning": 45
+        "warning": 33
       }
     },
     {
@@ -1566,9 +1587,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-security-levels.js",
-      "count": 35,
+      "count": 20,
       "severities": {
-        "warning": 35
+        "warning": 20
       }
     },
     {
@@ -1636,9 +1657,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-simplify.js",
-      "count": 32,
+      "count": 25,
       "severities": {
-        "warning": 32
+        "warning": 25
       }
     },
     {
@@ -1664,9 +1685,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-suppression-gate.js",
-      "count": 11,
+      "count": 10,
       "severities": {
-        "warning": 11
+        "warning": 10
       }
     },
     {
@@ -1678,9 +1699,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-symbol-index.js",
-      "count": 23,
+      "count": 22,
       "severities": {
-        "warning": 23
+        "warning": 22
       }
     },
     {
@@ -1699,9 +1720,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-ts-modern.js",
-      "count": 31,
+      "count": 21,
       "severities": {
-        "warning": 31
+        "warning": 21
       }
     },
     {
@@ -1776,16 +1797,16 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/architecture.ts",
-      "count": 69,
+      "count": 58,
       "severities": {
-        "warning": 69
+        "warning": 58
       }
     },
     {
       "key": "complexity|high-complexity|src/analyzers/architecture.ts",
-      "count": 1,
+      "count": 3,
       "severities": {
-        "warning": 1
+        "warning": 3
       }
     },
     {
@@ -1804,20 +1825,20 @@
     },
     {
       "key": "governance|GOV-PRF-002|src/analyzers/architecture.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "info": 4
+        "info": 3
       }
     },
     {
-      "key": "hygiene|HYG-CLN-001|src/analyzers/architecture.ts",
+      "key": "governance|GOV-TYP-003|src/analyzers/architecture.ts",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "governance|GOV-TYP-003|src/analyzers/architecture.ts",
+      "key": "hygiene|HYG-CLN-001|src/analyzers/architecture.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -1832,9 +1853,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/comments.ts",
-      "count": 16,
+      "count": 5,
       "severities": {
-        "warning": 16
+        "warning": 5
       }
     },
     {
@@ -1867,9 +1888,23 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/complexity.ts",
-      "count": 15,
+      "count": 10,
       "severities": {
-        "warning": 15
+        "warning": 10
+      }
+    },
+    {
+      "key": "simplify|SIM-LONG-001|src/analyzers/complexity.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/analyzers/complexity.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
       }
     },
     {
@@ -1888,9 +1923,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/constants.ts",
-      "count": 12,
+      "count": 10,
       "severities": {
-        "warning": 12
+        "warning": 10
       }
     },
     {
@@ -1923,13 +1958,20 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/dataArchitecture.ts",
-      "count": 11,
+      "count": 12,
       "severities": {
-        "warning": 11
+        "warning": 12
       }
     },
     {
       "key": "complexity|high-complexity|src/analyzers/dataArchitecture.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/analyzers/dataArchitecture.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -1943,13 +1985,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-002|src/analyzers/dataArchitecture.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/analyzers/dataArchitecture.ts",
       "count": 1,
       "severities": {
@@ -1958,9 +1993,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/dependencyGraph.ts",
-      "count": 8,
+      "count": 7,
       "severities": {
-        "warning": 8
+        "warning": 7
       }
     },
     {
@@ -1978,31 +2013,31 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/analyzers/dependencyLayout.ts",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
       "key": "complexity|high-complexity|src/analyzers/dependencyLayout.ts",
-      "count": 1,
+      "count": 4,
       "severities": {
-        "warning": 1
+        "warning": 4
       }
     },
     {
-      "key": "governance|GOV-LOG-001|src/analyzers/dependencyLayout.ts",
-      "count": 1,
+      "key": "constants|hardcoded-string|src/analyzers/dependencyLayout.ts",
+      "count": 8,
       "severities": {
-        "warning": 1
+        "warning": 8
       }
     },
     {
       "key": "simplify|SIM-LONG-001|src/analyzers/dependencyLayout.ts",
-      "count": 1,
+      "count": 3,
       "severities": {
-        "warning": 1
+        "warning": 3
+      }
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/analyzers/dependencyLayout.ts",
+      "count": 3,
+      "severities": {
+        "warning": 3
       }
     },
     {
@@ -2021,9 +2056,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/docs.ts",
-      "count": 11,
+      "count": 8,
       "severities": {
-        "warning": 11
+        "warning": 8
       }
     },
     {
@@ -2070,9 +2105,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/gdscriptModern.ts",
-      "count": 9,
+      "count": 4,
       "severities": {
-        "warning": 9
+        "warning": 4
       }
     },
     {
@@ -2084,9 +2119,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/governance.ts",
-      "count": 9,
+      "count": 6,
       "severities": {
-        "warning": 9
+        "warning": 6
       }
     },
     {
@@ -2140,9 +2175,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/hygiene.ts",
-      "count": 81,
+      "count": 71,
       "severities": {
-        "warning": 81
+        "warning": 71
       }
     },
     {
@@ -2210,9 +2245,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/performance.ts",
-      "count": 22,
+      "count": 18,
       "severities": {
-        "warning": 22
+        "warning": 18
       }
     },
     {
@@ -2245,9 +2280,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/pythonModern.ts",
-      "count": 55,
+      "count": 45,
       "severities": {
-        "warning": 55
+        "warning": 45
       }
     },
     {
@@ -2279,13 +2314,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/analyzers/rustModern.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
       "key": "governance|GOV-LOG-001|src/analyzers/rustModern.ts",
       "count": 1,
       "severities": {
@@ -2294,9 +2322,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/secrets.ts",
-      "count": 17,
+      "count": 16,
       "severities": {
-        "warning": 17
+        "warning": 16
       }
     },
     {
@@ -2322,9 +2350,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/security.ts",
-      "count": 21,
+      "count": 12,
       "severities": {
-        "warning": 21
+        "warning": 12
       }
     },
     {
@@ -2363,13 +2391,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/analyzers/simplify.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
       "key": "governance|GOV-LOG-001|src/analyzers/simplify.ts",
       "count": 3,
       "severities": {
@@ -2405,6 +2426,20 @@
       }
     },
     {
+      "key": "constants|hardcoded-string|src/analyzers/simplify.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "large-file|large-file|src/analyzers/testModernity.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
       "key": "constants|hardcoded-string|src/analyzers/testModernity.ts",
       "count": 7,
       "severities": {
@@ -2413,9 +2448,44 @@
     },
     {
       "key": "complexity|high-complexity|src/analyzers/testModernity.ts",
+      "count": 4,
+      "severities": {
+        "warning": 4
+      }
+    },
+    {
+      "key": "governance|GOV-LOG-001|src/analyzers/testModernity.ts",
+      "count": 4,
+      "severities": {
+        "warning": 4
+      }
+    },
+    {
+      "key": "complexity|CPX-SPACE-001|src/analyzers/testModernity.ts",
       "count": 1,
       "severities": {
         "warning": 1
+      }
+    },
+    {
+      "key": "hygiene|HYG-CLN-001|src/analyzers/testModernity.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "performance|PRF-MEM-001|src/analyzers/testModernity.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/analyzers/testModernity.ts",
+      "count": 3,
+      "severities": {
+        "info": 3
       }
     },
     {
@@ -2427,9 +2497,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/tsModern.ts",
-      "count": 15,
+      "count": 8,
       "severities": {
-        "warning": 15
+        "warning": 8
       }
     },
     {
@@ -2546,9 +2616,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/adapters.ts",
-      "count": 12,
+      "count": 7,
       "severities": {
-        "warning": 12
+        "warning": 7
       }
     },
     {
@@ -2644,9 +2714,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/cacheKey.ts",
-      "count": 11,
+      "count": 10,
       "severities": {
-        "warning": 11
+        "warning": 10
       }
     },
     {
@@ -2658,6 +2728,13 @@
     },
     {
       "key": "governance|GOV-LOG-001|src/core/cacheKey.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "complexity|CPX-AMP-001|src/core/cacheKey.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -2693,9 +2770,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/config.ts",
-      "count": 55,
+      "count": 49,
       "severities": {
-        "warning": 55
+        "warning": 49
       }
     },
     {
@@ -2707,6 +2784,13 @@
     },
     {
       "key": "governance|GOV-LOG-001|src/core/config.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "complexity|CPX-AMP-001|src/core/config.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -2742,9 +2826,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/configTuning.ts",
-      "count": 17,
+      "count": 14,
       "severities": {
-        "warning": 17
+        "warning": 14
       }
     },
     {
@@ -2780,6 +2864,13 @@
       "count": 2,
       "severities": {
         "info": 2
+      }
+    },
+    {
+      "key": "complexity|CPX-SPACE-001|src/core/dependencyGraph.ts",
+      "count": 4,
+      "severities": {
+        "warning": 4
       }
     },
     {
@@ -2819,9 +2910,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/diff.ts",
-      "count": 7,
+      "count": 6,
       "severities": {
-        "warning": 7
+        "warning": 6
       }
     },
     {
@@ -2864,6 +2955,13 @@
       "count": 5,
       "severities": {
         "warning": 5
+      }
+    },
+    {
+      "key": "complexity|CPX-SPACE-001|src/core/editDiff.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
       }
     },
     {
@@ -2920,13 +3018,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/gdscriptAdapter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -3001,9 +3092,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/languageProfiles.ts",
-      "count": 30,
+      "count": 25,
       "severities": {
-        "warning": 30
+        "warning": 25
       }
     },
     {
@@ -3036,16 +3127,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/codeLogic.ts",
-      "count": 10,
+      "count": 5,
       "severities": {
-        "warning": 10
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/governance/rules/compressionBounds.ts",
-      "count": 15,
-      "severities": {
-        "warning": 15
+        "warning": 5
       }
     },
     {
@@ -3060,6 +3144,13 @@
       "count": 1,
       "severities": {
         "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/core/governance/rules/compressionBounds.ts",
+      "count": 4,
+      "severities": {
+        "warning": 4
       }
     },
     {
@@ -3092,9 +3183,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/debugLogging.ts",
-      "count": 13,
+      "count": 11,
       "severities": {
-        "warning": 13
+        "warning": 11
       }
     },
     {
@@ -3127,9 +3218,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/exceptionSafety.ts",
-      "count": 23,
+      "count": 16,
       "severities": {
-        "warning": 23
+        "warning": 16
       }
     },
     {
@@ -3148,9 +3239,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/fileStructure.ts",
-      "count": 25,
+      "count": 20,
       "severities": {
-        "warning": 25
+        "warning": 20
       }
     },
     {
@@ -3190,9 +3281,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/maintainability.ts",
-      "count": 32,
+      "count": 27,
       "severities": {
-        "warning": 32
+        "warning": 27
       }
     },
     {
@@ -3239,9 +3330,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/performance.ts",
-      "count": 24,
+      "count": 12,
       "severities": {
-        "warning": 24
+        "warning": 12
       }
     },
     {
@@ -3288,9 +3379,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/sanitization.ts",
-      "count": 12,
+      "count": 9,
       "severities": {
-        "warning": 12
+        "warning": 9
       }
     },
     {
@@ -3309,9 +3400,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/standardization.ts",
-      "count": 15,
+      "count": 4,
       "severities": {
-        "warning": 15
+        "warning": 4
       }
     },
     {
@@ -3344,9 +3435,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/typeSystem.ts",
-      "count": 29,
+      "count": 18,
       "severities": {
-        "warning": 29
+        "warning": 18
       }
     },
     {
@@ -3428,9 +3519,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/types.ts",
-      "count": 22,
+      "count": 21,
       "severities": {
-        "warning": 22
+        "warning": 21
       }
     },
     {
@@ -3602,13 +3693,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/intelligence/crossFunctionComplexity.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-PRF-002|src/core/intelligence/dataAccessContext.ts",
       "count": 1,
       "severities": {
@@ -3617,9 +3701,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dataArchitecture.ts",
-      "count": 28,
+      "count": 15,
       "severities": {
-        "warning": 28
+        "warning": 15
       }
     },
     {
@@ -3645,9 +3729,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/intelligence/dataArchitecture.ts",
-      "count": 6,
+      "count": 4,
       "severities": {
-        "warning": 6
+        "warning": 4
       }
     },
     {
@@ -3673,9 +3757,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dataFlow.ts",
-      "count": 33,
+      "count": 31,
       "severities": {
-        "warning": 33
+        "warning": 31
       }
     },
     {
@@ -3690,6 +3774,13 @@
       "count": 1,
       "severities": {
         "info": 1
+      }
+    },
+    {
+      "key": "complexity|CPX-SPACE-001|src/core/intelligence/dataFlow.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
       }
     },
     {
@@ -3715,9 +3806,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayout.ts",
-      "count": 28,
+      "count": 23,
       "severities": {
-        "warning": 28
+        "warning": 23
       }
     },
     {
@@ -3743,9 +3834,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/intelligence/dependencyLayout.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 4
+        "warning": 3
       }
     },
     {
@@ -3771,9 +3862,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayoutHelpers.ts",
-      "count": 31,
+      "count": 29,
       "severities": {
-        "warning": 31
+        "warning": 29
       }
     },
     {
@@ -3784,17 +3875,31 @@
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|src/core/intelligence/dependencyLayoutHelpers.ts",
+      "key": "hygiene|HYG-DED-001|src/core/intelligence/dependencyLayoutHelpers.ts",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-DED-001|src/core/intelligence/dependencyLayoutHelpers.ts",
-      "count": 6,
+      "key": "governance|GOV-LOG-001|src/core/intelligence/dependencyLayoutHelpers.ts",
+      "count": 1,
       "severities": {
-        "warning": 6
+        "warning": 1
+      }
+    },
+    {
+      "key": "governance|GOV-PRF-002|src/core/intelligence/dependencyLayoutHelpers.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
+    },
+    {
+      "key": "complexity|CPX-SPACE-001|src/core/intelligence/errorFlow.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
       }
     },
     {
@@ -3883,9 +3988,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/literalIndex.ts",
-      "count": 7,
+      "count": 5,
       "severities": {
-        "warning": 7
+        "warning": 5
       }
     },
     {
@@ -3904,9 +4009,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/semanticArchitecture.ts",
-      "count": 30,
+      "count": 28,
       "severities": {
-        "warning": 30
+        "warning": 28
       }
     },
     {
@@ -3918,9 +4023,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/semanticComplexity.ts",
-      "count": 32,
+      "count": 22,
       "severities": {
-        "warning": 32
+        "warning": 22
       }
     },
     {
@@ -3953,9 +4058,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/symbolIndex.ts",
-      "count": 27,
+      "count": 23,
       "severities": {
-        "warning": 27
+        "warning": 23
       }
     },
     {
@@ -3980,6 +4085,13 @@
       }
     },
     {
+      "key": "complexity|CPX-SPACE-001|src/core/intelligence/symbolIndex.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
       "key": "performance|PRF-MEM-001|src/core/intelligence/symbolIndex.ts",
       "count": 1,
       "severities": {
@@ -3995,9 +4107,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/testModernity.ts",
-      "count": 14,
+      "count": 9,
       "severities": {
-        "warning": 14
+        "warning": 9
       }
     },
     {
@@ -4023,9 +4135,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/intelligence/testModernity.ts",
-      "count": 7,
+      "count": 5,
       "severities": {
-        "warning": 7
+        "warning": 5
       }
     },
     {
@@ -4114,9 +4226,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/memory/domainFingerprint.ts",
-      "count": 7,
+      "count": 3,
       "severities": {
-        "warning": 7
+        "warning": 3
       }
     },
     {
@@ -4240,9 +4352,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/memory/types.ts",
-      "count": 11,
+      "count": 10,
       "severities": {
-        "warning": 11
+        "warning": 10
       }
     },
     {
@@ -4422,9 +4534,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 27,
+      "count": 25,
       "severities": {
-        "warning": 27
+        "warning": 25
       }
     },
     {
@@ -4453,6 +4565,13 @@
       "count": 2,
       "severities": {
         "info": 2
+      }
+    },
+    {
+      "key": "complexity|CPX-SPACE-001|src/core/pipeline/dualTrackPipeline.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
       }
     },
     {
@@ -4499,9 +4618,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/profiler/loadGovernor.ts",
-      "count": 13,
+      "count": 12,
       "severities": {
-        "warning": 13
+        "warning": 12
       }
     },
     {
@@ -4527,9 +4646,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/profiler/projectProfiler.ts",
-      "count": 44,
+      "count": 39,
       "severities": {
-        "warning": 44
+        "warning": 39
       }
     },
     {
@@ -4562,9 +4681,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/pythonAdapter.ts",
-      "count": 61,
+      "count": 56,
       "severities": {
-        "warning": 61
+        "warning": 56
       }
     },
     {
@@ -4632,9 +4751,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/reporting/reportFinalizer.ts",
-      "count": 13,
+      "count": 11,
       "severities": {
-        "warning": 13
+        "warning": 11
       }
     },
     {
@@ -4695,9 +4814,16 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/resultCodec.ts",
-      "count": 8,
+      "count": 7,
       "severities": {
-        "warning": 8
+        "warning": 7
+      }
+    },
+    {
+      "key": "complexity|CPX-SPACE-001|src/core/resultCodec.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
       }
     },
     {
@@ -4744,16 +4870,16 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/router/sparseRuleRouter.ts",
-      "count": 7,
+      "count": 6,
       "severities": {
-        "warning": 7
+        "warning": 6
       }
     },
     {
       "key": "constants|hardcoded-string|src/core/router/sparseRuleRouter.ts",
-      "count": 24,
+      "count": 21,
       "severities": {
-        "warning": 24
+        "warning": 21
       }
     },
     {
@@ -4785,13 +4911,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/rules/aliases.ts",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/rules/entries/analyzers.ts",
       "count": 1,
       "severities": {
@@ -4800,9 +4919,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/entries/analyzers.ts",
-      "count": 58,
+      "count": 13,
       "severities": {
-        "warning": 58
+        "warning": 13
       }
     },
     {
@@ -4842,9 +4961,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/entries/analyzersModern.ts",
-      "count": 43,
+      "count": 5,
       "severities": {
-        "warning": 43
+        "warning": 5
       }
     },
     {
@@ -4855,17 +4974,10 @@
       }
     },
     {
-      "key": "constants|duplicate-literal|src/core/rules/entries/governance.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/rules/entries/governance.ts",
-      "count": 31,
+      "count": 6,
       "severities": {
-        "warning": 31
+        "warning": 6
       }
     },
     {
@@ -4877,9 +4989,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/entries/platform.ts",
-      "count": 32,
+      "count": 24,
       "severities": {
-        "warning": 32
+        "warning": 24
       }
     },
     {
@@ -4919,9 +5031,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rustAdapter.ts",
-      "count": 70,
+      "count": 69,
       "severities": {
-        "warning": 70
+        "warning": 69
       }
     },
     {
@@ -4950,13 +5062,6 @@
       "count": 4,
       "severities": {
         "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scanner/cacheKeyHelper.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -5122,9 +5227,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scanner/legacyAnalyzers.ts",
-      "count": 5,
+      "count": 4,
       "severities": {
-        "warning": 5
+        "warning": 4
       }
     },
     {
@@ -5219,13 +5324,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/scoring/dimensionFamilyDeductions.ts",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
       "key": "hygiene|HYG-DED-001|src/core/scoring/dimensionFamilyDeductions.ts",
       "count": 1,
       "severities": {
@@ -5269,9 +5367,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scoring/dimensionRuleTable.ts",
-      "count": 26,
+      "count": 33,
       "severities": {
-        "warning": 26
+        "warning": 33
       }
     },
     {
@@ -5290,9 +5388,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scoring/scoringTypes.ts",
-      "count": 41,
+      "count": 34,
       "severities": {
-        "warning": 41
+        "warning": 34
       }
     },
     {
@@ -5346,9 +5444,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/stream.ts",
-      "count": 9,
+      "count": 8,
       "severities": {
-        "warning": 9
+        "warning": 8
       }
     },
     {
@@ -5451,9 +5549,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/traverse.ts",
-      "count": 20,
+      "count": 17,
       "severities": {
-        "warning": 20
+        "warning": 17
       }
     },
     {
@@ -5486,13 +5584,6 @@
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/tsPredicates.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/tsPredicates.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -5535,27 +5626,20 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/types.ts",
-      "count": 43,
+      "count": 42,
       "severities": {
-        "warning": 43
+        "warning": 42
       }
     },
     {
       "key": "constants|hardcoded-string|src/core/typescriptAdapter.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 4
+        "warning": 3
       }
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/typescriptAdapter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/utf8.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -5605,9 +5689,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/worker.ts",
-      "count": 10,
+      "count": 9,
       "severities": {
-        "warning": 10
+        "warning": 9
       }
     },
     {
@@ -5745,9 +5829,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/daemon/registry.ts",
-      "count": 11,
+      "count": 10,
       "severities": {
-        "warning": 11
+        "warning": 10
       }
     },
     {
@@ -5773,9 +5857,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/daemon/scanHandler.ts",
-      "count": 8,
+      "count": 5,
       "severities": {
-        "warning": 8
+        "warning": 5
       }
     },
     {
@@ -5801,9 +5885,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/daemon/server.ts",
-      "count": 30,
+      "count": 29,
       "severities": {
-        "warning": 30
+        "warning": 29
       }
     },
     {
@@ -5850,9 +5934,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/index.ts",
-      "count": 34,
+      "count": 33,
       "severities": {
-        "warning": 34
+        "warning": 33
       }
     },
     {

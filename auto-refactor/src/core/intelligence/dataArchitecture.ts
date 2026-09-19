@@ -41,6 +41,8 @@ export interface DataArchitectureOptions {
     checkNPlusOne?: boolean;
     checkRedundantSerialization?: boolean;
     checkDefensiveExcess?: boolean;
+    onlinePathPatterns?: string[];
+    offlinePathPatterns?: string[];
 }
 
 /**

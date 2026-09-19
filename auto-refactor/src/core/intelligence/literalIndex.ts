@@ -112,8 +112,6 @@ export interface LiteralIndexStats {
     builtFrom: string;
 }
 
-const ROLE_OF = LITERAL_ROLE;
-
 const FIXTURE_PATH = /(^|\/)(tests?|specs?|fixtures?|__tests__|samples?|mocks?)(\/|$)/i;
 const GENERATED_PATH = /(^|\/)(generated|vendor|dist|third_party)(\/|$)|\.(min|gen|g)\./i;
 const GENERATED_VALUE =
@@ -147,12 +145,12 @@ export function classifyLiteralRole(
     value: string,
     kind: NodeKind,
 ): LiteralRole {
-    if (FIXTURE_PATH.test(file)) return ROLE_OF.FIXTURE;
-    if (GENERATED_PATH.test(file) || GENERATED_VALUE.test(value)) return ROLE_OF.GENERATED;
-    if (kind === NodeKind.StringLiteral && SCREAMING_NAME.test(value)) return ROLE_OF.PROTOCOL;
-    if (symbol !== null && SCREAMING_NAME.test(symbol)) return ROLE_OF.PROTOCOL;
-    if (symbol !== null && ALGORITHM_NAME.test(symbol)) return ROLE_OF.ALGORITHM;
-    return ROLE_OF.UNKNOWN;
+    if (FIXTURE_PATH.test(file)) return LITERAL_ROLE.FIXTURE;
+    if (GENERATED_PATH.test(file) || GENERATED_VALUE.test(value)) return LITERAL_ROLE.GENERATED;
+    if (kind === NodeKind.StringLiteral && SCREAMING_NAME.test(value)) return LITERAL_ROLE.PROTOCOL;
+    if (symbol !== null && SCREAMING_NAME.test(symbol)) return LITERAL_ROLE.PROTOCOL;
+    if (symbol !== null && ALGORITHM_NAME.test(symbol)) return LITERAL_ROLE.ALGORITHM;
+    return LITERAL_ROLE.UNKNOWN;
 }
 
 /**

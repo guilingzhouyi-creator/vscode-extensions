@@ -48,6 +48,9 @@ const ALL_ANALYZERS = {
   'python-modern': { enabled: true },
   'rust-modern': { enabled: true },
   'gdscript-modern': { enabled: true },
+  'data-architecture': { enabled: true },
+  'test-modernity': { enabled: true },
+  'dependency-layout': { enabled: true },
 };
 
 /**

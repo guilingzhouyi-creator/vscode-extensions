@@ -191,6 +191,14 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
         complexity: {
             complexityWarn: DEFAULT_COMPLEXITY_WARN,
             complexityFail: DEFAULT_COMPLEXITY_FAIL,
+            // Shared with performance/governance: the semantic-complexity rules report blocking
+            // I/O inside loops (CPX-AMP-001), so the same one global policy must reach them,
+            // otherwise a path exempted for PRF-IO-001 is still reported under a second rule.
+            blockingIoAllowPatterns: [],
+            // Per-iteration allocation policy for CPX-SPACE-001, same shape and rationale: a
+            // process-style entry point allocates per iteration by design, a library hot path
+            // does not. Empty by default so opting in is always explicit.
+            allocationAllowPatterns: [],
         },
         governance: {
             maxNestingDepth: DEFAULT_MAX_NESTING_DEPTH,

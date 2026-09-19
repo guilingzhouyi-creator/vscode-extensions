@@ -52,6 +52,22 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     CMP: 'performanceEfficiency',
     'GOV-TYP': DIMENSION_ARCHITECTURE_CONSISTENCY,
     ARCH: DIMENSION_ARCHITECTURE_CONSISTENCY,
+    'ARCH-HDL': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    'ARCH-CFG': 'codeSecurity',
+    'CPX-REC': DIMENSION_MAINTAINABILITY,
+    CPX: 'performanceEfficiency',
+    'DAT-LAY': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    'DAT-DEF': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    DAT: 'performanceEfficiency',
+    'TST-TAU': DIMENSION_MAINTAINABILITY,
+    'TST-DBT': DIMENSION_MAINTAINABILITY,
+    TST: 'modernity',
+    'DEP-LAZ': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    'DEP-RES': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    'DEP-INV': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    'DEP-ORD': 'standardization',
+    'DEP-WLD': 'standardization',
+    DEP: 'standardization',
 };
 
 /**
@@ -101,7 +117,7 @@ export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionAp
         claimed.add(rule.dimension);
         apply(rule.dimension, rule.points, rule.rationale(issue.message), issue.rule, line);
     }
-    applySeverityDeductions(issue, apply, line);
+    applySeverityDeductions(issue, apply, claimed, line);
 }
 
 /**
@@ -131,16 +147,25 @@ export function dimensionDeductionSources(): Record<QualityDimension, string[]> 
  * Apply the severity-based technical-debt deduction that every analyzer feeds.
  *
  * The dimension is the finding's explicitly routed family dimension when it has one, so a rule
- * with a dedicated axis is never double-counted as generic debt. `FRAGMENT_ERROR` and
- * `FRAGMENT_WARNING` hold the severity literals themselves and are compared against
- * `severity`, not against a rule id.
+ * with a dedicated axis is never double-counted as generic debt. When that dedicated dimension
+ * has already been deducted by the rule table, the severity deduction is routed to
+ * DIMENSION_TECH_DEBT_RISK to prevent unfair double penalty on the primary quality dimension.
  *
  * @param issue - Analyzed issue finding.
  * @param apply - Deduction callback function.
+ * @param claimed - Optional set of dimensions already deducted by rule table.
  * @param line - Start line of the finding, when known.
  */
-function applySeverityDeductions(issue: Issue, apply: DeductionApplier, line?: number): void {
-    const debtDimension = familyDimensionOf(issue.rule) ?? DIMENSION_TECH_DEBT_RISK;
+function applySeverityDeductions(
+    issue: Issue,
+    apply: DeductionApplier,
+    claimed?: Set<QualityDimension>,
+    line?: number,
+): void {
+    let debtDimension = familyDimensionOf(issue.rule) ?? DIMENSION_TECH_DEBT_RISK;
+    if (claimed && claimed.has(debtDimension)) {
+        debtDimension = DIMENSION_TECH_DEBT_RISK;
+    }
     if (issue.severity === FRAGMENT_ERROR) {
         apply(
             debtDimension,
