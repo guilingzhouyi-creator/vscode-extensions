@@ -14,6 +14,17 @@ import type { SemanticEvidenceStep, SemanticReviewDetail } from '../semanticType
 import type { ArchitecturalFileInfo } from './semanticArchitecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from './semanticArchitecture';
 
+/** Analyzer id owning every architecture rule in this module. */
+const ANALYZER_ARCHITECTURE = 'architecture';
+/** Language tag written into the semantic review detail. */
+const LANGUAGE_TYPESCRIPT = 'typescript';
+/** Code-domain tag written into the semantic review detail. */
+const CODE_DOMAIN_BOUNDARIES = 'architecture-boundaries';
+/** Rule contract version recorded on every emitted issue. */
+const RULE_VERSION = '1.0.0';
+/** Engine config version recorded on every emitted issue. */
+const CONFIG_VERSION = '0.3.0';
+
 /**
  * Headless architecture violation (ARCH-HDL-001): a domain file imports a UI framework.
  *
@@ -40,10 +51,10 @@ export function checkHeadlessImports(
                 ];
 
                 const detail: SemanticReviewDetail = {
-                    language: 'typescript',
+                    language: LANGUAGE_TYPESCRIPT,
                     module: file.domainName,
                     symbol: imp,
-                    codeDomain: 'architecture-boundaries',
+                    codeDomain: CODE_DOMAIN_BOUNDARIES,
                     currentBehavior: `Headless / domain module '${file.filePath}' binds directly to presentation framework '${imp}'.`,
                     semanticEvidenceChain: evidence,
                     triggerCondition:
@@ -58,14 +69,14 @@ export function checkHeadlessImports(
                     impactedTests: [],
                     verificationMethod:
                         'Verify module executes in a headless Node or CLI environment without UI dependencies.',
-                    ruleVersion: '1.0.0',
-                    configVersion: '0.3.0',
+                    ruleVersion: RULE_VERSION,
+                    configVersion: CONFIG_VERSION,
                     canAutofix: false,
                 };
 
                 issues.push({
                     id: `architecture:ARCH-HDL-001:${file.filePath}:1`,
-                    analyzer: 'architecture',
+                    analyzer: ANALYZER_ARCHITECTURE,
                     rule: 'ARCH-HDL-001',
                     severity: 'error',
                     message: `Headless architecture violation: core logic in '${file.filePath}' imports presentation dependency '${imp}'.`,
@@ -112,10 +123,10 @@ export function checkCrossDomainBypass(
                 ];
 
                 const detail: SemanticReviewDetail = {
-                    language: 'typescript',
+                    language: LANGUAGE_TYPESCRIPT,
                     module: file.domainName,
                     symbol: imp,
-                    codeDomain: 'architecture-boundaries',
+                    codeDomain: CODE_DOMAIN_BOUNDARIES,
                     currentBehavior: `File '${file.filePath}' bypasses public domain facade to access internal private module '${imp}'.`,
                     semanticEvidenceChain: evidence,
                     triggerCondition:
@@ -130,14 +141,14 @@ export function checkCrossDomainBypass(
                     impactedTests: [],
                     verificationMethod:
                         'Verify imports reference only index or public export interfaces.',
-                    ruleVersion: '1.0.0',
-                    configVersion: '0.3.0',
+                    ruleVersion: RULE_VERSION,
+                    configVersion: CONFIG_VERSION,
                     canAutofix: false,
                 };
 
                 issues.push({
                     id: `architecture:ARCH-BND-001:${file.filePath}:1`,
-                    analyzer: 'architecture',
+                    analyzer: ANALYZER_ARCHITECTURE,
                     rule: 'ARCH-BND-001',
                     severity: 'warning',
                     message: `Cross-domain internal bypass: '${file.filePath}' imports private module '${imp}'.`,
@@ -182,10 +193,10 @@ export function checkMutableGlobalCoupling(
         ];
 
         const detail: SemanticReviewDetail = {
-            language: 'typescript',
+            language: LANGUAGE_TYPESCRIPT,
             module: file.domainName,
             symbol: 'globalState',
-            codeDomain: 'architecture-boundaries',
+            codeDomain: CODE_DOMAIN_BOUNDARIES,
             currentBehavior: `Exposing shared mutable state across module boundaries.`,
             semanticEvidenceChain: evidence,
             triggerCondition:
@@ -200,14 +211,14 @@ export function checkMutableGlobalCoupling(
             impactedTests: [],
             verificationMethod:
                 'Verify module state is isolated per instance without global static mutations.',
-            ruleVersion: '1.0.0',
-            configVersion: '0.3.0',
+            ruleVersion: RULE_VERSION,
+            configVersion: CONFIG_VERSION,
             canAutofix: false,
         };
 
         issues.push({
             id: `architecture:ARCH-GLB-001:${file.filePath}:1`,
-            analyzer: 'architecture',
+            analyzer: ANALYZER_ARCHITECTURE,
             rule: 'ARCH-GLB-001',
             severity: 'warning',
             message: `Implicit shared mutable global state in '${file.filePath}'.`,
@@ -258,10 +269,10 @@ export function checkLayeringIllusion(
             ];
 
             const detail: SemanticReviewDetail = {
-                language: 'typescript',
+                language: LANGUAGE_TYPESCRIPT,
                 module: file.domainName,
                 symbol: 'layer-inversion',
-                codeDomain: 'architecture-boundaries',
+                codeDomain: CODE_DOMAIN_BOUNDARIES,
                 currentBehavior: `Clean architecture dependency inversion: domain entity depends on outer infrastructure layer.`,
                 semanticEvidenceChain: evidence,
                 triggerCondition:
@@ -276,14 +287,14 @@ export function checkLayeringIllusion(
                 impactedTests: [],
                 verificationMethod:
                     'Verify domain layer has zero imports pointing to infrastructure layer.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
+                ruleVersion: RULE_VERSION,
+                configVersion: CONFIG_VERSION,
                 canAutofix: false,
             };
 
             issues.push({
                 id: `architecture:ARCH-DIR-003:${file.filePath}:1`,
-                analyzer: 'architecture',
+                analyzer: ANALYZER_ARCHITECTURE,
                 rule: 'ARCH-DIR-003',
                 severity: 'error',
                 message: `Structural layering illusion: domain file '${file.filePath}' directly imports infrastructure.`,
@@ -326,10 +337,10 @@ export function checkConfigLeakage(
         ];
 
         const detail: SemanticReviewDetail = {
-            language: 'typescript',
+            language: LANGUAGE_TYPESCRIPT,
             module: file.domainName,
             symbol: 'config-access',
-            codeDomain: 'architecture-boundaries',
+            codeDomain: CODE_DOMAIN_BOUNDARIES,
             currentBehavior: `Reading process.env or disk config directly in domain model.`,
             semanticEvidenceChain: evidence,
             triggerCondition:
@@ -344,14 +355,14 @@ export function checkConfigLeakage(
             impactedTests: [],
             verificationMethod:
                 'Verify domain entity constructors accept strongly typed options instead of reading environment.',
-            ruleVersion: '1.0.0',
-            configVersion: '0.3.0',
+            ruleVersion: RULE_VERSION,
+            configVersion: CONFIG_VERSION,
             canAutofix: false,
         };
 
         issues.push({
             id: `architecture:ARCH-CFG-001:${file.filePath}:1`,
-            analyzer: 'architecture',
+            analyzer: ANALYZER_ARCHITECTURE,
             rule: 'ARCH-CFG-001',
             severity: 'info',
             message: `Configuration leakage: domain file '${file.filePath}' reads environment or config directly.`,
