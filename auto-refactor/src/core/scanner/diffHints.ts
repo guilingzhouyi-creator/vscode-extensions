@@ -88,7 +88,7 @@ function routeFullFallback(
     incBucket: Map<string, IncrementalFileState>,
     state: DiffRoutingState,
 ): void {
-    if (incEnabled && countLines(newContent) >= incMinLines) {
+    if (isIncrementalCandidate(incEnabled, newContent, incMinLines)) {
         const fresh = new IncrementalFileState(newContent, contentHash);
         fresh.prepare(newContent, contentHash);
         incBucket.set(rel, fresh);
@@ -317,7 +317,7 @@ export async function processUnchangedFile(
         state.l2Refresh.push({ fpHash: fph, contentHash, rel, result, fp: s.fp || undefined });
         return;
     }
-    if (incEnabled && countLines(buf.toString('utf8')) >= incMinLines) {
+    if (isIncrementalCandidate(incEnabled, buf.toString('utf8'), incMinLines)) {
         const newContent = buf.toString('utf8');
         const oldState = incBucket.get(rel);
         if (oldState) {
@@ -370,4 +370,23 @@ export function hasWorkerPool<T extends { pool?: WorkerPoolManager }>(
     opts: T,
 ): opts is T & { pool: WorkerPoolManager } {
     return useWorkers && opts.pool !== undefined;
+}
+
+/**
+ * Report whether a content payload qualifies for line-level incremental routing.
+ *
+ * Extracted so both routing stages ask the same question through one named predicate, keeping
+ * the incremental eligibility rule (enabled flag plus minimum line count) in a single place.
+ *
+ * @param incEnabled - Whether incremental routing is enabled for this scan.
+ * @param content - Raw file content to measure.
+ * @param incMinLines - Minimum line count for incremental eligibility.
+ * @returns True when the file qualifies for incremental reuse.
+ */
+function isIncrementalCandidate(
+    incEnabled: boolean,
+    content: string,
+    incMinLines: number,
+): boolean {
+    return incEnabled && countLines(content) >= incMinLines;
 }
