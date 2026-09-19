@@ -29,29 +29,36 @@ import {
     getTunedThresholds,
 } from './profiler/scaleTuner';
 
-/** Built-in `constants` analyzer id; keys its `analyzers.constants` declaration. */
-export const ANALYZER_CONSTANTS = 'constants';
+import {
+    ANALYZER_CONSTANTS,
+    ANALYZER_SECRETS,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_COMMENTS,
+    ANALYZER_SECURITY,
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_GOVERNANCE,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_HYGIENE,
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
+    ANALYZER_DOCS,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
+} from './scoring/dimensionLiterals';
 
-/** Built-in `secrets` analyzer id; keys its `analyzers.secrets` declaration. */
-export const ANALYZER_SECRETS = 'secrets';
-
-/** Built-in `architecture` analyzer id; keys its `analyzers.architecture` declaration. */
-export const ANALYZER_ARCHITECTURE = 'architecture';
-
-/** Built-in `comments` analyzer id; keys its `analyzers.comments` declaration. */
-export const ANALYZER_COMMENTS = 'comments';
-
-/** Built-in `security` analyzer id; keys its `analyzers.security` declaration. */
-export const ANALYZER_SECURITY = 'security';
-
-/** Built-in `ts-modern` analyzer id; a specialized language pack, declared to be enabled. */
-export const ANALYZER_TYPESCRIPT_MODERN = 'ts-modern';
-
-/** Built-in `rust-modern` analyzer id; a specialized language pack, declared to be enabled. */
-export const ANALYZER_RUST_MODERN = 'rust-modern';
-
-/** Built-in `gdscript-modern` analyzer id; a specialized language pack, declared to be enabled. */
-export const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
+export {
+    ANALYZER_CONSTANTS,
+    ANALYZER_SECRETS,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_COMMENTS,
+    ANALYZER_SECURITY,
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_GDSCRIPT_MODERN,
+};
 
 /**
  * Analyzers that stay disabled until a config or CLI allow-list declares them.
@@ -61,21 +68,21 @@ export const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
  * the same question for every entry.
  */
 export const SPECIALIZED_ANALYZERS = new Set<string>([
-    'governance',
+    ANALYZER_GOVERNANCE,
     ANALYZER_ARCHITECTURE,
-    'performance',
+    ANALYZER_PERFORMANCE,
     ANALYZER_COMMENTS,
-    'hygiene',
+    ANALYZER_HYGIENE,
     ANALYZER_SECURITY,
-    'simplify',
-    'python-modern',
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
     ANALYZER_TYPESCRIPT_MODERN,
     ANALYZER_RUST_MODERN,
     ANALYZER_GDSCRIPT_MODERN,
-    'docs',
-    'data-architecture',
-    'test-modernity',
-    'dependency-layout',
+    ANALYZER_DOCS,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
 ]);
 
 /** Auto-tune estimate: source lines per profiled language entry. */

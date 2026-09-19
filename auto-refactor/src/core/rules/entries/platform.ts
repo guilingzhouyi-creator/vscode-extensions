@@ -11,35 +11,42 @@
  *   stays readable and never becomes a monolith.
  */
 import type { RuleDefinition } from '../types';
-import { ALL_LANGUAGES, defineRule } from '../types';
+import {
+    ALL_LANGUAGES,
+    defineRule,
+    SEVERITY_INFO,
+    SEVERITY_WARNING,
+    SEVERITY_ERROR,
+    RULE_FAMILY_ARCHITECTURE,
+    RULE_FAMILY_DEPENDENCY,
+    RULE_FAMILY_LEGACY,
+    RULE_FAMILY_LANG,
+    RULE_FAMILY_COMPLEXITY,
+    RULE_FAMILY_LARGE_FILE,
+    LEGACY_REASON_ID_NOT_CANONICAL,
+} from '../types';
+import {
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_CONSTANTS,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_SECRETS,
+    ANALYZER_LARGE_FILE,
+} from '../../scoring/dimensionLiterals';
 
-/** Rule-id family prefix for architecture rules; every id starts with `ARCH-`. */
-const RULE_FAMILY_ARCHITECTURE = 'ARCH';
-/** Analyzer id owning the layer and import architecture rules. */
-const ANALYZER_ARCHITECTURE = 'architecture';
-/** Rule-id family prefix for dependency-graph rules; ids start with `DEP-`. */
-const RULE_FAMILY_DEPENDENCY = 'DEP';
-/** Analyzer id owning the import-cycle and dependency-graph rule batch. */
-const ANALYZER_DEPENDENCY_GRAPH = 'dependency-graph';
-/** Default severity for advisory rules: reported, but not gate-blocking. */
-const SEVERITY_WARNING = 'warning';
-/** Default severity for rules whose violations block the quality gate. */
-const SEVERITY_ERROR = 'error';
-/** Legacy reason for ids kept only for backward compatibility. */
-const LEGACY_REASON_ID_NOT_CANONICAL = 'id-not-canonical';
-/** Family marker for rule ids that predate the canonical naming scheme. */
-const RULE_FAMILY_LEGACY = 'LEGACY';
+/** Built-in engine pseudo-analyzer identity for runtime/bootstrap errors. */
+const ANALYZER_ENGINE = 'engine';
 
 /** platform rules. */
 export const PLATFORM_RULES: readonly RuleDefinition[] = [
     defineRule({
         id: 'analyzer-error',
-        family: 'LANG',
-        analyzer: 'engine',
+        family: RULE_FAMILY_LANG,
+        analyzer: ANALYZER_ENGINE,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary: '分析器在单文件上抛异常（failOnAnalyzerError 可升为 error）。',
         remediation: '修复分析器缺陷；已知外部数据问题可保持 info 留痕。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#analyzer-error',
@@ -138,7 +145,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary: '环境配置泄漏：纯领域业务模型内部直接读取环境变量或底层磁盘配置。',
         remediation: '将环境配置提升到应用装配层解析，并以强类型参数注入领域对象。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-001',
@@ -170,7 +177,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     defineRule({
         id: 'duplicate-literal',
         family: RULE_FAMILY_LEGACY,
-        analyzer: 'constants',
+        analyzer: ANALYZER_CONSTANTS,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
@@ -181,8 +188,8 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'nested-constant',
-        family: 'LEGACY',
-        analyzer: 'constants',
+        family: RULE_FAMILY_LEGACY,
+        analyzer: ANALYZER_CONSTANTS,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
@@ -193,8 +200,8 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'high-complexity',
-        family: 'CPX',
-        analyzer: 'complexity',
+        family: RULE_FAMILY_COMPLEXITY,
+        analyzer: ANALYZER_COMPLEXITY,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
@@ -205,8 +212,8 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'high-entropy-token',
-        family: 'LEGACY',
-        analyzer: 'secrets',
+        family: RULE_FAMILY_LEGACY,
+        analyzer: ANALYZER_SECRETS,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
@@ -229,8 +236,8 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'large-file',
-        family: 'BIG',
-        analyzer: 'large-file',
+        family: RULE_FAMILY_LARGE_FILE,
+        analyzer: ANALYZER_LARGE_FILE,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
@@ -241,8 +248,8 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'secret-detected',
-        family: 'LEGACY',
-        analyzer: 'secrets',
+        family: RULE_FAMILY_LEGACY,
+        analyzer: ANALYZER_SECRETS,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,

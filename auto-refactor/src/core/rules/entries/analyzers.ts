@@ -11,26 +11,27 @@
  *   stays readable and never becomes a monolith.
  */
 import type { RuleDefinition } from '../types';
-import { ALL_LANGUAGES, defineRule } from '../types';
-
 import {
-    RULE_FAMILY_COMMENTS,
-    ANALYZER_COMMENTS,
-    RULE_FAMILY_HYGIENE,
-    RULE_FAMILY_ERROR,
-    ANALYZER_HYGIENE,
-    RULE_FAMILY_SECURITY,
-    ANALYZER_SECURITY,
-    RULE_FAMILY_SIMPLIFY,
-    ANALYZER_SIMPLIFY,
-    RULE_FAMILY_PYTHON_MODERN,
-    ANALYZER_PYTHON_MODERN,
+    ALL_LANGUAGES,
+    defineRule,
     SEVERITY_WARNING,
     SEVERITY_ERROR,
+    RULE_FAMILY_COMMENTS,
+    RULE_FAMILY_HYGIENE,
+    RULE_FAMILY_ERROR,
+    RULE_FAMILY_SECURITY,
+    RULE_FAMILY_SIMPLIFY,
+    RULE_FAMILY_PYTHON_MODERN,
     LANGUAGE_PYTHON,
-    REMEDIATION_STANDARD_AND_ABOVE,
-    ANALYZER_MODERN_RULES,
-} from './analyzersModern';
+} from '../types';
+import {
+    ANALYZER_COMMENTS,
+    ANALYZER_HYGIENE,
+    ANALYZER_SECURITY,
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
+} from '../../scoring/dimensionLiterals';
+import { REMEDIATION_STANDARD_AND_ABOVE, ANALYZER_MODERN_RULES } from './analyzersModern';
 
 /**
  * Analyzer rule table: every rule whose owner is a built-in analyzer pack.

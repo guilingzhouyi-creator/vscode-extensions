@@ -12,6 +12,18 @@
 
 /** Canonical rule-id shape: FAMILY-TOPIC-NNN (upper-case family, short topic, 3 digits). */
 export const RULE_ID_PATTERN = /^[A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3}$/;
+import type { Severity } from '../types';
+
+export {
+    SEVERITY_INFO,
+    SEVERITY_WARNING,
+    SEVERITY_ERROR,
+    LANGUAGE_TYPESCRIPT,
+    LANGUAGE_JAVASCRIPT,
+    LANGUAGE_PYTHON,
+    LANGUAGE_RUST,
+    LANGUAGE_GDSCRIPT,
+} from '../types';
 
 /** Rule families the engine recognises (canonical prefixes). */
 export type RuleFamily =
@@ -34,10 +46,63 @@ export type RuleFamily =
     | 'CMP'
     | 'DAT'
     | 'TST'
+    | 'TSM'
+    | 'RSM'
+    | 'GDM'
     | 'LEGACY';
 
+/** Canonical rule-family prefix for general language rules. */
+export const RULE_FAMILY_LANG = 'LANG';
+/** Canonical rule-family prefix for comments and header rules. */
+export const RULE_FAMILY_COMMENTS = 'CMT';
+/** Canonical rule-family prefix for simplification rules. */
+export const RULE_FAMILY_SIMPLIFY = 'SIM';
+/** Canonical rule-family prefix for code hygiene rules. */
+export const RULE_FAMILY_HYGIENE = 'HYG';
+/** Canonical rule-family prefix for architecture governance rules. */
+export const RULE_FAMILY_GOVERNANCE = 'GOV';
+/** Canonical rule-family prefix for performance efficiency rules. */
+export const RULE_FAMILY_PERFORMANCE = 'PRF';
+/** Canonical rule-family prefix for code security rules. */
+export const RULE_FAMILY_SECURITY = 'SEC';
+/** Canonical rule-family prefix for architecture consistency rules. */
+export const RULE_FAMILY_ARCHITECTURE = 'ARCH';
+/** Canonical rule-family prefix for ARC architectural rules. */
+export const RULE_FAMILY_ARC = 'ARC';
+/** Canonical rule-family prefix for Python modernization rules. */
+export const RULE_FAMILY_PYTHON_MODERN = 'PYM';
+/** Canonical rule-family prefix for documentation rules. */
+export const RULE_FAMILY_DOCS = 'DOC';
+/** Canonical rule-family prefix for constant extraction rules. */
+export const RULE_FAMILY_CONSTANTS = 'CONST';
+/** Canonical rule-family prefix for dependency layout rules. */
+export const RULE_FAMILY_DEPENDENCY = 'DEP';
+/** Canonical rule-family prefix for cyclomatic and cognitive complexity rules. */
+export const RULE_FAMILY_COMPLEXITY = 'CPX';
+/** Canonical rule-family prefix for large file size rules. */
+export const RULE_FAMILY_LARGE_FILE = 'BIG';
+/** Canonical rule-family prefix for static error rules. */
+export const RULE_FAMILY_ERROR = 'ERR';
+/** Canonical rule-family prefix for compression bounds rules. */
+export const RULE_FAMILY_CMP = 'CMP';
+/** Canonical rule-family prefix for data architecture rules. */
+export const RULE_FAMILY_DATA_ARCHITECTURE = 'DAT';
+/** Canonical rule-family prefix for test modernity rules. */
+export const RULE_FAMILY_TEST_MODERNITY = 'TST';
+/** Canonical rule-family prefix for TypeScript modernization rules. */
+export const RULE_FAMILY_TYPESCRIPT_MODERN = 'TSM';
+/** Canonical rule-family prefix for Rust modernization rules. */
+export const RULE_FAMILY_RUST_MODERN = 'RSM';
+/** Canonical rule-family prefix for GDScript modernization rules. */
+export const RULE_FAMILY_GDSCRIPT_MODERN = 'GDM';
+/** Canonical rule-family prefix for backward-compatible legacy rules. */
+export const RULE_FAMILY_LEGACY = 'LEGACY';
+
+/** Canonical legacy reason string for backward-compatible non-canonical ids. */
+export const LEGACY_REASON_ID_NOT_CANONICAL = 'id-not-canonical';
+
 /** Severity a rule carries by default; per-context escalation is described in `summary`. */
-export type RuleSeverity = 'info' | 'warning' | 'error';
+export type RuleSeverity = Severity;
 
 /** Metadata for one rule id: identity, ownership, language scope, intent and remediation. */
 export interface RuleDefinition {

@@ -42,6 +42,20 @@ import {
     SPECIALIZED_ANALYZERS,
     applyAutoTuning,
 } from './configTuning';
+import {
+    ANALYZER_LARGE_FILE,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_GOVERNANCE,
+    ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_HYGIENE,
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
+    ANALYZER_DOCS,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
+} from './scoring/dimensionLiterals';
 import { applySemanticAndSecurityLevels } from './configCascades';
 import type { ConfigOverrides } from './configTuning';
 
@@ -60,25 +74,25 @@ export const TOOL_VERSION = '0.3.0';
 /** Built-in analyzer names shipped with the engine (also usable as keys in `analyzers`). */
 export const BUILTIN_ANALYZERS = [
     ANALYZER_CONSTANTS,
-    'large-file',
-    'complexity',
-    'governance',
-    'dependency-graph',
+    ANALYZER_LARGE_FILE,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_GOVERNANCE,
+    ANALYZER_DEPENDENCY_GRAPH,
     ANALYZER_SECRETS,
     ANALYZER_ARCHITECTURE,
-    'performance',
+    ANALYZER_PERFORMANCE,
     ANALYZER_COMMENTS,
-    'hygiene',
+    ANALYZER_HYGIENE,
     ANALYZER_SECURITY,
-    'simplify',
-    'python-modern',
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
     ANALYZER_TYPESCRIPT_MODERN,
     ANALYZER_RUST_MODERN,
     ANALYZER_GDSCRIPT_MODERN,
-    'docs',
-    'data-architecture',
-    'test-modernity',
-    'dependency-layout',
+    ANALYZER_DOCS,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──

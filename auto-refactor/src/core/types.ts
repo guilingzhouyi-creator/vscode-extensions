@@ -53,6 +53,30 @@ export const NEED_RUNTIME_EVIDENCE = 'NEED_RUNTIME_EVIDENCE';
 /** Severity levels; map to CI/SARIF levels (info->note, warning->warning, error->error). */
 export type Severity = 'info' | 'warning' | 'error';
 
+/** Informational severity level; maps to SARIF note level. */
+export const SEVERITY_INFO: Severity = 'info';
+
+/** Warning severity level; indicates advisory issues that do not fail quality gate by default. */
+export const SEVERITY_WARNING: Severity = 'warning';
+
+/** Error severity level; gate-blocking failure. */
+export const SEVERITY_ERROR: Severity = 'error';
+
+/** Canonical TypeScript language identifier. */
+export const LANGUAGE_TYPESCRIPT = 'typescript';
+
+/** Canonical JavaScript language identifier. */
+export const LANGUAGE_JAVASCRIPT = 'javascript';
+
+/** Canonical Python language identifier. */
+export const LANGUAGE_PYTHON = 'python';
+
+/** Canonical Rust language identifier. */
+export const LANGUAGE_RUST = 'rust';
+
+/** Canonical GDScript language identifier. */
+export const LANGUAGE_GDSCRIPT = 'gdscript';
+
 /** Analyzer identifiers are open strings (built-in names + any custom-registered name). */
 export type AnalyzerId = string;
 

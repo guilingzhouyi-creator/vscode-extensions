@@ -256,6 +256,36 @@ export const ANALYZER_COMMENTS = 'comments';
 export const ANALYZER_CONSTANTS = 'constants';
 
 /**
+ * Analyzer id owning the simplify rule family.
+ */
+export const ANALYZER_SIMPLIFY = 'simplify';
+
+/**
+ * Analyzer id owning the python modernization pack.
+ */
+export const ANALYZER_PYTHON_MODERN = 'python-modern';
+
+/**
+ * Analyzer id owning the typescript modernization pack.
+ */
+export const ANALYZER_TYPESCRIPT_MODERN = 'ts-modern';
+
+/**
+ * Analyzer id owning the rust modernization pack.
+ */
+export const ANALYZER_RUST_MODERN = 'rust-modern';
+
+/**
+ * Analyzer id owning the gdscript modernization pack.
+ */
+export const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
+
+/**
+ * Analyzer id owning documentation markdown and link checks.
+ */
+export const ANALYZER_DOCS = 'docs';
+
+/**
  * Quality dimension id for semantic purity.
  */
 export const DIMENSION_SEMANTIC_PURITY = 'semanticPurity';
@@ -289,6 +319,11 @@ export const DIMENSION_DUPLICATION = 'duplication';
  * Quality dimension id for tech debt risk.
  */
 export const DIMENSION_TECH_DEBT_RISK = 'techDebtRisk';
+
+/**
+ * Quality dimension id for performance efficiency.
+ */
+export const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
 
 /**
  * Rule id of the arch leak 002 finding.
@@ -489,6 +524,11 @@ export const FRAGMENT_ERROR = 'error';
  * Rule-id or message fragment matched by the deduction evaluators.
  */
 export const FRAGMENT_WARNING = 'warning';
+
+/**
+ * Rule-id or message fragment matched by credential key evaluators.
+ */
+export const FRAGMENT_KEY = 'key';
 
 /** Analyzer id for data architecture modernization. */
 export const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';

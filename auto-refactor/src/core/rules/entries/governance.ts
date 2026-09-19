@@ -11,18 +11,21 @@
  *   stays readable and never becomes a monolith.
  */
 import type { RuleDefinition } from '../types';
-import { ALL_LANGUAGES, defineRule } from '../types';
+import {
+    ALL_LANGUAGES,
+    defineRule,
+    RULE_FAMILY_GOVERNANCE,
+    RULE_FAMILY_CMP,
+    SEVERITY_INFO,
+    SEVERITY_WARNING,
+    SEVERITY_ERROR,
+    LANGUAGE_TYPESCRIPT,
+    LANGUAGE_JAVASCRIPT,
+    LANGUAGE_PYTHON,
+    LANGUAGE_RUST,
+} from '../types';
+import { ANALYZER_GOVERNANCE } from '../../scoring/dimensionLiterals';
 
-/** Rule-id family prefix for GOV-* governance rules. */
-const RULE_FAMILY_GOVERNANCE = 'GOV';
-/** Rule-id family prefix for the CMP-* compression lower bounds family. */
-const RULE_FAMILY_CMP = 'CMP';
-/** Analyzer id owning every governance rule in this registry domain. */
-const ANALYZER_GOVERNANCE = 'governance';
-/** Default severity for advisory rules: reported, but not gate-blocking. */
-const SEVERITY_WARNING = 'warning';
-/** Language tag restricting a rule's applicability to TypeScript sources. */
-const LANGUAGE_TYPESCRIPT = 'typescript';
 /**
  * Languages the CMP-* family is declared for.
  *
@@ -30,7 +33,15 @@ const LANGUAGE_TYPESCRIPT = 'typescript';
  * declaration stays equal to the set of languages a fixture actually proves rather than claiming
  * every language the engine can scan.
  */
-const CMP_LANGUAGES = [LANGUAGE_TYPESCRIPT, 'javascript'];
+const CMP_LANGUAGES: readonly string[] = [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT];
+const LANGUAGES_TS_JS: readonly string[] = [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT];
+const LANGUAGES_TS: readonly string[] = [LANGUAGE_TYPESCRIPT];
+const LANGUAGES_EXC_001: readonly string[] = [
+    LANGUAGE_TYPESCRIPT,
+    LANGUAGE_JAVASCRIPT,
+    LANGUAGE_PYTHON,
+];
+const LANGUAGES_RUST: readonly string[] = [LANGUAGE_RUST];
 
 /** governance rules. */
 export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
@@ -51,8 +62,8 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
-        languages: [LANGUAGE_TYPESCRIPT, 'javascript', 'python'],
-        defaultSeverity: 'error',
+        languages: LANGUAGES_EXC_001,
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'Empty catch blocks silently swallow exceptions, causing silent data corruption or masking critical failures. A catch whose body carries an explicit rationale marker (best-effort / ignore / intentional / expected) is treated as a documented decision instead of a silent swallow.',
         remediation: '处理/记录/显式重抛；确属 best-effort 时在 catch 内写明理由标记。',
@@ -63,7 +74,7 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
-        languages: ['rust'],
+        languages: LANGUAGES_RUST,
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Naked `.unwrap()` causes unrecoverable process panics in production upon Err or None.',
@@ -88,7 +99,7 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary:
             'Substantial production modules must declare their architectural role and responsibility boundary.',
         remediation: '修正文件头声明路径，或补齐缺失的头部字段。',
@@ -112,7 +123,7 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary:
             'Vacuous wrapper methods that purely forward calls without validation or translation add unnecessary indirection.',
         remediation: '去掉直通式包装，让调用方直达目标或合并职责。',
@@ -136,7 +147,7 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'error',
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'Domain layer must remain clean and portable; importing UI or CLI presentation frameworks introduces severe coupling.',
         remediation: '反转依赖：内层定义端口/接口，由外层实现。',
@@ -160,7 +171,7 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary:
             'Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M); pre-indexing in Map/Set optimizes to O(N).',
         remediation: '用 Set/Map 承载查找，消除循环内线性扫描。',
@@ -171,8 +182,8 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
-        languages: [LANGUAGE_TYPESCRIPT, 'javascript'],
-        defaultSeverity: 'error',
+        languages: LANGUAGES_TS_JS,
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'Numeric timer delays bypass centralized clamping; a literal of <=0 triggers a ~1ms busy loop (CPU/IO hotspot).',
         remediation: '定时器延时常量具名或走集中配置，避免绕过统一钳制。',
@@ -183,7 +194,7 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
-        languages: [LANGUAGE_TYPESCRIPT, 'javascript'],
+        languages: LANGUAGES_TS_JS,
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Sync fs calls block the host event loop (UI jank in IDE extensions, request stalls on servers).',
@@ -255,7 +266,7 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
-        languages: [LANGUAGE_TYPESCRIPT],
+        languages: LANGUAGES_TS,
         defaultSeverity: SEVERITY_WARNING,
         summary: 'Naked `any` bypasses the entire compiler type checker, leaking type instability.',
         remediation: '裸 any 换成 unknown 或具体联合；动态边界用受控断言并注释理由。',

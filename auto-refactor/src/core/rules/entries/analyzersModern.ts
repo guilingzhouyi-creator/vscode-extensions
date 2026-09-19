@@ -12,79 +12,41 @@
  * Exit Semantics & Design Rationale: Pure data module — no runtime logic; keeping the
  *   constants here makes the dependency direction one-way (analyzers -> analyzersModern).
  */
-import { ALL_LANGUAGES, defineRule } from '../types';
+import {
+    ALL_LANGUAGES,
+    defineRule,
+    SEVERITY_INFO,
+    SEVERITY_WARNING,
+    SEVERITY_ERROR,
+    RULE_FAMILY_TYPESCRIPT_MODERN,
+    RULE_FAMILY_RUST_MODERN,
+    RULE_FAMILY_GDSCRIPT_MODERN,
+    RULE_FAMILY_COMPLEXITY,
+    RULE_FAMILY_DATA_ARCHITECTURE,
+    RULE_FAMILY_TEST_MODERNITY,
+    RULE_FAMILY_DEPENDENCY,
+    LANGUAGE_TYPESCRIPT,
+    LANGUAGE_JAVASCRIPT,
+    LANGUAGE_RUST,
+    LANGUAGE_GDSCRIPT,
+} from '../types';
 import type { RuleDefinition } from '../types';
 
-/** Rule-id family prefix for comment rules; every id starts with `CMT-`. */
-export const RULE_FAMILY_COMMENTS = 'CMT';
-/** Analyzer id owning every comment rule in this registry domain. */
-export const ANALYZER_COMMENTS = 'comments';
-/** Rule-id family prefix for hygiene rules; every id starts with `HYG-`. */
-export const RULE_FAMILY_HYGIENE = 'HYG';
-/** Rule-id family prefix for error propagation rules; every id starts with `ERR-`. */
-export const RULE_FAMILY_ERROR = 'ERR';
-/** Analyzer id owning the hygiene batch, including its Python subset. */
-export const ANALYZER_HYGIENE = 'hygiene';
-/** Rule-id family prefix for security rules; every id starts with `SEC-`. */
-export const RULE_FAMILY_SECURITY = 'SEC';
-/** Analyzer id owning every security rule in this registry domain. */
-export const ANALYZER_SECURITY = 'security';
-/** Rule-id family prefix for simplification rules; every id starts with `SIM-`. */
-export const RULE_FAMILY_SIMPLIFY = 'SIM';
-/** Analyzer id owning every simplification rule in this registry domain. */
-export const ANALYZER_SIMPLIFY = 'simplify';
-/** Rule-id family prefix for Python-modernization rules; ids start with `PYM-`. */
-export const RULE_FAMILY_PYTHON_MODERN = 'PYM';
-/** Analyzer id owning the Python-modernization rule batch. */
-export const ANALYZER_PYTHON_MODERN = 'python-modern';
-/** Default severity for advisory rules: reported, but not gate-blocking. */
-export const SEVERITY_WARNING = 'warning';
-/** Default severity for rules whose violations block the quality gate. */
-export const SEVERITY_ERROR = 'error';
-/** Language tag restricting a rule's applicability to Python sources. */
-export const LANGUAGE_PYTHON = 'python';
+import {
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
+} from '../../scoring/dimensionLiterals';
+
 /** Remediation note: the rule activates at the `standard` preset and above. */
 export const REMEDIATION_STANDARD_AND_ABOVE = '`standard` 及以上';
 
-/** Rule-id family prefix for TypeScript/JavaScript modernization rules; ids start with `TSM-`. */
-export const RULE_FAMILY_TYPESCRIPT_MODERN = 'TSM';
-/** Analyzer id owning the TypeScript/JavaScript modernization rule batch. */
-export const ANALYZER_TYPESCRIPT_MODERN = 'ts-modern';
-/** Rule-id family prefix for Rust modernization rules; every id starts with `RSM-`. */
-export const RULE_FAMILY_RUST_MODERN = 'RSM';
-/** Analyzer id owning the Rust modernization rule batch. */
-export const ANALYZER_RUST_MODERN = 'rust-modern';
-/** Rule-id family prefix for GDScript migration rules; every id starts with `GDM-`. */
-export const RULE_FAMILY_GDSCRIPT_MODERN = 'GDM';
-/** Analyzer id owning the GDScript (Godot 3 -> 4) migration rule batch. */
-export const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
-/** Language tag restricting a rule's applicability to TypeScript sources. */
-export const LANGUAGE_TYPESCRIPT = 'typescript';
-/** Language tag restricting a rule's applicability to JavaScript sources. */
-export const LANGUAGE_JAVASCRIPT = 'javascript';
 /** Both tags of the TS/JS family; the pack parses either dialect with the same adapter. */
 const LANGUAGES_TS_FAMILY: readonly string[] = [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT];
-/** Language tag restricting a rule's applicability to Rust sources. */
-export const LANGUAGE_RUST = 'rust';
-/** Language tag restricting a rule's applicability to GDScript sources. */
-export const LANGUAGE_GDSCRIPT = 'gdscript';
-
-/** Rule-id family prefix for complexity semantic rules; ids start with `CPX-`. */
-export const RULE_FAMILY_COMPLEXITY = 'CPX';
-/** Analyzer id owning complexity rules. */
-export const ANALYZER_COMPLEXITY = 'complexity';
-/** Rule-id family prefix for data architecture rules; ids start with `DAT-`. */
-export const RULE_FAMILY_DATA_ARCH = 'DAT';
-/** Analyzer id owning data architecture rules. */
-export const ANALYZER_DATA_ARCH = 'data-architecture';
-/** Rule-id family prefix for test modernity rules; ids start with `TST-`. */
-export const RULE_FAMILY_TEST_MODERNITY = 'TST';
-/** Analyzer id owning test modernity rules. */
-export const ANALYZER_TEST_MODERNITY = 'test-modernity';
-/** Rule-id family prefix for dependency layout rules; ids start with `DEP-`. */
-export const RULE_FAMILY_DEP_LAYOUT = 'DEP';
-/** Analyzer id owning dependency layout rules. */
-export const ANALYZER_DEP_LAYOUT = 'dependency-layout';
 
 /** analyzer rules. */
 
@@ -407,8 +369,8 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     // ── Data Architecture Rules ──
     defineRule({
         id: 'DAT-QRY-001',
-        family: RULE_FAMILY_DATA_ARCH,
-        analyzer: ANALYZER_DATA_ARCH,
+        family: RULE_FAMILY_DATA_ARCHITECTURE,
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
@@ -418,8 +380,8 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'DAT-NPL-001',
-        family: RULE_FAMILY_DATA_ARCH,
-        analyzer: ANALYZER_DATA_ARCH,
+        family: RULE_FAMILY_DATA_ARCHITECTURE,
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
@@ -429,30 +391,30 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'DAT-SER-001',
-        family: RULE_FAMILY_DATA_ARCH,
-        analyzer: ANALYZER_DATA_ARCH,
+        family: RULE_FAMILY_DATA_ARCHITECTURE,
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary: '跨层调用链中的重复序列化与反序列化转换。',
         remediation: '在内部调用链路传递强类型原生对象，仅在网络边界执行序列化。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-ser-001',
     }),
     defineRule({
         id: 'DAT-DEF-001',
-        family: RULE_FAMILY_DATA_ARCH,
-        analyzer: ANALYZER_DATA_ARCH,
+        family: RULE_FAMILY_DATA_ARCHITECTURE,
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary: '受信内部领域边界内的冗余重复防御性校验。',
         remediation: '在信任边界执行一次性完整校验，内部领域对象依托不可变类型保证。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-def-001',
     }),
     defineRule({
         id: 'DAT-LAY-001',
-        family: RULE_FAMILY_DATA_ARCH,
-        analyzer: ANALYZER_DATA_ARCH,
+        family: RULE_FAMILY_DATA_ARCHITECTURE,
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
@@ -501,7 +463,7 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_TEST_MODERNITY,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary: '关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。',
         remediation: '补齐高风险语义单元的契约测试与边界测试，提高实际故障感知能力。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-den-001',
@@ -512,7 +474,7 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_TEST_MODERNITY,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary: '未登记里程碑收敛计划或责任人的滞后测试技术债务。',
         remediation: '在测试债务登记表中补全责任 Agent 及目标收敛里程碑。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-dbt-001',
@@ -521,19 +483,19 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     // ── Dependency Layout Rules ──
     defineRule({
         id: 'DEP-ORD-001',
-        family: RULE_FAMILY_DEP_LAYOUT,
-        analyzer: ANALYZER_DEP_LAYOUT,
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: 'info',
+        defaultSeverity: SEVERITY_INFO,
         summary: '文件布局与导入分组不符合当前语言现代化工程规范。',
         remediation: '调整导入顺序为 Stdlib -> ThirdParty -> InternalShared -> Local。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-ord-001',
     }),
     defineRule({
         id: 'DEP-LAZ-001',
-        family: RULE_FAMILY_DEP_LAYOUT,
-        analyzer: ANALYZER_DEP_LAYOUT,
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
@@ -543,8 +505,8 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'DEP-RES-001',
-        family: RULE_FAMILY_DEP_LAYOUT,
-        analyzer: ANALYZER_DEP_LAYOUT,
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
@@ -554,8 +516,8 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'DEP-WLD-001',
-        family: RULE_FAMILY_DEP_LAYOUT,
-        analyzer: ANALYZER_DEP_LAYOUT,
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
@@ -565,8 +527,8 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'DEP-INV-001',
-        family: RULE_FAMILY_DEP_LAYOUT,
-        analyzer: ANALYZER_DEP_LAYOUT,
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,

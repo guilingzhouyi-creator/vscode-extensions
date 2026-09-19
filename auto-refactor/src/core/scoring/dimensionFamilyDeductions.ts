@@ -55,6 +55,7 @@ import {
     FRAGMENT_CIRCULAR,
     FRAGMENT_LOOP,
     FRAGMENT_ALLOC,
+    FRAGMENT_KEY,
 } from './dimensionLiterals';
 import type { DeductionApplier } from './dimensionDeductions';
 
@@ -218,7 +219,7 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
         issue.analyzer === ANALYZER_SECRETS ||
         r.includes(FRAGMENT_SECRET) ||
         r.includes(FRAGMENT_TOKEN) ||
-        r.includes('key')
+        r.includes(FRAGMENT_KEY)
     ) {
         apply(
             DIMENSION_CODE_SECURITY,

@@ -30,6 +30,13 @@ import type { ScanOptions } from './api';
 import { scanAndRender } from './api';
 import { resolveConfig } from './core/config';
 import type { LogLevel } from './core/types';
+import {
+    SEVERITY_INFO,
+    SEVERITY_WARNING,
+    SEVERITY_ERROR,
+    LANGUAGE_TYPESCRIPT,
+    COMMENT_LEVEL_OFF,
+} from './core/types';
 // NOTE: daemonCommand / CacheStore are required lazily in main() — the default CLI path
 // must not pay for the daemon module graph (net, child_process) at boot.
 
@@ -47,9 +54,6 @@ const DAEMON_SUBCOMMAND = 'daemon';
 
 /** Daemon mode value disabling daemon probing and auto-start (`--no-daemon`). */
 const DAEMON_MODE_OFF = 'off';
-
-/** Comment-level value disabling comment governance checks. */
-const COMMENT_LEVEL_OFF = 'off';
 
 /** Security-level value disabling security analysis. */
 const SECURITY_LEVEL_OFF = 'off';
@@ -117,7 +121,9 @@ const VALUE_FLAG_HANDLERS: Record<string, ValueFlagHandler> = {
             .filter(Boolean);
     },
     'fail-on-severity': (opt, val) => {
-        if (val === 'info' || val === 'warning' || val === 'error') opt.failOnSeverity = val;
+        if (val === SEVERITY_INFO || val === SEVERITY_WARNING || val === SEVERITY_ERROR) {
+            opt.failOnSeverity = val;
+        }
     },
     'baseline-granularity': (opt, val) => {
         if (val === 'id' || val === 'grouped') opt.baselineGranularity = val;
@@ -141,7 +147,7 @@ const VALUE_FLAG_HANDLERS: Record<string, ValueFlagHandler> = {
         opt.out = val;
     },
     parser: (opt, val) => {
-        opt.parser = val === 'oxc' ? 'oxc' : 'typescript';
+        opt.parser = val === 'oxc' ? 'oxc' : (LANGUAGE_TYPESCRIPT as any);
     },
     root: (opt, val) => {
         opt.root = val;
@@ -345,25 +351,37 @@ async function main(): Promise<void> {
         const rootIdx = args.indexOf('--root');
         const root = rootIdx !== -1 ? args[rootIdx + 1] : process.cwd();
         querySymbols(target, { root, logLevel: 'silent', daemon: DAEMON_MODE_OFF, cache: false })
-            .then((result: any) => {
-                process.stdout.write(`
+            .then(
+                (result: {
+                    definitions: Array<{ kind: string; file: string; line?: number }>;
+                    references: Array<{ file: string; line?: number }>;
+                    stats: {
+                        definitions: number;
+                        references: number;
+                        crossFileReferences: number;
+                        builtFrom: string;
+                    };
+                }) => {
+                    process.stdout.write(`
 === Symbol: ${target} ===
 `);
-                for (const d of result.definitions) {
-                    process.stdout.write(`  defined  ${d.kind.padEnd(9)} ${d.file}:${d.line ?? '?'}
+                    for (const d of result.definitions) {
+                        process.stdout
+                            .write(`  defined  ${d.kind.padEnd(9)} ${d.file}:${d.line ?? '?'}
 `);
-                }
-                for (const r of result.references) {
-                    process.stdout.write(`  called   ${r.file}:${r.line ?? '?'}
+                    }
+                    for (const r of result.references) {
+                        process.stdout.write(`  called   ${r.file}:${r.line ?? '?'}
 `);
-                }
-                process.stdout.write(
-                    `  coverage defs=${result.stats.definitions} refs=${result.stats.references} ` +
-                        `crossFile=${result.stats.crossFileReferences} (${result.stats.builtFrom})
+                    }
+                    process.stdout.write(
+                        `  coverage defs=${result.stats.definitions} refs=${result.stats.references} ` +
+                            `crossFile=${result.stats.crossFileReferences} (${result.stats.builtFrom})
 `,
-                );
-                process.exit(0);
-            })
+                    );
+                    process.exit(0);
+                },
+            )
             .catch((error: unknown) => {
                 process.stderr.write(`symbols failed: ${String(error)}
 `);

@@ -22,15 +22,34 @@
 
 import type { DiffClassificationResult, DiffSemanticCategory } from './diffClassifier';
 import type { ProjectArchetype } from '../types';
+import {
+    ANALYZER_CONSTANTS,
+    ANALYZER_LARGE_FILE,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_GOVERNANCE,
+    ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_SECRETS,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_COMMENTS,
+    ANALYZER_HYGIENE,
+    ANALYZER_SECURITY,
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_DOCS,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
+} from '../scoring/dimensionLiterals';
 
 /** Decimal places retained when rounding the activation ratio for stable reporting. */
 const ACTIVATION_RATIO_DECIMALS = 3;
 
 /** Scale factor converting a 0-1 activation ratio into a whole percentage. */
 const PERCENT_SCALE = 100;
-
-/** Built-in analyzer id for governance; registered and routed by category. */
-const GOVERNANCE_ANALYZER_ID = 'governance';
 
 /**
  * Canonical ids of every built-in analyzer, listed in registration order.
@@ -39,30 +58,30 @@ const GOVERNANCE_ANALYZER_ID = 'governance';
  * union; custom analyzers loaded from config stay outside it and are handled separately.
  */
 export const ALL_BUILTIN_ANALYZERS = [
-    'constants',
-    'large-file',
-    'complexity',
-    GOVERNANCE_ANALYZER_ID,
-    'dependency-graph',
-    'secrets',
-    'architecture',
-    'performance',
-    'comments',
-    'hygiene',
-    'security',
+    ANALYZER_CONSTANTS,
+    ANALYZER_LARGE_FILE,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_GOVERNANCE,
+    ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_SECRETS,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_COMMENTS,
+    ANALYZER_HYGIENE,
+    ANALYZER_SECURITY,
     // Specialized packs and doc rules are routable too: they belong to the general candidate set,
     // and leaving them out here silently dropped them from every category route (the built-in
     // registry in core/config.ts and the analyzer factories both list them). Kept in sync by the
     // cross-registry assertion in scripts/validate-rules-registry.js.
-    'simplify',
-    'python-modern',
-    'ts-modern',
-    'rust-modern',
-    'gdscript-modern',
-    'docs',
-    'data-architecture',
-    'test-modernity',
-    'dependency-layout',
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_DOCS,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
 ] as const;
 
 /**
@@ -95,31 +114,37 @@ export interface SparseRouteResult {
 export const CATEGORY_ANALYZER_MATRIX: Record<DiffSemanticCategory, readonly string[]> = {
     // Only literal values changed: strings, numbers, flags.
     // Sensitive to: hardcoded constants and secret credentials.
-    LITERAL_ONLY: ['constants', 'secrets'],
+    LITERAL_ONLY: [ANALYZER_CONSTANTS, ANALYZER_SECRETS],
 
     // Control flow mutations: if, switch, loops, try/catch, returns.
     // Sensitive to: cyclomatic/cognitive complexity, performance hot-paths, hygiene,
     // governance, security injection/eval.
-    CONTROL_FLOW: ['complexity', 'performance', 'hygiene', GOVERNANCE_ANALYZER_ID, 'security'],
+    CONTROL_FLOW: [
+        ANALYZER_COMPLEXITY,
+        ANALYZER_PERFORMANCE,
+        ANALYZER_HYGIENE,
+        ANALYZER_GOVERNANCE,
+        ANALYZER_SECURITY,
+    ],
 
     // Type definitions, class/function signatures, interfaces.
     // Sensitive to: architecture boundaries, governance, hygiene, comments/docs,
     // security DTO exposure.
     INTERFACE_SIGNATURE: [
-        'architecture',
-        GOVERNANCE_ANALYZER_ID,
-        'hygiene',
-        'comments',
-        'security',
+        ANALYZER_ARCHITECTURE,
+        ANALYZER_GOVERNANCE,
+        ANALYZER_HYGIENE,
+        ANALYZER_COMMENTS,
+        ANALYZER_SECURITY,
     ],
 
     // Imports, exports, require statements.
     // Sensitive to: dependency graph, architecture layering, governance.
-    IMPORT_EXPORT: ['dependency-graph', 'architecture', GOVERNANCE_ANALYZER_ID],
+    IMPORT_EXPORT: [ANALYZER_DEPENDENCY_GRAPH, ANALYZER_ARCHITECTURE, ANALYZER_GOVERNANCE],
 
     // Documentation / comment only changes.
     // Sensitive to: comments analyzer.
-    COMMENT_DOC_ONLY: ['comments'],
+    COMMENT_DOC_ONLY: [ANALYZER_COMMENTS],
 
     // Arbitrary general code changes.
     // Sensitive to: all analyzers.
@@ -131,38 +156,38 @@ export const CATEGORY_ANALYZER_MATRIX: Record<DiffSemanticCategory, readonly str
  * Directs focused reviewer subsets tailored to the project's operational domain.
  */
 export const ARCHETYPE_ANALYZER_MATRIX: Record<ProjectArchetype, readonly string[]> = {
-    demo: ['constants', 'hygiene', 'simplify', 'comments'],
+    demo: [ANALYZER_CONSTANTS, ANALYZER_HYGIENE, ANALYZER_SIMPLIFY, ANALYZER_COMMENTS],
     web: [
-        'security',
-        'hygiene',
-        'constants',
-        'performance',
-        GOVERNANCE_ANALYZER_ID,
-        'ts-modern',
-        'complexity',
+        ANALYZER_SECURITY,
+        ANALYZER_HYGIENE,
+        ANALYZER_CONSTANTS,
+        ANALYZER_PERFORMANCE,
+        ANALYZER_GOVERNANCE,
+        ANALYZER_TYPESCRIPT_MODERN,
+        ANALYZER_COMPLEXITY,
     ],
     game: [
-        'performance',
-        'gdscript-modern',
-        'rust-modern',
-        GOVERNANCE_ANALYZER_ID,
-        'hygiene',
-        'complexity',
-        'constants',
+        ANALYZER_PERFORMANCE,
+        ANALYZER_GDSCRIPT_MODERN,
+        ANALYZER_RUST_MODERN,
+        ANALYZER_GOVERNANCE,
+        ANALYZER_HYGIENE,
+        ANALYZER_COMPLEXITY,
+        ANALYZER_CONSTANTS,
     ],
     library: [
-        'architecture',
-        'dependency-graph',
-        'ts-modern',
-        'python-modern',
-        'rust-modern',
-        'docs',
-        'comments',
-        GOVERNANCE_ANALYZER_ID,
-        'hygiene',
-        'large-file',
-        'complexity',
-        'constants',
+        ANALYZER_ARCHITECTURE,
+        ANALYZER_DEPENDENCY_GRAPH,
+        ANALYZER_TYPESCRIPT_MODERN,
+        ANALYZER_PYTHON_MODERN,
+        ANALYZER_RUST_MODERN,
+        ANALYZER_DOCS,
+        ANALYZER_COMMENTS,
+        ANALYZER_GOVERNANCE,
+        ANALYZER_HYGIENE,
+        ANALYZER_LARGE_FILE,
+        ANALYZER_COMPLEXITY,
+        ANALYZER_CONSTANTS,
     ],
 };
 
