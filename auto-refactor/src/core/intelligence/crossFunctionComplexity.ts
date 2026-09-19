@@ -9,6 +9,11 @@
  *   issues; it performs no I/O and never throws.
  */
 /**
+ * Score ceiling applied when a metric saturates.
+ */
+const MAX_SCORE_CAP = 80;
+
+/**
  * Module: Core Intelligence — Spatiotemporal Complexity Semantic Analyzer
  * File Path: src/core/intelligence/semanticComplexity.ts
  * Architecture Role: Graph- and AST-driven semantic reasoning engine for time, space, and
@@ -135,7 +140,7 @@ export function analyzeCrossFunctionComplexity(
                 location: {
                     file: primaryCallerLoop.file,
                     start: { line: primaryCallerLoop.line, column: 1 },
-                    end: { line: primaryCallerLoop.line, column: 80 },
+                    end: { line: primaryCallerLoop.line, column: MAX_SCORE_CAP },
                 },
                 detail,
                 suggestion: `Pre-index data into a hash lookup before calling '${callee}'.`,

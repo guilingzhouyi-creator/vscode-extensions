@@ -16,6 +16,10 @@ export { MAX_COMPLEXITY_TRACE_DEPTH } from './crossFunctionComplexity';
  * Exit Semantics & Design Rationale: Pure in-memory graph walk without disk I/O or throwing;
  *   returns structured Issue records conforming strictly to the Section VII result schema.
  */
+/**
+ * Score ceiling applied when a metric saturates.
+ */
+const MAX_SCORE_CAP = 80;
 
 import type { CallGraph } from './callGraph';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
@@ -148,7 +152,7 @@ export function detectUnboundedRecursion(
                         location: {
                             file,
                             start: { line: primaryLine, column: 1 },
-                            end: { line: primaryLine, column: 80 },
+                            end: { line: primaryLine, column: MAX_SCORE_CAP },
                         },
                         detail,
                         suggestion:
@@ -238,7 +242,7 @@ export function detectComplexityAmplification(loopSites: Map<string, LoopSite[]>
                     location: {
                         file: site.file,
                         start: { line: site.line, column: 1 },
-                        end: { line: site.line, column: 80 },
+                        end: { line: site.line, column: MAX_SCORE_CAP },
                     },
                     detail,
                     suggestion: 'Refactor to batch read/write before or after the loop.',
@@ -297,7 +301,7 @@ export function detectComplexityAmplification(loopSites: Map<string, LoopSite[]>
                     location: {
                         file: site.file,
                         start: { line: site.line, column: 1 },
-                        end: { line: site.line, column: 80 },
+                        end: { line: site.line, column: MAX_SCORE_CAP },
                     },
                     detail,
                     suggestion: 'Hoist allocation outside the loop and clear/reuse the instance.',

@@ -9,6 +9,21 @@
  *   the caller keeps the analyzer wiring and severity policy.
  */
 /**
+ * Scale factor converting a ratio into per-mille units.
+ */
+const METRIC_SCALE = 1000;
+
+/**
+ * Scale factor converting a ratio into a whole percentage.
+ */
+const PERCENT_SCALE = 100;
+
+/**
+ * Score ceiling applied when a metric saturates.
+ */
+const MAX_SCORE_CAP = 80;
+
+/**
  * Module: Core Intelligence — Test Modernity & Contract Fulfillment
  * File Path: src/core/intelligence/testModernity.ts
  * Architecture Role: Evaluates test suites for actual business risk mitigation, contract
@@ -58,12 +73,12 @@ export function computeTestModernityMetrics(
     }
 
     const nlocDivisor = Math.max(1, activeTestNloc);
-    const emtd = Math.round((1000 * weightedQualitySum) / nlocDivisor);
+    const emtd = Math.round((METRIC_SCALE * weightedQualitySum) / nlocDivisor);
     const cbcr = totalWeight > 0 ? weightedFreshCoverageSum / totalWeight : 1.0;
 
     return {
         emtd,
-        cbcr: Math.round(cbcr * 1000) / 1000,
+        cbcr: Math.round(cbcr * METRIC_SCALE) / METRIC_SCALE,
         activeTestNloc,
         activeSemanticUnits: units.length,
         coveredSemanticUnits: coveredCount,
@@ -82,7 +97,7 @@ export function evaluateTestModernityThresholds(
     domain: string,
     options: TestModernityOptions = {},
 ): Issue[] {
-    const minEmtd = options.minEmtd ?? 100;
+    const minEmtd = options.minEmtd ?? PERCENT_SCALE;
     const minCbcr = options.minCbcr ?? 0.7;
     const issues: Issue[] = [];
 
@@ -119,7 +134,7 @@ export function evaluateTestModernityThresholds(
             location: {
                 file: `tests/unit/${domain}.test.ts`,
                 start: { line: 1, column: 1 },
-                end: { line: 1, column: 80 },
+                end: { line: 1, column: MAX_SCORE_CAP },
             },
             detail,
             suggestion: 'Increase effective contract assertions for active domain workflows.',
