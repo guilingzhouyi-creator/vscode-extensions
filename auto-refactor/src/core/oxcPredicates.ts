@@ -118,6 +118,20 @@ export function oxcKindOf(n: OxcNode): NodeKind {
     );
 }
 
+const OXC_BRANCH_WEIGHT_TYPES = new Set([
+    'IfStatement',
+    'ForStatement',
+    'ForInStatement',
+    'ForOfStatement',
+    'WhileStatement',
+    'DoWhileStatement',
+    'SwitchStatement',
+    'CatchClause',
+    'ConditionalExpression',
+]);
+
+const OXC_LOGICAL_OPS = new Set(['&&', '||', '??']);
+
 /**
  * Calculate cyclomatic decision-point weight for an oxc node (SwitchCase default -> 0).
  *
@@ -125,28 +139,12 @@ export function oxcKindOf(n: OxcNode): NodeKind {
  * @returns Decision point branch weight (0 or 1).
  */
 export function oxcBranchWeightOf(n: OxcNode): number {
-    switch (n.type) {
-        case 'IfStatement':
-        case 'ForStatement':
-        case 'ForInStatement':
-        case 'ForOfStatement':
-        case 'WhileStatement':
-        case 'DoWhileStatement':
-        case 'SwitchStatement':
-        case 'CatchClause':
-        case 'ConditionalExpression':
-            return 1;
-        case 'SwitchCase':
-            return n.test ? 1 : 0;
-        case 'BinaryExpression':
-        case 'LogicalExpression': {
-            const op = n.operator;
-            if (op === '&&' || op === '||' || op === '??') return 1;
-            return 0;
-        }
-        default:
-            return 0;
+    if (OXC_BRANCH_WEIGHT_TYPES.has(n.type)) return 1;
+    if (n.type === 'SwitchCase') return n.test ? 1 : 0;
+    if (n.type === 'BinaryExpression' || n.type === 'LogicalExpression') {
+        return OXC_LOGICAL_OPS.has(n.operator as string) ? 1 : 0;
     }
+    return 0;
 }
 
 /**
@@ -295,7 +293,8 @@ function oxcIsStringTolerated(node: OxcNode, p: OxcNode, ctx: Ctx): boolean {
     if (p.type === NODE_KIND_MEMBER_EXPRESSION && !p.computed) return true;
     if (p.type === 'JSXAttribute' && p.name === node) return true;
     if (p.type === 'JSXElement' || p.type === 'JSXOpeningElement') return false;
-    if (p.type === 'CallExpression' && Array.isArray(p.arguments) && p.arguments.includes(node)) {
+    const args = p.arguments;
+    if (p.type === 'CallExpression' && Array.isArray(args) && args.includes(node)) {
         const callee = p.callee ? ctx.src.slice(p.callee.start, p.callee.end) : '';
         if (/\b(t|i18n\.\w*|translate|fmt|formatMessage)\s*$/.test(callee)) return true;
     }
