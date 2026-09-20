@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.3.0-1789896094528",
-  "timestamp": "2026-09-20T09:21:34.528Z",
+  "snapshotId": "snapshot-v0.3.0-1789905392776",
+  "timestamp": "2026-09-20T11:56:32.776Z",
   "versions": {
     "engineVersion": "0.3.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "f4e29dd072010710dd4684b36b28e8847d3db4abda27bd41a4833d2d610702ea",
+  "rulesDigest": "fbf9d99cc72e31d7b9dffcf13881aa208ce7cc9d5783e771bceed080dbfab5e1",
   "configDigest": "0dab70dfd67cf93720953c6122883d8cdd4ac66e771123293a95b01694f21f75",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 146,
+    "ruleCount": 155,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -120,6 +120,15 @@
     "import-cycle",
     "large-file",
     "loop-transient-allocation",
+    "NAM-COL-001",
+    "NAM-DIR-001",
+    "NAM-FIL-001",
+    "NAM-GLB-001",
+    "NAM-GLB-002",
+    "NAM-MBR-001",
+    "NAM-SGL-001",
+    "NAM-TYP-001",
+    "NAM-VAG-001",
     "nested-constant",
     "PRF-ALG-001",
     "PRF-IO-001",
