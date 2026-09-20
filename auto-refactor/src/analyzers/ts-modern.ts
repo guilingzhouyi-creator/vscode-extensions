@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis Engine — TypeScript/JavaScript Modernization Rules
- * File Path: src/analyzers/tsModern.ts
+ * File Path: src/analyzers/ts-modern.ts
  * Architecture Role: TS/JS-only style analyzer (a language pack bound to the language family,
  *     never to a project) — the TypeScript counterpart of the Python modernization pack
  * Dependencies & Triggers: core types only; enabled when a config declares `analyzers.ts-modern`;

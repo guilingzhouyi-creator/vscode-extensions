@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis Engine — GDScript Modernization Rules
- * File Path: src/analyzers/gdscriptModern.ts
+ * File Path: src/analyzers/gdscript-modern.ts
  * Architecture Role: GDScript-only style analyzer (a language pack bound to the language, never to
  *     a project) — Godot 3 → 4 migration findings, which no mature external linter covers
  * Dependencies & Triggers: core types + the shared source masker; enabled when a config declares

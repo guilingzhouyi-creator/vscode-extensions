@@ -30,7 +30,8 @@ import {
     detectComplexityAmplification,
     isBoundedCollection,
 } from '../core/intelligence/semanticComplexity';
-import { evaluateStructuredClarity, formatOptimizationHint } from './structuredClarity';
+import { evaluateStructuredClarity, formatOptimizationHint } from './structured-clarity';
+import { TypeScriptAdapter } from '../core/typescriptAdapter';
 
 /**
  * Maximum window of lines inside a loop body inspected for allocations and blocking I/O.
@@ -96,8 +97,6 @@ export class ComplexityAnalyzer implements Analyzer {
         this.loopSites.clear();
         this.maskedLines = maskedLinesOfPath(ctx.filePath, ctx.content);
 
-        const { TypeScriptAdapter } =
-            require('../core/typescriptAdapter') as typeof import('../core/typescriptAdapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sf.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [

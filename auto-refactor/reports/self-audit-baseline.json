@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.3.0-1789905405798",
-  "timestamp": "2026-09-20T11:56:47.792Z",
+  "snapshotId": "snapshot-v0.3.0-1789906782527",
+  "timestamp": "2026-09-20T12:19:44.365Z",
   "versions": {
     "engineVersion": "0.3.0",
     "ruleVersion": "2026.09-v1",
@@ -13,24 +13,24 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 313,
-    "durationMs": 1852
+    "durationMs": 1699
   },
   "metrics": {
     "compositeScore": 99.8,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 6674,
+    "totalIssues": 6672,
     "suppressedIssues": 2754,
-    "unsuppressedIssues": 3920,
+    "unsuppressedIssues": 3918,
     "bySeverity": {
       "info": 208,
-      "warning": 6466,
+      "warning": 6464,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 216,
-      "medium": 5781,
+      "medium": 5779,
       "low": 677
     }
   },
@@ -154,7 +154,7 @@
     "summary": {
       "critical": 0,
       "high": 216,
-      "medium": 5781,
+      "medium": 5779,
       "low": 677
     },
     "criticalItems": [],
@@ -331,21 +331,21 @@
         "message": "Function \"ArchitectureAnalyzer.auditDomainImports\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/complexity.ts:66",
+        "id": "complexity:high-complexity:src/analyzers/complexity.ts:67",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/complexity.ts",
-        "line": 66,
+        "line": 67,
         "message": "Function \"nameFor\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/complexity.ts:108",
+        "id": "complexity:high-complexity:src/analyzers/complexity.ts:107",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/complexity.ts",
-        "line": 108,
+        "line": 107,
         "message": "Function \"ComplexityAnalyzer.visit\" has cyclomatic complexity 19 (threshold 12)."
       },
       {
@@ -385,47 +385,47 @@
         "message": "Function \"ConstantsAnalyzer.detectDuplicates\" has cyclomatic complexity 23 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/dataArchitecture.ts:107",
+        "id": "complexity:high-complexity:src/analyzers/data-architecture.ts:107",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/dataArchitecture.ts",
+        "file": "src/analyzers/data-architecture.ts",
         "line": 107,
         "message": "Function \"DataArchitectureAnalyzer.analyze\" has cyclomatic complexity 20 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/dependencyLayout.ts:42",
+        "id": "complexity:high-complexity:src/analyzers/dependency-layout.ts:42",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/dependencyLayout.ts",
+        "file": "src/analyzers/dependency-layout.ts",
         "line": 42,
         "message": "Function \"DependencyLayoutAnalyzer.analyze\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/dependencyLayout.ts:86",
+        "id": "complexity:high-complexity:src/analyzers/dependency-layout.ts:86",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/dependencyLayout.ts",
+        "file": "src/analyzers/dependency-layout.ts",
         "line": 86,
         "message": "Function \"visit\" has cyclomatic complexity 18 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/dependencyLayout.ts:216",
+        "id": "complexity:high-complexity:src/analyzers/dependency-layout.ts:216",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/dependencyLayout.ts",
+        "file": "src/analyzers/dependency-layout.ts",
         "line": 216,
         "message": "Function \"DependencyLayoutAnalyzer.checkFunctionState\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/dependencyLayout.ts:249",
+        "id": "complexity:high-complexity:src/analyzers/dependency-layout.ts:249",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/dependencyLayout.ts",
+        "file": "src/analyzers/dependency-layout.ts",
         "line": 249,
         "message": "Function \"DependencyLayoutAnalyzer.parseLineImport\" has cyclomatic complexity 15 (threshold 12)."
       },
@@ -475,20 +475,20 @@
         "message": "Function \"PerformanceAnalyzer.handleComments\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/pythonModern.ts:307",
+        "id": "complexity:high-complexity:src/analyzers/python-modern.ts:307",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/pythonModern.ts",
+        "file": "src/analyzers/python-modern.ts",
         "line": 307,
         "message": "Function \"PythonModernAnalyzer.auditControlFlow\" has cyclomatic complexity 16 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-001:src/analyzers/pythonModern.ts:493",
+        "id": "performance:PRF-ALG-001:src/analyzers/python-modern.ts:493",
         "rule": "PRF-ALG-001",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/pythonModern.ts",
+        "file": "src/analyzers/python-modern.ts",
         "line": 493,
         "message": "High algorithmic complexity risk: Found 3 levels of nested loops (potential O(N^3) compute hotspot, threshold 3)"
       },
@@ -538,56 +538,56 @@
         "message": "Function \"SimplifyAnalyzer.pythonBodyIsEmpty\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/testModernity.ts:89",
+        "id": "complexity:high-complexity:src/analyzers/test-modernity.ts:89",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/testModernity.ts",
+        "file": "src/analyzers/test-modernity.ts",
         "line": 89,
         "message": "Function \"TestModernityAnalyzer.analyze\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/testModernity.ts:326",
+        "id": "complexity:high-complexity:src/analyzers/test-modernity.ts:326",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/testModernity.ts",
+        "file": "src/analyzers/test-modernity.ts",
         "line": 326,
         "message": "Function \"TestModernityAnalyzer.checkTautological\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/testModernity.ts:380",
+        "id": "complexity:high-complexity:src/analyzers/test-modernity.ts:380",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/testModernity.ts",
+        "file": "src/analyzers/test-modernity.ts",
         "line": 380,
         "message": "Function \"TestModernityAnalyzer.analyzeWithLines\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
-        "id": "complexity:CPX-SPACE-001:src/analyzers/testModernity.ts:389",
+        "id": "complexity:CPX-SPACE-001:src/analyzers/test-modernity.ts:389",
         "rule": "CPX-SPACE-001",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/testModernity.ts",
+        "file": "src/analyzers/test-modernity.ts",
         "line": 389,
         "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'lines.length'."
       },
       {
-        "id": "performance:PRF-MEM-001:src/analyzers/testModernity.ts:404",
+        "id": "performance:PRF-MEM-001:src/analyzers/test-modernity.ts:404",
         "rule": "PRF-MEM-001",
         "tier": "high",
         "severity": "info",
-        "file": "src/analyzers/testModernity.ts",
+        "file": "src/analyzers/test-modernity.ts",
         "line": 404,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/testModernity.ts:471",
+        "id": "complexity:high-complexity:src/analyzers/test-modernity.ts:471",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/analyzers/testModernity.ts",
+        "file": "src/analyzers/test-modernity.ts",
         "line": 471,
         "message": "Function \"TestModernityAnalyzer.buildSemanticUnits\" has cyclomatic complexity 12 (threshold 12)."
       },

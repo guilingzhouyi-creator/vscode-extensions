@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis Engine — Rust Modernization Rules
- * File Path: src/analyzers/rustModern.ts
+ * File Path: src/analyzers/rust-modern.ts
  * Architecture Role: Rust-only style analyzer (a language pack bound to the language, never to a
  *     project) — the Rust counterpart of the Python/TypeScript modernization packs
  * Dependencies & Triggers: core types + the shared source masker; enabled when a config declares

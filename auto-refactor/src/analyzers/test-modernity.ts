@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis — Test Modernity & Business Contract Fulfillment
- * File Path: src/analyzers/testModernity.ts
+ * File Path: src/analyzers/test-modernity.ts
  * Architecture Role: Analyzer adapter implementing the Analyzer contract; inspects test suites
  *   for effective business risk mitigation, contract freshness, and assertion validity.
  * Dependencies & Triggers: Core types (Analyzer, AnalyzerContext, Issue), testModernity

@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis — Import, Dependency & External Resource Layout
- * File Path: src/analyzers/dependencyLayout.ts
+ * File Path: src/analyzers/dependency-layout.ts
  * Architecture Role: Analyzer adapter implementing the Analyzer contract; inspects file layout,
  *   import grouping orders, in-function imports, and unmanaged remote URLs.
  * Dependencies & Triggers: Core types (Analyzer, AnalyzerContext, Issue), dependencyLayout

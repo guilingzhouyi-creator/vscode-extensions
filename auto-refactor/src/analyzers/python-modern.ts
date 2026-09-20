@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis Engine — Python Modernization Rules
- * File Path: src/analyzers/pythonModern.ts
+ * File Path: src/analyzers/python-modern.ts
  * Architecture Role: Python-only style analyzer (a language pack: binds to Python, not to
  *     a project) — pathlib, exception chaining, mutable defaults, async blocking, f-strings,
  * Dependencies & Triggers: core types only; enabled when a config declares

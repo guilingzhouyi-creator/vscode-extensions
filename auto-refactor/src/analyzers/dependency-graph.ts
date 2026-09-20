@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis Engine — Dependency Graph Analyzer
- * File Path: src/analyzers/dependencyGraph.ts
+ * File Path: src/analyzers/dependency-graph.ts
  * Architecture Role: Per-file analyzer adapter enforcing declarative import boundaries
  * Dependencies & Triggers: core types plus `path`; triggered when `analyzers["dependency-graph"]`
  *   is enabled by CLI / CI / daemon scans, and also through the standalone analyze() contract

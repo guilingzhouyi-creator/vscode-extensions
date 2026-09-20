@@ -11,7 +11,7 @@ function firstWord(name: string): string {
 
 /**
  * Module: Static Analysis — Large File & Decomposition Analyzer
- * File Path: src/analyzers/largeFile.ts
+ * File Path: src/analyzers/large-file.ts
  * Architecture Role: Analyzer adapter serving both the single-pass streaming path
  *   (visit/finalize) and the standalone analyze() contract.
  * Dependencies & Triggers: Core types, NodeKind/NormalizedNode, runStreaming, plus a lazy

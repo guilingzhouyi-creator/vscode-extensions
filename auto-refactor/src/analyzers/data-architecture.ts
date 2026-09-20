@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis — Data Access & Architecture Modernization
- * File Path: src/analyzers/dataArchitecture.ts
+ * File Path: src/analyzers/data-architecture.ts
  * Architecture Role: Analyzer adapter implementing the Analyzer contract; inspects data layer
  *   boundaries, query shapes, N+1 patterns, and serialization hotspots.
  * Dependencies & Triggers: Core types (Analyzer, AnalyzerContext, Issue), dataArchitecture

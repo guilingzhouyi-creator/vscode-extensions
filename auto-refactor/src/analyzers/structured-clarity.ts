@@ -1,6 +1,6 @@
 /**
  * Module: Static Analysis Engine — Structured Clarity Exemption Evaluator
- * File Path: src/analyzers/structuredClarity.ts
+ * File Path: src/analyzers/structured-clarity.ts
  * Architecture Role: Evaluates functions for structured clarity, shallow branching depth, and
  *   explicit dispatch patterns to grant elastic cyclomatic complexity exemptions.
  * Dependencies & Triggers: ../core/types, ../core/multilang; called by ComplexityAnalyzer.

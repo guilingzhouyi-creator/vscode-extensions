@@ -23,10 +23,10 @@ import type { Analyzer, AnalyzerId, ScanConfig } from './types';
 import { AutoRefactorError } from './logger';
 import { instantiateAnalyzer } from './loadAnalyzer';
 import { ConstantsAnalyzer } from '../analyzers/constants';
-import { LargeFileAnalyzer } from '../analyzers/largeFile';
+import { LargeFileAnalyzer } from '../analyzers/large-file';
 import { ComplexityAnalyzer } from '../analyzers/complexity';
 import { GovernanceAnalyzer } from '../analyzers/governance';
-import { DependencyGraphAnalyzer } from '../analyzers/dependencyGraph';
+import { DependencyGraphAnalyzer } from '../analyzers/dependency-graph';
 import { SecretsAnalyzer } from '../analyzers/secrets';
 import { ArchitectureAnalyzer } from '../analyzers/architecture';
 import { PerformanceAnalyzer } from '../analyzers/performance';
@@ -34,14 +34,14 @@ import { CommentAnalyzer } from '../analyzers/comments';
 import { HygieneAnalyzer } from '../analyzers/hygiene';
 import { SecurityAnalyzer } from '../analyzers/security';
 import { SimplifyAnalyzer } from '../analyzers/simplify';
-import { PythonModernAnalyzer } from '../analyzers/pythonModern';
-import { TsModernAnalyzer } from '../analyzers/tsModern';
-import { RustModernAnalyzer } from '../analyzers/rustModern';
-import { GdscriptModernAnalyzer } from '../analyzers/gdscriptModern';
+import { PythonModernAnalyzer } from '../analyzers/python-modern';
+import { TsModernAnalyzer } from '../analyzers/ts-modern';
+import { RustModernAnalyzer } from '../analyzers/rust-modern';
+import { GdscriptModernAnalyzer } from '../analyzers/gdscript-modern';
 import { DocsAnalyzer } from '../analyzers/docs';
-import { DataArchitectureAnalyzer } from '../analyzers/dataArchitecture';
-import { TestModernityAnalyzer } from '../analyzers/testModernity';
-import { DependencyLayoutAnalyzer } from '../analyzers/dependencyLayout';
+import { DataArchitectureAnalyzer } from '../analyzers/data-architecture';
+import { TestModernityAnalyzer } from '../analyzers/test-modernity';
+import { DependencyLayoutAnalyzer } from '../analyzers/dependency-layout';
 import { NamingAnalyzer } from '../analyzers/naming';
 
 /**
@@ -114,10 +114,10 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
  */
 export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     constants: '../analyzers/constants',
-    'large-file': '../analyzers/largeFile',
+    'large-file': '../analyzers/large-file',
     complexity: '../analyzers/complexity',
     governance: '../analyzers/governance',
-    'dependency-graph': '../analyzers/dependencyGraph',
+    'dependency-graph': '../analyzers/dependency-graph',
     secrets: '../analyzers/secrets',
     architecture: '../analyzers/architecture',
     performance: '../analyzers/performance',
@@ -125,14 +125,14 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     hygiene: '../analyzers/hygiene',
     security: '../analyzers/security',
     simplify: '../analyzers/simplify',
-    'python-modern': '../analyzers/pythonModern',
-    'ts-modern': '../analyzers/tsModern',
-    'rust-modern': '../analyzers/rustModern',
-    'gdscript-modern': '../analyzers/gdscriptModern',
+    'python-modern': '../analyzers/python-modern',
+    'ts-modern': '../analyzers/ts-modern',
+    'rust-modern': '../analyzers/rust-modern',
+    'gdscript-modern': '../analyzers/gdscript-modern',
     docs: '../analyzers/docs',
-    'data-architecture': '../analyzers/dataArchitecture',
-    'test-modernity': '../analyzers/testModernity',
-    'dependency-layout': '../analyzers/dependencyLayout',
+    'data-architecture': '../analyzers/data-architecture',
+    'test-modernity': '../analyzers/test-modernity',
+    'dependency-layout': '../analyzers/dependency-layout',
     naming: '../analyzers/naming',
 };
 

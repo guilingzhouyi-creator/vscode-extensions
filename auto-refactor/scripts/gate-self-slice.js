@@ -207,12 +207,12 @@ function extractAllSlices(targetFiles, extractor) {
  */
 function resolveTargetFiles(explicitFiles, isSmoke) {
   if (explicitFiles && explicitFiles.length > 0) return explicitFiles;
-  const changed = getGitChangedFiles();
-  if (changed.length > 0) return changed;
   if (isSmoke) {
     process.stdout.write('[gate:self:slice] --smoke mode: targeting default slice\n');
     return ['src/core/router/sparseMoEGate.ts'];
   }
+  const changed = getGitChangedFiles();
+  if (changed.length > 0) return changed;
   return [];
 }
 

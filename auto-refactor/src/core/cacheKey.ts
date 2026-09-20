@@ -69,7 +69,7 @@ const TYPESCRIPT_ADAPTER_ID = 'typescript';
 /** Built-in adapter module-path map (mirrors analyzer.ts BUILTIN_MODULE_PATHS). */
 const BUILTIN_MODULE_PATHS: Record<string, string> = {
     constants: '../analyzers/constants',
-    'large-file': '../analyzers/largeFile',
+    'large-file': '../analyzers/large-file',
     complexity: '../analyzers/complexity',
     governance: '../analyzers/governance',
 };
