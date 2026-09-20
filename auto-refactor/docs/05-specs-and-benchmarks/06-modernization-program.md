@@ -89,7 +89,7 @@
 1. **规则 ID**：`FAMILY-TOPIC-NNN`（大写、主题 2–4 词、3 位序号）；家族清单固定：`LANG / CMT / SIM / HYG / GOV / PRF / SEC / ARCH / PYM / DOC / DB`。
 2. **选项名**：camelCase + 单位/语义后缀（`Ms`/`Lines`/`Threshold`/`Patterns`）；统一 `*AllowPatterns`（弃用 `*AllowList` 别名一版）。
 3. **代码命名**：文件 kebab-case、类 PascalCase、函数/变量 camelCase、常量 UPPER_SNAKE；Python 侧由 `HYG-NAM-001`/`PYM-*` 覆盖。
-4. **守卫**：`scripts/validate-naming-conventions.js` —— 规则 ID 正则、选项名白名单、文档标题格式、通用缩写禁用表（`cfg`/`mgr`/`tmp` 等仅在私有作用域允许）。
+4. **守卫**：目前由 `scripts/validate-rules-registry.js` 与 `scripts/validate-self-norms.js`（以及计划中专属的例如 `scripts/validate-naming-conventions.js`）联合看守 —— 规则 ID 正则、选项名白名单、文档标题格式、通用缩写禁用表（`cfg`/`mgr`/`tmp` 等仅在私有作用域允许）。
 5. **迁移**：旧选项名保留一个版本（配置层吸收 + `CHANGELOG` 标注），下一大版本移除。
 
 **验收**：命名守卫进 `npm test`；新增规则/选项不需要人工记忆命名规则。

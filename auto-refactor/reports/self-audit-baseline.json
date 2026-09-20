@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.3.0-1789895254287",
-  "timestamp": "2026-09-20T09:07:36.076Z",
+  "snapshotId": "snapshot-v0.3.0-1789896106662",
+  "timestamp": "2026-09-20T09:21:48.429Z",
   "versions": {
     "engineVersion": "0.3.0",
     "ruleVersion": "2026.09-v1",
@@ -13,7 +13,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 310,
-    "durationMs": 1654
+    "durationMs": 1628
   },
   "metrics": {
     "compositeScore": 99.8,

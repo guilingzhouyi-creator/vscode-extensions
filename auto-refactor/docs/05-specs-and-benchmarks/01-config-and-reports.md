@@ -6,7 +6,7 @@
 
 ---
 
-## 1. 配置文件模式 (`auto-refactor.config.json`)
+## 1. 配置文件模式 (`ar.config.json`)
 
 引擎提供完整的 JSON Schema 校验支持（`config.schema.json`）：
 
@@ -55,11 +55,13 @@
 > 与 `matchAnalyzer` / `matchRule` / `matchSymbol` 可组合，`reason` 必填；命中的发现**仍留在报告里**
 > 并标记 suppression（可审计），只是不再计入门禁阻断。
 
-`summary` 除计数外还带两个**自检字段**，用于区分「真零违规」与「规则没跑」：
+`summary` 除计数外还带以下**自检与可观测性字段**，用于区分「真零违规」与「规则没跑」：
 
 - `summary.disabledAnalyzers`：被有效配置关闭的分析器清单（`enabled === false`）；`text` 输出打印为 `skipped (disabled) analyzers: …`。
 - `summary.warnings`：配置自检提示——include 命中 0 文件、缓存回退重读建图、**语言包关闭却扫到了该语言的文件**（`.py` + `python-modern` 关闭、`.md` + `docs` 关闭）时的 `analyzer coverage:` 提示，以及增量口径下跳过跨文件通道的 `incremental scope:` 说明。
 - `summary.postScanPasses`：本报告实际执行的后处理通道（`suppressions` / `dependency-graph` / `baseline`，按执行顺序）。全量扫描含跨文件通道，增量扫描不含——消费方据此判断「这份报告能不能回答跨文件问题」。
+- `summary.activatedReviewers`：Sparse MoE 稀疏激活结果（`archetype`、`active`、`skipped`、`activationRatio`、`reason`），明确标识领域分析器激活比例与节约的计算量。
+- `summary.uncertainty`：不确定性证据模型度量（`requiresRuntimeCount`、`averageConfidence`），精确量化静态不可证问题。
 
 ## 质量分的可评估性契约（notEvaluated / coverage）
 

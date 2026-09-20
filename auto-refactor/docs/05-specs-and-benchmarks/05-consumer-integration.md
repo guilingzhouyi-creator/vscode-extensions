@@ -56,9 +56,11 @@ node <engine>/templates/consumer/run.mjs --root <project> --fail-on-severity war
   auto-refactor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout target project repository
+        uses: actions/checkout@v4
         with: { path: project }
-      - uses: actions/checkout@v4
+      - name: Checkout auto-refactor engine repository
+        uses: actions/checkout@v4.2.2
         with:
           repository: <org>/vscode-extensions
           path: engine

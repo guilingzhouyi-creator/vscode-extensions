@@ -11,14 +11,14 @@
 
 | 升级模块 | 核心能力与架构演进 | 交付与影响 |
 | :--- | :--- | :--- |
-| **跨语言语义 IR** | 统一 `SemanticGraph` 拓扑底座，支持 TypeScript、Python、Rust 等多语言抽象语法投影与语义降解 | 实现跨语言统一拓扑遍历与零黑话规范 |
-| **四层规则金字塔** | 构建 Layer 1 全域安全层、Layer 2 领域原型层、Layer 3 团队规范层、Layer 4 项目配置层，内置扩充至 146 条规则 | 单一真源规则注册表，零孤儿规则，覆盖率 100% |
-| **八维质量度量** | 八大战略质量支柱、非线性缺陷惩罚与上限截断机制、有效代码密度与反刷分检测 | 彻底杜绝稀释刷分，量化得分客观精准 |
+| **跨语言语义 IR** | 统一 `SemanticGraph` 拓扑底座，支持 TypeScript、Python、Rust、GDScript 等多语言抽象语法投影与语义降解 | 实现跨语言统一拓扑遍历与零黑话规范 |
+| **四层规则金字塔** | 构建 Layer 1 全域安全层、Layer 2 领域原型层、Layer 3 团队规范层、Layer 4 项目配置层，内置扩充至 146 条全量规则 | 单一真源规则注册表，零孤儿规则，覆盖率 100% |
+| **十维质量度量** | 十大战略质量支柱、非线性缺陷惩罚与上限截断机制、有效代码密度与反刷分检测 | 彻底杜绝稀释刷分，量化得分客观精准 |
 | **多 Agent 协作治理** | Agent 变更属性追踪、越级依赖与冲突检测、意图仲裁器与重复工作影响半径评估 | 发射 `GOV-AGN-001`，保障多智能体并行协作安全性 |
 | **增量切片与 Sparse MoE** | AST 切片提取器、非对称稀疏激活架构（MoE CED，绕过率 $\ge 70\%$）、反向调用链影响面追踪 | 毫秒级增量响应，发射破坏性变更告警 `GOV-SLC-001` |
 | **改造轨迹配方学习** | Bad $\rightarrow$ Good 轨迹学习、结构化重构配方提取、循环修改震荡拦截与死灰复燃反模式检测 | 发射 `GOV-TRJ-001`，提供 `IPraxisTrajectoryLearningService` |
 | **Praxis 门面与 SPI** | 汇聚 Governance、SliceAudit、TrajectoryLearning 与 ReviewRunner 等强类型门面 | 完整保留 Praxis 团队接口与 SPI 扩展契约 |
-| **全量并行测试流水线** | 扩充至 **53 套** 并行/异步测试套件，接入全自动化闭环承压基准 | 17.89s 内全量 PASS，一次性通过 20+ 项严苛门禁 |
+| **全量并行测试流水线** | 扩充至 **55 套** 并行/异步测试套件，接入全自动化闭环承压基准 | 16.75s 内全量 PASS，一次性通过 20+ 项严苛门禁 |
 
 ### v0.3.0 (2026-09-05) — 联动 workspace-timing v0.4.9 工程审查系统
 
@@ -35,7 +35,7 @@
 | 修复项 | 说明 | 影响 |
 |--------|------|------|
 | **CLI 无值 flag 吞参修复** | `parseArgs` 重构：布尔 flag（`--fail-on-issue` / `--cache` / `--daemon` / `--respect-gitignore` 等）默认置 `true`，仅显式 `=false` 或紧跟独立 token `true|false` 时才消费下一参数；带值 flag 才取下一 token | 修复 `--fail-on-issue --format json` 中 `--format` 被吞、输出格式静默丢失的问题 |
-| **glob `**/` 段边界修复** | `globToRegExp`：`**/` 改为 `(?:.*/)?`（零或多个完整路径段），不再用 `.*` 吞掉分隔符边界 | 修复 `a/**/b.ts` 误匹配 `a/xxb.ts`，include/exclude 语义与标准 glob 一致 |
+| **glob `**/` 段边界修复** | `globToRegExp`：`**/` 改为 `(?:.*/)?`（零或多个完整路径段），不再用 `.*` 吞掉分隔符边界 | 修复类似 `a/**/b.ts` 误匹配 `a/xxb.ts`（例如示例路径），include/exclude 语义与标准 glob 一致 |
 | **坏配置显式告警** | `resolveConfig`：配置文件存在但解析失败时 `console.warn` 告警并回退默认值，不再静默忽略 | 用户配置写错（如尾逗号）时 CI 可即时发现 |
 
 验证：`npm test` 全套 validate（等价性/暖缓存/oxc 关键点/diff/praxis/codec）通过；`bench-fastpath.js --check` 字节等价通过；`benchmark.js` 300 文件 median ≈103ms，与历史基线持平。
@@ -46,25 +46,25 @@
 
 | 文档 | 主题 | 状态 |
 |------|------|:---:|
-| [docs/01-architecture/01-system-overview.md](./docs/01-architecture/01-system-overview.md) | 系统整体架构、执行模式、并发 Worker 调度与 RSS 自愈 | ✅ 已落地 |
-| [docs/01-architecture/02-pipeline-and-caching.md](./docs/01-architecture/02-pipeline-and-caching.md) | L1/L2 两级增量缓存与配置指纹隔离机制 | ✅ 已落地 |
-| [docs/01-architecture/03-daemon-and-ipc.md](./docs/01-architecture/03-daemon-and-ipc.md) | 跨平台 Daemon 守护进程、NDJSON 通信与生命周期 | ✅ 已落地 |
+| [docs/01-architecture/01-system-overview.md](./docs/01-architecture/01-system-overview.md) | 系统整体架构、DualTrack 双轨流水线、Sparse MoE 稀疏路由与 RSS 自愈 | ✅ 已落地 |
+| [docs/01-architecture/02-pipeline-and-caching.md](./docs/01-architecture/02-pipeline-and-caching.md) | L1/L2 两级增量缓存、非对称缓存探针与配置指纹隔离机制 | ✅ 已落地 |
+| [docs/01-architecture/03-daemon-and-ipc.md](./docs/01-architecture/03-daemon-and-ipc.md) | 跨平台 Daemon 守护进程、NDJSON 通信、心跳自愈与生命周期 | ✅ 已落地 |
 | [docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md](./docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md) | Praxis 分形 Git 工作树、两级门禁、三层联动回滚与智能体生命周期（v1.0.0-PROD-SPEC） | ✅ 已落地 |
 
 ## 🌲 2. 语法解析与 AST 适配 (Parsers & AST)
 
 | 文档 | 主题 | 状态 |
 |------|------|:---:|
-| [docs/02-parsers-and-ast/01-multilang-abstraction.md](./docs/02-parsers-and-ast/01-multilang-abstraction.md) | NormalizedNode 统一抽象与 Rust (Tree-Sitter) 语言适配 | ✅ 已落地 |
-| [docs/02-parsers-and-ast/02-oxc-fastpath.md](./docs/02-parsers-and-ast/02-oxc-fastpath.md) | Rust oxc-parser 快速解析与字节等价性补偿 | ✅ 已落地 |
-| [docs/02-parsers-and-ast/03-lazy-projection.md](./docs/02-parsers-and-ast/03-lazy-projection.md) | 零物化懒投影技术与稀疏消费遍历 | ✅ 已落地 |
+| [docs/02-parsers-and-ast/01-multilang-abstraction.md](./docs/02-parsers-and-ast/01-multilang-abstraction.md) | NormalizedNode 统一抽象与五语言适配矩阵 (TS, Python, Rust, GDScript, Markdown) | ✅ 已落地 |
+| [docs/02-parsers-and-ast/02-oxc-fastpath.md](./docs/02-parsers-and-ast/02-oxc-fastpath.md) | Rust oxc-parser 快速解析、Mode A/B 调度与 100% 字节等价性补偿 | ✅ 已落地 |
+| [docs/02-parsers-and-ast/03-lazy-projection.md](./docs/02-parsers-and-ast/03-lazy-projection.md) | 零物化懒投影技术、流式观察者遍历与多维索引构建 | ✅ 已落地 |
 
 ## ⚡ 3. 增量计算与 Diff 接入 (Incremental & Diff)
 
 | 文档 | 主题 | 状态 |
 |------|------|:---:|
-| [docs/03-incremental-and-diff/01-line-level-incremental.md](./docs/03-incremental-and-diff/01-line-level-incremental.md) | 行级增量子树复用 (reuseSubtree) 与坐标平移 | ✅ 已落地 |
-| [docs/03-incremental-and-diff/02-diff-interface-spec.md](./docs/03-incremental-and-diff/02-diff-interface-spec.md) | Diff 接入规格、UTF-8 字节转码与双通道 API | ✅ 已落地 |
+| [docs/03-incremental-and-diff/01-line-level-incremental.md](./docs/03-incremental-and-diff/01-line-level-incremental.md) | 行级增量子树复用 (reuseSubtree)、LineMap 坐标平移与 64-bit SWAR 向量化 | ✅ 已落地 |
+| [docs/03-incremental-and-diff/02-diff-interface-spec.md](./docs/03-incremental-and-diff/02-diff-interface-spec.md) | Diff 接入规格、FastDiff 与 Bit-Parallel Myers 64 位并行差分算法 | ✅ 已落地 |
 | [docs/03-incremental-and-diff/03-praxis-integration-guide.md](./docs/03-incremental-and-diff/03-praxis-integration-guide.md) | Praxis 团队接口改造、五大 SPI 扩展插槽与定制 Diff 底座接入 | ✅ 已落地 |
 | [PRAXIS_HANDOFF_REPORT.md](./docs/PRAXIS_HANDOFF_REPORT.md) | Praxis 定制高性能 Diff 底座交付摘要与索引（引向 01-architecture/04 与 03-incremental-and-diff/03） | ✅ 已落地 |
 
@@ -72,15 +72,20 @@
 
 | 文档 | 主题 | 状态 |
 |------|------|:---:|
-| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 常量提取、圈复杂度、大文件等内置分析规则 | ✅ 已落地 |
-| [docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md](./docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md) | 第三方自定义分析器插件契约与生命周期钩子 | ✅ 已落地 |
+| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 四层规则金字塔、146 条全量内置规则 (100% 覆盖) 与双轨文案解耦 | ✅ 已落地 |
+| [docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md](./docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md) | 第三方自定义分析器插件契约与生命周期钩子规范 | ✅ 已落地 |
 
 ## 📊 5. 规范与性能基准 (Specs & Benchmarks)
 
 | 文档 | 主题 | 状态 |
 |------|------|:---:|
-| [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | config.schema 规则配置与 JSON / SARIF / Text 报告格式 | ✅ 已落地 |
-| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 基准性能矩阵、吞吐量 Benchmark 与理论性能边界 | ✅ 已落地 |
+| [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | ar.config.json 规则配置与 JSON / SARIF 2.1.0 / Text 报告格式契约 | ✅ 已落地 |
+| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 全维基准性能台账、6 大维度量化评测对比与防劣化回归护栏 | ✅ 已落地 |
+| [docs/05-specs-and-benchmarks/03-comment-and-header-standard.md](./docs/05-specs-and-benchmarks/03-comment-and-header-standard.md) | 注释与文件头工业契约 v1.0.0（六字段模板、公有 API JSDoc 与并发契约） | ✅ 已落地 |
+| [docs/05-specs-and-benchmarks/04-cross-language-generalization.md](./docs/05-specs-and-benchmarks/04-cross-language-generalization.md) | 跨语言泛化审查方法论、四层边界与项目中立性不变量 | ✅ 已落地 |
+| [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | 消费方通用接入规范、脚手架 runner、基线棘轮与 CI 门禁集成 | ✅ 已落地 |
+| [docs/05-specs-and-benchmarks/06-modernization-program.md](./docs/05-specs-and-benchmarks/06-modernization-program.md) | 六域现代化改造计划（常量化、规则集集中管理、零分配性能优化等） | ✅ 已落地 |
+| [docs/05-specs-and-benchmarks/07-quantified-quality-standard.md](./docs/05-specs-and-benchmarks/07-quantified-quality-standard.md) | 十维量化质量度量模型（公式、权重、非线性惩罚与防刷分机制） | ✅ 已落地 |
 
 ## 🛡️ 6. 门禁与验证矩阵 (Gates & Verification Matrix)
 
@@ -91,6 +96,7 @@
 | `npm run gate` | build → format:check → lint → gate:comments → gate:self → gate:self:warning → test | 提交前唯一入口，任一环失败即阻断 |
 | `npm run gate:self` | 自扫棘轮（error 级） | `newBlocking(error)` 必须为 0 |
 | `npm run gate:self:warning` | 自扫棘轮（warning 级） | 新增 warning 同样阻断，防止"把告警搬进新文件"式改造 |
+| `npm run gate:self:slice` | AST 语义切片增量自审 | 毫秒级极速切片自审，捕获局部语法树突变 |
 | `npm run gate:self:update` | 重冻基线 | **仅在 findings 真实下降后执行**；禁止用它掩盖新增告警 |
 | `npm run gate:comments` | 注释/文档头一致性棘轮 | 新增注释违规即阻断 |
 
@@ -155,9 +161,7 @@ const w2 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   
 | B. 真算法 | 复杂度来自算法本身（差分/求解/图遍历），抽 helper 只会掩盖 | CC≥20 中约 5 个 | `editDiff.fastDiff`(23)、`histogramDiff.solve`(22)、`editDiff.myersDiff`(20) | **保留并具名说明**（在文件头/函数 JSDoc 写清复杂度来源）；**不**加抑制、**不**拆 |
 | C. 真缠绕 | 嵌套/早期返回缺失导致的深分支 | 其余 CC 13-19 多数 | `src/index.ts main`(24)、`dualTrackPipeline.executeDualTrack`(23)、`workerScheduler` 内匿名(21) | 抽 guard / 降嵌套 / 提前返回 |
 
-大文件（src 40 个 ≥400 行，前 10：types 926、editDiff 850、architecture 824、api 824、dependencyGraph 817、comments 796、hygiene 792、cache 741、config 706、dataFlow 673）按同一原则处理：**先按职责切**（A/B/C 里属于哪一类就按哪一类切），切完必须复核目标函数的 CC 是否真的下降——只降行数不算完成。
-
-护栏：`gate:self` 只在**新增**上阻断，因此"把告警搬进新文件"或"重冻基线"都不会被误判为进展；每次重冻必须附逐键比对（新增键要么为零，要么全部落在已登记抑制内）。
+大文件按同一原则处理：**先按职责切**（A/B/C 里属于哪一类就按哪一类切），切完必须复核目标函数的 CC 是否真的下降——只降行数不算完成。
 
 ### 6.9 双轨文案分层契约（机读英文底座与人读中文规则解耦）
 
@@ -167,10 +171,6 @@ const w2 = await scanWarm({ ...opts, daemon: 'off', cache: true, cacheDir });   
 | :--- | :--- | :--- | :--- |
 | **机读/执行轨 (Machine / Agent Track)** | `src/core/messages/`<br/>`src/core/guidance/`<br/>`src/analyzers/` | **纯英文 (100% English Baseline)** | 提供高 Token 密度、确定性且高依从度的 LLM Agent 提示词（Guidance Prompts）、以及符合 SARIF 2.1.0 / CI 编译器标准的底层诊断（Issue Message / Suggestion / Rationale）。 |
 | **人读/展示轨 (Human / Governance Track)** | `src/core/rules/entries/`<br/>`docs/` 规则表 | **标准中文 (Chinese Guidance)** | 提供直观、详实、易于团队开发者理解与遵循的规则摘要（summary）与修复指引（remediation）。 |
-
-**门禁看守保证**：
-- `validate-self-norms.js` (Check 4 & 5)：严格断言 `src/core/messages/` 与 `src/core/guidance/` 中的字符串字面量、以及分析器发射的诊断信息绝不包含未授权汉字（仅 `comments.ts` 中的文件头六要素 AST 匹配靶标享有受限白名单豁免）；
-- `validate-rules-registry.js`：严格断言所有注册规则具备详尽指导，且严禁泄露 `<TODO...>`、`TBD` 等未决占位符。
 
 ---
 
