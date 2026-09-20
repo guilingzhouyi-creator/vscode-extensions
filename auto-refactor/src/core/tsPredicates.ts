@@ -285,14 +285,40 @@ function isToleratedString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): boolea
     return false;
 }
 
-function isToleratedNumeric(node: ts.Node, p: ts.Node): boolean {
+const RE_PARSE_INT = /(?:^|\.)parseInt$/;
+const RE_ZERO_ARG_METHODS = /(?:^|\.)(?:slice|indexOf|substring|substr)$/;
+const RADIX_BASE_DECIMAL = 10;
+const RADIX_BASE_HEX = 16;
+const RADIX_BASE_OCTAL = 8;
+const RADIX_BASE_BINARY = 2;
+const TOLERATED_RADIX_SET = new Set([
+    RADIX_BASE_BINARY,
+    RADIX_BASE_OCTAL,
+    RADIX_BASE_DECIMAL,
+    RADIX_BASE_HEX,
+]);
+
+function isToleratedCallArg(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {
+    if (!ts.isCallExpression(p) || !sf) return false;
+    const args = p.arguments;
+    const argIdx = args.indexOf(node as ts.Expression);
+    if (argIdx < 0) return false;
+    const callee = p.expression.getText(sf);
+    const numVal = Number((node as ts.NumericLiteral).text ?? node.getText(sf));
+    if (argIdx === 1 && RE_PARSE_INT.test(callee)) {
+        return TOLERATED_RADIX_SET.has(numVal);
+    }
+    return argIdx === 0 && numVal === 0 && RE_ZERO_ARG_METHODS.test(callee);
+}
+
+function isToleratedNumeric(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {
     if (ts.isElementAccessExpression(p) && p.argumentExpression === node) return true;
     if (ts.isPropertyAccessExpression(p)) return true;
     if (ts.isPropertyAssignment(p) && p.name === node) return true;
     if (ts.isEnumMember(p)) return true;
     if (ts.isTypeNode(p)) return true;
     if (ts.isCaseClause(p)) return true;
-    return false;
+    return isToleratedCallArg(node, p, sf);
 }
 
 /**
@@ -306,7 +332,7 @@ function isToleratedNumeric(node: ts.Node, p: ts.Node): boolean {
 export function isToleratedOf(node: ts.Node, p: ts.Node | undefined, sf: ts.SourceFile): boolean {
     if (!p) return false;
     if (ts.isNumericLiteral(node)) {
-        return isToleratedNumeric(node, p);
+        return isToleratedNumeric(node, p, sf);
     }
     return isToleratedString(node, p, sf);
 }

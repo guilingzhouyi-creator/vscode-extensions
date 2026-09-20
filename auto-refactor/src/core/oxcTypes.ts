@@ -59,6 +59,8 @@ export const NODE_KIND_MEMBER_EXPRESSION = 'MemberExpression';
 export const NODE_KIND_EXPORT_NAMED_DECLARATION = 'ExportNamedDeclaration';
 /** oxc node type of a default export declaration. */
 export const NODE_KIND_EXPORT_DEFAULT_DECLARATION = 'ExportDefaultDeclaration';
+/** oxc node type of a call expression. */
+export const NODE_KIND_CALL_EXPRESSION = 'CallExpression';
 
 /** Type tag string for JavaScript number values. */
 export const TYPEOF_NUMBER = 'number';

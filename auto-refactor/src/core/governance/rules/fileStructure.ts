@@ -77,11 +77,19 @@ export const FileNamingRule: GovernanceRule = {
                 suggestion = `Rename file to snake_case (e.g. \`${checked.replace(/[-\s]+/g, '_').toLowerCase()}${ext}\`).`;
             }
         } else if (convention === 'kebab-case') {
-            // Must be kebab-case or standard camelCase
+            // Must be kebab-case, camelCase, or PascalCase matching type definition.
             const KEBAB_OR_CAMEL_RE = /^[a-z0-9]+(-[a-z0-9]+)*$|^[a-z][a-zA-Z0-9]*$/;
             if (!KEBAB_OR_CAMEL_RE.test(nameWithoutExt)) {
-                valid = false;
-                suggestion = `Rename file to kebab-case (e.g. \`${nameWithoutExt.replace(/[_]/g, '-').toLowerCase()}${ext}\`).`;
+                const isPascal = /^[A-Z][a-zA-Z0-9]*$/.test(nameWithoutExt);
+                const opts = ctx.ctx?.options as Record<string, unknown> | undefined;
+                const allowPascal = opts?.allowPascalCaseClasses !== false;
+                const matchesDecl =
+                    isPascal && allowPascal && hasTypeDecl(ctx.content, nameWithoutExt);
+                if (!matchesDecl) {
+                    valid = false;
+                    const kebab = nameWithoutExt.replace(/[_]/g, '-').toLowerCase();
+                    suggestion = `Rename file to kebab-case (e.g. \`${kebab}${ext}\`).`;
+                }
             }
         }
 
@@ -223,3 +231,8 @@ export const ModuleHeaderRule: GovernanceRule = {
         return null;
     },
 };
+
+function hasTypeDecl(content: string, name: string): boolean {
+    const patterns = [`class ${name}`, `interface ${name}`, `type ${name}`, `enum ${name}`];
+    return patterns.some((p) => content.includes(p));
+}

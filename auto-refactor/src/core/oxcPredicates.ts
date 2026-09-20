@@ -23,6 +23,7 @@ import {
     NODE_KIND_CLASS_EXPRESSION,
     NODE_KIND_ASSIGNMENT_EXPRESSION,
     NODE_KIND_MEMBER_EXPRESSION,
+    NODE_KIND_CALL_EXPRESSION,
     TYPEOF_NUMBER,
     TYPEOF_STRING,
     FN_TYPES,
@@ -265,14 +266,41 @@ function oxcIsTypeNodeType(t: string): boolean {
     );
 }
 
+const RE_PARSE_INT = /(?:^|\.)parseInt$/;
+const RE_ZERO_ARG_METHODS = /(?:^|\.)(?:slice|indexOf|substring|substr)$/;
+const RADIX_BASE_DECIMAL = 10;
+const RADIX_BASE_HEX = 16;
+const RADIX_BASE_OCTAL = 8;
+const RADIX_BASE_BINARY = 2;
+const TOLERATED_RADIX_SET = new Set([
+    RADIX_BASE_BINARY,
+    RADIX_BASE_OCTAL,
+    RADIX_BASE_DECIMAL,
+    RADIX_BASE_HEX,
+]);
+
+function oxcIsToleratedCallArg(node: OxcNode, p: OxcNode, ctx?: Ctx): boolean {
+    if (p.type !== NODE_KIND_CALL_EXPRESSION || !ctx) return false;
+    const args = p.arguments;
+    if (!Array.isArray(args)) return false;
+    const argIdx = args.indexOf(node);
+    if (argIdx < 0) return false;
+    const callee = p.callee ? ctx.src.slice(p.callee.start, p.callee.end) : '';
+    const numVal = Number(node.value ?? 0);
+    if (argIdx === 1 && RE_PARSE_INT.test(callee)) {
+        return TOLERATED_RADIX_SET.has(numVal);
+    }
+    return argIdx === 0 && numVal === 0 && RE_ZERO_ARG_METHODS.test(callee);
+}
+
 /** Check whether a numeric literal appears in a tolerated AST context. */
-function oxcIsNumericTolerated(node: OxcNode, p: OxcNode): boolean {
+function oxcIsNumericTolerated(node: OxcNode, p: OxcNode, ctx?: Ctx): boolean {
     if (p.type === NODE_KIND_MEMBER_EXPRESSION) return true;
     if (p.type === NODE_KIND_PROPERTY && p.key === node) return true;
     if (p.type === 'TSEnumMember') return true;
     if (oxcIsTypeNodeType(p.type)) return true;
     if (p.type === 'SwitchCase' && p.test === node) return true;
-    return false;
+    return oxcIsToleratedCallArg(node, p, ctx);
 }
 
 /** Check whether a string literal appears in a tolerated AST context. */
@@ -300,7 +328,7 @@ function oxcIsStringTolerated(node: OxcNode, p: OxcNode, ctx: Ctx): boolean {
 export function oxcIsToleratedOf(node: OxcNode, p: OxcNode | undefined, ctx: Ctx): boolean {
     if (!p) return false;
     if (typeof node.value === TYPEOF_NUMBER) {
-        return oxcIsNumericTolerated(node, p);
+        return oxcIsNumericTolerated(node, p, ctx);
     }
     return oxcIsStringTolerated(node, p, ctx);
 }

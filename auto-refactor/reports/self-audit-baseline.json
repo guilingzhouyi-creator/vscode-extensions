@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.3.0-1789832695763",
-  "timestamp": "2026-09-19T15:44:57.976Z",
+  "snapshotId": "snapshot-v0.3.0-1789878284929",
+  "timestamp": "2026-09-20T04:24:47.093Z",
   "versions": {
     "engineVersion": "0.3.0",
     "ruleVersion": "2026.09-v1",
@@ -13,24 +13,24 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 306,
-    "durationMs": 2067
+    "durationMs": 2050
   },
   "metrics": {
     "compositeScore": 99.8,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 6559,
-    "suppressedIssues": 2644,
+    "totalIssues": 6553,
+    "suppressedIssues": 2638,
     "unsuppressedIssues": 3915,
     "bySeverity": {
       "info": 200,
-      "warning": 6359,
+      "warning": 6353,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 218,
-      "medium": 5672,
+      "medium": 5666,
       "low": 669
     }
   },
@@ -116,7 +116,7 @@
     {
       "filePath": "scripts/test-parallel.js",
       "domain": "scripts",
-      "totalIssues": 93,
+      "totalIssues": 92,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -154,7 +154,7 @@
     "summary": {
       "critical": 0,
       "high": 218,
-      "medium": 5672,
+      "medium": 5666,
       "low": 669
     },
     "criticalItems": [],
