@@ -21,7 +21,7 @@ import {
     WorkspaceTimingData,
     createEmptyTimingData,
     LATEST_VERSION,
-    CRASH_COMPENSATION_CAP_MS,
+    MS_PER_DAY,
     DailyTotalsMap,
 } from '../domain/models';
 import { TimeAggregator, localDateStr } from '../domain/TimeAggregator';
@@ -172,7 +172,7 @@ export class RecoveryService {
         if (!journalReplayed && data.currentSessionStartMs > 0) {
             const now = Date.now();
             const totalElapsed = now - data.currentSessionStartMs;
-            if (totalElapsed > 0 && totalElapsed < CRASH_COMPENSATION_CAP_MS) { // 最多补偿 24h，防止异常
+            if (totalElapsed > 0 && totalElapsed < MS_PER_DAY) { // 最多补偿 24h，防止异常
                 const lastSaved = data.lastSavedAtMs > data.currentSessionStartMs
                     ? data.lastSavedAtMs
                     : data.currentSessionStartMs;

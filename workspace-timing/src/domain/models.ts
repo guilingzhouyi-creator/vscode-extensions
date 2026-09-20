@@ -18,15 +18,12 @@ export const MS_PER_DAY = 24 * MS_PER_HOUR;
 // ─── 默认值（引用时间常量）──────────────
 export const DEFAULT_RING_BUFFER_CAP = 1024;
 export const DEFAULT_JOURNAL_FLUSH_MS = 10 * MS_PER_SECOND;  // 10s — journal 落盘
-export const DEFAULT_FULL_SAVE_MS = MS_PER_MINUTE;           // 60s — 全量存盘
 /** 会话明细保留上限——兜底安全值；常规历史治理由 historyRawRetentionDays 折叠承担 */
 export const DEFAULT_MAX_SESSIONS = 5000;
 /** 原始会话保留窗（天）：超出窗口的会话按日折叠进 dailyTotals；0=永不折叠 */
 export const DEFAULT_RAW_RETENTION_DAYS = 45;
 /** journal 文件大小告警阈值 */
 export const JOURNAL_WARN_BYTES = 5 * 1024 * 1024;
-/** 崩溃补偿上限 24h，防止异常数据导致计时暴涨 */
-export const CRASH_COMPENSATION_CAP_MS = MS_PER_DAY;
 /** 周工作时长上限下限 (1h) */
 export const MIN_WEEKLY_LIMIT_HOURS = 1;
 /** 周工作时长上限上限 (168h = 7天*24小时) */
@@ -75,7 +72,7 @@ export function sanitizeJournalFlushIntervalMs(val: unknown): number {
 }
 
 export function sanitizeFullSaveIntervalMs(val: unknown): number {
-    return clampNumber(val, MIN_FULL_SAVE_MS, MAX_FULL_SAVE_MS, DEFAULT_FULL_SAVE_MS);
+    return clampNumber(val, MIN_FULL_SAVE_MS, MAX_FULL_SAVE_MS, MS_PER_MINUTE);
 }
 
 export function sanitizeHistoryRawRetentionDays(val: unknown): number {
@@ -256,13 +253,13 @@ export const DEFAULT_CONFIG: TimingConfig = {
     historyRawRetentionDays: DEFAULT_RAW_RETENTION_DAYS,
     safetySnapshot: true,
     weeklyLimitEnabled: false,
-    weeklyLimitHours: 40,
+    weeklyLimitHours: DEFAULT_WEEKLY_LIMIT_HOURS,
     statusBarEnabled: true,
     backupToFile: true,
     journalEnabled: true,
     ringBufferCapacity: DEFAULT_RING_BUFFER_CAP,
     journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
-    fullSaveIntervalMs: DEFAULT_FULL_SAVE_MS,
+    fullSaveIntervalMs: MS_PER_MINUTE,
     statusBarMode: 'today-total',
     maxSessions: DEFAULT_MAX_SESSIONS,
 };

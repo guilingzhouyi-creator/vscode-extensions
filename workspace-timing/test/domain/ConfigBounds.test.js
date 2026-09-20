@@ -51,7 +51,7 @@ describe('ConfigBounds（配置边界单一真源）', () => {
         const cases = [
             [m.sanitizeRingBufferCapacity, m.DEFAULT_RING_BUFFER_CAP],
             [m.sanitizeJournalFlushIntervalMs, m.DEFAULT_JOURNAL_FLUSH_MS],
-            [m.sanitizeFullSaveIntervalMs, m.DEFAULT_FULL_SAVE_MS],
+            [m.sanitizeFullSaveIntervalMs, m.MS_PER_MINUTE],
             [m.sanitizeHistoryRawRetentionDays, m.DEFAULT_RAW_RETENTION_DAYS],
             [m.sanitizeMaxSessions, m.DEFAULT_MAX_SESSIONS],
         ];
@@ -66,7 +66,7 @@ describe('ConfigBounds（配置边界单一真源）', () => {
 
     it('数字字符串可解析（面板手写 JSON 场景）', () => {
         assert.strictEqual(m.sanitizeRingBufferCapacity('2048'), 2048, '数字字符串解析');
-        assert.strictEqual(m.sanitizeFullSaveIntervalMs('abc'), m.DEFAULT_FULL_SAVE_MS, '垃圾字符串回退');
+        assert.strictEqual(m.sanitizeFullSaveIntervalMs('abc'), m.MS_PER_MINUTE, '垃圾字符串回退');
     });
 
     it('weeklyLimitHours：钳制到 [1, 168]', () => {

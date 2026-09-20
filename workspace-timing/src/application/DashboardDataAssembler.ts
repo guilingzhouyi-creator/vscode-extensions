@@ -14,11 +14,13 @@ import {
     TimeSession,
     DEFAULT_RING_BUFFER_CAP,
     DEFAULT_JOURNAL_FLUSH_MS,
-    DEFAULT_FULL_SAVE_MS,
+    MS_PER_MINUTE,
     DEFAULT_MAX_SESSIONS,
+    DEFAULT_WEEKLY_LIMIT_HOURS,
 } from '../domain/models';
 import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
 import { DashboardData, WeeklyTrendEntry } from '../domain/dashboard-types';
+import { DEFAULT_HEATMAP_WEEKS, DEFAULT_TREND_WEEKS } from '../domain/chartConstants';
 import { GlobalSnapshot } from './GlobalAggregator';
 
 /** 组装面板 DTO 所需的最小快照（由 Orchestrator 采集） */
@@ -102,13 +104,13 @@ export function buildDashboardData(input: DashboardAssemblerInput): DashboardDat
         sessions,
         data.currentSessionStartMs,
         data.dailyTotals,
-        12,
+        DEFAULT_HEATMAP_WEEKS,
     );
 
     // 周报多周趋势（近 4 周）+ 今日明细
     const weeklyTrend = buildWeeklyTrendEntries(
         sessions,
-        4,
+        DEFAULT_TREND_WEEKS,
         data.currentSessionStartMs,
         data.dailyTotals,
     );
@@ -148,9 +150,9 @@ export function buildDashboardData(input: DashboardAssemblerInput): DashboardDat
         backupToFile: config.backupToFile ?? true,
         ringBufferCapacity: config.ringBufferCapacity ?? DEFAULT_RING_BUFFER_CAP,
         journalFlushIntervalMs: config.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
-        fullSaveIntervalMs: config.fullSaveIntervalMs ?? DEFAULT_FULL_SAVE_MS,
+        fullSaveIntervalMs: config.fullSaveIntervalMs ?? MS_PER_MINUTE,
         maxSessions: config.maxSessions ?? DEFAULT_MAX_SESSIONS,
         weeklyLimitEnabled: config.weeklyLimitEnabled ?? false,
-        weeklyLimitHours: config.weeklyLimitHours ?? 40,
+        weeklyLimitHours: config.weeklyLimitHours ?? DEFAULT_WEEKLY_LIMIT_HOURS,
     };
 }

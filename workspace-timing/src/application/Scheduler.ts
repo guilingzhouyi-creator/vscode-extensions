@@ -22,7 +22,7 @@ import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
 import {
     DEFAULT_JOURNAL_FLUSH_MS,
-    DEFAULT_FULL_SAVE_MS,
+    MS_PER_MINUTE,
     MS_PER_SECOND,
     sanitizeJournalFlushIntervalMs,
     sanitizeFullSaveIntervalMs,
@@ -78,7 +78,7 @@ export class Scheduler {
         this.sessionManager = sessionManager;
         this.options = {
             journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
-            fullSaveIntervalMs: DEFAULT_FULL_SAVE_MS,
+            fullSaveIntervalMs: MS_PER_MINUTE,
             statusBarUpdateIntervalMs: MS_PER_SECOND,
             journalEnabled: true,
             ...options,

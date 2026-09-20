@@ -6,11 +6,13 @@
  * 依赖：仅依赖 models.ts
  */
 
-import { TimeSession, DailyTotalsMap, MS_PER_DAY, MS_PER_SECOND } from './models';
+import { TimeSession, DailyTotalsMap, MS_PER_DAY, MS_PER_SECOND, MS_PER_HOUR } from './models';
 import { HeatmapDay } from './dashboard-types';
-
-/** 周趋势默认窗口：近 N 周（含当前周） */
-const DEFAULT_TREND_WEEKS = 4;
+import {
+    DAYS_PER_WEEK,
+    DEFAULT_HEATMAP_WEEKS,
+    DEFAULT_TREND_WEEKS,
+} from './chartConstants';
 
 /** 按日聚合统计 */
 export interface DailyStats {
@@ -113,9 +115,9 @@ export function parseLocalDate(dateStr: string): number {
 /** 热力图着色等级：基于当日累计时长分 5 档（与历史 v0.3.8 口径一致） */
 function heatmapLevel(ms: number): 0 | 1 | 2 | 3 | 4 {
     if (ms <= 0) return 0;
-    if (ms < 3600000) return 1;          // < 1h
-    if (ms < 2 * 3600000) return 2;      // 1h ~ 2h
-    if (ms < 4 * 3600000) return 3;      // 2h ~ 4h
+    if (ms < MS_PER_HOUR) return 1;          // < 1h
+    if (ms < 2 * MS_PER_HOUR) return 2;      // 1h ~ 2h
+    if (ms < 4 * MS_PER_HOUR) return 3;      // 2h ~ 4h
     return 4;                            // ≥ 4h
 }
 
@@ -490,20 +492,20 @@ export class TimeAggregator {
         sessions: readonly TimeSession[],
         currentSessionStartMs = 0,
         dailyTotals?: DailyTotalsMap,
-        weeks = 12,
+        weeks = DEFAULT_HEATMAP_WEEKS,
     ): HeatmapDay[] {
         // 以「今日所在周一」为最后一列起点，向前取 weeks 个完整周（Date 构造，DST 安全）
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const todayStart = today.getTime();
-        const todayDow = (now.getDay() + 6) % 7; // 0=周一 … 6=周日
+        const todayDow = (now.getDay() + 6) % DAYS_PER_WEEK; // 0=周一 … 6=周日
         const lastColMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - todayDow);
         const firstMonday = new Date(
             lastColMonday.getFullYear(),
             lastColMonday.getMonth(),
-            lastColMonday.getDate() - (weeks - 1) * 7,
+            lastColMonday.getDate() - (weeks - 1) * DAYS_PER_WEEK,
         );
-        const total = weeks * 7;
+        const total = weeks * DAYS_PER_WEEK;
 
         // 预生成窗口内各格子的日期串（同时得到窗口起止时间戳用于粗筛会话）
         const windowDates = new Set<string>();

@@ -63,6 +63,17 @@ function getRouterContext(): MessageRouterContext {
     };
 }
 
+/** 面板数据异步刷新（具名函数，避免在 tick 监听中形成深度内联回调） */
+async function updateDashboardIfVisible(targetOrchestrator: TimerOrchestrator): Promise<void> {
+    try {
+        const data = await targetOrchestrator.getDashboardData();
+        DashboardPanel.currentPanel?.updateData(data);
+    } catch (err) {
+        // 面板更新失败不应导致扩展主机崩溃（未处理的 Promise 拒绝）
+        log(LogLevel.Warn, 'Dashboard update failed', err as Error);
+    }
+}
+
 export function activate(context: vscode.ExtensionContext): void {
     const startTime = Date.now();
 
@@ -147,12 +158,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 if (DashboardPanel.currentPanel?.isVisible && orchestrator
                     && now - lastPanelUpdateMs >= PANEL_REFRESH_INTERVAL_MS) {
                     lastPanelUpdateMs = now;
-                    orchestrator.getDashboardData().then(data => {
-                        DashboardPanel.currentPanel?.updateData(data);
-                    }).catch(err => {
-                        // 面板更新失败不应导致扩展主机崩溃（未处理的 Promise 拒绝）
-                        log(LogLevel.Warn, 'Dashboard update failed', err as Error);
-                    });
+                    void updateDashboardIfVisible(orchestrator);
                 }
             });
             orchestrator.onStateChange((state) => {
