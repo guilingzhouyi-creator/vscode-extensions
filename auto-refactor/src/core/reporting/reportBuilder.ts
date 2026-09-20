@@ -22,7 +22,7 @@ import type {
     Severity,
 } from '../types';
 import { TOOL_NAME, TOOL_VERSION } from '../config';
-import { sha256Hex } from '../cacheKey';
+import { sha256Hex } from '../cache-key';
 import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
 import type { QualityScorer } from '../scoring/qualityScorer';
 import type { ReviewMemoryManager } from '../memory/reviewMemory';

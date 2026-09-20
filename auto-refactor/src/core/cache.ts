@@ -22,7 +22,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Issue, FileMetric } from './types';
 import { TOOL_VERSION } from './config';
-import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cacheKey';
+import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cache-key';
 
 /**
  * Two-level incremental cache (docs/01-architecture/02-pipeline-and-caching.md Part B).

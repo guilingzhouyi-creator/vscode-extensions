@@ -8,9 +8,9 @@
  * Exit Semantics & Design Rationale: Provides clean and consolidated import targets.
  */
 
-export * from './pathUtils';
+export * from './path-utils';
 export * from './base';
-export * from './typescriptAdapter';
-export * from './pythonAdapter';
-export * from './skeletonAdapters';
+export * from './typescript-adapter';
+export * from './python-adapter';
+export * from './skeleton-adapters';
 export * from './registry';

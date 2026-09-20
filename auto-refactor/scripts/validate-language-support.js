@@ -23,12 +23,12 @@ const os = require('os');
 const path = require('path');
 const { scan, resolveConfig } = require('../dist/api');
 const { EXTENSION_ADAPTER_IDS } = require('../dist/core/adapters');
-const { TypeScriptAdapter } = require('../dist/core/typescriptAdapter');
-const { RustAdapter } = require('../dist/core/rustAdapter');
-const { OxcAdapter } = require('../dist/core/oxcAdapter');
-const { GDScriptAdapter } = require('../dist/core/gdscriptAdapter');
-const { PythonAdapter } = require('../dist/core/pythonAdapter');
-const { MarkdownAdapter } = require('../dist/core/markdownAdapter');
+const { TypeScriptAdapter } = require('../dist/core/typescript-adapter');
+const { RustAdapter } = require('../dist/core/rust-adapter');
+const { OxcAdapter } = require('../dist/core/oxc-adapter');
+const { GDScriptAdapter } = require('../dist/core/gdscript-adapter');
+const { PythonAdapter } = require('../dist/core/python-adapter');
+const { MarkdownAdapter } = require('../dist/core/markdown-adapter');
 
 const RULE = 'LANG-UNSUPPORTED';
 

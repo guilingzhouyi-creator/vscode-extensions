@@ -3,7 +3,7 @@
  * File Path: src/core/semantic/adapters/base.ts
  * Architecture Role: Abstract base class establishing contracts for mapping concrete
  *   programming language syntax trees to the language-agnostic SemanticGraph.
- * Dependencies & Triggers: Extends ./pathUtils; consumes SemanticGraph, SemanticNode,
+ * Dependencies & Triggers: Extends ./path-utils; consumes SemanticGraph, SemanticNode,
  *   and SemanticEdge from core/semantic.
  * Responsibilities: Provide file extension matching, canonical ID building, and standard
  *   node/edge factory helpers.
@@ -20,7 +20,7 @@ import type {
     SemanticNode,
 } from '../types';
 import type { SemanticGraph } from '../semanticGraph';
-import { buildCanonicalSymbolId, normalizeCanonicalPath } from './pathUtils';
+import { buildCanonicalSymbolId, normalizeCanonicalPath } from './path-utils';
 
 /**
  * Universal contract for extracting language ASTs into the unified semantic graph.

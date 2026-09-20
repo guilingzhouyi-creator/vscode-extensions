@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { sha256Hex } from '../core/cacheKey';
+import { sha256Hex } from '../core/cache-key';
 
 /**
  * Module: Daemon — Per-Project Discovery Registry

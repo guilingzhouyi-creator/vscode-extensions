@@ -22,7 +22,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_TYPESCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
-import { maskSourceText, type SourceMaskConfig } from '../core/sourceMask';
+import { maskSourceText, type SourceMaskConfig } from '../core/source-mask';
 
 /** Extensions the pack accepts: the content-only path sees every language, so gate on the path. */
 const SUPPORTED_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];

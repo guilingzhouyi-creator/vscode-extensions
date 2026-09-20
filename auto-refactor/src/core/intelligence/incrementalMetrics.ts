@@ -16,8 +16,8 @@
  *     existing consumer is re-gated without declaring a policy. Split out of `dataFlow.ts` when
  *     that module crossed this repository's own large-file fail threshold.
  */
-import { maskSourceText, type SourceMaskConfig } from '../sourceMask';
-import { computeLineStartsAndHashes, getLine } from '../editDiff';
+import { maskSourceText, type SourceMaskConfig } from '../source-mask';
+import { computeLineStartsAndHashes, getLine } from '../edit-diff';
 
 /**
  * Mask applied to content whose language is unknown.

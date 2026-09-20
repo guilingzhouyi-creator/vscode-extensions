@@ -18,8 +18,8 @@ import {
     pruneIncrementalBucket,
     incrementalRssGuard,
     incrementalMaxFiles,
-} from '../incrementalState';
-import { globToRegExp, collectFiles } from '../fileDiscovery';
+} from '../incremental-state';
+import { globToRegExp, collectFiles } from '../file-discovery';
 import { loadGitignore } from '../gitignore';
 import type { ScannerContext } from './scannerContext';
 import {

@@ -33,13 +33,13 @@ import type {
 } from './types';
 // NOTE: `../utils/ast` (and therefore `typescript`) stays lazily required so an oxc +
 // no-legacy scan never loads it; that require now lives in scanner/analyzerRunner.ts.
-import type { ResolvedAnalyzer } from './analyzerRegistry';
-import { resolveAnalyzers } from './analyzerRegistry';
-import { ModuleDependencyGraph } from './dependencyGraph';
+import type { ResolvedAnalyzer } from './analyzer-registry';
+import { resolveAnalyzers } from './analyzer-registry';
+import { ModuleDependencyGraph } from './dependency-graph';
 import { Logger } from './logger';
 import { loadGitignore } from './gitignore';
-import { globToRegExp, collectFiles } from './fileDiscovery';
-import type { IncrementalFileState } from './incrementalState';
+import { globToRegExp, collectFiles } from './file-discovery';
+import type { IncrementalFileState } from './incremental-state';
 import { ReviewMemoryManager } from './memory/reviewMemory';
 import { SymbolIndex } from './intelligence/symbolIndex';
 import { LiteralIndex } from './intelligence/literalIndex';
@@ -82,8 +82,8 @@ export {
     resolveAnalyzers,
     BUILTIN_FACTORIES,
     BUILTIN_MODULE_PATHS,
-} from './analyzerRegistry';
-export { WorkerPoolManager, WorkerPoolEntry } from './workerPool';
+} from './analyzer-registry';
+export { WorkerPoolManager, WorkerPoolEntry } from './worker-pool';
 
 import { pMap, AR_TIMING, nowMs } from './scanner/workerScheduler';
 import { runFileAnalyzers } from './scanner/analyzerRunner';

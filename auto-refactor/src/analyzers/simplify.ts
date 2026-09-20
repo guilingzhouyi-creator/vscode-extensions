@@ -22,7 +22,7 @@ import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
 import { locN } from '../utils/normalized';
-import { globToRegExp, matchAny } from '../core/fileDiscovery';
+import { globToRegExp, matchAny } from '../core/file-discovery';
 
 /** Per-analyzer tunables (declared in `defaultAnalyzerOptions().simplify`). */
 interface SimplifyOptions {

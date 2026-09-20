@@ -34,7 +34,7 @@ const {
   TrainingDatasetExporter,
   ReviewMemoryManager,
 } = require('../dist/api');
-const { ModuleDependencyGraph } = require('../dist/core/dependencyGraph');
+const { ModuleDependencyGraph } = require('../dist/core/dependency-graph');
 const { SecretsAnalyzer } = require('../dist/analyzers/secrets');
 
 /**

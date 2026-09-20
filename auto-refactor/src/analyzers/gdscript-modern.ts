@@ -20,7 +20,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
-import { maskSourceText, type SourceMaskConfig } from '../core/sourceMask';
+import { maskSourceText, type SourceMaskConfig } from '../core/source-mask';
 
 /** Extension the pack accepts; the content-only path sees every language. */
 const SOURCE_EXTENSION = '.gd';

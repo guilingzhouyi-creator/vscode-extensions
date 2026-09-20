@@ -41,7 +41,7 @@ import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
 import { extractCodeDomains, computeAstDigest } from '../memory/domainFingerprint';
 import { matchDomains } from '../memory/semanticMatcher';
 import { AgentConstraintGenerator } from '../guidance/agentConstraintGenerator';
-import { ModuleDependencyGraph } from '../dependencyGraph';
+import { ModuleDependencyGraph } from '../dependency-graph';
 import type { FileRevision } from '../trajectory/types';
 
 /** Number of leading digest hex characters kept as the short revision identifier. */

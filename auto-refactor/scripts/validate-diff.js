@@ -20,7 +20,7 @@
  */
 
 const { scan, scanDiff, scanDiffDelta } = require('../dist/api');
-const { computeEditRanges } = require('../dist/core/editDiff');
+const { computeEditRanges } = require('../dist/core/edit-diff');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');

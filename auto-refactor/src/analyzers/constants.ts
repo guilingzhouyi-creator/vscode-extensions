@@ -37,11 +37,11 @@ import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
-import type { LiteralRecord } from '../core/incrementalState';
+import type { LiteralRecord } from '../core/incremental-state';
 import { locN } from '../utils/normalized';
 import { runStreaming } from '../core/traverse';
 import { classifyLiteral } from '../core/governance/semanticLiterals';
-import { maskedLinesOfPath } from '../core/sourceMask';
+import { maskedLinesOfPath } from '../core/source-mask';
 
 const TRIVIAL_NUMBERS = new Set(['0', '1', '-1']);
 
@@ -133,7 +133,7 @@ export class ConstantsAnalyzer implements Analyzer {
         // standalone `analyze()` contract — never on the worker streaming path.
 
         const { TypeScriptAdapter } =
-            require('../core/typescriptAdapter') as typeof import('../core/typescriptAdapter');
+            require('../core/typescript-adapter') as typeof import('../core/typescript-adapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sf.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [

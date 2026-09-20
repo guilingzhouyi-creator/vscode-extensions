@@ -22,8 +22,8 @@
 
 import type { DiffInput, ScanDiffOptions, DiffStreamEvent, RefactoringPatch, Issue } from './types';
 import type { ReviewDiffHunk, AttributedDiffLine } from './praxis/contracts';
-import { computeDetailedHunks } from './editDiff';
-import { CircularDiffBuffer } from './ringBuffer';
+import { computeDetailedHunks } from './edit-diff';
+import { CircularDiffBuffer } from './ring-buffer';
 
 /**
  * Build a single-edit refactoring patch from an issue that carries an applicable suggestion.

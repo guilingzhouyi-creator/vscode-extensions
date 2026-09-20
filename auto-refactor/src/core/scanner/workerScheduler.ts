@@ -15,9 +15,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { Worker } from 'worker_threads';
 import type { ScanConfig, Issue, FileMetric } from '../types';
-import type { WorkerAnalyzerDesc } from '../analyzerRegistry';
+import type { WorkerAnalyzerDesc } from '../analyzer-registry';
 import type { Logger } from '../logger';
-import { decodeResults } from '../resultCodec';
+import { decodeResults } from '../result-codec';
 
 const DEFAULT_WORKER_FLUSH_TIMEOUT_MS = 3000;
 

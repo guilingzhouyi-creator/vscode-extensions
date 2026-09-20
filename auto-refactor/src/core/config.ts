@@ -30,7 +30,7 @@ import type {
     LogLevel,
     LiteralPolicyConfig,
 } from './types';
-import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from './literalPolicyEngine';
+import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from './literal-policy-engine';
 
 import {
     ANALYZER_ARCHITECTURE,
@@ -43,7 +43,7 @@ import {
     ANALYZER_TYPESCRIPT_MODERN,
     SPECIALIZED_ANALYZERS,
     applyAutoTuning,
-} from './configTuning';
+} from './config-tuning';
 import {
     ANALYZER_LARGE_FILE,
     ANALYZER_COMPLEXITY,
@@ -59,11 +59,11 @@ import {
     ANALYZER_DEPENDENCY_LAYOUT,
     ANALYZER_NAMING,
 } from './scoring/dimensionLiterals';
-import { applySemanticAndSecurityLevels } from './configCascades';
-import type { ConfigOverrides } from './configTuning';
+import { applySemanticAndSecurityLevels } from './config-cascades';
+import type { ConfigOverrides } from './config-tuning';
 
 // Compatibility surface: callers historically imported ConfigOverrides from this module.
-export type { ConfigOverrides } from './configTuning';
+export type { ConfigOverrides } from './config-tuning';
 
 /** Public tool identity string that consumers can surface in banners, reports, and logs. */
 export const TOOL_NAME = 'auto-refactor';

@@ -12,7 +12,7 @@
  */
 import type * as ts from 'typescript';
 import type { AnalyzerContext, Issue, Severity } from '../types';
-import type { ResolvedAnalyzer } from '../analyzerRegistry';
+import type { ResolvedAnalyzer } from '../analyzer-registry';
 import type { LanguageAdapter } from '../multilang';
 import type { AnalyzerHost, FileContextBase, ParseState, StreamingOutcome } from './analyzerRunner';
 

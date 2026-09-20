@@ -715,7 +715,7 @@ export { finalizeReport, recomputeSummary, groupCounts } from './core/reporting/
 
 export { resolveConfig, Scanner, Logger, AutoRefactorError, render, CacheStore };
 export { scanDiffStream } from './core/stream';
-export { CircularDiffBuffer } from './core/ringBuffer';
+export { CircularDiffBuffer } from './core/ring-buffer';
 export { PraxisRollbackEngine, revertDiffHunk, revertTaskCard } from './core/rollback';
 export {
     fnv1a32,
@@ -733,8 +733,8 @@ export {
     linesOf,
     getLine,
     countLines,
-} from './core/editDiff';
-export { ModuleDependencyGraph, runCyclePass, findImportCycles } from './core/dependencyGraph';
+} from './core/edit-diff';
+export { ModuleDependencyGraph, runCyclePass, findImportCycles } from './core/dependency-graph';
 export { GovernanceAnalyzer } from './analyzers/governance';
 export { ArchitectureAnalyzer } from './analyzers/architecture';
 export { PerformanceAnalyzer } from './analyzers/performance';
@@ -807,7 +807,7 @@ export {
     getMaturityTunedThresholds,
     getMaturityTunedAnalyzerOptions,
 } from './core/profiler/scaleTuner';
-export { ImportedSymbolRef, SymbolImpactAnalysis } from './core/dependencyGraph';
+export { ImportedSymbolRef, SymbolImpactAnalysis } from './core/dependency-graph';
 export { NEED_RUNTIME_EVIDENCE, IssueEvidence } from './core/types';
 export {
     LifecycleStage,

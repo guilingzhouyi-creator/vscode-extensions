@@ -23,15 +23,15 @@ import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
 import { locN } from '../utils/normalized';
 import { runStreaming } from '../core/traverse';
-import { maskedLinesOfPath } from '../core/sourceMask';
-import { globToRegExp } from '../core/fileDiscovery';
+import { maskedLinesOfPath } from '../core/source-mask';
+import { globToRegExp } from '../core/file-discovery';
 import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import {
     detectComplexityAmplification,
     isBoundedCollection,
 } from '../core/intelligence/semanticComplexity';
 import { evaluateStructuredClarity, formatOptimizationHint } from './structured-clarity';
-import { TypeScriptAdapter } from '../core/typescriptAdapter';
+import { TypeScriptAdapter } from '../core/typescript-adapter';
 
 /**
  * Maximum window of lines inside a loop body inspected for allocations and blocking I/O.

@@ -15,7 +15,7 @@ function firstWord(name: string): string {
  * Architecture Role: Analyzer adapter serving both the single-pass streaming path
  *   (visit/finalize) and the standalone analyze() contract.
  * Dependencies & Triggers: Core types, NodeKind/NormalizedNode, runStreaming, plus a lazy
- *   require('../core/typescriptAdapter') used only by analyze(); triggered by engine passes.
+ *   require('../core/typescript-adapter') used only by analyze(); triggered by engine passes.
  * Responsibilities: Accumulate lines, non-blank lines, functions, max nesting depth,
  *   top-level declarations and exported symbols; infer module prefixes from the first word of
  *   function names; emit at most one large-file finding with split suggestions when the
@@ -54,7 +54,7 @@ export class LargeFileAnalyzer implements Analyzer {
         // standalone `analyze()` contract — never on the worker streaming path.
 
         const { TypeScriptAdapter } =
-            require('../core/typescriptAdapter') as typeof import('../core/typescriptAdapter');
+            require('../core/typescript-adapter') as typeof import('../core/typescript-adapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sf.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [

@@ -30,7 +30,7 @@
 import type { Issue } from '../types';
 import { NEED_RUNTIME_EVIDENCE } from '../types';
 import { PerformanceMessages } from '../messages/performance';
-import { maskedLinesOfPath } from '../sourceMask';
+import { maskedLinesOfPath } from '../source-mask';
 
 // The incremental metrics live in their own module (this file crossed the repository's own
 // large-file fail threshold); re-exported here so the public surface stays one import site.

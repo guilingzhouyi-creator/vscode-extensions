@@ -11,7 +11,7 @@
  */
 import type { Issue } from '../types';
 import { SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR } from '../types';
-import type { SemanticEvidenceStep, SemanticReviewDetail } from '../semanticTypes';
+import type { SemanticEvidenceStep, SemanticReviewDetail } from '../semantic-types';
 import type { ArchitecturalFileInfo } from './semanticArchitecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from './semanticArchitecture';
 /** Evidence-chain step kind for a call site. */

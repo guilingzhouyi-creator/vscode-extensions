@@ -69,17 +69,17 @@ const cache: Record<string, LanguageAdapter> = {};
 const registered: Record<string, LanguageAdapter> = {};
 
 const factories: Record<string, () => LanguageAdapter> = {
-    typescript: () => new (require('./typescriptAdapter').TypeScriptAdapter)(),
+    typescript: () => new (require('./typescript-adapter').TypeScriptAdapter)(),
 
-    rust: () => new (require('./rustAdapter').RustAdapter)(),
+    rust: () => new (require('./rust-adapter').RustAdapter)(),
 
-    oxc: () => new (require('./oxcAdapter').OxcAdapter)(),
+    oxc: () => new (require('./oxc-adapter').OxcAdapter)(),
 
-    gdscript: () => new (require('./gdscriptAdapter').GDScriptAdapter)(),
+    gdscript: () => new (require('./gdscript-adapter').GDScriptAdapter)(),
 
-    python: () => new (require('./pythonAdapter').PythonAdapter)(),
+    python: () => new (require('./python-adapter').PythonAdapter)(),
 
-    markdown: () => new (require('./markdownAdapter').MarkdownAdapter)(),
+    markdown: () => new (require('./markdown-adapter').MarkdownAdapter)(),
 };
 
 function getAdapter(id: string): LanguageAdapter {

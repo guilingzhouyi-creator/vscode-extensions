@@ -15,7 +15,7 @@
  *   reported as impacted rather than silently reused so stale findings cannot skip a re-audit,
  *   while byte and AST fast paths avoid re-analysis when only layout moved in the CI edit loop.
  */
-import { sha256Hex } from '../cacheKey';
+import { sha256Hex } from '../cache-key';
 import type { CodeDomainFingerprint, DomainMatchResult, ReviewMemoryRecord } from './types';
 import { computeAstDigest } from './domainFingerprint';
 

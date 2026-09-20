@@ -3,7 +3,7 @@
  * File Path: scripts/test-result-codec.js
  * Architecture Role: Protocol conformance gate for the encode/decode pair, using
  *   structured-clone equivalence as the acceptance oracle.
- * Dependencies & Triggers: ../dist/core/resultCodec.js encodeResults/decodeResults
+ * Dependencies & Triggers: ../dist/core/result-codec.js encodeResults/decodeResults
  *   and ../dist/api.js scan(); triggered by `npm run test-codec`, which npm test
  *   runs after the validate scripts, over the samples/ corpus and crafted payloads.
  * Responsibilities: Recursively compare decoded graphs with the originals; check
@@ -15,7 +15,7 @@
  *   or field-presence drift is diagnosed precisely rather than as a generic diff.
  */
 const path = require('path');
-const { encodeResults, decodeResults } = require('../dist/core/resultCodec.js');
+const { encodeResults, decodeResults } = require('../dist/core/result-codec.js');
 const { scan } = require('../dist/api.js');
 
 function deepEqualStrict(a, b) {

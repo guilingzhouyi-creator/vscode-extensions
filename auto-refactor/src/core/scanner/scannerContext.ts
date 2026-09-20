@@ -10,8 +10,8 @@
  */
 
 import type { ScanConfig, ScanReport, Issue, FileMetric } from '../types';
-import type { ResolvedAnalyzer } from '../analyzerRegistry';
-import type { IncrementalFileState } from '../incrementalState';
+import type { ResolvedAnalyzer } from '../analyzer-registry';
+import type { IncrementalFileState } from '../incremental-state';
 import type { Logger } from '../logger';
 
 /** Execution context exposing Scanner state and execution primitives to sub-pipelines. */

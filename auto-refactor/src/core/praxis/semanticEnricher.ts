@@ -14,7 +14,7 @@
 
 import type { IPraxisContextEnricher, PraxisEnrichedContext, ReviewDiffHunk } from './contracts';
 import type { SemanticGraph } from '../semantic/semanticGraph';
-import { normalizeCanonicalPath } from '../semantic/adapters/pathUtils';
+import { normalizeCanonicalPath } from '../semantic/adapters/path-utils';
 
 /** Threshold in diff line count above which rework is suggested instead of auto-fix */
 const HUNK_REWORK_LINE_THRESHOLD = 50;

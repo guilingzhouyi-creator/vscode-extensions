@@ -10,7 +10,7 @@
  *   module so the routing stages can share them without an import cycle.
  */
 import { countLines } from '../incremental';
-import type { WorkerPoolManager } from '../workerPool';
+import type { WorkerPoolManager } from '../worker-pool';
 
 /**
  * Report whether the diff miss batch should go to the persistent worker pool.

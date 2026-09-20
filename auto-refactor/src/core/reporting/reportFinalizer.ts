@@ -16,8 +16,8 @@ import type { ScanConfig, ScanReport, Issue, SuppressionRule } from '../types';
 import type { Scanner } from '../analyzer';
 import { summarizeUncertainty } from './uncertaintySummary';
 import type { Logger } from '../logger';
-import { globToRegExp } from '../fileDiscovery';
-import { runCyclePass } from '../dependencyGraph';
+import { globToRegExp } from '../file-discovery';
+import { runCyclePass } from '../dependency-graph';
 import {
     BASELINE_GRANULARITY_GROUPED,
     groupCounts,

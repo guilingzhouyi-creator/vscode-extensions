@@ -22,9 +22,9 @@
  *                    This module NEVER imports `typescript`.
  */
 
-import type { EditRange } from './editDiff';
-import { computeEditRanges, changedLineCount, countLines, shouldUseIncremental } from './editDiff';
-import type { IncrementalFileState } from './incrementalState';
+import type { EditRange } from './edit-diff';
+import { computeEditRanges, changedLineCount, countLines, shouldUseIncremental } from './edit-diff';
+import type { IncrementalFileState } from './incremental-state';
 
 /**
  * Radix passed to `parseInt` so env overrides are always read as base-10 integers (never
@@ -167,4 +167,4 @@ export type { EditRange };
 export { resolveDiff as routeDiff, resolveDiff } from './diff';
 export type { ResolvedDiff, ResolveDiffOpts, DiffMode } from './diff';
 export { normalizeEditRanges } from './utf8';
-export { validateEditRanges } from './editDiff';
+export { validateEditRanges } from './edit-diff';

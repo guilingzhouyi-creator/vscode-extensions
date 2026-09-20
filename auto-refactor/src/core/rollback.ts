@@ -24,7 +24,7 @@
  */
 
 import type { ReviewDiffHunk, IPraxisRollbackGatekeeper } from './praxis/contracts';
-import { computeLineStarts, linesOf } from './editDiff';
+import { computeLineStarts, linesOf } from './edit-diff';
 
 /**
  * Outcome of reverting one diff hunk.

@@ -28,15 +28,15 @@
  * This module NEVER imports `typescript`.
  */
 
-import type { EditRange, DiffOp } from './editDiff';
+import type { EditRange, DiffOp } from './edit-diff';
 import {
     computeEditRangesWithOps,
     computeDetailedHunks,
     changedLineCount,
     countLines,
-} from './editDiff';
+} from './edit-diff';
 import { normalizeEditRanges, decodeContent } from './utf8';
-import type { IncrementalFileState } from './incrementalState';
+import type { IncrementalFileState } from './incremental-state';
 import type { DiffInput } from './types';
 import type { ReviewDiffHunk, PraxisVerdict, PraxisPluginHooks } from './praxis/contracts';
 

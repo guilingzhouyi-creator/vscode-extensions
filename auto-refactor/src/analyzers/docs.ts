@@ -18,7 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
-import { globToRegExp } from '../core/fileDiscovery';
+import { globToRegExp } from '../core/file-discovery';
 
 const FENCE_RE = /^\s*(`{3,}|~{3,})/;
 const INLINE_CODE_RE = /`([^`\n]+)`/g;

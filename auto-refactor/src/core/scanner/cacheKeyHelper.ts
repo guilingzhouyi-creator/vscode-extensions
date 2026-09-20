@@ -13,8 +13,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanConfig, Issue, FileMetric } from '../types';
-import type { ResolvedAnalyzer } from '../analyzerRegistry';
-import type { FingerprintAnalyzerDesc } from '../cacheKey';
+import type { ResolvedAnalyzer } from '../analyzer-registry';
+import type { FingerprintAnalyzerDesc } from '../cache-key';
 import {
     ANALYZER_VERSIONS,
     buildFingerprintPayload,
@@ -22,9 +22,9 @@ import {
     adapterIdFor,
     computeCustomHash,
     buildPoolFingerprint,
-} from '../cacheKey';
+} from '../cache-key';
 import type { CachedResult, Fingerprint } from '../cache';
-import type { IncrementalFileState } from '../incrementalState';
+import type { IncrementalFileState } from '../incremental-state';
 
 /** TypeScript declaration-file suffix, keyed separately from a plain `.ts` extension. */
 export const DTS_EXTENSION = '.d.ts';

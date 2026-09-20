@@ -26,8 +26,8 @@ import type {
     RuleEvaluationContext,
 } from '../core/governance/types';
 import { resolveLanguageProfile } from '../core/governance/languageProfiles';
-import { maskedLinesOf } from '../core/sourceMask';
-import { TypeScriptAdapter } from '../core/typescriptAdapter';
+import { maskedLinesOf } from '../core/source-mask';
+import { TypeScriptAdapter } from '../core/typescript-adapter';
 import type { GovernanceRegistry } from '../core/governance/registry';
 import { getDefaultGovernanceRegistry } from '../core/governance/registry';
 

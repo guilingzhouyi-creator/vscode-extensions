@@ -13,13 +13,13 @@
 
 import type { SemanticGraph } from '../index';
 import type { UnifiedLanguageAdapter } from './base';
-import { TypeScriptSemanticAdapter } from './typescriptAdapter';
-import { PythonSemanticAdapter } from './pythonAdapter';
+import { TypeScriptSemanticAdapter } from './typescript-adapter';
+import { PythonSemanticAdapter } from './python-adapter';
 import {
     GoSemanticAdapter,
     GDScriptSemanticAdapter,
     RustSemanticAdapter,
-} from './skeletonAdapters';
+} from './skeleton-adapters';
 
 /**
  * Registry managing language adapters for unified semantic graph ingestion.

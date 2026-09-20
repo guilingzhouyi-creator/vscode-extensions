@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.3.0-1789906782527",
-  "timestamp": "2026-09-20T12:19:44.365Z",
+  "snapshotId": "snapshot-v0.3.0-1789907529135",
+  "timestamp": "2026-09-20T12:32:10.865Z",
   "versions": {
     "engineVersion": "0.3.0",
     "ruleVersion": "2026.09-v1",
@@ -13,7 +13,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 313,
-    "durationMs": 1699
+    "durationMs": 1601
   },
   "metrics": {
     "compositeScore": 99.8,
@@ -105,7 +105,7 @@
       "effectiveDensity": 0.97
     },
     {
-      "filePath": "src/core/oxcTypes.ts",
+      "filePath": "src/core/oxc-types.ts",
       "domain": "core",
       "totalIssues": 96,
       "criticalCount": 0,
@@ -141,7 +141,7 @@
       "effectiveDensity": 0.98
     },
     {
-      "filePath": "src/core/pythonAdapter.ts",
+      "filePath": "src/core/python-adapter.ts",
       "domain": "core",
       "totalIssues": 78,
       "criticalCount": 0,
@@ -592,20 +592,20 @@
         "message": "Function \"TestModernityAnalyzer.buildSemanticUnits\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "performance:PRF-MEM-001:src/core/analyzerRegistry.ts:168",
+        "id": "performance:PRF-MEM-001:src/core/analyzer-registry.ts:168",
         "rule": "PRF-MEM-001",
         "tier": "high",
         "severity": "info",
-        "file": "src/core/analyzerRegistry.ts",
+        "file": "src/core/analyzer-registry.ts",
         "line": 168,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
-        "id": "performance:PRF-MEM-001:src/core/analyzerRegistry.ts:169",
+        "id": "performance:PRF-MEM-001:src/core/analyzer-registry.ts:169",
         "rule": "PRF-MEM-001",
         "tier": "high",
         "severity": "info",
-        "file": "src/core/analyzerRegistry.ts",
+        "file": "src/core/analyzer-registry.ts",
         "line": 169,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       }

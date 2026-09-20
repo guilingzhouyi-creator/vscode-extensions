@@ -18,7 +18,7 @@
  */
 
 const { scan, scanDiff, scanDiffDelta } = require('../dist/api');
-const { computeEditRanges } = require('../dist/core/editDiff');
+const { computeEditRanges } = require('../dist/core/edit-diff');
 const { normalizeEditRanges } = require('../dist/core/utf8');
 const fs = require('fs');
 const path = require('path');

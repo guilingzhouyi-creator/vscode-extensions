@@ -33,7 +33,7 @@ const {
 } = require('../dist/core/rules/registry');
 
 const { LEGACY_RULE_ALIASES } = require('../dist/core/rules/aliases');
-const { BUILTIN_FACTORIES } = require('../dist/core/analyzerRegistry');
+const { BUILTIN_FACTORIES } = require('../dist/core/analyzer-registry');
 const { BUILTIN_ANALYZERS } = require('../dist/core/config');
 const { ALL_BUILTIN_ANALYZERS } = require('../dist/core/router/sparseRuleRouter');
 

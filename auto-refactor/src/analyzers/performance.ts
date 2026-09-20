@@ -15,7 +15,7 @@
  */
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { PerformanceMessages } from '../core/messages';
-import { globToRegExp, matchAny } from '../core/fileDiscovery';
+import { globToRegExp, matchAny } from '../core/file-discovery';
 import { detectUnboundedGrowth } from '../core/intelligence/dataFlow';
 
 /** Default maximum loop nesting depth before PRF-ALG-001 is emitted. */

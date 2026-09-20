@@ -17,7 +17,7 @@
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { NEED_RUNTIME_EVIDENCE } from '../../types';
-import { globToRegExp, matchAny } from '../../fileDiscovery';
+import { globToRegExp, matchAny } from '../../file-discovery';
 
 /** Governance category shared by every performance rule exported from this file. */
 const PERFORMANCE_CATEGORY = 'performance';

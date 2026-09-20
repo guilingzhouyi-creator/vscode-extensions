@@ -4,7 +4,7 @@ import type * as ts from 'typescript';
 // ts-free modules only — importing `../utils/ast` here would pull `typescript` into every
 // worker isolate, even when the oxc parser + built-in analyzers never touch it.
 import { countLineStats } from '../utils/linestats';
-import { instantiateAnalyzer } from './loadAnalyzer';
+import { instantiateAnalyzer } from './load-analyzer';
 import type { AnalyzerContext, Issue, FileMetric, ScanConfig } from './types';
 import {
     runStreaming,
@@ -13,9 +13,9 @@ import {
     tryCreateProjector,
 } from './traverse';
 import { adapterFor } from './adapters';
-import { unsupportedLanguageDiagnostic } from './languageSupport';
+import { unsupportedLanguageDiagnostic } from './language-support';
 import type { LanguageAdapter, NodeProjector, NormalizedAst, NormalizedNode } from './multilang';
-import { encodeResults, BINARY_RESULT_ENABLED } from './resultCodec';
+import { encodeResults, BINARY_RESULT_ENABLED } from './result-codec';
 
 type LineStats = ReturnType<typeof countLineStats>;
 

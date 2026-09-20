@@ -24,7 +24,7 @@ const os = require('os');
 const path = require('path');
 
 const { scanAndRender } = require('../dist/api');
-const { ModuleDependencyGraph, runCyclePass } = require('../dist/core/dependencyGraph');
+const { ModuleDependencyGraph, runCyclePass } = require('../dist/core/dependency-graph');
 
 /**
  * Write a set of fixture files into a directory tree.

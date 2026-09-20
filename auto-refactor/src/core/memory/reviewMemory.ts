@@ -23,7 +23,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { MemoryEvictionPolicy, ReviewMemoryRecord } from './types';
 import type { FileRevision } from '../trajectory/types';
-import { sha256Hex } from '../cacheKey';
+import { sha256Hex } from '../cache-key';
 
 /**
  * Default cap on review-memory records kept in memory; the LRU tail is evicted beyond it.

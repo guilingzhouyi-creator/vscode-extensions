@@ -12,7 +12,7 @@
  */
 
 import type { FileMetric, Issue, ScanConfig } from '../types';
-import type { ResolvedAnalyzer, WorkerAnalyzerDesc } from '../analyzerRegistry';
+import type { ResolvedAnalyzer, WorkerAnalyzerDesc } from '../analyzer-registry';
 import type { Logger } from '../logger';
 import { AR_TIMING, effectiveWorkers, nowMs, runWorkerPool } from './workerScheduler';
 
