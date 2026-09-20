@@ -70,6 +70,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-ts-modern', script: 'scripts/validate-ts-modern.js' },
   { name: 'validate-modern-packs', script: 'scripts/validate-modern-packs.js' },
   { name: 'validate-naming-suite', script: 'scripts/validate-naming-suite.js' },
+  { name: 'validate-physical-naming', script: 'scripts/validate-physical-naming.js' },
   { name: 'validate-python-imports', script: 'scripts/validate-python-imports.js' },
   { name: 'validate-postscan-parity', script: 'scripts/validate-postscan-parity.js' },
   { name: 'validate-literal-policy', script: 'scripts/validate-literal-policy.js' },
