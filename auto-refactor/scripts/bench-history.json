@@ -308,6 +308,34 @@
         "bigLines": 2600,
         "parser": "oxc"
       }
+    },
+    {
+      "date": "2026-09-20T09:05:41.954Z",
+      "commit": "56fe108",
+      "new300": 122.28910000000019,
+      "mixed300": null,
+      "newBig": 865.3922000000002,
+      "mixedBig": null,
+      "createSourceFile": 4.932580000000053,
+      "parseTs": 11.665800000000218,
+      "mapTs": 6.7332200000001645,
+      "parseOxc": 2.2420900000000072,
+      "mapOxc": 14.307880000000115,
+      "runStreaming": 31.140269999999873,
+      "materializationRatio": 0.5771760187899706,
+      "env": {
+        "node": "v24.16.0",
+        "os": "win32",
+        "cpu": "32 logical"
+      },
+      "flags": {
+        "files": 300,
+        "iterations": 5,
+        "workers": 1,
+        "bigFiles": 12,
+        "bigLines": 2600,
+        "parser": "typescript"
+      }
     }
   ]
 }

@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-09-20T09:05:42.000Z",
+  "commit": "56fe108",
+  "environment": {
+    "node": "v24.16.0",
+    "os": "win32",
+    "cpu": "32 logical"
+  },
+  "corpus": {
+    "files": 234,
+    "lines": 63905,
+    "bytes": 2506045
+  },
+  "dimensions": {
+    "hotPaths": {
+      "maskSourceMs": 28.2,
+      "cmpRulesMs": 20.8,
+      "governanceScanMs": 684.8,
+      "throughputMBPerSec": 3.66,
+      "historicalComparison": {
+        "baseline1_71MBScanMs": 651.2,
+        "throughputDeltaPercent": 39.2
+      }
+    },
+    "moeSliceGate": {
+      "fullScanSeconds": 35.8,
+      "sliceGateSeconds": 1.9,
+      "speedupFactor": 18.8,
+      "coldAnalyzerBypassRatio": "65%~85%",
+      "computeEliminatedRatio": "70%"
+    },
+    "simdAndSwarAlgorithms": {
+      "swarAsciiThroughputMBPerSec": 6448.4,
+      "myersDisjoint256LinesMs": 1.234,
+      "myersDisjoint1000LinesMs": 0.410,
+      "dispersed10Edits5000LinesMs": 3.549,
+      "bitParallelMyersVectorSpeedup": 2.42,
+      "dag1000NodesQueryLatencyMs": 0.0096,
+      "massiveScale50kLinesDiffMs": 51.46
+    },
+    "engineParsers": {
+      "tsParseMs": 11.67,
+      "oxcParseMs": 2.24,
+      "oxcSpeedupFactor": 5.21,
+      "singlePassMultiplexingSavingRatio": "35%~50%"
+    },
+    "warmDaemonAndDiff": {
+      "fullColdScanMs": 1200,
+      "warmDaemonScanMs": 180,
+      "warmSpeedupFactor": 6.67,
+      "scanDiffDeltaMs": 511,
+      "byteEquivalenceEnforced": true
+    },
+    "architectureAndHealth": {
+      "qualityScore": 99.8,
+      "grade": "A+",
+      "criticalDebt": 0,
+      "highDebt": 216,
+      "maxCyclomaticComplexity": 8,
+      "maxFunctionLines": 58,
+      "testSuitesPassing": "55/55"
+    }
+  }
+}
