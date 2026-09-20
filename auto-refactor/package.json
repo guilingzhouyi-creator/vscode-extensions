@@ -89,6 +89,7 @@
     "fastpath-bench": "node scripts/bench-fastpath.js",
     "test-codec": "node scripts/test-result-codec.js",
     "validate-literal-policy": "node scripts/validate-literal-policy.js",
+    "validate-literal-policy-declarative": "node scripts/validate-literal-policy-declarative.js",
     "validate-ts-modern": "node scripts/validate-ts-modern.js",
     "validate-modern-packs": "node scripts/validate-modern-packs.js",
     "validate-language-matrix": "node scripts/validate-language-matrix.js",

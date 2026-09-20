@@ -28,7 +28,9 @@ import type {
     CustomAnalyzerDeclaration,
     AnalyzerId,
     LogLevel,
+    LiteralPolicyConfig,
 } from './types';
+import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from './literalPolicyEngine';
 
 import {
     ANALYZER_ARCHITECTURE,
@@ -324,6 +326,9 @@ export function defaultConfig(root: string): ScanConfig {
         failOnSeverity: undefined,
         suppressions: [],
         baselineGranularity: 'id',
+        literalPolicy: {
+            toleratedCallArguments: { ...DEFAULT_TOLERATED_CALL_ARGUMENTS },
+        },
         // observability / scheduling defaults
         logLevel: 'info',
         logFile: undefined,
@@ -583,6 +588,21 @@ function assembleReportingOptions(
     };
 }
 
+function mergeLiteralPolicy(
+    base?: LiteralPolicyConfig,
+    custom?: LiteralPolicyConfig,
+): LiteralPolicyConfig | undefined {
+    if (!custom) return base;
+    return {
+        ...base,
+        ...custom,
+        toleratedCallArguments: {
+            ...(base?.toleratedCallArguments ?? {}),
+            ...(custom?.toleratedCallArguments ?? {}),
+        },
+    };
+}
+
 /**
  * Assemble domain governance, memory, routing, and language support options.
  *
@@ -718,6 +738,7 @@ export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {
         maturityTier,
         classifyLiterals,
         granularRules,
+        literalPolicy: mergeLiteralPolicy(base.literalPolicy, fileCfg.literalPolicy),
         ...assembleExecutionOptions(base, fileCfg, overrides),
         ...assembleReportingOptions(base, fileCfg, overrides),
         ...assembleDomainOptions(base, fileCfg, overrides),

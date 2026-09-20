@@ -15,6 +15,7 @@ import * as ts from 'typescript';
 import type { Position } from './multilang';
 import { NodeKind } from './multilang';
 import { isFunctionLike } from '../utils/ast';
+import { isCallArgumentToleratedByPolicy } from './literalPolicyEngine';
 
 /** Set of TypeScript syntax kinds that represent control flow or block scopes. */
 export const CONTROL_OR_BLOCK = new Set<ts.SyntaxKind>([
@@ -285,19 +286,6 @@ function isToleratedString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): boolea
     return false;
 }
 
-const RE_PARSE_INT = /(?:^|\.)parseInt$/;
-const RE_ZERO_ARG_METHODS = /(?:^|\.)(?:slice|indexOf|substring|substr)$/;
-const RADIX_BASE_DECIMAL = 10;
-const RADIX_BASE_HEX = 16;
-const RADIX_BASE_OCTAL = 8;
-const RADIX_BASE_BINARY = 2;
-const TOLERATED_RADIX_SET = new Set([
-    RADIX_BASE_BINARY,
-    RADIX_BASE_OCTAL,
-    RADIX_BASE_DECIMAL,
-    RADIX_BASE_HEX,
-]);
-
 function isToleratedCallArg(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {
     if (!ts.isCallExpression(p) || !sf) return false;
     const args = p.arguments;
@@ -305,10 +293,7 @@ function isToleratedCallArg(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): bool
     if (argIdx < 0) return false;
     const callee = p.expression.getText(sf);
     const numVal = Number((node as ts.NumericLiteral).text ?? node.getText(sf));
-    if (argIdx === 1 && RE_PARSE_INT.test(callee)) {
-        return TOLERATED_RADIX_SET.has(numVal);
-    }
-    return argIdx === 0 && numVal === 0 && RE_ZERO_ARG_METHODS.test(callee);
+    return isCallArgumentToleratedByPolicy(callee, argIdx, numVal);
 }
 
 function isToleratedNumeric(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {

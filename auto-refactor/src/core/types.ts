@@ -516,6 +516,18 @@ export interface AnalyzerContext {
     incremental?: IncrementalFileState;
 }
 
+/** Declarative tolerance policy for function call arguments. */
+export interface ToleratedCallArgumentPolicy {
+    argIndex: number;
+    allowedValues?: (number | string)[];
+    allowedPattern?: string;
+}
+
+/** Declarative literal policy configuration. */
+export interface LiteralPolicyConfig {
+    toleratedCallArguments?: Record<string, ToleratedCallArgumentPolicy>;
+}
+
 /**
  * Fully resolved scan configuration: file discovery globs, analyzer registry, global
  * thresholds, execution controls, and reporting fields. Produced by resolveConfig, which
@@ -558,6 +570,8 @@ export interface ScanConfig {
     suppressions?: SuppressionRule[];
     /** Baseline ratchet comparison granularity. Default 'id' (exact issue id, line-sensitive). */
     baselineGranularity?: 'id' | 'grouped';
+    /** Declarative literal tolerance policy for function call arguments and standard patterns. */
+    literalPolicy?: LiteralPolicyConfig;
 
     // ---- unified execution / observability controls ----
     /** Log verbosity. Default 'info'. Logs go to stderr so stdout stays machine-readable. */

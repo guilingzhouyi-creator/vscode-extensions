@@ -29,6 +29,7 @@ import {
     FN_TYPES,
     TYPE_SKIP_TYPES,
 } from './oxcTypes';
+import { isCallArgumentToleratedByPolicy } from './literalPolicyEngine';
 
 function isFnLikeType(t: string | undefined): boolean {
     return !!t && FN_TYPES.has(t);
@@ -266,19 +267,6 @@ function oxcIsTypeNodeType(t: string): boolean {
     );
 }
 
-const RE_PARSE_INT = /(?:^|\.)parseInt$/;
-const RE_ZERO_ARG_METHODS = /(?:^|\.)(?:slice|indexOf|substring|substr)$/;
-const RADIX_BASE_DECIMAL = 10;
-const RADIX_BASE_HEX = 16;
-const RADIX_BASE_OCTAL = 8;
-const RADIX_BASE_BINARY = 2;
-const TOLERATED_RADIX_SET = new Set([
-    RADIX_BASE_BINARY,
-    RADIX_BASE_OCTAL,
-    RADIX_BASE_DECIMAL,
-    RADIX_BASE_HEX,
-]);
-
 function oxcIsToleratedCallArg(node: OxcNode, p: OxcNode, ctx?: Ctx): boolean {
     if (p.type !== NODE_KIND_CALL_EXPRESSION || !ctx) return false;
     const args = p.arguments;
@@ -287,10 +275,7 @@ function oxcIsToleratedCallArg(node: OxcNode, p: OxcNode, ctx?: Ctx): boolean {
     if (argIdx < 0) return false;
     const callee = p.callee ? ctx.src.slice(p.callee.start, p.callee.end) : '';
     const numVal = Number(node.value ?? 0);
-    if (argIdx === 1 && RE_PARSE_INT.test(callee)) {
-        return TOLERATED_RADIX_SET.has(numVal);
-    }
-    return argIdx === 0 && numVal === 0 && RE_ZERO_ARG_METHODS.test(callee);
+    return isCallArgumentToleratedByPolicy(callee, argIdx, numVal);
 }
 
 /** Check whether a numeric literal appears in a tolerated AST context. */
