@@ -57,6 +57,7 @@ import {
     ANALYZER_DATA_ARCHITECTURE,
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_NAMING,
 } from './scoring/dimensionLiterals';
 import { applySemanticAndSecurityLevels } from './configCascades';
 import type { ConfigOverrides } from './configTuning';
@@ -95,6 +96,7 @@ export const BUILTIN_ANALYZERS = [
     ANALYZER_DATA_ARCHITECTURE,
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_NAMING,
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──

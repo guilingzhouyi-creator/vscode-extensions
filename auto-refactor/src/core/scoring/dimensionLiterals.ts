@@ -221,6 +221,11 @@ export const ANALYZER_GOVERNANCE = 'governance';
 export const ANALYZER_HYGIENE = 'hygiene';
 
 /**
+ * Analyzer id owning the naming rule family.
+ */
+export const ANALYZER_NAMING = 'naming';
+
+/**
  * Analyzer id owning the security rule family.
  */
 export const ANALYZER_SECURITY = 'security';

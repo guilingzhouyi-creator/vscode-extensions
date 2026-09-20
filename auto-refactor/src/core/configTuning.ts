@@ -47,6 +47,7 @@ import {
     ANALYZER_DATA_ARCHITECTURE,
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_NAMING,
 } from './scoring/dimensionLiterals';
 
 export {
@@ -83,6 +84,7 @@ export const SPECIALIZED_ANALYZERS = new Set<string>([
     ANALYZER_DATA_ARCHITECTURE,
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_NAMING,
 ]);
 
 /** Auto-tune estimate: source lines per profiled language entry. */

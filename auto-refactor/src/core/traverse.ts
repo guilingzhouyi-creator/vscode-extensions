@@ -365,6 +365,7 @@ export const FAST_PATH_ANALYZERS = new Set([
     'performance',
     'comments',
     'hygiene',
+    'naming',
 ]);
 
 /**

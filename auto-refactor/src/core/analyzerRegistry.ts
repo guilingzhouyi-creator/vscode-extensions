@@ -17,6 +17,7 @@
  *   throwing to keep the engine robust. Relative worker paths deliberately start with `../`
  *   because workers run from `dist/core`.
  */
+import { createRequire } from 'module';
 import * as path from 'path';
 import type { Analyzer, AnalyzerId, ScanConfig } from './types';
 import { AutoRefactorError } from './logger';
@@ -41,6 +42,7 @@ import { DocsAnalyzer } from '../analyzers/docs';
 import { DataArchitectureAnalyzer } from '../analyzers/dataArchitecture';
 import { TestModernityAnalyzer } from '../analyzers/testModernity';
 import { DependencyLayoutAnalyzer } from '../analyzers/dependencyLayout';
+import { NamingAnalyzer } from '../analyzers/naming';
 
 /**
  * Resolved metadata and fresh instance factory for a declared analyzer.
@@ -96,6 +98,7 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
     'data-architecture': () => new DataArchitectureAnalyzer(),
     'test-modernity': () => new TestModernityAnalyzer(),
     'dependency-layout': () => new DependencyLayoutAnalyzer(),
+    naming: () => new NamingAnalyzer(),
 };
 
 /**
@@ -130,7 +133,10 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     'data-architecture': '../analyzers/dataArchitecture',
     'test-modernity': '../analyzers/testModernity',
     'dependency-layout': '../analyzers/dependencyLayout',
+    naming: '../analyzers/naming',
 };
+
+const dynamicRequire = createRequire(__filename);
 
 function loadExternalAnalyzer(
     decl: { name: string; module: string },
@@ -138,7 +144,7 @@ function loadExternalAnalyzer(
 ): { analyzer: Analyzer; modulePath: string } {
     const modPath = path.isAbsolute(decl.module) ? decl.module : path.resolve(baseDir, decl.module);
 
-    const mod = require(modPath);
+    const mod = dynamicRequire(modPath);
     let analyzer: Analyzer;
     try {
         analyzer = instantiateAnalyzer(mod, decl.name);
@@ -232,7 +238,7 @@ export function resolveAnalyzers(config: ScanConfig, baseDir: string): ResolvedA
             options: { ...config.thresholds, ...(c.options || {}) },
             modulePath,
             factory: () => {
-                const mod = require(customModulePath);
+                const mod = dynamicRequire(customModulePath);
                 return instantiateAnalyzer(mod, c.name);
             },
         });

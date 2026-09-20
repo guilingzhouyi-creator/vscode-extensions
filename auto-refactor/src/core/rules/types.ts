@@ -49,8 +49,11 @@ export type RuleFamily =
     | 'TSM'
     | 'RSM'
     | 'GDM'
+    | 'NAM'
     | 'LEGACY';
 
+/** Canonical rule-family prefix for naming governance and hygiene rules. */
+export const RULE_FAMILY_NAMING = 'NAM';
 /** Canonical rule-family prefix for general language rules. */
 export const RULE_FAMILY_LANG = 'LANG';
 /** Canonical rule-family prefix for comments and header rules. */

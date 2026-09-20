@@ -15,6 +15,7 @@
  */
 import { ANALYZER_RULES } from './entries/analyzers';
 import { GOVERNANCE_RULES } from './entries/governance';
+import { NAMING_RULES } from './entries/naming';
 import { PLATFORM_RULES } from './entries/platform';
 import type { RuleDefinition } from './types';
 
@@ -25,6 +26,7 @@ export { RULE_ID_PATTERN, defineRule } from './types';
 export const RULE_REGISTRY: readonly RuleDefinition[] = [
     ...ANALYZER_RULES,
     ...GOVERNANCE_RULES,
+    ...NAMING_RULES,
     ...PLATFORM_RULES,
 ].sort((a, b) => a.id.localeCompare(b.id));
 
