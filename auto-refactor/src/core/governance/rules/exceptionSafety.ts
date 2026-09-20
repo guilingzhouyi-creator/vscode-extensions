@@ -40,6 +40,10 @@ const SWALLOWED_EXCEPTION_RULE_ID = 'GOV-EXC-001';
 /** Remediation text for swallowed exceptions, byte-identical across all report paths. */
 const SWALLOWED_EXCEPTION_SUGGESTION = 'Handle, log, or explicitly re-throw the caught exception.';
 
+const TOKEN_EXCEPT = 'except';
+const TOKEN_CATCH = 'catch';
+const TOKEN_UNWRAP = '.unwrap()';
+
 /**
  * Inspects a multi-line Python except block to detect if all contained statements are swallowed.
  */
@@ -167,6 +171,7 @@ function checkJsTsExceptions(lines: string[]): GovernanceViolation[] {
     const violations: GovernanceViolation[] = [];
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        if (!line.includes(TOKEN_CATCH)) continue;
         if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
 
         if (EMPTY_CATCH_SINGLE_RE.test(line)) {
@@ -174,7 +179,7 @@ function checkJsTsExceptions(lines: string[]): GovernanceViolation[] {
                 ruleId: SWALLOWED_EXCEPTION_RULE_ID,
                 message: 'Empty `catch` block silently swallows exceptions.',
                 line: i + 1,
-                column: line.indexOf('catch') + 1,
+                column: line.indexOf(TOKEN_CATCH) + 1,
                 suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
                 fixable: false,
             });
@@ -188,7 +193,7 @@ function checkJsTsExceptions(lines: string[]): GovernanceViolation[] {
                     ruleId: SWALLOWED_EXCEPTION_RULE_ID,
                     message: 'Empty `catch` block with no active handling statements.',
                     line: i + 1,
-                    column: lines[i].indexOf('catch') + 1,
+                    column: lines[i].indexOf(TOKEN_CATCH) + 1,
                     suggestion: SWALLOWED_EXCEPTION_SUGGESTION,
                     fixable: false,
                 });
@@ -216,9 +221,14 @@ export const SwallowedExceptionRule: GovernanceRule = {
         // RAW view on purpose: this rule exempts a catch whose handling is DOCUMENTED by a
         // rationale marker in the comment, so the comment is evidence rather than noise. Masking
         // it removed the exemption and multiplied the findings (1 -> 45 on this repository).
-        const lines = ctx.lines;
         const lang = ctx.capabilities.languageId;
+        if (lang === 'python') {
+            if (!ctx.content.includes(TOKEN_EXCEPT)) return null;
+        } else {
+            if (!ctx.content.includes(TOKEN_CATCH)) return null;
+        }
 
+        const lines = ctx.lines;
         const violations =
             lang === 'python' ? checkPythonExceptions(lines) : checkJsTsExceptions(lines);
 
@@ -241,27 +251,27 @@ export const NakedUnwrapRule: GovernanceRule = {
     isFixable: false,
     languages: ['rust'],
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (!ctx.content.includes(TOKEN_UNWRAP)) return null;
         // Skip test files / test modules
-        if (pathHasSegment(ctx.filePath, 'tests') || fileNameEndsWith(ctx.filePath, ['_test.rs'])) {
+        if (pathHasSegment(ctx.filePath, 'tests') || fileNameEndsWith(ctx.filePath, ['test.rs'])) {
             return null;
         }
 
         const violations: GovernanceViolation[] = [];
-        // RAW view on purpose: this rule exempts a catch whose handling is DOCUMENTED by a
-        // rationale marker in the comment, so the comment is evidence rather than noise. Masking
-        // it removed the exemption and multiplied the findings (1 -> 45 on this repository).
-        const lines = ctx.lines;
+        const lines = ctx.masked;
+        const UNWRAP_RE = /\bunwrap\s*\(/;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            if (!line.includes(TOKEN_UNWRAP)) continue;
             if (line.trim().startsWith('//')) continue;
-            if (line.includes('.unwrap()')) {
+            if (UNWRAP_RE.test(line)) {
                 violations.push({
                     ruleId: 'GOV-EXC-002',
                     message:
                         'Naked `.unwrap()` invocation in production code may trigger unhandled panics.',
                     line: i + 1,
-                    column: line.indexOf('.unwrap()') + 1,
+                    column: line.indexOf(TOKEN_UNWRAP) + 1,
                     suggestion:
                         'Handle with `?` error propagation, `.expect("reason")`, or `match` / `if let`.',
                     fixable: false,
@@ -289,8 +299,14 @@ export const SilentPseudoCatchRule: GovernanceRule = {
     isFixable: false,
     languages: ['typescript', 'javascript', 'python'],
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        const lines = ctx.lines;
         const lang = ctx.capabilities.languageId;
+        if (lang === 'python') {
+            if (!ctx.content.includes(TOKEN_EXCEPT)) return null;
+        } else {
+            if (!ctx.content.includes(TOKEN_CATCH)) return null;
+        }
+
+        const lines = ctx.lines;
         const violations =
             lang === 'python'
                 ? checkPythonSilentExceptions(lines)

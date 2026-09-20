@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-15T16:08:26.522Z",
-  "corpusBytes": 1711281,
+  "generatedAt": "2026-09-20T05:24:23.002Z",
+  "corpusBytes": 2505877,
   "paths": {
-    "mask-source": 31.5,
-    "cmp-rules": 20.2,
-    "governance-scan": 651.2
+    "mask-source": 29.1,
+    "cmp-rules": 23.3,
+    "governance-scan": 753
   }
 }

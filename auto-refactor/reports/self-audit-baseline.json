@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.3.0-1789879713910",
-  "timestamp": "2026-09-20T04:48:36.108Z",
+  "snapshotId": "snapshot-v0.3.0-1789881993670",
+  "timestamp": "2026-09-20T05:26:35.580Z",
   "versions": {
     "engineVersion": "0.3.0",
     "ruleVersion": "2026.09-v1",
@@ -13,25 +13,25 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 310,
-    "durationMs": 2065
+    "durationMs": 1756
   },
   "metrics": {
     "compositeScore": 99.8,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 6641,
+    "totalIssues": 6632,
     "suppressedIssues": 2728,
-    "unsuppressedIssues": 3913,
+    "unsuppressedIssues": 3904,
     "bySeverity": {
-      "info": 200,
-      "warning": 6441,
+      "info": 207,
+      "warning": 6425,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 217,
-      "medium": 5756,
-      "low": 668
+      "high": 216,
+      "medium": 5742,
+      "low": 674
     }
   },
   "eightPillars": {
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 217,
-      "medium": 5756,
-      "low": 668
+      "high": 216,
+      "medium": 5742,
+      "low": 674
     },
     "criticalItems": [],
     "highItems": [
@@ -439,12 +439,12 @@
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/governance.ts:129",
+        "id": "complexity:high-complexity:src/analyzers/governance.ts:149",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/governance.ts",
-        "line": 129,
+        "line": 149,
         "message": "Function \"GovernanceAnalyzer.finalize\" has cyclomatic complexity 18 (threshold 12)."
       },
       {

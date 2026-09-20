@@ -112,13 +112,13 @@ export const GiantExpressionRule: GovernanceRule = {
             const code = (ctx.masked[i] ?? '').trim();
             if (!code || DECLARATION_PREFIX_RE.test(code)) continue;
 
-            // Cheap gate ahead of the three allocation-heavy rewrites below. Without a `?` the
-            // only way this rule can fire is a chain of >= MAX_LOGICAL_OPERATORS `&&`/`||`
-            // operators, and each such operator contributes two `&`/`|` characters, so the
-            // character count is a sound lower bound. Adds no finding, only skips work.
-            if (!code.includes('?')) {
-                if (countChars(code, '&') + countChars(code, '|') < MAX_LOGICAL_OPERATORS) continue;
-            }
+            // Cheap gate ahead of the three allocation-heavy rewrites below. Without multiple `?`
+            // or >= MAX_LOGICAL_OPERATORS boolean operators, the line cannot fire.
+            const qCount = countChars(code, '?');
+            const hasPossibleTernary = qCount >= 2 && code.includes(':');
+            const logicalOpChars = countChars(code, '&') + countChars(code, '|');
+            const hasPossibleLogical = logicalOpChars >= MAX_LOGICAL_OPERATORS;
+            if (!hasPossibleTernary && !hasPossibleLogical) continue;
 
             const withoutOptional = code.replace(/\?\./g, '  ').replace(/\?\?/g, '  ');
             const clean = withoutOptional.replace(/[a-zA-Z0-9_$]+\s*\?\s*:/g, '  ');
@@ -177,9 +177,14 @@ export const SingleLineMultiSemanticRule: GovernanceRule = {
             // A `for` header carries two semicolons by design; the body is what the rule targets.
             if (/^for\s*(?:await\s*)?\(/.test(code)) continue;
             if (DECLARATION_PREFIX_RE.test(code)) continue;
-            // Two statement parts require at least one semicolon, so a line without one can never
-            // fire; skipping it before the brace-strip and split avoids two allocations per line.
-            if (!code.includes(';')) continue;
+            // Two statement parts require at least one semicolon, so a line without one can
+            // never fire; skipping lines with <= 1 semicolon before brace-strip avoids
+            // allocations per line.
+            const firstSemi = code.indexOf(';');
+            if (firstSemi === -1) continue;
+            const hasMultiple =
+                firstSemi !== code.lastIndexOf(';') || code.slice(firstSemi + 1).trim().length > 0;
+            if (!hasMultiple) continue;
 
             // Strip inner type/object bodies like { a: string; b: number } before splitting.
             const statementCode = code
@@ -281,17 +286,55 @@ export const CallbackDepthRule: GovernanceRule = {
                 }
             }
 
-            const closes = (code.match(/\}/g) || []).length;
-            const opens = (code.match(/\{/g) || []).length;
-            if (closes > opens && callbackDepth > 0) {
-                const diff = Math.min(callbackDepth, closes - opens);
-                callbackDepth -= diff;
+            if (code.includes('}') || code.includes('{')) {
+                const closes = countChars(code, '}');
+                const opens = countChars(code, '{');
+                if (closes > opens && callbackDepth > 0) {
+                    const diff = Math.min(callbackDepth, closes - opens);
+                    callbackDepth -= diff;
+                }
             }
         }
 
         return violations.length > 0 ? violations : null;
     },
 };
+
+/**
+ * Evaluates cognitive operator density for a single masked code line.
+ */
+function checkDensityLine(
+    raw: string,
+    code: string,
+    lineIndex: number,
+): GovernanceViolation | null {
+    if (!code || DECLARATION_PREFIX_RE.test(code)) return null;
+    if (code.length < DENSITY_MIN_LENGTH) return null;
+    if (!STRONG_BITWISE_RE.test(code)) return null;
+
+    const nonWs = code.replace(/\s+/g, '');
+    if (nonWs.length < DENSITY_MIN_LENGTH || nonWs.length > DENSITY_MAX_LENGTH) return null;
+
+    const opMatches = code.match(OPERATOR_RE) || [];
+    if (opMatches.length < DENSITY_MIN_OPERATORS) return null;
+
+    const density = opMatches.length / nonWs.length;
+    if (density < DENSITY_THRESHOLD) return null;
+
+    const percent = (density * 100).toFixed(0);
+    return {
+        ruleId: 'CMP-DEN-001',
+        message: `High cognitive token density (${percent}% operators) exceeds maintainability lower bounds.`,
+        line: lineIndex + 1,
+        column: raw.search(/\S/) + 1,
+        suggestion: '降低认知密度：添加适当空白与具名中间常量，拆分高密度算式或位运算组合。',
+        fixable: false,
+        evidence: {
+            confidence: 0.8,
+            requiresRuntime: false,
+        },
+    };
+}
 
 /**
  * CMP-DEN-001: Cognitive Token Density Rule.
@@ -313,40 +356,8 @@ export const CognitiveDensityRule: GovernanceRule = {
         for (let i = 0; i < ctx.lines.length; i++) {
             const raw = ctx.lines[i];
             const code = (ctx.masked[i] ?? '').trim();
-            if (!code || DECLARATION_PREFIX_RE.test(code)) continue;
-
-            // Selectivity order matters: the strong-operator test rejects almost every line for one
-            // allocation-free scan, and `code.length` is a sound upper bound for the non-whitespace
-            // length, so both run before the copy-building `replace` below. No finding changes; the
-            // expensive work simply stops happening on lines that cannot fire.
-            if (code.length < DENSITY_MIN_LENGTH) continue;
-            if (!STRONG_BITWISE_RE.test(code)) continue;
-
-            // No comment guard is needed here any more: comment bodies are already blank, so a
-            // JSDoc line reaches this point empty and is skipped above.
-            const nonWs = code.replace(/\s+/g, '');
-            if (nonWs.length < DENSITY_MIN_LENGTH || nonWs.length > DENSITY_MAX_LENGTH) continue;
-
-            const opMatches = code.match(OPERATOR_RE) || [];
-            if (opMatches.length < DENSITY_MIN_OPERATORS) continue;
-
-            const density = opMatches.length / nonWs.length;
-            if (density < DENSITY_THRESHOLD) continue;
-
-            const percent = (density * 100).toFixed(0);
-            violations.push({
-                ruleId: 'CMP-DEN-001',
-                message: `High cognitive token density (${percent}% operators) exceeds maintainability lower bounds.`,
-                line: i + 1,
-                column: raw.search(/\S/) + 1,
-                suggestion:
-                    '降低认知密度：添加适当空白与具名中间常量，拆分高密度算式或位运算组合。',
-                fixable: false,
-                evidence: {
-                    confidence: 0.8,
-                    requiresRuntime: false,
-                },
-            });
+            const violation = checkDensityLine(raw, code, i);
+            if (violation) violations.push(violation);
         }
 
         return violations.length > 0 ? violations : null;

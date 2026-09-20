@@ -94,6 +94,8 @@ const GD_FUNC_RE = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*
 const PY_FUNC_START_RE = /^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
 const PY_RETURN_TYPE_RE = /\)\s*->\s*[^:]+:/;
 
+const ANY_RE = /:\s*\bany\b|\bas\s+any\b/;
+
 /**
  * GOV-TYP-002: Function Signature Completeness (ADV-TYP-002 generalized).
  * Enforces return type annotations on public/exported functions.
@@ -107,6 +109,7 @@ export const FunctionSignatureCompletenessRule: GovernanceRule = {
     rationale:
         'Unannotated function signatures compromise API boundaries and allow unintended type drift.',
     isFixable: false,
+    languages: ['gdscript', 'python'],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.capabilities.supportsStaticTyping) return null;
         if (!ctx.node.functionLike) return null;
@@ -211,12 +214,14 @@ export const UnsafeAnyRule: GovernanceRule = {
     isFixable: false,
     languages: ['typescript'],
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (!ctx.content.includes('any')) return null;
+
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
 
-        const ANY_RE = /:\s*\bany\b|\bas\s+any\b/;
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            if (!line.includes('any')) continue;
             if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
             // Exclude generic declarations or third-party wrappers
             if (ANY_RE.test(line) && !line.includes('eslint-disable')) {

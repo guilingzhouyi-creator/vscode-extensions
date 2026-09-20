@@ -90,8 +90,13 @@ export const DiagnosticLeakRule: GovernanceRule = {
         const lines = ctx.masked;
         const patterns = getDbgPatterns(ctx.capabilities.debugIdentifiers);
 
+        if (!patterns.some((p) => ctx.content.includes(p.id))) {
+            return null;
+        }
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            if (!patterns.some((p) => line.includes(p.id))) continue;
 
             // Fast ASCII comment pre-check (zero string allocation)
             let startIdx = 0;

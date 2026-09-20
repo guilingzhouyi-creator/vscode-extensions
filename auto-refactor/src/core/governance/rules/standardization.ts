@@ -22,6 +22,12 @@
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { NodeKind } from '../../multilang';
 
+const IF_TRUE_RE = /^\s*if\s+(.+?)\s*:\s*return\s+true\s*$/i;
+const ELSE_FALSE_RE = /^\s*else\s*:\s*return\s+false\s*$/i;
+const TS_IF_TRUE_RE =
+    /^\s*if\s*\((.+?)\)\s*(?:\{\s*)?return\s+true;?\s*\}?\s*else\s*(?:\{\s*)?return\s+false;?\s*\}?/i;
+const VAR_RE = /^\s*\bvar\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/;
+
 /**
  * GOV-STD-001: Redundant Boolean Logic (SIM-DED-001 generalized).
  * Replaces `if (x) return true; else return false;` with `return Boolean(x);` or `return x;`.
@@ -36,6 +42,9 @@ export const RedundantBooleanRule: GovernanceRule = {
         'Redundant if-then-else returning boolean literals increases cyclomatic complexity and mental overhead.',
     isFixable: true,
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (!ctx.content.includes('return true') && !ctx.content.includes('return True')) {
+            return null;
+        }
         if (
             ctx.node.kind !== NodeKind.ControlFlow &&
             ctx.node.kind !== NodeKind.Function &&
@@ -51,13 +60,9 @@ export const RedundantBooleanRule: GovernanceRule = {
         const startLine = ctx.node.start?.line ?? 1;
         const endLine = ctx.node.end?.line ?? lines.length;
 
-        const IF_TRUE_RE = /^\s*if\s+(.+?)\s*:\s*return\s+true\s*$/i;
-        const ELSE_FALSE_RE = /^\s*else\s*:\s*return\s+false\s*$/i;
-        const TS_IF_TRUE_RE =
-            /^\s*if\s*\((.+?)\)\s*(?:\{\s*)?return\s+true;?\s*\}?\s*else\s*(?:\{\s*)?return\s+false;?\s*\}?/i;
-
         for (let i = startLine - 1; i < endLine && i < lines.length; i++) {
             const line = lines[i];
+            if (!line.includes('return true') && !line.includes('return True')) continue;
 
             // Single line TS/JS: if (x) return true; else return false;
             const mTs = line.match(TS_IF_TRUE_RE);
@@ -98,6 +103,8 @@ export const RedundantBooleanRule: GovernanceRule = {
     },
 };
 
+const KEYWORD_PASS = 'pass';
+
 /**
  * GOV-STD-002: Deprecated / Suboptimal Constructs.
  * Flags `var` in TS/JS and bare redundant `pass` in GDScript.
@@ -117,9 +124,10 @@ export const ModernConstructRule: GovernanceRule = {
         const lang = ctx.capabilities.languageId;
 
         if (lang === 'typescript' || lang === 'javascript') {
-            const VAR_RE = /^\s*\bvar\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/;
+            if (!ctx.content.includes('var')) return null;
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
+                if (!line.includes('var')) continue;
                 if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
                 const m = line.match(VAR_RE);
                 if (m) {
@@ -135,12 +143,13 @@ export const ModernConstructRule: GovernanceRule = {
                 }
             }
         } else if (lang === 'gdscript') {
+            if (!ctx.content.includes(KEYWORD_PASS)) return null;
             // Check for redundant pass after statements in a block
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 const prevLine = lines[i - 1].trim();
                 if (
-                    line === 'pass' &&
+                    line === KEYWORD_PASS &&
                     prevLine &&
                     !prevLine.endsWith(':') &&
                     !prevLine.startsWith('#')
@@ -149,7 +158,7 @@ export const ModernConstructRule: GovernanceRule = {
                         ruleId: 'GOV-STD-002',
                         message: 'Redundant `pass` statement in non-empty code block.',
                         line: i + 1,
-                        column: lines[i].indexOf('pass') + 1,
+                        column: lines[i].indexOf(KEYWORD_PASS) + 1,
                         suggestion: 'Remove unnecessary `pass` statement.',
                         fixable: true,
                         suggestedPatch: '',

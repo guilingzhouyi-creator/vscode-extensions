@@ -253,13 +253,14 @@ function triggerRegex(config: SourceMaskConfig): RegExp {
  */
 function maskLine(line: string, state: MaskState, config: SourceMaskConfig): string {
     // Fast path: with no multi-line construct active and nothing on the line able to open one,
-    // masking is the identity. Measured on this repository's own source, ~50% of lines qualify
-    // (fewer than the ~70% carrying no quote or slash, because JSDoc bodies are inside a block
-    // comment and must still be blanked), and each of them otherwise costs a split, a walk and a
-    // join.
-    // The state check is NOT optional: a line inside a block comment or a multi-line template can
-    // carry none of the trigger characters and must still be blanked.
+    // masking is the identity.
     if (!state.quote && !state.inBlockComment && !triggerRegex(config).test(line)) return line;
+
+    // Fast path: line is wholly inside a block comment and contains no closing delimiter.
+    const close = config.blockComment?.close ?? '';
+    if (state.inBlockComment && !state.quote && close.length > 0 && !line.includes(close)) {
+        return ' '.repeat(line.length);
+    }
 
     const out = line.split('');
     let index = 0;
@@ -339,7 +340,7 @@ function opensRegexLiteral(line: string, index: number): boolean {
     for (let back = index - 1; back >= 0; back -= 1) {
         const char = line[back];
         if (char === ' ' || char === '\t') continue;
-        return REGEX_PREFIX_CHARS.indexOf(char) !== -1;
+        return REGEX_PREFIX_CHARS.includes(char);
     }
     return true;
 }
@@ -384,6 +385,30 @@ function maskRegexBody(line: string, index: number, out: string[]): number {
 }
 
 /**
+ * Attempts to open a line comment or block comment at index.
+ * Returns the new index if a comment opened, or -1 otherwise.
+ */
+function tryOpenComment(
+    line: string,
+    index: number,
+    state: MaskState,
+    out: string[],
+    config: SourceMaskConfig,
+): number {
+    if (line.startsWith(config.lineComment, index)) {
+        for (let rest = index; rest < line.length; rest += 1) out[rest] = ' ';
+        return line.length;
+    }
+    const block = config.blockComment;
+    if (block && line.startsWith(block.open, index)) {
+        for (let offset = 0; offset < block.open.length; offset += 1) out[index + offset] = ' ';
+        state.inBlockComment = true;
+        return index + block.open.length;
+    }
+    return -1;
+}
+
+/**
  * Consume one step of ordinary code: comments and literals open a masked run, everything else is
  * left as written.
  *
@@ -401,16 +426,9 @@ function maskCode(
     out: string[],
     config: SourceMaskConfig,
 ): number {
-    if (line.startsWith(config.lineComment, index)) {
-        for (let rest = index; rest < line.length; rest += 1) out[rest] = ' ';
-        return line.length;
-    }
-    const block = config.blockComment;
-    if (block && line.startsWith(block.open, index)) {
-        for (let offset = 0; offset < block.open.length; offset += 1) out[index + offset] = ' ';
-        state.inBlockComment = true;
-        return index + block.open.length;
-    }
+    const commentEnd = tryOpenComment(line, index, state, out, config);
+    if (commentEnd !== -1) return commentEnd;
+
     const char = line[index];
     if (config.regexLiterals && char === '/' && opensRegexLiteral(line, index)) {
         return maskRegexBody(line, index, out);

@@ -16,7 +16,7 @@
  */
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue, IssueLocation } from '../core/types';
-import type { NormalizedNode } from '../core/multilang';
+import { NodeKind, type NormalizedNode } from '../core/multilang';
 import { runStreaming } from '../core/traverse';
 import type {
     GovernanceIssueDetail,
@@ -27,6 +27,7 @@ import type {
 } from '../core/governance/types';
 import { resolveLanguageProfile } from '../core/governance/languageProfiles';
 import { maskedLinesOf } from '../core/sourceMask';
+import { TypeScriptAdapter } from '../core/typescriptAdapter';
 import type { GovernanceRegistry } from '../core/governance/registry';
 import { getDefaultGovernanceRegistry } from '../core/governance/registry';
 
@@ -51,6 +52,7 @@ export class GovernanceAnalyzer implements Analyzer {
     private hasCheckedFile = false;
     private nodeRules: GovernanceRule[] = [];
     private fileRules: GovernanceRule[] = [];
+    private reusableEvalCtx: RuleEvaluationContext | null = null;
 
     constructor(registry?: GovernanceRegistry) {
         this.registry = registry || getDefaultGovernanceRegistry();
@@ -71,6 +73,20 @@ export class GovernanceAnalyzer implements Analyzer {
             );
             this.nodeRules = rules.filter((r) => typeof r.checkNode === 'function');
             this.fileRules = rules.filter((r) => typeof r.checkFile === 'function');
+            this.reusableEvalCtx = {
+                node: undefined as unknown as NormalizedNode,
+                ctx,
+                parent: undefined,
+                grandparent: undefined,
+                depth: 0,
+                className: null,
+                binding: null,
+                capabilities: this.capabilities,
+                filePath: ctx.filePath,
+                content: ctx.content,
+                lines: this.lines,
+                masked: this.maskedLines,
+            };
         }
     }
 
@@ -79,10 +95,9 @@ export class GovernanceAnalyzer implements Analyzer {
         this.hasCheckedFile = false;
         this.nodeRules = [];
         this.fileRules = [];
+        this.reusableEvalCtx = null;
         // Standalone contract fallback
 
-        const { TypeScriptAdapter } =
-            require('../core/typescriptAdapter') as typeof import('../core/typescriptAdapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sf.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [
@@ -102,20 +117,25 @@ export class GovernanceAnalyzer implements Analyzer {
         this.ensureInitialized(ctx);
         if (this.nodeRules.length === 0) return;
 
-        const evalCtx: RuleEvaluationContext = {
-            node,
-            ctx,
-            parent,
-            grandparent,
-            depth,
-            className,
-            binding,
-            capabilities: this.capabilities,
-            filePath: ctx.filePath,
-            content: ctx.content,
-            lines: this.lines,
-            masked: this.maskedLines,
-        };
+        // Fast node pre-filter: all node-level governance rules (redundant boolean, nesting,
+        // wrapper, signature completeness) only evaluate control flow or function/method nodes.
+        // Skipping expressions, literals, identifiers and statements eliminates >90% of visits.
+        const kind = node.kind;
+        const isCandidate =
+            node.functionLike ||
+            kind === NodeKind.Function ||
+            kind === NodeKind.Method ||
+            kind === NodeKind.ControlFlow;
+        if (!isCandidate) return;
+
+        const evalCtx = this.reusableEvalCtx!;
+        evalCtx.node = node;
+        evalCtx.ctx = ctx;
+        evalCtx.parent = parent;
+        evalCtx.grandparent = grandparent;
+        evalCtx.depth = depth;
+        evalCtx.className = className;
+        evalCtx.binding = binding;
 
         // Evaluate pre-filtered node-level rules
         for (const rule of this.nodeRules) {
@@ -136,18 +156,14 @@ export class GovernanceAnalyzer implements Analyzer {
         if (!this.hasCheckedFile) {
             this.hasCheckedFile = true;
             if (this.fileRules.length > 0) {
-                const evalCtx: RuleEvaluationContext = {
-                    node: ctx.root,
-                    ctx,
-                    depth: 0,
-                    className: null,
-                    binding: null,
-                    capabilities: this.capabilities,
-                    filePath: ctx.filePath,
-                    content: ctx.content,
-                    lines: this.lines,
-                    masked: this.maskedLines,
-                };
+                const evalCtx = this.reusableEvalCtx!;
+                evalCtx.node = ctx.root;
+                evalCtx.ctx = ctx;
+                evalCtx.parent = undefined;
+                evalCtx.grandparent = undefined;
+                evalCtx.depth = 0;
+                evalCtx.className = null;
+                evalCtx.binding = null;
 
                 for (const rule of this.fileRules) {
                     const result = rule.checkFile!(evalCtx);

@@ -17,6 +17,54 @@
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 
+const EXTENDS_RE = /\bclass\s+([a-zA-Z0-9_$]+)\s+extends\s+([a-zA-Z0-9_$.]+)/;
+const GD_EXTENDS_RE = /^\s*extends\s+([a-zA-Z0-9_$.]+)/;
+
+const FORBIDDEN_IMPORTS = [
+    'react',
+    'vue',
+    'electron',
+    'vscode',
+    'express',
+    'koa',
+    'commander',
+    'yargs',
+];
+
+const FORBIDDEN_IMPORT_PATTERNS = FORBIDDEN_IMPORTS.map((pkg) => ({
+    pkg,
+    re: new RegExp(`(?:from|require\\s*\\()\\s*['"]${pkg}['"]`),
+}));
+
+const KEYWORD_EXTENDS = 'extends';
+
+/**
+ * Scans lines for forbidden framework imports and collects violation records.
+ */
+function findForbiddenImportViolations(lines: string[]): GovernanceViolation[] {
+    const violations: GovernanceViolation[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.includes('from') && !line.includes('require')) continue;
+        if (line.trim().startsWith('//') || line.trim().startsWith('#')) continue;
+
+        for (const { pkg, re } of FORBIDDEN_IMPORT_PATTERNS) {
+            if (line.includes(pkg) && re.test(line)) {
+                violations.push({
+                    ruleId: 'GOV-MNT-002',
+                    message: `Core domain module imports presentation/framework package \`${pkg}\`.`,
+                    line: i + 1,
+                    column: 1,
+                    suggestion: `Decouple domain logic from \`${pkg}\` using ports-and-adapters (dependency inversion).`,
+                    fixable: false,
+                });
+                break;
+            }
+        }
+    }
+    return violations;
+}
+
 /**
  * GOV-MNT-001: Excessive Class Inheritance Depth (SIM-INH-001 generalized).
  * Limits class inheritance depth to <= 2 (Composition over Inheritance).
@@ -32,6 +80,7 @@ export const InheritanceDepthRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.capabilities.supportsClassInheritance) return null;
+        if (!ctx.content.includes(KEYWORD_EXTENDS)) return null;
 
         const violations: GovernanceViolation[] = [];
         // RAW view on purpose: this family matches module specifiers and layer paths, which live
@@ -39,12 +88,9 @@ export const InheritanceDepthRule: GovernanceRule = {
         // on its own fixture (caught by validate-governance check 5).
         const lines = ctx.lines;
 
-        // Pattern matching extends in TS/GDScript
-        const EXTENDS_RE = /\bclass\s+([a-zA-Z0-9_$]+)\s+extends\s+([a-zA-Z0-9_$.]+)/;
-        const GD_EXTENDS_RE = /^\s*extends\s+([a-zA-Z0-9_$.]+)/;
-
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            if (!line.includes(KEYWORD_EXTENDS)) continue;
             if (line.trim().startsWith('//') || line.trim().startsWith('#')) continue;
 
             const m = line.match(EXTENDS_RE);
@@ -62,7 +108,7 @@ export const InheritanceDepthRule: GovernanceRule = {
                         ruleId: 'GOV-MNT-001',
                         message: `Class \`${className}\` extends \`${superName}\`, potentially exceeding max inheritance depth of 2.`,
                         line: i + 1,
-                        column: line.indexOf('extends') + 1,
+                        column: line.indexOf(KEYWORD_EXTENDS) + 1,
                         suggestion:
                             'Refactor deep class hierarchy into single domain class + composition strategy pattern.',
                         fixable: false,
@@ -82,7 +128,7 @@ export const InheritanceDepthRule: GovernanceRule = {
                             ruleId: 'GOV-MNT-001',
                             message: `Domain model extends presentation node \`${superName}\`. Pure domain classes must extend RefCounted.`,
                             line: i + 1,
-                            column: line.indexOf('extends') + 1,
+                            column: line.indexOf(KEYWORD_EXTENDS) + 1,
                             suggestion:
                                 'Change base class to `RefCounted` and decouple presentation via EventBus.',
                             fixable: false,
@@ -119,43 +165,9 @@ export const DomainDecouplingRule: GovernanceRule = {
             (p.includes('/core/') && !p.includes('/cli/'));
         if (!isDomain) return null;
 
-        const violations: GovernanceViolation[] = [];
-        // RAW view on purpose: this family matches module specifiers and layer paths, which live
-        // INSIDE string literals that the masked view blanks. Masking made GOV-MNT-002 stop firing
-        // on its own fixture (caught by validate-governance check 5).
-        const lines = ctx.lines;
+        if (!FORBIDDEN_IMPORTS.some((pkg) => ctx.content.includes(pkg))) return null;
 
-        const FORBIDDEN_IMPORTS = [
-            'react',
-            'vue',
-            'electron',
-            'vscode',
-            'express',
-            'koa',
-            'commander',
-            'yargs',
-        ];
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (line.trim().startsWith('//') || line.trim().startsWith('#')) continue;
-
-            for (const pkg of FORBIDDEN_IMPORTS) {
-                const importPattern = new RegExp(`(?:from|require\\s*\\()\\s*['"]${pkg}['"]`);
-                if (importPattern.test(line)) {
-                    violations.push({
-                        ruleId: 'GOV-MNT-002',
-                        message: `Core domain module imports presentation/framework package \`${pkg}\`.`,
-                        line: i + 1,
-                        column: 1,
-                        suggestion: `Decouple domain logic from \`${pkg}\` using ports-and-adapters (dependency inversion).`,
-                        fixable: false,
-                    });
-                    break;
-                }
-            }
-        }
-
+        const violations = findForbiddenImportViolations(ctx.lines);
         return violations.length > 0 ? violations : null;
     },
 };

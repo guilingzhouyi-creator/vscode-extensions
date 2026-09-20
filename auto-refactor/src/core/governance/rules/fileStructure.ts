@@ -127,6 +127,75 @@ const MIN_HEADER_ENFORCEMENT_LINES = 40;
 const HEADER_SCAN_LINES = 15;
 
 /**
+ * Validates declared @file or localized file-path tag against actual physical path.
+ */
+function validatePathParity(lines: string[], normalizedPath: string): GovernanceViolation | null {
+    const scanLimit = Math.min(PATH_DECL_SCAN_LINES, lines.length);
+    for (let i = 0; i < scanLimit; i++) {
+        const line = lines[i];
+        if (!line.includes('文件路径') && !line.includes('@file')) continue;
+        const match = PATH_DECL_RE.exec(line);
+        if (!match || !match[1]) continue;
+
+        const declPath = match[1].trim().replace(/\\/g, '/');
+        const cleanDecl = declPath.replace(/^res:\/\//, '').replace(/^\/+/, '');
+        const cleanPhysical = normalizedPath.replace(/^\/+/, '');
+        const declBasename = path.basename(cleanDecl);
+        const physicalBasename = path.basename(cleanPhysical);
+
+        const matches =
+            cleanPhysical === cleanDecl ||
+            cleanPhysical.endsWith('/' + cleanDecl) ||
+            cleanDecl.endsWith('/' + cleanPhysical);
+
+        if (!matches || declBasename !== physicalBasename) {
+            return {
+                ruleId: 'GOV-FIL-002',
+                message: `Declared header path \`${declPath}\` does not match physical file path \`${normalizedPath}\`.`,
+                line: i + 1,
+                column: line.indexOf(match[1]) + 1,
+                suggestion: `Synchronize declared header path to match the real relative path: \`${normalizedPath}\`.`,
+                fixable: false,
+            };
+        }
+    }
+    return null;
+}
+
+const HEADER_DIVIDER_SLASH = '// ====================';
+const HEADER_DIVIDER_HASH = '# ====================';
+
+/**
+ * Checks whether the module contains an architectural docstring header in leading lines.
+ */
+function hasModuleHeaderDocstring(lines: string[], isPython: boolean): boolean {
+    const headLimit = Math.min(HEADER_SCAN_LINES, lines.length);
+    for (let i = 0; i < headLimit; i++) {
+        const l = lines[i];
+        const trimmed = l.trim();
+        if (isPython && (trimmed.startsWith('"""') || trimmed.startsWith("'''"))) {
+            return true;
+        }
+        if (
+            l.includes('/**') ||
+            l.includes('职责') ||
+            l.includes('Responsibilities') ||
+            l.includes('Overview') ||
+            l.includes('模块归属') ||
+            l.includes(HEADER_DIVIDER_SLASH) ||
+            l.includes(HEADER_DIVIDER_HASH)
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const SEGMENT_TESTS = 'tests';
+const SEGMENT_BENCHMARKS = 'benchmarks';
+const EXT_PY = '.py';
+
+/**
  * GOV-FIL-002: Module Responsibility & Architectural Docstring Header.
  * Ensures significant modules provide architectural overview comments and path parity.
  */
@@ -140,81 +209,23 @@ export const ModuleHeaderRule: GovernanceRule = {
         'Substantial production modules must declare their architectural role and responsibility boundary.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        // Skip tests and benchmarks. The segment test subsumes both the old absolute-path
-        // substring form and the `startsWith('tests/')` relative form, which sat side by side
-        // here precisely because the first one never matched a repository-relative path.
         const normalizedPath = ctx.filePath.replace(/\\/g, '/');
         if (
-            pathHasSegment(normalizedPath, 'tests') ||
-            pathHasSegment(normalizedPath, 'benchmarks')
+            pathHasSegment(normalizedPath, SEGMENT_TESTS) ||
+            pathHasSegment(normalizedPath, SEGMENT_BENCHMARKS)
         ) {
             return null;
         }
 
-        // 1. Path Parity Check: If a header declares @file or a localized file-path tag,
-        // ensure it matches the actual path.
-        const scanLimit = Math.min(PATH_DECL_SCAN_LINES, ctx.lines.length);
-        for (let i = 0; i < scanLimit; i++) {
-            const line = ctx.lines[i];
-            const match = PATH_DECL_RE.exec(line);
-            if (match && match[1]) {
-                const declPath = match[1].trim().replace(/\\/g, '/');
-                const cleanDecl = declPath.replace(/^res:\/\//, '').replace(/^\/+/, '');
-                const cleanPhysical = normalizedPath.replace(/^\/+/, '');
-                const declBasename = path.basename(cleanDecl);
-                const physicalBasename = path.basename(cleanPhysical);
-
-                const matches =
-                    cleanPhysical === cleanDecl ||
-                    cleanPhysical.endsWith('/' + cleanDecl) ||
-                    cleanDecl.endsWith('/' + cleanPhysical);
-
-                const basenamesMatch = declBasename === physicalBasename;
-
-                if (!matches || !basenamesMatch) {
-                    return [
-                        {
-                            ruleId: 'GOV-FIL-002',
-                            message: `Declared header path \`${declPath}\` does not match physical file path \`${normalizedPath}\`.`,
-                            line: i + 1,
-                            column: line.indexOf(match[1]) + 1,
-                            suggestion: `Synchronize declared header path to match the real relative path: \`${normalizedPath}\`.`,
-                            fixable: false,
-                        },
-                    ];
-                }
-            }
-        }
+        // 1. Path Parity Check
+        const parityViolation = validatePathParity(ctx.lines, normalizedPath);
+        if (parityViolation) return [parityViolation];
 
         // 2. Only enforce header presence for substantial production modules (> 40 lines)
         if (ctx.lines.length < MIN_HEADER_ENFORCEMENT_LINES) return null;
 
-        const headLimit = Math.min(HEADER_SCAN_LINES, ctx.lines.length);
-        const isPython = normalizedPath.endsWith('.py');
-        let hasHeader = false;
-        for (let i = 0; i < headLimit; i++) {
-            const l = ctx.lines[i];
-            const trimmed = l.trim();
-            // Python's canonical module header is the leading triple-quoted docstring.
-            if (isPython && (trimmed.startsWith('"""') || trimmed.startsWith("'''"))) {
-                hasHeader = true;
-                break;
-            }
-            if (
-                l.includes('/**') ||
-                l.includes('职责') ||
-                l.includes('Responsibilities') ||
-                l.includes('Overview') ||
-                l.includes('模块归属') ||
-                l.includes('// ====================') ||
-                l.includes('# ====================')
-            ) {
-                hasHeader = true;
-                break;
-            }
-        }
-
-        if (!hasHeader) {
+        const isPython = normalizedPath.endsWith(EXT_PY);
+        if (!hasModuleHeaderDocstring(ctx.lines, isPython)) {
             return [
                 {
                     ruleId: 'GOV-FIL-002',

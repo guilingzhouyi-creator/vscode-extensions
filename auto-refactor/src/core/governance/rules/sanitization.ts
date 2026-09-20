@@ -41,9 +41,53 @@ const CHAR_CODE_SLASH = 47;
 const CHAR_CODE_ASTERISK = 42;
 
 /**
+ * Checks whether a single source line contains temporary task jargon or WIP markers in comments.
+ */
+function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViolation | null {
+    let startIdx = 0;
+    while (
+        startIdx < line.length &&
+        (line.charCodeAt(startIdx) === CHAR_CODE_SPACE ||
+            line.charCodeAt(startIdx) === CHAR_CODE_TAB)
+    ) {
+        startIdx++;
+    }
+    if (startIdx >= line.length) return null;
+    const c0 = line.charCodeAt(startIdx);
+    const c1 = line.charCodeAt(startIdx + 1);
+    const isComment =
+        c0 === CHAR_CODE_HASH ||
+        (c0 === CHAR_CODE_SLASH && (c1 === CHAR_CODE_SLASH || c1 === CHAR_CODE_ASTERISK)) ||
+        c0 === CHAR_CODE_ASTERISK;
+
+    if (!isComment) return null;
+
+    if (
+        line.includes('JARGON_RE') ||
+        line.includes('LexicalHygieneRule') ||
+        line.includes('GOV-SAN-001') ||
+        line.includes('COMMENT-JARGON')
+    ) {
+        return null;
+    }
+
+    const match = JARGON_RE.exec(line);
+    if (!match || isVocabularyEnumeration(line, match.index, match[0])) return null;
+
+    return {
+        ruleId: 'GOV-SAN-001',
+        message: `Comment contains temporary batch jargon / WIP marker \`${match[0]}\`. Replace with canonical architectural description.`,
+        line: lineIndex + 1,
+        column: (match.index ?? line.indexOf(match[0])) + 1,
+        suggestion: 'Remove temporary phase/task tags and use standard domain terminology.',
+        fixable: false,
+    };
+}
+
+/**
  * GOV-SAN-001: Lexical Hygiene & Temporary Jargon Prevention.
- * Detects temporary development tags and batch jargon (pXX, phaseXX, stXX, wip)
- * in comments to prevent sprint-level noise from polluting long-term architecture.
+ * Detects temporary development tags and batch jargon (such as task prefixes
+ * or work-in-progress tags) in comments to prevent sprint-level noise.
  */
 export const LexicalHygieneRule: GovernanceRule = {
     id: 'GOV-SAN-001',
@@ -52,14 +96,9 @@ export const LexicalHygieneRule: GovernanceRule = {
     severity: 'warning',
     risk: 'medium',
     rationale:
-        'Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architectural longevity and create documentation drift.',
+        'Transient task tags and batch jargon compromise architectural longevity and create documentation drift.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        // Generic corpus conventions only. Project-specific file names used to be listed
-        // here, which silently made the rule inert for whoever it was tuned against; the
-        // enumeration check below now handles the vocabulary case without naming any file.
-        // Directory membership uses the shared segment test so that a repository-relative
-        // path such as `tests/a.py` is exempted too, which the substring form was not.
         if (
             pathHasSegment(ctx.filePath, 'tests') ||
             pathHasSegment(ctx.filePath, 'test') ||
@@ -69,55 +108,16 @@ export const LexicalHygieneRule: GovernanceRule = {
             return null;
         }
 
+        if (!JARGON_RE.test(ctx.content)) {
+            return null;
+        }
+
         const violations: GovernanceViolation[] = [];
         const lines = ctx.lines;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-
-            // Fast zero-allocation ASCII comment check
-            let startIdx = 0;
-            while (
-                startIdx < line.length &&
-                (line.charCodeAt(startIdx) === CHAR_CODE_SPACE ||
-                    line.charCodeAt(startIdx) === CHAR_CODE_TAB)
-            ) {
-                startIdx++;
-            }
-            if (startIdx >= line.length) continue;
-            const c0 = line.charCodeAt(startIdx);
-            const c1 = line.charCodeAt(startIdx + 1);
-            const isComment =
-                c0 === CHAR_CODE_HASH /* '#' */ ||
-                (c0 === CHAR_CODE_SLASH &&
-                    (c1 === CHAR_CODE_SLASH || c1 === CHAR_CODE_ASTERISK)) /* '//' or '/*' */ ||
-                c0 === CHAR_CODE_ASTERISK; /* '*' */
-
-            if (!isComment) continue;
-
-            // Ignore rule definitions, constants, or regex patterns
-            if (
-                line.includes('JARGON_RE') ||
-                line.includes('LexicalHygieneRule') ||
-                line.includes('GOV-SAN-001') ||
-                line.includes('COMMENT-JARGON')
-            ) {
-                continue;
-            }
-
-            const match = JARGON_RE.exec(line);
-            if (match && isVocabularyEnumeration(line, match.index, match[0])) continue;
-            if (match) {
-                violations.push({
-                    ruleId: 'GOV-SAN-001',
-                    message: `Comment contains temporary batch jargon / WIP marker \`${match[0]}\`. Replace with canonical architectural description.`,
-                    line: i + 1,
-                    column: (match.index ?? line.indexOf(match[0])) + 1,
-                    suggestion:
-                        'Remove temporary phase/task tags and use standard domain terminology.',
-                    fixable: false,
-                });
-            }
+            const hit = checkCommentLineJargon(lines[i], i);
+            if (hit) violations.push(hit);
         }
 
         return violations.length > 0 ? violations : null;

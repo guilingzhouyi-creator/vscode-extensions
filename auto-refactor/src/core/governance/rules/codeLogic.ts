@@ -23,31 +23,51 @@ const DEFAULT_MAX_NESTING_DEPTH = 5;
 /** Maximum inclusive source span for a function to count as a trivial pass-through wrapper. */
 const MAX_PASSTHROUGH_LINE_COUNT = 3;
 
+const PASSTHROUGH_RE = /return\s+(_?[a-zA-Z0-9_$]+)\.([a-zA-Z0-9_$]+)\s*\(([^)]*)\);?/;
+
+const SCRATCH_NODE_STACK: NormalizedNode[] = [];
+const SCRATCH_DEPTH_STACK: number[] = [];
+
 /**
  * Iteratively calculates maximum control-flow nesting depth within a function scope.
- * Uses an explicit stack to eliminate call-stack recursion overhead on deep ASTs.
+ * Uses an explicit flat stack to eliminate call-stack recursion overhead and heap allocations.
  */
 function calculateMaxNesting(rootNode: NormalizedNode): number {
-    let max = 0;
-    const stack: Array<{ node: NormalizedNode; depth: number }> = [];
+    const rootChildren = rootNode.children;
+    if (!rootChildren || rootChildren.length === 0) return 0;
 
-    for (const child of rootNode.children || []) {
+    let max = 0;
+    const nodeStack = SCRATCH_NODE_STACK;
+    const depthStack = SCRATCH_DEPTH_STACK;
+    nodeStack.length = 0;
+    depthStack.length = 0;
+
+    for (let i = 0; i < rootChildren.length; i++) {
+        const child = rootChildren[i];
         if (!child.functionLike) {
             const nextDepth = child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0;
-            stack.push({ node: child, depth: nextDepth });
+            nodeStack.push(child);
+            depthStack.push(nextDepth);
         }
     }
 
-    while (stack.length > 0) {
-        const current = stack.pop()!;
-        if (current.depth > max) max = current.depth;
+    while (nodeStack.length > 0) {
+        const currentNode = nodeStack.pop()!;
+        const currentDepth = depthStack.pop()!;
+        if (currentDepth > max) max = currentDepth;
 
-        for (const child of current.node.children || []) {
-            if (child.functionLike) continue; // nested functions are measured in their own scope
-            const nextDepth =
-                current.depth +
-                (child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0);
-            stack.push({ node: child, depth: nextDepth });
+        const children = currentNode.children;
+        if (children) {
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                // nested functions are measured in their own scope
+                if (child.functionLike) continue;
+                const nextDepth =
+                    currentDepth +
+                    (child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0);
+                nodeStack.push(child);
+                depthStack.push(nextDepth);
+            }
         }
     }
 
@@ -92,6 +112,43 @@ export const ExcessiveNestingRule: GovernanceRule = {
     },
 };
 
+const KEYWORD_RETURN = 'return';
+
+/**
+ * Checks whether any line in the given span contains the return keyword.
+ */
+function hasReturnInSpan(lines: string[], startLine: number, endLine: number): boolean {
+    const limit = Math.min(endLine, lines.length);
+    for (let i = startLine - 1; i < limit; i++) {
+        if (lines[i].includes(KEYWORD_RETURN)) return true;
+    }
+    return false;
+}
+
+/**
+ * Evaluates whether a function body matches a trivial forwarding pass-through wrapper.
+ */
+function extractPassThroughViolation(
+    node: NormalizedNode,
+    masked: string[],
+    startLine: number,
+    endLine: number,
+): GovernanceViolation | null {
+    const body = masked.slice(startLine - 1, endLine).join(' ');
+    const m = body.match(PASSTHROUGH_RE);
+    if (m && node.name && m[2] === node.name) {
+        return {
+            ruleId: 'GOV-LOG-002',
+            message: `Method \`${node.name}\` appears to be a trivial pass-through wrapper forwarding directly to \`${m[1]}.${m[2]}\`.`,
+            line: startLine,
+            column: node.start?.column ?? 1,
+            suggestion: 'Consider inline usage or document the explicit interception rationale.',
+            fixable: false,
+        };
+    }
+    return null;
+}
+
 /**
  * GOV-LOG-002: Empty / Pass-through Wrapper Governance (SIM-WRP-001 generalized).
  * Flags trivial wrapper functions that add no value.
@@ -106,6 +163,7 @@ export const VacuousWrapperRule: GovernanceRule = {
         'Vacuous wrapper methods that purely forward calls without validation or translation add unnecessary indirection.',
     isFixable: false,
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (!ctx.content.includes(KEYWORD_RETURN)) return null;
         if (ctx.node.kind !== NodeKind.Method && ctx.node.kind !== NodeKind.Function) return null;
 
         const startLine = ctx.node.start?.line;
@@ -113,25 +171,10 @@ export const VacuousWrapperRule: GovernanceRule = {
         if (!startLine || !endLine) return null;
 
         const lineCount = endLine - startLine + 1;
-        if (lineCount <= MAX_PASSTHROUGH_LINE_COUNT) {
-            const body = ctx.masked.slice(startLine - 1, endLine).join(' ');
-            // Detect `return this.target.func(args)` or `return _inner.func(args)`
-            const PASSTHROUGH_RE = /return\s+(_?[a-zA-Z0-9_$]+)\.([a-zA-Z0-9_$]+)\s*\(([^)]*)\);?/;
-            const m = body.match(PASSTHROUGH_RE);
-            if (m && ctx.node.name && m[2] === ctx.node.name) {
-                return [
-                    {
-                        ruleId: 'GOV-LOG-002',
-                        message: `Method \`${ctx.node.name}\` appears to be a trivial pass-through wrapper forwarding directly to \`${m[1]}.${m[2]}\`.`,
-                        line: startLine,
-                        column: ctx.node.start?.column ?? 1,
-                        suggestion:
-                            'Consider inline usage or document the explicit interception rationale.',
-                        fixable: false,
-                    },
-                ];
-            }
-        }
-        return null;
+        if (lineCount > MAX_PASSTHROUGH_LINE_COUNT) return null;
+        if (!hasReturnInSpan(ctx.masked, startLine, endLine)) return null;
+
+        const violation = extractPassThroughViolation(ctx.node, ctx.masked, startLine, endLine);
+        return violation ? [violation] : null;
     },
 };
