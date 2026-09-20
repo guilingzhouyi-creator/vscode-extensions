@@ -24,7 +24,7 @@
 * [03-praxis-integration-guide.md](./03-incremental-and-diff/03-praxis-integration-guide.md)：Praxis 团队接口改造、五大 SPI 扩展插槽、跨文件逆向依赖闭包与原子回滚（另见 [PRAXIS_HANDOFF_REPORT.md](./PRAXIS_HANDOFF_REPORT.md) 交付摘要）。
 
 ### 🔍 04. 规则引擎与内置分析器 (Analyzers & Rules)
-* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则金字塔、146 条全量内置规则（100% 文档覆盖）、22 类全域治理规则与双轨文案架构。
+* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则金字塔、155 条全量内置规则（100% 文档覆盖）、24 类全域治理规则与双轨文案架构。
 * [02-custom-analyzer-plugin.md](./04-analyzers-and-rules/02-custom-analyzer-plugin.md)：第三方自定义分析器插件契约与生命周期钩子规范。
 
 ### 📊 05. 规范、配置与性能基准 (Specs & Benchmarks)

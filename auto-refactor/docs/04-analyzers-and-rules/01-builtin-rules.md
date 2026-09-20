@@ -467,3 +467,22 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `high-algorithmic-complexity` | `warning` | 循环多重嵌套引发潜在 $O(N^2)$ / $O(N^3)$ 复杂度热点或循环体内隐式线性查找。 | 重构循环嵌套或预先构建 Map/Set 索引将查找降为 $O(1)$。 |
 | `loop-transient-allocation` | `warning` | 循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。 | 将对象实例化提升到循环外或使用对象池模式（ADV-POOL-001）。 |
 
+---
+
+## 24. 命名规范与现代变量作用域族 (`naming` / `NAM-*`)
+
+面向现代化工程规范的全局分层命名与作用域守卫体系，涵盖物理组织（文件与目录）、模块全局（常量与顶层状态）、类型与成员、局部业务变量（模糊词黑名单与单字母作用域拦截）以及集合意图表达：
+
+| 规则 ID | 级别 | 触发条件 | 治理策略 |
+| :--- | :--- | :--- | :--- |
+| `NAM-FIL-001` | `warning` | 文件命名不符合语言规范（TS/JS 强制 kebab-case，Python/Rust/GDScript 强制 snake_case）或包含临时批次黑话词。 | 将文件名规范重命名为对应语言的标准格式（如 `foo-bar.ts` 或 `foo_bar.py`），且不可带有临时标记。 |
+| `NAM-DIR-001` | `warning` | 源码目录名包含大写驼峰（CamelCase）、空格或临时批次工单词。 | 将目录重命名为全小写短横线风格（如 `ast-utils`、`pipeline`）。 |
+| `NAM-GLB-001` | `warning` | 模块顶层声明的不可变原始值或数组未遵循 UPPER_SNAKE_CASE 规范。 | 将模块级原始常量重命名为大写蛇形命名（如 `MAX_RETRIES`、`DEFAULT_TIMEOUT`）。 |
+| `NAM-GLB-002` | `warning` | 在模块顶层声明可变的 `let` 或 `var` 变量（隐式全局共享状态、破坏并发安全）。 | 重构顶层可变状态为函数作用域变量、类实例属性或显式单例状态持有者。 |
+| `NAM-TYP-001` | `warning` | 类（class）、接口（interface）、类型别名（type）或枚举（enum）未遵循 PascalCase 大驼峰命名。 | 将类、接口、类型别名或枚举重命名为大驼峰格式（如 `Scanner`、`RuleDefinition`）。 |
+| `NAM-MBR-001` | `warning` | 类属性、对象字段或方法名未遵循 camelCase 小驼峰命名规范。 | 将属性和方法名调整为清晰有意义的小驼峰命名。 |
+| `NAM-VAG-001` | `warning` | 变量名使用了无业务语义的模糊泛化裸词（如 `data`、`res`、`ret`、`tmp`、`item` 等）。 | 结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。 |
+| `NAM-SGL-001` | `warning` | 在业务逻辑中使用无语义的单字母变量名（仅循环头计数器 `i`/`j`/`k` 与 discard 占位符 `_` 豁免）。 | 改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。 |
+| `NAM-COL-001` | `info` | 数组集合未使用复数名词，或字典映射未表达键值关联关系（如缺少 `*To*` 或 `*By*`）。 | 为数组集合增加复数形态，为字典映射添加 `*To*` 或 `*By*` 表达关联意图。 |
+
+
