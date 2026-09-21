@@ -19,3 +19,4 @@ export * from './hierarchicalScorer';
 export * from './patchQuality';
 export * from './diffScore';
 export * from './qualityScorer';
+export * from './project-governance-evaluator';

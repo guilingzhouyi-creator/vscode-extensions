@@ -677,3 +677,35 @@ export const DEDUCTION_UNJUSTIFIED_COMPLEXITY = 15;
 export const DEDUCTION_BOUNDARY_IMBALANCE = 15;
 /** Points deducted for mechanical decomposition and trivial forwarding wrappers. */
 export const DEDUCTION_MECHANICAL_SPLITTING = 15;
+
+/** Rule id for project-scale distributed redundant complexity. */
+export const RULE_CPX_RED_001 = 'CPX-RED-001';
+/** Rule id for misclassified pseudo-shared library and boundary drift. */
+export const RULE_ARCH_ROL_001 = 'ARCH-ROL-001';
+/** Rule id for business modules bearing unbounded common utilities. */
+export const RULE_ARCH_ROL_002 = 'ARCH-ROL-002';
+/** Rule id for monolithic god object utility and junk drawer file anti-patterns. */
+export const RULE_ARCH_UTL_001 = 'ARCH-UTL-001';
+/** Rule id for over-abstraction, spurious indirection, and cyclic sharing. */
+export const RULE_ARCH_ABS_001 = 'ARCH-ABS-001';
+/** Rule id for unpooled high-frequency expensive allocations in hot paths. */
+export const RULE_PRF_POL_001 = 'PRF-POL-001';
+/** Rule id for unsound pooling missing reset contracts or capacity caps. */
+export const RULE_PRF_POL_002 = 'PRF-POL-002';
+/** Rule id for negative-ROI excessive pooling of tiny objects or cold paths. */
+export const RULE_PRF_POL_003 = 'PRF-POL-003';
+
+/** Points deducted for project-scale distributed redundant complexity. */
+export const DEDUCTION_DISTRIBUTED_REDUNDANCY = 15;
+/** Points deducted for misclassified pseudo-shared library or role drift. */
+export const DEDUCTION_ROLE_DEVIATION = 15;
+/** Points deducted for monolithic god object utility anti-pattern. */
+export const DEDUCTION_GOD_UTILS = 20;
+/** Points deducted for over-abstraction and spurious indirection. */
+export const DEDUCTION_OVER_ABSTRACTION = 15;
+/** Points deducted for unpooled high-frequency allocations in hot paths. */
+export const DEDUCTION_UNPOOLED_RESOURCE = 15;
+/** Points deducted for unsound resource pooling lacking reset or caps. */
+export const DEDUCTION_UNSOUND_POOLING = 15;
+/** Points deducted for negative-ROI excessive pooling of tiny objects. */
+export const DEDUCTION_NEGATIVE_ROI_POOLING = 10;
