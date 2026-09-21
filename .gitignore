@@ -26,6 +26,8 @@ sarif/
 **/.*-corpus/
 **/.corpus/
 **/.corpus-*.actual.json
+**/*.actual.json
+**/.*.actual.json
 **/.t04-keypoints-*/
 **/.t04-keypoints-*
 *.log
