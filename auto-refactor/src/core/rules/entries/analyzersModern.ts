@@ -26,6 +26,7 @@ import {
     RULE_FAMILY_TEST_MODERNITY,
     RULE_FAMILY_DEPENDENCY,
     RULE_FAMILY_ARCHITECTURE,
+    RULE_FAMILY_PERFORMANCE,
     LANGUAGE_TYPESCRIPT,
     LANGUAGE_JAVASCRIPT,
     LANGUAGE_RUST,
@@ -42,6 +43,7 @@ import {
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
     ANALYZER_ARCHITECTURE,
+    ANALYZER_PERFORMANCE,
 } from '../../scoring/dimensionLiterals';
 
 /** Remediation note: the rule activates at the `standard` preset and above. */
@@ -50,11 +52,66 @@ export const REMEDIATION_STANDARD_AND_ABOVE = '`standard` 及以上';
 /** Both tags of the TS/JS family; the pack parses either dialect with the same adapter. */
 const LANGUAGES_TS_FAMILY: readonly string[] = [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT];
 
-/** analyzer rules. */
+function defineLanguageAgnosticRule(
+    id: string,
+    family: typeof RULE_FAMILY_ARCHITECTURE | typeof RULE_FAMILY_PERFORMANCE,
+    analyzer: typeof ANALYZER_ARCHITECTURE | typeof ANALYZER_PERFORMANCE,
+    defaultSeverity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
+    summary: string,
+    remediation: string,
+    docsAnchor: string,
+): RuleDefinition {
+    return defineRule({
+        id,
+        family,
+        analyzer,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity,
+        summary,
+        remediation,
+        docsAnchor,
+    });
+}
+
+function defineArchitectureRule(
+    id: string,
+    summary: string,
+    remediation: string,
+    docsAnchor: string,
+): RuleDefinition {
+    return defineLanguageAgnosticRule(
+        id,
+        RULE_FAMILY_ARCHITECTURE,
+        ANALYZER_ARCHITECTURE,
+        SEVERITY_WARNING,
+        summary,
+        remediation,
+        docsAnchor,
+    );
+}
+
+function definePerformanceRule(
+    id: string,
+    defaultSeverity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
+    summary: string,
+    remediation: string,
+    docsAnchor: string,
+): RuleDefinition {
+    return defineLanguageAgnosticRule(
+        id,
+        RULE_FAMILY_PERFORMANCE,
+        ANALYZER_PERFORMANCE,
+        defaultSeverity,
+        summary,
+        remediation,
+        docsAnchor,
+    );
+}
 
 /**
- * Modernization and architecture/dependency rule entries, spread into ANALYZER_RULES after
- * the core packs so the emitted rule order matches the pre-split registry exactly.
+ * Modern analyzer rule definitions cataloging TypeScript,
+ * Python, architecture, and performance rules.
  */
 export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     defineRule({
@@ -659,4 +716,61 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         remediation: '消除无意义的透传转发包装，聚焦于语义重用与领域内聚。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-hop-001',
     }),
+    defineRule({
+        id: 'CPX-RED-001',
+        family: RULE_FAMILY_COMPLEXITY,
+        analyzer: ANALYZER_COMPLEXITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            '分布式冗余复杂度超标：跨多个文件存在高度相似的算法流程、计算或校验逻辑，累积形成隐性系统复杂度。',
+        remediation: '评估逻辑共性并依据领域边界进行抽离，或消除局部开发复制。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-red-001',
+    }),
+    defineArchitectureRule(
+        'ARCH-ROL-001',
+        '文件本体角色失衡与伪共享库：文件承担过多易变状态或高耦合业务逻辑，却被跨域频繁引用作为共享库。',
+        '剥离核心领域状态，明确稳定输入输出边界，构建真正低耦合的共享库。',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-rol-001',
+    ),
+    defineArchitectureRule(
+        'ARCH-ROL-002',
+        '业务模块承载无界公共能力：领域业务模块内部私自承载与导出通用基础设施或公共计算能力。',
+        '将通用能力下沉至对应共享层或基础设施层，确保领域模块职责专注单一。',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-rol-002',
+    ),
+    defineArchitectureRule(
+        'ARCH-UTL-001',
+        '万能工具库反模式：检测到承担混杂异构逻辑的 utils/common 垃圾桶文件。',
+        '按四分流治理原则重构：纯算子进入算法库、常量进入常量库、规则进入策略库、通用转换进入基础层。',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-utl-001',
+    ),
+    defineArchitectureRule(
+        'ARCH-ABS-001',
+        '过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。',
+        '消除负收益间接跳板与人为抽象，容许领域隔离的局部正当实现。',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-abs-001',
+    ),
+    definePerformanceRule(
+        'PRF-POL-001',
+        SEVERITY_WARNING,
+        '热路径高频昂贵资源缺乏复用池化：循环内或高频调用中频繁分配重型对象、缓冲区或连接。',
+        '引入对应对象池/缓冲池机制并在生命周期结束时回收复用。',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-pol-001',
+    ),
+    definePerformanceRule(
+        'PRF-POL-002',
+        SEVERITY_ERROR,
+        '资源池缺乏状态重置契约或容量上限：池化机制缺失 reset_state 回收契约或无界增长导致数据污染与泄漏。',
+        '补全对象归还重置逻辑并设定池容量高水位淘汰限制。',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-pol-002',
+    ),
+    definePerformanceRule(
+        'PRF-POL-003',
+        SEVERITY_WARNING,
+        '负收益过度池化：对极小轻量纯值对象或冷路径过度引入池化管理开销，得不偿失。',
+        '移除负收益池化包装层，直接采用值对象或短生命周期瞬态分配。',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-pol-003',
+    ),
 ];
