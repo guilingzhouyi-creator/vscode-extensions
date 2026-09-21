@@ -80,6 +80,10 @@ function isErrorCode(value: string, override: RegExp | null): boolean {
     return DEFAULT_CODE_PATTERNS.some((pattern) => pattern.test(stripped));
 }
 
+function deduplicateSorted(items: string[]): string[] {
+    return [...new Set(items)].sort();
+}
+
 /**
  * Walk the call graph upward from a raiser, collecting the callers that can observe the code.
  *
@@ -97,12 +101,44 @@ function propagationChain(graph: CallGraph, raiser: string): string[] {
             .map((edge) => edge.caller)
             .filter((caller): caller is string => caller !== null && !seen.has(caller));
         if (callers.length === 0) break;
-        const next = [...new Set(callers)].sort()[0];
+        const next = deduplicateSorted(callers)[0];
         seen.add(next);
         chain.push(next);
         current = next;
     }
     return chain;
+}
+
+interface AttributedSiteInfo {
+    code: string;
+    sites: LiteralOccurrence[];
+    raisers: string[];
+    files: string[];
+    duplicate: boolean;
+    attributedRaisers: string[];
+}
+
+function extractAttributedSiteInfo(entryValue: string, literals: LiteralIndex): AttributedSiteInfo {
+    const code = stripQuotes(entryValue);
+    const sites = literals.sitesOf(entryValue);
+    const raiserSymbols = sites.map((site: LiteralOccurrence) => site.symbol ?? UNATTRIBUTED);
+    const raisers = deduplicateSorted(raiserSymbols);
+    const files = deduplicateSorted(sites.map((s) => s.file));
+    const duplicate =
+        raisers.filter((raiser) => raiser !== UNATTRIBUTED).length > 1 || files.length > 1;
+    const attributedRaisers = raisers.filter((raiser): raiser is string => raiser !== UNATTRIBUTED);
+    return { code, sites, raisers, files, duplicate, attributedRaisers };
+}
+
+function findBestPropagationChain(graph: CallGraph, attributedRaisers: string[]): string[] {
+    let bestChain: string[] = [];
+    for (const r of attributedRaisers) {
+        const c = propagationChain(graph, r);
+        if (c.length > bestChain.length) {
+            bestChain = c;
+        }
+    }
+    return bestChain;
 }
 
 /**
@@ -126,32 +162,21 @@ export function buildErrorFlowIssues(
 
     for (const entry of literals.entries()) {
         if (!isErrorCode(entry.value, override)) continue;
-        const code = stripQuotes(entry.value);
-        const sites = literals.sitesOf(entry.value);
-        const raiserSymbols = sites.map((site: LiteralOccurrence) => site.symbol ?? UNATTRIBUTED);
-        const raisers: string[] = [...new Set(raiserSymbols)].sort();
-        const files: string[] = [...new Set(sites.map((s) => s.file))].sort();
-        const duplicate =
-            raisers.filter((raiser) => raiser !== UNATTRIBUTED).length > 1 || files.length > 1;
-        const attributedRaisers = raisers.filter(
-            (raiser): raiser is string => raiser !== UNATTRIBUTED,
-        );
-        let bestChain: string[] = [];
-        for (const r of attributedRaisers) {
-            const c = propagationChain(graph, r);
-            if (c.length > bestChain.length) {
-                bestChain = c;
-            }
-        }
-        const chain = bestChain;
+        const siteInfo = extractAttributedSiteInfo(entry.value, literals);
+        const chain = findBestPropagationChain(graph, siteInfo.attributedRaisers);
         const hops = Math.max(0, chain.length - 1);
-        if (!duplicate && hops < minHops) continue;
-        const first = sites[0];
+        if (!siteInfo.duplicate && hops < minHops) continue;
+        const first = siteInfo.sites[0];
         const boundary = chain.length > 0 ? chain[chain.length - 1] : null;
         const boundarySeenFrom = boundary === null ? [] : graph.callersOf(boundary);
-        const reason = duplicate
-            ? `在 ${raisers.length} 个声明中重复出现（错误分类法冲突）`
+        const reason = siteInfo.duplicate
+            ? `在 ${siteInfo.raisers.length} 个声明中重复出现（错误分类法冲突）`
             : `可沿调用链向上传播 ${hops} 跳`;
+        const code = siteInfo.code;
+        const sites = siteInfo.sites;
+        const raisers = siteInfo.raisers;
+        const files = siteInfo.files;
+        const duplicate = siteInfo.duplicate;
         issues.push({
             hops,
             issue: {

@@ -1,5 +1,3 @@
-export { isOfflineOrMigrationContext } from './dataAccessContext';
-
 /**
  * Module: Core Intelligence — Data Architecture & Access Modernization
  * File Path: src/core/intelligence/dataArchitecture.ts
@@ -16,8 +14,192 @@ export { isOfflineOrMigrationContext } from './dataAccessContext';
  *   database dependencies; issues include full evidence chains and risk assessments.
  */
 
+export { isOfflineOrMigrationContext } from './dataAccessContext';
+
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
 import type { SemanticGraph } from '../semantic/semanticGraph';
+import type { SemanticNode } from '../semantic/types';
+
+const MAX_INTER_PROCEDURAL_QUERY_DEPTH = 4;
+const STRING_JSON_STRINGIFY = 'JSON.stringify';
+const STRING_JSON_PARSE = 'JSON.parse';
+const DEFAULT_RULE_VERSION = '1.0.0';
+const DEFAULT_CONFIG_VERSION = '0.3.0';
+
+function isLoopStart(line: string): boolean {
+    return (
+        /^(for\s*\(|for\s+[a-zA-Z0-9_$]+\s+in|while\s*\(|while\s+)/.test(line) ||
+        /\.(?:map|forEach|filter)\s*\(/.test(line)
+    );
+}
+
+function isLoopEnd(line: string): boolean {
+    return line === '}' || line === '});' || line === '})';
+}
+
+function isDatabaseQueryLine(line: string): boolean {
+    if (/\b(?:findByIds|findAllById|batchFind|bulkQuery|queryIn)\b/.test(line)) {
+        return false;
+    }
+    return (
+        /\b(?:find|select|query|fetch|get)\w*\s*\(/.test(line) ||
+        /\.(?:findById|findOne|findFirst|filter|select)\s*\(/.test(line) ||
+        /db\.query|pool\.execute|rawQuery/.test(line)
+    );
+}
+
+function isUnboundedQueryLine(line: string): boolean {
+    return (
+        /\b(?:findAll|selectAll|getAll)\s*\(/.test(line) ||
+        (/\b(?:find|select)\s*\(\s*\{\s*\}\s*\)/.test(line) &&
+            !line.includes('limit') &&
+            !line.includes('take'))
+    );
+}
+
+function isDriverCallLine(line: string): boolean {
+    return /\b(?:pool\.execute|db\.query|client\.query|execSql)\s*\(/.test(line);
+}
+
+function isPureDomainFile(filePath: string): boolean {
+    const lower = filePath.toLowerCase();
+    return (
+        (lower.includes('/domain/') || lower.includes('/services/') || lower.includes('/core/')) &&
+        !lower.includes('repository') &&
+        !lower.includes('data') &&
+        !lower.includes('db')
+    );
+}
+
+function isOnlinePath(
+    filePath: string,
+    content: string,
+    options: DataArchitectureOptions,
+): boolean {
+    const lower = filePath.toLowerCase();
+    if (lower.includes('/test/') || lower.includes('/scripts/') || lower.includes('migration')) {
+        return false;
+    }
+    const onlineWords = options.onlinePathPatterns ?? [
+        'api',
+        'controller',
+        'service',
+        'handler',
+        'route',
+    ];
+    return (
+        onlineWords.some((w) => lower.includes(w)) ||
+        /@(?:Get|Post|Put|Delete)\b/.test(content) ||
+        /\b(?:express|fastify|router)\b/.test(content)
+    );
+}
+
+function buildSimpleReviewDetail(
+    filePath: string,
+    behavior: string,
+    risk: string,
+    fix: string,
+    evidence: SemanticEvidenceStep[] = [],
+): SemanticReviewDetail {
+    return {
+        language: 'typescript',
+        module: 'data-access',
+        symbol: 'global',
+        codeDomain: 'data-architecture',
+        currentBehavior: behavior,
+        semanticEvidenceChain: evidence,
+        triggerCondition: behavior,
+        risk,
+        blastRadius: [filePath],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix: fix,
+        impactedCallers: [],
+        impactedTests: [],
+        verificationMethod: 'Run automated static and integration checks.',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
+        canAutofix: false,
+    };
+}
+
+function createDataArchitectureIssue(
+    filePath: string,
+    line: number,
+    rule: string,
+    severity: 'error' | 'warning' | 'info',
+    message: string,
+    behavior: string,
+    risk: string,
+    suggestion: string,
+): Issue {
+    return {
+        id: `data-architecture:${rule}:${filePath}:${line}`,
+        analyzer: 'data-architecture',
+        rule,
+        severity,
+        message,
+        location: {
+            file: filePath,
+            start: { line, column: 1 },
+            end: { line, column: 1 },
+        },
+        detail: buildSimpleReviewDetail(filePath, behavior, risk, suggestion),
+        suggestion,
+    };
+}
+
+function createLoopQueryIssue(filePath: string, line: number, text: string): Issue {
+    return createDataArchitectureIssue(
+        filePath,
+        line,
+        'DAT-NPL-001',
+        'error',
+        `N+1 query hazard: persistent storage query executed inside loop: '${text}'.`,
+        `Persistent storage query executed inside loop: '${text}'`,
+        'Dispatches N separate roundtrips across iterations.',
+        'Hoist query outside loop and use a batch IN clause or dataloader pattern.',
+    );
+}
+
+function createUnboundedQueryIssue(filePath: string, line: number, text: string): Issue {
+    return createDataArchitectureIssue(
+        filePath,
+        line,
+        'DAT-QRY-001',
+        'warning',
+        `Unbounded query without limit or pagination on online path: '${text}'.`,
+        `Unbounded query executed on online path: '${text}'`,
+        'Risk of memory exhaustion or large DB lock.',
+        'Enforce maximum page size or cursor limit on online queries.',
+    );
+}
+
+function createLoopSerializationIssue(filePath: string, line: number, text: string): Issue {
+    return createDataArchitectureIssue(
+        filePath,
+        line,
+        'DAT-SER-001',
+        'info',
+        `Repetitive serialization inside iteration: '${text}'.`,
+        `Repetitive JSON serialization inside iteration: '${text}'`,
+        'CPU churn and GC memory pressure in hot loops.',
+        'Operate on native in-memory objects; serialize only at network perimeter.',
+    );
+}
+
+function createLeakyAbstractionIssue(filePath: string, line: number, text: string): Issue {
+    return createDataArchitectureIssue(
+        filePath,
+        line,
+        'DAT-LAY-001',
+        'warning',
+        `Leaky data access abstraction: raw persistence driver call in domain layer: '${text}'.`,
+        `Raw persistence driver call in domain layer: '${text}'`,
+        'Tight coupling to storage implementation.',
+        'Abstract database operations behind a repository interface.',
+    );
+}
 
 /**
  * Context descriptor for a data access operation.
@@ -46,6 +228,260 @@ export interface DataArchitectureOptions {
     offlinePathPatterns?: string[];
 }
 
+function buildSiteDetail(
+    site: DataAccessSite,
+    behavior: string,
+    evidence: SemanticEvidenceStep[],
+    triggerCondition: string,
+    risk: string,
+    suggestedFix: string,
+    verificationMethod: string,
+    deterministic = true,
+): SemanticReviewDetail {
+    return {
+        language: 'typescript',
+        module: 'data-access',
+        symbol: site.symbol,
+        codeDomain: 'data-architecture',
+        currentBehavior: behavior,
+        semanticEvidenceChain: evidence,
+        triggerCondition,
+        risk,
+        blastRadius: [site.file],
+        isDeterministic: deterministic,
+        requiresManualConfirm: !deterministic,
+        suggestedFix,
+        impactedCallers: [],
+        impactedTests: [],
+        verificationMethod,
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
+        canAutofix: false,
+    };
+}
+
+function buildSiteIssue(
+    site: DataAccessSite,
+    rule: string,
+    severity: 'warning' | 'error' | 'info',
+    message: string,
+    suggestion: string,
+    detail: SemanticReviewDetail,
+    confidence = 0.95,
+): Issue {
+    return {
+        id: `data-architecture:${rule}:${site.file}:${site.line}`,
+        analyzer: 'data-architecture',
+        rule,
+        severity,
+        message,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: 80 },
+        },
+        detail,
+        suggestion,
+        evidence: { confidence, requiresRuntime: false },
+    };
+}
+
+function checkUnboundedQuerySite(site: DataAccessSite): Issue | null {
+    if (!site.isOnlinePath || !site.isUnboundedQuery) return null;
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'condition',
+            description: `Online request handler in '${site.symbol}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+        {
+            kind: 'io',
+            description: `Unbounded query without pagination/cursor limit: '${site.expressionText}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+    ];
+    const detail = buildSiteDetail(
+        site,
+        `Querying persistent storage with unbounded fetch: '${site.expressionText}'.`,
+        evidence,
+        'Unpaginated query execution detected within an online request handler',
+        'Database query may return unbounded records under production data volume, causing OOM or high latency.',
+        'Add cursor-based or limit/offset pagination with an explicit maximum page size.',
+        'Verify query SQL/ORM execution includes LIMIT and OFFSET/cursor constraints.',
+    );
+    return buildSiteIssue(
+        site,
+        'DAT-QRY-001',
+        'warning',
+        `Unbounded query on online request path: '${site.expressionText}' lacks pagination limit.`,
+        'Introduce limit/cursor parameters to enforce bounded result sets.',
+        detail,
+    );
+}
+
+function checkNPlusOneSite(site: DataAccessSite): Issue | null {
+    if (!site.isLoopContext || site.operationKind !== 'query') return null;
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'loop',
+            description: `Iterative execution block in '${site.symbol}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+        {
+            kind: 'io',
+            description: `Database or storage query executed inside iteration: '${site.expressionText}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+    ];
+    const detail = buildSiteDetail(
+        site,
+        `Executing query '${site.expressionText}' inside a loop or mapping iteration.`,
+        evidence,
+        'Persistent storage query dispatched inside an iteration loop',
+        'Dispatches N separate database roundtrips for N items, causing severe database connection starvation.',
+        'Batch identifiers into a single batch query (e.g. IN (...) clause or batch lookup) outside the loop.',
+        'Assert database query count equals 1 regardless of collection size.',
+    );
+    return buildSiteIssue(
+        site,
+        'DAT-NPL-001',
+        'error',
+        `N+1 query hazard: persistent storage fetch executed inside iteration in '${site.symbol}'.`,
+        'Hoist query outside loop and use a batch IN clause or dataloader pattern.',
+        detail,
+    );
+}
+
+function checkRedundantSerializationSite(site: DataAccessSite): Issue | null {
+    if (site.operationKind !== 'serialization' || !site.isLoopContext) return null;
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'loop',
+            description: `Loop iteration in '${site.symbol}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+        {
+            kind: 'allocation',
+            description: `Repetitive serialization/deserialization: '${site.expressionText}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+    ];
+    const detail = buildSiteDetail(
+        site,
+        `Repeatedly parsing or stringifying objects inside an iteration block: '${site.expressionText}'.`,
+        evidence,
+        'Serialization roundtrip invoked per item within an iteration loop',
+        'Excessive CPU overhead and memory churn from JSON encoding/decoding inside critical paths.',
+        'Pass strongly-typed in-memory representations directly; serialize only at network perimeter.',
+        'Benchmark JSON parse/stringify invocations across pipeline execution.',
+    );
+    return buildSiteIssue(
+        site,
+        'DAT-SER-001',
+        'info',
+        `Redundant serialization cycle inside iteration: '${site.expressionText}'.`,
+        'Operate on native objects in memory and serialize only at the external boundary.',
+        detail,
+        0.85,
+    );
+}
+
+function checkDefensiveExcessSite(
+    site: DataAccessSite,
+    validationCountInSymbol: Map<string, number>,
+): Issue | null {
+    if (site.operationKind !== 'validation') return null;
+    const count = (validationCountInSymbol.get(site.symbol) ?? 0) + 1;
+    validationCountInSymbol.set(site.symbol, count);
+
+    if (count <= 2 || site.isOnlinePath) return null;
+
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'condition',
+            description: `Internal non-perimeter domain logic in '${site.symbol}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+        {
+            kind: 'condition',
+            description: `Repeated defensive validation of already established invariant: '${site.expressionText}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+    ];
+    const detail = buildSiteDetail(
+        site,
+        `Repeated redundant parameter and invariant validation in internal function '${site.symbol}'.`,
+        evidence,
+        'Multiple repetitive assertions on trusted internal domain types within non-perimeter code',
+        'Obscures business flow with noisy defensive checks; masks true ownership of invariant enforcement.',
+        'Enforce domain invariants once at construction or trust boundary; rely on type guarantees internally.',
+        'Verify unit tests validate invariant failures at boundary rather than internal functions.',
+        false,
+    );
+    return buildSiteIssue(
+        site,
+        'DAT-DEF-001',
+        'info',
+        `Excessive defensive validation in internal domain logic: '${site.expressionText}'.`,
+        'Retain perimeter validation at entry boundaries; rely on typed value objects internally.',
+        detail,
+        0.8,
+    );
+}
+
+function checkLeakyAbstractionSite(site: DataAccessSite): Issue | null {
+    if (
+        site.operationKind !== 'driver-call' ||
+        site.file.includes('repository') ||
+        site.file.includes('data')
+    ) {
+        return null;
+    }
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'call',
+            description: `Low-level database driver call in business domain: '${site.expressionText}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.symbol,
+        },
+    ];
+    const detail = buildSiteDetail(
+        site,
+        `Directly invoking storage driver/SQL execution from non-repository file '${site.file}'.`,
+        evidence,
+        'Low-level persistence API directly referenced outside repository layer',
+        'Tight coupling of domain logic to specific persistence driver prevents testing and schema evolution.',
+        'Encapsulate database driver access behind a repository interface or gateway abstraction.',
+        'Verify domain module imports only repository interfaces, not raw database clients.',
+    );
+    return buildSiteIssue(
+        site,
+        'DAT-LAY-001',
+        'warning',
+        `Leaky data access abstraction: raw persistence driver call in domain layer '${site.file}'.`,
+        'Abstract database operations behind a repository interface.',
+        detail,
+        0.9,
+    );
+}
+
 /**
  * Scan a list of data access sites in a file and generate diagnostic issues.
  *
@@ -67,327 +503,57 @@ export function analyzeDataAccessSites(
     const validationCountInSymbol = new Map<string, number>();
 
     for (const site of sites) {
-        // 1. Unbounded query on online request path (DAT-QRY-001)
-        if (checkUnbounded && site.isOnlinePath && site.isUnboundedQuery) {
-            const evidence: SemanticEvidenceStep[] = [
-                {
-                    kind: 'condition',
-                    description: `Online request handler in '${site.symbol}'`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.symbol,
-                },
-                {
-                    kind: 'io',
-                    description: `Unbounded query without pagination/cursor limit: '${site.expressionText}'`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.symbol,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'data-access',
-                symbol: site.symbol,
-                codeDomain: 'data-architecture',
-                currentBehavior: `Querying persistent storage with unbounded fetch: '${site.expressionText}'.`,
-                semanticEvidenceChain: evidence,
-                triggerCondition:
-                    'Unpaginated query execution detected within an online request handler',
-                risk: 'Database query may return unbounded records under production data volume, causing OOM or high latency.',
-                blastRadius: [site.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix:
-                    'Add cursor-based or limit/offset pagination with an explicit maximum page size.',
-                impactedCallers: [],
-                impactedTests: [],
-                verificationMethod:
-                    'Verify query SQL/ORM execution includes LIMIT and OFFSET/cursor constraints.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `data-architecture:DAT-QRY-001:${site.file}:${site.line}`,
-                analyzer: 'data-architecture',
-                rule: 'DAT-QRY-001',
-                severity: 'warning',
-                message: `Unbounded query on online request path: '${site.expressionText}' lacks pagination limit.`,
-                location: {
-                    file: site.file,
-                    start: { line: site.line, column: 1 },
-                    end: { line: site.line, column: 80 },
-                },
-                detail,
-                suggestion: 'Introduce limit/cursor parameters to enforce bounded result sets.',
-                evidence: {
-                    confidence: 0.95,
-                    requiresRuntime: false,
-                },
-            });
+        if (checkUnbounded) {
+            const issue = checkUnboundedQuerySite(site);
+            if (issue) issues.push(issue);
         }
-
-        // 2. N+1 query in loop context (DAT-NPL-001)
-        if (checkNPlusOne && site.isLoopContext && site.operationKind === 'query') {
-            const evidence: SemanticEvidenceStep[] = [
-                {
-                    kind: 'loop',
-                    description: `Iterative execution block in '${site.symbol}'`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.symbol,
-                },
-                {
-                    kind: 'io',
-                    description: `Database or storage query executed inside iteration: '${site.expressionText}'`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.symbol,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'data-access',
-                symbol: site.symbol,
-                codeDomain: 'data-architecture',
-                currentBehavior: `Executing query '${site.expressionText}' inside a loop or mapping iteration.`,
-                semanticEvidenceChain: evidence,
-                triggerCondition: 'Persistent storage query dispatched inside an iteration loop',
-                risk: 'Dispatches N separate database roundtrips for N items, causing severe database connection starvation.',
-                blastRadius: [site.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix:
-                    'Batch identifiers into a single batch query (e.g. IN (...) clause or batch lookup) outside the loop.',
-                impactedCallers: [],
-                impactedTests: [],
-                verificationMethod:
-                    'Assert database query count equals 1 regardless of collection size.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `data-architecture:DAT-NPL-001:${site.file}:${site.line}`,
-                analyzer: 'data-architecture',
-                rule: 'DAT-NPL-001',
-                severity: 'error',
-                message: `N+1 query hazard: persistent storage fetch executed inside iteration in '${site.symbol}'.`,
-                location: {
-                    file: site.file,
-                    start: { line: site.line, column: 1 },
-                    end: { line: site.line, column: 80 },
-                },
-                detail,
-                suggestion:
-                    'Hoist query outside loop and use a batch IN clause or dataloader pattern.',
-                evidence: {
-                    confidence: 0.95,
-                    requiresRuntime: false,
-                },
-            });
+        if (checkNPlusOne) {
+            const issue = checkNPlusOneSite(site);
+            if (issue) issues.push(issue);
         }
-
-        // 3. Redundant serialization in loop or consecutive calls (DAT-SER-001)
-        if (checkRedundantSer && site.operationKind === 'serialization' && site.isLoopContext) {
-            const evidence: SemanticEvidenceStep[] = [
-                {
-                    kind: 'loop',
-                    description: `Loop iteration in '${site.symbol}'`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.symbol,
-                },
-                {
-                    kind: 'allocation',
-                    description: `Repetitive serialization/deserialization: '${site.expressionText}'`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.symbol,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'data-access',
-                symbol: site.symbol,
-                codeDomain: 'data-architecture',
-                currentBehavior: `Repeatedly parsing or stringifying objects inside an iteration block: '${site.expressionText}'.`,
-                semanticEvidenceChain: evidence,
-                triggerCondition:
-                    'Serialization roundtrip invoked per item within an iteration loop',
-                risk: 'Excessive CPU overhead and memory churn from JSON encoding/decoding inside critical paths.',
-                blastRadius: [site.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix:
-                    'Pass strongly-typed in-memory representations directly; serialize only at network perimeter.',
-                impactedCallers: [],
-                impactedTests: [],
-                verificationMethod:
-                    'Benchmark JSON parse/stringify invocations across pipeline execution.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `data-architecture:DAT-SER-001:${site.file}:${site.line}`,
-                analyzer: 'data-architecture',
-                rule: 'DAT-SER-001',
-                severity: 'info',
-                message: `Redundant serialization cycle inside iteration: '${site.expressionText}'.`,
-                location: {
-                    file: site.file,
-                    start: { line: site.line, column: 1 },
-                    end: { line: site.line, column: 80 },
-                },
-                detail,
-                suggestion:
-                    'Operate on native objects in memory and serialize only at the external boundary.',
-                evidence: {
-                    confidence: 0.85,
-                    requiresRuntime: false,
-                },
-            });
+        if (checkRedundantSer) {
+            const issue = checkRedundantSerializationSite(site);
+            if (issue) issues.push(issue);
         }
-
-        // 4. Excessive defensive validation within trusted domain context (DAT-DEF-001)
-        if (checkDefensive && site.operationKind === 'validation') {
-            const count = (validationCountInSymbol.get(site.symbol) ?? 0) + 1;
-            validationCountInSymbol.set(site.symbol, count);
-
-            if (count > 2 && !site.isOnlinePath) {
-                const evidence: SemanticEvidenceStep[] = [
-                    {
-                        kind: 'condition',
-                        description: `Internal non-perimeter domain logic in '${site.symbol}'`,
-                        file: site.file,
-                        line: site.line,
-                        symbol: site.symbol,
-                    },
-                    {
-                        kind: 'condition',
-                        description: `Repeated defensive validation of already established invariant: '${site.expressionText}'`,
-                        file: site.file,
-                        line: site.line,
-                        symbol: site.symbol,
-                    },
-                ];
-
-                const detail: SemanticReviewDetail = {
-                    language: 'typescript',
-                    module: 'data-access',
-                    symbol: site.symbol,
-                    codeDomain: 'data-architecture',
-                    currentBehavior: `Repeated redundant parameter and invariant validation in internal function '${site.symbol}'.`,
-                    semanticEvidenceChain: evidence,
-                    triggerCondition:
-                        'Multiple repetitive assertions on trusted internal domain types within non-perimeter code',
-                    risk: 'Obscures business flow with noisy defensive checks; masks true ownership of invariant enforcement.',
-                    blastRadius: [site.file],
-                    isDeterministic: false,
-                    requiresManualConfirm: true,
-                    suggestedFix:
-                        'Enforce domain invariants once at construction or trust boundary; rely on type guarantees internally.',
-                    impactedCallers: [],
-                    impactedTests: [],
-                    verificationMethod:
-                        'Verify unit tests validate invariant failures at boundary rather than internal functions.',
-                    ruleVersion: '1.0.0',
-                    configVersion: '0.3.0',
-                    canAutofix: false,
-                };
-
-                issues.push({
-                    id: `data-architecture:DAT-DEF-001:${site.file}:${site.line}`,
-                    analyzer: 'data-architecture',
-                    rule: 'DAT-DEF-001',
-                    severity: 'info',
-                    message: `Excessive defensive validation in internal domain logic: '${site.expressionText}'.`,
-                    location: {
-                        file: site.file,
-                        start: { line: site.line, column: 1 },
-                        end: { line: site.line, column: 80 },
-                    },
-                    detail,
-                    suggestion:
-                        'Retain perimeter validation at entry boundaries; rely on typed value objects internally.',
-                    evidence: {
-                        confidence: 0.8,
-                        requiresRuntime: false,
-                    },
-                });
-            }
+        if (checkDefensive) {
+            const issue = checkDefensiveExcessSite(site, validationCountInSymbol);
+            if (issue) issues.push(issue);
         }
-
-        // 5. Leaky data access abstraction (DAT-LAY-001)
-        if (
-            site.operationKind === 'driver-call' &&
-            !site.file.includes('repository') &&
-            !site.file.includes('data')
-        ) {
-            const evidence: SemanticEvidenceStep[] = [
-                {
-                    kind: 'call',
-                    description: `Low-level database driver call in business domain: '${site.expressionText}'`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.symbol,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'data-access',
-                symbol: site.symbol,
-                codeDomain: 'data-architecture',
-                currentBehavior: `Directly invoking storage driver/SQL execution from non-repository file '${site.file}'.`,
-                semanticEvidenceChain: evidence,
-                triggerCondition:
-                    'Low-level persistence API directly referenced outside repository layer',
-                risk: 'Tight coupling of domain logic to specific persistence driver prevents testing and schema evolution.',
-                blastRadius: [site.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix:
-                    'Encapsulate database driver access behind a repository interface or gateway abstraction.',
-                impactedCallers: [],
-                impactedTests: [],
-                verificationMethod:
-                    'Verify domain module imports only repository interfaces, not raw database clients.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `data-architecture:DAT-LAY-001:${site.file}:${site.line}`,
-                analyzer: 'data-architecture',
-                rule: 'DAT-LAY-001',
-                severity: 'warning',
-                message: `Leaky data access abstraction: raw persistence driver call in domain layer '${site.file}'.`,
-                location: {
-                    file: site.file,
-                    start: { line: site.line, column: 1 },
-                    end: { line: site.line, column: 80 },
-                },
-                detail,
-                suggestion: 'Abstract database operations behind a repository interface.',
-                evidence: {
-                    confidence: 0.9,
-                    requiresRuntime: false,
-                },
-            });
-        }
+        const leakyIssue = checkLeakyAbstractionSite(site);
+        if (leakyIssue) issues.push(leakyIssue);
     }
 
     return issues;
+}
+
+function findIndirectStorageQueryIssue(
+    node: SemanticNode,
+    callsMap: Map<string, string[]>,
+    graph: SemanticGraph,
+): Issue | null {
+    const visited = new Set<string>();
+    const queue: Array<{ id: string; path: string[] }> = [{ id: node.id, path: [node.name] }];
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (current.path.length > MAX_INTER_PROCEDURAL_QUERY_DEPTH) continue;
+
+        const targets = callsMap.get(current.id) || [];
+        for (const targetId of targets) {
+            if (visited.has(targetId)) continue;
+            visited.add(targetId);
+
+            const targetNode = graph.getNode(targetId);
+            if (!targetNode) continue;
+
+            const newPath = [...current.path, targetNode.name];
+            if (isDataQuerySymbol(targetNode.name, targetNode.location.file)) {
+                return createIndirectNPlusOneIssue(node, targetNode, newPath);
+            }
+            queue.push({ id: targetId, path: newPath });
+        }
+    }
+    return null;
 }
 
 /**
@@ -417,31 +583,8 @@ export function analyzeDataArchitectureWithGraph(
 
     for (const node of allNodes) {
         if (!isLoopCallerNode(node.name)) continue;
-
-        // Traverse downstream call tree up to depth 3 looking for storage access
-        const visited = new Set<string>();
-        const queue: Array<{ id: string; path: string[] }> = [{ id: node.id, path: [node.name] }];
-
-        while (queue.length > 0) {
-            const current = queue.shift()!;
-            if (current.path.length > 4) continue;
-
-            const targets = callsMap.get(current.id) || [];
-            for (const targetId of targets) {
-                if (visited.has(targetId)) continue;
-                visited.add(targetId);
-
-                const targetNode = graph.getNode(targetId);
-                if (!targetNode) continue;
-
-                const newPath = [...current.path, targetNode.name];
-                if (isDataQuerySymbol(targetNode.name, targetNode.location.file)) {
-                    issues.push(createIndirectNPlusOneIssue(node, targetNode, newPath));
-                    break;
-                }
-                queue.push({ id: targetId, path: newPath });
-            }
-        }
+        const issue = findIndirectStorageQueryIssue(node, callsMap, graph);
+        if (issue) issues.push(issue);
     }
 
     return issues;
@@ -534,8 +677,8 @@ function createIndirectNPlusOneIssue(
         impactedCallers: [],
         impactedTests: [],
         verificationMethod: 'Verify query count is constant (O(1)) across iterations.',
-        ruleVersion: '1.0.0',
-        configVersion: '0.3.0',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 
@@ -557,6 +700,43 @@ function createIndirectNPlusOneIssue(
             requiresRuntime: false,
         },
     };
+}
+
+function updateLoopDepth(trimmed: string, inLoop: number): number {
+    let nextDepth = inLoop;
+    if (isLoopStart(trimmed)) {
+        const isSingleLine =
+            trimmed.includes('=>') && (trimmed.endsWith(');') || trimmed.endsWith(')'));
+        if (!isSingleLine) {
+            nextDepth++;
+        }
+    }
+    return nextDepth;
+}
+
+function auditDataArchitectureLine(
+    filePath: string,
+    lineNo: number,
+    trimmed: string,
+    inLoop: number,
+    isOnline: boolean,
+    issues: Issue[],
+): void {
+    if (inLoop > 0) {
+        if (isDatabaseQueryLine(trimmed)) {
+            issues.push(createLoopQueryIssue(filePath, lineNo, trimmed));
+        } else if (trimmed.includes(STRING_JSON_STRINGIFY) || trimmed.includes(STRING_JSON_PARSE)) {
+            issues.push(createLoopSerializationIssue(filePath, lineNo, trimmed));
+        }
+    }
+
+    if (isOnline && isUnboundedQueryLine(trimmed)) {
+        issues.push(createUnboundedQueryIssue(filePath, lineNo, trimmed));
+    }
+
+    if (isDriverCallLine(trimmed) && isPureDomainFile(filePath)) {
+        issues.push(createLeakyAbstractionIssue(filePath, lineNo, trimmed));
+    }
 }
 
 /**
@@ -583,29 +763,8 @@ export function auditDataArchitectureSource(
         const trimmed = line.trim();
         const lineNo = i + 1;
 
-        if (isLoopStart(trimmed)) {
-            const isSingleLine =
-                trimmed.includes('=>') && (trimmed.endsWith(');') || trimmed.endsWith(')'));
-            if (!isSingleLine) {
-                inLoop++;
-            }
-        }
-
-        if (inLoop > 0) {
-            if (isDatabaseQueryLine(trimmed)) {
-                issues.push(createLoopQueryIssue(filePath, lineNo, trimmed));
-            } else if (trimmed.includes('JSON.stringify') || trimmed.includes('JSON.parse')) {
-                issues.push(createLoopSerializationIssue(filePath, lineNo, trimmed));
-            }
-        }
-
-        if (isOnline && isUnboundedQueryLine(trimmed)) {
-            issues.push(createUnboundedQueryIssue(filePath, lineNo, trimmed));
-        }
-
-        if (isDriverCallLine(trimmed) && isPureDomainFile(filePath)) {
-            issues.push(createLeakyAbstractionIssue(filePath, lineNo, trimmed));
-        }
+        inLoop = updateLoopDepth(trimmed, inLoop);
+        auditDataArchitectureLine(filePath, lineNo, trimmed, inLoop, isOnline, issues);
 
         if (isLoopEnd(trimmed) && inLoop > 0) {
             inLoop--;
@@ -613,224 +772,6 @@ export function auditDataArchitectureSource(
     }
 
     return issues;
-}
-
-/**
- * Checks if the line marks the start of a loop construct.
- */
-function isLoopStart(line: string): boolean {
-    return (
-        /^(for\s*\(|for\s+[a-zA-Z0-9_$]+\s+in|while\s*\(|while\s+)/.test(line) ||
-        /\.(?:map|forEach|filter)\s*\(/.test(line)
-    );
-}
-
-/**
- * Checks if the line marks the end of a loop block.
- */
-function isLoopEnd(line: string): boolean {
-    return line === '}' || line === '});' || line === '})';
-}
-
-/**
- * Checks if the line performs a database or persistent storage query.
- */
-function isDatabaseQueryLine(line: string): boolean {
-    if (/\b(?:findByIds|findAllById|batchFind|bulkQuery|queryIn)\b/.test(line)) {
-        return false;
-    }
-    return (
-        /\b(?:find|select|query|fetch|get)\w*\s*\(/.test(line) ||
-        /\.(?:findById|findOne|findFirst|filter|select)\s*\(/.test(line) ||
-        /db\.query|pool\.execute|rawQuery/.test(line)
-    );
-}
-
-/**
- * Checks if the line is an unbounded query without limit or pagination.
- */
-function isUnboundedQueryLine(line: string): boolean {
-    const isFetchAll =
-        /\b(?:findAll|selectAll|getAll)\s*\(/.test(line) ||
-        (/\b(?:find|select)\s*\(\s*\{\s*\}\s*\)/.test(line) &&
-            !line.includes('limit') &&
-            !line.includes('take'));
-    return isFetchAll;
-}
-
-/**
- * Checks if the line invokes raw database driver execution.
- */
-function isDriverCallLine(line: string): boolean {
-    return /\b(?:pool\.execute|db\.query|client\.query|execSql)\s*\(/.test(line);
-}
-
-/**
- * Checks if a file belongs to pure domain business logic.
- */
-function isPureDomainFile(filePath: string): boolean {
-    const lower = filePath.toLowerCase();
-    return (
-        (lower.includes('/domain/') || lower.includes('/services/') || lower.includes('/core/')) &&
-        !lower.includes('repository') &&
-        !lower.includes('data') &&
-        !lower.includes('db')
-    );
-}
-
-/**
- * Checks if file belongs to an online request path.
- */
-function isOnlinePath(
-    filePath: string,
-    content: string,
-    options: DataArchitectureOptions,
-): boolean {
-    const lower = filePath.toLowerCase();
-    if (lower.includes('/test/') || lower.includes('/scripts/') || lower.includes('migration')) {
-        return false;
-    }
-    const onlineWords = options.onlinePathPatterns ?? [
-        'api',
-        'controller',
-        'service',
-        'handler',
-        'route',
-    ];
-    return (
-        onlineWords.some((w) => lower.includes(w)) ||
-        /@(?:Get|Post|Put|Delete)\b/.test(content) ||
-        /\b(?:express|fastify|router)\b/.test(content)
-    );
-}
-
-function buildSimpleReviewDetail(
-    filePath: string,
-    behavior: string,
-    risk: string,
-    fix: string,
-    evidence: SemanticEvidenceStep[] = [],
-): SemanticReviewDetail {
-    return {
-        language: 'typescript',
-        module: 'data-access',
-        symbol: 'global',
-        codeDomain: 'data-architecture',
-        currentBehavior: behavior,
-        semanticEvidenceChain: evidence,
-        triggerCondition: behavior,
-        risk,
-        blastRadius: [filePath],
-        isDeterministic: true,
-        requiresManualConfirm: false,
-        suggestedFix: fix,
-        impactedCallers: [],
-        impactedTests: [],
-        verificationMethod: 'Run automated static and integration checks.',
-        ruleVersion: '1.0.0',
-        configVersion: '0.3.0',
-        canAutofix: false,
-    };
-}
-
-/**
- * Creates an issue for direct loop query (N+1).
- */
-function createLoopQueryIssue(filePath: string, line: number, text: string): Issue {
-    return {
-        id: `data-architecture:DAT-NPL-001:${filePath}:${line}`,
-        analyzer: 'data-architecture',
-        rule: 'DAT-NPL-001',
-        severity: 'error',
-        message: `N+1 query hazard: persistent storage query executed inside loop: '${text}'.`,
-        location: {
-            file: filePath,
-            start: { line, column: 1 },
-            end: { line, column: 1 },
-        },
-        detail: buildSimpleReviewDetail(
-            filePath,
-            `Persistent storage query executed inside loop: '${text}'`,
-            'Dispatches N separate roundtrips across iterations.',
-            'Hoist query outside loop and use batching.',
-        ),
-        suggestion: 'Hoist query outside loop and use a batch IN clause or dataloader pattern.',
-    };
-}
-
-/**
- * Creates an issue for unbounded queries on online paths.
- */
-function createUnboundedQueryIssue(filePath: string, line: number, text: string): Issue {
-    return {
-        id: `data-architecture:DAT-QRY-001:${filePath}:${line}`,
-        analyzer: 'data-architecture',
-        rule: 'DAT-QRY-001',
-        severity: 'warning',
-        message: `Unbounded query without limit or pagination on online path: '${text}'.`,
-        location: {
-            file: filePath,
-            start: { line, column: 1 },
-            end: { line, column: 1 },
-        },
-        detail: buildSimpleReviewDetail(
-            filePath,
-            `Unbounded query executed on online path: '${text}'`,
-            'Risk of memory exhaustion or large DB lock.',
-            'Enforce maximum page size or cursor limit.',
-        ),
-        suggestion: 'Enforce maximum page size or cursor limit on online queries.',
-    };
-}
-
-/**
- * Creates an issue for loop serialization.
- */
-function createLoopSerializationIssue(filePath: string, line: number, text: string): Issue {
-    return {
-        id: `data-architecture:DAT-SER-001:${filePath}:${line}`,
-        analyzer: 'data-architecture',
-        rule: 'DAT-SER-001',
-        severity: 'info',
-        message: `Repetitive serialization inside iteration: '${text}'.`,
-        location: {
-            file: filePath,
-            start: { line, column: 1 },
-            end: { line, column: 1 },
-        },
-        detail: buildSimpleReviewDetail(
-            filePath,
-            `Repetitive JSON serialization inside iteration: '${text}'`,
-            'CPU churn and GC memory pressure in hot loops.',
-            'Pass typed in-memory objects and serialize only at perimeter.',
-        ),
-        suggestion: 'Operate on native in-memory objects; serialize only at network perimeter.',
-    };
-}
-
-/**
- * Creates an issue for leaky data layer abstraction.
- */
-function createLeakyAbstractionIssue(filePath: string, line: number, text: string): Issue {
-    return {
-        id: `data-architecture:DAT-LAY-001:${filePath}:${line}`,
-        analyzer: 'data-architecture',
-        rule: 'DAT-LAY-001',
-        severity: 'warning',
-        message: `Leaky data access abstraction: raw persistence driver call in domain layer: '${text}'.`,
-        location: {
-            file: filePath,
-            start: { line, column: 1 },
-            end: { line, column: 1 },
-        },
-        detail: buildSimpleReviewDetail(
-            filePath,
-            `Raw persistence driver call in domain layer: '${text}'`,
-            'Tight coupling to storage implementation.',
-            'Abstract database operations behind a repository interface.',
-        ),
-        suggestion: 'Abstract database operations behind a repository interface.',
-    };
 }
 
 /**

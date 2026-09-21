@@ -106,6 +106,42 @@ function declarationKindOf(kind: NodeKind): SymbolKind | null {
     }
 }
 
+interface CollectSymbolContext {
+    file: string;
+    definitions: SymbolDefinition[];
+    references: SymbolReference[];
+    stack: Array<{ node: NormalizedNode; caller: string | null }>;
+}
+
+function processSymbolFrame(
+    frame: { node: NormalizedNode; caller: string | null },
+    ctx: CollectSymbolContext,
+): void {
+    const node = frame.node;
+    const kind = declarationKindOf(node.kind);
+    const name = node.name ?? node.bindingName ?? null;
+    let childCaller = frame.caller;
+    if (kind && typeof name === 'string' && name.length > 0) {
+        ctx.definitions.push({ name, kind, file: ctx.file, line: node.start?.line ?? null });
+        childCaller = name;
+    } else if (node.kind === NodeKind.Call && typeof name === 'string' && name.length > 0) {
+        ctx.references.push({
+            name,
+            file: ctx.file,
+            line: node.start?.line ?? null,
+            column: node.start?.column ?? null,
+            kind: 'call',
+            caller: frame.caller,
+        });
+    }
+    const children = node.children;
+    if (children) {
+        for (let i = 0; i < children.length; i += 1) {
+            ctx.stack.push({ node: children[i], caller: childCaller });
+        }
+    }
+}
+
 /**
  * Collect the declarations and call sites of one file's normalized tree.
  *
@@ -130,31 +166,10 @@ export function collectSymbols(
     // Frames carry the nearest enclosing declaration so a call site is attributed to the function
     // it lives in without a second traversal (the projection path passes the caller in directly).
     const stack: Array<{ node: NormalizedNode; caller: string | null }> = [{ node: root, caller }];
+    const ctx: CollectSymbolContext = { file, definitions, references, stack };
     while (stack.length > 0) {
         const frame = stack.pop() as { node: NormalizedNode; caller: string | null };
-        const node = frame.node;
-        const kind = declarationKindOf(node.kind);
-        const name = node.name ?? node.bindingName ?? null;
-        let childCaller = frame.caller;
-        if (kind && typeof name === 'string' && name.length > 0) {
-            definitions.push({ name, kind, file, line: node.start?.line ?? null });
-            childCaller = name;
-        } else if (node.kind === NodeKind.Call && typeof name === 'string' && name.length > 0) {
-            references.push({
-                name,
-                file,
-                line: node.start?.line ?? null,
-                column: node.start?.column ?? null,
-                kind: 'call',
-                caller: frame.caller,
-            });
-        }
-        const children = node.children;
-        if (children) {
-            for (let i = 0; i < children.length; i += 1) {
-                stack.push({ node: children[i], caller: childCaller });
-            }
-        }
+        processSymbolFrame(frame, ctx);
     }
     return { definitions, references };
 }
@@ -277,10 +292,10 @@ export class SymbolIndex {
         let crossFileReferences = 0;
         for (const [name, list] of this.references) {
             references += list.length;
-            const homes = new Set((this.definitions.get(name) ?? []).map((d) => d.file));
+            const homes = getDefinitionHomes(this.definitions.get(name));
             if (homes.size === 0) continue;
             for (const reference of list) {
-                if ([...homes].some((home) => home !== reference.file)) crossFileReferences += 1;
+                if (homes.size > 1 || !homes.has(reference.file)) crossFileReferences += 1;
             }
         }
         return {
@@ -292,4 +307,14 @@ export class SymbolIndex {
             builtFrom: this.builtFrom,
         };
     }
+}
+
+function getDefinitionHomes(defs: SymbolDefinition[] | undefined): Set<string> {
+    const homes = new Set<string>();
+    if (defs) {
+        for (let i = 0; i < defs.length; i++) {
+            homes.add(defs[i].file);
+        }
+    }
+    return homes;
 }

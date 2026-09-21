@@ -84,6 +84,44 @@ export interface SymbolImpactAnalysis {
     suggestedRefactorPlan: string[];
 }
 
+function parsePythonImportStatement(
+    line: string,
+    out: Array<{ module: string; names: string[] }>,
+): boolean {
+    const importMatch = /^import[ \t]+([^\n#]+)/.exec(line);
+    if (!importMatch) return false;
+    for (const part of importMatch[1].split(',')) {
+        const name = part
+            .trim()
+            .split(/\s+as\s+/)[0]
+            .trim();
+        if (/^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$/.test(name)) {
+            out.push({ module: name, names: [] });
+        }
+    }
+    return true;
+}
+
+function parsePythonFromImportStatement(
+    line: string,
+    out: Array<{ module: string; names: string[] }>,
+): void {
+    const fromMatch =
+        /^from[ \t]+(\.+|\.*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)[ \t]+import[ \t]+([^\n#]*)/.exec(line);
+    if (!fromMatch) return;
+    const names = fromMatch[2]
+        .replace(/[()]/g, ' ')
+        .split(',')
+        .map((name) =>
+            name
+                .trim()
+                .split(/\s+as\s+/)[0]
+                .trim(),
+        )
+        .filter((name) => /^[A-Za-z_]\w*$/.test(name));
+    out.push({ module: fromMatch[1], names });
+}
+
 /**
  * Extract module-level Python import targets: `import a.b, c.d` and `from .pkg import name`.
  *
@@ -112,39 +150,63 @@ function collectPythonImports(content: string): Array<{ module: string; names: s
             continue;
         }
 
-        const importMatch = /^import[ \t]+([^\n#]+)/.exec(line);
-        if (importMatch) {
-            for (const part of importMatch[1].split(',')) {
-                const name = part
-                    .trim()
-                    .split(/\s+as\s+/)[0]
-                    .trim();
-                if (/^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$/.test(name)) {
-                    out.push({ module: name, names: [] });
-                }
-            }
+        if (parsePythonImportStatement(line, out)) {
             continue;
         }
-
-        const fromMatch =
-            /^from[ \t]+(\.+|\.*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)[ \t]+import[ \t]+([^\n#]*)/.exec(
-                line,
-            );
-        if (fromMatch) {
-            const names = fromMatch[2]
-                .replace(/[()]/g, ' ')
-                .split(',')
-                .map((name) =>
-                    name
-                        .trim()
-                        .split(/\s+as\s+/)[0]
-                        .trim(),
-                )
-                .filter((name) => /^[A-Za-z_]\w*$/.test(name));
-            out.push({ module: fromMatch[1], names });
-        }
+        parsePythonFromImportStatement(line, out);
     }
     return out;
+}
+
+function cloneStringSet(set: Set<string>): Set<string> {
+    return new Set(set);
+}
+
+function extractImportedPaths(content: string): string[] {
+    const importedPaths: string[] = [];
+    const importRegex =
+        /(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?['"]([^'"]+)['"]|export\s+(?:[\s\S]*?from\s+)?['"]([^'"]+)['"]|import\(['"]([^'"]+)['"]\)|require\(['"]([^'"]+)['"]\))/g;
+    let match: RegExpExecArray | null;
+    while ((match = importRegex.exec(content)) !== null) {
+        const specifier = match[1] || match[2] || match[3] || match[4];
+        if (
+            specifier &&
+            (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('@/'))
+        ) {
+            importedPaths.push(specifier);
+        }
+    }
+    return importedPaths;
+}
+
+function extractExportedSymbols(content: string): string[] {
+    const exportedSymbols: string[] = [];
+    const exportDeclRegex =
+        /export\s+(?:declare\s+)?(?:async\s+)?(?:function|class|const|let|var|interface|type|enum)\s+([A-Za-z0-9_$]+)/g;
+    let match: RegExpExecArray | null;
+    while ((match = exportDeclRegex.exec(content)) !== null) {
+        if (match[1]) exportedSymbols.push(match[1]);
+    }
+    return exportedSymbols;
+}
+
+function parseNamedImportParts(rawSymbols: string, resolved: string): ImportedSymbolRef[] {
+    const refs: ImportedSymbolRef[] = [];
+    const parts = rawSymbols.split(',');
+    for (const p of parts) {
+        const item = p.trim();
+        if (!item) continue;
+        const asMatch = item.match(/^([A-Za-z0-9_$]+)\s+as\s+([A-Za-z0-9_$]+)$/);
+        if (asMatch) {
+            refs.push({ symbol: asMatch[1], alias: asMatch[2], sourceFile: resolved });
+        } else {
+            const symMatch = item.match(/^([A-Za-z0-9_$]+)$/);
+            if (symMatch) {
+                refs.push({ symbol: symMatch[1], sourceFile: resolved });
+            }
+        }
+    }
+    return refs;
 }
 
 /**
@@ -188,13 +250,7 @@ export class ModuleDependencyGraph {
         for (const imp of importedPaths) {
             const resolved = this.resolveImportPath(normFile, imp);
             resolvedImports.add(resolved);
-
-            let revSet = this.reverseDeps.get(resolved);
-            if (!revSet) {
-                revSet = new Set();
-                this.reverseDeps.set(resolved, revSet);
-            }
-            revSet.add(normFile);
+            this.getOrCreateReverseSet(resolved).add(normFile);
         }
 
         this.modules.set(normFile, {
@@ -203,52 +259,16 @@ export class ModuleDependencyGraph {
         });
     }
 
-    /**
-     * Fast regex-based module parser for extracting import specifiers without full AST overhead.
-     */
-    registerFromContent(filePath: string, content: string): void {
-        // Python has its own statement grammar (`import a.b` / `from .pkg import name`) and its
-        // own resolution rules (packages, `__init__.py`, relative dots); route it to the Python
-        // branch instead of the TS/JS specifier regex.
-        if (filePath.endsWith('.py')) {
-            this.registerPythonModule(filePath, content);
-            return;
+    private getOrCreateReverseSet(resolved: string): Set<string> {
+        let revSet = this.reverseDeps.get(resolved);
+        if (!revSet) {
+            revSet = new Set<string>();
+            this.reverseDeps.set(resolved, revSet);
         }
+        return revSet;
+    }
 
-        const importedPaths: string[] = [];
-        const exportedSymbols: string[] = [];
-
-        // Match static and dynamic imports/exports:
-        // 1. import ... from '...'
-        // 2. import '...'
-        // 3. import type ... from '...'
-        // 4. export * from '...'
-        // 5. export { ... } from '...'
-        // 6. import('...')
-        // 7. require('...')
-        const importRegex =
-            /(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?['"]([^'"]+)['"]|export\s+(?:[\s\S]*?from\s+)?['"]([^'"]+)['"]|import\(['"]([^'"]+)['"]\)|require\(['"]([^'"]+)['"]\))/g;
-        let match: RegExpExecArray | null;
-        while ((match = importRegex.exec(content)) !== null) {
-            const specifier = match[1] || match[2] || match[3] || match[4];
-            if (
-                specifier &&
-                (specifier.startsWith('.') ||
-                    specifier.startsWith('/') ||
-                    specifier.startsWith('@/'))
-            ) {
-                importedPaths.push(specifier);
-            }
-        }
-
-        // Match named exports: export function foo, export const bar, export class Baz
-        const exportDeclRegex =
-            /export\s+(?:declare\s+)?(?:async\s+)?(?:function|class|const|let|var|interface|type|enum)\s+([A-Za-z0-9_$]+)/g;
-        while ((match = exportDeclRegex.exec(content)) !== null) {
-            if (match[1]) exportedSymbols.push(match[1]);
-        }
-
-        // Match named imports: import { a, b as c } from '...'
+    private extractAndRecordNamedImports(filePath: string, content: string): void {
         const namedImportRegex = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g;
         const normFile = this.norm(filePath);
         let targetMap = this.importedSymbolsMap.get(normFile);
@@ -256,6 +276,7 @@ export class ModuleDependencyGraph {
             targetMap = new Map();
             this.importedSymbolsMap.set(normFile, targetMap);
         }
+        let match: RegExpExecArray | null;
         while ((match = namedImportRegex.exec(content)) !== null) {
             const rawSymbols = match[1];
             const specifier = match[2];
@@ -271,23 +292,29 @@ export class ModuleDependencyGraph {
                     refs = [];
                     targetMap.set(resolved, refs);
                 }
-                const parts = rawSymbols.split(',');
-                for (const p of parts) {
-                    const item = p.trim();
-                    if (!item) continue;
-                    const asMatch = item.match(/^([A-Za-z0-9_$]+)\s+as\s+([A-Za-z0-9_$]+)$/);
-                    if (asMatch) {
-                        refs.push({ symbol: asMatch[1], alias: asMatch[2], sourceFile: resolved });
-                    } else {
-                        const symMatch = item.match(/^([A-Za-z0-9_$]+)$/);
-                        if (symMatch) {
-                            refs.push({ symbol: symMatch[1], sourceFile: resolved });
-                        }
-                    }
+                const parsed = parseNamedImportParts(rawSymbols, resolved);
+                for (let i = 0; i < parsed.length; i++) {
+                    refs.push(parsed[i]);
                 }
             }
         }
+    }
 
+    /**
+     * Fast regex-based module parser for extracting import specifiers without full AST overhead.
+     */
+    registerFromContent(filePath: string, content: string): void {
+        // Python has its own statement grammar (`import a.b` / `from .pkg import name`) and its
+        // own resolution rules (packages, `__init__.py`, relative dots); route it to the Python
+        // branch instead of the TS/JS specifier regex.
+        if (filePath.endsWith('.py')) {
+            this.registerPythonModule(filePath, content);
+            return;
+        }
+
+        const importedPaths = extractImportedPaths(content);
+        const exportedSymbols = extractExportedSymbols(content);
+        this.extractAndRecordNamedImports(filePath, content);
         this.registerModule(filePath, importedPaths, exportedSymbols);
     }
 
@@ -300,7 +327,7 @@ export class ModuleDependencyGraph {
     getForwardEdges(): Map<string, Set<string>> {
         const out = new Map<string, Set<string>>();
         for (const [file, info] of this.modules) {
-            out.set(file, new Set(info.importedModules));
+            out.set(file, cloneStringSet(info.importedModules));
         }
         return out;
     }
@@ -518,10 +545,6 @@ export function globToRegex(glob: string): RegExp {
     return new RegExp(`^${escaped}$`);
 }
 
-function escapeRe(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /**
  * Detect import cycles with an iterative three-color DFS (WHITE/GRAY/BLACK).
  *
@@ -542,7 +565,15 @@ export function findImportCycles(edges: Map<string, Set<string>>): string[][] {
         BLACK = 2;
     const color = new Map<string, number>();
     const cycles: string[][] = [];
-    const sortedNexts = (n: string): string[] => [...(edges.get(n) ?? [])].sort();
+    const sortedAdjacency = new Map<string, string[]>();
+    const sortedNexts = (n: string): string[] => {
+        let cached = sortedAdjacency.get(n);
+        if (!cached) {
+            cached = [...(edges.get(n) ?? [])].sort();
+            sortedAdjacency.set(n, cached);
+        }
+        return cached;
+    };
 
     for (const start of [...edges.keys()].sort()) {
         // Unvisited nodes are absent from `color`, so the default MUST be WHITE;
@@ -588,6 +619,50 @@ interface CyclePassOptions {
     unusedSeverity?: Severity;
 }
 
+async function readSingleFileSafe(
+    rootDir: string,
+    f: string,
+): Promise<readonly [string, string] | null> {
+    try {
+        return [f, await fs.promises.readFile(path.join(rootDir, f), 'utf8')] as const;
+    } catch {
+        return null;
+    }
+}
+
+function applyReadResults(
+    results: Array<readonly [string, string] | null>,
+    graph: ModuleDependencyGraph,
+    contents: Map<string, string>,
+): number {
+    let failures = 0;
+    for (const r of results) {
+        if (!r) {
+            failures++;
+            continue;
+        }
+        contents.set(r[0], r[1]);
+        graph.registerFromContent(r[0], r[1]);
+    }
+    return failures;
+}
+
+async function readFilesBatched(
+    files: string[],
+    rootDir: string,
+    graph: ModuleDependencyGraph,
+    contents: Map<string, string>,
+): Promise<number> {
+    const READ_WINDOW = 64;
+    let failures = 0;
+    for (let i = 0; i < files.length; i += READ_WINDOW) {
+        const chunk = files.slice(i, i + READ_WINDOW);
+        const results = await Promise.all(chunk.map((f) => readSingleFileSafe(rootDir, f)));
+        failures += applyReadResults(results, graph, contents);
+    }
+    return failures;
+}
+
 async function populateGraphFromFiles(
     files: string[],
     rootDir: string,
@@ -595,40 +670,7 @@ async function populateGraphFromFiles(
     contents: Map<string, string>,
     warnings: string[],
 ): Promise<void> {
-    const PARALLEL_THRESHOLD = 500;
-    const READ_WINDOW = 64;
-    let readFailures = 0;
-    if (files.length <= PARALLEL_THRESHOLD) {
-        for (const f of files) {
-            try {
-                const c = await fs.promises.readFile(path.join(rootDir, f), 'utf8');
-                contents.set(f, c);
-                graph.registerFromContent(f, c);
-            } catch (_readErr) {
-                readFailures++;
-            }
-        }
-    } else {
-        for (let i = 0; i < files.length; i += READ_WINDOW) {
-            const chunk = files.slice(i, i + READ_WINDOW);
-            const results = await Promise.all(
-                chunk.map((f) =>
-                    fs.promises
-                        .readFile(path.join(rootDir, f), 'utf8')
-                        .then((c) => [f, c] as const)
-                        .catch(() => null),
-                ),
-            );
-            for (const r of results) {
-                if (r === null) {
-                    readFailures++;
-                    continue;
-                }
-                contents.set(r[0], r[1]);
-                graph.registerFromContent(r[0], r[1]);
-            }
-        }
-    }
+    const readFailures = await readFilesBatched(files, rootDir, graph, contents);
     if (readFailures > 0) {
         warnings.push(
             `dependency-graph: ${readFailures} file(s) unreadable, excluded from cycle analysis`,
@@ -636,32 +678,54 @@ async function populateGraphFromFiles(
     }
 }
 
+function getOrCreateImporterSet(map: Map<string, Set<string>>, key: string): Set<string> {
+    let set = map.get(key);
+    if (!set) {
+        set = new Set<string>();
+        map.set(key, set);
+    }
+    return set;
+}
+
 function buildImportersMap(forward: Map<string, Set<string>>): Map<string, Set<string>> {
     const importers = new Map<string, Set<string>>();
     for (const [from, nexts] of forward) {
         for (const n of nexts) {
-            const set = importers.get(n) ?? new Set<string>();
-            set.add(from);
-            importers.set(n, set);
+            getOrCreateImporterSet(importers, n).add(from);
         }
     }
     return importers;
+}
+
+function getImporterTokens(
+    f: string,
+    contents: Map<string, string>,
+    tokenCache: Map<string, Set<string>>,
+): Set<string> | undefined {
+    let tokens = tokenCache.get(f);
+    if (!tokens) {
+        const c = contents.get(f);
+        if (c === undefined) return undefined;
+        tokens = new Set(c.match(/\b[A-Za-z0-9_$]+\b/g) ?? []);
+        tokenCache.set(f, tokens);
+    }
+    return tokens;
 }
 
 function auditModuleSymbols(
     mod: { file: string; exportedSymbols: string[] },
     importerFiles: string[],
     contents: Map<string, string>,
+    importerTokenSets: Map<string, Set<string>>,
     severity: Severity,
     issues: Issue[],
 ): number {
     let flagged = 0;
     for (const sym of mod.exportedSymbols) {
         if (flagged >= MAX_UNUSED_EXPORTS_PER_MODULE) break;
-        const wordRe = new RegExp(`\\b${escapeRe(sym)}\\b`);
         const used = importerFiles.some((f) => {
-            const c = contents.get(f);
-            return c === undefined ? true : wordRe.test(c);
+            const tokens = getImporterTokens(f, contents, importerTokenSets);
+            return tokens === undefined ? true : tokens.has(sym);
         });
         if (!used) {
             issues.push({
@@ -697,6 +761,7 @@ function auditUnusedExports(
 ): void {
     const entryRes = (opts.entryGlobs ?? []).map(globToRegex);
     const importers = buildImportersMap(graph.getForwardEdges());
+    const importerTokenSets = new Map<string, Set<string>>();
     const ENTRY_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
     const isEntry = (f: string): boolean =>
         entryRes.some((re) => ENTRY_EXTS.some((ext) => re.test(f + ext)));
@@ -729,7 +794,14 @@ function auditUnusedExports(
             continue;
         }
 
-        unusedFlagged += auditModuleSymbols(mod, importerFiles, contents, unusedSeverity, issues);
+        unusedFlagged += auditModuleSymbols(
+            mod,
+            importerFiles,
+            contents,
+            importerTokenSets,
+            unusedSeverity,
+            issues,
+        );
     }
     if (unusedFlagged > 0 && logger) {
         logger.info(`dependency-graph: ${unusedFlagged} unused module/export issue(s)`);

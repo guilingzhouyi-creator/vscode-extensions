@@ -132,16 +132,19 @@ export class DataFlowGraph {
      */
     public traceLifecycle(startNodeId: string): LifecycleStage[] {
         const visited = new Set<string>();
+        const seenStages = new Set<LifecycleStage>();
         const stages: LifecycleStage[] = [];
         const queue: string[] = [startNodeId];
+        let head = 0;
 
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
+        while (head < queue.length) {
+            const currentId = queue[head++];
             if (visited.has(currentId)) continue;
             visited.add(currentId);
 
             const node = this.nodes.get(currentId);
-            if (node && !stages.includes(node.stage)) {
+            if (node && !seenStages.has(node.stage)) {
+                seenStages.add(node.stage);
                 stages.push(node.stage);
             }
 
@@ -153,6 +156,29 @@ export class DataFlowGraph {
             }
         }
         return stages;
+    }
+
+    private findLastReachableNode(src: DataFlowNode): DataFlowNode {
+        let lastNode = src;
+        const visited = new Set<string>();
+        const queue = [src.id];
+        let head = 0;
+        while (head < queue.length) {
+            const cur = queue[head++];
+            if (visited.has(cur)) continue;
+            visited.add(cur);
+            const n = this.nodes.get(cur);
+            if (n) lastNode = n;
+            const outgoingEdges = this.outgoing.get(cur);
+            if (outgoingEdges) {
+                for (const e of outgoingEdges) {
+                    if (!visited.has(e.to)) {
+                        queue.push(e.to);
+                    }
+                }
+            }
+        }
+        return lastNode;
     }
 
     /**
@@ -174,19 +200,7 @@ export class DataFlowGraph {
 
         for (const src of sources) {
             const stages = this.traceLifecycle(src.id);
-            let lastNode = src;
-            const visited = new Set<string>();
-            const queue = [src.id];
-            while (queue.length > 0) {
-                const cur = queue.shift()!;
-                if (visited.has(cur)) continue;
-                visited.add(cur);
-                const n = this.nodes.get(cur);
-                if (n) lastNode = n;
-                for (const e of this.outgoing.get(cur) ?? []) {
-                    queue.push(e.to);
-                }
-            }
+            const lastNode = this.findLastReachableNode(src);
             pipelines.push({
                 startNode: src,
                 stages,

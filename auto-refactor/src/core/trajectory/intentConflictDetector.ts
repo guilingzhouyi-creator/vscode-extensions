@@ -54,12 +54,14 @@ export class IntentConflictDetector {
         const conflicts: AgentIntentConflict[] = [];
         const normPath = normalizePath(filePath);
         const resolvedMap = new Map<string, { agentUid: string; revId: string }>();
+        const revisionIssueSets: Array<Set<string>> = revisions.map(
+            (rev) => new Set(rev.ruleHitIds || []),
+        );
 
         for (let i = 1; i < revisions.length; i++) {
-            const prev = revisions[i - 1];
             const curr = revisions[i];
-            const prevIssues = new Set(prev.ruleHitIds || []);
-            const currIssues = new Set(curr.ruleHitIds || []);
+            const prevIssues = revisionIssueSets[i - 1];
+            const currIssues = revisionIssueSets[i];
 
             // Check what prev resolved
             for (const pIssue of prevIssues) {
@@ -109,18 +111,25 @@ export class IntentConflictDetector {
 
         for (const [norm, group] of fileMap.entries()) {
             if (group.length < 2) continue;
-            for (let i = 0; i < group.length; i++) {
-                for (let j = i + 1; j < group.length; j++) {
-                    const p1 = group[i];
-                    const p2 = group[j];
-                    if (p1.agentUid === p2.agentUid) continue;
-
-                    this.evaluatePairConflicts(norm, p1, p2, conflicts);
-                }
-            }
+            this.evaluateGroupPairConflicts(norm, group, conflicts);
         }
 
         return conflicts;
+    }
+
+    private evaluateGroupPairConflicts(
+        norm: string,
+        group: AgentPatchSlice[],
+        conflicts: AgentIntentConflict[],
+    ): void {
+        for (let i = 0; i < group.length; i++) {
+            for (let j = i + 1; j < group.length; j++) {
+                const patchA = group[i];
+                const patchB = group[j];
+                if (patchA.agentUid === patchB.agentUid) continue;
+                this.evaluatePairConflicts(norm, patchA, patchB, conflicts);
+            }
+        }
     }
 
     /**
@@ -128,45 +137,61 @@ export class IntentConflictDetector {
      */
     private evaluatePairConflicts(
         file: string,
-        p1: AgentPatchSlice,
-        p2: AgentPatchSlice,
+        patchA: AgentPatchSlice,
+        patchB: AgentPatchSlice,
         out: AgentIntentConflict[],
     ): void {
-        if (p1.newContent && p2.newContent) {
-            const p1Erodes = p1.oldContent && checkGuardErosion(p1.oldContent, p1.newContent);
-            const p2Erodes = p2.oldContent && checkGuardErosion(p2.oldContent, p2.newContent);
-
-            if (p1Erodes || p2Erodes) {
-                const offendingAgent = p1Erodes ? p1.agentUid : p2.agentUid;
-                const otherAgent = p1Erodes ? p2.agentUid : p1.agentUid;
-                out.push({
-                    conflictId: `guard-erosion-${file}-${offendingAgent}`,
-                    kind: 'eroded_guard',
-                    agents: [otherAgent, offendingAgent],
-                    filePath: file,
-                    description:
-                        `Agent '${offendingAgent}' removed defensive validation guards in ` +
-                        `'${file}' concurrently touched by '${otherAgent}'`,
-                });
-            }
-
-            // Detect opposing line churn (one agent mostly adds, the other mostly deletes)
-            const isOpposing =
-                (p1.addedLines > 20 && p2.deletedLines > 20) ||
-                (p2.addedLines > 20 && p1.deletedLines > 20);
-            if (isOpposing) {
-                out.push({
-                    conflictId: `opposing-churn-${file}-${p1.agentUid}-${p2.agentUid}`,
-                    kind: 'opposing_refactor',
-                    agents: [p1.agentUid, p2.agentUid],
-                    filePath: file,
-                    description:
-                        `Opposing refactoring direction in '${file}' between agents ` +
-                        `'${p1.agentUid}' and '${p2.agentUid}'`,
-                });
-            }
-        }
+        if (!patchA.newContent || !patchB.newContent) return;
+        const erosion = evaluateGuardErosionConflict(file, patchA, patchB);
+        if (erosion) out.push(erosion);
+        const churn = evaluateOpposingChurnConflict(file, patchA, patchB);
+        if (churn) out.push(churn);
     }
+}
+
+function evaluateGuardErosionConflict(
+    file: string,
+    patchA: AgentPatchSlice,
+    patchB: AgentPatchSlice,
+): AgentIntentConflict | null {
+    const patchAErodes = patchA.oldContent
+        ? checkGuardErosion(patchA.oldContent, patchA.newContent!)
+        : false;
+    const patchBErodes = patchB.oldContent
+        ? checkGuardErosion(patchB.oldContent, patchB.newContent!)
+        : false;
+    if (!patchAErodes && !patchBErodes) return null;
+    const offendingAgent = patchAErodes ? patchA.agentUid : patchB.agentUid;
+    const otherAgent = patchAErodes ? patchB.agentUid : patchA.agentUid;
+    return {
+        conflictId: `guard-erosion-${file}-${offendingAgent}`,
+        kind: 'eroded_guard',
+        agents: [otherAgent, offendingAgent],
+        filePath: file,
+        description:
+            `Agent '${offendingAgent}' removed defensive validation guards in ` +
+            `'${file}' concurrently touched by '${otherAgent}'`,
+    };
+}
+
+function evaluateOpposingChurnConflict(
+    file: string,
+    patchA: AgentPatchSlice,
+    patchB: AgentPatchSlice,
+): AgentIntentConflict | null {
+    const isOpposing =
+        (patchA.addedLines > 20 && patchB.deletedLines > 20) ||
+        (patchB.addedLines > 20 && patchA.deletedLines > 20);
+    if (!isOpposing) return null;
+    return {
+        conflictId: `opposing-churn-${file}-${patchA.agentUid}-${patchB.agentUid}`,
+        kind: 'opposing_refactor',
+        agents: [patchA.agentUid, patchB.agentUid],
+        filePath: file,
+        description:
+            `Opposing refactoring direction in '${file}' between agents ` +
+            `'${patchA.agentUid}' and '${patchB.agentUid}'`,
+    };
 }
 
 /** Default singleton instance of IntentConflictDetector */
