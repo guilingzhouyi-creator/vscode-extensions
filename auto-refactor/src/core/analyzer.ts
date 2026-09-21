@@ -85,24 +85,24 @@ export {
 } from './analyzer-registry';
 export { WorkerPoolManager, WorkerPoolEntry } from './worker-pool';
 
-import { pMap, AR_TIMING, nowMs } from './scanner/workerScheduler';
-import { runFileAnalyzers } from './scanner/analyzerRunner';
+import { pMap, AR_TIMING, nowMs } from './scanner/worker-scheduler';
+import { runFileAnalyzers } from './scanner/analyzer-runner';
 import {
     mergePerFileResults,
     printScanTiming,
     runParseAnalyzeStage,
     sortIssues,
-} from './scanner/scanStage';
+} from './scanner/scan-stage';
 import { buildScanReport } from './reporting/reportBuilder';
-import type { ScanWithCacheOptions } from './scanner/cacheScanner';
-import { executeScanWithCache } from './scanner/cacheScanner';
-import type { ScanWithDiffOptions } from './scanner/diffScanner';
-import { executeScanWithDiff } from './scanner/diffScanner';
-import type { ScannerContext } from './scanner/scannerContext';
+import type { ScanWithCacheOptions } from './scanner/cache-scanner';
+import { executeScanWithCache } from './scanner/cache-scanner';
+import type { ScanWithDiffOptions } from './scanner/diff-scanner';
+import { executeScanWithDiff } from './scanner/diff-scanner';
+import type { ScannerContext } from './scanner/scanner-context';
 
-export { WarmSession, createWarmSession } from './scanner/cacheKeyHelper';
-export type { ScanWithCacheOptions } from './scanner/cacheScanner';
-export type { ScanWithDiffOptions } from './scanner/diffScanner';
+export { WarmSession, createWarmSession } from './scanner/cache-key-helper';
+export type { ScanWithCacheOptions } from './scanner/cache-scanner';
+export type { ScanWithDiffOptions } from './scanner/diff-scanner';
 export { summarizeUncertainty } from './reporting/uncertaintySummary';
 
 /**

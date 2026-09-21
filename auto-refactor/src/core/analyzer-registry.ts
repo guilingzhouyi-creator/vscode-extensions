@@ -163,10 +163,12 @@ function loadExternalAnalyzer(
  * (the later node is kept but a warning is logged) rather than throwing, to stay robust.
  */
 function topoSort(plan: ResolvedAnalyzer[]): ResolvedAnalyzer[] {
-    const byName = new Map<string, ResolvedAnalyzer>();
-    for (const p of plan) byName.set(p.name, p);
     const visited = new Set<string>();
     const inProgress = new Set<string>();
+    const byName = new Map<string, ResolvedAnalyzer>();
+    for (const p of plan) {
+        byName.set(p.name, p);
+    }
     const out: ResolvedAnalyzer[] = [];
 
     const visit = (p: ResolvedAnalyzer) => {
@@ -187,6 +189,51 @@ function topoSort(plan: ResolvedAnalyzer[]): ResolvedAnalyzer[] {
 
     for (const p of plan) visit(p);
     return out;
+}
+
+function resolveBuiltinAnalyzers(
+    config: ScanConfig,
+    plan: ResolvedAnalyzer[],
+    seen: Set<string>,
+): void {
+    for (const [name, decl] of Object.entries(config.analyzers || {})) {
+        if (!decl || decl.enabled === false) continue;
+        const factory = BUILTIN_FACTORIES[name];
+        if (factory) {
+            plan.push({
+                name,
+                instance: factory(),
+                options: { ...config.thresholds, ...(decl.options || {}) },
+                modulePath: BUILTIN_MODULE_PATHS[name],
+                factory,
+            });
+            seen.add(name);
+        }
+    }
+}
+
+function resolveCustomAnalyzers(
+    config: ScanConfig,
+    baseDir: string,
+    plan: ResolvedAnalyzer[],
+    seen: Set<string>,
+): void {
+    for (const c of config.customAnalyzers || []) {
+        if (c.enabled === false || seen.has(c.name)) continue;
+        const { analyzer, modulePath } = loadExternalAnalyzer(c, baseDir);
+        const customModulePath = modulePath;
+        plan.push({
+            name: c.name,
+            instance: analyzer,
+            options: { ...config.thresholds, ...(c.options || {}) },
+            modulePath,
+            factory: () => {
+                const mod = dynamicRequire(customModulePath);
+                return instantiateAnalyzer(mod, c.name);
+            },
+        });
+        seen.add(c.name);
+    }
 }
 
 /**
@@ -212,38 +259,8 @@ export function resolveAnalyzers(config: ScanConfig, baseDir: string): ResolvedA
     const plan: ResolvedAnalyzer[] = [];
     const seen = new Set<string>();
 
-    for (const [name, decl] of Object.entries(config.analyzers || {})) {
-        if (!decl || decl.enabled === false) continue;
-        const factory = BUILTIN_FACTORIES[name];
-        if (factory) {
-            plan.push({
-                name,
-                instance: factory(),
-                options: { ...config.thresholds, ...(decl.options || {}) },
-                modulePath: BUILTIN_MODULE_PATHS[name],
-                factory,
-            });
-            seen.add(name);
-        }
-    }
-
-    for (const c of config.customAnalyzers || []) {
-        if (c.enabled === false) continue;
-        if (seen.has(c.name)) continue;
-        const { analyzer, modulePath } = loadExternalAnalyzer(c, baseDir);
-        const customModulePath = modulePath;
-        plan.push({
-            name: c.name,
-            instance: analyzer,
-            options: { ...config.thresholds, ...(c.options || {}) },
-            modulePath,
-            factory: () => {
-                const mod = dynamicRequire(customModulePath);
-                return instantiateAnalyzer(mod, c.name);
-            },
-        });
-        seen.add(c.name);
-    }
+    resolveBuiltinAnalyzers(config, plan, seen);
+    resolveCustomAnalyzers(config, baseDir, plan, seen);
 
     return topoSort(plan);
 }

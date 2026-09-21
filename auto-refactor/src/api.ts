@@ -33,7 +33,7 @@ import type {
     UnsupportedLanguageSeverity,
     MaturityTier,
 } from './core/types';
-import { resolveConfig } from './core/config';
+import { resolveConfig, TOOL_VERSION } from './core/config';
 import { Scanner } from './core/analyzer';
 import { CacheStore } from './core/cache';
 import { render } from './core/reporters';
@@ -528,7 +528,7 @@ async function collectGitChangedFiles(root: string): Promise<string[]> {
 function createEmptyDiffReport(config: ScanConfig): ScanReport {
     return {
         tool: 'auto-refactor',
-        version: '0.3.0',
+        version: TOOL_VERSION,
         generatedAt: new Date().toISOString(),
         root: config.root,
         config,
