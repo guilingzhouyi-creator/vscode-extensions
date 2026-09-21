@@ -336,6 +336,62 @@
         "bigLines": 2600,
         "parser": "typescript"
       }
+    },
+    {
+      "date": "2026-09-20T13:13:09.124Z",
+      "commit": "f610f50",
+      "new300": 120.54269999999997,
+      "mixed300": null,
+      "newBig": 1004.9659999999994,
+      "mixedBig": null,
+      "createSourceFile": 5.929739999999947,
+      "parseTs": 15.922779999999966,
+      "mapTs": 9.993040000000018,
+      "parseOxc": 1.558060000000023,
+      "mapOxc": 15.487179999999992,
+      "runStreaming": 36.25683000000008,
+      "materializationRatio": 0.6275939251814092,
+      "env": {
+        "node": "v24.16.0",
+        "os": "win32",
+        "cpu": "32 logical"
+      },
+      "flags": {
+        "files": 300,
+        "iterations": 5,
+        "workers": 1,
+        "bigFiles": 12,
+        "bigLines": 2600,
+        "parser": "typescript"
+      }
+    },
+    {
+      "date": "2026-09-20T13:43:04.246Z",
+      "commit": "f610f50",
+      "new300": 115.09940000000006,
+      "mixed300": null,
+      "newBig": 699.5414999999998,
+      "mixedBig": null,
+      "createSourceFile": 3.6539299999997636,
+      "parseTs": 9.146349999999984,
+      "mapTs": 5.49242000000022,
+      "parseOxc": 1.470129999999881,
+      "mapOxc": 9.863360000000013,
+      "runStreaming": 23.80810999999985,
+      "materializationRatio": 0.6005040261962673,
+      "env": {
+        "node": "v24.16.0",
+        "os": "win32",
+        "cpu": "32 logical"
+      },
+      "flags": {
+        "files": 300,
+        "iterations": 5,
+        "workers": 1,
+        "bigFiles": 12,
+        "bigLines": 2600,
+        "parser": "typescript"
+      }
     }
   ]
 }

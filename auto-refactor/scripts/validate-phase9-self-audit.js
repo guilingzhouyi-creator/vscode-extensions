@@ -37,7 +37,7 @@ async function main() {
   // 3. Validate Immutable Audit Snapshot Quintuple (E, R, C, L, S)
   console.log('3. Validating Immutable Snapshot Metadata...');
   assert.ok(report.snapshotId && report.snapshotId.startsWith('snapshot-'));
-  assert.strictEqual(report.versions.engineVersion, '0.3.0');
+  assert.strictEqual(report.versions.engineVersion, '0.4.0');
   assert.strictEqual(report.versions.ruleVersion, '2026.09-v1');
   assert.strictEqual(report.versions.configVersion, 'cfg-v1.0');
   assert.strictEqual(report.versions.languageAdapterVersion, 'adapters-v1.0');

@@ -1,8 +1,50 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-19T14:20:47.585Z",
+  "timestamp": "2026-09-21T10:58:39.027Z",
   "groups": [
+    {
+      "key": "comments|CMT-WID-001|scripts/validate-cognitive-cost-anti-gaming.js",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-cognitive-cost-anti-gaming.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-WID-001|scripts/validate-config-driven-architecture.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-config-driven-architecture.js",
+      "count": 5,
+      "severities": {
+        "warning": 5
+      }
+    },
+    {
+      "key": "comments|CMT-WID-001|scripts/validate-elastic-complexity-budget.js",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "comments|CMT-WID-001|scripts/validate-function-cohesion-skeleton.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
     {
       "key": "comments|CMT-DOC-001|scripts/validate-phase11-rule-generalization.js",
       "count": 2,
@@ -64,34 +106,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "comments|CMT-CON-001|src/core/scanner/analyzerRunner.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "comments|CMT-CON-001|src/core/scanner/cacheProbe.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
-      "key": "comments|CMT-CON-001|src/core/scanner/diffHints.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "comments|CMT-CON-001|src/core/scanner/scanStage.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     }
   ]
