@@ -28,13 +28,18 @@ import { globToRegExp } from '../core/file-discovery';
 import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import { detectComplexityAmplification } from '../core/intelligence/semanticComplexity';
 import { evaluateStructuredClarity, formatOptimizationHint } from './structured-clarity';
-import { TypeScriptAdapter } from '../core/typescript-adapter';
-import { findLoopSitesInFunction } from './complexity-loops';
+import {
+    findLoopSitesInFunction,
+    collectLoopAllocSites,
+    createRoutineDescriptors,
+} from './complexity-loops';
 import {
     evaluateElasticComplexityBudget,
     evaluateFileCumulativeBudget,
 } from '../core/intelligence/elastic-complexity-budget';
 import { analyzeFunctionCohesionAndSkeleton } from '../core/intelligence/function-cohesion-skeleton';
+import { evaluateDistributedRedundancy } from '../core/intelligence/semantic-domain-detector';
+import { evaluateResourcePooling } from '../core/intelligence/resource-pooling-auditor';
 
 /**
  * Cyclomatic complexity of a function-like node: base 1 + sum of `branchWeight` over every
@@ -169,6 +174,8 @@ export class ComplexityAnalyzer implements Analyzer {
         this.fileFunctions = [];
         this.maskedLines = maskedLinesOfPath(ctx.filePath, ctx.content);
 
+        const { TypeScriptAdapter } =
+            require('../core/typescript-adapter') as typeof import('../core/typescript-adapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sf.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [
@@ -272,20 +279,23 @@ export class ComplexityAnalyzer implements Analyzer {
         }
     }
 
-    finalize(ctx: AnalyzerContext): Issue[] {
-        if (this.loopSites.size > 0) {
-            const toRegExps = (globs: unknown): RegExp[] =>
-                ((globs ?? []) as string[]).map((glob) => globToRegExp(glob));
-            const ampIssues = detectComplexityAmplification(
-                this.loopSites,
-                toRegExps(ctx.options?.blockingIoAllowPatterns),
-                toRegExps(ctx.options?.allocationAllowPatterns),
-            );
-            this.issues.push(...ampIssues);
-        }
+    private finalizeAmplification(ctx: AnalyzerContext): void {
+        if (this.loopSites.size === 0) return;
+        const toRegExps = (globs: unknown): RegExp[] =>
+            ((globs ?? []) as string[]).map((glob) => globToRegExp(glob));
+        const ampIssues = detectComplexityAmplification(
+            this.loopSites,
+            toRegExps(ctx.options?.blockingIoAllowPatterns),
+            toRegExps(ctx.options?.allocationAllowPatterns),
+        );
+        this.issues.push(...ampIssues);
+    }
 
-        const opts = ctx.options as Record<string, unknown> | undefined;
-        const thresh = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
+    private finalizeElasticAndCohesion(
+        ctx: AnalyzerContext,
+        opts: Record<string, unknown> | undefined,
+        thresh: Record<string, unknown> | undefined,
+    ): void {
         const flagElasticBudget = Boolean(
             opts?.enforceElasticBudget ?? thresh?.enforceElasticBudget ?? false,
         );
@@ -311,6 +321,50 @@ export class ComplexityAnalyzer implements Analyzer {
             );
             this.issues.push(...cohesionResult.issues);
         }
+    }
+
+    private finalizeRedundancy(
+        ctx: AnalyzerContext,
+        opts: Record<string, unknown> | undefined,
+        thresh: Record<string, unknown> | undefined,
+    ): void {
+        const flagRedundancy = Boolean(
+            opts?.flagDistributedRedundancy ?? thresh?.flagDistributedRedundancy ?? false,
+        );
+        if (!flagRedundancy || this.fileFunctions.length < 2) return;
+
+        const descriptors = createRoutineDescriptors(this.fileFunctions, ctx.filePath);
+        const redundancyResult = evaluateDistributedRedundancy(
+            descriptors,
+            ctx.content ? ctx.content.split('\n').length : 100,
+        );
+        this.issues.push(...redundancyResult.issues);
+    }
+
+    private finalizePooling(
+        opts: Record<string, unknown> | undefined,
+        thresh: Record<string, unknown> | undefined,
+    ): void {
+        const flagPooling = Boolean(
+            opts?.flagResourcePooling ?? thresh?.flagResourcePooling ?? false,
+        );
+        if (!flagPooling || this.loopSites.size === 0) return;
+
+        const allocSites = collectLoopAllocSites(this.loopSites);
+        if (allocSites.length > 0) {
+            const poolingResult = evaluateResourcePooling(allocSites, []);
+            this.issues.push(...poolingResult.issues);
+        }
+    }
+
+    finalize(ctx: AnalyzerContext): Issue[] {
+        const opts = ctx.options as Record<string, unknown> | undefined;
+        const thresh = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
+
+        this.finalizeAmplification(ctx);
+        this.finalizeElasticAndCohesion(ctx, opts, thresh);
+        this.finalizeRedundancy(ctx, opts, thresh);
+        this.finalizePooling(opts, thresh);
 
         return this.issues;
     }

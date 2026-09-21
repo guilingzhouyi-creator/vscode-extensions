@@ -173,3 +173,92 @@ export function findLoopSitesInFunction(
 
     return sites;
 }
+
+import type { AllocationSiteContext } from '../core/intelligence/resource-pooling-auditor';
+import type { RoutineSemanticDescriptor } from '../core/intelligence/semantic-domain-detector';
+
+function toAllocSiteContext(fnName: string, loop: LoopSite): AllocationSiteContext {
+    return {
+        id: `${loop.file}:${loop.line}:${loop.symbol}`,
+        filePath: loop.file,
+        functionName: fnName,
+        line: loop.line,
+        isInLoopOrHotPath: true,
+        allocatedType: 'Object',
+        fieldCount: 4,
+        isPrimitiveOrTiny: false,
+        hasExpensiveConstructor: true,
+        estimatedAllocFrequency: 'loop_hot',
+    };
+}
+
+function collectAllocSitesForFunction(
+    fnName: string,
+    loops: LoopSite[],
+    out: AllocationSiteContext[],
+): void {
+    for (const loop of loops) {
+        if (loop.hasTransientAllocation && !loop.isBounded) {
+            out.push(toAllocSiteContext(fnName, loop));
+        }
+    }
+}
+
+/**
+ * Collects allocation sites suitable for resource pooling audit from loop sites.
+ *
+ * @param loopSites - Map of function names to detected loop sites.
+ * @returns Array of allocation site contexts.
+ */
+export function collectLoopAllocSites(loopSites: Map<string, LoopSite[]>): AllocationSiteContext[] {
+    const allocSites: AllocationSiteContext[] = [];
+    for (const [fnName, loops] of loopSites.entries()) {
+        collectAllocSitesForFunction(fnName, loops, allocSites);
+    }
+    return allocSites;
+}
+
+/**
+ * Converts file functions into routine semantic descriptors for distributed redundancy review.
+ *
+ * @param fileFunctions - Analyzed functions in the file.
+ * @param filePath - Path of the file under analysis.
+ * @returns Array of routine semantic descriptors.
+ */
+export function createRoutineDescriptors(
+    fileFunctions: Array<{
+        name: string;
+        startLine: number;
+        endLine: number;
+        cc: number;
+    }>,
+    filePath: string,
+): RoutineSemanticDescriptor[] {
+    const domainName = filePath.split(/[\\/]/)[0] || 'default';
+    return fileFunctions.map((fn) => ({
+        id: `${filePath}:${fn.name}:${fn.startLine}`,
+        filePath,
+        name: fn.name,
+        startLine: fn.startLine,
+        endLine: fn.endLine,
+        cc: fn.cc,
+        loc: fn.endLine - fn.startLine + 1,
+        fingerprint: {
+            symbolTokens: new Set([fn.name]),
+            domainName,
+            callInDegree: 1,
+            callOutDegree: 1,
+            cfgSkeletonHash: 'entry->cond->exit',
+            dataFlowStages: ['input', 'compute', 'return'],
+            ioShape: {
+                arity: 1,
+                paramTypes: ['unknown'],
+                returnKind: 'scalar' as const,
+            },
+            algorithmicSteps: ['validate', 'compute'],
+            sideEffectBoundary: 'pure' as const,
+            stateOwnership: 'transient' as const,
+            callFrequencyHotness: 'hot_loop' as const,
+        },
+    }));
+}

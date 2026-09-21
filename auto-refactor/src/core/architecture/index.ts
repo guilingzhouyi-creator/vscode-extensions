@@ -47,3 +47,11 @@ export type {
     ConfigDrivenAnalysisResult,
     ConfigDrivenOptions,
 } from './config-driven-architecture';
+
+export { classifyFileOntology, auditFileTaxonomy } from './file-taxonomy-ontology';
+export type {
+    FileOntologyRole,
+    FileBehavioralMetrics,
+    FileOntologyClassification,
+    FileTaxonomyAuditResult,
+} from './file-taxonomy-ontology';

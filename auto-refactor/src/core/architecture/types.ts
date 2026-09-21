@@ -88,6 +88,8 @@ export interface ArchitectureAuditOptions {
     isSelfRepo?: boolean;
     customRoleMappings?: Record<string, SystemTopologyRole>;
     customAllowedDependencies?: Partial<Record<SystemTopologyRole, SystemTopologyRole[]>>;
+    flagFileTaxonomy?: boolean;
+    flagBoundaryDiscipline?: boolean;
 }
 
 /**
@@ -103,6 +105,8 @@ export interface ArchitectureAuditResult {
     privateBypassCount: number;
     passed: boolean;
     configMaturity?: ConfigDrivenAnalysisResult;
+    fileTaxonomyResult?: import('./file-taxonomy-ontology').FileTaxonomyAuditResult;
+    boundaryDisciplineResult?: import('../intelligence/boundary-discipline-engine').BoundaryDisciplineResult;
 }
 
 const ALL_ROLES_SET: ReadonlySet<SystemTopologyRole> = new Set([
