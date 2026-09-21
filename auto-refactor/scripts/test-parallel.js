@@ -167,6 +167,23 @@ const PARALLEL_SUITES = [
     name: 'validate-cognitive-cost-anti-gaming',
     script: 'scripts/validate-cognitive-cost-anti-gaming.js',
   },
+  {
+    name: 'validate-semantic-domain-detector',
+    script: 'scripts/validate-semantic-domain-detector.js',
+  },
+  { name: 'validate-file-taxonomy-ontology', script: 'scripts/validate-file-taxonomy-ontology.js' },
+  {
+    name: 'validate-resource-pooling-auditor',
+    script: 'scripts/validate-resource-pooling-auditor.js',
+  },
+  {
+    name: 'validate-boundary-discipline-engine',
+    script: 'scripts/validate-boundary-discipline-engine.js',
+  },
+  {
+    name: 'validate-project-governance-evaluator',
+    script: 'scripts/validate-project-governance-evaluator.js',
+  },
 ];
 
 // Phase 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)
@@ -196,12 +213,8 @@ function runScriptAsync(scriptRel) {
     let stdout = '';
     let stderr = '';
 
-    child.stdout.on('data', (d) => {
-      stdout += d;
-    });
-    child.stderr.on('data', (d) => {
-      stderr += d;
-    });
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
 
     child.on('close', (code) => {
       resolve({
@@ -238,29 +251,25 @@ async function executeSuite(suite) {
     return { name: suite.name, ...res };
   }
 
-  // Composite pack: run scripts sequentially within the pack
   let combinedStdout = '';
   let combinedStderr = '';
+  let ok = true;
+  let code = 0;
   for (const script of suite.composite) {
     const res = await runScriptAsync(script);
     combinedStdout += res.stdout;
     combinedStderr += res.stderr;
     if (!res.ok) {
-      return {
-        name: suite.name,
-        ok: false,
-        code: res.code,
-        stdout: combinedStdout,
-        stderr: combinedStderr,
-        durationMs: Date.now() - start,
-      };
+      ok = false;
+      code = res.code;
+      break;
     }
   }
 
   return {
     name: suite.name,
-    ok: true,
-    code: 0,
+    ok,
+    code,
     stdout: combinedStdout,
     stderr: combinedStderr,
     durationMs: Date.now() - start,
