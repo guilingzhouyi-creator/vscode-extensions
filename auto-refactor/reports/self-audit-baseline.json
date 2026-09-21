@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1789996887497",
-  "timestamp": "2026-09-21T13:21:29.466Z",
+  "snapshotId": "snapshot-v0.4.0-1790004197600",
+  "timestamp": "2026-09-21T15:23:19.720Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,30 +8,30 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "d195e1c9df45d867ac8bf5bb853f75b2cbecf822d3bc239775e8fa1d7b590565",
+  "rulesDigest": "3575edb24ea156d03398a928ff72f68a4a0a42dacb7a50ebfa56c1829c67bade",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 355,
-    "durationMs": 1823
+    "filesScanned": 367,
+    "durationMs": 1965
   },
   "metrics": {
     "compositeScore": 99.8,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 6183,
-    "suppressedIssues": 2721,
-    "unsuppressedIssues": 3462,
+    "totalIssues": 6602,
+    "suppressedIssues": 3003,
+    "unsuppressedIssues": 3599,
     "bySeverity": {
-      "info": 193,
-      "warning": 5990,
+      "info": 192,
+      "warning": 6410,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 166,
-      "medium": 5400,
-      "low": 617
+      "high": 167,
+      "medium": 5819,
+      "low": 616
     }
   },
   "eightPillars": {
@@ -69,6 +69,15 @@
       "effectiveDensity": 0.97
     },
     {
+      "filePath": "scripts/validate-semantic-domain-detector.js",
+      "domain": "scripts",
+      "totalIssues": 121,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.98
+    },
+    {
       "filePath": "src/api.ts",
       "domain": "src",
       "totalIssues": 107,
@@ -76,6 +85,15 @@
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "scripts/test-parallel.js",
+      "domain": "scripts",
+      "totalIssues": 103,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.94
     },
     {
       "filePath": "scripts/validate-phase12-multi-agent.js",
@@ -94,15 +112,6 @@
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.95
-    },
-    {
-      "filePath": "scripts/test-parallel.js",
-      "domain": "scripts",
-      "totalIssues": 98,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.94
     },
     {
       "filePath": "scripts/bench-fastpath.js",
@@ -139,23 +148,14 @@
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.94
-    },
-    {
-      "filePath": "scripts/validate-phase15-e2e-stress.js",
-      "domain": "scripts",
-      "totalIssues": 61,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.96
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 166,
-      "medium": 5400,
-      "low": 617
+      "high": 167,
+      "medium": 5819,
+      "low": 616
     },
     "criticalItems": [],
     "highItems": [
@@ -313,12 +313,12 @@
         "message": "Function \"ArchitectureAnalyzer.analyze\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/complexity.ts:192",
+        "id": "complexity:high-complexity:src/analyzers/complexity.ts:199",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/complexity.ts",
-        "line": 192,
+        "line": 199,
         "message": "Function \"ComplexityAnalyzer.visit\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
@@ -466,13 +466,22 @@
         "message": "Function \"TestModernityAnalyzer.analyzeWithLines\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/architecture/metaArchitectureEvaluator.ts:238",
-        "rule": "high-complexity",
+        "id": "complexity:CPX-SPACE-001:src/core/architecture/metaArchitectureEvaluator.ts:143",
+        "rule": "CPX-SPACE-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/architecture/metaArchitectureEvaluator.ts",
-        "line": 238,
-        "message": "Function \"MetaArchitectureEvaluator.evaluate\" has cyclomatic complexity 24 (threshold 12)."
+        "line": 143,
+        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'edges'."
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/architecture/metaArchitectureEvaluator.ts:151",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/architecture/metaArchitectureEvaluator.ts",
+        "line": 151,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
         "id": "complexity:high-complexity:src/core/ast/gdscript-adapter.ts:44",
@@ -599,15 +608,6 @@
         "file": "src/core/ast/ts-predicates.ts",
         "line": 121,
         "message": "Function \"bindingName\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/ts-predicates.ts:273",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/ts-predicates.ts",
-        "line": 273,
-        "message": "Function \"isEnclosedInConstDeclaration\" has cyclomatic complexity 13 (threshold 12)."
       }
     ]
   },
@@ -619,7 +619,7 @@
         "pillars": {
           "architecture": 100,
           "maintainability": 99.8,
-          "performance": 99.8,
+          "performance": 99.9,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -693,8 +693,8 @@
         "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.5,
-          "performance": 100,
+          "maintainability": 99.7,
+          "performance": 99.9,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -795,11 +795,11 @@
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 99.7,
+        "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.4,
-          "performance": 99.7,
+          "maintainability": 98.7,
+          "performance": 99.8,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -1008,7 +1008,7 @@
         "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.1,
+          "maintainability": 99.2,
           "performance": 100,
           "data": 100,
           "testing": 100,

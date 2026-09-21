@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1789996803035",
-  "timestamp": "2026-09-21T13:20:03.035Z",
+  "snapshotId": "snapshot-v0.4.0-1790004183723",
+  "timestamp": "2026-09-21T15:23:03.723Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "d195e1c9df45d867ac8bf5bb853f75b2cbecf822d3bc239775e8fa1d7b590565",
+  "rulesDigest": "3575edb24ea156d03398a928ff72f68a4a0a42dacb7a50ebfa56c1829c67bade",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 166,
+    "ruleCount": 174,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -28,6 +28,7 @@
   },
   "registeredRuleIds": [
     "analyzer-error",
+    "ARCH-ABS-001",
     "ARCH-BLR-001",
     "ARCH-BND-001",
     "ARCH-CFG-001",
@@ -45,7 +46,10 @@
     "ARCH-HDL-001",
     "ARCH-LEAK-001",
     "ARCH-LEAK-002",
+    "ARCH-ROL-001",
+    "ARCH-ROL-002",
     "ARCH-SKL-001",
+    "ARCH-UTL-001",
     "clean-layer-violation",
     "CMP-CAL-001",
     "CMP-DEN-001",
@@ -66,6 +70,7 @@
     "CPX-HOP-001",
     "CPX-JST-001",
     "CPX-REC-001",
+    "CPX-RED-001",
     "CPX-SPACE-001",
     "CPX-TIME-001",
     "DAT-DEF-001",
@@ -145,6 +150,9 @@
     "PRF-IO-001",
     "PRF-LEAK-001",
     "PRF-MEM-001",
+    "PRF-POL-001",
+    "PRF-POL-002",
+    "PRF-POL-003",
     "PYM-ABC-001",
     "PYM-ASYNC-001",
     "PYM-DATETIME-001",
