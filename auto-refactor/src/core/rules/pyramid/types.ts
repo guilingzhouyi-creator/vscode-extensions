@@ -14,13 +14,23 @@
 import type { Issue } from '../../types';
 import type { SemanticGraph } from '../../semantic/semanticGraph';
 
+/** Universal Layer 1 rule tier identifier for cross-language rules. */
+export const RULE_LAYER_UNIVERSAL = 'layer1_universal' as const;
+/** Language Family Layer 2 rule tier identifier. */
+export const RULE_LAYER_FAMILY = 'layer2_family' as const;
+/** Dialect Specific Layer 3 rule tier identifier. */
+export const RULE_LAYER_DIALECT = 'layer3_dialect' as const;
+
 /**
  * Three-tier architectural hierarchy for code governance and review rules.
  */
 export type RuleLayer =
-    | 'layer1_universal' // Language-agnostic (topology, lifecycle symmetry, clean architecture)
-    | 'layer2_family' // Language-family level (static type systems, garbage-collected runtimes)
-    | 'layer3_dialect'; // Concrete language/syntax specific (idioms, decorators, macro patterns)
+    // Language-agnostic (topology, lifecycle symmetry, clean architecture)
+    | typeof RULE_LAYER_UNIVERSAL
+    // Language-family level (static type systems, garbage-collected runtimes)
+    | typeof RULE_LAYER_FAMILY
+    // Concrete language/syntax specific (idioms, decorators, macro patterns)
+    | typeof RULE_LAYER_DIALECT;
 
 /**
  * Evaluation context supplied to universal semantic rules.

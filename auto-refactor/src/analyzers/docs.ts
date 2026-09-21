@@ -213,26 +213,30 @@ export class DocsAnalyzer implements Analyzer {
      * @param emit - Issue factory.
      */
     private checkDuplicateProse(lines: string[], emit: Emit): void {
-        const counts = new Map<string, { count: number; line: number }>();
+        const lineCounts = new Map<string, number>();
+        const lineFirst = new Map<string, number>();
         for (let i = 0; i < lines.length; i++) {
             const text = lines[i].trim();
             if (text.length < DUP_MIN_LENGTH) continue;
             if (DUP_IGNORED_PREFIXES.some((prefix) => text.startsWith(prefix))) continue;
-            const entry = counts.get(text);
-            if (entry) entry.count++;
-            else counts.set(text, { count: 1, line: i + 1 });
+            const current = lineCounts.get(text) || 0;
+            lineCounts.set(text, current + 1);
+            if (current === 0) {
+                lineFirst.set(text, i + 1);
+            }
         }
-        const repeated = [...counts.entries()]
-            .filter(([, entry]) => entry.count >= 2)
-            .sort((a, b) => b[1].count - a[1].count)
+        const repeated = [...lineCounts.entries()]
+            .filter(([, count]) => count >= 2)
+            .sort((a, b) => b[1] - a[1])
             .slice(0, DUP_MAX_REPORTED);
         if (repeated.length === 0) return;
-        const [sample, entry] = repeated[0];
+        const [sample, count] = repeated[0];
+        const firstLine = lineFirst.get(sample) || 1;
         emit(
-            entry.line - 1,
+            firstLine - 1,
             'DOC-DUP-001',
             `Duplicated prose: ${repeated.length} line(s) repeat inside this document ` +
-                `(most frequent appears ${entry.count} times: "${sample.slice(0, DUP_MESSAGE_SAMPLE_CHARS)}…").`,
+                `(most frequent appears ${count} times: "${sample.slice(0, DUP_MESSAGE_SAMPLE_CHARS)}…").`,
             SEVERITY_WARNING,
             'Collapse the repetition into one canonical section and reference it, so the copy cannot drift.',
             { repeated: repeated.length, sample: sample.slice(0, DUP_DETAIL_SAMPLE_CHARS) },

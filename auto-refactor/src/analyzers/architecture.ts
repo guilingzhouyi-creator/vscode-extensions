@@ -23,6 +23,7 @@ import { inferDirectorySemantic } from '../core/profiler/projectProfiler';
 import { ArchitectureMessages } from '../core/messages/architecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from '../core/intelligence/semanticArchitecture';
 import { auditDispatchComplexity } from '../core/rules/evolution/dispatchComplexityRule';
+import { auditConfigDrivenArchitecture } from '../core/architecture/config-driven-architecture';
 
 /**
  * Threshold keys the architecture rules additionally read from the global `thresholds` block.
@@ -55,46 +56,12 @@ interface SpecifierInfo {
     resolvedPath?: string;
 }
 
-const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = [
-    // Web & UI frameworks
-    'express',
-    'koa',
-    'fastify',
-    'react',
-    'vue',
-    '@angular',
-    'svelte',
-    'django',
-    'fastapi',
-    'flask',
-    'actix_web',
-    'actix-web',
-    'axum',
-    'tokio',
-    'godot',
-    'vscode',
-    'electron',
-    // Database & ORM drivers
-    'pg',
-    'mysql',
-    'mysql2',
-    'sqlite3',
-    'typeorm',
-    'prisma',
-    'mongoose',
-    'sequelize',
-    'sqlalchemy',
-    'diesel',
-    'sqlx',
-    // Low-level runtime I/O
-    'fs',
-    'net',
-    'http',
-    'https',
-    'child_process',
-    'subprocess',
-    'socket',
-];
+const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = (
+    'express koa fastify react vue @angular svelte django fastapi flask ' +
+    'actix_web actix-web axum tokio godot vscode electron pg mysql mysql2 sqlite3 ' +
+    'typeorm prisma mongoose sequelize sqlalchemy diesel sqlx fs net http https ' +
+    'child_process subprocess socket'
+).split(' ');
 
 /**
  * Polyglot import and module reference extractors:
@@ -172,7 +139,49 @@ export class ArchitectureAnalyzer implements Analyzer {
             opts.forbiddenDomainImports || DEFAULT_FORBIDDEN_DOMAIN_IMPORTS,
         );
 
-        const content = ctx.content || '';
+        this.scanSourceLines(
+            ctx.content || '',
+            file,
+            currentLayer,
+            ctx,
+            opts,
+            forbiddenModules,
+            issues,
+        );
+
+        if (opts.flagDispatchComplexity !== false) {
+            issues.push(...auditDispatchComplexity(ctx.content || '', file, ctx));
+        }
+
+        const flagConfig = Boolean(
+            opts.flagConfigLeakage ??
+            (ctx.config?.thresholds as unknown as Record<string, unknown> | undefined)
+                ?.flagConfigLeakage ??
+            false,
+        );
+        if (flagConfig) {
+            const cfgResult = auditConfigDrivenArchitecture([
+                {
+                    filePath: file,
+                    content: ctx.content || '',
+                    isDomainCore: currentLayer === 'domain',
+                },
+            ]);
+            issues.push(...cfgResult.issues);
+        }
+
+        return issues;
+    }
+
+    private scanSourceLines(
+        content: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        forbiddenModules: Set<string>,
+        issues: Issue[],
+    ): void {
         const len = content.length;
         let lineStart = 0;
         let lineIdx = 0;
@@ -196,10 +205,7 @@ export class ArchitectureAnalyzer implements Analyzer {
             const lineText = content.slice(lineStart, lineEnd);
             const trimmed = lineText.trim();
 
-            // Check DTO credential exposure in export contracts
             this.checkDtoLeakage(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
-
-            // Collect and audit referenced module specifiers
             const specifiers = this.extractSpecifiers(lineText, trimmed, file);
             this.auditSpecifiers(
                 specifiers,
@@ -211,8 +217,6 @@ export class ArchitectureAnalyzer implements Analyzer {
                 forbiddenModules,
                 issues,
             );
-
-            // Check shared mutable global state and direct configuration access
             this.checkGlobalAndConfigViolations(
                 lineText,
                 trimmed,
@@ -227,25 +231,16 @@ export class ArchitectureAnalyzer implements Analyzer {
             lineIdx++;
             lineStart = nextStart;
         }
-
-        if (opts.flagDispatchComplexity !== false) {
-            issues.push(...auditDispatchComplexity(content, file, ctx));
-        }
-
-        return issues;
     }
 
-    private checkGlobalAndConfigViolations(
+    private checkMutableGlobalState(
         lineText: string,
-        trimmed: string,
         file: string,
-        currentLayer: ArchitectureLayer,
         lineIdx: number,
         ctx: AnalyzerContext,
         opts: ArchitectureOptions,
         issues: Issue[],
     ): void {
-        // Check shared mutable global state (ARCH-GLB-001)
         const flagGlobal =
             opts.flagMutableGlobalCoupling ??
             ctx.config.thresholds?.flagMutableGlobalCoupling ??
@@ -263,17 +258,28 @@ export class ArchitectureAnalyzer implements Analyzer {
                 ),
             );
         }
+    }
 
-        // Check direct environment or disk config access in domain (ARCH-CFG-001)
+    private checkDirectConfigAccess(
+        trimmed: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        issues: Issue[],
+    ): void {
         const flagConfig =
             opts.flagConfigLeakage ?? ctx.config.thresholds?.flagConfigLeakage ?? false;
+        if (!flagConfig || currentLayer !== ARCHITECTURE_LAYER_DOMAIN) return;
+
         const customConfigKws =
             opts.protectedConfigKeywords ?? (ctx.config.thresholds as any)?.protectedConfigKeywords;
         const hasDirectConfigAccess =
             trimmed.includes('process.env') ||
             trimmed.includes('fs.readFileSync') ||
             (customConfigKws && customConfigKws.some((kw: string) => trimmed.includes(kw)));
-        if (flagConfig && currentLayer === ARCHITECTURE_LAYER_DOMAIN && hasDirectConfigAccess) {
+        if (hasDirectConfigAccess) {
             issues.push(
                 this.mkIssue(
                     ctx,
@@ -286,6 +292,20 @@ export class ArchitectureAnalyzer implements Analyzer {
                 ),
             );
         }
+    }
+
+    private checkGlobalAndConfigViolations(
+        lineText: string,
+        trimmed: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        issues: Issue[],
+    ): void {
+        this.checkMutableGlobalState(lineText, file, lineIdx, ctx, opts, issues);
+        this.checkDirectConfigAccess(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
     }
 
     private checkDtoLeakage(
@@ -520,17 +540,80 @@ export class ArchitectureAnalyzer implements Analyzer {
     }
 
     /**
-     * auditDomainImports audit step.
+     * checkFrameworkLeak audit step.
      *
      * @param spec - Specifier being audited.
+     * @param basePkg - Base package name extracted from spec.
      * @param file - Repository-relative path of the importing file.
      * @param currentLayer - Layer inferred for the importing file.
      * @param lineIdx - Line index of the import statement.
      * @param ctx - Analyzer context of the current file.
-     * @param opts - Architecture options resolved for this file.
      * @param forbiddenModules - Forbidden module set from the options.
      * @param issues - Issue accumulator the violations are pushed into.
      */
+    private checkFrameworkLeak(
+        spec: SpecifierInfo,
+        basePkg: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        forbiddenModules: Set<string>,
+        issues: Issue[],
+    ): void {
+        if (!forbiddenModules.has(basePkg) && !forbiddenModules.has(spec.raw)) return;
+        const descriptor = ArchitectureMessages.DOMAIN_FRAMEWORK_LEAK(spec.raw);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'ARCH-LEAK-001',
+                descriptor.message,
+                SEVERITY_ERROR,
+                { file, layer: currentLayer, specifier: spec.raw },
+                descriptor.suggestion,
+            ),
+        );
+    }
+
+    private checkHeadlessBoundary(
+        spec: SpecifierInfo,
+        basePkg: string,
+        file: string,
+        currentLayer: ArchitectureLayer,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        opts: ArchitectureOptions,
+        issues: Issue[],
+    ): void {
+        const enforceHeadless =
+            opts.enforceHeadless ?? ctx.config.thresholds?.enforceHeadless ?? false;
+        if (!enforceHeadless) return;
+
+        const thresholdHeadless = (ctx.config.thresholds as ArchitectureThresholds | undefined)
+            ?.headlessDisallowedImports;
+        const customHeadless = opts.headlessDisallowedImports ?? thresholdHeadless;
+        const isForbiddenHeadless =
+            FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
+            FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw) ||
+            (customHeadless &&
+                (customHeadless.includes(basePkg) || customHeadless.includes(spec.raw)));
+
+        if (isForbiddenHeadless) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'ARCH-HDL-001',
+                    `Headless architecture violation: domain logic in '${file}' imports presentation framework '${spec.raw}'.`,
+                    SEVERITY_ERROR,
+                    { file, layer: currentLayer, specifier: spec.raw },
+                    'Decouple core domain logic from UI/IDE presentation frameworks.',
+                ),
+            );
+        }
+    }
+
     private auditDomainImports(
         spec: SpecifierInfo,
         file: string,
@@ -541,50 +624,22 @@ export class ArchitectureAnalyzer implements Analyzer {
         forbiddenModules: Set<string>,
         issues: Issue[],
     ): void {
-        if (currentLayer === ARCHITECTURE_LAYER_DOMAIN) {
-            const basePkg = spec.raw.startsWith('@')
-                ? spec.raw.split('/').slice(0, 2).join('/')
-                : spec.raw.split('/')[0];
-            if (forbiddenModules.has(basePkg) || forbiddenModules.has(spec.raw)) {
-                const descriptor = ArchitectureMessages.DOMAIN_FRAMEWORK_LEAK(spec.raw);
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'ARCH-LEAK-001',
-                        descriptor.message,
-                        SEVERITY_ERROR,
-                        { file, layer: currentLayer, specifier: spec.raw },
-                        descriptor.suggestion,
-                    ),
-                );
-            }
+        if (currentLayer !== ARCHITECTURE_LAYER_DOMAIN) return;
+        const basePkg = spec.raw.startsWith('@')
+            ? spec.raw.split('/').slice(0, 2).join('/')
+            : spec.raw.split('/')[0];
 
-            // Headless architecture boundary check (ARCH-HDL-001)
-            const enforceHeadless =
-                opts.enforceHeadless ?? ctx.config.thresholds?.enforceHeadless ?? false;
-            const thresholdHeadless = (ctx.config.thresholds as ArchitectureThresholds | undefined)
-                ?.headlessDisallowedImports;
-            const customHeadless = opts.headlessDisallowedImports ?? thresholdHeadless;
-            const isForbiddenHeadless =
-                FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
-                FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw) ||
-                (customHeadless &&
-                    (customHeadless.includes(basePkg) || customHeadless.includes(spec.raw)));
-            if (enforceHeadless && isForbiddenHeadless) {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'ARCH-HDL-001',
-                        `Headless architecture violation: domain logic in '${file}' imports presentation framework '${spec.raw}'.`,
-                        SEVERITY_ERROR,
-                        { file, layer: currentLayer, specifier: spec.raw },
-                        'Decouple core domain logic from UI/IDE presentation frameworks.',
-                    ),
-                );
-            }
-        }
+        this.checkFrameworkLeak(
+            spec,
+            basePkg,
+            file,
+            currentLayer,
+            lineIdx,
+            ctx,
+            forbiddenModules,
+            issues,
+        );
+        this.checkHeadlessBoundary(spec, basePkg, file, currentLayer, lineIdx, ctx, opts, issues);
     }
 
     /**
@@ -707,16 +762,6 @@ export class ArchitectureAnalyzer implements Analyzer {
 
     /**
      * auditApplicationDependency audit step.
-     *
-     * @param spec - Specifier being audited.
-     * @param resolvedPath - Resolved target path (narrowed by the caller).
-     * @param file - Repository-relative path of the importing file.
-     * @param currentLayer - Layer inferred for the importing file.
-     * @param targetLayer - Layer inferred for the imported module.
-     * @param lineIdx - Line index of the import statement.
-     * @param ctx - Analyzer context of the current file.
-     * @param opts - Architecture options resolved for this file.
-     * @param issues - Issue accumulator the violations are pushed into.
      */
     private auditApplicationDependency(
         spec: SpecifierInfo,
@@ -731,23 +776,16 @@ export class ArchitectureAnalyzer implements Analyzer {
     ): void {
         // Rule 2: Application cannot depend on Interface
         if (currentLayer === 'application' && targetLayer === ARCHITECTURE_LAYER_INTERFACE) {
-            const descriptor = ArchitectureMessages.APPLICATION_LAYER_BREACH(
-                targetLayer,
-                resolvedPath,
-            );
+            const d = ArchitectureMessages.APPLICATION_LAYER_BREACH(targetLayer, resolvedPath);
             issues.push(
                 this.mkIssue(
                     ctx,
                     lineIdx,
                     'ARCH-DIR-001',
-                    descriptor.message,
+                    d.message,
                     SEVERITY_ERROR,
-                    {
-                        fromLayer: currentLayer,
-                        toLayer: targetLayer,
-                        targetPath: resolvedPath,
-                    },
-                    descriptor.suggestion,
+                    { fromLayer: currentLayer, toLayer: targetLayer, targetPath: resolvedPath },
+                    d.suggestion,
                 ),
             );
         }
@@ -755,16 +793,6 @@ export class ArchitectureAnalyzer implements Analyzer {
 
     /**
      * auditInterfaceSkipLayer audit step.
-     *
-     * @param spec - Specifier being audited.
-     * @param resolvedPath - Resolved target path (narrowed by the caller).
-     * @param file - Repository-relative path of the importing file.
-     * @param currentLayer - Layer inferred for the importing file.
-     * @param targetLayer - Layer inferred for the imported module.
-     * @param lineIdx - Line index of the import statement.
-     * @param ctx - Analyzer context of the current file.
-     * @param opts - Architecture options resolved for this file.
-     * @param issues - Issue accumulator the violations are pushed into.
      */
     private auditInterfaceSkipLayer(
         spec: SpecifierInfo,
@@ -777,30 +805,24 @@ export class ArchitectureAnalyzer implements Analyzer {
         opts: ArchitectureOptions,
         issues: Issue[],
     ): void {
-        // Rule 3: Interface should not directly bypass Application to Infrastructure
-        // (Skip-Layer)
-        if (currentLayer === ARCHITECTURE_LAYER_INTERFACE && targetLayer === 'infrastructure') {
-            if (!opts.allowSkipLayers) {
-                const descriptor = ArchitectureMessages.SKIP_LAYER_PENETRATION(
-                    targetLayer,
-                    resolvedPath,
-                );
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'ARCH-DIR-002',
-                        descriptor.message,
-                        SEVERITY_WARNING,
-                        {
-                            fromLayer: currentLayer,
-                            toLayer: targetLayer,
-                            targetPath: resolvedPath,
-                        },
-                        descriptor.suggestion,
-                    ),
-                );
-            }
+        // Rule 3: Interface should not directly bypass Application to Infrastructure (Skip-Layer)
+        if (
+            currentLayer === ARCHITECTURE_LAYER_INTERFACE &&
+            targetLayer === 'infrastructure' &&
+            !opts.allowSkipLayers
+        ) {
+            const d = ArchitectureMessages.SKIP_LAYER_PENETRATION(targetLayer, resolvedPath);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'ARCH-DIR-002',
+                    d.message,
+                    SEVERITY_WARNING,
+                    { fromLayer: currentLayer, toLayer: targetLayer, targetPath: resolvedPath },
+                    d.suggestion,
+                ),
+            );
         }
     }
 

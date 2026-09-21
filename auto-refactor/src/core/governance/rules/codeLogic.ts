@@ -14,6 +14,7 @@
  *     deep nesting raises cognitive load and pass-through wrappers add indirection.
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
+import { isToolOrTestScript } from '../pathScope';
 import type { NormalizedNode } from '../../multilang';
 import { NodeKind } from '../../multilang';
 
@@ -89,6 +90,7 @@ export const ExcessiveNestingRule: GovernanceRule = {
     isFixable: false,
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.node.functionLike) return null;
+        if (isToolOrTestScript(ctx.filePath)) return null;
 
         const maxNesting = calculateMaxNesting(ctx.node);
         const threshold = ctx.ctx.options?.maxNestingDepth ?? DEFAULT_MAX_NESTING_DEPTH;

@@ -228,7 +228,25 @@ export class LiteralIndex {
      * @returns Clustered entries, most frequent first.
      */
     clusters(minFiles = 2): LiteralEntry[] {
-        return this.entries().filter((entry) => entry.files.length >= minFiles);
+        const result: LiteralEntry[] = [];
+        for (const [value, occurrences] of this.byValue) {
+            if (occurrences.length < minFiles) continue;
+            let distinctFiles = 1;
+            const firstFile = occurrences[0].file;
+            for (let i = 1; i < occurrences.length; i++) {
+                if (occurrences[i].file !== firstFile) {
+                    distinctFiles++;
+                    if (distinctFiles >= minFiles) break;
+                }
+            }
+            if (distinctFiles < minFiles) continue;
+            const entry = this.entryOf(value, occurrences);
+            if (entry.files.length >= minFiles) {
+                result.push(entry);
+            }
+        }
+        result.sort((a, b) => b.occurrences - a.occurrences || (a.value < b.value ? -1 : 1));
+        return result;
     }
 
     /**
@@ -289,24 +307,30 @@ export class LiteralIndex {
         else existing.push(site);
     }
 
+    private updateMeaning(meanings: Map<string, LiteralMeaning>, site: LiteralOccurrence): void {
+        const key = `${site.role}|${site.symbol ?? ''}`;
+        const meaning = meanings.get(key);
+        if (meaning === undefined) {
+            meanings.set(key, {
+                role: site.role,
+                symbol: site.symbol,
+                files: [site.file],
+                occurrences: 1,
+            });
+            return;
+        }
+        meaning.occurrences += 1;
+        if (!meaning.files.includes(site.file)) {
+            meaning.files.push(site.file);
+        }
+    }
+
     private entryOf(value: string, occurrences: LiteralOccurrence[]): LiteralEntry {
         const files = new Set<string>();
         const meanings = new Map<string, LiteralMeaning>();
         for (const site of occurrences) {
             files.add(site.file);
-            const key = `${site.role}|${site.symbol ?? ''}`;
-            const meaning = meanings.get(key);
-            if (meaning === undefined) {
-                meanings.set(key, {
-                    role: site.role,
-                    symbol: site.symbol,
-                    files: [site.file],
-                    occurrences: 1,
-                });
-            } else {
-                meaning.occurrences += 1;
-                if (!meaning.files.includes(site.file)) meaning.files.push(site.file);
-            }
+            this.updateMeaning(meanings, site);
         }
         const meaningList = [...meanings.values()];
         return {

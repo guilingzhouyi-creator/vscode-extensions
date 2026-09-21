@@ -90,16 +90,6 @@ export function detectUnboundedRecursion(
     recursiveSymbolsWithGuards: Set<string>,
 ): Issue[] {
     const issues: Issue[] = [];
-    const allEdges = callGraph.edges();
-
-    const adj = new Map<string, Array<{ callee: string; file: string; line: number | null }>>();
-    for (const edge of allEdges) {
-        if (!edge.caller) continue;
-        const list = adj.get(edge.caller) ?? [];
-        list.push({ callee: edge.callee, file: edge.callerFile, line: edge.line });
-        adj.set(edge.caller, list);
-    }
-
     const visited = new Set<string>();
     const inStack = new Set<string>();
     const stack: string[] = [];
@@ -109,8 +99,11 @@ export function detectUnboundedRecursion(
         inStack.add(u);
         stack.push(u);
 
-        const neighbors = adj.get(u) ?? [];
-        for (const { callee, file, line } of neighbors) {
+        const neighbors = callGraph.calleesOf(u);
+        for (const edge of neighbors) {
+            const callee = edge.callee;
+            const file = edge.callerFile;
+            const line = edge.line;
             if (!visited.has(callee)) {
                 dfs(callee);
             } else if (inStack.has(callee)) {
@@ -180,7 +173,7 @@ export function detectUnboundedRecursion(
         inStack.delete(u);
     }
 
-    for (const caller of adj.keys()) {
+    for (const caller of callGraph.callerNames()) {
         if (!visited.has(caller)) {
             dfs(caller);
         }

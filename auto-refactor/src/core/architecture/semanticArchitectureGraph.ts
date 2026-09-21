@@ -55,6 +55,7 @@ function isPrivateInternalPath(importPath: string): boolean {
  */
 export class SemanticArchitectureGraph {
     private readonly nodes: Map<string, SemanticArchitectureNode> = new Map();
+    private readonly pathIndex: Map<string, string> = new Map();
     private readonly edges: SemanticArchitectureEdge[] = [];
     private readonly edgeIndex: Set<string> = new Set();
 
@@ -63,11 +64,13 @@ export class SemanticArchitectureGraph {
      */
     public addNode(node: SemanticArchitectureNode): this {
         this.nodes.set(node.id, node);
+        const norm = normalizePath(node.filePath);
+        this.pathIndex.set(norm, node.id);
         return this;
     }
 
     /**
-     * Retrieves a node by id or file path.
+     * Retrieves a node by id or file path in O(1) time.
      */
     public getNode(idOrPath: string): SemanticArchitectureNode | undefined {
         const direct = this.nodes.get(idOrPath);
@@ -75,12 +78,8 @@ export class SemanticArchitectureGraph {
             return direct;
         }
         const norm = normalizePath(idOrPath);
-        for (const node of this.nodes.values()) {
-            if (node.filePath === norm || normalizePath(node.filePath) === norm) {
-                return node;
-            }
-        }
-        return undefined;
+        const indexedId = this.pathIndex.get(norm);
+        return indexedId ? this.nodes.get(indexedId) : undefined;
     }
 
     /**
@@ -174,6 +173,8 @@ export class SemanticArchitectureGraph {
             application_cli: 0,
             shared: 0,
             configuration: 0,
+            tool_script: 0,
+            test_suite: 0,
         };
         for (const node of this.nodes.values()) {
             dist[node.role] = (dist[node.role] || 0) + 1;
@@ -189,105 +190,9 @@ export class SemanticArchitectureGraph {
         options: ArchitectureAuditOptions = {},
     ): SemanticArchitectureGraph {
         const archGraph = new SemanticArchitectureGraph();
-        const fileMap = new Map<string, { imports: Set<string>; exports: Set<string> }>();
-
-        // 1. Group nodes and extract imports/exports per file
-        for (const node of graph.getAllNodes()) {
-            const f = normalizePath(node.location.file);
-            if (!fileMap.has(f)) {
-                fileMap.set(f, { imports: new Set(), exports: new Set() });
-            }
-            const info = fileMap.get(f)!;
-            info.exports.add(node.name);
-        }
-
-        // 2. Map edges to collect import/dependency relationships
-        for (const edge of graph.getAllEdges()) {
-            const fromNode = graph.getNode(edge.fromNodeId);
-            if (!fromNode) {
-                continue;
-            }
-            const fromFile = normalizePath(fromNode.location.file);
-            const entry = fileMap.get(fromFile);
-            if (!entry) {
-                continue;
-            }
-
-            const toNode = graph.getNode(edge.toNodeId);
-            if (toNode && fromNode.location.file !== toNode.location.file) {
-                const toFile = normalizePath(toNode.location.file);
-                entry.imports.add(toFile);
-            } else if (!toNode && edge.kind === 'depends_on') {
-                // External package import (e.g., 'typescript:vscode#module' -> 'vscode')
-                const colonIdx = edge.toNodeId.indexOf(':');
-                const hashIdx = edge.toNodeId.indexOf('#');
-                if (colonIdx !== -1) {
-                    const start = colonIdx + 1;
-                    const end = hashIdx !== -1 ? hashIdx : edge.toNodeId.length;
-                    const pkg = edge.toNodeId.slice(start, end);
-                    if (pkg) {
-                        entry.imports.add(pkg);
-                    }
-                }
-            }
-        }
-
-        // 3. Create architecture nodes
-        for (const [filePath, { imports, exports }] of fileMap.entries()) {
-            const importList = Array.from(imports);
-            const exportList = Array.from(exports);
-            const inference = inferSystemTopologyRole(
-                filePath,
-                importList,
-                exportList,
-                '',
-                options,
-            );
-            const domainName = extractDomainName(filePath);
-
-            archGraph.addNode({
-                id: filePath,
-                filePath,
-                role: inference.role,
-                isHeadless: inference.isHeadless,
-                domainName,
-                inferredReasons: inference.reasons,
-                imports: importList,
-                exports: exportList,
-                hasDirectConfigAccess: false,
-                hasGlobalMutableState: false,
-            });
-        }
-
-        // 4. Connect architecture edges
-        for (const [filePath, { imports }] of fileMap.entries()) {
-            const fromNode = archGraph.getNode(filePath);
-            if (!fromNode) {
-                continue;
-            }
-
-            for (const imp of imports) {
-                const toNode = archGraph.getNode(imp);
-                if (!toNode) {
-                    continue;
-                }
-
-                const isCrossDomain = fromNode.domainName !== toNode.domainName;
-                const isPrivate = isPrivateInternalPath(imp);
-                const edgeId = `${fromNode.id}->${toNode.id}`;
-
-                archGraph.addEdge({
-                    id: edgeId,
-                    fromNodeId: fromNode.id,
-                    toNodeId: toNode.id,
-                    edgeKind: 'depends_on',
-                    isCrossDomain,
-                    isLayerInversion: false,
-                    isPrivateBypass: isCrossDomain && isPrivate,
-                });
-            }
-        }
-
+        const fileMap = collectFileMap(graph);
+        populateArchitectureNodes(archGraph, fileMap, options);
+        connectArchitectureEdges(archGraph, fileMap);
         return archGraph;
     }
 
@@ -354,5 +259,114 @@ export class SemanticArchitectureGraph {
         }
 
         return archGraph;
+    }
+}
+
+interface FileEntry {
+    imports: Set<string>;
+    exports: Set<string>;
+}
+
+function getOrCreateFileEntry(fileMap: Map<string, FileEntry>, file: string): FileEntry {
+    let entry = fileMap.get(file);
+    if (!entry) {
+        entry = { imports: new Set(), exports: new Set() };
+        fileMap.set(file, entry);
+    }
+    return entry;
+}
+
+function parseExternalPackage(edgeToNodeId: string): string | null {
+    const colonIdx = edgeToNodeId.indexOf(':');
+    const hashIdx = edgeToNodeId.indexOf('#');
+    if (colonIdx === -1) return null;
+    const start = colonIdx + 1;
+    const end = hashIdx !== -1 ? hashIdx : edgeToNodeId.length;
+    const pkg = edgeToNodeId.slice(start, end);
+    return pkg || null;
+}
+
+function collectFileMap(graph: SemanticGraph): Map<string, FileEntry> {
+    const fileMap = new Map<string, FileEntry>();
+
+    for (const node of graph.getAllNodes()) {
+        const f = normalizePath(node.location.file);
+        const info = getOrCreateFileEntry(fileMap, f);
+        info.exports.add(node.name);
+    }
+
+    for (const edge of graph.getAllEdges()) {
+        const fromNode = graph.getNode(edge.fromNodeId);
+        if (!fromNode) continue;
+
+        const fromFile = normalizePath(fromNode.location.file);
+        const entry = fileMap.get(fromFile);
+        if (!entry) continue;
+
+        const toNode = graph.getNode(edge.toNodeId);
+        if (toNode && fromNode.location.file !== toNode.location.file) {
+            const toFile = normalizePath(toNode.location.file);
+            entry.imports.add(toFile);
+        } else if (!toNode && edge.kind === 'depends_on') {
+            const pkg = parseExternalPackage(edge.toNodeId);
+            if (pkg) entry.imports.add(pkg);
+        }
+    }
+
+    return fileMap;
+}
+
+function populateArchitectureNodes(
+    archGraph: SemanticArchitectureGraph,
+    fileMap: Map<string, FileEntry>,
+    options: ArchitectureAuditOptions,
+): void {
+    for (const [filePath, { imports, exports }] of fileMap.entries()) {
+        const importList = Array.from(imports);
+        const exportList = Array.from(exports);
+        const inference = inferSystemTopologyRole(filePath, importList, exportList, '', options);
+        const domainName = extractDomainName(filePath);
+
+        archGraph.addNode({
+            id: filePath,
+            filePath,
+            role: inference.role,
+            isHeadless: inference.isHeadless,
+            domainName,
+            inferredReasons: inference.reasons,
+            imports: importList,
+            exports: exportList,
+            hasDirectConfigAccess: false,
+            hasGlobalMutableState: false,
+        });
+    }
+}
+
+function connectArchitectureEdges(
+    archGraph: SemanticArchitectureGraph,
+    fileMap: Map<string, FileEntry>,
+): void {
+    for (const [filePath, { imports }] of fileMap.entries()) {
+        const fromNode = archGraph.getNode(filePath);
+        if (!fromNode) continue;
+
+        for (const imp of imports) {
+            const toNode = archGraph.getNode(imp);
+            if (!toNode) continue;
+
+            const isCrossDomain = fromNode.domainName !== toNode.domainName;
+            const isPrivate = isPrivateInternalPath(imp);
+            const edgeId = `${fromNode.id}->${toNode.id}`;
+
+            archGraph.addEdge({
+                id: edgeId,
+                fromNodeId: fromNode.id,
+                toNodeId: toNode.id,
+                edgeKind: 'depends_on',
+                isCrossDomain,
+                isLayerInversion: false,
+                isPrivateBypass: isCrossDomain && isPrivate,
+            });
+        }
     }
 }

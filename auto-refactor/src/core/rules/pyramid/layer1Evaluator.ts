@@ -13,7 +13,14 @@
 
 import type { Issue } from '../../types';
 import type { SemanticGraph } from '../../semantic/semanticGraph';
-import type { RuleLayer, UniversalEvaluationContext, UniversalSemanticRule } from './types';
+import {
+    RULE_LAYER_DIALECT,
+    RULE_LAYER_FAMILY,
+    RULE_LAYER_UNIVERSAL,
+    type RuleLayer,
+    type UniversalEvaluationContext,
+    type UniversalSemanticRule,
+} from './types';
 import {
     ExpensiveLoopOperationRule,
     HighAlgorithmicComplexityRule,
@@ -28,7 +35,7 @@ import { DEFAULT_ALLOWED_DEPENDENCIES } from '../../architecture/types';
 export class UniversalCycleRule implements UniversalSemanticRule {
     public readonly id = 'import-cycle';
     public readonly name = 'Universal Circular Dependency';
-    public readonly layer: RuleLayer = 'layer1_universal';
+    public readonly layer: RuleLayer = RULE_LAYER_UNIVERSAL;
     public readonly defaultSeverity = 'error' as const;
     public readonly description =
         'Detects circular dependency topologies across modules, classes, and packages.';
@@ -38,24 +45,22 @@ export class UniversalCycleRule implements UniversalSemanticRule {
         const cycles = graph.findCycles();
 
         for (const cycle of cycles) {
-            const head = cycle[0];
             const cyclePath = cycle.join(' -> ');
-            const node = graph.getNode(head);
-            const file = node?.location.file || 'unknown';
-            const line = node?.location.start.line || 1;
-
             issues.push({
-                id: `architecture:import-cycle:${head}`,
+                id: `cycle:${cycle.sort().join('|')}`,
                 analyzer: 'architecture',
-                rule: 'import-cycle',
-                severity: 'error',
+                rule: this.id,
+                severity: this.defaultSeverity,
                 message: `Circular dependency detected in graph: ${cyclePath}`,
                 location: {
-                    file,
-                    start: { line, column: 1 },
-                    end: { line, column: 1 },
+                    file: cycle[0],
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 1 },
                 },
-                detail: { cycle },
+                detail: {
+                    cycle,
+                    length: cycle.length,
+                },
             });
         }
 
@@ -69,7 +74,7 @@ export class UniversalCycleRule implements UniversalSemanticRule {
 export class UniversalCleanArchitectureRule implements UniversalSemanticRule {
     public readonly id = 'clean-layer-violation';
     public readonly name = 'Universal Clean Architecture Boundary Violation';
-    public readonly layer: RuleLayer = 'layer1_universal';
+    public readonly layer: RuleLayer = RULE_LAYER_UNIVERSAL;
     public readonly defaultSeverity = 'error' as const;
     public readonly description =
         'Enforces unidirectional dependency flow from volatile outer layers to stable core.';
@@ -141,7 +146,7 @@ export function classifyRuleLayer(ruleId: string): RuleLayer {
         ruleId.startsWith('ARCH-') ||
         ruleId.startsWith('RES-')
     ) {
-        return 'layer1_universal';
+        return RULE_LAYER_UNIVERSAL;
     }
     if (
         ruleId.includes('python') ||
@@ -150,9 +155,9 @@ export function classifyRuleLayer(ruleId: string): RuleLayer {
         ruleId.startsWith('PY-') ||
         ruleId === 'GOV-EXC-003'
     ) {
-        return 'layer2_family';
+        return RULE_LAYER_FAMILY;
     }
-    return 'layer3_dialect';
+    return RULE_LAYER_DIALECT;
 }
 
 /**

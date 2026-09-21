@@ -64,6 +64,20 @@ export interface CallGraphStats {
 
 const TRACE_LIMIT = 10000;
 
+function enqueueUnseenCallees(
+    edges: CallGraphEdge[],
+    seen: Set<string>,
+    order: string[],
+    queue: string[],
+): void {
+    for (const edge of edges) {
+        if (seen.has(edge.callee)) continue;
+        seen.add(edge.callee);
+        order.push(edge.callee);
+        if (edge.resolved) queue.push(edge.callee);
+    }
+}
+
 /**
  * Cross-file call graph derived from a symbol index.
  *
@@ -72,6 +86,8 @@ const TRACE_LIMIT = 10000;
  */
 export class CallGraph {
     private readonly allEdges: CallGraphEdge[] = [];
+    private readonly byCaller = new Map<string, CallGraphEdge[]>();
+    private readonly byCallee = new Map<string, CallGraphEdge[]>();
 
     private readonly indexed = new Set<string>();
 
@@ -108,6 +124,16 @@ export class CallGraph {
                 (a.line ?? 0) - (b.line ?? 0) ||
                 a.callee.localeCompare(b.callee),
         );
+        for (const edge of this.allEdges) {
+            if (edge.caller !== null) {
+                const callerList = this.byCaller.get(edge.caller);
+                if (callerList) callerList.push(edge);
+                else this.byCaller.set(edge.caller, [edge]);
+            }
+            const calleeList = this.byCallee.get(edge.callee);
+            if (calleeList) calleeList.push(edge);
+            else this.byCallee.set(edge.callee, [edge]);
+        }
         this.builtFrom = index.stats().builtFrom;
     }
 
@@ -127,7 +153,7 @@ export class CallGraph {
      * @returns Matching edges.
      */
     calleesOf(caller: string): CallGraphEdge[] {
-        return this.allEdges.filter((edge) => edge.caller === caller);
+        return this.byCaller.get(caller) ?? [];
     }
 
     /**
@@ -137,7 +163,16 @@ export class CallGraph {
      * @returns Matching edges.
      */
     callersOf(callee: string): CallGraphEdge[] {
-        return this.allEdges.filter((edge) => edge.callee === callee);
+        return this.byCallee.get(callee) ?? [];
+    }
+
+    /**
+     * List all distinct caller symbol names with outgoing call edges.
+     *
+     * @returns Array of caller symbol names.
+     */
+    callerNames(): string[] {
+        return Array.from(this.byCaller.keys());
     }
 
     /**
@@ -150,14 +185,10 @@ export class CallGraph {
         const seen = new Set<string>([caller]);
         const order: string[] = [];
         const queue: string[] = [caller];
-        while (queue.length > 0 && order.length < TRACE_LIMIT) {
-            const current = queue.shift() as string;
-            for (const edge of this.calleesOf(current)) {
-                if (seen.has(edge.callee)) continue;
-                seen.add(edge.callee);
-                order.push(edge.callee);
-                if (edge.resolved) queue.push(edge.callee);
-            }
+        let head = 0;
+        while (head < queue.length && order.length < TRACE_LIMIT) {
+            const current = queue[head++];
+            enqueueUnseenCallees(this.calleesOf(current), seen, order, queue);
         }
         return order;
     }

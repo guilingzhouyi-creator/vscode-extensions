@@ -10,18 +10,40 @@
  */
 
 import type { Issue } from '../types';
+import type { ConfigDrivenAnalysisResult } from './config-driven-architecture';
+
+/** Headless domain core business logic role. */
+export const ROLE_HEADLESS_DOMAIN_CORE = 'headless_domain_core' as const;
+/** Data layer repository or store role. */
+export const ROLE_DATA_LAYER = 'data_layer' as const;
+/** Infrastructure system service or client role. */
+export const ROLE_INFRASTRUCTURE = 'infrastructure' as const;
+/** Adapter boundary translation role. */
+export const ROLE_ADAPTER = 'adapter' as const;
+/** Application entry point or CLI role. */
+export const ROLE_APPLICATION_CLI = 'application_cli' as const;
+/** Shared utility or common library role. */
+export const ROLE_SHARED = 'shared' as const;
+/** Static configuration or schema role. */
+export const ROLE_CONFIGURATION = 'configuration' as const;
+/** Tooling or repository maintenance script role. */
+export const ROLE_TOOL_SCRIPT = 'tool_script' as const;
+/** Automated test suite or benchmark role. */
+export const ROLE_TEST_SUITE = 'test_suite' as const;
 
 /**
  * Fundamental system topology roles recognized across multi-language codebases.
  */
 export type SystemTopologyRole =
-    | 'headless_domain_core'
-    | 'data_layer'
-    | 'infrastructure'
-    | 'adapter'
-    | 'application_cli'
-    | 'shared'
-    | 'configuration';
+    | typeof ROLE_HEADLESS_DOMAIN_CORE
+    | typeof ROLE_DATA_LAYER
+    | typeof ROLE_INFRASTRUCTURE
+    | typeof ROLE_ADAPTER
+    | typeof ROLE_APPLICATION_CLI
+    | typeof ROLE_SHARED
+    | typeof ROLE_CONFIGURATION
+    | typeof ROLE_TOOL_SCRIPT
+    | typeof ROLE_TEST_SUITE;
 
 /**
  * Descriptor of a node within the SemanticArchitectureGraph.
@@ -80,7 +102,20 @@ export interface ArchitectureAuditResult {
     headlessBreachCount: number;
     privateBypassCount: number;
     passed: boolean;
+    configMaturity?: ConfigDrivenAnalysisResult;
 }
+
+const ALL_ROLES_SET: ReadonlySet<SystemTopologyRole> = new Set([
+    ROLE_HEADLESS_DOMAIN_CORE,
+    ROLE_DATA_LAYER,
+    ROLE_INFRASTRUCTURE,
+    ROLE_ADAPTER,
+    ROLE_APPLICATION_CLI,
+    ROLE_SHARED,
+    ROLE_CONFIGURATION,
+    ROLE_TOOL_SCRIPT,
+    ROLE_TEST_SUITE,
+]);
 
 /**
  * Standard allowed dependency flow for unidirectional clean architecture.
@@ -89,18 +124,30 @@ export const DEFAULT_ALLOWED_DEPENDENCIES: Record<
     SystemTopologyRole,
     ReadonlySet<SystemTopologyRole>
 > = {
-    headless_domain_core: new Set(['shared', 'configuration']),
-    data_layer: new Set(['headless_domain_core', 'infrastructure', 'shared', 'configuration']),
-    infrastructure: new Set(['shared', 'configuration']),
-    adapter: new Set(['headless_domain_core', 'infrastructure', 'shared', 'configuration']),
-    application_cli: new Set([
-        'headless_domain_core',
-        'data_layer',
-        'infrastructure',
-        'adapter',
-        'shared',
-        'configuration',
+    [ROLE_HEADLESS_DOMAIN_CORE]: new Set([ROLE_SHARED, ROLE_CONFIGURATION]),
+    [ROLE_DATA_LAYER]: new Set([
+        ROLE_HEADLESS_DOMAIN_CORE,
+        ROLE_INFRASTRUCTURE,
+        ROLE_SHARED,
+        ROLE_CONFIGURATION,
     ]),
-    shared: new Set(['shared', 'configuration']),
-    configuration: new Set(['configuration', 'shared']),
+    [ROLE_INFRASTRUCTURE]: new Set([ROLE_SHARED, ROLE_CONFIGURATION]),
+    [ROLE_ADAPTER]: new Set([
+        ROLE_HEADLESS_DOMAIN_CORE,
+        ROLE_INFRASTRUCTURE,
+        ROLE_SHARED,
+        ROLE_CONFIGURATION,
+    ]),
+    [ROLE_APPLICATION_CLI]: new Set([
+        ROLE_HEADLESS_DOMAIN_CORE,
+        ROLE_DATA_LAYER,
+        ROLE_INFRASTRUCTURE,
+        ROLE_ADAPTER,
+        ROLE_SHARED,
+        ROLE_CONFIGURATION,
+    ]),
+    [ROLE_SHARED]: new Set([ROLE_SHARED, ROLE_CONFIGURATION]),
+    [ROLE_CONFIGURATION]: new Set([ROLE_CONFIGURATION, ROLE_SHARED]),
+    [ROLE_TOOL_SCRIPT]: ALL_ROLES_SET,
+    [ROLE_TEST_SUITE]: ALL_ROLES_SET,
 };

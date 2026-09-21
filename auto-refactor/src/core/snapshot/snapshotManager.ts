@@ -19,7 +19,7 @@ import { RULE_REGISTRY } from '../rules/registry';
 import type { AuditSnapshot, BaselineScoreMetrics, VersionInfo } from './types';
 
 /** Current semantic version of the auto-refactor engine. */
-export const CURRENT_ENGINE_VERSION = '0.3.0';
+export const CURRENT_ENGINE_VERSION = '0.4.0';
 
 /** Monotonic version tag of the immutable compiled rule registry. */
 export const CURRENT_RULE_VERSION = '2026.09-v1';

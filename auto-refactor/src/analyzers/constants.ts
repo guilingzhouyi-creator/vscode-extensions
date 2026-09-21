@@ -76,27 +76,21 @@ function byPosition(a: LiteralRecord, b: LiteralRecord): number {
     return ac - bc;
 }
 
+function isQuoteCharCode(code: number): boolean {
+    return (
+        code === CHAR_CODE_SINGLE_QUOTE ||
+        code === CHAR_CODE_DOUBLE_QUOTE ||
+        code === CHAR_CODE_BACKTICK
+    );
+}
+
 /** Fast strip leading and trailing quote characters without RegExp allocation */
 function stripQuotes(str: string): string {
     const len = str.length;
-    if (len < 2) {
-        if (len === 1 && (str === "'" || str === '"' || str === '`')) return '';
-        return str;
-    }
-    const first = str.charCodeAt(0);
-    const last = str.charCodeAt(len - 1);
-    const hasLead =
-        first === CHAR_CODE_SINGLE_QUOTE ||
-        first === CHAR_CODE_DOUBLE_QUOTE ||
-        first === CHAR_CODE_BACKTICK;
-    const hasTail =
-        last === CHAR_CODE_SINGLE_QUOTE ||
-        last === CHAR_CODE_DOUBLE_QUOTE ||
-        last === CHAR_CODE_BACKTICK;
-    if (hasLead && hasTail) return str.slice(1, -1);
-    if (hasLead) return str.slice(1);
-    if (hasTail) return str.slice(0, -1);
-    return str;
+    if (len === 0) return str;
+    const start = isQuoteCharCode(str.charCodeAt(0)) ? 1 : 0;
+    const end = len > start && isQuoteCharCode(str.charCodeAt(len - 1)) ? len - 1 : len;
+    return start > 0 || end < len ? str.slice(start, end) : str;
 }
 
 /**
@@ -244,37 +238,23 @@ export class ConstantsAnalyzer implements Analyzer {
         const classification = classify ? classifyLiteral(lit.value, true) : null;
         if (classification && classification.isReasonable) return null;
 
-        const isGranular =
-            granular && classification && classification.kind !== LITERAL_KIND_GENERAL;
-        const rule = isGranular ? `literal-${classification!.kind}` : 'magic-number';
-
-        const suggested =
-            classification && classification.suggestedConstPrefix !== 'CONST'
-                ? classification.suggestedConstPrefix
-                : this.suggestName(lit.value, NUM_KIND);
-
-        const detail: Record<string, unknown> = {
-            value: lit.value,
-            numeric: true,
-            suggestedName: suggested,
-            ...(classification
-                ? { semanticKind: classification.kind, rationale: classification.rationale }
-                : {}),
-        };
-
-        const message = isGranular
-            ? `${classification!.rationale}: ${lit.value} should be extracted.`
-            : `Magic number ${lit.value} should be extracted into a named constant.`;
+        const res = resolveLiteralIssueData(
+            lit.value,
+            true,
+            classification,
+            granular,
+            this.suggestName(lit.value, NUM_KIND),
+        );
 
         return {
-            id: `constants:${rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
+            id: `constants:${res.rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
             analyzer: CONSTANTS_ANALYZER_NAME,
-            rule,
+            rule: res.rule,
             severity: CONSTANTS_SEVERITY,
-            message,
+            message: res.message,
             location: locN(lit.node, ctx.filePath),
-            detail,
-            suggestion: `const ${suggested} = ${lit.value};`,
+            detail: res.detail,
+            suggestion: `const ${res.suggested} = ${lit.value};`,
         };
     }
 
@@ -321,37 +301,23 @@ export class ConstantsAnalyzer implements Analyzer {
         const classification = classify ? classifyLiteral(text, false) : null;
         if (classification && classification.isReasonable) return null;
 
-        const isGranular =
-            granular && classification && classification.kind !== LITERAL_KIND_GENERAL;
-        const rule = isGranular ? `literal-${classification!.kind}` : 'hardcoded-string';
-
-        const suggested =
-            classification && classification.suggestedConstPrefix !== 'CONST_STR'
-                ? `${classification.suggestedConstPrefix}_${this.suggestName(inner, STR_KIND)}`
-                : this.suggestName(inner, STR_KIND);
-
-        const detail: Record<string, unknown> = {
-            value: text,
-            length: inner.length,
-            suggestedName: suggested,
-            ...(classification
-                ? { semanticKind: classification.kind, rationale: classification.rationale }
-                : {}),
-        };
-
-        const message = isGranular
-            ? `${classification!.rationale}: ${text} should be extracted.`
-            : `Hardcoded string should be extracted into a named constant.`;
+        const res = resolveLiteralIssueData(
+            text,
+            false,
+            classification,
+            granular,
+            this.suggestName(inner, STR_KIND),
+        );
 
         return {
-            id: `constants:${rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
+            id: `constants:${res.rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
             analyzer: CONSTANTS_ANALYZER_NAME,
-            rule,
+            rule: res.rule,
             severity: CONSTANTS_SEVERITY,
-            message,
+            message: res.message,
             location: locN(lit.node, ctx.filePath),
-            detail,
-            suggestion: `const ${suggested} = ${text};`,
+            detail: res.detail,
+            suggestion: `const ${res.suggested} = ${text};`,
         };
     }
 
@@ -363,37 +329,12 @@ export class ConstantsAnalyzer implements Analyzer {
         const threshold = ctx.options.duplicateLiteralThreshold;
         const ignoreSet = new Set<string>(ctx.options.ignoreLiterals || []);
         const classify = !!ctx.options.classifyLiterals;
-        const groups = new Map<string, LiteralRecord[]>();
-        for (const lit of this.literals) {
-            if (lit.isConstBound) continue;
-            // Tolerated contexts are out of scope in every pass; without this check a repeated
-            // docstring / import path / JSX text would be reported as an extraction candidate
-            // even though the magic-number and hardcoded-string passes skip it.
-            if (lit.tolerated) continue;
-            if (
-                lit.numeric &&
-                (TRIVIAL_NUMBERS.has(lit.value) ||
-                    Math.abs(Number(lit.value)) < ctx.options.magicNumberMin)
-            ) {
-                continue;
-            }
-            if (!lit.numeric) {
-                const str = stripQuotes(lit.value).trim();
-                // Empty string or whitespace is not considered a duplicate literal
-                // requiring extraction.
-                if (str.length === 0) continue;
-                if (ignoreSet.has(lit.value) || ignoreSet.has(str)) continue;
-            }
-            // Same semantic gate the magic-number and hardcoded-string passes apply: a benign
-            // delimiter, encoding name or HTTP verb repeats because the vocabulary does, and the
-            // extraction advice would be wrong for it. Gated on `classifyLiterals` so enabling the
-            // engine can never silently drop findings for a project that has not opted in.
-            if (classify && classifyLiteral(lit.value, lit.numeric).isReasonable) continue;
-            const key = `${lit.numeric ? 'N' : 'S'}:${lit.value}`;
-            const arr = groups.get(key) || [];
-            arr.push(lit);
-            groups.set(key, arr);
-        }
+        const groups = groupDuplicates(
+            this.literals,
+            ctx.options.magicNumberMin,
+            ignoreSet,
+            classify,
+        );
 
         for (const [, arr] of groups) {
             if (arr.length < threshold) continue;
@@ -402,22 +343,7 @@ export class ConstantsAnalyzer implements Analyzer {
             const valText = first.value.trim();
             if (!first.numeric && valText.length === 0) continue;
             const suggested = this.suggestName(first.value, first.numeric ? NUM_KIND : STR_KIND);
-            out.push({
-                id: `constants:duplicate-literal:${ctx.filePath}:${first.node.start?.line ?? 1}`,
-                analyzer: CONSTANTS_ANALYZER_NAME,
-                rule: 'duplicate-literal',
-                severity: CONSTANTS_SEVERITY,
-                message: `Literal ${first.value} is repeated ${arr.length} times in this file; extract it into a shared constant.`,
-                location: locN(first.node, ctx.filePath),
-                detail: {
-                    value: first.value,
-                    numeric: first.numeric,
-                    occurrences: arr.length,
-                    lines: arr.map((l) => l.node.start?.line ?? 1),
-                    suggestedName: suggested,
-                },
-                suggestion: `const ${suggested} = ${first.value}; // used ${arr.length}x`,
-            });
+            out.push(buildDuplicateIssue(ctx, arr, suggested));
         }
     }
 
@@ -494,4 +420,130 @@ export class ConstantsAnalyzer implements Analyzer {
             suggestion: `Remove '${aliasName}' and reference '${targetName}' directly at call sites.`,
         });
     }
+}
+
+interface LiteralResolution {
+    rule: string;
+    message: string;
+    detail: Record<string, unknown>;
+    suggested: string;
+}
+
+function resolveSuggestedName(
+    numeric: boolean,
+    classification: ReturnType<typeof classifyLiteral> | null,
+    fallback: string,
+): string {
+    if (!classification) return fallback;
+    const prefix = classification.suggestedConstPrefix;
+    if (numeric) {
+        return prefix !== 'CONST' ? prefix : fallback;
+    }
+    return prefix !== 'CONST_STR' ? `${prefix}_${fallback}` : fallback;
+}
+
+function resolveLiteralMessage(
+    value: string,
+    numeric: boolean,
+    isGranular: boolean,
+    rationale?: string,
+): string {
+    if (isGranular && rationale) {
+        return `${rationale}: ${value} should be extracted.`;
+    }
+    return numeric
+        ? `Magic number ${value} should be extracted into a named constant.`
+        : 'Hardcoded string should be extracted into a named constant.';
+}
+
+function resolveLiteralIssueData(
+    value: string,
+    numeric: boolean,
+    classification: ReturnType<typeof classifyLiteral> | null,
+    granular: boolean,
+    suggestedNameFallback: string,
+): LiteralResolution {
+    const isGranular = Boolean(
+        granular && classification && classification.kind !== LITERAL_KIND_GENERAL,
+    );
+    const defaultRule = numeric ? 'magic-number' : 'hardcoded-string';
+    const rule = isGranular ? `literal-${classification!.kind}` : defaultRule;
+    const suggested = resolveSuggestedName(numeric, classification, suggestedNameFallback);
+    const message = resolveLiteralMessage(value, numeric, isGranular, classification?.rationale);
+
+    const detail: Record<string, unknown> = numeric
+        ? {
+              value,
+              numeric: true,
+              suggestedName: suggested,
+              ...(classification
+                  ? { semanticKind: classification.kind, rationale: classification.rationale }
+                  : {}),
+          }
+        : {
+              value,
+              length: stripQuotes(value).length,
+              suggestedName: suggested,
+              ...(classification
+                  ? { semanticKind: classification.kind, rationale: classification.rationale }
+                  : {}),
+          };
+
+    return { rule, message, detail, suggested };
+}
+
+function isDuplicateCandidate(
+    lit: LiteralRecord,
+    magicNumberMin: number,
+    ignoreSet: Set<string>,
+    classify: boolean,
+): boolean {
+    if (lit.isConstBound || lit.tolerated) return false;
+    if (lit.numeric) {
+        if (TRIVIAL_NUMBERS.has(lit.value)) return false;
+        if (Math.abs(Number(lit.value)) < magicNumberMin) return false;
+    } else {
+        const str = stripQuotes(lit.value).trim();
+        if (str.length === 0) return false;
+        if (ignoreSet.has(lit.value) || ignoreSet.has(str)) return false;
+    }
+    if (classify && classifyLiteral(lit.value, lit.numeric).isReasonable) return false;
+    return true;
+}
+
+function groupDuplicates(
+    literals: LiteralRecord[],
+    magicNumberMin: number,
+    ignoreSet: Set<string>,
+    classify: boolean,
+): Map<string, LiteralRecord[]> {
+    const groups = new Map<string, LiteralRecord[]>();
+    for (const lit of literals) {
+        if (!isDuplicateCandidate(lit, magicNumberMin, ignoreSet, classify)) continue;
+        const key = `${lit.numeric ? 'N' : 'S'}:${lit.value}`;
+        const arr = groups.get(key) || [];
+        arr.push(lit);
+        groups.set(key, arr);
+    }
+    return groups;
+}
+
+function buildDuplicateIssue(ctx: AnalyzerContext, arr: LiteralRecord[], suggested: string): Issue {
+    const first = arr[0];
+    return {
+        id: `constants:duplicate-literal:${ctx.filePath}:${first.node.start?.line ?? 1}`,
+        analyzer: CONSTANTS_ANALYZER_NAME,
+        rule: 'duplicate-literal',
+        severity: CONSTANTS_SEVERITY,
+        message: `Literal ${first.value} is repeated ${arr.length} times in this file; extract it into a shared constant.`,
+        location: locN(first.node, ctx.filePath),
+        detail: {
+            value: first.value,
+            numeric: first.numeric,
+            occurrences: arr.length,
+            lines: arr.map((l) => l.node.start?.line ?? 1),
+            suggestedName: suggested,
+        },
+        suggestion: `const ${suggested} = ${first.value}; // used ${arr.length}x`,
+    };
 }

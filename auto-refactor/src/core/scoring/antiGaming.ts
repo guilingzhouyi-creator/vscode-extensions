@@ -11,6 +11,7 @@
 
 import type { Issue } from '../types';
 import { computeEffectiveCodeDensity } from './effectiveDensity';
+import { evaluateNetCognitiveCost } from './cognitive-cost-model';
 
 /**
  * Rule identifier for anti-gaming detection.
@@ -48,6 +49,21 @@ function checkArtificialSplitting(
     gamingKinds: GamingPatternKind[],
 ): number {
     const density = computeEffectiveCodeDensity(content);
+    // Check mechanical call hop inflation (CPX-HOP-001)
+    if (density.forwardingCount >= 3) {
+        const hopCost = evaluateNetCognitiveCost(
+            filePath,
+            Array.from({ length: density.forwardingCount }, (_, i) => ({
+                name: `forwarder_${i + 1}`,
+                loc: 2,
+                cc: 1,
+                callDepth: 1,
+                isForwardingWrapper: true,
+            })),
+        );
+        issues.push(...hopCost.issues);
+    }
+
     // If there are 5 or more trivial forwarders and density drops below 0.65
     if (density.forwardingCount >= 5 && density.effectiveDensity < 0.65) {
         gamingKinds.push('artificial_function_splitting');

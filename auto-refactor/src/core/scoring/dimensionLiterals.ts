@@ -634,3 +634,46 @@ export const DEDUCTION_CONFIG_LEAK_VIOLATION = 20;
 export const RULE_NESTED_CONSTANT = 'nested-constant';
 /** Points deducted for nested constant anti-patterns and redundant aliases. */
 export const DEDUCTION_NESTED_CONSTANT = 5;
+
+/** Rule id for unused or dead configuration declarations. */
+export const RULE_ARCH_CFG_002 = 'ARCH-CFG-002';
+/** Rule id for duplicate configuration declarations across modules. */
+export const RULE_ARCH_CFG_003 = 'ARCH-CFG-003';
+/** Rule id for implicit configuration and hardcoded environment reads. */
+export const RULE_ARCH_CFG_004 = 'ARCH-CFG-004';
+/** Rule id for scattered configuration access across domain boundaries. */
+export const RULE_ARCH_CFG_005 = 'ARCH-CFG-005';
+/** Rule id for tight coupling between domain entities and concrete configs. */
+export const RULE_ARCH_CFG_006 = 'ARCH-CFG-006';
+/** Rule id for over-abstracted configuration indirection layers. */
+export const RULE_ARCH_CFG_007 = 'ARCH-CFG-007';
+
+/** Rule id for elastic complexity budget violations. */
+export const RULE_CPX_BUD_001 = 'CPX-BUD-001';
+/** Rule id for unjustified complexity lacking algorithmic proof. */
+export const RULE_CPX_JST_001 = 'CPX-JST-001';
+/** Rule id for file boundary imbalance aggregating disjoint complex functions. */
+export const RULE_ARCH_BLR_001 = 'ARCH-BLR-001';
+/** Rule id for shared execution skeleton candidates with divergent strategies. */
+export const RULE_ARCH_SKL_001 = 'ARCH-SKL-001';
+/** Rule id for mechanical function splitting and trivial forwarding wrappers. */
+export const RULE_CPX_HOP_001 = 'CPX-HOP-001';
+
+/** Points deducted for unused or dead configuration declarations. */
+export const DEDUCTION_DEAD_CONFIG = 10;
+/** Points deducted for duplicate configuration declarations. */
+export const DEDUCTION_DUPLICATE_CONFIG = 10;
+/** Points deducted for implicit configuration scattered in domain code. */
+export const DEDUCTION_IMPLICIT_CONFIG = 15;
+/** Points deducted for scattered configuration access. */
+export const DEDUCTION_SCATTERED_CONFIG = 12;
+/** Points deducted for domain coupling with physical configuration formats. */
+export const DEDUCTION_CONFIG_COUPLING = 15;
+/** Points deducted for exceeding context-aware elastic complexity budget. */
+export const DEDUCTION_ELASTIC_BUDGET = 15;
+/** Points deducted for unjustified design-collapse complexity. */
+export const DEDUCTION_UNJUSTIFIED_COMPLEXITY = 15;
+/** Points deducted for file boundary imbalance with disjoint complex functions. */
+export const DEDUCTION_BOUNDARY_IMBALANCE = 15;
+/** Points deducted for mechanical decomposition and trivial forwarding wrappers. */
+export const DEDUCTION_MECHANICAL_SPLITTING = 15;

@@ -41,6 +41,21 @@ export type DiffSemanticCategory =
     | typeof GENERAL_CODE_CATEGORY;
 
 /**
+ * Architectural code role of the file housing the diff, separating production
+ * runtime from scripts and tests.
+ */
+/** Production runtime code role. */
+export const CODE_ROLE_PRODUCTION = 'PRODUCTION' as const;
+/** Maintenance or build tooling script code role. */
+export const CODE_ROLE_TOOL_SCRIPT = 'TOOL_SCRIPT' as const;
+/** Automated test suite or fixture code role. */
+export const CODE_ROLE_TEST_SUITE = 'TEST_SUITE' as const;
+
+/** Union of architectural code roles. */
+export type CodeRole =
+    typeof CODE_ROLE_PRODUCTION | typeof CODE_ROLE_TOOL_SCRIPT | typeof CODE_ROLE_TEST_SUITE;
+
+/**
  * Outcome of one diff classification: matched categories plus per-dimension flags.
  *
  * `categories` is a de-duplicated set that may hold several entries at once; each boolean
@@ -60,6 +75,8 @@ export interface DiffClassificationResult {
     language?: string;
     /** Associated target file path when provided. */
     filePath?: string;
+    /** Inferred code role separating production runtime from tooling and test suites. */
+    codeRole?: CodeRole;
 }
 
 const CONTROL_FLOW_RE =
@@ -219,6 +236,29 @@ function computeConfidenceTier(
 }
 
 /**
+ * Infer architectural code role from file path to separate production code from tests and scripts.
+ *
+ * @param filePath - Optional file path of the diff target.
+ * @returns Inferred CodeRole enum ('PRODUCTION', 'TOOL_SCRIPT', or 'TEST_SUITE').
+ */
+export function inferCodeRoleFromPath(filePath?: string): CodeRole {
+    if (!filePath) return CODE_ROLE_PRODUCTION;
+    const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+    if (
+        /(?:^|\/)(?:tests?|testdata|benchmarks?|fixtures?|specs?)\//.test(normalized) ||
+        normalized.endsWith('.test.ts') ||
+        normalized.endsWith('.spec.ts') ||
+        normalized.endsWith('.test.js')
+    ) {
+        return CODE_ROLE_TEST_SUITE;
+    }
+    if (/(?:^|\/)(?:scripts|tools?|bin)\//.test(normalized)) {
+        return CODE_ROLE_TOOL_SCRIPT;
+    }
+    return CODE_ROLE_PRODUCTION;
+}
+
+/**
  * Construct empty classification result for zero inspected lines.
  */
 function buildEmptyClassificationResult(filePath?: string): DiffClassificationResult {
@@ -233,6 +273,7 @@ function buildEmptyClassificationResult(filePath?: string): DiffClassificationRe
         confidenceTier: 'HIGH',
         language: inferLanguageFromPath(filePath),
         filePath,
+        codeRole: inferCodeRoleFromPath(filePath),
     };
 }
 
@@ -258,6 +299,7 @@ function buildClassificationResult(
             confidenceTier: 'HIGH',
             language,
             filePath,
+            codeRole: inferCodeRoleFromPath(filePath),
         };
     }
 
@@ -281,6 +323,7 @@ function buildClassificationResult(
         confidenceTier: computeConfidenceTier(categories, false),
         language,
         filePath,
+        codeRole: inferCodeRoleFromPath(filePath),
     };
 }
 

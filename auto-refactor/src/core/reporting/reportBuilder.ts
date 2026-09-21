@@ -33,7 +33,7 @@ import type { SymbolIndex } from '../intelligence/symbolIndex';
 import type { LiteralIndex } from '../intelligence/literalIndex';
 import { CallGraph } from '../intelligence/callGraph';
 import { summarizeUncertainty } from './uncertaintySummary';
-import { analyzerCoverage } from '../scanner/workerScheduler';
+import { analyzerCoverage } from '../scanner/worker-scheduler';
 
 /** Number of hex characters kept from a record hash to form the stored short revision id. */
 const REVISION_ID_LENGTH = 16;

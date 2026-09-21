@@ -150,6 +150,23 @@ const PARALLEL_SUITES = [
       'scripts/validate-diff-score.js',
     ],
   },
+  { name: 'validate-role-inference', script: 'scripts/validate-role-inference.js' },
+  {
+    name: 'validate-config-driven-architecture',
+    script: 'scripts/validate-config-driven-architecture.js',
+  },
+  {
+    name: 'validate-elastic-complexity-budget',
+    script: 'scripts/validate-elastic-complexity-budget.js',
+  },
+  {
+    name: 'validate-function-cohesion-skeleton',
+    script: 'scripts/validate-function-cohesion-skeleton.js',
+  },
+  {
+    name: 'validate-cognitive-cost-anti-gaming',
+    script: 'scripts/validate-cognitive-cost-anti-gaming.js',
+  },
 ];
 
 // Phase 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)

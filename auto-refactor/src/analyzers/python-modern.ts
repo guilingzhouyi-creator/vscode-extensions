@@ -487,21 +487,35 @@ export class PythonModernAnalyzer implements Analyzer {
         const sections: ImportRecord[][] = [[], [], []];
         for (const record of records) sections[record.section].push(record);
         for (let index = 0; index < sections.length; index++) {
-            const group = sections[index];
-            const texts = group.map((r) => r.text);
-            const ordered = [...texts].sort();
-            for (let pos = 0; pos < texts.length; pos++) {
-                if (texts[pos] !== ordered[pos]) {
-                    emit(
-                        group[pos].line - 1,
-                        'PYM-IMPORT-001',
-                        `${SECTION_LABELS[index]} imports are not alphabetically ordered (expected \`${ordered[pos]}\` at this position).`,
-                        SEVERITY_WARNING,
-                        'Sort each import section alphabetically by whole line.',
-                        { line: texts[pos], expected: ordered[pos] },
-                    );
-                    break;
-                }
+            this.checkSectionAlphabetical(sections[index], index, emit);
+        }
+    }
+
+    private checkSectionAlphabetical(
+        group: ImportRecord[],
+        index: number,
+        emit: (
+            lineIdx: number,
+            rule: string,
+            message: string,
+            severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
+            suggestion: string,
+            detail: Record<string, unknown>,
+        ) => void,
+    ): void {
+        const texts = group.map((r) => r.text);
+        const ordered = [...texts].sort();
+        for (let pos = 0; pos < texts.length; pos++) {
+            if (texts[pos] !== ordered[pos]) {
+                emit(
+                    group[pos].line - 1,
+                    'PYM-IMPORT-001',
+                    `${SECTION_LABELS[index]} imports are not alphabetically ordered (expected \`${ordered[pos]}\` at this position).`,
+                    SEVERITY_WARNING,
+                    'Sort each import section alphabetically by whole line.',
+                    { line: texts[pos], expected: ordered[pos] },
+                );
+                break;
             }
         }
     }

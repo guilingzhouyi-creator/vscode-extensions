@@ -13,7 +13,7 @@
  *     and ASCII prefix pre-check avoid repeated regex compilation and per-line allocation because
  *     debug output leaks diagnostics and can degrade production I/O throughput.
  */
-import { fileNameEndsWith, pathHasSegment } from '../pathScope';
+import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 
 /** ASCII code for a space, skipped while advancing past a line's leading whitespace. */
@@ -76,11 +76,7 @@ export const DiagnosticLeakRule: GovernanceRule = {
         // produces (`scripts/bench.js` has no leading slash), so the guard was dead code and
         // reported 472 findings on this repository's own scripts directory.
         if (
-            pathHasSegment(ctx.filePath, 'tests') ||
-            pathHasSegment(ctx.filePath, 'testdata') ||
-            pathHasSegment(ctx.filePath, 'benchmarks') ||
-            pathHasSegment(ctx.filePath, 'scripts') ||
-            pathHasSegment(ctx.filePath, 'samples') ||
+            isToolOrTestScript(ctx.filePath) ||
             fileNameEndsWith(ctx.filePath, ['index.ts', 'cli.ts'])
         ) {
             return null;

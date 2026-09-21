@@ -57,3 +57,50 @@ export function fileNameEndsWith(filePath: string, suffixes: readonly string[]):
     const name = segments[segments.length - 1];
     return suffixes.some((suffix) => name.endsWith(suffix));
 }
+
+/**
+ * Common directory segments indicating automated tests, benchmarks, fixtures, or sample code.
+ */
+export const TEST_OR_FIXTURE_SEGMENTS = [
+    'tests',
+    'test',
+    'testdata',
+    'benchmarks',
+    'fixtures',
+] as const;
+
+/**
+ * Common directory segments indicating maintenance, tooling, or deployment scripts.
+ */
+export const TOOL_SCRIPT_SEGMENTS = ['scripts', 'bin', 'tools'] as const;
+
+/**
+ * Tests whether a path belongs to automated tests, benchmarks, or fixture corpora.
+ *
+ * @param filePath - Path to test, absolute or relative.
+ * @returns True when the path resides inside test or fixture directories.
+ */
+export function isTestOrFixturePath(filePath: string): boolean {
+    return TEST_OR_FIXTURE_SEGMENTS.some((segment) => pathHasSegment(filePath, segment));
+}
+
+/**
+ * Tests whether a path belongs to tooling or repository maintenance scripts.
+ *
+ * @param filePath - Path to test, absolute or relative.
+ * @returns True when the path resides inside tooling script directories.
+ */
+export function isToolScriptPath(filePath: string): boolean {
+    return TOOL_SCRIPT_SEGMENTS.some((segment) => pathHasSegment(filePath, segment));
+}
+
+/**
+ * Tests whether a path belongs to tooling scripts, test suites, or fixture corpora
+ * rather than production runtime code.
+ *
+ * @param filePath - Path to test, absolute or relative.
+ * @returns True when the file is non-production tooling or test code.
+ */
+export function isToolOrTestScript(filePath: string): boolean {
+    return isTestOrFixturePath(filePath) || isToolScriptPath(filePath);
+}

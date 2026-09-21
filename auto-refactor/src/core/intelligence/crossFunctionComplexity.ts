@@ -94,9 +94,7 @@ export function analyzeCrossFunctionComplexity(
             const primaryCallerLoop = unboundedCallerLoops[0];
             const primaryCalleeLoop = unboundedCalleeLoops[0];
 
-            const edges = callGraph
-                .edges()
-                .filter((e) => e.caller === callerSymbol && e.callee === callee);
+            const edges = callGraph.calleesOf(callerSymbol).filter((e) => e.callee === callee);
             const callLine =
                 edges.length > 0
                     ? (edges[0].line ?? primaryCallerLoop.line)

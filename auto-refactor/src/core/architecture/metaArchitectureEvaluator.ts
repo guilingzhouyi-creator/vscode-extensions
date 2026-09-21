@@ -20,6 +20,7 @@ import type {
     SemanticArchitectureNode,
 } from './types';
 import { DEFAULT_ALLOWED_DEPENDENCIES } from './types';
+import { auditConfigDrivenArchitecture } from './config-driven-architecture';
 
 /**
  * Standard rule identifiers for meta-architectural governance.
@@ -294,6 +295,24 @@ export class MetaArchitectureEvaluator {
             }
         }
 
+        // 4. Config-Driven Architecture Audit
+        let configMaturity:
+            import('./config-driven-architecture').ConfigDrivenAnalysisResult | undefined;
+        if (flagConfig) {
+            const configFiles = nodes.map((n) => ({
+                filePath: n.filePath,
+                content: '',
+                imports: n.imports,
+                isDomainCore: n.role === 'headless_domain_core',
+            }));
+            const domainSet = new Set(nodes.map((n) => n.domainName).filter(Boolean));
+            configMaturity = auditConfigDrivenArchitecture(configFiles, {
+                fileCount: nodes.length,
+                domainCount: domainSet.size || 1,
+            });
+            issues.push(...configMaturity.issues);
+        }
+
         const headlessBreachCount = graph.findHeadlessViolations().length;
         const layerDistribution = graph.computeDistribution();
         const nodeMap = new Map<string, SemanticArchitectureNode>();
@@ -312,6 +331,7 @@ export class MetaArchitectureEvaluator {
             headlessBreachCount,
             privateBypassCount,
             passed: !hasErrors,
+            configMaturity,
         };
     }
 }

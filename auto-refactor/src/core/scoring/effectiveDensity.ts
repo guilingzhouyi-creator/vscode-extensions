@@ -25,10 +25,10 @@ export interface EffectiveDensityResult {
  * Patterns matching trivial forwarding or getter/setter methods.
  */
 const TRIVIAL_FORWARD_PATTERNS: RegExp[] = [
-    /^\s*(?:public|private|protected)?\s*(?:get|set)?\s*\w+\s*\([^)]*\)\s*:\s*[^;{]+\s*\{\s*return\s+(?:this\.)?\w+(?:\([^)]*\))?;\s*\}\s*$/,
-    /^\s*(?:public|private|protected)?\s*\w+\s*\([^)]*\)\s*\{\s*return\s+(?:this\.)?\w+(?:\([^)]*\))?;\s*\}\s*$/,
-    /^\s*def\s+\w+\([^)]*\):\s*(?:return\s+self\.\w+(?:\([^)]*\))?|pass)\s*$/,
-    /^\s*func\s+\w+\([^)]*\)\s*->\s*\w+:\s*return\s+\w+\s*$/,
+    /^\s*(?:public|private|protected)?\s*(?:get|set)?\s*\w+\s*\([^)]*\)\s*:\s*[^;{]+\s*\{\s*return\s+(?:this\.)?[\w.]+(?:\([^)]*\))?;\s*\}\s*$/,
+    /^\s*(?:public|private|protected)?\s*\w+\s*\([^)]*\)\s*\{\s*return\s+(?:this\.)?[\w.]+(?:\([^)]*\))?;\s*\}\s*$/,
+    /^\s*def\s+\w+\([^)]*\):\s*(?:return\s+(?:self\.)?[\w.]+(?:\([^)]*\))?|pass)\s*$/,
+    /^\s*func\s+\w+\([^)]*\)\s*->\s*\w+:\s*return\s+[\w.]+\s*$/,
 ];
 
 /**

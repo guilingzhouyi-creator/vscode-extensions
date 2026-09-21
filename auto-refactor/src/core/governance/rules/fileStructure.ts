@@ -15,7 +15,7 @@
  *     declaration checks stop header drift from hiding the real module location.
  */
 import * as path from 'path';
-import { pathHasSegment } from '../pathScope';
+import { isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 
 /**
@@ -191,8 +191,6 @@ function hasModuleHeaderDocstring(lines: string[], isPython: boolean): boolean {
     return false;
 }
 
-const SEGMENT_TESTS = 'tests';
-const SEGMENT_BENCHMARKS = 'benchmarks';
 const EXT_PY = '.py';
 
 /**
@@ -210,10 +208,7 @@ export const ModuleHeaderRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         const normalizedPath = ctx.filePath.replace(/\\/g, '/');
-        if (
-            pathHasSegment(normalizedPath, SEGMENT_TESTS) ||
-            pathHasSegment(normalizedPath, SEGMENT_BENCHMARKS)
-        ) {
+        if (isToolOrTestScript(normalizedPath)) {
             return null;
         }
 

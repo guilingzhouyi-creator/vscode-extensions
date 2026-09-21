@@ -73,9 +73,12 @@ export class CallChainImpactTracer {
         if (callGraph) {
             let currentCallees = [targetSymbol];
             let currentDepth = 1;
+            const visitedCallers = new Set<string>([targetSymbol]);
+            const nextCalleesSet = new Set<string>();
 
             while (currentCallees.length > 0 && currentDepth <= maxDepth) {
                 const nextCallees: string[] = [];
+                nextCalleesSet.clear();
 
                 for (const callee of currentCallees) {
                     const incomingEdges: CallGraphEdge[] = callGraph.callersOf(callee);
@@ -97,7 +100,13 @@ export class CallChainImpactTracer {
                             impactedFilesSet.add(edge.callerFile);
                         }
 
-                        if (edge.caller && !nextCallees.includes(edge.caller)) {
+                        if (
+                            edge.caller &&
+                            !visitedCallers.has(edge.caller) &&
+                            !nextCalleesSet.has(edge.caller)
+                        ) {
+                            visitedCallers.add(edge.caller);
+                            nextCalleesSet.add(edge.caller);
                             nextCallees.push(edge.caller);
                         }
                     }

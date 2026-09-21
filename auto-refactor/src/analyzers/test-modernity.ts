@@ -77,7 +77,58 @@ interface CaseRecord {
     mockAssertionsCount: number;
     tautologicalCount: number;
     obsoleteCount: number;
-    testedSymbols: Set<string>;
+    testedSymbols?: Set<string>;
+}
+
+function isCaseEffective(c: CaseRecord): boolean {
+    if (c.isSkipped || c.tautologicalCount > 0) return false;
+    return c.assertionsCount === 0 || c.mockAssertionsCount < c.assertionsCount;
+}
+
+function createUnitForSymbol(
+    domain: string,
+    sym: string,
+    isEffective: boolean,
+    isFresh: boolean,
+): ActiveSemanticUnit {
+    return {
+        id: `${domain}:${sym}`,
+        domain,
+        riskWeight: 0.8,
+        isCovered: isEffective,
+        freshness: isFresh ? 1.0 : 0.3,
+        effectiveness: isEffective ? 0.9 : 0.1,
+        uniqueness: 1.0,
+    };
+}
+
+function createUnitForCase(
+    domain: string,
+    caseName: string,
+    isEffective: boolean,
+    isFresh: boolean,
+): ActiveSemanticUnit {
+    return {
+        id: `${domain}:${caseName}`,
+        domain,
+        riskWeight: 0.7,
+        isCovered: isEffective,
+        freshness: isFresh ? 1.0 : 0.4,
+        effectiveness: isEffective ? 0.8 : 0.1,
+        uniqueness: 1.0,
+    };
+}
+
+function createLineCaseRecord(name: string, line: number): CaseRecord {
+    return {
+        name,
+        line,
+        isSkipped: false,
+        assertionsCount: 0,
+        mockAssertionsCount: 0,
+        tautologicalCount: 0,
+        obsoleteCount: 0,
+    };
 }
 
 /**
@@ -164,6 +215,9 @@ export class TestModernityAnalyzer implements Analyzer {
                     ts.isPropertyAccessExpression(node.expression) &&
                     !IGNORED_TEST_SYMBOLS.has(node.expression.name.text)
                 ) {
+                    if (!currentCase.testedSymbols) {
+                        currentCase.testedSymbols = new Set();
+                    }
                     currentCase.testedSymbols.add(node.expression.name.text);
                 }
             }
@@ -393,16 +447,7 @@ export class TestModernityAnalyzer implements Analyzer {
             const declMatch = line.match(TEST_DECL_RE);
             if (declMatch) {
                 currentTestName = declMatch[1] || declMatch[2] || UNKNOWN_TEST_NAME;
-                currentCase = {
-                    name: currentTestName,
-                    line: lineNum,
-                    isSkipped: false,
-                    assertionsCount: 0,
-                    mockAssertionsCount: 0,
-                    tautologicalCount: 0,
-                    obsoleteCount: 0,
-                    testedSymbols: new Set(),
-                };
+                currentCase = createLineCaseRecord(currentTestName, lineNum);
                 caseRecords.push(currentCase);
             }
 
@@ -470,43 +515,18 @@ export class TestModernityAnalyzer implements Analyzer {
 
     private buildSemanticUnits(domain: string, cases: CaseRecord[]): ActiveSemanticUnit[] {
         const units: ActiveSemanticUnit[] = [];
-
-        if (cases.length === 0) {
-            return units;
-        }
-
         for (const c of cases) {
-            const isEffective =
-                !c.isSkipped &&
-                c.tautologicalCount === 0 &&
-                (c.assertionsCount === 0 || c.mockAssertionsCount < c.assertionsCount);
+            const isEffective = isCaseEffective(c);
             const isFresh = c.obsoleteCount === 0;
 
-            if (c.testedSymbols.size > 0) {
+            if (c.testedSymbols && c.testedSymbols.size > 0) {
                 for (const sym of c.testedSymbols) {
-                    units.push({
-                        id: `${domain}:${sym}`,
-                        domain,
-                        riskWeight: 0.8,
-                        isCovered: isEffective,
-                        freshness: isFresh ? 1.0 : 0.3,
-                        effectiveness: isEffective ? 0.9 : 0.1,
-                        uniqueness: 1.0,
-                    });
+                    units.push(createUnitForSymbol(domain, sym, isEffective, isFresh));
                 }
             } else {
-                units.push({
-                    id: `${domain}:${c.name}`,
-                    domain,
-                    riskWeight: 0.7,
-                    isCovered: isEffective,
-                    freshness: isFresh ? 1.0 : 0.4,
-                    effectiveness: isEffective ? 0.8 : 0.1,
-                    uniqueness: 1.0,
-                });
+                units.push(createUnitForCase(domain, c.name, isEffective, isFresh));
             }
         }
-
         return units;
     }
 }

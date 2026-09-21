@@ -20,7 +20,7 @@
  *     than runtime defects.
  */
 import { isVocabularyEnumeration } from '../markerScope';
-import { fileNameEndsWith, pathHasSegment } from '../pathScope';
+import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 
 const JARGON_RE = /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|wip)\b/i;
@@ -100,9 +100,7 @@ export const LexicalHygieneRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (
-            pathHasSegment(ctx.filePath, 'tests') ||
-            pathHasSegment(ctx.filePath, 'test') ||
-            pathHasSegment(ctx.filePath, 'benchmarks') ||
+            isToolOrTestScript(ctx.filePath) ||
             fileNameEndsWith(ctx.filePath, ['sanitization.ts'])
         ) {
             return null;

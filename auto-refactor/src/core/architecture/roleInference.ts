@@ -11,6 +11,7 @@
 
 import { FORBIDDEN_HEADLESS_IMPORTS } from '../intelligence/semanticArchitecture';
 import type { ArchitectureAuditOptions, SystemTopologyRole } from './types';
+import { ROLE_TEST_SUITE, ROLE_TOOL_SCRIPT } from './types';
 
 /**
  * Libraries indicating CLI and application entry controllers.
@@ -108,12 +109,27 @@ const ANNOTATED_ROLE_MAP: Readonly<Record<string, SystemTopologyRole>> = {
     util: 'shared',
     config: 'configuration',
     configuration: 'configuration',
+    tool: ROLE_TOOL_SCRIPT,
+    tooling: ROLE_TOOL_SCRIPT,
+    script: ROLE_TOOL_SCRIPT,
+    scripts: ROLE_TOOL_SCRIPT,
+    tool_script: ROLE_TOOL_SCRIPT,
+    test: ROLE_TEST_SUITE,
+    tests: ROLE_TEST_SUITE,
+    spec: ROLE_TEST_SUITE,
+    test_suite: ROLE_TEST_SUITE,
 };
+
+const TEST_DIR_PATTERN = /(?:^|\/)(?:tests?|testdata|benchmarks?|fixtures?|specs?)\//;
+const TOOL_DIR_PATTERN = /(?:^|\/)(?:scripts|tools?|bin)\//;
+const TEST_FILE_EXTENSIONS = ['.test.ts', '.spec.ts', '.test.js'] as const;
 
 const PATH_HEURISTIC_RULES: ReadonlyArray<{
     re: RegExp;
     role: SystemTopologyRole;
 }> = [
+    { re: TEST_DIR_PATTERN, role: ROLE_TEST_SUITE },
+    { re: TOOL_DIR_PATTERN, role: ROLE_TOOL_SCRIPT },
     { re: /\/(?:config|constants|rules)\//, role: 'configuration' },
     { re: /\/(?:cli|ui|view|frontend|controllers)\//, role: 'application_cli' },
     { re: /\/(?:adapters?|parsers)\//, role: 'adapter' },
@@ -176,6 +192,33 @@ function matchRoleFromPathHeuristics(lowerPath: string): SystemTopologyRole {
 }
 
 /**
+ * Matches test suite or tooling script paths prior to domain heuristics.
+ *
+ * @param lowerPath - Lowercased normalized file path.
+ * @returns Inferred test or tool role, or null if not applicable.
+ */
+function matchStructuralTestOrToolRole(lowerPath: string): RoleInferenceResult | null {
+    const isTest =
+        TEST_DIR_PATTERN.test(lowerPath) ||
+        TEST_FILE_EXTENSIONS.some((ext) => lowerPath.endsWith(ext));
+    if (isTest) {
+        return {
+            role: ROLE_TEST_SUITE,
+            reasons: ['Structural test suite or fixture path'],
+            isHeadless: true,
+        };
+    }
+    if (TOOL_DIR_PATTERN.test(lowerPath)) {
+        return {
+            role: ROLE_TOOL_SCRIPT,
+            reasons: ['Structural tooling or maintenance script path'],
+            isHeadless: true,
+        };
+    }
+    return null;
+}
+
+/**
  * Infer the system topology role of a file using multi-signal analysis.
  *
  * @param filePath - Path to the file.
@@ -197,12 +240,13 @@ export function inferSystemTopologyRole(
     const lower = normalized.toLowerCase();
 
     // 1. Explicit user override from options
-    if (options.customRoleMappings && options.customRoleMappings[filePath]) {
-        const role = options.customRoleMappings[filePath];
+    const customRole =
+        options.customRoleMappings?.[filePath] ?? options.customRoleMappings?.[normalized];
+    if (customRole) {
         return {
-            role,
+            role: customRole,
             reasons: ['Explicit override from customRoleMappings'],
-            isHeadless: role !== 'application_cli' && !containsPresentationImports(imports),
+            isHeadless: customRole !== 'application_cli' && !containsPresentationImports(imports),
         };
     }
 
@@ -216,9 +260,15 @@ export function inferSystemTopologyRole(
         };
     }
 
+    // 3. Test suites and maintenance tooling paths take precedence over domain core path heuristics
+    const testOrTool = matchStructuralTestOrToolRole(lower);
+    if (testOrTool) {
+        return testOrTool;
+    }
+
     const hasUI = containsPresentationImports(imports);
 
-    // 3. Structural domain/core path defines core intent even if rogue imports exist
+    // 4. Structural domain/core path defines core intent even if rogue imports exist
     const isDomainPath = DOMAIN_PATH_RE.test(lower);
     if (isDomainPath) {
         return {

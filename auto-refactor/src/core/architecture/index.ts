@@ -36,3 +36,14 @@ export {
     META_ARCH_RULES,
     MetaArchitectureEvaluator,
 } from './metaArchitectureEvaluator';
+
+export { auditConfigDrivenArchitecture } from './config-driven-architecture';
+
+export type {
+    ConfigScanFile,
+    ProjectScaleProfile,
+    ConfigMaturityGrade,
+    ConfigMaturityBreakdown,
+    ConfigDrivenAnalysisResult,
+    ConfigDrivenOptions,
+} from './config-driven-architecture';
