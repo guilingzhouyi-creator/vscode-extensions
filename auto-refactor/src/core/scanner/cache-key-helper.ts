@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Scanner Cache Key & Fingerprint Resolver
- * File Path: src/core/scanner/cacheKeyHelper.ts
+ * File Path: src/core/scanner/cache-key-helper.ts
  * Architecture Role: Fingerprint computation, stat probe, and session bucket resolution.
  * Dependencies & Triggers: fs, path, ../types, ../cache, ../cacheKey, ../analyzerRegistry;
  *   invoked by Scanner before evaluating warm-cache hits or diff executions.

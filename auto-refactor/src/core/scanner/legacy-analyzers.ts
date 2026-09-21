@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Legacy Analyzer Phase
- * File Path: src/core/scanner/legacyAnalyzers.ts
+ * File Path: src/core/scanner/legacy-analyzers.ts
  * Architecture Role: Legacy per-analyzer execution stage of the in-process scan path.
  * Dependencies & Triggers: typescript, ../types, ../analyzerRegistry, ../multilang, and
  *   ./analyzerRunner (shared host and context contracts); invoked by runFileAnalyzers for
@@ -14,7 +14,12 @@ import type * as ts from 'typescript';
 import type { AnalyzerContext, Issue, Severity } from '../types';
 import type { ResolvedAnalyzer } from '../analyzer-registry';
 import type { LanguageAdapter } from '../multilang';
-import type { AnalyzerHost, FileContextBase, ParseState, StreamingOutcome } from './analyzerRunner';
+import type {
+    AnalyzerHost,
+    FileContextBase,
+    ParseState,
+    StreamingOutcome,
+} from './analyzer-runner';
 
 /**
  * Materialize the ts.SourceFile, but only when a legacy TS-only plug-in needs it.

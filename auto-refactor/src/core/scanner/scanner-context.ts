@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Scanner Execution Context Contract
- * File Path: src/core/scanner/scannerContext.ts
+ * File Path: src/core/scanner/scanner-context.ts
  * Architecture Role: Decoupled interface representing Scanner capabilities for sub-scanners.
  * Dependencies & Triggers: ../types, ../logger, ../analyzerRegistry, ../incrementalState;
  *   implemented by Scanner and consumed by cacheScanner and diffScanner.

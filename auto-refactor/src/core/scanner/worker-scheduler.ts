@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Worker Thread Scheduler & Dispatcher
- * File Path: src/core/scanner/workerScheduler.ts
+ * File Path: src/core/scanner/worker-scheduler.ts
  * Architecture Role: Parallel execution and thread pool scheduling layer for file scanning.
  * Dependencies & Triggers: worker_threads, os, path, fs, ../types, ../logger, ../resultCodec;
  *   invoked by Scanner during scan, scanWithCache, and scanWithDiff execution.

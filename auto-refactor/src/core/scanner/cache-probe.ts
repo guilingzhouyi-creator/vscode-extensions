@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Cache Probe & Miss Execution
- * File Path: src/core/scanner/cacheProbe.ts
+ * File Path: src/core/scanner/cache-probe.ts
  * Architecture Role: Warm-cache scan orchestrator coordinating L1/L2 cache and incremental.
  * Dependencies & Triggers: fs, path, ../types, ../cache, ../cacheKey, ../incremental,
  *   ../fileDiscovery, ./scannerContext, ./cacheKeyHelper, ./workerScheduler.
@@ -9,8 +9,8 @@
  * Exit Semantics & Design Rationale: Decomposes scanWithCache into focused sub-steps to guarantee
  *   low cyclomatic complexity and ensure byte-identical results with cold scans.
  */
-import { isFreshL1Hit } from './scanGuards';
-import { hasWorkerPool } from './scanGuards';
+import { isFreshL1Hit } from './scan-guards';
+import { hasWorkerPool } from './scan-guards';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -20,15 +20,15 @@ import type { WorkerPoolManager } from '../worker-pool';
 import { sha256Hex } from '../cache-key';
 import { route, countLines } from '../incremental';
 import { IncrementalFileState, touchIncremental } from '../incremental-state';
-import type { ScannerContext } from './scannerContext';
-import type { WarmSession, CacheFingerprintContext, StatResultEntry } from './cacheKeyHelper';
-import { remapCachedResult } from './cacheKeyHelper';
+import type { ScannerContext } from './scanner-context';
+import type { WarmSession, CacheFingerprintContext, StatResultEntry } from './cache-key-helper';
+import { remapCachedResult } from './cache-key-helper';
 import {
     effectiveWorkers,
     computeHybridK,
     dispatchBatches,
     runWorkerPool,
-} from './workerScheduler';
+} from './worker-scheduler';
 
 /** Options accepted by executeScanWithCache. */
 export interface ScanWithCacheOptions {
@@ -85,6 +85,8 @@ export interface CacheAnalysisQueue {
  * @param queue - Routing work lists accumulated across the probed files.
  * @param incEnabled - Whether line-level incremental routing is enabled.
  * @param incMinLines - Minimum line count for incremental routing eligibility.
+ *
+ * Concurrency: asynchronous cache probe; safe for single-threaded caller.
  * @returns Resolves once the file is routed and its queue entry recorded.
  */
 export async function probeSingleFileCache(
@@ -196,6 +198,8 @@ export async function probeSingleFileCache(
  * @param perFile - Index-aligned per-file results the caller merges into the report.
  * @param fpByRel - Per-file cache fingerprint used when writing L2 entries.
  * @param cache - Two-level cache store backing the writes.
+ * Concurrency: asynchronous coordinator dispatching to worker pool; safe for
+ *   single-threaded caller.
  * @returns Files analyzed and whether the worker pool was reused.
  */
 export async function executeCacheMisses(
@@ -303,6 +307,8 @@ export async function executeCacheMisses(
  * @param perFile - Index-aligned per-file results the caller merges into the report.
  * @param fpByRel - Per-file cache fingerprint used when writing L2 entries.
  * @param cache - Two-level cache store backing the writes.
+ *
+ * Concurrency: asynchronous execution; safe for single-threaded caller.
  * @returns Incremental file count and how many subtrees were reused.
  */
 export async function executeIncrementalFiles(

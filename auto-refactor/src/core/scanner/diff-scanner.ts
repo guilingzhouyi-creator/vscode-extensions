@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Diff & Incremental Scanner Pipeline
- * File Path: src/core/scanner/diffScanner.ts
+ * File Path: src/core/scanner/diff-scanner.ts
  * Architecture Role: Diff-driven scan orchestrator coordinating hint routing, L1/L2, and delta.
  * Dependencies & Triggers: fs, path, ../types, ../cache, ../cacheKey, ../incremental,
  *   ../diff, ../utf8, ./scannerContext, ./cacheKeyHelper, ./workerScheduler.
@@ -9,7 +9,7 @@
  * Exit Semantics & Design Rationale: Decomposes scanWithDiff into isolated processing steps;
  *   guarantees byte-equivalence with full cold scans and caps cyclomatic complexity under 12.
  */
-import { hasWorkerPool } from './scanGuards';
+import { hasWorkerPool } from './scan-guards';
 
 import * as path from 'path';
 import type {
@@ -31,31 +31,31 @@ import {
 } from '../incremental-state';
 import { globToRegExp, collectFiles } from '../file-discovery';
 import { loadGitignore } from '../gitignore';
-import type { ScannerContext } from './scannerContext';
+import type { ScannerContext } from './scanner-context';
 import {
     createWarmSession,
     buildCacheFingerprintContext,
     resolveSessionBuckets,
     collectStatFingerprints,
     normalizeRelPath,
-} from './cacheKeyHelper';
+} from './cache-key-helper';
 import {
     effectiveWorkers,
     computeHybridK,
     dispatchBatches,
     runWorkerPool,
-} from './workerScheduler';
+} from './worker-scheduler';
 
 // Public option surface stays here for callers; the interface itself now lives with the
 // hint-routing stage that consumes it.
-export type { ScanWithDiffOptions } from './diffHints';
+export type { ScanWithDiffOptions } from './diff-hints';
 
 import {
     processChangedFileHint,
     processUnchangedFile,
     type DiffRoutingState,
     type ScanWithDiffOptions,
-} from './diffHints';
+} from './diff-hints';
 
 async function executeDiffMissBatches(
     scanner: ScannerContext,

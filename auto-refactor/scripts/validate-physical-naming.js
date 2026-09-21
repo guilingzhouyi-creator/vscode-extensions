@@ -28,7 +28,7 @@ const KEBAB_CASE_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+)*$/;
 
 // Monotonic Ratchet: baseline count of legacy camelCase files in src/
 // As subdirectories are refactored, this budget MUST strictly decrease.
-const LEGACY_CAMEL_CASE_BUDGET = 109;
+const LEGACY_CAMEL_CASE_BUDGET = 98;
 
 function isKebabCase(name) {
   const ext = path.extname(name);

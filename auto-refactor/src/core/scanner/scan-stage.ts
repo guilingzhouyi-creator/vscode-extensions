@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Parse+Analyze Stage Selection
- * File Path: src/core/scanner/scanStage.ts
+ * File Path: src/core/scanner/scan-stage.ts
  * Architecture Role: Execution-strategy layer choosing worker-pool vs in-process analysis.
  * Dependencies & Triggers: ../types, ../analyzerRegistry, ../logger, ./workerScheduler; invoked
  *   by Scanner.scan (and reused by the warm/diff pipelines through the same host surface).
@@ -14,7 +14,7 @@
 import type { FileMetric, Issue, ScanConfig } from '../types';
 import type { ResolvedAnalyzer, WorkerAnalyzerDesc } from '../analyzer-registry';
 import type { Logger } from '../logger';
-import { AR_TIMING, effectiveWorkers, nowMs, runWorkerPool } from './workerScheduler';
+import { AR_TIMING, effectiveWorkers, nowMs, runWorkerPool } from './worker-scheduler';
 
 /** One file's analyzer output; the array is index-aligned with the dispatched file list. */
 export interface PerFileResult {
@@ -73,6 +73,8 @@ function workerDescs(plan: ResolvedAnalyzer[]): WorkerAnalyzerDesc[] {
  * @param host - Scanner surface providing the plan, config, logger, and fallbacks.
  * @param files - Relative paths of the discovered files.
  * @param absRoot - Absolute root path of the project.
+ * Concurrency: asynchronous coordinator dispatching to worker pool; safe for
+ *   single-threaded caller.
  * @returns One index-aligned result per input file.
  */
 export async function runParseAnalyzeStage(

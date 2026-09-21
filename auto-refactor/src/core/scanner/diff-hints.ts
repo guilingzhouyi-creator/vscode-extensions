@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Diff Hint Routing
- * File Path: src/core/scanner/diffHints.ts
+ * File Path: src/core/scanner/diff-hints.ts
  * Architecture Role: Per-file diff-hint routing stage of the diff scan pipeline.
  * Dependencies & Triggers: fs, path, ../types, ../cache, ../cacheKey, ../incremental,
  *   ../incrementalState, ./scannerContext, ./cacheKeyHelper; invoked by executeScanWithDiff in
@@ -11,7 +11,7 @@
  * Exit Semantics & Design Rationale: A malformed or stale hint never throws — it degrades to a
  *   full rescan, so routed results stay byte-identical to a cold scan.
  */
-import { isIncrementalCandidate } from './scanGuards';
+import { isIncrementalCandidate } from './scan-guards';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -23,9 +23,9 @@ import { route, incrementalMaxChangedLines } from '../incremental';
 import { resolveDiff } from '../diff';
 import { decodeContent } from '../utf8';
 import { IncrementalFileState, touchIncremental } from '../incremental-state';
-import type { ScannerContext } from './scannerContext';
-import type { WarmSession, CacheFingerprintContext, StatResultEntry } from './cacheKeyHelper';
-import { remapCachedResult } from './cacheKeyHelper';
+import type { ScannerContext } from './scanner-context';
+import type { WarmSession, CacheFingerprintContext, StatResultEntry } from './cache-key-helper';
+import { remapCachedResult } from './cache-key-helper';
 
 /** Options accepted by executeScanWithDiff. */
 export interface ScanWithDiffOptions {
@@ -123,6 +123,8 @@ function routeFullFallback(
  * @param incMinLines - Minimum line count for incremental routing eligibility.
  * @param s - Pre-read stat fingerprint of the file.
  * @param scanner - Scanner execution context supplying config and fallbacks.
+ *
+ * Concurrency: asynchronous coordinator; safe for single-threaded caller.
  * @returns Resolves once the file is routed and its per-file result recorded.
  */
 export async function processChangedFileHint(
@@ -259,6 +261,8 @@ export async function processChangedFileHint(
  * @param state - Routing counters accumulated across the diff scan.
  * @param incEnabled - Whether line-level incremental routing is enabled.
  * @param incMinLines - Minimum line count for incremental routing eligibility.
+ *
+ * Concurrency: asynchronous coordinator; safe for single-threaded caller.
  * @returns Resolves once the file is routed and its per-file result recorded.
  */
 export async function processUnchangedFile(

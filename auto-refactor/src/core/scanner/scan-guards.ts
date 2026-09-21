@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Scan Guard Predicates
- * File Path: src/core/scanner/scanGuards.ts
+ * File Path: src/core/scanner/scan-guards.ts
  * Architecture Role: Leaf predicates shared by the diff and cache scan stages.
  * Dependencies & Triggers: ../incremental (countLines) and ../workerPool (types); consumed by
  *   diffHints, diffScanner, and cacheProbe.

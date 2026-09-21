@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Two-Level Cache Scanner Pipeline
- * File Path: src/core/scanner/cacheScanner.ts
+ * File Path: src/core/scanner/cache-scanner.ts
  * Architecture Role: Warm-cache scan orchestrator coordinating L1/L2 cache and incremental.
  * Dependencies & Triggers: fs, path, ../types, ../cache, ../cacheKey, ../incremental,
  *   ../fileDiscovery, ./scannerContext, ./cacheKeyHelper, ./workerScheduler.
@@ -21,17 +21,17 @@ import {
 } from '../incremental-state';
 import { globToRegExp, collectFiles } from '../file-discovery';
 import { loadGitignore } from '../gitignore';
-import type { ScannerContext } from './scannerContext';
+import type { ScannerContext } from './scanner-context';
 import {
     createWarmSession,
     buildCacheFingerprintContext,
     resolveSessionBuckets,
     collectStatFingerprints,
-} from './cacheKeyHelper';
+} from './cache-key-helper';
 
 // Public option surface stays here for callers; the interfaces themselves now live with the
 // probe stage that consumes them.
-export type { ScanWithCacheOptions } from './cacheProbe';
+export type { ScanWithCacheOptions } from './cache-probe';
 
 import {
     probeSingleFileCache,
@@ -39,7 +39,7 @@ import {
     executeIncrementalFiles,
     type CacheAnalysisQueue,
     type ScanWithCacheOptions,
-} from './cacheProbe';
+} from './cache-probe';
 
 /**
  * Execute a cached scan run over project files using L1/L2 caches and worker dispatch.

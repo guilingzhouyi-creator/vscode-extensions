@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Per-File Analyzer Runner
- * File Path: src/core/scanner/analyzerRunner.ts
+ * File Path: src/core/scanner/analyzer-runner.ts
  * Architecture Role: Single-file parse + analyzer execution stage of the scan pipeline.
  * Dependencies & Triggers: ../adapters, ../languageSupport, ../multilang, ../traverse,
  *   ../dependencyGraph, ../intelligence/symbolIndex, ../intelligence/literalIndex,
@@ -40,7 +40,7 @@ const TYPEOF_FUNCTION = 'function';
 
 export type { FileContextBase, ParseState, StreamingOutcome };
 
-import { materializeSourceFile, runLegacyPhase } from './legacyAnalyzers';
+import { materializeSourceFile, runLegacyPhase } from './legacy-analyzers';
 
 /**
  * Host surface the runner needs from the Scanner: the resolved plan plus the cross-file stores
@@ -348,6 +348,7 @@ function seedIndexes(
  *     materialized parse path so unchanged subtrees can be reused.
  * @param activeAnalyzers - Optional allow-list of analyzer names; omitted means the full
  *     resolved plan runs.
+ * Concurrency: asynchronous per-file execution; safe for concurrent execution on separate files.
  * @returns The file's issues and its per-file metric summary.
  */
 export async function runFileAnalyzers(
