@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 3 Universal Rule Hierarchy & Praxis Integration
+ * Module: Verification Harness — Universal Rules Universal Rule Hierarchy & Praxis Integration
  * File Path: scripts/validate-universal-rules.js
  * Architecture Role: Validates the three-tier rule pyramid (Layer 1 Universal, Layer 2 Family,
  *   Layer 3 Dialect), confirms language-agnostic clean architecture and cycle detection on the
@@ -24,7 +24,7 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 3] Testing Universal Rule Pyramid & Praxis Diff Subsystem ===\n');
+  console.log('=== [Universal Rules] Testing Universal Rule Pyramid & Praxis Diff Subsystem ===\n');
 
   // 1. Verify Three-Tier Rule Pyramid Classification
   assert.strictEqual(classifyRuleLayer('import-cycle'), 'layer1_universal');
@@ -205,11 +205,11 @@ export function login(user: string): boolean {
   console.log('✔ PraxisDiffGovernanceService end-to-end interface execution verified.');
 
   console.log('\n================================================================');
-  console.log('🎉 ALL PHASE 3 UNIVERSAL RULES & PRAXIS TESTS PASSED (5/5)!');
+  console.log('🎉 ALL Universal Rules UNIVERSAL RULES & PRAXIS TESTS PASSED (5/5)!');
   console.log('================================================================\n');
 }
 
 main().catch((err) => {
-  console.error('[FAIL] validate-phase3-universal-rules failed:', err);
+  console.error('[FAIL] validate-universal-rules failed:', err);
   process.exit(1);
 });

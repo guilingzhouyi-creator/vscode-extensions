@@ -1,11 +1,11 @@
 /**
- * Module: Verification Harness — Phase 0 Baseline Freeze & AuditSnapshot Verification
+ * Module: Verification Harness — Baseline Freeze Baseline Freeze & AuditSnapshot Verification
  * File Path: scripts/validate-baseline-freeze.js
  * Architecture Role: Validates the immutable AuditSnapshot (E, R, C, L, S) quintuple,
  *   freezes the v0.3.0 baseline manifest to reports/baseline-v0.3.0.json, and asserts
  *   that the sandbox snapshot matches runtime rules and configuration integrity.
  * Dependencies & Triggers: Consumes ../dist/api and node:assert/path/fs; invoked by npm test
- *   as part of the Phase 0 bootstrap baseline verification.
+ *   as part of the Baseline Freeze bootstrap baseline verification.
  * Responsibilities: Assert snapshot structure, verify rules digest reproducibility, test
  *   filesystem freeze and reload, and confirm baseline metrics consistency.
  * Exit Semantics & Design Rationale: Exits 0 on full verification pass; throws AssertionError
@@ -32,7 +32,7 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 0] Testing AuditSnapshot (E, R, C, L, S) & Sandbox Freeze ===\n');
+  console.log('=== [Baseline Freeze] Testing AuditSnapshot (E, R, C, L, S) & Sandbox Freeze ===\n');
 
   // 1. Create runtime snapshot
   const snapshot = createAuditSnapshot();
@@ -115,11 +115,11 @@ async function main() {
   console.log('✔ Tampered snapshot detection verified (fail-closed).\n');
 
   console.log('================================================================');
-  console.log('🎉 PHASE 0 BASELINE FREEZE & AUDIT SNAPSHOT VERIFICATION PASSED!');
+  console.log('🎉 Baseline Freeze BASELINE FREEZE & AUDIT SNAPSHOT VERIFICATION PASSED!');
   console.log('================================================================');
 }
 
 main().catch((err) => {
-  console.error('Phase 0 verification failed:', err);
+  console.error('Baseline Freeze verification failed:', err);
   process.exit(1);
 });

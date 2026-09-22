@@ -1,11 +1,11 @@
 /**
- * Module: Verification Harness - Phase 14 Historical Trajectory Learning & Recipe Extraction
+ * Module: Verification Harness - Historical Trajectory Learning & Recipe Extraction
  * File Path: scripts/validate-trajectory-learning.js
  * Architecture Role: Comprehensive verification harness for Bad-to-Good trajectory learning,
  *   refactoring recipe synthesis, precondition matching, regression detection (GOV-TRJ-001),
  *   and Praxis trajectory learning facade SPI integration.
  * Dependencies & Triggers: Consumes ../dist/api; executed in test-parallel runner.
- * Responsibilities: Validate all 6 core functional gates of Phase 14.
+ * Responsibilities: Validate all 6 core functional gates of Trajectory Learning.
  * Exit Semantics & Design Rationale: Exits 0 on all assertions passing,
  *   throws AssertionError on failure.
  */
@@ -21,7 +21,7 @@ const {
 
 async function main() {
   console.log('================================================================');
-  console.log('🧪 Verifying Phase 14: Trajectory Learning & Recipe Extraction');
+  console.log('🧪 Verifying Trajectory Learning: Trajectory Learning & Recipe Extraction');
   console.log('================================================================');
 
   const extractor = new TrajectoryRecipeExtractor();
@@ -322,11 +322,11 @@ function billingRun(accounts: any[]) {
   assert(avgMs < 15.0, `Average latency (${avgMs.toFixed(2)}ms) exceeded 15ms threshold`);
 
   console.log('\n================================================================');
-  console.log('🎉 ALL 6 GATES OF PHASE 14 VERIFIED SUCCESSFULLY!');
+  console.log('🎉 ALL 6 GATES OF Trajectory Learning VERIFIED SUCCESSFULLY!');
   console.log('================================================================');
 }
 
 main().catch((err) => {
-  console.error('\n❌ Phase 14 validation failed:', err);
+  console.error('\n❌ Trajectory Learning validation failed:', err);
   process.exit(1);
 });

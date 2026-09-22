@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 5 Data Architecture & Access Governance
+ * Module: Verification Harness — Data Architecture Data Architecture & Access Governance
  * File Path: scripts/validate-data-architecture.js
  * Architecture Role: Validates data architecture rules, including direct/indirect N+1 queries
  *   (DAT-NPL-001), unbounded full scans on online paths (DAT-QRY-001),
@@ -23,7 +23,7 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 5] Testing Data Architecture & Persistence Access Governance ===\n');
+  console.log('=== [Data Architecture] Testing Data Architecture & Persistence Access Governance ===\n');
 
   // 1. Direct Loop Query (N+1 Hazard - DAT-NPL-001)
   const directNPlusOneCode = `
@@ -220,10 +220,10 @@ export class CleanInvoiceService {
   assert.strictEqual(Array.isArray(evalIssues), true);
   console.log('✔ defaultDataArchitectureEvaluator instance interface verified.');
 
-  console.log('\n=== All Phase 5 Data Architecture & Query Governance Tests PASSED ===');
+  console.log('\n=== All Data Architecture Data Architecture & Query Governance Tests PASSED ===');
 }
 
 main().catch((err) => {
-  console.error('Phase 5 verification failed:', err);
+  console.error('Data Architecture verification failed:', err);
   process.exit(1);
 });

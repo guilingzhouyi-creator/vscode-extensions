@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 2 Multi-Language Semantic Adapters Verification
+ * Module: Verification Harness — Language Adapters Multi-Language Semantic Adapters Verification
  * File Path: scripts/validate-language-adapters.js
  * Architecture Role: Validates that concrete source code in TypeScript, Python, Rust, Go,
  *   and GDScript is losslessly mapped into canonical SemanticNode entities and SemanticEdge
@@ -8,7 +8,7 @@
  * Responsibilities: Assert canonical path normalization, multi-language adapter routing,
  *   AST symbol extraction, function metric deduction, call binding, and inheritance.
  * Exit Semantics & Design Rationale: Exits 0 on full verification pass; throws AssertionError
- *   and exits 1 on any discrepancy, guaranteeing invariant language adaptation for Phase 3.
+ *   and exits 1 on any discrepancy, guaranteeing invariant language adaptation for Universal Rules.
  */
 
 'use strict';
@@ -22,7 +22,7 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 2] Testing Multi-Language Semantic Adapters & AST Bridge ===\n');
+  console.log('=== [Language Adapters] Testing Multi-Language Semantic Adapters & AST Bridge ===\n');
 
   // 1. Verify Path Normalization & Canonical Symbol ID
   const rawWinPath = 'C:\\Project\\src\\service\\authService.ts';
@@ -180,11 +180,11 @@ def standalone_helper(x, y, z):
   console.log(`  - Density:     ${metrics.density}`);
 
   console.log('\n================================================================');
-  console.log('🎉 ALL PHASE 2 MULTI-LANGUAGE ADAPTER TESTS PASSED (5/5)!');
+  console.log('🎉 ALL Language Adapters MULTI-LANGUAGE ADAPTER TESTS PASSED (5/5)!');
   console.log('================================================================\n');
 }
 
 main().catch((err) => {
-  console.error('[FAIL] validate-phase2-language-adapters failed:', err);
+  console.error('[FAIL] validate-language-adapters failed:', err);
   process.exit(1);
 });

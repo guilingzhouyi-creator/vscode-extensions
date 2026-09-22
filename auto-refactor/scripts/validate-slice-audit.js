@@ -1,11 +1,11 @@
 /**
- * Module: Verification Harness - Phase 13 Incremental Slice Audit Engine & Sparse MoE
+ * Module: Verification Harness - Slice Audit Incremental Slice Audit Engine & Sparse MoE
  * File Path: scripts/validate-slice-audit.js
  * Architecture Role: Comprehensive verification harness for fine-grained AST slice extraction,
  *   feature vector classification, sparse MoE CED routing, call-chain impact tracing, and
  *   Praxis slice audit service facade.
  * Dependencies & Triggers: Consumes ../dist/api; executed in test-parallel runner.
- * Responsibilities: Validate all 6 core functional gates of Phase 13.
+ * Responsibilities: Validate all 6 core functional gates of Slice Audit.
  * Exit Semantics & Design Rationale: Exits 0 on all assertions passing,
  *   throws AssertionError on failure.
  */
@@ -24,7 +24,7 @@ const { CallGraph } = require('../dist/core/intelligence/callGraph');
 
 async function main() {
   console.log('================================================================');
-  console.log('Phase 13: Incremental Slice Audit Engine & Sparse MoE Harness');
+  console.log('Slice Audit: Incremental Slice Audit Engine & Sparse MoE Harness');
   console.log('================================================================\n');
 
   // ── Step 1: Fine-Grained AST Slice Extraction & Feature Vectors ──
@@ -255,11 +255,11 @@ async function main() {
   console.log(`  ✔ Praxis slice audit facade verified (Verdict status: ${fullVerdict.status})`);
 
   console.log('\n================================================================');
-  console.log('🎉 PHASE 13: ALL 6 INCREMENTAL SLICE AUDIT GATES PASSED (100%)');
+  console.log('🎉 Slice Audit: ALL 6 INCREMENTAL SLICE AUDIT GATES PASSED (100%)');
   console.log('================================================================\n');
 }
 
 main().catch((err) => {
-  console.error('Phase 13 verification failed:', err);
+  console.error('Slice Audit verification failed:', err);
   process.exit(1);
 });

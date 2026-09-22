@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 7 Semantic Architecture & Meta Architecture Rules
+ * Module: Verification Harness — Meta-Architecture Semantic Architecture & Meta Architecture Rules
  * File Path: scripts/validate-meta-architecture.js
  * Architecture Role: Validates the Semantic Architecture Graph, multi-signal system topology
  *   role inference, 6 meta-architecture rules, and Praxis Diff governance integration.
@@ -23,7 +23,7 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 7] Testing Semantic Architecture Graph & Meta-Rules ===\n');
+  console.log('=== [Meta-Architecture] Testing Semantic Architecture Graph & Meta-Rules ===\n');
 
   // 1. Multi-signal System Topology Role Inference
   console.log('1. Testing Multi-signal Topology Role Inference...');
@@ -251,11 +251,11 @@ export class TradingEngine {
   );
 
   console.log('\n================================================================');
-  console.log('🎉 ALL PHASE 7 SEMANTIC ARCHITECTURE TESTS PASSED (7/7)!');
+  console.log('🎉 ALL Meta-Architecture SEMANTIC ARCHITECTURE TESTS PASSED (7/7)!');
   console.log('================================================================\n');
 }
 
 main().catch((err) => {
-  console.error('Phase 7 verification failed:', err);
+  console.error('Meta-Architecture verification failed:', err);
   process.exit(1);
 });

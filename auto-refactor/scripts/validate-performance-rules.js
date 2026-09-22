@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 4 Algorithmic & Performance Auditing
+ * Module: Verification Harness — Performance Rules Algorithmic & Performance Auditing
  * File Path: scripts/validate-performance-rules.js
  * Architecture Role: Validates deep algorithmic complexity, loop transient allocation detection
  *   (ADV-PRF-002), expensive operation detection, and end-to-end integration into the Praxis
@@ -21,7 +21,7 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 4] Testing Deep Algorithmic & Performance Auditing ===\n');
+  console.log('=== [Performance Rules] Testing Deep Algorithmic & Performance Auditing ===\n');
 
   // 1. Test TypeScript Loop Transient Allocation Detection
   const tsAllocationCode = `
@@ -223,10 +223,10 @@ export class CleanService {
   assert.strictEqual(cleanResult.verdict.status, 'passed', 'Clean diff verdict must be passed');
   console.log('✔ Clean diff passed without issues.');
 
-  console.log('\n=== All Phase 4 Performance & Algorithmic Auditing Tests PASSED ===');
+  console.log('\n=== All Performance Rules Performance & Algorithmic Auditing Tests PASSED ===');
 }
 
 main().catch((err) => {
-  console.error('Phase 4 verification failed:', err);
+  console.error('Performance Rules verification failed:', err);
   process.exit(1);
 });

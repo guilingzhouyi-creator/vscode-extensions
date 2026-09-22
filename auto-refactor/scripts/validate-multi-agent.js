@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 12 Multi-Agent Governance Mode
+ * Module: Verification Harness — Multi-Agent Multi-Agent Governance Mode
  * File Path: scripts/validate-multi-agent.js
  * Architecture Role: Comprehensive verification harness validating multi-agent change
  *   attribution, cross-agent architectural collision detection (GOV-AGENT-COLLISION),
@@ -408,7 +408,7 @@ async function testPraxisFacadeService() {
 
 async function main() {
   console.log('================================================================');
-  console.log('Phase 12: Multi-Agent Governance Mode Verification Harness');
+  console.log('Multi-Agent: Multi-Agent Governance Mode Verification Harness');
   console.log('================================================================');
 
   testAgentAttribution();
@@ -419,11 +419,11 @@ async function main() {
   await testPraxisFacadeService();
 
   console.log('================================================================');
-  console.log('🎉 PHASE 12: ALL 6 MULTI-AGENT GOVERNANCE GATES PASSED (100%)');
+  console.log('🎉 Multi-Agent: ALL 6 MULTI-AGENT GOVERNANCE GATES PASSED (100%)');
   console.log('================================================================');
 }
 
 main().catch((err) => {
-  console.error('\n❌ Phase 12 validation failed:', err);
+  console.error('\n❌ Multi-Agent validation failed:', err);
   process.exit(1);
 });

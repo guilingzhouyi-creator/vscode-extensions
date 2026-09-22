@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-22T05:52:26.514Z",
+  "timestamp": "2026-09-22T12:49:05.155Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -375,13 +375,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/run-self-audit.js",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
       "key": "constants|hardcoded-string|scripts/run-self-audit.js",
       "count": 17,
       "severities": {
@@ -421,13 +414,6 @@
       "count": 4,
       "severities": {
         "warning": 4
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|scripts/test-parallel.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
       }
     },
     {
@@ -1411,637 +1397,539 @@
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase0-baseline.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase0-baseline.js",
+      "key": "constants|hardcoded-string|scripts/validate-baseline-freeze.js",
       "count": 5,
       "severities": {
         "warning": 5
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase0-baseline.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-baseline-freeze.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase0-baseline.js",
+      "key": "constants|magic-number|scripts/validate-baseline-freeze.js",
       "count": 8,
       "severities": {
         "warning": 8
       }
     },
     {
-      "key": "governance|GOV-PRF-002|scripts/validate-phase0-baseline.js",
+      "key": "governance|GOV-PRF-002|scripts/validate-baseline-freeze.js",
       "count": 1,
       "severities": {
         "info": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase1-semantic-ir.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase1-semantic-ir.js",
+      "key": "constants|hardcoded-string|scripts/validate-semantic-ir.js",
       "count": 27,
       "severities": {
         "warning": 27
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase1-semantic-ir.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-semantic-ir.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase1-semantic-ir.js",
+      "key": "constants|magic-number|scripts/validate-semantic-ir.js",
       "count": 11,
       "severities": {
         "warning": 11
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase1-semantic-ir.js",
+      "key": "constants|duplicate-literal|scripts/validate-semantic-ir.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase10-self-refactor.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase10-self-refactor.js",
+      "key": "constants|hardcoded-string|scripts/validate-self-refactor.js",
       "count": 7,
       "severities": {
         "warning": 7
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase10-self-refactor.js",
+      "key": "constants|magic-number|scripts/validate-self-refactor.js",
       "count": 10,
       "severities": {
         "warning": 10
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase10-self-refactor.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-self-refactor.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase10-self-refactor.js",
+      "key": "constants|duplicate-literal|scripts/validate-self-refactor.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "large-file|large-file|scripts/validate-phase11-rule-generalization.js",
+      "key": "large-file|large-file|scripts/validate-rule-generalization.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase11-rule-generalization.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase11-rule-generalization.js",
+      "key": "constants|hardcoded-string|scripts/validate-rule-generalization.js",
       "count": 25,
       "severities": {
         "warning": 25
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase11-rule-generalization.js",
+      "key": "constants|magic-number|scripts/validate-rule-generalization.js",
       "count": 3,
       "severities": {
         "warning": 3
       }
     },
     {
-      "key": "hygiene|HYG-STB-001|scripts/validate-phase11-rule-generalization.js",
+      "key": "hygiene|HYG-STB-001|scripts/validate-rule-generalization.js",
       "count": 4,
       "severities": {
         "info": 4
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase11-rule-generalization.js",
+      "key": "constants|duplicate-literal|scripts/validate-rule-generalization.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase11-rule-generalization.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-rule-generalization.js",
       "count": 2,
       "severities": {
         "warning": 2
       }
     },
     {
-      "key": "hygiene|HYG-WRAP-001|scripts/validate-phase11-rule-generalization.js",
+      "key": "hygiene|HYG-WRAP-001|scripts/validate-rule-generalization.js",
       "count": 3,
       "severities": {
         "warning": 3
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase11-rule-generalization.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-rule-generalization.js",
       "count": 2,
       "severities": {
         "info": 2
       }
     },
     {
-      "key": "hygiene|HYG-DED-001|scripts/validate-phase11-rule-generalization.js",
+      "key": "hygiene|HYG-DED-001|scripts/validate-rule-generalization.js",
       "count": 2,
       "severities": {
         "warning": 2
       }
     },
     {
-      "key": "large-file|large-file|scripts/validate-phase12-multi-agent.js",
+      "key": "large-file|large-file|scripts/validate-multi-agent.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase12-multi-agent.js",
-      "count": 9,
+      "key": "hygiene|HYG-STB-002|scripts/validate-multi-agent.js",
+      "count": 3,
       "severities": {
-        "warning": 9
+        "warning": 3
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-phase12-multi-agent.js",
+      "key": "constants|hardcoded-string|scripts/validate-multi-agent.js",
       "count": 44,
       "severities": {
         "warning": 44
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase12-multi-agent.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-multi-agent.js",
       "count": 3,
       "severities": {
         "warning": 3
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase12-multi-agent.js",
+      "key": "constants|duplicate-literal|scripts/validate-multi-agent.js",
       "count": 7,
       "severities": {
         "warning": 7
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase12-multi-agent.js",
+      "key": "constants|magic-number|scripts/validate-multi-agent.js",
       "count": 37,
       "severities": {
         "warning": 37
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase13-slice-audit.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase13-slice-audit.js",
+      "key": "constants|hardcoded-string|scripts/validate-slice-audit.js",
       "count": 21,
       "severities": {
         "warning": 21
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase13-slice-audit.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-slice-audit.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-CLN-001|scripts/validate-phase13-slice-audit.js",
+      "key": "hygiene|HYG-CLN-001|scripts/validate-slice-audit.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase13-slice-audit.js",
+      "key": "constants|duplicate-literal|scripts/validate-slice-audit.js",
       "count": 2,
       "severities": {
         "warning": 2
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase13-slice-audit.js",
+      "key": "constants|magic-number|scripts/validate-slice-audit.js",
       "count": 8,
       "severities": {
         "warning": 8
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase14-trajectory-learning.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase14-trajectory-learning.js",
+      "key": "constants|hardcoded-string|scripts/validate-trajectory-learning.js",
       "count": 19,
       "severities": {
         "warning": 19
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase14-trajectory-learning.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-trajectory-learning.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase14-trajectory-learning.js",
+      "key": "constants|magic-number|scripts/validate-trajectory-learning.js",
       "count": 10,
       "severities": {
         "warning": 10
       }
     },
     {
-      "key": "large-file|large-file|scripts/validate-phase15-e2e-stress.js",
+      "key": "large-file|large-file|scripts/validate-e2e-stress.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase15-e2e-stress.js",
-      "count": 3,
+      "key": "hygiene|HYG-STB-002|scripts/validate-e2e-stress.js",
+      "count": 2,
       "severities": {
-        "warning": 3
+        "warning": 2
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-phase15-e2e-stress.js",
+      "key": "constants|hardcoded-string|scripts/validate-e2e-stress.js",
       "count": 19,
       "severities": {
         "warning": 19
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase15-e2e-stress.js",
+      "key": "constants|magic-number|scripts/validate-e2e-stress.js",
       "count": 36,
       "severities": {
         "warning": 36
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase15-e2e-stress.js",
+      "key": "constants|duplicate-literal|scripts/validate-e2e-stress.js",
       "count": 2,
       "severities": {
         "warning": 2
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase2-language-adapters.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase2-language-adapters.js",
+      "key": "constants|hardcoded-string|scripts/validate-language-adapters.js",
       "count": 22,
       "severities": {
         "warning": 22
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase2-language-adapters.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-language-adapters.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase2-language-adapters.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-language-adapters.js",
       "count": 5,
       "severities": {
         "info": 5
       }
     },
     {
-      "key": "hygiene|HYG-DED-001|scripts/validate-phase2-language-adapters.js",
+      "key": "hygiene|HYG-DED-001|scripts/validate-language-adapters.js",
       "count": 2,
       "severities": {
         "warning": 2
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase2-language-adapters.js",
+      "key": "constants|magic-number|scripts/validate-language-adapters.js",
       "count": 3,
       "severities": {
         "warning": 3
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase3-universal-rules.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase3-universal-rules.js",
+      "key": "constants|hardcoded-string|scripts/validate-universal-rules.js",
       "count": 34,
       "severities": {
         "warning": 34
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase3-universal-rules.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-universal-rules.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase3-universal-rules.js",
+      "key": "constants|magic-number|scripts/validate-universal-rules.js",
       "count": 14,
       "severities": {
         "warning": 14
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase3-universal-rules.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-universal-rules.js",
       "count": 1,
       "severities": {
         "info": 1
       }
     },
     {
-      "key": "hygiene|HYG-WRAP-001|scripts/validate-phase3-universal-rules.js",
+      "key": "hygiene|HYG-WRAP-001|scripts/validate-universal-rules.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase4-performance-rules.js",
+      "key": "constants|hardcoded-string|scripts/validate-performance-rules.js",
       "count": 5,
       "severities": {
         "warning": 5
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-phase4-performance-rules.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase4-performance-rules.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-performance-rules.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase4-performance-rules.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-performance-rules.js",
       "count": 9,
       "severities": {
         "info": 9
       }
     },
     {
-      "key": "performance|PRF-MEM-001|scripts/validate-phase4-performance-rules.js",
+      "key": "performance|PRF-MEM-001|scripts/validate-performance-rules.js",
       "count": 2,
       "severities": {
         "info": 2
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase4-performance-rules.js",
+      "key": "constants|duplicate-literal|scripts/validate-performance-rules.js",
       "count": 2,
       "severities": {
         "warning": 2
       }
     },
     {
-      "key": "performance|PRF-ALG-001|scripts/validate-phase4-performance-rules.js",
+      "key": "performance|PRF-ALG-001|scripts/validate-performance-rules.js",
       "count": 2,
       "severities": {
         "warning": 2
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase5-data-architecture.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase5-data-architecture.js",
+      "key": "constants|hardcoded-string|scripts/validate-data-architecture.js",
       "count": 14,
       "severities": {
         "warning": 14
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase5-data-architecture.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-data-architecture.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase5-data-architecture.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-data-architecture.js",
       "count": 5,
       "severities": {
         "info": 5
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase5-data-architecture.js",
+      "key": "constants|duplicate-literal|scripts/validate-data-architecture.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase5-data-architecture.js",
+      "key": "constants|magic-number|scripts/validate-data-architecture.js",
       "count": 7,
       "severities": {
         "warning": 7
       }
     },
     {
-      "key": "hygiene|HYG-WRAP-001|scripts/validate-phase5-data-architecture.js",
+      "key": "hygiene|HYG-WRAP-001|scripts/validate-data-architecture.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase6-test-modernity.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase6-test-modernity.js",
+      "key": "constants|hardcoded-string|scripts/validate-test-modernity.js",
       "count": 8,
       "severities": {
         "warning": 8
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase6-test-modernity.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-test-modernity.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase6-test-modernity.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-test-modernity.js",
       "count": 3,
       "severities": {
         "info": 3
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase6-test-modernity.js",
+      "key": "constants|magic-number|scripts/validate-test-modernity.js",
       "count": 7,
       "severities": {
         "warning": 7
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase7-meta-architecture.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase7-meta-architecture.js",
+      "key": "constants|hardcoded-string|scripts/validate-meta-architecture.js",
       "count": 30,
       "severities": {
         "warning": 30
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase7-meta-architecture.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-meta-architecture.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase7-meta-architecture.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-meta-architecture.js",
       "count": 1,
       "severities": {
         "info": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase8-quality-quantification.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase8-quality-quantification.js",
+      "key": "constants|hardcoded-string|scripts/validate-quality-quantification.js",
       "count": 12,
       "severities": {
         "warning": 12
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase8-quality-quantification.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-quality-quantification.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase8-quality-quantification.js",
+      "key": "constants|magic-number|scripts/validate-quality-quantification.js",
       "count": 22,
       "severities": {
         "warning": 22
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase8-quality-quantification.js",
+      "key": "constants|duplicate-literal|scripts/validate-quality-quantification.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-phase9-self-audit.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-phase9-self-audit.js",
+      "key": "constants|hardcoded-string|scripts/validate-self-audit.js",
       "count": 11,
       "severities": {
         "warning": 11
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/validate-phase9-self-audit.js",
+      "key": "simplify|SIM-LONG-001|scripts/validate-self-audit.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-phase9-self-audit.js",
+      "key": "constants|magic-number|scripts/validate-self-audit.js",
       "count": 8,
       "severities": {
         "warning": 8
       }
     },
     {
-      "key": "constants|duplicate-literal|scripts/validate-phase9-self-audit.js",
+      "key": "constants|duplicate-literal|scripts/validate-self-audit.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -2630,23 +2518,16 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/architecture.ts",
-      "count": 27,
+      "count": 21,
       "severities": {
-        "warning": 27
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/analyzers/architecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 21
       }
     },
     {
       "key": "governance|GOV-LOG-001|src/analyzers/architecture.ts",
-      "count": 5,
+      "count": 3,
       "severities": {
-        "warning": 5
+        "warning": 3
       }
     },
     {
@@ -2741,27 +2622,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/analyzers/complexity.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/complexity.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-WRAP-001|src/analyzers/complexity.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|magic-number|src/analyzers/complexity.ts",
       "count": 1,
       "severities": {
@@ -2808,34 +2668,6 @@
       "count": 12,
       "severities": {
         "warning": 12
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/analyzers/data-architecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/analyzers/data-architecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/data-architecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/analyzers/data-architecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -2965,31 +2797,10 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/analyzers/governance.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/analyzers/governance.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/governance.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/governance.ts",
-      "count": 3,
+      "count": 2,
       "severities": {
-        "warning": 3
+        "warning": 2
       }
     },
     {
@@ -3022,9 +2833,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/hygiene.ts",
-      "count": 16,
+      "count": 13,
       "severities": {
-        "warning": 16
+        "warning": 13
       }
     },
     {
@@ -3035,17 +2846,10 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/analyzers/hygiene.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-LOG-001|src/analyzers/hygiene.ts",
-      "count": 3,
+      "count": 2,
       "severities": {
-        "warning": 3
+        "warning": 2
       }
     },
     {
@@ -3141,13 +2945,6 @@
     },
     {
       "key": "complexity|high-complexity|src/analyzers/performance.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/performance.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -3176,13 +2973,6 @@
     },
     {
       "key": "hygiene|HYG-CLN-001|src/analyzers/python-modern.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/analyzers/python-modern.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -3218,9 +3008,9 @@
     },
     {
       "key": "complexity|high-complexity|src/analyzers/security.ts",
-      "count": 3,
+      "count": 1,
       "severities": {
-        "warning": 3
+        "warning": 1
       }
     },
     {
@@ -3231,21 +3021,7 @@
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|src/analyzers/security.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/analyzers/security.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/analyzers/security.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -3281,9 +3057,9 @@
     },
     {
       "key": "complexity|high-complexity|src/analyzers/simplify.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -3316,9 +3092,9 @@
     },
     {
       "key": "complexity|high-complexity|src/analyzers/test-modernity.ts",
-      "count": 3,
+      "count": 1,
       "severities": {
-        "warning": 3
+        "warning": 1
       }
     },
     {
@@ -3330,16 +3106,16 @@
     },
     {
       "key": "governance|GOV-LOG-001|src/analyzers/test-modernity.ts",
-      "count": 5,
+      "count": 4,
       "severities": {
-        "warning": 5
+        "warning": 4
       }
     },
     {
       "key": "governance|GOV-PRF-002|src/analyzers/test-modernity.ts",
-      "count": 3,
+      "count": 2,
       "severities": {
-        "info": 3
+        "info": 2
       }
     },
     {
@@ -3354,13 +3130,6 @@
       "count": 8,
       "severities": {
         "warning": 8
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/analyzers/ts-modern.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -5906,9 +5675,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 23,
+      "count": 20,
       "severities": {
-        "warning": 23
+        "warning": 20
       }
     },
     {
@@ -6269,13 +6038,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-004|src/core/reporting/baselineManager.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/reporting/reportBuilder.ts",
       "count": 2,
       "severities": {
@@ -6402,21 +6164,7 @@
       }
     },
     {
-      "key": "constants|duplicate-literal|src/core/router/diffClassifier.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/router/diffClassifier.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/router/diffClassifier.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -6515,13 +6263,6 @@
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/router/sparseRuleRouter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/router/sparseRuleRouter.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -6672,13 +6413,6 @@
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "comments|CMT-DOC-001|src/core/rules/evolution/generalizationPipeline.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
       }
     },
     {

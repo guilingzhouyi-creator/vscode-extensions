@@ -1,8 +1,9 @@
 /**
- * Module: Verification Harness — Phase 11 Rule Generalization & Knowledge Pipeline
+ * Module: Verification Harness — Rule Generalization & Knowledge Pipeline
  * File Path: scripts/validate-rule-generalization.js
- * Architecture Role: End-to-end verification suite for Phase 11; asserts candidate lifecycle,
- *   4-tier generalization scrutiny, cross-language fixture evaluation (TS, Python, Rust),
+ * Architecture Role: End-to-end verification suite for Rule Generalization;
+ *   asserts candidate lifecycle, 4-tier generalization scrutiny,
+ *   cross-language fixture evaluation (TS, Python, Rust),
  *   rule engine integration, and registry consistency.
  * Dependencies & Triggers: `node scripts/validate-rule-generalization.js`; part of
  *   parallel test runner suite.
@@ -385,7 +386,7 @@ function run(cmd: string) {
 
 function run() {
   console.log('===============================================================');
-  console.log(' PHASE 11: RULE GENERALIZATION & KNOWLEDGE PIPELINE VERIFICATION');
+  console.log(' Rule Generalization: RULE GENERALIZATION & KNOWLEDGE PIPELINE VERIFICATION');
   console.log('===============================================================');
 
   testCandidateStateAndScrutiny();
@@ -395,7 +396,7 @@ function run() {
   testArchDispMultiLanguage();
   testAnalyzerIntegration();
 
-  console.log('\n>>> ALL PHASE 11 RULE GENERALIZATION CHECKS PASSED SUCCESSFULLY! <<<\n');
+  console.log('\n>>> ALL Rule Generalization RULE GENERALIZATION CHECKS PASSED SUCCESSFULLY! <<<\n');
 }
 
 run();

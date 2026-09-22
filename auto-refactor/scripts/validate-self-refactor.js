@@ -1,7 +1,7 @@
 /**
- * Module: Verification Harness — Phase 10 First-Round Self-Refactoring & Delta Measurement
+ * Module: Verification Harness — Self-Refactor First-Round Self-Refactoring & Delta Measurement
  * File Path: scripts/validate-self-refactor.js
- * Architecture Role: Verifies the target refactoring closure of Phase 10:
+ * Architecture Role: Verifies the target refactoring closure of Self-Refactor:
  *   1. 100% elimination of all Critical Debt items (reduced to 0);
  *   2. Net reduction of High Debt hotspots (bench-baselines, semanticLiterals, roleInference);
  *   3. Stability and improvement across Eight Strategic Pillars (Security 99.5 -> 100.0);
@@ -22,8 +22,8 @@ const path = require('path');
 const { runSelfAudit, BASELINE_OUTPUT } = require('./run-self-audit');
 const { scan, createPraxisDiffGovernanceService, scanAndRender } = require('../dist/api');
 
-// Baseline reference metrics from Phase 9 pre-refactor snapshot
-const PHASE9_BASELINE = {
+// Baseline reference metrics from Self-Audit pre-refactor snapshot
+const INITIAL_SELF_AUDIT_BASELINE = {
   criticalDebt: 5,
   highDebt: 216,
   mediumDebt: 5135,
@@ -45,10 +45,10 @@ function fmtDelta(delta) {
 }
 
 /**
- * Main verification routine for Phase 10 self-refactoring closure.
+ * Main verification routine for Self-Refactor self-refactoring closure.
  */
 async function main() {
-  console.log('=== [Phase 10] Testing Self-Refactoring & Delta Measurement ===\n');
+  console.log('=== [Self-Refactor] Testing Self-Refactoring & Delta Measurement ===\n');
 
   const start = Date.now();
 
@@ -69,7 +69,7 @@ async function main() {
   assert.strictEqual(
     criticalCount,
     0,
-    `Critical debt must be 0 after Phase 10 refactoring, found: ${criticalCount}`,
+    `Critical debt must be 0 after Self-Refactor refactoring, found: ${criticalCount}`,
   );
   assert.strictEqual(
     criticalItems.length,
@@ -83,7 +83,7 @@ async function main() {
   const highCount = report.metrics.byDebtTier.high;
   assert.ok(
     highCount <= 220,
-    `High debt must be <= 220 (with Phase 11/12 rule expansion), found: ${highCount}`,
+    `High debt must be <= 220 (with Rule Generalization/12 rule expansion), found: ${highCount}`,
   );
 
   // Assert target hotspots resolved high issues
@@ -123,8 +123,8 @@ async function main() {
   assert.ok(pillars.architecture >= 100, 'Architecture must be 100');
   assert.ok(pillars.maintainability >= 98.0, 'Maintainability must be >= 98');
   assert.ok(pillars.performance >= 99.0, 'Performance must be >= 99');
-  assert.ok(report.metrics.compositeScore >= PHASE9_BASELINE.compositeScore);
-  assert.ok(report.metrics.effectiveCodeDensity >= PHASE9_BASELINE.effectiveCodeDensity);
+  assert.ok(report.metrics.compositeScore >= INITIAL_SELF_AUDIT_BASELINE.compositeScore);
+  assert.ok(report.metrics.effectiveCodeDensity >= INITIAL_SELF_AUDIT_BASELINE.effectiveCodeDensity);
 
   console.log(`✔ Security Pillar: 99.5 -> ${pillars.security.toFixed(1)} (+0.5).`);
   console.log(
@@ -158,29 +158,29 @@ async function main() {
   console.log(`✔ Praxis diff governance facade verified (Verdict: ${diffVerdict.verdict.status}).`);
 
   // 6. Output Quantitative Accounting Ledger
-  console.log('\n--- [Phase 10 Before / After / Delta Quantitative Accounting] ---');
+  console.log('\n--- [Self-Refactor Before / After / Delta Quantitative Accounting] ---');
   console.log(
-    `  Critical Debt      : ${PHASE9_BASELINE.criticalDebt} -> ${criticalCount} (${fmtDelta(criticalCount - PHASE9_BASELINE.criticalDebt)}) [100% ELIMINATED]`,
+    `  Critical Debt      : ${INITIAL_SELF_AUDIT_BASELINE.criticalDebt} -> ${criticalCount} (${fmtDelta(criticalCount - INITIAL_SELF_AUDIT_BASELINE.criticalDebt)}) [100% ELIMINATED]`,
   );
   console.log(
-    `  High Debt          : ${PHASE9_BASELINE.highDebt} -> ${highCount} (${fmtDelta(highCount - PHASE9_BASELINE.highDebt)})`,
+    `  High Debt          : ${INITIAL_SELF_AUDIT_BASELINE.highDebt} -> ${highCount} (${fmtDelta(highCount - INITIAL_SELF_AUDIT_BASELINE.highDebt)})`,
   );
   console.log(
-    `  Security Pillar    : ${PHASE9_BASELINE.securityPillar.toFixed(1)} -> ${pillars.security.toFixed(1)} (${fmtDelta(pillars.security - PHASE9_BASELINE.securityPillar)})`,
+    `  Security Pillar    : ${INITIAL_SELF_AUDIT_BASELINE.securityPillar.toFixed(1)} -> ${pillars.security.toFixed(1)} (${fmtDelta(pillars.security - INITIAL_SELF_AUDIT_BASELINE.securityPillar)})`,
   );
   console.log(
-    `  Composite Score    : ${PHASE9_BASELINE.compositeScore.toFixed(1)} -> ${report.metrics.compositeScore.toFixed(1)} (${fmtDelta(report.metrics.compositeScore - PHASE9_BASELINE.compositeScore)})`,
+    `  Composite Score    : ${INITIAL_SELF_AUDIT_BASELINE.compositeScore.toFixed(1)} -> ${report.metrics.compositeScore.toFixed(1)} (${fmtDelta(report.metrics.compositeScore - INITIAL_SELF_AUDIT_BASELINE.compositeScore)})`,
   );
   console.log(
-    `  Code Density       : ${(PHASE9_BASELINE.effectiveCodeDensity * 100).toFixed(1)}% -> ${(report.metrics.effectiveCodeDensity * 100).toFixed(1)}%`,
+    `  Code Density       : ${(INITIAL_SELF_AUDIT_BASELINE.effectiveCodeDensity * 100).toFixed(1)}% -> ${(report.metrics.effectiveCodeDensity * 100).toFixed(1)}%`,
   );
 
   console.log('\n================================================================');
-  console.log('🎉 ALL PHASE 10 SELF-REFACTORING & DELTA TESTS PASSED (6/6)!');
+  console.log('🎉 ALL Self-Refactor SELF-REFACTORING & DELTA TESTS PASSED (6/6)!');
   console.log('================================================================');
 }
 
 main().catch((err) => {
-  console.error('Phase 10 verification failed:', err);
+  console.error('Self-Refactor verification failed:', err);
   process.exit(1);
 });

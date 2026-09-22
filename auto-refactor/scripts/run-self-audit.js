@@ -6,7 +6,7 @@
  *   extracting technical debt ledgers (Critical/High/Medium/Low) without code privilege.
  * Dependencies & Triggers: Consumes ../dist/api; writes reports/self-audit-baseline.json.
  * Responsibilities: Run full-repo scan, compute 8-pillar scores, classify technical debt,
- *   identify top refactoring hotspots, and export the official Phase 9 baseline report.
+ *   identify top refactoring hotspots, and export the official self-audit baseline report.
  * Exit Semantics & Design Rationale: Standalone executable CLI & programmatic function.
  */
 
@@ -179,7 +179,7 @@ async function runSelfAudit(options = {}) {
   const fileScores = computeFileScores(fileIssuesMap);
   const projectScore = aggregateProjectScore(fileScores);
 
-  // 5. Identify Top Refactoring Hotspots for Phase 10
+  // 5. Identify Top Refactoring Hotspots for Self-Refactoring
   const topHotspots = computeTopHotspots(fileScores);
 
   // 6. Build Baseline Report Object
@@ -239,7 +239,7 @@ async function runSelfAudit(options = {}) {
  */
 function printTerminalDashboard(report) {
   console.log('================================================================');
-  console.log('       AUTO-REFACTOR SYSTEM SELF-AUDIT BASELINE (PHASE 9)       ');
+  console.log('       AUTO-REFACTOR SYSTEM SELF-AUDIT BASELINE       ');
   console.log('================================================================\n');
 
   console.log(`Snapshot ID    : ${report.snapshotId}`);
@@ -271,7 +271,7 @@ function printTerminalDashboard(report) {
   console.log(`  Medium Debt   : ${report.metrics.byDebtTier.medium}`);
   console.log(`  Low Debt      : ${report.metrics.byDebtTier.low}`);
 
-  console.log('\n--- [Top 5 Technical Debt Hotspots for Phase 10 Refactoring] ---');
+  console.log('\n--- [Top 5 Technical Debt Hotspots for Self-Refactoring Refactoring] ---');
   for (const [idx, h] of report.topHotspots.slice(0, 5).entries()) {
     console.log(
       `  ${idx + 1}. ${h.filePath} (${h.totalIssues} issues, ` +

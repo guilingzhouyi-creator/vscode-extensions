@@ -51,7 +51,7 @@ for (let i = 0; i < rawArgs.length; i++) {
 }
 
 // ── Test Suites Declaration ──
-// Phase 1: Isolated parallel test suites (no shared daemon or corpus disk state)
+// Stage 1: Isolated parallel test suites (no shared daemon or corpus disk state)
 const PARALLEL_SUITES = [
   { name: 'validate-oxc', script: 'scripts/validate-oxc-keypoints.js' },
   { name: 'validate-praxis', script: 'scripts/validate-praxis-foundation.js' },
@@ -191,7 +191,7 @@ const PARALLEL_SUITES = [
   },
 ];
 
-// Phase 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)
+// Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)
 const SEQUENTIAL_SUITES = [
   { name: 'validate-equivalence', script: 'scripts/validate-equivalence.js' },
   { name: 'validate-warm', script: 'scripts/validate-warm.js' },

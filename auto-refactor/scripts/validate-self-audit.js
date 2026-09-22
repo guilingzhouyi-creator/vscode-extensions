@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 9 System Self-Audit Baseline
+ * Module: Verification Harness — Self-Audit System Self-Audit Baseline
  * File Path: scripts/validate-self-audit.js
  * Architecture Role: Validates the production-grade self-examination runner, confirming
  *   immutable AuditSnapshot sandbox isolation, 8-pillar quality evaluation, technical debt
@@ -17,7 +17,7 @@ const fs = require('fs');
 const { runSelfAudit, BASELINE_OUTPUT } = require('./run-self-audit');
 
 async function main() {
-  console.log('=== [Phase 9] Testing System Self-Audit Engine (Reviewer -> Reviewer) ===\n');
+  console.log('=== [Self-Audit] Testing System Self-Audit Engine (Reviewer -> Reviewer) ===\n');
 
   const start = Date.now();
 
@@ -95,17 +95,17 @@ async function main() {
   assert.ok(typeof tiers.medium === 'number');
   assert.ok(typeof tiers.low === 'number');
   assert.ok(tiers.critical + tiers.high + tiers.medium + tiers.low === report.metrics.totalIssues);
-  assert.ok(report.topHotspots.length > 0, 'Must produce top hotspots for Phase 10 input');
+  assert.ok(report.topHotspots.length > 0, 'Must produce top hotspots for Self-Refactor input');
   console.log(
     `✔ Debt ledger categorized: Critical=${tiers.critical}, High=${tiers.high}, Med=${tiers.medium}, Low=${tiers.low}.`,
   );
 
   console.log('\n================================================================');
-  console.log('🎉 ALL PHASE 9 SYSTEM SELF-AUDIT TESTS PASSED (6/6)!');
+  console.log('🎉 ALL Self-Audit SYSTEM SELF-AUDIT TESTS PASSED (6/6)!');
   console.log('================================================================');
 }
 
 main().catch((err) => {
-  console.error('Phase 9 verification failed:', err);
+  console.error('Self-Audit verification failed:', err);
   process.exit(1);
 });

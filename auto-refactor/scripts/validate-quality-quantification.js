@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 8 Quality Quantification & Anti-Gaming
+ * Module: Verification Harness — Quality Quantification Quality Quantification & Anti-Gaming
  * File Path: scripts/validate-quality-quantification.js
  * Architecture Role: Validates the 8-pillar quality model, non-linear risk penalties,
  *   severe pillar ceilings, effective code density, anti-gaming detection (GOV-GAM-001),
@@ -26,7 +26,7 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 8] Testing Quality Quantification & Anti-Gaming System ===\n');
+  console.log('=== [Quality Quantification] Testing Quality Quantification & Anti-Gaming System ===\n');
 
   // 1. Eight-Pillar Model and Custom Weights
   console.log('1. Testing Eight-Pillar Quality Model & Weight Synthesis...');
@@ -231,11 +231,11 @@ async function main() {
   console.log('✔ Praxis Diff governance correctly escalates gaming patches to L3A.');
 
   console.log('\n================================================================');
-  console.log('🎉 ALL PHASE 8 QUALITY QUANTIFICATION TESTS PASSED (7/7)!');
+  console.log('🎉 ALL Quality Quantification QUALITY QUANTIFICATION TESTS PASSED (7/7)!');
   console.log('================================================================');
 }
 
 main().catch((err) => {
-  console.error('Phase 8 verification failed:', err);
+  console.error('Quality Quantification verification failed:', err);
   process.exit(1);
 });

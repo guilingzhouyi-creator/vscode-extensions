@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 1 Unified Semantic IR & Graph Verification
+ * Module: Verification Harness — Semantic IR Unified Semantic IR & Graph Verification
  * File Path: scripts/validate-semantic-ir.js
  * Architecture Role: Validates the language-agnostic SemanticNode, SemanticEdge, and
  *   SemanticGraph topology engine, asserting node indexing, bidirectional edge queries,
@@ -17,7 +17,7 @@ const assert = require('assert');
 const { SemanticGraph } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 1] Testing Unified Semantic IR & Graph Engine ===\n');
+  console.log('=== [Semantic IR] Testing Unified Semantic IR & Graph Engine ===\n');
 
   const graph = new SemanticGraph();
 
@@ -171,11 +171,11 @@ async function main() {
   console.log('✔ JSON serialization and reconstruction roundtrip verified.');
 
   console.log('\n================================================================');
-  console.log('🎉 ALL PHASE 1 UNIFIED SEMANTIC IR TESTS PASSED (7/7)!');
+  console.log('🎉 ALL Semantic IR UNIFIED SEMANTIC IR TESTS PASSED (7/7)!');
   console.log('================================================================\n');
 }
 
 main().catch((err) => {
-  console.error('[FAIL] validate-phase1-semantic-ir failed:', err);
+  console.error('[FAIL] validate-semantic-ir failed:', err);
   process.exit(1);
 });

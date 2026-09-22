@@ -1,5 +1,5 @@
 /**
- * Module: Verification Harness — Phase 6 Test Modernity & Contract Governance
+ * Module: Verification Harness — Test Modernity Test Modernity & Contract Governance
  * File Path: scripts/validate-test-modernity.js
  * Architecture Role: Validates multi-language test modernity rules, including tautological
  *   assertions (TST-TAU-001), orphaned skipped tests (TST-SKP-001), mock-only illusions
@@ -24,7 +24,7 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Phase 6] Testing Test Modernity & Contract Coverage Governance ===\n');
+  console.log('=== [Test Modernity] Testing Test Modernity & Contract Coverage Governance ===\n');
 
   // 1. Multi-language Tautological Assertion Detection (TST-TAU-001)
   console.log('1. Testing Multi-language Tautological & Non-verifying Assertions (TST-TAU-001)...');
@@ -309,10 +309,10 @@ describe('UserProfile Tests', () => {
   assert.strictEqual(evalIssues.length >= 1, true);
   console.log('✔ defaultTestModernityEvaluator instance interface verified.');
 
-  console.log('\n=== All Phase 6 Test Modernity & Contract Governance Tests PASSED ===');
+  console.log('\n=== All Test Modernity Test Modernity & Contract Governance Tests PASSED ===');
 }
 
 main().catch((err) => {
-  console.error('Phase 6 verification failed:', err);
+  console.error('Test Modernity verification failed:', err);
   process.exit(1);
 });

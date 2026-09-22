@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Module: Core Layer Topology Migration (Phase 1 / M2)
+ * Module: Core Layer Topology Migration (M2)
  * File Path: scripts/migrate-core-m2.js
  * Architecture Role: Safe, progressive migration script for clusterizing flat src/core/*.ts
  *   files into dedicated domain subdirectories (ast, diff, policy, config) while preserving
  *   full backward compatibility via Facade Re-export Shims and strict JSDoc headers.
- * Dependencies & Triggers: Executed as part of Phase 1 / M2 topology migration.
+ * Dependencies & Triggers: Executed as part of M2 topology migration.
  * Responsibilities: Migrate modules to domain clusters and maintain 6-field header shims.
  * Exit Semantics & Design Rationale: Exits 0 on successful migration and shim generation.
  */
