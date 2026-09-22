@@ -404,6 +404,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-prnt-001',
     }),
     defineRule({
+        id: 'SIM-FLAT-002',
+        family: RULE_FAMILY_SIMPLIFY,
+        analyzer: ANALYZER_SIMPLIFY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            '深层嵌套的条件分支与 AST 访问流应使用卫语句（Guard Clause）提前返回或短路扁平化，控制嵌套深度 ≤ 3。',
+        remediation:
+            '将深层嵌套的 if/else 重构为反向条件的前置卫语句（提前 return/continue/break），保持主逻辑扁平清晰。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-flat-002',
+    }),
+    defineRule({
         id: 'DOC-DUP-001',
         family: 'DOC',
         analyzer: 'docs',

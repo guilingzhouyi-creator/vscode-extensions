@@ -662,6 +662,19 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-007',
     }),
     defineRule({
+        id: 'ARCH-DEC-002',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            '多语言 AST 解析与适配器逻辑必须独立解耦为适配器模块，分析器主体严禁混杂语法树构造细节或深耦合特定语言适配器实现。',
+        remediation:
+            '将多语言 AST 构造逻辑抽取至 `src/core/semantic/adapters/` 独立适配器，分析器仅面向 `NormalizedNode` 或多态接口。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dec-002',
+    }),
+    defineRule({
         id: 'CPX-BUD-001',
         family: RULE_FAMILY_COMPLEXITY,
         analyzer: ANALYZER_COMPLEXITY,

@@ -358,9 +358,24 @@ function run(cmd: string) {
   const dispFinding = archIssues.find((i) => i.rule === 'ARCH-DISP-001');
   assert.ok(dispFinding, 'ArchitectureAnalyzer must emit ARCH-DISP-001');
 
+  // Test ArchitectureAnalyzer emitting ARCH-DEC-002
+  const parserDecoupleContent = `
+import { Parser } from 'oxc-parser';
+export class CustomService {}
+`;
+  const decoupleIssues = arch.analyze(null, {
+    filePath: 'src/domain/analyzer-service.ts',
+    content: parserDecoupleContent,
+    config: {},
+    options: {},
+  });
+  const decoupleFinding = decoupleIssues.find((i) => i.rule === 'ARCH-DEC-002');
+  assert.ok(decoupleFinding, 'ArchitectureAnalyzer must emit ARCH-DEC-002 for direct parser coupling');
+
   // Test Pyramid Layer Classification
   assert.strictEqual(classifyRuleLayer('HYG-WRAP-001'), 'layer1_universal');
   assert.strictEqual(classifyRuleLayer('ARCH-DISP-001'), 'layer1_universal');
+  assert.strictEqual(classifyRuleLayer('ARCH-DEC-002'), 'layer1_universal');
   assert.strictEqual(classifyRuleLayer('GOV-EXC-003'), 'layer2_family');
 
   // Test Registry Registration
@@ -378,6 +393,11 @@ function run(cmd: string) {
   assert.ok(dispRule, 'ARCH-DISP-001 must be registered');
   assert.strictEqual(dispRule.analyzer, 'architecture');
   assert.strictEqual(dispRule.canonical, true);
+
+  const decRule = getRule('ARCH-DEC-002');
+  assert.ok(decRule, 'ARCH-DEC-002 must be registered');
+  assert.strictEqual(decRule.analyzer, 'architecture');
+  assert.strictEqual(decRule.canonical, true);
 
   console.log(
     `  [PASS] Full analyzer integration & registry lookup (${RULE_REGISTRY.length} rules)`,

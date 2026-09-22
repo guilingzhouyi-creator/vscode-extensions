@@ -61,6 +61,13 @@ const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = (
     'child_process subprocess socket'
 ).split(' ');
 
+const DISALLOWED_PARSER_PACKAGES = [
+    'oxc-parser',
+    '@babel/parser',
+    'tree-sitter',
+    'ts-morph/dist',
+];
+
 /** ASCII code of carriage return, stripped from CRLF line endings before per-line analysis. */
 const CARRIAGE_RETURN_CHAR_CODE = 13;
 
@@ -370,6 +377,7 @@ export class ArchitectureAnalyzer implements Analyzer {
                 issues,
             );
             this.auditCrossDomainBypass(spec, file, lineIdx, ctx, opts, issues);
+            this.auditPolyglotAdapterDecoupling(spec, file, lineIdx, ctx, issues);
             if (spec.resolvedPath) {
                 const targetLayer = this.resolveLayer(spec.resolvedPath, opts, ctx);
                 if (
@@ -555,6 +563,38 @@ export class ArchitectureAnalyzer implements Analyzer {
                     SEVERITY_WARNING,
                     { file, specifier: spec.raw },
                     'Import through public module facade rather than private directories.',
+                ),
+            );
+        }
+    }
+
+    /**
+     * auditPolyglotAdapterDecoupling (ARCH-DEC-002).
+     * Disallow direct concrete parser dependencies in analyzer or domain code.
+     */
+    private auditPolyglotAdapterDecoupling(
+        spec: SpecifierInfo,
+        file: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const isAnalyzerOrDomain =
+            file.includes('analyzers/') || file.includes('analyzer') || file.includes('domain');
+        if (!isAnalyzerOrDomain) return;
+
+        const isDisallowed = DISALLOWED_PARSER_PACKAGES.some((pkg) => spec.raw.includes(pkg));
+        if (isDisallowed) {
+            const descriptor = ArchitectureMessages.POLYGLOT_PARSER_COUPLING(file, spec.raw);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'ARCH-DEC-002',
+                    descriptor.message,
+                    SEVERITY_WARNING,
+                    { file, specifier: spec.raw },
+                    descriptor.suggestion,
                 ),
             );
         }

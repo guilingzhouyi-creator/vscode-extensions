@@ -81,6 +81,20 @@ const FIXTURES = {
   ),
   'cli/tool.py': ['def main():', '    print("cli output")', ''].join('\n'),
   'scripts/tool.py': ['def main():', '    print("script output")', ''].join('\n'),
+  'deep_nested.ts': [
+    'export function deepCheck(a: number, b: number, c: number, d: number): number {',
+    '    if (a > 0) {',
+    '        if (b > 0) {',
+    '            if (c > 0) {',
+    '                if (d > 0) {',
+    '                    return a + b + c + d;',
+    '                }',
+    '            }',
+    '        }',
+    '    }',
+    '    return 0;',
+    '}',
+  ].join('\n'),
 };
 
 /**
@@ -96,7 +110,17 @@ function writeWorkspace(root) {
     fs.writeFileSync(abs, content);
   }
   const configPath = path.join(root, 'ar.config.json');
-  fs.writeFileSync(configPath, JSON.stringify({ thresholds: { maxFunctionLines: 60 } }));
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify({
+      thresholds: { maxFunctionLines: 60 },
+      analyzers: {
+        simplify: {
+          options: { checkGuardClauses: true, maxGuardClauseNesting: 3 },
+        },
+      },
+    }),
+  );
   return configPath;
 }
 
@@ -157,6 +181,12 @@ async function run() {
     assert.strictEqual(debug.length, 1, 'only non-CLI debug output qualifies');
     assert.strictEqual(debug[0].location.file, 'debug.py');
     console.log('  [PASS] SIM-PRNT-001 exempts cli/ and scripts/ paths');
+
+    const flat = byRule('SIM-FLAT-002');
+    assert.strictEqual(flat.length, 1, 'deeply nested function must trigger SIM-FLAT-002');
+    assert.strictEqual(flat[0].location.file, 'deep_nested.ts');
+    assert.ok(flat[0].detail.nestingDepth >= 4, 'nesting depth must be at least 4');
+    console.log('  [PASS] SIM-FLAT-002 flags deep conditional nesting and recommends guard clauses');
 
     const strictConfig = path.join(root, 'strict.config.json');
     fs.writeFileSync(

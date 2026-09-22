@@ -29,6 +29,8 @@ interface SimplifyOptions {
     maxFunctionLines?: number;
     commentedCodeMinLines?: number;
     printAllowPatterns?: string[];
+    checkGuardClauses?: boolean;
+    maxGuardClauseNesting?: number;
 }
 
 const DEFAULT_MAX_FUNCTION_LINES = 60;
@@ -61,6 +63,44 @@ const BRACE_EMPTY_ONE_LINER_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\
 const BRACE_OPEN_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*$/;
 const BRACE_CLOSE_RE = /^\s*\}\s*;?\s*$/;
 const COMMENT_MARKERS = ['//', '#', '*'];
+
+function computeControlFlowNesting(rootNode: NormalizedNode): number {
+    const rootChildren = rootNode.children;
+    if (!rootChildren || rootChildren.length === 0) return 0;
+
+    let max = 0;
+    const nodeStack: NormalizedNode[] = [];
+    const depthStack: number[] = [];
+
+    for (let i = 0; i < rootChildren.length; i++) {
+        const child = rootChildren[i];
+        if (!child.functionLike) {
+            const nextDepth = child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0;
+            nodeStack.push(child);
+            depthStack.push(nextDepth);
+        }
+    }
+
+    while (nodeStack.length > 0) {
+        const currentNode = nodeStack.pop()!;
+        const currentDepth = depthStack.pop()!;
+        if (currentDepth > max) max = currentDepth;
+
+        const children = currentNode.children;
+        if (children) {
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                if (!child.functionLike) {
+                    const inc =
+                        child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0;
+                    nodeStack.push(child);
+                    depthStack.push(currentDepth + inc);
+                }
+            }
+        }
+    }
+    return max;
+}
 
 /**
  * Simplification and structure-smell analyzer (language-agnostic).
@@ -98,19 +138,38 @@ export class SimplifyAnalyzer implements Analyzer {
         const opts = (ctx.options || {}) as SimplifyOptions;
         const limit = opts.maxFunctionLines ?? DEFAULT_MAX_FUNCTION_LINES;
         const length = node.end.line - node.start.line + 1;
-        if (length <= limit) return;
         const name = this.nameFor(node, className ?? null, binding ?? null);
-        this.longFunctions.push({
-            id: `simplify:SIM-LONG-001:${ctx.filePath}:${node.start.line}`,
-            analyzer: ANALYZER_SIMPLIFY,
-            rule: 'SIM-LONG-001',
-            severity: SEVERITY_WARNING,
-            message: `Function "${name}" spans ${length} lines (limit ${limit}).`,
-            location: locN(node, ctx.filePath),
-            detail: { function: name, lines: length, limit },
-            suggestion:
-                'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
-        });
+        if (length > limit) {
+            this.longFunctions.push({
+                id: `simplify:SIM-LONG-001:${ctx.filePath}:${node.start.line}`,
+                analyzer: ANALYZER_SIMPLIFY,
+                rule: 'SIM-LONG-001',
+                severity: SEVERITY_WARNING,
+                message: `Function "${name}" spans ${length} lines (limit ${limit}).`,
+                location: locN(node, ctx.filePath),
+                detail: { function: name, lines: length, limit },
+                suggestion:
+                    'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
+            });
+        }
+
+        if (opts.checkGuardClauses !== false && opts.checkGuardClauses !== undefined) {
+            const maxNesting = computeControlFlowNesting(node);
+            const maxAllowed = opts.maxGuardClauseNesting ?? 3;
+            if (maxNesting > maxAllowed) {
+                this.longFunctions.push({
+                    id: `simplify:SIM-FLAT-002:${ctx.filePath}:${node.start.line}`,
+                    analyzer: ANALYZER_SIMPLIFY,
+                    rule: 'SIM-FLAT-002',
+                    severity: SEVERITY_WARNING,
+                    message: `Function "${name}" has nested conditional control-flow depth ${maxNesting} (limit ${maxAllowed}). Flatten with guard clauses.`,
+                    location: locN(node, ctx.filePath),
+                    detail: { function: name, nestingDepth: maxNesting, limit: maxAllowed },
+                    suggestion:
+                        'Invert deep conditionals and return early with guard clauses to flatten control flow.',
+                });
+            }
+        }
     }
 
     /**

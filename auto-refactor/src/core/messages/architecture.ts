@@ -123,4 +123,23 @@ export const ArchitectureMessages = {
             'Exposing authentication secrets or password hashes in external data transfer objects risks credential theft and unauthorized access.',
         risk: RISK_HIGH,
     }),
+
+    // ARCH-DEC-002: Direct AST parser coupling in domain or analyzer
+    /**
+     * Build the ARCH-DEC-002 descriptor for direct concrete AST parser coupling.
+     *
+     * @param file - File path containing the coupling.
+     * @param specifier - Concrete parser module name.
+     * @returns Fresh descriptor with Medium risk and adapter extraction guidance.
+     */
+    POLYGLOT_PARSER_COUPLING: (file: string, specifier: string): DiagnosticDescriptor => ({
+        message: `Direct AST parser coupling: '${file}' directly couples to concrete parser '${specifier}'.`,
+        suggestion:
+            'Extract polyglot AST parsing to src/core/semantic/adapters/' +
+            ' and interact through NormalizedNode polymorphic interface.',
+        rationale:
+            'Analyzers and domain services must remain decoupled from specific' +
+            ' AST parser implementations to facilitate modular evolution.',
+        risk: 'Medium',
+    }),
 } as const;
