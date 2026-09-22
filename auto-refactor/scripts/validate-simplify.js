@@ -186,7 +186,9 @@ async function run() {
     assert.strictEqual(flat.length, 1, 'deeply nested function must trigger SIM-FLAT-002');
     assert.strictEqual(flat[0].location.file, 'deep_nested.ts');
     assert.ok(flat[0].detail.nestingDepth >= 4, 'nesting depth must be at least 4');
-    console.log('  [PASS] SIM-FLAT-002 flags deep conditional nesting and recommends guard clauses');
+    console.log(
+      '  [PASS] SIM-FLAT-002 flags deep conditional nesting and recommends guard clauses',
+    );
 
     const strictConfig = path.join(root, 'strict.config.json');
     fs.writeFileSync(

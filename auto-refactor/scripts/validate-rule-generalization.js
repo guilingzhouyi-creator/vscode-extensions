@@ -370,7 +370,10 @@ export class CustomService {}
     options: {},
   });
   const decoupleFinding = decoupleIssues.find((i) => i.rule === 'ARCH-DEC-002');
-  assert.ok(decoupleFinding, 'ArchitectureAnalyzer must emit ARCH-DEC-002 for direct parser coupling');
+  assert.ok(
+    decoupleFinding,
+    'ArchitectureAnalyzer must emit ARCH-DEC-002 for direct parser coupling',
+  );
 
   // Test Pyramid Layer Classification
   assert.strictEqual(classifyRuleLayer('HYG-WRAP-001'), 'layer1_universal');
@@ -416,7 +419,9 @@ function run() {
   testArchDispMultiLanguage();
   testAnalyzerIntegration();
 
-  console.log('\n>>> ALL Rule Generalization RULE GENERALIZATION CHECKS PASSED SUCCESSFULLY! <<<\n');
+  console.log(
+    '\n>>> ALL Rule Generalization RULE GENERALIZATION CHECKS PASSED SUCCESSFULLY! <<<\n',
+  );
 }
 
 run();

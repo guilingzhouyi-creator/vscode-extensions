@@ -26,7 +26,9 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Quality Quantification] Testing Quality Quantification & Anti-Gaming System ===\n');
+  console.log(
+    '=== [Quality Quantification] Testing Quality Quantification & Anti-Gaming System ===\n',
+  );
 
   // 1. Eight-Pillar Model and Custom Weights
   console.log('1. Testing Eight-Pillar Quality Model & Weight Synthesis...');

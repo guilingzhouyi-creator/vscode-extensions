@@ -236,34 +236,16 @@ async function checkSeverityEscalation(root) {
   console.log('  [PASS] de-escalation is not reported as a new finding');
 }
 
-function checkRenamePathShiftNormalization() {
-  assert.strictEqual(RULE_GOV_RTC_002, 'GOV-RTC-002');
-
-  const oldGroups = [
-    {
-      key: 'constants|hardcoded-string|src/legacy/old-util.ts',
-      count: 5,
-      severities: { warning: 5 },
-    },
-    {
-      key: 'simplify|SIM-LONG-001|src/unchanged.ts',
-      count: 1,
-      severities: { warning: 1 },
-    },
-  ];
-
-  const pathRemap = {
-    'src/legacy/old-util.ts': 'src/core/new-util.ts',
-  };
-
+function assertRemapKeysAndGroups(oldGroups, pathRemap) {
   const remappedKey = remapGroupKey(oldGroups[0].key, pathRemap);
   assert.strictEqual(remappedKey, 'constants|hardcoded-string|src/core/new-util.ts');
 
   const normalized = normalizeGroupsForRename(oldGroups, pathRemap);
   assert.strictEqual(normalized[0].key, 'constants|hardcoded-string|src/core/new-util.ts');
   assert.strictEqual(normalized[1].key, 'simplify|SIM-LONG-001|src/unchanged.ts');
+}
 
-  // When files are renamed, ratchetDownGroups with pathRemap prevents false-positive debt expansion
+function assertRatchetRemapBehavior(oldGroups, pathRemap) {
   const currentIssues = [
     {
       rule: 'hardcoded-string',
@@ -287,14 +269,12 @@ function checkRenamePathShiftNormalization() {
     },
   ];
 
-  // Without pathRemap: old-util.ts debt is pruned, new-util.ts is considered a new expansion
   const withoutRemap = ratchetDownGroups(oldGroups, currentIssues, false);
   assert.ok(
     withoutRemap.expandedKeys.length > 0,
     'without remap, rename triggers expansion rejection',
   );
 
-  // With pathRemap: new-util.ts matches prior baseline, debt count decreased from 5 to 1
   const withRemap = ratchetDownGroups(oldGroups, currentIssues, false, pathRemap);
   assert.strictEqual(
     withRemap.expandedKeys.length,
@@ -304,6 +284,30 @@ function checkRenamePathShiftNormalization() {
   assert.strictEqual(withRemap.decreasedCount, 4, 'debt decreased from 5 to 1');
   assert.strictEqual(withRemap.groups[0].key, 'constants|hardcoded-string|src/core/new-util.ts');
   assert.strictEqual(withRemap.groups[0].count, 1);
+}
+
+function checkRenamePathShiftNormalization() {
+  assert.strictEqual(RULE_GOV_RTC_002, 'GOV-RTC-002');
+
+  const oldGroups = [
+    {
+      key: 'constants|hardcoded-string|src/legacy/old-util.ts',
+      count: 5,
+      severities: { warning: 5 },
+    },
+    {
+      key: 'simplify|SIM-LONG-001|src/unchanged.ts',
+      count: 1,
+      severities: { warning: 1 },
+    },
+  ];
+
+  const pathRemap = {
+    'src/legacy/old-util.ts': 'src/core/new-util.ts',
+  };
+
+  assertRemapKeysAndGroups(oldGroups, pathRemap);
+  assertRatchetRemapBehavior(oldGroups, pathRemap);
 
   console.log('  [PASS] GOV-RTC-002: baseline refactoring rename path normalization validated');
 }

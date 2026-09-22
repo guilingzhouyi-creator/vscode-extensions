@@ -23,7 +23,9 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Data Architecture] Testing Data Architecture & Persistence Access Governance ===\n');
+  console.log(
+    '=== [Data Architecture] Testing Data Architecture & Persistence Access Governance ===\n',
+  );
 
   // 1. Direct Loop Query (N+1 Hazard - DAT-NPL-001)
   const directNPlusOneCode = `

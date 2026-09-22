@@ -124,7 +124,9 @@ async function main() {
   assert.ok(pillars.maintainability >= 98.0, 'Maintainability must be >= 98');
   assert.ok(pillars.performance >= 99.0, 'Performance must be >= 99');
   assert.ok(report.metrics.compositeScore >= INITIAL_SELF_AUDIT_BASELINE.compositeScore);
-  assert.ok(report.metrics.effectiveCodeDensity >= INITIAL_SELF_AUDIT_BASELINE.effectiveCodeDensity);
+  assert.ok(
+    report.metrics.effectiveCodeDensity >= INITIAL_SELF_AUDIT_BASELINE.effectiveCodeDensity,
+  );
 
   console.log(`✔ Security Pillar: 99.5 -> ${pillars.security.toFixed(1)} (+0.5).`);
   console.log(

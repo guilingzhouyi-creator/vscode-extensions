@@ -88,11 +88,9 @@ const FIXTURES = {
     '});',
   ].join('\n'),
 
-  'src/clean-module/jargon_python.py': [
-    'class PhaseOneWorker:',
-    '    pass',
-    'temp_var = 123',
-  ].join('\n'),
+  'src/clean-module/jargon_python.py': ['class PhaseOneWorker:', '    pass', 'temp_var = 123'].join(
+    '\n',
+  ),
 };
 
 function writeWorkspace(root) {
@@ -173,7 +171,9 @@ function verifyJargonRules(byRule) {
   assert.ok(jrg.some((i) => i.detail && i.detail.title === 'verify p0 regression'));
   assert.ok(jrg.some((i) => i.detail && i.detail.name === 'PhaseOneWorker'));
   assert.ok(jrg.some((i) => i.detail && i.detail.name === 'temp_var'));
-  console.log('  [PASS] NAM-JRG-002 flags transient construction jargon across TS and Python code/tests');
+  console.log(
+    '  [PASS] NAM-JRG-002 flags transient construction jargon across TS and Python code/tests',
+  );
 }
 
 async function run() {

@@ -22,7 +22,9 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Language Adapters] Testing Multi-Language Semantic Adapters & AST Bridge ===\n');
+  console.log(
+    '=== [Language Adapters] Testing Multi-Language Semantic Adapters & AST Bridge ===\n',
+  );
 
   // 1. Verify Path Normalization & Canonical Symbol ID
   const rawWinPath = 'C:\\Project\\src\\service\\authService.ts';
