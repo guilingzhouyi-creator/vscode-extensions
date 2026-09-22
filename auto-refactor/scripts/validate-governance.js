@@ -108,6 +108,21 @@ export function processOrder(order: any) { // Unsafe any (GOV-TYP-003)
 `,
   );
 
+  // Diagnostic message English violation fixture (GOV-MSG-001)
+  write(
+    'src/analyzers/sample_violating_analyzer.ts',
+    `export class ViolatingAnalyzer {
+    audit() {
+        return {
+            rule: 'TEST-001',
+            message: '严重错误：变量未定义',
+            suggestion: '请修复该变量声明',
+        };
+    }
+}
+`,
+  );
+
   // GDScript Sample with violations
   write(
     'backend/domains/battle_system.gd',
@@ -338,6 +353,12 @@ function verifyLanguageAdaptation(issues) {
   assert(
     pyExceptIssues.length > 0,
     `Python file correctly detected bare/swallowed except violation (${pyExceptIssues.length})`,
+  );
+
+  const msgIssues = issues.filter((i) => i.rule === 'GOV-MSG-001');
+  assert(
+    msgIssues.length > 0,
+    `Analyzer diagnostic message correctly detected non-English characters (GOV-MSG-001) (${msgIssues.length})`,
   );
 }
 

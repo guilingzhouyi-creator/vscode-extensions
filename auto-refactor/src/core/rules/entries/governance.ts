@@ -96,6 +96,19 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-dbg-001',
     }),
     defineRule({
+        id: 'GOV-MSG-001',
+        family: RULE_FAMILY_GOVERNANCE,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            '底层诊断消息与修复建议必须统一采用标准英文并由常量字典集中管控，严禁在分析器发射点硬编码内联或非 ASCII 文本。',
+        remediation:
+            '将内联错误提示提取至 `src/core/messages/` 集中常量池，并确保文案符合英语工业技术标准。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-msg-001',
+    }),
+    defineRule({
         id: 'GOV-EXC-001',
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,

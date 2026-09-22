@@ -37,7 +37,7 @@ import {
     SyncIoRule,
 } from './rules/performance';
 import { InheritanceDepthRule, DomainDecouplingRule } from './rules/maintainability';
-import { LexicalHygieneRule } from './rules/sanitization';
+import { LexicalHygieneRule, DiagnosticMessageRule } from './rules/sanitization';
 import {
     GiantExpressionRule,
     SingleLineMultiSemanticRule,
@@ -57,6 +57,7 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     // 1. Standardization
     RedundantBooleanRule,
     ModernConstructRule,
+    DiagnosticMessageRule,
     // 2. File Structure
     FileNamingRule,
     ModuleHeaderRule,

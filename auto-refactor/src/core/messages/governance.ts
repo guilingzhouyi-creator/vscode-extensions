@@ -41,6 +41,6 @@ export {
 
 export { InheritanceDepthRule, DomainDecouplingRule } from '../governance/rules/maintainability';
 
-export { LexicalHygieneRule } from '../governance/rules/sanitization';
+export { LexicalHygieneRule, DiagnosticMessageRule } from '../governance/rules/sanitization';
 
 export { BUILTIN_GOVERNANCE_RULES } from '../governance/registry';
