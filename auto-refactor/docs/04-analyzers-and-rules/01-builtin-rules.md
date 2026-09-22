@@ -114,6 +114,8 @@ $$\text{通用规范原则} \longrightarrow \text{语言能力适配层} \longri
 | `GOV-AGN-001` | `error` | 多 Agent 并发修改导致架构边界突破、跨模块循环依赖闭环或公共契约破坏。 | 协调并行 Agent 的架构边界与修改职责，消解跨模块并发循环依赖并维护单向分层契约。 |
 | `GOV-SLC-001` | `error` | AST 切片改动引入破坏性签名漂移或向外部调用链扩散不可控副作用。 | 确保切片改动向后兼容，或同步重构受影响调用链上的全部外部调用者。 |
 | `GOV-TRJ-001` | `error` | 历史演化轨迹呈现循环震荡（Flip-Flop）或反向退化，死灰复燃已被重构配方消除的架构反模式。 | 确保演化轨迹保持单调质量提升，避免在后续修订中死灰复燃已被重构配方消除的架构反模式。 |
+| `GOV-MSG-001` | `warning` | 底层诊断消息与建议必须统一采用标准英文并由常量字典集中管控，严禁在分析器发射点硬编码内联或非 ASCII 文本。 | 将内联提示提取至 `src/core/messages/` 集中常量池，并确保文案符合英语工业技术标准。 |
+| `GOV-RTC-002` | `warning` | 基线债务记录必须感知物理文件重命名，单调递减门禁在重构发生时必须重映射历史基线至新路径。 | 在基线更新与门禁收敛中应用重命名路径规范化映射 (pathRemap)，确保文件重构后既有基线连续继承，杜绝因重命名引发基线虚增或债务逃逸。 |
 
 ### 统一结构化诊断契约
 
@@ -257,6 +259,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `SIM-COMC-001` | `warning` | 连续 ≥ `commentedCodeMinLines`（默认 3）行「代码形状」注释。关键字锚定（`def`/`function`/`return`/`if`/`import`… 或 `NAME =` 形式），散文注释不会命中。 | 直接删除（历史在 git 里）或恢复为真实代码 |
 | `SIM-EMPTY-001` | `warning` | 函数体只剩 `pass`/`...`（跳过前置 docstring）或空 `{}`。 | 实现函数体、显式抛「未实现」异常，或删除声明 |
 | `SIM-PRNT-001` | `warning` | 非豁免路径出现调试输出（`print`/`pprint`/`breakpoint`/`console.log`/`println!`/`dbg!` 等）。默认豁免 `**/cli/**`、`**/scripts/**`、`**/tests/**`、`**/bench/**`、`*.test.*`、`*.spec.*`，可用 `printAllowPatterns` 覆盖。 | 改用结构化 logger 或删除；调试输出绕过日志级别并泄漏到生产 stdout |
+| `SIM-FLAT-002` | `warning` | 控制流深度嵌套超过阈值（默认 > 3 层），决策树过深增加心智负担。 | 采用卫语句（Guard Clauses）提前返回扁平化控制流，或将深层嵌套提炼为独立函数。 |
 
 **未内化项（需语句序列 / 符号引用分析，另行评估）**：布尔返回化简、`len()` 比较化简、冗余 `else`（均需兄弟语句分析）、未使用导入（需跨文件符号引用，且 TS/JS 与 Python 已有 ESLint/ruff 原生覆盖）。
 
@@ -469,6 +472,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `ARCH-ROL-002` | `warning` | 业务模块承载无界公共能力：领域业务模块内部私自承载与导出通用基础设施或公共计算能力。 | 将通用能力下沉至对应共享层或基础设施层，确保领域模块职责专注单一。 |
 | `ARCH-UTL-001` | `warning` | 万能工具库反模式：检测到承担混杂异构逻辑的 utils/common 垃圾桶文件。 | 按四分流治理原则重构：纯算子进入算法库、常量进入常量库、规则进入策略库、通用转换进入基础层。 |
 | `ARCH-ABS-001` | `warning` | 过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。 | 消除负收益间接跳板与人为抽象，容许领域隔离的局部正当实现。 |
+| `ARCH-DEC-002` | `warning` | 分析器或领域模型直接耦合具体 AST 解析器库（如 `oxc-parser`、`@babel/parser`、`tree-sitter`、`ts-morph/dist`）。 | 将底层 AST 解析抽取至独立适配器，面向统一的 NormalizedNode 抽象接口交互。 |
 
 ---
 
@@ -502,6 +506,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `NAM-VAG-001` | `warning` | 变量名使用了无业务语义的模糊泛化裸词（如 `data`、`res`、`ret`、`tmp`、`item` 等）。 | 结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。 |
 | `NAM-SGL-001` | `warning` | 在业务逻辑中使用无语义的单字母变量名（仅循环头计数器 `i`/`j`/`k` 与 discard 占位符 `_` 豁免）。 | 改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。 |
 | `NAM-COL-001` | `info` | 数组集合未使用复数名词，或字典映射未表达键值关联关系（如缺少 `*To*` 或 `*By*`）。 | 为数组集合增加复数形态，为字典映射添加 `*To*` 或 `*By*` 表达关联意图。 |
+| `NAM-JRG-002` | `warning` | 标识符、函数名、类名或测试套件名称中包含临时性施工批次黑话词（`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`）。 | 消除临时性工程批次词汇，使用具备长效业务语义的领域词汇或标准功能命名。 |
 
 ---
 

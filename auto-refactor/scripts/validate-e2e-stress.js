@@ -33,10 +33,10 @@ const { SymbolIndex } = require('../dist/core/intelligence/symbolIndex');
 const { CallGraph } = require('../dist/core/intelligence/callGraph');
 
 /**
- * Verify 180 canonical rules and tier distributions.
+ * Verify 185 canonical rules and tier distributions.
  */
 function verifyRulePyramidDistribution() {
-  assert.strictEqual(RULE_REGISTRY.length, 180);
+  assert.strictEqual(RULE_REGISTRY.length, 185);
   let layer1 = 0;
   let layer2 = 0;
   for (const r of RULE_REGISTRY) {

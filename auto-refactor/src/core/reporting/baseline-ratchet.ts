@@ -61,7 +61,8 @@ export interface BaselineUpdateOptions {
     /** When true, forces overwriting the baseline even if debt counts grow. Default false. */
     forceExpand?: boolean;
     /**
-     * Optional path remap dictionary (oldPath -> newPath) for refactoring normalization (GOV-RTC-002).
+     * Optional path remap dictionary (oldPath -> newPath) for refactoring
+     * normalization (GOV-RTC-002).
      */
     pathRemap?: Record<string, string>;
 }
