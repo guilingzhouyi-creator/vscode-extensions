@@ -92,10 +92,10 @@ check('inferCodeRoleFromPath produces correct CodeRole enum', () => {
 });
 
 check('classifyDiff annotates result with codeRole', () => {
-  const resTool = classifyDiff('const a = 1;', 'const a = 2;', undefined, 'scripts/bench.js');
+  const resTool = classifyDiff('const a = 1;', 'const a = 2;', 'scripts/bench.js');
   assert.strictEqual(resTool.codeRole, 'TOOL_SCRIPT');
 
-  const resProd = classifyDiff('const a = 1;', 'const a = 2;', undefined, 'src/core/diff.ts');
+  const resProd = classifyDiff('const a = 1;', 'const a = 2;', 'src/core/diff.ts');
   assert.strictEqual(resProd.codeRole, 'PRODUCTION');
 });
 

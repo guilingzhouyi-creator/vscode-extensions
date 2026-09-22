@@ -98,8 +98,6 @@ export interface DiffFileInput {
     oldContent: string;
     /** Content after this mutation; may be empty for a deletion. */
     newContent: string;
-    /** Optional pre-computed changed-line markers forwarded to the diff classifier. */
-    changedLines?: string[];
 }
 
 /**
@@ -681,8 +679,8 @@ function resolveActiveAnalyzersForFile(
     activeAnalyzers: Set<string>;
     currentDomains: ReturnType<typeof extractCodeDomains>;
 } {
-    const { filePath, oldContent, newContent, changedLines } = input;
-    const classification = classifyDiff(oldContent, newContent, changedLines, filePath);
+    const { filePath, oldContent, newContent } = input;
+    const classification = classifyDiff(oldContent, newContent, { filePath });
     const routing = routeDiffToAnalyzers(classification, {
         availableAnalyzers: scanner.getPlan().map((p) => p.name),
         forceFull: options.forceFull,

@@ -106,7 +106,7 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
         input: PraxisSliceAuditInput,
         callGraph?: CallGraph,
     ): Promise<PraxisSliceAuditVerdict> {
-        const startTime = Date.now();
+        const startHr = process.hrtime.bigint();
         const slices = this.extractor.extractSlices(
             input.filePath,
             input.oldContent,
@@ -129,7 +129,8 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
             }
         }
 
-        const latencyMs = Math.max(1, Date.now() - startTime);
+        const latencyUs = Number((process.hrtime.bigint() - startHr) / 1000n);
+        const latencyMs = Number(latencyUs) / 1000;
         const hasErrors = issues.some((i) => i.severity === 'error');
         const hasWarnings = issues.some((i) => i.severity === 'warning');
         const status: 'PASS' | 'WARN' | 'BLOCK' = hasErrors
@@ -144,6 +145,7 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
             routingPlan,
             impacts,
             issues,
+            latencyUs,
             latencyMs,
             status,
         };

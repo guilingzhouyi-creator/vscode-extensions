@@ -78,13 +78,25 @@ async function main() {
   assert(docClass.categories.has('COMMENT_DOC_ONLY'), 'Should contain COMMENT_DOC_ONLY');
 
   // 5. Language inference and DSpark confidence tier
-  const tsClass = classifyDiff('const A = 1;', 'const A = 2;', undefined, 'src/index.ts');
+  const tsClass = classifyDiff('const A = 1;', 'const A = 2;', 'src/index.ts');
   assert.strictEqual(tsClass.language, 'typescript', 'Should infer typescript from .ts');
   assert.strictEqual(tsClass.confidenceTier, 'HIGH', 'Literal change should be HIGH confidence');
 
-  const pyClass = classifyDiff('x = 1', 'import os\nx = 2', undefined, 'app/main.py');
+  const pyClass = classifyDiff('x = 1', 'import os\nx = 2', 'app/main.py');
   assert.strictEqual(pyClass.language, 'python', 'Should infer python from .py');
   assert.strictEqual(pyClass.confidenceTier, 'LOW', 'Import change should be LOW confidence');
+
+  // 6. True Diff Deletion & Doc-only Safety (F1 & D1 Guard)
+  const delClass = classifyDiff('if (!auth) throw new Error();', '');
+  assert(delClass.hasDeletion, 'Pure deletion must flag hasDeletion = true');
+  assert(delClass.signals.has('DELETION'), 'Pure deletion must emit DELETION signal');
+  assert(!delClass.isDocOnly, 'Code deletion must NOT be doc-only');
+  assert(delClass.categories.has('CONTROL_FLOW'), 'Deleted control flow must retain CONTROL_FLOW');
+  assert.strictEqual(
+    delClass.confidenceTier,
+    'LOW',
+    'Deleted control flow must yield LOW confidence',
+  );
 
   console.log('✔ Diff Semantic Classifier verified.\n');
 
@@ -197,7 +209,6 @@ async function main() {
       filePath: testFile,
       oldContent: initialContent,
       newContent: updatedContent,
-      changedLines: ['  return a * 100;'],
     },
   ]);
 

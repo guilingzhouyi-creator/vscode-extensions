@@ -63,6 +63,7 @@ export const EXTENSION_ADAPTER_IDS: Readonly<Record<string, string>> = {
     '.gd': 'gdscript',
     '.py': 'python',
     '.md': 'markdown',
+    '.go': 'go',
 };
 
 const cache: Record<string, LanguageAdapter> = {};
@@ -80,6 +81,8 @@ const factories: Record<string, () => LanguageAdapter> = {
     python: () => new (require('./python-adapter').PythonAdapter)(),
 
     markdown: () => new (require('./markdown-adapter').MarkdownAdapter)(),
+
+    go: () => new (require('./go-adapter').GoAdapter)(),
 };
 
 function getAdapter(id: string): LanguageAdapter {

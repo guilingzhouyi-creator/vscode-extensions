@@ -80,7 +80,6 @@ async function runBenchmark() {
         filePath: targetFile,
         oldContent: sampleOldLit,
         newContent: sampleNewLit,
-        changedLines: ['const MAX_TIMEOUT = 10000;'],
       },
     ]);
     fastVerdictA = exec.fastVerdict;
@@ -114,7 +113,6 @@ async function runBenchmark() {
       filePath: targetFile,
       oldContent: sampleOldStruct,
       newContent: sampleNewStruct,
-      changedLines: ['export function testA() { return 42; }'],
     },
   ]);
   const asymFastDurationB = Date.now() - t3;

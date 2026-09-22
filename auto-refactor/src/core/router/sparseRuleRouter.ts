@@ -22,6 +22,8 @@
 
 import type { DiffClassificationResult, DiffSemanticCategory } from './diffClassifier';
 import type { ProjectArchetype } from '../types';
+import { EXPERT_MANIFEST } from './expert-manifest';
+import { deriveCategoryMatrix, deriveArchetypeMatrix } from './expert-matrices';
 import {
     ANALYZER_CONSTANTS,
     ANALYZER_LARGE_FILE,
@@ -111,87 +113,17 @@ export interface SparseRouteResult {
 
 /**
  * Category-to-Analyzer Activation Matrix.
- * Defines which analyzers are sensitive to each mutation category.
+ * Dynamically derived from EXPERT_MANIFEST (single source of truth).
  */
-export const CATEGORY_ANALYZER_MATRIX: Record<DiffSemanticCategory, readonly string[]> = {
-    // Only literal values changed: strings, numbers, flags.
-    // Sensitive to: hardcoded constants and secret credentials.
-    LITERAL_ONLY: [ANALYZER_CONSTANTS, ANALYZER_SECRETS],
-
-    // Control flow mutations: if, switch, loops, try/catch, returns.
-    // Sensitive to: cyclomatic/cognitive complexity, performance hot-paths, hygiene,
-    // governance, security injection/eval.
-    CONTROL_FLOW: [
-        ANALYZER_COMPLEXITY,
-        ANALYZER_PERFORMANCE,
-        ANALYZER_HYGIENE,
-        ANALYZER_GOVERNANCE,
-        ANALYZER_SECURITY,
-    ],
-
-    // Type definitions, class/function signatures, interfaces.
-    // Sensitive to: architecture boundaries, governance, hygiene, comments/docs,
-    // security DTO exposure.
-    INTERFACE_SIGNATURE: [
-        ANALYZER_ARCHITECTURE,
-        ANALYZER_GOVERNANCE,
-        ANALYZER_HYGIENE,
-        ANALYZER_COMMENTS,
-        ANALYZER_SECURITY,
-    ],
-
-    // Imports, exports, require statements.
-    // Sensitive to: dependency graph, architecture layering, governance.
-    IMPORT_EXPORT: [ANALYZER_DEPENDENCY_GRAPH, ANALYZER_ARCHITECTURE, ANALYZER_GOVERNANCE],
-
-    // Documentation / comment only changes.
-    // Sensitive to: comments analyzer.
-    COMMENT_DOC_ONLY: [ANALYZER_COMMENTS],
-
-    // Arbitrary general code changes.
-    // Sensitive to: all analyzers.
-    GENERAL_CODE: ALL_BUILTIN_ANALYZERS,
-};
+export const CATEGORY_ANALYZER_MATRIX: Record<DiffSemanticCategory, readonly string[]> =
+    deriveCategoryMatrix(EXPERT_MANIFEST) as Record<DiffSemanticCategory, readonly string[]>;
 
 /**
  * Archetype-to-Analyzer activation matrix.
- * Directs focused reviewer subsets tailored to the project's operational domain.
+ * Dynamically derived from EXPERT_MANIFEST (single source of truth).
  */
-export const ARCHETYPE_ANALYZER_MATRIX: Record<ProjectArchetype, readonly string[]> = {
-    demo: [ANALYZER_CONSTANTS, ANALYZER_HYGIENE, ANALYZER_SIMPLIFY, ANALYZER_COMMENTS],
-    web: [
-        ANALYZER_SECURITY,
-        ANALYZER_HYGIENE,
-        ANALYZER_CONSTANTS,
-        ANALYZER_PERFORMANCE,
-        ANALYZER_GOVERNANCE,
-        ANALYZER_TYPESCRIPT_MODERN,
-        ANALYZER_COMPLEXITY,
-    ],
-    game: [
-        ANALYZER_PERFORMANCE,
-        ANALYZER_GDSCRIPT_MODERN,
-        ANALYZER_RUST_MODERN,
-        ANALYZER_GOVERNANCE,
-        ANALYZER_HYGIENE,
-        ANALYZER_COMPLEXITY,
-        ANALYZER_CONSTANTS,
-    ],
-    library: [
-        ANALYZER_ARCHITECTURE,
-        ANALYZER_DEPENDENCY_GRAPH,
-        ANALYZER_TYPESCRIPT_MODERN,
-        ANALYZER_PYTHON_MODERN,
-        ANALYZER_RUST_MODERN,
-        ANALYZER_DOCS,
-        ANALYZER_COMMENTS,
-        ANALYZER_GOVERNANCE,
-        ANALYZER_HYGIENE,
-        ANALYZER_LARGE_FILE,
-        ANALYZER_COMPLEXITY,
-        ANALYZER_CONSTANTS,
-    ],
-};
+export const ARCHETYPE_ANALYZER_MATRIX: Record<ProjectArchetype, readonly string[]> =
+    deriveArchetypeMatrix(EXPERT_MANIFEST);
 
 /**
  * Shared Experts in DeepSeek-V4.1 MoE architecture.

@@ -140,6 +140,8 @@ export interface PraxisSliceAuditVerdict {
     impacts: CallChainImpactResult[];
     /** Issues identified during slice inspection. */
     issues: Issue[];
+    /** High-resolution analysis latency in microseconds (C-06). */
+    latencyUs: number;
     /** Analysis latency in milliseconds. */
     latencyMs: number;
     /** Status indicating whether slice passes architectural governance. */

@@ -5,17 +5,19 @@
  * File Path: src/core/router/diffClassifier.ts
  * Architecture Role: Pure leaf classifier feeding sparse analyzer routing; it owns the
  *   shared DiffSemanticCategory vocabulary consumed by the category-to-analyzer policy
- * Dependencies & Triggers: No imports, IO or side effects; called by the FastTrack loop of
- *   src/core/pipeline/dualTrackPipeline.ts per changed file, right before sparseRuleRouter's
- *   routeDiffToAnalyzers consumes the returned classification
- * Responsibilities: Recover changed lines from old/new content when no explicit list is given;
- *   flag literal-only, control-flow, interface-signature, import/export and comment/doc-only
- *   mutations; return the category set plus the boolean flags of DiffClassificationResult
+ * Dependencies & Triggers: Imports true diff primitives from edit-diff and myers-algorithm,
+ *   and MutationSignal from expert-manifest; called by dualTrackPipeline FastTrack loop.
+ * Responsibilities: Compute true Myers line diff between old and new content; flag literal,
+ *   control-flow, interface, import/export, doc-only and deletion mutations; emit both
+ *   DiffSemanticCategory and MutationSignal sets with zero implicit fallback.
  * Exit Semantics & Design Rationale: Synchronous and never throws; empty input short-circuits
  *   to LITERAL_ONLY marked doc-only and an all-comment diff to COMMENT_DOC_ONLY. Unmatched or
- *   general code falls back to GENERAL_CODE, keeping the downstream route fail-open (all
- *   analyzers) instead of risking a missed analyzer on an uncertain diff.
+ *   general code falls back to GENERAL_CODE, keeping downstream routing fail-open.
  */
+
+import { computeEditRangesWithOps, linesOf } from '../diff/edit-diff';
+import { DIFF_OP_DELETE, DIFF_OP_INSERT } from '../diff/myers-algorithm';
+import type { MutationSignal } from './expert-manifest';
 
 /** Mutation category for a hunk whose only change is a literal value. */
 const LITERAL_ONLY_CATEGORY = 'LITERAL_ONLY' as const;
@@ -56,27 +58,35 @@ export type CodeRole =
     typeof CODE_ROLE_PRODUCTION | typeof CODE_ROLE_TOOL_SCRIPT | typeof CODE_ROLE_TEST_SUITE;
 
 /**
- * Outcome of one diff classification: matched categories plus per-dimension flags.
- *
- * `categories` is a de-duplicated set that may hold several entries at once; each boolean
- * mirrors whether the corresponding mutation kind was observed anywhere in the inspected
- * lines, so callers can gate individual analyzers without re-scanning the diff.
+ * Outcome of one diff classification: matched categories, mutation signals, and flags.
  */
 export interface DiffClassificationResult {
     categories: Set<DiffSemanticCategory>;
+    /** Fine-grained normative mutation signals for sparse routing. */
+    signals: Set<MutationSignal>;
     hasLiteralChange: boolean;
     hasControlFlowChange: boolean;
     hasInterfaceChange: boolean;
     hasImportExportChange: boolean;
+    /** True when any non-comment code lines were removed in this diff. */
+    hasDeletion: boolean;
     isDocOnly: boolean;
     /** DSpark confidence tier for speculative decoding and tiered verification bypass. */
     confidenceTier: 'HIGH' | 'MEDIUM' | 'LOW';
-    /** Inferred target language (e.g. 'typescript', 'python', 'rust', 'gdscript'). */
+    /** Inferred target language (e.g. 'typescript', 'python', 'rust', 'gdscript', 'go'). */
     language?: string;
     /** Associated target file path when provided. */
     filePath?: string;
     /** Inferred code role separating production runtime from tooling and test suites. */
     codeRole?: CodeRole;
+}
+
+/**
+ * Optional configuration options passed to {@link classifyDiff}.
+ */
+export interface DiffOptions {
+    /** Target file path used for language and architectural code role inference. */
+    filePath?: string;
 }
 
 const CONTROL_FLOW_RE =
@@ -93,28 +103,6 @@ interface DiffLineObservation {
     hasImportExport: boolean;
     hasLiteral: boolean;
     hasGeneralCode: boolean;
-}
-
-/**
- * Extract changed lines from old and new text when explicit changed lines are omitted.
- */
-function extractChangedLines(
-    oldContent: string,
-    newContent: string,
-    changedLines?: string[],
-): string[] {
-    if (changedLines) {
-        return changedLines;
-    }
-    const linesToInspect: string[] = [];
-    const oldLines = new Set(oldContent.split(/\r?\n/));
-    const newL = newContent.split(/\r?\n/);
-    for (const l of newL) {
-        if (!oldLines.has(l) && l.trim()) {
-            linesToInspect.push(l);
-        }
-    }
-    return linesToInspect;
 }
 
 /**
@@ -176,15 +164,6 @@ function inspectLines(lines: string[]): DiffLineObservation {
 }
 
 /**
- * Determine if observed changes qualify exclusively as a literal mutation.
- */
-function isLiteralOnlyObservation(obs: DiffLineObservation): boolean {
-    if (!obs.hasLiteral || obs.hasGeneralCode) return false;
-    if (obs.hasControlFlow || obs.hasInterface || obs.hasImportExport) return false;
-    return true;
-}
-
-/**
  * Infer source language from file path extension.
  */
 function inferLanguageFromPath(filePath?: string): string | undefined {
@@ -205,6 +184,8 @@ function inferLanguageFromPath(filePath?: string): string | undefined {
             return 'python';
         case '.rs':
             return 'rust';
+        case '.go':
+            return 'go';
         case '.gd':
             return 'gdscript';
         case '.md':
@@ -215,13 +196,16 @@ function inferLanguageFromPath(filePath?: string): string | undefined {
 }
 
 /**
- * Compute DSpark confidence tier based on mutation categories.
- * HIGH confidence indicates localized literal/doc modifications safe for speculative bypass.
+ * Compute DSpark confidence tier based on mutation categories and deletion attributes.
  */
 function computeConfidenceTier(
     categories: Set<DiffSemanticCategory>,
     isDocOnly: boolean,
+    hasStructuralDeletion: boolean,
 ): 'HIGH' | 'MEDIUM' | 'LOW' {
+    if (hasStructuralDeletion) {
+        return 'LOW';
+    }
     if (isDocOnly || (categories.size === 1 && categories.has(LITERAL_ONLY_CATEGORY))) {
         return 'HIGH';
     }
@@ -263,12 +247,15 @@ export function inferCodeRoleFromPath(filePath?: string): CodeRole {
  */
 function buildEmptyClassificationResult(filePath?: string): DiffClassificationResult {
     const categories = new Set<DiffSemanticCategory>([LITERAL_ONLY_CATEGORY]);
+    const signals = new Set<MutationSignal>(['LITERAL']);
     return {
         categories,
+        signals,
         hasLiteralChange: false,
         hasControlFlowChange: false,
         hasInterfaceChange: false,
         hasImportExportChange: false,
+        hasDeletion: false,
         isDocOnly: true,
         confidenceTier: 'HIGH',
         language: inferLanguageFromPath(filePath),
@@ -281,79 +268,138 @@ function buildEmptyClassificationResult(filePath?: string): DiffClassificationRe
  * Construct final DiffClassificationResult from aggregated line observations.
  */
 function buildClassificationResult(
-    obs: DiffLineObservation,
+    addedObs: DiffLineObservation,
+    removedObs: DiffLineObservation,
     filePath?: string,
 ): DiffClassificationResult {
     const categories = new Set<DiffSemanticCategory>();
+    const signals = new Set<MutationSignal>();
     const language = inferLanguageFromPath(filePath);
+    const codeRole = inferCodeRoleFromPath(filePath);
 
-    if (obs.allComments) {
+    if (addedObs.allComments && removedObs.allComments) {
         categories.add(COMMENT_DOC_ONLY_CATEGORY);
+        signals.add('DOC_COMMENT');
         return {
             categories,
+            signals,
             hasLiteralChange: false,
             hasControlFlowChange: false,
             hasInterfaceChange: false,
             hasImportExportChange: false,
+            hasDeletion: false,
             isDocOnly: true,
             confidenceTier: 'HIGH',
             language,
             filePath,
-            codeRole: inferCodeRoleFromPath(filePath),
+            codeRole,
         };
     }
 
-    if (obs.hasImportExport) categories.add(IMPORT_EXPORT_CATEGORY);
-    if (obs.hasInterface) categories.add(INTERFACE_SIGNATURE_CATEGORY);
-    if (obs.hasControlFlow) categories.add(CONTROL_FLOW_CATEGORY);
-    if (isLiteralOnlyObservation(obs)) {
+    const hasDeletion = !removedObs.allComments;
+    if (hasDeletion) {
+        signals.add('DELETION');
+    }
+
+    const hasImportExport = addedObs.hasImportExport || removedObs.hasImportExport;
+    const hasInterface = addedObs.hasInterface || removedObs.hasInterface;
+    const hasControlFlow = addedObs.hasControlFlow || removedObs.hasControlFlow;
+    const hasLiteral = addedObs.hasLiteral || removedObs.hasLiteral;
+    const hasGeneralCode = addedObs.hasGeneralCode || removedObs.hasGeneralCode;
+
+    if (hasImportExport) {
+        categories.add(IMPORT_EXPORT_CATEGORY);
+        signals.add('IMPORT_EXPORT');
+    }
+    if (hasInterface) {
+        categories.add(INTERFACE_SIGNATURE_CATEGORY);
+        signals.add('INTERFACE_SIGNATURE');
+    }
+    if (hasControlFlow) {
+        categories.add(CONTROL_FLOW_CATEGORY);
+        signals.add('CONTROL_FLOW');
+    }
+
+    const isLiteralOnlyChange =
+        hasLiteral && !hasGeneralCode && !hasControlFlow && !hasInterface && !hasImportExport;
+    if (isLiteralOnlyChange) {
         categories.add(LITERAL_ONLY_CATEGORY);
+        signals.add('LITERAL');
     }
-    if (categories.size === 0 || obs.hasGeneralCode) {
+    if (categories.size === 0 || hasGeneralCode) {
         categories.add(GENERAL_CODE_CATEGORY);
+        signals.add('GENERAL_CODE');
     }
+
+    const hasStructuralDeletion =
+        !removedObs.allComments &&
+        (removedObs.hasControlFlow ||
+            removedObs.hasInterface ||
+            removedObs.hasImportExport ||
+            removedObs.hasGeneralCode);
+    const confidenceTier = computeConfidenceTier(categories, false, hasStructuralDeletion);
 
     return {
         categories,
-        hasLiteralChange: obs.hasLiteral || categories.has(LITERAL_ONLY_CATEGORY),
-        hasControlFlowChange: obs.hasControlFlow,
-        hasInterfaceChange: obs.hasInterface,
-        hasImportExportChange: obs.hasImportExport,
+        signals,
+        hasLiteralChange: hasLiteral || categories.has(LITERAL_ONLY_CATEGORY),
+        hasControlFlowChange: hasControlFlow,
+        hasInterfaceChange: hasInterface,
+        hasImportExportChange: hasImportExport,
+        hasDeletion,
         isDocOnly: false,
-        confidenceTier: computeConfidenceTier(categories, false),
+        confidenceTier,
         language,
         filePath,
-        codeRole: inferCodeRoleFromPath(filePath),
+        codeRole,
     };
 }
 
 /**
- * Classify semantic categories from old and new content snippets or changed lines.
+ * Classify semantic categories and mutation signals from old and new content via true diff.
  *
- * When `changedLines` is omitted, candidate lines are derived from the content pair by keeping
- * non-blank new lines that do not exist in the old text; an empty candidate set reports an
- * empty literal-only diff marked as doc-only instead of throwing.
+ * Calculates Myers line-level diff ops between oldContent and newContent to extract
+ * added and removed lines, flagging structural deletions and computing sparse routing signals.
  *
- * @param oldContent - Full previous file text; read only to derive changed lines when no
- *   explicit `changedLines` list is supplied.
- * @param newContent - Current file text whose lines are compared against `oldContent`.
- * @param changedLines - Optional pre-computed changed lines; when present the two contents are
- *   ignored and the supplied lines are classified verbatim.
- * @param filePath - Optional path of target file used for language inference and metadata tracking.
- * @returns The matched category set and its boolean flags; never throws and always yields a
- *   result, falling back to `GENERAL_CODE` when a line resists narrower classification.
+ * @param oldContent - Full previous file text.
+ * @param newContent - Current file text compared against `oldContent`.
+ * @param options - Optional file path or DiffOptions object for language and role inference.
+ * @returns The matched category set, signal set, and boolean mutation flags; never throws.
  */
 export function classifyDiff(
     oldContent: string,
     newContent: string,
-    changedLines?: string[],
-    filePath?: string,
+    options?: DiffOptions | string,
 ): DiffClassificationResult {
-    const linesToInspect = extractChangedLines(oldContent, newContent, changedLines);
-    if (linesToInspect.length === 0) {
+    const filePath = typeof options === 'string' ? options : options?.filePath;
+    if (oldContent === newContent) {
         return buildEmptyClassificationResult(filePath);
     }
 
-    const obs = inspectLines(linesToInspect);
-    return buildClassificationResult(obs, filePath);
+    const { ops, oldIndex, newIndex } = computeEditRangesWithOps(oldContent, newContent);
+    if (ops.length === 0) {
+        return buildEmptyClassificationResult(filePath);
+    }
+
+    const oldLines = linesOf(oldContent, oldIndex.starts);
+    const newLines = linesOf(newContent, newIndex.starts);
+
+    const addedLines: string[] = [];
+    const removedLines: string[] = [];
+
+    for (const op of ops) {
+        if (op.type === DIFF_OP_INSERT) {
+            addedLines.push(newLines[op.bIdx]);
+        } else if (op.type === DIFF_OP_DELETE) {
+            removedLines.push(oldLines[op.aIdx]);
+        }
+    }
+
+    if (addedLines.length === 0 && removedLines.length === 0) {
+        return buildEmptyClassificationResult(filePath);
+    }
+
+    const addedObs = inspectLines(addedLines);
+    const removedObs = inspectLines(removedLines);
+    return buildClassificationResult(addedObs, removedObs, filePath);
 }
