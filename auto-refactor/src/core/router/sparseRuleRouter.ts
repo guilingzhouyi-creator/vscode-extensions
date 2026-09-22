@@ -20,10 +20,16 @@
  *   category mapping, and the ratio is rounded to 3 decimals for stable reporting.
  */
 
-import type { DiffClassificationResult, DiffSemanticCategory } from './diffClassifier';
+import type { DiffClassificationResult } from './diffClassifier';
 import type { ProjectArchetype } from '../types';
 import { EXPERT_MANIFEST } from './expert-manifest';
 import { deriveCategoryMatrix, deriveArchetypeMatrix } from './expert-matrices';
+import {
+    ERR_UNKNOWN_CATEGORY,
+    ERR_UNCLASSIFIED_FILE,
+    CATEGORY_GENERAL_CODE,
+    type DiffSemanticCategory,
+} from './sliceTypes';
 import {
     ANALYZER_CONSTANTS,
     ANALYZER_LARGE_FILE,
@@ -172,10 +178,12 @@ export interface RouterOptions {
     archetype?: ProjectArchetype;
 }
 
-const ROUTING_EVENT_UNKNOWN_CATEGORY = 'UNKNOWN_CATEGORY_FALLBACK' as const;
-const ROUTING_EVENT_UNCLASSIFIED_LANGUAGE = 'UNCLASSIFIED_LANGUAGE_FALLBACK' as const;
-const ENV_VAL_TRUE = 'true' as const;
-const ENV_VAL_ONE = '1' as const;
+/** Routing event tag emitted when unknown diff category fallback is triggered. */
+export const ROUTING_EVENT_UNKNOWN_CATEGORY = 'UNKNOWN_CATEGORY_FALLBACK' as const;
+
+/** Routing event tag emitted when unclassified language fallback is triggered. */
+export const ROUTING_EVENT_UNCLASSIFIED_LANGUAGE = 'UNCLASSIFIED_LANGUAGE_FALLBACK' as const;
+const LANG_ARTIFACT = 'artifact' as const;
 
 /** Callback hook for observing routing fallback telemetry in gray-scale stages. */
 export type RoutingFallbackListener = (event: {
@@ -197,15 +205,12 @@ export function setRoutingFallbackListener(listener: RoutingFallbackListener | n
 }
 
 /**
- * Check if fail-closed enforcement mode is enabled via environment.
+ * Check if fail-closed enforcement mode is enabled.
  *
- * @returns True if fail-closed mode is active.
+ * @returns True as fail-closed mode is unconditionally active in the MoE engine.
  */
 export function isFailClosedMode(): boolean {
-    return (
-        process.env.AUTO_REFACTOR_FAIL_CLOSED === ENV_VAL_TRUE ||
-        process.env.AUTO_REFACTOR_FAIL_CLOSED === ENV_VAL_ONE
-    );
+    return true;
 }
 
 /**
@@ -219,41 +224,38 @@ export function resolveCategoryTargets(
     cat: DiffSemanticCategory,
     archetype?: ProjectArchetype,
 ): readonly string[] {
-    if (cat === 'GENERAL_CODE' && archetype) {
+    if (cat === CATEGORY_GENERAL_CODE && archetype) {
         const archTargets = ARCHETYPE_ANALYZER_MATRIX[archetype];
         if (archTargets) return archTargets;
         if (fallbackListener) {
             fallbackListener({ type: ROUTING_EVENT_UNKNOWN_CATEGORY, category: cat, archetype });
         }
-        if (isFailClosedMode()) {
-            throw new Error(`[UNKNOWN_CATEGORY] Unknown archetype: ${archetype}`);
-        }
-        return ALL_BUILTIN_ANALYZERS;
+        throw new Error(`${ERR_UNKNOWN_CATEGORY} Unknown archetype: ${archetype}`);
     }
     const targets = CATEGORY_ANALYZER_MATRIX[cat];
     if (targets) return targets;
     if (fallbackListener) {
         fallbackListener({ type: ROUTING_EVENT_UNKNOWN_CATEGORY, category: cat });
     }
-    if (isFailClosedMode()) {
-        throw new Error(`[UNKNOWN_CATEGORY] Unknown diff category: ${cat}`);
-    }
-    return ALL_BUILTIN_ANALYZERS;
+    throw new Error(`${ERR_UNKNOWN_CATEGORY} Unknown diff category: ${cat}`);
 }
 
 /**
  * Filter out language-exclusive analyzers that do not match the detected language.
  *
  * @param active - Active analyzer set mutated in-place.
- * @param language - Detected programming language identifier.
+ * @param language - Detected programming language identifier or 'artifact'.
  */
 export function applyLanguageGating(active: Set<string>, language?: string): void {
     if (!language) {
         if (fallbackListener) {
             fallbackListener({ type: ROUTING_EVENT_UNCLASSIFIED_LANGUAGE });
         }
-        if (isFailClosedMode()) {
-            throw new Error(`[UNCLASSIFIED_FILE] File lacks registered language classification`);
+        throw new Error(`${ERR_UNCLASSIFIED_FILE} File lacks registered language classification`);
+    }
+    if (language === LANG_ARTIFACT) {
+        for (const spec of ALL_LANGUAGE_SPECIFIC_ANALYZERS) {
+            active.delete(spec);
         }
         return;
     }
@@ -391,7 +393,13 @@ export function routeArchetypeToAnalyzers(
     }
 
     const active = new Set<string>();
-    const targets = ARCHETYPE_ANALYZER_MATRIX[archetype] || ALL_BUILTIN_ANALYZERS;
+    const targets = ARCHETYPE_ANALYZER_MATRIX[archetype];
+    if (!targets) {
+        if (fallbackListener) {
+            fallbackListener({ type: ROUTING_EVENT_UNKNOWN_CATEGORY, archetype });
+        }
+        throw new Error(`${ERR_UNKNOWN_CATEGORY} Unknown archetype: ${archetype}`);
+    }
     for (const a of targets) {
         if (allSet.has(a)) {
             active.add(a);

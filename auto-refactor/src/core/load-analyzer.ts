@@ -17,6 +17,7 @@
  */
 
 import type { Analyzer } from './types';
+import { ERR_INVALID_CUSTOM_ANALYZER } from './router/sliceTypes';
 
 /** `typeof` tag identifying callable module exports and analyzer methods. */
 const TYPEOF_FUNCTION = 'function';
@@ -58,7 +59,9 @@ export function instantiateAnalyzer(mod: any, name: string): Analyzer {
         }
     }
     if (!resolved || typeof resolved.analyze !== TYPEOF_FUNCTION) {
-        throw new Error(`custom analyzer "${name}" does not export a valid Analyzer`);
+        throw new Error(
+            `${ERR_INVALID_CUSTOM_ANALYZER} custom analyzer "${name}" does not export a valid Analyzer`,
+        );
     }
     return resolved;
 }

@@ -47,7 +47,7 @@ async function main() {
   console.log('=== [1/5] Testing Diff Semantic Classifier ===');
 
   // 1. Literal only change
-  const litClass = classifyDiff('const TIMEOUT = 1000;', 'const TIMEOUT = 5000;');
+  const litClass = classifyDiff('const TIMEOUT = 1000;', 'const TIMEOUT = 5000;', 'src/config.ts');
   console.log('Literal only categories:', Array.from(litClass.categories));
   assert(litClass.categories.has('LITERAL_ONLY'), 'Should classify as LITERAL_ONLY');
   assert(!litClass.isDocOnly, 'Should not be doc only');
@@ -56,6 +56,7 @@ async function main() {
   const cfClass = classifyDiff(
     'function run() { doWork(); }',
     'function run() { if (ready) doWork(); else throw new Error(); }',
+    'src/worker.ts',
   );
   console.log('Control flow categories:', Array.from(cfClass.categories));
   assert(cfClass.categories.has('CONTROL_FLOW'), 'Should classify as CONTROL_FLOW');
@@ -64,6 +65,7 @@ async function main() {
   const impClass = classifyDiff(
     'import { a } from "./a";',
     'import { a } from "./a";\nimport { b } from "./b";',
+    'src/module.ts',
   );
   console.log('Import/export categories:', Array.from(impClass.categories));
   assert(impClass.categories.has('IMPORT_EXPORT'), 'Should classify as IMPORT_EXPORT');
@@ -72,6 +74,7 @@ async function main() {
   const docClass = classifyDiff(
     '// old doc\nfunction a() {}',
     '// updated documentation explanation\nfunction a() {}',
+    'src/doc.ts',
   );
   console.log('Doc only categories:', Array.from(docClass.categories));
   assert(docClass.isDocOnly, 'Should classify as isDocOnly');
@@ -87,7 +90,7 @@ async function main() {
   assert.strictEqual(pyClass.confidenceTier, 'LOW', 'Import change should be LOW confidence');
 
   // 6. True Diff Deletion & Doc-only Safety (F1 & D1 Guard)
-  const delClass = classifyDiff('if (!auth) throw new Error();', '');
+  const delClass = classifyDiff('if (!auth) throw new Error();', '', 'src/auth.ts');
   assert(delClass.hasDeletion, 'Pure deletion must flag hasDeletion = true');
   assert(delClass.signals.has('DELETION'), 'Pure deletion must emit DELETION signal');
   assert(!delClass.isDocOnly, 'Code deletion must NOT be doc-only');
@@ -141,32 +144,14 @@ async function main() {
     'ALL_LANGUAGE_SPECIFIC_ANALYZERS must declare at least 4 modernizers',
   );
   const routeTs = routeDiffToAnalyzers(tsClass);
-  assert(
-    !routeTs.activeAnalyzers.has('python-modern'),
-    'Language gating must prune python-modern for TypeScript',
-  );
-  assert(
-    !routeTs.activeAnalyzers.has('rust-modern'),
-    'Language gating must prune rust-modern for TypeScript',
-  );
-  assert(
-    !routeTs.activeAnalyzers.has('gdscript-modern'),
-    'Language gating must prune gdscript-modern for TypeScript',
-  );
+  assert(!routeTs.activeAnalyzers.has('python-modern'), 'Prune python-modern for TS');
+  assert(!routeTs.activeAnalyzers.has('rust-modern'), 'Prune rust-modern for TS');
+  assert(!routeTs.activeAnalyzers.has('gdscript-modern'), 'Prune gdscript-modern for TS');
 
   const routePy = routeDiffToAnalyzers(pyClass);
-  assert(
-    !routePy.activeAnalyzers.has('typescript-modern'),
-    'Language gating must prune typescript-modern for Python',
-  );
-  assert(
-    !routePy.activeAnalyzers.has('rust-modern'),
-    'Language gating must prune rust-modern for Python',
-  );
-  assert(
-    !routePy.activeAnalyzers.has('gdscript-modern'),
-    'Language gating must prune gdscript-modern for Python',
-  );
+  assert(!routePy.activeAnalyzers.has('typescript-modern'), 'Prune ts-modern for Python');
+  assert(!routePy.activeAnalyzers.has('rust-modern'), 'Prune rust-modern for Python');
+  assert(!routePy.activeAnalyzers.has('gdscript-modern'), 'Prune gdscript-modern for Python');
 
   const routeDoc = routeDiffToAnalyzers(docClass);
   console.log(
@@ -360,8 +345,9 @@ async function main() {
     assert(!demoRep.summary.activatedReviewers.active.includes('architecture'));
 
     // 2. Web workspace (package.json has express)
+    const webPkg = JSON.stringify({ name: 'web', dependencies: { express: '^4.18.0' } });
     const webDir = setupWs('web_app', {
-      'package.json': JSON.stringify({ name: 'web', dependencies: { express: '^4.18.0' } }),
+      'package.json': webPkg,
       'src/server.ts': 'export function app() {}\n',
     });
     const webRep = await scan({ root: webDir, cache: false, workers: 1 });
@@ -369,17 +355,19 @@ async function main() {
     assert(webRep.summary.activatedReviewers.active.includes('security'));
 
     // 3. Game workspace (project.godot exists)
-    const gameDir = setupWs('game_project', {
+    const gameFiles = {
       'project.godot': 'config_version=5\n',
       'scripts/player.gd': 'extends Node\nfunc _ready():\n\tpass\n',
-    });
+    };
+    const gameDir = setupWs('game_project', gameFiles);
     const gameRep = await scan({ root: gameDir, cache: false, workers: 1 });
     assert.strictEqual(gameRep.summary.activatedReviewers?.archetype, 'game');
     assert(gameRep.summary.activatedReviewers.active.includes('gdscript-modern'));
 
     // 4. Library workspace (package.json has main/module)
+    const libPkg = JSON.stringify({ name: 'my-lib', main: 'dist/index.js' });
     const libDir = setupWs('my_lib', {
-      'package.json': JSON.stringify({ name: 'my-lib', main: 'dist/index.js' }),
+      'package.json': libPkg,
       'src/index.ts': 'export function lib() {}\n',
     });
     const libRep = await scan({ root: libDir, cache: false, workers: 1 });

@@ -29,7 +29,7 @@ const { OxcAdapter } = require('../dist/core/oxc-adapter');
 const { GDScriptAdapter } = require('../dist/core/gdscript-adapter');
 const { PythonAdapter } = require('../dist/core/python-adapter');
 const { MarkdownAdapter } = require('../dist/core/markdown-adapter');
-const { GoAdapter } = require('../dist/core/go-adapter');
+const { GoAdapter } = require('../dist/core/ast/go-adapter');
 
 const RULE = 'LANG-UNSUPPORTED';
 

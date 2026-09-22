@@ -27,6 +27,9 @@ import type {
 } from '../router/sliceTypes';
 import type { Issue } from '../types';
 
+const NANOS_PER_MICRO = 1000n;
+const MICROS_PER_MILLI = 1000;
+
 /**
  * Interface contract provided to Praxis team for fine-grained AST slice audit governance.
  */
@@ -129,8 +132,8 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
             }
         }
 
-        const latencyUs = Number((process.hrtime.bigint() - startHr) / 1000n);
-        const latencyMs = Number(latencyUs) / 1000;
+        const latencyUs = Number((process.hrtime.bigint() - startHr) / NANOS_PER_MICRO);
+        const latencyMs = Number(latencyUs) / MICROS_PER_MILLI;
         const hasErrors = issues.some((i) => i.severity === 'error');
         const hasWarnings = issues.some((i) => i.severity === 'warning');
         const status: 'PASS' | 'WARN' | 'BLOCK' = hasErrors

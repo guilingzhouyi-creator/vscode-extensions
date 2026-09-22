@@ -73,9 +73,9 @@ const SIG_INSTRUCTION_SURFACE = 'INSTRUCTION_SURFACE' as const;
 const SIG_MANIFEST = 'MANIFEST' as const;
 const SIG_CONFIG_SECURITY = 'CONFIG_SECURITY' as const;
 const SIG_IO = 'IO' as const;
-const SIG_DELETION = 'DELETION' as const;
-const SIG_ASYNC = 'ASYNC' as const;
-const SIG_AGENT_METADATA = 'AGENT_METADATA' as const;
+const _SIG_DELETION = 'DELETION' as const;
+const _SIG_ASYNC = 'ASYNC' as const;
+const _SIG_AGENT_METADATA = 'AGENT_METADATA' as const;
 const _SIG_UNKNOWN = 'UNKNOWN' as const;
 
 /**
@@ -98,9 +98,9 @@ export type MutationSignal =
     | typeof SIG_MANIFEST
     | typeof SIG_CONFIG_SECURITY
     | typeof SIG_IO
-    | typeof SIG_DELETION
-    | typeof SIG_ASYNC
-    | typeof SIG_AGENT_METADATA
+    | typeof _SIG_DELETION
+    | typeof _SIG_ASYNC
+    | typeof _SIG_AGENT_METADATA
     | typeof _SIG_UNKNOWN;
 
 /**
@@ -117,6 +117,30 @@ export interface ExpertManifestEntry {
     description?: string;
 }
 
+const COST_30 = 30,
+    COST_40 = 40,
+    COST_45 = 45,
+    COST_50 = 50,
+    COST_60 = 60;
+const COST_70 = 70,
+    COST_85 = 85,
+    COST_90 = 90,
+    COST_95 = 95,
+    COST_110 = 110;
+const COST_120 = 120,
+    COST_130 = 130,
+    COST_140 = 140,
+    COST_150 = 150,
+    COST_160 = 160;
+const COST_180 = 180,
+    COST_200 = 200,
+    COST_250 = 250;
+const WEIGHT_3_0 = 3.0,
+    WEIGHT_3_2 = 3.2,
+    WEIGHT_3_5 = 3.5,
+    WEIGHT_4_0 = 4.0,
+    WEIGHT_4_5 = 4.5;
+
 /**
  * Canonical registry of all built-in expert manifests.
  * Single source of truth (C-01 & C-02).
@@ -126,7 +150,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_CONSTANTS,
         signals: [SIG_LITERAL, SIG_GENERAL_CODE],
         track: TRACK_FAST,
-        steadyCostUs: 45,
+        steadyCostUs: COST_45,
         weight: 1.0,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Magic numbers and duplicate literal extraction',
@@ -135,7 +159,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_LARGE_FILE,
         signals: [SIG_GENERAL_CODE, SIG_INTERFACE_SIGNATURE],
         track: TRACK_DEEP,
-        steadyCostUs: 30,
+        steadyCostUs: COST_30,
         weight: 1.2,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Large file splitting and modularization',
@@ -144,7 +168,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_COMPLEXITY,
         signals: [SIG_CONTROL_FLOW, SIG_GENERAL_CODE],
         track: TRACK_FAST,
-        steadyCostUs: 120,
+        steadyCostUs: COST_120,
         weight: 2.5,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Cyclomatic and cognitive complexity bounds',
@@ -153,8 +177,8 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_GOVERNANCE,
         signals: [SIG_IMPORT_EXPORT, SIG_INTERFACE_SIGNATURE, SIG_CONTROL_FLOW, SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 150,
-        weight: 3.0,
+        steadyCostUs: COST_150,
+        weight: WEIGHT_3_0,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Project norms and contract verification',
     },
@@ -162,8 +186,8 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_DEPENDENCY_GRAPH,
         signals: [SIG_IMPORT_EXPORT, SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 250,
-        weight: 4.5,
+        steadyCostUs: COST_250,
+        weight: WEIGHT_4_5,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Dependency cycle and layering verification',
     },
@@ -171,7 +195,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_SECRETS,
         signals: [SIG_LITERAL, SIG_GENERAL_CODE, SIG_NON_SOURCE],
         track: TRACK_FAST,
-        steadyCostUs: 40,
+        steadyCostUs: COST_40,
         weight: 1.0,
         fallback: FALLBACK_BLOCK,
         isSecurityFamily: true,
@@ -181,8 +205,8 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_ARCHITECTURE,
         signals: [SIG_IMPORT_EXPORT, SIG_INTERFACE_SIGNATURE, SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 200,
-        weight: 4.0,
+        steadyCostUs: COST_200,
+        weight: WEIGHT_4_0,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Architecture boundaries and domain integrity',
     },
@@ -190,8 +214,8 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_PERFORMANCE,
         signals: [SIG_CONTROL_FLOW, SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 180,
-        weight: 3.5,
+        steadyCostUs: COST_180,
+        weight: WEIGHT_3_5,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Loop allocations, pooling, and micro-benchmarks',
     },
@@ -199,7 +223,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_COMMENTS,
         signals: [SIG_DOC_COMMENT, SIG_COMMENT_DOC_ONLY, SIG_INTERFACE_SIGNATURE, SIG_GENERAL_CODE],
         track: TRACK_FAST,
-        steadyCostUs: 50,
+        steadyCostUs: COST_50,
         weight: 1.0,
         fallback: FALLBACK_SKIP,
         description: 'Contract documentation and comment hygiene',
@@ -208,7 +232,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_HYGIENE,
         signals: [SIG_LITERAL, SIG_INTERFACE_SIGNATURE, SIG_CONTROL_FLOW, SIG_GENERAL_CODE],
         track: TRACK_FAST,
-        steadyCostUs: 60,
+        steadyCostUs: COST_60,
         weight: 1.2,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Dead code, duplicate blocks, and naming hygiene',
@@ -224,7 +248,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
             SIG_GENERAL_CODE,
         ],
         track: TRACK_FAST,
-        steadyCostUs: 85,
+        steadyCostUs: COST_85,
         weight: 2.0,
         fallback: FALLBACK_BLOCK,
         isSecurityFamily: true,
@@ -234,7 +258,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_SIMPLIFY,
         signals: [SIG_CONTROL_FLOW, SIG_GENERAL_CODE],
         track: TRACK_FAST,
-        steadyCostUs: 70,
+        steadyCostUs: COST_70,
         weight: 1.5,
         fallback: FALLBACK_SKIP,
         description: 'Control flow simplification and guard clause inversion',
@@ -243,7 +267,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_PYTHON_MODERN,
         signals: [SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 110,
+        steadyCostUs: COST_110,
         weight: 2.2,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Python modernization and standard library idioms',
@@ -252,7 +276,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_TYPESCRIPT_MODERN,
         signals: [SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 95,
+        steadyCostUs: COST_95,
         weight: 2.0,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'TypeScript modernization, strict typing, and ES idioms',
@@ -261,7 +285,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_RUST_MODERN,
         signals: [SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 90,
+        steadyCostUs: COST_90,
         weight: 2.0,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Rust idioms and memory safety checks',
@@ -270,7 +294,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_GDSCRIPT_MODERN,
         signals: [SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 85,
+        steadyCostUs: COST_85,
         weight: 1.8,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'GDScript typing and node lifecycle best practices',
@@ -279,7 +303,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_DOCS,
         signals: [SIG_DOC_COMMENT, SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 60,
+        steadyCostUs: COST_60,
         weight: 1.2,
         fallback: FALLBACK_SKIP,
         description: 'API documentation completeness and parity',
@@ -288,7 +312,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_DATA_ARCHITECTURE,
         signals: [SIG_GENERAL_CODE, SIG_IO],
         track: TRACK_DEEP,
-        steadyCostUs: 130,
+        steadyCostUs: COST_130,
         weight: 2.8,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Data model invariants, schemas, and nullability',
@@ -297,8 +321,8 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_TEST_MODERNITY,
         signals: [SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 140,
-        weight: 3.0,
+        steadyCostUs: COST_140,
+        weight: WEIGHT_3_0,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Test effectiveness, anti-gaming, and tautology detection',
     },
@@ -306,8 +330,8 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_DEPENDENCY_LAYOUT,
         signals: [SIG_IMPORT_EXPORT, SIG_GENERAL_CODE],
         track: TRACK_DEEP,
-        steadyCostUs: 160,
-        weight: 3.2,
+        steadyCostUs: COST_160,
+        weight: WEIGHT_3_2,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Package layout, workspace structure, and packaging',
     },
@@ -315,7 +339,7 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         id: ANALYZER_NAMING,
         signals: [SIG_INTERFACE_SIGNATURE, SIG_GENERAL_CODE],
         track: TRACK_FAST,
-        steadyCostUs: 40,
+        steadyCostUs: COST_40,
         weight: 1.0,
         fallback: FALLBACK_SKIP,
         description: 'Identifier and physical naming conventions',

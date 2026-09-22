@@ -403,6 +403,10 @@ export interface CustomAnalyzerDeclaration {
     /** Module path or package specifier. Resolved relative to the config file's directory. */
     module: string;
     enabled?: boolean;
+    /** Mutation signals triggering this custom analyzer (Fail-Closed, N-08). */
+    signals?: readonly string[];
+    /** Execution track for this custom analyzer ('fast' | 'deep' | 'off') (N-08). */
+    track?: string;
     options?: Record<string, any>;
 }
 

@@ -67,7 +67,9 @@ async function scanFixture(root, enabled) {
       'no-console': { enabled: true },
       hygiene: { enabled: true, options: enabled ? { errorPropagation: true } : {} },
     },
-    customAnalyzers: [{ name: 'no-console', module: PLUGIN, enabled: true }],
+    customAnalyzers: [
+      { name: 'no-console', module: PLUGIN, enabled: true, signals: ['LITERAL'], track: 'fast' },
+    ],
   };
   const configFile = path.join(root, 'auto-refactor.config.json');
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));

@@ -164,6 +164,8 @@ export function hidden(): number { return 999; }
         name: 'no-console',
         module: path.join(SAMPLES, 'analyzers', 'noConsole.js'),
         enabled: true,
+        signals: ['LITERAL'],
+        track: 'fast',
         options: { severity: 'warning', allowed: ['error'] },
       },
     ],

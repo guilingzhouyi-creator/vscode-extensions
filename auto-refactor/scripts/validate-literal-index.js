@@ -36,7 +36,9 @@ const MATERIALIZED_CONFIG = {
     'no-console': { enabled: true },
     constants: { enabled: true, options: { crossFileLiteralClusters: true } },
   },
-  customAnalyzers: [{ name: 'no-console', module: PLUGIN, enabled: true }],
+  customAnalyzers: [
+    { name: 'no-console', module: PLUGIN, enabled: true, signals: ['LITERAL'], track: 'fast' },
+  ],
 };
 
 /** Config with streaming analyzers only, which takes the lazy-projection fast path. */

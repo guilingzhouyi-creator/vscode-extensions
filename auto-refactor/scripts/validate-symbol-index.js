@@ -75,7 +75,9 @@ const PLUGIN = path.join(__dirname, '..', 'samples', 'analyzers', 'noConsole.js'
 const CONFIG = {
   include: ['**/*.ts', '**/*.py'],
   analyzers: { 'no-console': { enabled: true } },
-  customAnalyzers: [{ name: 'no-console', module: PLUGIN, enabled: true }],
+  customAnalyzers: [
+    { name: 'no-console', module: PLUGIN, enabled: true, signals: ['LITERAL'], track: 'fast' },
+  ],
 };
 
 /**

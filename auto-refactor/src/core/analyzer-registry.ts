@@ -22,6 +22,7 @@ import * as path from 'path';
 import type { Analyzer, AnalyzerId, ScanConfig } from './types';
 import { AutoRefactorError } from './logger';
 import { instantiateAnalyzer } from './load-analyzer';
+import { ERR_INVALID_CUSTOM_ANALYZER } from './router/sliceTypes';
 import { ConstantsAnalyzer } from '../analyzers/constants';
 import { LargeFileAnalyzer } from '../analyzers/large-file';
 import { ComplexityAnalyzer } from '../analyzers/complexity';
@@ -150,7 +151,7 @@ function loadExternalAnalyzer(
         analyzer = instantiateAnalyzer(mod, decl.name);
     } catch (_e) {
         throw new AutoRefactorError(
-            `custom analyzer "${decl.name}" does not export a valid Analyzer from ${modPath}`,
+            `${ERR_INVALID_CUSTOM_ANALYZER} custom analyzer "${decl.name}" does not export a valid Analyzer from ${modPath}`,
             'MODULE_NOT_FOUND',
         );
     }
@@ -220,6 +221,11 @@ function resolveCustomAnalyzers(
 ): void {
     for (const c of config.customAnalyzers || []) {
         if (c.enabled === false || seen.has(c.name)) continue;
+        if (!c.signals || !Array.isArray(c.signals) || c.signals.length === 0 || !c.track) {
+            throw new Error(
+                `${ERR_INVALID_CUSTOM_ANALYZER} Custom analyzer '${c.name}' must declare 'signals' and 'track' (Fail-Closed, N-08)`,
+            );
+        }
         const { analyzer, modulePath } = loadExternalAnalyzer(c, baseDir);
         const customModulePath = modulePath;
         plan.push({

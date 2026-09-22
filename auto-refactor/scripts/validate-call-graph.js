@@ -31,7 +31,9 @@ const PLUGIN = path.join(__dirname, '..', 'samples', 'analyzers', 'noConsole.js'
 const MATERIALIZED_CONFIG = {
   include: ['**/*.ts'],
   analyzers: { 'no-console': { enabled: true } },
-  customAnalyzers: [{ name: 'no-console', module: PLUGIN, enabled: true }],
+  customAnalyzers: [
+    { name: 'no-console', module: PLUGIN, enabled: true, signals: ['LITERAL'], track: 'fast' },
+  ],
 };
 
 /** Streaming-only config: takes the lazy-projection fast path. */

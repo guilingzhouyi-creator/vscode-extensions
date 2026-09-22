@@ -42,6 +42,12 @@ const ADAPTER_ID_TYPESCRIPT = 'typescript';
 /** Adapter-registry id of the Rust `oxc-parser` TS/JS adapter (`parser: 'oxc'`). */
 const ADAPTER_ID_OXC = 'oxc';
 
+/** Adapter-registry id of the Go adapter. */
+const ADAPTER_ID_GO = 'go';
+
+/** Adapter-registry id of the Markdown adapter. */
+const ADAPTER_ID_MARKDOWN = 'markdown';
+
 /**
  * Extension -> built-in adapter id.
  *
@@ -62,27 +68,31 @@ export const EXTENSION_ADAPTER_IDS: Readonly<Record<string, string>> = {
     '.rs': 'rust',
     '.gd': 'gdscript',
     '.py': 'python',
-    '.md': 'markdown',
-    '.go': 'go',
+    '.md': ADAPTER_ID_MARKDOWN,
+    '.go': ADAPTER_ID_GO,
 };
 
 const cache: Record<string, LanguageAdapter> = {};
 const registered: Record<string, LanguageAdapter> = {};
 
+const ADAPTER_MODULES = {
+    typescript: './typescript-adapter',
+    rust: './rust-adapter',
+    oxc: './oxc-adapter',
+    gdscript: './gdscript-adapter',
+    python: './python-adapter',
+    markdown: './markdown-adapter',
+    go: './go-adapter',
+} as const;
+
 const factories: Record<string, () => LanguageAdapter> = {
-    typescript: () => new (require('./typescript-adapter').TypeScriptAdapter)(),
-
-    rust: () => new (require('./rust-adapter').RustAdapter)(),
-
-    oxc: () => new (require('./oxc-adapter').OxcAdapter)(),
-
-    gdscript: () => new (require('./gdscript-adapter').GDScriptAdapter)(),
-
-    python: () => new (require('./python-adapter').PythonAdapter)(),
-
-    markdown: () => new (require('./markdown-adapter').MarkdownAdapter)(),
-
-    go: () => new (require('./go-adapter').GoAdapter)(),
+    typescript: () => new (require(ADAPTER_MODULES.typescript).TypeScriptAdapter)(),
+    rust: () => new (require(ADAPTER_MODULES.rust).RustAdapter)(),
+    oxc: () => new (require(ADAPTER_MODULES.oxc).OxcAdapter)(),
+    gdscript: () => new (require(ADAPTER_MODULES.gdscript).GDScriptAdapter)(),
+    python: () => new (require(ADAPTER_MODULES.python).PythonAdapter)(),
+    [ADAPTER_ID_MARKDOWN]: () => new (require(ADAPTER_MODULES.markdown).MarkdownAdapter)(),
+    [ADAPTER_ID_GO]: () => new (require(ADAPTER_MODULES.go).GoAdapter)(),
 };
 
 function getAdapter(id: string): LanguageAdapter {

@@ -13,6 +13,42 @@
 
 import type { Issue } from '../types';
 
+/** Canonical domain error tag for invalid custom analyzer declarations (N-08). */
+export const ERR_INVALID_CUSTOM_ANALYZER = '[INVALID_CUSTOM_ANALYZER]' as const;
+
+/** Canonical domain error tag for unknown semantic diff categories (N-02). */
+export const ERR_UNKNOWN_CATEGORY = '[UNKNOWN_CATEGORY]' as const;
+
+/** Canonical domain error tag for unclassified files lacking language support (N-03). */
+export const ERR_UNCLASSIFIED_FILE = '[UNCLASSIFIED_FILE]' as const;
+
+/** Mutation category for a diff hunk modifying literal values only. */
+export const CATEGORY_LITERAL_ONLY = 'LITERAL_ONLY' as const;
+
+/** Mutation category for a diff hunk modifying control-flow structures. */
+export const CATEGORY_CONTROL_FLOW = 'CONTROL_FLOW' as const;
+
+/** Mutation category for a diff hunk modifying type or interface signatures. */
+export const CATEGORY_INTERFACE_SIGNATURE = 'INTERFACE_SIGNATURE' as const;
+
+/** Mutation category for a diff hunk modifying import or export statements. */
+export const CATEGORY_IMPORT_EXPORT = 'IMPORT_EXPORT' as const;
+
+/** Mutation category for a diff hunk modifying comments or documentation only. */
+export const CATEGORY_COMMENT_DOC_ONLY = 'COMMENT_DOC_ONLY' as const;
+
+/** Mutation category for unclassified or general multi-feature code modifications. */
+export const CATEGORY_GENERAL_CODE = 'GENERAL_CODE' as const;
+
+/** Closed vocabulary of mutation categories emitted by diff classification. */
+export type DiffSemanticCategory =
+    | typeof CATEGORY_LITERAL_ONLY
+    | typeof CATEGORY_CONTROL_FLOW
+    | typeof CATEGORY_INTERFACE_SIGNATURE
+    | typeof CATEGORY_IMPORT_EXPORT
+    | typeof CATEGORY_COMMENT_DOC_ONLY
+    | typeof CATEGORY_GENERAL_CODE;
+
 /** Kinds of semantic mutations detected within an AST slice. */
 export type SliceMutationKind =
     | 'signature'

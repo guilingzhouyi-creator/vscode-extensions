@@ -31,6 +31,7 @@ import type {
     LiteralPolicyConfig,
 } from '../types';
 import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from '../literal-policy-engine';
+import { ERR_INVALID_CUSTOM_ANALYZER } from '../router/sliceTypes';
 
 import {
     ANALYZER_ARCHITECTURE,
@@ -671,6 +672,43 @@ function applyCliAnalyzersFilter(
     return next;
 }
 
+/** Pick raw custom analyzers array based on configuration precedence. */
+function pickCustomAnalyzers(
+    overrides: ConfigOverrides,
+    fileCfg: Partial<ScanConfig>,
+    base: ScanConfig,
+): CustomAnalyzerDeclaration[] {
+    if (overrides.customAnalyzers && overrides.customAnalyzers.length > 0) {
+        return overrides.customAnalyzers;
+    }
+    if (fileCfg.customAnalyzers && fileCfg.customAnalyzers.length > 0) {
+        return fileCfg.customAnalyzers;
+    }
+    return base.customAnalyzers ?? [];
+}
+
+/** Check whether a custom analyzer satisfies Fail-Closed sparse routing contracts (N-08). */
+function isValidCustomAnalyzerContract(ca: CustomAnalyzerDeclaration): boolean {
+    return Boolean(Array.isArray(ca.signals) && ca.signals.length > 0 && ca.track);
+}
+
+/** Resolve and validate customAnalyzers declarations under Fail-Closed N-08. */
+function resolveCustomAnalyzersList(
+    overrides: ConfigOverrides,
+    fileCfg: Partial<ScanConfig>,
+    base: ScanConfig,
+): CustomAnalyzerDeclaration[] {
+    const list = pickCustomAnalyzers(overrides, fileCfg, base);
+    for (const ca of list) {
+        if (ca.enabled !== false && !isValidCustomAnalyzerContract(ca)) {
+            throw new Error(
+                `${ERR_INVALID_CUSTOM_ANALYZER} Custom analyzer '${ca.name}' must declare 'signals' and 'track' (Fail-Closed, N-08)`,
+            );
+        }
+    }
+    return list;
+}
+
 /**
  * Resolve a final config by layering (lowest -> highest precedence):
  *   1) built-in defaults (registry + thresholds + scheduling)
@@ -719,10 +757,7 @@ export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {
     const { commentLevel, securityLevel, classifyLiterals, granularRules } =
         applySemanticAndSecurityLevels(fileCfg, overrides, analyzers);
 
-    const customAnalyzers: CustomAnalyzerDeclaration[] =
-        (fileCfg.customAnalyzers && fileCfg.customAnalyzers.length
-            ? fileCfg.customAnalyzers
-            : base.customAnalyzers) || [];
+    const customAnalyzers = resolveCustomAnalyzersList(overrides, fileCfg, base);
 
     const merged: ScanConfig = {
         root,
