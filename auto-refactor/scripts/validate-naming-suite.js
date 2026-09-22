@@ -74,6 +74,25 @@ const FIXTURES = {
     '    const myTable = new Map();',
     '}',
   ].join('\n'),
+
+  'src/clean-module/jargon-symbols-test.ts': [
+    'export const phase1Result = 42;',
+    'export class PhaseTwoHandler {',
+    '    public p0Execute(): void {}',
+    '}',
+    'export function checkFlow(wipFlag: boolean): void {',
+    '    const tempBuffer = 10;',
+    '}',
+    'describe("test phase 1 features", () => {',
+    '    it("verify p0 regression", () => {});',
+    '});',
+  ].join('\n'),
+
+  'src/clean-module/jargon_python.py': [
+    'class PhaseOneWorker:',
+    '    pass',
+    'temp_var = 123',
+  ].join('\n'),
 };
 
 function writeWorkspace(root) {
@@ -142,6 +161,21 @@ function verifyVariablesAndCollections(byRule) {
   console.log('  [PASS] NAM-COL-001 checks Map relationship semantics');
 }
 
+function verifyJargonRules(byRule) {
+  const jrg = byRule('NAM-JRG-002');
+  assert.ok(jrg.length >= 6, `Expected at least 6 NAM-JRG-002 issues, got ${jrg.length}`);
+  assert.ok(jrg.some((i) => i.detail && i.detail.name === 'phase1Result'));
+  assert.ok(jrg.some((i) => i.detail && i.detail.name === 'PhaseTwoHandler'));
+  assert.ok(jrg.some((i) => i.detail && i.detail.name === 'p0Execute'));
+  assert.ok(jrg.some((i) => i.detail && i.detail.name === 'wipFlag'));
+  assert.ok(jrg.some((i) => i.detail && i.detail.name === 'tempBuffer'));
+  assert.ok(jrg.some((i) => i.detail && i.detail.title === 'test phase 1 features'));
+  assert.ok(jrg.some((i) => i.detail && i.detail.title === 'verify p0 regression'));
+  assert.ok(jrg.some((i) => i.detail && i.detail.name === 'PhaseOneWorker'));
+  assert.ok(jrg.some((i) => i.detail && i.detail.name === 'temp_var'));
+  console.log('  [PASS] NAM-JRG-002 flags transient construction jargon across TS and Python code/tests');
+}
+
 async function run() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-naming-'));
   try {
@@ -161,6 +195,7 @@ async function run() {
     verifyFileAndDirRules(byRule);
     verifyGlobalsAndTypes(byRule);
     verifyVariablesAndCollections(byRule);
+    verifyJargonRules(byRule);
 
     console.log('\n ALL NAMING SUITE VERIFICATION CHECKS PASSED SUCCESSFULLY!\n');
   } finally {

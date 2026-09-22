@@ -127,4 +127,17 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         remediation: '为数组集合增加复数形态，为字典映射添加 `*To*` 或 `*By*` 表达关联意图。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-col-001',
     }),
+    defineRule({
+        id: 'NAM-JRG-002',
+        family: RULE_FAMILY_NAMING,
+        analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            '工程资产与测试用例中严禁包含施工批次与临时黑话标记（禁止词：phase[0-9]+、p[0-9]+、st[0-9]+、temp、wip 等），覆盖测试套件名、函数符号与标识符。',
+        remediation:
+            '将施工批次标记替换为具有实际业务与领域架构含义的语义命名，杜绝将临时施工代号固化为资产。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-jrg-002',
+    }),
 ];

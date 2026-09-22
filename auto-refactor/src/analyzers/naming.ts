@@ -32,6 +32,7 @@ export interface NamingOptions {
     checkVagueNames?: boolean;
     checkSingleLetters?: boolean;
     checkCollections?: boolean;
+    checkJargon?: boolean;
     vagueBlacklist?: string[];
     singleLetterAllowed?: string[];
 }
@@ -47,6 +48,28 @@ const DEFAULT_SINGLE_LETTER_ALLOWED = new Set(['i', 'j', 'k', '_']);
 const JARGON_PATTERN_STR =
     '\\b(p[0-9]+|phase[\\s_]*[0-9]+|st[\\s_]*[0-9]+|temp|tmp|w' + 'ip|new)\\b';
 const TRANSIENT_JARGON_RE = new RegExp(JARGON_PATTERN_STR, 'i');
+const TEST_TITLE_JARGON_RE =
+    new RegExp('\\b(p[0-9]+|phase[\\s_-]*[0-9]+|st[\\s_-]*[0-9]+|temp|tmp|w' + 'ip)\\b', 'i');
+
+function hasTransientJargon(name: string): boolean {
+    const tokens = name
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/);
+    const JARGON_TOKEN_RE = /^(p\d+|phase\d*|st\d+|temp|tmp|wip)$/;
+    for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (JARGON_TOKEN_RE.test(t)) return true;
+        if (
+            (t === 'p' || t === 'st' || t === 'phase') &&
+            i + 1 < tokens.length &&
+            /^\d+$/.test(tokens[i + 1])
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
 
 const IGNORED_FILE_BASENAMES = new Set(
     'index main lib mod api types cli readme changelog license'.split(' '),
@@ -367,6 +390,9 @@ export class NamingAnalyzer implements Analyzer {
             this.checkIdentifierVagueness(name, pos, vagueSet, ctx, issues, opts);
             this.checkSingleLetter(name, pos, inLoop, singleAllowed, ctx, issues, opts);
             this.checkCollectionNaming(name, decl.initializer, pos, ctx, issues, opts);
+            if (opts.checkJargon !== false) {
+                this.checkSymbolJargon(name, pos, ctx, issues);
+            }
         } else if (ts.isObjectBindingPattern(decl.name) || ts.isArrayBindingPattern(decl.name)) {
             this.checkBindingPattern(
                 decl.name,
@@ -440,8 +466,8 @@ export class NamingAnalyzer implements Analyzer {
             | ts.EnumDeclaration;
         if (namedNode.name && ts.isIdentifier(namedNode.name)) {
             const typeName = namedNode.name.text;
+            const pos = sf.getLineAndCharacterOfPosition(namedNode.name.getStart(sf));
             if (!/^[A-Z][a-zA-Z0-9]*$/.test(typeName)) {
-                const pos = sf.getLineAndCharacterOfPosition(namedNode.name.getStart(sf));
                 issues.push(
                     this.mkIssue(
                         ctx,
@@ -454,6 +480,9 @@ export class NamingAnalyzer implements Analyzer {
                         `Rename '${typeName}' to PascalCase (e.g. '${typeName[0].toUpperCase()}${typeName.slice(1)}').`,
                     ),
                 );
+            }
+            if (opts.checkJargon !== false) {
+                this.checkSymbolJargon(typeName, pos, ctx, issues);
             }
         }
     }
@@ -470,8 +499,8 @@ export class NamingAnalyzer implements Analyzer {
             ts.MethodDeclaration | ts.PropertyDeclaration | ts.PropertyAssignment;
         if (member.name && ts.isIdentifier(member.name)) {
             const memberName = member.name.text;
+            const pos = sf.getLineAndCharacterOfPosition(member.name.getStart(sf));
             if (!/^[_]?[a-z][a-zA-Z0-9]*$/.test(memberName) && !/^[A-Z0-9_]+$/.test(memberName)) {
-                const pos = sf.getLineAndCharacterOfPosition(member.name.getStart(sf));
                 issues.push(
                     this.mkIssue(
                         ctx,
@@ -484,6 +513,9 @@ export class NamingAnalyzer implements Analyzer {
                         `Rename member '${memberName}' to camelCase.`,
                     ),
                 );
+            }
+            if (opts.checkJargon !== false) {
+                this.checkSymbolJargon(memberName, pos, ctx, issues);
             }
         }
     }
@@ -502,12 +534,19 @@ export class NamingAnalyzer implements Analyzer {
             | ts.ArrowFunction
             | ts.FunctionExpression
             | ts.MethodDeclaration;
+        if (ts.isFunctionDeclaration(node) && node.name && opts.checkJargon !== false) {
+            const pos = sf.getLineAndCharacterOfPosition(node.name.getStart(sf));
+            this.checkSymbolJargon(node.name.text, pos, ctx, issues);
+        }
         for (const param of fn.parameters) {
             if (ts.isIdentifier(param.name)) {
                 const paramName = param.name.text;
                 const pos = sf.getLineAndCharacterOfPosition(param.name.getStart(sf));
                 this.checkIdentifierVagueness(paramName, pos, vagueSet, ctx, issues, opts);
                 this.checkSingleLetter(paramName, pos, false, singleAllowed, ctx, issues, opts);
+                if (opts.checkJargon !== false) {
+                    this.checkSymbolJargon(paramName, pos, ctx, issues);
+                }
             }
         }
     }
@@ -556,6 +595,27 @@ export class NamingAnalyzer implements Analyzer {
                 this.checkMemberDeclaration(node, sf, opts, ctx, issues);
             } else if (this.isFunctionDecl(node)) {
                 this.checkFunctionParameters(node, sf, opts, vagueSet, singleAllowed, ctx, issues);
+            } else if (ts.isCallExpression(node) && opts.checkJargon !== false) {
+                if (ts.isIdentifier(node.expression) && ['describe', 'it', 'test', 'suite'].includes(node.expression.text)) {
+                    const arg0 = node.arguments[0];
+                    if (arg0 && (ts.isStringLiteral(arg0) || ts.isNoSubstitutionTemplateLiteral(arg0))) {
+                        if (TEST_TITLE_JARGON_RE.test(arg0.text)) {
+                            const pos = sf.getLineAndCharacterOfPosition(arg0.getStart(sf));
+                            issues.push(
+                                this.mkIssue(
+                                    ctx,
+                                    pos.line + 1,
+                                    pos.character + 1,
+                                    'NAM-JRG-002',
+                                    `Test title '${arg0.text}' contains transient construction jargon or milestone marker.`,
+                                    SEVERITY_WARNING,
+                                    { title: arg0.text },
+                                    'Remove transient batch markers (e.g. phaseXX, pXX) from test description.',
+                                ),
+                            );
+                        }
+                    }
+                }
             }
 
             ts.forEachChild(node, visit);
@@ -564,6 +624,28 @@ export class NamingAnalyzer implements Analyzer {
         };
 
         ts.forEachChild(sf, visit);
+    }
+
+    private checkSymbolJargon(
+        name: string,
+        pos: { line: number; character: number },
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (hasTransientJargon(name)) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    pos.line + 1,
+                    pos.character + 1,
+                    'NAM-JRG-002',
+                    `Symbol or test identifier '${name}' contains transient construction jargon or milestone marker.`,
+                    SEVERITY_WARNING,
+                    { name },
+                    'Replace transient process markers (e.g. phaseXX, pXX, stXX, wip) with semantic domain naming.',
+                ),
+            );
+        }
     }
 
     private checkIdentifierVagueness(
@@ -676,6 +758,20 @@ export class NamingAnalyzer implements Analyzer {
                 ),
             );
         }
+        if (opts.checkJargon !== false && hasTransientJargon(className)) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx + 1,
+                    1,
+                    'NAM-JRG-002',
+                    `Python class '${className}' contains transient construction jargon.`,
+                    SEVERITY_WARNING,
+                    { name: className },
+                    'Replace transient process markers with semantic domain naming.',
+                ),
+            );
+        }
     }
 
     private auditPythonAssignment(
@@ -714,6 +810,20 @@ export class NamingAnalyzer implements Analyzer {
                     SEVERITY_WARNING,
                     { name: varName },
                     `Replace '${varName}' with a meaningful name.`,
+                ),
+            );
+        }
+        if (opts.checkJargon !== false && hasTransientJargon(varName)) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx + 1,
+                    1,
+                    'NAM-JRG-002',
+                    `Python identifier '${varName}' contains transient construction jargon.`,
+                    SEVERITY_WARNING,
+                    { name: varName },
+                    'Replace transient process markers with semantic domain naming.',
                 ),
             );
         }
