@@ -73,6 +73,16 @@
       "reason": "该文件承载「故意违规」的验证夹具/自检语料：字符串里必须保留未记录的空 catch 才能断言规则命中；GOV-EXC-001 按行扫描不解析字符串边界，属已登记的精度限制"
     },
     {
+      "matchFile": "src/core/governance/semantic-naming-engine.ts",
+      "matchRule": "magic-number",
+      "reason": "该文件承载「协议码与命名映射表」（HTTP 状态码/端口/时间单位），表项即协议数值字典本身，按既有表类文件同一判据登记；真实逻辑控制阈值已抽离。"
+    },
+    {
+      "matchFile": "src/core/governance/semantic-naming-engine.ts",
+      "matchRule": "hardcoded-string",
+      "reason": "该文件承载「协议与事件命名词典」（HTTP/端口/事件/停用词），表项即映射目标符号与词表数据本身；应用代码仍逐条要求具名常量。"
+    },
+    {
       "matchFile": "src/core/governance/semanticLiterals.ts",
       "matchRule": "magic-number",
       "reason": "该文件承载「已知值表」（常用端口/HTTP 状态码/时长毫秒），表项本身即数据而非魔法数；拆成数百个具名标量只会降低可读性。真实比较阈值已提取为 MS_PER_SECOND/EPHEMERAL_PORT_MIN/PORT_MAX。"

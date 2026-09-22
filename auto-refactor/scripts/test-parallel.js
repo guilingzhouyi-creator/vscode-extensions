@@ -87,6 +87,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-suppression-gate', script: 'scripts/validate-suppression-gate.js' },
   { name: 'validate-five-core-capabilities', script: 'scripts/validate-five-core-capabilities.js' },
   { name: 'validate-rules-registry', script: 'scripts/validate-rules-registry.js' },
+  { name: 'validate-constant-governance', script: 'scripts/validate-constant-governance.js' },
   { name: 'validate-rule-aliases', script: 'scripts/validate-rule-aliases.js' },
   { name: 'validate-expert-manifest', script: 'scripts/validate-expert-manifest.js' },
   { name: 'validate-governance-exemptions', script: 'scripts/validate-governance-exemptions.js' },

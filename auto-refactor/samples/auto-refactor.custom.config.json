@@ -23,6 +23,8 @@
       "name": "no-console",
       "module": "./analyzers/noConsole.js",
       "enabled": true,
+      "signals": ["IO", "GENERAL_CODE"],
+      "track": "fast",
       "options": { "severity": "warning", "allowed": ["error"] }
     }
   ]

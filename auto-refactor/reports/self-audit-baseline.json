@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790057620004",
-  "timestamp": "2026-09-22T06:13:41.929Z",
+  "snapshotId": "snapshot-v0.4.0-1790077151345",
+  "timestamp": "2026-09-22T11:39:13.426Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,36 +8,36 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "3575edb24ea156d03398a928ff72f68a4a0a42dacb7a50ebfa56c1829c67bade",
+  "rulesDigest": "49c5776832a0e2fc074c1358527b54ab3d4509d03a30302bd0d5c9a9bb5c2d6a",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 370,
-    "durationMs": 1781
+    "filesScanned": 389,
+    "durationMs": 1926
   },
   "metrics": {
-    "compositeScore": 99.8,
+    "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 6576,
-    "suppressedIssues": 3003,
-    "unsuppressedIssues": 3573,
+    "totalIssues": 6816,
+    "suppressedIssues": 3216,
+    "unsuppressedIssues": 3600,
     "bySeverity": {
-      "info": 192,
-      "warning": 6384,
+      "info": 198,
+      "warning": 6618,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 162,
-      "medium": 5800,
-      "low": 614
+      "medium": 6035,
+      "low": 619
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 99.1,
+      "maintainability": 99.2,
       "performance": 99.8,
       "data": 100,
       "testing": 100,
@@ -45,7 +45,7 @@
       "security": 100,
       "extensibility": 100
     },
-    "compositeScore": 99.8,
+    "compositeScore": 99.9,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -78,6 +78,15 @@
       "effectiveDensity": 0.98
     },
     {
+      "filePath": "scripts/test-parallel.js",
+      "domain": "scripts",
+      "totalIssues": 108,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.94
+    },
+    {
       "filePath": "src/api.ts",
       "domain": "src",
       "totalIssues": 107,
@@ -87,13 +96,13 @@
       "effectiveDensity": 0.96
     },
     {
-      "filePath": "scripts/test-parallel.js",
+      "filePath": "scripts/bench-baselines.js",
       "domain": "scripts",
-      "totalIssues": 103,
+      "totalIssues": 102,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
-      "effectiveDensity": 0.94
+      "effectiveDensity": 0.95
     },
     {
       "filePath": "scripts/validate-phase12-multi-agent.js",
@@ -105,9 +114,9 @@
       "effectiveDensity": 0.96
     },
     {
-      "filePath": "scripts/bench-baselines.js",
-      "domain": "scripts",
-      "totalIssues": 100,
+      "filePath": "src/core/governance/semantic-naming-engine.ts",
+      "domain": "governance",
+      "totalIssues": 80,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -139,23 +148,14 @@
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.99
-    },
-    {
-      "filePath": "scripts/validate-equivalence.js",
-      "domain": "scripts",
-      "totalIssues": 62,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.94
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
       "high": 162,
-      "medium": 5800,
-      "low": 614
+      "medium": 6035,
+      "low": 619
     },
     "criticalItems": [],
     "highItems": [
@@ -615,7 +615,7 @@
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 99.9,
+        "compositeScore": 100,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.8,
@@ -738,7 +738,7 @@
         "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.8,
+          "maintainability": 98.2,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -933,7 +933,7 @@
         "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.6,
+          "maintainability": 98.8,
           "performance": 100,
           "data": 100,
           "testing": 100,

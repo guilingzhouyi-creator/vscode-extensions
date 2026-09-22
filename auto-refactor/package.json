@@ -60,6 +60,7 @@
     "validate-five-core-capabilities": "node scripts/validate-five-core-capabilities.js",
     "validate-suppression-gate": "node scripts/validate-suppression-gate.js",
     "validate-rules-registry": "node scripts/validate-rules-registry.js",
+    "validate-constant-governance": "node scripts/validate-constant-governance.js",
     "validate-docs": "node scripts/validate-docs.js",
     "validate-project-neutrality": "node scripts/validate-project-neutrality.js",
     "validate-consumer-runner": "node scripts/validate-consumer-runner.js",

@@ -233,7 +233,9 @@
         "type": "object",
         "required": [
           "name",
-          "module"
+          "module",
+          "signals",
+          "track"
         ],
         "properties": {
           "name": {
@@ -583,7 +585,11 @@
         {
           "name": "no-console",
           "module": "./analyzers/noConsole.js",
-          "enabled": true
+          "enabled": true,
+          "signals": [
+            "LITERAL"
+          ],
+          "track": "fast"
         }
       ],
       "logLevel": "warn",

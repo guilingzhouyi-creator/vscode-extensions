@@ -163,6 +163,8 @@ function buildConfig(root, workers) {
         name: 'no-console',
         module: path.join(ROOT, 'samples', 'analyzers', 'noConsole.js'),
         enabled: true,
+        signals: ['LITERAL'],
+        track: 'fast',
         options: { severity: 'warning', allowed: ['error'] },
       },
     ],

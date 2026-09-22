@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790057607321",
-  "timestamp": "2026-09-22T06:13:27.321Z",
+  "snapshotId": "snapshot-v0.4.0-1790077137955",
+  "timestamp": "2026-09-22T11:38:57.955Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "3575edb24ea156d03398a928ff72f68a4a0a42dacb7a50ebfa56c1829c67bade",
+  "rulesDigest": "49c5776832a0e2fc074c1358527b54ab3d4509d03a30302bd0d5c9a9bb5c2d6a",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 174,
+    "ruleCount": 180,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -65,6 +65,12 @@
     "CMT-MOJI-001",
     "CMT-SEP-001",
     "CMT-WID-001",
+    "CONST-CLU-001",
+    "CONST-DRF-001",
+    "CONST-LAY-001",
+    "CONST-OWN-001",
+    "CONST-SCP-001",
+    "CONST-SCP-002",
     "CPX-AMP-001",
     "CPX-BUD-001",
     "CPX-HOP-001",
