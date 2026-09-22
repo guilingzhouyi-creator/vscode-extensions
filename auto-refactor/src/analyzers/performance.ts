@@ -105,6 +105,7 @@ export class PerformanceAnalyzer implements Analyzer {
      * @returns Performance issues ordered by line; severity is `info`, `warning` or `error`.
      */
     analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+        void sf;
         const opts = (ctx.options || {}) as PerformanceOptions;
         const maxNesting = opts.maxLoopNesting ?? DEFAULT_MAX_LOOP_NESTING;
         const checkIO = opts.checkBlockingIO !== false;
@@ -122,6 +123,14 @@ export class PerformanceAnalyzer implements Analyzer {
             syncIoAllowPatterns.length > 0 && matchAny(syncIoAllowPatterns, file);
         const isIndentBased = file.endsWith('.py') || file.endsWith('.gd');
 
+        const scanConfig = {
+            maxNesting,
+            checkAlloc,
+            checkIO,
+            syncIoAllowlisted,
+            isIndentBased,
+        };
+
         let lineStart = 0;
         let lineIdx = 0;
         const scanState: LineScanState = { inAsyncFunction: false, inBlockComment: false };
@@ -136,45 +145,7 @@ export class PerformanceAnalyzer implements Analyzer {
                 continue;
             }
 
-            this.updateIndentLoops(nextLine.lineText, isIndentBased, loopStack);
-            if (this.isAsyncDeclaration(nextLine.trimmed)) {
-                scanState.inAsyncFunction = true;
-            }
-
-            this.checkLoopNesting(
-                nextLine.trimmed,
-                nextLine.lineText,
-                maxNesting,
-                lineIdx,
-                ctx,
-                loopStack,
-                issues,
-            );
-
-            if (loopStack.length > 0 && checkAlloc) {
-                this.checkTransientAllocation(
-                    nextLine.trimmed,
-                    lineIdx,
-                    ctx,
-                    loopStack.length,
-                    issues,
-                );
-            }
-
-            if (checkIO && !syncIoAllowlisted) {
-                this.checkBlockingIo(
-                    nextLine.trimmed,
-                    nextLine.lineText,
-                    lineIdx,
-                    scanState.inAsyncFunction,
-                    ctx,
-                    issues,
-                );
-            }
-
-            if (!isIndentBased) {
-                this.updateBraceLoops(nextLine.trimmed, loopStack);
-            }
+            this.scanLineContent(nextLine, lineIdx, ctx, scanConfig, scanState, loopStack, issues);
 
             lineIdx++;
         }
@@ -184,6 +155,56 @@ export class PerformanceAnalyzer implements Analyzer {
         }
 
         return issues;
+    }
+
+    private scanLineContent(
+        nextLine: { lineText: string; trimmed: string },
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        scanConfig: {
+            maxNesting: number;
+            checkAlloc: boolean;
+            checkIO: boolean;
+            syncIoAllowlisted: boolean;
+            isIndentBased: boolean;
+        },
+        scanState: LineScanState,
+        loopStack: LoopScope[],
+        issues: Issue[],
+    ): void {
+        this.updateIndentLoops(nextLine.lineText, scanConfig.isIndentBased, loopStack);
+        if (this.isAsyncDeclaration(nextLine.trimmed)) {
+            scanState.inAsyncFunction = true;
+        }
+
+        this.checkLoopNesting(
+            nextLine.trimmed,
+            nextLine.lineText,
+            scanConfig.maxNesting,
+            lineIdx,
+            ctx,
+            loopStack,
+            issues,
+        );
+
+        if (loopStack.length > 0 && scanConfig.checkAlloc) {
+            this.checkTransientAllocation(nextLine.trimmed, lineIdx, ctx, loopStack.length, issues);
+        }
+
+        if (scanConfig.checkIO && !scanConfig.syncIoAllowlisted) {
+            this.checkBlockingIo(
+                nextLine.trimmed,
+                nextLine.lineText,
+                lineIdx,
+                scanState.inAsyncFunction,
+                ctx,
+                issues,
+            );
+        }
+
+        if (!scanConfig.isIndentBased) {
+            this.updateBraceLoops(nextLine.trimmed, loopStack);
+        }
     }
 
     private extractNextLine(
@@ -213,7 +234,9 @@ export class PerformanceAnalyzer implements Analyzer {
             }
             return true;
         }
-        if (trimmed.startsWith('/*') || (isIndentBased && trimmed.startsWith('"""'))) {
+        const isBlockStart =
+            trimmed.startsWith('/*') || (isIndentBased && trimmed.startsWith('"""'));
+        if (isBlockStart) {
             if (!trimmed.endsWith('*/') && !trimmed.endsWith('"""')) {
                 state.inBlockComment = true;
             }

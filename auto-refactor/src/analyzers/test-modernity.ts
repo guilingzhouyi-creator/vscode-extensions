@@ -131,6 +131,19 @@ function createLineCaseRecord(name: string, line: number): CaseRecord {
     };
 }
 
+function isTestFilePath(filePath: string): boolean {
+    const lowerPath = filePath.toLowerCase().replace(/\\/g, '/');
+    return (
+        lowerPath.includes('test') ||
+        lowerPath.includes('spec') ||
+        lowerPath.includes('__tests__') ||
+        lowerPath.endsWith('_test.py') ||
+        lowerPath.startsWith('test_') ||
+        lowerPath.endsWith('_test.gd') ||
+        lowerPath.includes('/test_')
+    );
+}
+
 /**
  * Analyzer detecting test integrity illusions and obsolete test suites.
  */
@@ -138,17 +151,7 @@ export class TestModernityAnalyzer implements Analyzer {
     name = 'test-modernity' as const;
 
     analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
-        const lowerPath = ctx.filePath.toLowerCase().replace(/\\/g, '/');
-        const isTestFile =
-            lowerPath.includes('test') ||
-            lowerPath.includes('spec') ||
-            lowerPath.includes('__tests__') ||
-            lowerPath.endsWith('_test.py') ||
-            lowerPath.startsWith('test_') ||
-            lowerPath.endsWith('_test.gd') ||
-            lowerPath.includes('/test_');
-
-        if (!isTestFile) {
+        if (!isTestFilePath(ctx.filePath)) {
             return [];
         }
 
@@ -374,24 +377,22 @@ export class TestModernityAnalyzer implements Analyzer {
         }
     }
 
-    /**
-     * Determine if an assertion is tautological (comparing invariant or identical operands).
-     */
-    private checkTautological(node: ts.CallExpression, sf: ts.SourceFile): boolean {
-        if (!ts.isPropertyAccessExpression(node.expression)) {
-            if (node.expression.getText(sf) === 'assert' && node.arguments.length > 0) {
-                const arg = node.arguments[0].getText(sf).replace(/\s+/g, '');
-                return arg === 'true' || arg === '1===1' || arg === '1==1';
-            }
+    private checkDirectAssertTautological(node: ts.CallExpression, sf: ts.SourceFile): boolean {
+        if (node.expression.getText(sf) === 'assert' && node.arguments.length > 0) {
+            const arg = node.arguments[0].getText(sf).replace(/\s+/g, '');
+            return arg === 'true' || arg === '1===1' || arg === '1==1';
+        }
+        return false;
+    }
+
+    private checkExpectMatcherTautological(node: ts.CallExpression, sf: ts.SourceFile): boolean {
+        const prop = node.expression as ts.PropertyAccessExpression;
+        const method = prop.name.text;
+        if (!EQUALITY_MATCHERS.has(method) || !ts.isCallExpression(prop.expression)) {
             return false;
         }
 
-        const method = node.expression.name.text;
-        if (!EQUALITY_MATCHERS.has(method) || !ts.isCallExpression(node.expression.expression)) {
-            return false;
-        }
-
-        const innerCall = node.expression.expression;
+        const innerCall = prop.expression;
         if (
             innerCall.expression.getText(sf) !== 'expect' ||
             innerCall.arguments.length === 0 ||
@@ -402,10 +403,18 @@ export class TestModernityAnalyzer implements Analyzer {
 
         const actual = innerCall.arguments[0].getText(sf).trim();
         const expected = node.arguments[0].getText(sf).trim();
-        // An assertion whose two sides are both invariant literals verifies nothing beyond the
-        // language itself, so it is as tautological as comparing a value with itself.
         const bothInvariant = INVARIANT_CONSTANTS.has(actual) && INVARIANT_CONSTANTS.has(expected);
         return actual === expected || bothInvariant;
+    }
+
+    /**
+     * Determine if an assertion is tautological (comparing invariant or identical operands).
+     */
+    private checkTautological(node: ts.CallExpression, sf: ts.SourceFile): boolean {
+        if (!ts.isPropertyAccessExpression(node.expression)) {
+            return this.checkDirectAssertTautological(node, sf);
+        }
+        return this.checkExpectMatcherTautological(node, sf);
     }
 
     /**
@@ -429,6 +438,21 @@ export class TestModernityAnalyzer implements Analyzer {
             }
         }
         return false;
+    }
+
+    private updateCaseCounts(
+        line: string,
+        currentCase: CaseRecord,
+        isMockOnly: boolean,
+        isTautological: boolean,
+        isObsolete: boolean,
+    ): void {
+        if (line.includes('assert') || line.includes('expect')) {
+            currentCase.assertionsCount++;
+        }
+        if (isMockOnly) currentCase.mockAssertionsCount++;
+        if (isTautological) currentCase.tautologicalCount++;
+        if (isObsolete) currentCase.obsoleteCount++;
     }
 
     private analyzeWithLines(
@@ -457,12 +481,7 @@ export class TestModernityAnalyzer implements Analyzer {
             const isObsolete = OBSOLETE_CONTRACT_RE.test(line);
 
             if (currentCase) {
-                if (line.includes('assert') || line.includes('expect')) {
-                    currentCase.assertionsCount++;
-                }
-                if (isMockOnly) currentCase.mockAssertionsCount++;
-                if (isTautological) currentCase.tautologicalCount++;
-                if (isObsolete) currentCase.obsoleteCount++;
+                this.updateCaseCounts(line, currentCase, isMockOnly, isTautological, isObsolete);
             }
 
             if (isSkipped || isTautological || isMockOnly || isObsolete) {

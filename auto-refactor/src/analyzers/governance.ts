@@ -146,33 +146,85 @@ export class GovernanceAnalyzer implements Analyzer {
         }
     }
 
+    private runFileRules(ctx: AnalyzerContext): void {
+        if (this.hasCheckedFile) return;
+        this.hasCheckedFile = true;
+        if (this.fileRules.length === 0) return;
+
+        const evalCtx = this.reusableEvalCtx!;
+        evalCtx.node = ctx.root;
+        evalCtx.ctx = ctx;
+        evalCtx.parent = undefined;
+        evalCtx.grandparent = undefined;
+        evalCtx.depth = 0;
+        evalCtx.className = null;
+        evalCtx.binding = null;
+
+        for (const rule of this.fileRules) {
+            const result = rule.checkFile!(evalCtx);
+            if (result && result.length > 0) {
+                this.violations.push(...result);
+            }
+        }
+    }
+
+    private recordViolationIssue(
+        v: GovernanceViolation,
+        ctx: AnalyzerContext,
+        seenIds: Set<string>,
+        issues: Issue[],
+    ): void {
+        const issueId = `governance:${v.ruleId}:${ctx.filePath}:${v.line}`;
+        if (seenIds.has(issueId)) return;
+        seenIds.add(issueId);
+
+        const rule = this.registry.get(v.ruleId);
+        const category = rule?.category || 'standardization';
+        const severity = rule?.severity || 'warning';
+        const risk = rule?.risk || 'medium';
+        const rationale = rule?.rationale || '';
+        const isFixable = rule?.isFixable ?? false;
+        const fixable = v.fixable !== undefined ? v.fixable : isFixable;
+
+        const loc: IssueLocation = {
+            file: ctx.filePath,
+            start: { line: v.line, column: v.column },
+            end: { line: v.endLine ?? v.line, column: v.endColumn ?? v.column + 1 },
+        };
+
+        const detail: GovernanceIssueDetail = {
+            category,
+            risk,
+            rationale,
+            fixable,
+            targetLanguage: this.capabilities.languageId,
+            ruleId: v.ruleId,
+            suggestedPatch: v.suggestedPatch,
+            ...v.customDetail,
+        };
+
+        const issue: Issue = {
+            id: issueId,
+            analyzer: this.name,
+            rule: v.ruleId,
+            severity,
+            message: v.message,
+            location: loc,
+            detail,
+            suggestion: v.suggestion,
+        };
+        if (v.evidence) {
+            issue.evidence = v.evidence;
+        }
+        issues.push(issue);
+    }
+
     finalize(ctx: AnalyzerContext): Issue[] {
         // Source-code governance (naming, headers, type rules) does not apply to documentation
         // prose: markdown is audited by the dedicated `docs` analyzer instead.
         if (ctx.filePath.replace(/\\/g, '/').endsWith('.md')) return [];
         this.ensureInitialized(ctx);
-
-        // Run file-level rules once per file
-        if (!this.hasCheckedFile) {
-            this.hasCheckedFile = true;
-            if (this.fileRules.length > 0) {
-                const evalCtx = this.reusableEvalCtx!;
-                evalCtx.node = ctx.root;
-                evalCtx.ctx = ctx;
-                evalCtx.parent = undefined;
-                evalCtx.grandparent = undefined;
-                evalCtx.depth = 0;
-                evalCtx.className = null;
-                evalCtx.binding = null;
-
-                for (const rule of this.fileRules) {
-                    const result = rule.checkFile!(evalCtx);
-                    if (result && result.length > 0) {
-                        this.violations.push(...result);
-                    }
-                }
-            }
-        }
+        this.runFileRules(ctx);
 
         // Convert accumulated violations to canonical Issue records carrying category, risk,
         // rationale and fixability metadata.
@@ -180,45 +232,7 @@ export class GovernanceAnalyzer implements Analyzer {
         const seenIds = new Set<string>();
 
         for (const v of this.violations) {
-            const rule = this.registry.get(v.ruleId);
-            const category = rule?.category ?? 'standardization';
-            const severity = rule?.severity ?? 'warning';
-            const risk = rule?.risk ?? 'medium';
-            const rationale = rule?.rationale ?? '';
-            const fixable = v.fixable ?? rule?.isFixable ?? false;
-
-            const loc: IssueLocation = {
-                file: ctx.filePath,
-                start: { line: v.line, column: v.column },
-                end: { line: v.endLine ?? v.line, column: v.endColumn ?? v.column + 1 },
-            };
-
-            const issueId = `governance:${v.ruleId}:${ctx.filePath}:${v.line}`;
-            if (seenIds.has(issueId)) continue;
-            seenIds.add(issueId);
-
-            const detail: GovernanceIssueDetail = {
-                category,
-                risk,
-                rationale,
-                fixable,
-                targetLanguage: this.capabilities.languageId,
-                ruleId: v.ruleId,
-                suggestedPatch: v.suggestedPatch,
-                ...v.customDetail,
-            };
-
-            issues.push({
-                id: issueId,
-                analyzer: 'governance',
-                rule: v.ruleId,
-                severity,
-                message: v.message,
-                location: loc,
-                detail,
-                suggestion: v.suggestion,
-                ...(v.evidence ? { evidence: v.evidence } : {}),
-            });
+            this.recordViolationIssue(v, ctx, seenIds, issues);
         }
 
         return issues;

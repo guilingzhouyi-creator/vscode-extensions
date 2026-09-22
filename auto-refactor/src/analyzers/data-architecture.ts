@@ -101,6 +101,80 @@ function isOnlineExecutionContext(
 /**
  * Analyzer detecting database access antipatterns and data architecture violations.
  */
+const FN_DECL_RE = /\b(?:function|class|async\s+function|def|func)\s+([A-Za-z0-9_$]+)/;
+const METHOD_DECL_RE = /\b(?:async\s+)?([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/;
+const CONTROL_KEYWORD_RE = /^(?:if|for|while|switch|catch)$/;
+
+function extractSymbolFromLine(trimmed: string): string | null {
+    const fnMatch = trimmed.match(FN_DECL_RE);
+    if (fnMatch) return fnMatch[1];
+    const methodMatch = trimmed.match(METHOD_DECL_RE);
+    if (methodMatch && !CONTROL_KEYWORD_RE.test(methodMatch[1])) {
+        return methodMatch[1];
+    }
+    return null;
+}
+
+function updateLoopTracker(
+    trimmed: string,
+    currentIndent: number,
+    tracker: { inLoop: boolean; loopIndent: number },
+): void {
+    if (LOOP_HEADER_RE.test(trimmed)) {
+        tracker.inLoop = true;
+        tracker.loopIndent = currentIndent >= 0 ? currentIndent : 0;
+    } else if (tracker.inLoop && trimmed === '}' && currentIndent <= tracker.loopIndent) {
+        tracker.inLoop = false;
+    }
+}
+
+interface SiteMeta {
+    filePath: string;
+    lineNum: number;
+    symbol: string;
+    isOnline: boolean;
+    isLoopContext: boolean;
+}
+
+type OperationKind = 'query' | 'serialization' | 'validation' | 'driver-call';
+
+function pushSite(
+    sites: DataAccessSite[],
+    meta: SiteMeta,
+    expressionText: string,
+    operationKind: OperationKind,
+    isUnboundedQuery = false,
+): void {
+    sites.push({
+        file: meta.filePath,
+        line: meta.lineNum,
+        symbol: meta.symbol,
+        isOnlinePath: meta.isOnline,
+        isLoopContext: meta.isLoopContext,
+        isUnboundedQuery,
+        operationKind,
+        expressionText,
+    });
+}
+
+function checkAndPushSite(trimmed: string, meta: SiteMeta, sites: DataAccessSite[]): void {
+    if (DRIVER_CALL_RE.test(trimmed)) {
+        pushSite(sites, meta, trimmed, 'driver-call');
+    }
+    if (QUERY_CALL_RE.test(trimmed)) {
+        pushSite(sites, meta, trimmed, 'query', UNBOUNDED_QUERY_RE.test(trimmed));
+    }
+    if (SERIALIZATION_RE.test(trimmed)) {
+        pushSite(sites, meta, trimmed, 'serialization');
+    }
+    if (VALIDATION_RE.test(trimmed)) {
+        pushSite(sites, meta, trimmed, 'validation');
+    }
+}
+
+/**
+ * Analyzer detecting database access antipatterns and data architecture violations.
+ */
 export class DataArchitectureAnalyzer implements Analyzer {
     name = 'data-architecture' as const;
 
@@ -113,106 +187,36 @@ export class DataArchitectureAnalyzer implements Analyzer {
         const sites: DataAccessSite[] = [];
         const isOnline = isOnlineExecutionContext(ctx.filePath, content, options);
 
-        let inLoop = false;
-        let loopIndent = 0;
+        const loopTracker = { inLoop: false, loopIndent: 0 };
         let currentSymbol = 'anonymous';
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
-            const lineNum = i + 1;
-            const currentIndent = line.search(/\S/);
-
             if (trimmed.startsWith('//') || trimmed.startsWith('#')) {
                 continue;
             }
 
-            // Track function/method symbol
-            const fnMatch = trimmed.match(
-                /\b(?:function|class|async\s+function|def|func)\s+([A-Za-z0-9_$]+)/,
+            const symbol = extractSymbolFromLine(trimmed);
+            if (symbol) {
+                currentSymbol = symbol;
+            }
+
+            const currentIndent = line.search(/\S/);
+            updateLoopTracker(trimmed, currentIndent, loopTracker);
+
+            const inIter = loopTracker.inLoop || ITERATION_METHOD_RE.test(trimmed);
+            checkAndPushSite(
+                trimmed,
+                {
+                    filePath: ctx.filePath,
+                    lineNum: i + 1,
+                    symbol: currentSymbol,
+                    isOnline,
+                    isLoopContext: inIter,
+                },
+                sites,
             );
-            if (fnMatch) {
-                currentSymbol = fnMatch[1];
-            } else {
-                const methodMatch = trimmed.match(
-                    /\b(?:async\s+)?([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/,
-                );
-                if (
-                    methodMatch &&
-                    methodMatch[1] !== 'if' &&
-                    methodMatch[1] !== 'for' &&
-                    methodMatch[1] !== 'while'
-                ) {
-                    currentSymbol = methodMatch[1];
-                }
-            }
-
-            // Track loop context
-            if (LOOP_HEADER_RE.test(trimmed)) {
-                inLoop = true;
-                loopIndent = currentIndent >= 0 ? currentIndent : 0;
-            } else if (inLoop && trimmed === '}' && currentIndent <= loopIndent) {
-                inLoop = false;
-            }
-
-            const inIter = inLoop || ITERATION_METHOD_RE.test(trimmed);
-
-            // Raw driver check
-            if (DRIVER_CALL_RE.test(trimmed)) {
-                sites.push({
-                    file: ctx.filePath,
-                    line: lineNum,
-                    symbol: currentSymbol,
-                    isOnlinePath: isOnline,
-                    isLoopContext: inIter,
-                    isUnboundedQuery: false,
-                    operationKind: 'driver-call',
-                    expressionText: trimmed,
-                });
-            }
-
-            // Database query check
-            if (QUERY_CALL_RE.test(trimmed)) {
-                const isUnbounded = UNBOUNDED_QUERY_RE.test(trimmed);
-                sites.push({
-                    file: ctx.filePath,
-                    line: lineNum,
-                    symbol: currentSymbol,
-                    isOnlinePath: isOnline,
-                    isLoopContext: inIter,
-                    isUnboundedQuery: isUnbounded,
-                    operationKind: 'query',
-                    expressionText: trimmed,
-                });
-            }
-
-            // Serialization check
-            if (SERIALIZATION_RE.test(trimmed)) {
-                sites.push({
-                    file: ctx.filePath,
-                    line: lineNum,
-                    symbol: currentSymbol,
-                    isOnlinePath: isOnline,
-                    isLoopContext: inIter,
-                    isUnboundedQuery: false,
-                    operationKind: 'serialization',
-                    expressionText: trimmed,
-                });
-            }
-
-            // Validation check
-            if (VALIDATION_RE.test(trimmed)) {
-                sites.push({
-                    file: ctx.filePath,
-                    line: lineNum,
-                    symbol: currentSymbol,
-                    isOnlinePath: isOnline,
-                    isLoopContext: inIter,
-                    isUnboundedQuery: false,
-                    operationKind: 'validation',
-                    expressionText: trimmed,
-                });
-            }
         }
 
         return analyzeDataAccessSites(sites, options);

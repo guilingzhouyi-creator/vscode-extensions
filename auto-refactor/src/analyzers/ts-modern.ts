@@ -259,6 +259,26 @@ export class TsModernAnalyzer implements Analyzer {
         return TYPED_EXTENSIONS.some((extension) => file.endsWith(extension));
     }
 
+    private applyLineRulesToCode(code: string, file: string, index: number, out: Issue[]): void {
+        for (const rule of LINE_RULES) {
+            if (!rule.pattern.test(code)) continue;
+            out.push(
+                makeIssue(
+                    file,
+                    index,
+                    rule.rule,
+                    rule.severity,
+                    rule.message,
+                    rule.suggestion,
+                    {
+                        line: code.trim(),
+                    },
+                    1,
+                ),
+            );
+        }
+    }
+
     /**
      * Run the keyword rules over every masked line.
      *
@@ -270,23 +290,7 @@ export class TsModernAnalyzer implements Analyzer {
         for (let index = 0; index < masked.length; index += 1) {
             const code = masked[index];
             if (code.trim().length === 0) continue;
-            for (const rule of LINE_RULES) {
-                if (!rule.pattern.test(code)) continue;
-                out.push(
-                    makeIssue(
-                        file,
-                        index,
-                        rule.rule,
-                        rule.severity,
-                        rule.message,
-                        rule.suggestion,
-                        {
-                            line: code.trim(),
-                        },
-                        1,
-                    ),
-                );
-            }
+            this.applyLineRulesToCode(code, file, index, out);
         }
     }
 

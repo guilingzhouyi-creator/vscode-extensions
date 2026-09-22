@@ -24,6 +24,10 @@ import { ArchitectureMessages } from '../core/messages/architecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from '../core/intelligence/semanticArchitecture';
 import { auditDispatchComplexity } from '../core/rules/evolution/dispatchComplexityRule';
 import { auditConfigDrivenArchitecture } from '../core/architecture/config-driven-architecture';
+import {
+    extractSpecifiers,
+    type SpecifierInfo,
+} from '../core/architecture/import-specifier-extractor';
 
 /**
  * Threshold keys the architecture rules additionally read from the global `thresholds` block.
@@ -50,41 +54,12 @@ interface ArchitectureOptions {
     flagDispatchComplexity?: boolean;
 }
 
-interface SpecifierInfo {
-    raw: string;
-    isExternal: boolean;
-    resolvedPath?: string;
-}
-
 const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = (
     'express koa fastify react vue @angular svelte django fastapi flask ' +
     'actix_web actix-web axum tokio godot vscode electron pg mysql mysql2 sqlite3 ' +
     'typeorm prisma mongoose sequelize sqlalchemy diesel sqlx fs net http https ' +
     'child_process subprocess socket'
 ).split(' ');
-
-/**
- * Polyglot import and module reference extractors:
- * 1. TS/JS: import ... from '...', require('...'), import('...')
- * 2. GDScript: preload("res://..."), load("res://..."), extends "res://..."
- * 3. Python: from .pkg.module import ..., from pkg.module import ..., import pkg.module
- * 4. Rust: use crate::pkg::module, use super::pkg::module
- */
-const JS_IMPORT_RE =
-    /(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|export\s+(?:[\s\S]*?from\s+)?|import\(|require\()['"]([^'"]+)['"]/g;
-
-const GDSCRIPT_IMPORT_RE =
-    /(?:(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)|extends\s+['"](?:res:\/\/)?([^'"]+)['"])/g;
-
-const PYTHON_FROM_IMPORT_RE = /^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0-9_.]+))/;
-
-const RUST_USE_RE = /^\s*use\s+(?:crate|super)::([A-Za-z0-9_:]+)/;
-
-const GO_IMPORT_RE = /^\s*(?:import\s+)?['"]([^'"]+)['"]/;
-
-const JAVA_IMPORT_RE = /^\s*import\s+(?:static\s+)?([A-Za-z0-9_.]+);?/;
-
-const CSHARP_USING_RE = /^\s*using\s+([A-Za-z0-9_.]+);/;
 
 /** ASCII code of carriage return, stripped from CRLF line endings before per-line analysis. */
 const CARRIAGE_RETURN_CHAR_CODE = 13;
@@ -94,6 +69,42 @@ const ARCHITECTURE_LAYER_DOMAIN = 'domain';
 
 /** Clean Architecture layer name for interface/adapter code (the outermost layer). */
 const ARCHITECTURE_LAYER_INTERFACE = 'interface';
+
+function isExemptLayer(layer: ArchitectureLayer): boolean {
+    return layer === 'test' || layer === 'tooling' || layer === 'shared';
+}
+
+function shouldFlagConfigLeakage(opts: ArchitectureOptions, ctx: AnalyzerContext): boolean {
+    if (opts.flagConfigLeakage !== undefined) {
+        return Boolean(opts.flagConfigLeakage);
+    }
+    const thresholds = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
+    return Boolean(thresholds?.flagConfigLeakage);
+}
+
+function matchUserLayer(
+    norm: string,
+    layers?: Record<string, ArchitectureLayer>,
+): ArchitectureLayer | null {
+    if (!layers) return null;
+    for (const [pattern, layer] of Object.entries(layers)) {
+        if (norm.includes(pattern)) return layer;
+    }
+    return null;
+}
+
+function matchDirectorySemantics(
+    norm: string,
+    semantics?: Record<string, ArchitectureLayer>,
+): ArchitectureLayer | null {
+    if (!semantics) return null;
+    for (const [dir, layer] of Object.entries(semantics)) {
+        if (norm.startsWith(dir + '/') || norm.includes('/' + dir + '/')) {
+            return layer;
+        }
+    }
+    return null;
+}
 
 /**
  * Enforce declarative Clean Architecture boundaries for a single source file.
@@ -121,6 +132,7 @@ export class ArchitectureAnalyzer implements Analyzer {
     name = 'architecture' as const;
 
     analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+        void sf;
         const opts = (ctx.options || {}) as ArchitectureOptions;
         if (opts.enforceCleanLayers === false) {
             return [];
@@ -128,16 +140,13 @@ export class ArchitectureAnalyzer implements Analyzer {
 
         const file = ctx.filePath.replace(/\\/g, '/');
         const currentLayer = this.resolveLayer(file, opts, ctx);
-
-        // Tests and tooling are exempt from domain-layer inversion rules
-        if (currentLayer === 'test' || currentLayer === 'tooling' || currentLayer === 'shared') {
+        if (isExemptLayer(currentLayer)) {
             return [];
         }
 
         const issues: Issue[] = [];
-        const forbiddenModules = new Set(
-            opts.forbiddenDomainImports || DEFAULT_FORBIDDEN_DOMAIN_IMPORTS,
-        );
+        const forbiddenList = opts.forbiddenDomainImports || DEFAULT_FORBIDDEN_DOMAIN_IMPORTS;
+        const forbiddenModules = new Set(forbiddenList);
 
         this.scanSourceLines(
             ctx.content || '',
@@ -153,13 +162,7 @@ export class ArchitectureAnalyzer implements Analyzer {
             issues.push(...auditDispatchComplexity(ctx.content || '', file, ctx));
         }
 
-        const flagConfig = Boolean(
-            opts.flagConfigLeakage ??
-            (ctx.config?.thresholds as unknown as Record<string, unknown> | undefined)
-                ?.flagConfigLeakage ??
-            false,
-        );
-        if (flagConfig) {
+        if (shouldFlagConfigLeakage(opts, ctx)) {
             const cfgResult = auditConfigDrivenArchitecture([
                 {
                     filePath: file,
@@ -206,7 +209,7 @@ export class ArchitectureAnalyzer implements Analyzer {
             const trimmed = lineText.trim();
 
             this.checkDtoLeakage(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
-            const specifiers = this.extractSpecifiers(lineText, trimmed, file);
+            const specifiers = extractSpecifiers(lineText, trimmed, file);
             this.auditSpecifiers(
                 specifiers,
                 file,
@@ -343,131 +346,6 @@ export class ArchitectureAnalyzer implements Analyzer {
                 );
             }
         }
-    }
-
-    private extractJsSpecifiers(lineText: string, file: string, specifiers: SpecifierInfo[]): void {
-        JS_IMPORT_RE.lastIndex = 0;
-        let m: RegExpExecArray | null;
-        while ((m = JS_IMPORT_RE.exec(lineText)) !== null) {
-            if (m[1]) {
-                const raw = m[1];
-                const isRelative =
-                    raw.startsWith('.') || raw.startsWith('/') || raw.startsWith('@/');
-                specifiers.push({
-                    raw,
-                    isExternal: !isRelative,
-                    resolvedPath: isRelative
-                        ? path.posix.normalize(path.posix.join(path.posix.dirname(file), raw))
-                        : undefined,
-                });
-            }
-        }
-    }
-
-    private extractGdScriptSpecifiers(lineText: string, specifiers: SpecifierInfo[]): void {
-        GDSCRIPT_IMPORT_RE.lastIndex = 0;
-        let m: RegExpExecArray | null;
-        while ((m = GDSCRIPT_IMPORT_RE.exec(lineText)) !== null) {
-            const raw = m[1] || m[2];
-            if (raw) {
-                specifiers.push({
-                    raw,
-                    isExternal: false,
-                    resolvedPath: raw.replace(/\.(gd|tscn)$/, ''),
-                });
-            }
-        }
-    }
-
-    private extractPythonSpecifiers(
-        trimmed: string,
-        file: string,
-        specifiers: SpecifierInfo[],
-    ): void {
-        const pyMatch = trimmed.match(PYTHON_FROM_IMPORT_RE);
-        if (!pyMatch) return;
-        const mod = pyMatch[1] || pyMatch[2];
-        if (!mod) return;
-        const isRelative = mod.startsWith('.');
-        const cleanMod = mod.replace(/^\.+/, '').replace(/\./g, '/');
-        specifiers.push({
-            raw: mod,
-            isExternal:
-                !isRelative &&
-                !mod.startsWith('app') &&
-                !mod.startsWith(ARCHITECTURE_LAYER_DOMAIN) &&
-                !mod.startsWith('infra'),
-            resolvedPath: isRelative
-                ? path.posix.normalize(path.posix.join(path.posix.dirname(file), cleanMod))
-                : cleanMod,
-        });
-    }
-
-    private extractRustSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
-        const rustMatch = trimmed.match(RUST_USE_RE);
-        if (rustMatch && rustMatch[1]) {
-            specifiers.push({
-                raw: rustMatch[1],
-                isExternal: false,
-                resolvedPath: rustMatch[1].replace(/::/g, '/'),
-            });
-        }
-    }
-
-    private extractGoSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
-        const goMatch = trimmed.match(GO_IMPORT_RE);
-        if (goMatch && goMatch[1]) {
-            specifiers.push({
-                raw: goMatch[1],
-                isExternal: !goMatch[1].includes('.'),
-                resolvedPath: goMatch[1],
-            });
-        }
-    }
-
-    private extractJvmSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
-        const jvmMatch = trimmed.match(JAVA_IMPORT_RE);
-        if (jvmMatch && jvmMatch[1]) {
-            specifiers.push({
-                raw: jvmMatch[1],
-                isExternal:
-                    jvmMatch[1].startsWith('java.') ||
-                    jvmMatch[1].startsWith('javax.') ||
-                    jvmMatch[1].startsWith('kotlin.'),
-                resolvedPath: jvmMatch[1].replace(/\./g, '/'),
-            });
-        }
-    }
-
-    private extractCSharpSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
-        const csMatch = trimmed.match(CSHARP_USING_RE);
-        if (csMatch && csMatch[1]) {
-            specifiers.push({
-                raw: csMatch[1],
-                isExternal: csMatch[1].startsWith('System.') || csMatch[1].startsWith('Microsoft.'),
-                resolvedPath: csMatch[1].replace(/\./g, '/'),
-            });
-        }
-    }
-
-    private extractSpecifiers(lineText: string, trimmed: string, file: string): SpecifierInfo[] {
-        const specifiers: SpecifierInfo[] = [];
-        this.extractJsSpecifiers(lineText, file, specifiers);
-        this.extractGdScriptSpecifiers(lineText, specifiers);
-
-        if (file.endsWith('.py')) {
-            this.extractPythonSpecifiers(trimmed, file, specifiers);
-        } else if (file.endsWith('.rs')) {
-            this.extractRustSpecifiers(trimmed, specifiers);
-        } else if (file.endsWith('.go')) {
-            this.extractGoSpecifiers(trimmed, specifiers);
-        } else if (file.endsWith('.java') || file.endsWith('.kt') || file.endsWith('.kts')) {
-            this.extractJvmSpecifiers(trimmed, specifiers);
-        } else if (file.endsWith('.cs')) {
-            this.extractCSharpSpecifiers(trimmed, specifiers);
-        }
-
-        return specifiers;
     }
 
     private auditSpecifiers(
@@ -837,21 +715,14 @@ export class ArchitectureAnalyzer implements Analyzer {
     ): ArchitectureLayer {
         const norm = filePath.replace(/\\/g, '/');
 
-        // Check user layer overrides first
-        if (opts.layers) {
-            for (const [pattern, layer] of Object.entries(opts.layers)) {
-                if (norm.includes(pattern)) return layer;
-            }
-        }
+        const userLayer = matchUserLayer(norm, opts.layers);
+        if (userLayer) return userLayer;
 
-        // Check project profile directory semantics
-        if (ctx.config?.profile?.directorySemantics) {
-            for (const [dir, layer] of Object.entries(ctx.config.profile.directorySemantics)) {
-                if (norm.startsWith(dir + '/') || norm.includes('/' + dir + '/')) {
-                    return layer;
-                }
-            }
-        }
+        const semanticLayer = matchDirectorySemantics(
+            norm,
+            ctx.config?.profile?.directorySemantics,
+        );
+        if (semanticLayer) return semanticLayer;
 
         if (/(?:dto|api|controller|view|contract|facade)/i.test(norm)) {
             return ARCHITECTURE_LAYER_INTERFACE;

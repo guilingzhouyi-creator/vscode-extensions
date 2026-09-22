@@ -180,6 +180,32 @@ function hashString32(str: string): number {
     return h | 0;
 }
 
+const EXEMPT_FILE_NAMES = new Set(['README', 'CHANGELOG', 'LICENSE']);
+
+function isExemptFileName(name: string): boolean {
+    return name.startsWith('.') || EXEMPT_FILE_NAMES.has(name);
+}
+
+function checkJsTsNaming(
+    baseName: string,
+    nameWithoutExt: string,
+): ReturnType<typeof HygieneMessages.FILE_NAMING_KEBAB> | null {
+    if (/[A-Z]/.test(nameWithoutExt) && nameWithoutExt.includes('_')) {
+        return HygieneMessages.FILE_NAMING_KEBAB(baseName);
+    }
+    return null;
+}
+
+function checkSnakeNaming(
+    baseName: string,
+    nameWithoutExt: string,
+): ReturnType<typeof HygieneMessages.FILE_NAMING_SNAKE> | null {
+    if (/[A-Z]/.test(nameWithoutExt) || nameWithoutExt.includes('-')) {
+        return HygieneMessages.FILE_NAMING_SNAKE(baseName);
+    }
+    return null;
+}
+
 /**
  * Report hygiene and maintainability findings from a raw file content scan.
  *
@@ -475,42 +501,42 @@ export class HygieneAnalyzer implements Analyzer {
         const ext = path.extname(baseName);
         const nameWithoutExt = baseName.slice(0, baseName.length - ext.length);
 
-        if (
-            !nameWithoutExt.startsWith('.') &&
-            nameWithoutExt !== 'README' &&
-            nameWithoutExt !== 'CHANGELOG' &&
-            nameWithoutExt !== 'LICENSE'
-        ) {
-            if (ext === '.ts' || ext === '.js') {
-                if (/[A-Z]/.test(nameWithoutExt) && nameWithoutExt.includes('_')) {
-                    const desc = HygieneMessages.FILE_NAMING_KEBAB(baseName);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            0,
-                            'HYG-NAM-001',
-                            desc.message,
-                            'info',
-                            { file, baseName },
-                            desc.suggestion,
-                        ),
-                    );
-                }
-            } else if (ext === '.gd' || ext === '.py' || ext === '.rs') {
-                if (/[A-Z]/.test(nameWithoutExt) || nameWithoutExt.includes('-')) {
-                    const desc = HygieneMessages.FILE_NAMING_SNAKE(baseName);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            0,
-                            'HYG-NAM-001',
-                            desc.message,
-                            SEVERITY_WARNING,
-                            { file, baseName },
-                            desc.suggestion,
-                        ),
-                    );
-                }
+        if (isExemptFileName(nameWithoutExt)) {
+            return;
+        }
+
+        if (ext === '.ts' || ext === '.js') {
+            const desc = checkJsTsNaming(baseName, nameWithoutExt);
+            if (desc) {
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        0,
+                        'HYG-NAM-001',
+                        desc.message,
+                        'info',
+                        { file, baseName },
+                        desc.suggestion,
+                    ),
+                );
+            }
+            return;
+        }
+
+        if (ext === '.gd' || ext === '.py' || ext === '.rs') {
+            const desc = checkSnakeNaming(baseName, nameWithoutExt);
+            if (desc) {
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        0,
+                        'HYG-NAM-001',
+                        desc.message,
+                        SEVERITY_WARNING,
+                        { file, baseName },
+                        desc.suggestion,
+                    ),
+                );
             }
         }
     }

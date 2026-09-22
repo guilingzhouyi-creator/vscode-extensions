@@ -167,6 +167,108 @@ export class SecurityAnalyzer implements Analyzer {
      * @param opts - Merged analyzer options; a `check*` flag set to false disables its rule.
      * @param issues - Mutable accumulator that receives zero or more new issues.
      */
+    private checkCodeExecution(
+        trimmed: string,
+        lineText: string,
+        lineNum: number,
+        file: string,
+        issues: Issue[],
+    ): void {
+        if (
+            DYNAMIC_EXEC_RE.test(trimmed) ||
+            (file.endsWith('.py') && PYTHON_EXEC_RE.test(trimmed)) ||
+            (file.endsWith('.gd') && GDSCRIPT_EXEC_RE.test(trimmed))
+        ) {
+            issues.push({
+                id: `security:arbitrary-code-execution:${file}:${lineNum}`,
+                analyzer: ANALYZER_SECURITY,
+                rule: 'SEC-VUL-001',
+                severity: SEVERITY_ERROR,
+                message: SecurityMessages.ARBITRARY_CODE_EXECUTION.message,
+                location: {
+                    file,
+                    start: { line: lineNum, column: 1 },
+                    end: { line: lineNum, column: lineText.length },
+                },
+                detail: {
+                    risk: SecurityMessages.ARBITRARY_CODE_EXECUTION.risk,
+                    category: 'code_execution',
+                    snippet: trimmed,
+                },
+                suggestion: SecurityMessages.ARBITRARY_CODE_EXECUTION.suggestion,
+            });
+        }
+    }
+
+    private checkCommandInjection(
+        trimmed: string,
+        lineText: string,
+        lineNum: number,
+        file: string,
+        issues: Issue[],
+    ): void {
+        if (SHELL_INJECTION_RE.test(trimmed) || PYTHON_SHELL_INJECTION_RE.test(trimmed)) {
+            issues.push({
+                id: `security:command-injection:${file}:${lineNum}`,
+                analyzer: ANALYZER_SECURITY,
+                rule: 'SEC-VUL-002',
+                severity: SEVERITY_ERROR,
+                message: SecurityMessages.COMMAND_INJECTION.message,
+                location: {
+                    file,
+                    start: { line: lineNum, column: 1 },
+                    end: { line: lineNum, column: lineText.length },
+                },
+                detail: {
+                    risk: SecurityMessages.COMMAND_INJECTION.risk,
+                    category: 'command_injection',
+                    snippet: trimmed,
+                },
+                suggestion: SecurityMessages.COMMAND_INJECTION.suggestion,
+            });
+        }
+    }
+
+    private checkPrototypePollution(
+        trimmed: string,
+        lineText: string,
+        lineNum: number,
+        file: string,
+        issues: Issue[],
+    ): void {
+        if (PROTO_POLLUTION_RE.test(trimmed)) {
+            issues.push({
+                id: `security:prototype-pollution:${file}:${lineNum}`,
+                analyzer: ANALYZER_SECURITY,
+                rule: 'SEC-VUL-003',
+                severity: SEVERITY_ERROR,
+                message: SecurityMessages.PROTOTYPE_POLLUTION.message,
+                location: {
+                    file,
+                    start: { line: lineNum, column: 1 },
+                    end: { line: lineNum, column: lineText.length },
+                },
+                detail: {
+                    risk: SecurityMessages.PROTOTYPE_POLLUTION.risk,
+                    category: 'prototype_pollution',
+                    snippet: trimmed,
+                },
+                suggestion: SecurityMessages.PROTOTYPE_POLLUTION.suggestion,
+            });
+        }
+    }
+
+    /**
+     * Run the basic SEC-VUL-001..003 checks against one trimmed line.
+     *
+     * @param trimmed - Line with leading and trailing whitespace removed; all regexes run on it.
+     * @param lineText - Original line, used only to compute the reported end column.
+     * @param lineNum - One-based line number recorded in each issue id and location.
+     * @param file - Repository-relative POSIX path recorded in each issue.
+     * @param isTestOrFixture - When true, every basic check is skipped for this file.
+     * @param opts - Merged analyzer options; a `check*` flag set to false disables its rule.
+     * @param issues - Mutable accumulator that receives zero or more new issues.
+     */
     private auditBasicInjections(
         trimmed: string,
         lineText: string,
@@ -176,80 +278,144 @@ export class SecurityAnalyzer implements Analyzer {
         opts: SecurityOptions,
         issues: Issue[],
     ): void {
-        // 1. SEC-VUL-001: Arbitrary Dynamic Code Execution
-        if (opts.checkCodeExecution !== false && !isTestOrFixture) {
-            if (
-                DYNAMIC_EXEC_RE.test(trimmed) ||
-                (file.endsWith('.py') && PYTHON_EXEC_RE.test(trimmed)) ||
-                (file.endsWith('.gd') && GDSCRIPT_EXEC_RE.test(trimmed))
-            ) {
-                issues.push({
-                    id: `security:arbitrary-code-execution:${file}:${lineNum}`,
-                    analyzer: ANALYZER_SECURITY,
-                    rule: 'SEC-VUL-001',
-                    severity: SEVERITY_ERROR,
-                    message: SecurityMessages.ARBITRARY_CODE_EXECUTION.message,
-                    location: {
-                        file,
-                        start: { line: lineNum, column: 1 },
-                        end: { line: lineNum, column: lineText.length },
-                    },
-                    detail: {
-                        risk: SecurityMessages.ARBITRARY_CODE_EXECUTION.risk,
-                        category: 'code_execution',
-                        snippet: trimmed,
-                    },
-                    suggestion: SecurityMessages.ARBITRARY_CODE_EXECUTION.suggestion,
-                });
-            }
+        if (isTestOrFixture) return;
+        if (opts.checkCodeExecution !== false) {
+            this.checkCodeExecution(trimmed, lineText, lineNum, file, issues);
         }
-
-        // 2. SEC-VUL-002: Command Injection via Unsanitized Shell Concatenation
-        if (opts.checkCommandInjection !== false && !isTestOrFixture) {
-            if (SHELL_INJECTION_RE.test(trimmed) || PYTHON_SHELL_INJECTION_RE.test(trimmed)) {
-                issues.push({
-                    id: `security:command-injection:${file}:${lineNum}`,
-                    analyzer: ANALYZER_SECURITY,
-                    rule: 'SEC-VUL-002',
-                    severity: SEVERITY_ERROR,
-                    message: SecurityMessages.COMMAND_INJECTION.message,
-                    location: {
-                        file,
-                        start: { line: lineNum, column: 1 },
-                        end: { line: lineNum, column: lineText.length },
-                    },
-                    detail: {
-                        risk: SecurityMessages.COMMAND_INJECTION.risk,
-                        category: 'command_injection',
-                        snippet: trimmed,
-                    },
-                    suggestion: SecurityMessages.COMMAND_INJECTION.suggestion,
-                });
-            }
+        if (opts.checkCommandInjection !== false) {
+            this.checkCommandInjection(trimmed, lineText, lineNum, file, issues);
         }
+        if (opts.checkPrototypePollution !== false) {
+            this.checkPrototypePollution(trimmed, lineText, lineNum, file, issues);
+        }
+    }
 
-        // 3. SEC-VUL-003: Prototype Pollution
-        if (opts.checkPrototypePollution !== false && !isTestOrFixture) {
-            if (PROTO_POLLUTION_RE.test(trimmed)) {
-                issues.push({
-                    id: `security:prototype-pollution:${file}:${lineNum}`,
-                    analyzer: ANALYZER_SECURITY,
-                    rule: 'SEC-VUL-003',
-                    severity: SEVERITY_ERROR,
-                    message: SecurityMessages.PROTOTYPE_POLLUTION.message,
-                    location: {
-                        file,
-                        start: { line: lineNum, column: 1 },
-                        end: { line: lineNum, column: lineText.length },
-                    },
-                    detail: {
-                        risk: SecurityMessages.PROTOTYPE_POLLUTION.risk,
-                        category: 'prototype_pollution',
-                        snippet: trimmed,
-                    },
-                    suggestion: SecurityMessages.PROTOTYPE_POLLUTION.suggestion,
-                });
-            }
+    /**
+     * Run the full-level SEC-VUL-004..006 and SEC-LEAK-001 checks against one line.
+     *
+     * Callers must already have excluded non-production paths; this helper has no suppression
+     * flag because `analyze` only invokes it when the level is `full` and the path is eligible.
+     *
+     * @param trimmed - Line with leading and trailing whitespace removed; all regexes run on it.
+     * @param lineText - Original line, used only to compute the reported end column.
+     * @param lineNum - One-based line number recorded in each issue id and location.
+     * @param file - Repository-relative POSIX path recorded in each issue.
+     * @param opts - Merged analyzer options; a `check*` flag set to false disables its rule.
+     * @param issues - Mutable accumulator that receives zero or more new issues.
+     */
+    private checkInsecureRandom(
+        trimmed: string,
+        lineText: string,
+        lineNum: number,
+        file: string,
+        issues: Issue[],
+    ): void {
+        if (INSECURE_RANDOM_CTX_RE.test(trimmed) && INSECURE_RANDOM_CALL_RE.test(trimmed)) {
+            issues.push({
+                id: `security:insecure-randomness:${file}:${lineNum}`,
+                analyzer: ANALYZER_SECURITY,
+                rule: 'SEC-VUL-004',
+                severity: SEVERITY_WARNING,
+                message: SecurityMessages.INSECURE_RANDOMNESS.message,
+                location: {
+                    file,
+                    start: { line: lineNum, column: 1 },
+                    end: { line: lineNum, column: lineText.length },
+                },
+                detail: {
+                    risk: SecurityMessages.INSECURE_RANDOMNESS.risk,
+                    category: 'weak_randomness',
+                    snippet: trimmed,
+                },
+                suggestion: SecurityMessages.INSECURE_RANDOMNESS.suggestion,
+            });
+        }
+    }
+
+    private checkBrokenCrypto(
+        trimmed: string,
+        lineText: string,
+        lineNum: number,
+        file: string,
+        issues: Issue[],
+    ): void {
+        if (BROKEN_CRYPTO_RE.test(trimmed)) {
+            issues.push({
+                id: `security:broken-crypto-hash:${file}:${lineNum}`,
+                analyzer: ANALYZER_SECURITY,
+                rule: 'SEC-VUL-005',
+                severity: SEVERITY_WARNING,
+                message: SecurityMessages.BROKEN_CRYPTO_HASH.message,
+                location: {
+                    file,
+                    start: { line: lineNum, column: 1 },
+                    end: { line: lineNum, column: lineText.length },
+                },
+                detail: {
+                    risk: SecurityMessages.BROKEN_CRYPTO_HASH.risk,
+                    category: 'broken_hash',
+                    snippet: trimmed,
+                },
+                suggestion: SecurityMessages.BROKEN_CRYPTO_HASH.suggestion,
+            });
+        }
+    }
+
+    private checkPathTraversal(
+        trimmed: string,
+        lineText: string,
+        lineNum: number,
+        file: string,
+        issues: Issue[],
+    ): void {
+        if (PATH_TRAVERSAL_RE.test(trimmed)) {
+            issues.push({
+                id: `security:path-traversal:${file}:${lineNum}`,
+                analyzer: ANALYZER_SECURITY,
+                rule: 'SEC-VUL-006',
+                severity: SEVERITY_WARNING,
+                message: SecurityMessages.PATH_TRAVERSAL.message,
+                location: {
+                    file,
+                    start: { line: lineNum, column: 1 },
+                    end: { line: lineNum, column: lineText.length },
+                },
+                detail: {
+                    risk: SecurityMessages.PATH_TRAVERSAL.risk,
+                    category: 'path_traversal',
+                    snippet: trimmed,
+                },
+                suggestion: SecurityMessages.PATH_TRAVERSAL.suggestion,
+            });
+        }
+    }
+
+    private checkSensitiveLogging(
+        trimmed: string,
+        lineText: string,
+        lineNum: number,
+        file: string,
+        issues: Issue[],
+    ): void {
+        if (SENSITIVE_LOG_RE.test(trimmed)) {
+            issues.push({
+                id: `security:sensitive-data-logging:${file}:${lineNum}`,
+                analyzer: ANALYZER_SECURITY,
+                rule: 'SEC-LEAK-001',
+                severity: SEVERITY_WARNING,
+                message: SecurityMessages.SENSITIVE_DATA_LOGGING.message,
+                location: {
+                    file,
+                    start: { line: lineNum, column: 1 },
+                    end: { line: lineNum, column: lineText.length },
+                },
+                detail: {
+                    risk: SecurityMessages.SENSITIVE_DATA_LOGGING.risk,
+                    category: 'info_leakage',
+                    snippet: trimmed,
+                },
+                suggestion: SecurityMessages.SENSITIVE_DATA_LOGGING.suggestion,
+            });
         }
     }
 
@@ -274,100 +440,17 @@ export class SecurityAnalyzer implements Analyzer {
         opts: SecurityOptions,
         issues: Issue[],
     ): void {
-        // 4. SEC-VUL-004: Insecure Pseudo-Random Number Generator in Security Context
         if (opts.checkInsecureRandom !== false) {
-            if (INSECURE_RANDOM_CTX_RE.test(trimmed) && INSECURE_RANDOM_CALL_RE.test(trimmed)) {
-                issues.push({
-                    id: `security:insecure-randomness:${file}:${lineNum}`,
-                    analyzer: ANALYZER_SECURITY,
-                    rule: 'SEC-VUL-004',
-                    severity: SEVERITY_WARNING,
-                    message: SecurityMessages.INSECURE_RANDOMNESS.message,
-                    location: {
-                        file,
-                        start: { line: lineNum, column: 1 },
-                        end: { line: lineNum, column: lineText.length },
-                    },
-                    detail: {
-                        risk: SecurityMessages.INSECURE_RANDOMNESS.risk,
-                        category: 'weak_randomness',
-                        snippet: trimmed,
-                    },
-                    suggestion: SecurityMessages.INSECURE_RANDOMNESS.suggestion,
-                });
-            }
+            this.checkInsecureRandom(trimmed, lineText, lineNum, file, issues);
         }
-
-        // 5. SEC-VUL-005: Broken / Deprecated Cryptographic Hash
         if (opts.checkBrokenCrypto !== false) {
-            if (BROKEN_CRYPTO_RE.test(trimmed)) {
-                issues.push({
-                    id: `security:broken-crypto-hash:${file}:${lineNum}`,
-                    analyzer: ANALYZER_SECURITY,
-                    rule: 'SEC-VUL-005',
-                    severity: SEVERITY_WARNING,
-                    message: SecurityMessages.BROKEN_CRYPTO_HASH.message,
-                    location: {
-                        file,
-                        start: { line: lineNum, column: 1 },
-                        end: { line: lineNum, column: lineText.length },
-                    },
-                    detail: {
-                        risk: SecurityMessages.BROKEN_CRYPTO_HASH.risk,
-                        category: 'broken_hash',
-                        snippet: trimmed,
-                    },
-                    suggestion: SecurityMessages.BROKEN_CRYPTO_HASH.suggestion,
-                });
-            }
+            this.checkBrokenCrypto(trimmed, lineText, lineNum, file, issues);
         }
-
-        // 6. SEC-VUL-006: Potential Path Traversal via Unverified User Input
         if (opts.checkPathTraversal !== false) {
-            if (PATH_TRAVERSAL_RE.test(trimmed)) {
-                issues.push({
-                    id: `security:path-traversal:${file}:${lineNum}`,
-                    analyzer: ANALYZER_SECURITY,
-                    rule: 'SEC-VUL-006',
-                    severity: SEVERITY_WARNING,
-                    message: SecurityMessages.PATH_TRAVERSAL.message,
-                    location: {
-                        file,
-                        start: { line: lineNum, column: 1 },
-                        end: { line: lineNum, column: lineText.length },
-                    },
-                    detail: {
-                        risk: SecurityMessages.PATH_TRAVERSAL.risk,
-                        category: 'path_traversal',
-                        snippet: trimmed,
-                    },
-                    suggestion: SecurityMessages.PATH_TRAVERSAL.suggestion,
-                });
-            }
+            this.checkPathTraversal(trimmed, lineText, lineNum, file, issues);
         }
-
-        // 7. SEC-LEAK-001: Sensitive Data Logging
         if (opts.checkSensitiveLogging !== false) {
-            if (SENSITIVE_LOG_RE.test(trimmed)) {
-                issues.push({
-                    id: `security:sensitive-data-logging:${file}:${lineNum}`,
-                    analyzer: ANALYZER_SECURITY,
-                    rule: 'SEC-LEAK-001',
-                    severity: SEVERITY_WARNING,
-                    message: SecurityMessages.SENSITIVE_DATA_LOGGING.message,
-                    location: {
-                        file,
-                        start: { line: lineNum, column: 1 },
-                        end: { line: lineNum, column: lineText.length },
-                    },
-                    detail: {
-                        risk: SecurityMessages.SENSITIVE_DATA_LOGGING.risk,
-                        category: 'info_leakage',
-                        snippet: trimmed,
-                    },
-                    suggestion: SecurityMessages.SENSITIVE_DATA_LOGGING.suggestion,
-                });
-            }
+            this.checkSensitiveLogging(trimmed, lineText, lineNum, file, issues);
         }
     }
 
@@ -398,34 +481,37 @@ export class SecurityAnalyzer implements Analyzer {
         const level: SecurityLevel = opts.level || ctx.config.securityLevel || 'basic';
         if (level === 'off') return;
 
-        // Check call expressions for eval or Function
         if (node.kind === NodeKind.Call && node.name) {
-            if (node.name === 'eval' || node.name === 'execScript') {
-                const file = ctx.filePath.replace(/\\/g, '/');
-                const isTestOrFixture =
-                    /(?:tests?|specs?|fixtures?|samples?|benchmark|dist|mock)/i.test(file);
-                if (!isTestOrFixture) {
-                    const line = node.start?.line ?? 1;
-                    this.issues.push({
-                        id: `security:arbitrary-code-execution:${file}:${line}`,
-                        analyzer: ANALYZER_SECURITY,
-                        rule: 'SEC-VUL-001',
-                        severity: SEVERITY_ERROR,
-                        message: SecurityMessages.ARBITRARY_CODE_EXECUTION.message,
-                        location: {
-                            file,
-                            start: node.start || { line, column: 1 },
-                            end: node.end || { line, column: 1 },
-                        },
-                        detail: {
-                            risk: SecurityMessages.ARBITRARY_CODE_EXECUTION.risk,
-                            function: node.name,
-                        },
-                        suggestion: SecurityMessages.ARBITRARY_CODE_EXECUTION.suggestion,
-                    });
-                }
-            }
+            this.checkStreamingCall(node, ctx);
         }
+    }
+
+    private checkStreamingCall(node: NormalizedNode, ctx: AnalyzerContext): void {
+        if (node.name !== 'eval' && node.name !== 'execScript') return;
+        const file = ctx.filePath.replace(/\\/g, '/');
+        const isTestOrFixture = /(?:tests?|specs?|fixtures?|samples?|benchmark|dist|mock)/i.test(
+            file,
+        );
+        if (isTestOrFixture) return;
+
+        const line = node.start?.line ?? 1;
+        this.issues.push({
+            id: `security:arbitrary-code-execution:${file}:${line}`,
+            analyzer: ANALYZER_SECURITY,
+            rule: 'SEC-VUL-001',
+            severity: SEVERITY_ERROR,
+            message: SecurityMessages.ARBITRARY_CODE_EXECUTION.message,
+            location: {
+                file,
+                start: node.start || { line, column: 1 },
+                end: node.end || { line, column: 1 },
+            },
+            detail: {
+                risk: SecurityMessages.ARBITRARY_CODE_EXECUTION.risk,
+                function: node.name,
+            },
+            suggestion: SecurityMessages.ARBITRARY_CODE_EXECUTION.suggestion,
+        });
     }
 
     /**

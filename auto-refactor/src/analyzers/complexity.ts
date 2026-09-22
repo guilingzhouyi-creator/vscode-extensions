@@ -196,6 +196,50 @@ export class ComplexityAnalyzer implements Analyzer {
         return cc;
     }
 
+    private ensureFileState(filePath: string, content?: string): void {
+        if (this.maskedFor === filePath) return;
+        this.maskedLines = maskedLinesOfPath(filePath, content || '');
+        this.maskedFor = filePath;
+        this.functionCCs = [];
+        this.fileFunctions = [];
+    }
+
+    private checkElasticBudget(
+        node: NormalizedNode,
+        ctx: AnalyzerContext,
+        name: string,
+        cc: number,
+        loc: number,
+        maxDepth: number,
+        startLine: number,
+    ): void {
+        const opts = ctx.options as Record<string, unknown> | undefined;
+        const thresh = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
+        const flagElasticBudget = Boolean(
+            opts?.enforceElasticBudget ?? thresh?.enforceElasticBudget ?? false,
+        );
+        if (!flagElasticBudget) return;
+
+        const lang = ctx.filePath.split('.').pop() || 'ts';
+        const budgetResult = evaluateElasticComplexityBudget(
+            {
+                name,
+                filePath: ctx.filePath,
+                language: lang,
+                cc,
+                loc,
+                maxDepth,
+                startLine,
+                startColumn: node.start?.column ?? 1,
+            },
+            ctx.options.complexityWarn,
+            ctx.options.complexityFail,
+        );
+        if (budgetResult.issues.length > 0) {
+            this.issues.push(...budgetResult.issues);
+        }
+    }
+
     visit(
         node: NormalizedNode,
         ctx: AnalyzerContext,
@@ -210,12 +254,7 @@ export class ComplexityAnalyzer implements Analyzer {
 
         // The engine drives visit/finalize directly (only the standalone contract calls
         // analyze), so the masked view is built here on first use per file.
-        if (this.maskedFor !== ctx.filePath) {
-            this.maskedLines = maskedLinesOfPath(ctx.filePath, ctx.content);
-            this.maskedFor = ctx.filePath;
-            this.functionCCs = [];
-            this.fileFunctions = [];
-        }
+        this.ensureFileState(ctx.filePath, ctx.content);
 
         // Collect loop sites within the function boundaries
         const fnSites = findLoopSitesInFunction(
@@ -247,32 +286,7 @@ export class ComplexityAnalyzer implements Analyzer {
         const fnLines = allLines.slice(startLine - 1, endLine);
         this.fileFunctions.push({ name, startLine, endLine, cc, lines: fnLines });
 
-        const opts = ctx.options as Record<string, unknown> | undefined;
-        const thresh = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
-        const flagElasticBudget = Boolean(
-            opts?.enforceElasticBudget ?? thresh?.enforceElasticBudget ?? false,
-        );
-
-        if (flagElasticBudget) {
-            const lang = ctx.filePath.split('.').pop() || 'ts';
-            const budgetResult = evaluateElasticComplexityBudget(
-                {
-                    name,
-                    filePath: ctx.filePath,
-                    language: lang,
-                    cc,
-                    loc,
-                    maxDepth: clarity.maxDepth,
-                    startLine,
-                    startColumn: node.start?.column ?? 1,
-                },
-                ctx.options.complexityWarn,
-                ctx.options.complexityFail,
-            );
-            if (budgetResult.issues.length > 0) {
-                this.issues.push(...budgetResult.issues);
-            }
-        }
+        this.checkElasticBudget(node, ctx, name, cc, loc, clarity.maxDepth, startLine);
 
         if (cc >= clarity.effectiveWarn) {
             this.issues.push(buildComplexityIssue(node, ctx, name, cc, clarity));
@@ -311,6 +325,7 @@ export class ComplexityAnalyzer implements Analyzer {
             );
             if (fileBudgetIssue) {
                 this.issues.push(fileBudgetIssue);
+                void 0;
             }
         }
 

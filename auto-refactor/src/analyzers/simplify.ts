@@ -223,80 +223,48 @@ export class SimplifyAnalyzer implements Analyzer {
      * @param ctx - Analyzer context.
      * @param issues - Accumulator for emitted issues.
      */
-    private detectEmptyImplementations(
+    private emitEmptyIssue(
         lines: string[],
         file: string,
-        ctx: AnalyzerContext,
+        lineIndex: number,
         issues: Issue[],
     ): void {
-        const emit = (lineIndex: number): void => {
-            issues.push({
-                id: `simplify:SIM-EMPTY-001:${file}:${lineIndex + 1}`,
-                analyzer: ANALYZER_SIMPLIFY,
-                rule: 'SIM-EMPTY-001',
-                severity: SEVERITY_WARNING,
-                message: 'Empty implementation: the function body is only a placeholder.',
-                location: {
-                    file,
-                    start: { line: lineIndex + 1, column: 1 },
-                    end: { line: lineIndex + 1, column: 1 },
-                },
-                detail: { line: lines[lineIndex].trim() },
-                suggestion:
-                    'Implement the body, raise an explicit not-implemented error, or remove the declaration.',
-            });
-        };
-        let inTriple: '"' | "'" | null = null;
-        for (let i = 0; i < lines.length; i++) {
-            const raw = lines[i];
-            const trimmedLine = raw.trim();
-            // Python docstrings often embed example code; never treat it as real code.
-            if (inTriple) {
-                const closers =
-                    inTriple === '"' ? raw.split('"""').length - 1 : raw.split("'''").length - 1;
-                if (closers > 0) inTriple = null;
-                continue;
-            }
-            if (trimmedLine.startsWith('"""') || trimmedLine.startsWith("'''")) {
-                const marker = trimmedLine.startsWith('"""') ? '"""' : "'''";
-                if (trimmedLine.split(marker).length - 1 < 2)
-                    inTriple = marker === '"""' ? '"' : "'";
-                continue;
-            }
-            const def = PY_DEF_RE.exec(lines[i]);
-            if (def) {
-                if (this.pythonBodyIsEmpty(lines, i, def[1].length)) emit(i);
-                continue;
-            }
-            if (BRACE_EMPTY_ONE_LINER_RE.test(lines[i])) {
-                emit(i);
-                continue;
-            }
-            if (BRACE_OPEN_RE.test(lines[i])) {
-                let j = i + 1;
-                while (
-                    j < lines.length &&
-                    (lines[j].trim() === '' || lines[j].trim().startsWith('//'))
-                )
-                    j++;
-                if (j < lines.length && BRACE_CLOSE_RE.test(lines[j])) emit(i);
-            }
-        }
+        issues.push({
+            id: `simplify:SIM-EMPTY-001:${file}:${lineIndex + 1}`,
+            analyzer: ANALYZER_SIMPLIFY,
+            rule: 'SIM-EMPTY-001',
+            severity: SEVERITY_WARNING,
+            message: 'Empty implementation: the function body is only a placeholder.',
+            location: {
+                file,
+                start: { line: lineIndex + 1, column: 1 },
+                end: { line: lineIndex + 1, column: 1 },
+            },
+            detail: { line: lines[lineIndex].trim() },
+            suggestion:
+                'Implement the body, raise an explicit not-implemented error, or remove the declaration.',
+        });
     }
 
-    /**
-     * Report whether a Python function's effective body is only `pass`/`...`.
-     *
-     * Skips a leading docstring (single- or multi-line) before testing the body, then verifies
-     * the placeholder is the last statement of the block by indentation.
-     *
-     * @param lines - File content split into physical lines.
-     * @param defIndex - Index of the `def` line.
-     * @param defIndent - Indentation width of the `def` keyword.
-     * @returns True when the body consists solely of a placeholder.
-     */
-    private pythonBodyIsEmpty(lines: string[], defIndex: number, defIndent: number): boolean {
-        let j = defIndex + 1;
+    private isBraceBlockEmpty(lines: string[], startIndex: number): boolean {
+        if (BRACE_EMPTY_ONE_LINER_RE.test(lines[startIndex])) {
+            return true;
+        }
+        if (BRACE_OPEN_RE.test(lines[startIndex])) {
+            let j = startIndex + 1;
+            while (
+                j < lines.length &&
+                (lines[j].trim() === '' || lines[j].trim().startsWith('//'))
+            ) {
+                j++;
+            }
+            return j < lines.length && BRACE_CLOSE_RE.test(lines[j]);
+        }
+        return false;
+    }
+
+    private skipPythonLeadingCommentsAndDocstrings(lines: string[], startIndex: number): number {
+        let j = startIndex;
         while (j < lines.length) {
             const trimmed = lines[j].trim();
             if (trimmed === '' || trimmed.startsWith('#')) {
@@ -316,6 +284,65 @@ export class SimplifyAnalyzer implements Analyzer {
             }
             break;
         }
+        return j;
+    }
+
+    /**
+     * Flag functions whose entire body is `pass`, `...`, or an empty brace pair.
+     *
+     * @param lines - File content split into physical lines.
+     * @param file - Normalized file path.
+     * @param _ctx - Analyzer context.
+     * @param issues - Accumulator for emitted issues.
+     */
+    private detectEmptyImplementations(
+        lines: string[],
+        file: string,
+        _ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        let inTriple: '"' | "'" | null = null;
+        for (let i = 0; i < lines.length; i++) {
+            const raw = lines[i];
+            const trimmedLine = raw.trim();
+            if (inTriple) {
+                const closers =
+                    inTriple === '"' ? raw.split('"""').length - 1 : raw.split("'''").length - 1;
+                if (closers > 0) inTriple = null;
+                continue;
+            }
+            if (trimmedLine.startsWith('"""') || trimmedLine.startsWith("'''")) {
+                const marker = trimmedLine.startsWith('"""') ? '"""' : "'''";
+                if (trimmedLine.split(marker).length - 1 < 2)
+                    inTriple = marker === '"""' ? '"' : "'";
+                continue;
+            }
+            const def = PY_DEF_RE.exec(lines[i]);
+            if (def) {
+                if (this.pythonBodyIsEmpty(lines, i, def[1].length)) {
+                    this.emitEmptyIssue(lines, file, i, issues);
+                }
+                continue;
+            }
+            if (this.isBraceBlockEmpty(lines, i)) {
+                this.emitEmptyIssue(lines, file, i, issues);
+            }
+        }
+    }
+
+    /**
+     * Report whether a Python function's effective body is only `pass`/`...`.
+     *
+     * Skips a leading docstring (single- or multi-line) before testing the body, then verifies
+     * the placeholder is the last statement of the block by indentation.
+     *
+     * @param lines - File content split into physical lines.
+     * @param defIndex - Index of the `def` line.
+     * @param defIndent - Indentation width of the `def` keyword.
+     * @returns True when the body consists solely of a placeholder.
+     */
+    private pythonBodyIsEmpty(lines: string[], defIndex: number, defIndent: number): boolean {
+        const j = this.skipPythonLeadingCommentsAndDocstrings(lines, defIndex + 1);
         if (j >= lines.length || !PY_EMPTY_BODY_RE.test(lines[j].trim())) return false;
         if (this.indentWidth(lines[j]) <= defIndent) return false;
         let k = j + 1;

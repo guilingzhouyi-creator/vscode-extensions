@@ -304,6 +304,66 @@ export class PythonModernAnalyzer implements Analyzer {
         }
     }
 
+    private auditRaiseFrom(
+        codeOnly: string,
+        trimmed: string,
+        i: number,
+        lines: string[],
+        emit: PyEmitter,
+    ): void {
+        if (!RAISE_RE.test(codeOnly)) return;
+        const hasCauseAhead =
+            RAISE_FROM_RE.test(codeOnly) ||
+            this.followingLinesContain(i, lines, /\bfrom\b/, RAISE_CAUSE_LOOKAHEAD_LINES);
+        if (!hasCauseAhead) {
+            emit(
+                i,
+                'PYM-RAISE-001',
+                '`raise` inside an except block without `from` drops the original exception chain.',
+                SEVERITY_WARNING,
+                'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
+                { line: trimmed },
+            );
+        }
+    }
+
+    private auditMutableDefaults(line: string, trimmed: string, i: number, emit: PyEmitter): void {
+        const isDef = ASYNC_DEF_RE.test(line) || DEF_RE.test(line) || CLASS_RE.test(line);
+        if (!isDef) return;
+        const parenIdx = line.indexOf('(');
+        if (parenIdx === -1) return;
+        const signature = line.slice(parenIdx + 1);
+        if (signature !== '' && MUTABLE_DEFAULT_RE.test(signature)) {
+            emit(
+                i,
+                'PYM-DEFAULT-001',
+                'Mutable default argument detected: the default is created once and shared by every call.',
+                SEVERITY_WARNING,
+                'Use a `None` sentinel and build the list/dict/set inside the body.',
+                { line: trimmed },
+            );
+        }
+    }
+
+    private auditUnmanagedOpen(
+        line: string,
+        trimmed: string,
+        i: number,
+        inWith: boolean,
+        emit: PyEmitter,
+    ): void {
+        if (!inWith && /\bopen\s*\(/.test(line) && !WITH_RE.test(line)) {
+            emit(
+                i,
+                'PYM-OPEN-001',
+                '`open()` without a `with` block leaks the file handle on error paths.',
+                SEVERITY_WARNING,
+                'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
+                { line: trimmed },
+            );
+        }
+    }
+
     private auditControlFlow(
         line: string,
         trimmed: string,
@@ -315,48 +375,16 @@ export class PythonModernAnalyzer implements Analyzer {
         emit: PyEmitter,
     ): void {
         const codeOnly = trimmed.split('#')[0].trim();
-        const hasCauseAhead =
-            RAISE_FROM_RE.test(codeOnly) ||
-            this.followingLinesContain(i, lines, /\bfrom\b/, RAISE_CAUSE_LOOKAHEAD_LINES);
-        if (inExcept && RAISE_RE.test(codeOnly) && !hasCauseAhead) {
-            emit(
-                i,
-                'PYM-RAISE-001',
-                '`raise` inside an except block without `from` drops the original exception chain.',
-                SEVERITY_WARNING,
-                'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
-                { line: trimmed },
-            );
+        if (inExcept) {
+            this.auditRaiseFrom(codeOnly, trimmed, i, lines, emit);
         }
-
-        const isAsyncDef = ASYNC_DEF_RE.test(line);
-        const isDef = isAsyncDef || DEF_RE.test(line) || CLASS_RE.test(line);
-        const signature = line.includes('(') ? line.slice(line.indexOf('(') + 1) : '';
-        if (isDef && signature !== '' && MUTABLE_DEFAULT_RE.test(signature)) {
-            emit(
-                i,
-                'PYM-DEFAULT-001',
-                'Mutable default argument detected: the default is created once and shared by every call.',
-                SEVERITY_WARNING,
-                'Use a `None` sentinel and build the list/dict/set inside the body.',
-                { line: trimmed },
-            );
-        }
+        this.auditMutableDefaults(line, trimmed, i, emit);
 
         if (inAsync && !ASYNC_DEF_RE.test(line)) {
             this.auditAsyncCalls(line, trimmed, i, emit);
         }
 
-        if (/\bopen\s*\(/.test(line) && !inWith && !WITH_RE.test(line)) {
-            emit(
-                i,
-                'PYM-OPEN-001',
-                '`open()` without a `with` block leaks the file handle on error paths.',
-                SEVERITY_WARNING,
-                'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
-                { line: trimmed },
-            );
-        }
+        this.auditUnmanagedOpen(line, trimmed, i, inWith, emit);
     }
 
     private auditAsyncCalls(line: string, trimmed: string, i: number, emit: PyEmitter): void {
