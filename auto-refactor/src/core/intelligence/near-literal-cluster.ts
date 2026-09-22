@@ -20,6 +20,7 @@ import type { LiteralRecord } from '../incremental-state';
 import { generateSemanticConstantName } from '../governance/semantic-naming-engine';
 import { classifyLiteral } from '../governance/semanticLiterals';
 import { locN } from '../../utils/normalized';
+import { ConstantsMessages } from '../messages/constants';
 
 const LOCAL_WINDOW_LINE_DELTA = 25;
 const MIN_CLUSTER_SIZE = 2;
@@ -169,16 +170,18 @@ function buildClusterIssue(cluster: SiblingLiteralCluster, filePath: string): Is
         return `const ${suggestedName} = ${l.value}; (line ${l.line})`;
     });
 
+    const desc = ConstantsMessages.UNEXTRACTED_CLUSTER_LEAK(
+        cluster.family,
+        unextracted.length,
+        cluster.hasExtractedConstant,
+    );
+
     return {
         id: `${CONSTANTS_ANALYZER}:${RULE_CONST_CLU_001}:${filePath}:${firstUnextracted.line}`,
         analyzer: CONSTANTS_ANALYZER,
         rule: RULE_CONST_CLU_001,
         severity: SEVERITY_WARNING,
-        message:
-            `临近调用域语义扫描发现 ${unextracted.length} 个未抽取的同类 "${cluster.family}" 硬编码字面量` +
-            (cluster.hasExtractedConstant
-                ? '（邻近已有同族常量提取，存在同源硬编码遗留）'
-                : '，建议一并打包抽取。'),
+        message: desc.message,
         location: locN(firstUnextracted.node, filePath),
         detail: {
             family: cluster.family,
@@ -187,7 +190,7 @@ function buildClusterIssue(cluster: SiblingLiteralCluster, filePath: string): Is
             lines: unextracted.map((l) => l.line),
             values: unextracted.map((l) => l.value),
         },
-        suggestion: `推荐一揽子抽离同域常量:\n  ${suggestions.join('\n  ')}`,
+        suggestion: `${desc.suggestion}:\n  ${suggestions.join('\n  ')}`,
     };
 }
 

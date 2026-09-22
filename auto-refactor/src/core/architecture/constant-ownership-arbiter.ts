@@ -14,6 +14,7 @@
  */
 
 import type { Issue } from '../types';
+import { ConstantsMessages } from '../messages/constants';
 
 const TIER_MODULE_PRIVATE = 'module_private';
 const TIER_DOMAIN_SHARED = 'domain_shared';
@@ -95,7 +96,7 @@ function computeRecommendedPlacement(
         return {
             recommendedTier: TIER_SYSTEM_CONFIG,
             recommendedTargetFile: SYSTEM_CONFIG_TARGET,
-            rationale: `常量 "${symbolName}" 属于可配置的运行时阈值/容量，建议纳入配置体系。`,
+            rationale: `Constant '${symbolName}' represents a configurable runtime threshold/capacity and should be governed by the configuration subsystem.`,
         };
     }
 
@@ -103,9 +104,7 @@ function computeRecommendedPlacement(
         return {
             recommendedTier: TIER_MODULE_PRIVATE,
             recommendedTargetFile: uniqueConsumers[0] || declarationFile,
-            rationale:
-                `常量 "${symbolName}" 仅在单文件内消费，应作为模块私有常量，` +
-                '严禁暴露至外部或塞入全局 constants 文件。',
+            rationale: `Constant '${symbolName}' is only consumed within a single file and should remain module-private rather than exported.`,
         };
     }
 
@@ -115,18 +114,14 @@ function computeRecommendedPlacement(
         return {
             recommendedTier: TIER_DOMAIN_SHARED,
             recommendedTargetFile: `${domain}/types.ts`,
-            rationale:
-                `常量 "${symbolName}" 在子系统 "${domain}" 内部多个文件复用，` +
-                '建议归属于该领域的共享类型或常量库。',
+            rationale: `Constant '${symbolName}' is reused across multiple files within subsystem '${domain}' and should belong to that domain's shared constants.`,
         };
     }
 
     return {
         recommendedTier: TIER_PROTOCOL_SHARED,
         recommendedTargetFile: PROTOCOL_SHARED_TARGET,
-        rationale:
-            `常量 "${symbolName}" 跨越 ${domains.size} 个子系统领域消费，` +
-            '建议提升至协议/契约契约层。',
+        rationale: `Constant '${symbolName}' is consumed across ${domains.size} subsystems and should be promoted to the protocol/contract layer.`,
     };
 }
 
@@ -142,14 +137,18 @@ function buildMisplacedIssue(
     rationale: string,
     consumerCount: number,
 ): Issue {
+    const desc = ConstantsMessages.MISPLACED_OWNERSHIP_TIER(
+        symbolName,
+        recommendedTier,
+        recommendedTargetFile,
+        rationale,
+    );
     return {
         id: `${CONSTANTS_ANALYZER}:${RULE_CONST_OWN_001}:${declarationFile}:${declarationLine}`,
         analyzer: CONSTANTS_ANALYZER,
         rule: RULE_CONST_OWN_001,
         severity: SEVERITY_WARNING,
-        message:
-            `常量 "${symbolName}" 架构所有权分层不合理（当前处于 ${declarationFile}，推荐层级为 [${recommendedTier}]）。` +
-            rationale,
+        message: desc.message,
         location: {
             file: declarationFile,
             start: { line: declarationLine, column: 1 },
@@ -161,8 +160,9 @@ function buildMisplacedIssue(
             recommendedTargetFile,
             recommendedTier,
             consumerCount,
+            rationale,
         },
-        suggestion: `重构所有权归属：将 "${symbolName}" 迁移并收敛至 [${recommendedTargetFile}]。`,
+        suggestion: desc.suggestion,
     };
 }
 

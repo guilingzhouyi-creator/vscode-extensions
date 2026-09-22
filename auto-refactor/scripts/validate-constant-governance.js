@@ -264,7 +264,7 @@ function otherWork() {
     scpIssue,
     'Must flag top-level constant that is only consumed in single local function',
   );
-  assert.ok(scpIssue.message.includes('作用域过度扩大'));
+  assert.ok(scpIssue.message.includes('over-widened'));
 }
 console.log('  PASS: CONST-SCP-001 prevents over-widening local invariants.\n');
 

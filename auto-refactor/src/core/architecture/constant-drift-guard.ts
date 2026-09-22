@@ -13,6 +13,7 @@
  */
 
 import type { Issue } from '../types';
+import { ConstantsMessages } from '../messages/constants';
 
 const CONSTANTS_ANALYZER = 'constants';
 const RULE_CONST_DRF_001 = 'CONST-DRF-001';
@@ -48,15 +49,14 @@ function inspectConstantGroupDrift(name: string, list: ObservedConstantDeclarati
         .join('; ');
 
     const issues: Issue[] = [];
+    const desc = ConstantsMessages.CROSS_FILE_DRIFT(name, summary);
     for (const item of list) {
         issues.push({
             id: `${CONSTANTS_ANALYZER}:${RULE_CONST_DRF_001}:${item.filePath}:${item.line}`,
             analyzer: CONSTANTS_ANALYZER,
             rule: RULE_CONST_DRF_001,
             severity: SEVERITY_WARNING,
-            message:
-                `跨文件同名常量 "${name}" 发生版本/语义值漂移（${summary}）。` +
-                '严禁不同文件各自维护互有偏差的同名副本，必须建立单一真源。',
+            message: desc.message,
             location: {
                 file: item.filePath,
                 start: { line: item.line, column: 1 },
@@ -68,7 +68,7 @@ function inspectConstantGroupDrift(name: string, list: ObservedConstantDeclarati
                 allDistinctValues: Array.from(distinctValues.keys()),
                 filesInvolved: list.map((l) => l.filePath),
             },
-            suggestion: `收敛版本漂移：统一确定 "${name}" 的规范值，并在所属领域共享库中保留单一真源（SSOT）。`,
+            suggestion: desc.suggestion,
         });
     }
     return issues;

@@ -19,6 +19,7 @@
 import type { Issue } from '../types';
 import { extractConstantEntities } from '../diff/constant-relocation-detector';
 import type { ConstantEntity } from '../intelligence/constant-identity';
+import { ConstantsMessages } from '../messages/constants';
 
 const ANALYZER_NAME = 'constants';
 const RULE_CONST_LAY_001 = 'CONST-LAY-001';
@@ -107,14 +108,13 @@ function checkMisplacedConstantLayout(
     if (firstLogicLine <= 0 || line <= firstLogicLine) {
         return null;
     }
+    const desc = ConstantsMessages.LAYOUT_ORDER_BREACH(entity.identity.name, lastImportLine);
     return {
         id: `${ANALYZER_NAME}:${RULE_CONST_LAY_001}:${filePath}:${line}`,
         analyzer: ANALYZER_NAME,
         rule: RULE_CONST_LAY_001,
         severity: SEVERITY_WARNING,
-        message:
-            `模块级常量 "${entity.identity.name}" 位置不合规（位于第 ${line} 行，处于首个函数/类声明第 ${firstLogicLine} 行之后）。` +
-            '模块级稳定常量应统一位于依赖区之后、业务逻辑声明之前。',
+        message: desc.message,
         location: {
             file: filePath,
             start: { line, column: entity.identity.column ?? 1 },
@@ -129,7 +129,7 @@ function checkMisplacedConstantLayout(
             firstLogicLine,
             lastImportLine,
         },
-        suggestion: `将 "const ${entity.identity.name}" 移动至依赖引入区（第 ${lastImportLine > 0 ? lastImportLine : 1} 行）之后的顶层常量区。`,
+        suggestion: desc.suggestion,
     };
 }
 
@@ -157,14 +157,13 @@ function checkScopeOverWidening(
         const minLine = Math.min(...matchedLines);
         const maxLine = Math.max(...matchedLines);
         if (maxLine - minLine <= LOCAL_SCOPE_SPAN_THRESHOLD) {
+            const desc = ConstantsMessages.SCOPE_OVERWIDENING(name, minLine, maxLine);
             return {
                 id: `${ANALYZER_NAME}:${RULE_CONST_SCP_001}:${filePath}:${line}`,
                 analyzer: ANALYZER_NAME,
                 rule: RULE_CONST_SCP_001,
                 severity: SEVERITY_WARNING,
-                message:
-                    `作用域过度扩大：常量 "${name}" 仅在单处局部逻辑（行 ${minLine}..${maxLine}）被引用，` +
-                    '严禁为了所谓“统一位置”而将其盲目提升至模块顶层全局可见。',
+                message: desc.message,
                 location: {
                     file: filePath,
                     start: { line, column: entity.identity.column ?? 1 },
@@ -175,7 +174,7 @@ function checkScopeOverWidening(
                     declaredLine: line,
                     usageLines: matchedLines,
                 },
-                suggestion: `收敛作用域：将 "${name}" 下沉至其被调用的局部函数或代码块头部声明。`,
+                suggestion: desc.suggestion,
             };
         }
     }
