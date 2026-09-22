@@ -256,6 +256,8 @@ async function finalizeBaseline(
         baseline?: string;
         updateBaseline?: string;
         baselineGranularity?: string;
+        baselineRatchetDown?: boolean;
+        forceBaselineExpand?: boolean;
     },
     logger: Logger,
     postScanPasses: string[],
@@ -266,7 +268,10 @@ async function finalizeBaseline(
         postScanPasses.push('baseline');
     }
     if (options.updateBaseline) {
-        await handleBaselineUpdate(report, options.updateBaseline, granularity, logger);
+        await handleBaselineUpdate(report, options.updateBaseline, granularity, logger, {
+            ratchetDown: options.baselineRatchetDown ?? true,
+            forceExpand: options.forceBaselineExpand ?? false,
+        });
     }
     if (options.baseline) {
         await handleBaselineRatchet(report, options.baseline, logger);
@@ -282,6 +287,8 @@ async function finalizeBaseline(
  * @param options.baseline - Baseline file to ratchet the report against, when supplied.
  * @param options.updateBaseline - Baseline file to rewrite with the current report, when supplied.
  * @param options.baselineGranularity - Grouping granularity used for baseline comparisons.
+ * @param options.baselineRatchetDown - Enforce downward-only ratchet on update.
+ * @param options.forceBaselineExpand - Allow baseline expansion on update.
  * @param logger - Logger instance for operational telemetry.
  * @param reportScanner - Scanner that executed the scan, or null if warm/remote.
  * @param scope - Post-scan scope: full allows cross-file passes; incremental skips them.
@@ -294,6 +301,8 @@ export async function finalizeReport(
         baseline?: string;
         updateBaseline?: string;
         baselineGranularity?: string;
+        baselineRatchetDown?: boolean;
+        forceBaselineExpand?: boolean;
     },
     logger: Logger,
     reportScanner: Scanner | null,

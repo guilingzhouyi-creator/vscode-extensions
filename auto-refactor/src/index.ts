@@ -201,6 +201,12 @@ const STANDALONE_FLAG_HANDLERS: Record<string, (opt: CliOptions) => void> = {
     'no-memory': (opt) => {
         opt.memory = false;
     },
+    'baseline-ratchet-down': (opt) => {
+        opt.baselineRatchetDown = true;
+    },
+    'force-baseline-expand': (opt) => {
+        opt.forceBaselineExpand = true;
+    },
     help: () => {
         printUsage();
         process.exit(0);

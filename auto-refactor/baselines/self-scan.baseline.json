@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-21T15:07:32.300Z",
+  "timestamp": "2026-09-22T05:52:26.514Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -4317,9 +4317,9 @@
     },
     {
       "key": "governance|GOV-LOG-001|src/core/diff/edit-diff.ts",
-      "count": 5,
+      "count": 1,
       "severities": {
-        "warning": 5
+        "warning": 1
       }
     },
     {
@@ -4331,27 +4331,6 @@
     },
     {
       "key": "complexity|high-complexity|src/core/diff/edit-diff.ts",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/diff/edit-diff.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/diff/edit-diff.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/diff/edit-diff.ts",
       "count": 2,
       "severities": {
         "warning": 2
@@ -5927,9 +5906,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 28,
+      "count": 23,
       "severities": {
-        "warning": 28
+        "warning": 23
       }
     },
     {
@@ -5941,23 +5920,23 @@
     },
     {
       "key": "complexity|high-complexity|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 4,
+      "count": 2,
       "severities": {
-        "warning": 4
+        "warning": 2
       }
     },
     {
       "key": "governance|GOV-LOG-001|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 3,
+      "count": 2,
       "severities": {
-        "warning": 3
+        "warning": 2
       }
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 5,
+      "count": 3,
       "severities": {
-        "warning": 5
+        "warning": 3
       }
     },
     {

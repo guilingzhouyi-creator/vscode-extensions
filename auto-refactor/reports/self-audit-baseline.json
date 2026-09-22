@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790004197600",
-  "timestamp": "2026-09-21T15:23:19.720Z",
+  "snapshotId": "snapshot-v0.4.0-1790057620004",
+  "timestamp": "2026-09-22T06:13:41.929Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,26 +12,26 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 367,
-    "durationMs": 1965
+    "filesScanned": 370,
+    "durationMs": 1781
   },
   "metrics": {
     "compositeScore": 99.8,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 6602,
+    "totalIssues": 6576,
     "suppressedIssues": 3003,
-    "unsuppressedIssues": 3599,
+    "unsuppressedIssues": 3573,
     "bySeverity": {
       "info": 192,
-      "warning": 6410,
+      "warning": 6384,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 167,
-      "medium": 5819,
-      "low": 616
+      "high": 162,
+      "medium": 5800,
+      "low": 614
     }
   },
   "eightPillars": {
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 167,
-      "medium": 5819,
-      "low": 616
+      "high": 162,
+      "medium": 5800,
+      "low": 614
     },
     "criticalItems": [],
     "highItems": [
@@ -466,21 +466,21 @@
         "message": "Function \"TestModernityAnalyzer.analyzeWithLines\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
-        "id": "complexity:CPX-SPACE-001:src/core/architecture/metaArchitectureEvaluator.ts:143",
+        "id": "complexity:CPX-SPACE-001:src/core/architecture/metaArchitectureEvaluator.ts:152",
         "rule": "CPX-SPACE-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/architecture/metaArchitectureEvaluator.ts",
-        "line": 143,
-        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'edges'."
+        "line": 152,
+        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'nodes'."
       },
       {
-        "id": "performance:PRF-MEM-001:src/core/architecture/metaArchitectureEvaluator.ts:151",
+        "id": "performance:PRF-MEM-001:src/core/architecture/metaArchitectureEvaluator.ts:153",
         "rule": "PRF-MEM-001",
         "tier": "high",
         "severity": "info",
         "file": "src/core/architecture/metaArchitectureEvaluator.ts",
-        "line": 151,
+        "line": 153,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
@@ -735,10 +735,10 @@
       },
       {
         "domainName": "diff",
-        "compositeScore": 99.6,
+        "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.3,
+          "maintainability": 97.8,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -840,10 +840,10 @@
       },
       {
         "domainName": "pipeline",
-        "compositeScore": 99.6,
+        "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97,
+          "maintainability": 97.9,
           "performance": 100,
           "data": 100,
           "testing": 100,

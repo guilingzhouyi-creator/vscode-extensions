@@ -40,6 +40,15 @@ import {
 
 export { META_ARCH_RULES };
 
+const RE_UTIL_OR_SHARED = /[\/\\](?:utils?|helpers?|shared|common)[\/\\]/i;
+const RE_INFRA = /[\/\\](?:infra|storage|db|network|fs|system)[\/\\]/i;
+const RE_RULE = /[\/\\](?:rules?|policies|policy)[\/\\]/i;
+const RE_POOL = /[\/\\](?:pool|buffer|cache)[\/\\]/i;
+const RE_ALGO = /[\/\\](?:algo|math|transforms?|operators?)[\/\\]/i;
+const RE_CONST = /[\/\\](?:constants?|literals?|enums?)[\/\\]/i;
+const RE_UTILITY_FILE =
+    /(?:^|[\/\\])(?:utils?|helpers?|common|tools?|misc|shared-utils?)(?:\.[a-zA-Z0-9]+)?$/i;
+
 /**
  * Evaluator engine for SemanticArchitectureGraph.
  */
@@ -140,33 +149,31 @@ export class MetaArchitectureEvaluator {
         const crossDomainFanInMap = new Map<string, Set<string>>();
         const fanOutMap = new Map<string, number>();
 
+        for (const node of nodes) {
+            crossDomainFanInMap.set(node.id, new Set<string>());
+        }
+
         for (const edge of edges) {
             fanOutMap.set(edge.fromNodeId, (fanOutMap.get(edge.fromNodeId) ?? 0) + 1);
             fanInMap.set(edge.toNodeId, (fanInMap.get(edge.toNodeId) ?? 0) + 1);
             if (edge.isCrossDomain) {
                 const fromNode = graph.getNode(edge.fromNodeId);
                 if (fromNode) {
-                    let domainSet = crossDomainFanInMap.get(edge.toNodeId);
-                    if (!domainSet) {
-                        domainSet = new Set<string>();
-                        crossDomainFanInMap.set(edge.toNodeId, domainSet);
+                    const domainSet = crossDomainFanInMap.get(edge.toNodeId);
+                    if (domainSet) {
+                        domainSet.add(fromNode.domainName);
                     }
-                    domainSet.add(fromNode.domainName);
                 }
             }
         }
 
         const metricsList: FileBehavioralMetrics[] = nodes.map((node) => {
-            const isUtilOrShared = /[\/\\](?:utils?|helpers?|shared|common)[\/\\]/i.test(
-                node.filePath,
-            );
-            const isInfra = /[\/\\](?:infra|storage|db|network|fs|system)[\/\\]/i.test(
-                node.filePath,
-            );
-            const isRule = /[\/\\](?:rules?|policies|policy)[\/\\]/i.test(node.filePath);
-            const isPool = /[\/\\](?:pool|buffer|cache)[\/\\]/i.test(node.filePath);
-            const isAlgo = /[\/\\](?:algo|math|transforms?|operators?)[\/\\]/i.test(node.filePath);
-            const isConst = /[\/\\](?:constants?|literals?|enums?)[\/\\]/i.test(node.filePath);
+            const isUtilOrShared = RE_UTIL_OR_SHARED.test(node.filePath);
+            const isInfra = RE_INFRA.test(node.filePath);
+            const isRule = RE_RULE.test(node.filePath);
+            const isPool = RE_POOL.test(node.filePath);
+            const isAlgo = RE_ALGO.test(node.filePath);
+            const isConst = RE_CONST.test(node.filePath);
 
             return {
                 filePath: node.filePath,
@@ -201,11 +208,7 @@ export class MetaArchitectureEvaluator {
         if (!flagDiscipline) return undefined;
 
         const utilityContexts: UtilityFileInspectionContext[] = nodes
-            .filter((node) =>
-                /(?:^|[\/\\])(?:utils?|helpers?|common|tools?|misc|shared-utils?)(?:\.[a-zA-Z0-9]+)?$/i.test(
-                    node.filePath,
-                ),
-            )
+            .filter((node) => RE_UTILITY_FILE.test(node.filePath))
             .map((node) => ({
                 filePath: node.filePath,
                 loc: 150,

@@ -12,10 +12,18 @@
  *   one id covers every finding of a rule on a line and severity never entered the comparison.
  */
 
-import * as fs from 'fs';
-import type { ScanReport, Issue, Severity } from '../types';
+import type { Issue, Severity } from '../types';
 import { SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR } from '../types';
-import type { Logger } from '../logger';
+import {
+    ratchetDownGroups,
+    handleBaselineUpdate,
+    handleBaselineRatchet,
+    type RatchetDownResult,
+    type BaselineUpdateOptions,
+} from './baseline-ratchet';
+
+export { ratchetDownGroups, handleBaselineUpdate, handleBaselineRatchet };
+export type { RatchetDownResult, BaselineUpdateOptions };
 
 /** Baseline ratchet granularity that compares per-(analyzer|rule|file) counts. */
 export const BASELINE_GRANULARITY_GROUPED = 'grouped';
@@ -29,6 +37,10 @@ export const BASELINE_VERSION = '1.2.0';
 
 /** Bucket that absorbs every severity; used when a baseline recorded none (legacy payloads). */
 const UNKNOWN_SEVERITY = 'unknown';
+
+/** Informational notice appended when ratcheting against legacy baselines. */
+export const LEGACY_ESCALATION_NOTICE =
+    ' [legacy baseline: severity escalation stays undetectable until a re-freeze]';
 
 /** Severity ordering. A credit only absorbs findings at or below its own severity. */
 const SEVERITY_RANK: Record<string, number> = {
@@ -59,7 +71,7 @@ interface BaselineCredits {
 }
 
 /** A baseline payload as written to disk; legacy versions simply omit the newer fields. */
-interface BaselinePayload {
+export interface BaselinePayload {
     version?: string;
     granularity?: string;
     timestamp?: string;
@@ -69,13 +81,18 @@ interface BaselinePayload {
 }
 
 /** Parsed baseline plus whether it recorded severity (1.2.0+) or only occurrence counts. */
-interface BaselineSnapshot {
+export interface BaselineSnapshot {
     credits: Map<string, BaselineCredits>;
     severityAware: boolean;
 }
 
-/** Comparison key for grouped granularity: analyzer, rule and repository-relative file. */
-function issueGroupKey(issue: Issue): string {
+/**
+ * Comparison key for grouped granularity: analyzer, rule and repository-relative file.
+ *
+ * @param issue - Issue to compute grouped key for.
+ * @returns Serialized grouped key string.
+ */
+export function issueGroupKey(issue: Issue): string {
     return `${issue.analyzer}|${issue.rule}|${issue.location.file.replace(/\\/g, '/')}`;
 }
 
@@ -103,7 +120,7 @@ export function groupCounts(issues: Issue[]): GroupedBaselineRow[] {
  * @param issues - Issues of the frozen report.
  * @returns Occurrence counts per severity for every distinct issue id.
  */
-function idSeverityHistograms(issues: Issue[]): Record<string, SeverityHistogram> {
+export function idSeverityHistograms(issues: Issue[]): Record<string, SeverityHistogram> {
     const histograms: Record<string, SeverityHistogram> = {};
     for (const issue of issues) {
         const histogram = histograms[issue.id] ?? {};
@@ -134,44 +151,50 @@ function creditFrom(count: number, severities?: SeverityHistogram): BaselineCred
 }
 
 /**
+ * Compute the comparison rank of a baseline credit bucket.
+ */
+function bucketRank(bucket: string): number {
+    if (bucket === UNKNOWN_SEVERITY) return Number.POSITIVE_INFINITY;
+    return SEVERITY_RANK[bucket] ?? 0;
+}
+
+/**
  * Consume one baseline credit for a finding.
  *
  * The exact severity bucket is tried first; otherwise any bucket at least as severe may absorb the
  * finding, so a baselined error absorbs a later warning while a baselined warning never absorbs a
- * later error. An `unknown` bucket (legacy baseline) absorbs everything.
+ * later error.
  *
- * @param credits - Mutable ledger entry for the finding's key.
- * @param severity - Severity of the finding asking for a credit.
- * @returns True when a credit was consumed, false when the finding must be reported as new.
+ * @param credit - Credit ledger entry for the comparison key (mutated).
+ * @param severity - Severity of the current finding.
+ * @returns True when a credit was successfully consumed.
  */
-function consumeCredit(credits: BaselineCredits, severity: Severity): boolean {
-    if (credits.remaining <= 0) return false;
-    const exact = credits.buckets.get(severity) ?? 0;
+function consumeCredit(credit: BaselineCredits, severity: Severity): boolean {
+    if (credit.remaining <= 0) return false;
+    const exact = credit.buckets.get(severity) ?? 0;
     if (exact > 0) {
-        credits.buckets.set(severity, exact - 1);
-        credits.remaining -= 1;
+        credit.buckets.set(severity, exact - 1);
+        credit.remaining -= 1;
         return true;
     }
-    const rank = SEVERITY_RANK[severity] ?? 0;
-    for (const [bucket, available] of credits.buckets) {
-        const bucketRank =
-            bucket === UNKNOWN_SEVERITY ? Number.POSITIVE_INFINITY : (SEVERITY_RANK[bucket] ?? 0);
-        if (available > 0 && bucketRank >= rank) {
-            credits.buckets.set(bucket, available - 1);
-            credits.remaining -= 1;
-            return true;
-        }
-    }
-    return false;
+    const findingRank = SEVERITY_RANK[severity] ?? 0;
+    const compatible = [...credit.buckets.entries()]
+        .filter(([bucket, count]) => count > 0 && bucketRank(bucket) >= findingRank)
+        .sort((a, b) => bucketRank(a[0]) - bucketRank(b[0]));
+    if (compatible.length === 0) return false;
+    const [chosenBucket, count] = compatible[0];
+    credit.buckets.set(chosenBucket, count - 1);
+    credit.remaining -= 1;
+    return true;
 }
 
 /**
- * Read the credit ledger of a grouped baseline.
+ * Read the credit ledger of a grouped-granularity baseline.
  *
- * @param groups - Grouped rows as stored in the payload.
- * @returns Credit ledger plus whether any row recorded severities.
+ * @param groups - Grouped rows recorded in the payload.
+ * @returns Credit ledger plus whether the payload recorded severities.
  */
-function readGroupedCredits(groups: GroupedBaselineRow[]): BaselineSnapshot {
+export function readGroupedCredits(groups: GroupedBaselineRow[]): BaselineSnapshot {
     const credits = new Map<string, BaselineCredits>();
     let severityAware = false;
     for (const group of groups) {
@@ -193,7 +216,7 @@ function readGroupedCredits(groups: GroupedBaselineRow[]): BaselineSnapshot {
  * @param severities - Per-id severity histograms, when the baseline recorded them.
  * @returns Credit ledger plus whether the payload recorded severities.
  */
-function readIdCredits(
+export function readIdCredits(
     ids: string[],
     severities?: Record<string, SeverityHistogram>,
 ): BaselineSnapshot {
@@ -221,7 +244,7 @@ function readIdCredits(
  * @param keyOf - Key function matching the baseline granularity.
  * @returns Findings to annotate as new.
  */
-function selectNewIssues(
+export function selectNewIssues(
     issues: Issue[],
     snapshot: BaselineSnapshot,
     keyOf: (issue: Issue) => string,
@@ -232,88 +255,4 @@ function selectNewIssues(
         if (!credit || !consumeCredit(credit, issue.severity)) newIssues.push(issue);
     }
     return newIssues;
-}
-
-/**
- * Persist the current scan issues to a baseline snapshot file.
- *
- * @param report - Completed scan report to serialize.
- * @param updateBaselinePath - Destination path for baseline JSON.
- * @param granularity - Ratchet granularity ('id' or 'grouped').
- * @param logger - Logger instance for operational telemetry.
- * Concurrency: asynchronous I/O operation; safe for single-threaded runtime.
- */
-export async function handleBaselineUpdate(
-    report: ScanReport,
-    updateBaselinePath: string,
-    granularity: string,
-    logger: Logger,
-): Promise<void> {
-    const timestamp = new Date().toISOString();
-    const baselineData: BaselinePayload =
-        granularity === BASELINE_GRANULARITY_GROUPED
-            ? {
-                  version: BASELINE_VERSION,
-                  granularity,
-                  timestamp,
-                  groups: groupCounts(report.issues),
-              }
-            : {
-                  version: BASELINE_VERSION,
-                  granularity: 'id',
-                  timestamp,
-                  // One row per distinct id: multiplicity and severity live in the histogram,
-                  // so an id is never repeated once per same-line finding.
-                  issues: [...new Set(report.issues.map((i) => i.id))],
-                  severities: idSeverityHistograms(report.issues),
-              };
-    await fs.promises.writeFile(
-        updateBaselinePath,
-        JSON.stringify(baselineData, null, 2) + '\n',
-        'utf8',
-    );
-    logger.info(`baseline written to ${updateBaselinePath} (granularity=${granularity})`);
-}
-
-/**
- * Compare scan issues against an existing baseline snapshot and mark new issues.
- *
- * @param report - Completed scan report to annotate in-place.
- * @param baselinePath - Source path for baseline JSON snapshot.
- * @param logger - Logger instance for operational telemetry.
- * Concurrency: asynchronous I/O operation; safe for single-threaded runtime.
- */
-export async function handleBaselineRatchet(
-    report: ScanReport,
-    baselinePath: string,
-    logger: Logger,
-): Promise<void> {
-    if (!fs.existsSync(baselinePath)) return;
-    try {
-        const raw = await fs.promises.readFile(baselinePath, 'utf8');
-        const baselineData = JSON.parse(raw) as BaselinePayload;
-        const groups = baselineData.groups ?? [];
-        const ids = baselineData.issues ?? [];
-        const isGrouped = baselineData.granularity === BASELINE_GRANULARITY_GROUPED;
-        const snapshot = isGrouped
-            ? readGroupedCredits(groups)
-            : readIdCredits(ids, baselineData.severities);
-        const newIssues = selectNewIssues(
-            report.issues,
-            snapshot,
-            isGrouped ? issueGroupKey : (issue: Issue) => issue.id,
-        );
-        for (const issue of newIssues) issue.isNew = true;
-        report.summary.ratchetBaselineUsed = true;
-        const accepted = isGrouped ? groups.length : ids.length;
-        logger.info(
-            `baseline ratchet(${baselineData.granularity ?? 'id'}): accepted=${accepted} ` +
-                `newIssues=${newIssues.length}` +
-                (snapshot.severityAware
-                    ? ''
-                    : ' [legacy baseline: severity escalation stays undetectable until a re-freeze]'),
-        );
-    } catch (e) {
-        logger.warn(`Failed to read baseline file: ${e}`);
-    }
 }

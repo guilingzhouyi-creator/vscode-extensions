@@ -32,11 +32,28 @@ const REPORT = path.join(os.tmpdir(), `auto-refactor-self-scan-${process.pid}.js
 
 const args = process.argv.slice(2);
 const update = args.includes('--update');
+const forceExpand = args.includes('--force-expand');
 const severityIndex = args.indexOf('--severity');
 const severity = severityIndex >= 0 ? args[severityIndex + 1] : 'error';
 if (!['info', 'warning', 'error'].includes(severity)) {
   process.stderr.write(`[gate:self] invalid --severity: ${severity}\n`);
   process.exit(2);
+}
+
+function countBaselineIssues(filePath) {
+  if (!fs.existsSync(filePath)) return 0;
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (Array.isArray(data.groups)) {
+      return data.groups.reduce((acc, g) => acc + (g.count || 0), 0);
+    }
+    if (Array.isArray(data.issues)) {
+      return data.issues.length;
+    }
+  } catch {
+    return 0;
+  }
+  return 0;
 }
 
 if (!fs.existsSync(CLI)) {
@@ -51,6 +68,8 @@ if (!update && !fs.existsSync(BASELINE)) {
   process.exit(2);
 }
 fs.mkdirSync(path.dirname(BASELINE), { recursive: true });
+
+const oldBaselineTotal = update ? countBaselineIssues(BASELINE) : 0;
 
 const cliArgs = [
   CLI,
@@ -73,9 +92,12 @@ const cliArgs = [
   'warn',
 ];
 if (update) {
-  // A freeze is a review action: it records the current state and must not gate on it, or a
-  // repository that legitimately carries existing error-severity debt could never refreeze.
   cliArgs.push('--update-baseline', BASELINE);
+  if (forceExpand) {
+    cliArgs.push('--force-baseline-expand');
+  } else {
+    cliArgs.push('--baseline-ratchet-down');
+  }
 } else {
   cliArgs.push('--baseline', BASELINE, '--fail-on-severity', severity);
 }
@@ -125,6 +147,23 @@ if (summary) {
       `suppressed=${summary.suppressed} newBlocking(${severity})=${summary.newBlocking}\n`,
   );
 }
+
+if (update) {
+  const newBaselineTotal = countBaselineIssues(BASELINE);
+  const delta = newBaselineTotal - oldBaselineTotal;
+  const deltaStr = delta <= 0 ? `${delta}` : `+${delta}`;
+  process.stdout.write(
+    `[gate:self] baseline count: ${oldBaselineTotal} -> ${newBaselineTotal} (delta: ${deltaStr})\n`,
+  );
+  if (!forceExpand && delta > 0) {
+    process.stderr.write(
+      `[gate:self] ERROR: Baseline expanded by +${delta} issues (${oldBaselineTotal} -> ${newBaselineTotal})!\n` +
+        `[gate:self] Ratchet Principle Violation: baseline may only shrink or stay equal. Use --force-expand to override.\n`,
+    );
+    process.exit(1);
+  }
+}
+
 process.stdout.write(
   `[gate:self] ${update ? 'baseline updated' : `self-scan ratchet (severity=${severity})`} → ${code === 0 ? 'PASS' : 'FAIL'}\n`,
 );

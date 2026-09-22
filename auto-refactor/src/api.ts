@@ -130,6 +130,13 @@ export interface ScanOptions {
      * counts). Default from config ('id').
      */
     baselineGranularity?: 'id' | typeof BASELINE_GRANULARITY_GROUPED;
+    /**
+     * Enforce downward-only ratchet on updateBaseline (pruning resolved groups,
+     * forbidding growth).
+     */
+    baselineRatchetDown?: boolean;
+    /** Allow baseline expansion when updating baseline. */
+    forceBaselineExpand?: boolean;
 
     // ---- warm-scan (all default OFF) ----
     /** Enable the two-level incremental cache (scan() only; default false). */
