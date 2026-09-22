@@ -16,7 +16,6 @@
  *   and checkDtoCredentialLeakage let teams stage adoption rather than flip an all-or-nothing
  *   gate.
  */
-import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue, ArchitectureLayer, Severity } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { inferDirectorySemantic } from '../core/profiler/projectProfiler';
@@ -61,12 +60,7 @@ const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = (
     'child_process subprocess socket'
 ).split(' ');
 
-const DISALLOWED_PARSER_PACKAGES = [
-    'oxc-parser',
-    '@babel/parser',
-    'tree-sitter',
-    'ts-morph/dist',
-];
+const DISALLOWED_PARSER_PACKAGES = ['oxc-parser', '@babel/parser', 'tree-sitter', 'ts-morph/dist'];
 
 /** ASCII code of carriage return, stripped from CRLF line endings before per-line analysis. */
 const CARRIAGE_RETURN_CHAR_CODE = 13;
@@ -76,6 +70,12 @@ const ARCHITECTURE_LAYER_DOMAIN = 'domain';
 
 /** Clean Architecture layer name for interface/adapter code (the outermost layer). */
 const ARCHITECTURE_LAYER_INTERFACE = 'interface';
+
+/** Clean Architecture layer name for application code. */
+const ARCHITECTURE_LAYER_APPLICATION = 'application';
+
+/** Clean Architecture layer name for infrastructure code. */
+const ARCHITECTURE_LAYER_INFRASTRUCTURE = 'infrastructure';
 
 function isExemptLayer(layer: ArchitectureLayer): boolean {
     return layer === 'test' || layer === 'tooling' || layer === 'shared';
@@ -627,8 +627,8 @@ export class ArchitectureAnalyzer implements Analyzer {
         // Rule 1: Domain cannot depend on Application, Infrastructure, or Interface
         if (currentLayer === ARCHITECTURE_LAYER_DOMAIN) {
             if (
-                targetLayer === 'application' ||
-                targetLayer === 'infrastructure' ||
+                targetLayer === ARCHITECTURE_LAYER_APPLICATION ||
+                targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE ||
                 targetLayer === ARCHITECTURE_LAYER_INTERFACE
             ) {
                 const descriptor = ArchitectureMessages.DOMAIN_INVERSION_BREACH(
@@ -657,7 +657,7 @@ export class ArchitectureAnalyzer implements Analyzer {
                     opts.flagLayeringIllusions ??
                     ctx.config.thresholds?.flagLayeringIllusions ??
                     false;
-                if (flagIllusions && targetLayer === 'infrastructure') {
+                if (flagIllusions && targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE) {
                     issues.push(
                         this.mkIssue(
                             ctx,
@@ -693,7 +693,10 @@ export class ArchitectureAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         // Rule 2: Application cannot depend on Interface
-        if (currentLayer === 'application' && targetLayer === ARCHITECTURE_LAYER_INTERFACE) {
+        if (
+            currentLayer === ARCHITECTURE_LAYER_APPLICATION &&
+            targetLayer === ARCHITECTURE_LAYER_INTERFACE
+        ) {
             const d = ArchitectureMessages.APPLICATION_LAYER_BREACH(targetLayer, resolvedPath);
             issues.push(
                 this.mkIssue(
@@ -726,7 +729,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         // Rule 3: Interface should not directly bypass Application to Infrastructure (Skip-Layer)
         if (
             currentLayer === ARCHITECTURE_LAYER_INTERFACE &&
-            targetLayer === 'infrastructure' &&
+            targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE &&
             !opts.allowSkipLayers
         ) {
             const d = ArchitectureMessages.SKIP_LAYER_PENETRATION(targetLayer, resolvedPath);

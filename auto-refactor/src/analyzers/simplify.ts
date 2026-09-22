@@ -35,6 +35,7 @@ interface SimplifyOptions {
 
 const DEFAULT_MAX_FUNCTION_LINES = 60;
 const DEFAULT_MIN_COMMENTED_CODE_LINES = 3;
+const DEFAULT_MAX_GUARD_CLAUSE_NESTING = 3;
 const DEFAULT_PRINT_ALLOW_PATTERNS = [
     '**/cli/**',
     '**/scripts/**',
@@ -63,6 +64,11 @@ const BRACE_EMPTY_ONE_LINER_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\
 const BRACE_OPEN_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*$/;
 const BRACE_CLOSE_RE = /^\s*\}\s*;?\s*$/;
 const COMMENT_MARKERS = ['//', '#', '*'];
+const CHAR_DOUBLE_QUOTE = '"';
+const CHAR_SINGLE_QUOTE = "'";
+const TRIPLE_DOUBLE_QUOTE = '"""';
+const TRIPLE_SINGLE_QUOTE = "'''";
+type DocstringQuote = typeof CHAR_DOUBLE_QUOTE | typeof CHAR_SINGLE_QUOTE;
 
 function computeControlFlowNesting(rootNode: NormalizedNode): number {
     const rootChildren = rootNode.children;
@@ -119,12 +125,56 @@ export class SimplifyAnalyzer implements Analyzer {
      *
      * @param node - Every visited node; only function-like nodes are measured.
      * @param ctx - Analyzer context (file path, options, content).
-     * @param _parent - Unused; sibling access is not required by this rule.
-     * @param _grandparent - Unused.
-     * @param _depth - Unused.
-     * @param className - Enclosing class name threaded by the engine, used for naming methods.
-     * @param binding - Enclosing binding name for anonymous functions.
+     * @param opts - Merged analyzer options.
+     * @param name - Display name of the function or method.
      */
+    private checkFunctionLength(
+        node: NormalizedNode,
+        ctx: AnalyzerContext,
+        opts: SimplifyOptions,
+        name: string,
+    ): void {
+        const limit = opts.maxFunctionLines ?? DEFAULT_MAX_FUNCTION_LINES;
+        const length = (node.end?.line ?? 0) - (node.start?.line ?? 0) + 1;
+        if (length > limit) {
+            this.longFunctions.push({
+                id: `simplify:SIM-LONG-001:${ctx.filePath}:${node.start?.line ?? 1}`,
+                analyzer: ANALYZER_SIMPLIFY,
+                rule: 'SIM-LONG-001',
+                severity: SEVERITY_WARNING,
+                message: `Function "${name}" spans ${length} lines (limit ${limit}).`,
+                location: locN(node, ctx.filePath),
+                detail: { function: name, lines: length, limit },
+                suggestion:
+                    'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
+            });
+        }
+    }
+
+    private checkGuardClauseNesting(
+        node: NormalizedNode,
+        ctx: AnalyzerContext,
+        opts: SimplifyOptions,
+        name: string,
+    ): void {
+        if (!opts.checkGuardClauses) return;
+        const maxNesting = computeControlFlowNesting(node);
+        const maxAllowed = opts.maxGuardClauseNesting ?? DEFAULT_MAX_GUARD_CLAUSE_NESTING;
+        if (maxNesting > maxAllowed) {
+            this.longFunctions.push({
+                id: `simplify:SIM-FLAT-002:${ctx.filePath}:${node.start?.line ?? 1}`,
+                analyzer: ANALYZER_SIMPLIFY,
+                rule: 'SIM-FLAT-002',
+                severity: SEVERITY_WARNING,
+                message: `Function "${name}" has nested conditional control-flow depth ${maxNesting} (limit ${maxAllowed}). Flatten with guard clauses.`,
+                location: locN(node, ctx.filePath),
+                detail: { function: name, nestingDepth: maxNesting, limit: maxAllowed },
+                suggestion:
+                    'Invert deep conditionals and return early with guard clauses to flatten control flow.',
+            });
+        }
+    }
+
     visit(
         node: NormalizedNode,
         ctx: AnalyzerContext,
@@ -136,40 +186,9 @@ export class SimplifyAnalyzer implements Analyzer {
     ): void {
         if (!node.functionLike || !node.start || !node.end) return;
         const opts = (ctx.options || {}) as SimplifyOptions;
-        const limit = opts.maxFunctionLines ?? DEFAULT_MAX_FUNCTION_LINES;
-        const length = node.end.line - node.start.line + 1;
         const name = this.nameFor(node, className ?? null, binding ?? null);
-        if (length > limit) {
-            this.longFunctions.push({
-                id: `simplify:SIM-LONG-001:${ctx.filePath}:${node.start.line}`,
-                analyzer: ANALYZER_SIMPLIFY,
-                rule: 'SIM-LONG-001',
-                severity: SEVERITY_WARNING,
-                message: `Function "${name}" spans ${length} lines (limit ${limit}).`,
-                location: locN(node, ctx.filePath),
-                detail: { function: name, lines: length, limit },
-                suggestion:
-                    'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
-            });
-        }
-
-        if (opts.checkGuardClauses !== false && opts.checkGuardClauses !== undefined) {
-            const maxNesting = computeControlFlowNesting(node);
-            const maxAllowed = opts.maxGuardClauseNesting ?? 3;
-            if (maxNesting > maxAllowed) {
-                this.longFunctions.push({
-                    id: `simplify:SIM-FLAT-002:${ctx.filePath}:${node.start.line}`,
-                    analyzer: ANALYZER_SIMPLIFY,
-                    rule: 'SIM-FLAT-002',
-                    severity: SEVERITY_WARNING,
-                    message: `Function "${name}" has nested conditional control-flow depth ${maxNesting} (limit ${maxAllowed}). Flatten with guard clauses.`,
-                    location: locN(node, ctx.filePath),
-                    detail: { function: name, nestingDepth: maxNesting, limit: maxAllowed },
-                    suggestion:
-                        'Invert deep conditionals and return early with guard clauses to flatten control flow.',
-                });
-            }
-        }
+        this.checkFunctionLength(node, ctx, opts, name);
+        this.checkGuardClauseNesting(node, ctx, opts, name);
     }
 
     /**
@@ -279,7 +298,7 @@ export class SimplifyAnalyzer implements Analyzer {
      *
      * @param lines - File content split into physical lines.
      * @param file - Normalized file path.
-     * @param ctx - Analyzer context.
+     * @param lineIndex - Zero-based line index of the detected empty placeholder.
      * @param issues - Accumulator for emitted issues.
      */
     private emitEmptyIssue(
@@ -346,10 +365,48 @@ export class SimplifyAnalyzer implements Analyzer {
         return j;
     }
 
+    private updateDocstringState(
+        raw: string,
+        trimmed: string,
+        inTriple: DocstringQuote | null,
+    ): DocstringQuote | null {
+        if (inTriple) {
+            const closers =
+                inTriple === CHAR_DOUBLE_QUOTE
+                    ? raw.split(TRIPLE_DOUBLE_QUOTE).length - 1
+                    : raw.split(TRIPLE_SINGLE_QUOTE).length - 1;
+            return closers > 0 ? null : inTriple;
+        }
+        if (trimmed.startsWith(TRIPLE_DOUBLE_QUOTE) || trimmed.startsWith(TRIPLE_SINGLE_QUOTE)) {
+            const marker = trimmed.startsWith(TRIPLE_DOUBLE_QUOTE)
+                ? TRIPLE_DOUBLE_QUOTE
+                : TRIPLE_SINGLE_QUOTE;
+            return trimmed.split(marker).length - 1 < 2
+                ? marker === TRIPLE_DOUBLE_QUOTE
+                    ? CHAR_DOUBLE_QUOTE
+                    : CHAR_SINGLE_QUOTE
+                : null;
+        }
+        return null;
+    }
+
+    private checkEmptyAtLine(lines: string[], file: string, i: number, issues: Issue[]): void {
+        const def = PY_DEF_RE.exec(lines[i]);
+        if (def) {
+            if (this.pythonBodyIsEmpty(lines, i, def[1].length)) {
+                this.emitEmptyIssue(lines, file, i, issues);
+            }
+            return;
+        }
+        if (this.isBraceBlockEmpty(lines, i)) {
+            this.emitEmptyIssue(lines, file, i, issues);
+        }
+    }
+
     /**
-     * Flag functions whose entire body is `pass`, `...`, or an empty brace pair.
+     * Identify empty implementation blocks across physical lines.
      *
-     * @param lines - File content split into physical lines.
+     * @param lines - Physical lines of the file.
      * @param file - Normalized file path.
      * @param _ctx - Analyzer context.
      * @param issues - Accumulator for emitted issues.
@@ -364,28 +421,12 @@ export class SimplifyAnalyzer implements Analyzer {
         for (let i = 0; i < lines.length; i++) {
             const raw = lines[i];
             const trimmedLine = raw.trim();
-            if (inTriple) {
-                const closers =
-                    inTriple === '"' ? raw.split('"""').length - 1 : raw.split("'''").length - 1;
-                if (closers > 0) inTriple = null;
+            const nextTriple = this.updateDocstringState(raw, trimmedLine, inTriple);
+            if (inTriple !== null || nextTriple !== null) {
+                inTriple = nextTriple;
                 continue;
             }
-            if (trimmedLine.startsWith('"""') || trimmedLine.startsWith("'''")) {
-                const marker = trimmedLine.startsWith('"""') ? '"""' : "'''";
-                if (trimmedLine.split(marker).length - 1 < 2)
-                    inTriple = marker === '"""' ? '"' : "'";
-                continue;
-            }
-            const def = PY_DEF_RE.exec(lines[i]);
-            if (def) {
-                if (this.pythonBodyIsEmpty(lines, i, def[1].length)) {
-                    this.emitEmptyIssue(lines, file, i, issues);
-                }
-                continue;
-            }
-            if (this.isBraceBlockEmpty(lines, i)) {
-                this.emitEmptyIssue(lines, file, i, issues);
-            }
+            this.checkEmptyAtLine(lines, file, i, issues);
         }
     }
 
@@ -442,9 +483,12 @@ export class SimplifyAnalyzer implements Analyzer {
         if (patterns.length > 0 && matchAny(patterns, file)) return;
         for (let i = 0; i < lines.length; i++) {
             const trimmed = lines[i].trim();
-            if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*'))
+            if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*')) {
                 continue;
-            if (!DEBUG_PRINT_RE.test(lines[i])) continue;
+            }
+            if (!DEBUG_PRINT_RE.test(lines[i])) {
+                continue;
+            }
             issues.push({
                 id: `simplify:SIM-PRNT-001:${file}:${i + 1}`,
                 analyzer: ANALYZER_SIMPLIFY,

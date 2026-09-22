@@ -327,12 +327,22 @@ function isToleratedCallString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): bo
     return false;
 }
 
+const MODULE_BOUNDARY_KINDS = new Set<ts.SyntaxKind>([
+    ts.SyntaxKind.ImportDeclaration,
+    ts.SyntaxKind.ImportEqualsDeclaration,
+]);
+
+const JSX_ELEMENT_KINDS = new Set<ts.SyntaxKind>([
+    ts.SyntaxKind.JsxElement,
+    ts.SyntaxKind.JsxSelfClosingElement,
+]);
+
 function isToleratedString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): boolean {
-    if (ts.isImportDeclaration(p) || ts.isImportEqualsDeclaration(p)) return true;
+    if (MODULE_BOUNDARY_KINDS.has(p.kind)) return true;
     if (ts.isPropertyAssignment(p) && p.name === node) return true;
     if (ts.isPropertyAccessExpression(p)) return true;
     if (ts.isJsxAttribute(p) && p.name === node) return true;
-    if (ts.isJsxElement(p) || ts.isJsxSelfClosingElement(p)) return false;
+    if (JSX_ELEMENT_KINDS.has(p.kind)) return false;
     return isToleratedCallString(node, p, sf);
 }
 

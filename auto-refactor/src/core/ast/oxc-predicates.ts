@@ -31,6 +31,8 @@ import {
 } from './oxc-types';
 import { isCallArgumentToleratedByPolicy } from '../literal-policy-engine';
 
+const NODE_TYPE_TEMPLATE_LITERAL = 'TemplateLiteral';
+
 /** Determine NodeKind for declaration-like oxc AST nodes. */
 function oxcDeclarationKindOf(n: OxcNode): NodeKind | undefined {
     switch (n.type) {
@@ -372,6 +374,6 @@ export function oxcPosOf(off: number, ctx: Ctx): Position {
  * @returns Literal string representation.
  */
 export function oxcLiteralText(n: OxcNode, ctx: Ctx): string {
-    if (n.type === 'TemplateLiteral') return ctx.src.slice(n.start, n.end);
+    if (n.type === NODE_TYPE_TEMPLATE_LITERAL) return ctx.src.slice(n.start, n.end);
     return n.raw != null ? String(n.raw) : ctx.src.slice(n.start, n.end);
 }

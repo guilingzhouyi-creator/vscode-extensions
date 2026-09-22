@@ -48,20 +48,27 @@ const DEFAULT_SINGLE_LETTER_ALLOWED = new Set(['i', 'j', 'k', '_']);
 const JARGON_PATTERN_STR =
     '\\b(p[0-9]+|phase[\\s_]*[0-9]+|st[\\s_]*[0-9]+|temp|tmp|w' + 'ip|new)\\b';
 const TRANSIENT_JARGON_RE = new RegExp(JARGON_PATTERN_STR, 'i');
-const TEST_TITLE_JARGON_RE =
-    new RegExp('\\b(p[0-9]+|phase[\\s_-]*[0-9]+|st[\\s_-]*[0-9]+|temp|tmp|w' + 'ip)\\b', 'i');
+const TEST_TITLE_JARGON_RE = new RegExp(
+    '\\b(p[0-9]+|phase[\\s_-]*[0-9]+|st[\\s_-]*[0-9]+|temp|tmp|w' + 'ip)\\b',
+    'i',
+);
+const JARGON_TOKEN_RE = new RegExp('^(p\\d+|phase\\d*|st\\d+|temp|tmp|w' + 'ip)$');
+const JARGON_PREFIX_TOKEN_RE = /^(?:p|st|phase)$/;
+const TEST_RUNNER_FUNCTIONS = new Set(['describe', 'it', 'test', 'suite']);
+
+const CAMEL_TO_KEBAB_PATTERN = '$1-$2';
+const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
 
 function hasTransientJargon(name: string): boolean {
     const tokens = name
-        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
         .toLowerCase()
         .split(/[^a-z0-9]+/);
-    const JARGON_TOKEN_RE = /^(p\d+|phase\d*|st\d+|temp|tmp|wip)$/;
     for (let i = 0; i < tokens.length; i++) {
         const t = tokens[i];
         if (JARGON_TOKEN_RE.test(t)) return true;
         if (
-            (t === 'p' || t === 'st' || t === 'phase') &&
+            JARGON_PREFIX_TOKEN_RE.test(t) &&
             i + 1 < tokens.length &&
             /^\d+$/.test(tokens[i + 1])
         ) {
@@ -182,7 +189,7 @@ export class NamingAnalyzer implements Analyzer {
                     `File name '${baseName}' contains transient process jargon or milestone tags.`,
                     SEVERITY_WARNING,
                     { file: filePath, baseName },
-                    'Remove temporary batch markers (e.g. pXX, phaseXX, wip, temp) from file name.',
+                    'Remove temporary process markers from file name.',
                 ),
             );
             return;
@@ -206,7 +213,7 @@ export class NamingAnalyzer implements Analyzer {
         const isKebab = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(nameWithoutExt);
         if (isKebab) return;
         const suggested = nameWithoutExt
-            .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+            .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_KEBAB_PATTERN)
             .replace(/[_]/g, '-')
             .toLowerCase();
         issues.push(
@@ -237,7 +244,7 @@ export class NamingAnalyzer implements Analyzer {
             (ext === '.py' && /^__[a-z0-9_]+__$/.test(nameWithoutExt));
         if (isSnake) return;
         const suggested = nameWithoutExt
-            .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+            .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
             .replace(/[-]/g, '_')
             .toLowerCase();
         issues.push(
@@ -336,7 +343,7 @@ export class NamingAnalyzer implements Analyzer {
                     `Top-level constant '${name}' should follow UPPER_SNAKE_CASE naming convention.`,
                     SEVERITY_WARNING,
                     { name },
-                    `Rename '${name}' to an uppercase snake_case constant (e.g. '${name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase()}').`,
+                    `Rename '${name}' to an uppercase snake_case constant (e.g. '${name.replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN).toUpperCase()}').`,
                 ),
             );
         }
@@ -578,45 +585,7 @@ export class NamingAnalyzer implements Analyzer {
                 ts.isWhileStatement(node);
             if (isLoop) inLoopDepth++;
 
-            if (ts.isVariableStatement(node)) {
-                this.checkVariableStatement(
-                    node,
-                    sf,
-                    opts,
-                    vagueSet,
-                    singleAllowed,
-                    inLoopDepth,
-                    ctx,
-                    issues,
-                );
-            } else if (this.isTypeDecl(node)) {
-                this.checkTypeDeclaration(node, sf, opts, ctx, issues);
-            } else if (this.isMemberDecl(node)) {
-                this.checkMemberDeclaration(node, sf, opts, ctx, issues);
-            } else if (this.isFunctionDecl(node)) {
-                this.checkFunctionParameters(node, sf, opts, vagueSet, singleAllowed, ctx, issues);
-            } else if (ts.isCallExpression(node) && opts.checkJargon !== false) {
-                if (ts.isIdentifier(node.expression) && ['describe', 'it', 'test', 'suite'].includes(node.expression.text)) {
-                    const arg0 = node.arguments[0];
-                    if (arg0 && (ts.isStringLiteral(arg0) || ts.isNoSubstitutionTemplateLiteral(arg0))) {
-                        if (TEST_TITLE_JARGON_RE.test(arg0.text)) {
-                            const pos = sf.getLineAndCharacterOfPosition(arg0.getStart(sf));
-                            issues.push(
-                                this.mkIssue(
-                                    ctx,
-                                    pos.line + 1,
-                                    pos.character + 1,
-                                    'NAM-JRG-002',
-                                    `Test title '${arg0.text}' contains transient construction jargon or milestone marker.`,
-                                    SEVERITY_WARNING,
-                                    { title: arg0.text },
-                                    'Remove transient batch markers (e.g. phaseXX, pXX) from test description.',
-                                ),
-                            );
-                        }
-                    }
-                }
-            }
+            this.dispatchAstNode(node, sf, opts, vagueSet, singleAllowed, inLoopDepth, ctx, issues);
 
             ts.forEachChild(node, visit);
 
@@ -624,6 +593,68 @@ export class NamingAnalyzer implements Analyzer {
         };
 
         ts.forEachChild(sf, visit);
+    }
+
+    private dispatchAstNode(
+        node: ts.Node,
+        sf: ts.SourceFile,
+        opts: NamingOptions,
+        vagueSet: Set<string>,
+        singleAllowed: Set<string>,
+        inLoopDepth: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (ts.isVariableStatement(node)) {
+            this.checkVariableStatement(
+                node,
+                sf,
+                opts,
+                vagueSet,
+                singleAllowed,
+                inLoopDepth,
+                ctx,
+                issues,
+            );
+        } else if (this.isTypeDecl(node)) {
+            this.checkTypeDeclaration(node, sf, opts, ctx, issues);
+        } else if (this.isMemberDecl(node)) {
+            this.checkMemberDeclaration(node, sf, opts, ctx, issues);
+        } else if (this.isFunctionDecl(node)) {
+            this.checkFunctionParameters(node, sf, opts, vagueSet, singleAllowed, ctx, issues);
+        } else if (ts.isCallExpression(node) && opts.checkJargon !== false) {
+            this.checkCallExpressionJargon(node, sf, ctx, issues);
+        }
+    }
+
+    private checkCallExpressionJargon(
+        node: ts.CallExpression,
+        sf: ts.SourceFile,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (!ts.isIdentifier(node.expression) || !TEST_RUNNER_FUNCTIONS.has(node.expression.text)) {
+            return;
+        }
+        const arg0 = node.arguments[0];
+        if (!arg0 || (!ts.isStringLiteral(arg0) && !ts.isNoSubstitutionTemplateLiteral(arg0))) {
+            return;
+        }
+        if (TEST_TITLE_JARGON_RE.test(arg0.text)) {
+            const pos = sf.getLineAndCharacterOfPosition(arg0.getStart(sf));
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    pos.line + 1,
+                    pos.character + 1,
+                    'NAM-JRG-002',
+                    `Test title '${arg0.text}' contains transient construction jargon or milestone marker.`,
+                    SEVERITY_WARNING,
+                    { title: arg0.text },
+                    'Remove transient process markers from test description.',
+                ),
+            );
+        }
     }
 
     private checkSymbolJargon(
@@ -642,7 +673,7 @@ export class NamingAnalyzer implements Analyzer {
                     `Symbol or test identifier '${name}' contains transient construction jargon or milestone marker.`,
                     SEVERITY_WARNING,
                     { name },
-                    'Replace transient process markers (e.g. phaseXX, pXX, stXX, wip) with semantic domain naming.',
+                    'Replace transient process markers with semantic domain naming.',
                 ),
             );
         }
@@ -710,27 +741,29 @@ export class NamingAnalyzer implements Analyzer {
         opts: NamingOptions,
     ): void {
         if (opts.checkCollections === false || !init) return;
-        if (ts.isNewExpression(init) && init.expression && ts.isIdentifier(init.expression)) {
-            if (init.expression.text === 'Map') {
-                if (
-                    !/(By[A-Z0-9]|To[A-Z0-9]|Map|Dict|Mapping)/.test(name) &&
-                    !/(To|By|Map|Dict)$/i.test(name)
-                ) {
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            pos.line + 1,
-                            pos.character + 1,
-                            'NAM-COL-001',
-                            `Map '${name}' should describe key-value relation in its name.`,
-                            SEVERITY_INFO,
-                            { name },
-                            `Rename Map to express relationship (e.g. '${name}ById', '${name}ToTarget', or '${name}Map').`,
-                        ),
-                    );
-                }
-            }
+        if (!ts.isNewExpression(init) || !init.expression || !ts.isIdentifier(init.expression)) {
+            return;
         }
+        if (init.expression.text !== 'Map') return;
+        if (
+            /(By[A-Z0-9]|To[A-Z0-9]|Map|Dict|Mapping)/.test(name) ||
+            /(To|By|Map|Dict)$/i.test(name)
+        ) {
+            return;
+        }
+
+        issues.push(
+            this.mkIssue(
+                ctx,
+                pos.line + 1,
+                pos.character + 1,
+                'NAM-COL-001',
+                `Map '${name}' should describe key-value relation in its name.`,
+                SEVERITY_INFO,
+                { name },
+                `Rename Map to express relationship (e.g. '${name}ById', '${name}ToTarget', or '${name}Map').`,
+            ),
+        );
     }
 
     private auditPythonClass(

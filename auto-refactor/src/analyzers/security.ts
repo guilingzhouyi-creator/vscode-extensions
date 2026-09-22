@@ -163,8 +163,6 @@ export class SecurityAnalyzer implements Analyzer {
      * @param lineText - Original line, used only to compute the reported end column.
      * @param lineNum - One-based line number recorded in each issue id and location.
      * @param file - Repository-relative POSIX path recorded in each issue.
-     * @param isTestOrFixture - When true, every basic check is skipped for this file.
-     * @param opts - Merged analyzer options; a `check*` flag set to false disables its rule.
      * @param issues - Mutable accumulator that receives zero or more new issues.
      */
     private checkCodeExecution(
@@ -300,7 +298,6 @@ export class SecurityAnalyzer implements Analyzer {
      * @param lineText - Original line, used only to compute the reported end column.
      * @param lineNum - One-based line number recorded in each issue id and location.
      * @param file - Repository-relative POSIX path recorded in each issue.
-     * @param opts - Merged analyzer options; a `check*` flag set to false disables its rule.
      * @param issues - Mutable accumulator that receives zero or more new issues.
      */
     private checkInsecureRandom(

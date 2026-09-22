@@ -32,6 +32,7 @@ import {
     findLoopSitesInFunction,
     collectLoopAllocSites,
     createRoutineDescriptors,
+    cyclomaticComplexity,
 } from './complexity-loops';
 import {
     evaluateElasticComplexityBudget,
@@ -40,28 +41,6 @@ import {
 import { analyzeFunctionCohesionAndSkeleton } from '../core/intelligence/function-cohesion-skeleton';
 import { evaluateDistributedRedundancy } from '../core/intelligence/semantic-domain-detector';
 import { evaluateResourcePooling } from '../core/intelligence/resource-pooling-auditor';
-
-/**
- * Cyclomatic complexity of a function-like node: base 1 + sum of `branchWeight` over every
- * decision point inside it, NOT descending into nested function-like nodes (each nested
- * function is its own complexity unit, measured separately). Branch weights are precomputed
- * by the language adapter, so this is fully language-agnostic.
- */
-function walkChildrenCC(node: NormalizedNode): number {
-    let sum = 0;
-    const kids = node.children;
-    if (!kids) return 0;
-    for (let i = 0; i < kids.length; i++) {
-        const c = kids[i];
-        if (c.functionLike) continue;
-        sum += (c.branchWeight || 0) + walkChildrenCC(c);
-    }
-    return sum;
-}
-
-function cyclomaticComplexity(node: NormalizedNode): number {
-    return 1 + walkChildrenCC(node);
-}
 
 function formatAnonymous(className: string | null, binding: string | null): string {
     if (binding) return binding;
