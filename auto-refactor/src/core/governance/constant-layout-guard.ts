@@ -29,45 +29,10 @@ const LOCAL_SCOPE_SPAN_THRESHOLD = 15;
 const LOCAL_USAGE_COUNT_MAX = 2;
 const DOMAIN_MODULE_CONSTANTS = 'module_constants';
 
-const IMPORT_STATEMENT_PREFIXES = [
-    'import ',
-    'import{',
-    'require(',
-    'export * from',
-    'export {',
-    'from ',
-    'use ',
-];
-
-const LOGIC_DECLARATION_PREFIXES = [
-    'function ',
-    'export function ',
-    'class ',
-    'export class ',
-    'interface ',
-    'export interface ',
-    'type ',
-    'export type ',
-    'describe(',
-    'test(',
-];
-
-function isImportStatement(trimmed: string): boolean {
-    return IMPORT_STATEMENT_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
-}
-
-function isLogicDeclaration(trimmed: string): boolean {
-    return LOGIC_DECLARATION_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
-}
-
-function isHeaderCommentOrBlank(trimmed: string): boolean {
-    return (
-        trimmed.length === 0 ||
-        trimmed.startsWith('//') ||
-        trimmed.startsWith('/*') ||
-        trimmed.startsWith('*')
-    );
-}
+const IMPORT_STATEMENT_RE = /^(?:import\s|import\{|require\(|export\s+(?:\*|\{)|from\s|use\s)/;
+const LOGIC_DECLARATION_RE =
+    /^(?:(?:export\s+)?(?:function|class|interface|type)\b|describe\(|test\()/;
+const COMMENT_OR_BLANK_RE = /^(?:\/\/|\/\*|\*|$)/;
 
 function findFileBoundaryIndices(lines: string[]): {
     lastImportLine: number;
@@ -81,16 +46,16 @@ function findFileBoundaryIndices(lines: string[]): {
         const trimmed = lines[i].trim();
         const lineNo = i + 1;
 
-        if (inHeaderComments && isHeaderCommentOrBlank(trimmed)) {
+        if (inHeaderComments && COMMENT_OR_BLANK_RE.test(trimmed)) {
             continue;
         }
         inHeaderComments = false;
 
-        if (isImportStatement(trimmed)) {
+        if (IMPORT_STATEMENT_RE.test(trimmed)) {
             lastImportLine = lineNo;
             continue;
         }
-        if (firstLogicLine === 0 && isLogicDeclaration(trimmed)) {
+        if (firstLogicLine === 0 && LOGIC_DECLARATION_RE.test(trimmed)) {
             firstLogicLine = lineNo;
         }
     }

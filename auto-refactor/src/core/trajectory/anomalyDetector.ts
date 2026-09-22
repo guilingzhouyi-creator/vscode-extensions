@@ -22,6 +22,11 @@ import type { EvolutionAnomaly, FileRevision, TrajectoryComparison } from './typ
 import type { QualityDimension } from '../scoring/scoringTypes';
 import { ALL_QUALITY_DIMENSIONS } from '../scoring/scoringTypes';
 import { TrajectoryMessages } from '../messages';
+import type { Severity } from '../types';
+import { SEVERITY_WARNING, SEVERITY_INFO, SEVERITY_ERROR } from '../types';
+
+const ANOMALY_KIND_REINTRODUCED = 're-introduced-issue';
+const ANOMALY_KIND_DUPLICATE_FIX = 'duplicate-fix';
 
 /** Default per-dimension quality score used when a revision omits an index. */
 const DEFAULT_QUALITY_SCORE = 100;
@@ -208,8 +213,8 @@ function detectReintroducedIssues(
         for (const oldRev of history) {
             if (oldRev.revisionId !== previous.revisionId && oldRev.ruleHitIds.includes(newId)) {
                 anomalies.push({
-                    kind: 're-introduced-issue',
-                    severity: 'error',
+                    kind: ANOMALY_KIND_REINTRODUCED,
+                    severity: SEVERITY_ERROR,
                     message: TrajectoryMessages.REINTRODUCED_ISSUE(newId, oldRev.revisionId),
                     affectedAgents: [oldRev.agentUid, current.agentUid],
                     details: { issueId: newId, originRevision: oldRev.revisionId },
@@ -245,8 +250,8 @@ function detectConflictingFixes(
         );
         if (overlapping.length > 0 && Math.abs(compositeDelta) < 2) {
             return {
-                kind: 'duplicate-fix',
-                severity: 'info',
+                kind: ANOMALY_KIND_DUPLICATE_FIX,
+                severity: SEVERITY_INFO,
                 message: TrajectoryMessages.RECURRING_CONFLICTING_MODS(overlapping),
                 affectedAgents: [previous.agentUid, current.agentUid],
                 details: { domains: overlapping },
@@ -264,11 +269,7 @@ function detectConflictingFixes(
  * @param defaultMessage - User-facing description label.
  * @returns Array of structured issue records.
  */
-function formatIssueSummaries(
-    issueIds: string[],
-    severity: 'warning' | 'info',
-    defaultMessage: string,
-) {
+function formatIssueSummaries(issueIds: string[], severity: Severity, defaultMessage: string) {
     return issueIds.map((id) => ({
         id,
         rule: id.split(':')[1] || id,
@@ -359,12 +360,12 @@ export class AnomalyDetector {
             compositeDelta,
             newIssues: formatIssueSummaries(
                 newIssueIds,
-                'warning',
+                SEVERITY_WARNING,
                 TrajectoryMessages.NEW_ISSUE_LABEL,
             ),
             resolvedIssues: formatIssueSummaries(
                 resolvedIssueIds,
-                'info',
+                SEVERITY_INFO,
                 TrajectoryMessages.RESOLVED_ISSUE_LABEL,
             ),
             anomalies,

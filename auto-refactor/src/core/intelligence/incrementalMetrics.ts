@@ -49,6 +49,11 @@ const CALL_SPECIFIER_RE = /\b(?:require|import)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 /** Leading keyword of a matched specifier pattern, used to prove the match starts in code. */
 const LEADING_WORD_RE = /^[A-Za-z_$]+/;
 
+const VERDICT_PASSED = 'PASSED';
+const VERDICT_WARNING = 'WARNING';
+const VERDICT_FAILED = 'FAILED';
+type MetricsVerdict = typeof VERDICT_PASSED | typeof VERDICT_WARNING | typeof VERDICT_FAILED;
+
 /** A file's raw and masked lines, built once and shared by every metric in this module. */
 interface MetricsView {
     /** Raw lines, used where the literal text is the answer (specifier names). */
@@ -326,30 +331,30 @@ export function computeIncrementalMetrics(
         options?.failOnNegativeLocWithIncreasedCoupling ?? true;
     const maxCouplingDelta = options?.maxCouplingDelta ?? 5;
 
-    let verdict: 'PASSED' | 'FAILED' | 'WARNING' = 'PASSED';
+    let verdict: MetricsVerdict = VERDICT_PASSED;
     let rejectionRationale: string | undefined;
 
     if (failOnNegativeLocWithIncreasedCoupling && effectiveLocDelta < 0 && couplingDelta > 0) {
-        verdict = 'FAILED';
+        verdict = VERDICT_FAILED;
         rejectionRationale =
             `Anti-pattern rejected: lines of code decreased by ${Math.abs(effectiveLocDelta)} ` +
             `but coupling increased by +${couplingDelta} (violates maintainability invariant: ` +
             `code deletion must not increase external coupling)`;
     } else if (couplingDelta > maxCouplingDelta) {
-        verdict = 'FAILED';
+        verdict = VERDICT_FAILED;
         rejectionRationale = `Coupling delta +${couplingDelta} exceeded maximum threshold +${maxCouplingDelta}`;
     } else if (
         options?.minMaintainabilityDelta !== undefined &&
         maintainabilityDelta < options.minMaintainabilityDelta
     ) {
-        verdict = 'FAILED';
+        verdict = VERDICT_FAILED;
         rejectionRationale =
             `Maintainability delta ${maintainabilityDelta} fell below the declared floor ` +
             `${options.minMaintainabilityDelta}`;
     } else if (couplingDelta > 0 && duplicationDelta > 0) {
-        verdict = 'WARNING';
+        verdict = VERDICT_WARNING;
     } else if (couplingDelta > 0 && complexityDelta > 0) {
-        verdict = 'WARNING';
+        verdict = VERDICT_WARNING;
     }
 
     return {

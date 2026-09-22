@@ -33,6 +33,12 @@
 /** Fallback semantic kind when no specialized literal domain matches. */
 const GENERAL_LITERAL_KIND = 'general';
 
+/** Semantic classification kind representing a network URL endpoint. */
+export const SEMANTIC_KIND_URL = 'url';
+
+/** Semantic classification kind representing a local or relative filesystem path. */
+export const SEMANTIC_KIND_FILE_PATH = 'file-path';
+
 /**
  * Semantic domains a hardcoded literal can be classified into.
  *
@@ -41,8 +47,8 @@ const GENERAL_LITERAL_KIND = 'general';
  * paths, globs and report prose); see `classifyLiteral`.
  */
 export type LiteralSemanticKind =
-    | 'url'
-    | 'file-path'
+    | typeof SEMANTIC_KIND_URL
+    | typeof SEMANTIC_KIND_FILE_PATH
     | 'inline-svg'
     | 'port'
     | 'http-status'

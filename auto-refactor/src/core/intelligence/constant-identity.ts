@@ -21,8 +21,40 @@ const CHAR_CODE_SINGLE_QUOTE = 39;
 const CHAR_CODE_DOUBLE_QUOTE = 34;
 const CHAR_CODE_BACKTICK = 96;
 
-const INFERRED_TYPE_NUMBER: ConstantInferredType = 'number';
-const INFERRED_TYPE_STRING: ConstantInferredType = 'string';
+/** File header code domain token. */
+export const DOMAIN_FILE_HEADER = 'file_header';
+/** Import area code domain token. */
+export const DOMAIN_IMPORT_AREA = 'import_area';
+/** Module constants code domain token. */
+export const DOMAIN_MODULE_CONSTANTS = 'module_constants';
+/** Type declarations code domain token. */
+export const DOMAIN_TYPE_DECLARATIONS = 'type_declarations';
+/** Class declarations code domain token. */
+export const DOMAIN_CLASS_DECLARATIONS = 'class_declarations';
+/** Function declarations code domain token. */
+export const DOMAIN_FUNCTION_DECLARATIONS = 'function_declarations';
+/** Function local code domain token. */
+export const DOMAIN_FUNCTION_LOCAL = 'function_local';
+/** Block local code domain token. */
+export const DOMAIN_BLOCK_LOCAL = 'block_local';
+/** Unknown code domain token. */
+export const DOMAIN_UNKNOWN = 'unknown';
+
+/** Number inferred constant type token. */
+export const INFERRED_TYPE_NUMBER = 'number';
+/** String inferred constant type token. */
+export const INFERRED_TYPE_STRING = 'string';
+/** Boolean inferred constant type token. */
+export const INFERRED_TYPE_BOOLEAN = 'boolean';
+/** Array inferred constant type token. */
+export const INFERRED_TYPE_ARRAY = 'array';
+/** Object inferred constant type token. */
+export const INFERRED_TYPE_OBJECT = 'object';
+/** Regular expression inferred constant type token. */
+export const INFERRED_TYPE_REGEX = 'regex';
+/** Unknown inferred constant type token. */
+export const INFERRED_TYPE_UNKNOWN = 'unknown';
+
 const DEFAULT_SEMANTIC_KIND = 'general';
 const HASH_ALGO_SHA256 = 'sha256';
 const ENCODING_UTF8 = 'utf8';
@@ -32,15 +64,15 @@ const DIGEST_HEX = 'hex';
  * Standard intra-file code domain hierarchy representing structural zones.
  */
 export type CodeDomainKind =
-    | 'file_header'
-    | 'import_area'
-    | 'module_constants'
-    | 'type_declarations'
-    | 'class_declarations'
-    | 'function_declarations'
-    | 'function_local'
-    | 'block_local'
-    | 'unknown';
+    | typeof DOMAIN_FILE_HEADER
+    | typeof DOMAIN_IMPORT_AREA
+    | typeof DOMAIN_MODULE_CONSTANTS
+    | typeof DOMAIN_TYPE_DECLARATIONS
+    | typeof DOMAIN_CLASS_DECLARATIONS
+    | typeof DOMAIN_FUNCTION_DECLARATIONS
+    | typeof DOMAIN_FUNCTION_LOCAL
+    | typeof DOMAIN_BLOCK_LOCAL
+    | typeof DOMAIN_UNKNOWN;
 
 /**
  * Stable symbol identity descriptor identifying a constant entity across physical line shifts.
@@ -66,7 +98,13 @@ export interface ConstantSymbolIdentity {
  * Inferred data type of the constant value.
  */
 export type ConstantInferredType =
-    'number' | 'string' | 'boolean' | 'array' | 'object' | 'regex' | 'unknown';
+    | typeof INFERRED_TYPE_NUMBER
+    | typeof INFERRED_TYPE_STRING
+    | typeof INFERRED_TYPE_BOOLEAN
+    | typeof INFERRED_TYPE_ARRAY
+    | typeof INFERRED_TYPE_OBJECT
+    | typeof INFERRED_TYPE_REGEX
+    | typeof INFERRED_TYPE_UNKNOWN;
 
 /**
  * Content- and semantic-derived fingerprint of a constant's value and immutability.

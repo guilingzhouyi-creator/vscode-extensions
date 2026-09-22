@@ -139,7 +139,8 @@ export const GiantExpressionRule: GovernanceRule = {
                         : 'Unbounded boolean logical chain with excessive operators exceeds cognitive threshold.',
                     line: i + 1,
                     column: raw.search(/\S/) + 1,
-                    suggestion: '将巨型嵌套三元或长逻辑链拆分为具名中间变量或 if-else 分支。',
+                    suggestion:
+                        'Split giant nested ternary or long logical chain into named intermediate variables or if-else statements.',
                     fixable: false,
                     evidence: {
                         confidence: 0.9,
@@ -327,7 +328,8 @@ function checkDensityLine(
         message: `High cognitive token density (${percent}% operators) exceeds maintainability lower bounds.`,
         line: lineIndex + 1,
         column: raw.search(/\S/) + 1,
-        suggestion: '降低认知密度：添加适当空白与具名中间常量，拆分高密度算式或位运算组合。',
+        suggestion:
+            'Reduce cognitive density: introduce whitespace and named intermediate constants, decomposing dense expressions or bitwise operations.',
         fixable: false,
         evidence: {
             confidence: 0.8,

@@ -27,6 +27,13 @@ export const RULE_GOV_GAM_001 = 'GOV-GAM-001';
  */
 export const ALIAS_SCORE_GAMING_001 = RULE_GOV_GAM_001;
 
+const ANALYZER_GOVERNANCE = 'governance';
+const SEVERITY_WARNING = 'warning';
+const DEFAULT_LINE_END_COLUMN = 80;
+const RELOCATION_PADDING_MIN_COUNT = 4;
+const RELOCATION_PADDING_PENALTY = 15.0;
+const GAMING_KIND_RELOCATION_PADDING: GamingPatternKind = 'artificial_relocation_padding';
+
 /**
  * Kinds of score gaming recognized.
  */
@@ -75,17 +82,17 @@ function checkArtificialSplitting(
     if (density.forwardingCount >= 5 && density.effectiveDensity < 0.65) {
         gamingKinds.push('artificial_function_splitting');
         issues.push({
-            id: `governance:${RULE_GOV_GAM_001}:${filePath}:1`,
-            analyzer: 'governance',
+            id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:1`,
+            analyzer: ANALYZER_GOVERNANCE,
             rule: RULE_GOV_GAM_001,
-            severity: 'warning',
+            severity: SEVERITY_WARNING,
             message:
                 `Anti-gaming violation: detected artificial function splitting with ` +
                 `${density.forwardingCount} trivial forwarding methods (density: ${density.effectiveDensity}).`,
             location: {
                 file: filePath,
                 start: { line: 1, column: 1 },
-                end: { line: 1, column: 80 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
             },
             detail: {
                 gamingType: 'artificial_function_splitting',
@@ -123,17 +130,17 @@ function checkTautologicalTestPadding(
     if (count >= 3) {
         gamingKinds.push('tautological_test_padding');
         issues.push({
-            id: `governance:${RULE_GOV_GAM_001}:${filePath}:tautology`,
-            analyzer: 'governance',
+            id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:tautology`,
+            analyzer: ANALYZER_GOVERNANCE,
             rule: RULE_GOV_GAM_001,
-            severity: 'warning',
+            severity: SEVERITY_WARNING,
             message:
                 `Anti-gaming violation: detected ${count} tautological non-verifying assertions ` +
                 `inflating test coverage artificially.`,
             location: {
                 file: filePath,
                 start: { line: 1, column: 1 },
-                end: { line: 1, column: 80 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
             },
             detail: {
                 gamingType: 'tautological_test_padding',
@@ -146,13 +153,6 @@ function checkTautologicalTestPadding(
     }
     return 0.0;
 }
-
-const RELOCATION_PADDING_MIN_COUNT = 4;
-const RELOCATION_PADDING_PENALTY = 15.0;
-const GAMING_KIND_RELOCATION_PADDING: GamingPatternKind = 'artificial_relocation_padding';
-const ANALYZER_GOVERNANCE = 'governance';
-const SEVERITY_WARNING = 'warning';
-const DEFAULT_LINE_END_COLUMN = 80;
 
 /**
  * Detects artificial relocation padding where constants are moved around

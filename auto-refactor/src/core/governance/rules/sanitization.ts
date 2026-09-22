@@ -124,34 +124,56 @@ export const LexicalHygieneRule: GovernanceRule = {
 
 const CHINESE_CHAR_RE = /[\u4e00-\u9fa5]/;
 
+const SEVERITY_WARNING_LEVEL = 'warning';
+const RISK_MEDIUM_LEVEL = 'medium';
+const SANITIZATION_FILENAME = 'sanitization.ts';
+const TEST_DIR_NAME = 'test';
+const FIXTURE_DIR_NAME = 'fixture';
+const MD_EXTENSION = '.md';
+const DIAGNOSTIC_TRIGGER_RE = /(?:mkIssue|message:|suggestion:)/;
+const GOV_MSG_001_ID = 'GOV-MSG-001';
+const GOV_MSG_001_MARKER_RE = /GOV-MSG-001/;
+const GOV_MSG_001_MESSAGE =
+    'Diagnostic message or suggestion contains non-English characters. Low-level analyzer diagnostics must use technical English.';
+const GOV_MSG_001_SUGGESTION =
+    'Replace non-English text with standardized technical English message and centralize in src/core/messages/.';
+
+function isExemptDiagnosticFile(filePath: string): boolean {
+    return (
+        isToolOrTestScript(filePath) ||
+        fileNameEndsWith(filePath, [SANITIZATION_FILENAME]) ||
+        filePath.includes(TEST_DIR_NAME) ||
+        filePath.includes(FIXTURE_DIR_NAME) ||
+        filePath.endsWith(MD_EXTENSION)
+    );
+}
+
+function isCommentLine(line: string): boolean {
+    const trimmed = line.trim();
+    return (
+        trimmed.startsWith('*') ||
+        trimmed.startsWith('//') ||
+        trimmed.startsWith('/*') ||
+        trimmed.startsWith('#')
+    );
+}
+
 /**
- * GOV-MSG-001: Diagnostic Messages English Standardization Contract.
- * Enforces that diagnostic messages and suggestions in analyzers and rules
+ * GOV-MSG-001: Technical diagnostic messages and suggestions in lower-level analyzers must
  * strictly adhere to standard technical English and avoid unmanaged non-ASCII strings.
  */
 export const DiagnosticMessageRule: GovernanceRule = {
-    id: 'GOV-MSG-001',
+    id: GOV_MSG_001_ID,
     name: 'Diagnostic Messages English Standardization Contract',
     category: 'standardization',
-    severity: 'warning',
-    risk: 'medium',
+    severity: SEVERITY_WARNING_LEVEL,
+    risk: RISK_MEDIUM_LEVEL,
     rationale:
         'All low-level diagnostic messages, analyzer issues, and remediation suggestions must strictly use technical English to maintain industrial compatibility and avoid encoding artifacts.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        if (
-            isToolOrTestScript(ctx.filePath) ||
-            fileNameEndsWith(ctx.filePath, ['sanitization.ts']) ||
-            ctx.filePath.includes('test') ||
-            ctx.filePath.includes('fixture') ||
-            ctx.filePath.endsWith('.md')
-        ) {
-            return null;
-        }
-
-        if (!CHINESE_CHAR_RE.test(ctx.content)) {
-            return null;
-        }
+        if (isExemptDiagnosticFile(ctx.filePath)) return null;
+        if (!CHINESE_CHAR_RE.test(ctx.content)) return null;
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.lines;
@@ -159,31 +181,15 @@ export const DiagnosticMessageRule: GovernanceRule = {
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (!CHINESE_CHAR_RE.test(line)) continue;
+            if (isCommentLine(line)) continue;
 
-            const trimmed = line.trim();
-            if (
-                trimmed.startsWith('*') ||
-                trimmed.startsWith('//') ||
-                trimmed.startsWith('/*') ||
-                trimmed.startsWith('#')
-            ) {
-                continue;
-            }
-
-            if (
-                (line.includes('mkIssue') ||
-                    line.includes('message:') ||
-                    line.includes('suggestion:')) &&
-                !line.includes('GOV-MSG-001')
-            ) {
+            if (DIAGNOSTIC_TRIGGER_RE.test(line) && !GOV_MSG_001_MARKER_RE.test(line)) {
                 violations.push({
-                    ruleId: 'GOV-MSG-001',
-                    message:
-                        'Diagnostic message or suggestion contains non-English characters. Low-level analyzer diagnostics must use technical English.',
+                    ruleId: GOV_MSG_001_ID,
+                    message: GOV_MSG_001_MESSAGE,
                     line: i + 1,
                     column: line.search(CHINESE_CHAR_RE) + 1,
-                    suggestion:
-                        'Replace non-English text with standardized technical English message and centralize in src/core/messages/.',
+                    suggestion: GOV_MSG_001_SUGGESTION,
                     fixable: false,
                 });
             }
@@ -192,4 +198,3 @@ export const DiagnosticMessageRule: GovernanceRule = {
         return violations.length > 0 ? violations : null;
     },
 };
-

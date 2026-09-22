@@ -14,6 +14,14 @@ import * as path from 'path';
 /** Clean Architecture layer name for domain code, used in comparisons and path prefixes. */
 const ARCHITECTURE_LAYER_DOMAIN = 'domain';
 
+const LAYER_PREFIX_APP = 'app';
+const LAYER_PREFIX_INFRA = 'infra';
+const PREFIX_JAVA = 'java.';
+const PREFIX_JAVAX = 'javax.';
+const PREFIX_KOTLIN = 'kotlin.';
+const PREFIX_SYSTEM = 'System.';
+const PREFIX_MICROSOFT = 'Microsoft.';
+
 /**
  * Descriptor for an extracted module import or package dependency.
  */
@@ -90,9 +98,9 @@ function extractPythonSpecifiers(trimmed: string, file: string, specifiers: Spec
         raw: mod,
         isExternal:
             !isRelative &&
-            !mod.startsWith('app') &&
+            !mod.startsWith(LAYER_PREFIX_APP) &&
             !mod.startsWith(ARCHITECTURE_LAYER_DOMAIN) &&
-            !mod.startsWith('infra'),
+            !mod.startsWith(LAYER_PREFIX_INFRA),
         resolvedPath: isRelative
             ? path.posix.normalize(path.posix.join(path.posix.dirname(file), cleanMod))
             : cleanMod,
@@ -127,9 +135,9 @@ function extractJvmSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): voi
         specifiers.push({
             raw: jvmMatch[1],
             isExternal:
-                jvmMatch[1].startsWith('java.') ||
-                jvmMatch[1].startsWith('javax.') ||
-                jvmMatch[1].startsWith('kotlin.'),
+                jvmMatch[1].startsWith(PREFIX_JAVA) ||
+                jvmMatch[1].startsWith(PREFIX_JAVAX) ||
+                jvmMatch[1].startsWith(PREFIX_KOTLIN),
             resolvedPath: jvmMatch[1].replace(/\./g, '/'),
         });
     }
@@ -140,9 +148,36 @@ function extractCSharpSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): 
     if (csMatch && csMatch[1]) {
         specifiers.push({
             raw: csMatch[1],
-            isExternal: csMatch[1].startsWith('System.') || csMatch[1].startsWith('Microsoft.'),
+            isExternal:
+                csMatch[1].startsWith(PREFIX_SYSTEM) || csMatch[1].startsWith(PREFIX_MICROSOFT),
             resolvedPath: csMatch[1].replace(/\./g, '/'),
         });
+    }
+}
+
+function dispatchPolyglotExtractor(
+    trimmed: string,
+    file: string,
+    specifiers: SpecifierInfo[],
+): void {
+    if (file.endsWith('.py')) {
+        extractPythonSpecifiers(trimmed, file, specifiers);
+        return;
+    }
+    if (file.endsWith('.rs')) {
+        extractRustSpecifiers(trimmed, specifiers);
+        return;
+    }
+    if (file.endsWith('.go')) {
+        extractGoSpecifiers(trimmed, specifiers);
+        return;
+    }
+    if (file.endsWith('.java') || file.endsWith('.kt') || file.endsWith('.kts')) {
+        extractJvmSpecifiers(trimmed, specifiers);
+        return;
+    }
+    if (file.endsWith('.cs')) {
+        extractCSharpSpecifiers(trimmed, specifiers);
     }
 }
 
@@ -162,18 +197,6 @@ export function extractSpecifiers(
     const specifiers: SpecifierInfo[] = [];
     extractJsSpecifiers(lineText, file, specifiers);
     extractGdScriptSpecifiers(lineText, specifiers);
-
-    if (file.endsWith('.py')) {
-        extractPythonSpecifiers(trimmed, file, specifiers);
-    } else if (file.endsWith('.rs')) {
-        extractRustSpecifiers(trimmed, specifiers);
-    } else if (file.endsWith('.go')) {
-        extractGoSpecifiers(trimmed, specifiers);
-    } else if (file.endsWith('.java') || file.endsWith('.kt') || file.endsWith('.kts')) {
-        extractJvmSpecifiers(trimmed, specifiers);
-    } else if (file.endsWith('.cs')) {
-        extractCSharpSpecifiers(trimmed, specifiers);
-    }
-
+    dispatchPolyglotExtractor(trimmed, file, specifiers);
     return specifiers;
 }

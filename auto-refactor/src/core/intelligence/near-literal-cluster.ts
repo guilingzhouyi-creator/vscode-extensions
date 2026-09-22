@@ -18,7 +18,11 @@
 import type { Issue } from '../types';
 import type { LiteralRecord } from '../incremental-state';
 import { generateSemanticConstantName } from '../governance/semantic-naming-engine';
-import { classifyLiteral } from '../governance/semanticLiterals';
+import {
+    classifyLiteral,
+    SEMANTIC_KIND_URL,
+    SEMANTIC_KIND_FILE_PATH,
+} from '../governance/semanticLiterals';
 import { locN } from '../../utils/normalized';
 import { ConstantsMessages } from '../messages/constants';
 
@@ -66,6 +70,7 @@ const KNOWN_STATUS_SET = new Set([
     'success',
     'failed',
 ]);
+const TOLERATED_NUMERIC_STRINGS = new Set(['0', '1', '-1']);
 
 /**
  * Semantic cluster representing sibling literals belonging to the same domain.
@@ -96,8 +101,8 @@ function identifyStringFamily(rawVal: string): string | null {
     if (KNOWN_STATUS_SET.has(val.toLowerCase())) return FAMILY_STATUS_FLAG;
 
     const classification = classifyLiteral(val, false);
-    if (classification.kind === 'url') return FAMILY_URL_ENDPOINT;
-    if (classification.kind === 'file-path') return FAMILY_FILE_PATH;
+    if (classification.kind === SEMANTIC_KIND_URL) return FAMILY_URL_ENDPOINT;
+    if (classification.kind === SEMANTIC_KIND_FILE_PATH) return FAMILY_FILE_PATH;
     return null;
 }
 
@@ -207,7 +212,7 @@ export function scanNearLiteralClusters(literals: LiteralRecord[], filePath: str
 
     const candidates = literals.filter((l) => {
         if (l.tolerated) return false;
-        if (l.numeric && ['0', '1', '-1'].includes(l.value)) return false;
+        if (l.numeric && TOLERATED_NUMERIC_STRINGS.has(l.value)) return false;
         return true;
     });
 

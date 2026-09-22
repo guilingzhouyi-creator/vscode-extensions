@@ -20,6 +20,9 @@ import type { DiagnosticDescriptor } from './types';
 /** Risk tier for architecture boundary breaches that must render as High severity. */
 const RISK_HIGH = 'High';
 
+/** Risk tier for architecture boundary breaches that render as Medium severity. */
+const RISK_MEDIUM = 'Medium';
+
 /**
  * Architecture-rule diagnostic descriptor catalog.
  *
@@ -87,7 +90,7 @@ export const ArchitectureMessages = {
             'Route interface requests through application use cases or services rather than directly querying infrastructure adapters',
         rationale:
             'Bypassing use-case orchestration creates tight coupling between presentation and database/network facilities.',
-        risk: 'Medium',
+        risk: RISK_MEDIUM,
     }),
 
     // ARCH-LEAK-001: External framework/DB driver leakage in Domain
@@ -140,6 +143,6 @@ export const ArchitectureMessages = {
         rationale:
             'Analyzers and domain services must remain decoupled from specific' +
             ' AST parser implementations to facilitate modular evolution.',
-        risk: 'Medium',
+        risk: RISK_MEDIUM,
     }),
 } as const;

@@ -29,6 +29,7 @@ const CONST_DECL_RE =
     /^(?:(export)\s+)?(?:const|static\s+readonly)\s+([A-Za-z0-9_$]+)\s*(?::\s*[^=]+)?\s*=\s*([^;,\n]+)/;
 const IMPORT_LINE_RE = /^(?:import[\s{]|require\(|export\s+(?:\*|\{)|from\s|use\s)/;
 const COMMENT_LINE_RE = /^(\/\/|#)/;
+const BLOCK_COMMENT_END_RE = /\*\//;
 const HEADER_COMMENT_RE = /^(\/\/|\/\*|\*)/;
 const COMPLEX_INITIALIZER_RE = /^[{(\s]|^(?:function\b|=>)/;
 const SCOPE_DECL_RE =
@@ -163,7 +164,7 @@ export function extractConstantEntities(content: string, filePath: string): Cons
 
         if (trimmed.startsWith('/*')) inCommentBlock = true;
         if (inCommentBlock) {
-            inCommentBlock = !trimmed.includes('*/');
+            inCommentBlock = !BLOCK_COMMENT_END_RE.test(trimmed);
             continue;
         }
         if (COMMENT_LINE_RE.test(trimmed)) continue;

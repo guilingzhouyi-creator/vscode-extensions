@@ -170,13 +170,14 @@ export function buildErrorFlowIssues(
         const boundary = chain.length > 0 ? chain[chain.length - 1] : null;
         const boundarySeenFrom = boundary === null ? [] : graph.callersOf(boundary);
         const reason = siteInfo.duplicate
-            ? `在 ${siteInfo.raisers.length} 个声明中重复出现（错误分类法冲突）`
-            : `可沿调用链向上传播 ${hops} 跳`;
+            ? `appears in ${siteInfo.raisers.length} declarations (taxonomy collision)`
+            : `propagates ${hops} hops along call graph`;
         const code = siteInfo.code;
         const sites = siteInfo.sites;
         const raisers = siteInfo.raisers;
         const files = siteInfo.files;
         const duplicate = siteInfo.duplicate;
+        const chainStr = chain.join(' <- ') || '(unattributed caller)';
         issues.push({
             hops,
             issue: {
@@ -184,7 +185,7 @@ export function buildErrorFlowIssues(
                 analyzer: 'hygiene',
                 rule: ERROR_PROPAGATION_RULE_ID,
                 severity: severity as Issue['severity'],
-                message: `错误码 "${code}" ${reason}；静态链路：${chain.join(' <- ') || '(无归属调用者)'}`,
+                message: `Error code "${code}" ${reason}; static chain: ${chainStr}`,
                 location: {
                     file: first.file,
                     start: { line: first.line, column: first.column },
@@ -207,8 +208,8 @@ export function buildErrorFlowIssues(
                     staticOnly: true,
                 },
                 suggestion:
-                    '统一错误分类法：让该错误码只有一个所有者（领域错误类型/枚举），在边界层显式转换、记录并决定恢复策略；' +
-                    '若多个模块确需同一语义，改用具名错误类型而不是裸字符串，避免同一码在不同层被重新解释。',
+                    'Unify error taxonomy: ensure error code has a single owner (domain error type or enum) ' +
+                    'and handle/log conversions at boundary layers.',
             },
         });
     }

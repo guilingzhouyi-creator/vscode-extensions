@@ -46,6 +46,39 @@ const CAT_IMPORT_EXPORT = 'IMPORT_EXPORT';
 const CAT_COMMENT_DOC_ONLY = 'COMMENT_DOC_ONLY';
 const CAT_GENERAL_CODE = 'GENERAL_CODE';
 
+function mapSignalToCategory(sig: string, entryId: string): string | null {
+    switch (sig) {
+        case SIG_LITERAL:
+            return CAT_LITERAL_ONLY;
+        case SIG_CONTROL_FLOW:
+            return CAT_CONTROL_FLOW;
+        case SIG_INTERFACE_SIGNATURE:
+            return CAT_INTERFACE_SIGNATURE;
+        case SIG_IMPORT_EXPORT:
+            return CAT_IMPORT_EXPORT;
+        case SIG_COMMENT_DOC_ONLY:
+            return CAT_COMMENT_DOC_ONLY;
+        case SIG_DOC_COMMENT:
+            return entryId === ANALYZER_COMMENTS ? CAT_COMMENT_DOC_ONLY : null;
+        case SIG_GENERAL_CODE:
+            return CAT_GENERAL_CODE;
+        default:
+            return null;
+    }
+}
+
+function populateEntryCategories(
+    entry: ExpertManifestEntry,
+    result: Record<string, string[]>,
+): void {
+    for (let s = 0; s < entry.signals.length; s++) {
+        const cat = mapSignalToCategory(entry.signals[s], entry.id);
+        if (cat) {
+            result[cat].push(entry.id);
+        }
+    }
+}
+
 /**
  * Dynamically derive the category-to-analyzer mapping matrix from manifest signals.
  *
@@ -65,27 +98,7 @@ export function deriveCategoryMatrix(
     };
 
     for (const entry of manifest) {
-        if (entry.signals.includes(SIG_LITERAL)) {
-            result[CAT_LITERAL_ONLY].push(entry.id);
-        }
-        if (entry.signals.includes(SIG_CONTROL_FLOW)) {
-            result[CAT_CONTROL_FLOW].push(entry.id);
-        }
-        if (entry.signals.includes(SIG_INTERFACE_SIGNATURE)) {
-            result[CAT_INTERFACE_SIGNATURE].push(entry.id);
-        }
-        if (entry.signals.includes(SIG_IMPORT_EXPORT)) {
-            result[CAT_IMPORT_EXPORT].push(entry.id);
-        }
-        if (
-            entry.signals.includes(SIG_COMMENT_DOC_ONLY) ||
-            (entry.signals.includes(SIG_DOC_COMMENT) && entry.id === ANALYZER_COMMENTS)
-        ) {
-            result[CAT_COMMENT_DOC_ONLY].push(entry.id);
-        }
-        if (entry.signals.includes(SIG_GENERAL_CODE)) {
-            result[CAT_GENERAL_CODE].push(entry.id);
-        }
+        populateEntryCategories(entry, result);
     }
 
     return result;

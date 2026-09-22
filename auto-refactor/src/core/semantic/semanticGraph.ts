@@ -20,6 +20,11 @@ import type {
     SemanticSubgraph,
 } from './types';
 
+const DIRECTION_FORWARD = 'forward';
+const DIRECTION_BACKWARD = 'backward';
+const DIRECTION_BOTH = 'both';
+type GraphDirection = typeof DIRECTION_FORWARD | typeof DIRECTION_BACKWARD | typeof DIRECTION_BOTH;
+
 /**
  * High-performance language-agnostic code topology graph.
  */
@@ -132,7 +137,7 @@ export class SemanticGraph {
     public getSlice(
         seedNodeId: string,
         maxDepth: number = 3,
-        direction: 'forward' | 'backward' | 'both' = 'forward',
+        direction: GraphDirection = DIRECTION_FORWARD,
     ): SemanticSubgraph {
         const visitedNodes = new Set<string>();
         const collectedEdges = new Set<SemanticEdge>();
@@ -173,17 +178,17 @@ export class SemanticGraph {
      */
     private expandNeighbors(
         current: { id: string; depth: number },
-        direction: 'forward' | 'backward' | 'both',
+        direction: GraphDirection,
         queue: Array<{ id: string; depth: number }>,
         collectedEdges: Set<SemanticEdge>,
     ): void {
-        if (direction === 'forward' || direction === 'both') {
+        if (direction === DIRECTION_FORWARD || direction === DIRECTION_BOTH) {
             for (const edge of this.getOutgoingEdges(current.id)) {
                 collectedEdges.add(edge);
                 queue.push({ id: edge.toNodeId, depth: current.depth + 1 });
             }
         }
-        if (direction === 'backward' || direction === 'both') {
+        if (direction === DIRECTION_BACKWARD || direction === DIRECTION_BOTH) {
             for (const edge of this.getIncomingEdges(current.id)) {
                 collectedEdges.add(edge);
                 queue.push({ id: edge.fromNodeId, depth: current.depth + 1 });

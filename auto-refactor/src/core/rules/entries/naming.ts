@@ -129,13 +129,13 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'NAM-JRG-002',
-        family: RULE_FAMILY_NAMING,
-        analyzer: ANALYZER_NAMING,
         canonical: true,
-        languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
+        family: RULE_FAMILY_NAMING,
+        languages: ALL_LANGUAGES,
+        analyzer: ANALYZER_NAMING,
         summary:
-            '工程资产与测试用例中严禁包含施工批次与临时黑话标记（禁止词：phase[0-9]+、p[0-9]+、st[0-9]+、temp、wip 等），覆盖测试套件名、函数符号与标识符。',
+            '工程资产与测试用例中严禁包含施工批次与临时黑话标记（禁止词如阶段批次号、临时变量及在制品缩写标记等），覆盖测试套件名、函数符号与标识符。',
         remediation:
             '将施工批次标记替换为具有实际业务与领域架构含义的语义命名，杜绝将临时施工代号固化为资产。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-jrg-002',

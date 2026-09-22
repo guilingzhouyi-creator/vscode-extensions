@@ -26,6 +26,13 @@ const STRING_JSON_PARSE = 'JSON.parse';
 const DEFAULT_RULE_VERSION = '1.0.0';
 const DEFAULT_CONFIG_VERSION = '0.3.0';
 
+const FILE_TOKEN_STORE = 'store';
+const CALL_ARROW_SEPARATOR = ' -> ';
+const EVIDENCE_KIND_CALL = 'call';
+const MODULE_DATA_ACCESS = 'data-access';
+const SEVERITY_ERROR = 'error';
+const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';
+
 function isLoopStart(line: string): boolean {
     return (
         /^(for\s*\(|for\s+[a-zA-Z0-9_$]+\s+in|while\s*\(|while\s+)/.test(line) ||
@@ -623,7 +630,7 @@ function isDataQuerySymbol(name: string, filePath: string): boolean {
     const isRepoFile =
         filePath.toLowerCase().includes('repository') ||
         filePath.toLowerCase().includes('dao') ||
-        filePath.toLowerCase().includes('store');
+        filePath.toLowerCase().includes(FILE_TOKEN_STORE);
 
     return isQueryName || isRepoFile;
 }
@@ -636,7 +643,7 @@ function createIndirectNPlusOneIssue(
     queryTarget: { location: { file: string }; name: string },
     callPath: string[],
 ): Issue {
-    const pathStr = callPath.join(' -> ');
+    const pathStr = callPath.join(CALL_ARROW_SEPARATOR);
     const evidence: SemanticEvidenceStep[] = [
         {
             kind: 'loop',
@@ -646,7 +653,7 @@ function createIndirectNPlusOneIssue(
             symbol: caller.name,
         },
         {
-            kind: 'call',
+            kind: EVIDENCE_KIND_CALL,
             description: `Inter-procedural call sequence: ${pathStr}`,
             file: caller.location.file,
             line: caller.location.start.line,
@@ -663,7 +670,7 @@ function createIndirectNPlusOneIssue(
 
     const detail: SemanticReviewDetail = {
         language: 'typescript',
-        module: 'data-access',
+        module: MODULE_DATA_ACCESS,
         symbol: caller.name,
         codeDomain: 'data-architecture',
         currentBehavior: `Indirect N+1 query dispatched via downstream call: ${pathStr}`,
@@ -683,10 +690,10 @@ function createIndirectNPlusOneIssue(
     };
 
     return {
-        id: `data-architecture:DAT-NPL-001:${caller.location.file}:${caller.location.start.line}`,
-        analyzer: 'data-architecture',
+        id: `${ANALYZER_DATA_ARCHITECTURE}:DAT-NPL-001:${caller.location.file}:${caller.location.start.line}`,
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
         rule: 'DAT-NPL-001',
-        severity: 'error',
+        severity: SEVERITY_ERROR,
         message: `Indirect N+1 query hazard in '${caller.name}': downstream persistence call (${pathStr}).`,
         location: {
             file: caller.location.file,

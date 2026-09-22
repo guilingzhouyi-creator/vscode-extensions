@@ -46,6 +46,9 @@ const DEFAULT_MAX_CYCLES_REPORTED = 20;
 /** Registered analyzer id, used as the config key and on every emitted issue. */
 const DEPENDENCY_GRAPH_ANALYZER_ID = 'dependency-graph';
 
+/** Arrow separator used to format circular dependency chain paths. */
+const CYCLE_ARROW_SEPARATOR = ' -> ';
+
 /**
  * Per-module inventory: the file's exported symbol names plus the normalized specifiers of
  * every module it imports; the graph keys these entries by extension-less normalized path.
@@ -733,7 +736,7 @@ function auditModuleSymbols(
                 analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
                 rule: 'unused-export',
                 severity,
-                message: `导出符号 "${sym}" 未被任何导入方引用（${mod.file}）`,
+                message: `Exported symbol "${sym}" is not imported by any module (${mod.file}).`,
                 location: {
                     file: mod.file,
                     start: { line: 1, column: 1 },
@@ -744,7 +747,7 @@ function auditModuleSymbols(
                     importers: importerFiles.slice(0, IMPORTER_DETAIL_LIMIT),
                 },
                 suggestion:
-                    '删除该导出，或确认其为对外 API（如是，加入 entryGlobs 白名单并说明理由）',
+                    'Remove this export or add it to entryGlobs if it is an external entry point.',
             });
             flagged++;
         }
@@ -779,7 +782,7 @@ function auditUnusedExports(
                 analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
                 rule: 'unused-module',
                 severity: unusedSeverity,
-                message: `模块未被任何文件导入且导出 ${mod.exportedSymbols.length} 个符号（死模块候选）`,
+                message: `Module is not imported by any file and exports ${mod.exportedSymbols.length} symbol(s) (dead module candidate).`,
                 location: {
                     file: mod.file,
                     start: { line: 1, column: 1 },
@@ -788,7 +791,8 @@ function auditUnusedExports(
                 detail: {
                     exportedSymbols: mod.exportedSymbols.slice(0, EXPORTED_SYMBOL_DETAIL_LIMIT),
                 },
-                suggestion: '确认是否为遗留代码：删除、归档，或加入 entryGlobs 白名单并说明理由',
+                suggestion:
+                    'Verify whether this is legacy dead code: remove, archive, or add to entryGlobs with justification.',
             });
             unusedFlagged++;
             continue;
@@ -823,10 +827,11 @@ function auditImportCycles(
             analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
             rule: 'import-cycle',
             severity: cycleSeverity,
-            message: `循环依赖: ${cyc.join(' → ')}`,
+            message: `Circular dependency: ${cyc.join(CYCLE_ARROW_SEPARATOR)}`,
             location: { file: cyc[0], start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
             detail: { cycle: cyc, length: cyc.length },
-            suggestion: '提取共享逻辑到被共同依赖的下层模块，或经接口反转断开环',
+            suggestion:
+                'Extract shared logic to a lower-layer module or invert dependency via interfaces.',
         });
     }
     if (cycles.length > cap) {
