@@ -27,15 +27,7 @@ import {
     type BaselinePayload,
     type BaselineSnapshot,
 } from './baselineManager';
-
-/** Typeof 'object' string comparison token. */
-const TYPEOF_OBJECT = 'object';
-
-/** Error object code property name token. */
-const PROPERTY_CODE = 'code';
-
-/** File not found error code for asynchronous baseline reading. */
-const ERROR_CODE_ENOENT = 'ENOENT';
+import { tryReadExistingBaseline, readBaselineFile } from './baseline-io';
 
 /**
  * Canonical rule identifier for baseline refactoring rename path normalization (GOV-RTC-002).
@@ -67,49 +59,9 @@ export interface BaselineUpdateOptions {
     pathRemap?: Record<string, string>;
 }
 
-/**
- * Remap a grouped baseline key if its file portion matches a path remap dictionary.
- * Group key format: `${analyzer}|${rule}|${filePath}`.
- *
- * @param key - Original group key.
- * @param pathRemap - Mapping from old relative path to new relative path.
- * @returns Remapped group key or original key if not matched.
- */
-export function remapGroupKey(key: string, pathRemap?: Record<string, string>): string {
-    if (!pathRemap) return key;
-    const parts = key.split('|');
-    if (parts.length < 3) return key;
-    const filePath = parts.slice(2).join('|');
-    const target = pathRemap[filePath] ?? pathRemap[filePath.replace(/\\/g, '/')];
-    if (target) {
-        return `${parts[0]}|${parts[1]}|${target.replace(/\\/g, '/')}`;
-    }
-    return key;
-}
+import { remapGroupKey, normalizeGroupsForRename } from './baseline-rename-normalizer';
 
-/**
- * Normalizes existing baseline groups with path remapping for refactoring migrations (GOV-RTC-002).
- *
- * @param groups - Prior baseline groups.
- * @param pathRemap - Mapping dictionary from old paths to new paths.
- * @returns Group list with normalized paths.
- */
-export function normalizeGroupsForRename(
-    groups: GroupedBaselineRow[],
-    pathRemap?: Record<string, string>,
-): GroupedBaselineRow[] {
-    if (!pathRemap || Object.keys(pathRemap).length === 0) return groups;
-    return groups.map((g) => {
-        const remappedKey = remapGroupKey(g.key, pathRemap);
-        if (remappedKey !== g.key) {
-            return {
-                ...g,
-                key: remappedKey,
-            };
-        }
-        return g;
-    });
-}
+export { remapGroupKey, normalizeGroupsForRename };
 
 /**
  * Mutating state container used while comparing baseline groups.
@@ -200,6 +152,7 @@ function checkNewKey(
  * @param existingGroups - Baseline groups currently stored on disk.
  * @param currentIssues - Issues produced by the current scan.
  * @param allowExpansion - If false, count increases and new keys are tracked as expansions.
+ * @param pathRemap - Optional file path remapping dictionary to preserve history across renames.
  * @returns Ratcheted baseline groups, pruned keys, and delta statistics.
  */
 export function ratchetDownGroups(
@@ -231,21 +184,6 @@ export function ratchetDownGroups(
     }
 
     return acc;
-}
-
-/**
- * Asynchronously read and parse existing baseline if available.
- *
- * @param filePath - Path to baseline JSON file.
- * @returns Parsed baseline payload or null on missing/corrupt file.
- */
-async function tryReadExistingBaseline(filePath: string): Promise<BaselinePayload | null> {
-    try {
-        const raw = await fs.promises.readFile(filePath, 'utf8');
-        return JSON.parse(raw) as BaselinePayload;
-    } catch {
-        return null;
-    }
 }
 
 /**
@@ -333,16 +271,6 @@ export async function handleBaselineUpdate(
 }
 
 /**
- * Type guard for ENOENT filesystem errors.
- */
-function isEnoentError(error: unknown): boolean {
-    if (!error || typeof error !== TYPEOF_OBJECT) {
-        return false;
-    }
-    return (error as Record<string, unknown>)[PROPERTY_CODE] === ERROR_CODE_ENOENT;
-}
-
-/**
  * Select the key extraction function based on baseline granularity.
  */
 function selectKeyExtractor(isGrouped: boolean): (issue: Issue) => string {
@@ -379,24 +307,6 @@ function resolveBaselineSnapshot(baselineData: BaselinePayload): {
         snapshot: readIdCredits(ids, baselineData.severities),
         accepted: ids.length,
     };
-}
-
-/**
- * Log read errors unless the file is cleanly absent.
- */
-function logBaselineReadError(err: unknown, logger: Logger): void {
-    if (isEnoentError(err)) return;
-    logger.warn(`Failed to read baseline file: ${err}`);
-}
-
-/**
- * Read baseline file asynchronously, ignoring missing files.
- */
-function readBaselineFile(baselinePath: string, logger: Logger): Promise<string | null> {
-    return fs.promises.readFile(baselinePath, 'utf8').catch((err: unknown) => {
-        logBaselineReadError(err, logger);
-        return null;
-    });
 }
 
 /**
