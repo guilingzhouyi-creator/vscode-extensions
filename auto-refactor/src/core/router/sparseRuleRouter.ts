@@ -240,21 +240,73 @@ export interface RouterOptions {
     archetype?: ProjectArchetype;
 }
 
+const ROUTING_EVENT_UNKNOWN_CATEGORY = 'UNKNOWN_CATEGORY_FALLBACK' as const;
+const ROUTING_EVENT_UNCLASSIFIED_LANGUAGE = 'UNCLASSIFIED_LANGUAGE_FALLBACK' as const;
+const ENV_VAL_TRUE = 'true' as const;
+const ENV_VAL_ONE = '1' as const;
+
+/** Callback hook for observing routing fallback telemetry in gray-scale stages. */
+export type RoutingFallbackListener = (event: {
+    type: typeof ROUTING_EVENT_UNKNOWN_CATEGORY | typeof ROUTING_EVENT_UNCLASSIFIED_LANGUAGE;
+    category?: string;
+    archetype?: string;
+    language?: string;
+}) => void;
+
+let fallbackListener: RoutingFallbackListener | null = null;
+
 /**
- * Resolve candidate analyzer targets for a single diff category, taking archetype into account.
+ * Register listener to capture fallback events during gray-scale telemetry exposure.
+ *
+ * @param listener - Fallback listener callback or null to reset.
+ */
+export function setRoutingFallbackListener(listener: RoutingFallbackListener | null): void {
+    fallbackListener = listener;
+}
+
+/**
+ * Check if fail-closed enforcement mode is enabled via environment.
+ *
+ * @returns True if fail-closed mode is active.
+ */
+export function isFailClosedMode(): boolean {
+    return (
+        process.env.AUTO_REFACTOR_FAIL_CLOSED === ENV_VAL_TRUE ||
+        process.env.AUTO_REFACTOR_FAIL_CLOSED === ENV_VAL_ONE
+    );
+}
+
+/**
+ * Resolve the target analyzer ids for a given semantic category and optional archetype.
  *
  * @param cat - Category of mutation.
  * @param archetype - Optional project archetype for specialized general-code steering.
  * @returns Analyzer identifiers targeted by this category.
  */
-function resolveCategoryTargets(
+export function resolveCategoryTargets(
     cat: DiffSemanticCategory,
     archetype?: ProjectArchetype,
 ): readonly string[] {
     if (cat === 'GENERAL_CODE' && archetype) {
-        return ARCHETYPE_ANALYZER_MATRIX[archetype] || ALL_BUILTIN_ANALYZERS;
+        const archTargets = ARCHETYPE_ANALYZER_MATRIX[archetype];
+        if (archTargets) return archTargets;
+        if (fallbackListener) {
+            fallbackListener({ type: ROUTING_EVENT_UNKNOWN_CATEGORY, category: cat, archetype });
+        }
+        if (isFailClosedMode()) {
+            throw new Error(`[UNKNOWN_CATEGORY] Unknown archetype: ${archetype}`);
+        }
+        return ALL_BUILTIN_ANALYZERS;
     }
-    return CATEGORY_ANALYZER_MATRIX[cat] || ALL_BUILTIN_ANALYZERS;
+    const targets = CATEGORY_ANALYZER_MATRIX[cat];
+    if (targets) return targets;
+    if (fallbackListener) {
+        fallbackListener({ type: ROUTING_EVENT_UNKNOWN_CATEGORY, category: cat });
+    }
+    if (isFailClosedMode()) {
+        throw new Error(`[UNKNOWN_CATEGORY] Unknown diff category: ${cat}`);
+    }
+    return ALL_BUILTIN_ANALYZERS;
 }
 
 /**
@@ -263,8 +315,16 @@ function resolveCategoryTargets(
  * @param active - Active analyzer set mutated in-place.
  * @param language - Detected programming language identifier.
  */
-function applyLanguageGating(active: Set<string>, language?: string): void {
-    if (!language) return;
+export function applyLanguageGating(active: Set<string>, language?: string): void {
+    if (!language) {
+        if (fallbackListener) {
+            fallbackListener({ type: ROUTING_EVENT_UNCLASSIFIED_LANGUAGE });
+        }
+        if (isFailClosedMode()) {
+            throw new Error(`[UNCLASSIFIED_FILE] File lacks registered language classification`);
+        }
+        return;
+    }
     const allowed = new Set(LANGUAGE_EXCLUSIVE_ANALYZERS[language] || []);
     for (const spec of ALL_LANGUAGE_SPECIFIC_ANALYZERS) {
         if (!allowed.has(spec)) {

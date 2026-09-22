@@ -248,6 +248,22 @@
             "type": "boolean",
             "default": true
           },
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Mutation signals that trigger this custom analyzer."
+          },
+          "track": {
+            "type": "string",
+            "enum": [
+              "fast",
+              "deep",
+              "off"
+            ],
+            "description": "Execution track for this custom analyzer."
+          },
           "options": {
             "type": "object"
           }
@@ -381,6 +397,54 @@
         "additionalProperties": false
       },
       "description": "Declarative, reason-carrying suppressions applied post-scan. Matched issues stay in the report (auditable); downgradeTo lowers severity, otherwise excluded from gate counting."
+    },
+    "governanceExemptions": {
+      "type": "array",
+      "description": "Centralized governance exemption ledger (governance-exemptions.json). Each exemption must specify ruleId, exact workspace-relative file path, symbol, owner, reason, and an expiration timestamp (expiresAt).",
+      "items": {
+        "type": "object",
+        "required": [
+          "ruleId",
+          "file",
+          "owner",
+          "reason",
+          "expiresAt"
+        ],
+        "properties": {
+          "ruleId": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string",
+            "description": "Exact workspace-relative file path (no globs permitted)."
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "untrusted",
+        "standard",
+        "trusted-autonomous",
+        "human-review"
+      ],
+      "default": "standard",
+      "description": "Agent execution security profile determining governance and gating thresholds."
     },
     "baselineGranularity": {
       "type": "string",

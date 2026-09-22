@@ -53,6 +53,9 @@ export const NEED_RUNTIME_EVIDENCE = 'NEED_RUNTIME_EVIDENCE';
 /** Severity levels; map to CI/SARIF levels (info->note, warning->warning, error->error). */
 export type Severity = 'info' | 'warning' | 'error';
 
+import type { AgentProfileName } from './governance/agent-profiles';
+export type { AgentProfileName };
+
 /** Informational severity level; maps to SARIF note level. */
 export const SEVERITY_INFO: Severity = 'info';
 
@@ -725,6 +728,16 @@ export interface ScanSummary {
     bySeverity: Record<Severity, number>;
     byAnalyzer: Record<string, number>;
     durationMs: number;
+    /** High-precision scan duration in microseconds from process.hrtime.bigint(). */
+    latencyUs?: number;
+    /** Effective Agent security profile under which the scan executed. */
+    agentProfile?: AgentProfileName;
+    /** Ratio of actually executed analyzers against suggested routing plan. */
+    appliedRatio?: number;
+    /** Recorded degradation and budget fallback events during scan. */
+    degraded?: Array<{ reason: string; timestamp: string }>;
+    /** Expert analyzer ids skipped because mutation signals did not trigger them. */
+    expertsSkippedBySignal?: string[];
     /** Built-in analyzer ids disabled by the effective config (sorted by registry order). */
     disabledAnalyzers?: string[];
     /** Config self-check notes (ineffective globs, disabled language packs, cache fallbacks). */

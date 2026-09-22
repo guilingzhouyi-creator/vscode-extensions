@@ -80,6 +80,54 @@
           "minimum": 0,
           "description": "Wall-clock scan duration in milliseconds."
         },
+        "agentProfile": {
+          "type": "string",
+          "enum": [
+            "untrusted",
+            "standard",
+            "trusted-autonomous",
+            "human-review"
+          ],
+          "description": "Effective Agent security profile under which the scan executed."
+        },
+        "appliedRatio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Ratio of actually executed analyzers against suggested routing plan."
+        },
+        "degraded": {
+          "type": "array",
+          "description": "Recorded degradation and budget fallback events during scan.",
+          "items": {
+            "type": "object",
+            "required": [
+              "reason",
+              "timestamp"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "expertsSkippedBySignal": {
+          "type": "array",
+          "description": "List of expert analyzer ids skipped because mutation signals did not trigger them.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latencyUs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "High-precision scan duration in microseconds from process.hrtime.bigint()."
+        },
         "suppressedCount": {
           "type": "integer",
           "minimum": 0,

@@ -1,0 +1,177 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-09-22T06:33:23.087Z",
+  "sampleFilesCount": 200,
+  "normalizedBaseUs": 50,
+  "expertsDigest": "60239981a8b2ca6503f5952eca80ec35ee2cfb7668d352eb55038c3879bc2bc5",
+  "experts": {
+    "constants": {
+      "track": "fast",
+      "p50Us": 45,
+      "p95Us": 81,
+      "weight": 0.9,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "large-file": {
+      "track": "deep",
+      "p50Us": 30,
+      "p95Us": 54,
+      "weight": 0.6,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "complexity": {
+      "track": "fast",
+      "p50Us": 120,
+      "p95Us": 216,
+      "weight": 2.4,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "governance": {
+      "track": "deep",
+      "p50Us": 150,
+      "p95Us": 270,
+      "weight": 3,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "dependency-graph": {
+      "track": "deep",
+      "p50Us": 250,
+      "p95Us": 450,
+      "weight": 5,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "secrets": {
+      "track": "fast",
+      "p50Us": 40,
+      "p95Us": 72,
+      "weight": 0.8,
+      "fallback": "block",
+      "isSecurityFamily": true
+    },
+    "architecture": {
+      "track": "deep",
+      "p50Us": 200,
+      "p95Us": 360,
+      "weight": 4,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "performance": {
+      "track": "deep",
+      "p50Us": 180,
+      "p95Us": 324,
+      "weight": 3.6,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "comments": {
+      "track": "fast",
+      "p50Us": 50,
+      "p95Us": 90,
+      "weight": 1,
+      "fallback": "skip",
+      "isSecurityFamily": false
+    },
+    "hygiene": {
+      "track": "fast",
+      "p50Us": 60,
+      "p95Us": 108,
+      "weight": 1.2,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "security": {
+      "track": "fast",
+      "p50Us": 85,
+      "p95Us": 153,
+      "weight": 1.7,
+      "fallback": "block",
+      "isSecurityFamily": true
+    },
+    "simplify": {
+      "track": "fast",
+      "p50Us": 70,
+      "p95Us": 126,
+      "weight": 1.4,
+      "fallback": "skip",
+      "isSecurityFamily": false
+    },
+    "python-modern": {
+      "track": "deep",
+      "p50Us": 110,
+      "p95Us": 198,
+      "weight": 2.2,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "ts-modern": {
+      "track": "deep",
+      "p50Us": 95,
+      "p95Us": 171,
+      "weight": 1.9,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "rust-modern": {
+      "track": "deep",
+      "p50Us": 90,
+      "p95Us": 162,
+      "weight": 1.8,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "gdscript-modern": {
+      "track": "deep",
+      "p50Us": 85,
+      "p95Us": 153,
+      "weight": 1.7,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "docs": {
+      "track": "deep",
+      "p50Us": 60,
+      "p95Us": 108,
+      "weight": 1.2,
+      "fallback": "skip",
+      "isSecurityFamily": false
+    },
+    "data-architecture": {
+      "track": "deep",
+      "p50Us": 130,
+      "p95Us": 234,
+      "weight": 2.6,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "test-modernity": {
+      "track": "deep",
+      "p50Us": 140,
+      "p95Us": 252,
+      "weight": 2.8,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "dependency-layout": {
+      "track": "deep",
+      "p50Us": 160,
+      "p95Us": 288,
+      "weight": 3.2,
+      "fallback": "escalate-deep",
+      "isSecurityFamily": false
+    },
+    "naming": {
+      "track": "fast",
+      "p50Us": 40,
+      "p95Us": 72,
+      "weight": 0.8,
+      "fallback": "skip",
+      "isSecurityFamily": false
+    }
+  }
+}

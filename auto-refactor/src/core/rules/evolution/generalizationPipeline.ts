@@ -46,11 +46,11 @@ function forwardQuery(id: string, count: number): Result {
     {
         language: 'python',
         negativeSample: `
-def fetch_user(user_id, mode):
+def _fetch_user(user_id, mode):
     return self.client.get_user(user_id, mode)
 `,
         positiveSample: `
-def fetch_user(user_id, mode):
+def _fetch_user(user_id, mode):
     # Logging added
     logger.info("Fetching user %s", user_id)
     return self.client.get_user(user_id, mode)
