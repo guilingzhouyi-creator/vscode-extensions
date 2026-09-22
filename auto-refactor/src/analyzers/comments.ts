@@ -514,6 +514,7 @@ export class CommentAnalyzer implements Analyzer {
         let lineIdx = 0;
         const recentCommentLines: Array<{ line: number; text: string }> = [];
         const state = { hadBlankLineSinceComment: false };
+        let inTemplateLiteral = false;
 
         while (cursor < len) {
             const nextNl = content.indexOf('\n', cursor);
@@ -524,7 +525,13 @@ export class CommentAnalyzer implements Analyzer {
 
             const isCode = this.collectRecentComments(trimmed, lineIdx, recentCommentLines, state);
 
-            if (isCode) {
+            const backticks = (line.match(/(?<!\\)`/g) || []).length;
+            const wasInTemplate = inTemplateLiteral;
+            if (backticks % 2 === 1) {
+                inTemplateLiteral = !inTemplateLiteral;
+            }
+
+            if (isCode && !wasInTemplate) {
                 this.processCodeLineForPublicApi(
                     content,
                     len,
