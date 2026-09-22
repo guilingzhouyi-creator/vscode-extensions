@@ -113,6 +113,11 @@
       "reason": "该文件是词汇表判据的样本夹具：SAMPLES 里必须逐字保留 wip/pN 等标记才能断言「应用标签仍上报、清单条目仍豁免」两个方向；HYG-STB-002 是注释检查器，按设计必须读原文而非掩码，因此样本字符串必然命中，属夹具自身的固有代价"
     },
     {
+      "matchFile": "scripts/validate-naming-suite.js",
+      "matchRule": "HYG-STB-002",
+      "reason": "该文件是全局黑话零容忍（NAM-JRG-002）的校验夹具：必须在测试用例源码和断言中断言 phase 1/p0/wip 等标记才能验证违规捕获与正确性，属夹具固有测试数据"
+    },
+    {
       "matchFile": "scripts/**",
       "matchRule": "duplicate-literal",
       "reason": "同上：校验器/基准夹具里的重复字面量是夹具数据（输入路径、期望值、基准参数），不是可共享的语义常量；把 'f0.ts'、'src/a.ts'、10/100 这类夹具值提成 CONST_* 只会掩盖它们只是样例。产品代码（src/**）仍逐条要求提取"

@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790077137955",
-  "timestamp": "2026-09-22T11:38:57.955Z",
+  "snapshotId": "snapshot-v0.4.0-1790091844444",
+  "timestamp": "2026-09-22T15:44:04.444Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "49c5776832a0e2fc074c1358527b54ab3d4509d03a30302bd0d5c9a9bb5c2d6a",
+  "rulesDigest": "b6b139d0ebe16a1d6721046147ac8a684d23559572746c5f6ad7ab698b20a16b",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 180,
+    "ruleCount": 185,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -38,6 +38,7 @@
     "ARCH-CFG-005",
     "ARCH-CFG-006",
     "ARCH-CFG-007",
+    "ARCH-DEC-002",
     "ARCH-DIR-001",
     "ARCH-DIR-002",
     "ARCH-DIR-003",
@@ -115,10 +116,12 @@
     "GOV-LOG-002",
     "GOV-MNT-001",
     "GOV-MNT-002",
+    "GOV-MSG-001",
     "GOV-PRF-001",
     "GOV-PRF-002",
     "GOV-PRF-003",
     "GOV-PRF-004",
+    "GOV-RTC-002",
     "GOV-SAN-001",
     "GOV-SLC-001",
     "GOV-STD-001",
@@ -147,6 +150,7 @@
     "NAM-FIL-001",
     "NAM-GLB-001",
     "NAM-GLB-002",
+    "NAM-JRG-002",
     "NAM-MBR-001",
     "NAM-SGL-001",
     "NAM-TYP-001",
@@ -188,6 +192,7 @@
     "secret-detected",
     "SIM-COMC-001",
     "SIM-EMPTY-001",
+    "SIM-FLAT-002",
     "SIM-LONG-001",
     "SIM-PRNT-001",
     "TSM-ANY-001",

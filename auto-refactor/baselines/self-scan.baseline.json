@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-22T12:49:05.155Z",
+  "timestamp": "2026-09-22T15:38:34.049Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -599,13 +599,6 @@
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-cognitive-cost-anti-gaming.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|scripts/validate-comment-hygiene.js",
       "count": 7,
       "severities": {
@@ -694,13 +687,6 @@
       "count": 7,
       "severities": {
         "warning": 7
-      }
-    },
-    {
-      "key": "comments|CMT-DOC-001|scripts/validate-config-driven-architecture.js",
-      "count": 5,
-      "severities": {
-        "info": 5
       }
     },
     {
@@ -1530,13 +1516,6 @@
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-rule-generalization.js",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
       "key": "hygiene|HYG-DED-001|scripts/validate-rule-generalization.js",
       "count": 2,
       "severities": {
@@ -1691,13 +1670,6 @@
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-language-adapters.js",
-      "count": 5,
-      "severities": {
-        "info": 5
-      }
-    },
-    {
       "key": "hygiene|HYG-DED-001|scripts/validate-language-adapters.js",
       "count": 2,
       "severities": {
@@ -1733,13 +1705,6 @@
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-universal-rules.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-WRAP-001|scripts/validate-universal-rules.js",
       "count": 1,
       "severities": {
@@ -1758,13 +1723,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "comments|CMT-DOC-001|scripts/validate-performance-rules.js",
-      "count": 9,
-      "severities": {
-        "info": 9
       }
     },
     {
@@ -1803,13 +1761,6 @@
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-data-architecture.js",
-      "count": 5,
-      "severities": {
-        "info": 5
-      }
-    },
-    {
       "key": "constants|duplicate-literal|scripts/validate-data-architecture.js",
       "count": 1,
       "severities": {
@@ -1845,13 +1796,6 @@
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-test-modernity.js",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
       "key": "constants|magic-number|scripts/validate-test-modernity.js",
       "count": 7,
       "severities": {
@@ -1870,13 +1814,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "comments|CMT-DOC-001|scripts/validate-meta-architecture.js",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -2518,9 +2455,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/architecture.ts",
-      "count": 21,
+      "count": 20,
       "severities": {
-        "warning": 21
+        "warning": 20
       }
     },
     {
@@ -2889,16 +2826,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/naming.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/analyzers/naming.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 3
       }
     },
     {
@@ -3540,9 +3470,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/ast/oxc-predicates.ts",
-      "count": 46,
+      "count": 45,
       "severities": {
-        "warning": 46
+        "warning": 45
       }
     },
     {
@@ -4576,9 +4506,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/semanticLiterals.ts",
-      "count": 23,
+      "count": 22,
       "severities": {
-        "warning": 23
+        "warning": 22
       }
     },
     {
@@ -4814,9 +4744,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dataArchitecture.ts",
-      "count": 42,
+      "count": 38,
       "severities": {
-        "warning": 42
+        "warning": 38
       }
     },
     {
@@ -5069,13 +4999,6 @@
       "count": 4,
       "severities": {
         "warning": 4
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/intelligence/incrementalMetrics.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -5566,13 +5489,6 @@
       "count": 11,
       "severities": {
         "warning": 11
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/messages/architecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -6949,16 +6865,16 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scoring/antiGaming.ts",
-      "count": 11,
+      "count": 8,
       "severities": {
-        "warning": 11
+        "warning": 8
       }
     },
     {
       "key": "constants|magic-number|src/core/scoring/antiGaming.ts",
-      "count": 7,
+      "count": 5,
       "severities": {
-        "warning": 7
+        "warning": 5
       }
     },
     {
@@ -7382,20 +7298,6 @@
       }
     },
     {
-      "key": "constants|duplicate-literal|src/core/semantic/semanticGraph.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/semantic/semanticGraph.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "governance|GOV-LOG-001|src/core/semantic/semanticGraph.ts",
       "count": 3,
       "severities": {
@@ -7568,13 +7470,6 @@
       "count": 8,
       "severities": {
         "warning": 8
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/trajectory/anomalyDetector.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
