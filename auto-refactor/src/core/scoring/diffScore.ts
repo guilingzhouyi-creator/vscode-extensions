@@ -25,6 +25,10 @@ import {
     type IncrementalOptions,
 } from '../intelligence/incrementalMetrics';
 import type { QualityDimension } from './scoringTypes';
+import {
+    extractConstantEntities,
+    analyzeConstantTransitions,
+} from '../diff/constant-relocation-detector';
 
 /** Per-unit weights turning incremental metrics into dimension deltas (points, signed). */
 export interface DiffScoreWeights {
@@ -108,11 +112,17 @@ export function scoreDiff(
     );
     const weights: DiffScoreWeights = { ...DEFAULT_WEIGHTS, ...(options.weights ?? {}) };
 
+    const DIFF_VIRTUAL_FILE_PATH = 'diff';
+    const beforeEntities = extractConstantEntities(oldContent, DIFF_VIRTUAL_FILE_PATH);
+    const afterEntities = extractConstantEntities(newContent, DIFF_VIRTUAL_FILE_PATH);
+    const relocationAnalysis = analyzeConstantTransitions(beforeEntities, afterEntities);
+
     const architectureDelta = roundDelta(-metrics.couplingDelta * weights.couplingPerUnit);
     const performanceDelta = roundDelta(-metrics.complexityDelta * weights.complexityPerUnit);
-    const maintainabilityDelta = roundDelta(
-        -metrics.effectiveLocDelta * weights.effectiveLocPerLine,
-    );
+    let maintainabilityDelta = roundDelta(-metrics.effectiveLocDelta * weights.effectiveLocPerLine);
+    if (relocationAnalysis.hasPureRelocationsOnly && maintainabilityDelta > 0) {
+        maintainabilityDelta = 0;
+    }
     const duplicationDelta = roundDelta(-metrics.duplicationDelta * weights.duplicationPerLine);
 
     const dimensionDeltas: Partial<Record<QualityDimension, number>> = {
@@ -128,6 +138,11 @@ export function scoreDiff(
             ${metrics.effectiveLocDelta}`,
         `duplication ${duplicationDelta} from duplicationDelta ${metrics.duplicationDelta}`,
     ];
+    if (relocationAnalysis.hasPureRelocationsOnly) {
+        rationale.push(
+            `maintainability debounced to 0: detected ${relocationAnalysis.relocatedCount} pure constant relocation(s)`,
+        );
+    }
 
     return {
         metrics,

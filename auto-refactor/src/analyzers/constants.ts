@@ -42,6 +42,8 @@ import { locN } from '../utils/normalized';
 import { runStreaming } from '../core/traverse';
 import { classifyLiteral } from '../core/governance/semanticLiterals';
 import { maskedLinesOfPath } from '../core/source-mask';
+import { scanNearLiteralClusters } from '../core/intelligence/near-literal-cluster';
+import { checkConstantLayoutAndScope } from '../core/governance/constant-layout-guard';
 
 const TRIVIAL_NUMBERS = new Set(['0', '1', '-1']);
 
@@ -65,6 +67,8 @@ const LITERAL_KIND_GENERAL = 'general';
 const NUM_KIND = 'number';
 /** `suggestName` kind for string literals. */
 const STR_KIND = 'string';
+/** Rule ID for duplicate literal extractions. */
+const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
 
 /** Order two literal observations by source position (1-based line, then column). */
 function byPosition(a: LiteralRecord, b: LiteralRecord): number {
@@ -164,22 +168,7 @@ export class ConstantsAnalyzer implements Analyzer {
 
     finalize(ctx: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
-        const state = ctx.incremental;
-
-        // T03 recomposition: duplicate-literal is a FULL-FILE multiset, so it can never be
-        // reused wholesale. Rebuild it from (reused-subtree records from the previous scan) +
-        // (fresh records collected this scan), then re-sort by source position so the group
-        // membership + `lines` ordering match a full rescan byte-for-byte.
-        if (state && state.getPrevLiteralRecords().length > 0) {
-            const reused: LiteralRecord[] = [];
-            for (const rec of state.getPrevLiteralRecords()) {
-                if (state.isReusedLiteral(rec.node)) reused.push(rec);
-            }
-            this.literals = [...reused, ...this.literals].sort(byPosition);
-            state.setLiteralRecords(this.literals);
-        } else if (state) {
-            state.setLiteralRecords(this.literals);
-        }
+        this.reconcileIncrementalLiterals(ctx.incremental);
         this.issues = issues;
 
         // Pass 1: find duplicate groups, emit duplicate-literal findings, and collect the
@@ -191,13 +180,41 @@ export class ConstantsAnalyzer implements Analyzer {
         this.detectMagicNumbers(ctx, duplicateNodes, issues);
         this.detectHardcodedStrings(ctx, duplicateNodes, issues);
 
+        // Extended governance passes (4, 5, 6)
+        this.runExtendedGovernancePasses(ctx, issues);
+
+        return issues;
+    }
+
+    private reconcileIncrementalLiterals(state: AnalyzerContext['incremental']): void {
+        if (!state) return;
+        const prevRecords = state.getPrevLiteralRecords();
+        if (prevRecords.length > 0) {
+            const reused: LiteralRecord[] = [];
+            for (const rec of prevRecords) {
+                if (state.isReusedLiteral(rec.node)) reused.push(rec);
+            }
+            this.literals = [...reused, ...this.literals].sort(byPosition);
+        }
+        state.setLiteralRecords(this.literals);
+    }
+
+    private runExtendedGovernancePasses(ctx: AnalyzerContext, issues: Issue[]): void {
         // Pass 4: detect nested constant anti-patterns and redundant constant aliasing.
         const flagNested = ctx.options?.flagNestedConstants !== false;
         if (flagNested && ctx.content) {
             this.detectNestedConstants(ctx, issues);
         }
 
-        return issues;
+        // Pass 5: near-literal calling domain clustering scanner (CONST-CLU-001)
+        if (ctx.options?.checkConstantClusters || ctx.options?.constantGovernance) {
+            issues.push(...scanNearLiteralClusters(this.literals, ctx.filePath));
+        }
+
+        // Pass 6: file layout and scope discipline guard (CONST-LAY-001, CONST-SCP-001)
+        if ((ctx.options?.checkConstantLayout || ctx.options?.constantGovernance) && ctx.content) {
+            issues.push(...checkConstantLayoutAndScope(ctx.content, ctx.filePath));
+        }
     }
 
     private detectMagicNumbers(
@@ -531,9 +548,9 @@ function groupDuplicates(
 function buildDuplicateIssue(ctx: AnalyzerContext, arr: LiteralRecord[], suggested: string): Issue {
     const first = arr[0];
     return {
-        id: `constants:duplicate-literal:${ctx.filePath}:${first.node.start?.line ?? 1}`,
+        id: `${CONSTANTS_ANALYZER_NAME}:${RULE_DUPLICATE_LITERAL}:${ctx.filePath}:${first.node.start?.line ?? 1}`,
         analyzer: CONSTANTS_ANALYZER_NAME,
-        rule: 'duplicate-literal',
+        rule: RULE_DUPLICATE_LITERAL,
         severity: CONSTANTS_SEVERITY,
         message: `Literal ${first.value} is repeated ${arr.length} times in this file; extract it into a shared constant.`,
         location: locN(first.node, ctx.filePath),
