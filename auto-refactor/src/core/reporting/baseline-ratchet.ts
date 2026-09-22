@@ -38,6 +38,11 @@ const PROPERTY_CODE = 'code';
 const ERROR_CODE_ENOENT = 'ENOENT';
 
 /**
+ * Canonical rule identifier for baseline refactoring rename path normalization (GOV-RTC-002).
+ */
+export const RULE_GOV_RTC_002 = 'GOV-RTC-002';
+
+/**
  * Result of applying downward ratchet to baseline groups.
  */
 export interface RatchetDownResult {
@@ -55,6 +60,54 @@ export interface BaselineUpdateOptions {
     ratchetDown?: boolean;
     /** When true, forces overwriting the baseline even if debt counts grow. Default false. */
     forceExpand?: boolean;
+    /**
+     * Optional path remap dictionary (oldPath -> newPath) for refactoring normalization (GOV-RTC-002).
+     */
+    pathRemap?: Record<string, string>;
+}
+
+/**
+ * Remap a grouped baseline key if its file portion matches a path remap dictionary.
+ * Group key format: `${analyzer}|${rule}|${filePath}`.
+ *
+ * @param key - Original group key.
+ * @param pathRemap - Mapping from old relative path to new relative path.
+ * @returns Remapped group key or original key if not matched.
+ */
+export function remapGroupKey(key: string, pathRemap?: Record<string, string>): string {
+    if (!pathRemap) return key;
+    const parts = key.split('|');
+    if (parts.length < 3) return key;
+    const filePath = parts.slice(2).join('|');
+    const target = pathRemap[filePath] ?? pathRemap[filePath.replace(/\\/g, '/')];
+    if (target) {
+        return `${parts[0]}|${parts[1]}|${target.replace(/\\/g, '/')}`;
+    }
+    return key;
+}
+
+/**
+ * Normalizes existing baseline groups with path remapping for refactoring migrations (GOV-RTC-002).
+ *
+ * @param groups - Prior baseline groups.
+ * @param pathRemap - Mapping dictionary from old paths to new paths.
+ * @returns Group list with normalized paths.
+ */
+export function normalizeGroupsForRename(
+    groups: GroupedBaselineRow[],
+    pathRemap?: Record<string, string>,
+): GroupedBaselineRow[] {
+    if (!pathRemap || Object.keys(pathRemap).length === 0) return groups;
+    return groups.map((g) => {
+        const remappedKey = remapGroupKey(g.key, pathRemap);
+        if (remappedKey !== g.key) {
+            return {
+                ...g,
+                key: remappedKey,
+            };
+        }
+        return g;
+    });
 }
 
 /**
@@ -152,10 +205,14 @@ export function ratchetDownGroups(
     existingGroups: GroupedBaselineRow[],
     currentIssues: Issue[],
     allowExpansion = false,
+    pathRemap?: Record<string, string>,
 ): RatchetDownResult {
+    const priorGroups = pathRemap
+        ? normalizeGroupsForRename(existingGroups, pathRemap)
+        : existingGroups;
     const currentGrouped = groupCounts(currentIssues);
     const currentMap = new Map<string, GroupedBaselineRow>(currentGrouped.map((g) => [g.key, g]));
-    const existingMap = new Map<string, GroupedBaselineRow>(existingGroups.map((g) => [g.key, g]));
+    const existingMap = new Map<string, GroupedBaselineRow>(priorGroups.map((g) => [g.key, g]));
 
     const acc: RatchetAccumulator = {
         groups: [],
@@ -210,6 +267,7 @@ function resolveGroupsForUpdate(
             existing.groups,
             reportIssues,
             Boolean(options.forceExpand),
+            options.pathRemap,
         );
         if (result.expandedKeys.length > 0) {
             logger.warn(

@@ -109,6 +109,22 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-msg-001',
     }),
     defineRule({
+        id: 'GOV-RTC-002',
+        family: RULE_FAMILY_GOVERNANCE,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Baseline debt entries must track physical file rename operations without artificial' +
+            ' inflation or false positive churn. Monotonic downward ratchets must remap prior' +
+            ' baselines to new paths upon refactoring.',
+        remediation:
+            '在基线更新与门禁收敛中应用重命名路径规范化映射 (pathRemap)，确保文件重构后' +
+            '既有基线连续继承，严禁因重命名引发基线虚增或债务逃逸。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-rtc-002',
+    }),
+    defineRule({
         id: 'GOV-EXC-001',
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,

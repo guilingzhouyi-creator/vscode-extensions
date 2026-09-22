@@ -25,6 +25,12 @@ const os = require('os');
 const path = require('path');
 
 const { scan } = require('../dist/api');
+const {
+  ratchetDownGroups,
+  remapGroupKey,
+  normalizeGroupsForRename,
+  RULE_GOV_RTC_002,
+} = require('../dist/core/reporting/baseline-ratchet');
 
 /** Issue id the constants analyzer emits for the first magic number of the fixture line. */
 const MAGIC_ID = 'constants:magic-number:src/a.ts:1';
@@ -230,6 +236,78 @@ async function checkSeverityEscalation(root) {
   console.log('  [PASS] de-escalation is not reported as a new finding');
 }
 
+function checkRenamePathShiftNormalization() {
+  assert.strictEqual(RULE_GOV_RTC_002, 'GOV-RTC-002');
+
+  const oldGroups = [
+    {
+      key: 'constants|hardcoded-string|src/legacy/old-util.ts',
+      count: 5,
+      severities: { warning: 5 },
+    },
+    {
+      key: 'simplify|SIM-LONG-001|src/unchanged.ts',
+      count: 1,
+      severities: { warning: 1 },
+    },
+  ];
+
+  const pathRemap = {
+    'src/legacy/old-util.ts': 'src/core/new-util.ts',
+  };
+
+  const remappedKey = remapGroupKey(oldGroups[0].key, pathRemap);
+  assert.strictEqual(remappedKey, 'constants|hardcoded-string|src/core/new-util.ts');
+
+  const normalized = normalizeGroupsForRename(oldGroups, pathRemap);
+  assert.strictEqual(normalized[0].key, 'constants|hardcoded-string|src/core/new-util.ts');
+  assert.strictEqual(normalized[1].key, 'simplify|SIM-LONG-001|src/unchanged.ts');
+
+  // When files are renamed, ratchetDownGroups with pathRemap prevents false-positive debt expansion
+  const currentIssues = [
+    {
+      rule: 'hardcoded-string',
+      analyzer: 'constants',
+      location: {
+        file: 'src/core/new-util.ts',
+        start: { line: 10, column: 1 },
+        end: { line: 10, column: 1 },
+      },
+      severity: 'warning',
+    },
+    {
+      rule: 'SIM-LONG-001',
+      analyzer: 'simplify',
+      location: {
+        file: 'src/unchanged.ts',
+        start: { line: 1, column: 1 },
+        end: { line: 1, column: 1 },
+      },
+      severity: 'warning',
+    },
+  ];
+
+  // Without pathRemap: old-util.ts debt is pruned, new-util.ts is considered a new expansion
+  const withoutRemap = ratchetDownGroups(oldGroups, currentIssues, false);
+  assert.ok(
+    withoutRemap.expandedKeys.length > 0,
+    'without remap, rename triggers expansion rejection',
+  );
+
+  // With pathRemap: new-util.ts matches prior baseline, debt count decreased from 5 to 1
+  const withRemap = ratchetDownGroups(oldGroups, currentIssues, false, pathRemap);
+  assert.strictEqual(
+    withRemap.expandedKeys.length,
+    0,
+    'with remap, rename does not cause expansion rejection',
+  );
+  assert.strictEqual(withRemap.decreasedCount, 4, 'debt decreased from 5 to 1');
+  assert.strictEqual(withRemap.groups[0].key, 'constants|hardcoded-string|src/core/new-util.ts');
+  assert.strictEqual(withRemap.groups[0].count, 1);
+
+  console.log('  [PASS] GOV-RTC-002: baseline refactoring rename path normalization validated');
+}
+
 async function main() {
   const smallRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-ratchet-'));
   const bigRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-ratchet-big-'));
@@ -262,6 +340,7 @@ async function main() {
 
     await checkSameLineGrowth(smallRoot);
     await checkSeverityEscalation(bigRoot);
+    checkRenamePathShiftNormalization();
     console.log('  [PASS] ratchet credits cover multiplicity, escalation and legacy payloads');
   } finally {
     fs.rmSync(smallRoot, { recursive: true, force: true });
