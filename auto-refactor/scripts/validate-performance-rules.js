@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 4 Algorithmic & Performance Auditing
- * File Path: scripts/validate-phase4-performance-rules.js
+ * File Path: scripts/validate-performance-rules.js
  * Architecture Role: Validates deep algorithmic complexity, loop transient allocation detection
  *   (ADV-PRF-002), expensive operation detection, and end-to-end integration into the Praxis
  *   Diff Governance Subsystem.

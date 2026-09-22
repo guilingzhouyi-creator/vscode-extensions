@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness - Closed-Loop Governance & High-Load Stress
- * File Path: scripts/validate-phase15-e2e-stress.js
+ * File Path: scripts/validate-e2e-stress.js
  * Architecture Role: Comprehensive verification harness for full-lifecycle closed-loop
  *   governance, multi-language mixed project stress scenarios, fine-grained slice MoE
  *   dispatch, trajectory recipe learning & oscillation defense, Praxis SPI facade synergy,

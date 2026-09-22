@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 10 First-Round Self-Refactoring & Delta Measurement
- * File Path: scripts/validate-phase10-self-refactor.js
+ * File Path: scripts/validate-self-refactor.js
  * Architecture Role: Verifies the target refactoring closure of Phase 10:
  *   1. 100% elimination of all Critical Debt items (reduced to 0);
  *   2. Net reduction of High Debt hotspots (bench-baselines, semanticLiterals, roleInference);

@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 2 Multi-Language Semantic Adapters Verification
- * File Path: scripts/validate-phase2-language-adapters.js
+ * File Path: scripts/validate-language-adapters.js
  * Architecture Role: Validates that concrete source code in TypeScript, Python, Rust, Go,
  *   and GDScript is losslessly mapped into canonical SemanticNode entities and SemanticEdge
  *   relations within the unified SemanticGraph via the SemanticAdapterRegistry.

@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 8 Quality Quantification & Anti-Gaming
- * File Path: scripts/validate-phase8-quality-quantification.js
+ * File Path: scripts/validate-quality-quantification.js
  * Architecture Role: Validates the 8-pillar quality model, non-linear risk penalties,
  *   severe pillar ceilings, effective code density, anti-gaming detection (GOV-GAM-001),
  *   5-level hierarchical scoring, patch quality deltas, and Praxis Diff governance.

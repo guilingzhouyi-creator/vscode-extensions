@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 0 Baseline Freeze & AuditSnapshot Verification
- * File Path: scripts/validate-phase0-baseline.js
+ * File Path: scripts/validate-baseline-freeze.js
  * Architecture Role: Validates the immutable AuditSnapshot (E, R, C, L, S) quintuple,
  *   freezes the v0.3.0 baseline manifest to reports/baseline-v0.3.0.json, and asserts
  *   that the sandbox snapshot matches runtime rules and configuration integrity.

@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 1 Unified Semantic IR & Graph Verification
- * File Path: scripts/validate-phase1-semantic-ir.js
+ * File Path: scripts/validate-semantic-ir.js
  * Architecture Role: Validates the language-agnostic SemanticNode, SemanticEdge, and
  *   SemanticGraph topology engine, asserting node indexing, bidirectional edge queries,
  *   subgraph slicing, cycle detection, topological sorting, and JSON roundtrip serialization.

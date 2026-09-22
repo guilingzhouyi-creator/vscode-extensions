@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 6 Test Modernity & Contract Governance
- * File Path: scripts/validate-phase6-test-modernity.js
+ * File Path: scripts/validate-test-modernity.js
  * Architecture Role: Validates multi-language test modernity rules, including tautological
  *   assertions (TST-TAU-001), orphaned skipped tests (TST-SKP-001), mock-only illusions
  *   (TST-ILS-001), business-to-test semantic mapping, EMTD/CBCR five-dimensional scoring

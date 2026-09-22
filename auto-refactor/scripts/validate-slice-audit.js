@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness - Phase 13 Incremental Slice Audit Engine & Sparse MoE
- * File Path: scripts/validate-phase13-slice-audit.js
+ * File Path: scripts/validate-slice-audit.js
  * Architecture Role: Comprehensive verification harness for fine-grained AST slice extraction,
  *   feature vector classification, sparse MoE CED routing, call-chain impact tracing, and
  *   Praxis slice audit service facade.

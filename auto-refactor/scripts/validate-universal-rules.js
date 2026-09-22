@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 3 Universal Rule Hierarchy & Praxis Integration
- * File Path: scripts/validate-phase3-universal-rules.js
+ * File Path: scripts/validate-universal-rules.js
  * Architecture Role: Validates the three-tier rule pyramid (Layer 1 Universal, Layer 2 Family,
  *   Layer 3 Dialect), confirms language-agnostic clean architecture and cycle detection on the
  *   SemanticGraph, and verifies the Praxis Diff Governance Subsystem service facade.

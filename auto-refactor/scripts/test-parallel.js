@@ -99,40 +99,40 @@ const PARALLEL_SUITES = [
   { name: 'test-codec', script: 'scripts/test-result-codec.js' },
   { name: 'validate-compression', script: 'scripts/validate-compression-bounds.js' },
   { name: 'validate-marker-scope', script: 'scripts/validate-marker-scope.js' },
-  { name: 'validate-baseline-freeze', script: 'scripts/validate-phase0-baseline.js' },
-  { name: 'validate-semantic-ir', script: 'scripts/validate-phase1-semantic-ir.js' },
-  { name: 'validate-language-adapters', script: 'scripts/validate-phase2-language-adapters.js' },
-  { name: 'validate-universal-rules', script: 'scripts/validate-phase3-universal-rules.js' },
-  { name: 'validate-performance-rules', script: 'scripts/validate-phase4-performance-rules.js' },
-  { name: 'validate-data-architecture', script: 'scripts/validate-phase5-data-architecture.js' },
-  { name: 'validate-test-modernity', script: 'scripts/validate-phase6-test-modernity.js' },
+  { name: 'validate-baseline-freeze', script: 'scripts/validate-baseline-freeze.js' },
+  { name: 'validate-semantic-ir', script: 'scripts/validate-semantic-ir.js' },
+  { name: 'validate-language-adapters', script: 'scripts/validate-language-adapters.js' },
+  { name: 'validate-universal-rules', script: 'scripts/validate-universal-rules.js' },
+  { name: 'validate-performance-rules', script: 'scripts/validate-performance-rules.js' },
+  { name: 'validate-data-architecture', script: 'scripts/validate-data-architecture.js' },
+  { name: 'validate-test-modernity', script: 'scripts/validate-test-modernity.js' },
   {
     name: 'validate-meta-architecture',
-    script: 'scripts/validate-phase7-meta-architecture.js',
+    script: 'scripts/validate-meta-architecture.js',
   },
   {
     name: 'validate-quality-quantification',
-    script: 'scripts/validate-phase8-quality-quantification.js',
+    script: 'scripts/validate-quality-quantification.js',
   },
   {
     name: 'validate-rule-generalization',
-    script: 'scripts/validate-phase11-rule-generalization.js',
+    script: 'scripts/validate-rule-generalization.js',
   },
   {
     name: 'validate-multi-agent',
-    script: 'scripts/validate-phase12-multi-agent.js',
+    script: 'scripts/validate-multi-agent.js',
   },
   {
     name: 'validate-slice-audit',
-    script: 'scripts/validate-phase13-slice-audit.js',
+    script: 'scripts/validate-slice-audit.js',
   },
   {
     name: 'validate-trajectory-learning',
-    script: 'scripts/validate-phase14-trajectory-learning.js',
+    script: 'scripts/validate-trajectory-learning.js',
   },
   {
     name: 'validate-e2e-stress',
-    script: 'scripts/validate-phase15-e2e-stress.js',
+    script: 'scripts/validate-e2e-stress.js',
   },
   {
     name: 'validate-symbol-index-pack',
@@ -196,8 +196,8 @@ const SEQUENTIAL_SUITES = [
   { name: 'validate-equivalence', script: 'scripts/validate-equivalence.js' },
   { name: 'validate-warm', script: 'scripts/validate-warm.js' },
   { name: 'validate-diff', script: 'scripts/validate-diff.js' },
-  { name: 'validate-self-audit', script: 'scripts/validate-phase9-self-audit.js' },
-  { name: 'validate-self-refactor', script: 'scripts/validate-phase10-self-refactor.js' },
+  { name: 'validate-self-audit', script: 'scripts/validate-self-audit.js' },
+  { name: 'validate-self-refactor', script: 'scripts/validate-self-refactor.js' },
 ];
 
 /**

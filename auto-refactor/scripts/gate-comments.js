@@ -22,7 +22,9 @@ const CLI = path.join(ROOT, 'dist', 'index.js');
 const BASELINE = path.join(ROOT, 'baselines', 'comments.strict.baseline.json');
 const INCLUDE = 'src/**/*.ts,scripts/*.js';
 
-const update = process.argv.slice(2).includes('--update');
+const args = process.argv.slice(2);
+const update = args.includes('--update');
+const forceExpand = args.includes('--force-expand');
 
 if (!fs.existsSync(CLI)) {
   process.stderr.write('[gate:comments] dist/index.js missing — run "npm run build" first\n');
@@ -70,6 +72,9 @@ const cliArgs = [
 
 if (update) {
   cliArgs.push('--update-baseline', BASELINE);
+  if (forceExpand) {
+    cliArgs.push('--force-baseline-expand');
+  }
 }
 
 const result = spawnSync(process.execPath, cliArgs, { cwd: ROOT, stdio: 'inherit' });

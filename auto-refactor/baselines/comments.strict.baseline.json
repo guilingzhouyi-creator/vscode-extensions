@@ -1,24 +1,10 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-21T10:58:39.027Z",
+  "timestamp": "2026-09-22T12:39:44.158Z",
   "groups": [
     {
-      "key": "comments|CMT-WID-001|scripts/validate-cognitive-cost-anti-gaming.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "comments|CMT-DOC-001|scripts/validate-cognitive-cost-anti-gaming.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "comments|CMT-WID-001|scripts/validate-config-driven-architecture.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -32,80 +18,52 @@
       }
     },
     {
-      "key": "comments|CMT-WID-001|scripts/validate-elastic-complexity-budget.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "comments|CMT-WID-001|scripts/validate-function-cohesion-skeleton.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase11-rule-generalization.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase2-language-adapters.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-data-architecture.js",
       "count": 5,
       "severities": {
         "warning": 5
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase3-universal-rules.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-language-adapters.js",
+      "count": 5,
+      "severities": {
+        "warning": 5
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|scripts/validate-meta-architecture.js",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase4-performance-rules.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-performance-rules.js",
       "count": 9,
       "severities": {
         "warning": 9
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase5-data-architecture.js",
-      "count": 5,
+      "key": "comments|CMT-DOC-001|scripts/validate-rule-generalization.js",
+      "count": 2,
       "severities": {
-        "warning": 5
+        "warning": 2
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase6-test-modernity.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-test-modernity.js",
       "count": 3,
       "severities": {
         "warning": 3
       }
     },
     {
-      "key": "comments|CMT-DOC-001|scripts/validate-phase7-meta-architecture.js",
+      "key": "comments|CMT-DOC-001|scripts/validate-universal-rules.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "comments|CMT-CON-001|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "comments|CMT-DOC-001|src/core/rules/evolution/generalizationPipeline.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     }
   ]

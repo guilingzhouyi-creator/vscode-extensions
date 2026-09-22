@@ -1,11 +1,11 @@
 /**
  * Module: Verification Harness — Phase 12 Multi-Agent Governance Mode
- * File Path: scripts/validate-phase12-multi-agent.js
+ * File Path: scripts/validate-multi-agent.js
  * Architecture Role: Comprehensive verification harness validating multi-agent change
  *   attribution, cross-agent architectural collision detection (GOV-AGENT-COLLISION),
  *   intent conflict & regression auditing, duplicate work blast radius calculations,
  *   patch arbitration, and Praxis IPraxisMultiAgentGovernanceService integration.
- * Dependencies & Triggers: Run via `node scripts/validate-phase12-multi-agent.js`; integrated into
+ * Dependencies & Triggers: Run via `node scripts/validate-multi-agent.js`; integrated into
  *   test-parallel runner suite.
  * Responsibilities: Assert all 6 core pillars of multi-agent governance with strict invariants.
  * Exit Semantics & Design Rationale: Exits 0 on total pass, 1 on any assertion failure.

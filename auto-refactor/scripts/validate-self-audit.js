@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 9 System Self-Audit Baseline
- * File Path: scripts/validate-phase9-self-audit.js
+ * File Path: scripts/validate-self-audit.js
  * Architecture Role: Validates the production-grade self-examination runner, confirming
  *   immutable AuditSnapshot sandbox isolation, 8-pillar quality evaluation, technical debt
  *   ledger tiering (Critical/High/Medium/Low), and baseline report schema integrity.

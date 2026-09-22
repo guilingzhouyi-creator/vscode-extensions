@@ -1,10 +1,10 @@
 /**
  * Module: Verification Harness — Phase 11 Rule Generalization & Knowledge Pipeline
- * File Path: scripts/validate-phase11-rule-generalization.js
+ * File Path: scripts/validate-rule-generalization.js
  * Architecture Role: End-to-end verification suite for Phase 11; asserts candidate lifecycle,
  *   4-tier generalization scrutiny, cross-language fixture evaluation (TS, Python, Rust),
  *   rule engine integration, and registry consistency.
- * Dependencies & Triggers: `node scripts/validate-phase11-rule-generalization.js`; part of
+ * Dependencies & Triggers: `node scripts/validate-rule-generalization.js`; part of
  *   parallel test runner suite.
  * Responsibilities: Verify candidate promotion, assert multi-language detection for
  *   HYG-WRAP-001, GOV-EXC-003, and ARCH-DISP-001, verify false positive guards, and assert

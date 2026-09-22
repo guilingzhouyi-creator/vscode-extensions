@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness - Phase 14 Historical Trajectory Learning & Recipe Extraction
- * File Path: scripts/validate-phase14-trajectory-learning.js
+ * File Path: scripts/validate-trajectory-learning.js
  * Architecture Role: Comprehensive verification harness for Bad-to-Good trajectory learning,
  *   refactoring recipe synthesis, precondition matching, regression detection (GOV-TRJ-001),
  *   and Praxis trajectory learning facade SPI integration.

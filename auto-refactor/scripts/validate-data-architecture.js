@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 5 Data Architecture & Access Governance
- * File Path: scripts/validate-phase5-data-architecture.js
+ * File Path: scripts/validate-data-architecture.js
  * Architecture Role: Validates data architecture rules, including direct/indirect N+1 queries
  *   (DAT-NPL-001), unbounded full scans on online paths (DAT-QRY-001),
  *   leaky abstractions (DAT-LAY-001), and end-to-end integration into Praxis Diff Governance.

@@ -1,6 +1,6 @@
 /**
  * Module: Verification Harness — Phase 7 Semantic Architecture & Meta Architecture Rules
- * File Path: scripts/validate-phase7-meta-architecture.js
+ * File Path: scripts/validate-meta-architecture.js
  * Architecture Role: Validates the Semantic Architecture Graph, multi-signal system topology
  *   role inference, 6 meta-architecture rules, and Praxis Diff governance integration.
  * Dependencies & Triggers: Consumes ../dist/api; executed during test-parallel runner.
