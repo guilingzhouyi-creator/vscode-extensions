@@ -18,6 +18,54 @@ import * as path from 'path';
 import { isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 
+const SNAKE_CASE_RE = /^[a-z0-9]+(_[a-z0-9]+)*$/;
+const KEBAB_OR_CAMEL_RE = /^[a-z0-9]+(-[a-z0-9]+)*$|^[a-z][a-zA-Z0-9]*$/;
+const PASCAL_CASE_RE = /^[A-Z][a-zA-Z0-9]*$/;
+const PATH_DECL_TAG_RE = /文件路径|@file/;
+const HEADER_KEYWORD_RE = /\/\*\*|职责|Responsibilities|Overview|模块归属|\/\/\s*={10,}|#\s*={10,}/;
+
+/**
+ * Validates snake_case file naming convention.
+ */
+function validateSnakeCaseNaming(
+    nameWithoutExt: string,
+    ext: string,
+): { valid: boolean; suggestion: string } {
+    const checked = ext === '.py' ? nameWithoutExt.replace(/^_(?!_)/, '') : nameWithoutExt;
+    if (!SNAKE_CASE_RE.test(checked)) {
+        return {
+            valid: false,
+            suggestion: `Rename file to snake_case (e.g. \`${checked.replace(/[-\s]+/g, '_').toLowerCase()}${ext}\`).`,
+        };
+    }
+    return { valid: true, suggestion: '' };
+}
+
+/**
+ * Validates kebab-case file naming convention.
+ */
+function validateKebabCaseNaming(
+    nameWithoutExt: string,
+    ext: string,
+    ctx: RuleEvaluationContext,
+): { valid: boolean; suggestion: string } {
+    if (KEBAB_OR_CAMEL_RE.test(nameWithoutExt)) {
+        return { valid: true, suggestion: '' };
+    }
+    const isPascal = PASCAL_CASE_RE.test(nameWithoutExt);
+    const opts = ctx.ctx?.options as Record<string, unknown> | undefined;
+    const allowPascal = opts?.allowPascalCaseClasses !== false;
+    const matchesDecl = isPascal && allowPascal && hasTypeDecl(ctx.content, nameWithoutExt);
+    if (matchesDecl) {
+        return { valid: true, suggestion: '' };
+    }
+    const kebab = nameWithoutExt.replace(/[_]/g, '-').toLowerCase();
+    return {
+        valid: false,
+        suggestion: `Rename file to kebab-case (e.g. \`${kebab}${ext}\`).`,
+    };
+}
+
 /**
  * GOV-FIL-001: File and Module Naming Convention.
  * Enforces kebab-case/camelCase in TS and snake_case in GDScript/Rust.
@@ -64,43 +112,22 @@ export const FileNamingRule: GovernanceRule = {
         }
 
         const convention = ctx.capabilities.namingConventions.file;
-        let valid = true;
-        let suggestion = '';
+        let result = { valid: true, suggestion: '' };
 
         if (convention === 'snake_case') {
-            // Python's privacy convention allows a single leading underscore (`_ids.py`).
-            const checked = ext === '.py' ? nameWithoutExt.replace(/^_(?!_)/, '') : nameWithoutExt;
-            // Must be lower snake_case, no hyphens, no PascalCase
-            const SNAKE_CASE_RE = /^[a-z0-9]+(_[a-z0-9]+)*$/;
-            if (!SNAKE_CASE_RE.test(checked)) {
-                valid = false;
-                suggestion = `Rename file to snake_case (e.g. \`${checked.replace(/[-\s]+/g, '_').toLowerCase()}${ext}\`).`;
-            }
+            result = validateSnakeCaseNaming(nameWithoutExt, ext);
         } else if (convention === 'kebab-case') {
-            // Must be kebab-case, camelCase, or PascalCase matching type definition.
-            const KEBAB_OR_CAMEL_RE = /^[a-z0-9]+(-[a-z0-9]+)*$|^[a-z][a-zA-Z0-9]*$/;
-            if (!KEBAB_OR_CAMEL_RE.test(nameWithoutExt)) {
-                const isPascal = /^[A-Z][a-zA-Z0-9]*$/.test(nameWithoutExt);
-                const opts = ctx.ctx?.options as Record<string, unknown> | undefined;
-                const allowPascal = opts?.allowPascalCaseClasses !== false;
-                const matchesDecl =
-                    isPascal && allowPascal && hasTypeDecl(ctx.content, nameWithoutExt);
-                if (!matchesDecl) {
-                    valid = false;
-                    const kebab = nameWithoutExt.replace(/[_]/g, '-').toLowerCase();
-                    suggestion = `Rename file to kebab-case (e.g. \`${kebab}${ext}\`).`;
-                }
-            }
+            result = validateKebabCaseNaming(nameWithoutExt, ext, ctx);
         }
 
-        if (!valid) {
+        if (!result.valid) {
             return [
                 {
                     ruleId: 'GOV-FIL-001',
                     message: `File \`${baseName}\` violates standard \`${convention}\` naming convention for ${ctx.capabilities.languageId}.`,
                     line: 1,
                     column: 1,
-                    suggestion,
+                    suggestion: result.suggestion,
                     fixable: false,
                 },
             ];
@@ -124,7 +151,7 @@ const MIN_HEADER_ENFORCEMENT_LINES = 40;
 /**
  * Number of leading lines scanned when checking for a module responsibility/header comment.
  */
-const HEADER_SCAN_LINES = 15;
+const HEADER_SCAN_LINES = 50;
 
 /**
  * Validates declared @file or localized file-path tag against actual physical path.
@@ -133,7 +160,8 @@ function validatePathParity(lines: string[], normalizedPath: string): Governance
     const scanLimit = Math.min(PATH_DECL_SCAN_LINES, lines.length);
     for (let i = 0; i < scanLimit; i++) {
         const line = lines[i];
-        if (!line.includes('文件路径') && !line.includes('@file')) continue;
+        if (!/^\s*(?:\/\*|\*|\/\/|#|"{3}|'{3})/.test(line)) continue;
+        if (!PATH_DECL_TAG_RE.test(line)) continue;
         const match = PATH_DECL_RE.exec(line);
         if (!match || !match[1]) continue;
 
@@ -153,7 +181,7 @@ function validatePathParity(lines: string[], normalizedPath: string): Governance
                 ruleId: 'GOV-FIL-002',
                 message: `Declared header path \`${declPath}\` does not match physical file path \`${normalizedPath}\`.`,
                 line: i + 1,
-                column: line.indexOf(match[1]) + 1,
+                column: match.index != null ? match.index + 1 : 1,
                 suggestion: `Synchronize declared header path to match the real relative path: \`${normalizedPath}\`.`,
                 fixable: false,
             };
@@ -161,9 +189,6 @@ function validatePathParity(lines: string[], normalizedPath: string): Governance
     }
     return null;
 }
-
-const HEADER_DIVIDER_SLASH = '// ====================';
-const HEADER_DIVIDER_HASH = '# ====================';
 
 /**
  * Checks whether the module contains an architectural docstring header in leading lines.
@@ -176,15 +201,7 @@ function hasModuleHeaderDocstring(lines: string[], isPython: boolean): boolean {
         if (isPython && (trimmed.startsWith('"""') || trimmed.startsWith("'''"))) {
             return true;
         }
-        if (
-            l.includes('/**') ||
-            l.includes('职责') ||
-            l.includes('Responsibilities') ||
-            l.includes('Overview') ||
-            l.includes('模块归属') ||
-            l.includes(HEADER_DIVIDER_SLASH) ||
-            l.includes(HEADER_DIVIDER_HASH)
-        ) {
+        if (HEADER_KEYWORD_RE.test(l)) {
             return true;
         }
     }

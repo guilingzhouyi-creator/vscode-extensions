@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-22T15:38:34.049Z",
+  "timestamp": "2026-09-23T05:47:28.743Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -4162,31 +4162,10 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/governance/rules/codeLogic.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/codeLogic.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/governance/rules/codeLogic.ts",
       "count": 5,
       "severities": {
         "warning": 5
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/governance/rules/compressionBounds.ts",
-      "count": 5,
-      "severities": {
-        "info": 5
       }
     },
     {
@@ -4205,9 +4184,9 @@
     },
     {
       "key": "complexity|high-complexity|src/core/governance/rules/compressionBounds.ts",
-      "count": 3,
+      "count": 1,
       "severities": {
-        "warning": 3
+        "warning": 1
       }
     },
     {
@@ -4215,13 +4194,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/compressionBounds.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -4246,45 +4218,10 @@
       }
     },
     {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/debugLogging.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/governance/rules/debugLogging.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/governance/rules/debugLogging.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/governance/rules/exceptionSafety.ts",
-      "count": 15,
+      "count": 14,
       "severities": {
-        "warning": 15
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/exceptionSafety.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/governance/rules/exceptionSafety.ts",
-      "count": 7,
-      "severities": {
-        "info": 7
+        "warning": 14
       }
     },
     {
@@ -4296,37 +4233,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/fileStructure.ts",
-      "count": 13,
+      "count": 8,
       "severities": {
-        "warning": 13
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/governance/rules/fileStructure.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/fileStructure.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/governance/rules/fileStructure.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/governance/rules/fileStructure.ts",
-      "count": 9,
-      "severities": {
-        "info": 9
+        "warning": 8
       }
     },
     {
@@ -4338,51 +4247,16 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/maintainability.ts",
-      "count": 27,
+      "count": 18,
       "severities": {
-        "warning": 27
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/maintainability.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/governance/rules/maintainability.ts",
-      "count": 10,
-      "severities": {
-        "info": 10
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/governance/rules/maintainability.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/governance/rules/maintainability.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 18
       }
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/performance.ts",
-      "count": 12,
+      "count": 8,
       "severities": {
-        "warning": 12
-      }
-    },
-    {
-      "key": "performance|PRF-IO-001|src/core/governance/rules/performance.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 8
       }
     },
     {
@@ -4390,20 +4264,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/performance.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/governance/rules/performance.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
       }
     },
     {
@@ -4442,59 +4302,10 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/governance/rules/standardization.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/standardization.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/governance/rules/standardization.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/governance/rules/typeSystem.ts",
-      "count": 18,
+      "count": 10,
       "severities": {
-        "warning": 18
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/governance/rules/typeSystem.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/governance/rules/typeSystem.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-002|src/core/governance/rules/typeSystem.ts",
-      "count": 9,
-      "severities": {
-        "info": 9
-      }
-    },
-    {
-      "key": "performance|PRF-ALG-001|src/core/governance/rules/typeSystem.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 10
       }
     },
     {
@@ -7722,13 +7533,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-FIL-002|src/core/worker.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {

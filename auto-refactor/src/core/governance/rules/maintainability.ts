@@ -38,6 +38,34 @@ const FORBIDDEN_IMPORT_PATTERNS = FORBIDDEN_IMPORTS.map((pkg) => ({
 
 const KEYWORD_EXTENDS = 'extends';
 
+const SUBCLASS_HEURISTIC_RE = /(?:Sub|Derived|Child)/;
+const UI_NODES_SET = new Set(['Control', 'Node2D', 'Node3D', 'CanvasItem']);
+const IMPORT_KEYWORD_RE = /\b(?:from|require)\b/;
+const EXTENDS_KEYWORD_RE = /\bextends\b/;
+
+/**
+ * Checks a line for forbidden framework imports and appends violations.
+ */
+function checkLineForbiddenImports(
+    line: string,
+    lineIndex: number,
+    violations: GovernanceViolation[],
+): void {
+    for (const { pkg, re } of FORBIDDEN_IMPORT_PATTERNS) {
+        if (re.test(line)) {
+            violations.push({
+                ruleId: 'GOV-MNT-002',
+                message: `Core domain module imports presentation/framework package \`${pkg}\`.`,
+                line: lineIndex + 1,
+                column: 1,
+                suggestion: `Decouple domain logic from \`${pkg}\` using ports-and-adapters (dependency inversion).`,
+                fixable: false,
+            });
+            break;
+        }
+    }
+}
+
 /**
  * Scans lines for forbidden framework imports and collects violation records.
  */
@@ -45,24 +73,55 @@ function findForbiddenImportViolations(lines: string[]): GovernanceViolation[] {
     const violations: GovernanceViolation[] = [];
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        if (!line.includes('from') && !line.includes('require')) continue;
-        if (line.trim().startsWith('//') || line.trim().startsWith('#')) continue;
-
-        for (const { pkg, re } of FORBIDDEN_IMPORT_PATTERNS) {
-            if (line.includes(pkg) && re.test(line)) {
-                violations.push({
-                    ruleId: 'GOV-MNT-002',
-                    message: `Core domain module imports presentation/framework package \`${pkg}\`.`,
-                    line: i + 1,
-                    column: 1,
-                    suggestion: `Decouple domain logic from \`${pkg}\` using ports-and-adapters (dependency inversion).`,
-                    fixable: false,
-                });
-                break;
-            }
-        }
+        if (!IMPORT_KEYWORD_RE.test(line)) continue;
+        const trimmed = line.trim();
+        if (trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
+        checkLineForbiddenImports(line, i, violations);
     }
     return violations;
+}
+
+/**
+ * Checks a line for inheritance depth violations and appends findings.
+ */
+function checkExtendsLine(
+    line: string,
+    lineIndex: number,
+    isDomainOrBackend: boolean,
+    violations: GovernanceViolation[],
+): void {
+    const m = line.match(EXTENDS_RE);
+    if (m) {
+        const className = m[1];
+        const superName = m[2];
+        if (SUBCLASS_HEURISTIC_RE.test(superName)) {
+            violations.push({
+                ruleId: 'GOV-MNT-001',
+                message: `Class \`${className}\` extends \`${superName}\`, potentially exceeding max inheritance depth of 2.`,
+                line: lineIndex + 1,
+                column: m.index != null ? m.index + 1 : 1,
+                suggestion:
+                    'Refactor deep class hierarchy into single domain class + composition strategy pattern.',
+                fixable: false,
+            });
+        }
+    }
+
+    const mGd = line.match(GD_EXTENDS_RE);
+    if (mGd && isDomainOrBackend) {
+        const superName = mGd[1];
+        if (UI_NODES_SET.has(superName)) {
+            violations.push({
+                ruleId: 'GOV-MNT-001',
+                message: `Domain model extends presentation node \`${superName}\`. Pure domain classes must extend RefCounted.`,
+                line: lineIndex + 1,
+                column: mGd.index != null ? mGd.index + 1 : 1,
+                suggestion:
+                    'Change base class to `RefCounted` and decouple presentation via EventBus.',
+                fixable: false,
+            });
+        }
+    }
 }
 
 /**
@@ -87,55 +146,16 @@ export const InheritanceDepthRule: GovernanceRule = {
         // INSIDE string literals that the masked view blanks. Masking made GOV-MNT-002 stop firing
         // on its own fixture (caught by validate-governance check 5).
         const lines = ctx.lines;
+        const normalizedPath = ctx.filePath.replace(/\\/g, '/');
+        const isDomainOrBackend =
+            normalizedPath.includes('/domain') || normalizedPath.includes('/backend/');
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (!line.includes(KEYWORD_EXTENDS)) continue;
-            if (line.trim().startsWith('//') || line.trim().startsWith('#')) continue;
-
-            const m = line.match(EXTENDS_RE);
-            if (m) {
-                const className = m[1];
-                const superName = m[2];
-                // Heuristic: If superName is already a specific subclass (contains Sub/Derived
-                // or known multi-level pattern)
-                if (
-                    superName.includes('Sub') ||
-                    superName.includes('Derived') ||
-                    superName.includes('Child')
-                ) {
-                    violations.push({
-                        ruleId: 'GOV-MNT-001',
-                        message: `Class \`${className}\` extends \`${superName}\`, potentially exceeding max inheritance depth of 2.`,
-                        line: i + 1,
-                        column: line.indexOf(KEYWORD_EXTENDS) + 1,
-                        suggestion:
-                            'Refactor deep class hierarchy into single domain class + composition strategy pattern.',
-                        fixable: false,
-                    });
-                }
-            }
-
-            const mGd = line.match(GD_EXTENDS_RE);
-            if (mGd) {
-                const superName = mGd[1];
-                const p = ctx.filePath.replace(/\\/g, '/');
-                // If in backend/domain and extends a UI node type (ADV-DEC-001 in GDScript)
-                if (p.includes('/domain') || p.includes('/backend/')) {
-                    const UI_NODES = ['Control', 'Node2D', 'Node3D', 'CanvasItem', 'Control'];
-                    if (UI_NODES.includes(superName)) {
-                        violations.push({
-                            ruleId: 'GOV-MNT-001',
-                            message: `Domain model extends presentation node \`${superName}\`. Pure domain classes must extend RefCounted.`,
-                            line: i + 1,
-                            column: line.indexOf(KEYWORD_EXTENDS) + 1,
-                            suggestion:
-                                'Change base class to `RefCounted` and decouple presentation via EventBus.',
-                            fixable: false,
-                        });
-                    }
-                }
-            }
+            if (!EXTENDS_KEYWORD_RE.test(line)) continue;
+            const trimmed = line.trim();
+            if (trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
+            checkExtendsLine(line, i, isDomainOrBackend, violations);
         }
 
         return violations.length > 0 ? violations : null;

@@ -27,6 +27,50 @@ import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from 
  * GOV-TYP-001: Explicit Strong Typing & Type Inference (ADV-TYP-001 generalized).
  * Enforces explicit type annotations or static inference in typed languages.
  */
+const GD_WEAK_VAR_RE = /^\s*(?:@\w+\s+)?(?:static\s+)?var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=(?!=)/;
+const VARIANT_RHS_RE = /^\s*(null|\[\]|\{\}|Variant)/;
+const VARIANT_CALL_RE = /\.get\(|\bget\(.*Variant|Variant.*get\(/;
+const VARIANT_COLLECTION_ACCESS_RE = /^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[\[.]/;
+const NON_VARIANT_SINGLETONS_RE = /(?:GameConfig|DeterministicRNG|UniqueIdGenerator)\./;
+const ANY_KEYWORD_RE = /\bany\b/;
+const ESLINT_DISABLE_RE = /eslint-disable/;
+
+/**
+ * Evaluates a single line for GDScript weak variable assignment.
+ */
+function checkGdWeakVarLine(
+    line: string,
+    lineIndex: number,
+    violations: GovernanceViolation[],
+): void {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('#')) return;
+    const m = line.match(GD_WEAK_VAR_RE);
+    if (!m) return;
+
+    const rhs = line.slice((m.index ?? 0) + m[0].length).trim();
+    const isVariantAmbiguous =
+        VARIANT_RHS_RE.test(rhs) ||
+        rhs.startsWith('d.get(') ||
+        VARIANT_CALL_RE.test(rhs) ||
+        (VARIANT_COLLECTION_ACCESS_RE.test(rhs) && !NON_VARIANT_SINGLETONS_RE.test(rhs));
+    if (isVariantAmbiguous) return;
+
+    violations.push({
+        ruleId: 'GOV-TYP-001',
+        message: `Variable \`${m[1]}\` uses implicit loose assignment (\`var =\`). Use explicit declaration (\`: Type =\`) or static inference (\`:=\`).`,
+        line: lineIndex + 1,
+        column: (m.index ?? 0) + 1,
+        suggestion: `Change to \`var ${m[1]} := ...\` or provide an explicit type annotation.`,
+        fixable: true,
+        suggestedPatch: line.replace(/var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=/, 'var $1 :='),
+    });
+}
+
+/**
+ * GOV-TYP-001: Explicit Strong Typing & Type Inference (ADV-TYP-001 generalized).
+ * Enforces explicit type annotations or static inference in typed languages.
+ */
 export const ExplicitTypingRule: GovernanceRule = {
     id: 'GOV-TYP-001',
     name: 'Explicit Strong Typing and Static Inference',
@@ -44,45 +88,8 @@ export const ExplicitTypingRule: GovernanceRule = {
         const lang = ctx.capabilities.languageId;
 
         if (lang === 'gdscript') {
-            // In GDScript: property or var declarations without `: Type` or `:=`
-            // e.g. `var x = 10` or `var x` (property level)
-            // Improvement: Skip Variant-ambiguous RHS where `:=` would infer Variant and
-            // trigger check-gdscript error.
-            // Such cases require explicit `var x: Type =` instead of `:=`.
-            const GD_WEAK_VAR_RE =
-                /^\s*(?:@\w+\s+)?(?:static\s+)?var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=(?!=)/;
-            const VARIANT_RHS_RE = /^\s*(null|\[\]|\{\}|Variant)/;
             for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                if (line.trim().startsWith('#')) continue;
-                const m = line.match(GD_WEAK_VAR_RE);
-                if (m) {
-                    const rhs = line.slice((m.index ?? 0) + m[0].length).trim();
-                    // Skip Variant-ambiguous RHS: `d.get(`, `.get(`, `null`, `[]`, `{}`
-                    const isVariantAmbiguous =
-                        VARIANT_RHS_RE.test(rhs) ||
-                        rhs.startsWith('d.get(') ||
-                        rhs.includes('.get(') ||
-                        (rhs.includes('get(') && rhs.includes('Variant')) ||
-                        // Heuristic: `var x = some_dict[key]` or `var x = array[idx]` often Variant
-                        (/^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[\[.]/.test(rhs) &&
-                            !rhs.includes('GameConfig.') &&
-                            !rhs.includes('DeterministicRNG.') &&
-                            !rhs.includes('UniqueIdGenerator.'));
-                    if (isVariantAmbiguous) continue;
-                    violations.push({
-                        ruleId: 'GOV-TYP-001',
-                        message: `Variable \`${m[1]}\` uses implicit loose assignment (\`var =\`). Use explicit declaration (\`: Type =\`) or static inference (\`:=\`).`,
-                        line: i + 1,
-                        column: line.indexOf('var') + 1,
-                        suggestion: `Change to \`var ${m[1]} := ...\` or provide an explicit type annotation.`,
-                        fixable: true,
-                        suggestedPatch: line.replace(
-                            /var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=/,
-                            'var $1 :=',
-                        ),
-                    });
-                }
+                checkGdWeakVarLine(lines[i], i, violations);
             }
         }
 
@@ -97,6 +104,75 @@ const PY_RETURN_TYPE_RE = /\)\s*->\s*[^:]+:/;
 const ANY_RE = /:\s*\bany\b|\bas\s+any\b/;
 
 /**
+ * Computes the paren/bracket balance delta for a code segment.
+ */
+function computeParenDelta(codePart: string): number {
+    let delta = 0;
+    for (let c = 0; c < codePart.length; c++) {
+        const ch = codePart[c];
+        if (ch === '(' || ch === '[' || ch === '{') delta++;
+        else if (ch === ')' || ch === ']' || ch === '}') delta--;
+    }
+    return delta;
+}
+
+/**
+ * Extracts and parses a Python function signature across multiple lines.
+ */
+function parsePythonFunctionSignature(
+    lines: string[],
+    startIndex: number,
+): { sigText: string; matchedEnd: boolean; endLine: number } {
+    let sigText = '';
+    let depth = 0;
+    let matchedEnd = false;
+    let endLine = startIndex;
+
+    for (let j = startIndex; j < lines.length; j++) {
+        const l = lines[j];
+        const hashIdx = l.search(/#/);
+        const codePart = hashIdx >= 0 ? l.slice(0, hashIdx) : l;
+
+        depth += computeParenDelta(codePart);
+        sigText += ' ' + codePart.trim();
+        if (depth <= 0 && /:/.test(codePart)) {
+            matchedEnd = true;
+            endLine = j;
+            break;
+        }
+    }
+    return { sigText, matchedEnd, endLine };
+}
+
+/**
+ * Scans Python code lines for unannotated function return types.
+ */
+function checkPythonFunctionReturnTypes(lines: string[], violations: GovernanceViolation[]): void {
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim().startsWith('#')) continue;
+        const match = PY_FUNC_START_RE.exec(line);
+        if (!match) continue;
+
+        const funcName = match[1];
+        const { sigText, matchedEnd, endLine } = parsePythonFunctionSignature(lines, i);
+        if (!matchedEnd) continue;
+
+        i = endLine; // Jump cursor over multi-line parameter definitions
+        if (!PY_RETURN_TYPE_RE.test(sigText)) {
+            violations.push({
+                ruleId: 'GOV-TYP-002',
+                message: `Function \`${funcName}\` lacks explicit return type annotation (\`-> Type\`).`,
+                line: i + 1,
+                column: match.index != null ? match.index + 1 : 1,
+                suggestion: `Add explicit return type: \`def ${funcName}(...) -> None:\` or appropriate type.`,
+                fixable: false,
+            });
+        }
+    }
+}
+
+/**
  * GOV-TYP-002: Function Signature Completeness (ADV-TYP-002 generalized).
  * Enforces return type annotations on public/exported functions.
  */
@@ -107,7 +183,7 @@ export const FunctionSignatureCompletenessRule: GovernanceRule = {
     severity: 'warning',
     risk: 'medium',
     rationale:
-        'Unannotated function signatures compromise API boundaries and allow unintended type drift.',
+        'Missing return type annotations on functions degrade API contracts and compiler static analysis.',
     isFixable: false,
     languages: ['gdscript', 'python'],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
@@ -121,7 +197,6 @@ export const FunctionSignatureCompletenessRule: GovernanceRule = {
         const signatureLine = ctx.masked[startLine - 1];
 
         if (lang === 'gdscript') {
-            // In GDScript: `func name(...) -> Type:`
             const m = signatureLine.match(GD_FUNC_RE);
             if (m && !m[1].startsWith('_')) {
                 return [
@@ -129,7 +204,7 @@ export const FunctionSignatureCompletenessRule: GovernanceRule = {
                         ruleId: 'GOV-TYP-002',
                         message: `Function \`${m[1]}\` lacks explicit return type annotation (\`-> Type\`).`,
                         line: startLine,
-                        column: signatureLine.indexOf('func') + 1,
+                        column: m.index != null ? m.index + 1 : 1,
                         suggestion: `Add explicit return type: \`func ${m[1]}(...) -> void:\` or appropriate type.`,
                         fixable: false,
                     },
@@ -141,62 +216,11 @@ export const FunctionSignatureCompletenessRule: GovernanceRule = {
     },
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.capabilities.supportsStaticTyping) return null;
-        const lang = ctx.capabilities.languageId;
+        if (ctx.capabilities.languageId !== 'python') return null;
 
-        if (lang === 'python') {
-            const violations: GovernanceViolation[] = [];
-            const lines = ctx.masked;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                if (line.trim().startsWith('#')) continue;
-                const match = PY_FUNC_START_RE.exec(line);
-                if (!match) continue;
-
-                const funcName = match[1];
-                let sigText = '';
-                let depth = 0;
-                let matchedEnd = false;
-                let endLine = i;
-
-                for (let j = i; j < lines.length; j++) {
-                    const l = lines[j];
-                    const commentIdx = l.indexOf('#');
-                    const codePart = commentIdx >= 0 ? l.slice(0, commentIdx) : l;
-
-                    for (let c = 0; c < codePart.length; c++) {
-                        const ch = codePart[c];
-                        if (ch === '(' || ch === '[' || ch === '{') depth++;
-                        else if (ch === ')' || ch === ']' || ch === '}') depth--;
-                    }
-                    sigText += ' ' + codePart.trim();
-                    if (depth <= 0 && codePart.includes(':')) {
-                        matchedEnd = true;
-                        endLine = j;
-                        break;
-                    }
-                }
-
-                if (matchedEnd) {
-                    const hasReturnType = PY_RETURN_TYPE_RE.test(sigText);
-                    if (!hasReturnType) {
-                        violations.push({
-                            ruleId: 'GOV-TYP-002',
-                            message: `Function \`${funcName}\` lacks explicit return type annotation (\`-> Type\`).`,
-                            line: i + 1,
-                            column: line.indexOf('def') + 1,
-                            suggestion: `Add explicit return type: \`def ${funcName}(...) -> None:\` or appropriate type.`,
-                            fixable: false,
-                        });
-                    }
-                    i = endLine; // Jump cursor over multi-line parameter definitions
-                }
-            }
-
-            return violations.length > 0 ? violations : null;
-        }
-
-        return null;
+        const violations: GovernanceViolation[] = [];
+        checkPythonFunctionReturnTypes(ctx.masked, violations);
+        return violations.length > 0 ? violations : null;
     },
 };
 
@@ -221,10 +245,11 @@ export const UnsafeAnyRule: GovernanceRule = {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (!line.includes('any')) continue;
-            if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
+            if (!ANY_KEYWORD_RE.test(line)) continue;
+            const trimmed = line.trim();
+            if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
             // Exclude generic declarations or third-party wrappers
-            if (ANY_RE.test(line) && !line.includes('eslint-disable')) {
+            if (ANY_RE.test(line) && !ESLINT_DISABLE_RE.test(line)) {
                 violations.push({
                     ruleId: 'GOV-TYP-003',
                     message:

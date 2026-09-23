@@ -27,18 +27,39 @@ const LINE_COMMENT = '//';
 
 const LOOP_HEAD_RE = /^\s*(?:for|while)\s*[({:]/;
 const LINEAR_SEARCH_RE = /\b([a-zA-Z0-9_$]+)\.(find|indexOf|includes)\s*\(/;
-const EXPENSIVE_OPS = [
-    'GameConfig.get_',
-    'JSON.parse(',
-    'fs.readFileSync(',
-    'new RegExp(',
-    'readFileSync(',
-];
+const EXPENSIVE_OPS_RE =
+    /GameConfig\.get_|JSON\.parse\(|fs\.readFileSync\(|new RegExp\(|readFileSync\(/;
 const TIMER_CALL_RE = /set(?:Timeout|Interval)\s*\(/;
 const TIMER_LITERAL_RE = /,\s*(\d+)\s*[,)]/;
 const SYNC_FS_RE =
     /\b(?:readFileSync|writeFileSync|appendFileSync|copyFileSync|readdirSync|accessSync|existsSync|statSync|lstatSync|rmSync|rmdirSync|mkdirSync|openSync|closeSync|renameSync|unlinkSync)\s*\(/;
-const SYNC_CALL_PATTERN = 'Sync(';
+
+/**
+ * Checks if a line in a loop body executes an expensive loop-invariant operation.
+ */
+function checkExpensiveLoopOp(
+    line: string,
+    lineIndex: number,
+    violations: GovernanceViolation[],
+): void {
+    const match = line.match(EXPENSIVE_OPS_RE);
+    if (!match) return;
+    const op = match[0];
+    violations.push({
+        ruleId: 'GOV-PRF-001',
+        message: `Potentially loop-invariant expensive operation \`${op.replace(/[(_]/g, '')}\` executed inside loop body.`,
+        line: lineIndex + 1,
+        column: match.index != null ? match.index + 1 : 1,
+        suggestion:
+            'Hoist the configuration lookup or expensive resource creation before the loop.',
+        fixable: false,
+        evidence: {
+            confidence: 0.7,
+            requiresRuntime: true,
+            runtimeEvidenceReason: NEED_RUNTIME_EVIDENCE,
+        },
+    });
+}
 
 /**
  * GOV-PRF-001: In-Loop Invariant & Configuration Lookup (ADV-PRF-001 generalized).
@@ -80,25 +101,7 @@ export const LoopInvariantRule: GovernanceRule = {
             }
 
             if (inLoop) {
-                for (const op of EXPENSIVE_OPS) {
-                    if (line.includes(op)) {
-                        violations.push({
-                            ruleId: 'GOV-PRF-001',
-                            message: `Potentially loop-invariant expensive operation \`${op.replace(/[(_]/g, '')}\` executed inside loop body.`,
-                            line: i + 1,
-                            column: line.indexOf(op) + 1,
-                            suggestion:
-                                'Hoist the configuration lookup or expensive resource creation before the loop.',
-                            fixable: false,
-                            evidence: {
-                                confidence: 0.7,
-                                requiresRuntime: true,
-                                runtimeEvidenceReason: NEED_RUNTIME_EVIDENCE,
-                            },
-                        });
-                        break;
-                    }
-                }
+                checkExpensiveLoopOp(line, i, violations);
             }
         }
 
@@ -175,11 +178,9 @@ function collectLinearSearchViolations(lines: string[]): GovernanceViolation[] {
             loopIndent = indent;
             continue;
         }
-
-        if (inLoop) {
-            const hit = checkLinearSearchHit(line, i);
-            if (hit) violations.push(hit);
-        }
+        if (!inLoop) continue;
+        const hit = checkLinearSearchHit(line, i);
+        if (hit) violations.push(hit);
     }
     return violations;
 }
@@ -199,26 +200,26 @@ export const InLoopLinearSearchRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes('for') && !ctx.content.includes('while')) return null;
+
         const violations = collectLinearSearchViolations(ctx.masked);
         return violations.length > 0 ? violations : null;
     },
 };
 
 /**
- * GOV-PRF-003: Unclamped Timer Literal (generalized from workspace-timing's PERF-TIMER-LITERAL).
- * Flags setInterval/setTimeout whose delay is a numeric literal — bypasses centralized
- * clamping and historically caused ~1ms busy-loop CPU/IO hotspots when misconfigured.
+ * GOV-PRF-003: Non-Clamped Timer Literal.
+ * Flags non-zero numeric literals passed to setTimeout/setInterval.
  */
 export const TimerLiteralRule: GovernanceRule = {
     id: 'GOV-PRF-003',
-    name: 'Unclamped Timer Delay Literal',
+    name: 'Non-Clamped Timer Literal Delay',
     category: PERFORMANCE_CATEGORY,
-    severity: 'error',
-    risk: 'high',
-    rationale:
-        'Numeric timer delays bypass centralized clamping; a literal of <=0 triggers a ~1ms busy loop (CPU/IO hotspot).',
-    isFixable: false,
+    severity: 'warning',
+    risk: 'medium',
     languages: ['typescript', 'javascript'],
+    rationale:
+        'Hardcoded timer delays bypass centralized clamping and platform-specific background throttling.',
+    isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes(FN_SET_TIMEOUT) && !ctx.content.includes(FN_SET_INTERVAL)) {
             return null;
@@ -226,32 +227,33 @@ export const TimerLiteralRule: GovernanceRule = {
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
+
         for (let i = 0; i < lines.length; i++) {
             const hit = checkTimerLiteralHit(lines[i], i);
             if (hit) violations.push(hit);
         }
+
         return violations.length > 0 ? violations : null;
     },
 };
 
 /**
- * GOV-PRF-004: Synchronous FS in Extension-Host / Server Code (generalized from
- * workspace-timing's PERF-SYNC-FS). Blocking sync I/O stalls the host event loop.
+ * GOV-PRF-004: Synchronous File I/O in Host Event Loop.
+ * Flags sync fs calls in TypeScript/JavaScript outside test or allowlisted files.
  */
 export const SyncIoRule: GovernanceRule = {
     id: 'GOV-PRF-004',
-    name: 'Synchronous FS Blocking the Host Event Loop',
+    name: 'Synchronous File I/O Blocking Host Event Loop',
     category: PERFORMANCE_CATEGORY,
     severity: 'warning',
-    risk: 'medium',
-    rationale:
-        'Sync fs calls block the host event loop (UI jank in IDE extensions, request stalls on servers).',
-    isFixable: false,
+    risk: 'high',
     languages: ['typescript', 'javascript'],
+    rationale:
+        'Synchronous file I/O blocks the host JavaScript event loop, causing severe UI freezes or stalling concurrent request processing.',
+    isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (/\.(d\.ts)$/.test(ctx.filePath)) return null;
         if (/(^|\/)(tests?|__tests__)\//.test(ctx.filePath)) return null;
-        if (!ctx.content.includes(SYNC_CALL_PATTERN)) return null;
 
         // Shared policy key with the performance analyzer (PRF-IO-001): CLI entry points and
         // validation/benchmark harnesses are synchronous by design, so their sync fs calls are a
@@ -273,20 +275,17 @@ export const SyncIoRule: GovernanceRule = {
         const lines = ctx.masked;
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (!line.includes(SYNC_CALL_PATTERN)) continue;
+            if (!SYNC_FS_RE.test(line)) continue;
             if (line.trim().startsWith(LINE_COMMENT)) continue;
-            if (SYNC_FS_RE.test(line)) {
-                violations.push({
-                    ruleId: 'GOV-PRF-004',
-                    message:
-                        'Synchronous fs call blocks the host event loop (UI jank / request stall source).',
-                    line: i + 1,
-                    column: line.search(SYNC_FS_RE) + 1,
-                    suggestion:
-                        'Use fs/promises or the host async fs API (e.g. vscode.workspace.fs).',
-                    fixable: false,
-                });
-            }
+            violations.push({
+                ruleId: 'GOV-PRF-004',
+                message:
+                    'Synchronous fs call blocks the host event loop (UI jank / request stall source).',
+                line: i + 1,
+                column: line.search(SYNC_FS_RE) + 1,
+                suggestion: 'Use fs/promises or the host async fs API (e.g. vscode.workspace.fs).',
+                fixable: false,
+            });
         }
         return violations.length > 0 ? violations : null;
     },

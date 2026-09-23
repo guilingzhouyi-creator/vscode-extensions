@@ -60,6 +60,54 @@ function getDbgPatterns(identifiers: string[]): CachedDbgPattern[] {
  * GOV-DBG-001: Diagnostic & Debug Statements in Production Code.
  * Ensures debugging statements do not leak into production paths.
  */
+/**
+ * Checks a single masked line against active diagnostic patterns.
+ */
+function checkDebugLine(
+    line: string,
+    lineIndex: number,
+    patterns: ReturnType<typeof getDbgPatterns>,
+    violations: GovernanceViolation[],
+): void {
+    // Fast ASCII comment pre-check (zero string allocation)
+    let startIdx = 0;
+    while (
+        startIdx < line.length &&
+        (line.charCodeAt(startIdx) === CHAR_CODE_SPACE ||
+            line.charCodeAt(startIdx) === CHAR_CODE_TAB)
+    ) {
+        startIdx++;
+    }
+    if (startIdx >= line.length) return;
+    const c0 = line.charCodeAt(startIdx);
+    if (c0 === CHAR_CODE_HASH || c0 === CHAR_CODE_SLASH || c0 === CHAR_CODE_ASTERISK) {
+        return;
+    }
+
+    for (let pIdx = 0; pIdx < patterns.length; pIdx++) {
+        const pat = patterns[pIdx];
+        if (!pat.wordRe.test(line)) continue;
+
+        if (pat.callRe.test(line)) {
+            const m = line.match(pat.wordRe);
+            violations.push({
+                ruleId: 'GOV-DBG-001',
+                message: `Diagnostic call \`${pat.id}\` found in production file.`,
+                line: lineIndex + 1,
+                column: m && m.index != null ? m.index + 1 : line.search(pat.wordRe) + 1,
+                suggestion:
+                    'Remove debug statement or route through a configurable Logger interface.',
+                fixable: false,
+            });
+            break;
+        }
+    }
+}
+
+/**
+ * GOV-DBG-001: Diagnostic & Debug Statements in Production Code.
+ * Ensures debugging statements do not leak into production paths.
+ */
 export const DiagnosticLeakRule: GovernanceRule = {
     id: 'GOV-DBG-001',
     name: 'Diagnostic & Debug Statements in Production Paths',
@@ -91,42 +139,7 @@ export const DiagnosticLeakRule: GovernanceRule = {
         }
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (!patterns.some((p) => line.includes(p.id))) continue;
-
-            // Fast ASCII comment pre-check (zero string allocation)
-            let startIdx = 0;
-            while (
-                startIdx < line.length &&
-                (line.charCodeAt(startIdx) === CHAR_CODE_SPACE ||
-                    line.charCodeAt(startIdx) === CHAR_CODE_TAB)
-            ) {
-                startIdx++;
-            }
-            if (startIdx >= line.length) continue;
-            const c0 = line.charCodeAt(startIdx);
-            if (c0 === CHAR_CODE_HASH || c0 === CHAR_CODE_SLASH || c0 === CHAR_CODE_ASTERISK) {
-                continue;
-            }
-
-            for (let pIdx = 0; pIdx < patterns.length; pIdx++) {
-                const pat = patterns[pIdx];
-                if (!pat.wordRe.test(line)) continue;
-
-                if (pat.callRe.test(line)) {
-                    const m = line.match(pat.wordRe);
-                    violations.push({
-                        ruleId: 'GOV-DBG-001',
-                        message: `Diagnostic call \`${pat.id}\` found in production file.`,
-                        line: i + 1,
-                        column: m ? (m.index ?? 0) + 1 : line.indexOf(pat.id) + 1,
-                        suggestion:
-                            'Remove debug statement or route through a configurable Logger interface.',
-                        fixable: false,
-                    });
-                    break;
-                }
-            }
+            checkDebugLine(lines[i], i, patterns, violations);
         }
 
         return violations.length > 0 ? violations : null;

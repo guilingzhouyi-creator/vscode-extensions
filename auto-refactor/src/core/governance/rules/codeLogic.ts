@@ -30,6 +30,20 @@ const SCRATCH_NODE_STACK: NormalizedNode[] = [];
 const SCRATCH_DEPTH_STACK: number[] = [];
 
 /**
+ * Pushes non-function child nodes and their computed control-flow depths onto the stack.
+ */
+function pushChildrenToStack(children: NormalizedNode[], currentDepth: number): void {
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (child.functionLike) continue;
+        const nextDepth =
+            currentDepth + (child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0);
+        SCRATCH_NODE_STACK.push(child);
+        SCRATCH_DEPTH_STACK.push(nextDepth);
+    }
+}
+
+/**
  * Iteratively calculates maximum control-flow nesting depth within a function scope.
  * Uses an explicit flat stack to eliminate call-stack recursion overhead and heap allocations.
  */
@@ -43,32 +57,15 @@ function calculateMaxNesting(rootNode: NormalizedNode): number {
     nodeStack.length = 0;
     depthStack.length = 0;
 
-    for (let i = 0; i < rootChildren.length; i++) {
-        const child = rootChildren[i];
-        if (!child.functionLike) {
-            const nextDepth = child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0;
-            nodeStack.push(child);
-            depthStack.push(nextDepth);
-        }
-    }
+    pushChildrenToStack(rootChildren, 0);
 
     while (nodeStack.length > 0) {
         const currentNode = nodeStack.pop()!;
         const currentDepth = depthStack.pop()!;
         if (currentDepth > max) max = currentDepth;
 
-        const children = currentNode.children;
-        if (children) {
-            for (let i = 0; i < children.length; i++) {
-                const child = children[i];
-                // nested functions are measured in their own scope
-                if (child.functionLike) continue;
-                const nextDepth =
-                    currentDepth +
-                    (child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0);
-                nodeStack.push(child);
-                depthStack.push(nextDepth);
-            }
+        if (currentNode.children) {
+            pushChildrenToStack(currentNode.children, currentDepth);
         }
     }
 

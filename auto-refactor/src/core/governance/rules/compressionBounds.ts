@@ -80,13 +80,16 @@ const DECLARATION_PREFIX_RE =
  */
 function countChars(text: string, char: string): number {
     let count = 0;
-    let index = text.indexOf(char);
-    while (index !== -1) {
-        count += 1;
-        index = text.indexOf(char, index + 1);
+    const targetCode = char.charCodeAt(0);
+    for (let i = 0; i < text.length; i++) {
+        if (text.charCodeAt(i) === targetCode) {
+            count += 1;
+        }
     }
     return count;
 }
+
+const MULTI_TERNARY_RE = /\?[^:]+\?[^:]+:/;
 
 /**
  * CMP-EXP-001: Giant Unbounded Expression Rule.
@@ -115,7 +118,7 @@ export const GiantExpressionRule: GovernanceRule = {
             // Cheap gate ahead of the three allocation-heavy rewrites below. Without multiple `?`
             // or >= MAX_LOGICAL_OPERATORS boolean operators, the line cannot fire.
             const qCount = countChars(code, '?');
-            const hasPossibleTernary = qCount >= 2 && code.includes(':');
+            const hasPossibleTernary = qCount >= 2 && /:/.test(code);
             const logicalOpChars = countChars(code, '&') + countChars(code, '|');
             const hasPossibleLogical = logicalOpChars >= MAX_LOGICAL_OPERATORS;
             if (!hasPossibleTernary && !hasPossibleLogical) continue;
@@ -128,10 +131,10 @@ export const GiantExpressionRule: GovernanceRule = {
 
             const isNestedTernary =
                 ternaryMatches.length >= MAX_TERNARY_BRANCHES ||
-                (ternaryMatches.length >= 2 && /\?[^:]+\?[^:]+:/.test(clean));
-            const isLongLogicalChain = logicalMatches.length >= MAX_LOGICAL_OPERATORS;
+                (ternaryMatches.length >= 2 && MULTI_TERNARY_RE.test(clean));
+            const isUnboundedLogical = logicalMatches.length >= MAX_LOGICAL_OPERATORS;
 
-            if (isNestedTernary || isLongLogicalChain) {
+            if (isNestedTernary || isUnboundedLogical) {
                 violations.push({
                     ruleId: 'CMP-EXP-001',
                     message: isNestedTernary
@@ -139,8 +142,9 @@ export const GiantExpressionRule: GovernanceRule = {
                         : 'Unbounded boolean logical chain with excessive operators exceeds cognitive threshold.',
                     line: i + 1,
                     column: raw.search(/\S/) + 1,
-                    suggestion:
-                        'Split giant nested ternary or long logical chain into named intermediate variables or if-else statements.',
+                    suggestion: isNestedTernary
+                        ? '将嵌套三元表达式重构为具名纯函数、早返回卫语句或 lookup 表。'
+                        : '将复杂逻辑链提取为语义化布尔谓词常量或子函数。',
                     fixable: false,
                     evidence: {
                         confidence: 0.9,
@@ -154,13 +158,68 @@ export const GiantExpressionRule: GovernanceRule = {
     },
 };
 
+const SEMICOLON_RE = /;/;
+
+/**
+ * Checks a masked code line for multi-statement packing on a single line.
+ */
+function checkSingleLineStatement(
+    raw: string,
+    code: string,
+    lineIndex: number,
+    violations: GovernanceViolation[],
+): void {
+    if (!code) return;
+    // A `for` header carries two semicolons by design; the body is what the rule targets.
+    if (/^for\s*(?:await\s*)?\(/.test(code)) return;
+    if (DECLARATION_PREFIX_RE.test(code)) return;
+
+    const firstSemi = code.search(SEMICOLON_RE);
+    if (firstSemi === -1) return;
+    const hasMultiple =
+        firstSemi !== code.lastIndexOf(';') || code.slice(firstSemi + 1).trim().length > 0;
+    if (!hasMultiple) return;
+
+    // Strip inner type/object bodies like { a: string; b: number } before splitting.
+    const statementCode = code
+        .replace(/\{[^}]*\}/g, '{}')
+        .trim()
+        .replace(/;$/, '');
+    const semiParts = statementCode
+        .split(';')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+    if (semiParts.length < 2 || semiParts.every((p) => /^(case\s+|default:)/.test(p))) {
+        return;
+    }
+
+    const executableParts = semiParts.filter((p) =>
+        /\b(?:const|let|var|return|throw|if|while|await|yield)\b|[a-zA-Z0-9_$]+\s*\(/.test(p),
+    );
+    if (executableParts.length >= 2) {
+        violations.push({
+            ruleId: 'CMP-LIN-001',
+            message: 'Single line packs multiple executable statements or side effects.',
+            line: lineIndex + 1,
+            column: raw.search(/\S/) + 1,
+            suggestion: '将单行内的多个语句或副作用拆分为独立代码行，遵循单行单一语义原则。',
+            fixable: false,
+            evidence: {
+                confidence: 0.95,
+                requiresRuntime: false,
+            },
+        });
+    }
+}
+
 /**
  * CMP-LIN-001: Single-Line Multi-Semantic Statement Rule.
  * Rejects packing multiple executable statements or mutations onto a single line.
  */
 export const SingleLineMultiSemanticRule: GovernanceRule = {
     id: 'CMP-LIN-001',
-    name: 'Single-Line Multi-Semantic Packing',
+    name: 'Packed Line Multi-Statement Compression',
     category: MAINTAINABILITY_CATEGORY,
     severity: 'warning',
     risk: 'medium',
@@ -174,57 +233,68 @@ export const SingleLineMultiSemanticRule: GovernanceRule = {
         for (let i = 0; i < ctx.lines.length; i++) {
             const raw = ctx.lines[i];
             const code = (ctx.masked[i] ?? '').trim();
-            if (!code) continue;
-            // A `for` header carries two semicolons by design; the body is what the rule targets.
-            if (/^for\s*(?:await\s*)?\(/.test(code)) continue;
-            if (DECLARATION_PREFIX_RE.test(code)) continue;
-            // Two statement parts require at least one semicolon, so a line without one can
-            // never fire; skipping lines with <= 1 semicolon before brace-strip avoids
-            // allocations per line.
-            const firstSemi = code.indexOf(';');
-            if (firstSemi === -1) continue;
-            const hasMultiple =
-                firstSemi !== code.lastIndexOf(';') || code.slice(firstSemi + 1).trim().length > 0;
-            if (!hasMultiple) continue;
-
-            // Strip inner type/object bodies like { a: string; b: number } before splitting.
-            const statementCode = code
-                .replace(/\{[^}]*\}/g, '{}')
-                .trim()
-                .replace(/;$/, '');
-            const semiParts = statementCode
-                .split(';')
-                .map((s) => s.trim())
-                .filter(Boolean);
-
-            if (semiParts.length >= 2 && !semiParts.every((p) => /^(case\s+|default:)/.test(p))) {
-                const executableParts = semiParts.filter((p) =>
-                    /\b(?:const|let|var|return|throw|if|while|await|yield)\b|[a-zA-Z0-9_$]+\s*\(/.test(
-                        p,
-                    ),
-                );
-                if (executableParts.length >= 2) {
-                    violations.push({
-                        ruleId: 'CMP-LIN-001',
-                        message:
-                            'Single line packs multiple executable statements or side effects.',
-                        line: i + 1,
-                        column: raw.search(/\S/) + 1,
-                        suggestion:
-                            '将单行内的多个语句或副作用拆分为独立代码行，遵循单行单一语义原则。',
-                        fixable: false,
-                        evidence: {
-                            confidence: 0.95,
-                            requiresRuntime: false,
-                        },
-                    });
-                }
-            }
+            checkSingleLineStatement(raw, code, i, violations);
         }
 
         return violations.length > 0 ? violations : null;
     },
 };
+
+const CALLBACK_KEYWORD_RE = /=>|\bfunction\b/;
+
+/**
+ * Evaluates a masked code line for callback chain opening or closing.
+ */
+function evaluateCallbackLine(
+    raw: string,
+    code: string,
+    lineIndex: number,
+    currentDepth: number,
+    violations: GovernanceViolation[],
+): number {
+    let depth = currentDepth;
+    const mayOpenCallback = CALLBACK_KEYWORD_RE.test(code);
+    const isDeclaredFunction =
+        mayOpenCallback &&
+        /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s+[a-zA-Z0-9_$]+|(?:public|private|protected|static)\s+[a-zA-Z0-9_$]+\s*\()/.test(
+            code,
+        );
+    const opensCallback =
+        mayOpenCallback &&
+        !isDeclaredFunction &&
+        /(?:(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>\s*\{|\bfunction\s*(?:[a-zA-Z0-9_$]+)?\s*\([^)]*\)\s*\{)/.test(
+            code,
+        );
+
+    if (opensCallback) {
+        depth++;
+        if (depth >= MAX_CALLBACK_DEPTH) {
+            violations.push({
+                ruleId: 'CMP-CAL-001',
+                message: `Callback nesting depth (${depth}) exceeds lower maintainability bounds.`,
+                line: lineIndex + 1,
+                column: raw.search(/\S/) + 1,
+                suggestion:
+                    '降低回调嵌套深度：改用 async/await、Promise 链扁平化或抽取具名顶层函数。',
+                fixable: false,
+                evidence: {
+                    confidence: 0.85,
+                    requiresRuntime: false,
+                },
+            });
+        }
+    }
+
+    if (/[{}]/.test(code)) {
+        const closes = countChars(code, '}');
+        const opens = countChars(code, '{');
+        if (closes > opens && depth > 0) {
+            const diff = Math.min(depth, closes - opens);
+            depth -= diff;
+        }
+    }
+    return depth;
+}
 
 /**
  * CMP-CAL-001: Callback Chain Nesting Depth Rule.
@@ -246,55 +316,9 @@ export const CallbackDepthRule: GovernanceRule = {
 
         for (let i = 0; i < ctx.lines.length; i++) {
             const raw = ctx.lines[i];
-            // Braces are counted on the masked view: a `{` inside a string or comment must not
-            // shift the depth, which is what previously let the closing brace arrive early.
             const code = (ctx.masked[i] ?? '').trim();
             if (!code) continue;
-
-            // The brace accounting below must still run for EVERY line, so only these two regex
-            // tests are gated: a callback can only open on a line carrying `=>` or `function`.
-            const mayOpenCallback = code.includes('=>') || code.includes('function');
-            const isDeclaredFunction =
-                mayOpenCallback &&
-                /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s+[a-zA-Z0-9_$]+|(?:public|private|protected|static)\s+[a-zA-Z0-9_$]+\s*\()/.test(
-                    code,
-                );
-            const opensCallback =
-                mayOpenCallback &&
-                !isDeclaredFunction &&
-                /(?:(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>\s*\{|\bfunction\s*(?:[a-zA-Z0-9_$]+)?\s*\([^)]*\)\s*\{)/.test(
-                    code,
-                );
-
-            if (opensCallback) {
-                callbackDepth++;
-                if (callbackDepth >= MAX_CALLBACK_DEPTH) {
-                    violations.push({
-                        ruleId: 'CMP-CAL-001',
-                        message: `Callback nesting depth (${callbackDepth}) exceeds lower maintainability bounds.`,
-                        line: i + 1,
-                        column: raw.search(/\S/) + 1,
-                        suggestion:
-                            '降低回调嵌套深度：改用 async/await、Promise 链扁平化或抽取具名顶层函数。',
-                        fixable: false,
-                        // Nesting depth is a syntactic fact: no runtime observation can confirm or
-                        // refute it, so this finding must not claim runtime evidence.
-                        evidence: {
-                            confidence: 0.85,
-                            requiresRuntime: false,
-                        },
-                    });
-                }
-            }
-
-            if (code.includes('}') || code.includes('{')) {
-                const closes = countChars(code, '}');
-                const opens = countChars(code, '{');
-                if (closes > opens && callbackDepth > 0) {
-                    const diff = Math.min(callbackDepth, closes - opens);
-                    callbackDepth -= diff;
-                }
-            }
+            callbackDepth = evaluateCallbackLine(raw, code, i, callbackDepth, violations);
         }
 
         return violations.length > 0 ? violations : null;
