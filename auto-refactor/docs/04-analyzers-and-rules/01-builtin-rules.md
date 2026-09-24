@@ -106,6 +106,7 @@ $$\text{通用规范原则} \longrightarrow \text{语言能力适配层} \longri
 | `GOV-TYP-003` | `warning` | 类型位置出现危险裸 `any`，绕过编译器类型检查。 | 裸 any 换成 unknown 或具体联合；动态边界用受控断言并注释理由。 |
 | `GOV-TYP-004` | `warning` | 参数或赋值使用 `undefined as any` 或 `null as any` 强行逃逸类型检查。 | 将目标参数声明为可选联合类型或拆分专有接口，消除强制类型断言。 |
 | `GOV-TYP-005` | `warning` | 通过 `(expr as any).prop` 盲目读取未受检属性。 | 使用标准类型收窄谓词（如 ts.canHaveModifiers 或 isXxx）保护属性访问。 |
+| `GOV-TYP-006` | `warning` | 导出的公共函数、类方法缺少显式返回类型注解，导致跨包跨模块调用依赖隐式推断甚至引发类型破损。 | 为导出的公共函数、箭头函数与类方法补充显式返回类型注解。 |
 | `GOV-EXC-001` | `error` | 空 `catch` / 裸 `except:` 静默吞异常；catch 内带理由标记（best-effort / ignore / intentional / expected）视为已记录决策，不再上报。 | 处理/记录/显式重抛；确属 best-effort 时在 catch 内写明理由标记。 |
 | `GOV-EXC-002` | `warning` | 生产路径裸 `.unwrap()` / `expect` 在 Err 或 None 时导致不可恢复 panic。 | 避免裸 unwrap/expect，改为显式错误分支或 Result/Option 传播。 |
 | `GOV-EXC-003` | `error` | 伪处理 catch/except 块：使用 `void 0`、无用变量赋值等 dummy 语句静默吞噬异常，未记日志也无 rationale 标记。 | 处理/记录/显式重抛；确属 best-effort 时在注释写明理由标记。 |
@@ -168,6 +169,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | :--- | :--- | :--- | :--- |
 | `PRF-ALG-001` | `warning`/`error` | 发现 $\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。 | 将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。 |
 | `PRF-MEM-001` | `info` | 高频热路径瞬态堆对象分配 (循环体内 `new Array`, `new Object`, `.duplicate(true)` 等)。 | 将缓冲区/对象提升至循环外部复用，循环内仅清空重置。 |
+| `PRF-MEM-002` | `warning` | 跨语言循环热路径高危类实例化与深拷贝（违背 `ADV-PRF-002` 零瞬态堆分配契约）。 | 严禁循环内频繁分配；引入对象池并在借出/回收时通过 `reset_state()` 重置，或提升至循环外复用。 |
 | `PRF-IO-001` | `warning`/`error` | 事件循环同步阻塞风险：在 `async` 上下文或高频帧循环内调用同步阻塞 I/O (如 `readFileSync`, `time.sleep`)。`thresholds.blockingIoAllowPatterns` 声明的路径 glob（CLI/校验器/基准脚本等进程式工具）豁免；该键同时下发给治理规则 `GOV-PRF-004`，属单一策略源。 | 切换为异步非阻塞对应 API，避免锁死 Node.js 事件循环或游戏主线程。 |
 | `PRF-LEAK-001` | `warning` | 检测循环或定时器内的集合无界追加，防范 $O(t)$ 或 $O(n)$ 内存泄漏。 | 为集合设置容量上限/LRU淘汰/定期重置，或避免在循环与定时器内无界追加。 |
 
@@ -213,6 +215,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `HYG-SGL-001` | `warning` | Python：赋值/循环/with/参数出现单字母名。仅 `i`/`j`/`k`/`_` 放行。 | 使用描述性命名。 |
 | `HYG-EXC-001` | `warning` | Python：`except ... as <name>` 的变量名不是 `exc`。 | 统一命名为 `exc`，让错误处理读起来一致。 |
 | `HYG-WRAP-001` | `warning` | 空层转发与无意义包装函数：单一函数仅透传参数至内部目标函数而无任何参数转换、校验、日志或错误处理。 | 直接调用目标方法，或为包装层补充数据校验、状态转换与上下文日志。 |
+| `HYG-WRAP-002` | `info` | 冗余零参委托包装器：单一函数无参数且直接穿透委托至内部成员方法，缺乏数据校验、多态重载或上下文补充。 | 若无多态抽象必要直接暴露被委托方或内联调用；若确需封装，补充守卫逻辑、状态转换或日志。 |
 | `ERR-PRP-001` | `warning` | 错误码跨声明重复抛出（分类法冲突）或沿调用链向上传播过多跳数。 | 统一错误分类法，使用具名错误类型并在边界层显式捕获转换。 |
 
 > **未内化**：外层作用域遮蔽需要引擎暴露作用域图（当前 `visit` 只提供 className/binding 线程化上下文），与「需语句序列/作用域分析」的简化类规则同属待办。
@@ -484,6 +487,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `ARCH-UTL-001` | `warning` | 万能工具库反模式：检测到承担混杂异构逻辑的 utils/common 垃圾桶文件。 | 按四分流治理原则重构：纯算子进入算法库、常量进入常量库、规则进入策略库、通用转换进入基础层。 |
 | `ARCH-ABS-001` | `warning` | 过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。 | 消除负收益间接跳板与人为抽象，容许领域隔离的局部正当实现。 |
 | `ARCH-DEC-002` | `warning` | 分析器或领域模型直接耦合具体 AST 解析器库（如 `oxc-parser`、`@babel/parser`、`tree-sitter`、`ts-morph/dist`）。 | 将底层 AST 解析抽取至独立适配器，面向统一的 NormalizedNode 抽象接口交互。 |
+| `ARCH-TMP-001` | `warning` | 巨石视图/模板渲染器未解耦：单函数规模超标且包含深度 HTML/SVG/DSL 模板字符串拼接，缺少局部组件化。 | 拆解为领域正交的局部组件（Header/Card/Graph Partials），由结构化 ViewModel 驱动渲染。 |
 
 ---
 
