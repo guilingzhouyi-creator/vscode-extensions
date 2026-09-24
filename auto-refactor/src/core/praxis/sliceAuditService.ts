@@ -26,9 +26,12 @@ import type {
     SparseRoutingPlan,
 } from '../router/sliceTypes';
 import type { Issue } from '../types';
+import type { CompactAgentPrompt } from '../guidance/agentConstraintGenerator';
+import { formatCompactAgentPrompt } from '../guidance/agentConstraintGenerator';
 
 const NANOS_PER_MICRO = 1000n;
 const MICROS_PER_MILLI = 1000;
+const SCOPE_FULL_FILE = 'full';
 
 /**
  * Interface contract provided to Praxis team for fine-grained AST slice audit governance.
@@ -45,6 +48,18 @@ export interface IPraxisSliceAuditService {
         input: PraxisSliceAuditInput,
         callGraph?: CallGraph,
     ): Promise<PraxisSliceAuditVerdict>;
+
+    /**
+     * Audit an incremental AST slice and synthesize a Compact Agent Prompt Protocol (CAPP) verdict.
+     *
+     * @param input - Diff slice code and line boundaries.
+     * @param callGraph - Optional pre-warmed repository CallGraph.
+     * @returns CompactAgentPrompt for direct injection into agent context windows.
+     */
+    auditAgentSlice(
+        input: PraxisSliceAuditInput,
+        callGraph?: CallGraph,
+    ): Promise<CompactAgentPrompt>;
 
     /**
      * Trace the caller blast radius for a symbol without executing full review.
@@ -152,6 +167,20 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
             latencyMs,
             status,
         };
+    }
+
+    /**
+     * Audit incremental slice and format as CAPP prompt.
+     */
+    public async auditAgentSlice(
+        input: PraxisSliceAuditInput,
+        callGraph?: CallGraph,
+    ): Promise<CompactAgentPrompt> {
+        const verdict = await this.auditSlice(input, callGraph);
+        const linesDesc =
+            input.changedLines.length > 0 ? `L${input.changedLines.join(',')}` : SCOPE_FULL_FILE;
+        const target = `${input.filePath}#${linesDesc}`;
+        return formatCompactAgentPrompt(target, verdict.issues);
     }
 
     /**

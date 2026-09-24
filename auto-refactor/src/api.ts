@@ -870,3 +870,12 @@ export * from './core/router/sliceTypes';
 export * from './core/router/sliceExtractor';
 export * from './core/router/sparseMoEGate';
 export * from './core/intelligence/callChainImpactTracer';
+
+// ---- Compact Agent Prompt Protocol (CAPP) & Localized Slice Audit ----
+export {
+    CompactDirectiveSeverity,
+    CompactGuardDirective,
+    CompactAgentPrompt,
+    formatCompactGuardDirective,
+    formatCompactAgentPrompt,
+} from './core/guidance/agentConstraintGenerator';

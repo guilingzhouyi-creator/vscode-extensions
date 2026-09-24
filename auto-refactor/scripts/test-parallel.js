@@ -73,15 +73,13 @@ const PARALLEL_SUITES = [
   { name: 'validate-physical-naming', script: 'scripts/validate-physical-naming.js' },
   { name: 'validate-python-imports', script: 'scripts/validate-python-imports.js' },
   { name: 'validate-postscan-parity', script: 'scripts/validate-postscan-parity.js' },
+  { name: 'validate-capp-protocol', script: 'scripts/validate-capp-protocol.js' },
   { name: 'validate-literal-policy', script: 'scripts/validate-literal-policy.js' },
   {
     name: 'validate-literal-policy-declarative',
     script: 'scripts/validate-literal-policy-declarative.js',
   },
-  {
-    name: 'validate-self-slice-audit',
-    script: 'scripts/validate-self-slice-audit.js',
-  },
+  { name: 'validate-self-slice-audit', script: 'scripts/validate-self-slice-audit.js' },
   { name: 'validate-diff-interface', script: 'scripts/validate-diff-interface.js' },
   { name: 'validate-baseline-ratchet', script: 'scripts/validate-baseline-ratchet.js' },
   { name: 'validate-suppression-gate', script: 'scripts/validate-suppression-gate.js' },
@@ -106,34 +104,13 @@ const PARALLEL_SUITES = [
   { name: 'validate-performance-rules', script: 'scripts/validate-performance-rules.js' },
   { name: 'validate-data-architecture', script: 'scripts/validate-data-architecture.js' },
   { name: 'validate-test-modernity', script: 'scripts/validate-test-modernity.js' },
-  {
-    name: 'validate-meta-architecture',
-    script: 'scripts/validate-meta-architecture.js',
-  },
-  {
-    name: 'validate-quality-quantification',
-    script: 'scripts/validate-quality-quantification.js',
-  },
-  {
-    name: 'validate-rule-generalization',
-    script: 'scripts/validate-rule-generalization.js',
-  },
-  {
-    name: 'validate-multi-agent',
-    script: 'scripts/validate-multi-agent.js',
-  },
-  {
-    name: 'validate-slice-audit',
-    script: 'scripts/validate-slice-audit.js',
-  },
-  {
-    name: 'validate-trajectory-learning',
-    script: 'scripts/validate-trajectory-learning.js',
-  },
-  {
-    name: 'validate-e2e-stress',
-    script: 'scripts/validate-e2e-stress.js',
-  },
+  { name: 'validate-meta-architecture', script: 'scripts/validate-meta-architecture.js' },
+  { name: 'validate-quality-quantification', script: 'scripts/validate-quality-quantification.js' },
+  { name: 'validate-rule-generalization', script: 'scripts/validate-rule-generalization.js' },
+  { name: 'validate-multi-agent', script: 'scripts/validate-multi-agent.js' },
+  { name: 'validate-slice-audit', script: 'scripts/validate-slice-audit.js' },
+  { name: 'validate-trajectory-learning', script: 'scripts/validate-trajectory-learning.js' },
+  { name: 'validate-e2e-stress', script: 'scripts/validate-e2e-stress.js' },
   {
     name: 'validate-symbol-index-pack',
     composite: [
@@ -332,6 +309,14 @@ function recordResult(suite, res, passed, failed) {
   }
 }
 
+async function runSequentialSuites(suites, bail, passed, failed) {
+  for (const suite of suites) {
+    const res = await executeSuite(suite);
+    recordResult(suite, res, passed, failed);
+    if (!res.ok && bail) break;
+  }
+}
+
 // ── Main Runner ──
 async function main() {
   const overallStart = Date.now();
@@ -364,15 +349,12 @@ async function main() {
     });
   }
 
-  if (sequentialList.length > 0 && (!bail || failed.length === 0)) {
+  const canRunSequential = sequentialList.length > 0 && (!bail || failed.length === 0);
+  if (canRunSequential) {
     console.log(
       `\n--- [Serial Suites] Executing ${sequentialList.length} Stateful/Daemon Suites Sequentially ---`,
     );
-    for (const suite of sequentialList) {
-      const res = await executeSuite(suite);
-      recordResult(suite, res, passed, failed);
-      if (!res.ok && bail) break;
-    }
+    await runSequentialSuites(sequentialList, bail, passed, failed);
   }
 
   const totalTime = ((Date.now() - overallStart) / 1000).toFixed(2);
@@ -383,13 +365,12 @@ async function main() {
     console.log(`🎉 ALL ${total}/${total} TEST SUITES PASSED in ${totalTime}s!`);
     console.log(`================================================================\n`);
     process.exit(0);
-  } else {
-    console.log(
-      `❌ TEST RUN FAILED: ${passed.length} passed, ${failed.length} failed in ${totalTime}s`,
-    );
-    console.log(`================================================================\n`);
-    process.exit(1);
   }
+  console.log(
+    `❌ TEST RUN FAILED: ${passed.length} passed, ${failed.length} failed in ${totalTime}s`,
+  );
+  console.log(`================================================================\n`);
+  process.exit(1);
 }
 
 main().catch((err) => {
