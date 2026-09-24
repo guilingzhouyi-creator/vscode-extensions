@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-24T12:49:11.757Z",
+  "timestamp": "2026-09-24T14:49:17.438Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
@@ -991,13 +991,6 @@
       }
     },
     {
-      "key": "performance|PRF-MEM-001|scripts/validate-five-core-capabilities.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|scripts/validate-function-cohesion-skeleton.js",
       "count": 20,
       "severities": {
@@ -1058,13 +1051,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "performance|PRF-MEM-001|scripts/validate-generalized.js",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -1698,13 +1684,6 @@
       }
     },
     {
-      "key": "performance|PRF-MEM-001|scripts/validate-performance-rules.js",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
       "key": "constants|duplicate-literal|scripts/validate-performance-rules.js",
       "count": 2,
       "severities": {
@@ -1713,9 +1692,9 @@
     },
     {
       "key": "performance|PRF-ALG-001|scripts/validate-performance-rules.js",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -1744,13 +1723,6 @@
       "count": 7,
       "severities": {
         "warning": 7
-      }
-    },
-    {
-      "key": "hygiene|HYG-WRAP-001|scripts/validate-data-architecture.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -2122,13 +2094,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "performance|PRF-MEM-001|scripts/validate-rules-registry.js",
-      "count": 2,
-      "severities": {
-        "info": 2
       }
     },
     {
@@ -2545,13 +2510,6 @@
       }
     },
     {
-      "key": "performance|PRF-MEM-001|src/analyzers/docs.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/analyzers/docs.ts",
       "count": 1,
       "severities": {
@@ -2657,24 +2615,10 @@
       }
     },
     {
-      "key": "large-file|large-file|src/analyzers/performance.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/performance.ts",
-      "count": 17,
+      "count": 3,
       "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/analyzers/performance.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 3
       }
     },
     {
@@ -2812,9 +2756,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/api.ts",
-      "count": 90,
+      "count": 18,
       "severities": {
-        "warning": 90
+        "warning": 18
       }
     },
     {
@@ -2836,13 +2780,6 @@
       "count": 16,
       "severities": {
         "warning": 16
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/adapters.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -2868,9 +2805,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/analyzer.ts",
-      "count": 9,
+      "count": 2,
       "severities": {
-        "warning": 9
+        "warning": 2
       }
     },
     {
@@ -2920,13 +2857,6 @@
       "count": 5,
       "severities": {
         "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/architecture/index.ts",
-      "count": 11,
-      "severities": {
-        "warning": 11
       }
     },
     {
@@ -3057,9 +2987,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/ast/oxc-adapter.ts",
-      "count": 14,
+      "count": 13,
       "severities": {
-        "warning": 14
+        "warning": 13
       }
     },
     {
@@ -3232,9 +3162,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/ast/typescript-adapter.ts",
-      "count": 3,
+      "count": 1,
       "severities": {
-        "warning": 3
+        "warning": 1
       }
     },
     {
@@ -3350,27 +3280,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/config-cascades.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/config-tuning.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/config.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/config/config-cascades.ts",
       "count": 4,
       "severities": {
@@ -3400,9 +3309,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/config/config.ts",
-      "count": 41,
+      "count": 40,
       "severities": {
-        "warning": 41
+        "warning": 40
       }
     },
     {
@@ -3463,20 +3372,6 @@
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/dependency-graph.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/diff-types.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/diff.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -3561,16 +3456,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/diff/incremental.ts",
-      "count": 8,
+      "count": 4,
       "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/edit-diff.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 4
       }
     },
     {
@@ -3585,27 +3473,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/gdscript-adapter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/gitignore.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/governance/index.ts",
-      "count": 12,
-      "severities": {
-        "warning": 12
       }
     },
     {
@@ -3757,9 +3624,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/typeSystem.ts",
-      "count": 6,
+      "count": 3,
       "severities": {
-        "warning": 6
+        "warning": 3
       }
     },
     {
@@ -3795,27 +3662,6 @@
       "count": 4,
       "severities": {
         "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/histogram-diff.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/incremental-state.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/incremental.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -3960,9 +3806,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dataArchitecture.ts",
-      "count": 30,
+      "count": 29,
       "severities": {
-        "warning": 30
+        "warning": 29
       }
     },
     {
@@ -4009,9 +3855,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dataFlow.ts",
-      "count": 31,
+      "count": 30,
       "severities": {
-        "warning": 31
+        "warning": 30
       }
     },
     {
@@ -4037,9 +3883,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayout.ts",
-      "count": 20,
+      "count": 18,
       "severities": {
-        "warning": 20
+        "warning": 18
       }
     },
     {
@@ -4205,9 +4051,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/semantic-domain-detector.ts",
-      "count": 15,
+      "count": 13,
       "severities": {
-        "warning": 15
+        "warning": 13
       }
     },
     {
@@ -4240,9 +4086,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/semanticComplexity.ts",
-      "count": 22,
+      "count": 20,
       "severities": {
-        "warning": 22
+        "warning": 20
       }
     },
     {
@@ -4281,17 +4127,10 @@
       }
     },
     {
-      "key": "performance|PRF-ALG-001|src/core/intelligence/symbolIndex.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/intelligence/testModernity.ts",
-      "count": 10,
+      "count": 8,
       "severities": {
-        "warning": 10
+        "warning": 8
       }
     },
     {
@@ -4365,27 +4204,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/language-support.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/line-map.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/literal-policy-engine.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/load-analyzer.ts",
       "count": 1,
       "severities": {
@@ -4408,13 +4226,6 @@
     },
     {
       "key": "performance|PRF-IO-001|src/core/logger.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/markdown-adapter.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -4568,24 +4379,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/messages/governance.ts",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/messages/index.ts",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/messages/performance.ts",
-      "count": 7,
+      "count": 3,
       "severities": {
-        "warning": 7
+        "warning": 3
       }
     },
     {
@@ -4614,41 +4411,6 @@
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/multilang.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/oxc-adapter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/oxc-predicates.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/oxc-projector.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/oxc-types.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -4792,13 +4554,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/praxis/index.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/praxis/multiAgentGovernance.ts",
       "count": 8,
       "severities": {
@@ -4891,13 +4646,6 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/profiler/scaleTuner.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/python-adapter.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -5233,13 +4981,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/rules/evolution/index.ts",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/rules/evolution/patternNormalizer.ts",
       "count": 9,
       "severities": {
@@ -5303,17 +5044,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/rules/pyramid/index.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/rules/pyramid/layer1Evaluator.ts",
-      "count": 16,
+      "count": 14,
       "severities": {
-        "warning": 16
+        "warning": 14
       }
     },
     {
@@ -5366,17 +5100,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/rules/registry.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/rules/types.ts",
-      "count": 5,
+      "count": 4,
       "severities": {
-        "warning": 5
+        "warning": 4
       }
     },
     {
@@ -5384,13 +5111,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/rust-adapter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -5429,13 +5149,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/scanner/cache-scanner.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "complexity|high-complexity|src/core/scanner/cache-scanner.ts",
       "count": 1,
       "severities": {
@@ -5444,13 +5157,6 @@
     },
     {
       "key": "simplify|SIM-LONG-001|src/core/scanner/cache-scanner.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "performance|PRF-ALG-001|src/core/scanner/cache-scanner.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -5486,9 +5192,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scanner/diff-scanner.ts",
-      "count": 3,
+      "count": 2,
       "severities": {
-        "warning": 3
+        "warning": 2
       }
     },
     {
@@ -5507,13 +5213,6 @@
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/scanner/diff-scanner.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "performance|PRF-ALG-001|src/core/scanner/diff-scanner.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -5612,13 +5311,6 @@
     },
     {
       "key": "constants|magic-number|src/core/scoring/diffScore.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/dimensionDeductions.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -5758,13 +5450,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/scoring/index.ts",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/scoring/patchQuality.ts",
       "count": 10,
       "severities": {
@@ -5856,13 +5541,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/semantic/adapters/index.ts",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
       "key": "complexity|high-complexity|src/core/semantic/adapters/python-adapter.ts",
       "count": 1,
       "severities": {
@@ -5902,13 +5580,6 @@
       "count": 4,
       "severities": {
         "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/semantic/index.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
       }
     },
     {
@@ -5982,24 +5653,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/source-mask.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/stream.ts",
       "count": 8,
       "severities": {
         "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/swar.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -6059,13 +5716,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-WRAP-001|src/core/trajectory/changeTrajectory.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "complexity|CPX-SPACE-001|src/core/trajectory/duplicateWorkAuditor.ts",
       "count": 1,
       "severities": {
@@ -6084,13 +5734,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/trajectory/index.ts",
-      "count": 12,
-      "severities": {
-        "warning": 12
       }
     },
     {
@@ -6185,27 +5828,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/traverse.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/ts-predicates.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/ts-projector.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/types.ts",
       "count": 1,
       "severities": {
@@ -6214,23 +5836,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/types.ts",
-      "count": 42,
+      "count": 34,
       "severities": {
-        "warning": 42
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/typescript-adapter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/utf8.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 34
       }
     },
     {
@@ -6402,13 +6010,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-WRAP-001|src/daemon/server.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/index.ts",
       "count": 19,
       "severities": {
@@ -6427,13 +6028,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/utils/ast.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {

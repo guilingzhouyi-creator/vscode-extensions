@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790254264206",
-  "timestamp": "2026-09-24T12:51:04.205Z",
+  "snapshotId": "snapshot-v0.4.0-1790261410398",
+  "timestamp": "2026-09-24T14:50:10.398Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "041e21c5f211dd71c9a1e8265bf7c3b2e7bd58263fe237b1cc389815330f09e1",
+  "rulesDigest": "f5c7448e067c9adfb289babd42ed988a6a86b432d7923ac0f1b262e39e1feb30",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 192,
+    "ruleCount": 196,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -51,6 +51,7 @@
     "ARCH-ROL-001",
     "ARCH-ROL-002",
     "ARCH-SKL-001",
+    "ARCH-TMP-001",
     "ARCH-UTL-001",
     "clean-layer-violation",
     "CMP-CAL-001",
@@ -135,6 +136,7 @@
     "GOV-TYP-003",
     "GOV-TYP-004",
     "GOV-TYP-005",
+    "GOV-TYP-006",
     "high-algorithmic-complexity",
     "high-complexity",
     "high-entropy-token",
@@ -147,6 +149,7 @@
     "HYG-STB-001",
     "HYG-STB-002",
     "HYG-WRAP-001",
+    "HYG-WRAP-002",
     "import-cycle",
     "large-file",
     "loop-transient-allocation",
@@ -165,6 +168,7 @@
     "PRF-IO-001",
     "PRF-LEAK-001",
     "PRF-MEM-001",
+    "PRF-MEM-002",
     "PRF-POL-001",
     "PRF-POL-002",
     "PRF-POL-003",
