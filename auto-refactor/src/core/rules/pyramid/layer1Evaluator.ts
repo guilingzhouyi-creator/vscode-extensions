@@ -126,6 +126,13 @@ export class UniversalCleanArchitectureRule implements UniversalSemanticRule {
     }
 }
 
+const PREFIX_HYG_WRAP = 'HYG-WRAP-';
+const PREFIX_ARCH = 'ARCH-';
+const PREFIX_RES = 'RES-';
+const PREFIX_TS = 'TS-';
+const PREFIX_PY = 'PY-';
+const PREFIX_GOV_TYP = 'GOV-TYP-';
+
 /**
  * Classifies any rule identifier into its corresponding pyramid tier.
  *
@@ -139,20 +146,21 @@ export function classifyRuleLayer(ruleId: string): RuleLayer {
         ruleId === 'loop-transient-allocation' ||
         ruleId === 'high-algorithmic-complexity' ||
         ruleId === 'expensive-loop-operation' ||
-        ruleId === 'HYG-WRAP-001' ||
+        ruleId.startsWith(PREFIX_HYG_WRAP) ||
         ruleId === 'GOV-AGN-001' ||
         ruleId === 'GOV-SLC-001' ||
         ruleId === 'GOV-TRJ-001' ||
-        ruleId.startsWith('ARCH-') ||
-        ruleId.startsWith('RES-')
+        ruleId.startsWith(PREFIX_ARCH) ||
+        ruleId.startsWith(PREFIX_RES)
     ) {
         return RULE_LAYER_UNIVERSAL;
     }
     if (
         ruleId.includes('python') ||
         ruleId.includes('typescript') ||
-        ruleId.startsWith('TS-') ||
-        ruleId.startsWith('PY-') ||
+        ruleId.startsWith(PREFIX_TS) ||
+        ruleId.startsWith(PREFIX_PY) ||
+        ruleId.startsWith(PREFIX_GOV_TYP) ||
         ruleId === 'GOV-EXC-003'
     ) {
         return RULE_LAYER_FAMILY;

@@ -331,6 +331,7 @@ function isToleratedCallString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): bo
 const TOLERATED_STRING_PARENT_KINDS = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.ImportDeclaration,
     ts.SyntaxKind.ImportEqualsDeclaration,
+    ts.SyntaxKind.ExportDeclaration,
     ts.SyntaxKind.PropertyAccessExpression,
     ts.SyntaxKind.CaseClause,
 ]);

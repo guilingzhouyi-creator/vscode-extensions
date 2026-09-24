@@ -224,6 +224,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-wrap-001',
     }),
     defineRule({
+        id: 'HYG-WRAP-002',
+        family: RULE_FAMILY_HYGIENE,
+        analyzer: ANALYZER_HYGIENE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_INFO,
+        summary:
+            'Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction.',
+        remediation:
+            '若无多态或抽象解耦必要，直接暴露被委托方或内联调用；若确需封装，请补充守卫逻辑、状态转换或上下文日志。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-wrap-002',
+    }),
+    defineRule({
         id: 'ERR-PRP-001',
         family: RULE_FAMILY_ERROR,
         analyzer: ANALYZER_HYGIENE,
@@ -268,6 +281,18 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         remediation:
             '高频热路径瞬态堆对象分配 (循环体内 `new Array`, `new Object`, `.duplicate(true)` 等)。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-mem-001',
+    }),
+    defineRule({
+        id: 'PRF-MEM-002',
+        family: 'PRF',
+        analyzer: 'performance',
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '循环热路径严禁瞬态实例化与深复制，必须使用对象池或外部复用（ADV-PRF-002）。',
+        remediation:
+            '高承压热路径瞬态堆对象分配 (循环体内 `new Class()`, `.new()`, `.duplicate(true)` 等)。采用对象池模式并在借出/归还时调用 `reset_state()` 重置状态。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-mem-002',
     }),
     defineRule({
         id: 'PRF-LEAK-001',

@@ -15,67 +15,53 @@
  */
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { PerformanceMessages } from '../core/messages';
-import { globToRegExp, matchAny } from '../core/file-discovery';
 import { detectUnboundedGrowth } from '../core/intelligence/dataFlow';
 
-/** Default maximum loop nesting depth before PRF-ALG-001 is emitted. */
-const DEFAULT_MAX_LOOP_NESTING = 3;
+import {
+    LOOP_DEPTH_ERROR_THRESHOLD,
+    CHAR_CODE_SPACE,
+    CHAR_CODE_TAB,
+    type PerformanceOptions,
+    LOOP_KEYWORD_RE,
+    TRANSIENT_ALLOC_RE,
+    HIGH_RISK_OBJECT_ALLOC_RE,
+    type LoopScope,
+    type LineScanState,
+    extractNextLine,
+    handleComments,
+    createScanConfig,
+} from './performance-helpers';
 
-/** Loop nesting depth at or above which PRF-ALG-001 escalates to error severity. */
-const LOOP_DEPTH_ERROR_THRESHOLD = 4;
-
-/** ASCII code for a carriage return, used to trim CRLF line endings. */
-const CHAR_CODE_CR = 13;
-
-/** ASCII code for a space, counted as leading indentation whitespace. */
-const CHAR_CODE_SPACE = 32;
-
-/** ASCII code for a tab, counted as leading indentation whitespace. */
-const CHAR_CODE_TAB = 9;
-
-interface PerformanceOptions {
-    maxLoopNesting?: number;
-    checkBlockingIO?: boolean;
-    checkTransientAllocations?: boolean;
-    /** Opt-in check for unbounded memory growth leaks in loops and timers (PRF-LEAK-001). */
-    checkUnboundedGrowth?: boolean;
-    /**
-     * Path globs whose synchronous I/O is a documented policy (CLI entry points, validation and
-     * benchmark harnesses are synchronous by design). Shared with the governance rule GOV-PRF-004
-     * through the global `thresholds` layer, so one policy key silences both without muting the
-     * analyzers elsewhere.
-     */
-    blockingIoAllowPatterns?: string[];
-}
+const NAME_FS_READ = 'fs.readFileSync';
+const NAME_FS_WRITE = 'fs.writeFileSync';
+const NAME_FS_APPEND = 'fs.appendFileSync';
+const NAME_EXEC_SYNC = 'execSync';
+const NAME_CP_EXEC_SYNC = 'cp.execSync';
+const NAME_TIME_SLEEP = 'time.sleep';
+const NAME_OS_DELAY = 'OS.delay';
+const NAME_SUBPROCESS_RUN = 'subprocess.run';
+const NAME_OS_SYSTEM = 'os.system';
 
 const BLOCKING_IO_PATTERNS = [
-    { pattern: /\bfs\.readFileSync\s*\(/, name: 'fs.readFileSync' },
-    { pattern: /\bfs\.writeFileSync\s*\(/, name: 'fs.writeFileSync' },
-    { pattern: /\bfs\.appendFileSync\s*\(/, name: 'fs.appendFileSync' },
-    { pattern: /\bchild_process\.execSync\s*\(/, name: 'execSync' },
-    { pattern: /\bcp\.execSync\s*\(/, name: 'cp.execSync' },
-    { pattern: /\btime\.sleep\s*\(/, name: 'time.sleep' },
-    { pattern: /\bOS\.delay\s*\(/, name: 'OS.delay' },
-    { pattern: /\bsubprocess\.(?:run|check_output|call)\s*\(/, name: 'subprocess.run' },
-    { pattern: /\bos\.system\s*\(/, name: 'os.system' },
+    { pattern: /\bfs\.readFileSync\s*\(/, name: NAME_FS_READ },
+    { pattern: /\bfs\.writeFileSync\s*\(/, name: NAME_FS_WRITE },
+    { pattern: /\bfs\.appendFileSync\s*\(/, name: NAME_FS_APPEND },
+    { pattern: /\bchild_process\.execSync\s*\(/, name: NAME_EXEC_SYNC },
+    { pattern: /\bcp\.execSync\s*\(/, name: NAME_CP_EXEC_SYNC },
+    { pattern: /\btime\.sleep\s*\(/, name: NAME_TIME_SLEEP },
+    { pattern: /\bOS\.delay\s*\(/, name: NAME_OS_DELAY },
+    { pattern: /\bsubprocess\.(?:run|check_output|call)\s*\(/, name: NAME_SUBPROCESS_RUN },
+    { pattern: /\bos\.system\s*\(/, name: NAME_OS_SYSTEM },
 ];
 
-const LOOP_KEYWORD_RE =
-    /\b(?:for\s*\(|for\s+await\s*\(|while\s*\(|for\s+[A-Za-z0-9_$]+\s+in\s+|for\s+[A-Za-z0-9_$]+\s+of\s+|while\s+[^\n:]+:|for\s+[A-Za-z0-9_$]+\s*:=\s*range\b|for\s+[^{;]+\bin\b[^{;]*\{|loop\s*\{|for\s*\{)/;
+const SEVERITY_WARNING = 'warning' as const;
+const SEVERITY_INFO = 'info' as const;
+const SEVERITY_ERROR = 'error' as const;
 
-const TRANSIENT_ALLOC_RE =
-    /\b(?:new\s+(?:Array|Object|Map|Set|RegExp|Buffer)|Buffer\.alloc|\[\s*\]|\{\s*\}|Vec::new|HashMap::new|vec!|Array\(\)|Dictionary\(\)|list\(\)|dict\(\)|\.new\(|\.duplicate\()\b/;
-
-interface LoopScope {
-    depth: number;
-    indent: number;
-    usesBrace: boolean;
-}
-
-interface LineScanState {
-    inAsyncFunction: boolean;
-    inBlockComment: boolean;
-}
+const RULE_PRF_ALG_001 = 'PRF-ALG-001';
+const RULE_PRF_MEM_001 = 'PRF-MEM-001';
+const RULE_PRF_MEM_002 = 'PRF-MEM-002';
+const RULE_PRF_IO_001 = 'PRF-IO-001';
 
 /**
  * Detect performance hazards in one source file with a single line-oriented pass: nested loops
@@ -107,29 +93,12 @@ export class PerformanceAnalyzer implements Analyzer {
     analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         void sf;
         const opts = (ctx.options || {}) as PerformanceOptions;
-        const maxNesting = opts.maxLoopNesting ?? DEFAULT_MAX_LOOP_NESTING;
-        const checkIO = opts.checkBlockingIO !== false;
-        const checkAlloc = opts.checkTransientAllocations !== false;
-
         const issues: Issue[] = [];
         const content = ctx.content || '';
         const len = content.length;
         const file = ctx.filePath.replace(/\\/g, '/');
 
-        const syncIoAllowPatterns = (opts.blockingIoAllowPatterns ?? []).map((g) =>
-            globToRegExp(g),
-        );
-        const syncIoAllowlisted =
-            syncIoAllowPatterns.length > 0 && matchAny(syncIoAllowPatterns, file);
-        const isIndentBased = file.endsWith('.py') || file.endsWith('.gd');
-
-        const scanConfig = {
-            maxNesting,
-            checkAlloc,
-            checkIO,
-            syncIoAllowlisted,
-            isIndentBased,
-        };
+        const scanConfig = createScanConfig(opts, file);
 
         let lineStart = 0;
         let lineIdx = 0;
@@ -137,10 +106,10 @@ export class PerformanceAnalyzer implements Analyzer {
         const loopStack: LoopScope[] = [];
 
         while (lineStart < len) {
-            const nextLine = this.extractNextLine(content, len, lineStart);
+            const nextLine = extractNextLine(content, len, lineStart);
             lineStart = nextLine.nextStart;
 
-            if (this.handleComments(nextLine.trimmed, isIndentBased, scanState)) {
+            if (handleComments(nextLine.trimmed, scanConfig.isIndentBased, scanState)) {
                 lineIdx++;
                 continue;
             }
@@ -166,6 +135,7 @@ export class PerformanceAnalyzer implements Analyzer {
             checkAlloc: boolean;
             checkIO: boolean;
             syncIoAllowlisted: boolean;
+            allocAllowlisted: boolean;
             isIndentBased: boolean;
         },
         scanState: LineScanState,
@@ -187,7 +157,7 @@ export class PerformanceAnalyzer implements Analyzer {
             issues,
         );
 
-        if (loopStack.length > 0 && scanConfig.checkAlloc) {
+        if (loopStack.length > 0 && scanConfig.checkAlloc && !scanConfig.allocAllowlisted) {
             this.checkTransientAllocation(nextLine.trimmed, lineIdx, ctx, loopStack.length, issues);
         }
 
@@ -204,48 +174,14 @@ export class PerformanceAnalyzer implements Analyzer {
 
         if (!scanConfig.isIndentBased) {
             this.updateBraceLoops(nextLine.trimmed, loopStack);
-        }
-    }
-
-    private extractNextLine(
-        content: string,
-        len: number,
-        lineStart: number,
-    ): { lineText: string; trimmed: string; nextStart: number } {
-        let lineEnd = content.indexOf('\n', lineStart);
-        let nextStart: number;
-        if (lineEnd === -1) {
-            lineEnd = len;
-            nextStart = len;
-        } else {
-            nextStart = lineEnd + 1;
-            if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
-                lineEnd--;
+            if (
+                loopStack.length > 0 &&
+                !loopStack[loopStack.length - 1].usesBrace &&
+                nextLine.trimmed.endsWith(';')
+            ) {
+                loopStack.pop();
             }
         }
-        const lineText = content.slice(lineStart, lineEnd);
-        return { lineText, trimmed: lineText.trim(), nextStart };
-    }
-
-    private handleComments(trimmed: string, isIndentBased: boolean, state: LineScanState): boolean {
-        if (state.inBlockComment) {
-            if (trimmed.includes('*/') || trimmed.includes('"""')) {
-                state.inBlockComment = false;
-            }
-            return true;
-        }
-        const isBlockStart =
-            trimmed.startsWith('/*') || (isIndentBased && trimmed.startsWith('"""'));
-        if (isBlockStart) {
-            if (!trimmed.endsWith('*/') && !trimmed.endsWith('"""')) {
-                state.inBlockComment = true;
-            }
-            return true;
-        }
-        if (trimmed.startsWith('*')) {
-            return true;
-        }
-        return trimmed === '' || trimmed.startsWith('//') || trimmed.startsWith('#');
     }
 
     private calculateIndent(lineText: string): number {
@@ -304,9 +240,9 @@ export class PerformanceAnalyzer implements Analyzer {
                 this.mkIssue(
                     ctx,
                     lineIdx,
-                    'PRF-ALG-001',
+                    RULE_PRF_ALG_001,
                     desc.message,
-                    currentDepth >= LOOP_DEPTH_ERROR_THRESHOLD ? 'error' : 'warning',
+                    currentDepth >= LOOP_DEPTH_ERROR_THRESHOLD ? SEVERITY_ERROR : SEVERITY_WARNING,
                     { loopDepth: currentDepth, threshold: maxNesting },
                     desc.suggestion,
                 ),
@@ -321,19 +257,39 @@ export class PerformanceAnalyzer implements Analyzer {
         loopDepth: number,
         issues: Issue[],
     ): void {
-        if (!TRANSIENT_ALLOC_RE.test(trimmed)) return;
-        const desc = PerformanceMessages.TRANSIENT_LOOP_ALLOCATION(loopDepth);
-        issues.push(
-            this.mkIssue(
-                ctx,
-                lineIdx,
-                'PRF-MEM-001',
-                desc.message,
-                'info',
-                { loopDepth },
-                desc.suggestion,
-            ),
-        );
+        if (/^\s*throw\b|\bthrow\s+new\b/.test(trimmed)) return;
+        const isHighRisk = HIGH_RISK_OBJECT_ALLOC_RE.test(trimmed);
+        const isGeneralAlloc = TRANSIENT_ALLOC_RE.test(trimmed);
+        if (!isHighRisk && !isGeneralAlloc) return;
+
+        if (isHighRisk) {
+            const poolDesc = PerformanceMessages.HIGH_PRESSURE_OBJECT_ALLOCATION(loopDepth);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    RULE_PRF_MEM_002,
+                    poolDesc.message,
+                    SEVERITY_WARNING,
+                    { loopDepth },
+                    poolDesc.suggestion,
+                ),
+            );
+        }
+        if (isGeneralAlloc) {
+            const desc = PerformanceMessages.TRANSIENT_LOOP_ALLOCATION(loopDepth);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    RULE_PRF_MEM_001,
+                    desc.message,
+                    SEVERITY_INFO,
+                    { loopDepth },
+                    desc.suggestion,
+                ),
+            );
+        }
     }
 
     private checkBlockingIo(
@@ -354,9 +310,9 @@ export class PerformanceAnalyzer implements Analyzer {
                 this.mkIssue(
                     ctx,
                     lineIdx,
-                    'PRF-IO-001',
+                    RULE_PRF_IO_001,
                     desc.message,
-                    isCriticalContext ? 'error' : 'warning',
+                    isCriticalContext ? SEVERITY_ERROR : SEVERITY_WARNING,
                     { api: io.name, inAsync: inAsyncFunction },
                     desc.suggestion,
                 ),

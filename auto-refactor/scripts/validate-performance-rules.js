@@ -19,6 +19,7 @@ const {
   PerformanceRuleEvaluator,
   defaultPraxisGovernanceService,
 } = require('../dist/api');
+const { PerformanceAnalyzer } = require('../dist/analyzers/performance');
 
 async function main() {
   console.log('=== [Performance Rules] Testing Deep Algorithmic & Performance Auditing ===\n');
@@ -222,6 +223,59 @@ export class CleanService {
   );
   assert.strictEqual(cleanResult.verdict.status, 'passed', 'Clean diff verdict must be passed');
   console.log('✔ Clean diff passed without issues.');
+
+  // 7. Test Cross-Language PRF-MEM-002 Object Pooling Contract Violation (ADV-PRF-002)
+  const perfAnalyzer = new PerformanceAnalyzer();
+
+  const tsPoolViolationCode = `
+export function spawnEnemies(waves: number[]): void {
+    for (let i = 0; i < waves.length; i++) {
+        const enemy = new EnemyInstance();
+        enemy.init(i);
+    }
+}
+`;
+  const tsCtx = {
+    filePath: 'src/spawner.ts',
+    content: tsPoolViolationCode,
+    options: { checkTransientAllocations: true },
+    config: {},
+  };
+  const tsPoolIssues = perfAnalyzer.analyze(null, tsCtx);
+  const tsMem002 = tsPoolIssues.filter((i) => i.rule === 'PRF-MEM-002');
+  assert.ok(tsMem002.length >= 1, 'Must detect PRF-MEM-002 for TS loop new Class() allocation');
+  assert.strictEqual(tsMem002[0].severity, 'warning', 'PRF-MEM-002 must be warning severity');
+  assert.ok(
+    tsMem002[0].message.includes('ADV-PRF-002'),
+    'PRF-MEM-002 message must cite ADV-PRF-002',
+  );
+  assert.ok(
+    tsMem002[0].suggestion && tsMem002[0].suggestion.includes('reset_state'),
+    'PRF-MEM-002 suggestion must suggest reset_state lifecycle hook',
+  );
+
+  const gdPoolViolationCode = `func spawn_bullets():\n\tfor i in range(100):\n\t\tvar bullet = BulletNode.new()\n\t\tvar copy = bullet.duplicate(true)\n`;
+  const gdCtx = {
+    filePath: 'scripts/bullet_spawner.gd',
+    content: gdPoolViolationCode,
+    options: { checkTransientAllocations: true },
+    config: {},
+  };
+  const gdPoolIssues = perfAnalyzer.analyze(null, gdCtx);
+  const gdMem002 = gdPoolIssues.filter((i) => i.rule === 'PRF-MEM-002');
+  assert.ok(
+    gdMem002.length >= 2,
+    'Must detect PRF-MEM-002 for GDScript .new() and .duplicate(true)',
+  );
+  assert.ok(
+    gdMem002.every((i) => i.severity === 'warning'),
+    'GDScript PRF-MEM-002 must be warning severity',
+  );
+  assert.ok(
+    gdMem002.some((i) => i.suggestion && i.suggestion.includes('object pool')),
+    'GDScript PRF-MEM-002 must recommend object pool',
+  );
+  console.log('✔ Cross-language PRF-MEM-002 (ADV-PRF-002) object pooling contracts verified.');
 
   console.log('\n=== All Performance Rules Performance & Algorithmic Auditing Tests PASSED ===');
 }

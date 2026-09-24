@@ -11,11 +11,17 @@
  */
 
 import type { AnalyzerContext, Issue } from '../../types';
-import { SEVERITY_WARNING } from '../../types';
+import { SEVERITY_INFO, SEVERITY_WARNING } from '../../types';
 import { isTransparentForwarding, normalizeParameterNames } from './patternNormalizer';
 
-/** Rule ID emitted by this checker. */
+/** Rule ID emitted for 1:1 parameter forwarding wrappers. */
 export const HYG_WRAP_RULE_ID = 'HYG-WRAP-001';
+
+/** Rule ID emitted for redundant zero-argument delegation wrappers. */
+export const HYG_WRAP_REDUNDANT_RULE_ID = 'HYG-WRAP-002';
+
+const HYGIENE_ANALYZER_NAME = 'hygiene';
+const INIT_METHOD_PREFIX = '_init';
 
 /** Maximum line count for a function to be considered a candidate trivial wrapper. */
 const MAX_WRAPPER_LINE_COUNT = 4;
@@ -84,7 +90,7 @@ function inspectBodyForForwarding(
     // Match patterns strictly requiring the entire body to be only the return/call:
     // `return this.target(a, b);` or `return target(a, b);` or `target(a, b)` (Rust)
     const callMatch = joinedBody.match(
-        /^(?:return\s+)?(?:this\.|self\.)?([a-zA-Z0-9_$]+(?:\.[a-zA-Z0-9_$]+)?)\s*\(([^)]*)\)\s*;?$/,
+        /^(?:return\s+)?(?:this\.|self\.)?([a-zA-Z0-9_$]+(?:\.[a-zA-Z0-9_$]+)*)\s*\(([^)]*)\)\s*;?$/,
     );
 
     if (!callMatch) {
@@ -92,6 +98,10 @@ function inspectBodyForForwarding(
     }
 
     const target = callMatch[1];
+    if (target.startsWith('super.') || target === 'super') {
+        return null;
+    }
+
     const callArgs = callMatch[2];
 
     if (isTransparentForwarding(params, callArgs)) {
@@ -101,7 +111,8 @@ function inspectBodyForForwarding(
     return null;
 }
 
-const FN_HEAD_PY_RE = /(?:async\s+)?def\s+([a-zA-Z0-9_$]+)\s*\(([^)]*)\)\s*:/;
+const FN_HEAD_PY_RE =
+    /(?:async\s+)?(?:def|func)\s+([a-zA-Z0-9_$]+)\s*\(([^)]*)\)\s*(?:->\s*[^:]+)?\s*:/;
 const FN_HEAD_BRACED_RE =
     /(?:async\s+)?(?:def|fn|func|function)\s+([a-zA-Z0-9_$]+)\s*\(([^)]*)\)|(?:public|private|protected)?\s*([a-zA-Z0-9_$]+)\s*\(([^)]*)\)\s*(?::\s*[^{]+)?\{/;
 
@@ -127,7 +138,7 @@ function extractFunctionHead(
     if (
         !fnName ||
         fnName === 'constructor' ||
-        fnName.startsWith('_init') ||
+        fnName.startsWith(INIT_METHOD_PREFIX) ||
         RESERVED_CONTROL_KEYWORDS.has(fnName)
     ) {
         return null;
@@ -211,14 +222,22 @@ function checkFunctionAtLine(
     if (!forwardInfo || forwardInfo.target === head.fnName) return null;
 
     const lineNum = idx + 1;
+    const isRedundantZeroArg = params.length === 0;
+    const ruleId = isRedundantZeroArg ? HYG_WRAP_REDUNDANT_RULE_ID : HYG_WRAP_RULE_ID;
+    const severity = isRedundantZeroArg ? SEVERITY_INFO : SEVERITY_WARNING;
+    const message = isRedundantZeroArg
+        ? `Method \`${head.fnName}\` is a redundant delegation wrapper forwarding directly to \`${forwardInfo.target}\`.`
+        : `Function \`${head.fnName}\` is a vacuous passthrough wrapper directly forwarding arguments to \`${forwardInfo.target}\`.`;
+    const suggestion = isRedundantZeroArg
+        ? 'Directly invoke or expose the underlying target if polymorphism is not required, or add necessary validation, transformation, or context logging.'
+        : 'Directly invoke the underlying target or introduce necessary validation, transformation, or context logging to the wrapper.';
+
     return {
-        id: `hygiene:${HYG_WRAP_RULE_ID}:${file}:${lineNum}`,
-        analyzer: 'hygiene',
-        rule: HYG_WRAP_RULE_ID,
-        severity: SEVERITY_WARNING,
-        message:
-            `Function \`${head.fnName}\` is a vacuous passthrough wrapper directly ` +
-            `forwarding arguments to \`${forwardInfo.target}\`.`,
+        id: `hygiene:${ruleId}:${file}:${lineNum}`,
+        analyzer: HYGIENE_ANALYZER_NAME,
+        rule: ruleId,
+        severity,
+        message,
         location: {
             file,
             start: { line: lineNum, column: lines[idx].indexOf(head.fnName) + 1 },
@@ -228,9 +247,7 @@ function checkFunctionAtLine(
             },
         },
         detail: { fnName: head.fnName, target: forwardInfo.target, paramCount: params.length },
-        suggestion:
-            'Directly invoke the underlying target or introduce necessary validation, ' +
-            'transformation, or context logging to the wrapper.',
+        suggestion,
     };
 }
 

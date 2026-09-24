@@ -22,6 +22,7 @@ import { inferDirectorySemantic } from '../core/profiler/projectProfiler';
 import { ArchitectureMessages } from '../core/messages/architecture';
 import { FORBIDDEN_HEADLESS_IMPORTS } from '../core/intelligence/semanticArchitecture';
 import { auditDispatchComplexity } from '../core/rules/evolution/dispatchComplexityRule';
+import { auditTemplateComplexity } from '../core/rules/evolution/template-complexity-rule';
 import { auditConfigDrivenArchitecture } from '../core/architecture/config-driven-architecture';
 import {
     extractSpecifiers,
@@ -51,6 +52,7 @@ interface ArchitectureOptions {
     flagConfigLeakage?: boolean;
     protectedConfigKeywords?: string[];
     flagDispatchComplexity?: boolean;
+    flagTemplateComplexity?: boolean;
 }
 
 const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = (
@@ -87,6 +89,22 @@ function shouldFlagConfigLeakage(opts: ArchitectureOptions, ctx: AnalyzerContext
     }
     const thresholds = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
     return Boolean(thresholds?.flagConfigLeakage);
+}
+
+function auditEvolutionaryArchitectureRules(
+    content: string,
+    file: string,
+    ctx: AnalyzerContext,
+    opts: ArchitectureOptions,
+): Issue[] {
+    const issues: Issue[] = [];
+    if (opts.flagDispatchComplexity !== false) {
+        issues.push(...auditDispatchComplexity(content, file, ctx));
+    }
+    if (opts.flagTemplateComplexity !== false) {
+        issues.push(...auditTemplateComplexity(content, file, ctx));
+    }
+    return issues;
 }
 
 function matchUserLayer(
@@ -152,6 +170,8 @@ export class ArchitectureAnalyzer implements Analyzer {
         }
 
         const issues: Issue[] = [];
+        issues.push(...auditEvolutionaryArchitectureRules(ctx.content || '', file, ctx, opts));
+
         const forbiddenList = opts.forbiddenDomainImports || DEFAULT_FORBIDDEN_DOMAIN_IMPORTS;
         const forbiddenModules = new Set(forbiddenList);
 
@@ -164,10 +184,6 @@ export class ArchitectureAnalyzer implements Analyzer {
             forbiddenModules,
             issues,
         );
-
-        if (opts.flagDispatchComplexity !== false) {
-            issues.push(...auditDispatchComplexity(ctx.content || '', file, ctx));
-        }
 
         if (shouldFlagConfigLeakage(opts, ctx)) {
             const cfgResult = auditConfigDrivenArchitecture([

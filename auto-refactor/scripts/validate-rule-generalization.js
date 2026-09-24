@@ -23,11 +23,14 @@ const {
   RuleGeneralizationPipeline,
   auditVacuousWrappers,
   HYG_WRAP_RULE_ID,
+  HYG_WRAP_REDUNDANT_RULE_ID,
   checkJsTsSilentExceptions,
   checkPythonSilentExceptions,
   GOV_EXC_SILENT_RULE_ID,
   auditDispatchComplexity,
   ARCH_DISP_RULE_ID,
+  auditTemplateComplexity,
+  ARCH_TMP_RULE_ID,
   normalizeParameterNames,
   isTransparentForwarding,
   isPseudoCatchStatement,
@@ -224,6 +227,74 @@ fn dispatch(id: u64, code: u32) -> Result {
   console.log('  [PASS] HYG-WRAP-001 verified on TypeScript, Python, Rust');
 }
 
+function testHygWrapRedundantDelegation() {
+  console.log('── Step 3b: HYG-WRAP-002 Redundant Forwarding Wrapper Verification ──');
+
+  const fakeCtx = (content, filePath) => ({ content, filePath, options: {} });
+
+  const tsBad = `
+class ServiceWorker {
+    show(): void {
+        this.refresh();
+    }
+    process(): void {
+        this._inner.process();
+    }
+}
+`;
+  const tsIssues = auditVacuousWrappers(tsBad, 'src/service.ts', fakeCtx(tsBad, 'src/service.ts'));
+  assert.strictEqual(tsIssues.length, 2, 'TS redundant zero-arg delegation must be detected');
+  assert.strictEqual(tsIssues[0].rule, HYG_WRAP_REDUNDANT_RULE_ID);
+  assert.strictEqual(tsIssues[0].severity, 'info');
+  assert.strictEqual(tsIssues[1].rule, HYG_WRAP_REDUNDANT_RULE_ID);
+
+  const tsGood = `
+class SafeWorker {
+    show(): void {
+        if (!this.active) return;
+        this.refresh();
+    }
+    transform(val: number): number {
+        return this.calculator.compute(val * 2);
+    }
+    /** @override */
+    render(): void {
+        this.baseRender();
+    }
+}
+`;
+  const tsGoodIssues = auditVacuousWrappers(
+    tsGood,
+    'src/service.ts',
+    fakeCtx(tsGood, 'src/service.ts'),
+  );
+  assert.strictEqual(tsGoodIssues.length, 0, 'TS valid methods must pass HYG-WRAP-002');
+
+  const pyBad = `
+def refresh(self):
+    self._inner.refresh()
+`;
+  const pyIssues = auditVacuousWrappers(pyBad, 'app/service.py', fakeCtx(pyBad, 'app/service.py'));
+  assert.strictEqual(pyIssues.length, 1, 'Python redundant zero-arg delegation must be detected');
+  assert.strictEqual(pyIssues[0].rule, HYG_WRAP_REDUNDANT_RULE_ID);
+  assert.strictEqual(pyIssues[0].severity, 'info');
+
+  const gdBad = `
+func refresh() -> void:
+    _inner.refresh()
+`;
+  const gdIssues = auditVacuousWrappers(
+    gdBad,
+    'scripts/service.gd',
+    fakeCtx(gdBad, 'scripts/service.gd'),
+  );
+  assert.strictEqual(gdIssues.length, 1, 'GDScript redundant zero-arg delegation must be detected');
+  assert.strictEqual(gdIssues[0].rule, HYG_WRAP_REDUNDANT_RULE_ID);
+  assert.strictEqual(gdIssues[0].severity, 'info');
+
+  console.log('  [PASS] HYG-WRAP-002 verified on TypeScript, Python, GDScript');
+}
+
 function testGovExcSilentMultiLanguage() {
   console.log('── Step 4: GOV-EXC-003 Multi-Language Verification ──');
 
@@ -348,6 +419,48 @@ ${closureLines.join('\n')}
   console.log('  [PASS] ARCH-DSP-002 verified on closure fragmentation');
 }
 
+function testArchTmpMonolithicTemplate() {
+  console.log('── Step 5c: ARCH-TMP-001 Monolithic Template Renderer Verification ──');
+
+  const templateLines = [];
+  templateLines.push('function renderDashboard(data: any): string {');
+  templateLines.push('    let html = \'<div class="dashboard-container">\';');
+  for (let i = 1; i <= 140; i++) {
+    templateLines.push(
+      `    html += '<section class=\"card-${i}\"><span>Metric ${i}</span><table><tr><td>${i}</td></tr></table></section>';`,
+    );
+  }
+  templateLines.push("    html += '</div>';");
+  templateLines.push('    return html;');
+  templateLines.push('}');
+
+  const badTemplate = templateLines.join('\n');
+  const fakeCtx = { options: { maxTemplateFunctionLines: 100, minTemplateTagCount: 8 } };
+  const badIssues = auditTemplateComplexity(
+    badTemplate,
+    'src/presentation/dashboard-template.ts',
+    fakeCtx,
+  );
+  const tmpIssue = badIssues.find((i) => i.rule === ARCH_TMP_RULE_ID);
+  assert.ok(tmpIssue, 'Monolithic template function must emit ARCH-TMP-001');
+  assert.strictEqual(tmpIssue.detail.ruleId, 'ARCH-TMP-001');
+
+  // Modular componentized partial should pass cleanly
+  const goodComponent = `
+function renderMetricCard(title: string, value: number): string {
+    return \`<div class="metric-card"><span>\${title}</span><b>\${value}</b></div>\`;
+}
+`;
+  const goodIssues = auditTemplateComplexity(
+    goodComponent,
+    'src/presentation/metric-card.ts',
+    fakeCtx,
+  );
+  assert.strictEqual(goodIssues.length, 0, 'Small componentized partial must pass ARCH-TMP-001');
+
+  console.log('  [PASS] ARCH-TMP-001 verified on monolithic template vs componentized partial');
+}
+
 function testAnalyzerIntegration() {
   console.log('── Step 6: Analyzer Pipeline & Registry Integration ──');
 
@@ -365,6 +478,23 @@ function forwardCall(a: string, b: number) {
   });
   const wrapFinding = hygieneIssues.find((i) => i.rule === 'HYG-WRAP-001');
   assert.ok(wrapFinding, 'HygieneAnalyzer must emit HYG-WRAP-001');
+
+  // Test HygieneAnalyzer emitting HYG-WRAP-002
+  const sampleRedundant = `
+class ServiceWorker {
+    show(): void {
+        this.refresh();
+    }
+}
+`;
+  const redundantIssues = hygiene.analyze(null, {
+    filePath: 'src/test-redundant.ts',
+    content: sampleRedundant,
+    options: {},
+  });
+  const redundantFinding = redundantIssues.find((i) => i.rule === 'HYG-WRAP-002');
+  assert.ok(redundantFinding, 'HygieneAnalyzer must emit HYG-WRAP-002');
+  assert.strictEqual(redundantFinding.severity, 'info');
 
   // Test ArchitectureAnalyzer emitting ARCH-DISP-001
   const arch = new ArchitectureAnalyzer();
@@ -410,10 +540,30 @@ export class CustomService {}
     'ArchitectureAnalyzer must emit ARCH-DEC-002 for direct parser coupling',
   );
 
+  // Test ArchitectureAnalyzer emitting ARCH-TMP-001
+  const templateMonolith = `
+function buildHtmlView(ctx: any): string {
+    let out = '<div>';
+${Array.from({ length: 130 }, (_, i) => `    out += '<span>tag ${i}</span>';`).join('\n')}
+    out += '</div>';
+    return out;
+}
+`;
+  const tmpIssues = arch.analyze(null, {
+    filePath: 'src/presentation/view.ts',
+    content: templateMonolith,
+    config: {},
+    options: { maxTemplateFunctionLines: 100, minTemplateTagCount: 8 },
+  });
+  const tmpFinding = tmpIssues.find((i) => i.rule === 'ARCH-TMP-001');
+  assert.ok(tmpFinding, 'ArchitectureAnalyzer must emit ARCH-TMP-001 for monolithic view');
+
   // Test Pyramid Layer Classification
   assert.strictEqual(classifyRuleLayer('HYG-WRAP-001'), 'layer1_universal');
+  assert.strictEqual(classifyRuleLayer('HYG-WRAP-002'), 'layer1_universal');
   assert.strictEqual(classifyRuleLayer('ARCH-DISP-001'), 'layer1_universal');
   assert.strictEqual(classifyRuleLayer('ARCH-DEC-002'), 'layer1_universal');
+  assert.strictEqual(classifyRuleLayer('ARCH-TMP-001'), 'layer1_universal');
   assert.strictEqual(classifyRuleLayer('GOV-EXC-003'), 'layer2_family');
 
   // Test Registry Registration
@@ -421,6 +571,12 @@ export class CustomService {}
   assert.ok(wrapRule, 'HYG-WRAP-001 must be registered');
   assert.strictEqual(wrapRule.analyzer, 'hygiene');
   assert.strictEqual(wrapRule.canonical, true);
+
+  const wrapRedundantRule = getRule('HYG-WRAP-002');
+  assert.ok(wrapRedundantRule, 'HYG-WRAP-002 must be registered');
+  assert.strictEqual(wrapRedundantRule.analyzer, 'hygiene');
+  assert.strictEqual(wrapRedundantRule.canonical, true);
+  assert.strictEqual(wrapRedundantRule.defaultSeverity, 'info');
 
   const excRule = getRule('GOV-EXC-003');
   assert.ok(excRule, 'GOV-EXC-003 must be registered');
@@ -437,6 +593,11 @@ export class CustomService {}
   assert.strictEqual(decRule.analyzer, 'architecture');
   assert.strictEqual(decRule.canonical, true);
 
+  const archTmpRule = getRule('ARCH-TMP-001');
+  assert.ok(archTmpRule, 'ARCH-TMP-001 must be registered');
+  assert.strictEqual(archTmpRule.analyzer, 'architecture');
+  assert.strictEqual(archTmpRule.canonical, true);
+
   console.log(
     `  [PASS] Full analyzer integration & registry lookup (${RULE_REGISTRY.length} rules)`,
   );
@@ -450,9 +611,11 @@ function run() {
   testCandidateStateAndScrutiny();
   testPatternNormalizer();
   testHygWrapMultiLanguage();
+  testHygWrapRedundantDelegation();
   testGovExcSilentMultiLanguage();
   testArchDispMultiLanguage();
   testArchDspClosureFragmentation();
+  testArchTmpMonolithicTemplate();
   testAnalyzerIntegration();
 
   console.log(

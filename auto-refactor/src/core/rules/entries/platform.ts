@@ -179,6 +179,19 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dsp-002',
     }),
     defineRule({
+        id: 'ARCH-TMP-001',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            '巨石视图/模板渲染器未解耦：单函数规模超标且包含深度 HTML/SVG/DSL 模板字符串拼接，缺少局部组件化。',
+        remediation:
+            '拆解为领域正交的局部组件（Header/Card/Graph Partials），由结构化 ViewModel 驱动渲染。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-tmp-001',
+    }),
+    defineRule({
         id: 'clean-layer-violation',
         family: RULE_FAMILY_ARCHITECTURE,
         analyzer: ANALYZER_ARCHITECTURE,

@@ -21,6 +21,10 @@ import type { DiagnosticDescriptor } from './types';
 /** Loop-nesting depth at or above which PRF-ALG-001 escalates risk to High. */
 const HIGH_RISK_NESTING_DEPTH = 4;
 
+const RISK_HIGH = 'High';
+const RISK_MEDIUM = 'Medium';
+const RISK_LOW = 'Low';
+
 /**
  * Performance-rule diagnostic descriptor catalog.
  *
@@ -46,7 +50,7 @@ export const PerformanceMessages = {
             'Deeply nested loops risk exponential/polynomial performance degradation; consider pre-indexing with Map/Set or breaking down algorithms',
         rationale:
             'Nested iteration over unbound collections leads to CPU starvation and frame drops on high-throughput workloads.',
-        risk: currentDepth >= HIGH_RISK_NESTING_DEPTH ? 'High' : 'Medium',
+        risk: currentDepth >= HIGH_RISK_NESTING_DEPTH ? RISK_HIGH : RISK_MEDIUM,
     }),
 
     // PRF-MEM-001
@@ -64,7 +68,23 @@ export const PerformanceMessages = {
             'Hoist temporary buffers, arrays, or objects outside the loop and reuse them by calling clear() or reset() each iteration',
         rationale:
             'Allocating short-lived objects in tight loops generates high garbage collection (GC) pressure and causes latency spikes.',
-        risk: 'Low',
+        risk: RISK_LOW,
+    }),
+
+    // PRF-MEM-002
+    /**
+     * Build the PRF-MEM-002 descriptor for high-pressure object pooling contract violations.
+     *
+     * @param loopDepth - Observed loop depth.
+     * @returns Fresh descriptor with High risk and ADV-PRF-002 object pooling guidance.
+     */
+    HIGH_PRESSURE_OBJECT_ALLOCATION: (loopDepth: number): DiagnosticDescriptor => ({
+        message: `High-pressure loop transient allocation: Violates ADV-PRF-002 zero-transient heap allocation contract in hot loop (depth ${loopDepth})`,
+        suggestion:
+            'Eliminate in-loop allocation by hoisting to outer scope or adopting an object pool with explicit reset_state() lifecycle hooks',
+        rationale:
+            'Transient heap allocations and deep duplicates inside loops produce GC spikes and memory fragmentation in latency-sensitive runtimes.',
+        risk: RISK_HIGH,
     }),
 
     // PRF-IO-001
@@ -81,7 +101,7 @@ export const PerformanceMessages = {
             'Synchronous file or network calls freeze the event loop or game main thread; replace with non-blocking asynchronous alternatives',
         rationale:
             'Blocking the main thread stops event handling, network dispatching, and UI rendering until the OS filesystem operation completes.',
-        risk: inAsync ? 'High' : 'Medium',
+        risk: inAsync ? RISK_HIGH : RISK_MEDIUM,
     }),
 
     // PRF-LEAK-001
