@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790261425681",
-  "timestamp": "2026-09-24T14:50:28.379Z",
+  "snapshotId": "snapshot-v0.4.0-1790265458542",
+  "timestamp": "2026-09-24T15:57:41.107Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,26 +12,26 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 402,
-    "durationMs": 2533
+    "filesScanned": 403,
+    "durationMs": 2410
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
-    "effectiveCodeDensity": 0.95,
-    "totalIssues": 5900,
-    "suppressedIssues": 3254,
-    "unsuppressedIssues": 2646,
+    "effectiveCodeDensity": 0.96,
+    "totalIssues": 5855,
+    "suppressedIssues": 3232,
+    "unsuppressedIssues": 2623,
     "bySeverity": {
-      "info": 248,
-      "warning": 5652,
+      "info": 244,
+      "warning": 5611,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 117,
-      "medium": 5377,
-      "low": 406
+      "high": 115,
+      "medium": 5335,
+      "low": 405
     }
   },
   "eightPillars": {
@@ -98,7 +98,7 @@
     {
       "filePath": "scripts/test-parallel.js",
       "domain": "scripts",
-      "totalIssues": 90,
+      "totalIssues": 86,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 117,
-      "medium": 5377,
-      "low": 406
+      "high": 115,
+      "medium": 5335,
+      "low": 405
     },
     "criticalItems": [],
     "highItems": [
@@ -322,22 +322,13 @@
         "message": "Function \"OxcAdapter.collectLiteralsInType\" has cyclomatic complexity 16 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/oxc-predicates.ts:249",
+        "id": "complexity:high-complexity:src/core/ast/oxc-predicates.ts:314",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/oxc-predicates.ts",
-        "line": 249,
-        "message": "Function \"oxcIsConstBoundOf\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/oxc-predicates.ts:308",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/oxc-predicates.ts",
-        "line": 308,
-        "message": "Function \"oxcIsStringTolerated\" has cyclomatic complexity 18 (threshold 12)."
+        "line": 314,
+        "message": "Function \"oxcIsStringTolerated\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/ast/oxc-projector.ts:331",
@@ -385,22 +376,13 @@
         "message": "Function \"visitRaw\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/ts-predicates.ts:121",
+        "id": "complexity:high-complexity:src/core/ast/ts-predicates.ts:115",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/ts-predicates.ts",
-        "line": 121,
-        "message": "Function \"bindingName\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/ts-predicates.ts:274",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/ts-predicates.ts",
-        "line": 274,
-        "message": "Function \"isEnclosedInConstDeclaration\" has cyclomatic complexity 13 (threshold 12)."
+        "line": 115,
+        "message": "Function \"bindingName\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/ast/ts-projector.ts:80",
@@ -608,6 +590,24 @@
         "file": "src/core/intelligence/callChainImpactTracer.ts",
         "line": 61,
         "message": "Function \"CallChainImpactTracer.traceSymbolImpact\" has cyclomatic complexity 17 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-001:src/core/intelligence/callChainImpactTracer.ts:86",
+        "rule": "PRF-ALG-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/intelligence/callChainImpactTracer.ts",
+        "line": 86,
+        "message": "High algorithmic complexity risk: Found 3 levels of nested loops (potential O(N^3) compute hotspot, threshold 3)"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/intelligence/contextSlice.ts:132",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/intelligence/contextSlice.ts",
+        "line": 132,
+        "message": "Function \"buildContextSlice\" has cyclomatic complexity 22 (threshold 12)."
       }
     ]
   },
@@ -708,7 +708,7 @@
         "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.8,
+          "maintainability": 98,
           "performance": 100,
           "data": 100,
           "testing": 100,

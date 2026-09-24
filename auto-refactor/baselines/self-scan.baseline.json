@@ -1,13 +1,13 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-24T14:49:17.438Z",
+  "timestamp": "2026-09-24T15:53:36.307Z",
   "groups": [
     {
       "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
-      "count": 3,
+      "count": 1,
       "severities": {
-        "warning": 3
+        "warning": 1
       }
     },
     {
@@ -68,9 +68,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/bench-deep-stress.js",
-      "count": 24,
+      "count": 23,
       "severities": {
-        "warning": 24
+        "warning": 23
       }
     },
     {
@@ -243,9 +243,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/bench-quant.js",
-      "count": 5,
+      "count": 2,
       "severities": {
-        "warning": 5
+        "warning": 2
       }
     },
     {
@@ -369,9 +369,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/run-self-audit.js",
-      "count": 17,
+      "count": 14,
       "severities": {
-        "warning": 17
+        "warning": 14
       }
     },
     {
@@ -411,9 +411,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/test-result-codec.js",
-      "count": 33,
+      "count": 30,
       "severities": {
-        "warning": 33
+        "warning": 30
       }
     },
     {
@@ -523,9 +523,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-capabilities.js",
-      "count": 39,
+      "count": 38,
       "severities": {
-        "warning": 39
+        "warning": 38
       }
     },
     {
@@ -978,9 +978,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-five-core-capabilities.js",
-      "count": 15,
+      "count": 13,
       "severities": {
-        "warning": 15
+        "warning": 13
       }
     },
     {
@@ -1307,9 +1307,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-oxc-keypoints.js",
-      "count": 32,
+      "count": 30,
       "severities": {
-        "warning": 32
+        "warning": 30
       }
     },
     {
@@ -1370,9 +1370,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-semantic-ir.js",
-      "count": 27,
+      "count": 25,
       "severities": {
-        "warning": 27
+        "warning": 25
       }
     },
     {
@@ -1398,9 +1398,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-self-refactor.js",
-      "count": 7,
+      "count": 6,
       "severities": {
-        "warning": 7
+        "warning": 6
       }
     },
     {
@@ -1524,9 +1524,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-slice-audit.js",
-      "count": 21,
+      "count": 18,
       "severities": {
-        "warning": 21
+        "warning": 18
       }
     },
     {
@@ -1559,9 +1559,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-trajectory-learning.js",
-      "count": 19,
+      "count": 18,
       "severities": {
-        "warning": 19
+        "warning": 18
       }
     },
     {
@@ -1594,9 +1594,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-e2e-stress.js",
-      "count": 19,
+      "count": 18,
       "severities": {
-        "warning": 19
+        "warning": 18
       }
     },
     {
@@ -1615,9 +1615,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-language-adapters.js",
-      "count": 22,
+      "count": 20,
       "severities": {
-        "warning": 22
+        "warning": 20
       }
     },
     {
@@ -1643,9 +1643,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-universal-rules.js",
-      "count": 34,
+      "count": 32,
       "severities": {
-        "warning": 34
+        "warning": 32
       }
     },
     {
@@ -1748,9 +1748,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-meta-architecture.js",
-      "count": 30,
+      "count": 28,
       "severities": {
-        "warning": 30
+        "warning": 28
       }
     },
     {
@@ -1762,9 +1762,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-quality-quantification.js",
-      "count": 12,
+      "count": 11,
       "severities": {
-        "warning": 12
+        "warning": 11
       }
     },
     {
@@ -1790,9 +1790,9 @@
     },
     {
       "key": "constants|hardcoded-string|scripts/validate-self-audit.js",
-      "count": 11,
+      "count": 10,
       "severities": {
-        "warning": 11
+        "warning": 10
       }
     },
     {
@@ -2455,9 +2455,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/dependency-graph.ts",
-      "count": 6,
+      "count": 5,
       "severities": {
-        "warning": 6
+        "warning": 5
       }
     },
     {
@@ -2756,9 +2756,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/api.ts",
-      "count": 18,
+      "count": 14,
       "severities": {
-        "warning": 18
+        "warning": 14
       }
     },
     {
@@ -2791,9 +2791,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/analyzer-registry.ts",
-      "count": 22,
+      "count": 21,
       "severities": {
-        "warning": 22
+        "warning": 21
       }
     },
     {
@@ -3008,16 +3008,16 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/ast/oxc-predicates.ts",
-      "count": 28,
+      "count": 25,
       "severities": {
-        "warning": 28
+        "warning": 25
       }
     },
     {
       "key": "complexity|high-complexity|src/core/ast/oxc-predicates.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -3127,9 +3127,9 @@
     },
     {
       "key": "complexity|high-complexity|src/core/ast/ts-predicates.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -5913,9 +5913,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/daemon/client.ts",
-      "count": 15,
+      "count": 10,
       "severities": {
-        "warning": 15
+        "warning": 10
       }
     },
     {
@@ -6011,9 +6011,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/index.ts",
-      "count": 19,
+      "count": 17,
       "severities": {
-        "warning": 19
+        "warning": 17
       }
     },
     {
