@@ -74,6 +74,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-python-imports', script: 'scripts/validate-python-imports.js' },
   { name: 'validate-postscan-parity', script: 'scripts/validate-postscan-parity.js' },
   { name: 'validate-capp-protocol', script: 'scripts/validate-capp-protocol.js' },
+  { name: 'validate-praxis-presentation', script: 'scripts/validate-praxis-presentation.js' },
   { name: 'validate-literal-policy', script: 'scripts/validate-literal-policy.js' },
   {
     name: 'validate-literal-policy-declarative',

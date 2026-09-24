@@ -21,3 +21,4 @@ export * from './diffGovernance';
 export * from './multiAgentGovernance';
 export * from './sliceAuditService';
 export * from './trajectoryLearningService';
+export * from './presentation';
