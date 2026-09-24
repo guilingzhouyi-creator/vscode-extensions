@@ -227,7 +227,8 @@ function checkSnakeNaming(
 export class HygieneAnalyzer implements Analyzer {
     name = 'hygiene' as const;
 
-    analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
+        void sf;
         const opts = (ctx.options || {}) as HygieneOptions;
         const checkDead = opts.checkDeadCode !== false;
         const checkNaming = opts.checkNaming !== false;
@@ -793,7 +794,7 @@ export class HygieneAnalyzer implements Analyzer {
     }
 
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined as any, ctx);
+        return this.analyze(undefined, ctx);
     }
 
     private mkIssue(

@@ -151,7 +151,8 @@ const SINGLE_QUOTE = "'";
 export class CommentAnalyzer implements Analyzer {
     name = 'comments' as const;
 
-    analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
+        void sf;
         const opts = (ctx.options || {}) as CommentOptions;
         const level: CommentLevel = opts.level || ctx.config.commentLevel || 'standard';
 
@@ -764,7 +765,7 @@ export class CommentAnalyzer implements Analyzer {
     }
 
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined as any, ctx);
+        return this.analyze(undefined, ctx);
     }
 
     private mkIssue(

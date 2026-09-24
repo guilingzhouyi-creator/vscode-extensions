@@ -95,6 +95,24 @@ const factories: Record<string, () => LanguageAdapter> = {
     [ADAPTER_ID_GO]: () => new (require(ADAPTER_MODULES.go).GoAdapter)(),
 };
 
+const adapterExtensionSets = new WeakMap<LanguageAdapter, Set<string>>();
+
+/**
+ * Checks whether an adapter supports the given file extension using a cached Set lookup.
+ *
+ * @param adapter - The LanguageAdapter instance to query.
+ * @param ext - Lowercased file extension (e.g. '.ts').
+ * @returns True if the extension is claimed by the adapter, false otherwise.
+ */
+function adapterSupportsExtension(adapter: LanguageAdapter, ext: string): boolean {
+    let set = adapterExtensionSets.get(adapter);
+    if (!set) {
+        set = new Set(adapter.extensions);
+        adapterExtensionSets.set(adapter, set);
+    }
+    return set.has(ext);
+}
+
 function getAdapter(id: string): LanguageAdapter {
     if (registered[id]) return registered[id];
     return (cache[id] ??= factories[id]());
@@ -135,19 +153,19 @@ export function adapterFor(filePath: string, parser: ParserKind = 'typescript'):
     const ext = path.extname(filePath).toLowerCase();
     if (parser === ADAPTER_ID_OXC) {
         const oxc = getAdapter(ADAPTER_ID_OXC);
-        if (oxc.extensions.includes(ext)) return oxc;
+        if (adapterSupportsExtension(oxc, ext)) return oxc;
     }
     const known = EXTENSION_ADAPTER_IDS[ext];
     if (known && !registered[known]) {
         const adapter = getAdapter(known);
-        if (adapter.extensions.includes(ext)) return adapter;
+        if (adapterSupportsExtension(adapter, ext)) return adapter;
     }
     for (const id of Object.keys(factories)) {
         const a = getAdapter(id);
-        if (a.extensions.includes(ext)) return a;
+        if (adapterSupportsExtension(a, ext)) return a;
     }
     for (const a of Object.values(registered)) {
-        if (a.extensions.includes(ext)) return a;
+        if (adapterSupportsExtension(a, ext)) return a;
     }
     return getAdapter(ADAPTER_ID_TYPESCRIPT);
 }
@@ -165,18 +183,18 @@ export function adapterFor(filePath: string, parser: ParserKind = 'typescript'):
  */
 export function hasAdapterFor(filePath: string, parser: ParserKind = 'typescript'): boolean {
     const ext = path.extname(filePath).toLowerCase();
-    if (parser === ADAPTER_ID_OXC && getAdapter(ADAPTER_ID_OXC).extensions.includes(ext)) {
+    if (parser === ADAPTER_ID_OXC && adapterSupportsExtension(getAdapter(ADAPTER_ID_OXC), ext)) {
         return true;
     }
     const known = EXTENSION_ADAPTER_IDS[ext];
     if (known && !registered[known]) {
-        if (getAdapter(known).extensions.includes(ext)) return true;
+        if (adapterSupportsExtension(getAdapter(known), ext)) return true;
     }
     for (const id of Object.keys(factories)) {
-        if (getAdapter(id).extensions.includes(ext)) return true;
+        if (adapterSupportsExtension(getAdapter(id), ext)) return true;
     }
     for (const a of Object.values(registered)) {
-        if (a.extensions.includes(ext)) return true;
+        if (adapterSupportsExtension(a, ext)) return true;
     }
     return false;
 }

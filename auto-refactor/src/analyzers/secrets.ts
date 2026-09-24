@@ -170,7 +170,8 @@ export class SecretsAnalyzer implements Analyzer {
      * @returns At most `maxIssuesPerFile` issues, at most one per line; empty for off/suppressed.
      * @throws SyntaxError - When a caller-supplied pattern string is not a valid regex.
      */
-    analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
+        void sf;
         const opts = (ctx.options || {}) as SecretsOptions & { level?: SecurityLevel };
         const level: SecurityLevel = opts.level || ctx.config.securityLevel || 'basic';
         const normPath = ctx.filePath.replace(/\\/g, '/');
@@ -287,7 +288,7 @@ export class SecretsAnalyzer implements Analyzer {
      * @throws SyntaxError - When a caller-supplied pattern string is not a valid regex.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined as any, ctx);
+        return this.analyze(undefined, ctx);
     }
 
     /**

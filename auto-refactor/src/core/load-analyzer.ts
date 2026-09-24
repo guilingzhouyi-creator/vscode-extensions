@@ -27,9 +27,9 @@ const TYPEOF_FUNCTION = 'function';
  *
  * Handles every export shape we support (used both for external plug-ins in the
  * main process and for built-in/custom analyzers reconstructed inside workers):
- *   module.exports = Class                       -> typeof mod === 'function'
- *   module.exports = new Analyzer()             -> mod.analyze is a function (already instance)
- *   module.exports = { default: Class, ... } -> pick default / Analyzer / `name` / first function
+ * - Direct constructor function or class export
+ * - Pre-instantiated analyzer object exposing an analyze method
+ * - Object export containing default, Analyzer, or a named member export
  *
  * Throws a clear error if no valid analyzer can be derived (caller turns it into
  * an AutoRefactorError for config-level failures).
@@ -42,20 +42,21 @@ const TYPEOF_FUNCTION = 'function';
  *   class-like exports are constructed fresh so callers never share one instance accidentally.
  * @throws When no export shape resolves to an object whose `analyze` member is callable.
  */
-export function instantiateAnalyzer(mod: any, name: string): Analyzer {
+export function instantiateAnalyzer(mod: unknown, name: string): Analyzer {
     let resolved: Analyzer | null = null;
     if (typeof mod === TYPEOF_FUNCTION) {
-        resolved = new mod();
+        resolved = new (mod as new () => Analyzer)();
     } else if (mod && typeof mod === 'object') {
-        if (typeof mod.analyze === TYPEOF_FUNCTION) {
-            resolved = mod as Analyzer;
+        const record = mod as Record<string, unknown>;
+        if (typeof record.analyze === TYPEOF_FUNCTION) {
+            resolved = record as unknown as Analyzer;
         } else {
             const Ctor =
-                mod.default ||
-                mod.Analyzer ||
-                mod[name] ||
-                Object.values(mod).find((v: any) => typeof v === TYPEOF_FUNCTION);
-            if (typeof Ctor === TYPEOF_FUNCTION) resolved = new Ctor();
+                record.default ||
+                record.Analyzer ||
+                record[name] ||
+                Object.values(record).find((v) => typeof v === TYPEOF_FUNCTION);
+            if (typeof Ctor === TYPEOF_FUNCTION) resolved = new (Ctor as new () => Analyzer)();
         }
     }
     if (!resolved || typeof resolved.analyze !== TYPEOF_FUNCTION) {

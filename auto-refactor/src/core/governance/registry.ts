@@ -23,6 +23,8 @@ import {
     ExplicitTypingRule,
     FunctionSignatureCompletenessRule,
     UnsafeAnyRule,
+    ContractForcedEscapeRule,
+    UnsafePropertyPenetrationRule,
 } from './rules/typeSystem';
 import {
     SwallowedExceptionRule,
@@ -33,10 +35,15 @@ import { DiagnosticLeakRule } from './rules/debugLogging';
 import {
     LoopInvariantRule,
     InLoopLinearSearchRule,
+    InLoopArrayPreHashRule,
     TimerLiteralRule,
     SyncIoRule,
 } from './rules/performance';
-import { InheritanceDepthRule, DomainDecouplingRule } from './rules/maintainability';
+import {
+    InheritanceDepthRule,
+    DomainDecouplingRule,
+    DataClumpsRule,
+} from './rules/maintainability';
 import { LexicalHygieneRule, DiagnosticMessageRule } from './rules/sanitization';
 import {
     GiantExpressionRule,
@@ -68,6 +75,8 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     ExplicitTypingRule,
     FunctionSignatureCompletenessRule,
     UnsafeAnyRule,
+    ContractForcedEscapeRule,
+    UnsafePropertyPenetrationRule,
     // 5. Exception Safety
     SwallowedExceptionRule,
     NakedUnwrapRule,
@@ -77,11 +86,13 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     // 7. Performance
     LoopInvariantRule,
     InLoopLinearSearchRule,
+    InLoopArrayPreHashRule,
     TimerLiteralRule,
     SyncIoRule,
     // 8. Maintainability
     InheritanceDepthRule,
     DomainDecouplingRule,
+    DataClumpsRule,
     LexicalHygieneRule,
     GiantExpressionRule,
     SingleLineMultiSemanticRule,

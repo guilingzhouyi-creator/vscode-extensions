@@ -339,13 +339,14 @@ export class CacheStore {
         }
     }
 
-    private isValidL1(o: any): boolean {
+    private isValidL1(o: unknown): o is { t: string; p: string; m: number; s: number; i?: number } {
+        const obj = o as Record<string, unknown> | null;
         return Boolean(
-            o &&
-            o.t === 'f' &&
-            typeof o.p === TYPEOF_STRING &&
-            typeof o.m === TYPEOF_NUMBER &&
-            typeof o.s === TYPEOF_NUMBER,
+            obj &&
+            obj.t === 'f' &&
+            typeof obj.p === TYPEOF_STRING &&
+            typeof obj.m === TYPEOF_NUMBER &&
+            typeof obj.s === TYPEOF_NUMBER,
         );
     }
 
@@ -372,9 +373,9 @@ export class CacheStore {
                 p: o.p,
                 issues: o.issues,
                 metric: o.metric || null,
-                ts: typeof o.ts === TYPEOF_NUMBER ? o.ts : 0,
-                fm: typeof o.fm === TYPEOF_NUMBER ? o.fm : undefined,
-                fs: typeof o.fs === TYPEOF_NUMBER ? o.fs : undefined,
+                ts: typeof o.ts === TYPEOF_NUMBER ? (o.ts as number) : 0,
+                fm: typeof o.fm === TYPEOF_NUMBER ? (o.fm as number) : undefined,
+                fs: typeof o.fs === TYPEOF_NUMBER ? (o.fs as number) : undefined,
             };
             this.l2.set(o.k, entry);
             this.indexL2ByPath(entry);
@@ -383,13 +384,23 @@ export class CacheStore {
         }
     }
 
-    private isValidL2(o: any): boolean {
+    private isValidL2(o: unknown): o is {
+        t: string;
+        k: string;
+        p: string;
+        issues: Issue[];
+        metric?: FileMetric;
+        ts?: number;
+        fm?: number;
+        fs?: number;
+    } {
+        const obj = o as Record<string, unknown> | null;
         return Boolean(
-            o &&
-            o.t === 'r' &&
-            typeof o.k === TYPEOF_STRING &&
-            typeof o.p === TYPEOF_STRING &&
-            Array.isArray(o.issues),
+            obj &&
+            obj.t === 'r' &&
+            typeof obj.k === TYPEOF_STRING &&
+            typeof obj.p === TYPEOF_STRING &&
+            Array.isArray(obj.issues),
         );
     }
 
@@ -412,9 +423,13 @@ export class CacheStore {
         }
     }
 
-    private isValidPathEntry(o: any): boolean {
+    private isValidPathEntry(o: unknown): o is { t: string; pk: string; k: string } {
+        const obj = o as Record<string, unknown> | null;
         return Boolean(
-            o && o.t === 'x' && typeof o.pk === TYPEOF_STRING && typeof o.k === TYPEOF_STRING,
+            obj &&
+            obj.t === 'x' &&
+            typeof obj.pk === TYPEOF_STRING &&
+            typeof obj.k === TYPEOF_STRING,
         );
     }
 
@@ -595,7 +610,7 @@ export class CacheStore {
     private serializeL1(): string {
         const lines: string[] = [];
         for (const [p, fp] of this.l1) {
-            const o: Record<string, any> = { t: 'f', p, m: fp.mtimeMs, s: fp.size };
+            const o: Record<string, unknown> = { t: 'f', p, m: fp.mtimeMs, s: fp.size };
             if (fp.ino !== undefined) o.i = fp.ino;
             lines.push(JSON.stringify(o));
         }
@@ -605,7 +620,7 @@ export class CacheStore {
     private serializeL2(): string {
         const lines: string[] = [];
         for (const e of this.l2.values()) {
-            const o: Record<string, any> = {
+            const o: Record<string, unknown> = {
                 t: 'r',
                 k: e.k,
                 p: e.p,

@@ -55,7 +55,7 @@ export function isTopLevelDecl(n: ts.Node): boolean {
  * @returns True when the node's modifier list contains the export keyword.
  */
 export function hasExportModifier(n: ts.Node): boolean {
-    const list = (n as any).modifiers as ts.NodeArray<ts.Modifier> | undefined;
+    const list = ts.canHaveModifiers(n) ? ts.getModifiers(n) : undefined;
     return Boolean(list && list.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
 }
 
@@ -240,9 +240,10 @@ export function calleeNameOf(n: ts.Node, sf: ts.SourceFile): string | null {
  * @returns The non-empty name text, or null if unnamed.
  */
 export function nameOf(n: ts.Node, sf: ts.SourceFile): string | null {
-    const name = (n as any).name as ts.Node | undefined;
+    const named = n as ts.NamedDeclaration;
+    const name = named.name;
     if (!name) return null;
-    const t = (name as any).getText?.(sf);
+    const t = name.getText(sf);
     return typeof t === 'string' && t.length > 0 ? t : null;
 }
 
@@ -327,9 +328,11 @@ function isToleratedCallString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): bo
     return false;
 }
 
-const MODULE_BOUNDARY_KINDS = new Set<ts.SyntaxKind>([
+const TOLERATED_STRING_PARENT_KINDS = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.ImportDeclaration,
     ts.SyntaxKind.ImportEqualsDeclaration,
+    ts.SyntaxKind.PropertyAccessExpression,
+    ts.SyntaxKind.CaseClause,
 ]);
 
 const JSX_ELEMENT_KINDS = new Set<ts.SyntaxKind>([
@@ -338,12 +341,10 @@ const JSX_ELEMENT_KINDS = new Set<ts.SyntaxKind>([
 ]);
 
 function isToleratedString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): boolean {
-    if (MODULE_BOUNDARY_KINDS.has(p.kind)) return true;
-    if (ts.isPropertyAssignment(p) && p.name === node) return true;
-    if (ts.isPropertyAccessExpression(p)) return true;
-    if (ts.isJsxAttribute(p) && p.name === node) return true;
-    if (JSX_ELEMENT_KINDS.has(p.kind)) return false;
-    return isToleratedCallString(node, p, sf);
+    if (TOLERATED_STRING_PARENT_KINDS.has(p.kind)) return true;
+    if (ts.isPropertyAssignment(p) || ts.isJsxAttribute(p)) return p.name === node;
+    if (ts.isElementAccessExpression(p)) return p.argumentExpression === node;
+    return JSX_ELEMENT_KINDS.has(p.kind) ? false : isToleratedCallString(node, p, sf);
 }
 
 function isToleratedCallArg(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {

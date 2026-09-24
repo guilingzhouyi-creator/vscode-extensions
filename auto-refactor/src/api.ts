@@ -32,6 +32,7 @@ import type {
     SecurityLevel,
     UnsupportedLanguageSeverity,
     MaturityTier,
+    ProjectProfile,
 } from './core/types';
 import { resolveConfig, TOOL_VERSION } from './core/config';
 import { Scanner } from './core/analyzer';
@@ -40,6 +41,7 @@ import { render } from './core/reporters';
 import { Logger, AutoRefactorError } from './core/logger';
 import { decodeContent } from './core/utf8';
 import type { BASELINE_GRANULARITY_GROUPED } from './core/reporting/reportFinalizer';
+import type { QualityScoreBreakdown } from './core/scoring/scoringTypes';
 import {
     finalizeReport,
     POST_SCAN_SCOPE_FULL,
@@ -181,25 +183,45 @@ export interface ScanOptions {
     granularRules?: boolean;
 }
 
+const MODULE_DAEMON_CLIENT = './daemon/client';
+const MODULE_CLI_DAEMON_CMD = './cli/daemonCmd';
+
+interface LazyWarmScanOptions {
+    cache: boolean;
+    cacheDir?: string;
+    cacheCustom?: boolean;
+    workers?: number;
+    parser?: string;
+}
+
+interface LazyWarmScanDiffOptions extends LazyWarmScanOptions {
+    verifyDiskContent: boolean;
+    delta: boolean;
+}
+
+function buildWarmOptions(options: ScanOptions, defaultCache: boolean): LazyWarmScanOptions {
+    return {
+        cache: defaultCache ? options.cache !== false : options.cache === true,
+        cacheDir: options.cacheDir,
+        cacheCustom: options.cacheCustom,
+        workers: options.workers,
+        parser: options.parser,
+    };
+}
+
 /** Lazy daemon-client access (keeps the default scan() module graph daemon-free). */
 function lazyTryWarmScan(
     root: string,
     config: ScanConfig,
-    options: {
-        cache: boolean;
-        cacheDir?: string;
-        cacheCustom?: boolean;
-        workers?: number;
-        parser?: string;
-    },
+    options: LazyWarmScanOptions,
 ): Promise<{ report: ScanReport; stats: WarmStats } | null> {
-    const { tryWarmScan } = require('./daemon/client');
+    const { tryWarmScan } = require(MODULE_DAEMON_CLIENT);
     return tryWarmScan(root, config, options);
 }
 
 /** Lazy daemon auto-start access (only used by daemon:'on'). */
 function lazyEnsureDaemon(root: string): Promise<boolean> {
-    const { ensureDaemon } = require('./cli/daemonCmd');
+    const { ensureDaemon } = require(MODULE_CLI_DAEMON_CMD);
     return ensureDaemon(root);
 }
 
@@ -208,26 +230,15 @@ function lazyTryWarmScanDiff(
     root: string,
     config: ScanConfig,
     diffs: DiffInput[],
-    options: {
-        cache: boolean;
-        cacheDir?: string;
-        cacheCustom?: boolean;
-        workers?: number;
-        parser?: string;
-        verifyDiskContent: boolean;
-        delta: boolean;
-    },
+    options: LazyWarmScanDiffOptions,
 ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null> {
-    const { tryWarmScanDiff } = require('./daemon/client');
+    const { tryWarmScanDiff } = require(MODULE_DAEMON_CLIENT);
     return tryWarmScanDiff(root, config, diffs, options);
 }
 
 /**
- * Programmatic entry point. Use from a Node script:
- *
- *   const { scan } = require('auto-refactor');
- *   const report = await scan({ root: './src', format: 'json' });
- *   if (report.summary.bySeverity.error > 0) process.exit(1);
+ * Programmatic entry point. Call `await scan(...)` with root and options; inspect
+ * `report.summary.bySeverity.error` to evaluate gate outcomes.
  *
  * This async entry point awaits config resolution and the scan while keeping no shared mutable
  * scan state; callers must serialize writes to a shared `cacheDir`. Semantics are unchanged
@@ -267,13 +278,7 @@ export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
     if (options.warm && options.daemon !== DAEMON_MODE_OFF) {
         const mode = options.daemon || DAEMON_MODE_AUTO;
         if (mode === DAEMON_MODE_ON) await lazyEnsureDaemon(config.root);
-        const warm = await lazyTryWarmScan(config.root, config, {
-            cache: options.cache === true,
-            cacheDir: options.cacheDir,
-            cacheCustom: options.cacheCustom,
-            workers: options.workers,
-            parser: options.parser,
-        });
+        const warm = await lazyTryWarmScan(config.root, config, buildWarmOptions(options, false));
         if (warm) {
             report = warm.report;
         } else {
@@ -312,13 +317,7 @@ export async function scanWarm(
 
     if (mode !== DAEMON_MODE_OFF) {
         if (mode === DAEMON_MODE_ON) await lazyEnsureDaemon(config.root);
-        const warm = await lazyTryWarmScan(config.root, config, {
-            cache: options.cache !== false,
-            cacheDir: options.cacheDir,
-            cacheCustom: options.cacheCustom,
-            workers: options.workers,
-            parser: options.parser,
-        });
+        const warm = await lazyTryWarmScan(config.root, config, buildWarmOptions(options, true));
         if (warm) {
             // Daemon reports arrive unfinalized (the daemon runs the raw scanner), so apply the
             // same post-scan pipeline here with no in-process graph to reuse.
@@ -424,13 +423,15 @@ async function runDiff(
             : new CacheStore(options.cacheDir, config.root);
     const diffHints = new Map<string, DiffInput>();
     for (const d of norm) if (!diffHints.has(d.filePath)) diffHints.set(d.filePath, d);
-    const r = await scanner.scanWithDiff({
+    const baseDiffOpts = {
         cache,
         cacheCustom: options.cacheCustom,
         diffHints,
         verifyDiskContent: options.verifyDiskContent !== false,
-        deltaOnly: delta,
-    } as any);
+    };
+    const r = delta
+        ? await scanner.scanWithDiff({ ...baseDiffOpts, deltaOnly: true })
+        : await scanner.scanWithDiff({ ...baseDiffOpts, deltaOnly: false });
     await finalizeReport(
         r.report as ScanReport,
         config,
@@ -492,7 +493,7 @@ export async function scanDiffDelta(
  * @param profile - Resolved project profile whose partitions are summarized.
  * @param scaleGrade - Optional scale grade label; defaults to 'standard' when omitted.
  */
-function printProjectStackProfile(profile: any, scaleGrade?: string): void {
+function printProjectStackProfile(profile: ProjectProfile, scaleGrade?: string): void {
     process.stdout.write(`\n=== Project Stack Profile ===\n`);
     process.stdout.write(`Primary Language: ${profile.primaryLanguage}\n`);
     process.stdout.write(`Build Systems:    ${profile.buildSystems.join(', ') || 'none'}\n`);
@@ -501,7 +502,7 @@ function printProjectStackProfile(profile: any, scaleGrade?: string): void {
     process.stdout.write(`Is Polyglot:      ${profile.isPolyglot}\n`);
     if (profile.partitions.length > 0) {
         process.stdout.write(
-            `Partitions:       ${profile.partitions.map((p: any) => p.name).join(', ')}\n`,
+            `Partitions:       ${profile.partitions.map((p) => p.name).join(', ')}\n`,
         );
     }
     process.stdout.write(`=============================\n\n`);
@@ -554,15 +555,15 @@ function createEmptyDiffReport(config: ScanConfig): ScanReport {
 async function executeDiffScanMode(
     config: ScanConfig,
     logger: Logger,
-): Promise<{ report: ScanReport; scanner: Scanner | null }> {
+): Promise<{ report: ScanReport; stats: WarmStats | null; scanner: Scanner | null }> {
     const changedFiles = await collectGitChangedFiles(config.root);
     if (changedFiles.length === 0) {
-        return { report: createEmptyDiffReport(config), scanner: null };
+        return { report: createEmptyDiffReport(config), stats: null, scanner: null };
     }
     const include = [...new Set(changedFiles)].sort();
     const scanner = new Scanner({ ...config, include }, logger);
     const report = await scanner.scan();
-    return { report, scanner };
+    return { report, stats: null, scanner };
 }
 
 async function executeStandardScanMode(
@@ -594,7 +595,7 @@ async function executeStandardScanMode(
     return { report, stats: null, scanner };
 }
 
-function printQualityScoreAssessment(q: any): void {
+function printQualityScoreAssessment(q: QualityScoreBreakdown): void {
     process.stdout.write(`\n=== Transparent Code Quality Assessment ===\n`);
     process.stdout.write(
         `Composite Quality Index: ${q.compositeScore.toFixed(1)} / 100 [Grade: ${q.grade}] (Confidence: ${(q.confidence * PERCENT_SCALE).toFixed(0)}%)\n`,
@@ -654,7 +655,7 @@ function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
  * @param logger - Active logger instance.
  * @param stats - Optional warm stats payload.
  */
-function logWarmStats(logger: Logger, stats: any): void {
+function logWarmStats(logger: Logger, stats?: WarmStats | null): void {
     if (!stats) return;
     logger.info(
         `warm: daemonUsed=${stats.daemonUsed} cacheHit=${stats.cacheHit}/${stats.cacheTotal} ` +
@@ -700,16 +701,16 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
             ? await executeDiffScanMode(config, logger)
             : await executeStandardScanMode(config, options, logger, mode);
 
-        const { report, scanner } = scanResult;
-        logWarmStats(logger, (scanResult as any).stats);
+        const { report, stats, scanner } = scanResult;
+        logWarmStats(logger, stats);
 
         const scope = options.diff ? POST_SCAN_SCOPE_INCREMENTAL : POST_SCAN_SCOPE_FULL;
         await finalizeReport(report, config, options, logger, scanner, scope);
 
         await outputRenderedReport(report, config, logger);
 
-        if (options.showScore && (report as any).qualityScore) {
-            printQualityScoreAssessment((report as any).qualityScore);
+        if (options.showScore && report.qualityScore) {
+            printQualityScoreAssessment(report.qualityScore);
         }
         logger.close();
         return evaluateGateExitCode(report, config);

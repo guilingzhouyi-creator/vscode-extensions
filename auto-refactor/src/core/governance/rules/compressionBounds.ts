@@ -203,7 +203,8 @@ function checkSingleLineStatement(
             message: 'Single line packs multiple executable statements or side effects.',
             line: lineIndex + 1,
             column: raw.search(/\S/) + 1,
-            suggestion: '将单行内的多个语句或副作用拆分为独立代码行，遵循单行单一语义原则。',
+            suggestion:
+                'Split multiple executable statements or side-effects onto separate lines following single responsibility per line.',
             fixable: false,
             evidence: {
                 confidence: 0.95,

@@ -59,6 +59,12 @@ interface PendingScan {
     socket: net.Socket;
 }
 
+interface TransportIo {
+    write: (m: DaemonMessage) => void;
+    close: () => void;
+    id: () => number;
+}
+
 /**
  * Per-project daemon instance: owns the bound net server (or stdio transport), the persistent
  * scan context that keeps caches and worker pools warm across requests, and the shutdown state.
@@ -167,11 +173,10 @@ export class DaemonServer {
                     continue;
                 }
                 this.handleMessage(msg, {
-                    write: (m: DaemonMessage | Record<string, any>) =>
-                        stdout.write(encodeMessage(m)),
+                    write: (m: DaemonMessage) => stdout.write(encodeMessage(m)),
                     close: () => {},
                     id: () => 0,
-                } as any);
+                });
             }
         });
         stdin.on('end', () => this.shutdown('stdio-eof'));
@@ -181,7 +186,7 @@ export class DaemonServer {
         this.touchIdle();
         let buffer = '';
         socket.setEncoding('utf8');
-        const write = (m: DaemonMessage | Record<string, any>) => {
+        const write = (m: DaemonMessage) => {
             if (!socket.destroyed) socket.write(encodeMessage(m));
         };
         socket.on('data', (chunk: string) => {
@@ -216,14 +221,7 @@ export class DaemonServer {
     }
 
     /** Dispatch one decoded NDJSON message (shared by net + stdio transports). */
-    private handleMessage(
-        msg: DaemonMessage,
-        io: {
-            write: (m: DaemonMessage | Record<string, any>) => void;
-            close: () => void;
-            id: () => number;
-        },
-    ): void {
+    private handleMessage(msg: DaemonMessage, io: TransportIo): void {
         switch (msg.type) {
             case 'hello': {
                 const ack: HelloAckMessage = {
@@ -278,13 +276,13 @@ export class DaemonServer {
                     id: msg.id,
                     type: MESSAGE_TYPE_ERROR,
                     code: 'UNKNOWN_MESSAGE',
-                    message: `unknown type ${(msg as any).type}`,
+                    message: `unknown type ${String((msg as { type?: unknown }).type)}`,
                 });
         }
     }
 
     private async runScan(
-        configJson: Record<string, any>,
+        configJson: Record<string, unknown>,
         options: {
             cache: boolean;
             cacheDir?: string;
@@ -294,7 +292,7 @@ export class DaemonServer {
         },
         id: number,
         requestId: string,
-        io: { write: (m: DaemonMessage | Record<string, any>) => void },
+        io: { write: (m: DaemonMessage) => void },
     ): Promise<void> {
         const config = configJson as unknown as ScanConfig;
         try {
@@ -304,8 +302,8 @@ export class DaemonServer {
                 id,
                 type: 'scan_done',
                 requestId,
-                report: report as unknown as Record<string, any>,
-                stats,
+                report: report as unknown as Record<string, unknown>,
+                stats: stats as unknown as Record<string, unknown>,
             });
             this.pending.delete(requestId);
             this.touchIdle();
@@ -326,8 +324,8 @@ export class DaemonServer {
     }
 
     private async runScanDiff(
-        configJson: Record<string, any>,
-        diffs: Array<Record<string, any>>,
+        configJson: Record<string, unknown>,
+        diffs: Array<Record<string, unknown>>,
         options: {
             cache: boolean;
             cacheDir?: string;
@@ -339,7 +337,7 @@ export class DaemonServer {
         },
         id: number,
         requestId: string,
-        io: { write: (m: DaemonMessage | Record<string, any>) => void },
+        io: { write: (m: DaemonMessage) => void },
     ): Promise<void> {
         const config = configJson as unknown as ScanConfig;
         try {
@@ -349,8 +347,8 @@ export class DaemonServer {
                 id,
                 type: 'scan_done',
                 requestId,
-                report: report as unknown as Record<string, any>,
-                stats,
+                report: report as unknown as Record<string, unknown>,
+                stats: stats as unknown as Record<string, unknown>,
             });
             this.pending.delete(requestId);
             this.touchIdle();

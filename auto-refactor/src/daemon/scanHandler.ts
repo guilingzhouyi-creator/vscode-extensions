@@ -1,5 +1,12 @@
 import * as path from 'path';
-import type { ScanConfig, ScanReport, WarmStats, DiffInput, DiffStats } from '../core/types';
+import type {
+    ScanConfig,
+    ScanReport,
+    DiffDeltaReport,
+    WarmStats,
+    DiffInput,
+    DiffStats,
+} from '../core/types';
 import type { WarmSession } from '../core/analyzer';
 import { Scanner, WorkerPoolManager, createWarmSession } from '../core/analyzer';
 import { CacheStore } from '../core/cache';
@@ -94,6 +101,22 @@ export async function handleScan(
 }
 
 /**
+ * Build a deduplicated file-path-to-DiffInput map from raw diff inputs.
+ *
+ * @param diffs - Raw diff hint records.
+ * @returns Map of relative file paths to validated DiffInput items.
+ */
+function buildDiffHintsMap(diffs: Array<Record<string, unknown>>): Map<string, DiffInput> {
+    const diffHints = new Map<string, DiffInput>();
+    for (const d of diffs) {
+        if (d && typeof d.filePath === 'string' && !diffHints.has(d.filePath)) {
+            diffHints.set(d.filePath, d as unknown as DiffInput);
+        }
+    }
+    return diffHints;
+}
+
+/**
  * Execute one daemon-side diff scan (scanDiff or scanDiffDelta) over the same shared assets.
  *
  * This routine is async: it awaits Scanner.scanWithDiff and closes its per-call Logger before
@@ -120,7 +143,7 @@ export async function handleScan(
 export async function handleScanDiff(
     ctx: DaemonScanContext,
     config: ScanConfig,
-    diffs: Array<Record<string, any>>,
+    diffs: Array<Record<string, unknown>>,
     options: {
         cache: boolean;
         cacheDir?: string;
@@ -130,7 +153,7 @@ export async function handleScanDiff(
         verifyDiskContent?: boolean;
         delta?: boolean;
     },
-): Promise<{ report: ScanReport | any; stats: DiffStats }> {
+): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats }> {
     const t0 = Date.now();
     const cfg = { ...config } as ScanConfig;
     if (typeof options.workers === 'number' && options.workers > 0) cfg.workers = options.workers;
@@ -142,23 +165,20 @@ export async function handleScanDiff(
 
     const logger = new Logger(cfg.logLevel || 'silent', cfg.logFile);
     const scanner = new Scanner(cfg, logger);
+    const diffHints = buildDiffHintsMap(diffs);
 
-    const diffHints = new Map<string, DiffInput>();
-    for (const d of diffs) {
-        if (d && typeof d.filePath === 'string' && !diffHints.has(d.filePath)) {
-            diffHints.set(d.filePath, d as unknown as DiffInput);
-        }
-    }
-
-    const result = await scanner.scanWithDiff({
+    const baseOpts = {
         cache,
         session: ctx.session,
         pool: ctx.pools,
         cacheCustom: options.cacheCustom === true,
         diffHints,
         verifyDiskContent: options.verifyDiskContent !== false,
-        deltaOnly: options.delta === true,
-    } as any);
+    };
+    const result =
+        options.delta === true
+            ? await scanner.scanWithDiff({ ...baseOpts, deltaOnly: true })
+            : await scanner.scanWithDiff({ ...baseOpts, deltaOnly: false });
     logger.close();
 
     result.stats.daemonUsed = true;

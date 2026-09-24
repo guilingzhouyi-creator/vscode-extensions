@@ -84,8 +84,17 @@ const RULE_HYG_NAMING = 'HYG-NAM-001';
 const RULE_HYG_DEAD_CODE = 'HYG-DED-001';
 /** Governance rule flagging deprecated constructs (`var` in TS/JS, bare `pass`). */
 const RULE_GOV_DEPRECATED = 'GOV-STD-002';
-/** Governance type-safety rules: implicit typing, missing annotations, naked `any`. */
-const RULES_GOV_TYPE_SAFETY = ['GOV-TYP-001', 'GOV-TYP-002', 'GOV-TYP-003'];
+/**
+ * Governance type-safety rules: implicit typing, missing annotations, naked `any`,
+ * forced escape, and unsafe penetration.
+ */
+const RULES_GOV_TYPE_SAFETY = [
+    'GOV-TYP-001',
+    'GOV-TYP-002',
+    'GOV-TYP-003',
+    'GOV-TYP-004',
+    'GOV-TYP-005',
+];
 /** Dependency-graph rules for exported symbols nothing consumes. */
 const RULES_UNUSED_BINDING = ['unused-export', 'unused-module'];
 /** Comment rules for banned vocabulary and temporary markers, in precedence order. */

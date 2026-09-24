@@ -15,6 +15,8 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 
 const {
   defaultGeneralizationPipeline,
@@ -313,6 +315,39 @@ function dispatch(action: string, payload: any) {
   console.log('  [PASS] ARCH-DISP-001 verified on procedural dispatchers');
 }
 
+function testArchDspClosureFragmentation() {
+  console.log('── Step 5b: ARCH-DSP-002 Dispatcher Closure Fragmentation Verification ──');
+
+  const closureLines = [];
+  for (let i = 1; i <= 20; i++) {
+    closureLines.push(`    'flag-${i}': (opt, v) => { opt.f${i} = v; },`);
+  }
+  const badClosureTable = `
+const BOOL_SETTERS: Record<string, (opt: any, v: boolean) => void> = {
+${closureLines.join('\n')}
+};
+`;
+
+  const fakeCtx = { options: { maxDispatcherClosures: 15 } };
+  const badIssues = auditDispatchComplexity(badClosureTable, 'src/dispatcher.ts', fakeCtx);
+  const closureIssue = badIssues.find((i) => i.rule === 'ARCH-DSP-002');
+  assert.ok(closureIssue, 'Dispatcher table with >= 15 closures must emit ARCH-DSP-002');
+  assert.strictEqual(closureIssue.detail.closureCount, 20);
+
+  // cli-parser.ts should have 0 ARCH-DSP-002 issues
+  const cliParserPath = path.join(__dirname, '..', 'src', 'cli', 'cli-parser.ts');
+  const cliContent = fs.readFileSync(cliParserPath, 'utf8');
+  const cliIssues = auditDispatchComplexity(cliContent, 'src/cli/cli-parser.ts', fakeCtx);
+  const cliClosureIssues = cliIssues.filter((i) => i.rule === 'ARCH-DSP-002');
+  assert.strictEqual(
+    cliClosureIssues.length,
+    0,
+    'cli-parser.ts orthogonal switch dispatchers must pass',
+  );
+
+  console.log('  [PASS] ARCH-DSP-002 verified on closure fragmentation');
+}
+
 function testAnalyzerIntegration() {
   console.log('── Step 6: Analyzer Pipeline & Registry Integration ──');
 
@@ -417,6 +452,7 @@ function run() {
   testHygWrapMultiLanguage();
   testGovExcSilentMultiLanguage();
   testArchDispMultiLanguage();
+  testArchDspClosureFragmentation();
   testAnalyzerIntegration();
 
   console.log(

@@ -44,16 +44,22 @@ export interface EvaluatePatchParams {
 }
 
 /**
- * Result of patch quality evaluation.
+ * Metrics representing score and effective code density deltas for a patch.
  */
-export interface PatchQualityResult {
-    filePath: string;
+export interface PatchScoreMetrics {
     beforeScore: number;
     afterScore: number;
     deltaScore: number;
     effectiveDensityBefore: number;
     effectiveDensityAfter: number;
     effectiveDensityDelta: number;
+}
+
+/**
+ * Result of patch quality evaluation.
+ */
+export interface PatchQualityResult extends PatchScoreMetrics {
+    filePath: string;
     pillarDeltas: Record<PrimaryQualityPillar, number>;
     introducedIssues: Issue[];
     resolvedIssues: Issue[];
@@ -62,6 +68,7 @@ export interface PatchQualityResult {
     explanation: string[];
     beforeDetails: FileQualityScore;
     afterDetails: FileQualityScore;
+    simplificationRewardBonus?: number;
 }
 
 /**
@@ -119,6 +126,64 @@ function resolvePatchVerdict(deltaScore: number, gamingCount: number): PatchQual
         return 'degraded';
     }
     return 'neutral';
+}
+
+const TYPE_NUMBER = 'number';
+
+/**
+ * Sum simplification bonus reward points from issues.
+ */
+function computeSimplificationRewardBonus(newIssues: Issue[]): number {
+    let bonus = 0;
+    for (const issue of newIssues) {
+        if (issue.detail && typeof issue.detail.rewardBonus === TYPE_NUMBER) {
+            bonus += issue.detail.rewardBonus;
+        }
+    }
+    return bonus;
+}
+
+/**
+ * Construct diagnostic and evaluation explanations for a patch quality result.
+ */
+function buildPatchExplanations(
+    metrics: PatchScoreMetrics,
+    relocationAnalysis: ReturnType<typeof analyzeConstantTransitions>,
+    gamingCount: number,
+    introducedCount: number,
+    resolvedCount: number,
+    simplificationRewardBonus: number,
+): string[] {
+    const explanation: string[] = [
+        `Quality score moved from ${metrics.beforeScore} to ${metrics.afterScore} (Delta: ${metrics.deltaScore > 0 ? '+' : ''}${metrics.deltaScore}).`,
+        `Effective code density shifted from ${metrics.effectiveDensityBefore} to ${metrics.effectiveDensityAfter} (Delta: ${metrics.effectiveDensityDelta}).`,
+    ];
+
+    if (relocationAnalysis.hasPureRelocationsOnly) {
+        explanation.push(
+            `DEBOUNCED: Detected ${relocationAnalysis.relocatedCount} pure constant relocation(s) without semantic improvement; score gain clamped to 0.0.`,
+        );
+    }
+
+    if (gamingCount > 0) {
+        explanation.push(
+            `REJECTED: Detected ${gamingCount} anti-gaming metric manipulation pattern(s).`,
+        );
+    }
+    if (introducedCount > 0) {
+        explanation.push(`Introduced ${introducedCount} new issue(s).`);
+    }
+    if (resolvedCount > 0) {
+        explanation.push(`Resolved ${resolvedCount} previous issue(s).`);
+    }
+
+    if (simplificationRewardBonus > 0) {
+        explanation.push(
+            `REWARD BONUS: Earned +${simplificationRewardBonus} simplification bonus points for immutable folding/ternary refactoring opportunities.`,
+        );
+    }
+
+    return explanation;
 }
 
 /**
@@ -194,37 +259,29 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
         verdict = VERDICT_NEUTRAL;
     }
 
-    const explanation: string[] = [
-        `Quality score moved from ${beforeScore} to ${afterScore} (Delta: ${deltaScore > 0 ? '+' : ''}${deltaScore}).`,
-        `Effective code density shifted from ${effectiveDensityBefore} to ${effectiveDensityAfter} (Delta: ${effectiveDensityDelta}).`,
-    ];
+    const simplificationRewardBonus = computeSimplificationRewardBonus(newIssues);
 
-    if (relocationAnalysis.hasPureRelocationsOnly) {
-        explanation.push(
-            `DEBOUNCED: Detected ${relocationAnalysis.relocatedCount} pure constant relocation(s) without semantic improvement; score gain clamped to 0.0.`,
-        );
-    }
-
-    if (gaming.length > 0) {
-        explanation.push(
-            `REJECTED: Detected ${gaming.length} anti-gaming metric manipulation pattern(s).`,
-        );
-    }
-    if (introduced.length > 0) {
-        explanation.push(`Introduced ${introduced.length} new issue(s).`);
-    }
-    if (resolved.length > 0) {
-        explanation.push(`Resolved ${resolved.length} previous issue(s).`);
-    }
-
-    return {
-        filePath,
+    const metrics: PatchScoreMetrics = {
         beforeScore,
         afterScore,
         deltaScore,
         effectiveDensityBefore,
         effectiveDensityAfter,
         effectiveDensityDelta,
+    };
+
+    const explanation = buildPatchExplanations(
+        metrics,
+        relocationAnalysis,
+        gaming.length,
+        introduced.length,
+        resolved.length,
+        simplificationRewardBonus,
+    );
+
+    return {
+        filePath,
+        ...metrics,
         pillarDeltas,
         introducedIssues: introduced,
         resolvedIssues: resolved,
@@ -233,5 +290,6 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
         explanation,
         beforeDetails,
         afterDetails,
+        simplificationRewardBonus,
     };
 }

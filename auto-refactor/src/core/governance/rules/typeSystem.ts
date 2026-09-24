@@ -2,26 +2,25 @@
  * Module: Core Engine - Governance Rules - Type System
  * File Path: src/core/governance/rules/typeSystem.ts
  * Architecture Role: Rule provider exporting ExplicitTypingRule (GOV-TYP-001),
- *     FunctionSignatureCompletenessRule (GOV-TYP-002) and UnsafeAnyRule (GOV-TYP-003), plus
- *     shared GDScript/Python signature regexes; the governance registry wires all three rules.
+ *     FunctionSignatureCompletenessRule (GOV-TYP-002), UnsafeAnyRule (GOV-TYP-003),
+ *     ContractForcedEscapeRule (GOV-TYP-004) and UnsafePropertyPenetrationRule (GOV-TYP-005).
  * Dependencies & Triggers: Imports GovernanceRule, GovernanceViolation and
  *     RuleEvaluationContext from ../types plus NodeKind from ../../multilang; checkFile rules
  *     run from GovernanceAnalyzer.finalize, checkNode from visit(), during governance-enabled
  *     CLI, CI or daemon scans filtered by the resolved language capability profile.
- * Responsibilities: GOV-TYP-001 flags GDScript `var name =` assignments lacking a type
- *     annotation or `:=` inference, skipping Variant-ambiguous right-hand sides such as null,
- *     empty literals, dynamic get() calls and bare index/field access; GOV-TYP-002 requires
- *     return annotations on GDScript functions and Python `def` signatures, scanning
- *     multi-line parameter lists; GOV-TYP-003 flags naked `any` annotations and casts in
- *     TypeScript, skipping comment lines and lines carrying an eslint-disable pragma.
- * Exit Semantics & Design Rationale: every hook returns null when the language is unsupported,
+ * Responsibilities: Enforce strong typing across GDScript, Python and TypeScript; eliminate
+ *     weak variable assignments, unannotated return types, naked any annotations,
+ *     forced undefined/null as any escape hatches, and unsafe property penetrations.
+ * Exit Semantics & Design Rationale: Every hook returns null when the language is unsupported,
  *     the node does not apply or the file is clean, and a violation array otherwise; none
- *     throw or mutate shared state. Only GOV-TYP-001 marks findings fixable and attaches a
- *     `:=` patch; GOV-TYP-002 and GOV-TYP-003 report non-fixable findings. Capability gating
- *     runs first so untyped languages stay silent, while explicit annotations are demanded
- *     because inference around Variant or any erases compiler guarantees.
+ *     throw or mutate shared state. Capability gating runs first so untyped languages stay silent.
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
+import { SEVERITY_WARNING } from '../../types';
+
+/** Category token shared across all type system governance rules. */
+const TYPE_SYSTEM_CATEGORY = 'type_system';
+const RISK_MEDIUM = 'medium';
 
 /**
  * GOV-TYP-001: Explicit Strong Typing & Type Inference (ADV-TYP-001 generalized).
@@ -74,9 +73,9 @@ function checkGdWeakVarLine(
 export const ExplicitTypingRule: GovernanceRule = {
     id: 'GOV-TYP-001',
     name: 'Explicit Strong Typing and Static Inference',
-    category: 'type_system',
-    severity: 'warning',
-    risk: 'medium',
+    category: TYPE_SYSTEM_CATEGORY,
+    severity: SEVERITY_WARNING,
+    risk: RISK_MEDIUM,
     rationale:
         'Implicit loose typing hides type errors at runtime and weakens static safety guarantees.',
     isFixable: false,
@@ -179,9 +178,9 @@ function checkPythonFunctionReturnTypes(lines: string[], violations: GovernanceV
 export const FunctionSignatureCompletenessRule: GovernanceRule = {
     id: 'GOV-TYP-002',
     name: 'Function Signature Parameter & Return Type Completeness',
-    category: 'type_system',
-    severity: 'warning',
-    risk: 'medium',
+    category: TYPE_SYSTEM_CATEGORY,
+    severity: SEVERITY_WARNING,
+    risk: RISK_MEDIUM,
     rationale:
         'Missing return type annotations on functions degrade API contracts and compiler static analysis.',
     isFixable: false,
@@ -231,8 +230,8 @@ export const FunctionSignatureCompletenessRule: GovernanceRule = {
 export const UnsafeAnyRule: GovernanceRule = {
     id: 'GOV-TYP-003',
     name: 'Unsafe Any Escape Hatch Elimination',
-    category: 'type_system',
-    severity: 'warning',
+    category: TYPE_SYSTEM_CATEGORY,
+    severity: SEVERITY_WARNING,
     risk: 'high',
     rationale: 'Naked `any` bypasses the entire compiler type checker, leaking type instability.',
     isFixable: false,
@@ -266,3 +265,103 @@ export const UnsafeAnyRule: GovernanceRule = {
         return violations.length > 0 ? violations : null;
     },
 };
+
+const FORCED_ESCAPE_RE = /\b(?:undefined|null)\s+as\s+any\b/;
+const PROPERTY_PENETRATION_RE = /\(\s*([a-zA-Z0-9_$]+)\s+as\s+any\s*\)\s*(?:\.|\?\.|\b\[)/;
+
+/**
+ * Scans masked lines for regex matches and formats governance violations.
+ */
+function scanLinePatternViolations(
+    lines: string[],
+    pattern: RegExp,
+    ruleId: 'GOV-TYP-004' | 'GOV-TYP-005',
+    messageFn: (m: RegExpExecArray) => string,
+    suggestion: string,
+): GovernanceViolation[] {
+    const violations: GovernanceViolation[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+        if (ESLINT_DISABLE_RE.test(line)) continue;
+
+        const match = pattern.exec(line);
+        if (match) {
+            violations.push({
+                ruleId,
+                message: messageFn(match),
+                line: i + 1,
+                column: match.index + 1,
+                suggestion,
+                fixable: false,
+            });
+        }
+    }
+    return violations;
+}
+
+/**
+ * Factory for creating TypeScript pattern-matching governance rules.
+ */
+function createTypeGovernanceRule(
+    id: 'GOV-TYP-004' | 'GOV-TYP-005',
+    name: string,
+    risk: 'medium' | 'high',
+    rationale: string,
+    pattern: RegExp,
+    messageFn: (m: RegExpExecArray) => string,
+    suggestion: string,
+): GovernanceRule {
+    return {
+        id,
+        name,
+        category: TYPE_SYSTEM_CATEGORY,
+        severity: SEVERITY_WARNING,
+        risk,
+        rationale,
+        isFixable: false,
+        languages: ['typescript'],
+        checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+            if (!ctx.content.includes('as any')) return null;
+            const violations = scanLinePatternViolations(
+                ctx.masked,
+                pattern,
+                id,
+                messageFn,
+                suggestion,
+            );
+            return violations.length > 0 ? violations : null;
+        },
+    };
+}
+
+/**
+ * GOV-TYP-004: Contract-Forced Escape Hatch / ISP Violation.
+ * Flags passing or assigning `undefined as any` or `null as any` to force interface compliance.
+ */
+export const ContractForcedEscapeRule: GovernanceRule = createTypeGovernanceRule(
+    'GOV-TYP-004',
+    'Contract-Forced Escape Hatch Elimination',
+    RISK_MEDIUM,
+    'Passing or assigning `undefined as any` or `null as any` indicates an Interface Segregation Principle (ISP) violation. Design optional union parameters (`param?: Type`) or split interfaces instead.',
+    FORCED_ESCAPE_RE,
+    () =>
+        'Avoid `undefined as any` or `null as any`; refactor interface to optional type (`?`) or split into specific interfaces.',
+    'Update the target parameter signature to allow `undefined` or use interface segregation.',
+);
+
+/**
+ * GOV-TYP-005: Unsafe Property Penetration.
+ * Flags accessing properties through `(expr as any).prop` or `(expr as any)?.prop`.
+ */
+export const UnsafePropertyPenetrationRule: GovernanceRule = createTypeGovernanceRule(
+    'GOV-TYP-005',
+    'Unsafe Property Penetration Elimination',
+    'high',
+    'Accessing properties via `(expr as any).prop` bypasses compiler type safety and indicates missing type narrowing guards or proper domain entity types.',
+    PROPERTY_PENETRATION_RE,
+    (m) =>
+        `Unsafe property penetration on \`${m[1]}\` via \`as any\`. Use standard type guards or narrowing.`,
+    'Use standard type guards (e.g. `ts.isXxx()`, `in` operator, or custom predicate) before accessing properties.',
+);

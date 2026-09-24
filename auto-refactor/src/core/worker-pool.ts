@@ -49,8 +49,8 @@ const BYTES_PER_MIB = 1048576;
  */
 export interface WorkerPoolEntry {
     fp: string;
-    workers: any[];
-    workerIdx: Map<any, number>;
+    workers: Worker[];
+    workerIdx: Map<Worker, number>;
     n: number;
     lastUsed: number;
     warm: boolean;
@@ -74,8 +74,8 @@ export class WorkerPoolManager {
     ): WorkerPoolEntry {
         let e = this.pools.get(fp);
         if (!e) {
-            const workers: any[] = [];
-            const workerIdx = new Map<any, number>();
+            const workers: Worker[] = [];
+            const workerIdx = new Map<Worker, number>();
             for (let k = 0; k < n; k++) {
                 const w = new Worker(this.workerPath, {
                     workerData: { config, analyzerDescs: descs },

@@ -105,6 +105,25 @@ export function processOrder(order: any) { // Unsafe any (GOV-TYP-003)
 
   return false;
 }
+
+export function submitRefund(receiptId: string, options: any) {
+  validateReceipt(receiptId, undefined as any);
+}
+
+export function getReceiptToken(rawMeta: unknown): string | undefined {
+  return (rawMeta as any).token;
+}
+
+export function evaluatePatchMetrics(
+  filePath: string,
+  fileLines: number,
+  baseScore: number,
+  riskWeight: number,
+  isCoreModule: boolean,
+  authorUid: string,
+) {
+  return fileLines > 0 ? baseScore : 0;
+}
 `,
   );
 
@@ -291,6 +310,64 @@ function verifyOutputSchema(govIssues) {
 }
 
 /**
+ * Verify TypeScript-specific governance rules and exemptions.
+ */
+function verifyTypeScriptAdaptation(tsIssues) {
+  const tsCatchIssues = tsIssues.filter((i) => i.rule === 'GOV-EXC-001');
+  assert(
+    tsCatchIssues.length > 0,
+    `TypeScript file correctly detected empty catch block violation (${tsCatchIssues.length})`,
+  );
+
+  const documentedCatchIssues = tsIssues.filter(
+    (i) => i.rule === 'GOV-EXC-001' && i.location.file.endsWith('documented_catch.ts'),
+  );
+  assert(
+    documentedCatchIssues.length === 0,
+    `A catch documented with a rationale marker must stay silent (${documentedCatchIssues.length})`,
+  );
+
+  const forcedEscapeIssues = tsIssues.filter((i) => i.rule === 'GOV-TYP-004');
+  assert(
+    forcedEscapeIssues.length > 0,
+    `TypeScript file correctly detected contract-forced escape hatch (GOV-TYP-004) (${forcedEscapeIssues.length})`,
+  );
+
+  const penetrationIssues = tsIssues.filter((i) => i.rule === 'GOV-TYP-005');
+  assert(
+    penetrationIssues.length > 0,
+    `TypeScript file correctly detected unsafe property penetration (GOV-TYP-005) (${penetrationIssues.length})`,
+  );
+
+  const syncIoIssues = tsIssues.filter((i) => i.rule === 'GOV-PRF-004');
+  assert(
+    syncIoIssues.length > 0,
+    `GOV-PRF-004 must report synchronous fs outside the policy globs (${syncIoIssues.length})`,
+  );
+
+  const preHashIssues = tsIssues.filter((i) => i.rule === 'GOV-PRF-005');
+  assert(
+    preHashIssues.length > 0,
+    `TypeScript file correctly detected in-loop array pre-hashing (GOV-PRF-005) (${preHashIssues.length})`,
+  );
+  assert(
+    preHashIssues[0].suggestion.includes('new Set'),
+    'GOV-PRF-005 suggestion must recommend hoisting new Set',
+  );
+
+  const dataClumpIssues = tsIssues.filter((i) => i.rule === 'GOV-DAT-001');
+  assert(
+    dataClumpIssues.length > 0,
+    `TypeScript file correctly detected data clumps parameter convergence (GOV-DAT-001) (${dataClumpIssues.length})`,
+  );
+  assert(
+    dataClumpIssues[0].suggestion.includes('Context') ||
+      dataClumpIssues[0].suggestion.includes('Options'),
+    'GOV-DAT-001 suggestion must recommend aggregating parameters into Context/Options',
+  );
+}
+
+/**
  * Verify language-specific adaptation and boundary rules across TS, GDScript, Rust, and Python.
  */
 function verifyLanguageAdaptation(issues) {
@@ -310,25 +387,7 @@ function verifyLanguageAdaptation(issues) {
   );
 
   const tsIssues = issues.filter((i) => i.location.file.endsWith('.ts'));
-  const tsCatchIssues = tsIssues.filter((i) => i.rule === 'GOV-EXC-001');
-  assert(
-    tsCatchIssues.length > 0,
-    `TypeScript file correctly detected empty catch block violation (${tsCatchIssues.length})`,
-  );
-
-  const documentedCatchIssues = tsIssues.filter(
-    (i) => i.rule === 'GOV-EXC-001' && i.location.file.endsWith('documented_catch.ts'),
-  );
-  assert(
-    documentedCatchIssues.length === 0,
-    `A catch documented with a rationale marker must stay silent (${documentedCatchIssues.length})`,
-  );
-
-  const syncIoIssues = tsIssues.filter((i) => i.rule === 'GOV-PRF-004');
-  assert(
-    syncIoIssues.length > 0,
-    `GOV-PRF-004 must report synchronous fs outside the policy globs (${syncIoIssues.length})`,
-  );
+  verifyTypeScriptAdaptation(tsIssues);
 
   const pyIssues = issues.filter((i) => i.location.file.endsWith('.py'));
   const pyJargonIssues = pyIssues.filter((i) => i.rule === 'GOV-SAN-001');

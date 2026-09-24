@@ -1,24 +1,3 @@
-import { parentPort, workerData } from 'worker_threads';
-import * as fs from 'fs';
-import type * as ts from 'typescript';
-// ts-free modules only — importing `../utils/ast` here would pull `typescript` into every
-// worker isolate, even when the oxc parser + built-in analyzers never touch it.
-import { countLineStats } from '../utils/linestats';
-import { instantiateAnalyzer } from './load-analyzer';
-import type { AnalyzerContext, Issue, FileMetric, ScanConfig } from './types';
-import {
-    runStreaming,
-    runStreamingProjected,
-    FileMetricCollector,
-    tryCreateProjector,
-} from './traverse';
-import { adapterFor } from './adapters';
-import { unsupportedLanguageDiagnostic } from './language-support';
-import type { LanguageAdapter, NodeProjector, NormalizedAst, NormalizedNode } from './multilang';
-import { encodeResults, BINARY_RESULT_ENABLED } from './result-codec';
-
-type LineStats = ReturnType<typeof countLineStats>;
-
 /**
  * Module: Core Engine — Parallel Parse/Analyze Worker Isolate
  * File Path: src/core/worker.ts
@@ -52,26 +31,62 @@ type LineStats = ReturnType<typeof countLineStats>;
  * config/descs loaded at spawn time.
  */
 
+import { parentPort, workerData } from 'worker_threads';
+import * as fs from 'fs';
+import type * as ts from 'typescript';
+// ts-free modules only — importing `../utils/ast` here would pull `typescript` into every
+// worker isolate, even when the oxc parser + built-in analyzers never touch it.
+import { countLineStats } from '../utils/linestats';
+import { instantiateAnalyzer } from './load-analyzer';
+import type { AnalyzerContext, Issue, FileMetric, ScanConfig } from './types';
+import {
+    runStreaming,
+    runStreamingProjected,
+    FileMetricCollector,
+    tryCreateProjector,
+    type StreamingEntry,
+} from './traverse';
+import { adapterFor } from './adapters';
+import { unsupportedLanguageDiagnostic } from './language-support';
+import type { LanguageAdapter, NodeProjector, NormalizedAst, NormalizedNode } from './multilang';
+import { encodeResults, BINARY_RESULT_ENABLED } from './result-codec';
+
+type LineStats = ReturnType<typeof countLineStats>;
+
 interface Desc {
     name: string;
     modulePath: string;
-    options: Record<string, any>;
+    options: Record<string, unknown>;
 }
 
 interface LoadedAnalyzer {
     name: string;
     analyzer: {
-        name: string;
-        analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[];
-        visit?: (...args: any[]) => unknown;
-        finalize?: (...args: any[]) => unknown;
+        name?: string;
+        analyze?(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[];
+        visit?(
+            node: NormalizedNode,
+            ctx: AnalyzerContext,
+            parent?: NormalizedNode,
+            grandparent?: NormalizedNode,
+            depth?: number,
+            className?: string | null,
+            binding?: string | null,
+        ): void;
+        finalize?(ctx: AnalyzerContext): Issue[];
     };
-    options: Record<string, any>;
-    mod: any;
+    options: Record<string, unknown>;
+    mod: unknown;
 }
 
-const workerDataConfig = (workerData && (workerData as any).config) as ScanConfig | undefined;
-const workerDataDescs = ((workerData && (workerData as any).analyzerDescs) || []) as Desc[];
+interface WorkerInitPayload {
+    config?: ScanConfig;
+    analyzerDescs?: Desc[];
+}
+
+const rawWorkerData = workerData as WorkerInitPayload | null;
+const workerDataConfig = rawWorkerData?.config;
+const workerDataDescs = rawWorkerData?.analyzerDescs || [];
 
 /**
  * AR_TIMING debug instrumentation (OFF unless AR_TIMING=1). Adds timing only — the produced
@@ -88,6 +103,9 @@ const TYPEOF_FUNCTION = 'function';
 
 /** Multiplier that converts a ratio into a percentage. */
 const PERCENT_SCALE = 100;
+
+/** Event name for worker message loop. */
+const EVENT_MESSAGE = 'message';
 
 /** Maximum message durations printed in full before the timing list is truncated. */
 const MSG_DURATION_FULL_LIST_LIMIT = 6;
@@ -253,13 +271,13 @@ function splitAnalyzers(instances: LoadedAnalyzer[]): {
 } {
     const streaming = instances.filter(
         (a) =>
-            typeof (a.analyzer as any).visit === TYPEOF_FUNCTION ||
-            typeof (a.analyzer as any).finalize === TYPEOF_FUNCTION,
+            typeof a.analyzer.visit === TYPEOF_FUNCTION ||
+            typeof a.analyzer.finalize === TYPEOF_FUNCTION,
     );
     const legacy = instances.filter(
         (a) =>
-            typeof (a.analyzer as any).visit !== TYPEOF_FUNCTION &&
-            typeof (a.analyzer as any).finalize !== TYPEOF_FUNCTION,
+            typeof a.analyzer.visit !== TYPEOF_FUNCTION &&
+            typeof a.analyzer.finalize !== TYPEOF_FUNCTION,
     );
     return { streaming, legacy };
 }
@@ -309,13 +327,13 @@ function createAnalyzerEntries(
     sourceFile: ts.SourceFile | undefined,
     config: ScanConfig,
     lineStats: LineStats,
-): { analyzer: any; ctx: AnalyzerContext }[] {
+): StreamingEntry[] {
     const tInst0 = AR_TIMING ? nowMs() : 0;
-    const es: { analyzer: any; ctx: AnalyzerContext }[] = [];
+    const es: StreamingEntry[] = [];
     for (const a of streaming) {
         const fresh = instantiateAnalyzer(a.mod, a.name);
         es.push({
-            analyzer: fresh,
+            analyzer: fresh as unknown as StreamingEntry['analyzer'],
             ctx: {
                 filePath: file,
                 content,
@@ -350,7 +368,7 @@ function createAnalyzerEntries(
  */
 function executeStreamingAnalyzers(
     proj: NodeProjector | null,
-    entries: { analyzer: any; ctx: AnalyzerContext }[],
+    entries: StreamingEntry[],
     adapter: LanguageAdapter,
     ast: NormalizedAst | null,
     content: string,
@@ -423,7 +441,9 @@ function executeLegacyAnalyzers(
             lineStats,
         };
         try {
-            issues.push(...a.analyzer.analyze(sourceFile, ctx));
+            if (typeof a.analyzer.analyze === 'function') {
+                issues.push(...a.analyzer.analyze(sourceFile, ctx));
+            }
         } catch (e) {
             const sev: 'error' | 'info' = config.failOnAnalyzerError ? 'error' : 'info';
             issues.push({
@@ -555,7 +575,7 @@ if (parentPort) {
     // produce comma-joined byte numbers. Always decode via Buffer.from(...) over the
     // transferred ArrayBuffer (a zero-copy view, correct for both Uint8Array and Buffer).
     parentPort.on(
-        'message',
+        EVENT_MESSAGE,
         (msg: {
             tasks?: { file: string; absPath?: string; buf?: Uint8Array }[];
             flush?: boolean;

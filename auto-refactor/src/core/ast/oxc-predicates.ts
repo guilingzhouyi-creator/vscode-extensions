@@ -306,10 +306,13 @@ function oxcIsNumericTolerated(node: OxcNode, p: OxcNode, ctx?: Ctx): boolean {
 
 /** Check whether a string literal appears in a tolerated AST context. */
 function oxcIsStringTolerated(node: OxcNode, p: OxcNode, ctx: Ctx): boolean {
-    if (p.type === 'ImportDeclaration' || p.type === 'TSImportEqualsDeclaration') return true;
+    if (p.type === 'ImportDeclaration' || p.type === 'TSImportEqualsDeclaration') {
+        return true;
+    }
     if (p.type === NODE_KIND_PROPERTY && p.key === node) return true;
-    if (p.type === NODE_KIND_MEMBER_EXPRESSION && !p.computed) return true;
+    if (p.type === NODE_KIND_MEMBER_EXPRESSION) return true;
     if (p.type === 'JSXAttribute' && p.name === node) return true;
+    if (p.type === 'SwitchCase' && p.test === node) return true;
     if (p.type === 'JSXElement' || p.type === 'JSXOpeningElement') return false;
     const args = p.arguments;
     if (p.type === 'CallExpression' && Array.isArray(args) && args.includes(node)) {

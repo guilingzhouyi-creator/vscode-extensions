@@ -1,5 +1,6 @@
 import type { NormalizedNode, NormalizedAst, LanguageAdapter } from './multilang';
 import { NodeKind } from './multilang';
+import type { TreeSitterNode, TreeSitterParser } from './tree-sitter-types';
 
 /**
  * Module: Core Engine — Rust Language Adapter
@@ -21,7 +22,7 @@ import { NodeKind } from './multilang';
  */
 
 // Lazily-initialized shared parser (safe: parse is synchronous, workers get their own copy).
-let parser: any = null;
+let parser: TreeSitterParser | null = null;
 
 /**
  * Lazily-initialize and return the shared tree-sitter-rust parser.
@@ -31,14 +32,14 @@ let parser: any = null;
  * @returns the cached Parser instance; the first call requires the native bindings and
  * configures the Rust grammar, while later calls reuse the cached instance.
  */
-function rustParser(): any {
+function rustParser(): TreeSitterParser {
     if (!parser) {
         const Parser = require('tree-sitter');
 
         const Rust = require('tree-sitter-rust');
         const p = new Parser();
         p.setLanguage(Rust);
-        parser = p;
+        parser = p as TreeSitterParser;
     }
     return parser;
 }
@@ -171,7 +172,7 @@ export class RustAdapter implements LanguageAdapter {
      * @returns the normalized node with the exact field shape the analyzers consume,
      * including the precomputed binding and branching flags.
      */
-    private mapNode(sn: any, parent: any): NormalizedNode {
+    private mapNode(sn: TreeSitterNode, parent: TreeSitterNode | undefined): NormalizedNode {
         const kind = this.kindOf(sn, parent);
         const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
         const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
@@ -207,12 +208,16 @@ export class RustAdapter implements LanguageAdapter {
             isConstructor: false,
         };
 
-        const topLevel = !!parent && parent.type === 'source_file' && TOP_LEVEL_TYPES.has(sn.type);
+        const topLevel = Boolean(
+            parent && parent.type === 'source_file' && TOP_LEVEL_TYPES.has(sn.type),
+        );
         node.topLevel = topLevel;
         node.exported =
             topLevel &&
-            (sn.namedChildren || []).some(
-                (c: any) => c.type === 'visibility_modifier' && c.text.startsWith('pub'),
+            Boolean(
+                sn.namedChildren?.some(
+                    (c) => c.type === 'visibility_modifier' && Boolean(c.text?.startsWith('pub')),
+                ),
             );
 
         if (isLiteral) {
@@ -239,7 +244,7 @@ export class RustAdapter implements LanguageAdapter {
      * @returns the normalized kind, defaulting to `NodeKind.Other` for unmapped types and
      * to `NodeKind.ControlFlow` for the branch types listed in BRANCH_TYPES.
      */
-    private kindOf(sn: any, parent: any): NodeKind {
+    private kindOf(sn: TreeSitterNode, parent: TreeSitterNode | undefined): NodeKind {
         if (sn.type === 'function_item') {
             return parent && (parent.type === NODE_KIND_IMPL_ITEM || parent.type === 'trait_item')
                 ? NodeKind.Method
@@ -260,11 +265,11 @@ export class RustAdapter implements LanguageAdapter {
      * @returns `1` for branch constructs, the `?` operator and short-circuit `&&`/`||`
      * operators, otherwise `0`.
      */
-    private branchWeightOf(sn: any): number {
+    private branchWeightOf(sn: TreeSitterNode): number {
         if (BRANCH_TYPES.has(sn.type)) return 1;
         if (sn.type === 'try_expression') return 1; // `?` operator
         if (sn.type === 'binary_expression') {
-            const op = sn.childForFieldName && sn.childForFieldName('operator');
+            const op = sn.childForFieldName ? sn.childForFieldName('operator') : null;
             if (op && (op.text === '&&' || op.text === '||')) return 1;
         }
         return 0;
@@ -276,12 +281,12 @@ export class RustAdapter implements LanguageAdapter {
      * @param sn - let declaration node.
      * @returns identifier text or null.
      */
-    private resolveLetPatternName(sn: any): string | null {
-        const pat = sn.childForFieldName && sn.childForFieldName('pattern');
+    private resolveLetPatternName(sn: TreeSitterNode): string | null {
+        const pat = sn.childForFieldName ? sn.childForFieldName('pattern') : null;
         if (!pat) return null;
-        if (pat.type === 'identifier') return pat.text;
-        const id = (pat.namedChildren || []).find((c: any) => c.type === 'identifier');
-        return id ? id.text : null;
+        if (pat.type === 'identifier') return pat.text ?? null;
+        const id = pat.namedChildren?.find((c) => c.type === 'identifier');
+        return id?.text ?? null;
     }
 
     /**
@@ -293,15 +298,15 @@ export class RustAdapter implements LanguageAdapter {
      * @param sn - raw tree-sitter node.
      * @returns the resolved non-empty name, or `null` when the node has no name.
      */
-    private nameOf(sn: any): string | null {
-        const name = sn.childForFieldName && sn.childForFieldName('name');
-        if (name && name.type === 'identifier') return name.text;
+    private nameOf(sn: TreeSitterNode): string | null {
+        const name = sn.childForFieldName ? sn.childForFieldName('name') : null;
+        if (name && name.type === 'identifier') return name.text ?? null;
         if (sn.type === 'let_declaration') {
             return this.resolveLetPatternName(sn);
         }
         if (sn.type === NODE_KIND_IMPL_ITEM) {
-            const ty = sn.childForFieldName && sn.childForFieldName('type');
-            if (ty) return ty.text;
+            const ty = sn.childForFieldName ? sn.childForFieldName('type') : null;
+            if (ty) return ty.text ?? null;
         }
         return null;
     }
@@ -312,10 +317,10 @@ export class RustAdapter implements LanguageAdapter {
      * @param sn - raw tree-sitter node.
      * @returns `true` when the node is a `let` declaration whose value is a closure.
      */
-    private introducesBinding(sn: any): boolean {
+    private introducesBinding(sn: TreeSitterNode): boolean {
         if (sn.type !== 'let_declaration') return false;
-        const val = sn.childForFieldName && sn.childForFieldName('value');
-        return !!val && val.type === 'closure_expression';
+        const val = sn.childForFieldName ? sn.childForFieldName('value') : null;
+        return Boolean(val && val.type === 'closure_expression');
     }
 
     /**
@@ -325,7 +330,7 @@ export class RustAdapter implements LanguageAdapter {
      * @param parent - raw parent; `undefined` means the literal has no parent context.
      * @returns `true` for literals under `const` / `static` items or enum variants.
      */
-    private isConstBoundOf(_sn: any, parent: any): boolean {
+    private isConstBoundOf(_sn: TreeSitterNode, parent: TreeSitterNode | undefined): boolean {
         if (!parent) return false;
         return CONST_BOUND_PARENTS.has(parent.type);
     }
@@ -338,7 +343,7 @@ export class RustAdapter implements LanguageAdapter {
      * @returns `true` for index/tuple indices and macro/attribute/use contexts where the
      * constants analyzer must not report the literal.
      */
-    private isToleratedOf(sn: any, parent: any): boolean {
+    private isToleratedOf(sn: TreeSitterNode, parent: TreeSitterNode | undefined): boolean {
         if (!parent) return false;
         if (sn.type === 'integer_literal' || sn.type === 'float_literal') {
             return NUMERIC_TOLERATED_PARENTS.has(parent.type);

@@ -16,6 +16,7 @@
  *   three line-based rules use conservative, keyword-anchored patterns: a false "delete this
  *   code" suggestion is far more expensive than a missed smell.
  */
+import * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
@@ -23,14 +24,18 @@ import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
 import { locN } from '../utils/normalized';
 import { globToRegExp, matchAny } from '../core/file-discovery';
+import { detectTernaryOpportunities } from './simplify-ternary';
 
 /** Per-analyzer tunables (declared in `defaultAnalyzerOptions().simplify`). */
-interface SimplifyOptions {
+export interface SimplifyOptions {
     maxFunctionLines?: number;
     commentedCodeMinLines?: number;
     printAllowPatterns?: string[];
     checkGuardClauses?: boolean;
     maxGuardClauseNesting?: number;
+    checkTernarySimplification?: boolean;
+    maxTernaryLength?: number;
+    rewardSimplifications?: boolean;
 }
 
 const DEFAULT_MAX_FUNCTION_LINES = 60;
@@ -63,12 +68,41 @@ const PY_EMPTY_BODY_RE = /^pass\s*$/;
 const BRACE_EMPTY_ONE_LINER_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*\}\s*$/;
 const BRACE_OPEN_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*$/;
 const BRACE_CLOSE_RE = /^\s*\}\s*;?\s*$/;
-const COMMENT_MARKERS = ['//', '#', '*'];
+const PREFIX_SLASH_SLASH = '//';
+const PREFIX_HASH = '#';
+const PREFIX_STAR = '*';
+const PREFIX_BLOCK_COMMENT_START = '/*';
+const COMMENT_MARKERS = [PREFIX_SLASH_SLASH, PREFIX_HASH, PREFIX_STAR];
 const CHAR_DOUBLE_QUOTE = '"';
+
+function isCommentOrBlankLine(trimmed: string): boolean {
+    if (!trimmed) return true;
+    return (
+        trimmed.startsWith(PREFIX_SLASH_SLASH) ||
+        trimmed.startsWith(PREFIX_HASH) ||
+        trimmed.startsWith(PREFIX_STAR) ||
+        trimmed.startsWith(PREFIX_BLOCK_COMMENT_START)
+    );
+}
+
+function countEffectiveFunctionLines(lines: string[], startLine: number, endLine: number): number {
+    const startIdx = Math.max(0, startLine - 1);
+    const endIdx = Math.min(lines.length, endLine);
+    let effective = 0;
+    for (let i = startIdx; i < endIdx; i++) {
+        if (!isCommentOrBlankLine(lines[i].trim())) {
+            effective++;
+        }
+    }
+    return effective;
+}
 const CHAR_SINGLE_QUOTE = "'";
 const TRIPLE_DOUBLE_QUOTE = '"""';
 const TRIPLE_SINGLE_QUOTE = "'''";
 type DocstringQuote = typeof CHAR_DOUBLE_QUOTE | typeof CHAR_SINGLE_QUOTE;
+const PROP_FOR_EACH_CHILD = 'forEachChild';
+const ANONYMOUS_NAME = 'anonymous';
+const ANONYMOUS_SUFFIX = '.<anonymous>';
 
 function computeControlFlowNesting(rootNode: NormalizedNode): number {
     const rootChildren = rootNode.children;
@@ -81,7 +115,10 @@ function computeControlFlowNesting(rootNode: NormalizedNode): number {
     for (let i = 0; i < rootChildren.length; i++) {
         const child = rootChildren[i];
         if (!child.functionLike) {
-            const nextDepth = child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0;
+            const isNesting =
+                child.kind === NodeKind.ControlFlow ||
+                (Boolean(child.increasesNesting) && child.kind !== NodeKind.Block);
+            const nextDepth = isNesting ? 1 : 0;
             nodeStack.push(child);
             depthStack.push(nextDepth);
         }
@@ -98,7 +135,10 @@ function computeControlFlowNesting(rootNode: NormalizedNode): number {
                 const child = children[i];
                 if (!child.functionLike) {
                     const inc =
-                        child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0;
+                        child.kind === NodeKind.ControlFlow ||
+                        (Boolean(child.increasesNesting) && child.kind !== NodeKind.Block)
+                            ? 1
+                            : 0;
                     nodeStack.push(child);
                     depthStack.push(currentDepth + inc);
                 }
@@ -119,6 +159,14 @@ export class SimplifyAnalyzer implements Analyzer {
     name = ANALYZER_SIMPLIFY;
 
     private longFunctions: Issue[] = [];
+    private contentLines: string[] | null = null;
+
+    private getContentLines(ctx: AnalyzerContext): string[] {
+        if (!this.contentLines) {
+            this.contentLines = ctx.content ? ctx.content.split('\n') : [];
+        }
+        return this.contentLines;
+    }
 
     /**
      * Record functions whose measured span exceeds `maxFunctionLines`.
@@ -135,20 +183,26 @@ export class SimplifyAnalyzer implements Analyzer {
         name: string,
     ): void {
         const limit = opts.maxFunctionLines ?? DEFAULT_MAX_FUNCTION_LINES;
-        const length = (node.end?.line ?? 0) - (node.start?.line ?? 0) + 1;
-        if (length > limit) {
-            this.longFunctions.push({
-                id: `simplify:SIM-LONG-001:${ctx.filePath}:${node.start?.line ?? 1}`,
-                analyzer: ANALYZER_SIMPLIFY,
-                rule: 'SIM-LONG-001',
-                severity: SEVERITY_WARNING,
-                message: `Function "${name}" spans ${length} lines (limit ${limit}).`,
-                location: locN(node, ctx.filePath),
-                detail: { function: name, lines: length, limit },
-                suggestion:
-                    'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
-            });
-        }
+        const startLine = node.start?.line ?? 1;
+        const endLine = node.end?.line ?? startLine;
+        const length = endLine - startLine + 1;
+        if (length <= limit) return;
+
+        const lines = this.getContentLines(ctx);
+        const effectiveLines = countEffectiveFunctionLines(lines, startLine, endLine);
+        if (effectiveLines <= limit) return;
+
+        this.longFunctions.push({
+            id: `simplify:SIM-LONG-001:${ctx.filePath}:${startLine}`,
+            analyzer: ANALYZER_SIMPLIFY,
+            rule: 'SIM-LONG-001',
+            severity: SEVERITY_WARNING,
+            message: `Function "${name}" spans ${length} lines (limit ${limit}).`,
+            location: locN(node, ctx.filePath),
+            detail: { function: name, lines: length, limit },
+            suggestion:
+                'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
+        });
     }
 
     private checkGuardClauseNesting(
@@ -198,21 +252,57 @@ export class SimplifyAnalyzer implements Analyzer {
      * @returns All findings for the file.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.longFunctions.concat(this.scanContent(ctx));
+        const issues = this.longFunctions.concat(this.scanContent(ctx));
+        const opts = (ctx.options || {}) as SimplifyOptions;
+        const sourceFile = this.parseTsSource(ctx);
+        if (sourceFile) {
+            detectTernaryOpportunities(sourceFile, ctx, opts, issues);
+        }
+        return issues;
     }
 
     /**
-     * Standalone `analyze()` contract: run the line-based scan without a normalized AST.
+     * Standalone `analyze()` contract: run the line-based scan and ternary opportunities.
      *
-     * The engine's streaming path uses `visit` + `finalize`, so function-span measurement is
-     * unavailable here; callers of this compatibility entry point still get every content rule.
-     *
-     * @param _sf - Unused TypeScript source file (kept for the analyzer contract).
+     * @param sf - Optional TypeScript source file or unknown AST.
      * @param ctx - Analyzer context carrying the file content and options.
-     * @returns The content-rule findings for the file.
+     * @returns The findings for the file.
      */
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
-        return this.scanContent(ctx);
+    analyze(sf: unknown, ctx: AnalyzerContext): Issue[] {
+        const issues = this.scanContent(ctx);
+        const opts = (ctx.options || {}) as SimplifyOptions;
+        const isTsSource =
+            typeof sf === 'object' &&
+            sf !== null &&
+            PROP_FOR_EACH_CHILD in sf &&
+            typeof (sf as Record<string, unknown>)[PROP_FOR_EACH_CHILD] === 'function';
+        const sourceFile = isTsSource ? (sf as ts.SourceFile) : this.parseTsSource(ctx);
+        if (sourceFile) {
+            detectTernaryOpportunities(sourceFile, ctx, opts, issues);
+        }
+        return issues;
+    }
+
+    /**
+     * Parse source text into a TypeScript SourceFile if the target file is TS/JS.
+     *
+     * @param ctx - Analyzer context.
+     * @returns Parsed SourceFile or null for non-TS/JS sources.
+     */
+    private parseTsSource(ctx: AnalyzerContext): ts.SourceFile | null {
+        if (!ctx.content) return null;
+        const p = ctx.filePath.toLowerCase();
+        if (
+            !p.endsWith('.ts') &&
+            !p.endsWith('.tsx') &&
+            !p.endsWith('.js') &&
+            !p.endsWith('.jsx') &&
+            !p.endsWith('.mjs') &&
+            !p.endsWith('.cjs')
+        ) {
+            return null;
+        }
+        return ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true);
     }
 
     /**
@@ -277,7 +367,13 @@ export class SimplifyAnalyzer implements Analyzer {
         };
         for (let i = 0; i < lines.length; i++) {
             const trimmed = lines[i].trim();
-            const marker = COMMENT_MARKERS.find((m) => trimmed.startsWith(m));
+            let marker: string | undefined;
+            for (const m of COMMENT_MARKERS) {
+                if (trimmed.startsWith(m)) {
+                    marker = m;
+                    break;
+                }
+            }
             const body = marker ? trimmed.slice(marker.length).trim() : '';
             const codeShaped =
                 !!marker &&
@@ -332,7 +428,7 @@ export class SimplifyAnalyzer implements Analyzer {
             let j = startIndex + 1;
             while (
                 j < lines.length &&
-                (lines[j].trim() === '' || lines[j].trim().startsWith('//'))
+                (lines[j].trim() === '' || lines[j].trim().startsWith(PREFIX_SLASH_SLASH))
             ) {
                 j++;
             }
@@ -522,10 +618,10 @@ export class SimplifyAnalyzer implements Analyzer {
         binding: string | null,
     ): string {
         if (node.kind === NodeKind.Method && !node.isConstructor) {
-            const m = node.name ?? 'anonymous';
+            const m = node.name ?? ANONYMOUS_NAME;
             return className ? className + '.' + m : m;
         }
         if (node.kind === NodeKind.Function && node.name) return node.name;
-        return binding ?? (className ? className + '.<anonymous>' : 'anonymous');
+        return binding ?? (className ? className + ANONYMOUS_SUFFIX : ANONYMOUS_NAME);
     }
 }

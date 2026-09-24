@@ -155,7 +155,8 @@ const CARRIAGE_RETURN_CHAR_CODE = 13;
 export class DependencyGraphAnalyzer implements Analyzer {
     name = 'dependency-graph' as const;
 
-    analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
+        void sf;
         const opts = (ctx.options || {}) as DependencyGraphOptions;
         const groups = opts.groups ?? {};
         const rules = opts.rules ?? {};
@@ -335,7 +336,7 @@ export class DependencyGraphAnalyzer implements Analyzer {
     }
 
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined as any, ctx);
+        return this.analyze(undefined, ctx);
     }
 
     private mkIssue(

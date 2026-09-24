@@ -33,6 +33,17 @@ const EXEMPTION_MARKERS = [
     'delegate',
 ];
 
+const RESERVED_CONTROL_KEYWORDS = new Set([
+    'catch',
+    'if',
+    'while',
+    'for',
+    'switch',
+    'with',
+    'except',
+    'finally',
+]);
+
 /**
  * Checks if a comment block preceding or inside the function contains an exemption marker.
  *
@@ -113,7 +124,12 @@ function extractFunctionHead(
     if (!match) return null;
     const fnName = match[1] || match[3];
     const rawParams = match[2] !== undefined ? match[2] : match[4];
-    if (!fnName || fnName === 'constructor' || fnName.startsWith('_init')) {
+    if (
+        !fnName ||
+        fnName === 'constructor' ||
+        fnName.startsWith('_init') ||
+        RESERVED_CONTROL_KEYWORDS.has(fnName)
+    ) {
         return null;
     }
     return { fnName, rawParams: rawParams || '' };

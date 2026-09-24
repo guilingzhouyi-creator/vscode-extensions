@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790142215926",
-  "timestamp": "2026-09-23T05:43:38.043Z",
+  "snapshotId": "snapshot-v0.4.0-1790254277801",
+  "timestamp": "2026-09-24T12:51:20.186Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,36 +8,36 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "b6b139d0ebe16a1d6721046147ac8a684d23559572746c5f6ad7ab698b20a16b",
+  "rulesDigest": "041e21c5f211dd71c9a1e8265bf7c3b2e7bd58263fe237b1cc389815330f09e1",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 393,
-    "durationMs": 1989
+    "filesScanned": 399,
+    "durationMs": 2243
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 6497,
-    "suppressedIssues": 3244,
-    "unsuppressedIssues": 3253,
+    "totalIssues": 6157,
+    "suppressedIssues": 3248,
+    "unsuppressedIssues": 2909,
     "bySeverity": {
-      "info": 109,
-      "warning": 6388,
+      "info": 245,
+      "warning": 5912,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 138,
-      "medium": 5937,
-      "low": 422
+      "high": 130,
+      "medium": 5628,
+      "low": 399
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 99.3,
+      "maintainability": 99.4,
       "performance": 99.8,
       "data": 100,
       "testing": 100,
@@ -62,7 +62,7 @@
     {
       "filePath": "scripts/validate-review-memory.js",
       "domain": "scripts",
-      "totalIssues": 141,
+      "totalIssues": 138,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -71,20 +71,11 @@
     {
       "filePath": "scripts/validate-semantic-domain-detector.js",
       "domain": "scripts",
-      "totalIssues": 121,
+      "totalIssues": 124,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.98
-    },
-    {
-      "filePath": "src/api.ts",
-      "domain": "src",
-      "totalIssues": 107,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.96
     },
     {
       "filePath": "scripts/bench-baselines.js",
@@ -98,7 +89,16 @@
     {
       "filePath": "scripts/validate-multi-agent.js",
       "domain": "scripts",
-      "totalIssues": 95,
+      "totalIssues": 94,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "src/api.ts",
+      "domain": "src",
+      "totalIssues": 91,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -116,20 +116,11 @@
     {
       "filePath": "src/core/governance/semantic-naming-engine.ts",
       "domain": "governance",
-      "totalIssues": 80,
+      "totalIssues": 81,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.95
-    },
-    {
-      "filePath": "scripts/bench-fastpath.js",
-      "domain": "scripts",
-      "totalIssues": 75,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.96
     },
     {
       "filePath": "scripts/validate-generalized.js",
@@ -141,9 +132,18 @@
       "effectiveDensity": 0.98
     },
     {
+      "filePath": "scripts/bench-fastpath.js",
+      "domain": "scripts",
+      "totalIssues": 74,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.96
+    },
+    {
       "filePath": "scripts/validate-data-flow.js",
       "domain": "scripts",
-      "totalIssues": 67,
+      "totalIssues": 66,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 138,
-      "medium": 5937,
-      "low": 422
+      "high": 130,
+      "medium": 5628,
+      "low": 399
     },
     "criticalItems": [],
     "highItems": [
@@ -205,12 +205,12 @@
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
-        "id": "complexity:high-complexity:scripts/validate-governance.js:259",
+        "id": "complexity:high-complexity:scripts/validate-governance.js:278",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-governance.js",
-        "line": 259,
+        "line": 278,
         "message": "Function \"verifyOutputSchema\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
@@ -340,13 +340,13 @@
         "message": "Function \"SecurityAnalyzer.analyze\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/simplify.ts:73",
+        "id": "complexity:high-complexity:src/analyzers/simplify.ts:107",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/simplify.ts",
-        "line": 73,
-        "message": "Function \"computeControlFlowNesting\" has cyclomatic complexity 14 (threshold 12)."
+        "line": 107,
+        "message": "Function \"computeControlFlowNesting\" has cyclomatic complexity 16 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/analyzers/test-modernity.ts:458",
@@ -427,7 +427,7 @@
         "severity": "warning",
         "file": "src/core/ast/oxc-predicates.ts",
         "line": 308,
-        "message": "Function \"oxcIsStringTolerated\" has cyclomatic complexity 17 (threshold 12)."
+        "message": "Function \"oxcIsStringTolerated\" has cyclomatic complexity 18 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/ast/oxc-projector.ts:331",
@@ -448,40 +448,22 @@
         "message": "Function \"OxcProjector.pushRaw\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/python-adapter.ts:155",
+        "id": "complexity:high-complexity:src/core/ast/python-adapter.ts:114",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/python-adapter.ts",
-        "line": 155,
+        "line": 114,
         "message": "Function \"PythonAdapter.mapNode\" has cyclomatic complexity 20 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/python-adapter.ts:219",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/python-adapter.ts",
-        "line": 219,
-        "message": "Function \"PythonAdapter.kindOf\" has cyclomatic complexity 20 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/python-adapter.ts:332",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/python-adapter.ts",
-        "line": 332,
-        "message": "Function \"PythonAdapter.nameOf\" has cyclomatic complexity 16 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/rust-adapter.ts:174",
+        "id": "complexity:high-complexity:src/core/ast/rust-adapter.ts:175",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/rust-adapter.ts",
-        "line": 174,
-        "message": "Function \"RustAdapter.mapNode\" has cyclomatic complexity 18 (threshold 12)."
+        "line": 175,
+        "message": "Function \"RustAdapter.mapNode\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/ast/traverse.ts:289",
@@ -502,12 +484,12 @@
         "message": "Function \"bindingName\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/ts-predicates.ts:273",
+        "id": "complexity:high-complexity:src/core/ast/ts-predicates.ts:274",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/ts-predicates.ts",
-        "line": 273,
+        "line": 274,
         "message": "Function \"isEnclosedInConstDeclaration\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
@@ -592,22 +574,40 @@
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
       },
       {
-        "id": "performance:PRF-IO-001:src/core/cache.ts:424",
+        "id": "performance:PRF-IO-001:src/core/cache.ts:439",
         "rule": "PRF-IO-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/cache.ts",
-        "line": 424,
+        "line": 439,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
       },
       {
-        "id": "complexity:CPX-AMP-001:src/core/config/config.ts:383",
+        "id": "complexity:CPX-AMP-001:src/core/config/config.ts:403",
         "rule": "CPX-AMP-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/config/config.ts",
-        "line": 383,
+        "line": 403,
         "message": "Complexity amplification hazard: synchronous I/O executed inside loop over 'candidates'."
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/config/config.ts:406",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/config/config.ts",
+        "line": 406,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/dependency-graph.ts:140",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/dependency-graph.ts",
+        "line": 140,
+        "message": "Function \"collectPythonImports\" has cyclomatic complexity 12 (threshold 12)."
       }
     ]
   },
@@ -645,10 +645,10 @@
       },
       {
         "domainName": "src",
-        "compositeScore": 99.8,
+        "compositeScore": 100,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.5,
+          "maintainability": 100,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -708,7 +708,7 @@
         "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.7,
+          "maintainability": 97.8,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -735,10 +735,10 @@
       },
       {
         "domainName": "diff",
-        "compositeScore": 99.7,
+        "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.8,
+          "maintainability": 98.8,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -768,7 +768,7 @@
         "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99,
+          "maintainability": 99.3,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -798,7 +798,7 @@
         "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.7,
+          "maintainability": 98.8,
           "performance": 99.8,
           "data": 100,
           "testing": 100,
@@ -960,10 +960,10 @@
       },
       {
         "domainName": "evolution",
-        "compositeScore": 99.8,
+        "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.5,
+          "maintainability": 99,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1008,7 +1008,7 @@
         "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.2,
+          "maintainability": 99.5,
           "performance": 100,
           "data": 100,
           "testing": 100,

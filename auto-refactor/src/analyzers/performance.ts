@@ -104,7 +104,7 @@ export class PerformanceAnalyzer implements Analyzer {
      * @param ctx - Scan context with the normalized file path, raw text and option overrides.
      * @returns Performance issues ordered by line; severity is `info`, `warning` or `error`.
      */
-    analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         void sf;
         const opts = (ctx.options || {}) as PerformanceOptions;
         const maxNesting = opts.maxLoopNesting ?? DEFAULT_MAX_LOOP_NESTING;
@@ -386,7 +386,7 @@ export class PerformanceAnalyzer implements Analyzer {
      * @returns The same issues `analyze` returns for `ctx`, ordered by line.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined as any, ctx);
+        return this.analyze(undefined, ctx);
     }
 
     /**

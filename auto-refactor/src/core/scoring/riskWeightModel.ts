@@ -18,6 +18,22 @@ import type { PillarCeilingConstraint, PrimaryQualityPillar } from './eightPilla
  */
 export type IssueReach = 'local' | 'file' | 'cross_domain';
 
+const PILLAR_ARCHITECTURE: PrimaryQualityPillar = 'architecture';
+const PILLAR_MAINTAINABILITY: PrimaryQualityPillar = 'maintainability';
+const PILLAR_PERFORMANCE: PrimaryQualityPillar = 'performance';
+const PILLAR_DATA: PrimaryQualityPillar = 'data';
+const PILLAR_TESTING: PrimaryQualityPillar = 'testing';
+const PILLAR_RELIABILITY: PrimaryQualityPillar = 'reliability';
+const PILLAR_SECURITY: PrimaryQualityPillar = 'security';
+const PILLAR_EXTENSIBILITY: PrimaryQualityPillar = 'extensibility';
+
+const REACH_LOCAL: IssueReach = 'local';
+const REACH_FILE: IssueReach = 'file';
+const REACH_CROSS_DOMAIN: IssueReach = 'cross_domain';
+
+const SEVERITY_ERROR = 'error';
+const SEVERITY_WARNING = 'warning';
+
 /**
  * Multipliers for severity weights.
  */
@@ -35,6 +51,88 @@ export const REACH_FACTORS = {
     file: 1.5,
     cross_domain: 2.5,
 } as const;
+
+const CEILING_MAX_SCORE_ARCHITECTURE = 40;
+const CEILING_MAX_SCORE_PERFORMANCE = 45;
+const CEILING_MAX_SCORE_SECURITY = 30;
+
+const DEFAULT_SEVERITY_FACTOR = 3.0;
+const DEFAULT_CONFIDENCE = 1.0;
+const DAMPENING_SCALE = 10;
+
+const PREFIX_ARCH = 'ARCH-';
+const PREFIX_PRF = 'PRF-';
+const PREFIX_DAT = 'DAT-';
+const PREFIX_TST = 'TST-';
+const PREFIX_SEC = 'SEC-';
+const PREFIX_CPX = 'CPX-';
+const PREFIX_BIG = 'BIG-';
+const PREFIX_DEP = 'DEP-';
+
+const RULE_CLEAN_LAYER = 'clean-layer-violation';
+const RULE_HIGH_COMPLEXITY = 'high-complexity';
+const RULE_IMPORT_CYCLE = 'import-cycle';
+
+const KEYWORD_ALGORITHMIC = 'algorithmic';
+const KEYWORD_TRANSIENT = 'transient';
+const KEYWORD_QUERY = 'query';
+const KEYWORD_TEST = 'test';
+const KEYWORD_SECRET = 'secret';
+const KEYWORD_ENTROPY = 'entropy';
+
+const EXACT_RULE_TO_PILLAR: Readonly<Record<string, PrimaryQualityPillar>> = {
+    [RULE_CLEAN_LAYER]: PILLAR_ARCHITECTURE,
+    [RULE_HIGH_COMPLEXITY]: PILLAR_MAINTAINABILITY,
+    [RULE_IMPORT_CYCLE]: PILLAR_RELIABILITY,
+};
+
+const PREFIX_TO_PILLAR: ReadonlyArray<readonly [string, PrimaryQualityPillar]> = [
+    [PREFIX_ARCH, PILLAR_ARCHITECTURE],
+    [PREFIX_PRF, PILLAR_PERFORMANCE],
+    [PREFIX_DAT, PILLAR_DATA],
+    [PREFIX_TST, PILLAR_TESTING],
+    [PREFIX_SEC, PILLAR_SECURITY],
+    [PREFIX_CPX, PILLAR_MAINTAINABILITY],
+    [PREFIX_BIG, PILLAR_MAINTAINABILITY],
+    [PREFIX_DEP, PILLAR_RELIABILITY],
+];
+
+const KEYWORD_TO_PILLAR_MAP: Readonly<Record<string, PrimaryQualityPillar>> = {
+    [KEYWORD_ALGORITHMIC]: PILLAR_PERFORMANCE,
+    [KEYWORD_TRANSIENT]: PILLAR_PERFORMANCE,
+    [KEYWORD_QUERY]: PILLAR_DATA,
+    [KEYWORD_TEST]: PILLAR_TESTING,
+    [KEYWORD_SECRET]: PILLAR_SECURITY,
+    [KEYWORD_ENTROPY]: PILLAR_SECURITY,
+};
+
+const KEYWORD_DISPATCH_RE = /(algorithmic|transient|query|test|secret|entropy)/;
+
+const CROSS_DOMAIN_EXACT_RULES = new Set([RULE_CLEAN_LAYER, RULE_IMPORT_CYCLE]);
+const CROSS_DOMAIN_PREFIXES = [PREFIX_ARCH, PREFIX_DAT];
+const FILE_PREFIXES = [PREFIX_BIG, PREFIX_SEC];
+
+const FATAL_CEILING_CONFIGS: ReadonlyArray<{
+    pillar: PrimaryQualityPillar;
+    maxScore: number;
+    prefix: string;
+}> = [
+    {
+        pillar: PILLAR_ARCHITECTURE,
+        maxScore: CEILING_MAX_SCORE_ARCHITECTURE,
+        prefix: 'Fatal architecture breach',
+    },
+    {
+        pillar: PILLAR_PERFORMANCE,
+        maxScore: CEILING_MAX_SCORE_PERFORMANCE,
+        prefix: 'Fatal performance violation',
+    },
+    {
+        pillar: PILLAR_SECURITY,
+        maxScore: CEILING_MAX_SCORE_SECURITY,
+        prefix: 'Fatal security vulnerability',
+    },
+];
 
 /**
  * Calculated risk impact of an individual issue.
@@ -68,32 +166,21 @@ export interface RiskPenaltyResult {
  * @returns Impacted primary quality pillar.
  */
 export function mapRuleToPrimaryPillar(ruleId: string): PrimaryQualityPillar {
-    if (ruleId.startsWith('ARCH-') || ruleId === 'clean-layer-violation') {
-        return 'architecture';
+    const exact = EXACT_RULE_TO_PILLAR[ruleId];
+    if (exact) return exact;
+
+    for (let i = 0; i < PREFIX_TO_PILLAR.length; i++) {
+        if (ruleId.startsWith(PREFIX_TO_PILLAR[i][0])) {
+            return PREFIX_TO_PILLAR[i][1];
+        }
     }
-    if (
-        ruleId.startsWith('PRF-') ||
-        ruleId.includes('algorithmic') ||
-        ruleId.includes('transient')
-    ) {
-        return 'performance';
+
+    const m = KEYWORD_DISPATCH_RE.exec(ruleId);
+    if (m && KEYWORD_TO_PILLAR_MAP[m[1]]) {
+        return KEYWORD_TO_PILLAR_MAP[m[1]];
     }
-    if (ruleId.startsWith('DAT-') || ruleId.includes('query')) {
-        return 'data';
-    }
-    if (ruleId.startsWith('TST-') || ruleId.includes('test')) {
-        return 'testing';
-    }
-    if (ruleId.startsWith('SEC-') || ruleId.includes('secret') || ruleId.includes('entropy')) {
-        return 'security';
-    }
-    if (ruleId.startsWith('CPX-') || ruleId.startsWith('BIG-') || ruleId === 'high-complexity') {
-        return 'maintainability';
-    }
-    if (ruleId.startsWith('DEP-') || ruleId === 'import-cycle') {
-        return 'reliability';
-    }
-    return 'extensibility';
+
+    return PILLAR_EXTENSIBILITY;
 }
 
 /**
@@ -104,18 +191,67 @@ export function mapRuleToPrimaryPillar(ruleId: string): PrimaryQualityPillar {
  */
 export function inferIssueReach(issue: Issue): IssueReach {
     const rule = issue.rule;
-    if (
-        rule.startsWith('ARCH-') ||
-        rule === 'clean-layer-violation' ||
-        rule === 'import-cycle' ||
-        rule.startsWith('DAT-')
-    ) {
-        return 'cross_domain';
+    if (CROSS_DOMAIN_EXACT_RULES.has(rule)) return REACH_CROSS_DOMAIN;
+    for (let i = 0; i < CROSS_DOMAIN_PREFIXES.length; i++) {
+        if (rule.startsWith(CROSS_DOMAIN_PREFIXES[i])) return REACH_CROSS_DOMAIN;
     }
-    if (rule.startsWith('BIG-') || rule.startsWith('SEC-')) {
-        return 'file';
+    for (let i = 0; i < FILE_PREFIXES.length; i++) {
+        if (rule.startsWith(FILE_PREFIXES[i])) return REACH_FILE;
     }
-    return 'local';
+    return REACH_LOCAL;
+}
+
+interface SingleIssueEvaluation {
+    assessment: IssueRiskAssessment;
+    ceiling?: PillarCeilingConstraint;
+    isFatal: boolean;
+}
+
+function evaluateSingleIssue(issue: Issue, ruleCount: number): SingleIssueEvaluation {
+    const severity = issue.severity || SEVERITY_WARNING;
+    const sevFactor = SEVERITY_FACTORS[severity] || DEFAULT_SEVERITY_FACTOR;
+    const reach = inferIssueReach(issue);
+    const reachFactor = REACH_FACTORS[reach];
+    const confidence = issue.evidence?.confidence ?? DEFAULT_CONFIDENCE;
+
+    // Logarithmic frequency dampening prevents runaway compounding
+    const freqDampening = 1 / Math.sqrt(ruleCount);
+    const effectivePenalty =
+        Math.round(sevFactor * reachFactor * confidence * freqDampening * DAMPENING_SCALE) /
+        DAMPENING_SCALE;
+
+    const affectedPillar = mapRuleToPrimaryPillar(issue.rule);
+    let ceiling: PillarCeilingConstraint | undefined;
+    const isFatal = severity === SEVERITY_ERROR;
+
+    if (isFatal) {
+        for (let i = 0; i < FATAL_CEILING_CONFIGS.length; i++) {
+            const cfg = FATAL_CEILING_CONFIGS[i];
+            if (affectedPillar === cfg.pillar) {
+                ceiling = {
+                    pillar: cfg.pillar,
+                    maxScore: cfg.maxScore,
+                    reason: `${cfg.prefix}: [${issue.rule}] ${issue.message}`,
+                };
+                break;
+            }
+        }
+    }
+
+    return {
+        assessment: {
+            issueId: issue.id,
+            rule: issue.rule,
+            severity,
+            basePenalty: sevFactor,
+            reach,
+            confidence,
+            effectivePenalty,
+            affectedPillar,
+        },
+        ceiling,
+        isFatal,
+    };
 }
 
 /**
@@ -138,63 +274,23 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
     };
 
     const ruleFrequencies = new Map<string, number>();
-    for (const issue of issues) {
-        ruleFrequencies.set(issue.rule, (ruleFrequencies.get(issue.rule) || 0) + 1);
+    for (let i = 0; i < issues.length; i++) {
+        const rule = issues[i].rule;
+        ruleFrequencies.set(rule, (ruleFrequencies.get(rule) || 0) + 1);
     }
 
     const ceilings: PillarCeilingConstraint[] = [];
     let fatalIssueCount = 0;
 
-    for (const issue of issues) {
-        const severity = issue.severity || 'warning';
-        const sevFactor = SEVERITY_FACTORS[severity] || 3.0;
-        const reach = inferIssueReach(issue);
-        const reachFactor = REACH_FACTORS[reach];
-        const confidence = issue.evidence?.confidence ?? 1.0;
+    for (let i = 0; i < issues.length; i++) {
+        const issue = issues[i];
         const count = ruleFrequencies.get(issue.rule) || 1;
+        const result = evaluateSingleIssue(issue, count);
 
-        // Logarithmic frequency dampening prevents runaway compounding
-        const freqDampening = 1 / Math.sqrt(count);
-        const effectivePenalty =
-            Math.round(sevFactor * reachFactor * confidence * freqDampening * 10) / 10;
-
-        const affectedPillar = mapRuleToPrimaryPillar(issue.rule);
-        pillarPenalties[affectedPillar] += effectivePenalty;
-
-        assessments.push({
-            issueId: issue.id,
-            rule: issue.rule,
-            severity,
-            basePenalty: sevFactor,
-            reach,
-            confidence,
-            effectivePenalty,
-            affectedPillar,
-        });
-
-        // Fatal ceiling triggers
-        if (severity === 'error') {
-            fatalIssueCount++;
-            if (affectedPillar === 'architecture') {
-                ceilings.push({
-                    pillar: 'architecture',
-                    maxScore: 40,
-                    reason: `Fatal architecture breach: [${issue.rule}] ${issue.message}`,
-                });
-            } else if (affectedPillar === 'performance') {
-                ceilings.push({
-                    pillar: 'performance',
-                    maxScore: 45,
-                    reason: `Fatal performance violation: [${issue.rule}] ${issue.message}`,
-                });
-            } else if (affectedPillar === 'security') {
-                ceilings.push({
-                    pillar: 'security',
-                    maxScore: 30,
-                    reason: `Fatal security vulnerability: [${issue.rule}] ${issue.message}`,
-                });
-            }
-        }
+        pillarPenalties[result.assessment.affectedPillar] += result.assessment.effectivePenalty;
+        assessments.push(result.assessment);
+        if (result.isFatal) fatalIssueCount++;
+        if (result.ceiling) ceilings.push(result.ceiling);
     }
 
     let totalPenalty = 0;
@@ -203,7 +299,7 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
     }
 
     return {
-        totalPenalty: Math.round(totalPenalty * 10) / 10,
+        totalPenalty: Math.round(totalPenalty * DAMPENING_SCALE) / DAMPENING_SCALE,
         assessments,
         pillarPenalties,
         ceilings,

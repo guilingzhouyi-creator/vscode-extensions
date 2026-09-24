@@ -2,7 +2,7 @@ import * as net from 'net';
 import type { ScanConfig, ScanReport, WarmStats } from '../core/types';
 import type { RegistryInfo } from './registry';
 import { readRegistry, projectHashFor } from './registry';
-import type { DaemonMessage } from './protocol';
+import type { DaemonMessage, HelloAckMessage } from './protocol';
 import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
 
 /**
@@ -54,13 +54,16 @@ export class DaemonClient {
     private registry: RegistryInfo | null = null;
     private buffer = '';
     private nextId = 0;
-    private pendingHello: { resolve: (ack: any) => void; reject: (e: Error) => void } | null = null;
+    private pendingHello: {
+        resolve: (ack: HelloAckMessage) => void;
+        reject: (e: Error) => void;
+    } | null = null;
     private pendingScan: {
         resolve: (r: WarmScanResult) => void;
         reject: (e: Error) => void;
     } | null = null;
     private pendingScanDiff: {
-        resolve: (r: { report: any; stats: any }) => void;
+        resolve: (r: { report: unknown; stats: unknown }) => void;
         reject: (e: Error) => void;
     } | null = null;
     private pendingPong: { resolve: () => void; reject: (e: Error) => void } | null = null;
@@ -219,7 +222,7 @@ export class DaemonClient {
                 type: 'scan',
                 params: {
                     requestId,
-                    config: config as unknown as Record<string, any>,
+                    config: config as unknown as Record<string, unknown>,
                     options: {
                         cache: options.cache,
                         cacheDir: options.cacheDir,
@@ -240,7 +243,7 @@ export class DaemonClient {
     /** Run one diff scan (scanDiff / scanDiffDelta). Must be connected first. */
     scanDiff(
         config: ScanConfig,
-        diffs: Array<Record<string, any>>,
+        diffs: Array<Record<string, unknown>>,
         options: {
             cache: boolean;
             cacheDir?: string;
@@ -250,7 +253,7 @@ export class DaemonClient {
             verifyDiskContent: boolean;
             delta: boolean;
         },
-    ): Promise<{ report: any; stats: any }> {
+    ): Promise<{ report: unknown; stats: unknown }> {
         return new Promise((resolve, reject) => {
             if (!this.socket || this.socket.destroyed) {
                 reject(new Error(NOT_CONNECTED_ERROR));
@@ -285,7 +288,7 @@ export class DaemonClient {
                 type: 'scan_diff',
                 params: {
                     requestId,
-                    config: config as unknown as Record<string, any>,
+                    config: config as unknown as Record<string, unknown>,
                     diffs,
                     options: {
                         cache: options.cache,
@@ -357,7 +360,7 @@ export class DaemonClient {
         this.socket = null;
     }
 
-    private send(msg: Record<string, any>): void {
+    private send(msg: DaemonMessage): void {
         if (!this.socket || this.socket.destroyed) throw new Error(NOT_CONNECTED_ERROR);
         this.socket.write(encodeMessage(msg as DaemonMessage));
     }
@@ -392,7 +395,7 @@ export class DaemonClient {
                         ),
                     );
                 } else {
-                    this.caps = msg.caps as any;
+                    this.caps = msg.caps;
                     this.pendingHello?.resolve(msg);
                 }
                 this.pendingHello = null;
@@ -495,7 +498,7 @@ export async function tryWarmScan(
 export async function tryWarmScanDiff(
     root: string,
     config: ScanConfig,
-    diffs: Array<Record<string, any>>,
+    diffs: Array<Record<string, unknown>>,
     options: {
         cache: boolean;
         cacheDir?: string;
@@ -505,7 +508,7 @@ export async function tryWarmScanDiff(
         verifyDiskContent: boolean;
         delta: boolean;
     },
-): Promise<{ report: any; stats: any } | null> {
+): Promise<{ report: unknown; stats: unknown } | null> {
     const client = new DaemonClient(root);
     try {
         await client.connect();

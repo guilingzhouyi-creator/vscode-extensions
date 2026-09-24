@@ -98,11 +98,11 @@ export function revertDiffHunk(currentContent: string, hunk: ReviewDiffHunk): Ro
             updatedContent,
             patch,
         };
-    } catch (err: any) {
+    } catch (err) {
         return {
             success: false,
             patch: '',
-            error: err?.message || String(err),
+            error: err instanceof Error ? err.message : String(err),
         };
     }
 }

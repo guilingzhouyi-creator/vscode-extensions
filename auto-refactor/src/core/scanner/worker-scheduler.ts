@@ -20,6 +20,8 @@ import type { Logger } from '../logger';
 import { decodeResults } from '../result-codec';
 
 const DEFAULT_WORKER_FLUSH_TIMEOUT_MS = 3000;
+const TYPEOF_OBJECT = 'object';
+const EVENT_ERROR = 'error';
 
 /** Scale factor turning a 0-1 elapsed-time ratio into a whole percentage (AR-TIMING). */
 const TIMING_PERCENT_SCALE = 100;
@@ -349,8 +351,13 @@ export async function dispatchBatches(
             const acks = workers.map(
                 (w) =>
                     new Promise<void>((res) => {
-                        const onMsg = (m: any): void => {
-                            if (m && m.flushed) {
+                        const onMsg = (m: unknown): void => {
+                            if (
+                                m &&
+                                typeof m === 'object' &&
+                                'flushed' in m &&
+                                (m as { flushed: unknown }).flushed
+                            ) {
                                 w.off('message', onMsg);
                                 res();
                             }
@@ -513,7 +520,7 @@ export async function dispatchBatches(
                 inflightRead = readNextBatch();
             }
             const tPost0 = T ? nowMs() : 0;
-            const msg: any = { tasks: ready.tasks };
+            const msg: Record<string, unknown> = { tasks: ready.tasks };
             if (fp !== undefined) {
                 msg.fp = fp;
                 msg.config = config;
@@ -574,7 +581,7 @@ export async function dispatchBatches(
                     if (
                         resArr !== undefined &&
                         resArr !== null &&
-                        typeof resArr !== 'object' &&
+                        typeof resArr !== TYPEOF_OBJECT &&
                         !Array.isArray(resArr)
                     ) {
                         resArr = [];
@@ -594,7 +601,7 @@ export async function dispatchBatches(
                     void dispatch(w);
                 },
             );
-            w.on('error', fail);
+            w.on(EVENT_ERROR, fail);
             void dispatch(w);
         };
 

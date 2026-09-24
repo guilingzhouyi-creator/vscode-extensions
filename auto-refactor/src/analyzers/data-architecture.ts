@@ -25,7 +25,8 @@ import {
 } from '../core/intelligence/dataArchitecture';
 
 /** Pattern detecting query or fetch calls against database/storage. */
-const QUERY_CALL_RE = /\b(?:find|findAll|select|query|fetchRecords|getBy|queryAll)\s*\(/;
+const QUERY_CALL_RE =
+    /(?:(?:repo|repository|db|database|pool|client|model|dao|collection|prisma|table|session|orm|store)\s*\.\s*(?:find|findAll|select|query|fetch|get)\w*|\.(?:findById|findOne|findFirst|findMany|fetchRecords|getBy\w+|queryAll))\s*\(/i;
 
 /** Pattern detecting unpaginated/unbounded query keywords. */
 const UNBOUNDED_QUERY_RE =

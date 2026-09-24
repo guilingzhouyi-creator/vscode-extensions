@@ -241,6 +241,8 @@ export interface Thresholds {
     flagLayeringIllusions?: boolean;
     /** Flag configuration or environment leakage into domain logic. */
     flagConfigLeakage?: boolean;
+    /** Protected keywords for configuration leakage detection. */
+    protectedConfigKeywords?: string[];
 }
 
 /**
@@ -460,7 +462,7 @@ export interface Analyzer {
      * calling `analyze` directly (e.g. from a unit test or a script) still works and yields the
      * same results as the multiplexed engine path.
      */
-    analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[];
+    analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[];
     /**
      * OPTIONAL streaming hook — part of the single-pass multiplexed traversal.
      *

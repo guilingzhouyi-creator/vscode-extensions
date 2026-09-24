@@ -119,7 +119,7 @@ export function buildCacheFingerprintContext(
         version: ANALYZER_VERSIONS[p.name] ?? 1,
         modulePath: p.modulePath,
         options: p.options,
-        legacy: typeof (p.instance as any).visit !== TYPEOF_FUNCTION,
+        legacy: typeof p.instance.visit !== TYPEOF_FUNCTION,
     }));
     const customAnalyzers = (cfg.customAnalyzers || []).filter((c) => c.enabled !== false);
     const customHash =

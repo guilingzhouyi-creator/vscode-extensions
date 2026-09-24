@@ -22,11 +22,18 @@ import { globToRegExp, matchAny } from '../../file-discovery';
 /** Governance category shared by every performance rule exported from this file. */
 const PERFORMANCE_CATEGORY = 'performance';
 
+const SEVERITY_WARN = 'warning' as const;
+const SEVERITY_INFO_LEVEL = 'info' as const;
+const RISK_HIGH = 'high' as const;
+const RISK_MEDIUM = 'medium' as const;
+
 /** Line-comment prefix skipped by the line-scanning rules in this file. */
 const LINE_COMMENT = '//';
 
 const LOOP_HEAD_RE = /^\s*(?:for|while)\s*[({:]/;
 const LINEAR_SEARCH_RE = /\b([a-zA-Z0-9_$]+)\.(find|indexOf|includes)\s*\(/;
+const TEXT_VARIABLE_RE =
+    /^(?:line|str|text|content|src|name|token|word|buf|buffer|key|val|value|raw|msg|message|query|url|path|file|specifier|uri|route|comment|prefix|suffix|pattern|char|cmd|arg|call|norm|pkg|trimmed|cleanLine|source|code|chunk|segment|snippet|title|desc|body|header|s|[a-zA-Z0-9_$]*(?:str|text|line|content|name|msg|query|url|path|file|specifier|uri|route|buf|buffer|pattern|chunk|slice|segment|expr|raw|comment|arg|call|norm|pkg|snippet|desc|body|title)|s)$/i;
 const EXPENSIVE_OPS_RE =
     /GameConfig\.get_|JSON\.parse\(|fs\.readFileSync\(|new RegExp\(|readFileSync\(/;
 const TIMER_CALL_RE = /set(?:Timeout|Interval)\s*\(/;
@@ -61,6 +68,52 @@ function checkExpensiveLoopOp(
     });
 }
 
+interface LoopContext {
+    inLoop: boolean;
+    loopIndent: number;
+    loopBraces: number;
+}
+
+const CODE_OPEN_BRACE = 123;
+const CODE_CLOSE_BRACE = 125;
+
+/**
+ * Counts net change in curly braces within a line.
+ */
+function countBraceDelta(line: string): number {
+    let delta = 0;
+    for (let i = 0; i < line.length; i++) {
+        const code = line.charCodeAt(i);
+        if (code === CODE_OPEN_BRACE) delta++;
+        else if (code === CODE_CLOSE_BRACE) delta--;
+    }
+    return delta;
+}
+
+/**
+ * Advances the loop tracking state based on line indentation and brace balance.
+ */
+function advanceLoopState(ctx: LoopContext, line: string, indent: number): boolean {
+    if (ctx.inLoop) {
+        if (ctx.loopBraces > 0) {
+            ctx.loopBraces += countBraceDelta(line);
+            if (ctx.loopBraces <= 0) {
+                ctx.inLoop = false;
+                return false;
+            }
+        } else if (indent <= ctx.loopIndent) {
+            ctx.inLoop = false;
+        }
+    }
+    if (LOOP_HEAD_RE.test(line)) {
+        ctx.inLoop = true;
+        ctx.loopIndent = indent;
+        ctx.loopBraces = countBraceDelta(line);
+        return false;
+    }
+    return ctx.inLoop;
+}
+
 /**
  * GOV-PRF-001: In-Loop Invariant & Configuration Lookup (ADV-PRF-001 generalized).
  * Detects expensive or invariant operations inside loops.
@@ -69,8 +122,8 @@ export const LoopInvariantRule: GovernanceRule = {
     id: 'GOV-PRF-001',
     name: 'Loop-Invariant Expensive Operation Hoisting',
     category: PERFORMANCE_CATEGORY,
-    severity: 'warning',
-    risk: 'high',
+    severity: SEVERITY_WARN,
+    risk: RISK_HIGH,
     rationale:
         'Performing invariant I/O, regex construction, or repetitive configuration lookups in loops incurs severe CPU/throughput penalties.',
     isFixable: false,
@@ -79,9 +132,7 @@ export const LoopInvariantRule: GovernanceRule = {
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
-
-        let inLoop = false;
-        let loopIndent = 0;
+        const loopCtx: LoopContext = { inLoop: false, loopIndent: 0, loopBraces: 0 };
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -89,18 +140,8 @@ export const LoopInvariantRule: GovernanceRule = {
             if (!trimmed || trimmed.startsWith(LINE_COMMENT) || trimmed.startsWith('#')) continue;
 
             const indent = line.search(/\S/);
-
-            if (inLoop && indent <= loopIndent) {
-                inLoop = false;
-            }
-
-            if (LOOP_HEAD_RE.test(line)) {
-                inLoop = true;
-                loopIndent = indent;
-                continue;
-            }
-
-            if (inLoop) {
+            const active = advanceLoopState(loopCtx, line, indent);
+            if (active) {
                 checkExpensiveLoopOp(line, i, violations);
             }
         }
@@ -111,6 +152,8 @@ export const LoopInvariantRule: GovernanceRule = {
 
 const FN_SET_TIMEOUT = 'setTimeout';
 const FN_SET_INTERVAL = 'setInterval';
+const METHOD_INCLUDES = 'includes';
+const METHOD_INDEXOF = 'indexOf';
 
 /**
  * Evaluates whether a line within a loop body performs an unindexed linear search.
@@ -118,6 +161,24 @@ const FN_SET_INTERVAL = 'setInterval';
 function checkLinearSearchHit(line: string, lineIndex: number): GovernanceViolation | null {
     const m = line.match(LINEAR_SEARCH_RE);
     if (!m) return null;
+    if (TEXT_VARIABLE_RE.test(m[1]) && (m[2] === METHOD_INCLUDES || m[2] === METHOD_INDEXOF)) {
+        return null;
+    }
+    if (m[2] === METHOD_INCLUDES || m[2] === METHOD_INDEXOF) {
+        return {
+            ruleId: 'GOV-PRF-005',
+            message: `Array linear lookup \`${m[1]}.${m[2]}()\` inside loop body creates quadratic O(N*M) time complexity.`,
+            line: lineIndex + 1,
+            column: line.indexOf(m[0]) + 1,
+            suggestion: `Hoist array to Set before loop: \`const ${m[1]}Set = new Set(${m[1]});\` and use \`${m[1]}Set.has(...)\` for O(1) lookups.`,
+            fixable: false,
+            evidence: {
+                confidence: 0.7,
+                requiresRuntime: true,
+                runtimeEvidenceReason: NEED_RUNTIME_EVIDENCE,
+            },
+        };
+    }
     return {
         ruleId: 'GOV-PRF-002',
         message: `Linear search \`${m[1]}.${m[2]}()\` inside loop body creates quadratic O(N*M) time complexity.`,
@@ -160,8 +221,7 @@ function checkTimerLiteralHit(line: string, lineIndex: number): GovernanceViolat
  */
 function collectLinearSearchViolations(lines: string[]): GovernanceViolation[] {
     const violations: GovernanceViolation[] = [];
-    let inLoop = false;
-    let loopIndent = 0;
+    const loopCtx: LoopContext = { inLoop: false, loopIndent: 0, loopBraces: 0 };
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -169,16 +229,9 @@ function collectLinearSearchViolations(lines: string[]): GovernanceViolation[] {
         if (!trimmed || trimmed.startsWith(LINE_COMMENT) || trimmed.startsWith('#')) continue;
 
         const indent = line.search(/\S/);
-        if (inLoop && indent <= loopIndent) {
-            inLoop = false;
-        }
+        const active = advanceLoopState(loopCtx, line, indent);
+        if (!active) continue;
 
-        if (LOOP_HEAD_RE.test(line)) {
-            inLoop = true;
-            loopIndent = indent;
-            continue;
-        }
-        if (!inLoop) continue;
         const hit = checkLinearSearchHit(line, i);
         if (hit) violations.push(hit);
     }
@@ -193,8 +246,8 @@ export const InLoopLinearSearchRule: GovernanceRule = {
     id: 'GOV-PRF-002',
     name: 'In-Loop Linear Search Optimization',
     category: PERFORMANCE_CATEGORY,
-    severity: 'info',
-    risk: 'medium',
+    severity: SEVERITY_INFO_LEVEL,
+    risk: RISK_MEDIUM,
     rationale:
         'Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M); pre-indexing in Map/Set optimizes to O(N).',
     isFixable: false,
@@ -202,7 +255,30 @@ export const InLoopLinearSearchRule: GovernanceRule = {
         if (!ctx.content.includes('for') && !ctx.content.includes('while')) return null;
 
         const violations = collectLinearSearchViolations(ctx.masked);
-        return violations.length > 0 ? violations : null;
+        const filtered = violations.filter((v) => v.ruleId === 'GOV-PRF-002');
+        return filtered.length > 0 ? filtered : null;
+    },
+};
+
+/**
+ * GOV-PRF-005: In-Loop Array Pre-Hashing Rule.
+ * Flags array .includes() / .indexOf() lookups inside loops that should be hoisted into Sets.
+ */
+export const InLoopArrayPreHashRule: GovernanceRule = {
+    id: 'GOV-PRF-005',
+    name: 'In-Loop Array Set Pre-Indexing',
+    category: PERFORMANCE_CATEGORY,
+    severity: SEVERITY_INFO_LEVEL,
+    risk: RISK_MEDIUM,
+    rationale:
+        'Calling array linear search (.includes / .indexOf) inside a loop degrades performance to O(N*M); pre-indexing in a Set outside the loop optimizes to O(1).',
+    isFixable: false,
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (!ctx.content.includes('for') && !ctx.content.includes('while')) return null;
+
+        const violations = collectLinearSearchViolations(ctx.masked);
+        const filtered = violations.filter((v) => v.ruleId === 'GOV-PRF-005');
+        return filtered.length > 0 ? filtered : null;
     },
 };
 
@@ -214,8 +290,8 @@ export const TimerLiteralRule: GovernanceRule = {
     id: 'GOV-PRF-003',
     name: 'Non-Clamped Timer Literal Delay',
     category: PERFORMANCE_CATEGORY,
-    severity: 'warning',
-    risk: 'medium',
+    severity: SEVERITY_WARN,
+    risk: RISK_MEDIUM,
     languages: ['typescript', 'javascript'],
     rationale:
         'Hardcoded timer delays bypass centralized clamping and platform-specific background throttling.',
@@ -245,8 +321,8 @@ export const SyncIoRule: GovernanceRule = {
     id: 'GOV-PRF-004',
     name: 'Synchronous File I/O Blocking Host Event Loop',
     category: PERFORMANCE_CATEGORY,
-    severity: 'warning',
-    risk: 'high',
+    severity: SEVERITY_WARN,
+    risk: RISK_HIGH,
     languages: ['typescript', 'javascript'],
     rationale:
         'Synchronous file I/O blocks the host JavaScript event loop, causing severe UI freezes or stalling concurrent request processing.',

@@ -74,7 +74,7 @@ export interface ScanMessage {
         requestId: string;
         /** Full resolved ScanConfig JSON (client-side resolveConfig) — the daemon never re-reads
          *  config files, eliminating client/daemon config drift. */
-        config: Record<string, any>;
+        config: Record<string, unknown>;
         options: {
             cache: boolean;
             cacheDir?: string;
@@ -95,9 +95,9 @@ export interface ScanDiffMessage {
     type: 'scan_diff';
     params: {
         requestId: string;
-        config: Record<string, any>;
+        config: Record<string, unknown>;
         /** DiffInput[] (JSON-serialized; content fields are already UTF-16 strings). */
-        diffs: Array<Record<string, any>>;
+        diffs: Array<Record<string, unknown>>;
         options: {
             cache: boolean;
             cacheDir?: string;
@@ -122,8 +122,8 @@ export interface ScanDataMessage {
     requestId: string;
     seq: number;
     files: string[];
-    issues: any[];
-    metrics: any[];
+    issues: unknown[];
+    metrics: unknown[];
 }
 
 /**
@@ -135,8 +135,8 @@ export interface ScanDoneMessage {
     id: number;
     type: 'scan_done';
     requestId: string;
-    report: Record<string, any>;
-    stats: Record<string, any>;
+    report: Record<string, unknown>;
+    stats: Record<string, unknown>;
 }
 
 /**
@@ -150,7 +150,7 @@ export interface ErrorMessage {
     requestId?: string;
     code: string;
     message: string;
-    detail?: Record<string, any>;
+    detail?: Record<string, unknown>;
 }
 
 /**
@@ -209,7 +209,7 @@ export type DaemonMessage =
  * @throws When `msg` contains a circular reference, JSON.stringify raises TypeError; callers
  *   should keep payloads acyclic as the wire contract requires.
  */
-export function encodeMessage(msg: DaemonMessage | Record<string, any>): string {
+export function encodeMessage(msg: DaemonMessage | Record<string, unknown>): string {
     return JSON.stringify(msg) + '\n';
 }
 

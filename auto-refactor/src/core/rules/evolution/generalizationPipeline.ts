@@ -18,6 +18,7 @@ import type {
     RuleCandidate,
     ScrutinyEvaluationResult,
 } from './types';
+import type { AnalyzerContext } from '../../types';
 import { auditVacuousWrappers, HYG_WRAP_RULE_ID } from './wrapperRule';
 import {
     checkJsTsSilentExceptions,
@@ -325,21 +326,29 @@ export class RuleGeneralizationPipeline {
         for (const fixture of candidate.fixtures) {
             const ext =
                 fixture.language === 'python' ? '.py' : fixture.language === 'rust' ? '.rs' : '.ts';
-            const fakeCtx = {
-                filePath: `test/fixture${ext}`,
+            const fixturePath = `test/fixture${ext}`;
+            const fakeCtx: Partial<AnalyzerContext> = {
+                filePath: fixturePath,
                 content: fixture.negativeSample,
-            } as any;
+                options: {},
+            };
 
             let negativeDetected = false;
             let positiveDetected = false;
 
             if (candidate.canonicalRuleId === HYG_WRAP_RULE_ID) {
                 negativeDetected =
-                    auditVacuousWrappers(fixture.negativeSample, fakeCtx.filePath, fakeCtx).length >
-                    0;
+                    auditVacuousWrappers(
+                        fixture.negativeSample,
+                        fixturePath,
+                        fakeCtx as AnalyzerContext,
+                    ).length > 0;
                 positiveDetected =
-                    auditVacuousWrappers(fixture.positiveSample, fakeCtx.filePath, fakeCtx).length >
-                    0;
+                    auditVacuousWrappers(
+                        fixture.positiveSample,
+                        fixturePath,
+                        fakeCtx as AnalyzerContext,
+                    ).length > 0;
             } else if (candidate.canonicalRuleId === GOV_EXC_SILENT_RULE_ID) {
                 const linesNeg = fixture.negativeSample.split('\n');
                 const linesPos = fixture.positiveSample.split('\n');
@@ -352,11 +361,17 @@ export class RuleGeneralizationPipeline {
                 }
             } else if (candidate.canonicalRuleId === ARCH_DISP_RULE_ID) {
                 negativeDetected =
-                    auditDispatchComplexity(fixture.negativeSample, fakeCtx.filePath, fakeCtx)
-                        .length > 0;
+                    auditDispatchComplexity(
+                        fixture.negativeSample,
+                        fixturePath,
+                        fakeCtx as AnalyzerContext,
+                    ).length > 0;
                 positiveDetected =
-                    auditDispatchComplexity(fixture.positiveSample, fakeCtx.filePath, fakeCtx)
-                        .length > 0;
+                    auditDispatchComplexity(
+                        fixture.positiveSample,
+                        fixturePath,
+                        fakeCtx as AnalyzerContext,
+                    ).length > 0;
             }
 
             if (!negativeDetected || positiveDetected) {

@@ -103,7 +103,8 @@ export class SecurityAnalyzer implements Analyzer {
      * @returns Findings capped at `maxIssuesPerFile`; empty when the level is `off` or the path is
      *   treated as non-production test, fixture, sample, dist, or mock code.
      */
-    analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
+        void sf;
         const opts = (ctx.options || {}) as SecurityOptions;
         const level: SecurityLevel = opts.level || ctx.config.securityLevel || 'basic';
 
@@ -519,7 +520,7 @@ export class SecurityAnalyzer implements Analyzer {
      *   next file because the buffered streaming findings are cleared before returning.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
-        const standaloneIssues = this.analyze(undefined as any, ctx);
+        const standaloneIssues = this.analyze(undefined, ctx);
         const set = new Set<string>();
         const merged: Issue[] = [];
         for (const issue of [...this.issues, ...standaloneIssues]) {

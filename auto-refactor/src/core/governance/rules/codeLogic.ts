@@ -36,8 +36,10 @@ function pushChildrenToStack(children: NormalizedNode[], currentDepth: number): 
     for (let i = 0; i < children.length; i++) {
         const child = children[i];
         if (child.functionLike) continue;
-        const nextDepth =
-            currentDepth + (child.kind === NodeKind.ControlFlow || child.increasesNesting ? 1 : 0);
+        const isNestingControl =
+            child.kind === NodeKind.ControlFlow ||
+            (Boolean(child.increasesNesting) && child.kind !== NodeKind.Block);
+        const nextDepth = currentDepth + (isNestingControl ? 1 : 0);
         SCRATCH_NODE_STACK.push(child);
         SCRATCH_DEPTH_STACK.push(nextDepth);
     }

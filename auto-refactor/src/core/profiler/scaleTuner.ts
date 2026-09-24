@@ -18,7 +18,7 @@
  *   Every policy number is a named constant (the engine's own constants rule flags inline
  *   literals), so tuning intent reads as decisions rather than a wall of digits.
  */
-import type { ScaleGrade, MaturityTier, Thresholds } from '../types';
+import type { ScaleGrade, Thresholds } from '../types';
 
 /**
  * Input metrics describing project size for scale grading.
@@ -47,24 +47,11 @@ const ANALYZER_ARCHITECTURE = 'architecture';
 const ANALYZER_COMMENTS = 'comments';
 /** Analyzer id for governance option tuning. */
 const ANALYZER_GOVERNANCE = 'governance';
-/** Analyzer id for hygiene option tuning. */
-const ANALYZER_HYGIENE = 'hygiene';
-/** Analyzer id for performance option tuning. */
-const ANALYZER_PERFORMANCE = 'performance';
+/** Analyzer id for simplify option tuning. */
+const ANALYZER_SIMPLIFY = 'simplify';
 
 /** Scale grade identifier for medium projects. */
 const SCALE_GRADE_MEDIUM = 'medium';
-
-/** Maturity tier identifiers. */
-const TIER_DEMO_NAME = 'demo';
-const TIER_PROTOTYPE_NAME = 'prototype';
-const TIER_PRODUCTION_NAME = 'production';
-const TIER_INDUSTRIAL_NAME = 'industrial';
-
-/** Comment level values. */
-const COMMENT_LEVEL_OFF = 'off';
-const COMMENT_LEVEL_BASIC = 'basic';
-const COMMENT_LEVEL_STRICT = 'strict';
 
 // ── Scale bands: inclusive ceilings, evaluated in order; enterprise is the fallback ──
 const MICRO_MAX_FILES = 10;
@@ -101,22 +88,11 @@ const LARGE_SCALE_MAX_NESTING = 6;
 const BASE_MAX_INHERITANCE = 2;
 const LARGE_SCALE_MAX_INHERITANCE = 3;
 
-// ── Maturity threshold rows ──
-const DEMO_FILE_LINES_WARN = 800;
-const DEMO_FILE_LINES_FAIL = 1_500;
-const DEMO_COMPLEXITY_WARN = 20;
-const DEMO_COMPLEXITY_FAIL = 35;
-const PROTOTYPE_FILE_LINES_WARN = 600;
-const PROTOTYPE_FILE_LINES_FAIL = 1_200;
-const PROTOTYPE_COMPLEXITY_WARN = 15;
-const PROTOTYPE_COMPLEXITY_FAIL = 25;
-const INDUSTRIAL_FILE_LINES_WARN = 350;
-const INDUSTRIAL_FILE_LINES_FAIL = 700;
-const INDUSTRIAL_COMPLEXITY_WARN = 8;
-const INDUSTRIAL_COMPLEXITY_FAIL = 14;
-
-/** Industrial tier is the only tightening maturity row; demo/prototype relax. */
-const INDUSTRIAL_MAX_LOOP_NESTING = 2;
+// ── Simplify limits per scale ──
+const MICRO_MAX_TERNARY_LENGTH = 100;
+const ENTERPRISE_MAX_TERNARY_LENGTH = 80;
+const MICRO_MAX_GUARD_NESTING = 4;
+const ENTERPRISE_MAX_GUARD_NESTING = 3;
 
 /**
  * Classify a project into a scale grade from its file count and source lines of code.
@@ -225,15 +201,28 @@ function tuneGovernanceByGrade(grade: ScaleGrade, tuned: Record<string, any>): v
 }
 
 /**
- * Layer scale-grade overrides onto analyzer options.
- * Governance nesting limits relax with scale, inheritance limits step from 2 to 3 at large
- * scale, clean-layer enforcement is disabled for micro/small projects, and public API docs
- * become mandatory for large/enterprise. Other analyzers pass through unchanged.
+ * Tune simplify analyzer options by scale grade.
  *
- * @param grade - Scale grade; unknown values apply no overrides.
- * @param analyzerName - Analyzer id to tune; matching is exact and case-sensitive.
- * @param baseOpts - Base option bag; shallow-copied, never mutated.
- * @returns A shallow copy of baseOpts with the grade-specific overrides applied.
+ * @param grade - Scale grade.
+ * @param tuned - Tuned options bag to mutate.
+ */
+function tuneSimplifyByGrade(grade: ScaleGrade, tuned: Record<string, any>): void {
+    if (grade === SCALE_GRADE_MICRO || grade === SCALE_GRADE_SMALL) {
+        tuned.maxTernaryLength = MICRO_MAX_TERNARY_LENGTH;
+        tuned.maxGuardClauseNesting = MICRO_MAX_GUARD_NESTING;
+    } else if (grade === SCALE_GRADE_ENTERPRISE || grade === SCALE_GRADE_LARGE) {
+        tuned.maxTernaryLength = ENTERPRISE_MAX_TERNARY_LENGTH;
+        tuned.maxGuardClauseNesting = ENTERPRISE_MAX_GUARD_NESTING;
+    }
+}
+
+/**
+ * Tune analyzer options by scale grade.
+ *
+ * @param grade - Scale grade.
+ * @param analyzerName - Analyzer id.
+ * @param baseOpts - Base option bag.
+ * @returns Shallow-copied options with grade overrides applied.
  */
 export function getTunedAnalyzerOptions(
     grade: ScaleGrade,
@@ -245,151 +234,18 @@ export function getTunedAnalyzerOptions(
     if (analyzerName === ANALYZER_GOVERNANCE) {
         tuneGovernanceByGrade(grade, tuned);
     } else if (analyzerName === ANALYZER_ARCHITECTURE) {
-        // Micro/small projects don't enforce strict multi-tier DDD separation by default
         tuned.enforceCleanLayers = grade !== SCALE_GRADE_MICRO && grade !== SCALE_GRADE_SMALL;
     } else if (analyzerName === ANALYZER_COMMENTS) {
         if (grade === SCALE_GRADE_ENTERPRISE || grade === SCALE_GRADE_LARGE) {
             tuned.requirePublicApiDocs = true;
         }
+    } else if (analyzerName === ANALYZER_SIMPLIFY) {
+        tuneSimplifyByGrade(grade, tuned);
     }
 
     return tuned;
 }
 
-/**
- * Derive elastic thresholds for a project maturity tier (demo, prototype, production,
- * industrial). demo/prototype relax limits with Math.max, industrial tightens them with
- * Math.min, and production keeps the caller baseline; the base object is never mutated.
- *
- * @param tier - Maturity tier; selects the adjustment row.
- * @param base - Caller baseline thresholds, used as the floor for relaxations and the
- *   ceiling for industrial tightening.
- * @returns A new Thresholds object with the tier-specific file-line and complexity limits;
- *   the input stays untouched.
- */
-export function getMaturityTunedThresholds(tier: MaturityTier, base: Thresholds): Thresholds {
-    const tuned: Thresholds = { ...base };
+import { getMaturityTunedThresholds, getMaturityTunedAnalyzerOptions } from './scale-tuner-tiers';
 
-    switch (tier) {
-        case TIER_DEMO_NAME:
-            // Demos: allow relaxed thresholds, prototype scripting, and fast iteration
-            tuned.fileLinesWarn = Math.max(base.fileLinesWarn, DEMO_FILE_LINES_WARN);
-            tuned.fileLinesFail = Math.max(base.fileLinesFail, DEMO_FILE_LINES_FAIL);
-            tuned.complexityWarn = Math.max(base.complexityWarn, DEMO_COMPLEXITY_WARN);
-            tuned.complexityFail = Math.max(base.complexityFail, DEMO_COMPLEXITY_FAIL);
-            break;
-
-        case TIER_PROTOTYPE_NAME:
-            tuned.fileLinesWarn = Math.max(base.fileLinesWarn, PROTOTYPE_FILE_LINES_WARN);
-            tuned.fileLinesFail = Math.max(base.fileLinesFail, PROTOTYPE_FILE_LINES_FAIL);
-            tuned.complexityWarn = Math.max(base.complexityWarn, PROTOTYPE_COMPLEXITY_WARN);
-            tuned.complexityFail = Math.max(base.complexityFail, PROTOTYPE_COMPLEXITY_FAIL);
-            break;
-
-        case TIER_PRODUCTION_NAME:
-            // Production baseline standard
-            break;
-
-        case TIER_INDUSTRIAL_NAME:
-            // Industrial / Mission-critical: strict gates
-            tuned.fileLinesWarn = Math.min(base.fileLinesWarn, INDUSTRIAL_FILE_LINES_WARN);
-            tuned.fileLinesFail = Math.min(base.fileLinesFail, INDUSTRIAL_FILE_LINES_FAIL);
-            tuned.complexityWarn = Math.min(base.complexityWarn, INDUSTRIAL_COMPLEXITY_WARN);
-            tuned.complexityFail = Math.min(base.complexityFail, INDUSTRIAL_COMPLEXITY_FAIL);
-            break;
-    }
-
-    return tuned;
-}
-
-/**
- * Tune analyzer options for demo-tier projects.
- *
- * @param analyzerName - Target analyzer identifier.
- * @param tuned - Mutable options object to update.
- */
-function tuneByDemoTier(analyzerName: string, tuned: Record<string, any>): void {
-    if (analyzerName === ANALYZER_COMMENTS) {
-        tuned.requireHeader = false;
-        tuned.level = COMMENT_LEVEL_OFF;
-    } else if (analyzerName === ANALYZER_ARCHITECTURE) {
-        tuned.enforceCleanLayers = false;
-        tuned.allowSkipLayers = true;
-        tuned.checkDtoCredentialLeakage = false;
-    } else if (analyzerName === ANALYZER_HYGIENE) {
-        tuned.checkDeadCode = false;
-        tuned.checkTemporaryStubs = false;
-    }
-}
-
-/**
- * Tune analyzer options for prototype-tier projects.
- *
- * @param analyzerName - Target analyzer identifier.
- * @param tuned - Mutable options object to update.
- */
-function tuneByPrototypeTier(analyzerName: string, tuned: Record<string, any>): void {
-    if (analyzerName === ANALYZER_COMMENTS) {
-        tuned.requireHeader = false;
-        tuned.level = COMMENT_LEVEL_BASIC;
-    } else if (analyzerName === ANALYZER_ARCHITECTURE) {
-        tuned.allowSkipLayers = true;
-    } else if (analyzerName === ANALYZER_HYGIENE) {
-        tuned.checkTemporaryStubs = false;
-    }
-}
-
-/**
- * Tune analyzer options for industrial-tier projects.
- *
- * @param analyzerName - Target analyzer identifier.
- * @param tuned - Mutable options object to update.
- */
-function tuneByIndustrialTier(analyzerName: string, tuned: Record<string, any>): void {
-    if (analyzerName === ANALYZER_COMMENTS) {
-        tuned.requireHeader = true;
-        tuned.level = COMMENT_LEVEL_STRICT;
-    } else if (analyzerName === ANALYZER_ARCHITECTURE) {
-        tuned.enforceCleanLayers = true;
-        tuned.allowSkipLayers = false;
-        tuned.checkDtoCredentialLeakage = true;
-    } else if (analyzerName === ANALYZER_PERFORMANCE) {
-        tuned.maxLoopNesting = INDUSTRIAL_MAX_LOOP_NESTING;
-        tuned.checkBlockingIO = true;
-        tuned.checkTransientAllocations = true;
-    }
-}
-
-/**
- * Layer maturity-tier overrides onto analyzer options.
- * demo disables header and strict comment checks plus several architecture/hygiene checks,
- * prototype softens comments to `basic`, and industrial enforces strict comments, clean
- * layers, credential-leak detection and tighter performance checks. Unlisted analyzers and
- * tiers keep the base options.
- *
- * @param tier - Maturity tier; only demo, prototype and industrial carry overrides.
- * @param analyzerName - Analyzer id to tune; matching is exact and case-sensitive.
- * @param baseOpts - Base option bag; shallow-copied, never mutated.
- * @returns A shallow copy of baseOpts with the tier-specific overrides applied.
- */
-export function getMaturityTunedAnalyzerOptions(
-    tier: MaturityTier,
-    analyzerName: string,
-    baseOpts: Record<string, any>,
-): Record<string, any> {
-    const tuned = { ...baseOpts };
-
-    switch (tier) {
-        case TIER_DEMO_NAME:
-            tuneByDemoTier(analyzerName, tuned);
-            break;
-        case TIER_PROTOTYPE_NAME:
-            tuneByPrototypeTier(analyzerName, tuned);
-            break;
-        case TIER_INDUSTRIAL_NAME:
-            tuneByIndustrialTier(analyzerName, tuned);
-            break;
-    }
-
-    return tuned;
-}
+export { getMaturityTunedThresholds, getMaturityTunedAnalyzerOptions };

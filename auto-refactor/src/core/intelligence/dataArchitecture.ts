@@ -32,6 +32,16 @@ const EVIDENCE_KIND_CALL = 'call';
 const MODULE_DATA_ACCESS = 'data-access';
 const SEVERITY_ERROR = 'error';
 const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';
+const PREFIX_FIND = 'find';
+const PREFIX_SELECT = 'select';
+const PREFIX_QUERY = 'query';
+const PREFIX_GETBY = 'getby';
+const PREFIX_FETCH = 'fetch';
+const TOKEN_BATCH = 'batch';
+const TOKEN_BULK = 'bulk';
+const TOKEN_INLIST = 'inlist';
+const TOKEN_REPOSITORY = 'repository';
+const TOKEN_DAO = 'dao';
 
 function isLoopStart(line: string): boolean {
     return (
@@ -48,11 +58,17 @@ function isDatabaseQueryLine(line: string): boolean {
     if (/\b(?:findByIds|findAllById|batchFind|bulkQuery|queryIn)\b/.test(line)) {
         return false;
     }
-    return (
-        /\b(?:find|select|query|fetch|get)\w*\s*\(/.test(line) ||
-        /\.(?:findById|findOne|findFirst|filter|select)\s*\(/.test(line) ||
-        /db\.query|pool\.execute|rawQuery/.test(line)
-    );
+    const hasPersistenceTarget =
+        /(?:repo|repository|db|database|pool|client|model|dao|collection|prisma|table|session|orm|store)\s*\.\s*(?:find|findAll|select|query|fetch|get|filter)\w*\s*\(/i.test(
+            line,
+        );
+    const hasExplicitOrmMethod =
+        /\.(?:findById|findOne|findFirst|findMany|fetchRecords|queryAll|getBy\w+|selectFrom|rawQuery|execSql)\s*\(/.test(
+            line,
+        );
+    const hasDriverCall = /\b(?:db\.query|pool\.execute|rawQuery)\b/.test(line);
+
+    return hasPersistenceTarget || hasExplicitOrmMethod || hasDriverCall;
 }
 
 function isUnboundedQueryLine(line: string): boolean {
@@ -617,19 +633,20 @@ function isLoopCallerNode(name: string): boolean {
  */
 function isDataQuerySymbol(name: string, filePath: string): boolean {
     const lower = name.toLowerCase();
-    const isBatch = lower.includes('batch') || lower.includes('bulk') || lower.includes('inlist');
+    const isBatch =
+        lower.includes(TOKEN_BATCH) || lower.includes(TOKEN_BULK) || lower.includes(TOKEN_INLIST);
     if (isBatch) return false;
 
     const isQueryName =
-        lower.startsWith('find') ||
-        lower.startsWith('select') ||
-        lower.startsWith('query') ||
-        lower.startsWith('getby') ||
-        lower.startsWith('fetch');
+        lower.startsWith(PREFIX_FIND) ||
+        lower.startsWith(PREFIX_SELECT) ||
+        lower.startsWith(PREFIX_QUERY) ||
+        lower.startsWith(PREFIX_GETBY) ||
+        lower.startsWith(PREFIX_FETCH);
 
     const isRepoFile =
-        filePath.toLowerCase().includes('repository') ||
-        filePath.toLowerCase().includes('dao') ||
+        filePath.toLowerCase().includes(TOKEN_REPOSITORY) ||
+        filePath.toLowerCase().includes(TOKEN_DAO) ||
         filePath.toLowerCase().includes(FILE_TOKEN_STORE);
 
     return isQueryName || isRepoFile;

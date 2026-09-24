@@ -72,13 +72,17 @@ $$\text{通用规范原则} \longrightarrow \text{语言能力适配层} \longri
 | **类型体系** | `GOV-TYP-001` | `warning` | 隐式弱类型分配 (GDScript `var =` $\to$ `:=` / `: Type =`) | ✅ 可安全修复 |
 | **类型体系** | `GOV-TYP-002` | `warning` | 导出与公共函数签名完整性 (GDScript/Python 显式返回值标注 `-> Type`) | 建议标注 |
 | **类型体系** | `GOV-TYP-003` | `warning` | 危险裸 `any` 类型逃逸检查 | 建议精准类型 |
+| **类型体系** | `GOV-TYP-004` | `warning` | 契约强迫性类型逃逸 (`undefined as any` / `null as any` 违背 ISP) | 建议声明可选或拆解接口 |
+| **类型体系** | `GOV-TYP-005` | `warning` | 危险裸属性穿透 (`(expr as any).prop` 绕过类型守卫) | 建议使用标准类型守卫 |
 | **异常容错** | `GOV-EXC-001` | `error` | 空 `catch` / 裸 `except:` 吞异常治理 (TS/JS `catch {}`，Python 裸 `except:` 及 swallowed `pass`)。**注释携带理由标记**（`best-effort` / `ignore` / `intentional` / `expected`）的 catch 视为已记录决策，不再报；无理由的注释-空 catch 仍报 | 建议兜底 |
 | **异常容错** | `GOV-EXC-002` | `warning` | 生产路径裸 `.unwrap()` 未受保护 panic 治理 | 建议 `?` 传播 |
 | **调试隔离** | `GOV-DBG-001` | `warning` | 生产路径残留 `console.log` / `print()` / `println!` 泄露治理 | 建议 Logger |
 | **性能规范** | `GOV-PRF-001` | `warning` | 循环热路径内不变配置读取/频繁 IO/重复对象分配提升建议 | 建议循环外提升 |
 | **性能规范** | `GOV-PRF-002` | `info` | 循环体内线性查找未索引化治理 (建议转换为 Map/Set $O(1)$) | 建议哈希索引 |
+| **性能规范** | `GOV-PRF-005` | `info` | 循环体内部调用未索引数组对象的 `.includes()` / `.indexOf()` 线性查找 | 建议循环外提升预建 Set 索引 |
 | **可维护性** | `GOV-MNT-001` | `warning` | 面向对象类多层继承约束（继承深度 $> 2$，推崇组合优于继承） | 建议组合重构 |
 | **可维护性** | `GOV-MNT-002` | `error` | 核心纯领域模型反向耦合外部框架/UI 依赖审查 | 建议端口适配 |
+| **可维护性** | `GOV-DAT-001` | `info` | 函数入参离散参数过多 (≥ 5) 数据泥团坏味道 | 建议聚合为 Context 或 Options 接口 |
 | **可维护性** | `GOV-SAN-001` | `warning` | 词法卫生与临时批次黑话拦截 (注释中残留的 pXX/phaseXX/stXX/wip 临时工单标记) | 建议清理黑话 |
 | **协同治理** | `GOV-AGN-001` | `error` | 多 Agent 并发改动制造跨模块循环依赖、分层倒置或破坏公共契约审查 | 协调架构边界与依赖职责 |
 | **增量切片** | `GOV-SLC-001` | `error` | AST 切片改动引入破坏性签名漂移或向外部调用链扩散不可控副作用 | 确保切片向后兼容或同步重构调用者 |
@@ -100,6 +104,8 @@ $$\text{通用规范原则} \longrightarrow \text{语言能力适配层} \longri
 | `GOV-TYP-001` | `warning` | 隐式弱类型赋值：变量或参数缺少类型注解，类型错误推迟到运行时才暴露。 | 为变量/参数补齐类型注解。 |
 | `GOV-TYP-002` | `warning` | 导出或公共函数签名缺少返回类型标注（GDScript/Python 未写 `-> Type`）。 | 为函数补齐返回类型注解。 |
 | `GOV-TYP-003` | `warning` | 类型位置出现危险裸 `any`，绕过编译器类型检查。 | 裸 any 换成 unknown 或具体联合；动态边界用受控断言并注释理由。 |
+| `GOV-TYP-004` | `warning` | 参数或赋值使用 `undefined as any` 或 `null as any` 强行逃逸类型检查。 | 将目标参数声明为可选联合类型或拆分专有接口，消除强制类型断言。 |
+| `GOV-TYP-005` | `warning` | 通过 `(expr as any).prop` 盲目读取未受检属性。 | 使用标准类型收窄谓词（如 ts.canHaveModifiers 或 isXxx）保护属性访问。 |
 | `GOV-EXC-001` | `error` | 空 `catch` / 裸 `except:` 静默吞异常；catch 内带理由标记（best-effort / ignore / intentional / expected）视为已记录决策，不再上报。 | 处理/记录/显式重抛；确属 best-effort 时在 catch 内写明理由标记。 |
 | `GOV-EXC-002` | `warning` | 生产路径裸 `.unwrap()` / `expect` 在 Err 或 None 时导致不可恢复 panic。 | 避免裸 unwrap/expect，改为显式错误分支或 Result/Option 传播。 |
 | `GOV-EXC-003` | `error` | 伪处理 catch/except 块：使用 `void 0`、无用变量赋值等 dummy 语句静默吞噬异常，未记日志也无 rationale 标记。 | 处理/记录/显式重抛；确属 best-effort 时在注释写明理由标记。 |
@@ -108,8 +114,10 @@ $$\text{通用规范原则} \longrightarrow \text{语言能力适配层} \longri
 | `GOV-PRF-002` | `info` | 循环体内调用 `.find` / `.indexOf` / `.includes` 线性查找，复杂度退化为 O(N*M)。 | 用 Set/Map 承载查找，消除循环内线性扫描。 |
 | `GOV-PRF-003` | `error` | 定时器使用数字字面量延时绕过集中钳制；字面量 ≤ 0 会触发约 1ms 忙循环热点。 | 定时器延时常量具名或走集中配置，避免绕过统一钳制。 |
 | `GOV-PRF-004` | `warning` | 同步 fs 调用阻塞宿主事件循环（IDE 扩展 UI 卡顿、服务端请求停顿）。 | 改用异步 IO；进程式 CLI 路径可用 blockingIoAllowPatterns 声明豁免。 |
+| `GOV-PRF-005` | `info` | 循环体内调用数组 `.includes` / `.indexOf` 线性查找，复杂度退化为 O(N*M)。 | 在循环前使用 `const set = new Set(arr)` 预建索引，循环内改用 `.has()` 检索。 |
 | `GOV-MNT-001` | `warning` | 类继承深度超过 2 层，出现脆弱基类问题。 | 收敛继承层级：组合优先，或抽公共能力为独立模块。 |
 | `GOV-MNT-002` | `error` | 核心纯领域模型反向导入 UI/CLI 表现层框架，产生严重耦合。 | 反转依赖：内层定义端口/接口，由外层实现。 |
+| `GOV-DAT-001` | `info` | 函数入参离散参数过多 (≥ 5)，出现数据泥团 (Data Clumps) 坏味道。 | 将离散参数群聚合为强类型的结构化上下文模型（如 Context 或 Options 接口对象）。 |
 | `GOV-SAN-001` | `warning` | 代码或注释残留临时工单/批次黑话（pXX、phaseXX、stXX、wip），损害架构寿命并造成文档漂移。 | 移除临时工单/批次黑话，改用长效领域术语。 |
 | `GOV-AGN-001` | `error` | 多 Agent 并发修改导致架构边界突破、跨模块循环依赖闭环或公共契约破坏。 | 协调并行 Agent 的架构边界与修改职责，消解跨模块并发循环依赖并维护单向分层契约。 |
 | `GOV-SLC-001` | `error` | AST 切片改动引入破坏性签名漂移或向外部调用链扩散不可控副作用。 | 确保切片改动向后兼容，或同步重构受影响调用链上的全部外部调用者。 |
@@ -136,6 +144,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `ARCH-LEAK-001` | `error` | 职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。 | 领域模型使用 POJO/原生实体，隔离外部框架专有类型。 |
 | `ARCH-LEAK-002` | `warning` | 分层越界：外层实现被内层直接反向引用（Clean/DDD 层序反转）。 | 把依赖改回单向（内层定义接口、外层实现），或把该文件移入正确层。 |
 | `ARCH-DISP-001` | `warning` | 巨石分支分发器：单一函数内 switch/if-else 分支过多 (≥ 8) 且紧耦合各分支业务逻辑。 | 重构为查表映射 (Table-driven) 或策略对象模式 (Strategy Pattern)。 |
+| `ARCH-DSP-002` | `warning` | 分发器闭包碎片化：单一对象字面量内连续定义过多匿名单行函数闭包 (≥ 15)。 | 重构为按职责正交划分的 switch 分发函数（圈复杂度 ≤ 10）或顶层具名函数。 |
 | `clean-layer-violation` | `error` | 增量管线中的分层越界（clean-layer 口径）。 | 按层序调整依赖方向或把实现下沉/上提到正确层。 |
 
 ### 依赖图与导入边界 (`dependency-graph`)
@@ -260,6 +269,8 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `SIM-EMPTY-001` | `warning` | 函数体只剩 `pass`/`...`（跳过前置 docstring）或空 `{}`。 | 实现函数体、显式抛「未实现」异常，或删除声明 |
 | `SIM-PRNT-001` | `warning` | 非豁免路径出现调试输出（`print`/`pprint`/`breakpoint`/`console.log`/`println!`/`dbg!` 等）。默认豁免 `**/cli/**`、`**/scripts/**`、`**/tests/**`、`**/bench/**`、`*.test.*`、`*.spec.*`，可用 `printAllowPatterns` 覆盖。 | 改用结构化 logger 或删除；调试输出绕过日志级别并泄漏到生产 stdout |
 | `SIM-FLAT-002` | `warning` | 控制流深度嵌套超过阈值（默认 > 3 层），决策树过深增加心智负担。 | 采用卫语句（Guard Clauses）提前返回扁平化控制流，或将深层嵌套提炼为独立函数。 |
+| `SIM-TRN-001` | `info` | 冗长且无副作用的 if-else 分支可折叠为浅层单行三元表达式。 | 双分支为同变量单一赋值或纯返回值时，在无副作用、单层深度且行长 ≤ 80 字符的前提下折叠为三元表达式。 |
+| `SIM-IMM-001` | `info` | 通过三元表达式折叠消除未初始化的局部可变绑定，提纯为不可变 const。 | 将 `let x; if (c) { x = a; } else { x = b; }` 提纯为 `const x = c ? a : b;`，消除可变状态生命周期。 |
 
 **未内化项（需语句序列 / 符号引用分析，另行评估）**：布尔返回化简、`len()` 比较化简、冗余 `else`（均需兄弟语句分析）、未使用导入（需跨文件符号引用，且 TS/JS 与 Python 已有 ESLint/ruff 原生覆盖）。
 

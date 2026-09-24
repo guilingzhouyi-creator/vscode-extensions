@@ -14,6 +14,7 @@ import type { RuleDefinition } from '../types';
 import {
     ALL_LANGUAGES,
     defineRule,
+    SEVERITY_INFO,
     SEVERITY_WARNING,
     SEVERITY_ERROR,
     RULE_FAMILY_COMMENTS,
@@ -415,6 +416,30 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         remediation:
             '将深层嵌套的 if/else 重构为反向条件的前置卫语句（提前 return/continue/break），保持主逻辑扁平清晰。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-flat-002',
+    }),
+    defineRule({
+        id: 'SIM-TRN-001',
+        family: RULE_FAMILY_SIMPLIFY,
+        analyzer: ANALYZER_SIMPLIFY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_INFO,
+        summary: '冗长且无副作用的 if-else 分支可折叠为浅层单行三元表达式',
+        remediation:
+            '双分支为同变量单一赋值或纯返回值时，在无副作用、单层深度且行长 ≤ 80 字符的前提下折叠为三元表达式，降低控制流复杂度。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-trn-001',
+    }),
+    defineRule({
+        id: 'SIM-IMM-001',
+        family: RULE_FAMILY_SIMPLIFY,
+        analyzer: ANALYZER_SIMPLIFY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_INFO,
+        summary: '通过三元表达式折叠消除未初始化的局部可变绑定，提纯为不可变 const',
+        remediation:
+            '将 let x; if (c) { x = a; } else { x = b; } 提纯为 const x = c ? a : b;，消除可变状态生命周期。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-imm-001',
     }),
     defineRule({
         id: 'DOC-DUP-001',

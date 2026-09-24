@@ -158,7 +158,7 @@ export async function processChangedFileHint(
     const fph = fpContext.fpHashFor(rel);
 
     if (opts.verifyDiskContent) {
-        const provided = decodeContent((diffInput as any).newContent);
+        const provided = decodeContent(diffInput.newContent);
         if (sha256Hex(Buffer.from(provided, 'utf8')) !== contentHash) {
             scanner.logger.warn(`diff newContent mismatch on ${rel}; falling back to full rescan`);
             state.diffFull++;

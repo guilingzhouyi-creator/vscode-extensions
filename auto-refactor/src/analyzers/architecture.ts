@@ -192,6 +192,11 @@ export class ArchitectureAnalyzer implements Analyzer {
         forbiddenModules: Set<string>,
         issues: Issue[],
     ): void {
+        const thresholdHeadless = (ctx.config.thresholds as ArchitectureThresholds | undefined)
+            ?.headlessDisallowedImports;
+        const customHeadless = opts.headlessDisallowedImports ?? thresholdHeadless;
+        const customHeadlessSet = customHeadless ? new Set(customHeadless) : undefined;
+
         const len = content.length;
         let lineStart = 0;
         let lineIdx = 0;
@@ -226,6 +231,7 @@ export class ArchitectureAnalyzer implements Analyzer {
                 opts,
                 forbiddenModules,
                 issues,
+                customHeadlessSet,
             );
             this.checkGlobalAndConfigViolations(
                 lineText,
@@ -284,7 +290,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         if (!flagConfig || currentLayer !== ARCHITECTURE_LAYER_DOMAIN) return;
 
         const customConfigKws =
-            opts.protectedConfigKeywords ?? (ctx.config.thresholds as any)?.protectedConfigKeywords;
+            opts.protectedConfigKeywords ?? ctx.config.thresholds?.protectedConfigKeywords;
         const hasDirectConfigAccess =
             trimmed.includes('process.env') ||
             trimmed.includes('fs.readFileSync') ||
@@ -364,6 +370,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         opts: ArchitectureOptions,
         forbiddenModules: Set<string>,
         issues: Issue[],
+        customHeadlessSet?: Set<string>,
     ): void {
         for (const spec of specifiers) {
             this.auditDomainImports(
@@ -375,6 +382,7 @@ export class ArchitectureAnalyzer implements Analyzer {
                 opts,
                 forbiddenModules,
                 issues,
+                customHeadlessSet,
             );
             this.auditCrossDomainBypass(spec, file, lineIdx, ctx, opts, issues);
             this.auditPolyglotAdapterDecoupling(spec, file, lineIdx, ctx, issues);
@@ -471,19 +479,19 @@ export class ArchitectureAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         opts: ArchitectureOptions,
         issues: Issue[],
+        customHeadlessSet?: Set<string>,
     ): void {
         const enforceHeadless =
             opts.enforceHeadless ?? ctx.config.thresholds?.enforceHeadless ?? false;
         if (!enforceHeadless) return;
 
-        const thresholdHeadless = (ctx.config.thresholds as ArchitectureThresholds | undefined)
-            ?.headlessDisallowedImports;
-        const customHeadless = opts.headlessDisallowedImports ?? thresholdHeadless;
         const isForbiddenHeadless =
             FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
             FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw) ||
-            (customHeadless &&
-                (customHeadless.includes(basePkg) || customHeadless.includes(spec.raw)));
+            Boolean(
+                customHeadlessSet &&
+                (customHeadlessSet.has(basePkg) || customHeadlessSet.has(spec.raw)),
+            );
 
         if (isForbiddenHeadless) {
             issues.push(
@@ -509,6 +517,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         opts: ArchitectureOptions,
         forbiddenModules: Set<string>,
         issues: Issue[],
+        customHeadlessSet?: Set<string>,
     ): void {
         if (currentLayer !== ARCHITECTURE_LAYER_DOMAIN) return;
         const basePkg = spec.raw.startsWith('@')
@@ -525,7 +534,17 @@ export class ArchitectureAnalyzer implements Analyzer {
             forbiddenModules,
             issues,
         );
-        this.checkHeadlessBoundary(spec, basePkg, file, currentLayer, lineIdx, ctx, opts, issues);
+        this.checkHeadlessBoundary(
+            spec,
+            basePkg,
+            file,
+            currentLayer,
+            lineIdx,
+            ctx,
+            opts,
+            issues,
+            customHeadlessSet,
+        );
     }
 
     /**

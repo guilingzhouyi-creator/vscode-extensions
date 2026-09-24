@@ -127,11 +127,18 @@ const DEFAULT_SECRET_MAX_ISSUES_PER_FILE = 50;
 const DEFAULT_MAX_FUNCTION_LINES = 60;
 /** simplify analyzer default minimum run of commented-out lines. */
 const DEFAULT_COMMENTED_CODE_MIN_LINES = 3;
+/** simplify analyzer default maximum ternary expression column length. */
+const DEFAULT_MAX_TERNARY_LENGTH = 80;
+/** simplify analyzer default guard clause nesting limit. */
+const DEFAULT_MAX_GUARD_CLAUSE_NESTING = 3;
 /** Scheduler default: in-process unless the repo is big enough to amortise worker threads. */
 const DEFAULT_MAX_CONCURRENCY = 4;
 
 /** `typeof` tag used to validate boolean overrides before they are layered into the config. */
 const TYPEOF_BOOLEAN = 'boolean';
+const TYPEOF_STRING = 'string';
+const TYPEOF_OBJECT = 'object';
+const DELIM_COMMA = ',';
 
 /**
  * True when `value` is a genuine boolean (not a stringified CLI value), used instead of an
@@ -142,6 +149,14 @@ const TYPEOF_BOOLEAN = 'boolean';
  */
 function isBooleanFlag(value: unknown): value is boolean {
     return typeof value === TYPEOF_BOOLEAN;
+}
+
+function isStringValue(value: unknown): value is string {
+    return typeof value === TYPEOF_STRING;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === TYPEOF_OBJECT && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -276,6 +291,11 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
         simplify: {
             maxFunctionLines: DEFAULT_MAX_FUNCTION_LINES,
             commentedCodeMinLines: DEFAULT_COMMENTED_CODE_MIN_LINES,
+            checkGuardClauses: false,
+            maxGuardClauseNesting: DEFAULT_MAX_GUARD_CLAUSE_NESTING,
+            checkTernarySimplification: true,
+            maxTernaryLength: DEFAULT_MAX_TERNARY_LENGTH,
+            rewardSimplifications: true,
         },
         security: {
             level: 'basic',
@@ -656,12 +676,25 @@ function assembleDomainOptions(
  */
 function applyCliAnalyzersFilter(
     analyzers: Record<string, AnalyzerDeclaration>,
-    allowList?: string[],
+    allowList?: unknown,
 ): Record<string, AnalyzerDeclaration> {
-    if (!allowList || allowList.length === 0) {
+    if (!allowList) return analyzers;
+    let items: string[];
+    if (Array.isArray(allowList)) {
+        items = allowList;
+    } else if (isStringValue(allowList)) {
+        items = allowList
+            .split(DELIM_COMMA)
+            .map((s) => s.trim())
+            .filter(Boolean);
+    } else if (isPlainObject(allowList)) {
+        items = Object.keys(allowList).filter((k) => Boolean(allowList[k]));
+    } else {
         return analyzers;
     }
-    const set = new Set(allowList);
+    if (items.length === 0) return analyzers;
+
+    const set = new Set(items);
     const next: Record<string, AnalyzerDeclaration> = {};
     for (const [name, decl] of Object.entries(analyzers)) {
         next[name] = { ...decl, enabled: set.has(name) };

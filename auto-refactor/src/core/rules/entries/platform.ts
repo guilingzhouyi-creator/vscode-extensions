@@ -166,6 +166,19 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-disp-001',
     }),
     defineRule({
+        id: 'ARCH-DSP-002',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation.',
+        remediation:
+            '重构为按职责正交划分的 switch 分发函数（单函数圈复杂度 <= 10）或顶层具名处理函数，消除闭包碎片化。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dsp-002',
+    }),
+    defineRule({
         id: 'clean-layer-violation',
         family: RULE_FAMILY_ARCHITECTURE,
         analyzer: ANALYZER_ARCHITECTURE,

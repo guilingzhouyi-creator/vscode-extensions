@@ -95,6 +95,46 @@ const FIXTURES = {
     '    return 0;',
     '}',
   ].join('\n'),
+  'ternary.ts': [
+    'export function testImm(flag: boolean): number {',
+    '    let value: number;',
+    '    if (flag) {',
+    '        value = 10;',
+    '    } else {',
+    '        value = 20;',
+    '    }',
+    '    return value;',
+    '}',
+    'export function testReturn(val: number): string {',
+    '    if (val > 0) {',
+    '        return "positive";',
+    '    } else {',
+    '        return "non-positive";',
+    '    }',
+    '}',
+    'export function testSeq(val: number): string {',
+    '    if (val === 0) return "zero";',
+    '    return "nonzero";',
+    '}',
+  ].join('\n'),
+  'ternary_negative.ts': [
+    'export function testSideEffect(flag: boolean, count: number): number {',
+    '    let value = 0;',
+    '    if (flag) {',
+    '        value = count++;',
+    '    } else {',
+    '        value = 20;',
+    '    }',
+    '    return value;',
+    '}',
+    'export function testLong(flag: boolean): string {',
+    '    if (flag) {',
+    '        return "this is an extremely long string that definitely exceeds eighty columns of width when combined with everything else in the statement";',
+    '    } else {',
+    '        return "another extremely long string that guarantees the folded ternary expression length ceiling is triggered";',
+    '    }',
+    '}',
+  ].join('\n'),
 };
 
 /**
@@ -189,6 +229,28 @@ async function run() {
     console.log(
       '  [PASS] SIM-FLAT-002 flags deep conditional nesting and recommends guard clauses',
     );
+
+    const trn = byRule('SIM-TRN-001');
+    assert.strictEqual(
+      trn.length,
+      3,
+      'SIM-TRN-001 must flag exactly the 3 safe candidates in ternary.ts',
+    );
+    assert.strictEqual(
+      trn.every((i) => i.location.file === 'ternary.ts'),
+      true,
+    );
+    console.log('  [PASS] SIM-TRN-001 identifies safe shallow ternary folding opportunities');
+
+    const imm = byRule('SIM-IMM-001');
+    assert.strictEqual(
+      imm.length,
+      1,
+      'SIM-IMM-001 must flag mutable let fold opportunity in ternary.ts',
+    );
+    assert.strictEqual(imm[0].detail.canMakeImmutable, true);
+    assert.strictEqual(imm[0].detail.rewardBonus, 5);
+    console.log('  [PASS] SIM-IMM-001 detects immutable const conversion with +5 reward bonus');
 
     const strictConfig = path.join(root, 'strict.config.json');
     fs.writeFileSync(

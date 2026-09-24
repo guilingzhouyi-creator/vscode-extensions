@@ -55,7 +55,13 @@ function scanDeclarationBoundaries(lines: string[]): DeclarationBoundary[] {
         if (!current) {
             const match = DECLARATION_START_RE.exec(line);
             if (match) {
-                const name = match.slice(1).find((m) => Boolean(m)) || 'anonymous';
+                let name = 'anonymous';
+                for (let k = 1; k < match.length; k++) {
+                    if (match[k]) {
+                        name = match[k];
+                        break;
+                    }
+                }
                 const isExported = line.includes('export');
                 let kind = 'FunctionDeclaration';
                 if (line.includes('class ')) kind = 'ClassDeclaration';
@@ -188,6 +194,84 @@ function deriveChangedLineNumbers(oldContent: string, newContent: string): numbe
 }
 
 /**
+ * Binary search for a declaration boundary enclosing the given line number.
+ *
+ * @param boundaries - Ordered list of declaration boundaries.
+ * @param lineNum - 1-based target line number.
+ * @returns The matching boundary if found, undefined otherwise.
+ */
+function findEnclosingBoundary(
+    boundaries: DeclarationBoundary[],
+    lineNum: number,
+): DeclarationBoundary | undefined {
+    let low = 0;
+    let high = boundaries.length - 1;
+    while (low <= high) {
+        const mid = (low + high) >> 1;
+        const b = boundaries[mid];
+        if (lineNum < b.startLine) {
+            high = mid - 1;
+        } else if (lineNum > b.endLine) {
+            low = mid + 1;
+        } else {
+            return b;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Constructs an ASTSliceNode for an enclosing declaration boundary.
+ */
+function createBoundarySliceNode(
+    filePath: string,
+    match: DeclarationBoundary,
+    oldLines: string[],
+    newLines: string[],
+): ASTSliceNode {
+    const sliceOldLines = oldLines.slice(match.startLine - 1, match.endLine);
+    const sliceNewLines = newLines.slice(match.startLine - 1, match.endLine);
+    const oldSig = sliceOldLines[0]?.trim() || '';
+    const newSig = sliceNewLines[0]?.trim() || '';
+    const signatureChanged = oldSig !== newSig;
+
+    const oldLinesSet = new Set(sliceOldLines);
+    const addedLines = sliceNewLines.filter((l) => !oldLinesSet.has(l));
+    const vector = inspectSliceDelta(addedLines, signatureChanged);
+    const primaryKind = resolvePrimaryKind(vector);
+
+    return {
+        sliceId: `slice:${filePath}:${match.name}:${match.startLine}`,
+        filePath,
+        startLine: match.startLine,
+        endLine: match.endLine,
+        nodeKind: match.kind,
+        symbolName: match.name,
+        isExported: match.isExported,
+        featureVector: vector,
+        primaryKind,
+    };
+}
+
+/**
+ * Constructs an ASTSliceNode for a top-level uncontained modification.
+ */
+function createFallbackSliceNode(filePath: string, lineNum: number, rawLine: string): ASTSliceNode {
+    const vector = inspectSliceDelta([rawLine], false);
+    return {
+        sliceId: `slice:${filePath}:top-level:${lineNum}`,
+        filePath,
+        startLine: lineNum,
+        endLine: lineNum,
+        nodeKind: 'TopLevelStatement',
+        symbolName: 'top-level',
+        isExported: rawLine.includes('export'),
+        featureVector: vector,
+        primaryKind: resolvePrimaryKind(vector),
+    };
+}
+
+/**
  * ASTSliceExtractor isolates code mutations to minimal containing declaration nodes.
  */
 export class ASTSliceExtractor {
@@ -217,48 +301,20 @@ export class ASTSliceExtractor {
         const sliceMap = new Map<string, ASTSliceNode>();
 
         for (const lineNum of changedLines) {
-            const match = boundaries.find((b) => lineNum >= b.startLine && lineNum <= b.endLine);
+            const match = findEnclosingBoundary(boundaries, lineNum);
 
             if (match) {
                 if (!sliceMap.has(match.name)) {
-                    const sliceOldLines = oldLines.slice(match.startLine - 1, match.endLine);
-                    const sliceNewLines = newLines.slice(match.startLine - 1, match.endLine);
-                    const oldSig = sliceOldLines[0]?.trim() || '';
-                    const newSig = sliceNewLines[0]?.trim() || '';
-                    const signatureChanged = oldSig !== newSig;
-
-                    const addedLines = sliceNewLines.filter((l) => !sliceOldLines.includes(l));
-                    const vector = inspectSliceDelta(addedLines, signatureChanged);
-                    const primaryKind = resolvePrimaryKind(vector);
-
-                    sliceMap.set(match.name, {
-                        sliceId: `slice:${filePath}:${match.name}:${match.startLine}`,
-                        filePath,
-                        startLine: match.startLine,
-                        endLine: match.endLine,
-                        nodeKind: match.kind,
-                        symbolName: match.name,
-                        isExported: match.isExported,
-                        featureVector: vector,
-                        primaryKind,
-                    });
+                    sliceMap.set(
+                        match.name,
+                        createBoundarySliceNode(filePath, match, oldLines, newLines),
+                    );
                 }
             } else {
                 const fallbackKey = `top-level:${lineNum}`;
                 if (!sliceMap.has(fallbackKey)) {
                     const rawLine = newLines[lineNum - 1] || '';
-                    const vector = inspectSliceDelta([rawLine], false);
-                    sliceMap.set(fallbackKey, {
-                        sliceId: `slice:${filePath}:top-level:${lineNum}`,
-                        filePath,
-                        startLine: lineNum,
-                        endLine: lineNum,
-                        nodeKind: 'TopLevelStatement',
-                        symbolName: 'top-level',
-                        isExported: rawLine.includes('export'),
-                        featureVector: vector,
-                        primaryKind: resolvePrimaryKind(vector),
-                    });
+                    sliceMap.set(fallbackKey, createFallbackSliceNode(filePath, lineNum, rawLine));
                 }
             }
         }
