@@ -19,13 +19,7 @@ import type { GovernanceRule } from './types';
 import { RedundantBooleanRule, ModernConstructRule } from './rules/standardization';
 import { FileNamingRule, ModuleHeaderRule } from './rules/fileStructure';
 import { ExcessiveNestingRule, VacuousWrapperRule } from './rules/codeLogic';
-import {
-    ExplicitTypingRule,
-    FunctionSignatureCompletenessRule,
-    UnsafeAnyRule,
-    ContractForcedEscapeRule,
-    UnsafePropertyPenetrationRule,
-} from './rules/typeSystem';
+import { TYPE_SYSTEM_GOVERNANCE_RULES } from './rules/typeSystem';
 import {
     SwallowedExceptionRule,
     NakedUnwrapRule,
@@ -72,11 +66,7 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     ExcessiveNestingRule,
     VacuousWrapperRule,
     // 4. Type System
-    ExplicitTypingRule,
-    FunctionSignatureCompletenessRule,
-    UnsafeAnyRule,
-    ContractForcedEscapeRule,
-    UnsafePropertyPenetrationRule,
+    ...TYPE_SYSTEM_GOVERNANCE_RULES,
     // 5. Exception Safety
     SwallowedExceptionRule,
     NakedUnwrapRule,

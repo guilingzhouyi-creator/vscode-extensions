@@ -320,6 +320,14 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         '使用标准类型收窄谓词（如 ts.canHaveModifiers 或 isXxx）保护属性访问。',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-typ-005',
     ),
+    defineGov(
+        'GOV-TYP-006',
+        LANGUAGES_TS,
+        SEVERITY_WARNING,
+        'Exported functions, classes, and public methods must specify explicit return types to protect public API contracts.',
+        '为导出的公共函数、类方法补充显式返回类型注解，避免依赖隐式类型推断引起 API 破坏。',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-typ-006',
+    ),
     defineCmp(
         'CMP-EXP-001',
         SEVERITY_WARNING,

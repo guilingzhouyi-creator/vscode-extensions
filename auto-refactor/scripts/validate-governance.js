@@ -339,6 +339,12 @@ function verifyTypeScriptAdaptation(tsIssues) {
     `TypeScript file correctly detected unsafe property penetration (GOV-TYP-005) (${penetrationIssues.length})`,
   );
 
+  const exportTypeIssues = tsIssues.filter((i) => i.rule === 'GOV-TYP-006');
+  assert(
+    exportTypeIssues.length >= 2,
+    `TypeScript file correctly detected missing exported return types (GOV-TYP-006) (${exportTypeIssues.length})`,
+  );
+
   const syncIoIssues = tsIssues.filter((i) => i.rule === 'GOV-PRF-004');
   assert(
     syncIoIssues.length > 0,
