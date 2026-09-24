@@ -3,6 +3,9 @@ import type { Analyzer, AnalyzerContext, Issue, FileMetric, Severity } from '../
 import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
 import { runStreaming } from '../core/traverse';
+import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
+import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
+import { evaluateRoleElasticBudget } from '../core/intelligence/elastic-budget-matrix';
 
 function firstWord(name: string): string {
     const m = name.match(/^[a-z]+|^[A-Z]+/) || ['misc'];
@@ -123,6 +126,20 @@ export class LargeFileAnalyzer implements Analyzer {
         };
 
         const t = ctx.options;
+        const density = analyzeCodeDensity(ctx.content, ctx.filePath);
+        const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content.slice(0, 500));
+        const elasticEvaluation = evaluateRoleElasticBudget(roleInference.role, density);
+
+        // 在开启弹性预算模式或判定为高自述性优良低密度文件时，以真实有效代码负荷为准
+        if (
+            t.enableElasticBudget === true ||
+            (density.isLowDensityDocumented && !elasticEvaluation.shouldFlagLargeFile)
+        ) {
+            if (!elasticEvaluation.shouldFlagLargeFile && m.functions < t.fileFunctionsWarn) {
+                return [];
+            }
+        }
+
         let severity: Severity | null = null;
         const reasons: string[] = [];
 
@@ -171,6 +188,9 @@ export class LargeFileAnalyzer implements Analyzer {
                     ...m,
                     reasons,
                     inferredModules: modules,
+                    densityMetrics: density,
+                    fileRole: roleInference.role,
+                    elasticEvaluation,
                 },
                 suggestion: suggestions.join(' '),
             },

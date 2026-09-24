@@ -879,3 +879,22 @@ export {
     formatCompactGuardDirective,
     formatCompactAgentPrompt,
 } from './core/guidance/agentConstraintGenerator';
+
+// ---- Scale-Adaptive Sparse Review Scheduler & Elastic Code Density ----
+export {
+    LineClassificationKind,
+    CodeDensityMetrics,
+    analyzeCodeDensity,
+} from './core/intelligence/code-density-analyzer';
+export {
+    FineGrainedFileRole,
+    FileRoleInferenceResult,
+    inferFineGrainedFileRole,
+} from './core/intelligence/file-role-inference';
+export {
+    RoleBudgetThresholds,
+    ElasticBudgetEvaluation,
+    getRoleBudget,
+    evaluateRoleElasticBudget,
+} from './core/intelligence/elastic-budget-matrix';
+export * from './core/scheduler';
