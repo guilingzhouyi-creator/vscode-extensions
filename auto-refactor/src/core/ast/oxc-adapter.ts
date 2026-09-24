@@ -270,7 +270,7 @@ export class OxcAdapter implements LanguageAdapter {
         node.exported = topLevel && (Boolean(n.__exported) || n.type === 'TSExportAssignment');
         if (isLiteral) {
             node.isConstBound = oxcIsConstBoundOf(n, parent, grandparent);
-            node.tolerated = oxcIsToleratedOf(n, parent, ctx);
+            node.tolerated = oxcIsToleratedOf(n, parent, ctx, grandparent);
         }
     }
 

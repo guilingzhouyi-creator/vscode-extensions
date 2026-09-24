@@ -17,9 +17,7 @@ import { NodeKind } from './multilang';
 import { isFunctionLike } from '../../utils/ast';
 import { isCallArgumentToleratedByPolicy } from '../literal-policy-engine';
 
-/** Set of TypeScript syntax kinds that represent control flow or block scopes. */
-export const CONTROL_OR_BLOCK = new Set<ts.SyntaxKind>([
-    ts.SyntaxKind.Block,
+const LOOP_AND_COND_KINDS = [
     ts.SyntaxKind.IfStatement,
     ts.SyntaxKind.ForStatement,
     ts.SyntaxKind.ForInStatement,
@@ -27,7 +25,13 @@ export const CONTROL_OR_BLOCK = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.WhileStatement,
     ts.SyntaxKind.DoStatement,
     ts.SyntaxKind.SwitchStatement,
+];
+
+/** Set of TypeScript syntax kinds that represent control flow or block scopes. */
+export const CONTROL_OR_BLOCK = new Set<ts.SyntaxKind>([
+    ts.SyntaxKind.Block,
     ts.SyntaxKind.TryStatement,
+    ...LOOP_AND_COND_KINDS,
 ]);
 
 /**
@@ -56,7 +60,7 @@ export function isTopLevelDecl(n: ts.Node): boolean {
  */
 export function hasExportModifier(n: ts.Node): boolean {
     const list = ts.canHaveModifiers(n) ? ts.getModifiers(n) : undefined;
-    return Boolean(list && list.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
+    return Boolean(list?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
 }
 
 /**
@@ -66,26 +70,15 @@ export function hasExportModifier(n: ts.Node): boolean {
  * @returns True for the four binding-source shapes.
  */
 export function introducesBinding(node: ts.Node): boolean {
-    switch (node.kind) {
-        case ts.SyntaxKind.VariableDeclaration: {
-            const v = node as ts.VariableDeclaration;
-            return Boolean(v.initializer && isFunctionLike(v.initializer));
-        }
-        case ts.SyntaxKind.PropertyAssignment: {
-            const p = node as ts.PropertyAssignment;
-            return isFunctionLike(p.initializer);
-        }
-        case ts.SyntaxKind.PropertyDeclaration: {
-            const p = node as ts.PropertyDeclaration;
-            return Boolean(p.initializer && isFunctionLike(p.initializer));
-        }
-        case ts.SyntaxKind.BinaryExpression: {
-            const b = node as ts.BinaryExpression;
-            return b.operatorToken.kind === ts.SyntaxKind.EqualsToken && isFunctionLike(b.right);
-        }
-        default:
-            return false;
+    if (ts.isVariableDeclaration(node) || ts.isPropertyDeclaration(node)) {
+        return Boolean(node.initializer && isFunctionLike(node.initializer));
     }
+    if (ts.isPropertyAssignment(node)) return isFunctionLike(node.initializer);
+    return (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        isFunctionLike(node.right)
+    );
 }
 
 /** Literal node kinds the analyzers consume (constants reads their text as the value). */
@@ -104,11 +97,12 @@ const LITERAL_KINDS = new Set<ts.SyntaxKind>([
  * @returns True when the node is a punctuation, keyword, or identifier token to skip.
  */
 export function isSkippableToken(n: ts.Node): boolean {
-    if (!ts.isToken(n)) return false;
-    if (LITERAL_KINDS.has(n.kind)) return false;
-    if (n.kind === ts.SyntaxKind.FunctionKeyword) return false;
-    if (ts.isModifier(n)) return false;
-    return true;
+    return (
+        ts.isToken(n) &&
+        !LITERAL_KINDS.has(n.kind) &&
+        n.kind !== ts.SyntaxKind.FunctionKeyword &&
+        !ts.isModifier(n)
+    );
 }
 
 /**
@@ -120,26 +114,32 @@ export function isSkippableToken(n: ts.Node): boolean {
  */
 export function bindingName(node: ts.Node, sf: ts.SourceFile): string | null {
     if (ts.isVariableDeclaration(node) && node.initializer && isFunctionLike(node.initializer)) {
-        const n = (node.name as ts.Identifier)?.getText?.(sf);
-        return n ?? null;
+        return (node.name as ts.Identifier)?.getText?.(sf) ?? null;
     }
-    if (ts.isPropertyAssignment(node) && isFunctionLike(node.initializer)) {
+    const isProp = ts.isPropertyAssignment(node) || ts.isPropertyDeclaration(node);
+    if (isProp && node.initializer && isFunctionLike(node.initializer)) {
         return node.name.getText(sf);
     }
-    if (ts.isPropertyDeclaration(node) && node.initializer && isFunctionLike(node.initializer)) {
-        return node.name.getText(sf);
-    }
-    if (
+    const isAssign =
         ts.isBinaryExpression(node) &&
         node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-        isFunctionLike(node.right)
-    ) {
-        if (ts.isPropertyAccessExpression(node.left)) return node.left.getText(sf);
-        if (ts.isIdentifier(node.left)) return node.left.getText(sf);
-        return null;
+        isFunctionLike(node.right);
+    if (isAssign && (ts.isPropertyAccessExpression(node.left) || ts.isIdentifier(node.left))) {
+        return node.left.getText(sf);
     }
     return null;
 }
+
+const COMMON_BRANCH_KINDS = [
+    ...LOOP_AND_COND_KINDS,
+    ts.SyntaxKind.CaseClause,
+    ts.SyntaxKind.CatchClause,
+];
+
+const CONTROL_FLOW_KINDS = new Set<ts.SyntaxKind>([
+    ...COMMON_BRANCH_KINDS,
+    ts.SyntaxKind.TryStatement,
+]);
 
 const KIND_MAP = new Map<ts.SyntaxKind, NodeKind>([
     [ts.SyntaxKind.SourceFile, NodeKind.SourceFile],
@@ -160,16 +160,6 @@ const KIND_MAP = new Map<ts.SyntaxKind, NodeKind>([
     [ts.SyntaxKind.CallExpression, NodeKind.Call],
     [ts.SyntaxKind.NewExpression, NodeKind.Call],
     [ts.SyntaxKind.BinaryExpression, NodeKind.BinaryExpr],
-    [ts.SyntaxKind.IfStatement, NodeKind.ControlFlow],
-    [ts.SyntaxKind.ForStatement, NodeKind.ControlFlow],
-    [ts.SyntaxKind.ForInStatement, NodeKind.ControlFlow],
-    [ts.SyntaxKind.ForOfStatement, NodeKind.ControlFlow],
-    [ts.SyntaxKind.WhileStatement, NodeKind.ControlFlow],
-    [ts.SyntaxKind.DoStatement, NodeKind.ControlFlow],
-    [ts.SyntaxKind.SwitchStatement, NodeKind.ControlFlow],
-    [ts.SyntaxKind.CaseClause, NodeKind.ControlFlow],
-    [ts.SyntaxKind.CatchClause, NodeKind.ControlFlow],
-    [ts.SyntaxKind.TryStatement, NodeKind.ControlFlow],
     [ts.SyntaxKind.Block, NodeKind.Block],
 ]);
 
@@ -180,19 +170,12 @@ const KIND_MAP = new Map<ts.SyntaxKind, NodeKind>([
  * @returns The normalized NodeKind enum value.
  */
 export function kindOf(n: ts.Node): NodeKind {
+    if (CONTROL_FLOW_KINDS.has(n.kind)) return NodeKind.ControlFlow;
     return KIND_MAP.get(n.kind) ?? NodeKind.Other;
 }
 
 const BRANCH_WEIGHT_KINDS = new Set<ts.SyntaxKind>([
-    ts.SyntaxKind.IfStatement,
-    ts.SyntaxKind.ForStatement,
-    ts.SyntaxKind.ForInStatement,
-    ts.SyntaxKind.ForOfStatement,
-    ts.SyntaxKind.WhileStatement,
-    ts.SyntaxKind.DoStatement,
-    ts.SyntaxKind.SwitchStatement,
-    ts.SyntaxKind.CatchClause,
-    ts.SyntaxKind.CaseClause,
+    ...COMMON_BRANCH_KINDS,
     ts.SyntaxKind.ConditionalExpression,
 ]);
 
@@ -240,10 +223,7 @@ export function calleeNameOf(n: ts.Node, sf: ts.SourceFile): string | null {
  * @returns The non-empty name text, or null if unnamed.
  */
 export function nameOf(n: ts.Node, sf: ts.SourceFile): string | null {
-    const named = n as ts.NamedDeclaration;
-    const name = named.name;
-    if (!name) return null;
-    const t = name.getText(sf);
+    const t = (n as ts.NamedDeclaration).name?.getText(sf);
     return typeof t === 'string' && t.length > 0 ? t : null;
 }
 
@@ -251,15 +231,25 @@ export function nameOf(n: ts.Node, sf: ts.SourceFile): string | null {
 const TEST_AND_ASSERT_CALLEES =
     /\b(describe|it|test|suite|context|beforeEach|afterEach|beforeAll|afterAll|assert|expect|should|equal|strictEqual|deepEqual|deepStrictEqual|ok|match|throws|rejects)\b/;
 
+/** Regex matching error constructors and error factory calls. */
+const ERROR_CONSTRUCTOR_CALLEES =
+    /\b(?:createError|buildError|makeError|[A-Z][A-Za-z0-9_$]*(?:Error|Exception)|Error)\b/;
+
+/** Regex matching logger and standard output call targets. */
+const LOGGING_AND_OUTPUT_CALLEES =
+    /\b(?:console|logger|logging|log)\.(?:log|info|warn|error|debug|trace|dir)\b|\bprocess\.(?:stdout|stderr)\.write\b|\bchalk\.\w+\b/;
+
 const KEYWORD_CONST = 'const';
 
 function isAsConst(node: ts.Node | undefined): boolean {
     if (!node) return false;
     if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
-        const typeNode = node.type;
-        if (ts.isTypeReferenceNode(typeNode) && ts.isIdentifier(typeNode.typeName)) {
-            return typeNode.typeName.text === KEYWORD_CONST;
-        }
+        const tn = node.type;
+        return Boolean(
+            ts.isTypeReferenceNode(tn) &&
+            ts.isIdentifier(tn.typeName) &&
+            tn.typeName.text === KEYWORD_CONST,
+        );
     }
     return false;
 }
@@ -276,16 +266,9 @@ function isEnclosedInConstDeclaration(
     grandparent?: ts.Node | undefined,
 ): boolean {
     if (isAsConst(parent) || isAsConst(grandparent)) return true;
-    if (parent && ts.isNewExpression(parent)) {
-        const expr = parent.expression;
-        if (ts.isIdentifier(expr) && (expr.text === 'Set' || expr.text === 'Map')) {
-            return true;
-        }
-    }
-    if (grandparent && ts.isNewExpression(grandparent)) {
-        const expr = grandparent.expression;
-        if (ts.isIdentifier(expr) && (expr.text === 'Set' || expr.text === 'Map')) {
-            return true;
+    for (const n of [parent, grandparent]) {
+        if (n && ts.isNewExpression(n) && ts.isIdentifier(n.expression)) {
+            if (n.expression.text === 'Set' || n.expression.text === 'Map') return true;
         }
     }
     return false;
@@ -304,28 +287,27 @@ export function isConstBoundOf(
     parent: ts.Node | undefined,
     grandparent: ts.Node | undefined,
 ): boolean {
-    if (
+    const isConstVar =
         parent &&
         ts.isVariableDeclaration(parent) &&
         parent.initializer === node &&
         grandparent &&
         ts.isVariableDeclarationList(grandparent) &&
-        (grandparent.flags & ts.NodeFlags.Const) !== 0
-    ) {
-        return true;
-    }
-    if (parent && ts.isEnumMember(parent)) return true;
-    if (isEnclosedInConstDeclaration(parent, grandparent)) return true;
-    return false;
+        (grandparent.flags & ts.NodeFlags.Const) !== 0;
+    if (isConstVar || (parent && ts.isEnumMember(parent))) return true;
+    return isEnclosedInConstDeclaration(parent, grandparent);
 }
 
-function isToleratedCallString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): boolean {
-    if (ts.isCallExpression(p) && p.arguments.includes(node as ts.Expression)) {
-        const callee = p.expression.getText(sf);
-        if (/\b(t|i18n\.\w*|translate|fmt|formatMessage)\s*$/.test(callee)) return true;
-        if (TEST_AND_ASSERT_CALLEES.test(callee)) return true;
-    }
-    return false;
+function tsIsCallTolerated(caller: ts.Node, arg: ts.Node, sf: ts.SourceFile): boolean {
+    if (!ts.isCallExpression(caller) && !ts.isNewExpression(caller)) return false;
+    if (!caller.arguments?.includes(arg as ts.Expression)) return false;
+    const callee = caller.expression.getText(sf);
+    return (
+        /\b(t|i18n\.\w*|translate|fmt|formatMessage)\s*$/.test(callee) ||
+        TEST_AND_ASSERT_CALLEES.test(callee) ||
+        ERROR_CONSTRUCTOR_CALLEES.test(callee) ||
+        LOGGING_AND_OUTPUT_CALLEES.test(callee)
+    );
 }
 
 const TOLERATED_STRING_PARENT_KINDS = new Set<ts.SyntaxKind>([
@@ -334,6 +316,7 @@ const TOLERATED_STRING_PARENT_KINDS = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.ExportDeclaration,
     ts.SyntaxKind.PropertyAccessExpression,
     ts.SyntaxKind.CaseClause,
+    ts.SyntaxKind.ThrowStatement,
 ]);
 
 const JSX_ELEMENT_KINDS = new Set<ts.SyntaxKind>([
@@ -341,11 +324,25 @@ const JSX_ELEMENT_KINDS = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.JsxSelfClosingElement,
 ]);
 
-function isToleratedString(node: ts.Node, p: ts.Node, sf: ts.SourceFile): boolean {
+function isToleratedString(
+    node: ts.Node,
+    p: ts.Node,
+    sf: ts.SourceFile,
+    grandparent?: ts.Node,
+): boolean {
     if (TOLERATED_STRING_PARENT_KINDS.has(p.kind)) return true;
     if (ts.isPropertyAssignment(p) || ts.isJsxAttribute(p)) return p.name === node;
     if (ts.isElementAccessExpression(p)) return p.argumentExpression === node;
-    return JSX_ELEMENT_KINDS.has(p.kind) ? false : isToleratedCallString(node, p, sf);
+    if (JSX_ELEMENT_KINDS.has(p.kind)) return false;
+    if (tsIsCallTolerated(p, node, sf)) return true;
+    if (
+        grandparent &&
+        ts.isBinaryExpression(p) &&
+        p.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+        return tsIsCallTolerated(grandparent, p, sf);
+    }
+    return false;
 }
 
 function isToleratedCallArg(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {
@@ -359,12 +356,11 @@ function isToleratedCallArg(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): bool
 }
 
 function isToleratedNumeric(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {
-    if (ts.isElementAccessExpression(p) && p.argumentExpression === node) return true;
-    if (ts.isPropertyAccessExpression(p)) return true;
-    if (ts.isPropertyAssignment(p) && p.name === node) return true;
-    if (ts.isEnumMember(p)) return true;
-    if (ts.isTypeNode(p)) return true;
-    if (ts.isCaseClause(p)) return true;
+    const isAccess =
+        (ts.isElementAccessExpression(p) && p.argumentExpression === node) ||
+        (ts.isPropertyAssignment(p) && p.name === node);
+    if (isAccess || ts.isPropertyAccessExpression(p) || ts.isEnumMember(p)) return true;
+    if (ts.isTypeNode(p) || ts.isCaseClause(p)) return true;
     return isToleratedCallArg(node, p, sf);
 }
 
@@ -374,14 +370,18 @@ function isToleratedNumeric(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): bool
  * @param node - Literal node to classify.
  * @param p - Raw parent node.
  * @param sf - Source file used to print call callees for the i18n heuristic.
+ * @param grandparent - Optional raw grandparent node for compound expressions.
  * @returns True when the literal sits in a tolerated context.
  */
-export function isToleratedOf(node: ts.Node, p: ts.Node | undefined, sf: ts.SourceFile): boolean {
+export function isToleratedOf(
+    node: ts.Node,
+    p: ts.Node | undefined,
+    sf: ts.SourceFile,
+    grandparent?: ts.Node,
+): boolean {
     if (!p) return false;
-    if (ts.isNumericLiteral(node)) {
-        return isToleratedNumeric(node, p, sf);
-    }
-    return isToleratedString(node, p, sf);
+    if (ts.isNumericLiteral(node)) return isToleratedNumeric(node, p, sf);
+    return isToleratedString(node, p, sf, grandparent);
 }
 
 /**

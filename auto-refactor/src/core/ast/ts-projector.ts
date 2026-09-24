@@ -377,7 +377,7 @@ export class TsNodeProjector implements NodeProjector {
     ): void {
         if (isLiteral && this.policy.needLiterals) {
             node.isConstBound = isConstBoundOf(n, parentRaw, grandparentRaw);
-            node.tolerated = isToleratedOf(n, parentRaw, this.sf);
+            node.tolerated = isToleratedOf(n, parentRaw, this.sf, grandparentRaw);
         }
         if (this.policy.needComplexity && fnLike) {
             node.children = this.projectSubtree(n, parentRaw, grandparentRaw);
@@ -480,7 +480,7 @@ export class TsNodeProjector implements NodeProjector {
                 node.start = posOf(n.getStart(this.sf), this.sf);
                 node.end = posOf(n.getEnd(), this.sf);
                 node.isConstBound = isConstBoundOf(n, parentRaw, grandparentRaw);
-                node.tolerated = isToleratedOf(n, parentRaw, this.sf);
+                node.tolerated = isToleratedOf(n, parentRaw, this.sf, grandparentRaw);
             }
         } else if (n.kind === ts.SyntaxKind.FunctionKeyword) {
             if (this.policy.needComplexity) node.rawKind = 'FunctionKeyword';

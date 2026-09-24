@@ -265,7 +265,7 @@ export class OxcProjector implements NodeProjector {
     ): void {
         if (isLiteral && this.policy.needLiterals) {
             node.isConstBound = oxcIsConstBoundOf(n, parentRaw, grandparentRaw);
-            node.tolerated = oxcIsToleratedOf(n, parentRaw, this.ctx);
+            node.tolerated = oxcIsToleratedOf(n, parentRaw, this.ctx, grandparentRaw);
         }
         if (this.policy.needComplexity && fnLike) {
             node.children = this.projectSubtree(n, parentRaw, grandparentRaw);
@@ -444,7 +444,7 @@ export class OxcProjector implements NodeProjector {
             node.start = oxcPosOf(n.start, this.ctx);
             node.end = oxcPosOf(n.end, this.ctx);
             node.isConstBound = oxcIsConstBoundOf(n, parentRaw, grandparentRaw);
-            node.tolerated = oxcIsToleratedOf(n, parentRaw, this.ctx);
+            node.tolerated = oxcIsToleratedOf(n, parentRaw, this.ctx, grandparentRaw);
         }
     }
 

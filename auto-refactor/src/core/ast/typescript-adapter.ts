@@ -177,7 +177,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
             (hasExportModifier(n) || ts.isExportAssignment(n) || ts.isExportDeclaration(n));
         if (isLiteral) {
             node.isConstBound = isConstBoundOf(n, parentTs, grandparentTs);
-            node.tolerated = isToleratedOf(n, parentTs, sf);
+            node.tolerated = isToleratedOf(n, parentTs, sf, grandparentTs);
         }
     }
 

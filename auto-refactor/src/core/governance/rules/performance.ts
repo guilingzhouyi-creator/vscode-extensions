@@ -331,9 +331,19 @@ export const SyncIoRule: GovernanceRule = {
         if (/\.(d\.ts)$/.test(ctx.filePath)) return null;
         if (/(^|\/)(tests?|__tests__)\//.test(ctx.filePath)) return null;
 
-        // Shared policy key with the performance analyzer (PRF-IO-001): CLI entry points and
-        // validation/benchmark harnesses are synchronous by design, so their sync fs calls are a
-        // documented decision rather than event-loop debt.
+        // Shared policy key with the performance analyzer (PRF-IO-001): When the dedicated
+        // performance analyzer is actively enabled in the scan plan, PRF-IO-001 is the
+        // canonical analyzer rule for synchronous I/O; suppress GOV-PRF-004 to
+        // eliminate duplicate findings.
+        const analyzers = (
+            ctx.ctx.options as { analyzers?: Record<string, { enabled?: boolean }> } | undefined
+        )?.analyzers;
+        if (analyzers?.performance?.enabled === true) {
+            return null;
+        }
+
+        // CLI entry points and validation/benchmark harnesses are synchronous by design,
+        // so their sync fs calls are a documented decision rather than event-loop debt.
         const allowPatterns = (
             ctx.ctx.options as { blockingIoAllowPatterns?: string[] } | undefined
         )?.blockingIoAllowPatterns;
