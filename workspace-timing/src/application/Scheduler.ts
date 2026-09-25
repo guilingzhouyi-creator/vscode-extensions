@@ -44,6 +44,8 @@ export interface StatusBarDisplayData {
     todayMs: number;
 }
 
+const MSG_STATUS_BAR_UPDATE_FAILED = 'Scheduler: status bar update tick failed';
+
 export type StatusBarUpdateCallback = (data: StatusBarDisplayData) => void;
 
 /** 周期全量存盘完成回调（用于跨工作区全局同步） */
@@ -189,8 +191,9 @@ export class Scheduler {
                     const todayMs = this.sessionManager.getTodayMs();
                     this.statusBarCallback({ totalMs: snap.currentTotalMs, todayMs });
                 }
-            } catch {
-                // 状态栏更新失败不抛异常
+            } catch (err) {
+                // 状态栏更新失败记录调试日志，不阻断主调度循环
+                log(LogLevel.Debug, MSG_STATUS_BAR_UPDATE_FAILED, err as Error);
             }
         }, this.options.statusBarUpdateIntervalMs);
 

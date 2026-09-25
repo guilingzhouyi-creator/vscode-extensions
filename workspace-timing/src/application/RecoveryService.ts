@@ -23,6 +23,7 @@ import {
     LATEST_VERSION,
     MS_PER_DAY,
     DailyTotalsMap,
+    TimeSlice,
 } from '../domain/models';
 import { TimeAggregator, localDateStr } from '../domain/TimeAggregator';
 import { migrateToFolded } from '../domain/HistoryFolder';
@@ -94,101 +95,10 @@ export class RecoveryService {
         data.dailyTotals = migrated.dailyTotals;
 
         // Step 2: 回放 journal
-        // 进行中会话的增量由 journal 完整记录（checkpoint 只固化历史累计、不清空 journal）。
-        // ★ 回放时长必须落成按自然日切分的 finished TimeSession 并入 sessions[]，
-        //   否则 totalMs 虽恢复，今日/近7天/周报等按日统计在重载后会丢失该段时长。
-        //   片段按时间连续性分组（间隔 > JOURNAL_RUN_GAP_MS 视为断点，如系统休眠），
-        //   每组合成会话；组内 durationMs 以墙钟跨度计（与按日归桶口径一致）。
-        let journalReplayed = false;
-        const journalExists = await this.journal.exists();
-        if (journalExists) {
-            let slices = await this.journal.readJournal();
-
-            // ★ 幂等水位线：truncate 失败时 journal 会残留已回放过的切片，
-            //   下次恢复若不拦截就会重复累计（数据翻倍）。上次恢复成功时会把
-            //   已回放的最大时间戳记入 metadata.lastJournalTs，此处据此跳过旧切片。
-            const watermark = Number(data.metadata?.['lastJournalTs'] ?? 0);
-            if (watermark > 0) {
-                const before = slices.length;
-                slices = slices.filter(s => s.timestamp > watermark);
-                if (slices.length < before) {
-                    log(LogLevel.Warn,
-                        `RecoveryService: skipped ${before - slices.length} already-replayed journal slice(s) ` +
-                        `(watermark=${watermark}) — previous truncate likely failed`);
-                }
-            }
-
-            if (slices.length > 0) {
-                const journalDelta = slices.reduce((sum, s) => sum + s.deltaMs, 0);
-                data.totalMs += journalDelta;
-                journalReplayed = true;
-
-                const runs: { startMs: number; endMs: number }[] = [];
-                for (const s of slices) {
-                    const start = s.timestamp - s.deltaMs;
-                    const last = runs[runs.length - 1];
-                    if (last && start <= last.endMs + JOURNAL_RUN_GAP_MS) {
-                        last.endMs = Math.max(last.endMs, s.timestamp);
-                    } else {
-                        runs.push({ startMs: start, endMs: s.timestamp });
-                    }
-                }
-                let synthesized = 0;
-                for (const run of runs) {
-                    const segs = TimeAggregator.splitByNaturalDay(run.startMs, run.endMs);
-                    data.sessions.push(...segs);
-                    // ★ 合成段同步入日桶：折叠层与原始层口径一致
-                    data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
-                    synthesized += segs.length;
-                }
-
-                log(LogLevel.Info,
-                    `RecoveryService: replayed ${slices.length} journal entries, +${journalDelta}ms, ` +
-                    `synthesized ${synthesized} session segment(s)`);
-            }
-
-            // 记录回放水位线（无论本次是否有新切片，都推进到 journal 最新时间戳），
-            // 即使下方 truncate 失败，下次恢复也能据此去重。
-            const maxTs = slices.reduce((max, s) => Math.max(max, s.timestamp), 0);
-            if (maxTs > 0) {
-                data.metadata = { ...data.metadata, lastJournalTs: String(maxTs) };
-            }
-
-            // truncate 失败会抛出（IJournalStore 契约）：捕获告警但继续激活——
-            // 水位线已写入 data 并将随本次 save 持久化，残留切片不会造成重复累计。
-            try {
-                await this.journal.truncate();
-            } catch (err) {
-                log(LogLevel.Error,
-                    'RecoveryService: journal truncate FAILED — residual slices will be ' +
-                    'deduplicated via metadata.lastJournalTs on next recovery', err as Error);
-            }
-        }
+        const journalReplayed = await this.replayJournal(data);
 
         // Step 3: 补偿未完成会话
-        // 仅当 journal 无有效回放且存在进行中会话时，才用起止时间差兜底补偿，
-        // 避免与 journal 回放对同一时段重复累计（"三重计数"修复）。
-        // 补偿上限：取 data.lastSavedAtMs + 60s 与 now 的较小值，避免开机时将关机/休眠整夜时间误算入今日。
-        if (!journalReplayed && data.currentSessionStartMs > 0) {
-            const now = Date.now();
-            const totalElapsed = now - data.currentSessionStartMs;
-            if (totalElapsed > 0 && totalElapsed < MS_PER_DAY) { // 最多补偿 24h，防止异常
-                const lastSaved = data.lastSavedAtMs > data.currentSessionStartMs
-                    ? data.lastSavedAtMs
-                    : data.currentSessionStartMs;
-                const maxCompensatedEnd = Math.min(now, lastSaved + 60000);
-                const elapsed = maxCompensatedEnd - data.currentSessionStartMs;
-                if (elapsed > 0) {
-                    data.totalMs += elapsed;
-                    // ★ 补偿时长同样落成按日会话，保证日报/周报口径一致（并同步入日桶）
-                    const segs = TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, maxCompensatedEnd);
-                    data.sessions.push(...segs);
-                    data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
-                    log(LogLevel.Info,
-                        `RecoveryService: compensated unfinished session: +${elapsed}ms`);
-                }
-            }
-        }
+        this.compensateUnfinishedSession(data, journalReplayed);
 
         // 若回放或补偿后会话超出容量上限，再次执行折叠收敛
         if (maxSessions > 0 && data.sessions.length > maxSessions) {
@@ -207,5 +117,105 @@ export class RecoveryService {
         log(LogLevel.Info,
             `RecoveryService: recovery complete, totalMs=${data.totalMs}`);
         return data;
+    }
+
+    /**
+     * 将按时间连续性分组的切片段合成并入 sessions 与 dailyTotals
+     */
+    private applyJournalSlices(data: WorkspaceTimingData, slices: TimeSlice[]): void {
+        const journalDelta = slices.reduce((sum, s) => sum + s.deltaMs, 0);
+        data.totalMs += journalDelta;
+
+        const runs: { startMs: number; endMs: number }[] = [];
+        for (const s of slices) {
+            const start = s.timestamp - s.deltaMs;
+            const last = runs[runs.length - 1];
+            if (last && start <= last.endMs + JOURNAL_RUN_GAP_MS) {
+                last.endMs = Math.max(last.endMs, s.timestamp);
+            } else {
+                runs.push({ startMs: start, endMs: s.timestamp });
+            }
+        }
+        let synthesized = 0;
+        for (const run of runs) {
+            const segs = TimeAggregator.splitByNaturalDay(run.startMs, run.endMs);
+            data.sessions.push(...segs);
+            data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
+            synthesized += segs.length;
+        }
+
+        log(LogLevel.Info,
+            `RecoveryService: replayed ${slices.length} journal entries, +${journalDelta}ms, ` +
+            `synthesized ${synthesized} session segment(s)`);
+    }
+
+    /**
+     * 回放 journal 并执行幂等水位线过滤与自然日切分
+     */
+    private async replayJournal(data: WorkspaceTimingData): Promise<boolean> {
+        if (!await this.journal.exists()) {
+            return false;
+        }
+
+        let slices = await this.journal.readJournal();
+        const watermark = Number(data.metadata?.['lastJournalTs'] ?? 0);
+        if (watermark > 0) {
+            const before = slices.length;
+            slices = slices.filter(s => s.timestamp > watermark);
+            if (slices.length < before) {
+                log(LogLevel.Warn,
+                    `RecoveryService: skipped ${before - slices.length} already-replayed journal slice(s) ` +
+                    `(watermark=${watermark}) — previous truncate likely failed`);
+            }
+        }
+
+        const journalReplayed = slices.length > 0;
+        if (journalReplayed) {
+            this.applyJournalSlices(data, slices);
+        }
+
+        const maxTs = slices.reduce((max, s) => Math.max(max, s.timestamp), 0);
+        if (maxTs > 0) {
+            data.metadata = { ...data.metadata, lastJournalTs: String(maxTs) };
+        }
+
+        try {
+            await this.journal.truncate();
+        } catch (err) {
+            log(LogLevel.Error,
+                'RecoveryService: journal truncate FAILED — residual slices will be ' +
+                'deduplicated via metadata.lastJournalTs on next recovery', err as Error);
+        }
+
+        return journalReplayed;
+    }
+
+    /**
+     * 补偿未完成会话
+     */
+    private compensateUnfinishedSession(data: WorkspaceTimingData, journalReplayed: boolean): void {
+        if (journalReplayed || data.currentSessionStartMs <= 0) {
+            return;
+        }
+
+        const now = Date.now();
+        const totalElapsed = now - data.currentSessionStartMs;
+        if (totalElapsed <= 0 || totalElapsed >= MS_PER_DAY) {
+            return;
+        }
+
+        const lastSaved = data.lastSavedAtMs > data.currentSessionStartMs
+            ? data.lastSavedAtMs
+            : data.currentSessionStartMs;
+        const maxCompensatedEnd = Math.min(now, lastSaved + 60000);
+        const elapsed = maxCompensatedEnd - data.currentSessionStartMs;
+        if (elapsed > 0) {
+            data.totalMs += elapsed;
+            const segs = TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, maxCompensatedEnd);
+            data.sessions.push(...segs);
+            data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
+            log(LogLevel.Info,
+                `RecoveryService: compensated unfinished session: +${elapsed}ms`);
+        }
     }
 }

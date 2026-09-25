@@ -72,49 +72,54 @@ function foldSessionsIntoTotals(sessions: readonly TimeSession[], totals: DailyT
  * @param cutoffStartMs 折叠截止点（当日零点时刻戳）；0 = 不按时间折叠
  * @param maxSessions 原始会话最大保留条数；0 = 不按条数折叠
  */
+/**
+ * 依据时间窗过滤会话，清洗脏数据并划分保留与折叠会话
+ */
+function filterSessionsByCutoff(
+    sessions: readonly TimeSession[],
+    cutoffStartMs: number,
+): { kept: TimeSession[]; toFold: TimeSession[] } {
+    const kept: TimeSession[] = [];
+    const toFold: TimeSession[] = [];
+
+    for (const s of sessions) {
+        if (!(s.endMs > s.startMs) || s.startMs <= 0) continue; // 脏数据清除
+        if (cutoffStartMs > 0 && s.endMs < cutoffStartMs) {
+            toFold.push(s);
+        } else {
+            kept.push(s);
+        }
+    }
+    return { kept, toFold };
+}
+
+/**
+ * 将过期及超容量会话折叠进日桶（双阈值无损回收）。
+ * @param sessions 当前全部原始会话
+ * @param existingTotals 既有沉淀桶（可为 undefined）
+ * @param cutoffStartMs 折叠截止点（当日零点时刻戳）；0 = 不按时间折叠
+ * @param maxSessions 原始会话最大保留条数；0 = 不按条数折叠
+ */
 export function foldExpiredSessions(
     sessions: readonly TimeSession[],
     existingTotals: DailyTotalsMap | undefined,
     cutoffStartMs: number,
     maxSessions: number = 0,
 ): FoldResult {
-    // 空会话快退
-    if (sessions.length === 0) {
-        const totals: DailyTotalsMap = {};
-        if (existingTotals) {
-            for (const [k, v] of Object.entries(existingTotals)) {
-                totals[k] = { totalMs: v.totalMs, sessionCount: v.sessionCount };
-            }
-        }
-        return { keptSessions: [], updatedDailyTotals: totals, foldedSessionCount: 0 };
-    }
-
-    let kept: TimeSession[] = [];
     const totals: DailyTotalsMap = {};
     for (const [k, v] of Object.entries(existingTotals ?? {})) {
         totals[k] = { totalMs: v.totalMs, sessionCount: v.sessionCount };
     }
-    let foldedCount = 0;
+
+    // 空会话快退
+    if (sessions.length === 0) {
+        return { keptSessions: [], updatedDailyTotals: totals, foldedSessionCount: 0 };
+    }
 
     // 1. 时间窗阈值过滤（retentionDays）
-    if (cutoffStartMs > 0) {
-        const toFold: TimeSession[] = [];
-        for (const s of sessions) {
-            if (!(s.endMs > s.startMs) || s.startMs <= 0) continue; // 脏数据清除
-            if (s.endMs >= cutoffStartMs) {
-                kept.push(s);
-            } else {
-                toFold.push(s);
-            }
-        }
-        foldedCount += foldSessionsIntoTotals(toFold, totals);
-    } else {
-        for (const s of sessions) {
-            if (s.endMs > s.startMs && s.startMs > 0) {
-                kept.push(s);
-            }
-        }
-    }
+    const { kept: timeFilteredKept, toFold } = filterSessionsByCutoff(sessions, cutoffStartMs);
+    let kept = timeFilteredKept;
+    let foldedCount = foldSessionsIntoTotals(toFold, totals);
 
     // 2. 条数容量阈值截断（maxSessions）
     // 若剩余会话仍超出 maxSessions 容量，将最旧的超出部分按 FIFO 折叠入日桶

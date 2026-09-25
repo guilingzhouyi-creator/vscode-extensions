@@ -600,15 +600,7 @@ export class TimeAggregator {
         }
 
         // 2. 折叠沉淀桶打底（仅查窗口内的日期，O(weeks * 7) = O(28) 查表）
-        const dayMap = new Map<string, { totalMs: number; sessionCount: number }>();
-        if (dailyTotals) {
-            for (const date of windowDates) {
-                const b = dailyTotals[date];
-                if (b && b.totalMs > 0) {
-                    dayMap.set(date, { totalMs: b.totalMs, sessionCount: b.sessionCount || 1 });
-                }
-            }
-        }
+        const dayMap = TimeAggregator.initDayMapFromDailyTotals(windowDates, dailyTotals);
 
         // 3. 原始会话：窗口范围粗筛，按自然日切分并覆盖同日折叠桶
         const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
@@ -634,22 +626,7 @@ export class TimeAggregator {
         }
 
         // 4. 进行中会话：叠加到今日
-        if (currentSessionStartMs > 0 && currentSessionStartMs < latestEndMs) {
-            const segStartClamped = Math.max(currentSessionStartMs, earliestStartMs);
-            const now = Date.now();
-            if (now > segStartClamped) {
-                let counted = false;
-                TimeAggregator.eachDaySegment(segStartClamped, now, (date, segStart, segEnd) => {
-                    if (windowDates.has(date)) {
-                        const entry = dayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
-                        entry.totalMs += segEnd - segStart;
-                        if (!counted) entry.sessionCount++;
-                        counted = true;
-                        dayMap.set(date, entry);
-                    }
-                });
-            }
-        }
+        TimeAggregator.overlayOngoingSession(dayMap, windowDates, currentSessionStartMs, earliestStartMs, latestEndMs);
 
         // 5. 按天归入对应周桶
         for (const [date, v] of dayMap) {
@@ -691,15 +668,7 @@ export class TimeAggregator {
         }
 
         // 2. 折叠桶打底（仅查本周 7 个日期，O(7) = O(1)）
-        const dayMap = new Map<string, { totalMs: number; sessionCount: number }>();
-        if (dailyTotals) {
-            for (const date of weekDates) {
-                const b = dailyTotals[date];
-                if (b && b.totalMs > 0) {
-                    dayMap.set(date, { totalMs: b.totalMs, sessionCount: b.sessionCount || 1 });
-                }
-            }
-        }
+        const dayMap = TimeAggregator.initDayMapFromDailyTotals(weekDates, dailyTotals);
 
         // 3. 原始会话：逆序扫描，遇到早于本周一的会话直接 break。
         //    依赖 sessions 按起始时间升序的排序不变量：内部路径天然有序，
@@ -729,21 +698,7 @@ export class TimeAggregator {
         }
 
         // 4. 进行中会话：叠加到今日
-        if (currentSessionStartMs > 0 && currentSessionStartMs < weekEndMs) {
-            const segStartClamped = Math.max(currentSessionStartMs, weekStartMs);
-            if (now > segStartClamped) {
-                let counted = false;
-                TimeAggregator.eachDaySegment(segStartClamped, now, (date, segStart, segEnd) => {
-                    if (weekDates.has(date)) {
-                        const entry = dayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
-                        entry.totalMs += segEnd - segStart;
-                        if (!counted) entry.sessionCount++;
-                        counted = true;
-                        dayMap.set(date, entry);
-                    }
-                });
-            }
-        }
+        TimeAggregator.overlayOngoingSession(dayMap, weekDates, currentSessionStartMs, weekStartMs, weekEndMs);
 
         // 5. 聚合本周 7 天指标
         let totalMs = 0;
@@ -812,5 +767,47 @@ export class TimeAggregator {
         if (hours > 0) return `${hours}h ${minutes}m`;
         if (minutes > 0) return `${minutes}m ${seconds}s`;
         return `${seconds}s`;
+    }
+
+    /** 从折叠沉淀桶中提取指定日期集合的日聚合数据 */
+    private static initDayMapFromDailyTotals(
+        dates: Set<string>,
+        dailyTotals?: DailyTotalsMap,
+    ): Map<string, { totalMs: number; sessionCount: number }> {
+        const dayMap = new Map<string, { totalMs: number; sessionCount: number }>();
+        if (dailyTotals) {
+            for (const date of dates) {
+                const b = dailyTotals[date];
+                if (b && b.totalMs > 0) {
+                    dayMap.set(date, { totalMs: b.totalMs, sessionCount: b.sessionCount || 1 });
+                }
+            }
+        }
+        return dayMap;
+    }
+
+    /** 将进行中会话叠加至对应日聚合数据 */
+    private static overlayOngoingSession(
+        dayMap: Map<string, { totalMs: number; sessionCount: number }>,
+        windowDates: Set<string>,
+        currentSessionStartMs: number,
+        earliestStartMs: number,
+        latestEndMs: number,
+    ): void {
+        if (currentSessionStartMs <= 0 || currentSessionStartMs >= latestEndMs) return;
+        const segStartClamped = Math.max(currentSessionStartMs, earliestStartMs);
+        const now = Date.now();
+        if (now <= segStartClamped) return;
+
+        let counted = false;
+        TimeAggregator.eachDaySegment(segStartClamped, now, (date, segStart, segEnd) => {
+            if (windowDates.has(date)) {
+                const entry = dayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
+                entry.totalMs += segEnd - segStart;
+                if (!counted) entry.sessionCount++;
+                counted = true;
+                dayMap.set(date, entry);
+            }
+        });
     }
 }
