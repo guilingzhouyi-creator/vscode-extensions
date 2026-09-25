@@ -133,3 +133,65 @@ pub fn mask_source_code(content: String, config: NativeMaskConfig) -> NativeMask
     let mask_config: ops_mask::MaskConfig = config.into();
     ops_mask::mask_source_code(&content, &mask_config).into()
 }
+
+#[napi(object)]
+pub struct NativeCloneBlock {
+    pub start_line: u32,
+    pub original_line: u32,
+    pub line_span: u32,
+}
+
+impl From<ops_clone::CloneBlock> for NativeCloneBlock {
+    fn from(b: ops_clone::CloneBlock) -> Self {
+        Self {
+            start_line: b.start_line,
+            original_line: b.original_line,
+            line_span: b.line_span,
+        }
+    }
+}
+
+#[napi(object)]
+pub struct NativeClonePair {
+    pub file_a: u32,
+    pub file_b: u32,
+    pub similarity: f64,
+}
+
+impl From<ops_clone::ClonePair> for NativeClonePair {
+    fn from(p: ops_clone::ClonePair) -> Self {
+        Self {
+            file_a: p.file_a,
+            file_b: p.file_b,
+            similarity: p.similarity,
+        }
+    }
+}
+
+#[napi]
+pub fn count_duplicate_lines(content: String) -> u32 {
+    ops_clone::count_duplicate_lines(&content)
+}
+
+#[napi]
+pub fn detect_clone_blocks(content: String, min_clone_lines: u32) -> Vec<NativeCloneBlock> {
+    ops_clone::detect_clone_blocks(&content, min_clone_lines)
+        .into_iter()
+        .map(Into::into)
+        .collect()
+}
+
+#[napi(js_name = "computeMinHash")]
+pub fn compute_minhash(content: String, num_perm: Option<u32>) -> Vec<u32> {
+    let k = num_perm.unwrap_or(64) as usize;
+    ops_clone::compute_minhash(&content, k)
+}
+
+#[napi]
+pub fn find_clone_pairs(signatures: Vec<Vec<u32>>, threshold: f64) -> Vec<NativeClonePair> {
+    ops_clone::find_clone_pairs(&signatures, threshold)
+        .into_iter()
+        .map(Into::into)
+        .collect()
+}
+

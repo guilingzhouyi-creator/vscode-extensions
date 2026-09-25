@@ -18,6 +18,8 @@
  */
 import { maskSourceText, type SourceMaskConfig } from '../source-mask';
 import { computeLineStartsAndHashes, getLine } from '../edit-diff';
+import { nativeCore } from '../native/native-bridge';
+
 
 /**
  * Mask applied to content whose language is unknown.
@@ -241,16 +243,30 @@ export interface IncrementalOptions {
 }
 
 /**
- * Count repeated lines, using the shared line-hash substrate from `core/editDiff`.
+ * Count repeated lines, using high-performance native operator with fallback.
  *
- * Reuses `computeLineStartsAndHashes` so this metric and the diff engine share one definition of a
- * line hash, instead of each reviewer deriving its own. Blank and whitespace-only lines are
- * excluded because they repeat trivially in every file and would swamp the signal.
+ * Blank and whitespace-only lines are excluded because they repeat trivially in
+ * every file and would swamp the signal.
  *
  * @param content - Full file content.
  * @returns Occurrences beyond the first, summed over every repeated non-blank line.
  */
 export function countDuplicateLines(content: string): number {
+    try {
+        return nativeCore.countDuplicateLines(content);
+    } catch (_err) {
+        void _err;
+        return countDuplicateLinesJs(content);
+    }
+}
+
+/**
+ * Pure JavaScript fallback for counting duplicated non-blank lines.
+ *
+ * @param content - Full file content.
+ * @returns Occurrences beyond the first, summed over every repeated non-blank line.
+ */
+export function countDuplicateLinesJs(content: string): number {
     const { starts, hashes } = computeLineStartsAndHashes(content);
     const counts = new Map<number, number>();
     for (let i = 0; i < hashes.length; i += 1) {

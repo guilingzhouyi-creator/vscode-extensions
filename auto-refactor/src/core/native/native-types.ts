@@ -78,6 +78,24 @@ export interface NativeMaskedSource {
 }
 
 /**
+ * Detected intra-file code clone block.
+ */
+export interface NativeCloneBlock {
+    readonly startLine: number;
+    readonly originalLine: number;
+    readonly lineSpan: number;
+}
+
+/**
+ * Detected candidate clone file pair with similarity score.
+ */
+export interface NativeClonePair {
+    readonly fileA: number;
+    readonly fileB: number;
+    readonly similarity: number;
+}
+
+/**
  * Unified interface implemented by both native Rust core and pure JS shim.
  */
 export interface INativeCore {
@@ -102,8 +120,29 @@ export interface INativeCore {
     maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource;
 
     /**
+     * Counts duplicated non-blank lines in source content.
+     */
+    countDuplicateLines(content: string): number;
+
+    /**
+     * Detects repeated code blocks within a single file.
+     */
+    detectCloneBlocks(content: string, minCloneLines: number): NativeCloneBlock[];
+
+    /**
+     * Computes MinHash signature vector for a source file.
+     */
+    computeMinHash(content: string, numPermutations?: number): number[];
+
+    /**
+     * Discovers similar file pairs using Locality Sensitive Hashing (LSH).
+     */
+    findClonePairs(signatures: number[][], threshold: number): NativeClonePair[];
+
+    /**
      * Inspects active engine status and capabilities.
      */
     getStatus(): NativeCoreStatus;
 }
+
 

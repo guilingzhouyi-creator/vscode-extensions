@@ -24,6 +24,8 @@ import { HygieneMessages } from '../core/messages';
 import { isVocabularyEnumeration } from '../core/governance/markerScope';
 import { auditVacuousWrappers } from '../core/rules/evolution/wrapperRule';
 import { auditRegexSafety, isRegexSafe } from '../utils/safe-regex';
+import { nativeCore } from '../core/native';
+
 
 interface HygieneOptions {
     checkDeadCode?: boolean;
@@ -277,7 +279,14 @@ export class HygieneAnalyzer implements Analyzer {
         );
 
         if (checkClones && lineHashes.length >= minCloneLines * 2) {
-            this.auditCloneBlocks(lineHashes, meaningfulLineIndices, minCloneLines, ctx, issues);
+            this.auditCloneBlocks(
+                lineHashes,
+                meaningfulLineIndices,
+                minCloneLines,
+                ctx,
+                issues,
+                content,
+            );
         }
 
         if (opts.checkWrappers !== false) {
@@ -779,7 +788,40 @@ export class HygieneAnalyzer implements Analyzer {
         minCloneLines: number,
         ctx: AnalyzerContext,
         issues: Issue[],
+        content?: string,
     ): void {
+        if (content) {
+            try {
+                const clones = nativeCore.detectCloneBlocks(content, minCloneLines);
+                if (clones.length > 0) {
+                    const clone = clones[0];
+                    const desc = HygieneMessages.DUPLICATE_CODE_CLONE(
+                        clone.lineSpan,
+                        clone.originalLine,
+                    );
+                    issues.push(
+                        this.mkIssue(
+                            ctx,
+                            clone.startLine - 1,
+                            'HYG-CLN-001',
+                            desc.message,
+                            SEVERITY_WARNING,
+                            {
+                                startLine: clone.startLine,
+                                originalLine: clone.originalLine,
+                                lineSpan: clone.lineSpan,
+                            },
+                            desc.suggestion,
+                        ),
+                    );
+                    return;
+                }
+            } catch (_err) {
+                // Fall through to pure JS line-hash rolling loop on error
+                void _err;
+            }
+        }
+
         const blockMap = new Map<number, number>();
         const total = lineHashes.length;
 

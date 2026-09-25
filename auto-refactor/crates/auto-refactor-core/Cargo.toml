@@ -13,3 +13,4 @@ ops-diff = { path = "../ops-diff" }
 ops-graph = { path = "../ops-graph" }
 ops-pattern = { path = "../ops-pattern" }
 ops-mask = { path = "../ops-mask" }
+ops-clone = { path = "../ops-clone" }

@@ -276,6 +276,69 @@ function runValidation() {
   }
   console.log('✓ Diff and Graph operators parity verified.');
 
+  // 5. Parity of Clone and Duplication Operators
+  console.log('[Clone & Duplication] Verifying duplicate lines and clone detection parity...');
+  const dupSamples = [
+    'line 1\nline 2\nline 1\n\nline 1\n',
+    'const a = 1;\r\nconst b = 2;\r\nconst a = 1;\r\n',
+    'function foo() {\n  return 42;\n}\n\nfunction foo() {\n  return 42;\n}\n',
+    '// 注释1\nconst x = "你好世界";\nconst x = "你好世界";\n',
+  ];
+  for (const sample of dupSamples) {
+    const dupRust = nativeCore.countDuplicateLines(sample);
+    const dupShim = shim.countDuplicateLines(sample);
+    assert.strictEqual(dupRust, dupShim, `Duplicate line count mismatch for sample: ${sample}`);
+  }
+  console.log('  ✓ Duplicate line counting 100% equivalent across all samples.');
+
+  // Clone block detection
+  const cloneLines = [];
+  for (let i = 0; i < 7; i++) {
+    cloneLines.push(`    const value_${i} = computeNumber(${i});`);
+  }
+  cloneLines.push('    callIntermediateLogging();');
+  for (let i = 0; i < 7; i++) {
+    cloneLines.push(`    const value_${i} = computeNumber(${i});`);
+  }
+  const cloneCode = cloneLines.join('\n');
+  const cloneBlocksRust = nativeCore.detectCloneBlocks(cloneCode, 6);
+  const cloneBlocksShim = shim.detectCloneBlocks(cloneCode, 6);
+  assert.strictEqual(cloneBlocksRust.length, cloneBlocksShim.length);
+  for (let i = 0; i < cloneBlocksRust.length; i++) {
+    assert.strictEqual(cloneBlocksRust[i].startLine, cloneBlocksShim[i].startLine);
+    assert.strictEqual(cloneBlocksRust[i].originalLine, cloneBlocksShim[i].originalLine);
+    assert.strictEqual(cloneBlocksRust[i].lineSpan, cloneBlocksShim[i].lineSpan);
+  }
+  console.log('  ✓ Intra-file clone block detection 100% equivalent.');
+
+  // MinHash signature & LSH similarity pair detection
+  const fileA = 'function calcA() {\n  const x = 10;\n  const y = 20;\n  return x + y;\n}\n';
+  const fileB = 'function calcA() {\n  const x = 10;\n  const y = 20;\n  return x + y;\n}\n';
+  const fileC = 'function unrelatedService() {\n  const name = "user";\n  console.log(name);\n}\n';
+
+  const sigRustA = nativeCore.computeMinHash(fileA, 64);
+  const sigShimA = shim.computeMinHash(fileA, 64);
+  assert.strictEqual(sigRustA.length, 64);
+  assert.strictEqual(sigShimA.length, 64);
+  for (let i = 0; i < 64; i++) {
+    assert.strictEqual(sigRustA[i], sigShimA[i], `MinHash signature mismatch at index ${i}`);
+  }
+
+  const sigRustB = nativeCore.computeMinHash(fileB, 64);
+  const sigRustC = nativeCore.computeMinHash(fileC, 64);
+  const sigShimB = shim.computeMinHash(fileB, 64);
+  const sigShimC = shim.computeMinHash(fileC, 64);
+
+  const pairsRust = nativeCore.findClonePairs([sigRustA, sigRustB, sigRustC], 0.7);
+  const pairsShim = shim.findClonePairs([sigShimA, sigShimB, sigShimC], 0.7);
+  assert.strictEqual(pairsRust.length, pairsShim.length);
+  for (let i = 0; i < pairsRust.length; i++) {
+    assert.strictEqual(pairsRust[i].fileA, pairsShim[i].fileA);
+    assert.strictEqual(pairsRust[i].fileB, pairsShim[i].fileB);
+    assert.strictEqual(pairsRust[i].similarity, pairsShim[i].similarity);
+  }
+  console.log('  ✓ MinHash signature generation & LSH clone pair detection 100% equivalent.');
+
   console.log('=== [Native Operator Validation] SUCCESS: All assertions passed. ===');
 }
 
