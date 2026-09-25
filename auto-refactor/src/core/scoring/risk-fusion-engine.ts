@@ -167,3 +167,97 @@ export function fuseIssueRisks(
         rationale,
     };
 }
+
+/**
+ * Caller node in a topological call graph representing dynamic invocation pressure.
+ */
+export interface TopologicalCallerNode {
+    /** Identifier or name of the caller function or module */
+    callerSymbol: string;
+    /** Dynamic hotspot risk of the caller */
+    dynamicRisk: DynamicIssueRisk;
+    /** Relative invocation frequency weight omega(u, v) in [0.0, 1.0] (default: 0.5) */
+    couplingWeight?: number;
+}
+
+/**
+ * Result of topological cascading risk evaluation across call paths.
+ */
+export interface CascadedRiskResult extends FusedIssueRisk {
+    /** Cumulative dynamic risk cascading into this callee from all upstream callers */
+    upstreamCascadedDynamicRisk: number;
+    /** Effective composite dynamic risk after topological amplification */
+    effectiveDynamicRisk: number;
+    /** List of callers contributing to the cascaded risk */
+    contributingCallers: string[];
+}
+
+/**
+ * Evaluates non-linear topological risk resonance cascading along caller-callee execution edges:
+ * Risk_cascaded(v) = S_i(v)^alpha * (D_i(v) + sum(omega(u, v) * D_i(u)))^beta * H_i(v)^gamma
+ *
+ * @param staticRisk - Quantified static risk assessment for the target callee (S_i(v)).
+ * @param selfDynamicRisk - Direct dynamic hotspot risk of the callee (D_i(v)).
+ * @param callers - Array of upstream callers feeding execution pressure into this callee.
+ * @param historicalFactor - Historical failure multiplier H_i.
+ * @param customCoeffs - Optional override for alpha, beta, gamma exponents.
+ * @returns Fully articulated CascadedRiskResult.
+ */
+export function fuseCascadedRisks(
+    staticRisk: StaticIssueRisk,
+    selfDynamicRisk: DynamicIssueRisk | undefined,
+    callers: TopologicalCallerNode[] = [],
+    historicalFactor = 1.0,
+    customCoeffs: Partial<RiskFusionCoefficients> = {},
+): CascadedRiskResult {
+    let cascadedDynamicSum = 0;
+    const contributingCallers: string[] = [];
+
+    for (const caller of callers) {
+        const weight = Math.max(0.0, Math.min(1.0, caller.couplingWeight ?? 0.5));
+        const callerRisk = caller.dynamicRisk.normalizedRisk;
+        if (callerRisk > 0 && weight > 0) {
+            cascadedDynamicSum += callerRisk * weight;
+            contributingCallers.push(caller.callerSymbol);
+        }
+    }
+
+    const selfRiskVal = selfDynamicRisk ? selfDynamicRisk.normalizedRisk : 0.0;
+    const effectiveDynamic = Math.min(10.0, selfRiskVal + cascadedDynamicSum);
+
+    const effectiveDynamicRiskObj: DynamicIssueRisk = {
+        hotspotId: selfDynamicRisk?.hotspotId ?? `cascaded-${staticRisk.issueId}`,
+        targetSymbol: selfDynamicRisk?.targetSymbol,
+        filePath: selfDynamicRisk?.filePath,
+        line: selfDynamicRisk?.line,
+        B: selfDynamicRisk?.B ?? 2.0,
+        F: selfDynamicRisk?.F ?? 2.0,
+        R: selfDynamicRisk?.R ?? 2.0,
+        V: selfDynamicRisk?.V ?? 2.0,
+        rawRisk: Math.round(effectiveDynamic * 25.0 * 100) / 100,
+        normalizedRisk: Math.round(effectiveDynamic * 10) / 10,
+        evidenceConfidence: selfDynamicRisk?.evidenceConfidence ?? (callers.length > 0 ? 0.9 : 0.6),
+    };
+
+    const baseFused = fuseIssueRisks(
+        staticRisk,
+        effectiveDynamicRiskObj,
+        historicalFactor,
+        customCoeffs,
+    );
+
+    let updatedRationale = baseFused.rationale;
+    if (contributingCallers.length > 0) {
+        updatedRationale +=
+            ` [Topological Cascade: Amplified by ${contributingCallers.length} caller(s) ` +
+            `(${contributingCallers.join(', ')}), +${cascadedDynamicSum.toFixed(1)} dynamic pressure]`;
+    }
+
+    return {
+        ...baseFused,
+        rationale: updatedRationale,
+        upstreamCascadedDynamicRisk: Math.round(cascadedDynamicSum * 10) / 10,
+        effectiveDynamicRisk: Math.round(effectiveDynamic * 10) / 10,
+        contributingCallers,
+    };
+}

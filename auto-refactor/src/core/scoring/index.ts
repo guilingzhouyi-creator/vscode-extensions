@@ -24,3 +24,4 @@ export * from './static-quality-model';
 export * from './risk-fusion-engine';
 export * from './fusion-scorer';
 export * from './change-quality-arbiter';
+export * from './dimensionDeductions';

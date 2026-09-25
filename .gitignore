@@ -22,6 +22,7 @@ sarif/
 # auto-refactor 运行时缓存、测试语料与基准临时文件（不入库）
 **/.auto-refactor-cache/
 **/.auto-refactor-cache-*/
+**/.praxis/
 **/.bench-corpus/
 **/.*-corpus/
 **/.corpus/

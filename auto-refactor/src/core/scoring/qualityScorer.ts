@@ -236,7 +236,6 @@ export class QualityScorer {
             line?: number,
         ) => {
             deductionPoints[dim] += points;
-            rawScores[dim] = Math.max(0, rawScores[dim] - points);
             rationales.push({
                 dimension: dim,
                 delta: -points,
@@ -252,6 +251,28 @@ export class QualityScorer {
 
         if (metric) {
             applyMetricDeductions(metric, applyDeduction);
+        }
+
+        const lines = metric?.nonBlankLines ?? (metric?.lines ?? 100);
+        const scaleFactor = Math.max(1, lines / 100);
+
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            const rawPoints = deductionPoints[dim];
+            if (rawPoints <= 0) {
+                rawScores[dim] = DIMENSION_MAX_SCORE;
+                continue;
+            }
+            if (scaleFactor <= 1 || dim === 'codeSecurity') {
+                rawScores[dim] = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
+            } else {
+                const density = rawPoints / scaleFactor;
+                const effectivePenalty = Math.min(
+                    rawPoints,
+                    Math.round(DIMENSION_MAX_SCORE * (1 - Math.exp(-density / 40))),
+                );
+                rawScores[dim] = Math.max(0, DIMENSION_MAX_SCORE - effectivePenalty);
+            }
+            deductionPoints[dim] = DIMENSION_MAX_SCORE - rawScores[dim];
         }
 
         const { evaluatedBy, notEvaluated, evaluatedDimensions } =

@@ -169,6 +169,66 @@ export function dimensionDeductionSources(): Record<QualityDimension, string[]> 
  * @param claimed - Optional set of dimensions already deducted by rule table.
  * @param line - Start line of the finding, when known.
  */
+/**
+ * Three-tier debt classification for technical debt isolation:
+ * Tier 1: Critical structural debt (100% penetration to techDebtRisk, no cap)
+ * Tier 2: Evolutionary maintenance debt (50% damped penetration to techDebtRisk)
+ * Tier 3: Code smells and hygiene (0% penetration to techDebtRisk, primary dimension only)
+ */
+export type DebtTier = 1 | 2 | 3;
+
+/**
+ * Classify an issue into a technical debt tier.
+ *
+ * @param issue - Analyzed issue finding.
+ * @returns Technical debt tier (1 = critical, 2 = evolutionary, 3 = smell).
+ */
+export function classifyDebtTier(issue: Issue): DebtTier {
+    const rule = (issue.rule ?? '').toUpperCase();
+    const analyzer = (issue.analyzer ?? '').toLowerCase();
+
+    // Tier 1: Critical structural debt (security, architecture violations, leaks, circular deps)
+    if (
+        issue.severity === FRAGMENT_ERROR ||
+        rule.startsWith('SEC') ||
+        rule.startsWith('ARCH') ||
+        rule.includes('LEAK') ||
+        rule.includes('CIRCULAR') ||
+        rule.includes('DEP-INV') ||
+        analyzer.includes('security')
+    ) {
+        return 1;
+    }
+
+    // Tier 2: Evolutionary maintenance debt (complexity, data clump, deep nesting, budget)
+    if (
+        rule.startsWith('CPX') ||
+        rule.startsWith('CMP') ||
+        rule.startsWith('DAT') ||
+        rule.startsWith('TST-DBT') ||
+        analyzer.includes('complexity') ||
+        analyzer.includes('maintainability')
+    ) {
+        return 2;
+    }
+
+    // Tier 3: Code smells and hygiene (literals, comments, formatting, naming)
+    return 3;
+}
+
+/**
+ * Apply the severity-based technical-debt deduction that every analyzer feeds.
+ *
+ * The dimension is the finding's explicitly routed family dimension when it has one, so a rule
+ * with a dedicated axis is never double-counted as generic debt. When that dedicated dimension
+ * has already been deducted by the rule table, the severity deduction is routed to
+ * DIMENSION_TECH_DEBT_RISK to prevent unfair double penalty on the primary quality dimension.
+ *
+ * @param issue - Analyzed issue finding.
+ * @param apply - Deduction callback function.
+ * @param claimed - Optional set of dimensions already deducted by rule table.
+ * @param line - Start line of the finding, when known.
+ */
 function applySeverityDeductions(
     issue: Issue,
     apply: DeductionApplier,
@@ -179,6 +239,29 @@ function applySeverityDeductions(
     if (claimed && claimed.has(debtDimension)) {
         debtDimension = DIMENSION_TECH_DEBT_RISK;
     }
+
+    // Tiered debt isolation for techDebtRisk
+    if (debtDimension === DIMENSION_TECH_DEBT_RISK) {
+        const tier = classifyDebtTier(issue);
+        if (tier === 3) {
+            // Tier 3 code smells do not penetrate into techDebtRisk
+            return;
+        }
+        if (tier === 2) {
+            // Tier 2 evolutionary debt penetrates with 50% damping
+            const penalty =
+                issue.severity === FRAGMENT_ERROR
+                    ? Math.round(DEDUCTION_ERROR_TECH_DEBT * 0.5)
+                    : Math.round(DEDUCTION_WARNING_TECH_DEBT * 0.5);
+            const rationale =
+                issue.severity === FRAGMENT_ERROR
+                    ? ScoringRationales.ERROR_TECH_DEBT(issue.message)
+                    : ScoringRationales.WARNING_TECH_DEBT(issue.message);
+            apply(debtDimension, penalty, rationale, issue.rule, line);
+            return;
+        }
+    }
+
     if (issue.severity === FRAGMENT_ERROR) {
         apply(
             debtDimension,

@@ -19,6 +19,8 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 
 const {
   synthesizeStaticQualityVector,
@@ -28,10 +30,14 @@ const {
   computeDynamicQualityVector,
   computeDynamicQualityScore,
   computeDynamicHotspotRisk,
+  evaluateDynamicCompleteness,
   fuseIssueRisks,
+  fuseCascadedRisks,
   resolveAdaptiveFusionWeights,
   computeUnifiedQualityScore,
   evaluateChangeQuality,
+  QualityScorer,
+  classifyDebtTier,
   FeedbackIncidentLedger,
   FeedbackAdaptiveSupervisor,
 } = require('../dist/api');
@@ -368,6 +374,160 @@ async function main() {
   assert.ok(updatedWeights.Wd > initialWeights.Wd, 'Dynamic weight must increase');
   assert.ok(updatedWeights.Ws < initialWeights.Ws, 'Static weight must adjust downwards');
   console.log('✔ Adaptive gradient descent W_{t+1} successfully updated.\n');
+
+  // 7. Test S1: Scale Elasticity & 3-Tier Debt Isolation
+  console.log('>>> [S1] Testing Scale Elasticity & 3-Tier Debt Isolation...');
+  const tier3Issue = {
+    rule: 'LIT-001',
+    analyzer: 'literalAnalyzer',
+    severity: 'warning',
+    message: 'Magic string literal "status"',
+  };
+  const tier2Issue = {
+    rule: 'CPX-001',
+    analyzer: 'complexityAnalyzer',
+    severity: 'warning',
+    message: 'Function cyclomatic complexity is 18',
+  };
+  const tier1Issue = {
+    rule: 'SEC-001',
+    analyzer: 'securityAnalyzer',
+    severity: 'error',
+    message: 'Hardcoded secret detected',
+  };
+
+  assert.strictEqual(classifyDebtTier(tier3Issue), 3, 'Literals must be Tier 3');
+  assert.strictEqual(classifyDebtTier(tier2Issue), 2, 'Complexity must be Tier 2');
+  assert.strictEqual(classifyDebtTier(tier1Issue), 1, 'Security error must be Tier 1');
+
+  // Verify Tier 3 code smell does not penetrate into techDebtRisk
+  const scorer = new QualityScorer();
+  const mockMetric = {
+    file: 'large-core.ts',
+    lines: 1000,
+    nonBlankLines: 800,
+    functions: 20,
+    maxNestingDepth: 3,
+    topLevelDeclarations: 10,
+    exportedSymbols: 5,
+  };
+  const twentySmells = Array.from({ length: 20 }, (_, idx) => ({
+    rule: 'LIT-001',
+    analyzer: 'literalAnalyzer',
+    severity: 'warning',
+    message: `Literal ${idx}`,
+    location: { start: { line: idx * 10 + 1 } },
+  }));
+
+  const largeBreakdown = scorer.evaluateFile('large-core.ts', twentySmells, mockMetric);
+  assert.strictEqual(
+    largeBreakdown.indices.techDebtRisk,
+    100,
+    'Tier 3 smells must be 100% isolated from techDebtRisk',
+  );
+  assert.ok(
+    largeBreakdown.indices.standardization > 70,
+    `Elastic log dampening must prevent drop to 0, got ${largeBreakdown.indices.standardization}`,
+  );
+  console.log('✔ Tiered debt isolation and scale-normalized log dampening verified.\n');
+
+  // 8. Test S2: Bayesian Dynamic Smoothing & Topological Cascading
+  console.log('>>> [S2] Testing Bayesian Dynamic Smoothing & Topological Cascading...');
+  const partialTelemetry = {
+    timestamp: Date.now(),
+    latency: { p99Ms: 12.0, budgetMs: 16.67 },
+    execution: { lineCoveragePct: 92.0, branchCoveragePct: 88.0 },
+  };
+  const completeness = evaluateDynamicCompleteness(partialTelemetry);
+  assert.strictEqual(completeness.completeness, 0.4, 'Observed 2 of 5 axes must be 0.4');
+  assert.deepStrictEqual(completeness.observedAxes, ['L', 'E']);
+
+  const smoothedVector = computeDynamicQualityVector(partialTelemetry, 95.0);
+  assert.strictEqual(smoothedVector.T, 95.0, 'Unobserved T axis must inherit prior score');
+  assert.strictEqual(smoothedVector.M, 95.0, 'Unobserved M axis must inherit prior score');
+  assert.strictEqual(smoothedVector.C, 95.0, 'Unobserved C axis must inherit prior score');
+  assert.ok(smoothedVector.E > 75.0, 'Execution score with coverage must be smoothed');
+
+  // Topological call graph cascading risk
+  const leafStaticRisk = computeStaticIssueRisk(
+    {
+      rule: 'PRF-ALG-001',
+      analyzer: 'performanceAnalyzer',
+      severity: 'warning',
+      message: 'Quadratic loop in math routine',
+    },
+    { ruleProbability: 0.9, semanticConfidence: 0.9, impactScope: 'cross_domain' },
+  );
+  const dispatcherCaller = {
+    callerSymbol: 'TaskDispatcher.dispatchLoop',
+    dynamicRisk: computeDynamicHotspotRisk({
+      invocationsPerHour: 72000,
+      behavioralScope: 4.0,
+      resourceConsumption: 8.0,
+      businessSensitivity: 4.5,
+    }),
+    couplingWeight: 0.85,
+  };
+  const cascadedResult = fuseCascadedRisks(leafStaticRisk, undefined, [dispatcherCaller]);
+  assert.ok(
+    cascadedResult.upstreamCascadedDynamicRisk > 3.0,
+    'Caller dynamic pressure must cascade into callee',
+  );
+  assert.ok(
+    cascadedResult.fusedScore > leafStaticRisk.normalizedRisk,
+    'Topological cascading must amplify callee risk score',
+  );
+  assert.strictEqual(cascadedResult.isDualConfirmed, true);
+  console.log('✔ Bayesian dynamic smoothing & topological cascading verified.\n');
+
+  // 9. Test S3: Refactoring Idiom Immunity & Anti-Gaming Balance
+  console.log('>>> [S3] Testing Refactoring Idiom Immunity & Anti-Gaming Balance...');
+  const approvedRefactorEval = evaluateChangeQuality({
+    filePath: 'src/core/complexEngine.ts',
+    beforeContent: 'function processOrder() {\n  return 1;\n}',
+    afterContent:
+      'function processOrder() {\n  validate();\n  calculate();\n  return 1;\n}\n' +
+      'function validate() {}\nfunction calculate() {}',
+    beforeScore: 70.0,
+    afterScore: 82.0,
+    approvedPattern: {
+      pattern: 'extract_function',
+      originalSymbol: 'processOrder',
+      deltaCC: -6,
+      maxSubParamCount: 2,
+      isNarrowScope: true,
+    },
+  });
+  assert.strictEqual(approvedRefactorEval.isApprovedRefactoring, true);
+  assert.strictEqual(approvedRefactorEval.refactoringBonus, 5.0);
+  assert.strictEqual(approvedRefactorEval.verdict, 'approved');
+  assert.ok(
+    approvedRefactorEval.changeScore >= 17.0,
+    `Approved refactoring score must include bonus, got ${approvedRefactorEval.changeScore}`,
+  );
+  console.log('✔ Approved refactoring immunity against G-03 and +5.0 bonus verified.\n');
+
+  // 10. Test S4: Governance Ledger Snapshot Persistence
+  console.log('>>> [S4] Testing Governance Ledger Snapshot Persistence...');
+  const praxisDir = path.join(__dirname, '../.praxis');
+  const snapshotPath = path.join(praxisDir, 'governance-weights.json');
+  supervisor.saveLedgerSnapshot(snapshotPath, 'core_framework');
+  assert.ok(fs.existsSync(snapshotPath), 'Snapshot file must exist on disk');
+
+  const snapshotContent = JSON.parse(fs.readFileSync(snapshotPath, 'utf-8'));
+  assert.strictEqual(snapshotContent.version, '1.0');
+  assert.strictEqual(snapshotContent.projectProfile, 'core_framework');
+  assert.ok(snapshotContent.learnedWeights.Ws > 0);
+
+  const restoredSupervisor = new FeedbackAdaptiveSupervisor();
+  const loaded = restoredSupervisor.loadLedgerSnapshot(snapshotPath);
+  assert.strictEqual(loaded, true, 'Snapshot must load successfully');
+  assert.deepStrictEqual(
+    restoredSupervisor.getWeights(),
+    supervisor.getWeights(),
+    'Restored weights must match saved weights',
+  );
+  console.log('✔ Governance ledger snapshot persistence and recovery verified.\n');
 
   console.log('================================================================');
   console.log('                THREE-PLANE AUDIT SCORE MATRIX                  ');

@@ -16,7 +16,23 @@
  *   learning rate eta constrained to [0.01, 0.05]; safe serialization/deserialization for CI.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { FusionWeights } from '../scoring/fusion-scorer';
+
+/**
+ * Persistent snapshot schema for governance ledger and learned tri-plane weights.
+ */
+export interface GovernanceLedgerSnapshot {
+    version: string;
+    lastUpdated: string;
+    projectProfile: string;
+    learnedWeights: FusionWeights;
+    activeIncidents: number;
+    demotedRules: string[];
+    boostedPatterns: string[];
+    evolutionStepsCount: number;
+}
 
 /** Classification of feedback incident */
 export type FeedbackIncidentType =
@@ -524,6 +540,95 @@ export class FeedbackAdaptiveSupervisor {
             currentWeights: { ...this.currentWeights },
             evolutionStepsCount: this.evolutionHistory.length,
         };
+    }
+
+    /**
+     * Exports a portable governance snapshot of the supervisor's learned weights and state.
+     *
+     * @param projectProfile - Project profile identifier (default: 'standard').
+     * @returns Portable GovernanceLedgerSnapshot.
+     */
+    public exportLedgerSnapshot(projectProfile = 'standard'): GovernanceLedgerSnapshot {
+        const summary = this.generateGovernanceSummary();
+        const incidents = this.ledger.getAllIncidents();
+
+        const demotedRules: string[] = [];
+        for (const inc of incidents) {
+            if (inc.ruleId && !demotedRules.includes(inc.ruleId)) {
+                if (this.ledger.getRuleReliability(inc.ruleId).confidenceMultiplier < 1.0) {
+                    demotedRules.push(inc.ruleId);
+                }
+            }
+        }
+
+        const boostedPatterns: string[] = [];
+        for (const inc of incidents) {
+            if (inc.patternId && !boostedPatterns.includes(inc.patternId)) {
+                if (this.ledger.getPatternStability(inc.patternId).stabilityBoostFactor > 1.0) {
+                    boostedPatterns.push(inc.patternId);
+                }
+            }
+        }
+
+        return {
+            version: '1.0',
+            lastUpdated: new Date().toISOString(),
+            projectProfile,
+            learnedWeights: { ...this.currentWeights },
+            activeIncidents: summary.totalIncidents,
+            demotedRules,
+            boostedPatterns,
+            evolutionStepsCount: this.evolutionHistory.length,
+        };
+    }
+
+    /**
+     * Imports a governance snapshot to restore learned weights and evolutionary state.
+     *
+     * @param snapshot - GovernanceLedgerSnapshot to load.
+     */
+    public importLedgerSnapshot(snapshot: GovernanceLedgerSnapshot): void {
+        if (snapshot.learnedWeights) {
+            const { Ws, Wd, Wf } = snapshot.learnedWeights;
+            if (typeof Ws === 'number' && typeof Wd === 'number' && typeof Wf === 'number') {
+                this.currentWeights = { Ws, Wd, Wf };
+            }
+        }
+    }
+
+    /**
+     * Serializes and writes the governance snapshot to a JSON file.
+     *
+     * @param filePath - Destination JSON file path.
+     * @param projectProfile - Project profile identifier.
+     */
+    public saveLedgerSnapshot(filePath: string, projectProfile = 'standard'): void {
+        const snapshot = this.exportLedgerSnapshot(projectProfile);
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2), 'utf-8');
+    }
+
+    /**
+     * Loads and restores governance snapshot from a JSON file.
+     *
+     * @param filePath - Source JSON file path.
+     * @returns True if successfully loaded, false if file does not exist or invalid.
+     */
+    public loadLedgerSnapshot(filePath: string): boolean {
+        try {
+            if (!fs.existsSync(filePath)) {
+                return false;
+            }
+            const content = fs.readFileSync(filePath, 'utf-8');
+            const parsed = JSON.parse(content) as GovernanceLedgerSnapshot;
+            this.importLedgerSnapshot(parsed);
+            return true;
+        } catch {
+            return false;
+        }
     }
 }
 
