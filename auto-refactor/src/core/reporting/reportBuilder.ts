@@ -25,6 +25,12 @@ import { TOOL_NAME, TOOL_VERSION } from '../config';
 import { sha256Hex } from '../cache-key';
 import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
 import type { QualityScorer } from '../scoring/qualityScorer';
+import { synthesizeStaticQualityVector } from '../scoring/static-quality-model';
+import { computeDynamicQualityVector } from '../dynamic/dynamic-quality-scorer';
+import {
+    computeUnifiedQualityScore,
+    type GovernanceProjectProfile,
+} from '../scoring/fusion-scorer';
 import type { ReviewMemoryManager } from '../memory/reviewMemory';
 import type { ReviewMemoryRecord } from '../memory/types';
 import { extractCodeDomains, computeAstDigest } from '../memory/domainFingerprint';
@@ -242,6 +248,33 @@ function buildSummary(
  * @param durationMs - Total scan duration in milliseconds.
  * @returns Assembled ScanReport structure.
  */
+/**
+ * Map ScanConfig profile, scale, maturity, and archetype to GovernanceProjectProfile.
+ */
+function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
+    const stage: GovernanceProjectProfile['stage'] =
+        cfg.maturityTier === 'industrial'
+            ? 'industrial_infrastructure'
+            : cfg.maturityTier === 'demo' || cfg.maturityTier === 'prototype'
+              ? 'prototype'
+              : 'production';
+
+    const scale: GovernanceProjectProfile['scale'] =
+        cfg.scaleGrade === 'enterprise'
+            ? 'massive'
+            : cfg.scaleGrade === 'large'
+              ? 'large'
+              : cfg.scaleGrade === 'medium'
+                ? 'medium'
+                : 'small';
+
+    let domain: GovernanceProjectProfile['domain'] = 'core_framework';
+    if (cfg.archetype === 'library') domain = 'algorithm_lib';
+    else if (cfg.archetype === 'game' || cfg.archetype === 'web') domain = 'business_app';
+
+    return { stage, scale, domain };
+}
+
 export function buildScanReport(
     host: ReportHost,
     filesScanned: number,
@@ -259,6 +292,18 @@ export function buildScanReport(
         cfg,
         issues,
     );
+    const staticVector = synthesizeStaticQualityVector(projectQualityScore.indices);
+    const dynamicTelemetry = cfg.telemetryData;
+    const dynamicVector = dynamicTelemetry
+        ? computeDynamicQualityVector(dynamicTelemetry)
+        : undefined;
+    const triPlaneQuality = computeUnifiedQualityScore(
+        staticVector,
+        dynamicVector,
+        100.0,
+        resolveGovernanceProfile(cfg),
+    );
+
     host.reviewMemory.flush();
     return {
         tool: TOOL_NAME,
@@ -271,5 +316,6 @@ export function buildScanReport(
         fileMetrics,
         qualityScore: projectQualityScore,
         fileQualityScores,
+        triPlaneQuality,
     };
 }

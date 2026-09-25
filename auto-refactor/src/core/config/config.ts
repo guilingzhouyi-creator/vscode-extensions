@@ -29,6 +29,7 @@ import type {
     AnalyzerId,
     LogLevel,
     LiteralPolicyConfig,
+    DynamicEvidenceDTO,
 } from '../types';
 import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from '../literal-policy-engine';
 import { ERR_INVALID_CUSTOM_ANALYZER } from '../router/sliceTypes';
@@ -635,14 +636,38 @@ function mergeLiteralPolicy(
 }
 
 /**
+ * Load dynamic telemetry evidence from file if path is specified and valid.
+ */
+function loadTelemetryData(
+    root: string,
+    telemetryPath?: string,
+): DynamicEvidenceDTO | undefined {
+    if (!telemetryPath) return undefined;
+    const resolvedPath = path.isAbsolute(telemetryPath)
+        ? telemetryPath
+        : path.resolve(root, telemetryPath);
+    try {
+        if (fs.existsSync(resolvedPath)) {
+            const raw = fs.readFileSync(resolvedPath, 'utf8');
+            return JSON.parse(raw) as DynamicEvidenceDTO;
+        }
+    } catch (_err) {
+        return undefined;
+    }
+    return undefined;
+}
+
+/**
  * Assemble domain governance, memory, routing, and language support options.
  *
+ * @param root - Project scan root directory.
  * @param base - Base default configuration.
  * @param fileCfg - Config-file specified overrides.
  * @param overrides - Explicit CLI or runtime overrides.
  * @returns Filtered domain options.
  */
 function assembleDomainOptions(
+    root: string,
     base: ScanConfig,
     fileCfg: Partial<ScanConfig>,
     overrides: ConfigOverrides,
@@ -655,7 +680,14 @@ function assembleDomainOptions(
     | 'archetype'
     | 'sparseRouting'
     | 'signal'
+    | 'telemetry'
+    | 'telemetryData'
 > {
+    const telemetry = overrides.telemetry || fileCfg.telemetry;
+    const telemetryData =
+        overrides.telemetryData ||
+        fileCfg.telemetryData ||
+        loadTelemetryData(root, telemetry);
     return {
         unsupportedLanguage: resolveScalar(
             overrides.unsupportedLanguage,
@@ -672,6 +704,8 @@ function assembleDomainOptions(
         archetype: overrides.archetype || fileCfg.archetype,
         sparseRouting: resolveFlag(overrides.sparseRouting, fileCfg.sparseRouting, false),
         signal: overrides.signal,
+        telemetry,
+        telemetryData,
     };
 }
 
@@ -819,7 +853,7 @@ export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {
         literalPolicy: mergeLiteralPolicy(base.literalPolicy, fileCfg.literalPolicy),
         ...assembleExecutionOptions(base, fileCfg, overrides),
         ...assembleReportingOptions(base, fileCfg, overrides),
-        ...assembleDomainOptions(base, fileCfg, overrides),
+        ...assembleDomainOptions(root, base, fileCfg, overrides),
     };
 
     return merged;

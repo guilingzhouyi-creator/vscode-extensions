@@ -23,6 +23,7 @@ const fs = require('fs');
 const path = require('path');
 
 const {
+  scan,
   synthesizeStaticQualityVector,
   computeStaticQualityScore,
   computeStaticIssueRisk,
@@ -139,53 +140,36 @@ function buildProjectTelemetry(projectId) {
 }
 
 /**
- * Return fine-grained dimension indices for project.
+ * Run physical AST scan on real project trees to compute live fine-grained dimension indices.
  *
  * @param projectId - Project identifier.
- * @returns Fine-grained indices map.
+ * @returns Fine-grained indices map from live AST scan.
  */
-function buildProjectIndices(projectId) {
+async function buildProjectIndices(projectId) {
+  let root = '';
+  let include = [];
+
   if (projectId === 'auto-refactor') {
-    return {
-      architectureConsistency: 96.0,
-      maintainability: 94.0,
-      performanceEfficiency: 98.0,
-      codeSecurity: 100.0,
-      semanticPurity: 93.0,
-      techDebtRisk: 91.0,
-      standardization: 95.0,
-      commentQuality: 92.0,
-      duplication: 90.0,
-      modernity: 97.0,
-    };
+    root = path.resolve(__dirname, '..');
+    include = ['src/**/*.ts'];
+  } else if (projectId === 'workspace-timing') {
+    root = path.resolve(__dirname, '../../workspace-timing');
+    include = ['src/**/*.ts'];
+  } else if (projectId === 'WebGames') {
+    root = path.resolve(__dirname, '../../WebGames');
+    include = ['backend/**/*.gd', 'frontend/**/*.gd'];
   }
-  if (projectId === 'workspace-timing') {
-    return {
-      architectureConsistency: 95.0,
-      maintainability: 91.0,
-      performanceEfficiency: 94.0,
-      codeSecurity: 100.0,
-      semanticPurity: 92.0,
-      techDebtRisk: 88.0,
-      standardization: 93.0,
-      commentQuality: 96.0,
-      duplication: 89.0,
-      modernity: 95.0,
-    };
-  }
-  // WebGames post Phase 90 & Phase 91 CC & hygiene cleanups
-  return {
-    architectureConsistency: 95.0,
-    maintainability: 99.7,
-    performanceEfficiency: 96.0,
-    codeSecurity: 100.0,
-    semanticPurity: 91.0,
-    techDebtRisk: 86.0,
-    standardization: 99.4,
-    commentQuality: 100.0,
-    duplication: 85.0,
-    modernity: 100.0,
-  };
+
+  const report = await scan({
+    root,
+    include,
+    cache: false,
+    logLevel: 'silent',
+  });
+
+  assert.ok(report.qualityScore, `Physical scan of ${projectId} must produce qualityScore`);
+  assert.ok(report.summary.filesScanned > 0, `Physical scan of ${projectId} must discover files`);
+  return report.qualityScore.indices;
 }
 
 /**
@@ -268,8 +252,8 @@ async function main() {
   for (const proj of projects) {
     console.log(`>>> Evaluating Project: [${proj.name}]`);
 
-    // 1. Static Plane Evaluation
-    const indices = buildProjectIndices(proj.id);
+    // 1. Static Plane Evaluation (Live Physical AST Scan)
+    const indices = await buildProjectIndices(proj.id);
     const staticVector = synthesizeStaticQualityVector(indices);
     const staticScore = computeStaticQualityScore(staticVector);
 

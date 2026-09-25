@@ -590,6 +590,10 @@ export interface ScanConfig {
     baselineGranularity?: 'id' | 'grouped';
     /** Declarative literal tolerance policy for function call arguments and standard patterns. */
     literalPolicy?: LiteralPolicyConfig;
+    /** Optional path to a dynamic telemetry profile (JSON). */
+    telemetry?: string;
+    /** Loaded dynamic telemetry evidence DTO for tri-plane fusion quality synthesis. */
+    telemetryData?: import('./dynamic/dynamic-types').DynamicEvidenceDTO;
 
     // ---- unified execution / observability controls ----
     /** Log verbosity. Default 'info'. Logs go to stderr so stdout stays machine-readable. */
@@ -789,12 +793,18 @@ export interface ScanReport {
     qualityScore?: import('./scoring/scoringTypes').QualityScoreBreakdown;
     /** Per-file transparent quality scoring breakdown */
     fileQualityScores?: Record<string, import('./scoring/scoringTypes').QualityScoreBreakdown>;
+    /**
+     * Tri-plane unified governance quality assessment (Static Q_s, Dynamic Q_d,
+     * Feedback Q_f, Fused Q_tot).
+     */
+    triPlaneQuality?: import('./scoring/fusion-scorer').UnifiedQualityAssessment;
 }
 
 export * from './scoring/scoringTypes';
 export * from './memory/types';
 export * from './trajectory/types';
 export * from './praxis/contracts';
+export type { DynamicEvidenceDTO } from './dynamic/dynamic-types';
 /**
  * Diff, warm-scan and streaming contracts. Declared in ./diffTypes and re-exported here so the
  * type hub stays a single import site for consumers without carrying the declarations itself.

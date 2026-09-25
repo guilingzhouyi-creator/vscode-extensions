@@ -194,6 +194,9 @@ function applyGeneralValueFlag(opt: CliOptions, arg: string, val: string): boole
         case 'agent-uid':
             opt.agentUid = val;
             return true;
+        case 'telemetry':
+            opt.telemetry = val;
+            return true;
         case 'log-file':
             opt.logFile = val;
             return true;
@@ -379,6 +382,8 @@ Options:
   --security-level <level>     Leveled security audit: off | basic | full (default: basic)
   --auto-tune                 Enable scale-adaptive dynamic threshold and option tuning
   --profile                   Display auto-detected project stack profile and partition details
+  --score                     Output multi-dimensional quality assessment and Tri-Plane vectors
+  --telemetry <file>          Ingest dynamic runtime telemetry profile (DynamicEvidenceDTO JSON)
   --help, -h                  Show this help
 `);
 }

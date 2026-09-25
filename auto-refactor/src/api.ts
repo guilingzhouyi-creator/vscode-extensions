@@ -32,7 +32,7 @@ import type {
     SecurityLevel,
     UnsupportedLanguageSeverity,
     MaturityTier,
-    ProjectProfile,
+    DynamicEvidenceDTO,
 } from './core/types';
 import { resolveConfig, TOOL_VERSION } from './core/config';
 import { Scanner } from './core/analyzer';
@@ -41,7 +41,10 @@ import { render } from './core/reporters';
 import { Logger, AutoRefactorError } from './core/logger';
 import { decodeContent } from './core/utf8';
 import type { BASELINE_GRANULARITY_GROUPED } from './core/reporting/reportFinalizer';
-import type { QualityScoreBreakdown } from './core/scoring/scoringTypes';
+import {
+    printProjectStackProfile,
+    printQualityScoreAssessment,
+} from './core/reporting/quality-printer';
 import {
     finalizeReport,
     POST_SCAN_SCOPE_FULL,
@@ -51,21 +54,6 @@ import {
 // default scan() path (and CLI boot) never pays for the daemon module graph (net, child_process).
 // This preserves the "single-run zero cost" guarantee
 // (docs/01-architecture/02-pipeline-and-caching.md §A4.3).
-
-/**
- * Scale factor that converts a 0..1 confidence/score fraction into a percentage.
- */
-const PERCENT_SCALE = 100;
-
-/**
- * Minimum column width for a quality-dimension label in the score report.
- */
-const QUALITY_DIMENSION_LABEL_WIDTH = 26;
-
-/**
- * Maximum number of quality rationales printed by `--score`, highest-impact first.
- */
-const MAX_QUALITY_RATIONALES = 8;
 
 /** Diff input kind whose record carries both the old and the new file content. */
 const DIFF_INPUT_KIND_FULL = 'full';
@@ -181,6 +169,10 @@ export interface ScanOptions {
     classifyLiterals?: boolean;
     /** Enable granular rule names for classified literals. */
     granularRules?: boolean;
+    /** Dynamic telemetry file path for Tri-Plane runtime evidence ingestion. */
+    telemetry?: string;
+    /** In-memory dynamic runtime evidence for Tri-Plane dynamic quality scoring. */
+    telemetryData?: DynamicEvidenceDTO;
 }
 
 const MODULE_DAEMON_CLIENT = './daemon/client';
@@ -486,27 +478,7 @@ export async function scanDiffDelta(
     return { report: r.report as DiffDeltaReport, stats: r.stats };
 }
 
-/**
- * Print the resolved project stack profile to stdout: language, build systems, frameworks,
- * scale grade, polyglot flag, and partition names.
- *
- * @param profile - Resolved project profile whose partitions are summarized.
- * @param scaleGrade - Optional scale grade label; defaults to 'standard' when omitted.
- */
-function printProjectStackProfile(profile: ProjectProfile, scaleGrade?: string): void {
-    process.stdout.write(`\n=== Project Stack Profile ===\n`);
-    process.stdout.write(`Primary Language: ${profile.primaryLanguage}\n`);
-    process.stdout.write(`Build Systems:    ${profile.buildSystems.join(', ') || 'none'}\n`);
-    process.stdout.write(`Frameworks:       ${profile.frameworks.join(', ') || 'none'}\n`);
-    process.stdout.write(`Scale Grade:      ${scaleGrade || 'standard'}\n`);
-    process.stdout.write(`Is Polyglot:      ${profile.isPolyglot}\n`);
-    if (profile.partitions.length > 0) {
-        process.stdout.write(
-            `Partitions:       ${profile.partitions.map((p) => p.name).join(', ')}\n`,
-        );
-    }
-    process.stdout.write(`=============================\n\n`);
-}
+
 
 async function collectGitChangedFiles(root: string): Promise<string[]> {
     const changedFiles: string[] = [];
@@ -595,28 +567,7 @@ async function executeStandardScanMode(
     return { report, stats: null, scanner };
 }
 
-function printQualityScoreAssessment(q: QualityScoreBreakdown): void {
-    process.stdout.write(`\n=== Transparent Code Quality Assessment ===\n`);
-    process.stdout.write(
-        `Composite Quality Index: ${q.compositeScore.toFixed(1)} / 100 [Grade: ${q.grade}] (Confidence: ${(q.confidence * PERCENT_SCALE).toFixed(0)}%)\n`,
-    );
-    process.stdout.write(`-------------------------------------------\n`);
-    for (const [dim, val] of Object.entries(q.indices)) {
-        process.stdout.write(
-            `  • ${dim.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${(val as number).toFixed(1)}\n`,
-        );
-    }
-    if (q.rationales && q.rationales.length > 0) {
-        process.stdout.write(`-------------------------------------------\n`);
-        process.stdout.write(`Key Deductions & Rationales:\n`);
-        for (const r of q.rationales.slice(0, MAX_QUALITY_RATIONALES)) {
-            process.stdout.write(
-                `  [${r.delta} pts] ${r.dimension}: ${r.reason}${r.line ? ` (L${r.line})` : ''}\n`,
-            );
-        }
-    }
-    process.stdout.write(`===========================================\n\n`);
-}
+
 
 async function outputRenderedReport(
     report: ScanReport,
@@ -710,7 +661,7 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
         await outputRenderedReport(report, config, logger);
 
         if (options.showScore && report.qualityScore) {
-            printQualityScoreAssessment(report.qualityScore);
+            printQualityScoreAssessment(report.qualityScore, report.triPlaneQuality);
         }
         logger.close();
         return evaluateGateExitCode(report, config);
@@ -888,3 +839,4 @@ export * from './core/comments';
 
 // ---- Native Acceleration Core & Algorithmic Dual-Track Bridge ----
 export * from './core/native';
+export * from './core/reporting/quality-printer';

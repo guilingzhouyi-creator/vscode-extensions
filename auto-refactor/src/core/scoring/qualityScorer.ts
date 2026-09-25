@@ -16,7 +16,6 @@
 import type { Issue, FileMetric, ScanConfig } from '../types';
 import type {
     QualityDimension,
-    QualityGrade,
     QualityScoreBreakdown,
     QualityScoreRationale,
     QualityWeights,
@@ -24,164 +23,28 @@ import type {
 import {
     ALL_QUALITY_DIMENSIONS,
     DEFAULT_QUALITY_WEIGHTS,
-    DIMENSION_ANALYZERS,
 } from './scoringTypes';
 import {
     FAMILY_DIMENSIONS,
     applyIssueDeductions,
     applyMetricDeductions,
 } from './dimensionDeductions';
-
-/** Maximum clean score a quality dimension starts at before deductions. */
-const DIMENSION_MAX_SCORE = 100;
-/** Letter-grade cut-offs on the 0-100 composite score. */
-const GRADE_A_PLUS_MIN = 95;
-const GRADE_A_MIN = 85;
-const GRADE_B_MIN = 75;
-const GRADE_C_MIN = 65;
-const GRADE_D_MIN = 50;
-/** Composite rounding: one decimal place. */
-const SCORE_ROUNDING = 10;
-/** Confidence model: floor, line cap, and the scale that maps lines onto 0..1. */
-const CONFIDENCE_FLOOR = 0.6;
-const CONFIDENCE_LINE_CAP = 300;
-const CONFIDENCE_LINE_SCALE = 750;
-/** Fallback metric size when a file has no metric entry. */
-const DEFAULT_METRIC_LINES = 50;
-/** Percentage scale used when rounding confidence to two decimals. */
-const PERCENT_SCALE = 100;
-
-/**
- * Determine which quality dimensions were evaluated under the given scan configuration.
- *
- * @param config - Optional ScanConfig to inspect enabled analyzers.
- * @returns Partitioned dimensions and active analyzer sets.
- */
-function calculateEvaluatedDimensions(config?: ScanConfig): {
-    evaluatedBy: Partial<Record<QualityDimension, string[]>>;
-    notEvaluated: QualityDimension[];
-    evaluatedDimensions: QualityDimension[];
-} {
-    const evaluatedBy: Partial<Record<QualityDimension, string[]>> = {};
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        evaluatedBy[dim] = DIMENSION_ANALYZERS[dim].filter((id) => {
-            if (config === undefined) return true;
-            const declaration = config.analyzers?.[id];
-            return declaration !== undefined && declaration.enabled !== false;
-        });
-    }
-    const notEvaluated = ALL_QUALITY_DIMENSIONS.filter(
-        (dim) => (evaluatedBy[dim] ?? []).length === 0,
-    );
-    const evaluatedDimensions = ALL_QUALITY_DIMENSIONS.filter((dim) => !notEvaluated.includes(dim));
-    return { evaluatedBy, notEvaluated, evaluatedDimensions };
-}
-
-/**
- * Aggregate deduction entries and net penalty points by quality dimension.
- *
- * @param rationales - Recorded rationale items from deduction applier.
- * @param deductionPoints - Net deduction points accumulated per dimension.
- * @returns Audit trail map partitioned by quality dimension.
- */
-function groupDeductionsByDimension(
-    rationales: QualityScoreRationale[],
-    deductionPoints: Record<QualityDimension, number>,
-): Record<
-    QualityDimension,
-    { points: number; entries: { rule: string; points: number; reason: string }[] }
-> {
-    const deductionsByDimension = {} as Record<
-        QualityDimension,
-        { points: number; entries: { rule: string; points: number; reason: string }[] }
-    >;
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        deductionsByDimension[dim] = { points: 0, entries: [] };
-    }
-    for (const entry of rationales) {
-        const bucket = deductionsByDimension[entry.dimension];
-        const points = -entry.delta;
-        bucket.points += points;
-        bucket.entries.push({ rule: entry.rule ?? 'metric', points, reason: entry.reason });
-    }
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        deductionsByDimension[dim].points = deductionPoints[dim];
-    }
-    return deductionsByDimension;
-}
-
-/**
- * Calculate the weighted composite score and measured weight coverage.
- *
- * @param rawScores - Unweighted score per dimension (0-100).
- * @param evaluatedDimensions - List of active dimensions evaluated in scan.
- * @param weights - Scoring weight configuration.
- * @returns Composite score rounded to one decimal and coverage ratio.
- */
-function computeCompositeScore(
-    rawScores: Record<QualityDimension, number>,
-    evaluatedDimensions: QualityDimension[],
-    weights: QualityWeights,
-): { compositeScore: number; coverage: number } {
-    let totalWeightedScore = 0;
-    let totalWeight = 0;
-    let overallWeight = 0;
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        overallWeight += weights[dim];
-    }
-    for (const dim of evaluatedDimensions) {
-        const w = weights[dim];
-        totalWeightedScore += rawScores[dim] * w;
-        totalWeight += w;
-    }
-    const compositeScore =
-        Math.round((totalWeightedScore / (totalWeight || 1)) * SCORE_ROUNDING) / SCORE_ROUNDING;
-    const coverage =
-        overallWeight === 0
-            ? 1
-            : Math.round((totalWeight / overallWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
-    return { compositeScore, coverage };
-}
-
-/**
- * Map a numeric composite score to a letter grade.
- *
- * @param compositeScore - Computed composite score (0-100).
- * @returns Matching QualityGrade ('A+' through 'F').
- */
-function resolveQualityGrade(compositeScore: number): QualityGrade {
-    if (compositeScore >= GRADE_A_PLUS_MIN) return 'A+';
-    if (compositeScore >= GRADE_A_MIN) return 'A';
-    if (compositeScore >= GRADE_B_MIN) return 'B';
-    if (compositeScore >= GRADE_C_MIN) return 'C';
-    if (compositeScore >= GRADE_D_MIN) return 'D';
-    return 'F';
-}
-
-/**
- * Compute statistical confidence adjusted for measured file size and coverage.
- *
- * @param metric - Computed file metric measurements.
- * @param coverage - Dimension coverage ratio (0-1).
- * @returns Confidence score clamped between floor and 1.
- */
-function calculateConfidence(metric: FileMetric | null | undefined, coverage: number): number {
-    const lines = metric?.nonBlankLines ?? DEFAULT_METRIC_LINES;
-    const baseConfidence = Math.min(
-        1.0,
-        Math.max(
-            CONFIDENCE_FLOOR,
-            Math.round(
-                (CONFIDENCE_FLOOR + Math.min(lines, CONFIDENCE_LINE_CAP) / CONFIDENCE_LINE_SCALE) *
-                    PERCENT_SCALE,
-            ) / PERCENT_SCALE,
-        ),
-    );
-    return (
-        Math.round(Math.max(CONFIDENCE_FLOOR, Number(baseConfidence) * coverage) * PERCENT_SCALE) /
-        PERCENT_SCALE
-    );
-}
+import {
+    DIMENSION_MAX_SCORE,
+    GRADE_A_PLUS_MIN,
+    GRADE_A_MIN,
+    GRADE_B_MIN,
+    GRADE_C_MIN,
+    GRADE_D_MIN,
+    SCORE_ROUNDING,
+    calculateEvaluatedDimensions,
+    groupDeductionsByDimension,
+    computeCompositeScore,
+    resolveQualityGrade,
+    calculateConfidence,
+    applyScaleDampedScores,
+    accumulateProjectMetrics,
+} from './scorer-formulas';
 
 /**
  * Transparent Multi-Dimensional Quality Scorer.
@@ -209,19 +72,6 @@ export class QualityScorer {
         metric?: FileMetric | null,
         config?: ScanConfig,
     ): QualityScoreBreakdown {
-        const rawScores: Record<QualityDimension, number> = {
-            architectureConsistency: DIMENSION_MAX_SCORE,
-            semanticPurity: DIMENSION_MAX_SCORE,
-            codeSecurity: DIMENSION_MAX_SCORE,
-            performanceEfficiency: DIMENSION_MAX_SCORE,
-            standardization: DIMENSION_MAX_SCORE,
-            modernity: DIMENSION_MAX_SCORE,
-            maintainability: DIMENSION_MAX_SCORE,
-            commentQuality: DIMENSION_MAX_SCORE,
-            duplication: DIMENSION_MAX_SCORE,
-            techDebtRisk: DIMENSION_MAX_SCORE,
-        };
-
         const rationales: QualityScoreRationale[] = [];
         const deductionPoints = {} as Record<QualityDimension, number>;
         for (const dim of ALL_QUALITY_DIMENSIONS) {
@@ -256,22 +106,8 @@ export class QualityScorer {
         const lines = metric?.nonBlankLines ?? (metric?.lines ?? 100);
         const scaleFactor = Math.max(1, lines / 100);
 
+        const rawScores = applyScaleDampedScores(deductionPoints, scaleFactor);
         for (const dim of ALL_QUALITY_DIMENSIONS) {
-            const rawPoints = deductionPoints[dim];
-            if (rawPoints <= 0) {
-                rawScores[dim] = DIMENSION_MAX_SCORE;
-                continue;
-            }
-            if (scaleFactor <= 1 || dim === 'codeSecurity') {
-                rawScores[dim] = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
-            } else {
-                const density = rawPoints / scaleFactor;
-                const effectivePenalty = Math.min(
-                    rawPoints,
-                    Math.round(DIMENSION_MAX_SCORE * (1 - Math.exp(-density / 40))),
-                );
-                rawScores[dim] = Math.max(0, DIMENSION_MAX_SCORE - effectivePenalty);
-            }
             deductionPoints[dim] = DIMENSION_MAX_SCORE - rawScores[dim];
         }
 
@@ -337,51 +173,12 @@ export class QualityScorer {
             return this.evaluateFile('PROJECT_OVERALL', allIssues ?? [], null, config);
         }
 
-        const rawScores: Record<QualityDimension, number> = {
-            architectureConsistency: 0,
-            semanticPurity: 0,
-            codeSecurity: 0,
-            performanceEfficiency: 0,
-            standardization: 0,
-            modernity: 0,
-            maintainability: 0,
-            commentQuality: 0,
-            duplication: 0,
-            techDebtRisk: 0,
-        };
+        const { rawScores, totalWeight, allRationales } = accumulateProjectMetrics(
+            fileQualityScores,
+            fileMetrics,
+        );
 
-        let totalWeight = 0;
-        const allRationales: QualityScoreRationale[] = [];
-        const deductionPoints: Record<QualityDimension, number> = {
-            architectureConsistency: 0,
-            semanticPurity: 0,
-            codeSecurity: 0,
-            performanceEfficiency: 0,
-            standardization: 0,
-            modernity: 0,
-            maintainability: 0,
-            commentQuality: 0,
-            duplication: 0,
-            techDebtRisk: 0,
-        };
-
-        for (const m of fileMetrics) {
-            const fScore = fileQualityScores[m.file];
-            if (!fScore) continue;
-
-            const weight = Math.max(1, m.nonBlankLines || m.lines || 1);
-            totalWeight += weight;
-
-            for (const dim of ALL_QUALITY_DIMENSIONS) {
-                const dimScore = fScore.indices[dim] ?? DIMENSION_MAX_SCORE;
-                rawScores[dim] += dimScore * weight;
-            }
-
-            if (fScore.rationales) {
-                allRationales.push(...fScore.rationales);
-            }
-        }
-
+        const deductionPoints = {} as Record<QualityDimension, number>;
         const divisor = totalWeight || 1;
         for (const dim of ALL_QUALITY_DIMENSIONS) {
             const weightedScore = rawScores[dim] / divisor;

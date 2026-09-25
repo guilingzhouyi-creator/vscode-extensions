@@ -177,6 +177,23 @@ export function dimensionDeductionSources(): Record<QualityDimension, string[]> 
  */
 export type DebtTier = 1 | 2 | 3;
 
+const TIER1_PREFIXES = ['SEC', 'ARCH', 'DEP-INV'];
+const TIER1_KEYWORDS = ['LEAK', 'CIRCULAR'];
+
+function isTier1CriticalDebt(rule: string, analyzer: string, severity: string): boolean {
+    if (severity === FRAGMENT_ERROR) return true;
+    if (analyzer.includes('security')) return true;
+    if (TIER1_PREFIXES.some((p) => rule.startsWith(p))) return true;
+    return TIER1_KEYWORDS.some((k) => rule.includes(k));
+}
+
+const TIER2_PREFIXES = ['CPX', 'CMP', 'DAT', 'TST-DBT'];
+
+function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean {
+    if (analyzer.includes('complexity') || analyzer.includes('maintainability')) return true;
+    return TIER2_PREFIXES.some((p) => rule.startsWith(p));
+}
+
 /**
  * Classify an issue into a technical debt tier.
  *
@@ -186,33 +203,14 @@ export type DebtTier = 1 | 2 | 3;
 export function classifyDebtTier(issue: Issue): DebtTier {
     const rule = (issue.rule ?? '').toUpperCase();
     const analyzer = (issue.analyzer ?? '').toLowerCase();
+    const severity = issue.severity ?? '';
 
-    // Tier 1: Critical structural debt (security, architecture violations, leaks, circular deps)
-    if (
-        issue.severity === FRAGMENT_ERROR ||
-        rule.startsWith('SEC') ||
-        rule.startsWith('ARCH') ||
-        rule.includes('LEAK') ||
-        rule.includes('CIRCULAR') ||
-        rule.includes('DEP-INV') ||
-        analyzer.includes('security')
-    ) {
+    if (isTier1CriticalDebt(rule, analyzer, severity)) {
         return 1;
     }
-
-    // Tier 2: Evolutionary maintenance debt (complexity, data clump, deep nesting, budget)
-    if (
-        rule.startsWith('CPX') ||
-        rule.startsWith('CMP') ||
-        rule.startsWith('DAT') ||
-        rule.startsWith('TST-DBT') ||
-        analyzer.includes('complexity') ||
-        analyzer.includes('maintainability')
-    ) {
+    if (isTier2EvolutionaryDebt(rule, analyzer)) {
         return 2;
     }
-
-    // Tier 3: Code smells and hygiene (literals, comments, formatting, naming)
     return 3;
 }
 

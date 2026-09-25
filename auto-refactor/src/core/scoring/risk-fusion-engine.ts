@@ -79,6 +79,85 @@ export interface FusedIssueRisk {
  * @param customCoeffs - Optional override for alpha, beta, gamma exponents.
  * @returns Fully articulated FusedIssueRisk record.
  */
+interface CorroborationArbitration {
+    D: number;
+    isDualConfirmed: boolean;
+    suppressionApplied: boolean;
+    rationale: string;
+}
+
+function arbitrateCorroboration(
+    staticRisk: StaticIssueRisk,
+    dynamicRisk?: DynamicIssueRisk,
+): CorroborationArbitration {
+    if (!dynamicRisk || dynamicRisk.evidenceConfidence <= 0) {
+        return {
+            D: 1.0,
+            isDualConfirmed: false,
+            suppressionApplied: false,
+            rationale:
+                'Dynamic telemetry unavailable; risk inferred from static structural ' +
+                'analysis with neutral dynamic baseline.',
+        };
+    }
+
+    const D = Math.max(0.05, dynamicRisk.normalizedRisk);
+    const S = staticRisk.normalizedRisk;
+
+    if (S >= 3.0 && D >= 3.0) {
+        return {
+            D,
+            isDualConfirmed: true,
+            suppressionApplied: false,
+            rationale:
+                `Dual-plane confirmed: High static structural risk (S=${S.toFixed(1)}) ` +
+                `corroborated by runtime hotspot evidence (D=${D.toFixed(1)}). Risk amplified.`,
+        };
+    }
+    if (S >= 2.0 && D <= 0.5) {
+        return {
+            D,
+            isDualConfirmed: false,
+            suppressionApplied: true,
+            rationale:
+                `Single-sided dampening: High static complexity (S=${S.toFixed(1)}) ` +
+                `refuted by cold runtime invocation evidence (D=${D.toFixed(1)}). Severity downgraded.`,
+        };
+    }
+    if (S <= 1.0 && D >= 5.0) {
+        return {
+            D,
+            isDualConfirmed: false,
+            suppressionApplied: false,
+            rationale:
+                `Hidden runtime bottleneck: Low static penalty (S=${S.toFixed(1)}) ` +
+                `overridden by severe runtime latency/contention hotspot (D=${D.toFixed(1)}).`,
+        };
+    }
+    return {
+        D,
+        isDualConfirmed: false,
+        suppressionApplied: false,
+        rationale: 'Standard dual-plane fusion across static and dynamic indicators.',
+    };
+}
+
+function classifyFusedRiskLevel(fusedScore: number, isDualConfirmed: boolean): FusedRiskLevel {
+    if (fusedScore >= 20.0 || (isDualConfirmed && fusedScore >= 12.0)) {
+        return 'critical';
+    }
+    if (fusedScore >= 10.0) {
+        return 'high';
+    }
+    if (fusedScore >= 4.0) {
+        return 'medium';
+    }
+    if (fusedScore >= 1.5) {
+        return 'low';
+    }
+    return 'informational';
+}
+
 export function fuseIssueRisks(
     staticRisk: StaticIssueRisk,
     dynamicRisk?: DynamicIssueRisk,
@@ -93,66 +172,19 @@ export function fuseIssueRisks(
     const S = Math.max(0.1, staticRisk.normalizedRisk);
     const H = Math.max(0.5, Math.min(3.0, historicalFactor));
 
-    let D = 1.0;
-    let isDualConfirmed = false;
-    let suppressionApplied = false;
-    let rationale = '';
+    const { D, isDualConfirmed, suppressionApplied, rationale } =
+        arbitrateCorroboration(staticRisk, dynamicRisk);
 
-    if (dynamicRisk && dynamicRisk.evidenceConfidence > 0) {
-        D = Math.max(0.05, dynamicRisk.normalizedRisk);
-
-        // Corroboration arbitration:
-        if (staticRisk.normalizedRisk >= 3.0 && dynamicRisk.normalizedRisk >= 3.0) {
-            // Case 1: Dual confirmation -> Exponential resonance amplification
-            isDualConfirmed = true;
-            rationale =
-                `Dual-plane confirmed: High static structural risk (S=${staticRisk.normalizedRisk.toFixed(1)}) ` +
-                `corroborated by runtime hotspot evidence (D=${dynamicRisk.normalizedRisk.toFixed(1)}). Risk amplified.`;
-        } else if (staticRisk.normalizedRisk >= 2.0 && dynamicRisk.normalizedRisk <= 0.5) {
-            // Case 2: Static alarm on cold/uninvoked path -> Dampen to suppress noise
-            suppressionApplied = true;
-            rationale =
-                `Single-sided dampening: High static complexity (S=${staticRisk.normalizedRisk.toFixed(1)}) ` +
-                `refuted by cold runtime invocation evidence (D=${dynamicRisk.normalizedRisk.toFixed(1)}). Severity downgraded.`;
-        } else if (staticRisk.normalizedRisk <= 1.0 && dynamicRisk.normalizedRisk >= 5.0) {
-            // Case 3: Hidden runtime bottleneck not visible in AST heuristics
-            rationale =
-                `Hidden runtime bottleneck: Low static penalty (S=${staticRisk.normalizedRisk.toFixed(1)}) ` +
-                `overridden by severe runtime latency/contention hotspot (D=${dynamicRisk.normalizedRisk.toFixed(1)}).`;
-        } else {
-            rationale = `Standard dual-plane fusion across static and dynamic indicators.`;
-        }
-    } else {
-        // Telemetry absent: fallback to static baseline with neutral dynamic factor
-        D = 1.0;
-        rationale = `Dynamic telemetry unavailable; risk inferred from static structural analysis with neutral dynamic baseline.`;
-    }
-
-    // Mathematical formula: S^alpha * D^beta * H^gamma
     let rawFused = Math.pow(S, coeffs.alpha) * Math.pow(D, coeffs.beta) * Math.pow(H, coeffs.gamma);
 
     if (suppressionApplied) {
-        // Apply 65% noise suppression discount
         rawFused *= 0.35;
     } else if (isDualConfirmed) {
-        // Apply 30% resonance boost
         rawFused *= 1.3;
     }
 
     const fusedScore = Math.round(Math.min(100.0, rawFused) * 10) / 10;
-
-    let level: FusedRiskLevel = 'informational';
-    if (fusedScore >= 20.0 || (isDualConfirmed && fusedScore >= 12.0)) {
-        level = 'critical';
-    } else if (fusedScore >= 10.0) {
-        level = 'high';
-    } else if (fusedScore >= 4.0) {
-        level = 'medium';
-    } else if (fusedScore >= 1.5) {
-        level = 'low';
-    } else {
-        level = 'informational';
-    }
+    const level = classifyFusedRiskLevel(fusedScore, isDualConfirmed);
 
     return {
         issueId: staticRisk.issueId,
@@ -192,24 +224,10 @@ export interface CascadedRiskResult extends FusedIssueRisk {
     contributingCallers: string[];
 }
 
-/**
- * Evaluates non-linear topological risk resonance cascading along caller-callee execution edges:
- * Risk_cascaded(v) = S_i(v)^alpha * (D_i(v) + sum(omega(u, v) * D_i(u)))^beta * H_i(v)^gamma
- *
- * @param staticRisk - Quantified static risk assessment for the target callee (S_i(v)).
- * @param selfDynamicRisk - Direct dynamic hotspot risk of the callee (D_i(v)).
- * @param callers - Array of upstream callers feeding execution pressure into this callee.
- * @param historicalFactor - Historical failure multiplier H_i.
- * @param customCoeffs - Optional override for alpha, beta, gamma exponents.
- * @returns Fully articulated CascadedRiskResult.
- */
-export function fuseCascadedRisks(
-    staticRisk: StaticIssueRisk,
-    selfDynamicRisk: DynamicIssueRisk | undefined,
-    callers: TopologicalCallerNode[] = [],
-    historicalFactor = 1.0,
-    customCoeffs: Partial<RiskFusionCoefficients> = {},
-): CascadedRiskResult {
+function aggregateTopologicalCallers(callers: TopologicalCallerNode[]): {
+    cascadedDynamicSum: number;
+    contributingCallers: string[];
+} {
     let cascadedDynamicSum = 0;
     const contributingCallers: string[] = [];
 
@@ -221,11 +239,16 @@ export function fuseCascadedRisks(
             contributingCallers.push(caller.callerSymbol);
         }
     }
+    return { cascadedDynamicSum, contributingCallers };
+}
 
-    const selfRiskVal = selfDynamicRisk ? selfDynamicRisk.normalizedRisk : 0.0;
-    const effectiveDynamic = Math.min(10.0, selfRiskVal + cascadedDynamicSum);
-
-    const effectiveDynamicRiskObj: DynamicIssueRisk = {
+function buildEffectiveDynamicHotspot(
+    staticRisk: StaticIssueRisk,
+    selfDynamicRisk: DynamicIssueRisk | undefined,
+    effectiveDynamic: number,
+    callersCount: number,
+): DynamicIssueRisk {
+    return {
         hotspotId: selfDynamicRisk?.hotspotId ?? `cascaded-${staticRisk.issueId}`,
         targetSymbol: selfDynamicRisk?.targetSymbol,
         filePath: selfDynamicRisk?.filePath,
@@ -236,8 +259,40 @@ export function fuseCascadedRisks(
         V: selfDynamicRisk?.V ?? 2.0,
         rawRisk: Math.round(effectiveDynamic * 25.0 * 100) / 100,
         normalizedRisk: Math.round(effectiveDynamic * 10) / 10,
-        evidenceConfidence: selfDynamicRisk?.evidenceConfidence ?? (callers.length > 0 ? 0.9 : 0.6),
+        evidenceConfidence: selfDynamicRisk?.evidenceConfidence ?? (callersCount > 0 ? 0.9 : 0.6),
     };
+}
+
+/**
+ * Evaluates non-linear topological risk resonance cascading along caller-callee execution edges:
+ * Risk_cascaded(v) = S_i(v)^alpha * (D_i(v) + sum(omega(u, v) * D_i(u)))^beta * H_i(v)^gamma
+ *
+ * @param staticRisk - Quantified static risk assessment for the target callee (S_i(v)).
+ * @param selfDynamicRisk - Direct dynamic hotspot risk of the callee (D_i(v)).
+ * @param callers - Array of upstream callers feeding execution pressure into this callee.
+ * @param historicalFactor - Historical failure multiplier H_i.
+ * @param customCoeffs - Optional override for alpha, beta, gamma exponents.
+ * @returns Fully articulated CascadedRiskResult.
+ */
+
+export function fuseCascadedRisks(
+    staticRisk: StaticIssueRisk,
+    selfDynamicRisk: DynamicIssueRisk | undefined,
+    callers: TopologicalCallerNode[] = [],
+    historicalFactor = 1.0,
+    customCoeffs: Partial<RiskFusionCoefficients> = {},
+): CascadedRiskResult {
+    const { cascadedDynamicSum, contributingCallers } = aggregateTopologicalCallers(callers);
+
+    const selfRiskVal = selfDynamicRisk ? selfDynamicRisk.normalizedRisk : 0.0;
+    const effectiveDynamic = Math.min(10.0, selfRiskVal + cascadedDynamicSum);
+
+    const effectiveDynamicRiskObj = buildEffectiveDynamicHotspot(
+        staticRisk,
+        selfDynamicRisk,
+        effectiveDynamic,
+        callers.length,
+    );
 
     const baseFused = fuseIssueRisks(
         staticRisk,
