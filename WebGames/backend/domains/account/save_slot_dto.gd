@@ -25,7 +25,7 @@ var is_fallen: bool = GameConfig.get_bool("domains.account", "save_slot/defaults
 var last_saved_time_utc: int = GameConfig.get_int("domains.account", "save_slot/defaults/last_saved_time_utc", 0)
 var save_file_sha256: String = GameConfig.get_string("domains.account", "save_slot/defaults/save_file_sha256", "")
 
-# 角色本体档案（Phase 08 隔离域：与账号/世界数据严格分离，死亡按白名单精确清理）
+# 角色本体档案（角色生命周期隔离域：与账号/世界数据严格分离，死亡按白名单精确清理）
 var character_profile: CharacterProfile = null
 
 ## 角色本体数据归属判定（白名单，禁删全档）

@@ -79,6 +79,36 @@
         "checkDuplicateBlocks": false
       }
     },
+    "gdscript-modern": {
+      "enabled": true,
+      "severity": "warning",
+      "options": {
+        "godotTargetVersion": "4.x"
+      }
+    },
+    "dependency-graph": {
+      "enabled": true,
+      "options": {
+        "importCycle": true,
+        "unusedExport": true,
+        "unusedModule": true
+      }
+    },
+    "dependency-layout": {
+      "enabled": true,
+      "severity": "warning"
+    },
+    "simplify": {
+      "enabled": true,
+      "severity": "info"
+    },
+    "naming": {
+      "enabled": true,
+      "severity": "warning",
+      "options": {
+        "checkJargon": true
+      }
+    },
     "comments": {
       "enabled": false
     }

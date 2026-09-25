@@ -58,8 +58,8 @@ func _build_graph_indices() -> void:
 			_outgoing_edges_index[from_id] = []
 		_outgoing_edges_index[from_id].append(edge)
 
-## 推进指定活跃节点的动作
-func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Dictionary:
+## 校验指定活跃节点是否可执行
+func _verify_node_executable(node_id: String) -> Dictionary:
 	if is_terminated:
 		return { "success": false, "error_code": "GRAPH_ALREADY_TERMINATED" }
 
@@ -70,8 +70,6 @@ func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Di
 		return { "success": false, "error_code": "NODE_NOT_FOUND" }
 
 	var current_node: NarrativeDAGNode = graph.nodes[node_id]
-
-	# 1. 汇聚校验：检查前置依赖是否已全部完成（O(1) 哈希校验）
 	for pre in current_node.required_prerequisites:
 		if not _completed_set.has(pre):
 			return {
@@ -80,14 +78,15 @@ func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Di
 				"missing_pre": pre,
 				"message": "汇聚前置节点 %s 尚未完成" % pre
 			}
+	return { "success": true }
 
-	# 2. 标记完成并移出活跃列表
+## 提交节点动作完成态、合并载荷并广播完成事件
+func _commit_node_completion(node_id: String, current_node: NarrativeDAGNode, action_payload: Dictionary) -> void:
 	active_node_ids.erase(node_id)
 	if not completed_node_ids.has(node_id):
 		completed_node_ids.append(node_id)
 		_completed_set[node_id] = true
 
-	# 合并动作结果至运行时上下文
 	for k in action_payload.keys():
 		runtime_context[k] = action_payload[k]
 
@@ -97,7 +96,8 @@ func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Di
 		"mutations": current_node.mutations_on_complete
 	})
 
-	# 3. 终态退出判定
+## 终态出口判定与广播
+func _try_handle_terminal(node_id: String, current_node: NarrativeDAGNode) -> Dictionary:
 	if node_id == graph.terminal_node_id or current_node.node_type == NarrativeDAGNode.NodeType.TERMINAL_EXIT:
 		is_terminated = true
 		active_node_ids.clear()
@@ -111,8 +111,10 @@ func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Di
 			"completed_node": node_id,
 			"mutations": current_node.mutations_on_complete
 		}
+	return {}
 
-	# 4. 派生激活下游分支或并行节点
+## 派生激活下游分支或并行节点
+func _derive_downstream_activations(node_id: String, current_node: NarrativeDAGNode) -> Array[String]:
 	var newly_activated: Array[String] = []
 	var outgoing_edges := _get_outgoing_edges(node_id)
 	var matched_edges: Array[NarrativeDAGEdge] = []
@@ -139,7 +141,22 @@ func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Di
 					"dag_id": graph.graph_id,
 					"node_id": next_id
 				})
+	return newly_activated
 
+## 推进指定活跃节点的动作
+func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Dictionary:
+	var verify_res := _verify_node_executable(node_id)
+	if not verify_res.get("success", false):
+		return verify_res
+
+	var current_node: NarrativeDAGNode = graph.nodes[node_id]
+	_commit_node_completion(node_id, current_node, action_payload)
+
+	var term_res := _try_handle_terminal(node_id, current_node)
+	if not term_res.is_empty():
+		return term_res
+
+	var newly_activated := _derive_downstream_activations(node_id, current_node)
 	if newly_activated.is_empty() and active_node_ids.is_empty() and not is_terminated:
 		return {
 			"success": false,

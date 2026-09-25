@@ -64,11 +64,11 @@ func to_dto() -> Dictionary:
 
 	var clean_field_mapping: Array[Dictionary] = []
 	for fm in field_mapping:
-		clean_field_mapping.append(fm.duplicate(true))
+		clean_field_mapping.append(fm.duplicate(false))
 
 	var clean_params_schema: Array[Dictionary] = []
 	for ps in params_schema:
-		clean_params_schema.append(ps.duplicate(true))
+		clean_params_schema.append(ps.duplicate(false))
 
 	return {
 		"contract_id": contract_id,

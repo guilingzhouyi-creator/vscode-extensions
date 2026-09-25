@@ -87,6 +87,8 @@ func get_next_available_slot_id() -> String:
 
 ## 槽位是否已占用（save_slot_summaries 命中判定）
 func is_slot_occupied(slot_id: String) -> bool:
+	if slot_id.is_empty():
+		return false
 	return save_slot_summaries.has(slot_id)
 
 ## 序列化账户聚合为字典（含槽位摘要序列化与权限密封 entitlements_seal）

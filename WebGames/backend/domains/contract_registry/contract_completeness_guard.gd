@@ -223,15 +223,15 @@ static func audit_full_registry() -> Dictionary:
 				"note": e.breaking_change_note
 			})
 
-	# I1：forward_orphan（后端域无任何视图映射）由数据推导
+	# I1：forward_orphan（后端域无任何视图映射）由数据推导（预置哈希集合，降阶至 O(D + E)）
+	var domains_with_view: Dictionary = {}
+	for e in all_entries:
+		if not e.view_name.is_empty():
+			domains_with_view[e.domain_name] = true
+
 	var forward_orphans: Array[Dictionary] = []
 	for d in domains_seen:
-		var has_view := false
-		for e in all_entries:
-			if e.domain_name == d and not e.view_name.is_empty():
-				has_view = true
-				break
-		if not has_view:
+		if not domains_with_view.has(d):
 			forward_orphans.append({
 				"domain_name": d,
 				"reason": "backend domain has no view mapping"

@@ -68,7 +68,7 @@ static func _seal_key_id() -> String:
 ## HMAC 密钥读取：仅接受环境密钥（受控密钥提供器）——缺失返回空（失败关闭），
 ## 严禁回退到公开配置值（seal_key_id 为非秘密元数据，不得充当 HMAC 密钥）
 static func _seal_key() -> PackedByteArray:
-	# P39 清单 6：仅接受环境密钥（受控密钥提供器）——缺失返回空（失败关闭），
+	# 密钥安全策略：仅接受环境密钥（受控密钥提供器）——缺失返回空（失败关闭），
 	# 严禁回退到公开配置值（seal_key_id 为非秘密元数据，不得充当 HMAC 密钥）
 	var env_name := GameConfig.get_string("infrastructure.admin", "security/seal_key_env", "")
 	var key := OS.get_environment(env_name) if not env_name.is_empty() else ""

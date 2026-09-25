@@ -122,6 +122,13 @@ static func route_domain_event(event: Dictionary) -> Dictionary:
 	var matched_ids: Array[String] = []
 	var signals_to_emit: Array[Dictionary] = []
 
+## 校验事件载荷是否满足前置过滤器条件
+static func _matches_event_filter(filter: Dictionary, payload: Dictionary) -> bool:
+	for k in filter.keys():
+		if payload.get(k) != filter[k]:
+			return false
+	return true
+
 	# 事件路由覆盖任何携带 event_name 的契约条目（配置模型：DTO 条目同样承载事件订阅元数据；
 	# 原 find_by_endpoint(EVENT) 在当前无 EVENT 类条目的配置下路由恒为空——B1 验证修复死代码）
 	var all_events: Array = IndexClass.find_all()
@@ -130,13 +137,7 @@ static func route_domain_event(event: Dictionary) -> Dictionary:
 			continue
 		# 匹配事件名或通道
 		if channel == e.event_name or channel.ends_with("." + e.event_name) or e.event_name == "*":
-			# 前置过滤器检查
-			var filter_ok := true
-			for k in e.event_filter.keys():
-				if payload.get(k) != e.event_filter[k]:
-					filter_ok = false
-					break
-			if filter_ok:
+			if _matches_event_filter(e.event_filter, payload):
 				matched_ids.append(e.contract_id)
 				signals_to_emit.append({
 					"view_name": e.view_name,
