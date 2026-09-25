@@ -96,6 +96,39 @@ export interface NativeClonePair {
 }
 
 /**
+ * Dominator tree analysis result for a control-flow / dataflow graph.
+ */
+export interface NativeDominatorTreeResult {
+    readonly entry: string;
+    readonly reachableNodes: string[];
+    readonly idom: Record<string, string>;
+    readonly dominanceFrontiers: Record<string, string[]>;
+    readonly loopHeaders: string[];
+    readonly backEdges: Array<[string, string]>;
+}
+
+/**
+ * Dataflow fixed-point solver parameters.
+ */
+export interface NativeDataflowParams {
+    readonly entry: string;
+    readonly nodes?: string[];
+    readonly edges: Array<[string, string]>;
+    readonly forward?: boolean;
+    readonly gen?: Record<string, string[]>;
+    readonly kill?: Record<string, string[]>;
+}
+
+/**
+ * Dataflow fixed-point solver result.
+ */
+export interface NativeDataflowResult {
+    readonly inSets: Record<string, string[]>;
+    readonly outSets: Record<string, string[]>;
+    readonly iterations: number;
+}
+
+/**
  * Unified interface implemented by both native Rust core and pure JS shim.
  */
 export interface INativeCore {
@@ -138,6 +171,20 @@ export interface INativeCore {
      * Discovers similar file pairs using Locality Sensitive Hashing (LSH).
      */
     findClonePairs(signatures: number[][], threshold: number): NativeClonePair[];
+
+    /**
+     * Computes the immediate dominator tree and dominance frontiers for a graph.
+     */
+    computeDominatorTree(
+        entry: string,
+        nodes: string[],
+        edges: Array<[string, string]>,
+    ): NativeDominatorTreeResult;
+
+    /**
+     * Solves forward or backward dataflow equations to a fixed point.
+     */
+    solveDataflow(params: NativeDataflowParams): NativeDataflowResult;
 
     /**
      * Inspects active engine status and capabilities.

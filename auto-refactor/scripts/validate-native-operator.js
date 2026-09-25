@@ -167,6 +167,8 @@ function runValidation() {
   assert.ok(status.capabilities.includes('simd-source-mask'), 'Capability simd-source-mask missing');
   assert.ok(status.capabilities.includes('histogram-diff'), 'Capability histogram-diff missing');
   assert.ok(status.capabilities.includes('tarjan-scc'), 'Capability tarjan-scc missing');
+  assert.ok(status.capabilities.includes('dominator-tree'), 'Capability dominator-tree missing');
+  assert.ok(status.capabilities.includes('dataflow-solver'), 'Capability dataflow-solver missing');
 
   // 2. Multilingual Matrix Dual-Track Equivalence
   console.log(`[Matrix] Validating ${TEST_CORPUS.length} multilingual test cases...`);
@@ -338,6 +340,74 @@ function runValidation() {
     assert.strictEqual(pairsRust[i].similarity, pairsShim[i].similarity);
   }
   console.log('  ✓ MinHash signature generation & LSH clone pair detection 100% equivalent.');
+
+  // 6. Parity of Dominator Tree and Dataflow Fixed-Point Solver
+  console.log('[Dominator & Dataflow] Verifying dominator tree and dataflow solver parity...');
+
+  // Diamond CFG
+  const diamondEdges = [
+    ['Entry', 'A'],
+    ['Entry', 'B'],
+    ['A', 'Merge'],
+    ['B', 'Merge'],
+  ];
+  const domDiamondRust = nativeCore.computeDominatorTree('Entry', [], diamondEdges);
+  const domDiamondShim = shim.computeDominatorTree('Entry', [], diamondEdges);
+  assert.deepStrictEqual(domDiamondRust.idom, domDiamondShim.idom, 'Diamond idom parity');
+  assert.deepStrictEqual(
+    domDiamondRust.dominanceFrontiers,
+    domDiamondShim.dominanceFrontiers,
+    'Diamond DF parity',
+  );
+  assert.deepStrictEqual(domDiamondRust.loopHeaders, domDiamondShim.loopHeaders);
+  assert.deepStrictEqual(domDiamondRust.backEdges, domDiamondShim.backEdges);
+
+  // Loop CFG with back-edges
+  const loopEdges = [
+    ['Header', 'Body'],
+    ['Body', 'Latch'],
+    ['Latch', 'Header'],
+    ['Latch', 'Exit'],
+  ];
+  const domLoopRust = nativeCore.computeDominatorTree('Header', [], loopEdges);
+  const domLoopShim = shim.computeDominatorTree('Header', [], loopEdges);
+  assert.deepStrictEqual(domLoopRust.idom, domLoopShim.idom, 'Loop idom parity');
+  assert.deepStrictEqual(domLoopRust.dominanceFrontiers, domLoopShim.dominanceFrontiers, 'Loop DF parity');
+  assert.deepStrictEqual(domLoopRust.loopHeaders, domLoopShim.loopHeaders, 'Loop headers parity');
+  assert.deepStrictEqual(domLoopRust.backEdges, domLoopShim.backEdges, 'Back edges parity');
+  assert.strictEqual(domLoopRust.loopHeaders.includes('Header'), true);
+
+  // Dataflow fixed point solver parity
+  const flowEdges = [
+    ['N0', 'N1'],
+    ['N1', 'N2'],
+    ['N2', 'N3'],
+  ];
+  const genMap = {
+    N0: ['def_a'],
+    N1: ['def_b'],
+    N2: ['def_c'],
+  };
+  const killMap = {
+    N2: ['def_a'],
+  };
+  const flowRust = nativeCore.solveDataflow({
+    entry: 'N0',
+    edges: flowEdges,
+    forward: true,
+    gen: genMap,
+    kill: killMap,
+  });
+  const flowShim = shim.solveDataflow({
+    entry: 'N0',
+    edges: flowEdges,
+    forward: true,
+    gen: genMap,
+    kill: killMap,
+  });
+  assert.deepStrictEqual(flowRust.inSets, flowShim.inSets, 'Dataflow In-sets parity');
+  assert.deepStrictEqual(flowRust.outSets, flowShim.outSets, 'Dataflow Out-sets parity');
+  console.log('  ✓ Dominator tree and Dataflow solver 100% equivalent.');
 
   console.log('=== [Native Operator Validation] SUCCESS: All assertions passed. ===');
 }

@@ -9,3 +9,5 @@
 
 export * from './native-types';
 export * from './native-bridge';
+export * from './native-clone-shim';
+export * from './native-flow-shim';

@@ -31,6 +31,8 @@ import type { Issue } from '../types';
 import { NEED_RUNTIME_EVIDENCE } from '../types';
 import { PerformanceMessages } from '../messages/performance';
 import { maskedLinesOfPath } from '../source-mask';
+import type { NativeDominatorTreeResult, NativeDataflowResult } from '../native/native-types';
+import { nativeCore } from '../native/native-bridge';
 
 // The incremental metrics live in their own module (this file crossed the repository's own
 // large-file fail threshold); re-exported here so the public surface stays one import site.
@@ -241,6 +243,45 @@ export class DataFlowGraph {
             stageDistribution: stageDist,
             lifetimeDistribution: lifeDist,
         };
+    }
+
+    /**
+     * Computes the immediate dominator tree and dominance frontiers for the flow graph.
+     *
+     * @param entryNodeId - Identifier of the root/entry node.
+     * @returns Dominator tree structure with immediate dominators and loops.
+     */
+    public computeDominators(entryNodeId: string): NativeDominatorTreeResult {
+        const nodeIds = Array.from(this.nodes.keys());
+        const edgeTuples: Array<[string, string]> = this.edges.map((e) => [e.from, e.to]);
+        return nativeCore.computeDominatorTree(entryNodeId, nodeIds, edgeTuples);
+    }
+
+    /**
+     * Solves dataflow equations across this graph to a fixed point.
+     *
+     * @param entryNodeId - Identifier of the root/entry node.
+     * @param gen - Generator mapping per node ID.
+     * @param kill - Kill set mapping per node ID.
+     * @param forward - True for forward analysis, false for backward analysis.
+     * @returns Converged In and Out sets per node ID.
+     */
+    public solveDataflow(
+        entryNodeId: string,
+        gen?: Record<string, string[]>,
+        kill?: Record<string, string[]>,
+        forward = true,
+    ): NativeDataflowResult {
+        const nodeIds = Array.from(this.nodes.keys());
+        const edgeTuples: Array<[string, string]> = this.edges.map((e) => [e.from, e.to]);
+        return nativeCore.solveDataflow({
+            entry: entryNodeId,
+            nodes: nodeIds,
+            edges: edgeTuples,
+            forward,
+            gen,
+            kill,
+        });
     }
 }
 

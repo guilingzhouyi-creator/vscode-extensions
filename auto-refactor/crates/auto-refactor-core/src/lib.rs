@@ -1,4 +1,5 @@
 use napi_derive::napi;
+use std::collections::HashMap;
 
 #[napi]
 pub const VERSION: &str = "0.4.0-rust-native";
@@ -194,4 +195,69 @@ pub fn find_clone_pairs(signatures: Vec<Vec<u32>>, threshold: f64) -> Vec<Native
         .map(Into::into)
         .collect()
 }
+
+#[napi(object)]
+pub struct NativeDominatorTreeResult {
+    pub entry: String,
+    pub reachable_nodes: Vec<String>,
+    pub idom: HashMap<String, String>,
+    pub dominance_frontiers: HashMap<String, Vec<String>>,
+    pub loop_headers: Vec<String>,
+    pub back_edges: Vec<Vec<String>>,
+}
+
+impl From<ops_graph::DominatorTreeResult> for NativeDominatorTreeResult {
+    fn from(r: ops_graph::DominatorTreeResult) -> Self {
+        Self {
+            entry: r.entry,
+            reachable_nodes: r.reachable_nodes,
+            idom: r.idom,
+            dominance_frontiers: r.dominance_frontiers,
+            loop_headers: r.loop_headers,
+            back_edges: r.back_edges.into_iter().map(|(u, v)| vec![u, v]).collect(),
+        }
+    }
+}
+
+#[napi(object)]
+pub struct NativeDataflowResult {
+    pub in_sets: HashMap<String, Vec<String>>,
+    pub out_sets: HashMap<String, Vec<String>>,
+    pub iterations: u32,
+}
+
+impl From<ops_graph::DataflowResult> for NativeDataflowResult {
+    fn from(r: ops_graph::DataflowResult) -> Self {
+        Self {
+            in_sets: r.in_sets,
+            out_sets: r.out_sets,
+            iterations: r.iterations as u32,
+        }
+    }
+}
+
+#[napi(js_name = "computeDominatorTree")]
+pub fn compute_dominator_tree(
+    entry: String,
+    nodes: Vec<String>,
+    edges: Vec<Vec<String>>,
+) -> NativeDominatorTreeResult {
+    ops_graph::compute_dominator_tree(&entry, &nodes, &edges).into()
+}
+
+#[napi(js_name = "solveDataflow")]
+pub fn solve_dataflow(
+    entry: String,
+    nodes: Vec<String>,
+    edges: Vec<Vec<String>>,
+    forward: Option<bool>,
+    gen_map: Option<HashMap<String, Vec<String>>>,
+    kill_map: Option<HashMap<String, Vec<String>>>,
+) -> NativeDataflowResult {
+    let fwd = forward.unwrap_or(true);
+    let gen = gen_map.unwrap_or_default();
+    let kill = kill_map.unwrap_or_default();
+    ops_graph::solve_dataflow(&entry, &nodes, &edges, fwd, &gen, &kill).into()
+}
+
 
