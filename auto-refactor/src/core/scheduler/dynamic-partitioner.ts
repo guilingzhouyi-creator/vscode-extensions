@@ -1,25 +1,21 @@
 /**
  * Module: Core Engine - Dynamic Semantic Partitioner & Workload Balancer
  * File Path: src/core/scheduler/dynamic-partitioner.ts
- * Architecture Role: Semantic clustering partitioner grouping files into cohesive review partitions;
+ * Architecture Role: Semantic clustering partitioner grouping files into cohesive partitions;
  *   replaces naive chunk slicing with module-affinity clustering and workload-balanced packing.
- * Dependencies & Triggers: Consumes scheduler-types, code-density-analyzer, and file-role-inference;
+ * Dependencies & Triggers: Consumes scheduler-types, code-density and file-role modules;
  *   consumed by sparse-orchestrator.
  * Responsibilities: Cluster files by directory affinity; estimate computing workloads from ECL;
- *   balance partitions to minimize cross-partition AST latency; assign reviewer responsibility domains.
+ *   balance partitions to minimize cross-partition AST latency; assign reviewer domains.
  * Exit Semantics & Design Rationale: Never throws; deterministic clustering completing in <5ms
  *   even for 1,000+ files.
  */
 
 import { analyzeCodeDensity } from '../intelligence/code-density-analyzer';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
-import type {
-    ReviewDomainBinding,
-    ReviewPartition,
-    ReviewerDomain,
-} from './scheduler-types';
+import type { ReviewDomainBinding, ReviewPartition, ReviewerDomain } from './scheduler-types';
 
-/** 内置标准审查责任域绑定表 */
+/** Default domain bindings mapping architectural categories to analyzers */
 export const DEFAULT_DOMAIN_BINDINGS: ReviewDomainBinding[] = [
     {
         domain: 'DOCUMENTATION',
@@ -29,7 +25,8 @@ export const DEFAULT_DOMAIN_BINDINGS: ReviewDomainBinding[] = [
     {
         domain: 'LOGIC_AND_COMPLEXITY',
         analyzers: ['complexity', 'performance'],
-        scopeDescription: 'Branching logic, cyclomatic complexity, loops, and transient allocations',
+        scopeDescription:
+            'Branching logic, cyclomatic complexity, loops, and transient allocations',
     },
     {
         domain: 'NAMING_AND_LAYOUT',
@@ -48,18 +45,21 @@ export const DEFAULT_DOMAIN_BINDINGS: ReviewDomainBinding[] = [
     },
 ];
 
-/** 默认最大单分区文件数 */
+/** Default maximum files clustered in a single partition */
 const DEFAULT_MAX_PARTITION_FILES = 20;
 
 /**
- * 提取文件的模块聚合标识符
+ * Extracts a normalized module cluster identifier from a file path.
+ * Strips top-level source folders ('src' or 'lib') for domain affinity.
  *
- * @param filePath - 文件相对路径
- * @returns 模块标识 (例如 "core/praxis")
+ * @param filePath - Relative file path
+ * @returns Semantic module identifier (e.g. "core/cache")
  */
 function extractModuleGroupKey(filePath: string): string {
     const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
-    const parts = normalized.split('/');
+    const segments = normalized.split('/').filter(Boolean);
+    const startIdx = segments[0] === 'src' || segments[0] === 'lib' ? 1 : 0;
+    const parts = segments.slice(startIdx);
     if (parts.length <= 1) {
         return 'root';
     }
@@ -70,7 +70,7 @@ function extractModuleGroupKey(filePath: string): string {
 }
 
 /**
- * 动态审查分区划分器
+ * Dynamic reviewer partitioner clustering files by semantic affinity.
  */
 export class DynamicPartitioner {
     private readonly maxFilesPerPartition: number;
@@ -80,12 +80,12 @@ export class DynamicPartitioner {
     }
 
     /**
-     * 将文件集合智能划分为高内聚、负载均衡的动态审查分区
+     * Clusters files into balanced semantic review partitions.
      *
-     * @param files - 待审查的文件路径列表
-     * @param fileContents - 可选的文件内容映射（用于精准计算工作量）
-     * @param targetDomains - 激活的责任域列表
-     * @returns 动态分区列表
+     * @param files - Target file paths
+     * @param fileContents - Optional content mapping for workload estimation
+     * @param targetDomains - Active reviewer domains
+     * @returns Array of balanced review partitions
      */
     public createPartitions(
         files: string[],
@@ -98,7 +98,7 @@ export class DynamicPartitioner {
 
         const activeDomains = targetDomains ?? DEFAULT_DOMAIN_BINDINGS.map((b) => b.domain);
 
-        // 1. 按模块亲和度聚类
+        // 1. Group files by module affinity
         const clusters = new Map<string, string[]>();
         for (const file of files) {
             const key = extractModuleGroupKey(file);
@@ -107,7 +107,7 @@ export class DynamicPartitioner {
             clusters.set(key, group);
         }
 
-        // 2. 针对各聚类，结合工作量切片打包为平衡分区
+        // 2. Pack files into balanced partitions based on workload
         const partitions: ReviewPartition[] = [];
         let partitionSeq = 1;
 
@@ -120,9 +120,11 @@ export class DynamicPartitioner {
                 const density = analyzeCodeDensity(content, file);
                 const roleInference = inferFineGrainedFileRole(file, content.slice(0, 300));
 
-                // 预估工作负荷：有效代码行 * 角色系数
                 const roleFactor = roleInference.role === 'algorithm_computation' ? 1.5 : 1.0;
-                const fileWorkload = Math.max(1, Math.round(density.effectiveCodeLines * roleFactor));
+                const fileWorkload = Math.max(
+                    1,
+                    Math.round(density.effectiveCodeLines * roleFactor),
+                );
 
                 currentFiles.push(file);
                 currentWorkload += fileWorkload;
@@ -148,7 +150,7 @@ export class DynamicPartitioner {
                     id: `part-${moduleKey.replace(/[^a-zA-Z0-9_-]/g, '-')}-${partitionSeq++}`,
                     primaryFiles: currentFiles,
                     contextFiles: [],
-                    estimatedWorkload: Math.max(1, currentWorkload),
+                    estimatedWorkload: currentWorkload,
                     activeDomains,
                     dominantRole,
                 });
@@ -159,5 +161,5 @@ export class DynamicPartitioner {
     }
 }
 
-/** 默认全局动态分区划分器实例 */
+/** Default singleton DynamicPartitioner instance */
 export const defaultDynamicPartitioner = new DynamicPartitioner();

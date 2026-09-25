@@ -17,12 +17,8 @@
 const assert = require('assert');
 const {
   defaultDynamicPartitioner,
-  DynamicPartitioner,
-  defaultReviewContextCache,
   ReviewContextCache,
-  defaultReviewEventBus,
   ReviewEventBus,
-  defaultSparseOrchestrator,
   SparseOrchestrator,
 } = require('../dist/api');
 
@@ -62,7 +58,9 @@ async function testDynamicPartitioner() {
   assert.strictEqual(astPart.primaryFiles.length, 3);
   assert.strictEqual(astPart.dominantRole, 'algorithm_computation');
 
-  console.log(`  ✔ Successfully clustered ${mockFiles.length} files into ${partitions.length} semantic partitions`);
+  console.log(
+    `  ✔ Successfully clustered ${mockFiles.length} files into ${partitions.length} semantic partitions`,
+  );
 }
 
 async function testReviewContextCache() {
@@ -153,7 +151,11 @@ async function testReviewEventBus() {
     reason: 'Another event',
   });
 
-  assert.strictEqual(capturedEvents.length, 1, 'Unsubscribed listener should not receive second event');
+  assert.strictEqual(
+    capturedEvents.length,
+    1,
+    'Unsubscribed listener should not receive second event',
+  );
   console.log('  ✔ ReviewEventBus coordinates cross-reviewer domain event dispatching smoothly');
 }
 
@@ -175,7 +177,10 @@ async function testSparseOrchestratorEndToEnd() {
     '/** Module: Pure Utility */\nexport function setVal() { global.flag = true; }',
   );
   fileContents.set('src/core/store.ts', 'export function query() { return 42; }');
-  fileContents.set('src/utils/string-helper.ts', 'export function trim(s: string) { return s.trim(); }');
+  fileContents.set(
+    'src/utils/string-helper.ts',
+    'export function trim(s: string) { return s.trim(); }',
+  );
   fileContents.set('src/config/limits.ts', 'export const MAX_RETRY = 5;');
 
   const result = await orchestrator.orchestrate(files, fileContents, {

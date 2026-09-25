@@ -11,10 +11,15 @@
 
 import type { ReviewContextEntry } from './scheduler-types';
 
-/** 最大缓存条目数 */
+/** Maximum retained in-memory cache entries */
 const MAX_CACHE_ENTRIES = 2000;
 
-/** 简易快速哈希计算函数 */
+/**
+ * Computes a fast deterministic content hash string.
+ *
+ * @param content - Source file content
+ * @returns Formatted hash string
+ */
 export function computeSimpleContentHash(content: string): string {
     let hash = 0;
     for (let i = 0; i < content.length; i++) {
@@ -24,18 +29,20 @@ export function computeSimpleContentHash(content: string): string {
     return `h${hash}_${content.length}`;
 }
 
-/** 审查上下文缓存管理器 */
+/**
+ * Review context in-memory cache manager.
+ */
 export class ReviewContextCache {
     private readonly entries = new Map<string, ReviewContextEntry>();
     private hitCount = 0;
     private missCount = 0;
 
     /**
-     * 获取缓存条目
+     * Retrieves a cached context entry if fingerprint matches.
      *
-     * @param filePath - 文件路径
-     * @param contentHash - 内容哈希指纹
-     * @returns 匹配的缓存条目或 undefined
+     * @param filePath - Target file path
+     * @param contentHash - Expected content fingerprint hash
+     * @returns Matching ReviewContextEntry or undefined
      */
     public get(filePath: string, contentHash: string): ReviewContextEntry | undefined {
         const entry = this.entries.get(filePath);
@@ -48,9 +55,9 @@ export class ReviewContextCache {
     }
 
     /**
-     * 写入或更新缓存条目
+     * Stores or updates a review context entry.
      *
-     * @param entry - 审查上下文条目
+     * @param entry - Context entry payload
      */
     public set(entry: ReviewContextEntry): void {
         if (this.entries.size >= MAX_CACHE_ENTRIES) {
@@ -63,14 +70,14 @@ export class ReviewContextCache {
     }
 
     /**
-     * 获取已缓存的所有文件条目
+     * Returns all currently retained context entries.
      */
     public getAllEntries(): ReviewContextEntry[] {
         return Array.from(this.entries.values());
     }
 
     /**
-     * 获取缓存统计指标
+     * Retrieves cache telemetry and hit ratio metrics.
      */
     public getMetrics(): { hits: number; misses: number; hitRatio: number; size: number } {
         const total = this.hitCount + this.missCount;
@@ -84,7 +91,7 @@ export class ReviewContextCache {
     }
 
     /**
-     * 清空缓存
+     * Clears all entries and resets telemetry counters.
      */
     public clear(): void {
         this.entries.clear();
@@ -93,5 +100,5 @@ export class ReviewContextCache {
     }
 }
 
-/** 默认全局审查上下文缓存单例 */
+/** Default singleton instance of ReviewContextCache */
 export const defaultReviewContextCache = new ReviewContextCache();

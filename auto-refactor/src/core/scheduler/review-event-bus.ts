@@ -9,26 +9,24 @@
  * Exit Semantics & Design Rationale: Synchronous in-memory event dispatch; never throws.
  */
 
-import type {
-    ReviewCascadeEvent,
-    ReviewCascadeEventKind,
-    ReviewerDomain,
-} from './scheduler-types';
+import type { ReviewCascadeEvent, ReviewCascadeEventKind, ReviewerDomain } from './scheduler-types';
 
-/** 事件监听处理函数类型 */
+/** Callback listener signature for review cascade events */
 export type ReviewCascadeListener = (event: ReviewCascadeEvent) => void;
 
-/** 审查器级联触发事件总线 */
+/**
+ * Event bus coordinating secondary review cascades across responsibility domains.
+ */
 export class ReviewEventBus {
     private readonly listeners = new Map<string, Set<ReviewCascadeListener>>();
     private readonly dispatchedEvents: ReviewCascadeEvent[] = [];
 
     /**
-     * 订阅指定事件类别或目标责任域的级联事件
+     * Subscribes to events targeting a specific domain, event kind, or wildcard '*'.
      *
-     * @param topic - 目标责任域或事件类型
-     * @param listener - 回调处理函数
-     * @returns 解除订阅的注销函数
+     * @param topic - Target domain, event category, or '*' for all events
+     * @param listener - Event listener callback
+     * @returns Unsubscribe closure
      */
     public subscribe(
         topic: ReviewerDomain | ReviewCascadeEventKind | '*',
@@ -46,59 +44,59 @@ export class ReviewEventBus {
     }
 
     /**
-     * 派发级联触发事件
+     * Dispatches a review cascade event to matching domain and kind listeners.
      *
-     * @param event - 级联事件载荷
+     * @param event - Cascade event payload
      */
     public dispatch(event: ReviewCascadeEvent): void {
         this.dispatchedEvents.push(event);
 
-        // 1. 派发给目标领域订阅者
+        // 1. Dispatch to target domain subscribers
         const domainListeners = this.listeners.get(event.targetDomain);
         if (domainListeners) {
             for (const listener of domainListeners) {
                 try {
                     listener(event);
                 } catch {
-                    // 隔离异常，避免阻断流水线
+                    // best-effort: isolate listener errors to preserve review pipeline continuity
                 }
             }
         }
 
-        // 2. 派发给特定事件类别订阅者
+        // 2. Dispatch to event kind subscribers
         const kindListeners = this.listeners.get(event.kind);
         if (kindListeners) {
             for (const listener of kindListeners) {
                 try {
                     listener(event);
                 } catch {
-                    // 隔离异常
+                    // best-effort: isolate listener errors to preserve review pipeline continuity
                 }
             }
         }
 
-        // 3. 通配广播
+        // 3. Broadcast to wildcard subscribers
         const wildcardListeners = this.listeners.get('*');
         if (wildcardListeners) {
             for (const listener of wildcardListeners) {
                 try {
                     listener(event);
                 } catch {
-                    // 隔离异常
+                    // best-effort: isolate listener errors to preserve review pipeline continuity
                 }
             }
         }
     }
 
     /**
-     * 获取历史上已派发的所有级联事件
+     * Retrieves audit log of all events dispatched during the current session.
      */
     public getDispatchedEvents(): readonly ReviewCascadeEvent[] {
         return this.dispatchedEvents;
     }
 
     /**
-     * 重置事件历史与清空监听器
+     * Clears all subscribers and purges event history.
      */
     public reset(): void {
         this.listeners.clear();
@@ -106,5 +104,5 @@ export class ReviewEventBus {
     }
 }
 
-/** 默认全局审查级联事件总线单例 */
+/** Default singleton instance of ReviewEventBus */
 export const defaultReviewEventBus = new ReviewEventBus();
