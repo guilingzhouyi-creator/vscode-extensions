@@ -253,7 +253,12 @@ export function buildScanReport(
     const tallies = tallyIssues(issues);
     const issuesByFile = groupIssuesByFile(issues);
     const fileQualityScores = collectFileQuality(host, fileMetrics, issuesByFile);
-    const projectQualityScore = host.scorer.evaluateFile('PROJECT_OVERALL', issues, null, cfg);
+    const projectQualityScore = host.scorer.evaluateProject(
+        fileQualityScores,
+        fileMetrics,
+        cfg,
+        issues,
+    );
     host.reviewMemory.flush();
     return {
         tool: TOOL_NAME,

@@ -294,4 +294,123 @@ export class QualityScorer {
             evaluatedAt: Date.now(),
         };
     }
+
+    /**
+     * Evaluate the project-level quality score breakdown by aggregating file quality scores
+     * using code line weights (LOC-weighted micro-average), avoiding floor-clamping saturation.
+     *
+     * @param fileQualityScores - Map of file path to individual QualityScoreBreakdown.
+     * @param fileMetrics - Per-file metric records of this scan.
+     * @param config - Optional ScanConfig to identify enabled analyzers.
+     * @param allIssues - Optional full list of scan issues for fallback.
+     * @returns Aggregated project quality score breakdown.
+     */
+    evaluateProject(
+        fileQualityScores: Record<string, QualityScoreBreakdown>,
+        fileMetrics: FileMetric[],
+        config?: ScanConfig,
+        allIssues?: Issue[],
+    ): QualityScoreBreakdown {
+        const fileCount = Object.keys(fileQualityScores).length;
+        if (fileCount === 0 || fileMetrics.length === 0) {
+            return this.evaluateFile('PROJECT_OVERALL', allIssues ?? [], null, config);
+        }
+
+        const rawScores: Record<QualityDimension, number> = {
+            architectureConsistency: 0,
+            semanticPurity: 0,
+            codeSecurity: 0,
+            performanceEfficiency: 0,
+            standardization: 0,
+            modernity: 0,
+            maintainability: 0,
+            commentQuality: 0,
+            duplication: 0,
+            techDebtRisk: 0,
+        };
+
+        let totalWeight = 0;
+        const allRationales: QualityScoreRationale[] = [];
+        const deductionPoints: Record<QualityDimension, number> = {
+            architectureConsistency: 0,
+            semanticPurity: 0,
+            codeSecurity: 0,
+            performanceEfficiency: 0,
+            standardization: 0,
+            modernity: 0,
+            maintainability: 0,
+            commentQuality: 0,
+            duplication: 0,
+            techDebtRisk: 0,
+        };
+
+        for (const m of fileMetrics) {
+            const fScore = fileQualityScores[m.file];
+            if (!fScore) continue;
+
+            const weight = Math.max(1, m.nonBlankLines || m.lines || 1);
+            totalWeight += weight;
+
+            for (const dim of ALL_QUALITY_DIMENSIONS) {
+                const dimScore = fScore.indices[dim] ?? DIMENSION_MAX_SCORE;
+                rawScores[dim] += dimScore * weight;
+            }
+
+            if (fScore.rationales) {
+                allRationales.push(...fScore.rationales);
+            }
+        }
+
+        const divisor = totalWeight || 1;
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            const weightedScore = rawScores[dim] / divisor;
+            rawScores[dim] = Math.round(weightedScore * SCORE_ROUNDING) / SCORE_ROUNDING;
+            deductionPoints[dim] = Math.max(0, DIMENSION_MAX_SCORE - rawScores[dim]);
+        }
+
+        allRationales.sort((a, b) => a.delta - b.delta);
+
+        const { evaluatedBy, notEvaluated, evaluatedDimensions } =
+            calculateEvaluatedDimensions(config);
+        const deductionsByDimension = groupDeductionsByDimension(allRationales, deductionPoints);
+        const { compositeScore, coverage } = computeCompositeScore(
+            rawScores,
+            evaluatedDimensions,
+            this.weights,
+        );
+        const grade = resolveQualityGrade(compositeScore);
+        const confidence = calculateConfidence(
+            { nonBlankLines: totalWeight } as FileMetric,
+            coverage,
+        );
+
+        return {
+            indices: rawScores,
+            compositeScore,
+            grade,
+            confidence,
+            weights: { ...this.weights },
+            formulas: {
+                composite:
+                    'sum(indices[d] * weights[d] for d in evaluated) / sum(weights[d] for d in evaluated)',
+                coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
+                confidence: 'clamp(baseConfidenceFromLines * coverage, floor, 1)',
+                gradeCutoffs: [
+                    { grade: 'A+', min: GRADE_A_PLUS_MIN },
+                    { grade: 'A', min: GRADE_A_MIN },
+                    { grade: 'B', min: GRADE_B_MIN },
+                    { grade: 'C', min: GRADE_C_MIN },
+                    { grade: 'D', min: GRADE_D_MIN },
+                ],
+                dimensionWeights: { ...this.weights },
+                familyDimensions: { ...FAMILY_DIMENSIONS },
+            },
+            notEvaluated,
+            coverage,
+            deductionsByDimension,
+            evaluatedBy,
+            rationales: allRationales.slice(0, 10),
+            evaluatedAt: Date.now(),
+        };
+    }
 }
