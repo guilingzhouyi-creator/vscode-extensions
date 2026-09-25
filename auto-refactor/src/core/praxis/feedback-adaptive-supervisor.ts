@@ -13,7 +13,7 @@
  *   3. Enforce rule confidence dampening for advice that causes regressions or reverts.
  *   4. Apply stability boosts for proven zero-defect architectural invariant implementations.
  * Exit Semantics & Design Rationale: Bounded convex weight evolution guaranteed to sum to 1.0;
- *   learning rate eta constrained to [0.01, 0.05]; safe serialization/deserialization for CI persistence.
+ *   learning rate eta constrained to [0.01, 0.05]; safe serialization/deserialization for CI.
  */
 
 import type { FusionWeights } from '../scoring/fusion-scorer';
@@ -197,7 +197,7 @@ export class FeedbackIncidentLedger {
     }
 
     /**
-     * Records a successful zero-defect release milestone for a module following an architecture pattern.
+     * Records a zero-defect release milestone for a module following an architecture pattern.
      */
     public recordStabilityMilestone(
         patternId: string,
@@ -232,7 +232,8 @@ export class FeedbackIncidentLedger {
             multiplier += 0.1;
         }
 
-        const confidenceMultiplier = Math.max(0.2, Math.min(1.2, Math.round(multiplier * 100) / 100));
+        const confidenceMultiplier =
+            Math.max(0.2, Math.min(1.2, Math.round(multiplier * 100) / 100));
 
         return {
             ruleId,
@@ -400,9 +401,9 @@ export class FeedbackAdaptiveSupervisor {
             gradient = params.customGradient;
         } else {
             // When error < 0 (over-optimistic prediction):
-            // - If runtime failure occurred (dynamic), dynamic plane was underweighted -> gradient pulls Wd up, Ws down.
-            // - If structural/architecture regression occurred (static), static plane was underweighted -> gradient pulls Ws up, Wd down.
-            // - If historical pattern was ignored (feedback), feedback plane was underweighted -> gradient pulls Wf up.
+            // - Runtime failure (dynamic): Wd underweighted -> pull Wd up, Ws down.
+            // - Structural regression (static): Ws underweighted -> pull Ws up, Wd down.
+            // - Historical issue (feedback): Wf underweighted -> pull Wf up.
             switch (plane) {
                 case 'dynamic':
                     gradient = { Ws: 0.005, Wd: -0.008, Wf: 0.003 };
@@ -423,8 +424,8 @@ export class FeedbackAdaptiveSupervisor {
         const prev = { ...this.currentWeights };
 
         // Delta = eta * Error * Gradient
-        // Note: When error < 0 (predicted was too high) and gradient is negative for the underweighted plane,
-        // delta = eta * (-|error|) * (-|grad|) > 0, which correctly increases that plane's weight.
+        // When error < 0 and gradient is negative for the underweighted plane,
+        // delta = eta * (-|error|) * (-|grad|) > 0, correctly increasing weight.
         let rawWs = prev.Ws + this.learningRate * error * gradient.Ws;
         let rawWd = prev.Wd + this.learningRate * error * gradient.Wd;
         let rawWf = prev.Wf + this.learningRate * error * gradient.Wf;
@@ -445,7 +446,8 @@ export class FeedbackAdaptiveSupervisor {
         // Fix any residual roundoff to ensure exact 1.000 sum
         const roundSum = updatedWeights.Ws + updatedWeights.Wd + updatedWeights.Wf;
         if (roundSum !== 1.0) {
-            updatedWeights.Ws = Math.round((1.0 - updatedWeights.Wd - updatedWeights.Wf) * 1000) / 1000;
+            const remainder = 1.0 - updatedWeights.Wd - updatedWeights.Wf;
+            updatedWeights.Ws = Math.round(remainder * 1000) / 1000;
         }
 
         this.currentWeights = updatedWeights;

@@ -129,6 +129,9 @@ export interface StaticIssueRisk {
 
 /**
  * Maps a PrimaryQualityPillar to its corresponding StaticQualityAxis.
+ *
+ * @param pillar - Strategic primary quality pillar.
+ * @returns Corresponding single-character StaticQualityAxis.
  */
 export function pillarToStaticAxis(pillar: PrimaryQualityPillar): StaticQualityAxis {
     switch (pillar) {
@@ -212,10 +215,8 @@ export function computeStaticIssueRisk(
     options: StaticRiskOptions = {},
 ): StaticIssueRisk {
     const P = Math.max(0.1, Math.min(1.0, options.ruleProbability ?? 1.0));
-    const C = Math.max(
-        0.1,
-        Math.min(1.0, options.semanticConfidence ?? resolveDefaultSemanticConfidence(issue.analyzer)),
-    );
+    const defaultConfidence = resolveDefaultSemanticConfidence(issue.analyzer);
+    const C = Math.max(0.1, Math.min(1.0, options.semanticConfidence ?? defaultConfidence));
     const I = resolveImpactFactor(options.impactScope);
 
     const rawRisk = P * C * I;

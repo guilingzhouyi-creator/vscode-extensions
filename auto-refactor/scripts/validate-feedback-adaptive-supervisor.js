@@ -57,9 +57,18 @@ async function main() {
 
   const dampenedStats = ledger.getRuleReliability('RULE-MAP-CONVERT');
   assert.strictEqual(dampenedStats.rollbacks, 2);
-  assert.ok(dampenedStats.confidenceMultiplier <= 0.6, `Multiplier should be heavily dampened: got ${dampenedStats.confidenceMultiplier}`);
-  assert.ok(dampenedStats.confidenceMultiplier >= 0.2, `Multiplier must respect floor: got ${dampenedStats.confidenceMultiplier}`);
-  console.log(`✔ Rule confidence dampening confirmed: RULE-MAP-CONVERT multiplier = ${dampenedStats.confidenceMultiplier}`);
+  assert.ok(
+    dampenedStats.confidenceMultiplier <= 0.6,
+    `Multiplier should be heavily dampened: got ${dampenedStats.confidenceMultiplier}`
+  );
+  assert.ok(
+    dampenedStats.confidenceMultiplier >= 0.2,
+    `Multiplier must respect floor: got ${dampenedStats.confidenceMultiplier}`
+  );
+  console.log(
+    `✔ Rule confidence dampening confirmed: ` +
+    `RULE-MAP-CONVERT multiplier = ${dampenedStats.confidenceMultiplier}`
+  );
 
   // 2. Architectural Stability Milestones
   console.log('2. Testing Architectural Stability Boosts...');
@@ -69,9 +78,15 @@ async function main() {
 
   const patternStats = ledger.getPatternStability('zero_transient_pooling');
   assert.strictEqual(patternStats.milestoneCount, 3);
-  assert.ok(patternStats.stabilityBoostFactor >= 1.15, `Pattern boost should be >= 1.15, got ${patternStats.stabilityBoostFactor}`);
+  assert.ok(
+    patternStats.stabilityBoostFactor >= 1.15,
+    `Pattern boost should be >= 1.15, got ${patternStats.stabilityBoostFactor}`
+  );
   assert.ok(patternStats.stabilityBoostFactor <= 1.25, `Pattern boost must not exceed 1.25`);
-  console.log(`✔ Architectural stability boost confirmed: zero_transient_pooling factor = ${patternStats.stabilityBoostFactor}`);
+  console.log(
+    `✔ Architectural stability boost confirmed: ` +
+    `zero_transient_pooling factor = ${patternStats.stabilityBoostFactor}`
+  );
 
   // 3. Weight Evolution: W_{t+1} = W_t + eta * Error * Gradient
   console.log('3. Testing Adaptive Tri-Plane Weight Evolution (Gradient Descent)...');
@@ -105,9 +120,14 @@ async function main() {
   );
 
   // Total weights must strictly sum to 1.0
-  const weightSum = Math.round((updatedWeights.Ws + updatedWeights.Wd + updatedWeights.Wf) * 1000) / 1000;
+  const weightSum =
+    Math.round((updatedWeights.Ws + updatedWeights.Wd + updatedWeights.Wf) * 1000) / 1000;
   assert.strictEqual(weightSum, 1.0, `Weights must sum to 1.0: got ${weightSum}`);
-  console.log(`✔ Adaptive step 1: [Ws: ${initialWeights.Ws} -> ${updatedWeights.Ws}, Wd: ${initialWeights.Wd} -> ${updatedWeights.Wd}, Wf: ${initialWeights.Wf} -> ${updatedWeights.Wf}]`);
+  console.log(
+    `✔ Adaptive step 1: [Ws: ${initialWeights.Ws} -> ${updatedWeights.Ws}, ` +
+    `Wd: ${initialWeights.Wd} -> ${updatedWeights.Wd}, ` +
+    `Wf: ${initialWeights.Wf} -> ${updatedWeights.Wf}]`
+  );
 
   // Scenario B: Architecture regression missed by dynamic testing
   const step2 = supervisor.evolveFromOutcome({
@@ -121,22 +141,37 @@ async function main() {
   assert.strictEqual(step2.stepIndex, 2);
   assert.ok(
     weightsAfterStatic.Ws > updatedWeights.Ws,
-    `Static weight Ws must re-increase following architectural regression: was ${updatedWeights.Ws}, now ${weightsAfterStatic.Ws}`
+    `Static weight Ws must re-increase: was ${updatedWeights.Ws}, now ${weightsAfterStatic.Ws}`
   );
-  const sum2 = Math.round((weightsAfterStatic.Ws + weightsAfterStatic.Wd + weightsAfterStatic.Wf) * 1000) / 1000;
+  const sum2 =
+    Math.round((weightsAfterStatic.Ws + weightsAfterStatic.Wd + weightsAfterStatic.Wf) * 1000) /
+    1000;
   assert.strictEqual(sum2, 1.0, `Weights must sum to 1.0: got ${sum2}`);
-  console.log(`✔ Adaptive step 2: [Ws: ${updatedWeights.Ws} -> ${weightsAfterStatic.Ws}, Wd: ${updatedWeights.Wd} -> ${weightsAfterStatic.Wd}, Wf: ${updatedWeights.Wf} -> ${weightsAfterStatic.Wf}]`);
+  console.log(
+    `✔ Adaptive step 2: [Ws: ${updatedWeights.Ws} -> ${weightsAfterStatic.Ws}, ` +
+    `Wd: ${updatedWeights.Wd} -> ${weightsAfterStatic.Wd}, ` +
+    `Wf: ${updatedWeights.Wf} -> ${weightsAfterStatic.Wf}]`
+  );
 
   // 4. Rule Confidence Adjustment & Architecture Boost API
   console.log('4. Testing Rule Confidence Adjustment & Architecture Boost APIs...');
   const baseConf = 0.9;
   const adjustedConf = supervisor.adjustRuleConfidence('RULE-MAP-CONVERT', baseConf);
-  assert.ok(adjustedConf < baseConf, `Adjusted confidence should be reduced from base ${baseConf}: got ${adjustedConf}`);
+  assert.ok(
+    adjustedConf < baseConf,
+    `Adjusted confidence should be reduced from base ${baseConf}: got ${adjustedConf}`
+  );
 
   const baseScore = 80.0;
   const boostedScore = supervisor.applyArchitectureBoost('zero_transient_pooling', baseScore);
-  assert.ok(boostedScore > baseScore, `Boosted score should exceed base ${baseScore}: got ${boostedScore}`);
-  console.log(`✔ Supervisor applied adjustments: Conf ${baseConf} -> ${adjustedConf}, Score ${baseScore} -> ${boostedScore}`);
+  assert.ok(
+    boostedScore > baseScore,
+    `Boosted score should exceed base ${baseScore}: got ${boostedScore}`
+  );
+  console.log(
+    `✔ Supervisor applied adjustments: Conf ${baseConf} -> ${adjustedConf}, ` +
+    `Score ${baseScore} -> ${boostedScore}`
+  );
 
   // 5. State Serialization & Restoration
   console.log('5. Testing Ledger State Persistence...');

@@ -11,7 +11,8 @@
  *      and Execution Evidence (E).
  *   2. Define DynamicQualityVector Q_d and its default balancing weights.
  *   3. Define DynamicRiskParams and DynamicIssueRisk for runtime hotspot risk quantification.
- *   4. Define DynamicEvidenceDTO for agnostic telemetry ingestion (benchmarks, coverage, profilers).
+ *   4. Define DynamicEvidenceDTO for agnostic telemetry ingestion (benchmarks,
+ *      coverage, profilers).
  * Exit Semantics & Design Rationale: Pure types and constants; bounded scores [0.0, 100.0] and
  *   normalized risks [0.0, 10.0]; zero side-effects.
  */
@@ -26,7 +27,10 @@ export interface LatencyMetric {
     p95Ms: number;
     /** 99th percentile (tail) latency in milliseconds */
     p99Ms: number;
-    /** Target p99 SLA budget in milliseconds (default: 16.67ms for 60 FPS UI/game, or 100ms for services) */
+    /**
+     * Target p99 SLA budget in milliseconds
+     * (default: 16.67ms for 60 FPS UI/game, or 100ms for services)
+     */
     budgetMs?: number;
 }
 

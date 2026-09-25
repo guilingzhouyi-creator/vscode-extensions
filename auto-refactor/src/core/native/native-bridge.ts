@@ -14,7 +14,7 @@
  *   guarantees 100% algorithmic parity and platform neutrality across all Node environments.
  */
 
-import {
+import type {
     INativeCore,
     NativeCoreStatus,
     NativeDiffHunk,
@@ -26,7 +26,9 @@ import {
     linesOf,
 } from '../diff/edit-diff';
 import { histogramDiff } from '../diff/histogram-diff';
-import { DIFF_OP_EQUAL, DIFF_OP_DELETE, DIFF_OP_INSERT, DiffOp } from '../diff/myers-algorithm';
+import type { DiffOp } from '../diff/myers-algorithm';
+import { DIFF_OP_EQUAL, DIFF_OP_DELETE, DIFF_OP_INSERT } from '../diff/myers-algorithm';
+
 
 /**
  * Pure JavaScript fallback implementation of INativeCore.
@@ -259,7 +261,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
-     * Determines the cluster end index, bridging adjacent change blocks separated by few equal lines.
+     * Determines cluster end index, bridging adjacent change blocks separated by few equal lines.
      */
     private findClusterEnd(
         ops: DiffOp[],
@@ -297,7 +299,11 @@ export class PureJsNativeShim implements INativeCore {
     ): number {
         let count = 0;
         let trailIdx = clusterEnd;
-        while (trailIdx < ops.length && ops[trailIdx].type === DIFF_OP_EQUAL && count < contextLines) {
+        while (
+            trailIdx < ops.length &&
+            ops[trailIdx].type === DIFF_OP_EQUAL &&
+            count < contextLines
+        ) {
             count++;
             trailIdx++;
         }
@@ -404,7 +410,6 @@ export class PureJsNativeShim implements INativeCore {
 function probeNativeBinding(): INativeCore | null {
     try {
         // Probe relative prebuilt N-API binary location
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const binding = require('../../../crates/auto-refactor-core/index.node');
         if (binding && typeof binding.computeHistogramDiff === 'function') {
             return {
@@ -428,7 +433,7 @@ function probeNativeBinding(): INativeCore | null {
             };
         }
     } catch (_err) {
-        // Expected: native binary not present or platform unsupported; graceful fallback to pure JS shim
+        // Expected: native binary missing or unsupported platform; fallback to pure JS shim
         void _err;
     }
     return null;
@@ -442,6 +447,8 @@ export const nativeCore: INativeCore = probeNativeBinding() || new PureJsNativeS
 
 /**
  * Retrieves the status and capabilities of the active acceleration engine.
+ *
+ * @returns Active native core engine status descriptor.
  */
 export function getNativeCoreStatus(): NativeCoreStatus {
     return nativeCore.getStatus();
@@ -449,6 +456,10 @@ export function getNativeCoreStatus(): NativeCoreStatus {
 
 /**
  * Convenience helper to compute histogram diffs.
+ *
+ * @param oldContent - Original text content.
+ * @param newContent - Updated text content.
+ * @returns Array of computed NativeDiffHunk elements.
  */
 export function nativeHistogramDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
     return nativeCore.computeHistogramDiff(oldContent, newContent);
@@ -456,6 +467,9 @@ export function nativeHistogramDiff(oldContent: string, newContent: string): Nat
 
 /**
  * Convenience helper to analyze dependency graph topology and detect cycles.
+ *
+ * @param edges - Array of directed [from, to] dependency edges.
+ * @returns Graph analysis result with cycles, topological order, and SCCs.
  */
 export function nativeAnalyzeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
     return nativeCore.analyzeDependencyGraph(edges);
@@ -463,6 +477,10 @@ export function nativeAnalyzeDependencyGraph(edges: [string, string][]): NativeG
 
 /**
  * Convenience helper to perform fast pattern matching.
+ *
+ * @param sourceText - Target text to search.
+ * @param patterns - Pattern strings to match against source.
+ * @returns Array of pattern matches with offsets and line numbers.
  */
 export function nativeFastPatternMatch(
     sourceText: string,
@@ -470,3 +488,4 @@ export function nativeFastPatternMatch(
 ): NativePatternMatch[] {
     return nativeCore.fastPatternMatch(sourceText, patterns);
 }
+

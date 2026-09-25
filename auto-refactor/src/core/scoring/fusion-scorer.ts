@@ -4,8 +4,8 @@
  * Architecture Role: Primary quality synthesis engine uniting Static Analysis Plane (Q_s),
  *   Dynamic Analysis Plane (Q_d), and Historical Feedback Ledger (Q_f):
  *   Q_total = W_s * Q_s + W_d * Q_d + W_f * Q_f.
- * Dependencies & Triggers: Consumes static-quality-model, dynamic-types, and dynamic-quality-scorer;
- *   consumed by reportBuilder, CLI, and change-quality arbiter.
+ * Dependencies & Triggers: Consumes static-quality-model, dynamic-types,
+ *   and dynamic-quality-scorer; consumed by reportBuilder, CLI, and change-quality arbiter.
  * Responsibilities:
  *   1. Resolve context-adaptive weights W = f(Stage, Scale, Domain, Risk).
  *   2. Synthesize total unified quality score Q_total.

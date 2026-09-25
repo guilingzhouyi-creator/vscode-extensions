@@ -154,7 +154,11 @@ export function computeDynamicHotspotRisk(
     const rawRisk = B * F * R * V;
     // Bounded normalization: 5 * 10 * 10 * 5 = 2500 max raw -> normalize to 0..10 scale
     const normalizedRisk = Math.min(10.0, Math.round((rawRisk / 250.0) * 100) / 10);
-    const evidenceConfidence = params.invocationsPerHour !== undefined || params.frequencyFactor !== undefined ? 1.0 : 0.6;
+    const hasEvidence =
+        params.invocationsPerHour !== undefined || params.frequencyFactor !== undefined;
+    const evidenceConfidence = hasEvidence ? 1.0 : 0.6;
+
+
 
     return {
         hotspotId,

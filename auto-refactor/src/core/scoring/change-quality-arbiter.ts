@@ -12,7 +12,8 @@
  *   1. Calculate genuine net quality delta deltaQ = Q_after - Q_before.
  *   2. Deduct penalties for regressions, cognitive complexity cost, and new maintenance debt.
  *   3. Enforce the 4 Anti-Gaming hard blocks (G-01 through G-04).
- *   4. Render explainable change evaluation verdict: approved, neutral, degraded, or gaming_rejected.
+ *   4. Render explainable change evaluation verdict: approved, neutral, degraded,
+ *      or gaming_rejected.
  * Exit Semantics & Design Rationale: Deterministic calculation; gaming violations immediately
  *   fail-closed with 'gaming_rejected' verdict to protect downstream code bases.
  */
@@ -66,7 +67,10 @@ export interface ChangeEvaluationResult {
     complexityCost: number;
     /** MaintenanceDebt: new technical debt introduced */
     maintenanceDebt: number;
-    /** Final net improvement: ChangeScore = deltaQ - Regression - ComplexityCost - MaintenanceDebt */
+    /**
+     * Final net improvement:
+     * ChangeScore = deltaQ - Regression - ComplexityCost - MaintenanceDebt
+     */
     changeScore: number;
     /** Whether change was flagged for score gaming */
     isGamingRejected: boolean;
@@ -81,7 +85,7 @@ export interface ChangeEvaluationResult {
 }
 
 /**
- * Evaluates an agent or developer modification for true engineering improvement and anti-gaming compliance:
+ * Evaluates modification for true engineering improvement and anti-gaming compliance:
  * ChangeScore = deltaQ - Regression - ComplexityCost - MaintenanceDebt
  *
  * @param input - Change evaluation parameters.
@@ -133,7 +137,8 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
     }
     regressionPenalty = Math.round(regressionPenalty * 10) / 10;
     if (regressionPenalty > 0) {
-        explanation.push(`Regression penalty: -${regressionPenalty} (${totalRegressions.length} introduced issues)`);
+        const count = totalRegressions.length;
+        explanation.push(`Regression penalty: -${regressionPenalty} (${count} introduced issues)`);
     }
 
     // 4. Complexity Cost calculation (Call Hopping & Forwarding Wrappers)
@@ -141,7 +146,10 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
     if (input.cognitiveHopCost === undefined) {
         const afterDensity = computeEffectiveCodeDensity(afterContent);
         const beforeDensity = computeEffectiveCodeDensity(beforeContent);
-        const addedForwarders = Math.max(0, afterDensity.forwardingCount - beforeDensity.forwardingCount);
+        const addedForwarders = Math.max(
+            0,
+            afterDensity.forwardingCount - beforeDensity.forwardingCount,
+        );
         if (addedForwarders >= 2) {
             // Mechanical hop inflation detected
             const hopEval = evaluateNetCognitiveCost(
@@ -164,9 +172,9 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
     // 5. Maintenance Debt calculation
     let maintenanceDebt = input.maintenanceDebtPoints ?? 0;
     if (input.maintenanceDebtPoints === undefined) {
-        // Count suppression tags or @ts-ignore added
-        const beforeIgnores = (beforeContent.match(/@ts-ignore|@ts-nocheck|eslint-disable/g) ?? []).length;
-        const afterIgnores = (afterContent.match(/@ts-ignore|@ts-nocheck|eslint-disable/g) ?? []).length;
+        const ignorePattern = /@ts-ignore|@ts-nocheck|eslint-disable/g;
+        const beforeIgnores = (beforeContent.match(ignorePattern) ?? []).length;
+        const afterIgnores = (afterContent.match(ignorePattern) ?? []).length;
         const newIgnores = Math.max(0, afterIgnores - beforeIgnores);
         maintenanceDebt += newIgnores * 10.0;
     }
@@ -174,8 +182,9 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
         explanation.push(`Maintenance debt penalty: -${maintenanceDebt}`);
     }
 
-    // 6. Net ChangeScore Formulation: ChangeScore = deltaQ - Regression - ComplexityCost - MaintenanceDebt
-    let changeScore = Math.round((deltaQ - regressionPenalty - complexityCost - maintenanceDebt) * 10) / 10;
+    // 6. Net ChangeScore: deltaQ - Regression - ComplexityCost - MaintenanceDebt
+    const netDelta = deltaQ - regressionPenalty - complexityCost - maintenanceDebt;
+    let changeScore = Math.round(netDelta * 10) / 10;
 
     // 7. Anti-Gaming Verdict Enforcement
     let verdict: ChangeArbiterVerdict = 'neutral';

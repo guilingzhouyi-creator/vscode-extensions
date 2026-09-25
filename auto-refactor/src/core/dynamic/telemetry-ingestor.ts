@@ -28,8 +28,11 @@ import type {
  * @param jsonContent - Raw JSON string or parsed object.
  * @returns Normalized DynamicEvidenceDTO.
  */
-export function ingestBenchmarkJson(jsonContent: string | Record<string, unknown>): DynamicEvidenceDTO {
+export function ingestBenchmarkJson(
+    jsonContent: string | Record<string, unknown>,
+): DynamicEvidenceDTO {
     const data: Record<string, unknown> =
+
         typeof jsonContent === 'string' ? safeJsonParse(jsonContent) : jsonContent;
 
     const timestamp = typeof data.timestamp === 'number' ? data.timestamp : Date.now();
@@ -119,7 +122,10 @@ export function ingestLcovCoverage(lcovContent: string): Partial<ExecutionEviden
     }
 
     const lineCoveragePct = linesFound > 0 ? Math.round((linesHit / linesFound) * 1000) / 10 : 0;
-    const branchCoveragePct = branchesFound > 0 ? Math.round((branchesHit / branchesFound) * 1000) / 10 : lineCoveragePct;
+    const branchCoveragePct =
+        branchesFound > 0
+            ? Math.round((branchesHit / branchesFound) * 1000) / 10
+            : lineCoveragePct;
 
     return {
         lineCoveragePct,
@@ -129,8 +135,11 @@ export function ingestLcovCoverage(lcovContent: string): Partial<ExecutionEviden
 
 /**
  * Creates empty fallback telemetry when dynamic observation is not yet enabled.
+ *
+ * @returns Default DynamicEvidenceDTO instance.
  */
 export function createDefaultFallbackEvidence(): DynamicEvidenceDTO {
+
     return {
         timestamp: Date.now(),
         environment: 'unobserved_default',
