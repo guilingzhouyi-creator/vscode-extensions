@@ -122,6 +122,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-risk-fusion-engine', script: 'scripts/validate-risk-fusion-engine.js' },
   { name: 'validate-change-quality-arbiter', script: 'scripts/validate-change-quality-arbiter.js' },
   { name: 'validate-feedback-adaptive-supervisor', script: 'scripts/validate-feedback-adaptive-supervisor.js' },
+  { name: 'validate-triplane-cross-project', script: 'scripts/validate-triplane-cross-project.js' },
   { name: 'validate-rule-generalization', script: 'scripts/validate-rule-generalization.js' },
   { name: 'validate-multi-agent', script: 'scripts/validate-multi-agent.js' },
   { name: 'validate-slice-audit', script: 'scripts/validate-slice-audit.js' },
