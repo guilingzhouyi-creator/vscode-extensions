@@ -23,6 +23,7 @@ import { SEVERITY_WARNING } from '../core/types';
 import { HygieneMessages } from '../core/messages';
 import { isVocabularyEnumeration } from '../core/governance/markerScope';
 import { auditVacuousWrappers } from '../core/rules/evolution/wrapperRule';
+import { auditRegexSafety, isRegexSafe } from '../utils/safe-regex';
 
 interface HygieneOptions {
     checkDeadCode?: boolean;
@@ -73,8 +74,26 @@ const CLONE_ROLLING_HASH_MULTIPLIER = 31;
 function buildJargonRe(patterns?: string[]): RegExp {
     const list = (patterns || []).map((pattern) => String(pattern).trim()).filter(Boolean);
     if (list.length === 0) return DEFAULT_JARGON_RE;
+
+    // Validate each user-supplied pattern for ReDoS safety. Unsafe patterns
+    // are dropped with a console warning; if all patterns are unsafe we fall
+    // back to the built-in vocabulary to avoid silently disabling the check.
+    const safePatterns: string[] = [];
+    for (const pattern of list) {
+        if (isRegexSafe(pattern)) {
+            safePatterns.push(pattern);
+        } else {
+            const warnings = auditRegexSafety(pattern);
+            console.warn(
+                `[hygiene] Skipping unsafe jargon pattern "${pattern.slice(0, 40)}": ${warnings.join('; ')}`,
+            );
+        }
+    }
+
+    if (safePatterns.length === 0) return DEFAULT_JARGON_RE;
+
     try {
-        return new RegExp(`\\b(?:${list.join('|')})\\b`, 'i');
+        return new RegExp(`\\b(?:${safePatterns.join('|')})\\b`, 'i');
     } catch {
         return DEFAULT_JARGON_RE;
     }

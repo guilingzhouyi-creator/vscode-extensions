@@ -17,6 +17,7 @@
  *     claim a scope no fixture proves.
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
+import { safeRegexMatch } from '../../../utils/safe-regex';
 
 /** Category shared by every compression lower bounds rule. */
 const MAINTAINABILITY_CATEGORY = 'maintainability';
@@ -341,7 +342,7 @@ function checkDensityLine(
     const nonWs = code.replace(/\s+/g, '');
     if (nonWs.length < DENSITY_MIN_LENGTH || nonWs.length > DENSITY_MAX_LENGTH) return null;
 
-    const opMatches = code.match(OPERATOR_RE) || [];
+    const opMatches = safeRegexMatch(code, OPERATOR_RE) || [];
     if (opMatches.length < DENSITY_MIN_OPERATORS) return null;
 
     const density = opMatches.length / nonWs.length;

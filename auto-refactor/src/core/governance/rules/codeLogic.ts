@@ -87,6 +87,7 @@ export const ExcessiveNestingRule: GovernanceRule = {
     rationale:
         'Deeply nested control flows (> 5 levels) create high cognitive load and increase defect risk.',
     isFixable: false,
+    targetKinds: [NodeKind.Function, NodeKind.Method],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.node.functionLike) return null;
         if (isToolOrTestScript(ctx.filePath)) return null;
@@ -163,6 +164,7 @@ export const VacuousWrapperRule: GovernanceRule = {
     rationale:
         'Vacuous wrapper methods that purely forward calls without validation or translation add unnecessary indirection.',
     isFixable: false,
+    targetKinds: [NodeKind.Function, NodeKind.Method],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes(KEYWORD_RETURN)) return null;
         if (ctx.node.kind !== NodeKind.Method && ctx.node.kind !== NodeKind.Function) return null;

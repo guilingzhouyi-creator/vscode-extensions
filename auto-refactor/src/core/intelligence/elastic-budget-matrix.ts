@@ -14,39 +14,39 @@
 import type { CodeDensityMetrics } from './code-density-analyzer';
 import type { FineGrainedFileRole } from './file-role-inference';
 
-/** 角色预算阈值契约 */
+/** Role budget threshold contract */
 export interface RoleBudgetThresholds {
-    /** 物理行警告阈值 */
+    /** Physical line warning threshold */
     physicalLinesWarn: number;
-    /** 物理行失败阈值 */
+    /** Physical line failure threshold */
     physicalLinesFail: number;
-    /** 真实有效代码行警告阈值 */
+    /** Effective code line (ECL) warning threshold */
     effectiveLocWarn: number;
-    /** 真实有效代码行失败阈值 */
+    /** Effective code line (ECL) failure threshold */
     effectiveLocFail: number;
-    /** 圈复杂度阈值 */
+    /** Cyclomatic complexity budget */
     complexityBudget: number;
-    /** 嵌套深度阈值 */
+    /** Nesting depth budget */
     nestingDepthBudget: number;
 }
 
-/** 弹性预算评估结果 */
+/** Elastic budget evaluation result */
 export interface ElasticBudgetEvaluation {
-    /** 最终生效的物理行警告阈值（经密度阻尼调整后） */
+    /** Effective physical line warning threshold after density damping */
     effectivePhysicalWarn: number;
-    /** 最终生效的物理行失败阈值（经密度阻尼调整后） */
+    /** Effective physical line failure threshold after density damping */
     effectivePhysicalFail: number;
-    /** 是否超出了有效代码行预算 */
+    /** Whether effective code line budget is exceeded */
     isEffectiveLocExceeded: boolean;
-    /** 是否应当触发大文件警告 */
+    /** Whether large file issue should be flagged */
     shouldFlagLargeFile: boolean;
-    /** 触发违规时的严重度等级 ('warning' | 'error' | null) */
+    /** Violation severity level ('warning' | 'error' | null) */
     violationSeverity: 'warning' | 'error' | null;
-    /** 判定原因解释 */
+    /** Evaluation explanation rationale */
     rationale: string;
 }
 
-/** 基础角色预算配置表 */
+/** Base role budget configuration table */
 const BASE_ROLE_BUDGETS: Record<FineGrainedFileRole, RoleBudgetThresholds> = {
     core_trunk: {
         physicalLinesWarn: 500,
@@ -115,21 +115,21 @@ const BASE_ROLE_BUDGETS: Record<FineGrainedFileRole, RoleBudgetThresholds> = {
 };
 
 /**
- * 获取指定角色的基准预算阈值
+ * Retrieves baseline budget thresholds for given role.
  *
- * @param role - 细粒度架构角色
- * @returns 角色预算配置
+ * @param role - Fine-grained architectural role
+ * @returns Role budget configuration
  */
 export function getRoleBudget(role: FineGrainedFileRole): RoleBudgetThresholds {
     return BASE_ROLE_BUDGETS[role] ?? BASE_ROLE_BUDGETS.business_module;
 }
 
 /**
- * 结合文件代码密度对文件规模进行弹性判定
+ * Evaluates file size with elastic density damping against role budgets.
  *
- * @param role - 文件角色
- * @param metrics - 代码密度分析指标
- * @returns 弹性预算综合评估结果
+ * @param role - File architectural role
+ * @param metrics - Code density metrics
+ * @returns Elastic budget evaluation result
  */
 export function evaluateRoleElasticBudget(
     role: FineGrainedFileRole,
@@ -137,7 +137,7 @@ export function evaluateRoleElasticBudget(
 ): ElasticBudgetEvaluation {
     const base = getRoleBudget(role);
 
-    // 自动生成代码完全豁免
+    // Auto-generated code is fully exempt
     if (role === 'auto_generated') {
         return {
             effectivePhysicalWarn: Number.MAX_SAFE_INTEGER,
@@ -149,19 +149,18 @@ export function evaluateRoleElasticBudget(
         };
     }
 
-    // 自述性优良/高注释/高静态数据的文件享受 1.5 倍物理行扩展缓冲
+    // Well-documented or data-heavy files receive 1.5x physical line headroom damping
     const densityDampingFactor = metrics.isLowDensityDocumented ? 1.5 : 1.0;
     const effectivePhysicalWarn = Math.round(base.physicalLinesWarn * densityDampingFactor);
     const effectivePhysicalFail = Math.round(base.physicalLinesFail * densityDampingFactor);
 
-    // 判定真实有效代码行超限状态
+    // Evaluate effective code lines vs thresholds
     const isEclFail = metrics.effectiveCodeLines >= base.effectiveLocFail;
     const isEclWarn = metrics.effectiveCodeLines >= base.effectiveLocWarn;
     const isPhysicalFail = metrics.physicalLines >= effectivePhysicalFail;
     const isPhysicalWarn = metrics.physicalLines >= effectivePhysicalWarn;
 
-    // 核心判定准则：
-    // 只有当有效代码行超标，或物理行超标且有效代码密度高于 0.35 时才报告违规
+    // Violation criteria: ECL exceeded, or physical exceeded with high density (>0.35)
     let violationSeverity: 'warning' | 'error' | null = null;
     let rationale = 'File size is within elastic complexity budget';
 

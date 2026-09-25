@@ -88,6 +88,7 @@ export const RedundantBooleanRule: GovernanceRule = {
     rationale:
         'Redundant if-then-else returning boolean literals increases cyclomatic complexity and mental overhead.',
     isFixable: true,
+    targetKinds: [NodeKind.ControlFlow, NodeKind.Function, NodeKind.Method],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes('return true') && !ctx.content.includes('return True')) {
             return null;

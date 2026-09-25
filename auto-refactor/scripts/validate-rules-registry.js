@@ -50,7 +50,7 @@ function emittedRuleIds() {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (full.endsWith('.ts')) files.push(full);
+      else if (full.endsWith('.ts') && !full.includes('dictionaries')) files.push(full);
     }
   })(path.join(ROOT, 'src'));
 

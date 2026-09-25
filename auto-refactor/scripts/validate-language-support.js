@@ -216,7 +216,7 @@ async function run() {
     // now owns it. Moving either one can no longer drop the fail-closed wiring silently.
     const guardWiring = [
       ['../dist/core/analyzer.js', 'runFileAnalyzers'],
-      ['../dist/core/scanner/analyzerRunner.js', 'unsupportedLanguageDiagnostic'],
+      ['../dist/core/scanner/analyzer-runner.js', 'unsupportedLanguageDiagnostic'],
       ['../dist/core/worker.js', 'unsupportedLanguageDiagnostic'],
     ];
     for (const [modulePath, needle] of guardWiring) {

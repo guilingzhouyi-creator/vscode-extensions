@@ -17,6 +17,8 @@ import {
     analyzeConstantTransitions,
 } from '../diff/constant-relocation-detector';
 
+import { evaluateEffectiveCommentDensity } from '../comments/comment-density-model';
+
 /**
  * Rule identifier for anti-gaming detection.
  */
@@ -41,7 +43,8 @@ export type GamingPatternKind =
     | 'artificial_function_splitting'
     | 'tautological_test_padding'
     | 'spurious_empty_interface'
-    | 'artificial_relocation_padding';
+    | 'artificial_relocation_padding'
+    | 'tautological_comment_padding';
 
 /**
  * Result of anti-gaming detection.
@@ -200,6 +203,42 @@ function checkRelocationPadding(
 }
 
 /**
+ * Detects tautological comment padding and water-logging (ECR < 0.40).
+ */
+function checkTautologicalCommentPadding(
+    filePath: string,
+    content: string,
+    issues: Issue[],
+    gamingKinds: GamingPatternKind[],
+): number {
+    const metrics = evaluateEffectiveCommentDensity(content);
+    if (metrics.hasWaterLogging && metrics.totalCommentLines >= 5) {
+        issues.push({
+            id: `governance:${RULE_GOV_GAM_001}:${filePath}:1`,
+            analyzer: ANALYZER_GOVERNANCE,
+            rule: RULE_GOV_GAM_001,
+            severity: SEVERITY_WARNING,
+            message: `Detected tautological comment padding or water-logging (ECR: ${metrics.effectiveCommentRatio}).`,
+            location: {
+                file: filePath,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
+            },
+            detail: {
+                gamingKind: 'tautological_comment_padding',
+                effectiveCommentRatio: metrics.effectiveCommentRatio,
+                totalCommentLines: metrics.totalCommentLines,
+            },
+            suggestion:
+                'Replace tautological line-by-line echoes with substantive design rationale and invariants.',
+        });
+        gamingKinds.push('tautological_comment_padding');
+        return 10.0;
+    }
+    return 0.0;
+}
+
+/**
  * Evaluates whether source code exhibits artificial score-gaming patterns.
  *
  * @param filePath - Physical path to the source file under evaluation.
@@ -212,7 +251,8 @@ export function detectScoreGaming(filePath: string, content: string): AntiGaming
 
     const splitPenalty = checkArtificialSplitting(filePath, content, issues, gamingKinds);
     const testPenalty = checkTautologicalTestPadding(filePath, content, issues, gamingKinds);
-    const gamingPenalty = splitPenalty + testPenalty;
+    const commentPenalty = checkTautologicalCommentPadding(filePath, content, issues, gamingKinds);
+    const gamingPenalty = splitPenalty + testPenalty + commentPenalty;
 
     return {
         hasGaming: issues.length > 0,

@@ -23,7 +23,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const { maskSourceText, SOURCE_MASK_PRESETS } = require(path.join(ROOT, 'dist/core/sourceMask'));
+const { maskSourceText, SOURCE_MASK_PRESETS } = require(path.join(ROOT, 'dist/core/source-mask'));
 
 /**
  * Rule files that still hardcode path fragments, with the reason. Recorded debt: shrinking this

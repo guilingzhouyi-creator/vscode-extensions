@@ -18,6 +18,7 @@
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { NEED_RUNTIME_EVIDENCE } from '../../types';
 import { globToRegExp, matchAny } from '../../file-discovery';
+import { safeRegexTest, createPrefixedTest } from '../../../utils/safe-regex';
 
 /** Governance category shared by every performance rule exported from this file. */
 const PERFORMANCE_CATEGORY = 'performance';
@@ -34,12 +35,16 @@ const LOOP_HEAD_RE = /^\s*(?:for|while)\s*[({:]/;
 const LINEAR_SEARCH_RE = /\b([a-zA-Z0-9_$]+)\.(find|indexOf|includes)\s*\(/;
 const TEXT_VARIABLE_RE =
     /^(?:line|str|text|content|src|name|token|word|buf|buffer|key|val|value|raw|msg|message|query|url|path|file|specifier|uri|route|comment|prefix|suffix|pattern|char|cmd|arg|call|norm|pkg|trimmed|cleanLine|source|code|chunk|segment|snippet|title|desc|body|header|s|[a-zA-Z0-9_$]*(?:str|text|line|content|name|msg|query|url|path|file|specifier|uri|route|buf|buffer|pattern|chunk|slice|segment|expr|raw|comment|arg|call|norm|pkg|snippet|desc|body|title)|s)$/i;
+const MAX_TEXT_VARIABLE_NAME_LENGTH = 64;
 const EXPENSIVE_OPS_RE =
     /GameConfig\.get_|JSON\.parse\(|fs\.readFileSync\(|new RegExp\(|readFileSync\(/;
 const TIMER_CALL_RE = /set(?:Timeout|Interval)\s*\(/;
 const TIMER_LITERAL_RE = /,\s*(\d+)\s*[,)]/;
 const SYNC_FS_RE =
     /\b(?:readFileSync|writeFileSync|appendFileSync|copyFileSync|readdirSync|accessSync|existsSync|statSync|lstatSync|rmSync|rmdirSync|mkdirSync|openSync|closeSync|renameSync|unlinkSync)\s*\(/;
+/** Substring pre-gate for SYNC_FS_RE — avoids running the long alternation
+ *  on non-matching lines. */
+const syncFsPrefixedTest = createPrefixedTest('Sync', SYNC_FS_RE);
 
 /**
  * Checks if a line in a loop body executes an expensive loop-invariant operation.
@@ -161,7 +166,15 @@ const METHOD_INDEXOF = 'indexOf';
 function checkLinearSearchHit(line: string, lineIndex: number): GovernanceViolation | null {
     const m = line.match(LINEAR_SEARCH_RE);
     if (!m) return null;
-    if (TEXT_VARIABLE_RE.test(m[1]) && (m[2] === METHOD_INCLUDES || m[2] === METHOD_INDEXOF)) {
+    // TEXT_VARIABLE_RE has a long alternation chain. It is only tested against
+    // JS identifiers (m[1] from LINEAR_SEARCH_RE). Variable names longer than
+    // 64 characters are not realistic text/semantic variable names, so we skip
+    // the full regex test for them — this also bounds any backtracking cost.
+    const varName = m[1];
+    const isTextVar =
+        varName.length <= MAX_TEXT_VARIABLE_NAME_LENGTH &&
+        safeRegexTest(TEXT_VARIABLE_RE, varName);
+    if (isTextVar && (m[2] === METHOD_INCLUDES || m[2] === METHOD_INDEXOF)) {
         return null;
     }
     if (m[2] === METHOD_INCLUDES || m[2] === METHOD_INDEXOF) {
@@ -327,6 +340,7 @@ export const SyncIoRule: GovernanceRule = {
     rationale:
         'Synchronous file I/O blocks the host JavaScript event loop, causing severe UI freezes or stalling concurrent request processing.',
     isFixable: false,
+    textTrigger: 'Sync',
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (/\.(d\.ts)$/.test(ctx.filePath)) return null;
         if (/(^|\/)(tests?|__tests__)\//.test(ctx.filePath)) return null;
@@ -361,7 +375,7 @@ export const SyncIoRule: GovernanceRule = {
         const lines = ctx.masked;
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (!SYNC_FS_RE.test(line)) continue;
+            if (!syncFsPrefixedTest(line)) continue;
             if (line.trim().startsWith(LINE_COMMENT)) continue;
             violations.push({
                 ruleId: 'GOV-PRF-004',

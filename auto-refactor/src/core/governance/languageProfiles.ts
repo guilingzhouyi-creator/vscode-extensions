@@ -153,6 +153,23 @@ export const LANGUAGE_PROFILES: Record<string, LanguageCapabilities> = {
             constant: NAMING_UPPER_SNAKE_CASE,
         },
     },
+    go: {
+        languageId: 'go',
+        supportsStaticTyping: true,
+        supportsTypeInference: true,
+        supportsClassInheritance: false, // Go uses struct embedding and interfaces, not inheritance
+        supportsPatternMatching: false, // Go has no pattern matching (switch is type-switch only)
+        hasResultType: false, // Go uses multi-value returns (value, error), not a Result type
+        hasExceptions: false, // Go uses error values, not exceptions
+        debugIdentifiers: ['fmt.Println', 'fmt.Printf', 'log.Println', 'log.Printf', 'panic'],
+        namingConventions: {
+            file: NAMING_SNAKE_CASE,
+            class: NAMING_PASCAL_CASE, // exported types
+            function: NAMING_CAMEL_CASE, // mixedCaps, exported = PascalCase
+            variable: NAMING_CAMEL_CASE, // mixedCaps
+            constant: NAMING_UPPER_SNAKE_CASE, // Go uses camelCase in practice; profile uses the shared enum
+        },
+    },
     shell: {
         languageId: 'shell',
         supportsStaticTyping: false,
@@ -204,9 +221,13 @@ const EXT_TO_PROFILE = new Map<string, LanguageCapabilities>([
     ['.gd', LANGUAGE_PROFILES.gdscript],
     ['.rs', LANGUAGE_PROFILES.rust],
     ['.py', LANGUAGE_PROFILES.python],
+    ['.go', LANGUAGE_PROFILES.go],
     ['.sh', LANGUAGE_PROFILES.shell],
     ['.bash', LANGUAGE_PROFILES.shell],
+    ['.zsh', LANGUAGE_PROFILES.shell],
     ['.ps1', LANGUAGE_PROFILES.powershell],
+    ['.psm1', LANGUAGE_PROFILES.powershell],
+    ['.psd1', LANGUAGE_PROFILES.powershell],
 ]);
 
 /**

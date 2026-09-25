@@ -53,6 +53,12 @@ export class GovernanceAnalyzer implements Analyzer {
     private nodeRules: GovernanceRule[] = [];
     private fileRules: GovernanceRule[] = [];
     private reusableEvalCtx: RuleEvaluationContext | null = null;
+    /** Combined text trigger regex for fast file-rule pre-scan short-circuit. */
+    private fileTrigger: RegExp | null = null;
+    /** Combined text trigger regex for fast node-rule pre-scan short-circuit. */
+    private nodeTrigger: RegExp | null = null;
+    /** Node-level rules grouped by target NodeKind for dispatch optimization. */
+    private nodeRulesByKind: Map<string, GovernanceRule[]> = new Map();
 
     constructor(registry?: GovernanceRegistry) {
         this.registry = registry || getDefaultGovernanceRegistry();
@@ -73,6 +79,30 @@ export class GovernanceAnalyzer implements Analyzer {
             );
             this.nodeRules = rules.filter((r) => typeof r.checkNode === 'function');
             this.fileRules = rules.filter((r) => typeof r.checkFile === 'function');
+
+            // === OPTIMIZATION BLOCK: text trigger pre-scan + kind grouping ===
+            // Build combined text triggers for fast pre-scan short-circuit.
+            // We test against the raw content string (no join allocation) for speed.
+            // False positives from comments / string literals are acceptable: they only
+            // reduce how often we short-circuit, never correctness — the actual rule
+            // still runs its own precise checks on the masked view.
+            this.fileTrigger = this.registry.buildTextTrigger(this.fileRules);
+            this.nodeTrigger = this.registry.buildTextTrigger(this.nodeRules);
+
+            // Fast path: if no text trigger matches in the raw content, only the rules
+            // that have a textTrigger can be skipped (their trigger is a necessary condition).
+            // Rules without textTrigger always run because we cannot prove they won't fire.
+            if (this.fileTrigger && !this.fileTrigger.test(ctx.content)) {
+                this.fileRules = this.fileRules.filter((r) => !r.textTrigger);
+            }
+            if (this.nodeTrigger && !this.nodeTrigger.test(ctx.content)) {
+                this.nodeRules = this.nodeRules.filter((r) => !r.textTrigger);
+            }
+
+            // Group node-level rules by target kind for dispatch optimization.
+            this.nodeRulesByKind = this.registry.groupNodeRulesByKind(this.nodeRules);
+            // === END OPTIMIZATION BLOCK ===
+
             this.reusableEvalCtx = {
                 node: undefined as unknown as NormalizedNode,
                 ctx,
@@ -96,6 +126,9 @@ export class GovernanceAnalyzer implements Analyzer {
         this.nodeRules = [];
         this.fileRules = [];
         this.reusableEvalCtx = null;
+        this.fileTrigger = null;
+        this.nodeTrigger = null;
+        this.nodeRulesByKind = new Map();
         // Standalone contract fallback
 
         const adapter = new TypeScriptAdapter();
@@ -137,11 +170,26 @@ export class GovernanceAnalyzer implements Analyzer {
         evalCtx.className = className;
         evalCtx.binding = binding;
 
-        // Evaluate pre-filtered node-level rules
-        for (const rule of this.nodeRules) {
-            const result = rule.checkNode!(evalCtx);
-            if (result && result.length > 0) {
-                this.violations.push(...result);
+        // Evaluate pre-filtered node-level rules using kind-based dispatch.
+        // Rules with explicit targetKinds are matched by node.kind; rules without
+        // targetKinds fall into the '*' group and run for every candidate node.
+        const kindRules = this.nodeRulesByKind.get(kind);
+        const wildcardRules = this.nodeRulesByKind.get('*');
+
+        if (kindRules) {
+            for (const rule of kindRules) {
+                const result = rule.checkNode!(evalCtx);
+                if (result && result.length > 0) {
+                    this.violations.push(...result);
+                }
+            }
+        }
+        if (wildcardRules) {
+            for (const rule of wildcardRules) {
+                const result = rule.checkNode!(evalCtx);
+                if (result && result.length > 0) {
+                    this.violations.push(...result);
+                }
             }
         }
     }

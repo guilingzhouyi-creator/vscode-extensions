@@ -133,6 +133,19 @@ export interface GovernanceRule {
      */
     languages?: string[];
     /**
+     * Fast text trigger pattern. When provided, the rule can only fire if the file
+     * text (or masked text) contains this substring. Used for pre-scan short-circuiting.
+     *
+     * Must be a necessary condition: if the rule fires, the file text MUST contain this substring.
+     * Rules that cannot guarantee this invariant should omit this property.
+     */
+    textTrigger?: string;
+    /**
+     * Node kinds this rule targets. When omitted, the rule runs on all candidate kinds.
+     * Used for node-level rule dispatch optimization in GovernanceAnalyzer.visit.
+     */
+    targetKinds?: string[];
+    /**
      * Evaluated per AST node during streaming traversal.
      */
     checkNode?(context: RuleEvaluationContext): GovernanceViolation[] | null;

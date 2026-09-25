@@ -33,9 +33,13 @@ export const DEFAULT_EXT: readonly string[] = [
     '.rs',
     '.gd',
     '.py',
+    '.go',
     '.sh',
     '.bash',
+    '.zsh',
     '.ps1',
+    '.psm1',
+    '.psd1',
     '.md',
 ];
 

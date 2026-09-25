@@ -138,6 +138,43 @@ export class GovernanceRegistry {
         }
         return active;
     }
+
+    /**
+     * Build a fast combined text trigger check for the given rule set.
+     * Returns null when no rules have text triggers (cannot short-circuit).
+     *
+     * The returned RegExp is a case-sensitive alternation of all triggers;
+     * each trigger is escaped to prevent regex injection / ReDoS.
+     */
+    buildTextTrigger(rules: GovernanceRule[]): RegExp | null {
+        const triggers: string[] = [];
+        for (const rule of rules) {
+            if (rule.textTrigger) {
+                triggers.push(rule.textTrigger);
+            }
+        }
+        if (triggers.length === 0) return null;
+        // Build a case-sensitive alternation regex; we escape each trigger first.
+        const escaped = triggers.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        return new RegExp(escaped.join('|'));
+    }
+
+    /**
+     * Group node-level rules by the NodeKind they target.
+     * Rules with no specific target go under the '*' key.
+     */
+    groupNodeRulesByKind(rules: GovernanceRule[]): Map<string, GovernanceRule[]> {
+        const groups = new Map<string, GovernanceRule[]>();
+        for (const rule of rules) {
+            if (typeof rule.checkNode !== 'function') continue;
+            const kinds = rule.targetKinds || ['*'];
+            for (const kind of kinds) {
+                if (!groups.has(kind)) groups.set(kind, []);
+                groups.get(kind)!.push(rule);
+            }
+        }
+        return groups;
+    }
 }
 
 let defaultRegistryInstance: GovernanceRegistry | null = null;

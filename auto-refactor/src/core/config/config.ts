@@ -59,6 +59,8 @@ import {
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
     ANALYZER_NAMING,
+    ANALYZER_GO_MODERN,
+    ANALYZER_SHELL_LINT,
 } from '../scoring/dimensionLiterals';
 import { applySemanticAndSecurityLevels } from './config-cascades';
 import type { ConfigOverrides } from './config-tuning';
@@ -98,6 +100,8 @@ export const BUILTIN_ANALYZERS = [
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
     ANALYZER_NAMING,
+    ANALYZER_GO_MODERN,
+    ANALYZER_SHELL_LINT,
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──
@@ -296,6 +300,10 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
             checkTernarySimplification: true,
             maxTernaryLength: DEFAULT_MAX_TERNARY_LENGTH,
             rewardSimplifications: true,
+            checkRedundantElse: true,
+            checkBooleanReturn: true,
+            checkGuardClausePatterns: true,
+            maxGuardClausePatternNesting: DEFAULT_MAX_GUARD_CLAUSE_NESTING,
         },
         security: {
             level: 'basic',

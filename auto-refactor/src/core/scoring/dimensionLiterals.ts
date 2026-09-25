@@ -286,6 +286,11 @@ export const ANALYZER_RUST_MODERN = 'rust-modern';
 export const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
 
 /**
+ * Analyzer id owning the go modernization pack.
+ */
+export const ANALYZER_GO_MODERN = 'go-modern';
+
+/**
  * Analyzer id owning documentation markdown and link checks.
  */
 export const ANALYZER_DOCS = 'docs';
@@ -541,6 +546,8 @@ export const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';
 export const ANALYZER_TEST_MODERNITY = 'test-modernity';
 /** Analyzer id for dependency layout and resource hygiene. */
 export const ANALYZER_DEPENDENCY_LAYOUT = 'dependency-layout';
+/** Analyzer id for shell/PowerShell lint rules. */
+export const ANALYZER_SHELL_LINT = 'shell-lint';
 
 /** Rule id for cross-file polynomial time complexity amplification. */
 export const RULE_CPX_TIME_001 = 'CPX-TIME-001';

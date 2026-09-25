@@ -283,6 +283,7 @@ export const NakedUnwrapRule: GovernanceRule = {
         'Naked `.unwrap()` causes unrecoverable process panics in production upon Err or None.',
     isFixable: false,
     languages: ['rust'],
+    textTrigger: TOKEN_UNWRAP,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes(TOKEN_UNWRAP)) return null;
         // Skip test files / test modules

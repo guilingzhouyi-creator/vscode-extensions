@@ -17,6 +17,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:native": "node scripts/build-native.js",
     "lint": "eslint \"src/**/*.ts\" \"scripts/*.js\"",
     "lint:fix": "eslint \"src/**/*.ts\" \"scripts/*.js\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"scripts/*.js\"",
@@ -31,6 +32,9 @@
     "gate": "npm run build && npm run format:check && npm run lint && npm run gate:comments && npm run gate:self && npm run gate:self:warning && npm test",
     "pretest": "npm run build",
     "test": "node scripts/test-parallel.js",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:unit:coverage": "vitest run --coverage",
     "test:parallel": "node scripts/test-parallel.js",
     "test:serial": "npm run validate && npm run validate-warm && npm run validate-oxc && npm run validate-diff && npm run validate-praxis && npm run validate-governance && npm run validate-generalized && npm run validate-review-memory && npm run validate-asymmetric && npm run validate-security && npm run validate-capabilities && npm run validate-language-support && npm run validate-language-matrix && npm run validate-python && npm run validate-comment-hygiene && npm run validate-simplify && npm run validate-python-modern && npm run validate-ts-modern && npm run validate-modern-packs && npm run validate-naming-suite && npm run validate-python-imports && npm run validate-postscan-parity && npm run validate-literal-policy && npm run validate-diff-interface && npm run validate-baseline-ratchet && npm run validate-suppression-gate && npm run validate-five-core-capabilities && npm run validate-rules-registry && npm run validate-symbol-index && npm run validate-rule-aliases && npm run validate-docs && npm run validate-project-neutrality && npm run validate-consumer-runner && npm run test-codec && npm run validate-compression && npm run validate-data-flow && npm run validate-self-norms && npm run validate-marker-scope",
     "validate-naming-suite": "node scripts/validate-naming-suite.js",
@@ -39,6 +43,13 @@
     "validate-governance-exemptions": "node scripts/validate-governance-exemptions.js",
     "validate-fail-closed": "node scripts/validate-fail-closed.js",
     "validate-latency-metrics": "node scripts/validate-latency-metrics.js",
+    "validate-scheduler-pools": "node scripts/validate-scheduler-pools.js",
+    "validate-ring-buffer-bus": "node scripts/validate-ring-buffer-bus.js",
+    "validate-topology-cache": "node scripts/validate-topology-cache.js",
+    "validate-native-bridge": "node scripts/validate-native-bridge.js",
+    "validate-tensor-partitions": "node scripts/validate-tensor-partitions.js",
+    "validate-agent-quota-gateway": "node scripts/validate-agent-quota-gateway.js",
+    "validate-scalable-e2e": "node scripts/validate-scalable-e2e.js",
     "validate-role-inference": "node scripts/validate-role-inference.js",
     "validate-config-driven-architecture": "node scripts/validate-config-driven-architecture.js",
     "validate-elastic-complexity-budget": "node scripts/validate-elastic-complexity-budget.js",
@@ -53,6 +64,7 @@
     "validate-comment-hygiene": "node scripts/validate-comment-hygiene.js",
     "validate-simplify": "node scripts/validate-simplify.js",
     "validate-python-modern": "node scripts/validate-python-modern.js",
+    "validate-shadowing": "node scripts/validate-shadowing.js",
     "validate-python-imports": "node scripts/validate-python-imports.js",
     "validate-postscan-parity": "node scripts/validate-postscan-parity.js",
     "validate-diff-interface": "node scripts/validate-diff-interface.js",
@@ -130,12 +142,15 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^62.9.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.6",
     "typescript": "^5.3.3",
-    "typescript-eslint": "^8.70.0"
+    "typescript-eslint": "^8.70.0",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.1"
   }
 }

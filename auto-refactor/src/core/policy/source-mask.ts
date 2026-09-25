@@ -59,6 +59,8 @@ export const MASK_LANGUAGE_PYTHON = 'python';
 export const MASK_LANGUAGE_GDSCRIPT = 'gdscript';
 /** Canonical language id for Rust sources. */
 export const MASK_LANGUAGE_RUST = 'rust';
+/** Canonical language id for Go sources. */
+export const MASK_LANGUAGE_GO = 'go';
 /** Canonical language id for POSIX shell sources. */
 export const MASK_LANGUAGE_SHELL = 'shell';
 /** Canonical language id for PowerShell sources. */
@@ -90,6 +92,12 @@ export const SOURCE_MASK_PRESETS: Record<string, SourceMaskConfig> = {
         blockComment: { open: '/*', close: '*/' },
         quoteChars: '"',
     },
+    [MASK_LANGUAGE_GO]: {
+        lineComment: '//',
+        blockComment: { open: '/*', close: '*/' },
+        quoteChars: '"`',
+        multilineTemplates: true, // backtick raw strings can span lines
+    },
     [MASK_LANGUAGE_SHELL]: { lineComment: '#', quoteChars: '\'"' },
     [MASK_LANGUAGE_POWERSHELL]: {
         lineComment: '#',
@@ -119,9 +127,13 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
     '.py': MASK_LANGUAGE_PYTHON,
     '.gd': MASK_LANGUAGE_GDSCRIPT,
     '.rs': MASK_LANGUAGE_RUST,
+    '.go': MASK_LANGUAGE_GO,
     '.sh': MASK_LANGUAGE_SHELL,
     '.bash': MASK_LANGUAGE_SHELL,
+    '.zsh': MASK_LANGUAGE_SHELL,
     '.ps1': MASK_LANGUAGE_POWERSHELL,
+    '.psm1': MASK_LANGUAGE_POWERSHELL,
+    '.psd1': MASK_LANGUAGE_POWERSHELL,
 };
 
 /** Characters that, immediately before a `/`, mean the slash opens a regex literal. */

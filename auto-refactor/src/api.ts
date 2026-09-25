@@ -872,29 +872,16 @@ export * from './core/router/sparseMoEGate';
 export * from './core/intelligence/callChainImpactTracer';
 
 // ---- Compact Agent Prompt Protocol (CAPP) & Localized Slice Audit ----
-export {
-    CompactDirectiveSeverity,
-    CompactGuardDirective,
-    CompactAgentPrompt,
-    formatCompactGuardDirective,
-    formatCompactAgentPrompt,
-} from './core/guidance/agentConstraintGenerator';
+export * from './core/guidance/agentConstraintGenerator';
 
 // ---- Scale-Adaptive Sparse Review Scheduler & Elastic Code Density ----
-export {
-    LineClassificationKind,
-    CodeDensityMetrics,
-    analyzeCodeDensity,
-} from './core/intelligence/code-density-analyzer';
-export {
-    FineGrainedFileRole,
-    FileRoleInferenceResult,
-    inferFineGrainedFileRole,
-} from './core/intelligence/file-role-inference';
-export {
-    RoleBudgetThresholds,
-    ElasticBudgetEvaluation,
-    getRoleBudget,
-    evaluateRoleElasticBudget,
-} from './core/intelligence/elastic-budget-matrix';
+export * from './core/intelligence/code-density-analyzer';
+export * from './core/intelligence/file-role-inference';
+export * from './core/intelligence/elastic-budget-matrix';
 export * from './core/scheduler';
+
+// ---- Comment Governance & Effective Comment Density (ECD-C) ----
+export * from './core/comments';
+
+// ---- Native Acceleration Core & Algorithmic Dual-Track Bridge ----
+export * from './core/native';

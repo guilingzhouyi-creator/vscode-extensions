@@ -15,6 +15,7 @@
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { SEVERITY_WARNING } from '../../types';
+import { NodeKind } from '../../multilang';
 import {
     TYPE_SYSTEM_CATEGORY,
     RISK_MEDIUM,
@@ -82,6 +83,7 @@ function scanLinePatternViolations(
  * @param pattern - Pattern to search for.
  * @param messageFn - Formatter for violation message.
  * @param suggestion - Remediation guidance.
+ * @param trigger - Fast text trigger substring (necessary condition).
  * @returns Configured GovernanceRule instance.
  */
 function createTypeGovernanceRule(
@@ -92,6 +94,7 @@ function createTypeGovernanceRule(
     pattern: RegExp,
     messageFn: (m: RegExpExecArray) => string,
     suggestion: string,
+    trigger: string,
 ): GovernanceRule {
     return {
         id,
@@ -102,6 +105,7 @@ function createTypeGovernanceRule(
         rationale,
         isFixable: false,
         languages: ['typescript'],
+        textTrigger: trigger,
         checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
             if (!ctx.content.includes('as any')) return null;
             const violations = scanLinePatternViolations(
@@ -160,6 +164,7 @@ export const FunctionSignatureCompletenessRule: GovernanceRule = {
         'Missing return type annotations on functions degrade API contracts and compiler static analysis.',
     isFixable: false,
     languages: ['gdscript', 'python'],
+    targetKinds: [NodeKind.Function, NodeKind.Method],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.capabilities.supportsStaticTyping) return null;
         if (!ctx.node.functionLike) return null;
@@ -200,6 +205,7 @@ export const UnsafeAnyRule: GovernanceRule = {
     rationale: 'Naked `any` bypasses the entire compiler type checker, leaking type instability.',
     isFixable: false,
     languages: ['typescript'],
+    textTrigger: 'any',
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes('any')) return null;
 
@@ -220,6 +226,7 @@ export const ContractForcedEscapeRule: GovernanceRule = createTypeGovernanceRule
     FORCED_ESCAPE_RE,
     () => 'Avoid `undefined as any` or `null as any`; refactor interface to optional type (`?`).',
     'Update the target parameter signature to allow `undefined` or use interface segregation.',
+    'as any',
 );
 
 /**
@@ -233,6 +240,7 @@ export const UnsafePropertyPenetrationRule: GovernanceRule = createTypeGovernanc
     PROPERTY_PENETRATION_RE,
     (m) => `Unsafe property penetration on \`${m[1]}\` via \`as any\`. Use standard type guards.`,
     'Use standard type guards before accessing properties.',
+    'as any',
 );
 
 /**
@@ -249,6 +257,7 @@ export const ExportExplicitTypeRule: GovernanceRule = {
         'Exported symbols without explicit return types leak internal implementation details and lead to unstable public API contracts across package boundaries.',
     isFixable: false,
     languages: ['typescript'],
+    textTrigger: EXPORT_KEYWORD,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes(EXPORT_KEYWORD)) return null;
 

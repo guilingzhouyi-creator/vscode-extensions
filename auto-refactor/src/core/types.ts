@@ -80,6 +80,15 @@ export const LANGUAGE_RUST = 'rust';
 /** Canonical GDScript language identifier. */
 export const LANGUAGE_GDSCRIPT = 'gdscript';
 
+/** Canonical Go language identifier. */
+export const LANGUAGE_GO = 'go';
+
+/** Canonical Shell language identifier. */
+export const LANGUAGE_SHELL = 'shell';
+
+/** Canonical PowerShell language identifier. */
+export const LANGUAGE_POWERSHELL = 'powershell';
+
 /** Analyzer identifiers are open strings (built-in names + any custom-registered name). */
 export type AnalyzerId = string;
 

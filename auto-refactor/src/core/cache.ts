@@ -21,6 +21,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Issue, FileMetric } from './types';
+import type { Logger } from './logger';
 import { TOOL_VERSION } from './config';
 import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cache-key';
 
@@ -93,6 +94,8 @@ export interface CacheStoreOptions {
     maxL2LoadBytes?: number;
     /** Hard-disable the cache (no mkdir, no manifest, every lookup misses, writes no-op). */
     disabled?: boolean;
+    /** Optional logger for diagnostics (e.g. L2 load-level warnings). */
+    logger?: Logger;
 }
 
 const DEFAULT_MAX_ENTRIES = 100_000;
@@ -172,6 +175,10 @@ export class CacheStore {
      *  without re-reading file contents (the design's "L1 hit = skip" across processes). */
     private readonly pathsPath: string;
     private loaded = false;
+    /** Current L2 load degradation level. */
+    private l2LoadLevel: 'full' | 'hot' | 'metadata' | 'disabled' = 'full';
+    /** Optional logger for diagnostics. */
+    private readonly logger?: Logger;
 
     /**
      * Open or create the cache at the resolved directory.
@@ -191,6 +198,7 @@ export class CacheStore {
         this.maxEntries = opts.maxEntries ?? DEFAULT_MAX_ENTRIES;
         this.maxAgeDays = opts.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS;
         this.maxL2LoadBytes = opts.maxL2LoadBytes ?? DEFAULT_MAX_L2_LOAD_BYTES;
+        this.logger = opts.logger;
         this.manifestPath = path.join(this.dir, 'manifest.json');
         this.fingerprintsPath = path.join(this.dir, 'fingerprints.jsonl');
         this.resultsPath = path.join(this.dir, 'results.jsonl');
@@ -351,16 +359,110 @@ export class CacheStore {
     }
 
     private loadResults(): void {
+        let fileSize: number;
         try {
             const st = fs.statSync(this.resultsPath);
-            if (st.size > this.maxL2LoadBytes) return;
+            fileSize = st.size;
         } catch {
             return;
         }
+
+        const ratio = fileSize / this.maxL2LoadBytes;
+
+        if (ratio <= 0.7) {
+            // Level 0: Full load (original behavior)
+            this.loadResultsFull();
+            this.l2LoadLevel = 'full';
+        } else if (ratio <= 1.0) {
+            // Level 1: Hot entries only (recent 7 days + error severity)
+            const cutoff = Date.now() - 7 * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
+            this.loadResultsFiltered((entry: L2Entry) => {
+                if (entry.ts && entry.ts >= cutoff) return true;
+                if (entry.issues && Array.isArray(entry.issues)) {
+                    return entry.issues.some((i: Issue) => i.severity === 'error');
+                }
+                return false;
+            });
+            this.l2LoadLevel = 'hot';
+        } else if (ratio <= 2.0) {
+            // Level 2: Metadata only (key + path + timestamp)
+            this.loadResultsMetadataOnly();
+            this.l2LoadLevel = 'metadata';
+        } else {
+            // Level 3: Completely disabled
+            this.l2LoadLevel = 'disabled';
+            if (this.logger) {
+                this.logger.warn(
+                    `L2 cache too large (${(fileSize / BYTES_PER_KIB / KIB_PER_MIB).toFixed(1)} MiB), skipping load`,
+                );
+            }
+        }
+    }
+
+    /** Load all L2 entries from disk (full / Level 0). */
+    private loadResultsFull(): void {
         const lines = this.readLinesSafe(this.resultsPath);
         for (const line of lines) {
             if (!line.trim()) continue;
             this.parseL2Line(line);
+        }
+    }
+
+    /**
+     * Load L2 entries matching a predicate (hot / Level 1).
+     *
+     * @param predicate - Filter function; only entries returning true are kept in memory.
+     */
+    private loadResultsFiltered(predicate: (entry: L2Entry) => boolean): void {
+        const lines = this.readLinesSafe(this.resultsPath);
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+                const o = JSON.parse(line);
+                if (!this.isValidL2(o)) continue;
+                const entry: L2Entry = {
+                    k: o.k,
+                    p: o.p,
+                    issues: o.issues,
+                    metric: o.metric || null,
+                    ts: typeof o.ts === TYPEOF_NUMBER ? (o.ts as number) : 0,
+                    fm: typeof o.fm === TYPEOF_NUMBER ? (o.fm as number) : undefined,
+                    fs: typeof o.fs === TYPEOF_NUMBER ? (o.fs as number) : undefined,
+                };
+                if (predicate(entry)) {
+                    this.l2.set(o.k, entry);
+                    this.indexL2ByPath(entry);
+                }
+            } catch {
+                /* Best-effort: skip corrupt line */
+            }
+        }
+    }
+
+    /**
+     * Load only metadata (key + path + timestamp) from L2 — no issues or metric data.
+     * Used for Level 2 degradation so L1→L2 fast-path checks still have keys available.
+     */
+    private loadResultsMetadataOnly(): void {
+        const lines = this.readLinesSafe(this.resultsPath);
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+                const o = JSON.parse(line);
+                if (!this.isValidL2(o)) continue;
+                // Store minimal entry: key + path + timestamp, no issues/metric
+                const entry: L2Entry = {
+                    k: o.k,
+                    p: o.p,
+                    issues: [],
+                    metric: null,
+                    ts: typeof o.ts === TYPEOF_NUMBER ? (o.ts as number) : 0,
+                };
+                this.l2.set(o.k, entry);
+                this.indexL2ByPath(entry);
+            } catch {
+                /* Best-effort: skip corrupt line */
+            }
         }
     }
 
@@ -478,6 +580,10 @@ export class CacheStore {
         const key = l2Key(fpHashValue, contentHash);
         const e = this.l2.get(key);
         if (!e) return null;
+        // If entry is metadata-only (no actual issues/metric data), treat as miss
+        if (e.issues.length === 0 && e.metric === null && this.l2LoadLevel === 'metadata') {
+            return null;
+        }
         // Refresh the hit timestamp lazily (used by cleanup LRU/TTL trimming).
         const now = Date.now();
         if (now - e.ts > 60_000) {
@@ -574,6 +680,10 @@ export class CacheStore {
         if (!this.enabled) return null;
         const e = this.l2ByPath.get(`${fpHashValue}\u0000${relPath}\u0000${mtimeMs}\u0000${size}`);
         if (!e) return null;
+        // If entry is metadata-only (no actual issues/metric data), treat as miss
+        if (e.issues.length === 0 && e.metric === null && this.l2LoadLevel === 'metadata') {
+            return null;
+        }
         return { issues: e.issues, metric: e.metric, p: e.p };
     }
 
@@ -727,10 +837,19 @@ export class CacheStore {
     /**
      * Report current in-memory entry counts for debug/status output.
      *
-     * @returns Fresh object with the live L1 and L2 map sizes.
+     * @returns Fresh object with the live L1 and L2 map sizes and the current L2 load level.
      */
-    size(): { l1: number; l2: number } {
-        return { l1: this.l1.size, l2: this.l2.size };
+    size(): { l1: number; l2: number; l2LoadLevel: string } {
+        return { l1: this.l1.size, l2: this.l2.size, l2LoadLevel: this.l2LoadLevel };
+    }
+
+    /**
+     * Return the current L2 cache load degradation level.
+     *
+     * @returns One of 'full' | 'hot' | 'metadata' | 'disabled'.
+     */
+    getLoadLevel(): 'full' | 'hot' | 'metadata' | 'disabled' {
+        return this.l2LoadLevel;
     }
 
     /**

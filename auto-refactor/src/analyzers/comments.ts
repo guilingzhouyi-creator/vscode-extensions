@@ -21,6 +21,12 @@
 import type { Analyzer, AnalyzerContext, Issue, CommentLevel, IssueEvidence } from '../core/types';
 import { SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { CommentMessages, SIX_FIELD_HEADERS_EN, SIX_FIELD_HEADERS_ZH } from '../core/messages';
+import {
+    auditCommentLanguage,
+    auditCommentDensity,
+    auditCommentSemanticDuty,
+} from '../core/comments/comment-auditor';
+import type { CommentLanguageKind } from '../core/comments/comment-types';
 
 interface CommentOptions {
     level?: CommentLevel;
@@ -33,6 +39,14 @@ interface CommentOptions {
      * exactly like the built-in tool directives; empty/absent keeps built-ins only.
      */
     directiveTokens?: string[];
+    /** Whether project-level comment language consistency governance is enabled. */
+    enableLanguageGovernance?: boolean;
+    /** Target dominant language policy ('en' | 'zh-CN' | 'bilingual'). */
+    targetDominantLanguage?: CommentLanguageKind;
+    /** Whether effective comment density and water-logging checks are enabled. */
+    enableDensityGovernance?: boolean;
+    /** Whether semantic contract duty verification against code AST is enabled. */
+    enableSemanticDutyCheck?: boolean;
 }
 
 /**
@@ -173,6 +187,28 @@ export class CommentAnalyzer implements Analyzer {
         this.auditFileHeader(content, len, file, level, opts, ctx, issues);
         this.auditPublicApi(content, len, file, level, opts, ctx, issues);
         this.auditCommentHygiene(content, file, level, opts, ctx, issues);
+
+        const shouldAuditLanguage =
+            opts.enableLanguageGovernance ?? (level === 'standard' || level === 'strict');
+        const shouldAuditDensity =
+            opts.enableDensityGovernance ?? (level === 'standard' || level === 'strict');
+        const shouldAuditSemanticDuty = opts.enableSemanticDutyCheck ?? level === 'strict';
+
+        if (shouldAuditLanguage) {
+            auditCommentLanguage(content, opts, ctx, issues, (c, l, r, m, s, d, sug) =>
+                this.mkIssue(c, l, r, m, s, d || {}, sug),
+            );
+        }
+        if (shouldAuditDensity) {
+            auditCommentDensity(content, ctx, issues, (c, l, r, m, s, d, sug) =>
+                this.mkIssue(c, l, r, m, s, d || {}, sug),
+            );
+        }
+        if (shouldAuditSemanticDuty) {
+            auditCommentSemanticDuty(content, ctx, issues, (c, l, r, m, s, d, sug) =>
+                this.mkIssue(c, l, r, m, s, d || {}, sug),
+            );
+        }
 
         return issues;
     }

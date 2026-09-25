@@ -111,6 +111,30 @@ const INCREMENTAL_MAX_FILES_DEFAULT = 32;
 const INCREMENTAL_RSS_CLEAR_BYTES = INCREMENTAL_RSS_CLEAR_MIB * BYTES_PER_KIB * KIB_PER_MIB;
 
 /**
+ * Tier-1 RSS threshold (bytes) for large-file eviction.
+ *
+ * When RSS exceeds 350 MiB we evict only very large files (>1000 lines), which
+ * consume the most memory but are relatively few in number.  Small/medium file
+ * incremental state is preserved.
+ */
+const INCREMENTAL_RSS_TIER1_BYTES = 350 * BYTES_PER_KIB * KIB_PER_MIB;
+
+/**
+ * Tier-2 RSS threshold (bytes) for cold-file eviction.
+ *
+ * When RSS exceeds 450 MiB we additionally drop files not accessed in 7+ days
+ * (cold entries).  Actively-edited files — which benefit most from incremental
+ * diff — are kept.
+ */
+const INCREMENTAL_RSS_TIER2_BYTES = 450 * BYTES_PER_KIB * KIB_PER_MIB;
+
+/** File size threshold (in lines) for "large file" eviction in tier 1. */
+const LARGE_FILE_LINE_THRESHOLD = 1000;
+
+/** Age threshold (ms) for "cold file" eviction in tier 2 (7 days). */
+const COLD_FILE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
  * Resolve the per-fingerprint LRU bound from `AR_INCREMENTAL_MAX_FILES`.
  *
  * @returns Parsed positive integer override, or the 32-file default when the variable is
@@ -135,6 +159,10 @@ export class IncrementalFileState {
     content: string;
     contentHash: string;
     lineStarts: number[];
+    /** Number of lines in the current content (== lineStarts.length). */
+    lineCount: number;
+    /** Timestamp (ms) of the last time this file's incremental state was accessed. */
+    lastAccessed: number;
     subtrees: Map<number | string, CachedSubtree>;
     /** Current scan's per-function cyclomatic-complexity memo (for the NEXT scan's reuse). */
     complexityMemo: Map<number | string, number>;
@@ -161,6 +189,8 @@ export class IncrementalFileState {
         this.content = content;
         this.contentHash = contentHash;
         this.lineStarts = computeLineStarts(content);
+        this.lineCount = this.lineStarts.length;
+        this.lastAccessed = Date.now();
         this.subtrees = new Map();
         this.complexityMemo = new Map();
         this.literalRecords = [];
@@ -174,6 +204,8 @@ export class IncrementalFileState {
         this.content = newContent;
         this.contentHash = newHash;
         this.lineStarts = computeLineStarts(newContent);
+        this.lineCount = this.lineStarts.length;
+        this.lastAccessed = Date.now();
         this.prevSubtrees = this.subtrees;
         this.subtrees = new Map();
         this.prevComplexityMemo = this.complexityMemo;
@@ -325,7 +357,8 @@ export class IncrementalFileState {
 
 /**
  * Move `rel` to the most-recently-used end of `bucket`, making it the last candidate for LRU
- * eviction. Entries absent from the bucket are ignored, so touching a stale key is safe.
+ * eviction.  Also refreshes the `lastAccessed` timestamp used by tiered RSS eviction.
+ * Entries absent from the bucket are ignored, so touching a stale key is safe.
  *
  * @param bucket - Per-fingerprint map from relative file path to its incremental state.
  * @param rel - Repo-relative file path to mark as most recently used.
@@ -333,6 +366,7 @@ export class IncrementalFileState {
 export function touchIncremental(bucket: Map<string, IncrementalFileState>, rel: string): void {
     const st = bucket.get(rel);
     if (!st) return;
+    st.lastAccessed = Date.now();
     bucket.delete(rel);
     bucket.set(rel, st);
 }
@@ -363,23 +397,92 @@ export function pruneIncrementalBucket(
 }
 
 /**
- * Drop every incremental bucket once process RSS exceeds the 512 MiB soft cap, bounding daemon
- * memory on long-lived warm sessions. Below the cap nothing is touched, so steady-state scans
- * keep their reuse caches; this is a loss-free cache reset, not a hard memory limit.
+ * Evict incremental state progressively based on RSS pressure, trying to keep
+ * the hottest (most-beneficial) entries alive as long as possible.
  *
- * @param session - Scan-session object whose `incremental` map is drained under memory pressure.
+ * **Tier 1 (>350 MiB):** Drop only large files (>1000 lines).  Big files consume
+ *   the most memory per entry but are relatively few in number, so removing them
+ *   frees significant memory while preserving small/medium file state — which
+ *   covers the vast majority of day-to-day edits.
+ *
+ * **Tier 2 (>450 MiB):** Drop files not accessed in 7+ days (cold entries).
+ *   Actively-edited files — which benefit most from incremental diff — are kept.
+ *
+ * **Tier 3 (>512 MiB):** Drop everything (original behavior) — last-resort safety net.
+ *
+ * After each tier we re-check RSS; if memory is back below the next threshold
+ * we stop early and avoid over-evicting.
+ *
+ * This is a loss-free cache reset: an evicted file simply falls back to a full
+ * rescan next time it changes (byte-identical output, just slower).
+ *
+ * @param session - Scan-session object whose `incremental` map is pruned under memory pressure.
  * @param session.incremental - Fingerprint-keyed buckets holding per-file incremental states.
  * @returns Total number of per-file states evicted; 0 when RSS is within the soft cap.
  */
 export function incrementalRssGuard(session: {
     incremental: Map<string, Map<string, IncrementalFileState>>;
 }): number {
-    if (process.memoryUsage().rss <= INCREMENTAL_RSS_CLEAR_BYTES) return 0;
+    const rss0 = process.memoryUsage().rss;
+    if (rss0 < INCREMENTAL_RSS_TIER1_BYTES) return 0;
+
     let evicted = 0;
-    for (const bucket of session.incremental.values()) {
-        for (const st of bucket.values()) st.evict();
-        evicted += bucket.size;
-        bucket.clear();
+
+    // ---- Tier 1: evict large files (>LARGE_FILE_LINE_THRESHOLD lines) ----
+    if (rss0 >= INCREMENTAL_RSS_TIER1_BYTES) {
+        for (const bucket of session.incremental.values()) {
+            const toRemove: string[] = [];
+            for (const [path, st] of bucket) {
+                if (st.lineCount > LARGE_FILE_LINE_THRESHOLD) {
+                    toRemove.push(path);
+                }
+            }
+            for (const path of toRemove) {
+                const st = bucket.get(path);
+                if (st) st.evict();
+                bucket.delete(path);
+                evicted++;
+            }
+        }
+
+        // Re-check after tier 1 — if we're below tier 2, stop early.
+        if (process.memoryUsage().rss < INCREMENTAL_RSS_TIER2_BYTES) {
+            return evicted;
+        }
     }
+
+    // ---- Tier 2: evict cold files (not accessed in 7+ days) ----
+    if (process.memoryUsage().rss >= INCREMENTAL_RSS_TIER2_BYTES) {
+        const cutoff = Date.now() - COLD_FILE_AGE_MS;
+        for (const bucket of session.incremental.values()) {
+            const toRemove: string[] = [];
+            for (const [path, st] of bucket) {
+                if (st.lastAccessed < cutoff) {
+                    toRemove.push(path);
+                }
+            }
+            for (const path of toRemove) {
+                const st = bucket.get(path);
+                if (st) st.evict();
+                bucket.delete(path);
+                evicted++;
+            }
+        }
+
+        // Re-check after tier 2 — if we're below the hard cap, stop early.
+        if (process.memoryUsage().rss < INCREMENTAL_RSS_CLEAR_BYTES) {
+            return evicted;
+        }
+    }
+
+    // ---- Tier 3: clear everything (last resort, original behavior) ----
+    if (process.memoryUsage().rss >= INCREMENTAL_RSS_CLEAR_BYTES) {
+        for (const bucket of session.incremental.values()) {
+            for (const st of bucket.values()) st.evict();
+            evicted += bucket.size;
+            bucket.clear();
+        }
+    }
+
     return evicted;
 }

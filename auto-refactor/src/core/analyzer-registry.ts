@@ -39,11 +39,13 @@ import { PythonModernAnalyzer } from '../analyzers/python-modern';
 import { TsModernAnalyzer } from '../analyzers/ts-modern';
 import { RustModernAnalyzer } from '../analyzers/rust-modern';
 import { GdscriptModernAnalyzer } from '../analyzers/gdscript-modern';
+import { GoModernAnalyzer } from '../analyzers/go-modern';
 import { DocsAnalyzer } from '../analyzers/docs';
 import { DataArchitectureAnalyzer } from '../analyzers/data-architecture';
 import { TestModernityAnalyzer } from '../analyzers/test-modernity';
 import { DependencyLayoutAnalyzer } from '../analyzers/dependency-layout';
 import { NamingAnalyzer } from '../analyzers/naming';
+import { ShellLintAnalyzer } from '../analyzers/shell-lint';
 
 /**
  * Resolved metadata and fresh instance factory for a declared analyzer.
@@ -95,11 +97,13 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
     'ts-modern': () => new TsModernAnalyzer(),
     'rust-modern': () => new RustModernAnalyzer(),
     'gdscript-modern': () => new GdscriptModernAnalyzer(),
+    'go-modern': () => new GoModernAnalyzer(),
     docs: () => new DocsAnalyzer(),
     'data-architecture': () => new DataArchitectureAnalyzer(),
     'test-modernity': () => new TestModernityAnalyzer(),
     'dependency-layout': () => new DependencyLayoutAnalyzer(),
     naming: () => new NamingAnalyzer(),
+    'shell-lint': () => new ShellLintAnalyzer(),
 };
 
 /**
@@ -130,11 +134,13 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     'ts-modern': '../analyzers/ts-modern',
     'rust-modern': '../analyzers/rust-modern',
     'gdscript-modern': '../analyzers/gdscript-modern',
+    'go-modern': '../analyzers/go-modern',
     docs: '../analyzers/docs',
     'data-architecture': '../analyzers/data-architecture',
     'test-modernity': '../analyzers/test-modernity',
     'dependency-layout': '../analyzers/dependency-layout',
     naming: '../analyzers/naming',
+    'shell-lint': '../analyzers/shell-lint',
 };
 
 const dynamicRequire = createRequire(__filename);

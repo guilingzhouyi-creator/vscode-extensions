@@ -23,6 +23,9 @@ export {
     LANGUAGE_PYTHON,
     LANGUAGE_RUST,
     LANGUAGE_GDSCRIPT,
+    LANGUAGE_GO,
+    LANGUAGE_SHELL,
+    LANGUAGE_POWERSHELL,
 } from '../types';
 
 /** Rule families the engine recognises (canonical prefixes). */
@@ -50,6 +53,9 @@ export type RuleFamily =
     | 'RSM'
     | 'GDM'
     | 'NAM'
+    | 'GOM'
+    | 'SH'
+    | 'PS'
     | 'LEGACY';
 
 /** Canonical rule-family prefix for naming governance and hygiene rules. */

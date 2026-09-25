@@ -15,12 +15,8 @@
 'use strict';
 
 const assert = require('assert');
-const {
-  analyzeCodeDensity,
-} = require('../dist/core/intelligence/code-density-analyzer');
-const {
-  inferFineGrainedFileRole,
-} = require('../dist/core/intelligence/file-role-inference');
+const { analyzeCodeDensity } = require('../dist/core/intelligence/code-density-analyzer');
+const { inferFineGrainedFileRole } = require('../dist/core/intelligence/file-role-inference');
 const {
   evaluateRoleElasticBudget,
   getRoleBudget,
@@ -62,10 +58,16 @@ async function testLineSpectrumClassification() {
   assert.strictEqual(metrics.physicalLines, 25);
   assert.ok(metrics.classificationCounts.COMMENT_LINE >= 5, 'Should count JSDoc and line comments');
   assert.ok(metrics.classificationCounts.BLANK_LINE >= 4, 'Should count blank separator lines');
-  assert.ok(metrics.classificationCounts.FRAMEWORK_SCAFFOLD >= 1, 'Should count interface declaration');
+  assert.ok(
+    metrics.classificationCounts.FRAMEWORK_SCAFFOLD >= 1,
+    'Should count interface declaration',
+  );
   assert.ok(metrics.classificationCounts.DATA_DECLARATION >= 1, 'Should count data/dict entries');
   assert.ok(metrics.classificationCounts.FORMATTED_WRAP >= 1, 'Should count trailing wrap tokens');
-  assert.ok(metrics.classificationCounts.EFFECTIVE_CODE >= 5, 'Should count actual logic expressions');
+  assert.ok(
+    metrics.classificationCounts.EFFECTIVE_CODE >= 5,
+    'Should count actual logic expressions',
+  );
 
   // ECL must be significantly lower than physical LOC due to comments, blanks, and config
   assert.ok(
@@ -75,7 +77,9 @@ async function testLineSpectrumClassification() {
   assert.ok(metrics.effectiveDensity > 0 && metrics.effectiveDensity < 1.0);
 
   console.log('  ✔ 9 line spectrum categories classified and weighted correctly');
-  console.log(`    - Physical: ${metrics.physicalLines}, Effective: ${metrics.effectiveCodeLines}, Density: ${metrics.effectiveDensity}`);
+  console.log(
+    `    - Physical: ${metrics.physicalLines}, Effective: ${metrics.effectiveCodeLines}, Density: ${metrics.effectiveDensity}`,
+  );
 }
 
 async function testLowDensityExemption() {
@@ -93,15 +97,20 @@ async function testLowDensityExemption() {
 
   assert.strictEqual(metrics.physicalLines, 800);
   assert.ok(metrics.commentRatio >= 0.35, 'Comment ratio should be >= 35%');
-  assert.ok(metrics.blankRatio >= 0.20, 'Blank ratio should be >= 20%');
+  assert.ok(metrics.blankRatio >= 0.2, 'Blank ratio should be >= 20%');
   assert.ok(metrics.isLowDensityDocumented, 'File must be identified as low-density documented');
   assert.ok(metrics.effectiveCodeLines <= 250, 'Effective code lines should be approx ~220');
 
   // Evaluate under business_module
   const evaluation = evaluateRoleElasticBudget('business_module', metrics);
-  assert.ok(!evaluation.shouldFlagLargeFile, 'Well-documented low-density 800-line file should NOT trigger error');
+  assert.ok(
+    !evaluation.shouldFlagLargeFile,
+    'Well-documented low-density 800-line file should NOT trigger error',
+  );
 
-  console.log('  ✔ Low-density documented module successfully shielded from premature large-file alarms');
+  console.log(
+    '  ✔ Low-density documented module successfully shielded from premature large-file alarms',
+  );
 }
 
 async function testFileRoleInference() {

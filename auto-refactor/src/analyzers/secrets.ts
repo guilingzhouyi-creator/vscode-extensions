@@ -27,6 +27,12 @@
 
 import type { Analyzer, AnalyzerContext, Issue, Severity, SecurityLevel } from '../core/types';
 import { SecretMessages } from '../core/messages/secrets';
+import {
+    auditRegexSafety,
+    isRegexSafe,
+    safeRegexExecLoop,
+    safeRegexTest,
+} from '../utils/safe-regex';
 
 /** Named regex source pair used by the built-in and caller-supplied pattern tables. */
 interface PatternDef {
@@ -134,13 +140,36 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
     const base = opts.patterns
         ? opts.patterns.map((source, i) => ({ name: `custom-${i + 1}`, source }))
         : DEFAULT_PATTERNS;
-    return [
-        ...base.map((p) => ({ name: p.name, re: new RegExp(p.source) })),
-        ...(opts.extraPatterns ?? []).map((source) => ({
-            name: 'custom-extra',
-            re: new RegExp(source),
-        })),
-    ];
+
+    // Validate user-supplied patterns for ReDoS risk. Patterns with known
+    // dangerous constructs (nested quantifiers, alternation-inside-quantifiers)
+    // are skipped with a console warning rather than silently running risky
+    // regexes on untrusted file content.
+    const compiled: CompiledSecretPattern[] = [];
+
+    for (const p of base) {
+        if (opts.patterns && !isRegexSafe(p.source)) {
+            const warnings = auditRegexSafety(p.source);
+            console.warn(
+                `[secrets] Skipping unsafe pattern "${p.name}": ${warnings.join('; ')}`,
+            );
+            continue;
+        }
+        compiled.push({ name: p.name, re: new RegExp(p.source) });
+    }
+
+    for (const source of opts.extraPatterns ?? []) {
+        if (!isRegexSafe(source)) {
+            const warnings = auditRegexSafety(source);
+            console.warn(
+                `[secrets] Skipping unsafe extraPattern "${source.slice(0, 40)}": ${warnings.join('; ')}`,
+            );
+            continue;
+        }
+        compiled.push({ name: 'custom-extra', re: new RegExp(source) });
+    }
+
+    return compiled;
 }
 
 function resolveEntropyConfig(opts: SecretsOptions, level: SecurityLevel): ResolvedEntropyConfig {
@@ -228,7 +257,10 @@ export class SecretsAnalyzer implements Analyzer {
         issues: Issue[],
     ): boolean {
         for (const p of patterns) {
-            if (p.re.test(lineText)) {
+            // Use safeRegexTest: direct for short lines, bounded for long lines
+            // (e.g. minified content on a single line). All secret patterns are
+            // keyword-level triggers, so truncating long lines is safe.
+            if (safeRegexTest(p.re, lineText)) {
                 const desc = SecretMessages.HARDCODED_SECRET(
                     p.name,
                     p.re.source.slice(0, REGEX_SOURCE_PREVIEW_LENGTH),
@@ -258,8 +290,11 @@ export class SecretsAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         const TOKEN_RE = /[A-Za-z0-9_\-=]{16,}/g;
-        let t: RegExpExecArray | null;
-        while ((t = TOKEN_RE.exec(lineText)) !== null) {
+        // Use bounded exec loop to cap work on extremely long lines (e.g. minified).
+        // TOKEN_RE itself has no nested quantifiers, but a very long alphanumeric
+        // line could produce thousands of matches — the iteration cap prevents
+        // unbounded entropy computation per line.
+        safeRegexExecLoop(TOKEN_RE, lineText, (t) => {
             const h = shannonEntropy(t[0]);
             if (h >= entropy.threshold && t[0].length >= entropy.minLength) {
                 const desc = SecretMessages.HIGH_ENTROPY_TOKEN(h, t[0].length);
@@ -274,9 +309,10 @@ export class SecretsAnalyzer implements Analyzer {
                         desc.suggestion,
                     ),
                 );
-                break;
+                return false; // Stop at first match per line (at most one per line)
             }
-        }
+            return true; // Continue scanning
+        }, 100);
     }
 
     /**

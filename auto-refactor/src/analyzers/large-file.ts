@@ -130,7 +130,8 @@ export class LargeFileAnalyzer implements Analyzer {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content.slice(0, 500));
         const elasticEvaluation = evaluateRoleElasticBudget(roleInference.role, density);
 
-        // 在开启弹性预算模式或判定为高自述性优良低密度文件时，以真实有效代码负荷为准
+        // When elastic budget is enabled or module is documented/low-density,
+        // base verdict on real effective code load rather than raw line count.
         if (
             t.enableElasticBudget === true ||
             (density.isLowDensityDocumented && !elasticEvaluation.shouldFlagLargeFile)
@@ -169,6 +170,17 @@ export class LargeFileAnalyzer implements Analyzer {
             );
         }
 
+        const detailPayload: Record<string, unknown> = {
+            ...m,
+            reasons,
+            inferredModules: modules,
+        };
+        if (t.enableElasticBudget === true) {
+            detailPayload.densityMetrics = density;
+            detailPayload.fileRole = roleInference.role;
+            detailPayload.elasticEvaluation = elasticEvaluation;
+        }
+
         return [
             {
                 id: `large-file:large-file:${ctx.filePath}:1`,
@@ -184,14 +196,7 @@ export class LargeFileAnalyzer implements Analyzer {
                     start: { line: 1, column: 1 },
                     end: { line: 1, column: 1 },
                 },
-                detail: {
-                    ...m,
-                    reasons,
-                    inferredModules: modules,
-                    densityMetrics: density,
-                    fileRole: roleInference.role,
-                    elasticEvaluation,
-                },
+                detail: detailPayload,
                 suggestion: suggestions.join(' '),
             },
         ];
