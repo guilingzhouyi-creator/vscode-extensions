@@ -622,6 +622,24 @@ static func _strip_comments(source: String) -> String:
 	return _strip_by_mode(source, false)
 
 
+## 转义字符安全跳过辅助函数
+static func _skip_string_escape(buf: PackedByteArray, i: int, n: int, blank_strings: bool) -> int:
+	if i + 1 < n:
+		if blank_strings:
+			buf[i] = 0x20
+			buf[i + 1] = 0x20
+		return i + 2
+	if blank_strings:
+		buf[i] = 0x20
+	return i + 1
+
+
+## 条件擦除字符串内字节
+static func _blank_char_if_needed(buf: PackedByteArray, i: int, b: int, blank_strings: bool) -> void:
+	if blank_strings and b != 0x0A:
+		buf[i] = 0x20
+
+
 ## 统一的注释/字符串剥离器。
 ## 字符串边界【始终】跟踪——否则 "a # b" 里的 # 会被误判为注释起点，造成漏检；
 ## blank_strings 仅决定字符串内容是否被清空：
@@ -645,22 +663,11 @@ static func _strip_by_mode(source: String, blank_strings: bool) -> String:
 			continue
 		if in_string:
 			if b == 0x5C:  # 反斜杠转义：连跳两个字节
-				if i + 1 < n:
-					if blank_strings:
-						buf[i] = 0x20
-						buf[i + 1] = 0x20
-					i += 2
-				else:
-					if blank_strings:
-						buf[i] = 0x20
-					i += 1
+				i = _skip_string_escape(buf, i, n, blank_strings)
 				continue
 			if b == delim:
 				in_string = false
-				if blank_strings:
-					buf[i] = 0x20
-			elif b != 0x0A and blank_strings:
-				buf[i] = 0x20
+			_blank_char_if_needed(buf, i, b, blank_strings)
 			i += 1
 			continue
 		if b == 0x23:  # '#' 行注释
@@ -671,8 +678,7 @@ static func _strip_by_mode(source: String, blank_strings: bool) -> String:
 		if b == 0x22 or b == 0x27:  # '"' 或 "'" 字符串
 			in_string = true
 			delim = b
-			if blank_strings:
-				buf[i] = 0x20
+			_blank_char_if_needed(buf, i, b, blank_strings)
 			i += 1
 			continue
 		i += 1

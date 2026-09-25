@@ -105,14 +105,17 @@ static func query(criteria: LogQueryDTO.Criteria) -> LogQueryDTO.Result:
 # 三、内部实现（过滤匹配 / 磁盘解析）
 # ==============================================================================
 
-## 六维过滤匹配：时间窗/级别/通道/trace_id/error_code/关键字，任一不满足即排除
-static func _matches_criteria(dto: Dictionary, c: LogQueryDTO.Criteria) -> bool:
+## 时间窗过滤断言
+static func _matches_time_window(dto: Dictionary, c: LogQueryDTO.Criteria) -> bool:
 	var ts := int(dto.get("timestamp_utc", 0))
 	if c.from_utc > 0 and ts < c.from_utc:
 		return false
 	if c.to_utc > 0 and ts > c.to_utc:
 		return false
-		
+	return true
+
+## 日志级别与频道过滤断言
+static func _matches_level_and_channel(dto: Dictionary, c: LogQueryDTO.Criteria) -> bool:
 	if not c.levels.is_empty():
 		var lvl := str(dto.get("level", ""))
 		var hit_lvl := false
@@ -122,28 +125,40 @@ static func _matches_criteria(dto: Dictionary, c: LogQueryDTO.Criteria) -> bool:
 				break
 		if not hit_lvl:
 			return false
-			
+
 	if not c.channels.is_empty():
 		var ch := str(dto.get("channel", ""))
 		if not (ch in c.channels):
 			return false
-			
+
+	return true
+
+## trace_id、error_code 与关键字过滤断言
+static func _matches_identifiers_and_keyword(dto: Dictionary, c: LogQueryDTO.Criteria) -> bool:
 	if not c.trace_id.is_empty():
 		var tr := str(dto.get("trace_id", ""))
 		if tr != c.trace_id:
 			return false
-			
+
 	if not c.error_code.is_empty():
 		var ec := str(dto.get("error_code", ""))
 		if ec != c.error_code:
 			return false
-			
+
 	if not c.keyword.is_empty():
 		var msg := str(dto.get("message", ""))
 		if not msg.contains(c.keyword):
 			return false
-			
+
 	return true
+
+## 六维过滤匹配：时间窗/级别/通道/trace_id/error_code/关键字，任一不满足即排除
+static func _matches_criteria(dto: Dictionary, c: LogQueryDTO.Criteria) -> bool:
+	if not _matches_time_window(dto, c):
+		return false
+	if not _matches_level_and_channel(dto, c):
+		return false
+	return _matches_identifiers_and_keyword(dto, c)
 
 ## 读取磁盘 NDJSON 导出日志（签名命中直接复用缓存，磁盘变更才重解析）
 static func _read_disk_logs() -> Array[Dictionary]:

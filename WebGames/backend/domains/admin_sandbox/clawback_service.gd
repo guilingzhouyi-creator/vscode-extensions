@@ -22,7 +22,7 @@ static var _processed_audits: Dictionary = {}
 
 ## S3-03 有界保留：追缴幂等/审计键超容量时按插入序裁剪最旧（内存有界，防无限增长）
 static func _prune_processed_audits() -> void:
-	# P4：单次 keys 快照裁剪最旧溢出项（消除 while keys()[0] 每轮重建的 O(k×N)）
+	# 边界约束：单次 keys 快照裁剪最旧溢出项（消除 while keys()[0] 每轮重建的 O(k×N)）
 	FifoBudget.trim_oldest(_processed_audits, GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000))
 
 ## 当前运行模式（联机服务端宿主默认 online；单机进程在配置里置 standalone）
@@ -192,7 +192,7 @@ static func clawback_item_instance(
 # ==============================================================================
 
 ## 边界门禁：联机模式（服务端独立判定 + 调用方意图双满足）+ LEVEL_GAME_MASTER
-## + CLAWBACK 授权权限（P39 清单 5：空权限集合不能仅凭等级放行——权限集合为权威）
+## + CLAWBACK 授权权限（权限清单规范：空权限集合不能仅凭等级放行——权限集合为权威）
 static func _gate(admin: AdminPermissionAggregate, mode: String) -> Dictionary:
 	if mode != RUN_MODE_ONLINE or current_run_mode() != RUN_MODE_ONLINE:
 		return {

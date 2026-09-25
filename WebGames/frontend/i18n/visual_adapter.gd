@@ -24,6 +24,48 @@ static func _estimate_width(text: String, size: int, is_cjk: bool) -> float:
 	var ratio: float = CJK_WIDTH_RATIO if is_cjk else LATIN_WIDTH_RATIO
 	return float(text.length()) * float(size) * ratio
 
+## 获取 Label/RichTextLabel 节点当前设置的字号
+static func _get_label_current_font_size(label: Node) -> int:
+	if label is Label:
+		return (label as Label).get_theme_font_size("font_size")
+	if label is RichTextLabel:
+		return (label as RichTextLabel).get_theme_default_font_size()
+	return 20
+
+## 解析 Label 可用渲染容器宽度
+static func _resolve_label_available_width(label: Node, container_width: float) -> float:
+	if container_width >= 0.0:
+		return container_width
+	if label is Control and (label as Control).size.x > 0.0:
+		return (label as Control).size.x
+	return 200.0
+
+## 计算适配阶梯目标字号
+static func _resolve_fitted_font_size(text: String, avail_width: float, current_size: int, is_cjk: bool, min_size: int) -> int:
+	var estimated_width := _estimate_width(text, current_size, is_cjk)
+	if estimated_width <= avail_width * 0.9:
+		return current_size
+	for step_size in FONT_SIZE_STEPS:
+		if step_size < min_size:
+			break
+		if _estimate_width(text, step_size, is_cjk) <= avail_width * 0.9:
+			return step_size
+	return min_size
+
+## 应用 Label 样式与溢出策略
+static func _apply_label_visual_style(label: Node, font_size: int, is_overflow: bool) -> void:
+	if label is Label:
+		var lbl := label as Label
+		if is_overflow:
+			lbl.clip_text = true
+			lbl.ellipsis_char = ELLIPSIS_CHAR
+		lbl.add_theme_font_size_override("font_size", font_size)
+	elif label is RichTextLabel:
+		var rlbl := label as RichTextLabel
+		if is_overflow:
+			rlbl.fit_content = true
+		rlbl.add_theme_font_size_override("normal_font_size", font_size)
+
 ## 适配 Label 节点
 ## 根据文本长度、容器宽度、语言特性自动调整字号和换行模式
 static func adapt_label(label: Node, text: String, container_width: float = -1.0) -> void:
@@ -32,47 +74,12 @@ static func adapt_label(label: Node, text: String, container_width: float = -1.0
 
 	var is_cjk := UITextResolver.is_cjk_locale()
 	var min_size := FONT_SIZE_MIN_CJK if is_cjk else FONT_SIZE_MIN_LATIN
+	var current_size := _get_label_current_font_size(label)
+	var avail_width := _resolve_label_available_width(label, container_width)
 
-	# 获取当前字号
-	var current_size := 20
-	if label is Label:
-		current_size = label.get_theme_font_size("font_size")
-	elif label is RichTextLabel:
-		current_size = label.get_theme_default_font_size()
-
-	# 估算文本宽度（R-14：按语言分宽度系数，CJK≈1.0em / Latin≈0.5em）
-	var estimated_width := _estimate_width(text, current_size, is_cjk)
-
-	# 容器宽度
-	var avail_width := container_width
-	if avail_width < 0:
-		avail_width = label.size.x if label.size.x > 0 else 200.0
-
-	# 文本溢出 → 逐级降字号
-	if estimated_width > avail_width * 0.9:
-		var fitted := false
-		for step_size in FONT_SIZE_STEPS:
-			if step_size < min_size:
-				break
-			var step_width: float = _estimate_width(text, step_size, is_cjk)
-			if step_width <= avail_width * 0.9:
-				current_size = step_size
-				fitted = true
-				break
-		if not fitted:
-			# 所有字号都溢出 → 启用截断或换行
-			current_size = min_size
-			if label is Label:
-				(label as Label).clip_text = true
-				(label as Label).ellipsis_char = ELLIPSIS_CHAR
-			elif label is RichTextLabel:
-				(label as RichTextLabel).fit_content = true
-
-	# 应用字号
-	if label is Label:
-		(label as Label).add_theme_font_size_override("font_size", current_size)
-	elif label is RichTextLabel:
-		(label as RichTextLabel).add_theme_font_size_override("normal_font_size", current_size)
+	var fitted_size := _resolve_fitted_font_size(text, avail_width, current_size, is_cjk, min_size)
+	var is_overflow := (fitted_size == min_size) and (_estimate_width(text, min_size, is_cjk) > avail_width * 0.9)
+	_apply_label_visual_style(label, fitted_size, is_overflow)
 
 ## 适配 Button 节点
 ## 按钮文本过长时自动缩字号, 保持按钮不溢出

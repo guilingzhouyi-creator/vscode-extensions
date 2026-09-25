@@ -116,21 +116,38 @@ func _unregister_token(token: EventBusSubscriptionToken) -> void:
 # 原语 ①：dispatch_now（即时同步因果 + 递归熔断）
 # ==============================================================================
 
-func dispatch_now(packet: EventPacket) -> void:
-	if packet == null:
-		return
-	if _dispatch_depth >= _max_depth:
-		ErrorReporter.emit("event_bus2_reentrancy_guard", {"channel_id": packet.channel_id, "max_depth": _max_depth})
-		return
-	# 深度索引化暂存（复用不重建，零热路径堆分配）；越界即自愈重建（异常回调泄漏深度后仍能恢复服务）
-	var depth: int = _dispatch_depth
-	_dispatch_depth += 1
+## 深度索引化暂存准备（复用不重建，零热路径堆分配）
+func _prepare_dispatch_scratch(depth: int) -> void:
 	if depth >= _target_scratch.size():
 		_target_scratch.resize(depth + 1)
 		_target_scratch[depth] = []
 	if depth >= _seen_scratch.size():
 		_seen_scratch.resize(depth + 1)
 		_seen_scratch[depth] = {}
+
+## 收集指定频道的有效订阅者到 targets 快照列表
+func _collect_channel_subscribers(channel_id: int, packet: EventPacket, seen: Dictionary, targets: Array) -> void:
+	if not _channel_routes.has(channel_id):
+		return
+	var subs: Array = _channel_routes[channel_id]
+	for item in subs:
+		var tok: EventBusSubscriptionToken = item as EventBusSubscriptionToken
+		if tok == null or not tok.is_active:
+			continue
+		var mask_match: bool = ((tok.category_mask & packet.category_mask) != 0) or tok.category_mask == 0
+		if mask_match and not seen.has(tok):
+			seen[tok] = true
+			targets.append(tok)
+
+func dispatch_now(packet: EventPacket) -> void:
+	if packet == null:
+		return
+	if _dispatch_depth >= _max_depth:
+		ErrorReporter.emit("event_bus2_reentrancy_guard", {"channel_id": packet.channel_id, "max_depth": _max_depth})
+		return
+	var depth: int = _dispatch_depth
+	_dispatch_depth += 1
+	_prepare_dispatch_scratch(depth)
 	var targets: Array = _target_scratch[depth]
 	var seen: Dictionary = _seen_scratch[depth]
 	targets.clear()
@@ -138,23 +155,9 @@ func dispatch_now(packet: EventPacket) -> void:
 	_seq_counter += 1
 	packet.event_id = _seq_counter
 
-	if _channel_routes.has(packet.channel_id):
-		# 遍历前直接快照到 targets（Inv-EB2-7 回调内 unbind 不跳项；不 duplicate 原数组）
-		var subs: Array = _channel_routes[packet.channel_id]
-		for item in subs:
-			var tok: EventBusSubscriptionToken = item as EventBusSubscriptionToken
-			if tok != null and tok.is_active and ((tok.category_mask & packet.category_mask) != 0 or tok.category_mask == 0):
-				if not seen.has(tok):
-					seen[tok] = true
-					targets.append(tok)
-	if packet.channel_id != 0 and _channel_routes.has(0):
-		var subs_zero: Array = _channel_routes[0]
-		for item in subs_zero:
-			var tok: EventBusSubscriptionToken = item as EventBusSubscriptionToken
-			if tok != null and tok.is_active and ((tok.category_mask & packet.category_mask) != 0 or tok.category_mask == 0):
-				if not seen.has(tok):
-					seen[tok] = true
-					targets.append(tok)
+	_collect_channel_subscribers(packet.channel_id, packet, seen, targets)
+	if packet.channel_id != 0:
+		_collect_channel_subscribers(0, packet, seen, targets)
 
 	# 派发快照已在独立 targets 中，回调内增删订阅不影响本轮遍历（Inv-EB2-7）
 	for tok in targets:

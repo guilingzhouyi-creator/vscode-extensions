@@ -46,70 +46,58 @@ static func ensure_loaded() -> void:
 
 ## 从 contracts.json 装载契约条目：主/备路径探测、JSON 解析、schema 版本校验、
 ## infra_domains 与 entries 装配；任一步失败 emit_error 并置 _loaded 防重复装载
-func _load_from_config() -> void:
-	_entries.clear()
-	_infra_domains.clear()
-	_reverse_orphans.clear()
-	# P3-11 修复：失败路径（缺文件/解析失败/schema 不匹配/validate_config 拒绝）同样
-	# 清空预建索引，避免 find_all 返回空而 find_by_*/get_contract 仍返回陈旧条目的状态分裂
-	_by_id.clear()
-	_by_domain.clear()
-	_by_view.clear()
-	_by_domain_view.clear()
-	_by_endpoint.clear()
-
+## 读取契约配置文件文本（含主备路径探测与错误广播）
+func _read_config_file_text() -> String:
 	var path := CONTRACT_CONFIG_PATH_PRIMARY
 	if not FileAccess.file_exists(path):
 		path = CONTRACT_CONFIG_PATH_FALLBACK
-		# I5：主路径缺失回退后备副本时显式告警，防双配置源静默漂移
 		ErrorReporter.emit_error("contract_registry_index", "CONFIG_FALLBACK_USED", "ContractRegistryIndex: 主配置缺失 %s，回退后备路径 %s（请收敛双配置源）" % [CONTRACT_CONFIG_PATH_PRIMARY, CONTRACT_CONFIG_PATH_FALLBACK])
 
 	if not FileAccess.file_exists(path):
 		ErrorReporter.emit_error("contract_registry_index", "CONFIG_FILE_NOT_FOUND", "ContractRegistryIndex: 未找到配置文件: %s" % path)
-		_loaded = true
-		return
+		return ""
 
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		ErrorReporter.emit_error("contract_registry_index", "CONFIG_FILE_READ_FAIL", "ContractRegistryIndex: 无法读取配置文件: %s" % path)
-		_loaded = true
-		return
+		return ""
 
 	var text := file.get_as_text()
 	file.close()
+	return text
 
+## 解析 JSON 字符串并断言字典根节点
+func _parse_json_dict(text: String) -> Dictionary:
 	var json := JSON.new()
 	var err := json.parse(text)
 	if err != OK:
 		ErrorReporter.emit_error("contract_registry_index", "CONFIG_JSON_PARSE_FAIL", "ContractRegistryIndex: JSON 解析失败: %s" % json.get_error_message())
-		_loaded = true
-		return
+		return {}
 
 	var data = json.get_data()
 	if not (data is Dictionary):
 		ErrorReporter.emit_error("contract_registry_index", "CONFIG_ROOT_NOT_DICT", "ContractRegistryIndex: 配置根节点必须为 Dictionary")
-		_loaded = true
-		return
+		return {}
 
-	var dict: Dictionary = data as Dictionary
+	return data as Dictionary
+
+## 解包契约各分段结构并重建预建索引
+func _unpack_registry_sections(dict: Dictionary) -> bool:
 	_schema_version = int(dict.get("$schema_version", 0))
 	if _schema_version != SUPPORTED_SCHEMA_VERSION:
 		ErrorReporter.emit_error("contract_registry_index", "CONFIG_SCHEMA_UNSUPPORTED", "ContractRegistryIndex: schema_version %d 不受支持 (期望 %d)" % [_schema_version, SUPPORTED_SCHEMA_VERSION])
-		_loaded = true
-		return
+		return false
 
 	var raw_infra = dict.get("infra_domains", [])
 	if raw_infra is Array:
 		for item in raw_infra:
 			_infra_domains.append(String(item))
 
-	# 结构校验（门禁阻断：损坏配置拒绝装载并 emit_error，杜绝半装载状态）
 	var vres := validate_config(dict)
 	if not bool(vres.get("valid", false)):
 		var errs: Array = vres.get("errors", [])
 		ErrorReporter.emit_error("contract_registry_index", "CONFIG_VALIDATION_FAILED", "ContractRegistryIndex: 契约配置结构校验失败: %s" % "; ".join(errs))
-		_loaded = true
-		return
+		return false
 
 	var raw_entries = dict.get("entries", [])
 	if raw_entries is Array:
@@ -122,9 +110,35 @@ func _load_from_config() -> void:
 	if raw_orphans is Array:
 		for item in raw_orphans:
 			if item is Dictionary:
-				_reverse_orphans.append((item as Dictionary).duplicate(true))
+				_reverse_orphans.append((item as Dictionary).duplicate(false))
 
 	_rebuild_indexes()
+	return true
+
+## 从 contracts.json 装载契约条目：主/备路径探测、JSON 解析、schema 版本校验、
+## infra_domains 与 entries 装配；任一步失败 emit_error 并置 _loaded 防重复装载
+func _load_from_config() -> void:
+	_entries.clear()
+	_infra_domains.clear()
+	_reverse_orphans.clear()
+	# 清空预建索引，避免 find_all 返回空而 find_by_*/get_contract 仍返回陈旧条目的状态分裂
+	_by_id.clear()
+	_by_domain.clear()
+	_by_view.clear()
+	_by_domain_view.clear()
+	_by_endpoint.clear()
+
+	var text := _read_config_file_text()
+	if text.is_empty():
+		_loaded = true
+		return
+
+	var dict := _parse_json_dict(text)
+	if dict.is_empty():
+		_loaded = true
+		return
+
+	_unpack_registry_sections(dict)
 	_loaded = true
 
 
