@@ -844,6 +844,9 @@ export * from './core/intelligence/dataArchitecture';
 // ---- Quality Quantification & Scoring Engine ----
 export * from './core/scoring';
 
+// ---- Dynamic Analysis Plane Telemetry & Profiling ----
+export * from './core/dynamic';
+
 // ---- Audit Snapshot & Sandbox Baseline Extensions ----
 export * from './core/snapshot/types';
 export * from './core/snapshot/snapshotManager';

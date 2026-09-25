@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790323263314",
-  "timestamp": "2026-09-25T08:01:06.792Z",
+  "snapshotId": "snapshot-v0.4.0-1790329993477",
+  "timestamp": "2026-09-25T09:53:17.975Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,32 +12,32 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 459,
-    "durationMs": 3206
+    "filesScanned": 473,
+    "durationMs": 4118
   },
   "metrics": {
-    "compositeScore": 99.9,
+    "compositeScore": 99.8,
     "grade": "A+",
-    "effectiveCodeDensity": 0.95,
-    "totalIssues": 7039,
-    "suppressedIssues": 3772,
-    "unsuppressedIssues": 3267,
+    "effectiveCodeDensity": 0.96,
+    "totalIssues": 7453,
+    "suppressedIssues": 3980,
+    "unsuppressedIssues": 3473,
     "bySeverity": {
-      "info": 317,
-      "warning": 6722,
+      "info": 319,
+      "warning": 7134,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 160,
-      "medium": 6367,
-      "low": 512
+      "high": 166,
+      "medium": 6752,
+      "low": 535
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 99.2,
+      "maintainability": 99.1,
       "performance": 99.8,
       "data": 100,
       "testing": 100,
@@ -45,7 +45,7 @@
       "security": 100,
       "extensibility": 100
     },
-    "compositeScore": 99.9,
+    "compositeScore": 99.8,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -89,7 +89,7 @@
     {
       "filePath": "scripts/test-parallel.js",
       "domain": "scripts",
-      "totalIssues": 97,
+      "totalIssues": 102,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 160,
-      "medium": 6367,
-      "low": 512
+      "high": 166,
+      "medium": 6752,
+      "low": 535
     },
     "criticalItems": [],
     "highItems": [
@@ -764,6 +764,21 @@
         "moduleCount": 1
       },
       {
+        "domainName": "dynamic",
+        "compositeScore": 99.7,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 97.6,
+          "performance": 100,
+          "data": 100,
+          "testing": 100,
+          "reliability": 100,
+          "security": 100,
+          "extensibility": 100
+        },
+        "moduleCount": 1
+      },
+      {
         "domainName": "governance",
         "compositeScore": 100,
         "pillars": {
@@ -1083,7 +1098,7 @@
         "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.4,
+          "maintainability": 99,
           "performance": 100,
           "data": 100,
           "testing": 100,

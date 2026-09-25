@@ -20,3 +20,7 @@ export * from './patchQuality';
 export * from './diffScore';
 export * from './qualityScorer';
 export * from './project-governance-evaluator';
+export * from './static-quality-model';
+export * from './risk-fusion-engine';
+export * from './fusion-scorer';
+export * from './change-quality-arbiter';

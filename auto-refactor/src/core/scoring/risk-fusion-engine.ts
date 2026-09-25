@@ -1,0 +1,169 @@
+/**
+ * Module: Feedback Fusion Layer — Dual-Plane Risk Fusion Engine
+ * File Path: src/core/scoring/risk-fusion-engine.ts
+ * Architecture Role: Evaluates non-linear cross-plane risk resonance combining static analysis
+ *   inferences, dynamic runtime evidence, and historical failure records:
+ *   Risk_i = S_i^alpha * D_i^beta * H_i^gamma.
+ * Dependencies & Triggers: Consumes static-quality-model and dynamic-types; consumed by
+ *   fusion-scorer, report-builder, and governance gates.
+ * Responsibilities:
+ *   1. Evaluate non-linear resonance between Static Risk (S_i) and Dynamic Risk (D_i).
+ *   2. Enforce Dual Confirmation escalation to CRITICAL for verified hotspots.
+ *   3. Enforce Single-Side Dampening to eliminate false positives on cold/uninvoked paths.
+ *   4. Capture hidden runtime bottlenecks when static heuristics underestimate complexity.
+ * Exit Semantics & Design Rationale: Bounded [0.0, 100.0] fused score space; deterministic;
+ *   produces transparent rationale explaining why risks were amplified or dampened.
+ */
+
+import type { StaticIssueRisk } from './static-quality-model';
+import type { DynamicIssueRisk } from '../dynamic/dynamic-types';
+
+/**
+ * Exponent tuning coefficients for risk resonance calculation:
+ * Risk_i = S_i^alpha * D_i^beta * H_i^gamma
+ */
+export interface RiskFusionCoefficients {
+    /** alpha: Static inference exponent (default: 1.0) */
+    alpha: number;
+    /** beta: Dynamic evidence exponent (default: 1.2, prioritizing runtime facts) */
+    beta: number;
+    /** gamma: Historical failure sensitivity exponent (default: 0.8) */
+    gamma: number;
+}
+
+/**
+ * Standard default risk fusion coefficients.
+ */
+export const DEFAULT_FUSION_COEFFICIENTS: Readonly<RiskFusionCoefficients> = {
+    alpha: 1.0,
+    beta: 1.2,
+    gamma: 0.8,
+};
+
+/**
+ * Final classified risk levels after cross-plane fusion.
+ */
+export type FusedRiskLevel = 'critical' | 'high' | 'medium' | 'low' | 'informational';
+
+/**
+ * Quantified cross-plane fused issue risk evaluation.
+ */
+export interface FusedIssueRisk {
+    issueId: string;
+    rule: string;
+    /** S_i: Static risk score [0.0, 10.0] */
+    staticRisk: number;
+    /** D_i: Dynamic risk score [0.0, 10.0] */
+    dynamicRisk: number;
+    /** H_i: Historical incident multiplier [0.5, 3.0] */
+    historicalFactor: number;
+    /** Fused risk score: S_i^alpha * D_i^beta * H_i^gamma */
+    fusedScore: number;
+    /** Final categorized risk level */
+    level: FusedRiskLevel;
+    /** True if issue is corroborated by both static AST and dynamic profiler */
+    isDualConfirmed: boolean;
+    /** True if single-sided noise dampening was applied */
+    suppressionApplied: boolean;
+    /** Human-readable explanation of the fusion arbitration verdict */
+    rationale: string;
+}
+
+/**
+ * Fuses static risk and dynamic runtime evidence for an issue or hotspot:
+ * Risk_i = S_i^alpha * D_i^beta * H_i^gamma
+ *
+ * @param staticRisk - Quantified static risk assessment (S_i).
+ * @param dynamicRisk - Optional dynamic hotspot risk assessment (D_i).
+ * @param historicalFactor - Optional historical failure multiplier (H_i, default 1.0).
+ * @param customCoeffs - Optional override for alpha, beta, gamma exponents.
+ * @returns Fully articulated FusedIssueRisk record.
+ */
+export function fuseIssueRisks(
+    staticRisk: StaticIssueRisk,
+    dynamicRisk?: DynamicIssueRisk,
+    historicalFactor = 1.0,
+    customCoeffs: Partial<RiskFusionCoefficients> = {},
+): FusedIssueRisk {
+    const coeffs: RiskFusionCoefficients = {
+        ...DEFAULT_FUSION_COEFFICIENTS,
+        ...customCoeffs,
+    };
+
+    const S = Math.max(0.1, staticRisk.normalizedRisk);
+    const H = Math.max(0.5, Math.min(3.0, historicalFactor));
+
+    let D = 1.0;
+    let isDualConfirmed = false;
+    let suppressionApplied = false;
+    let rationale = '';
+
+    if (dynamicRisk && dynamicRisk.evidenceConfidence > 0) {
+        D = Math.max(0.05, dynamicRisk.normalizedRisk);
+
+        // Corroboration arbitration:
+        if (staticRisk.normalizedRisk >= 3.0 && dynamicRisk.normalizedRisk >= 3.0) {
+            // Case 1: Dual confirmation -> Exponential resonance amplification
+            isDualConfirmed = true;
+            rationale =
+                `Dual-plane confirmed: High static structural risk (S=${staticRisk.normalizedRisk.toFixed(1)}) ` +
+                `corroborated by runtime hotspot evidence (D=${dynamicRisk.normalizedRisk.toFixed(1)}). Risk amplified.`;
+        } else if (staticRisk.normalizedRisk >= 2.0 && dynamicRisk.normalizedRisk <= 0.5) {
+            // Case 2: Static alarm on cold/uninvoked path -> Dampen to suppress noise
+            suppressionApplied = true;
+            rationale =
+                `Single-sided dampening: High static complexity (S=${staticRisk.normalizedRisk.toFixed(1)}) ` +
+                `refuted by cold runtime invocation evidence (D=${dynamicRisk.normalizedRisk.toFixed(1)}). Severity downgraded.`;
+        } else if (staticRisk.normalizedRisk <= 1.0 && dynamicRisk.normalizedRisk >= 5.0) {
+            // Case 3: Hidden runtime bottleneck not visible in AST heuristics
+            rationale =
+                `Hidden runtime bottleneck: Low static penalty (S=${staticRisk.normalizedRisk.toFixed(1)}) ` +
+                `overridden by severe runtime latency/contention hotspot (D=${dynamicRisk.normalizedRisk.toFixed(1)}).`;
+        } else {
+            rationale = `Standard dual-plane fusion across static and dynamic indicators.`;
+        }
+    } else {
+        // Telemetry absent: fallback to static baseline with neutral dynamic factor
+        D = 1.0;
+        rationale = `Dynamic telemetry unavailable; risk inferred from static structural analysis with neutral dynamic baseline.`;
+    }
+
+    // Mathematical formula: S^alpha * D^beta * H^gamma
+    let rawFused = Math.pow(S, coeffs.alpha) * Math.pow(D, coeffs.beta) * Math.pow(H, coeffs.gamma);
+
+    if (suppressionApplied) {
+        // Apply 65% noise suppression discount
+        rawFused *= 0.35;
+    } else if (isDualConfirmed) {
+        // Apply 30% resonance boost
+        rawFused *= 1.3;
+    }
+
+    const fusedScore = Math.round(Math.min(100.0, rawFused) * 10) / 10;
+
+    let level: FusedRiskLevel = 'informational';
+    if (fusedScore >= 20.0 || (isDualConfirmed && fusedScore >= 12.0)) {
+        level = 'critical';
+    } else if (fusedScore >= 10.0) {
+        level = 'high';
+    } else if (fusedScore >= 4.0) {
+        level = 'medium';
+    } else if (fusedScore >= 1.5) {
+        level = 'low';
+    } else {
+        level = 'informational';
+    }
+
+    return {
+        issueId: staticRisk.issueId,
+        rule: staticRisk.rule,
+        staticRisk: Math.round(staticRisk.normalizedRisk * 10) / 10,
+        dynamicRisk: dynamicRisk ? Math.round(dynamicRisk.normalizedRisk * 10) / 10 : 0.0,
+        historicalFactor: Math.round(H * 100) / 100,
+        fusedScore,
+        level,
+        isDualConfirmed,
+        suppressionApplied,
+        rationale,
+    };
+}
