@@ -56,6 +56,28 @@ export interface NativePatternMatch {
 }
 
 /**
+ * Lexical masking configuration consumed by the native source masking operator.
+ */
+export interface NativeMaskConfig {
+    readonly lineComment: string;
+    readonly blockCommentOpen?: string;
+    readonly blockCommentClose?: string;
+    readonly quoteChars: string;
+    readonly multilineTemplates?: boolean;
+    readonly regexLiterals?: boolean;
+}
+
+/**
+ * Result of native source code masking including raw/masked lines and line counts.
+ */
+export interface NativeMaskedSource {
+    readonly raw: string[];
+    readonly masked: string[];
+    readonly lines: number;
+    readonly nonBlankLines: number;
+}
+
+/**
  * Unified interface implemented by both native Rust core and pure JS shim.
  */
 export interface INativeCore {
@@ -75,7 +97,13 @@ export interface INativeCore {
     fastPatternMatch(sourceText: string, patterns: string[]): NativePatternMatch[];
 
     /**
+     * Masks comment and literal regions using the fast native SIMD masking operator.
+     */
+    maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource;
+
+    /**
      * Inspects active engine status and capabilities.
      */
     getStatus(): NativeCoreStatus;
 }
+

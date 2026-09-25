@@ -1,0 +1,6 @@
+[package]
+name = "ops-diff"
+version = "0.4.0"
+edition = "2021"
+
+[dependencies]

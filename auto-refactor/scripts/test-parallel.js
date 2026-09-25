@@ -53,6 +53,7 @@ for (let i = 0; i < rawArgs.length; i++) {
 // ── Test Suites Declaration ──
 // Stage 1: Isolated parallel test suites (no shared daemon or corpus disk state)
 const PARALLEL_SUITES = [
+  { name: 'validate-native-operator', script: 'scripts/validate-native-operator.js' },
   { name: 'validate-oxc', script: 'scripts/validate-oxc-keypoints.js' },
   { name: 'validate-praxis', script: 'scripts/validate-praxis-foundation.js' },
   { name: 'validate-governance', script: 'scripts/validate-governance.js' },

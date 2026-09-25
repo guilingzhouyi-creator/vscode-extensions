@@ -1,27 +1,135 @@
-mod diff;
-mod graph;
-mod pattern;
-
-pub use diff::NativeDiffHunk;
-pub use graph::NativeGraphAnalysis;
-pub use pattern::NativePatternMatch;
-
 use napi_derive::napi;
 
 #[napi]
 pub const VERSION: &str = "0.4.0-rust-native";
 
+#[napi(object)]
+pub struct NativeDiffHunk {
+    pub old_start: u32,
+    pub old_lines: u32,
+    pub new_start: u32,
+    pub new_lines: u32,
+    pub lines: Vec<String>,
+}
+
+impl From<ops_diff::DiffHunk> for NativeDiffHunk {
+    fn from(h: ops_diff::DiffHunk) -> Self {
+        Self {
+            old_start: h.old_start,
+            old_lines: h.old_lines,
+            new_start: h.new_start,
+            new_lines: h.new_lines,
+            lines: h.lines,
+        }
+    }
+}
+
+#[napi(object)]
+pub struct NativeGraphAnalysis {
+    pub cycles: Vec<Vec<String>>,
+    pub topological_order: Vec<String>,
+    pub strongly_connected_components: Vec<Vec<String>>,
+    pub is_acyclic: bool,
+}
+
+impl From<ops_graph::GraphAnalysis> for NativeGraphAnalysis {
+    fn from(g: ops_graph::GraphAnalysis) -> Self {
+        Self {
+            cycles: g.cycles,
+            topological_order: g.topological_order,
+            strongly_connected_components: g.strongly_connected_components,
+            is_acyclic: g.is_acyclic,
+        }
+    }
+}
+
+#[napi(object)]
+pub struct NativePatternMatch {
+    pub pattern: String,
+    pub line: u32,
+    pub column: u32,
+    pub match_text: String,
+}
+
+impl From<ops_pattern::PatternMatch> for NativePatternMatch {
+    fn from(p: ops_pattern::PatternMatch) -> Self {
+        Self {
+            pattern: p.pattern,
+            line: p.line,
+            column: p.column,
+            match_text: p.match_text,
+        }
+    }
+}
+
+#[napi(object)]
+pub struct NativeMaskConfig {
+    pub line_comment: String,
+    pub block_comment_open: Option<String>,
+    pub block_comment_close: Option<String>,
+    pub quote_chars: String,
+    pub multiline_templates: Option<bool>,
+    pub regex_literals: Option<bool>,
+}
+
+#[napi(object)]
+pub struct NativeMaskedSource {
+    pub raw: Vec<String>,
+    pub masked: Vec<String>,
+    pub lines: u32,
+    pub non_blank_lines: u32,
+}
+
+impl From<NativeMaskConfig> for ops_mask::MaskConfig {
+    fn from(c: NativeMaskConfig) -> Self {
+        let block_comment = match (c.block_comment_open, c.block_comment_close) {
+            (Some(o), Some(cl)) if !o.is_empty() && !cl.is_empty() => Some((o, cl)),
+            _ => None,
+        };
+        Self {
+            line_comment: c.line_comment,
+            block_comment,
+            quote_chars: c.quote_chars,
+            multiline_templates: c.multiline_templates.unwrap_or(false),
+            regex_literals: c.regex_literals.unwrap_or(false),
+        }
+    }
+}
+
+impl From<ops_mask::MaskResult> for NativeMaskedSource {
+    fn from(r: ops_mask::MaskResult) -> Self {
+        Self {
+            raw: r.raw,
+            masked: r.masked,
+            lines: r.lines,
+            non_blank_lines: r.non_blank_lines,
+        }
+    }
+}
+
 #[napi]
 pub fn compute_histogram_diff(old_content: String, new_content: String) -> Vec<NativeDiffHunk> {
-    diff::run_histogram_diff(&old_content, &new_content)
+    ops_diff::run_histogram_diff(&old_content, &new_content)
+        .into_iter()
+        .map(Into::into)
+        .collect()
 }
 
 #[napi]
 pub fn analyze_dependency_graph(edges: Vec<Vec<String>>) -> NativeGraphAnalysis {
-    graph::run_analyze_dependency_graph(&edges)
+    ops_graph::run_analyze_dependency_graph(&edges).into()
 }
 
 #[napi]
 pub fn fast_pattern_match(source_text: String, patterns: Vec<String>) -> Vec<NativePatternMatch> {
-    pattern::run_fast_pattern_match(&source_text, &patterns)
+    ops_pattern::run_fast_pattern_match(&source_text, &patterns)
+        .into_iter()
+        .map(Into::into)
+        .collect()
+}
+
+#[napi]
+pub fn mask_source_code(content: String, config: NativeMaskConfig) -> NativeMaskedSource {
+    let mask_config: ops_mask::MaskConfig = config.into();
+    ops_mask::mask_source_code(&content, &mask_config).into()
 }

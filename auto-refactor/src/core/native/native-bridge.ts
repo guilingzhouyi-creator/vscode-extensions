@@ -19,6 +19,8 @@ import type {
     NativeCoreStatus,
     NativeDiffHunk,
     NativeGraphAnalysis,
+    NativeMaskConfig,
+    NativeMaskedSource,
     NativePatternMatch,
 } from './native-types';
 import {
@@ -28,6 +30,9 @@ import {
 import { histogramDiff } from '../diff/histogram-diff';
 import type { DiffOp } from '../diff/myers-algorithm';
 import { DIFF_OP_EQUAL, DIFF_OP_DELETE, DIFF_OP_INSERT } from '../diff/myers-algorithm';
+import { countLineStats } from '../../utils/linestats';
+import { maskSourceTextJs } from '../policy/source-mask';
+
 
 
 /**
@@ -55,6 +60,7 @@ export class PureJsNativeShim implements INativeCore {
                 'tarjan-scc',
                 'topological-sort',
                 'fast-pattern-match',
+                'simd-source-mask',
             ],
         };
     }
@@ -244,6 +250,29 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * Pure JS fallback implementation of source masking and line statistics.
+     */
+    public maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource {
+        const res = maskSourceTextJs(content, {
+            lineComment: config.lineComment,
+            blockComment: config.blockCommentOpen && config.blockCommentClose
+                ? { open: config.blockCommentOpen, close: config.blockCommentClose }
+                : undefined,
+            quoteChars: config.quoteChars,
+            multilineTemplates: config.multilineTemplates,
+            regexLiterals: config.regexLiterals,
+        });
+        const stats = countLineStats(content);
+        return {
+            raw: res.raw,
+            masked: res.masked,
+            lines: stats.lines,
+            nonBlankLines: stats.nonBlankLines,
+        };
+    }
+
+
+    /**
      * Finds preceding equal context line count before a cluster start.
      */
     private findPrecedingContextCount(
@@ -416,6 +445,7 @@ function probeNativeBinding(): INativeCore | null {
                 computeHistogramDiff: binding.computeHistogramDiff,
                 analyzeDependencyGraph: binding.analyzeDependencyGraph,
                 fastPatternMatch: binding.fastPatternMatch,
+                maskSourceCode: binding.maskSourceCode,
                 getStatus: () => ({
                     isNativeAvailable: true,
                     activeEngine: 'rust-native',
@@ -428,6 +458,7 @@ function probeNativeBinding(): INativeCore | null {
                         'simd-histogram-diff',
                         'parallel-tarjan-scc',
                         'zero-copy-buffer',
+                        'simd-source-mask',
                     ],
                 }),
             };
@@ -488,4 +519,19 @@ export function nativeFastPatternMatch(
 ): NativePatternMatch[] {
     return nativeCore.fastPatternMatch(sourceText, patterns);
 }
+
+/**
+ * Convenience helper to mask source code comments and literals.
+ *
+ * @param content - Target source code content.
+ * @param config - Lexical masking configuration.
+ * @returns Masked source text structure with line metrics.
+ */
+export function nativeMaskSourceCode(
+    content: string,
+    config: NativeMaskConfig,
+): NativeMaskedSource {
+    return nativeCore.maskSourceCode(content, config);
+}
+
 

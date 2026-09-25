@@ -50,6 +50,8 @@
 | [docs/01-architecture/02-pipeline-and-caching.md](./docs/01-architecture/02-pipeline-and-caching.md) | L1/L2 两级增量缓存、非对称缓存探针与配置指纹隔离机制 | ✅ 已落地 |
 | [docs/01-architecture/03-daemon-and-ipc.md](./docs/01-architecture/03-daemon-and-ipc.md) | 跨平台 Daemon 守护进程、NDJSON 通信、心跳自愈与生命周期 | ✅ 已落地 |
 | [docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md](./docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md) | Praxis 分形 Git 工作树、两级门禁、三层联动回滚与智能体生命周期（v1.0.0-PROD-SPEC） | ✅ 已落地 |
+| [docs/01-architecture/05-rust-native-operator-kernel.md](./docs/01-architecture/05-rust-native-operator-kernel.md) | Rust 原生算子库（auto-refactor-ops）、Cargo Workspace 拓扑与 SIMD 脱敏双轨等价规范 | ✅ 已落地 |
+
 
 ## 🌲 2. 语法解析与 AST 适配 (Parsers & AST)
 

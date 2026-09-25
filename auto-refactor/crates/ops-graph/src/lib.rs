@@ -1,15 +1,14 @@
-use napi_derive::napi;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-#[napi(object)]
-pub struct NativeGraphAnalysis {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphAnalysis {
     pub cycles: Vec<Vec<String>>,
     pub topological_order: Vec<String>,
     pub strongly_connected_components: Vec<Vec<String>>,
     pub is_acyclic: bool,
 }
 
-pub fn run_analyze_dependency_graph(edges: &[Vec<String>]) -> NativeGraphAnalysis {
+pub fn run_analyze_dependency_graph(edges: &[Vec<String>]) -> GraphAnalysis {
     let mut adjacency: HashMap<String, HashSet<String>> = HashMap::new();
     let mut in_degree: HashMap<String, usize> = HashMap::new();
     let mut all_nodes: BTreeSet<String> = BTreeSet::new();
@@ -154,10 +153,37 @@ pub fn run_analyze_dependency_graph(edges: &[Vec<String>]) -> NativeGraphAnalysi
 
     let is_acyclic = cycles.is_empty();
 
-    NativeGraphAnalysis {
+    GraphAnalysis {
         cycles,
         topological_order,
         strongly_connected_components: sccs,
         is_acyclic,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_acyclic_graph() {
+        let edges = vec![
+            vec!["a".to_string(), "b".to_string()],
+            vec!["b".to_string(), "c".to_string()],
+        ];
+        let analysis = run_analyze_dependency_graph(&edges);
+        assert!(analysis.is_acyclic);
+        assert_eq!(analysis.topological_order, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_cyclic_graph() {
+        let edges = vec![
+            vec!["a".to_string(), "b".to_string()],
+            vec!["b".to_string(), "a".to_string()],
+        ];
+        let analysis = run_analyze_dependency_graph(&edges);
+        assert!(!analysis.is_acyclic);
+        assert_eq!(analysis.cycles.len(), 1);
     }
 }

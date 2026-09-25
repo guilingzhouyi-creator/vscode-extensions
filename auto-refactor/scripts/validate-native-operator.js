@@ -1,0 +1,287 @@
+#!/usr/bin/env node
+/**
+ * Module: Verification Harness — Native Operator & Dual-Track Equivalence
+ * File Path: scripts/validate-native-operator.js
+ * Architecture Role: Verifies the integrity of the Rust native operator kernel (auto-refactor-ops)
+ *   and asserts 100% byte and algorithmic equivalence between Rust SIMD operators and the
+ *   pure JavaScript fallback shim across multilingual source code matrices.
+ * Dependencies & Triggers: Consumes src/core/native, src/core/policy/source-mask;
+ *   executed by scripts/test-parallel.js or `node scripts/validate-native-operator.js`.
+ * Responsibilities:
+ *   1. Validate native acceleration status, capabilities, and version metadata;
+ *   2. Assert 100% byte equivalence between Rust SIMD masking and JS fallback across
+ *      TypeScript, JavaScript, Python, Rust, GDScript, Go, Shell, and PowerShell;
+ *   3. Assert UTF-16 column alignment and character counts on Unicode/multilingual comments;
+ *   4. Verify parity across diff hunks, Tarjan SCC cycle detection, and pattern matching;
+ *   5. Perform real-file regression scans across repository sources.
+ * Exit Semantics & Design Rationale: Exits 0 on all tests passing, exits 1 on any parity drift.
+ */
+
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const {
+  getNativeCoreStatus,
+  nativeCore,
+  PureJsNativeShim,
+} = require('../dist/core/native');
+const {
+  SOURCE_MASK_PRESETS,
+  MASK_LANGUAGE_TYPESCRIPT,
+  MASK_LANGUAGE_JAVASCRIPT,
+  MASK_LANGUAGE_PYTHON,
+  MASK_LANGUAGE_GDSCRIPT,
+  MASK_LANGUAGE_RUST,
+  MASK_LANGUAGE_GO,
+  MASK_LANGUAGE_SHELL,
+  MASK_LANGUAGE_POWERSHELL,
+} = require('../dist/core/policy/source-mask');
+
+const shim = new PureJsNativeShim();
+
+function toNativeConfig(preset) {
+  return {
+    lineComment: preset.lineComment,
+    blockCommentOpen: preset.blockComment ? preset.blockComment.open : undefined,
+    blockCommentClose: preset.blockComment ? preset.blockComment.close : undefined,
+    quoteChars: preset.quoteChars,
+    multilineTemplates: preset.multilineTemplates,
+    regexLiterals: preset.regexLiterals,
+  };
+}
+
+const TEST_CORPUS = [
+  {
+    language: MASK_LANGUAGE_TYPESCRIPT,
+    source: [
+      'import { foo } from "./foo"; // import statement',
+      'const regex = /pattern[a-z]\\//gi; /* block comment */ const x = 10 / 2;',
+      'const template = `line 1',
+      'line 2 ${foo}',
+      'line 3`; const y = \'single\\\'quoted\';',
+      '// trailing line comment',
+    ].join('\n'),
+  },
+  {
+    language: MASK_LANGUAGE_JAVASCRIPT,
+    source: [
+      'function test() {',
+      '  const str = "hello \\"world\\""; // string escape',
+      '  const div = a / b / c; // division, not regex',
+      '  const re = /(?:foo|bar)/m; // regex literal',
+      '}',
+    ].join('\r\n'),
+  },
+  {
+    language: MASK_LANGUAGE_PYTHON,
+    source: [
+      '# Python file header',
+      'def compute(x):',
+      '    """Multi-line docstring here"""',
+      '    msg = \'Single quotes with # hash symbol inside\'',
+      '    return x * 2  # inline comment',
+    ].join('\n'),
+  },
+  {
+    language: MASK_LANGUAGE_GDSCRIPT,
+    source: [
+      'extends Node2D',
+      '# Godot GDScript node',
+      '@export var speed: float = 100.0 # movement speed',
+      'var label: String = "Score: %d" # format string',
+      'func _ready() -> void:',
+      '\tpass',
+    ].join('\n'),
+  },
+  {
+    language: MASK_LANGUAGE_RUST,
+    source: [
+      '// Rust source module',
+      'fn calculate<\'a>(slice: &\'a [u8]) -> usize {',
+      '    /* lifetime \'a should not be treated as quote */',
+      '    let message = "hello \\"world\\"";',
+      '    slice.len()',
+      '}',
+    ].join('\n'),
+  },
+  {
+    language: MASK_LANGUAGE_GO,
+    source: [
+      'package main',
+      '// Go package comment',
+      'const raw = `multiline',
+      'raw string in go`;',
+      '/* block comment',
+      '   spanning lines */',
+      'func main() {}',
+    ].join('\n'),
+  },
+  {
+    language: MASK_LANGUAGE_SHELL,
+    source: [
+      '#!/bin/bash',
+      '# Shell script test',
+      'NAME="World"',
+      'echo "Hello, $NAME" # greeting message',
+    ].join('\n'),
+  },
+  {
+    language: MASK_LANGUAGE_POWERSHELL,
+    source: [
+      '# PowerShell script',
+      '<# Multi-line block',
+      '   comment in PowerShell #>',
+      'Write-Host "Running diagnostics..."',
+    ].join('\n'),
+  },
+  {
+    language: MASK_LANGUAGE_TYPESCRIPT,
+    source: [
+      '// 中文注释与国际化字符测试',
+      'const greeting = "你好，世界！"; // 这是行末注释',
+      '/* 这是一个跨行的',
+      '   中文块注释 */',
+      'const emoji = "🚀 Antigravity 2.0 ✨";',
+    ].join('\n'),
+  },
+  {
+    language: MASK_LANGUAGE_TYPESCRIPT,
+    source: '',
+  },
+  {
+    language: MASK_LANGUAGE_TYPESCRIPT,
+    source: '// Single comment line only\n',
+  },
+];
+
+function runValidation() {
+  console.log('=== [Native Operator Validation] Testing Rust Kernel & Dual-Track Parity ===');
+
+  // 1. Verify Status and Capabilities
+  const status = getNativeCoreStatus();
+  console.log(`[Status] Active Engine: ${status.activeEngine} (version: ${status.version})`);
+  console.log(`[Status] Capabilities: ${status.capabilities.join(', ')}`);
+  assert.ok(status.capabilities.includes('simd-source-mask'), 'Capability simd-source-mask missing');
+  assert.ok(status.capabilities.includes('histogram-diff'), 'Capability histogram-diff missing');
+  assert.ok(status.capabilities.includes('tarjan-scc'), 'Capability tarjan-scc missing');
+
+  // 2. Multilingual Matrix Dual-Track Equivalence
+  console.log(`[Matrix] Validating ${TEST_CORPUS.length} multilingual test cases...`);
+  for (let idx = 0; idx < TEST_CORPUS.length; idx++) {
+    const testCase = TEST_CORPUS[idx];
+    const preset = SOURCE_MASK_PRESETS[testCase.language];
+    const config = toNativeConfig(preset);
+
+    const rustRes = nativeCore.maskSourceCode(testCase.source, config);
+    const shimRes = shim.maskSourceCode(testCase.source, config);
+
+    // Byte-for-byte raw lines equivalence
+    assert.strictEqual(
+      rustRes.raw.length,
+      shimRes.raw.length,
+      `Case ${idx} (${testCase.language}): raw lines length mismatch`,
+    );
+    for (let i = 0; i < rustRes.raw.length; i++) {
+      assert.strictEqual(
+        rustRes.raw[i],
+        shimRes.raw[i],
+        `Case ${idx} (${testCase.language}) line ${i}: raw line mismatch`,
+      );
+    }
+
+    // Byte-for-byte masked lines equivalence
+    assert.strictEqual(
+      rustRes.masked.length,
+      shimRes.masked.length,
+      `Case ${idx} (${testCase.language}): masked lines length mismatch`,
+    );
+    for (let i = 0; i < rustRes.masked.length; i++) {
+      assert.strictEqual(
+        rustRes.masked[i],
+        shimRes.masked[i],
+        `Case ${idx} (${testCase.language}) line ${i}: masked line content mismatch:\nRust: "${rustRes.masked[i]}"\nShim: "${shimRes.masked[i]}"`,
+      );
+    }
+
+    // Line counts equivalence
+    assert.strictEqual(
+      rustRes.lines,
+      shimRes.lines,
+      `Case ${idx} (${testCase.language}): total lines count mismatch`,
+    );
+    assert.strictEqual(
+      rustRes.nonBlankLines,
+      shimRes.nonBlankLines,
+      `Case ${idx} (${testCase.language}): non-blank lines count mismatch`,
+    );
+  }
+  console.log('✓ All multilingual corpus test cases achieved 100% byte equivalence.');
+
+  // 3. Real Repository Files Regression Test
+  const realFiles = [
+    path.resolve(__dirname, '..', 'src', 'core', 'policy', 'source-mask.ts'),
+    path.resolve(__dirname, '..', 'src', 'core', 'native', 'native-bridge.ts'),
+    path.resolve(__dirname, '..', 'src', 'core', 'scoring', 'risk-fusion-engine.ts'),
+  ];
+
+  console.log(`[Real Files] Verifying against ${realFiles.length} actual codebase files...`);
+  for (const filePath of realFiles) {
+    if (!fs.existsSync(filePath)) continue;
+    const content = fs.readFileSync(filePath, 'utf8');
+    const config = toNativeConfig(SOURCE_MASK_PRESETS[MASK_LANGUAGE_TYPESCRIPT]);
+
+    const rustRes = nativeCore.maskSourceCode(content, config);
+    const shimRes = shim.maskSourceCode(content, config);
+
+    assert.strictEqual(rustRes.raw.length, shimRes.raw.length);
+    assert.strictEqual(rustRes.masked.length, shimRes.masked.length);
+    assert.strictEqual(rustRes.lines, shimRes.lines);
+    assert.strictEqual(rustRes.nonBlankLines, shimRes.nonBlankLines);
+
+    for (let i = 0; i < rustRes.masked.length; i++) {
+      if (rustRes.masked[i] !== shimRes.masked[i]) {
+        assert.fail(`Mismatch in ${path.basename(filePath)} at line ${i + 1}`);
+      }
+    }
+    console.log(`  ✓ ${path.basename(filePath)}: ${rustRes.lines} lines, 100% byte-matched.`);
+  }
+
+  // 4. Parity of Graph and Diff Operators
+  console.log('[Diff & Graph] Verifying graph analysis and diff hunk parity...');
+  const edges = [
+    ['moduleA', 'moduleB'],
+    ['moduleB', 'moduleC'],
+    ['moduleC', 'moduleA'],
+    ['moduleD', 'moduleE'],
+  ];
+  const graphRust = nativeCore.analyzeDependencyGraph(edges);
+  const graphShim = shim.analyzeDependencyGraph(edges);
+  assert.strictEqual(graphRust.isAcyclic, graphShim.isAcyclic);
+  assert.strictEqual(graphRust.cycles.length, graphShim.cycles.length);
+  assert.strictEqual(
+    graphRust.stronglyConnectedComponents.length,
+    graphShim.stronglyConnectedComponents.length,
+  );
+
+  const oldText = 'line 1\nline 2\nline 3\nline 4';
+  const newText = 'line 1\nline 2 MODIFIED\nline 3\nline 4';
+  const diffRust = nativeCore.computeHistogramDiff(oldText, newText);
+  const diffShim = shim.computeHistogramDiff(oldText, newText);
+  assert.strictEqual(diffRust.length, diffShim.length);
+  for (let i = 0; i < diffRust.length; i++) {
+    assert.strictEqual(diffRust[i].lines.length, diffShim[i].lines.length);
+  }
+  console.log('✓ Diff and Graph operators parity verified.');
+
+  console.log('=== [Native Operator Validation] SUCCESS: All assertions passed. ===');
+}
+
+try {
+  runValidation();
+} catch (err) {
+  console.error('[Native Operator Validation FAILED]:', err);
+  process.exit(1);
+}

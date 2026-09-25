@@ -41,12 +41,18 @@ export interface SourceMaskConfig {
     regexLiterals?: boolean;
 }
 
+import { nativeCore } from '../native/native-bridge';
+
 /** Raw lines plus the masked view used by the keyword rules. */
 export interface MaskedSource {
     /** Source lines with the trailing carriage return removed. */
     raw: string[];
     /** Same-length copy of each line with comment/literal bodies replaced by spaces. */
     masked: string[];
+    /** Optional total line count computed during masking pass. */
+    lines?: number;
+    /** Optional non-blank line count computed during masking pass. */
+    nonBlankLines?: number;
 }
 
 /** Canonical language id for TypeScript sources. */
@@ -143,16 +149,43 @@ const REGEX_PREFIX_CHARS = '([{,=:!&|?;+-*%<>';
 const REGEX_FLAG_RE = /[a-z]/i;
 
 /**
+ * Pure JavaScript implementation of source masking.
+ *
+ * Preserved as deterministic fallback when native operators are unavailable.
+ *
+ * @param content - Full file content as read from disk.
+ * @param config - Comment and quote syntax of the language being scanned.
+ * @returns Both views; `raw` feeds evidence text, `masked` feeds the rule patterns.
+ */
+export function maskSourceTextJs(content: string, config: SourceMaskConfig): MaskedSource {
+    const raw = content.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+    const state: MaskState = { inBlockComment: false, quote: null };
+    return { raw, masked: raw.map((line) => maskLine(line, state, config)) };
+}
+
+/**
  * Split content into raw lines and a masked copy, keeping every index in place.
+ *
+ * Automatically dispatches to high-performance native SIMD operator when available,
+ * falling back seamlessly to deterministic pure JS execution.
  *
  * @param content - Full file content as read from disk.
  * @param config - Comment and quote syntax of the language being scanned.
  * @returns Both views; `raw` feeds evidence text, `masked` feeds the rule patterns.
  */
 export function maskSourceText(content: string, config: SourceMaskConfig): MaskedSource {
-    const raw = content.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
-    const state: MaskState = { inBlockComment: false, quote: null };
-    return { raw, masked: raw.map((line) => maskLine(line, state, config)) };
+    try {
+        return nativeCore.maskSourceCode(content, {
+            lineComment: config.lineComment,
+            blockCommentOpen: config.blockComment?.open,
+            blockCommentClose: config.blockComment?.close,
+            quoteChars: config.quoteChars,
+            multilineTemplates: config.multilineTemplates,
+            regexLiterals: config.regexLiterals,
+        });
+    } catch (_err) {
+        return maskSourceTextJs(content, config);
+    }
 }
 
 /**

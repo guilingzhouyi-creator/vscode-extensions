@@ -1,8 +1,7 @@
-use napi_derive::napi;
 use std::collections::HashMap;
 
-#[napi(object)]
-pub struct NativeDiffHunk {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHunk {
     pub old_start: u32,
     pub old_lines: u32,
     pub new_start: u32,
@@ -12,12 +11,12 @@ pub struct NativeDiffHunk {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DiffOp {
-    Equal(usize, usize),  // old_idx, new_idx
-    Delete(usize),        // old_idx
-    Insert(usize),        // new_idx
+    Equal(usize, usize),
+    Delete(usize),
+    Insert(usize),
 }
 
-pub fn run_histogram_diff(old_content: &str, new_content: &str) -> Vec<NativeDiffHunk> {
+pub fn run_histogram_diff(old_content: &str, new_content: &str) -> Vec<DiffHunk> {
     if old_content == new_content {
         return Vec::new();
     }
@@ -52,8 +51,6 @@ fn split_lines(content: &str) -> Vec<&str> {
     }
     if start < len {
         lines.push(&content[start..len]);
-    } else if content.ends_with('\n') {
-        // trailing empty line after final newline is typically omitted in line diff
     }
     lines
 }
@@ -62,13 +59,11 @@ fn compute_diff(old: &[&str], new: &[&str]) -> Vec<DiffOp> {
     let n = old.len();
     let m = new.len();
 
-    // Fast path: prefix match
     let mut prefix = 0;
     while prefix < n && prefix < m && old[prefix] == new[prefix] {
         prefix += 1;
     }
 
-    // Fast path: suffix match
     let mut suffix = 0;
     while suffix < (n - prefix) && suffix < (m - prefix) && old[n - 1 - suffix] == new[m - 1 - suffix] {
         suffix += 1;
@@ -104,7 +99,6 @@ fn myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
         return (0..n).map(|i| DiffOp::Delete(offset + i)).collect();
     }
 
-    // Standard Myers LCS / shortest edit script
     let max = n + m;
     let mut v: HashMap<isize, usize> = HashMap::new();
     v.insert(1, 0);
@@ -137,7 +131,6 @@ fn myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
         }
     }
 
-    // Fallback: delete all then insert all
     let mut fallback = Vec::new();
     for i in 0..n {
         fallback.push(DiffOp::Delete(offset + i));
@@ -203,13 +196,12 @@ fn assemble_hunks(
     old_lines: &[&str],
     new_lines: &[&str],
     context: usize,
-) -> Vec<NativeDiffHunk> {
+) -> Vec<DiffHunk> {
     let mut hunks = Vec::new();
     let len = ops.len();
     let mut i = 0;
 
     while i < len {
-        // Find next modification
         while i < len {
             if !matches!(ops[i], DiffOp::Equal(_, _)) {
                 break;
@@ -221,7 +213,6 @@ fn assemble_hunks(
             break;
         }
 
-        // Hunk starts with context before
         let hunk_start = i.saturating_sub(context);
         let mut hunk_end = i;
 
@@ -229,7 +220,6 @@ fn assemble_hunks(
             if !matches!(ops[hunk_end], DiffOp::Equal(_, _)) {
                 hunk_end += 1;
             } else {
-                // Count consecutive equal lines
                 let mut eq_count = 0;
                 let mut peek = hunk_end;
                 while peek < len && matches!(ops[peek], DiffOp::Equal(_, _)) {
@@ -270,12 +260,18 @@ fn assemble_hunks(
                     if old_start == 0 {
                         old_start = o + 1;
                     }
+                    if old_lines_count == 0 && old_start == 0 {
+                        old_start = o + 1;
+                    }
                     old_lines_count += 1;
                     let text = old_lines.get(o).copied().unwrap_or("");
                     lines.push(format!("-{text}"));
                 }
                 DiffOp::Insert(n) => {
                     if new_start == 0 {
+                        new_start = n + 1;
+                    }
+                    if new_lines_count == 0 && new_start == 0 {
                         new_start = n + 1;
                     }
                     new_lines_count += 1;
@@ -285,7 +281,7 @@ fn assemble_hunks(
             }
         }
 
-        hunks.push(NativeDiffHunk {
+        hunks.push(DiffHunk {
             old_start: old_start.max(1) as u32,
             old_lines: old_lines_count as u32,
             new_start: new_start.max(1) as u32,
@@ -297,4 +293,22 @@ fn assemble_hunks(
     }
 
     hunks
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_identical_diff() {
+        assert!(run_histogram_diff("hello\nworld", "hello\nworld").is_empty());
+    }
+
+    #[test]
+    fn test_simple_diff() {
+        let hunks = run_histogram_diff("a\nb\nc", "a\nB\nc");
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].old_start, 1);
+        assert_eq!(hunks[0].new_start, 1);
+    }
 }

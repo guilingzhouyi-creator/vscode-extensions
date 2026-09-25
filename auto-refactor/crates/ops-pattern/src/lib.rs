@@ -1,14 +1,12 @@
-use napi_derive::napi;
-
-#[napi(object)]
-pub struct NativePatternMatch {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PatternMatch {
     pub pattern: String,
     pub line: u32,
     pub column: u32,
     pub match_text: String,
 }
 
-pub fn run_fast_pattern_match(source_text: &str, patterns: &[String]) -> Vec<NativePatternMatch> {
+pub fn run_fast_pattern_match(source_text: &str, patterns: &[String]) -> Vec<PatternMatch> {
     let mut results = Vec::new();
     if source_text.is_empty() || patterns.is_empty() {
         return results;
@@ -23,7 +21,7 @@ pub fn run_fast_pattern_match(source_text: &str, patterns: &[String]) -> Vec<Nat
             let mut start_idx = 0;
             while let Some(pos) = line[start_idx..].find(pattern) {
                 let actual_col = (start_idx + pos + 1) as u32;
-                results.push(NativePatternMatch {
+                results.push(PatternMatch {
                     pattern: pattern.clone(),
                     line: line_num,
                     column: actual_col,
@@ -38,4 +36,20 @@ pub fn run_fast_pattern_match(source_text: &str, patterns: &[String]) -> Vec<Nat
     }
 
     results
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pattern_match() {
+        let text = "const foo = 1;\nconst bar = foo + 1;";
+        let matches = run_fast_pattern_match(text, &["foo".to_string()]);
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].line, 1);
+        assert_eq!(matches[0].column, 7);
+        assert_eq!(matches[1].line, 2);
+        assert_eq!(matches[1].column, 13);
+    }
 }

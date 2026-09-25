@@ -35,9 +35,13 @@ function buildNativeCore() {
   execSync(command, { cwd: CRATE_DIR, stdio: 'inherit' });
 
   const candidatePaths = [
+    path.join(CRATE_DIR, '..', 'target', 'x86_64-pc-windows-gnu', 'release', 'auto_refactor_core.dll'),
     path.join(CRATE_DIR, 'target', 'x86_64-pc-windows-gnu', 'release', 'auto_refactor_core.dll'),
+    path.join(CRATE_DIR, '..', 'target', 'release', 'auto_refactor_core.dll'),
     path.join(CRATE_DIR, 'target', 'release', 'auto_refactor_core.dll'),
+    path.join(CRATE_DIR, '..', 'target', 'release', 'libauto_refactor_core.so'),
     path.join(CRATE_DIR, 'target', 'release', 'libauto_refactor_core.so'),
+    path.join(CRATE_DIR, '..', 'target', 'release', 'libauto_refactor_core.dylib'),
     path.join(CRATE_DIR, 'target', 'release', 'libauto_refactor_core.dylib'),
   ];
 

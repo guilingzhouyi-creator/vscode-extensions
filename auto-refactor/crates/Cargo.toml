@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "auto-refactor-core",
+    "ops-diff",
+    "ops-graph",
+    "ops-pattern",
+    "ops-mask",
+]
+resolver = "2"
