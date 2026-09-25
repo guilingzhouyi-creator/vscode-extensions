@@ -128,7 +128,10 @@ export class PythonAdapter implements LanguageAdapter {
         // `a.b()` reduces to the final segment, matching the TypeScript adapter's contract.
         const callCallee = sn.type === 'call' ? callNameOf(sn) : null;
         const name =
-            callCallee ?? (fnLike || isClassDefining || isBinding ? nameOf(sn) : undefined);
+            callCallee ??
+            (fnLike || isClassDefining || isBinding || kind === NodeKind.Variable || kind === NodeKind.Constant
+                ? nameOf(sn)
+                : undefined);
 
         const node: NormalizedNode = {
             kind,

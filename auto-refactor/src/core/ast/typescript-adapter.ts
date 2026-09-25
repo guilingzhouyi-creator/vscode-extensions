@@ -110,7 +110,14 @@ export class TypeScriptAdapter implements LanguageAdapter {
         isCall: boolean,
         sf: ts.SourceFile,
     ): { start?: Position; end?: Position } {
-        const needsPos = isLiteral || fnLike || n.kind === ts.SyntaxKind.FunctionKeyword || isCall;
+        const needsPos =
+            isLiteral ||
+            fnLike ||
+            isCall ||
+            n.kind === ts.SyntaxKind.FunctionKeyword ||
+            n.kind === ts.SyntaxKind.SourceFile ||
+            ts.isClassDeclaration(n) ||
+            ts.isClassExpression(n);
         if (!needsPos) return {};
         return {
             start: posOf(n.getStart(sf), sf),
@@ -120,6 +127,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
 
     private resolveNodeName(
         n: ts.Node,
+        kind: NodeKind,
         isCall: boolean,
         fnLike: boolean,
         isClassDefining: boolean,
@@ -128,6 +136,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     ): string | undefined {
         if (isCall) return calleeNameOf(n, sf) ?? undefined;
         if (fnLike || isClassDefining || isBinding) return nameOf(n, sf) ?? undefined;
+        if (kind === NodeKind.Variable || kind === NodeKind.Constant) return nameOf(n, sf) ?? undefined;
         return undefined;
     }
 
@@ -148,7 +157,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
             text: isLiteral ? n.getText(sf) : undefined,
             start: pos.start,
             end: pos.end,
-            name: this.resolveNodeName(n, isCall, fnLike, isClassDefining, isBinding, sf),
+            name: this.resolveNodeName(n, kind, isCall, fnLike, isClassDefining, isBinding, sf),
             isNumeric: kind === NodeKind.NumericLiteral,
             isString: kind === NodeKind.StringLiteral,
             branchWeight: branchWeightOf(n),

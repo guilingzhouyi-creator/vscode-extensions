@@ -25,6 +25,27 @@ const CLASS_RE = /^\s*class\b/;
 const EXCEPT_RE = /^\s*except\b/;
 const WITH_RE = /^\s*(?:async\s+)?with\b/;
 
+/* Shadowing detection (PYM-SHADOW-001) --------------------------------------------------- */
+
+/** Direct assignment: `name = value` — excludes `==`, `+=`, `-=`, etc. */
+const ASSIGN_RE = /^\s*([A-Za-z_]\w*)\s*=(?!=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<=|>>=|\*\*=|\/\/=)/;
+/** for loop variable: `for x in ...:` */
+const FOR_VAR_RE = /^\s*for\s+([A-Za-z_]\w*)\s+in\b/;
+/** Function definition with parameters: `def foo(a, b, c):` */
+const DEF_PARAMS_RE = /^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/;
+/** with statement target: `with ... as f:` */
+const WITH_AS_RE = /^\s*(?:async\s+)?with\b.*\bas\s+([A-Za-z_]\w*)\s*[:,#]/;
+/** except clause target: `except Exception as e:` */
+const EXCEPT_AS_RE = /^\s*except\b.*\bas\s+([A-Za-z_]\w*)\s*:/;
+/** import statement: `import os` or `from sys import path` */
+const IMPORT_SIMPLE_RE = /^\s*import\s+([A-Za-z_]\w*)/;
+const IMPORT_FROM_RE = /^\s*from\s+[A-Za-z_.\w]+\s+import\s+(.+)$/;
+
+/** Idiomatic single-letter / conventional names exempt from shadowing warnings. */
+const SHADOW_IGNORE_NAMES = new Set(
+    '_ self cls i j k n x y z e ex f fd fp fh t s v w h d r g p q a b c'.split(' '),
+);
+
 const BLOCKING_CALL_RE =
     /\b(?:time\.sleep|requests\.(?:get|post|put|patch|delete|request)|urllib\.request\.urlopen)\s*\(/;
 const SYNC_ORM_CALL_RE = /(?<![\w.])(?:[A-Za-z_]\w*\.)*(?:session|Session)\.(?:query|execute)\s*\(/;
@@ -118,6 +139,25 @@ interface Block {
     kind: BlockKind;
 }
 
+/**
+ * A Python lexical scope tracked for outer-scope shadowing detection (PYM-SHADOW-001).
+ *
+ * Python has LEGB scoping — only modules, functions, classes, and comprehensions introduce
+ * new scopes. Control-flow blocks (if/for/while/with/try) do NOT create new bindings; names
+ * assigned inside them leak into the enclosing function / class / module scope.
+ */
+interface VarScope {
+    indent: number;
+    kind: 'module' | 'function' | 'class';
+    names: Map<string, number>; // name -> 1-based line number of first declaration
+}
+
+/** Options shape for the shadowing rule, resolved from `ctx.options.shadowing`. */
+interface ShadowingOptions {
+    enabled: boolean;
+    ignoreNames: Set<string>;
+}
+
 type PyEmitter = (
     lineIdx: number,
     rule: string,
@@ -166,6 +206,12 @@ export class PythonModernAnalyzer implements Analyzer {
         const issues: Issue[] = [];
         const emit = this.createIssueEmitter(file, issues);
 
+        // Shadowing: initialize with a module-level scope (indent -1 so it is never popped).
+        const varScopes: VarScope[] = [
+            { indent: -1, kind: 'module', names: new Map<string, number>() },
+        ];
+        const shadowOpts = this.resolveShadowingOptions(ctx.options);
+
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i];
             if (line.endsWith('\r')) line = line.slice(0, -1);
@@ -174,6 +220,10 @@ export class PythonModernAnalyzer implements Analyzer {
 
             const indent = line.length - line.trimStart().length;
             while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) blocks.pop();
+            // Pop function/class scopes when indent drops back to or past their level.
+            while (varScopes.length > 1 && indent <= varScopes[varScopes.length - 1].indent) {
+                varScopes.pop();
+            }
 
             const inAsync = this.hasKind(blocks, PYTHON_ASYNC_KEYWORD);
             const inExcept = this.hasKind(blocks, 'except');
@@ -184,6 +234,7 @@ export class PythonModernAnalyzer implements Analyzer {
             this.auditControlFlow(line, trimmed, i, lines, inExcept, inWith, inAsync, emit);
             this.auditDataclassSlots(trimmed, i, lines, emit);
             this.recordModuleImports(trimmed, indent, blocks, file, i, importRecords);
+            this.auditVariableShadowing(line, trimmed, i, indent, varScopes, shadowOpts, emit);
 
             if (BLOCK_OPEN_RE.test(trimmed)) {
                 blocks.push({ indent, kind: this.kindOf(trimmed) });
@@ -571,6 +622,251 @@ export class PythonModernAnalyzer implements Analyzer {
             if (pattern.test(lines[i])) return true;
         }
         return false;
+    }
+
+    /**
+     * Resolve shadowing-rule options from the analyzer-level `options` bag.
+     *
+     * @param options - The analyzer's merged options (from `ctx.options`).
+     * @returns Normalized shadowing options with defaults applied.
+     */
+    private resolveShadowingOptions(options: Record<string, any>): ShadowingOptions {
+        const raw = (options?.shadowing ?? {}) as Record<string, unknown>;
+        const enabled = raw.enabled !== false; // default: on
+        const ignoreNames = new Set<string>(SHADOW_IGNORE_NAMES);
+        if (Array.isArray(raw.ignoreNames)) {
+            for (const name of raw.ignoreNames) {
+                if (typeof name === 'string') ignoreNames.add(name);
+            }
+        }
+        return { enabled, ignoreNames };
+    }
+
+    /**
+     * Detect outer-scope variable shadowing (PYM-SHADOW-001).
+     *
+     * Heuristic, text-level implementation: tracks names per function/class/module scope
+     * on a parallel stack (`varScopes`). Assignments, for-loop variables, function
+     * parameters, `with ... as`, `except ... as`, and imports are all treated as bindings.
+     * Control-flow blocks (if/for/while/with/try) do NOT create new scopes — matching
+     * Python's actual LEGB rule.
+     *
+     * @param line - Raw current line (with leading whitespace).
+     * @param trimmed - Current line with surrounding whitespace removed.
+     * @param lineIdx - Zero-based line index.
+     * @param indent - Indentation width of the current line.
+     * @param varScopes - Variable scope stack (mutated in place).
+     * @param opts - Shadowing rule options (enabled flag, ignore-names set).
+     * @param emit - Issue factory shared with the rest of the analyzer.
+     */
+    private auditVariableShadowing(
+        line: string,
+        trimmed: string,
+        lineIdx: number,
+        indent: number,
+        varScopes: VarScope[],
+        opts: ShadowingOptions,
+        emit: PyEmitter,
+    ): void {
+        if (!opts.enabled) return;
+
+        const codeOnly = trimmed.split('#')[0].trim();
+        const currentScope = varScopes[varScopes.length - 1];
+        const line1 = lineIdx + 1; // 1-based for user-facing messages
+
+        // --- 1. Function / class definition: name + parameters -------------------------
+        const defMatch = DEF_PARAMS_RE.exec(line);
+        if (defMatch) {
+            const funcName = defMatch[1];
+            const paramsStr = defMatch[2];
+
+            // Function/class name belongs to the enclosing (current) scope.
+            this.registerBinding(funcName, line1, currentScope, varScopes, opts, emit);
+
+            // Determine the new scope kind and push it.
+            const isAsync = ASYNC_DEF_RE.test(line);
+            const newKind: 'function' | 'class' = isAsync || DEF_RE.test(line) ? 'function' : 'class';
+            const newScope: VarScope = { indent, kind: newKind, names: new Map() };
+            varScopes.push(newScope);
+
+            // Parameters belong to the new function scope. Each param may shadow outer scopes.
+            if (newKind === 'function') {
+                const paramNames = this.extractParamNames(paramsStr);
+                for (const pName of paramNames) {
+                    this.registerBinding(pName, line1, newScope, varScopes, opts, emit);
+                }
+            }
+            return;
+        }
+
+        // Class definition (without params on the same line heuristic).
+        if (CLASS_RE.test(line)) {
+            const clsMatch = /^\s*class\s+([A-Za-z_]\w*)/.exec(line);
+            if (clsMatch) {
+                this.registerBinding(clsMatch[1], line1, currentScope, varScopes, opts, emit);
+            }
+            const newScope: VarScope = { indent, kind: 'class', names: new Map() };
+            varScopes.push(newScope);
+            return;
+        }
+
+        // --- 2. Import statements (module-level or function-level, both count) ----------
+        if (/^(?:import|from)\s+/.test(codeOnly)) {
+            const simpleImp = IMPORT_SIMPLE_RE.exec(line);
+            if (simpleImp) {
+                this.registerBinding(simpleImp[1], line1, currentScope, varScopes, opts, emit);
+            }
+            const fromImp = IMPORT_FROM_RE.exec(codeOnly);
+            if (fromImp) {
+                const namesPart = fromImp[1];
+                // Handle `import a, b, c as d` style lists.
+                const items = namesPart.split(',');
+                for (const item of items) {
+                    const trimmedItem = item.trim();
+                    if (trimmedItem === '' || trimmedItem === '(' || trimmedItem === ')') continue;
+                    // Strip parentheses for multi-line imports.
+                    const clean = trimmedItem.replace(/[()]/g, '').trim();
+                    if (clean === '') continue;
+                    const asMatch = /^(.+?)\s+as\s+([A-Za-z_]\w*)$/.exec(clean);
+                    const name = asMatch ? asMatch[2] : clean.split(/\s+/)[0];
+                    if (/^[A-Za-z_]\w*$/.test(name)) {
+                        this.registerBinding(name, line1, currentScope, varScopes, opts, emit);
+                    }
+                }
+            }
+            return;
+        }
+
+        // --- 3. for loop variable ------------------------------------------------------
+        const forMatch = FOR_VAR_RE.exec(line);
+        if (forMatch) {
+            this.registerBinding(forMatch[1], line1, currentScope, varScopes, opts, emit);
+            // Note: we do NOT return here — a for line might also have other patterns,
+            // but in practice the loop variable is the only binding on a `for` line.
+            return;
+        }
+
+        // --- 4. with ... as target -----------------------------------------------------
+        const withMatch = WITH_AS_RE.exec(line);
+        if (withMatch) {
+            this.registerBinding(withMatch[1], line1, currentScope, varScopes, opts, emit);
+            return;
+        }
+
+        // --- 5. except ... as target ---------------------------------------------------
+        const exceptMatch = EXCEPT_AS_RE.exec(line);
+        if (exceptMatch) {
+            this.registerBinding(exceptMatch[1], line1, currentScope, varScopes, opts, emit);
+            return;
+        }
+
+        // --- 6. Direct assignment: `name = value` --------------------------------------
+        const assignMatch = ASSIGN_RE.exec(line);
+        if (assignMatch) {
+            // Skip augmented assigns that the regex might still match (e.g. `a == b` is
+            // excluded by the negative lookahead, but double-check defensively).
+            const afterEq = line.slice(assignMatch[0].length);
+            if (afterEq.startsWith('=')) return;
+            this.registerBinding(assignMatch[1], line1, currentScope, varScopes, opts, emit);
+        }
+    }
+
+    /**
+     * Register a binding in the current scope and emit a shadowing warning when the name
+     * already exists in any enclosing scope.
+     *
+     * @param name - The variable/parameter/function name to register.
+     * @param line1 - 1-based line number of the declaration.
+     * @param currentScope - The scope the name belongs to (varScopes top).
+     * @param varScopes - Full scope stack (used for outer-scope lookup).
+     * @param opts - Shadowing options (ignore-names set).
+     * @param emit - Issue factory.
+     */
+    private registerBinding(
+        name: string,
+        line1: number,
+        currentScope: VarScope,
+        varScopes: VarScope[],
+        opts: ShadowingOptions,
+        emit: PyEmitter,
+    ): void {
+        if (opts.ignoreNames.has(name)) return;
+
+        // If the name already exists in the SAME scope, this is a reassignment, not shadowing.
+        if (currentScope.names.has(name)) return;
+
+        // Walk outer scopes (skip the current one) looking for a prior declaration.
+        let outerLine = -1;
+        for (let i = varScopes.length - 2; i >= 0; i--) {
+            const found = varScopes[i].names.get(name);
+            if (found !== undefined) {
+                outerLine = found;
+                break;
+            }
+        }
+
+        if (outerLine > 0) {
+            emit(
+                line1 - 1,
+                'PYM-SHADOW-001',
+                `Variable \`${name}\` may shadow an outer-scope declaration (line ${outerLine}).`,
+                SEVERITY_WARNING,
+                'Rename the variable or use a different name to avoid shadowing the outer binding.',
+                { name, outerLine, scope: currentScope.kind },
+            );
+        }
+
+        currentScope.names.set(name, line1);
+    }
+
+    /**
+     * Parse a Python function parameter string and return the parameter names.
+     *
+     * Handles simple names, defaults (`x=1`), type annotations (`x: int`), *args, **kwargs,
+     * and `/` / `*` positional-only / keyword-only markers.  Multi-line signatures are not
+     * supported — this is a heuristic, line-level parser.
+     *
+     * @param paramsStr - The raw text inside the parentheses of a `def` line.
+     * @returns Array of parameter names in declaration order.
+     */
+    private extractParamNames(paramsStr: string): string[] {
+        const names: string[] = [];
+        // Strip nested parens/brackets/braces crudely by splitting on commas at depth 0.
+        let depth = 0;
+        let current = '';
+        const parts: string[] = [];
+        for (const ch of paramsStr) {
+            if (ch === '(' || ch === '[' || ch === '{') depth++;
+            else if (ch === ')' || ch === ']' || ch === '}') depth--;
+            if (ch === ',' && depth === 0) {
+                parts.push(current);
+                current = '';
+            } else {
+                current += ch;
+            }
+        }
+        if (current.trim() !== '') parts.push(current);
+
+        for (const part of parts) {
+            const trimmed = part.trim();
+            if (trimmed === '' || trimmed === '/' || trimmed === '*') continue;
+            // Strip leading * or ** (varargs / kwargs markers).
+            let cleaned = trimmed.replace(/^\*{1,2}/, '').trim();
+            // Remove type annotation: everything after the first `:` before `=`.
+            const eqIdx = cleaned.indexOf('=');
+            const colonIdx = cleaned.indexOf(':');
+            if (colonIdx !== -1 && (eqIdx === -1 || colonIdx < eqIdx)) {
+                cleaned = cleaned.slice(0, colonIdx).trim();
+            }
+            // Remove default value: everything after `=`.
+            if (eqIdx !== -1) {
+                cleaned = cleaned.slice(0, eqIdx).trim();
+            }
+            if (/^[A-Za-z_]\w*$/.test(cleaned)) {
+                names.push(cleaned);
+            }
+        }
+        return names;
     }
 
     private kindOf(trimmed: string): BlockKind {

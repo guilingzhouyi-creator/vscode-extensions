@@ -9,12 +9,16 @@
  * Responsibilities: Measure function line spans (SIM-LONG-001); flag blocks of >= 3
  *   consecutive code-shaped comment lines (SIM-COMC-001); flag function bodies that are only
  *   `pass`/`...` or `{}` (SIM-EMPTY-001); flag debug print/console output outside allow-listed
- *   paths (SIM-PRNT-001)
+ *   paths (SIM-PRNT-001); flag redundant `else` after terminating statements (SIM-ELSE-001);
+ *   flag boolean returns that can be simplified to returning the condition directly
+ *   (SIM-BOOL-001); flag deep conditional nesting at function start that should use guard
+ *   clauses (SIM-GUARD-001)
  * Exit Semantics & Design Rationale: Pure detector — never throws and returns [] for empty
  *   content. Function length uses adapter-materialized start/end lines (the normalized AST
  *   guarantee for function-like nodes) so the measurement stays language-agnostic, while the
- *   three line-based rules use conservative, keyword-anchored patterns: a false "delete this
- *   code" suggestion is far more expensive than a missed smell.
+ *   line-based rules use conservative, keyword-anchored patterns: a false "delete this code"
+ *   suggestion is far more expensive than a missed smell. Heavier line-check implementations
+ *   live in `simplify-linecheck.ts` to keep this file under the large-file threshold.
  */
 import * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
@@ -25,6 +29,11 @@ import { NodeKind } from '../core/multilang';
 import { locN } from '../utils/normalized';
 import { globToRegExp, matchAny } from '../core/file-discovery';
 import { detectTernaryOpportunities } from './simplify-ternary';
+import {
+    auditRedundantElse,
+    auditBooleanReturn,
+    auditGuardClausePatterns,
+} from './simplify-linecheck';
 
 /** Per-analyzer tunables (declared in `defaultAnalyzerOptions().simplify`). */
 export interface SimplifyOptions {
@@ -36,6 +45,10 @@ export interface SimplifyOptions {
     checkTernarySimplification?: boolean;
     maxTernaryLength?: number;
     rewardSimplifications?: boolean;
+    checkRedundantElse?: boolean;
+    checkBooleanReturn?: boolean;
+    checkGuardClausePatterns?: boolean;
+    maxGuardClausePatternNesting?: number;
 }
 
 const DEFAULT_MAX_FUNCTION_LINES = 60;
@@ -322,6 +335,9 @@ export class SimplifyAnalyzer implements Analyzer {
         this.detectCommentedOutCode(lines, file, opts, ctx, issues);
         this.detectEmptyImplementations(lines, file, ctx, issues);
         this.detectDebugOutput(lines, file, opts, ctx, issues);
+        this.auditRedundantElse(lines, file, opts, issues);
+        this.auditBooleanReturn(lines, file, opts, issues);
+        this.auditGuardClausePatterns(lines, file, opts, issues);
 
         return issues;
     }
@@ -623,5 +639,44 @@ export class SimplifyAnalyzer implements Analyzer {
         }
         if (node.kind === NodeKind.Function && node.name) return node.name;
         return binding ?? (className ? className + ANONYMOUS_SUFFIX : ANONYMOUS_NAME);
+    }
+
+    /**
+     * Flag redundant `else` after terminating statements (SIM-ELSE-001).
+     * Delegates to the linecheck helper module to keep this file lean.
+     */
+    private auditRedundantElse(
+        lines: string[],
+        file: string,
+        opts: SimplifyOptions,
+        issues: Issue[],
+    ): void {
+        auditRedundantElse(lines, file, opts, issues);
+    }
+
+    /**
+     * Flag simplifiable boolean return patterns (SIM-BOOL-001).
+     * Delegates to the linecheck helper module to keep this file lean.
+     */
+    private auditBooleanReturn(
+        lines: string[],
+        file: string,
+        opts: SimplifyOptions,
+        issues: Issue[],
+    ): void {
+        auditBooleanReturn(lines, file, opts, issues);
+    }
+
+    /**
+     * Flag consecutive if-return guard-clause patterns at function start (SIM-GUARD-001).
+     * Delegates to the linecheck helper module to keep this file lean.
+     */
+    private auditGuardClausePatterns(
+        lines: string[],
+        file: string,
+        opts: SimplifyOptions,
+        issues: Issue[],
+    ): void {
+        auditGuardClausePatterns(lines, file, opts, issues);
     }
 }

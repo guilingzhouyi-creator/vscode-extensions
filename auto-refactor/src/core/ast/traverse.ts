@@ -35,6 +35,19 @@ export interface StreamingEntry {
             className: string | null,
             binding: string | null,
         ): void;
+        /**
+         * Post-order hook: called after recursing into children (reverse order of visit).
+         * Optional — analyzers that don't need post-order traversal skip it (zero overhead).
+         */
+        leave?(
+            node: NormalizedNode,
+            ctx: AnalyzerContext,
+            parent: NormalizedNode | undefined,
+            grandparent: NormalizedNode | undefined,
+            depth: number,
+            className: string | null,
+            binding: string | null,
+        ): void;
         finalize?(ctx: AnalyzerContext): Issue[];
     };
     ctx: AnalyzerContext;
@@ -77,6 +90,13 @@ export function runStreaming(
     const visits = entries.map((a) =>
         isCallable(a.analyzer.visit) ? a.analyzer.visit.bind(a.analyzer) : null,
     );
+
+    // Pre-bind leave hooks (post-order). null when the analyzer has no leave method —
+    // the per-node leave loop is skipped entirely when all entries are null.
+    const leaves = entries.map((a) =>
+        isCallable(a.analyzer.leave) ? a.analyzer.leave.bind(a.analyzer) : null,
+    );
+    const hasAnyLeave = leaves.some((l) => l !== null);
 
     const pushError = (name: string, e: unknown, ctx: AnalyzerContext) => {
         if (errored.has(name)) return; // one error issue per analyzer per file
@@ -134,6 +154,21 @@ export function runStreaming(
 
         for (const c of adapter.children(node)) {
             visitNode(c, node, parent, childDepth, cName, cBinding);
+        }
+
+        // Post-order leave hooks — called in REVERSE order so that the first entry's
+        // leave runs last (e.g. scope builder pops after everyone else has left).
+        // Skipped entirely when no analyzer declares a leave method (zero overhead).
+        if (hasAnyLeave) {
+            for (let i = leaves.length - 1; i >= 0; i--) {
+                const l = leaves[i];
+                if (!l) continue;
+                try {
+                    l(node, entries[i].ctx, parent, grandparent, depth, className, binding);
+                } catch (e) {
+                    pushError(entries[i].analyzer.name, e, entries[i].ctx);
+                }
+            }
         }
     };
 
@@ -262,6 +297,12 @@ export function runStreamingProjected(
         isCallable(a.analyzer.visit) ? a.analyzer.visit.bind(a.analyzer) : null,
     );
 
+    // Pre-bind leave hooks (post-order) — same zero-overhead pattern as runStreaming.
+    const leaves = entries.map((a) =>
+        isCallable(a.analyzer.leave) ? a.analyzer.leave.bind(a.analyzer) : null,
+    );
+    const hasAnyLeave = leaves.some((l) => l !== null);
+
     const pushError = (name: string, e: unknown, ctx: AnalyzerContext) => {
         if (errored.has(name)) return; // one error issue per analyzer per file
         errored.add(name);
@@ -331,6 +372,19 @@ export function runStreamingProjected(
 
         for (const c of projector.forEachChild(raw)) {
             visitRaw(c, raw, parentRaw, childDepth, cName, cBinding, node, parentProj, cCaller);
+        }
+
+        // Post-order leave hooks — reverse order, zero overhead when unused.
+        if (hasAnyLeave) {
+            for (let i = leaves.length - 1; i >= 0; i--) {
+                const l = leaves[i];
+                if (!l) continue;
+                try {
+                    l(node, entries[i].ctx, parentProj, grandparentProj, depth, className, binding);
+                } catch (e) {
+                    pushError(entries[i].analyzer.name, e, entries[i].ctx);
+                }
+            }
         }
     };
 

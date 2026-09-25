@@ -135,6 +135,149 @@ const FIXTURES = {
     '    }',
     '}',
   ].join('\n'),
+  // SIM-ELSE-001 fixtures
+  'redundant_else_return.ts': [
+    'export function check(val: number): string {',
+    '    if (val > 0) {',
+    '        return "positive";',
+    '    } else {',
+    '        return "non-positive";',
+    '    }',
+    '}',
+  ].join('\n'),
+  'redundant_else_throw.ts': [
+    'export function check(val: number): void {',
+    '    if (val < 0) {',
+    '        throw new Error("negative");',
+    '    } else {',
+    '        processValue(val);',
+    '    }',
+    '}',
+  ].join('\n'),
+  'redundant_else_break.ts': [
+    'export function find(arr: number[], target: number): number {',
+    '    let result = -1;',
+    '    for (let i = 0; i < arr.length; i++) {',
+    '        if (arr[i] === target) {',
+    '            result = i;',
+    '            break;',
+    '        } else {',
+    '            continue;',
+    '        }',
+    '    }',
+    '    return result;',
+    '}',
+  ].join('\n'),
+  'redundant_else_continue.ts': [
+    'export function process(arr: number[]): void {',
+    '    for (const x of arr) {',
+    '        if (x < 0) {',
+    '            continue;',
+    '        } else {',
+    '            handleValue(x);',
+    '        }',
+    '    }',
+    '}',
+  ].join('\n'),
+  'no_else_if.ts': [
+    'export function check(val: number): string {',
+    '    if (val > 0) {',
+    '        return "positive";',
+    '    }',
+    '    return "non-positive";',
+    '}',
+  ].join('\n'),
+  // SIM-BOOL-001 fixtures
+  'bool_return_ifelse.ts': [
+    'export function isPositive(val: number): boolean {',
+    '    if (val > 0) {',
+    '        return true;',
+    '    } else {',
+    '        return false;',
+    '    }',
+    '}',
+  ].join('\n'),
+  'bool_return_ternary.ts': [
+    'export function isPositive(val: number): boolean {',
+    '    return val > 0 ? true : false;',
+    '}',
+  ].join('\n'),
+  'bool_return_noelse.ts': [
+    'export function isPositive(val: number): boolean {',
+    '    if (val > 0) return true;',
+    '    return false;',
+    '}',
+  ].join('\n'),
+  'bool_return_normal.ts': [
+    'export function getFlag(flag: boolean): boolean {',
+    '    return flag;',
+    '}',
+  ].join('\n'),
+  'bool_return_complex.ts': [
+    'export function check(val: number): boolean {',
+    '    if (val > 0) {',
+    '        trackPositive(val);',
+    '        return true;',
+    '    } else {',
+    '        trackNonPositive(val);',
+    '        return false;',
+    '    }',
+    '}',
+  ].join('\n'),
+  // SIM-GUARD-001 fixtures
+  'guard_clauses_3.ts': [
+    'export function process(a: number, b: number, c: number): number {',
+    '    if (a <= 0) {',
+    '        return -1;',
+    '    }',
+    '    if (b <= 0) {',
+    '        return -2;',
+    '    }',
+    '    if (c <= 0) {',
+    '        return -3;',
+    '    }',
+    '    return a + b + c;',
+    '}',
+  ].join('\n'),
+  'guard_clauses_2.ts': [
+    'export function process(a: number, b: number): number {',
+    '    if (a <= 0) {',
+    '        return -1;',
+    '    }',
+    '    if (b <= 0) {',
+    '        return -2;',
+    '    }',
+    '    return a + b;',
+    '}',
+  ].join('\n'),
+  'guard_clauses_middle.ts': [
+    'export function process(arr: number[]): number {',
+    '    let sum = 0;',
+    '    for (const x of arr) {',
+    '        if (x < 0) return -1;',
+    '        if (x === 0) return 0;',
+    '        if (x > 100) return 100;',
+    '        sum += x;',
+    '    }',
+    '    return sum;',
+    '}',
+  ].join('\n'),
+  'guard_clauses_throw.ts': [
+    'export function process(a: number, b: number, c: number): number {',
+    '    if (a <= 0) throw new Error("a");',
+    '    if (b <= 0) throw new Error("b");',
+    '    if (c <= 0) throw new Error("c");',
+    '    return a + b + c;',
+    '}',
+  ].join('\n'),
+  'guard_clauses_mixed.ts': [
+    'export function process(a: number, b: number): number {',
+    '    if (a <= 0) { return -1; }',
+    '    let result = a * 2;',
+    '    if (b <= 0) return -2;',
+    '    return result + b;',
+    '}',
+  ].join('\n'),
 };
 
 /**
@@ -230,7 +373,7 @@ async function run() {
       '  [PASS] SIM-FLAT-002 flags deep conditional nesting and recommends guard clauses',
     );
 
-    const trn = byRule('SIM-TRN-001');
+    const trn = byRule('SIM-TRN-001').filter((i) => i.location.file === 'ternary.ts');
     assert.strictEqual(
       trn.length,
       3,
@@ -242,7 +385,7 @@ async function run() {
     );
     console.log('  [PASS] SIM-TRN-001 identifies safe shallow ternary folding opportunities');
 
-    const imm = byRule('SIM-IMM-001');
+    const imm = byRule('SIM-IMM-001').filter((i) => i.location.file === 'ternary.ts');
     assert.strictEqual(
       imm.length,
       1,
@@ -251,6 +394,99 @@ async function run() {
     assert.strictEqual(imm[0].detail.canMakeImmutable, true);
     assert.strictEqual(imm[0].detail.rewardBonus, 5);
     console.log('  [PASS] SIM-IMM-001 detects immutable const conversion with +5 reward bonus');
+
+    // === SIM-ELSE-001: redundant-else ===
+    const redundantElse = byRule('SIM-ELSE-001');
+    const redundantElseFiles = redundantElse.map((i) => i.location.file).sort();
+
+    // Positive cases: should flag
+    assert.ok(
+      redundantElseFiles.includes('redundant_else_return.ts'),
+      'SIM-ELSE-001 must flag if-return-else pattern',
+    );
+    assert.ok(
+      redundantElseFiles.includes('redundant_else_throw.ts'),
+      'SIM-ELSE-001 must flag if-throw-else pattern',
+    );
+    assert.ok(
+      redundantElseFiles.includes('redundant_else_break.ts'),
+      'SIM-ELSE-001 must flag if-break-else pattern',
+    );
+    assert.ok(
+      redundantElseFiles.includes('redundant_else_continue.ts'),
+      'SIM-ELSE-001 must flag if-continue-else pattern',
+    );
+
+    // Negative case: no else, should NOT flag
+    assert.ok(
+      !redundantElseFiles.includes('no_else_if.ts'),
+      'SIM-ELSE-001 must NOT flag if without else',
+    );
+
+    assert.strictEqual(redundantElse.every((i) => i.severity === 'info'), true, 'SIM-ELSE-001 severity must be info');
+    console.log('  [PASS] SIM-ELSE-001 flags redundant else after terminating statements');
+
+    // === SIM-BOOL-001: simplify-boolean-return ===
+    const boolReturn = byRule('SIM-BOOL-001');
+    const boolReturnFiles = boolReturn.map((i) => i.location.file).sort();
+
+    // Positive cases: should flag
+    assert.ok(
+      boolReturnFiles.includes('bool_return_ifelse.ts'),
+      'SIM-BOOL-001 must flag if/else true/false pattern',
+    );
+    assert.ok(
+      boolReturnFiles.includes('bool_return_ternary.ts'),
+      'SIM-BOOL-001 must flag ternary true/false pattern',
+    );
+    assert.ok(
+      boolReturnFiles.includes('bool_return_noelse.ts'),
+      'SIM-BOOL-001 must flag if-return without else pattern',
+    );
+
+    // Negative cases: should NOT flag
+    assert.ok(
+      !boolReturnFiles.includes('bool_return_normal.ts'),
+      'SIM-BOOL-001 must NOT flag normal boolean return',
+    );
+    assert.ok(
+      !boolReturnFiles.includes('bool_return_complex.ts'),
+      'SIM-BOOL-001 must NOT flag if/else with side effects',
+    );
+
+    assert.strictEqual(boolReturn.every((i) => i.severity === 'info'), true, 'SIM-BOOL-001 severity must be info');
+    console.log('  [PASS] SIM-BOOL-001 flags simplifiable boolean return patterns');
+
+    // === SIM-GUARD-001: use-guard-clause ===
+    const guardClause = byRule('SIM-GUARD-001');
+    const guardClauseFiles = guardClause.map((i) => i.location.file).sort();
+
+    // Positive case: 3 consecutive if-return at function start should trigger
+    assert.ok(
+      guardClauseFiles.includes('guard_clauses_3.ts'),
+      'SIM-GUARD-001 must flag 3 consecutive if-return at function start',
+    );
+    assert.ok(
+      guardClauseFiles.includes('guard_clauses_throw.ts'),
+      'SIM-GUARD-001 must flag 3 consecutive if-throw at function start',
+    );
+
+    // Negative cases: should NOT flag
+    assert.ok(
+      !guardClauseFiles.includes('guard_clauses_2.ts'),
+      'SIM-GUARD-001 must NOT flag only 2 consecutive guard clauses (below threshold)',
+    );
+    assert.ok(
+      !guardClauseFiles.includes('guard_clauses_middle.ts'),
+      'SIM-GUARD-001 must NOT flag nested ifs inside loops (not at function start)',
+    );
+    assert.ok(
+      !guardClauseFiles.includes('guard_clauses_mixed.ts'),
+      'SIM-GUARD-001 must NOT flag when non-if statement breaks the sequence',
+    );
+
+    assert.strictEqual(guardClause.every((i) => i.severity === 'info'), true, 'SIM-GUARD-001 severity must be info');
+    console.log('  [PASS] SIM-GUARD-001 flags deep conditional nesting at function start');
 
     const strictConfig = path.join(root, 'strict.config.json');
     fs.writeFileSync(

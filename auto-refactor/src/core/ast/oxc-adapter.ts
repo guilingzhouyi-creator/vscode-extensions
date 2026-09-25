@@ -197,12 +197,18 @@ export class OxcAdapter implements LanguageAdapter {
 
     private resolveNodePositions(
         n: OxcNode,
+        kind: NodeKind,
         startOff: number,
         isLiteral: boolean,
         fnLike: boolean,
         ctx: Ctx,
     ): { start?: Position; end?: Position } {
-        if (!isLiteral && !fnLike) return {};
+        const needsPos =
+            isLiteral ||
+            fnLike ||
+            kind === NodeKind.SourceFile ||
+            kind === NodeKind.Class;
+        if (!needsPos) return {};
         return {
             start: oxcPosOf(startOff, ctx),
             end: oxcPosOf(n.end, ctx),
@@ -211,12 +217,16 @@ export class OxcAdapter implements LanguageAdapter {
 
     private resolveNodeName(
         n: OxcNode,
+        kind: NodeKind,
         fnLike: boolean,
         isClassDefining: boolean,
         isBinding: boolean,
         ctx: Ctx,
     ): string | undefined {
         if (fnLike || isClassDefining || isBinding) {
+            return oxcNameOf(n, ctx) ?? undefined;
+        }
+        if (kind === NodeKind.Variable || kind === NodeKind.Constant) {
             return oxcNameOf(n, ctx) ?? undefined;
         }
         return undefined;
@@ -233,14 +243,14 @@ export class OxcAdapter implements LanguageAdapter {
         ctx: Ctx,
     ): NormalizedNode {
         const t = n.type;
-        const pos = this.resolveNodePositions(n, startOff, isLiteral, fnLike, ctx);
+        const pos = this.resolveNodePositions(n, kind, startOff, isLiteral, fnLike, ctx);
         const node: NormalizedNode = {
             kind,
             rawKind: t,
             text: isLiteral ? oxcLiteralText(n, ctx) : undefined,
             start: pos.start,
             end: pos.end,
-            name: this.resolveNodeName(n, fnLike, isClassDefining, isBinding, ctx),
+            name: this.resolveNodeName(n, kind, fnLike, isClassDefining, isBinding, ctx),
             isNumeric: kind === NodeKind.NumericLiteral,
             isString: kind === NodeKind.StringLiteral,
             branchWeight: oxcBranchWeightOf(n),
