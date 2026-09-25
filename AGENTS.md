@@ -37,7 +37,7 @@
 | 项目 | 测试目录与组织拓扑 | 命名公式与规范示范 | 契约基座与护栏约束 |
 | :--- | :--- | :--- | :--- |
 | **`workspace-timing/`** | `tests/unit/`（单元测试）<br/>`tests/e2e/`（端到端测试） | `*.test.ts`<br/>示例：`ring-buffer.test.ts`, `journal.test.ts` | Mocha/Chai 底座；异步与定时器精准清理；覆盖率看守。 |
-| **`auto-refactor/`** | `test/`（单元与集成测试）<br/>`scripts/test-parallel.js` | `validate-*.ts` / `test-*.ts`<br/>示例：`validate-physical-naming.js`, `validate-praxis.ts` | 62 套并行异步流水线；全量 PASS 门禁；基线防回退（ratchet）。 |
+| **`auto-refactor/`** | `test/`（单元与集成测试）<br/>`scripts/test-parallel.js` | `validate-*.ts` / `test-*.ts`<br/>示例：`validate-physical-naming.js`, `validate-praxis.ts` | 91 套并行异步流水线；全量 PASS 门禁；基线防回退（ratchet）。 |
 | **`WebGames/`** | `tests/unit/domains/`（领域单测）<br/>`tests/unit/frontend/`（前端视图/基建）<br/>`tests/unit/infrastructure/`（基础设施）<br/>`tests/guards/`（架构与配置长效护栏）<br/>`tests/integration/pipelines/`（跨域管线）<br/>`tests/fixtures/factories/`（测试工厂） | 领域：`test_<domain_id>.gd`<br/>前端视图：`test_fe_NN_<view>.gd`<br/>前端基建：`test_frontend_<topic>.gd`<br/>基础设施：`test_<service>.gd`<br/>长效护栏：`test_<topic>_guard.gd`<br/>跨域管线：`test_<topic>_pipeline.gd`<br/>测试工厂：`<entity>_factory.gd`（禁 `test_`） | 统一继承 `TestCase`（`pack_results` 打包）；`tests/unit/` 根目录散落文件数恒为 0；护栏单源演进（严禁随案卷分裂新建护栏文件）；新增领域在 `domains.json` 与 `test_registry.gd` 双向对齐。 |
 
 ## 五、 Agent 行为边界与绝对红线清单

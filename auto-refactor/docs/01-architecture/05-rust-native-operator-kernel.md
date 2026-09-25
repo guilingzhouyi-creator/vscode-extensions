@@ -39,15 +39,18 @@ crates/
 ├── ops-diff/                        # 【差分算子】Myers & Git 直方图差分
 │   ├── Cargo.toml
 │   └── src/lib.rs                   # 纯 Rust: run_histogram_diff
-├── ops-graph/                       # 【图论算子】Tarjan SCC 强连通分量与拓扑排序
+├── ops-graph/                       # 【图论算子】Tarjan SCC、拓扑排序、CHK 支配树与数据流不动点求解
 │   ├── Cargo.toml
-│   └── src/lib.rs                   # 纯 Rust: run_analyze_dependency_graph
+│   └── src/lib.rs                   # 纯 Rust: Tarjan SCC, Dominator Tree, Dataflow Solver
 ├── ops-pattern/                     # 【扫描算子】极速行级多模式文本搜索
 │   ├── Cargo.toml
 │   └── src/lib.rs                   # 纯 Rust: run_fast_pattern_match
-└── ops-mask/                        # 【脱敏算子】SIMD 源码词法脱敏与行统计
-    ├── Cargo.toml                   # 依赖 memchr 2.7
-    └── src/lib.rs                   # 纯 Rust: mask_source_code
+├── ops-mask/                        # 【脱敏算子】SIMD 源码词法脱敏与行统计
+│   ├── Cargo.toml                   # 依赖 memchr 2.7
+│   └── src/lib.rs                   # 纯 Rust: mask_source_code
+└── ops-clone/                       # 【克隆算子】滚动哈希、MinHash 64维特征签名与 LSH 倒排分桶
+    ├── Cargo.toml
+    └── src/lib.rs                   # 纯 Rust: count_duplicate_lines, detect_clone_blocks, MinHash/LSH
 ```
 
 ---
@@ -83,7 +86,24 @@ pub fn mask_source_code(content: &str, config: &MaskConfig) -> MaskResult;
 
 ---
 
-## 四、 构建、验证与持续集成护栏
+## 四、 `ops-clone` 代码克隆与重复度检测算子技术规格
+
+### 1. 算法与优化机制
+- **精确连续行克隆块检测**：基于滑动窗口与 `FxHashMap` 哈希指纹表，以 $O(N)$ 时间复杂度捕获跨文件与文件内的多行克隆段落（`detect_clone_blocks`）。
+- **MinHash 64 维签名投影**：针对 Token 集合（$k$-shingle），执行 64 轮仿射变换伪随机哈希，计算 Jaccard 相似度投影向量（`compute_minhash`）。
+- **LSH 局部敏感哈希分桶检索**：将 64 维 MinHash 签名划分为多 Band，利用哈希碰撞在 $O(B \cdot N)$ 亚线性时间内高效发现潜在的高相似度克隆对（`find_clone_pairs`）。
+
+---
+
+## 五、 `ops-graph` 支配树与数据流不动点求解算子技术规格
+
+### 1. 算法与优化机制
+- **Cooper-Harvey-Kennedy (CHK) 即时支配树**：针对任意控制流图（CFG），执行逆后序（Reverse Post-Order, RPO）遍历并基于两相汇聚迭代高效计算 Immediate Dominators（IDom）、支配边界（Dominance Frontiers）与自然循环头。
+- **单调数据流定点求解器 (Monotone Fixed-Point Solver)**：支持前向（Forward）与后向（Backward）数据流分析，根据节点转移方程 $Out[B] = Gen[B] \cup (In[B] \setminus Kill[B])$，基于 Worklist 迭代直至全图状态收敛。
+
+---
+
+## 六、 构建、验证与持续集成护栏
 
 1. **本地编译构建**：
    ```bash
