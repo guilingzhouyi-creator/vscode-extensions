@@ -19,7 +19,6 @@ const {
   defaultPraxisI18nProvider,
   createPraxisI18nProvider,
   defaultPraxisPresentationService,
-  createPraxisPresentationService,
   formatCompactAgentPrompt,
 } = require('../dist/api');
 
@@ -52,10 +51,13 @@ async function testI18nProvider() {
   assert.strictEqual(enCommon.badgeWarn, 'WARN');
 
   // Graceful fallback to RULE_REGISTRY
-  const fallbackRule = defaultPraxisI18nProvider.getRuleText('HYG-NO-CONSOLE', 'zh-CN');
-  assert.ok(fallbackRule, 'Expected fallback entry from RULE_REGISTRY for HYG-NO-CONSOLE');
+  const fallbackRule = defaultPraxisI18nProvider.getRuleText('GOV-DBG-001', 'zh-CN');
+  assert.ok(fallbackRule, 'Expected fallback entry from RULE_REGISTRY for GOV-DBG-001');
   assert.ok(fallbackRule.summary.length > 0, 'Summary should be populated from rule registry');
-  assert.ok(fallbackRule.remediation.length > 0, 'Remediation should be populated from rule registry');
+  assert.ok(
+    fallbackRule.remediation.length > 0,
+    'Remediation should be populated from rule registry',
+  );
 
   // Custom extension rule registration
   const isolatedProvider = createPraxisI18nProvider('zh-CN');
@@ -142,18 +144,20 @@ async function testToPresentation() {
   assert.strictEqual(payloadEn.cards[1].badgeText, '[WARN]');
   assert.strictEqual(payloadEn.cards[1].badgeColor, 'yellow');
 
-  console.log('  ✔ toPresentation converts CAPP prompts into rich localized cards with dual-faced alignment');
+  console.log(
+    '  ✔ toPresentation converts CAPP prompts into rich localized cards with dual-faced alignment',
+  );
 }
 
 async function testAuditAndPresentEndToEnd() {
   console.log('\n3. Testing auditAndPresent end-to-end pipeline...');
 
   const startTime = Date.now();
+  const fakeToken = ['ghp', 'x'.repeat(28)].join('_');
   const input = {
     file: 'src/core/cache.ts',
     oldCode: 'export function run() { return 1; }',
-    newCode:
-      'export function run() {\n    const secretToken = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx";\n    return secretToken;\n}',
+    newCode: `export function run() {\n    const secretToken = "${fakeToken}";\n    return secretToken;\n}`,
     changedLines: [2],
   };
 
@@ -172,7 +176,9 @@ async function testAuditAndPresentEndToEnd() {
   console.log(`    - Overall verdict: ${payload.overallVerdict}`);
   console.log(`    - Cards count: ${payload.cards.length}`);
   console.log(`    - Summary text: "${payload.summaryText}"`);
-  console.log(`    - Raw CAPP prompt:\n      ${payload.rawAgentPrompt.compactPromptText.split('\n')[0]}`);
+  console.log(
+    `    - Raw CAPP prompt:\n      ${payload.rawAgentPrompt.compactPromptText.split('\n')[0]}`,
+  );
 }
 
 async function runAll() {

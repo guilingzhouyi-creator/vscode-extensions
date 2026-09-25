@@ -13,97 +13,97 @@
 
 import type { CallGraph } from '../../intelligence/callGraph';
 import type { CompactAgentPrompt } from '../../guidance/agentConstraintGenerator';
-import type { PraxisSliceAuditInput, PraxisSliceAuditVerdict } from '../router/sliceTypes';
+import type { PraxisSliceAuditInput, PraxisSliceAuditVerdict } from '../../router/sliceTypes';
 import type { IPraxisI18nProvider, PraxisLocale } from './i18n-types';
 
-/** 前端卡片严重级别 */
+/** Diagnostic severity level for presentation card */
 export type PraxisPresentationSeverity = 'block' | 'warn' | 'info' | 'pass';
 
-/** 前端视觉语义色彩 */
+/** Visual badge semantic color */
 export type PraxisBadgeColor = 'red' | 'yellow' | 'blue' | 'green';
 
-/** 单个面向前端界面的结构化诊断卡片 */
+/** Individual structured diagnostic card for UI rendering */
 export interface PraxisDiagnosticCard {
-    /** 卡片唯一 ID (形如 "file:line:rule") */
+    /** Unique card ID (e.g., "file:line:rule") */
     id: string;
-    /** 规则编号 (如 SEC-CST-001) */
+    /** Canonical rule identifier (e.g., SEC-VUL-001) */
     ruleId: string;
-    /** 前端严重级别映射 */
+    /** Mapped presentation severity level */
     severity: PraxisPresentationSeverity;
-    /** 本地化视觉徽章文案 (如 "[阻断]" / "[BLOCK]") */
+    /** Localized visual badge label (e.g., "[BLOCK]" or "[阻断]") */
     badgeText: string;
-    /** 视觉色彩映射，便于直接绑定前端 CSS 类 */
+    /** Semantic color mapping for frontend CSS binding */
     badgeColor: PraxisBadgeColor;
-    /** 目标文件名或相对路径 */
+    /** Target file relative path */
     file: string;
-    /** 目标行号 */
+    /** Target line number */
     line: number;
-    /** 目标列号 (可选) */
+    /** Target column number (optional) */
     column?: number;
-    /** 本地化规则短标题 */
+    /** Localized short rule title */
     title: string;
-    /** 本地化规则概要与上下文信息 */
+    /** Localized diagnostic message and context */
     message: string;
-    /** 本地化修复指导意见 */
+    /** Localized remediation guidance */
     remediation: string;
-    /** 建议修复代码片段或操作提示 (可选) */
+    /** Suggested quick fix code snippet or instruction (optional) */
     quickFixSnippet?: string;
-    /** 规则设计规约或说明文档跳转 URL (可选) */
+    /** Documentation URL link (optional) */
     docsUrl?: string;
-    /** 底层对应的 Agent CAPP 指令原文 (一体两面同源回溯) */
+    /** Underlying machine-oriented CAPP directive for bidirectional traceability */
     sourceAgentDirective: string;
 }
 
-/** 呈现层聚合统计指标 */
+/** Aggregated presentation metrics */
 export interface PraxisPresentationMetrics {
-    /** 诊断指令总数 */
+    /** Total number of diagnostic directives */
     totalDirectives: number;
-    /** 阻断级卡片数 */
+    /** Number of blocking cards */
     blockCount: number;
-    /** 警告级卡片数 */
+    /** Number of warning cards */
     warnCount: number;
-    /** 提示级卡片数 */
+    /** Number of info cards */
     infoCount: number;
-    /** 底层机器面 Token 压缩节省率 (0.00 ~ 1.00) */
+    /** Underlying machine token compression savings ratio (0.00 ~ 1.00) */
     tokenSavingsRatio: number;
 }
 
-/** 交付给 Praxis 前端的完整展示载荷 */
+/** Complete presentation payload delivered to Praxis UI */
 export interface PraxisPresentationPayload {
-    /** 目标切片范围或路径 (如 "src/cache.ts#L240") */
+    /** Target slice scope or path (e.g., "src/cache.ts#L240") */
     target: string;
-    /** 综合审查裁决 */
+    /** Overall review verdict */
     overallVerdict: 'PASS' | 'WARN' | 'BLOCK';
-    /** 当前生效的语言标识 */
+    /** Currently active locale identifier */
     locale: PraxisLocale;
-    /** 本地化综合结论摘要 */
+    /** Localized overall verdict summary text */
     summaryText: string;
-    /** 呈现层统计指标 */
+    /** Presentation layer aggregate metrics */
     metrics: PraxisPresentationMetrics;
-    /** 前端诊断卡片列表 */
+    /** List of diagnostic cards for display */
     cards: PraxisDiagnosticCard[];
-    /** 挂载的底层原始 Agent CAPP 提示载荷 (一体两面) */
+    /** Underlying raw Agent CAPP prompt payload (dual-faceted architecture) */
     rawAgentPrompt: CompactAgentPrompt;
 }
 
-/** 前端转换配置选项 */
+/** Configuration options for presentation rendering */
 export interface PraxisPresentationOptions {
-    /** 目标语言偏好 (默认为 'zh-CN') */
+    /** Preferred target locale (defaults to 'zh-CN') */
     locale?: PraxisLocale;
-    /** 是否包含快速修复代码片段 (默认为 true) */
+    /** Whether to include quick-fix snippets (defaults to true) */
     includeQuickFix?: boolean;
-    /** 规则文档基路径 (如 "https://rules.praxis.internal/rules/") */
+    /** Base URL for rule documentation links */
     docsBaseUrl?: string;
 }
 
-/** Praxis 呈现转换与集成服务 SPI 契约 */
+/** Praxis presentation service SPI contract */
 export interface IPraxisPresentationService {
     /**
-     * 将面向 Agent 的 CAPP 紧凑提示转换为前端展示载荷
+     * Converts machine-oriented CAPP compact prompt to rich UI presentation payload.
      *
-     * @param agentPrompt - 底层生成的 CompactAgentPrompt
-     * @param options - 呈现选项
-     * @returns 面向前端的富展示载荷
+     * @param agentPrompt - Underlying CompactAgentPrompt
+     * @param options - Presentation options
+     * @returns Rich UI presentation payload
      */
     toPresentation(
         agentPrompt: CompactAgentPrompt,
@@ -111,12 +111,12 @@ export interface IPraxisPresentationService {
     ): PraxisPresentationPayload;
 
     /**
-     * 将底层切片审计结果直接转换为前端展示载荷
+     * Converts raw slice audit verdict to rich UI presentation payload.
      *
-     * @param verdict - 底层切片审计裁决
-     * @param target - 目标切片范围标识
-     * @param options - 呈现选项
-     * @returns 面向前端的富展示载荷
+     * @param verdict - Underlying slice audit verdict
+     * @param target - Target slice scope identifier
+     * @param options - Presentation options
+     * @returns Rich UI presentation payload
      */
     fromSliceVerdict(
         verdict: PraxisSliceAuditVerdict,
@@ -125,12 +125,12 @@ export interface IPraxisPresentationService {
     ): PraxisPresentationPayload;
 
     /**
-     * 一体两面一站式审计与呈现：同时完成底层 AST 切片审计并输出前端展示载荷
+     * Dual-faceted all-in-one audit and presentation pipeline.
      *
-     * @param input - 切片审计输入
-     * @param options - 呈现选项
-     * @param callGraph - 可选的全局调用图
-     * @returns 面向前端的富展示载荷（内含底层 CAPP）
+     * @param input - Slice audit input
+     * @param options - Presentation options
+     * @param callGraph - Optional global call graph
+     * @returns Rich UI presentation payload containing underlying CAPP
      */
     auditAndPresent(
         input: PraxisSliceAuditInput,
@@ -139,9 +139,9 @@ export interface IPraxisPresentationService {
     ): Promise<PraxisPresentationPayload>;
 
     /**
-     * 获取绑定的 i18n 多语言提供者
+     * Returns the bound internationalization provider.
      *
-     * @returns IPraxisI18nProvider 实例
+     * @returns IPraxisI18nProvider instance
      */
     getI18nProvider(): IPraxisI18nProvider;
 }

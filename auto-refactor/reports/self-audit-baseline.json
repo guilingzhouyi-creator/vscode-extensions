@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790265458542",
-  "timestamp": "2026-09-24T15:57:41.107Z",
+  "snapshotId": "snapshot-v0.4.0-1790323263314",
+  "timestamp": "2026-09-25T08:01:06.792Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,36 +8,36 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "f5c7448e067c9adfb289babd42ed988a6a86b432d7923ac0f1b262e39e1feb30",
+  "rulesDigest": "6239a6ac2326ed592c9ebc65ceb520990eff13e72e00aa44760498f453630cec",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 403,
-    "durationMs": 2410
+    "filesScanned": 459,
+    "durationMs": 3206
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
-    "effectiveCodeDensity": 0.96,
-    "totalIssues": 5855,
-    "suppressedIssues": 3232,
-    "unsuppressedIssues": 2623,
+    "effectiveCodeDensity": 0.95,
+    "totalIssues": 7039,
+    "suppressedIssues": 3772,
+    "unsuppressedIssues": 3267,
     "bySeverity": {
-      "info": 244,
-      "warning": 5611,
+      "info": 317,
+      "warning": 6722,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 115,
-      "medium": 5335,
-      "low": 405
+      "high": 160,
+      "medium": 6367,
+      "low": 512
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 99.3,
+      "maintainability": 99.2,
       "performance": 99.8,
       "data": 100,
       "testing": 100,
@@ -62,7 +62,7 @@
     {
       "filePath": "scripts/validate-review-memory.js",
       "domain": "scripts",
-      "totalIssues": 138,
+      "totalIssues": 139,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -87,6 +87,15 @@
       "effectiveDensity": 0.95
     },
     {
+      "filePath": "scripts/test-parallel.js",
+      "domain": "scripts",
+      "totalIssues": 97,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.95
+    },
+    {
       "filePath": "scripts/validate-multi-agent.js",
       "domain": "scripts",
       "totalIssues": 94,
@@ -94,15 +103,6 @@
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.96
-    },
-    {
-      "filePath": "scripts/test-parallel.js",
-      "domain": "scripts",
-      "totalIssues": 86,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.94
     },
     {
       "filePath": "src/core/governance/semantic-naming-engine.ts",
@@ -132,6 +132,15 @@
       "effectiveDensity": 0.98
     },
     {
+      "filePath": "src/analyzers/shell-lint.ts",
+      "domain": "analyzers",
+      "totalIssues": 68,
+      "criticalCount": 0,
+      "highCount": 2,
+      "compositeScore": 99.4,
+      "effectiveDensity": 0.95
+    },
+    {
       "filePath": "scripts/validate-data-flow.js",
       "domain": "scripts",
       "totalIssues": 66,
@@ -139,23 +148,14 @@
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.99
-    },
-    {
-      "filePath": "scripts/validate-equivalence.js",
-      "domain": "scripts",
-      "totalIssues": 64,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.94
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 115,
-      "medium": 5335,
-      "low": 405
+      "high": 160,
+      "medium": 6367,
+      "low": 512
     },
     "criticalItems": [],
     "highItems": [
@@ -241,6 +241,69 @@
         "message": "Function \"main\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
+        "id": "complexity:high-complexity:src/analyzers/comments.ts:168",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/comments.ts",
+        "line": 168,
+        "message": "Function \"CommentAnalyzer.analyze\" has cyclomatic complexity 16 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/go-modern.ts:273",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/go-modern.ts",
+        "line": 273,
+        "message": "Function \"GoModernAnalyzer.analyze\" has cyclomatic complexity 16 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/governance.ts:141",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/governance.ts",
+        "line": 141,
+        "message": "Function \"GovernanceAnalyzer.visit\" has cyclomatic complexity 14 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/large-file.ts:101",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/large-file.ts",
+        "line": 101,
+        "message": "Function \"LargeFileAnalyzer.finalize\" has cyclomatic complexity 16 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/python-modern.ts:199",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/python-modern.ts",
+        "line": 199,
+        "message": "Function \"PythonModernAnalyzer.analyze\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/python-modern.ts:662",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/python-modern.ts",
+        "line": 662,
+        "message": "Function \"PythonModernAnalyzer.auditVariableShadowing\" has cyclomatic complexity 24 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/python-modern.ts:832",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/python-modern.ts",
+        "line": 832,
+        "message": "Function \"PythonModernAnalyzer.extractParamNames\" has cyclomatic complexity 20 (threshold 12)."
+      },
+      {
         "id": "complexity:high-complexity:src/analyzers/security.ts:106",
         "rule": "high-complexity",
         "tier": "high",
@@ -250,12 +313,66 @@
         "message": "Function \"SecurityAnalyzer.analyze\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/simplify.ts:107",
+        "id": "complexity:high-complexity:src/analyzers/shell-lint.ts:374",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/shell-lint.ts",
+        "line": 374,
+        "message": "Function \"ShellLintAnalyzer.checkSetEuoPipefail\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/shell-lint.ts:567",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/shell-lint.ts",
+        "line": 567,
+        "message": "Function \"ShellLintAnalyzer.analyzePowerShell\" has cyclomatic complexity 24 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/simplify-linecheck.ts:179",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/simplify-linecheck.ts",
+        "line": 179,
+        "message": "Function \"auditRedundantElsePython\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/simplify-linecheck.ts:302",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/simplify-linecheck.ts",
+        "line": 302,
+        "message": "Function \"auditBooleanReturnBlockIf\" has cyclomatic complexity 19 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/simplify-linecheck.ts:385",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/simplify-linecheck.ts",
+        "line": 385,
+        "message": "Function \"auditBooleanReturnPython\" has cyclomatic complexity 19 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/simplify-linecheck.ts:503",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/simplify-linecheck.ts",
+        "line": 503,
+        "message": "Function \"auditGuardClausePatternsBrace\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/simplify.ts:120",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/simplify.ts",
-        "line": 107,
+        "line": 120,
         "message": "Function \"computeControlFlowNesting\" has cyclomatic complexity 16 (threshold 12)."
       },
       {
@@ -304,21 +421,39 @@
         "message": "Function \"GDScriptAdapter.isInsideTolerantCall\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/oxc-adapter.ts:405",
+        "id": "complexity:high-complexity:src/core/ast/go-adapter-parser.ts:655",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/go-adapter-parser.ts",
+        "line": 655,
+        "message": "Function \"handleDeclarationLine\" has cyclomatic complexity 23 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/ast/go-adapter-parser.ts:796",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/go-adapter-parser.ts",
+        "line": 796,
+        "message": "Function \"processGoLine\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/ast/oxc-adapter.ts:415",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/oxc-adapter.ts",
-        "line": 405,
+        "line": 415,
         "message": "Function \"OxcAdapter.pushChild\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/oxc-adapter.ts:454",
+        "id": "complexity:high-complexity:src/core/ast/oxc-adapter.ts:464",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/oxc-adapter.ts",
-        "line": 454,
+        "line": 464,
         "message": "Function \"OxcAdapter.collectLiteralsInType\" has cyclomatic complexity 16 (threshold 12)."
       },
       {
@@ -355,7 +490,7 @@
         "severity": "warning",
         "file": "src/core/ast/python-adapter.ts",
         "line": 114,
-        "message": "Function \"PythonAdapter.mapNode\" has cyclomatic complexity 20 (threshold 12)."
+        "message": "Function \"PythonAdapter.mapNode\" has cyclomatic complexity 22 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/ast/rust-adapter.ts:175",
@@ -367,13 +502,22 @@
         "message": "Function \"RustAdapter.mapNode\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/traverse.ts:289",
+        "id": "complexity:high-complexity:src/core/ast/traverse.ts:120",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/traverse.ts",
-        "line": 289,
-        "message": "Function \"visitRaw\" has cyclomatic complexity 14 (threshold 12)."
+        "line": 120,
+        "message": "Function \"visitNode\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/ast/traverse.ts:330",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/traverse.ts",
+        "line": 330,
+        "message": "Function \"visitRaw\" has cyclomatic complexity 18 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/ast/ts-predicates.ts:115",
@@ -439,175 +583,31 @@
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
       },
       {
-        "id": "performance:PRF-IO-001:src/core/cache.ts:243",
+        "id": "performance:PRF-IO-001:src/core/cache.ts:251",
         "rule": "PRF-IO-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/cache.ts",
-        "line": 243,
+        "line": 251,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
       },
       {
-        "id": "performance:PRF-IO-001:src/core/cache.ts:273",
+        "id": "performance:PRF-IO-001:src/core/cache.ts:281",
         "rule": "PRF-IO-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/cache.ts",
-        "line": 273,
+        "line": 281,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
       },
       {
-        "id": "performance:PRF-IO-001:src/core/cache.ts:314",
+        "id": "performance:PRF-IO-001:src/core/cache.ts:322",
         "rule": "PRF-IO-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/cache.ts",
-        "line": 314,
+        "line": 322,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/cache.ts:439",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/cache.ts",
-        "line": 439,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
-      },
-      {
-        "id": "complexity:CPX-AMP-001:src/core/config/config.ts:403",
-        "rule": "CPX-AMP-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/config/config.ts",
-        "line": 403,
-        "message": "Complexity amplification hazard: synchronous I/O executed inside loop over 'candidates'."
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/config/config.ts:406",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/config/config.ts",
-        "line": 406,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/dependency-graph.ts:140",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/dependency-graph.ts",
-        "line": 140,
-        "message": "Function \"collectPythonImports\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-SPACE-001:src/core/diff/edit-diff.ts:142",
-        "rule": "CPX-SPACE-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/diff/edit-diff.ts",
-        "line": 142,
-        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'len'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/diff/edit-diff.ts:233",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/diff/edit-diff.ts",
-        "line": 233,
-        "message": "Function \"fastDiff\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/diff/edit-diff.ts:291",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/diff/edit-diff.ts",
-        "line": 291,
-        "message": "Function \"validateSingleEditRange\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/diff/histogram-diff.ts:106",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/diff/histogram-diff.ts",
-        "line": 106,
-        "message": "Function \"findBestAnchor\" has cyclomatic complexity 16 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/diff/histogram-diff.ts:215",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/diff/histogram-diff.ts",
-        "line": 215,
-        "message": "Function \"solve\" has cyclomatic complexity 22 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/file-discovery.ts:122",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/file-discovery.ts",
-        "line": 122,
-        "message": "Function \"collectFiles\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/governance/rules/compressionBounds.ts:108",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/governance/rules/compressionBounds.ts",
-        "line": 108,
-        "message": "Function \"checkFile\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/governance/rules/debugLogging.ts:66",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/governance/rules/debugLogging.ts",
-        "line": 66,
-        "message": "Function \"checkDebugLine\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/governance/rules/sanitization.ts:46",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/governance/rules/sanitization.ts",
-        "line": 46,
-        "message": "Function \"checkCommentLineJargon\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/callChainImpactTracer.ts:61",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/callChainImpactTracer.ts",
-        "line": 61,
-        "message": "Function \"CallChainImpactTracer.traceSymbolImpact\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-001:src/core/intelligence/callChainImpactTracer.ts:86",
-        "rule": "PRF-ALG-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/callChainImpactTracer.ts",
-        "line": 86,
-        "message": "High algorithmic complexity risk: Found 3 levels of nested loops (potential O(N^3) compute hotspot, threshold 3)"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/contextSlice.ts:132",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/contextSlice.ts",
-        "line": 132,
-        "message": "Function \"buildContextSlice\" has cyclomatic complexity 22 (threshold 12)."
       }
     ]
   },
@@ -630,10 +630,10 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 99.9,
+        "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.6,
+          "maintainability": 98.7,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -708,7 +708,22 @@
         "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98,
+          "maintainability": 97.9,
+          "performance": 100,
+          "data": 100,
+          "testing": 100,
+          "reliability": 100,
+          "security": 100,
+          "extensibility": 100
+        },
+        "moduleCount": 1
+      },
+      {
+        "domainName": "comments",
+        "compositeScore": 99.8,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 98.6,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -738,7 +753,7 @@
         "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.8,
+          "maintainability": 98.4,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -839,6 +854,21 @@
         "moduleCount": 1
       },
       {
+        "domainName": "native",
+        "compositeScore": 99.1,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 96,
+          "performance": 98.1,
+          "data": 100,
+          "testing": 100,
+          "reliability": 100,
+          "security": 100,
+          "extensibility": 100
+        },
+        "moduleCount": 1
+      },
+      {
         "domainName": "pipeline",
         "compositeScore": 99.7,
         "pillars": {
@@ -874,6 +904,36 @@
         "pillars": {
           "architecture": 100,
           "maintainability": 100,
+          "performance": 100,
+          "data": 100,
+          "testing": 100,
+          "reliability": 100,
+          "security": 100,
+          "extensibility": 100
+        },
+        "moduleCount": 1
+      },
+      {
+        "domainName": "dictionaries",
+        "compositeScore": 100,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 100,
+          "performance": 100,
+          "data": 100,
+          "testing": 100,
+          "reliability": 100,
+          "security": 100,
+          "extensibility": 100
+        },
+        "moduleCount": 1
+      },
+      {
+        "domainName": "presentation",
+        "compositeScore": 99.9,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 99,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1004,6 +1064,21 @@
         "moduleCount": 1
       },
       {
+        "domainName": "scheduler",
+        "compositeScore": 99.6,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 98,
+          "performance": 99.5,
+          "data": 100,
+          "testing": 100,
+          "reliability": 100,
+          "security": 100,
+          "extensibility": 100
+        },
+        "moduleCount": 1
+      },
+      {
         "domainName": "scoring",
         "compositeScore": 99.9,
         "pillars": {
@@ -1095,10 +1170,10 @@
       },
       {
         "domainName": "utils",
-        "compositeScore": 99.6,
+        "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97,
+          "maintainability": 98.5,
           "performance": 100,
           "data": 100,
           "testing": 100,

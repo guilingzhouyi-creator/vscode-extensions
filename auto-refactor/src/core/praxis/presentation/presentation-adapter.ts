@@ -18,10 +18,7 @@ import type {
     CompactGuardDirective,
 } from '../../guidance/agentConstraintGenerator';
 import { formatCompactAgentPrompt } from '../../guidance/agentConstraintGenerator';
-import type {
-    PraxisSliceAuditInput,
-    PraxisSliceAuditVerdict,
-} from '../router/sliceTypes';
+import type { PraxisSliceAuditInput, PraxisSliceAuditVerdict } from '../../router/sliceTypes';
 import type { IPraxisSliceAuditService } from '../sliceAuditService';
 import { defaultPraxisSliceAuditService } from '../sliceAuditService';
 import type { IPraxisI18nProvider, PraxisLocale } from './i18n-types';
@@ -37,10 +34,10 @@ import type {
 } from './presentation-types';
 
 /**
- * 将底层 CAPP 严重级别映射为前端卡片语义级别
+ * Maps underlying CAPP severity to frontend card severity.
  *
- * @param severity - CAPP 指令严重度 ('BLOCK' | 'WARN' | 'INFO')
- * @returns 前端呈现级别
+ * @param severity - CAPP directive severity ('BLOCK' | 'WARN' | 'INFO')
+ * @returns Mapped presentation severity
  */
 function mapSeverity(severity: string): PraxisPresentationSeverity {
     if (severity === 'BLOCK') {
@@ -53,12 +50,12 @@ function mapSeverity(severity: string): PraxisPresentationSeverity {
 }
 
 /**
- * 解析卡片视觉徽章属性
+ * Resolves visual badge attributes for a diagnostic card.
  *
- * @param severity - 前端呈现级别
- * @param i18n - 多语言提供者
- * @param locale - 当前语言
- * @returns 徽章文本与颜色
+ * @param severity - Presentation severity level
+ * @param i18n - Internationalization provider
+ * @param locale - Active locale
+ * @returns Badge text and color mapping
  */
 function resolveBadge(
     severity: PraxisPresentationSeverity,
@@ -79,13 +76,13 @@ function resolveBadge(
 }
 
 /**
- * 组装单个前端诊断卡片
+ * Assembles an individual frontend diagnostic card.
  *
- * @param directive - 底层紧凑指令
- * @param i18n - 多语言提供者
- * @param locale - 当前语言
- * @param options - 呈现选项
- * @returns 前端诊断卡片
+ * @param directive - Underlying compact directive
+ * @param i18n - Internationalization provider
+ * @param locale - Active locale
+ * @param options - Presentation options
+ * @returns Formatted diagnostic card
  */
 function buildDiagnosticCard(
     directive: CompactGuardDirective,
@@ -133,11 +130,11 @@ function buildDiagnosticCard(
 }
 
 /**
- * 计算呈现层统计指标
+ * Computes presentation layer summary metrics.
  *
- * @param cards - 前端卡片列表
- * @param tokenSavingsRatio - 机器面 Token 节省率
- * @returns 呈现层指标集合
+ * @param cards - List of diagnostic cards
+ * @param tokenSavingsRatio - Token savings ratio
+ * @returns Presentation metrics
  */
 function computeMetrics(
     cards: PraxisDiagnosticCard[],
@@ -167,13 +164,13 @@ function computeMetrics(
 }
 
 /**
- * 组装呈现层综合摘要文本
+ * Builds localized overall summary text.
  *
- * @param overallVerdict - 综合判定结果
- * @param metrics - 呈现指标
- * @param i18n - 多语言提供者
- * @param locale - 当前语言
- * @returns 本地化综合摘要
+ * @param overallVerdict - Overall review verdict
+ * @param metrics - Presentation metrics
+ * @param i18n - Internationalization provider
+ * @param locale - Active locale
+ * @returns Localized summary text
  */
 function buildSummaryText(
     overallVerdict: 'PASS' | 'WARN' | 'BLOCK',
@@ -191,7 +188,7 @@ function buildSummaryText(
     return `${common.verdictBlock} (${metrics.blockCount})`;
 }
 
-/** Praxis 呈现服务适配器实现 */
+/** Concrete Praxis presentation service adapter */
 export class PraxisPresentationAdapter implements IPraxisPresentationService {
     private readonly i18n: IPraxisI18nProvider;
     private readonly sliceService: IPraxisSliceAuditService;
@@ -205,14 +202,14 @@ export class PraxisPresentationAdapter implements IPraxisPresentationService {
     }
 
     /**
-     * 获取绑定的 i18n 提供者实例
+     * Returns the bound internationalization provider.
      */
     public getI18nProvider(): IPraxisI18nProvider {
         return this.i18n;
     }
 
     /**
-     * 将面向 Agent 的 CAPP 紧凑提示转换为前端展示载荷
+     * Converts machine-oriented CAPP compact prompt to rich UI presentation payload.
      */
     public toPresentation(
         agentPrompt: CompactAgentPrompt,
@@ -238,7 +235,7 @@ export class PraxisPresentationAdapter implements IPraxisPresentationService {
     }
 
     /**
-     * 将底层切片审计结果转换为前端展示载荷
+     * Converts raw slice audit verdict to rich UI presentation payload.
      */
     public fromSliceVerdict(
         verdict: PraxisSliceAuditVerdict,
@@ -250,27 +247,34 @@ export class PraxisPresentationAdapter implements IPraxisPresentationService {
     }
 
     /**
-     * 一体两面一站式审计与呈现：同时完成底层 AST 切片审计并输出前端展示载荷
+     * Unified audit and presentation pipeline: audits AST slice and maps to frontend payload.
      */
     public async auditAndPresent(
         input: PraxisSliceAuditInput,
         options?: PraxisPresentationOptions,
         callGraph?: CallGraph,
     ): Promise<PraxisPresentationPayload> {
-        const agentPrompt = await this.sliceService.auditAgentSlice(input, callGraph);
+        const normalizedInput: PraxisSliceAuditInput = {
+            filePath: input.filePath || (input as any).file || '',
+            oldContent: input.oldContent ?? (input as any).oldCode ?? '',
+            newContent: input.newContent ?? (input as any).newCode ?? '',
+            changedLines: input.changedLines,
+            maxCallDepth: input.maxCallDepth,
+        };
+        const agentPrompt = await this.sliceService.auditAgentSlice(normalizedInput, callGraph);
         return this.toPresentation(agentPrompt, options);
     }
 }
 
-/** 默认全局 Praxis 呈现服务单例 */
+/** Default singleton instance of PraxisPresentationAdapter */
 export const defaultPraxisPresentationService = new PraxisPresentationAdapter();
 
 /**
- * 创建独立的 Praxis 呈现服务实例
+ * Creates an independent Praxis presentation service instance.
  *
- * @param i18n - 可选的多语言提供者
- * @param sliceService - 可选的切片审计服务
- * @returns IPraxisPresentationService 实例
+ * @param i18n - Optional internationalization provider
+ * @param sliceService - Optional slice audit service
+ * @returns IPraxisPresentationService instance
  */
 export function createPraxisPresentationService(
     i18n?: IPraxisI18nProvider,

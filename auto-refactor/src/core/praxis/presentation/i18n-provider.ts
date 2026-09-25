@@ -22,10 +22,10 @@ import type {
 } from './i18n-types';
 
 /**
- * 规范化语言标识符
+ * Normalizes input locale string to canonical tag.
  *
- * @param locale - 输入的语言代码 (如 'zh-cn', 'zh-CN', 'en-US')
- * @returns 标准化的语言标签 ('zh-CN' | 'en')
+ * @param locale - Input locale code (e.g., 'zh-cn', 'zh-CN', 'en-US')
+ * @returns Normalized language tag ('zh-CN' | 'en')
  */
 export function normalizeLocale(locale?: string): 'zh-CN' | 'en' {
     if (!locale) {
@@ -38,7 +38,7 @@ export function normalizeLocale(locale?: string): 'zh-CN' | 'en' {
     return 'en';
 }
 
-/** Praxis 呈现层 i18n 提供者实现类 */
+/** Concrete Praxis presentation i18n provider implementation */
 export class PraxisI18nProvider implements IPraxisI18nProvider {
     private currentLocale: 'zh-CN' | 'en' = 'zh-CN';
     private customRules: Map<string, Map<string, Partial<PraxisRuleI18nEntry>>> = new Map();
@@ -48,34 +48,37 @@ export class PraxisI18nProvider implements IPraxisI18nProvider {
     }
 
     /**
-     * 获取当前默认语言
+     * Gets currently active default locale.
      *
-     * @returns 当前生效的规范化语言标签
+     * @returns Current normalized locale tag
      */
     public getLocale(): PraxisLocale {
         return this.currentLocale;
     }
 
     /**
-     * 设置当前默认语言
+     * Sets currently active default locale.
      *
-     * @param locale - 目标语言
+     * @param locale - Target locale
      */
     public setLocale(locale: PraxisLocale): void {
         this.currentLocale = normalizeLocale(locale);
     }
 
     /**
-     * 查询规则的本地化展示条目，包含优雅降级逻辑
+     * Looks up localized presentation entry with graceful degradation fallback.
      *
-     * @param ruleId - 规则编号 (如 'SEC-CST-001')
-     * @param targetLocale - 可选的目标语言，默认取当前生效语言
-     * @returns 匹配的本地化条目，或降级构建的条目
+     * @param ruleId - Rule ID (e.g., 'SEC-VUL-001')
+     * @param targetLocale - Optional target locale (defaults to current locale)
+     * @returns Matching localized entry or degraded fallback entry
      */
-    public getRuleText(ruleId: string, targetLocale?: PraxisLocale): PraxisRuleI18nEntry | undefined {
+    public getRuleText(
+        ruleId: string,
+        targetLocale?: PraxisLocale,
+    ): PraxisRuleI18nEntry | undefined {
         const locale = normalizeLocale(targetLocale ?? this.currentLocale);
 
-        // 1. 优先查动态扩展字典
+        // 1. Query dynamically registered custom dictionary first
         const customForLocale = this.customRules.get(locale);
         if (customForLocale && customForLocale.has(ruleId)) {
             const custom = customForLocale.get(ruleId)!;
@@ -88,20 +91,19 @@ export class PraxisI18nProvider implements IPraxisI18nProvider {
             };
         }
 
-        // 2. 查内置静态多语言字典
+        // 2. Query built-in static multi-language dictionaries
         const staticEntry = this.resolveStaticDictionary(ruleId, locale);
         if (staticEntry) {
             return staticEntry;
         }
 
-        // 3. 优雅降级：直接回退到底层 RULE_REGISTRY 元数据
+        // 3. Graceful fallback: fall back to core RULE_REGISTRY metadata
         const canonical = getRule(ruleId);
         if (canonical) {
             return {
                 name: ruleId,
                 summary: canonical.summary,
                 remediation: canonical.remediation,
-                rationale: canonical.rationale,
             };
         }
 
@@ -109,10 +111,10 @@ export class PraxisI18nProvider implements IPraxisI18nProvider {
     }
 
     /**
-     * 获取通用短语表
+     * Retrieves common UI strings table.
      *
-     * @param targetLocale - 可选的目标语言
-     * @returns 通用短语表
+     * @param targetLocale - Optional target locale
+     * @returns Common UI strings dictionary
      */
     public getCommonStrings(targetLocale?: PraxisLocale): PraxisCommonI18nStrings {
         const locale = normalizeLocale(targetLocale ?? this.currentLocale);
@@ -120,10 +122,10 @@ export class PraxisI18nProvider implements IPraxisI18nProvider {
     }
 
     /**
-     * 动态注册第三方或插件规则的多语言条目
+     * Dynamically registers extension or plugin rule translations.
      *
-     * @param locale - 语言代码
-     * @param entries - 规则条目映射表
+     * @param locale - Locale code
+     * @param entries - Rule entry mapping table
      */
     public registerRuleI18n(
         locale: PraxisLocale,
@@ -141,7 +143,10 @@ export class PraxisI18nProvider implements IPraxisI18nProvider {
         }
     }
 
-    private resolveStaticDictionary(ruleId: string, locale: 'zh-CN' | 'en'): PraxisRuleI18nEntry | undefined {
+    private resolveStaticDictionary(
+        ruleId: string,
+        locale: 'zh-CN' | 'en',
+    ): PraxisRuleI18nEntry | undefined {
         if (locale === 'zh-CN') {
             return ZH_CN_RULES[ruleId] ?? EN_RULES[ruleId];
         }
@@ -149,15 +154,17 @@ export class PraxisI18nProvider implements IPraxisI18nProvider {
     }
 }
 
-/** 默认全局 Praxis i18n 提供者单例 */
+/** Default global Praxis i18n provider singleton instance */
 export const defaultPraxisI18nProvider = new PraxisI18nProvider('zh-CN');
 
 /**
- * 创建独立的 Praxis i18n 提供者实例
+ * Creates an independent Praxis i18n provider instance.
  *
- * @param initialLocale - 初始语言，默认为 'zh-CN'
- * @returns 独立的 IPraxisI18nProvider 实例
+ * @param initialLocale - Initial locale (defaults to 'zh-CN')
+ * @returns Independent IPraxisI18nProvider instance
  */
-export function createPraxisI18nProvider(initialLocale: PraxisLocale = 'zh-CN'): IPraxisI18nProvider {
+export function createPraxisI18nProvider(
+    initialLocale: PraxisLocale = 'zh-CN',
+): IPraxisI18nProvider {
     return new PraxisI18nProvider(initialLocale);
 }

@@ -80,7 +80,8 @@ export const ZH_CN_RULES: Record<string, PraxisRuleI18nEntry> = {
     'RES-LAK-001': {
         name: '资源未在终结块释放',
         summary: '打开的流、句柄、定时器或锁未在 finally 块或清理函数中保证释放。',
-        remediation: '确保在 try...finally 结构中调用 release/close/dispose，或使用 Disposable 模式。',
+        remediation:
+            '确保在 try...finally 结构中调用 release/close/dispose，或使用 Disposable 模式。',
         rationale: '异常路径下的资源遗漏将导致文件句柄枯竭、内存泄漏或死锁。',
     },
     'ASY-AWT-001': {
