@@ -149,20 +149,18 @@ export class MetaArchitectureEvaluator {
         const crossDomainFanInMap = new Map<string, Set<string>>();
         const fanOutMap = new Map<string, number>();
 
-        for (const node of nodes) {
-            crossDomainFanInMap.set(node.id, new Set<string>());
-        }
-
         for (const edge of edges) {
             fanOutMap.set(edge.fromNodeId, (fanOutMap.get(edge.fromNodeId) ?? 0) + 1);
             fanInMap.set(edge.toNodeId, (fanInMap.get(edge.toNodeId) ?? 0) + 1);
             if (edge.isCrossDomain) {
                 const fromNode = graph.getNode(edge.fromNodeId);
                 if (fromNode) {
-                    const domainSet = crossDomainFanInMap.get(edge.toNodeId);
-                    if (domainSet) {
-                        domainSet.add(fromNode.domainName);
+                    let domainSet = crossDomainFanInMap.get(edge.toNodeId);
+                    if (!domainSet) {
+                        domainSet = new Set<string>();
+                        crossDomainFanInMap.set(edge.toNodeId, domainSet);
                     }
+                    domainSet.add(fromNode.domainName);
                 }
             }
         }

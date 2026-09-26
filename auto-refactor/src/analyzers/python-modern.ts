@@ -41,10 +41,12 @@ const EXCEPT_AS_RE = /^\s*except\b.*\bas\s+([A-Za-z_]\w*)\s*:/;
 const IMPORT_SIMPLE_RE = /^\s*import\s+([A-Za-z_]\w*)/;
 const IMPORT_FROM_RE = /^\s*from\s+[A-Za-z_.\w]+\s+import\s+(.+)$/;
 
-/** Idiomatic single-letter / conventional names exempt from shadowing warnings. */
-const SHADOW_IGNORE_NAMES = new Set(
-    '_ self cls i j k n x y z e ex f fd fp fh t s v w h d r g p q a b c'.split(' '),
-);
+import {
+    PY_STDLIB_NAMES,
+    PY_LOCAL_ROOTS,
+    PY_ABC_TYPING_NAMES,
+    SHADOW_IGNORE_NAMES,
+} from './python-modern-tables';
 
 const BLOCKING_CALL_RE =
     /\b(?:time\.sleep|requests\.(?:get|post|put|patch|delete|request)|urllib\.request\.urlopen)\s*\(/;
@@ -60,63 +62,6 @@ const RAISE_CAUSE_LOOKAHEAD_LINES = 5;
 
 /** Block kind for an `async def` frame; mirrors the Python `async` keyword token. */
 const PYTHON_ASYNC_KEYWORD = 'async';
-
-/** Python stdlib top-level modules (`sys.stdlib_module_names` + `__future__`). */
-const PY_STDLIB_NAMES = new Set(
-    (
-        '__future__ _abc _aix_support _ast _asyncio _bisect _blake2 _bootsubprocess _bz2 _codecs _codecs_cn ' +
-        '_codecs_hk _codecs_iso2022 _codecs_jp _codecs_kr _codecs_tw _collections _collections_abc _compat_pickle ' +
-        '_compression _contextvars _crypt _csv _ctypes _curses _curses_panel _datetime _dbm _decimal _elementtree ' +
-        '_frozen_importlib _frozen_importlib_external _functools _gdbm _hashlib _heapq _imp _io _json _locale ' +
-        '_lsprof _lzma _markupbase _md5 _msi _multibytecodec _multiprocessing _opcode _operator _osx_support ' +
-        '_overlapped _pickle _posixshmem _posixsubprocess _py_abc _pydecimal _pyio _queue _random _scproxy _sha1 ' +
-        '_sha256 _sha3 _sha512 _signal _sitebuiltins _socket _sqlite3 _sre _ssl _stat _statistics _string ' +
-        '_strptime _struct _symtable _thread _threading_local _tkinter _tokenize _tracemalloc _typing _uuid ' +
-        '_warnings _weakref _weakrefset _winapi _zoneinfo abc aifc antigravity argparse array ast asynchat ' +
-        'asyncio asyncore atexit audioop base64 bdb binascii bisect builtins bz2 cProfile calendar cgi cgitb ' +
-        'chunk cmath cmd code codecs codeop collections colorsys compileall concurrent configparser contextlib ' +
-        'contextvars copy copyreg crypt csv ctypes curses dataclasses datetime dbm decimal difflib dis distutils ' +
-        'doctest email encodings ensurepip enum errno faulthandler fcntl filecmp fileinput fnmatch fractions ' +
-        'ftplib functools gc genericpath getopt getpass gettext glob graphlib grp gzip hashlib heapq hmac html ' +
-        'http idlelib imaplib imghdr imp importlib inspect io ipaddress itertools json keyword lib2to3 linecache ' +
-        'locale logging lzma mailbox mailcap marshal math mimetypes mmap modulefinder msilib msvcrt ' +
-        'multiprocessing netrc nis nntplib nt ntpath nturl2path numbers opcode operator optparse os ossaudiodev ' +
-        'pathlib pdb pickle pickletools pipes pkgutil platform plistlib poplib posix posixpath pprint profile ' +
-        'pstats pty pwd py_compile pyclbr pydoc pydoc_data pyexpat queue quopri random re readline reprlib ' +
-        'resource rlcompleter runpy sched secrets select selectors shelve shlex shutil signal site smtpd smtplib ' +
-        'sndhdr socket socketserver spwd sqlite3 sre_compile sre_constants sre_parse ssl stat statistics string ' +
-        'stringprep struct subprocess sunau symtable sys sysconfig syslog tabnanny tarfile telnetlib tempfile ' +
-        'termios textwrap this threading time timeit tkinter token tokenize tomllib trace traceback tracemalloc ' +
-        'tty turtle turtledemo types typing unicodedata unittest urllib uu uuid venv warnings wave weakref ' +
-        'webbrowser winreg winsound wsgiref xdrlib xml xmlrpc zipapp zipfile zipimport zlib zoneinfo'
-    ).split(' '),
-);
-/** Roots treated as first-party imports when the scanned file lives outside them. */
-const PY_LOCAL_ROOTS = new Set(['app', 'src', 'lib', 'tests', 'scripts', 'conftest', 'helpers']);
-/** Abstract types that belong to `collections.abc` rather than `typing` (PEP 585). */
-const PY_ABC_TYPING_NAMES = new Set([
-    'Iterable',
-    'Iterator',
-    'Sequence',
-    'MutableSequence',
-    'Mapping',
-    'MutableMapping',
-    'MutableSet',
-    'Callable',
-    'Awaitable',
-    'AsyncIterable',
-    'AsyncIterator',
-    'AsyncGenerator',
-    'Generator',
-    'Hashable',
-    'Sized',
-    'Container',
-    'Collection',
-    'Reversible',
-    'KeysView',
-    'ItemsView',
-    'ValuesView',
-]);
 const PY_PEP585_RE = /\b(?:typing\.)?(List|Dict|Set|FrozenSet|Tuple|Type)\s*\[/;
 const ABC_IMPORT_RE = /^from\s+typing\s+import\s+(.+)$/;
 const PY_PEP604_ANN_ASSIGN_RE =
@@ -219,11 +164,7 @@ export class PythonModernAnalyzer implements Analyzer {
             if (trimmed === '' || trimmed.startsWith('#')) continue;
 
             const indent = line.length - line.trimStart().length;
-            while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) blocks.pop();
-            // Pop function/class scopes when indent drops back to or past their level.
-            while (varScopes.length > 1 && indent <= varScopes[varScopes.length - 1].indent) {
-                varScopes.pop();
-            }
+            this.popScopesForIndent(indent, blocks, varScopes);
 
             const inAsync = this.hasKind(blocks, PYTHON_ASYNC_KEYWORD);
             const inExcept = this.hasKind(blocks, 'except');
@@ -243,6 +184,15 @@ export class PythonModernAnalyzer implements Analyzer {
 
         this.checkImportOrder(importRecords, emit);
         return issues;
+    }
+
+    private popScopesForIndent(indent: number, blocks: Block[], varScopes: VarScope[]): void {
+        while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) {
+            blocks.pop();
+        }
+        while (varScopes.length > 1 && indent <= varScopes[varScopes.length - 1].indent) {
+            varScopes.pop();
+        }
     }
 
     private createIssueEmitter(file: string, issues: Issue[]): PyEmitter {
@@ -672,34 +622,48 @@ export class PythonModernAnalyzer implements Analyzer {
 
         const codeOnly = trimmed.split('#')[0].trim();
         const currentScope = varScopes[varScopes.length - 1];
-        const line1 = lineIdx + 1; // 1-based for user-facing messages
+        const line1 = lineIdx + 1;
 
-        // --- 1. Function / class definition: name + parameters -------------------------
+        if (this.auditDefAndClassShadowing(line, line1, indent, currentScope, varScopes, opts, emit)) {
+            return;
+        }
+        if (this.auditImportShadowing(line, codeOnly, line1, currentScope, varScopes, opts, emit)) {
+            return;
+        }
+        if (this.auditContextBindingShadowing(line, line1, currentScope, varScopes, opts, emit)) {
+            return;
+        }
+        this.auditAssignShadowing(line, line1, currentScope, varScopes, opts, emit);
+    }
+
+    private auditDefAndClassShadowing(
+        line: string,
+        line1: number,
+        indent: number,
+        currentScope: VarScope,
+        varScopes: VarScope[],
+        opts: ShadowingOptions,
+        emit: PyEmitter,
+    ): boolean {
         const defMatch = DEF_PARAMS_RE.exec(line);
         if (defMatch) {
             const funcName = defMatch[1];
             const paramsStr = defMatch[2];
-
-            // Function/class name belongs to the enclosing (current) scope.
             this.registerBinding(funcName, line1, currentScope, varScopes, opts, emit);
-
-            // Determine the new scope kind and push it.
             const isAsync = ASYNC_DEF_RE.test(line);
             const newKind: 'function' | 'class' = isAsync || DEF_RE.test(line) ? 'function' : 'class';
             const newScope: VarScope = { indent, kind: newKind, names: new Map() };
             varScopes.push(newScope);
 
-            // Parameters belong to the new function scope. Each param may shadow outer scopes.
             if (newKind === 'function') {
                 const paramNames = this.extractParamNames(paramsStr);
                 for (const pName of paramNames) {
                     this.registerBinding(pName, line1, newScope, varScopes, opts, emit);
                 }
             }
-            return;
+            return true;
         }
 
-        // Class definition (without params on the same line heuristic).
         if (CLASS_RE.test(line)) {
             const clsMatch = /^\s*class\s+([A-Za-z_]\w*)/.exec(line);
             if (clsMatch) {
@@ -707,64 +671,85 @@ export class PythonModernAnalyzer implements Analyzer {
             }
             const newScope: VarScope = { indent, kind: 'class', names: new Map() };
             varScopes.push(newScope);
-            return;
+            return true;
         }
 
-        // --- 2. Import statements (module-level or function-level, both count) ----------
-        if (/^(?:import|from)\s+/.test(codeOnly)) {
-            const simpleImp = IMPORT_SIMPLE_RE.exec(line);
-            if (simpleImp) {
-                this.registerBinding(simpleImp[1], line1, currentScope, varScopes, opts, emit);
-            }
-            const fromImp = IMPORT_FROM_RE.exec(codeOnly);
-            if (fromImp) {
-                const namesPart = fromImp[1];
-                // Handle `import a, b, c as d` style lists.
-                const items = namesPart.split(',');
-                for (const item of items) {
-                    const trimmedItem = item.trim();
-                    if (trimmedItem === '' || trimmedItem === '(' || trimmedItem === ')') continue;
-                    // Strip parentheses for multi-line imports.
-                    const clean = trimmedItem.replace(/[()]/g, '').trim();
-                    if (clean === '') continue;
-                    const asMatch = /^(.+?)\s+as\s+([A-Za-z_]\w*)$/.exec(clean);
-                    const name = asMatch ? asMatch[2] : clean.split(/\s+/)[0];
-                    if (/^[A-Za-z_]\w*$/.test(name)) {
-                        this.registerBinding(name, line1, currentScope, varScopes, opts, emit);
-                    }
+        return false;
+    }
+
+    private auditImportShadowing(
+        line: string,
+        codeOnly: string,
+        line1: number,
+        currentScope: VarScope,
+        varScopes: VarScope[],
+        opts: ShadowingOptions,
+        emit: PyEmitter,
+    ): boolean {
+        if (!/^(?:import|from)\s+/.test(codeOnly)) return false;
+
+        const simpleImp = IMPORT_SIMPLE_RE.exec(line);
+        if (simpleImp) {
+            this.registerBinding(simpleImp[1], line1, currentScope, varScopes, opts, emit);
+        }
+        const fromImp = IMPORT_FROM_RE.exec(codeOnly);
+        if (fromImp) {
+            const namesPart = fromImp[1];
+            const items = namesPart.split(',');
+            for (const item of items) {
+                const trimmedItem = item.trim();
+                if (trimmedItem === '' || trimmedItem === '(' || trimmedItem === ')') continue;
+                const clean = trimmedItem.replace(/[()]/g, '').trim();
+                if (clean === '') continue;
+                const asMatch = /^(.+?)\s+as\s+([A-Za-z_]\w*)$/.exec(clean);
+                const name = asMatch ? asMatch[2] : clean.split(/\s+/)[0];
+                if (/^[A-Za-z_]\w*$/.test(name)) {
+                    this.registerBinding(name, line1, currentScope, varScopes, opts, emit);
                 }
             }
-            return;
         }
+        return true;
+    }
 
-        // --- 3. for loop variable ------------------------------------------------------
+    private auditContextBindingShadowing(
+        line: string,
+        line1: number,
+        currentScope: VarScope,
+        varScopes: VarScope[],
+        opts: ShadowingOptions,
+        emit: PyEmitter,
+    ): boolean {
         const forMatch = FOR_VAR_RE.exec(line);
         if (forMatch) {
             this.registerBinding(forMatch[1], line1, currentScope, varScopes, opts, emit);
-            // Note: we do NOT return here — a for line might also have other patterns,
-            // but in practice the loop variable is the only binding on a `for` line.
-            return;
+            return true;
         }
 
-        // --- 4. with ... as target -----------------------------------------------------
         const withMatch = WITH_AS_RE.exec(line);
         if (withMatch) {
             this.registerBinding(withMatch[1], line1, currentScope, varScopes, opts, emit);
-            return;
+            return true;
         }
 
-        // --- 5. except ... as target ---------------------------------------------------
         const exceptMatch = EXCEPT_AS_RE.exec(line);
         if (exceptMatch) {
             this.registerBinding(exceptMatch[1], line1, currentScope, varScopes, opts, emit);
-            return;
+            return true;
         }
 
-        // --- 6. Direct assignment: `name = value` --------------------------------------
+        return false;
+    }
+
+    private auditAssignShadowing(
+        line: string,
+        line1: number,
+        currentScope: VarScope,
+        varScopes: VarScope[],
+        opts: ShadowingOptions,
+        emit: PyEmitter,
+    ): void {
         const assignMatch = ASSIGN_RE.exec(line);
         if (assignMatch) {
-            // Skip augmented assigns that the regex might still match (e.g. `a == b` is
-            // excluded by the negative lookahead, but double-check defensively).
             const afterEq = line.slice(assignMatch[0].length);
             if (afterEq.startsWith('=')) return;
             this.registerBinding(assignMatch[1], line1, currentScope, varScopes, opts, emit);
@@ -830,8 +815,18 @@ export class PythonModernAnalyzer implements Analyzer {
      * @returns Array of parameter names in declaration order.
      */
     private extractParamNames(paramsStr: string): string[] {
+        const parts = this.splitParamParts(paramsStr);
         const names: string[] = [];
-        // Strip nested parens/brackets/braces crudely by splitting on commas at depth 0.
+        for (const part of parts) {
+            const name = this.cleanParamName(part);
+            if (name) {
+                names.push(name);
+            }
+        }
+        return names;
+    }
+
+    private splitParamParts(paramsStr: string): string[] {
         let depth = 0;
         let current = '';
         const parts: string[] = [];
@@ -846,27 +841,22 @@ export class PythonModernAnalyzer implements Analyzer {
             }
         }
         if (current.trim() !== '') parts.push(current);
+        return parts;
+    }
 
-        for (const part of parts) {
-            const trimmed = part.trim();
-            if (trimmed === '' || trimmed === '/' || trimmed === '*') continue;
-            // Strip leading * or ** (varargs / kwargs markers).
-            let cleaned = trimmed.replace(/^\*{1,2}/, '').trim();
-            // Remove type annotation: everything after the first `:` before `=`.
-            const eqIdx = cleaned.indexOf('=');
-            const colonIdx = cleaned.indexOf(':');
-            if (colonIdx !== -1 && (eqIdx === -1 || colonIdx < eqIdx)) {
-                cleaned = cleaned.slice(0, colonIdx).trim();
-            }
-            // Remove default value: everything after `=`.
-            if (eqIdx !== -1) {
-                cleaned = cleaned.slice(0, eqIdx).trim();
-            }
-            if (/^[A-Za-z_]\w*$/.test(cleaned)) {
-                names.push(cleaned);
-            }
+    private cleanParamName(part: string): string | null {
+        const trimmed = part.trim();
+        if (trimmed === '' || trimmed === '/' || trimmed === '*') return null;
+        let cleaned = trimmed.replace(/^\*{1,2}/, '').trim();
+        const eqIdx = cleaned.indexOf('=');
+        const colonIdx = cleaned.indexOf(':');
+        if (colonIdx !== -1 && (eqIdx === -1 || colonIdx < eqIdx)) {
+            cleaned = cleaned.slice(0, colonIdx).trim();
         }
-        return names;
+        if (eqIdx !== -1) {
+            cleaned = cleaned.slice(0, eqIdx).trim();
+        }
+        return /^[A-Za-z_]\w*$/.test(cleaned) ? cleaned : null;
     }
 
     private kindOf(trimmed: string): BlockKind {

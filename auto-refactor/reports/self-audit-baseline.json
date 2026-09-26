@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790401185456",
-  "timestamp": "2026-09-26T05:39:50.082Z",
+  "snapshotId": "snapshot-v0.4.0-1790402083843",
+  "timestamp": "2026-09-26T05:54:48.452Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,26 +12,26 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 493,
-    "durationMs": 4308
+    "filesScanned": 494,
+    "durationMs": 4204
   },
   "metrics": {
     "compositeScore": 99.8,
     "grade": "A+",
-    "effectiveCodeDensity": 0.95,
-    "totalIssues": 8394,
+    "effectiveCodeDensity": 0.96,
+    "totalIssues": 8385,
     "suppressedIssues": 4387,
-    "unsuppressedIssues": 4007,
+    "unsuppressedIssues": 3998,
     "bySeverity": {
-      "info": 356,
-      "warning": 8038,
+      "info": 354,
+      "warning": 8031,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 204,
-      "medium": 7603,
-      "low": 587
+      "high": 199,
+      "medium": 7601,
+      "low": 585
     }
   },
   "eightPillars": {
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 204,
-      "medium": 7603,
-      "low": 587
+      "high": 199,
+      "medium": 7601,
+      "low": 585
     },
     "criticalItems": [],
     "highItems": [
@@ -304,51 +304,6 @@
         "message": "Function \"LargeFileAnalyzer.finalize\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/python-modern.ts:199",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/python-modern.ts",
-        "line": 199,
-        "message": "Function \"PythonModernAnalyzer.analyze\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/analyzers/python-modern.ts:662",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/python-modern.ts",
-        "line": 662,
-        "message": "Function \"PythonModernAnalyzer.auditVariableShadowing\" has cyclomatic complexity 24 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/analyzers/python-modern.ts:832",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/python-modern.ts",
-        "line": 832,
-        "message": "Function \"PythonModernAnalyzer.extractParamNames\" has cyclomatic complexity 20 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/analyzers/shell-lint.ts:374",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/shell-lint.ts",
-        "line": 374,
-        "message": "Function \"ShellLintAnalyzer.checkSetEuoPipefail\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/analyzers/shell-lint.ts:567",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/shell-lint.ts",
-        "line": 567,
-        "message": "Function \"ShellLintAnalyzer.analyzePowerShell\" has cyclomatic complexity 24 (threshold 12)."
-      },
-      {
         "id": "complexity:high-complexity:src/analyzers/simplify-linecheck.ts:179",
         "rule": "high-complexity",
         "tier": "high",
@@ -418,15 +373,15 @@
         "severity": "warning",
         "file": "src/core/architecture/metaArchitectureEvaluator.ts",
         "line": 152,
-        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'nodes'."
+        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'edges'."
       },
       {
-        "id": "performance:PRF-MEM-001:src/core/architecture/metaArchitectureEvaluator.ts:153",
+        "id": "performance:PRF-MEM-001:src/core/architecture/metaArchitectureEvaluator.ts:160",
         "rule": "PRF-MEM-001",
         "tier": "high",
         "severity": "info",
         "file": "src/core/architecture/metaArchitectureEvaluator.ts",
-        "line": 153,
+        "line": 160,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
@@ -608,6 +563,51 @@
         "file": "src/core/cache.ts",
         "line": 322,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/cache.ts:361",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/cache.ts",
+        "line": 361,
+        "message": "Unbounded control-flow nesting: function 'CacheStore.loadResults' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/cache.ts:541",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/cache.ts",
+        "line": 541,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/comments/comment-auditor.ts:76",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/comments/comment-auditor.ts",
+        "line": 76,
+        "message": "Function \"auditCommentLanguage\" has cyclomatic complexity 21 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/comments/comment-density-model.ts:98",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/comments/comment-density-model.ts",
+        "line": 98,
+        "message": "Function \"classifyCommentSnippet\" has cyclomatic complexity 22 (exceeds relaxed threshold 18 for shallow structure)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/comments/comment-density-model.ts:254",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/comments/comment-density-model.ts",
+        "line": 254,
+        "message": "Function \"evaluateEffectiveCommentDensity\" has cyclomatic complexity 17 (threshold 12)."
       }
     ]
   },
@@ -633,7 +633,7 @@
         "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.5,
+          "maintainability": 98.9,
           "performance": 100,
           "data": 100,
           "testing": 100,

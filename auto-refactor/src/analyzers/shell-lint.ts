@@ -245,6 +245,16 @@ type ShellEmitter = (
     detail: Record<string, unknown>,
 ) => void;
 
+interface PowerShellScanState {
+    inFunction: boolean;
+    functionName: string;
+    functionStartLine: number;
+    seenCmdletBinding: boolean;
+    inParamBlock: boolean;
+    paramBraceDepth: number;
+    hasUntypedParam: boolean;
+}
+
 /* ---- Analyzer ---- */
 
 /**
@@ -371,16 +381,11 @@ export class ShellLintAnalyzer implements Analyzer {
         }
     }
 
-    private checkSetEuoPipefail(
-        lines: string[],
-        maskedLines: string[],
-        emit: ShellEmitter,
-    ): void {
-        // Look for set -euo pipefail in the first 20 non-blank, non-comment lines
+    private scanStrictErrorFlags(maskedLines: string[]): { hasE: boolean; hasU: boolean; hasPipefail: boolean } {
         let hasE = false;
         let hasU = false;
         let hasPipefail = false;
-        const maxScan = Math.min(lines.length, 30);
+        const maxScan = Math.min(maskedLines.length, 30);
 
         for (let i = 0; i < maxScan; i++) {
             const trimmed = maskedLines[i].trim();
@@ -390,21 +395,30 @@ export class ShellLintAnalyzer implements Analyzer {
             if (SET_PIPEFAIL_RE.test(trimmed)) hasPipefail = true;
             if (hasE && hasU && hasPipefail) break;
         }
+        return { hasE, hasU, hasPipefail };
+    }
 
-        if (!(hasE && hasU && hasPipefail)) {
-            const missing: string[] = [];
-            if (!hasE) missing.push('-e (errexit)');
-            if (!hasU) missing.push('-u (nounset)');
-            if (!hasPipefail) missing.push('-o pipefail');
-            emit(
-                0,
-                'SH-ERR-001',
-                `Script does not set strict error handling (missing: ${missing.join(', ')}).`,
-                SEVERITY_INFO,
-                'Add `set -euo pipefail` near the top of the script to make errors and unset variables fail fast.',
-                { missing },
-            );
-        }
+    private checkSetEuoPipefail(
+        lines: string[],
+        maskedLines: string[],
+        emit: ShellEmitter,
+    ): void {
+        const { hasE, hasU, hasPipefail } = this.scanStrictErrorFlags(maskedLines);
+        if (hasE && hasU && hasPipefail) return;
+
+        const missing: string[] = [];
+        if (!hasE) missing.push('-e (errexit)');
+        if (!hasU) missing.push('-u (nounset)');
+        if (!hasPipefail) missing.push('-o pipefail');
+
+        emit(
+            0,
+            'SH-ERR-001',
+            `Script does not set strict error handling (missing: ${missing.join(', ')}).`,
+            SEVERITY_INFO,
+            'Add `set -euo pipefail` near the top of the script to make errors and unset variables fail fast.',
+            { missing },
+        );
     }
 
     private checkDeprecatedSyntax(
@@ -565,7 +579,6 @@ export class ShellLintAnalyzer implements Analyzer {
      * ========================================================================= */
 
     private analyzePowerShell(content: string, _file: string, emit: ShellEmitter): void {
-        const langId = 'powershell';
         const { raw, masked } = maskSourceText(content, {
             lineComment: '#',
             blockComment: { open: '<#', close: '#>' },
@@ -578,13 +591,15 @@ export class ShellLintAnalyzer implements Analyzer {
         this.checkErrorActionPreference(lines, emit);
 
         // --- Line-level checks (with multi-line state) ---
-        let inFunction = false;
-        let functionName = '';
-        let functionStartLine = -1;
-        let seenCmdletBinding = false;
-        let inParamBlock = false;
-        let paramBraceDepth = 0;
-        let hasUntypedParam = false;
+        const state: PowerShellScanState = {
+            inFunction: false,
+            functionName: '',
+            functionStartLine: -1,
+            seenCmdletBinding: false,
+            inParamBlock: false,
+            paramBraceDepth: 0,
+            hasUntypedParam: false,
+        };
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -593,84 +608,103 @@ export class ShellLintAnalyzer implements Analyzer {
 
             if (trimmed === '' || trimmed.startsWith('#')) continue;
 
-            // Function detection
-            const funcMatch = PS_FUNCTION_RE.exec(trimmed);
-            if (funcMatch && !inFunction) {
-                inFunction = true;
-                functionName = funcMatch[1];
-                functionStartLine = i;
-                seenCmdletBinding = false;
-                hasUntypedParam = false;
-                // Check approved verb
-                this.checkApprovedVerb(functionName, i, emit);
-            }
-
-            // Track param block
-            if (inFunction && PS_PARAM_BLOCK_RE.test(trimmed)) {
-                inParamBlock = true;
-                paramBraceDepth = 0;
-            }
-
-            // Check for CmdletBinding anywhere inside the function
-            if (inFunction && PS_CMDLET_BINDING_RE.test(trimmed)) {
-                seenCmdletBinding = true;
-            }
-
-            if (inParamBlock) {
-                // Count parentheses to track param block end
-                for (const ch of trimmed) {
-                    if (ch === '(') paramBraceDepth++;
-                    else if (ch === ')') paramBraceDepth--;
-                }
-                // Check parameter types
-                if (!PS_PARAM_WITH_TYPE_RE.test(trimmed) && PS_PARAM_SIMPLE_RE.test(trimmed)) {
-                    // Make sure it's not just `$` inside a string (masked line check)
-                    if (/\$[A-Za-z]/.test(maskedTrimmed)) {
-                        hasUntypedParam = true;
-                    }
-                }
-                if (paramBraceDepth <= 0) {
-                    inParamBlock = false;
-                }
-            }
-
-            // Check for end of function (closing brace at top level — heuristic)
-            // We approximate: if we see a lone `}` and we're in a function, end it
-            if (inFunction && /^\s*\}\s*$/.test(line)) {
-                // Emit CmdletBinding finding if missing
-                if (!seenCmdletBinding && functionName !== '') {
-                    // Only flag for functions that look like advanced functions (have param block or are PascalCase)
-                    if (/^[A-Z]/.test(functionName)) {
-                        emit(
-                            functionStartLine,
-                            'PS-CMDLET-001',
-                            `Function \`${functionName}\` is missing \`[CmdletBinding()]\` — common parameters (-Verbose, -WhatIf, etc.) will not work.`,
-                            SEVERITY_INFO,
-                            `Add \`[CmdletBinding()]\` before the \`param()\` block of \`${functionName}\` to enable common parameters and pipeline support.`,
-                            { function: functionName },
-                        );
-                    }
-                }
-                // Emit parameter type finding if applicable
-                if (hasUntypedParam) {
-                    emit(
-                        functionStartLine,
-                        'PS-PARAM-001',
-                        `Function \`${functionName}\` has parameters without explicit type annotations.`,
-                        SEVERITY_INFO,
-                        `Add type annotations (e.g. \`[string]$Name\`) to parameters for self-documentation and input validation.`,
-                        { function: functionName },
-                    );
-                }
-                inFunction = false;
-                functionName = '';
-                functionStartLine = -1;
-                hasUntypedParam = false;
-            }
-
-            // Alias detection
+            this.updatePowerShellFunctionState(state, line, trimmed, maskedTrimmed, i, emit);
             this.checkPowerShellAliases(trimmed, maskedTrimmed, i, emit);
         }
+    }
+
+    private updatePowerShellFunctionState(
+        state: PowerShellScanState,
+        line: string,
+        trimmed: string,
+        maskedTrimmed: string,
+        lineIdx: number,
+        emit: ShellEmitter,
+    ): void {
+        this.checkPowerShellFunctionEntry(state, trimmed, lineIdx, emit);
+        this.checkPowerShellParamBlock(state, trimmed, maskedTrimmed);
+
+        if (state.inFunction && PS_CMDLET_BINDING_RE.test(trimmed)) {
+            state.seenCmdletBinding = true;
+        }
+
+        if (state.inFunction && /^\s*\}\s*$/.test(line)) {
+            this.finalizePowerShellFunction(state, emit);
+        }
+    }
+
+    private checkPowerShellFunctionEntry(
+        state: PowerShellScanState,
+        trimmed: string,
+        lineIdx: number,
+        emit: ShellEmitter,
+    ): void {
+        const funcMatch = PS_FUNCTION_RE.exec(trimmed);
+        if (funcMatch && !state.inFunction) {
+            state.inFunction = true;
+            state.functionName = funcMatch[1];
+            state.functionStartLine = lineIdx;
+            state.seenCmdletBinding = false;
+            state.hasUntypedParam = false;
+            this.checkApprovedVerb(state.functionName, lineIdx, emit);
+        }
+    }
+
+    private checkPowerShellParamBlock(
+        state: PowerShellScanState,
+        trimmed: string,
+        maskedTrimmed: string,
+    ): void {
+        if (state.inFunction && PS_PARAM_BLOCK_RE.test(trimmed)) {
+            state.inParamBlock = true;
+            state.paramBraceDepth = 0;
+        }
+
+        if (state.inParamBlock) {
+            for (const ch of trimmed) {
+                if (ch === '(') state.paramBraceDepth++;
+                else if (ch === ')') state.paramBraceDepth--;
+            }
+            if (!PS_PARAM_WITH_TYPE_RE.test(trimmed) && PS_PARAM_SIMPLE_RE.test(trimmed)) {
+                if (/\$[A-Za-z]/.test(maskedTrimmed)) {
+                    state.hasUntypedParam = true;
+                }
+            }
+            if (state.paramBraceDepth <= 0) {
+                state.inParamBlock = false;
+            }
+        }
+    }
+
+    private finalizePowerShellFunction(state: PowerShellScanState, emit: ShellEmitter): void {
+        if (!state.seenCmdletBinding && state.functionName !== '') {
+            if (/^[A-Z]/.test(state.functionName)) {
+                emit(
+                    state.functionStartLine,
+                    'PS-CMDLET-001',
+                    `Function \`${state.functionName}\` is missing \`[CmdletBinding()]\` — common parameters (-Verbose, -WhatIf, etc.) will not work.`,
+                    SEVERITY_INFO,
+                    `Add \`[CmdletBinding()]\` before the \`param()\` block of \`${state.functionName}\` to enable common parameters and pipeline support.`,
+                    { function: state.functionName },
+                );
+            }
+        }
+
+        if (state.hasUntypedParam) {
+            emit(
+                state.functionStartLine,
+                'PS-PARAM-001',
+                `Function \`${state.functionName}\` has parameters without explicit type annotations.`,
+                SEVERITY_INFO,
+                `Add type annotations (e.g. \`[string]$Name\`) to parameters for self-documentation and input validation.`,
+                { function: state.functionName },
+            );
+        }
+
+        state.inFunction = false;
+        state.functionName = '';
+        state.functionStartLine = -1;
+        state.hasUntypedParam = false;
     }
 
     private checkErrorActionPreference(
