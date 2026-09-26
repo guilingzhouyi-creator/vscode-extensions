@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790404884378",
-  "timestamp": "2026-09-26T06:41:28.845Z",
+  "snapshotId": "snapshot-v0.4.0-1790423307524",
+  "timestamp": "2026-09-26T11:48:32.270Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,30 +8,30 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "313f641d50860706a81e610ee9b35b392c65cdabe56ea526aa40cb05ffbeec50",
+  "rulesDigest": "ad605ecbed92c8b741450cdfff45566436fe317e9a0dee5c772decf0da21aa94",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 494,
-    "durationMs": 4106
+    "filesScanned": 509,
+    "durationMs": 4411
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 8365,
-    "suppressedIssues": 4387,
-    "unsuppressedIssues": 3978,
+    "totalIssues": 9335,
+    "suppressedIssues": 5130,
+    "unsuppressedIssues": 4205,
     "bySeverity": {
-      "info": 383,
-      "warning": 7982,
+      "info": 535,
+      "warning": 8800,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 158,
-      "medium": 7597,
-      "low": 610
+      "high": 160,
+      "medium": 8413,
+      "low": 762
     }
   },
   "eightPillars": {
@@ -60,6 +60,15 @@
   },
   "topHotspots": [
     {
+      "filePath": "scripts/validate-review-memory.js",
+      "domain": "scripts",
+      "totalIssues": 145,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.97
+    },
+    {
       "filePath": "src/core/native/native-clone-shim.ts",
       "domain": "native",
       "totalIssues": 145,
@@ -69,18 +78,18 @@
       "effectiveDensity": 0.93
     },
     {
-      "filePath": "scripts/validate-review-memory.js",
+      "filePath": "scripts/bench-baselines.js",
       "domain": "scripts",
-      "totalIssues": 139,
+      "totalIssues": 142,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
-      "effectiveDensity": 0.97
+      "effectiveDensity": 0.95
     },
     {
       "filePath": "scripts/validate-semantic-domain-detector.js",
       "domain": "scripts",
-      "totalIssues": 124,
+      "totalIssues": 136,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -89,43 +98,25 @@
     {
       "filePath": "scripts/validate-triplane-cross-project.js",
       "domain": "scripts",
-      "totalIssues": 123,
+      "totalIssues": 136,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.98
     },
     {
-      "filePath": "scripts/test-parallel.js",
-      "domain": "scripts",
-      "totalIssues": 112,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.95
-    },
-    {
-      "filePath": "scripts/bench-baselines.js",
-      "domain": "scripts",
-      "totalIssues": 102,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.95
-    },
-    {
       "filePath": "scripts/validate-multi-agent.js",
       "domain": "scripts",
-      "totalIssues": 94,
+      "totalIssues": 130,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.96
     },
     {
-      "filePath": "src/core/governance/semantic-naming-engine.ts",
-      "domain": "governance",
-      "totalIssues": 81,
+      "filePath": "scripts/test-parallel.js",
+      "domain": "scripts",
+      "totalIssues": 118,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -134,28 +125,37 @@
     {
       "filePath": "scripts/bench-fastpath.js",
       "domain": "scripts",
-      "totalIssues": 74,
+      "totalIssues": 116,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.96
     },
     {
-      "filePath": "scripts/validate-autonomy-scorer.js",
+      "filePath": "scripts/validate-native-operator.js",
       "domain": "scripts",
-      "totalIssues": 74,
+      "totalIssues": 98,
       "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
+      "highCount": 1,
+      "compositeScore": 99.6,
       "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "scripts/validate-generalized.js",
+      "domain": "scripts",
+      "totalIssues": 85,
+      "criticalCount": 0,
+      "highCount": 1,
+      "compositeScore": 99.6,
+      "effectiveDensity": 0.98
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 158,
-      "medium": 7597,
-      "low": 610
+      "high": 160,
+      "medium": 8413,
+      "low": 762
     },
     "criticalItems": [],
     "highItems": [
@@ -193,7 +193,7 @@
         "severity": "warning",
         "file": "scripts/validate-native-operator.js",
         "line": 160,
-        "message": "Function \"runValidation\" has cyclomatic complexity 15 (threshold 12)."
+        "message": "Function \"runValidation\" has cyclomatic complexity 23 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:scripts/validate-oxc-keypoints.js:140",
@@ -230,6 +230,15 @@
         "file": "scripts/validate-rules-registry.js",
         "line": 97,
         "message": "Function \"run\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/constants.ts:552",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/constants.ts",
+        "line": 552,
+        "message": "Function \"ConstantsAnalyzer.detectDuplicates\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
         "id": "complexity:CPX-NEST-001:src/core/cache.ts:379",
@@ -286,30 +295,30 @@
         "message": "Function \"parseHumanMetric\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/dependency-graph.ts:141",
+        "id": "complexity:high-complexity:src/core/dependency-graph.ts:143",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/dependency-graph.ts",
-        "line": 141,
+        "line": 143,
         "message": "Function \"collectPythonImports\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "complexity:CPX-SPACE-001:src/core/diff/edit-diff.ts:142",
+        "id": "complexity:CPX-SPACE-001:src/core/diff/edit-diff.ts:151",
         "rule": "CPX-SPACE-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/diff/edit-diff.ts",
-        "line": 142,
+        "line": 151,
         "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'len'."
       },
       {
-        "id": "complexity:high-complexity:src/core/diff/edit-diff.ts:291",
+        "id": "complexity:high-complexity:src/core/diff/edit-diff.ts:300",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/diff/edit-diff.ts",
-        "line": 291,
+        "line": 300,
         "message": "Function \"validateSingleEditRange\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
@@ -599,15 +608,6 @@
         "file": "src/core/memory/reviewMemory.ts",
         "line": 370,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/memory/reviewMemory.ts:386",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/memory/reviewMemory.ts",
-        "line": 386,
-        "message": "Unbounded control-flow nesting: function 'ReviewMemoryManager.loadFromDisk' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
       }
     ]
   },
@@ -633,7 +633,7 @@
         "compositeScore": 100,
         "pillars": {
           "architecture": 100,
-          "maintainability": 100,
+          "maintainability": 99.9,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -678,7 +678,7 @@
         "compositeScore": 99.6,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.9,
+          "maintainability": 97.7,
           "performance": 99.4,
           "data": 100,
           "testing": 100,
@@ -740,6 +740,21 @@
           "architecture": 100,
           "maintainability": 97.8,
           "performance": 99,
+          "data": 100,
+          "testing": 100,
+          "reliability": 100,
+          "security": 100,
+          "extensibility": 100
+        },
+        "moduleCount": 1
+      },
+      {
+        "domainName": "constants",
+        "compositeScore": 100,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 100,
+          "performance": 100,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -1008,7 +1023,7 @@
         "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.7,
+          "maintainability": 98.5,
           "performance": 100,
           "data": 100,
           "testing": 100,

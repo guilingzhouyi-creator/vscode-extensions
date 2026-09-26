@@ -54,6 +54,7 @@ for (let i = 0; i < rawArgs.length; i++) {
 // Stage 1: Isolated parallel test suites (no shared daemon or corpus disk state)
 const PARALLEL_SUITES = [
   { name: 'validate-native-operator', script: 'scripts/validate-native-operator.js' },
+  { name: 'validate-native-benchmark', script: 'scripts/validate-native-benchmark.js' },
   { name: 'validate-oxc', script: 'scripts/validate-oxc-keypoints.js' },
   { name: 'validate-praxis', script: 'scripts/validate-praxis-foundation.js' },
   { name: 'validate-governance', script: 'scripts/validate-governance.js' },
@@ -127,6 +128,11 @@ const PARALLEL_SUITES = [
   { name: 'validate-triplane-cross-project', script: 'scripts/validate-triplane-cross-project.js' },
   { name: 'validate-autonomy-scorer', script: 'scripts/validate-autonomy-scorer.js' },
   { name: 'validate-stdlib-profile', script: 'scripts/validate-stdlib-profile.js' },
+  { name: 'validate-agent-actionable', script: 'scripts/validate-agent-actionable.js' },
+  { name: 'validate-constants-ssot', script: 'scripts/validate-constants-ssot.js' },
+  { name: 'validate-i18n-cleanliness', script: 'scripts/validate-i18n-cleanliness.js' },
+  { name: 'validate-nested-constant-cleanliness', script: 'scripts/validate-nested-constant-cleanliness.js' },
+  { name: 'validate-constant-library-topology', script: 'scripts/validate-constant-library-topology.js' },
   { name: 'validate-rule-generalization', script: 'scripts/validate-rule-generalization.js' },
   { name: 'validate-multi-agent', script: 'scripts/validate-multi-agent.js' },
   { name: 'validate-slice-audit', script: 'scripts/validate-slice-audit.js' },
@@ -193,6 +199,10 @@ const PARALLEL_SUITES = [
   {
     name: 'validate-control-flow-nesting-tolerance',
     script: 'scripts/validate-control-flow-nesting-tolerance.js',
+  },
+  {
+    name: 'validate-mit-corpus',
+    script: 'scripts/validate-mit-corpus.js',
   },
 ];
 
