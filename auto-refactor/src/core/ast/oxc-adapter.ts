@@ -422,7 +422,17 @@ export class OxcAdapter implements LanguageAdapter {
         seed?: ProjectionSeed,
     ): void {
         if (item == null) return;
-        if (this.tryHandleSpecialChild(node, item, oxcParent, oxcGrandparent, inlineFnValue, ctx, seed)) {
+        if (
+            this.tryHandleSpecialChild(
+                node,
+                item,
+                oxcParent,
+                oxcGrandparent,
+                inlineFnValue,
+                ctx,
+                seed,
+            )
+        ) {
             return;
         }
         const child = this.mapNode(item, oxcParent, oxcGrandparent, undefined, ctx, seed);

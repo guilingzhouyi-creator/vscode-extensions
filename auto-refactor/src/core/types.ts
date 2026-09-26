@@ -136,6 +136,57 @@ export interface IssueEvidence {
  * count occurrences). The baseline ratchet relies on that multiplicity.
  * `detail` carries machine-readable payloads for CI / code-review integration.
  */
+/**
+ * Canonical action types that an Agent or automated refactoring bot can execute deterministically.
+ */
+export type AgentActionType =
+    | 'extract_constant'
+    | 'hoist_declaration'
+    | 'narrow_scope'
+    | 'split_function'
+    | 'simplify_control_flow'
+    | 'replace_token'
+    | 'insert_comment_contract'
+    | 'guard_recursion'
+    | 'use_constant_time_comparison'
+    | 'scaffold_constant_library';
+
+/**
+ * Machine-actionable mutation payload tailored for AI Agents and automated codemods.
+ *
+ * Eliminates prose guesswork by supplying structured mutation targets, exact scopes,
+ * safe-to-automate certainty flags, and concrete patch metadata.
+ */
+export interface AgentActionablePayload {
+    /** Atomic refactoring action category */
+    action: AgentActionType;
+    /** Standardized machine rule code (e.g. AR-CONST-001) */
+    code: string;
+    /** Target scope for declaration or hoisting */
+    targetScope?: 'module_top_level' | 'function_local' | 'block_local' | 'shared_domain';
+    /** Recommended variable/constant identifier */
+    targetSymbol?: string;
+    /** Target directory for structured constant library scaffolding */
+    targetDirectory?: string;
+    /** Recommended module breakdown and symbols for constant library scaffolding */
+    suggestedModules?: Array<{ file: string; symbols: string[]; isBarrel?: boolean }>;
+    /** Anchor location for declaration insertion */
+    insertAnchor?: {
+        position: 'after_imports' | 'function_start' | 'before_target';
+        line?: number;
+    };
+    /** Precise edit range and replacement text */
+    patch?: {
+        range: { startLine: number; startCol: number; endLine: number; endCol: number };
+        replacementText: string;
+    };
+    /** Whether an automated Agent can safely apply this patch without human arbitration */
+    safeToAutomate: boolean;
+}
+
+/**
+ * Canonical refactoring issue reported by an analyzer.
+ */
 export interface Issue {
     /**
      * Stable, repeatable grouping key: `${analyzer}:${rule}:${file}:${line}`. Unique per
@@ -157,6 +208,8 @@ export interface Issue {
     suggestion?: string;
     /** Uncertainty and empirical evidence metadata (e.g. confidence score, runtime need). */
     evidence?: IssueEvidence;
+    /** Machine-actionable mutation payload for automated Agent refactoring. */
+    actionable?: AgentActionablePayload;
     /**
      * Baseline ratchet verdict, set only when a baseline file was compared. True means this
      * finding had no matching credit left in the baseline — a brand-new finding, an extra

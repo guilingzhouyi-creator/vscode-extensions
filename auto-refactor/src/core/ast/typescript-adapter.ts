@@ -136,7 +136,9 @@ export class TypeScriptAdapter implements LanguageAdapter {
     ): string | undefined {
         if (isCall) return calleeNameOf(n, sf) ?? undefined;
         if (fnLike || isClassDefining || isBinding) return nameOf(n, sf) ?? undefined;
-        if (kind === NodeKind.Variable || kind === NodeKind.Constant) return nameOf(n, sf) ?? undefined;
+        if (kind === NodeKind.Variable || kind === NodeKind.Constant) {
+            return nameOf(n, sf) ?? undefined;
+        }
         return undefined;
     }
 

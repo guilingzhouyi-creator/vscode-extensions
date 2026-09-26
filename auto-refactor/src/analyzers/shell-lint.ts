@@ -22,7 +22,7 @@
  */
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
-import { maskSourceText, languageIdFromPath, type SourceMaskConfig } from '../core/policy/source-mask';
+import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 
 /* ---- Shell extension detection ---- */
 
@@ -72,22 +72,11 @@ function isPowerShellFile(filePath: string): boolean {
 /** Shebang line for bash / sh / zsh. */
 const SHEBANG_RE = /^#!\s*\/.*(?:bash|sh|zsh|ksh|env\s+\w*sh)\b/;
 
-/** `set -euo pipefail` or equivalent combinations. */
-const SET_EUO_PIPEFAIL_RE = /^\s*set\s+(?:-[a-zA-Z]*e[a-zA-Z]*u[a-zA-Z]*o[a-zA-Z]*|[a-zA-Z]*e[a-zA-Z]*u[a-zA-Z]*)\s+pipefail\b/;
-// Also accept `set -euxo pipefail` etc. — match `-` followed by option letters containing e/u, or `set -o errexit` form.
+// Also accept `set -euxo pipefail` etc. — match `-` followed by option letters
+// containing e/u, or `set -o errexit` form.
 const SET_E_RE = /\bset\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)\b/;
 const SET_U_RE = /\bset\s+(-[a-zA-Z]*u[a-zA-Z]*|-o\s+nounset)\b/;
 const SET_PIPEFAIL_RE = /\bset\s+(-o\s+pipefail|-[a-zA-Z]*o[a-zA-Z]*\s+pipefail)\b/;
-
-/** Unquoted variable reference heuristic: `$var` or `${var}` not inside quotes.
- *  We use the masked source so strings are already blanked, then look for bare `$`
- *  references that are not inside `$()` or `${}` followed by a quote character.
- *
- *  This is intentionally conservative: we only flag simple `$name` patterns that
- *  appear in command arguments (not on the left side of assignments, not inside
- *  `[[ ]]`, not in `case` patterns, etc.).
- */
-const UNQUOTED_VAR_RE = /(?:^|[\s;|&(])\$([A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})(?=[\s;|&)\]]|$)/;
 
 /** Deprecated backtick command substitution: `cmd` */
 const BACKTICK_CMD_RE = /`[^`]+`/;
@@ -175,16 +164,7 @@ const POWERSHELL_ALIASES: Record<string, string> = {
     get: 'Get-Content',
 };
 
-/** Build a regex that matches alias usage at the start of a pipeline position. */
-function buildAliasRegex(): RegExp {
-    const aliases = Object.keys(POWERSHELL_ALIASES)
-        .filter((a) => /^\w+$/.test(a)) // only word-character aliases
-        .map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-        .join('|');
-    return new RegExp(`(?:^|[\\s;|&|])(${aliases})\\s+`, 'i');
-}
 
-const PS_ALIAS_RE = buildAliasRegex();
 
 /** PowerShell approved verbs list (common subset from
  *  https://docs.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands
@@ -225,7 +205,10 @@ const PS_CMDLET_BINDING_RE = /\[CmdletBinding\s*\(\s*\)\]/;
 /** PowerShell `param()` block start. */
 const PS_PARAM_BLOCK_RE = /^\s*param\s*\(/i;
 
-/** PowerShell parameter with type annotation: `[Type]$Name` or `[Parameter(Mandatory)][Type]$Name`. */
+/**
+ * PowerShell parameter with type annotation: `[Type]$Name` or
+ * `[Parameter(Mandatory)][Type]$Name`.
+ */
 const PS_PARAM_WITH_TYPE_RE = /\[[A-Za-z][A-Za-z0-9_.]*\]\s*\$/;
 
 /** PowerShell parameter without type annotation: just `$Name` or `$Name = value`. */
@@ -334,7 +317,6 @@ export class ShellLintAnalyzer implements Analyzer {
      * ========================================================================= */
 
     private analyzeShell(content: string, file: string, emit: ShellEmitter): void {
-        const langId = languageIdFromPath(file) || 'shell';
         const { raw, masked } = maskSourceText(content, this.shellMaskConfig());
         const lines = raw;
         const maskedLines = masked;
@@ -381,7 +363,9 @@ export class ShellLintAnalyzer implements Analyzer {
         }
     }
 
-    private scanStrictErrorFlags(maskedLines: string[]): { hasE: boolean; hasU: boolean; hasPipefail: boolean } {
+    private scanStrictErrorFlags(
+        maskedLines: string[],
+    ): { hasE: boolean; hasU: boolean; hasPipefail: boolean } {
         let hasE = false;
         let hasU = false;
         let hasPipefail = false;

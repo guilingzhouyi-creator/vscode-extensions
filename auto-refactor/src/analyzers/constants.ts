@@ -44,7 +44,25 @@ import { classifyLiteral } from '../core/governance/semanticLiterals';
 import { maskedLinesOfPath } from '../core/source-mask';
 import { scanNearLiteralClusters } from '../core/intelligence/near-literal-cluster';
 import { checkConstantLayoutAndScope } from '../core/governance/constant-layout-guard';
+import { extractConstantEntities } from '../core/diff/constant-relocation-detector';
+import { inspectConstantLibraryTopology } from '../core/architecture/constant-library-auditor';
 import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
+import { isToolOrTestScript } from '../core/governance/pathScope';
+import {
+    formatConstantDeclarationSuggestion,
+    isConstantDefinitionFile,
+} from '../core/intelligence/constant-identity';
+
+import {
+    ANALYZER_CONSTANTS,
+    RULE_DUPLICATE_LITERAL,
+    RULE_NESTED_CONSTANT,
+    CODE_CONST_HARDCODED_STRING,
+    CODE_CONST_MAGIC_NUMBER,
+    CODE_CONST_DUPLICATE_LITERAL,
+    CODE_CONST_NESTED_CONSTANT,
+    SEVERITY_WARNING,
+} from '../core/constants';
 
 const TRIVIAL_NUMBERS = new Set(['0', '1', '-1']);
 
@@ -66,6 +84,55 @@ const TEST_SUITE_BENIGN_TOKENS = new Set([
     'success',
     'pass',
     'fail',
+    'warning',
+    'info',
+    'exit',
+    'status',
+    'expected',
+    'actual',
+    'fixture',
+    'file',
+    'input',
+    'output',
+    'summary',
+    'result',
+    'baseline',
+    'suite',
+]);
+
+/** AST and parser domain token set exempt from constant extraction in parser/ast files. */
+const AST_PARSER_BENIGN_TOKENS = new Set([
+    'identifier',
+    'callexpression',
+    'memberexpression',
+    'functiondeclaration',
+    'functionexpression',
+    'arrowfunctionexpression',
+    'classdeclaration',
+    'classexpression',
+    'methoddefinition',
+    'property',
+    'literal',
+    'string',
+    'number',
+    'boolean',
+    'object',
+    'undefined',
+    'symbol',
+    'type',
+    'start',
+    'end',
+    'kind',
+    'parent',
+    'node',
+    'body',
+    'params',
+    'init',
+    'left',
+    'right',
+    'operator',
+    'arguments',
+    'declarations',
 ]);
 
 /** Schema property token set exempt from duplicate-literal flagging in config/data tables. */
@@ -104,18 +171,12 @@ const CHAR_CODE_BACKTICK = 96;
 const SUGGESTED_NAME_INTEGER_LIMIT = 1000;
 /** Maximum number of words kept when deriving a constant name from a string literal. */
 const SUGGESTED_NAME_MAX_WORDS = 4;
-/** Analyzer id emitted on every finding and matched by the declarative `analyzers.constants`. */
-const CONSTANTS_ANALYZER_NAME = 'constants';
-/** Severity every constants finding carries: extraction advice never blocks a build by itself. */
-const CONSTANTS_SEVERITY = 'warning';
 /** Semantic literal kind used when no specialized category (URL, port, path, ...) applies. */
 const LITERAL_KIND_GENERAL = 'general';
 /** `suggestName` kind for numeric literals. */
 const NUM_KIND = 'number';
 /** `suggestName` kind for string literals. */
 const STR_KIND = 'string';
-/** Rule ID for duplicate literal extractions. */
-const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
 
 /** Order two literal observations by source position (1-based line, then column). */
 function byPosition(a: LiteralRecord, b: LiteralRecord): number {
@@ -166,7 +227,7 @@ function stripQuotes(str: string): string {
  * Failure semantics: never throws; a file with no analyzable literals yields [].
  */
 export class ConstantsAnalyzer implements Analyzer {
-    name = CONSTANTS_ANALYZER_NAME;
+    name = ANALYZER_CONSTANTS;
 
     private literals: LiteralRecord[] = [];
     private issues: Issue[] = [];
@@ -262,6 +323,20 @@ export class ConstantsAnalyzer implements Analyzer {
         if ((ctx.options?.checkConstantLayout || ctx.options?.constantGovernance) && ctx.content) {
             issues.push(...checkConstantLayoutAndScope(ctx.content, ctx.filePath));
         }
+
+        // Pass 7: constant library topology auditor (CONST-LIB-001)
+        const checkTopology = ctx.options?.checkConstantTopology || ctx.options?.constantGovernance;
+        if (checkTopology && ctx.content) {
+            const entities = extractConstantEntities(ctx.content, ctx.filePath);
+            const observed = entities.map((e) => ({
+                name: e.identity.name,
+                normalizedValue: e.fingerprint?.normalizedValue ?? '',
+                filePath: ctx.filePath,
+                line: e.identity.line ?? 1,
+                isExported: e.identity.isExported,
+            }));
+            issues.push(...inspectConstantLibraryTopology(observed, ctx.filePath));
+        }
     }
 
     private detectMagicNumbers(
@@ -269,12 +344,14 @@ export class ConstantsAnalyzer implements Analyzer {
         suppress: Set<NormalizedNode>,
         out: Issue[],
     ): void {
+        const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
+        const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
         const min = ctx.options.magicNumberMin;
         const classify = !!ctx.options.classifyLiterals;
         const granular = !!ctx.options.granularRules;
 
         for (const lit of this.literals) {
-            if (this.shouldSkipMagicNumber(lit, min, suppress)) continue;
+            if (this.shouldSkipMagicNumber(lit, min, suppress, isDataOrConfig)) continue;
 
             const issue = this.buildMagicNumberIssue(lit, ctx, classify, granular);
             if (issue) out.push(issue);
@@ -285,9 +362,13 @@ export class ConstantsAnalyzer implements Analyzer {
         lit: LiteralRecord,
         min: number,
         suppress: Set<NormalizedNode>,
+        isDataOrConfig = false,
     ): boolean {
         if (!lit.numeric || lit.isConstBound || lit.tolerated) return true;
         if (suppress.has(lit.node)) return true;
+        if (isDataOrConfig && !lit.parent?.functionLike) {
+            return true;
+        }
         const num = Number(lit.value);
         if (!isFinite(num) || TRIVIAL_NUMBERS.has(lit.value)) return true;
         return Math.abs(num) < min;
@@ -312,13 +393,35 @@ export class ConstantsAnalyzer implements Analyzer {
 
         return {
             id: `constants:${res.rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
-            analyzer: CONSTANTS_ANALYZER_NAME,
+            analyzer: ANALYZER_CONSTANTS,
             rule: res.rule,
-            severity: CONSTANTS_SEVERITY,
+            severity: SEVERITY_WARNING,
             message: res.message,
             location: locN(lit.node, ctx.filePath),
             detail: res.detail,
-            suggestion: `const ${res.suggested} = ${lit.value};`,
+            suggestion: formatConstantDeclarationSuggestion(
+                ctx.filePath,
+                res.suggested,
+                lit.value,
+                true,
+            ),
+            actionable: {
+                action: 'extract_constant',
+                code: CODE_CONST_MAGIC_NUMBER,
+                targetScope: 'module_top_level',
+                targetSymbol: res.suggested,
+                insertAnchor: { position: 'after_imports' },
+                patch: {
+                    range: {
+                        startLine: lit.node.start?.line ?? 1,
+                        startCol: lit.node.start?.column ?? 1,
+                        endLine: lit.node.end?.line ?? 1,
+                        endCol: lit.node.end?.column ?? 1,
+                    },
+                    replacementText: res.suggested,
+                },
+                safeToAutomate: true,
+            },
         };
     }
 
@@ -328,11 +431,15 @@ export class ConstantsAnalyzer implements Analyzer {
         out: Issue[],
     ): void {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
-        const isTest = roleInference.role === 'test_suite';
+        const isTest = roleInference.role === 'test_suite' || isToolOrTestScript(ctx.filePath);
         const isDataOrConfig =
             roleInference.role === 'config_constant' ||
             roleInference.role === 'rules_registry' ||
             ctx.filePath.endsWith('.json');
+        const isAlgorithm =
+            roleInference.role === 'algorithm_computation' ||
+            ctx.filePath.includes('/ast/') ||
+            ctx.filePath.includes('\\ast\\');
 
         const minLen = ctx.options.hardcodedStringMinLength;
         const ignoreSet = new Set<string>(ctx.options.ignoreLiterals || []);
@@ -340,16 +447,35 @@ export class ConstantsAnalyzer implements Analyzer {
         const granular = !!ctx.options.granularRules;
 
         for (const lit of this.literals) {
-            if (this.shouldSkipHardcodedString(lit, minLen, ignoreSet, suppress, isTest, isDataOrConfig)) continue;
+            if (
+                this.shouldSkipHardcodedString(
+                    lit,
+                    minLen,
+                    ignoreSet,
+                    suppress,
+                    isTest,
+                    isDataOrConfig,
+                    isAlgorithm,
+                )
+            ) {
+                continue;
+            }
 
             const issue = this.buildHardcodedStringIssue(lit, ctx, classify, granular);
             if (issue) out.push(issue);
         }
     }
 
-    private isHardcodedContextAllowed(lower: string, isTest: boolean, isDataOrConfig: boolean): boolean {
+    private isHardcodedContextAllowed(
+        lower: string,
+        isTest: boolean,
+        isDataOrConfig: boolean,
+        isAlgorithm = false,
+    ): boolean {
         if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return true;
-        return isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower);
+        if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return true;
+        if (isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lower)) return true;
+        return false;
     }
 
     private shouldSkipHardcodedString(
@@ -359,13 +485,14 @@ export class ConstantsAnalyzer implements Analyzer {
         suppress: Set<NormalizedNode>,
         isTest = false,
         isDataOrConfig = false,
+        isAlgorithm = false,
     ): boolean {
         if (lit.numeric || lit.isConstBound || lit.tolerated || suppress.has(lit.node)) return true;
         const text = lit.value;
         const inner = stripQuotes(text);
         if (inner.length < minLen || inner.trim().length === 0) return true;
         const lower = inner.toLowerCase();
-        if (this.isHardcodedContextAllowed(lower, isTest, isDataOrConfig)) return true;
+        if (this.isHardcodedContextAllowed(lower, isTest, isDataOrConfig, isAlgorithm)) return true;
         return ignoreSet.has(text) || ignoreSet.has(inner);
     }
 
@@ -390,13 +517,35 @@ export class ConstantsAnalyzer implements Analyzer {
 
         return {
             id: `constants:${res.rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
-            analyzer: CONSTANTS_ANALYZER_NAME,
+            analyzer: ANALYZER_CONSTANTS,
             rule: res.rule,
-            severity: CONSTANTS_SEVERITY,
+            severity: SEVERITY_WARNING,
             message: res.message,
             location: locN(lit.node, ctx.filePath),
             detail: res.detail,
-            suggestion: `const ${res.suggested} = ${text};`,
+            suggestion: formatConstantDeclarationSuggestion(
+                ctx.filePath,
+                res.suggested,
+                text,
+                false,
+            ),
+            actionable: {
+                action: 'extract_constant',
+                code: CODE_CONST_HARDCODED_STRING,
+                targetScope: 'module_top_level',
+                targetSymbol: res.suggested,
+                insertAnchor: { position: 'after_imports' },
+                patch: {
+                    range: {
+                        startLine: lit.node.start?.line ?? 1,
+                        startCol: lit.node.start?.column ?? 1,
+                        endLine: lit.node.end?.line ?? 1,
+                        endCol: lit.node.end?.column ?? 1,
+                    },
+                    replacementText: res.suggested,
+                },
+                safeToAutomate: true,
+            },
         };
     }
 
@@ -406,8 +555,12 @@ export class ConstantsAnalyzer implements Analyzer {
         out: Issue[],
     ): void {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
-        const isTest = roleInference.role === 'test_suite';
+        const isTest = roleInference.role === 'test_suite' || isToolOrTestScript(ctx.filePath);
         const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
+        const isAlgorithm =
+            roleInference.role === 'algorithm_computation' ||
+            ctx.filePath.includes('/ast/') ||
+            ctx.filePath.includes('\\ast\\');
         const threshold = resolveDuplicateThreshold(
             ctx.options.duplicateLiteralThreshold ?? 4,
             isTest,
@@ -423,6 +576,7 @@ export class ConstantsAnalyzer implements Analyzer {
             classify,
             isTest,
             isDataOrConfig,
+            isAlgorithm,
         );
 
         for (const [, arr] of groups) {
@@ -451,7 +605,8 @@ export class ConstantsAnalyzer implements Analyzer {
             .slice(0, SUGGESTED_NAME_MAX_WORDS)
             .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
             .join('');
-        return cleaned ? `${cleaned.toUpperCase()}_TEXT` : 'EXTRACTED_STRING';
+        const name = cleaned ? `${cleaned.toUpperCase()}_TEXT` : 'EXTRACTED_STRING';
+        return /^[0-9]/.test(name) ? `CONST_${name}` : name;
     }
 
     /**
@@ -491,11 +646,13 @@ export class ConstantsAnalyzer implements Analyzer {
         if (aliasName === targetName) return;
 
         out.push({
-            id: `constants:nested-constant:${ctx.filePath}:${lineNum}`,
-            analyzer: CONSTANTS_ANALYZER_NAME,
+            id: `constants:${RULE_NESTED_CONSTANT}:${ctx.filePath}:${lineNum}`,
+            analyzer: ANALYZER_CONSTANTS,
             rule: 'nested-constant',
-            severity: CONSTANTS_SEVERITY,
-            message: `Redundant constant alias: '${aliasName}' directly references '${targetName}'. Avoid constant nesting and indirection; use '${targetName}' directly.`,
+            severity: SEVERITY_WARNING,
+            message:
+                `Redundant constant alias: '${aliasName}' directly references '${targetName}'. ` +
+                `Avoid constant nesting and indirection; use '${targetName}' directly.`,
             location: {
                 file: ctx.filePath,
                 start: { line: lineNum, column: 1 },
@@ -507,6 +664,12 @@ export class ConstantsAnalyzer implements Analyzer {
                 target: targetName,
             },
             suggestion: `Remove '${aliasName}' and reference '${targetName}' directly at call sites.`,
+            actionable: {
+                action: 'replace_token',
+                code: CODE_CONST_NESTED_CONSTANT,
+                targetSymbol: targetName,
+                safeToAutomate: false,
+            },
         });
     }
 }
@@ -588,7 +751,12 @@ function resolveDuplicateThreshold(base: number, isTest: boolean, isDataOrConfig
 }
 
 function isDataOrConfigFile(role: string, filePath: string): boolean {
-    return role === 'config_constant' || role === 'rules_registry' || filePath.endsWith('.json');
+    return (
+        role === 'config_constant' ||
+        role === 'rules_registry' ||
+        filePath.endsWith('.json') ||
+        isConstantDefinitionFile(filePath)
+    );
 }
 
 function isNumericDuplicateCandidate(value: string, magicNumberMin: number): boolean {
@@ -601,12 +769,15 @@ function isStringDuplicateCandidate(
     ignoreSet: Set<string>,
     isTest: boolean,
     isDataOrConfig: boolean,
+    isAlgorithm = false,
 ): boolean {
     const str = stripQuotes(value).trim();
     if (str.length === 0 || ignoreSet.has(value) || ignoreSet.has(str)) return false;
     const lower = str.toLowerCase();
     if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return false;
-    return !(isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower));
+    if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return false;
+    if (isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lower)) return false;
+    return true;
 }
 
 function isDuplicateCandidate(
@@ -616,11 +787,12 @@ function isDuplicateCandidate(
     classify: boolean,
     isTest = false,
     isDataOrConfig = false,
+    isAlgorithm = false,
 ): boolean {
     if (lit.isConstBound || lit.tolerated) return false;
     const candidate = lit.numeric
         ? isNumericDuplicateCandidate(lit.value, magicNumberMin)
-        : isStringDuplicateCandidate(lit.value, ignoreSet, isTest, isDataOrConfig);
+        : isStringDuplicateCandidate(lit.value, ignoreSet, isTest, isDataOrConfig, isAlgorithm);
     if (!candidate) return false;
     return !(classify && classifyLiteral(lit.value, lit.numeric).isReasonable);
 }
@@ -632,10 +804,23 @@ function groupDuplicates(
     classify: boolean,
     isTest = false,
     isDataOrConfig = false,
+    isAlgorithm = false,
 ): Map<string, LiteralRecord[]> {
     const groups = new Map<string, LiteralRecord[]>();
     for (const lit of literals) {
-        if (!isDuplicateCandidate(lit, magicNumberMin, ignoreSet, classify, isTest, isDataOrConfig)) continue;
+        if (
+            !isDuplicateCandidate(
+                lit,
+                magicNumberMin,
+                ignoreSet,
+                classify,
+                isTest,
+                isDataOrConfig,
+                isAlgorithm,
+            )
+        ) {
+            continue;
+        }
         const key = `${lit.numeric ? 'N' : 'S'}:${lit.value}`;
         const arr = groups.get(key) || [];
         arr.push(lit);
@@ -647,10 +832,12 @@ function groupDuplicates(
 function buildDuplicateIssue(ctx: AnalyzerContext, arr: LiteralRecord[], suggested: string): Issue {
     const first = arr[0];
     return {
-        id: `${CONSTANTS_ANALYZER_NAME}:${RULE_DUPLICATE_LITERAL}:${ctx.filePath}:${first.node.start?.line ?? 1}`,
-        analyzer: CONSTANTS_ANALYZER_NAME,
+        id:
+            `${ANALYZER_CONSTANTS}:${RULE_DUPLICATE_LITERAL}:${ctx.filePath}:` +
+            `${first.node.start?.line ?? 1}`,
+        analyzer: ANALYZER_CONSTANTS,
         rule: RULE_DUPLICATE_LITERAL,
-        severity: CONSTANTS_SEVERITY,
+        severity: SEVERITY_WARNING,
         message: `Literal ${first.value} is repeated ${arr.length} times in this file; extract it into a shared constant.`,
         location: locN(first.node, ctx.filePath),
         detail: {
@@ -660,6 +847,20 @@ function buildDuplicateIssue(ctx: AnalyzerContext, arr: LiteralRecord[], suggest
             lines: arr.map((l) => l.node.start?.line ?? 1),
             suggestedName: suggested,
         },
-        suggestion: `const ${suggested} = ${first.value}; // used ${arr.length}x`,
+        suggestion: formatConstantDeclarationSuggestion(
+            ctx.filePath,
+            suggested,
+            first.value,
+            first.numeric,
+            `used ${arr.length}x`,
+        ),
+        actionable: {
+            action: 'extract_constant',
+            code: CODE_CONST_DUPLICATE_LITERAL,
+            targetScope: 'module_top_level',
+            targetSymbol: suggested,
+            insertAnchor: { position: 'after_imports' },
+            safeToAutomate: true,
+        },
     };
 }

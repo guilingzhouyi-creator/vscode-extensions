@@ -42,7 +42,7 @@ interface Pattern {
     regex: RegExp;
 }
 
-function globToRegExp(glob: string): RegExp {
+function globPatternBody(glob: string): string {
     let re = '';
     let i = 0;
     while (i < glob.length) {
@@ -67,7 +67,17 @@ function globToRegExp(glob: string): RegExp {
             i++;
         }
     }
-    return new RegExp('^' + re + '$');
+    return re;
+}
+
+/**
+ * Convert a glob pattern into an anchored RegExp.
+ *
+ * @param glob - Glob pattern string.
+ * @returns Anchored RegExp matching the pattern.
+ */
+export function globToRegExp(glob: string): RegExp {
+    return new RegExp('^' + globPatternBody(glob) + '$');
 }
 
 /**
@@ -85,13 +95,21 @@ function globToRegExp(glob: string): RegExp {
  */
 export function loadGitignore(root: string): (rel: string) => boolean {
     const giPath = path.join(root, '.gitignore');
-    let lines: string[] = [];
     try {
-        lines = fs.readFileSync(giPath, 'utf8').split(/\r?\n/);
+        const lines = fs.readFileSync(giPath, 'utf8').split(/\r?\n/);
+        return parseGitignoreLines(lines);
     } catch {
         return () => false;
     }
+}
 
+/**
+ * Parse an array of .gitignore lines into a path predicate.
+ *
+ * @param lines - Array of gitignore pattern strings.
+ * @returns Predicate over relative paths returning true if ignored.
+ */
+export function parseGitignoreLines(lines: string[]): (rel: string) => boolean {
     const patterns: Pattern[] = [];
     for (let raw of lines) {
         raw = raw.trim();
@@ -106,10 +124,13 @@ export function loadGitignore(root: string): (rel: string) => boolean {
             dirOnly = true;
             raw = raw.slice(0, -1);
         }
-        if (raw.startsWith('/')) raw = raw.slice(1); // anchor to this dir
-        const slashless = !raw.includes('/');
-        const body = globToRegExp(raw).source; // reuse the anchored body
-        const regex = new RegExp('^' + body + (dirOnly ? '(/.*)?$' : '$'));
+        const hadLeadingSlash = raw.startsWith('/');
+        if (hadLeadingSlash) raw = raw.slice(1); // anchor to this dir
+        const slashless = !hadLeadingSlash && !raw.includes('/');
+        const body = globPatternBody(raw);
+        const regex = slashless
+            ? new RegExp('(^|/)' + body + '(/.*)?$')
+            : new RegExp('^' + body + '(/.*)?$');
         patterns.push({ negated, dirOnly, slashless, regex });
     }
 
@@ -119,12 +140,9 @@ export function loadGitignore(root: string): (rel: string) => boolean {
         const norm = rel.split(path.sep).join('/');
         let ignored = false;
         for (const p of patterns) {
-            let hit = p.regex.test(norm);
-            if (!hit && p.slashless) {
-                const base = norm.includes('/') ? norm.slice(norm.lastIndexOf('/') + 1) : norm;
-                hit = p.regex.test(base);
+            if (p.regex.test(norm)) {
+                ignored = !p.negated;
             }
-            if (hit) ignored = !p.negated;
         }
         return ignored;
     };
