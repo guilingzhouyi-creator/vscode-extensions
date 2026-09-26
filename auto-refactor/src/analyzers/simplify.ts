@@ -117,6 +117,29 @@ const PROP_FOR_EACH_CHILD = 'forEachChild';
 const ANONYMOUS_NAME = 'anonymous';
 const ANONYMOUS_SUFFIX = '.<anonymous>';
 
+function isNestingNode(node: NormalizedNode): boolean {
+    return (
+        node.kind === NodeKind.ControlFlow ||
+        (Boolean(node.increasesNesting) && node.kind !== NodeKind.Block)
+    );
+}
+
+function pushNonFunctionChildren(
+    children: NormalizedNode[] | undefined,
+    baseDepth: number,
+    nodeStack: NormalizedNode[],
+    depthStack: number[],
+): void {
+    if (!children) return;
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (!child.functionLike) {
+            nodeStack.push(child);
+            depthStack.push(baseDepth + (isNestingNode(child) ? 1 : 0));
+        }
+    }
+}
+
 function computeControlFlowNesting(rootNode: NormalizedNode): number {
     const rootChildren = rootNode.children;
     if (!rootChildren || rootChildren.length === 0) return 0;
@@ -125,38 +148,13 @@ function computeControlFlowNesting(rootNode: NormalizedNode): number {
     const nodeStack: NormalizedNode[] = [];
     const depthStack: number[] = [];
 
-    for (let i = 0; i < rootChildren.length; i++) {
-        const child = rootChildren[i];
-        if (!child.functionLike) {
-            const isNesting =
-                child.kind === NodeKind.ControlFlow ||
-                (Boolean(child.increasesNesting) && child.kind !== NodeKind.Block);
-            const nextDepth = isNesting ? 1 : 0;
-            nodeStack.push(child);
-            depthStack.push(nextDepth);
-        }
-    }
+    pushNonFunctionChildren(rootChildren, 0, nodeStack, depthStack);
 
     while (nodeStack.length > 0) {
         const currentNode = nodeStack.pop()!;
         const currentDepth = depthStack.pop()!;
         if (currentDepth > max) max = currentDepth;
-
-        const children = currentNode.children;
-        if (children) {
-            for (let i = 0; i < children.length; i++) {
-                const child = children[i];
-                if (!child.functionLike) {
-                    const inc =
-                        child.kind === NodeKind.ControlFlow ||
-                        (Boolean(child.increasesNesting) && child.kind !== NodeKind.Block)
-                            ? 1
-                            : 0;
-                    nodeStack.push(child);
-                    depthStack.push(currentDepth + inc);
-                }
-            }
-        }
+        pushNonFunctionChildren(currentNode.children, currentDepth, nodeStack, depthStack);
     }
     return max;
 }

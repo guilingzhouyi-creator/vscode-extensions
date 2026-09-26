@@ -254,17 +254,7 @@ export class TsModernAnalyzer implements Analyzer {
 
             const isStartOfDisposable = ISOLATED_DISPOSABLE_RE.test(line);
             if (isStartOfDisposable && openParenDepth === 0) {
-                let isPassedAsArg = false;
-                for (let prev = i - 1; prev >= 0; prev--) {
-                    const prevTrim = masked[prev].trim();
-                    if (prevTrim.length === 0) continue;
-                    if (/[(=,[]$/.test(prevTrim)) {
-                        isPassedAsArg = true;
-                    }
-                    break;
-                }
-
-                if (!isPassedAsArg) {
+                if (!isPassedAsArgPreviousLine(masked, i)) {
                     const m = line.match(ISOLATED_DISPOSABLE_RE)!;
                     const col = line.indexOf(m[0].trimStart()) + 1;
                     out.push(
@@ -282,10 +272,7 @@ export class TsModernAnalyzer implements Analyzer {
                 }
             }
 
-            for (let c = 0; c < line.length; c++) {
-                if (line[c] === '(') openParenDepth++;
-                else if (line[c] === ')' && openParenDepth > 0) openParenDepth--;
-            }
+            openParenDepth = updateOpenParenDepth(line, openParenDepth);
         }
     }
 
@@ -523,4 +510,22 @@ export class TsModernAnalyzer implements Analyzer {
         }
         return total > 0 && typed >= total;
     }
+}
+
+function isPassedAsArgPreviousLine(masked: string[], start: number): boolean {
+    for (let prev = start - 1; prev >= 0; prev--) {
+        const prevTrim = masked[prev].trim();
+        if (prevTrim.length === 0) continue;
+        return /[(=,[]$/.test(prevTrim);
+    }
+    return false;
+}
+
+function updateOpenParenDepth(line: string, currentDepth: number): number {
+    let depth = currentDepth;
+    for (let c = 0; c < line.length; c++) {
+        if (line[c] === '(') depth++;
+        else if (line[c] === ')' && depth > 0) depth--;
+    }
+    return depth;
 }

@@ -176,6 +176,30 @@ function auditRedundantElseBrace(
     }
 }
 
+function findPythonIfBodyLastStmt(lines: string[], start: number, ifIndent: number): number {
+    let lastStmtIdx = -1;
+    let j = start;
+    while (j < lines.length) {
+        const trimmed = lines[j].trim();
+        if (trimmed === '' || trimmed.startsWith('#')) {
+            j++;
+            continue;
+        }
+        if (indentWidth(lines[j]) <= ifIndent) break;
+        lastStmtIdx = j;
+        j++;
+    }
+    return lastStmtIdx;
+}
+
+function isPythonTerminatingElse(lines: string[], lastStmtIdx: number, ifIndent: number): number {
+    const lastStmt = lines[lastStmtIdx].trim();
+    if (!/^(?:return|raise|break|continue)\b/.test(lastStmt)) return -1;
+    const k = skipBlanksAndComments(lines, lastStmtIdx + 1);
+    if (k >= lines.length || indentWidth(lines[k]) !== ifIndent) return -1;
+    return /^(else|elif)\b/.test(lines[k].trim()) ? k : -1;
+}
+
 function auditRedundantElsePython(
     lines: string[],
     file: string,
@@ -186,27 +210,11 @@ function auditRedundantElsePython(
         if (!ifMatch) continue;
         const ifIndent = ifMatch[1].length;
 
-        let lastStmtIdx = -1;
-        let j = i + 1;
-        while (j < lines.length) {
-            const trimmed = lines[j].trim();
-            if (trimmed === '' || trimmed.startsWith('#')) {
-                j++;
-                continue;
-            }
-            if (indentWidth(lines[j]) <= ifIndent) break;
-            lastStmtIdx = j;
-            j++;
-        }
+        const lastStmtIdx = findPythonIfBodyLastStmt(lines, i + 1, ifIndent);
         if (lastStmtIdx === -1) continue;
 
-        const lastStmt = lines[lastStmtIdx].trim();
-        if (!/^(?:return|raise|break|continue)\b/.test(lastStmt)) continue;
-
-        const k = skipBlanksAndComments(lines, lastStmtIdx + 1);
-        if (k >= lines.length) continue;
-        if (indentWidth(lines[k]) !== ifIndent) continue;
-        if (!/^(else|elif)\b/.test(lines[k].trim())) continue;
+        const k = isPythonTerminatingElse(lines, lastStmtIdx, ifIndent);
+        if (k === -1) continue;
 
         issues.push(
             makeIssue(
@@ -299,6 +307,74 @@ function auditBooleanReturnSingleLineIf(
     }
 }
 
+function findElseBodyStart(lines: string[], closeIdx: number): number {
+    const closeLine = lines[closeIdx];
+    const afterClose = closeLine.replace(/^\s*\}\s*/, '');
+    if (/^else\b/.test(afterClose)) return closeIdx;
+    const nextIdx = skipBlanksAndComments(lines, closeIdx + 1);
+    if (nextIdx < lines.length && ELSE_RE.test(lines[nextIdx])) return nextIdx;
+    return -1;
+}
+
+function checkBlockIfNoElse(
+    lines: string[],
+    file: string,
+    i: number,
+    closeIdx: number,
+    ifBool: boolean,
+    issues: Issue[],
+): void {
+    const j = skipBlanksAndComments(lines, closeIdx + 1);
+    if (j >= lines.length) return;
+    const nextBool = RETURN_BOOL_RE.exec(lines[j].trim());
+    if (!nextBool || ifBool === (nextBool[1] === 'true')) return;
+
+    issues.push(
+        makeIssue(
+            'SIM-BOOL-001',
+            file,
+            i + 1,
+            j + 1,
+            BOOL_MSG_IF,
+            BOOL_SUGGESTION,
+            { pattern: 'block-if-boolean-return-no-else' },
+        ),
+    );
+}
+
+function checkBlockIfWithElse(
+    lines: string[],
+    file: string,
+    i: number,
+    elseBodyStart: number,
+    ifBool: boolean,
+    issues: Issue[],
+): void {
+    const elseCloseIdx = findMatchingBrace(lines, elseBodyStart);
+    if (elseCloseIdx === -1) return;
+
+    const elseLastIdx = findLastMeaningfulLine(lines, elseBodyStart + 1, elseCloseIdx - 1);
+    if (elseLastIdx === -1) return;
+    const elseBoolMatch = RETURN_BOOL_RE.exec(lines[elseLastIdx].trim());
+    if (!elseBoolMatch) return;
+    const elseBool = elseBoolMatch[1] === 'true';
+    if (ifBool === elseBool) return;
+
+    if (countMeaningfulStmts(lines, elseBodyStart + 1, elseCloseIdx) !== 1) return;
+
+    issues.push(
+        makeIssue(
+            'SIM-BOOL-001',
+            file,
+            i + 1,
+            elseCloseIdx + 1,
+            BOOL_MSG_IFELSE,
+            BOOL_SUGGESTION,
+            { pattern: 'if-else-boolean-return-blocks' },
+        ),
+    );
+}
+
 function auditBooleanReturnBlockIf(
     lines: string[],
     file: string,
@@ -319,67 +395,78 @@ function auditBooleanReturnBlockIf(
 
         if (countMeaningfulStmts(lines, i + 1, closeIdx) !== 1) continue;
 
-        // Check for `} else {`
-        const closeLine = lines[closeIdx];
-        const afterClose = closeLine.replace(/^\s*\}\s*/, '');
-        const hasElseSameLine = /^else\b/.test(afterClose);
-
-        let elseBodyStart = -1;
-        if (hasElseSameLine) {
-            elseBodyStart = closeIdx;
-        } else {
-            const nextIdx = skipBlanksAndComments(lines, closeIdx + 1);
-            if (nextIdx < lines.length && ELSE_RE.test(lines[nextIdx])) {
-                elseBodyStart = nextIdx;
-            }
-        }
-
+        const elseBodyStart = findElseBodyStart(lines, closeIdx);
         if (elseBodyStart === -1) {
-            // Pattern: no else, next line returns opposite boolean
-            const j = skipBlanksAndComments(lines, closeIdx + 1);
-            if (j >= lines.length) continue;
-            const nextBool = RETURN_BOOL_RE.exec(lines[j].trim());
-            if (!nextBool) continue;
-            if (ifBool === (nextBool[1] === 'true')) continue;
+            checkBlockIfNoElse(lines, file, i, closeIdx, ifBool, issues);
+        } else {
+            checkBlockIfWithElse(lines, file, i, elseBodyStart, ifBool, issues);
+        }
+    }
+}
 
-            issues.push(
-                makeIssue(
-                    'SIM-BOOL-001',
-                    file,
-                    i + 1,
-                    j + 1,
-                    BOOL_MSG_IF,
-                    BOOL_SUGGESTION,
-                    { pattern: 'block-if-boolean-return-no-else' },
-                ),
-            );
+function findPythonBlockEnd(lines: string[], start: number, ifIndent: number): number {
+    let k = start;
+    while (k < lines.length) {
+        const t = lines[k].trim();
+        if (t === '' || t.startsWith('#')) {
+            k++;
             continue;
         }
-
-        const elseCloseIdx = findMatchingBrace(lines, elseBodyStart);
-        if (elseCloseIdx === -1) continue;
-
-        const elseLastIdx = findLastMeaningfulLine(lines, elseBodyStart + 1, elseCloseIdx - 1);
-        if (elseLastIdx === -1) continue;
-        const elseBoolMatch = RETURN_BOOL_RE.exec(lines[elseLastIdx].trim());
-        if (!elseBoolMatch) continue;
-        const elseBool = elseBoolMatch[1] === 'true';
-        if (ifBool === elseBool) continue;
-
-        if (countMeaningfulStmts(lines, elseBodyStart + 1, elseCloseIdx) !== 1) continue;
-
-        issues.push(
-            makeIssue(
-                'SIM-BOOL-001',
-                file,
-                i + 1,
-                elseCloseIdx + 1,
-                BOOL_MSG_IFELSE,
-                BOOL_SUGGESTION,
-                { pattern: 'if-else-boolean-return-blocks' },
-            ),
-        );
+        if (indentWidth(lines[k]) <= ifIndent) break;
+        k++;
     }
+    return k;
+}
+
+function checkPythonBoolReturnWithElse(
+    lines: string[],
+    file: string,
+    i: number,
+    k: number,
+    ifIndent: number,
+    ifBool: boolean,
+    issues: Issue[],
+): void {
+    const m = skipBlanksAndComments(lines, k + 1);
+    if (m >= lines.length || indentWidth(lines[m]) <= ifIndent) return;
+    const elseBoolMatch = /^return\s+(True|False)\s*$/.exec(lines[m].trim());
+    if (!elseBoolMatch || ifBool === (elseBoolMatch[1] === 'True')) return;
+
+    issues.push(
+        makeIssue(
+            'SIM-BOOL-001',
+            file,
+            i + 1,
+            k + 1,
+            BOOL_MSG_IFELSE,
+            BOOL_SUGGESTION,
+            { pattern: 'python-if-else-boolean-return' },
+        ),
+    );
+}
+
+function checkPythonBoolReturnNoElse(
+    file: string,
+    i: number,
+    k: number,
+    afterTrimmed: string,
+    ifBool: boolean,
+    issues: Issue[],
+): void {
+    const afterBool = /^return\s+(True|False)\s*$/.exec(afterTrimmed);
+    if (!afterBool || ifBool === (afterBool[1] === 'True')) return;
+
+    issues.push(
+        makeIssue(
+            'SIM-BOOL-001',
+            file,
+            i + 1,
+            k + 1,
+            BOOL_MSG_IF,
+            BOOL_SUGGESTION,
+            { pattern: 'python-if-boolean-return-no-else' },
+        ),
+    );
 }
 
 function auditBooleanReturnPython(
@@ -393,61 +480,21 @@ function auditBooleanReturnPython(
 
         const ifIndent = indentWidth(lines[i]);
         const j = skipBlanksAndComments(lines, i + 1);
-        if (j >= lines.length) continue;
-        if (indentWidth(lines[j]) <= ifIndent) continue;
+        if (j >= lines.length || indentWidth(lines[j]) <= ifIndent) continue;
 
         const bodyTrimmed = lines[j].trim();
         const boolMatch = /^return\s+(True|False)\s*$/.exec(bodyTrimmed);
         if (!boolMatch) continue;
         const ifBool = boolMatch[1] === 'True';
 
-        // Find end of if block
-        let k = j + 1;
-        while (k < lines.length) {
-            const t = lines[k].trim();
-            if (t === '' || t.startsWith('#')) { k++; continue; }
-            if (indentWidth(lines[k]) <= ifIndent) break;
-            k++;
-        }
-        if (k >= lines.length) continue;
-        if (indentWidth(lines[k]) !== ifIndent) continue;
+        const k = findPythonBlockEnd(lines, j + 1, ifIndent);
+        if (k >= lines.length || indentWidth(lines[k]) !== ifIndent) continue;
 
         const afterTrimmed = lines[k].trim();
-
         if (/^else\s*:/.test(afterTrimmed)) {
-            const m = skipBlanksAndComments(lines, k + 1);
-            if (m >= lines.length) continue;
-            if (indentWidth(lines[m]) <= ifIndent) continue;
-            const elseBoolMatch = /^return\s+(True|False)\s*$/.exec(lines[m].trim());
-            if (!elseBoolMatch) continue;
-            if (ifBool === (elseBoolMatch[1] === 'True')) continue;
-
-            issues.push(
-                makeIssue(
-                    'SIM-BOOL-001',
-                    file,
-                    i + 1,
-                    k + 1,
-                    BOOL_MSG_IFELSE,
-                    BOOL_SUGGESTION,
-                    { pattern: 'python-if-else-boolean-return' },
-                ),
-            );
+            checkPythonBoolReturnWithElse(lines, file, i, k, ifIndent, ifBool, issues);
         } else if (/^return\s+(True|False)\s*$/.test(afterTrimmed)) {
-            const afterBool = /^return\s+(True|False)\s*$/.exec(afterTrimmed)!;
-            if (ifBool === (afterBool[1] === 'True')) continue;
-
-            issues.push(
-                makeIssue(
-                    'SIM-BOOL-001',
-                    file,
-                    i + 1,
-                    k + 1,
-                    BOOL_MSG_IF,
-                    BOOL_SUGGESTION,
-                    { pattern: 'python-if-boolean-return-no-else' },
-                ),
-            );
+            checkPythonBoolReturnNoElse(file, i, k, afterTrimmed, ifBool, issues);
         }
     }
 }
@@ -500,6 +547,37 @@ function getGuardIfEndLine(lines: string[], idx: number): number {
     return idx;
 }
 
+function findFunctionOpeningBrace(lines: string[], start: number): number {
+    for (let braceIdx = start; braceIdx < lines.length && braceIdx < start + 5; braceIdx++) {
+        if (lines[braceIdx].includes('{')) return braceIdx;
+    }
+    return -1;
+}
+
+function countConsecutiveGuardClauses(
+    lines: string[],
+    start: number,
+): { count: number; firstIfLine: number } {
+    let count = 0;
+    let firstIfLine = -1;
+    let cur = start;
+    while (cur < lines.length) {
+        const curTrimmed = lines[cur].trim();
+        if (isCommentOrBlankLine(curTrimmed)) {
+            cur++;
+            continue;
+        }
+        if (isGuardIfBlock(lines, cur)) {
+            if (firstIfLine === -1) firstIfLine = cur;
+            count++;
+            cur = getGuardIfEndLine(lines, cur) + 1;
+            continue;
+        }
+        break;
+    }
+    return { count, firstIfLine };
+}
+
 function auditGuardClausePatternsBrace(
     lines: string[],
     file: string,
@@ -508,34 +586,12 @@ function auditGuardClausePatternsBrace(
 ): void {
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
-        if (!/\b(?:function|fn|func)\s+[A-Za-z_]\w*/.test(trimmed)) continue;
-        if (trimmed.endsWith(';')) continue;
+        if (!/\b(?:function|fn|func)\s+[A-Za-z_]\w*/.test(trimmed) || trimmed.endsWith(';')) continue;
 
-        // Find opening brace of function body
-        let braceIdx = i;
-        let found = false;
-        while (braceIdx < lines.length && braceIdx < i + 5) {
-            if (lines[braceIdx].includes('{')) { found = true; break; }
-            braceIdx++;
-        }
-        if (!found) continue;
+        const braceIdx = findFunctionOpeningBrace(lines, i);
+        if (braceIdx === -1) continue;
 
-        let count = 0;
-        let firstIfLine = -1;
-        let cur = braceIdx + 1;
-
-        while (cur < lines.length) {
-            const curTrimmed = lines[cur].trim();
-            if (isCommentOrBlankLine(curTrimmed)) { cur++; continue; }
-
-            if (isGuardIfBlock(lines, cur)) {
-                if (firstIfLine === -1) firstIfLine = cur;
-                count++;
-                cur = getGuardIfEndLine(lines, cur) + 1;
-                continue;
-            }
-            break;
-        }
+        const { count, firstIfLine } = countConsecutiveGuardClauses(lines, braceIdx + 1);
 
         if (count >= threshold) {
             issues.push(

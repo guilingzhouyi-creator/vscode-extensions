@@ -347,6 +347,11 @@ export class ConstantsAnalyzer implements Analyzer {
         }
     }
 
+    private isHardcodedContextAllowed(lower: string, isTest: boolean, isDataOrConfig: boolean): boolean {
+        if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return true;
+        return isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower);
+    }
+
     private shouldSkipHardcodedString(
         lit: LiteralRecord,
         minLen: number,
@@ -355,14 +360,12 @@ export class ConstantsAnalyzer implements Analyzer {
         isTest = false,
         isDataOrConfig = false,
     ): boolean {
-        if (lit.numeric || lit.isConstBound || lit.tolerated) return true;
-        if (suppress.has(lit.node)) return true;
+        if (lit.numeric || lit.isConstBound || lit.tolerated || suppress.has(lit.node)) return true;
         const text = lit.value;
         const inner = stripQuotes(text);
         if (inner.length < minLen || inner.trim().length === 0) return true;
         const lower = inner.toLowerCase();
-        if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return true;
-        if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return true;
+        if (this.isHardcodedContextAllowed(lower, isTest, isDataOrConfig)) return true;
         return ignoreSet.has(text) || ignoreSet.has(inner);
     }
 
@@ -404,18 +407,12 @@ export class ConstantsAnalyzer implements Analyzer {
     ): void {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
         const isTest = roleInference.role === 'test_suite';
-        const isDataOrConfig =
-            roleInference.role === 'config_constant' ||
-            roleInference.role === 'rules_registry' ||
-            ctx.filePath.endsWith('.json');
-
-        const baseThreshold = ctx.options.duplicateLiteralThreshold ?? 4;
-        let threshold = baseThreshold;
-        if (isTest) {
-            threshold = Math.max(baseThreshold * 3, 12);
-        } else if (isDataOrConfig) {
-            threshold = Math.max(baseThreshold * 2, 8);
-        }
+        const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
+        const threshold = resolveDuplicateThreshold(
+            ctx.options.duplicateLiteralThreshold ?? 4,
+            isTest,
+            isDataOrConfig,
+        );
 
         const ignoreSet = new Set<string>(ctx.options.ignoreLiterals || []);
         const classify = !!ctx.options.classifyLiterals;
@@ -584,6 +581,34 @@ function resolveLiteralIssueData(
     return { rule, message, detail, suggested };
 }
 
+function resolveDuplicateThreshold(base: number, isTest: boolean, isDataOrConfig: boolean): number {
+    if (isTest) return Math.max(base * 3, 12);
+    if (isDataOrConfig) return Math.max(base * 2, 8);
+    return base;
+}
+
+function isDataOrConfigFile(role: string, filePath: string): boolean {
+    return role === 'config_constant' || role === 'rules_registry' || filePath.endsWith('.json');
+}
+
+function isNumericDuplicateCandidate(value: string, magicNumberMin: number): boolean {
+    if (TRIVIAL_NUMBERS.has(value)) return false;
+    return Math.abs(Number(value)) >= magicNumberMin;
+}
+
+function isStringDuplicateCandidate(
+    value: string,
+    ignoreSet: Set<string>,
+    isTest: boolean,
+    isDataOrConfig: boolean,
+): boolean {
+    const str = stripQuotes(value).trim();
+    if (str.length === 0 || ignoreSet.has(value) || ignoreSet.has(str)) return false;
+    const lower = str.toLowerCase();
+    if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return false;
+    return !(isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower));
+}
+
 function isDuplicateCandidate(
     lit: LiteralRecord,
     magicNumberMin: number,
@@ -593,19 +618,11 @@ function isDuplicateCandidate(
     isDataOrConfig = false,
 ): boolean {
     if (lit.isConstBound || lit.tolerated) return false;
-    if (lit.numeric) {
-        if (TRIVIAL_NUMBERS.has(lit.value)) return false;
-        if (Math.abs(Number(lit.value)) < magicNumberMin) return false;
-    } else {
-        const str = stripQuotes(lit.value).trim();
-        if (str.length === 0) return false;
-        if (ignoreSet.has(lit.value) || ignoreSet.has(str)) return false;
-        const lower = str.toLowerCase();
-        if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return false;
-        if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return false;
-    }
-    if (classify && classifyLiteral(lit.value, lit.numeric).isReasonable) return false;
-    return true;
+    const candidate = lit.numeric
+        ? isNumericDuplicateCandidate(lit.value, magicNumberMin)
+        : isStringDuplicateCandidate(lit.value, ignoreSet, isTest, isDataOrConfig);
+    if (!candidate) return false;
+    return !(classify && classifyLiteral(lit.value, lit.numeric).isReasonable);
 }
 
 function groupDuplicates(

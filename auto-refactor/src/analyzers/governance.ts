@@ -41,6 +41,29 @@ import { getDefaultGovernanceRegistry } from '../core/governance/registry';
  * Generalizes WebGames script audits into a cross-language, modern quality gate.
  * Single-pass multiplexed traversal integration with zero duplicate walks.
  */
+function isGovernanceCandidate(node: NormalizedNode): boolean {
+    return (
+        node.functionLike ||
+        node.kind === NodeKind.Function ||
+        node.kind === NodeKind.Method ||
+        node.kind === NodeKind.ControlFlow
+    );
+}
+
+function dispatchGovernanceRules(
+    rules: GovernanceRule[] | undefined,
+    evalCtx: RuleEvaluationContext,
+    violations: GovernanceViolation[],
+): void {
+    if (!rules) return;
+    for (const rule of rules) {
+        const result = rule.checkNode!(evalCtx);
+        if (result && result.length > 0) {
+            violations.push(...result);
+        }
+    }
+}
+
 export class GovernanceAnalyzer implements Analyzer {
     name = 'governance' as const;
 
@@ -148,18 +171,7 @@ export class GovernanceAnalyzer implements Analyzer {
         binding: string | null,
     ): void {
         this.ensureInitialized(ctx);
-        if (this.nodeRules.length === 0) return;
-
-        // Fast node pre-filter: all node-level governance rules (redundant boolean, nesting,
-        // wrapper, signature completeness) only evaluate control flow or function/method nodes.
-        // Skipping expressions, literals, identifiers and statements eliminates >90% of visits.
-        const kind = node.kind;
-        const isCandidate =
-            node.functionLike ||
-            kind === NodeKind.Function ||
-            kind === NodeKind.Method ||
-            kind === NodeKind.ControlFlow;
-        if (!isCandidate) return;
+        if (this.nodeRules.length === 0 || !isGovernanceCandidate(node)) return;
 
         const evalCtx = this.reusableEvalCtx!;
         evalCtx.node = node;
@@ -170,28 +182,8 @@ export class GovernanceAnalyzer implements Analyzer {
         evalCtx.className = className;
         evalCtx.binding = binding;
 
-        // Evaluate pre-filtered node-level rules using kind-based dispatch.
-        // Rules with explicit targetKinds are matched by node.kind; rules without
-        // targetKinds fall into the '*' group and run for every candidate node.
-        const kindRules = this.nodeRulesByKind.get(kind);
-        const wildcardRules = this.nodeRulesByKind.get('*');
-
-        if (kindRules) {
-            for (const rule of kindRules) {
-                const result = rule.checkNode!(evalCtx);
-                if (result && result.length > 0) {
-                    this.violations.push(...result);
-                }
-            }
-        }
-        if (wildcardRules) {
-            for (const rule of wildcardRules) {
-                const result = rule.checkNode!(evalCtx);
-                if (result && result.length > 0) {
-                    this.violations.push(...result);
-                }
-            }
-        }
+        dispatchGovernanceRules(this.nodeRulesByKind.get(node.kind), evalCtx, this.violations);
+        dispatchGovernanceRules(this.nodeRulesByKind.get('*'), evalCtx, this.violations);
     }
 
     private runFileRules(ctx: AnalyzerContext): void {

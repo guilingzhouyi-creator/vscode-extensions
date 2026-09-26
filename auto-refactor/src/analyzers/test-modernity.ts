@@ -484,20 +484,41 @@ export class TestModernityAnalyzer implements Analyzer {
                 this.updateCaseCounts(line, currentCase, isMockOnly, isTautological, isObsolete);
             }
 
-            if (isSkipped || isTautological || isMockOnly || isObsolete) {
-                sites.push({
-                    file: ctx.filePath,
-                    line: lineNum,
-                    testName: currentTestName,
-                    isSkipped,
-                    isTautological,
-                    isMockOnly,
-                    referencesDeprecatedContract: isObsolete,
-                    contractVersion: isObsolete ? 'V1' : undefined,
-                    activeContractVersion: isObsolete ? 'V3' : undefined,
-                });
-            }
+            this.recordSiteIfSmell(
+                ctx.filePath,
+                lineNum,
+                currentTestName,
+                isSkipped,
+                isTautological,
+                isMockOnly,
+                isObsolete,
+                sites,
+            );
         }
+    }
+
+    private recordSiteIfSmell(
+        filePath: string,
+        lineNum: number,
+        testName: string,
+        isSkipped: boolean,
+        isTautological: boolean,
+        isMockOnly: boolean,
+        isObsolete: boolean,
+        sites: TestSite[],
+    ): void {
+        if (!isSkipped && !isTautological && !isMockOnly && !isObsolete) return;
+        sites.push({
+            file: filePath,
+            line: lineNum,
+            testName,
+            isSkipped,
+            isTautological,
+            isMockOnly,
+            referencesDeprecatedContract: isObsolete,
+            contractVersion: isObsolete ? 'V1' : undefined,
+            activeContractVersion: isObsolete ? 'V3' : undefined,
+        });
     }
 
     private countNloc(content: string): number {

@@ -162,6 +162,15 @@ const SINGLE_QUOTE = "'";
  * Failure semantics: deterministic line scan that never throws, including for languages
  * it only partially understands.
  */
+function shouldRunSubAudit(
+    override: boolean | undefined,
+    level: CommentLevel,
+    strictOnly = false,
+): boolean {
+    if (override !== undefined) return override;
+    return strictOnly ? level === 'strict' : level === 'standard' || level === 'strict';
+}
+
 export class CommentAnalyzer implements Analyzer {
     name = 'comments' as const;
 
@@ -188,23 +197,17 @@ export class CommentAnalyzer implements Analyzer {
         this.auditPublicApi(content, len, file, level, opts, ctx, issues);
         this.auditCommentHygiene(content, file, level, opts, ctx, issues);
 
-        const shouldAuditLanguage =
-            opts.enableLanguageGovernance ?? (level === 'standard' || level === 'strict');
-        const shouldAuditDensity =
-            opts.enableDensityGovernance ?? (level === 'standard' || level === 'strict');
-        const shouldAuditSemanticDuty = opts.enableSemanticDutyCheck ?? level === 'strict';
-
-        if (shouldAuditLanguage) {
+        if (shouldRunSubAudit(opts.enableLanguageGovernance, level)) {
             auditCommentLanguage(content, opts, ctx, issues, (c, l, r, m, s, d, sug) =>
                 this.mkIssue(c, l, r, m, s, d || {}, sug),
             );
         }
-        if (shouldAuditDensity) {
+        if (shouldRunSubAudit(opts.enableDensityGovernance, level)) {
             auditCommentDensity(content, ctx, issues, (c, l, r, m, s, d, sug) =>
                 this.mkIssue(c, l, r, m, s, d || {}, sug),
             );
         }
-        if (shouldAuditSemanticDuty) {
+        if (shouldRunSubAudit(opts.enableSemanticDutyCheck, level, true)) {
             auditCommentSemanticDuty(content, ctx, issues, (c, l, r, m, s, d, sug) =>
                 this.mkIssue(c, l, r, m, s, d || {}, sug),
             );

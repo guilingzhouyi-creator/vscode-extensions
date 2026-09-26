@@ -62,44 +62,52 @@ function shouldExemptElastic(
     return !elasticEvaluation.shouldFlagLargeFile && functionsCount < t.fileFunctionsWarn;
 }
 
+function checkFailThreshold(m: FileMetric, t: Record<string, any>, density: any): string | null {
+    if (t.effectiveLocFail && density.effectiveCodeLines >= t.effectiveLocFail) {
+        return `effective LOC ${density.effectiveCodeLines} >= fail threshold ${t.effectiveLocFail} (lines: ${m.lines})`;
+    }
+    if (m.lines >= t.fileLinesFail) {
+        return `lines ${m.lines} >= fail threshold ${t.fileLinesFail}`;
+    }
+    return null;
+}
+
+function collectWarnReasons(
+    m: FileMetric,
+    t: Record<string, any>,
+    density: any,
+    zoneProfile: any,
+): string[] {
+    const reasons: string[] = [];
+    if (t.effectiveLocWarn && density.effectiveCodeLines >= t.effectiveLocWarn) {
+        reasons.push(
+            `effective LOC ${density.effectiveCodeLines} >= warn threshold ${t.effectiveLocWarn} (raw lines: ${m.lines})`,
+        );
+    } else if (m.lines >= t.fileLinesWarn) {
+        reasons.push(`lines ${m.lines} >= warn threshold ${t.fileLinesWarn}`);
+    }
+    if (m.functions >= t.fileFunctionsWarn) {
+        reasons.push(`functions ${m.functions} >= warn threshold ${t.fileFunctionsWarn}`);
+    }
+    if (reasons.length > 0 && !zoneProfile.isDecoupled && (t.enableElasticBudget || t.flagZonePartitioner)) {
+        reasons.push(`high intra-file entanglement (EI: ${zoneProfile.entanglementIndex})`);
+    }
+    return reasons;
+}
+
 function evaluateThresholdSeverity(
     m: FileMetric,
     t: Record<string, any>,
     density: any,
     zoneProfile: any,
 ): { severity: Severity | null; reasons: string[] } {
-    const reasons: string[] = [];
-    const isPhysicalFail = m.lines >= t.fileLinesFail;
-    const isEffectiveFail = Boolean(
-        t.effectiveLocFail && density.effectiveCodeLines >= t.effectiveLocFail,
-    );
-    if (isPhysicalFail || isEffectiveFail) {
-        const msg = isEffectiveFail
-            ? `effective LOC ${density.effectiveCodeLines} >= fail threshold ${t.effectiveLocFail} (lines: ${m.lines})`
-            : `lines ${m.lines} >= fail threshold ${t.fileLinesFail}`;
-        return { severity: 'error', reasons: [msg] };
+    const failReason = checkFailThreshold(m, t, density);
+    if (failReason) {
+        return { severity: 'error', reasons: [failReason] };
     }
 
-    const isPhysicalWarn = m.lines >= t.fileLinesWarn;
-    const isEffectiveWarn = Boolean(
-        t.effectiveLocWarn && density.effectiveCodeLines >= t.effectiveLocWarn,
-    );
-    const isFunctionsWarn = m.functions >= t.fileFunctionsWarn;
-
-    if (isPhysicalWarn || isEffectiveWarn || isFunctionsWarn) {
-        if (isEffectiveWarn) {
-            reasons.push(
-                `effective LOC ${density.effectiveCodeLines} >= warn threshold ${t.effectiveLocWarn} (raw lines: ${m.lines})`,
-            );
-        } else if (isPhysicalWarn) {
-            reasons.push(`lines ${m.lines} >= warn threshold ${t.fileLinesWarn}`);
-        }
-        if (isFunctionsWarn) {
-            reasons.push(`functions ${m.functions} >= warn threshold ${t.fileFunctionsWarn}`);
-        }
-        if (!zoneProfile.isDecoupled && (t.enableElasticBudget || t.flagZonePartitioner)) {
-            reasons.push(`high intra-file entanglement (EI: ${zoneProfile.entanglementIndex})`);
-        }
+    const reasons = collectWarnReasons(m, t, density, zoneProfile);
+    if (reasons.length > 0) {
         return { severity: 'warning', reasons };
     }
 
@@ -227,16 +235,7 @@ export class LargeFileAnalyzer implements Analyzer {
             return [];
         }
 
-        const isStdlib =
-            ctx.config.archetype === 'stdlib' || ctx.config.archetype === 'systems_runtime';
-        if (
-            isStdlib &&
-            m.lines <= 3000 &&
-            (roleInference.role === 'algorithm_computation' ||
-                roleInference.role === 'config_constant' ||
-                roleInference.role === 'rules_registry' ||
-                roleInference.role === 'shared_library')
-        ) {
+        if (isStdlibExempt(ctx.config.archetype, roleInference.role, m.lines)) {
             return [];
         }
 
@@ -278,4 +277,16 @@ export class LargeFileAnalyzer implements Analyzer {
             },
         ];
     }
+}
+
+const STDLIB_EXEMPT_ROLES = new Set([
+    'algorithm_computation',
+    'config_constant',
+    'rules_registry',
+    'shared_library',
+]);
+
+function isStdlibExempt(archetype: string | undefined, role: string, lines: number): boolean {
+    const isStdlib = archetype === 'stdlib' || archetype === 'systems_runtime';
+    return isStdlib && lines <= 3000 && STDLIB_EXEMPT_ROLES.has(role);
 }

@@ -243,6 +243,93 @@ function hasBadErrorName(code: string): boolean {
     return true;
 }
 
+function checkGoStyleRules(
+    file: string,
+    index: number,
+    trimmed: string,
+    rawLine: string,
+    out: Issue[],
+): void {
+    if (hasUncheckedError(trimmed)) {
+        out.push(
+            makeIssue(
+                file,
+                index,
+                UNCHECKED_ERROR_RULE.rule,
+                UNCHECKED_ERROR_RULE.severity,
+                UNCHECKED_ERROR_RULE.message,
+                UNCHECKED_ERROR_RULE.suggestion,
+                { line: rawLine },
+            ),
+        );
+    }
+    if (hasContextNotFirst(trimmed)) {
+        out.push(
+            makeIssue(
+                file,
+                index,
+                CONTEXT_FIRST_RULE.rule,
+                CONTEXT_FIRST_RULE.severity,
+                CONTEXT_FIRST_RULE.message,
+                CONTEXT_FIRST_RULE.suggestion,
+                { line: rawLine },
+            ),
+        );
+    }
+    if (hasBadReceiverName(trimmed)) {
+        out.push(
+            makeIssue(
+                file,
+                index,
+                RECEIVER_NAMING_RULE.rule,
+                RECEIVER_NAMING_RULE.severity,
+                RECEIVER_NAMING_RULE.message,
+                RECEIVER_NAMING_RULE.suggestion,
+                { line: rawLine },
+            ),
+        );
+    }
+    if (hasBadErrorName(trimmed)) {
+        out.push(
+            makeIssue(
+                file,
+                index,
+                ERROR_NAMING_RULE.rule,
+                ERROR_NAMING_RULE.severity,
+                ERROR_NAMING_RULE.message,
+                ERROR_NAMING_RULE.suggestion,
+                { line: rawLine },
+            ),
+        );
+    }
+}
+
+function checkGoPackageComment(
+    file: string,
+    index: number,
+    raw: string[],
+    rawLine: string,
+    out: Issue[],
+): void {
+    let prevIdx = index - 1;
+    while (prevIdx >= 0 && raw[prevIdx].trim().length === 0) {
+        prevIdx--;
+    }
+    if (prevIdx < 0 || !COMMENT_LINE_RE.test(raw[prevIdx])) {
+        out.push(
+            makeIssue(
+                file,
+                index,
+                PACKAGE_COMMENT_RULE.rule,
+                PACKAGE_COMMENT_RULE.severity,
+                PACKAGE_COMMENT_RULE.message,
+                PACKAGE_COMMENT_RULE.suggestion,
+                { line: rawLine },
+            ),
+        );
+    }
+}
+
 /**
  * Go modernization analyzer.
  *
@@ -284,87 +371,12 @@ export class GoModernAnalyzer implements Analyzer {
             const code = masked[index];
             const trimmed = code.trim();
             if (trimmed.length === 0) continue;
+            const rawLine = raw[index].trim();
 
-            // --- GOM-ERR-001: unchecked errors ---
-            if (hasUncheckedError(trimmed)) {
-                out.push(
-                    makeIssue(
-                        file,
-                        index,
-                        UNCHECKED_ERROR_RULE.rule,
-                        UNCHECKED_ERROR_RULE.severity,
-                        UNCHECKED_ERROR_RULE.message,
-                        UNCHECKED_ERROR_RULE.suggestion,
-                        { line: raw[index].trim() },
-                    ),
-                );
-            }
+            checkGoStyleRules(file, index, trimmed, rawLine, out);
 
-            // --- GOM-CTX-001: context not first arg ---
-            if (hasContextNotFirst(trimmed)) {
-                out.push(
-                    makeIssue(
-                        file,
-                        index,
-                        CONTEXT_FIRST_RULE.rule,
-                        CONTEXT_FIRST_RULE.severity,
-                        CONTEXT_FIRST_RULE.message,
-                        CONTEXT_FIRST_RULE.suggestion,
-                        { line: raw[index].trim() },
-                    ),
-                );
-            }
-
-            // --- GOM-STYLE-001: receiver naming ---
-            if (hasBadReceiverName(trimmed)) {
-                out.push(
-                    makeIssue(
-                        file,
-                        index,
-                        RECEIVER_NAMING_RULE.rule,
-                        RECEIVER_NAMING_RULE.severity,
-                        RECEIVER_NAMING_RULE.message,
-                        RECEIVER_NAMING_RULE.suggestion,
-                        { line: raw[index].trim() },
-                    ),
-                );
-            }
-
-            // --- GOM-STYLE-002: error variable naming ---
-            if (hasBadErrorName(trimmed)) {
-                out.push(
-                    makeIssue(
-                        file,
-                        index,
-                        ERROR_NAMING_RULE.rule,
-                        ERROR_NAMING_RULE.severity,
-                        ERROR_NAMING_RULE.message,
-                        ERROR_NAMING_RULE.suggestion,
-                        { line: raw[index].trim() },
-                    ),
-                );
-            }
-
-            // --- GOM-STYLE-003: package comment ---
             if (PACKAGE_DECL_RE.test(trimmed)) {
-                // Check if the previous non-blank line (in raw source) is a comment
-                let prevIdx = index - 1;
-                while (prevIdx >= 0 && raw[prevIdx].trim().length === 0) {
-                    prevIdx--;
-                }
-                if (prevIdx < 0 || !COMMENT_LINE_RE.test(raw[prevIdx])) {
-                    out.push(
-                        makeIssue(
-                            file,
-                            index,
-                            PACKAGE_COMMENT_RULE.rule,
-                            PACKAGE_COMMENT_RULE.severity,
-                            PACKAGE_COMMENT_RULE.message,
-                            PACKAGE_COMMENT_RULE.suggestion,
-                            { line: raw[index].trim() },
-                        ),
-                    );
-                }
+                checkGoPackageComment(file, index, raw, rawLine, out);
                 foundPackageComment = true;
             }
         }
