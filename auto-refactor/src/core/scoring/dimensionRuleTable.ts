@@ -37,6 +37,7 @@ import {
     ANALYZER_DATA_ARCHITECTURE,
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_STDLIB,
     RULE_CPX_TIME_001,
     RULE_CPX_SPACE_001,
     RULE_CPX_AMP_001,
@@ -75,6 +76,18 @@ import {
     DIMENSION_ARCHITECTURE_CONSISTENCY,
     FRAGMENT_LINES,
     FRAGMENT_PLACEHOLDER_MARKER,
+    RULE_STDLIB_PANIC_001,
+    RULE_STDLIB_ALLOC_001,
+    RULE_STDLIB_UNSAFE_001,
+    RULE_STDLIB_CONST_001,
+    RULE_STDLIB_RECURSION_001,
+    RULE_STDLIB_PORT_001,
+    DEDUCTION_STDLIB_PANIC,
+    DEDUCTION_STDLIB_ALLOC,
+    DEDUCTION_STDLIB_UNSAFE,
+    DEDUCTION_STDLIB_CONST,
+    DEDUCTION_STDLIB_RECURSION,
+    DEDUCTION_STDLIB_PORT,
 } from './dimensionLiterals';
 import type { QualityDimension } from './scoringTypes';
 
@@ -98,7 +111,7 @@ const RULES_GOV_TYPE_SAFETY = [
 /** Dependency-graph rules for exported symbols nothing consumes. */
 const RULES_UNUSED_BINDING = ['unused-export', 'unused-module'];
 /** Comment rules for banned vocabulary and temporary markers, in precedence order. */
-const RULES_COMMENT_BANNED = ['CMT-BAN-001', 'CMT-WID-001'];
+const RULES_COMMENT_BANNED = ['CMT-BAN-001'];
 /** Comment rules for a missing public API docstring. */
 const RULES_COMMENT_MISSING_DOC = ['CMT-DOC-001', 'CMT-DOC-002'];
 /** Constants rules with their own deduction, ahead of the hardcoded-string fallback. */
@@ -351,5 +364,55 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_DUPLICATION,
         points: DEDUCTION_HARDCODED_STRING,
         rationale: ScoringRationales.HARDCODED_STRING,
+    },
+    // Standard Library & Systems Runtime Verification
+    {
+        analyzer: ANALYZER_STDLIB,
+        covers: ruleMatches([RULE_STDLIB_PANIC_001], ['panic', 'unwrap']),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_STDLIB_PANIC,
+        rationale: () => '标准库公开接口发生裸 panic/unwrap 逃逸调用',
+    },
+    {
+        analyzer: ANALYZER_STDLIB,
+        covers: ruleMatches([RULE_STDLIB_ALLOC_001], ['alloc', 'heap']),
+        dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+        points: DEDUCTION_STDLIB_ALLOC,
+        rationale: () => 'no_std 裸机运行环境发生隐式动态堆内存分配',
+    },
+    {
+        analyzer: ANALYZER_STDLIB,
+        covers: ruleMatches([RULE_STDLIB_UNSAFE_001], ['unsafe', 'SAFETY']),
+        dimension: DIMENSION_SEMANTIC_PURITY,
+        points: DEDUCTION_STDLIB_UNSAFE,
+        rationale: () => '底层 unsafe 块缺少强制的 // SAFETY: 证明契约',
+    },
+    {
+        analyzer: ANALYZER_STDLIB,
+        covers: ruleMatches([RULE_STDLIB_CONST_001], ['crypto', 'constant_time']),
+        dimension: DIMENSION_SEMANTIC_PURITY,
+        points: DEDUCTION_STDLIB_CONST,
+        rationale: () => '密码学敏感比对存在非恒定时间短路时序泄露',
+    },
+    {
+        analyzer: ANALYZER_STDLIB,
+        covers: ruleMatches([RULE_STDLIB_RECURSION_001], ['recursion', 'depth']),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_STDLIB_RECURSION,
+        rationale: () => '底层核心算法存在无界深层递归且缺少栈深度防卫',
+    },
+    {
+        analyzer: ANALYZER_STDLIB,
+        covers: ruleMatches([RULE_STDLIB_PORT_001], ['cfg', 'portability']),
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_STDLIB_PORT,
+        rationale: () => '平台特定条件编译缺少 compile_error 阻断兜底',
+    },
+    {
+        analyzer: ANALYZER_STDLIB,
+        covers: anyFinding,
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_STDLIB_PORT,
+        rationale: () => '标准库与底层系统运行时规范检查未通过',
     },
 ];

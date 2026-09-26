@@ -551,5 +551,21 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `CONST-DRF-001` | `warning` | 跨文件同名异值或同值异名语义漂移：跨模块存在同名常量取值不同，破坏 Single Source of Truth。 | 统一定义至公共领域配置或类型模块，消除跨文件语义漂移与硬编码碎片化。 |
 | `CONST-OWN-001` | `warning` | 常量架构所有权归属不合规：常量放置在错误的架构层级或全局大杂烩文件中。 | 按四层所有权（模块私有/领域共享/协议共享/系统配置）将常量迁移至对应归属模块。 |
 
+---
+
+## 27. 标准库与系统级运行时特种规则族 (`stdlib` / `STDLIB-*`)
+
+专为标准库、裸机内核、系统运行时与密码学基础设施定制的高级别硬核质量与安全防卫：
+
+| 规则 ID | 级别 | 触发条件 | 治理策略 |
+| :--- | :--- | :--- | :--- |
+| `STDLIB-PANIC-001` | `warning` | 系统标准库公开接口严禁逃逸裸 panic/unwrap/abort，强制 Result/Option 或有界 error 返回。 | 对可能失败的公开 API 采用 Result<T, E> 或显式 error code 表达错误，内部调用使用 match 或 ? 操作符解包。 |
+| `STDLIB-ALLOC-001` | `error` | 裸机与 no_std 系统运行环境下隐式堆逃逸与动态重分配静态拦截。 | 在 no_std / core 作用域下使用固定容量栈缓冲、借用切片或预分配内存池，避免裸调 Box::new / malloc。 |
+| `STDLIB-UNSAFE-001` | `error` | Rust/C++ 底层 unsafe 块强制附带 // SAFETY: 契约证明，缺失即阻断。 | 在每个 unsafe 块或函数前编写 // SAFETY: 注释，明确记录调用者必须保证的前置条件与内存安全不变量。 |
+| `STDLIB-CONST-001` | `warning` | 标准库密码学与哈希敏感比较严禁分支时间泄漏，强制常量时间恒定延迟比对。 | 使用恒定时间累加比对（如 constant_time_eq / subtle::ConstantTimeEq），严禁在字节不匹配时提前 return false。 |
+| `STDLIB-RECURSION-001` | `warning` | 底层核心算法无界深层递归缺乏显式栈深检查或上限防卫。 | 为递归算法引入显式 depth 计数限制，或改用显式工作栈与迭代平铺展开循环。 |
+| `STDLIB-PORT-001` | `warning` | 底层平台条件编译 #[cfg(...)] 缺少未知平台或未支持目标架构时的 fallback 阻断。 | 在特定操作系统/目标平台条件编译块末尾添加 compile_error! 或通用软实现作为兜底后备。 |
+
+
 
 

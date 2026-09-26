@@ -548,6 +548,34 @@ export const ANALYZER_TEST_MODERNITY = 'test-modernity';
 export const ANALYZER_DEPENDENCY_LAYOUT = 'dependency-layout';
 /** Analyzer id for shell/PowerShell lint rules. */
 export const ANALYZER_SHELL_LINT = 'shell-lint';
+/** Analyzer id for standard library and systems runtime verification. */
+export const ANALYZER_STDLIB = 'stdlib';
+
+/** Rule id for bare panic/unwrap escaping public API. */
+export const RULE_STDLIB_PANIC_001 = 'STDLIB-PANIC-001';
+/** Rule id for implicit heap allocation in no_std/systems runtime. */
+export const RULE_STDLIB_ALLOC_001 = 'STDLIB-ALLOC-001';
+/** Rule id for unsafe blocks lacking explicit SAFETY contracts. */
+export const RULE_STDLIB_UNSAFE_001 = 'STDLIB-UNSAFE-001';
+/** Rule id for variable-time comparisons in cryptographic routines. */
+export const RULE_STDLIB_CONST_001 = 'STDLIB-CONST-001';
+/** Rule id for unbounded recursion lacking explicit stack depth limits. */
+export const RULE_STDLIB_RECURSION_001 = 'STDLIB-RECURSION-001';
+/** Rule id for platform conditional compilation missing fallback/error guard. */
+export const RULE_STDLIB_PORT_001 = 'STDLIB-PORT-001';
+
+/** Points deducted for bare panic/unwrap in public API. */
+export const DEDUCTION_STDLIB_PANIC = 15;
+/** Points deducted for implicit heap allocation in no_std environments. */
+export const DEDUCTION_STDLIB_ALLOC = 20;
+/** Points deducted for unsafe blocks lacking SAFETY contract. */
+export const DEDUCTION_STDLIB_UNSAFE = 20;
+/** Points deducted for variable-time comparison in crypto routines. */
+export const DEDUCTION_STDLIB_CONST = 20;
+/** Points deducted for unbounded recursion without stack guard. */
+export const DEDUCTION_STDLIB_RECURSION = 15;
+/** Points deducted for platform cfg missing fallback compile error. */
+export const DEDUCTION_STDLIB_PORT = 15;
 
 /** Rule id for cross-file polynomial time complexity amplification. */
 export const RULE_CPX_TIME_001 = 'CPX-TIME-001';

@@ -46,6 +46,7 @@ import { TestModernityAnalyzer } from '../analyzers/test-modernity';
 import { DependencyLayoutAnalyzer } from '../analyzers/dependency-layout';
 import { NamingAnalyzer } from '../analyzers/naming';
 import { ShellLintAnalyzer } from '../analyzers/shell-lint';
+import { StdlibAnalyzer } from '../analyzers/stdlib';
 
 /**
  * Resolved metadata and fresh instance factory for a declared analyzer.
@@ -104,6 +105,7 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
     'dependency-layout': () => new DependencyLayoutAnalyzer(),
     naming: () => new NamingAnalyzer(),
     'shell-lint': () => new ShellLintAnalyzer(),
+    stdlib: () => new StdlibAnalyzer(),
 };
 
 /**
@@ -141,6 +143,7 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     'dependency-layout': '../analyzers/dependency-layout',
     naming: '../analyzers/naming',
     'shell-lint': '../analyzers/shell-lint',
+    stdlib: '../analyzers/stdlib',
 };
 
 const dynamicRequire = createRequire(__filename);

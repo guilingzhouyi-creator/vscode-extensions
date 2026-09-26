@@ -29,6 +29,7 @@ import {
     ANALYZER_RUST_MODERN,
     ANALYZER_GDSCRIPT_MODERN,
     ANALYZER_DOCS,
+    ANALYZER_STDLIB,
 } from '../scoring/dimensionLiterals';
 import type { ExpertManifestEntry } from './expert-manifest';
 const SIG_LITERAL = 'LITERAL';
@@ -148,6 +149,30 @@ export function deriveArchetypeMatrix(
             ANALYZER_GOVERNANCE,
             ANALYZER_HYGIENE,
             ANALYZER_LARGE_FILE,
+            ANALYZER_COMPLEXITY,
+            ANALYZER_CONSTANTS,
+        ]),
+        stdlib: pick([
+            ANALYZER_GOVERNANCE,
+            ANALYZER_SECURITY,
+            ANALYZER_PERFORMANCE,
+            ANALYZER_STDLIB,
+            ANALYZER_RUST_MODERN,
+            ANALYZER_PYTHON_MODERN,
+            ANALYZER_TYPESCRIPT_MODERN,
+            ANALYZER_DOCS,
+            ANALYZER_COMMENTS,
+            ANALYZER_HYGIENE,
+            ANALYZER_COMPLEXITY,
+            ANALYZER_CONSTANTS,
+        ]),
+        systems_runtime: pick([
+            ANALYZER_GOVERNANCE,
+            ANALYZER_SECURITY,
+            ANALYZER_PERFORMANCE,
+            ANALYZER_STDLIB,
+            ANALYZER_RUST_MODERN,
+            ANALYZER_HYGIENE,
             ANALYZER_COMPLEXITY,
             ANALYZER_CONSTANTS,
         ]),

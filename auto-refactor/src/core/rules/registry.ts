@@ -18,6 +18,7 @@ import { CONSTANT_GOVERNANCE_RULES } from './entries/constant-governance';
 import { GOVERNANCE_RULES } from './entries/governance';
 import { NAMING_RULES } from './entries/naming';
 import { PLATFORM_RULES } from './entries/platform';
+import { STDLIB_RULES } from './entries/stdlib';
 import type { RuleDefinition } from './types';
 
 export type { RuleDefinition, RuleFamily, RuleSeverity } from './types';
@@ -30,6 +31,7 @@ export const RULE_REGISTRY: readonly RuleDefinition[] = [
     ...GOVERNANCE_RULES,
     ...NAMING_RULES,
     ...PLATFORM_RULES,
+    ...STDLIB_RULES,
 ].sort((a, b) => a.id.localeCompare(b.id));
 
 /**

@@ -34,6 +34,7 @@ import {
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
     ANALYZER_NAMING,
+    ANALYZER_STDLIB,
 } from '../scoring/dimensionLiterals';
 
 const TRACK_FAST = 'fast' as const;
@@ -343,6 +344,16 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         weight: 1.0,
         fallback: FALLBACK_SKIP,
         description: 'Identifier and physical naming conventions',
+    },
+    {
+        id: ANALYZER_STDLIB,
+        signals: [SIG_CONTROL_FLOW, SIG_GENERAL_CODE],
+        track: TRACK_FAST,
+        steadyCostUs: COST_60,
+        weight: 3.0,
+        fallback: FALLBACK_BLOCK,
+        isSecurityFamily: true,
+        description: 'Standard library and systems runtime safety and contract verification',
     },
 ];
 

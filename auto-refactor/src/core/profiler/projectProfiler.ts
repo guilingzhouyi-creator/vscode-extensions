@@ -122,6 +122,18 @@ export const ARCHETYPE_WEB: ProjectArchetype = 'web';
 /** Project archetype constant for standalone shared libraries and packages. */
 export const ARCHETYPE_LIBRARY: ProjectArchetype = 'library';
 
+/**
+ * Project archetype constant for language standard libraries
+ * (Rust core/std, CPython Lib, Go stdlib).
+ */
+export const ARCHETYPE_STDLIB: ProjectArchetype = 'stdlib';
+
+/**
+ * Project archetype constant for low-level systems runtimes,
+ * microkernels, bare-metal or drivers.
+ */
+export const ARCHETYPE_SYSTEMS_RUNTIME: ProjectArchetype = 'systems_runtime';
+
 interface LayerRule {
     readonly pattern: RegExp;
     readonly layer: ArchitectureLayer;
@@ -581,13 +593,124 @@ function isWebArchetype(
     return false;
 }
 
+function isStdlibArchetype(root: string, profile?: Partial<ProjectProfile>): boolean {
+    const normRoot = root.replace(/\\/g, '/');
+
+    // 1. Rust standard library / core detection
+    const cargoToml = path.join(root, 'Cargo.toml');
+    if (fs.existsSync(cargoToml)) {
+        try {
+            const raw = fs.readFileSync(cargoToml, 'utf8');
+            if (
+                /name\s*=\s*["'](?:.*-)?(?:core|alloc|std)(?:-.*)?["']/i.test(raw) ||
+                normRoot.includes('/library/core') ||
+                normRoot.includes('/library/std') ||
+                normRoot.includes('/library/alloc') ||
+                fs.existsSync(path.join(root, 'library', 'core')) ||
+                fs.existsSync(path.join(root, 'library', 'std'))
+            ) {
+                return true;
+            }
+        } catch {
+            // best-effort fallback: ignored when file is unreadable
+        }
+    }
+
+    // 2. Python standard library detection
+    const isPythonTree = Boolean(profile?.languages?.['python']);
+    if (
+        (isPythonTree || fs.existsSync(path.join(root, 'Lib'))) &&
+        (fs.existsSync(path.join(root, 'Include', 'Python.h')) ||
+            (fs.existsSync(path.join(root, 'Lib', 'os.py')) &&
+                fs.existsSync(path.join(root, 'Lib', 'sys.py'))))
+    ) {
+        return true;
+    }
+
+    // 3. Go standard library detection
+    if (
+        fs.existsSync(path.join(root, 'src', 'runtime')) &&
+        fs.existsSync(path.join(root, 'src', 'sync')) &&
+        (fs.existsSync(path.join(root, 'src', 'cmd', 'go')) ||
+            fs.existsSync(path.join(root, 'src', 'net')))
+    ) {
+        return true;
+    }
+
+    // 4. Node.js built-in runtime detection
+    if (
+        fs.existsSync(path.join(root, 'lib', 'internal')) &&
+        (fs.existsSync(path.join(root, 'src', 'node.h')) ||
+            fs.existsSync(path.join(root, 'lib', 'fs.js')))
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+function isSystemsRuntimeArchetype(root: string, profile?: Partial<ProjectProfile>): boolean {
+    void profile;
+    const normRoot = root.replace(/\\/g, '/');
+
+    // Check no_std marker in Rust root lib.rs/main.rs,
+    // or immediate subdirectories (e.g. core/src/lib.rs)
+    const candidateFiles = [
+        path.join(root, 'src', 'lib.rs'),
+        path.join(root, 'src', 'main.rs'),
+        path.join(root, 'core', 'src', 'lib.rs'),
+        path.join(root, 'kernel', 'src', 'lib.rs'),
+        path.join(root, 'runtime', 'src', 'lib.rs'),
+    ];
+
+    for (const f of candidateFiles) {
+        if (fs.existsSync(f)) {
+            try {
+                const header = fs.readFileSync(f, 'utf8').slice(0, 1000);
+                if (header.includes('#![no_std]') || header.includes('#![no_core]')) {
+                    return true;
+                }
+            } catch {
+                // best-effort fallback: ignored when file is unreadable
+            }
+        }
+    }
+
+    const cargoToml = path.join(root, 'Cargo.toml');
+    if (fs.existsSync(cargoToml)) {
+        try {
+            const raw = fs.readFileSync(cargoToml, 'utf8');
+            if (
+                /name\s*=\s*["'](?:sys-core|.*-kernel|.*-baremetal|.*-sys|.*-runtime)["']/i.test(
+                    raw,
+                )
+            ) {
+                return true;
+            }
+        } catch {
+            // best-effort fallback
+        }
+    }
+
+    if (
+        normRoot.includes('/kernel') ||
+        normRoot.includes('/runtime') ||
+        normRoot.includes('/bare-metal') ||
+        normRoot.includes('/freestanding')
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
 /**
- * Classify project archetype (demo, web, game, library) to drive sparse reviewer routing.
+ * Classify project archetype (demo, web, game, library, stdlib, systems_runtime).
  *
  * @param root - Project root directory path.
  * @param profile - Optional ProjectProfile or partial profile indicators.
  * @param pkg - Optional parsed package.json object.
- * @returns Detected archetype ('demo' | 'web' | 'game' | 'library').
+ * @returns Detected archetype.
  */
 export function detectProjectArchetype(
     root: string,
@@ -596,6 +719,8 @@ export function detectProjectArchetype(
 ): ProjectArchetype {
     if (profile?.archetype) return profile.archetype;
     const packageData = readPackageData(root, pkg);
+    if (isStdlibArchetype(root, profile)) return ARCHETYPE_STDLIB;
+    if (isSystemsRuntimeArchetype(root, profile)) return ARCHETYPE_SYSTEMS_RUNTIME;
     if (isDemoArchetype(root, packageData)) return ARCHETYPE_DEMO;
     if (isGameArchetype(root, profile)) return ARCHETYPE_GAME;
     if (isWebArchetype(profile, packageData)) return ARCHETYPE_WEB;

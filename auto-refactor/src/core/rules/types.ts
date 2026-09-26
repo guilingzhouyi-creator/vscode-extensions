@@ -56,7 +56,11 @@ export type RuleFamily =
     | 'GOM'
     | 'SH'
     | 'PS'
+    | 'STDLIB'
     | 'LEGACY';
+
+/** Canonical rule-family prefix for standard library and runtime verification. */
+export const RULE_FAMILY_STDLIB = 'STDLIB';
 
 /** Canonical rule-family prefix for naming governance and hygiene rules. */
 export const RULE_FAMILY_NAMING = 'NAM';

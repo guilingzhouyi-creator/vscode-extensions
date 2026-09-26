@@ -54,6 +54,7 @@ import {
     ANALYZER_NAMING,
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
+    ANALYZER_STDLIB,
 } from '../scoring/dimensionLiterals';
 
 /** Decimal places retained when rounding the activation ratio for stable reporting. */
@@ -96,6 +97,7 @@ export const ALL_BUILTIN_ANALYZERS = [
     ANALYZER_NAMING,
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
+    ANALYZER_STDLIB,
 ] as const;
 
 /**
