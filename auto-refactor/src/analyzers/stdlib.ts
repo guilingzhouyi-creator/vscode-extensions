@@ -20,6 +20,15 @@
 
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import {
+    ANALYZER_STDLIB,
+    CODE_STB_PANIC_ESCAPE,
+    CODE_STB_DYNAMIC_ALLOC,
+    CODE_STB_MISSING_SAFETY,
+    CODE_STB_TIMING_ATTACK,
+    CODE_STB_UNBOUNDED_RECURSION,
+    CODE_STB_CONDITIONAL_COMPILATION,
+} from '../core/constants';
 
 /** Relevant source extensions for standard library and systems runtime analysis */
 const STDLIB_EXTS = new Set([
@@ -55,7 +64,7 @@ function hasSafetyComment(lines: string[], i: number): boolean {
  * Standard Library & Systems Runtime Safety Analyzer.
  */
 export class StdlibAnalyzer implements Analyzer {
-    name = 'stdlib' as const;
+    name = ANALYZER_STDLIB;
 
     finalize(ctx: AnalyzerContext): Issue[] {
         return this.analyze(undefined, ctx);
@@ -98,6 +107,17 @@ export class StdlibAnalyzer implements Analyzer {
         suggestion: string,
         detail: Record<string, unknown> = {},
     ): void {
+        const actionableMap: Record<string, { action: any; code: string; safe: boolean }> = {
+            'STDLIB-PANIC-001': { action: 'replace_token', code: CODE_STB_PANIC_ESCAPE, safe: false },
+            'STDLIB-ALLOC-001': { action: 'replace_token', code: CODE_STB_DYNAMIC_ALLOC, safe: false },
+            'STDLIB-UNSAFE-001': { action: 'insert_comment_contract', code: CODE_STB_MISSING_SAFETY, safe: true },
+            'STDLIB-CONST-001': { action: 'use_constant_time_comparison', code: CODE_STB_TIMING_ATTACK, safe: false },
+            'STDLIB-RECURSION-001': { action: 'guard_recursion', code: CODE_STB_UNBOUNDED_RECURSION, safe: false },
+            'STDLIB-PORT-001': { action: 'insert_comment_contract', code: CODE_STB_CONDITIONAL_COMPILATION, safe: true },
+        };
+
+        const targetActionable = actionableMap[rule];
+
         issues.push({
             id: `stdlib:${rule}:${file}:${line}`,
             analyzer: this.name,
@@ -111,6 +131,16 @@ export class StdlibAnalyzer implements Analyzer {
             },
             suggestion,
             detail,
+            ...(targetActionable
+                ? {
+                      actionable: {
+                          action: targetActionable.action,
+                          code: targetActionable.code,
+                          targetSymbol: (detail.functionName as string) || undefined,
+                          safeToAutomate: targetActionable.safe,
+                      },
+                  }
+                : {}),
         });
     }
 
@@ -158,8 +188,8 @@ export class StdlibAnalyzer implements Analyzer {
                     i + 1,
                     'STDLIB-PANIC-001',
                     SEVERITY_WARNING,
-                    `标准库公开接口 \`${fnName}\` 包含可能崩溃的裸 panic/unwrap 逃逸调用。`,
-                    '公开 API 应返回 Result<T, E> 或 Option<T>，使用 match 或 ? 操作符解包。',
+                    `Public API \`${fnName}\` contains potentially crashing naked panic/unwrap invocation.`,
+                    'Public APIs should return Result<T, E> or Option<T>; handle unwraps explicitly using match or the ? operator.',
                     { functionName: fnName },
                 );
             }
@@ -195,8 +225,8 @@ export class StdlibAnalyzer implements Analyzer {
                     i + 1,
                     'STDLIB-PANIC-001',
                     SEVERITY_WARNING,
-                    `公开函数 \`${fnName}\` 包含裸 panic 调用。`,
-                    '应返回显式 error 参数并在调用点处理。',
+                    `Public function \`${fnName}\` contains direct panic invocation.`,
+                    'Return explicit error parameter and handle it at call sites.',
                     { functionName: fnName },
                 );
             }
@@ -228,8 +258,8 @@ export class StdlibAnalyzer implements Analyzer {
                     i + 1,
                     'STDLIB-ALLOC-001',
                     SEVERITY_ERROR,
-                    `no_std 裸机上下文检测到隐式动态堆内存分配。`,
-                    '在 no_std 作用域下使用固定容量栈缓冲、引用切片或预分配内存池。',
+                    'Implicit dynamic heap allocation detected in no_std bare-metal context.',
+                    'Use fixed-capacity stack buffer, reference slices, or preallocated memory pool in no_std context.',
                 );
             }
         }
@@ -259,8 +289,8 @@ export class StdlibAnalyzer implements Analyzer {
                         i + 1,
                         'STDLIB-UNSAFE-001',
                         SEVERITY_ERROR,
-                        `底层 unsafe 块缺少强制的 // SAFETY: 契约证明。`,
-                        '在 unsafe 块前添加 // SAFETY: 说明为何调用者前提与内存不变量得以保证。',
+                        'Unsafe block lacks mandatory // SAFETY: invariant contract proof.',
+                        'Prepend // SAFETY: explaining why caller preconditions and memory invariants are upheld.',
                     );
                 }
             }
@@ -295,8 +325,8 @@ export class StdlibAnalyzer implements Analyzer {
                     i + 1,
                     'STDLIB-CONST-001',
                     SEVERITY_WARNING,
-                    `密码学/哈希敏感比对存在字节短路分支，易受时序侧信道攻击。`,
-                    '改用恒定时间比对（例如 constant_time_eq 或累加异或位），避免提前退出。',
+                    'Timing side-channel vulnerability: short-circuit byte comparison in cryptographic context.',
+                    'Use constant-time comparison (e.g. constant_time_eq or bitwise XOR accumulator) to prevent early termination.',
                 );
             }
         }
@@ -333,8 +363,8 @@ export class StdlibAnalyzer implements Analyzer {
                     i + 1,
                     'STDLIB-RECURSION-001',
                     SEVERITY_WARNING,
-                    `函数 \`${currentFn}\` 存在递归自调用，但缺少显式深度限制参数或防卫。`,
-                    '引入显式 depth / recursion_limit 参数并在超限时返回错误，或改用迭代循环。',
+                    `Function \`${currentFn}\` has recursive self-invocation without explicit depth limit parameter or guard.`,
+                    'Introduce explicit depth/recursion_limit parameter returning error upon limit, or convert to iterative loop.',
                     { functionName: currentFn },
                 );
                 currentFn = '';
@@ -361,8 +391,8 @@ export class StdlibAnalyzer implements Analyzer {
             1,
             'STDLIB-PORT-001',
             SEVERITY_WARNING,
-            `平台特定条件编译块缺少 compile_error! 或 #error 不支持平台阻断兜底。`,
-            '添加 #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); 兜底。',
+            'Platform-specific conditional compilation block lacks compile_error! or #error fallback for unsupported platforms.',
+            'Add #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); fallback guard.',
         );
     }
 }

@@ -4,7 +4,8 @@
  * Architecture Role: Validates that GDScript adapter correctly classifies dictionary keys,
  *   subscript expressions, engine API calls as tolerated while maintaining strict detection
  *   on real hardcoded strings and magic literals.
- * Dependencies & Triggers: Run via `node scripts/validate-gdscript-adapter-tolerance.js` and test-parallel.
+ * Dependencies & Triggers: Run via
+ *   `node scripts/validate-gdscript-adapter-tolerance.js` and test-parallel.
  * Responsibilities: Exercise positive and negative parsing fixtures for GDScript tolerance rules.
  * Exit Semantics & Design Rationale: Process exits 0 on success; throws AssertionError on failure.
  */

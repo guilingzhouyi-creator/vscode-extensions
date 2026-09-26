@@ -25,9 +25,9 @@ import { evaluateEffectiveCommentDensity } from '../comments/comment-density-mod
 export const RULE_GOV_GAM_001 = 'GOV-GAM-001';
 
 /**
- * Legacy/common alias for GOV-GAM-001.
+ * Legacy/common alias for GOV-GAM-001 (clean re-export without nested constant indirection).
  */
-export const ALIAS_SCORE_GAMING_001 = RULE_GOV_GAM_001;
+export { RULE_GOV_GAM_001 as ALIAS_SCORE_GAMING_001 };
 
 const ANALYZER_GOVERNANCE = 'governance';
 const SEVERITY_WARNING = 'warning';

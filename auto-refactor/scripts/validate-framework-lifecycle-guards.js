@@ -4,7 +4,8 @@
  * Architecture Role: Verifies TSM-DISP-001 (VS Code Disposable leak guard),
  *   GDM-POOL-002 (Godot object pool lifecycle contract), CPX-HOP-001 (cognitive jump cost),
  *   and CMT-WID-001 URL elastic exemption.
- * Dependencies & Triggers: Run via `node scripts/validate-framework-lifecycle-guards.js` and test-parallel.
+ * Dependencies & Triggers: Run via
+ *   `node scripts/validate-framework-lifecycle-guards.js` and test-parallel.
  * Responsibilities: Exercise positive and negative fixtures for framework lifecycle guards.
  * Exit Semantics & Design Rationale: Process exits 0 on success; throws AssertionError on failure.
  */

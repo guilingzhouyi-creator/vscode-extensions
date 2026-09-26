@@ -2,9 +2,8 @@
  * Module: Verification Harness — Context-Aware Control Flow Nesting & CFNI
  * File Path: scripts/validate-control-flow-nesting-tolerance.js
  * Architecture Role: Validates context-aware elastic depth budgets (parsers, state machines,
- *   short guards), rule emissions (CPX-NEST-001, CPX-NEST-002, CPX-STM-001), and CFNI scoring.
- * Dependencies & Triggers: Consumes ../dist/analyzers/complexity, ../dist/core/scoring/cognitive-cost-model;
- *   triggered by test-parallel.
+ * Dependencies & Triggers: Consumes ../dist/analyzers/complexity,
+ *   ../dist/core/scoring/cognitive-cost-model; triggered by test-parallel.
  * Responsibilities: Exercise positive tolerance for legitimate nesting and strict detection
  *   for unbudgeted business nesting escapes.
  * Exit Semantics & Design Rationale: Process exits 0 on full success, 1 on assertion failure.

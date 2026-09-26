@@ -144,30 +144,35 @@ function resolveAutonomyGrade(score: number): {
     if (score >= 95.0) {
         return {
             grade: 'L5_INDEPENDENT',
-            description: '极高自主率：核心架构与算法完全自研，对外部黑盒 SDK 极低耦合',
+            description:
+                'Extremely high autonomy: Core architecture and algorithms are entirely proprietary with minimal external SDK coupling',
         };
     }
     if (score >= 85.0) {
         return {
             grade: 'L4_HIGH_AUTONOMY',
-            description: '高度自研：业务逻辑与领域内核完备自主，合理集成标准开源生态',
+            description:
+                'High autonomy: Business logic and domain kernel are fully proprietary, integrating standard open-source ecosystems reasonably',
         };
     }
     if (score >= 70.0) {
         return {
             grade: 'L3_BALANCED',
-            description: '均衡研发：核心业务自研与主流第三方框架/云原生生态中度协同',
+            description:
+                'Balanced autonomy: Core business is proprietary with moderate collaboration with mainstream frameworks and cloud ecosystems',
         };
     }
     if (score >= 50.0) {
         return {
             grade: 'L2_FRAMEWORK_DEPENDENT',
-            description: '框架依赖型：较多业务逻辑围绕第三方外部 SDK 胶水编排展开',
+            description:
+                'Framework dependent: Substantial business logic is composed as glue code around third-party external SDKs',
         };
     }
     return {
         grade: 'L1_SHALLOW_WRAPPER',
-        description: '浅层封装型：以接口透传和第三方实现引用为主，核心自研比重较低',
+        description:
+            'Shallow wrapper: Primarily interface passthrough and third-party implementation references with low proprietary ratio',
     };
 }
 

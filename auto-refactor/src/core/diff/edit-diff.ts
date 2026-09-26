@@ -30,8 +30,17 @@ import {
     buildReviewHunksFromOps,
     formatUnifiedDiff,
 } from './hunk-builder';
+import { nativeCore } from '../native';
+import type { NativeDiffHunk } from '../native';
 
 export { histogramDiff, myersDiff, DiffOp, getLine, formatUnifiedDiff };
+
+/**
+ * Computes line-level histogram diff hunks using the high-performance native Rust operator.
+ */
+export function fastNativeDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
+    return nativeCore.computeHistogramDiff(oldContent, newContent);
+}
 
 /** UTF-16 code unit of LINE FEED (`\n`), the only character that starts a new line. */
 const LINE_FEED_CODE = 10;

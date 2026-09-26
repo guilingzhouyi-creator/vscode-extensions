@@ -28,6 +28,8 @@ import * as path from 'path';
 import { normalizePath } from './file-discovery';
 import { PYTHON_STDLIB_MODULES } from './intelligence/python-stdlib';
 import type { Issue, ScanConfig, ScanReport, Severity } from './types';
+import { nativeCore } from './native/native-bridge';
+import type { NativeGraphAnalysis } from './native/native-types';
 
 /** Default maximum traversal depth for transitive affected-file queries. */
 const DEFAULT_MAX_AFFECTED_DEPTH = 10;
@@ -320,6 +322,20 @@ export class ModuleDependencyGraph {
         const exportedSymbols = extractExportedSymbols(content);
         this.extractAndRecordNamedImports(filePath, content);
         this.registerModule(filePath, importedPaths, exportedSymbols);
+    }
+
+    /**
+     * Whole-graph topological and SCC analysis via nativeCore (Rust Tarjan SCC operator).
+     * Returns detected cycle components, Kahn's topological order, and acyclic status.
+     */
+    public analyzeTopologicalStructure(): NativeGraphAnalysis {
+        const edgeTuples: [string, string][] = [];
+        for (const [file, info] of this.modules) {
+            for (const imp of info.importedModules) {
+                edgeTuples.push([file, imp]);
+            }
+        }
+        return nativeCore.analyzeDependencyGraph(edgeTuples);
     }
 
     /**
@@ -624,10 +640,7 @@ interface CyclePassOptions {
     unusedSeverity?: Severity;
 }
 
-async function readSingleFileSafe(
-    rootDir: string,
-    f: string,
-): Promise<readonly [string, string] | null> {
+async function readSingleFileSafe(rootDir: string, f: string): Promise<readonly [string, string] | null> {
     try {
         return [f, await fs.promises.readFile(path.join(rootDir, f), 'utf8')] as const;
     } catch {
@@ -677,9 +690,7 @@ async function populateGraphFromFiles(
 ): Promise<void> {
     const readFailures = await readFilesBatched(files, rootDir, graph, contents);
     if (readFailures > 0) {
-        warnings.push(
-            `dependency-graph: ${readFailures} file(s) unreadable, excluded from cycle analysis`,
-        );
+        warnings.push(`dependency-graph: ${readFailures} file(s) unreadable, excluded from cycle analysis`);
     }
 }
 
@@ -739,17 +750,9 @@ function auditModuleSymbols(
                 rule: 'unused-export',
                 severity,
                 message: `Exported symbol "${sym}" is not imported by any module (${mod.file}).`,
-                location: {
-                    file: mod.file,
-                    start: { line: 1, column: 1 },
-                    end: { line: 1, column: 1 },
-                },
-                detail: {
-                    symbol: sym,
-                    importers: importerFiles.slice(0, IMPORTER_DETAIL_LIMIT),
-                },
-                suggestion:
-                    'Remove this export or add it to entryGlobs if it is an external entry point.',
+                location: { file: mod.file, start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
+                detail: { symbol: sym, importers: importerFiles.slice(0, IMPORTER_DETAIL_LIMIT) },
+                suggestion: 'Remove this export or add it to entryGlobs if it is an external entry point.',
             });
             flagged++;
         }
@@ -768,8 +771,7 @@ function auditUnusedExports(
     const importers = buildImportersMap(graph.getForwardEdges());
     const importerTokenSets = new Map<string, Set<string>>();
     const ENTRY_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
-    const isEntry = (f: string): boolean =>
-        entryRes.some((re) => ENTRY_EXTS.some((ext) => re.test(f + ext)));
+    const isEntry = (f: string): boolean => entryRes.some((re) => ENTRY_EXTS.some((ext) => re.test(f + ext)));
     let unusedFlagged = 0;
     const unusedSeverity: Severity = opts.unusedSeverity ?? 'warning';
 
@@ -785,29 +787,15 @@ function auditUnusedExports(
                 rule: 'unused-module',
                 severity: unusedSeverity,
                 message: `Module is not imported by any file and exports ${mod.exportedSymbols.length} symbol(s) (dead module candidate).`,
-                location: {
-                    file: mod.file,
-                    start: { line: 1, column: 1 },
-                    end: { line: 1, column: 1 },
-                },
-                detail: {
-                    exportedSymbols: mod.exportedSymbols.slice(0, EXPORTED_SYMBOL_DETAIL_LIMIT),
-                },
-                suggestion:
-                    'Verify whether this is legacy dead code: remove, archive, or add to entryGlobs with justification.',
+                location: { file: mod.file, start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
+                detail: { exportedSymbols: mod.exportedSymbols.slice(0, EXPORTED_SYMBOL_DETAIL_LIMIT) },
+                suggestion: 'Verify whether this is legacy dead code: remove, archive, or add to entryGlobs with justification.',
             });
             unusedFlagged++;
             continue;
         }
 
-        unusedFlagged += auditModuleSymbols(
-            mod,
-            importerFiles,
-            contents,
-            importerTokenSets,
-            unusedSeverity,
-            issues,
-        );
+        unusedFlagged += auditModuleSymbols(mod, importerFiles, contents, importerTokenSets, unusedSeverity, issues);
     }
     if (unusedFlagged > 0 && logger) {
         logger.info(`dependency-graph: ${unusedFlagged} unused module/export issue(s)`);
@@ -820,6 +808,9 @@ function auditImportCycles(
     issues: Issue[],
     warnings: string[],
 ): void {
+    // Fast-path: check whole-graph acyclic state via Rust Tarjan SCC operator
+    const topo = graph.analyzeTopologicalStructure();
+    if (topo.isAcyclic) return;
     const cycles = findImportCycles(graph.getForwardEdges());
     const cap = opts.maxCyclesReported ?? DEFAULT_MAX_CYCLES_REPORTED;
     const cycleSeverity: Severity = opts.cycleSeverity ?? 'error';
@@ -832,36 +823,16 @@ function auditImportCycles(
             message: `Circular dependency: ${cyc.join(CYCLE_ARROW_SEPARATOR)}`,
             location: { file: cyc[0], start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
             detail: { cycle: cyc, length: cyc.length },
-            suggestion:
-                'Extract shared logic to a lower-layer module or invert dependency via interfaces.',
+            suggestion: 'Extract shared logic to a lower-layer module or invert dependency via interfaces.',
         });
     }
     if (cycles.length > cap) {
-        warnings.push(
-            `dependency-graph: ${cycles.length - cap} additional cycle(s) beyond report cap (${cap})`,
-        );
+        warnings.push(`dependency-graph: ${cycles.length - cap} additional cycle(s) beyond report cap (${cap})`);
     }
 }
 
 /**
  * Post-scan pass that reports import cycles and, when enabled, unused modules/exports.
- *
- * It builds or reuses a dependency graph from the report's file list, reads source contents
- * to feed the regex parser, and appends findings to the returned issue list. This routine is
- * async: reads are awaited, and inputs above 500 files are read in windows of 64 concurrent
- * awaits to bound open file handles. Unreadable files are counted and excluded rather than
- * rejecting, and the pass is deterministic for a given input, so repeated runs are idempotent
- * with respect to what they report.
- *
- * @param report - Completed scan report whose fileMetrics define the module set.
- * @param config - Resolved scan config; `analyzers['dependency-graph'].options` selects
- *   detection, severities, caps, entry globs and the unused-export opt-in.
- * @param logger - Optional sink for a one-line unused-issue summary; omitted in quiet runs.
- * @param logger.info - Info-level callback invoked once when unused modules/exports were flagged.
- * @param prebuilt - Optional complete graph from an earlier pass; reused only when unused-export
- *   detection is off, otherwise the graph is rebuilt from disk.
- * @returns The accumulated issues plus non-fatal warnings (for example unreadable files or
- *   cycles beyond maxCyclesReported); callers may await the promise and inspect both arrays.
  */
 export async function runCyclePass(
     report: ScanReport,
@@ -871,11 +842,9 @@ export async function runCyclePass(
 ): Promise<{ issues: Issue[]; warnings: string[] }> {
     const issues: Issue[] = [];
     const warnings: string[] = [];
-    const opts = (config.analyzers[DEPENDENCY_GRAPH_ANALYZER_ID]?.options ||
-        {}) as CyclePassOptions;
+    const opts = (config.analyzers[DEPENDENCY_GRAPH_ANALYZER_ID]?.options || {}) as CyclePassOptions;
     if (opts.detectCycles === false) return { issues, warnings };
 
-    // Prebuilt graph reuse requires caller-verified full coverage and unused-export off.
     const files = report.fileMetrics.map((m) => m.file);
     const usePrebuilt = prebuilt != null && opts.detectUnusedExports !== true;
     const graph = usePrebuilt ? prebuilt : new ModuleDependencyGraph();
@@ -884,11 +853,9 @@ export async function runCyclePass(
     if (!usePrebuilt) {
         await populateGraphFromFiles(files, config.root, graph, contents, warnings);
     }
-
     if (opts.detectUnusedExports === true) {
         auditUnusedExports(graph, contents, opts, issues, logger);
     }
-
     auditImportCycles(graph, opts, issues, warnings);
 
     return { issues, warnings };

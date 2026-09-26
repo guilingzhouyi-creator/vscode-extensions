@@ -14,7 +14,7 @@
  *   False negatives are preferred over false positives — patterns are only reported
  *   when the heuristic is highly confident.
  */
-import type { Issue } from '../core/types';
+import type { Issue, AgentActionType } from '../core/types';
 import { SEVERITY_INFO } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
 import type { SimplifyOptions } from './simplify';
@@ -25,7 +25,6 @@ const PREFIX_SLASH_SLASH = '//';
 const PREFIX_HASH = '#';
 const PREFIX_STAR = '*';
 const PREFIX_BLOCK_COMMENT_START = '/*';
-const COMMENT_MARKERS = [PREFIX_SLASH_SLASH, PREFIX_HASH, PREFIX_STAR];
 
 const TERMINATING_STMT_RE = /^\s*(?:return|throw|break|continue)\b/;
 const IF_OPEN_RE = /\bif\s*\([^)]*\)\s*\{/;
@@ -103,6 +102,15 @@ function skipBlanksAndComments(lines: string[], start: number): number {
     return i;
 }
 
+const SIMPLIFY_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean }
+> = {
+    'SIM-ELSE-001': { action: 'simplify_control_flow', code: 'AR:SIM:011', safeToAutomate: false },
+    'SIM-BOOL-001': { action: 'simplify_control_flow', code: 'AR:SIM:012', safeToAutomate: false },
+    'SIM-GUARD-001': { action: 'simplify_control_flow', code: 'AR:SIM:013', safeToAutomate: false },
+};
+
 /** Build a standard issue object for simplify line-level rules. */
 function makeIssue(
     rule: string,
@@ -113,6 +121,15 @@ function makeIssue(
     suggestion: string,
     detail: Record<string, unknown>,
 ): Issue {
+    const mapped = SIMPLIFY_ACTIONABLE_MAP[rule];
+    const actionable = mapped
+        ? {
+              action: mapped.action,
+              code: mapped.code,
+              safeToAutomate: mapped.safeToAutomate,
+          }
+        : undefined;
+
     return {
         id: `simplify:${rule}:${file}:${startLine}`,
         analyzer: ANALYZER_SIMPLIFY,
@@ -126,6 +143,7 @@ function makeIssue(
         },
         detail,
         suggestion,
+        ...(actionable ? { actionable } : {}),
     };
 }
 

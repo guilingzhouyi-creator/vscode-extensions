@@ -19,7 +19,7 @@
  *     rewrite suggestion, and the two judgement-heavy rules (global `replace`, type-only imports)
  *     report at info severity instead of demanding a mechanical rewrite.
  */
-import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_TYPESCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/source-mask';
@@ -150,6 +150,22 @@ const LINE_RULES: LineRule[] = [
  * @param column - 1-based column of the evidence on that line.
  * @returns The finding, ready to be pushed onto the result list.
  */
+const TSM_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean }
+> = {
+    'TSM-VAR-001': { action: 'replace_token', code: 'AR:TSM:001', safeToAutomate: false },
+    'TSM-CTOR-001': { action: 'replace_token', code: 'AR:TSM:002', safeToAutomate: false },
+    'TSM-ARGS-001': { action: 'split_function', code: 'AR:TSM:003', safeToAutomate: false },
+    'TSM-SPREAD-001': { action: 'replace_token', code: 'AR:TSM:004', safeToAutomate: false },
+    'TSM-INCLUDES-001': { action: 'replace_token', code: 'AR:TSM:005', safeToAutomate: false },
+    'TSM-SUBSTR-001': { action: 'replace_token', code: 'AR:TSM:006', safeToAutomate: false },
+    'TSM-REPLACE-001': { action: 'replace_token', code: 'AR:TSM:007', safeToAutomate: false },
+    'TSM-ANY-001': { action: 'replace_token', code: 'AR:TSM:008', safeToAutomate: false },
+    'TSM-TYPE-001': { action: 'replace_token', code: 'AR:TSM:009', safeToAutomate: false },
+    'TSM-REQUIRE-001': { action: 'replace_token', code: 'AR:TSM:010', safeToAutomate: false },
+};
+
 function makeIssue(
     file: string,
     lineIndex: number,
@@ -161,6 +177,15 @@ function makeIssue(
     column: number,
 ): Issue {
     const line = lineIndex + 1;
+    const mapped = TSM_ACTIONABLE_MAP[rule];
+    const actionable = mapped
+        ? {
+              action: mapped.action,
+              code: mapped.code,
+              safeToAutomate: mapped.safeToAutomate,
+          }
+        : undefined;
+
     return {
         id: `${ANALYZER_TYPESCRIPT_MODERN}:${rule}:${file}:${line}`,
         analyzer: ANALYZER_TYPESCRIPT_MODERN,
@@ -170,6 +195,7 @@ function makeIssue(
         location: { file, start: { line, column }, end: { line, column } },
         detail,
         suggestion,
+        ...(actionable ? { actionable } : {}),
     };
 }
 
@@ -240,7 +266,8 @@ export class TsModernAnalyzer implements Analyzer {
     }
 
     /**
-     * Report isolated Disposable creations / event registrations that are not tracked in subscriptions.
+     * Report isolated Disposable creations / event registrations that are not
+     * tracked in subscriptions.
      */
     private reportDisposableLeaks(masked: string[], file: string, out: Issue[]): void {
         const ISOLATED_DISPOSABLE_RE =

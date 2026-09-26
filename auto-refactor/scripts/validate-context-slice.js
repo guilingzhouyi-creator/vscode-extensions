@@ -123,7 +123,7 @@ async function scanAndSlice(root) {
     'every region must carry its selection evidence',
   );
   assert.ok(
-    slice.constraints.some((line) => line.includes('静态推断')),
+    slice.constraints.some((line) => line.includes('Static inference') || line.includes('静态推断')),
     'the slice must state that its edges are static',
   );
   assert.ok(!slice.truncated, 'a three-region slice must not report truncation');

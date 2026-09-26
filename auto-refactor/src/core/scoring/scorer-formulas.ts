@@ -28,17 +28,23 @@ import {
 
 /** Maximum clean score a quality dimension starts at before deductions. */
 export const DIMENSION_MAX_SCORE = 100;
-/** Letter-grade cut-offs on the 0-100 composite score. */
+/** Letter-grade cut-offs on the 0-100 composite score: A+ minimum. */
 export const GRADE_A_PLUS_MIN = 95;
+/** Grade A minimum threshold. */
 export const GRADE_A_MIN = 85;
+/** Grade B minimum threshold. */
 export const GRADE_B_MIN = 75;
+/** Grade C minimum threshold. */
 export const GRADE_C_MIN = 65;
+/** Grade D minimum threshold. */
 export const GRADE_D_MIN = 50;
 /** Composite rounding: one decimal place. */
 export const SCORE_ROUNDING = 10;
-/** Confidence model: floor, line cap, and the scale that maps lines onto 0..1. */
+/** Confidence floor threshold. */
 export const CONFIDENCE_FLOOR = 0.6;
+/** Confidence line cap upper bound. */
 export const CONFIDENCE_LINE_CAP = 300;
+/** Confidence line scaling factor. */
 export const CONFIDENCE_LINE_SCALE = 750;
 /** Fallback metric size when a file has no metric entry. */
 export const DEFAULT_METRIC_LINES = 50;

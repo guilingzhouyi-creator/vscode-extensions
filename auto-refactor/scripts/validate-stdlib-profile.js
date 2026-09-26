@@ -24,7 +24,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { scan } = require('../dist/api');
 const { StdlibAnalyzer } = require('../dist/analyzers/stdlib');
 const { detectProjectProfile } = require('../dist/core/profiler/projectProfiler');
 const { evaluateProjectAutonomy } = require('../dist/core/scoring/autonomy-scorer');

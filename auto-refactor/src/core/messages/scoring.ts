@@ -363,4 +363,20 @@ export const ScoringRationales = {
         `Potential unbounded recursion without base-case guard: ${msg}`,
     NESTED_CONSTANT: (msg: string) =>
         `Nested constant anti-pattern or redundant constant aliasing: ${msg}`,
+
+    // 12. Standard Library & Systems Runtime Verification
+    STDLIB_PANIC_ESCAPE: (msg: string) =>
+        `Public standard library interface escapes with unhandled panic/unwrap: ${msg}`,
+    STDLIB_IMPLICIT_ALLOC: (msg: string) =>
+        `Implicit dynamic heap allocation in no_std bare-metal runtime environment: ${msg}`,
+    STDLIB_UNPROVEN_UNSAFE: (msg: string) =>
+        `Low-level unsafe block lacks mandatory // SAFETY: proof contract: ${msg}`,
+    STDLIB_TIMING_LEAK: (msg: string) =>
+        `Cryptographic comparison exhibits non-constant-time timing side-channel leak: ${msg}`,
+    STDLIB_UNBOUNDED_RECURSION: (msg: string) =>
+        `Core algorithm contains unbounded deep recursion without stack guard: ${msg}`,
+    STDLIB_PORTABILITY_FALLBACK: (msg: string) =>
+        `Platform-specific conditional compilation lacks compile_error fallback: ${msg}`,
+    STDLIB_GENERIC_MISMATCH: (msg: string) =>
+        `Standard library and system runtime specification check failed: ${msg}`,
 } as const;

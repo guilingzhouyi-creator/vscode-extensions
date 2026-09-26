@@ -18,6 +18,8 @@ import { summarizeUncertainty } from './uncertaintySummary';
 import type { Logger } from '../logger';
 import { globToRegExp } from '../file-discovery';
 import { runCyclePass } from '../dependency-graph';
+import type { ObservedConstantDeclaration } from '../architecture/constant-library-auditor';
+import { inspectConstantLibraryTopology } from '../architecture/constant-library-auditor';
 import {
     BASELINE_GRANULARITY_GROUPED,
     groupCounts,
@@ -83,7 +85,7 @@ async function applyDependencyGraphPass(
     const cycle = await runCyclePass(report, config, logger, covered ? prebuilt : null);
 
     if (!covered && prebuilt !== null) {
-        warnings.push('dependency-graph: 扫描图覆盖不全（缓存命中路径），回退重读建图');
+        warnings.push('dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph');
     }
     report.issues.push(...cycle.issues);
     warnings.push(...cycle.warnings);
@@ -108,7 +110,7 @@ function applyLiteralClustersPass(
 
     postScanPasses.push('literal-clusters');
     if (reportScanner === null) {
-        warnings.push('literal-clusters: 缓存命中路径没有共享字面量索引，跳过（请执行完整扫描）');
+        warnings.push('literal-clusters: cached paths lack shared literal index, skipping (run full cold scan)');
         return;
     }
     const clusterIssues = reportScanner.getLiteralClusterIssues();
@@ -117,6 +119,41 @@ function applyLiteralClustersPass(
     if (clusterIssues.length > 0) {
         logger.info(
             `literal-clusters: ${clusterIssues.length} cross-file literal cluster issue(s)`,
+        );
+    }
+}
+
+function applyConstantLibraryTopologyPass(
+    report: ScanReport,
+    config: ScanConfig,
+    logger: Logger,
+    scope: PostScanScope,
+    postScanPasses: string[],
+): void {
+    const constDecl = scope === POST_SCAN_SCOPE_FULL ? config.analyzers['constants'] : undefined;
+    const constOpts = constDecl?.options as Record<string, unknown> | undefined;
+    if (!constDecl?.enabled || constOpts?.['checkConstantTopology'] !== true) return;
+
+    postScanPasses.push('constant-library-topology');
+    const declarations: ObservedConstantDeclaration[] = [];
+    for (const issue of report.issues) {
+        if (issue.analyzer === 'constants' && issue.actionable?.targetSymbol) {
+            declarations.push({
+                name: issue.actionable.targetSymbol,
+                normalizedValue: String(issue.detail?.value ?? ''),
+                filePath: issue.location.file,
+                line: issue.location.start.line,
+                isExported: true,
+            });
+        }
+    }
+    const topologyIssues = inspectConstantLibraryTopology(declarations);
+    if (topologyIssues.length > 0) {
+        report.issues.push(...topologyIssues);
+        recomputeSummary(report);
+        logger.info(
+            `constant-library-topology: emitted ${topologyIssues.length} ` +
+            `constant library recommendation(s)`,
         );
     }
 }
@@ -136,7 +173,7 @@ function applyErrorFlowPass(
 
     postScanPasses.push('error-flow');
     if (reportScanner === null) {
-        warnings.push('error-flow: 缓存命中路径没有共享调用图索引，跳过（请执行完整扫描）');
+        warnings.push('error-flow: cached paths lack shared call-graph index, skipping (run full cold scan)');
         return;
     }
     const errorIssues = reportScanner.getErrorFlowIssues(errorOpts);
@@ -163,7 +200,7 @@ function applySemanticComplexityPass(
     postScanPasses.push('semantic-complexity');
     if (reportScanner === null) {
         warnings.push(
-            'semantic-complexity: 缓存命中路径没有共享调用图索引，跳过（请执行完整扫描）',
+            'semantic-complexity: cached paths lack shared call-graph index, skipping (run full cold scan)',
         );
         return;
     }
@@ -333,6 +370,7 @@ export async function finalizeReport(
         warnings,
         postScanPasses,
     );
+    applyConstantLibraryTopologyPass(report, config, logger, scope, postScanPasses);
     applyErrorFlowPass(report, config, logger, reportScanner, scope, warnings, postScanPasses);
     applySemanticComplexityPass(
         report,

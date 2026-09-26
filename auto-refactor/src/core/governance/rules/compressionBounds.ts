@@ -144,8 +144,8 @@ export const GiantExpressionRule: GovernanceRule = {
                     line: i + 1,
                     column: raw.search(/\S/) + 1,
                     suggestion: isNestedTernary
-                        ? '将嵌套三元表达式重构为具名纯函数、早返回卫语句或 lookup 表。'
-                        : '将复杂逻辑链提取为语义化布尔谓词常量或子函数。',
+                        ? 'Refactor nested ternary expressions into named pure functions, early-return guard clauses, or lookup tables.'
+                        : 'Extract complex logical chains into semantic boolean predicates or helper functions.',
                     fixable: false,
                     evidence: {
                         confidence: 0.9,
@@ -277,7 +277,7 @@ function evaluateCallbackLine(
                 line: lineIndex + 1,
                 column: raw.search(/\S/) + 1,
                 suggestion:
-                    '降低回调嵌套深度：改用 async/await、Promise 链扁平化或抽取具名顶层函数。',
+                    'Reduce callback nesting depth: convert to async/await, flatten Promise chains, or extract named functions.',
                 fixable: false,
                 evidence: {
                     confidence: 0.85,

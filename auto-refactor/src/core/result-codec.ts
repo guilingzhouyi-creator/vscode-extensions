@@ -331,6 +331,12 @@ export function encodeResults(results: FileResult[]): Buffer {
             } else {
                 w.u8(0);
             }
+            if (i.actionable !== undefined) {
+                w.u8(1);
+                w.value(i.actionable);
+            } else {
+                w.u8(0);
+            }
         }
     }
     return w.result();
@@ -385,6 +391,8 @@ export function decodeResults(buf: Buffer | Uint8Array): FileResult[] {
             const detail = r.value() as Record<string, unknown>;
             const hasSug = r.u8();
             const suggestion = hasSug ? r.str() : undefined;
+            const hasAct = r.u8();
+            const actionable = hasAct ? (r.value() as any) : undefined;
             issues[k] = {
                 id,
                 analyzer,
@@ -398,6 +406,7 @@ export function decodeResults(buf: Buffer | Uint8Array): FileResult[] {
                 },
                 detail,
                 ...(suggestion !== undefined ? { suggestion } : {}),
+                ...(actionable !== undefined ? { actionable } : {}),
             };
         }
         out[f] = { file, issues, metric };

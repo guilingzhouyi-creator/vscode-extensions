@@ -96,4 +96,62 @@ export const ZH_CN_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '改用显式命名导出（Named Exports），明确暴露公开 API 边界。',
         rationale: '通配导出容易导致命名冲突、破坏模块边界封装并增加最终打包产物膨胀体积。',
     },
+    'STDLIB-PANIC-001': {
+        name: '公开接口裸 panic 逃逸防护',
+        summary: '标准库或核心公开接口中包含可能崩溃的裸 panic/unwrap 逃逸调用。',
+        remediation: '公开 API 应返回 Result<T, E> 或 Option<T>，使用 match 或 ? 操作符解包。',
+        rationale: '底层库发生不可捕获的 panic 会导致宿主进程直接崩溃，违反生产健壮性规范。',
+    },
+    'STDLIB-ALLOC-001': {
+        name: 'no_std 隐式堆分配防护',
+        summary: '在裸机或 no_std 系统上下文中检测到隐式动态堆内存分配。',
+        remediation: '使用固定容量栈缓冲、引用切片或预分配内存池代替堆内存分配。',
+        rationale: '裸机与嵌入式环境缺乏全局堆分配器，动态堆分配会引发链接或运行时错误。',
+    },
+    'STDLIB-UNSAFE-001': {
+        name: 'unsafe 块契约证明补齐',
+        summary: '底层 unsafe 代码块缺少强制性的 // SAFETY: 契约证明注释。',
+        remediation: '在 unsafe 块前添加 // SAFETY: 说明为何前提条件与内存不变量得以保证。',
+        rationale: '未附带证明的 unsafe 块显著增加内存破坏、未定义行为与维护审计风险。',
+    },
+    'STDLIB-CONST-001': {
+        name: '密码学恒定时间比对',
+        summary: '密码学或哈希校验敏感比对存在提前退出的字节短路分支，易受时序侧信道攻击。',
+        remediation: '改用恒定时间比对（例如 constant_time_eq 或累加异或位），避免提前退出。',
+        rationale: '时序侧信道可被攻击者利用逐字节推导比对内容，造成安全机制绕过。',
+    },
+    'STDLIB-RECURSION-001': {
+        name: '无界递归深度防卫',
+        summary: '检测到递归自调用，但缺少显式深度限制参数或递归保护防卫。',
+        remediation: '引入显式 depth / recursion_limit 参数并在超限时返回错误，或改用迭代循环。',
+        rationale: '无界递归极易因极端输入耗尽调用栈而引发栈溢出崩溃（Stack Overflow）。',
+    },
+    'STDLIB-PORT-001': {
+        name: '跨平台编译兜底防护',
+        summary: '平台特定条件编译块缺少不支持目标平台的阻断兜底。',
+        remediation: '添加 #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); 兜底。',
+        rationale: '缺少兜底条件编译会导致在未支持平台上产生隐晦的符号缺失而非明确的编译报错。',
+    },
+    'CMP-EXP-001': {
+        name: '巨型表达式认知负载超限',
+        summary: '嵌套三元表达式或冗长逻辑运算链超出人类与模型局部推理的认知阈值。',
+        remediation: '将嵌套三元表达式重构为具名纯函数、早返回卫语句或 lookup 表；将复杂逻辑链提取为布尔谓词常量。',
+        rationale: '过于冗长的内联表达式增加认知负荷并极易掩盖短路求值与优先级逻辑缺陷。',
+    },
+    'CMP-CAL-001': {
+        name: '异步回调嵌套层级超标',
+        summary: '多层连续回调缩进嵌套形成回调地狱，超出可维护性界限。',
+        remediation: '降低回调嵌套深度：改用 async/await、Promise 链扁平化或抽取具名顶层函数。',
+        rationale: '深层回调嵌套不仅可读性极差，而且异常冒泡与上下文资源清理非常容易遗漏。',
+    },
+    'CONST-LIB-001': {
+        name: '集中式大规模常量库构建拓扑建议',
+        summary: '检测到项目中大量常量散落于业务代码文件中，缺乏集中分层的常量库目录结构。',
+        remediation:
+            '根据 Agent 建议的目录拓扑与分片模块（如 ast-tokens、rule-codes 等），' +
+            '在 constants/ 目录下集中归档并提供统一 index.ts 导出。',
+        rationale:
+            '散落常量容易造成符号重复定义、命名漂移与跨文件循环依赖，' +
+            '建立集中式常量库是架构工程化的必要底座。',
+    },
 };

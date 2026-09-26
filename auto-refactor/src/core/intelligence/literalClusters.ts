@@ -79,9 +79,9 @@ export function buildLiteralClusterIssues(
             rule: 'duplicate-literal',
             severity: severity as Issue['severity'],
             message:
-                `字面量 "${entry.value}" 跨 ${entry.files.length} 个文件出现 ${entry.occurrences} 次，` +
-                `且承载 ${entry.meanings.length} 种语义（${entry.meanings.map(meaningLabel).join('; ')}）` +
-                '—— 不得合并为同一个常量',
+                `Literal "${entry.value}" appears ${entry.occurrences} times across ${entry.files.length} files ` +
+                `with ${entry.meanings.length} distinct semantic meanings (${entry.meanings.map(meaningLabel).join('; ')}) ` +
+                '— must not be merged into a single god constant.',
             location: {
                 file: site.file,
                 start: { line: site.line, column: site.column },
@@ -95,8 +95,8 @@ export function buildLiteralClusterIssues(
                 meanings,
             },
             suggestion:
-                '按语义分别定义常量：协议/接口值归协议层，算法调参归算法模块，测试夹具留在 fixture；' +
-                '若确属同一语义，收敛到唯一的领域所有者并保留兼容别名',
+                'Define separate constants per semantic domain: protocol/interface in protocol layer, algorithm parameters in algorithm modules, test fixtures in test fixtures; ' +
+                'if genuine single semantic invariant, converge to single domain owner and retain compatibility aliases.',
         });
     }
     return issues;

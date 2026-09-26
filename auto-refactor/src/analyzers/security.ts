@@ -35,6 +35,7 @@ import { ANALYZER_SECURITY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/multilang';
 import { NodeKind } from '../core/multilang';
 import { SecurityMessages } from '../core/messages/security';
+import { nativeCore } from '../core/native';
 
 /**
  * Optional per-file configuration for the security analyzer.
@@ -80,6 +81,26 @@ const PATH_TRAVERSAL_RE =
 const SENSITIVE_LOG_RE =
     /\b(?:console\.(?:log|warn|error|info|debug)|logger\.(?:log|warn|error|info|debug))\s*\([^)]*(?:password|passwd|secretKey|client_secret|apiKey|authToken|bearerToken|accessToken)/i;
 
+/** Critical tokens for fast native pattern pre-screening across large source texts. */
+const SECURITY_FAST_FILTER_TOKENS: readonly string[] = [
+    'eval',
+    'exec',
+    'Function',
+    'child_process',
+    '__proto__',
+    'prototype',
+    'random',
+    'rand',
+    'createHash',
+    'md5',
+    'sha1',
+    'readFile',
+    'unlink',
+    'rmdir',
+    'console.',
+    'logger.',
+];
+
 /** Default per-file finding cap used when `SecurityOptions.maxIssuesPerFile` is omitted. */
 const DEFAULT_MAX_ISSUES_PER_FILE = 50;
 
@@ -121,6 +142,14 @@ export class SecurityAnalyzer implements Analyzer {
         const isTestOrFixture = /(?:tests?|specs?|fixtures?|samples?|benchmark|dist|mock)/i.test(
             file,
         );
+
+        // High-performance fast path: pre-screen large files via native SIMD multi-pattern matcher
+        if (content.length > 5000) {
+            const hits = nativeCore.fastPatternMatch(content, SECURITY_FAST_FILTER_TOKENS as string[]);
+            if (hits.length === 0) {
+                return [];
+            }
+        }
 
         const lines = content.split(/\r?\n/);
 

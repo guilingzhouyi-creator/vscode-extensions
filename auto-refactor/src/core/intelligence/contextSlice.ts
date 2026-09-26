@@ -173,7 +173,7 @@ export function buildContextSlice(
                 symbol,
                 role: 'definition',
                 line: definition.line,
-                reason: `任务意图解析到声明 ${symbol}（${definition.kind}）`,
+                reason: `Task intent resolved definition of ${symbol} (${definition.kind})`,
             });
         }
         const calleeEdges = graph.calleesOf(symbol);
@@ -186,13 +186,13 @@ export function buildContextSlice(
                 symbol: edge.callee,
                 role: 'dependency',
                 line: target?.line ?? edge.line,
-                reason: `${symbol} 调用 ${edge.callee}${edge.resolved ? '' : '（未解析，外部/动态）'}`,
+                reason: `${symbol} calls ${edge.callee}${edge.resolved ? '' : ' (unresolved external/dynamic)'}`,
             });
         }
         const callerEdges = graph.callersOf(symbol);
         for (const edge of callerEdges) {
             if (impacts.length >= maxImpacts) break;
-            const caller = edge.caller ?? '(模块级)';
+            const caller = edge.caller ?? '(module-level)';
             impacts.push(caller);
             if (edge.callerFile !== (definitions[0]?.file ?? edge.callerFile))
                 crossFileImpacts += 1;
@@ -201,16 +201,16 @@ export function buildContextSlice(
                 symbol: caller,
                 role: 'impact',
                 line: edge.line,
-                reason: `${caller} 调用 ${symbol}（改动影响面${edge.callerFile !== (definitions[0]?.file ?? '') ? '，跨文件' : ''}）`,
+                reason: `${caller} calls ${symbol} (impact scope${edge.callerFile !== (definitions[0]?.file ?? '') ? ', cross-file' : ''})`,
             });
         }
     }
 
     const constraints = [
-        `预算：regions≤${maxRegions}（实际 ${regions.length}${truncated ? '，已截断' : ''}），` +
-            `dependencies≤${maxDependencies}（实际 ${dependencies.length}），impacts≤${maxImpacts}（实际 ${impacts.length}）`,
-        `跨文件影响面：${crossFileImpacts} 个调用点`,
-        '静态推断：仅来自共享 SymbolIndex/CallGraph，未验证运行时行为；未解析调用已显式标注',
+        `Budget: regions≤${maxRegions} (actual ${regions.length}${truncated ? ', truncated' : ''}), ` +
+            `dependencies≤${maxDependencies} (actual ${dependencies.length}), impacts≤${maxImpacts} (actual ${impacts.length})`,
+        `Cross-file impact scope: ${crossFileImpacts} call sites`,
+        'Static inference: derived from shared SymbolIndex/CallGraph without runtime validation; unresolved calls explicitly flagged',
     ];
 
     return {

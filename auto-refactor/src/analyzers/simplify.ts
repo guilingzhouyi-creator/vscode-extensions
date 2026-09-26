@@ -213,6 +213,13 @@ export class SimplifyAnalyzer implements Analyzer {
             detail: { function: name, lines: length, limit },
             suggestion:
                 'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
+            actionable: {
+                action: 'split_function',
+                code: 'AR:SIM:001',
+                targetScope: 'module_top_level',
+                targetSymbol: name,
+                safeToAutomate: false,
+            },
         });
     }
 
@@ -236,6 +243,13 @@ export class SimplifyAnalyzer implements Analyzer {
                 detail: { function: name, nestingDepth: maxNesting, limit: maxAllowed },
                 suggestion:
                     'Invert deep conditionals and return early with guard clauses to flatten control flow.',
+                actionable: {
+                    action: 'simplify_control_flow',
+                    code: 'AR:SIM:002',
+                    targetScope: 'function_local',
+                    targetSymbol: name,
+                    safeToAutomate: false,
+                },
             });
         }
     }
@@ -375,6 +389,11 @@ export class SimplifyAnalyzer implements Analyzer {
                     detail: { lines: streak, first: lines[start].trim() },
                     suggestion:
                         'Delete the block (history lives in git) or restore it to real code.',
+                    actionable: {
+                        action: 'replace_token',
+                        code: 'AR:SIM:003',
+                        safeToAutomate: false,
+                    },
                 });
             }
             streak = 0;
@@ -431,6 +450,11 @@ export class SimplifyAnalyzer implements Analyzer {
             detail: { line: lines[lineIndex].trim() },
             suggestion:
                 'Implement the body, raise an explicit not-implemented error, or remove the declaration.',
+            actionable: {
+                action: 'replace_token',
+                code: 'AR:SIM:005',
+                safeToAutomate: false,
+            },
         });
     }
 
@@ -614,6 +638,11 @@ export class SimplifyAnalyzer implements Analyzer {
                 detail: { line: trimmed },
                 suggestion:
                     'Use the structured logger (or remove the statement); debug output bypasses log levels and leaks to production stdout.',
+                actionable: {
+                    action: 'replace_token',
+                    code: 'AR:SIM:004',
+                    safeToAutomate: false,
+                },
             });
         }
     }
