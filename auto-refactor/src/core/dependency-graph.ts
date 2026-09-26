@@ -26,6 +26,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { normalizePath } from './file-discovery';
+import { PYTHON_STDLIB_MODULES } from './intelligence/python-stdlib';
 import type { Issue, ScanConfig, ScanReport, Severity } from './types';
 
 /** Default maximum traversal depth for transitive affected-file queries. */
@@ -501,6 +502,7 @@ export class ModuleDependencyGraph {
             tailSegments = trimmed ? trimmed.split('.') : [];
         } else {
             const parts = statement.module.split('.');
+            if (PYTHON_STDLIB_MODULES.has(parts[0])) return [];
             const anchor = dirSegments.indexOf(parts[0]);
             if (anchor < 0) return [];
             baseSegments = dirSegments.slice(0, anchor).concat(parts);
@@ -514,7 +516,7 @@ export class ModuleDependencyGraph {
         };
         push(baseSegments.concat(tailSegments));
         for (const name of statement.names) push(baseSegments.concat(tailSegments, [name]));
-        return targets;
+        return targets.filter((target) => target !== importingFile);
     }
 
     /** Total number of indexed modules */

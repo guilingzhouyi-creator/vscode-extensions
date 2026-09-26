@@ -16,6 +16,7 @@
 import type { ProjectProfile } from '../types';
 import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
 import type { UnifiedQualityAssessment } from '../scoring/fusion-scorer';
+import type { AutonomyEvaluation } from '../scoring/autonomy-scorer';
 
 /** Scale factor that converts a 0..1 confidence/score fraction into a percentage. */
 const PERCENT_SCALE = 100;
@@ -119,3 +120,61 @@ export function printQualityScoreAssessment(
     }
     process.stdout.write(`===========================================\n\n`);
 }
+
+/**
+ * Print the In-House Autonomy Index and external SDK breakdown to stdout.
+ *
+ * @param a - Project autonomy evaluation.
+ */
+export function printAutonomyAssessment(a: AutonomyEvaluation): void {
+    process.stdout.write(`\n=== In-House Self-Development Assessment (CAI 2.0) ===\n`);
+    process.stdout.write(
+        `Composite Autonomy Index: ${a.compositeAutonomyIndex.toFixed(1)}% ` +
+            `[Grade: ${a.grade}]\n`,
+    );
+    process.stdout.write(`Status: ${a.gradeDescription}\n`);
+    if (a.confidence) {
+        const confTag = a.confidence.isLowConfidence ? ' [Sparse Sample - Smoothed]' : '';
+        process.stdout.write(
+            `Bayesian Credible Bounds : [${a.confidence.lowerBound.toFixed(1)}% ~ ` +
+                `${a.confidence.upperBound.toFixed(1)}%] ` +
+                `(Sample Sufficiency: ${(a.confidence.sampleSufficiency * 100).toFixed(0)}%)${confTag}\n`,
+        );
+    }
+    process.stdout.write(`-------------------------------------------\n`);
+    process.stdout.write(
+        `  • Effective LOC Autonomy : ${a.dimensions.effectiveLocAutonomy.toFixed(1)}% ` +
+            `(${a.stats.proprietaryEffectiveLoc} / ${a.stats.totalEffectiveLoc} ELOC)\n`,
+    );
+    process.stdout.write(
+        `  • Symbol Call Autonomy   : ${a.dimensions.symbolCallAutonomy.toFixed(1)}% ` +
+            `(${a.stats.internalSymbolCalls} int vs ${a.stats.externalSdkCalls} ext SDK)\n`,
+    );
+    process.stdout.write(
+        `  • Domain Kernel Density  : ${a.dimensions.domainKernelDensity.toFixed(1)}%\n`,
+    );
+    process.stdout.write(
+        `  • Code Originality       : ${a.dimensions.codeOriginality.toFixed(1)}%\n`,
+    );
+    process.stdout.write(
+        `  • Supply Chain Resilience: ${a.dimensions.supplyChainResilience.toFixed(1)}% ` +
+            `(${a.supplyChain?.directDependencies || 0} direct, ` +
+            `${a.supplyChain?.transitiveDependencies || 0} transitive, ` +
+            `depth: ${a.supplyChain?.estimatedDepth || 1})\n`,
+    );
+    process.stdout.write(
+        `  • Critical Path Autonomy : ${a.dimensions.criticalPathAutonomy.toFixed(1)}% ` +
+            `(${a.stats.criticalPathFiles || 0} files in security/runtime core)\n`,
+    );
+    if (a.externalSdkInventory.length > 0) {
+        process.stdout.write(`-------------------------------------------\n`);
+        process.stdout.write(`Top External SDK Dependencies:\n`);
+        for (const sdk of a.externalSdkInventory.slice(0, 5)) {
+            process.stdout.write(
+                `  • ${sdk.name.padEnd(20)}: ${sdk.callCount} calls across ${sdk.fileCount} files\n`,
+            );
+        }
+    }
+    process.stdout.write(`==================================================\n\n`);
+}
+

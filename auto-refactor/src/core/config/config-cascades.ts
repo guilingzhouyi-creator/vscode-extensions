@@ -88,6 +88,9 @@ function applyArchitectureAnalyzerLevel(
 ): void {
     const decl = analyzers[ANALYZER_ARCHITECTURE];
     if (!decl) return;
+    if (securityLevel === 'full') {
+        decl.enabled = true;
+    }
     decl.options = {
         ...(decl.options || {}),
         securityLevel,

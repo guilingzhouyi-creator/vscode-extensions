@@ -62,6 +62,7 @@ import {
     ANALYZER_NAMING,
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
+    ANALYZER_STDLIB,
 } from '../scoring/dimensionLiterals';
 import { applySemanticAndSecurityLevels } from './config-cascades';
 import type { ConfigOverrides } from './config-tuning';
@@ -103,6 +104,7 @@ export const BUILTIN_ANALYZERS = [
     ANALYZER_NAMING,
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
+    ANALYZER_STDLIB,
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──
@@ -114,6 +116,8 @@ const DEFAULT_HARDCODED_STRING_MIN_LENGTH = 3;
 const DEFAULT_FILE_LINES_WARN = 400;
 const DEFAULT_FILE_LINES_FAIL = 800;
 const DEFAULT_FILE_FUNCTIONS_WARN = 15;
+export const DEFAULT_EFFECTIVE_LOC_WARN = 800;
+export const DEFAULT_EFFECTIVE_LOC_FAIL = 1600;
 /** complexity analyzer defaults. */
 const DEFAULT_COMPLEXITY_WARN = 10;
 const DEFAULT_COMPLEXITY_FAIL = 20;
@@ -180,6 +184,8 @@ export function defaultThresholds(): Thresholds {
         fileLinesWarn: DEFAULT_FILE_LINES_WARN,
         fileLinesFail: DEFAULT_FILE_LINES_FAIL,
         fileFunctionsWarn: DEFAULT_FILE_FUNCTIONS_WARN,
+        effectiveLocWarn: DEFAULT_EFFECTIVE_LOC_WARN,
+        effectiveLocFail: DEFAULT_EFFECTIVE_LOC_FAIL,
         // complexity
         complexityWarn: DEFAULT_COMPLEXITY_WARN,
         complexityFail: DEFAULT_COMPLEXITY_FAIL,
@@ -195,7 +201,7 @@ export function defaultThresholds(): Thresholds {
  *
  *  constants:       magicNumberMin, duplicateLiteralThreshold, hardcodedStringMinLength,
  *                   ignoreLiterals
- *  large-file:      fileLinesWarn, fileLinesFail, fileFunctionsWarn
+ *  large-file:      fileLinesWarn, fileLinesFail, fileFunctionsWarn, effectiveLocWarn, effectiveLocFail
  *  complexity:      complexityWarn, complexityFail
  *  governance:      maxNestingDepth, maxInheritanceDepth, blockingIoAllowPatterns
  *  architecture:    enforceCleanLayers, allowSkipLayers
@@ -226,6 +232,8 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
             fileLinesWarn: DEFAULT_FILE_LINES_WARN,
             fileLinesFail: DEFAULT_FILE_LINES_FAIL,
             fileFunctionsWarn: DEFAULT_FILE_FUNCTIONS_WARN,
+            effectiveLocWarn: DEFAULT_EFFECTIVE_LOC_WARN,
+            effectiveLocFail: DEFAULT_EFFECTIVE_LOC_FAIL,
         },
         complexity: {
             complexityWarn: DEFAULT_COMPLEXITY_WARN,
@@ -404,10 +412,11 @@ function loadConfigFile(
 ): { fileCfg: Partial<ScanConfig>; baseDir: string } {
     let fileCfg: Partial<ScanConfig> = {};
     let baseDir = root;
+    const isDifferentRoot = path.resolve(root) !== path.resolve(process.cwd());
     const candidates = [
         configFile,
         path.join(root, 'auto-refactor.config.json'),
-        path.join(process.cwd(), 'auto-refactor.config.json'),
+        !isDifferentRoot ? path.join(process.cwd(), 'auto-refactor.config.json') : undefined,
     ].filter(Boolean) as string[];
     for (const c of candidates) {
         try {
@@ -638,10 +647,7 @@ function mergeLiteralPolicy(
 /**
  * Load dynamic telemetry evidence from file if path is specified and valid.
  */
-function loadTelemetryData(
-    root: string,
-    telemetryPath?: string,
-): DynamicEvidenceDTO | undefined {
+function loadTelemetryData(root: string, telemetryPath?: string): DynamicEvidenceDTO | undefined {
     if (!telemetryPath) return undefined;
     const resolvedPath = path.isAbsolute(telemetryPath)
         ? telemetryPath
@@ -685,9 +691,7 @@ function assembleDomainOptions(
 > {
     const telemetry = overrides.telemetry || fileCfg.telemetry;
     const telemetryData =
-        overrides.telemetryData ||
-        fileCfg.telemetryData ||
-        loadTelemetryData(root, telemetry);
+        overrides.telemetryData || fileCfg.telemetryData || loadTelemetryData(root, telemetry);
     return {
         unsupportedLanguage: resolveScalar(
             overrides.unsupportedLanguage,
@@ -808,10 +812,26 @@ export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {
 
     const { fileCfg, baseDir } = loadConfigFile(root, overrides.configFile);
 
+    const cliEffectiveLoc = (overrides as { effectiveLoc?: number }).effectiveLoc;
+    const cliFileLinesWarn = (overrides as { fileLinesWarn?: number }).fileLinesWarn;
+    const cliFileLinesFail = (overrides as { fileLinesFail?: number }).fileLinesFail;
+
     const globalThresholds = {
         ...base.thresholds,
         ...(fileCfg.thresholds || {}),
         ...(overrides.thresholds || {}),
+        ...(cliEffectiveLoc
+            ? {
+                  effectiveLocWarn: cliEffectiveLoc,
+                  effectiveLocFail: Math.round(cliEffectiveLoc * 2),
+                  ...(!cliFileLinesWarn ? { fileLinesWarn: Math.max(400, cliEffectiveLoc) } : {}),
+                  ...(!cliFileLinesFail
+                      ? { fileLinesFail: Math.max(800, Math.round(cliEffectiveLoc * 2)) }
+                      : {}),
+              }
+            : {}),
+        ...(cliFileLinesWarn ? { fileLinesWarn: cliFileLinesWarn } : {}),
+        ...(cliFileLinesFail ? { fileLinesFail: cliFileLinesFail } : {}),
     } as Record<string, unknown>;
 
     const analyzers = mergeAnalyzerDeclarations(

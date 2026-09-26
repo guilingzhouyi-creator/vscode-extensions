@@ -203,6 +203,13 @@ export interface Thresholds {
     fileLinesWarn: number;
     fileLinesFail: number;
     fileFunctionsWarn: number;
+    /**
+     * Effective Code Lines (ECL) warning threshold
+     * (excluding comments/blank lines/closing wrappers).
+     */
+    effectiveLocWarn?: number;
+    /** Effective Code Lines (ECL) failure threshold. */
+    effectiveLocFail?: number;
     // complexity
     complexityWarn: number;
     complexityFail: number;
@@ -316,7 +323,13 @@ export interface ProjectPartition {
 /**
  * Project archetype classification driving sparse reviewer routing and review budgets.
  */
-export type ProjectArchetype = 'demo' | 'web' | 'game' | 'library';
+export type ProjectArchetype =
+    | 'demo'
+    | 'web'
+    | 'game'
+    | 'library'
+    | 'stdlib'
+    | 'systems_runtime';
 
 /**
  * Sparse-routing decision for the detected archetype, published in ScanSummary.
@@ -798,6 +811,10 @@ export interface ScanReport {
      * Feedback Q_f, Fused Q_tot).
      */
     triPlaneQuality?: import('./scoring/fusion-scorer').UnifiedQualityAssessment;
+    /**
+     * In-house self-development ratio and code autonomy index (CAI).
+     */
+    autonomy?: import('./scoring/autonomy-scorer').AutonomyEvaluation;
 }
 
 export * from './scoring/scoringTypes';

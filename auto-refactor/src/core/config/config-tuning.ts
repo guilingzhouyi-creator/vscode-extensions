@@ -50,6 +50,7 @@ import {
     ANALYZER_NAMING,
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
+    ANALYZER_STDLIB,
 } from '../scoring/dimensionLiterals';
 
 export {
@@ -89,6 +90,7 @@ export const SPECIALIZED_ANALYZERS = new Set<string>([
     ANALYZER_NAMING,
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
+    ANALYZER_STDLIB,
 ]);
 
 /** Auto-tune estimate: source lines per profiled language entry. */
@@ -142,7 +144,27 @@ function mergeThresholds(
     fileCfg: Partial<ScanConfig>,
     overrides: ConfigOverrides,
 ): Thresholds {
-    return { ...baseThresholds, ...(fileCfg.thresholds || {}), ...(overrides.thresholds || {}) };
+    const cliEffectiveLoc = (overrides as { effectiveLoc?: number }).effectiveLoc;
+    const cliFileLinesWarn = (overrides as { fileLinesWarn?: number }).fileLinesWarn;
+    const cliFileLinesFail = (overrides as { fileLinesFail?: number }).fileLinesFail;
+
+    return {
+        ...baseThresholds,
+        ...(fileCfg.thresholds || {}),
+        ...(overrides.thresholds || {}),
+        ...(cliEffectiveLoc
+            ? {
+                  effectiveLocWarn: cliEffectiveLoc,
+                  effectiveLocFail: Math.round(cliEffectiveLoc * 2),
+                  ...(!cliFileLinesWarn ? { fileLinesWarn: Math.max(400, cliEffectiveLoc) } : {}),
+                  ...(!cliFileLinesFail
+                      ? { fileLinesFail: Math.max(800, Math.round(cliEffectiveLoc * 2)) }
+                      : {}),
+              }
+            : {}),
+        ...(cliFileLinesWarn ? { fileLinesWarn: cliFileLinesWarn } : {}),
+        ...(cliFileLinesFail ? { fileLinesFail: cliFileLinesFail } : {}),
+    };
 }
 
 /**
@@ -250,7 +272,12 @@ export function applyAutoTuning(
 ): AutoTuningResult {
     const profile = fileCfg.profile || overrides.profile || detectProjectProfile(root);
     const autoTuneScale = overrides.autoTuneScale ?? fileCfg.autoTuneScale ?? false;
-    const hasExplicitThresholds = Boolean(fileCfg.thresholds || overrides.thresholds);
+    const hasExplicitThresholds = Boolean(
+        fileCfg.thresholds ||
+        overrides.thresholds ||
+        (overrides as { effectiveLoc?: number }).effectiveLoc !== undefined ||
+        (overrides as { fileLinesWarn?: number }).fileLinesWarn !== undefined,
+    );
     let tunedThresholds = mergeThresholds(baseThresholds, fileCfg, overrides);
     let scaleGrade = fileCfg.scaleGrade || overrides.scaleGrade;
 

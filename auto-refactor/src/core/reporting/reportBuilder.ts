@@ -40,6 +40,7 @@ import type { LiteralIndex } from '../intelligence/literalIndex';
 import { CallGraph } from '../intelligence/callGraph';
 import { summarizeUncertainty } from './uncertaintySummary';
 import { analyzerCoverage } from '../scanner/worker-scheduler';
+import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
 
 /** Number of hex characters kept from a record hash to form the stored short revision id. */
 const REVISION_ID_LENGTH = 16;
@@ -303,6 +304,7 @@ export function buildScanReport(
         100.0,
         resolveGovernanceProfile(cfg),
     );
+    const autonomy = evaluateProjectAutonomy(fileMetrics, issues, cfg);
 
     host.reviewMemory.flush();
     return {
@@ -317,5 +319,6 @@ export function buildScanReport(
         qualityScore: projectQualityScore,
         fileQualityScores,
         triPlaneQuality,
+        autonomy,
     };
 }
