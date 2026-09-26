@@ -28,6 +28,7 @@ const RULE_ID_CONST_SCP_002 = 'CONST-SCP-002';
 const RULE_ID_CONST_CLU_001 = 'CONST-CLU-001';
 const RULE_ID_CONST_DRF_001 = 'CONST-DRF-001';
 const RULE_ID_CONST_OWN_001 = 'CONST-OWN-001';
+const RULE_ID_CONST_LIB_001 = 'CONST-LIB-001';
 
 function createGovernanceRule(
     id: string,
@@ -82,5 +83,10 @@ export const CONSTANT_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         RULE_ID_CONST_OWN_001,
         '共享常量所有权分层错误，严禁塞入全局大杂烩 constants 文件或藏匿在底层私有模块。',
         '按照所有权四层模型，分流至 Module-Private、Domain-Shared、Protocol-Shared 或 System-Config。',
+    ),
+    createGovernanceRule(
+        RULE_ID_CONST_LIB_001,
+        '大规模常量散落于业务代码文件中，缺乏集中分层的常量库目录结构。',
+        '根据 Agent 建议的目录拓扑与分片模块，在 constants/ 集中归档并提供统一 index.ts 导出。',
     ),
 ];

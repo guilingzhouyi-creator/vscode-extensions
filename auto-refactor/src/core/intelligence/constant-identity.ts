@@ -232,3 +232,51 @@ export function areSemanticallyEqual(
             a.semanticKind === b.semanticKind)
     );
 }
+
+/**
+ * Detect if a file path is a dedicated constant definition module.
+ *
+ * @param filePath - Path to inspect.
+ * @returns True if the file name or folder designates a dedicated constant catalog.
+ */
+export function isConstantDefinitionFile(filePath: string): boolean {
+    const norm = filePath.replace(/\\/g, '/').toLowerCase();
+    return /(?:^|[\\/])constant(?:s)?\.[a-z0-9]+$/.test(norm) || /[\\/]constants?[\\/]/.test(norm);
+}
+
+/**
+ * Format language-aware constant declaration proposal for analyzer suggestions.
+ *
+ * @param filePath - Target file path for language dialect determination.
+ * @param name - Proposed constant identifier.
+ * @param value - Literal string representation.
+ * @param numeric - Whether literal is numeric.
+ * @param comment - Optional diagnostic explanation comment.
+ * @returns Idiomatic declaration string tailored for Python, GDScript, Rust, or TS/JS.
+ */
+export function formatConstantDeclarationSuggestion(
+    filePath: string,
+    name: string,
+    value: string,
+    numeric: boolean,
+    comment?: string,
+): string {
+    const norm = filePath.replace(/\\/g, '/').toLowerCase();
+    const commentText = comment ? comment.trim() : '';
+
+    if (norm.endsWith('.py')) {
+        const commentSuffix = commentText ? `  # ${commentText.replace(/^\/\/\s*/, '')}` : '';
+        return `${name} = ${value}${commentSuffix}`;
+    }
+    if (norm.endsWith('.gd')) {
+        const commentSuffix = commentText ? ` # ${commentText.replace(/^\/\/\s*/, '')}` : '';
+        return `const ${name} = ${value}${commentSuffix}`;
+    }
+    if (norm.endsWith('.rs')) {
+        const typeAnnotation = numeric ? (value.includes('.') ? ': f64' : ': i64') : ': &str';
+        const commentSuffix = commentText ? ` // ${commentText.replace(/^\/\/\s*/, '')}` : '';
+        return `const ${name}${typeAnnotation} = ${value};${commentSuffix}`;
+    }
+    const commentSuffix = commentText ? ` // ${commentText.replace(/^\/\/\s*/, '')}` : '';
+    return `const ${name} = ${value};${commentSuffix}`;
+}
