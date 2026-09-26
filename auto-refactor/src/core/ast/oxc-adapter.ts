@@ -391,7 +391,7 @@ export class OxcAdapter implements LanguageAdapter {
         return node;
     }
 
-    private pushMethodFunctionValue(
+    pushMethodFunctionValue(
         node: NormalizedNode,
         item: OxcNode,
         oxcParent: OxcNode,
@@ -412,7 +412,7 @@ export class OxcAdapter implements LanguageAdapter {
         }
     }
 
-    private pushChild(
+    pushChild(
         node: NormalizedNode,
         item: OxcNode | null | undefined,
         oxcParent: OxcNode,
@@ -422,22 +422,28 @@ export class OxcAdapter implements LanguageAdapter {
         seed?: ProjectionSeed,
     ): void {
         if (item == null) return;
-        if (inlineFnValue && item.type === NODE_KIND_FUNCTION_EXPRESSION) {
-            this.pushMethodFunctionValue(node, item, oxcParent, ctx, seed);
+        if (this.tryHandleSpecialChild(node, item, oxcParent, oxcGrandparent, inlineFnValue, ctx, seed)) {
             return;
         }
-        if (TYPE_SKIP_TYPES.has(item.type)) {
-            this.collectLiteralsInType(item, node, ctx);
-            return;
-        }
-        if (SKIP_TYPES.has(item.type)) return;
+        const child = this.mapNode(item, oxcParent, oxcGrandparent, undefined, ctx, seed);
+        node.children!.push(child);
+    }
+
+    private tryHandleExportChild(
+        node: NormalizedNode,
+        item: OxcNode,
+        oxcParent: OxcNode,
+        oxcGrandparent: OxcNode | undefined,
+        ctx: Ctx,
+        seed?: ProjectionSeed,
+    ): boolean {
         if (item.type === 'ExportAllDeclaration') {
             if (item.source) {
                 node.children!.push(
                     this.mapNode(item.source, oxcParent, oxcGrandparent, item, ctx, seed),
                 );
             }
-            return;
+            return true;
         }
         if (
             item.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
@@ -449,61 +455,91 @@ export class OxcAdapter implements LanguageAdapter {
                     this.mapNode(item.declaration, oxcParent, oxcGrandparent, item, ctx, seed),
                 );
             }
-            return;
+            return true;
+        }
+        return false;
+    }
+
+    private tryHandleSpecialChild(
+        node: NormalizedNode,
+        item: OxcNode,
+        oxcParent: OxcNode,
+        oxcGrandparent: OxcNode | undefined,
+        inlineFnValue: boolean,
+        ctx: Ctx,
+        seed?: ProjectionSeed,
+    ): boolean {
+        if (inlineFnValue && item.type === NODE_KIND_FUNCTION_EXPRESSION) {
+            this.pushMethodFunctionValue(node, item, oxcParent, ctx, seed);
+            return true;
+        }
+        if (TYPE_SKIP_TYPES.has(item.type)) {
+            this.collectLiteralsInType(item, node, ctx);
+            return true;
+        }
+        if (SKIP_TYPES.has(item.type)) return true;
+        if (this.tryHandleExportChild(node, item, oxcParent, oxcGrandparent, ctx, seed)) {
+            return true;
         }
         if (item.type === 'TSEnumBody') {
             for (const m of item.members || []) {
                 this.pushChild(node, m, oxcParent, oxcGrandparent, false, ctx, seed);
             }
-            return;
+            return true;
         }
-        const child = this.mapNode(item, oxcParent, oxcGrandparent, undefined, ctx, seed);
-        node.children!.push(child);
+        return false;
     }
 
-    private collectLiteralsInType(typeNode: OxcNode, container: NormalizedNode, ctx: Ctx): void {
+    private tryCollectLiteralInType(cur: OxcNode, container: NormalizedNode, ctx: Ctx): boolean {
+        if (cur.type !== 'Literal') return false;
+        const kind =
+            typeof cur.value === TYPEOF_STRING
+                ? NodeKind.StringLiteral
+                : typeof cur.value === TYPEOF_NUMBER
+                  ? NodeKind.NumericLiteral
+                  : NodeKind.Other;
+        if (kind !== NodeKind.Other) {
+            container.children!.push({
+                kind,
+                rawKind: 'Literal',
+                text: oxcLiteralText(cur, ctx),
+                start: oxcPosOf(cur.start, ctx),
+                end: oxcPosOf(cur.end, ctx),
+                isNumeric: kind === NodeKind.NumericLiteral,
+                isString: kind === NodeKind.StringLiteral,
+                branchWeight: 0,
+                isConstBound: false,
+                tolerated: kind === NodeKind.NumericLiteral,
+                children: [],
+            });
+        }
+        return true;
+    }
+
+    private pushOxcChildrenToStack(cur: OxcNode, stack: OxcNode[]): void {
+        const children: OxcNode[] = [];
+        for (const k of Object.keys(cur)) {
+            if (OXC_META_KEYS.has(k)) continue;
+            const v = cur[k];
+            if (v == null) continue;
+            if (Array.isArray(v)) {
+                for (const x of v) {
+                    if (x && typeof x === TYPEOF_OBJECT) children.push(x as OxcNode);
+                }
+            } else if (typeof v === TYPEOF_OBJECT) {
+                children.push(v as OxcNode);
+            }
+        }
+        for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+    }
+
+    collectLiteralsInType(typeNode: OxcNode, container: NormalizedNode, ctx: Ctx): void {
         const stack: OxcNode[] = [typeNode];
         while (stack.length) {
             const cur = stack.pop();
             if (cur == null) continue;
-            if (cur.type === 'Literal') {
-                const kind =
-                    typeof cur.value === TYPEOF_STRING
-                        ? NodeKind.StringLiteral
-                        : typeof cur.value === TYPEOF_NUMBER
-                          ? NodeKind.NumericLiteral
-                          : NodeKind.Other;
-                if (kind !== NodeKind.Other) {
-                    container.children!.push({
-                        kind,
-                        rawKind: 'Literal',
-                        text: oxcLiteralText(cur, ctx),
-                        start: oxcPosOf(cur.start, ctx),
-                        end: oxcPosOf(cur.end, ctx),
-                        isNumeric: kind === NodeKind.NumericLiteral,
-                        isString: kind === NodeKind.StringLiteral,
-                        branchWeight: 0,
-                        isConstBound: false,
-                        tolerated: kind === NodeKind.NumericLiteral,
-                        children: [],
-                    });
-                }
-                continue;
-            }
-            const children: OxcNode[] = [];
-            for (const k of Object.keys(cur)) {
-                if (OXC_META_KEYS.has(k)) continue;
-                const v = cur[k];
-                if (v == null) continue;
-                if (Array.isArray(v)) {
-                    for (const x of v) {
-                        if (x && typeof x === TYPEOF_OBJECT) children.push(x as OxcNode);
-                    }
-                } else if (typeof v === TYPEOF_OBJECT) {
-                    children.push(v as OxcNode);
-                }
-            }
-            for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+            if (this.tryCollectLiteralInType(cur, container, ctx)) continue;
+            this.pushOxcChildrenToStack(cur, stack);
         }
     }
 }

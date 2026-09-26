@@ -64,6 +64,70 @@ function isCallable<T extends (...args: never[]) => unknown>(value: T | undefine
     return typeof value === TYPEOF_FUNCTION;
 }
 
+function resolveChildScopeName(node: NormalizedNode, className: string | null): string | null {
+    if (node.isClassDefining) {
+        return node.name ?? className;
+    }
+    return className;
+}
+
+function resolveChildScopeBinding(node: NormalizedNode, binding: string | null): string | null {
+    if (node.isClassDefining || node.functionLike) {
+        return null;
+    }
+    if (node.introducesBinding) {
+        return node.bindingName ?? binding;
+    }
+    return binding;
+}
+
+type NodeHookFn = NonNullable<StreamingEntry['analyzer']['visit']>;
+type ErrorReporter = (analyzerName: string, err: unknown, ctx: AnalyzerContext) => void;
+
+function dispatchNodeVisits(
+    visits: (NodeHookFn | null | undefined)[],
+    entries: StreamingEntry[],
+    node: NormalizedNode,
+    parent: NormalizedNode | undefined,
+    grandparent: NormalizedNode | undefined,
+    depth: number,
+    className: string | null,
+    binding: string | null,
+    pushError: ErrorReporter,
+): void {
+    for (let i = 0; i < visits.length; i++) {
+        const v = visits[i];
+        if (!v) continue;
+        try {
+            v(node, entries[i].ctx, parent, grandparent, depth, className, binding);
+        } catch (e) {
+            pushError(entries[i].analyzer.name, e, entries[i].ctx);
+        }
+    }
+}
+
+function dispatchNodeLeaves(
+    leaves: (NodeHookFn | null | undefined)[],
+    entries: StreamingEntry[],
+    node: NormalizedNode,
+    parent: NormalizedNode | undefined,
+    grandparent: NormalizedNode | undefined,
+    depth: number,
+    className: string | null,
+    binding: string | null,
+    pushError: ErrorReporter,
+): void {
+    for (let i = leaves.length - 1; i >= 0; i--) {
+        const l = leaves[i];
+        if (!l) continue;
+        try {
+            l(node, entries[i].ctx, parent, grandparent, depth, className, binding);
+        } catch (e) {
+            pushError(entries[i].analyzer.name, e, entries[i].ctx);
+        }
+    }
+}
+
 /**
  * Run the single shared traversal over the normalized tree, dispatching to each entry's
  * `visit` (per node) and `finalize` (once). Analyzers without `visit`/`finalize` are skipped
@@ -125,50 +189,18 @@ export function runStreaming(
         className: string | null,
         binding: string | null,
     ): void => {
-        for (let i = 0; i < visits.length; i++) {
-            const v = visits[i];
-            if (!v) continue;
-            try {
-                v(node, entries[i].ctx, parent, grandparent, depth, className, binding);
-            } catch (e) {
-                pushError(entries[i].analyzer.name, e, entries[i].ctx);
-            }
-        }
+        dispatchNodeVisits(visits, entries, node, parent, grandparent, depth, className, binding, pushError);
 
-        // Compute the scope frame for this node's children. The scope rules are
-        // identical for every adapter (both built-ins were byte-for-byte the same), so the
-        // derivation is inlined here with plain local variables — ZERO object allocation
-        // per node (previously one `{className, binding}` object per node, ~8.6k/file).
-        // Language-specific rules are expressed through the normalized flags only.
         const childDepth = depth + (node.increasesNesting ? 1 : 0);
-        let cName = className;
-        let cBinding = binding;
-        if (node.isClassDefining) {
-            cName = node.name ?? className;
-            cBinding = null;
-        } else if (node.functionLike) {
-            cBinding = null;
-        } else if (node.introducesBinding) {
-            cBinding = node.bindingName ?? binding;
-        }
+        const cName = resolveChildScopeName(node, className);
+        const cBinding = resolveChildScopeBinding(node, binding);
 
         for (const c of adapter.children(node)) {
             visitNode(c, node, parent, childDepth, cName, cBinding);
         }
 
-        // Post-order leave hooks — called in REVERSE order so that the first entry's
-        // leave runs last (e.g. scope builder pops after everyone else has left).
-        // Skipped entirely when no analyzer declares a leave method (zero overhead).
         if (hasAnyLeave) {
-            for (let i = leaves.length - 1; i >= 0; i--) {
-                const l = leaves[i];
-                if (!l) continue;
-                try {
-                    l(node, entries[i].ctx, parent, grandparent, depth, className, binding);
-                } catch (e) {
-                    pushError(entries[i].analyzer.name, e, entries[i].ctx);
-                }
-            }
+            dispatchNodeLeaves(leaves, entries, node, parent, grandparent, depth, className, binding, pushError);
         }
     };
 
@@ -342,49 +374,19 @@ export function runStreamingProjected(
         // Scan-wide consumers (the cross-file symbol index) observe the SAME projected nodes the
         // analyzers see; this is the only point where the lazy path has a NormalizedNode in hand.
         if (onNode) onNode(node, caller);
-        for (let i = 0; i < visits.length; i++) {
-            const v = visits[i];
-            if (!v) continue;
-            try {
-                v(node, entries[i].ctx, parentProj, grandparentProj, depth, className, binding);
-            } catch (e) {
-                pushError(entries[i].analyzer.name, e, entries[i].ctx);
-            }
-        }
+        dispatchNodeVisits(visits, entries, node, parentProj, grandparentProj, depth, className, binding, pushError);
 
-        // Scope frame for this node's children — byte-identical derivation to runStreaming
-        // (the same inlined scope rules, expressed through the projected normalized flags).
         const childDepth = depth + (node.increasesNesting ? 1 : 0);
-        let cName = className;
-        let cBinding = binding;
-        if (node.isClassDefining) {
-            cName = node.name ?? className;
-            cBinding = null;
-        } else if (node.functionLike) {
-            cBinding = null;
-        } else if (node.introducesBinding) {
-            cBinding = node.bindingName ?? binding;
-        }
-
-        // Nearest enclosing function-like name, tracked for the scan-wide observer so a call
-        // site is attributed to its caller on the lazy path exactly as on the materialized one.
+        const cName = resolveChildScopeName(node, className);
+        const cBinding = resolveChildScopeBinding(node, binding);
         const cCaller = node.functionLike && typeof node.name === 'string' ? node.name : caller;
 
         for (const c of projector.forEachChild(raw)) {
             visitRaw(c, raw, parentRaw, childDepth, cName, cBinding, node, parentProj, cCaller);
         }
 
-        // Post-order leave hooks — reverse order, zero overhead when unused.
         if (hasAnyLeave) {
-            for (let i = leaves.length - 1; i >= 0; i--) {
-                const l = leaves[i];
-                if (!l) continue;
-                try {
-                    l(node, entries[i].ctx, parentProj, grandparentProj, depth, className, binding);
-                } catch (e) {
-                    pushError(entries[i].analyzer.name, e, entries[i].ctx);
-                }
-            }
+            dispatchNodeLeaves(leaves, entries, node, parentProj, grandparentProj, depth, className, binding, pushError);
         }
     };
 

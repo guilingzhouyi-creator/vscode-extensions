@@ -95,26 +95,12 @@ function extractNextLineSymbol(nextLine?: string): string | undefined {
  * @param lineIdx - 1-based source line index
  * @returns Classified CommentSnippetAnalysis record
  */
-export function classifyCommentSnippet(
+function checkWaterLoggingSnippet(
+    clean: string,
     lineText: string,
+    lineIdx: number,
     nextCodeLine?: string,
-    lineIdx = 1,
-): CommentSnippetAnalysis {
-    const trimmed = lineText.trim();
-    if (trimmed === '/**' || trimmed === '*/' || trimmed === '/*' || trimmed === '*') {
-        return {
-            line: lineIdx,
-            text: lineText,
-            category: 'API_CONTRACT',
-            weight: 0,
-            isWaterLogging: false,
-            reason: 'Block comment syntactic delimiter',
-        };
-    }
-
-    const clean = cleanCommentString(lineText);
-
-    // 1. Empty or placeholder water-logging
+): CommentSnippetAnalysis | null {
     if (WATER_LOGGING_RE.test(clean) || (clean.length > 0 && clean.length <= 2)) {
         return {
             line: lineIdx,
@@ -126,7 +112,6 @@ export function classifyCommentSnippet(
         };
     }
 
-    // 2. Tautological behavior echo
     if (nextCodeLine && BEHAVIOR_ECHO_CODE_RE.test(nextCodeLine.trim())) {
         const nextClean = nextCodeLine.trim().toLowerCase().replace(/[;{}]/g, '');
         if (clean.toLowerCase().includes(nextClean) || nextClean.includes(clean.toLowerCase())) {
@@ -141,7 +126,6 @@ export function classifyCommentSnippet(
         }
     }
 
-    // 3. Trivial symbol translation
     const nextSymbol = extractNextLineSymbol(nextCodeLine);
     if (nextSymbol) {
         const symbolLower = nextSymbol.toLowerCase();
@@ -162,7 +146,14 @@ export function classifyCommentSnippet(
         }
     }
 
-    // 4. Substantive design rationale
+    return null;
+}
+
+function checkHighValueDocumentationSnippet(
+    clean: string,
+    lineText: string,
+    lineIdx: number,
+): CommentSnippetAnalysis | null {
     if (DESIGN_RATIONALE_RE.test(clean)) {
         return {
             line: lineIdx,
@@ -173,8 +164,6 @@ export function classifyCommentSnippet(
             reason: 'Substantive design rationale explaining why decisions or trade-offs were made',
         };
     }
-
-    // 5. Architectural intent
     if (ARCHITECTURE_INTENT_RE.test(clean)) {
         return {
             line: lineIdx,
@@ -185,8 +174,6 @@ export function classifyCommentSnippet(
             reason: 'Architectural intent and subsystem role declaration',
         };
     }
-
-    // 6. Algorithmic proof and complexity
     if (ALGORITHMIC_PROOF_RE.test(clean)) {
         return {
             line: lineIdx,
@@ -197,8 +184,6 @@ export function classifyCommentSnippet(
             reason: 'Algorithmic proof, complexity bounds, or convergence invariants',
         };
     }
-
-    // 7. Invariant boundaries
     if (INVARIANT_BOUNDARY_RE.test(clean)) {
         return {
             line: lineIdx,
@@ -209,8 +194,6 @@ export function classifyCommentSnippet(
             reason: 'Invariant boundary, safety guard, or failure fallback specification',
         };
     }
-
-    // 8. Resource lifecycle and concurrency ownership
     if (LIFECYCLE_OWNERSHIP_RE.test(clean)) {
         return {
             line: lineIdx,
@@ -221,8 +204,6 @@ export function classifyCommentSnippet(
             reason: 'Resource lifecycle, ownership management, or concurrency reentrancy notice',
         };
     }
-
-    // 9. Structured API contracts
     if (API_CONTRACT_RE.test(clean)) {
         return {
             line: lineIdx,
@@ -233,8 +214,34 @@ export function classifyCommentSnippet(
             reason: 'Structured API contract, parameters, or return specifications',
         };
     }
+    return null;
+}
 
-    // 10. Default baseline explanatory documentation
+export function classifyCommentSnippet(
+    lineText: string,
+    nextCodeLine?: string,
+    lineIdx = 1,
+): CommentSnippetAnalysis {
+    const trimmed = lineText.trim();
+    if (trimmed === '/**' || trimmed === '*/' || trimmed === '/*' || trimmed === '*') {
+        return {
+            line: lineIdx,
+            text: lineText,
+            category: 'API_CONTRACT',
+            weight: 0,
+            isWaterLogging: false,
+            reason: 'Block comment syntactic delimiter',
+        };
+    }
+
+    const clean = cleanCommentString(lineText);
+
+    const waterLog = checkWaterLoggingSnippet(clean, lineText, lineIdx, nextCodeLine);
+    if (waterLog) return waterLog;
+
+    const highValue = checkHighValueDocumentationSnippet(clean, lineText, lineIdx);
+    if (highValue) return highValue;
+
     return {
         line: lineIdx,
         text: lineText,
@@ -251,6 +258,40 @@ export function classifyCommentSnippet(
  * @param content - Full source code text
  * @returns Evaluated EffectiveCommentMetrics
  */
+function extractCommentLineInfo(
+    trimmed: string,
+    inBlockComment: boolean,
+): { isComment: boolean; text: string; nextInBlock: boolean; shouldSkip: boolean } {
+    if (inBlockComment) {
+        const nextInBlock = !trimmed.includes('*/');
+        if (trimmed === '*/' || trimmed === '*') {
+            return { isComment: false, text: '', nextInBlock, shouldSkip: true };
+        }
+        return { isComment: true, text: trimmed, nextInBlock, shouldSkip: false };
+    }
+    if (trimmed.startsWith('/*')) {
+        const nextInBlock = !trimmed.includes('*/');
+        if (trimmed === '/**' || trimmed === '/*') {
+            return { isComment: false, text: '', nextInBlock, shouldSkip: true };
+        }
+        return { isComment: true, text: trimmed, nextInBlock, shouldSkip: false };
+    }
+    if (trimmed.startsWith('//') || (trimmed.startsWith('#') && !trimmed.startsWith('#!'))) {
+        return { isComment: true, text: trimmed, nextInBlock: false, shouldSkip: false };
+    }
+    return { isComment: false, text: '', nextInBlock: false, shouldSkip: false };
+}
+
+function findNextCodeLine(lines: string[], start: number): string | undefined {
+    for (let j = start; j < lines.length; j++) {
+        const t = lines[j].trim();
+        if (t.length > 0 && !t.startsWith('//') && !t.startsWith('/*') && !t.startsWith('*')) {
+            return lines[j];
+        }
+    }
+    return undefined;
+}
+
 export function evaluateEffectiveCommentDensity(content: string): EffectiveCommentMetrics {
     const lines = content.split(/\r\n|\n/);
     const snippets: CommentSnippetAnalysis[] = [];
@@ -271,49 +312,17 @@ export function evaluateEffectiveCommentDensity(content: string): EffectiveComme
     let inBlockComment = false;
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmed = line.trim();
-        const nextCodeLine = lines.slice(i + 1).find((l) => {
-            const t = l.trim();
-            return t.length > 0 && !t.startsWith('//') && !t.startsWith('/*') && !t.startsWith('*');
-        });
+        const trimmed = lines[i].trim();
+        const info = extractCommentLineInfo(trimmed, inBlockComment);
+        inBlockComment = info.nextInBlock;
+        if (info.shouldSkip || !info.isComment) continue;
 
-        let isCommentLine = false;
-        let lineCommentText = '';
-
-        if (inBlockComment) {
-            if (trimmed.includes('*/')) {
-                inBlockComment = false;
-            }
-            if (trimmed === '*/' || trimmed === '*') {
-                continue;
-            }
-            isCommentLine = true;
-            lineCommentText = trimmed;
-        } else if (trimmed.startsWith('/*')) {
-            if (!trimmed.includes('*/')) {
-                inBlockComment = true;
-            }
-            if (trimmed === '/**' || trimmed === '/*') {
-                continue;
-            }
-            isCommentLine = true;
-            lineCommentText = trimmed;
-        } else if (
-            trimmed.startsWith('//') ||
-            (trimmed.startsWith('#') && !trimmed.startsWith('#!'))
-        ) {
-            isCommentLine = true;
-            lineCommentText = trimmed;
-        }
-
-        if (isCommentLine) {
-            totalCommentLines++;
-            const analysis = classifyCommentSnippet(lineCommentText, nextCodeLine, i + 1);
-            snippets.push(analysis);
-            counts[analysis.category]++;
-            weightedSum += analysis.weight;
-        }
+        const nextCodeLine = findNextCodeLine(lines, i + 1);
+        totalCommentLines++;
+        const analysis = classifyCommentSnippet(info.text, nextCodeLine, i + 1);
+        snippets.push(analysis);
+        counts[analysis.category]++;
+        weightedSum += analysis.weight;
     }
 
     const effectiveCommentLines = Math.max(0, Math.round(weightedSum * 10) / 10);

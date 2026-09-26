@@ -77,42 +77,59 @@ const TOP_LEVEL_DECL_KINDS = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.VariableStatement,
 ]);
 
+function computeKindLiteralType(kindNum: ts.SyntaxKind): 0 | 1 | 2 {
+    if (kindNum === ts.SyntaxKind.NumericLiteral) return 1;
+    if (
+        kindNum === ts.SyntaxKind.StringLiteral ||
+        kindNum === ts.SyntaxKind.NoSubstitutionTemplateLiteral
+    ) {
+        return 2;
+    }
+    return 0;
+}
+
+function computeKindSpecialFlag(
+    kindNum: ts.SyntaxKind,
+    literal: number,
+    isClassDefining: boolean,
+): boolean {
+    return (
+        literal !== 0 ||
+        isFunctionLike({ kind: kindNum } as ts.Node) ||
+        isClassDefining ||
+        CONTROL_OR_BLOCK.has(kindNum) ||
+        kindNum === ts.SyntaxKind.FunctionKeyword ||
+        BINDING_SOURCE_KINDS.has(kindNum) ||
+        TOP_LEVEL_DECL_KINDS.has(kindNum)
+    );
+}
+
+function buildKindInfo(kindNum: ts.SyntaxKind): TsKindInfo {
+    const branch =
+        kindNum === ts.SyntaxKind.BinaryExpression
+            ? 0
+            : branchWeightOf({ kind: kindNum } as ts.Node);
+    const isClassDefining =
+        ts.isClassDeclaration({ kind: kindNum } as ts.Node) ||
+        ts.isClassExpression({ kind: kindNum } as ts.Node);
+    const kind = kindOf({ kind: kindNum } as ts.Node);
+    const literal = computeKindLiteralType(kindNum);
+    const special = computeKindSpecialFlag(kindNum, literal, isClassDefining);
+    return {
+        kind,
+        fnLike: isFunctionLike({ kind: kindNum } as ts.Node),
+        branch,
+        increasesNesting: CONTROL_OR_BLOCK.has(kindNum),
+        isClassDefining,
+        literal,
+        special,
+    };
+}
+
 const TS_KIND_INFO: TsKindInfo[] = (() => {
     const table: TsKindInfo[] = new Array(TS_KIND_INFO_MAX);
     for (let k = 0; k < TS_KIND_INFO_MAX; k++) {
-        const kindNum = k as ts.SyntaxKind;
-        const branch =
-            kindNum === ts.SyntaxKind.BinaryExpression
-                ? 0
-                : branchWeightOf({ kind: kindNum } as ts.Node);
-        const isClassDefining =
-            ts.isClassDeclaration({ kind: kindNum } as ts.Node) ||
-            ts.isClassExpression({ kind: kindNum } as ts.Node);
-        const kind = kindOf({ kind: kindNum } as ts.Node);
-        const literal =
-            kindNum === ts.SyntaxKind.NumericLiteral
-                ? 1
-                : kindNum === ts.SyntaxKind.StringLiteral ||
-                    kindNum === ts.SyntaxKind.NoSubstitutionTemplateLiteral
-                  ? 2
-                  : 0;
-        const special =
-            literal !== 0 ||
-            isFunctionLike({ kind: kindNum } as ts.Node) ||
-            isClassDefining ||
-            CONTROL_OR_BLOCK.has(kindNum) ||
-            kindNum === ts.SyntaxKind.FunctionKeyword ||
-            BINDING_SOURCE_KINDS.has(kindNum) ||
-            TOP_LEVEL_DECL_KINDS.has(kindNum);
-        table[k] = {
-            kind,
-            fnLike: isFunctionLike({ kind: kindNum } as ts.Node),
-            branch,
-            increasesNesting: CONTROL_OR_BLOCK.has(kindNum),
-            isClassDefining,
-            literal,
-            special,
-        };
+        table[k] = buildKindInfo(k as ts.SyntaxKind);
     }
     return table;
 })();
@@ -455,6 +472,20 @@ export class TsNodeProjector implements NodeProjector {
         if (this.policy.needComplexity) node.isConstructor = ts.isConstructorDeclaration(n);
     }
 
+    private applyCheapLiteralProps(
+        node: NormalizedNode,
+        n: ts.Node,
+        parentRaw: ts.Node | undefined,
+        grandparentRaw: ts.Node | undefined,
+    ): void {
+        if (!this.policy.needLiterals) return;
+        node.text = n.getText(this.sf);
+        node.start = posOf(n.getStart(this.sf), this.sf);
+        node.end = posOf(n.getEnd(), this.sf);
+        node.isConstBound = isConstBoundOf(n, parentRaw, grandparentRaw);
+        node.tolerated = isToleratedOf(n, parentRaw, this.sf, grandparentRaw);
+    }
+
     private applyCheapNonFunctionProps(
         node: NormalizedNode,
         n: ts.Node,
@@ -475,13 +506,7 @@ export class TsNodeProjector implements NodeProjector {
             node.end = posOf(n.getEnd(), this.sf);
         }
         if (isLiteral) {
-            if (this.policy.needLiterals) {
-                node.text = n.getText(this.sf);
-                node.start = posOf(n.getStart(this.sf), this.sf);
-                node.end = posOf(n.getEnd(), this.sf);
-                node.isConstBound = isConstBoundOf(n, parentRaw, grandparentRaw);
-                node.tolerated = isToleratedOf(n, parentRaw, this.sf, grandparentRaw);
-            }
+            this.applyCheapLiteralProps(node, n, parentRaw, grandparentRaw);
         } else if (n.kind === ts.SyntaxKind.FunctionKeyword) {
             if (this.policy.needComplexity) node.rawKind = 'FunctionKeyword';
             if (this.policy.needPositions) {

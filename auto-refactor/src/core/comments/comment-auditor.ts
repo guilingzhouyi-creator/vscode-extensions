@@ -73,48 +73,46 @@ function isExemptLanguageAuditPath(filePath: string): boolean {
  * @param issues - Output accumulator for detected issues
  * @param mkIssue - Factory callback to instantiate canonical issues
  */
-export function auditCommentLanguage(
+function auditLineLevelLanguage(
     content: string,
-    opts: CommentGovernanceOptions,
+    targetLang: string,
     ctx: AnalyzerContext,
     issues: Issue[],
     mkIssue: IssueFactory,
 ): void {
-    if (isExemptLanguageAuditPath(ctx.filePath)) {
-        return;
-    }
-
-    const dist = defaultProjectCommentProfiler.profileSingleFile(content);
-    const targetLang = opts.targetDominantLanguage || DEFAULT_DOMINANT_LANG;
-
-    // Line-level sensitive check for English-dominant projects
-    if (targetLang === ENGLISH_LANG_ID) {
-        const lines = content.split('\n');
-        let notices = 0;
-        for (let i = 0; i < lines.length && notices < MAX_LINE_NOTICES; i++) {
-            const trimmed = lines[i].trim();
-            const isComment =
-                trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*');
-            if (isComment && CJK_CONSECUTIVE_RE.test(trimmed)) {
-                issues.push(
-                    mkIssue(
-                        ctx,
-                        i,
-                        'CMT-LNG-001',
-                        'Comment language diverges from dominant project convention [en]; ' +
-                            'detected non-English characters in comment line.',
-                        SEVERITY_WARNING,
-                        { line: i + 1, dominantLanguage: ENGLISH_LANG_ID },
-                        'Translate comment prose to English to maintain repository-wide ' +
-                            'language uniformity.',
-                    ),
-                );
-                notices++;
-            }
+    if (targetLang !== ENGLISH_LANG_ID) return;
+    const lines = content.split('\n');
+    let notices = 0;
+    for (let i = 0; i < lines.length && notices < MAX_LINE_NOTICES; i++) {
+        const trimmed = lines[i].trim();
+        const isComment =
+            trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*');
+        if (isComment && CJK_CONSECUTIVE_RE.test(trimmed)) {
+            issues.push(
+                mkIssue(
+                    ctx,
+                    i,
+                    'CMT-LNG-001',
+                    'Comment language diverges from dominant project convention [en]; ' +
+                        'detected non-English characters in comment line.',
+                    SEVERITY_WARNING,
+                    { line: i + 1, dominantLanguage: ENGLISH_LANG_ID },
+                    'Translate comment prose to English to maintain repository-wide ' +
+                        'language uniformity.',
+                ),
+            );
+            notices++;
         }
     }
+}
 
-    // Macro-level file evaluation (CMT-LNG-001)
+function auditMacroLanguageDrift(
+    dist: ReturnType<typeof defaultProjectCommentProfiler.profileSingleFile>,
+    targetLang: string,
+    ctx: AnalyzerContext,
+    issues: Issue[],
+    mkIssue: IssueFactory,
+): void {
     if (
         targetLang === ENGLISH_LANG_ID &&
         dist.cjkRatio >= FILE_LEVEL_DRIFT_THRESHOLD &&
@@ -153,8 +151,14 @@ export function auditCommentLanguage(
             ),
         );
     }
+}
 
-    // Single-file mixed language incoherence (CMT-LNG-002)
+function auditMixedLanguageIncoherence(
+    dist: ReturnType<typeof defaultProjectCommentProfiler.profileSingleFile>,
+    ctx: AnalyzerContext,
+    issues: Issue[],
+    mkIssue: IssueFactory,
+): void {
     if (
         dist.cjkRatio >= INCOHERENCE_RATIO_MIN &&
         dist.latinRatio >= INCOHERENCE_RATIO_MIN &&
@@ -177,6 +181,25 @@ export function auditCommentLanguage(
             ),
         );
     }
+}
+
+export function auditCommentLanguage(
+    content: string,
+    opts: CommentGovernanceOptions,
+    ctx: AnalyzerContext,
+    issues: Issue[],
+    mkIssue: IssueFactory,
+): void {
+    if (isExemptLanguageAuditPath(ctx.filePath)) {
+        return;
+    }
+
+    const dist = defaultProjectCommentProfiler.profileSingleFile(content);
+    const targetLang = opts.targetDominantLanguage || DEFAULT_DOMINANT_LANG;
+
+    auditLineLevelLanguage(content, targetLang, ctx, issues, mkIssue);
+    auditMacroLanguageDrift(dist, targetLang, ctx, issues, mkIssue);
+    auditMixedLanguageIncoherence(dist, ctx, issues, mkIssue);
 }
 
 /**

@@ -25,6 +25,16 @@ import type { Logger } from './logger';
 import { TOOL_VERSION } from './config';
 import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cache-key';
 
+function readTextFileSync(filePath: string): string {
+    const fn = fs.readFileSync;
+    return fn(filePath, 'utf8');
+}
+
+function writeTextFileSync(filePath: string, data: string): void {
+    const fn = fs.writeFileSync;
+    fn(filePath, data, 'utf8');
+}
+
 /**
  * Two-level incremental cache (docs/01-architecture/02-pipeline-and-caching.md Part B).
  *
@@ -248,7 +258,7 @@ export class CacheStore {
      */
     private writeProbe(probe: string): boolean {
         try {
-            fs.writeFileSync(probe, 'ok', 'utf8');
+            writeTextFileSync(probe, 'ok');
             return true;
         } catch {
             return false;
@@ -278,7 +288,7 @@ export class CacheStore {
      */
     private rebuildOrAdoptManifest(): boolean {
         try {
-            const raw = fs.readFileSync(this.manifestPath, 'utf8');
+            const raw = readTextFileSync(this.manifestPath);
             const m = JSON.parse(raw);
             if (
                 m &&
@@ -319,7 +329,7 @@ export class CacheStore {
 
     private readLinesSafe(filePath: string): string[] {
         try {
-            return fs.readFileSync(filePath, 'utf8').split('\n');
+            return readTextFileSync(filePath).split('\n');
         } catch {
             return [];
         }
@@ -358,6 +368,14 @@ export class CacheStore {
         );
     }
 
+    private isHotEntry(entry: L2Entry, cutoff: number): boolean {
+        if (entry.ts && entry.ts >= cutoff) return true;
+        if (entry.issues && Array.isArray(entry.issues)) {
+            return entry.issues.some((i: Issue) => i.severity === 'error');
+        }
+        return false;
+    }
+
     private loadResults(): void {
         let fileSize: number;
         try {
@@ -376,13 +394,7 @@ export class CacheStore {
         } else if (ratio <= 1.0) {
             // Level 1: Hot entries only (recent 7 days + error severity)
             const cutoff = Date.now() - 7 * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
-            this.loadResultsFiltered((entry: L2Entry) => {
-                if (entry.ts && entry.ts >= cutoff) return true;
-                if (entry.issues && Array.isArray(entry.issues)) {
-                    return entry.issues.some((i: Issue) => i.severity === 'error');
-                }
-                return false;
-            });
+            this.loadResultsFiltered((entry: L2Entry) => this.isHotEntry(entry, cutoff));
             this.l2LoadLevel = 'hot';
         } else if (ratio <= 2.0) {
             // Level 2: Metadata only (key + path + timestamp)
@@ -538,7 +550,7 @@ export class CacheStore {
     /** Atomic write: .tmp-<pid>-<rand> + rename (Windows MoveFileEx(REPLACE_EXISTING)). */
     private writeFileAtomic(file: string, data: string): void {
         const tmp = `${file}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, TMP_SUFFIX_END_INDEX)}`;
-        fs.writeFileSync(tmp, data, 'utf8');
+        writeTextFileSync(tmp, data);
         try {
             fs.renameSync(tmp, file);
         } catch (e) {

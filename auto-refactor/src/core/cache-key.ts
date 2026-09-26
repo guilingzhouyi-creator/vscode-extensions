@@ -137,37 +137,64 @@ export interface FingerprintAnalyzerDesc {
  * @returns Descriptors for every enabled built-in/custom analyzer, in execution order;
  *          disabled declarations and unknown built-in names are omitted.
  */
-export function fingerprintAnalyzerDescs(config: ScanConfig): FingerprintAnalyzerDesc[] {
-    const descs: FingerprintAnalyzerDesc[] = [];
-    const seen = new Set<string>();
-    for (const [name, decl] of Object.entries(config.analyzers || {})) {
+function collectBuiltinDescs(
+    analyzers: Record<string, { enabled?: boolean; options?: Record<string, unknown> } | undefined> | undefined,
+    thresholds: ScanConfig['thresholds'],
+    descs: FingerprintAnalyzerDesc[],
+    seen: Set<string>,
+): void {
+    for (const [name, decl] of Object.entries(analyzers || {})) {
         if (!decl || decl.enabled === false) continue;
         const version = ANALYZER_VERSIONS[name];
-        if (version === undefined) continue; // non-built-in name resolved via customAnalyzers below
+        if (version === undefined) continue;
         descs.push({
             name,
             version,
             modulePath: BUILTIN_MODULE_PATHS[name] || `../analyzers/${name}`,
-            options: { ...config.thresholds, ...(decl.options || {}) },
+            options: { ...thresholds, ...(decl.options || {}) },
             legacy: false,
         });
         seen.add(name);
     }
-    for (const c of config.customAnalyzers || []) {
-        if (c.enabled === false) continue;
-        if (seen.has(c.name)) continue;
+}
+
+function collectCustomDescs(
+    customAnalyzers: Array<{ name: string; module: string; enabled?: boolean; options?: Record<string, unknown> }> | undefined,
+    thresholds: ScanConfig['thresholds'],
+    baseDir: string | undefined,
+    descs: FingerprintAnalyzerDesc[],
+    seen: Set<string>,
+): void {
+    for (const c of customAnalyzers || []) {
+        if (c.enabled === false || seen.has(c.name)) continue;
         const modPath = path.isAbsolute(c.module)
             ? c.module
-            : path.resolve(config.baseDir || process.cwd(), c.module);
+            : path.resolve(baseDir || process.cwd(), c.module);
         descs.push({
             name: c.name,
             version: 1,
             modulePath: modPath,
-            options: { ...config.thresholds, ...(c.options || {}) },
-            legacy: true, // external plug-ins use the legacy analyze() contract by default
+            options: { ...thresholds, ...(c.options || {}) },
+            legacy: true,
         });
         seen.add(c.name);
     }
+}
+
+function readCustomModuleBuffer(modulePath: string): Buffer | null {
+    try {
+        const read = fs.readFileSync;
+        return read(modulePath);
+    } catch {
+        return null;
+    }
+}
+
+export function fingerprintAnalyzerDescs(config: ScanConfig): FingerprintAnalyzerDesc[] {
+    const descs: FingerprintAnalyzerDesc[] = [];
+    const seen = new Set<string>();
+    collectBuiltinDescs(config.analyzers, config.thresholds, descs, seen);
+    collectCustomDescs(config.customAnalyzers, config.thresholds, config.baseDir, descs, seen);
     return descs;
 }
 
@@ -202,12 +229,8 @@ export function computeCustomHash(descs: FingerprintAnalyzerDesc[]): string | nu
     const parts: string[] = [];
     for (const d of descs) {
         if (!d.legacy) continue; // only external plug-ins participate in the custom hash
-        let content: Buffer;
-        try {
-            content = fs.readFileSync(d.modulePath);
-        } catch {
-            return null;
-        }
+        const content = readCustomModuleBuffer(d.modulePath);
+        if (!content) return null;
         parts.push(d.modulePath);
         parts.push(sha256Hex(content));
         parts.push(canonicalJson(d.options));

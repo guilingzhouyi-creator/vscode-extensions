@@ -652,33 +652,26 @@ function handleCommentLine(trimmed: string, ctx: ParseContext): boolean {
  * @param children - Output array to append nodes to.
  * @returns True when the line is a declaration (caller should skip further processing).
  */
-function handleDeclarationLine(
-    codeOnly: string,
-    rawLine: string,
-    lineNum: number,
-    ctx: ParseContext,
-    children: NormalizedNode[],
-): boolean {
-    const wasTopLevel = ctx.braceDepth === 0;
-
-    // Package declaration
-    if (wasTopLevel && PACKAGE_DECL_RE.test(codeOnly)) {
-        return true;
-    }
-
-    // Import declaration
+function handlePackageAndImport(codeOnly: string, wasTopLevel: boolean, ctx: ParseContext): boolean {
+    if (wasTopLevel && PACKAGE_DECL_RE.test(codeOnly)) return true;
     if (wasTopLevel && IMPORT_DECL_RE.test(codeOnly)) {
-        if (codeOnly.includes('(')) {
-            ctx.inImport = true;
-        }
+        if (codeOnly.includes('(')) ctx.inImport = true;
         return true;
     }
     if (ctx.inImport && codeOnly.startsWith(')')) {
         ctx.inImport = false;
         return true;
     }
+    return false;
+}
 
-    // Type declaration (struct / interface)
+function handleTypeOrFunc(
+    codeOnly: string,
+    rawLine: string,
+    lineNum: number,
+    ctx: ParseContext,
+    children: NormalizedNode[],
+): boolean {
     const typeNode = parseTypeDeclaration(codeOnly, rawLine, lineNum);
     if (typeNode) {
         children.push(typeNode);
@@ -689,8 +682,6 @@ function handleDeclarationLine(
         trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
         return true;
     }
-
-    // Function or method declaration
     const funcNode = parseFuncOrMethod(codeOnly, rawLine, lineNum);
     if (funcNode) {
         children.push(funcNode);
@@ -700,14 +691,21 @@ function handleDeclarationLine(
         trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
         return true;
     }
+    return false;
+}
 
-    // Var block start
+function handleVarOrConst(
+    codeOnly: string,
+    rawLine: string,
+    lineNum: number,
+    wasTopLevel: boolean,
+    ctx: ParseContext,
+    children: NormalizedNode[],
+): boolean {
     if (wasTopLevel && VAR_BLOCK_START_RE.test(codeOnly)) {
         ctx.inVarBlock = true;
         return true;
     }
-
-    // Single-line var declaration
     const varNode = parseVarDeclaration(codeOnly, rawLine, lineNum);
     if (varNode) {
         varNode.topLevel = wasTopLevel;
@@ -715,14 +713,10 @@ function handleDeclarationLine(
         trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
         return true;
     }
-
-    // Const block start
     if (wasTopLevel && CONST_BLOCK_START_RE.test(codeOnly)) {
         ctx.inConstBlock = true;
         return true;
     }
-
-    // Single-line const declaration
     const constNode = parseConstDeclaration(codeOnly, rawLine, lineNum);
     if (constNode) {
         constNode.topLevel = wasTopLevel;
@@ -730,22 +724,41 @@ function handleDeclarationLine(
         trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
         return true;
     }
+    return false;
+}
 
-    // Inside const/var block: parse entries
-    if (ctx.inConstBlock || ctx.inVarBlock) {
-        if (codeOnly === ')') {
-            ctx.inConstBlock = false;
-            ctx.inVarBlock = false;
-            return true;
-        }
-        const entryNode = parseBlockEntry(codeOnly, rawLine, lineNum, ctx.inConstBlock);
-        if (entryNode) {
-            children.push(entryNode);
-        }
+function handleBlockEntries(
+    codeOnly: string,
+    rawLine: string,
+    lineNum: number,
+    ctx: ParseContext,
+    children: NormalizedNode[],
+): boolean {
+    if (!ctx.inConstBlock && !ctx.inVarBlock) return false;
+    if (codeOnly === ')') {
+        ctx.inConstBlock = false;
+        ctx.inVarBlock = false;
         return true;
     }
+    const entryNode = parseBlockEntry(codeOnly, rawLine, lineNum, ctx.inConstBlock);
+    if (entryNode) children.push(entryNode);
+    return true;
+}
 
-    return false;
+function handleDeclarationLine(
+    codeOnly: string,
+    rawLine: string,
+    lineNum: number,
+    ctx: ParseContext,
+    children: NormalizedNode[],
+): boolean {
+    const wasTopLevel = ctx.braceDepth === 0;
+    return (
+        handlePackageAndImport(codeOnly, wasTopLevel, ctx) ||
+        handleTypeOrFunc(codeOnly, rawLine, lineNum, ctx, children) ||
+        handleVarOrConst(codeOnly, rawLine, lineNum, wasTopLevel, ctx, children) ||
+        handleBlockEntries(codeOnly, rawLine, lineNum, ctx, children)
+    );
 }
 
 /**

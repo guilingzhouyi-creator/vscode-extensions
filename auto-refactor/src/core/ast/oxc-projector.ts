@@ -328,6 +328,14 @@ export class OxcProjector implements NodeProjector {
         return out;
     }
 
+    private collectNodeValue(out: OxcNode[], v: unknown, isMethodSource: boolean): void {
+        if (Array.isArray(v)) {
+            for (const item of v) this.pushRaw(out, item, isMethodSource);
+        } else if (typeof v === TYPEOF_OBJECT && typeof (v as OxcNode).type === TYPEOF_STRING) {
+            this.pushRaw(out, v as OxcNode, isMethodSource);
+        }
+    }
+
     private collectInto(n: OxcNode, out: OxcNode[]): void {
         const isMethodSource =
             n.type === NODE_KIND_METHOD_DEFINITION ||
@@ -335,33 +343,16 @@ export class OxcProjector implements NodeProjector {
         for (const key of Object.keys(n)) {
             if (OXC_META_KEYS.has(key) || key === '__exported' || key === '__exportStart') continue;
             const v = n[key];
-            if (v == null) continue;
-            if (Array.isArray(v)) {
-                for (const item of v) this.pushRaw(out, item, isMethodSource);
-            } else if (typeof v === TYPEOF_OBJECT && typeof (v as OxcNode).type === TYPEOF_STRING) {
-                this.pushRaw(out, v as OxcNode, isMethodSource);
+            if (v != null) {
+                this.collectNodeValue(out, v, isMethodSource);
             }
         }
     }
 
-    private pushRaw(
-        out: OxcNode[],
-        item: OxcNode | null | undefined,
-        inlineFnValue: boolean,
-    ): void {
-        if (item == null) return;
-        if (inlineFnValue && item.type === NODE_KIND_FUNCTION_EXPRESSION) {
-            this.collectInto(item, out);
-            return;
-        }
-        if (TYPE_SKIP_TYPES.has(item.type)) {
-            out.push(item);
-            return;
-        }
-        if (SKIP_TYPES.has(item.type)) return;
+    private tryHandleRawExport(out: OxcNode[], item: OxcNode): boolean {
         if (item.type === 'ExportAllDeclaration') {
             if (item.source) out.push(item.source);
-            return;
+            return true;
         }
         if (
             item.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
@@ -372,12 +363,36 @@ export class OxcProjector implements NodeProjector {
                 item.declaration.__exportStart = item.start;
                 out.push(item.declaration);
             }
-            return;
+            return true;
         }
+        return false;
+    }
+
+    private tryHandleRawSpecial(out: OxcNode[], item: OxcNode, inlineFnValue: boolean): boolean {
+        if (inlineFnValue && item.type === NODE_KIND_FUNCTION_EXPRESSION) {
+            this.collectInto(item, out);
+            return true;
+        }
+        if (TYPE_SKIP_TYPES.has(item.type)) {
+            out.push(item);
+            return true;
+        }
+        if (SKIP_TYPES.has(item.type)) return true;
+        if (this.tryHandleRawExport(out, item)) return true;
         if (item.type === 'TSEnumBody') {
             for (const m of item.members || []) this.pushRaw(out, m, false);
-            return;
+            return true;
         }
+        return false;
+    }
+
+    private pushRaw(
+        out: OxcNode[],
+        item: OxcNode | null | undefined,
+        inlineFnValue: boolean,
+    ): void {
+        if (item == null) return;
+        if (this.tryHandleRawSpecial(out, item, inlineFnValue)) return;
         out.push(item);
     }
 

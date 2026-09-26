@@ -64,6 +64,37 @@ function pythonParser(): TreeSitterParser {
  * `.py` files here; `parse` materializes the whole tree eagerly and `root` / `children`
  * expose it to the shared single-pass traversal without any further parsing.
  */
+function isPythonLiteralNode(kind: NodeKind, sn: TreeSitterNode): boolean {
+    return (
+        kind === NodeKind.NumericLiteral ||
+        kind === NodeKind.StringLiteral ||
+        (kind === NodeKind.Literal && isAtomLiteral(sn))
+    );
+}
+
+function resolvePythonNodeName(
+    sn: TreeSitterNode,
+    kind: NodeKind,
+    fnLike: boolean,
+    isClassDefining: boolean,
+    isBinding: boolean,
+): string | undefined {
+    if (sn.type === 'call') return callNameOf(sn) ?? undefined;
+    const shouldName =
+        fnLike ||
+        isClassDefining ||
+        isBinding ||
+        kind === NodeKind.Variable ||
+        kind === NodeKind.Constant;
+    return shouldName ? (nameOf(sn) ?? undefined) : undefined;
+}
+
+function resolveChildMapContext(ctx: MapContext, sn: TreeSitterNode): MapContext {
+    return {
+        constBound: ctx.constBound || (sn.type === PY_ASSIGNMENT && isConstTarget(sn)),
+    };
+}
+
 export class PythonAdapter implements LanguageAdapter {
     id = 'python' as const;
     extensions = ['.py'];
@@ -117,21 +148,11 @@ export class PythonAdapter implements LanguageAdapter {
         ctx: MapContext,
     ): NormalizedNode {
         const kind = kindOfPythonNode(sn);
-        const isLiteral =
-            kind === NodeKind.NumericLiteral ||
-            kind === NodeKind.StringLiteral ||
-            (kind === NodeKind.Literal && isAtomLiteral(sn));
+        const isLiteral = isPythonLiteralNode(kind, sn);
         const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isClassDefining = kind === NodeKind.Class;
         const isBinding = introducesBinding(sn);
-        // Call nodes carry the callee text so the cross-file symbol index can resolve references;
-        // `a.b()` reduces to the final segment, matching the TypeScript adapter's contract.
-        const callCallee = sn.type === 'call' ? callNameOf(sn) : null;
-        const name =
-            callCallee ??
-            (fnLike || isClassDefining || isBinding || kind === NodeKind.Variable || kind === NodeKind.Constant
-                ? nameOf(sn)
-                : undefined);
+        const name = resolvePythonNodeName(sn, kind, fnLike, isClassDefining, isBinding);
 
         const node: NormalizedNode = {
             kind,
@@ -164,9 +185,7 @@ export class PythonAdapter implements LanguageAdapter {
             node.tolerated = isToleratedOf(sn, parent);
         }
 
-        const childCtx: MapContext = {
-            constBound: ctx.constBound || (sn.type === PY_ASSIGNMENT && isConstTarget(sn)),
-        };
+        const childCtx = resolveChildMapContext(ctx, sn);
         let kids: NormalizedNode[] | undefined;
         for (const c of sn.namedChildren || []) {
             const kid = this.mapNode(c, sn, childCtx);

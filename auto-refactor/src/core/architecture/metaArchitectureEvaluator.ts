@@ -155,12 +155,7 @@ export class MetaArchitectureEvaluator {
             if (edge.isCrossDomain) {
                 const fromNode = graph.getNode(edge.fromNodeId);
                 if (fromNode) {
-                    let domainSet = crossDomainFanInMap.get(edge.toNodeId);
-                    if (!domainSet) {
-                        domainSet = new Set<string>();
-                        crossDomainFanInMap.set(edge.toNodeId, domainSet);
-                    }
-                    domainSet.add(fromNode.domainName);
+                    recordCrossDomainFanIn(crossDomainFanInMap, edge.toNodeId, fromNode.domainName);
                 }
             }
         }
@@ -317,6 +312,19 @@ export class MetaArchitectureEvaluator {
             boundaryDisciplineResult,
         );
     }
+}
+
+function recordCrossDomainFanIn(
+    crossDomainFanInMap: Map<string, Set<string>>,
+    toNodeId: string,
+    domainName: string,
+): void {
+    let domainSet = crossDomainFanInMap.get(toNodeId);
+    if (!domainSet) {
+        domainSet = new Set<string>();
+        crossDomainFanInMap.set(toNodeId, domainSet);
+    }
+    domainSet.add(domainName);
 }
 
 /** Singleton default meta-architecture evaluator */

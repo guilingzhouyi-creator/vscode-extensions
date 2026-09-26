@@ -37,6 +37,156 @@ const MIN_SIGNIFICANT_STRING_LENGTH = 3;
  * - Extracts numeric & string literals with const-binding and tolerated-context detection.
  * - 100% project-agnostic, zero external native dependencies, ultra-fast execution.
  */
+const FUNC_RE = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
+const CLASS_NAME_RE = /^\s*class_name\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
+const INNER_CLASS_RE = /^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
+const CONST_DECL_RE = /^\s*const\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
+const CONTROL_RE = /^\s*(if|elif|while|for|match)\b/;
+
+interface ScopeFrame {
+    indent: number;
+    node: NormalizedNode;
+}
+
+function findCallClosingParen(rawLine: string, openIdx: number): number {
+    let depth = 1;
+    let inStr: string | null = null;
+    for (let i = openIdx + 1; i < rawLine.length; i++) {
+        const ch = rawLine[i];
+        if (inStr) {
+            if (ch === '\\') {
+                i++;
+            } else if (ch === inStr) {
+                inStr = null;
+            }
+            continue;
+        }
+        if (ch === '"' || ch === "'") {
+            inStr = ch;
+        } else if (ch === '(') {
+            depth++;
+        } else if (ch === ')') {
+            depth--;
+            if (depth === 0) return i;
+        }
+    }
+    return -1;
+}
+
+function tryParseClassDecl(
+    rawLine: string,
+    lineNum: number,
+    indent: number,
+    parentNode: NormalizedNode,
+    scopeStack: ScopeFrame[],
+): boolean {
+    const mClassName = rawLine.match(CLASS_NAME_RE);
+    if (mClassName) {
+        const classNode: NormalizedNode = {
+            kind: NodeKind.Class,
+            name: mClassName[1],
+            isClassDefining: true,
+            topLevel: true,
+            exported: true,
+            start: { line: lineNum, column: indent + 1 },
+            end: { line: lineNum, column: rawLine.length + 1 },
+            children: [],
+        };
+        parentNode.children ||= [];
+        parentNode.children.push(classNode);
+        return true;
+    }
+    const mInnerClass = rawLine.match(INNER_CLASS_RE);
+    if (mInnerClass) {
+        const innerClassNode: NormalizedNode = {
+            kind: NodeKind.Class,
+            name: mInnerClass[1],
+            isClassDefining: true,
+            topLevel: false,
+            start: { line: lineNum, column: indent + 1 },
+            end: { line: lineNum, column: rawLine.length + 1 },
+            children: [],
+        };
+        parentNode.children ||= [];
+        parentNode.children.push(innerClassNode);
+        scopeStack.push({ indent, node: innerClassNode });
+        return true;
+    }
+    return false;
+}
+
+function tryParseFuncDecl(
+    rawLine: string,
+    lineNum: number,
+    indent: number,
+    parentNode: NormalizedNode,
+    scopeStack: ScopeFrame[],
+    adapter: GDScriptAdapter,
+): boolean {
+    const mFunc = rawLine.match(FUNC_RE);
+    if (!mFunc) return false;
+    const isMethod =
+        scopeStack.length > 1 && scopeStack[scopeStack.length - 1].node.isClassDefining;
+    const fnNode: NormalizedNode = {
+        kind: isMethod ? NodeKind.Method : NodeKind.Function,
+        name: mFunc[1],
+        functionLike: true,
+        increasesNesting: true,
+        topLevel: indent === 0,
+        start: { line: lineNum, column: indent + 1 },
+        end: { line: lineNum, column: rawLine.length + 1 },
+        children: [],
+    };
+    parentNode.children ||= [];
+    parentNode.children.push(fnNode);
+    scopeStack.push({ indent, node: fnNode });
+    adapter.extractLiterals(rawLine, lineNum, fnNode, false);
+    return true;
+}
+
+function tryParseControlStmt(
+    rawLine: string,
+    lineNum: number,
+    indent: number,
+    parentNode: NormalizedNode,
+    scopeStack: ScopeFrame[],
+    adapter: GDScriptAdapter,
+): boolean {
+    const mCtrl = rawLine.match(CONTROL_RE);
+    if (!mCtrl) return false;
+    let weight = 1;
+    const opMatches = rawLine.match(/\b(and|or)\b|&&|\|\|/g);
+    if (opMatches) weight += opMatches.length;
+    const ctrlNode: NormalizedNode = {
+        kind: NodeKind.ControlFlow,
+        branchWeight: weight,
+        increasesNesting: true,
+        start: { line: lineNum, column: indent + 1 },
+        end: { line: lineNum, column: rawLine.length + 1 },
+        children: [],
+    };
+    parentNode.children ||= [];
+    parentNode.children.push(ctrlNode);
+    scopeStack.push({ indent, node: ctrlNode });
+    adapter.extractLiterals(rawLine, lineNum, ctrlNode, false);
+    return true;
+}
+
+function tryParseStructureStmt(
+    rawLine: string,
+    lineNum: number,
+    indent: number,
+    parentNode: NormalizedNode,
+    scopeStack: ScopeFrame[],
+    adapter: GDScriptAdapter,
+): boolean {
+    return (
+        tryParseClassDecl(rawLine, lineNum, indent, parentNode, scopeStack) ||
+        tryParseFuncDecl(rawLine, lineNum, indent, parentNode, scopeStack, adapter) ||
+        tryParseControlStmt(rawLine, lineNum, indent, parentNode, scopeStack, adapter)
+    );
+}
+
 export class GDScriptAdapter implements LanguageAdapter {
     id = 'gdscript' as const;
     extensions = ['.gd'];
@@ -50,19 +200,7 @@ export class GDScriptAdapter implements LanguageAdapter {
             children: [],
         };
 
-        let currentClassName: string | null = null;
-        interface ScopeFrame {
-            indent: number;
-            node: NormalizedNode;
-        }
-
         const scopeStack: ScopeFrame[] = [{ indent: -1, node: rootNode }];
-
-        const FUNC_RE = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
-        const CLASS_NAME_RE = /^\s*class_name\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
-        const INNER_CLASS_RE = /^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
-        const CONST_DECL_RE = /^\s*const\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
-        const CONTROL_RE = /^\s*(if|elif|while|for|match)\b/;
 
         for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
             const lineNum = lineIdx + 1;
@@ -82,96 +220,11 @@ export class GDScriptAdapter implements LanguageAdapter {
 
             const parentNode = scopeStack[scopeStack.length - 1].node;
 
-            // 1. class_name statement
-            const mClassName = rawLine.match(CLASS_NAME_RE);
-            if (mClassName) {
-                currentClassName = mClassName[1];
-                const classNode: NormalizedNode = {
-                    kind: NodeKind.Class,
-                    name: currentClassName,
-                    isClassDefining: true,
-                    topLevel: true,
-                    exported: true,
-                    start: { line: lineNum, column: indent + 1 },
-                    end: { line: lineNum, column: rawLine.length + 1 },
-                    children: [],
-                };
-                parentNode.children ||= [];
-                parentNode.children.push(classNode);
+            if (tryParseStructureStmt(rawLine, lineNum, indent, parentNode, scopeStack, this)) {
                 continue;
             }
 
-            // 2. Inner class statement
-            const mInnerClass = rawLine.match(INNER_CLASS_RE);
-            if (mInnerClass) {
-                const innerName = mInnerClass[1];
-                const innerClassNode: NormalizedNode = {
-                    kind: NodeKind.Class,
-                    name: innerName,
-                    isClassDefining: true,
-                    topLevel: false,
-                    start: { line: lineNum, column: indent + 1 },
-                    end: { line: lineNum, column: rawLine.length + 1 },
-                    children: [],
-                };
-                parentNode.children ||= [];
-                parentNode.children.push(innerClassNode);
-                scopeStack.push({ indent, node: innerClassNode });
-                continue;
-            }
-
-            // 3. Function declaration
-            const mFunc = rawLine.match(FUNC_RE);
-            if (mFunc) {
-                const funcName = mFunc[1];
-                const isMethod =
-                    scopeStack.length > 1 && scopeStack[scopeStack.length - 1].node.isClassDefining;
-                const fnNode: NormalizedNode = {
-                    kind: isMethod ? NodeKind.Method : NodeKind.Function,
-                    name: funcName,
-                    functionLike: true,
-                    increasesNesting: true,
-                    topLevel: indent === 0,
-                    start: { line: lineNum, column: indent + 1 },
-                    end: { line: lineNum, column: rawLine.length + 1 },
-                    children: [],
-                };
-                parentNode.children ||= [];
-                parentNode.children.push(fnNode);
-                scopeStack.push({ indent, node: fnNode });
-
-                // Extract literals within func signature / initial line
-                this.extractLiterals(rawLine, lineNum, fnNode, false);
-                continue;
-            }
-
-            // 4. Control flow statement (if/elif/for/while/match)
-            const mCtrl = rawLine.match(CONTROL_RE);
-            if (mCtrl) {
-                let weight = 1;
-                // Count additional logical operators: and, or, &&, ||
-                const opMatches = rawLine.match(/\b(and|or)\b|&&|\|\|/g);
-                if (opMatches) {
-                    weight += opMatches.length;
-                }
-
-                const ctrlNode: NormalizedNode = {
-                    kind: NodeKind.ControlFlow,
-                    branchWeight: weight,
-                    increasesNesting: true,
-                    start: { line: lineNum, column: indent + 1 },
-                    end: { line: lineNum, column: rawLine.length + 1 },
-                    children: [],
-                };
-                parentNode.children ||= [];
-                parentNode.children.push(ctrlNode);
-                scopeStack.push({ indent, node: ctrlNode });
-
-                this.extractLiterals(rawLine, lineNum, ctrlNode, false);
-                continue;
-            }
-
-            // 5. Const declaration vs normal statement
+            // Const declaration vs normal statement
             const isConstBound = CONST_DECL_RE.test(rawLine);
             const stmtNode: NormalizedNode = {
                 kind: isConstBound ? NodeKind.Constant : NodeKind.Other,
@@ -228,7 +281,7 @@ export class GDScriptAdapter implements LanguageAdapter {
     /**
      * Tokenizes and extracts numeric and string literals from a line of GDScript.
      */
-    private extractLiterals(
+    extractLiterals(
         rawLine: string,
         lineNum: number,
         parentNode: NormalizedNode,
@@ -308,37 +361,9 @@ export class GDScriptAdapter implements LanguageAdapter {
         let cm: RegExpExecArray | null;
         while ((cm = callRe.exec(rawLine)) !== null) {
             const openIdx = cm.index + cm[0].lastIndexOf('(');
-            let depth = 1;
-            let inStr: string | null = null;
-            for (let i = openIdx + 1; i < rawLine.length; i++) {
-                const ch = rawLine[i];
-                if (inStr) {
-                    if (ch === '\\') {
-                        i++;
-                        continue;
-                    }
-                    if (ch === inStr) {
-                        inStr = null;
-                    }
-                    continue;
-                }
-                if (ch === '"' || ch === "'") {
-                    inStr = ch;
-                    continue;
-                }
-                if (ch === '(') {
-                    depth++;
-                    continue;
-                }
-                if (ch === ')') {
-                    depth--;
-                    if (depth === 0) {
-                        if (col0 >= openIdx && col0 <= i) {
-                            return true;
-                        }
-                        break;
-                    }
-                }
+            const closeIdx = findCallClosingParen(rawLine, openIdx);
+            if (closeIdx !== -1 && col0 >= openIdx && col0 <= closeIdx) {
+                return true;
             }
         }
         return false;

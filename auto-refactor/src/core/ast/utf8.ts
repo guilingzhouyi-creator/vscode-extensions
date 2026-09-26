@@ -95,6 +95,46 @@ export function isPureAscii(buf: Uint8Array): boolean {
     return isPureAsciiSWAR64(buf);
 }
 
+function decodeLeadByte(
+    b: number,
+    i: number,
+    emitAt: (idx: number, codeUnits: number) => void,
+): { needed: number; cp: number; startIdx: number } {
+    if (b <= ASCII_MAX) {
+        emitAt(i, BMP_CODE_UNITS);
+        return { needed: 0, cp: 0, startIdx: -1 };
+    }
+    if (b >= LEAD2_MIN && b <= LEAD2_MAX) {
+        return { needed: LEAD2_CONTINUATIONS, cp: b & LEAD2_PAYLOAD_MASK, startIdx: i };
+    }
+    if (b >= LEAD3_MIN && b <= LEAD3_MAX) {
+        return { needed: LEAD3_CONTINUATIONS, cp: b & LEAD3_PAYLOAD_MASK, startIdx: i };
+    }
+    if (b >= LEAD4_MIN && b <= LEAD4_MAX) {
+        return { needed: LEAD4_CONTINUATIONS, cp: b & LEAD4_PAYLOAD_MASK, startIdx: i };
+    }
+    emitAt(i, BMP_CODE_UNITS);
+    return { needed: 0, cp: 0, startIdx: -1 };
+}
+
+function finishMultiByteSequence(
+    cp: number,
+    needed: number,
+    startIdx: number,
+    emitAt: (idx: number, codeUnits: number) => void,
+    minForLen: (n: number) => number,
+): void {
+    const isInvalid =
+        cp < minForLen(needed) ||
+        cp > MAX_CODE_POINT ||
+        (cp >= SURROGATE_MIN && cp <= SURROGATE_MAX);
+    if (isInvalid) {
+        emitAt(startIdx, BMP_CODE_UNITS);
+    } else {
+        emitAt(startIdx, cp > BMP_MAX ? SURROGATE_PAIR_CODE_UNITS : BMP_CODE_UNITS);
+    }
+}
+
 /**
  * Build the byte→code-unit mapping for a UTF-8 buffer, following the WHATWG UTF-8 decoder
  * (the same algorithm `Buffer#toString('utf8')` uses) with `fatal:false` → lossy U+FFFD
@@ -139,30 +179,11 @@ export function utf8ToUtf16Offsets(buf: Uint8Array): Int32Array {
     while (i < buf.length) {
         const b = buf[i];
         if (needed === 0) {
-            // Expect a lead byte (or a single-byte ASCII / an invalid byte).
-            if (b <= ASCII_MAX) {
-                emitAt(i, BMP_CODE_UNITS);
-                i++;
-            } else if (b >= LEAD2_MIN && b <= LEAD2_MAX) {
-                needed = LEAD2_CONTINUATIONS;
-                cp = b & LEAD2_PAYLOAD_MASK;
-                startIdx = i;
-                i++;
-            } else if (b >= LEAD3_MIN && b <= LEAD3_MAX) {
-                needed = LEAD3_CONTINUATIONS;
-                cp = b & LEAD3_PAYLOAD_MASK;
-                startIdx = i;
-                i++;
-            } else if (b >= LEAD4_MIN && b <= LEAD4_MAX) {
-                needed = LEAD4_CONTINUATIONS;
-                cp = b & LEAD4_PAYLOAD_MASK;
-                startIdx = i;
-                i++;
-            } else {
-                // Invalid lead byte → one U+FFFD for this single byte.
-                emitAt(i, BMP_CODE_UNITS);
-                i++;
-            }
+            const lead = decodeLeadByte(b, i, emitAt);
+            needed = lead.needed;
+            cp = lead.cp;
+            startIdx = lead.startIdx;
+            i++;
             continue;
         }
 
@@ -171,16 +192,7 @@ export function utf8ToUtf16Offsets(buf: Uint8Array): Int32Array {
             seen++;
             cp = (cp << CONTINUATION_SHIFT_BITS) | (b & CONTINUATION_PAYLOAD_MASK);
             if (seen === needed) {
-                if (
-                    cp < minForLen(needed) ||
-                    cp > MAX_CODE_POINT ||
-                    (cp >= SURROGATE_MIN && cp <= SURROGATE_MAX)
-                ) {
-                    // Overlong / surrogate / out-of-range → one U+FFFD for the whole sequence.
-                    emitAt(startIdx, BMP_CODE_UNITS);
-                } else {
-                    emitAt(startIdx, cp > BMP_MAX ? SURROGATE_PAIR_CODE_UNITS : BMP_CODE_UNITS);
-                }
+                finishMultiByteSequence(cp, needed, startIdx, emitAt, minForLen);
                 needed = 0;
                 seen = 0;
                 cp = 0;
