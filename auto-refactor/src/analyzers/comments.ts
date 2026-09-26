@@ -350,7 +350,8 @@ export class CommentAnalyzer implements Analyzer {
 
         if (level === 'basic') return;
 
-        if (line.length > MAX_COMMENT_WIDTH && !directiveRe.test(body)) {
+        const containsUrlOrInlineCode = /https?:\/\/\S+|`[^`]{20,}`/.test(body);
+        if (line.length > MAX_COMMENT_WIDTH && !directiveRe.test(body) && !containsUrlOrInlineCode) {
             const desc = CommentMessages.COMMENT_WIDTH(line.length, MAX_COMMENT_WIDTH);
             issues.push(
                 this.mkIssue(

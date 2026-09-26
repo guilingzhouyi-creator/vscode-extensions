@@ -117,11 +117,87 @@ const BASE_ROLE_BUDGETS: Record<FineGrainedFileRole, RoleBudgetThresholds> = {
 /**
  * Retrieves baseline budget thresholds for given role.
  *
+/**
+ * Multi-language syntactic verbosity coefficients.
+ * Normalizes syntactic footprint differences relative to TypeScript/JavaScript (1.0).
+ */
+export const LANGUAGE_VERBOSITY_FACTORS: Readonly<Record<string, number>> = {
+    python: 0.7,
+    py: 0.7,
+    gdscript: 0.75,
+    gd: 0.75,
+    typescript: 1.0,
+    ts: 1.0,
+    javascript: 1.0,
+    js: 1.0,
+    rust: 1.25,
+    rs: 1.25,
+    go: 1.4,
+    c: 1.35,
+    cpp: 1.35,
+    'c++': 1.35,
+};
+
+/**
+ * Resolves the verbosity factor for a given language identifier or file extension.
+ *
+ * @param language - Language identifier or extension (e.g., 'python', 'rs', 'go')
+ * @returns Verbosity factor (defaulting to 1.0 for unspecified languages)
+ */
+export function getLanguageVerbosityFactor(language?: string): number {
+    if (!language) return 1.0;
+    const key = language.toLowerCase().replace(/^\./, '');
+    return LANGUAGE_VERBOSITY_FACTORS[key] ?? 1.0;
+}
+
+/**
+ * Retrieves baseline budget thresholds for given role, optionally scaled by language verbosity.
+ *
  * @param role - Fine-grained architectural role
+ * @param language - Optional language identifier for verbosity normalization
+ * @param baseEffectiveLocWarn - Optional custom base effective LOC budget
  * @returns Role budget configuration
  */
-export function getRoleBudget(role: FineGrainedFileRole): RoleBudgetThresholds {
-    return BASE_ROLE_BUDGETS[role] ?? BASE_ROLE_BUDGETS.business_module;
+export function getRoleBudget(
+    role: FineGrainedFileRole,
+    language?: string,
+    baseEffectiveLocWarn?: number,
+): RoleBudgetThresholds {
+    const base = BASE_ROLE_BUDGETS[role] ?? BASE_ROLE_BUDGETS.business_module;
+    const vFactor = getLanguageVerbosityFactor(language);
+
+    if (
+        baseEffectiveLocWarn !== undefined &&
+        Number.isFinite(baseEffectiveLocWarn) &&
+        baseEffectiveLocWarn > 0
+    ) {
+        // Compute dynamically based on parameterized base budget
+        const roleScale = base.effectiveLocWarn / 400; // Normalized to 400 default baseline
+        const dynamicWarn = Math.round(baseEffectiveLocWarn * vFactor * roleScale);
+        const dynamicFail = Math.round(dynamicWarn * 2.0);
+        const physicalWarn = Math.round(dynamicWarn * 1.4);
+        const physicalFail = Math.round(dynamicFail * 1.4);
+
+        return {
+            ...base,
+            physicalLinesWarn: physicalWarn,
+            physicalLinesFail: physicalFail,
+            effectiveLocWarn: dynamicWarn,
+            effectiveLocFail: dynamicFail,
+        };
+    }
+
+    if (vFactor === 1.0) {
+        return base;
+    }
+
+    return {
+        ...base,
+        physicalLinesWarn: Math.round(base.physicalLinesWarn * vFactor),
+        physicalLinesFail: Math.round(base.physicalLinesFail * vFactor),
+        effectiveLocWarn: Math.round(base.effectiveLocWarn * vFactor),
+        effectiveLocFail: Math.round(base.effectiveLocFail * vFactor),
+    };
 }
 
 /**
@@ -129,13 +205,17 @@ export function getRoleBudget(role: FineGrainedFileRole): RoleBudgetThresholds {
  *
  * @param role - File architectural role
  * @param metrics - Code density metrics
+ * @param language - Optional language identifier for verbosity normalization
+ * @param baseEffectiveLocWarn - Optional custom base effective LOC budget
  * @returns Elastic budget evaluation result
  */
 export function evaluateRoleElasticBudget(
     role: FineGrainedFileRole,
     metrics: CodeDensityMetrics,
+    language?: string,
+    baseEffectiveLocWarn?: number,
 ): ElasticBudgetEvaluation {
-    const base = getRoleBudget(role);
+    const base = getRoleBudget(role, language, baseEffectiveLocWarn);
 
     // Auto-generated code is fully exempt
     if (role === 'auto_generated') {

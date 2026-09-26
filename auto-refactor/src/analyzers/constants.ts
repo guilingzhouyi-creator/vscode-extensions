@@ -44,8 +44,55 @@ import { classifyLiteral } from '../core/governance/semanticLiterals';
 import { maskedLinesOfPath } from '../core/source-mask';
 import { scanNearLiteralClusters } from '../core/intelligence/near-literal-cluster';
 import { checkConstantLayoutAndScope } from '../core/governance/constant-layout-guard';
+import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
 
 const TRIVIAL_NUMBERS = new Set(['0', '1', '-1']);
+
+/** Benign common token set exempt from duplicate-literal flagging in test suites. */
+const TEST_SUITE_BENIGN_TOKENS = new Set([
+    'foo',
+    'bar',
+    'baz',
+    'qux',
+    'test',
+    'sample',
+    'mock',
+    'dummy',
+    'fake',
+    '*',
+    'ok',
+    'err',
+    'error',
+    'success',
+    'pass',
+    'fail',
+]);
+
+/** Schema property token set exempt from duplicate-literal flagging in config/data tables. */
+const SCHEMA_PROPERTY_TOKENS = new Set([
+    'id',
+    'name',
+    'type',
+    'value',
+    'key',
+    'label',
+    'desc',
+    'description',
+    'icon',
+    'category',
+    'status',
+    'weight',
+    'enabled',
+    'disabled',
+    'target',
+    'item',
+    'version',
+    'title',
+    'group',
+    'order',
+    'path',
+    'data',
+]);
 
 /** Character code of the single-quote (') string delimiter. */
 const CHAR_CODE_SINGLE_QUOTE = 39;
@@ -280,13 +327,20 @@ export class ConstantsAnalyzer implements Analyzer {
         suppress: Set<NormalizedNode>,
         out: Issue[],
     ): void {
+        const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
+        const isTest = roleInference.role === 'test_suite';
+        const isDataOrConfig =
+            roleInference.role === 'config_constant' ||
+            roleInference.role === 'rules_registry' ||
+            ctx.filePath.endsWith('.json');
+
         const minLen = ctx.options.hardcodedStringMinLength;
         const ignoreSet = new Set<string>(ctx.options.ignoreLiterals || []);
         const classify = !!ctx.options.classifyLiterals;
         const granular = !!ctx.options.granularRules;
 
         for (const lit of this.literals) {
-            if (this.shouldSkipHardcodedString(lit, minLen, ignoreSet, suppress)) continue;
+            if (this.shouldSkipHardcodedString(lit, minLen, ignoreSet, suppress, isTest, isDataOrConfig)) continue;
 
             const issue = this.buildHardcodedStringIssue(lit, ctx, classify, granular);
             if (issue) out.push(issue);
@@ -298,12 +352,17 @@ export class ConstantsAnalyzer implements Analyzer {
         minLen: number,
         ignoreSet: Set<string>,
         suppress: Set<NormalizedNode>,
+        isTest = false,
+        isDataOrConfig = false,
     ): boolean {
         if (lit.numeric || lit.isConstBound || lit.tolerated) return true;
         if (suppress.has(lit.node)) return true;
         const text = lit.value;
         const inner = stripQuotes(text);
         if (inner.length < minLen || inner.trim().length === 0) return true;
+        const lower = inner.toLowerCase();
+        if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return true;
+        if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return true;
         return ignoreSet.has(text) || ignoreSet.has(inner);
     }
 
@@ -343,7 +402,21 @@ export class ConstantsAnalyzer implements Analyzer {
         suppress: Set<NormalizedNode>,
         out: Issue[],
     ): void {
-        const threshold = ctx.options.duplicateLiteralThreshold;
+        const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
+        const isTest = roleInference.role === 'test_suite';
+        const isDataOrConfig =
+            roleInference.role === 'config_constant' ||
+            roleInference.role === 'rules_registry' ||
+            ctx.filePath.endsWith('.json');
+
+        const baseThreshold = ctx.options.duplicateLiteralThreshold ?? 4;
+        let threshold = baseThreshold;
+        if (isTest) {
+            threshold = Math.max(baseThreshold * 3, 12);
+        } else if (isDataOrConfig) {
+            threshold = Math.max(baseThreshold * 2, 8);
+        }
+
         const ignoreSet = new Set<string>(ctx.options.ignoreLiterals || []);
         const classify = !!ctx.options.classifyLiterals;
         const groups = groupDuplicates(
@@ -351,6 +424,8 @@ export class ConstantsAnalyzer implements Analyzer {
             ctx.options.magicNumberMin,
             ignoreSet,
             classify,
+            isTest,
+            isDataOrConfig,
         );
 
         for (const [, arr] of groups) {
@@ -514,6 +589,8 @@ function isDuplicateCandidate(
     magicNumberMin: number,
     ignoreSet: Set<string>,
     classify: boolean,
+    isTest = false,
+    isDataOrConfig = false,
 ): boolean {
     if (lit.isConstBound || lit.tolerated) return false;
     if (lit.numeric) {
@@ -523,6 +600,9 @@ function isDuplicateCandidate(
         const str = stripQuotes(lit.value).trim();
         if (str.length === 0) return false;
         if (ignoreSet.has(lit.value) || ignoreSet.has(str)) return false;
+        const lower = str.toLowerCase();
+        if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return false;
+        if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return false;
     }
     if (classify && classifyLiteral(lit.value, lit.numeric).isReasonable) return false;
     return true;
@@ -533,10 +613,12 @@ function groupDuplicates(
     magicNumberMin: number,
     ignoreSet: Set<string>,
     classify: boolean,
+    isTest = false,
+    isDataOrConfig = false,
 ): Map<string, LiteralRecord[]> {
     const groups = new Map<string, LiteralRecord[]>();
     for (const lit of literals) {
-        if (!isDuplicateCandidate(lit, magicNumberMin, ignoreSet, classify)) continue;
+        if (!isDuplicateCandidate(lit, magicNumberMin, ignoreSet, classify, isTest, isDataOrConfig)) continue;
         const key = `${lit.numeric ? 'N' : 'S'}:${lit.value}`;
         const arr = groups.get(key) || [];
         arr.push(lit);

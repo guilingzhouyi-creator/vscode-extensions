@@ -231,11 +231,62 @@ export class TsModernAnalyzer implements Analyzer {
         this.reportLineRules(masked, file, out);
         this.reportRequireCalls(masked, file, out);
         this.reportStringPatternReplace(masked, raw, file, out);
+        this.reportDisposableLeaks(masked, file, out);
         if (this.isTyped(file)) {
             this.reportExplicitAny(masked, file, out);
             this.reportTypeOnlyImports(masked, raw, file, out);
         }
         return out;
+    }
+
+    /**
+     * Report isolated Disposable creations / event registrations that are not tracked in subscriptions.
+     */
+    private reportDisposableLeaks(masked: string[], file: string, out: Issue[]): void {
+        const ISOLATED_DISPOSABLE_RE =
+            /^\s*(?:vscode\.(?:window|workspace|languages|commands)\.(?:onDidChange[A-Za-z0-9_]+|onDidOpen[A-Za-z0-9_]+|onDidClose[A-Za-z0-9_]+|onDidSave[A-Za-z0-9_]+|registerCommand|registerTextEditorCommand)|setInterval)\s*\(/;
+
+        let openParenDepth = 0;
+        for (let i = 0; i < masked.length; i++) {
+            const line = masked[i];
+            const trimmed = line.trim();
+            if (trimmed.length === 0) continue;
+
+            const isStartOfDisposable = ISOLATED_DISPOSABLE_RE.test(line);
+            if (isStartOfDisposable && openParenDepth === 0) {
+                let isPassedAsArg = false;
+                for (let prev = i - 1; prev >= 0; prev--) {
+                    const prevTrim = masked[prev].trim();
+                    if (prevTrim.length === 0) continue;
+                    if (/[(=,[]$/.test(prevTrim)) {
+                        isPassedAsArg = true;
+                    }
+                    break;
+                }
+
+                if (!isPassedAsArg) {
+                    const m = line.match(ISOLATED_DISPOSABLE_RE)!;
+                    const col = line.indexOf(m[0].trimStart()) + 1;
+                    out.push(
+                        makeIssue(
+                            file,
+                            i,
+                            'TSM-DISP-001',
+                            SEVERITY_WARNING,
+                            'Disposable resource/listener created in isolated statement without tracking in subscriptions.',
+                            'Pass to `context.subscriptions.push(...)` or store in a Disposable collection to prevent memory leaks.',
+                            { matched: m[0].trim() },
+                            col,
+                        ),
+                    );
+                }
+            }
+
+            for (let c = 0; c < line.length; c++) {
+                if (line[c] === '(') openParenDepth++;
+                else if (line[c] === ')' && openParenDepth > 0) openParenDepth--;
+            }
+        }
     }
 
     /**

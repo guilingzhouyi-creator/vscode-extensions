@@ -197,6 +197,35 @@ export class GDScriptAdapter implements LanguageAdapter {
     }
 
     /**
+     * Check if a string literal token represents a dictionary key or subscript index in GDScript:
+     * 1. Dictionary key: followed by a colon (e.g. `"key": value` or `{"key": value}`).
+     * 2. Subscript index: preceded by `[` which follows an expression and followed by `]` (e.g. `data["key"]`).
+     */
+    private isDictionaryKeyOrSubscript(rawLine: string, matchIdx: number, matchLen: number): boolean {
+        const afterStr = rawLine.slice(matchIdx + matchLen);
+        // 1. Dictionary key: `"key": val`
+        if (/^\s*:\s*/.test(afterStr)) {
+            return true;
+        }
+
+        // 2. Subscript index: `target["key"]`
+        const beforeStr = rawLine.slice(0, matchIdx);
+        const isIndexedAccess = /[A-Za-z0-9_\)\]]\s*\[\s*$/.test(beforeStr);
+        if (isIndexedAccess && /^\s*\]/.test(afterStr)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** Check if a numeric literal is an index inside a subscript expression, e.g. `arr[0]`. */
+    private isNumericSubscriptIndex(rawLine: string, matchIdx: number, matchLen: number): boolean {
+        const beforeStr = rawLine.slice(0, matchIdx);
+        const afterStr = rawLine.slice(matchIdx + matchLen);
+        return /[A-Za-z0-9_\)\]]\s*\[\s*$/.test(beforeStr) && /^\s*\]/.test(afterStr);
+    }
+
+    /**
      * Tokenizes and extracts numeric and string literals from a line of GDScript.
      */
     private extractLiterals(
@@ -221,6 +250,7 @@ export class GDScriptAdapter implements LanguageAdapter {
             const fullText = match[0];
             const col = match.index + 1;
             const strVal = match[1] !== undefined ? match[1] : match[2];
+            const isDictOrIndex = this.isDictionaryKeyOrSubscript(rawLine, match.index, fullText.length);
 
             const litNode: NormalizedNode = {
                 kind: NodeKind.StringLiteral,
@@ -229,6 +259,7 @@ export class GDScriptAdapter implements LanguageAdapter {
                 isConstBound,
                 tolerated:
                     isLegacyToleratedLine ||
+                    isDictOrIndex ||
                     strVal.length < MIN_SIGNIFICANT_STRING_LENGTH ||
                     this.isInsideTolerantCall(rawLine, match.index),
                 start: { line: lineNum, column: col },
@@ -246,13 +277,17 @@ export class GDScriptAdapter implements LanguageAdapter {
         while ((match = numRegex.exec(codeWithoutStrings)) !== null) {
             const numText = match[0];
             const col = match.index + 1;
+            const isSubscriptIndex = this.isNumericSubscriptIndex(rawLine, match.index, numText.length);
 
             const litNode: NormalizedNode = {
                 kind: NodeKind.NumericLiteral,
                 text: numText,
                 isNumeric: true,
                 isConstBound,
-                tolerated: isLegacyToleratedLine || this.isInsideTolerantCall(rawLine, match.index),
+                tolerated:
+                    isLegacyToleratedLine ||
+                    isSubscriptIndex ||
+                    this.isInsideTolerantCall(rawLine, match.index),
                 start: { line: lineNum, column: col },
                 end: { line: lineNum, column: col + numText.length },
             };
@@ -263,12 +298,13 @@ export class GDScriptAdapter implements LanguageAdapter {
 
     /**
      * Token-level tolerance: returns true when the 0-based `col0` position lies inside the
-     * argument span of a GameConfig.* / render_narrative / emit_narrative_by_key call. Only
-     * literals that are actual arguments of these calls carry canonical config keys and are
-     * exempt; the rest of the line stays analyzable.
+     * argument span of a GameConfig.* / render_narrative / emit_narrative_by_key or engine
+     * method call. Only literals that are actual arguments of these calls carry canonical
+     * names/keys and are exempt; the rest of the line stays analyzable.
      */
     private isInsideTolerantCall(rawLine: string, col0: number): boolean {
-        const callRe = /\b(GameConfig\.[A-Za-z0-9_]+|render_narrative|emit_narrative_by_key)\s*\(/g;
+        const callRe =
+            /\b(?:GameConfig\.[A-Za-z0-9_]+|render_narrative|emit_narrative_by_key|get|set|has|get_meta|set_meta|has_meta|emit_signal|connect|disconnect|is_action_pressed|is_action_just_pressed|is_action_just_released|play|play_backwards|change_scene_to_file|rpc|rpc_id)\s*\(/g;
         let cm: RegExpExecArray | null;
         while ((cm = callRe.exec(rawLine)) !== null) {
             const openIdx = cm.index + cm[0].lastIndexOf('(');
@@ -295,7 +331,10 @@ export class GDScriptAdapter implements LanguageAdapter {
                 } else if (ch === ')') {
                     depth--;
                     if (depth === 0) {
-                        return col0 >= openIdx && col0 <= i;
+                        if (col0 >= openIdx && col0 <= i) {
+                            return true;
+                        }
+                        break;
                     }
                 }
             }
@@ -303,3 +342,4 @@ export class GDScriptAdapter implements LanguageAdapter {
         return false;
     }
 }
+

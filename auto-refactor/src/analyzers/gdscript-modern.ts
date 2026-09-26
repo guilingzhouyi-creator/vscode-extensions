@@ -210,6 +210,44 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 );
             }
         }
+
+        // Check for Object Pool contract violation: reset_state without super call
+        const hasExtends = masked.some((l) => /^\s*extends\s+[A-Za-z0-9_]/.test(l));
+        if (hasExtends) {
+            for (let index = 0; index < masked.length; index += 1) {
+                const code = masked[index];
+                if (/^\s*func\s+reset_state\s*\(/.test(code)) {
+                    const funcIndent = code.search(/\S/);
+                    let hasSuperCall = false;
+                    for (let j = index + 1; j < masked.length; j += 1) {
+                        const bodyLine = masked[j];
+                        if (bodyLine.trim().length === 0 || bodyLine.trim().startsWith('#')) continue;
+                        const bodyIndent = bodyLine.search(/\S/);
+                        if (bodyIndent <= funcIndent) {
+                            break;
+                        }
+                        if (/\bsuper(?:\.reset_state\s*\(|\s*\()/.test(bodyLine)) {
+                            hasSuperCall = true;
+                            break;
+                        }
+                    }
+                    if (!hasSuperCall) {
+                        out.push(
+                            makeIssue(
+                                file,
+                                index,
+                                'GDM-POOL-002',
+                                SEVERITY_WARNING,
+                                'Object pool `reset_state()` method should invoke `super.reset_state()` to maintain parent state cleanup contract.',
+                                'Add `super.reset_state()` to ensure inherited entity properties are safely reset before reuse.',
+                                { line: raw[index].trim() },
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+
         return out;
     }
 }

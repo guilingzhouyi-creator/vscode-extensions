@@ -48,7 +48,7 @@ const RULES_REGISTRY_PATTERN =
 
 /** Configuration and static constants pattern */
 const CONFIG_CONSTANT_PATTERN =
-    /[\\/](?:config|configs|constants|schema|schemas)[\\/]|[\\/][a-z0-9_-]*(?:config|constants|schema|types|contracts)\.[a-z0-9]+$/i;
+    /[\\/](?:config|configs|constants|schema|schemas|data|tables|locale|locales|i18n)[\\/]|[\\/][a-z0-9_-]*(?:config|constants|schema|types|contracts|table|data)\.[a-z0-9]+$/i;
 
 /** Utility and shared library pattern */
 const SHARED_LIB_PATTERN =
@@ -56,7 +56,7 @@ const SHARED_LIB_PATTERN =
 
 /** Test suite and fixture pattern */
 const TEST_SUITE_PATTERN =
-    /[\\/](?:tests?|fixtures?|mocks?|benchmarks?)[\\/]|[\\/][a-z0-9_.-]+(?:\.test|\.spec|\.benchmark|_test)\.[a-z0-9]+$/i;
+    /[\\/](?:tests?|fixtures?|mocks?|benchmarks?)[\\/]|[\\/](?:test_[a-z0-9_.-]+|[a-z0-9_.-]+(?:\.test|\.spec|\.benchmark|_test|\.mock))\.[a-z0-9]+$/i;
 
 /** Auto-generated code path pattern */
 const AUTO_GENERATED_PATTERN =
