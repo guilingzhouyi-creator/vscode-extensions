@@ -234,6 +234,17 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tsm-type-001',
     }),
     defineRule({
+        id: 'TSM-DISP-001',
+        family: RULE_FAMILY_TYPESCRIPT_MODERN,
+        analyzer: ANALYZER_TYPESCRIPT_MODERN,
+        canonical: true,
+        languages: LANGUAGES_TS_FAMILY,
+        defaultSeverity: SEVERITY_WARNING,
+        summary: 'VS Code 监听器或 Disposable 对象未注册至 subscriptions 容器。',
+        remediation: '使用 context.subscriptions.push(...) 或生命周期容器管理 Disposable 以防泄露。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tsm-disp-001',
+    }),
+    defineRule({
         id: 'RSM-TRY-001',
         family: RULE_FAMILY_RUST_MODERN,
         analyzer: ANALYZER_RUST_MODERN,
@@ -386,6 +397,17 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         summary: '使用 remote/master/puppet/slave 函数修饰符。',
         remediation: '改用 @rpc 注解。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-rpc-001',
+    }),
+    defineRule({
+        id: 'GDM-POOL-002',
+        family: RULE_FAMILY_GDSCRIPT_MODERN,
+        analyzer: ANALYZER_GDSCRIPT_MODERN,
+        canonical: true,
+        languages: [LANGUAGE_GDSCRIPT],
+        defaultSeverity: SEVERITY_WARNING,
+        summary: '对象池 reset_state 未调用基类重置方法破坏契约。',
+        remediation: '在 reset_state() 内部添加 super.reset_state() 调用以确保父类状态正确清理。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-pool-002',
     }),
 
     // ── Complexity Semantic Rules ──

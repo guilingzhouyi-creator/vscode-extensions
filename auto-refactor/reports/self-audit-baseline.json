@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790329993477",
-  "timestamp": "2026-09-25T09:53:17.975Z",
+  "snapshotId": "snapshot-v0.4.0-1790398539559",
+  "timestamp": "2026-09-26T04:55:44.116Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,36 +8,36 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "6239a6ac2326ed592c9ebc65ceb520990eff13e72e00aa44760498f453630cec",
+  "rulesDigest": "69e3726be153b2b57946da20fa02d845d091d3bba8946574a1ff2a886b757d07",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 473,
-    "durationMs": 4118
+    "filesScanned": 492,
+    "durationMs": 4250
   },
   "metrics": {
     "compositeScore": 99.8,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 7453,
-    "suppressedIssues": 3980,
-    "unsuppressedIssues": 3473,
+    "totalIssues": 8336,
+    "suppressedIssues": 4344,
+    "unsuppressedIssues": 3992,
     "bySeverity": {
-      "info": 319,
-      "warning": 7134,
+      "info": 356,
+      "warning": 7980,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 166,
-      "medium": 6752,
-      "low": 535
+      "high": 214,
+      "medium": 7537,
+      "low": 585
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 99.1,
+      "maintainability": 98.9,
       "performance": 99.8,
       "data": 100,
       "testing": 100,
@@ -60,6 +60,15 @@
   },
   "topHotspots": [
     {
+      "filePath": "src/core/native/native-clone-shim.ts",
+      "domain": "native",
+      "totalIssues": 145,
+      "criticalCount": 0,
+      "highCount": 4,
+      "compositeScore": 98.6,
+      "effectiveDensity": 0.93
+    },
+    {
       "filePath": "scripts/validate-review-memory.js",
       "domain": "scripts",
       "totalIssues": 139,
@@ -78,16 +87,25 @@
       "effectiveDensity": 0.98
     },
     {
-      "filePath": "scripts/bench-baselines.js",
+      "filePath": "scripts/validate-triplane-cross-project.js",
       "domain": "scripts",
-      "totalIssues": 102,
+      "totalIssues": 123,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.98
+    },
+    {
+      "filePath": "scripts/test-parallel.js",
+      "domain": "scripts",
+      "totalIssues": 111,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.95
     },
     {
-      "filePath": "scripts/test-parallel.js",
+      "filePath": "scripts/bench-baselines.js",
       "domain": "scripts",
       "totalIssues": 102,
       "criticalCount": 0,
@@ -123,39 +141,21 @@
       "effectiveDensity": 0.96
     },
     {
-      "filePath": "scripts/validate-generalized.js",
+      "filePath": "scripts/validate-autonomy-scorer.js",
       "domain": "scripts",
       "totalIssues": 74,
       "criticalCount": 0,
-      "highCount": 1,
-      "compositeScore": 99.6,
-      "effectiveDensity": 0.98
-    },
-    {
-      "filePath": "src/analyzers/shell-lint.ts",
-      "domain": "analyzers",
-      "totalIssues": 68,
-      "criticalCount": 0,
-      "highCount": 2,
-      "compositeScore": 99.4,
-      "effectiveDensity": 0.95
-    },
-    {
-      "filePath": "scripts/validate-data-flow.js",
-      "domain": "scripts",
-      "totalIssues": 66,
-      "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
-      "effectiveDensity": 0.99
+      "effectiveDensity": 0.96
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 166,
-      "medium": 6752,
-      "low": 535
+      "high": 214,
+      "medium": 7537,
+      "low": 585
     },
     "criticalItems": [],
     "highItems": [
@@ -194,6 +194,15 @@
         "file": "scripts/validate-governance.js",
         "line": 278,
         "message": "Function \"verifyOutputSchema\" has cyclomatic complexity 17 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:scripts/validate-native-operator.js:160",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-native-operator.js",
+        "line": 160,
+        "message": "Function \"runValidation\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:scripts/validate-oxc-keypoints.js:140",
@@ -241,6 +250,15 @@
         "message": "Function \"main\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
+        "id": "complexity:CPX-HOP-001:src/analyzers/architecture.ts:419",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/architecture.ts",
+        "line": 419,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'ArchitectureAnalyzer.auditSpecifiers' over long span (71 LOC)."
+      },
+      {
         "id": "complexity:high-complexity:src/analyzers/comments.ts:168",
         "rule": "high-complexity",
         "tier": "high",
@@ -248,6 +266,51 @@
         "file": "src/analyzers/comments.ts",
         "line": 168,
         "message": "Function \"CommentAnalyzer.analyze\" has cyclomatic complexity 16 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/constants.ts:350",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/constants.ts",
+        "line": 350,
+        "message": "Function \"ConstantsAnalyzer.shouldSkipHardcodedString\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/constants.ts:400",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/constants.ts",
+        "line": 400,
+        "message": "Function \"ConstantsAnalyzer.detectDuplicates\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/constants.ts:587",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/constants.ts",
+        "line": 587,
+        "message": "Function \"isDuplicateCandidate\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/gdscript-modern.ts:173",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-modern.ts",
+        "line": 173,
+        "message": "Function \"GdscriptModernAnalyzer.analyze\" has cyclomatic complexity 19 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-HOP-001:src/analyzers/gdscript-modern.ts:227",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-modern.ts",
+        "line": 227,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'GdscriptModernAnalyzer.analyze' over long span (80 LOC)."
       },
       {
         "id": "complexity:high-complexity:src/analyzers/go-modern.ts:273",
@@ -268,13 +331,31 @@
         "message": "Function \"GovernanceAnalyzer.visit\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/large-file.ts:101",
+        "id": "complexity:CPX-HOP-001:src/analyzers/hygiene.ts:817",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/hygiene.ts",
+        "line": 817,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'HygieneAnalyzer.auditCloneBlocks' over long span (71 LOC)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/large-file.ts:65",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/large-file.ts",
-        "line": 101,
-        "message": "Function \"LargeFileAnalyzer.finalize\" has cyclomatic complexity 16 (threshold 12)."
+        "line": 65,
+        "message": "Function \"evaluateThresholdSeverity\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/large-file.ts:190",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/large-file.ts",
+        "line": 190,
+        "message": "Function \"LargeFileAnalyzer.finalize\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/analyzers/python-modern.ts:199",
@@ -313,6 +394,15 @@
         "message": "Function \"SecurityAnalyzer.analyze\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
+        "id": "complexity:CPX-HOP-001:src/analyzers/security.ts:139",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/security.ts",
+        "line": 139,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'SecurityAnalyzer.analyze' over long span (53 LOC)."
+      },
+      {
         "id": "complexity:high-complexity:src/analyzers/shell-lint.ts:374",
         "rule": "high-complexity",
         "tier": "high",
@@ -320,6 +410,15 @@
         "file": "src/analyzers/shell-lint.ts",
         "line": 374,
         "message": "Function \"ShellLintAnalyzer.checkSetEuoPipefail\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-HOP-001:src/analyzers/shell-lint.ts:545",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/shell-lint.ts",
+        "line": 545,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'ShellLintAnalyzer.checkUnquotedVariables' over long span (60 LOC)."
       },
       {
         "id": "complexity:high-complexity:src/analyzers/shell-lint.ts:567",
@@ -367,6 +466,15 @@
         "message": "Function \"auditGuardClausePatternsBrace\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
+        "id": "complexity:CPX-HOP-001:src/analyzers/simplify-linecheck.ts:535",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/simplify-linecheck.ts",
+        "line": 535,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'auditGuardClausePatternsBrace' over long span (52 LOC)."
+      },
+      {
         "id": "complexity:high-complexity:src/analyzers/simplify.ts:120",
         "rule": "high-complexity",
         "tier": "high",
@@ -376,6 +484,15 @@
         "message": "Function \"computeControlFlowNesting\" has cyclomatic complexity 16 (threshold 12)."
       },
       {
+        "id": "complexity:CPX-HOP-001:src/analyzers/simplify.ts:390",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/simplify.ts",
+        "line": 390,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'SimplifyAnalyzer.detectCommentedOutCode' over long span (53 LOC)."
+      },
+      {
         "id": "complexity:high-complexity:src/analyzers/test-modernity.ts:458",
         "rule": "high-complexity",
         "tier": "high",
@@ -383,6 +500,24 @@
         "file": "src/analyzers/test-modernity.ts",
         "line": 458,
         "message": "Function \"TestModernityAnalyzer.analyzeWithLines\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/ts-modern.ts:245",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/ts-modern.ts",
+        "line": 245,
+        "message": "Function \"TsModernAnalyzer.reportDisposableLeaks\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-HOP-001:src/cli/daemonCmd.ts:159",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/cli/daemonCmd.ts",
+        "line": 159,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'startDaemon' over long span (50 LOC)."
       },
       {
         "id": "complexity:CPX-SPACE-001:src/core/architecture/metaArchitectureEvaluator.ts:152",
@@ -403,6 +538,15 @@
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
+        "id": "complexity:CPX-HOP-001:src/core/architecture/semanticArchitectureGraph.ts:239",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/architecture/semanticArchitectureGraph.ts",
+        "line": 239,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'SemanticArchitectureGraph.fromFiles' over long span (61 LOC)."
+      },
+      {
         "id": "complexity:high-complexity:src/core/ast/gdscript-adapter.ts:44",
         "rule": "high-complexity",
         "tier": "high",
@@ -412,13 +556,22 @@
         "message": "Function \"GDScriptAdapter.parse\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/ast/gdscript-adapter.ts:270",
+        "id": "complexity:CPX-HOP-001:src/core/ast/gdscript-adapter.ts:101",
+        "rule": "CPX-HOP-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/gdscript-adapter.ts",
+        "line": 101,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'GDScriptAdapter.parse' over long span (146 LOC)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/ast/gdscript-adapter.ts:305",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/gdscript-adapter.ts",
-        "line": 270,
-        "message": "Function \"GDScriptAdapter.isInsideTolerantCall\" has cyclomatic complexity 12 (threshold 12)."
+        "line": 305,
+        "message": "Function \"GDScriptAdapter.isInsideTolerantCall\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/ast/go-adapter-parser.ts:655",
@@ -455,159 +608,6 @@
         "file": "src/core/ast/oxc-adapter.ts",
         "line": 464,
         "message": "Function \"OxcAdapter.collectLiteralsInType\" has cyclomatic complexity 16 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/oxc-predicates.ts:314",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/oxc-predicates.ts",
-        "line": 314,
-        "message": "Function \"oxcIsStringTolerated\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/oxc-projector.ts:331",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/oxc-projector.ts",
-        "line": 331,
-        "message": "Function \"OxcProjector.collectInto\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/oxc-projector.ts:347",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/oxc-projector.ts",
-        "line": 347,
-        "message": "Function \"OxcProjector.pushRaw\" has cyclomatic complexity 14 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/python-adapter.ts:114",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/python-adapter.ts",
-        "line": 114,
-        "message": "Function \"PythonAdapter.mapNode\" has cyclomatic complexity 22 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/rust-adapter.ts:175",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/rust-adapter.ts",
-        "line": 175,
-        "message": "Function \"RustAdapter.mapNode\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/traverse.ts:120",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/traverse.ts",
-        "line": 120,
-        "message": "Function \"visitNode\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/traverse.ts:330",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/traverse.ts",
-        "line": 330,
-        "message": "Function \"visitRaw\" has cyclomatic complexity 18 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/ts-predicates.ts:115",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/ts-predicates.ts",
-        "line": 115,
-        "message": "Function \"bindingName\" has cyclomatic complexity 14 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/ts-projector.ts:80",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/ts-projector.ts",
-        "line": 80,
-        "message": "Function \"anonymous\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/ts-projector.ts:458",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/ts-projector.ts",
-        "line": 458,
-        "message": "Function \"TsNodeProjector.applyCheapNonFunctionProps\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/ast/utf8.ts:114",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/utf8.ts",
-        "line": 114,
-        "message": "Function \"utf8ToUtf16Offsets\" has cyclomatic complexity 19 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/cache-key.ts:140",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/cache-key.ts",
-        "line": 140,
-        "message": "Function \"fingerprintAnalyzerDescs\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-AMP-001:src/core/cache-key.ts:203",
-        "rule": "CPX-AMP-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/cache-key.ts",
-        "line": 203,
-        "message": "Complexity amplification hazard: synchronous I/O executed inside loop over 'descs'."
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/cache-key.ts:207",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/cache-key.ts",
-        "line": 207,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/cache.ts:251",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/cache.ts",
-        "line": 251,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/cache.ts:281",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/cache.ts",
-        "line": 281,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/cache.ts:322",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/cache.ts",
-        "line": 322,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
       }
     ]
   },
@@ -630,10 +630,10 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 99.8,
+        "compositeScore": 99.6,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.7,
+          "maintainability": 97.5,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -660,10 +660,10 @@
       },
       {
         "domainName": "cli",
-        "compositeScore": 100,
+        "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 100,
+          "maintainability": 99,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -678,7 +678,7 @@
         "compositeScore": 99.6,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.4,
+          "maintainability": 98,
           "performance": 98.9,
           "data": 100,
           "testing": 100,
@@ -693,7 +693,7 @@
         "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.7,
+          "maintainability": 99.3,
           "performance": 99.9,
           "data": 100,
           "testing": 100,
@@ -708,7 +708,7 @@
         "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.9,
+          "maintainability": 97.7,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -720,10 +720,10 @@
       },
       {
         "domainName": "comments",
-        "compositeScore": 99.8,
+        "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.6,
+          "maintainability": 98,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -735,10 +735,10 @@
       },
       {
         "domainName": "config",
-        "compositeScore": 99.7,
+        "compositeScore": 99.5,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.1,
+          "maintainability": 97.8,
           "performance": 99,
           "data": 100,
           "testing": 100,
@@ -765,10 +765,10 @@
       },
       {
         "domainName": "dynamic",
-        "compositeScore": 99.7,
+        "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.6,
+          "maintainability": 98.6,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -828,7 +828,7 @@
         "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.8,
+          "maintainability": 98.7,
           "performance": 99.9,
           "data": 100,
           "testing": 100,
@@ -840,10 +840,10 @@
       },
       {
         "domainName": "memory",
-        "compositeScore": 99.4,
+        "compositeScore": 99.3,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.2,
+          "maintainability": 97.6,
           "performance": 97.5,
           "data": 100,
           "testing": 100,
@@ -873,8 +873,8 @@
         "compositeScore": 99.1,
         "pillars": {
           "architecture": 100,
-          "maintainability": 96,
-          "performance": 98.1,
+          "maintainability": 96.6,
+          "performance": 97.1,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -885,10 +885,10 @@
       },
       {
         "domainName": "pipeline",
-        "compositeScore": 99.7,
+        "compositeScore": 99.4,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.9,
+          "maintainability": 95.8,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -915,11 +915,11 @@
       },
       {
         "domainName": "praxis",
-        "compositeScore": 100,
+        "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 100,
-          "performance": 100,
+          "maintainability": 99.6,
+          "performance": 99.5,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -960,10 +960,10 @@
       },
       {
         "domainName": "profiler",
-        "compositeScore": 100,
+        "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 100,
+          "maintainability": 98,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1005,10 +1005,10 @@
       },
       {
         "domainName": "router",
-        "compositeScore": 99.8,
+        "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.6,
+          "maintainability": 99,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1035,10 +1035,10 @@
       },
       {
         "domainName": "evolution",
-        "compositeScore": 99.9,
+        "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99,
+          "maintainability": 98.1,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1065,10 +1065,10 @@
       },
       {
         "domainName": "scanner",
-        "compositeScore": 99.7,
+        "compositeScore": 99.5,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.8,
+          "maintainability": 96.7,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1083,7 +1083,7 @@
         "compositeScore": 99.6,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98,
+          "maintainability": 97.7,
           "performance": 99.5,
           "data": 100,
           "testing": 100,
@@ -1098,8 +1098,8 @@
         "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99,
-          "performance": 100,
+          "maintainability": 99.5,
+          "performance": 99.8,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -1110,10 +1110,10 @@
       },
       {
         "domainName": "adapters",
-        "compositeScore": 99.9,
+        "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.3,
+          "maintainability": 98.5,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1155,10 +1155,10 @@
       },
       {
         "domainName": "trajectory",
-        "compositeScore": 99.9,
+        "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.3,
+          "maintainability": 99.1,
           "performance": 99.9,
           "data": 100,
           "testing": 100,
@@ -1170,10 +1170,10 @@
       },
       {
         "domainName": "daemon",
-        "compositeScore": 99.8,
+        "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.4,
+          "maintainability": 98.8,
           "performance": 99.2,
           "data": 100,
           "testing": 100,

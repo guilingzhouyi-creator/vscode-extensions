@@ -65,7 +65,10 @@ fn compute_diff(old: &[&str], new: &[&str]) -> Vec<DiffOp> {
     }
 
     let mut suffix = 0;
-    while suffix < (n - prefix) && suffix < (m - prefix) && old[n - 1 - suffix] == new[m - 1 - suffix] {
+    while suffix < (n - prefix)
+        && suffix < (m - prefix)
+        && old[n - 1 - suffix] == new[m - 1 - suffix]
+    {
         suffix += 1;
     }
 
@@ -109,7 +112,11 @@ fn myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
         trace.push(v.clone());
         let mut k = -d;
         while k <= d {
-            let mut x = if k == -d || (k != d && v.get(&(k - 1)).copied().unwrap_or(0) < v.get(&(k + 1)).copied().unwrap_or(0)) {
+            let mut x = if k == -d
+                || (k != d
+                    && v.get(&(k - 1)).copied().unwrap_or(0)
+                        < v.get(&(k + 1)).copied().unwrap_or(0))
+            {
                 v.get(&(k + 1)).copied().unwrap_or(0)
             } else {
                 v.get(&(k - 1)).copied().unwrap_or(0) + 1
@@ -157,7 +164,10 @@ fn backtrack(
         let v = &trace[step];
         let k = curr_x as isize - curr_y as isize;
 
-        let prev_k = if k == -(step as isize) || (k != (step as isize) && v.get(&(k - 1)).copied().unwrap_or(0) < v.get(&(k + 1)).copied().unwrap_or(0)) {
+        let prev_k = if k == -(step as isize)
+            || (k != (step as isize)
+                && v.get(&(k - 1)).copied().unwrap_or(0) < v.get(&(k + 1)).copied().unwrap_or(0))
+        {
             k + 1
         } else {
             k - 1

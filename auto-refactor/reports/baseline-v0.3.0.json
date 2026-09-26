@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790323245988",
-  "timestamp": "2026-09-25T08:00:45.987Z",
+  "snapshotId": "snapshot-v0.4.0-1790398517925",
+  "timestamp": "2026-09-26T04:55:17.925Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "6239a6ac2326ed592c9ebc65ceb520990eff13e72e00aa44760498f453630cec",
+  "rulesDigest": "69e3726be153b2b57946da20fa02d845d091d3bba8946574a1ff2a886b757d07",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 222,
+    "ruleCount": 230,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -107,6 +107,7 @@
     "GDM-EXPORT-001",
     "GDM-ONREADY-001",
     "GDM-POOL-001",
+    "GDM-POOL-002",
     "GDM-RPC-001",
     "GDM-TOOL-001",
     "GDM-YIELD-001",
@@ -232,9 +233,16 @@
     "SIM-LONG-001",
     "SIM-PRNT-001",
     "SIM-TRN-001",
+    "STDLIB-ALLOC-001",
+    "STDLIB-CONST-001",
+    "STDLIB-PANIC-001",
+    "STDLIB-PORT-001",
+    "STDLIB-RECURSION-001",
+    "STDLIB-UNSAFE-001",
     "TSM-ANY-001",
     "TSM-ARGS-001",
     "TSM-CTOR-001",
+    "TSM-DISP-001",
     "TSM-INCLUDES-001",
     "TSM-REPLACE-001",
     "TSM-REQUIRE-001",

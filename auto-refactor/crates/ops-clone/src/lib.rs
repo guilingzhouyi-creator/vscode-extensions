@@ -1,3 +1,8 @@
+//! Module: Native Acceleration Kernel — MinHash, LSH & Clone Detection
+//! Crate: ops-clone
+//! Architecture Role: Rolling polynomial hash and LSH MinHash indexing for
+//! sub-quadratic code clone detection and cross-file duplicate identification.
+
 use std::collections::{HashMap, HashSet};
 
 const FNV1A_32_PRIME: u32 = 0x01000193;
@@ -144,11 +149,7 @@ pub fn detect_clone_blocks(content: &str, min_clone_lines: u32) -> Vec<CloneBloc
     let mut meaningful_lines: Vec<(usize, u32)> = Vec::new();
 
     for (line_idx, raw_slice) in content.split('\n').enumerate() {
-        let line = if raw_slice.ends_with('\r') {
-            &raw_slice[..raw_slice.len() - 1]
-        } else {
-            raw_slice
-        };
+        let line = raw_slice.strip_suffix('\r').unwrap_or(raw_slice);
         let trimmed = line.trim();
         if !trimmed.is_empty()
             && !trimmed.starts_with("//")
@@ -202,11 +203,7 @@ pub fn compute_minhash(content: &str, num_perm: usize) -> Vec<u32> {
 
     let mut meaningful_hashes: Vec<u32> = Vec::new();
     for raw_slice in content.split('\n') {
-        let line = if raw_slice.ends_with('\r') {
-            &raw_slice[..raw_slice.len() - 1]
-        } else {
-            raw_slice
-        };
+        let line = raw_slice.strip_suffix('\r').unwrap_or(raw_slice);
         let trimmed = line.trim();
         if !trimmed.is_empty()
             && !trimmed.starts_with("//")
@@ -276,8 +273,8 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
                 continue;
             }
             let mut band_hash = FNV1A_32_OFFSET_BASIS;
-            for r in start..end {
-                band_hash ^= sig[r];
+            for &val in &sig[start..end] {
+                band_hash ^= val;
                 band_hash = band_hash.wrapping_mul(FNV1A_32_PRIME);
             }
             buckets.entry(band_hash).or_default().push(file_idx as u32);

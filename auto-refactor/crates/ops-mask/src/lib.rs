@@ -1,5 +1,11 @@
+//! Module: Native Acceleration Kernel — Source Masking & Spectrum Extractor
+//! Crate: ops-mask
+//! Architecture Role: SIMD byte-level scanner for multilang string/comment masking
+//! and line statistics, providing 100% byte-parity with ECMAScript UTF-16 AST rules.
+
 use memchr::memchr;
 
+/// Configuration flags for source code comment and literal masking.
 #[derive(Debug, Clone)]
 pub struct MaskConfig {
     pub line_comment: String,
@@ -9,6 +15,7 @@ pub struct MaskConfig {
     pub regex_literals: bool,
 }
 
+/// Result of source code masking containing raw/masked line buffers and metrics.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaskResult {
     pub raw: Vec<String>,
@@ -25,6 +32,7 @@ struct MaskState {
 
 const REGEX_PREFIX_CHARS: &[u8] = b"([{,=:!&|?;+-*%<>";
 
+/// Tests if Unicode code point is ECMAScript whitespace or line terminator.
 #[inline]
 pub fn is_ecma_whitespace(ch: u32) -> bool {
     matches!(
@@ -43,6 +51,8 @@ pub fn is_ecma_whitespace(ch: u32) -> bool {
     )
 }
 
+/// Masks comments and string literals in source code according to the language profile.
+/// Returns both raw and masked line buffers alongside non-blank line counts.
 pub fn mask_source_code(content: &str, config: &MaskConfig) -> MaskResult {
     let mut raw = Vec::new();
     let mut masked = Vec::new();
@@ -52,11 +62,7 @@ pub fn mask_source_code(content: &str, config: &MaskConfig) -> MaskResult {
     // Split content by '\n', stripping trailing '\r' if present.
     // Note: empty content yields one empty line in JS ("".split('\n') -> [""])
     for raw_slice in content.split('\n') {
-        let line = if raw_slice.ends_with('\r') {
-            &raw_slice[..raw_slice.len() - 1]
-        } else {
-            raw_slice
-        };
+        let line = raw_slice.strip_suffix('\r').unwrap_or(raw_slice);
 
         // Check if line is non-blank according to ECMAScript trim()
         let is_non_blank = line.chars().any(|c| !is_ecma_whitespace(c as u32));
@@ -120,7 +126,11 @@ fn mask_line(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
 
     // Fast path: wholly inside a block comment and contains no closing delimiter
     if let Some((_, close)) = &config.block_comment {
-        if state.in_block_comment && state.quote.is_none() && !close.is_empty() && !line.contains(close) {
+        if state.in_block_comment
+            && state.quote.is_none()
+            && !close.is_empty()
+            && !line.contains(close)
+        {
             let space_count = if line.is_ascii() {
                 line.len()
             } else {
@@ -229,9 +239,7 @@ fn mask_line_ascii(line: &[u8], state: &mut MaskState, config: &MaskConfig) -> S
 
         // Code mode: check comments
         if !lc_bytes.is_empty() && line[index..].starts_with(lc_bytes) {
-            for rest in index..len {
-                out[rest] = b' ';
-            }
+            out[index..len].fill(b' ');
             return String::from_utf8(out).unwrap_or_default();
         }
 
@@ -304,7 +312,9 @@ fn mask_regex_body_u16(units: &[u16], index: usize, out: &mut [u16]) -> usize {
             in_class = false;
         } else if u == b'/' as u16 && !in_class {
             cursor += 1;
-            while cursor < len && (units[cursor] <= 127 && (units[cursor] as u8).is_ascii_alphabetic()) {
+            while cursor < len
+                && (units[cursor] <= 127 && (units[cursor] as u8).is_ascii_alphabetic())
+            {
                 out[cursor] = 0x20;
                 cursor += 1;
             }
@@ -368,9 +378,7 @@ fn mask_line_utf16(line: &str, state: &mut MaskState, config: &MaskConfig) -> St
         }
 
         if !lc_units.is_empty() && units[index..].starts_with(&lc_units) {
-            for rest in index..len {
-                out[rest] = 0x20;
-            }
+            out[index..len].fill(0x20);
             return String::from_utf16_lossy(&out);
         }
 
@@ -447,14 +455,20 @@ mod tests {
     fn test_regex_masking() {
         let code = "const re = /abc[0-9]\\//gi; const div = a / b / c;";
         let res = mask_source_code(code, &c_family_config());
-        assert_eq!(res.masked[0], "const re =               ; const div = a / b / c;");
+        assert_eq!(
+            res.masked[0],
+            "const re =               ; const div = a / b / c;"
+        );
     }
 
     #[test]
     fn test_chinese_and_unicode_char_count() {
         let code = "const msg = '你好世界'; // 这是注释";
         let res = mask_source_code(code, &c_family_config());
-        assert_eq!(res.raw[0].encode_utf16().count(), res.masked[0].encode_utf16().count());
+        assert_eq!(
+            res.raw[0].encode_utf16().count(),
+            res.masked[0].encode_utf16().count()
+        );
         assert!(res.masked[0].starts_with("const msg = "));
     }
 }

@@ -51,6 +51,10 @@ const ALL_ANALYZERS = {
   'data-architecture': { enabled: true },
   'test-modernity': { enabled: true },
   'dependency-layout': { enabled: true },
+  naming: { enabled: true },
+  'go-modern': { enabled: true },
+  'shell-lint': { enabled: true },
+  stdlib: { enabled: true },
 };
 
 /**

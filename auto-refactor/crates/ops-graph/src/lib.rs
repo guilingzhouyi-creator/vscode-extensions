@@ -1,11 +1,92 @@
+//! Module: Native Acceleration Kernel — Dependency Graph Analysis
+//! Crate: ops-graph
+//! Architecture Role: Tarjan SCC cycle detection and Kahn topological sorting
+//! for modular architecture rules and dependency graph traversal.
+
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+/// Result of graph analysis containing detected cycles, topological order, and SCCs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraphAnalysis {
     pub cycles: Vec<Vec<String>>,
     pub topological_order: Vec<String>,
     pub strongly_connected_components: Vec<Vec<String>>,
     pub is_acyclic: bool,
+}
+
+struct TarjanState<'a> {
+    adjacency: &'a HashMap<String, HashSet<String>>,
+    index_counter: usize,
+    indices: HashMap<String, usize>,
+    lowlinks: HashMap<String, usize>,
+    on_stack: HashSet<String>,
+    stack: Vec<String>,
+    sccs: Vec<Vec<String>>,
+    cycles: Vec<Vec<String>>,
+}
+
+impl<'a> TarjanState<'a> {
+    fn new(adjacency: &'a HashMap<String, HashSet<String>>) -> Self {
+        Self {
+            adjacency,
+            index_counter: 0,
+            indices: HashMap::new(),
+            lowlinks: HashMap::new(),
+            on_stack: HashSet::new(),
+            stack: Vec::new(),
+            sccs: Vec::new(),
+            cycles: Vec::new(),
+        }
+    }
+
+    fn strong_connect(&mut self, node: &str) {
+        self.indices.insert(node.to_string(), self.index_counter);
+        self.lowlinks.insert(node.to_string(), self.index_counter);
+        self.index_counter += 1;
+        self.stack.push(node.to_string());
+        self.on_stack.insert(node.to_string());
+
+        if let Some(neighbors) = self.adjacency.get(node) {
+            for neighbor in neighbors {
+                if !self.indices.contains_key(neighbor) {
+                    self.strong_connect(neighbor);
+                    let n_low = self.lowlinks.get(neighbor).copied().unwrap_or(0);
+                    if let Some(curr_low) = self.lowlinks.get_mut(node) {
+                        *curr_low = (*curr_low).min(n_low);
+                    }
+                } else if self.on_stack.contains(neighbor) {
+                    let n_idx = self.indices.get(neighbor).copied().unwrap_or(0);
+                    if let Some(curr_low) = self.lowlinks.get_mut(node) {
+                        *curr_low = (*curr_low).min(n_idx);
+                    }
+                }
+            }
+        }
+
+        let is_root = self.lowlinks.get(node) == self.indices.get(node);
+        if is_root {
+            let mut scc = Vec::new();
+            while let Some(w) = self.stack.pop() {
+                self.on_stack.remove(&w);
+                let is_node = w == node;
+                scc.push(w);
+                if is_node {
+                    break;
+                }
+            }
+            self.sccs.push(scc.clone());
+
+            if scc.len() > 1 {
+                self.cycles.push(scc);
+            } else if let Some(single) = scc.first() {
+                if let Some(neighbors) = self.adjacency.get(single) {
+                    if neighbors.contains(single) {
+                        self.cycles.push(vec![single.clone(), single.clone()]);
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub fn run_analyze_dependency_graph(edges: &[Vec<String>]) -> GraphAnalysis {
@@ -30,94 +111,14 @@ pub fn run_analyze_dependency_graph(edges: &[Vec<String>]) -> GraphAnalysis {
     }
 
     // 1. Tarjan's Strongly Connected Components (SCC)
-    let mut index_counter = 0usize;
-    let mut indices: HashMap<String, usize> = HashMap::new();
-    let mut lowlinks: HashMap<String, usize> = HashMap::new();
-    let mut on_stack: HashSet<String> = HashSet::new();
-    let mut stack: Vec<String> = Vec::new();
-    let mut sccs: Vec<Vec<String>> = Vec::new();
-    let mut cycles: Vec<Vec<String>> = Vec::new();
-
-    fn strong_connect(
-        node: &str,
-        adjacency: &HashMap<String, HashSet<String>>,
-        index_counter: &mut usize,
-        indices: &mut HashMap<String, usize>,
-        lowlinks: &mut HashMap<String, usize>,
-        on_stack: &mut HashSet<String>,
-        stack: &mut Vec<String>,
-        sccs: &mut Vec<Vec<String>>,
-        cycles: &mut Vec<Vec<String>>,
-    ) {
-        indices.insert(node.to_string(), *index_counter);
-        lowlinks.insert(node.to_string(), *index_counter);
-        *index_counter += 1;
-        stack.push(node.to_string());
-        on_stack.insert(node.to_string());
-
-        if let Some(neighbors) = adjacency.get(node) {
-            for neighbor in neighbors {
-                if !indices.contains_key(neighbor) {
-                    strong_connect(
-                        neighbor,
-                        adjacency,
-                        index_counter,
-                        indices,
-                        lowlinks,
-                        on_stack,
-                        stack,
-                        sccs,
-                        cycles,
-                    );
-                    let n_low = lowlinks[neighbor];
-                    let curr_low = lowlinks.get_mut(node).unwrap();
-                    *curr_low = (*curr_low).min(n_low);
-                } else if on_stack.contains(neighbor) {
-                    let n_idx = indices[neighbor];
-                    let curr_low = lowlinks.get_mut(node).unwrap();
-                    *curr_low = (*curr_low).min(n_idx);
-                }
-            }
-        }
-
-        if lowlinks[node] == indices[node] {
-            let mut scc = Vec::new();
-            while let Some(w) = stack.pop() {
-                on_stack.remove(&w);
-                scc.push(w.clone());
-                if w == node {
-                    break;
-                }
-            }
-            sccs.push(scc.clone());
-
-            if scc.len() > 1 {
-                cycles.push(scc);
-            } else if let Some(single) = scc.first() {
-                if let Some(neighbors) = adjacency.get(single) {
-                    if neighbors.contains(single) {
-                        cycles.push(vec![single.clone(), single.clone()]);
-                    }
-                }
-            }
-        }
-    }
-
+    let mut tarjan = TarjanState::new(&adjacency);
     for node in &all_nodes {
-        if !indices.contains_key(node) {
-            strong_connect(
-                node,
-                &adjacency,
-                &mut index_counter,
-                &mut indices,
-                &mut lowlinks,
-                &mut on_stack,
-                &mut stack,
-                &mut sccs,
-                &mut cycles,
-            );
+        if !tarjan.indices.contains_key(node) {
+            tarjan.strong_connect(node);
         }
     }
+    let cycles = tarjan.cycles;
+    let sccs = tarjan.sccs;
 
     // 2. Kahn's Topological Sort
     let mut in_degree_copy = in_degree.clone();
@@ -328,11 +329,9 @@ pub fn compute_dominator_tree(
     for edge in edges {
         if edge.len() >= 2 {
             if let (Some(&u), Some(&v)) = (name_to_id.get(&edge[0]), name_to_id.get(&edge[1])) {
-                if doms[u] != usize::MAX && doms[v] != usize::MAX {
-                    if node_dominates(&doms, u, v) {
-                        back_edges.push((edge[0].clone(), edge[1].clone()));
-                        loop_headers_set.insert(edge[1].clone());
-                    }
+                if doms[u] != usize::MAX && doms[v] != usize::MAX && node_dominates(&doms, u, v) {
+                    back_edges.push((edge[0].clone(), edge[1].clone()));
+                    loop_headers_set.insert(edge[1].clone());
                 }
             }
         }
@@ -349,7 +348,10 @@ pub fn compute_dominator_tree(
 
     let mut df_map = HashMap::new();
     for &b in &rpo {
-        let targets: Vec<String> = df[b].iter().map(|&idx| all_node_names[idx].clone()).collect();
+        let targets: Vec<String> = df[b]
+            .iter()
+            .map(|&idx| all_node_names[idx].clone())
+            .collect();
         df_map.insert(all_node_names[b].clone(), targets);
     }
 

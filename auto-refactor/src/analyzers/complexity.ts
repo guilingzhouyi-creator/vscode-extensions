@@ -266,9 +266,58 @@ export class ComplexityAnalyzer implements Analyzer {
         this.fileFunctions.push({ name, startLine, endLine, cc, lines: fnLines });
 
         this.checkElasticBudget(node, ctx, name, cc, loc, clarity.maxDepth, startLine);
+        this.checkCognitiveHopCost(node, ctx, name, loc, clarity.maxDepth, startLine, fnLines);
 
         if (cc >= clarity.effectiveWarn) {
             this.issues.push(buildComplexityIssue(node, ctx, name, cc, clarity));
+        }
+    }
+
+    private checkCognitiveHopCost(
+        node: NormalizedNode,
+        ctx: AnalyzerContext,
+        name: string,
+        loc: number,
+        maxDepth: number,
+        startLine: number,
+        fnLines: string[],
+    ): void {
+        if (loc < 50 || maxDepth < 4) return;
+
+        let deepJumpLine = -1;
+        for (let i = 0; i < fnLines.length; i++) {
+            const line = fnLines[i];
+            const trimmed = line.trimStart();
+            const indentSpaces = line.length - trimmed.length;
+            if (indentSpaces >= 16 && /^(?:return\b|throw\b|break\b|continue\b)/.test(trimmed)) {
+                if (i >= 30) {
+                    deepJumpLine = startLine + i;
+                    break;
+                }
+            }
+        }
+
+        if (deepJumpLine > 0) {
+            this.issues.push({
+                id: `${ANALYZER_COMPLEXITY}:CPX-HOP-001:${ctx.filePath}:${deepJumpLine}`,
+                analyzer: ANALYZER_COMPLEXITY,
+                rule: 'CPX-HOP-001',
+                severity: SEVERITY_WARNING,
+                message: `Cognitive jump cost: deep control-flow jump (nesting >= 4) in function '${name}' over long span (${loc} LOC).`,
+                location: {
+                    file: ctx.filePath,
+                    start: { line: deepJumpLine, column: 1 },
+                    end: { line: deepJumpLine, column: 1 },
+                },
+                detail: {
+                    function: name,
+                    loc,
+                    maxDepth,
+                    jumpLine: deepJumpLine,
+                },
+                suggestion:
+                    'Extract deeply nested block into a localized helper method to reduce cognitive jump distance.',
+            });
         }
     }
 

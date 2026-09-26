@@ -26,7 +26,7 @@ const ROOT = path.join(__dirname, '..');
 const CLI = path.join(ROOT, 'dist', 'index.js');
 const CONFIG = path.join(ROOT, 'auto-refactor.config.json');
 const BASELINE = path.join(ROOT, 'baselines', 'self-scan.baseline.json');
-const INCLUDE = 'src/**/*.ts,scripts/*.js';
+const INCLUDE = 'src/**/*.ts,scripts/*.js,crates/**/*.rs';
 // Kept outside the work tree: a gate must never leave artifacts that need ignore rules.
 const REPORT = path.join(os.tmpdir(), `auto-refactor-self-scan-${process.pid}.json`);
 

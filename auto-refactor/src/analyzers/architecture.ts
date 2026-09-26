@@ -162,6 +162,12 @@ export class ArchitectureAnalyzer implements Analyzer {
         if (opts.enforceCleanLayers === false) {
             return [];
         }
+        if (
+            ctx.config.archetype === 'stdlib' ||
+            ctx.config.archetype === 'systems_runtime'
+        ) {
+            return [];
+        }
 
         const file = ctx.filePath.replace(/\\/g, '/');
         const currentLayer = this.resolveLayer(file, opts, ctx);
@@ -338,6 +344,7 @@ export class ArchitectureAnalyzer implements Analyzer {
     ): void {
         this.checkMutableGlobalState(lineText, file, lineIdx, ctx, opts, issues);
         this.checkDirectConfigAccess(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
+        this.checkDtoLeakage(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
     }
 
     private checkDtoLeakage(

@@ -18,6 +18,8 @@ import {
     COMMENT_LEVEL_OFF,
 } from '../core/types';
 
+import { parseHumanMetric } from '../core/config/metric-parser';
+
 /** Boolean `--daemon` CLI flag name opting into daemon auto-start. */
 export const DAEMON_FLAG = 'daemon';
 
@@ -63,6 +65,9 @@ const VALID_SECURITY_LEVELS = new Set<string>([SECURITY_LEVEL_OFF, STR_BASIC, ST
 export interface CliOptions extends ScanOptions {
     out?: string;
     cacheClear?: boolean;
+    effectiveLoc?: number;
+    fileLinesWarn?: number;
+    fileLinesFail?: number;
 }
 
 /**
@@ -174,6 +179,7 @@ function applyGeneralValueFlag(opt: CliOptions, arg: string, val: string): boole
                 .filter(Boolean);
             return true;
         case 'out':
+        case 'output':
             opt.out = val;
             return true;
         case 'root':
@@ -221,6 +227,16 @@ function applyNumericOrPathFlag(opt: CliOptions, arg: string, val: string): bool
             return true;
         case 'log-level':
             opt.logLevel = val as LogLevel;
+            return true;
+        case 'effective-loc':
+        case 'max-sloc':
+            opt.effectiveLoc = parseHumanMetric(val);
+            return true;
+        case 'file-lines-warn':
+            opt.fileLinesWarn = parseHumanMetric(val);
+            return true;
+        case 'file-lines-fail':
+            opt.fileLinesFail = parseHumanMetric(val);
             return true;
         default:
             return false;
@@ -380,6 +396,8 @@ Options:
   --no-daemon                 Never connect to the daemon (pure cold scan)
   --comment-level <level>      Leveled comment audit: off | basic | standard | strict (default: standard)
   --security-level <level>     Leveled security audit: off | basic | full (default: basic)
+  --effective-loc <size>      Effective Code Lines (ECL) budget (e.g. 800, 1k, 2.5k, 50k; default: 800)
+  --file-lines-warn <size>    Physical line warning threshold (supports 800, 1k, 2k, etc.)
   --auto-tune                 Enable scale-adaptive dynamic threshold and option tuning
   --profile                   Display auto-detected project stack profile and partition details
   --score                     Output multi-dimensional quality assessment and Tri-Plane vectors

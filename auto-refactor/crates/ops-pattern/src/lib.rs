@@ -1,3 +1,8 @@
+//! Module: Native Acceleration Kernel — Multi-Pattern Search
+//! Crate: ops-pattern
+//! Architecture Role: Fast line-aware multi-pattern search operator
+//! for forbidden tokens, imports, and AST pattern anchors.
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatternMatch {
     pub pattern: String,

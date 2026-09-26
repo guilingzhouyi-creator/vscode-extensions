@@ -35,6 +35,7 @@ sarif/
 *.tsbuildinfo
 err.txt
 out.txt
+**/reports/audit-*.json
 
 # 版本归档（历史快照 / 备份 / 演示材料，统一集中管理）
 /archive/

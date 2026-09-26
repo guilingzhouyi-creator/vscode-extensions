@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Go Language Adapter
- * File Path: src/core/ast/go-adapter.ts
+ * File Path: src/core/ast/go-adapter-parser.ts
  * Architecture Role: LanguageAdapter implementation mapping Go (.go) source files into
  *   normalized AST (NormalizedNode) for multi-language analyzer traversal.
  * Dependencies & Triggers: multilang contracts (NodeKind, NormalizedNode, NormalizedAst,

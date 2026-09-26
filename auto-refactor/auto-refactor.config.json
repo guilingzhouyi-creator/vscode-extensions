@@ -4,7 +4,7 @@
   "failOnIssue": false,
   "commentLevel": "standard",
   "autoTune": true,
-  "include": ["src/**/*.ts", "scripts/*.js"],
+  "include": ["src/**/*.ts", "scripts/*.js", "crates/**/*.rs"],
   "exclude": ["node_modules", ".git", "dist", "build", "coverage", "testdata"],
   "thresholds": {
     "magicNumberMin": 3,
@@ -12,11 +12,13 @@
     "hardcodedStringMinLength": 4,
     "fileLinesWarn": 400,
     "fileLinesFail": 900,
+    "effectiveLocWarn": 800,
+    "effectiveLocFail": 1600,
     "fileFunctionsWarn": 20,
     "complexityWarn": 12,
     "complexityFail": 25,
-    "blockingIoAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**"],
-    "allocationAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**"]
+    "blockingIoAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**", "src/core/intelligence/**"],
+    "allocationAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**", "src/core/intelligence/**"]
   },
   "analyzers": {
     "constants": {
@@ -52,6 +54,11 @@
   "respectGitignore": true,
   "failOnAnalyzerError": false,
   "suppressions": [
+    {
+      "matchFile": "crates/ops-graph/src/lib.rs",
+      "matchRule": "high-complexity",
+      "reason": "图论支配树算法（Lengauer-Tarjan/CHK）为高复杂度密集算子，具有多分支回溯流。"
+    },
     {
       "matchFile": "scripts/validate-capabilities.js",
       "matchRule": "secret-detected",
