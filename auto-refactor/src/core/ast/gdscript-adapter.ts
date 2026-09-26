@@ -328,7 +328,9 @@ export class GDScriptAdapter implements LanguageAdapter {
                 }
                 if (ch === '(') {
                     depth++;
-                } else if (ch === ')') {
+                    continue;
+                }
+                if (ch === ')') {
                     depth--;
                     if (depth === 0) {
                         if (col0 >= openIdx && col0 <= i) {

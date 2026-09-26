@@ -11,6 +11,7 @@
  */
 import type { AnalyzerContext } from '../core/types';
 import type { NormalizedNode } from '../core/multilang';
+import { NodeKind } from '../core/multilang';
 
 /** Number of preceding lines inspected for JSDoc or structured dispatch contract markers. */
 const JSDOC_LOOKAHEAD_LINES = 10;
@@ -34,6 +35,7 @@ export interface StructuredClarityResult {
 /**
  * Compute the maximum control-flow nesting depth inside a function node.
  * Does not descend into child function-like nodes.
+ * Excludes redundant Block containers to measure true control-flow branch depth.
  *
  * @param node - Function node being analyzed.
  * @param currentDepth - Current nesting depth in traversal.
@@ -46,7 +48,10 @@ function computeMaxBranchDepth(node: NormalizedNode, currentDepth = 0): number {
     for (let i = 0; i < kids.length; i++) {
         const c = kids[i];
         if (c.functionLike) continue;
-        const nextDepth = c.increasesNesting ? currentDepth + 1 : currentDepth;
+        const isNestingControl =
+            c.kind === NodeKind.ControlFlow ||
+            (Boolean(c.increasesNesting) && c.kind !== NodeKind.Block);
+        const nextDepth = isNestingControl ? currentDepth + 1 : currentDepth;
         const childMax = computeMaxBranchDepth(c, nextDepth);
         if (childMax > max) max = childMax;
     }

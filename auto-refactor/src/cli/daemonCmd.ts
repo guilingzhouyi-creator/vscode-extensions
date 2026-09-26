@@ -147,22 +147,33 @@ async function startDaemon(root: string, projectHash: string): Promise<DaemonCli
     child.unref();
 
     // Wait for the registry + a successful ping (up to ~5s).
+    const pollResult = await pollDaemonReady(root, projectHash);
+    if (pollResult) {
+        return pollResult;
+    }
+    return { code: 1, text: `daemon failed to become ready within 5s (root=${root})` };
+}
+
+/**
+ * Polls the daemon registry and probes the socket until successfully connected or timeout.
+ */
+async function pollDaemonReady(root: string, projectHash: string): Promise<DaemonCliResult | null> {
     for (let i = 0; i < DAEMON_START_MAX_ATTEMPTS; i++) {
         await sleep(DAEMON_POLL_INTERVAL_MS);
         const reg = readRegistry(projectHash);
-        if (reg) {
-            const probe = new DaemonClient(root, projectHash);
-            try {
-                await probe.connect(DAEMON_LIFECYCLE_TIMEOUT_MS);
-                await probe.ping(DAEMON_LIFECYCLE_TIMEOUT_MS);
-                probe.close();
-                return { code: 0, text: `daemon started (pid ${reg.pid}, pipe ${reg.pipe})` };
-            } catch {
-                /* Expected: not ready yet — keep polling */
-            }
+        if (!reg) continue;
+
+        const probe = new DaemonClient(root, projectHash);
+        try {
+            await probe.connect(DAEMON_LIFECYCLE_TIMEOUT_MS);
+            await probe.ping(DAEMON_LIFECYCLE_TIMEOUT_MS);
+            probe.close();
+            return { code: 0, text: `daemon started (pid ${reg.pid}, pipe ${reg.pipe})` };
+        } catch {
+            /* Expected: not ready yet — keep polling */
         }
     }
-    return { code: 1, text: `daemon failed to become ready within 5s (root=${root})` };
+    return null;
 }
 
 /**

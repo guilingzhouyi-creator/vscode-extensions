@@ -713,6 +713,20 @@ export const DEDUCTION_BOUNDARY_IMBALANCE = 15;
 /** Points deducted for mechanical decomposition and trivial forwarding wrappers. */
 export const DEDUCTION_MECHANICAL_SPLITTING = 15;
 
+/** Rule id for unbounded deep control-flow nesting exceeding contextual budget. */
+export const RULE_CPX_NEST_001 = 'CPX-NEST-001';
+/** Rule id for deep control-flow jump over long cognitive distance. */
+export const RULE_CPX_NEST_002 = 'CPX-NEST-002';
+/** Rule id for state machine structural dispatch discipline. */
+export const RULE_CPX_STM_001 = 'CPX-STM-001';
+
+/** Points deducted for unbounded deep control-flow nesting. */
+export const DEDUCTION_UNBOUNDED_NESTING = 12;
+/** Points deducted for deep long-span control flow escape. */
+export const DEDUCTION_DEEP_CONTROL_ESCAPE = 12;
+/** Points deducted for state machine structural dispatch discipline violations. */
+export const DEDUCTION_STATE_MACHINE_DISCIPLINE = 8;
+
 /** Rule id for project-scale distributed redundant complexity. */
 export const RULE_CPX_RED_001 = 'CPX-RED-001';
 /** Rule id for misclassified pseudo-shared library and boundary drift. */

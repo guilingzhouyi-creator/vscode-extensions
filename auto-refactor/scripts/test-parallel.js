@@ -190,6 +190,10 @@ const PARALLEL_SUITES = [
     name: 'validate-project-governance-evaluator',
     script: 'scripts/validate-project-governance-evaluator.js',
   },
+  {
+    name: 'validate-control-flow-nesting-tolerance',
+    script: 'scripts/validate-control-flow-nesting-tolerance.js',
+  },
 ];
 
 // Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)

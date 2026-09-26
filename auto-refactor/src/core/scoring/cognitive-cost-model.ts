@@ -16,7 +16,7 @@ import { SEVERITY_WARNING } from '../types';
 import { ANALYZER_COMPLEXITY, RULE_CPX_HOP_001 } from './dimensionLiterals';
 
 /**
- * Metric descriptor for a function evaluated for mechanical decomposition.
+ * Metric descriptor for a function evaluated for mechanical decomposition and control-flow nesting.
  */
 export interface FunctionDecompositionMetric {
     name: string;
@@ -25,18 +25,83 @@ export interface FunctionDecompositionMetric {
     callDepth: number;
     isForwardingWrapper: boolean;
     delegatesTo?: string;
+    maxDepth?: number;
+    nestingSpan?: number;
 }
 
 /**
- * Result of cognitive cost and anti-gaming evaluation.
+ * Context role for control-flow nesting elasticity.
+ */
+export type NestingContextRole =
+    | 'parser'
+    | 'state-machine'
+    | 'algorithm'
+    | 'infrastructure'
+    | 'rule'
+    | 'business';
+
+/**
+ * Result of cognitive cost, CFNI, and anti-gaming evaluation.
  */
 export interface CognitiveCostEvaluation {
     isGaming: boolean;
     netCognitiveGain: number;
     hopPenalty: number;
     wrapperCount: number;
+    cfni: number;
+    nestingPenalty: number;
     issues: Issue[];
     recommendation?: string;
+}
+
+/**
+ * Calculates the Control Flow Nesting Index (CFNI) and continuous weighted penalty.
+ *
+ * @param metrics - Function metrics including depth and span.
+ * @param role - Contextual role of the file or routine.
+ * @returns Object with CFNI (0..100) and continuous weighted nesting penalty.
+ */
+export function calculateControlFlowNestingIndex(
+    metrics: Array<FunctionDecompositionMetric>,
+    role: NestingContextRole = 'business',
+): { cfni: number; nestingPenalty: number } {
+    if (metrics.length === 0) {
+        return { cfni: 100, nestingPenalty: 0 };
+    }
+
+    // Role correction factor kappa
+    const kappaMap: Record<NestingContextRole, number> = {
+        parser: 0.4,
+        'state-machine': 0.4,
+        algorithm: 0.6,
+        infrastructure: 0.8,
+        rule: 1.2,
+        business: 1.2,
+    };
+    const kappa = kappaMap[role] ?? 1.0;
+
+    // Context-aware depth budget
+    const budget = role === 'parser' || role === 'state-machine' ? 5 : 3;
+
+    let totalPenalty = 0;
+    for (const fn of metrics) {
+        const depth = fn.maxDepth ?? 1;
+        const excessDepth = Math.max(0, depth - budget);
+        if (excessDepth > 0) {
+            const span = fn.nestingSpan ?? fn.loc;
+            const spanRatio = fn.loc > 0 ? Math.min(1.0, span / fn.loc) : 1.0;
+            const ccFactor = 1 + (fn.cc || 1) / 10;
+            const fnPenalty = kappa * excessDepth * spanRatio * ccFactor;
+            totalPenalty += fnPenalty;
+        }
+    }
+
+    // CFNI starts at 100, smoothly damped by total penalty
+    const cfni = Math.max(0, Math.min(100, Math.round(100 - totalPenalty * 4)));
+    return {
+        cfni,
+        nestingPenalty: Number(totalPenalty.toFixed(2)),
+    };
 }
 
 /**
@@ -119,11 +184,15 @@ export function evaluateNetCognitiveCost(
     const isGaming =
         wrapperCount >= 3 && (previousMaxCC !== undefined ? netCognitiveGain <= 0 : true);
 
+    const { cfni, nestingPenalty } = calculateControlFlowNestingIndex(metrics);
+
     return {
         isGaming,
         netCognitiveGain,
         hopPenalty,
         wrapperCount,
+        cfni,
+        nestingPenalty,
         issues,
         recommendation: isGaming
             ? 'Reject superficial CC metric optimization; consolidate pass-through hops.'

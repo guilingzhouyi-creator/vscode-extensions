@@ -242,6 +242,38 @@ export const ScoringRationales = {
      */
     MAX_NESTING_DEPTH_OVERFLOW: (depth: number) =>
         `Maximum nesting depth is ${depth}; consider extracting helper functions`,
+    /**
+     * Format the rationale for unbounded deep control-flow nesting exceeding contextual budget.
+     *
+     * @param msg - Analyzer finding text embedded after the rationale prefix.
+     * @returns Deduction rationale for the maintainability dimension.
+     */
+    UNBOUNDED_NESTING: (msg: string) =>
+        `Unbounded deep control-flow nesting exceeding contextual budget: ${msg}`,
+    /**
+     * Format the rationale for deep control-flow escape over long cognitive distance.
+     *
+     * @param msg - Analyzer finding text embedded after the rationale prefix.
+     * @returns Deduction rationale for the maintainability dimension.
+     */
+    DEEP_CONTROL_ESCAPE: (msg: string) =>
+        `Deep control-flow escape over long cognitive distance: ${msg}`,
+    /**
+     * Format the rationale for mechanical decomposition and trivial forwarding wrappers.
+     *
+     * @param msg - Analyzer finding text embedded after the rationale prefix.
+     * @returns Deduction rationale for the maintainability dimension.
+     */
+    MECHANICAL_SPLITTING: (msg: string) =>
+        `Mechanical function splitting and trivial forwarding wrappers: ${msg}`,
+    /**
+     * Format the rationale for state machine structural dispatch discipline violations.
+     *
+     * @param msg - Analyzer finding text embedded after the rationale prefix.
+     * @returns Deduction rationale for the maintainability dimension.
+     */
+    STATE_MACHINE_DISCIPLINE: (msg: string) =>
+        `State machine structural dispatch discipline violation: ${msg}`,
 
     // 8. Comment Quality
     /**
