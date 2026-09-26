@@ -321,4 +321,96 @@ mod tests {
         assert_eq!(hunks[0].old_start, 1);
         assert_eq!(hunks[0].new_start, 1);
     }
+
+    #[test]
+    fn test_empty_inputs() {
+        assert!(run_histogram_diff("", "").is_empty());
+        let add_hunks = run_histogram_diff("", "line1\nline2");
+        assert_eq!(add_hunks.len(), 1);
+        assert_eq!(add_hunks[0].new_lines, 2);
+
+        let del_hunks = run_histogram_diff("line1\nline2", "");
+        assert_eq!(del_hunks.len(), 1);
+        assert_eq!(del_hunks[0].old_lines, 2);
+    }
+
+    #[test]
+    fn test_pure_insertion_and_deletion() {
+        let ins = run_histogram_diff("a\nb\nc", "a\nb\nINS\nc");
+        assert_eq!(ins.len(), 1);
+        assert!(ins[0].lines.iter().any(|l| l.starts_with("+INS")));
+
+        let del = run_histogram_diff("a\nb\nDEL\nc", "a\nb\nc");
+        assert_eq!(del.len(), 1);
+        assert!(del[0].lines.iter().any(|l| l.starts_with("-DEL")));
+    }
+
+    #[test]
+    fn test_unicode_and_multilingual_diff() {
+        let old_text = "fn greet() {\n    let msg = \"你好，世界！\";\n}";
+        let new_text = "fn greet() {\n    let msg = \"你好，Rust加速世界！\";\n}";
+        let hunks = run_histogram_diff(old_text, new_text);
+        assert_eq!(hunks.len(), 1);
+        assert!(hunks[0].lines.iter().any(|l| l.contains("Rust加速世界")));
+    }
+
+    #[test]
+    fn test_large_common_prefix_suffix() {
+        let mut old_lines = Vec::new();
+        let mut new_lines = Vec::new();
+        for i in 0..50 {
+            old_lines.push(format!("stable_prefix_line_{}", i));
+            new_lines.push(format!("stable_prefix_line_{}", i));
+        }
+        old_lines.push("old_mid_line".to_string());
+        new_lines.push("new_mid_line".to_string());
+        for i in 0..50 {
+            old_lines.push(format!("stable_suffix_line_{}", i));
+            new_lines.push(format!("stable_suffix_line_{}", i));
+        }
+        let hunks = run_histogram_diff(&old_lines.join("\n"), &new_lines.join("\n"));
+        assert_eq!(hunks.len(), 1);
+        assert!(hunks[0].lines.iter().any(|l| l.contains("-old_mid_line")));
+        assert!(hunks[0].lines.iter().any(|l| l.contains("+new_mid_line")));
+    }
+
+    #[test]
+    fn test_disjoint_replacement() {
+        let hunks = run_histogram_diff("one\ntwo\nthree", "alpha\nbeta\ngamma");
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].old_lines, 3);
+        assert_eq!(hunks[0].new_lines, 3);
+    }
+
+    #[test]
+    fn test_trailing_newline_differences() {
+        let hunks = run_histogram_diff("first\nsecond", "first\nsecond\nthird");
+        assert_eq!(hunks.len(), 1);
+        assert!(hunks[0].lines.iter().any(|l| l.starts_with("+third")));
+    }
+
+    #[test]
+    fn test_multiple_separated_hunks() {
+        let mut old_lines: Vec<String> = Vec::new();
+        let mut new_lines: Vec<String> = Vec::new();
+
+        old_lines.push("HEAD_ORIG".to_string());
+        new_lines.push("HEAD_MOD".to_string());
+
+        for i in 0..10 {
+            let filler = format!("filler_line_{}", i);
+            old_lines.push(filler.clone());
+            new_lines.push(filler);
+        }
+
+        old_lines.push("TAIL_ORIG".to_string());
+        new_lines.push("TAIL_MOD".to_string());
+
+        let old_text = old_lines.join("\n");
+        let new_text = new_lines.join("\n");
+        let hunks = run_histogram_diff(&old_text, &new_text);
+        assert_eq!(hunks.len(), 2);
+        assert!(hunks[0].lines.iter().any(|l| l.contains("HEAD_MOD")));
+        assert!(hunks[1].lines.iter().any(|l| l.contains("TAIL_MOD")));
+    }
 }

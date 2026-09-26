@@ -375,4 +375,74 @@ mod tests {
         assert_eq!(pairs[0].file_b, 1);
         assert!((pairs[0].similarity - 1.0).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_empty_and_trivial_clone() {
+        assert_eq!(count_duplicate_lines(""), 0);
+        assert_eq!(count_duplicate_lines("   \n\n\t\n"), 0);
+        assert!(detect_clone_blocks("", 3).is_empty());
+        assert!(detect_clone_blocks("const a = 1;", 3).is_empty());
+
+        let sig = compute_minhash("", 64);
+        assert_eq!(sig.len(), 64);
+    }
+
+    #[test]
+    fn test_lsh_threshold_filtering() {
+        let mut lines_base = Vec::new();
+        for i in 0..20 {
+            lines_base.push(format!("    let var_{} = compute_val({});", i, i));
+        }
+        let mut lines_similar = lines_base.clone();
+        lines_similar[10] = "    let var_10 = compute_val_modified(10);".to_string();
+
+        let code_base = lines_base.join("\n");
+        let code_similar = lines_similar.join("\n");
+        let code_diff = "class UnrelatedClass {\n    private id = 1;\n}\n";
+
+        let sig_1 = compute_minhash(&code_base, 64);
+        let sig_2 = compute_minhash(&code_similar, 64);
+        let sig_3 = compute_minhash(code_diff, 64);
+
+        let high_thresh = find_clone_pairs(&[sig_1.clone(), sig_2.clone(), sig_3.clone()], 0.99);
+        assert!(high_thresh.is_empty());
+
+        let med_thresh = find_clone_pairs(&[sig_1, sig_2, sig_3], 0.6);
+        assert_eq!(med_thresh.len(), 1);
+    }
+
+    #[test]
+    fn test_minhash_permutation_counts() {
+        let code = "const tokenA = 100;\nconst tokenB = 200;\n";
+        assert_eq!(compute_minhash(code, 16).len(), 16);
+        assert_eq!(compute_minhash(code, 32).len(), 32);
+        assert_eq!(compute_minhash(code, 64).len(), 64);
+    }
+
+    #[test]
+    fn test_clone_blocks_min_span_boundary() {
+        let code = "a();\nb();\nc();\nx();\na();\nb();\nc();\n";
+        let clones_3 = detect_clone_blocks(code, 3);
+        assert_eq!(clones_3.len(), 1);
+
+        let clones_4 = detect_clone_blocks(code, 4);
+        assert!(clones_4.is_empty());
+    }
+
+    #[test]
+    fn test_lsh_empty_and_single_signature() {
+        assert!(find_clone_pairs(&[], 0.8).is_empty());
+        let single_sig = vec![1, 2, 3, 4];
+        assert!(find_clone_pairs(&[single_sig], 0.8).is_empty());
+    }
+
+    #[test]
+    fn test_detect_clone_blocks_overlapping_prevention() {
+        let code = "x();\nx();\nx();\nx();\nx();\nx();\n";
+        let clones = detect_clone_blocks(code, 3);
+        assert!(!clones.is_empty());
+        for clone in &clones {
+            assert!(clone.start_line >= clone.original_line + clone.line_span);
+        }
+    }
 }

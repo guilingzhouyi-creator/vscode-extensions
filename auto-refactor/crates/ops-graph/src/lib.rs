@@ -589,4 +589,94 @@ mod tests {
         assert!(out_n3.contains(&"y".to_string()));
         assert!(!out_n3.contains(&"x".to_string()));
     }
+
+    #[test]
+    fn test_empty_graph() {
+        let empty_analysis = run_analyze_dependency_graph(&[]);
+        assert!(empty_analysis.is_acyclic);
+        assert!(empty_analysis.cycles.is_empty());
+        assert!(empty_analysis.topological_order.is_empty());
+    }
+
+    #[test]
+    fn test_self_loop() {
+        let edges = vec![vec!["A".to_string(), "A".to_string()]];
+        let analysis = run_analyze_dependency_graph(&edges);
+        assert!(!analysis.is_acyclic);
+        assert_eq!(analysis.cycles.len(), 1);
+        assert_eq!(analysis.cycles[0], vec!["A".to_string(), "A".to_string()]);
+    }
+
+    #[test]
+    fn test_disconnected_components() {
+        let edges = vec![
+            vec!["A".to_string(), "B".to_string()],
+            vec!["C".to_string(), "D".to_string()],
+            vec!["E".to_string(), "F".to_string()],
+            vec!["F".to_string(), "E".to_string()],
+        ];
+        let analysis = run_analyze_dependency_graph(&edges);
+        assert!(!analysis.is_acyclic);
+        assert_eq!(analysis.cycles.len(), 1);
+        assert!(analysis.strongly_connected_components.len() >= 3);
+    }
+
+    #[test]
+    fn test_backward_dataflow() {
+        let edges = vec![
+            vec!["entry".to_string(), "middle".to_string()],
+            vec!["middle".to_string(), "exit".to_string()],
+        ];
+        let mut gen = HashMap::new();
+        gen.insert("exit".to_string(), vec!["live_var".to_string()]);
+
+        let res = solve_dataflow("entry", &[], &edges, false, &gen, &HashMap::new());
+        assert!(res.iterations >= 2);
+        let in_middle = res.in_sets.get("middle").unwrap();
+        assert!(in_middle.contains(&"live_var".to_string()));
+    }
+
+    #[test]
+    fn test_topological_sort_kahn() {
+        let edges = vec![
+            vec!["A".to_string(), "B".to_string()],
+            vec!["B".to_string(), "C".to_string()],
+            vec!["C".to_string(), "D".to_string()],
+        ];
+        let analysis = run_analyze_dependency_graph(&edges);
+        assert!(analysis.is_acyclic);
+        assert_eq!(analysis.topological_order, vec!["A", "B", "C", "D"]);
+    }
+
+    #[test]
+    fn test_dominator_tree_deep_chain() {
+        let edges = vec![
+            vec!["N0".to_string(), "N1".to_string()],
+            vec!["N1".to_string(), "N2".to_string()],
+            vec!["N2".to_string(), "N3".to_string()],
+            vec!["N3".to_string(), "N4".to_string()],
+        ];
+        let res = compute_dominator_tree("N0", &[], &edges);
+        assert_eq!(res.idom.get("N1").unwrap(), "N0");
+        assert_eq!(res.idom.get("N2").unwrap(), "N1");
+        assert_eq!(res.idom.get("N3").unwrap(), "N2");
+        assert_eq!(res.idom.get("N4").unwrap(), "N3");
+        assert!(res.loop_headers.is_empty());
+    }
+
+    #[test]
+    fn test_dataflow_multi_predecessor_union() {
+        let edges = vec![
+            vec!["P1".to_string(), "Merge".to_string()],
+            vec!["P2".to_string(), "Merge".to_string()],
+        ];
+        let mut gen = HashMap::new();
+        gen.insert("P1".to_string(), vec!["fact_from_p1".to_string()]);
+        gen.insert("P2".to_string(), vec!["fact_from_p2".to_string()]);
+
+        let res = solve_dataflow("P1", &[], &edges, true, &gen, &HashMap::new());
+        let in_merge = res.in_sets.get("Merge").unwrap();
+        assert!(in_merge.contains(&"fact_from_p1".to_string()));
+        assert!(in_merge.contains(&"fact_from_p2".to_string()));
+    }
 }

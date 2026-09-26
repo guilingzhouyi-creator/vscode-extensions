@@ -409,6 +409,113 @@ function runValidation() {
   assert.deepStrictEqual(flowRust.outSets, flowShim.outSets, 'Dataflow Out-sets parity');
   console.log('  ✓ Dominator tree and Dataflow solver 100% equivalent.');
 
+  // 7. Parity of Multi-Pattern Match Operator
+  console.log('[Pattern Match] Verifying fast multi-pattern matching parity...');
+  const patternCorpus = [
+    'const API_KEY = "sk-1234567890abcdef"; // secret key',
+    'let token = "TOKEN_XYZ"; // another secret token',
+    'function authenticate(apiKey, tokenVal) {',
+    '  if (apiKey === API_KEY) return true;',
+    '  return tokenVal === token;',
+    '}',
+  ].join('\n');
+  const searchPatterns = ['API_KEY', 'token', 'secret', 'authenticate', 'not_found'];
+  const matchesRust = nativeCore.fastPatternMatch(patternCorpus, searchPatterns);
+  const matchesShim = shim.fastPatternMatch(patternCorpus, searchPatterns);
+  assert.strictEqual(matchesRust.length, matchesShim.length, 'Pattern matches count mismatch');
+  for (let i = 0; i < matchesRust.length; i++) {
+    assert.strictEqual(matchesRust[i].pattern, matchesShim[i].pattern);
+    assert.strictEqual(matchesRust[i].line, matchesShim[i].line);
+    assert.strictEqual(matchesRust[i].column, matchesShim[i].column);
+    assert.strictEqual(matchesRust[i].matchText, matchesShim[i].matchText);
+  }
+  console.log('  ✓ Multi-pattern matching 100% equivalent.');
+
+  // 8. Fuzzing & Mutation Stream Stress Parity
+  console.log('[Fuzzing & Mutation] Running 40 deterministic mutation fuzzing rounds...');
+  let seed = 123456789;
+  function pseudoRandom() {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  }
+
+  const fuzzTokens = [
+    '// line comment',
+    '/* block comment */',
+    '/* unclosed block',
+    '# python/ps comment',
+    '<# ps block #>',
+    '\"double quote string with \\\"escaped\\\"\"',
+    '\'single quote with \\\'escaped\\\'\'',
+    '`template ${val} literal`',
+    '/regex_pattern[0-9]+/gi',
+    ' / not_regex / 2;',
+    '你好，世界！',
+    '🚀 Antigravity ✨',
+    'const x = 100;',
+    'function f() { return 1; }',
+    '\n',
+    '\r\n',
+    '\t',
+    '    ',
+  ];
+
+  const presetsToTest = [
+    SOURCE_MASK_PRESETS[MASK_LANGUAGE_TYPESCRIPT],
+    SOURCE_MASK_PRESETS[MASK_LANGUAGE_PYTHON],
+    SOURCE_MASK_PRESETS[MASK_LANGUAGE_GDSCRIPT],
+    SOURCE_MASK_PRESETS[MASK_LANGUAGE_RUST],
+    SOURCE_MASK_PRESETS[MASK_LANGUAGE_POWERSHELL],
+  ];
+
+  for (let round = 0; round < 40; round++) {
+    const numTokens = 5 + Math.floor(pseudoRandom() * 15);
+    const chosenTokens = [];
+    for (let t = 0; t < numTokens; t++) {
+      const idx = Math.floor(pseudoRandom() * fuzzTokens.length);
+      chosenTokens.push(fuzzTokens[idx]);
+    }
+    const fuzzSource = chosenTokens.join(pseudoRandom() > 0.5 ? '\n' : ' ');
+    const preset = presetsToTest[round % presetsToTest.length];
+    const config = toNativeConfig(preset);
+
+    const fRust = nativeCore.maskSourceCode(fuzzSource, config);
+    const fShim = shim.maskSourceCode(fuzzSource, config);
+
+    assert.strictEqual(fRust.lines, fShim.lines, `Fuzz round ${round} lines mismatch`);
+    assert.strictEqual(fRust.nonBlankLines, fShim.nonBlankLines, `Fuzz round ${round} nonBlankLines mismatch`);
+    assert.strictEqual(fRust.masked.length, fShim.masked.length, `Fuzz round ${round} masked length mismatch`);
+    for (let li = 0; li < fRust.masked.length; li++) {
+      if (fRust.masked[li] !== fShim.masked[li]) {
+        assert.fail(
+          `Fuzz round ${round} line ${li} drift:\nRust: "${fRust.masked[li]}"\nShim: "${fShim.masked[li]}"`,
+        );
+      }
+    }
+  }
+  console.log('  ✓ 40 rounds of deterministic mutation fuzzing achieved 100% byte equivalence.');
+
+  // 9. Random Directed Graph Equivalence
+  console.log('[Random Graph] Verifying random DAG and cyclic graph SCC parity...');
+  for (let g = 0; g < 5; g++) {
+    const nodeCount = 10 + g * 2;
+    const randomEdges = [];
+    for (let e = 0; e < nodeCount * 2; e++) {
+      const u = `Node_${Math.floor(pseudoRandom() * nodeCount)}`;
+      const v = `Node_${Math.floor(pseudoRandom() * nodeCount)}`;
+      randomEdges.push([u, v]);
+    }
+    const rG_Rust = nativeCore.analyzeDependencyGraph(randomEdges);
+    const rG_Shim = shim.analyzeDependencyGraph(randomEdges);
+    assert.strictEqual(rG_Rust.isAcyclic, rG_Shim.isAcyclic, `Graph ${g} isAcyclic parity`);
+    assert.strictEqual(
+      rG_Rust.stronglyConnectedComponents.length,
+      rG_Shim.stronglyConnectedComponents.length,
+      `Graph ${g} SCC count parity`,
+    );
+  }
+  console.log('  ✓ Random graph topology analysis parity verified.');
+
   console.log('=== [Native Operator Validation] SUCCESS: All assertions passed. ===');
 }
 

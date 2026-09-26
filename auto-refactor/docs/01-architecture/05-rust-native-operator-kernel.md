@@ -103,20 +103,45 @@ pub fn mask_source_code(content: &str, config: &MaskConfig) -> MaskResult;
 
 ---
 
-## 六、 构建、验证与持续集成护栏
+## 六、 存量高性能算子业务接入拓扑 (Business Integration Topology)
+
+为杜绝“算子实现与业务割裂”的孤儿算子现象，5 大高性能底层算子均已完成工业级业务流水线全量接入：
+
+| 算子类别 | 原生底层实现 | 业务调用方 | 业务价值与接入模式 |
+| :--- | :--- | :--- | :--- |
+| **Tarjan SCC 图分析** | `ops-graph` | `src/core/dependency-graph.ts`<br/>(`ModuleDependencyGraph`) | 在 `auditImportCycles` 中先经 `analyzeTopologicalStructure` 进行无环预筛；无环工程 0 开销直接放行，有环工程再由 DFS 精确定位循环链 |
+| **跨文件 MinHash/LSH 克隆** | `ops-clone` | `src/core/intelligence/`<br/>`cross-file-clone-detector.ts` | 64 维哈希投影与 LSH 分桶倒排索引，跨模块批量发现高重复率代码段，向分析器输出结构化克隆组 |
+| **直方图差分算子** | `ops-diff` | `src/core/diff/edit-diff.ts`<br/>(`fastNativeDiff`) | Myers & Git 直方图快速差分，支持行级 Hunk 聚类，在大文件增量扫描与重构预览时极速生成统一 Diff |
+| **极速多模式匹配** | `ops-pattern` | `src/analyzers/security.ts`<br/>(`SECURITY_FAST_FILTER_TOKENS`) | 硬编码敏感词（API Token、Secret Key）前置初筛，大幅减少 V8 正则引擎逐行扫描的调用频率 |
+| **SIMD 源码脱敏与度量** | `ops-mask` | `src/core/policy/source-mask.ts`<br/>(`maskSourceFile`) | 单趟 UTF-8 扫描完成代码/注释/字符串切片分离，同时输出非空有效行（eLOC）统计，实现 0 增量开销分析 |
+
+---
+
+## 七、 构建、门禁与持续集成护栏 (Gates & Verification)
 
 1. **本地编译构建**：
    ```bash
    npm run build:native
    ```
    由 `scripts/build-native.js` 自动调度 MinGW GCC 链接器完成 Cargo Workspace release 模式编译，并将动态库提取部署至 `crates/auto-refactor-core/index.node`。
-2. **纯 Rust 单元测试**：
+2. **Rust 强门禁闭环 (`gate:rust`)**：
    ```bash
-   cargo test --workspace --exclude auto-refactor-core
+   npm run gate:rust
    ```
-   各独立子算子均具备完全脱离 Node.js 的 Rust 原生测试用例。
-3. **双轨等价性端到端验证**：
+   组合 `cargo clippy` (-D warnings 零警告) + `cargo fmt --check` (代码格式校验) + `node scripts/test-rust.js`（调度跨平台 MinGW 工具链运行全部 48 个纯 Rust 单测）。
+3. **纯 Rust 单元测试套件**：
+   ```bash
+   npm run test:rust
+   ```
+   共计 **48 个** 纯原生测试用例（`ops-diff`: 9, `ops-graph`: 12, `ops-mask`: 11, `ops-clone`: 9, `ops-pattern`: 7），覆盖空文件、Unicode CJK、极端转义、自环/复杂拓扑图、LSH 相似度边界与多 Hunk 差分。
+4. **双轨等价性与 Fuzzing 压力变异验证**：
    ```bash
    node scripts/validate-native-operator.js
    ```
-   已集成至 `scripts/test-parallel.js` 全量测试流水线，自动看守多语言矩阵与真实工程文件的 100% 字节等价性。
+   验证多语言矩阵（TS/JS/Py/GDScript/Rust/Go/Shell/PS）、真实工程文件、40 轮伪随机 Fuzzing 变异流以及随机有向图的双轨 100% 字节等价性。
+5. **性能加速比防退化守护**：
+   ```bash
+   npm run benchmark:native
+   ```
+   通过 `scripts/validate-native-benchmark.js` 持续监控 SIMD 脱敏（≥ 50 MB/s）、克隆分析（≥ 2.0x 加速比）以及直方图差分性能，纳入 `scripts/test-parallel.js` 全量并发回归矩阵。
+

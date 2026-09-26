@@ -471,4 +471,83 @@ mod tests {
         );
         assert!(res.masked[0].starts_with("const msg = "));
     }
+
+    #[test]
+    fn test_empty_and_whitespace() {
+        let res = mask_source_code("", &c_family_config());
+        assert_eq!(res.lines, 1);
+        assert_eq!(res.non_blank_lines, 0);
+
+        let res_ws = mask_source_code("   \n\t\n", &c_family_config());
+        assert_eq!(res_ws.lines, 3);
+        assert_eq!(res_ws.non_blank_lines, 0);
+    }
+
+    #[test]
+    fn test_python_hash_and_docstrings() {
+        let py_config = MaskConfig {
+            line_comment: "#".to_string(),
+            block_comment: Some(("\"\"\"".to_string(), "\"\"\"".to_string())),
+            quote_chars: "'\"".to_string(),
+            multiline_templates: false,
+            regex_literals: false,
+        };
+        let code =
+            "# Header\ndef foo():\n    \"\"\"Docstring\n    line 2\"\"\"\n    return 42 # end";
+        let res = mask_source_code(code, &py_config);
+        assert_eq!(res.lines, 5);
+        assert!(res.masked[0].trim().is_empty());
+        assert!(res.masked[4].ends_with("      "));
+    }
+
+    #[test]
+    fn test_powershell_block_comments() {
+        let ps_config = MaskConfig {
+            line_comment: "#".to_string(),
+            block_comment: Some(("<#".to_string(), "#>".to_string())),
+            quote_chars: "'\"".to_string(),
+            multiline_templates: false,
+            regex_literals: false,
+        };
+        let code = "<# Block comment\n multi-line #>\nWrite-Host 'Hello'";
+        let res = mask_source_code(code, &ps_config);
+        assert_eq!(res.lines, 3);
+        assert!(res.masked[0].trim().is_empty());
+        assert!(res.masked[1].trim().is_empty());
+        assert!(res.masked[2].starts_with("Write-Host "));
+    }
+
+    #[test]
+    fn test_escaped_quotes_inside_strings() {
+        let code = "const s = \"escaped \\\"quote\\\" inside\"; const next = 10;";
+        let res = mask_source_code(code, &c_family_config());
+        assert!(res.masked[0].ends_with("const next = 10;"));
+        assert!(res.masked[0].starts_with("const s = "));
+    }
+
+    #[test]
+    fn test_multiline_template_literals() {
+        let code = "const t = `line 1\nline 2 ${val}\nline 3`; const done = true;";
+        let res = mask_source_code(code, &c_family_config());
+        assert_eq!(res.lines, 3);
+        assert!(res.masked[2].ends_with("const done = true;"));
+    }
+
+    #[test]
+    fn test_unclosed_block_comment() {
+        let code = "const a = 1;\n/* unclosed comment start\nline 3";
+        let res = mask_source_code(code, &c_family_config());
+        assert_eq!(res.lines, 3);
+        assert!(res.masked[1].trim().is_empty());
+        assert!(res.masked[2].trim().is_empty());
+    }
+
+    #[test]
+    fn test_mixed_single_and_double_quotes() {
+        let code = "const msg1 = \"double 'with' single\"; const msg2 = 'single \"with\" double';";
+        let res = mask_source_code(code, &c_family_config());
+        assert_eq!(res.lines, 1);
+        assert!(res.masked[0].contains("const msg1 = "));
+        assert!(res.masked[0].contains("; const msg2 = "));
+    }
 }
