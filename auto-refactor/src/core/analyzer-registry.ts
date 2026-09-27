@@ -47,6 +47,8 @@ import { DependencyLayoutAnalyzer } from '../analyzers/dependency-layout';
 import { NamingAnalyzer } from '../analyzers/naming';
 import { ShellLintAnalyzer } from '../analyzers/shell-lint';
 import { StdlibAnalyzer } from '../analyzers/stdlib';
+import { GdscriptGameAnalyzer } from '../analyzers/gdscript-game';
+import { VscodeExtensionAnalyzer } from '../analyzers/vscode-extension';
 
 /**
  * Resolved metadata and fresh instance factory for a declared analyzer.
@@ -106,6 +108,8 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
     naming: () => new NamingAnalyzer(),
     'shell-lint': () => new ShellLintAnalyzer(),
     stdlib: () => new StdlibAnalyzer(),
+    'gdscript-game': () => new GdscriptGameAnalyzer(),
+    'vscode-extension': () => new VscodeExtensionAnalyzer(),
 };
 
 /**
@@ -144,6 +148,8 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     naming: '../analyzers/naming',
     'shell-lint': '../analyzers/shell-lint',
     stdlib: '../analyzers/stdlib',
+    'gdscript-game': '../analyzers/gdscript-game',
+    'vscode-extension': '../analyzers/vscode-extension',
 };
 
 const dynamicRequire = createRequire(__filename);

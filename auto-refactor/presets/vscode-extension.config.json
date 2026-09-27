@@ -1,0 +1,19 @@
+{
+  "$schema": "../config.schema.json",
+  "_comment": "领域级声明式预设：VS Code 扩展审查（Disposable 泄漏、主线程阻塞、UI 国际化）",
+  "include": [
+    "**/*.ts",
+    "**/*.js"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/test/**",
+    "**/tests/**"
+  ],
+  "analyzers": {
+    "vscode-extension": {
+      "enabled": true
+    }
+  }
+}

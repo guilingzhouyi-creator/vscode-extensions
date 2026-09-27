@@ -296,6 +296,16 @@ export const ANALYZER_GO_MODERN = 'go-modern';
 export const ANALYZER_DOCS = 'docs';
 
 /**
+ * Analyzer id owning the gdscript game domain pack.
+ */
+export const ANALYZER_GDSCRIPT_GAME = 'gdscript-game';
+
+/**
+ * Analyzer id owning the vscode extension domain pack.
+ */
+export const ANALYZER_VSCODE_EXTENSION = 'vscode-extension';
+
+/**
  * Quality dimension id for semantic purity.
  */
 export const DIMENSION_SEMANTIC_PURITY = 'semanticPurity';

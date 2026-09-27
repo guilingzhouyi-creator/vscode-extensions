@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790501781072",
-  "timestamp": "2026-09-27T09:36:21.072Z",
+  "snapshotId": "snapshot-v0.4.0-1790513259906",
+  "timestamp": "2026-09-27T12:47:39.905Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "a68d7f749191029d77dd5dbfa5515b99f1068e4dd2a8fa14677dd4bdcd98b179",
+  "rulesDigest": "0c4322224e9071a16d49340e5cda2236cd4a824ad27087090e7a2c5c21406e31",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 236,
+    "ruleCount": 243,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -109,10 +109,14 @@
     "expensive-loop-operation",
     "GDM-CONNECT-001",
     "GDM-EXPORT-001",
+    "GDM-ISO-001",
     "GDM-ONREADY-001",
+    "GDM-POL-001",
     "GDM-POOL-001",
     "GDM-POOL-002",
+    "GDM-PRF-001",
     "GDM-RPC-001",
+    "GDM-SIG-001",
     "GDM-TOOL-001",
     "GDM-YIELD-001",
     "GOM-CTX-001",
@@ -262,6 +266,9 @@
     "TST-TAU-001",
     "TST-TOP-001",
     "unused-export",
-    "unused-module"
+    "unused-module",
+    "VSC-I18N-001",
+    "VSC-MEM-001",
+    "VSC-PERF-001"
   ]
 }

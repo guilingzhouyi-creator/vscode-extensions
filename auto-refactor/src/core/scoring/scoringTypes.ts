@@ -77,10 +77,17 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         'data-architecture',
         'stdlib',
         'naming',
+        'gdscript-game',
     ],
     semanticPurity: ['governance', 'hygiene', 'dependency-graph', 'stdlib'],
     codeSecurity: ['architecture', 'security', 'secrets'],
-    performanceEfficiency: ['performance', 'data-architecture', 'complexity'],
+    performanceEfficiency: [
+        'performance',
+        'data-architecture',
+        'complexity',
+        'gdscript-game',
+        'vscode-extension',
+    ],
     standardization: ['hygiene', 'large-file', 'dependency-layout', 'stdlib', 'naming'],
     modernity: [
         'governance',

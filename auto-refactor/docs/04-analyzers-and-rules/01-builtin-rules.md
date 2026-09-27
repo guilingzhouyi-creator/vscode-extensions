@@ -373,6 +373,31 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `GDM-CONNECT-001` | `info` | Godot 3 `connect("signal", self, "method")` 字符串方法名 | 改用 `signal.connect(Callable)` 形式 |
 | `GDM-RPC-001` | `warning` | `remote`/`master`/`puppet`/`slave` 函数修饰符 | 改用 `@rpc` 注解 |
 
+---
+
+## 16b. Godot 4.7 游戏引擎专属审查包 (`gdscript-game`) — 4 条
+
+深度看守 Godot 4.7 游戏工程架构契约、无头逻辑解耦与高承压运行性能（默认关闭，声明 `analyzers.gdscript-game` 启用）：
+
+| 规则 ID | 级别 | 触发条件 | 治理策略 |
+| :--- | :--- | :--- | :--- |
+| `GDM-PRF-001` | `error` | 循环内瞬态堆分配拦截：`for`/`while` 内部出现 `.new()`、`.duplicate()` 或瞬态集合字面量 | 提升至循环外部或使用对象池与预分配缓冲 |
+| `GDM-POL-001` | `warning` | 对象池回收契约守护：池化对象回收时未调用 `reset_state()` | 在回池函数内显式调用 `reset_state()` 彻底清理脏状态 |
+| `GDM-SIG-001` | `warning` | 信号连接泄漏守卫：`connect()` 未在对应生命周期 `disconnect()` 且未设 `CONNECT_ONE_SHOT` | 补充配对的 `disconnect()` 或声明 `CONNECT_ONE_SHOT` 标志 |
+| `GDM-ISO-001` | `error` | 纯逻辑无头解耦守卫：纯领域类直接持有 UI 节点或直接订阅 `EventBus` | 严格分离领域逻辑与展示层；通过快照模型单向注入 |
+
+---
+
+## 16c. VS Code 插件专属审查包 (`vscode-extension`) — 3 条
+
+看守 VS Code 插件核心生命周期、事件循环性能与界面国际化（默认关闭，声明 `analyzers.vscode-extension` 启用）：
+
+| 规则 ID | 级别 | 触发条件 | 治理策略 |
+| :--- | :--- | :--- | :--- |
+| `VSC-MEM-001` | `error` | `Disposable` 资源泄漏：注册命令或监听器未压入 `context.subscriptions` | 将返回的 Disposable 压入 `context.subscriptions.push(...)` |
+| `VSC-PERF-001` | `warning` | 主线程事件循环卡顿拦截：Extension Host 主线程直接调用同步阻塞文件 I/O | 将同步 I/O 改为异步流 (`fs.promises`) 或 `vscode.workspace.fs` |
+| `VSC-I18N-001` | `warning` | UI 硬编码裸文案拦截：弹窗或状态栏通知传入未本地化的字符串字面量 | 使用 `vscode.l10n.t(...)` 或引入项目双语字典 |
+
 > **三个语言包的共同契约**：均为「内容型分析器」，实现 `finalize()` 并共用 `src/core/sourceMask.ts` 的掩码能力；全部默认关闭，声明后才参与扫描，因此升级引擎不会静默改变既有门禁结果。规则 id、注册表条目、键点验证脚本（`validate-ts-modern.js` / `validate-modern-packs.js`）与本文档四处必须同步。
 
 ---

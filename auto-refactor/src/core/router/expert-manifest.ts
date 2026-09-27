@@ -35,6 +35,8 @@ import {
     ANALYZER_DEPENDENCY_LAYOUT,
     ANALYZER_NAMING,
     ANALYZER_STDLIB,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
 } from '../scoring/dimensionLiterals';
 
 const TRACK_FAST = 'fast' as const;
@@ -354,6 +356,24 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         fallback: FALLBACK_BLOCK,
         isSecurityFamily: true,
         description: 'Standard library and systems runtime safety and contract verification',
+    },
+    {
+        id: ANALYZER_GDSCRIPT_GAME,
+        signals: [SIG_GENERAL_CODE],
+        track: TRACK_DEEP,
+        steadyCostUs: COST_90,
+        weight: 2.0,
+        fallback: FALLBACK_ESCALATE_DEEP,
+        description: 'GDScript game performance, object pool, and headless domain decoupling',
+    },
+    {
+        id: ANALYZER_VSCODE_EXTENSION,
+        signals: [SIG_GENERAL_CODE],
+        track: TRACK_DEEP,
+        steadyCostUs: COST_90,
+        weight: 2.0,
+        fallback: FALLBACK_ESCALATE_DEEP,
+        description: 'VS Code extension disposable lifecycle, blocking I/O, and UI localization',
     },
 ];
 

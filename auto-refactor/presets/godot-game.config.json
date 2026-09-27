@@ -1,0 +1,17 @@
+{
+  "$schema": "../config.schema.json",
+  "_comment": "领域级声明式预设：Godot 游戏逻辑审查（热路径瞬态分配、对象池契约、信号泄漏、领域无头解耦）",
+  "include": [
+    "**/*.gd"
+  ],
+  "exclude": [
+    "**/test/**",
+    "**/tests/**",
+    "**/addons/**"
+  ],
+  "analyzers": {
+    "gdscript-game": {
+      "enabled": true
+    }
+  }
+}

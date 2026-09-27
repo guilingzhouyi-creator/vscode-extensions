@@ -55,6 +55,8 @@ import {
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
     ANALYZER_STDLIB,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
 } from '../scoring/dimensionLiterals';
 
 /** Decimal places retained when rounding the activation ratio for stable reporting. */
@@ -98,6 +100,8 @@ export const ALL_BUILTIN_ANALYZERS = [
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
     ANALYZER_STDLIB,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
 ] as const;
 
 /**
