@@ -187,6 +187,9 @@ function tryParseStructureStmt(
     );
 }
 
+/**
+ * Language adapter projecting GDScript syntax into normalized language-agnostic AST.
+ */
 export class GDScriptAdapter implements LanguageAdapter {
     id = 'gdscript' as const;
     extensions = ['.gd'];
@@ -252,9 +255,14 @@ export class GDScriptAdapter implements LanguageAdapter {
     /**
      * Check if a string literal token represents a dictionary key or subscript index in GDScript:
      * 1. Dictionary key: followed by a colon (e.g. `"key": value` or `{"key": value}`).
-     * 2. Subscript index: preceded by `[` which follows an expression and followed by `]` (e.g. `data["key"]`).
+     * 2. Subscript index: preceded by `[` which follows an expression and followed by `]`
+     *    (e.g. `data["key"]`).
      */
-    private isDictionaryKeyOrSubscript(rawLine: string, matchIdx: number, matchLen: number): boolean {
+    private isDictionaryKeyOrSubscript(
+        rawLine: string,
+        matchIdx: number,
+        matchLen: number,
+    ): boolean {
         const afterStr = rawLine.slice(matchIdx + matchLen);
         // 1. Dictionary key: `"key": val`
         if (/^\s*:\s*/.test(afterStr)) {
@@ -303,7 +311,11 @@ export class GDScriptAdapter implements LanguageAdapter {
             const fullText = match[0];
             const col = match.index + 1;
             const strVal = match[1] !== undefined ? match[1] : match[2];
-            const isDictOrIndex = this.isDictionaryKeyOrSubscript(rawLine, match.index, fullText.length);
+            const isDictOrIndex = this.isDictionaryKeyOrSubscript(
+                rawLine,
+                match.index,
+                fullText.length,
+            );
 
             const litNode: NormalizedNode = {
                 kind: NodeKind.StringLiteral,
@@ -330,7 +342,11 @@ export class GDScriptAdapter implements LanguageAdapter {
         while ((match = numRegex.exec(codeWithoutStrings)) !== null) {
             const numText = match[0];
             const col = match.index + 1;
-            const isSubscriptIndex = this.isNumericSubscriptIndex(rawLine, match.index, numText.length);
+            const isSubscriptIndex = this.isNumericSubscriptIndex(
+                rawLine,
+                match.index,
+                numText.length,
+            );
 
             const litNode: NormalizedNode = {
                 kind: NodeKind.NumericLiteral,
@@ -369,4 +385,3 @@ export class GDScriptAdapter implements LanguageAdapter {
         return false;
     }
 }
-

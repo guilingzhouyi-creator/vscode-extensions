@@ -41,152 +41,152 @@ const { adapterFor, hasAdapterFor } = require('../dist/core/ast/adapters');
  * Representative Go source exercising every NodeKind the adapter should emit.
  */
 const GO_FIXTURE = [
-    '// Package sample is a sample Go package.',
-    'package sample',
-    '',
-    'import (',
-    '\t"context"',
-    '\t"fmt"',
-    '\t"os"',
-    ')',
-    '',
-    '// MaxRetries is the maximum number of retries.',
-    'const MaxRetries = 3',
-    '',
-    'const (',
-    '\tStatusOK       = 200',
-    '\tStatusNotFound = 404',
-    ')',
-    '',
-    'var globalCounter int',
-    '',
-    '// User represents a system user.',
-    'type User struct {',
-    '\tID   int',
-    '\tName string',
-    '\tAge  int',
-    '}',
-    '',
-    '// Repository defines the data access interface.',
-    'type Repository interface {',
-    '\tGetUser(ctx context.Context, id int) (*User, error)',
-    '}',
-    '',
-    '// UserRepository implements Repository.',
-    'type UserRepository struct {',
-    '\tdb string',
-    '}',
-    '',
-    '// NewUserRepository creates a new UserRepository.',
-    'func NewUserRepository(db string) *UserRepository {',
-    '\treturn &UserRepository{db: db}',
-    '}',
-    '',
-    '// GetUser retrieves a user by ID.',
-    'func (r *UserRepository) GetUser(ctx context.Context, id int) (*User, error) {',
-    '\tif id <= 0 {',
-    '\t\treturn nil, fmt.Errorf("invalid id: %d", id)',
-    '\t}',
-    '\tfor i := 0; i < MaxRetries; i++ {',
-    '\t\tswitch id {',
-    '\t\tcase 1:',
-    '\t\t\treturn &User{ID: 1, Name: "Alice", Age: 30}, nil',
-    '\t\tcase 2:',
-    '\t\t\treturn &User{ID: 2, Name: "Bob", Age: 25}, nil',
-    '\t\tdefault:',
-    '\t\t\treturn nil, os.ErrNotExist',
-    '\t\t}',
-    '\t}',
-    '\treturn nil, nil',
-    '}',
-    '',
-    '// processData handles data with concurrency.',
-    'func processData(items []string, timeout float64) {',
-    '\tch := make(chan string, len(items))',
-    '\tfor _, item := range items {',
-    '\t\tgo func(s string) {',
-    '\t\t\tdefer close(ch)',
-    '\t\t\tch <- s',
-    '\t\t}(item)',
-    '\t}',
-    '\tselect {',
-    '\tcase result := <-ch:',
-    '\t\tfmt.Println("got:", result)',
-    '\tcase <-time.After(timeout):',
-    '\t\tfmt.Println("timeout")',
-    '\t}',
-    '}',
-    '',
+  '// Package sample is a sample Go package.',
+  'package sample',
+  '',
+  'import (',
+  '\t"context"',
+  '\t"fmt"',
+  '\t"os"',
+  ')',
+  '',
+  '// MaxRetries is the maximum number of retries.',
+  'const MaxRetries = 3',
+  '',
+  'const (',
+  '\tStatusOK       = 200',
+  '\tStatusNotFound = 404',
+  ')',
+  '',
+  'var globalCounter int',
+  '',
+  '// User represents a system user.',
+  'type User struct {',
+  '\tID   int',
+  '\tName string',
+  '\tAge  int',
+  '}',
+  '',
+  '// Repository defines the data access interface.',
+  'type Repository interface {',
+  '\tGetUser(ctx context.Context, id int) (*User, error)',
+  '}',
+  '',
+  '// UserRepository implements Repository.',
+  'type UserRepository struct {',
+  '\tdb string',
+  '}',
+  '',
+  '// NewUserRepository creates a new UserRepository.',
+  'func NewUserRepository(db string) *UserRepository {',
+  '\treturn &UserRepository{db: db}',
+  '}',
+  '',
+  '// GetUser retrieves a user by ID.',
+  'func (r *UserRepository) GetUser(ctx context.Context, id int) (*User, error) {',
+  '\tif id <= 0 {',
+  '\t\treturn nil, fmt.Errorf("invalid id: %d", id)',
+  '\t}',
+  '\tfor i := 0; i < MaxRetries; i++ {',
+  '\t\tswitch id {',
+  '\t\tcase 1:',
+  '\t\t\treturn &User{ID: 1, Name: "Alice", Age: 30}, nil',
+  '\t\tcase 2:',
+  '\t\t\treturn &User{ID: 2, Name: "Bob", Age: 25}, nil',
+  '\t\tdefault:',
+  '\t\t\treturn nil, os.ErrNotExist',
+  '\t\t}',
+  '\t}',
+  '\treturn nil, nil',
+  '}',
+  '',
+  '// processData handles data with concurrency.',
+  'func processData(items []string, timeout float64) {',
+  '\tch := make(chan string, len(items))',
+  '\tfor _, item := range items {',
+  '\t\tgo func(s string) {',
+  '\t\t\tdefer close(ch)',
+  '\t\t\tch <- s',
+  '\t\t}(item)',
+  '\t}',
+  '\tselect {',
+  '\tcase result := <-ch:',
+  '\t\tfmt.Println("got:", result)',
+  '\tcase <-time.After(timeout):',
+  '\t\tfmt.Println("timeout")',
+  '\t}',
+  '}',
+  '',
 ].join('\n');
 
 /**
  * Go fixture designed to trigger every go-modern rule.
  */
 const GO_LEGACY_FIXTURE = [
-    'package badcode',
-    '',
-    'import (',
-    '\t"context"',
-    '\t"errors"',
-    '\t"os"',
-    ')',
-    '',
-    '// self is a bad receiver name.',
-    'type BadReceiver struct{}',
-    '',
-    'func (self *BadReceiver) DoSomething() error {',
-    '\treturn nil',
-    '}',
-    '',
-    'func openFile(name string, ctx context.Context) (*os.File, error) {',
-    '\tvar openErr error',
-    '\tf, _ := os.Open(name) // unchecked error',
-    '\treturn f, openErr',
-    '}',
-    '',
-    'func main() {',
-    '\tresult, _ := openFile("test.txt", context.Background())',
-    '\t_ = result',
-    '}',
-    '',
+  'package badcode',
+  '',
+  'import (',
+  '\t"context"',
+  '\t"errors"',
+  '\t"os"',
+  ')',
+  '',
+  '// self is a bad receiver name.',
+  'type BadReceiver struct{}',
+  '',
+  'func (self *BadReceiver) DoSomething() error {',
+  '\treturn nil',
+  '}',
+  '',
+  'func openFile(name string, ctx context.Context) (*os.File, error) {',
+  '\tvar openErr error',
+  '\tf, _ := os.Open(name) // unchecked error',
+  '\treturn f, openErr',
+  '}',
+  '',
+  'func main() {',
+  '\tresult, _ := openFile("test.txt", context.Background())',
+  '\t_ = result',
+  '}',
+  '',
 ].join('\n');
 
 /**
  * Go fixture with compliant code — should trigger no go-modern issues.
  */
 const GO_GOOD_FIXTURE = [
-    '// Package goodcode demonstrates idiomatic Go patterns.',
-    'package goodcode',
-    '',
-    'import (',
-    '\t"context"',
-    '\t"os"',
-    ')',
-    '',
-    '// GoodService provides services.',
-    'type GoodService struct{}',
-    '',
-    'func (s *GoodService) DoWork(ctx context.Context) error {',
-    '\treturn nil',
-    '}',
-    '',
-    'func openFile(ctx context.Context, name string) (*os.File, error) {',
-    '\tf, err := os.Open(name)',
-    '\tif err != nil {',
-    '\t\treturn nil, err',
-    '\t}',
-    '\treturn f, nil',
-    '}',
-    '',
-    'func main() {',
-    '\tctx := context.Background()',
-    '\tf, err := openFile(ctx, "test.txt")',
-    '\tif err != nil {',
-    '\t\tpanic(err)',
-    '\t}',
-    '\tdefer f.Close()',
-    '}',
-    '',
+  '// Package goodcode demonstrates idiomatic Go patterns.',
+  'package goodcode',
+  '',
+  'import (',
+  '\t"context"',
+  '\t"os"',
+  ')',
+  '',
+  '// GoodService provides services.',
+  'type GoodService struct{}',
+  '',
+  'func (s *GoodService) DoWork(ctx context.Context) error {',
+  '\treturn nil',
+  '}',
+  '',
+  'func openFile(ctx context.Context, name string) (*os.File, error) {',
+  '\tf, err := os.Open(name)',
+  '\tif err != nil {',
+  '\t\treturn nil, err',
+  '\t}',
+  '\treturn f, nil',
+  '}',
+  '',
+  'func main() {',
+  '\tctx := context.Background()',
+  '\tf, err := openFile(ctx, "test.txt")',
+  '\tif err != nil {',
+  '\t\tpanic(err)',
+  '\t}',
+  '\tdefer f.Close()',
+  '}',
+  '',
 ].join('\n');
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -230,10 +230,7 @@ async function scanFixture(files, analyzers) {
       fs.writeFileSync(abs, content);
     }
     const configFile = path.join(root, 'auto-refactor.config.json');
-    fs.writeFileSync(
-      configFile,
-      JSON.stringify({ include: ['**/*'], analyzers }, null, 2),
-    );
+    fs.writeFileSync(configFile, JSON.stringify({ include: ['**/*'], analyzers }, null, 2));
     const report = await scan({
       root,
       configFile,
@@ -259,11 +256,7 @@ async function runAdapterTests() {
   const ast = adapter.parse(GO_FIXTURE, 'sample.go');
 
   // Test 1: SourceFile root
-  assert.strictEqual(
-    ast.root.kind,
-    NodeKind.SourceFile,
-    'root node must be SourceFile',
-  );
+  assert.strictEqual(ast.root.kind, NodeKind.SourceFile, 'root node must be SourceFile');
   console.log('  [PASS] 1. SourceFile root node');
 
   // Test 2: Function declarations
@@ -292,10 +285,7 @@ async function runAdapterTests() {
   assert.ok(structs.length >= 2, `expected >= 2 structs, got ${structs.length}`);
   const structNames = structs.map((s) => s.name);
   assert.ok(structNames.includes('User'), 'User struct must be detected');
-  assert.ok(
-    structNames.includes('UserRepository'),
-    'UserRepository struct must be detected',
-  );
+  assert.ok(structNames.includes('UserRepository'), 'UserRepository struct must be detected');
   assert.strictEqual(structs[0].isClassDefining, true);
   console.log(`  [PASS] 4. Struct detection (${structs.length} found)`);
 
@@ -327,10 +317,7 @@ async function runAdapterTests() {
 
   // Test 8: Control flow nodes (if / for / switch / select)
   const cfNodes = findNodes(ast, NodeKind.ControlFlow);
-  assert.ok(
-    cfNodes.length >= 4,
-    `expected >= 4 control flow nodes, got ${cfNodes.length}`,
-  );
+  assert.ok(cfNodes.length >= 4, `expected >= 4 control flow nodes, got ${cfNodes.length}`);
   assert.ok(
     cfNodes.every((n) => n.branchWeight >= 1),
     'every control flow node must have branchWeight >= 1',
@@ -339,10 +326,7 @@ async function runAdapterTests() {
 
   // Test 9: String literals
   const strings = findNodes(ast, NodeKind.StringLiteral);
-  assert.ok(
-    strings.length >= 3,
-    `expected >= 3 string literals, got ${strings.length}`,
-  );
+  assert.ok(strings.length >= 3, `expected >= 3 string literals, got ${strings.length}`);
   assert.ok(
     strings.every((s) => s.isString === true),
     'every string literal must have isString=true',
@@ -351,10 +335,7 @@ async function runAdapterTests() {
 
   // Test 10: Numeric literals
   const numbers = findNodes(ast, NodeKind.NumericLiteral);
-  assert.ok(
-    numbers.length >= 3,
-    `expected >= 3 numeric literals, got ${numbers.length}`,
-  );
+  assert.ok(numbers.length >= 3, `expected >= 3 numeric literals, got ${numbers.length}`);
   assert.ok(
     numbers.every((n) => n.isNumeric === true),
     'every numeric literal must have isNumeric=true',
@@ -386,20 +367,13 @@ async function runAdapterTests() {
 
   // Test 14: Named literals (true / false / nil / iota)
   const literals = findNodes(ast, NodeKind.Literal);
-  assert.ok(
-    literals.length >= 1,
-    `expected >= 1 named literal (nil), got ${literals.length}`,
-  );
+  assert.ok(literals.length >= 1, `expected >= 1 named literal (nil), got ${literals.length}`);
   console.log(`  [PASS] 14. Named Literal detection (${literals.length} found)`);
 
   // Test 15: Adapter registration
   assert.strictEqual(adapter.id, 'go', 'adapter id must be "go"');
   assert.deepStrictEqual(adapter.extensions, ['.go'], 'extensions must be [".go"]');
-  assert.strictEqual(
-    hasAdapterFor('foo.go'),
-    true,
-    'hasAdapterFor must return true for .go files',
-  );
+  assert.strictEqual(hasAdapterFor('foo.go'), true, 'hasAdapterFor must return true for .go files');
   const resolved = adapterFor('foo.go');
   assert.strictEqual(resolved.id, 'go', 'adapterFor must resolve to Go adapter');
   console.log('  [PASS] 15. Adapter registration & extension resolution');
@@ -478,11 +452,7 @@ async function runModernAnalyzerTests() {
     { 'go-modern': { enabled: true } },
   );
   const goModernDecoy = decoyIssues.filter((i) => i.rule.startsWith('GOM-'));
-  assert.deepStrictEqual(
-    goModernDecoy,
-    [],
-    'go-modern must not inspect TypeScript files',
-  );
+  assert.deepStrictEqual(goModernDecoy, [], 'go-modern must not inspect TypeScript files');
   console.log('  [PASS] 22. Non-Go files are ignored by go-modern');
 
   // Test 23: go-modern is opt-in (no declaration = no findings)
@@ -491,11 +461,7 @@ async function runModernAnalyzerTests() {
     {}, // no analyzers declared
   );
   const goModernOff = offIssues.filter((i) => i.rule.startsWith('GOM-'));
-  assert.deepStrictEqual(
-    goModernOff,
-    [],
-    'go-modern must stay off when not declared in config',
-  );
+  assert.deepStrictEqual(goModernOff, [], 'go-modern must stay off when not declared in config');
   console.log('  [PASS] 23. go-modern is opt-in (default-off)');
 }
 
@@ -508,15 +474,12 @@ async function runIntegrationTests() {
     { complexity: { enabled: true } },
   );
   const unsupported = issues.filter((i) => i.rule === 'LANG-UNSUPPORTED');
-  assert.deepStrictEqual(
-    unsupported,
-    [],
-    '.go files must NOT trigger LANG-UNSUPPORTED',
-  );
+  assert.deepStrictEqual(unsupported, [], '.go files must NOT trigger LANG-UNSUPPORTED');
   console.log('  [PASS] 24. .go files are recognized (no LANG-UNSUPPORTED)');
 
   // Test 25: complexity analyzer produces function metrics for Go
   const complexityIssues = issues.filter((i) => i.analyzer === 'complexity');
+  assert.ok(Array.isArray(complexityIssues));
   // We expect at least some complexity findings or at least the file to be scanned
   // The key thing is that the file was processed without error
   assert.ok(

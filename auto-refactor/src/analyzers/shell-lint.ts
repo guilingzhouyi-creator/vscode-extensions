@@ -164,36 +164,160 @@ const POWERSHELL_ALIASES: Record<string, string> = {
     get: 'Get-Content',
 };
 
-
-
 /** PowerShell approved verbs list (common subset from
  *  https://docs.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands
  */
 const PS_APPROVED_VERBS = new Set([
     // Common verbs
-    'Add', 'Approve', 'Assert', 'Backup', 'Block', 'Build', 'Checkpoint', 'Clear',
-    'Close', 'Compare', 'Complete', 'Compress', 'Confirm', 'Connect', 'Convert',
-    'ConvertFrom', 'ConvertTo', 'Copy', 'Debug', 'Deny', 'Disable', 'Disconnect',
-    'Dismount', 'Edit', 'Enable', 'Enter', 'Exit', 'Expand', 'Export', 'Find',
-    'Format', 'Get', 'Grant', 'Group', 'Hide', 'Import', 'Initialize', 'Install',
-    'Invoke', 'Join', 'Limit', 'Lock', 'Measure', 'Merge', 'Mount', 'Move', 'New',
-    'Open', 'Optimize', 'Out', 'Ping', 'Pop', 'Protect', 'Publish', 'Push', 'Put',
-    'Read', 'Receive', 'Redo', 'Register', 'Remove', 'Rename', 'Repair', 'Request',
-    'Reset', 'Resize', 'Resolve', 'Restart', 'Restore', 'Resume', 'Revoke', 'Save',
-    'Search', 'Select', 'Send', 'Set', 'Show', 'Skip', 'Split', 'Start', 'Step',
-    'Stop', 'Submit', 'Suspend', 'Switch', 'Sync', 'Test', 'Trace', 'Undo',
-    'Uninstall', 'Unlock', 'Unprotect', 'Unpublish', 'Unregister', 'Update',
-    'Use', 'Wait', 'Watch', 'Write',
+    'Add',
+    'Approve',
+    'Assert',
+    'Backup',
+    'Block',
+    'Build',
+    'Checkpoint',
+    'Clear',
+    'Close',
+    'Compare',
+    'Complete',
+    'Compress',
+    'Confirm',
+    'Connect',
+    'Convert',
+    'ConvertFrom',
+    'ConvertTo',
+    'Copy',
+    'Debug',
+    'Deny',
+    'Disable',
+    'Disconnect',
+    'Dismount',
+    'Edit',
+    'Enable',
+    'Enter',
+    'Exit',
+    'Expand',
+    'Export',
+    'Find',
+    'Format',
+    'Get',
+    'Grant',
+    'Group',
+    'Hide',
+    'Import',
+    'Initialize',
+    'Install',
+    'Invoke',
+    'Join',
+    'Limit',
+    'Lock',
+    'Measure',
+    'Merge',
+    'Mount',
+    'Move',
+    'New',
+    'Open',
+    'Optimize',
+    'Out',
+    'Ping',
+    'Pop',
+    'Protect',
+    'Publish',
+    'Push',
+    'Put',
+    'Read',
+    'Receive',
+    'Redo',
+    'Register',
+    'Remove',
+    'Rename',
+    'Repair',
+    'Request',
+    'Reset',
+    'Resize',
+    'Resolve',
+    'Restart',
+    'Restore',
+    'Resume',
+    'Revoke',
+    'Save',
+    'Search',
+    'Select',
+    'Send',
+    'Set',
+    'Show',
+    'Skip',
+    'Split',
+    'Start',
+    'Step',
+    'Stop',
+    'Submit',
+    'Suspend',
+    'Switch',
+    'Sync',
+    'Test',
+    'Trace',
+    'Undo',
+    'Uninstall',
+    'Unlock',
+    'Unprotect',
+    'Unpublish',
+    'Unregister',
+    'Update',
+    'Use',
+    'Wait',
+    'Watch',
+    'Write',
     // Data verbs
-    'Backup', 'Checkpoint', 'Compare', 'Compress', 'Convert', 'ConvertFrom',
-    'ConvertTo', 'Dismount', 'Edit', 'Expand', 'Export', 'Import', 'Initialize',
-    'Limit', 'Merge', 'Mount', 'Out', 'Publish', 'Restore', 'Save', 'Sync',
+    'Backup',
+    'Checkpoint',
+    'Compare',
+    'Compress',
+    'Convert',
+    'ConvertFrom',
+    'ConvertTo',
+    'Dismount',
+    'Edit',
+    'Expand',
+    'Export',
+    'Import',
+    'Initialize',
+    'Limit',
+    'Merge',
+    'Mount',
+    'Out',
+    'Publish',
+    'Restore',
+    'Save',
+    'Sync',
     // Lifecycle verbs
-    'Approve', 'Assert', 'Complete', 'Confirm', 'Deny', 'Enable', 'Disable',
-    'Install', 'Invoke', 'Register', 'Request', 'Restart', 'Resume', 'Start',
-    'Stop', 'Submit', 'Suspend', 'Uninstall', 'Unregister', 'Update', 'Wait',
+    'Approve',
+    'Assert',
+    'Complete',
+    'Confirm',
+    'Deny',
+    'Enable',
+    'Disable',
+    'Install',
+    'Invoke',
+    'Register',
+    'Request',
+    'Restart',
+    'Resume',
+    'Start',
+    'Stop',
+    'Submit',
+    'Suspend',
+    'Uninstall',
+    'Unregister',
+    'Update',
+    'Wait',
     // Security verbs
-    'Block', 'Grant', 'Protect', 'Revoke', 'Unprotect',
+    'Block',
+    'Grant',
+    'Protect',
+    'Revoke',
+    'Unprotect',
 ]);
 
 /** PowerShell function definition: `function Name {` or `function Name() {`. */
@@ -363,9 +487,11 @@ export class ShellLintAnalyzer implements Analyzer {
         }
     }
 
-    private scanStrictErrorFlags(
-        maskedLines: string[],
-    ): { hasE: boolean; hasU: boolean; hasPipefail: boolean } {
+    private scanStrictErrorFlags(maskedLines: string[]): {
+        hasE: boolean;
+        hasU: boolean;
+        hasPipefail: boolean;
+    } {
         let hasE = false;
         let hasU = false;
         let hasPipefail = false;
@@ -382,11 +508,7 @@ export class ShellLintAnalyzer implements Analyzer {
         return { hasE, hasU, hasPipefail };
     }
 
-    private checkSetEuoPipefail(
-        lines: string[],
-        maskedLines: string[],
-        emit: ShellEmitter,
-    ): void {
+    private checkSetEuoPipefail(lines: string[], maskedLines: string[], emit: ShellEmitter): void {
         const { hasE, hasU, hasPipefail } = this.scanStrictErrorFlags(maskedLines);
         if (hasE && hasU && hasPipefail) return;
 
@@ -529,7 +651,9 @@ export class ShellLintAnalyzer implements Analyzer {
         // Look for unquoted $var or ${var}
         // We look for $ followed by name or ${name} that is NOT preceded by a quote
         // and NOT inside ${} already (handled by masking strings)
-        const matches = maskedTrimmed.match(/(^|[\s;|&(])\$([A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})(?=[\s;|&)\]]|$)/g);
+        const matches = maskedTrimmed.match(
+            /(^|[\s;|&(])\$([A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})(?=[\s;|&)\]]|$)/g,
+        );
         if (matches && matches.length > 0) {
             // Filter out known-safe usages
             // Skip $? $# $0 $@ $- $$ $! $* (special vars)
@@ -691,10 +815,7 @@ export class ShellLintAnalyzer implements Analyzer {
         state.hasUntypedParam = false;
     }
 
-    private checkErrorActionPreference(
-        lines: string[],
-        emit: ShellEmitter,
-    ): void {
+    private checkErrorActionPreference(lines: string[], emit: ShellEmitter): void {
         let found = false;
         const maxScan = Math.min(lines.length, 30);
         for (let i = 0; i < maxScan; i++) {
@@ -709,9 +830,9 @@ export class ShellLintAnalyzer implements Analyzer {
             emit(
                 0,
                 'PS-ERROR-001',
-                'Script does not set `$ErrorActionPreference = \'Stop\'` — non-terminating errors will be silently ignored.',
+                "Script does not set `$ErrorActionPreference = 'Stop'` — non-terminating errors will be silently ignored.",
                 SEVERITY_INFO,
-                'Add `$ErrorActionPreference = \'Stop\'` near the top of the script so non-terminating errors are treated as terminating.',
+                "Add `$ErrorActionPreference = 'Stop'` near the top of the script so non-terminating errors are treated as terminating.",
                 {},
             );
         }
@@ -749,9 +870,7 @@ export class ShellLintAnalyzer implements Analyzer {
         // Find aliases at the start of statements
         // We look for alias words that appear to be command invocations
         // (at line start, after `|`, `;`, `&`, or `&&` / `||`)
-        const aliasMatches = maskedTrimmed.matchAll(
-            /(?:^|[\s;|&])([a-z][a-z0-9]*)(?=\s+)/gi,
-        );
+        const aliasMatches = maskedTrimmed.matchAll(/(?:^|[\s;|&])([a-z][a-z0-9]*)(?=\s+)/gi);
 
         for (const match of aliasMatches) {
             const alias = match[1].toLowerCase();

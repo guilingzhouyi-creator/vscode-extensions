@@ -105,8 +105,7 @@ interface LineRule {
 const UNCHECKED_ERROR_RULE: LineRule = {
     rule: 'GOM-ERR-001',
     severity: SEVERITY_WARNING,
-    message:
-        'Error return value is discarded with `_`, silently hiding potential failures.',
+    message: 'Error return value is discarded with `_`, silently hiding potential failures.',
     suggestion:
         'Check the error explicitly (`if err != nil { return err }`) or document why it is safe to ignore.',
 };

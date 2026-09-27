@@ -412,6 +412,49 @@ export function pruneIncrementalBucket(
  *
  * After each tier we re-check RSS; if memory is back below the next threshold
  * we stop early and avoid over-evicting.
+/**
+ * Selectively evicts states matching the provided filter predicate across all buckets.
+ */
+function evictMatchingStates(
+    incremental: Map<string, Map<string, IncrementalFileState>>,
+    predicate: (st: IncrementalFileState) => boolean,
+): number {
+    let evicted = 0;
+    for (const bucket of incremental.values()) {
+        const toRemove: string[] = [];
+        for (const [path, st] of bucket) {
+            if (predicate(st)) {
+                toRemove.push(path);
+            }
+        }
+        for (const path of toRemove) {
+            const st = bucket.get(path);
+            if (st) st.evict();
+            bucket.delete(path);
+            evicted++;
+        }
+    }
+    return evicted;
+}
+
+/**
+ * Clears all cached states across all buckets under emergency memory pressure.
+ */
+function clearAllStates(incremental: Map<string, Map<string, IncrementalFileState>>): number {
+    let evicted = 0;
+    for (const bucket of incremental.values()) {
+        for (const st of bucket.values()) {
+            st.evict();
+        }
+        evicted += bucket.size;
+        bucket.clear();
+    }
+    return evicted;
+}
+
+/**
+ * Proactively evicts cached `IncrementalFileState` objects when RSS memory crosses
+ * configured thresholds.
  *
  * This is a loss-free cache reset: an evicted file simply falls back to a full
  * rescan next time it changes (byte-identical output, just slower).
@@ -424,65 +467,29 @@ export function incrementalRssGuard(session: {
     incremental: Map<string, Map<string, IncrementalFileState>>;
 }): number {
     const rss0 = process.memoryUsage().rss;
-    if (rss0 < INCREMENTAL_RSS_TIER1_BYTES) return 0;
-
-    let evicted = 0;
-
-    // ---- Tier 1: evict large files (>LARGE_FILE_LINE_THRESHOLD lines) ----
-    if (rss0 >= INCREMENTAL_RSS_TIER1_BYTES) {
-        for (const bucket of session.incremental.values()) {
-            const toRemove: string[] = [];
-            for (const [path, st] of bucket) {
-                if (st.lineCount > LARGE_FILE_LINE_THRESHOLD) {
-                    toRemove.push(path);
-                }
-            }
-            for (const path of toRemove) {
-                const st = bucket.get(path);
-                if (st) st.evict();
-                bucket.delete(path);
-                evicted++;
-            }
-        }
-
-        // Re-check after tier 1 — if we're below tier 2, stop early.
-        if (process.memoryUsage().rss < INCREMENTAL_RSS_TIER2_BYTES) {
-            return evicted;
-        }
+    if (rss0 < INCREMENTAL_RSS_TIER1_BYTES) {
+        return 0;
     }
 
-    // ---- Tier 2: evict cold files (not accessed in 7+ days) ----
-    if (process.memoryUsage().rss >= INCREMENTAL_RSS_TIER2_BYTES) {
-        const cutoff = Date.now() - COLD_FILE_AGE_MS;
-        for (const bucket of session.incremental.values()) {
-            const toRemove: string[] = [];
-            for (const [path, st] of bucket) {
-                if (st.lastAccessed < cutoff) {
-                    toRemove.push(path);
-                }
-            }
-            for (const path of toRemove) {
-                const st = bucket.get(path);
-                if (st) st.evict();
-                bucket.delete(path);
-                evicted++;
-            }
-        }
+    // Tier 1: evict large files
+    let evicted = evictMatchingStates(
+        session.incremental,
+        (st) => st.lineCount > LARGE_FILE_LINE_THRESHOLD,
+    );
 
-        // Re-check after tier 2 — if we're below the hard cap, stop early.
-        if (process.memoryUsage().rss < INCREMENTAL_RSS_CLEAR_BYTES) {
-            return evicted;
-        }
+    if (process.memoryUsage().rss < INCREMENTAL_RSS_TIER2_BYTES) {
+        return evicted;
     }
 
-    // ---- Tier 3: clear everything (last resort, original behavior) ----
-    if (process.memoryUsage().rss >= INCREMENTAL_RSS_CLEAR_BYTES) {
-        for (const bucket of session.incremental.values()) {
-            for (const st of bucket.values()) st.evict();
-            evicted += bucket.size;
-            bucket.clear();
-        }
+    // Tier 2: evict cold files
+    const cutoff = Date.now() - COLD_FILE_AGE_MS;
+    evicted += evictMatchingStates(session.incremental, (st) => st.lastAccessed < cutoff);
+
+    if (process.memoryUsage().rss < INCREMENTAL_RSS_CLEAR_BYTES) {
+        return evicted;
     }
 
+    // Tier 3: clear everything as last resort
+    evicted += clearAllStates(session.incremental);
     return evicted;
 }

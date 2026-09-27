@@ -37,6 +37,10 @@ export { histogramDiff, myersDiff, DiffOp, getLine, formatUnifiedDiff };
 
 /**
  * Computes line-level histogram diff hunks using the high-performance native Rust operator.
+ *
+ * @param oldContent - Original text content before modifications.
+ * @param newContent - Updated text content after modifications.
+ * @returns Array of native diff hunks describing line changes.
  */
 export function fastNativeDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
     return nativeCore.computeHistogramDiff(oldContent, newContent);
@@ -133,6 +137,19 @@ export interface LineIndex {
     hashes: Uint32Array;
 }
 
+function reallocateLineBuffers(
+    startsBuf: Int32Array,
+    hashesBuf: Uint32Array,
+    capacity: number,
+): { starts: Int32Array; hashes: Uint32Array; capacity: number } {
+    const nextCapacity = capacity << 1;
+    const nextStarts = new Int32Array(nextCapacity);
+    nextStarts.set(startsBuf);
+    const nextHashes = new Uint32Array(nextCapacity);
+    nextHashes.set(hashesBuf);
+    return { starts: nextStarts, hashes: nextHashes, capacity: nextCapacity };
+}
+
 /**
  * Compute line starts and 32-bit FNV-1a line hashes in one pass over the source.
  *
@@ -142,8 +159,8 @@ export interface LineIndex {
 export function computeLineStartsAndHashes(content: string): LineIndex {
     const len = content.length;
     let capacity = Math.max(MIN_LINE_CAPACITY, Math.ceil(len / SOURCE_CHARS_PER_LINE_SLOT));
-    let startsBuf = new Int32Array(capacity);
-    let hashesBuf = new Uint32Array(capacity);
+    let startsBuf: Int32Array = new Int32Array(capacity);
+    let hashesBuf: Uint32Array = new Uint32Array(capacity);
     startsBuf[0] = 0;
     let lineCount = 1;
 
@@ -152,13 +169,10 @@ export function computeLineStartsAndHashes(content: string): LineIndex {
         const code = content.charCodeAt(i);
         if (code === LINE_FEED_CODE) {
             if (lineCount >= capacity) {
-                capacity = capacity << 1;
-                const nextStarts = new Int32Array(capacity);
-                nextStarts.set(startsBuf);
-                startsBuf = nextStarts;
-                const nextHashes = new Uint32Array(capacity);
-                nextHashes.set(hashesBuf);
-                hashesBuf = nextHashes;
+                const resized = reallocateLineBuffers(startsBuf, hashesBuf, capacity);
+                startsBuf = resized.starts;
+                hashesBuf = resized.hashes;
+                capacity = resized.capacity;
             }
             hashesBuf[lineCount - 1] = hash >>> 0;
             startsBuf[lineCount] = i + 1;
@@ -254,8 +268,8 @@ export function fastDiff(a: string[], b: string[], hA?: Uint32Array, hB?: Uint32
     const midM = midB.length;
 
     if (midN === 0 && midM === 0) {
-        const ops: DiffOp[] = [];
-        for (let i = 0; i < n; i++) ops.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
+        const ops: DiffOp[] = new Array(n);
+        for (let i = 0; i < n; i++) ops[i] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
         return ops;
     }
 
@@ -264,17 +278,20 @@ export function fastDiff(a: string[], b: string[], hA?: Uint32Array, hB?: Uint32
             ? histogramDiff(midA, midB, midHA, midHB)
             : myersDiff(midA, midB, midHA, midHB);
 
-    const fullOps: DiffOp[] = [];
-    for (let i = 0; i < prefix; i++) fullOps.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
-    for (const op of midOps) {
-        fullOps.push({
+    const total = prefix + midOps.length + suffix;
+    const fullOps: DiffOp[] = new Array(total);
+    let idx = 0;
+    for (let i = 0; i < prefix; i++) fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
+    for (let i = 0; i < midOps.length; i++) {
+        const op = midOps[i];
+        fullOps[idx++] = {
             type: op.type,
             aIdx: prefix + op.aIdx,
             bIdx: prefix + op.bIdx,
-        });
+        };
     }
     for (let i = 0; i < suffix; i++) {
-        fullOps.push({ type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i });
+        fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i };
     }
 
     return fullOps;
@@ -297,24 +314,34 @@ function hasInvalidCoordinates(e: EditRange): boolean {
     return false;
 }
 
+function validateEditLineBounds(e: EditRange): void {
+    if (e.startLine < 1) {
+        throw new Error('invalid edit range: startLine < 1');
+    }
+    if (e.oldEndLine < e.startLine || e.newEndLine < e.startLine) {
+        throw new Error('invalid edit range: end line before start line');
+    }
+}
+
+function validateEditByteBounds(e: EditRange, maxByte?: number): void {
+    if (e.startByte < 0) {
+        throw new Error('invalid edit range: negative byte offset');
+    }
+    if (e.oldEndByte < e.startByte || e.newEndByte < e.startByte) {
+        throw new Error('invalid edit range: end byte before start byte');
+    }
+    if (maxByte === undefined) return;
+    if (e.startByte > maxByte || e.oldEndByte > maxByte || e.newEndByte > maxByte) {
+        throw new Error('invalid edit range: byte offset out of bounds');
+    }
+}
+
 function validateSingleEditRange(e: EditRange, maxByte?: number): void {
     if (!e || hasInvalidCoordinates(e)) {
         throw new Error('invalid edit range: non-numeric field');
     }
-    if (e.startLine < 1) throw new Error('invalid edit range: startLine < 1');
-    if (e.oldEndLine < e.startLine || e.newEndLine < e.startLine) {
-        throw new Error('invalid edit range: end line before start line');
-    }
-    if (e.startByte < 0) throw new Error('invalid edit range: negative byte offset');
-    if (e.oldEndByte < e.startByte || e.newEndByte < e.startByte) {
-        throw new Error('invalid edit range: end byte before start byte');
-    }
-    if (
-        maxByte !== undefined &&
-        (e.startByte > maxByte || e.oldEndByte > maxByte || e.newEndByte > maxByte)
-    ) {
-        throw new Error('invalid edit range: byte offset out of bounds');
-    }
+    validateEditLineBounds(e);
+    validateEditByteBounds(e, maxByte);
 }
 
 /**

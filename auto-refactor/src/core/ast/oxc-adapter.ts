@@ -204,10 +204,7 @@ export class OxcAdapter implements LanguageAdapter {
         ctx: Ctx,
     ): { start?: Position; end?: Position } {
         const needsPos =
-            isLiteral ||
-            fnLike ||
-            kind === NodeKind.SourceFile ||
-            kind === NodeKind.Class;
+            isLiteral || fnLike || kind === NodeKind.SourceFile || kind === NodeKind.Class;
         if (!needsPos) return {};
         return {
             start: oxcPosOf(startOff, ctx),

@@ -189,7 +189,17 @@ export function runStreaming(
         className: string | null,
         binding: string | null,
     ): void => {
-        dispatchNodeVisits(visits, entries, node, parent, grandparent, depth, className, binding, pushError);
+        dispatchNodeVisits(
+            visits,
+            entries,
+            node,
+            parent,
+            grandparent,
+            depth,
+            className,
+            binding,
+            pushError,
+        );
 
         const childDepth = depth + (node.increasesNesting ? 1 : 0);
         const cName = resolveChildScopeName(node, className);
@@ -200,7 +210,17 @@ export function runStreaming(
         }
 
         if (hasAnyLeave) {
-            dispatchNodeLeaves(leaves, entries, node, parent, grandparent, depth, className, binding, pushError);
+            dispatchNodeLeaves(
+                leaves,
+                entries,
+                node,
+                parent,
+                grandparent,
+                depth,
+                className,
+                binding,
+                pushError,
+            );
         }
     };
 
@@ -374,7 +394,17 @@ export function runStreamingProjected(
         // Scan-wide consumers (the cross-file symbol index) observe the SAME projected nodes the
         // analyzers see; this is the only point where the lazy path has a NormalizedNode in hand.
         if (onNode) onNode(node, caller);
-        dispatchNodeVisits(visits, entries, node, parentProj, grandparentProj, depth, className, binding, pushError);
+        dispatchNodeVisits(
+            visits,
+            entries,
+            node,
+            parentProj,
+            grandparentProj,
+            depth,
+            className,
+            binding,
+            pushError,
+        );
 
         const childDepth = depth + (node.increasesNesting ? 1 : 0);
         const cName = resolveChildScopeName(node, className);
@@ -386,7 +416,17 @@ export function runStreamingProjected(
         }
 
         if (hasAnyLeave) {
-            dispatchNodeLeaves(leaves, entries, node, parentProj, grandparentProj, depth, className, binding, pushError);
+            dispatchNodeLeaves(
+                leaves,
+                entries,
+                node,
+                parentProj,
+                grandparentProj,
+                depth,
+                className,
+                binding,
+                pushError,
+            );
         }
     };
 

@@ -29,7 +29,7 @@ export interface BindingInfo {
     name: string;
     kind: BindingKind;
     node: NormalizedNode; // The declaration node
-    scope: Scope;         // The scope this binding belongs to
+    scope: Scope; // The scope this binding belongs to
 }
 
 /** A single scope node in the scope graph. */

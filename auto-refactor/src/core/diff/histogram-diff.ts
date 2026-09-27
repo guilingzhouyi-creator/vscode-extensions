@@ -46,6 +46,56 @@ const DIFF_OP_EQUAL = 'equal';
 const DIFF_OP_INSERT = 'insert';
 
 /**
+ * Checks if a candidate anchor has fewer occurrences or is closer to the midpoint.
+ */
+function isBetterAnchorCandidate(
+    countB: number,
+    dist: number,
+    minOccurrences: number,
+    bestDistFromMid: number,
+): boolean {
+    if (countB < minOccurrences) {
+        return true;
+    }
+    return countB === minOccurrences && dist < bestDistFromMid;
+}
+
+/**
+ * Emits trivial diff operations when one or both sub-problem spans are empty.
+ */
+function handleEmptySpan(
+    lenA: number,
+    lenB: number,
+    startA: number,
+    endA: number,
+    startB: number,
+    endB: number,
+    ops: DiffOp[],
+): boolean {
+    if (lenA === 0 && lenB === 0) return true;
+    if (lenA === 0) {
+        for (let i = startB; i < endB; i++) {
+            ops.push({ type: DIFF_OP_INSERT, aIdx: startA, bIdx: i });
+        }
+        return true;
+    }
+    if (lenB === 0) {
+        for (let i = startA; i < endA; i++) {
+            ops.push({ type: 'delete', aIdx: i, bIdx: startB });
+        }
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Tests whether sub-problem remainder meets Myers fallback criteria.
+ */
+function isFallbackCondition(remA: number, remB: number, depth: number): boolean {
+    return remA <= FALLBACK_THRESHOLD || remB <= FALLBACK_THRESHOLD || depth >= MAX_RECURSION_DEPTH;
+}
+
+/**
  * Diff two line arrays with the histogram algorithm over caller-supplied 32-bit line hashes.
  *
  * Trims the common prefix/suffix, picks the rarest shared line nearest the midpoint as a split
@@ -103,6 +153,25 @@ export function histogramDiff(
         return low;
     }
 
+    function countValidOccurrences(
+        bList: number[],
+        startK: number,
+        curEndB: number,
+        targetLine: string,
+        b: string[],
+    ): { countB: number; matchedB: number } {
+        let countB = 0;
+        let matchedB = -1;
+        const listLen = bList.length;
+        for (let k = startK; k < listLen; k++) {
+            const pos = bList[k];
+            if (pos >= curEndB) break;
+            countB++;
+            if (matchedB === -1 && targetLine === b[pos]) matchedB = pos;
+        }
+        return { countB, matchedB };
+    }
+
     function findBestAnchor(
         curStartA: number,
         curEndA: number,
@@ -129,18 +198,11 @@ export function histogramDiff(
             if (bList[0] >= curEndB || bList[listLen - 1] < curStartB) continue;
 
             const startK = findBucketStart(bList, curStartB);
-            let countB = 0;
-            let matchedB = -1;
-            for (let k = startK; k < listLen; k++) {
-                const pos = bList[k];
-                if (pos >= curEndB) break;
-                countB++;
-                if (matchedB === -1 && a[i] === b[pos]) matchedB = pos;
-            }
+            const { countB, matchedB } = countValidOccurrences(bList, startK, curEndB, a[i], b);
             if (countB === 0 || matchedB === -1) continue;
 
             const dist = Math.abs(i - midPointA);
-            if (countB < minOccurrences || (countB === minOccurrences && dist < bestDistFromMid)) {
+            if (isBetterAnchorCandidate(countB, dist, minOccurrences, bestDistFromMid)) {
                 minOccurrences = countB;
                 bestDistFromMid = dist;
                 anchorA = i;
@@ -169,25 +231,11 @@ export function histogramDiff(
         const subOps = myersDiff(sliceA, sliceB, sliceHA, sliceHB);
 
         for (const op of subOps) {
-            if (op.type === DIFF_OP_EQUAL) {
-                ops.push({
-                    type: DIFF_OP_EQUAL,
-                    aIdx: curStartA + op.aIdx,
-                    bIdx: curStartB + op.bIdx,
-                });
-            } else if (op.type === 'delete') {
-                ops.push({
-                    type: 'delete',
-                    aIdx: curStartA + op.aIdx,
-                    bIdx: curStartB + op.bIdx,
-                });
-            } else if (op.type === DIFF_OP_INSERT) {
-                ops.push({
-                    type: DIFF_OP_INSERT,
-                    aIdx: curStartA + op.aIdx,
-                    bIdx: curStartB + op.bIdx,
-                });
-            }
+            ops.push({
+                type: op.type,
+                aIdx: curStartA + op.aIdx,
+                bIdx: curStartB + op.bIdx,
+            });
         }
     }
 
@@ -212,23 +260,17 @@ export function histogramDiff(
         }
     }
 
-    function solve(span: Span, depth: number): void {
-        const { startA, endA, startB, endB } = span;
-        const lenA = endA - startA;
-        const lenB = endB - startB;
-
-        if (lenA === 0 && lenB === 0) return;
-        if (lenA === 0) {
-            for (let i = startB; i < endB; i++)
-                ops.push({ type: DIFF_OP_INSERT, aIdx: startA, bIdx: i });
-            return;
-        }
-        if (lenB === 0) {
-            for (let i = startA; i < endA; i++) ops.push({ type: 'delete', aIdx: i, bIdx: startB });
-            return;
-        }
-
-        // Common prefix trimming
+    function trimCommonPrefix(
+        startA: number,
+        endA: number,
+        startB: number,
+        endB: number,
+        a: string[],
+        b: string[],
+        hA: Uint32Array,
+        hB: Uint32Array,
+        ops: DiffOp[],
+    ): number {
         let p = 0;
         while (
             startA + p < endA &&
@@ -239,17 +281,42 @@ export function histogramDiff(
             ops.push({ type: DIFF_OP_EQUAL, aIdx: startA + p, bIdx: startB + p });
             p++;
         }
+        return p;
+    }
 
-        // Common suffix trimming
+    function trimCommonSuffix(
+        minA: number,
+        endA: number,
+        minB: number,
+        endB: number,
+        a: string[],
+        b: string[],
+        hA: Uint32Array,
+        hB: Uint32Array,
+    ): number {
         let s = 0;
         while (
-            endA - 1 - s >= startA + p &&
-            endB - 1 - s >= startB + p &&
+            endA - 1 - s >= minA &&
+            endB - 1 - s >= minB &&
             hA[endA - 1 - s] === hB[endB - 1 - s] &&
             a[endA - 1 - s] === b[endB - 1 - s]
         ) {
             s++;
         }
+        return s;
+    }
+
+    function solve(span: Span, depth: number): void {
+        const { startA, endA, startB, endB } = span;
+        const lenA = endA - startA;
+        const lenB = endB - startB;
+
+        if (handleEmptySpan(lenA, lenB, startA, endA, startB, endB, ops)) {
+            return;
+        }
+
+        const p = trimCommonPrefix(startA, endA, startB, endB, a, b, hA, hB, ops);
+        const s = trimCommonSuffix(startA + p, endA, startB + p, endB, a, b, hA, hB);
 
         const curStartA = startA + p;
         const curEndA = endA - s;
@@ -263,11 +330,7 @@ export function histogramDiff(
             return;
         }
 
-        if (
-            remA <= FALLBACK_THRESHOLD ||
-            remB <= FALLBACK_THRESHOLD ||
-            depth >= MAX_RECURSION_DEPTH
-        ) {
+        if (isFallbackCondition(remA, remB, depth)) {
             handleMyersFallback(curStartA, curEndA, curStartB, curEndB, a, b, hA, hB, ops);
             appendSuffixEquals(curEndA, curEndB, s, ops);
             return;

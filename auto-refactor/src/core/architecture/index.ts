@@ -55,3 +55,17 @@ export type {
     FileOntologyClassification,
     FileTaxonomyAuditResult,
 } from './file-taxonomy-ontology';
+
+export {
+    DEFAULT_NAMING_DECOUPLING_CONFIG,
+    deriveDomainProposal,
+    NamingDecouplingAuditor,
+    splitIdentifierTokens,
+} from './naming-decoupling-auditor';
+export type {
+    ActionableDecouplingProposal,
+    NamingDecouplingConfig,
+    NamingDecouplingFinding,
+    SymbolDeclarationKind,
+    SymbolEntry,
+} from './naming-decoupling-auditor';

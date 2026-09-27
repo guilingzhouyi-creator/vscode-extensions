@@ -640,7 +640,10 @@ interface CyclePassOptions {
     unusedSeverity?: Severity;
 }
 
-async function readSingleFileSafe(rootDir: string, f: string): Promise<readonly [string, string] | null> {
+async function readSingleFileSafe(
+    rootDir: string,
+    f: string,
+): Promise<readonly [string, string] | null> {
     try {
         return [f, await fs.promises.readFile(path.join(rootDir, f), 'utf8')] as const;
     } catch {
@@ -690,7 +693,9 @@ async function populateGraphFromFiles(
 ): Promise<void> {
     const readFailures = await readFilesBatched(files, rootDir, graph, contents);
     if (readFailures > 0) {
-        warnings.push(`dependency-graph: ${readFailures} file(s) unreadable, excluded from cycle analysis`);
+        warnings.push(
+            `dependency-graph: ${readFailures} file(s) unreadable, excluded from cycle analysis`,
+        );
     }
 }
 
@@ -750,9 +755,14 @@ function auditModuleSymbols(
                 rule: 'unused-export',
                 severity,
                 message: `Exported symbol "${sym}" is not imported by any module (${mod.file}).`,
-                location: { file: mod.file, start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
+                location: {
+                    file: mod.file,
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 1 },
+                },
                 detail: { symbol: sym, importers: importerFiles.slice(0, IMPORTER_DETAIL_LIMIT) },
-                suggestion: 'Remove this export or add it to entryGlobs if it is an external entry point.',
+                suggestion:
+                    'Remove this export or add it to entryGlobs if it is an external entry point.',
             });
             flagged++;
         }
@@ -771,7 +781,8 @@ function auditUnusedExports(
     const importers = buildImportersMap(graph.getForwardEdges());
     const importerTokenSets = new Map<string, Set<string>>();
     const ENTRY_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
-    const isEntry = (f: string): boolean => entryRes.some((re) => ENTRY_EXTS.some((ext) => re.test(f + ext)));
+    const isEntry = (f: string): boolean =>
+        entryRes.some((re) => ENTRY_EXTS.some((ext) => re.test(f + ext)));
     let unusedFlagged = 0;
     const unusedSeverity: Severity = opts.unusedSeverity ?? 'warning';
 
@@ -787,15 +798,29 @@ function auditUnusedExports(
                 rule: 'unused-module',
                 severity: unusedSeverity,
                 message: `Module is not imported by any file and exports ${mod.exportedSymbols.length} symbol(s) (dead module candidate).`,
-                location: { file: mod.file, start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
-                detail: { exportedSymbols: mod.exportedSymbols.slice(0, EXPORTED_SYMBOL_DETAIL_LIMIT) },
-                suggestion: 'Verify whether this is legacy dead code: remove, archive, or add to entryGlobs with justification.',
+                location: {
+                    file: mod.file,
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 1 },
+                },
+                detail: {
+                    exportedSymbols: mod.exportedSymbols.slice(0, EXPORTED_SYMBOL_DETAIL_LIMIT),
+                },
+                suggestion:
+                    'Verify whether this is legacy dead code: remove, archive, or add to entryGlobs with justification.',
             });
             unusedFlagged++;
             continue;
         }
 
-        unusedFlagged += auditModuleSymbols(mod, importerFiles, contents, importerTokenSets, unusedSeverity, issues);
+        unusedFlagged += auditModuleSymbols(
+            mod,
+            importerFiles,
+            contents,
+            importerTokenSets,
+            unusedSeverity,
+            issues,
+        );
     }
     if (unusedFlagged > 0 && logger) {
         logger.info(`dependency-graph: ${unusedFlagged} unused module/export issue(s)`);
@@ -823,11 +848,14 @@ function auditImportCycles(
             message: `Circular dependency: ${cyc.join(CYCLE_ARROW_SEPARATOR)}`,
             location: { file: cyc[0], start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
             detail: { cycle: cyc, length: cyc.length },
-            suggestion: 'Extract shared logic to a lower-layer module or invert dependency via interfaces.',
+            suggestion:
+                'Extract shared logic to a lower-layer module or invert dependency via interfaces.',
         });
     }
     if (cycles.length > cap) {
-        warnings.push(`dependency-graph: ${cycles.length - cap} additional cycle(s) beyond report cap (${cap})`);
+        warnings.push(
+            `dependency-graph: ${cycles.length - cap} additional cycle(s) beyond report cap (${cap})`,
+        );
     }
 }
 
@@ -842,7 +870,8 @@ export async function runCyclePass(
 ): Promise<{ issues: Issue[]; warnings: string[] }> {
     const issues: Issue[] = [];
     const warnings: string[] = [];
-    const opts = (config.analyzers[DEPENDENCY_GRAPH_ANALYZER_ID]?.options || {}) as CyclePassOptions;
+    const opts = (config.analyzers[DEPENDENCY_GRAPH_ANALYZER_ID]?.options ||
+        {}) as CyclePassOptions;
     if (opts.detectCycles === false) return { issues, warnings };
 
     const files = report.fileMetrics.map((m) => m.file);

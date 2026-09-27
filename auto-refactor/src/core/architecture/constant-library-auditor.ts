@@ -79,11 +79,7 @@ function categorizeSymbolToModule(name: string): string {
     ) {
         return 'system-tokens.ts';
     }
-    if (
-        upper.startsWith('SEVERITY_') ||
-        upper.startsWith('STATUS_') ||
-        upper.startsWith('DIAG_')
-    ) {
+    if (upper.startsWith('SEVERITY_') || upper.startsWith('STATUS_') || upper.startsWith('DIAG_')) {
         return 'diagnostic-tokens.ts';
     }
     if (

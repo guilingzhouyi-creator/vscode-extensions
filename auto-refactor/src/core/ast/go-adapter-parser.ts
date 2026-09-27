@@ -14,7 +14,7 @@
  *   collection including function count, complexity, literal detection, and nesting depth.
  */
 
-import type { NormalizedNode, NormalizedAst, LanguageAdapter } from './multilang';
+import type { NormalizedNode } from './multilang';
 import { NodeKind } from './multilang';
 
 const MIN_SIGNIFICANT_STRING_LENGTH = 3;
@@ -125,14 +125,10 @@ const IMPORT_DECL_RE = /^import\s+/;
 // --- Tolerated context detection ---
 
 /** Contexts where numeric literals are tolerated (index access, array lengths). */
-const NUMERIC_TOLERATED_PARENTS = new Set([
-    'index_expression',
-    'array_type',
-    'slice_type',
-]);
+export const NUMERIC_TOLERATED_PARENTS = new Set(['index_expression', 'array_type', 'slice_type']);
 
 /** Contexts where string literals are tolerated (import paths, tags). */
-const STRING_TOLERATED_PARENTS = new Set(['import_spec', 'struct_tag']);
+export const STRING_TOLERATED_PARENTS = new Set(['import_spec', 'struct_tag']);
 
 /**
  * Parse struct or interface type definitions: `type Foo struct` or `type Bar interface`.
@@ -315,11 +311,7 @@ function parseBlockEntry(
  * @param lineNum - 1-based line number.
  * @returns NormalizedNode for control flow, or null.
  */
-function parseControlFlow(
-    trimmed: string,
-    line: string,
-    lineNum: number,
-): NormalizedNode | null {
+function parseControlFlow(trimmed: string, line: string, lineNum: number): NormalizedNode | null {
     if (!CONTROL_FLOW_RE.test(trimmed)) return null;
     return {
         kind: NodeKind.ControlFlow,
@@ -415,9 +407,7 @@ function parseNumericLiterals(
         const idx = m.index ?? 0;
         // Skip if this int overlaps with a float match
         const overlaps = floatMatches.some(
-            (fm) =>
-                idx >= (fm.index ?? 0) &&
-                idx < (fm.index ?? 0) + (fm[0]?.length ?? 0),
+            (fm) => idx >= (fm.index ?? 0) && idx < (fm.index ?? 0) + (fm[0]?.length ?? 0),
         );
         if (overlaps) continue;
         out.push({
@@ -567,7 +557,10 @@ export interface ParseContext {
     /** Whether we are inside a `var ( ... )` block. */
     inVarBlock: boolean;
     /** Stack of brace-entry kinds for proper pop behavior. */
-    braceStack: Array<{ depth: number; kind: 'struct' | 'switch' | 'select' | 'func' | 'const' | 'var' | 'other' }>;
+    braceStack: Array<{
+        depth: number;
+        kind: 'struct' | 'switch' | 'select' | 'func' | 'const' | 'var' | 'other';
+    }>;
 }
 
 /**
@@ -642,17 +635,18 @@ function handleCommentLine(trimmed: string, ctx: ParseContext): boolean {
 }
 
 /**
- * Handle top-level declarations: package, import, type, func, var, const.
- * Also handles const/var block entries.
+ * Handle top-level package and import declarations, tracking multi-line import blocks.
  *
  * @param codeOnly - Line with line comment stripped.
- * @param rawLine - Raw source line.
- * @param lineNum - 1-based line number.
+ * @param wasTopLevel - Whether the line is at top-level block scope.
  * @param ctx - Parse context (mutated in place).
- * @param children - Output array to append nodes to.
  * @returns True when the line is a declaration (caller should skip further processing).
  */
-function handlePackageAndImport(codeOnly: string, wasTopLevel: boolean, ctx: ParseContext): boolean {
+function handlePackageAndImport(
+    codeOnly: string,
+    wasTopLevel: boolean,
+    ctx: ParseContext,
+): boolean {
     if (wasTopLevel && PACKAGE_DECL_RE.test(codeOnly)) return true;
     if (wasTopLevel && IMPORT_DECL_RE.test(codeOnly)) {
         if (codeOnly.includes('(')) ctx.inImport = true;

@@ -47,7 +47,12 @@ function runAudit() {
     const lines = content.split('\n');
     lines.forEach((line, idx) => {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+      if (
+        !trimmed ||
+        trimmed.startsWith('//') ||
+        trimmed.startsWith('/*') ||
+        trimmed.startsWith('*')
+      ) {
         return;
       }
       const match = trimmed.match(ALIAS_RE);

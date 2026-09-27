@@ -216,7 +216,6 @@ async function run() {
     });
 
     const issues = report.issues.filter((i) => i.analyzer === 'shell-lint');
-    const byRule = (rule) => issues.filter((i) => i.rule === rule).map((i) => i.location.file);
     const inFile = (file) => issues.filter((i) => i.location.file === file);
     const byRuleInFile = (rule, file) =>
       issues.filter((i) => i.rule === rule && i.location.file === file).length;
@@ -244,11 +243,7 @@ async function run() {
     );
     console.log('    [PASS] SH-READ-001 fires on read without -r');
 
-    assert.strictEqual(
-      byRuleInFile('SH-ARRAY-001', 'bad.sh'),
-      1,
-      'SH-ARRAY-001 should fire on $*',
-    );
+    assert.strictEqual(byRuleInFile('SH-ARRAY-001', 'bad.sh'), 1, 'SH-ARRAY-001 should fire on $*');
     console.log('    [PASS] SH-ARRAY-001 fires on $* usage');
 
     assert.strictEqual(

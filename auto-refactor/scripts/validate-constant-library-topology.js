@@ -63,7 +63,12 @@ function testDomainClusteringAndScaffolding() {
   console.log('2. Testing Domain Slicing & Library Scaffolding...');
 
   const scattered = [];
-  const files = ['src/core/parser.ts', 'src/core/eval.ts', 'src/core/util.ts', 'src/core/runner.ts'];
+  const files = [
+    'src/core/parser.ts',
+    'src/core/eval.ts',
+    'src/core/util.ts',
+    'src/core/runner.ts',
+  ];
 
   // Add AST tokens
   for (let i = 0; i < 6; i++) {
@@ -103,7 +108,11 @@ function testDomainClusteringAndScaffolding() {
   }
 
   const verdict = auditConstantLibraryTopology(scattered);
-  assert.strictEqual(verdict.needsCentralizedLibrary, true, 'Scattered constants should trigger recommendation');
+  assert.strictEqual(
+    verdict.needsCentralizedLibrary,
+    true,
+    'Scattered constants should trigger recommendation',
+  );
   assert.strictEqual(verdict.recommendedDirectory, 'src/core/constants');
 
   const moduleFiles = verdict.suggestedModules.map((m) => path.basename(m.file));
@@ -139,7 +148,10 @@ function testAgentActionableIssueEmission() {
   assert.strictEqual(issue.analyzer, 'constants');
   assert.strictEqual(issue.rule, 'CONST-LIB-001');
   assert.strictEqual(issue.severity, 'warning');
-  assert.ok(issue.message.includes('Unstructured constant sprawl'), 'Message should indicate sprawl');
+  assert.ok(
+    issue.message.includes('Unstructured constant sprawl'),
+    'Message should indicate sprawl',
+  );
 
   assert.ok(issue.actionable, 'Issue must carry actionable payload');
   assert.strictEqual(issue.actionable.action, 'scaffold_constant_library');
@@ -174,7 +186,10 @@ function testNestedConstantActionableInAnalyzer() {
   const nested = nestedIssues[0];
 
   assert.strictEqual(nested.rule, 'nested-constant');
-  assert.ok(nested.message.includes('Redundant constant alias'), 'Should warn about redundant alias');
+  assert.ok(
+    nested.message.includes('Redundant constant alias'),
+    'Should warn about redundant alias',
+  );
   assert.ok(nested.actionable, 'nested-constant must carry actionable payload');
   assert.strictEqual(nested.actionable.action, 'replace_token');
   assert.strictEqual(nested.actionable.code, 'AR:CONST:004');

@@ -95,6 +95,10 @@ function resolveChildMapContext(ctx: MapContext, sn: TreeSitterNode): MapContext
     };
 }
 
+/**
+ * Language adapter projecting Python syntax into normalized
+ * language-agnostic AST using Tree-sitter.
+ */
 export class PythonAdapter implements LanguageAdapter {
     id = 'python' as const;
     extensions = ['.py'];

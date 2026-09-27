@@ -624,7 +624,9 @@ export class PythonModernAnalyzer implements Analyzer {
         const currentScope = varScopes[varScopes.length - 1];
         const line1 = lineIdx + 1;
 
-        if (this.auditDefAndClassShadowing(line, line1, indent, currentScope, varScopes, opts, emit)) {
+        if (
+            this.auditDefAndClassShadowing(line, line1, indent, currentScope, varScopes, opts, emit)
+        ) {
             return;
         }
         if (this.auditImportShadowing(line, codeOnly, line1, currentScope, varScopes, opts, emit)) {
@@ -651,7 +653,8 @@ export class PythonModernAnalyzer implements Analyzer {
             const paramsStr = defMatch[2];
             this.registerBinding(funcName, line1, currentScope, varScopes, opts, emit);
             const isAsync = ASYNC_DEF_RE.test(line);
-            const newKind: 'function' | 'class' = isAsync || DEF_RE.test(line) ? 'function' : 'class';
+            const newKind: 'function' | 'class' =
+                isAsync || DEF_RE.test(line) ? 'function' : 'class';
             const newScope: VarScope = { indent, kind: newKind, names: new Map() };
             varScopes.push(newScope);
 

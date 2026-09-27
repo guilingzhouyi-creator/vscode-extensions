@@ -76,13 +76,26 @@ export function trimPrefixSuffix(
         suffix++;
     }
 
+    const midN = n - prefix - suffix;
+    const midM = m - prefix - suffix;
+
     return {
         prefix,
         suffix,
-        midA: a.slice(prefix, n - suffix),
-        midB: b.slice(prefix, m - suffix),
-        midHA: hashA.subarray(prefix, n - suffix),
-        midHB: hashB.subarray(prefix, m - suffix),
+        midA: prefix === 0 && suffix === 0 ? a : midN === 0 ? [] : a.slice(prefix, n - suffix),
+        midB: prefix === 0 && suffix === 0 ? b : midM === 0 ? [] : b.slice(prefix, m - suffix),
+        midHA:
+            prefix === 0 && suffix === 0
+                ? hashA
+                : midN === 0
+                  ? new Uint32Array(0)
+                  : hashA.subarray(prefix, n - suffix),
+        midHB:
+            prefix === 0 && suffix === 0
+                ? hashB
+                : midM === 0
+                  ? new Uint32Array(0)
+                  : hashB.subarray(prefix, m - suffix),
     };
 }
 
@@ -94,38 +107,6 @@ interface MyersSearchResult {
     d: number;
     rowSize: number;
     offset: number;
-}
-
-/**
- * Advance diagonal snake along equal lines.
- */
-function advanceSnake(
-    midA: string[],
-    midB: string[],
-    midHA: Uint32Array,
-    midHB: Uint32Array,
-    startX: number,
-    startY: number,
-    midN: number,
-    midM: number,
-): number {
-    let x = startX;
-    let y = startY;
-    while (x < midN && y < midM && midHA[x] === midHB[y] && midA[x] === midB[y]) {
-        x++;
-        y++;
-    }
-    return x;
-}
-
-/**
- * Compute the next X position on diagonal k.
- */
-function getNextDiagonalX(v: Int32Array, k: number, d: number, offset: number): number {
-    if (k === -d || (k !== d && v[k - 1 + offset] < v[k + 1 + offset])) {
-        return v[k + 1 + offset];
-    }
-    return v[k - 1 + offset] + 1;
 }
 
 /**
@@ -141,25 +122,10 @@ interface MyersContext {
 }
 
 /**
- * Search one diagonal row d in the Myers forward trace.
- */
-function searchDiagonalRow(v: Int32Array, d: number, offset: number, ctx: MyersContext): boolean {
-    const { midA, midB, midHA, midHB, midN, midM } = ctx;
-    for (let k = -d; k <= d; k += 2) {
-        const initialX = getNextDiagonalX(v, k, d, offset);
-        const x = advanceSnake(midA, midB, midHA, midHB, initialX, initialX - k, midN, midM);
-        v[k + offset] = x;
-        if (x >= midN && x - k >= midM) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
- * Execute forward diagonal trace for Myers greedy search.
+ * Execute forward diagonal trace for Myers greedy search with inlined diagonal snake advancement.
  */
 function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
+    const { midA, midB, midHA, midHB, midN, midM } = ctx;
     const offset = max;
     const rowSize = 2 * max + 1;
     const v = new Int32Array(rowSize);
@@ -168,7 +134,25 @@ function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
 
     for (d = 0; d <= max; d++) {
         trace.set(v, d * rowSize);
-        if (searchDiagonalRow(v, d, offset, ctx)) {
+        let reached = false;
+        for (let k = -d; k <= d; k += 2) {
+            const initialX =
+                k === -d || (k !== d && v[k - 1 + offset] < v[k + 1 + offset])
+                    ? v[k + 1 + offset]
+                    : v[k - 1 + offset] + 1;
+            let x = initialX;
+            let y = x - k;
+            while (x < midN && y < midM && midHA[x] === midHB[y] && midA[x] === midB[y]) {
+                x++;
+                y++;
+            }
+            v[k + offset] = x;
+            if (x >= midN && y >= midM) {
+                reached = true;
+                break;
+            }
+        }
+        if (reached) {
             break;
         }
     }
@@ -254,17 +238,17 @@ export function assembleDiffOps(
     m: number,
     midOps: DiffOp[],
 ): DiffOp[] {
-    const fullOps: DiffOp[] = [];
+    const total = prefix + midOps.length + suffix;
+    const fullOps: DiffOp[] = new Array(total);
+    let idx = 0;
     for (let i = 0; i < prefix; i++) {
-        fullOps.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
+        fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
     }
-    for (const op of midOps) {
-        fullOps.push(op);
+    for (let i = 0; i < midOps.length; i++) {
+        fullOps[idx++] = midOps[i];
     }
     for (let i = 0; i < suffix; i++) {
-        const aIdx = n - suffix + i;
-        const bIdx = m - suffix + i;
-        fullOps.push({ type: DIFF_OP_EQUAL, aIdx, bIdx });
+        fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i };
     }
     return fullOps;
 }
@@ -328,7 +312,11 @@ export function myersDiff(
     const { prefix, suffix, midA, midB, midHA, midHB } = trimmed;
 
     if (prefix + suffix === n && prefix + suffix === m) {
-        return Array.from({ length: n }, (_, i) => ({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i }));
+        const fullOps: DiffOp[] = new Array(n);
+        for (let i = 0; i < n; i++) {
+            fullOps[i] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
+        }
+        return fullOps;
     }
 
     const midN = midA.length;

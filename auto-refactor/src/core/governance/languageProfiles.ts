@@ -167,7 +167,8 @@ export const LANGUAGE_PROFILES: Record<string, LanguageCapabilities> = {
             class: NAMING_PASCAL_CASE, // exported types
             function: NAMING_CAMEL_CASE, // mixedCaps, exported = PascalCase
             variable: NAMING_CAMEL_CASE, // mixedCaps
-            constant: NAMING_UPPER_SNAKE_CASE, // Go uses camelCase in practice; profile uses the shared enum
+            // Go uses camelCase in practice; profile uses the shared enum
+            constant: NAMING_UPPER_SNAKE_CASE,
         },
     },
     shell: {

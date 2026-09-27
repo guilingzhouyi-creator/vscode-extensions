@@ -32,15 +32,29 @@ import {
 
 /** Relevant source extensions for standard library and systems runtime analysis */
 const STDLIB_EXTS = new Set([
-    '.rs', '.go', '.py', '.c', '.cc', '.cpp', '.cxx', '.h', '.hpp', '.ts', '.js',
+    '.rs',
+    '.go',
+    '.py',
+    '.c',
+    '.cc',
+    '.cpp',
+    '.cxx',
+    '.h',
+    '.hpp',
+    '.ts',
+    '.js',
 ]);
 
-const TEST_PATH_RE = /(?:\/tests?\/|\/fixtures\/|_test\.[a-z]+|\.test\.[a-z]+|\.spec\.[a-z]+|^test_)/i;
-const CRYPTO_KEYWORD_RE = /(?:crypto|hash|token|secret|digest|cipher|signature|subtle|constant_time|hmac|sha256|blake3|keccak|aes_)/i;
-const TARGET_CFG_RE = /(?:#\[cfg\(target_os|#\[cfg\(target_arch|#if defined\(__linux__\)|#ifdef _WIN32)/;
+const TEST_PATH_RE =
+    /(?:\/tests?\/|\/fixtures\/|_test\.[a-z]+|\.test\.[a-z]+|\.spec\.[a-z]+|^test_)/i;
+const CRYPTO_KEYWORD_RE =
+    /(?:crypto|hash|token|secret|digest|cipher|signature|subtle|constant_time|hmac|sha256|blake3|keccak|aes_)/i;
+const TARGET_CFG_RE =
+    /(?:#\[cfg\(target_os|#\[cfg\(target_arch|#if defined\(__linux__\)|#ifdef _WIN32)/;
 const FALLBACK_RE = /(?:compile_error!|#error|unsupported platform|cfg\(not\(any\()/;
 const NO_STD_CONTEXT_RE = /(?:#!\[no_std\]|#!\[no_core\]|\/no_std\/|\/core\/)/;
-const IMPLICIT_ALLOC_RE = /(?:\bBox::new\s*\(|\bVec::new\s*\(|\balloc::boxed::Box\b|\balloc::vec::Vec\b|\b(?:malloc|calloc)\s*\()/;
+const IMPLICIT_ALLOC_RE =
+    /(?:\bBox::new\s*\(|\bVec::new\s*\(|\balloc::boxed::Box\b|\balloc::vec::Vec\b|\b(?:malloc|calloc)\s*\()/;
 const RUST_PUB_FN_RE = /^\s*pub(?:\s*\([^)]*\))?\s*(?:async\s+)?(?:unsafe\s+)?fn\s+([a-zA-Z0-9_]+)/;
 const RUST_PANIC_RE = /(?:\bpanic!\s*\(|\b(?:todo!|unimplemented!)\s*\(|\.unwrap\(\))/;
 const GO_PUB_FN_RE = /^func\s+(?:\([^)]+\)\s+)?([A-Z][a-zA-Z0-9_]*)\s*\(/;
@@ -108,12 +122,36 @@ export class StdlibAnalyzer implements Analyzer {
         detail: Record<string, unknown> = {},
     ): void {
         const actionableMap: Record<string, { action: any; code: string; safe: boolean }> = {
-            'STDLIB-PANIC-001': { action: 'replace_token', code: CODE_STB_PANIC_ESCAPE, safe: false },
-            'STDLIB-ALLOC-001': { action: 'replace_token', code: CODE_STB_DYNAMIC_ALLOC, safe: false },
-            'STDLIB-UNSAFE-001': { action: 'insert_comment_contract', code: CODE_STB_MISSING_SAFETY, safe: true },
-            'STDLIB-CONST-001': { action: 'use_constant_time_comparison', code: CODE_STB_TIMING_ATTACK, safe: false },
-            'STDLIB-RECURSION-001': { action: 'guard_recursion', code: CODE_STB_UNBOUNDED_RECURSION, safe: false },
-            'STDLIB-PORT-001': { action: 'insert_comment_contract', code: CODE_STB_CONDITIONAL_COMPILATION, safe: true },
+            'STDLIB-PANIC-001': {
+                action: 'replace_token',
+                code: CODE_STB_PANIC_ESCAPE,
+                safe: false,
+            },
+            'STDLIB-ALLOC-001': {
+                action: 'replace_token',
+                code: CODE_STB_DYNAMIC_ALLOC,
+                safe: false,
+            },
+            'STDLIB-UNSAFE-001': {
+                action: 'insert_comment_contract',
+                code: CODE_STB_MISSING_SAFETY,
+                safe: true,
+            },
+            'STDLIB-CONST-001': {
+                action: 'use_constant_time_comparison',
+                code: CODE_STB_TIMING_ATTACK,
+                safe: false,
+            },
+            'STDLIB-RECURSION-001': {
+                action: 'guard_recursion',
+                code: CODE_STB_UNBOUNDED_RECURSION,
+                safe: false,
+            },
+            'STDLIB-PORT-001': {
+                action: 'insert_comment_contract',
+                code: CODE_STB_CONDITIONAL_COMPILATION,
+                safe: true,
+            },
         };
 
         const targetActionable = actionableMap[rule];
@@ -301,10 +339,7 @@ export class StdlibAnalyzer implements Analyzer {
      * STDLIB-CONST-001: Flag short-circuit early returns in cryptographic hash comparisons.
      */
     private checkConstantTimeComparisons(content: string, file: string, issues: Issue[]): void {
-        if (
-            !CRYPTO_KEYWORD_RE.test(file) &&
-            !CRYPTO_KEYWORD_RE.test(content.slice(0, 1000))
-        ) {
+        if (!CRYPTO_KEYWORD_RE.test(file) && !CRYPTO_KEYWORD_RE.test(content.slice(0, 1000))) {
             return;
         }
 
@@ -356,7 +391,11 @@ export class StdlibAnalyzer implements Analyzer {
                 continue;
             }
 
-            if (new RegExp(`\\b${currentFn}\\s*\\(`).test(line) && !line.includes('fn ') && !line.includes('def ')) {
+            if (
+                new RegExp(`\\b${currentFn}\\s*\\(`).test(line) &&
+                !line.includes('fn ') &&
+                !line.includes('def ')
+            ) {
                 this.emitIssue(
                     issues,
                     file,

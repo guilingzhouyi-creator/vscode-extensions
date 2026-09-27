@@ -3,7 +3,9 @@
  * File Path: src/analyzers/python-modern-tables.ts
  * Architecture Role: Static lookup dictionaries and symbol tables for Python modernization rules.
  * Dependencies & Triggers: Consumed by python-modern analyzer.
- * Responsibilities: Maintain stdlib module lists, typing abstract collections, and conventional name sets.
+ * Responsibilities: Maintain stdlib module lists, typing abstract collections,
+ *   and conventional name sets.
+ * Exit Semantics & Design Rationale: Read-only static lookup sets; zero runtime mutation.
  */
 
 /** Python stdlib top-level modules (`sys.stdlib_module_names` + `__future__`). */
@@ -38,7 +40,15 @@ export const PY_STDLIB_NAMES = new Set(
 );
 
 /** Roots treated as first-party imports when the scanned file lives outside them. */
-export const PY_LOCAL_ROOTS = new Set(['app', 'src', 'lib', 'tests', 'scripts', 'conftest', 'helpers']);
+export const PY_LOCAL_ROOTS = new Set([
+    'app',
+    'src',
+    'lib',
+    'tests',
+    'scripts',
+    'conftest',
+    'helpers',
+]);
 
 /** Abstract types that belong to `collections.abc` rather than `typing` (PEP 585). */
 export const PY_ABC_TYPING_NAMES = new Set([
