@@ -29,9 +29,7 @@ const {
   classifyFileProvenance,
   classifyImportProvenance,
 } = require('../dist/core/intelligence/dependency-provenance');
-const {
-  evaluateProjectAutonomy,
-} = require('../dist/core/scoring/autonomy-scorer');
+const { evaluateProjectAutonomy } = require('../dist/core/scoring/autonomy-scorer');
 const { scan } = require('../dist/api');
 
 async function testProvenanceManifestDetection() {
@@ -47,25 +45,25 @@ async function testProvenanceManifestDetection() {
         dependencies: { lodash: '^4.17.21', express: '^4.18.2' },
         devDependencies: { mocha: '^10.0.0' },
       }),
-      'utf8'
+      'utf8',
     );
 
     fs.writeFileSync(
       path.join(tempDir, 'requirements.txt'),
       'requests>=2.28.0\npytest==7.1.2\n',
-      'utf8'
+      'utf8',
     );
 
     fs.writeFileSync(
       path.join(tempDir, 'Cargo.toml'),
       '[package]\nname = "test-rs"\n[dependencies]\nserde = "1.0"\n',
-      'utf8'
+      'utf8',
     );
 
     fs.writeFileSync(
       path.join(tempDir, 'go.mod'),
       'module example.com/test\n\ngo 1.20\n\nrequire (\n\tgithub.com/gin-gonic/gin v1.9.0\n)\n',
-      'utf8'
+      'utf8',
     );
 
     const deps = loadProjectManifestDependencies(tempDir);
@@ -88,7 +86,10 @@ async function testProvenanceManifestDetection() {
     assert.strictEqual(classifyImportProvenance('sys', 'app/main.py', deps), 'stdlib');
     assert.strictEqual(classifyImportProvenance('lodash', 'src/index.ts', deps), 'external_sdk');
     assert.strictEqual(classifyImportProvenance('./utils', 'src/index.ts', deps), 'internal');
-    assert.strictEqual(classifyImportProvenance('../vendor/helper', 'src/index.ts', deps), 'in_tree_vendor');
+    assert.strictEqual(
+      classifyImportProvenance('../vendor/helper', 'src/index.ts', deps),
+      'in_tree_vendor',
+    );
 
     console.log('   ✓ Manifest detection and classification verified.');
   } finally {
@@ -109,20 +110,25 @@ async function testAutonomyMathematicalModel() {
         file: 'src/core/math.ts',
         lines: 300,
         characters: 8000,
-        content: 'export function add(a: number, b: number) { return a + b; }\nexport function mul(a: number, b: number) { return a * b; }',
+        content:
+          'export function add(a: number, b: number) { return a + b; }\nexport function mul(a: number, b: number) { return a * b; }',
       },
       {
         file: 'src/core/state.ts',
         lines: 200,
         characters: 5000,
-        content: 'import { add } from "./math";\nexport class StateMachine { run() { return add(1, 2); } }',
+        content:
+          'import { add } from "./math";\nexport class StateMachine { run() { return add(1, 2); } }',
       },
     ];
 
     const evalPure = evaluateProjectAutonomy(pureMetrics, [], mockConfig);
 
     assert.strictEqual(evalPure.grade, 'L5_INDEPENDENT');
-    assert.ok(evalPure.compositeAutonomyIndex >= 90.0, `Expected >= 90, got ${evalPure.compositeAutonomyIndex}`);
+    assert.ok(
+      evalPure.compositeAutonomyIndex >= 90.0,
+      `Expected >= 90, got ${evalPure.compositeAutonomyIndex}`,
+    );
     assert.strictEqual(evalPure.dimensions.effectiveLocAutonomy, 100);
     assert.ok(evalPure.dimensions.symbolCallAutonomy >= 90);
     assert.ok(evalPure.dimensions.supplyChainResilience >= 95);
@@ -145,7 +151,8 @@ async function testAutonomyMathematicalModel() {
         file: 'src/wrapper.ts',
         lines: 100,
         characters: 2500,
-        content: 'import * as aws from "@aws-sdk/client-s3";\nimport * as express from "express";\nexport function run() {}',
+        content:
+          'import * as aws from "@aws-sdk/client-s3";\nimport * as express from "express";\nexport function run() {}',
       },
     ];
 
@@ -153,9 +160,12 @@ async function testAutonomyMathematicalModel() {
 
     assert.ok(
       evalVendor.grade === 'L1_SHALLOW_WRAPPER' || evalVendor.grade === 'L2_FRAMEWORK_DEPENDENT',
-      `Expected low grade, got ${evalVendor.grade}`
+      `Expected low grade, got ${evalVendor.grade}`,
     );
-    assert.ok(evalVendor.compositeAutonomyIndex < 60.0, `Expected low score, got ${evalVendor.compositeAutonomyIndex}`);
+    assert.ok(
+      evalVendor.compositeAutonomyIndex < 60.0,
+      `Expected low score, got ${evalVendor.compositeAutonomyIndex}`,
+    );
     assert.strictEqual(evalVendor.stats.vendorFiles, 1);
     assert.strictEqual(evalVendor.stats.proprietaryFiles, 1);
     assert.ok(evalVendor.externalSdkInventory.length > 0, 'Should register external SDK inventory');
@@ -175,7 +185,7 @@ async function testSupplyChainAndCredibleIntervals() {
     fs.writeFileSync(
       path.join(tempDir, 'package.json'),
       JSON.stringify({ name: 'deep-chain', dependencies: { foo: '1.0.0' } }),
-      'utf8'
+      'utf8',
     );
     // Fake lockfile with 100 packages
     const fakeLock = {
@@ -201,9 +211,19 @@ async function testSupplyChainAndCredibleIntervals() {
     assert.strictEqual(result.supplyChain.hasLockfile, true);
     assert.strictEqual(result.supplyChain.lockfileType, 'npm');
     assert.ok(result.supplyChain.transitiveDependencies >= 70, 'Transitive deps should be tracked');
-    assert.ok(result.dimensions.supplyChainResilience < 95.0, 'Resilience should be discounted by deep transitive tree');
-    assert.strictEqual(result.confidence.isLowConfidence, true, 'Single small file must trigger low confidence flag');
-    assert.ok(result.stats.criticalPathFiles === 1, 'auth_token should be identified as critical path');
+    assert.ok(
+      result.dimensions.supplyChainResilience < 95.0,
+      'Resilience should be discounted by deep transitive tree',
+    );
+    assert.strictEqual(
+      result.confidence.isLowConfidence,
+      true,
+      'Single small file must trigger low confidence flag',
+    );
+    assert.ok(
+      result.stats.criticalPathFiles === 1,
+      'auth_token should be identified as critical path',
+    );
     assert.ok(result.dimensions.criticalPathAutonomy >= 0.0);
 
     console.log('   ✓ Supply chain penetration and Bayesian confidence verified.');
@@ -258,13 +278,15 @@ async function testFiveTierBoundaryHold() {
     const balancedEval = evaluateProjectAutonomy(balancedMetrics, [], mockConfig);
     assert.ok(
       balancedEval.grade === 'L3_BALANCED' || balancedEval.grade === 'L4_HIGH_AUTONOMY',
-      `Expected balanced grade, got ${balancedEval.grade} (${balancedEval.compositeAutonomyIndex})`
+      `Expected balanced grade, got ${balancedEval.grade} (${balancedEval.compositeAutonomyIndex})`,
     );
 
     // 3. Shallow wrapper test
     const shallowMetrics = makeMetrics(0.15, 20);
     const shallowEval = evaluateProjectAutonomy(shallowMetrics, [], mockConfig);
-    assert.ok(shallowEval.grade === 'L1_SHALLOW_WRAPPER' || shallowEval.grade === 'L2_FRAMEWORK_DEPENDENT');
+    assert.ok(
+      shallowEval.grade === 'L1_SHALLOW_WRAPPER' || shallowEval.grade === 'L2_FRAMEWORK_DEPENDENT',
+    );
 
     console.log('   ✓ Tier classification grades verified.');
   } finally {
@@ -283,7 +305,7 @@ async function testEndToEndScanIntegration() {
         name: 'sample-project',
         dependencies: { chalk: '^4.1.2' },
       }),
-      'utf8'
+      'utf8',
     );
 
     const srcDir = path.join(tempDir, 'src');
@@ -300,16 +322,13 @@ async function testEndToEndScanIntegration() {
         '}',
         'module.exports = { add, multiply };',
       ].join('\n'),
-      'utf8'
+      'utf8',
     );
 
     fs.writeFileSync(
       path.join(srcDir, 'index.js'),
-      [
-        'const calc = require("./calc");',
-        'console.log(calc.add(1, 2));',
-      ].join('\n'),
-      'utf8'
+      ['const calc = require("./calc");', 'console.log(calc.add(1, 2));'].join('\n'),
+      'utf8',
     );
 
     const report = await scan({
@@ -322,7 +341,7 @@ async function testEndToEndScanIntegration() {
     assert.ok(typeof report.autonomy.compositeAutonomyIndex === 'number');
     assert.ok(
       report.autonomy.compositeAutonomyIndex >= 85.0,
-      `Expected autonomous score >= 85, got ${report.autonomy.compositeAutonomyIndex}`
+      `Expected autonomous score >= 85, got ${report.autonomy.compositeAutonomyIndex}`,
     );
     assert.strictEqual(report.autonomy.grade, 'L5_INDEPENDENT');
     assert.ok(report.autonomy.dimensions.effectiveLocAutonomy >= 95.0);

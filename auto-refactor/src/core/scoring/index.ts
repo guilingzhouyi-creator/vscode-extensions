@@ -26,3 +26,7 @@ export * from './fusion-scorer';
 export * from './change-quality-arbiter';
 export * from './dimensionDeductions';
 export * from './scorer-formulas';
+export * from './dual-track-test-evaluator';
+export * from './archetype-weight-tuner';
+export * from './logistic-deduction-curve';
+export * from './topological-churn-evaluator';

@@ -13,22 +13,21 @@
  *   unmatched analyzer/rule combinations fall through to generic or zero deductions;
  *   every deduction records a rationale so output stays explainable, not black-box.
  */
-import type { Issue, FileMetric, ScanConfig } from '../types';
+import type { Issue, FileMetric, ScanConfig, ProjectArchetype } from '../types';
 import type {
     QualityDimension,
     QualityScoreBreakdown,
     QualityScoreRationale,
     QualityWeights,
 } from './scoringTypes';
-import {
-    ALL_QUALITY_DIMENSIONS,
-    DEFAULT_QUALITY_WEIGHTS,
-} from './scoringTypes';
+import { ALL_QUALITY_DIMENSIONS, DEFAULT_QUALITY_WEIGHTS } from './scoringTypes';
 import {
     FAMILY_DIMENSIONS,
     applyIssueDeductions,
     applyMetricDeductions,
+    type IssueDeductionOptions,
 } from './dimensionDeductions';
+import { ArchetypeWeightTuner } from './archetype-weight-tuner';
 import {
     DIMENSION_MAX_SCORE,
     GRADE_A_PLUS_MIN,
@@ -52,9 +51,14 @@ import {
  */
 export class QualityScorer {
     private weights: QualityWeights;
+    private hasExplicitCustomWeights: boolean;
+    private tuner: ArchetypeWeightTuner;
 
-    constructor(customWeights?: Partial<QualityWeights>) {
-        this.weights = { ...DEFAULT_QUALITY_WEIGHTS, ...(customWeights || {}) };
+    constructor(customWeights?: Partial<QualityWeights>, archetype?: ProjectArchetype) {
+        this.tuner = new ArchetypeWeightTuner();
+        this.hasExplicitCustomWeights = !!customWeights && Object.keys(customWeights).length > 0;
+        const base = { ...DEFAULT_QUALITY_WEIGHTS, ...(customWeights || {}) };
+        this.weights = archetype ? this.tuner.tuneWeights(archetype, base) : base;
     }
 
     /**
@@ -71,6 +75,7 @@ export class QualityScorer {
         issues: Issue[],
         metric?: FileMetric | null,
         config?: ScanConfig,
+        options?: IssueDeductionOptions,
     ): QualityScoreBreakdown {
         const rationales: QualityScoreRationale[] = [];
         const deductionPoints = {} as Record<QualityDimension, number>;
@@ -96,14 +101,14 @@ export class QualityScorer {
         };
 
         for (const issue of issues) {
-            applyIssueDeductions(issue, applyDeduction);
+            applyIssueDeductions(issue, applyDeduction, options);
         }
 
         if (metric) {
             applyMetricDeductions(metric, applyDeduction);
         }
 
-        const lines = metric?.nonBlankLines ?? (metric?.lines ?? 100);
+        const lines = metric?.nonBlankLines ?? metric?.lines ?? 100;
         const scaleFactor = Math.max(1, lines / 100);
 
         const rawScores = applyScaleDampedScores(deductionPoints, scaleFactor);
@@ -114,10 +119,16 @@ export class QualityScorer {
         const { evaluatedBy, notEvaluated, evaluatedDimensions } =
             calculateEvaluatedDimensions(config);
         const deductionsByDimension = groupDeductionsByDimension(rationales, deductionPoints);
+
+        const effectiveWeights =
+            config?.archetype && !this.hasExplicitCustomWeights
+                ? this.tuner.tuneWeights(config.archetype, this.weights)
+                : this.weights;
+
         const { compositeScore, coverage } = computeCompositeScore(
             rawScores,
             evaluatedDimensions,
-            this.weights,
+            effectiveWeights,
         );
         const grade = resolveQualityGrade(compositeScore);
         const confidence = calculateConfidence(metric, coverage);
@@ -127,7 +138,7 @@ export class QualityScorer {
             compositeScore,
             grade,
             confidence,
-            weights: { ...this.weights },
+            weights: { ...effectiveWeights },
             formulas: {
                 composite:
                     'sum(indices[d] * weights[d] for d in evaluated) / sum(weights[d] for d in evaluated)',

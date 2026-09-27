@@ -28,7 +28,9 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Static Analysis Plane] Testing Static Quality Model & S_i = P_i * C_i * I_i ===\n');
+  console.log(
+    '=== [Static Analysis Plane] Testing Static Quality Model & S_i = P_i * C_i * I_i ===\n',
+  );
 
   // 1. Static Quality Axis Definitions & Completeness
   console.log('1. Testing Seven Static Quality Axes...');
@@ -85,7 +87,7 @@ async function main() {
 
   // 3. Static Issue Risk Confidence Model: S_i = P_i * C_i * I_i
   console.log('3. Testing Static Issue Risk Confidence Formulation S_i = P_i * C_i * I_i...');
-  
+
   // Case A: High-confidence, cross-domain architectural breach
   const archIssue = {
     id: 'arch-cross-domain-1',
@@ -93,7 +95,11 @@ async function main() {
     rule: 'ARCH-HDL-001',
     severity: 'error',
     message: 'Domain circular dependency across boundaries',
-    location: { file: 'src/core/model.ts', start: { line: 10, column: 1 }, end: { line: 10, column: 40 } },
+    location: {
+      file: 'src/core/model.ts',
+      start: { line: 10, column: 1 },
+      end: { line: 10, column: 40 },
+    },
   };
 
   const archRisk = computeStaticIssueRisk(archIssue, {
@@ -107,7 +113,9 @@ async function main() {
   assert.strictEqual(archRisk.I, 7.5);
   assert.strictEqual(archRisk.rawRisk, 7.5);
   assert.strictEqual(archRisk.affectedAxis, 'A');
-  console.log(`✔ Cross-domain architectural issue risk: S_i = ${archRisk.rawRisk} (Axis: ${archRisk.affectedAxis})`);
+  console.log(
+    `✔ Cross-domain architectural issue risk: S_i = ${archRisk.rawRisk} (Axis: ${archRisk.affectedAxis})`,
+  );
 
   // Case B: Low-confidence, local variable smell
   const localSmell = {
@@ -116,7 +124,11 @@ async function main() {
     rule: 'HYG-NAM-001',
     severity: 'info',
     message: 'Local variable naming abbreviation',
-    location: { file: 'src/utils/math.ts', start: { line: 42, column: 5 }, end: { line: 42, column: 10 } },
+    location: {
+      file: 'src/utils/math.ts',
+      start: { line: 42, column: 5 },
+      end: { line: 42, column: 10 },
+    },
   };
 
   const localRisk = computeStaticIssueRisk(localSmell, {
@@ -130,7 +142,9 @@ async function main() {
   assert.strictEqual(localRisk.I, 1.0);
   assert.strictEqual(Math.round(localRisk.rawRisk * 100) / 100, 0.56);
   assert.strictEqual(localRisk.affectedAxis, 'E');
-  console.log(`✔ Local hygiene issue risk dampened: S_i = ${localRisk.rawRisk.toFixed(2)} (Axis: ${localRisk.affectedAxis})`);
+  console.log(
+    `✔ Local hygiene issue risk dampened: S_i = ${localRisk.rawRisk.toFixed(2)} (Axis: ${localRisk.affectedAxis})`,
+  );
 
   // Case C: Performance hotspot (transient loop allocation)
   const perfIssue = {
@@ -139,7 +153,11 @@ async function main() {
     rule: 'PRF-MEM-001',
     severity: 'warning',
     message: 'Transient allocation in hot loop',
-    location: { file: 'src/core/solver.ts', start: { line: 88, column: 1 }, end: { line: 88, column: 30 } },
+    location: {
+      file: 'src/core/solver.ts',
+      start: { line: 88, column: 1 },
+      end: { line: 88, column: 30 },
+    },
   };
 
   const perfRisk = computeStaticIssueRisk(perfIssue, {
@@ -150,7 +168,9 @@ async function main() {
   assert.strictEqual(perfRisk.I, 2.5); // reach file
   assert.strictEqual(Math.round(perfRisk.rawRisk * 100) / 100, 2.25);
   assert.strictEqual(perfRisk.affectedAxis, 'P');
-  console.log(`✔ Performance issue risk verified: S_i = ${perfRisk.rawRisk.toFixed(2)} (Axis: ${perfRisk.affectedAxis})`);
+  console.log(
+    `✔ Performance issue risk verified: S_i = ${perfRisk.rawRisk.toFixed(2)} (Axis: ${perfRisk.affectedAxis})`,
+  );
 
   // 4. Vector Delta & Directional Shift
   console.log('4. Testing Static Vector Space Delta & Metric Progress...');
@@ -179,9 +199,17 @@ async function main() {
   assert.strictEqual(delta.deltaVector.M, 25.0);
   assert.strictEqual(delta.deltaVector.P, 15.0);
   assert.ok(delta.scalarDelta > 0, `Scalar delta must be positive (got ${delta.scalarDelta})`);
-  assert.ok(delta.euclideanDistance > 0, `Euclidean distance must be positive (got ${delta.euclideanDistance})`);
-  assert.ok(delta.cosineSimilarity >= 0.95, `Cosine similarity should reflect strong directional alignment: ${delta.cosineSimilarity}`);
-  console.log(`✔ Vector delta computed: scalarΔ = +${delta.scalarDelta}, distance = ${delta.euclideanDistance}, cosθ = ${delta.cosineSimilarity}`);
+  assert.ok(
+    delta.euclideanDistance > 0,
+    `Euclidean distance must be positive (got ${delta.euclideanDistance})`,
+  );
+  assert.ok(
+    delta.cosineSimilarity >= 0.95,
+    `Cosine similarity should reflect strong directional alignment: ${delta.cosineSimilarity}`,
+  );
+  console.log(
+    `✔ Vector delta computed: scalarΔ = +${delta.scalarDelta}, distance = ${delta.euclideanDistance}, cosθ = ${delta.cosineSimilarity}`,
+  );
 
   // 5. Pillar to Static Axis Mapping
   console.log('5. Testing Pillar to Static Axis Projection...');

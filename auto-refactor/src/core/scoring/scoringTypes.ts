@@ -76,11 +76,12 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         'dependency-layout',
         'data-architecture',
         'stdlib',
+        'naming',
     ],
     semanticPurity: ['governance', 'hygiene', 'dependency-graph', 'stdlib'],
     codeSecurity: ['architecture', 'security', 'secrets'],
     performanceEfficiency: ['performance', 'data-architecture', 'complexity'],
-    standardization: ['hygiene', 'large-file', 'dependency-layout', 'stdlib'],
+    standardization: ['hygiene', 'large-file', 'dependency-layout', 'stdlib', 'naming'],
     modernity: [
         'governance',
         'ts-modern',

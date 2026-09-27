@@ -138,6 +138,76 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
         );
     }
 }
+type SecurityDeductionRuleHandler = (msg: string) => { deduction: number; rationale: string };
+
+const SECURITY_RULE_MAP: Record<string, SecurityDeductionRuleHandler> = {
+    [RULE_SEC_VUL_001]: (msg) => ({
+        deduction: DEDUCTION_CRITICAL_CODE_EXECUTION,
+        rationale: ScoringRationales.CRITICAL_CODE_EXECUTION(msg),
+    }),
+    [RULE_SEC_VUL_002]: (msg) => ({
+        deduction: DEDUCTION_CRITICAL_COMMAND_INJECTION,
+        rationale: ScoringRationales.CRITICAL_COMMAND_INJECTION(msg),
+    }),
+    [RULE_SEC_VUL_003]: (msg) => ({
+        deduction: DEDUCTION_PROTOTYPE_POLLUTION,
+        rationale: ScoringRationales.PROTOTYPE_POLLUTION_RISK(msg),
+    }),
+    [RULE_SEC_VUL_004]: (msg) => ({
+        deduction: DEDUCTION_INSECURE_RANDOMNESS,
+        rationale: ScoringRationales.INSECURE_RANDOMNESS_RISK(msg),
+    }),
+    [RULE_SEC_VUL_005]: (msg) => ({
+        deduction: DEDUCTION_BROKEN_HASH,
+        rationale: ScoringRationales.BROKEN_HASH_ALGORITHM(msg),
+    }),
+    [RULE_SEC_VUL_006]: (msg) => ({
+        deduction: DEDUCTION_PATH_TRAVERSAL,
+        rationale: ScoringRationales.PATH_TRAVERSAL_RISK(msg),
+    }),
+    [RULE_SEC_LEAK_001]: (msg) => ({
+        deduction: DEDUCTION_SENSITIVE_DATA_LOGGED,
+        rationale: ScoringRationales.SENSITIVE_DATA_LOGGED(msg),
+    }),
+};
+
+function resolveSecurityDeduction(
+    analyzer: string | undefined,
+    rule: string,
+    msg: string,
+): { deduction: number; rationale: string } | null {
+    if (analyzer === ANALYZER_SECURITY) {
+        const handler = SECURITY_RULE_MAP[rule];
+        if (handler) return handler(msg);
+        return {
+            deduction: DEDUCTION_GENERIC_SECURITY,
+            rationale: ScoringRationales.GENERIC_SECURITY_RISK(msg),
+        };
+    }
+    if (
+        analyzer === ANALYZER_SECRETS ||
+        rule.includes(FRAGMENT_SECRET) ||
+        rule.includes(FRAGMENT_TOKEN) ||
+        rule.includes(FRAGMENT_KEY)
+    ) {
+        return {
+            deduction: DEDUCTION_HARDCODED_CREDENTIAL,
+            rationale: ScoringRationales.HARDCODED_CREDENTIAL(msg),
+        };
+    }
+    if (
+        rule.includes(FRAGMENT_EVAL) ||
+        rule.includes(FRAGMENT_UNSAFE) ||
+        rule.includes(FRAGMENT_SANITIZATION)
+    ) {
+        return {
+            deduction: DEDUCTION_POTENTIAL_INJECTION,
+            rationale: ScoringRationales.POTENTIAL_INJECTION_RISK(msg),
+        };
+    }
+    return null;
+}
+
 /**
  * Apply deductions for code security and secrets issues.
  *
@@ -145,102 +215,18 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
  * @param apply - Deduction callback function.
  */
 export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): void {
-    const line = issue.location?.start?.line;
     const r = issue.rule;
     const msg = issue.message;
+    const resolution = resolveSecurityDeduction(issue.analyzer, r, msg);
+    if (!resolution) return;
 
-    if (issue.analyzer === ANALYZER_SECURITY) {
-        if (r === RULE_SEC_VUL_001) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_CRITICAL_CODE_EXECUTION,
-                ScoringRationales.CRITICAL_CODE_EXECUTION(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_002) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_CRITICAL_COMMAND_INJECTION,
-                ScoringRationales.CRITICAL_COMMAND_INJECTION(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_003) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_PROTOTYPE_POLLUTION,
-                ScoringRationales.PROTOTYPE_POLLUTION_RISK(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_004) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_INSECURE_RANDOMNESS,
-                ScoringRationales.INSECURE_RANDOMNESS_RISK(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_005) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_BROKEN_HASH,
-                ScoringRationales.BROKEN_HASH_ALGORITHM(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_VUL_006) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_PATH_TRAVERSAL,
-                ScoringRationales.PATH_TRAVERSAL_RISK(msg),
-                r,
-                line,
-            );
-        } else if (r === RULE_SEC_LEAK_001) {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_SENSITIVE_DATA_LOGGED,
-                ScoringRationales.SENSITIVE_DATA_LOGGED(msg),
-                r,
-                line,
-            );
-        } else {
-            apply(
-                DIMENSION_CODE_SECURITY,
-                DEDUCTION_GENERIC_SECURITY,
-                ScoringRationales.GENERIC_SECURITY_RISK(msg),
-                r,
-                line,
-            );
-        }
-    } else if (
-        issue.analyzer === ANALYZER_SECRETS ||
-        r.includes(FRAGMENT_SECRET) ||
-        r.includes(FRAGMENT_TOKEN) ||
-        r.includes(FRAGMENT_KEY)
-    ) {
-        apply(
-            DIMENSION_CODE_SECURITY,
-            DEDUCTION_HARDCODED_CREDENTIAL,
-            ScoringRationales.HARDCODED_CREDENTIAL(msg),
-            r,
-            line,
-        );
-    } else if (
-        r.includes(FRAGMENT_EVAL) ||
-        r.includes(FRAGMENT_UNSAFE) ||
-        r.includes(FRAGMENT_SANITIZATION)
-    ) {
-        apply(
-            DIMENSION_CODE_SECURITY,
-            DEDUCTION_POTENTIAL_INJECTION,
-            ScoringRationales.POTENTIAL_INJECTION_RISK(msg),
-            r,
-            line,
-        );
-    }
+    apply(
+        DIMENSION_CODE_SECURITY,
+        resolution.deduction,
+        resolution.rationale,
+        r,
+        issue.location?.start?.line,
+    );
 }
 /**
  * Quality dimension id scored for performance-efficiency findings.

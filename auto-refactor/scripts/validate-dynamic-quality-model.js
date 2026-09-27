@@ -29,14 +29,19 @@ const {
 } = require('../dist/api');
 
 async function main() {
-  console.log('=== [Dynamic Analysis Plane] Testing Dynamic Quality Model & D_i = B_i * F_i * R_i * V_i ===\n');
+  console.log(
+    '=== [Dynamic Analysis Plane] Testing Dynamic Quality Model & D_i = B_i * F_i * R_i * V_i ===\n',
+  );
 
   // 1. Dynamic Quality Axis Definitions
   console.log('1. Testing Dynamic Quality Axes & Default Weights...');
   assert.strictEqual(ALL_DYNAMIC_QUALITY_AXES.length, 5);
   assert.deepStrictEqual([...ALL_DYNAMIC_QUALITY_AXES], ['L', 'T', 'M', 'C', 'E']);
   const weightSum = Object.values(DEFAULT_DYNAMIC_WEIGHTS).reduce((acc, w) => acc + w, 0);
-  assert.ok(Math.abs(weightSum - 1.0) < 1e-6, `Default dynamic weights must sum to 1.0 (got ${weightSum})`);
+  assert.ok(
+    Math.abs(weightSum - 1.0) < 1e-6,
+    `Default dynamic weights must sum to 1.0 (got ${weightSum})`,
+  );
   console.log('✔ Five dynamic quality axes and normalized weights verified.');
 
   // 2. Telemetry Ingestion (Benchmark JSON + LCOV)
@@ -87,7 +92,9 @@ async function main() {
   const lcovResult = ingestLcovCoverage(sampleLcov);
   assert.strictEqual(lcovResult.lineCoveragePct, 90.0);
   assert.strictEqual(lcovResult.branchCoveragePct, 90.0);
-  console.log(`✔ LCOV ingestion verified: line=${lcovResult.lineCoveragePct}%, branch=${lcovResult.branchCoveragePct}%`);
+  console.log(
+    `✔ LCOV ingestion verified: line=${lcovResult.lineCoveragePct}%, branch=${lcovResult.branchCoveragePct}%`,
+  );
 
   // 3. Dynamic Vector Synthesis Q_d = (L, T, M, C, E)
   console.log('3. Testing Dynamic Quality Vector Synthesis...');
@@ -99,8 +106,13 @@ async function main() {
   assert.ok(vector.E > 80.0, `Expected strong execution evidence score (got ${vector.E})`);
 
   const dynamicScore = computeDynamicQualityScore(vector);
-  assert.ok(dynamicScore >= 90.0 && dynamicScore <= 100.0, `Score out of expected range: ${dynamicScore}`);
-  console.log(`✔ Dynamic quality vector computed: score=${dynamicScore}, Q_d=${JSON.stringify(vector)}`);
+  assert.ok(
+    dynamicScore >= 90.0 && dynamicScore <= 100.0,
+    `Score out of expected range: ${dynamicScore}`,
+  );
+  console.log(
+    `✔ Dynamic quality vector computed: score=${dynamicScore}, Q_d=${JSON.stringify(vector)}`,
+  );
 
   // 4. Edge Cases: Deadlocks and Leaks
   console.log('4. Testing Dynamic Failure Penalty Edge Cases...');
@@ -111,10 +123,18 @@ async function main() {
     concurrency: { deadlockDetected: true }, // fatal deadlock
   };
   const degradedVector = computeDynamicQualityVector(ingestBenchmarkJson(degradedTelemetry));
-  assert.ok(degradedVector.L < 50.0, `Latency score should degrade heavily upon SLA overshoot: ${degradedVector.L}`);
-  assert.ok(degradedVector.M <= 50.0, `Memory score must drop on detected leak: ${degradedVector.M}`);
+  assert.ok(
+    degradedVector.L < 50.0,
+    `Latency score should degrade heavily upon SLA overshoot: ${degradedVector.L}`,
+  );
+  assert.ok(
+    degradedVector.M <= 50.0,
+    `Memory score must drop on detected leak: ${degradedVector.M}`,
+  );
   assert.strictEqual(degradedVector.C, 0.0, 'Concurrency score must be 0 on deadlock detection');
-  console.log(`✔ Failure penalties triggered correctly: L=${degradedVector.L}, M=${degradedVector.M}, C=${degradedVector.C}`);
+  console.log(
+    `✔ Failure penalties triggered correctly: L=${degradedVector.L}, M=${degradedVector.M}, C=${degradedVector.C}`,
+  );
 
   // 5. Dynamic Risk Model: D_i = B_i * F_i * R_i * V_i
   console.log('5. Testing Dynamic Hotspot Risk D_i = B_i * F_i * R_i * V_i...');
@@ -132,8 +152,13 @@ async function main() {
   assert.strictEqual(hotTrace.R, 8.5);
   assert.strictEqual(hotTrace.V, 4.5);
   assert.ok(hotTrace.rawRisk > 500, `Raw risk should be high: ${hotTrace.rawRisk}`);
-  assert.ok(hotTrace.normalizedRisk >= 3.0, `Normalized risk should reflect hot path severity: ${hotTrace.normalizedRisk}`);
-  console.log(`✔ Hotspot dynamic risk verified: D_i = ${hotTrace.normalizedRisk}/10 (raw: ${hotTrace.rawRisk})`);
+  assert.ok(
+    hotTrace.normalizedRisk >= 3.0,
+    `Normalized risk should reflect hot path severity: ${hotTrace.normalizedRisk}`,
+  );
+  console.log(
+    `✔ Hotspot dynamic risk verified: D_i = ${hotTrace.normalizedRisk}/10 (raw: ${hotTrace.rawRisk})`,
+  );
 
   // Hotspot B: Cold async maintenance task
   const coldTrace = computeDynamicHotspotRisk('cold_cleanup_cron', {
@@ -142,8 +167,13 @@ async function main() {
     resourceConsumption: 1.0,
     businessSensitivity: 1.0,
   });
-  assert.ok(coldTrace.normalizedRisk < 0.2, `Cold trace risk must be negligible: ${coldTrace.normalizedRisk}`);
-  console.log(`✔ Cold task dynamic risk dampened: D_i = ${coldTrace.normalizedRisk}/10 (raw: ${coldTrace.rawRisk})`);
+  assert.ok(
+    coldTrace.normalizedRisk < 0.2,
+    `Cold trace risk must be negligible: ${coldTrace.normalizedRisk}`,
+  );
+  console.log(
+    `✔ Cold task dynamic risk dampened: D_i = ${coldTrace.normalizedRisk}/10 (raw: ${coldTrace.rawRisk})`,
+  );
 
   // 6. Safe Fallback
   console.log('6. Testing Fallback Behavior...');

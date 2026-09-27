@@ -280,16 +280,45 @@ function applySeverityDeductions(
 }
 
 /**
+ * Options for contextual issue deduction scaling (e.g. Git evolution or fan-in topology).
+ */
+export interface IssueDeductionOptions {
+    evolutionMultiplier?: number;
+    impactMultiplier?: number;
+}
+
+/**
  * Apply all issue-based deductions across quality dimensions.
  *
  * @param issue - Analyzed issue finding.
  * @param apply - Deduction callback function.
+ * @param options - Optional scaling modifiers (evolutionary vulnerability or topological churn).
  */
-export function applyIssueDeductions(issue: Issue, apply: DeductionApplier): void {
-    applyArchitectureDeductions(issue, apply);
-    applySecurityDeductions(issue, apply);
-    applyPerformanceDeductions(issue, apply);
-    applyQualityDimensionDeductions(issue, apply);
+export function applyIssueDeductions(
+    issue: Issue,
+    apply: DeductionApplier,
+    options?: IssueDeductionOptions,
+): void {
+    const evoMul = options?.evolutionMultiplier ?? 1.0;
+    const impMul = options?.impactMultiplier ?? 1.0;
+    const combinedMultiplier = evoMul * impMul;
+
+    const effectiveApply: DeductionApplier =
+        combinedMultiplier !== 1.0
+            ? (dim, points, reason, rule, line) => {
+                  const amplifiedPoints = Math.round(points * combinedMultiplier);
+                  const amplifiedReason =
+                      combinedMultiplier > 1.0
+                          ? `${reason} [Vulnerability x${combinedMultiplier.toFixed(2)}]`
+                          : reason;
+                  apply(dim, amplifiedPoints, amplifiedReason, rule, line);
+              }
+            : apply;
+
+    applyArchitectureDeductions(issue, effectiveApply);
+    applySecurityDeductions(issue, effectiveApply);
+    applyPerformanceDeductions(issue, effectiveApply);
+    applyQualityDimensionDeductions(issue, effectiveApply);
 }
 
 /**

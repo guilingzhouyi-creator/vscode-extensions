@@ -37,7 +37,11 @@ async function main() {
       rule: 'ARCH-HDL-001',
       severity: 'error',
       message: 'Critical boundary bypass',
-      location: { file: 'src/core/dispatch.ts', start: { line: 10, column: 1 }, end: { line: 10, column: 20 } },
+      location: {
+        file: 'src/core/dispatch.ts',
+        start: { line: 10, column: 1 },
+        end: { line: 10, column: 20 },
+      },
     },
     { impactScope: 'cross_domain' },
   ); // S_i = 7.5
@@ -52,8 +56,13 @@ async function main() {
   const dualConfirmed = fuseIssueRisks(staticHotIssue, dynamicHotTrace, 1.2);
   assert.strictEqual(dualConfirmed.isDualConfirmed, true);
   assert.strictEqual(dualConfirmed.level, 'critical');
-  assert.ok(dualConfirmed.fusedScore >= 20.0, `Dual-confirmed score should be critical: ${dualConfirmed.fusedScore}`);
-  console.log(`✔ Dual-confirmed hotspot amplified to CRITICAL: Risk_i = ${dualConfirmed.fusedScore} (${dualConfirmed.level})`);
+  assert.ok(
+    dualConfirmed.fusedScore >= 20.0,
+    `Dual-confirmed score should be critical: ${dualConfirmed.fusedScore}`,
+  );
+  console.log(
+    `✔ Dual-confirmed hotspot amplified to CRITICAL: Risk_i = ${dualConfirmed.fusedScore} (${dualConfirmed.level})`,
+  );
 
   // 2. Single-Sided Cold Path Dampening (False Positive Suppression)
   console.log('2. Testing Single-Sided Cold Path Noise Suppression...');
@@ -64,7 +73,11 @@ async function main() {
       rule: 'CPX-CC-001',
       severity: 'warning',
       message: 'High cyclomatic complexity in admin script',
-      location: { file: 'src/admin/cleaner.ts', start: { line: 5, column: 1 }, end: { line: 5, column: 20 } },
+      location: {
+        file: 'src/admin/cleaner.ts',
+        start: { line: 5, column: 1 },
+        end: { line: 5, column: 20 },
+      },
     },
     { impactScope: 'file' },
   ); // S_i is high
@@ -78,9 +91,14 @@ async function main() {
 
   const dampened = fuseIssueRisks(staticComplexColdIssue, dynamicColdTrace, 1.0);
   assert.strictEqual(dampened.suppressionApplied, true);
-  assert.ok(dampened.level === 'low' || dampened.level === 'informational', `Dampened level should be low: ${dampened.level}`);
+  assert.ok(
+    dampened.level === 'low' || dampened.level === 'informational',
+    `Dampened level should be low: ${dampened.level}`,
+  );
   assert.ok(dampened.fusedScore < 4.0, `Dampened score should be small: ${dampened.fusedScore}`);
-  console.log(`✔ Cold path high complexity dampened: Risk_i = ${dampened.fusedScore} (${dampened.level})`);
+  console.log(
+    `✔ Cold path high complexity dampened: Risk_i = ${dampened.fusedScore} (${dampened.level})`,
+  );
 
   // 3. Hidden Runtime Bottleneck Capture
   console.log('3. Testing Hidden Runtime Bottleneck Capture...');
@@ -91,7 +109,11 @@ async function main() {
       rule: 'HYG-NAM-001',
       severity: 'info',
       message: 'Minor variable name issue',
-      location: { file: 'src/core/loop.ts', start: { line: 12, column: 1 }, end: { line: 12, column: 10 } },
+      location: {
+        file: 'src/core/loop.ts',
+        start: { line: 12, column: 1 },
+        end: { line: 12, column: 10 },
+      },
     },
     { impactScope: 'local' },
   ); // S_i ~ 0.56
@@ -104,25 +126,38 @@ async function main() {
   }); // D_i >= 5.0
 
   const bottleneck = fuseIssueRisks(staticMinorIssue, dynamicHeavyBottleneck, 1.0);
-  assert.ok(bottleneck.fusedScore >= 1.5, `Hidden bottleneck must elevate risk score: ${bottleneck.fusedScore}`);
-  console.log(`✔ Hidden runtime bottleneck captured: Risk_i = ${bottleneck.fusedScore} (${bottleneck.level})`);
+  assert.ok(
+    bottleneck.fusedScore >= 1.5,
+    `Hidden bottleneck must elevate risk score: ${bottleneck.fusedScore}`,
+  );
+  console.log(
+    `✔ Hidden runtime bottleneck captured: Risk_i = ${bottleneck.fusedScore} (${bottleneck.level})`,
+  );
 
   // 4. Adaptive Project Weights W = f(Stage, Scale, Domain, Risk)
   console.log('4. Testing Adaptive Project Weights Resolution...');
-  const frameworkWeights = resolveAdaptiveFusionWeights({ domain: 'core_framework', stage: 'production' }, true);
+  const frameworkWeights = resolveAdaptiveFusionWeights(
+    { domain: 'core_framework', stage: 'production' },
+    true,
+  );
   assert.strictEqual(frameworkWeights.Ws, 0.55);
-  assert.strictEqual(frameworkWeights.Wd, 0.30);
+  assert.strictEqual(frameworkWeights.Wd, 0.3);
   assert.strictEqual(frameworkWeights.Wf, 0.15);
 
-  const algorithmWeights = resolveAdaptiveFusionWeights({ domain: 'algorithm_lib', stage: 'production' }, true);
+  const algorithmWeights = resolveAdaptiveFusionWeights(
+    { domain: 'algorithm_lib', stage: 'production' },
+    true,
+  );
   assert.strictEqual(algorithmWeights.Ws, 0.35);
-  assert.strictEqual(algorithmWeights.Wd, 0.50);
+  assert.strictEqual(algorithmWeights.Wd, 0.5);
   assert.strictEqual(algorithmWeights.Wf, 0.15);
 
   const missingTelemetryWeights = resolveAdaptiveFusionWeights({ domain: 'core_framework' }, false);
   assert.strictEqual(missingTelemetryWeights.Wd, 0.0);
   assert.strictEqual(missingTelemetryWeights.Ws, 0.85);
-  console.log('✔ Adaptive weights correctly tilt across core_framework, algorithm_lib, and missing telemetry.');
+  console.log(
+    '✔ Adaptive weights correctly tilt across core_framework, algorithm_lib, and missing telemetry.',
+  );
 
   // 5. Total Unified Quality Score Q_total = W_s*Q_s + W_d*Q_d + W_f*Q_f
   console.log('5. Testing Total Unified Quality Score Calculation...');
@@ -135,7 +170,9 @@ async function main() {
 
   assert.ok(assessment.totalScore >= 88.0 && assessment.totalScore <= 96.0);
   assert.ok(assessment.explanation.includes('Unified quality synthesized: Q_total='));
-  console.log(`✔ Unified assessment computed: Q_total = ${assessment.totalScore}/100 [Ws=${assessment.weights.Ws}, Wd=${assessment.weights.Wd}, Wf=${assessment.weights.Wf}]`);
+  console.log(
+    `✔ Unified assessment computed: Q_total = ${assessment.totalScore}/100 [Ws=${assessment.weights.Ws}, Wd=${assessment.weights.Wd}, Wf=${assessment.weights.Wf}]`,
+  );
 
   console.log('\n🎉 ALL FEEDBACK FUSION LAYER TESTS PASSED!');
 }

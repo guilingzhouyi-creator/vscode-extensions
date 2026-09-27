@@ -21,10 +21,7 @@ import type {
     QualityScoreRationale,
     QualityWeights,
 } from './scoringTypes';
-import {
-    ALL_QUALITY_DIMENSIONS,
-    DIMENSION_ANALYZERS,
-} from './scoringTypes';
+import { ALL_QUALITY_DIMENSIONS, DIMENSION_ANALYZERS } from './scoringTypes';
 
 /** Maximum clean score a quality dimension starts at before deductions. */
 export const DIMENSION_MAX_SCORE = 100;

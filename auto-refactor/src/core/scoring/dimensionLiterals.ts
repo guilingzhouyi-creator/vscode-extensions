@@ -607,6 +607,8 @@ export const RULE_TST_SKP_001 = 'TST-SKP-001';
 export const RULE_TST_DEN_001 = 'TST-DEN-001';
 /** Rule id for legacy test technical debt. */
 export const RULE_TST_DBT_001 = 'TST-DBT-001';
+/** Rule id for multi-language test topology discipline and embedded zone contracts. */
+export const RULE_TST_TOP_001 = 'TST-TOP-001';
 
 /** Rule id for non-standard in-function dynamic imports. */
 export const RULE_DEP_LAZ_001 = 'DEP-LAZ-001';
@@ -623,6 +625,11 @@ export const RULE_DEP_INV_001 = 'DEP-INV-001';
 export const RULE_ARCH_HDL_001 = 'ARCH-HDL-001';
 /** Rule id for domain logic leaking direct access to infrastructure config. */
 export const RULE_ARCH_CFG_001 = 'ARCH-CFG-001';
+/** Rule id for excessive identifier length suggesting architectural decomposition. */
+export const RULE_NAM_DEC_001 = 'NAM-DEC-001';
+
+/** Points deducted for excessive identifier length requiring architectural decoupling. */
+export const DEDUCTION_NAMING_DECOUPLING = 15;
 
 /** Points deducted for polynomial time complexity amplification. */
 export const DEDUCTION_POLYNOMIAL_TIME = 15;
@@ -652,6 +659,8 @@ export const DEDUCTION_MOCK_ONLY_TEST = 15;
 export const DEDUCTION_SKIPPED_TEST = 8;
 /** Points deducted for effective method test density deficit. */
 export const DEDUCTION_TEST_DENSITY_DEFICIT = 12;
+/** Points deducted for test topology discipline breaches. */
+export const DEDUCTION_TEST_TOPOLOGY_DISCIPLINE = 15;
 
 /** Points deducted for in-function dynamic imports. */
 export const DEDUCTION_IN_FUNCTION_IMPORT = 15;

@@ -339,12 +339,7 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
     );
 
     // 5. Maintenance Debt calculation
-    const maintenanceDebt = computeMaintenanceDebt(
-        input,
-        beforeContent,
-        afterContent,
-        explanation,
-    );
+    const maintenanceDebt = computeMaintenanceDebt(input, beforeContent, afterContent, explanation);
 
     // 6. Net ChangeScore: deltaQ - Regression - ComplexityCost - MaintenanceDebt + RefactorBonus
     let refactoringBonus = 0;
@@ -381,4 +376,154 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
         verdict,
         explanation,
     };
+}
+
+/**
+ * Agent automated patch arbitration decision verdict.
+ */
+export type AgentDecisionVerdict = 'AUTO_APPLY' | 'HUMAN_REVIEW' | 'AUTO_REJECT';
+
+/**
+ * Patch safety risk metrics.
+ */
+export interface PatchSafetyMetrics {
+    apiDriftScore: number; // [0.0, 1.0]
+    uncoveredRiskScore: number; // [0.0, 1.0]
+    semanticBleedScore: number; // [0.0, 1.0]
+    safetyIndex: number; // [0.0, 1.0]
+}
+
+/**
+ * Refactoring Return On Investment (ROI) metrics.
+ */
+export interface RefactoringRoiMetrics {
+    deltaQualityScore: number;
+    centralityMultiplier: number;
+    diffEntropy: number;
+    cognitiveLoad: number;
+    roi: number;
+}
+
+/**
+ * Complete quantified agent patch arbitration report.
+ */
+export interface AgentPatchArbitrationResult {
+    decision: AgentDecisionVerdict;
+    safety: PatchSafetyMetrics;
+    roi: RefactoringRoiMetrics;
+    baseEvaluation: ChangeEvaluationResult;
+    recommendation: string;
+}
+
+/**
+ * Configuration options contextualizing agent patch safety and risk arbitration.
+ */
+export interface AgentPatchArbitrationOptions {
+    centralityMultiplier?: number;
+    hasApiDrift?: boolean;
+    uncoveredRiskScore?: number;
+    semanticBleedScore?: number;
+}
+
+/**
+ * Arbitrate an automated agent patch considering ROI, Safety, and regression hazards.
+ *
+ * @param input - The change evaluation input containing before and after states.
+ * @param options - Contextual arbitration options including centrality and risk metrics.
+ * @returns Arbitration result with decision, ROI, and safety metrics.
+ */
+export function arbitrateAgentPatch(
+    input: ChangeEvaluationInput,
+    options?: AgentPatchArbitrationOptions,
+): AgentPatchArbitrationResult {
+    const baseEvaluation = evaluateChangeQuality(input);
+
+    const centrality = options?.centralityMultiplier ?? 1.0;
+    const apiDrift = options?.hasApiDrift ? 1.0 : 0.0;
+    const uncoveredRisk = Math.max(0.0, Math.min(1.0, options?.uncoveredRiskScore ?? 0.0));
+    const semanticBleed = Math.max(0.0, Math.min(1.0, options?.semanticBleedScore ?? 0.0));
+
+    // 1. Safety Index = 1.0 - (0.4 * ApiDrift + 0.3 * UncoveredRisk + 0.3 * SemanticBleed)
+    const rawSafety = 1.0 - (0.4 * apiDrift + 0.3 * uncoveredRisk + 0.3 * semanticBleed);
+    const safetyIndex = +Math.max(0.0, Math.min(1.0, rawSafety)).toFixed(3);
+
+    // 2. Diff Entropy heuristic from line modifications
+    const beforeLines = input.beforeContent.split(/\r\n|\n/).length;
+    const afterLines = input.afterContent.split(/\r\n|\n/).length;
+    const lineDelta = Math.abs(afterLines - beforeLines);
+    const diffEntropy = +(1.0 + Math.log10(1 + lineDelta)).toFixed(2);
+
+    // 3. Cognitive Load from baseEvaluation
+    const cognitiveLoad = Math.max(0.1, baseEvaluation.complexityCost);
+
+    // 4. Refactoring ROI: (deltaQ * Centrality) / (diffEntropy + cognitiveLoad + 0.1)
+    const effectiveDeltaQ = Math.max(0, baseEvaluation.changeScore);
+    const roi = +((effectiveDeltaQ * centrality) / (diffEntropy + cognitiveLoad + 0.1)).toFixed(2);
+
+    // 5. Decision Arbitration
+    let decision: AgentDecisionVerdict = 'HUMAN_REVIEW';
+    let recommendation = '';
+
+    if (
+        baseEvaluation.isGamingRejected ||
+        apiDrift >= 0.8 ||
+        safetyIndex < 0.7 ||
+        baseEvaluation.verdict === 'degraded' ||
+        roi < 0.5
+    ) {
+        decision = 'AUTO_REJECT';
+        recommendation =
+            `Patch rejected by safety arbiter. SafetyIndex=${safetyIndex}, ROI=${roi}, ` +
+            `Gaming=${baseEvaluation.isGamingRejected}, ApiDrift=${apiDrift > 0}. Automated rollback executed.`;
+    } else if (
+        safetyIndex >= 0.9 &&
+        roi >= 2.0 &&
+        baseEvaluation.verdict === 'approved' &&
+        baseEvaluation.regressionPenalty === 0
+    ) {
+        decision = 'AUTO_APPLY';
+        recommendation =
+            `Patch verified safe with high ROI (${roi}) and robust SafetyIndex (${safetyIndex}). ` +
+            `Approved for automated non-blocking application.`;
+    } else {
+        decision = 'HUMAN_REVIEW';
+        recommendation =
+            `Patch meets basic stability but requires human verification. ` +
+            `SafetyIndex=${safetyIndex}, ROI=${roi}.`;
+    }
+
+    return {
+        decision,
+        safety: {
+            apiDriftScore: apiDrift,
+            uncoveredRiskScore: uncoveredRisk,
+            semanticBleedScore: semanticBleed,
+            safetyIndex,
+        },
+        roi: {
+            deltaQualityScore: baseEvaluation.changeScore,
+            centralityMultiplier: centrality,
+            diffEntropy,
+            cognitiveLoad,
+            roi,
+        },
+        baseEvaluation,
+        recommendation,
+    };
+}
+
+/**
+ * Facade class for Change Quality Arbiter.
+ */
+export class ChangeQualityArbiter {
+    public evaluateChange(input: ChangeEvaluationInput): ChangeEvaluationResult {
+        return evaluateChangeQuality(input);
+    }
+
+    public arbitratePatch(
+        input: ChangeEvaluationInput,
+        options?: AgentPatchArbitrationOptions,
+    ): AgentPatchArbitrationResult {
+        return arbitrateAgentPatch(input, options);
+    }
 }

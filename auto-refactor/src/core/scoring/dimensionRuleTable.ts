@@ -38,6 +38,7 @@ import {
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
     ANALYZER_STDLIB,
+    ANALYZER_NAMING,
     RULE_CPX_TIME_001,
     RULE_CPX_SPACE_001,
     RULE_CPX_AMP_001,
@@ -61,6 +62,8 @@ import {
     RULE_TST_DEN_001,
     RULE_TST_TAU_001,
     RULE_TST_DBT_001,
+    RULE_TST_TOP_001,
+    DEDUCTION_TEST_TOPOLOGY_DISCIPLINE,
     DEDUCTION_POLYNOMIAL_TIME,
     DEDUCTION_UNBOUNDED_DATA_QUERY,
     DEDUCTION_DATA_LAYER_LEAK,
@@ -96,6 +99,8 @@ import {
     DEDUCTION_STDLIB_CONST,
     DEDUCTION_STDLIB_RECURSION,
     DEDUCTION_STDLIB_PORT,
+    RULE_NAM_DEC_001,
+    DEDUCTION_NAMING_DECOUPLING,
 } from './dimensionLiterals';
 import type { QualityDimension } from './scoringTypes';
 
@@ -220,6 +225,13 @@ export const DIMENSION_RULES: DimensionRule[] = [
         points: DEDUCTION_IMPORT_ORDER_VIOLATION,
         rationale: ScoringRationales.NAMING_CONVENTION_VIOLATION,
     },
+    {
+        analyzer: ANALYZER_NAMING,
+        covers: anyFinding,
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_NAMING_VIOLATION,
+        rationale: ScoringRationales.NAMING_CONVENTION_VIOLATION,
+    },
     // Modernity — deprecated constructs in governance output plus every modernization pack.
     {
         analyzer: ANALYZER_GOVERNANCE,
@@ -295,7 +307,22 @@ export const DIMENSION_RULES: DimensionRule[] = [
         points: DEDUCTION_IN_FUNCTION_IMPORT,
         rationale: ScoringRationales.IN_FUNCTION_IMPORT,
     },
-    // Maintainability — test tautology/debt, unbounded recursion, then CC fallback
+    {
+        analyzer: ANALYZER_NAMING,
+        covers: ruleMatches([RULE_NAM_DEC_001], ['decoupling', 'NAM-DEC']),
+        dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+        points: DEDUCTION_NAMING_DECOUPLING,
+        rationale: ScoringRationales.NAMING_DECOUPLING_RECOMMENDED,
+    },
+    // Maintainability — test topology discipline, test tautology/debt,
+    // unbounded recursion, then CC fallback
+    {
+        analyzer: ANALYZER_TEST_MODERNITY,
+        covers: ruleMatches([RULE_TST_TOP_001], ['topology', 'TST-TOP']),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_TEST_TOPOLOGY_DISCIPLINE,
+        rationale: ScoringRationales.TEST_TOPOLOGY_DISCIPLINE_BREACH,
+    },
     {
         analyzer: ANALYZER_TEST_MODERNITY,
         covers: ruleMatches(RULES_TST_MAINTAIN, ['tautological', 'debt']),

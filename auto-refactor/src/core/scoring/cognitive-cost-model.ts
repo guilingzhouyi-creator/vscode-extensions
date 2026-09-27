@@ -33,12 +33,7 @@ export interface FunctionDecompositionMetric {
  * Context role for control-flow nesting elasticity.
  */
 export type NestingContextRole =
-    | 'parser'
-    | 'state-machine'
-    | 'algorithm'
-    | 'infrastructure'
-    | 'rule'
-    | 'business';
+    'parser' | 'state-machine' | 'algorithm' | 'infrastructure' | 'rule' | 'business';
 
 /**
  * Result of cognitive cost, CFNI, and anti-gaming evaluation.

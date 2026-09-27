@@ -54,7 +54,9 @@ export function processItems(items: readonly string[]): string[] {
   assert.strictEqual(approvedChange.regressionPenalty, 0);
   assert.strictEqual(approvedChange.verdict, 'approved');
   assert.ok(approvedChange.changeScore >= 10.0);
-  console.log(`✔ Genuine refactoring approved: ChangeScore = +${approvedChange.changeScore} (${approvedChange.verdict})`);
+  console.log(
+    `✔ Genuine refactoring approved: ChangeScore = +${approvedChange.changeScore} (${approvedChange.verdict})`,
+  );
 
   // 2. Introduced Regressions (Broken Invariants)
   console.log('2. Testing Introduced Regressions Penalty...');
@@ -71,7 +73,11 @@ export function processItems(items: readonly string[]): string[] {
         rule: 'ARCH-CYCLE-001',
         severity: 'error',
         message: 'Introduced circular dependency',
-        location: { file: 'src/core/solver.ts', start: { line: 1, column: 1 }, end: { line: 1, column: 10 } },
+        location: {
+          file: 'src/core/solver.ts',
+          start: { line: 1, column: 1 },
+          end: { line: 1, column: 10 },
+        },
       },
     ],
   });
@@ -80,7 +86,9 @@ export function processItems(items: readonly string[]): string[] {
   assert.strictEqual(regressedChange.regressionPenalty, 15.0);
   assert.strictEqual(regressedChange.changeScore, -10.0);
   assert.strictEqual(regressedChange.verdict, 'degraded');
-  console.log(`✔ Introduced regression penalized: ChangeScore = ${regressedChange.changeScore} (${regressedChange.verdict})`);
+  console.log(
+    `✔ Introduced regression penalized: ChangeScore = ${regressedChange.changeScore} (${regressedChange.verdict})`,
+  );
 
   // 3. Score Gaming Detection (Mechanical Forwarding Splitting G-03)
   console.log('3. Testing Anti-Gaming Guard (Mechanical Forwarding Splitting G-03)...');
@@ -118,7 +126,9 @@ export class HeavyService {
   assert.strictEqual(gamingChange.verdict, 'gaming_rejected');
   assert.ok(gamingChange.changeScore <= -50.0);
   assert.ok(gamingChange.gamingKinds.includes('artificial_function_splitting'));
-  console.log(`✔ Gaming attempt strictly rejected: ChangeScore = ${gamingChange.changeScore} (${gamingChange.verdict})`);
+  console.log(
+    `✔ Gaming attempt strictly rejected: ChangeScore = ${gamingChange.changeScore} (${gamingChange.verdict})`,
+  );
 
   // 4. Maintenance Debt Deduction (Adding suppression tags)
   console.log('4. Testing Maintenance Debt Penalty (Suppression Tags)...');
@@ -136,7 +146,9 @@ export class HeavyService {
   assert.strictEqual(debtChange.maintenanceDebt, 20.0); // 2 new ignores * 10
   assert.strictEqual(debtChange.changeScore, -18.0);
   assert.strictEqual(debtChange.verdict, 'degraded');
-  console.log(`✔ Maintenance debt penalized: -${debtChange.maintenanceDebt} points (ChangeScore = ${debtChange.changeScore})`);
+  console.log(
+    `✔ Maintenance debt penalized: -${debtChange.maintenanceDebt} points (ChangeScore = ${debtChange.changeScore})`,
+  );
 
   console.log('\n🎉 ALL CHANGE QUALITY ARBITER & ANTI-GAMING TESTS PASSED!');
 }

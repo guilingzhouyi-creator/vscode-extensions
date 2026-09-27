@@ -158,9 +158,7 @@ export function computeUnifiedQualityScore(
     const feedbackScore = Math.max(0.0, Math.min(100.0, historicalScore));
 
     const totalRaw =
-        weights.Ws * staticScore +
-        weights.Wd * dynamicScore +
-        weights.Wf * feedbackScore;
+        weights.Ws * staticScore + weights.Wd * dynamicScore + weights.Wf * feedbackScore;
 
     const totalScore = Math.round(totalRaw * 10) / 10;
 

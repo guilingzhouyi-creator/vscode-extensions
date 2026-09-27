@@ -126,12 +126,12 @@ export interface AutonomyEvaluation {
 
 /** Default sub-dimension weighting distribution (CAI 2.0 normalized to 1.00) */
 const DEFAULT_AUTONOMY_WEIGHTS = {
-    effectiveLoc: 0.30,
-    symbolCall: 0.20,
+    effectiveLoc: 0.3,
+    symbolCall: 0.2,
     domainKernel: 0.15,
     codeOriginality: 0.15,
-    supplyChainResilience: 0.10,
-    criticalPathAutonomy: 0.10,
+    supplyChainResilience: 0.1,
+    criticalPathAutonomy: 0.1,
 };
 
 /**
@@ -182,8 +182,7 @@ function resolveAutonomyGrade(score: number): {
 function extractImportSpecifiersFromContent(content: string): string[] {
     const specifiers: string[] = [];
     const lines = content.split('\n');
-    const IMPORT_RE =
-        /(?:import\s+(?:.*?\s+from\s+)?|require\s*\(\s*|from\s+)(['"][^'"]+['"])/g;
+    const IMPORT_RE = /(?:import\s+(?:.*?\s+from\s+)?|require\s*\(\s*|from\s+)(['"][^'"]+['"])/g;
 
     for (const line of lines) {
         const trimmed = line.trim();
@@ -237,27 +236,87 @@ interface AutonomyScanState {
 /**
  * Load raw source content from memory map or disk file.
  */
+function readFirstChunkFallback(absPath: string): string {
+    let fd = -1;
+    try {
+        fd = fs.openSync(absPath, 'r');
+        const buf = Buffer.alloc(1024);
+        const bytesRead = fs.readSync(fd, buf, 0, 1024, 0);
+        return buf.toString('utf8', 0, bytesRead);
+    } catch {
+        return '';
+    } finally {
+        if (fd >= 0) {
+            try {
+                fs.closeSync(fd);
+            } catch {
+                // best-effort close
+            }
+        }
+    }
+}
+
 function loadFileRawContent(
     metric: FileMetric,
     config: ScanConfig,
     fileContents?: Map<string, string>,
 ): string {
-    const raw =
-        fileContents?.get(metric.file) || (metric as { content?: string }).content || '';
+    const raw = fileContents?.get(metric.file) || (metric as { content?: string }).content || '';
     if (raw) return raw;
     if (config.root) {
         const absPath = path.isAbsolute(metric.file)
             ? metric.file
             : path.join(config.root, metric.file);
         if (fs.existsSync(absPath)) {
-            try {
-                return fs.readFileSync(absPath, 'utf8');
-            } catch {
-                // best-effort fallback: ignored when file is unreadable
-            }
+            return readFirstChunkFallback(absPath);
         }
     }
     return '';
+}
+
+function recordSdkCall(
+    state: AutonomyScanState,
+    pkg: string,
+    currentFile: string,
+    isCritical: boolean,
+): void {
+    state.externalSdkCalls++;
+    if (isCritical) {
+        state.criticalPathExternalCalls++;
+    }
+    const currentCount = state.sdkCallCounts.get(pkg) || 0;
+    state.sdkCallCounts.set(pkg, currentCount + 1);
+    let set = state.sdkFileSets.get(pkg);
+    if (!set) {
+        set = new Set();
+        state.sdkFileSets.set(pkg, set);
+    }
+    set.add(currentFile);
+}
+
+function recordSingleSpecifier(
+    spec: string,
+    currentFile: string,
+    manifestDeps: Set<string>,
+    state: AutonomyScanState,
+    isCritical: boolean,
+): void {
+    const kind = classifyImportProvenance(spec, currentFile, manifestDeps);
+    if (kind === 'internal') {
+        state.internalSymbolCalls += 2;
+        if (isCritical) state.criticalPathInternalCalls += 2;
+        return;
+    }
+    if (kind === 'stdlib') {
+        state.stdlibCalls++;
+        return;
+    }
+    if (kind === 'external_sdk') {
+        const pkg = spec.startsWith('@')
+            ? spec.split('/').slice(0, 2).join('/')
+            : spec.split('/')[0].split('.')[0].toLowerCase();
+        recordSdkCall(state, pkg, currentFile, isCritical);
+    }
 }
 
 /**
@@ -271,22 +330,7 @@ function processImportSpecifiers(
     isCritical: boolean,
 ): void {
     for (const spec of specifiers) {
-        const kind = classifyImportProvenance(spec, currentFile, manifestDeps);
-        if (kind === 'internal') {
-            state.internalSymbolCalls += 2;
-            if (isCritical) state.criticalPathInternalCalls += 2;
-        } else if (kind === 'stdlib') {
-            state.stdlibCalls++;
-        } else if (kind === 'external_sdk') {
-            state.externalSdkCalls++;
-            if (isCritical) state.criticalPathExternalCalls++;
-            const pkg = spec.startsWith('@')
-                ? spec.split('/').slice(0, 2).join('/')
-                : spec.split('/')[0].split('.')[0].toLowerCase();
-            state.sdkCallCounts.set(pkg, (state.sdkCallCounts.get(pkg) || 0) + 1);
-            if (!state.sdkFileSets.has(pkg)) state.sdkFileSets.set(pkg, new Set());
-            state.sdkFileSets.get(pkg)!.add(currentFile);
-        }
+        recordSingleSpecifier(spec, currentFile, manifestDeps, state, isCritical);
     }
 }
 
@@ -374,8 +418,7 @@ function synthesizeAutonomyEvaluation(
     const rLoc = totalTreeEloc > 0 ? (state.proprietaryEffectiveLoc / totalTreeEloc) * 100 : 100;
 
     const totalScopedCalls = state.internalSymbolCalls + state.externalSdkCalls;
-    const rCall =
-        totalScopedCalls > 0 ? (state.internalSymbolCalls / totalScopedCalls) * 100 : 100;
+    const rCall = totalScopedCalls > 0 ? (state.internalSymbolCalls / totalScopedCalls) * 100 : 100;
 
     const rDomain =
         state.proprietaryEffectiveLoc > 0
@@ -415,10 +458,9 @@ function synthesizeAutonomyEvaluation(
 
     // Bayesian Credible Interval and Sample Sufficiency
     const sampleSufficiency = +(
-        Math.min(1.0, state.proprietaryEffectiveLoc / 1000) *
-        Math.min(1.0, totalFiles / 5)
+        Math.min(1.0, state.proprietaryEffectiveLoc / 1000) * Math.min(1.0, totalFiles / 5)
     ).toFixed(3);
-    const isLowConfidence = sampleSufficiency < 0.50;
+    const isLowConfidence = sampleSufficiency < 0.5;
     const priorBaseline = 65.0;
     const credibleScore = +(
         sampleSufficiency * boundedComposite +

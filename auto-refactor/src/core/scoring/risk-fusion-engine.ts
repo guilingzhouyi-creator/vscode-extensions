@@ -158,6 +158,15 @@ function classifyFusedRiskLevel(fusedScore: number, isDualConfirmed: boolean): F
     return 'informational';
 }
 
+/**
+ * Fuses static severity, dynamic telemetry, and historical decay into a unified risk rating.
+ *
+ * @param staticRisk - Static finding risk profile.
+ * @param dynamicRisk - Optional dynamic execution telemetry risk.
+ * @param historicalFactor - Multiplier reflecting churn and defect history.
+ * @param customCoeffs - Optional weight coefficients override.
+ * @returns Unified fused risk assessment.
+ */
 export function fuseIssueRisks(
     staticRisk: StaticIssueRisk,
     dynamicRisk?: DynamicIssueRisk,
@@ -172,8 +181,10 @@ export function fuseIssueRisks(
     const S = Math.max(0.1, staticRisk.normalizedRisk);
     const H = Math.max(0.5, Math.min(3.0, historicalFactor));
 
-    const { D, isDualConfirmed, suppressionApplied, rationale } =
-        arbitrateCorroboration(staticRisk, dynamicRisk);
+    const { D, isDualConfirmed, suppressionApplied, rationale } = arbitrateCorroboration(
+        staticRisk,
+        dynamicRisk,
+    );
 
     let rawFused = Math.pow(S, coeffs.alpha) * Math.pow(D, coeffs.beta) * Math.pow(H, coeffs.gamma);
 
@@ -198,6 +209,25 @@ export function fuseIssueRisks(
         suppressionApplied,
         rationale,
     };
+}
+
+/**
+ * Object-oriented facade for the Risk Fusion Engine.
+ */
+export class RiskFusionEngine {
+    private readonly defaultCoeffs?: Partial<RiskFusionCoefficients>;
+
+    constructor(defaultCoeffs?: Partial<RiskFusionCoefficients>) {
+        this.defaultCoeffs = defaultCoeffs;
+    }
+
+    public evaluateIssue(
+        staticRisk: StaticIssueRisk,
+        dynamicRisk?: DynamicIssueRisk,
+        historicalFactor = 1.0,
+    ): FusedIssueRisk {
+        return fuseIssueRisks(staticRisk, dynamicRisk, historicalFactor, this.defaultCoeffs);
+    }
 }
 
 /**
@@ -274,7 +304,6 @@ function buildEffectiveDynamicHotspot(
  * @param customCoeffs - Optional override for alpha, beta, gamma exponents.
  * @returns Fully articulated CascadedRiskResult.
  */
-
 export function fuseCascadedRisks(
     staticRisk: StaticIssueRisk,
     selfDynamicRisk: DynamicIssueRisk | undefined,

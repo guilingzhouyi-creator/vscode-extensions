@@ -156,6 +156,121 @@ export function scoreFileQuality(
 }
 
 /**
+ * Retrieves or initializes the module map for a given domain without per-loop allocations.
+ */
+function getOrCreateDomainModuleMap(
+    domainMap: Map<string, Map<string, FileQualityScore[]>>,
+    domainName: string,
+): Map<string, FileQualityScore[]> {
+    let moduleMap = domainMap.get(domainName);
+    if (!moduleMap) {
+        moduleMap = new Map();
+        domainMap.set(domainName, moduleMap);
+    }
+    return moduleMap;
+}
+
+/**
+ * Aggregates file scores within a single module into a ModuleQualityScore.
+ */
+function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQualityScore[] {
+    const modules: ModuleQualityScore[] = [];
+    for (const [moduleName, files] of modMap.entries()) {
+        const avgComposite = files.reduce((sum, f) => sum + f.compositeScore, 0) / files.length;
+        const pillars: Record<PrimaryQualityPillar, number> = {} as Record<
+            PrimaryQualityPillar,
+            number
+        >;
+        for (const p of ALL_PRIMARY_PILLARS) {
+            const avgP =
+                files.reduce((sum, f) => sum + f.eightPillars.pillars[p], 0) / files.length;
+            pillars[p] = Math.round(avgP * 10) / 10;
+        }
+        modules.push({
+            moduleName,
+            fileCount: files.length,
+            compositeScore: Math.round(avgComposite * 10) / 10,
+            pillars,
+            files,
+        });
+    }
+    return modules;
+}
+
+/**
+ * Aggregates module scores across domain boundaries into DomainQualityScores.
+ */
+function buildDomainScores(
+    domainMap: Map<string, Map<string, FileQualityScore[]>>,
+): DomainQualityScore[] {
+    const domains: DomainQualityScore[] = [];
+    for (const [domainName, modMap] of domainMap.entries()) {
+        const modules = buildModuleScores(modMap);
+        const domainComposite =
+            modules.reduce((sum, m) => sum + m.compositeScore, 0) / modules.length;
+        const domainPillars: Record<PrimaryQualityPillar, number> = {} as Record<
+            PrimaryQualityPillar,
+            number
+        >;
+        for (const p of ALL_PRIMARY_PILLARS) {
+            const avgP = modules.reduce((sum, m) => sum + m.pillars[p], 0) / modules.length;
+            domainPillars[p] = Math.round(avgP * 10) / 10;
+        }
+        domains.push({
+            domainName,
+            compositeScore: Math.round(domainComposite * 10) / 10,
+            pillars: domainPillars,
+            modules,
+        });
+    }
+    return domains;
+}
+
+/**
+ * Computes normalized project-level quality pillar scores across all files.
+ */
+function computeProjectPillars(
+    fileScores: FileQualityScore[],
+    fatalCount: number,
+): Record<PrimaryQualityPillar, number> {
+    const globalPillarSums: Record<PrimaryQualityPillar, number> = {
+        architecture: 0,
+        maintainability: 0,
+        performance: 0,
+        data: 0,
+        testing: 0,
+        reliability: 0,
+        security: 0,
+        extensibility: 0,
+    };
+
+    for (const file of fileScores) {
+        for (const p of ALL_PRIMARY_PILLARS) {
+            globalPillarSums[p] += file.eightPillars.pillars[p];
+        }
+    }
+
+    const projectPillars: Record<PrimaryQualityPillar, number> = {} as Record<
+        PrimaryQualityPillar,
+        number
+    >;
+    for (const p of ALL_PRIMARY_PILLARS) {
+        projectPillars[p] = Math.round((globalPillarSums[p] / fileScores.length) * 10) / 10;
+    }
+
+    if (fatalCount > 0) {
+        const hasFatalArch = fileScores.some((f) =>
+            f.issues.some((i) => i.severity === 'error' && i.rule.startsWith('ARCH-')),
+        );
+        if (hasFatalArch && projectPillars.architecture > 45) {
+            projectPillars.architecture = 45;
+        }
+    }
+
+    return projectPillars;
+}
+
+/**
  * Aggregates file quality scores into module, domain, and project levels.
  *
  * @param fileScores - List of individual file scores to aggregate.
@@ -186,93 +301,17 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
         fatalCount += file.issues.filter((i) => i.severity === 'error').length;
         totalDensity += file.effectiveDensity;
 
-        if (!domainMap.has(file.domainName)) {
-            domainMap.set(file.domainName, new Map());
+        const moduleMap = getOrCreateDomainModuleMap(domainMap, file.domainName);
+        let list = moduleMap.get(file.moduleName);
+        if (!list) {
+            list = [];
+            moduleMap.set(file.moduleName, list);
         }
-        const moduleMap = domainMap.get(file.domainName)!;
-        if (!moduleMap.has(file.moduleName)) {
-            moduleMap.set(file.moduleName, []);
-        }
-        moduleMap.get(file.moduleName)!.push(file);
+        list.push(file);
     }
 
-    const domains: DomainQualityScore[] = [];
-    const globalPillarSums: Record<PrimaryQualityPillar, number> = {
-        architecture: 0,
-        maintainability: 0,
-        performance: 0,
-        data: 0,
-        testing: 0,
-        reliability: 0,
-        security: 0,
-        extensibility: 0,
-    };
-
-    for (const [domainName, modMap] of domainMap.entries()) {
-        const modules: ModuleQualityScore[] = [];
-        for (const [moduleName, files] of modMap.entries()) {
-            const avgComposite = files.reduce((sum, f) => sum + f.compositeScore, 0) / files.length;
-            const pillars: Record<PrimaryQualityPillar, number> = {} as Record<
-                PrimaryQualityPillar,
-                number
-            >;
-            for (const p of ALL_PRIMARY_PILLARS) {
-                const avgP =
-                    files.reduce((sum, f) => sum + f.eightPillars.pillars[p], 0) / files.length;
-                pillars[p] = Math.round(avgP * 10) / 10;
-            }
-            modules.push({
-                moduleName,
-                fileCount: files.length,
-                compositeScore: Math.round(avgComposite * 10) / 10,
-                pillars,
-                files,
-            });
-        }
-
-        const domainComposite =
-            modules.reduce((sum, m) => sum + m.compositeScore, 0) / modules.length;
-        const domainPillars: Record<PrimaryQualityPillar, number> = {} as Record<
-            PrimaryQualityPillar,
-            number
-        >;
-        for (const p of ALL_PRIMARY_PILLARS) {
-            const avgP = modules.reduce((sum, m) => sum + m.pillars[p], 0) / modules.length;
-            domainPillars[p] = Math.round(avgP * 10) / 10;
-        }
-
-        domains.push({
-            domainName,
-            compositeScore: Math.round(domainComposite * 10) / 10,
-            pillars: domainPillars,
-            modules,
-        });
-    }
-
-    for (const file of fileScores) {
-        for (const p of ALL_PRIMARY_PILLARS) {
-            globalPillarSums[p] += file.eightPillars.pillars[p];
-        }
-    }
-
-    const projectPillars: Record<PrimaryQualityPillar, number> = {} as Record<
-        PrimaryQualityPillar,
-        number
-    >;
-    for (const p of ALL_PRIMARY_PILLARS) {
-        projectPillars[p] = Math.round((globalPillarSums[p] / fileScores.length) * 10) / 10;
-    }
-
-    // Ceilings: if any fatal architecture error exists across project,
-    // cap project architecture pillar to 45
-    if (fatalCount > 0) {
-        const hasFatalArch = fileScores.some((f) =>
-            f.issues.some((i) => i.severity === 'error' && i.rule.startsWith('ARCH-')),
-        );
-        if (hasFatalArch && projectPillars.architecture > 45) {
-            projectPillars.architecture = 45;
-        }
-    }
+    const domains = buildDomainScores(domainMap);
+    const projectPillars = computeProjectPillars(fileScores, fatalCount);
 
     const synthesized = synthesizeEightPillars(
         {} as Record<QualityDimension, number>,

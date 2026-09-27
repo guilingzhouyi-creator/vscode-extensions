@@ -44,9 +44,7 @@ export interface DynamicCompletenessResult {
  * @param dto - Dynamic evidence telemetry snapshot.
  * @returns Quantified DynamicCompletenessResult.
  */
-export function evaluateDynamicCompleteness(
-    dto: DynamicEvidenceDTO,
-): DynamicCompletenessResult {
+export function evaluateDynamicCompleteness(dto: DynamicEvidenceDTO): DynamicCompletenessResult {
     const observed: DynamicQualityAxis[] = [];
     if (dto.latency !== undefined) observed.push('L');
     if (dto.throughput !== undefined) observed.push('T');
@@ -231,8 +229,6 @@ export function computeDynamicHotspotRisk(
     const hasEvidence =
         params.invocationsPerHour !== undefined || params.frequencyFactor !== undefined;
     const evidenceConfidence = hasEvidence ? 1.0 : 0.6;
-
-
 
     return {
         hotspotId,
