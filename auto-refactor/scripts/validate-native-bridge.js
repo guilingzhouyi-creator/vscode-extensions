@@ -12,7 +12,8 @@
  *   4. Assert topological ordering on acyclic directed dependency graphs;
  *   5. Assert multi-pattern textual scanning line/column precision;
  *   6. Assert performance latency under burst analysis loads.
- * Exit Semantics & Design Rationale: Exits 0 on success, throws AssertionError and exits 1 on failure.
+ * Exit Semantics & Design Rationale: Exits 0 on success,
+ *   throws AssertionError and exits 1 on failure.
  */
 
 'use strict';
@@ -37,7 +38,9 @@ async function testEngineStatusAndCapabilities() {
   assert.ok(Array.isArray(status.capabilities));
   assert.ok(status.capabilities.includes('histogram-diff'));
   assert.ok(status.capabilities.includes('tarjan-scc'));
-  console.log(`  ✔ Engine active: ${status.activeEngine} (capabilities: ${status.capabilities.join(', ')})`);
+  console.log(
+    `  ✔ Engine active: ${status.activeEngine} (capabilities: ${status.capabilities.join(', ')})`,
+  );
 }
 
 async function testHistogramDiff() {
@@ -95,7 +98,11 @@ async function testGraphAnalysisAndCycleDetection() {
     ['Independent', 'X'],
   ];
   const cyclicAnalysis = nativeAnalyzeDependencyGraph(cyclicEdges);
-  assert.strictEqual(cyclicAnalysis.isAcyclic, false, 'Graph with circular imports must not be acyclic');
+  assert.strictEqual(
+    cyclicAnalysis.isAcyclic,
+    false,
+    'Graph with circular imports must not be acyclic',
+  );
   assert.ok(cyclicAnalysis.cycles.length >= 1, 'Must detect at least 1 cycle');
 
   const detectedCycle = cyclicAnalysis.cycles[0];
@@ -155,7 +162,9 @@ async function testMicroBenchmark() {
 
   const durationMs = Math.max(1, Date.now() - start);
   const opsPerSec = Math.round((iterations / durationMs) * 1000);
-  console.log(`  ✔ Completed ${iterations} graph analyses in ${durationMs}ms (~${opsPerSec.toLocaleString()} ops/sec)`);
+  console.log(
+    `  ✔ Completed ${iterations} graph analyses in ${durationMs}ms (~${opsPerSec.toLocaleString()} ops/sec)`,
+  );
 }
 
 async function runAll() {

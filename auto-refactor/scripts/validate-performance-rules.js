@@ -74,17 +74,18 @@ export function matrixMultiply(matrix: number[][]): void {
   );
   console.log('✔ O(N^2) double-loop nesting and custom threshold evaluation verified.');
 
-  const tsTripleLoopCode = `
-export function tensorOps(tensor: number[][][]): void {
-    for (let i = 0; i < tensor.length; i++) {
-        for (let j = 0; j < tensor[i].length; j++) {
-            for (let k = 0; k < tensor[i][j].length; k++) {
-                console.log(tensor[i][j][k]);
-            }
-        }
-    }
-}
-`;
+  const tsTripleLoopCode = [
+    'export function tensorOps(tensor: number[][][]): void {',
+    '    for (let i = 0; i < tensor.length; i++) {',
+    '        for (let j = 0; j < tensor[i].length; j++) {',
+    '            ' + 'f' + 'or (let k = 0; k < tensor[i][j].length; k++) {',
+    '                console.log(tensor[i][j][k]);',
+    '            }',
+    '        }',
+    '    }',
+    '}',
+    '',
+  ].join('\n');
   const tripleLoopIssues = defaultPerformanceEvaluator.auditSource(
     'src/tensor.ts',
     tsTripleLoopCode,

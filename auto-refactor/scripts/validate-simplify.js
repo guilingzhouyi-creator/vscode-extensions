@@ -423,7 +423,11 @@ async function run() {
       'SIM-ELSE-001 must NOT flag if without else',
     );
 
-    assert.strictEqual(redundantElse.every((i) => i.severity === 'info'), true, 'SIM-ELSE-001 severity must be info');
+    assert.strictEqual(
+      redundantElse.every((i) => i.severity === 'info'),
+      true,
+      'SIM-ELSE-001 severity must be info',
+    );
     console.log('  [PASS] SIM-ELSE-001 flags redundant else after terminating statements');
 
     // === SIM-BOOL-001: simplify-boolean-return ===
@@ -454,7 +458,11 @@ async function run() {
       'SIM-BOOL-001 must NOT flag if/else with side effects',
     );
 
-    assert.strictEqual(boolReturn.every((i) => i.severity === 'info'), true, 'SIM-BOOL-001 severity must be info');
+    assert.strictEqual(
+      boolReturn.every((i) => i.severity === 'info'),
+      true,
+      'SIM-BOOL-001 severity must be info',
+    );
     console.log('  [PASS] SIM-BOOL-001 flags simplifiable boolean return patterns');
 
     // === SIM-GUARD-001: use-guard-clause ===
@@ -485,7 +493,11 @@ async function run() {
       'SIM-GUARD-001 must NOT flag when non-if statement breaks the sequence',
     );
 
-    assert.strictEqual(guardClause.every((i) => i.severity === 'info'), true, 'SIM-GUARD-001 severity must be info');
+    assert.strictEqual(
+      guardClause.every((i) => i.severity === 'info'),
+      true,
+      'SIM-GUARD-001 severity must be info',
+    );
     console.log('  [PASS] SIM-GUARD-001 flags deep conditional nesting at function start');
 
     const strictConfig = path.join(root, 'strict.config.json');

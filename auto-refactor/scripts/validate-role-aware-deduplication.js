@@ -3,7 +3,8 @@
  * File Path: scripts/validate-role-aware-deduplication.js
  * Architecture Role: Contract lock ensuring that duplicate literal detection adaptively
  *     relaxes for test suites and configuration/data tables while remaining strictly enforced.
- * Dependencies & Triggers: Run via `node scripts/validate-role-aware-deduplication.js` and test-parallel.
+ * Dependencies & Triggers: Run via `node scripts/validate-role-aware-deduplication.js`
+ *     and test-parallel.
  * Responsibilities: Exercise positive and negative fixtures for role-aware deduplication.
  * Exit Semantics & Design Rationale: Process exits 0 on success; throws AssertionError on failure.
  */
@@ -92,7 +93,9 @@ async function testRoleAwareDeduplication() {
 
     console.log('  [PASS] Business module enforces standard duplicate literal extraction');
     console.log('  [PASS] Test suite benign tokens are exempt from duplicate literal warnings');
-    console.log('  [PASS] Config schema property tokens are exempt from duplicate literal warnings');
+    console.log(
+      '  [PASS] Config schema property tokens are exempt from duplicate literal warnings',
+    );
     console.log('\nALL ROLE-AWARE DEDUPLICATION CHECKS PASSED SUCCESSFULLY!\n');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

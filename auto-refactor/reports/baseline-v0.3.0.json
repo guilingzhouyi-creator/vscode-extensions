@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790423284667",
-  "timestamp": "2026-09-26T11:48:04.667Z",
+  "snapshotId": "snapshot-v0.4.0-1790501781072",
+  "timestamp": "2026-09-27T09:36:21.072Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "ad605ecbed92c8b741450cdfff45566436fe317e9a0dee5c772decf0da21aa94",
+  "rulesDigest": "a68d7f749191029d77dd5dbfa5515b99f1068e4dd2a8fa14677dd4bdcd98b179",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 234,
+    "ruleCount": 236,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -168,6 +168,7 @@
     "large-file",
     "loop-transient-allocation",
     "NAM-COL-001",
+    "NAM-DEC-001",
     "NAM-DIR-001",
     "NAM-FIL-001",
     "NAM-GLB-001",
@@ -259,6 +260,7 @@
     "TST-ILS-001",
     "TST-SKP-001",
     "TST-TAU-001",
+    "TST-TOP-001",
     "unused-export",
     "unused-module"
   ]

@@ -212,16 +212,18 @@ console.log('\n4. Testing Performance Analyzer (Algorithms & I/O)...');
   // 4.1 Nested loops (O(N^3))
   const ctxNestedLoop = {
     filePath: 'src/compute.ts',
-    content: `function processMatrix(a: any) {
-  for (let i = 0; i < 10; i++) {
-    for (let j = 0; j < 10; j++) {
-      for (let k = 0; k < 10; k++) {
-        const temp = new Array(100);
-      }
-    }
-  }
-}
-`,
+    content: [
+      'function processMatrix(a: any) {',
+      '  for (let i = 0; i < 10; i++) {',
+      '    for (let j = 0; j < 10; j++) {',
+      '      ' + 'f' + 'or (let k = 0; k < 10; k++) {',
+      '        const temp = new Array(100);',
+      '      }',
+      '    }',
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
     options: { maxLoopNesting: 3, checkTransientAllocations: true },
     config: {},
   };

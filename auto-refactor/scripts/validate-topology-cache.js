@@ -12,7 +12,8 @@
  *   4. Assert signature-changed transitive reverse-dependency cascade invalidation;
  *   5. Assert isolation: sibling branches unaffected during downstream invalidation;
  *   6. Assert LRU capacity bounding and telemetry metrics accuracy.
- * Exit Semantics & Design Rationale: Exits 0 on success, throws AssertionError and exits 1 on failure.
+ * Exit Semantics & Design Rationale: Exits 0 on success,
+ *   throws AssertionError and exits 1 on failure.
  */
 
 'use strict';
@@ -151,7 +152,9 @@ async function testTransitiveCascadeInvalidationWithSignatureChange() {
   assert.deepStrictEqual(cache.get(authUtil, 'h_au'), { id: 'au' });
   assert.deepStrictEqual(cache.get(authGuard, 'h_ag'), { id: 'ag' });
 
-  console.log('  ✔ Transitive cascade invalidates downstream subtree while preserving upstream and siblings');
+  console.log(
+    '  ✔ Transitive cascade invalidates downstream subtree while preserving upstream and siblings',
+  );
 }
 
 async function testTelemetryMetrics() {

@@ -44,6 +44,24 @@ const CANONICAL = new RegExp(RULE_ID_PATTERN.source);
  *
  * @returns Map of rule id to the set of source files that mention it.
  */
+function extractMatchesFromText(text, contexts, relPath, found) {
+  for (const re of contexts) {
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const id = match[1];
+      if (/^(info|warning|error|string|number|boolean|object)$/.test(id)) continue;
+      if (!found.has(id)) found.set(id, new Set());
+      found.get(id).add(relPath);
+    }
+  }
+}
+
+/**
+ * Collect every rule id literal the engine's own sources can emit.
+ *
+ * @returns Map of rule id to the set of source files that mention it.
+ */
 function emittedRuleIds() {
   const files = [];
   (function walk(dir) {
@@ -65,16 +83,8 @@ function emittedRuleIds() {
   ];
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
-    for (const re of contexts) {
-      re.lastIndex = 0;
-      let match;
-      while ((match = re.exec(text)) !== null) {
-        const id = match[1];
-        if (/^(info|warning|error|string|number|boolean|object)$/.test(id)) continue;
-        if (!found.has(id)) found.set(id, new Set());
-        found.get(id).add(path.relative(ROOT, file).split(path.sep).join('/'));
-      }
-    }
+    const relPath = path.relative(ROOT, file).split(path.sep).join('/');
+    extractMatchesFromText(text, contexts, relPath, found);
   }
   return found;
 }
@@ -94,9 +104,7 @@ function documentedRuleIds() {
   return ids;
 }
 
-function run() {
-  // ── 1. Structural integrity of the registry itself ──
-  const ids = RULE_REGISTRY.map((rule) => rule.id);
+function validateRegistryIntegrity(ids) {
   assert.strictEqual(new Set(ids).size, ids.length, 'registry ids must be unique');
   for (const rule of RULE_REGISTRY) {
     assert.ok(rule.summary && rule.summary.trim(), `${rule.id}: summary must not be empty`);
@@ -135,11 +143,9 @@ function run() {
   console.log(
     `  [PASS] registry integrity: ${RULE_REGISTRY.length} rules, unique, fully described`,
   );
+}
 
-  // ── 2. Emitted set must equal the registered set ──
-  // The alias window names the canonical ids a later batch will emit. They live in aliases.ts as
-  // data, not as emissions, so the declaration site is discounted for ids the table targets —
-  // any other mention of the same id still counts as an emission and must stay registered.
+function validateEmittedRules(ids) {
   const aliasTargets = new Set(Object.values(LEGACY_RULE_ALIASES));
   const aliasSource = 'src/core/rules/aliases.ts'; // stored repo-relative, POSIX separators
   const emitted = emittedRuleIds();
@@ -170,11 +176,9 @@ function run() {
     `rules registered but never emitted: ${neverEmitted.join(', ')}`,
   );
   console.log(`  [PASS] registry covers exactly the emitted set (${emitted.size} ids, no orphans)`);
+}
 
-  // ── 2b. Every registry surface must describe the same analyzer set ──
-  // Four registries have to agree or an analyzer silently disappears from one execution path:
-  // factories (instantiation), BUILTIN_ANALYZERS (declarative defaults), ALL_BUILTIN_ANALYZERS
-  // (sparse routing), and the rule entries (what each analyzer emits).
+function validateAnalyzerRegistries() {
   const factoryIds = Object.keys(BUILTIN_FACTORIES).sort();
   const declaredIds = [...BUILTIN_ANALYZERS].sort();
   const routedIds = [...ALL_BUILTIN_ANALYZERS].sort();
@@ -200,8 +204,9 @@ function run() {
   console.log(
     `  [PASS] analyzer registries agree (${factoryIds.length} analyzers across factories/config/router)`,
   );
+}
 
-  // ── 3. Naming split must be measurable (legacy ids need an alias window) ──
+function validateNamingAndDocs(ids) {
   const legacy = RULE_REGISTRY.filter((rule) => !rule.canonical)
     .map((rule) => rule.id)
     .sort();
@@ -210,7 +215,6 @@ function run() {
     console.log(`         legacy ids pending an alias window: ${legacy.join(', ')}`);
   }
 
-  // ── 4. Documentation coverage must stay visible and non-regressing ──
   const documented = documentedRuleIds();
   const covered = ids.filter((id) => documented.has(id));
   assert.ok(
@@ -226,6 +230,14 @@ function run() {
   if (uncovered.length > 0) {
     console.log(`         undocumented: ${uncovered.join(', ')}`);
   }
+}
+
+function run() {
+  const ids = RULE_REGISTRY.map((rule) => rule.id);
+  validateRegistryIntegrity(ids);
+  validateEmittedRules(ids);
+  validateAnalyzerRegistries();
+  validateNamingAndDocs(ids);
 }
 
 try {

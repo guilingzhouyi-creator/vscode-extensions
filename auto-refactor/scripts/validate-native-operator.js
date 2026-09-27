@@ -23,11 +23,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const {
-  getNativeCoreStatus,
-  nativeCore,
-  PureJsNativeShim,
-} = require('../dist/core/native');
+const { getNativeCoreStatus, nativeCore, PureJsNativeShim } = require('../dist/core/native');
 const {
   SOURCE_MASK_PRESETS,
   MASK_LANGUAGE_TYPESCRIPT,
@@ -61,7 +57,7 @@ const TEST_CORPUS = [
       'const regex = /pattern[a-z]\\//gi; /* block comment */ const x = 10 / 2;',
       'const template = `line 1',
       'line 2 ${foo}',
-      'line 3`; const y = \'single\\\'quoted\';',
+      "line 3`; const y = 'single\\'quoted';",
       '// trailing line comment',
     ].join('\n'),
   },
@@ -81,7 +77,7 @@ const TEST_CORPUS = [
       '# Python file header',
       'def compute(x):',
       '    """Multi-line docstring here"""',
-      '    msg = \'Single quotes with # hash symbol inside\'',
+      "    msg = 'Single quotes with # hash symbol inside'",
       '    return x * 2  # inline comment',
     ].join('\n'),
   },
@@ -100,8 +96,8 @@ const TEST_CORPUS = [
     language: MASK_LANGUAGE_RUST,
     source: [
       '// Rust source module',
-      'fn calculate<\'a>(slice: &\'a [u8]) -> usize {',
-      '    /* lifetime \'a should not be treated as quote */',
+      "fn calculate<'a>(slice: &'a [u8]) -> usize {",
+      "    /* lifetime 'a should not be treated as quote */",
       '    let message = "hello \\"world\\"";',
       '    slice.len()',
       '}',
@@ -164,7 +160,10 @@ function runValidation() {
   const status = getNativeCoreStatus();
   console.log(`[Status] Active Engine: ${status.activeEngine} (version: ${status.version})`);
   console.log(`[Status] Capabilities: ${status.capabilities.join(', ')}`);
-  assert.ok(status.capabilities.includes('simd-source-mask'), 'Capability simd-source-mask missing');
+  assert.ok(
+    status.capabilities.includes('simd-source-mask'),
+    'Capability simd-source-mask missing',
+  );
   assert.ok(status.capabilities.includes('histogram-diff'), 'Capability histogram-diff missing');
   assert.ok(status.capabilities.includes('tarjan-scc'), 'Capability tarjan-scc missing');
   assert.ok(status.capabilities.includes('dominator-tree'), 'Capability dominator-tree missing');
@@ -372,7 +371,11 @@ function runValidation() {
   const domLoopRust = nativeCore.computeDominatorTree('Header', [], loopEdges);
   const domLoopShim = shim.computeDominatorTree('Header', [], loopEdges);
   assert.deepStrictEqual(domLoopRust.idom, domLoopShim.idom, 'Loop idom parity');
-  assert.deepStrictEqual(domLoopRust.dominanceFrontiers, domLoopShim.dominanceFrontiers, 'Loop DF parity');
+  assert.deepStrictEqual(
+    domLoopRust.dominanceFrontiers,
+    domLoopShim.dominanceFrontiers,
+    'Loop DF parity',
+  );
   assert.deepStrictEqual(domLoopRust.loopHeaders, domLoopShim.loopHeaders, 'Loop headers parity');
   assert.deepStrictEqual(domLoopRust.backEdges, domLoopShim.backEdges, 'Back edges parity');
   assert.strictEqual(domLoopRust.loopHeaders.includes('Header'), true);
@@ -446,7 +449,7 @@ function runValidation() {
     '# python/ps comment',
     '<# ps block #>',
     '\"double quote string with \\\"escaped\\\"\"',
-    '\'single quote with \\\'escaped\\\'\'',
+    "'single quote with \\'escaped\\''",
     '`template ${val} literal`',
     '/regex_pattern[0-9]+/gi',
     ' / not_regex / 2;',
@@ -483,8 +486,16 @@ function runValidation() {
     const fShim = shim.maskSourceCode(fuzzSource, config);
 
     assert.strictEqual(fRust.lines, fShim.lines, `Fuzz round ${round} lines mismatch`);
-    assert.strictEqual(fRust.nonBlankLines, fShim.nonBlankLines, `Fuzz round ${round} nonBlankLines mismatch`);
-    assert.strictEqual(fRust.masked.length, fShim.masked.length, `Fuzz round ${round} masked length mismatch`);
+    assert.strictEqual(
+      fRust.nonBlankLines,
+      fShim.nonBlankLines,
+      `Fuzz round ${round} nonBlankLines mismatch`,
+    );
+    assert.strictEqual(
+      fRust.masked.length,
+      fShim.masked.length,
+      `Fuzz round ${round} masked length mismatch`,
+    );
     for (let li = 0; li < fRust.masked.length; li++) {
       if (fRust.masked[li] !== fShim.masked[li]) {
         assert.fail(

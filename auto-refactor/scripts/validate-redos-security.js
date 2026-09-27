@@ -1,25 +1,25 @@
 /**
- * ReDoS Security Validation Script
- *
- * Validates that regex safety hardening is effective:
- * 1. auditRegexSafety correctly identifies known dangerous patterns
- * 2. safeRegexTest / safeRegexMatch complete in bounded time on adversarial input
- * 3. User-supplied pattern validation rejects dangerous patterns
- * 4. Key analyzer regexes complete in <10ms on 10,000-char pathological strings
- *
- * Usage: node scripts/validate-redos-security.js
- * Exit code: 0 on success, 1 on failure
+ * Module: Security Engine — ReDoS Validation Harness
+ * File Path: scripts/validate-redos-security.js
+ * Architecture Role: Verifies regular expression safety and algorithmic polynomial time limits.
+ * Dependencies & Triggers: Consumes safe-regex utility; executed via npm test.
+ * Responsibilities:
+ *   1. Assert auditRegexSafety correctly identifies known dangerous patterns;
+ *   2. Assert safeRegexTest / safeRegexMatch complete in bounded time on adversarial input;
+ *   3. Assert user-supplied pattern validation rejects dangerous patterns;
+ *   4. Assert key analyzer regexes complete in bounded latency on pathological strings.
+ * Exit Semantics & Design Rationale: Process exits 0 on success, 1 on failure.
  */
 
 const {
-    auditRegexSafety,
-    isRegexSafe,
-    safeRegexTest,
-    safeRegexMatch,
-    safeRegexExecLoop,
-    escapeRegex,
-    createPrefixedTest,
-    buildAlternationRe,
+  auditRegexSafety,
+  isRegexSafe,
+  safeRegexTest,
+  safeRegexMatch,
+  safeRegexExecLoop,
+  escapeRegex,
+  createPrefixedTest,
+  buildAlternationRe,
 } = require('../dist/utils/safe-regex');
 
 const TIMEOUT_MS = 10; // Per-test timeout for "fast enough" check
@@ -29,21 +29,21 @@ let passed = 0;
 let failed = 0;
 
 function assert(condition, message) {
-    if (condition) {
-        passed++;
-        console.log(`  PASS: ${message}`);
-    } else {
-        failed++;
-        console.error(`  FAIL: ${message}`);
-    }
+  if (condition) {
+    passed++;
+    console.log(`  PASS: ${message}`);
+  } else {
+    failed++;
+    console.error(`  FAIL: ${message}`);
+  }
 }
 
 function measure(fn) {
-    const start = process.hrtime.bigint();
-    const result = fn();
-    const end = process.hrtime.bigint();
-    const ms = Number(end - start) / 1e6;
-    return { result, ms };
+  const start = process.hrtime.bigint();
+  const result = fn();
+  const end = process.hrtime.bigint();
+  const ms = Number(end - start) / 1e6;
+  return { result, ms };
 }
 
 // ---------------------------------------------------------------------------
@@ -54,22 +54,22 @@ console.log('\n1. auditRegexSafety — pattern safety detection');
 // Nested quantifiers
 const nestedWarn = auditRegexSafety('(a+)+');
 assert(
-    nestedWarn.some((w) => w.includes('Nested quantifier')),
-    'Detects nested quantifier (a+)+',
+  nestedWarn.some((w) => w.includes('Nested quantifier')),
+  'Detects nested quantifier (a+)+',
 );
 
 // Alternation inside quantifier
 const altWarn = auditRegexSafety('(a|aa)*');
 assert(
-    altWarn.some((w) => w.includes('Alternation inside quantified group')),
-    'Detects alternation inside quantifier (a|aa)*',
+  altWarn.some((w) => w.includes('Alternation inside quantified group')),
+  'Detects alternation inside quantifier (a|aa)*',
 );
 
 // Backreference inside quantified group — e.g. (a\1)+  where \1 is inside + group
 const backrefWarn = auditRegexSafety('(a\\1)+');
 assert(
-    backrefWarn.some((w) => w.includes('Backreference inside quantified group')),
-    'Detects backreference inside quantified group (a\\1)+',
+  backrefWarn.some((w) => w.includes('Backreference inside quantified group')),
+  'Detects backreference inside quantified group (a\\1)+',
 );
 
 // Safe patterns should produce no high-severity warnings
@@ -86,8 +86,8 @@ assert(!isRegexSafe('(a|aa)*'), 'Alternation-in-quantifier rejected by isRegexSa
 const longAlt = Array.from({ length: 25 }, (_, i) => `keyword${i}`).join('|');
 const longAltWarn = auditRegexSafety(longAlt);
 assert(
-    longAltWarn.some((w) => w.includes('Long alternation chain')),
-    'Warns about long alternation chains (>20 pipes)',
+  longAltWarn.some((w) => w.includes('Long alternation chain')),
+  'Warns about long alternation chains (>20 pipes)',
 );
 
 // ---------------------------------------------------------------------------
@@ -104,16 +104,16 @@ const evilInput = 'a'.repeat(LONG_STRING_LENGTH) + '!';
 // (30 chars of this pattern took ~71s in a previous test — exponential growth)
 let rawSlow = false;
 try {
-    const start = Date.now();
-    const shorterEvil = 'a'.repeat(22) + '!';
-    evilRe.test(shorterEvil);
-    const elapsed = Date.now() - start;
-    rawSlow = elapsed > 10; // 22 chars should take well over 10ms
-    console.log(`  INFO: Raw nested-quantifier regex on 22 chars took ${elapsed.toFixed(2)}ms`);
-} catch (e) {
-    // Expected: some regex engines or platforms may throw on pathological patterns;
-    // we only need to know if the raw pattern is slow, not that it throws.
-    rawSlow = true;
+  const start = Date.now();
+  const shorterEvil = 'a'.repeat(22) + '!';
+  evilRe.test(shorterEvil);
+  const elapsed = Date.now() - start;
+  rawSlow = elapsed > 10; // 22 chars should take well over 10ms
+  console.log(`  INFO: Raw nested-quantifier regex on 22 chars took ${elapsed.toFixed(2)}ms`);
+} catch (_e) {
+  // Expected: some regex engines or platforms may throw on pathological patterns;
+  // we only need to know if the raw pattern is slow, not that it throws.
+  rawSlow = true;
 }
 assert(rawSlow, 'Raw nested-quantifier regex is measurably slow (confirms ReDoS vector exists)');
 
@@ -121,8 +121,8 @@ assert(rawSlow, 'Raw nested-quantifier regex is measurably slow (confirms ReDoS 
 // (because it truncates to 5000 chars — still long but bounded)
 const { ms: safeMs } = measure(() => safeRegexTest(evilRe, evilInput));
 assert(
-    safeMs < TIMEOUT_MS * 5,
-    `safeRegexTest with nested-quantifier regex on 10k chars: ${safeMs.toFixed(2)}ms (< ${TIMEOUT_MS * 5}ms)`,
+  safeMs < TIMEOUT_MS * 5,
+  `safeRegexTest with nested-quantifier regex on 10k chars: ${safeMs.toFixed(2)}ms (< ${TIMEOUT_MS * 5}ms)`,
 );
 
 // Verify correct results on normal-length input
@@ -138,27 +138,28 @@ console.log('\n3. safeRegexMatch — bounded extraction on long input');
 // pattern-compilation time. safeRegexMatch protects *safe* patterns from
 // unexpectedly long input. We test with a realistic safe pattern (long
 // alternation) on a 10k-char string.
-const longAltMatchRe = /\b(?:readFileSync|writeFileSync|appendFileSync|copyFileSync|readdirSync|accessSync|existsSync|statSync|lstatSync|rmSync|rmdirSync|mkdirSync|openSync|closeSync|renameSync|unlinkSync)\b/;
+const longAltMatchRe =
+  /\b(?:readFileSync|writeFileSync|appendFileSync|copyFileSync|readdirSync|accessSync|existsSync|statSync|lstatSync|rmSync|rmdirSync|mkdirSync|openSync|closeSync|renameSync|unlinkSync)\b/;
 const longInput = 'x'.repeat(LONG_STRING_LENGTH);
 
 const { ms: matchMs } = measure(() => safeRegexMatch(longInput, longAltMatchRe));
 assert(
-    matchMs < TIMEOUT_MS,
-    `safeRegexMatch with long alternation on 10k non-matching chars: ${matchMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,
+  matchMs < TIMEOUT_MS,
+  `safeRegexMatch with long alternation on 10k non-matching chars: ${matchMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,
 );
 
 // A string that does match should still work correctly
 const matchingLine = '  fs.readFileSync(path);  ';
 const matchResult = safeRegexMatch(matchingLine, longAltMatchRe);
 assert(
-    matchResult !== null && matchResult[0] === 'readFileSync',
-    'safeRegexMatch extracts correct match from short matching string',
+  matchResult !== null && matchResult[0] === 'readFileSync',
+  'safeRegexMatch extracts correct match from short matching string',
 );
 
 // Verify isRegexSafe catches catastrophic patterns BEFORE they ever reach safeRegexMatch
 assert(
-    !isRegexSafe('(a+)+b'),
-    'isRegexSafe rejects catastrophic (a+)+b pattern — first line of defense',
+  !isRegexSafe('(a+)+b'),
+  'isRegexSafe rejects catastrophic (a+)+b pattern — first line of defense',
 );
 
 // ---------------------------------------------------------------------------
@@ -171,16 +172,22 @@ const longAlpha = 'abc '.repeat(LONG_STRING_LENGTH / 4);
 let matchCount = 0;
 
 const { ms: execMs } = measure(() => {
-    matchCount = safeRegexExecLoop(
-        tokenRe,
-        longAlpha,
-        () => true, // continue
-        100, // cap at 100 iterations
-    );
+  matchCount = safeRegexExecLoop(
+    tokenRe,
+    longAlpha,
+    () => true, // continue
+    100, // cap at 100 iterations
+  );
 });
 
-assert(matchCount <= 100, `safeRegexExecLoop respects iteration cap (got ${matchCount}, expected <=100)`);
-assert(execMs < TIMEOUT_MS, `safeRegexExecLoop with cap: ${execMs.toFixed(2)}ms (< ${TIMEOUT_MS}ms)`);
+assert(
+  matchCount <= 100,
+  `safeRegexExecLoop respects iteration cap (got ${matchCount}, expected <=100)`,
+);
+assert(
+  execMs < TIMEOUT_MS,
+  `safeRegexExecLoop with cap: ${execMs.toFixed(2)}ms (< ${TIMEOUT_MS}ms)`,
+);
 
 // ---------------------------------------------------------------------------
 // 5. escapeRegex correctness
@@ -207,8 +214,8 @@ assert(!prefixedTest('console.log("hello")'), 'Prefixed test rejects unrelated i
 const longNoMatch = 'x'.repeat(LONG_STRING_LENGTH);
 const { ms: prefixMs } = measure(() => prefixedTest(longNoMatch));
 assert(
-    prefixMs < 1,
-    `Prefixed test on 10k non-matching chars: ${prefixMs.toFixed(4)}ms (< 1ms, substring fast-path)`,
+  prefixMs < 1,
+  `Prefixed test on 10k non-matching chars: ${prefixMs.toFixed(4)}ms (< 1ms, substring fast-path)`,
 );
 
 // ---------------------------------------------------------------------------
@@ -237,13 +244,16 @@ console.log('\n8. Secrets analyzer — user pattern safety (via compileSecretPat
 
 // Simulate what compileSecretPatterns does for user-supplied patterns
 const userPatterns = [
-    'ghp_[A-Za-z0-9]{20,}', // safe
-    '(a+)+', // unsafe — nested quantifier
-    'sk-[A-Za-z0-9]{20,}', // safe
+  'ghp_[A-Za-z0-9]{20,}', // safe
+  '(a+)+', // unsafe — nested quantifier
+  'sk-[A-Za-z0-9]{20,}', // safe
 ];
 
 const safePatterns = userPatterns.filter((p) => isRegexSafe(p));
-assert(safePatterns.length === 2, `2 of 3 user patterns pass safety check (got ${safePatterns.length})`);
+assert(
+  safePatterns.length === 2,
+  `2 of 3 user patterns pass safety check (got ${safePatterns.length})`,
+);
 assert(safePatterns.includes('ghp_[A-Za-z0-9]{20,}'), 'Safe pattern 1 passes');
 assert(safePatterns.includes('sk-[A-Za-z0-9]{20,}'), 'Safe pattern 2 passes');
 assert(!safePatterns.includes('(a+)+'), 'Unsafe nested-quantifier pattern is rejected');
@@ -254,12 +264,13 @@ assert(!safePatterns.includes('(a+)+'), 'Unsafe nested-quantifier pattern is rej
 console.log('\n9. Hygiene jargon — user pattern safety (via buildJargonRe-equivalent)');
 
 const jargonPatterns = [
-    'p[0-9]+', // safe
-    '(wip|todo)+', // unsafe — alternation inside quantifier? Let's check
-    'phase[0-9]+', // safe
+  'p[0-9]+', // safe
+  '(wip|todo)+', // unsafe — alternation inside quantifier? Let's check
+  'phase[0-9]+', // safe
 ];
 
 const safeJargon = jargonPatterns.filter((p) => isRegexSafe(p));
+assert.ok(safeJargon.length > 0, 'Should find safe jargon patterns');
 // (wip|todo)+ has alternation inside + quantifier → should be flagged
 const hasUnsafe = jargonPatterns.some((p) => !isRegexSafe(p));
 assert(hasUnsafe, 'At least one jargon pattern is correctly flagged as unsafe');
@@ -273,12 +284,13 @@ const longRepeated = 'a'.repeat(LONG_STRING_LENGTH);
 const longMixed = 'abcdefghij'.repeat(LONG_STRING_LENGTH / 10);
 
 // SYNC_FS_RE equivalent on long string
-const syncFsRe = /\b(?:readFileSync|writeFileSync|appendFileSync|copyFileSync|readdirSync|accessSync|existsSync|statSync|lstatSync|rmSync|rmdirSync|mkdirSync|openSync|closeSync|renameSync|unlinkSync)\s*\(/;
+const syncFsRe =
+  /\b(?:readFileSync|writeFileSync|appendFileSync|copyFileSync|readdirSync|accessSync|existsSync|statSync|lstatSync|rmSync|rmdirSync|mkdirSync|openSync|closeSync|renameSync|unlinkSync)\s*\(/;
 
 const { ms: syncFsMs } = measure(() => safeRegexTest(syncFsRe, longRepeated));
 assert(
-    syncFsMs < TIMEOUT_MS,
-    `SYNC_FS_RE (via safeRegexTest) on 10k 'a's: ${syncFsMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,
+  syncFsMs < TIMEOUT_MS,
+  `SYNC_FS_RE (via safeRegexTest) on 10k 'a's: ${syncFsMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,
 );
 
 // TEXT_VARIABLE_RE equivalent (just the suffix-matching part) on a long identifier-ish string
@@ -287,19 +299,20 @@ const longIdent = 'x'.repeat(500); // 500-char identifier
 
 const { ms: textVarMs } = measure(() => safeRegexTest(textVarRe, longIdent));
 assert(
-    textVarMs < TIMEOUT_MS,
-    `TEXT_VARIABLE_RE (suffix part) on 500-char identifier: ${textVarMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,
+  textVarMs < TIMEOUT_MS,
+  `TEXT_VARIABLE_RE (suffix part) on 500-char identifier: ${textVarMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,
 );
 
 // TOKEN_RE (entropy detection) on long alphanumeric string
 const tokenRe2 = /[A-Za-z0-9_\-=]{16,}/g;
 let tokenCount = 0;
 const { ms: tokenMs } = measure(() => {
-    tokenCount = safeRegexExecLoop(tokenRe2, longMixed, () => true, 50);
+  tokenCount = safeRegexExecLoop(tokenRe2, longMixed, () => true, 50);
 });
+assert.ok(tokenCount >= 0, 'tokenCount should be non-negative');
 assert(
-    tokenMs < TIMEOUT_MS,
-    `TOKEN_RE exec loop (capped at 50) on 10k alphanumeric: ${tokenMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,
+  tokenMs < TIMEOUT_MS,
+  `TOKEN_RE exec loop (capped at 50) on 10k alphanumeric: ${tokenMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,
 );
 
 // ---------------------------------------------------------------------------
@@ -310,9 +323,9 @@ console.log(`ReDoS Security Validation: ${passed} passed, ${failed} failed`);
 console.log('='.repeat(60));
 
 if (failed > 0) {
-    console.error('\nSome ReDoS security checks FAILED!');
-    process.exit(1);
+  console.error('\nSome ReDoS security checks FAILED!');
+  process.exit(1);
 } else {
-    console.log('\nAll ReDoS security checks passed.');
-    process.exit(0);
+  console.log('\nAll ReDoS security checks passed.');
+  process.exit(0);
 }

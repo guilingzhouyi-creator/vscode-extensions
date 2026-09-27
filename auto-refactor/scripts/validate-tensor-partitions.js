@@ -12,7 +12,8 @@
  *   4. Assert cross-partition circular dependency loop detection;
  *   5. Assert multi-partition symbol collision detection;
  *   6. Assert performance latency under large partition aggregation.
- * Exit Semantics & Design Rationale: Exits 0 on success, throws AssertionError and exits 1 on failure.
+ * Exit Semantics & Design Rationale: Exits 0 on success,
+ *   throws AssertionError and exits 1 on failure.
  */
 
 'use strict';
@@ -46,26 +47,40 @@ async function testTensorWorkloadPartitioning() {
   const plan = partitioner.partition(files, edges);
 
   assert.ok(plan.totalCells > 0, 'Must produce non-zero tensor cells');
-  assert.ok(plan.dataDimensionSize >= 2, 'Must cluster into at least 2 module domains (core and utils)');
+  assert.ok(
+    plan.dataDimensionSize >= 2,
+    'Must cluster into at least 2 module domains (core and utils)',
+  );
   assert.strictEqual(
     plan.ruleDimensionSize,
     Object.keys(DEFAULT_TENSOR_RULE_FAMILIES).length,
     'Rule dimension size must match declared rule families',
   );
-  assert.ok(plan.maxDependencyDepth >= 2, 'Depth must be at least 2 for controller -> service -> model chain');
+  assert.ok(
+    plan.maxDependencyDepth >= 2,
+    'Depth must be at least 2 for controller -> service -> model chain',
+  );
 
   // Verify that model is at depth 0, service is at depth 1, controller is at depth 2
   const modelCell = plan.cells.find((c) => c.dataFiles.includes('src/core/models/user.ts'));
   assert.ok(modelCell);
   assert.strictEqual(modelCell.dependencyDepth, 0, 'Leaf model must be at depth 0');
 
-  const serviceCell = plan.cells.find((c) => c.dataFiles.includes('src/core/services/user-service.ts'));
+  const serviceCell = plan.cells.find((c) =>
+    c.dataFiles.includes('src/core/services/user-service.ts'),
+  );
   assert.ok(serviceCell);
   assert.strictEqual(serviceCell.dependencyDepth, 1, 'Service importing model must be at depth 1');
 
-  const ctrlCell = plan.cells.find((c) => c.dataFiles.includes('src/core/controllers/user-controller.ts'));
+  const ctrlCell = plan.cells.find((c) =>
+    c.dataFiles.includes('src/core/controllers/user-controller.ts'),
+  );
   assert.ok(ctrlCell);
-  assert.strictEqual(ctrlCell.dependencyDepth, 2, 'Controller importing service must be at depth 2');
+  assert.strictEqual(
+    ctrlCell.dependencyDepth,
+    2,
+    'Controller importing service must be at depth 2',
+  );
 
   console.log(
     `  ✔ Partitioned ${files.length} files into ${plan.totalCells} cells (Data clusters: ${plan.dataDimensionSize}, Rules: ${plan.ruleDimensionSize}, Max depth: ${plan.maxDependencyDepth})`,
@@ -149,12 +164,15 @@ async function testAllReduceIssueDeduplicationAndConvergence() {
   assert.strictEqual(converged.issuesBySeverity.info, 1);
 
   // Assert deterministic ordering:
-  // src/core/service.ts:12 (CMT-001) -> src/core/service.ts:42 (SEC-001) -> src/core/util.ts:10 (NAM-001)
+  // src/core/service.ts:12 (CMT-001) -> src/core/service.ts:42 (SEC-001)
+  // -> src/core/util.ts:10 (NAM-001)
   assert.strictEqual(converged.issues[0].rule, 'CMT-001');
   assert.strictEqual(converged.issues[1].rule, 'SEC-001');
   assert.strictEqual(converged.issues[2].rule, 'NAM-001');
 
-  console.log('  ✔ All-Reduce deduplicates overlapping issues and preserves deterministic ordering');
+  console.log(
+    '  ✔ All-Reduce deduplicates overlapping issues and preserves deterministic ordering',
+  );
 }
 
 async function testCrossPartitionCycleAndSymbolConflictDetection() {

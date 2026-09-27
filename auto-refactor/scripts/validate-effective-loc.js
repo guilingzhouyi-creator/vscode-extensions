@@ -21,13 +21,10 @@ const { parseHumanMetric } = require('../dist/core/config/metric-parser');
 const {
   getLanguageVerbosityFactor,
   getRoleBudget,
-  LANGUAGE_VERBOSITY_FACTORS,
 } = require('../dist/core/intelligence/elastic-budget-matrix');
 const {
   partitionFileZones,
   ZONE_COMPUTE_KERNEL,
-  ZONE_INTERFACE_GATEWAY,
-  ZONE_LOOKUP_TABLE,
 } = require('../dist/core/intelligence/zone-partitioner');
 const { resolveConfig } = require('../dist/core/config');
 

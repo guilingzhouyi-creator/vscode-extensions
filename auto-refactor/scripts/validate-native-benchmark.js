@@ -3,16 +3,19 @@
  * Module: Verification Harness — Native Operator Kernel Performance Benchmark
  * File Path: scripts/validate-native-benchmark.js
  * Architecture Role: Measures and guards the performance acceleration ratio and throughput
- *   of the Rust native operator kernel (auto-refactor-ops) compared to the pure JavaScript fallback shim.
+ *   of the Rust native operator kernel (auto-refactor-ops) compared to the pure
+ *   JavaScript fallback shim.
  * Dependencies & Triggers: Consumes src/core/native, src/core/policy/source-mask;
- *   executed by scripts/test-parallel.js or directly via `node scripts/validate-native-benchmark.js`.
+ *   executed by scripts/test-parallel.js or directly via
+ *   `node scripts/validate-native-benchmark.js`.
  * Responsibilities:
  *   1. Measure source masking and lexical scanning throughput (MB/s);
  *   2. Measure clone block detection and MinHash signature generation latency;
  *   3. Measure graph topological SCC analysis and cycle detection speed;
  *   4. Measure histogram diff hunk generation speed;
  *   5. Guard against performance degradation when native binary is available.
- * Exit Semantics & Design Rationale: Exits 0 on passing performance guardrails, exits 1 on regression.
+ * Exit Semantics & Design Rationale: Exits 0 on passing performance guardrails,
+ *   exits 1 on regression.
  */
 
 'use strict';
@@ -20,11 +23,7 @@
 const assert = require('assert');
 const { performance } = require('perf_hooks');
 
-const {
-  getNativeCoreStatus,
-  nativeCore,
-  PureJsNativeShim,
-} = require('../dist/core/native');
+const { getNativeCoreStatus, nativeCore, PureJsNativeShim } = require('../dist/core/native');
 const {
   SOURCE_MASK_PRESETS,
   MASK_LANGUAGE_TYPESCRIPT,
@@ -61,10 +60,14 @@ function generateBenchmarkCorpus(linesCount) {
         chunks.push(`/* Block comment spanning inside code */ const calc_${i} = ${i} * 42;`);
         break;
       case 3:
-        chunks.push(`const template_${i} = \`multiline template line 1\nline 2 \${token_${i}}\nline 3\`;`);
+        chunks.push(
+          `const template_${i} = \`multiline template line 1\nline 2 \${token_${i}}\nline 3\`;`,
+        );
         break;
       case 4:
-        chunks.push(`const pattern_${i} = /token_[0-9]+_[a-z]+/gi; const div_${i} = calc_${i} / 2;`);
+        chunks.push(
+          `const pattern_${i} = /token_[0-9]+_[a-z]+/gi; const div_${i} = calc_${i} / 2;`,
+        );
         break;
       case 5:
         chunks.push(`function computeAction_${i}(param: number): number { return param + ${i}; }`);
@@ -162,8 +165,14 @@ function benchmarkGraphTopology(iterations = 20) {
   const edges = [];
   const nodeCount = 300;
   for (let i = 0; i < nodeCount; i++) {
-    edges.push([`Module_Path_Prefix_Identifier_${i}`, `Module_Path_Prefix_Identifier_${(i + 1) % nodeCount}`]);
-    edges.push([`Module_Path_Prefix_Identifier_${i}`, `Module_Path_Prefix_Identifier_${(i * 7) % nodeCount}`]);
+    edges.push([
+      `Module_Path_Prefix_Identifier_${i}`,
+      `Module_Path_Prefix_Identifier_${(i + 1) % nodeCount}`,
+    ]);
+    edges.push([
+      `Module_Path_Prefix_Identifier_${i}`,
+      `Module_Path_Prefix_Identifier_${(i * 7) % nodeCount}`,
+    ]);
   }
 
   // Warmup
@@ -251,9 +260,7 @@ function runBenchmark() {
   ];
 
   console.log('-----------------------------------------------------------------------------');
-  console.log(
-    ' Operator              | Native (ms) | Shim (ms) | Speedup | Throughput (MB/s)',
-  );
+  console.log(' Operator              | Native (ms) | Shim (ms) | Speedup | Throughput (MB/s)');
   console.log('-----------------------------------------------------------------------------');
 
   for (const r of results) {

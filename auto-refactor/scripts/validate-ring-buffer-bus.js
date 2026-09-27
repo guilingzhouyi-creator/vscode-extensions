@@ -12,7 +12,8 @@
  *   4. Assert allocation-free bulk drainage via drainInto();
  *   5. Assert runtime telemetry accuracy (high-water mark, drops, rejections);
  *   6. Assert high-throughput execution under rapid push/pop stress cycles.
- * Exit Semantics & Design Rationale: Exits 0 on success, throws AssertionError and exits 1 on failure.
+ * Exit Semantics & Design Rationale: Exits 0 on success,
+ *   throws AssertionError and exits 1 on failure.
  */
 
 'use strict';

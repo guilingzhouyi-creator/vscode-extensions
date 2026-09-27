@@ -124,15 +124,51 @@ const PARALLEL_SUITES = [
   { name: 'validate-dynamic-quality-model', script: 'scripts/validate-dynamic-quality-model.js' },
   { name: 'validate-risk-fusion-engine', script: 'scripts/validate-risk-fusion-engine.js' },
   { name: 'validate-change-quality-arbiter', script: 'scripts/validate-change-quality-arbiter.js' },
-  { name: 'validate-feedback-adaptive-supervisor', script: 'scripts/validate-feedback-adaptive-supervisor.js' },
+  {
+    name: 'validate-feedback-adaptive-supervisor',
+    script: 'scripts/validate-feedback-adaptive-supervisor.js',
+  },
   { name: 'validate-triplane-cross-project', script: 'scripts/validate-triplane-cross-project.js' },
   { name: 'validate-autonomy-scorer', script: 'scripts/validate-autonomy-scorer.js' },
   { name: 'validate-stdlib-profile', script: 'scripts/validate-stdlib-profile.js' },
   { name: 'validate-agent-actionable', script: 'scripts/validate-agent-actionable.js' },
   { name: 'validate-constants-ssot', script: 'scripts/validate-constants-ssot.js' },
   { name: 'validate-i18n-cleanliness', script: 'scripts/validate-i18n-cleanliness.js' },
-  { name: 'validate-nested-constant-cleanliness', script: 'scripts/validate-nested-constant-cleanliness.js' },
-  { name: 'validate-constant-library-topology', script: 'scripts/validate-constant-library-topology.js' },
+  {
+    name: 'validate-nested-constant-cleanliness',
+    script: 'scripts/validate-nested-constant-cleanliness.js',
+  },
+  {
+    name: 'validate-constant-library-topology',
+    script: 'scripts/validate-constant-library-topology.js',
+  },
+  {
+    name: 'validate-naming-decoupling-architecture',
+    script: 'scripts/validate-naming-decoupling-architecture.js',
+  },
+  {
+    name: 'validate-dual-track-test-topology',
+    script: 'scripts/validate-dual-track-test-topology.js',
+  },
+  { name: 'validate-code-evolution-scoring', script: 'scripts/validate-code-evolution-scoring.js' },
+  { name: 'validate-batch-git-history', script: 'scripts/validate-batch-git-history.js' },
+  { name: 'validate-archetype-weight-tuner', script: 'scripts/validate-archetype-weight-tuner.js' },
+  {
+    name: 'validate-logistic-deduction-curve',
+    script: 'scripts/validate-logistic-deduction-curve.js',
+  },
+  {
+    name: 'validate-topological-churn-scoring',
+    script: 'scripts/validate-topological-churn-scoring.js',
+  },
+  {
+    name: 'validate-coverage-telemetry-fusion',
+    script: 'scripts/validate-coverage-telemetry-fusion.js',
+  },
+  {
+    name: 'validate-refactoring-roi-arbiter',
+    script: 'scripts/validate-refactoring-roi-arbiter.js',
+  },
   { name: 'validate-rule-generalization', script: 'scripts/validate-rule-generalization.js' },
   { name: 'validate-multi-agent', script: 'scripts/validate-multi-agent.js' },
   { name: 'validate-slice-audit', script: 'scripts/validate-slice-audit.js' },
@@ -160,9 +196,18 @@ const PARALLEL_SUITES = [
     ],
   },
   { name: 'validate-role-inference', script: 'scripts/validate-role-inference.js' },
-  { name: 'validate-role-aware-deduplication', script: 'scripts/validate-role-aware-deduplication.js' },
-  { name: 'validate-gdscript-adapter-tolerance', script: 'scripts/validate-gdscript-adapter-tolerance.js' },
-  { name: 'validate-framework-lifecycle-guards', script: 'scripts/validate-framework-lifecycle-guards.js' },
+  {
+    name: 'validate-role-aware-deduplication',
+    script: 'scripts/validate-role-aware-deduplication.js',
+  },
+  {
+    name: 'validate-gdscript-adapter-tolerance',
+    script: 'scripts/validate-gdscript-adapter-tolerance.js',
+  },
+  {
+    name: 'validate-framework-lifecycle-guards',
+    script: 'scripts/validate-framework-lifecycle-guards.js',
+  },
   {
     name: 'validate-config-driven-architecture',
     script: 'scripts/validate-config-driven-architecture.js',
@@ -203,6 +248,10 @@ const PARALLEL_SUITES = [
   {
     name: 'validate-mit-corpus',
     script: 'scripts/validate-mit-corpus.js',
+  },
+  {
+    name: 'validate-codemod-engine',
+    script: 'scripts/validate-codemod-engine.js',
   },
 ];
 

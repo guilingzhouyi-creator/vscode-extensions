@@ -76,7 +76,7 @@ function sleep(ms) {
   }
 }
 
-/** rm -rf with Windows file-lock retry (EBUSY/EPERM → 3 × 300ms). Throws if still locked. */
+/** rm -rf with Windows busy-file retry (EBUSY/EPERM → 3 × 300ms). Throws if still locked. */
 function rmRetry(p, attempts = 3, delayMs = 300) {
   let lastErr = null;
   for (let i = 0; i < attempts; i++) {

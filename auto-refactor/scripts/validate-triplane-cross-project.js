@@ -7,6 +7,7 @@
  *   1. auto-refactor (Core CLI / Analysis Engine)
  *   2. workspace-timing (VS Code Extension / Storage & UI)
  *   3. WebGames (Godot 4.7 Game Engine / Decoupled Domains)
+ * Dependencies & Triggers: Consumes src/core/scoring, telemetry, and reporting; run in npm test.
  * Responsibilities:
  *   - Evaluate 7-axis static quality vectors Q_s = (A, M, P, D, T, R, E) & confidence risk S_i.
  *   - Ingest project-specific dynamic telemetry Q_d = (L, T, M, C, E) & hotspot risk D_i.
@@ -14,7 +15,7 @@
  *   - Resolve adaptive weights W = f(Profile) and synthesize Q_total.
  *   - Execute ChangeScore net benefit arbiter & G-01~G-04 anti-gaming rules.
  *   - Run feedback adaptive supervisor gradient evolution W_{t+1}.
- * Exit Semantics: Exits 0 on all assertions passing, 1 on error.
+ * Exit Semantics & Design Rationale: Exits 0 on all assertions passing, 1 on error.
  */
 'use strict';
 
@@ -264,12 +265,7 @@ async function main() {
 
     // 3. Adaptive Weighting & Cross-Plane Fusion
     const weights = resolveAdaptiveFusionWeights(proj.profile, true);
-    const unified = computeUnifiedQualityScore(
-      staticVector,
-      dynamicVector,
-      95.0,
-      proj.profile,
-    );
+    const unified = computeUnifiedQualityScore(staticVector, dynamicVector, 95.0, proj.profile);
 
     // 4. Cross-Plane Risk Resonance
     const sampleIssue = buildProjectSampleIssue(proj.id);
@@ -286,16 +282,16 @@ async function main() {
       errorFrequency: 0.0,
     });
 
-    const fusedRisk = fuseIssueRisks(
-      sampleStaticRisk,
-      sampleDynamicRisk,
-      1.0,
-      { alpha: 1.0, beta: 1.0, gamma: 1.0 },
-    );
+    const fusedRisk = fuseIssueRisks(sampleStaticRisk, sampleDynamicRisk, 1.0, {
+      alpha: 1.0,
+      beta: 1.0,
+      gamma: 1.0,
+    });
 
     // 5. Change Score & Anti-Gaming Verification
     const changeEval = evaluateChangeQuality({
-      filePath: proj.id === 'WebGames' ? 'backend/domains/narrative/engine.gd' : 'src/core/runner.ts',
+      filePath:
+        proj.id === 'WebGames' ? 'backend/domains/narrative/engine.gd' : 'src/core/runner.ts',
       beforeContent: 'function legacyProcess() {\n  return 1;\n}',
       afterContent: 'function legacyProcess(): number {\n  return 1;\n}',
       beforeScore: 80.0,
@@ -337,13 +333,15 @@ async function main() {
       `  Resonance Fused R : ${fusedRisk.fusedScore.toFixed(3)} ` +
         `(Level: ${fusedRisk.level}, DualConfirmed: ${fusedRisk.isDualConfirmed})`,
     );
-    console.log(`  Refactor ChangeNet: +${changeEval.changeScore.toFixed(2)} pts (Gaming: Clean)\n`);
+    console.log(
+      `  Refactor ChangeNet: +${changeEval.changeScore.toFixed(2)} pts (Gaming: Clean)\n`,
+    );
   }
 
   // 6. Test FeedbackAdaptiveSupervisor Evolution
   console.log('>>> Testing FeedbackAdaptiveSupervisor Lifecycle Evolution...');
   const ledger = new FeedbackIncidentLedger();
-  const initialWeights = { Ws: 0.50, Wd: 0.35, Wf: 0.15 };
+  const initialWeights = { Ws: 0.5, Wd: 0.35, Wf: 0.15 };
   const supervisor = new FeedbackAdaptiveSupervisor(ledger, initialWeights, 0.02);
 
   const step1 = supervisor.evolveFromOutcome({
@@ -516,8 +514,12 @@ async function main() {
   console.log('================================================================');
   console.log('                THREE-PLANE AUDIT SCORE MATRIX                  ');
   console.log('================================================================');
-  console.log('| Project            | Q_s (Static) | Q_d (Dynamic) | Q_tot (Fused) | ChangeScore |');
-  console.log('| :----------------- | :----------: | :-----------: | :-----------: | :---------: |');
+  console.log(
+    '| Project            | Q_s (Static) | Q_d (Dynamic) | Q_tot (Fused) | ChangeScore |',
+  );
+  console.log(
+    '| :----------------- | :----------: | :-----------: | :-----------: | :---------: |',
+  );
   for (const r of results) {
     const pad = (s, n) => s.padEnd(n);
     console.log(

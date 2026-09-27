@@ -12,20 +12,18 @@
  *   4. Assert token-bucket rate limiting and deduction;
  *   5. Assert lease release and TTL expiration sweep;
  *   6. Assert telemetry metrics across concurrent simulated agents.
- * Exit Semantics & Design Rationale: Exits 0 on success, throws AssertionError and exits 1 on failure.
+ * Exit Semantics & Design Rationale: Exits 0 on success,
+ *   throws AssertionError and exits 1 on failure.
  */
 
 'use strict';
 
 const assert = require('assert');
-const {
-  AgentQuotaGateway,
-  TaskPriority,
-  DEFAULT_TIER_QUOTAS,
-} = require('../dist/api');
+const { AgentQuotaGateway, TaskPriority, DEFAULT_TIER_QUOTAS } = require('../dist/api');
 
 async function testTierRegistrationAndBasicLease() {
   console.log('1. Testing agent tier registration and lease lifecycle...');
+  assert.ok(DEFAULT_TIER_QUOTAS.interactive, 'DEFAULT_TIER_QUOTAS should define interactive tier');
   const gateway = new AgentQuotaGateway();
 
   gateway.registerAgent('agent-interactive-1', 'interactive');

@@ -14,20 +14,18 @@
  *   6. Assert analyzer instance pooling and object reuse;
  *   7. Assert runtime telemetry metrics (throughput, latency, p99);
  *   8. Assert graceful shutdown draining in-flight work and rejecting pending items.
- * Exit Semantics & Design Rationale: Exits 0 on success, throws AssertionError and exits 1 on failure.
+ * Exit Semantics & Design Rationale: Exits 0 on success,
+ *   throws AssertionError and exits 1 on failure.
  */
 
 'use strict';
 
 const assert = require('assert');
-const {
-  WorkerPoolManager,
-  TaskPriority,
-  defaultWorkerPoolManager,
-} = require('../dist/api');
+const { WorkerPoolManager, TaskPriority, defaultWorkerPoolManager } = require('../dist/api');
 
 async function testBasicTaskExecution() {
   console.log('1. Testing basic task submission and resolution...');
+  assert.ok(defaultWorkerPoolManager, 'defaultWorkerPoolManager should be exported');
   const pool = new WorkerPoolManager({ maxConcurrency: 4 });
 
   const result = await pool.submit({
@@ -142,7 +140,8 @@ async function testPreemptivePriorityOrdering() {
 
   await Promise.all([blocker, lowTask, idleTask, highTask, criticalTask]);
 
-  // Expected execution sequence: blocker finished first, then critical, then high, then low, then idle
+  // Expected execution sequence: blocker finished first,
+  // then critical, then high, then low, then idle
   assert.deepStrictEqual(
     executionOrder,
     ['blocker', 'critical', 'high', 'low', 'idle'],
@@ -174,7 +173,10 @@ async function testTaskTimeoutHandling() {
     });
   } catch (err) {
     errorCaught = true;
-    assert.ok(err.message.includes('timed out after 30ms'), 'Error message must specify timeout limit');
+    assert.ok(
+      err.message.includes('timed out after 30ms'),
+      'Error message must specify timeout limit',
+    );
   }
 
   assert.ok(errorCaught, 'Task exceeding timeout threshold must be rejected');
@@ -207,10 +209,18 @@ async function testAnalyzerInstancePooling() {
   // Acquire again - must reuse returned instances without invoking factory
   const instReused1 = pool.acquireAnalyzer('comments', factory);
   const instReused2 = pool.acquireAnalyzer('comments', factory);
-  assert.strictEqual(instanceCreations, 2, 'Factory must not be called when instances are available in pool');
+  assert.strictEqual(
+    instanceCreations,
+    2,
+    'Factory must not be called when instances are available in pool',
+  );
   assert.ok(
     instReused1 === inst2 || instReused1 === inst1,
     'Acquired instance must match one of the pooled objects',
+  );
+  assert.ok(
+    instReused2 === inst2 || instReused2 === inst1,
+    'Second acquired instance must match one of the pooled objects',
   );
 
   await pool.shutdown();

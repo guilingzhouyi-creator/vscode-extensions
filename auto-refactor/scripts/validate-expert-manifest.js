@@ -82,7 +82,10 @@ assert(archetypeMatrix.library.length > 0, 'Archetype library must have experts'
 assert(archetypeMatrix.stdlib.length > 0, 'Archetype stdlib must have experts');
 assert(archetypeMatrix.stdlib.includes('stdlib'), 'Archetype stdlib must activate stdlib analyzer');
 assert(archetypeMatrix.systems_runtime.length > 0, 'Archetype systems_runtime must have experts');
-assert(archetypeMatrix.systems_runtime.includes('stdlib'), 'Archetype systems_runtime must activate stdlib analyzer');
+assert(
+  archetypeMatrix.systems_runtime.includes('stdlib'),
+  'Archetype systems_runtime must activate stdlib analyzer',
+);
 console.log('✓ Dynamic archetype matrix derivation verified');
 
 console.log('[PASS] validate-expert-manifest passed all integrity and normative assertions.');
