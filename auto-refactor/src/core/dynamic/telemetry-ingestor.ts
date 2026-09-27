@@ -21,6 +21,55 @@ import type {
     ConcurrencyMetric,
     ExecutionEvidenceMetric,
 } from './dynamic-types';
+function parseLatency(raw: Record<string, number>): LatencyMetric {
+    return {
+        p50Ms: raw.p50Ms ?? raw.p50 ?? 5.0,
+        p95Ms: raw.p95Ms ?? raw.p95 ?? 12.0,
+        p99Ms: raw.p99Ms ?? raw.p99 ?? 16.0,
+        budgetMs: raw.budgetMs ?? 16.67,
+    };
+}
+
+function parseThroughput(raw: Record<string, number>): ThroughputMetric {
+    return {
+        opsPerSec: raw.opsPerSec ?? raw.throughput ?? 1000,
+        targetOpsPerSec: raw.targetOpsPerSec ?? 1000,
+    };
+}
+
+function parseMemory(raw: Record<string, number>): MemoryStabilityMetric {
+    return {
+        peakHeapBytes: raw.peakHeapBytes ?? 50 * 1024 * 1024,
+        allocationRateBytesPerSec: raw.allocationRateBytesPerSec ?? 1024 * 1024,
+        gcPauseCount: raw.gcPauseCount ?? 0,
+        gcTotalPauseMs: raw.gcTotalPauseMs ?? 0,
+        detectedLeakBytes: raw.detectedLeakBytes ?? 0,
+    };
+}
+
+function parseConcurrency(raw: Record<string, unknown>): ConcurrencyMetric {
+    return {
+        lockWaitCount: (raw.lockWaitCount as number) ?? 0,
+        totalLockWaitMs: (raw.totalLockWaitMs as number) ?? 0,
+        deadlockDetected: Boolean(raw.deadlockDetected),
+        contentionRatio: (raw.contentionRatio as number) ?? 0.0,
+    };
+}
+
+function parseExecution(raw: Record<string, number>): ExecutionEvidenceMetric {
+    return {
+        callCount: raw.callCount ?? 1000,
+        invocationsPerHour: raw.invocationsPerHour ?? 3600,
+        lineCoveragePct: raw.lineCoveragePct ?? 80.0,
+        branchCoveragePct: raw.branchCoveragePct ?? 75.0,
+        activeDatasetsProcessed: raw.activeDatasetsProcessed ?? 100,
+    };
+}
+
+function parseLcovMetric(line: string, prefixLen: number): number {
+    const val = parseInt(line.slice(prefixLen).trim(), 10);
+    return isNaN(val) ? 0 : val;
+}
 
 /**
  * Parses raw benchmark telemetry JSON into normalized DynamicEvidenceDTO.
@@ -32,62 +81,24 @@ export function ingestBenchmarkJson(
     jsonContent: string | Record<string, unknown>,
 ): DynamicEvidenceDTO {
     const data: Record<string, unknown> =
-
         typeof jsonContent === 'string' ? safeJsonParse(jsonContent) : jsonContent;
 
     const timestamp = typeof data.timestamp === 'number' ? data.timestamp : Date.now();
-    const environment = typeof data.environment === 'string' ? data.environment : 'synthetic_benchmark';
+    const environment =
+        typeof data.environment === 'string' ? data.environment : 'synthetic_benchmark';
 
-    const rawLatency = (data.latency ?? {}) as Record<string, number>;
-    const latency: LatencyMetric = {
-        p50Ms: rawLatency.p50Ms ?? rawLatency.p50 ?? 5.0,
-        p95Ms: rawLatency.p95Ms ?? rawLatency.p95 ?? 12.0,
-        p99Ms: rawLatency.p99Ms ?? rawLatency.p99 ?? 16.0,
-        budgetMs: rawLatency.budgetMs ?? 16.67,
-    };
-
-    const rawThroughput = (data.throughput ?? {}) as Record<string, number>;
-    const throughput: ThroughputMetric = {
-        opsPerSec: rawThroughput.opsPerSec ?? rawThroughput.throughput ?? 1000,
-        targetOpsPerSec: rawThroughput.targetOpsPerSec ?? 1000,
-    };
-
-    const rawMemory = (data.memory ?? {}) as Record<string, number>;
-    const memory: MemoryStabilityMetric = {
-        peakHeapBytes: rawMemory.peakHeapBytes ?? 50 * 1024 * 1024,
-        allocationRateBytesPerSec: rawMemory.allocationRateBytesPerSec ?? 1024 * 1024,
-        gcPauseCount: rawMemory.gcPauseCount ?? 0,
-        gcTotalPauseMs: rawMemory.gcTotalPauseMs ?? 0,
-        detectedLeakBytes: rawMemory.detectedLeakBytes ?? 0,
-    };
-
-    const rawConcurrency = (data.concurrency ?? {}) as Record<string, unknown>;
-    const concurrency: ConcurrencyMetric = {
-        lockWaitCount: (rawConcurrency.lockWaitCount as number) ?? 0,
-        totalLockWaitMs: (rawConcurrency.totalLockWaitMs as number) ?? 0,
-        deadlockDetected: Boolean(rawConcurrency.deadlockDetected),
-        contentionRatio: (rawConcurrency.contentionRatio as number) ?? 0.0,
-    };
-
-    const rawExecution = (data.execution ?? {}) as Record<string, number>;
-    const execution: ExecutionEvidenceMetric = {
-        callCount: rawExecution.callCount ?? 1000,
-        invocationsPerHour: rawExecution.invocationsPerHour ?? 3600,
-        lineCoveragePct: rawExecution.lineCoveragePct ?? 80.0,
-        branchCoveragePct: rawExecution.branchCoveragePct ?? 75.0,
-        activeDatasetsProcessed: rawExecution.activeDatasetsProcessed ?? 100,
-    };
-
-    const hotspots = Array.isArray(data.hotspots) ? (data.hotspots as DynamicEvidenceDTO['hotspots']) : [];
+    const hotspots = Array.isArray(data.hotspots)
+        ? (data.hotspots as DynamicEvidenceDTO['hotspots'])
+        : [];
 
     return {
         timestamp,
         environment,
-        latency,
-        throughput,
-        memory,
-        concurrency,
-        execution,
+        latency: parseLatency((data.latency ?? {}) as Record<string, number>),
+        throughput: parseThroughput((data.throughput ?? {}) as Record<string, number>),
+        memory: parseMemory((data.memory ?? {}) as Record<string, number>),
+        concurrency: parseConcurrency((data.concurrency ?? {}) as Record<string, unknown>),
+        execution: parseExecution((data.execution ?? {}) as Record<string, number>),
         hotspots,
     };
 }
@@ -111,21 +122,26 @@ export function ingestLcovCoverage(lcovContent: string): Partial<ExecutionEviden
     const lines = lcovContent.split(/\r?\n/);
     for (const line of lines) {
         if (line.startsWith('LF:')) {
-            linesFound += parseInt(line.slice(3).trim(), 10) || 0;
-        } else if (line.startsWith('LH:')) {
-            linesHit += parseInt(line.slice(3).trim(), 10) || 0;
-        } else if (line.startsWith('BRF:')) {
-            branchesFound += parseInt(line.slice(4).trim(), 10) || 0;
-        } else if (line.startsWith('BRH:')) {
-            branchesHit += parseInt(line.slice(4).trim(), 10) || 0;
+            linesFound += parseLcovMetric(line, 3);
+            continue;
+        }
+        if (line.startsWith('LH:')) {
+            linesHit += parseLcovMetric(line, 3);
+            continue;
+        }
+        if (line.startsWith('BRF:')) {
+            branchesFound += parseLcovMetric(line, 4);
+            continue;
+        }
+        if (line.startsWith('BRH:')) {
+            branchesHit += parseLcovMetric(line, 4);
+            continue;
         }
     }
 
     const lineCoveragePct = linesFound > 0 ? Math.round((linesHit / linesFound) * 1000) / 10 : 0;
     const branchCoveragePct =
-        branchesFound > 0
-            ? Math.round((branchesHit / branchesFound) * 1000) / 10
-            : lineCoveragePct;
+        branchesFound > 0 ? Math.round((branchesHit / branchesFound) * 1000) / 10 : lineCoveragePct;
 
     return {
         lineCoveragePct,
@@ -139,7 +155,6 @@ export function ingestLcovCoverage(lcovContent: string): Partial<ExecutionEviden
  * @returns Default DynamicEvidenceDTO instance.
  */
 export function createDefaultFallbackEvidence(): DynamicEvidenceDTO {
-
     return {
         timestamp: Date.now(),
         environment: 'unobserved_default',
@@ -178,4 +193,3 @@ function safeJsonParse(text: string): Record<string, unknown> {
         return {};
     }
 }
-
