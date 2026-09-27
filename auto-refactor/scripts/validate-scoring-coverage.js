@@ -55,6 +55,8 @@ const ALL_ANALYZERS = {
   'go-modern': { enabled: true },
   'shell-lint': { enabled: true },
   stdlib: { enabled: true },
+  'gdscript-game': { enabled: true },
+  'vscode-extension': { enabled: true },
 };
 
 /**

@@ -13,7 +13,7 @@
  *     runtime; centralizing the SPI here avoids circular imports between the registry and
  *     rule modules and keeps every category bound to one stable contract.
  */
-import type { NormalizedNode } from '../multilang';
+import type { NormalizedNode } from '../ast/multilang';
 import type { AnalyzerContext, Severity, IssueEvidence } from '../types';
 
 /**

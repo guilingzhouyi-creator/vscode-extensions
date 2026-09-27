@@ -186,7 +186,7 @@ async function ablate(api, cfgDir, apiOpts) {
 
 async function main() {
   const update = process.argv.includes('--update');
-  const maskMod = require(path.join(ROOT, 'dist/core/source-mask'));
+  const maskMod = require(path.join(ROOT, 'dist/core/policy/source-mask'));
   const api = require(path.join(ROOT, 'dist/api'));
   const rules = require(path.join(ROOT, 'dist/core/governance/rules/compressionBounds'));
   const benchDir = path.join(ROOT, 'bench');

@@ -17,7 +17,7 @@
  *     observation (a projected parent plus its materialized children) is idempotent by design, so
  *     both traversal paths can feed one store.
  */
-import { NodeKind } from '../multilang';
+import { NodeKind } from '../ast/multilang';
 
 /** Usage roles a literal can play. Inferred from path, declaration name and value evidence. */
 export const LITERAL_ROLE = {

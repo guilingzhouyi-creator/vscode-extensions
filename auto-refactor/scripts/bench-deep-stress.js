@@ -16,8 +16,8 @@
  */
 
 const { scanDiffStream, ModuleDependencyGraph, computeDetailedHunks } = require('../dist/api');
-const { computeLineStartsAndHashes, fastDiff } = require('../dist/core/edit-diff');
-const { isPureAsciiSWAR64 } = require('../dist/core/swar');
+const { computeLineStartsAndHashes, fastDiff } = require('../dist/core/diff/edit-diff');
+const { isPureAsciiSWAR64 } = require('../dist/core/ast/swar');
 
 function generateSampleSource(lineCount, variation = 0) {
   const lines = [];

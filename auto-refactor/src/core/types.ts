@@ -1,6 +1,6 @@
 import type * as ts from 'typescript';
-import type { NormalizedNode, LanguageAdapter, Position } from './multilang';
-import type { IncrementalFileState } from './incremental-state';
+import type { NormalizedNode, LanguageAdapter, Position } from './ast/multilang';
+import type { IncrementalFileState } from './diff/incremental-state';
 
 /**
  * Module: Core Engine — Shared Type Contracts and Domain Model
@@ -26,9 +26,9 @@ import type { IncrementalFileState } from './incremental-state';
  */
 
 // Re-exported for backward compatibility (utils/ast and other modules import Position here).
-export { Position } from './multilang';
+export { Position } from './ast/multilang';
 // EditRange is produced by editDiff.ts (ts-free) and consumed by the diff API (types below).
-export { EditRange } from './edit-diff';
+export { EditRange } from './diff/edit-diff';
 
 /**
  * Config `off` tokens. The same text disables four unrelated features, so it gets one named
@@ -881,4 +881,4 @@ export type {
     RefactoringPatch,
     ScanDiffOptions,
     WarmStats,
-} from './diff-types';
+} from './diff/diff-types';

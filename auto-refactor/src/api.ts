@@ -34,12 +34,12 @@ import type {
     MaturityTier,
     DynamicEvidenceDTO,
 } from './core/types';
-import { resolveConfig, TOOL_VERSION } from './core/config';
+import { resolveConfig, TOOL_VERSION } from './core/config/config';
 import { Scanner } from './core/analyzer';
 import { CacheStore } from './core/cache';
 import { render } from './core/reporters';
 import { Logger, AutoRefactorError } from './core/logger';
-import { decodeContent } from './core/utf8';
+import { decodeContent } from './core/ast/utf8';
 import type { BASELINE_GRANULARITY_GROUPED } from './core/reporting/reportFinalizer';
 import {
     printProjectStackProfile,
@@ -688,7 +688,7 @@ export {
     linesOf,
     getLine,
     countLines,
-} from './core/edit-diff';
+} from './core/diff/edit-diff';
 export { ModuleDependencyGraph, runCyclePass, findImportCycles } from './core/dependency-graph';
 export { GovernanceAnalyzer } from './analyzers/governance';
 export { ArchitectureAnalyzer } from './analyzers/architecture';
@@ -711,7 +711,7 @@ export {
     getTunedAnalyzerOptions,
 } from './core/profiler/scaleTuner';
 export * from './core/governance';
-export * from './core/swar';
+export * from './core/ast/swar';
 export * from './core/praxis';
 export * from './core/types';
 export * from './core/memory/types';

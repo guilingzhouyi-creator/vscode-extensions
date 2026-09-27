@@ -26,7 +26,7 @@ const {
   partitionFileZones,
   ZONE_COMPUTE_KERNEL,
 } = require('../dist/core/intelligence/zone-partitioner');
-const { resolveConfig } = require('../dist/core/config');
+const { resolveConfig } = require('../dist/core/config/config');
 
 function testMetricParser() {
   console.log('--- 1. Testing Human Metric Parser ---');

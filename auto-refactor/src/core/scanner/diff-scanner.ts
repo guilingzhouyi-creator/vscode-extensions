@@ -23,15 +23,15 @@ import type {
 } from '../types';
 import type { CacheStore, Fingerprint } from '../cache';
 import type { WorkerAnalyzerDesc } from '../analyzer-registry';
-import { incrementalEnabled, incrementalMinLines } from '../incremental';
+import { incrementalEnabled, incrementalMinLines } from '../diff/incremental';
 import {
     IncrementalFileState,
     pruneIncrementalBucket,
     incrementalRssGuard,
     incrementalMaxFiles,
-} from '../incremental-state';
+} from '../diff/incremental-state';
 import { globToRegExp, collectFiles } from '../file-discovery';
-import { loadGitignore } from '../gitignore';
+import { loadGitignore } from '../policy/gitignore';
 import type { ScannerContext } from './scanner-context';
 import {
     createWarmSession,

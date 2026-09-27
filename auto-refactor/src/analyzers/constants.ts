@@ -35,13 +35,13 @@
  */
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
-import type { NormalizedNode } from '../core/multilang';
-import { NodeKind } from '../core/multilang';
-import type { LiteralRecord } from '../core/incremental-state';
+import type { NormalizedNode } from '../core/ast/multilang';
+import { NodeKind } from '../core/ast/multilang';
+import type { LiteralRecord } from '../core/diff/incremental-state';
 import { locN } from '../utils/normalized';
-import { runStreaming } from '../core/traverse';
+import { runStreaming } from '../core/ast/traverse';
 import { classifyLiteral } from '../core/governance/semanticLiterals';
-import { maskedLinesOfPath } from '../core/source-mask';
+import { maskedLinesOfPath } from '../core/policy/source-mask';
 import { scanNearLiteralClusters } from '../core/intelligence/near-literal-cluster';
 import { checkConstantLayoutAndScope } from '../core/governance/constant-layout-guard';
 import { extractConstantEntities } from '../core/diff/constant-relocation-detector';
@@ -239,7 +239,7 @@ export class ConstantsAnalyzer implements Analyzer {
         // standalone `analyze()` contract — never on the worker streaming path.
 
         const { TypeScriptAdapter } =
-            require('../core/typescript-adapter') as typeof import('../core/typescript-adapter');
+            require('../core/ast/typescript-adapter') as typeof import('../core/ast/typescript-adapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sf.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [

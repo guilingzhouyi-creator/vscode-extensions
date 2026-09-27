@@ -15,8 +15,8 @@
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { isToolOrTestScript } from '../pathScope';
-import type { NormalizedNode } from '../../multilang';
-import { NodeKind } from '../../multilang';
+import type { NormalizedNode } from '../../ast/multilang';
+import { NodeKind } from '../../ast/multilang';
 
 /** Default nesting-depth threshold for GOV-LOG-001 when `maxNestingDepth` is not configured. */
 const DEFAULT_MAX_NESTING_DEPTH = 5;

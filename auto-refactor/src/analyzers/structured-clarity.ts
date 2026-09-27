@@ -10,8 +10,8 @@
  *   Prevents harmful forced decomposition of clean, readable state machines and dispatch tables.
  */
 import type { AnalyzerContext } from '../core/types';
-import type { NormalizedNode } from '../core/multilang';
-import { NodeKind } from '../core/multilang';
+import type { NormalizedNode } from '../core/ast/multilang';
+import { NodeKind } from '../core/ast/multilang';
 
 /** Number of preceding lines inspected for JSDoc or structured dispatch contract markers. */
 const JSDOC_LOOKAHEAD_LINES = 10;

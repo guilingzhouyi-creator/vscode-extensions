@@ -9,7 +9,7 @@
  * Exit Semantics & Design Rationale: Deterministic in-memory text scan with string masking.
  */
 
-import type { NormalizedNode } from '../core/multilang';
+import type { NormalizedNode } from '../core/ast/multilang';
 import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import { isBoundedCollection } from '../core/intelligence/semanticComplexity';
 

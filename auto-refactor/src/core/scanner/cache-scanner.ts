@@ -13,14 +13,14 @@
 import * as path from 'path';
 import type { ScanReport, Issue, FileMetric, WarmStats } from '../types';
 import type { Fingerprint } from '../cache';
-import { incrementalEnabled, incrementalMinLines } from '../incremental';
+import { incrementalEnabled, incrementalMinLines } from '../diff/incremental';
 import {
     pruneIncrementalBucket,
     incrementalRssGuard,
     incrementalMaxFiles,
-} from '../incremental-state';
+} from '../diff/incremental-state';
 import { globToRegExp, collectFiles } from '../file-discovery';
-import { loadGitignore } from '../gitignore';
+import { loadGitignore } from '../policy/gitignore';
 import type { ScannerContext } from './scanner-context';
 import {
     createWarmSession,

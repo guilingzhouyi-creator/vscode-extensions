@@ -32,8 +32,8 @@
 import type { Analyzer, AnalyzerContext, Issue, SecurityLevel } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { ANALYZER_SECURITY } from '../core/scoring/dimensionLiterals';
-import type { NormalizedNode } from '../core/multilang';
-import { NodeKind } from '../core/multilang';
+import type { NormalizedNode } from '../core/ast/multilang';
+import { NodeKind } from '../core/ast/multilang';
 import { SecurityMessages } from '../core/messages/security';
 import { nativeCore } from '../core/native';
 

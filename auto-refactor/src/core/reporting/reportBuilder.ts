@@ -21,7 +21,7 @@ import type {
     ScanReport,
     Severity,
 } from '../types';
-import { TOOL_NAME, TOOL_VERSION } from '../config';
+import { TOOL_NAME, TOOL_VERSION } from '../config/config';
 import { sha256Hex } from '../cache-key';
 import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
 import type { QualityScorer } from '../scoring/qualityScorer';

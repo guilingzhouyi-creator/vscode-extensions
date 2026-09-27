@@ -25,8 +25,8 @@
  * loadable without the parser).
  */
 
-import type { EditRange } from '../edit-diff';
-import { validateEditRanges } from '../edit-diff';
+import type { EditRange } from '../diff/edit-diff';
+import { validateEditRanges } from '../diff/edit-diff';
 
 // ── UTF-8 encoding boundaries (RFC 3629 / WHATWG decoder) ───────────────────────────
 /** Largest single-byte (ASCII) code point. */

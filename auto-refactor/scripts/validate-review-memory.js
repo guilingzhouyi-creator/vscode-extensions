@@ -634,7 +634,7 @@ test('The in-memory cap still evicts after reloading a log with duplicate audits
 });
 
 async function cacheDisabledLeavesNoLog() {
-  const { resolveConfig } = require('../dist/core/config');
+  const { resolveConfig } = require('../dist/core/config/config');
   assert.strictEqual(
     resolveConfig({ cache: false }).cacheEnabled,
     false,

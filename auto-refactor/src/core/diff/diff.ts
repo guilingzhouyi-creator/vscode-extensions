@@ -35,7 +35,7 @@ import {
     changedLineCount,
     countLines,
 } from './edit-diff';
-import { normalizeEditRanges, decodeContent } from '../utf8';
+import { normalizeEditRanges, decodeContent } from '../ast/utf8';
 import type { IncrementalFileState } from './incremental-state';
 import type { DiffInput } from '../types';
 import type { ReviewDiffHunk, PraxisVerdict, PraxisPluginHooks } from '../praxis/contracts';

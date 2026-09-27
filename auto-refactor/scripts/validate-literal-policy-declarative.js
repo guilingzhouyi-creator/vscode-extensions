@@ -18,7 +18,7 @@ const {
   extractBaseCallee,
   isCallArgumentToleratedByPolicy,
   DEFAULT_TOLERATED_CALL_ARGUMENTS,
-} = require('../dist/core/literal-policy-engine');
+} = require('../dist/core/policy/literal-policy-engine');
 
 /**
  * Verify base callee extraction from method chains.

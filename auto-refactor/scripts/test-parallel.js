@@ -253,6 +253,18 @@ const PARALLEL_SUITES = [
     name: 'validate-codemod-engine',
     script: 'scripts/validate-codemod-engine.js',
   },
+  {
+    name: 'validate-pattern-kernel',
+    script: 'scripts/validate-pattern-kernel.js',
+  },
+  {
+    name: 'validate-domain-adapters',
+    script: 'scripts/validate-domain-adapters.js',
+  },
+  {
+    name: 'validate-control-flow-graph',
+    script: 'scripts/validate-control-flow-graph.js',
+  },
 ];
 
 // Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)

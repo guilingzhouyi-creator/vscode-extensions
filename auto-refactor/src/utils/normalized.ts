@@ -19,7 +19,7 @@
  *   `typescript` out of the bundled runtime for oxc/rust scans.
  */
 import type { IssueLocation } from '../core/types';
-import type { NormalizedNode } from '../core/multilang';
+import type { NormalizedNode } from '../core/ast/multilang';
 
 /**
  * Materialize the source location of a parser-normalized node.

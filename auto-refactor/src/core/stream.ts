@@ -22,7 +22,7 @@
 
 import type { DiffInput, ScanDiffOptions, DiffStreamEvent, RefactoringPatch, Issue } from './types';
 import type { ReviewDiffHunk, AttributedDiffLine } from './praxis/contracts';
-import { computeDetailedHunks } from './edit-diff';
+import { computeDetailedHunks } from './diff/edit-diff';
 import { CircularDiffBuffer } from './ring-buffer';
 
 /**

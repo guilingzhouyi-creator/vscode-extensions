@@ -24,7 +24,7 @@ import {
     buildPoolFingerprint,
 } from '../cache-key';
 import type { CachedResult, Fingerprint } from '../cache';
-import type { IncrementalFileState } from '../incremental-state';
+import type { IncrementalFileState } from '../diff/incremental-state';
 
 /** TypeScript declaration-file suffix, keyed separately from a plain `.ts` extension. */
 export const DTS_EXTENSION = '.d.ts';

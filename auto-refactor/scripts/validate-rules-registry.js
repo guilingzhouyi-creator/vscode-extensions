@@ -34,7 +34,7 @@ const {
 
 const { LEGACY_RULE_ALIASES } = require('../dist/core/rules/aliases');
 const { BUILTIN_FACTORIES } = require('../dist/core/analyzer-registry');
-const { BUILTIN_ANALYZERS } = require('../dist/core/config');
+const { BUILTIN_ANALYZERS } = require('../dist/core/config/config');
 const { ALL_BUILTIN_ANALYZERS } = require('../dist/core/router/sparseRuleRouter');
 
 const CANONICAL = new RegExp(RULE_ID_PATTERN.source);

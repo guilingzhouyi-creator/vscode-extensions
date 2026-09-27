@@ -22,8 +22,8 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanConfig, ParserKind } from './types';
-import { TOOL_VERSION } from './config';
-import { policyFromAnalyzers, fastPathEnabled, FAST_PATH_ANALYZERS } from './traverse';
+import { TOOL_VERSION } from './config/config';
+import { policyFromAnalyzers, fastPathEnabled, FAST_PATH_ANALYZERS } from './ast/traverse';
 
 /**
  * Warm-scan cache key construction (docs/01-architecture/02-pipeline-and-caching.md §B2).

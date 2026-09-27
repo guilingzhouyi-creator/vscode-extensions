@@ -10,7 +10,7 @@
 
 export * from './path-utils';
 export * from './base';
-export * from './typescript-adapter';
-export * from './python-adapter';
+export * from '../../ast/typescript-adapter';
+export * from '../../ast/python-adapter';
 export * from './skeleton-adapters';
 export * from './registry';

@@ -30,7 +30,7 @@
 import type { Issue } from '../types';
 import { NEED_RUNTIME_EVIDENCE } from '../types';
 import { PerformanceMessages } from '../messages/performance';
-import { maskedLinesOfPath } from '../source-mask';
+import { maskedLinesOfPath } from '../policy/source-mask';
 import type { NativeDominatorTreeResult, NativeDataflowResult } from '../native/native-types';
 import { nativeCore } from '../native/native-bridge';
 

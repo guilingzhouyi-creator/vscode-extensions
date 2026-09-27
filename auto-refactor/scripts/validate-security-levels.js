@@ -31,7 +31,7 @@ const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
 const { Scanner } = require('../dist/api');
-const { resolveConfig } = require('../dist/core/config');
+const { resolveConfig } = require('../dist/core/config/config');
 const { QualityScorer } = require('../dist/core/scoring/qualityScorer');
 
 const TEST_DIR = path.join(__dirname, '../.test_security_workspace');

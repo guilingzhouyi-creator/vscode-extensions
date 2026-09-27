@@ -29,7 +29,7 @@ const {
   isPureAsciiSWAR64,
   bitParallelMyers64Distance,
 } = require('../dist/api');
-const { normalizeEditRanges } = require('../dist/core/utf8');
+const { normalizeEditRanges } = require('../dist/core/ast/utf8');
 
 function generateSyntheticSource(lineCount, editSpacing = 50) {
   const oldLines = [];

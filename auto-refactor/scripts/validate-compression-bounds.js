@@ -248,7 +248,7 @@ const NEGATIVE_FIXTURES = {
     const { requiresRuntimeCount, averageConfidence } = uncertainty;
     console.log(
       `  Uncertainty summary: requiresRuntimeCount=${requiresRuntimeCount}, ` +
-        `averageConfidence=${averageConfidence}`,
+      `averageConfidence=${averageConfidence}`,
     );
 
     // The summary must describe the issue list it is published with, not an earlier revision.
@@ -257,7 +257,7 @@ const NEGATIVE_FIXTURES = {
       runtimeIssues.length,
       requiresRuntimeCount,
       `summary.requiresRuntimeCount (${requiresRuntimeCount}) must equal the issue list ` +
-        `(${runtimeIssues.length})`,
+      `(${runtimeIssues.length})`,
     );
 
     // `averageConfidence` is the mean over evidence-bearing findings only. With none it must be
@@ -296,7 +296,7 @@ const NEGATIVE_FIXTURES = {
     const fpRate = cmpOnNegative / cmpTotal;
     console.log(
       `  CMP emissions=${cmpTotal}, on negative corpus=${cmpOnNegative} ` +
-        `(FP rate ${(fpRate * 100).toFixed(2)}%)`,
+      `(FP rate ${(fpRate * 100).toFixed(2)}%)`,
     );
     assert.strictEqual(cmpOnNegative, 0, 'idiomatic constructs must produce zero CMP findings');
     console.log(

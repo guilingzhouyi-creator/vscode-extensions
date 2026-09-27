@@ -76,6 +76,7 @@ const SNAKE_EXTS = new Set(['.py', '.rs', '.gd']);
  * @param opts - Path naming options.
  * @param ctx - Analyzer context.
  * @param mkIssue - Issue factory callback.
+ * @param issues - Accumulator array for generated issues.
  */
 export function auditFileAndDirectoryPaths(
     filePath: string,

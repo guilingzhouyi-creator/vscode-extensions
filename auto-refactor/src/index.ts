@@ -26,7 +26,7 @@ try {
 }
 
 import { scanAndRender } from './api';
-import { resolveConfig } from './core/config';
+import { resolveConfig } from './core/config/config';
 import { DAEMON_SUBCOMMAND, DAEMON_MODE_OFF, parseArgs, printUsage } from './cli/cli-parser';
 
 /** Decimal radix used when parsing numeric CLI arguments such as `--line`. */

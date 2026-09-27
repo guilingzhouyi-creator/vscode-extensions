@@ -9,7 +9,7 @@
  * Exit Semantics & Design Rationale: Pure predicates with no I/O and no state, kept in a leaf
  *   module so the routing stages can share them without an import cycle.
  */
-import { countLines } from '../incremental';
+import { countLines } from '../diff/incremental';
 import type { WorkerPoolManager } from '../worker-pool';
 
 /**

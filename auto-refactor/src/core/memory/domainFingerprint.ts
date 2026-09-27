@@ -15,8 +15,8 @@
  *   unstable positions so structurally equal domains stay reusable across line shifts.
  */
 import * as crypto from 'crypto';
-import type { NormalizedNode } from '../multilang';
-import { NodeKind } from '../multilang';
+import type { NormalizedNode } from '../ast/multilang';
+import { NodeKind } from '../ast/multilang';
 import type { Issue } from '../types';
 import type { CodeDomainFingerprint, CodeDomainKind } from './types';
 

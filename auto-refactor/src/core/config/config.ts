@@ -29,7 +29,7 @@ import type {
     AnalyzerId,
     DynamicEvidenceDTO,
 } from '../types';
-import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from '../literal-policy-engine';
+import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from '../policy/literal-policy-engine';
 import { ERR_INVALID_CUSTOM_ANALYZER } from '../router/sliceTypes';
 
 import {
@@ -61,6 +61,8 @@ import {
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
     ANALYZER_STDLIB,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
 } from '../scoring/dimensionLiterals';
 import {
     applySemanticAndSecurityLevels,
@@ -112,6 +114,8 @@ export const BUILTIN_ANALYZERS = [
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
     ANALYZER_STDLIB,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──

@@ -22,7 +22,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Issue, FileMetric } from './types';
 import type { Logger } from './logger';
-import { TOOL_VERSION } from './config';
+import { TOOL_VERSION } from './config/config';
 import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cache-key';
 
 function readTextFileSync(filePath: string): string {

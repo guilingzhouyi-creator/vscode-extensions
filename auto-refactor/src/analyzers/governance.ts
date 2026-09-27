@@ -16,8 +16,8 @@
  */
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue, IssueLocation } from '../core/types';
-import { NodeKind, type NormalizedNode } from '../core/multilang';
-import { runStreaming } from '../core/traverse';
+import { NodeKind, type NormalizedNode } from '../core/ast/multilang';
+import { runStreaming } from '../core/ast/traverse';
 import type {
     GovernanceIssueDetail,
     GovernanceRule,
@@ -26,8 +26,8 @@ import type {
     RuleEvaluationContext,
 } from '../core/governance/types';
 import { resolveLanguageProfile } from '../core/governance/languageProfiles';
-import { maskedLinesOf } from '../core/source-mask';
-import { TypeScriptAdapter } from '../core/typescript-adapter';
+import { maskedLinesOf } from '../core/policy/source-mask';
+import { TypeScriptAdapter } from '../core/ast/typescript-adapter';
 import type { GovernanceRegistry } from '../core/governance/registry';
 import { getDefaultGovernanceRegistry } from '../core/governance/registry';
 

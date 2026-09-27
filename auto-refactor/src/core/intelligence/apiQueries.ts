@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanReport } from '../types';
 import type { ScanOptions } from '../../api';
-import { resolveConfig } from '../config';
+import { resolveConfig } from '../config/config';
 import { Scanner } from '../analyzer';
 import { Logger } from '../logger';
 import { ReviewMemoryManager } from '../memory/reviewMemory';

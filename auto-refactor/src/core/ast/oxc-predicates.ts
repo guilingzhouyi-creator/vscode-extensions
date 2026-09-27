@@ -29,7 +29,7 @@ import {
     FN_TYPES,
     TYPE_SKIP_TYPES,
 } from './oxc-types';
-import { isCallArgumentToleratedByPolicy } from '../literal-policy-engine';
+import { isCallArgumentToleratedByPolicy } from '../policy/literal-policy-engine';
 
 const NODE_TYPE_TEMPLATE_LITERAL = 'TemplateLiteral';
 

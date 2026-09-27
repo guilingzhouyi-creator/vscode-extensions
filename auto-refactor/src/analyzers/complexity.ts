@@ -24,11 +24,11 @@ import {
     RULE_CPX_NEST_002,
     RULE_CPX_STM_001,
 } from '../core/scoring/dimensionLiterals';
-import type { NormalizedNode } from '../core/multilang';
-import { NodeKind } from '../core/multilang';
+import type { NormalizedNode } from '../core/ast/multilang';
+import { NodeKind } from '../core/ast/multilang';
 import { locN } from '../utils/normalized';
-import { runStreaming } from '../core/traverse';
-import { maskedLinesOfPath } from '../core/source-mask';
+import { runStreaming } from '../core/ast/traverse';
+import { maskedLinesOfPath } from '../core/policy/source-mask';
 import { globToRegExp } from '../core/file-discovery';
 import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import { detectComplexityAmplification } from '../core/intelligence/semanticComplexity';
@@ -159,7 +159,7 @@ export class ComplexityAnalyzer implements Analyzer {
         this.maskedLines = maskedLinesOfPath(ctx.filePath, ctx.content);
 
         const { TypeScriptAdapter } =
-            require('../core/typescript-adapter') as typeof import('../core/typescript-adapter');
+            require('../core/ast/typescript-adapter') as typeof import('../core/ast/typescript-adapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sf.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [

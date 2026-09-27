@@ -45,10 +45,15 @@ import {
     FileMetricCollector,
     tryCreateProjector,
     type StreamingEntry,
-} from './traverse';
-import { adapterFor } from './adapters';
-import { unsupportedLanguageDiagnostic } from './language-support';
-import type { LanguageAdapter, NodeProjector, NormalizedAst, NormalizedNode } from './multilang';
+} from './ast/traverse';
+import { adapterFor } from './ast/adapters';
+import { unsupportedLanguageDiagnostic } from './ast/language-support';
+import type {
+    LanguageAdapter,
+    NodeProjector,
+    NormalizedAst,
+    NormalizedNode,
+} from './ast/multilang';
 import { encodeResults, BINARY_RESULT_ENABLED } from './result-codec';
 
 type LineStats = ReturnType<typeof countLineStats>;

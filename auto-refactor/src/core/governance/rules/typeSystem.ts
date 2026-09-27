@@ -15,7 +15,7 @@
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { SEVERITY_WARNING } from '../../types';
-import { NodeKind } from '../../multilang';
+import { NodeKind } from '../../ast/multilang';
 import {
     TYPE_SYSTEM_CATEGORY,
     RISK_MEDIUM,

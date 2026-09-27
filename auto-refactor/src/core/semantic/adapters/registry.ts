@@ -13,8 +13,8 @@
 
 import type { SemanticGraph } from '../index';
 import type { UnifiedLanguageAdapter } from './base';
-import { TypeScriptSemanticAdapter } from './typescript-adapter';
-import { PythonSemanticAdapter } from './python-adapter';
+import { TypeScriptSemanticAdapter } from '../../ast/typescript-adapter';
+import { PythonSemanticAdapter } from '../../ast/python-adapter';
 import {
     GoSemanticAdapter,
     GDScriptSemanticAdapter,

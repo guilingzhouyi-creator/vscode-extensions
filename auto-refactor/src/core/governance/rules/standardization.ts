@@ -20,7 +20,7 @@
  *     rules are marked fixable.
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
-import { NodeKind } from '../../multilang';
+import { NodeKind } from '../../ast/multilang';
 
 const IF_TRUE_RE = /^\s*if\s+(.+?)\s*:\s*return\s+true\s*$/i;
 const ELSE_FALSE_RE = /^\s*else\s*:\s*return\s+false\s*$/i;

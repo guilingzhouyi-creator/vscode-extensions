@@ -25,8 +25,8 @@
  *                    `typescript`.
  */
 
-import type { NormalizedNode, ReusedSpan } from '../multilang';
-import { NodeKind } from '../multilang';
+import type { NormalizedNode, ReusedSpan } from '../ast/multilang';
+import { NodeKind } from '../ast/multilang';
 
 /**
  * Pack a 1-based (line, column) position into one numeric memo key, avoiding the 16-bit

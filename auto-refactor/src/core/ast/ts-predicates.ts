@@ -15,7 +15,7 @@ import * as ts from 'typescript';
 import type { Position } from './multilang';
 import { NodeKind } from './multilang';
 import { isFunctionLike } from '../../utils/ast';
-import { isCallArgumentToleratedByPolicy } from '../literal-policy-engine';
+import { isCallArgumentToleratedByPolicy } from '../policy/literal-policy-engine';
 
 const LOOP_AND_COND_KINDS = [
     ts.SyntaxKind.IfStatement,

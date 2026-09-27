@@ -16,8 +16,8 @@
  *     instead of pretending to be complete). Declarations without a position keep `line: null`
  *     rather than inventing one, because callers use the line to jump into source.
  */
-import type { NormalizedNode } from '../multilang';
-import { NodeKind } from '../multilang';
+import type { NormalizedNode } from '../ast/multilang';
+import { NodeKind } from '../ast/multilang';
 
 /** Kinds of declarations the index records, derived from the language-neutral node kinds. */
 export type SymbolKind =

@@ -11,4 +11,4 @@
 
 export * from './types';
 export * from './semanticGraph';
-export * from './adapters';
+export * from '../ast/adapters';

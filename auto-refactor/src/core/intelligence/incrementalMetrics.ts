@@ -16,8 +16,8 @@
  *     existing consumer is re-gated without declaring a policy. Split out of `dataFlow.ts` when
  *     that module crossed this repository's own large-file fail threshold.
  */
-import { maskSourceText, type SourceMaskConfig } from '../source-mask';
-import { computeLineStartsAndHashes, getLine } from '../edit-diff';
+import { maskSourceText, type SourceMaskConfig } from '../policy/source-mask';
+import { computeLineStartsAndHashes, getLine } from '../diff/edit-diff';
 import { nativeCore } from '../native/native-bridge';
 
 /**

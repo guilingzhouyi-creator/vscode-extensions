@@ -166,5 +166,5 @@ export type { EditRange };
 // `./incremental`.
 export { resolveDiff as routeDiff, resolveDiff } from './diff';
 export type { ResolvedDiff, ResolveDiffOpts, DiffMode } from './diff';
-export { normalizeEditRanges } from '../utf8';
+export { normalizeEditRanges } from '../ast/utf8';
 export { validateEditRanges } from './edit-diff';

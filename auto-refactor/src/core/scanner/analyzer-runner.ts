@@ -17,23 +17,28 @@
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, FileMetric, Issue, ScanConfig } from '../types';
 import type { ResolvedAnalyzer } from '../analyzer-registry';
-import type { IncrementalFileState } from '../incremental-state';
+import type { IncrementalFileState } from '../diff/incremental-state';
 import type { Logger } from '../logger';
 import type { ModuleDependencyGraph } from '../dependency-graph';
 import type { SymbolIndex } from '../intelligence/symbolIndex';
 import { collectSymbols } from '../intelligence/symbolIndex';
 import type { LiteralIndex } from '../intelligence/literalIndex';
-import type { LanguageAdapter, NodeProjector, NormalizedAst, NormalizedNode } from '../multilang';
+import type {
+    LanguageAdapter,
+    NodeProjector,
+    NormalizedAst,
+    NormalizedNode,
+} from '../ast/multilang';
 import { countLineStats } from '../../utils/linestats';
-import { adapterFor } from '../adapters';
-import { unsupportedLanguageDiagnostic } from '../language-support';
-import type { StreamingEntry } from '../traverse';
+import { adapterFor } from '../ast/adapters';
+import { unsupportedLanguageDiagnostic } from '../ast/language-support';
+import type { StreamingEntry } from '../ast/traverse';
 import {
     FileMetricCollector,
     runStreaming,
     runStreamingProjected,
     tryCreateProjector,
-} from '../traverse';
+} from '../ast/traverse';
 
 /** `typeof` tag for callable visit/finalize analyzer methods (streaming vs legacy). */
 const TYPEOF_FUNCTION = 'function';

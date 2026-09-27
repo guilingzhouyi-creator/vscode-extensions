@@ -16,7 +16,7 @@
  */
 
 import type { Issue } from '../types';
-import type { LiteralRecord } from '../incremental-state';
+import type { LiteralRecord } from '../diff/incremental-state';
 import { generateSemanticConstantName } from '../governance/semantic-naming-engine';
 import {
     classifyLiteral,

@@ -51,6 +51,8 @@ import {
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
     ANALYZER_STDLIB,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
 } from '../scoring/dimensionLiterals';
 
 export {
@@ -91,6 +93,8 @@ export const SPECIALIZED_ANALYZERS = new Set<string>([
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
     ANALYZER_STDLIB,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
 ]);
 
 /** Auto-tune estimate: source lines per profiled language entry. */
