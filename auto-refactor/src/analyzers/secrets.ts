@@ -150,9 +150,7 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
     for (const p of base) {
         if (opts.patterns && !isRegexSafe(p.source)) {
             const warnings = auditRegexSafety(p.source);
-            console.warn(
-                `[secrets] Skipping unsafe pattern "${p.name}": ${warnings.join('; ')}`,
-            );
+            console.warn(`[secrets] Skipping unsafe pattern "${p.name}": ${warnings.join('; ')}`);
             continue;
         }
         compiled.push({ name: p.name, re: new RegExp(p.source) });
@@ -294,25 +292,30 @@ export class SecretsAnalyzer implements Analyzer {
         // TOKEN_RE itself has no nested quantifiers, but a very long alphanumeric
         // line could produce thousands of matches — the iteration cap prevents
         // unbounded entropy computation per line.
-        safeRegexExecLoop(TOKEN_RE, lineText, (t) => {
-            const h = shannonEntropy(t[0]);
-            if (h >= entropy.threshold && t[0].length >= entropy.minLength) {
-                const desc = SecretMessages.HIGH_ENTROPY_TOKEN(h, t[0].length);
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        line,
-                        'high-entropy-token',
-                        desc.message,
-                        { entropy: Number(h.toFixed(2)), length: t[0].length },
-                        entropy.severity,
-                        desc.suggestion,
-                    ),
-                );
-                return false; // Stop at first match per line (at most one per line)
-            }
-            return true; // Continue scanning
-        }, 100);
+        safeRegexExecLoop(
+            TOKEN_RE,
+            lineText,
+            (t) => {
+                const h = shannonEntropy(t[0]);
+                if (h >= entropy.threshold && t[0].length >= entropy.minLength) {
+                    const desc = SecretMessages.HIGH_ENTROPY_TOKEN(h, t[0].length);
+                    issues.push(
+                        this.mkIssue(
+                            ctx,
+                            line,
+                            'high-entropy-token',
+                            desc.message,
+                            { entropy: Number(h.toFixed(2)), length: t[0].length },
+                            entropy.severity,
+                            desc.suggestion,
+                        ),
+                    );
+                    return false; // Stop at first match per line (at most one per line)
+                }
+                return true; // Continue scanning
+            },
+            100,
+        );
     }
 
     /**

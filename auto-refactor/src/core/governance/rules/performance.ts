@@ -172,8 +172,7 @@ function checkLinearSearchHit(line: string, lineIndex: number): GovernanceViolat
     // the full regex test for them — this also bounds any backtracking cost.
     const varName = m[1];
     const isTextVar =
-        varName.length <= MAX_TEXT_VARIABLE_NAME_LENGTH &&
-        safeRegexTest(TEXT_VARIABLE_RE, varName);
+        varName.length <= MAX_TEXT_VARIABLE_NAME_LENGTH && safeRegexTest(TEXT_VARIABLE_RE, varName);
     if (isTextVar && (m[2] === METHOD_INCLUDES || m[2] === METHOD_INDEXOF)) {
         return null;
     }

@@ -71,49 +71,29 @@ export class CallChainImpactTracer {
         const issues: Issue[] = [];
 
         if (callGraph) {
-            let currentCallees = [targetSymbol];
-            let currentDepth = 1;
+            const queue: Array<{ callee: string; depth: number }> = [
+                { callee: targetSymbol, depth: 1 },
+            ];
             const visitedCallers = new Set<string>([targetSymbol]);
-            const nextCalleesSet = new Set<string>();
 
-            while (currentCallees.length > 0 && currentDepth <= maxDepth) {
-                const nextCallees: string[] = [];
-                nextCalleesSet.clear();
+            while (queue.length > 0) {
+                const current = queue.shift()!;
+                const incomingEdges: CallGraphEdge[] = callGraph.callersOf(current.callee);
 
-                for (const callee of currentCallees) {
-                    const incomingEdges: CallGraphEdge[] = callGraph.callersOf(callee);
-
-                    for (const edge of incomingEdges) {
-                        const edgeKey = `${edge.callerFile}:${edge.caller || ''}:${edge.line || 0}:${callee}`;
-                        if (visitedEdges.has(edgeKey)) continue;
-                        visitedEdges.add(edgeKey);
-
-                        const callerName = edge.caller || 'anonymous';
-                        callChains.push({
-                            file: edge.callerFile,
-                            callerSymbol: callerName,
-                            line: edge.line || 1,
-                            depth: currentDepth,
-                        });
-
-                        if (edge.callerFile !== targetFile) {
-                            impactedFilesSet.add(edge.callerFile);
-                        }
-
-                        if (
-                            edge.caller &&
-                            !visitedCallers.has(edge.caller) &&
-                            !nextCalleesSet.has(edge.caller)
-                        ) {
-                            visitedCallers.add(edge.caller);
-                            nextCalleesSet.add(edge.caller);
-                            nextCallees.push(edge.caller);
-                        }
-                    }
+                for (const edge of incomingEdges) {
+                    this.processIncomingEdge(
+                        edge,
+                        current.callee,
+                        current.depth,
+                        maxDepth,
+                        targetFile,
+                        queue,
+                        callChains,
+                        impactedFilesSet,
+                        visitedEdges,
+                        visitedCallers,
+                    );
                 }
-
-                currentCallees = nextCallees;
-                currentDepth++;
             }
         }
 
@@ -182,6 +162,42 @@ export class CallChainImpactTracer {
             callGraph,
             maxDepth,
         );
+    }
+
+    private processIncomingEdge(
+        edge: CallGraphEdge,
+        callee: string,
+        currentDepth: number,
+        maxDepth: number,
+        targetFile: string,
+        queue: Array<{ callee: string; depth: number }>,
+        callChains: CallChainHop[],
+        impactedFilesSet: Set<string>,
+        visitedEdges: Set<string>,
+        visitedCallers: Set<string>,
+    ): void {
+        const edgeKey = `${edge.callerFile}:${edge.caller || ''}:${edge.line || 0}:${callee}`;
+        if (visitedEdges.has(edgeKey)) return;
+        visitedEdges.add(edgeKey);
+
+        const callerName = edge.caller || 'anonymous';
+        callChains.push({
+            file: edge.callerFile,
+            callerSymbol: callerName,
+            line: edge.line || 1,
+            depth: currentDepth,
+        });
+
+        if (edge.callerFile !== targetFile) {
+            impactedFilesSet.add(edge.callerFile);
+        }
+
+        if (edge.caller && !visitedCallers.has(edge.caller)) {
+            visitedCallers.add(edge.caller);
+            if (currentDepth + 1 <= maxDepth) {
+                queue.push({ callee: edge.caller, depth: currentDepth + 1 });
+            }
+        }
     }
 }
 

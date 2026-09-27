@@ -9,8 +9,8 @@
  *   1. Filter eligible candidate source files (line count and non-blank threshold);
  *   2. Compute 64-dim MinHash signatures via native SIMD operator;
  *   3. Execute LSH multi-band bucket clustering via native findClonePairs;
- *   4. Emit structured cross-file similarity records and actionable refactor targets.
- * Exit Semantics & Design Rationale: Pure analysis service; returns empty array when < 2 eligible files.
+ * Exit Semantics & Design Rationale: Pure analysis service;
+ *   returns empty array when < 2 eligible files.
  */
 
 import { nativeCore } from '../native/native-bridge';
@@ -28,7 +28,10 @@ export interface CrossFileCloneMatch {
  * Options configuring cross-file clone discovery.
  */
 export interface CrossFileCloneOptions {
-    /** Minimum non-trivial lines required for a file to participate in clone discovery (default: 8). */
+    /**
+     * Minimum non-trivial lines required for a file to participate in clone discovery
+     * (default: 8).
+     */
     readonly minLines?: number;
     /** Minimum Jaccard similarity threshold for candidate clone pairing (default: 0.80). */
     readonly similarityThreshold?: number;

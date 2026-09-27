@@ -140,4 +140,17 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
             '将施工批次标记替换为具有实际业务与领域架构含义的语义命名，杜绝将临时施工代号固化为资产。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-jrg-002',
     }),
+    defineRule({
+        id: 'NAM-DEC-001',
+        canonical: true,
+        defaultSeverity: SEVERITY_WARNING,
+        family: RULE_FAMILY_NAMING,
+        languages: ALL_LANGUAGES,
+        analyzer: ANALYZER_NAMING,
+        summary:
+            '标识符长度膨胀（30~40+ 字符）或同文件多符号共享长前缀，表明缺乏目录与模块分层解耦，驱动架构拆分。',
+        remediation:
+            '提炼公共领域模块或下沉子目录，将冗长的前缀转化为模块/包命名空间，降低单个符号长度并实现物理分层解耦。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-dec-001',
+    }),
 ];

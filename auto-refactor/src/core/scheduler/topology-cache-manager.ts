@@ -251,6 +251,9 @@ export class TopologyCacheManager<T = unknown> {
 
 /**
  * Computes a quick sha256 or MD5 hash for content string.
+ *
+ * @param content - Source string to compute content hash for.
+ * @returns 16-character hex digest of the content hash.
  */
 export function computeContentHash(content: string): string {
     return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);

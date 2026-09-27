@@ -216,6 +216,104 @@ export interface DispatchOpts {
     preloaded?: Map<string, Buffer>;
 }
 
+/** A batch whose files are already read into transferable buffers. */
+interface ReadyBatch {
+    tasks: { file: string; absPath: string; buf: Buffer }[];
+    transfer: ArrayBuffer[];
+}
+
+interface SingleHybridOutcome {
+    result: { issues: Issue[]; metric: FileMetric | null };
+    error?: unknown;
+}
+
+async function processSingleHybridFile(
+    b: { idx: number; rel: string },
+    absRoot: string,
+    optsPreloaded: Map<string, Buffer> | undefined,
+    runAnalyzersFn: (
+        rel: string,
+        content: string,
+    ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>,
+): Promise<SingleHybridOutcome> {
+    const absPath = path.join(absRoot, b.rel);
+    let content: string;
+    try {
+        const pre = optsPreloaded && optsPreloaded.get(b.rel);
+        content = pre ? pre.toString('utf8') : await fs.promises.readFile(absPath, 'utf8');
+    } catch {
+        return { result: { issues: [], metric: null } };
+    }
+    try {
+        const r = await runAnalyzersFn(b.rel, content);
+        return { result: r };
+    } catch (e) {
+        return { result: { issues: [], metric: null }, error: e };
+    }
+}
+
+function normalizeWorkerResults(
+    rawResults: unknown,
+): { file: string; issues: Issue[]; metric: FileMetric | null }[] {
+    let resArr = rawResults;
+    if (
+        resArr !== undefined &&
+        resArr !== null &&
+        typeof resArr !== TYPEOF_OBJECT &&
+        !Array.isArray(resArr)
+    ) {
+        resArr = [];
+    }
+    if (ArrayBuffer.isView(resArr) && !Array.isArray(resArr)) {
+        resArr = decodeResults(resArr as unknown as Uint8Array);
+    }
+    return (resArr as { file: string; issues: Issue[]; metric: FileMetric | null }[]) || [];
+}
+
+interface WorkerTelemetrySnapshot {
+    poolStart: number;
+    spawnMs: number[];
+    firstMsgMs: number[];
+    readTotal: number;
+    readCount: number;
+    readTimes: number[];
+    dispatchSyncTotal: number;
+    mergeTotal: number;
+    timeline: {
+        seq: number;
+        worker: number;
+        dispatch: number;
+        arrive: number;
+        rt: number;
+    }[];
+    lastDispatch: number[];
+    seqCounter: number;
+    flushing: boolean;
+    hybridK: number;
+    hybridFiles: number;
+    hybridDone: number;
+    hybridMs: number;
+    hybridDoneAtFirstMsg: number;
+}
+
+function updateArrivalTelemetry(T: WorkerTelemetrySnapshot | null, wk: number, tArr: number): void {
+    if (!T) return;
+    if (T.firstMsgMs[wk] === undefined) {
+        T.firstMsgMs[wk] = tArr - T.poolStart;
+        if (T.hybridDoneAtFirstMsg === -1) {
+            T.hybridDoneAtFirstMsg = T.hybridDone;
+        }
+    }
+    for (let i = T.timeline.length - 1; i >= 0; i--) {
+        const e = T.timeline[i];
+        if (e.worker === wk && e.arrive < 0) {
+            e.arrive = tArr - T.poolStart;
+            e.rt = tArr - T.lastDispatch[wk];
+            break;
+        }
+    }
+}
+
 /**
  * Distribute the parse+analyze stage across `numWorkers` worker threads.
  *
@@ -429,38 +527,23 @@ export async function dispatchBatches(
             const tH0 = T ? nowMs() : 0;
             await pMap(batch, HYBRID_CONCURRENCY, async (b) => {
                 if (failed) return;
-                const absPath = path.join(absRoot, b.rel);
-                let content: string;
-                try {
-                    const pre = opts.preloaded && opts.preloaded.get(b.rel);
-                    content = pre
-                        ? pre.toString('utf8')
-                        : await fs.promises.readFile(absPath, 'utf8');
-                } catch {
-                    results[b.idx] = { issues: [] as Issue[], metric: null as FileMetric | null };
-                    completed++;
-                    if (T) T.hybridDone++;
+                const { result, error } = await processSingleHybridFile(
+                    b,
+                    absRoot,
+                    opts.preloaded,
+                    runAnalyzersFn,
+                );
+                if (error) {
+                    fail(error);
                     return;
                 }
-                try {
-                    const r = await runAnalyzersFn(b.rel, content);
-                    results[b.idx] = r;
-                } catch (e) {
-                    fail(e);
-                    return;
-                }
+                results[b.idx] = result;
                 completed++;
                 if (T) T.hybridDone++;
             });
             if (T) T.hybridMs = nowMs() - tH0;
             finishIfDone();
         };
-
-        /** A batch whose files are already read into transferable buffers. */
-        interface ReadyBatch {
-            tasks: { file: string; absPath: string; buf: Buffer }[];
-            transfer: ArrayBuffer[];
-        }
 
         /** Claim + pre-read one batch of files (index order preserved). */
         const readNextBatch = async (): Promise<ReadyBatch> => {
@@ -491,34 +574,26 @@ export async function dispatchBatches(
 
         let inflightRead: Promise<ReadyBatch> | null = null;
 
-        const dispatch = async (w: Worker) => {
-            if (failed) return;
-            let ready: ReadyBatch | null = null;
+        const acquireReadyBatch = async (w: Worker): Promise<ReadyBatch | null> => {
             if (inflightRead) {
                 const p = inflightRead;
                 inflightRead = null;
-                ready = await p;
+                return await p;
             }
-            if (!ready) {
-                if (nextIdx >= files.length) {
-                    if (!T && !keepAlive)
-                        try {
-                            w.terminate();
-                        } catch {
-                            /* ignore */
-                        }
-                    return;
+            if (nextIdx >= files.length) {
+                if (!T && !keepAlive) {
+                    try {
+                        w.terminate();
+                    } catch {
+                        /* ignore */
+                    }
                 }
-                ready = await readNextBatch();
+                return null;
             }
-            if (ready.tasks.length === 0) {
-                if (finishIfDone()) return;
-                void dispatch(w);
-                return;
-            }
-            if (nextIdx < files.length && !inflightRead) {
-                inflightRead = readNextBatch();
-            }
+            return await readNextBatch();
+        };
+
+        const postBatchToWorker = (w: Worker, ready: ReadyBatch): void => {
             const tPost0 = T ? nowMs() : 0;
             const msg: Record<string, unknown> = { tasks: ready.tasks };
             if (fp !== undefined) {
@@ -543,6 +618,21 @@ export async function dispatchBatches(
             }
         };
 
+        const dispatch = async (w: Worker) => {
+            if (failed) return;
+            const ready = await acquireReadyBatch(w);
+            if (!ready) return;
+            if (ready.tasks.length === 0) {
+                if (finishIfDone()) return;
+                void dispatch(w);
+                return;
+            }
+            if (nextIdx < files.length && !inflightRead) {
+                inflightRead = readNextBatch();
+            }
+            postBatchToWorker(w, ready);
+        };
+
         const hybridBatch: { idx: number; rel: string }[] = [];
         while (hybridBatch.length < hybridK && nextIdx < files.length) {
             const i = nextIdx++;
@@ -561,39 +651,15 @@ export async function dispatchBatches(
                     results: { file: string; issues: Issue[]; metric: FileMetric | null }[];
                 }) => {
                     const tArr = T ? nowMs() : 0;
-                    if (T) {
-                        const wk = workerIdx.get(w) ?? 0;
-                        if (T.firstMsgMs[wk] === undefined) {
-                            T.firstMsgMs[wk] = tArr - T.poolStart;
-                            if (T.hybridDoneAtFirstMsg === -1)
-                                T.hybridDoneAtFirstMsg = T.hybridDone;
-                        }
-                        for (let i = T.timeline.length - 1; i >= 0; i--) {
-                            const e = T.timeline[i];
-                            if (e.worker === wk && e.arrive < 0) {
-                                e.arrive = tArr - T.poolStart;
-                                e.rt = tArr - T.lastDispatch[wk];
-                                break;
-                            }
-                        }
-                    }
-                    let resArr = res.results;
-                    if (
-                        resArr !== undefined &&
-                        resArr !== null &&
-                        typeof resArr !== TYPEOF_OBJECT &&
-                        !Array.isArray(resArr)
-                    ) {
-                        resArr = [];
-                    }
-                    if (ArrayBuffer.isView(resArr) && !Array.isArray(resArr)) {
-                        resArr = decodeResults(resArr as unknown as Uint8Array);
-                    }
-                    resArr ||= [];
+                    const wk = workerIdx.get(w) ?? 0;
+                    updateArrivalTelemetry(T, wk, tArr);
+
+                    const resArr = normalizeWorkerResults(res.results);
                     for (const r of resArr) {
                         const i = idxByFile.get(r.file);
-                        if (i !== undefined)
+                        if (i !== undefined) {
                             results[i] = { issues: r.issues || [], metric: r.metric || null };
+                        }
                     }
                     completed += resArr.length;
                     if (T) T.mergeTotal += nowMs() - tArr;

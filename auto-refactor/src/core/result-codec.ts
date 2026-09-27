@@ -153,43 +153,67 @@ class Writer {
         }
     }
 
+    writeNumber(v: number): void {
+        if (Number.isInteger(v) && Math.abs(v) < VARINT_SAFE_LIMIT) {
+            this.u8(T_INT);
+            // zigzag
+            this.varint(v >= 0 ? v * 2 : -v * 2 - 1);
+            return;
+        }
+        this.u8(T_FLOAT);
+        this.f64(v);
+    }
+
+    writeArray(v: unknown[]): void {
+        this.u8(T_ARRAY);
+        this.varint(v.length);
+        for (const item of v) this.value(item);
+    }
+
+    writeObject(v: Record<string, unknown>): void {
+        this.u8(T_OBJECT);
+        const keys = Object.keys(v);
+        this.varint(keys.length);
+        for (const k of keys) {
+            this.str(k);
+            this.value(v[k]);
+        }
+    }
+
     /** tagged JSON value — preserves key insertion order, arrays, ints/floats, non-ASCII. */
     value(v: unknown): void {
         if (v === null || v === undefined) {
             this.u8(T_NULL);
-        } else if (v === true) {
+            return;
+        }
+        if (v === true) {
             this.u8(T_TRUE);
-        } else if (v === false) {
+            return;
+        }
+        if (v === false) {
             this.u8(T_FALSE);
-        } else if (typeof v === 'number') {
-            if (Number.isInteger(v) && Math.abs(v) < VARINT_SAFE_LIMIT) {
-                this.u8(T_INT);
-                // zigzag
-                this.varint(v >= 0 ? v * 2 : -v * 2 - 1);
-            } else {
-                this.u8(T_FLOAT);
-                this.f64(v);
-            }
-        } else if (typeof v === 'string') {
+            return;
+        }
+        if (typeof v === 'number') {
+            this.writeNumber(v);
+            return;
+        }
+        if (typeof v === 'string') {
             this.u8(T_STRING);
             this.str(v);
-        } else if (Array.isArray(v)) {
-            this.u8(T_ARRAY);
-            this.varint(v.length);
-            for (const item of v) this.value(item);
-        } else if (typeof v === 'object') {
-            this.u8(T_OBJECT);
-            const keys = Object.keys(v as Record<string, unknown>);
-            this.varint(keys.length);
-            for (const k of keys) {
-                this.str(k);
-                this.value((v as Record<string, unknown>)[k]);
-            }
-        } else {
-            // function / symbol / bigint — never produced by built-in analyzers; safest fallback.
-            this.u8(T_STRING);
-            this.str(String(v));
+            return;
         }
+        if (Array.isArray(v)) {
+            this.writeArray(v);
+            return;
+        }
+        if (typeof v === 'object') {
+            this.writeObject(v as Record<string, unknown>);
+            return;
+        }
+        // function / symbol / bigint — never produced by built-in analyzers; safest fallback.
+        this.u8(T_STRING);
+        this.str(String(v));
     }
 
     result(): Buffer {
@@ -245,41 +269,39 @@ class Reader {
         this.pos += len;
         return s;
     }
+    private readInt(): number {
+        const z = this.varint();
+        return z % 2 === 0 ? z / 2 : -(z + 1) / 2;
+    }
+
+    private readArray(): unknown[] {
+        const n = this.varint();
+        const arr: unknown[] = new Array(n);
+        for (let i = 0; i < n; i++) arr[i] = this.value();
+        return arr;
+    }
+
+    private readObject(): Record<string, unknown> {
+        const n = this.varint();
+        const o: Record<string, unknown> = {};
+        for (let i = 0; i < n; i++) {
+            const k = this.str();
+            o[k] = this.value();
+        }
+        return o;
+    }
+
     value(): unknown {
         const t = this.u8();
-        switch (t) {
-            case T_NULL:
-                return null;
-            case T_TRUE:
-                return true;
-            case T_FALSE:
-                return false;
-            case T_INT: {
-                const z = this.varint();
-                return z % 2 === 0 ? z / 2 : -(z + 1) / 2;
-            }
-            case T_FLOAT:
-                return this.f64();
-            case T_STRING:
-                return this.str();
-            case T_ARRAY: {
-                const n = this.varint();
-                const arr: unknown[] = new Array(n);
-                for (let i = 0; i < n; i++) arr[i] = this.value();
-                return arr;
-            }
-            case T_OBJECT: {
-                const n = this.varint();
-                const o: Record<string, unknown> = {};
-                for (let i = 0; i < n; i++) {
-                    const k = this.str();
-                    o[k] = this.value();
-                }
-                return o;
-            }
-            default:
-                throw new Error(`resultCodec: bad type tag 0x${t.toString(HEX_RADIX)}`);
-        }
+        if (t === T_NULL) return null;
+        if (t === T_TRUE) return true;
+        if (t === T_FALSE) return false;
+        if (t === T_INT) return this.readInt();
+        if (t === T_FLOAT) return this.f64();
+        if (t === T_STRING) return this.str();
+        if (t === T_ARRAY) return this.readArray();
+        if (t === T_OBJECT) return this.readObject();
+        throw new Error(`resultCodec: bad type tag 0x${t.toString(HEX_RADIX)}`);
     }
 }
 
@@ -342,6 +364,69 @@ export function encodeResults(results: FileResult[]): Buffer {
     return w.result();
 }
 
+function decodeMetric(r: Reader, file: string): FileMetric | null {
+    const hasMetric = r.u8();
+    if (!hasMetric) return null;
+    return {
+        file,
+        lines: r.varint(),
+        nonBlankLines: r.varint(),
+        functions: r.varint(),
+        maxNestingDepth: r.varint(),
+        topLevelDeclarations: r.varint(),
+        exportedSymbols: r.varint(),
+    };
+}
+
+function decodeSingleIssue(r: Reader): Issue {
+    const id = r.str();
+    const analyzer = r.str();
+    const rule = r.str();
+    const sev = r.u8();
+    const message = r.str();
+    const locFile = r.str();
+    const startLine = r.varint();
+    const startCol = r.varint();
+    const endLine = r.varint();
+    const endCol = r.varint();
+    const detail = r.value() as Record<string, unknown>;
+    const hasSug = r.u8();
+    const suggestion = hasSug ? r.str() : undefined;
+    const hasAct = r.u8();
+    const actionable = hasAct ? (r.value() as any) : undefined;
+    return {
+        id,
+        analyzer,
+        rule,
+        severity: sev === 0 ? 'info' : sev === 1 ? 'warning' : 'error',
+        message,
+        location: {
+            file: locFile,
+            start: { line: startLine, column: startCol },
+            end: { line: endLine, column: endCol },
+        },
+        detail,
+        ...(suggestion !== undefined ? { suggestion } : {}),
+        ...(actionable !== undefined ? { actionable } : {}),
+    };
+}
+
+function decodeFileIssues(r: Reader): Issue[] {
+    const issueCount = r.varint();
+    const issues: Issue[] = new Array(issueCount);
+    for (let k = 0; k < issueCount; k++) {
+        issues[k] = decodeSingleIssue(r);
+    }
+    return issues;
+}
+
+function decodeSingleFileResult(r: Reader): FileResult {
+    const file = r.str();
+    const metric = decodeMetric(r, file);
+    const issues = decodeFileIssues(r);
+    return { file, issues, metric };
+}
+
 /**
  * Decode a P250 buffer back into the exact per-file result shape.
  *
@@ -361,55 +446,7 @@ export function decodeResults(buf: Buffer | Uint8Array): FileResult[] {
     const n = r.u32();
     const out: FileResult[] = new Array(n);
     for (let f = 0; f < n; f++) {
-        const file = r.str();
-        const hasMetric = r.u8();
-        let metric: FileMetric | null = null;
-        if (hasMetric) {
-            metric = {
-                file,
-                lines: r.varint(),
-                nonBlankLines: r.varint(),
-                functions: r.varint(),
-                maxNestingDepth: r.varint(),
-                topLevelDeclarations: r.varint(),
-                exportedSymbols: r.varint(),
-            };
-        }
-        const issueCount = r.varint();
-        const issues: Issue[] = new Array(issueCount);
-        for (let k = 0; k < issueCount; k++) {
-            const id = r.str();
-            const analyzer = r.str();
-            const rule = r.str();
-            const sev = r.u8();
-            const message = r.str();
-            const locFile = r.str();
-            const startLine = r.varint();
-            const startCol = r.varint();
-            const endLine = r.varint();
-            const endCol = r.varint();
-            const detail = r.value() as Record<string, unknown>;
-            const hasSug = r.u8();
-            const suggestion = hasSug ? r.str() : undefined;
-            const hasAct = r.u8();
-            const actionable = hasAct ? (r.value() as any) : undefined;
-            issues[k] = {
-                id,
-                analyzer,
-                rule,
-                severity: sev === 0 ? 'info' : sev === 1 ? 'warning' : 'error',
-                message,
-                location: {
-                    file: locFile,
-                    start: { line: startLine, column: startCol },
-                    end: { line: endLine, column: endCol },
-                },
-                detail,
-                ...(suggestion !== undefined ? { suggestion } : {}),
-                ...(actionable !== undefined ? { actionable } : {}),
-            };
-        }
-        out[f] = { file, issues, metric };
+        out[f] = decodeSingleFileResult(r);
     }
     return out;
 }

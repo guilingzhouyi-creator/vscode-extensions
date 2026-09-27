@@ -26,7 +26,6 @@ import { auditVacuousWrappers } from '../core/rules/evolution/wrapperRule';
 import { auditRegexSafety, isRegexSafe } from '../utils/safe-regex';
 import { nativeCore } from '../core/native';
 
-
 interface HygieneOptions {
     checkDeadCode?: boolean;
     checkNaming?: boolean;

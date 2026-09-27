@@ -27,6 +27,18 @@ function normalizePath(p: string): string {
     return p.replace(/\\/g, '/');
 }
 
+function getOrCreateAgentBlastRadius(
+    map: Map<string, AgentBlastRadius>,
+    agentUid: string,
+): AgentBlastRadius {
+    let radius = map.get(agentUid);
+    if (!radius) {
+        radius = { files: new Set(), symbols: new Set() };
+        map.set(agentUid, radius);
+    }
+    return radius;
+}
+
 /**
  * Collects blast radius for all agents from their patch slices.
  */
@@ -34,11 +46,7 @@ function collectAgentBlastRadii(patches: AgentPatchSlice[]): Map<string, AgentBl
     const map = new Map<string, AgentBlastRadius>();
 
     for (const patch of patches) {
-        let radius = map.get(patch.agentUid);
-        if (!radius) {
-            radius = { files: new Set(), symbols: new Set() };
-            map.set(patch.agentUid, radius);
-        }
+        const radius = getOrCreateAgentBlastRadius(map, patch.agentUid);
         radius.files.add(normalizePath(patch.filePath));
         for (const sym of patch.importedSymbols || []) {
             radius.symbols.add(sym);

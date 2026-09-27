@@ -256,7 +256,15 @@ function loadFileContent(absPath: string | undefined, content: string | undefine
         return null;
     }
     try {
-        return fs.readFileSync(absPath, 'utf8');
+        const fd = fs.openSync(absPath, 'r');
+        try {
+            const stat = fs.fstatSync(fd);
+            const buf = Buffer.allocUnsafe(stat.size);
+            fs.readSync(fd, buf, 0, stat.size, 0);
+            return buf.toString('utf8');
+        } finally {
+            fs.closeSync(fd);
+        }
     } catch {
         return null;
     }
@@ -461,6 +469,37 @@ function executeLegacyAnalyzers(
     return issues;
 }
 
+function createLegacySourceFile(
+    legacyCount: number,
+    adapterId: string,
+    file: string,
+    content: string,
+): ts.SourceFile | undefined {
+    if (legacyCount > 0 && (adapterId === 'typescript' || adapterId === 'oxc')) {
+        return require('../utils/ast').createSourceFile(file, content);
+    }
+    return undefined;
+}
+
+function recordWorkerPerf(
+    tLine: number,
+    tFilter: number,
+    tSf: number,
+    streamingCount: number,
+    tStream: number,
+    tLegacy: number,
+): void {
+    if (!AR_TIMING) return;
+    perf.files++;
+    perf.countLineStats += tLine;
+    perf.filterTotal += tFilter;
+    perf.filterCalls += 2;
+    perf.createSourceFile += tSf;
+    perf.instantiateCalls += streamingCount;
+    perf.runStreaming += tStream;
+    perf.legacy += tLegacy;
+}
+
 function runOne(
     file: string,
     absPath: string | undefined,
@@ -474,10 +513,9 @@ function runOne(
     }
 
     const adapter = adapterFor(file, cfg.parser);
-
-    const tFilter0 = AR_TIMING ? nowMs() : 0;
+    const t0 = AR_TIMING ? nowMs() : 0;
     const { streaming, legacy } = splitAnalyzers(instances);
-    const tFilter1 = AR_TIMING ? nowMs() : 0;
+    const tFilter = AR_TIMING ? nowMs() - t0 : 0;
 
     const { proj, ast, rootForCtx } = initAstOrProjector(
         adapter,
@@ -491,16 +529,13 @@ function runOne(
     const languageIssue = unsupportedLanguageDiagnostic(file, cfg);
     if (languageIssue) issues.push(languageIssue);
 
-    let sf: ts.SourceFile | undefined;
     const tSf0 = AR_TIMING ? nowMs() : 0;
-    if (legacy.length > 0 && (adapter.id === 'typescript' || adapter.id === 'oxc')) {
-        sf = require('../utils/ast').createSourceFile(file, c);
-    }
-    const tSf1 = AR_TIMING ? nowMs() : 0;
+    const sf = createLegacySourceFile(legacy.length, adapter.id, file, c);
+    const tSf = AR_TIMING ? nowMs() - tSf0 : 0;
 
     const tLine0 = AR_TIMING ? nowMs() : 0;
     const lineStats = countLineStats(c);
-    const tLine1 = AR_TIMING ? nowMs() : 0;
+    const tLine = AR_TIMING ? nowMs() - tLine0 : 0;
 
     const metricCollector = new FileMetricCollector();
     const entries = createAnalyzerEntries(
@@ -529,7 +564,7 @@ function runOne(
         lineStats,
     );
     issues.push(...streamResult.issues);
-    const tStream1 = AR_TIMING ? nowMs() : 0;
+    const tStream = AR_TIMING ? nowMs() - tStream0 : 0;
 
     const tLegacy0 = AR_TIMING ? nowMs() : 0;
     issues.push(
@@ -544,95 +579,89 @@ function runOne(
             lineStats,
         ),
     );
-    const tLegacy1 = AR_TIMING ? nowMs() : 0;
+    const tLegacy = AR_TIMING ? nowMs() - tLegacy0 : 0;
 
-    if (AR_TIMING) {
-        perf.files++;
-        perf.countLineStats += tLine1 - tLine0;
-        perf.filterTotal += tFilter1 - tFilter0;
-        perf.filterCalls += 2;
-        perf.createSourceFile += tSf1 - tSf0;
-        perf.instantiateCalls += streaming.length;
-        perf.runStreaming += tStream1 - tStream0;
-        perf.legacy += tLegacy1 - tLegacy0;
-    }
+    recordWorkerPerf(tLine, tFilter, tSf, streaming.length, tStream, tLegacy);
 
     const metric = streamResult.metricCollector.metric;
     return { file, issues, metric };
 }
 
+interface WorkerTaskMessage {
+    tasks?: { file: string; absPath?: string; buf?: Uint8Array }[];
+    flush?: boolean;
+    fp?: string;
+    config?: ScanConfig;
+    descs?: Desc[];
+}
+
+function resolveMessageInstances(msg: WorkerTaskMessage): {
+    cfg: ScanConfig;
+    instances: LoadedAnalyzer[];
+} {
+    const cfg: ScanConfig = (msg && msg.config) || workerDataConfig || ({} as ScanConfig);
+    if (!msg || !msg.fp) {
+        return { cfg, instances: initialInstances };
+    }
+    let arr = loadedByFp.get(msg.fp);
+    if (!arr) {
+        arr = loadDescs((msg && msg.descs) || workerDataDescs);
+        loadedByFp.set(msg.fp, arr);
+    }
+    return { cfg, instances: arr };
+}
+
+function decodeTaskContents(
+    tasks: { file: string; absPath?: string; buf?: Uint8Array }[],
+): (string | undefined)[] {
+    return tasks.map((t) => {
+        if (t.buf !== undefined) {
+            return Buffer.from(t.buf.buffer, t.buf.byteOffset, t.buf.byteLength).toString('utf8');
+        }
+        return undefined;
+    });
+}
+
+function recordBatchTiming(tMsg: number, tDecode0: number, tDecode1: number, tRun1: number): void {
+    if (!AR_TIMING) return;
+    perf.msgCount++;
+    perf.decodeTotal += tDecode1 - tDecode0;
+    perf.runOneTotal += tRun1 - tDecode1;
+    perf.msgWall += tRun1 - tMsg;
+    perf.msgDurs.push(tRun1 - tMsg);
+    const idle = perf.lastMsgEnd ? tMsg - perf.lastMsgEnd : tMsg - perf.started;
+    perf.idleTotal += idle;
+    perf.lastMsgEnd = tRun1;
+}
+
+function postWorkerResults(
+    port: import('worker_threads').MessagePort,
+    results: { file: string; issues: Issue[]; metric: FileMetric | null }[],
+): void {
+    if (BINARY_RESULT_ENABLED) {
+        const buf = encodeResults(results);
+        port.postMessage({ results: buf }, [buf.buffer as ArrayBuffer]);
+    } else {
+        port.postMessage({ results });
+    }
+}
+
 if (parentPort) {
-    // One message carries a batch of tasks so postMessage round-trips are amortized; each
-    // file is pre-read by the main thread and transferred as a Buffer, and one reply
-    // carries all results for the batch. The old per-file protocol ({ file, absPath }) is
-    // still honored via the absPath fallback.
-    //
-    // A message may also carry { fp, config, descs } so a persistent worker serves a
-    // per-fingerprint module cache and per-scan configuration.
-    //
-    // NOTE: after an ArrayBuffer transfer the payload arrives as a `Uint8Array`, NOT a
-    // Buffer — calling `.toString('utf8')` on it would fall through to Array.prototype and
-    // produce comma-joined byte numbers. Always decode via Buffer.from(...) over the
-    // transferred ArrayBuffer (a zero-copy view, correct for both Uint8Array and Buffer).
-    parentPort.on(
-        EVENT_MESSAGE,
-        (msg: {
-            tasks?: { file: string; absPath?: string; buf?: Uint8Array }[];
-            flush?: boolean;
-            fp?: string;
-            config?: ScanConfig;
-            descs?: Desc[];
-        }) => {
-            if (AR_TIMING && msg && msg.flush) {
-                printWorkerTable();
-                parentPort!.postMessage({ flushed: true });
-                return;
-            }
-            const tMsg = AR_TIMING ? nowMs() : 0;
-            // Resolve the active configuration + analyzer set for this message.
-            const cfg: ScanConfig = (msg && msg.config) || workerDataConfig || ({} as ScanConfig);
-            let instances: LoadedAnalyzer[];
-            if (msg && msg.fp) {
-                let arr = loadedByFp.get(msg.fp);
-                if (!arr) {
-                    arr = loadDescs((msg && msg.descs) || workerDataDescs);
-                    loadedByFp.set(msg.fp, arr);
-                }
-                instances = arr;
-            } else {
-                instances = initialInstances;
-            }
-            const tasks = msg.tasks || [];
-            const tDecode0 = AR_TIMING ? nowMs() : 0;
-            const contents: (string | undefined)[] = tasks.map((t) => {
-                if (t.buf !== undefined) {
-                    return Buffer.from(t.buf.buffer, t.buf.byteOffset, t.buf.byteLength).toString(
-                        'utf8',
-                    );
-                }
-                return undefined;
-            });
-            const tDecode1 = AR_TIMING ? nowMs() : 0;
-            const results = tasks.map((t, i) =>
-                runOne(t.file, t.absPath, contents[i], cfg, instances),
-            );
-            const tRun1 = AR_TIMING ? nowMs() : 0;
-            if (AR_TIMING) {
-                perf.msgCount++;
-                perf.decodeTotal += tDecode1 - tDecode0;
-                perf.runOneTotal += tRun1 - tDecode1;
-                perf.msgWall += tRun1 - tMsg;
-                perf.msgDurs.push(tRun1 - tMsg);
-                const idle = perf.lastMsgEnd ? tMsg - perf.lastMsgEnd : tMsg - perf.started;
-                perf.idleTotal += idle;
-                perf.lastMsgEnd = tRun1;
-            }
-            if (BINARY_RESULT_ENABLED) {
-                const buf = encodeResults(results);
-                parentPort!.postMessage({ results: buf }, [buf.buffer as ArrayBuffer]);
-            } else {
-                parentPort!.postMessage({ results });
-            }
-        },
-    );
+    parentPort.on(EVENT_MESSAGE, (msg: WorkerTaskMessage) => {
+        if (AR_TIMING && msg && msg.flush) {
+            printWorkerTable();
+            parentPort!.postMessage({ flushed: true });
+            return;
+        }
+        const tMsg = AR_TIMING ? nowMs() : 0;
+        const { cfg, instances } = resolveMessageInstances(msg);
+        const tasks = msg.tasks || [];
+        const tDecode0 = AR_TIMING ? nowMs() : 0;
+        const contents = decodeTaskContents(tasks);
+        const tDecode1 = AR_TIMING ? nowMs() : 0;
+        const results = tasks.map((t, i) => runOne(t.file, t.absPath, contents[i], cfg, instances));
+        const tRun1 = AR_TIMING ? nowMs() : 0;
+        recordBatchTiming(tMsg, tDecode0, tDecode1, tRun1);
+        postWorkerResults(parentPort!, results);
+    });
 }

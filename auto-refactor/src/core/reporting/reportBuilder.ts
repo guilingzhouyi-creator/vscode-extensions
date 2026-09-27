@@ -276,6 +276,16 @@ function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
     return { stage, scale, domain };
 }
 
+/**
+ * Assembles the final unified ScanReport including summaries, quality scores, and issues.
+ *
+ * @param host - Reporting host providing configuration and scorers.
+ * @param filesScanned - Total count of inspected files.
+ * @param issues - Complete list of detected issues.
+ * @param fileMetrics - Per-file complexity and LOC metrics.
+ * @param durationMs - Total wall-clock scan duration in milliseconds.
+ * @returns Fully constructed ScanReport object.
+ */
 export function buildScanReport(
     host: ReportHost,
     filesScanned: number,

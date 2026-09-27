@@ -9,7 +9,14 @@
  * Exit Semantics & Design Rationale: Pure in-memory mutation of the analyzer map handed in; an
  *   explicit config-file or CLI level always wins over the built-in default.
  */
-import type { AnalyzerDeclaration, CommentLevel, ScanConfig, SecurityLevel } from '../types';
+import type {
+    AnalyzerDeclaration,
+    CommentLevel,
+    ScanConfig,
+    SecurityLevel,
+    LogLevel,
+    LiteralPolicyConfig,
+} from '../types';
 import {
     ANALYZER_ARCHITECTURE,
     ANALYZER_COMMENTS,
@@ -217,4 +224,253 @@ export function applySemanticAndSecurityLevels(
     cascadeSecurityLevel(securityLevel, overrides.securityLevel, fileCfg.securityLevel, analyzers);
 
     return { commentLevel, securityLevel, classifyLiterals, granularRules };
+}
+
+/**
+ * Type guard testing whether a value is a genuine boolean primitive.
+ *
+ * @param value - Candidate value.
+ * @returns True only when value is strictly boolean.
+ */
+export function isBooleanFlag(value: unknown): value is boolean {
+    return typeof value === 'boolean';
+}
+
+/**
+ * Resolves a scalar configuration value applying CLI override,
+ * file config, and default base fallback.
+ *
+ * @param override - Highest priority CLI option override.
+ * @param fileValue - Configuration file value.
+ * @param baseValue - Default fallback value.
+ * @returns Effective resolved scalar value.
+ */
+export function resolveScalar<T>(
+    override: T | undefined,
+    fileValue: T | undefined,
+    baseValue: T,
+): T {
+    return override || fileValue || baseValue;
+}
+
+/**
+ * Resolves a boolean flag applying CLI override, file config, and default base fallback.
+ *
+ * @param override - Potential boolean override from CLI.
+ * @param fileValue - Potential boolean value from config file.
+ * @param baseValue - Default fallback boolean value.
+ * @returns Effective resolved boolean flag.
+ */
+export function resolveFlag<B extends boolean | undefined>(
+    override: unknown,
+    fileValue: boolean | undefined,
+    baseValue: B,
+): boolean | B {
+    return isBooleanFlag(override) ? override : (fileValue ?? baseValue);
+}
+
+function resolveNumber<B extends number | undefined>(
+    override: unknown,
+    fileValue: number | undefined,
+    baseValue: B,
+): number | B {
+    return typeof override === 'number' ? override : (fileValue ?? baseValue);
+}
+
+function cacheOverrideDisabled(overrides: ConfigOverrides): boolean {
+    return (overrides as { cache?: boolean }).cache === false;
+}
+
+/**
+ * Merges layered threshold dictionaries from base defaults, file config, and CLI overrides.
+ *
+ * @param baseThresholds - Built-in threshold defaults.
+ * @param fileThresholds - Optional file-level threshold configurations.
+ * @param overrideThresholds - Optional direct programmatic threshold overrides.
+ * @param overrides - Optional CLI flag overrides.
+ * @returns Fully unified dictionary of effective thresholds.
+ */
+export function assembleGlobalThresholds(
+    baseThresholds: ScanConfig['thresholds'],
+    fileThresholds?: Partial<ScanConfig['thresholds']>,
+    overrideThresholds?: Partial<ScanConfig['thresholds']>,
+    overrides?: ConfigOverrides,
+): Record<string, unknown> {
+    const cliEffectiveLoc = (overrides as { effectiveLoc?: number } | undefined)?.effectiveLoc;
+    const cliFileLinesWarn = (overrides as { fileLinesWarn?: number } | undefined)?.fileLinesWarn;
+    const cliFileLinesFail = (overrides as { fileLinesFail?: number } | undefined)?.fileLinesFail;
+
+    const res: Record<string, unknown> = {
+        ...baseThresholds,
+        ...(fileThresholds || {}),
+        ...(overrideThresholds || {}),
+    };
+
+    if (cliEffectiveLoc) {
+        res.effectiveLocWarn = cliEffectiveLoc;
+        res.effectiveLocFail = Math.round(cliEffectiveLoc * 2);
+        if (!cliFileLinesWarn) {
+            res.fileLinesWarn = Math.max(400, cliEffectiveLoc);
+        }
+        if (!cliFileLinesFail) {
+            res.fileLinesFail = Math.max(800, Math.round(cliEffectiveLoc * 2));
+        }
+    }
+    if (cliFileLinesWarn) res.fileLinesWarn = cliFileLinesWarn;
+    if (cliFileLinesFail) res.fileLinesFail = cliFileLinesFail;
+
+    return res;
+}
+
+/**
+ * Merges analyzer declarations combining built-in defaults,
+ * global threshold overlays, and file overrides.
+ *
+ * @param baseAnalyzers - Base analyzer declaration map.
+ * @param fileCfgAnalyzers - File-level analyzer configuration overrides.
+ * @param analyzerDefaults - Default configuration options per analyzer.
+ * @param globalThresholds - Global threshold overlays.
+ * @returns Fully resolved dictionary of analyzer declarations.
+ */
+export function mergeAnalyzerDeclarations(
+    baseAnalyzers: Record<string, AnalyzerDeclaration>,
+    fileCfgAnalyzers: Record<string, Partial<AnalyzerDeclaration>> | undefined,
+    analyzerDefaults: Record<string, Record<string, unknown>>,
+    globalThresholds: Record<string, unknown>,
+): Record<string, AnalyzerDeclaration> {
+    const globalThresholdLayer = (name: string): Record<string, unknown> => {
+        const layer: Record<string, unknown> = {};
+        for (const key of Object.keys(analyzerDefaults[name] || {})) {
+            if (key in globalThresholds) layer[key] = globalThresholds[key];
+        }
+        return layer;
+    };
+
+    const analyzers: Record<string, AnalyzerDeclaration> = { ...baseAnalyzers };
+    if (fileCfgAnalyzers) {
+        for (const [name, decl] of Object.entries(fileCfgAnalyzers)) {
+            const defaults = analyzerDefaults[name] || {};
+            analyzers[name] = {
+                enabled: decl?.enabled !== false,
+                options: {
+                    ...defaults,
+                    ...globalThresholdLayer(name),
+                    ...(analyzers[name]?.options || {}),
+                    ...(decl?.options || {}),
+                },
+            };
+        }
+    }
+    for (const name of Object.keys(analyzers)) {
+        if (!analyzers[name].options || Object.keys(analyzers[name].options).length === 0) {
+            analyzers[name] = {
+                ...analyzers[name],
+                options: { ...(analyzerDefaults[name] || {}), ...globalThresholdLayer(name) },
+            };
+        }
+    }
+    return analyzers;
+}
+
+/**
+ * Assembles runtime execution options such as workers, caching, and incremental modes.
+ *
+ * @param base - Baseline configuration.
+ * @param fileCfg - File-level configuration overrides.
+ * @param overrides - CLI programmatic overrides.
+ * @returns Sub-configuration object governing scan execution parameters.
+ */
+export function assembleExecutionOptions(
+    base: ScanConfig,
+    fileCfg: Partial<ScanConfig>,
+    overrides: ConfigOverrides,
+): Pick<
+    ScanConfig,
+    | 'workers'
+    | 'concurrency'
+    | 'respectGitignore'
+    | 'failOnIssue'
+    | 'failOnSeverity'
+    | 'failOnAnalyzerError'
+    | 'parser'
+    | 'cacheEnabled'
+    | 'incremental'
+    | 'incrementalMinLines'
+> {
+    return {
+        concurrency: resolveScalar(overrides.concurrency, fileCfg.concurrency, base.concurrency),
+        workers: resolveNumber(overrides.workers, fileCfg.workers, base.workers),
+        respectGitignore: resolveFlag(
+            overrides.respectGitignore,
+            fileCfg.respectGitignore,
+            base.respectGitignore,
+        ),
+        failOnIssue: resolveFlag(overrides.failOnIssue, fileCfg.failOnIssue, base.failOnIssue),
+        failOnSeverity: resolveScalar(
+            overrides.failOnSeverity,
+            fileCfg.failOnSeverity,
+            base.failOnSeverity,
+        ),
+        failOnAnalyzerError: resolveFlag(
+            overrides.failOnAnalyzerError,
+            fileCfg.failOnAnalyzerError,
+            base.failOnAnalyzerError,
+        ),
+        parser: resolveScalar(overrides.parser, fileCfg.parser, base.parser),
+        cacheEnabled: cacheOverrideDisabled(overrides) ? false : base.cacheEnabled,
+        incremental: resolveFlag(overrides.incremental, fileCfg.incremental, base.incremental),
+        incrementalMinLines: resolveNumber(
+            overrides.incrementalMinLines,
+            fileCfg.incrementalMinLines,
+            base.incrementalMinLines,
+        ),
+    };
+}
+
+/**
+ * Assembles output, logging, baseline, and suppression reporting options.
+ *
+ * @param base - Baseline configuration.
+ * @param fileCfg - File-level configuration overrides.
+ * @param overrides - CLI programmatic overrides.
+ * @returns Sub-configuration object governing reporting behavior.
+ */
+export function assembleReportingOptions(
+    base: ScanConfig,
+    fileCfg: Partial<ScanConfig>,
+    overrides: ConfigOverrides,
+): Pick<
+    ScanConfig,
+    'format' | 'logLevel' | 'logFile' | 'suppressions' | 'baselineGranularity' | 'out'
+> {
+    return {
+        format: overrides.format || fileCfg.format || base.format,
+        logLevel: (overrides.logLevel as LogLevel) || fileCfg.logLevel || base.logLevel,
+        logFile: overrides.logFile || fileCfg.logFile || base.logFile,
+        suppressions: fileCfg.suppressions ?? base.suppressions,
+        baselineGranularity: fileCfg.baselineGranularity ?? base.baselineGranularity,
+        out: overrides.out || fileCfg.out,
+    };
+}
+
+/**
+ * Merges layered literal governance policies into a single active configuration.
+ *
+ * @param base - Default literal policy.
+ * @param custom - Project-specific or file-level policy overrides.
+ * @returns Unified active literal policy configuration.
+ */
+export function mergeLiteralPolicy(
+    base?: LiteralPolicyConfig,
+    custom?: LiteralPolicyConfig,
+): LiteralPolicyConfig | undefined {
+    if (!custom) return base;
+    return {
+        ...base,
+        ...custom,
+        toleratedCallArguments: {
+            ...(base?.toleratedCallArguments ?? {}),
+            ...(custom?.toleratedCallArguments ?? {}),
+        },
+    };
 }

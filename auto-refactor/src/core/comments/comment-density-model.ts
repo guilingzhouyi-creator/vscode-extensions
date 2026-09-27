@@ -90,9 +90,10 @@ function extractNextLineSymbol(nextLine?: string): string | undefined {
 /**
  * Classifies a single comment snippet into one of the 9 taxonomic categories.
  *
+ * @param clean - Sanitized comment content text
  * @param lineText - Raw text line containing the comment
- * @param nextCodeLine - Optional immediate next non-empty code line
  * @param lineIdx - 1-based source line index
+ * @param nextCodeLine - Optional immediate next non-empty code line
  * @returns Classified CommentSnippetAnalysis record
  */
 function checkWaterLoggingSnippet(
@@ -217,6 +218,14 @@ function checkHighValueDocumentationSnippet(
     return null;
 }
 
+/**
+ * Classifies a single comment line into a semantic value category and quality tier.
+ *
+ * @param lineText - Raw comment line text.
+ * @param nextCodeLine - Optional subsequent line of code used for context-aware classification.
+ * @param lineIdx - 1-indexed line number in the source file.
+ * @returns Analyzed snippet metadata including category, quality tier, and score.
+ */
 export function classifyCommentSnippet(
     lineText: string,
     nextCodeLine?: string,
@@ -253,10 +262,11 @@ export function classifyCommentSnippet(
 }
 
 /**
- * Calculates Effective Comment Density (ECD-C) metrics for source content.
+ * Extracts line comment metadata including block comment state.
  *
- * @param content - Full source code text
- * @returns Evaluated EffectiveCommentMetrics
+ * @param trimmed - Whitespace-trimmed line text
+ * @param inBlockComment - Whether the line is inside an active multi-line block comment
+ * @returns Comment status descriptor for the line
  */
 function extractCommentLineInfo(
     trimmed: string,
@@ -292,6 +302,12 @@ function findNextCodeLine(lines: string[], start: number): string | undefined {
     return undefined;
 }
 
+/**
+ * Evaluates semantic comment density, categorization, and signal-to-noise ratio of a source module.
+ *
+ * @param content - Source file content string.
+ * @returns Computed metrics containing effective density ratio and category distributions.
+ */
 export function evaluateEffectiveCommentDensity(content: string): EffectiveCommentMetrics {
     const lines = content.split(/\r\n|\n/);
     const snippets: CommentSnippetAnalysis[] = [];

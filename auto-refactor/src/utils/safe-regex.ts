@@ -197,9 +197,7 @@ export function auditRegexSafety(pattern: string): string[] {
     // \1 inside a repeating group is a classic ReDoS vector.
     const backrefInQuantRegex = /\((?:[^()]*\\\d+[^()]*)\)[+*]/;
     if (backrefInQuantRegex.test(pattern)) {
-        warnings.push(
-            'Backreference inside quantified group — potential exponential backtracking',
-        );
+        warnings.push('Backreference inside quantified group — potential exponential backtracking');
     }
 
     return warnings;
@@ -263,9 +261,7 @@ export function buildAlternationRe(
     wordBounded = true,
 ): { re: RegExp; warnings: string[] } {
     const escaped = words.map((w) => escapeRegex(String(w)));
-    const source = wordBounded
-        ? `\\b(?:${escaped.join('|')})\\b`
-        : `(?:${escaped.join('|')})`;
+    const source = wordBounded ? `\\b(?:${escaped.join('|')})\\b` : `(?:${escaped.join('|')})`;
 
     const warnings = auditRegexSafety(source);
     const re = new RegExp(source, flags);

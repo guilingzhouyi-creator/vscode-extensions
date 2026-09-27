@@ -478,8 +478,6 @@ export async function scanDiffDelta(
     return { report: r.report as DiffDeltaReport, stats: r.stats };
 }
 
-
-
 async function collectGitChangedFiles(root: string): Promise<string[]> {
     const changedFiles: string[] = [];
     try {
@@ -566,8 +564,6 @@ async function executeStandardScanMode(
     const report = await scanner.scan();
     return { report, stats: null, scanner };
 }
-
-
 
 async function outputRenderedReport(
     report: ScanReport,
@@ -843,3 +839,9 @@ export * from './core/comments';
 // ---- Native Acceleration Core & Algorithmic Dual-Track Bridge ----
 export * from './core/native';
 export * from './core/reporting/quality-printer';
+
+// ---- Code Evolution Quality Model & Git History Mining ----
+export * from './core/evolution';
+
+// ---- Coverage Telemetry Ingestion & Dynamic Feedback ----
+export * from './core/telemetry';

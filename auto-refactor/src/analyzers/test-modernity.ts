@@ -24,6 +24,9 @@ import {
     computeTestModernityMetrics,
     evaluateTestModernityThresholds,
 } from '../core/intelligence/testModernity';
+import { DualTrackTestEvaluator } from '../core/scoring/dual-track-test-evaluator';
+import { partitionFileZones } from '../core/intelligence/zone-partitioner';
+import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
 
 /** Pattern identifying test case declarations for polyglot fallbacks. */
 const TEST_DECL_RE =
@@ -149,10 +152,42 @@ function isTestFilePath(filePath: string): boolean {
  */
 export class TestModernityAnalyzer implements Analyzer {
     name = 'test-modernity' as const;
+    private dualTrackEvaluator = new DualTrackTestEvaluator();
 
     analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+        const issues: Issue[] = [];
+        const density = analyzeCodeDensity(ctx.content, ctx.filePath);
+        const zoneProfile = partitionFileZones(ctx.content, ctx.filePath, density, ctx.root);
+        const dualTrackResult = this.dualTrackEvaluator.evaluateFile(
+            ctx.filePath,
+            ctx.content,
+            zoneProfile,
+        );
+
+        for (const finding of dualTrackResult.findings) {
+            issues.push({
+                id: `test-modernity:${finding.rule}:${ctx.filePath}:${finding.line}`,
+                analyzer: 'test-modernity',
+                rule: finding.rule,
+                severity: finding.severity,
+                message: finding.message,
+                location: {
+                    file: ctx.filePath,
+                    start: { line: finding.line, column: finding.column },
+                    end: { line: finding.line, column: finding.column },
+                },
+                detail: {
+                    track: dualTrackResult.track,
+                    language: dualTrackResult.language,
+                    testTopologyScore: dualTrackResult.testTopologyScore,
+                    actionableProposal: finding.actionableProposal,
+                },
+                suggestion: finding.actionableProposal.rationale,
+            });
+        }
+
         if (!isTestFilePath(ctx.filePath)) {
-            return [];
+            return issues;
         }
 
         const options = (ctx.config.analyzers['test-modernity']?.options ||
@@ -170,7 +205,8 @@ export class TestModernityAnalyzer implements Analyzer {
             this.analyzeWithLines(ctx, sites, caseRecords);
         }
 
-        const issues: Issue[] = analyzeTestModernitySites(sites, [], options);
+        const siteIssues: Issue[] = analyzeTestModernitySites(sites, [], options);
+        issues.push(...siteIssues);
 
         // Compute EMTD and CBCR metrics across detected semantic units
         const nloc = this.countNloc(ctx.content);

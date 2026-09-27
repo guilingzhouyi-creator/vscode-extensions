@@ -191,5 +191,3 @@ export interface INativeCore {
      */
     getStatus(): NativeCoreStatus;
 }
-
-

@@ -127,18 +127,17 @@ export interface FingerprintAnalyzerDesc {
 }
 
 /**
- * Derive deterministic analyzer descriptors WITHOUT loading any module. Order mirrors
- * resolveAnalyzers (built-ins in `config.analyzers` insertion order, then custom analyzers
- * appended), which for dependency-free built-ins equals the topological order. Used when no
- * resolved plan is available (standalone key tests, daemon warm path where the Scanner itself
- * resolves the plan); the scan pipeline passes the real resolved descriptors instead.
+ * Derive deterministic analyzer descriptors WITHOUT loading any module.
  *
- * @param config - Scan config whose enabled analyzer declarations and custom plugins are read.
- * @returns Descriptors for every enabled built-in/custom analyzer, in execution order;
- *          disabled declarations and unknown built-in names are omitted.
+ * @param analyzers - Configured analyzer declarations map.
+ * @param thresholds - Configured thresholds map.
+ * @param descs - Target output array to collect analyzer descriptors into.
+ * @param seen - Set tracking already seen analyzer names for deduplication.
  */
 function collectBuiltinDescs(
-    analyzers: Record<string, { enabled?: boolean; options?: Record<string, unknown> } | undefined> | undefined,
+    analyzers:
+        | Record<string, { enabled?: boolean; options?: Record<string, unknown> } | undefined>
+        | undefined,
     thresholds: ScanConfig['thresholds'],
     descs: FingerprintAnalyzerDesc[],
     seen: Set<string>,
@@ -159,7 +158,14 @@ function collectBuiltinDescs(
 }
 
 function collectCustomDescs(
-    customAnalyzers: Array<{ name: string; module: string; enabled?: boolean; options?: Record<string, unknown> }> | undefined,
+    customAnalyzers:
+        | Array<{
+              name: string;
+              module: string;
+              enabled?: boolean;
+              options?: Record<string, unknown>;
+          }>
+        | undefined,
     thresholds: ScanConfig['thresholds'],
     baseDir: string | undefined,
     descs: FingerprintAnalyzerDesc[],
@@ -190,6 +196,12 @@ function readCustomModuleBuffer(modulePath: string): Buffer | null {
     }
 }
 
+/**
+ * Collects normalized fingerprint descriptors for all enabled built-in and custom analyzers.
+ *
+ * @param config - Scan configuration supplying enabled analyzers and thresholds.
+ * @returns Array of fingerprint descriptors used for cache validation.
+ */
 export function fingerprintAnalyzerDescs(config: ScanConfig): FingerprintAnalyzerDesc[] {
     const descs: FingerprintAnalyzerDesc[] = [];
     const seen = new Set<string>();

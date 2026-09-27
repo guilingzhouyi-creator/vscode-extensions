@@ -248,8 +248,10 @@ export class FeedbackIncidentLedger {
             multiplier += 0.1;
         }
 
-        const confidenceMultiplier =
-            Math.max(0.2, Math.min(1.2, Math.round(multiplier * 100) / 100));
+        const confidenceMultiplier = Math.max(
+            0.2,
+            Math.min(1.2, Math.round(multiplier * 100) / 100),
+        );
 
         return {
             ruleId,
@@ -471,7 +473,7 @@ export class FeedbackAdaptiveSupervisor {
         const reason =
             params.reason ??
             `Adaptive weight shift on Error=${error.toFixed(1)} attributed to ${plane} plane ` +
-            `[Ws: ${prev.Ws} -> ${updatedWeights.Ws}, Wd: ${prev.Wd} -> ${updatedWeights.Wd}, Wf: ${prev.Wf} -> ${updatedWeights.Wf}]`;
+                `[Ws: ${prev.Ws} -> ${updatedWeights.Ws}, Wd: ${prev.Wd} -> ${updatedWeights.Wd}, Wf: ${prev.Wf} -> ${updatedWeights.Wf}]`;
 
         const step: AdaptiveEvolutionStep = {
             stepIndex: this.evolutionHistory.length + 1,

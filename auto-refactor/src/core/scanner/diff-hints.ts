@@ -105,6 +105,68 @@ function routeFullFallback(
     }
 }
 
+function verifyDiskMatch(
+    opts: ScanWithDiffOptions,
+    diffInput: DiffInput,
+    contentHash: string,
+    rel: string,
+    scanner: ScannerContext,
+): boolean {
+    if (!opts.verifyDiskContent) return true;
+    const provided = decodeContent(diffInput.newContent);
+    if (sha256Hex(Buffer.from(provided, 'utf8')) !== contentHash) {
+        scanner.logger.warn(`diff newContent mismatch on ${rel}; falling back to full rescan`);
+        return false;
+    }
+    return true;
+}
+
+function handleByteEqual(
+    fph: string,
+    contentHash: string,
+    rel: string,
+    i: number,
+    s: StatResultEntry,
+    fpContext: CacheFingerprintContext,
+    cache: CacheStore,
+    sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>,
+    perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[],
+    state: DiffRoutingState,
+): boolean {
+    state.byteEqual++;
+    const l2 = fpContext.l2Enabled ? cache.lookupL2(fph, contentHash) : null;
+    if (l2) {
+        const result = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, rel);
+        perFile[i] = result;
+        sessionBucket.set(rel, result);
+        state.l2Hit++;
+        state.l2Refresh.push({ fpHash: fph, contentHash, rel, result, fp: s.fp || undefined });
+        return true;
+    }
+    return false;
+}
+
+function queueIncremental(
+    i: number,
+    rel: string,
+    fph: string,
+    contentHash: string,
+    incState: IncrementalFileState,
+    newContent: string,
+    state: DiffRoutingState,
+): void {
+    state.diffIncremental++;
+    incState.prepare(newContent, contentHash);
+    state.toIncremental.push({
+        idx: i,
+        rel,
+        fpHash: fph,
+        contentHash,
+        state: incState,
+        content: newContent,
+    });
+}
+
 /**
  * Route one changed file from its diff hint into reuse, incremental, or a full rescan.
  *
@@ -157,25 +219,21 @@ export async function processChangedFileHint(
     const contentHash = sha256Hex(buf);
     const fph = fpContext.fpHashFor(rel);
 
-    if (opts.verifyDiskContent) {
-        const provided = decodeContent(diffInput.newContent);
-        if (sha256Hex(Buffer.from(provided, 'utf8')) !== contentHash) {
-            scanner.logger.warn(`diff newContent mismatch on ${rel}; falling back to full rescan`);
-            state.diffFull++;
-            routeFullFallback(
-                fph,
-                contentHash,
-                rel,
-                newContent,
-                buf,
-                i,
-                incEnabled,
-                incMinLines,
-                incBucket,
-                state,
-            );
-            return;
-        }
+    if (!verifyDiskMatch(opts, diffInput, contentHash, rel, scanner)) {
+        state.diffFull++;
+        routeFullFallback(
+            fph,
+            contentHash,
+            rel,
+            newContent,
+            buf,
+            i,
+            incEnabled,
+            incMinLines,
+            incBucket,
+            state,
+        );
+        return;
     }
 
     const incState = incBucket.get(rel);
@@ -192,30 +250,24 @@ export async function processChangedFileHint(
     if (resolved.oldContentFromState) state.oldContentFromDaemon++;
 
     if (resolved.mode === 'incremental') {
-        state.diffIncremental++;
-        incState!.prepare(newContent, contentHash);
-        state.toIncremental.push({
-            idx: i,
-            rel,
-            fpHash: fph,
-            contentHash,
-            state: incState!,
-            content: newContent,
-        });
+        queueIncremental(i, rel, fph, contentHash, incState!, newContent, state);
         return;
     }
 
     if (resolved.mode === 'byteEqual') {
-        state.byteEqual++;
-        const l2 = fpContext.l2Enabled ? cache.lookupL2(fph, contentHash) : null;
-        if (l2) {
-            const result = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, rel);
-            perFile[i] = result;
-            sessionBucket.set(rel, result);
-            state.l2Hit++;
-            state.l2Refresh.push({ fpHash: fph, contentHash, rel, result, fp: s.fp || undefined });
-            return;
-        }
+        const hit = handleByteEqual(
+            fph,
+            contentHash,
+            rel,
+            i,
+            s,
+            fpContext,
+            cache,
+            sessionBucket,
+            perFile,
+            state,
+        );
+        if (hit) return;
         routeFullFallback(
             fph,
             contentHash,
@@ -244,6 +296,115 @@ export async function processChangedFileHint(
         incBucket,
         state,
     );
+}
+
+function tryResolveUnchangedL1(
+    rel: string,
+    i: number,
+    s: StatResultEntry,
+    fpContext: CacheFingerprintContext,
+    sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>,
+    perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[],
+    cache: CacheStore,
+    state: DiffRoutingState,
+): boolean {
+    const l1 = cache.lookupL1(rel);
+    if (!s.fp || !l1 || l1.mtimeMs !== s.fp.mtimeMs || l1.size !== s.fp.size) {
+        return false;
+    }
+    const cached = sessionBucket.get(rel);
+    if (cached) {
+        perFile[i] = cached;
+        state.l1Hit++;
+        return true;
+    }
+    const fph = fpContext.fpHashFor(rel);
+    const byPath = fpContext.l2Enabled
+        ? cache.lookupL2ByPath(fph, rel, s.fp.mtimeMs, s.fp.size)
+        : null;
+    if (byPath) {
+        const result = remapCachedResult(
+            { issues: byPath.issues, metric: byPath.metric },
+            byPath.p,
+            rel,
+        );
+        perFile[i] = result;
+        sessionBucket.set(rel, result);
+        state.l1Hit++;
+        return true;
+    }
+    return false;
+}
+
+function tryResolveUnchangedL2(
+    rel: string,
+    i: number,
+    s: StatResultEntry,
+    fph: string,
+    contentHash: string,
+    fpContext: CacheFingerprintContext,
+    sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>,
+    perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[],
+    cache: CacheStore,
+    state: DiffRoutingState,
+): boolean {
+    const l2 = fpContext.l2Enabled ? cache.lookupL2(fph, contentHash) : null;
+    if (!l2) return false;
+    const result = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, rel);
+    perFile[i] = result;
+    sessionBucket.set(rel, result);
+    state.l2Hit++;
+    state.l2Refresh.push({ fpHash: fph, contentHash, rel, result, fp: s.fp || undefined });
+    return true;
+}
+
+function tryRouteUnchangedIncremental(
+    rel: string,
+    i: number,
+    fph: string,
+    contentHash: string,
+    buf: Buffer,
+    incBucket: Map<string, IncrementalFileState>,
+    state: DiffRoutingState,
+    incEnabled: boolean,
+    incMinLines: number,
+): boolean {
+    const newContent = buf.toString('utf8');
+    if (!isIncrementalCandidate(incEnabled, newContent, incMinLines)) {
+        return false;
+    }
+    const oldState = incBucket.get(rel);
+    if (oldState) {
+        touchIncremental(incBucket, rel);
+        const r = route(rel, oldState.content, newContent, oldState, {
+            enabled: true,
+            minLines: incMinLines,
+        });
+        if (r.mode === 'incremental') {
+            oldState.prepare(newContent, contentHash);
+            state.toIncremental.push({
+                idx: i,
+                rel,
+                fpHash: fph,
+                contentHash,
+                state: oldState,
+                content: newContent,
+            });
+            return true;
+        }
+    }
+    const fresh = new IncrementalFileState(newContent, contentHash);
+    fresh.prepare(newContent, contentHash);
+    incBucket.set(rel, fresh);
+    state.toIncremental.push({
+        idx: i,
+        rel,
+        fpHash: fph,
+        contentHash,
+        state: fresh,
+        content: newContent,
+    });
+    return true;
 }
 
 /**
@@ -279,29 +440,8 @@ export async function processUnchangedFile(
     incEnabled: boolean,
     incMinLines: number,
 ): Promise<void> {
-    const l1 = cache.lookupL1(rel);
-    if (s.fp && l1 && l1.mtimeMs === s.fp.mtimeMs && l1.size === s.fp.size) {
-        const cached = sessionBucket.get(rel);
-        if (cached) {
-            perFile[i] = cached;
-            state.l1Hit++;
-            return;
-        }
-        const fph = fpContext.fpHashFor(rel);
-        const byPath = fpContext.l2Enabled
-            ? cache.lookupL2ByPath(fph, rel, s.fp.mtimeMs, s.fp.size)
-            : null;
-        if (byPath) {
-            const result = remapCachedResult(
-                { issues: byPath.issues, metric: byPath.metric },
-                byPath.p,
-                rel,
-            );
-            perFile[i] = result;
-            sessionBucket.set(rel, result);
-            state.l1Hit++;
-            return;
-        }
+    if (tryResolveUnchangedL1(rel, i, s, fpContext, sessionBucket, perFile, cache, state)) {
+        return;
     }
     let buf: Buffer;
     try {
@@ -312,48 +452,35 @@ export async function processUnchangedFile(
     }
     const contentHash = sha256Hex(buf);
     const fph = fpContext.fpHashFor(rel);
-    const l2 = fpContext.l2Enabled ? cache.lookupL2(fph, contentHash) : null;
-    if (l2) {
-        const result = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, rel);
-        perFile[i] = result;
-        sessionBucket.set(rel, result);
-        state.l2Hit++;
-        state.l2Refresh.push({ fpHash: fph, contentHash, rel, result, fp: s.fp || undefined });
+    if (
+        tryResolveUnchangedL2(
+            rel,
+            i,
+            s,
+            fph,
+            contentHash,
+            fpContext,
+            sessionBucket,
+            perFile,
+            cache,
+            state,
+        )
+    ) {
         return;
     }
-    if (isIncrementalCandidate(incEnabled, buf.toString('utf8'), incMinLines)) {
-        const newContent = buf.toString('utf8');
-        const oldState = incBucket.get(rel);
-        if (oldState) {
-            touchIncremental(incBucket, rel);
-            const r = route(rel, oldState.content, newContent, oldState, {
-                enabled: true,
-                minLines: incMinLines,
-            });
-            if (r.mode === 'incremental') {
-                oldState.prepare(newContent, contentHash);
-                state.toIncremental.push({
-                    idx: i,
-                    rel,
-                    fpHash: fph,
-                    contentHash,
-                    state: oldState,
-                    content: newContent,
-                });
-                return;
-            }
-        }
-        const fresh = new IncrementalFileState(newContent, contentHash);
-        fresh.prepare(newContent, contentHash);
-        incBucket.set(rel, fresh);
-        state.toIncremental.push({
-            idx: i,
+    if (
+        tryRouteUnchangedIncremental(
             rel,
-            fpHash: fph,
+            i,
+            fph,
             contentHash,
-            state: fresh,
-            content: newContent,
-        });
+            buf,
+            incBucket,
+            state,
+            incEnabled,
+            incMinLines,
+        )
+    ) {
         return;
     }
     state.toAnalyze.push({ idx: i, rel, fpHash: fph, contentHash, buf });

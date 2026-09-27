@@ -64,6 +64,10 @@ function dispatchGovernanceRules(
     }
 }
 
+/**
+ * Static governance analyzer enforcing architectural boundaries,
+ * language profiles, and safety rules.
+ */
 export class GovernanceAnalyzer implements Analyzer {
     name = 'governance' as const;
 

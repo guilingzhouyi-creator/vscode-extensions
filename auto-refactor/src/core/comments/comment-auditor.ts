@@ -68,7 +68,7 @@ function isExemptLanguageAuditPath(filePath: string): boolean {
  * Audit source file for comment language consistency against project convention.
  *
  * @param content - Full source text of the file
- * @param opts - Comment governance configuration options
+ * @param targetLang - Target language identifier convention
  * @param ctx - Analyzer execution context
  * @param issues - Output accumulator for detected issues
  * @param mkIssue - Factory callback to instantiate canonical issues
@@ -183,6 +183,15 @@ function auditMixedLanguageIncoherence(
     }
 }
 
+/**
+ * Audits language consistency in source comments against the target dominant language.
+ *
+ * @param content - Raw source code string.
+ * @param opts - Comment governance options specifying target language.
+ * @param ctx - Analyzer context with normalized file path.
+ * @param issues - Output accumulator for emitted issues.
+ * @param mkIssue - Factory for instantiating canonical Issue records.
+ */
 export function auditCommentLanguage(
     content: string,
     opts: CommentGovernanceOptions,

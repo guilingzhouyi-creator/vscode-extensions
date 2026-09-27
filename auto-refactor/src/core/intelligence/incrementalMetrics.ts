@@ -20,7 +20,6 @@ import { maskSourceText, type SourceMaskConfig } from '../source-mask';
 import { computeLineStartsAndHashes, getLine } from '../edit-diff';
 import { nativeCore } from '../native/native-bridge';
 
-
 /**
  * Mask applied to content whose language is unknown.
  *
@@ -300,6 +299,55 @@ export interface IncrementalMetrics {
 }
 
 /**
+ * Evaluate incremental metrics against architectural safety thresholds.
+ */
+function determineVerdict(
+    effectiveLocDelta: number,
+    couplingDelta: number,
+    complexityDelta: number,
+    duplicationDelta: number,
+    maintainabilityDelta: number,
+    options?: IncrementalOptions,
+): { verdict: MetricsVerdict; rejectionRationale?: string } {
+    const failOnNegativeLoc = options?.failOnNegativeLocWithIncreasedCoupling ?? true;
+    if (failOnNegativeLoc && effectiveLocDelta < 0 && couplingDelta > 0) {
+        return {
+            verdict: VERDICT_FAILED,
+            rejectionRationale:
+                `Anti-pattern rejected: lines of code decreased by ${Math.abs(effectiveLocDelta)} ` +
+                `but coupling increased by +${couplingDelta} (violates maintainability invariant: ` +
+                `code deletion must not increase external coupling)`,
+        };
+    }
+
+    const maxCouplingDelta = options?.maxCouplingDelta ?? 5;
+    if (couplingDelta > maxCouplingDelta) {
+        return {
+            verdict: VERDICT_FAILED,
+            rejectionRationale: `Coupling delta +${couplingDelta} exceeded maximum threshold +${maxCouplingDelta}`,
+        };
+    }
+
+    if (
+        options?.minMaintainabilityDelta !== undefined &&
+        maintainabilityDelta < options.minMaintainabilityDelta
+    ) {
+        return {
+            verdict: VERDICT_FAILED,
+            rejectionRationale:
+                `Maintainability delta ${maintainabilityDelta} fell below the declared floor ` +
+                `${options.minMaintainabilityDelta}`,
+        };
+    }
+
+    if (couplingDelta > 0 && (duplicationDelta > 0 || complexityDelta > 0)) {
+        return { verdict: VERDICT_WARNING };
+    }
+
+    return { verdict: VERDICT_PASSED };
+}
+
+/**
  * Compute incremental maintenance metrics between two versions of a source file.
  *
  * Enforces the architectural invariant: deleting lines of code must not result in increased
@@ -343,35 +391,14 @@ export function computeIncrementalMetrics(
         DUPLICATION_WEIGHT * duplicationDelta;
     const maintainabilityDelta = Number((-weighed).toFixed(2));
 
-    const failOnNegativeLocWithIncreasedCoupling =
-        options?.failOnNegativeLocWithIncreasedCoupling ?? true;
-    const maxCouplingDelta = options?.maxCouplingDelta ?? 5;
-
-    let verdict: MetricsVerdict = VERDICT_PASSED;
-    let rejectionRationale: string | undefined;
-
-    if (failOnNegativeLocWithIncreasedCoupling && effectiveLocDelta < 0 && couplingDelta > 0) {
-        verdict = VERDICT_FAILED;
-        rejectionRationale =
-            `Anti-pattern rejected: lines of code decreased by ${Math.abs(effectiveLocDelta)} ` +
-            `but coupling increased by +${couplingDelta} (violates maintainability invariant: ` +
-            `code deletion must not increase external coupling)`;
-    } else if (couplingDelta > maxCouplingDelta) {
-        verdict = VERDICT_FAILED;
-        rejectionRationale = `Coupling delta +${couplingDelta} exceeded maximum threshold +${maxCouplingDelta}`;
-    } else if (
-        options?.minMaintainabilityDelta !== undefined &&
-        maintainabilityDelta < options.minMaintainabilityDelta
-    ) {
-        verdict = VERDICT_FAILED;
-        rejectionRationale =
-            `Maintainability delta ${maintainabilityDelta} fell below the declared floor ` +
-            `${options.minMaintainabilityDelta}`;
-    } else if (couplingDelta > 0 && duplicationDelta > 0) {
-        verdict = VERDICT_WARNING;
-    } else if (couplingDelta > 0 && complexityDelta > 0) {
-        verdict = VERDICT_WARNING;
-    }
+    const { verdict, rejectionRationale } = determineVerdict(
+        effectiveLocDelta,
+        couplingDelta,
+        complexityDelta,
+        duplicationDelta,
+        maintainabilityDelta,
+        options,
+    );
 
     return {
         oldLoc,

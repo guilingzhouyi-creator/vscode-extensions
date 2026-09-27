@@ -62,11 +62,28 @@ function shouldExemptElastic(
     return !elasticEvaluation.shouldFlagLargeFile && functionsCount < t.fileFunctionsWarn;
 }
 
-function checkFailThreshold(m: FileMetric, t: Record<string, any>, density: any): string | null {
-    if (t.effectiveLocFail && density.effectiveCodeLines >= t.effectiveLocFail) {
-        return `effective LOC ${density.effectiveCodeLines} >= fail threshold ${t.effectiveLocFail} (lines: ${m.lines})`;
+function getEvaluatedEffectiveLoc(density: any, zoneProfile: any): number {
+    if (zoneProfile && typeof zoneProfile.productionEffectiveLoc === 'number') {
+        return zoneProfile.productionEffectiveLoc;
+    }
+    return density ? density.effectiveCodeLines : 0;
+}
+
+function checkFailThreshold(
+    m: FileMetric,
+    t: Record<string, any>,
+    density: any,
+    zoneProfile?: any,
+): string | null {
+    const effectiveLoc = getEvaluatedEffectiveLoc(density, zoneProfile);
+    if (t.effectiveLocFail && effectiveLoc >= t.effectiveLocFail) {
+        return `effective LOC ${effectiveLoc} >= fail threshold ${t.effectiveLocFail} (lines: ${m.lines})`;
     }
     if (m.lines >= t.fileLinesFail) {
+        const testWarn = t.fileLinesWarn || 400;
+        if (zoneProfile && zoneProfile.embeddedTestLines > 0 && effectiveLoc < testWarn) {
+            return null;
+        }
         return `lines ${m.lines} >= fail threshold ${t.fileLinesFail}`;
     }
     return null;
@@ -79,17 +96,23 @@ function collectWarnReasons(
     zoneProfile: any,
 ): string[] {
     const reasons: string[] = [];
-    if (t.effectiveLocWarn && density.effectiveCodeLines >= t.effectiveLocWarn) {
+    const effectiveLoc = getEvaluatedEffectiveLoc(density, zoneProfile);
+    if (t.effectiveLocWarn && effectiveLoc >= t.effectiveLocWarn) {
         reasons.push(
-            `effective LOC ${density.effectiveCodeLines} >= warn threshold ${t.effectiveLocWarn} (raw lines: ${m.lines})`,
+            `effective LOC ${effectiveLoc} >= warn threshold ${t.effectiveLocWarn} (raw lines: ${m.lines})`,
         );
     } else if (m.lines >= t.fileLinesWarn) {
-        reasons.push(`lines ${m.lines} >= warn threshold ${t.fileLinesWarn}`);
+        const effWarn = t.effectiveLocWarn || 400;
+        const skipWarn = zoneProfile && zoneProfile.embeddedTestLines > 0 && effectiveLoc < effWarn;
+        if (!skipWarn) {
+            reasons.push(`lines ${m.lines} >= warn threshold ${t.fileLinesWarn}`);
+        }
     }
     if (m.functions >= t.fileFunctionsWarn) {
         reasons.push(`functions ${m.functions} >= warn threshold ${t.fileFunctionsWarn}`);
     }
-    if (reasons.length > 0 && !zoneProfile.isDecoupled && (t.enableElasticBudget || t.flagZonePartitioner)) {
+    const elasticActive = t.enableElasticBudget || t.flagZonePartitioner;
+    if (reasons.length > 0 && !zoneProfile.isDecoupled && elasticActive) {
         reasons.push(`high intra-file entanglement (EI: ${zoneProfile.entanglementIndex})`);
     }
     return reasons;
@@ -101,7 +124,7 @@ function evaluateThresholdSeverity(
     density: any,
     zoneProfile: any,
 ): { severity: Severity | null; reasons: string[] } {
-    const failReason = checkFailThreshold(m, t, density);
+    const failReason = checkFailThreshold(m, t, density, zoneProfile);
     if (failReason) {
         return { severity: 'error', reasons: [failReason] };
     }
@@ -140,6 +163,9 @@ function buildSplitSuggestions(
     return suggestions;
 }
 
+/**
+ * Analyzer checking file size, line counts, function density, and modular breakdown boundaries.
+ */
 export class LargeFileAnalyzer implements Analyzer {
     name = 'large-file' as const;
 
@@ -151,12 +177,13 @@ export class LargeFileAnalyzer implements Analyzer {
     private exportedSymbols = 0;
     private modules = new Set<string>();
 
-    analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         this.reset();
+        const content = sf && typeof sf.text === 'string' ? sf.text : ctx.content || '';
         const { TypeScriptAdapter } =
             require('../core/typescript-adapter') as typeof import('../core/typescript-adapter');
         const adapter = new TypeScriptAdapter();
-        const ast = adapter.parse(sf.text, ctx.filePath);
+        const ast = adapter.parse(content, ctx.filePath);
         return runStreaming(adapter, ast.root, [
             { analyzer: this, ctx: { ...ctx, sourceFile: sf, root: ast.root, adapter } },
         ]);

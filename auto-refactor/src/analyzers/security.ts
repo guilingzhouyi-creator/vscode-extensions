@@ -145,7 +145,10 @@ export class SecurityAnalyzer implements Analyzer {
 
         // High-performance fast path: pre-screen large files via native SIMD multi-pattern matcher
         if (content.length > 5000) {
-            const hits = nativeCore.fastPatternMatch(content, SECURITY_FAST_FILTER_TOKENS as string[]);
+            const hits = nativeCore.fastPatternMatch(
+                content,
+                SECURITY_FAST_FILTER_TOKENS as string[],
+            );
             if (hits.length === 0) {
                 return [];
             }

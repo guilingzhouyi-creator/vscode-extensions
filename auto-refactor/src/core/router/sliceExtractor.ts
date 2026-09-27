@@ -36,6 +36,51 @@ interface DeclarationBoundary {
     declarationLineText: string;
 }
 
+function extractDeclarationKind(line: string): string {
+    if (line.includes('class ')) return 'ClassDeclaration';
+    if (line.includes('interface ')) return 'InterfaceDeclaration';
+    if (line.includes('type ')) return 'TypeAliasDeclaration';
+    return 'FunctionDeclaration';
+}
+
+function extractMatchedName(match: RegExpExecArray): string {
+    for (let k = 1; k < match.length; k++) {
+        if (match[k]) return match[k];
+    }
+    return 'anonymous';
+}
+
+function tryStartBoundary(
+    line: string,
+    lineNum: number,
+    trimmed: string,
+): DeclarationBoundary | null {
+    const match = DECLARATION_START_RE.exec(line);
+    if (!match) return null;
+    return {
+        name: extractMatchedName(match),
+        kind: extractDeclarationKind(line),
+        startLine: lineNum,
+        endLine: lineNum,
+        isExported: line.includes('export'),
+        declarationLineText: trimmed,
+    };
+}
+
+function computeBraceDelta(line: string): number {
+    let delta = 0;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line.charCodeAt(i);
+        if (ch === 123) delta++;
+        else if (ch === 125) delta--;
+    }
+    return delta;
+}
+
+function isBoundaryClosed(line: string, braceDepth: number, kind: string): boolean {
+    return braceDepth <= 0 && (line.includes('}') || kind === 'TypeAliasDeclaration');
+}
+
 /**
  * Scan lines to detect declaration boundaries using block nesting tracking.
  *
@@ -53,44 +98,15 @@ function scanDeclarationBoundaries(lines: string[]): DeclarationBoundary[] {
         const trimmed = line.trim();
 
         if (!current) {
-            const match = DECLARATION_START_RE.exec(line);
-            if (match) {
-                let name = 'anonymous';
-                for (let k = 1; k < match.length; k++) {
-                    if (match[k]) {
-                        name = match[k];
-                        break;
-                    }
-                }
-                const isExported = line.includes('export');
-                let kind = 'FunctionDeclaration';
-                if (line.includes('class ')) kind = 'ClassDeclaration';
-                else if (line.includes('interface ')) kind = 'InterfaceDeclaration';
-                else if (line.includes('type ')) kind = 'TypeAliasDeclaration';
-
-                current = {
-                    name,
-                    kind,
-                    startLine: lineNum,
-                    endLine: lineNum,
-                    isExported,
-                    declarationLineText: trimmed,
-                };
-                braceDepth = 0;
-            }
+            current = tryStartBoundary(line, lineNum, trimmed);
+            if (current) braceDepth = 0;
         }
 
         if (current) {
-            for (const ch of line) {
-                if (ch === '{') braceDepth++;
-                else if (ch === '}') braceDepth--;
-            }
+            braceDepth += computeBraceDelta(line);
             current.endLine = lineNum;
 
-            if (
-                braceDepth <= 0 &&
-                (line.includes('}') || current.kind === 'TypeAliasDeclaration')
-            ) {
+            if (isBoundaryClosed(line, braceDepth, current.kind)) {
                 boundaries.push(current);
                 current = null;
                 braceDepth = 0;

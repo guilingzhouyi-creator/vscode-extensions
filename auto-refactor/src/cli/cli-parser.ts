@@ -68,6 +68,9 @@ export interface CliOptions extends ScanOptions {
     effectiveLoc?: number;
     fileLinesWarn?: number;
     fileLinesFail?: number;
+    fix?: boolean;
+    fixDryRun?: boolean;
+    fixRules?: string[];
 }
 
 /**
@@ -151,6 +154,12 @@ function applyStandaloneFlag(opt: CliOptions, arg: string): boolean {
         case 'force-baseline-expand':
             opt.forceBaselineExpand = true;
             return true;
+        case 'fix':
+            opt.fix = true;
+            return true;
+        case 'fix-dry-run':
+            opt.fixDryRun = true;
+            return true;
         case 'help':
         case 'h':
             printUsage();
@@ -205,6 +214,12 @@ function applyGeneralValueFlag(opt: CliOptions, arg: string, val: string): boole
             return true;
         case 'log-file':
             opt.logFile = val;
+            return true;
+        case 'fix-rules':
+            opt.fixRules = val
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
             return true;
         default:
             return false;
@@ -402,6 +417,9 @@ Options:
   --profile                   Display auto-detected project stack profile and partition details
   --score                     Output multi-dimensional quality assessment and Tri-Plane vectors
   --telemetry <file>          Ingest dynamic runtime telemetry profile (DynamicEvidenceDTO JSON)
+  --fix                       Automatically apply guaranteed codemod fixes in-place
+  --fix-dry-run               Compute and display unified diffs without modifying files
+  --fix-rules <rules>         Comma-separated list of rule IDs to restrict auto-fixing
   --help, -h                  Show this help
 `);
 }

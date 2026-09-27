@@ -19,7 +19,11 @@ import type { CodeDensityMetrics } from './code-density-analyzer';
 
 /** Canonical semantic zone classification kinds. */
 export type SemanticZoneType =
-    'ZONE_COMPUTE_KERNEL' | 'ZONE_INTERFACE_GATEWAY' | 'ZONE_LOOKUP_TABLE' | 'ZONE_STATE_LIFECYCLE';
+    | 'ZONE_COMPUTE_KERNEL'
+    | 'ZONE_INTERFACE_GATEWAY'
+    | 'ZONE_LOOKUP_TABLE'
+    | 'ZONE_STATE_LIFECYCLE'
+    | 'ZONE_EMBEDDED_TEST';
 
 /** High-density algorithm and mathematical computation kernel zone. */
 export const ZONE_COMPUTE_KERNEL: SemanticZoneType = 'ZONE_COMPUTE_KERNEL';
@@ -32,6 +36,9 @@ export const ZONE_LOOKUP_TABLE: SemanticZoneType = 'ZONE_LOOKUP_TABLE';
 
 /** Runtime state initialization, teardown, and lifecycle handler zone. */
 export const ZONE_STATE_LIFECYCLE: SemanticZoneType = 'ZONE_STATE_LIFECYCLE';
+
+/** Embedded unit test suite zone (e.g. Rust #[cfg(test)] mod tests, Python doctest). */
+export const ZONE_EMBEDDED_TEST: SemanticZoneType = 'ZONE_EMBEDDED_TEST';
 
 /** Contiguous semantic zone slice within a single file. */
 export interface SemanticZoneSegment {
@@ -48,6 +55,9 @@ export interface IntraFileZoneProfile {
     readonly filePath: string;
     readonly totalLines: number;
     readonly effectiveLoc: number;
+    readonly embeddedTestLines: number;
+    readonly productionEffectiveLoc: number;
+    readonly embeddedTestIntentAnnotatedRatio: number;
     readonly segments: SemanticZoneSegment[];
     readonly distribution: Record<SemanticZoneType, number>;
     readonly entanglementIndex: number;
@@ -71,6 +81,11 @@ const TABLE_PATTERN = /(?:table|matrix|lookup|dict|mapping|mask|constants|regist
  */
 function classifyNodeZone(node: NormalizedNode): SemanticZoneType {
     const name = (node.name || '').toLowerCase();
+
+    // 0. Embedded test zone: Rust #[cfg(test)], test modules, or test functions
+    if (name === 'tests' || name === 'test' || name.startsWith('test_') || name.endsWith('_test')) {
+        return ZONE_EMBEDDED_TEST;
+    }
 
     // 1. Data and lookup tables: constants or variables with high literal density
     if (node.kind === NodeKind.Constant || node.kind === NodeKind.Field) {
@@ -100,6 +115,85 @@ function classifyNodeZone(node: NormalizedNode): SemanticZoneType {
     return ZONE_COMPUTE_KERNEL;
 }
 
+/** Pattern heuristics for embedded test markers across Rust, Python, etc. */
+const EMBEDDED_TEST_HEADER_PATTERN =
+    /(?:#\[cfg\(test\)\]|mod\s+tests\b|if\s+__name__\s*==\s*['"]__main__['"])/;
+
+interface EmbeddedTestTracker {
+    inEmbeddedTest: boolean;
+    testBraceDepth: number;
+    testBraceStarted: boolean;
+    testCaseCount: number;
+    testIntentAnnotatedCount: number;
+}
+
+function updateEmbeddedTracker(tracker: EmbeddedTestTracker, line: string): void {
+    if (line.includes('#[test]') || line.startsWith('def test_') || line.startsWith('fn test_')) {
+        tracker.testCaseCount++;
+    }
+    const openBraces = (line.match(/\{/g) || []).length;
+    const closeBraces = (line.match(/\}/g) || []).length;
+    if (openBraces > 0) {
+        tracker.testBraceStarted = true;
+    }
+    if (tracker.testBraceStarted) {
+        tracker.testBraceDepth += openBraces - closeBraces;
+        if (tracker.testBraceDepth <= 0) {
+            tracker.inEmbeddedTest = false;
+            tracker.testBraceStarted = false;
+            tracker.testBraceDepth = 0;
+        }
+    }
+}
+
+const FUNCTION_KEYWORD_RE = /\b(?:function|fn|def|export)\b/;
+const STATE_CONTAINER_RE = /\b(?:class|struct|impl)\b/;
+const TABLE_DECLARATION_RE = /\b(?:const|let)\b|=/;
+const COMMENT_OR_EMPTY_RE = /^(?:\s*$|\/\/|#|\/\*)/;
+
+function isCommentOrEmptyLine(line: string): boolean {
+    return COMMENT_OR_EMPTY_RE.test(line);
+}
+
+function checkCommentIntent(line: string, tracker: EmbeddedTestTracker): void {
+    if (tracker.inEmbeddedTest && (line.includes('Case:') || line.includes('Assertion:'))) {
+        tracker.testIntentAnnotatedCount++;
+    }
+}
+
+function inferNonTestLineZone(line: string, defaultZone: SemanticZoneType): SemanticZoneType {
+    if (FUNCTION_KEYWORD_RE.test(line)) {
+        return GATEWAY_PATTERN.test(line) ? ZONE_INTERFACE_GATEWAY : ZONE_COMPUTE_KERNEL;
+    }
+    if (STATE_CONTAINER_RE.test(line) && STATE_PATTERN.test(line)) {
+        return ZONE_STATE_LIFECYCLE;
+    }
+    if (TABLE_DECLARATION_RE.test(line) && TABLE_PATTERN.test(line)) {
+        return ZONE_LOOKUP_TABLE;
+    }
+    return defaultZone;
+}
+
+function stepHeuristicLine(
+    line: string,
+    lineNum: number,
+    tracker: EmbeddedTestTracker,
+    currentZone: SemanticZoneType,
+    rawSegments: Array<{ zone: SemanticZoneType; line: number }>,
+): SemanticZoneType {
+    if (EMBEDDED_TEST_HEADER_PATTERN.test(line)) {
+        tracker.inEmbeddedTest = true;
+    }
+    if (tracker.inEmbeddedTest) {
+        updateEmbeddedTracker(tracker, line);
+        rawSegments.push({ zone: ZONE_EMBEDDED_TEST, line: lineNum });
+        return tracker.inEmbeddedTest ? currentZone : ZONE_COMPUTE_KERNEL;
+    }
+    const nextZone = inferNonTestLineZone(line, currentZone);
+    rawSegments.push({ zone: nextZone, line: lineNum });
+    return nextZone;
+}
+
 /**
  * Fallback line-level scanner when full AST traversal is unavailable or truncated.
  */
@@ -113,40 +207,29 @@ function partitionByTextHeuristics(
     const rawSegments: Array<{ zone: SemanticZoneType; line: number }> = [];
 
     let currentZone: SemanticZoneType = ZONE_COMPUTE_KERNEL;
+    const tracker: EmbeddedTestTracker = {
+        inEmbeddedTest: false,
+        testBraceDepth: 0,
+        testBraceStarted: false,
+        testCaseCount: 0,
+        testIntentAnnotatedCount: 0,
+    };
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        if (!line || line.startsWith('//') || line.startsWith('#') || line.startsWith('/*')) {
+        if (isCommentOrEmptyLine(line)) {
+            checkCommentIntent(line, tracker);
             continue;
         }
-
-        if (
-            line.includes('function') ||
-            line.includes('fn ') ||
-            line.includes('def ') ||
-            line.includes('export')
-        ) {
-            if (GATEWAY_PATTERN.test(line) || line.includes('export')) {
-                currentZone = ZONE_INTERFACE_GATEWAY;
-            } else {
-                currentZone = ZONE_COMPUTE_KERNEL;
-            }
-        } else if (
-            STATE_PATTERN.test(line) &&
-            (line.includes('class') || line.includes('struct') || line.includes('impl'))
-        ) {
-            currentZone = ZONE_STATE_LIFECYCLE;
-        } else if (
-            TABLE_PATTERN.test(line) &&
-            (line.includes('const') || line.includes('let') || line.includes('='))
-        ) {
-            currentZone = ZONE_LOOKUP_TABLE;
-        }
-
-        rawSegments.push({ zone: currentZone, line: i + 1 });
+        currentZone = stepHeuristicLine(line, i + 1, tracker, currentZone, rawSegments);
     }
 
-    return coalesceSegments(rawSegments, filePath, totalLines, effectiveLoc);
+    const intentRatio =
+        tracker.testCaseCount > 0
+            ? +(tracker.testIntentAnnotatedCount / tracker.testCaseCount).toFixed(2)
+            : 1.0;
+
+    return coalesceSegments(rawSegments, filePath, totalLines, effectiveLoc, intentRatio);
 }
 
 /**
@@ -157,18 +240,23 @@ function coalesceSegments(
     filePath: string,
     totalLines: number,
     effectiveLoc: number,
+    intentAnnotatedRatio = 1.0,
 ): IntraFileZoneProfile {
     if (items.length === 0) {
         return {
             filePath,
             totalLines,
             effectiveLoc,
+            embeddedTestLines: 0,
+            productionEffectiveLoc: effectiveLoc,
+            embeddedTestIntentAnnotatedRatio: 1.0,
             segments: [],
             distribution: {
                 ZONE_COMPUTE_KERNEL: 1.0,
                 ZONE_INTERFACE_GATEWAY: 0.0,
                 ZONE_LOOKUP_TABLE: 0.0,
                 ZONE_STATE_LIFECYCLE: 0.0,
+                ZONE_EMBEDDED_TEST: 0.0,
             },
             entanglementIndex: 0.0,
             isDecoupled: true,
@@ -218,6 +306,7 @@ function coalesceSegments(
         ZONE_INTERFACE_GATEWAY: 0,
         ZONE_LOOKUP_TABLE: 0,
         ZONE_STATE_LIFECYCLE: 0,
+        ZONE_EMBEDDED_TEST: 0,
     };
 
     let totalSegmentLines = 0;
@@ -232,22 +321,30 @@ function coalesceSegments(
         ZONE_INTERFACE_GATEWAY: +(zoneCounts.ZONE_INTERFACE_GATEWAY / denom).toFixed(3),
         ZONE_LOOKUP_TABLE: +(zoneCounts.ZONE_LOOKUP_TABLE / denom).toFixed(3),
         ZONE_STATE_LIFECYCLE: +(zoneCounts.ZONE_STATE_LIFECYCLE / denom).toFixed(3),
+        ZONE_EMBEDDED_TEST: +(zoneCounts.ZONE_EMBEDDED_TEST / denom).toFixed(3),
     };
 
+    const embeddedTestLines = zoneCounts.ZONE_EMBEDDED_TEST || 0;
+    const productionEffectiveLoc = Math.max(0, effectiveLoc - embeddedTestLines);
+
     // Entanglement Index (EI): ratio of zone transitions over total segments
-    // Clean file: few contiguous blocks (EI <= 0.15); interleaved: flips constantly (EI > 0.3)
-    const transitions = Math.max(0, segments.length - 1);
+    // Excluding terminal embedded test blocks from entanglement penalty
+    const nonTestSegments = segments.filter((s) => s.zone !== ZONE_EMBEDDED_TEST);
+    const transitions = Math.max(0, nonTestSegments.length - 1);
     const entanglementIndex = +(transitions / Math.max(1, items.length)).toFixed(4);
     const isDecoupled = entanglementIndex <= 0.25;
 
     const rationale = isDecoupled
-        ? `Clean intra-file semantic separation (EI: ${entanglementIndex}, ${segments.length} contiguous zones)`
-        : `High intra-file entanglement (EI: ${entanglementIndex}, ${segments.length} fragmented transitions between compute and gateway)`;
+        ? `Clean intra-file semantic separation (EI: ${entanglementIndex}, production LOC: ${productionEffectiveLoc})`
+        : `High intra-file entanglement (EI: ${entanglementIndex}, ${segments.length} fragmented transitions)`;
 
     return {
         filePath,
         totalLines,
         effectiveLoc,
+        embeddedTestLines,
+        productionEffectiveLoc,
+        embeddedTestIntentAnnotatedRatio: intentAnnotatedRatio,
         segments,
         distribution,
         entanglementIndex,

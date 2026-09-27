@@ -25,6 +25,29 @@ const DIRECTION_BACKWARD = 'backward';
 const DIRECTION_BOTH = 'both';
 type GraphDirection = typeof DIRECTION_FORWARD | typeof DIRECTION_BACKWARD | typeof DIRECTION_BOTH;
 
+function buildInDegreeMap(nodeIds: Iterable<string>, edges: SemanticEdge[]): Map<string, number> {
+    const inDegree = new Map<string, number>();
+    for (const nodeId of nodeIds) {
+        inDegree.set(nodeId, 0);
+    }
+    for (const edge of edges) {
+        if (inDegree.has(edge.toNodeId)) {
+            inDegree.set(edge.toNodeId, (inDegree.get(edge.toNodeId) ?? 0) + 1);
+        }
+    }
+    return inDegree;
+}
+
+function collectZeroDegreeNodes(inDegree: Map<string, number>): string[] {
+    const queue: string[] = [];
+    for (const [nodeId, deg] of inDegree.entries()) {
+        if (deg === 0) {
+            queue.push(nodeId);
+        }
+    }
+    return queue;
+}
+
 /**
  * High-performance language-agnostic code topology graph.
  */
@@ -251,24 +274,10 @@ export class SemanticGraph {
      * Performs a topological sort on DAG structures. Returns null if cycles exist.
      */
     public getTopologicalSort(): string[] | null {
-        const inDegree = new Map<string, number>();
-        for (const nodeId of this.nodes.keys()) {
-            inDegree.set(nodeId, 0);
-        }
-        for (const edge of this.getAllEdges()) {
-            if (inDegree.has(edge.toNodeId)) {
-                inDegree.set(edge.toNodeId, (inDegree.get(edge.toNodeId) ?? 0) + 1);
-            }
-        }
-
-        const queue: string[] = [];
-        for (const [nodeId, deg] of inDegree.entries()) {
-            if (deg === 0) {
-                queue.push(nodeId);
-            }
-        }
-
+        const inDegree = buildInDegreeMap(this.nodes.keys(), this.getAllEdges());
+        const queue = collectZeroDegreeNodes(inDegree);
         const order: string[] = [];
+
         while (queue.length > 0) {
             const u = queue.shift()!;
             order.push(u);
@@ -318,6 +327,29 @@ export class SemanticGraph {
         };
     }
 
+    private traverseComponent(startNode: string, visited: Set<string>): void {
+        const queue: string[] = [startNode];
+        visited.add(startNode);
+
+        while (queue.length > 0) {
+            const cur = queue.shift()!;
+            for (const edge of this.getOutgoingEdges(cur)) {
+                const n = edge.toNodeId;
+                if (this.nodes.has(n) && !visited.has(n)) {
+                    visited.add(n);
+                    queue.push(n);
+                }
+            }
+            for (const edge of this.getIncomingEdges(cur)) {
+                const n = edge.fromNodeId;
+                if (this.nodes.has(n) && !visited.has(n)) {
+                    visited.add(n);
+                    queue.push(n);
+                }
+            }
+        }
+    }
+
     /**
      * Calculates weakly connected component count via undirected traversal.
      */
@@ -328,22 +360,7 @@ export class SemanticGraph {
         for (const nodeId of this.nodes.keys()) {
             if (!visited.has(nodeId)) {
                 components++;
-                const queue: string[] = [nodeId];
-                visited.add(nodeId);
-
-                while (queue.length > 0) {
-                    const cur = queue.shift()!;
-                    const neighbors = [
-                        ...this.getOutgoingEdges(cur).map((e) => e.toNodeId),
-                        ...this.getIncomingEdges(cur).map((e) => e.fromNodeId),
-                    ];
-                    for (const n of neighbors) {
-                        if (this.nodes.has(n) && !visited.has(n)) {
-                            visited.add(n);
-                            queue.push(n);
-                        }
-                    }
-                }
+                this.traverseComponent(nodeId, visited);
             }
         }
 

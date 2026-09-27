@@ -162,10 +162,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         if (opts.enforceCleanLayers === false) {
             return [];
         }
-        if (
-            ctx.config.archetype === 'stdlib' ||
-            ctx.config.archetype === 'systems_runtime'
-        ) {
+        if (ctx.config.archetype === 'stdlib' || ctx.config.archetype === 'systems_runtime') {
             return [];
         }
 

@@ -391,23 +391,27 @@ export class CacheStore {
             // Level 0: Full load (original behavior)
             this.loadResultsFull();
             this.l2LoadLevel = 'full';
-        } else if (ratio <= 1.0) {
+            return;
+        }
+        if (ratio <= 1.0) {
             // Level 1: Hot entries only (recent 7 days + error severity)
             const cutoff = Date.now() - 7 * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
             this.loadResultsFiltered((entry: L2Entry) => this.isHotEntry(entry, cutoff));
             this.l2LoadLevel = 'hot';
-        } else if (ratio <= 2.0) {
+            return;
+        }
+        if (ratio <= 2.0) {
             // Level 2: Metadata only (key + path + timestamp)
             this.loadResultsMetadataOnly();
             this.l2LoadLevel = 'metadata';
-        } else {
-            // Level 3: Completely disabled
-            this.l2LoadLevel = 'disabled';
-            if (this.logger) {
-                this.logger.warn(
-                    `L2 cache too large (${(fileSize / BYTES_PER_KIB / KIB_PER_MIB).toFixed(1)} MiB), skipping load`,
-                );
-            }
+            return;
+        }
+        // Level 3: Completely disabled
+        this.l2LoadLevel = 'disabled';
+        if (this.logger) {
+            this.logger.warn(
+                `L2 cache too large (${(fileSize / BYTES_PER_KIB / KIB_PER_MIB).toFixed(1)} MiB), skipping load`,
+            );
         }
     }
 

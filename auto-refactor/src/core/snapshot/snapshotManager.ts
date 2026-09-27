@@ -156,6 +156,27 @@ export function verifyAuditSnapshot(snapshot: AuditSnapshot): {
     };
 }
 
+function writeTextFileSync(targetPath: string, text: string): void {
+    const fd = fs.openSync(targetPath, 'w');
+    try {
+        fs.writeSync(fd, text, 0, 'utf8');
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
+function readTextFileSync(targetPath: string): string {
+    const fd = fs.openSync(targetPath, 'r');
+    try {
+        const stat = fs.fstatSync(fd);
+        const buf = Buffer.allocUnsafe(stat.size);
+        fs.readSync(fd, buf, 0, stat.size, 0);
+        return buf.toString('utf8');
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
 /**
  * Freeze current audit snapshot to target file on disk.
  *
@@ -172,7 +193,7 @@ export function freezeBaselineToFile(
     const snapshot = createAuditSnapshot(metricsOverride);
 
     fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
-    fs.writeFileSync(resolvedPath, JSON.stringify(snapshot, null, 2), 'utf8');
+    writeTextFileSync(resolvedPath, JSON.stringify(snapshot, null, 2));
 
     return snapshot;
 }
@@ -189,6 +210,6 @@ export function loadFrozenBaseline(sourcePath?: string): AuditSnapshot | null {
     if (!fs.existsSync(resolvedPath)) {
         return null;
     }
-    const raw = fs.readFileSync(resolvedPath, 'utf8');
+    const raw = readTextFileSync(resolvedPath);
     return JSON.parse(raw) as AuditSnapshot;
 }

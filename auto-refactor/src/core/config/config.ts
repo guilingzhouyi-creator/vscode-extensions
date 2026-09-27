@@ -27,8 +27,6 @@ import type {
     AnalyzerDeclaration,
     CustomAnalyzerDeclaration,
     AnalyzerId,
-    LogLevel,
-    LiteralPolicyConfig,
     DynamicEvidenceDTO,
 } from '../types';
 import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from '../literal-policy-engine';
@@ -64,7 +62,16 @@ import {
     ANALYZER_SHELL_LINT,
     ANALYZER_STDLIB,
 } from '../scoring/dimensionLiterals';
-import { applySemanticAndSecurityLevels } from './config-cascades';
+import {
+    applySemanticAndSecurityLevels,
+    assembleGlobalThresholds,
+    mergeAnalyzerDeclarations,
+    assembleExecutionOptions,
+    assembleReportingOptions,
+    mergeLiteralPolicy,
+    resolveScalar,
+    resolveFlag,
+} from './config-cascades';
 import type { ConfigOverrides } from './config-tuning';
 
 // Compatibility surface: callers historically imported ConfigOverrides from this module.
@@ -116,7 +123,9 @@ const DEFAULT_HARDCODED_STRING_MIN_LENGTH = 3;
 const DEFAULT_FILE_LINES_WARN = 400;
 const DEFAULT_FILE_LINES_FAIL = 800;
 const DEFAULT_FILE_FUNCTIONS_WARN = 15;
+/** Default warning threshold for effective lines of code. */
 export const DEFAULT_EFFECTIVE_LOC_WARN = 800;
+/** Default failure threshold for effective lines of code. */
 export const DEFAULT_EFFECTIVE_LOC_FAIL = 1600;
 /** complexity analyzer defaults. */
 const DEFAULT_COMPLEXITY_WARN = 10;
@@ -144,21 +153,10 @@ const DEFAULT_MAX_GUARD_CLAUSE_NESTING = 3;
 const DEFAULT_MAX_CONCURRENCY = 4;
 
 /** `typeof` tag used to validate boolean overrides before they are layered into the config. */
-const TYPEOF_BOOLEAN = 'boolean';
+const _TYPEOF_BOOLEAN = 'boolean';
 const TYPEOF_STRING = 'string';
 const TYPEOF_OBJECT = 'object';
 const DELIM_COMMA = ',';
-
-/**
- * True when `value` is a genuine boolean (not a stringified CLI value), used instead of an
- * inline `typeof` check so the comparison token lives in exactly one named place.
- *
- * @param value - Raw override value read from CLI/API/file sources.
- * @returns True when the runtime type is boolean, narrowing `value` to `boolean`.
- */
-function isBooleanFlag(value: unknown): value is boolean {
-    return typeof value === TYPEOF_BOOLEAN;
-}
 
 function isStringValue(value: unknown): value is string {
     return typeof value === TYPEOF_STRING;
@@ -201,7 +199,8 @@ export function defaultThresholds(): Thresholds {
  *
  *  constants:       magicNumberMin, duplicateLiteralThreshold, hardcodedStringMinLength,
  *                   ignoreLiterals
- *  large-file:      fileLinesWarn, fileLinesFail, fileFunctionsWarn, effectiveLocWarn, effectiveLocFail
+ *  large-file:      fileLinesWarn, fileLinesFail, fileFunctionsWarn,
+ *                   effectiveLocWarn, effectiveLocFail
  *  complexity:      complexityWarn, complexityFail
  *  governance:      maxNestingDepth, maxInheritanceDepth, blockingIoAllowPatterns
  *  architecture:    enforceCleanLayers, allowSkipLayers
@@ -399,13 +398,30 @@ export function defaultConfig(root: string): ScanConfig {
 }
 
 /**
- * Locate and read a JSON configuration file if present, degrading gracefully on parse errors.
+ * Locate the first existing configuration candidate from a list of paths.
  *
- * @param root - The scan root directory used for candidate config paths.
- * @param configFile - Explicit config file path if specified via CLI or options.
- * @returns An object containing the parsed config (or empty object) and the resolved base
- *   directory.
+ * @param candidates - Potential config file candidate paths.
+ * @returns Path of first existing file, or undefined if none exist.
  */
+function findFirstExistingCandidate(candidates: string[]): string | undefined {
+    for (const c of candidates) {
+        if (fs.existsSync(c)) return c;
+    }
+    return undefined;
+}
+
+function readTextFile(filePath: string): string {
+    const fd = fs.openSync(filePath, 'r');
+    try {
+        const stat = fs.fstatSync(fd);
+        const buf = Buffer.allocUnsafe(stat.size);
+        fs.readSync(fd, buf, 0, stat.size, 0);
+        return buf.toString('utf8');
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
 function loadConfigFile(
     root: string,
     configFile?: string,
@@ -418,230 +434,20 @@ function loadConfigFile(
         path.join(root, 'auto-refactor.config.json'),
         !isDifferentRoot ? path.join(process.cwd(), 'auto-refactor.config.json') : undefined,
     ].filter(Boolean) as string[];
-    for (const c of candidates) {
+
+    const existingFile = findFirstExistingCandidate(candidates);
+    if (existingFile) {
         try {
-            if (fs.existsSync(c)) {
-                fileCfg = JSON.parse(fs.readFileSync(c, 'utf8'));
-                baseDir = path.dirname(path.resolve(c));
-                break;
-            }
+            fileCfg = JSON.parse(readTextFile(existingFile));
+            baseDir = path.dirname(path.resolve(existingFile));
         } catch (e) {
-            // A bad config must not be silently ignored: a parse failure is treated as "no config
-            // file" and falls back to defaults, silently discarding every user-tuned threshold
-            // and analyzer switch (extremely hard to diagnose in CI). Warn only here—never throw,
-            // so "bad config degrades" still holds—and explicitly distinguish "file missing"
-            // from "file corrupt".
             console.warn(
-                `[auto-refactor] config file exists but is invalid/unreadable, falling back to defaults: ${c} ` +
+                `[auto-refactor] config file exists but is invalid/unreadable, falling back to defaults: ${existingFile} ` +
                     `(${e instanceof Error ? e.message : String(e)})`,
             );
         }
     }
     return { fileCfg, baseDir };
-}
-
-/**
- * Merge declarative analyzer registries across defaults, config file, and global thresholds.
- *
- * @param baseAnalyzers - Base built-in analyzer registry declarations.
- * @param fileCfgAnalyzers - Config-file supplied analyzer overrides if any.
- * @param analyzerDefaults - Built-in default options for each analyzer.
- * @param globalThresholds - Merged global thresholds to cascade into analyzer options.
- * @returns Fully merged analyzer declarations map.
- */
-function mergeAnalyzerDeclarations(
-    baseAnalyzers: Record<string, AnalyzerDeclaration>,
-    fileCfgAnalyzers: Record<string, Partial<AnalyzerDeclaration>> | undefined,
-    analyzerDefaults: Record<string, Record<string, unknown>>,
-    globalThresholds: Record<string, unknown>,
-): Record<string, AnalyzerDeclaration> {
-    const globalThresholdLayer = (name: string): Record<string, unknown> => {
-        const layer: Record<string, unknown> = {};
-        for (const key of Object.keys(analyzerDefaults[name] || {})) {
-            if (key in globalThresholds) layer[key] = globalThresholds[key];
-        }
-        return layer;
-    };
-
-    const analyzers: Record<string, AnalyzerDeclaration> = { ...baseAnalyzers };
-    if (fileCfgAnalyzers) {
-        for (const [name, decl] of Object.entries(fileCfgAnalyzers)) {
-            const defaults = analyzerDefaults[name] || {};
-            analyzers[name] = {
-                enabled: decl?.enabled !== false,
-                options: {
-                    ...defaults,
-                    ...globalThresholdLayer(name),
-                    ...(analyzers[name]?.options || {}),
-                    ...(decl?.options || {}),
-                },
-            };
-        }
-    }
-    // built-in analyzers not customized still get their defaults plus the global threshold layer
-    for (const name of Object.keys(analyzers)) {
-        if (!analyzers[name].options || Object.keys(analyzers[name].options).length === 0) {
-            analyzers[name] = {
-                ...analyzers[name],
-                options: { ...(analyzerDefaults[name] || {}), ...globalThresholdLayer(name) },
-            };
-        }
-    }
-    return analyzers;
-}
-
-/**
- * Resolve a value by precedence: CLI/API override, then config file, then base default.
- *
- * Uses `||` (not `??`) to keep the historical layering semantics, where an empty value in a
- * higher layer falls through to the next one instead of winning.
- *
- * @param override - CLI/API override value.
- * @param fileValue - Config-file value.
- * @param baseValue - Built-in default value.
- * @returns The first set value, or undefined when no layer provides one.
- */
-function resolveScalar<T>(override: T | undefined, fileValue: T | undefined, baseValue: T): T {
-    return override || fileValue || baseValue;
-}
-
-/**
- * Resolve a tri-state boolean flag: a genuine boolean override wins, else file, else base.
- *
- * @param override - Raw CLI/API override value (may be a stringified flag).
- * @param fileValue - Config-file value.
- * @param baseValue - Built-in default value.
- * @returns The resolved flag, or undefined when no layer sets one.
- */
-function resolveFlag<B extends boolean | undefined>(
-    override: unknown,
-    fileValue: boolean | undefined,
-    baseValue: B,
-): boolean | B {
-    return isBooleanFlag(override) ? override : (fileValue ?? baseValue);
-}
-
-/**
- * Resolve a numeric option, ignoring non-numeric CLI strings.
- *
- * @param override - Raw CLI/API override value (may be a stringified number).
- * @param fileValue - Config-file value.
- * @param baseValue - Built-in default value.
- * @returns The resolved number, or undefined when no layer provides one.
- */
-function resolveNumber<B extends number | undefined>(
-    override: unknown,
-    fileValue: number | undefined,
-    baseValue: B,
-): number | B {
-    return typeof override === 'number' ? override : (fileValue ?? baseValue);
-}
-
-/**
- * True when the caller explicitly passed `cache: false` (a scan flag that is not part of
- * ScanConfig, so it is probed structurally instead of widening the override type).
- *
- * @param overrides - Explicit CLI or runtime overrides.
- * @returns True when the override layer disabled the cache.
- */
-function cacheOverrideDisabled(overrides: ConfigOverrides): boolean {
-    return (overrides as { cache?: boolean }).cache === false;
-}
-
-/**
- * Assemble execution, concurrency, cache, and failure handling configuration flags.
- *
- * @param base - Base default configuration.
- * @param fileCfg - Config-file specified overrides.
- * @param overrides - Explicit CLI or runtime overrides.
- * @returns Filtered execution and scheduling options.
- */
-function assembleExecutionOptions(
-    base: ScanConfig,
-    fileCfg: Partial<ScanConfig>,
-    overrides: ConfigOverrides,
-): Pick<
-    ScanConfig,
-    | 'workers'
-    | 'concurrency'
-    | 'respectGitignore'
-    | 'failOnIssue'
-    | 'failOnSeverity'
-    | 'failOnAnalyzerError'
-    | 'parser'
-    | 'cacheEnabled'
-    | 'incremental'
-    | 'incrementalMinLines'
-> {
-    return {
-        concurrency: resolveScalar(overrides.concurrency, fileCfg.concurrency, base.concurrency),
-        workers: resolveNumber(overrides.workers, fileCfg.workers, base.workers),
-        respectGitignore: resolveFlag(
-            overrides.respectGitignore,
-            fileCfg.respectGitignore,
-            base.respectGitignore,
-        ),
-        failOnIssue: resolveFlag(overrides.failOnIssue, fileCfg.failOnIssue, base.failOnIssue),
-        failOnSeverity: resolveScalar(
-            overrides.failOnSeverity,
-            fileCfg.failOnSeverity,
-            base.failOnSeverity,
-        ),
-        failOnAnalyzerError: resolveFlag(
-            overrides.failOnAnalyzerError,
-            fileCfg.failOnAnalyzerError,
-            base.failOnAnalyzerError,
-        ),
-        parser: resolveScalar(overrides.parser, fileCfg.parser, base.parser),
-        cacheEnabled: cacheOverrideDisabled(overrides) ? false : base.cacheEnabled,
-        incremental: resolveFlag(overrides.incremental, fileCfg.incremental, base.incremental),
-        incrementalMinLines: resolveNumber(
-            overrides.incrementalMinLines,
-            fileCfg.incrementalMinLines,
-            base.incrementalMinLines,
-        ),
-    };
-}
-
-/**
- * Assemble formatting, logging, baseline, and output destination options.
- *
- * @param base - Base default configuration.
- * @param fileCfg - Config-file specified overrides.
- * @param overrides - Explicit CLI or runtime overrides.
- * @returns Filtered reporting and output options.
- */
-function assembleReportingOptions(
-    base: ScanConfig,
-    fileCfg: Partial<ScanConfig>,
-    overrides: ConfigOverrides,
-): Pick<
-    ScanConfig,
-    'format' | 'logLevel' | 'logFile' | 'suppressions' | 'baselineGranularity' | 'out'
-> {
-    return {
-        format: overrides.format || fileCfg.format || base.format,
-        logLevel: (overrides.logLevel as LogLevel) || fileCfg.logLevel || base.logLevel,
-        logFile: overrides.logFile || fileCfg.logFile || base.logFile,
-        suppressions: fileCfg.suppressions ?? base.suppressions,
-        baselineGranularity: fileCfg.baselineGranularity ?? base.baselineGranularity,
-        out: overrides.out || fileCfg.out,
-    };
-}
-
-function mergeLiteralPolicy(
-    base?: LiteralPolicyConfig,
-    custom?: LiteralPolicyConfig,
-): LiteralPolicyConfig | undefined {
-    if (!custom) return base;
-    return {
-        ...base,
-        ...custom,
-        toleratedCallArguments: {
-            ...(base?.toleratedCallArguments ?? {}),
-            ...(custom?.toleratedCallArguments ?? {}),
-        },
-    };
 }
 
 /**
@@ -654,7 +460,7 @@ function loadTelemetryData(root: string, telemetryPath?: string): DynamicEvidenc
         : path.resolve(root, telemetryPath);
     try {
         if (fs.existsSync(resolvedPath)) {
-            const raw = fs.readFileSync(resolvedPath, 'utf8');
+            const raw = readTextFile(resolvedPath);
             return JSON.parse(raw) as DynamicEvidenceDTO;
         }
     } catch (_err) {
@@ -805,34 +611,36 @@ function resolveCustomAnalyzersList(
  * @returns The fully merged config; a malformed config file warns and degrades to defaults
  *   instead of throwing, so callers always receive a usable configuration object.
  */
+
+/**
+ * Resolve a final config by layering (lowest -> highest precedence):
+ *   1) built-in defaults (registry + thresholds + scheduling)
+ *   2) optional config file (declarative, found via --config or auto-discovery)
+ *   3) explicit CLI overrides
+ *
+ * The `analyzers` map and `customAnalyzers` array are merged declaratively:
+ *   - analyzer entries in the config file override enable/options per name
+ *   - CLI `--analyzers a,b` becomes an explicit allow-list (enables those, disables the rest)
+ *
+ * Per-analyzer `options` are deep-merged with that analyzer's built-in defaults.
+ *
+ * @param overrides - CLI/API overrides; `analyzers` acts as an explicit allow-list, while
+ *   omitted fields fall back to the config file and then to the built-in defaults.
+ * @returns The fully merged config; a malformed config file warns and degrades to defaults
+ *   instead of throwing, so callers always receive a usable configuration object.
+ */
 export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {
     const root = overrides.root || process.cwd();
     const base = defaultConfig(root);
     const analyzerDefaults = defaultAnalyzerOptions();
 
     const { fileCfg, baseDir } = loadConfigFile(root, overrides.configFile);
-
-    const cliEffectiveLoc = (overrides as { effectiveLoc?: number }).effectiveLoc;
-    const cliFileLinesWarn = (overrides as { fileLinesWarn?: number }).fileLinesWarn;
-    const cliFileLinesFail = (overrides as { fileLinesFail?: number }).fileLinesFail;
-
-    const globalThresholds = {
-        ...base.thresholds,
-        ...(fileCfg.thresholds || {}),
-        ...(overrides.thresholds || {}),
-        ...(cliEffectiveLoc
-            ? {
-                  effectiveLocWarn: cliEffectiveLoc,
-                  effectiveLocFail: Math.round(cliEffectiveLoc * 2),
-                  ...(!cliFileLinesWarn ? { fileLinesWarn: Math.max(400, cliEffectiveLoc) } : {}),
-                  ...(!cliFileLinesFail
-                      ? { fileLinesFail: Math.max(800, Math.round(cliEffectiveLoc * 2)) }
-                      : {}),
-              }
-            : {}),
-        ...(cliFileLinesWarn ? { fileLinesWarn: cliFileLinesWarn } : {}),
-        ...(cliFileLinesFail ? { fileLinesFail: cliFileLinesFail } : {}),
-    } as Record<string, unknown>;
+    const globalThresholds = assembleGlobalThresholds(
+        base.thresholds,
+        fileCfg.thresholds,
+        overrides.thresholds,
+        overrides,
+    );
 
     const analyzers = mergeAnalyzerDeclarations(
         base.analyzers,

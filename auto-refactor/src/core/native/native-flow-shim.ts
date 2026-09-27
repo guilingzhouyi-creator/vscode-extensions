@@ -99,12 +99,7 @@ function computeReversePostOrder(
 /**
  * Intersects two dominator paths in the semi-lattice.
  */
-function intersectIdom(
-    b1: number,
-    b2: number,
-    doms: number[],
-    rpoIndex: number[],
-): number {
+function intersectIdom(b1: number, b2: number, doms: number[], rpoIndex: number[]): number {
     let finger1 = b1;
     let finger2 = b2;
     while (finger1 !== finger2) {
@@ -131,6 +126,22 @@ function findFirstValidPredecessor(preds: number[], doms: number[]): number {
 }
 
 /**
+ * Refines the candidate immediate dominator across all valid predecessors of a node.
+ */
+function refineNodeDominator(nodePreds: number[], doms: number[], rpoIndex: number[]): number {
+    let newIdom = findFirstValidPredecessor(nodePreds, doms);
+    if (newIdom === -1) {
+        return -1;
+    }
+    for (const p of nodePreds) {
+        if (p !== newIdom && doms[p] !== -1) {
+            newIdom = intersectIdom(p, newIdom, doms, rpoIndex);
+        }
+    }
+    return newIdom;
+}
+
+/**
  * Iteratively computes immediate dominators using Cooper-Harvey-Kennedy algorithm.
  */
 function computeImmediateDominators(
@@ -148,22 +159,33 @@ function computeImmediateDominators(
         changed = false;
         for (let i = 1; i < rpo.length; i++) {
             const b = rpo[i];
-            let newIdom = findFirstValidPredecessor(preds[b], doms);
-            if (newIdom === -1) continue;
-
-            for (const p of preds[b]) {
-                if (p !== newIdom && doms[p] !== -1) {
-                    newIdom = intersectIdom(p, newIdom, doms, rpoIndex);
-                }
-            }
-
-            if (doms[b] !== newIdom) {
+            const newIdom = refineNodeDominator(preds[b], doms, rpoIndex);
+            if (newIdom !== -1 && doms[b] !== newIdom) {
                 doms[b] = newIdom;
                 changed = true;
             }
         }
     }
     return doms;
+}
+
+/**
+ * Propagates dominance frontier for a given join node up the dominator chain of a predecessor.
+ */
+function addFrontierFromPredecessor(
+    p: number,
+    b: number,
+    doms: number[],
+    df: Array<Set<number>>,
+): void {
+    let runner = p;
+    while (runner !== doms[b] && runner !== -1) {
+        df[runner].add(b);
+        if (runner === doms[runner]) {
+            break;
+        }
+        runner = doms[runner];
+    }
 }
 
 /**
@@ -180,12 +202,7 @@ function computeFrontiers(
     for (const b of rpo) {
         if (preds[b].length < 2) continue;
         for (const p of preds[b]) {
-            let runner = p;
-            while (runner !== doms[b] && runner !== -1) {
-                df[runner].add(b);
-                if (runner === doms[runner]) break;
-                runner = doms[runner];
-            }
+            addFrontierFromPredecessor(p, b, doms, df);
         }
     }
 

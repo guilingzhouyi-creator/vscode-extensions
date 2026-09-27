@@ -11,7 +11,6 @@
  *   enabling seamless pluggability across Node threads, child processes, and in-memory executors.
  */
 
-
 /**
  * Task priority enumeration for preemptive scheduler dispatching.
  */
@@ -31,12 +30,7 @@ export type ExecutionTargetKind = 'in_process' | 'worker_thread' | 'process_fork
 /**
  * Status lifecycle of a scheduled review task.
  */
-export type TaskExecutionStatus =
-    | 'pending'
-    | 'running'
-    | 'completed'
-    | 'failed'
-    | 'cancelled';
+export type TaskExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * Task payload descriptor submitted to the execution scheduler.

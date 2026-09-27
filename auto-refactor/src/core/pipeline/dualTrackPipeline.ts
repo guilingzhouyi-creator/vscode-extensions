@@ -27,7 +27,6 @@
  *   response fast, matching the DeepSeek 4.1 asymmetric design.
  */
 
-import * as path from 'path';
 import type { Scanner } from '../analyzer';
 import type { Issue, FileMetric, ProjectArchetype } from '../types';
 import { SEVERITY_ERROR } from '../types';
@@ -47,6 +46,7 @@ import type { FileRevision } from '../trajectory/types';
 import type { ReviewMemoryManager } from '../memory/reviewMemory';
 import type { CodeDomainFingerprint } from '../memory/types';
 import type { ChangeTrajectoryManager } from '../trajectory/changeTrajectory';
+import { detectDependencyCycles, detectDependencyCyclesAsync } from './cycle-detector';
 
 /** Number of leading digest hex characters kept as the short revision identifier. */
 const REVISION_ID_LENGTH = 16;
@@ -56,9 +56,6 @@ const REVISION_ID_LENGTH = 16;
  * per-invocation heap churn.
  */
 const SHARED_AGENT_CONSTRAINT_GENERATOR = new AgentConstraintGenerator();
-
-/** Default loop iterations between event loop yields in DFS cycle detection. */
-const DEFAULT_DFS_YIELD_INTERVAL = 50;
 
 /** Batch size of affected files to inspect before yielding the event loop. */
 const AFFECTED_FILES_YIELD_BATCH = 50;
@@ -170,211 +167,7 @@ export interface DualTrackOptions {
     archetype?: ProjectArchetype;
 }
 
-/**
- * Normalize target files or fallback to all known forward edge keys.
- *
- * @param targetFiles - Optional roots supplied by caller.
- * @param edges - Dependency graph forward edges.
- * @returns Array of normalized root node IDs.
- */
-function normalizeDependencyRoots(
-    targetFiles: string[] | undefined,
-    edges: Map<string, Set<string>>,
-): string[] {
-    if (targetFiles && targetFiles.length > 0) {
-        return targetFiles.map((f) =>
-            path
-                .normalize(f)
-                .replace(/\\/g, '/')
-                .replace(/\.(ts|tsx|js|jsx|d\.ts)$/, ''),
-        );
-    }
-    return Array.from(edges.keys());
-}
-
-/**
- * Detect dependency cycles with an iterative three-color (WHITE/GRAY/BLACK) DFS over the
- * graph's forward edges. An explicit frame stack removes the V8 call-stack limit, so deeply
- * nested dependency chains cannot overflow.
- *
- * @param graph - Dependency graph to inspect; only its current forward edges are read.
- * @param targetFiles - Optional roots; paths are normalized and extension-stripped before use.
- *   When omitted or empty, every known graph node is used as a root.
- * @returns Deduplicated cycle paths, each closed by repeating its entry node; empty when acyclic.
- */
-export function detectDependencyCycles(
-    graph: ModuleDependencyGraph,
-    targetFiles?: string[],
-): string[][] {
-    const edges = graph.getForwardEdges();
-    // 0 = unvisited (WHITE), 1 = visiting (GRAY), 2 = visited (BLACK)
-    const WHITE = 0,
-        GRAY = 1,
-        BLACK = 2;
-    const visited = new Map<string, number>();
-    const cycles: string[][] = [];
-    const seenCycleKeys = new Set<string>();
-
-    const targets = normalizeDependencyRoots(targetFiles, edges);
-
-    interface DfsFrame {
-        node: string;
-        neighbors: string[];
-        idx: number;
-    }
-
-    for (const root of targets) {
-        if ((visited.get(root) ?? WHITE) !== WHITE) continue;
-
-        visited.set(root, GRAY);
-        const activePath: string[] = [root];
-        const frameStack: DfsFrame[] = [
-            {
-                node: root,
-                neighbors: edges.get(root) ? Array.from(edges.get(root)!) : [],
-                idx: 0,
-            },
-        ];
-
-        while (frameStack.length > 0) {
-            const top = frameStack[frameStack.length - 1];
-
-            if (top.idx >= top.neighbors.length) {
-                // All neighbors explored; retreat
-                visited.set(top.node, BLACK);
-                frameStack.pop();
-                activePath.pop();
-                continue;
-            }
-
-            const next = top.neighbors[top.idx++];
-            const state = visited.get(next) ?? WHITE;
-
-            if (state === GRAY) {
-                // Cycle detected: next is on the current DFS active path
-                const cycleStartIndex = activePath.indexOf(next);
-                if (cycleStartIndex !== -1) {
-                    const cyclePath = activePath.slice(cycleStartIndex).concat(next);
-                    const key = cyclePath.slice().sort().join('->');
-                    if (!seenCycleKeys.has(key)) {
-                        seenCycleKeys.add(key);
-                        cycles.push(cyclePath);
-                    }
-                }
-            } else if (state === WHITE) {
-                // Unvisited neighbor: advance forward
-                visited.set(next, GRAY);
-                activePath.push(next);
-                frameStack.push({
-                    node: next,
-                    neighbors: edges.get(next) ? Array.from(edges.get(next)!) : [],
-                    idx: 0,
-                });
-            }
-            // If BLACK (state === 2), cross-edge to already completed component, ignore.
-        }
-    }
-
-    return cycles;
-}
-
-/**
- * Asynchronous, time-sliced variant of {@link detectDependencyCycles}.
- * Periodically yields the event loop every `yieldInterval` frames to prevent event-loop
- * starvation on massive enterprise dependency graphs.
- *
- * @param graph - Dependency graph to inspect; only its current forward edges are read.
- * @param targetFiles - Optional roots; paths are normalized and extension-stripped before use.
- * @param governor - Optional LoadGovernor instance used for yielding; if omitted,
- *   yielding is skipped.
- * @param yieldInterval - Number of loop iterations between event loop yields (default: 50).
- * @returns Deduplicated cycle paths, each closed by repeating its entry node.
- * Concurrency: Reentrant, safe for concurrent async execution over immutable graph snapshots.
- */
-export async function detectDependencyCyclesAsync(
-    graph: ModuleDependencyGraph,
-    targetFiles?: string[],
-    governor?: LoadGovernor,
-    yieldInterval = DEFAULT_DFS_YIELD_INTERVAL,
-): Promise<string[][]> {
-    const edges = graph.getForwardEdges();
-    // 0 = unvisited (WHITE), 1 = visiting (GRAY), 2 = visited (BLACK)
-    const WHITE = 0,
-        GRAY = 1,
-        BLACK = 2;
-    const visited = new Map<string, number>();
-    const cycles: string[][] = [];
-    const seenCycleKeys = new Set<string>();
-
-    const targets = normalizeDependencyRoots(targetFiles, edges);
-
-    interface DfsFrame {
-        node: string;
-        neighbors: string[];
-        idx: number;
-    }
-
-    let frameCount = 0;
-
-    for (const root of targets) {
-        if ((visited.get(root) ?? WHITE) !== WHITE) continue;
-
-        visited.set(root, GRAY);
-        const activePath: string[] = [root];
-        const frameStack: DfsFrame[] = [
-            {
-                node: root,
-                neighbors: edges.get(root) ? Array.from(edges.get(root)!) : [],
-                idx: 0,
-            },
-        ];
-
-        while (frameStack.length > 0) {
-            frameCount++;
-            if (governor && frameCount % yieldInterval === 0) {
-                await governor.yieldEventLoop();
-            }
-
-            const top = frameStack[frameStack.length - 1];
-
-            if (top.idx >= top.neighbors.length) {
-                // All neighbors explored; retreat
-                visited.set(top.node, BLACK);
-                frameStack.pop();
-                activePath.pop();
-                continue;
-            }
-
-            const next = top.neighbors[top.idx++];
-            const state = visited.get(next) ?? WHITE;
-
-            if (state === GRAY) {
-                // Cycle detected: next is on the current DFS active path
-                const cycleStartIndex = activePath.indexOf(next);
-                if (cycleStartIndex !== -1) {
-                    const cyclePath = activePath.slice(cycleStartIndex).concat(next);
-                    const key = cyclePath.slice().sort().join('->');
-                    if (!seenCycleKeys.has(key)) {
-                        seenCycleKeys.add(key);
-                        cycles.push(cyclePath);
-                    }
-                }
-            } else if (state === WHITE) {
-                // Unvisited neighbor: advance forward
-                visited.set(next, GRAY);
-                activePath.push(next);
-                frameStack.push({
-                    node: next,
-                    neighbors: edges.get(next) ? Array.from(edges.get(next)!) : [],
-                    idx: 0,
-                });
-            }
-            // If BLACK (state === 2), cross-edge to already completed component, ignore.
-        }
-    }
-
-    return cycles;
-}
+export { detectDependencyCycles, detectDependencyCyclesAsync };
 
 /**
  * Run the asymmetric dual-track audit: a foreground pass produces a speculative verdict from

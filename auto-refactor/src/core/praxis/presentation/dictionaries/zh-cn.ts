@@ -129,13 +129,15 @@ export const ZH_CN_RULES: Record<string, PraxisRuleI18nEntry> = {
     'STDLIB-PORT-001': {
         name: '跨平台编译兜底防护',
         summary: '平台特定条件编译块缺少不支持目标平台的阻断兜底。',
-        remediation: '添加 #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); 兜底。',
+        remediation:
+            '添加 #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); 兜底。',
         rationale: '缺少兜底条件编译会导致在未支持平台上产生隐晦的符号缺失而非明确的编译报错。',
     },
     'CMP-EXP-001': {
         name: '巨型表达式认知负载超限',
         summary: '嵌套三元表达式或冗长逻辑运算链超出人类与模型局部推理的认知阈值。',
-        remediation: '将嵌套三元表达式重构为具名纯函数、早返回卫语句或 lookup 表；将复杂逻辑链提取为布尔谓词常量。',
+        remediation:
+            '将嵌套三元表达式重构为具名纯函数、早返回卫语句或 lookup 表；将复杂逻辑链提取为布尔谓词常量。',
         rationale: '过于冗长的内联表达式增加认知负荷并极易掩盖短路求值与优先级逻辑缺陷。',
     },
     'CMP-CAL-001': {

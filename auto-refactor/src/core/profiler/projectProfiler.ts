@@ -593,115 +593,106 @@ function isWebArchetype(
     return false;
 }
 
-function isStdlibArchetype(root: string, profile?: Partial<ProjectProfile>): boolean {
-    const normRoot = root.replace(/\\/g, '/');
-
-    // 1. Rust standard library / core detection
+function isRustStdlib(root: string, normRoot: string): boolean {
     const cargoToml = path.join(root, 'Cargo.toml');
     if (fs.existsSync(cargoToml)) {
         try {
             const raw = fs.readFileSync(cargoToml, 'utf8');
-            if (
-                /name\s*=\s*["'](?:.*-)?(?:core|alloc|std)(?:-.*)?["']/i.test(raw) ||
-                normRoot.includes('/library/core') ||
-                normRoot.includes('/library/std') ||
-                normRoot.includes('/library/alloc') ||
-                fs.existsSync(path.join(root, 'library', 'core')) ||
-                fs.existsSync(path.join(root, 'library', 'std'))
-            ) {
-                return true;
-            }
+            if (/name\s*=\s*["'](?:.*-)?(?:core|alloc|std)(?:-.*)?["']/i.test(raw)) return true;
         } catch {
-            // best-effort fallback: ignored when file is unreadable
+            /* best-effort fallback */
         }
     }
+    return (
+        normRoot.includes('/library/core') ||
+        normRoot.includes('/library/std') ||
+        normRoot.includes('/library/alloc') ||
+        fs.existsSync(path.join(root, 'library', 'core')) ||
+        fs.existsSync(path.join(root, 'library', 'std'))
+    );
+}
 
-    // 2. Python standard library detection
+function isPythonStdlib(root: string, profile?: Partial<ProjectProfile>): boolean {
     const isPythonTree = Boolean(profile?.languages?.['python']);
-    if (
+    return (
         (isPythonTree || fs.existsSync(path.join(root, 'Lib'))) &&
         (fs.existsSync(path.join(root, 'Include', 'Python.h')) ||
             (fs.existsSync(path.join(root, 'Lib', 'os.py')) &&
                 fs.existsSync(path.join(root, 'Lib', 'sys.py'))))
-    ) {
-        return true;
-    }
+    );
+}
 
-    // 3. Go standard library detection
-    if (
+function isGoStdlib(root: string): boolean {
+    return (
         fs.existsSync(path.join(root, 'src', 'runtime')) &&
         fs.existsSync(path.join(root, 'src', 'sync')) &&
         (fs.existsSync(path.join(root, 'src', 'cmd', 'go')) ||
             fs.existsSync(path.join(root, 'src', 'net')))
-    ) {
-        return true;
-    }
+    );
+}
 
-    // 4. Node.js built-in runtime detection
-    if (
+function isNodeRuntime(root: string): boolean {
+    return (
         fs.existsSync(path.join(root, 'lib', 'internal')) &&
         (fs.existsSync(path.join(root, 'src', 'node.h')) ||
             fs.existsSync(path.join(root, 'lib', 'fs.js')))
-    ) {
-        return true;
-    }
-
-    return false;
+    );
 }
+
+function isStdlibArchetype(root: string, profile?: Partial<ProjectProfile>): boolean {
+    const normRoot = root.replace(/\\/g, '/');
+    return (
+        isRustStdlib(root, normRoot) ||
+        isPythonStdlib(root, profile) ||
+        isGoStdlib(root) ||
+        isNodeRuntime(root)
+    );
+}
+
+function hasNoStdHeader(filePath: string): boolean {
+    if (!fs.existsSync(filePath)) return false;
+    try {
+        const header = fs.readFileSync(filePath, 'utf8').slice(0, 1000);
+        return header.includes('#![no_std]') || header.includes('#![no_core]');
+    } catch {
+        return false;
+    }
+}
+
+function hasSystemsCargoName(root: string): boolean {
+    const cargoToml = path.join(root, 'Cargo.toml');
+    if (!fs.existsSync(cargoToml)) return false;
+    try {
+        const raw = fs.readFileSync(cargoToml, 'utf8');
+        return /name\s*=\s*["'](?:sys-core|.*-kernel|.*-baremetal|.*-sys|.*-runtime)["']/i.test(
+            raw,
+        );
+    } catch {
+        return false;
+    }
+}
+
+const SYSTEMS_CANDIDATE_PATHS = [
+    ['src', 'lib.rs'],
+    ['src', 'main.rs'],
+    ['core', 'src', 'lib.rs'],
+    ['kernel', 'src', 'lib.rs'],
+    ['runtime', 'src', 'lib.rs'],
+];
 
 function isSystemsRuntimeArchetype(root: string, profile?: Partial<ProjectProfile>): boolean {
     void profile;
     const normRoot = root.replace(/\\/g, '/');
-
-    // Check no_std marker in Rust root lib.rs/main.rs,
-    // or immediate subdirectories (e.g. core/src/lib.rs)
-    const candidateFiles = [
-        path.join(root, 'src', 'lib.rs'),
-        path.join(root, 'src', 'main.rs'),
-        path.join(root, 'core', 'src', 'lib.rs'),
-        path.join(root, 'kernel', 'src', 'lib.rs'),
-        path.join(root, 'runtime', 'src', 'lib.rs'),
-    ];
-
-    for (const f of candidateFiles) {
-        if (fs.existsSync(f)) {
-            try {
-                const header = fs.readFileSync(f, 'utf8').slice(0, 1000);
-                if (header.includes('#![no_std]') || header.includes('#![no_core]')) {
-                    return true;
-                }
-            } catch {
-                // best-effort fallback: ignored when file is unreadable
-            }
-        }
+    for (const parts of SYSTEMS_CANDIDATE_PATHS) {
+        if (hasNoStdHeader(path.join(root, ...parts))) return true;
     }
-
-    const cargoToml = path.join(root, 'Cargo.toml');
-    if (fs.existsSync(cargoToml)) {
-        try {
-            const raw = fs.readFileSync(cargoToml, 'utf8');
-            if (
-                /name\s*=\s*["'](?:sys-core|.*-kernel|.*-baremetal|.*-sys|.*-runtime)["']/i.test(
-                    raw,
-                )
-            ) {
-                return true;
-            }
-        } catch {
-            // best-effort fallback
-        }
-    }
-
-    if (
+    if (hasSystemsCargoName(root)) return true;
+    return (
         normRoot.includes('/kernel') ||
         normRoot.includes('/runtime') ||
         normRoot.includes('/bare-metal') ||
         normRoot.includes('/freestanding')
-    ) {
-        return true;
-    }
-
-    return false;
+    );
 }
 
 /**

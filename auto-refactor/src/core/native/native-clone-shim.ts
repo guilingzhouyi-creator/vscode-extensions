@@ -160,10 +160,7 @@ function filterMeaningfulLines(lines: string[]): { hashes: number[]; indices: nu
  * @param minCloneLines Minimum consecutive lines required to classify as a clone.
  * @returns Array of detected clone blocks.
  */
-export function detectCloneBlocksShim(
-    content: string,
-    minCloneLines: number,
-): NativeCloneBlock[] {
+export function detectCloneBlocksShim(content: string, minCloneLines: number): NativeCloneBlock[] {
     const lines = content.split('\n').map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
     const { hashes: meaningfulHashes, indices: meaningfulLineIndices } =
         filterMeaningfulLines(lines);
@@ -204,9 +201,11 @@ function computeShingles(meaningfulHashes: number[]): number[] {
     const shingles: number[] = [];
     if (meaningfulHashes.length >= 3) {
         for (let i = 0; i <= meaningfulHashes.length - 3; i++) {
-            const s = (Math.imul(meaningfulHashes[i], 961) +
-                Math.imul(meaningfulHashes[i + 1], 31) +
-                meaningfulHashes[i + 2]) >>> 0;
+            const s =
+                (Math.imul(meaningfulHashes[i], 961) +
+                    Math.imul(meaningfulHashes[i + 1], 31) +
+                    meaningfulHashes[i + 2]) >>>
+                0;
             shingles.push(s);
         }
     } else {
@@ -249,10 +248,7 @@ export function computeMinHashShim(content: string, numPermutations = 64): numbe
 /**
  * Extracts pairwise candidates from an LSH collision bucket.
  */
-function addBucketCandidates(
-    bucket: number[],
-    candidateMap: Map<string, [number, number]>,
-): void {
+function addBucketCandidates(bucket: number[], candidateMap: Map<string, [number, number]>): void {
     for (let i = 0; i < bucket.length; i++) {
         for (let j = i + 1; j < bucket.length; j++) {
             const a = Math.min(bucket[i], bucket[j]);
@@ -262,16 +258,68 @@ function addBucketCandidates(
     }
 }
 
+function addToBucket(buckets: Map<number, number[]>, hash: number, fileIdx: number): void {
+    const list = buckets.get(hash);
+    if (list) {
+        list.push(fileIdx);
+    } else {
+        buckets.set(hash, [fileIdx]);
+    }
+}
+
+function populateBandBuckets(
+    signatures: number[][],
+    start: number,
+    end: number,
+    n: number,
+    buckets: Map<number, number[]>,
+): void {
+    buckets.clear();
+    for (let f = 0; f < n; f++) {
+        const sig = signatures[f];
+        if (sig.length < end) continue;
+        let bandHash = 0x811c9dc5;
+        for (let r = start; r < end; r++) {
+            bandHash ^= sig[r];
+            bandHash = Math.imul(bandHash, 0x01000193);
+        }
+        addToBucket(buckets, bandHash >>> 0, f);
+    }
+}
+
+function computeSignatureSimilarity(sigA: number[], sigB: number[]): number {
+    const total = Math.min(sigA.length, sigB.length);
+    if (total === 0) return 0;
+    let matches = 0;
+    for (let i = 0; i < total; i++) {
+        if (sigA[i] === sigB[i]) matches++;
+    }
+    return matches / total;
+}
+
+function evaluateCloneCandidates(
+    signatures: number[][],
+    candidateMap: Map<string, [number, number]>,
+    threshold: number,
+): NativeClonePair[] {
+    const pairs: NativeClonePair[] = [];
+    for (const [a, b] of candidateMap.values()) {
+        const similarity = computeSignatureSimilarity(signatures[a], signatures[b]);
+        if (similarity >= threshold) {
+            pairs.push({ fileA: a, fileB: b, similarity });
+        }
+    }
+    pairs.sort((p1, p2) => p2.similarity - p1.similarity);
+    return pairs;
+}
+
 /**
  * Discovers similar file pairs using Locality Sensitive Hashing (LSH).
  * @param signatures Array of MinHash signature vectors.
  * @param threshold Jaccard similarity threshold [0.0, 1.0].
  * @returns List of candidate clone pairs exceeding the threshold.
  */
-export function findClonePairsShim(
-    signatures: number[][],
-    threshold: number,
-): NativeClonePair[] {
+export function findClonePairsShim(signatures: number[][], threshold: number): NativeClonePair[] {
     const n = signatures.length;
     if (n < 2) return [];
 
@@ -281,25 +329,12 @@ export function findClonePairsShim(
     if (rowsPerBand === 0) return [];
 
     const candidateMap = new Map<string, [number, number]>();
+    const buckets = new Map<number, number[]>();
 
     for (let band = 0; band < numBands; band++) {
         const start = band * rowsPerBand;
         const end = start + rowsPerBand;
-        const buckets = new Map<number, number[]>();
-
-        for (let f = 0; f < n; f++) {
-            const sig = signatures[f];
-            if (sig.length < end) continue;
-            let bandHash = 0x811c9dc5;
-            for (let r = start; r < end; r++) {
-                bandHash ^= sig[r];
-                bandHash = Math.imul(bandHash, 0x01000193);
-            }
-            const bh = bandHash >>> 0;
-            const bucket = buckets.get(bh) || [];
-            bucket.push(f);
-            buckets.set(bh, bucket);
-        }
+        populateBandBuckets(signatures, start, end, n, buckets);
 
         for (const bucket of buckets.values()) {
             if (bucket.length >= 2) {
@@ -308,23 +343,5 @@ export function findClonePairsShim(
         }
     }
 
-    const pairs: NativeClonePair[] = [];
-    for (const [a, b] of candidateMap.values()) {
-        const sigA = signatures[a];
-        const sigB = signatures[b];
-        const total = Math.min(sigA.length, sigB.length);
-        if (total === 0) continue;
-
-        let matches = 0;
-        for (let i = 0; i < total; i++) {
-            if (sigA[i] === sigB[i]) matches++;
-        }
-        const similarity = matches / total;
-        if (similarity >= threshold) {
-            pairs.push({ fileA: a, fileB: b, similarity });
-        }
-    }
-
-    pairs.sort((p1, p2) => p2.similarity - p1.similarity);
-    return pairs;
+    return evaluateCloneCandidates(signatures, candidateMap, threshold);
 }

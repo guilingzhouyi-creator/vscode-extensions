@@ -42,20 +42,24 @@ interface Pattern {
     regex: RegExp;
 }
 
+function parseStarGlob(glob: string, i: number): { re: string; nextI: number } {
+    if (glob[i + 1] === '*') {
+        let nextI = i + 2;
+        if (glob[nextI] === '/') nextI++;
+        return { re: '.*', nextI };
+    }
+    return { re: '[^/]*', nextI: i + 1 };
+}
+
 function globPatternBody(glob: string): string {
     let re = '';
     let i = 0;
     while (i < glob.length) {
         const c = glob[i];
         if (c === '*') {
-            if (glob[i + 1] === '*') {
-                re += '.*';
-                i += 2;
-                if (glob[i] === '/') i++; // consume separator after **
-            } else {
-                re += '[^/]*';
-                i++;
-            }
+            const step = parseStarGlob(glob, i);
+            re += step.re;
+            i = step.nextI;
         } else if (c === '?') {
             re += '[^/]';
             i++;
@@ -96,7 +100,17 @@ export function globToRegExp(glob: string): RegExp {
 export function loadGitignore(root: string): (rel: string) => boolean {
     const giPath = path.join(root, '.gitignore');
     try {
-        const lines = fs.readFileSync(giPath, 'utf8').split(/\r?\n/);
+        const fd = fs.openSync(giPath, 'r');
+        let content = '';
+        try {
+            const stat = fs.fstatSync(fd);
+            const buf = Buffer.allocUnsafe(stat.size);
+            fs.readSync(fd, buf, 0, stat.size, 0);
+            content = buf.toString('utf8');
+        } finally {
+            fs.closeSync(fd);
+        }
+        const lines = content.split(/\r?\n/);
         return parseGitignoreLines(lines);
     } catch {
         return () => false;

@@ -153,11 +153,7 @@ const ELSE_MSG =
     'Redundant `else` after terminating statement — the `if` block always returns/exits, so `else` can be flattened.';
 const ELSE_SUGGESTION = 'Remove the `else` keyword and de-indent its body to reduce nesting.';
 
-function auditRedundantElseBrace(
-    lines: string[],
-    file: string,
-    issues: Issue[],
-): void {
+function auditRedundantElseBrace(lines: string[], file: string, issues: Issue[]): void {
     for (let i = 0; i < lines.length; i++) {
         if (!IF_OPEN_RE.test(lines[i])) continue;
 
@@ -181,15 +177,9 @@ function auditRedundantElseBrace(
         if (!TERMINATING_STMT_RE.test(lines[lastStmtIdx].trim())) continue;
 
         issues.push(
-            makeIssue(
-                'SIM-ELSE-001',
-                file,
-                i + 1,
-                elseLineIdx + 1,
-                ELSE_MSG,
-                ELSE_SUGGESTION,
-                { pattern: 'brace-if-terminating-else' },
-            ),
+            makeIssue('SIM-ELSE-001', file, i + 1, elseLineIdx + 1, ELSE_MSG, ELSE_SUGGESTION, {
+                pattern: 'brace-if-terminating-else',
+            }),
         );
     }
 }
@@ -218,11 +208,7 @@ function isPythonTerminatingElse(lines: string[], lastStmtIdx: number, ifIndent:
     return /^(else|elif)\b/.test(lines[k].trim()) ? k : -1;
 }
 
-function auditRedundantElsePython(
-    lines: string[],
-    file: string,
-    issues: Issue[],
-): void {
+function auditRedundantElsePython(lines: string[], file: string, issues: Issue[]): void {
     for (let i = 0; i < lines.length; i++) {
         const ifMatch = PY_IF_RE.exec(lines[i]);
         if (!ifMatch) continue;
@@ -235,19 +221,21 @@ function auditRedundantElsePython(
         if (k === -1) continue;
 
         issues.push(
-            makeIssue(
-                'SIM-ELSE-001',
-                file,
-                i + 1,
-                k + 1,
-                ELSE_MSG,
-                ELSE_SUGGESTION,
-                { pattern: 'python-if-terminating-else' },
-            ),
+            makeIssue('SIM-ELSE-001', file, i + 1, k + 1, ELSE_MSG, ELSE_SUGGESTION, {
+                pattern: 'python-if-terminating-else',
+            }),
         );
     }
 }
 
+/**
+ * Audits source code lines for redundant else blocks after terminating statements.
+ *
+ * @param lines - Array of source code lines.
+ * @param file - File path under inspection.
+ * @param opts - Simplification analyzer options.
+ * @param issues - Output issue accumulator.
+ */
 export function auditRedundantElse(
     lines: string[],
     file: string,
@@ -272,34 +260,20 @@ const BOOL_MSG_TERNARY =
     'Boolean return can be simplified — return the condition directly instead of ternary.';
 const BOOL_SUGGESTION = 'Replace with `return <condition>;` for cleaner code.';
 
-function auditBooleanReturnTernary(
-    lines: string[],
-    file: string,
-    issues: Issue[],
-): void {
+function auditBooleanReturnTernary(lines: string[], file: string, issues: Issue[]): void {
     for (let i = 0; i < lines.length; i++) {
         if (!TERNARY_BOOL_RETURN_RE.test(lines[i])) continue;
         const match = lines[i].match(/return\s+(.+?)\?\s*(true|false)\s*:\s*(true|false)/);
         if (!match || match[2] === match[3]) continue;
         issues.push(
-            makeIssue(
-                'SIM-BOOL-001',
-                file,
-                i + 1,
-                i + 1,
-                BOOL_MSG_TERNARY,
-                BOOL_SUGGESTION,
-                { pattern: 'ternary-boolean-return' },
-            ),
+            makeIssue('SIM-BOOL-001', file, i + 1, i + 1, BOOL_MSG_TERNARY, BOOL_SUGGESTION, {
+                pattern: 'ternary-boolean-return',
+            }),
         );
     }
 }
 
-function auditBooleanReturnSingleLineIf(
-    lines: string[],
-    file: string,
-    issues: Issue[],
-): void {
+function auditBooleanReturnSingleLineIf(lines: string[], file: string, issues: Issue[]): void {
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
         const m = /^if\s*\((.+)\)\s*return\s+(true|false)\s*[;}]?\s*$/.exec(trimmed);
@@ -312,15 +286,9 @@ function auditBooleanReturnSingleLineIf(
         if (ifBool === (nextBool[1] === 'true')) continue;
 
         issues.push(
-            makeIssue(
-                'SIM-BOOL-001',
-                file,
-                i + 1,
-                j + 1,
-                BOOL_MSG_IF,
-                BOOL_SUGGESTION,
-                { pattern: 'single-line-if-boolean-return' },
-            ),
+            makeIssue('SIM-BOOL-001', file, i + 1, j + 1, BOOL_MSG_IF, BOOL_SUGGESTION, {
+                pattern: 'single-line-if-boolean-return',
+            }),
         );
     }
 }
@@ -348,15 +316,9 @@ function checkBlockIfNoElse(
     if (!nextBool || ifBool === (nextBool[1] === 'true')) return;
 
     issues.push(
-        makeIssue(
-            'SIM-BOOL-001',
-            file,
-            i + 1,
-            j + 1,
-            BOOL_MSG_IF,
-            BOOL_SUGGESTION,
-            { pattern: 'block-if-boolean-return-no-else' },
-        ),
+        makeIssue('SIM-BOOL-001', file, i + 1, j + 1, BOOL_MSG_IF, BOOL_SUGGESTION, {
+            pattern: 'block-if-boolean-return-no-else',
+        }),
     );
 }
 
@@ -381,23 +343,13 @@ function checkBlockIfWithElse(
     if (countMeaningfulStmts(lines, elseBodyStart + 1, elseCloseIdx) !== 1) return;
 
     issues.push(
-        makeIssue(
-            'SIM-BOOL-001',
-            file,
-            i + 1,
-            elseCloseIdx + 1,
-            BOOL_MSG_IFELSE,
-            BOOL_SUGGESTION,
-            { pattern: 'if-else-boolean-return-blocks' },
-        ),
+        makeIssue('SIM-BOOL-001', file, i + 1, elseCloseIdx + 1, BOOL_MSG_IFELSE, BOOL_SUGGESTION, {
+            pattern: 'if-else-boolean-return-blocks',
+        }),
     );
 }
 
-function auditBooleanReturnBlockIf(
-    lines: string[],
-    file: string,
-    issues: Issue[],
-): void {
+function auditBooleanReturnBlockIf(lines: string[], file: string, issues: Issue[]): void {
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
         if (!/^if\s*\((.+)\)\s*\{\s*$/.test(trimmed)) continue;
@@ -451,15 +403,9 @@ function checkPythonBoolReturnWithElse(
     if (!elseBoolMatch || ifBool === (elseBoolMatch[1] === 'True')) return;
 
     issues.push(
-        makeIssue(
-            'SIM-BOOL-001',
-            file,
-            i + 1,
-            k + 1,
-            BOOL_MSG_IFELSE,
-            BOOL_SUGGESTION,
-            { pattern: 'python-if-else-boolean-return' },
-        ),
+        makeIssue('SIM-BOOL-001', file, i + 1, k + 1, BOOL_MSG_IFELSE, BOOL_SUGGESTION, {
+            pattern: 'python-if-else-boolean-return',
+        }),
     );
 }
 
@@ -475,23 +421,13 @@ function checkPythonBoolReturnNoElse(
     if (!afterBool || ifBool === (afterBool[1] === 'True')) return;
 
     issues.push(
-        makeIssue(
-            'SIM-BOOL-001',
-            file,
-            i + 1,
-            k + 1,
-            BOOL_MSG_IF,
-            BOOL_SUGGESTION,
-            { pattern: 'python-if-boolean-return-no-else' },
-        ),
+        makeIssue('SIM-BOOL-001', file, i + 1, k + 1, BOOL_MSG_IF, BOOL_SUGGESTION, {
+            pattern: 'python-if-boolean-return-no-else',
+        }),
     );
 }
 
-function auditBooleanReturnPython(
-    lines: string[],
-    file: string,
-    issues: Issue[],
-): void {
+function auditBooleanReturnPython(lines: string[], file: string, issues: Issue[]): void {
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
         if (!/^if\s+(.+):\s*$/.test(trimmed)) continue;
@@ -517,6 +453,14 @@ function auditBooleanReturnPython(
     }
 }
 
+/**
+ * Audits source code lines for verbose boolean return patterns that can be simplified.
+ *
+ * @param lines - Array of source code lines.
+ * @param file - File path under inspection.
+ * @param opts - Simplification analyzer options.
+ * @param issues - Output issue accumulator.
+ */
 export function auditBooleanReturn(
     lines: string[],
     file: string,
@@ -604,7 +548,8 @@ function auditGuardClausePatternsBrace(
 ): void {
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
-        if (!/\b(?:function|fn|func)\s+[A-Za-z_]\w*/.test(trimmed) || trimmed.endsWith(';')) continue;
+        if (!/\b(?:function|fn|func)\s+[A-Za-z_]\w*/.test(trimmed) || trimmed.endsWith(';'))
+            continue;
 
         const braceIdx = findFunctionOpeningBrace(lines, i);
         if (braceIdx === -1) continue;
@@ -631,7 +576,10 @@ function skipPythonDocstrings(lines: string[], startIndex: number): number {
     let i = startIndex;
     while (i < lines.length) {
         const t = lines[i].trim();
-        if (t === '' || t.startsWith('#')) { i++; continue; }
+        if (t === '' || t.startsWith('#')) {
+            i++;
+            continue;
+        }
         if (t.startsWith('"""') || t.startsWith("'''")) {
             const marker = t.startsWith('"""') ? '"""' : "'''";
             if (t.split(marker).length - 1 < 2) {
@@ -660,7 +608,10 @@ function pythonGuardIfEnd(lines: string[], idx: number, ifIndent: number): numbe
     if (!/^(?:return|raise)\b/.test(lines[bodyIdx].trim())) return -1;
 
     let nextIdx = bodyIdx + 1;
-    while (nextIdx < lines.length && (lines[nextIdx].trim() === '' || lines[nextIdx].trim().startsWith('#'))) {
+    while (
+        nextIdx < lines.length &&
+        (lines[nextIdx].trim() === '' || lines[nextIdx].trim().startsWith('#'))
+    ) {
         nextIdx++;
     }
     if (nextIdx < lines.length && indentWidth(lines[nextIdx]) > ifIndent) return -1;
@@ -678,7 +629,10 @@ function countPythonGuardClauses(
 
     while (cur < lines.length) {
         const curTrimmed = lines[cur].trim();
-        if (curTrimmed === '' || curTrimmed.startsWith('#')) { cur++; continue; }
+        if (curTrimmed === '' || curTrimmed.startsWith('#')) {
+            cur++;
+            continue;
+        }
         if (indentWidth(lines[cur]) <= funcIndent) break;
 
         const ifMatch = PY_IF_RE.exec(lines[cur]);
@@ -726,6 +680,14 @@ function auditGuardClausePatternsPython(
     }
 }
 
+/**
+ * Audits excessive nesting patterns that can be flattened with early guard clauses.
+ *
+ * @param lines - Array of source code lines.
+ * @param file - File path under inspection.
+ * @param opts - Simplification analyzer options.
+ * @param issues - Output issue accumulator.
+ */
 export function auditGuardClausePatterns(
     lines: string[],
     file: string,

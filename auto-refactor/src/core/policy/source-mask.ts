@@ -174,18 +174,21 @@ export function maskSourceTextJs(content: string, config: SourceMaskConfig): Mas
  * @returns Both views; `raw` feeds evidence text, `masked` feeds the rule patterns.
  */
 export function maskSourceText(content: string, config: SourceMaskConfig): MaskedSource {
-    try {
-        return nativeCore.maskSourceCode(content, {
-            lineComment: config.lineComment,
-            blockCommentOpen: config.blockComment?.open,
-            blockCommentClose: config.blockComment?.close,
-            quoteChars: config.quoteChars,
-            multilineTemplates: config.multilineTemplates,
-            regexLiterals: config.regexLiterals,
-        });
-    } catch (_err) {
-        return maskSourceTextJs(content, config);
+    if (content.length > 50000) {
+        try {
+            return nativeCore.maskSourceCode(content, {
+                lineComment: config.lineComment,
+                blockCommentOpen: config.blockComment?.open,
+                blockCommentClose: config.blockComment?.close,
+                quoteChars: config.quoteChars,
+                multilineTemplates: config.multilineTemplates,
+                regexLiterals: config.regexLiterals,
+            });
+        } catch (_err) {
+            return maskSourceTextJs(content, config);
+        }
     }
+    return maskSourceTextJs(content, config);
 }
 
 /**
@@ -289,97 +292,7 @@ function triggerRegex(config: SourceMaskConfig): RegExp {
 }
 
 /**
- * Mask one raw line in place.
- *
- * @param line - Raw source line without its trailing carriage return.
- * @param state - Masking state, mutated so multi-line constructs continue on later lines.
- * @param config - Comment and quote syntax of the language.
- * @returns A same-length copy whose comment and literal characters are spaces.
- */
-function maskLine(line: string, state: MaskState, config: SourceMaskConfig): string {
-    // Fast path: with no multi-line construct active and nothing on the line able to open one,
-    // masking is the identity.
-    if (!state.quote && !state.inBlockComment && !triggerRegex(config).test(line)) return line;
-
-    // Fast path: line is wholly inside a block comment and contains no closing delimiter.
-    const close = config.blockComment?.close ?? '';
-    if (state.inBlockComment && !state.quote && close.length > 0 && !line.includes(close)) {
-        return ' '.repeat(line.length);
-    }
-
-    const out = line.split('');
-    let index = 0;
-    while (index < line.length) {
-        if (state.quote) {
-            index = maskQuoted(line, index, state, out);
-            continue;
-        }
-        if (state.inBlockComment) {
-            index = maskBlockComment(line, index, state, out, config);
-            continue;
-        }
-        index = maskCode(line, index, state, out, config);
-    }
-    return out.join('');
-}
-
-/**
- * Blank one string/template step and return the next index.
- *
- * @param line - Raw source line.
- * @param index - Index of the current character, known to be inside a quoted run.
- * @param state - Masking state; the quote is cleared when the closing quote is reached.
- * @param out - Character buffer being masked in place.
- * @returns Index of the next unprocessed character.
- */
-function maskQuoted(line: string, index: number, state: MaskState, out: string[]): number {
-    out[index] = ' ';
-    const char = line[index];
-    if (char === '\\') {
-        if (index + 1 < line.length) out[index + 1] = ' ';
-        return index + 2;
-    }
-    if (char === state.quote) state.quote = null;
-    return index + 1;
-}
-
-/**
- * Blank one block-comment step and return the next index.
- *
- * @param line - Raw source line.
- * @param index - Index of the current character, known to be inside a block comment.
- * @param state - Masking state; cleared when the terminator is reached.
- * @param out - Character buffer being masked in place.
- * @param config - Comment syntax supplying the terminator.
- * @returns Index of the next unprocessed character.
- */
-function maskBlockComment(
-    line: string,
-    index: number,
-    state: MaskState,
-    out: string[],
-    config: SourceMaskConfig,
-): number {
-    const close = config.blockComment?.close ?? '';
-    out[index] = ' ';
-    if (close.length > 0 && line.startsWith(close, index)) {
-        for (let offset = 0; offset < close.length; offset += 1) out[index + offset] = ' ';
-        state.inBlockComment = false;
-        return index + close.length;
-    }
-    return index + 1;
-}
-
-/**
  * Decide whether a slash opens a regex literal rather than dividing.
- *
- * Only consulted when `config.regexLiterals` is set. A slash can open a literal when the previous
- * non-blank character cannot end a complete operand; anything else (`identifier`, `)`, `]`, `}`,
- * digit) means division, and the slash is left as written.
- *
- * @param line - Raw source line.
- * @param index - Index of the slash.
- * @returns True when the slash opens a regex literal.
  */
 function opensRegexLiteral(line: string, index: number): boolean {
     for (let back = index - 1; back >= 0; back -= 1) {
@@ -391,97 +304,189 @@ function opensRegexLiteral(line: string, index: number): boolean {
 }
 
 /**
- * Blank one regex literal and return the next index.
- *
- * The body ends at the first unescaped slash outside a `[...]` character class; trailing flags are
- * consumed too. An unterminated literal blanks the remainder of the line, so regex text can never
- * leak operators into a counting rule. Regex literals cannot span lines, so no state is returned.
- *
- * @param line - Raw source line.
- * @param index - Index of the opening slash.
- * @param out - Character buffer being masked in place.
- * @returns Index of the next unprocessed character.
+ * Scan forward inside a quoted literal, updating quote state when terminated.
  */
-function maskRegexBody(line: string, index: number, out: string[]): number {
-    out[index] = ' ';
-    let cursor = index + 1;
+function scanQuotedSpan(
+    line: string,
+    startIndex: number,
+    quoteChar: string,
+    state: MaskState,
+): number {
+    let index = startIndex;
+    while (index < line.length) {
+        const char = line[index];
+        if (char === '\\') {
+            index += 2;
+            continue;
+        }
+        if (char === quoteChar) {
+            state.quote = null;
+            index++;
+            break;
+        }
+        index++;
+    }
+    return index;
+}
+
+/**
+ * Scan forward through a regular expression literal body and trailing flags.
+ */
+function scanRegexSpan(line: string, startIndex: number): number {
+    let cursor = startIndex + 1;
     let inClass = false;
     while (cursor < line.length) {
-        const char = line[cursor];
-        out[cursor] = ' ';
-        if (char === '\\') {
-            if (cursor + 1 < line.length) out[cursor + 1] = ' ';
+        const rc = line[cursor];
+        if (rc === '\\') {
             cursor += 2;
             continue;
         }
-        if (char === '[') inClass = true;
-        else if (char === ']') inClass = false;
-        else if (char === '/' && !inClass) {
-            cursor += 1;
+        if (rc === '[') inClass = true;
+        else if (rc === ']') inClass = false;
+        else if (rc === '/' && !inClass) {
+            cursor++;
             while (cursor < line.length && REGEX_FLAG_RE.test(line[cursor])) {
-                out[cursor] = ' ';
-                cursor += 1;
+                cursor++;
             }
-            return cursor;
+            break;
         }
-        cursor += 1;
+        cursor++;
     }
     return cursor;
 }
 
 /**
- * Attempts to open a line comment or block comment at index.
- * Returns the new index if a comment opened, or -1 otherwise.
+ * Advance past continuing block comment content.
  */
-function tryOpenComment(
+function scanBlockCommentContinuation(
     line: string,
     index: number,
+    close: string,
     state: MaskState,
-    out: string[],
-    config: SourceMaskConfig,
 ): number {
-    if (line.startsWith(config.lineComment, index)) {
-        for (let rest = index; rest < line.length; rest += 1) out[rest] = ' ';
-        return line.length;
+    const cIdx = close ? line.indexOf(close, index) : -1;
+    if (cIdx !== -1) {
+        state.inBlockComment = false;
+        return cIdx + close.length;
     }
+    return line.length;
+}
+
+/**
+ * Check and advance past an opening block comment if present.
+ */
+function scanOpeningBlockComment(
+    line: string,
+    index: number,
+    config: SourceMaskConfig,
+    state: MaskState,
+): number {
     const block = config.blockComment;
-    if (block && line.startsWith(block.open, index)) {
-        for (let offset = 0; offset < block.open.length; offset += 1) out[index + offset] = ' ';
-        state.inBlockComment = true;
-        return index + block.open.length;
+    if (!block || !line.startsWith(block.open, index)) return -1;
+    state.inBlockComment = true;
+    const close = block.close;
+    const cIdx = close ? line.indexOf(close, index + block.open.length) : -1;
+    if (cIdx !== -1) {
+        state.inBlockComment = false;
+        return cIdx + close.length;
+    }
+    return line.length;
+}
+
+/**
+ * Check and advance past a quote literal or regex literal if present.
+ */
+function scanQuoteOrRegex(
+    line: string,
+    index: number,
+    config: SourceMaskConfig,
+    state: MaskState,
+): number {
+    const char = line[index];
+    if (config.quoteChars.includes(char)) {
+        if (char === '`' && !config.multilineTemplates) {
+            return index + 1;
+        }
+        state.quote = char;
+        return scanQuotedSpan(line, index + 1, char, state);
+    }
+    if (config.regexLiterals && char === '/' && opensRegexLiteral(line, index)) {
+        return scanRegexSpan(line, index);
     }
     return -1;
 }
 
 /**
- * Consume one step of ordinary code: comments and literals open a masked run, everything else is
- * left as written.
+ * Mask one raw line in place using contiguous span blanking to avoid array allocations.
  *
- * @param line - Raw source line.
- * @param index - Index of the current character, known to be outside strings and comments.
- * @param state - Masking state, updated when a comment or literal starts.
- * @param out - Character buffer being masked in place.
+ * @param line - Raw source line without its trailing carriage return.
+ * @param state - Masking state, mutated so multi-line constructs continue on later lines.
  * @param config - Comment and quote syntax of the language.
- * @returns Index of the next unprocessed character.
+ * @returns A same-length copy whose comment and literal characters are spaces.
  */
-function maskCode(
-    line: string,
-    index: number,
-    state: MaskState,
-    out: string[],
-    config: SourceMaskConfig,
-): number {
-    const commentEnd = tryOpenComment(line, index, state, out, config);
-    if (commentEnd !== -1) return commentEnd;
+function maskLine(line: string, state: MaskState, config: SourceMaskConfig): string {
+    if (!state.quote && !state.inBlockComment && !triggerRegex(config).test(line)) return line;
 
-    const char = line[index];
-    if (config.regexLiterals && char === '/' && opensRegexLiteral(line, index)) {
-        return maskRegexBody(line, index, out);
+    const close = config.blockComment?.close ?? '';
+    if (state.inBlockComment && !state.quote && close.length > 0 && !line.includes(close)) {
+        return ' '.repeat(line.length);
     }
-    if (config.quoteChars.includes(char)) {
-        state.quote = char === '`' && !config.multilineTemplates ? null : char;
-        out[index] = ' ';
-        return index + 1;
+
+    const pieces: string[] = [];
+    let lastCopied = 0;
+    let hasBlanked = false;
+
+    const blankSpan = (start: number, end: number): void => {
+        if (start >= end) return;
+        hasBlanked = true;
+        if (start > lastCopied) {
+            pieces.push(line.slice(lastCopied, start));
+        }
+        pieces.push(' '.repeat(end - start));
+        lastCopied = end;
+    };
+
+    let index = 0;
+    while (index < line.length) {
+        if (state.quote) {
+            const nextIdx = scanQuotedSpan(line, index, state.quote, state);
+            blankSpan(index, nextIdx);
+            index = nextIdx;
+            continue;
+        }
+
+        if (state.inBlockComment) {
+            const nextIdx = scanBlockCommentContinuation(line, index, close, state);
+            blankSpan(index, nextIdx);
+            index = nextIdx;
+            continue;
+        }
+
+        if (line.startsWith(config.lineComment, index)) {
+            blankSpan(index, line.length);
+            break;
+        }
+
+        const bcEnd = scanOpeningBlockComment(line, index, config, state);
+        if (bcEnd !== -1) {
+            blankSpan(index, bcEnd);
+            index = bcEnd;
+            continue;
+        }
+
+        const litEnd = scanQuoteOrRegex(line, index, config, state);
+        if (litEnd !== -1) {
+            blankSpan(index, litEnd);
+            index = litEnd;
+            continue;
+        }
+
+        index++;
     }
-    return index + 1;
+
+    if (!hasBlanked) return line;
+    if (lastCopied < line.length) {
+        pieces.push(line.slice(lastCopied));
+    }
+    return pieces.join('');
 }

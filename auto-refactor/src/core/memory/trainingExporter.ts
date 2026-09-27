@@ -94,6 +94,51 @@ export interface ExportOptions {
     outputFile?: string;
 }
 
+function writeTextFileSync(targetFile: string, text: string): void {
+    fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+    const fd = fs.openSync(targetFile, 'w');
+    try {
+        fs.writeSync(fd, text, undefined, 'utf8');
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
+function buildAlpacaSample(
+    rec: ReviewMemoryRecord,
+    activeRules: RuleHitRecord[],
+    hardRules: RuleHitRecord[],
+): AlpacaSample {
+    const issuesDescription = activeRules
+        .map((r: RuleHitRecord) => `- [${r.severity.toUpperCase()}] Line ${r.line}: ${r.message}`)
+        .join('\n');
+
+    const instruction = `Perform static code review and automated refactoring on the provided source code snippet from '${rec.filePath}'. Identify violations and provide compliant corrections.`;
+    const domainSections = (rec.codeDomains || [])
+        .map(
+            (d: CodeDomainFingerprint) =>
+                `// Domain: ${d.name}\n// Complexity: ${d.cyclomaticComplexity}`,
+        )
+        .join('\n\n');
+    const input = `Code:\n\`\`\`\n// File: ${rec.filePath}\n${domainSections}\n\`\`\`\n\nDetected issues:\n${issuesDescription}`;
+
+    const output = `Refactoring Analysis:\n1. Violations Found: ${activeRules.length} issue(s) detected.\n${activeRules.map((r: RuleHitRecord) => `   - ${r.rule}: ${r.message}`).join('\n')}\n\n2. Remediation Strategy:\n- Extract constants, isolate architecture boundaries, and enforce proper error handling.\n\n3. Compliant Code:\n\`\`\`\n// Refactored and verified compliant\n\`\`\``;
+
+    return {
+        instruction,
+        input,
+        output,
+        metadata: {
+            file: rec.filePath,
+            ruleIds: activeRules.map((r: RuleHitRecord) => r.rule),
+            scoreDelta: rec.qualityScores?.compositeScore
+                ? rec.qualityScores.compositeScore - NEUTRAL_COMPOSITE_SCORE
+                : 0,
+            empirical: hardRules.length === 0,
+        },
+    };
+}
+
 /**
  * Projects stored review-memory records into LLM fine-tuning datasets.
  *
@@ -140,42 +185,11 @@ export class TrainingDatasetExporter {
             }
 
             const activeRules = options.includeEmpirical ? rec.ruleHits : hardRules;
-            const issuesDescription = activeRules
-                .map(
-                    (r: RuleHitRecord) =>
-                        `- [${r.severity.toUpperCase()}] Line ${r.line}: ${r.message}`,
-                )
-                .join('\n');
-
-            const instruction = `Perform static code review and automated refactoring on the provided source code snippet from '${rec.filePath}'. Identify violations and provide compliant corrections.`;
-            const domainSections = (rec.codeDomains || [])
-                .map(
-                    (d: CodeDomainFingerprint) =>
-                        `// Domain: ${d.name}\n// Complexity: ${d.cyclomaticComplexity}`,
-                )
-                .join('\n\n');
-            const input = `Code:\n\`\`\`\n// File: ${rec.filePath}\n${domainSections}\n\`\`\`\n\nDetected issues:\n${issuesDescription}`;
-
-            const output = `Refactoring Analysis:\n1. Violations Found: ${activeRules.length} issue(s) detected.\n${activeRules.map((r: RuleHitRecord) => `   - ${r.rule}: ${r.message}`).join('\n')}\n\n2. Remediation Strategy:\n- Extract constants, isolate architecture boundaries, and enforce proper error handling.\n\n3. Compliant Code:\n\`\`\`\n// Refactored and verified compliant\n\`\`\``;
-
-            samples.push({
-                instruction,
-                input,
-                output,
-                metadata: {
-                    file: rec.filePath,
-                    ruleIds: activeRules.map((r: RuleHitRecord) => r.rule),
-                    scoreDelta: rec.qualityScores?.compositeScore
-                        ? rec.qualityScores.compositeScore - NEUTRAL_COMPOSITE_SCORE
-                        : 0,
-                    empirical: hardRules.length === 0,
-                },
-            });
+            samples.push(buildAlpacaSample(rec, activeRules, hardRules));
         }
 
         if (options.outputFile) {
-            fs.mkdirSync(path.dirname(options.outputFile), { recursive: true });
-            fs.writeFileSync(options.outputFile, JSON.stringify(samples, null, 2), 'utf8');
+            writeTextFileSync(options.outputFile, JSON.stringify(samples, null, 2));
         }
 
         return samples;
@@ -208,8 +222,7 @@ export class TrainingDatasetExporter {
         }));
 
         if (options.outputFile) {
-            fs.mkdirSync(path.dirname(options.outputFile), { recursive: true });
-            fs.writeFileSync(options.outputFile, JSON.stringify(results, null, 2), 'utf8');
+            writeTextFileSync(options.outputFile, JSON.stringify(results, null, 2));
         }
 
         return results;

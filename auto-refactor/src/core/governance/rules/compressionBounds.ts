@@ -68,28 +68,6 @@ const OPERATOR_RE = /[&|^~]|<<|>>|\+|-|\*|\/|%|\?|:/g;
 const DECLARATION_PREFIX_RE =
     /^\s*(?:type\s+[A-Za-z0-9_$]+\s*=|interface\s+[A-Za-z0-9_$]+|import\s+|export\s+(?:type|interface)\b)/;
 
-/**
- * Count occurrences of a single character without allocating.
- *
- * A `String.match` with a global pattern builds an array of every match before the caller can look
- * at the count; an `indexOf` walk answers the same question allocation-free, which matters because
- * the callers below run per line over the whole corpus.
- *
- * @param text - Text to scan.
- * @param char - Single character to count.
- * @returns Number of occurrences.
- */
-function countChars(text: string, char: string): number {
-    let count = 0;
-    const targetCode = char.charCodeAt(0);
-    for (let i = 0; i < text.length; i++) {
-        if (text.charCodeAt(i) === targetCode) {
-            count += 1;
-        }
-    }
-    return count;
-}
-
 const MULTI_TERNARY_RE = /\?[^:]+\?[^:]+:/;
 
 /**
@@ -114,13 +92,23 @@ export const GiantExpressionRule: GovernanceRule = {
             // Only the masked view is trustworthy: it is the same length as the raw line, so
             // evidence columns stay correct while prose and literals are already blank.
             const code = (ctx.masked[i] ?? '').trim();
-            if (!code || DECLARATION_PREFIX_RE.test(code)) continue;
+            if (!code.includes('?') && !code.includes('&') && !code.includes('|')) continue;
+            if (DECLARATION_PREFIX_RE.test(code)) continue;
 
-            // Cheap gate ahead of the three allocation-heavy rewrites below. Without multiple `?`
-            // or >= MAX_LOGICAL_OPERATORS boolean operators, the line cannot fire.
-            const qCount = countChars(code, '?');
-            const hasPossibleTernary = qCount >= 2 && /:/.test(code);
-            const logicalOpChars = countChars(code, '&') + countChars(code, '|');
+            // Single-pass char code inspection for candidate operators
+            let qCount = 0;
+            let hasColon = false;
+            let logicalOpChars = 0;
+            for (let j = 0; j < code.length; j++) {
+                const ch = code.charCodeAt(j);
+                if (ch === 63)
+                    qCount++; // '?'
+                else if (ch === 58)
+                    hasColon = true; // ':'
+                else if (ch === 38 || ch === 124) logicalOpChars++; // '&' or '|'
+            }
+
+            const hasPossibleTernary = qCount >= 2 && hasColon;
             const hasPossibleLogical = logicalOpChars >= MAX_LOGICAL_OPERATORS;
             if (!hasPossibleTernary && !hasPossibleLogical) continue;
 
@@ -159,8 +147,6 @@ export const GiantExpressionRule: GovernanceRule = {
     },
 };
 
-const SEMICOLON_RE = /;/;
-
 /**
  * Checks a masked code line for multi-statement packing on a single line.
  */
@@ -171,19 +157,19 @@ function checkSingleLineStatement(
     violations: GovernanceViolation[],
 ): void {
     if (!code) return;
-    // A `for` header carries two semicolons by design; the body is what the rule targets.
-    if (/^for\s*(?:await\s*)?\(/.test(code)) return;
-    if (DECLARATION_PREFIX_RE.test(code)) return;
 
-    const firstSemi = code.search(SEMICOLON_RE);
+    const firstSemi = code.indexOf(';');
     if (firstSemi === -1) return;
     const hasMultiple =
         firstSemi !== code.lastIndexOf(';') || code.slice(firstSemi + 1).trim().length > 0;
     if (!hasMultiple) return;
 
+    // A `for` header carries two semicolons by design; the body is what the rule targets.
+    if (/^for\s*(?:await\s*)?\(/.test(code)) return;
+    if (DECLARATION_PREFIX_RE.test(code)) return;
+
     // Strip inner type/object bodies like { a: string; b: number } before splitting.
-    const statementCode = code
-        .replace(/\{[^}]*\}/g, '{}')
+    const statementCode = (code.includes('{') ? code.replace(/\{[^}]*\}/g, '{}') : code)
         .trim()
         .replace(/;$/, '');
     const semiParts = statementCode
@@ -256,43 +242,47 @@ function evaluateCallbackLine(
 ): number {
     let depth = currentDepth;
     const mayOpenCallback = CALLBACK_KEYWORD_RE.test(code);
-    const isDeclaredFunction =
-        mayOpenCallback &&
-        /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s+[a-zA-Z0-9_$]+|(?:public|private|protected|static)\s+[a-zA-Z0-9_$]+\s*\()/.test(
-            code,
-        );
-    const opensCallback =
-        mayOpenCallback &&
-        !isDeclaredFunction &&
-        /(?:(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>\s*\{|\bfunction\s*(?:[a-zA-Z0-9_$]+)?\s*\([^)]*\)\s*\{)/.test(
-            code,
-        );
+    if (mayOpenCallback) {
+        const isDeclaredFunction =
+            /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s+[a-zA-Z0-9_$]+|(?:public|private|protected|static)\s+[a-zA-Z0-9_$]+\s*\()/.test(
+                code,
+            );
+        const opensCallback =
+            !isDeclaredFunction &&
+            /(?:(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>\s*\{|\bfunction\s*(?:[a-zA-Z0-9_$]+)?\s*\([^)]*\)\s*\{)/.test(
+                code,
+            );
 
-    if (opensCallback) {
-        depth++;
-        if (depth >= MAX_CALLBACK_DEPTH) {
-            violations.push({
-                ruleId: 'CMP-CAL-001',
-                message: `Callback nesting depth (${depth}) exceeds lower maintainability bounds.`,
-                line: lineIndex + 1,
-                column: raw.search(/\S/) + 1,
-                suggestion:
-                    'Reduce callback nesting depth: convert to async/await, flatten Promise chains, or extract named functions.',
-                fixable: false,
-                evidence: {
-                    confidence: 0.85,
-                    requiresRuntime: false,
-                },
-            });
+        if (opensCallback) {
+            depth++;
+            if (depth >= MAX_CALLBACK_DEPTH) {
+                violations.push({
+                    ruleId: 'CMP-CAL-001',
+                    message: `Callback nesting depth (${depth}) exceeds lower maintainability bounds.`,
+                    line: lineIndex + 1,
+                    column: raw.search(/\S/) + 1,
+                    suggestion:
+                        'Reduce callback nesting depth: convert to async/await, flatten Promise chains, or extract named functions.',
+                    fixable: false,
+                    evidence: {
+                        confidence: 0.85,
+                        requiresRuntime: false,
+                    },
+                });
+            }
         }
     }
 
-    if (/[{}]/.test(code)) {
-        const closes = countChars(code, '}');
-        const opens = countChars(code, '{');
+    if (code.includes('}') || code.includes('{')) {
+        let opens = 0;
+        let closes = 0;
+        for (let j = 0; j < code.length; j++) {
+            const c = code.charCodeAt(j);
+            if (c === 125) closes++;
+            else if (c === 123) opens++;
+        }
         if (closes > opens && depth > 0) {
-            const diff = Math.min(depth, closes - opens);
-            depth -= diff;
+            depth -= Math.min(depth, closes - opens);
         }
     }
     return depth;
@@ -335,9 +325,9 @@ function checkDensityLine(
     code: string,
     lineIndex: number,
 ): GovernanceViolation | null {
-    if (!code || DECLARATION_PREFIX_RE.test(code)) return null;
-    if (code.length < DENSITY_MIN_LENGTH) return null;
+    if (!code || code.length < DENSITY_MIN_LENGTH) return null;
     if (!STRONG_BITWISE_RE.test(code)) return null;
+    if (DECLARATION_PREFIX_RE.test(code)) return null;
 
     const nonWs = code.replace(/\s+/g, '');
     if (nonWs.length < DENSITY_MIN_LENGTH || nonWs.length > DENSITY_MAX_LENGTH) return null;

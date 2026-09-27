@@ -276,6 +276,43 @@ function extractFromAst(root: NormalizedNode, issues: Issue[]): CodeDomainFinger
     return domains;
 }
 
+/** Count opening and closing braces in a single source line */
+function countLineBraces(line: string): { opens: number; closes: number } {
+    let opens = 0;
+    let closes = 0;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line.charCodeAt(i);
+        if (ch === 123) {
+            opens++;
+        } else if (ch === 125) {
+            closes++;
+        }
+    }
+    return { opens, closes };
+}
+
+/** Determine the end line of a text-based function/class declaration */
+function findScopeEndLine(lines: string[], startIdx: number): number {
+    const maxLine = Math.min(lines.length, startIdx + 1 + DECLARATION_HEURISTIC_WINDOW_LINES);
+    let braceCount = 0;
+    let foundStartBrace = false;
+
+    for (let j = startIdx; j < lines.length; j++) {
+        const { opens, closes } = countLineBraces(lines[j]);
+        if (opens > 0) {
+            foundStartBrace = true;
+            braceCount += opens;
+        }
+        if (closes > 0) {
+            braceCount -= closes;
+        }
+        if (foundStartBrace && braceCount <= 0) {
+            return j + 1;
+        }
+    }
+    return maxLine;
+}
+
 /** Fallback regex-based domain extractor for text or non-AST contexts */
 function extractFromText(content: string, issues: Issue[]): CodeDomainFingerprint[] {
     const domains: CodeDomainFingerprint[] = [];
@@ -288,62 +325,42 @@ function extractFromText(content: string, issues: Issue[]): CodeDomainFingerprin
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const match = declRegex.exec(line);
-        if (match) {
-            const name = match[1];
-            const startLine = i + 1;
-            // The declaration window never extends past the end of the file.
-            let endLine = Math.min(lines.length, startLine + DECLARATION_HEURISTIC_WINDOW_LINES);
+        if (!match) continue;
 
-            // Try to find closing brace or indentation return
-            let braceCount = 0;
-            let foundStartBrace = false;
-            for (let j = i; j < lines.length; j++) {
-                const l = lines[j];
-                for (let c = 0; c < l.length; c++) {
-                    if (l[c] === '{') {
-                        braceCount++;
-                        foundStartBrace = true;
-                    } else if (l[c] === '}') {
-                        braceCount--;
-                    }
-                }
-                if (foundStartBrace && braceCount <= 0) {
-                    endLine = j + 1;
-                    break;
-                }
-            }
+        const name = match[1];
+        const startLine = i + 1;
+        const endLine = findScopeEndLine(lines, i);
 
-            const domainSnippet = lines.slice(startLine - 1, endLine).join('\n');
-            const semanticHash = fastDigest(domainSnippet.replace(/\s+/g, ' '));
-            const domainId = `function:${name}:${startLine}`;
+        const domainSnippet = lines.slice(startLine - 1, endLine).join('\n');
+        const semanticHash = fastDigest(domainSnippet.replace(/\s+/g, ' '));
+        const domainId = `function:${name}:${startLine}`;
 
-            const domainIssues = issues.filter(
-                (it) =>
-                    it.location?.start &&
-                    it.location.start.line >= startLine &&
-                    it.location.start.line <= endLine,
-            );
+        const domainIssues = issues.filter(
+            (it) =>
+                it.location?.start &&
+                it.location.start.line >= startLine &&
+                it.location.start.line <= endLine,
+        );
 
-            domains.push({
-                domainId,
-                kind: 'function',
-                name,
-                span: { startLine, endLine, startCol: 1, endCol: 1 },
-                semanticHash,
-                cyclomaticComplexity: 1,
-                ruleViolations: domainIssues.map((it) => ({
-                    rule: it.rule,
-                    analyzer: it.analyzer,
-                    severity: it.severity,
-                    line: it.location.start.line,
-                    message: it.message,
-                })),
-                metricSummary: {
-                    lines: Math.max(1, endLine - startLine + 1),
-                    maxNesting: 0,
-                },
-            });
-        }
+        domains.push({
+            domainId,
+            kind: 'function',
+            name,
+            span: { startLine, endLine, startCol: 1, endCol: 1 },
+            semanticHash,
+            cyclomaticComplexity: 1,
+            ruleViolations: domainIssues.map((it) => ({
+                rule: it.rule,
+                analyzer: it.analyzer,
+                severity: it.severity,
+                line: it.location.start.line,
+                message: it.message,
+            })),
+            metricSummary: {
+                lines: Math.max(1, endLine - startLine + 1),
+                maxNesting: 0,
+            },
+        });
     }
 
     return domains;

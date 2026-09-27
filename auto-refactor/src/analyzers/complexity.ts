@@ -330,11 +330,12 @@ export class ComplexityAnalyzer implements Analyzer {
         const isParserContext =
             /(?:adapter|parser|lexer|walker|codec|deserializer|ast|analyzer|audit|evaluator|graph|rule)/i.test(
                 ctx.filePath,
-            ) || /(?:parse|tokenize|decode|visit|walk|match|audit|analyze|evaluate|dispatch)/i.test(name);
+            ) ||
+            /(?:parse|tokenize|decode|visit|walk|match|audit|analyze|evaluate|dispatch)/i.test(
+                name,
+            );
 
-        const hasSwitchOrDispatch = fnLines.some((l) =>
-            /^\s*(?:switch\b|case\b|match\b)/.test(l),
-        );
+        const hasSwitchOrDispatch = fnLines.some((l) => /^\s*(?:switch\b|case\b|match\b)/.test(l));
         const isStateMachine = hasSwitchOrDispatch && fnLines.length >= 15;
         const isEventLoop =
             /(?:daemon|server|worker|poller|eventloop)/i.test(ctx.filePath) ||
@@ -492,8 +493,7 @@ export class ComplexityAnalyzer implements Analyzer {
                 branchLine: caseLine,
                 branchLength: caseLength,
             },
-            suggestion:
-                'Extract branch body into a dedicated action to keep dispatch lean.',
+            suggestion: 'Extract branch body into a dedicated action to keep dispatch lean.',
         });
     }
 

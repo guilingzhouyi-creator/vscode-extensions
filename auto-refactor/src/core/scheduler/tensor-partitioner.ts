@@ -48,6 +48,112 @@ export const DEFAULT_TENSOR_RULE_FAMILIES: Record<string, string[]> = {
 };
 
 /**
+ * Context for generating tensor cells for a specific module and depth layer.
+ */
+interface CellBuilderContext {
+    moduleKey: string;
+    depth: number;
+    ruleFamilyEntries: [string, string[]][];
+    cellSeq: { current: number };
+}
+
+/**
+ * Creates tensor partition cells across rule families for a file chunk.
+ */
+function createCellsForChunk(
+    chunk: string[],
+    ctx: CellBuilderContext,
+): { cells: TensorPartitionCell[]; cost: number } {
+    const cells: TensorPartitionCell[] = [];
+    let cost = 0;
+    for (const [familyName, analyzers] of ctx.ruleFamilyEntries) {
+        const estimatedCost = chunk.length * analyzers.length * (ctx.depth + 1);
+        cost += estimatedCost;
+        const seq = ctx.cellSeq.current++;
+        cells.push({
+            cellId: `tensor-${ctx.moduleKey.replace(/[^a-zA-Z0-9_-]/g, '-')}-d${ctx.depth}-r${seq}`,
+            dataFiles: chunk,
+            ruleFamily: familyName,
+            ruleAnalyzers: analyzers,
+            dependencyDepth: ctx.depth,
+            estimatedCost,
+        });
+    }
+    return { cells, cost };
+}
+
+/**
+ * Partitions files of a single depth band into chunked tensor cells.
+ */
+function partitionDepthFiles(
+    depthFiles: string[],
+    maxChunkSize: number,
+    ctx: CellBuilderContext,
+    targetCells: TensorPartitionCell[],
+): number {
+    let addedCost = 0;
+    for (let i = 0; i < depthFiles.length; i += maxChunkSize) {
+        const chunk = depthFiles.slice(i, i + maxChunkSize);
+        const sub = createCellsForChunk(chunk, ctx);
+        addedCost += sub.cost;
+        for (const c of sub.cells) {
+            targetCells.push(c);
+        }
+    }
+    return addedCost;
+}
+
+/**
+ * Groups files of a single cluster by their dependency depth.
+ */
+function groupFilesByDepth(
+    clusterFiles: string[],
+    depthMap: Map<string, number>,
+): Map<number, string[]> {
+    const depthGroups = new Map<number, string[]>();
+    for (const file of clusterFiles) {
+        const depth = depthMap.get(file) ?? 0;
+        let grp = depthGroups.get(depth);
+        if (!grp) {
+            grp = [];
+            depthGroups.set(depth, grp);
+        }
+        grp.push(file);
+    }
+    return depthGroups;
+}
+
+/**
+ * Builds dependency adjacency list without per-iteration heap container instantiation.
+ */
+function buildImportsGraph(edges: [string, string][]): Map<string, string[]> {
+    const imports = new Map<string, string[]>();
+    for (const [from, to] of edges) {
+        let list = imports.get(from);
+        if (!list) {
+            list = [];
+            imports.set(from, list);
+        }
+        list.push(to);
+    }
+    return imports;
+}
+
+/**
+ * Computes maximum dependency depth among all imported predecessors.
+ */
+function computeMaxPredecessorDepth(importedFiles: string[], depths: Map<string, number>): number {
+    let currentMax = 0;
+    for (const imp of importedFiles) {
+        const impDepth = depths.get(imp) ?? 0;
+        if (impDepth > currentMax) {
+            currentMax = impDepth;
+        }
+    }
+    return currentMax;
+}
+
+/**
  * Multi-dimensional Tensor-Parallel Partitioner.
  */
 export class TensorPartitioner {
@@ -96,43 +202,24 @@ export class TensorPartitioner {
         // 3. Assemble 3D Tensor Cells: (DataCluster × Depth × RuleFamily)
         const cells: TensorPartitionCell[] = [];
         let totalCost = 0;
-        let cellSeq = 1;
-
+        const cellSeq = { current: 1 };
         const ruleFamilyEntries = Object.entries(ruleFamilies);
 
         for (const [moduleKey, clusterFiles] of dataClusters.entries()) {
-            // Further partition cluster files by dependency depth
-            const depthGroups = new Map<number, string[]>();
-            for (const file of clusterFiles) {
-                const depth = depthMap.get(file) ?? 0;
-                let grp = depthGroups.get(depth);
-                if (!grp) {
-                    grp = [];
-                    depthGroups.set(depth, grp);
-                }
-                grp.push(file);
-            }
-
+            const depthGroups = groupFilesByDepth(clusterFiles, depthMap);
             for (const [depth, depthFiles] of depthGroups.entries()) {
-                // Chunk files if larger than maxFilesPerDataCluster
-                for (let i = 0; i < depthFiles.length; i += this.maxFilesPerDataCluster) {
-                    const chunk = depthFiles.slice(i, i + this.maxFilesPerDataCluster);
-
-                    // Cross with Rule Families
-                    for (const [familyName, analyzers] of ruleFamilyEntries) {
-                        const estimatedCost = chunk.length * analyzers.length * (depth + 1);
-                        totalCost += estimatedCost;
-
-                        cells.push({
-                            cellId: `tensor-${moduleKey.replace(/[^a-zA-Z0-9_-]/g, '-')}-d${depth}-r${cellSeq++}`,
-                            dataFiles: chunk,
-                            ruleFamily: familyName,
-                            ruleAnalyzers: analyzers,
-                            dependencyDepth: depth,
-                            estimatedCost,
-                        });
-                    }
-                }
+                const ctx: CellBuilderContext = {
+                    moduleKey,
+                    depth,
+                    ruleFamilyEntries,
+                    cellSeq,
+                };
+                totalCost += partitionDepthFiles(
+                    depthFiles,
+                    this.maxFilesPerDataCluster,
+                    ctx,
+                    cells,
+                );
             }
         }
 
@@ -155,21 +242,11 @@ export class TensorPartitioner {
         edges: [string, string][],
     ): Map<string, number> {
         const depths = new Map<string, number>();
-        const imports = new Map<string, Set<string>>();
-
         for (const f of files) {
             depths.set(f, 0);
-            imports.set(f, new Set());
         }
 
-        for (const [from, to] of edges) {
-            let set = imports.get(from);
-            if (!set) {
-                set = new Set();
-                imports.set(from, set);
-            }
-            set.add(to);
-        }
+        const imports = buildImportsGraph(edges);
 
         // Iterative relaxation of depths up to max depth bound
         let changed = true;
@@ -182,19 +259,13 @@ export class TensorPartitioner {
 
             for (const file of files) {
                 const importedFiles = imports.get(file);
-                if (importedFiles && importedFiles.size > 0) {
-                    let currentMax = 0;
-                    for (const imp of importedFiles) {
-                        const impDepth = depths.get(imp) ?? 0;
-                        if (impDepth > currentMax) {
-                            currentMax = impDepth;
-                        }
-                    }
-                    const newDepth = currentMax + 1;
-                    if (newDepth !== depths.get(file)) {
-                        depths.set(file, newDepth);
-                        changed = true;
-                    }
+                if (!importedFiles || importedFiles.length === 0) {
+                    continue;
+                }
+                const newDepth = computeMaxPredecessorDepth(importedFiles, depths) + 1;
+                if (newDepth !== depths.get(file)) {
+                    depths.set(file, newDepth);
+                    changed = true;
                 }
             }
         }

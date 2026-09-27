@@ -62,6 +62,14 @@ export const ScoringRationales = {
      */
     EXCESSIVE_EXPORTED_SYMBOLS: (count: number) =>
         `Module defines ${count} top-level exported symbols, exceeding single-responsibility cohesion boundaries`,
+    /**
+     * Format the rationale for excessive identifier length suggesting architectural decomposition.
+     *
+     * @param msg - Analyzer finding text embedded after the rationale prefix.
+     * @returns Deduction rationale for the architecture-consistency dimension.
+     */
+    NAMING_DECOUPLING_RECOMMENDED: (msg: string) =>
+        `Excessive identifier length suggests architectural decomposition: ${msg}`,
 
     // 2. Semantic Purity
     /**
@@ -274,6 +282,14 @@ export const ScoringRationales = {
      */
     STATE_MACHINE_DISCIPLINE: (msg: string) =>
         `State machine structural dispatch discipline violation: ${msg}`,
+    /**
+     * Format the rationale for multi-language test topology discipline breaches.
+     *
+     * @param msg - Analyzer finding text embedded after the rationale prefix.
+     * @returns Deduction rationale for the maintainability dimension.
+     */
+    TEST_TOPOLOGY_DISCIPLINE_BREACH: (msg: string) =>
+        `Cross-language test topology discipline breach: ${msg}`,
 
     // 8. Comment Quality
     /**

@@ -107,6 +107,34 @@ export function revertDiffHunk(currentContent: string, hunk: ReviewDiffHunk): Ro
     }
 }
 
+function recordHunkCheckpoints(
+    rolledBackCheckpoints: Set<string>,
+    lines: ReviewDiffHunk['lines'],
+): void {
+    for (const line of lines) {
+        if (line.attribution?.checkpointId) {
+            rolledBackCheckpoints.add(line.attribution.checkpointId);
+        }
+    }
+}
+
+function applySortedHunksToFile(
+    initialContent: string,
+    sortedHunks: ReviewDiffHunk[],
+    rolledBackCheckpoints: Set<string>,
+): { success: boolean; content: string } {
+    let content = initialContent;
+    for (const hunk of sortedHunks) {
+        const res = revertDiffHunk(content, hunk);
+        if (!res.success || res.updatedContent === undefined) {
+            return { success: false, content: initialContent };
+        }
+        content = res.updatedContent;
+        recordHunkCheckpoints(rolledBackCheckpoints, hunk.lines);
+    }
+    return { success: true, content };
+}
+
 /**
  * Revert all hunks in multiple files attributed to a given TaskCard ID.
  * A hunk matches when any of its lines carries `attribution.cardId`; matches are applied in
@@ -128,41 +156,22 @@ export function revertTaskCard(
     const updatedFiles = new Map<string, string>();
 
     for (const [filePath, hunks] of hunksByFile.entries()) {
-        // Filter hunks attributed to targetCardId
         const matchingHunks = hunks.filter((h) =>
             h.lines.some((l) => l.attribution?.cardId === targetCardId),
         );
-
         if (matchingHunks.length === 0) continue;
 
-        let content = fileContents.get(filePath);
+        const content = fileContents.get(filePath);
         if (content === undefined) continue;
 
-        // Sort matching hunks in reverse order so line offsets stay valid during splicing
         const sortedHunks = [...matchingHunks].sort(
             (a, b) => b.newSpan.startLine - a.newSpan.startLine,
         );
 
-        let fileReverted = true;
-        for (const hunk of sortedHunks) {
-            const res = revertDiffHunk(content, hunk);
-            if (res.success && res.updatedContent !== undefined) {
-                content = res.updatedContent;
-                // Record associated checkpoint
-                for (const line of hunk.lines) {
-                    if (line.attribution?.checkpointId) {
-                        rolledBackCheckpoints.add(line.attribution.checkpointId);
-                    }
-                }
-            } else {
-                fileReverted = false;
-                break;
-            }
-        }
-
-        if (fileReverted) {
+        const revertResult = applySortedHunksToFile(content, sortedHunks, rolledBackCheckpoints);
+        if (revertResult.success) {
             affectedFiles.push(filePath);
-            updatedFiles.set(filePath, content);
+            updatedFiles.set(filePath, revertResult.content);
         }
     }
 

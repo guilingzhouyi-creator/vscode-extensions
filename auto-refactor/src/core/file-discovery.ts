@@ -43,6 +43,16 @@ export const DEFAULT_EXT: readonly string[] = [
     '.md',
 ];
 
+function consumeAsterisk(glob: string, i: number): { token: string; nextIndex: number } {
+    if (glob[i + 1] !== '*') {
+        return { token: '[^/]*', nextIndex: i + 1 };
+    }
+    if (glob[i + 2] === '/') {
+        return { token: '(?:.*/)?', nextIndex: i + 3 };
+    }
+    return { token: '.*', nextIndex: i + 2 };
+}
+
 /**
  * Translate a repo-relative path glob into an anchored RegExp for include/exclude matching.
  * `**` crosses separators, a leading double-star plus slash matches zero or more path segments,
@@ -57,20 +67,9 @@ export function globToRegExp(glob: string): RegExp {
     while (i < glob.length) {
         const c = glob[i];
         if (c === '*') {
-            if (glob[i + 1] === '*') {
-                i += 2;
-                if (glob[i] === '/') {
-                    // Double-star plus slash: match zero or more whole path segments.
-                    re += '(?:.*/)?';
-                    i++;
-                } else {
-                    // Bare double-star: match anything, including path separators.
-                    re += '.*';
-                }
-            } else {
-                re += '[^/]*';
-                i++;
-            }
+            const consumed = consumeAsterisk(glob, i);
+            re += consumed.token;
+            i = consumed.nextIndex;
         } else if (c === '?') {
             re += '[^/]';
             i++;
@@ -111,6 +110,30 @@ export function normalizePath(p: string): string {
     return norm;
 }
 
+function shouldTraverseDirectory(
+    rel: string,
+    dirName: string,
+    excludeRx: RegExp[],
+    gitignore: ((rel: string) => boolean) | null,
+): boolean {
+    if (matchAny(excludeRx, rel) || matchAny(excludeRx, dirName)) return false;
+    if (gitignore && gitignore(rel)) return false;
+    return true;
+}
+
+function shouldIncludeFile(
+    rel: string,
+    fileName: string,
+    includeRx: RegExp[],
+    excludeRx: RegExp[],
+    gitignore: ((rel: string) => boolean) | null,
+): boolean {
+    if (!matchAny(includeRx, rel) || matchAny(excludeRx, rel)) return false;
+    if (gitignore && gitignore(rel)) return false;
+    const ext = path.extname(fileName).toLowerCase();
+    return DEFAULT_EXT.includes(ext);
+}
+
 /**
  * Iterative filesystem walker for discovering participating source files.
  * Replaces recursive traversal with an explicit FIFO directory queue,
@@ -146,16 +169,12 @@ export function collectFiles(
             const abs = path.join(dir, e.name);
             const rel = path.relative(absRoot, abs).split(path.sep).join('/');
 
-            if (e.isDirectory()) {
-                if (matchAny(excludeRx, rel) || matchAny(excludeRx, e.name)) continue;
-                if (gitignore && gitignore(rel)) continue;
+            if (e.isDirectory() && shouldTraverseDirectory(rel, e.name, excludeRx, gitignore)) {
                 dirQueue.push(abs);
-            } else if (e.isFile()) {
-                if (!matchAny(includeRx, rel)) continue;
-                if (matchAny(excludeRx, rel)) continue;
-                if (gitignore && gitignore(rel)) continue;
-                const ext = path.extname(e.name).toLowerCase();
-                if (!DEFAULT_EXT.includes(ext)) continue;
+            } else if (
+                e.isFile() &&
+                shouldIncludeFile(rel, e.name, includeRx, excludeRx, gitignore)
+            ) {
                 results.push(rel);
             }
         }

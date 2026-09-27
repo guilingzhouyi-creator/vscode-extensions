@@ -332,7 +332,12 @@ export class ReviewMemoryManager {
     private flushPending(): void {
         if (!this.memoryFilePath || this.pendingLines.length === 0) return;
         try {
-            fs.appendFileSync(this.memoryFilePath, this.pendingLines.join(''), 'utf8');
+            const fd = fs.openSync(this.memoryFilePath, 'a');
+            try {
+                fs.writeSync(fd, this.pendingLines.join(''), undefined, 'utf8');
+            } finally {
+                fs.closeSync(fd);
+            }
             this.pendingLines.length = 0;
         } catch {
             /* Best-effort: keep the buffer for the next flush attempt */
@@ -367,11 +372,41 @@ export class ReviewMemoryManager {
                 .map((record) => JSON.stringify(record))
                 .join('\n');
             const tmp = `${this.memoryFilePath}.tmp`;
-            fs.writeFileSync(tmp, `${body}\n`, 'utf8');
+            const fd = fs.openSync(tmp, 'w');
+            try {
+                fs.writeSync(fd, `${body}\n`, undefined, 'utf8');
+            } finally {
+                fs.closeSync(fd);
+            }
             fs.renameSync(tmp, this.memoryFilePath);
             this.logLines = this.records.size;
         } catch {
             /* Best-effort: a failed compaction leaves the append-only log intact */
+        }
+    }
+
+    private parseLogLine(line: string): void {
+        if (!line.trim()) return;
+        this.logLines += 1;
+        try {
+            const rec: ReviewMemoryRecord = JSON.parse(line);
+            if (rec && rec.filePath) {
+                this.records.set(rec.filePath, rec);
+            }
+        } catch {
+            // ignore corrupted line
+        }
+    }
+
+    private readLogContent(filePath: string): string {
+        const fd = fs.openSync(filePath, 'r');
+        try {
+            const stat = fs.fstatSync(fd);
+            const buf = Buffer.allocUnsafe(stat.size);
+            fs.readSync(fd, buf, 0, stat.size, 0);
+            return buf.toString('utf8');
+        } finally {
+            fs.closeSync(fd);
         }
     }
 
@@ -386,25 +421,11 @@ export class ReviewMemoryManager {
     private loadFromDisk(): void {
         if (!this.memoryFilePath) return;
         try {
-            // A missing log is the normal first run: readFileSync throws ENOENT, which the catch
-            // below swallows exactly like a corrupt file, so no extra stat syscall is needed.
-            const content = fs.readFileSync(this.memoryFilePath, 'utf8');
+            const content = this.readLogContent(this.memoryFilePath);
             const lines = content.split('\n');
             for (const line of lines) {
-                if (!line.trim()) continue;
-                this.logLines += 1;
-                try {
-                    const rec: ReviewMemoryRecord = JSON.parse(line);
-                    if (rec && rec.filePath) {
-                        this.records.set(rec.filePath, rec);
-                    }
-                } catch {
-                    // ignore corrupted line
-                }
+                this.parseLogLine(line);
             }
-            // Rebuild the LRU order from the deduped map. The log may hold several audits per file,
-            // so pushing one slot per line would grow the order with history instead of with the
-            // file set — and eviction would then walk stale duplicates.
             this.lruOrder.length = 0;
             for (const key of this.records.keys()) this.lruOrder.push(key);
         } catch {

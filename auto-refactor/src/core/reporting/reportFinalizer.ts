@@ -85,7 +85,9 @@ async function applyDependencyGraphPass(
     const cycle = await runCyclePass(report, config, logger, covered ? prebuilt : null);
 
     if (!covered && prebuilt !== null) {
-        warnings.push('dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph');
+        warnings.push(
+            'dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph',
+        );
     }
     report.issues.push(...cycle.issues);
     warnings.push(...cycle.warnings);
@@ -110,7 +112,9 @@ function applyLiteralClustersPass(
 
     postScanPasses.push('literal-clusters');
     if (reportScanner === null) {
-        warnings.push('literal-clusters: cached paths lack shared literal index, skipping (run full cold scan)');
+        warnings.push(
+            'literal-clusters: cached paths lack shared literal index, skipping (run full cold scan)',
+        );
         return;
     }
     const clusterIssues = reportScanner.getLiteralClusterIssues();
@@ -153,7 +157,7 @@ function applyConstantLibraryTopologyPass(
         recomputeSummary(report);
         logger.info(
             `constant-library-topology: emitted ${topologyIssues.length} ` +
-            `constant library recommendation(s)`,
+                `constant library recommendation(s)`,
         );
     }
 }
@@ -173,7 +177,9 @@ function applyErrorFlowPass(
 
     postScanPasses.push('error-flow');
     if (reportScanner === null) {
-        warnings.push('error-flow: cached paths lack shared call-graph index, skipping (run full cold scan)');
+        warnings.push(
+            'error-flow: cached paths lack shared call-graph index, skipping (run full cold scan)',
+        );
         return;
     }
     const errorIssues = reportScanner.getErrorFlowIssues(errorOpts);

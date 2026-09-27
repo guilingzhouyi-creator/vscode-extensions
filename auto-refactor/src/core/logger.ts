@@ -95,7 +95,118 @@ export class AutoRefactorError extends Error {
  *    so logs survive `process.exit` without flush races.
  *  - Level filtering is done once at emit time.
  */
+export class LogRingBuffer {
+    private readonly buffer: string[];
+    private head: number = 0;
+    private tail: number = 0;
+    private count: number = 0;
+    private readonly capacity: number;
+    private readonly filePath: string;
+    private timer: NodeJS.Timeout | null = null;
+    private isFlushing: boolean = false;
+
+    /**
+     * Create a ring buffer for batching log disk appends.
+     *
+     * @param filePath - Destination log file path.
+     * @param capacity - Maximum buffer capacity in lines (default 2048).
+     */
+    constructor(filePath: string, capacity: number = 2048) {
+        this.filePath = filePath;
+        this.capacity = capacity;
+        this.buffer = new Array<string>(capacity);
+    }
+
+    /**
+     * Push a formatted log line into the in-memory circular buffer.
+     *
+     * @param line - Fully formatted log line string.
+     */
+    public push(line: string): void {
+        this.buffer[this.head] = line;
+        this.head = (this.head + 1) % this.capacity;
+        if (this.count < this.capacity) {
+            this.count++;
+        } else {
+            this.tail = (this.tail + 1) % this.capacity;
+        }
+
+        if (this.count >= 128) {
+            void this.flushAsync();
+        } else if (!this.timer) {
+            this.timer = setTimeout(() => {
+                this.timer = null;
+                void this.flushAsync();
+            }, 50);
+            if (this.timer.unref) {
+                this.timer.unref();
+            }
+        }
+    }
+
+    /**
+     * Synchronously flush all buffered log lines to disk immediately.
+     */
+    public flushSync(): void {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        if (this.count === 0) return;
+        const linesToFlush: string[] = [];
+        while (this.count > 0) {
+            linesToFlush.push(this.buffer[this.tail]);
+            this.tail = (this.tail + 1) % this.capacity;
+            this.count--;
+        }
+        try {
+            fs.appendFileSync(this.filePath, linesToFlush.join('\n') + '\n');
+        } catch (e) {
+            process.stderr.write(`[auto-refactor] WARN sync log flush failed: ${String(e)}\n`);
+        }
+    }
+
+    /**
+     * Asynchronously flush buffered logs to disk.
+     *
+     * @returns Promise resolving when flush completes.
+     */
+    public async flushAsync(): Promise<void> {
+        if (this.count === 0 || this.isFlushing) return;
+        this.isFlushing = true;
+        const linesToFlush: string[] = [];
+        while (this.count > 0) {
+            linesToFlush.push(this.buffer[this.tail]);
+            this.tail = (this.tail + 1) % this.capacity;
+            this.count--;
+        }
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        try {
+            await fs.promises.appendFile(this.filePath, linesToFlush.join('\n') + '\n');
+        } catch (e) {
+            process.stderr.write(`[auto-refactor] WARN async log append failed: ${String(e)}\n`);
+        } finally {
+            this.isFlushing = false;
+        }
+    }
+}
+
+/**
+ * Minimal, dependency-free logger with in-memory ring buffer batching.
+ *
+ * Design rules:
+ *  - All logs go to **stderr** so stdout stays clean for machine-readable output
+ *    (JSON / SARIF piping). This is critical for `auto-refactor ... > report.json`.
+ *  - Optionally mirrors to a file using **LogRingBuffer** batching so disk I/O does
+ *    not block execution, and close() flushes synchronously.
+ *  - Level filtering is done once at emit time.
+ */
 export class Logger {
+    private ringBuffer?: LogRingBuffer;
+
     /**
      * Create a logger bound to a maximum severity rank and an optional mirror file.
      *
@@ -104,7 +215,7 @@ export class Logger {
      *
      * @param level - Highest emitted severity rank; messages ranked above it are dropped.
      * @param filePath - Optional log-file path. When set, accepted lines are appended
-     *                   synchronously and still mirrored to stderr.
+     *                   via LogRingBuffer and mirrored to stderr.
      */
     constructor(
         private level: LogLevel = 'info',
@@ -113,6 +224,7 @@ export class Logger {
         if (filePath) {
             try {
                 fs.mkdirSync(path.dirname(filePath), { recursive: true });
+                this.ringBuffer = new LogRingBuffer(filePath);
             } catch {
                 /* best-effort; append attempts below will surface failures */
             }
@@ -142,14 +254,8 @@ export class Logger {
         const ts = new Date().toISOString();
         const line = `${ts} ${level.toUpperCase().padEnd(LOG_LEVEL_LABEL_WIDTH)} ${msg}`;
         process.stderr.write(line + '\n');
-        if (this.filePath) {
-            try {
-                fs.appendFileSync(this.filePath, line + '\n');
-            } catch (e) {
-                process.stderr.write(
-                    `[auto-refactor] WARN failed to write log file: ${String(e)}\n`,
-                );
-            }
+        if (this.ringBuffer) {
+            this.ringBuffer.push(line);
         }
     }
 
@@ -186,6 +292,23 @@ export class Logger {
         this.emit('debug', msg);
     }
 
-    /** No-op kept for API symmetry; synchronous writes need no explicit close. */
-    close(): void {}
+    /**
+     * Synchronously flushes all pending logs to disk and releases file resources.
+     */
+    close(): void {
+        if (this.ringBuffer) {
+            this.ringBuffer.flushSync();
+        }
+    }
+
+    /**
+     * Asynchronously flushes any buffered log entries.
+     *
+     * @returns Promise resolving when flush is complete.
+     */
+    async flush(): Promise<void> {
+        if (this.ringBuffer) {
+            await this.ringBuffer.flushAsync();
+        }
+    }
 }

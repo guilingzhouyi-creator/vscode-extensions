@@ -140,6 +140,72 @@ function handleMemoryCommand(): void {
     process.exit(0);
 }
 
+/**
+ * Executes automated AST codemod repairs for actionable scan findings.
+ *
+ * @param cli - Parsed command-line options including fix flags.
+ * @returns Exit code 0 on successful repair completion.
+ */
+async function handleFixWorkflow(cli: any): Promise<number> {
+    const { scan } = require('./api');
+    const { defaultPatchEngine, PatchEngine } = require('./core/codemod');
+    const fs = require('fs');
+    const path = require('path');
+
+    const report = await scan(cli);
+    const fixesByFile = new Map<string, any[]>();
+
+    for (const issue of report.issues) {
+        const fix = PatchEngine.issueToFix(issue);
+        if (fix) {
+            const relFile = issue.location.file;
+            const existing = fixesByFile.get(relFile) || [];
+            existing.push(fix);
+            fixesByFile.set(relFile, existing);
+        }
+    }
+
+    if (fixesByFile.size === 0) {
+        process.stdout.write(
+            '[auto-refactor] No automated codemod fixes available for detected issues.\n',
+        );
+        return 0;
+    }
+
+    const rootDir = cli.root || process.cwd();
+    let totalApplied = 0;
+    let totalSkipped = 0;
+
+    process.stdout.write(
+        `\n=== Automated Codemod Repair (${cli.fixDryRun ? 'DRY-RUN' : 'IN-PLACE'}) ===\n`,
+    );
+
+    for (const [relPath, fixes] of fixesByFile.entries()) {
+        const fullPath = path.resolve(rootDir, relPath);
+        if (!fs.existsSync(fullPath)) continue;
+
+        const content = await fs.promises.readFile(fullPath, 'utf8');
+        const result = defaultPatchEngine.applyFixes(fullPath, content, fixes, {
+            dryRun: cli.fixDryRun,
+            rules: cli.fixRules,
+        });
+
+        if (result.appliedFixCount > 0) {
+            totalApplied += result.appliedFixCount;
+            totalSkipped += result.skippedConflictCount;
+            if (result.unifiedDiff) {
+                process.stdout.write(result.unifiedDiff + '\n');
+            }
+        }
+    }
+
+    process.stdout.write(
+        `[auto-refactor] Fix summary: ${totalApplied} applied, ${totalSkipped} conflicts skipped across ${fixesByFile.size} files.\n\n`,
+    );
+
+    return 0;
+}
+
 async function handleScanCommand(args: string[]): Promise<number> {
     const cli = parseArgs(args);
 
@@ -152,6 +218,10 @@ async function handleScanCommand(args: string[]): Promise<number> {
         process.stderr.write(
             `[auto-refactor] cache cleared (${ok ? 'ok' : 'FAILED'}): ${cache.dir}\n`,
         );
+    }
+
+    if (cli.fix || cli.fixDryRun) {
+        return handleFixWorkflow(cli);
     }
 
     return scanAndRender(cli);

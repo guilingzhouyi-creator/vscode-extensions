@@ -79,14 +79,11 @@ export class WorkerPoolManager implements IExecutionScheduler {
      */
     public submit<TInput, TResult>(task: ExecutionTask<TInput, TResult>): Promise<TResult> {
         if (this.isShuttingDown) {
-            return Promise.reject(
-                new Error('Scheduler is shutting down; cannot accept new tasks'),
-            );
+            return Promise.reject(new Error('Scheduler is shutting down; cannot accept new tasks'));
         }
 
         if (this.queue.length >= this.maxQueueDepth && task.priority < 30) {
-            const queueMsg =
-                `Scheduler queue capacity reached (${this.queue.length} >= ${this.maxQueueDepth})`;
+            const queueMsg = `Scheduler queue capacity reached (${this.queue.length} >= ${this.maxQueueDepth})`;
             return Promise.reject(new Error(queueMsg));
         }
 

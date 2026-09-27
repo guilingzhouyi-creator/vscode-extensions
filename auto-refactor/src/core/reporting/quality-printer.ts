@@ -74,15 +74,15 @@ function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
                 `C:${dv.C.toFixed(0)} E:${dv.E.toFixed(0)}]\n`,
         );
     } else {
-        process.stdout.write(
-            `  • Dynamic Plane Q_d (${wdPct}% wt)  : N/A (Offline Static Only)\n`,
-        );
+        process.stdout.write(`  • Dynamic Plane Q_d (${wdPct}% wt)  : N/A (Offline Static Only)\n`);
     }
     const wfPct = (triPlane.weights.Wf * PERCENT_SCALE).toFixed(0);
     process.stdout.write(
         `  • Feedback Plane Q_f (${wfPct}% wt) : ${triPlane.feedbackScore.toFixed(1)}\n`,
     );
-    process.stdout.write(`  • Fused Total Q_tot         : ${triPlane.totalScore.toFixed(1)} / 100\n`);
+    process.stdout.write(
+        `  • Fused Total Q_tot         : ${triPlane.totalScore.toFixed(1)} / 100\n`,
+    );
 }
 
 /**
@@ -177,4 +177,3 @@ export function printAutonomyAssessment(a: AutonomyEvaluation): void {
     }
     process.stdout.write(`==================================================\n\n`);
 }
-

@@ -241,7 +241,8 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         languages: LANGUAGES_TS_FAMILY,
         defaultSeverity: SEVERITY_WARNING,
         summary: 'VS Code 监听器或 Disposable 对象未注册至 subscriptions 容器。',
-        remediation: '使用 context.subscriptions.push(...) 或生命周期容器管理 Disposable 以防泄露。',
+        remediation:
+            '使用 context.subscriptions.push(...) 或生命周期容器管理 Disposable 以防泄露。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tsm-disp-001',
     }),
     defineRule({
@@ -569,6 +570,19 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         remediation: '在测试债务登记表中补全责任 Agent 及目标收敛里程碑。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-dbt-001',
     }),
+    defineRule({
+        id: 'TST-TOP-001',
+        family: RULE_FAMILY_TEST_MODERNITY,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            '多语言测试拓扑双轨纪律：严禁在 TS/GDScript 等语言生产代码中内嵌测试代码域，强化 Rust 计算库物理分区与面向 Agent 可读注释契约。',
+        remediation:
+            '将内嵌在非 Rust 生产文件中的测试逻辑迁移至显式独立测试文件（如 *.test.ts），Rust 计算库测试必须置于 #[cfg(test)] 尾部分区并补充 Agent 可读注释。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-top-001',
+    }),
 
     // ── Dependency Layout Rules ──
     defineRule({
@@ -767,8 +781,10 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '失控深层控制流嵌套：控制流嵌套层级超出该上下文类型的弹性预算（业务代码>3层，状态机/解析器>5层）。',
-        remediation: '利用提前返回（Guard Clauses）扁平化控制流，或将复杂分支独立为子状态处理函数。',
+        summary:
+            '失控深层控制流嵌套：控制流嵌套层级超出该上下文类型的弹性预算（业务代码>3层，状态机/解析器>5层）。',
+        remediation:
+            '利用提前返回（Guard Clauses）扁平化控制流，或将复杂分支独立为子状态处理函数。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-nest-001',
     }),
     defineRule({
@@ -778,8 +794,10 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '深层长跨度控制流跳跃：在深层嵌套（>=4层）且距函数头超长跨度处执行非结构化控制流逃逸（return/break/throw）。',
-        remediation: '利用局部卫语句提前校验，或将深层长跨度闭环提取为纯函数子算子以缩短认知跳跃距离。',
+        summary:
+            '深层长跨度控制流跳跃：在深层嵌套（>=4层）且距函数头超长跨度处执行非结构化控制流逃逸（return/break/throw）。',
+        remediation:
+            '利用局部卫语句提前校验，或将深层长跨度闭环提取为纯函数子算子以缩短认知跳跃距离。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-nest-002',
     }),
     defineRule({
@@ -789,7 +807,8 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '状态机分派结构规范：状态机多层分支内存在过长单分支逻辑（>30 LOC），降低了分派骨架的清晰度。',
+        summary:
+            '状态机分派结构规范：状态机多层分支内存在过长单分支逻辑（>30 LOC），降低了分派骨架的清晰度。',
         remediation: '将状态机单分支过长逻辑提取为独立动作处理器，保留纯粹的状态转移分派骨架。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-stm-001',
     }),

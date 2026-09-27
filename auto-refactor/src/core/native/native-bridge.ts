@@ -28,10 +28,7 @@ import type {
     NativeMaskedSource,
     NativePatternMatch,
 } from './native-types';
-import {
-    computeLineStartsAndHashes,
-    linesOf,
-} from '../diff/edit-diff';
+import { computeLineStartsAndHashes, linesOf } from '../diff/edit-diff';
 import { histogramDiff } from '../diff/histogram-diff';
 import type { DiffOp } from '../diff/myers-algorithm';
 import { DIFF_OP_EQUAL, DIFF_OP_DELETE, DIFF_OP_INSERT } from '../diff/myers-algorithm';
@@ -44,12 +41,217 @@ import {
     findClonePairsShim,
     HASH_COEFFS,
 } from './native-clone-shim';
-import {
-    computeDominatorTreeShim,
-    solveDataflowShim,
-} from './native-flow-shim';
+import { computeDominatorTreeShim, solveDataflowShim } from './native-flow-shim';
 
 export { HASH_COEFFS };
+
+const EMPTY_NEIGHBOR_SET = new Set<string>();
+
+interface TarjanState {
+    indexCounter: number;
+    indices: Map<string, number>;
+    lowlinks: Map<string, number>;
+    onStack: Set<string>;
+    stack: string[];
+    sccs: string[][];
+    cycles: string[][];
+    adjacency: Map<string, Set<string>>;
+}
+
+function addDirectedEdge(
+    from: string,
+    to: string,
+    adjacency: Map<string, Set<string>>,
+    inDegree: Map<string, number>,
+): void {
+    let neighbors = adjacency.get(from);
+    if (!neighbors) {
+        neighbors = new Set();
+        adjacency.set(from, neighbors);
+    }
+    if (!neighbors.has(to)) {
+        neighbors.add(to);
+        inDegree.set(to, (inDegree.get(to) || 0) + 1);
+    }
+    if (!inDegree.has(from)) {
+        inDegree.set(from, 0);
+    }
+}
+
+function strongConnect(node: string, state: TarjanState): void {
+    state.indices.set(node, state.indexCounter);
+    state.lowlinks.set(node, state.indexCounter);
+    state.indexCounter++;
+    state.stack.push(node);
+    state.onStack.add(node);
+
+    const neighbors = state.adjacency.get(node) || EMPTY_NEIGHBOR_SET;
+    for (const neighbor of neighbors) {
+        if (!state.indices.has(neighbor)) {
+            strongConnect(neighbor, state);
+            state.lowlinks.set(
+                node,
+                Math.min(state.lowlinks.get(node)!, state.lowlinks.get(neighbor)!),
+            );
+            continue;
+        }
+        if (state.onStack.has(neighbor)) {
+            state.lowlinks.set(
+                node,
+                Math.min(state.lowlinks.get(node)!, state.indices.get(neighbor)!),
+            );
+        }
+    }
+
+    if (state.lowlinks.get(node) === state.indices.get(node)) {
+        popScc(node, state);
+    }
+}
+
+function popScc(node: string, state: TarjanState): void {
+    const scc: string[] = [];
+    let popped: string;
+    do {
+        popped = state.stack.pop()!;
+        state.onStack.delete(popped);
+        scc.push(popped);
+    } while (popped !== node);
+
+    state.sccs.push(scc);
+    if (scc.length > 1) {
+        state.cycles.push([...scc].reverse());
+        return;
+    }
+    if (scc.length === 1 && state.adjacency.get(node)?.has(node)) {
+        state.cycles.push([node, node]);
+    }
+}
+
+function computeSccsAndCycles(
+    allNodes: Set<string>,
+    adjacency: Map<string, Set<string>>,
+): { sccs: string[][]; cycles: string[][] } {
+    const state: TarjanState = {
+        indexCounter: 0,
+        indices: new Map(),
+        lowlinks: new Map(),
+        onStack: new Set(),
+        stack: [],
+        sccs: [],
+        cycles: [],
+        adjacency,
+    };
+    for (const node of allNodes) {
+        if (!state.indices.has(node)) {
+            strongConnect(node, state);
+        }
+    }
+    return { sccs: state.sccs, cycles: state.cycles };
+}
+
+function computeTopologicalOrder(
+    allNodes: Set<string>,
+    adjacency: Map<string, Set<string>>,
+    inDegree: Map<string, number>,
+): string[] {
+    const inDegreeCopy = new Map<string, number>();
+    for (const node of allNodes) {
+        inDegreeCopy.set(node, inDegree.get(node) || 0);
+    }
+
+    const queue: string[] = [];
+    for (const node of allNodes) {
+        if (inDegreeCopy.get(node) === 0) {
+            queue.push(node);
+        }
+    }
+    queue.sort();
+
+    const topologicalOrder: string[] = [];
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        topologicalOrder.push(current);
+
+        const neighbors = adjacency.get(current) || EMPTY_NEIGHBOR_SET;
+        for (const next of neighbors) {
+            const remainingIn = inDegreeCopy.get(next)! - 1;
+            inDegreeCopy.set(next, remainingIn);
+            if (remainingIn === 0) {
+                queue.push(next);
+                queue.sort();
+            }
+        }
+    }
+
+    for (const node of allNodes) {
+        if (!topologicalOrder.includes(node)) {
+            topologicalOrder.push(node);
+        }
+    }
+    return topologicalOrder;
+}
+
+function findPatternMatchesInLine(
+    line: string,
+    pattern: string,
+    lineNum: number,
+    results: NativePatternMatch[],
+): void {
+    let startCol = 0;
+    while (startCol < line.length) {
+        const matchIndex = line.indexOf(pattern, startCol);
+        if (matchIndex === -1) break;
+        results.push({
+            pattern,
+            line: lineNum,
+            column: matchIndex + 1,
+            matchText: pattern,
+        });
+        startCol = matchIndex + Math.max(1, pattern.length);
+    }
+}
+
+interface HunkBuilderState {
+    oldStart: number;
+    newStart: number;
+    oldLinesCount: number;
+    newLinesCount: number;
+    lines: string[];
+    firstOldAssigned: boolean;
+    firstNewAssigned: boolean;
+}
+
+function applyDiffOpEqual(op: DiffOp, oldLines: string[], state: HunkBuilderState): void {
+    if (!state.firstOldAssigned) {
+        state.oldStart = op.aIdx + 1;
+        state.firstOldAssigned = true;
+    }
+    if (!state.firstNewAssigned) {
+        state.newStart = op.bIdx + 1;
+        state.firstNewAssigned = true;
+    }
+    state.oldLinesCount++;
+    state.newLinesCount++;
+    state.lines.push(' ' + (oldLines[op.aIdx] ?? ''));
+}
+
+function applyDiffOpDelete(op: DiffOp, oldLines: string[], state: HunkBuilderState): void {
+    if (!state.firstOldAssigned) {
+        state.oldStart = op.aIdx + 1;
+        state.firstOldAssigned = true;
+    }
+    state.oldLinesCount++;
+    state.lines.push('-' + (oldLines[op.aIdx] ?? ''));
+}
+
+function applyDiffOpInsert(op: DiffOp, newLines: string[], state: HunkBuilderState): void {
+    if (!state.firstNewAssigned) {
+        state.newStart = op.bIdx + 1;
+        state.firstNewAssigned = true;
+    }
+    state.newLinesCount++;
+    state.lines.push('+' + (newLines[op.bIdx] ?? ''));
+}
 
 /**
  * Pure JavaScript fallback implementation of INativeCore.
@@ -112,119 +314,11 @@ export class PureJsNativeShim implements INativeCore {
         for (const [from, to] of edges) {
             allNodes.add(from);
             allNodes.add(to);
-
-            let neighbors = adjacency.get(from);
-            if (!neighbors) {
-                neighbors = new Set();
-                adjacency.set(from, neighbors);
-            }
-            if (!neighbors.has(to)) {
-                neighbors.add(to);
-                inDegree.set(to, (inDegree.get(to) || 0) + 1);
-            }
-            if (!inDegree.has(from)) {
-                inDegree.set(from, 0);
-            }
+            addDirectedEdge(from, to, adjacency, inDegree);
         }
 
-        // 1. Tarjan SCC & Cycle Detection
-        let indexCounter = 0;
-        const indices = new Map<string, number>();
-        const lowlinks = new Map<string, number>();
-        const onStack = new Set<string>();
-        const stack: string[] = [];
-        const sccs: string[][] = [];
-        const cycles: string[][] = [];
-
-        const strongConnect = (node: string): void => {
-            indices.set(node, indexCounter);
-            lowlinks.set(node, indexCounter);
-            indexCounter++;
-            stack.push(node);
-            onStack.add(node);
-
-            const neighbors = adjacency.get(node) || new Set();
-            for (const neighbor of neighbors) {
-                if (!indices.has(neighbor)) {
-                    strongConnect(neighbor);
-                    lowlinks.set(
-                        node,
-                        Math.min(lowlinks.get(node)!, lowlinks.get(neighbor)!),
-                    );
-                } else if (onStack.has(neighbor)) {
-                    lowlinks.set(
-                        node,
-                        Math.min(lowlinks.get(node)!, indices.get(neighbor)!),
-                    );
-                }
-            }
-
-            if (lowlinks.get(node) === indices.get(node)) {
-                const scc: string[] = [];
-                let popped: string;
-                do {
-                    popped = stack.pop()!;
-                    onStack.delete(popped);
-                    scc.push(popped);
-                } while (popped !== node);
-
-                sccs.push(scc);
-                // An SCC is a cycle if it contains more than 1 node, or has a self-loop
-                if (scc.length > 1) {
-                    cycles.push([...scc].reverse());
-                } else if (scc.length === 1) {
-                    const single = scc[0];
-                    if (adjacency.get(single)?.has(single)) {
-                        cycles.push([single, single]);
-                    }
-                }
-            }
-        };
-
-        for (const node of allNodes) {
-            if (!indices.has(node)) {
-                strongConnect(node);
-            }
-        }
-
-        // 2. Kahn's Topological Sort (ignoring cycles for best-effort ordering)
-        const inDegreeCopy = new Map<string, number>();
-        for (const node of allNodes) {
-            inDegreeCopy.set(node, inDegree.get(node) || 0);
-        }
-
-        const queue: string[] = [];
-        for (const node of allNodes) {
-            if (inDegreeCopy.get(node) === 0) {
-                queue.push(node);
-            }
-        }
-
-        // Sort queue deterministically
-        queue.sort();
-
-        const topologicalOrder: string[] = [];
-        while (queue.length > 0) {
-            const current = queue.shift()!;
-            topologicalOrder.push(current);
-
-            const neighbors = adjacency.get(current) || new Set();
-            for (const next of neighbors) {
-                const remainingIn = inDegreeCopy.get(next)! - 1;
-                inDegreeCopy.set(next, remainingIn);
-                if (remainingIn === 0) {
-                    queue.push(next);
-                    queue.sort();
-                }
-            }
-        }
-
-        // Append any unvisited nodes from cycles to ensure total coverage
-        for (const node of allNodes) {
-            if (!topologicalOrder.includes(node)) {
-                topologicalOrder.push(node);
-            }
-        }
+        const { sccs, cycles } = computeSccsAndCycles(allNodes, adjacency);
+        const topologicalOrder = computeTopologicalOrder(allNodes, adjacency, inDegree);
 
         return {
             cycles,
@@ -246,21 +340,9 @@ export class PureJsNativeShim implements INativeCore {
         const lines = sourceText.split(/\r?\n/);
         for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
             const line = lines[lineIndex];
+            const lineNum = lineIndex + 1;
             for (const pattern of patterns) {
-                let startCol = 0;
-                while (startCol < line.length) {
-                    const matchIndex = line.indexOf(pattern, startCol);
-                    if (matchIndex === -1) {
-                        break;
-                    }
-                    results.push({
-                        pattern,
-                        line: lineIndex + 1,
-                        column: matchIndex + 1,
-                        matchText: pattern,
-                    });
-                    startCol = matchIndex + Math.max(1, pattern.length);
-                }
+                findPatternMatchesInLine(line, pattern, lineNum, results);
             }
         }
 
@@ -273,9 +355,10 @@ export class PureJsNativeShim implements INativeCore {
     public maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource {
         const res = maskSourceTextJs(content, {
             lineComment: config.lineComment,
-            blockComment: config.blockCommentOpen && config.blockCommentClose
-                ? { open: config.blockCommentOpen, close: config.blockCommentClose }
-                : undefined,
+            blockComment:
+                config.blockCommentOpen && config.blockCommentClose
+                    ? { open: config.blockCommentOpen, close: config.blockCommentClose }
+                    : undefined,
             quoteChars: config.quoteChars,
             multilineTemplates: config.multilineTemplates,
             regexLiterals: config.regexLiterals,
@@ -335,8 +418,6 @@ export class PureJsNativeShim implements INativeCore {
         return solveDataflowShim(params);
     }
 
-
-
     /**
      * Finds preceding equal context line count before a cluster start.
      */
@@ -357,11 +438,7 @@ export class PureJsNativeShim implements INativeCore {
     /**
      * Determines cluster end index, bridging adjacent change blocks separated by few equal lines.
      */
-    private findClusterEnd(
-        ops: DiffOp[],
-        clusterStart: number,
-        contextLines: number,
-    ): number {
+    private findClusterEnd(ops: DiffOp[], clusterStart: number, contextLines: number): number {
         let clusterEnd = clusterStart;
         while (clusterEnd < ops.length) {
             if (ops[clusterEnd].type !== DIFF_OP_EQUAL) {
@@ -414,52 +491,37 @@ export class PureJsNativeShim implements INativeCore {
         oldLines: string[],
         newLines: string[],
     ): NativeDiffHunk {
-        let oldStart = 0;
-        let newStart = 0;
-        let oldLinesCount = 0;
-        let newLinesCount = 0;
-        const lines: string[] = [];
-
-        let firstOldAssigned = false;
-        let firstNewAssigned = false;
+        const state: HunkBuilderState = {
+            oldStart: 0,
+            newStart: 0,
+            oldLinesCount: 0,
+            newLinesCount: 0,
+            lines: [],
+            firstOldAssigned: false,
+            firstNewAssigned: false,
+        };
 
         for (let opIdx = startIdx; opIdx < endIdx; opIdx++) {
             const op = ops[opIdx];
             if (op.type === DIFF_OP_EQUAL) {
-                if (!firstOldAssigned) {
-                    oldStart = op.aIdx + 1;
-                    firstOldAssigned = true;
-                }
-                if (!firstNewAssigned) {
-                    newStart = op.bIdx + 1;
-                    firstNewAssigned = true;
-                }
-                oldLinesCount++;
-                newLinesCount++;
-                lines.push(' ' + (oldLines[op.aIdx] ?? ''));
-            } else if (op.type === DIFF_OP_DELETE) {
-                if (!firstOldAssigned) {
-                    oldStart = op.aIdx + 1;
-                    firstOldAssigned = true;
-                }
-                oldLinesCount++;
-                lines.push('-' + (oldLines[op.aIdx] ?? ''));
-            } else if (op.type === DIFF_OP_INSERT) {
-                if (!firstNewAssigned) {
-                    newStart = op.bIdx + 1;
-                    firstNewAssigned = true;
-                }
-                newLinesCount++;
-                lines.push('+' + (newLines[op.bIdx] ?? ''));
+                applyDiffOpEqual(op, oldLines, state);
+                continue;
+            }
+            if (op.type === DIFF_OP_DELETE) {
+                applyDiffOpDelete(op, oldLines, state);
+                continue;
+            }
+            if (op.type === DIFF_OP_INSERT) {
+                applyDiffOpInsert(op, newLines, state);
             }
         }
 
         return {
-            oldStart: oldStart || 1,
-            oldLines: oldLinesCount,
-            newStart: newStart || 1,
-            newLines: newLinesCount,
-            lines,
+            oldStart: state.oldStart || 1,
+            oldLines: state.oldLinesCount,
+            newStart: state.newStart || 1,
+            newLines: state.newLinesCount,
+            lines: state.lines,
         };
     }
 
@@ -506,9 +568,15 @@ function probeNativeBinding(): INativeCore | null {
         // Probe relative prebuilt N-API binary location
         const binding = require('../../../crates/auto-refactor-core/index.node');
         if (binding && typeof binding.computeHistogramDiff === 'function') {
+            const jsShim = new PureJsNativeShim();
             return {
                 computeHistogramDiff: binding.computeHistogramDiff,
-                analyzeDependencyGraph: binding.analyzeDependencyGraph,
+                analyzeDependencyGraph: (edges: [string, string][]) => {
+                    if (edges.length < 1500) {
+                        return jsShim.analyzeDependencyGraph(edges);
+                    }
+                    return binding.analyzeDependencyGraph(edges);
+                },
                 fastPatternMatch: binding.fastPatternMatch,
                 maskSourceCode: binding.maskSourceCode,
                 countDuplicateLines: binding.countDuplicateLines,
@@ -660,10 +728,7 @@ export function nativeComputeMinHash(content: string, numPermutations?: number):
  * @param threshold - Similarity threshold between 0.0 and 1.0.
  * @returns Array of detected similar file pairs with similarity scores.
  */
-export function nativeFindClonePairs(
-    signatures: number[][],
-    threshold: number,
-): NativeClonePair[] {
+export function nativeFindClonePairs(signatures: number[][], threshold: number): NativeClonePair[] {
     return nativeCore.findClonePairs(signatures, threshold);
 }
 
@@ -692,7 +757,3 @@ export function nativeComputeDominatorTree(
 export function nativeSolveDataflow(params: NativeDataflowParams): NativeDataflowResult {
     return nativeCore.solveDataflow(params);
 }
-
-
-
-

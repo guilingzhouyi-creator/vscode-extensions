@@ -20,18 +20,10 @@ import { PYTHON_STDLIB_MODULES } from './python-stdlib';
 
 /** Provenance classification for imported symbols and module references */
 export type ImportProvenanceKind =
-    | 'stdlib'
-    | 'internal'
-    | 'in_tree_vendor'
-    | 'external_sdk'
-    | 'unknown';
+    'stdlib' | 'internal' | 'in_tree_vendor' | 'external_sdk' | 'unknown';
 
 /** File origin provenance classification */
-export type FileProvenanceKind =
-    | 'proprietary'
-    | 'in_tree_vendor'
-    | 'generated'
-    | 'test_fixture';
+export type FileProvenanceKind = 'proprietary' | 'in_tree_vendor' | 'generated' | 'test_fixture';
 
 /** Node.js core standard library module names */
 const NODE_CORE_MODULES: ReadonlySet<string> = new Set([
@@ -80,11 +72,47 @@ const RUST_CORE_CRATES: ReadonlySet<string> = new Set(['std', 'core', 'alloc']);
 
 /** Go standard library package root prefixes */
 const GO_CORE_PACKAGES: ReadonlySet<string> = new Set([
-    'archive', 'bufio', 'bytes', 'compress', 'container', 'context', 'crypto',
-    'database', 'debug', 'embed', 'encoding', 'errors', 'expvar', 'flag', 'fmt',
-    'go', 'hash', 'html', 'image', 'index', 'io', 'log', 'math', 'mime', 'net',
-    'os', 'path', 'plugin', 'reflect', 'regexp', 'runtime', 'sort', 'strconv',
-    'strings', 'sync', 'syscall', 'testing', 'text', 'time', 'unicode', 'unsafe',
+    'archive',
+    'bufio',
+    'bytes',
+    'compress',
+    'container',
+    'context',
+    'crypto',
+    'database',
+    'debug',
+    'embed',
+    'encoding',
+    'errors',
+    'expvar',
+    'flag',
+    'fmt',
+    'go',
+    'hash',
+    'html',
+    'image',
+    'index',
+    'io',
+    'log',
+    'math',
+    'mime',
+    'net',
+    'os',
+    'path',
+    'plugin',
+    'reflect',
+    'regexp',
+    'runtime',
+    'sort',
+    'strconv',
+    'strings',
+    'sync',
+    'syscall',
+    'testing',
+    'text',
+    'time',
+    'unicode',
+    'unsafe',
 ]);
 
 /** In-tree vendor directory path patterns */
@@ -245,10 +273,7 @@ export function loadProjectManifestDependencies(rootDir: string): Set<string> {
  * @param headerClues - Optional source header lines
  * @returns FileProvenanceKind
  */
-export function classifyFileProvenance(
-    filePath: string,
-    headerClues?: string,
-): FileProvenanceKind {
+export function classifyFileProvenance(filePath: string, headerClues?: string): FileProvenanceKind {
     const norm = filePath.replace(/\\/g, '/');
 
     if (IN_TREE_VENDOR_PATTERN.test(norm)) {
@@ -274,7 +299,9 @@ function isStandardLibraryImport(firstSegment: string, trimmed: string): boolean
     if (NODE_CORE_MODULES.has(firstSegment) || NODE_CORE_MODULES.has(trimmed)) return true;
     if (PYTHON_STDLIB_MODULES.has(firstSegment) || PYTHON_STDLIB_MODULES.has(trimmed)) return true;
     if (RUST_CORE_CRATES.has(firstSegment) || GO_CORE_PACKAGES.has(firstSegment)) return true;
-    return trimmed.startsWith('@GlobalScope') || trimmed === 'Engine' || trimmed === 'ResourceLoader';
+    return (
+        trimmed.startsWith('@GlobalScope') || trimmed === 'Engine' || trimmed === 'ResourceLoader'
+    );
 }
 
 function isDeclaredDependency(firstSegment: string, manifestDeps?: Set<string>): boolean {
@@ -458,9 +485,7 @@ export function loadProjectSupplyChainProfile(
 ): SupplyChainProfile {
     const absRoot = path.resolve(rootDir);
     const direct =
-        directCount !== undefined
-            ? directCount
-            : loadProjectManifestDependencies(absRoot).size;
+        directCount !== undefined ? directCount : loadProjectManifestDependencies(absRoot).size;
 
     return (
         tryLoadNpmLock(absRoot, direct) ??
@@ -476,4 +501,3 @@ export function loadProjectSupplyChainProfile(
         }
     );
 }
-

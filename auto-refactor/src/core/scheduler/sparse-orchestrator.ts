@@ -17,10 +17,7 @@ import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import type { DynamicPartitioner } from './dynamic-partitioner';
 import { defaultDynamicPartitioner } from './dynamic-partitioner';
 import type { ReviewContextCache } from './review-context-cache';
-import {
-    computeSimpleContentHash,
-    defaultReviewContextCache,
-} from './review-context-cache';
+import { computeSimpleContentHash, defaultReviewContextCache } from './review-context-cache';
 import type { ReviewEventBus } from './review-event-bus';
 import { defaultReviewEventBus } from './review-event-bus';
 import type { TensorPartitioner } from './tensor-partitioner';
@@ -88,6 +85,178 @@ export class SparseOrchestrator {
     public setAuditExecutor(executor: DomainAuditExecutor): void {
         this.customExecutor = executor;
     }
+    /**
+     * Attempts to acquire an agent lease for quota tracking.
+     */
+    private acquireAgentLease(options?: SparseSchedulerOptions): AgentResourceLease | undefined {
+        if (!options?.agentUid) return undefined;
+        const leaseResult = this.quotaGateway.acquireLease(
+            options.agentUid,
+            options.priority ?? TaskPriority.NORMAL,
+        );
+        return leaseResult.granted && leaseResult.lease ? leaseResult.lease : undefined;
+    }
+
+    private async analyzeStructure(
+        validFiles: string[],
+        options?: SparseSchedulerOptions,
+    ): Promise<number> {
+        const t1Start = Date.now();
+        if (options?.dependencyEdges) {
+            for (const [from, to] of options.dependencyEdges) {
+                this.topologyCache.recordDependency(from, to);
+            }
+        }
+        await cooperativeYield();
+        return Math.max(1, Date.now() - t1Start);
+    }
+
+    private createPartitions(
+        validFiles: string[],
+        fileContents: Map<string, string>,
+        options?: SparseSchedulerOptions,
+    ): ReviewPartition[] {
+        if (options?.enableTensorPartitioning) {
+            const tensorPlan = this.tensorPartitioner.partition(
+                validFiles,
+                options.dependencyEdges ?? [],
+            );
+            return tensorPlan.cells.map((cell) => ({
+                id: cell.cellId,
+                primaryFiles: cell.dataFiles,
+                contextFiles: [],
+                estimatedWorkload: cell.estimatedCost,
+                activeDomains: ['LOGIC_AND_COMPLEXITY', 'ARCHITECTURE'],
+                dominantRole: inferFineGrainedFileRole(cell.dataFiles[0] || '').role,
+            }));
+        }
+        return this.partitioner.createPartitions(validFiles, fileContents, options?.enabledDomains);
+    }
+
+    private async analyzeFileInPartition(
+        file: string,
+        content: string,
+        partition: ReviewPartition,
+    ): Promise<{ findings: Issue[]; cacheHit: boolean }> {
+        const contentHash = computeSimpleContentHash(content);
+        const cached = this.cache.get(file, contentHash);
+        if (cached) {
+            return { findings: cached.localFindings, cacheHit: true };
+        }
+
+        const density = analyzeCodeDensity(content, file);
+        const roleInference = inferFineGrainedFileRole(file, content.slice(0, 300));
+        let findingsForFile: Issue[] = [];
+
+        if (this.customExecutor) {
+            findingsForFile = await this.customExecutor(file, content, partition);
+        }
+
+        this.cache.set({
+            filePath: file,
+            contentHash,
+            role: roleInference.role,
+            density,
+            localFindings: findingsForFile,
+            durationMs: 1,
+            cachedAt: Date.now(),
+        });
+        this.topologyCache.put(file, contentHash, contentHash, findingsForFile);
+        this.detectAndDispatchCascades(file, content, findingsForFile);
+
+        return { findings: findingsForFile, cacheHit: false };
+    }
+
+    private async executeLocalAnalysis(
+        partitions: ReviewPartition[],
+        fileContents: Map<string, string>,
+        options: SparseSchedulerOptions | undefined,
+        convergenceEngine: SemanticConvergenceEngine,
+    ): Promise<{ durationMs: number; cacheHits: number }> {
+        const t3Start = Date.now();
+        const resultBus = new RingBufferBus<SemanticDelta>(
+            Math.max(64, partitions.length * 2),
+            'reject',
+        );
+        let cacheHits = 0;
+        let processedUnits = 0;
+
+        for (const partition of partitions) {
+            const partitionFindings: Issue[] = [];
+            const partitionStart = Date.now();
+
+            for (const file of partition.primaryFiles) {
+                const content = fileContents.get(file) ?? '';
+                const fileResult = await this.analyzeFileInPartition(file, content, partition);
+                if (fileResult.cacheHit) {
+                    cacheHits++;
+                }
+                partitionFindings.push(...fileResult.findings);
+
+                processedUnits++;
+                if (processedUnits % 15 === 0) {
+                    await cooperativeYield();
+                }
+            }
+
+            resultBus.push({
+                partitionId: partition.id,
+                issues: partitionFindings,
+                dependencies: options?.dependencyEdges,
+                executionTimeMs: Math.max(1, Date.now() - partitionStart),
+            });
+        }
+
+        const deltas = resultBus.drainAll();
+        for (const delta of deltas) {
+            convergenceEngine.ingestDelta(delta);
+        }
+
+        return { durationMs: Math.max(1, Date.now() - t3Start), cacheHits };
+    }
+
+    private executeSecondaryRecheck(
+        cascadeEvents: readonly ReviewCascadeEvent[],
+        fileContents: Map<string, string>,
+        convergenceEngine: SemanticConvergenceEngine,
+    ): number {
+        const t5Start = Date.now();
+        const secondaryFindings: Issue[] = [];
+
+        for (const event of cascadeEvents) {
+            for (const affectedFile of event.affectedFiles) {
+                const content = fileContents.get(affectedFile);
+                if (content) {
+                    secondaryFindings.push({
+                        id: `cascade:${event.kind}:${affectedFile}:1`,
+                        analyzer: 'cascade-recheck',
+                        rule: event.kind,
+                        severity: 'warning',
+                        message: `Cascade trigger from ${event.sourceDomain}: ${event.reason}`,
+                        location: {
+                            file: affectedFile,
+                            start: { line: 1, column: 1 },
+                            end: { line: 1, column: 1 },
+                        },
+                        detail: {
+                            triggeringEventId: event.eventId,
+                            targetSymbol: event.targetSymbol,
+                        },
+                    });
+                }
+            }
+        }
+
+        if (secondaryFindings.length > 0) {
+            convergenceEngine.ingestDelta({
+                partitionId: 'cascade-recheck',
+                issues: secondaryFindings,
+                executionTimeMs: Math.max(1, Date.now() - t5Start),
+            });
+        }
+
+        return Math.max(1, Date.now() - t5Start);
+    }
 
     /**
      * Executes seven-stage "local -> cascade -> global" sparse scheduling pipeline.
@@ -102,18 +271,7 @@ export class SparseOrchestrator {
         fileContents: Map<string, string>,
         options?: SparseSchedulerOptions,
     ): Promise<SparseSchedulerResult> {
-        // Stage 0: Agent OS Quota Check & Lease Acquisition
-        let agentLease: AgentResourceLease | undefined;
-        if (options?.agentUid) {
-            const leaseResult = this.quotaGateway.acquireLease(
-                options.agentUid,
-                options.priority ?? TaskPriority.NORMAL,
-            );
-            if (leaseResult.granted && leaseResult.lease) {
-                agentLease = leaseResult.lease;
-            }
-        }
-
+        const agentLease = this.acquireAgentLease(options);
         const timings = {
             structureAnalysis: 0,
             partitioning: 0,
@@ -123,175 +281,45 @@ export class SparseOrchestrator {
             scoring: 0,
         };
 
-        // ---- Stage 1: Project Structure Analysis & Topology Ingestion ----
-        const t1Start = Date.now();
         const validFiles = files.filter((f) => Boolean(f && f.trim()));
-        if (options?.dependencyEdges) {
-            for (const [from, to] of options.dependencyEdges) {
-                this.topologyCache.recordDependency(from, to);
-            }
-        }
-        await cooperativeYield();
-        timings.structureAnalysis = Math.max(1, Date.now() - t1Start);
+        timings.structureAnalysis = await this.analyzeStructure(validFiles, options);
 
-        // ---- Stage 2: Dynamic Review Partitioning (Tensor or 1D) ----
         const t2Start = Date.now();
-        let partitions: ReviewPartition[] = [];
-        if (options?.enableTensorPartitioning) {
-            const tensorPlan = this.tensorPartitioner.partition(
-                validFiles,
-                options.dependencyEdges ?? [],
-            );
-            partitions = tensorPlan.cells.map((cell) => ({
-                id: cell.cellId,
-                primaryFiles: cell.dataFiles,
-                contextFiles: [],
-                estimatedWorkload: cell.estimatedCost,
-                activeDomains: ['LOGIC_AND_COMPLEXITY', 'ARCHITECTURE'],
-                dominantRole: inferFineGrainedFileRole(cell.dataFiles[0] || '').role,
-            }));
-        } else {
-            partitions = this.partitioner.createPartitions(
-                validFiles,
-                fileContents,
-                options?.enabledDomains,
-            );
-        }
+        const partitions = this.createPartitions(validFiles, fileContents, options);
         timings.partitioning = Math.max(1, Date.now() - t2Start);
 
-        // ---- Stage 3 & 4: Sparse Local Analysis & RingBuffer Result Bus ----
-        const t3Start = Date.now();
-        const resultBus = new RingBufferBus<SemanticDelta>(
-            Math.max(64, partitions.length * 2),
-            'reject',
-        );
         const convergenceEngine = new SemanticConvergenceEngine();
-        let cacheHits = 0;
-        let processedUnits = 0;
+        const localResult = await this.executeLocalAnalysis(
+            partitions,
+            fileContents,
+            options,
+            convergenceEngine,
+        );
+        timings.localAnalysis = localResult.durationMs;
 
-        for (const partition of partitions) {
-            const partitionFindings: Issue[] = [];
-            const partitionStart = Date.now();
-
-            for (const file of partition.primaryFiles) {
-                const content = fileContents.get(file) ?? '';
-                const contentHash = computeSimpleContentHash(content);
-
-                // 1. Check Context Cache
-                const cached = this.cache.get(file, contentHash);
-                if (cached) {
-                    cacheHits++;
-                    partitionFindings.push(...cached.localFindings);
-                    continue;
-                }
-
-                // 2. Local domain analysis
-                const density = analyzeCodeDensity(content, file);
-                const roleInference = inferFineGrainedFileRole(file, content.slice(0, 300));
-                let findingsForFile: Issue[] = [];
-
-                if (this.customExecutor) {
-                    findingsForFile = await this.customExecutor(file, content, partition);
-                }
-
-                partitionFindings.push(...findingsForFile);
-
-                // Backfill review context cache
-                this.cache.set({
-                    filePath: file,
-                    contentHash,
-                    role: roleInference.role,
-                    density,
-                    localFindings: findingsForFile,
-                    durationMs: 1,
-                    cachedAt: Date.now(),
-                });
-
-                // Also populate topology cache
-                this.topologyCache.put(file, contentHash, contentHash, findingsForFile);
-
-                // Detect and dispatch cascade events
-                this.detectAndDispatchCascades(file, content, findingsForFile);
-
-                processedUnits++;
-                if (processedUnits % 15 === 0) {
-                    await cooperativeYield();
-                }
-            }
-
-            // Pack partition outcome into SemanticDelta and push to result bus
-            resultBus.push({
-                partitionId: partition.id,
-                issues: partitionFindings,
-                dependencies: options?.dependencyEdges,
-                executionTimeMs: Math.max(1, Date.now() - partitionStart),
-            });
-        }
-
-        // Drain result bus into convergence engine
-        const deltas = resultBus.drainAll();
-        for (const delta of deltas) {
-            convergenceEngine.ingestDelta(delta);
-        }
-
-        timings.localAnalysis = Math.max(1, Date.now() - t3Start);
-
-        // ---- Stage 5: Semantic Cascade Targeted Recheck ----
-        const t5Start = Date.now();
         const cascadeEvents = this.eventBus.getDispatchedEvents();
-        const secondaryFindings: Issue[] = [];
-
         if (options?.enableSecondaryCheck !== false && cascadeEvents.length > 0) {
-            for (const event of cascadeEvents) {
-                for (const affectedFile of event.affectedFiles) {
-                    const content = fileContents.get(affectedFile);
-                    if (content) {
-                        secondaryFindings.push({
-                            id: `cascade:${event.kind}:${affectedFile}:1`,
-                            analyzer: 'cascade-recheck',
-                            rule: event.kind,
-                            severity: 'warning',
-                            message: `Cascade trigger from ${event.sourceDomain}: ${event.reason}`,
-                            location: {
-                                file: affectedFile,
-                                start: { line: 1, column: 1 },
-                                end: { line: 1, column: 1 },
-                            },
-                            detail: {
-                                triggeringEventId: event.eventId,
-                                targetSymbol: event.targetSymbol,
-                            },
-                        });
-                    }
-                }
-            }
-
-            if (secondaryFindings.length > 0) {
-                convergenceEngine.ingestDelta({
-                    partitionId: 'cascade-recheck',
-                    issues: secondaryFindings,
-                    executionTimeMs: Math.max(1, Date.now() - t5Start),
-                });
-            }
+            timings.secondaryCheck = this.executeSecondaryRecheck(
+                cascadeEvents,
+                fileContents,
+                convergenceEngine,
+            );
+        } else {
+            timings.secondaryCheck = 1;
         }
-        timings.secondaryCheck = Math.max(1, Date.now() - t5Start);
 
-        // ---- Stage 6: Global Invariant & All-Reduce Convergence ----
         const t6Start = Date.now();
         const converged = convergenceEngine.converge();
         await cooperativeYield();
         timings.globalInvariant = Math.max(1, Date.now() - t6Start);
 
-        // ---- Stage 7: Elastic Scoring & Result Aggregation ----
         const t7Start = Date.now();
         timings.scoring = Math.max(1, Date.now() - t7Start);
 
-        // Release agent lease if acquired
         if (agentLease) {
             this.quotaGateway.releaseLease(agentLease.leaseId);
         }
 
-        // Compute savings ratio from sparse activation vs full traversal
         const totalPossibleDomainUnits = validFiles.length * 5;
         const activatedUnits = partitions.reduce(
             (acc, p) => acc + p.primaryFiles.length * p.activeDomains.length,
@@ -313,7 +341,7 @@ export class SparseOrchestrator {
             stageTimingsMs: timings,
             sparseActivationSavingsRatio: Math.max(0.2, sparseActivationSavingsRatio),
             findings: converged.issues,
-            cacheHits,
+            cacheHits: localResult.cacheHits,
             cascadeEventCount: cascadeEvents.length,
             convergedResult: converged,
             circularDependencies: converged.circularDependencies,

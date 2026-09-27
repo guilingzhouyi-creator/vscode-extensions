@@ -171,6 +171,9 @@ function shouldRunSubAudit(
     return strictOnly ? level === 'strict' : level === 'standard' || level === 'strict';
 }
 
+/**
+ * Self-referential analyzer enforcing comment, header, and public API documentation contracts.
+ */
 export class CommentAnalyzer implements Analyzer {
     name = 'comments' as const;
 
@@ -354,7 +357,11 @@ export class CommentAnalyzer implements Analyzer {
         if (level === 'basic') return;
 
         const containsUrlOrInlineCode = /https?:\/\/\S+|`[^`]{20,}`/.test(body);
-        if (line.length > MAX_COMMENT_WIDTH && !directiveRe.test(body) && !containsUrlOrInlineCode) {
+        if (
+            line.length > MAX_COMMENT_WIDTH &&
+            !directiveRe.test(body) &&
+            !containsUrlOrInlineCode
+        ) {
             const desc = CommentMessages.COMMENT_WIDTH(line.length, MAX_COMMENT_WIDTH);
             issues.push(
                 this.mkIssue(

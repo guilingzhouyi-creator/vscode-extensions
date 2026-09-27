@@ -376,13 +376,7 @@ export interface ProjectPartition {
 /**
  * Project archetype classification driving sparse reviewer routing and review budgets.
  */
-export type ProjectArchetype =
-    | 'demo'
-    | 'web'
-    | 'game'
-    | 'library'
-    | 'stdlib'
-    | 'systems_runtime';
+export type ProjectArchetype = 'demo' | 'web' | 'game' | 'library' | 'stdlib' | 'systems_runtime';
 
 /**
  * Sparse-routing decision for the detected archetype, published in ScanSummary.
