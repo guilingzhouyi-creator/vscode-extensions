@@ -1,247 +1,247 @@
 {
-    "name": "workspace-timing",
-    "displayName": "Workspace Timing",
-    "description": "⏱ 轻量化工作区时长追踪 — 自动计时、周报图表、跨工作区聚合、崩溃保护；环形缓冲区 + Journal 双写入架构，预留多工作区对比与云端同步扩展 | Lightweight cross-workspace time tracker with RingBuffer+Journal storage, weekly charts, and extensible architecture",
-    "version": "0.4.9",
-    "publisher": "guilingzhouyi",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/guilingzhouyi-creator/vscode-extensions/tree/main/workspace-timing"
-    },
-    "homepage": "https://github.com/guilingzhouyi-creator/vscode-extensions/tree/main/workspace-timing#readme",
-    "license": "MIT",
-    "icon": "images/icon.png",
-    "galleryBanner": {
-        "color": "#1e1e1e",
-        "theme": "dark"
-    },
-    "engines": {
-        "vscode": "^1.85.0",
-        "node": ">=20"
-    },
-    "categories": [
-        "Other"
+  "name": "workspace-timing",
+  "displayName": "Workspace Timing",
+  "description": "⏱ 轻量化工作区时长追踪 — 自动计时、周报图表、多工作区统计与数据安全保护 | Lightweight cross-workspace time tracker with automatic tracking, weekly charts, and data protection",
+  "version": "0.4.10",
+  "publisher": "guilingzhouyi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guilingzhouyi-creator/vscode-extensions/tree/main/workspace-timing"
+  },
+  "homepage": "https://github.com/guilingzhouyi-creator/vscode-extensions/tree/main/workspace-timing#readme",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.85.0",
+    "node": ">=20"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "workspaceTiming.enable",
+        "title": "%workspaceTiming.enable%"
+      },
+      {
+        "command": "workspaceTiming.disable",
+        "title": "%workspaceTiming.disable%"
+      },
+      {
+        "command": "workspaceTiming.toggleGlobal",
+        "title": "%workspaceTiming.toggleGlobal%"
+      },
+      {
+        "command": "workspaceTiming.showStatus",
+        "title": "%workspaceTiming.showStatus%"
+      },
+      {
+        "command": "workspaceTiming.reset",
+        "title": "%workspaceTiming.reset%"
+      },
+      {
+        "command": "workspaceTiming.clearGlobal",
+        "title": "%workspaceTiming.clearGlobal%"
+      },
+      {
+        "command": "workspaceTiming.debugSave",
+        "title": "%workspaceTiming.debugSave%"
+      },
+      {
+        "command": "workspaceTiming.openDashboard",
+        "title": "%workspaceTiming.openDashboard%"
+      },
+      {
+        "command": "workspaceTiming.export",
+        "title": "%workspaceTiming.export%"
+      },
+      {
+        "command": "workspaceTiming.newPeriod",
+        "title": "%workspaceTiming.newPeriod%"
+      },
+      {
+        "command": "workspaceTiming.clearHistory",
+        "title": "%workspaceTiming.clearHistory%"
+      },
+      {
+        "command": "workspaceTiming.restore",
+        "title": "%workspaceTiming.restore%"
+      },
+      {
+        "command": "workspaceTiming.exportAggregated",
+        "title": "%workspaceTiming.exportAggregated%"
+      }
     ],
-    "activationEvents": [
-        "onStartupFinished"
-    ],
-    "main": "./out/extension.js",
-    "contributes": {
-        "commands": [
-            {
-                "command": "workspaceTiming.enable",
-                "title": "%workspaceTiming.enable%"
-            },
-            {
-                "command": "workspaceTiming.disable",
-                "title": "%workspaceTiming.disable%"
-            },
-            {
-                "command": "workspaceTiming.toggleGlobal",
-                "title": "%workspaceTiming.toggleGlobal%"
-            },
-            {
-                "command": "workspaceTiming.showStatus",
-                "title": "%workspaceTiming.showStatus%"
-            },
-            {
-                "command": "workspaceTiming.reset",
-                "title": "%workspaceTiming.reset%"
-            },
-            {
-                "command": "workspaceTiming.clearGlobal",
-                "title": "%workspaceTiming.clearGlobal%"
-            },
-            {
-                "command": "workspaceTiming.debugSave",
-                "title": "%workspaceTiming.debugSave%"
-            },
-            {
-                "command": "workspaceTiming.openDashboard",
-                "title": "%workspaceTiming.openDashboard%"
-            },
-            {
-                "command": "workspaceTiming.export",
-                "title": "%workspaceTiming.export%"
-            },
-            {
-                "command": "workspaceTiming.newPeriod",
-                "title": "%workspaceTiming.newPeriod%"
-            },
-            {
-                "command": "workspaceTiming.clearHistory",
-                "title": "%workspaceTiming.clearHistory%"
-            },
-            {
-                "command": "workspaceTiming.restore",
-                "title": "%workspaceTiming.restore%"
-            },
-            {
-                "command": "workspaceTiming.exportAggregated",
-                "title": "%workspaceTiming.exportAggregated%"
-            }
-        ],
-        "configuration": {
-            "title": "Workspace Timing",
-            "properties": {
-                "workspaceTiming.locale": {
-                    "type": "string",
-                    "enum": [
-                        "auto",
-                        "zh-CN",
-                        "en"
-                    ],
-                    "enumDescriptions": [
-                        "Follow VS Code display language",
-                        "简体中文",
-                        "English"
-                    ],
-                    "default": "auto",
-                    "description": "UI language for notifications and the dashboard panel. Takes effect immediately for the panel; command palette titles require a window reload."
-                },
-                "workspaceTiming.enabled": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable timing for the current workspace"
-                },
-                "workspaceTiming.globalDisabled": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Globally disable timing for all workspaces"
-                },
-                "workspaceTiming.statusBar.enabled": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Show timing in the status bar"
-                },
-                "workspaceTiming.statusBar.mode": {
-                    "type": "string",
-                    "enum": [
-                        "today-total",
-                        "total-today",
-                        "compact"
-                    ],
-                    "enumDescriptions": [
-                        "Today first (今日 30m · 累计 2h)",
-                        "Total first (累计 2h · 今日 30m)",
-                        "Compact (30m)"
-                    ],
-                    "default": "today-total",
-                    "description": "Initial status bar display mode; clicking the status bar item cycles modes and persists the choice"
-                },
-                "workspaceTiming.storage.backupToFile": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable JSON file backup in .vscode/"
-                },
-                "workspaceTiming.storage.journalEnabled": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable journal file for crash protection"
-                },
-                "workspaceTiming.storage.ringBufferCapacity": {
-                    "type": "number",
-                    "default": 1024,
-                    "minimum": 64,
-                    "maximum": 65536,
-                    "description": "RingBuffer capacity (number of time slices)"
-                },
-                "workspaceTiming.storage.journalFlushInterval": {
-                    "type": "number",
-                    "default": 10000,
-                    "minimum": 1000,
-                    "maximum": 300000,
-                    "description": "Journal flush interval in ms"
-                },
-                "workspaceTiming.storage.fullSaveInterval": {
-                    "type": "number",
-                    "default": 60000,
-                    "minimum": 5000,
-                    "maximum": 600000,
-                    "description": "Full save interval in ms"
-                },
-                "workspaceTiming.storage.maxSessions": {
-                    "type": "number",
-                    "default": 5000,
-                    "minimum": 0,
-                    "description": "Max session history entries (0 = unlimited)"
-                },
-                "workspaceTiming.storage.historyRawRetentionDays": {
-                    "type": "number",
-                    "default": 45,
-                    "minimum": 0,
-                    "maximum": 3650,
-                    "description": "Keep raw sessions for N days; older ones are folded into daily totals (0 = never fold)"
-                },
-                "workspaceTiming.storage.safetySnapshot": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Write a safety snapshot before destructive operations (reset/clear/restore)"
-                },
-                "workspaceTiming.weeklyLimit.enabled": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Enable weekly work limit and rest notification"
-                },
-                "workspaceTiming.weeklyLimit.hours": {
-                    "type": "number",
-                    "default": 40,
-                    "minimum": 1,
-                    "maximum": 168,
-                    "description": "Weekly work limit in hours (default: 40h)"
-                },
-                "workspaceTiming.cloudSync.enabled": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Cloud sync (placeholder, coming soon)"
-                }
-            }
+    "configuration": {
+      "title": "Workspace Timing",
+      "properties": {
+        "workspaceTiming.locale": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "zh-CN",
+            "en"
+          ],
+          "enumDescriptions": [
+            "Follow VS Code display language",
+            "简体中文",
+            "English"
+          ],
+          "default": "auto",
+          "description": "UI language for notifications and the dashboard panel. Takes effect immediately for the panel; command palette titles require a window reload."
         },
-        "keybindings": [
-            {
-                "command": "workspaceTiming.toggleGlobal",
-                "key": "ctrl+shift+t t"
-            },
-            {
-                "command": "workspaceTiming.reset",
-                "key": "ctrl+shift+t r"
-            }
-        ]
+        "workspaceTiming.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable timing for the current workspace"
+        },
+        "workspaceTiming.globalDisabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Globally disable timing for all workspaces"
+        },
+        "workspaceTiming.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show timing in the status bar"
+        },
+        "workspaceTiming.statusBar.mode": {
+          "type": "string",
+          "enum": [
+            "today-total",
+            "total-today",
+            "compact"
+          ],
+          "enumDescriptions": [
+            "Today first (今日 30m · 累计 2h)",
+            "Total first (累计 2h · 今日 30m)",
+            "Compact (30m)"
+          ],
+          "default": "today-total",
+          "description": "Initial status bar display mode; clicking the status bar item cycles modes and persists the choice"
+        },
+        "workspaceTiming.storage.backupToFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable local backup file in workspace folder"
+        },
+        "workspaceTiming.storage.journalEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time data loss protection"
+        },
+        "workspaceTiming.storage.ringBufferCapacity": {
+          "type": "number",
+          "default": 1024,
+          "minimum": 64,
+          "maximum": 65536,
+          "description": "In-memory cache capacity (number of time slices)"
+        },
+        "workspaceTiming.storage.journalFlushInterval": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 1000,
+          "maximum": 300000,
+          "description": "Real-time auto-save interval in ms"
+        },
+        "workspaceTiming.storage.fullSaveInterval": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 5000,
+          "maximum": 600000,
+          "description": "Full checkpoint save interval in ms"
+        },
+        "workspaceTiming.storage.maxSessions": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 0,
+          "description": "Max session history entries to retain (0 = unlimited)"
+        },
+        "workspaceTiming.storage.historyRawRetentionDays": {
+          "type": "number",
+          "default": 45,
+          "minimum": 0,
+          "maximum": 3650,
+          "description": "Keep detailed sessions for N days; older ones are summarized into daily totals (0 = never summarize)"
+        },
+        "workspaceTiming.storage.safetySnapshot": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically create backup snapshots before operations like reset or restore"
+        },
+        "workspaceTiming.weeklyLimit.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable weekly work limit and rest notification"
+        },
+        "workspaceTiming.weeklyLimit.hours": {
+          "type": "number",
+          "default": 40,
+          "minimum": 1,
+          "maximum": 168,
+          "description": "Weekly work limit in hours (default: 40h)"
+        },
+        "workspaceTiming.cloudSync.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Cloud sync (placeholder, coming soon)"
+        }
+      }
     },
-    "scripts": {
-        "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./",
-        "scripts:build": "tsc -p scripts/tsconfig.json",
-        "test": "npm run test:unit",
-        "test:unit": "npm run compile && mocha --reporter spec test/**/*.test.js",
-        "test:coverage": "npm run compile && c8 --reporter=lcov --reporter=json-summary --report-dir=coverage mocha --reporter spec test/**/*.test.js",
-        "lint": "eslint src scripts --ext ts",
-        "review": "npm run scripts:build && node scripts/dist/review/run-review.js",
-        "review:gate": "npm run scripts:build && node scripts/dist/review/run-review.js --gate",
-        "review:strict": "npm run scripts:build && node scripts/dist/review/run-review.js --gate --strict",
-        "review:selftest": "npm run scripts:build && node scripts/dist/review/run-review.js --self-test",
-        "refactor:scan": "npm run scripts:build && node scripts/dist/tooling/refactor-adapter.js"
-    },
-    "c8": {
-        "include": [
-            "out/**/*.js"
-        ],
-        "exclude": [
-            "out/test/**",
-            "out/**/*.test.js"
-        ],
-        "all": true
-    },
-    "devDependencies": {
-        "@types/vscode": "^1.85.0",
-        "@types/node": "^20.11.0",
-        "@types/mocha": "^10.0.6",
-        "typescript": "^5.3.3",
-        "eslint": "^8.56.0",
-        "@typescript-eslint/eslint-plugin": "^6.19.0",
-        "@typescript-eslint/parser": "^6.19.0",
-        "mocha": "^10.3.0",
-        "c8": "^10.1.2"
-    }
+    "keybindings": [
+      {
+        "command": "workspaceTiming.toggleGlobal",
+        "key": "ctrl+shift+t t"
+      },
+      {
+        "command": "workspaceTiming.reset",
+        "key": "ctrl+shift+t r"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "scripts:build": "tsc -p scripts/tsconfig.json",
+    "test": "npm run test:unit",
+    "test:unit": "npm run compile && mocha --reporter spec test/**/*.test.js",
+    "test:coverage": "npm run compile && c8 --reporter=lcov --reporter=json-summary --report-dir=coverage mocha --reporter spec test/**/*.test.js",
+    "lint": "eslint src scripts --ext ts",
+    "review": "npm run scripts:build && node scripts/dist/review/run-review.js",
+    "review:gate": "npm run scripts:build && node scripts/dist/review/run-review.js --gate",
+    "review:strict": "npm run scripts:build && node scripts/dist/review/run-review.js --gate --strict",
+    "review:selftest": "npm run scripts:build && node scripts/dist/review/run-review.js --self-test",
+    "refactor:scan": "npm run scripts:build && node scripts/dist/tooling/refactor-adapter.js"
+  },
+  "c8": {
+    "include": [
+      "out/**/*.js"
+    ],
+    "exclude": [
+      "out/test/**",
+      "out/**/*.test.js"
+    ],
+    "all": true
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.11.0",
+    "@types/mocha": "^10.0.6",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "mocha": "^10.3.0",
+    "c8": "^10.1.2"
+  }
 }

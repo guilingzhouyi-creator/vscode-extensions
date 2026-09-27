@@ -2,11 +2,17 @@
 
 ## [Unreleased]
 
+## [0.4.10] — 2026-09-27
+
 ### Engineering Infrastructure（工程基础设施）
 - **配置边界单一真源（双真源漂移收敛）**：`models.ts` 新增合法域常量与净化器（ringBuffer [64,65536] / journalFlush [1000,300000] / fullSave [5000,600000] / retention [0,3650] / maxSessions ≥0 / weeklyLimit [1,168]），ConfigWatcher 与 Scheduler 热更新路径统一接入（含上界钳制与枚举漂移回退）；新增 ConfigBounds 单测套件（11 项断言，含与 package.json contributes 三方一致的防漂移回归）；fullSaveInterval 热更新下界由 1000ms 收紧至 5000ms（与 UI 契约一致）；移除从未被消费的 `workspaceTiming.cloudSync.provider` 死配置
 - **文本布局门禁 L3-DOC-LAYOUT**：CHANGELOG 布局契约机器化（DOC-CL-001 Unreleased 节存在 / 002 版本头格式与降序 / 003 与 package.json 版本同步 / 004 分类标题标准表 / 005 列表粗体导语 / 006 日期合法不超前）+ README 必需节与路线图版本同步（DOC-RD-001/002）；eslint 覆盖扩展至 scripts/（no-tabs/trailing/eol 卫生规则）；变更日志全部历史条目补齐粗体导语
 - **打包内容收口**：`.vscodeignore` 排除本地审查缓存（`.auto-refactor-cache*/`、`.bench-corpus*/`、`.corpus*/`）与 `**/*.tsbuildinfo`——此前实测发布包混入 ~820KB 内部审查缓存；根目录遗留的 0.4.5/0.4.6/0.4.7/0.4.9 四个 vsix 归位统一 `dist/<扩展名>/` 布局
 - **审查注册表清理**：退役的本地 perf-patterns 检查器残留配置段（`perfPatterns`，无消费者）移除，注册表升版 v7；本地孤儿产物 `scripts/dist/audit/perf-patterns.js` 删除
+
+### Refactoring（架构与解耦）
+- **崩溃恢复解耦与调度异常治理**：重构 `RecoveryService` 统一管理崩溃回放与历时兜底补偿逻辑，强化无损持久化鲁棒性
+- **图表可视化常量抽离**：抽离图表可视化相关常量并重构面板异步刷新调度器
 
 ## [0.4.9] — 2026-09-05
 

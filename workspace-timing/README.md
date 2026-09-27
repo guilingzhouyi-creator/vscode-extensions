@@ -2,7 +2,7 @@
 
 ![Workspace Timing banner](images/banner.png)
 
-> 🪶 轻量化 · 高可扩展 — 环形缓冲区 + Journal 双写入架构；跨工作区聚合对比、多维报表、中英双语与崩溃保护。  
+> 🪶 轻量化 · 高可扩展 — 环形缓冲区 + Journal 双写入架构；跨工作区聚合对比、多维报表、中英双语与崩溃保护。
 > Lightweight & extensible — RingBuffer + Journal dual-write architecture; multi-workspace comparison, rich analytics, bilingual UI, and crash safety.
 
 ---
@@ -41,7 +41,7 @@
 | `Workspace Timing: Reset Timing Data` | 重置本工作区全部数据 | Reset workspace timing data completely |
 | `Workspace Timing: Force Save Now (Debug)` | 立即强制存盘（调试用） | Force immediate flush & checkpoint |
 
-> 💡 **状态栏快捷切换**：直接点击状态栏右侧的时钟图标，可在三种模式间无缝切换：  
+> 💡 **状态栏快捷切换**：直接点击状态栏右侧的时钟图标，可在三种模式间无缝切换：
 > `今日 30m · 累计 2h` → `累计 2h · 今日 30m` → `30m`（仅今日）
 
 ---
@@ -67,14 +67,14 @@
 | `workspaceTiming.statusBar.mode` | `today-total` | 状态栏初始显示模式（点击状态栏循环切换并自动保存） |
 | `workspaceTiming.weeklyLimit.enabled` | `false` | 是否启用周工作上限监控与休息提醒 |
 | `workspaceTiming.weeklyLimit.hours` | `40` | 周工作上限时长（小时，范围 1~168） |
-| `workspaceTiming.storage.backupToFile` | `true` | 启用 `.vscode/workspace-timing.json` 文件备份 |
-| `workspaceTiming.storage.journalEnabled` | `true` | 启用 journal 崩溃保护日志 |
-| `workspaceTiming.storage.ringBufferCapacity` | `1024` | 环形缓冲区时间片容量上限 |
-| `workspaceTiming.storage.journalFlushInterval` | `10000` | Journal 批量落盘间隔 (ms) |
-| `workspaceTiming.storage.fullSaveInterval` | `60000` | 全量检查点存盘与全局同步间隔 (ms) |
-| `workspaceTiming.storage.maxSessions` | `5000` | 历史会话保留条数上限 (0 = 不限) |
-| `workspaceTiming.storage.historyRawRetentionDays` | `45` | 原始会话保留天数（超出自动折叠为日汇总桶） |
-| `workspaceTiming.storage.safetySnapshot` | `true` | 重置/清除/还原等破坏性操作前自动写入安全快照 |
+| `workspaceTiming.storage.backupToFile` | `true` | 启用工作区本地文件备份 |
+| `workspaceTiming.storage.journalEnabled` | `true` | 启用实时数据防丢保护 |
+| `workspaceTiming.storage.ringBufferCapacity` | `1024` | 内存缓存容量上限 (条目数) |
+| `workspaceTiming.storage.journalFlushInterval` | `10000` | 实时数据自动保存间隔 (ms) |
+| `workspaceTiming.storage.fullSaveInterval` | `60000` | 全量检查点保存间隔 (ms) |
+| `workspaceTiming.storage.maxSessions` | `5000` | 详细会话保留条数上限 (0 = 不限) |
+| `workspaceTiming.storage.historyRawRetentionDays` | `45` | 详细会话保留天数（超出自动归档为日汇总） |
+| `workspaceTiming.storage.safetySnapshot` | `true` | 重置/清除/还原等操作前自动写入安全快照 |
 | `workspaceTiming.cloudSync.enabled` | `false` | 云端同步开关（占位，即将推出） |
 
 ---
@@ -92,6 +92,7 @@
 | **v0.4.6** | 崩溃恢复双重计数修复（跨午夜/休眠封存段 journal 水位线去重）、journal 失败回退时序修复、覆盖率口径修正 | ✅ 已完成 |
 | **v0.4.7** | 性能与开销优化：多周趋势窗口化轻量聚合、历史折叠引擎零拷贝快退、高频聚合时间窗提前过滤（GC 压力削减） | ✅ 已完成 |
 | **v0.4.9** | 工程治理基建：自动化审查系统（L0~L5 六层门禁）+ 脚本库 TypeScript 化 + auto-refactor 0.3.0 联动（secrets/unused-export/cycles）；表驱动配置持久化 | ✅ |
+| **v0.4.10** | 崩溃恢复解耦与调度异常治理、图表可视化常量抽离与面板异步刷新重构、配置边界单一真源收敛 | ✅ 已完成 |
 | **v0.5.0** | ☁️ 云端同步与多端聚合支持（WebDAV / GitHub Gist） | 🚧 规划中 |
 
 ---

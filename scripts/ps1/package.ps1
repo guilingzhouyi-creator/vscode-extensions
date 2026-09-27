@@ -43,7 +43,7 @@ $exts = @(Get-ChildItem $root -Directory -Exclude 'dist', 'scripts', 'node_modul
         $pkgPath = Join-Path $_.FullName 'package.json'
         if (-not (Test-Path $pkgPath)) { return $false }
         $pkg = [System.IO.File]::ReadAllText($pkgPath, [System.Text.UTF8Encoding]::new($false)) | ConvertFrom-Json
-        return ($null -ne $pkg.engines -and $null -ne $pkg.engines.vscode)
+        return ($null -ne $pkg.PSObject.Properties['engines'] -and $null -ne $pkg.engines.PSObject.Properties['vscode'])
     } |
     Select-Object -ExpandProperty Name)
 
