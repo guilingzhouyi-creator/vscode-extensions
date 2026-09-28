@@ -20,7 +20,11 @@ import type {
     QualityScoreRationale,
     QualityWeights,
 } from './scoringTypes';
-import { ALL_QUALITY_DIMENSIONS, DEFAULT_QUALITY_WEIGHTS } from './scoringTypes';
+import {
+    ALL_QUALITY_DIMENSIONS,
+    DEFAULT_QUALITY_WEIGHTS,
+    DIMENSION_SCALE_MODE,
+} from './scoringTypes';
 import {
     FAMILY_DIMENSIONS,
     applyIssueDeductions,
@@ -41,7 +45,10 @@ import {
     computeCompositeScore,
     resolveQualityGrade,
     calculateConfidence,
+    calculateConfidenceFromVolume,
     applyScaleDampedScores,
+    effectivePenaltyFromIndex,
+    SATURATION_HALFPOINT,
     accumulateProjectMetrics,
 } from './scorer-formulas';
 
@@ -111,14 +118,23 @@ export class QualityScorer {
         const lines = metric?.nonBlankLines ?? metric?.lines ?? 100;
         const scaleFactor = Math.max(1, lines / 100);
 
+        // Snapshot the linear totals before the curve consumes them: the index curve is not
+        // invertible from the index alone, so the report has to carry both.
+        const linearPoints = { ...deductionPoints };
         const rawScores = applyScaleDampedScores(deductionPoints, scaleFactor);
+        const effectivePoints = {} as Record<QualityDimension, number>;
         for (const dim of ALL_QUALITY_DIMENSIONS) {
+            effectivePoints[dim] = effectivePenaltyFromIndex(rawScores[dim]);
             deductionPoints[dim] = DIMENSION_MAX_SCORE - rawScores[dim];
         }
 
         const { evaluatedBy, notEvaluated, evaluatedDimensions } =
             calculateEvaluatedDimensions(config);
-        const deductionsByDimension = groupDeductionsByDimension(rationales, deductionPoints);
+        const deductionsByDimension = groupDeductionsByDimension(
+            rationales,
+            linearPoints,
+            effectivePoints,
+        );
 
         const effectiveWeights =
             config?.archetype && !this.hasExplicitCustomWeights
@@ -140,6 +156,11 @@ export class QualityScorer {
             confidence,
             weights: { ...effectiveWeights },
             formulas: {
+                indexMapping:
+                    'density dims: index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
+                    `${SATURATION_HALFPOINT}; absolute dims: index = max(0, 100 - linearPoints)`,
+                saturationHalfpoint: SATURATION_HALFPOINT,
+                dimensionScaleMode: { ...DIMENSION_SCALE_MODE },
                 composite:
                     'sum(indices[d] * weights[d] for d in evaluated) / sum(weights[d] for d in evaluated)',
                 coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
@@ -189,6 +210,8 @@ export class QualityScorer {
             fileMetrics,
         );
 
+        // At project level the per-file indices are already curve-shaped, so the linear
+        // and effective views coincide: the gap between them only exists within a file.
         const deductionPoints = {} as Record<QualityDimension, number>;
         const divisor = totalWeight || 1;
         for (const dim of ALL_QUALITY_DIMENSIONS) {
@@ -201,17 +224,21 @@ export class QualityScorer {
 
         const { evaluatedBy, notEvaluated, evaluatedDimensions } =
             calculateEvaluatedDimensions(config);
-        const deductionsByDimension = groupDeductionsByDimension(allRationales, deductionPoints);
+        const deductionsByDimension = groupDeductionsByDimension(
+            allRationales,
+            deductionPoints,
+            deductionPoints,
+        );
         const { compositeScore, coverage } = computeCompositeScore(
             rawScores,
             evaluatedDimensions,
             this.weights,
         );
         const grade = resolveQualityGrade(compositeScore);
-        const confidence = calculateConfidence(
-            { nonBlankLines: totalWeight } as FileMetric,
-            coverage,
-        );
+        // Project scope: totalWeight is the repository's non-blank line total. Passing it
+        // through the file-scoped helper capped it at 300 lines, so baseConfidence was always
+        // 1.0 and the published confidence collapsed to exactly coverage.
+        const confidence = calculateConfidenceFromVolume(totalWeight, coverage, 'project');
 
         return {
             indices: rawScores,
@@ -220,6 +247,11 @@ export class QualityScorer {
             confidence,
             weights: { ...this.weights },
             formulas: {
+                indexMapping:
+                    'density dims: index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
+                    `${SATURATION_HALFPOINT}; absolute dims: index = max(0, 100 - linearPoints)`,
+                saturationHalfpoint: SATURATION_HALFPOINT,
+                dimensionScaleMode: { ...DIMENSION_SCALE_MODE },
                 composite:
                     'sum(indices[d] * weights[d] for d in evaluated) / sum(weights[d] for d in evaluated)',
                 coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',

@@ -54,7 +54,11 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     'PRF-LEAK': DIMENSION_PERFORMANCE_EFFICIENCY,
     'PRF-POL': DIMENSION_PERFORMANCE_EFFICIENCY,
     CMP: DIMENSION_PERFORMANCE_EFFICIENCY,
-    'GOV-TYP': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    // GOV-TYP findings are implicit/loose typing that hides errors at runtime. That is a
+    // type-purity defect, which is where the rule table charges it, not an architecture
+    // breach. Routing the family to architectureConsistency double-charged one finding
+    // across two axes.
+    'GOV-TYP': 'semanticPurity',
     ARCH: DIMENSION_ARCHITECTURE_CONSISTENCY,
     'ARCH-HDL': DIMENSION_ARCHITECTURE_CONSISTENCY,
     'ARCH-CFG': DIMENSION_ARCHITECTURE_CONSISTENCY,
@@ -68,12 +72,21 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     'CPX-JST': DIMENSION_MAINTAINABILITY,
     'CPX-HOP': DIMENSION_MAINTAINABILITY,
     'CPX-RED': DIMENSION_MAINTAINABILITY,
+    // CPX-NEST and CPX-STM are deducted to maintainability by the rule table, so they need
+    // explicit entries here. Without them they fell through to the bare `CPX` catch-all
+    // below and were routed to performanceEfficiency, which contradicted the table.
+    'CPX-NEST': DIMENSION_MAINTAINABILITY,
+    'CPX-STM': DIMENSION_MAINTAINABILITY,
+    // Remaining complexity rules are time/space/amplification costs, owned by performance.
     CPX: DIMENSION_PERFORMANCE_EFFICIENCY,
     'DAT-LAY': DIMENSION_ARCHITECTURE_CONSISTENCY,
     'DAT-DEF': DIMENSION_ARCHITECTURE_CONSISTENCY,
     DAT: DIMENSION_PERFORMANCE_EFFICIENCY,
     'TST-TAU': DIMENSION_MAINTAINABILITY,
     'TST-DBT': DIMENSION_MAINTAINABILITY,
+    // Test topology breaches are charged to maintainability by the rule table, so the bare
+    // TST catch-all below must not claim them for modernity.
+    'TST-TOP': DIMENSION_MAINTAINABILITY,
     TST: DIMENSION_MODERNITY,
     'DEP-LAZ': DIMENSION_ARCHITECTURE_CONSISTENCY,
     'DEP-RES': DIMENSION_ARCHITECTURE_CONSISTENCY,
@@ -90,9 +103,15 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
  * @returns The routed dimension, or null when the family has no explicit owner.
  */
 export function familyDimensionOf(rule: string): QualityDimension | null {
+    if (typeof rule !== 'string' || rule.length === 0) {
+        return null;
+    }
     let best: string | null = null;
     for (const prefix of Object.keys(FAMILY_DIMENSIONS)) {
-        if (rule.startsWith(prefix + '-') && (best === null || prefix.length > best.length)) {
+        // Exact-family ids (e.g. a bare "ARCH") carry no trailing segment, so a plain
+        // prefix test would drop them and silently route the finding to techDebtRisk.
+        const matches = rule === prefix || rule.startsWith(prefix + '-');
+        if (matches && (best === null || prefix.length > best.length)) {
             best = prefix;
         }
     }
@@ -119,10 +138,17 @@ export type DeductionApplier = (
  *
  * @param issue - Analyzed issue finding.
  * @param apply - Deduction callback function.
+ * @param seedClaimed - Dimensions a family applier already charged for this finding.
  */
-export function applyQualityDimensionDeductions(issue: Issue, apply: DeductionApplier): void {
+export function applyQualityDimensionDeductions(
+    issue: Issue,
+    apply: DeductionApplier,
+    seedClaimed?: Set<QualityDimension>,
+): void {
     const line = issue.location?.start?.line;
-    const claimed = new Set<QualityDimension>();
+    // Seeded with the dimensions the family appliers already claimed, so a finding that
+    // lands in both buckets is charged once per dimension rather than once per bucket.
+    const claimed = new Set<QualityDimension>(seedClaimed);
     for (const rule of DIMENSION_RULES) {
         if (rule.analyzer !== issue.analyzer) continue;
         if (claimed.has(rule.dimension)) continue;
@@ -217,14 +243,17 @@ export function classifyDebtTier(issue: Issue): DebtTier {
 /**
  * Apply the severity-based technical-debt deduction that every analyzer feeds.
  *
- * The dimension is the finding's explicitly routed family dimension when it has one, so a rule
- * with a dedicated axis is never double-counted as generic debt. When that dedicated dimension
- * has already been deducted by the rule table, the severity deduction is routed to
- * DIMENSION_TECH_DEBT_RISK to prevent unfair double penalty on the primary quality dimension.
+ * When the rule table already charged this finding, the finding is debt in its own right and
+ * the severity penalty goes to DIMENSION_TECH_DEBT_RISK. Routing it to the family axis
+ * instead would charge one finding to two different quality axes: the table row for
+ * `GOV-TYP-*` deducts semanticPurity while the family table routes the same id to
+ * architectureConsistency, so the old `claimed.has(debtDimension)` check let the severity
+ * fallback add a second, different axis on top of the one the table had just charged.
  *
  * @param issue - Analyzed issue finding.
  * @param apply - Deduction callback function.
- * @param claimed - Optional set of dimensions already deducted by rule table.
+ * @param claimed - Dimensions already deducted for this finding by the rule table or a
+ *   family applier; a non-empty set means the finding has already been charged.
  * @param line - Start line of the finding, when known.
  */
 function applySeverityDeductions(
@@ -233,10 +262,15 @@ function applySeverityDeductions(
     claimed?: Set<QualityDimension>,
     line?: number,
 ): void {
-    let debtDimension = familyDimensionOf(issue.rule) ?? DIMENSION_TECH_DEBT_RISK;
-    if (claimed && claimed.has(debtDimension)) {
-        debtDimension = DIMENSION_TECH_DEBT_RISK;
-    }
+    // The table and the family map can name different axes for one id (GOV-TYP deducts
+    // semanticPurity in the table but routes to architectureConsistency by family), so
+    // membership of the exact routed axis is not enough to detect an existing charge.
+    // Any prior charge means this finding is already represented; the severity penalty
+    // then belongs to debt rather than to a second quality axis.
+    const debtDimension =
+        claimed && claimed.size > 0
+            ? DIMENSION_TECH_DEBT_RISK
+            : (familyDimensionOf(issue.rule ?? '') ?? DIMENSION_TECH_DEBT_RISK);
 
     // Tiered debt isolation for techDebtRisk
     if (debtDimension === DIMENSION_TECH_DEBT_RISK) {
@@ -315,10 +349,23 @@ export function applyIssueDeductions(
               }
             : apply;
 
-    applyArchitectureDeductions(issue, effectiveApply);
-    applySecurityDeductions(issue, effectiveApply);
-    applyPerformanceDeductions(issue, effectiveApply);
-    applyQualityDimensionDeductions(issue, effectiveApply);
+    // A single finding can match both a family applier and a rule-table row, and the two
+    // buckets are not mutually exclusive: `dependency-graph` appears in the rule table and
+    // is also accepted by the architecture applier. Charging the same dimension twice for
+    // one finding inflated it, so the family appliers are recorded here and the rule table
+    // is seeded with them. `ARCH-LEAK-002` still deducts two dimensions on purpose — a
+    // leaked credential is both an architecture breach and a security defect — because the
+    // guard is per dimension, not per finding.
+    const claimedByFamily = new Set<QualityDimension>();
+    const recordFamilyClaim: DeductionApplier = (dim, points, reason, rule, line) => {
+        claimedByFamily.add(dim);
+        apply(dim, points, reason, rule, line);
+    };
+
+    applyArchitectureDeductions(issue, recordFamilyClaim);
+    applySecurityDeductions(issue, recordFamilyClaim);
+    applyPerformanceDeductions(issue, recordFamilyClaim);
+    applyQualityDimensionDeductions(issue, effectiveApply, claimedByFamily);
 }
 
 /**

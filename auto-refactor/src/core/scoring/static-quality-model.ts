@@ -252,8 +252,12 @@ export function synthesizeStaticQualityVector(
     const M = overrides.M ?? indices.maintainability;
     const P = overrides.P ?? indices.performanceEfficiency;
 
-    // D: Data Architecture defaults to architectureConsistency or data metrics
-    const D = overrides.D ?? indices.architectureConsistency;
+    // D: Data Architecture had no QualityDimension of its own and defaulted to
+    // architectureConsistency, making this axis identical to A. It now derives from the axes
+    // that describe data quality, matching the eight-pillar model's data bucket.
+    const D =
+        overrides.D ??
+        Math.min(100.0, Math.max(0.0, (indices.duplication + indices.semanticPurity) / 2));
 
     // T: Test Quality maps to modernity
     const T = overrides.T ?? indices.modernity;

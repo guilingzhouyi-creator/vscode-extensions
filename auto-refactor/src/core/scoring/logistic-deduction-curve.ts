@@ -4,7 +4,11 @@
  * Architecture Role: Implements non-linear logistic saturation and marginal utility
  *   dampening to eliminate catastrophic score cliff crashes while maintaining strict penalty
  *   fidelity on early infractions.
- * Dependencies & Triggers: Mathematical utility invoked by scorer-formulas and QualityScorer.
+ * Dependencies & Triggers: **Not on the production scoring path.** This module is exported
+ *   through the public API, but `scorer-formulas.applyScaleDampedScores` uses a reciprocal
+ *   density curve instead. A logistic curve saturates toward its capacity limit L, so the
+ *   index still floors at 0 for extreme density; the reciprocal form asymptotes to 0 and
+ *   keeps extreme cases ordered. Kept for callers that want an explicit capacity ceiling.
  * Responsibilities:
  *   1. Compute sub-linear diminishing penalty returns for repetitive findings (1 + sum(1/sqrt(i))).
  *   2. Implement zero-anchored logistic saturation curve: D(0) = 0, D(x) -> L as x -> inf.
@@ -20,9 +24,9 @@
 export interface LogisticCurveOptions {
     /** Upper ceiling capacity limit L for single dimension deductions (default 100). */
     capacityLimit?: number;
-    /** Transition midpoint x0 where saturation inflection occurs (default 40). */
+    /** Transition midpoint x0 where saturation inflection occurs (default 45). */
     inflectionPoint?: number;
-    /** Growth rate / steepness k of the logistic sigmoid curve (default 0.035). */
+    /** Growth rate / steepness k of the logistic sigmoid curve (default 0.03). */
     steepness?: number;
     /** Linear fidelity threshold under which deductions remain 100% exact (default 15). */
     linearThreshold?: number;

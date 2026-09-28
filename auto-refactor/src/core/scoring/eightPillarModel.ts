@@ -110,11 +110,17 @@ export function synthesizeEightPillars(
         ...customWeights,
     };
 
+    // The data pillar previously defaulted to `architectureConsistency`, which has no
+    // QualityDimension of its own. Combined with `architecture: 0.15` that gave one ten-
+    // dimension index an effective 0.25 weight — more than any real axis — while the
+    // dimensions that actually describe data quality were counted at a third of that. It now
+    // derives from the axes that do describe it: duplication (repeated literals and code) and
+    // semantic purity (data and constant handling).
     const pillarBuckets: Record<PrimaryQualityPillar, number[]> = {
         architecture: [indices.architectureConsistency],
         maintainability: [indices.maintainability],
         performance: [indices.performanceEfficiency],
-        data: [dataScoreOverride ?? indices.architectureConsistency],
+        data: [dataScoreOverride ?? indices.duplication, indices.semanticPurity],
         testing: [testingScoreOverride ?? indices.modernity],
         reliability: [indices.semanticPurity, indices.techDebtRisk],
         security: [indices.codeSecurity],

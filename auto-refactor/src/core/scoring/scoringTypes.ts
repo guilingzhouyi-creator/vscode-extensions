@@ -103,26 +103,49 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
     techDebtRisk: ['governance'],
 };
 
+/**
+ * Per-dimension scaling mode used by the index curve.
+ *
+ * `absolute` scores by raw defect count and ignores file size; `density` divides the count
+ * by the file's line scale factor. Security is absolute because one hard-coded credential
+ * is one defect whether the file is 20 or 500 lines, so size-scaling would understate it.
+ * Declaring this here keeps the curve reading configuration rather than a hardcoded rule id.
+ */
+export const DIMENSION_SCALE_MODE: Record<QualityDimension, 'absolute' | 'density'> = {
+    architectureConsistency: 'density',
+    semanticPurity: 'density',
+    codeSecurity: 'absolute',
+    performanceEfficiency: 'density',
+    standardization: 'density',
+    modernity: 'density',
+    maintainability: 'density',
+    commentQuality: 'density',
+    duplication: 'density',
+    techDebtRisk: 'density',
+};
+
 /** Dimension weights for the composite Quality Index (default balanced) */
 export type QualityWeights = Record<QualityDimension, number>;
 
 /**
- * Balanced per-dimension weights used when the caller supplies no custom weights. Weights are
- * relative multipliers, not percentages: security weighs heaviest at 1.5, tech-debt risk
- * follows at 1.3, and each value can be overridden by the partial `customWeights` passed to
- * the `QualityScorer` constructor.
+ * Balanced per-dimension weights used when the caller supplies no custom weights.
+ *
+ * Normalized to sum to 1.0, matching `DEFAULT_PILLAR_WEIGHTS` and the static-quality model
+ * so weights are directly comparable across scoring surfaces. Only the ratios carry meaning:
+ * security weighs heaviest, tech-debt risk follows, and each value can be overridden by the
+ * partial `customWeights` passed to the `QualityScorer` constructor.
  */
 export const DEFAULT_QUALITY_WEIGHTS: QualityWeights = {
-    architectureConsistency: 1.2,
-    semanticPurity: 1.0,
-    codeSecurity: 1.5,
-    performanceEfficiency: 1.1,
-    standardization: 0.9,
-    modernity: 0.8,
-    maintainability: 1.2,
-    commentQuality: 0.8,
-    duplication: 1.0,
-    techDebtRisk: 1.3,
+    architectureConsistency: 0.111,
+    semanticPurity: 0.093,
+    codeSecurity: 0.139,
+    performanceEfficiency: 0.102,
+    standardization: 0.083,
+    modernity: 0.074,
+    maintainability: 0.111,
+    commentQuality: 0.074,
+    duplication: 0.093,
+    techDebtRisk: 0.12,
 };
 
 /** Traceable deduction or bonus explanation */
@@ -136,11 +159,16 @@ export interface QualityScoreRationale {
 }
 
 /**
- * Letter grade for a composite score: `A+` at >= 95, `A` at >= 85, `B` at >= 75, `C` at >= 65,
- * `D` at >= 50 and `F` below 50. The thresholds live in `qualityScorer`; this type only names
- * the possible labels, so callers should display the value rather than re-derive the buckets.
+ * Letter grade for a composite score: `A+` at >= 90, `A` at >= 80, `B` at >= 70, `C` at >= 60,
+ * `D` at >= 50 and `F` below 50. The cut-offs live in `scorer-formulas` as the single source
+ * of truth; this type only names the possible labels, so callers should display the value
+ * rather than re-derive the buckets.
+ *
+ * `N/A` means no dimension carried a weight, so no composite could be formed. That is
+ * missing data rather than a failing score, and a consumer should check `coverage` before
+ * quoting a letter.
  */
-export type QualityGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
+export type QualityGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F' | 'N/A';
 
 /** Complete breakdown of a quality assessment */
 export interface QualityScoreBreakdown {
@@ -178,9 +206,23 @@ export interface QualityScoreBreakdown {
      */
     deductionsByDimension?: Record<
         QualityDimension,
-        { points: number; entries: { rule: string; points: number; reason: string }[] }
+        {
+            /** Linear sum of the audit-trail entries, before the index curve compresses them. */
+            points: number;
+            /**
+             * Penalty the index curve actually consumed; `100 - indices[dim]` reconciles to it.
+             */
+            effectivePoints: number;
+            entries: { rule: string; points: number; reason: string }[];
+        }
     >;
     formulas?: {
+        /** How a linear point total becomes a 0-100 index, per scaling mode. */
+        indexMapping: string;
+        /** Half-point `H` of the density curve: at density H the index is exactly 50. */
+        saturationHalfpoint: number;
+        /** Which dimensions score by absolute count versus defect density. */
+        dimensionScaleMode: Record<QualityDimension, 'absolute' | 'density'>;
         composite: string;
         coverage: string;
         confidence: string;

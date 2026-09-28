@@ -33,6 +33,19 @@ export const ScoringRationales = {
     DTO_CREDENTIAL_LEAK: (msg: string) =>
         `Architectural data security leak (public contract exposes confidential credentials): ${msg}`,
     /**
+     * Security-side rationale for the same credential leak.
+     *
+     * A leaked credential is deliberately charged to two axes: it is an architecture breach
+     * and a security defect at once. The tag lets an auditor tell that design apart from an
+     * accidental double charge, which would otherwise be invisible because the two entries
+     * share the same rule, line and message.
+     *
+     * @param msg - Analyzer finding text embedded after the rationale prefix.
+     * @returns Deduction rationale for the code-security dimension.
+     */
+    DTO_CREDENTIAL_LEAK_SECURITY_AXIS: (msg: string) =>
+        `[dual-axis] Same credential leak also charged to architectureConsistency: ${msg}`,
+    /**
      * Format the rationale for a layer-boundary or dependency-inversion violation.
      *
      * @param msg - Analyzer finding text embedded after the rationale prefix.

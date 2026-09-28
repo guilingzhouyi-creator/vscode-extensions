@@ -18,6 +18,11 @@ import { computeEffectiveCodeDensity } from './effectiveDensity';
 import { detectScoreGaming } from './antiGaming';
 import type { QualityDimension, QualityGrade } from './scoringTypes';
 import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
+// Grade thresholds live in scorer-formulas as the single source of truth. This module used to
+// carry its own copy (95/85/75/65/50) which disagreed with the snapshot model, so the same
+// 92 points read as A+ on one surface and A on the other. It also had no NaN case, which
+// graded unmeasured input as F.
+import { resolveQualityGrade } from './scorer-formulas';
 
 /**
  * Scored function-level quality record.
@@ -76,18 +81,6 @@ export interface ProjectQualityScore {
     totalFiles: number;
     totalIssues: number;
     fatalCount: number;
-}
-
-/**
- * Resolves letter grade from a composite score.
- */
-function resolveGrade(score: number): QualityGrade {
-    if (score >= 95) return 'A+';
-    if (score >= 85) return 'A';
-    if (score >= 75) return 'B';
-    if (score >= 65) return 'C';
-    if (score >= 50) return 'D';
-    return 'F';
 }
 
 /**
@@ -331,7 +324,7 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
 
     return {
         compositeScore: finalComposite,
-        grade: resolveGrade(finalComposite),
+        grade: resolveQualityGrade(finalComposite),
         eightPillars: synthesized,
         effectiveCodeDensity: Math.round((totalDensity / fileScores.length) * 100) / 100,
         domains,

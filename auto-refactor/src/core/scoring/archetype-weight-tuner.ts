@@ -158,9 +158,26 @@ export class ArchetypeWeightTuner {
         // 3. Normalization scale factor
         const scale = unnormMass > 0 ? baseMass / unnormMass : 1.0;
 
+        // Renormalize after rounding rather than only before: rounding each weight to three
+        // decimals shifted the total away from baseMass (by up to 5e-3 across ten axes),
+        // which let the invariant the class documents drift. Rescaling by the post-round sum
+        // keeps the total exactly equal to baseMass.
+        const rounded = {} as QualityWeights;
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            rounded[dim] = +(unnormalized[dim] * scale).toFixed(6);
+        }
+        let roundedMass = 0;
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            roundedMass += rounded[dim];
+        }
+        if (roundedMass <= 0) {
+            return { ...baseWeights };
+        }
+        const correction = baseMass / roundedMass;
+
         const result: QualityWeights = {} as QualityWeights;
         for (const dim of ALL_QUALITY_DIMENSIONS) {
-            result[dim] = +(unnormalized[dim] * scale).toFixed(3);
+            result[dim] = +(rounded[dim] * correction).toFixed(6);
         }
 
         return result;

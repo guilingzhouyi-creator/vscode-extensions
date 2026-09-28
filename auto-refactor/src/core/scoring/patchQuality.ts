@@ -17,6 +17,7 @@ import { ALL_PRIMARY_PILLARS } from './eightPillarModel';
 import type { FileQualityScore } from './hierarchicalScorer';
 import { scoreFileQuality } from './hierarchicalScorer';
 import { RULE_GOV_GAM_001, detectDiffScoreGaming } from './antiGaming';
+import { scoreDelta } from './scorer-formulas';
 import {
     extractConstantEntities,
     analyzeConstantTransitions,
@@ -24,11 +25,18 @@ import {
 
 /**
  * Patch quality evaluation verdict.
+ *
+ * `unavailable` is returned when either side of the patch was not measured (composite is
+ * NaN). It is distinct from `neutral` on purpose: `neutral` asserts "measured, no material
+ * change", and a NaN delta satisfies neither `> 0.5` nor `< -0.5`, so an unmeasured patch
+ * would otherwise fall through to `neutral` and read as a passing verdict.
  */
-export type PatchQualityVerdict = 'improved' | 'neutral' | 'degraded' | 'gaming_rejected';
+export type PatchQualityVerdict =
+    'improved' | 'neutral' | 'degraded' | 'gaming_rejected' | 'unavailable';
 
 const VERDICT_IMPROVED: PatchQualityVerdict = 'improved';
 const VERDICT_NEUTRAL: PatchQualityVerdict = 'neutral';
+const VERDICT_UNAVAILABLE: PatchQualityVerdict = 'unavailable';
 
 /**
  * Parameters for patch quality evaluation.
@@ -49,7 +57,8 @@ export interface EvaluatePatchParams {
 export interface PatchScoreMetrics {
     beforeScore: number;
     afterScore: number;
-    deltaScore: number;
+    /** Signed score change, or null when either side was not measured (composite was NaN). */
+    deltaScore: number | null;
     effectiveDensityBefore: number;
     effectiveDensityAfter: number;
     effectiveDensityDelta: number;
@@ -114,10 +123,17 @@ function diffIssues(
 
 /**
  * Resolves patch verdict based on delta score and gaming detections.
+ *
+ * A null delta means one side was not measured, so the verdict is `unavailable` rather than
+ * a pass: every comparison against NaN is false, so without this guard an unmeasured patch
+ * would fall through to `neutral` and be reported as an acceptable change.
  */
-function resolvePatchVerdict(deltaScore: number, gamingCount: number): PatchQualityVerdict {
+function resolvePatchVerdict(deltaScore: number | null, gamingCount: number): PatchQualityVerdict {
     if (gamingCount > 0) {
         return 'gaming_rejected';
+    }
+    if (deltaScore === null) {
+        return VERDICT_UNAVAILABLE;
     }
     if (deltaScore > 0.5) {
         return 'improved';
@@ -125,7 +141,7 @@ function resolvePatchVerdict(deltaScore: number, gamingCount: number): PatchQual
     if (deltaScore < -0.5) {
         return 'degraded';
     }
-    return 'neutral';
+    return VERDICT_NEUTRAL;
 }
 
 const TYPE_NUMBER = 'number';
@@ -154,8 +170,14 @@ function buildPatchExplanations(
     resolvedCount: number,
     simplificationRewardBonus: number,
 ): string[] {
+    const scoreLine =
+        metrics.deltaScore === null
+            ? `Quality score could not be compared: the scan measured no quality dimension ` +
+              `(${metrics.beforeScore} -> ${metrics.afterScore}).`
+            : `Quality score moved from ${metrics.beforeScore} to ${metrics.afterScore} ` +
+              `(Delta: ${metrics.deltaScore > 0 ? '+' : ''}${metrics.deltaScore}).`;
     const explanation: string[] = [
-        `Quality score moved from ${metrics.beforeScore} to ${metrics.afterScore} (Delta: ${metrics.deltaScore > 0 ? '+' : ''}${metrics.deltaScore}).`,
+        scoreLine,
         `Effective code density shifted from ${metrics.effectiveDensityBefore} to ${metrics.effectiveDensityAfter} (Delta: ${metrics.effectiveDensityDelta}).`,
     ];
 
@@ -234,11 +256,15 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
 
     const beforeScore = beforeDetails.compositeScore;
     const afterScore = afterDetails.compositeScore;
-    let deltaScore = Math.round((afterScore - beforeScore) * 10) / 10;
+    // A NaN on either side means the scan measured no quality dimension, which happens on a
+    // narrow analyzer selection. Subtracting it would yield NaN, and a NaN delta satisfies
+    // neither `> 0.5` nor `< -0.5`, so the patch would be reported as `neutral`.
+    const rawDelta = scoreDelta(beforeScore, afterScore);
+    let deltaScore = rawDelta === null ? null : Math.round(rawDelta * 10) / 10;
 
     // Pure relocation debouncing: moving constants without quality improvement
     // earns 0 positive score
-    if (relocationAnalysis.hasPureRelocationsOnly && deltaScore > 0) {
+    if (deltaScore !== null && relocationAnalysis.hasPureRelocationsOnly && deltaScore > 0) {
         deltaScore = 0.0;
     }
 
@@ -251,6 +277,8 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const pBefore = beforeDetails.eightPillars.pillars[pillar];
         const pAfter = afterDetails.eightPillars.pillars[pillar];
+        // An unmeasured side yields NaN here too; keep it NaN rather than coercing to 0,
+        // which would read as "this pillar did not change".
         pillarDeltas[pillar] = Math.round((pAfter - pBefore) * 10) / 10;
     }
 

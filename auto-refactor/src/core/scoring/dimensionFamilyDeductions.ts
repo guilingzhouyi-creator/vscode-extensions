@@ -87,6 +87,9 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
     const msg = issue.message;
 
     if (r === RULE_ARCH_LEAK_002) {
+        // Charged to two axes on purpose: a leaked credential is an architecture breach and
+        // a security defect. The security-side rationale carries a [dual-axis] tag so the
+        // report can distinguish this from an accidental double charge.
         apply(
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_DTO_CREDENTIAL_LEAK,
@@ -97,7 +100,7 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
         apply(
             DIMENSION_CODE_SECURITY,
             DEDUCTION_DTO_CREDENTIAL_LEAK,
-            ScoringRationales.DTO_CREDENTIAL_LEAK(msg),
+            ScoringRationales.DTO_CREDENTIAL_LEAK_SECURITY_AXIS(msg),
             r,
             line,
         );
