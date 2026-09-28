@@ -46,6 +46,14 @@ func _initialize() -> void:
 			fails += 1
 			print("✗ %s (load failed)" % res_path)
 		elif script is GDScript:
+			# GDS 审查收敛：load() 对存在语法错误的脚本返回**非 null** 的 GDScript 对象
+			# （错误已记录在脚本自身），因此 `script == null` 与随后的 `reload()` 都会把
+			# 编译失败的脚本报成通过。`can_instantiate()` 是官方给出的「该脚本能否被实例化」
+			# 判据，编译失败时为 false——必须以它为准，否则本校验器恒绿。
+			if not script.can_instantiate():
+				fails += 1
+				print("✗ %s (script did not compile)" % res_path)
+				continue
 			var err: int = script.reload()
 			if err != OK:
 				fails += 1

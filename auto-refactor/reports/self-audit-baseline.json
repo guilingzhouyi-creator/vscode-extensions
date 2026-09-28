@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790577497149",
-  "timestamp": "2026-09-28T06:38:21.469Z",
+  "snapshotId": "snapshot-v0.4.0-1790599425279",
+  "timestamp": "2026-09-28T12:43:49.630Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,24 +13,24 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 530,
-    "durationMs": 3990
+    "durationMs": 4012
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 10012,
+    "totalIssues": 10011,
     "suppressedIssues": 5662,
-    "unsuppressedIssues": 4350,
+    "unsuppressedIssues": 4349,
     "bySeverity": {
       "info": 397,
-      "warning": 9615,
+      "warning": 9614,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 63,
-      "medium": 9303,
+      "medium": 9302,
       "low": 646
     }
   },
@@ -154,7 +154,7 @@
     "summary": {
       "critical": 0,
       "high": 63,
-      "medium": 9303,
+      "medium": 9302,
       "low": 646
     },
     "criticalItems": [],

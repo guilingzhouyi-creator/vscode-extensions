@@ -44,6 +44,7 @@ import type { BASELINE_GRANULARITY_GROUPED } from './core/reporting/reportFinali
 import {
     printProjectStackProfile,
     printQualityScoreAssessment,
+    printAutonomyAssessment,
 } from './core/reporting/quality-printer';
 import {
     finalizeReport,
@@ -658,6 +659,12 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
 
         if (options.showScore && report.qualityScore) {
             printQualityScoreAssessment(report.qualityScore, report.triPlaneQuality);
+            // The report already carries the autonomy assessment (reportBuilder computes it
+            // alongside the quality score), so `--score` printed the quality side and silently
+            // dropped the CAI side even though both were requested by the same flag.
+            if (report.autonomy) {
+                printAutonomyAssessment(report.autonomy);
+            }
         }
         logger.close();
         return evaluateGateExitCode(report, config);

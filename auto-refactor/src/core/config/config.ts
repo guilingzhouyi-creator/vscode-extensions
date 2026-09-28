@@ -257,6 +257,11 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
             // analyzers lets one global `thresholds.blockingIoAllowPatterns` policy reach both
             // the PRF-IO-001 analyzer and the GOV-PRF-004 governance rule.
             blockingIoAllowPatterns: [],
+            // Same shape and rationale as complexity.allocationAllowPatterns above. The
+            // performance analyzer reads opts.allocationAllowPatterns for the per-iteration
+            // allocation rule, so without this declaration a global thresholds entry could
+            // never reach it and a process-style entry point stayed reported.
+            allocationAllowPatterns: [],
         },
         'dependency-graph': {
             // Cross-file import-graph checks. Per-file `disallowed-import` rules are declared via

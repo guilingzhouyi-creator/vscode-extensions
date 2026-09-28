@@ -488,10 +488,10 @@
       "default": "error",
       "description": "Fail-closed guard for source files whose extension no language adapter claims (e.g. .py/.sh before an adapter exists). 'error' (default) fails the scan loudly, 'warning' reports without blocking, 'off' restores the historic silent fallback to the TypeScript parser."
     },
-    "autoTune": {
+    "autoTuneScale": {
       "type": "boolean",
       "default": false,
-      "description": "Automatically adjust complexity, file size, and rule thresholds based on detected project scale (micro -> enterprise)."
+      "description": "Automatically adjust complexity, file size, and rule thresholds based on detected project scale (micro -> enterprise). The key is autoTuneScale because it tunes the scale-sensitive thresholds only; maturity-tier detection rides along with it."
     },
     "profile": {
       "type": "object",

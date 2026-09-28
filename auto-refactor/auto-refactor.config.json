@@ -3,7 +3,7 @@
   "format": "text",
   "failOnIssue": false,
   "commentLevel": "standard",
-  "autoTune": true,
+  "autoTuneScale": true,
   "include": ["src/**/*.ts", "scripts/*.js", "crates/**/*.rs"],
   "exclude": ["node_modules", ".git", "dist", "build", "coverage", "testdata"],
   "thresholds": {
