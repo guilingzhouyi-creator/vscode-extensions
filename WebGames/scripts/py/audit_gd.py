@@ -70,6 +70,9 @@ PENDING_MARKER_RE = re.compile(r"#.*\b(TODO|FIXME|XXX|HACK)\b")
 VAR_DECL_RE = re.compile(r"^\s*(?:static\s+)?var\s+([A-Za-z_][A-Za-z0-9_]*)")
 FUNC_DECL_RE = re.compile(r"^\s*(?:static\s+)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)(?:\s*->\s*([A-Za-z0-9_\[\],\s.]+))?:")
 LOOP_RE = GD_LOOP_HEAD_RE  # Phase 60：与 audit_perf_hotspots.py 同源（audit_common.GD_LOOP_HEAD_RE）
+# ADV-PRF-002：循环体内的逐次瞬态堆分配。GDScript 写作 `ClassName.new()`（带类名前缀），
+# 故不能只匹配裸 `.new(`；深拷贝 `.duplicate(true)` 与 `.duplicate()` 同属逐次分配。
+ADV_PRF_002_ALLOC_RE = re.compile(r"(?:\.new\s*\(|\.duplicate\s*\()")
 FORBIDDEN_EXTENDS_DOMAINS = {"Node", "Node2D", "Node3D", "Control", "CanvasItem", "Area2D", "CharacterBody2D"}
 FORBIDDEN_RNG_CALLS = re.compile(r"(?<![.\w])(randf|randi|randomize|randf_range|randi_range|randfn)\s*\(")
 
@@ -616,6 +619,35 @@ class SimplificationAuditor:
                             message="在已执行语句后检测到多余冗余的「pass」语句",
                             fix_suggestion="直接删除无效的 pass 行"
                         ))
+
+            # 1b. ADV-PRF-002 循环内瞬态堆分配。
+            # 本文件头声称按 ADV-PRF-002 强校验「禁用循环内瞬态分配」，但此前全文并无任何
+            # 对应实现（LOOP_RE 仅在第 72 行赋值而从未被使用），该红线实际从未生效。
+            # 判据：行本身是循环头（for/while），其后缩进更深的代码行内出现
+            # `.new()` / `.duplicate(` / `.duplicate(true)` 即为逐次分配。
+            if LOOP_RE.match(stripped):
+                # 进入循环体：后续缩进大于当前循环头的行都算循环内
+                for j in range(i, len(lines)):
+                    body_raw = lines[j]
+                    body_code = body_raw.split("#")[0]
+                    if not body_code.strip():
+                        continue
+                    body_indent = len(body_raw) - len(body_raw.lstrip())
+                    if body_indent <= indent:
+                        break  # 回到同级或更外层，循环体结束
+                    if not ADV_PRF_002_ALLOC_RE.search(body_code):
+                        continue
+                    if self.is_exempt("ADV-PRF-002", rel_posix):
+                        continue
+                    self.findings.append(SimplificationFinding(
+                        rule_id="ADV-PRF-002",
+                        level=self.rules_config.get("ADV-PRF-002", {}).get("level", "WARN"),
+                        file_path=rel,
+                        line_number=j + 1,
+                        message="循环体内出现逐次瞬态堆分配（.new() / .duplicate()），热路径下将持续触发 GC 停顿",
+                        fix_suggestion="将分配提到循环外复用，或改用对象池（池化对象须实现 reset_state()）",
+                    ))
+                    break  # 每个循环头只报一次，避免同一体内刷屏
 
             # 2. 检查布尔冗余返回 (SIM-DED-001: if cond: return true/false else: return false/true)
             if ("return true" in stripped.lower() or "return false" in stripped.lower()) and not self.is_exempt("SIM-DED-001", rel_posix):
