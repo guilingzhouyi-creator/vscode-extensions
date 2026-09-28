@@ -8,144 +8,145 @@
 import * as vscode from 'vscode';
 
 import { DashboardData, DashboardMessage } from '../domain/dashboard-types';
+import { CSP_NONCE_LENGTH } from '../domain/models';
 import { buildDashboardHtml } from './dashboardTemplate';
 import { labelsWithPrefix, t, currentLocale } from '../i18n/index';
 export type { DashboardData, DashboardMessage }; // 重新导出以便其他文件引用
 
 export class DashboardPanel {
-    public static currentPanel: DashboardPanel | undefined;
-    /** 全局消息处理器，所有面板共享 */
-    private static _messageHandler: ((msg: DashboardMessage) => void) | null = null;
+  public static currentPanel: DashboardPanel | undefined;
+  /** 全局消息处理器，所有面板共享 */
+  private static _messageHandler: ((msg: DashboardMessage) => void) | null = null;
 
-    /** 设置全局消息处理器 */
-    static setMessageHandler(handler: ((msg: DashboardMessage) => void) | null): void {
-        DashboardPanel._messageHandler = handler;
+  /** 设置全局消息处理器 */
+  static setMessageHandler(handler: ((msg: DashboardMessage) => void) | null): void {
+    DashboardPanel._messageHandler = handler;
+  }
+
+  /** 关闭当前面板（扩展停用时调用，释放 Webview 资源） */
+  static disposeCurrent(): void {
+    if (DashboardPanel.currentPanel) {
+      DashboardPanel.currentPanel.dispose();
+      DashboardPanel.currentPanel = undefined;
+    }
+  }
+
+  /**
+   * 语言热切换后重建面板：用当前面板已持有的 extensionUri 重建，
+   * 使新语言词条渲染生效（webview 静态文案在渲染时注入，必须重建）。
+   */
+  static recreateForLocale(): void {
+    const existing = DashboardPanel.currentPanel;
+    if (!existing) return;
+    const uri = existing._extensionUri;
+    DashboardPanel.disposeCurrent();
+    DashboardPanel.createOrShow(uri);
+  }
+
+  /** 生成 CSP nonce（每次渲染 HTML 时唯一） */
+  private static getNonce(): string {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < CSP_NONCE_LENGTH; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+  }
+
+  private readonly _panel: vscode.WebviewPanel;
+  private readonly _extensionUri: vscode.Uri;
+  private _disposables: vscode.Disposable[] = [];
+  private _onMessage: ((msg: DashboardMessage) => void) | null = null;
+  private _disposed: boolean = false;
+
+  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    this._panel = panel;
+    this._extensionUri = extensionUri;
+
+    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+    // 先走全局处理器，再走实例处理器
+    this._panel.webview.onDidReceiveMessage(
+      (msg: DashboardMessage) => {
+        DashboardPanel._messageHandler?.(msg);
+        this._onMessage?.(msg);
+      },
+      null,
+      this._disposables,
+    );
+  }
+
+  /** 注册实例消息处理器（附加在全局之后） */
+  onMessage(cb: (msg: DashboardMessage) => void): void {
+    this._onMessage = cb;
+  }
+
+  /** 创建或聚焦面板 */
+  static createOrShow(extensionUri: vscode.Uri): DashboardPanel {
+    const column = vscode.window.activeTextEditor
+      ? vscode.window.activeTextEditor.viewColumn
+      : undefined;
+
+    if (DashboardPanel.currentPanel) {
+      DashboardPanel.currentPanel._panel.reveal(column);
+      return DashboardPanel.currentPanel;
     }
 
-    /** 关闭当前面板（扩展停用时调用，释放 Webview 资源） */
-    static disposeCurrent(): void {
-        if (DashboardPanel.currentPanel) {
-            DashboardPanel.currentPanel.dispose();
-            DashboardPanel.currentPanel = undefined;
-        }
+    const panel = vscode.window.createWebviewPanel(
+      'workspaceTiming.dashboard',
+      t()['panel.title'],
+      column ?? vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out')],
+      },
+    );
+
+    DashboardPanel.currentPanel = new DashboardPanel(panel, extensionUri);
+    DashboardPanel.currentPanel._updateContent();
+    return DashboardPanel.currentPanel;
+  }
+
+  /** 面板当前是否可见（隐藏时跳过昂贵的聚合刷新） */
+  get isVisible(): boolean {
+    return this._panel.visible;
+  }
+
+  /** 刷新数据显示 */
+  updateData(data: DashboardData): void {
+    if (this._panel.visible) {
+      this._panel.webview.postMessage({ type: 'updateData', payload: data });
     }
+  }
 
-    /**
-     * 语言热切换后重建面板：用当前面板已持有的 extensionUri 重建，
-     * 使新语言词条渲染生效（webview 静态文案在渲染时注入，必须重建）。
-     */
-    static recreateForLocale(): void {
-        const existing = DashboardPanel.currentPanel;
-        if (!existing) return;
-        const uri = existing._extensionUri;
-        DashboardPanel.disposeCurrent();
-        DashboardPanel.createOrShow(uri);
+  /** 设置 HTML 内容 */
+  private _updateContent(): void {
+    this._panel.webview.html = this._getHtml();
+  }
+
+  /** 释放资源（幂等，防 onDidDispose 递归） */
+  dispose(): void {
+    if (this._disposed) return;
+    this._disposed = true;
+
+    DashboardPanel.currentPanel = undefined;
+    this._panel.dispose();
+    while (this._disposables.length) {
+      const d = this._disposables.pop();
+      if (d) d.dispose();
     }
+  }
 
-    /** 生成 CSP nonce（每次渲染 HTML 时唯一） */
-    private static getNonce(): string {
-        let text = '';
-        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 32; i++) {
-            text += possible.charAt(Math.floor(Math.random() * possible.length));
-        }
-        return text;
-    }
-
-    private readonly _panel: vscode.WebviewPanel;
-    private readonly _extensionUri: vscode.Uri;
-    private _disposables: vscode.Disposable[] = [];
-    private _onMessage: ((msg: DashboardMessage) => void) | null = null;
-    private _disposed: boolean = false;
-
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        this._panel = panel;
-        this._extensionUri = extensionUri;
-
-        this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-
-        // 先走全局处理器，再走实例处理器
-        this._panel.webview.onDidReceiveMessage(
-            (msg: DashboardMessage) => {
-                DashboardPanel._messageHandler?.(msg);
-                this._onMessage?.(msg);
-            },
-            null,
-            this._disposables,
-        );
-    }
-
-    /** 注册实例消息处理器（附加在全局之后） */
-    onMessage(cb: (msg: DashboardMessage) => void): void {
-        this._onMessage = cb;
-    }
-
-    /** 创建或聚焦面板 */
-    static createOrShow(extensionUri: vscode.Uri): DashboardPanel {
-        const column = vscode.window.activeTextEditor
-            ? vscode.window.activeTextEditor.viewColumn
-            : undefined;
-
-        if (DashboardPanel.currentPanel) {
-            DashboardPanel.currentPanel._panel.reveal(column);
-            return DashboardPanel.currentPanel;
-        }
-
-        const panel = vscode.window.createWebviewPanel(
-            'workspaceTiming.dashboard',
-            t()['panel.title'],
-            column ?? vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out')],
-            },
-        );
-
-        DashboardPanel.currentPanel = new DashboardPanel(panel, extensionUri);
-        DashboardPanel.currentPanel._updateContent();
-        return DashboardPanel.currentPanel;
-    }
-
-    /** 面板当前是否可见（隐藏时跳过昂贵的聚合刷新） */
-    get isVisible(): boolean {
-        return this._panel.visible;
-    }
-
-    /** 刷新数据显示 */
-    updateData(data: DashboardData): void {
-        if (this._panel.visible) {
-            this._panel.webview.postMessage({ type: 'updateData', payload: data });
-        }
-    }
-
-    /** 设置 HTML 内容 */
-    private _updateContent(): void {
-        this._panel.webview.html = this._getHtml();
-    }
-
-    /** 释放资源（幂等，防 onDidDispose 递归） */
-    dispose(): void {
-        if (this._disposed) return;
-        this._disposed = true;
-
-        DashboardPanel.currentPanel = undefined;
-        this._panel.dispose();
-        while (this._disposables.length) {
-            const d = this._disposables.pop();
-            if (d) d.dispose();
-        }
-    }
-
-    /** 生成 HTML（含 CSP + nonce 安全加固；模板本体见 ./dashboardTemplate.ts） */
-    private _getHtml(): string {
-        const nonce = DashboardPanel.getNonce();
-        return buildDashboardHtml({
-            nonce,
-            cspSource: this._panel.webview.cspSource,
-            labels: labelsWithPrefix(['panel.', 'confirm.']),
-            // 文档语言随界面语言（语言热切换经面板重建生效）
-            lang: currentLocale(),
-        });
-    }
+  /** 生成 HTML（含 CSP + nonce 安全加固；模板本体见 ./dashboardTemplate.ts） */
+  private _getHtml(): string {
+    const nonce = DashboardPanel.getNonce();
+    return buildDashboardHtml({
+      nonce,
+      cspSource: this._panel.webview.cspSource,
+      labels: labelsWithPrefix(['panel.', 'confirm.']),
+      // 文档语言随界面语言（语言热切换经面板重建生效）
+      lang: currentLocale(),
+    });
+  }
 }

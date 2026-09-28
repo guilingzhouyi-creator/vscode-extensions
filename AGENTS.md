@@ -6,11 +6,11 @@
 
 | 项目目录 | 类型与核心架构 | 构建与验证流水线 | 权威真源指针 |
 | :--- | :--- | :--- | :--- |
-| `workspace-timing/` | VS Code 扩展（TS 五层架构，RingBuffer+Journal 双写无损，L0~L5 门禁） | `npm run compile → test:unit → lint` (`test:coverage`) | `workspace-timing/README.md` |
+| `workspace-timing/` | VS Code 扩展（TS 五层架构，RingBuffer+Journal 双写无损，L0~L5 门禁） | `npm run compile → test:unit → lint` (`sync` / `test:fast` / `review`) | `workspace-timing/README.md` |
 | `auto-refactor/` | Node CLI 静态分析审查引擎（oxc+ts-morph 混合解析，跨语言语义 IR，4 层规则金字塔） | `npm run build → npm test → npm run benchmark` | `auto-refactor/DOCS.md` |
 | `WebGames/` | Godot 4.7 引擎（纯逻辑无头解耦，配置驱动，GDScript，20 项静态门禁） | `test-run.sh → check-gdscript.sh → bench-sweep.sh`<br/>一键门禁：`audit-all.sh` / `audit-all.ps1` | `WebGames/docs/README.md`<br/>`WebGames/config/README.md`<br/>`WebGames/scripts/README.md` |
 
-- **统一发布工具链（根 `scripts/`）**：`package.sh`/`package.ps1`（本地打包至 `dist/<ext>/`）；`version-bump.sh`（语义递增+CHANGELOG，三门禁+自检）；`release-tag.sh`（发布闭环，`--no-push` 留痕）；`check-display-assets.sh`（资产校验）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
+- **统一发布工具链（根 `scripts/`）**：`package.sh`/`package.ps1`（本地打包至 `dist/<ext>/`，支持 `-HotSync`/`--hot-sync` 双端秒级热同步与 `-Install`/`--install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁+自检）；`release-tag.sh`（发布闭环，`--no-push` 留痕）；`check-display-assets.sh`（资产校验）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
 - **门禁通用契约**：执行各项目专属构建门禁，失败重跑；警告即错误；禁止跨项目越界引入未经测试的代码变更。
 
 ## 二、 跨项目通用契约与命名规范

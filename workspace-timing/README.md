@@ -69,13 +69,13 @@
 | `workspaceTiming.weeklyLimit.hours` | `40` | 周工作上限时长（小时，范围 1~168） |
 | `workspaceTiming.storage.backupToFile` | `true` | 启用工作区本地文件备份 |
 | `workspaceTiming.storage.journalEnabled` | `true` | 启用实时数据防丢保护 |
-| `workspaceTiming.storage.ringBufferCapacity` | `1024` | 内存缓存容量上限 (条目数) |
+| `workspaceTiming.storage.ringBufferCapacity` | `1024` | 实时记录缓存上限 |
 | `workspaceTiming.storage.journalFlushInterval` | `10000` | 实时数据自动保存间隔 (ms) |
 | `workspaceTiming.storage.fullSaveInterval` | `60000` | 全量检查点保存间隔 (ms) |
 | `workspaceTiming.storage.maxSessions` | `5000` | 详细会话保留条数上限 (0 = 不限) |
 | `workspaceTiming.storage.historyRawRetentionDays` | `45` | 详细会话保留天数（超出自动归档为日汇总） |
 | `workspaceTiming.storage.safetySnapshot` | `true` | 重置/清除/还原等操作前自动写入安全快照 |
-| `workspaceTiming.cloudSync.enabled` | `false` | 云端同步开关（占位，即将推出） |
+| `workspaceTiming.cloudSync.enabled` | `false` | 云端同步开关（即将推出） |
 
 ---
 
@@ -93,6 +93,7 @@
 | **v0.4.7** | 性能与开销优化：多周趋势窗口化轻量聚合、历史折叠引擎零拷贝快退、高频聚合时间窗提前过滤（GC 压力削减） | ✅ 已完成 |
 | **v0.4.9** | 工程治理基建：自动化审查系统（L0~L5 六层门禁）+ 脚本库 TypeScript 化 + auto-refactor 0.3.0 联动（secrets/unused-export/cycles）；表驱动配置持久化 | ✅ |
 | **v0.4.10** | 崩溃恢复解耦与调度异常治理、图表可视化常量抽离与面板异步刷新重构、配置边界单一真源收敛 | ✅ 已完成 |
+| **v0.4.12** | 展示文本去技术化体验升级、活跃曲线全宽自适应与亮白字体渲染、全库魔法值清零与双端秒级热同步流水线 | ✅ 已完成 |
 | **v0.5.0** | ☁️ 云端同步与多端聚合支持（WebDAV / GitHub Gist） | 🚧 规划中 |
 
 ---

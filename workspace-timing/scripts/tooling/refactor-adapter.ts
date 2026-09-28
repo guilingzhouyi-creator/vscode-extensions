@@ -64,7 +64,7 @@ if (!cliPath) {
     log.warn(`auto-refactor 不可用（候选均不存在：${candidates.join(', ')}）→ ${status}`);
     finish(status, [], {
         notes: [`外部审查能力缺失，按配置降级为 ${status}（gate.whenUnavailable=${gate.whenUnavailable}）`,
-            '恢复方式：构建外部工具（npm run build）或设置环境变量 ' + (cfg.tool?.resolve?.envOverride ?? 'WT_REFACTOR_CLI')],
+        '恢复方式：构建外部工具（npm run build）或设置环境变量 ' + (cfg.tool?.resolve?.envOverride ?? 'WT_REFACTOR_CLI')],
         tool: { resolved: null, candidates },
     });
 }

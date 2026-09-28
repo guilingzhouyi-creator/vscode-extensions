@@ -11,153 +11,154 @@
  */
 
 import { GlobalTimingData, WorkspaceRecord } from '../domain/global-types';
+import { GLOBAL_STALE_TTL_MS, MS_PER_HOUR } from '../domain/models';
 import { LogLevel, log } from '../integration/Logger';
 
 /** 当前工作区标识（由组合根注入，替代直读 vscode.workspace） */
 export interface WorkspaceInfo {
-    /** 归一化工作区 id（normalizeWorkspaceId 结果） */
-    id: string;
-    /** 显示名 */
-    name: string;
-    /** 完整 URI 字符串 */
-    uri: string;
+  /** 归一化工作区 id（normalizeWorkspaceId 结果） */
+  id: string;
+  /** 显示名 */
+  name: string;
+  /** 完整 URI 字符串 */
+  uri: string;
 }
 
 /** 全局存储端口（结构化最小接口；GlobalStorageProvider 天然满足） */
 interface GlobalStore {
-    isAvailable(): boolean;
-    load(): Promise<GlobalTimingData>;
-    save(data: GlobalTimingData): Promise<void>;
-    delete(): Promise<void>;
+  isAvailable(): boolean;
+  load(): Promise<GlobalTimingData>;
+  save(data: GlobalTimingData): Promise<void>;
+  delete(): Promise<void>;
 }
 
 export interface GlobalSnapshot {
-    /** 所有工作区累计时长 (ms) */
-    totalMs: number;
-    /** 工作区数量 */
-    workspaceCount: number;
-    /** 各工作区列表 */
-    workspaces: Array<{ name: string; totalMs: number }>;
+  /** 所有工作区累计时长 (ms) */
+  totalMs: number;
+  /** 工作区数量 */
+  workspaceCount: number;
+  /** 各工作区列表 */
+  workspaces: Array<{ name: string; totalMs: number }>;
 }
 
 export class GlobalAggregator {
-    private readonly storage: GlobalStore;
-    private readonly workspaceInfo: () => WorkspaceInfo | undefined;
-    private _cached: GlobalTimingData | null = null;
-    /** sync 进行中标志（防重入：并发 load→modify→save 会互相覆盖丢失写入） */
-    private _syncing = false;
-    /**
-     * 上次已成功同步的本工作区 totalMs；相等则跳过整轮读→改→写。
-     * ★ 在 doSync 成功后才记账：失败不更新，下轮 checkpoint 会重试（避免旧值卡死跳过）。
-     */
-    private _lastSyncedTotalMs: number | null = null;
-    /**
-     * 陈旧条目回收阈值：超过该天数未同步的工作区不再计入跨工作区累计。
-     * 背景：globalState 跨版本持久共享，历史遗留的失联工作区（已删除/改道的项目、
-     * 旧双计数 bug 时代的膨胀值）会永远计入总和，导致"跨工作区累计"虚高失真。
-     */
-    private static readonly STALE_TTL_MS = 30 * 24 * 3600_000;
+  private readonly storage: GlobalStore;
+  private readonly workspaceInfo: () => WorkspaceInfo | undefined;
+  private _cached: GlobalTimingData | null = null;
+  /** sync 进行中标志（防重入：并发 load→modify→save 会互相覆盖丢失写入） */
+  private _syncing = false;
+  /**
+   * 上次已成功同步的本工作区 totalMs；相等则跳过整轮读→改→写。
+   * ★ 在 doSync 成功后才记账：失败不更新，下轮 checkpoint 会重试（避免旧值卡死跳过）。
+   */
+  private _lastSyncedTotalMs: number | null = null;
+  /**
+   * 陈旧条目回收阈值：超过该天数未同步的工作区不再计入跨工作区累计。
+   * 背景：globalState 跨版本持久共享，历史遗留的失联工作区（已删除/改道的项目、
+   * 旧双计数 bug 时代的膨胀值）会永远计入总和，导致"跨工作区累计"虚高失真。
+   */
+  private static readonly STALE_TTL_MS = GLOBAL_STALE_TTL_MS;
 
-    constructor(storage: GlobalStore, workspaceInfo: () => WorkspaceInfo | undefined) {
-        this.storage = storage;
-        this.workspaceInfo = workspaceInfo;
+  constructor(storage: GlobalStore, workspaceInfo: () => WorkspaceInfo | undefined) {
+    this.storage = storage;
+    this.workspaceInfo = workspaceInfo;
+  }
+
+  /**
+   * 将当前工作区的计时同步到全局存储
+   * 由 Scheduler 周期全量存盘回调与 TimerOrchestrator.saveNow() 调用
+   */
+  async sync(localTotalMs: number, force = false): Promise<void> {
+    if (this._syncing) return; // 上一轮尚未完成，跳过本轮（下轮 checkpoint 会再同步）
+    if (!force && this._lastSyncedTotalMs === localTotalMs) return; // 未变化，跳过整轮读写
+    this._syncing = true;
+    try {
+      // ★ 仅在真正写成功后才记账：doSync 内部吞掉的失败返回 false，
+      //   守卫保持旧值，下轮 checkpoint 会用同值重试（否则会永久卡住不回填）。
+      if (await this.doSync(localTotalMs)) {
+        this._lastSyncedTotalMs = localTotalMs;
+      }
+    } finally {
+      this._syncing = false;
     }
+  }
 
-    /**
-     * 将当前工作区的计时同步到全局存储
-     * 由 Scheduler 周期全量存盘回调与 TimerOrchestrator.saveNow() 调用
-     */
-    async sync(localTotalMs: number, force = false): Promise<void> {
-        if (this._syncing) return; // 上一轮尚未完成，跳过本轮（下轮 checkpoint 会再同步）
-        if (!force && this._lastSyncedTotalMs === localTotalMs) return; // 未变化，跳过整轮读写
-        this._syncing = true;
-        try {
-            // ★ 仅在真正写成功后才记账：doSync 内部吞掉的失败返回 false，
-            //   守卫保持旧值，下轮 checkpoint 会用同值重试（否则会永久卡住不回填）。
-            if (await this.doSync(localTotalMs)) {
-                this._lastSyncedTotalMs = localTotalMs;
-            }
-        } finally {
-            this._syncing = false;
+  /** 执行一轮同步；返回是否成功（无可做之事/失败均返回 false，由调用方决定是否记账） */
+  private async doSync(localTotalMs: number): Promise<boolean> {
+    if (!this.storage.isAvailable()) return false;
+
+    const info = this.workspaceInfo();
+    if (!info) return false;
+
+    try {
+      const global = await this.storage.load();
+
+      // 回收陈旧条目：长期未同步的工作区（缺 lastSyncedAt 视为最陈旧）不再计入。
+      // 当前工作区条目随后会被刷新，不受影响。
+      const now = Date.now();
+      const pruned: string[] = [];
+      for (const [id, w] of Object.entries(global.workspaces)) {
+        if (now - (w.lastSyncedAt ?? 0) > GlobalAggregator.STALE_TTL_MS) {
+          delete global.workspaces[id];
+          pruned.push(`${w.name}(${Math.round((w.totalMs ?? 0) / MS_PER_HOUR)}h)`);
         }
+      }
+      if (pruned.length > 0) {
+        log(LogLevel.Info,
+          `GlobalAggregator: pruned ${pruned.length} stale workspace entr(y/ies): ${pruned.join(', ')}`);
+      }
+
+      // 更新/添加当前工作区记录
+      global.workspaces[info.id] = {
+        name: info.name,
+        uri: info.uri,
+        totalMs: localTotalMs,
+        lastSyncedAt: Date.now(),
+      };
+
+      // 重新计算总和
+      global.totalMs = Object.values(global.workspaces).reduce(
+        (sum, w) => sum + w.totalMs, 0,
+      );
+
+      await this.storage.save(global);
+      this._cached = global;
+
+      log(LogLevel.Debug,
+        `GlobalAggregator: synced (workspace=${info.name}, totalMs=${localTotalMs}, global=${global.totalMs})`);
+    } catch (err) {
+      log(LogLevel.Warn, 'GlobalAggregator: sync failed', err as Error);
+      return false;
     }
+    return true;
+  }
 
-    /** 执行一轮同步；返回是否成功（无可做之事/失败均返回 false，由调用方决定是否记账） */
-    private async doSync(localTotalMs: number): Promise<boolean> {
-        if (!this.storage.isAvailable()) return false;
+  /** 获取全局快照 */
+  async snapshot(): Promise<GlobalSnapshot> {
+    const global = this._cached ?? await this.storage.load();
+    this._cached = global;
 
-        const info = this.workspaceInfo();
-        if (!info) return false;
+    // ★ 防御：旧版 globalState 数据可能缺少 workspaces 字段（跨版本持久共享），
+    //   Object.keys(undefined) 会抛 TypeError，导致面板数据整体失败。
+    const workspaces = (global.workspaces && typeof global.workspaces === 'object')
+      ? global.workspaces
+      : {};
 
-        try {
-            const global = await this.storage.load();
+    return {
+      totalMs: typeof global.totalMs === 'number' ? global.totalMs : 0,
+      workspaceCount: Object.keys(workspaces).length,
+      workspaces: Object.values(workspaces)
+        .filter((w): w is WorkspaceRecord => !!w && typeof w === 'object')
+        .map(w => ({ name: w.name, totalMs: w.totalMs }))
+        .sort((a, b) => b.totalMs - a.totalMs),
+    };
+  }
 
-            // 回收陈旧条目：长期未同步的工作区（缺 lastSyncedAt 视为最陈旧）不再计入。
-            // 当前工作区条目随后会被刷新，不受影响。
-            const now = Date.now();
-            const pruned: string[] = [];
-            for (const [id, w] of Object.entries(global.workspaces)) {
-                if (now - (w.lastSyncedAt ?? 0) > GlobalAggregator.STALE_TTL_MS) {
-                    delete global.workspaces[id];
-                    pruned.push(`${w.name}(${Math.round((w.totalMs ?? 0) / 3600000)}h)`);
-                }
-            }
-            if (pruned.length > 0) {
-                log(LogLevel.Info,
-                    `GlobalAggregator: pruned ${pruned.length} stale workspace entr(y/ies): ${pruned.join(', ')}`);
-            }
-
-            // 更新/添加当前工作区记录
-            global.workspaces[info.id] = {
-                name: info.name,
-                uri: info.uri,
-                totalMs: localTotalMs,
-                lastSyncedAt: Date.now(),
-            };
-
-            // 重新计算总和
-            global.totalMs = Object.values(global.workspaces).reduce(
-                (sum, w) => sum + w.totalMs, 0,
-            );
-
-            await this.storage.save(global);
-            this._cached = global;
-
-            log(LogLevel.Debug,
-                `GlobalAggregator: synced (workspace=${info.name}, totalMs=${localTotalMs}, global=${global.totalMs})`);
-        } catch (err) {
-            log(LogLevel.Warn, 'GlobalAggregator: sync failed', err as Error);
-            return false;
-        }
-        return true;
-    }
-
-    /** 获取全局快照 */
-    async snapshot(): Promise<GlobalSnapshot> {
-        const global = this._cached ?? await this.storage.load();
-        this._cached = global;
-
-        // ★ 防御：旧版 globalState 数据可能缺少 workspaces 字段（跨版本持久共享），
-        //   Object.keys(undefined) 会抛 TypeError，导致面板数据整体失败。
-        const workspaces = (global.workspaces && typeof global.workspaces === 'object')
-            ? global.workspaces
-            : {};
-
-        return {
-            totalMs: typeof global.totalMs === 'number' ? global.totalMs : 0,
-            workspaceCount: Object.keys(workspaces).length,
-            workspaces: Object.values(workspaces)
-                .filter((w): w is WorkspaceRecord => !!w && typeof w === 'object')
-                .map(w => ({ name: w.name, totalMs: w.totalMs }))
-                .sort((a, b) => b.totalMs - a.totalMs),
-        };
-    }
-
-    /** 清空全局数据 */
-    async reset(): Promise<void> {
-        await this.storage.delete();
-        this._cached = null;
-        this._lastSyncedTotalMs = null;
-        log(LogLevel.Info, 'GlobalAggregator: reset');
-    }
+  /** 清空全局数据 */
+  async reset(): Promise<void> {
+    await this.storage.delete();
+    this._cached = null;
+    this._lastSyncedTotalMs = null;
+    log(LogLevel.Info, 'GlobalAggregator: reset');
+  }
 }

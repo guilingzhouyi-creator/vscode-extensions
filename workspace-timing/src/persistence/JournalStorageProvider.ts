@@ -1,14 +1,18 @@
 /**
- * JournalStorageProvider — 日志文件存储
+ * JournalStorageProvider — 增量日志存储
  *
- * 管理 .vscode/workspace-timing.journal 文件。
- * 格式：每行一个紧凑 JSON，代表一条 TimeSlice：
- *   {"t":<timestamp_ms>,"d":<delta_ms>}
+ * 将时间片写入 .vscode/workspace-timing.journal（NDJSON 格式）。
+ * 每行一个 JSON 对象：{"t": timestamp, "d": deltaMs}
  *
- * 文件生命周期：
- *   - 写入：append 追加到文件末尾
- *   - 回放：崩溃恢复时读取全部行
- *   - 清理：全量存盘成功后 truncate 清空
+ * 角色：
+ *   - 崩溃保护的第三道防线（在 RingBuffer 之后、全量存盘之前）
+ *   - JournalWriter.flush() 时批量追加
+ *   - 全量存盘成功后 truncate 清空
+ *   - 启动时如果文件非空 → 说明上次未正常退出 → 回放恢复
+ *
+ * 接口隔离：实现 IJournalStore（而非泛化的 IStorageProvider）——
+ * journal 本质是追加流而非完整快照存储，过去以 save/load 占位实现
+ * 满足 IStorageProvider 属于接口污染。
  */
 
 import * as vscode from 'vscode';
@@ -21,8 +25,7 @@ import { LogLevel, log } from '../integration/Logger';
 const JOURNAL_FILE = 'workspace-timing.journal';
 
 /**
- * 仅实现 IJournalStore 窄端口（cache 层消费方定义的依赖倒置接口）。
- * 不再实现 IStorageProvider——journal 不支持全量 load/save，此前以
+ * Journal 文件存储（实现 IJournalStore 窄接口）。
  * 空实现/恒 null 满足该接口属于接口隔离违反（LSP 反模式）。
  */
 export class JournalStorageProvider implements IJournalStore {
@@ -104,22 +107,8 @@ export class JournalStorageProvider implements IJournalStore {
             const lines = text.split('\n');
 
             for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
-
-                try {
-                    const parsed = JSON.parse(trimmed);
-                    // 数值合法性校验：拒绝负值/非有限数/异常大 delta（delta 必须 < timestamp，
-                    // 否则回放时 start = timestamp - deltaMs 为负），防止脏数据污染恢复结果
-                    if (typeof parsed.t === 'number' && Number.isFinite(parsed.t) && parsed.t > 0
-                        && typeof parsed.d === 'number' && Number.isFinite(parsed.d)
-                        && parsed.d > 0 && parsed.d < parsed.t) {
-                        slices.push({ timestamp: parsed.t, deltaMs: parsed.d });
-                    }
-                } catch {
-                    // 跳过损坏的行
-                    log(LogLevel.Warn, `JournalStorageProvider: skipping corrupt line: ${trimmed}`);
-                }
+                const slice = this.parseJournalLine(line);
+                if (slice) slices.push(slice);
             }
 
             return slices;
@@ -141,5 +130,25 @@ export class JournalStorageProvider implements IJournalStore {
 
         await vscode.workspace.fs.writeFile(this.journalUri, Buffer.alloc(0));
         log(LogLevel.Debug, 'JournalStorageProvider: journal truncated');
+    }
+
+    /** 解析并校验单行 journal 数据，损坏或非法时安全过滤 */
+    private parseJournalLine(line: string): TimeSlice | null {
+        const trimmed = line.trim();
+        if (!trimmed) return null;
+
+        try {
+            const parsed = JSON.parse(trimmed);
+            // 数值合法性校验：拒绝负值/非有限数/异常大 delta（delta 必须 < timestamp，
+            // 否则回放时 start = timestamp - deltaMs 为负），防止脏数据污染恢复结果
+            if (typeof parsed.t === 'number' && Number.isFinite(parsed.t) && parsed.t > 0
+                && typeof parsed.d === 'number' && Number.isFinite(parsed.d)
+                && parsed.d > 0 && parsed.d < parsed.t) {
+                return { timestamp: parsed.t, deltaMs: parsed.d };
+            }
+        } catch {
+            log(LogLevel.Warn, `JournalStorageProvider: skipping corrupt line: ${trimmed}`);
+        }
+        return null;
     }
 }

@@ -2,7 +2,7 @@
   "name": "workspace-timing",
   "displayName": "Workspace Timing",
   "description": "⏱ 轻量化工作区时长追踪 — 自动计时、周报图表、多工作区统计与数据安全保护 | Lightweight cross-workspace time tracker with automatic tracking, weekly charts, and data protection",
-  "version": "0.4.10",
+  "version": "0.4.12",
   "publisher": "guilingzhouyi",
   "repository": {
     "type": "git",
@@ -209,11 +209,13 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "node -e \"if (!process.env.WT_COMPILED) require('child_process').execSync('npm run compile', { stdio: 'inherit' })\"",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "sync": "pwsh -NoProfile -File ../scripts/ps1/package.ps1 -Name workspace-timing -HotSync",
     "scripts:build": "tsc -p scripts/tsconfig.json",
     "test": "npm run test:unit",
+    "test:fast": "mocha --reporter spec test/**/*.test.js",
     "test:unit": "npm run compile && mocha --reporter spec test/**/*.test.js",
     "test:coverage": "npm run compile && c8 --reporter=lcov --reporter=json-summary --report-dir=coverage mocha --reporter spec test/**/*.test.js",
     "lint": "eslint src scripts --ext ts",

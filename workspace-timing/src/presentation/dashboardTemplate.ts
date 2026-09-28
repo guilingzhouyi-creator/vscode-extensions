@@ -59,12 +59,17 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       --label: var(--vscode-settings-labelForeground, #cccccc);
       --description: var(--vscode-descriptionForeground, #9d9d9d);
       --focus: var(--vscode-focusBorder, #007fd4);
+      --cyan: #38bdf8;
       --radius-sm: 4px;
       --radius: 8px;
+      --radius-md: 10px;
       --radius-lg: 12px;
       --gap: 16px;
       --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12);
       --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.18);
+      --glass-bg: color-mix(in srgb, var(--vscode-editorWidget-background, #1e2430) 82%, var(--bg));
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -523,14 +528,21 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       font-weight: 700;
     }
 
-    /* 实时活跃曲线 */
+    /* 实时活跃曲线（对标参考图二高级可视化） */
     .active-curve {
       display: block;
-      height: 70px;
-      margin: 8px 0 4px 0;
-      padding: 6px 4px;
-      background: color-mix(in srgb, var(--input-bg) 60%, transparent);
-      border-radius: var(--radius-sm);
+      width: 100%;
+      height: 256px;
+      margin: 10px 0 8px 0;
+      padding: 12px 16px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      position: relative;
+      overflow: hidden;
     }
     .ac-svg {
       display: block;
@@ -538,28 +550,117 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       height: 100%;
       overflow: visible;
     }
+    .ac-grid-line {
+      stroke: rgba(255, 255, 255, 0.08);
+      stroke-dasharray: 4 4;
+      stroke-width: 1;
+    }
+    .ac-grid-base {
+      stroke: rgba(255, 255, 255, 0.18);
+      stroke-width: 1;
+    }
+    .ac-grid-label {
+      font-size: 10.5px;
+      font-weight: 500;
+      font-family: var(--vscode-editor-font-family, monospace);
+      fill: #ffffff;
+      opacity: 0.85;
+    }
     .ac-line {
       fill: none;
-      stroke: var(--success);
-      stroke-width: 2.5;
+      stroke: url(#acLineGradient);
+      stroke-width: 2.4;
       stroke-linejoin: round;
       stroke-linecap: round;
-      filter: drop-shadow(0 2px 4px rgba(78, 201, 176, 0.35));
+      filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.45));
     }
     .ac-area {
       fill: url(#acGradient);
     }
-    .ac-dot {
-      fill: var(--bg);
-      stroke: var(--success);
-      stroke-width: 2;
-      transition: r 0.2s, stroke-width 0.2s;
+    /* 微型精致同心发光数据节点（仅活跃日展示，零值平原无节点） */
+    .ac-dot-halo {
+      fill: rgba(56, 189, 248, 0.22);
+      stroke: rgba(56, 189, 248, 0.75);
+      stroke-width: 1.5;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       cursor: pointer;
     }
-    .ac-dot:hover {
-      r: 4.5;
-      stroke-width: 2.5;
-      fill: var(--success);
+    .ac-dot-core {
+      fill: #ffffff;
+      pointer-events: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ac-dot-group:hover .ac-dot-halo {
+      r: 7;
+      fill: rgba(56, 189, 248, 0.38);
+      stroke: #38bdf8;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.85));
+    }
+    .ac-dot-group:hover .ac-dot-core {
+      r: 3.2;
+    }
+    .ac-dot-group.is-peak .ac-dot-halo {
+      stroke: #34d399;
+      fill: rgba(16, 185, 129, 0.28);
+      filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.65));
+    }
+    /* 悬浮胶囊药丸气泡标签 */
+    .ac-pill-bg {
+      fill: rgba(15, 23, 42, 0.92);
+      stroke: rgba(255, 255, 255, 0.22);
+      stroke-width: 1.2;
+      filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.5));
+      transition: all 0.2s ease;
+    }
+    .ac-pill-bg.is-peak {
+      fill: rgba(15, 23, 42, 0.95);
+      stroke: #38bdf8;
+      stroke-width: 1.4;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.45));
+    }
+    .ac-pill-text {
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--vscode-editor-font-family, monospace);
+      fill: #ffffff;
+      text-anchor: middle;
+      pointer-events: none;
+      user-select: none;
+    }
+    .ac-pill-text.is-peak {
+      fill: #ffffff;
+    }
+    .ac-pill-text.is-zero {
+      fill: rgba(255, 255, 255, 0.55);
+    }
+    .ac-pill-group:hover .ac-pill-bg {
+      stroke: #38bdf8;
+      fill: rgba(15, 23, 42, 0.98);
+    }
+    /* 底部双层 X 轴对齐标尺 */
+    .ac-axis-date {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--vscode-editor-font-family, monospace);
+      fill: #ffffff;
+      text-anchor: middle;
+      user-select: none;
+    }
+    .ac-axis-val {
+      font-size: 11.5px;
+      font-weight: 700;
+      font-family: var(--vscode-editor-font-family, monospace);
+      fill: #ffffff;
+      text-anchor: middle;
+      user-select: none;
+    }
+    .ac-axis-val.is-peak {
+      fill: #ffffff;
+    }
+    .ac-axis-val.is-zero {
+      font-size: 10.5px;
+      font-weight: 500;
+      fill: rgba(255, 255, 255, 0.55);
     }
 
     /* 活动热力图（GitHub 风格现代化） */
@@ -680,44 +781,169 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     .session-time { color: var(--description); font-family: var(--vscode-editor-font-family, monospace); }
     .session-dur { font-family: var(--vscode-editor-font-family, monospace); font-weight: 600; color: var(--fg); }
 
-    /* 按小时分布柱状图 */
+    /* 按小时分布容器与骨架槽位 */
+    .hourly-wrapper {
+      position: relative;
+      margin: 10px 0 6px 0;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      padding: 12px 14px 8px 14px;
+      overflow: hidden;
+    }
+    .hourly-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .hourly-title-text {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--description);
+    }
+    .hourly-badge {
+      font-size: 11px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      color: var(--cyan);
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 999px;
+      padding: 1px 8px;
+      transition: all 0.2s ease;
+    }
     .hourly-chart {
       display: flex;
-      align-items: flex-end;
+      align-items: stretch;
       gap: 2px;
-      height: 64px;
-      margin: 8px 0 4px 0;
-      padding: 6px 4px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius-sm);
+      height: 72px;
+      position: relative;
+      box-sizing: border-box;
     }
-    .hourly-bar {
-      flex: 1;
-      min-width: 3px;
-      border-radius: 2px 2px 0 0;
-      background: var(--btn-bg);
-      opacity: 0.75;
-      transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s;
-    }
-    .hourly-bar:hover { opacity: 1; filter: brightness(1.2); }
-    .hourly-bar.is-peak {
-      background: linear-gradient(180deg, var(--success), var(--focus));
-      opacity: 1;
-      box-shadow: 0 0 6px var(--success-glow);
-    }
-    .hourly-axis {
-      display: flex;
-      gap: 2px;
-      margin: 0 4px 10px 4px;
-      font-size: 9px;
-      color: var(--description);
-      text-align: center;
-    }
-    .hourly-axis .tick {
+    .hourly-slot {
       flex: 1;
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      position: relative;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.15s ease;
+    }
+    .hourly-slot:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .hourly-slot.has-period-divider {
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
+      padding-right: 2px;
+      margin-right: 1px;
+    }
+    .hourly-slot-track {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      position: relative;
+      border-radius: 2px 2px 0 0;
+      background: rgba(255, 255, 255, 0.025);
+    }
+    .hourly-slot:hover .hourly-slot-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .hourly-bar {
+      width: 100%;
+      min-width: 2px;
+      border-radius: 2px 2px 0 0;
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.75), rgba(59, 130, 246, 0.5));
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.25);
+      transition: height 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
+    }
+    .hourly-slot:hover .hourly-bar {
+      filter: brightness(1.25);
+    }
+    .hourly-bar.is-peak {
+      background: linear-gradient(180deg, #10b981, #06b6d4);
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
+    }
+    .hourly-slot-base {
+      width: 100%;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.1);
+      margin-top: 2px;
+      border-radius: 1px;
+    }
+    .hourly-slot.has-activity .hourly-slot-base {
+      background: rgba(56, 189, 248, 0.5);
+    }
+    .hourly-slot.is-peak-slot .hourly-slot-base {
+      background: #10b981;
+      box-shadow: 0 0 4px #10b981;
+    }
+
+    /* 物理标尺刻度线与时间标签 */
+    .hourly-axis {
+      position: relative;
+      height: 22px;
+      margin-top: 4px;
+      box-sizing: border-box;
+    }
+    .hourly-axis-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .hourly-notch-group {
+      position: absolute;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      user-select: none;
+    }
+    .hourly-notch-group.is-start {
+      left: 0;
+      align-items: flex-start;
+    }
+    .hourly-notch-group.is-end {
+      right: 0;
+      align-items: flex-end;
+    }
+    .hourly-notch-group.is-mid {
+      transform: translateX(-50%);
+    }
+    .hourly-notch {
+      width: 1px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .hourly-notch-group.is-noon .hourly-notch {
+      height: 6px;
+      background: var(--cyan);
+      box-shadow: 0 0 4px rgba(56, 189, 248, 0.5);
+    }
+    .hourly-tick-label {
+      font-size: 9.5px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      color: var(--description);
+      margin-top: 3px;
       white-space: nowrap;
+      letter-spacing: -0.02em;
+    }
+    .hourly-notch-group.is-noon .hourly-tick-label {
+      color: var(--cyan);
+      font-weight: 600;
     }
 
     /* 多周趋势条 */
@@ -1057,9 +1283,14 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
       </div>
       <div id="sessionList" class="session-list" style="display:none"></div>
       <div class="empty-hint" id="sessionEmpty" style="display:none">${args.labels['panel.today.empty']}</div>
-      <h3 id="hourlyTitle" style="display:none;margin-top:12px">${args.labels['panel.today.hourlyTitle']}</h3>
-      <div id="hourlyChart" class="hourly-chart" style="display:none"></div>
-      <div id="hourlyAxis" class="hourly-axis" style="display:none"></div>
+      <div class="hourly-wrapper" id="hourlyWrapper" style="display:none">
+        <div class="hourly-header-row">
+          <div class="hourly-title-text" id="hourlyTitle">${args.labels['panel.today.hourlyTitle']}</div>
+          <div class="hourly-badge" id="hourlyBadge">--</div>
+        </div>
+        <div id="hourlyChart" class="hourly-chart"></div>
+        <div id="hourlyAxis" class="hourly-axis"></div>
+      </div>
       <div class="btn-row">
         <button class="btn btn-secondary" id="btnExportDaily">${args.labels['panel.today.exportBtn']}</button>
       </div>
@@ -1433,9 +1664,7 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         weekTotalEl.innerHTML = L['panel.js.weekTotalPrefix'] + '<strong>' + formatDuration(weekTotalMs || 0) + '</strong>';
       }
 
-      // ---- 周报曲线渲染（与柱状图同源）----
-      // 数据：与柱状图完全同源（data.dailyStats = last7Days，含今日实时增量），
-      //       曲线落差与柱状图一致；今日格随 updateData 周期增长 → 曲线尾端实时移动。
+      // ---- 周报曲线渲染（对标参考图二高级可视化）----
       function renderActiveCurve(dailyStats) {
         const el = document.getElementById('activeCurve');
         if (!el) return;
@@ -1446,63 +1675,180 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
           return;
         }
 
-        // 归一化点集：x 从左到右（7 天）、y 值越大越高（留 6px 上下内边距）
-        const W = 600, H = 70, PAD = 6;
+        // 动态读取容器真实宽度，铺满整个面板横向空间，留足顶部胶囊与底部双层标尺高度
+        const rawW = el.clientWidth || (el.parentElement ? el.parentElement.clientWidth : 960);
+        const W = Math.max(Math.round(rawW - 32), 680);
+        const H = 232;
+        const PAD_LEFT = 56, PAD_RIGHT = 36;
+        const PEAK_Y = 38;
+        const BASE_Y = 168;
+        const EFFECTIVE_H = BASE_Y - PEAK_Y; // 130px 有效曲线落差
+        const DRAW_W = W - PAD_LEFT - PAD_RIGHT;
+
         const maxVal = Math.max(...data.map(d => d.totalMs), 1);
+        const peakIndex = data.reduce((maxI, d, i, arr) => d.totalMs > arr[maxI].totalMs ? i : maxI, 0);
+
+        // 计算各天数据点物理坐标 (cx, cy)
         const pts = data.map((d, i) => {
-          const x = (i / (data.length - 1)) * W;
-          const y = H - PAD - (d.totalMs / maxVal) * (H - 2 * PAD);
-          return [x, y];
+          const cx = PAD_LEFT + (i / (data.length - 1)) * DRAW_W;
+          const cy = d.totalMs > 0
+            ? BASE_Y - (d.totalMs / maxVal) * EFFECTIVE_H
+            : BASE_Y;
+          return [cx, cy];
         });
 
-        // Catmull-Rom → 三次贝塞尔：过全部采样点的光滑曲线
-        function smoothPath(p) {
-          if (p.length < 2) return '';
-          let d = 'M' + p[0][0].toFixed(1) + ',' + p[0][1].toFixed(1);
-          for (let i = 0; i < p.length - 1; i++) {
-            const p0 = p[i - 1] || p[i];
-            const p1 = p[i];
-            const p2 = p[i + 1];
-            const p3 = p[i + 2] || p2;
-            const c1x = p1[0] + (p2[0] - p0[0]) / 6;
-            const c1y = p1[1] + (p2[1] - p0[1]) / 6;
-            const c2x = p2[0] - (p3[0] - p1[0]) / 6;
-            const c2y = p2[1] - (p3[1] - p1[1]) / 6;
-            d += 'C' + c1x.toFixed(1) + ',' + c1y.toFixed(1)
-              + ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1)
-              + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+        // Fritsch-Carlson 单调三次 Hermite 样条算法（零下冲、零穿模、保单调性）
+        function buildMonotonePath(pList, bY) {
+          const n = pList.length;
+          if (n < 2) return '';
+          if (n === 2) {
+            return 'M ' + pList[0][0].toFixed(1) + ',' + pList[0][1].toFixed(1) +
+                   ' L ' + pList[1][0].toFixed(1) + ',' + pList[1][1].toFixed(1);
           }
-          return d;
-        }
-        const line = smoothPath(pts);
-        const base = H - PAD;
-        const area = line + 'L' + W.toFixed(1) + ',' + base.toFixed(1) + 'L0,' + base.toFixed(1) + 'Z';
 
-        // 悬停总览：最近 7 天总时长（与柱状图周合计同口径）
+          const dx = [];
+          const dy = [];
+          const delta = [];
+          for (let i = 0; i < n - 1; i++) {
+            dx[i] = pList[i + 1][0] - pList[i][0];
+            dy[i] = pList[i + 1][1] - pList[i][1];
+            delta[i] = dx[i] !== 0 ? dy[i] / dx[i] : 0;
+          }
+
+          const m = new Array(n);
+          m[0] = delta[0];
+          m[n - 1] = delta[n - 2];
+          for (let i = 1; i < n - 1; i++) {
+            if (delta[i - 1] * delta[i] <= 0) {
+              m[i] = 0;
+            } else {
+              m[i] = (delta[i - 1] + delta[i]) / 2;
+            }
+          }
+
+          for (let i = 0; i < n - 1; i++) {
+            if (Math.abs(delta[i]) < 1e-7) {
+              m[i] = 0;
+              m[i + 1] = 0;
+              continue;
+            }
+            const alpha = m[i] / delta[i];
+            const beta = m[i + 1] / delta[i];
+            if (alpha < 0 || beta < 0) {
+              if (alpha < 0) m[i] = 0;
+              if (beta < 0) m[i + 1] = 0;
+            } else {
+              const hyp = alpha * alpha + beta * beta;
+              if (hyp > 9) {
+                const tau = 3 / Math.sqrt(hyp);
+                m[i] = tau * alpha * delta[i];
+                m[i + 1] = tau * beta * delta[i];
+              }
+            }
+          }
+
+          let path = 'M ' + pList[0][0].toFixed(1) + ',' + pList[0][1].toFixed(1);
+          for (let i = 0; i < n - 1; i++) {
+            const p1 = pList[i];
+            const p2 = pList[i + 1];
+            const h = dx[i];
+            const c1x = p1[0] + h / 3;
+            let c1y = p1[1] + (m[i] * h) / 3;
+            const c2x = p2[0] - h / 3;
+            let c2y = p2[1] - (m[i + 1] * h) / 3;
+
+            // 零下冲防护：控制点 Y 不可超越基线
+            if (c1y > bY) c1y = bY;
+            if (c2y > bY) c2y = bY;
+
+            path += ' C ' + c1x.toFixed(1) + ',' + c1y.toFixed(1) +
+                    ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) +
+                    ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+          }
+          return path;
+        }
+
+        const linePath = buildMonotonePath(pts, BASE_Y);
+        const areaPath = linePath +
+          ' L ' + pts[pts.length - 1][0].toFixed(1) + ',' + BASE_Y.toFixed(1) +
+          ' L ' + pts[0][0].toFixed(1) + ',' + BASE_Y.toFixed(1) + ' Z';
+
+        // 3 级水平网格与左端参考刻度（显式 fill="#ffffff" 确保亮白清晰）
+        const midY = (PEAK_Y + BASE_Y) / 2;
+        const gridSvg =
+          '<line class="ac-grid-line" x1="' + (PAD_LEFT - 10) + '" y1="' + PEAK_Y + '" x2="' + (W - PAD_RIGHT + 14) + '" y2="' + PEAK_Y + '"/>' +
+          '<text class="ac-grid-label" fill="#ffffff" x="' + (PAD_LEFT - 16) + '" y="' + (PEAK_Y + 4) + '" text-anchor="end">' + formatDuration(maxVal) + '</text>' +
+          '<line class="ac-grid-line" x1="' + (PAD_LEFT - 10) + '" y1="' + midY.toFixed(1) + '" x2="' + (W - PAD_RIGHT + 14) + '" y2="' + midY.toFixed(1) + '"/>' +
+          '<text class="ac-grid-label" fill="#ffffff" x="' + (PAD_LEFT - 16) + '" y="' + (midY + 4).toFixed(1) + '" text-anchor="end">' + formatDuration(Math.round(maxVal / 2)) + '</text>' +
+          '<line class="ac-grid-base" x1="' + (PAD_LEFT - 10) + '" y1="' + BASE_Y + '" x2="' + (W - PAD_RIGHT + 14) + '" y2="' + BASE_Y + '"/>' +
+          '<text class="ac-grid-label" fill="#ffffff" x="' + (PAD_LEFT - 16) + '" y="' + (BASE_Y + 4) + '" text-anchor="end">0</text>';
+
+        // 7 组悬浮胶囊数值标签 + 同心圆节点 + 底部双层 X 轴标尺
+        const elementsSvg = data.map((d, i) => {
+          const cx = pts[i][0];
+          const cy = pts[i][1];
+          const isPeak = i === peakIndex && d.totalMs > 0;
+          const hasTime = d.totalMs > 0;
+          const durStr = hasTime ? formatDuration(d.totalMs) : '0';
+
+          // 悬浮胶囊标签：仅在有工时的活跃日展示，彻底消除 0 值平原的药丸堆积（鲜亮纯白字体）
+          let pillGroup = '';
+          if (hasTime) {
+            const pillY = Math.max(cy - 16, 15);
+            const pillW = Math.max(durStr.length * 7.6 + 20, 56);
+            const halfW = pillW / 2;
+            const pillTextCls = isPeak ? 'ac-pill-text is-peak' : 'ac-pill-text';
+            const pillBgCls = isPeak ? 'ac-pill-bg is-peak' : 'ac-pill-bg';
+            pillGroup =
+              '<g class="ac-pill-group" transform="translate(' + cx.toFixed(1) + ',' + pillY.toFixed(1) + ')">' +
+                '<rect class="' + pillBgCls + '" x="-' + halfW.toFixed(1) + '" y="-13" width="' + pillW.toFixed(1) + '" height="22" rx="11"/>' +
+                '<text class="' + pillTextCls + '" fill="#ffffff" x="0" y="2">' + durStr + '</text>' +
+              '</g>';
+          }
+
+          // 数据节点：0 工时日绝不画圆圈！仅活跃日绘制精致白核发光点
+          let dotGroup = '';
+          if (hasTime) {
+            dotGroup =
+              '<g class="ac-dot-group' + (isPeak ? ' is-peak' : '') + '">' +
+                '<circle class="ac-dot-halo" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="5"/>' +
+                '<circle class="ac-dot-core" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="2.6"/>' +
+              '</g>';
+          }
+
+          // 底部双层 X 轴标尺（第一行周几鲜亮纯白，第二行对应数值鲜亮纯白）
+          const dateCls = 'ac-axis-date';
+          const valCls = isPeak ? 'ac-axis-val is-peak' : (hasTime ? 'ac-axis-val' : 'ac-axis-val is-zero');
+          const valFill = hasTime ? '#ffffff' : 'rgba(255, 255, 255, 0.55)';
+          const axisGroup =
+            '<text class="' + dateCls + '" fill="#ffffff" x="' + cx.toFixed(1) + '" y="196">' + escapeHtml(d.weekday) + '</text>' +
+            '<text class="' + valCls + '" fill="' + valFill + '" x="' + cx.toFixed(1) + '" y="218">' + durStr + '</text>';
+
+          return pillGroup + dotGroup + axisGroup;
+        }).join('');
+
         const totalMs = data.reduce((s, d) => s + d.totalMs, 0);
         const tip = L['panel.js.weekTotalPrefix'] + formatDuration(totalMs);
-
-        // 数据点悬停提示（每格日期 + 时长）
-        const dots = data.map((d, i) => {
-          const cx = (i / (data.length - 1)) * W;
-          const cy = H - PAD - (d.totalMs / maxVal) * (H - 2 * PAD);
-          const t = d.label + ' (' + d.weekday + '): ' + formatDuration(d.totalMs);
-          return '<circle class="ac-dot" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="3.5">' +
-            '<title>' + t + '</title></circle>';
-        }).join('');
 
         el.innerHTML =
           '<svg class="ac-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
             '<defs>' +
+              '<linearGradient id="acLineGradient" x1="0" y1="0" x2="1" y2="0">' +
+                '<stop offset="0%" stop-color="#818cf8"/>' +
+                '<stop offset="60%" stop-color="#38bdf8"/>' +
+                '<stop offset="100%" stop-color="#34d399"/>' +
+              '</linearGradient>' +
               '<linearGradient id="acGradient" x1="0" y1="0" x2="0" y2="1">' +
-                '<stop offset="0%" stop-color="#4ec9b0" stop-opacity="0.4"/>' +
-                '<stop offset="100%" stop-color="#4ec9b0" stop-opacity="0.0"/>' +
+                '<stop offset="0%" stop-color="#38bdf8" stop-opacity="0.28"/>' +
+                '<stop offset="60%" stop-color="#818cf8" stop-opacity="0.08"/>' +
+                '<stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/>' +
               '</linearGradient>' +
             '</defs>' +
             '<title>' + tip + '</title>' +
-            '<path class="ac-area" d="' + area + '"></path>' +
-            '<path class="ac-line" d="' + line + '"></path>' +
-            dots +
+            gridSvg +
+            '<path class="ac-area" d="' + areaPath + '"></path>' +
+            '<path class="ac-line" d="' + linePath + '"></path>' +
+            elementsSvg +
           '</svg>';
       }
 
@@ -1662,14 +2008,18 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
 
       // ---- 按小时分布柱状图 ----
       function renderHourly(hourly, peakHour, el, titleEl, axisEl) {
+        const wrapper = document.getElementById('hourlyWrapper');
+        const badgeEl = document.getElementById('hourlyBadge');
         if (!el || !titleEl) return;
         const buckets = hourly || [];
         if (buckets.length === 0) {
+          if (wrapper) wrapper.style.display = 'none';
           el.style.display = 'none';
           titleEl.style.display = 'none';
           if (axisEl) axisEl.style.display = 'none';
           return;
         }
+        if (wrapper) wrapper.style.display = 'block';
         titleEl.style.display = 'block';
         el.style.display = 'flex';
 
@@ -1680,20 +2030,77 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         }
         const maxVal = Math.max(...hours, 1);
 
+        const peakMs = (peakHour !== undefined && peakHour >= 0 && peakHour < 24) ? hours[peakHour] : 0;
+        const peakHourStr = peakHour !== undefined && peakHour >= 0 ? String(peakHour).padStart(2, '0') + ':00' : '';
+        const defaultBadgeText = (peakMs > 0 && peakHourStr)
+          ? L['panel.today.hourlyPeak'] + ': ' + peakHourStr + ' · ' + formatDuration(peakMs)
+          : L['panel.today.hourlyOverview'];
+
+        if (badgeEl) badgeEl.textContent = defaultBadgeText;
+
+        // 渲染 24 个槽位骨架（每个包含底轨、立柱、基线指示，并在每 4 小时边界处添加段落分隔）
         el.innerHTML = hours.map((ms, h) => {
-          const pct = ms > 0 ? Math.max((ms / maxVal) * 100, 4) : 0;
-          const isPeak = ms > 0 && h === peakHour ? ' is-peak' : '';
-          const tip = String(h).padStart(2, '0') + ':00 ' + formatDuration(ms);
-          return '<div class="hourly-bar' + isPeak + '" style="height:' + pct + '%" title="' + tip + '"></div>';
+          const pct = ms > 0 ? Math.max((ms / maxVal) * 100, 6) : 0;
+          const isPeak = (ms > 0 && h === peakHour) ? ' is-peak' : '';
+          const isPeakSlot = (ms > 0 && h === peakHour) ? ' is-peak-slot' : '';
+          const hasAct = ms > 0 ? ' has-activity' : '';
+          const isPeriodDivider = (h === 3 || h === 7 || h === 11 || h === 15 || h === 19) ? ' has-period-divider' : '';
+
+          const curH = String(h).padStart(2, '0') + ':00';
+          const nextH = String(h + 1).padStart(2, '0') + ':00';
+          const timeRange = curH + ' - ' + nextH;
+          const durStr = ms > 0 ? formatDuration(ms) : L['panel.today.hourlyIdle'];
+          const peakTag = (ms > 0 && h === peakHour) ? ' (' + L['panel.today.hourlyPeak'] + ')' : '';
+          const tip = timeRange + ' : ' + durStr + peakTag;
+
+          return '<div class="hourly-slot' + isPeakSlot + hasAct + isPeriodDivider + '" data-timerange="' + timeRange + '" data-dur="' + durStr + peakTag + '" title="' + tip + '">' +
+            '<div class="hourly-slot-track">' +
+              '<div class="hourly-bar' + isPeak + '" style="height:' + pct + '%"></div>' +
+            '</div>' +
+            '<div class="hourly-slot-base"></div>' +
+          '</div>';
         }).join('');
 
-        // X 轴刻度：与柱状图同 24 格对齐，每 4 小时标注一次（0/4/8/12/16/20）
+        // 槽位鼠标悬停交互：顶部徽章动态联动
+        const slots = el.querySelectorAll('.hourly-slot');
+        slots.forEach(slot => {
+          slot.addEventListener('mouseenter', () => {
+            if (badgeEl) {
+              const tr = slot.getAttribute('data-timerange') || '';
+              const dur = slot.getAttribute('data-dur') || '';
+              badgeEl.textContent = tr + ' · ' + dur;
+            }
+          });
+          slot.addEventListener('mouseleave', () => {
+            if (badgeEl) {
+              badgeEl.textContent = defaultBadgeText;
+            }
+          });
+        });
+
+        // 连续物理标尺：7 锚点精准对齐（00:00, 04:00, 08:00, 12:00, 16:00, 20:00, 24:00）
         if (axisEl) {
-          axisEl.style.display = 'flex';
-          axisEl.innerHTML = hours.map((_, h) => {
-            const label = h % 4 === 0 ? String(h).padStart(2, '0') + ':00' : '';
-            return '<div class="tick">' + label + '</div>';
-          }).join('');
+          axisEl.style.display = 'block';
+          const anchors = [
+            { pct: 0, label: '00:00', posClass: 'is-start' },
+            { pct: 16.6667, label: '04:00', posClass: 'is-mid' },
+            { pct: 33.3333, label: '08:00', posClass: 'is-mid' },
+            { pct: 50.0000, label: '12:00', posClass: 'is-mid is-noon' },
+            { pct: 66.6667, label: '16:00', posClass: 'is-mid' },
+            { pct: 83.3333, label: '20:00', posClass: 'is-mid' },
+            { pct: 100.000, label: '24:00', posClass: 'is-end' }
+          ];
+
+          axisEl.innerHTML = '<div class="hourly-axis-line"></div>' +
+            anchors.map(a => {
+              const posStyle = a.posClass.includes('is-start')
+                ? 'left:0;'
+                : (a.posClass.includes('is-end') ? 'right:0;' : 'left:' + a.pct + '%;');
+              return '<div class="hourly-notch-group ' + a.posClass + '" style="' + posStyle + '">' +
+                '<div class="hourly-notch"></div>' +
+                '<div class="hourly-tick-label">' + a.label + '</div>' +
+              '</div>';
+            }).join('');
         }
       }
 
@@ -1813,6 +2220,14 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
         setChartMode(chartMode === 'bars' ? 'curve' : 'bars');
       });
 
+      let resizeTimer = null;
+      window.addEventListener('resize', () => {
+        if (chartMode === 'curve' && pendingData && pendingData.dailyStats) {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => renderActiveCurve(pendingData.dailyStats), 80);
+        }
+      });
+
       // ---- Toast 提示 ----
       function showToast(msg) {
         const toast = document.getElementById('statusToast');
@@ -1824,4 +2239,5 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
   </script>
 </body>
 </html>
-`;}
+`;
+}

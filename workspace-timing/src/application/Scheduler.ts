@@ -21,27 +21,28 @@ import { SessionManager } from './SessionManager';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
 import {
-    DEFAULT_JOURNAL_FLUSH_MS,
-    MS_PER_MINUTE,
-    MS_PER_SECOND,
-    sanitizeJournalFlushIntervalMs,
-    sanitizeFullSaveIntervalMs,
+  DEFAULT_JOURNAL_FLUSH_MS,
+  MS_PER_MINUTE,
+  MS_PER_SECOND,
+  SLEEP_DETECT_GAP_MS,
+  sanitizeJournalFlushIntervalMs,
+  sanitizeFullSaveIntervalMs,
 } from '../domain/models';
 
 export interface SchedulerOptions {
-    /** journal flush 间隔 (ms) */
-    journalFlushIntervalMs: number;
-    /** 全量存盘间隔 (ms) */
-    fullSaveIntervalMs: number;
-    /** 状态栏更新间隔 (ms) */
-    statusBarUpdateIntervalMs: number;
-    /** 是否启用 journal 崩溃保护（false 时不写 RingBuffer/journal） */
-    journalEnabled: boolean;
+  /** journal flush 间隔 (ms) */
+  journalFlushIntervalMs: number;
+  /** 全量存盘间隔 (ms) */
+  fullSaveIntervalMs: number;
+  /** 状态栏更新间隔 (ms) */
+  statusBarUpdateIntervalMs: number;
+  /** 是否启用 journal 崩溃保护（false 时不写 RingBuffer/journal） */
+  journalEnabled: boolean;
 }
 
 export interface StatusBarDisplayData {
-    totalMs: number;
-    todayMs: number;
+  totalMs: number;
+  todayMs: number;
 }
 
 const MSG_STATUS_BAR_UPDATE_FAILED = 'Scheduler: status bar update tick failed';
@@ -52,198 +53,198 @@ export type StatusBarUpdateCallback = (data: StatusBarDisplayData) => void;
 export type FullSavedCallback = () => void | Promise<void>;
 
 export class Scheduler {
-    private readonly journal: JournalWriter;
-    private readonly sessionManager: SessionManager;
-    private options: SchedulerOptions;
+  private readonly journal: JournalWriter;
+  private readonly sessionManager: SessionManager;
+  private options: SchedulerOptions;
 
-    private fullSaveTimer: ReturnType<typeof setInterval> | null = null;
-    private statusBarTimer: ReturnType<typeof setInterval> | null = null;
-    private statusBarCallback: StatusBarUpdateCallback | null = null;
-    private fullSavedCallback: FullSavedCallback | null = null;
+  private fullSaveTimer: ReturnType<typeof setInterval> | null = null;
+  private statusBarTimer: ReturnType<typeof setInterval> | null = null;
+  private statusBarCallback: StatusBarUpdateCallback | null = null;
+  private fullSavedCallback: FullSavedCallback | null = null;
 
-    private _running: boolean = false;
-    /** 全量存盘进行中标志（防重入：上一轮未完成时跳过本轮） */
-    private _saving: boolean = false;
-    /** journal flush 进行中标志 */
-    private _flushing: boolean = false;
-    /** 上次心跳时间戳（用于检测系统休眠/挂起恢复） */
-    private _lastTickMs: number = Date.now();
-    /** 当前日期字符串（用于检测跨午夜自然日更替） */
-    private _currentDayStr: string = TimeAggregator.todayStr();
+  private _running: boolean = false;
+  /** 全量存盘进行中标志（防重入：上一轮未完成时跳过本轮） */
+  private _saving: boolean = false;
+  /** journal flush 进行中标志 */
+  private _flushing: boolean = false;
+  /** 上次心跳时间戳（用于检测系统休眠/挂起恢复） */
+  private _lastTickMs: number = Date.now();
+  /** 当前日期字符串（用于检测跨午夜自然日更替） */
+  private _currentDayStr: string = TimeAggregator.todayStr();
 
-    constructor(
-        journal: JournalWriter,
-        sessionManager: SessionManager,
-        options?: Partial<SchedulerOptions>,
-    ) {
-        this.journal = journal;
-        this.sessionManager = sessionManager;
-        this.options = {
-            journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
-            fullSaveIntervalMs: MS_PER_MINUTE,
-            statusBarUpdateIntervalMs: MS_PER_SECOND,
-            journalEnabled: true,
-            ...options,
-        };
+  constructor(
+    journal: JournalWriter,
+    sessionManager: SessionManager,
+    options?: Partial<SchedulerOptions>,
+  ) {
+    this.journal = journal;
+    this.sessionManager = sessionManager;
+    this.options = {
+      journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
+      fullSaveIntervalMs: MS_PER_MINUTE,
+      statusBarUpdateIntervalMs: MS_PER_SECOND,
+      journalEnabled: true,
+      ...options,
+    };
+  }
+
+  /** 是否正在运行 */
+  get isRunning(): boolean {
+    return this._running;
+  }
+
+  /** 注册状态栏更新回调 */
+  onStatusBarUpdate(cb: StatusBarUpdateCallback): void {
+    this.statusBarCallback = cb;
+  }
+
+  /** 注册周期全量存盘完成回调 */
+  onFullSaved(cb: FullSavedCallback): void {
+    this.fullSavedCallback = cb;
+  }
+
+  /**
+   * 运行期热更新调度间隔（journalEnabled 不支持热切换，需重启）
+   * 运行中会重建对应定时器使新间隔立即生效。
+   *
+   * ★ 间隔钳制：与 models.ts 配置边界单一真源一致（journal ≥1000ms、
+   *   fullSave ≥5000ms 且均带上限）——面板/配置写入 0 或负数时，
+   *   setInterval 会以 ~1ms 触发，全量存盘变成 CPU+I/O 热点；
+   *   越界上值（手写配置）同样钳回合法域。
+   *   journal flush 间隔经 JournalWriter.updateFlushInterval 同步给缓存策略。
+   */
+  updateIntervals(patch: Partial<Pick<SchedulerOptions, 'journalFlushIntervalMs' | 'fullSaveIntervalMs'>>): void {
+    const clamped = {
+      ...(patch.journalFlushIntervalMs !== undefined
+        ? { journalFlushIntervalMs: sanitizeJournalFlushIntervalMs(patch.journalFlushIntervalMs) }
+        : {}),
+      ...(patch.fullSaveIntervalMs !== undefined
+        ? { fullSaveIntervalMs: sanitizeFullSaveIntervalMs(patch.fullSaveIntervalMs) }
+        : {}),
+    };
+
+    const journalChanged = clamped.journalFlushIntervalMs !== undefined
+      && clamped.journalFlushIntervalMs !== this.options.journalFlushIntervalMs;
+    const fullSaveChanged = clamped.fullSaveIntervalMs !== undefined
+      && clamped.fullSaveIntervalMs !== this.options.fullSaveIntervalMs;
+
+    if (!journalChanged && !fullSaveChanged) return;
+
+    this.options = { ...this.options, ...clamped };
+
+    if (journalChanged) {
+      // 无独立 flush 定时器：新间隔直接同步给缓存策略，心跳尝试时按新节奏落盘
+      this.journal.updateFlushInterval(this.options.journalFlushIntervalMs);
+    }
+    if (fullSaveChanged && this._running) {
+      if (this.fullSaveTimer) clearInterval(this.fullSaveTimer);
+      this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
     }
 
-    /** 是否正在运行 */
-    get isRunning(): boolean {
-        return this._running;
-    }
+    log(LogLevel.Debug, `Scheduler: intervals updated (journal=${this.options.journalFlushIntervalMs}ms, fullSave=${this.options.fullSaveIntervalMs}ms)`);
+  }
 
-    /** 注册状态栏更新回调 */
-    onStatusBarUpdate(cb: StatusBarUpdateCallback): void {
-        this.statusBarCallback = cb;
-    }
+  /** 启动所有周期任务 */
+  start(): void {
+    if (this._running) return;
+    this._running = true;
+    this._lastTickMs = Date.now();
+    this._currentDayStr = TimeAggregator.todayStr();
 
-    /** 注册周期全量存盘完成回调 */
-    onFullSaved(cb: FullSavedCallback): void {
-        this.fullSavedCallback = cb;
-    }
+    // 1. 全量存盘定时器
+    this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
 
-    /**
-     * 运行期热更新调度间隔（journalEnabled 不支持热切换，需重启）
-     * 运行中会重建对应定时器使新间隔立即生效。
-     *
-     * ★ 间隔钳制：与 models.ts 配置边界单一真源一致（journal ≥1000ms、
-     *   fullSave ≥5000ms 且均带上限）——面板/配置写入 0 或负数时，
-     *   setInterval 会以 ~1ms 触发，全量存盘变成 CPU+I/O 热点；
-     *   越界上值（手写配置）同样钳回合法域。
-     *   journal flush 间隔经 JournalWriter.updateFlushInterval 同步给缓存策略。
-     */
-    updateIntervals(patch: Partial<Pick<SchedulerOptions, 'journalFlushIntervalMs' | 'fullSaveIntervalMs'>>): void {
-        const clamped = {
-            ...(patch.journalFlushIntervalMs !== undefined
-                ? { journalFlushIntervalMs: sanitizeJournalFlushIntervalMs(patch.journalFlushIntervalMs) }
-                : {}),
-            ...(patch.fullSaveIntervalMs !== undefined
-                ? { fullSaveIntervalMs: sanitizeFullSaveIntervalMs(patch.fullSaveIntervalMs) }
-                : {}),
-        };
+    // 2. 心跳定时器：每秒推入时间片 + 跨午夜与休眠检测 + 尝试 flush + 更新状态栏
+    this.statusBarTimer = setInterval(() => {
+      try {
+        const now = Date.now();
+        const gap = now - this._lastTickMs;
 
-        const journalChanged = clamped.journalFlushIntervalMs !== undefined
-            && clamped.journalFlushIntervalMs !== this.options.journalFlushIntervalMs;
-        const fullSaveChanged = clamped.fullSaveIntervalMs !== undefined
-            && clamped.fullSaveIntervalMs !== this.options.fullSaveIntervalMs;
-
-        if (!journalChanged && !fullSaveChanged) return;
-
-        this.options = { ...this.options, ...clamped };
-
-        if (journalChanged) {
-            // 无独立 flush 定时器：新间隔直接同步给缓存策略，心跳尝试时按新节奏落盘
-            this.journal.updateFlushInterval(this.options.journalFlushIntervalMs);
-        }
-        if (fullSaveChanged && this._running) {
-            if (this.fullSaveTimer) clearInterval(this.fullSaveTimer);
-            this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
-        }
-
-        log(LogLevel.Debug, `Scheduler: intervals updated (journal=${this.options.journalFlushIntervalMs}ms, fullSave=${this.options.fullSaveIntervalMs}ms)`);
-    }
-
-    /** 启动所有周期任务 */
-    start(): void {
-        if (this._running) return;
-        this._running = true;
-        this._lastTickMs = Date.now();
-        this._currentDayStr = TimeAggregator.todayStr();
-
-        // 1. 全量存盘定时器
-        this.fullSaveTimer = setInterval(() => void this.saveOnce(), this.options.fullSaveIntervalMs);
-
-        // 2. 心跳定时器：每秒推入时间片 + 跨午夜与休眠检测 + 尝试 flush + 更新状态栏
-        this.statusBarTimer = setInterval(() => {
-            try {
-                const now = Date.now();
-                const gap = now - this._lastTickMs;
-
-                // 1. 休眠/挂起恢复检测（时钟跳变超过 15 秒）
-                if (gap >= 15000) {
-                    const sleepStart = this._lastTickMs + 1000;
-                    this._lastTickMs = now;
-                    this._currentDayStr = TimeAggregator.todayStr();
-                    void this.sessionManager.handleSystemResume(sleepStart, now);
-                } else {
-                    this._lastTickMs = now;
-                    // 2. 跨午夜自然日切换检测
-                    const todayStr = TimeAggregator.todayStr();
-                    if (todayStr !== this._currentDayStr) {
-                        this._currentDayStr = todayStr;
-                        void this.sessionManager.rotateSessionAtMidnight();
-                    }
-                }
-
-                // 推入时间片到 RingBuffer（仅当 journal 启用时）
-                if (this.options.journalEnabled) {
-                    this.journal.push({
-                        timestamp: now,
-                        deltaMs: this.options.statusBarUpdateIntervalMs, // 1000ms = 1s
-                    });
-                    // 尝试 flush：策略未到时间/无数据时为空操作，I/O 零成本
-                    void this.flushOnce();
-                }
-
-                // 更新状态栏（含今日时长和累计时长）
-                if (this.statusBarCallback) {
-                    const snap = this.sessionManager.snapshot;
-                    const todayMs = this.sessionManager.getTodayMs();
-                    this.statusBarCallback({ totalMs: snap.currentTotalMs, todayMs });
-                }
-            } catch (err) {
-                // 状态栏更新失败记录调试日志，不阻断主调度循环
-                log(LogLevel.Debug, MSG_STATUS_BAR_UPDATE_FAILED, err as Error);
-            }
-        }, this.options.statusBarUpdateIntervalMs);
-
-        log(LogLevel.Info, 'Scheduler: started');
-    }
-
-    /**
-     * 单次 journal flush（带防重入守卫）
-     */
-    private async flushOnce(): Promise<void> {
-        if (this._flushing) return;
-        this._flushing = true;
-        try {
-            await this.journal.tryFlush();
-        } catch (err) {
-            log(LogLevel.Error, 'Scheduler: journal flush failed', err as Error);
-        } finally {
-            this._flushing = false;
-        }
-    }
-
-    /**
-     * 单次全量存盘（带防重入守卫），完成后触发 onFullSaved 回调
-     */
-    private async saveOnce(): Promise<void> {
-        if (this._saving) return;
-        this._saving = true;
-        try {
-            await this.sessionManager.saveCheckpoint();
-            await this.fullSavedCallback?.();
-        } catch (err) {
-            log(LogLevel.Error, 'Scheduler: full save failed', err as Error);
-        } finally {
-            this._saving = false;
-        }
-    }
-
-    /** 停止所有周期任务 */
-    stop(): void {
-        this._running = false;
-
-        if (this.fullSaveTimer) {
-            clearInterval(this.fullSaveTimer);
-            this.fullSaveTimer = null;
-        }
-        if (this.statusBarTimer) {
-            clearInterval(this.statusBarTimer);
-            this.statusBarTimer = null;
+        // 1. 休眠/挂起恢复检测（时钟跳变超过 15 秒）
+        if (gap >= SLEEP_DETECT_GAP_MS) {
+          const sleepStart = this._lastTickMs + MS_PER_SECOND;
+          this._lastTickMs = now;
+          this._currentDayStr = TimeAggregator.todayStr();
+          void this.sessionManager.handleSystemResume(sleepStart, now);
+        } else {
+          this._lastTickMs = now;
+          // 2. 跨午夜自然日切换检测
+          const todayStr = TimeAggregator.todayStr();
+          if (todayStr !== this._currentDayStr) {
+            this._currentDayStr = todayStr;
+            void this.sessionManager.rotateSessionAtMidnight();
+          }
         }
 
-        log(LogLevel.Info, 'Scheduler: stopped');
+        // 推入时间片到 RingBuffer（仅当 journal 启用时）
+        if (this.options.journalEnabled) {
+          this.journal.push({
+            timestamp: now,
+            deltaMs: this.options.statusBarUpdateIntervalMs, // 1000ms = 1s
+          });
+          // 尝试 flush：策略未到时间/无数据时为空操作，I/O 零成本
+          void this.flushOnce();
+        }
+
+        // 更新状态栏（含今日时长和累计时长）
+        if (this.statusBarCallback) {
+          const snap = this.sessionManager.snapshot;
+          const todayMs = this.sessionManager.getTodayMs();
+          this.statusBarCallback({ totalMs: snap.currentTotalMs, todayMs });
+        }
+      } catch (err) {
+        // 状态栏更新失败记录调试日志，不阻断主调度循环
+        log(LogLevel.Debug, MSG_STATUS_BAR_UPDATE_FAILED, err as Error);
+      }
+    }, this.options.statusBarUpdateIntervalMs);
+
+    log(LogLevel.Info, 'Scheduler: started');
+  }
+
+  /**
+   * 单次 journal flush（带防重入守卫）
+   */
+  private async flushOnce(): Promise<void> {
+    if (this._flushing) return;
+    this._flushing = true;
+    try {
+      await this.journal.tryFlush();
+    } catch (err) {
+      log(LogLevel.Error, 'Scheduler: journal flush failed', err as Error);
+    } finally {
+      this._flushing = false;
     }
+  }
+
+  /**
+   * 单次全量存盘（带防重入守卫），完成后触发 onFullSaved 回调
+   */
+  private async saveOnce(): Promise<void> {
+    if (this._saving) return;
+    this._saving = true;
+    try {
+      await this.sessionManager.saveCheckpoint();
+      await this.fullSavedCallback?.();
+    } catch (err) {
+      log(LogLevel.Error, 'Scheduler: full save failed', err as Error);
+    } finally {
+      this._saving = false;
+    }
+  }
+
+  /** 停止所有周期任务 */
+  stop(): void {
+    this._running = false;
+
+    if (this.fullSaveTimer) {
+      clearInterval(this.fullSaveTimer);
+      this.fullSaveTimer = null;
+    }
+    if (this.statusBarTimer) {
+      clearInterval(this.statusBarTimer);
+      this.statusBarTimer = null;
+    }
+
+    log(LogLevel.Info, 'Scheduler: stopped');
+  }
 }

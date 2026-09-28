@@ -10,7 +10,7 @@
  */
 
 import * as vscode from 'vscode';
-import { StatusBarMode } from '../domain/models';
+import { StatusBarMode, STATUS_BAR_PRIORITY } from '../domain/models';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/Logger';
 import { t, format } from '../i18n/index';
@@ -19,133 +19,133 @@ export type { StatusBarMode };
 
 /** 模式名 i18n key（命令提示与 tooltip 共用，杜绝硬编码中文双轨） */
 const MODE_LABEL_KEYS: Record<StatusBarMode, 'statusBar.mode.today-total' | 'statusBar.mode.total-today' | 'statusBar.mode.compact'> = {
-    'today-total': 'statusBar.mode.today-total',
-    'total-today': 'statusBar.mode.total-today',
-    'compact': 'statusBar.mode.compact',
+  'today-total': 'statusBar.mode.today-total',
+  'total-today': 'statusBar.mode.total-today',
+  'compact': 'statusBar.mode.compact',
 };
 
 /** 获取模式显示名（本地化） */
 export function statusBarModeLabel(mode: StatusBarMode): string {
-    return t()[MODE_LABEL_KEYS[mode]];
+  return t()[MODE_LABEL_KEYS[mode]];
 }
 
 const MODE_CYCLE: StatusBarMode[] = ['today-total', 'total-today', 'compact'];
 
 export interface StatusBarConfig {
-    enabled?: boolean;
-    /** 显示模式（workspaceTiming.statusBar.mode 初始值；点击状态栏循环切换后由调用方持久化） */
-    mode?: StatusBarMode;
+  enabled?: boolean;
+  /** 显示模式（workspaceTiming.statusBar.mode 初始值；点击状态栏循环切换后由调用方持久化） */
+  mode?: StatusBarMode;
 }
 
 export class StatusBarController {
-    private readonly statusBarItem: vscode.StatusBarItem;
-    private _enabled: boolean = true;
-    private _mode: StatusBarMode = 'today-total';
-    private _todayMs: number = 0;
-    private _totalMs: number = 0;
-    /** 上次渲染的文本（变更检测，避免每秒无谓重绘） */
-    private _lastText: string = '';
-    private _visible: boolean = false;
+  private readonly statusBarItem: vscode.StatusBarItem;
+  private _enabled: boolean = true;
+  private _mode: StatusBarMode = 'today-total';
+  private _todayMs: number = 0;
+  private _totalMs: number = 0;
+  /** 上次渲染的文本（变更检测，避免每秒无谓重绘） */
+  private _lastText: string = '';
+  private _visible: boolean = false;
 
-    constructor() {
-        this.statusBarItem = vscode.window.createStatusBarItem(
-            vscode.StatusBarAlignment.Right,
-            100,
-        );
-        this.statusBarItem.command = 'workspaceTiming.showStatus';
-        this.statusBarItem.tooltip = t()['statusBar.tooltip'];
+  constructor() {
+    this.statusBarItem = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      STATUS_BAR_PRIORITY,
+    );
+    this.statusBarItem.command = 'workspaceTiming.showStatus';
+    this.statusBarItem.tooltip = t()['statusBar.tooltip'];
+  }
+
+  /** 更新配置（显示开关 / 显示模式；由 ConfigWatcher 配置热应用与命令循环切换共用） */
+  updateConfig(config: Partial<StatusBarConfig>): void {
+    if (config.enabled !== undefined) this._enabled = config.enabled;
+    if (config.mode !== undefined && config.mode !== this._mode) this._mode = config.mode;
+    this.refresh();
+  }
+
+  /** 更新计时数据并刷新显示 */
+  updateTime(todayMs: number, totalMs: number): void {
+    this._todayMs = todayMs;
+    this._totalMs = totalMs;
+    this.refresh();
+  }
+
+  /** 刷新状态栏显示 */
+  private refresh(): void {
+    if (!this._enabled) {
+      if (this._visible) {
+        this.statusBarItem.hide();
+        this._visible = false;
+        this._lastText = '';
+      }
+      return;
     }
 
-    /** 更新配置（显示开关 / 显示模式；由 ConfigWatcher 配置热应用与命令循环切换共用） */
-    updateConfig(config: Partial<StatusBarConfig>): void {
-        if (config.enabled !== undefined) this._enabled = config.enabled;
-        if (config.mode !== undefined && config.mode !== this._mode) this._mode = config.mode;
-        this.refresh();
+    let text: string;
+    switch (this._mode) {
+      case 'today-total':
+        // 复用既有 i18n 模板（zh: 今日 {0} · 累计 {1}），不硬编码中文
+        text = format(t()['statusBar.todayTotal'],
+          TimeAggregator.formatDurationCompact(this._todayMs),
+          TimeAggregator.formatDurationCompact(this._totalMs));
+        break;
+      case 'total-today':
+        // 复用既有 i18n 模板（zh: 累计 {0} · 今日 {1}），不再硬编码中文
+        text = format(t()['statusBar.totalToday'],
+          TimeAggregator.formatDurationCompact(this._totalMs),
+          TimeAggregator.formatDurationCompact(this._todayMs));
+        break;
+      case 'compact':
+        text = TimeAggregator.formatDurationCompact(this._todayMs);
+        break;
     }
 
-    /** 更新计时数据并刷新显示 */
-    updateTime(todayMs: number, totalMs: number): void {
-        this._todayMs = todayMs;
-        this._totalMs = totalMs;
-        this.refresh();
+    const displayText = `$(watch) ${text}`;
+
+    // 仅在文本实际变化时更新，避免每秒触发 VS Code 状态栏重绘
+    if (displayText !== this._lastText) {
+      this.statusBarItem.text = displayText;
+      this.statusBarItem.tooltip = `${t()['statusBar.tooltip']}（${statusBarModeLabel(this._mode)}）`;
+      this._lastText = displayText;
     }
 
-    /** 刷新状态栏显示 */
-    private refresh(): void {
-        if (!this._enabled) {
-            if (this._visible) {
-                this.statusBarItem.hide();
-                this._visible = false;
-                this._lastText = '';
-            }
-            return;
-        }
-
-        let text: string;
-        switch (this._mode) {
-            case 'today-total':
-                // 复用既有 i18n 模板（zh: 今日 {0} · 累计 {1}），不硬编码中文
-                text = format(t()['statusBar.todayTotal'],
-                    TimeAggregator.formatDurationCompact(this._todayMs),
-                    TimeAggregator.formatDurationCompact(this._totalMs));
-                break;
-            case 'total-today':
-                // 复用既有 i18n 模板（zh: 累计 {0} · 今日 {1}），不再硬编码中文
-                text = format(t()['statusBar.totalToday'],
-                    TimeAggregator.formatDurationCompact(this._totalMs),
-                    TimeAggregator.formatDurationCompact(this._todayMs));
-                break;
-            case 'compact':
-                text = TimeAggregator.formatDurationCompact(this._todayMs);
-                break;
-        }
-
-        const displayText = `$(watch) ${text}`;
-
-        // 仅在文本实际变化时更新，避免每秒触发 VS Code 状态栏重绘
-        if (displayText !== this._lastText) {
-            this.statusBarItem.text = displayText;
-            this.statusBarItem.tooltip = `${t()['statusBar.tooltip']}（${statusBarModeLabel(this._mode)}）`;
-            this._lastText = displayText;
-        }
-
-        // 仅在首次或从隐藏恢复时调用 .show()，避免冗余重排
-        if (!this._visible) {
-            this.statusBarItem.show();
-            this._visible = true;
-        }
+    // 仅在首次或从隐藏恢复时调用 .show()，避免冗余重排
+    if (!this._visible) {
+      this.statusBarItem.show();
+      this._visible = true;
     }
+  }
 
-    /** 循环切换显示模式 */
-    cycleMode(): StatusBarMode {
-        const idx = MODE_CYCLE.indexOf(this._mode);
-        this._mode = MODE_CYCLE[(idx + 1) % MODE_CYCLE.length];
-        this.refresh();
-        log(LogLevel.Debug, `StatusBarController: mode switched to ${this._mode}`);
-        return this._mode;
-    }
+  /** 循环切换显示模式 */
+  cycleMode(): StatusBarMode {
+    const idx = MODE_CYCLE.indexOf(this._mode);
+    this._mode = MODE_CYCLE[(idx + 1) % MODE_CYCLE.length];
+    this.refresh();
+    log(LogLevel.Debug, `StatusBarController: mode switched to ${this._mode}`);
+    return this._mode;
+  }
 
-    /** 初始化显示 */
-    show(): void {
-        this.refresh();
-    }
+  /** 初始化显示 */
+  show(): void {
+    this.refresh();
+  }
 
-    /** 隐藏状态栏 */
-    hide(): void {
-        if (this._visible) {
-            this.statusBarItem.hide();
-            this._visible = false;
-            this._lastText = '';
-        }
+  /** 隐藏状态栏 */
+  hide(): void {
+    if (this._visible) {
+      this.statusBarItem.hide();
+      this._visible = false;
+      this._lastText = '';
     }
+  }
 
-    /** 获取当前模式 */
-    get mode(): StatusBarMode {
-        return this._mode;
-    }
+  /** 获取当前模式 */
+  get mode(): StatusBarMode {
+    return this._mode;
+  }
 
-    /** 释放资源 */
-    dispose(): void {
-        this.statusBarItem.dispose();
-    }
+  /** 释放资源 */
+  dispose(): void {
+    this.statusBarItem.dispose();
+  }
 }

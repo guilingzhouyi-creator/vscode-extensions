@@ -399,32 +399,7 @@ export class TimeAggregator {
             : -1;
 
         // 活跃时段：连续小时区间按**累计时长**最大者（而非跨度最长）
-        let activeWindow = '';
-        if (hourly.length > 0) {
-            let bestStart = hourly[0].hour;
-            let bestLen = 1;
-            let bestSum = hourly[0].totalMs;
-            let curStart = hourly[0].hour;
-            let curLen = 1;
-            let curSum = hourly[0].totalMs;
-            for (let i = 1; i < hourly.length; i++) {
-                if (hourly[i].hour === hourly[i - 1].hour + 1) {
-                    curLen++;
-                    curSum += hourly[i].totalMs;
-                    if (curSum > bestSum) {
-                        bestSum = curSum;
-                        bestLen = curLen;
-                        bestStart = curStart;
-                    }
-                } else {
-                    curStart = hourly[i].hour;
-                    curLen = 1;
-                    curSum = hourly[i].totalMs;
-                }
-            }
-            const endHour = bestStart + bestLen - 1;
-            activeWindow = `${String(bestStart).padStart(2, '0')}:00-${String(endHour).padStart(2, '0')}:00`;
-        }
+        const activeWindow = TimeAggregator.computeActiveWindow(hourly);
 
         return {
             date: dateStr,
@@ -435,6 +410,34 @@ export class TimeAggregator {
             peakHour,
             activeWindow,
         };
+    }
+
+    /** 找出按累计时长最大的连续小时活跃时段 */
+    private static computeActiveWindow(hourly: readonly HourlyBucket[]): string {
+        if (hourly.length === 0) return '';
+        let bestStart = hourly[0].hour;
+        let bestLen = 1;
+        let bestSum = hourly[0].totalMs;
+        let curStart = hourly[0].hour;
+        let curLen = 1;
+        let curSum = hourly[0].totalMs;
+        for (let i = 1; i < hourly.length; i++) {
+            if (hourly[i].hour === hourly[i - 1].hour + 1) {
+                curLen++;
+                curSum += hourly[i].totalMs;
+                if (curSum > bestSum) {
+                    bestSum = curSum;
+                    bestLen = curLen;
+                    bestStart = curStart;
+                }
+            } else {
+                curStart = hourly[i].hour;
+                curLen = 1;
+                curSum = hourly[i].totalMs;
+            }
+        }
+        const endHour = bestStart + bestLen - 1;
+        return `${String(bestStart).padStart(2, '0')}:00-${String(endHour).padStart(2, '0')}:00`;
     }
 
     /** 计算时间戳所在周的起始日（周一）本地日期字符串 */
