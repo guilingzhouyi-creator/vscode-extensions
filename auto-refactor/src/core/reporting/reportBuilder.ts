@@ -45,6 +45,9 @@ import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
 /** Number of hex characters kept from a record hash to form the stored short revision id. */
 const REVISION_ID_LENGTH = 16;
 
+/** Stable stand-in for a composite that was not measured, used inside revision identity. */
+const UNMEASURED_TOKEN = 'unmeasured';
+
 /** Default agent identity recorded when the config carries no explicit agent uid. */
 const DEFAULT_AGENT_UID = 'default-agent';
 
@@ -134,10 +137,17 @@ function buildMemoryRecord(
         })),
         qualityScores: score,
         lastAudited,
-        revisionId: sha256Hex(metric.file + ':' + score.compositeScore + ':' + lastAudited).slice(
-            0,
-            REVISION_ID_LENGTH,
-        ),
+        // An unmeasured composite is NaN. String-interpolating it produced a revision id
+        // containing "NaN", which is not a stable identity: two identical unmeasured states
+        // are indistinguishable from two different ones. A fixed token keeps the id
+        // deterministic while still distinguishing measured from unmeasured revisions.
+        revisionId: sha256Hex(
+            metric.file +
+                ':' +
+                (Number.isFinite(score.compositeScore) ? score.compositeScore : UNMEASURED_TOKEN) +
+                ':' +
+                lastAudited,
+        ).slice(0, REVISION_ID_LENGTH),
         agentUid: cfg.agentUid || DEFAULT_AGENT_UID,
         contextWindows: {
             imports: [],

@@ -114,8 +114,12 @@ function handleTrajectoryCommand(args: string[]): void {
         `Total Revisions: ${traj.totalRevisions} | Agents: ${traj.participatingAgents.join(', ')}\n`,
     );
     for (const r of traj.revisions) {
+        // `??` only catches null/undefined, so an unmeasured composite (NaN) would print
+        // as the literal "NaN". A revision that measured no dimension is shown as N/A.
+        const score = r.qualityScore?.compositeScore;
+        const scoreText = typeof score === 'number' && Number.isFinite(score) ? score : 'N/A';
         process.stdout.write(
-            `  • [${new Date(r.timestamp).toISOString()}] Rev ${r.revisionId.slice(0, REVISION_ID_DISPLAY_LENGTH)} by Agent: ${r.agentUid} | Score: ${r.qualityScore?.compositeScore ?? 'N/A'}\n`,
+            `  • [${new Date(r.timestamp).toISOString()}] Rev ${r.revisionId.slice(0, REVISION_ID_DISPLAY_LENGTH)} by Agent: ${r.agentUid} | Score: ${scoreText}\n`,
         );
     }
     if (traj.activeAnomalies.length > 0) {

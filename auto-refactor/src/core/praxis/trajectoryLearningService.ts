@@ -23,6 +23,7 @@ import type { TrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import { defaultTrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import type { RegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
 import { defaultRegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
+import { scoreDelta } from '../scoring/scorer-formulas';
 
 /**
  * Public service interface provided to the Praxis team for trajectory learning governance.
@@ -162,7 +163,15 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
 
     private calculateDelta(input: PraxisTrajectoryLearningInput): number {
         if (input.beforeScore && input.afterScore) {
-            return input.afterScore.compositeScore - input.beforeScore.compositeScore;
+            // An unmeasured composite is NaN; subtracting it would feed NaN into the
+            // trajectory learning signal, where every threshold comparison silently fails.
+            const delta = scoreDelta(
+                input.beforeScore.compositeScore,
+                input.afterScore.compositeScore,
+            );
+            if (delta !== null) {
+                return delta;
+            }
         }
         return input.beforeContent !== input.afterContent ? 8.0 : 0.0;
     }

@@ -131,9 +131,16 @@ function buildAlpacaSample(
         metadata: {
             file: rec.filePath,
             ruleIds: activeRules.map((r: RuleHitRecord) => r.rule),
-            scoreDelta: rec.qualityScores?.compositeScore
-                ? rec.qualityScores.compositeScore - NEUTRAL_COMPOSITE_SCORE
-                : 0,
+            // An unmeasured composite is NaN, which is falsy, so a truthiness test would
+            // silently record 0 and train on a fabricated "no change" signal. Only a real
+            // measurement is converted; anything else is left out of the training record.
+            scoreDelta: (() => {
+                const score = rec.qualityScores?.compositeScore;
+                if (typeof score !== 'number' || !Number.isFinite(score)) {
+                    return undefined;
+                }
+                return score - NEUTRAL_COMPOSITE_SCORE;
+            })(),
             empirical: hardRules.length === 0,
         },
     };

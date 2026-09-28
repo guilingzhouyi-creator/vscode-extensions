@@ -86,10 +86,17 @@ function finalizeAttribution(mutable: MutableAttribution, baselineScore: number)
     attr.netIssueDelta = attr.resolvedIssues.length - attr.introducedIssues.length;
 
     if (scores.length > 0) {
-        const sum = scores.reduce((acc, val) => acc + val, 0);
-        attr.averageQualityScore = Math.round((sum / scores.length) * 10) / 10;
+        // One unmeasured revision would poison the whole sum, so only real measurements are
+        // averaged; a NaN here would report a fabricated average for the agent.
+        const measured = scores.filter((value) => Number.isFinite(value));
+        if (measured.length > 0) {
+            const sum = measured.reduce((acc, val) => acc + val, 0);
+            attr.averageQualityScore = Math.round((sum / measured.length) * 10) / 10;
+        }
         const lastScore = scores[scores.length - 1];
-        attr.scoreImpact = Math.round((lastScore - baselineScore) * 10) / 10;
+        if (Number.isFinite(lastScore) && Number.isFinite(baselineScore)) {
+            attr.scoreImpact = Math.round((lastScore - baselineScore) * 10) / 10;
+        }
     }
     return attr;
 }

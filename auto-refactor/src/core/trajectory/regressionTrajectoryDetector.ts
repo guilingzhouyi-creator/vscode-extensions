@@ -13,6 +13,7 @@
 
 import type { Issue } from '../types';
 import type { FileRevision, TrajectoryComparison } from './types';
+import { scoreDelta } from '../scoring/scorer-formulas';
 
 /**
  * Detector that identifies regressive oscillation and anti-pattern re-emergence in trajectories.
@@ -125,7 +126,15 @@ export class RegressionTrajectoryDetector {
             return undefined;
         }
 
-        const delta = current.qualityScore.compositeScore - previous.qualityScore.compositeScore;
+        // An unmeasured side makes `delta` NaN, and `NaN <= -12` is false, so a real
+        // regression would pass unnoticed. Bail out instead of reporting nothing.
+        const delta = scoreDelta(
+            previous.qualityScore.compositeScore,
+            current.qualityScore.compositeScore,
+        );
+        if (delta === null) {
+            return undefined;
+        }
         if (delta <= -12.0) {
             return this.createRegressionIssue(
                 filePath,

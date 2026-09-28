@@ -21,6 +21,7 @@ import type {
     TransformOp,
     TransformOpKind,
 } from './recipeTypes';
+import { scoreDelta } from '../scoring/scorer-formulas';
 
 /**
  * Extractor engine that derives reusable refactoring recipes from code evolution history.
@@ -116,7 +117,13 @@ export class TrajectoryRecipeExtractor {
      */
     private calculateDeltaScore(input: PraxisTrajectoryLearningInput): number {
         if (input.beforeScore && input.afterScore) {
-            return input.afterScore.compositeScore - input.beforeScore.compositeScore;
+            const delta = scoreDelta(
+                input.beforeScore.compositeScore,
+                input.afterScore.compositeScore,
+            );
+            if (delta !== null) {
+                return delta;
+            }
         }
         // Heuristic default if scores are absent: positive delta on structural optimization
         return 10.0;

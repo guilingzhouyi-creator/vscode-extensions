@@ -147,6 +147,21 @@
           },
           "description": "Built-in analyzer ids disabled by the effective config; a skipped rule family must never look like a clean result."
         },
+        "symbolIndex": {
+          "type": "object",
+          "description": "Symbol index counters for this scan.",
+          "additionalProperties": true
+        },
+        "literalIndex": {
+          "type": "object",
+          "description": "Literal index counters for this scan.",
+          "additionalProperties": true
+        },
+        "callGraph": {
+          "type": "object",
+          "description": "Call graph counters for this scan.",
+          "additionalProperties": true
+        },
         "postScanPasses": {
           "type": "array",
           "items": {
@@ -224,10 +239,100 @@
       "items": {
         "$ref": "#/definitions/FileMetric"
       }
+    },
+    "qualityScore": {
+      "$ref": "#/definitions/QualityScoreBreakdown",
+      "description": "Project-level ten-dimension assessment. Absent when scoring is not requested."
+    },
+    "fileQualityScores": {
+      "type": "object",
+      "description": "Per-file ten-dimension assessments keyed by file path.",
+      "additionalProperties": {
+        "$ref": "#/definitions/QualityScoreBreakdown"
+      }
+    },
+    "triPlaneQuality": {
+      "type": "object",
+      "description": "Tri-plane unified assessment (static, dynamic, feedback). Present when scoring ran.",
+      "additionalProperties": true
+    },
+    "autonomy": {
+      "type": "object",
+      "description": "In-house self-development assessment (CAI). Present when scoring ran.",
+      "additionalProperties": true
     }
   },
   "additionalProperties": false,
   "definitions": {
+    "QualityScoreBreakdown": {
+      "type": "object",
+      "description": "Ten-dimension quality breakdown. compositeScore is null when no dimension carried a weight, which happens on a narrow scan; that is missing data, not a zero score, and grade is then 'N/A'.",
+      "required": ["indices", "compositeScore", "grade", "confidence"],
+      "properties": {
+        "indices": {
+          "type": "object",
+          "description": "One index per quality dimension, 0-100.",
+          "additionalProperties": { "type": "number", "minimum": 0, "maximum": 100 }
+        },
+        "compositeScore": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Weighted geometric mean of the measured indices, or null when unmeasured. JSON has no NaN literal, so an unmeasured score serialises to null rather than to 0."
+        },
+        "grade": {
+          "type": "string",
+          "enum": ["A+", "A", "B", "C", "D", "F", "N/A"]
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "coverage": { "type": "number", "minimum": 0, "maximum": 1 },
+        "weights": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 }
+        },
+        "notEvaluated": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "evaluatedBy": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "deductionsByDimension": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["points", "effectivePoints", "entries"],
+            "properties": {
+              "points": {
+                "type": "number",
+                "description": "Linear sum of the entries, before the index curve compresses them."
+              },
+              "effectivePoints": {
+                "type": "number",
+                "description": "Penalty the index curve consumed; 100 - effectivePoints reconciles to the published index."
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["rule", "points", "reason"],
+                  "properties": {
+                    "rule": { "type": "string" },
+                    "points": { "type": "number" },
+                    "reason": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "Issue": {
       "type": "object",
       "required": ["id", "analyzer", "rule", "severity", "message", "location", "detail"],
@@ -311,6 +416,11 @@
           "required": ["confidence"],
           "additionalProperties": true,
           "description": "Uncertainty and empirical evidence metadata (e.g. confidence score, runtime need)."
+        },
+        "actionable": {
+          "type": "object",
+          "description": "Agent-executable change payload. Present only for findings that carry a concrete, automatable remediation; a consumer must treat safeToAutomate as advisory, not a guarantee.",
+          "additionalProperties": true
         }
       },
       "additionalProperties": false,

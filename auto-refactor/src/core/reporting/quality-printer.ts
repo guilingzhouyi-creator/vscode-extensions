@@ -96,8 +96,14 @@ export function printQualityScoreAssessment(
     triPlane?: UnifiedQualityAssessment,
 ): void {
     process.stdout.write(`\n=== Transparent Code Quality Assessment ===\n`);
+    // A NaN composite means no dimension carried a weight (a narrow scan witnesses none of
+    // the ten axes). Printing "NaN / 100" would read as a corrupt number, so state plainly
+    // that nothing was measured instead.
+    const compositeText = Number.isNaN(q.compositeScore)
+        ? 'N/A (no quality dimension was measured)'
+        : `${q.compositeScore.toFixed(1)} / 100`;
     process.stdout.write(
-        `Composite Quality Index: ${q.compositeScore.toFixed(1)} / 100 [Grade: ${q.grade}] ` +
+        `Composite Quality Index: ${compositeText} [Grade: ${q.grade}] ` +
             `(Confidence: ${(q.confidence * PERCENT_SCALE).toFixed(0)}%)\n`,
     );
     process.stdout.write(`-------------------------------------------\n`);

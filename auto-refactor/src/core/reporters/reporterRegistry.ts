@@ -131,9 +131,14 @@ registerReporter({
         ];
 
         if (qualityScore) {
+            // NaN would print as the literal "NaN / 100"; the N/A grade already says the
+            // scan measured no dimension, so state that instead of showing a number.
+            const compositeText = Number.isFinite(qualityScore.compositeScore)
+                ? `${qualityScore.compositeScore} / 100`
+                : 'N/A';
             lines.push(
                 ``,
-                `## Quality Score: ${qualityScore.compositeScore} / 100 (Grade: ${qualityScore.grade})`,
+                `## Quality Score: ${compositeText} (Grade: ${qualityScore.grade})`,
                 ``,
                 `| Dimension | Score | Status |`,
                 `| :--- | :--- | :--- |`,
@@ -220,8 +225,14 @@ registerReporter({
 registerReporter({
     name: 'badge',
     format(report: ScanReport): string {
-        const score = report.qualityScore
-            ? Math.round(report.qualityScore.compositeScore)
+        // An unmeasured composite is NaN, and Math.round(NaN) is NaN, which would render the
+        // literal "NaN" into the badge and make every threshold comparison false (forcing
+        // the red colour for a scan that simply measured nothing). Treat it as "no score".
+        const measured =
+            report.qualityScore !== undefined &&
+            Number.isFinite(report.qualityScore.compositeScore);
+        const score = measured
+            ? Math.round((report.qualityScore as { compositeScore: number }).compositeScore)
             : BADGE_DEFAULT_SCORE;
         const color =
             score >= BADGE_GREEN_MIN_SCORE

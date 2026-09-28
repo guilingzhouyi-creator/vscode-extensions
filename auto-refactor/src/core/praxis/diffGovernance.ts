@@ -215,7 +215,9 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
                 affectedFiles,
             },
             patchQuality,
-            deltaScore: patchQuality?.deltaScore,
+            // deltaScore is null when either side of the patch was not measured; the
+            // optional field carries that as "no value" rather than coercing to zero.
+            deltaScore: patchQuality?.deltaScore ?? undefined,
         };
     }
 

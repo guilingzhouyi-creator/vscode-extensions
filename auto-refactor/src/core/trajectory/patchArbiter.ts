@@ -53,17 +53,24 @@ function evaluateCandidateSlice(patch: AgentPatchSlice): PatchArbitrationCandida
     });
 
     const isGaming = pq.verdict === 'gaming_rejected';
+    // A patch whose two sides were never measured cannot be ranked on quality. Ranking it as
+    // a zero delta would let an unmeasured change compete with genuinely neutral ones, so
+    // it is excluded from arbitration with an explicit reason instead.
+    const isUnmeasured = pq.verdict === 'unavailable';
     const compositeScore = patch.compositeScore ?? 90;
-    const deltaScore = isGaming ? -50 : pq.deltaScore;
+    const deltaScore = isGaming ? -50 : (pq.deltaScore ?? 0);
     const density = pq.effectiveDensityAfter;
 
-    const arbitrationScore = isGaming
-        ? -100
-        : computeArbitrationScore(compositeScore, deltaScore, density, issuesCount);
+    const arbitrationScore =
+        isGaming || isUnmeasured
+            ? -100
+            : computeArbitrationScore(compositeScore, deltaScore, density, issuesCount);
 
     const reasons: string[] = [];
     if (isGaming) {
         reasons.push('Rejected by anti-gaming filter: metric manipulation detected');
+    } else if (isUnmeasured) {
+        reasons.push('Excluded from arbitration: no quality dimension was measured');
     } else {
         reasons.push(`Quality Score: ${compositeScore}`);
         reasons.push(`Delta Score: +${deltaScore}`);

@@ -72,15 +72,17 @@ function calculateDimensionDeltas(
  *
  * @param current - Current file revision.
  * @param previous - Prior file revision.
- * @returns Rounded composite score delta.
+ * @returns Rounded composite score delta, or 0 when either side was not measured. A NaN
+ *   delta would make every downstream threshold comparison false, so regression and
+ *   recovery detection would silently stop firing for that pair.
  */
 function calculateCompositeDelta(current: FileRevision, previous: FileRevision): number {
-    return (
-        Math.round(
-            (current.qualityScore.compositeScore - previous.qualityScore.compositeScore) *
-                SCORE_DELTA_ROUND_SCALE,
-        ) / SCORE_DELTA_ROUND_SCALE
-    );
+    const before = previous.qualityScore.compositeScore;
+    const after = current.qualityScore.compositeScore;
+    if (!Number.isFinite(before) || !Number.isFinite(after)) {
+        return 0;
+    }
+    return Math.round((after - before) * SCORE_DELTA_ROUND_SCALE) / SCORE_DELTA_ROUND_SCALE;
 }
 
 /**
