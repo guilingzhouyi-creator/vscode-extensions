@@ -43,11 +43,12 @@
   │  • 零物化懒投影机制 (NodeProjector)      • 64-bit SWAR / SIMD 向量加速 │
   └── (归一化 NormalizedNode 投影) ───────┬────────────────────────────────┘
                                           ▼
-  ┌── 四层规则金字塔 (Four-Layer Rule Pyramid) ───────────────────────────┐
-  │  • Layer 1: 全域安全与凭据扫描 (Security / Secrets)                    │
-  │  • Layer 2: 领域原型与架构约束 (Architecture / Dependency Graph)       │
-  │  • Layer 3: 工业级工程与全域治理 (Governance 22 类 / Hygiene / Comments)│
-  │  • Layer 4: 项目定制与多维评分 (10 战略质量维度 / 门禁阈值 / 声明式策略) │
+  ┌── 三层规则金字塔 (Three-Layer Rule Pyramid) ───────────────────────────┐
+  │  • Layer 1: 全域安全与跨语言不变量 (Security / Secrets / 循环内开销)    │
+  │  • Layer 2: 语言族约束 (静态类型系统 / GC 运行时)                       │
+  │  • Layer 3: 方言与工程治理 (Governance / Hygiene / Comments)           │
+  │  ── 项目级定制 (非规则层，实现在 src/core/scoring/ 与 src/core/config/) │
+  │     十维质量评分 / 声明式门禁策略 / 原型自适应权重                      │
   └────────────────────────────────────────────────────────────────────────┘
 ```
 

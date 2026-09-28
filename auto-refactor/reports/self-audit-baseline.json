@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790513286953",
-  "timestamp": "2026-09-27T12:48:11.685Z",
+  "snapshotId": "snapshot-v0.4.0-1790577497149",
+  "timestamp": "2026-09-28T06:38:21.469Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,26 +12,26 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 525,
-    "durationMs": 4390
+    "filesScanned": 530,
+    "durationMs": 3990
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 9889,
-    "suppressedIssues": 5545,
-    "unsuppressedIssues": 4344,
+    "totalIssues": 10012,
+    "suppressedIssues": 5662,
+    "unsuppressedIssues": 4350,
     "bySeverity": {
-      "info": 400,
-      "warning": 9489,
+      "info": 397,
+      "warning": 9615,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 59,
-      "medium": 9181,
-      "low": 649
+      "high": 63,
+      "medium": 9303,
+      "low": 646
     }
   },
   "eightPillars": {
@@ -59,6 +59,15 @@
     "ceilingsApplied": []
   },
   "topHotspots": [
+    {
+      "filePath": "scripts/test-parallel.js",
+      "domain": "scripts",
+      "totalIssues": 155,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.94
+    },
     {
       "filePath": "scripts/validate-review-memory.js",
       "domain": "scripts",
@@ -105,15 +114,6 @@
       "effectiveDensity": 0.98
     },
     {
-      "filePath": "scripts/test-parallel.js",
-      "domain": "scripts",
-      "totalIssues": 132,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.94
-    },
-    {
       "filePath": "scripts/validate-multi-agent.js",
       "domain": "scripts",
       "totalIssues": 130,
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 59,
-      "medium": 9181,
-      "low": 649
+      "high": 63,
+      "medium": 9303,
+      "low": 646
     },
     "criticalItems": [],
     "highItems": [
@@ -241,6 +241,24 @@
         "message": "Function \"NamingDecouplingAuditor.auditClusters\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
+        "id": "complexity:CPX-NEST-001:src/core/cfg/cfg-builder.ts:261",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/cfg/cfg-builder.ts",
+        "line": 261,
+        "message": "Unbounded control-flow nesting: function 'CfgBuilder.inlineTerminator' has nesting depth 5 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/cfg/cfg-builder.ts:261",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/cfg/cfg-builder.ts",
+        "line": 261,
+        "message": "Function \"CfgBuilder.inlineTerminator\" has cyclomatic complexity 14 (threshold 12)."
+      },
+      {
         "id": "performance:PRF-ALG-001:src/core/cfg/def-use-chain.ts:52",
         "rule": "PRF-ALG-001",
         "tier": "high",
@@ -268,39 +286,39 @@
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
-        "id": "complexity:CPX-NEST-001:src/core/cfg/def-use-chain.ts:105",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/cfg/def-use-chain.ts",
-        "line": 105,
-        "message": "Unbounded control-flow nesting: function 'DefUseAnalyzer.analyze' has nesting depth 6 exceeding elastic budget 5 for context 'ast-parser'."
-      },
-      {
         "id": "complexity:high-complexity:src/core/cfg/def-use-chain.ts:105",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/cfg/def-use-chain.ts",
         "line": 105,
-        "message": "Function \"DefUseAnalyzer.analyze\" has cyclomatic complexity 21 (threshold 12)."
+        "message": "Function \"DefUseAnalyzer.analyze\" has cyclomatic complexity 20 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-001:src/core/cfg/def-use-chain.ts:137",
+        "id": "performance:PRF-ALG-001:src/core/cfg/def-use-chain.ts:141",
         "rule": "PRF-ALG-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/cfg/def-use-chain.ts",
-        "line": 137,
+        "line": 141,
         "message": "High algorithmic complexity risk: Found 3 levels of nested loops (potential O(N^3) compute hotspot, threshold 3)"
       },
       {
-        "id": "performance:PRF-MEM-001:src/core/cfg/def-use-chain.ts:144",
+        "id": "performance:PRF-ALG-001:src/core/cfg/def-use-chain.ts:154",
+        "rule": "PRF-ALG-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/cfg/def-use-chain.ts",
+        "line": 154,
+        "message": "High algorithmic complexity risk: Found 3 levels of nested loops (potential O(N^3) compute hotspot, threshold 3)"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/cfg/def-use-chain.ts:156",
         "rule": "PRF-MEM-001",
         "tier": "high",
         "severity": "info",
         "file": "src/core/cfg/def-use-chain.ts",
-        "line": 144,
+        "line": 156,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
@@ -590,24 +608,6 @@
         "file": "src/core/rules/evolution/silentExceptionRule.ts",
         "line": 124,
         "message": "Function \"checkPythonSilentExceptions\" has cyclomatic complexity 14 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/rules/pyramid/layer1Evaluator.ts:142",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/rules/pyramid/layer1Evaluator.ts",
-        "line": 142,
-        "message": "Function \"classifyRuleLayer\" has cyclomatic complexity 18 (exceeds relaxed threshold 18 for shallow structure)."
-      },
-      {
-        "id": "complexity:CPX-NEST-002:src/core/scanner/worker-scheduler.ts:538",
-        "rule": "CPX-NEST-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scanner/worker-scheduler.ts",
-        "line": 538,
-        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'anonymous' over long span (323 LOC)."
       }
     ]
   },
@@ -720,11 +720,11 @@
       },
       {
         "domainName": "cfg",
-        "compositeScore": 99.6,
+        "compositeScore": 99.4,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.5,
-          "performance": 98.5,
+          "maintainability": 97.8,
+          "performance": 98.3,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -1158,7 +1158,7 @@
         "compositeScore": 100,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.8,
+          "maintainability": 99.6,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1233,7 +1233,7 @@
         "compositeScore": 100,
         "pillars": {
           "architecture": 100,
-          "maintainability": 100,
+          "maintainability": 99.8,
           "performance": 100,
           "data": 100,
           "testing": 100,

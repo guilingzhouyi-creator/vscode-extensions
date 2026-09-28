@@ -1,7 +1,7 @@
 # 多语言通用 AST 抽象与适配器 (Multilang AST Abstraction)
 
 > **所属模块**：`02-parsers-and-ast`  
-> **核心源码**：`src/core/multilang.ts`, `src/core/adapters.ts`, `src/core/typescriptAdapter.ts`, `src/core/pythonAdapter.ts`, `src/core/rustAdapter.ts`, `src/core/gdscriptAdapter.ts`  
+> **核心源码**：`src/core/ast/multilang.ts`, `src/core/ast/adapters.ts`, `src/core/ast/typescript-adapter.ts`, `src/core/ast/python-adapter.ts`, `src/core/ast/rust-adapter.ts`, `src/core/ast/gdscript-adapter.ts`, `src/core/ast/go-adapter.ts`  
 > **文档状态**：✅ **已落地实施 (Implemented & Verified)**
 
 ---

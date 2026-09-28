@@ -12,13 +12,13 @@
 | 升级模块 | 核心能力与架构演进 | 交付与影响 |
 | :--- | :--- | :--- |
 | **跨语言语义 IR** | 统一 `SemanticGraph` 拓扑底座，支持 TypeScript、Python、Rust、GDScript 等多语言抽象语法投影与语义降解 | 实现跨语言统一拓扑遍历与零黑话规范 |
-| **四层规则金字塔** | 构建 Layer 1 全域安全层、Layer 2 领域原型层、Layer 3 团队规范层、Layer 4 项目配置层，内置扩充至 146 条全量规则 | 单一真源规则注册表，零孤儿规则，覆盖率 100% |
-| **十维质量度量** | 十大战略质量支柱、非线性缺陷惩罚与上限截断机制、有效代码密度与反刷分检测 | 彻底杜绝稀释刷分，量化得分客观精准 |
+| **三层规则金字塔** | 构建 Layer 1 全域安全层、Layer 2 语言族层、Layer 3 方言层，内置 **243 条**全量规则（228 规范 id + 15 条 legacy 别名窗口） | 单一真源规则注册表，零孤儿规则，文档覆盖率 243/243（由 `validate-rules-registry.js` 强制） |
+| **十维质量度量** | 十大战略质量支柱、倒数型密度饱和曲线（非硬截断，极值区间保持可分辨）、加权几何平均短板惩罚 | 彻底杜绝稀释刷分，量化得分客观精准；契约可复算（报告自带 `indexMapping` 与 `effectivePoints`） |
 | **多 Agent 协作治理** | Agent 变更属性追踪、越级依赖与冲突检测、意图仲裁器与重复工作影响半径评估 | 发射 `GOV-AGN-001`，保障多智能体并行协作安全性 |
 | **增量切片与 Sparse MoE** | AST 切片提取器、非对称稀疏激活架构（MoE CED，绕过率 $\ge 70\%$）、反向调用链影响面追踪 | 毫秒级增量响应，发射破坏性变更告警 `GOV-SLC-001` |
 | **改造轨迹配方学习** | Bad $\rightarrow$ Good 轨迹学习、结构化重构配方提取、循环修改震荡拦截与死灰复燃反模式检测 | 发射 `GOV-TRJ-001`，提供 `IPraxisTrajectoryLearningService` |
 | **Praxis 门面与 SPI** | 汇聚 Governance、SliceAudit、TrajectoryLearning 与 ReviewRunner 等强类型门面 | 完整保留 Praxis 团队接口与 SPI 扩展契约 |
-| **全量并行测试流水线** | 扩充至 **55 套** 并行/异步测试套件，接入全自动化闭环承压基准 | 16.75s 内全量 PASS，一次性通过 20+ 项严苛门禁 |
+| **全量并行测试流水线** | `scripts/test-parallel.js` 枚举 **124 个并行套件 + 5 个串行套件 + 1 个 vitest 单元阶段**；`scripts/validate-suite-manifest.js` 强制每个脚本都被注册（135 套件 / 11 豁免 / 10 基准，零遗漏） | 全量 PASS；集成与单元测试同处一条门禁 |
 
 ### v0.3.0 (2026-09-05) — 联动 workspace-timing v0.4.9 工程审查系统
 
@@ -74,7 +74,7 @@
 
 | 文档 | 主题 | 状态 |
 |------|------|:---:|
-| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 四层规则金字塔、146 条全量内置规则 (100% 覆盖) 与双轨文案解耦 | ✅ 已落地 |
+| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 三层规则金字塔、243 条全量内置规则 (243/243 文档覆盖，由门禁强制) 与双轨文案解耦 | ✅ 已落地 |
 | [docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md](./docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md) | 第三方自定义分析器插件契约与生命周期钩子规范 | ✅ 已落地 |
 
 ## 📊 5. 规范与性能基准 (Specs & Benchmarks)
@@ -95,12 +95,19 @@
 
 | 命令 | 覆盖范围 | 契约 |
 |------|----------|------|
-| `npm run gate` | build → format:check → lint → gate:comments → gate:self → gate:self:warning → test | 提交前唯一入口，任一环失败即阻断 |
-| `npm run gate:self` | 自扫棘轮（error 级） | `newBlocking(error)` 必须为 0 |
-| `npm run gate:self:warning` | 自扫棘轮（warning 级） | 新增 warning 同样阻断，防止"把告警搬进新文件"式改造 |
+| `npm run gate` | gate:rust → build → format:check → lint → gate:comments → gate:self → test | 提交前唯一入口，任一环失败即阻断 |
+| `npm run gate:full` | `gate` + `gate:self:warning` | 附加 warning 级自审棘轮（不在默认链内，见下） |
+| `npm run gate:self` | 自扫棘轮（error 级） | `newBlocking(error)` 必须为 0——**默认门禁的底线** |
+| `npm run gate:self:warning` | 自扫棘轮（warning 级） | **不在默认 gate 链内**，需显式调用 |
+| `npm run gate:self:warning:update` | 重冻 warning 级基线 | 棘轮默认禁止扩大（需 `--force-expand`）；仅在存量真实下降后执行 |
 | `npm run gate:self:slice` | AST 语义切片增量自审 | 毫秒级极速切片自审，捕获局部语法树突变 |
-| `npm run gate:self:update` | 重冻基线 | **仅在 findings 真实下降后执行**；禁止用它掩盖新增告警 |
 | `npm run gate:comments` | 注释/文档头一致性棘轮 | 新增注释违规即阻断 |
+| `npm run gate:rust` | clippy(-D warnings) + rustfmt --check + cargo test（全部 crate） | Rust 算子库零告警 |
+
+> **warning 级自审为何移出默认链**：该级在引入前就长期处于 FAIL 状态（存量 2031 条未抑制
+> warning），继续挂在默认链上只会让它变成习惯性阻断，既无法反映真实增量，也让 error 级
+> 的失败被淹没。现改为显式调用 + 基线冻结（2026-09 冻结于 10327 条），`gate:full` 可一并
+> 执行。error 级仍在默认链内且要求为 0，这是实际守住的底线。
 
 **评审纪律（非自动化）**：新增文件不得携带 `large-file`/`high-complexity` 超标；改造提交应同时给出 findings 前后对照。
 

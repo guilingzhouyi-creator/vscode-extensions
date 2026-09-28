@@ -21,6 +21,7 @@
 | `hardcoded-string` | `warning` | 长度超过阈值（默认 ≥ 3）的硬编码字符串。 | `const EXTRACTED_STRING = "...";` |
 | `duplicate-literal` | `warning` | 同一文件内相同字面量出现频次超标（默认 ≥ 3 次）。 | 自动聚合多处行号并提示提取共享常量。 |
 | `nested-constant` | `warning` | 常量化定义出现别名套壳（`const A = B`）、深层嵌套结构或作用域内伪常量。 | 直接内联、单源声明或提升为模块顶层常量。 |
+| `CONST-LIB-001` | `warning` | 大规模常量散落于业务代码文件中，缺乏集中分层的常量库目录结构。 |
 
 ---
 
@@ -201,6 +202,10 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `CMT-WID-001` | `warning` | `standard` 及以上 | 注释/docstring 物理行宽超过 100 列；工具指令行（`noqa`/`type: ignore`/`eslint-disable`/`@ts-expect-error` 等）以及 `comments.options.directiveTokens` 声明的项目自有指令豁免。 |
 | `CMT-SEP-001` | `warning` | `standard` 及以上 | 同一文件混用短标题分隔（`── 标题 ──`）与长串分隔（`──── 标题`）；纯分隔线豁免。 |
 | `CMT-BAN-001` | `warning` | `standard` 及以上 | 不足 150 行的小文件使用 `═` 文件级横幅。 |
+| `CMT-INT-001` | `warning` | `basic` 及以上 | 注释声称的职责特征（如纯函数、无副作用、并发安全）与 AST 实际数据流/副作用特征矛盾。 |
+| `CMT-LNG-001` | `warning` | `basic` 及以上 | 注释书写语言显著偏离项目或代码域的主导规范（例如英文主导库中突兀插入中文注释）。 |
+| `CMT-LNG-002` | `warning` | `basic` 及以上 | 单个文件内部中英文注释无序交错混杂（中文与英文占比均较高且缺乏分层规律）。 |
+| `CMT-VMD-001` | `warning` | `basic` 及以上 | 有效注释密度过低或存在逐行直译代码名的注水现象（未解释设计原因与边界不变量）。 |
 
 ---
 
@@ -278,8 +283,11 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `SIM-FLAT-002` | `warning` | 控制流深度嵌套超过阈值（默认 > 3 层），决策树过深增加心智负担。 | 采用卫语句（Guard Clauses）提前返回扁平化控制流，或将深层嵌套提炼为独立函数。 |
 | `SIM-TRN-001` | `info` | 冗长且无副作用的 if-else 分支可折叠为浅层单行三元表达式。 | 双分支为同变量单一赋值或纯返回值时，在无副作用、单层深度且行长 ≤ 80 字符的前提下折叠为三元表达式。 |
 | `SIM-IMM-001` | `info` | 通过三元表达式折叠消除未初始化的局部可变绑定，提纯为不可变 const。 | 将 `let x; if (c) { x = a; } else { x = b; }` 提纯为 `const x = c ? a : b;`，消除可变状态生命周期。 |
+| `SIM-BOOL-001` | `info` | 冗余的布尔字面量显式比对。 | 与布尔字面量直接比较的表达式可消除。 |
+| `SIM-ELSE-001` | `info` | 提前终止语句之后存在冗余 else 分支。 | 去除守护式提前返回后的冗余 else 包裹。 |
+| `SIM-GUARD-001` | `info` | 倒置的前置守卫条件导致深层嵌套。 | 改为正向提前返回的卫语句以扁平化控制流。 |
 
-**未内化项（需语句序列 / 符号引用分析，另行评估）**：布尔返回化简、`len()` 比较化简、冗余 `else`（均需兄弟语句分析）、未使用导入（需跨文件符号引用，且 TS/JS 与 Python 已有 ESLint/ruff 原生覆盖）。
+**未内化项（需语句序列 / 符号引用分析，另行评估）**：未使用导入（需跨文件符号引用，且 TS/JS 与 Python 已有 ESLint/ruff 原生覆盖）。
 
 ---
 
@@ -301,6 +309,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `PYM-ABC-001` | `error` | `from typing import` 引入 `collections.abc` 抽象类型（`Iterable`/`Callable`/`Mapping` 等 21 个） | 改从 `collections.abc` 导入 |
 | `PYM-DATETIME-001` | `error` | `timezone.utc` 用法 | 改用 `datetime.UTC`（PEP 615） |
 | `PYM-UNION-001` | `error` | 注解（带默认值）或类型别名位置使用 `Optional[...]`/`Union[...]` | 改用 PEP 604 写法 `X \| None` |
+| `PYM-SHADOW-001` | `warning` | 变量或参数遮蔽了 Python 核心内置标识符。 |
 
 > **引擎契约提示**：纯内容型分析器必须实现 `finalize()`；引擎的 legacy `analyze()` 路径只为 TS 系适配器物化 `ts.SourceFile`，非 TS 文件会被静默跳过（`hygiene`/`governance` 同样以 `finalize` 委托进入流式路径）。
 
@@ -324,7 +333,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 
 ---
 
-## 14. TypeScript/JavaScript 现代化审查器 (`ts-modern`) — 10 条
+## 14. TypeScript/JavaScript 现代化审查器 (`ts-modern`) — 11 条
 
 默认关闭（专用语言包，需显式声明 `analyzers.ts-modern`）；对 `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs` 生效，`.d.ts` 不参与；类型类规则（`TSM-ANY-001`、`TSM-TYPE-001`）只对 `.ts`/`.tsx` 生效。判定在「字符串与注释掩码」后的视图上进行，因此字符串/注释/模板里的关键字不会误报；掩码不建模正则字面量，属已登记的精度边界。
 
@@ -340,6 +349,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `TSM-REPLACE-001` | `info` | 字符串模式 `replace('literal', …)`，只替换首个匹配 | 需要全量替换时改用 `replaceAll` |
 | `TSM-ANY-001` | `warning` | 类型位置出现显式 `any` | 改用 `unknown` 加收窄，或精确泛型/联合类型 |
 | `TSM-TYPE-001` | `info` | 具名导入只出现在类型位置（保守判定：出现任一值位置即沉默） | 改为 `import type { … }` |
+| `TSM-DISP-001` | `warning` | VS Code 监听器或 Disposable 对象未注册至 subscriptions 容器。 |
 
 ---
 
@@ -359,7 +369,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 
 ---
 
-## 16. GDScript 现代化审查器 (`gdscript-modern`) — 7 条
+## 16. GDScript 现代化审查器 (`gdscript-modern`) — 8 条
 
 默认关闭（专用语言包，需显式声明 `analyzers.gdscript-modern`）；仅对 `.gd` 生效。承载 Godot 3 → 4 迁移清单：这段迁移没有成熟的外部 linter 覆盖，是引擎独有的跨语言「现代化批次」呈现。
 
@@ -370,6 +380,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `GDM-ONREADY-001` | `warning` | `onready var` | 改用 `@onready var` |
 | `GDM-TOOL-001` | `warning` | 脚本首行裸 `tool` | 改用 `@tool` 注解 |
 | `GDM-POOL-001` | `warning` | `Pool*Array` 类型 | 改用 `Packed*Array` 系列 |
+| `GDM-POOL-002` | `warning` | 对象池 reset_state 未调用基类重置方法破坏契约。 |
 | `GDM-CONNECT-001` | `info` | Godot 3 `connect("signal", self, "method")` 字符串方法名 | 改用 `signal.connect(Callable)` 形式 |
 | `GDM-RPC-001` | `warning` | `remote`/`master`/`puppet`/`slave` 函数修饰符 | 改用 `@rpc` 注解 |
 
@@ -398,7 +409,7 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | `VSC-PERF-001` | `warning` | 主线程事件循环卡顿拦截：Extension Host 主线程直接调用同步阻塞文件 I/O | 将同步 I/O 改为异步流 (`fs.promises`) 或 `vscode.workspace.fs` |
 | `VSC-I18N-001` | `warning` | UI 硬编码裸文案拦截：弹窗或状态栏通知传入未本地化的字符串字面量 | 使用 `vscode.l10n.t(...)` 或引入项目双语字典 |
 
-> **三个语言包的共同契约**：均为「内容型分析器」，实现 `finalize()` 并共用 `src/core/sourceMask.ts` 的掩码能力；全部默认关闭，声明后才参与扫描，因此升级引擎不会静默改变既有门禁结果。规则 id、注册表条目、键点验证脚本（`validate-ts-modern.js` / `validate-modern-packs.js`）与本文档四处必须同步。
+> **五个语言包的共同契约**（§14 `ts-modern`、§15 `rust-modern`、§16 `gdscript-modern`、§16b `gdscript-game`、§16c `vscode-extension`）：均为「内容型分析器」，实现 `finalize()` 并共用 `src/core/sourceMask.ts` 的掩码能力；全部默认关闭，声明后才参与扫描，因此升级引擎不会静默改变既有门禁结果。规则 id、注册表条目、键点验证脚本与本文档四处必须同步。
 
 ---
 
@@ -624,4 +635,36 @@ $$\text{问题位置} \longrightarrow \text{规范类别} \longrightarrow \text{
 | 规则 ID | 级别 | 触发条件 | 治理策略 |
 | :--- | :--- | :--- | :--- |
 | `TST-TOP-001` | `warning` | 跨语言测试范式错位（在 TS/GDScript 生产代码中内嵌测试代码域），或 Rust 内嵌测试未置于尾部分区 / 缺少 Agent 意图契约。 | 将非 Rust 内嵌测试迁移至显式独立测试文件，Rust 测试收敛至尾部 #[cfg(test)] 并补充 Case/Assertion 注释。 |
+
+## 30. Go 现代化审查器 (`go-modern` / `GOM-*`) — 5 条
+
+面向 Go 语言惯用契约（上下文传播、错误处理、接收器与包注释）的规范内化审查：
+
+| 规则 ID | 级别 | 触发条件 | 治理策略 |
+| :--- | :--- | :--- | :--- |
+| `GOM-CTX-001` | `warning` | `basic` 及以上 | context.Context 不是函数的首个形参。 |
+| `GOM-ERR-001` | `warning` | `basic` 及以上 | 使用 _ 静默丢弃错误返回值。 |
+| `GOM-STYLE-001` | `info` | `basic` 及以上 | 方法接收器命名不符合 Go 惯例。 |
+| `GOM-STYLE-002` | `info` | `basic` 及以上 | 错误变量未以 err 开头。 |
+| `GOM-STYLE-003` | `info` | `basic` 及以上 | 导出包注释或包命名不符合规范。 |
+
+## 31. Shell 与 PowerShell 脚本审查器 (`shell-lint` / `SH-*` `PS-*`) — 13 条
+
+面向 Shell 与 PowerShell 脚本的可移植性、引用安全与严格模式的静态审查：
+
+| 规则 ID | 级别 | 触发条件 | 治理策略 |
+| :--- | :--- | :--- | :--- |
+| `SH-ARRAY-001` | `info` | `basic` 及以上 | 使用 $* 代替了 "$@" 导致单词分割失效。 |
+| `SH-CMD-001` | `info` | `basic` 及以上 | 使用了已过时的反引号命令替换语法。 |
+| `SH-DEPR-001` | `info` | `basic` 及以上 | 使用了单中括号 [ 或旧式废弃测试语法。 |
+| `SH-ECHO-001` | `info` | `basic` 及以上 | 使用了不可移植的 echo -e / echo -n。 |
+| `SH-ERR-001` | `warning` | `basic` 及以上 | 关键命令执行后未进行错误退出码判定。 |
+| `SH-INIT-001` | `warning` | `basic` 及以上 | Shell 脚本头部未声明 set -euo pipefail 严格模式。 |
+| `SH-QUOTE-001` | `warning` | `basic` 及以上 | 参数展开未加双引号保护存在单词拆分与通配隐患。 |
+| `SH-READ-001` | `info` | `basic` 及以上 | read 命令未携带 -r 参数导致反斜杠被转义篡改。 |
+| `PS-ALIAS-001` | `info` | `basic` 及以上 | PowerShell 脚本使用了不推荐的命令别名。 |
+| `PS-CMDLET-001` | `info` | `basic` 及以上 | 函数命名不符合 Verb-Noun 动名词规范。 |
+| `PS-ERROR-001` | `warning` | `basic` 及以上 | PowerShell 中存在空 catch 或未捕获的错误。 |
+| `PS-PARAM-001` | `info` | `basic` 及以上 | 参数块缺失 [CmdletBinding()] 或参数未声明强类型。 |
+| `PS-VERB-001` | `info` | `basic` 及以上 | 使用了未批准的 PowerShell 动词。 |
 
