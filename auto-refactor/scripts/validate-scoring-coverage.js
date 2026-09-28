@@ -104,18 +104,23 @@ async function scanWith(root, analyzers, files = FIXTURE) {
 /**
  * Recompute the weighted composite over an evaluated-dimension subset.
  *
+ * Mirrors the engine's weighted geometric mean with the same index floor, so a drift
+ * between this reference and `computeCompositeScore` fails the gate.
+ *
  * @param indices - Reported dimension indices.
  * @param evaluated - Dimensions that were actually measured.
  * @returns Expected composite score.
  */
 function expectedComposite(indices, evaluated) {
-  let weighted = 0;
+  let logSum = 0;
   let weight = 0;
   for (const dim of evaluated) {
-    weighted += indices[dim] * DEFAULT_QUALITY_WEIGHTS[dim];
+    const index = Math.max(15, Math.min(100, indices[dim]));
+    logSum += DEFAULT_QUALITY_WEIGHTS[dim] * Math.log(index);
     weight += DEFAULT_QUALITY_WEIGHTS[dim];
   }
-  return Math.round((weighted / (weight || 1)) * 10) / 10;
+  if (weight <= 0) return Number.NaN;
+  return Math.round(Math.exp(logSum / weight) * 10) / 10;
 }
 
 /**
@@ -280,8 +285,20 @@ async function checkControlScan(root, narrow) {
   );
   assert.strictEqual(
     full.formulas.familyDimensions['GOV-TYP'],
-    'architectureConsistency',
-    'GOV-TYP rules must route to architectureConsistency',
+    'semanticPurity',
+    'GOV-TYP loose-typing rules must route to semanticPurity, matching where the rule table ' +
+      'charges them (routing them to architectureConsistency charged one finding twice, ' +
+      'across two axes)',
+  );
+  assert.strictEqual(
+    full.formulas.familyDimensions['CPX-NEST'],
+    'maintainability',
+    'CPX-NEST nesting rules must route to maintainability, matching the rule table',
+  );
+  assert.strictEqual(
+    full.formulas.familyDimensions['TST-TOP'],
+    'maintainability',
+    'TST-TOP test-topology rules must route to maintainability, matching the rule table',
   );
   assert.ok(
     full.formulas.composite.includes('evaluated') && full.formulas.coverage.includes('evaluated'),

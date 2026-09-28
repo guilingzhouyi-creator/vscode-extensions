@@ -24,6 +24,7 @@ const {
   defaultPraxisGovernanceService,
   RULE_GOV_GAM_001,
 } = require('../dist/api');
+const { resolveQualityGrade } = require('../dist/core/scoring/scorer-formulas');
 
 async function main() {
   console.log(
@@ -47,8 +48,16 @@ async function main() {
   const breakdown = synthesizeEightPillars(baseIndices, 88, 92);
   assert.ok(breakdown.compositeScore > 80 && breakdown.compositeScore < 95);
   assert.strictEqual(breakdown.pillars.security, 100);
-  assert.strictEqual(breakdown.pillars.data, 88);
+  // The data pillar averages its override with semanticPurity. It used to fall back to
+  // architectureConsistency, which handed that one ten-dimension index an effective 0.25
+  // weight (0.15 architecture + 0.10 data) — more than any real axis.
+  assert.strictEqual(breakdown.pillars.data, 89); // (88 override + 90 semanticPurity) / 2
   assert.strictEqual(breakdown.pillars.testing, 92);
+  assert.notStrictEqual(
+    breakdown.pillars.data,
+    breakdown.pillars.architecture,
+    'the data pillar must not mirror the architecture pillar',
+  );
   console.log('✔ Eight-pillar synthesis computed correct weighted breakdown.');
 
   // 2. Non-linear Risk Model & Anti-Dilution Ceilings
@@ -182,9 +191,24 @@ async function main() {
     projectScore.eightPillars.pillars.architecture <= 45,
     'Fatal issue in file3 must cap project arch pillar',
   );
-  assert.ok(['A', 'B', 'C'].includes(projectScore.grade));
+  // Grade bands are evenly spaced (90/80/70/60/50) and shared with the ten-dimension
+  // snapshot model. This composite lands at 91.8, which the previous 95/85/75/65/50 scale
+  // read as an A and the current scale reads as an A+. The assertion pins the band to the
+  // shared resolver so the two scoring surfaces cannot drift apart again.
+  assert.strictEqual(
+    projectScore.grade,
+    resolveQualityGrade(projectScore.compositeScore),
+    'project grade must follow the shared grade cut-offs, not a private scale',
+  );
+  // Known limitation, recorded rather than asserted away: fatalCount is tallied and
+  // reported but does not enter the composite, so a repository with a fatal finding can
+  // still grade A+. The arch pillar cap above is what currently bounds the blast radius.
+  // Making fatalCount gate the composite is a separate decision (see the round-2 plan).
+  assert.strictEqual(projectScore.fatalCount, 1, 'fatal findings must still be counted');
   console.log(
-    `✔ Five-level hierarchical scoring passed (Composite: ${projectScore.compositeScore}).`,
+    `✔ Five-level hierarchical scoring passed (Composite: ${projectScore.compositeScore}, ` +
+      `Grade: ${projectScore.grade}, fatalCount: ${projectScore.fatalCount} — note that ` +
+      `fatalCount is reported but not yet folded into the composite).`,
   );
 
   // 6. Patch Quality Quantification (Before / After / Delta)

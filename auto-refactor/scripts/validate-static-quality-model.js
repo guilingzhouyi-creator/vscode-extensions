@@ -67,7 +67,14 @@ async function main() {
   assert.strictEqual(vector.A, 92.0);
   assert.strictEqual(vector.M, 88.0);
   assert.strictEqual(vector.P, 95.0);
-  assert.strictEqual(vector.D, 92.0); // defaults to architectureConsistency
+  // D used to default to architectureConsistency, which made this axis identical to A. It now
+  // derives from the axes that describe data quality: (duplication + semanticPurity) / 2.
+  assert.strictEqual(vector.D, 92.5); // (95 + 90) / 2
+  assert.notStrictEqual(
+    vector.D,
+    vector.A,
+    'the data axis must not be a copy of the architecture axis',
+  );
   assert.strictEqual(vector.T, 82.0); // modernity
   assert.strictEqual(vector.R, 85.0); // (90 + 80) / 2
   assert.strictEqual(vector.E, 90.0); // (85 + 90 + 95) / 3

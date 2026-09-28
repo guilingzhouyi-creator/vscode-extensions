@@ -248,7 +248,7 @@ const NEGATIVE_FIXTURES = {
     const { requiresRuntimeCount, averageConfidence } = uncertainty;
     console.log(
       `  Uncertainty summary: requiresRuntimeCount=${requiresRuntimeCount}, ` +
-      `averageConfidence=${averageConfidence}`,
+        `averageConfidence=${averageConfidence}`,
     );
 
     // The summary must describe the issue list it is published with, not an earlier revision.
@@ -257,7 +257,7 @@ const NEGATIVE_FIXTURES = {
       runtimeIssues.length,
       requiresRuntimeCount,
       `summary.requiresRuntimeCount (${requiresRuntimeCount}) must equal the issue list ` +
-      `(${runtimeIssues.length})`,
+        `(${runtimeIssues.length})`,
     );
 
     // `averageConfidence` is the mean over evidence-bearing findings only. With none it must be
@@ -296,7 +296,7 @@ const NEGATIVE_FIXTURES = {
     const fpRate = cmpOnNegative / cmpTotal;
     console.log(
       `  CMP emissions=${cmpTotal}, on negative corpus=${cmpOnNegative} ` +
-      `(FP rate ${(fpRate * 100).toFixed(2)}%)`,
+        `(FP rate ${(fpRate * 100).toFixed(2)}%)`,
     );
     assert.strictEqual(cmpOnNegative, 0, 'idiomatic constructs must produce zero CMP findings');
     console.log(
@@ -307,14 +307,14 @@ const NEGATIVE_FIXTURES = {
     // shared masked view. Keeping them silent is the regression this suite exists to catch, and
     // they are the reason the synthetic corpus alone is not sufficient evidence.
     const productionSilent = [
-      'src/core/multilang.ts',
+      'src/core/ast/multilang.ts',
       'src/core/router/diffClassifier.ts',
       'src/analyzers/simplify.ts',
       'src/core/dependency-graph.ts',
       'src/core/governance/rules/exceptionSafety.ts',
-      'src/core/incremental-state.ts',
+      'src/core/diff/incremental-state.ts',
       'src/core/reporters.ts',
-      'src/core/typescript-adapter.ts',
+      'src/core/ast/typescript-adapter.ts',
       'src/daemon/server.ts',
       'src/index.ts',
       'src/analyzers/security.ts',
@@ -323,6 +323,16 @@ const NEGATIVE_FIXTURES = {
     let productionHits = 0;
     for (const rel of productionSilent) {
       const abs = path.join(__dirname, '..', rel);
+      // Several of these paths have been moved between domain subdirectories over time
+      // (multilang and typescript-adapter now live under core/ast, incremental-state under
+      // core/diff). A stale entry used to surface as a raw ENOENT stack, which reads like an
+      // analyzer crash rather than a fixture that needs updating.
+      if (!fs.existsSync(abs)) {
+        throw new Error(
+          `guard file moved or removed: ${rel}. Update the productionSilent list in ` +
+            `${path.basename(__filename)} to its current location.`,
+        );
+      }
       const content = fs.readFileSync(abs, 'utf8');
       const analyzer = new GovernanceAnalyzer();
       const fileIssues = analyzer.analyze(

@@ -160,13 +160,9 @@ describe('ScopeGraph', () => {
 
     describe('shadow detection', () => {
         it('detects name hiding across scope boundaries', () => {
-            const source = [
-                'const x = 1;',
-                'function foo() {',
-                '  const x = 2;',
-                '}',
-                '',
-            ].join('\n');
+            const source = ['const x = 1;', 'function foo() {', '  const x = 2;', '}', ''].join(
+                '\n',
+            );
             const graph = buildTS(source);
             const root = graph.getRoot()!;
             const fnScope = root.children[0];
@@ -184,13 +180,9 @@ describe('ScopeGraph', () => {
         });
 
         it('returns false when there is only one binding in the chain', () => {
-            const source = [
-                'const x = 1;',
-                'function foo() {',
-                '  const y = 2;',
-                '}',
-                '',
-            ].join('\n');
+            const source = ['const x = 1;', 'function foo() {', '  const y = 2;', '}', ''].join(
+                '\n',
+            );
             const graph = buildTS(source);
             const root = graph.getRoot()!;
             const fnScope = root.children[0];
@@ -203,13 +195,13 @@ describe('ScopeGraph', () => {
     describe('getScopeAtLine', () => {
         it('finds the innermost scope containing a line', () => {
             const source = [
-                'const x = 1;',          // line 1
-                'function outer() {',    // line 2
-                '  const a = 1;',        // line 3
-                '  function inner() {',  // line 4
-                '    const b = 2;',      // line 5
-                '  }',                   // line 6
-                '}',                     // line 7
+                'const x = 1;', // line 1
+                'function outer() {', // line 2
+                '  const a = 1;', // line 3
+                '  function inner() {', // line 4
+                '    const b = 2;', // line 5
+                '  }', // line 6
+                '}', // line 7
                 '',
             ].join('\n');
             const graph = buildTS(source);
@@ -290,12 +282,7 @@ describe('ScopeGraph', () => {
         });
 
         it('shadow detection works with Python adapter', () => {
-            const source = [
-                'x = 1',
-                'def foo():',
-                '    x = 2',
-                '',
-            ].join('\n');
+            const source = ['x = 1', 'def foo():', '    x = 2', ''].join('\n');
             const graph = buildPy(source);
             const root = graph.getRoot()!;
 
@@ -366,13 +353,9 @@ describe('ScopeGraph', () => {
 
     describe('binding kinds', () => {
         it('correctly distinguishes variable / function / class', () => {
-            const source = [
-                'const C = 1;',
-                'let v = 2;',
-                'function f() {}',
-                'class K {}',
-                '',
-            ].join('\n');
+            const source = ['const C = 1;', 'let v = 2;', 'function f() {}', 'class K {}', ''].join(
+                '\n',
+            );
             const graph = buildTS(source);
             const root = graph.getRoot()!;
 

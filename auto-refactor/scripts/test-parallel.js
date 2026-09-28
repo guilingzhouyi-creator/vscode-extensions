@@ -84,6 +84,19 @@ const PARALLEL_SUITES = [
   { name: 'validate-ring-buffer-bus', script: 'scripts/validate-ring-buffer-bus.js' },
   { name: 'validate-topology-cache', script: 'scripts/validate-topology-cache.js' },
   { name: 'validate-native-bridge', script: 'scripts/validate-native-bridge.js' },
+  { name: 'validate-native-parity', script: 'scripts/validate-native-parity.js' },
+  { name: 'validate-dimension-consistency', script: 'scripts/validate-dimension-consistency.js' },
+  { name: 'validate-suite-manifest', script: 'scripts/validate-suite-manifest.js' },
+  { name: 'validate-report-schema', script: 'scripts/validate-report-schema.js' },
+  // Language-pack suites: these are the only coverage the Go and shell/powershell rule
+  // families have, so leaving them unregistered meant GOM-*/SH-*/PS-* could regress silently.
+  { name: 'validate-go-support', script: 'scripts/validate-go-support.js' },
+  { name: 'validate-shell-lint', script: 'scripts/validate-shell-lint.js' },
+  { name: 'validate-scope-graph', script: 'scripts/validate-scope-graph.js' },
+  { name: 'validate-scope-graph-streaming', script: 'scripts/validate-scope-graph-streaming.js' },
+  { name: 'validate-redos-security', script: 'scripts/validate-redos-security.js' },
+  { name: 'validate-shadowing', script: 'scripts/validate-shadowing.js' },
+  { name: 'validate-no-empty-scripts', script: 'scripts/validate-no-empty-scripts.js' },
   { name: 'validate-tensor-partitions', script: 'scripts/validate-tensor-partitions.js' },
   { name: 'validate-agent-quota-gateway', script: 'scripts/validate-agent-quota-gateway.js' },
   { name: 'validate-scalable-e2e', script: 'scripts/validate-scalable-e2e.js' },
@@ -277,6 +290,52 @@ const SEQUENTIAL_SUITES = [
 ];
 
 /**
+ * Run the vitest unit suite as part of the aggregate gate.
+ *
+ * vitest is a CLI rather than a script file, so it cannot go through `runScriptAsync`
+ * (which spawns node against a .js path). It is invoked through the local binary instead.
+ *
+ * @param skip - Whether an earlier stage already failed and --bail was set.
+ * @returns Suite-shaped result, or null when skipped.
+ */
+async function runVitestUnit(skip) {
+  if (skip) {
+    return null;
+  }
+  console.log('\n--- [Unit Suites] Executing vitest tests/unit ---');
+  const start = Date.now();
+  const bin = path.join(
+    ROOT,
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'vitest.cmd' : 'vitest',
+  );
+  const res = await new Promise((resolve) => {
+    const child = spawn(bin, ['run'], {
+      cwd: ROOT,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('error', (err) => resolve({ code: 1, stdout, stderr: String(err) }));
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+  });
+  return {
+    name: 'vitest-unit',
+    script: 'vitest run',
+    code: res.code,
+    ok: res.code === 0,
+    durationMs: Date.now() - start,
+    stdout: res.stdout,
+    stderr: res.stderr,
+  };
+}
+
+/**
  * Execute a single script asynchronously and capture its result.
  *
  * @param scriptRel - Script path relative to ROOT.
@@ -454,6 +513,13 @@ async function main() {
       `\n--- [Serial Suites] Executing ${sequentialList.length} Stateful/Daemon Suites Sequentially ---`,
     );
     await runSequentialSuites(sequentialList, bail, passed, failed);
+  }
+
+  // Vitest unit tests live in tests/unit/ and were previously absent from this engine, so
+  // `npm test` (and therefore `npm run gate`) could pass while every unit assertion failed.
+  const unitResult = await runVitestUnit(bail && failed.length > 0);
+  if (unitResult) {
+    recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
   }
 
   const totalTime = ((Date.now() - overallStart) / 1000).toFixed(2);

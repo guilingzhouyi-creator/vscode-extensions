@@ -133,6 +133,26 @@
       "matchFile": "scripts/**",
       "matchRule": "hardcoded-string",
       "reason": "脚本目录是校验器与基准夹具：其中的路径、期望值与横幅是构造输入和断言文本，不是产品里应外部化的配置。分类器已先在语义层提纯（报告文案/glob/常规记号），此处只兜住夹具残留；产品代码（src/**）仍逐条要求提取。"
+    },
+    {
+      "matchFile": "crates/**/tests.rs",
+      "matchRule": "magic-number",
+      "reason": "N-API 暴露层的单元测试：其中的 64/3/4 是签名长度、菱形图边数等被断言的输入常量，逐个具名只会让断言更难读。与 scripts/** 的夹具同一判据；Rust 生产代码由 clippy -D warnings 把关。"
+    },
+    {
+      "matchFile": "crates/**/tests.rs",
+      "matchRule": "hardcoded-string",
+      "reason": "同上：图节点名 'a'/'b'/'seed' 与源码片段是被断言的输入，提取成常量会掩盖它们只是夹具值。"
+    },
+    {
+      "matchFile": "crates/**/tests.rs",
+      "matchRule": "duplicate-literal",
+      "reason": "同上：重复出现的 'a'/'b'/'seed' 是同一组夹具图节点，共享常量反而会削弱每个断言的独立可读性。"
+    },
+    {
+      "matchFile": "crates/**",
+      "matchRule": "large-file",
+      "reason": "Rust 运算符库按算法内聚为单文件（Tarjan 支配树、最小哈希、掩码状态机），行数阈值是 TS 侧的物理行口径，不适用于按算法组织的 Rust 模块；真实复杂度由 clippy 把关。"
     }
   ],
   "classifyLiterals": true,

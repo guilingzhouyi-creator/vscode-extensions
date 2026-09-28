@@ -41,16 +41,14 @@ describe('auditRegexSafety — pattern safety detection', () => {
 
     it('detects alternation inside quantifier (a|aa)*', () => {
         const warnings = auditRegexSafety('(a|aa)*');
-        expect(
-            warnings.some((w) => w.includes('Alternation inside quantified group')),
-        ).toBe(true);
+        expect(warnings.some((w) => w.includes('Alternation inside quantified group'))).toBe(true);
     });
 
     it('detects backreference inside quantified group (a\\1)+', () => {
         const warnings = auditRegexSafety('(a\\1)+');
-        expect(
-            warnings.some((w) => w.includes('Backreference inside quantified group')),
-        ).toBe(true);
+        expect(warnings.some((w) => w.includes('Backreference inside quantified group'))).toBe(
+            true,
+        );
     });
 
     it('warns about long alternation chains (>20 pipes)', () => {

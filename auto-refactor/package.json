@@ -26,13 +26,17 @@
     "gate:comments:update": "node scripts/gate-comments.js --update",
     "gate:self": "node scripts/gate-self.js",
     "gate:self:warning": "node scripts/gate-self.js --severity warning",
+    "gate:self:warning:update": "node scripts/gate-self.js --severity warning --update",
     "gate:self:slice": "node scripts/gate-self-slice.js",
     "gate:self:slice:warning": "node scripts/gate-self-slice.js --severity warning",
-    "gate:rust": "cargo clippy --manifest-path crates/Cargo.toml --workspace --exclude auto-refactor-core --all-targets -- -D warnings && cargo fmt --manifest-path crates/Cargo.toml --all -- --check && node scripts/test-rust.js",
+    "gate:rust": "node scripts/gate-rust.js",
     "test:rust": "node scripts/test-rust.js",
     "benchmark": "node scripts/benchmark.js",
     "benchmark:native": "node scripts/validate-native-benchmark.js",
-    "gate": "npm run gate:rust && npm run build && npm run format:check && npm run lint && npm run gate:comments && npm run gate:self && npm run gate:self:warning && npm test",
+    "validate-native-parity": "node scripts/validate-native-parity.js",
+    "validate-dimension-consistency": "node scripts/validate-dimension-consistency.js",
+    "gate": "npm run gate:rust && npm run build && npm run format:check && npm run lint && npm run gate:comments && npm run gate:self && npm test",
+    "gate:full": "npm run gate && npm run gate:self:warning",
     "pretest": "npm run build",
     "test": "node scripts/test-parallel.js",
     "test:unit": "vitest run",
@@ -153,11 +157,25 @@
     "declarative"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist/",
+    "crates/*/index.node",
+    "config.schema.json",
+    "report.schema.json",
+    "presets/",
+    "templates/",
+    "README.md",
+    "DOCS.md"
+  ],
   "dependencies": {
     "oxc-parser": "0.144.0",
     "tree-sitter": "^0.22.4",
     "tree-sitter-python": "^0.23.6",
-    "tree-sitter-rust": "^0.24.0"
+    "tree-sitter-rust": "^0.24.0",
+    "typescript": "^5.3.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
@@ -167,7 +185,6 @@
     "eslint-plugin-jsdoc": "^62.9.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.6",
-    "typescript": "^5.3.3",
     "typescript-eslint": "^8.70.0",
     "vite": "^8.3.1",
     "vitest": "^5.0.1"

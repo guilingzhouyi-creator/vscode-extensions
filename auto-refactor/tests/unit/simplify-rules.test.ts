@@ -176,7 +176,9 @@ function byRule(rule: string, issueList: Issue[] = issues): Issue[] {
 }
 
 function filesForRule(rule: string): string[] {
-    return byRule(rule).map((i) => i.location.file).sort();
+    return byRule(rule)
+        .map((i) => i.location.file)
+        .sort();
 }
 
 describe('Simplify Analyzer Rules', () => {

@@ -63,7 +63,7 @@ if (!fs.existsSync(CLI)) {
 if (!update && !fs.existsSync(BASELINE)) {
   process.stderr.write(
     `[gate:self] baseline missing: ${path.relative(ROOT, BASELINE)}\n` +
-      '[gate:self] run "npm run gate:self:update" to freeze the current state first\n',
+      '[gate:self] run "node scripts/gate-self.js --update" to freeze the current state first\n',
   );
   process.exit(2);
 }

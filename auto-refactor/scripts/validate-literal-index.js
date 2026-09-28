@@ -19,7 +19,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { NodeKind } = require('../dist/core/multilang.js');
+// multilang was moved under core/ast when the adapter layer was split out of core/; the
+// earlier core/multilang.js path no longer resolves after a build.
+const { NodeKind } = require('../dist/core/ast/multilang.js');
 const {
   LiteralIndex,
   LITERAL_ROLE,

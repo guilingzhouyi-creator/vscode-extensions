@@ -270,7 +270,7 @@ const jargonPatterns = [
 ];
 
 const safeJargon = jargonPatterns.filter((p) => isRegexSafe(p));
-assert.ok(safeJargon.length > 0, 'Should find safe jargon patterns');
+assert(safeJargon.length > 0, 'Should find safe jargon patterns');
 // (wip|todo)+ has alternation inside + quantifier → should be flagged
 const hasUnsafe = jargonPatterns.some((p) => !isRegexSafe(p));
 assert(hasUnsafe, 'At least one jargon pattern is correctly flagged as unsafe');
@@ -309,7 +309,7 @@ let tokenCount = 0;
 const { ms: tokenMs } = measure(() => {
   tokenCount = safeRegexExecLoop(tokenRe2, longMixed, () => true, 50);
 });
-assert.ok(tokenCount >= 0, 'tokenCount should be non-negative');
+assert(tokenCount >= 0, 'tokenCount should be non-negative');
 assert(
   tokenMs < TIMEOUT_MS,
   `TOKEN_RE exec loop (capped at 50) on 10k alphanumeric: ${tokenMs.toFixed(3)}ms (< ${TIMEOUT_MS}ms)`,

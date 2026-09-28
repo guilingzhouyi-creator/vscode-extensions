@@ -23,10 +23,15 @@ function runRustTests() {
   console.log('=== [Rust Native Operators] Running Pure-Rust Unit Tests ===');
   console.log(`Directory: ${CRATES_DIR}`);
 
+  // `auto-refactor-core` is no longer excluded. It is the N-API boundary — the only place the
+  // Rust/JavaScript argument shapes are defined — and excluding it left that layer with no
+  // clippy and no tests. A dropped argument there reached production before: the JS bridge
+  // called `maskSourceCode` with one argument while the binding takes two, and every native
+  // masking call threw at runtime.
   const command =
     process.platform === 'win32'
-      ? 'cargo +stable-x86_64-pc-windows-gnu test --workspace --exclude auto-refactor-core'
-      : 'cargo test --workspace --exclude auto-refactor-core';
+      ? 'cargo +stable-x86_64-pc-windows-gnu test --workspace'
+      : 'cargo test --workspace';
 
   console.log(`Executing: ${command}`);
   try {
