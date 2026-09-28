@@ -78,6 +78,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         'stdlib',
         'naming',
         'gdscript-game',
+        'vscode-extension',
     ],
     semanticPurity: ['governance', 'hygiene', 'dependency-graph', 'stdlib'],
     codeSecurity: ['architecture', 'security', 'secrets'],
@@ -88,18 +89,19 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         'gdscript-game',
         'vscode-extension',
     ],
-    standardization: ['hygiene', 'large-file', 'dependency-layout', 'stdlib', 'naming'],
+    standardization: ['hygiene', 'large-file', 'dependency-layout', 'stdlib', 'naming', 'docs'],
     modernity: [
         'governance',
         'ts-modern',
         'python-modern',
         'rust-modern',
         'gdscript-modern',
+        'gdscript-game',
         'test-modernity',
     ],
-    maintainability: ['complexity', 'large-file', 'test-modernity', 'stdlib'],
-    commentQuality: ['comments'],
-    duplication: ['constants'],
+    maintainability: ['complexity', 'large-file', 'test-modernity', 'stdlib', 'gdscript-game'],
+    commentQuality: ['comments', 'vscode-extension'],
+    duplication: ['constants', 'hygiene'],
     techDebtRisk: ['governance'],
 };
 
@@ -185,7 +187,13 @@ export interface QualityScoreBreakdown {
     /** Complete transparent audit trail explaining all deductions */
     rationales: QualityScoreRationale[];
     /** Evaluation timestamp (epoch ms) */
-    evaluatedAt: number; /** Dimensions whose analyzers did not run; excluded from the weighted
+    evaluatedAt: number;
+    /**
+     * Present when the project aggregate excluded files that had metrics but no per-file
+     * score. Such files still count towards `filesScanned`, so their absence would bias the
+     * composite downward with no visible cause; this makes the gap auditable.
+     */
+    skippedFileWarning?: string; /** Dimensions whose analyzers did not run; excluded from the weighted
         composite. */
     notEvaluated?: QualityDimension[];
     /** Share of the total weight that was actually measured (0.0-1.0). */
@@ -221,6 +229,12 @@ export interface QualityScoreBreakdown {
         indexMapping: string;
         /** Half-point `H` of the density curve: at density H the index is exactly 50. */
         saturationHalfpoint: number;
+        /**
+         * Index floor applied before the composite's geometric mean. Publishing it lets a
+         * consumer re-derive the score; the index floor is what keeps a collapsed axis from
+         * driving the whole aggregate to zero.
+         */
+        compositeIndexFloor?: number;
         /** Which dimensions score by absolute count versus defect density. */
         dimensionScaleMode: Record<QualityDimension, 'absolute' | 'density'>;
         composite: string;

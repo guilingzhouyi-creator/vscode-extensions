@@ -398,7 +398,8 @@ export function effectivePenaltyFromIndex(index: number): number {
  *
  * @param fileQualityScores - Map of file path to individual QualityScoreBreakdown.
  * @param fileMetrics - Per-file metric records of this scan.
- * @returns Aggregated raw scores, total weight, and collected rationales.
+ * @returns Aggregated raw scores, total weight, collected rationales, and the files that
+ *   were present in `fileMetrics` but had no score entry.
  */
 export function accumulateProjectMetrics(
     fileQualityScores: Record<string, import('./scoringTypes').QualityScoreBreakdown>,
@@ -407,6 +408,7 @@ export function accumulateProjectMetrics(
     rawScores: Record<QualityDimension, number>;
     totalWeight: number;
     allRationales: QualityScoreRationale[];
+    skippedFiles: string[];
 } {
     const rawScores = {} as Record<QualityDimension, number>;
     for (const dim of ALL_QUALITY_DIMENSIONS) {
@@ -414,10 +416,20 @@ export function accumulateProjectMetrics(
     }
     let totalWeight = 0;
     const allRationales: QualityScoreRationale[] = [];
+    // A file present in `fileMetrics` but absent from `fileQualityScores` would otherwise
+    // vanish from the project score while still being counted in `filesScanned`, leaving
+    // no trace anywhere in the report. This cannot happen on the current cold path (both
+    // are driven from the same array) but the warm/incremental path rebuilds the score map
+    // separately, where a key mismatch (notably `\` vs `/` separators on Windows) would drop
+    // the file silently. Counted and reported rather than skipped quietly.
+    const skippedFiles: string[] = [];
 
     for (const m of fileMetrics) {
         const fScore = fileQualityScores[m.file];
-        if (!fScore) continue;
+        if (!fScore) {
+            skippedFiles.push(m.file);
+            continue;
+        }
 
         const weight = Math.max(1, m.nonBlankLines || m.lines || 1);
         totalWeight += weight;
@@ -432,5 +444,5 @@ export function accumulateProjectMetrics(
         }
     }
 
-    return { rawScores, totalWeight, allRationales };
+    return { rawScores, totalWeight, allRationales, skippedFiles };
 }

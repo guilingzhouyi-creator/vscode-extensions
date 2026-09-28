@@ -684,6 +684,59 @@ export const DEDUCTION_HEADLESS_DECOUPLING_VIOLATION = 20;
 /** Points deducted for direct configuration access violation. */
 export const DEDUCTION_CONFIG_LEAK_VIOLATION = 20;
 
+// ── 冗余（redundancy）族 ────────────────────────────────────────────────────────
+// These rules were registered but had no explicit deduction row, so each one fell through
+// to whichever `anyFinding` catch-all happened to sit in its analyzer's block and was charged
+// to a semantically wrong axis. Each now names its own axis and weight.
+
+/** Points deducted when a file contains an unreferenced declaration of its own. */
+export const DEDUCTION_UNUSED_DECLARATION = 8;
+/** Points deducted for an exported symbol nothing consumes, per occurrence. */
+export const DEDUCTION_UNUSED_EXPORT = 5;
+/** Points deducted for a module no file imports, and which exports symbols. */
+export const DEDUCTION_UNUSED_MODULE = 5;
+/** Points deducted for vacuous passthrough or redundant zero-argument wrapper functions. */
+export const DEDUCTION_VACUOUS_WRAPPER = 8;
+/** Points deducted for duplicated code blocks inside one file. */
+export const DEDUCTION_DUPLICATE_CODE_BLOCK = 8;
+/** Points deducted for near-identical code blocks repeated across files. */
+export const DEDUCTION_CROSS_FILE_CLONE = 6;
+/** Points deducted for over-abstraction and unnecessary indirection layers. */
+export const DEDUCTION_UNNECESSARY_ABSTRACTION = 10;
+/** Points deducted for a function or method with no call site anywhere in the repository. */
+export const DEDUCTION_UNREFERENCED_FUNCTION = 5;
+/** Points deducted for a local variable declared and never read again. */
+export const DEDUCTION_UNUSED_LOCAL = 5;
+/** Points deducted for a mechanically redundant comment. */
+export const DEDUCTION_MEANINGLESS_COMMENT = 5;
+/** Points deducted for repeated prose inside one document. */
+export const DEDUCTION_DOCUMENT_DUPLICATION = 5;
+/** Points deducted for same-domain literals left unconsolidated within a call scope. */
+export const DEDUCTION_UNCONSOLIDATED_LITERALS = 6;
+/** Points deducted for the same semantic constant drifting or splitting across files. */
+export const DEDUCTION_CONSTANT_NAME_SPLIT = 6;
+/** Points deducted for scattered same-kind literals inside one function body. */
+export const DEDUCTION_SCATTERED_LOCALS = 4;
+/** Points deducted for an unnecessary resource-management indirection (dispose/close). */
+export const DEDUCTION_VACUOUS_RESOURCE_GUARD = 8;
+/** Points deducted for a declaration bound to a redundant alias. */
+export const DEDUCTION_REDUNDANT_ALIAS = 5;
+/** Points deducted for redundant boolean logic (SIM-DED lineage). */
+export const DEDUCTION_REDUNDANT_BOOLEAN = 5;
+
+// ── 宿主语言包（VS Code 扩展 / Godot）专用 ────────────────────────────────────────
+
+/** Points deducted when a Disposable or listener is never registered for cleanup. */
+export const DEDUCTION_UNDISPOSED_RESOURCE = 15;
+/** Points deducted for blocking synchronous I/O on the extension host main thread. */
+export const DEDUCTION_MAIN_THREAD_BLOCKING_IO = 15;
+/** Points deducted for hard-coded user-facing text bypassing localisation. */
+export const DEDUCTION_UNLOCALIZED_TEXT = 8;
+/** Points deducted for an object-pool contract breach such as a skipped reset_state. */
+export const DEDUCTION_POOL_CONTRACT_BREACH = 12;
+/** Points deducted for a host-lifecycle or performance-budget contract violation. */
+export const DEDUCTION_HOST_LIFECYCLE_BREACH = 10;
+
 /** Rule id legacy form for nested constant anti-patterns. */
 export const RULE_NESTED_CONSTANT = 'nested-constant';
 /** Points deducted for nested constant anti-patterns and redundant aliases. */

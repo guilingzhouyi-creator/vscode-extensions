@@ -35,9 +35,13 @@ import {
     ANALYZER_HYGIENE,
     ANALYZER_DEPENDENCY_GRAPH,
     ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_DOCS,
     ANALYZER_TEST_MODERNITY,
     ANALYZER_DEPENDENCY_LAYOUT,
     ANALYZER_STDLIB,
+    ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GDSCRIPT_GAME,
     ANALYZER_NAMING,
     RULE_CPX_TIME_001,
     RULE_CPX_SPACE_001,
@@ -99,6 +103,20 @@ import {
     DEDUCTION_STDLIB_CONST,
     DEDUCTION_STDLIB_RECURSION,
     DEDUCTION_STDLIB_PORT,
+    DEDUCTION_UNDISPOSED_RESOURCE,
+    DEDUCTION_MAIN_THREAD_BLOCKING_IO,
+    DEDUCTION_UNLOCALIZED_TEXT,
+    DEDUCTION_POOL_CONTRACT_BREACH,
+    DEDUCTION_HOST_LIFECYCLE_BREACH,
+    DEDUCTION_DUPLICATE_CODE_BLOCK,
+    DEDUCTION_VACUOUS_WRAPPER,
+    DEDUCTION_UNNECESSARY_ABSTRACTION,
+    DEDUCTION_DOCUMENT_DUPLICATION,
+    DEDUCTION_MEANINGLESS_COMMENT,
+    DEDUCTION_UNCONSOLIDATED_LITERALS,
+    DEDUCTION_CONSTANT_NAME_SPLIT,
+    DEDUCTION_SCATTERED_LOCALS,
+    DEDUCTION_DISTRIBUTED_REDUNDANCY,
     RULE_NAM_DEC_001,
     DEDUCTION_NAMING_DECOUPLING,
 } from './dimensionLiterals';
@@ -270,6 +288,29 @@ export const DIMENSION_RULES: DimensionRule[] = [
         rationale: ScoringRationales.UNREACHABLE_DEAD_CODE,
     },
     {
+        // HYG-CLN-001 flags a repeated code block inside one file. It had no row of its own,
+        // so it fell through to the hygiene catch-all (or to nothing at all) and never
+        // reached the duplication axis it describes.
+        analyzer: ANALYZER_HYGIENE,
+        covers: ruleMatches(['HYG-CLN-001'], ['clone', 'duplicat', 'extract']),
+        dimension: DIMENSION_DUPLICATION,
+        points: DEDUCTION_DUPLICATE_CODE_BLOCK,
+        rationale: ScoringRationales.DUPLICATE_CODE_BLOCK,
+    },
+    {
+        // HYG-WRAP-001/002 are vacuous forwarding wrappers: a function whose whole body is
+        // `return other(...)`. They are structural noise rather than a hygiene naming issue,
+        // so they belong on the purity axis.
+        analyzer: ANALYZER_HYGIENE,
+        covers: ruleMatches(
+            ['HYG-WRAP-001', 'HYG-WRAP-002'],
+            ['wrapper', 'passthrough', 'forward'],
+        ),
+        dimension: DIMENSION_SEMANTIC_PURITY,
+        points: DEDUCTION_VACUOUS_WRAPPER,
+        rationale: ScoringRationales.VACUOUS_WRAPPER,
+    },
+    {
         analyzer: ANALYZER_DEPENDENCY_GRAPH,
         covers: ruleMatches(RULES_UNUSED_BINDING, ['unused']),
         dimension: DIMENSION_SEMANTIC_PURITY,
@@ -366,11 +407,42 @@ export const DIMENSION_RULES: DimensionRule[] = [
         rationale: ScoringRationales.MECHANICAL_SPLITTING,
     },
     {
+        // CPX-RED-001 reports near-identical algorithms spread over several files, i.e.
+        // distributed redundant complexity. Without its own row it was absorbed by the
+        // cyclomatic-complexity catch-all below, which charges the same 15 points a plain
+        // CC breach costs and describes the finding as a complexity problem instead of the
+        // duplication it actually is.
+        analyzer: ANALYZER_COMPLEXITY,
+        covers: ruleMatches(['CPX-RED-001'], ['redundan', 'similar', 'duplicate']),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_DISTRIBUTED_REDUNDANCY,
+        rationale: ScoringRationales.DISTRIBUTED_REDUNDANCY,
+    },
+    {
         analyzer: ANALYZER_COMPLEXITY,
         covers: anyFinding,
         dimension: DIMENSION_MAINTAINABILITY,
         points: DEDUCTION_CYCLOMATIC_COMPLEXITY,
         rationale: ScoringRationales.CYCLOMATIC_COMPLEXITY_HIGH,
+    },
+    {
+        // ARCH-ABS-001: over-abstraction and unnecessary indirection layers. The architecture
+        // analyzer is deducted by the family applier, which knows nothing about this rule, so
+        // without a row here the finding was reported but never charged to any axis.
+        analyzer: ANALYZER_ARCHITECTURE,
+        covers: ruleMatches(['ARCH-ABS-001'], ['abstraction', 'indirection', 'unnecessary']),
+        dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+        points: DEDUCTION_UNNECESSARY_ABSTRACTION,
+        rationale: ScoringRationales.UNNECESSARY_ABSTRACTION,
+    },
+    {
+        // DOC-DUP-001: repeated prose inside one document. The docs analyzer had no row at
+        // all, so its only finding type never affected the score.
+        analyzer: ANALYZER_DOCS,
+        covers: ruleMatches(['DOC-DUP-001'], ['duplicat', 'repeat', 'prose']),
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_DOCUMENT_DUPLICATION,
+        rationale: ScoringRationales.DOCUMENT_DUPLICATION,
     },
     // Comment quality — banned vocabulary, then missing public docs, then everything else.
     {
@@ -385,8 +457,18 @@ export const DIMENSION_RULES: DimensionRule[] = [
         rationale: ScoringRationales.BANNED_JARGON_IN_COMMENT,
     },
     {
+        // CMT-DOC-002 is a *redundant* comment (it only restates the symbol name), not a missing
+        // one. It shared a rule array with CMT-DOC-001, so it was charged the "missing public
+        // API doc" penalty and the two findings became indistinguishable in the audit trail.
         analyzer: ANALYZER_COMMENTS,
-        covers: ruleMatches(RULES_COMMENT_MISSING_DOC, ['missing']),
+        covers: ruleMatches(['CMT-DOC-002'], ['redundant', 'meaningless', 'tautolog']),
+        dimension: DIMENSION_COMMENT_QUALITY,
+        points: DEDUCTION_MEANINGLESS_COMMENT,
+        rationale: ScoringRationales.MEANINGLESS_COMMENT,
+    },
+    {
+        analyzer: ANALYZER_COMMENTS,
+        covers: ruleMatches(['CMT-DOC-001'], ['missing']),
         dimension: DIMENSION_COMMENT_QUALITY,
         points: DEDUCTION_MISSING_PUBLIC_API_DOC,
         rationale: ScoringRationales.MISSING_PUBLIC_API_DOC,
@@ -420,6 +502,31 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_DUPLICATION,
         points: DEDUCTION_NESTED_CONSTANT,
         rationale: ScoringRationales.NESTED_CONSTANT,
+    },
+    {
+        // CONST-CLU-001: same-domain literals left unconsolidated inside one call scope.
+        // CONST-DRF-001: the same semantic constant drifting or splitting across files.
+        // Both are consolidation debt on the duplication axis; previously they only reached
+        // the generic constants catch-all, which charged them as hardcoded strings.
+        analyzer: ANALYZER_CONSTANTS,
+        covers: ruleMatches(['CONST-CLU-001'], ['cluster', 'consolidat', 'cluster']),
+        dimension: DIMENSION_DUPLICATION,
+        points: DEDUCTION_UNCONSOLIDATED_LITERALS,
+        rationale: ScoringRationales.UNCONSOLIDATED_LITERALS,
+    },
+    {
+        analyzer: ANALYZER_CONSTANTS,
+        covers: ruleMatches(['CONST-DRF-001'], ['drift', 'split', 'divergen']),
+        dimension: DIMENSION_DUPLICATION,
+        points: DEDUCTION_CONSTANT_NAME_SPLIT,
+        rationale: ScoringRationales.CONSTANT_NAME_SPLIT,
+    },
+    {
+        analyzer: ANALYZER_CONSTANTS,
+        covers: ruleMatches(['CONST-SCP-002'], ['scatter', 'scoped', 'local']),
+        dimension: DIMENSION_DUPLICATION,
+        points: DEDUCTION_SCATTERED_LOCALS,
+        rationale: ScoringRationales.SCATTERED_LOCALS,
     },
     {
         analyzer: ANALYZER_CONSTANTS,
@@ -477,5 +584,50 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_STANDARDIZATION,
         points: DEDUCTION_STDLIB_PORT,
         rationale: ScoringRationales.STDLIB_GENERIC_MISMATCH,
+    },
+
+    // ── 宿主语言包（VS Code 扩展 / Godot）───────────────────────────────────────────
+    // `vscode-extension` and `gdscript-game` were declared in DIMENSION_ANALYZERS as the
+    // evidence for architectureConsistency / performanceEfficiency / commentQuality, but had
+    // no row here and none in the family appliers. Enabling them therefore raised `coverage`
+    // — telling the consumer those axes had been measured — while they could never deduct a
+    // single point. `validate-scoring-coverage` did not catch it because its coverage-model
+    // assertion only ran in one direction: "a deducting analyzer must be declared", never
+    // "a declared analyzer must be able to deduct".
+
+    {
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        covers: ruleMatches(['VSC-MEM-001'], ['disposable', 'subscription', 'leak']),
+        dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+        points: DEDUCTION_UNDISPOSED_RESOURCE,
+        rationale: ScoringRationales.VSCODE_UNDISPOSED_RESOURCE,
+    },
+    {
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        covers: ruleMatches(['VSC-PERF-001'], ['blocking', 'synchronous', 'main thread']),
+        dimension: DIMENSION_PERFORMANCE_EFFICIENCY,
+        points: DEDUCTION_MAIN_THREAD_BLOCKING_IO,
+        rationale: ScoringRationales.VSCODE_MAIN_THREAD_BLOCKING_IO,
+    },
+    {
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        covers: ruleMatches(['VSC-I18N-001'], ['hardcoded', 'localis', 'localiz', 'i18n']),
+        dimension: DIMENSION_COMMENT_QUALITY,
+        points: DEDUCTION_UNLOCALIZED_TEXT,
+        rationale: ScoringRationales.VSCODE_UNLOCALIZED_TEXT,
+    },
+    {
+        analyzer: ANALYZER_GDSCRIPT_GAME,
+        covers: ruleMatches(['GDM-POOL-002'], ['pool', 'reset_state', 'contract']),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_POOL_CONTRACT_BREACH,
+        rationale: ScoringRationales.GDSCRIPT_POOL_CONTRACT_BREACH,
+    },
+    {
+        analyzer: ANALYZER_GDSCRIPT_GAME,
+        covers: anyFinding,
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_HOST_LIFECYCLE_BREACH,
+        rationale: ScoringRationales.GDSCRIPT_MODERNIZATION,
     },
 ];

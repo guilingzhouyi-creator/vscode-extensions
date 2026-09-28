@@ -34,6 +34,7 @@ import {
 import { ArchetypeWeightTuner } from './archetype-weight-tuner';
 import {
     DIMENSION_MAX_SCORE,
+    COMPOSITE_INDEX_FLOOR,
     GRADE_A_PLUS_MIN,
     GRADE_A_MIN,
     GRADE_B_MIN,
@@ -51,6 +52,9 @@ import {
     SATURATION_HALFPOINT,
     accumulateProjectMetrics,
 } from './scorer-formulas';
+
+/** Files named in the skipped-file warning before the list is truncated. */
+const SKIPPED_FILE_DETAIL_LIMIT = 5;
 
 /**
  * Transparent Multi-Dimensional Quality Scorer.
@@ -205,10 +209,22 @@ export class QualityScorer {
             return this.evaluateFile('PROJECT_OVERALL', allIssues ?? [], null, config);
         }
 
-        const { rawScores, totalWeight, allRationales } = accumulateProjectMetrics(
+        const { rawScores, totalWeight, allRationales, skippedFiles } = accumulateProjectMetrics(
             fileQualityScores,
             fileMetrics,
         );
+        let skippedFileWarning: string | undefined;
+
+        if (skippedFiles.length > 0) {
+            // Surfaced rather than swallowed: a file that leaves the project aggregate but
+            // stays in `filesScanned` biases the composite downward with no visible cause.
+            // Published on the breakdown so any consumer of the report can see it.
+            skippedFileWarning =
+                `quality: ${skippedFiles.length} file(s) had metrics but no quality score and ` +
+                `were excluded from the project aggregate: ${skippedFiles
+                    .slice(0, SKIPPED_FILE_DETAIL_LIMIT)
+                    .join(', ')}${skippedFiles.length > SKIPPED_FILE_DETAIL_LIMIT ? ', …' : ''}`;
+        }
 
         // At project level the per-file indices are already curve-shaped, so the linear
         // and effective views coincide: the gap between them only exists within a file.
@@ -272,6 +288,7 @@ export class QualityScorer {
             evaluatedBy,
             rationales: allRationales.slice(0, 10),
             evaluatedAt: Date.now(),
+            skippedFileWarning,
         };
     }
 }

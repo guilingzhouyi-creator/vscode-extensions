@@ -359,7 +359,18 @@ function checkCoverageModel() {
   // ── The coverage model and the deduction code must not drift apart ────────────────────────
   // The table covers five axes; architecture, security and performance are deducted by the
   // family appliers, so their sources are declared here and checked the same way.
-  const sources = { ...dimensionDeductionSources(), ...FAMILY_DEDUCTION_SOURCES };
+  // Merge, never overwrite: `{...table, ...family}` replaces a dimension's whole analyzer
+  // list whenever both carry rows for it, so `data-architecture` (table rows on two axes) was
+  // silently dropped from the family-provided axes and then reported as having no deduction
+  // path at all. A union is what "every analyzer that can deduct this axis" means.
+  const tableSources = dimensionDeductionSources();
+  const sources = {};
+  for (const [dimension, analyzers] of Object.entries(tableSources)) {
+    sources[dimension] = [...analyzers];
+  }
+  for (const [dimension, analyzers] of Object.entries(FAMILY_DEDUCTION_SOURCES)) {
+    sources[dimension] = [...new Set([...(sources[dimension] ?? []), ...analyzers])].sort();
+  }
   for (const [dimension, analyzers] of Object.entries(sources)) {
     for (const analyzer of analyzers) {
       assert.ok(
@@ -372,6 +383,38 @@ function checkCoverageModel() {
     Object.keys(sources).length >= 8,
     `only ${Object.keys(sources).length} dimension(s) carry a deduction source, which means a` +
       ' silent rewrite removed most of the table',
+  );
+
+  // Reverse direction: every analyzer a dimension names as evidence must actually be able to
+  // deduct somewhere. The forward loop above cannot catch this — an analyzer with no row in
+  // the table and no family applier simply never appears in `sources`, so nothing compares it
+  // against DIMENSION_ANALYZERS. `vscode-extension` and `gdscript-game` were declared as the
+  // evidence for three axes while having no deduction path at all, which raised `coverage` and
+  // told consumers those axes had been measured while they could never deduct a point.
+  const deducting = new Set();
+  for (const analyzers of Object.values(sources)) {
+    for (const analyzer of analyzers) deducting.add(analyzer);
+  }
+  const declared = new Map();
+  for (const [dimension, analyzers] of Object.entries(DIMENSION_ANALYZERS)) {
+    for (const analyzer of analyzers) {
+      if (!declared.has(analyzer)) declared.set(analyzer, []);
+      declared.get(analyzer).push(dimension);
+    }
+  }
+  const unbacked = [...declared.entries()]
+    .filter(([analyzer]) => !deducting.has(analyzer))
+    .map(([analyzer, dimensions]) => `${analyzer} -> [${dimensions.join(', ')}]`);
+  assert.deepStrictEqual(
+    unbacked,
+    [],
+    `${unbacked.length} analyzer(s) are declared as dimension evidence but can never deduct:\n  ` +
+      `${unbacked.join('\n  ')}\n` +
+      '  Either give them a deduction row, or stop naming them as evidence — a declared ' +
+      'analyzer that never deducts inflates coverage without ever lowering a score.',
+  );
+  console.log(
+    `  [PASS] all ${declared.size} declared evidence analyzer(s) can actually deduct (both directions)`,
   );
   console.log(
     `  [PASS] all ${Object.keys(sources).length} deduction-bearing dimensions declare their evidence`,

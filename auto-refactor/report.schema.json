@@ -285,6 +285,10 @@
           "enum": ["A+", "A", "B", "C", "D", "F", "N/A"]
         },
         "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "skippedFileWarning": {
+          "type": "string",
+          "description": "Present when files with metrics were excluded from the project aggregate because no per-file score existed; they still count towards filesScanned, so the gap would otherwise bias compositeScore downward invisibly."
+        },
         "coverage": { "type": "number", "minimum": 0, "maximum": 1 },
         "weights": {
           "type": "object",

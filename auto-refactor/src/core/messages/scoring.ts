@@ -408,4 +408,43 @@ export const ScoringRationales = {
         `Platform-specific conditional compilation lacks compile_error fallback: ${msg}`,
     STDLIB_GENERIC_MISMATCH: (msg: string) =>
         `Standard library and system runtime specification check failed: ${msg}`,
+
+    // ── 宿主语言包（VS Code 扩展 / Godot）───────────────────────────────────────────
+
+    VSCODE_UNDISPOSED_RESOURCE: (msg: string) =>
+        `Extension host resource lifecycle broken: a Disposable or listener is never registered for cleanup, so it leaks across deactivations: ${msg}`,
+    VSCODE_MAIN_THREAD_BLOCKING_IO: (msg: string) =>
+        `Extension host main thread performs blocking synchronous I/O, stalling every command and UI repaint: ${msg}`,
+    VSCODE_UNLOCALIZED_TEXT: (msg: string) =>
+        `User-facing text is hard-coded instead of routed through the localisation dictionary, so it cannot be translated: ${msg}`,
+    GDSCRIPT_POOL_CONTRACT_BREACH: (msg: string) =>
+        `Object-pool contract breached: a pooled instance is reused without a full reset, so state leaks from the previous owner: ${msg}`,
+    GDSCRIPT_MODERNIZATION: (msg: string) =>
+        `Godot engine host contract or migration requirement violated: ${msg}`,
+
+    // ── 冗余（redundancy）族 ────────────────────────────────────────────────────────
+
+    DUPLICATE_CODE_BLOCK: (msg: string) =>
+        `Repeated code block inside one file; extract the shared logic instead of maintaining parallel copies: ${msg}`,
+    VACUOUS_WRAPPER: (msg: string) =>
+        `Function only forwards to another function without adding behaviour, so the indirection costs a reader and nothing else: ${msg}`,
+    DISTRIBUTED_REDUNDANCY: (msg: string) =>
+        `Near-identical logic is spread across several files, so the same algorithm is maintained in more than one place: ${msg}`,
+    UNNECESSARY_ABSTRACTION: (msg: string) =>
+        `Layer that exists only to forward calls adds indirection without decoupling anything: ${msg}`,
+    DOCUMENT_DUPLICATION: (msg: string) =>
+        `Prose repeated within the same document; keep one authoritative statement and cross-reference it: ${msg}`,
+    MEANINGLESS_COMMENT: (msg: string) =>
+        `Comment only restates the symbol it annotates, so it adds noise instead of intent: ${msg}`,
+    UNCONSOLIDATED_LITERALS: (msg: string) =>
+        `Same-domain literals in one call scope were never consolidated into a single named value: ${msg}`,
+    CONSTANT_NAME_SPLIT: (msg: string) =>
+        `One semantic constant is spelled several ways across files, so the values can drift apart silently: ${msg}`,
+    SCATTERED_LOCALS: (msg: string) =>
+        `Same-kind literals are scattered through one function body instead of being declared once near the top: ${msg}`,
+    UNREFERENCED_FUNCTION: (msg: string) =>
+        `Function or method has no call site anywhere in the repository: ${msg}`,
+    UNUSED_LOCAL: (msg: string) => `Local variable is declared and never read again: ${msg}`,
+    CROSS_FILE_CLONE: (msg: string) =>
+        `Near-identical code block appears in more than one file: ${msg}`,
 } as const;
