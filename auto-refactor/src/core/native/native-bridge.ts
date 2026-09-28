@@ -28,7 +28,7 @@ import type {
     NativeMaskedSource,
     NativePatternMatch,
 } from './native-types';
-import { computeLineStartsAndHashes, linesOf } from '../diff/edit-diff';
+import { computeLineStartsAndHashes, linesOf, type LineIndex } from '../diff/edit-diff';
 import { histogramDiff } from '../diff/histogram-diff';
 import type { DiffOp } from '../diff/myers-algorithm';
 import { DIFF_OP_EQUAL, DIFF_OP_DELETE, DIFF_OP_INSERT } from '../diff/myers-algorithm';
@@ -254,6 +254,60 @@ function applyDiffOpInsert(op: DiffOp, newLines: string[], state: HunkBuilderSta
 }
 
 /**
+ * Drop the synthetic line start that follows a trailing newline.
+ *
+ * `computeLineStarts` records an offset immediately after every `\n`, so content ending in a
+ * newline yields a final start that denotes an empty final line. The Rust operator does not
+ * emit that line, and keeping it made the shim's diff hunks one context line longer and the
+ * hunk spans one line larger than the native ones for identical input. The start is removed
+ * only when it genuinely points past the last character.
+ *
+ * @param content - Source text the offsets were computed from.
+ * @param starts - Line-start offsets.
+ * @returns Offsets without the trailing empty line.
+ */
+function trimTrailingLineStart(content: string, starts: number[]): number[] {
+    if (starts.length > 0 && starts[starts.length - 1] >= content.length) {
+        return starts.slice(0, starts.length - 1);
+    }
+    return starts;
+}
+
+/**
+ * Split content into lines the way the Rust operator does.
+ *
+ * `linesOf` derives the last line's end from `content.length`, so a file ending in a newline
+ * yields a final line that still carries its `\n`, while every earlier line has already had
+ * the terminator removed. The Rust `split_lines` strips the terminator uniformly, so the
+ * trailing newline is trimmed here to keep both engines byte-identical.
+ *
+ * @param content - Source text to split.
+ * @param starts - Line-start offsets, already trimmed of any synthetic trailing line.
+ * @returns One string per line, without line terminators.
+ */
+function splitLinesLikeNative(content: string, starts: number[]): string[] {
+    const out = linesOf(content, starts);
+    if (out.length > 0) {
+        out[out.length - 1] = out[out.length - 1].replace(/\r?\n$/, '');
+    }
+    return out;
+}
+
+/**
+ * Line hashes truncated to match a trimmed line count.
+ *
+ * @param index - Line index produced by `computeLineStartsAndHashes`.
+ * @param lineCount - Number of lines after trailing-line trimming.
+ * @returns Hash array of exactly `lineCount` entries.
+ */
+function trimTrailingHash(index: LineIndex, lineCount: number): Uint32Array {
+    if (index.hashes.length === lineCount) {
+        return index.hashes;
+    }
+    return index.hashes.slice(0, lineCount);
+}
+
+/**
  * Pure JavaScript fallback implementation of INativeCore.
  * Provides Git-grade histogram diff, Tarjan strongly connected components,
  * deterministic topological sorting, and MinHash clone detection without native dependencies.
@@ -293,12 +347,26 @@ export class PureJsNativeShim implements INativeCore {
             return [];
         }
 
+        // The Rust `split_lines` yields one line per '\n' and does not synthesise a trailing
+        // empty line, whereas `computeLineStarts` records a start offset just past a final
+        // newline. Feeding that extra empty line into the diff made the shim report one more
+        // context line and a larger hunk span than the native operator for the same input,
+        // so the trailing start is dropped here to keep the two engines byte-identical.
         const oldIndex = computeLineStartsAndHashes(oldContent);
         const newIndex = computeLineStartsAndHashes(newContent);
-        const oldLines = linesOf(oldContent, oldIndex.starts);
-        const newLines = linesOf(newContent, newIndex.starts);
+        const oldLines = splitLinesLikeNative(
+            oldContent,
+            trimTrailingLineStart(oldContent, oldIndex.starts),
+        );
+        const newLines = splitLinesLikeNative(
+            newContent,
+            trimTrailingLineStart(newContent, newIndex.starts),
+        );
 
-        const ops = histogramDiff(oldLines, newLines, oldIndex.hashes, newIndex.hashes);
+        const oldHashes = trimTrailingHash(oldIndex, oldLines.length);
+        const newHashes = trimTrailingHash(newIndex, newLines.length);
+
+        const ops = histogramDiff(oldLines, newLines, oldHashes, newHashes);
         return this.assembleHunks(ops, oldLines, newLines, this.defaultContextLines);
     }
 
@@ -350,7 +418,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
-     * Pure JS fallback implementation of source masking and line statistics.
+     * Pure JS fallback implementation of the native operator library.
      */
     public maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource {
         const res = maskSourceTextJs(content, {
@@ -578,7 +646,11 @@ function probeNativeBinding(): INativeCore | null {
                     return binding.analyzeDependencyGraph(edges);
                 },
                 fastPatternMatch: binding.fastPatternMatch,
-                maskSourceCode: binding.maskSourceCode,
+                // The N-API binding takes `(content, config)`. Passing `binding.maskSourceCode`
+                // straight through dropped `config`, so every native masking call threw
+                // "Cannot convert undefined or null to object" at runtime.
+                maskSourceCode: (content: string, config: NativeMaskConfig) =>
+                    binding.maskSourceCode(content, config),
                 countDuplicateLines: binding.countDuplicateLines,
                 detectCloneBlocks: binding.detectCloneBlocks,
                 computeMinHash: binding.computeMinHash || binding.computeMinhash,

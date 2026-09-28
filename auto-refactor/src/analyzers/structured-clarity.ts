@@ -3,7 +3,7 @@
  * File Path: src/analyzers/structured-clarity.ts
  * Architecture Role: Evaluates functions for structured clarity, shallow branching depth, and
  *   explicit dispatch patterns to grant elastic cyclomatic complexity exemptions.
- * Dependencies & Triggers: ../core/types, ../core/multilang; called by ComplexityAnalyzer.
+ * Dependencies & Triggers: ../core/types, ../core/ast/multilang; called by ComplexityAnalyzer.
  * Responsibilities: Compute maximum control-flow nesting depth, inspect docstrings for
  *   contract annotations (@structured-dispatch, @state-machine), and compute relaxed thresholds.
  * Exit Semantics & Design Rationale: Pure AST and text analysis; never throws and performs no I/O.

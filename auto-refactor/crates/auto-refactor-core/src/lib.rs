@@ -1,6 +1,10 @@
 use napi_derive::napi;
 use std::collections::HashMap;
 
+#[cfg(test)]
+#[path = "tests.rs"]
+mod tests;
+
 #[napi]
 pub const VERSION: &str = "0.4.0-rust-native";
 

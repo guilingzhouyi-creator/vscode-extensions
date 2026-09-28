@@ -5,8 +5,8 @@
  *   the single definition site of function-like node classification and parent-pointer-free
  *   SourceFile creation, plus the compatibility re-export surface for extracted helpers.
  * Dependencies & Triggers: `typescript` (hard top-level import); Position / IssueLocation
- *   types from ../core/types and NormalizedNode from ../core/multilang; imported by
- *   core/typescriptAdapter.ts and lazy-required by core/analyzer.ts and core/worker.ts only
+ *   types from ../core/types and NormalizedNode from ../core/ast/multilang; imported by
+ *   core/ast/typescript-adapter.ts and lazy-required by core/analyzer.ts and core/worker.ts only
  *   when a legacy analyzer needs a real SourceFile on the typescript parser path.
  * Responsibilities: Detect function-like node kinds (declaration, expression, arrow,
  *   method, constructor, getter, setter); create SourceFiles with ScriptTarget.Latest and

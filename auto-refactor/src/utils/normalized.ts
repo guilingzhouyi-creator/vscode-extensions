@@ -6,7 +6,7 @@
  *   normalized node location on the oxc/rust parser paths. Extracted from utils/ast.ts so the
  *   built-in analyzers and worker threads never pull in the `typescript` module.
  * Dependencies & Triggers: Type-only imports of IssueLocation (../core/types) and
- *   NormalizedNode (../core/multilang) that erase at compile time, so no runtime dependency
+ *   NormalizedNode (../core/ast/multilang) that erase at compile time, so no runtime dependency
  *   is added; called by analyzers/complexity.ts and analyzers/constants.ts while visiting
  *   normalized nodes, and re-exported by utils/ast.ts for legacy import sites.
  * Responsibilities: Build `{ file, start, end }` IssueLocations from the byte spans the

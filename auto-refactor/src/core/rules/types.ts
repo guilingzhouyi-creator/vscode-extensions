@@ -111,6 +111,14 @@ export const RULE_FAMILY_GDSCRIPT_MODERN = 'GDM';
 /** Canonical rule-family prefix for backward-compatible legacy rules. */
 export const RULE_FAMILY_LEGACY = 'LEGACY';
 
+/**
+ * Rule family owning VS Code extension host contracts (host lifecycle, extension
+ * performance budgets, and the bilingual dictionary contract). Kept in this file so
+ * `entries/analyzersModern.ts` can declare `VSC-*` rules against a declared family
+ * rather than an inline string literal.
+ */
+export const RULE_FAMILY_VSCODE_EXTENSION = 'VSC';
+
 /** Canonical legacy reason string for backward-compatible non-canonical ids. */
 export const LEGACY_REASON_ID_NOT_CANONICAL = 'id-not-canonical';
 

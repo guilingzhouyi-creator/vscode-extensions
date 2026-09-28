@@ -247,6 +247,49 @@ export class CfgBuilder {
     }
 
     /**
+     * Whether a condition line carries a terminator in its body, such as
+     * `if (!user) return;` or `if (!conn) throw new Error();`.
+     *
+     * The closing paren of the condition is located first so a `return` appearing inside the
+     * condition itself (`if (list.includes(x)) return;`) is not mistaken for a terminator.
+     * A trailing brace means the body opens a block, which this line-oriented builder does not
+     * follow, so those forms are left to the normal two-branch handling.
+     *
+     * @param trimmed - Trimmed source line.
+     * @returns True when the guarded branch leaves the function on this line.
+     */
+    static inlineTerminator(trimmed: string): boolean {
+        if (!trimmed.startsWith('if ') && !trimmed.startsWith('if(')) {
+            return false;
+        }
+        const open = trimmed.indexOf('(');
+        if (open === -1) {
+            return false;
+        }
+        let depth = 0;
+        for (let i = open; i < trimmed.length; i++) {
+            const ch = trimmed[i];
+            if (ch === '(') depth++;
+            else if (ch === ')') {
+                depth--;
+                if (depth === 0) {
+                    const body = trimmed.slice(i + 1).trim();
+                    if (body === '' || body === '{}' || body === '{') {
+                        return false;
+                    }
+                    return (
+                        body.startsWith('return') ||
+                        body.startsWith('throw') ||
+                        body.startsWith('break') ||
+                        body.startsWith('continue')
+                    );
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Parses a single statement line into a structured CfgStatement.
      *
      * @param lineText - Raw text of the statement line.
@@ -310,12 +353,21 @@ export class CfgBuilder {
                 condBlock.addStatement(stmt);
                 currentBlock.addSuccessor(condBlock, 'unconditional');
 
-                const thenBlock = this.createBlock('normal');
-                const elseBlock = this.createBlock('normal');
-                condBlock.addSuccessor(thenBlock, 'true-branch');
-                condBlock.addSuccessor(elseBlock, 'false-branch');
+                // An inline terminator (`if (!x) return;`) makes the guarded branch leave
+                // the function instead of falling through. Without this the whole line was
+                // classified as a condition, the trailing `return` was dropped, and the
+                // fall-through block looked like a non-terminating guard, so every later
+                // `x.field` read was reported as an unguarded dereference.
+                if (CfgBuilder.inlineTerminator(trimmed)) {
+                    condBlock.addSuccessor(exit, 'true-branch');
+                } else {
+                    const thenBlock = this.createBlock('normal');
+                    const elseBlock = this.createBlock('normal');
+                    condBlock.addSuccessor(thenBlock, 'true-branch');
+                    condBlock.addSuccessor(elseBlock, 'false-branch');
 
-                currentBlock = thenBlock;
+                    currentBlock = thenBlock;
+                }
             } else if (stmt.kind === 'return' || stmt.kind === 'throw') {
                 currentBlock.addStatement(stmt);
                 currentBlock.addSuccessor(exit, 'unconditional');

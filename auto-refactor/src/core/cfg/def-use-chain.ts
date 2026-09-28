@@ -124,27 +124,42 @@ export class DefUseAnalyzer {
         }
 
         // 2. Detect unguarded null dereferences (SAF-NIL-001)
-        // If a statement checks a variable and doesn't terminate, subsequent dereferences are flagged
-        const guardedNullVars = new Set<string>();
+        //
+        // A guard makes a variable safe only when the guarded branch leaves the function:
+        // `if (!x) return;` sends that branch straight to the exit, so x is proven non-null
+        // on the fall-through path. A non-terminating guard (`if (!x) log(...)`) falls through
+        // to a normal block, so a null still flows through. A variable with no guard at all is
+        // equally unsafe.
+        //
+        // The previous code gated the whole check on a non-empty guard set, so a file with no
+        // guard was never examined and the most direct null dereference produced no finding.
+        const protectedVars = new Set<string>();
         for (const block of cfg.blocks) {
+            const leavesOnGuard = block.successors.some((succ) => succ.id === cfg.exit.id);
             for (const stmt of block.statements) {
-                if (stmt.isNullGuard && !block.isTerminator()) {
-                    for (const v of stmt.usedVars) {
-                        guardedNullVars.add(v);
+                if (!stmt.isNullGuard) continue;
+                for (const v of stmt.usedVars) {
+                    if (leavesOnGuard) {
+                        protectedVars.add(v);
+                    } else {
+                        protectedVars.delete(v);
                     }
                 }
-                if (guardedNullVars.size > 0) {
-                    for (const v of stmt.usedVars) {
-                        if (guardedNullVars.has(v)) {
-                            const derefPattern = new RegExp(`\\b${v}\\.[a-zA-Z0-9_$]+`);
-                            if (derefPattern.test(stmt.rawText) && !stmt.isNullGuard) {
-                                unguardedDereferences.push({
-                                    line: stmt.line,
-                                    variable: v,
-                                    rawText: stmt.rawText,
-                                });
-                            }
-                        }
+            }
+        }
+
+        for (const block of cfg.blocks) {
+            for (const stmt of block.statements) {
+                if (stmt.isNullGuard) continue;
+                for (const v of stmt.usedVars) {
+                    if (protectedVars.has(v)) continue;
+                    const derefPattern = new RegExp(`\\b${v}\\.[a-zA-Z0-9_$]+`);
+                    if (derefPattern.test(stmt.rawText)) {
+                        unguardedDereferences.push({
+                            line: stmt.line,
+                            variable: v,
+                            rawText: stmt.rawText,
+                        });
                     }
                 }
             }
@@ -153,7 +168,9 @@ export class DefUseAnalyzer {
         // 3. Detect unclosed or unregistered resource handles escaping to exit
         for (const def of defs) {
             if (!def.isResource) continue;
-            const hasCleanup = uses.some((u) => u.variable === def.variable && u.kind === 'cleanup');
+            const hasCleanup = uses.some(
+                (u) => u.variable === def.variable && u.kind === 'cleanup',
+            );
             if (!hasCleanup) {
                 unclosedResources.push({
                     variable: def.variable,

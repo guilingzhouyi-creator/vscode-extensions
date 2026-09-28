@@ -12,6 +12,7 @@
  *   issues with actionable remediation advice.
  */
 
+import { readFileSync } from 'node:fs';
 import * as ts from 'typescript';
 import type { Issue } from '../../types';
 import type { SemanticGraph } from '../../semantic/semanticGraph';
@@ -28,7 +29,42 @@ export interface PerformanceAuditOptions {
 }
 
 /**
+ * Run one performance rule over the file named in the evaluation context.
+ *
+ * `PerformanceRuleEvaluator.auditSource` emits findings for all three performance rules at
+ * once, so this filters the result down to the single rule the Layer 1 wrapper represents.
+ * A context without `currentFilePath` yields no findings rather than guessing a file.
+ *
+ * @param ruleId - Rule id the caller represents.
+ * @param context - Evaluation context naming the file under review.
+ * @returns Findings for that rule only.
+ */
+function runSourceRule(ruleId: string, context: UniversalEvaluationContext): Issue[] {
+    const filePath = context?.currentFilePath;
+    if (!filePath) {
+        return [];
+    }
+    let content: string;
+    try {
+        content = readFileSync(filePath, 'utf8');
+    } catch {
+        // The context may name a file that was removed or is unreadable; a Layer 1 rule
+        // must degrade quietly rather than abort the surrounding evaluation.
+        return [];
+    }
+    return defaultPerformanceEvaluator
+        .auditSource(filePath, content)
+        .filter((issue) => issue.rule === ruleId);
+}
+
+/**
  * Universal Rule: Loop Transient Allocation (ADV-PRF-002).
+ *
+ * Delegates to {@link PerformanceRuleEvaluator}, which implements the detection for real.
+ * This class previously returned an empty array unconditionally while still being registered
+ * with {@link UniversalPyramidEvaluator}, so the rule reported itself as active but never
+ * produced a finding. The SemanticGraph passed to a Layer 1 rule carries no loop annotations
+ * to inspect, so the evaluation is driven from source text via the context instead.
  */
 export class LoopTransientAllocationRule implements UniversalSemanticRule {
     public readonly id = 'loop-transient-allocation';
@@ -39,20 +75,22 @@ export class LoopTransientAllocationRule implements UniversalSemanticRule {
         'Detects transient heap allocations, closures, or instantiations inside loops.';
 
     /**
-     * Evaluates the graph for transient allocations.
+     * Evaluates the source under review for transient allocations.
      *
      * @param _graph - SemanticGraph instance.
-     * @param _context - Evaluation context.
+     * @param context - Evaluation context, used to resolve the file under review.
      * @returns List of detected issues.
      */
-    public evaluate(_graph: SemanticGraph, _context: UniversalEvaluationContext): Issue[] {
-        // Universal SemanticGraph-level evaluation (if nodes contain loop annotations)
-        return [];
+    public evaluate(_graph: SemanticGraph, context: UniversalEvaluationContext): Issue[] {
+        return runSourceRule(this.id, context);
     }
 }
 
 /**
  * Universal Rule: High Algorithmic Complexity Hotspot.
+ *
+ * Delegates to {@link PerformanceRuleEvaluator}; see {@link LoopTransientAllocationRule}
+ * for why the previous unconditional empty return was a defect.
  */
 export class HighAlgorithmicComplexityRule implements UniversalSemanticRule {
     public readonly id = 'high-algorithmic-complexity';
@@ -63,19 +101,22 @@ export class HighAlgorithmicComplexityRule implements UniversalSemanticRule {
         'Detects nested loop iterations causing potential O(N^2) or O(N^3) performance hotspots.';
 
     /**
-     * Evaluates the graph for complexity hotspots.
+     * Evaluates the source under review for complexity hotspots.
      *
      * @param _graph - SemanticGraph instance.
-     * @param _context - Evaluation context.
+     * @param context - Evaluation context, used to resolve the file under review.
      * @returns List of detected issues.
      */
-    public evaluate(_graph: SemanticGraph, _context: UniversalEvaluationContext): Issue[] {
-        return [];
+    public evaluate(_graph: SemanticGraph, context: UniversalEvaluationContext): Issue[] {
+        return runSourceRule(this.id, context);
     }
 }
 
 /**
  * Universal Rule: Expensive Operation in Loop.
+ *
+ * Delegates to {@link PerformanceRuleEvaluator}; see {@link LoopTransientAllocationRule}
+ * for why the previous unconditional empty return was a defect.
  */
 export class ExpensiveLoopOperationRule implements UniversalSemanticRule {
     public readonly id = 'expensive-loop-operation';
@@ -86,14 +127,14 @@ export class ExpensiveLoopOperationRule implements UniversalSemanticRule {
         'Detects expensive operations like deep copies or blocking I/O within loops.';
 
     /**
-     * Evaluates the graph for expensive loop operations.
+     * Evaluates the source under review for expensive in-loop operations.
      *
      * @param _graph - SemanticGraph instance.
-     * @param _context - Evaluation context.
+     * @param context - Evaluation context, used to resolve the file under review.
      * @returns List of detected issues.
      */
-    public evaluate(_graph: SemanticGraph, _context: UniversalEvaluationContext): Issue[] {
-        return [];
+    public evaluate(_graph: SemanticGraph, context: UniversalEvaluationContext): Issue[] {
+        return runSourceRule(this.id, context);
     }
 }
 

@@ -194,6 +194,31 @@ export class UniversalPyramidEvaluator {
         }
         return issues;
     }
+
+    /**
+     * Count the findings this evaluator produced per pyramid tier.
+     *
+     * `classifyRuleLayer` was previously reachable only from validation scripts, so the
+     * rule-layer contract existed on paper while a real scan never consulted it. Attaching
+     * the classification to the findings this evaluator actually emits makes the tier
+     * observable in production: a regression that pushed a Layer 1 defect down to a dialect
+     * tier would change the reported split.
+     *
+     * @param issues - Findings produced by `evaluateAllLayer1`.
+     * @returns Finding count per tier.
+     */
+    public summarizeByLayer(issues: readonly Issue[]): Record<RuleLayer, number> {
+        const summary: Record<RuleLayer, number> = {
+            [RULE_LAYER_UNIVERSAL]: 0,
+            [RULE_LAYER_FAMILY]: 0,
+            [RULE_LAYER_DIALECT]: 0,
+        };
+        for (const issue of issues) {
+            const ruleId = issue.rule ?? '';
+            summary[classifyRuleLayer(ruleId)] += 1;
+        }
+        return summary;
+    }
 }
 
 /** Default singleton evaluator */

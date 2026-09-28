@@ -324,7 +324,8 @@ export function matchPresentationLiterals(
 }
 
 /**
- * Matches control flow and dataflow invariants (floating promises, unguarded nulls, resource closures).
+ * Matches control flow and dataflow invariants (floating promises, unguarded nulls, resource
+ * closures).
  * Concurrency: Thread-safe, reentrant, creates isolated in-memory graph per call.
  *
  * @param lines - Source code lines.
