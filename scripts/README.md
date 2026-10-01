@@ -16,6 +16,8 @@
 | `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `commit-msg-gate.sh` | gate（本地提交信息格式与零黑话门禁） | `.githooks/commit-msg`、本地 CLI |
 | `ps1/` | PowerShell | `commit-msg-gate.ps1` | gate（commit-msg-gate.sh 同构双实现） | 本地 CLI（Windows） |
+| `sh/` | Bash | `pre-push-gate.sh` | gate（本地推送前置全量回归与质量门禁） | `.githooks/pre-push`、本地 CLI |
+| `ps1/` | PowerShell | `pre-push-gate.ps1` | gate（pre-push-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `install-hooks.sh` | gate（一键激活仓库级 Git Hooks） | 本地 CLI |
 | `ps1/` | PowerShell | `install-hooks.ps1` | gate（install-hooks.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | `check-display-assets.sh` | ci（打包资产校验） | `.github/workflows/ci.yml`、`release.yml` |

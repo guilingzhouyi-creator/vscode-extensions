@@ -26,6 +26,7 @@ git config core.hooksPath .githooks
 echo "✅ 已配置 git config core.hooksPath = .githooks"
 echo "✅ Pre-Commit 门禁 (.githooks/pre-commit -> scripts/sh/pre-commit-gate.sh)"
 echo "✅ Commit-Msg 门禁 (.githooks/commit-msg -> scripts/sh/commit-msg-gate.sh)"
+echo "✅ Pre-Push 门禁 (.githooks/pre-push -> scripts/sh/pre-push-gate.sh)"
 echo "================================================================="
 echo "🎉 本地 Git 提交门禁激活成功！后续每次 commit 将自动执行前置安全自检。"
 echo "================================================================="

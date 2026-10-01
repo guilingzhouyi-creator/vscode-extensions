@@ -281,6 +281,29 @@ jobs:
           bash scripts/sh/release-tag.sh no-cl patch --message "v0.2.0 — X | Y" --dry-run >/dev/null 2>&1 && { echo "::error::缺 CHANGELOG 未拦截"; exit 1; }
           echo "✔ release-tag.sh 夹具自检全部通过"
 
+      - name: Git hooks & local gate scripts self-test
+        run: |
+          set -euo pipefail
+          # 1. install-hooks.sh 激活自检
+          bash scripts/sh/install-hooks.sh
+          # 2. pre-commit-gate.sh 自检 (无暂存应 exit 0)
+          bash scripts/sh/pre-commit-gate.sh
+          # 3. commit-msg-gate.sh 规范自检
+          MSG_TEMP=$(mktemp)
+          echo "feat(ci): 自检提交信息规范门禁" > "$MSG_TEMP"
+          bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP"
+          # 4. commit-msg-gate.sh 非法信息阻断自检 (非法应 exit 1)
+          echo "bad message" > "$MSG_TEMP"
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截非法提交信息"; exit 1
+          fi
+          echo "wip: 临时改动" > "$MSG_TEMP"
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截 wip 黑话信息"; exit 1
+          fi
+          rm -f "$MSG_TEMP"
+          echo "✔ Git 本地门禁脚本自检全部通过"
+
   # ─── auto-refactor 工具门禁（与扩展矩阵解耦；仅改动 auto-refactor/ 时执行）───
   # 该目录不是 VS Code 扩展（无 engines.vscode），故不参与上方扩展矩阵。
   # 四道防线：Prettier 格式 → ESLint 结构/JSDoc → 自举 strict 注释棘轮 → 全量验证套件。

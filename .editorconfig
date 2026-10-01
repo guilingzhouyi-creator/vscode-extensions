@@ -1,3 +1,4 @@
+# 仓库级统一物理排版与换行契约 (单一真源)
 root = true
 
 [*]
@@ -13,6 +14,14 @@ indent_size = 4
 
 [*.ps1]
 end_of_line = crlf
+indent_size = 4
+
+[*.gd]
+indent_style = tab
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
 
 [*.png]
 charset = unset
@@ -21,6 +30,12 @@ insert_final_newline = unset
 trim_trailing_whitespace = unset
 
 [*.vsix]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[*.ico]
 charset = unset
 end_of_line = unset
 insert_final_newline = unset

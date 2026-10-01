@@ -8,7 +8,7 @@
   - `workspace-timing/`：VS Code 扩展，独立运行时，RingBuffer+Journal 内存双写崩溃安全，L0~L5 门禁；
   - `auto-refactor/`：Node CLI 静态重构与审查引擎（非扩展，独立工具），TS+Rust 双轨内核，4 层规则金字塔；
   - `WebGames/`：Godot 4.7 卡拉尔世界引擎（纯逻辑无头解耦，配置驱动，20 项静态门禁，四阶段案卷施工）；
-- **根级发布与门禁工具链（`scripts/`）**：`pre-commit-gate`/`commit-msg-gate`（本地提交前置物理卫生、零空文件、换行契约与信息规范门禁，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
+- **根级发布与门禁工具链（`scripts/`）**：`pre-commit-gate`/`commit-msg-gate`/`pre-push-gate`（本地提交与推送前置物理卫生、零空文件、换行契约、密钥防泄漏与回归门禁，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
 
 ## 二、 跨项目全局通用契约
 

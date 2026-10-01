@@ -1,6 +1,6 @@
 ﻿# <#
 # .SYNOPSIS
-#   pre-commit-gate.ps1 — 本地 Git 提交前置物理卫生与质量安全门禁 (PowerShell 同构实现)
+#   pre-commit-gate.ps1 — 本地 Git 提交前置物理卫生与质量安全门禁 (8 重防御，PowerShell 同构实现)
 # .DESCRIPTION
 #   职能域：gate
 #   触发方：.githooks/pre-commit 或 本地 CLI 手动触发
@@ -13,7 +13,7 @@ param()
 $ErrorActionPreference = "Stop"
 
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (PowerShell 版)" -ForegroundColor Cyan
+Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (8 重纵深防御，PowerShell 版)" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # 获取暂存区文件列表
@@ -26,7 +26,7 @@ if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1
 $failed = $false
 
 # --- Gate 1: 零 0 字节与纯空白空文件一票阻断 ---
-Write-Host "[1/6] 检查暂存区零空文件守卫..." -ForegroundColor Gray
+Write-Host "[1/8] 检查暂存区零空文件守卫..." -ForegroundColor Gray
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
     if (Test-Path $file -PathType Leaf) {
@@ -45,7 +45,7 @@ foreach ($file in $stagedFiles) {
 }
 
 # --- Gate 2: 换行符 (EOL: ps1->CRLF, 其余->LF) 契约看守 ---
-Write-Host "[2/6] 检查换行符 (EOL: ps1->CRLF, 其余->LF) 契约..." -ForegroundColor Gray
+Write-Host "[2/8] 检查换行符 (EOL: ps1->CRLF, 其余->LF) 契约..." -ForegroundColor Gray
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
     if (Test-Path $file -PathType Leaf) {
@@ -73,7 +73,7 @@ foreach ($file in $stagedFiles) {
 }
 
 # --- Gate 3: 绝对路径与盘符防泄漏 ---
-Write-Host "[3/6] 检查绝对路径与协议防泄漏..." -ForegroundColor Gray
+Write-Host "[3/8] 检查绝对路径与协议防泄漏..." -ForegroundColor Gray
 $addedDiff = @(git diff --cached -U0 --no-color 2>$null | Where-Object { $_ -match '^\+[^+]' })
 foreach ($line in $addedDiff) {
     if ($line -match "(\b[A-Za-z]:[\\/][a-zA-Z0-9_-]+|file:///)" -and $line -notmatch "node_modules|\.gemini|file://") {
@@ -84,7 +84,7 @@ foreach ($line in $addedDiff) {
 }
 
 # --- Gate 4: 零黑话与规范命名 ---
-Write-Host "[4/6] 检查零黑话与规范命名..." -ForegroundColor Gray
+Write-Host "[4/8] 检查零黑话与规范命名..." -ForegroundColor Gray
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
     $baseName = [System.IO.Path]::GetFileName($file)
@@ -98,7 +98,7 @@ foreach ($file in $stagedFiles) {
 }
 
 # --- Gate 5: 单文件行数红线预算 (源文件 < 900 LOC) ---
-Write-Host "[5/6] 检查源文件行数红线预算 (< 900 LOC)..." -ForegroundColor Gray
+Write-Host "[5/8] 检查源文件行数红线预算 (< 900 LOC)..." -ForegroundColor Gray
 $maxLocBudget = 900
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
@@ -114,27 +114,54 @@ foreach ($file in $stagedFiles) {
     }
 }
 
-# --- Gate 6: 项目增量编译与语法验证 ---
-Write-Host "[6/6] 检查相关项目增量编译与语法..." -ForegroundColor Gray
+# --- Gate 6: 密钥与敏感 Token 防泄漏扫描 ---
+Write-Host "[6/8] 扫描高危密钥与敏感 Token 防泄漏..." -ForegroundColor Gray
+$secretPattern = '(AIza[0-9A-Za-z-_]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----)'
+foreach ($line in $addedDiff) {
+    if ($line -match $secretPattern -and $line -notmatch '\$\{env:|CODEX_API_KEY|OPENAI_API_KEY|test-secret|mock-key|placeholder') {
+        Write-Host "❌ [FAIL] Gate 6: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！" -ForegroundColor Red
+        Write-Host "   $line" -ForegroundColor Yellow
+        $failed = $true
+        break
+    }
+}
+if (-not $failed) {
+    Write-Host "  ✔ [PASS] 密钥扫描无泄漏" -ForegroundColor Green
+}
+
+# --- Gate 7: 单源规则漂移熔断 ---
+Write-Host "[7/8] 校验单源规则元数据一致性..." -ForegroundColor Gray
+$touchesRules = $stagedFiles | Where-Object { $_ -match "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/" }
+if ($touchesRules) {
+    $res = Start-Process -FilePath "node" -ArgumentList "auto-refactor/scripts/validate-rules-registry.js" -NoNewWindow -PassThru -Wait
+    if ($res.ExitCode -ne 0) {
+        Write-Host "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！" -ForegroundColor Red
+        $failed = $true
+    } else {
+        Write-Host "  ✔ [PASS] 规则元数据单源一致性校验通过" -ForegroundColor Green
+    }
+}
+
+# --- Gate 8: 项目增量编译与语法验证 ---
+Write-Host "[8/8] 检查相关项目增量编译与语法..." -ForegroundColor Gray
 $hasWt = $stagedFiles | Where-Object { $_ -match "^workspace-timing/" }
 $hasAr = $stagedFiles | Where-Object { $_ -match "^auto-refactor/" }
+$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 
 if ($hasWt) {
     Write-Host "  ▶ 触发 workspace-timing 增量编译校验..." -ForegroundColor Cyan
-    $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
     $process = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "workspace-timing", "run", "compile" -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
-        Write-Host "❌ [FAIL] Gate 6: workspace-timing 编译失败！" -ForegroundColor Red
+        Write-Host "❌ [FAIL] Gate 8: workspace-timing 编译失败！" -ForegroundColor Red
         $failed = $true
     }
 }
 
 if ($hasAr) {
     Write-Host "  ▶ 触发 auto-refactor 增量编译校验..." -ForegroundColor Cyan
-    $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
     $process = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "run", "build" -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
-        Write-Host "❌ [FAIL] Gate 6: auto-refactor 编译失败！" -ForegroundColor Red
+        Write-Host "❌ [FAIL] Gate 8: auto-refactor 编译失败！" -ForegroundColor Red
         $failed = $true
     }
 }
@@ -145,7 +172,7 @@ if ($failed) {
     Write-Host "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
-    Write-Host "✅ 【门禁结论】Pre-Commit 六项安全与质量门禁全部 PASS！" -ForegroundColor Green
+    Write-Host "✅ 【门禁结论】Pre-Commit 八项安全与质量门禁全部 PASS！" -ForegroundColor Green
     Write-Host "=================================================================" -ForegroundColor Cyan
     exit 0
 }
