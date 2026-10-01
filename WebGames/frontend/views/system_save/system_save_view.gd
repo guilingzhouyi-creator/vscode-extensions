@@ -8,15 +8,19 @@
 class_name SystemSaveView
 extends BaseScreen
 
+const SystemSaveTabsClass = preload("res://frontend/views/system_save/system_save_tabs.gd")
+
+const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
+
 # ==============================================================================
 # 枚举
 # ==============================================================================
 
 ## 4 个 Tab 索引（与 TabContainer 子节点顺序一致）
-enum TabType { SAVE_SLOTS, DETERMINISTIC_REPLAY, GM_SANDBOX, CDKEY }
+enum TabType {SAVE_SLOTS, DETERMINISTIC_REPLAY, GM_SANDBOX, CDKEY}
 
 ## GM 权限等级
-enum GMPermissionLevel { NONE, MODERATOR, ADMIN, DEVELOPER }
+enum GMPermissionLevel {NONE, MODERATOR, ADMIN, DEVELOPER}
 
 # ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
@@ -123,6 +127,14 @@ var _cdkey_history: Array = []
 # ==============================================================================
 
 ## 生命周期初始化：主题/四 Tab 装配/静态文案/信号绑定/视觉适配（骨架零接线）
+var _tabs = null
+
+func _get_tabs():
+	if _tabs == null:
+		_tabs = SystemSaveTabsClass.new()
+		_tabs.setup(self)
+	return _tabs
+
 func _ready() -> void:
 	# 1. 应用主题
 	_apply_theme()
@@ -175,17 +187,19 @@ func _init_static_text() -> void:
 	UIIntermediary.resolve(_btn_back, "ui.fe16.common.back")
 
 	# --- Tab 标题 ---
-	UIIntermediary.resolve_tab(_tab_container, 0, "ui.fe16.save_slot.tab_title")
-	UIIntermediary.resolve_tab(_tab_container, 1, "ui.fe16.replay.tab_title")
-	UIIntermediary.resolve_tab(_tab_container, 2, "ui.fe16.gm.tab_title")
-	UIIntermediary.resolve_tab(_tab_container, 3, "ui.fe16.cdkey.tab_title")
+	KTabBar.init_titles(_tab_container, PackedStringArray([
+		"ui.fe16.save_slot.tab_title",
+		"ui.fe16.replay.tab_title",
+		"ui.fe16.gm.tab_title",
+		"ui.fe16.cdkey.tab_title",
+	]))
 
 	# --- Tab 0: 存档槽位 ---
-	var left_section_label: Label = $MainLayout/TabContainer/存档槽位/LeftPanel/SectionLabel
+	var left_section_label: Label = $MainLayout/TabContainer / 存档槽位 / LeftPanel / SectionLabel
 	UIIntermediary.resolve(left_section_label, "ui.fe16.save_slot.section_list")
-	var right_section_label: Label = $MainLayout/TabContainer/存档槽位/RightPanel/SectionLabel
+	var right_section_label: Label = $MainLayout/TabContainer / 存档槽位 / RightPanel / SectionLabel
 	UIIntermediary.resolve(right_section_label, "ui.fe16.save_slot.section_detail")
-	var thumb_placeholder: Label = $MainLayout/TabContainer/存档槽位/RightPanel/PanelSlotThumbnail/ThumbnailPlaceholder/Label
+	var thumb_placeholder: Label = $MainLayout/TabContainer / 存档槽位 / RightPanel / PanelSlotThumbnail / ThumbnailPlaceholder / Label
 	UIIntermediary.resolve(thumb_placeholder, "ui.fe16.save_slot.thumbnail_placeholder")
 	UIIntermediary.resolve(_btn_save_to_slot, "ui.fe16.save_slot.btn_save")
 	UIIntermediary.resolve(_btn_load_from_slot, "ui.fe16.save_slot.btn_load")
@@ -194,47 +208,7 @@ func _init_static_text() -> void:
 	UIIntermediary.resolve(_check_auto_save, "ui.fe16.save_slot.auto_save")
 	UIIntermediary.resolve(_btn_cloud_sync, "ui.fe16.save_slot.btn_cloud_sync")
 
-	# --- Tab 1: 确定性回放 ---
-	var replay_left_label: Label = $MainLayout/TabContainer/确定性回放/LeftPanel/SectionLabel
-	UIIntermediary.resolve(replay_left_label, "ui.fe16.replay.section_list")
-	var replay_right_label: Label = $MainLayout/TabContainer/确定性回放/RightPanel/SectionLabel
-	UIIntermediary.resolve(replay_right_label, "ui.fe16.replay.section_detail")
-	var control_label: Label = $MainLayout/TabContainer/确定性回放/RightPanel/ControlLabel
-	UIIntermediary.resolve(control_label, "ui.fe16.replay.control_label")
-	UIIntermediary.resolve(_btn_play_replay, "ui.fe16.replay.btn_play")
-	UIIntermediary.resolve(_btn_pause_replay, "ui.fe16.replay.btn_pause")
-	UIIntermediary.resolve(_btn_stop_replay, "ui.fe16.replay.btn_stop")
-	UIIntermediary.resolve(_btn_frame_prev, "ui.fe16.replay.btn_frame_prev")
-	UIIntermediary.resolve(_btn_frame_next, "ui.fe16.replay.btn_frame_next")
-	UIIntermediary.resolve(_btn_speed_down, "ui.fe16.replay.btn_speed_down")
-	UIIntermediary.resolve(_btn_speed_up, "ui.fe16.replay.btn_speed_up")
-
-	# --- Tab 2: GM 沙盒 ---
-	var gm_cmd_label: Label = $MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel/SectionLabel
-	UIIntermediary.resolve(gm_cmd_label, "ui.fe16.gm.section_command")
-	var gm_output_label: Label = $MainLayout/TabContainer/GM沙盒/GMContent/LeftPanel/OutputLabel
-	UIIntermediary.resolve(gm_output_label, "ui.fe16.gm.output_label")
-	UIIntermediary.resolve_placeholder(_line_edit_gm_input, "ui.fe16.gm.input_placeholder")
-	UIIntermediary.resolve(_btn_gm_execute, "ui.fe16.gm.btn_execute")
-	var gm_history_label: Label = $MainLayout/TabContainer/GM沙盒/GMContent/RightPanel/HistoryLabel
-	UIIntermediary.resolve(gm_history_label, "ui.fe16.gm.history_label")
-	var gm_quick_label: Label = $MainLayout/TabContainer/GM沙盒/GMContent/RightPanel/QuickLabel
-	UIIntermediary.resolve(gm_quick_label, "ui.fe16.gm.quick_label")
-	UIIntermediary.resolve(_btn_gm_god_mode, "ui.fe16.gm.btn_god_mode")
-	UIIntermediary.resolve(_btn_gm_give_item, "ui.fe16.gm.btn_give_item")
-	UIIntermediary.resolve(_btn_gm_teleport, "ui.fe16.gm.btn_teleport")
-	UIIntermediary.resolve(_btn_gm_spawn_mob, "ui.fe16.gm.btn_spawn_mob")
-	UIIntermediary.resolve(_btn_gm_set_time, "ui.fe16.gm.btn_set_time")
-
-	# --- Tab 3: CDK 兑换 ---
-	var cdkey_left_label: Label = $MainLayout/TabContainer/CDK兑换/LeftPanel/SectionLabel
-	UIIntermediary.resolve(cdkey_left_label, "ui.fe16.cdkey.section_redeem")
-	var cdkey_right_label: Label = $MainLayout/TabContainer/CDK兑换/RightPanel/SectionLabel
-	UIIntermediary.resolve(cdkey_right_label, "ui.fe16.cdkey.section_history")
-	UIIntermediary.resolve_placeholder(_line_edit_cdkey_input, "ui.fe16.cdkey.input_placeholder")
-	UIIntermediary.resolve(_btn_cdkey_redeem, "ui.fe16.cdkey.btn_redeem")
-	UIIntermediary.resolve(_label_reward_title, "ui.fe16.cdkey.reward_title_default")
-	UIIntermediary.resolve(_label_reward_desc, "ui.fe16.cdkey.reward_desc_default")
+	_get_tabs().init_static_text()
 
 # ==============================================================================
 # Tab 1: 存档槽位
@@ -244,12 +218,12 @@ func _init_static_text() -> void:
 func _init_save_slots() -> void:
 	# Mock 6 个存档槽位（角色名使用 i18n key）
 	save_slots = [
-		{ "slot_id": "SLOT_01", "char_name_key": "ui.fe16.mock.char.artoria", "level": 45, "playtime_sec": 86400, "save_date": "2026-08-31 23:15", "empty": false },
-		{ "slot_id": "SLOT_02", "char_name_key": "ui.fe16.mock.char.meriel", "level": 32, "playtime_sec": 43200, "save_date": "2026-08-30 18:42", "empty": false },
-		{ "slot_id": "SLOT_03", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true },
-		{ "slot_id": "SLOT_04", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true },
-		{ "slot_id": "SLOT_05", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true },
-		{ "slot_id": "SLOT_06", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true },
+		{"slot_id": "SLOT_01", "char_name_key": "ui.fe16.mock.char.artoria", "level": 45, "playtime_sec": 86400, "save_date": "2026-08-31 23:15", "empty": false},
+		{"slot_id": "SLOT_02", "char_name_key": "ui.fe16.mock.char.meriel", "level": 32, "playtime_sec": 43200, "save_date": "2026-08-30 18:42", "empty": false},
+		{"slot_id": "SLOT_03", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
+		{"slot_id": "SLOT_04", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
+		{"slot_id": "SLOT_05", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
+		{"slot_id": "SLOT_06", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
 	]
 	_refresh_save_slot_list()
 	_refresh_slot_detail()
@@ -300,116 +274,38 @@ func _format_playtime(seconds: int) -> String:
 	return "%02d:%02d:%02d" % [h, m, s]
 
 # ==============================================================================
-# Tab 2: 确定性回放
+# Tab 1~3 委托给 SystemSaveTabs
 # ==============================================================================
 
-## 初始化确定性回放：Mock 3 条回放并首刷列表与详情
 func _init_replay() -> void:
-	# Mock 回放数据（标题使用 i18n key）
-	_replay_data = [
-		{ "id": "R001", "title_key": "ui.fe16.mock.replay.dragon_peak", "scene": "DRAGON_PEAK", "level": 45, "duration_sec": 180, "frames": 10800, "date": "2026-08-31 22:00" },
-		{ "id": "R002", "title_key": "ui.fe16.mock.replay.iron_fortress", "scene": "IRON_FORTRESS", "level": 40, "duration_sec": 240, "frames": 14400, "date": "2026-08-30 15:30" },
-		{ "id": "R003", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "TRAINING_GROUND", "level": 45, "duration_sec": 60, "frames": 3600, "date": "2026-08-29 10:00" },
-	]
-	_refresh_replay_list()
-	_refresh_replay_detail()
+	_get_tabs().init_replay()
 
-## 刷新回放列表：回放标题填充
 func _refresh_replay_list() -> void:
-	_item_list_replays.clear()
-	for item in _replay_data:
-		var title := UIIntermediary.text(item.get("title_key", ""))
-		_item_list_replays.add_item(title)
+	_get_tabs().refresh_replay_list()
 
-## 刷新回放详情：未选中占位或完整字段（标题/场景/等级/时长/日期/帧信息），重置进度
 func _refresh_replay_detail() -> void:
-	if _selected_replay_idx < 0 or _selected_replay_idx >= _replay_data.size():
-		UIIntermediary.resolve(_label_replay_title, "ui.fe16.replay.title_default")
-		UIIntermediary.resolve(_label_replay_scene, "ui.fe16.replay.scene_default")
-		UIIntermediary.resolve(_label_replay_level, "ui.fe16.replay.level_default")
-		UIIntermediary.resolve(_label_replay_duration, "ui.fe16.replay.duration_default")
-		UIIntermediary.resolve(_label_replay_date, "ui.fe16.replay.date_default")
-		UIIntermediary.resolve(_label_frame_info, "ui.fe16.replay.frame_info", {"cur": 0, "total": 0})
-		_slider_replay_progress.value = 0.0
-		_replay_total_frames = 0
-		return
-	var item: Dictionary = _replay_data[_selected_replay_idx]
-	var title := UIIntermediary.text(item.get("title_key", ""))
-	UIIntermediary.resolve(_label_replay_title, "ui.fe16.replay.title_label", {"title": title})
-	UIIntermediary.resolve(_label_replay_scene, "ui.fe16.replay.scene_label", {"scene": item.get("scene", "--")})
-	UIIntermediary.resolve(_label_replay_level, "ui.fe16.replay.level_label", {"level": item.get("level", 0)})
-	UIIntermediary.resolve(_label_replay_duration, "ui.fe16.replay.duration_label", {"duration": _format_playtime(item.get("duration_sec", 0))})
-	UIIntermediary.resolve(_label_replay_date, "ui.fe16.replay.date_label", {"date": item.get("date", "--")})
-	_replay_total_frames = item.get("frames", 0)
-	_replay_current_frame = 0
-	UIIntermediary.resolve(_label_frame_info, "ui.fe16.replay.frame_info", {"cur": 0, "total": _replay_total_frames})
-	_slider_replay_progress.value = 0.0
+	_get_tabs().refresh_replay_detail()
 
-## 刷新回放进度条与帧信息（当前帧/总帧比例）
 func _refresh_replay_progress() -> void:
-	if _replay_total_frames > 0:
-		_slider_replay_progress.value = float(_replay_current_frame) / float(_replay_total_frames)
-		UIIntermediary.resolve(_label_frame_info, "ui.fe16.replay.frame_info", {"cur": _replay_current_frame, "total": _replay_total_frames})
+	_get_tabs().refresh_replay_progress()
 
-# ==============================================================================
-# Tab 3: GM 沙盒
-# ==============================================================================
-
-## 初始化 GM 沙盒：刷新权限等级展示
 func _init_gm_sandbox() -> void:
-	_refresh_gm_permission()
+	_get_tabs().init_gm_sandbox()
 
-## 刷新 GM 权限等级文案（NONE/MODERATOR/ADMIN/DEVELOPER 四档）
 func _refresh_gm_permission() -> void:
-	match _gm_permission_level:
-		GMPermissionLevel.NONE:
-			UIIntermediary.resolve(_label_gm_permission, "ui.fe16.gm.permission_none")
-		GMPermissionLevel.MODERATOR:
-			UIIntermediary.resolve(_label_gm_permission, "ui.fe16.gm.permission_moderator")
-		GMPermissionLevel.ADMIN:
-			UIIntermediary.resolve(_label_gm_permission, "ui.fe16.gm.permission_admin")
-		GMPermissionLevel.DEVELOPER:
-			UIIntermediary.resolve(_label_gm_permission, "ui.fe16.gm.permission_developer")
+	_get_tabs().refresh_gm_permission()
 
-## GM 输出终端追加行（SYSTEM 分类取色）
 func _append_gm_output(text: String) -> void:
-	var tm := ThemeManager.get_instance()
-	var color_tag := tm.get_bbcode_color_tag("SYSTEM")
-	_rich_gm_output.append_text("%s%s[/color]\n" % [color_tag, text])
+	_get_tabs().append_gm_output(text)
 
-## 执行 GM 指令：记录历史列表并模拟执行输出（骨架桩）
 func _execute_gm_command(command: String) -> void:
-	command = command.strip_edges()
-	if command.is_empty():
-		return
-	# 记录历史
-	_gm_command_history.append(command)
-	_item_list_gm_history.clear()
-	for cmd in _gm_command_history:
-		_item_list_gm_history.add_item(cmd)
-	# 模拟执行输出
-	_append_gm_output(">>> %s" % command)
-	_append_gm_output(UIIntermediary.text("ui.fe16.gm.exec_success"))
+	_get_tabs().execute_gm_command(command)
 
-# ==============================================================================
-# Tab 4: CDK 兑换
-# ==============================================================================
-
-## 初始化 CDK 兑换：Mock 2 条历史并首刷历史列表
 func _init_cdkey() -> void:
-	# Mock 兑换历史（奖励名使用 i18n key）
-	_cdkey_history = [
-		{ "code": "WELCOME2026", "reward_key": "ui.fe16.mock.cdkey.gold_10000", "time": "2026-08-28 10:00", "success": true },
-		{ "code": "SUMMER_GIFT", "reward_key": "ui.fe16.mock.cdkey.summer_outfit", "time": "2026-08-15 14:30", "success": true },
-	]
-	_refresh_cdkey_history()
+	_get_tabs().init_cdkey()
 
-## 刷新 CDK 兑换历史列表（成功/失败标记 + 兑换码 + 时间）
 func _refresh_cdkey_history() -> void:
-	_item_list_cdkey_history.clear()
-	for item in _cdkey_history:
-		var status := "[OK]" if item.get("success", false) else "[FAIL]"
-		_item_list_cdkey_history.add_item("%s  %s  %s" % [status, item.get("code", ""), item.get("time", "")])
+	_get_tabs().refresh_cdkey_history()
 
 # ==============================================================================
 # 信号绑定
@@ -432,29 +328,7 @@ func _connect_signals() -> void:
 	_check_auto_save.toggled.connect(_on_auto_save_toggled)
 	_btn_cloud_sync.pressed.connect(_on_cloud_sync_pressed)
 
-	# 确定性回放
-	_item_list_replays.item_selected.connect(_on_replay_selected)
-	_btn_play_replay.pressed.connect(_on_play_replay_pressed)
-	_btn_pause_replay.pressed.connect(_on_pause_replay_pressed)
-	_btn_stop_replay.pressed.connect(_on_stop_replay_pressed)
-	_btn_frame_prev.pressed.connect(_on_frame_prev_pressed)
-	_btn_frame_next.pressed.connect(_on_frame_next_pressed)
-	_btn_speed_down.pressed.connect(_on_speed_down_pressed)
-	_btn_speed_up.pressed.connect(_on_speed_up_pressed)
-	_slider_replay_progress.value_changed.connect(_on_replay_slider_changed)
-
-	# GM 沙盒
-	_btn_gm_execute.pressed.connect(_on_gm_execute_pressed)
-	_line_edit_gm_input.text_submitted.connect(_on_gm_input_submitted)
-	_btn_gm_god_mode.pressed.connect(func(): _execute_gm_command("/godmode on"))
-	_btn_gm_give_item.pressed.connect(func(): _execute_gm_command("/give gold 10000"))
-	_btn_gm_teleport.pressed.connect(func(): _execute_gm_command("/teleport VALAN_CAPITAL"))
-	_btn_gm_spawn_mob.pressed.connect(func(): _execute_gm_command("/spawnmob WOLF 3"))
-	_btn_gm_set_time.pressed.connect(func(): _execute_gm_command("/settime 12:00"))
-
-	# CDK 兑换
-	_btn_cdkey_redeem.pressed.connect(_on_cdkey_redeem_pressed)
-	_line_edit_cdkey_input.text_submitted.connect(_on_cdkey_input_submitted)
+	_get_tabs().connect_signals()
 
 # ==============================================================================
 # 信号回调
@@ -462,7 +336,7 @@ func _connect_signals() -> void:
 
 ## 返回按钮：经 ViewRouter 弹出视图回退上一级
 func _on_back_btn_pressed() -> void:
-	ViewRouter.get_instance().pop_view()
+	self.back()
 
 ## 主 Tab 切换：骨架阶段无额外处理（占位）
 func _on_tab_changed(_tab_idx: int) -> void:
@@ -505,17 +379,8 @@ func _on_delete_slot_pressed() -> void:
 	_item_list_save_slots.select(_selected_slot_idx)
 	_refresh_slot_detail()
 
-## 导出槽位：骨架阶段模拟导出（预留）
-func _on_export_slot_pressed() -> void:
-	if _selected_slot_idx < 0:
-		return
-	# 骨架阶段：模拟导出
-	pass
-
-## 自动存档开关：骨架阶段仅记录状态（预留）
-func _on_auto_save_toggled(button_pressed: bool) -> void:
-	# 骨架阶段：仅记录状态
-	pass
+func _on_export_slot_pressed() -> void: pass
+func _on_auto_save_toggled(_pressed: bool) -> void: pass
 
 ## 云同步按钮：模拟同步中→同步完成文案（骨架桩）
 func _on_cloud_sync_pressed() -> void:
@@ -523,98 +388,22 @@ func _on_cloud_sync_pressed() -> void:
 	# 骨架阶段：模拟同步完成
 	UIIntermediary.resolve(_label_cloud_status, "ui.fe16.save_slot.cloud_synced")
 
-# --- 确定性回放 ---
+# --- 确定性回放 / GM 沙盒 / CDK 兑换 回调委托 ---
 
-## 回放选中：记录索引、停止播放态并刷新详情
-func _on_replay_selected(idx: int) -> void:
-	_selected_replay_idx = idx
-	_replay_playing = false
-	_refresh_replay_detail()
-
-## 播放回放：置播放态并经服务推进一帧（骨架桩）
-func _on_play_replay_pressed() -> void:
-	if _selected_replay_idx < 0:
-		return
-	_replay_playing = true
-	# 骨架阶段：模拟推进一帧（帧钳制规则经服务）
-	_replay_current_frame = MockServiceContainer.get_instance().save().advance_replay(
-		_replay_current_frame, _replay_total_frames, 60)
-	_refresh_replay_progress()
-
-## 暂停回放：清除播放态
-func _on_pause_replay_pressed() -> void:
-	_replay_playing = false
-
-## 停止回放：清除播放态并重置到首帧
-func _on_stop_replay_pressed() -> void:
-	_replay_playing = false
-	_replay_current_frame = 0
-	_refresh_replay_progress()
-
-## 上一帧：经服务回退一帧并刷新进度
-func _on_frame_prev_pressed() -> void:
-	_replay_current_frame = MockServiceContainer.get_instance().save().advance_replay(
-		_replay_current_frame, _replay_total_frames, -1)
-	_refresh_replay_progress()
-
-## 下一帧：经服务前进一帧并刷新进度
-func _on_frame_next_pressed() -> void:
-	_replay_current_frame = MockServiceContainer.get_instance().save().advance_replay(
-		_replay_current_frame, _replay_total_frames, 1)
-	_refresh_replay_progress()
-
-## 回放减速：速度档位经服务下切一档并更新标签
-func _on_speed_down_pressed() -> void:
-	_replay_speed = MockServiceContainer.get_instance().save().change_replay_speed(_replay_speed, -1)
-	_label_speed_val.text = "%.2fx" % _replay_speed
-
-## 回放加速：速度档位经服务上切一档并更新标签
-func _on_speed_up_pressed() -> void:
-	_replay_speed = MockServiceContainer.get_instance().save().change_replay_speed(_replay_speed, 1)
-	_label_speed_val.text = "%.2fx" % _replay_speed
-
-## 回放进度条拖动：比例换算经服务并按帧刷新
-func _on_replay_slider_changed(value: float) -> void:
-	_replay_current_frame = MockServiceContainer.get_instance().save().frame_from_ratio(value, _replay_total_frames)
-	UIIntermediary.resolve(_label_frame_info, "ui.fe16.replay.frame_info", {"cur": _replay_current_frame, "total": _replay_total_frames})
-
-# --- GM 沙盒 ---
-
-## GM 执行按钮：委托 _execute_gm_command 并清空输入框
-func _on_gm_execute_pressed() -> void:
-	_execute_gm_command(_line_edit_gm_input.text)
-	_line_edit_gm_input.clear()
-
-## GM 输入框回车：委托 _execute_gm_command 并清空输入框
-func _on_gm_input_submitted(text: String) -> void:
-	_execute_gm_command(text)
-	_line_edit_gm_input.clear()
-
-# --- CDK 兑换 ---
-
-## CDK 兑换按钮：委托 _redeem_cdkey
-func _on_cdkey_redeem_pressed() -> void:
-	_redeem_cdkey()
-
-## CDK 输入框回车：委托 _redeem_cdkey
-func _on_cdkey_input_submitted(_text: String) -> void:
-	_redeem_cdkey()
-
-## 兑换 CDK：空码拦截，模拟兑换成功并追加历史/刷新奖励预览（骨架桩）
-func _redeem_cdkey() -> void:
-	var code := _line_edit_cdkey_input.text.strip_edges().to_upper()
-	if code.is_empty():
-		UIIntermediary.resolve(_label_cdkey_result, "ui.fe16.cdkey.error_empty")
-		return
-	cdkey_input_text = code
-	# 骨架阶段：模拟兑换成功
-	var reward := UIIntermediary.text("ui.fe16.mock.cdkey.gold_5000")
-	UIIntermediary.resolve(_label_cdkey_result, "ui.fe16.cdkey.success_msg")
-	UIIntermediary.resolve(_label_reward_title, "ui.fe16.cdkey.reward_title", {"reward": reward})
-	UIIntermediary.resolve(_label_reward_desc, "ui.fe16.cdkey.reward_desc", {"code": code})
-	_cdkey_history.append({ "code": code, "reward_key": "ui.fe16.mock.cdkey.gold_5000", "time": "2026-09-01 00:00", "success": true })
-	_refresh_cdkey_history()
-	_line_edit_cdkey_input.clear()
+func _on_replay_selected(idx: int) -> void: _get_tabs()._on_replay_selected(idx)
+func _on_play_replay_pressed() -> void: _get_tabs()._on_play_replay_pressed()
+func _on_pause_replay_pressed() -> void: _get_tabs()._on_pause_replay_pressed()
+func _on_stop_replay_pressed() -> void: _get_tabs()._on_stop_replay_pressed()
+func _on_frame_prev_pressed() -> void: _get_tabs()._on_frame_prev_pressed()
+func _on_frame_next_pressed() -> void: _get_tabs()._on_frame_next_pressed()
+func _on_speed_down_pressed() -> void: _get_tabs()._on_speed_down_pressed()
+func _on_speed_up_pressed() -> void: _get_tabs()._on_speed_up_pressed()
+func _on_replay_slider_changed(value: float) -> void: _get_tabs()._on_replay_slider_changed(value)
+func _on_gm_execute_pressed() -> void: _get_tabs()._on_gm_execute_pressed()
+func _on_gm_input_submitted(text: String) -> void: _get_tabs()._on_gm_input_submitted(text)
+func _on_cdkey_redeem_pressed() -> void: _get_tabs()._on_cdkey_redeem_pressed()
+func _on_cdkey_input_submitted(text: String) -> void: _get_tabs()._on_cdkey_input_submitted(text)
+func _redeem_cdkey() -> void: _get_tabs().redeem_cdkey()
 
 # ==============================================================================
 # 外部 API（保留数据桩接口供未来接线）
@@ -624,7 +413,7 @@ func _redeem_cdkey() -> void:
 func set_save_slots_snapshot(slots: Array) -> void:
 	apply_snapshot({"save_slots": slots})
 
-## 统一快照渲染映射（P81）：存档槽位 → 视图状态
+## 统一快照渲染映射（）：存档槽位 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("save_slots"):
 		save_slots = FrontendSnapshot.read_array(snapshot, "save_slots")
@@ -636,8 +425,8 @@ func select_slot(slot_id: String) -> Dictionary:
 		if save_slots[i].get("slot_id", "") == slot_id:
 			_selected_slot_idx = i
 			_refresh_slot_detail()
-			return { "success": true, "selected_slot": slot_id }
-	return { "success": false, "reason": "SLOT_NOT_FOUND" }
+			return {"success": true, "selected_slot": slot_id}
+	return {"success": false, "reason": "SLOT_NOT_FOUND"}
 
 ## 外部 API 桩：切换 GM 控制台开关态
 func toggle_gm_console() -> bool:
@@ -648,5 +437,5 @@ func toggle_gm_console() -> bool:
 func submit_cdkey_input(cdkey: String) -> Dictionary:
 	cdkey_input_text = cdkey.strip_edges().to_upper()
 	if cdkey_input_text.is_empty():
-		return { "success": false, "reason": "EMPTY_CODE" }
-	return { "success": true, "cdkey": cdkey_input_text }
+		return {"success": false, "reason": "EMPTY_CODE"}
+	return {"success": true, "cdkey": cdkey_input_text}

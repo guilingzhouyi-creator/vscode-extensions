@@ -10,7 +10,11 @@ const ModalManager = preload("res://frontend/ui_infrastructure/modal_manager.gd"
 const TooltipManager = preload("res://frontend/ui_infrastructure/tooltip_manager.gd")
 const DrawerManager = preload("res://frontend/ui_infrastructure/drawer_manager.gd")
 const ContextMenuManager = preload("res://frontend/ui_infrastructure/context_menu_manager.gd")
+const RedDotTreeManager = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
+const FocusInputManager = preload("res://frontend/ui_infrastructure/focus_input_manager.gd")
+const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
 const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
+const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
 
 ## 引导幂等守卫（R-27：重复引导不再重跑生命周期与默认入口压栈）
 static var _bootstrapped: bool = false
@@ -28,13 +32,18 @@ static func bootstrap(app_root: AppRoot) -> void:
 		DrawerManager.get_instance().bind_layer(app_root.modal_layer, app_root.modal_container)
 		ContextMenuManager.get_instance().bind_layer(app_root.overlay_layer, app_root.overlay_container)
 
+	# 无层级绑定依赖的管理器仅需 get_instance() 惰性初始化（幂等）
+	RedDotTreeManager.get_instance()
+	FocusInputManager.get_instance()
+	UIAudioBridge.get_instance()
+
 	# R-27：已完成一次完整引导则仅保留上述幂等重绑，跳过生命周期驱动与入口压栈
 	if _bootstrapped:
 		return
 	_bootstrapped = true
 
-	# 3. 初始化 Mock 服务容器并驱动应用生命周期状态机（版本握手 → 鉴权入口）
-	var services := MockServiceContainer.get_instance()
+	# 3. 初始化服务容器并驱动应用生命周期状态机（版本握手 → 鉴权入口）
+	var services := ServiceLocator.get_instance()
 	_drive_lifecycle_boot(services)
 
 	# 4. 应用全局主题
@@ -46,10 +55,10 @@ static func bootstrap(app_root: AppRoot) -> void:
 	nav.push_screen("account_entry")
 
 ## 启动态推进：BOOT → INITIALIZING →（版本握手）→ AUTHENTICATING
-static func _drive_lifecycle_boot(services: MockServiceContainer) -> void:
+static func _drive_lifecycle_boot(services: ServiceContainer) -> void:
 	var lifecycle := AppLifecycleFSM.get_instance()
 	lifecycle.transition_to(AppLifecycleFSM.AppState.INITIALIZING)
-	var version_service := services.version()
+	var version_service: Variant = services.version()
 	if version_service == null:
 		lifecycle.transition_to(AppLifecycleFSM.AppState.ERROR)
 		return
@@ -59,4 +68,3 @@ static func _drive_lifecycle_boot(services: MockServiceContainer) -> void:
 		else:
 			lifecycle.transition_to(AppLifecycleFSM.AppState.ERROR)
 	)
-

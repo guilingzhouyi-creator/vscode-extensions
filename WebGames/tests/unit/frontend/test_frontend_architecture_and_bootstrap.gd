@@ -77,7 +77,7 @@ static func _test_app_root_viewport_layers() -> Dictionary:
 	var passed := (bg_layer.layer == -10 and screen_layer.layer == 0 and hud_layer.layer == 10 and modal_layer.layer == 50 and overlay_layer.layer == 80 and debug_layer.layer == 100)
 
 	root.free()
-	return { "test": test_name, "passed": passed }
+	return {"test": test_name, "passed": passed}
 
 ## 2. 验证 NavManager 历史栈深度与跳转
 static func _test_nav_manager_stack_and_history() -> Dictionary:
@@ -104,14 +104,14 @@ static func _test_nav_manager_stack_and_history() -> Dictionary:
 	nav.push_screen("page_b")
 	var d2 := nav.get_stack_depth()
 
-	nav.pop_screen()
+	nav.pop_screen(NavTypes.TransitionType.NONE)
 	var d3 := nav.get_stack_depth()
 
 	var passed := (d1 == 1 and d2 == 2 and d3 == 1)
 
 	dummy_root.free()
 	nav.free()
-	return { "test": test_name, "passed": passed }
+	return {"test": test_name, "passed": passed}
 
 ## 3. 验证 ViewRouter 兼容代理穿透
 static func _test_view_router_compatibility_adapter() -> Dictionary:
@@ -122,7 +122,7 @@ static func _test_view_router_compatibility_adapter() -> Dictionary:
 	var has_invalid := vr.has_view("non_existing_view_xyz")
 
 	var passed := (has_account and has_hud and not has_invalid)
-	return { "test": test_name, "passed": passed }
+	return {"test": test_name, "passed": passed}
 
 ## 4. 验证 Toast 与 Loading 调度（节点挂入场景树，保证 Tween 有树环境）
 static func _test_toast_and_loading_dispatch() -> Dictionary:
@@ -144,4 +144,4 @@ static func _test_toast_and_loading_dispatch() -> Dictionary:
 	var passed := (child_count >= 1 and is_visible and is_hidden)
 	toast.free()
 	loading.free()
-	return { "test": test_name, "passed": passed }
+	return {"test": test_name, "passed": passed}

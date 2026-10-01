@@ -10,7 +10,7 @@ extends RefCounted
 func login_async(username: String, password_plain: String, callback: Callable) -> void:
 	printerr("IAuthService.login_async: 纯虚函数必须由子类实现")
 
-## 异步注册契约 (对齐 P71 AccountRegistrationDTO)
+## 异步注册契约 (对齐 AccountRegistrationDTO)
 func register_async(username: String, password_plain: String, callback: Callable) -> void:
 	printerr("IAuthService.register_async: 纯虚函数必须由子类实现")
 

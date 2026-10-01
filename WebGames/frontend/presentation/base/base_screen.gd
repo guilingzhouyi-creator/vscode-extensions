@@ -7,6 +7,8 @@ class_name BaseScreen
 extends Control
 
 const UIStateContainerClass = preload("res://frontend/presentation/common/ui_state_container.gd")
+const NavTypes = preload("res://frontend/navigation/nav_types.gd")
+const ViewRouter = preload("res://frontend/navigation/view_router.gd")
 
 var screen_id: String = ""
 var navigation_params: Dictionary = {}
@@ -20,6 +22,10 @@ func on_screen_enter(params: Dictionary = {}) -> void:
 ## 页面被弹出或销毁时调用（默认清理本视图 i18n 绑定，防悬挂引用）
 func on_screen_exit() -> void:
 	UIIntermediary.clear_view_bindings(self)
+
+## 统一返回上一视图（供子类或标题栏组件调用）
+func back(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> void:
+	ViewRouter.get_instance().pop_view(transition_type)
 
 ## 页面被后置遮盖挂起时调用 (如上面弹出了全屏新页面)
 func on_screen_suspend() -> void:

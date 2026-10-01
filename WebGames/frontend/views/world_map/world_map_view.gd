@@ -8,6 +8,8 @@
 class_name WorldMapView
 extends BaseScreen
 
+const WorldMapTabsClass = preload("res://frontend/views/world_map/world_map_tabs.gd")
+
 const KButtonClass = preload("res://frontend/components/k_button.gd")
 
 # ==============================================================================
@@ -129,24 +131,13 @@ var _mock_territories: Array = [
 ]
 
 # 主权国家数据（骨架阶段 Mock）
-var _mock_sovereignty: Dictionary = {
-	"nation_name": "ui.fe10.mock.sov.nation_name",
-	"monarch": "ui.fe10.mock.sov.monarch",
-	"population": 1200,
-	"territory_count": 2,
-	"level": "ui.fe10.mock.sov.level"
-}
+var _mock_sovereignty: Dictionary = {"nation_name": "ui.fe10.mock.sov.nation_name", "monarch": "ui.fe10.mock.sov.monarch", "population": 1200, "territory_count": 2, "level": "ui.fe10.mock.sov.level"}
 
 # 行军队伍状态（骨架阶段本地模拟）
 var _marching_active: bool = false
 
 # 地标 ID → i18n key 映射
-const _LANDMARK_NAME_KEYS := {
-	"VALAN_CAPITAL": "ui.fe10.mock.landmark.valan_capital",
-	"SILVER_GROVE": "ui.fe10.mock.landmark.silver_grove",
-	"IRON_FORTRESS": "ui.fe10.mock.landmark.iron_fortress",
-	"DRAGON_PEAK": "ui.fe10.mock.landmark.dragon_peak",
-}
+const _LANDMARK_NAME_KEYS := {"VALAN_CAPITAL": "ui.fe10.mock.landmark.valan_capital", "SILVER_GROVE": "ui.fe10.mock.landmark.silver_grove", "IRON_FORTRESS": "ui.fe10.mock.landmark.iron_fortress", "DRAGON_PEAK": "ui.fe10.mock.landmark.dragon_peak"}
 
 # ==============================================================================
 # 生命周期
@@ -156,18 +147,9 @@ const _LANDMARK_NAME_KEYS := {
 # 白模测试契约兼容桩（映射到新状态，不触碰 @onready 节点）
 # ==============================================================================
 
-## 白模测试契约桩：调整地图缩放（钳制范围与 MAP_MIN_ZOOM / MAP_MAX_ZOOM 常量单源一致）
-func adjust_zoom(delta: float) -> void:
-	map_zoom_level = clampf(map_zoom_level + delta, MAP_MIN_ZOOM, MAP_MAX_ZOOM)
-
-## 白模测试契约桩：选中城镇并记录 town_id
-func select_town(town_id: String) -> Dictionary:
-	selected_town_id = town_id
-	return {"success": true, "town_id": town_id}
-
-## 白模测试契约桩：注入行军路线快照（经统一快照入口）
-func set_marching_route_snapshot(routes: Array) -> void:
-	apply_snapshot({"marching_routes": routes})
+func adjust_zoom(delta: float) -> void: map_zoom_level = clampf(map_zoom_level + delta, MAP_MIN_ZOOM, MAP_MAX_ZOOM)
+func select_town(town_id: String) -> Dictionary: selected_town_id = town_id; return {"success": true, "town_id": town_id}
+func set_marching_route_snapshot(routes: Array) -> void: apply_snapshot({"marching_routes": routes})
 
 ## 统一快照渲染映射（P81）：行军路线 → 视图状态
 func _render_from_snapshot() -> void:
@@ -175,6 +157,14 @@ func _render_from_snapshot() -> void:
 		marching_routes = FrontendSnapshot.read_array(snapshot, "marching_routes")
 
 ## 生命周期初始化：主题/快照/六 Tab 标题与文案/各子界面装配/信号绑定（骨架零接线）
+var _tabs = null
+
+func _get_tabs():
+	if _tabs == null:
+		_tabs = WorldMapTabsClass.new()
+		_tabs.setup(self)
+	return _tabs
+
 func _ready() -> void:
 	# 1. 应用主题（骨架阶段直接用 ThemeManager 单例的默认主题）
 	var tm := ThemeManager.get_instance()
@@ -265,34 +255,7 @@ func _init_static_text() -> void:
 	UIIntermediary.resolve(_town_npc_section_label, "ui.fe10.town.npc_section")
 	UIIntermediary.resolve(_town_detail_section_label, "ui.fe10.town.detail_section")
 
-	# Tab 2: 行军
-	UIIntermediary.resolve(_march_section_label_1, "ui.fe10.march.route_section")
-	UIIntermediary.resolve(_march_from_label, "ui.fe10.march.from_label")
-	UIIntermediary.resolve(_march_to_label, "ui.fe10.march.to_label")
-	UIIntermediary.resolve(_march_section_label_2, "ui.fe10.march.preview_section")
-	UIIntermediary.resolve(_march_section_label_3, "ui.fe10.march.action_section")
-	UIIntermediary.resolve(_march_start_btn, "ui.fe10.march.start_btn")
-	UIIntermediary.resolve(_march_stop_btn, "ui.fe10.march.stop_btn")
-	UIIntermediary.resolve(_march_section_label_4, "ui.fe10.march.party_section")
-
-	# Tab 3: 主权
-	UIIntermediary.resolve(_sov_territory_section_label, "ui.fe10.sov.territory_section")
-	UIIntermediary.resolve(_sov_nation_section_label, "ui.fe10.sov.nation_section")
-	UIIntermediary.resolve(_sov_establish_btn, "ui.fe10.sov.establish_btn")
-
-	# Tab 4: 领地
-	UIIntermediary.resolve(_terr_list_section_label, "ui.fe10.terr.list_section")
-	UIIntermediary.resolve(_terr_detail_section_label, "ui.fe10.terr.detail_section")
-	UIIntermediary.resolve(_terr_construction_label, "ui.fe10.terr.construction_section")
-	UIIntermediary.resolve(_terr_upgrade_btn, "ui.fe10.terr.upgrade_btn")
-
-	# Tab 5: 寻路
-	UIIntermediary.resolve(_pf_start_label, "ui.fe10.pf.start_label")
-	UIIntermediary.resolve(_pf_end_label, "ui.fe10.pf.end_label")
-	UIIntermediary.resolve(_pf_calc_btn, "ui.fe10.pf.calc_btn")
-	UIIntermediary.resolve(_pf_routes_section_label, "ui.fe10.pf.routes_section")
-	UIIntermediary.resolve(_pf_route_detail_label, "ui.fe10.pf.detail_placeholder")
-	UIIntermediary.resolve(_pf_auto_btn, "ui.fe10.pf.auto_btn")
+	_get_tabs().init_static_text()
 
 # ==============================================================================
 # Tab 0: 大地图探索 - 初始化
@@ -329,14 +292,9 @@ func _spawn_landmark_buttons() -> void:
 		btn.pressed.connect(func(): _on_landmark_pressed(lid))
 		_wmap_landmark_container.add_child(btn)
 
-## 地标类型码 → i18n 类型键（CAPITAL/TOWN/FORTRESS/DUNGEON，未命中回传原码）
-func _landmark_type_key(type_code: String) -> String:
-	match type_code:
-		"CAPITAL": return "ui.fe10.landmark.type.capital"
-		"TOWN": return "ui.fe10.landmark.type.town"
-		"FORTRESS": return "ui.fe10.landmark.type.fortress"
-		"DUNGEON": return "ui.fe10.landmark.type.dungeon"
-		_: return type_code
+func _landmark_type_key(code: String) -> String:
+	var m := {"CAPITAL": "ui.fe10.landmark.type.capital", "TOWN": "ui.fe10.landmark.type.town", "FORTRESS": "ui.fe10.landmark.type.fortress", "DUNGEON": "ui.fe10.landmark.type.dungeon"}
+	return m.get(code, code)
 
 ## 刷新缩放百分比标签
 func _refresh_wmap_zoom() -> void:
@@ -383,141 +341,18 @@ func _show_town(landmark: Dictionary) -> void:
 		UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.detail_placeholder")
 
 # ==============================================================================
-# Tab 2: 行军探索 - 初始化
+# Tab 2~5 委托给 WorldMapTabs
 # ==============================================================================
 
-## 初始化行军探索 Tab：填充出发/目的地选项并刷新预览与队伍状态
-func _init_marching_tab() -> void:
-	# 填充出发地与目的地选项
-	_march_from_option.clear()
-	_march_to_option.clear()
-	for landmark in town_landmarks:
-		var name := UIIntermediary.text(landmark.get("name", ""))
-		_march_from_option.add_item(name)
-		_march_to_option.add_item(name)
-	# 默认选择
-	if town_landmarks.size() >= 2:
-		_march_from_option.select(0)
-		_march_to_option.select(1)
-		_refresh_march_preview()
-	# 初始队伍状态
-	_refresh_march_party_status()
-
-## 刷新行军预览：路线/预估耗时/地形（Mock 路线命中优先，缺省 4 小时）
-func _refresh_march_preview() -> void:
-	var from_idx := _march_from_option.selected
-	var to_idx := _march_to_option.selected
-	if from_idx < 0 or to_idx < 0 or from_idx >= town_landmarks.size() or to_idx >= town_landmarks.size():
-		return
-	var from_name := UIIntermediary.text(town_landmarks[from_idx].get("name", ""))
-	var to_name := UIIntermediary.text(town_landmarks[to_idx].get("name", ""))
-	if _march_route_preview_label:
-		UIIntermediary.resolve(_march_route_preview_label, "ui.fe10.march.route", {"from": from_name, "to": to_name})
-	# 查找匹配的 Mock 路线数据
-	var hours := 0
-	var terrain := UIIntermediary.text("ui.fe10.terrain.plains")
-	for route in marching_routes:
-		if route.get("from", "") == town_landmarks[from_idx].get("id", "") and route.get("to", "") == town_landmarks[to_idx].get("id", ""):
-			hours = route.get("hours_remain", 0)
-			terrain = UIIntermediary.text(_terrain_key(route.get("terrain", "PLAINS")))
-			break
-	if hours == 0 and from_idx != to_idx:
-		hours = 4  # 骨架阶段默认预估
-	if _march_eta_label:
-		UIIntermediary.resolve(_march_eta_label, "ui.fe10.march.eta", {"hours": hours})
-	if _march_terrain_label:
-		UIIntermediary.resolve(_march_terrain_label, "ui.fe10.march.terrain", {"terrain": terrain})
-
-## 地形码 → i18n 地形键（PLAINS/FOREST/MOUNTAIN/SWAMP/DESERT，未命中回传原码）
-func _terrain_key(code: String) -> String:
-	match code:
-		"PLAINS": return "ui.fe10.terrain.plains"
-		"FOREST": return "ui.fe10.terrain.forest"
-		"MOUNTAIN": return "ui.fe10.terrain.mountain"
-		"SWAMP": return "ui.fe10.terrain.swamp"
-		"DESERT": return "ui.fe10.terrain.desert"
-		_: return code
-
-## 刷新行军队伍状态（进行中/空闲 + 人数与补给）
-func _refresh_march_party_status() -> void:
-	if _march_party_status_label:
-		var supply := UIIntermediary.text("ui.fe10.march.supply_sufficient")
-		var status_key := "ui.fe10.march.party_active" if _marching_active else "ui.fe10.march.party_idle"
-		UIIntermediary.resolve(_march_party_status_label, status_key, {"count": 6, "supply": supply})
-
-# ==============================================================================
-# Tab 3: 主权建国 - 初始化
-# ==============================================================================
-
-## 初始化主权建国 Tab：填充领地列表并展示国家信息
-func _init_sovereignty_tab() -> void:
-	# 填充已占领领地列表
-	_sov_territory_list.clear()
-	for terr in _mock_territories:
-		_sov_territory_list.add_item(UIIntermediary.text(terr.get("name", "")))
-	# 显示国家信息
-	_refresh_sovereignty_info()
-
-## 刷新主权国家信息：国名/君主/人口/领地数/等级
-func _refresh_sovereignty_info() -> void:
-	if _sov_nation_name_label:
-		var nation_key: String = _mock_sovereignty.get("nation_name", "ui.fe10.sov.nation_name_none")
-		_sov_nation_name_label.text = UIIntermediary.text(nation_key)
-	if _sov_monarch_label:
-		var monarch_name := UIIntermediary.text(_mock_sovereignty.get("monarch", ""))
-		UIIntermediary.resolve(_sov_monarch_label, "ui.fe10.sov.monarch", {"name": monarch_name})
-	if _sov_population_label:
-		UIIntermediary.resolve(_sov_population_label, "ui.fe10.sov.population", {"count": _mock_sovereignty.get("population", 0)})
-	if _sov_territory_count_label:
-		UIIntermediary.resolve(_sov_territory_count_label, "ui.fe10.sov.territory_count", {"count": _mock_sovereignty.get("territory_count", 0)})
-	if _sov_level_label:
-		var level_name := UIIntermediary.text(_mock_sovereignty.get("level", "ui.fe10.sov.level_none"))
-		UIIntermediary.resolve(_sov_level_label, "ui.fe10.sov.level", {"level": level_name})
-
-# ==============================================================================
-# Tab 4: 领地管理 - 初始化
-# ==============================================================================
-
-## 初始化领地管理 Tab：填充领地列表并默认展示首个领地详情
-func _init_territory_tab() -> void:
-	# 填充领地列表
-	_territory_list.clear()
-	for terr in _mock_territories:
-		_territory_list.add_item(UIIntermediary.text(terr.get("name", "")))
-	# 默认选中第一个领地
-	if _mock_territories.size() > 0:
-		_show_territory_detail(_mock_territories[0])
-
-## 展示领地详情：资源/建设进度条/驻军
-func _show_territory_detail(terr: Dictionary) -> void:
-	if _terr_resource_label:
-		UIIntermediary.resolve(_terr_resource_label, "ui.fe10.terr.resource", {
-			"food": terr.get("food", 0),
-			"wood": terr.get("wood", 0),
-			"ore": terr.get("ore", 0)
-		})
-	if _terr_construction_bar:
-		_terr_construction_bar.value = terr.get("construction", 0.0) * 100.0
-	if _terr_garrison_label:
-		UIIntermediary.resolve(_terr_garrison_label, "ui.fe10.terr.garrison", {"count": terr.get("garrison", 0)})
-
-# ==============================================================================
-# Tab 5: 寻路规划 - 初始化
-# ==============================================================================
-
-## 初始化寻路规划 Tab：填充起点/终点选项
-func _init_pathfinding_tab() -> void:
-	# 填充起点与终点选项
-	_pf_start_option.clear()
-	_pf_end_option.clear()
-	for landmark in town_landmarks:
-		var name := UIIntermediary.text(landmark.get("name", ""))
-		_pf_start_option.add_item(name)
-		_pf_end_option.add_item(name)
-	# 默认选择
-	if town_landmarks.size() >= 2:
-		_pf_start_option.select(0)
-		_pf_end_option.select(1)
+func _init_marching_tab() -> void: _get_tabs().init_marching_tab()
+func _refresh_march_preview() -> void: _get_tabs().refresh_march_preview()
+func _terrain_key(code: String) -> String: return _get_tabs()._terrain_key(code)
+func _refresh_march_party_status() -> void: _get_tabs().refresh_march_party_status()
+func _init_sovereignty_tab() -> void: _get_tabs().init_sovereignty_tab()
+func _refresh_sovereignty_info() -> void: _get_tabs().refresh_sovereignty_info()
+func _init_territory_tab() -> void: _get_tabs().init_territory_tab()
+func _show_territory_detail(terr: Dictionary) -> void: _get_tabs().show_territory_detail(terr)
+func _init_pathfinding_tab() -> void: _get_tabs().init_pathfinding_tab()
 
 # ==============================================================================
 # 信号绑定（零接线：所有信号在本地脚本闭环，不接 EventBus）
@@ -538,34 +373,13 @@ func _connect_signals() -> void:
 	_town_facility_list.item_selected.connect(_on_town_facility_selected)
 	_town_npc_list.item_selected.connect(_on_town_npc_selected)
 
-	# 行军选项
-	_march_from_option.item_selected.connect(_on_march_option_changed)
-	_march_to_option.item_selected.connect(_on_march_option_changed)
-	_march_start_btn.pressed.connect(_on_march_start)
-	_march_stop_btn.pressed.connect(_on_march_stop)
-
-	# 主权
-	_sov_establish_btn.pressed.connect(_on_sov_establish)
-
-	# 领地
-	_territory_list.item_selected.connect(_on_territory_selected)
-	_terr_upgrade_btn.pressed.connect(_on_terr_upgrade)
-
-	# 寻路
-	_pf_calc_btn.pressed.connect(_on_pf_calc)
-	_pf_route_list.item_selected.connect(_on_pf_route_selected)
-	_pf_auto_btn.pressed.connect(_on_pf_auto)
+	_get_tabs().connect_signals()
 
 # ==============================================================================
 # 返回按钮
 # ==============================================================================
 
-## 返回按钮：经 ViewRouter 弹出视图回退上一级
-func _on_back_pressed() -> void:
-	# 右下角返回按钮：通过 ViewRouter 返回上一视图
-	var router := ViewRouter.get_instance()
-	if router != null:
-		router.pop_view()
+func _on_back_pressed() -> void: self.back()
 
 # ==============================================================================
 # 大地图交互
@@ -587,15 +401,8 @@ func _on_legend_selected(index: int) -> void:
 	if index >= 0 and index < town_landmarks.size():
 		_on_landmark_pressed(town_landmarks[index].get("id", ""))
 
-## 放大按钮：缩放 +0.25（上限 MAP_MAX_ZOOM）并刷新标签
-func _on_wmap_zoom_in() -> void:
-	map_zoom_level = minf(map_zoom_level + 0.25, MAP_MAX_ZOOM)
-	_refresh_wmap_zoom()
-
-## 缩小按钮：缩放 -0.25（下限 MAP_MIN_ZOOM）并刷新标签
-func _on_wmap_zoom_out() -> void:
-	map_zoom_level = maxf(map_zoom_level - 0.25, MAP_MIN_ZOOM)
-	_refresh_wmap_zoom()
+func _on_wmap_zoom_in() -> void: map_zoom_level = minf(map_zoom_level + 0.25, MAP_MAX_ZOOM); _refresh_wmap_zoom()
+func _on_wmap_zoom_out() -> void: map_zoom_level = maxf(map_zoom_level - 0.25, MAP_MIN_ZOOM); _refresh_wmap_zoom()
 
 # ==============================================================================
 # 城镇交互
@@ -620,103 +427,15 @@ func _on_town_npc_selected(index: int) -> void:
 			UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.npc_detail", {"name": name, "desc": desc})
 
 # ==============================================================================
-# 行军交互
+# Tab 2~5 回调委托
 # ==============================================================================
 
-## 行军出发/目的地选项变化：刷新路线预览
-func _on_march_option_changed(_index: int) -> void:
-	_refresh_march_preview()
-
-## 开始行军：置激活态、切换按钮可用性并刷新队伍状态
-func _on_march_start() -> void:
-	_marching_active = true
-	_march_start_btn.disabled = true
-	_march_stop_btn.disabled = false
-	_refresh_march_party_status()
-
-## 停止行军：清激活态、切换按钮可用性并刷新队伍状态
-func _on_march_stop() -> void:
-	_marching_active = false
-	_march_start_btn.disabled = false
-	_march_stop_btn.disabled = true
-	_refresh_march_party_status()
-
-# ==============================================================================
-# 主权交互
-# ==============================================================================
-
-## 建立国家按钮：模拟建国（刷新国家信息并禁用按钮，骨架桩）
-func _on_sov_establish() -> void:
-	# 骨架阶段：模拟建立国家
-	_mock_sovereignty = {
-		"nation_name": "ui.fe10.mock.sov.nation_name",
-		"monarch": "ui.fe10.mock.sov.monarch",
-		"population": 1200,
-		"territory_count": _mock_territories.size(),
-		"level": "ui.fe10.mock.sov.level"
-	}
-	_refresh_sovereignty_info()
-	_sov_establish_btn.disabled = true
-	UIIntermediary.resolve(_sov_establish_btn, "ui.fe10.sov.established")
-
-# ==============================================================================
-# 领地交互
-# ==============================================================================
-
-## 领地条目选中：展示领地详情
-func _on_territory_selected(index: int) -> void:
-	if index >= 0 and index < _mock_territories.size():
-		_show_territory_detail(_mock_territories[index])
-
-## 领地升级按钮：建设/驻军规则经服务，成功后回写并刷新详情
-func _on_terr_upgrade() -> void:
-	var idx := _territory_list.get_selected_items()
-	if idx.size() > 0 and idx[0] < _mock_territories.size():
-		var result := MockServiceContainer.get_instance().world().upgrade_territory(_mock_territories[idx[0]])
-		if bool(result.get("success", false)):
-			_mock_territories[idx[0]] = result.get("territory", _mock_territories[idx[0]])
-			_show_territory_detail(_mock_territories[idx[0]])
-
-# ==============================================================================
-# 寻路交互
-# ==============================================================================
-
-## 寻路计算按钮：路线生成经服务（起终点非法时服务返回空路线）
-func _on_pf_calc() -> void:
-	var from_idx := _pf_start_option.selected
-	var to_idx := _pf_end_option.selected
-	var route_data := MockServiceContainer.get_instance().world().plan_routes(from_idx, to_idx)
-	if route_data.is_empty():
-		if _pf_route_detail_label:
-			UIIntermediary.resolve(_pf_route_detail_label, "ui.fe10.pf.same_start_end")
-		return
-	# 渲染候选路线
-	_pf_route_list.clear()
-	var from_name := UIIntermediary.text(town_landmarks[from_idx].get("name", ""))
-	var to_name := UIIntermediary.text(town_landmarks[to_idx].get("name", ""))
-	for rd in route_data:
-		UIIntermediary.resolve_item(_pf_route_list, "ui.fe10.pf.route_item", {
-			"label": rd.label,
-			"from": from_name,
-			"to": to_name,
-			"hours": rd.hours,
-			"danger": UIIntermediary.text(rd.danger_key),
-			"cost": rd.cost,
-		})
-	if _pf_route_detail_label:
-		UIIntermediary.resolve(_pf_route_detail_label, "ui.fe10.pf.routes_calculated", {"count": route_data.size()})
-
-## 路线条目选中：渲染路线详情（按索引取 i18n 详情键）
-func _on_pf_route_selected(index: int) -> void:
-	if _pf_route_detail_label:
-		var detail_key := "ui.fe10.pf.route_detail_%d" % index
-		var detail_text := UIIntermediary.text(detail_key)
-		UIIntermediary.resolve(_pf_route_detail_label, "ui.fe10.pf.route_detail", {"index": index + 1, "detail": detail_text})
-
-## 自动寻路按钮：无路线先计算，模拟出发并提示（骨架桩）
-func _on_pf_auto() -> void:
-	# 骨架阶段：模拟自动寻路出发
-	if _pf_route_list.item_count == 0:
-		_on_pf_calc()
-	if _pf_route_detail_label:
-		UIIntermediary.resolve(_pf_route_detail_label, "ui.fe10.pf.auto_started")
+func _on_march_option_changed(idx: int) -> void: _get_tabs()._on_march_option_changed(idx)
+func _on_march_start() -> void: _get_tabs()._on_march_start()
+func _on_march_stop() -> void: _get_tabs()._on_march_stop()
+func _on_sov_establish() -> void: _get_tabs()._on_sov_establish()
+func _on_territory_selected(idx: int) -> void: _get_tabs()._on_territory_selected(idx)
+func _on_terr_upgrade() -> void: _get_tabs()._on_terr_upgrade()
+func _on_pf_calc() -> void: _get_tabs()._on_pf_calc()
+func _on_pf_route_selected(idx: int) -> void: _get_tabs()._on_pf_route_selected(idx)
+func _on_pf_auto() -> void: _get_tabs()._on_pf_auto()

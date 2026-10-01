@@ -4,7 +4,9 @@
 # 职责: 注册与解析前端服务实例，屏蔽底层服务实现是 Mock 还是未来真实后端
 # ==============================================================================
 class_name MockServiceContainer
-extends RefCounted
+extends ServiceContainer
+
+const ServiceContainer = preload("res://frontend/domain_boundary/service_container.gd")
 
 static var _instance: MockServiceContainer
 static func get_instance() -> MockServiceContainer:
@@ -19,7 +21,6 @@ static func reset_instance() -> void:
 		_instance._services.clear()
 	_instance = null
 
-var _services: Dictionary = {}
 
 ## 初始化默认 Mock 服务套件
 func _init_default_services() -> void:

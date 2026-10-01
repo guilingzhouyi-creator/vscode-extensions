@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://ccombatview04"]
+[gd_scene load_steps=3 format=3 uid="uid://ccombatview04"]
 
 [ext_resource type="Script" path="res://frontend/views/combat_view/combat_view.gd" id="1_combat"]
+[ext_resource type="Script" path="res://frontend/components/k_back_button.gd" id="2_kback"]
 
 [node name="CombatView" type="Control"]
 layout_mode = 3
@@ -451,3 +452,5 @@ offset_bottom = -168.0
 grow_horizontal = 0
 grow_vertical = 0
 text = ""
+script = ExtResource("2_kback")
+auto_pop = false

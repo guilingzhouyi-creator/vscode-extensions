@@ -9,12 +9,15 @@ extends Control
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 const RedDotTreeManager = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
 
+signal count_changed(count: int)
+
 @export var red_dot_path: String = "":
 	set(val):
 		red_dot_path = val
 		_refresh_from_manager()
 
 @export var show_count: bool = true
+@export var severity_level: int = 0 # 0: ERROR 红, 1: WARNING 黄, 2: INFO 蓝
 
 var _panel: PanelContainer
 var _lbl_count: Label
@@ -27,13 +30,17 @@ func _ready() -> void:
 	RedDotTreeManager.get_instance().red_dot_changed.connect(_on_red_dot_changed)
 	_refresh_from_manager()
 
+func _exit_tree() -> void:
+	if RedDotTreeManager.get_instance().red_dot_changed.is_connected(_on_red_dot_changed):
+		RedDotTreeManager.get_instance().red_dot_changed.disconnect(_on_red_dot_changed)
+
 func _setup_ui() -> void:
 	_panel = PanelContainer.new()
 	_panel.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	_panel.mouse_filter = MOUSE_FILTER_IGNORE
 
 	var style := StyleBoxFlat.new()
-	style.bg_color = DesignTokens.COLOR_ERROR
+	style.bg_color = _get_severity_color()
 	style.set_corner_radius_all(8)
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
@@ -46,6 +53,13 @@ func _setup_ui() -> void:
 	_lbl_count.mouse_filter = MOUSE_FILTER_IGNORE
 	_panel.add_child(_lbl_count)
 
+func _get_severity_color() -> Color:
+	match severity_level:
+		0: return DesignTokens.COLOR_ERROR
+		1: return DesignTokens.COLOR_WARNING
+		2: return DesignTokens.COLOR_INFO
+		_: return DesignTokens.COLOR_ERROR
+
 func _refresh_from_manager() -> void:
 	if red_dot_path.is_empty():
 		visible = false
@@ -57,6 +71,7 @@ func _refresh_from_manager() -> void:
 func _apply_count(count: int) -> void:
 	if count <= 0:
 		visible = false
+		count_changed.emit(count)
 		return
 
 	visible = true
@@ -65,6 +80,8 @@ func _apply_count(count: int) -> void:
 			_lbl_count.text = "99+" if count > 99 else str(count)
 		else:
 			_lbl_count.text = ""
+
+	count_changed.emit(count)
 
 func _on_red_dot_changed(path: String, count: int) -> void:
 	if path == red_dot_path:

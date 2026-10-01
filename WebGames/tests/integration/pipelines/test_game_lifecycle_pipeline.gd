@@ -5,7 +5,7 @@
 #       对称反装配与 18 项边界场景（重入防抖、非法跃迁、单例复位等）
 # ==============================================================================
 class_name TestGameLifecyclePipeline
-extends RefCounted
+extends TestCase
 
 const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
 const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
@@ -14,7 +14,7 @@ const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifec
 const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
 
 static func run_all_tests() -> Dictionary:
-	var results: Array = []
+	var results: Array[Dictionary] = []
 	results.append(_test_s1_01_lifecycle_model_enums())
 	results.append(_test_s1_02_shutdown_dto_codec_symmetry())
 	results.append(_test_s1_03_shutdown_dto_fallback_safety())
@@ -31,19 +31,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_s4_01_session_revocation_on_shutdown())
 	results.append(_test_s4_02_save_failure_graceful_degradation())
 
-	var total_count := results.size()
-	var passed_count := 0
-	for r in results:
-		if r.get("passed", false):
-			passed_count += 1
-
-	return {
-		"domain": "GameLifecyclePipeline",
-		"total_count": total_count,
-		"passed_count": passed_count,
-		"all_passed": passed_count == total_count,
-		"results": results
-	}
+	return TestCase.pack_results("GameLifecyclePipeline", results)
 
 # ==============================================================================
 # S1: 数据结构与契约测试

@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 模拟世界/主页状态服务
 # 文件路径: res://frontend/domain_boundary/mocks/mock_world_service.gd
-# 职责: 模拟主页 HUD 快照获取、小地图地标数据，严格遵循 P71 规范，经 MockBaseService 模拟网络延迟
+# 职责: 模拟主页 HUD 快照获取、小地图地标数据，严格遵循 规范，经 MockBaseService 模拟网络延迟
 # ==============================================================================
 class_name MockWorldService
 extends IWorldService

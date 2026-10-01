@@ -8,6 +8,7 @@ extends Button
 
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
+const UIIntermediary = preload("res://frontend/i18n/ui_intermediary.gd")
 
 enum StyleVariant {
 	PRIMARY,
@@ -44,27 +45,57 @@ func _ready() -> void:
 	_orig_text = text
 	pressed.connect(_on_internal_pressed)
 	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
 	_apply_style_variant()
 
+func _exit_tree() -> void:
+	if pressed.is_connected(_on_internal_pressed):
+		pressed.disconnect(_on_internal_pressed)
+	if mouse_entered.is_connected(_on_mouse_entered):
+		mouse_entered.disconnect(_on_mouse_entered)
+	if mouse_exited.is_connected(_on_mouse_exited):
+		mouse_exited.disconnect(_on_mouse_exited)
+
 func _apply_style_variant() -> void:
-	var style := StyleBoxFlat.new()
-	style.set_corner_radius_all(4)
+	var style_normal := StyleBoxFlat.new()
+	var style_hover := StyleBoxFlat.new()
+	var style_pressed := StyleBoxFlat.new()
+	var style_disabled := StyleBoxFlat.new()
+
+	for style in [style_normal, style_hover, style_pressed, style_disabled]:
+		style.set_corner_radius_all(4)
 
 	match variant:
 		StyleVariant.PRIMARY:
-			style.bg_color = DesignTokens.COLOR_PRIMARY
+			style_normal.bg_color = DesignTokens.COLOR_PRIMARY
+			style_hover.bg_color = DesignTokens.COLOR_PRIMARY_HOVER
+			style_pressed.bg_color = DesignTokens.COLOR_PRIMARY.darkened(0.15)
+			style_disabled.bg_color = DesignTokens.COLOR_SURFACE_CARD
 			add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
 		StyleVariant.SECONDARY:
-			style.bg_color = DesignTokens.COLOR_SURFACE_CARD
+			style_normal.bg_color = DesignTokens.COLOR_SURFACE_CARD
+			style_hover.bg_color = DesignTokens.COLOR_SURFACE_CARD.lightened(0.1)
+			style_pressed.bg_color = DesignTokens.COLOR_SURFACE_CARD.darkened(0.1)
+			style_disabled.bg_color = DesignTokens.COLOR_SURFACE_CARD
 			add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
 		StyleVariant.DANGER:
-			style.bg_color = DesignTokens.COLOR_ERROR
+			style_normal.bg_color = DesignTokens.COLOR_ERROR
+			style_hover.bg_color = DesignTokens.COLOR_ERROR.lightened(0.1)
+			style_pressed.bg_color = DesignTokens.COLOR_ERROR.darkened(0.15)
+			style_disabled.bg_color = DesignTokens.COLOR_SURFACE_CARD
 			add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
 		StyleVariant.FLAT:
-			style.bg_color = Color.TRANSPARENT
+			style_normal.bg_color = Color.TRANSPARENT
+			style_hover.bg_color = DesignTokens.COLOR_FLAT_HOVER
+			style_pressed.bg_color = DesignTokens.COLOR_FLAT_PRESSED
+			style_disabled.bg_color = Color.TRANSPARENT
 			add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
 
-	add_theme_stylebox_override("normal", style)
+	add_theme_stylebox_override("normal", style_normal)
+	add_theme_stylebox_override("hover", style_hover)
+	add_theme_stylebox_override("pressed", style_pressed)
+	add_theme_stylebox_override("disabled", style_disabled)
+	add_theme_color_override("font_disabled_color", DesignTokens.COLOR_TEXT_DISABLED)
 
 func _on_internal_pressed() -> void:
 	if is_loading:
@@ -84,3 +115,7 @@ func _on_internal_pressed() -> void:
 func _on_mouse_entered() -> void:
 	if not disabled and play_sound:
 		UIAudioBridge.get_instance().play_hover()
+	modulate = DesignTokens.COLOR_HOVER_MODULATE
+
+func _on_mouse_exited() -> void:
+	modulate = Color.WHITE

@@ -4,7 +4,7 @@
 # 职责: 验证新一代分发中枢的高性能、池化守恒、空间精确裁剪与因果时序一致性（12项断言）。
 # ==============================================================================
 class_name TestEventBus2ZeroGCPipeline
-extends RefCounted
+extends TestCase
 
 const EventPacket = preload("res://backend/infrastructure/event_bus/event_packet.gd")
 const EventCategoryMask = preload("res://backend/infrastructure/event_bus/event_category_mask.gd")
@@ -18,7 +18,23 @@ const IVisualPresentationAdapter = preload("res://backend/infrastructure/event_b
 const HeadlessPresentationMockAdapter = preload("res://backend/infrastructure/event_bus/headless_presentation_mock_adapter.gd")
 const EventBusCore = preload("res://backend/infrastructure/event_bus/event_bus_core.gd")
 
+static var _test_subscriptions: Array[EventBusSubscriptionToken] = []
+
+static func _track_subscription(token: EventBusSubscriptionToken) -> EventBusSubscriptionToken:
+	if token != null:
+		_test_subscriptions.append(token)
+	return token
+
+static func _release_test_subscriptions() -> void:
+	for token in _test_subscriptions:
+		if token.is_active:
+			token.unbind()
+		token.callback = Callable()
+		token.bus = null
+	_test_subscriptions.clear()
+
 static func run_all_tests() -> Dictionary:
+	_release_test_subscriptions()
 	var results: Array[Dictionary] = []
 	results.append(_test_event_pool_zero_deep_copy_conservation())
 	results.append(_test_spatial_hash_grid_aoi_zero_wakeup())
@@ -32,18 +48,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_iteration_safety_under_concurrent_modification())
 	results.append(_test_2d_projection_and_headless_routing())
 	results.append(_test_headless_presentation_api_control_without_models())
+	_release_test_subscriptions()
 
-	var passed_cnt: int = 0
-	for r in results:
-		if r.get("passed", false):
-			passed_cnt += 1
-	return {
-		"domain": "Phase 72: 新一代EventBus 2.0空间分发测试套件",
-		"all_passed": (passed_cnt == results.size()),
-		"total_count": results.size(),
-		"passed_count": passed_cnt,
-		"results": results
-	}
+	return TestCase.pack_results("Phase 72: 新一代EventBus 2.0空间分发测试套件", results)
 
 # ---- 1. 池化守恒与零深拷贝 ----
 static func _test_event_pool_zero_deep_copy_conservation() -> Dictionary:
@@ -96,8 +103,9 @@ static func _test_dispatch_now_strict_causal_inlining() -> Dictionary:
 	var tname := "TC-EB2-03: dispatch_now 严格同步因果强一致"
 	var bus := EventBusCore.new()
 	var state := {"player_hp": 100}
-	var token := bus.subscribe(EventChannelDefinition.COMBAT_HIT_RESOLVED, EventCategoryMask.CORE_STATE,
+	var token := _track_subscription(bus.subscribe(EventChannelDefinition.COMBAT_HIT_RESOLVED, EventCategoryMask.CORE_STATE,
 		func(_pkt: EventPacket) -> void: state["player_hp"] -= 35)
+	)
 	var pkt := bus.borrow_packet(EventChannelDefinition.COMBAT_HIT_RESOLVED, EventCategoryMask.CORE_STATE, {"damage": 35})
 	bus.dispatch_now(pkt)
 	bus.recycle_packet(pkt)
@@ -112,8 +120,9 @@ static func _test_enqueue_frame_ping_pong_batch_flush() -> Dictionary:
 	var tname := "TC-EB2-04: 帧级合批 FIFO 保持与自动回收"
 	var bus := EventBusCore.new()
 	var received: Array[int] = []
-	bus.subscribe(EventChannelDefinition.HUD_WALLET_MUTATED, EventCategoryMask.SPATIAL_VFX,
+	_track_subscription(bus.subscribe(EventChannelDefinition.HUD_WALLET_MUTATED, EventCategoryMask.SPATIAL_VFX,
 		func(pkt: EventPacket) -> void: received.append(int((pkt.payload_data as Dictionary).get("seq", -1))))
+	)
 	var bus_pool := bus.get_pool()
 	var warmup: Array[EventPacket] = []
 	for i in range(10):
@@ -143,10 +152,12 @@ static func _test_category_bitmask_orthogonal_isolation() -> Dictionary:
 	var bus := EventBusCore.new()
 	var state_c := {"n": 0}
 	var audio_c := {"n": 0}
-	var tok_state := bus.subscribe(EventChannelDefinition.COMBAT_HIT_RESOLVED, EventCategoryMask.CORE_STATE,
+	var tok_state := _track_subscription(bus.subscribe(EventChannelDefinition.COMBAT_HIT_RESOLVED, EventCategoryMask.CORE_STATE,
 		func(_p: EventPacket) -> void: state_c["n"] += 1)
-	var tok_audio := bus.subscribe(EventChannelDefinition.COMBAT_HIT_RESOLVED, EventCategoryMask.SPATIAL_AUDIO,
+	)
+	var tok_audio := _track_subscription(bus.subscribe(EventChannelDefinition.COMBAT_HIT_RESOLVED, EventCategoryMask.SPATIAL_AUDIO,
 		func(_p: EventPacket) -> void: audio_c["n"] += 1)
+	)
 	var pkt := bus.borrow_packet(EventChannelDefinition.COMBAT_HIT_RESOLVED, EventCategoryMask.SPATIAL_AUDIO, {})
 	bus.dispatch_now(pkt)
 	bus.recycle_packet(pkt)
@@ -161,8 +172,9 @@ static func _test_subscription_token_lifecycle() -> Dictionary:
 	var tname := "TC-EB2-06: 订阅令牌生命周期与幂等解绑"
 	var bus := EventBusCore.new()
 	var counter := {"n": 0}
-	var token := bus.subscribe(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY,
+	var token := _track_subscription(bus.subscribe(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY,
 		func(_p: EventPacket) -> void: counter["n"] += 1)
+	)
 	var p1 := bus.borrow_packet(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY, {})
 	bus.dispatch_now(p1)
 	bus.recycle_packet(p1)
@@ -226,7 +238,7 @@ static func _test_reentrancy_circuit_breaker() -> Dictionary:
 			var loop := bus.borrow_packet(0x0999, EventCategoryMask.CORE_STATE, {})
 			bus.dispatch_now(loop)
 			bus.recycle_packet(loop)
-	bus.subscribe(0x0999, EventCategoryMask.CORE_STATE, recursive_cb)
+	_track_subscription(bus.subscribe(0x0999, EventCategoryMask.CORE_STATE, recursive_cb))
 	var start := bus.borrow_packet(0x0999, EventCategoryMask.CORE_STATE, {})
 	bus.dispatch_now(start)
 	bus.recycle_packet(start)
@@ -240,13 +252,13 @@ static func _test_iteration_safety_under_concurrent_modification() -> Dictionary
 	var bus := EventBusCore.new()
 	var order: Array[int] = []
 	var token_holder: Array = [null]
-	var token1 := bus.subscribe(0x0888, EventCategoryMask.CORE_STATE, func(_p: EventPacket) -> void:
+	var token1 := _track_subscription(bus.subscribe(0x0888, EventCategoryMask.CORE_STATE, func(_p: EventPacket) -> void:
 		order.append(1)
 		if token_holder[0] != null:
 			(token_holder[0] as EventBusSubscriptionToken).unbind()
-	)
+	))
 	token_holder[0] = token1
-	bus.subscribe(0x0888, EventCategoryMask.CORE_STATE, func(_p: EventPacket) -> void: order.append(2))
+	_track_subscription(bus.subscribe(0x0888, EventCategoryMask.CORE_STATE, func(_p: EventPacket) -> void: order.append(2)))
 
 	var pkt := bus.borrow_packet(0x0888, EventCategoryMask.CORE_STATE, {})
 	bus.dispatch_now(pkt)
@@ -266,7 +278,7 @@ static func _test_2d_projection_and_headless_routing() -> Dictionary:
 	var tname := "TC-EB2-11: 2D/2.5D 平面投影无缝降维路由"
 	var bus := EventBusCore.new()
 	var counter := {"n": 0}
-	bus.on_spatial_2d(Vector2(100, 200), 20.0, func(_p: EventPacket) -> void: counter["n"] += 1)
+	_track_subscription(bus.on_spatial_2d(Vector2(100, 200), 20.0, func(_p: EventPacket) -> void: counter["n"] += 1))
 
 	var p_near := bus.borrow_packet(EventChannelDefinition.SPATIAL_COLLISION_CONTACT, EventCategoryMask.SPATIAL_VFX, {})
 	bus.dispatch_spatial_2d(p_near, Vector2(105, 205), 20.0)

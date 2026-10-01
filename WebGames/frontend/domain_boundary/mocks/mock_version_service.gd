@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 模拟版本服务
 # 文件路径: res://frontend/domain_boundary/mocks/mock_version_service.gd
-# 职责: 模拟客户端版本健康度与更新检测（对齐 P74 灰度体系），经 MockBaseService 模拟网络延迟
+# 职责: 模拟客户端版本健康度与更新检测（对齐 灰度体系），经 MockBaseService 模拟网络延迟
 # ==============================================================================
 class_name MockVersionService
 extends IVersionService

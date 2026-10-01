@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://cmainhudview02"]
+[gd_scene load_steps=3 format=3 uid="uid://cmainhudview02"]
 
 [ext_resource type="Script" path="res://frontend/views/main_hud/main_hud_view.gd" id="1_mainhud"]
+[ext_resource type="Script" path="res://frontend/components/k_tab_bar.gd" id="2_ktab"]
 
 [node name="MainHUDView" type="Control"]
 layout_mode = 3
@@ -214,6 +215,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 0
 theme_override_font_sizes/font_size = 11
+script = ExtResource("2_ktab")
 
 [node name="世界" type="Control" parent="ChatPanel/VBox/ChatTabs"]
 layout_mode = 2

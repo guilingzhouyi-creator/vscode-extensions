@@ -1,16 +1,19 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 角色 HUD 快照契约
 # 文件路径: res://frontend/domain_boundary/contracts/frontend_hud_snapshot.gd
-# 职责: 承载主 HUD 与角色养成视图的权威快照字段（对齐 P71 HudStatusSnapshotDTO）
+# 职责: 承载主 HUD 与角色养成视图的权威快照字段（对齐 HudStatusSnapshotDTO）
 # 边界: 纯数据契约；百分比与格式化属展示派生，不参与业务规则判定
 # ==============================================================================
 class_name FrontendHudSnapshot
 extends "res://frontend/domain_boundary/contracts/frontend_snapshot.gd"
 
-const SCHEMA_VERSION: int = 1
+const SCHEMA_VERSION: int = 2
 
 var character_id: String = ""
-var nickname: String = ""
+var character_name: String = ""
+var nickname: String:
+	get: return character_name
+	set(v): character_name = v
 var race_name: String = ""
 var location_name: String = ""
 var level: int = 1
@@ -25,13 +28,16 @@ var ap_max: float = 1.0
 var gold: int = 0
 var silver: int = 0
 var copper: int = 0
-var monocrystals: int = 0
+var mana_monocrystals: int = 0
+var monocrystals: int:
+	get: return mana_monocrystals
+	set(v): mana_monocrystals = v
 
 func to_dictionary() -> Dictionary:
 	return {
 		"schema_version": SCHEMA_VERSION,
 		"character_id": character_id,
-		"nickname": nickname,
+		"character_name": character_name,
 		"race_name": race_name,
 		"location_name": location_name,
 		"level": level,
@@ -44,13 +50,16 @@ func to_dictionary() -> Dictionary:
 		"gold": gold,
 		"silver": silver,
 		"copper": copper,
-		"monocrystals": monocrystals,
+		"mana_monocrystals": mana_monocrystals,
 	}
 
 static func from_dictionary(data: Dictionary) -> FrontendHudSnapshot:
 	var dto: FrontendHudSnapshot = load("res://frontend/domain_boundary/contracts/frontend_hud_snapshot.gd").new()
 	dto.character_id = read_string(data, "character_id")
-	dto.nickname = read_string(data, "nickname")
+	var name_val := read_string(data, "character_name", "")
+	if name_val.is_empty():
+		name_val = read_string(data, "nickname", "")
+	dto.character_name = name_val
 	dto.race_name = read_string(data, "race_name")
 	dto.location_name = read_string(data, "location_name")
 	dto.level = maxi(1, read_int(data, "level", 1))
@@ -63,7 +72,10 @@ static func from_dictionary(data: Dictionary) -> FrontendHudSnapshot:
 	dto.gold = maxi(0, read_int(data, "gold", 0))
 	dto.silver = maxi(0, read_int(data, "silver", 0))
 	dto.copper = maxi(0, read_int(data, "copper", 0))
-	dto.monocrystals = maxi(0, read_int(data, "monocrystals", 0))
+	var crystals := maxi(0, read_int(data, "mana_monocrystals", -1))
+	if crystals < 0:
+		crystals = maxi(0, read_int(data, "monocrystals", 0))
+	dto.mana_monocrystals = crystals
 	return dto
 
 ## 展示派生：生命值百分比（只读格式化，不参与任何业务规则）

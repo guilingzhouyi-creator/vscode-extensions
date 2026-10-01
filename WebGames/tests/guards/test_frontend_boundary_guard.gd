@@ -67,6 +67,11 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_kvirtual_list_pool_contract())
 	results.append(_test_ui_audio_bridge_placeholder_alive())
 	results.append(_test_frontend_compatibility_retirement())
+	results.append(_test_ui_buttons_debounce_discipline())
+	results.append(_test_fsm_zero_wild_state_mutations())
+	results.append(_test_ui_binding_registry_weakref_compliance())
+	results.append(_test_presentation_no_dto_in_place_mutation())
+	results.append(_test_views_responsive_layout_discipline())
 	return TestCase.pack_results("frontend_boundary_guard", results)
 
 # ==============================================================================
@@ -140,11 +145,18 @@ static func _test_views_no_bare_random() -> Dictionary:
 	var ok := TestCase.assert_eq(offenders.size(), 0, "视图禁止裸随机: %s" % str(offenders))
 	return TestCase.make_result("views_no_bare_random", ok, {"offenders": offenders})
 
-## 4. 原子组件生产落地（至少 KButton 与 KBadge 在视图有真实消费）
+## 4. 原子组件生产落地（全量 K-组件在视图有真实消费）
 static func _test_component_landing() -> Dictionary:
 	var kbutton_uses := 0
 	var kbadge_uses := 0
 	var kitem_uses := 0
+	var kvirtual_uses := 0
+	var kheader_uses := 0
+	var kstatus_uses := 0
+	var kcurrency_uses := 0
+	var ksplit_uses := 0
+	var ksearch_uses := 0
+	var kstate_uses := 0
 	for path in _view_files():
 		var text := FileAccess.get_file_as_string(path)
 		if text.contains("k_button.gd") and text.contains("KButtonClass.new("):
@@ -153,13 +165,41 @@ static func _test_component_landing() -> Dictionary:
 			kbadge_uses += 1
 		if text.contains("k_item_slot.gd") and text.contains("KItemSlotClass.new("):
 			kitem_uses += 1
+		if text.contains("k_virtual_list.gd") and text.contains("KVirtualListClass"):
+			kvirtual_uses += 1
+		if text.contains("k_page_header.gd") and text.contains("KPageHeaderClass"):
+			kheader_uses += 1
+		if text.contains("k_status_bar.gd") and text.contains("KStatusBarClass"):
+			kstatus_uses += 1
+		if text.contains("k_currency_bar.gd") and text.contains("KCurrencyBarClass"):
+			kcurrency_uses += 1
+		if text.contains("k_split_panel.gd") and text.contains("KSplitPanelClass"):
+			ksplit_uses += 1
+		if text.contains("k_search_bar.gd") and text.contains("KSearchBarClass"):
+			ksearch_uses += 1
+		if text.contains("k_state_panel.gd") and text.contains("KStatePanelClass"):
+			kstate_uses += 1
 	var ok := TestCase.assert_gte(kbutton_uses, 1, "KButton 组件需在生产视图落地")
 	ok = ok and TestCase.assert_gte(kbadge_uses, 1, "KBadge 组件需在生产视图落地")
 	ok = ok and TestCase.assert_gte(kitem_uses, 1, "KItemSlot 组件需在生产视图落地")
+	ok = ok and TestCase.assert_gte(kvirtual_uses, 3, "KVirtualList 组件需在至少3个视图落地")
+	ok = ok and TestCase.assert_gte(kheader_uses, 3, "KPageHeader 组件需在生产视图落地")
+	ok = ok and TestCase.assert_gte(kstatus_uses, 2, "KStatusBar 组件需在生产视图落地")
+	ok = ok and TestCase.assert_gte(kcurrency_uses, 2, "KCurrencyBar 组件需在生产视图落地")
+	ok = ok and TestCase.assert_gte(ksplit_uses, 3, "KSplitPanel 组件需在生产视图落地")
+	ok = ok and TestCase.assert_gte(ksearch_uses, 3, "KSearchBar 组件需在生产视图落地")
+	ok = ok and TestCase.assert_gte(kstate_uses, 3, "KStatePanel 组件需在生产视图落地")
 	return TestCase.make_result("component_landing", ok, {
 		"kbutton_files": kbutton_uses,
 		"kbadge_files": kbadge_uses,
 		"kitem_files": kitem_uses,
+		"kvirtual_files": kvirtual_uses,
+		"kheader_files": kheader_uses,
+		"kstatus_files": kstatus_uses,
+		"kcurrency_files": kcurrency_uses,
+		"ksplit_files": ksplit_uses,
+		"ksearch_files": ksearch_uses,
+		"kstate_files": kstate_uses,
 	})
 
 ## 5. 视图零相对漂移节点路径与模糊定位（允许同视图绝对字面路径）
@@ -318,3 +358,56 @@ static func _test_frontend_compatibility_retirement() -> Dictionary:
 
 	var all_ok: bool = dir_ok and skeleton_ok and fill_ok and char_ok and eco_wallet_ok and eco_trend_ok
 	return TestCase.make_result("frontend_compatibility_retirement", all_ok)
+
+## 14. 视图业务交互按钮防抖纪律断言 (GDM-DEB-001)
+static func _test_ui_buttons_debounce_discipline() -> Dictionary:
+	var offenders: Array[String] = []
+	for path in _view_files():
+		var text := FileAccess.get_file_as_string(path)
+		if text.contains(".pressed.connect(_on_submit") or text.contains(".pressed.connect(_on_buy"):
+			if not text.contains("debounced") and not text.contains("KButtonClass"):
+				offenders.append(path)
+	var ok := TestCase.assert_eq(offenders.size(), 0, "视图关键业务交互按钮须接入防抖/KButton: %s" % str(offenders))
+	return TestCase.make_result("ui_buttons_debounce_discipline", ok, {"offenders": offenders})
+
+## 15. 视图零野指针状态机就地突变断言 (GDM-FSM-001)
+static func _test_fsm_zero_wild_state_mutations() -> Dictionary:
+	var offenders: Array[String] = []
+	for path in _view_files():
+		var text := FileAccess.get_file_as_string(path)
+		if text.contains("_current_state =") and not text.contains("transition_to"):
+			offenders.append(path)
+	var ok := TestCase.assert_eq(offenders.size(), 0, "视图禁止绕过 transition_to 直接修改状态变量: %s" % str(offenders))
+	return TestCase.make_result("fsm_zero_wild_state_mutations", ok, {"offenders": offenders})
+
+## 16. UI 动态绑定与弱引用防悬挂断言 (GDM-WEAK-001)
+static func _test_ui_binding_registry_weakref_compliance() -> Dictionary:
+	var files := _frontend_gd_files()
+	var offenders: Array[String] = []
+	for path in files:
+		if path.ends_with("ui_binding_registry.gd"):
+			var text := FileAccess.get_file_as_string(path)
+			if text.contains("append(node)") and not text.contains("weakref"):
+				offenders.append(path)
+	var ok := TestCase.assert_eq(offenders.size(), 0, "UI 动态绑定注册表必须使用 weakref 弱引用包装 Node: %s" % str(offenders))
+	return TestCase.make_result("ui_binding_registry_weakref_compliance", ok, {"offenders": offenders})
+
+## 17. 表现层快照 DTO 零就地逆向篡改断言 (GDM-UNI-001)
+static func _test_presentation_no_dto_in_place_mutation() -> Dictionary:
+	var offenders: Array[String] = []
+	for path in _view_files():
+		var text := FileAccess.get_file_as_string(path)
+		if text.contains("snapshot.gold +=") or text.contains("snapshot.hp -="):
+			offenders.append(path)
+	var ok := TestCase.assert_eq(offenders.size(), 0, "表现层视图禁止对只读 Snapshot DTO 属性就地逆向赋值: %s" % str(offenders))
+	return TestCase.make_result("presentation_no_dto_in_place_mutation", ok, {"offenders": offenders})
+
+## 18. 视图响应式自适应布局纪律断言 (GDM-RES-001)
+static func _test_views_responsive_layout_discipline() -> Dictionary:
+	var offenders: Array[String] = []
+	for path in _view_files():
+		var text := FileAccess.get_file_as_string(path)
+		if text.contains("custom_minimum_size = Vector2(1920, 1080)"):
+			offenders.append(path)
+	var ok := TestCase.assert_eq(offenders.size(), 0, "视图禁止硬编码全屏固定像素尺寸 Vector2(1920, 1080): %s" % str(offenders))
+	return TestCase.make_result("views_responsive_layout_discipline", ok, {"offenders": offenders})

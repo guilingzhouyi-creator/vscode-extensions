@@ -27,16 +27,16 @@ func set_host(_container: Control) -> void:
 	pass
 
 ## 压入新视图 (保留历史，可返回)
-func push_view(view_id: String) -> Control:
-	return NavManager.get_instance().push_screen(view_id)
+func push_view(view_id: String, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
+	return NavManager.get_instance().push_screen(view_id, {}, transition_type)
 
 ## 替换当前视图 (不保留历史)
-func replace_view(view_id: String) -> Control:
-	return NavManager.get_instance().replace_screen(view_id)
+func replace_view(view_id: String, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
+	return NavManager.get_instance().replace_screen(view_id, {}, transition_type)
 
-## 返回上一视图
-func pop_view() -> Control:
-	return NavManager.get_instance().pop_screen()
+## 返回上一视图（默认 SLIDE_RIGHT 回退动效）
+func pop_view(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> Control:
+	return NavManager.get_instance().pop_screen(transition_type)
 
 ## 注册新视图
 func register_view(view_id: String, scene_path: String) -> void:

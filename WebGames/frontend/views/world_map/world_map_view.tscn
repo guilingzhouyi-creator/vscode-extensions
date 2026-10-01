@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://cworldmapview10"]
+[gd_scene load_steps=4 format=3 uid="uid://cworldmapview10"]
 
 [ext_resource type="Script" path="res://frontend/views/world_map/world_map_view.gd" id="1_worldmap"]
+[ext_resource type="Script" path="res://frontend/components/k_back_button.gd" id="2_kback"]
+[ext_resource type="Script" path="res://frontend/components/k_tab_bar.gd" id="3_ktab"]
 
 [node name="WorldMapView" type="Control"]
 layout_mode = 3
@@ -66,6 +68,7 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 tab_align = 0
+script = ExtResource("3_ktab")
 
 ; ------------------------------------------------------------------------------
 ; Tab 0: WORLD_MAP 大地图探索
@@ -612,3 +615,5 @@ unique_name_in_owner = true
 layout_mode = 2
 text = ""
 custom_minimum_size = Vector2(100, 0)
+script = ExtResource("2_kback")
+auto_pop = false

@@ -6,7 +6,7 @@
 # 需求源: Phase 71 阶段4（S4：TestSessionLifecycleAndHudSyncPipeline，8 用例）
 # ==============================================================================
 class_name TestSessionLifecycleAndHudSyncPipeline
-extends RefCounted
+extends TestCase
 
 const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
@@ -17,7 +17,7 @@ const HudEventContract = preload("res://backend/domains/world_state/hud_event_co
 const HudStateSyncService = preload("res://backend/domains/world_state/hud_state_sync_service.gd")
 
 static func run_all_tests() -> Dictionary:
-	var results: Array = []
+	var results: Array[Dictionary] = []
 	results.append(test_registration_validation_and_duplicate())
 	results.append(test_auth_eventbus_lifecycle_broadcast())
 	results.append(test_hud_snapshot_dto_and_divider_guards())
@@ -27,25 +27,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_narrative_template_args_contract())
 	results.append(test_session_bounded_and_no_residual_subscription())
 
-	var all_passed := true
-	for r in results:
-		if not r.get("passed", false):
-			all_passed = false
-			break
-	return {
-		"domain": "Phase 71: 用户会话生命周期与主页HUD双轨同步",
-		"all_passed": all_passed,
-		"total_count": results.size(),
-		"passed_count": (results.size() - _count_failed(results)),
-		"results": results
-	}
-
-static func _count_failed(results: Array) -> int:
-	var failed := 0
-	for r in results:
-		if not r.get("passed", false):
-			failed += 1
-	return failed
+	return TestCase.pack_results("Phase 71: 用户会话生命周期与主页HUD双轨同步", results)
 
 ## 事件捕获辅助：挂接/卸载 DOMAIN_EVENT_GENERIC 信道监听（零残留，返回解绑闭包）
 static func _capture_events(callback: Callable) -> Callable:
@@ -122,8 +104,8 @@ static func test_hud_snapshot_dto_and_divider_guards() -> Dictionary:
 	var data := {
 		"account_id": "ACC_1",
 		"hp_max": 0.0,
-		"ap_max": -10.0,
-		"hp_current": -5.0,
+		"ap_max": - 10.0,
+		"hp_current": - 5.0,
 		"wallet_gold": 7
 	}
 	var dto := HudStatusSnapshotDTO.from_dto(data)

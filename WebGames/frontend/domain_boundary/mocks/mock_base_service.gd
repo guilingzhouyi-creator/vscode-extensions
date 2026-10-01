@@ -6,7 +6,7 @@
 class_name MockBaseService
 extends RefCounted
 
-## 模拟网络延迟（毫秒，默认 200ms——与 Phase 77 阶段3 契约一致）
+## 模拟网络延迟（毫秒，默认 200ms——与 阶段3 契约一致）
 const DEFAULT_SIMULATE_DELAY_MS: int = 200
 
 ## 异步回调分发：

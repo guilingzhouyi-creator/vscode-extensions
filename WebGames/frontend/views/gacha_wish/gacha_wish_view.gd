@@ -11,7 +11,10 @@
 class_name GachaWishView
 extends BaseScreen
 
+const GachaWishTabsClass = preload("res://frontend/views/gacha_wish/gacha_wish_tabs.gd")
+
 const KButtonClass = preload("res://frontend/components/k_button.gd")
+const KRarityTag = preload("res://frontend/components/k_rarity_tag.gd")
 
 # ==============================================================================
 # 抽卡规则（经 domain_boundary 服务只读获取，视图不做概率/保底/扣费计算）
@@ -29,7 +32,7 @@ func _rule_float(key: String, fallback: float) -> float:
 	return float(_pull_rules.get(key, fallback))
 
 # 抽卡演出动画状态机
-enum WishAnimationState { IDLE, PULLING_ANIM, RESULT_REVEAL }
+enum WishAnimationState {IDLE, PULLING_ANIM, RESULT_REVEAL}
 var anim_state: WishAnimationState = WishAnimationState.IDLE
 
 # ==============================================================================
@@ -52,12 +55,13 @@ var _banners: Array = []
 
 # 最近一次抽卡结果（十连/单抽）
 var latest_pull_results: Array = []
+var _tabs = null
 
 # 抽卡历史日志（有界回收）
 var wish_history_log: Array = []
 var total_pull_count: int = 0
 # 出货统计
-var _rarity_counts: Dictionary = { "5": 0, "4": 0, "3": 0 }
+var _rarity_counts: Dictionary = {"5": 0, "4": 0, "3": 0}
 
 # 历史侧面板显示状态（默认隐藏）
 var history_panel_visible: bool = false
@@ -132,7 +136,7 @@ func execute_pull_preview(pull_count: int, mock_drops: Array) -> Dictionary:
 	var service := _gacha_service()
 	if service == null:
 		anim_state = WishAnimationState.IDLE
-		return { "success": false, "error_code": "SERVICE_UNAVAILABLE" }
+		return {"success": false, "error_code": "SERVICE_UNAVAILABLE"}
 	var outcome := service.resolve_pull({
 		"pity_counter": current_pity_counter,
 		"pity_5star": pity_5star,
@@ -142,7 +146,7 @@ func execute_pull_preview(pull_count: int, mock_drops: Array) -> Dictionary:
 	}, pull_count, mock_drops)
 	if not bool(outcome.get("success", false)):
 		anim_state = WishAnimationState.IDLE
-		return { "success": false, "error_code": str(outcome.get("error_code", "PULL_FAILED")) }
+		return {"success": false, "error_code": str(outcome.get("error_code", "PULL_FAILED"))}
 
 	latest_pull_results = outcome.get("results", [])
 	for drop in latest_pull_results:
@@ -153,7 +157,7 @@ func execute_pull_preview(pull_count: int, mock_drops: Array) -> Dictionary:
 	total_pull_count = int(outcome.get("total_pull_count", total_pull_count))
 	_rarity_counts = outcome.get("rarity_counts", _rarity_counts)
 	anim_state = WishAnimationState.RESULT_REVEAL
-	return { "success": true, "pull_count": pull_count, "results": latest_pull_results }
+	return {"success": true, "pull_count": pull_count, "results": latest_pull_results}
 
 ## 重置抽卡演出动画状态为 IDLE
 func reset_animation_state() -> void:
@@ -164,6 +168,12 @@ func reset_animation_state() -> void:
 # ==============================================================================
 
 ## 生命周期初始化：主题/Mock/文案/卡池切换/封面/UP/保底/货币/概率/历史/结果弹窗/信号（骨架零接线）
+func _get_tabs():
+	if _tabs == null:
+		_tabs = GachaWishTabsClass.new()
+		_tabs.setup(self)
+	return _tabs
+
 func _ready() -> void:
 	_apply_theme()
 	_load_mock_data()
@@ -196,73 +206,11 @@ func _apply_theme() -> void:
 
 ## 初始化全部静态文案（非 unique_name 节点经路径访问，i18n 全驱动）
 func _init_static_text() -> void:
-	# 顶部标题栏（非 unique_name 节点，通过路径访问）
-	var title_label: Label = $MainLayout/HeaderPanel/HeaderHBox/TitleLabel
-	UIIntermediary.resolve(title_label, "ui.fe06.header.title")
-	UIIntermediary.resolve(_btn_toggle_history, "ui.fe06.header.history")
-	UIIntermediary.resolve(_btn_back, "ui.fe06.header.back")
-	# 卡池切换标签
-	var banner_switch_label: Label = $MainLayout/BodyRow/WishMainPanel/BannerSwitchLabel
-	UIIntermediary.resolve(banner_switch_label, "ui.fe06.banner.select_label")
-	# 卡池封面占位
-	UIIntermediary.resolve(_label_cover_placeholder, "ui.fe06.banner.cover_placeholder")
-	# UP 物品展示标签
-	var up_items_label: Label = $MainLayout/BodyRow/WishMainPanel/UpItemsLabel
-	UIIntermediary.resolve(up_items_label, "ui.fe06.up_items.label")
-	# 保底进度标签
-	var pity_label_title: Label = $MainLayout/BodyRow/WishMainPanel/PitySection/PityLabelTitle
-	UIIntermediary.resolve(pity_label_title, "ui.fe06.pity.section_label")
-	# 抽卡按钮
-	UIIntermediary.resolve(_btn_single_pull, "ui.fe06.btn.single_pull")
-	UIIntermediary.resolve(_btn_ten_pull, "ui.fe06.btn.ten_pull")
-	# 历史面板标题与关闭按钮
-	var history_title_label: Label = $MainLayout/BodyRow/HistoryPanel/HistoryVBox/HistoryHeaderRow/HistoryTitleLabel
-	UIIntermediary.resolve(history_title_label, "ui.fe06.history.title")
-	UIIntermediary.resolve(_btn_history_close, "ui.fe06.history.close")
-	# 历史记录列表标签
-	var history_list_label: Label = $MainLayout/BodyRow/HistoryPanel/HistoryVBox/HistoryListLabel
-	UIIntermediary.resolve(history_list_label, "ui.fe06.history.list_label")
-	# 结果弹窗按钮
-	UIIntermediary.resolve(_btn_result_skip, "ui.fe06.result.skip")
-	UIIntermediary.resolve(_btn_result_detail, "ui.fe06.result.detail")
-	UIIntermediary.resolve(_btn_result_pull_again, "ui.fe06.result.pull_again")
+	_get_tabs().init_static_text()
 
-# ==============================================================================
-# Mock 数据加载（零接线阶段，不接后端）
-# ==============================================================================
-
-## 加载抽卡规则与 2 个卡池 Mock 数据（文案存 i18n key，UIIntermediary 解析）
 func _load_mock_data() -> void:
-	var service := _gacha_service()
-	var rules: Dictionary = service.get_rules() if service != null else {}
-	# 2 个卡池 Mock 数据（文案值存储 i18n key，由 UIIntermediary 解析）
-	var banners := [
-		{
-			"banner_id": "BANNER_LIMITED_WARRIOR",
-			"title": "ui.fe06.mock.banner.limited_warrior.title",
-			"subtitle": "ui.fe06.mock.banner.limited_warrior.subtitle",
-			"remaining_time": "ui.fe06.mock.banner.limited_warrior.remaining",
-			"up_items": [
-				{ "name": "ui.fe06.mock.item.flame_knight", "rarity": "5", "is_new": true },
-				{ "name": "ui.fe06.mock.item.dragon_spine_greatsword", "rarity": "5", "is_new": false },
-				{ "name": "ui.fe06.mock.item.wind_shortbow", "rarity": "4", "is_new": false },
-			],
-		},
-		{
-			"banner_id": "BANNER_PERMANENT",
-			"title": "ui.fe06.mock.banner.permanent.title",
-			"subtitle": "ui.fe06.mock.banner.permanent.subtitle",
-			"remaining_time": "ui.fe06.mock.banner.permanent.remaining",
-			"up_items": [
-				{ "name": "ui.fe06.mock.item.mithril_guardian", "rarity": "5", "is_new": false },
-				{ "name": "ui.fe06.mock.item.arcane_staff", "rarity": "4", "is_new": true },
-				{ "name": "ui.fe06.mock.item.healing_potion_l", "rarity": "3", "is_new": false },
-			],
-		},
-	]
-	apply_snapshot({"banners": banners, "pull_rules": rules})
+	_get_tabs().load_mock_data()
 
-## 统一快照渲染映射（P81）：卡池与抽卡规则 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("banners"):
 		_banners = FrontendSnapshot.read_array(snapshot, "banners")
@@ -270,116 +218,32 @@ func _render_from_snapshot() -> void:
 		_pull_rules = FrontendSnapshot.read_dict(snapshot, "pull_rules")
 
 # ==============================================================================
-# 信号绑定（零接线：所有信号在本地脚本闭环，不接 EventBus）
-# ==============================================================================
 
 ## 绑定本地 UI 交互信号（零接线：历史开关/抽卡/结果弹窗控件本地闭环）
 func _connect_signals() -> void:
-	# 返回按钮
-	_btn_back.pressed.connect(_on_back_pressed)
-	# 历史侧面板开关
-	_btn_toggle_history.pressed.connect(_on_toggle_history_pressed)
-	_btn_history_close.pressed.connect(_on_history_close_pressed)
-	# 抽卡按钮
-	_btn_single_pull.pressed.connect(_on_single_pull_pressed)
-	_btn_ten_pull.pressed.connect(_on_ten_pull_pressed)
-	# 结果弹窗按钮
-	_btn_result_skip.pressed.connect(_on_result_skip_pressed)
-	_btn_result_detail.pressed.connect(_on_result_detail_pressed)
-	_btn_result_pull_again.pressed.connect(_on_result_pull_again_pressed)
+	_get_tabs().connect_signals()
+
 
 # ==============================================================================
-# 卡池切换按钮（动态生成，与 BannerSwitchHBox 对应）
-# ==============================================================================
 
-## 动态生成卡池切换按钮（清占位后按卡池列表建 toggle 按钮）并刷新选中态
 func _init_banner_switch() -> void:
-	# 清除可能存在的占位子节点
-	for child in _banner_switch_hbox.get_children():
-		child.queue_free()
-	for banner in _banners:
-		var btn := KButtonClass.new()
-		btn.variant = KButtonClass.StyleVariant.SECONDARY
-		btn.text = UIIntermediary.text(str(banner.get("title", "ui.fe06.unknown")))
-		btn.toggle_mode = true
-		btn.custom_minimum_size = Vector2(140, 0)
-		var bid: String = str(banner.get("banner_id", ""))
-		btn.pressed.connect(func(): _on_banner_switch_pressed(bid))
-		_banner_switch_hbox.add_child(btn)
-	_refresh_banner_switch_buttons()
+	_get_tabs().init_banner_switch()
 
-## 卡池切换按钮点击：委托 switch_banner
 func _on_banner_switch_pressed(banner_id: String) -> void:
 	switch_banner(banner_id)
 
-## 刷新卡池切换按钮选中态（当前卡池唯一高亮）
 func _refresh_banner_switch_buttons() -> void:
-	if not _banner_switch_hbox:
-		return
-	for i in _banner_switch_hbox.get_child_count():
-		var btn: Button = _banner_switch_hbox.get_child(i)
-		var bid: String = str(_banners[i].get("banner_id", ""))
-		btn.button_pressed = (bid == current_banner_id)
+	_get_tabs().refresh_banner_switch_buttons()
 
-## 取当前卡池数据（按 banner_id 匹配，未命中回退首个卡池）
 func _get_current_banner() -> Dictionary:
-	for banner in _banners:
-		if str(banner.get("banner_id", "")) == current_banner_id:
-			return banner
-	return _banners[0] if not _banners.is_empty() else {}
+	return _get_tabs().get_current_banner()
 
-# ==============================================================================
-# WISH_MAIN: 卡池封面 / UP 展示刷新
-# ==============================================================================
-
-## 刷新卡池封面：标题/副标题/剩余时间（i18n key 解析）
 func _refresh_banner_display() -> void:
-	var banner := _get_current_banner()
-	var title_key := str(banner.get("title", "ui.fe06.banner.title_default"))
-	var subtitle_key := str(banner.get("subtitle", "ui.fe06.banner.subtitle_default"))
-	var remaining_key := str(banner.get("remaining_time", "ui.fe06.banner.remaining_default"))
-	UIIntermediary.resolve(_label_banner_title, title_key)
-	UIIntermediary.resolve(_label_banner_subtitle, subtitle_key)
-	UIIntermediary.resolve(_label_remaining_time, remaining_key)
+	_get_tabs().refresh_banner_display()
 
-## 重建 UP 物品网格（清旧格后按当前卡池生成细胞）
 func _refresh_up_items() -> void:
-	# 清除旧 UP 物品格
-	for child in _up_items_grid.get_children():
-		child.queue_free()
-	var banner := _get_current_banner()
-	var up_items: Array = banner.get("up_items", [])
-	for item in up_items:
-		_up_items_grid.add_child(_make_up_item_cell(item))
+	_get_tabs().refresh_up_items()
 
-## 构建 UP 物品细胞：名称/星级（稀有度配色）+ NEW 标记
-func _make_up_item_cell(item: Dictionary) -> Control:
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(140, 80)
-	var vbox := VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	var name_label := Label.new()
-	name_label.text = UIIntermediary.text(str(item.get("name", "ui.fe06.unknown")))
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 12)
-	name_label.add_theme_color_override("font_color", _rarity_color(str(item.get("rarity", "3"))))
-	vbox.add_child(name_label)
-	var rarity_label := Label.new()
-	var rarity_str := str(item.get("rarity", "3"))
-	rarity_label.text = UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str})
-	rarity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rarity_label.add_theme_font_size_override("font_size", 11)
-	rarity_label.add_theme_color_override("font_color", _rarity_color(rarity_str))
-	vbox.add_child(rarity_label)
-	if bool(item.get("is_new", false)):
-		var new_label := Label.new()
-		new_label.text = UIIntermediary.text("ui.fe06.result.new")
-		new_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		new_label.add_theme_font_size_override("font_size", 10)
-		new_label.add_theme_color_override("font_color", DesignTokens.COLOR_SUCCESS_DEFAULT)
-		vbox.add_child(new_label)
-	panel.add_child(vbox)
-	return panel
 
 # ==============================================================================
 # WISH_MAIN: 保底进度条刷新
@@ -425,61 +289,23 @@ func _refresh_probability_label() -> void:
 # ==============================================================================
 # PITY_HISTORY: 保底与历史侧面板
 # ==============================================================================
+# PITY_HISTORY: 委托给 GachaWishTabs
+# ==============================================================================
 
-## 初始化保底历史侧面板：默认隐藏 + 统计/列表首刷
 func _init_history_panel() -> void:
-	history_panel_visible = false
-	_history_panel.visible = false
-	_refresh_history_stats()
-	_refresh_history_list()
+	_get_tabs().init_history_panel()
 
-## 历史侧面板开关：翻转可见态并同步节点
 func _on_toggle_history_pressed() -> void:
-	history_panel_visible = not history_panel_visible
-	_history_panel.visible = history_panel_visible
+	_get_tabs().on_toggle_history_pressed()
 
-## 历史面板关闭按钮：隐藏面板
 func _on_history_close_pressed() -> void:
-	history_panel_visible = false
-	_history_panel.visible = false
+	_get_tabs().on_history_close_pressed()
 
-## 刷新历史统计：总抽数 + 各稀有度计数与占比（除零守卫）
 func _refresh_history_stats() -> void:
-	if _label_total_pulls:
-		UIIntermediary.resolve(_label_total_pulls, "ui.fe06.history.total_pulls", {"count": total_pull_count})
-	if _label_rarity_stats:
-		var total := total_pull_count if total_pull_count > 0 else 1
-		var r5 := int(_rarity_counts.get("5", 0))
-		var r4 := int(_rarity_counts.get("4", 0))
-		var r3 := int(_rarity_counts.get("3", 0))
-		UIIntermediary.resolve(_label_rarity_stats, "ui.fe06.history.rarity_stats", {
-			"r5": str(r5),
-			"r5_pct": "%.1f" % (float(r5) / float(total) * 100.0),
-			"r4": str(r4),
-			"r4_pct": "%.1f" % (float(r4) / float(total) * 100.0),
-			"r3": str(r3),
-			"r3_pct": "%.1f" % (float(r3) / float(total) * 100.0),
-		})
+	_get_tabs().refresh_history_stats()
 
-## 刷新历史列表：最近 50 条有界回收 + 倒序展示 + 稀有度着色
 func _refresh_history_list() -> void:
-	if not _history_item_list:
-		return
-	_history_item_list.clear()
-	# 最近 50 条（有界回收）
-	var recent := wish_history_log.slice(maxi(0, wish_history_log.size() - 50), wish_history_log.size())
-	# 倒序展示（最新在最上）
-	recent.reverse()
-	for entry in recent:
-		var name_key := str(entry.get("name", "ui.fe06.unknown"))
-		var name_str := UIIntermediary.text(name_key)
-		var rarity := str(entry.get("rarity", "3"))
-		var display := UIIntermediary.text("ui.fe06.history.item", {"rarity": rarity, "name": name_str})
-		_history_item_list.add_item(display)
-		var idx := _history_item_list.item_count - 1
-		_history_item_list.set_item_tooltip(idx, display)
-		# 按稀有度着色文字
-		_history_item_list.set_item_custom_fg_color(idx, _rarity_color(rarity))
+	_get_tabs().refresh_history_list()
 
 # ==============================================================================
 # WISH_MAIN: 抽卡执行（骨架阶段 Mock 驱动）
@@ -551,98 +377,19 @@ func _hide_result_overlay() -> void:
 
 ## 重建结果网格：按掉落生成细胞并设置数量提示
 func _populate_result_grid(drops: Array) -> void:
-	# 清除旧结果格
-	for child in _result_items_grid.get_children():
-		child.queue_free()
-	for drop in drops:
-		_result_items_grid.add_child(_make_result_cell(drop))
-	# 设置获得数量提示
-	_result_items_grid.tooltip_text = UIIntermediary.text("ui.fe06.result.count", {"count": drops.size()})
+	_get_tabs().populate_result_grid(drops)
 
-## 构建结果细胞：稀有度边框着色 + 星级/名称/NEW 标记
-func _make_result_cell(drop: Dictionary) -> Control:
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(96, 110)
-	# 稀有度边框着色
-	var style := StyleBoxFlat.new()
-	var rarity_str := str(drop.get("rarity", "3"))
-	var rarity_color := _rarity_color(rarity_str)
-	style.bg_color = DesignTokens.COLOR_SURFACE_DEFAULT
-	style.border_color = rarity_color
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_left = 6
-	style.corner_radius_bottom_right = 6
-	panel.add_theme_stylebox_override("panel", style)
-	var vbox := VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	var rarity_label := Label.new()
-	rarity_label.text = UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str})
-	rarity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rarity_label.add_theme_font_size_override("font_size", 14)
-	rarity_label.add_theme_color_override("font_color", rarity_color)
-	vbox.add_child(rarity_label)
-	var name_label := Label.new()
-	name_label.text = UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown")))
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 11)
-	name_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_DEFAULT)
-	vbox.add_child(name_label)
-	if bool(drop.get("is_new", false)):
-		var new_label := Label.new()
-		new_label.text = UIIntermediary.text("ui.fe06.result.new")
-		new_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		new_label.add_theme_font_size_override("font_size", 10)
-		new_label.add_theme_color_override("font_color", DesignTokens.COLOR_SUCCESS_DEFAULT)
-		vbox.add_child(new_label)
-	panel.add_child(vbox)
-	return panel
-
-## 跳过按钮：直接关闭结果弹窗
 func _on_result_skip_pressed() -> void:
-	# 跳过：直接关闭弹窗
-	_hide_result_overlay()
+	_get_tabs().on_result_skip_pressed()
 
-## 详情按钮：骨架阶段打印最近一次结果明细
 func _on_result_detail_pressed() -> void:
-	# 详情：骨架阶段仅打印最近一次结果
-	if latest_pull_results.is_empty():
-		return
-	for drop in latest_pull_results:
-		print("[GachaWish] %s星 %s (NEW: %s)" % [
-			str(drop.get("rarity", "3")),
-			UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown"))),
-			str(drop.get("is_new", false)),
-		])
+	_get_tabs().on_result_detail_pressed()
 
-## 再来一发：关闭弹窗并触发十连
 func _on_result_pull_again_pressed() -> void:
-	# 再来一发：关闭弹窗并触发十连
-	_hide_result_overlay()
-	_on_ten_pull_pressed()
+	_get_tabs().on_result_pull_again_pressed()
 
-# ==============================================================================
-# 全局信号处理
 # ==============================================================================
 
 ## 返回按钮：经 ViewRouter 弹出视图回退上一级
 func _on_back_pressed() -> void:
-	# 返回按钮：通过 ViewRouter 返回上一视图
-	var router := ViewRouter.get_instance()
-	if router != null:
-		router.pop_view()
-
-# ==============================================================================
-# 工具方法
-# ==============================================================================
-
-## 稀有度对应配色（5星金 / 4星紫 / 3星灰）
-func _rarity_color(rarity: String) -> Color:
-	match rarity:
-		"5": return DesignTokens.COLOR_WARNING_DEFAULT
-		"4": return DesignTokens.COLOR_RARITY_EPIC
-		_: return DesignTokens.COLOR_TEXT_MUTED_DEFAULT
+	self.back()

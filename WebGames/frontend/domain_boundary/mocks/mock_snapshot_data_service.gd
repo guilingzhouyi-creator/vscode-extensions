@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 骨架快照数据服务
 # 文件路径: res://frontend/domain_boundary/mocks/mock_snapshot_data_service.gd
-# 职责: 委托 MockDataCatalog 唯一数据源并按域返回深拷贝快照 (Phase 83 R-01 收敛)
+# 职责: 委托 MockDataCatalog 唯一数据源并按域返回深拷贝快照 (R-01 收敛)
 # 边界: 快照数据唯一物化于 MockDataCatalog，演示骨架已退役删除
 # ==============================================================================
 class_name MockSnapshotDataService

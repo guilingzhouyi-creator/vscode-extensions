@@ -1,12 +1,12 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 世界与主页状态服务契约
 # 文件路径: res://frontend/domain_boundary/interfaces/i_world_service.gd
-# 职责: 规范主页 HUD 状态快照与世界环境数据接口，对齐 P71 规范
+# 职责: 规范主页 HUD 状态快照与世界环境数据接口，对齐 规范
 # ==============================================================================
 class_name IWorldService
 extends RefCounted
 
-## 获取 HUD 权威状态快照 (对齐 P71 HudStatusSnapshotDTO)
+## 获取 HUD 权威状态快照 (对齐 HudStatusSnapshotDTO)
 func get_hud_snapshot_async(character_id: String, callback: Callable) -> void:
 	printerr("IWorldService.get_hud_snapshot_async: 纯虚函数必须由子类实现")
 

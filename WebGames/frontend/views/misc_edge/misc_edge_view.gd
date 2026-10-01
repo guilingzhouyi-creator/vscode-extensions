@@ -9,21 +9,31 @@
 class_name MiscEdgeView
 extends BaseScreen
 
+const MiscEdgeTabsClass = preload("res://frontend/views/misc_edge/misc_edge_tabs.gd")
+
+var _tabs = null
+
+func _get_tabs():
+	if _tabs == null:
+		_tabs = MiscEdgeTabsClass.new()
+		_tabs.setup(self)
+	return _tabs
+
 # ==============================================================================
 # 枚举
 # ==============================================================================
 
 ## 4 个 Tab 索引（与 MainTabContainer 子节点顺序一致）
-enum TabType { DISGUISE, MUTATION, GROUND_DROP, NAME_REGISTRY }
+enum TabType {DISGUISE, MUTATION, GROUND_DROP, NAME_REGISTRY}
 
 ## 突变筛选状态
-enum MutationFilter { ACTIVE, AVAILABLE, LOCKED }
+enum MutationFilter {ACTIVE, AVAILABLE, LOCKED}
 
 ## 地面掉落筛选分类
-enum GroundFilter { ALL, EQUIPMENT, MATERIAL, CONSUMABLE }
+enum GroundFilter {ALL, EQUIPMENT, MATERIAL, CONSUMABLE}
 
 ## 命名注册类型
-enum NameType { CHARACTER, PET, GUILD, TITLE }
+enum NameType {CHARACTER, PET, GUILD, TITLE}
 
 # ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
@@ -85,21 +95,9 @@ enum NameType { CHARACTER, PET, GUILD, TITLE }
 # ==============================================================================
 
 ## 突变品质 i18n key
-const MUTATION_QUALITY_KEYS := [
-	"ui.fe17.mutation.quality_common",
-	"ui.fe17.mutation.quality_uncommon",
-	"ui.fe17.mutation.quality_rare",
-	"ui.fe17.mutation.quality_epic",
-	"ui.fe17.mutation.quality_legendary"
-]
-## 命名类型 i18n key
-const NAME_TYPE_KEYS := [
-	"ui.fe17.name_registry.type_character",
-	"ui.fe17.name_registry.type_pet",
-	"ui.fe17.name_registry.type_guild",
-	"ui.fe17.name_registry.type_title"
-]
-## 命名类型对应费用
+const MUTATION_QUALITY_KEYS := ["ui.fe17.mutation.quality_common", "ui.fe17.mutation.quality_uncommon", "ui.fe17.mutation.quality_rare", "ui.fe17.mutation.quality_epic", "ui.fe17.mutation.quality_legendary"]
+const NAME_TYPE_KEYS := ["ui.fe17.name_registry.type_character", "ui.fe17.name_registry.type_pet", "ui.fe17.name_registry.type_guild", "ui.fe17.name_registry.type_title"]
+
 ## 命名注册费用表（规则经 domain_boundary 服务，已迁出视图）
 
 # ==============================================================================
@@ -193,59 +191,18 @@ func _apply_theme() -> void:
 
 ## 初始化全部静态文案：顶栏/四主 Tab 与子筛选 Tab/分区标签/按钮/占位符（i18n 全驱动）
 func _init_static_text() -> void:
-	# --- 顶栏 ---
-	var title_label: Label = $MarginContainer/VBox/TopBar/TitleLabel
-	UIIntermediary.resolve(title_label, "ui.fe17.common.header_title")
-	var sub_label: Label = $MarginContainer/VBox/TopBar/TitleSubLabel
-	UIIntermediary.resolve(sub_label, "ui.fe17.common.header_subtitle")
+	UIIntermediary.resolve($MarginContainer/VBox/TopBar/TitleLabel, "ui.fe17.common.header_title")
+	UIIntermediary.resolve($MarginContainer/VBox/TopBar/TitleSubLabel, "ui.fe17.common.header_subtitle")
 	UIIntermediary.resolve(_back_btn, "ui.fe17.common.back")
-
-	# --- 主 Tab 标题 ---
-	UIIntermediary.resolve_tab(_main_tab_container, 0, "ui.fe17.disguise.tab_title")
-	UIIntermediary.resolve_tab(_main_tab_container, 1, "ui.fe17.mutation.tab_title")
-	UIIntermediary.resolve_tab(_main_tab_container, 2, "ui.fe17.ground_drop.tab_title")
-	UIIntermediary.resolve_tab(_main_tab_container, 3, "ui.fe17.name_registry.tab_title")
-
-	# --- Tab 0: 身份伪装 ---
-	var mask_list_label: Label = $MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseMaskListLabel
-	UIIntermediary.resolve(mask_list_label, "ui.fe17.disguise.mask_list_label")
-	var detail_section_label: Label = $MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel/DisguiseDetailSectionLabel
-	UIIntermediary.resolve(detail_section_label, "ui.fe17.disguise.detail_section_label")
+	KTabBar.init_titles(_main_tab_container, PackedStringArray(["ui.fe17.disguise.tab_title", "ui.fe17.mutation.tab_title", "ui.fe17.ground_drop.tab_title", "ui.fe17.name_registry.tab_title"]))
+	UIIntermediary.resolve($MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseMaskListLabel, "ui.fe17.disguise.mask_list_label")
+	UIIntermediary.resolve($MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel/DisguiseDetailSectionLabel, "ui.fe17.disguise.detail_section_label")
 	UIIntermediary.resolve(_disguise_cancel_btn, "ui.fe17.disguise.btn_cancel")
 	UIIntermediary.resolve(_disguise_switch_btn, "ui.fe17.disguise.btn_switch")
-
-	# --- Tab 1: 精英突变 ---
-	UIIntermediary.resolve_tab(_mutation_filter_tabs, 0, "ui.fe17.mutation.filter_active")
-	UIIntermediary.resolve_tab(_mutation_filter_tabs, 1, "ui.fe17.mutation.filter_available")
-	UIIntermediary.resolve_tab(_mutation_filter_tabs, 2, "ui.fe17.mutation.filter_locked")
-	var mut_list_label: Label = $MarginContainer/VBox/MainTabContainer/MutationTab/MutationLeftPanel/MutationListLabel
-	UIIntermediary.resolve(mut_list_label, "ui.fe17.mutation.list_label")
-	var mut_detail_label: Label = $MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel/MutationDetailSectionLabel
-	UIIntermediary.resolve(mut_detail_label, "ui.fe17.mutation.detail_section_label")
-	var mut_combo_label: Label = $MarginContainer/VBox/MainTabContainer/MutationTab/MutationRightPanel/MutationComboSectionLabel
-	UIIntermediary.resolve(mut_combo_label, "ui.fe17.mutation.combo_section_label")
-	UIIntermediary.resolve(_mutation_replace_btn, "ui.fe17.mutation.btn_replace")
-	UIIntermediary.resolve(_mutation_activate_btn, "ui.fe17.mutation.btn_activate")
-
-	# --- Tab 2: 地面掉落 ---
-	UIIntermediary.resolve_tab(_ground_filter_tabs, 0, "ui.fe17.ground_drop.filter_all")
-	UIIntermediary.resolve_tab(_ground_filter_tabs, 1, "ui.fe17.ground_drop.filter_equipment")
-	UIIntermediary.resolve_tab(_ground_filter_tabs, 2, "ui.fe17.ground_drop.filter_material")
-	UIIntermediary.resolve_tab(_ground_filter_tabs, 3, "ui.fe17.ground_drop.filter_consumable")
+	KTabBar.init_titles(_ground_filter_tabs, PackedStringArray(["ui.fe17.ground_drop.filter_all", "ui.fe17.ground_drop.filter_equipment", "ui.fe17.ground_drop.filter_material", "ui.fe17.ground_drop.filter_consumable"]))
 	UIIntermediary.resolve(_ground_pickup_all_btn, "ui.fe17.ground_drop.btn_pickup_all")
 	UIIntermediary.resolve(_ground_pickup_btn, "ui.fe17.ground_drop.btn_pickup")
-
-	# --- Tab 3: 命名注册 ---
-	var name_type_label: Label = $MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox/NameTypeSectionLabel
-	UIIntermediary.resolve(name_type_label, "ui.fe17.name_registry.type_section_label")
-	var name_input_label: Label = $MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox/NameInputSectionLabel
-	UIIntermediary.resolve(name_input_label, "ui.fe17.name_registry.input_section_label")
-	UIIntermediary.resolve_placeholder(_name_input, "ui.fe17.name_registry.input_placeholder")
-	UIIntermediary.resolve(_name_check_btn, "ui.fe17.name_registry.btn_check")
-	UIIntermediary.resolve(_name_check_result_label, "ui.fe17.name_registry.check_result_default")
-	UIIntermediary.resolve(_name_register_btn, "ui.fe17.name_registry.btn_register")
-	var name_history_label: Label = $MarginContainer/VBox/MainTabContainer/NameRegistryTab/VBox/NameHistorySectionLabel
-	UIIntermediary.resolve(name_history_label, "ui.fe17.name_registry.history_section_label")
+	_get_tabs().init_static_text()
 
 # ==============================================================================
 # Tab 0: DISGUISE 身份伪装
@@ -258,9 +215,9 @@ func _init_disguise() -> void:
 		displayed_character_name = UIIntermediary.text("ui.fe17.mock.char.real_name")
 	# Mock 伪装身份列表（名称/种族/职业/来源/描述均使用 i18n key）
 	_disguise_masks = [
-		{ "id": "MASK_001", "name_key": "ui.fe17.mock.disguise.hans_name", "race_key": "ui.fe17.mock.disguise.race_human", "class_key": "ui.fe17.mock.disguise.class_merchant", "origin_key": "ui.fe17.mock.disguise.origin_valan_chamber", "desc_key": "ui.fe17.mock.disguise.hans_desc" },
-		{ "id": "MASK_002", "name_key": "ui.fe17.mock.disguise.leila_name", "race_key": "ui.fe17.mock.disguise.race_half_elf", "class_key": "ui.fe17.mock.disguise.class_bard", "origin_key": "ui.fe17.mock.disguise.origin_silver_forest", "desc_key": "ui.fe17.mock.disguise.leila_desc" },
-		{ "id": "MASK_003", "name_key": "ui.fe17.mock.disguise.iron_fist_name", "race_key": "ui.fe17.mock.disguise.race_dwarf", "class_key": "ui.fe17.mock.disguise.class_warrior", "origin_key": "ui.fe17.mock.disguise.origin_iron_mercenary", "desc_key": "ui.fe17.mock.disguise.iron_fist_desc" },
+		{"id": "MASK_001", "name_key": "ui.fe17.mock.disguise.hans_name", "race_key": "ui.fe17.mock.disguise.race_human", "class_key": "ui.fe17.mock.disguise.class_merchant", "origin_key": "ui.fe17.mock.disguise.origin_valan_chamber", "desc_key": "ui.fe17.mock.disguise.hans_desc"},
+		{"id": "MASK_002", "name_key": "ui.fe17.mock.disguise.leila_name", "race_key": "ui.fe17.mock.disguise.race_half_elf", "class_key": "ui.fe17.mock.disguise.class_bard", "origin_key": "ui.fe17.mock.disguise.origin_silver_forest", "desc_key": "ui.fe17.mock.disguise.leila_desc"},
+		{"id": "MASK_003", "name_key": "ui.fe17.mock.disguise.iron_fist_name", "race_key": "ui.fe17.mock.disguise.race_dwarf", "class_key": "ui.fe17.mock.disguise.class_warrior", "origin_key": "ui.fe17.mock.disguise.origin_iron_mercenary", "desc_key": "ui.fe17.mock.disguise.iron_fist_desc"},
 	]
 	_refresh_disguise_mask_list()
 	_refresh_disguise_current()
@@ -275,8 +232,7 @@ func _refresh_disguise_mask_list() -> void:
 ## 刷新当前身份展示：真实身份/伪装身份分派（名称/种族/职业/等级/状态/持续/风险）
 func _refresh_disguise_current() -> void:
 	if current_disguise_mask_id.is_empty():
-		var real_name := UIIntermediary.text("ui.fe17.mock.char.real_name")
-		UIIntermediary.resolve(_disguise_current_name_label, "ui.fe17.disguise.current_name", {"name": real_name})
+		UIIntermediary.resolve(_disguise_current_name_label, "ui.fe17.disguise.current_name", {"name": UIIntermediary.text("ui.fe17.mock.char.real_name")})
 		UIIntermediary.resolve(_disguise_current_race_label, "ui.fe17.disguise.race_label", {"race": UIIntermediary.text("ui.fe17.mock.disguise.race_human")})
 		UIIntermediary.resolve(_disguise_current_class_label, "ui.fe17.disguise.class_label", {"class": UIIntermediary.text("ui.fe17.mock.disguise.class_sword_saint")})
 		UIIntermediary.resolve(_disguise_current_level_label, "ui.fe17.disguise.level_label", {"level": 45})
@@ -286,23 +242,19 @@ func _refresh_disguise_current() -> void:
 		UIIntermediary.resolve(_disguise_detect_risk_label, "ui.fe17.disguise.risk_none")
 		_disguise_detect_risk_bar.value = 0.0
 	else:
-		# 找到当前伪装身份
 		for mask in _disguise_masks:
 			if mask.get("id", "") == current_disguise_mask_id:
-				var name := UIIntermediary.text(mask.get("name_key", ""))
-				UIIntermediary.resolve(_disguise_current_name_label, "ui.fe17.disguise.current_name", {"name": name})
+				UIIntermediary.resolve(_disguise_current_name_label, "ui.fe17.disguise.current_name", {"name": UIIntermediary.text(mask.get("name_key", ""))})
 				UIIntermediary.resolve(_disguise_current_race_label, "ui.fe17.disguise.race_label", {"race": UIIntermediary.text(mask.get("race_key", ""))})
 				UIIntermediary.resolve(_disguise_current_class_label, "ui.fe17.disguise.class_label", {"class": UIIntermediary.text(mask.get("class_key", ""))})
 				UIIntermediary.resolve(_disguise_current_level_label, "ui.fe17.disguise.level_label", {"level": 45})
 				UIIntermediary.resolve(_disguise_status_label, "ui.fe17.disguise.status_disguised")
 				break
-		# 骨架阶段：模拟持续时间与风险
 		UIIntermediary.resolve(_disguise_duration_label, "ui.fe17.disguise.duration_time", {"time": "45:00"})
 		_disguise_duration_bar.value = 75.0
 		UIIntermediary.resolve(_disguise_detect_risk_label, "ui.fe17.disguise.risk_low")
 		_disguise_detect_risk_bar.value = 15.0
 
-## 刷新伪装详情：未选中占位或面具名称/来源/描述
 func _refresh_disguise_detail() -> void:
 	if _selected_disguise_idx < 0 or _selected_disguise_idx >= _disguise_masks.size():
 		UIIntermediary.resolve(_disguise_detail_name_label, "ui.fe17.disguise.detail_select_prompt")
@@ -318,80 +270,13 @@ func _refresh_disguise_detail() -> void:
 	UIIntermediary.resolve(_disguise_detail_desc_label, "ui.fe17.disguise.detail_desc", {"desc": desc})
 
 # ==============================================================================
-# Tab 1: MUTATION 精英突变
+# Tab 1: MUTATION 精英突变委托
 # ==============================================================================
-
-## 初始化精英突变 Tab：Mock 词条 + 模拟 1 个已激活 + 列表/组合预览首刷
-func _init_mutation() -> void:
-	# Mock 突变词条数据（名称/效果/来源均使用 i18n key）
-	_mutation_data = [
-		{ "id": "MUT_001", "name_key": "ui.fe17.mock.mutation.bloodlust_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.bloodlust_effect", "source_key": "ui.fe17.mock.mutation.source_wolf_king", "state": "available" },
-		{ "id": "MUT_002", "name_key": "ui.fe17.mock.mutation.elemental_affinity_name", "quality": 3, "effect_key": "ui.fe17.mock.mutation.elemental_affinity_effect", "source_key": "ui.fe17.mock.mutation.source_elemental_core", "state": "available" },
-		{ "id": "MUT_003", "name_key": "ui.fe17.mock.mutation.iron_body_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.iron_body_effect", "source_key": "ui.fe17.mock.mutation.source_iron_crystal", "state": "available" },
-		{ "id": "MUT_004", "name_key": "ui.fe17.mock.mutation.shadow_stealth_name", "quality": 4, "effect_key": "ui.fe17.mock.mutation.shadow_stealth_effect", "source_key": "ui.fe17.mock.mutation.source_shadow_scale", "state": "locked" },
-		{ "id": "MUT_005", "name_key": "ui.fe17.mock.mutation.dragon_blood_name", "quality": 4, "effect_key": "ui.fe17.mock.mutation.dragon_blood_effect", "source_key": "ui.fe17.mock.mutation.source_dragon_heart", "state": "locked" },
-	]
-	# 模拟 1 个已激活的突变
-	_active_mutations = [{ "id": "MUT_001", "name_key": "ui.fe17.mock.mutation.bloodlust_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.bloodlust_effect", "source_key": "ui.fe17.mock.mutation.source_wolf_king", "state": "active" }]
-	_refresh_mutation_list()
-	_refresh_mutation_combo_preview()
-
-## 刷新突变列表：按筛选（激活/可用/锁定）过滤并渲染品质+名称行
-func _refresh_mutation_list() -> void:
-	_mutation_list.clear()
-	for item in _mutation_data:
-		var state: String = item.get("state", "available")
-		# 根据筛选过滤
-		match _mutation_filter:
-			MutationFilter.ACTIVE:
-				if state != "active":
-					continue
-			MutationFilter.AVAILABLE:
-				if state != "available":
-					continue
-			MutationFilter.LOCKED:
-				if state != "locked":
-					continue
-		var quality_name: String = _quality_name(int(item.get("quality", 0)))
-		var mut_name := UIIntermediary.text(item.get("name_key", ""))
-		var item_text := UIIntermediary.text("ui.fe17.mutation.list_item", {"quality": quality_name, "name": mut_name})
-		_mutation_list.add_item(item_text)
-
-## 刷新突变详情：未选中占位或名称/品质/效果/来源
-func _refresh_mutation_detail() -> void:
-	if _selected_mutation_idx < 0 or _selected_mutation_idx >= _mutation_data.size():
-		UIIntermediary.resolve(_mutation_detail_name_label, "ui.fe17.mutation.detail_select_prompt")
-		UIIntermediary.resolve(_mutation_detail_quality_label, "ui.fe17.mutation.quality_default")
-		UIIntermediary.resolve(_mutation_detail_effect_label, "ui.fe17.mutation.effect_default")
-		UIIntermediary.resolve(_mutation_detail_source_label, "ui.fe17.mutation.source_default")
-		return
-	var item: Dictionary = _mutation_data[_selected_mutation_idx]
-	var name := UIIntermediary.text(item.get("name_key", ""))
-	UIIntermediary.resolve(_mutation_detail_name_label, "ui.fe17.mutation.detail_name", {"name": name})
-	UIIntermediary.resolve(_mutation_detail_quality_label, "ui.fe17.mutation.quality_label", {"quality": _quality_name(int(item.get("quality", 0)))})
-	var effect := UIIntermediary.text(item.get("effect_key", ""))
-	UIIntermediary.resolve(_mutation_detail_effect_label, "ui.fe17.mutation.effect_label", {"effect": effect})
-	var source := UIIntermediary.text(item.get("source_key", ""))
-	UIIntermediary.resolve(_mutation_detail_source_label, "ui.fe17.mutation.source_label", {"source": source})
-
-## 刷新突变组合预览：已激活列表（最多 3 条）逐条渲染品质+名称
-func _refresh_mutation_combo_preview() -> void:
-	var count := _active_mutations.size()
-	var text := UIIntermediary.text("ui.fe17.mutation.combo_header", {"count": count, "max": 3}) + "\n"
-	if count == 0:
-		text += UIIntermediary.text("ui.fe17.mutation.combo_empty")
-	else:
-		for mut in _active_mutations:
-			var mut_name := UIIntermediary.text(mut.get("name_key", ""))
-			var qual_name := _quality_name(int(mut.get("quality", 0)))
-			text += UIIntermediary.text("ui.fe17.mutation.combo_item", {"name": mut_name, "quality": qual_name}) + "\n"
-	_mutation_combo_preview_label.text = text
-
-## 品质档 → i18n 品质名（五档索引，越界回退普通）
-func _quality_name(quality: int) -> String:
-	if quality >= 0 and quality < MUTATION_QUALITY_KEYS.size():
-		return UIIntermediary.text(MUTATION_QUALITY_KEYS[quality])
-	return UIIntermediary.text("ui.fe17.mutation.quality_common")
+func _init_mutation() -> void: _get_tabs().init_mutation()
+func _refresh_mutation_list() -> void: _get_tabs().refresh_mutation_list()
+func _refresh_mutation_detail() -> void: _get_tabs().refresh_mutation_detail()
+func _refresh_mutation_combo_preview() -> void: _get_tabs().refresh_mutation_combo_preview()
+func _quality_name(quality: int) -> String: return _get_tabs().quality_name(quality)
 
 # ==============================================================================
 # Tab 2: GROUND_DROP 地面掉落
@@ -401,11 +286,11 @@ func _quality_name(quality: int) -> String:
 func _init_ground_drop() -> void:
 	# Mock 地面掉落数据（物品名使用 i18n key）
 	ground_nearby_loot = [
-		{ "id": "L001", "name_key": "ui.fe17.mock.item.mithril_sword", "type": 1, "rarity": "RARE", "remain_sec": 300 },
-		{ "id": "L002", "name_key": "ui.fe17.mock.item.healing_potion", "type": 3, "rarity": "COMMON", "remain_sec": 120 },
-		{ "id": "L003", "name_key": "ui.fe17.mock.item.mithril_ore_x3", "type": 2, "rarity": "UNCOMMON", "remain_sec": 600 },
-		{ "id": "L004", "name_key": "ui.fe17.mock.item.refined_leather_armor", "type": 1, "rarity": "COMMON", "remain_sec": 90 },
-		{ "id": "L005", "name_key": "ui.fe17.mock.item.mana_shard", "type": 2, "rarity": "RARE", "remain_sec": 240 },
+		{"id": "L001", "name_key": "ui.fe17.mock.item.mithril_sword", "type": 1, "rarity": "RARE", "remain_sec": 300},
+		{"id": "L002", "name_key": "ui.fe17.mock.item.healing_potion", "type": 3, "rarity": "COMMON", "remain_sec": 120},
+		{"id": "L003", "name_key": "ui.fe17.mock.item.mithril_ore_x3", "type": 2, "rarity": "UNCOMMON", "remain_sec": 600},
+		{"id": "L004", "name_key": "ui.fe17.mock.item.refined_leather_armor", "type": 1, "rarity": "COMMON", "remain_sec": 90},
+		{"id": "L005", "name_key": "ui.fe17.mock.item.mana_shard", "type": 2, "rarity": "RARE", "remain_sec": 240},
 	]
 	_refresh_ground_loot_list()
 	_refresh_ground_status()
@@ -432,46 +317,11 @@ func _refresh_ground_status() -> void:
 	UIIntermediary.resolve(_ground_item_count_label, "ui.fe17.ground_drop.item_count_label", {"visible": visible_count, "total": total_count})
 
 # ==============================================================================
-# Tab 3: NAME_REGISTRY 命名注册
+# Tab 3: NAME_REGISTRY 命名注册委托
 # ==============================================================================
-
-## 初始化命名注册 Tab：四类型下拉 + 费用/历史首刷（Mock 2 条历史）
-func _init_name_registry() -> void:
-	# 填充命名类型下拉框（使用 i18n 文本）
-	_name_type_option.clear()
-	for key in NAME_TYPE_KEYS:
-		_name_type_option.add_item(UIIntermediary.text(key))
-	_name_type_option.select(0)
-	_refresh_name_fee()
-
-	# Mock 命名历史（名称使用 i18n key）
-	_name_history = [
-		{ "type": 0, "name_key": "ui.fe17.mock.char.real_name", "time": "2026-08-01 10:00", "success": true },
-		{ "type": 2, "name_key": "ui.fe17.mock.guild.dawn_wing", "time": "2026-08-15 14:30", "success": true },
-	]
-	_refresh_name_history()
-
-## 刷新命名注册费用（费用表经 domain_boundary 服务）
-func _refresh_name_fee() -> void:
-	var type_idx := _name_type_option.selected
-	var fee := MockServiceContainer.get_instance().misc_edge().get_name_type_fee(type_idx)
-	UIIntermediary.resolve(_name_fee_label, "ui.fe17.name_registry.fee_label", {"fee": fee})
-
-## 刷新命名历史：状态/类型/名称（支持 custom_name）/时间组合行
-func _refresh_name_history() -> void:
-	_name_history_list.clear()
-	for item in _name_history:
-		var type_idx: int = int(item.get("type", 0))
-		var type_name: String = UIIntermediary.text(NAME_TYPE_KEYS[type_idx]) if (type_idx >= 0 and type_idx < NAME_TYPE_KEYS.size()) else UIIntermediary.text("ui.fe17.name_registry.type_unknown")
-		var status := "[OK]" if item.get("success", false) else "[FAIL]"
-		# 支持 name_key（Mock 数据）和 custom_name（用户输入的名字）
-		var name: String
-		if item.has("custom_name") and not item.get("custom_name", "").is_empty():
-			name = item.get("custom_name", "")
-		else:
-			name = UIIntermediary.text(item.get("name_key", ""))
-		var history_item := UIIntermediary.text("ui.fe17.name_registry.history_item", {"status": status, "type": type_name, "name": name, "time": item.get("time", "")})
-		_name_history_list.add_item(history_item)
+func _init_name_registry() -> void: _get_tabs().init_name_registry()
+func _refresh_name_fee() -> void: _get_tabs().refresh_name_fee()
+func _refresh_name_history() -> void: _get_tabs().refresh_name_history()
 
 # ==============================================================================
 # 信号绑定
@@ -479,10 +329,7 @@ func _refresh_name_history() -> void:
 
 ## 绑定本地 UI 交互信号（零接线：四 Tab 控件在本地脚本闭环）
 func _connect_signals() -> void:
-	# 返回按钮
 	_back_btn.pressed.connect(_on_back_btn_pressed)
-
-	# Tab 切换
 	_main_tab_container.tab_changed.connect(_on_tab_changed)
 
 	# 身份伪装
@@ -490,23 +337,14 @@ func _connect_signals() -> void:
 	_disguise_switch_btn.pressed.connect(_on_disguise_switch_pressed)
 	_disguise_cancel_btn.pressed.connect(_on_disguise_cancel_pressed)
 
-	# 精英突变
-	_mutation_filter_tabs.tab_changed.connect(_on_mutation_filter_changed)
-	_mutation_list.item_selected.connect(_on_mutation_selected)
-	_mutation_activate_btn.pressed.connect(_on_mutation_activate_pressed)
-	_mutation_replace_btn.pressed.connect(_on_mutation_replace_pressed)
-
 	# 地面掉落
 	_ground_filter_tabs.tab_changed.connect(_on_ground_filter_changed)
 	_ground_loot_list.item_selected.connect(_on_loot_selected)
 	_ground_pickup_btn.pressed.connect(_on_pickup_pressed)
 	_ground_pickup_all_btn.pressed.connect(_on_pickup_all_pressed)
 
-	# 命名注册
-	_name_type_option.item_selected.connect(_on_name_type_selected)
-	_name_check_btn.pressed.connect(_on_name_check_pressed)
-	_name_register_btn.pressed.connect(_on_name_register_pressed)
-	_name_input.text_submitted.connect(_on_name_input_submitted)
+	# 精英突变与命名注册信号委托
+	_get_tabs().connect_signals()
 
 # ==============================================================================
 # 信号回调
@@ -542,41 +380,11 @@ func _on_disguise_cancel_pressed() -> void:
 	displayed_character_name = default_name
 	_refresh_disguise_current()
 
-# --- 精英突变 ---
-
-## 突变筛选切换：更新筛选并重置选中、刷新列表/详情
-func _on_mutation_filter_changed(tab_idx: int) -> void:
-	_mutation_filter = tab_idx as MutationFilter
-	_selected_mutation_idx = -1
-	_refresh_mutation_list()
-	_refresh_mutation_detail()
-
-## 突变条目选中：记录索引并刷新详情
-func _on_mutation_selected(idx: int) -> void:
-	_selected_mutation_idx = idx
-	_refresh_mutation_detail()
-
-## 激活突变按钮：槽位/去重规则经服务，成功后回写并刷新组合预览
-func _on_mutation_activate_pressed() -> void:
-	if _selected_mutation_idx < 0 or _selected_mutation_idx >= _mutation_data.size():
-		return
-	var result := MockServiceContainer.get_instance().misc_edge().activate_mutation(
-		_active_mutations, _mutation_data[_selected_mutation_idx], 3)
-	if not bool(result.get("success", false)):
-		return
-	_active_mutations = result.get("mutations", _active_mutations)
-	_refresh_mutation_combo_preview()
-
-## 替换突变按钮：替换规则经服务，成功后回写并刷新组合预览
-func _on_mutation_replace_pressed() -> void:
-	if _selected_mutation_idx < 0 or _selected_mutation_idx >= _mutation_data.size():
-		return
-	var result := MockServiceContainer.get_instance().misc_edge().replace_last_mutation(
-		_active_mutations, _mutation_data[_selected_mutation_idx])
-	if not bool(result.get("success", false)):
-		return
-	_active_mutations = result.get("mutations", _active_mutations)
-	_refresh_mutation_combo_preview()
+# --- 精英突变委托 ---
+func _on_mutation_filter_changed(tab_idx: int) -> void: _get_tabs()._on_mutation_filter_changed(tab_idx)
+func _on_mutation_selected(idx: int) -> void: _get_tabs()._on_mutation_selected(idx)
+func _on_mutation_activate_pressed() -> void: _get_tabs()._on_mutation_activate_pressed()
+func _on_mutation_replace_pressed() -> void: _get_tabs()._on_mutation_replace_pressed()
 
 # --- 地面掉落 ---
 
@@ -608,54 +416,20 @@ func _on_pickup_all_pressed() -> void:
 	_refresh_ground_loot_list()
 	_refresh_ground_status()
 
-# --- 命名注册 ---
+# --- 命名注册委托 ---
+func _on_name_type_selected(idx: int) -> void: _get_tabs()._on_name_type_selected(idx)
+func _on_name_check_pressed() -> void: _get_tabs()._on_name_check_pressed()
+func _on_name_register_pressed() -> void: _get_tabs()._on_name_register_pressed()
+func _on_name_input_submitted(text: String) -> void: _get_tabs()._on_name_input_submitted(text)
 
-## 命名类型切换：刷新费用标签
-func _on_name_type_selected(idx: int) -> void:
-	_refresh_name_fee()
-
-## 查重按钮：空名拦截，模拟查重并提示可用（骨架桩）
-func _on_name_check_pressed() -> void:
-	var name := _name_input.text.strip_edges()
-	if name.is_empty():
-		UIIntermediary.resolve(_name_check_result_label, "ui.fe17.name_registry.error_empty")
-		return
-	search_query_keyword = name
-	# 骨架阶段：模拟查重
-	UIIntermediary.resolve(_name_check_result_label, "ui.fe17.name_registry.check_available", {"name": name})
-
-## 注册按钮：空名拦截，模拟注册成功并追加历史（骨架桩）
-func _on_name_register_pressed() -> void:
-	var name := _name_input.text.strip_edges()
-	if name.is_empty():
-		UIIntermediary.resolve(_name_check_result_label, "ui.fe17.name_registry.error_empty")
-		return
-	var type_idx := _name_type_option.selected
-	# 骨架阶段：模拟注册成功
-	_name_history.append({ "type": type_idx, "name_key": "", "custom_name": name, "time": "2026-09-01 00:00", "success": true })
-	_refresh_name_history()
-	UIIntermediary.resolve(_name_check_result_label, "ui.fe17.name_registry.register_success", {"name": name})
-	_name_input.clear()
-
-## 命名输入框回车：委托查重
-func _on_name_input_submitted(_text: String) -> void:
-	_on_name_check_pressed()
-
-# ==============================================================================
-# 外部 API（保留数据桩接口供未来接线）
-# ==============================================================================
-
-## 外部 API 桩：应用伪装面具（空 ID 恢复真实名）
 func apply_disguise_mask(mask_id: String, fake_name: String) -> void:
 	current_disguise_mask_id = mask_id
 	var default_name: String = UIIntermediary.text("ui.fe17.mock.char.real_name")
 	displayed_character_name = fake_name if mask_id != "" else default_name
 
-## 外部 API 桩：注入地面掉落快照（经统一快照入口，节点存在守卫）
 func set_ground_nearby_loot_snapshot(loot_items: Array) -> void:
 	apply_snapshot({"ground_loot": loot_items})
 
-## 统一快照渲染映射（P81）：地面掉落 → 视图状态（节点存在守卫）
 func _render_from_snapshot() -> void:
 	if snapshot.has("ground_loot"):
 		ground_nearby_loot = FrontendSnapshot.read_array(snapshot, "ground_loot")
@@ -664,7 +438,6 @@ func _render_from_snapshot() -> void:
 	if _ground_range_label != null and _ground_item_count_label != null:
 		_refresh_ground_status()
 
-## 外部 API 桩：命名空间检索（记录查询关键词）
 func search_item_namespace(keyword: String) -> Dictionary:
 	search_query_keyword = keyword.strip_edges()
-	return { "success": true, "query": search_query_keyword }
+	return {"success": true, "query": search_query_keyword}

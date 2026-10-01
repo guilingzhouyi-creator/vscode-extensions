@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://cquestcausality07"]
+[gd_scene load_steps=4 format=3 uid="uid://cquestcausality07"]
 
 [ext_resource type="Script" path="res://frontend/views/quest_causality/quest_causality_view.gd" id="1_quest"]
+[ext_resource type="Script" path="res://frontend/components/k_back_button.gd" id="2_kback"]
+[ext_resource type="Script" path="res://frontend/components/k_tab_bar.gd" id="3_ktab"]
 
 [node name="QuestCausalityView" type="Control"]
 layout_mode = 3
@@ -55,12 +57,15 @@ size_flags_horizontal = 3
 unique_name_in_owner = true
 layout_mode = 2
 text = ""
+script = ExtResource("2_kback")
+auto_pop = false
 
 [node name="TabContainer" type="TabContainer" parent="MainLayout"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 current_tab = 0
+script = ExtResource("3_ktab")
 
 ; =========================================================================
 ; Tab 1: 任务列表 (QUEST_LIST)
@@ -326,6 +331,7 @@ unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(0, 80)
 current_tab = 0
+script = ExtResource("3_ktab")
 
 [node name="Tier 1" type="VBoxContainer" parent="MainLayout/TabContainer/悬赏通缉/BountyTierTab"]
 layout_mode = 2

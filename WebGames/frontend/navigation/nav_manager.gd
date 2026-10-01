@@ -20,8 +20,14 @@ var _current_screen: Control = null
 var _screen_registry: Dictionary = {}
 var _scene_cache: Dictionary = {}
 
+## 当前活跃的转场 Tween（同一时刻仅允许一个转场；新转场启动前先 kill 旧 Tween）
+var _active_transition: Tween = null
+
 ## 场景缓存最大条目（R-07：防随注册表扩张无界增长；超限按插入序 FIFO 逐出）
 const MAX_SCENE_CACHE_ENTRIES: int = 24
+
+## 转场动效持续时长（秒）
+const TRANSITION_DURATION: float = 0.25
 
 ## 默认注册 17 个功能视图（R-28：注释计数与实现对齐）
 func _init_default_registry() -> void:
@@ -58,25 +64,25 @@ func has_screen(screen_id: String) -> bool:
 	return _screen_registry.has(screen_id)
 
 ## 压入新 Screen (保留历史栈)
-func push_screen(screen_id: String, params: Dictionary = {}) -> Control:
-	return _navigate_to(screen_id, params, true)
+func push_screen(screen_id: String, params: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
+	return _navigate_to(screen_id, params, true, transition_type)
 
 ## 替换当前 Screen (不追加历史深度)
-func replace_screen(screen_id: String, params: Dictionary = {}) -> Control:
+func replace_screen(screen_id: String, params: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
 	var prev_depth := _screen_stack.size()
-	var result := _navigate_to(screen_id, params, true)
+	var result := _navigate_to(screen_id, params, true, transition_type)
 	# R-05：仅跳转成功且存在被替换项时才抹去旧栈顶，失败路径栈长度不变
 	if result != null and prev_depth > 0:
 		_screen_stack.remove_at(prev_depth - 1)
 	return result
 
-## 弹出并返回上一 Screen
-func pop_screen() -> Control:
+## 弹出并返回上一 Screen（默认 SLIDE_RIGHT 回退动效）
+func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> Control:
 	if _screen_stack.size() <= 1:
 		printerr("[NavManager] 已经是栈底，无法继续返回")
 		return null
 	var prev_id: String = _screen_stack[_screen_stack.size() - 2]
-	var result := _navigate_to(prev_id, {}, false)
+	var result := _navigate_to(prev_id, {}, false, transition_type)
 	# R-06：目标解析/跳转成功后才真正出栈，失败不回退栈深
 	if result != null:
 		_screen_stack.pop_back()
@@ -84,7 +90,8 @@ func pop_screen() -> Control:
 
 ## 核心跳转与生命周期驱动
 ## 顺序契约：先加载/实例化成功，再校验可挂载，最后销毁旧屏——失败路径不破坏栈/屏一致性
-func _navigate_to(screen_id: String, params: Dictionary, record_history: bool) -> Control:
+## 转场动效：transition_type != NONE 时旧屏在动效结束后才 queue_free，保证视觉连续性
+func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
 	if not _screen_registry.has(screen_id):
 		printerr("[NavManager] 未注册的 Screen: %s" % screen_id)
 		return null
@@ -110,16 +117,21 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool) -
 		inst.queue_free()
 		return null
 
-	# 3. 再销毁旧屏（退出钩子 + 延迟释放）
-	if _current_screen != null:
-		if _current_screen.has_method("on_screen_exit"):
-			_current_screen.call("on_screen_exit")
-		_current_screen.queue_free()
-		_current_screen = null
+	var old_screen := _current_screen
 
+	# 3. 挂载新屏（旧屏暂保留，转场结束后释放）
 	_current_screen = inst
 	_app_root.screen_container.add_child(inst)
 	inst.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	if transition_type == NavTypes.TransitionType.NONE or old_screen == null:
+		# 无动效：立即销毁旧屏（退出钩子 + 延迟释放）
+		if old_screen != null:
+			if old_screen.has_method("on_screen_exit"):
+				old_screen.call("on_screen_exit")
+			old_screen.queue_free()
+	else:
+		_play_transition(old_screen, inst, transition_type)
 
 	# 4. 挂载成功后才写栈，保证栈与场景树恒自洽
 	if record_history:
@@ -129,6 +141,57 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool) -
 		inst.call("on_screen_enter", params)
 
 	return inst
+
+## 转场动效调度：根据类型派发到具体动效实现，转场结束后自动清理旧屏
+func _play_transition(old_screen: Control, new_screen: Control, transition_type: int) -> void:
+	# 同一时刻仅允许一个转场；新转场启动前先 kill 旧 Tween 并立即释放旧屏
+	if _active_transition != null and _active_transition.is_valid():
+		_active_transition.kill()
+	_active_transition = _create_tween()
+
+	match transition_type:
+		NavTypes.TransitionType.FADE:
+			_play_fade_transition(old_screen, new_screen)
+		NavTypes.TransitionType.SLIDE_LEFT:
+			_play_slide_transition(old_screen, new_screen, true)
+		NavTypes.TransitionType.SLIDE_RIGHT:
+			_play_slide_transition(old_screen, new_screen, false)
+		_:
+			if old_screen.has_method("on_screen_exit"):
+				old_screen.call("on_screen_exit")
+			old_screen.queue_free()
+
+## 淡入淡出转场：旧屏淡出 + 新屏淡入（交叉淡入淡出）
+func _play_fade_transition(old_screen: Control, new_screen: Control) -> void:
+	new_screen.modulate.a = 0.0
+	_active_transition.set_parallel(true)
+	_active_transition.tween_property(new_screen, "modulate:a", 1.0, TRANSITION_DURATION)
+	_active_transition.tween_property(old_screen, "modulate:a", 0.0, TRANSITION_DURATION)
+	_active_transition.chain().tween_callback(func():
+		if old_screen.has_method("on_screen_exit"):
+			old_screen.call("on_screen_exit")
+		old_screen.queue_free()
+	)
+
+## 滑动转场：旧屏滑出 + 新屏滑入（方向由 slide_left 控制）
+func _play_slide_transition(old_screen: Control, new_screen: Control, slide_left: bool) -> void:
+	var container_size := _app_root.screen_container.size
+	var direction := 1.0 if slide_left else -1.0
+	new_screen.position.x = container_size.x * direction
+	_active_transition.set_parallel(true)
+	_active_transition.tween_property(old_screen, "position:x", -container_size.x * direction, TRANSITION_DURATION)
+	_active_transition.tween_property(new_screen, "position:x", 0.0, TRANSITION_DURATION)
+	_active_transition.chain().tween_callback(func():
+		if old_screen.has_method("on_screen_exit"):
+			old_screen.call("on_screen_exit")
+		old_screen.queue_free()
+	)
+
+## 创建 Tween（通过 app_root 的场景树，确保 process loop 驱动）
+func _create_tween() -> Tween:
+	if _app_root != null and _app_root.is_inside_tree():
+		return _app_root.create_tween()
+	return Tween.new()
 
 ## R-07：写入场景缓存并按插入序 FIFO 逐出，保证缓存条目有界（≤ MAX_SCENE_CACHE_ENTRIES）
 func _cache_scene(screen_id: String, scene: PackedScene) -> void:

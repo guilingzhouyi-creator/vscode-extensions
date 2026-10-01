@@ -53,10 +53,16 @@ static func _test_resolution_15s_rollback_prompt() -> Dictionary:
 
 static func _test_locale_switch() -> Dictionary:
 	var view = SettingsCenterView.new()
+	var test_label := Label.new()
+	UIIntermediary.switch_locale("zh_CN")
+	var text_zh := UIIntermediary.resolve(test_label, "ui.common.back")
 	view.switch_locale("en_US")
-	var passed = (view.selected_locale == "en_US")
+	var text_en := test_label.text
+	var passed = (view.selected_locale == "en_US") and (text_zh == "返回") and (text_en == "Back")
+	UIIntermediary.switch_locale("zh_CN")
+	test_label.free()
 	view.free()
 	return {
-		"test": "TC-FE15-03: 国际化多语言即时热切状态保持",
+		"test": "TC-FE15-03: 国际化多语言即时热切状态保持与节点文本响应",
 		"passed": passed
 	}

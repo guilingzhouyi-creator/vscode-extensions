@@ -8,6 +8,9 @@
 class_name QuestCausalityView
 extends BaseScreen
 
+const QuestCausalityTabsClass = preload("res://frontend/views/quest_causality/quest_causality_tabs.gd")
+const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
+
 # ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
 # ==============================================================================
@@ -72,13 +75,14 @@ extends BaseScreen
 # 状态与 Mock 数据
 # ==============================================================================
 
-enum QuestFilter { ALL, AVAILABLE, ACTIVE, COMPLETED }
+enum QuestFilter {ALL, AVAILABLE, ACTIVE, COMPLETED}
 var current_filter: int = QuestFilter.ALL
 
 var quest_list: Array = []
 var active_quest_detail: Dictionary = {}
 var causality_dag_nodes: Array = []
 var bounty_targets: Array = []
+var _tabs = null
 var show_completed_dag: bool = true
 
 # ==============================================================================
@@ -113,6 +117,12 @@ func _render_from_snapshot() -> void:
 		causality_dag_nodes = FrontendSnapshot.read_array(snapshot, "causality_dag")
 
 ## 生命周期初始化：主题/Mock 数据/四 Tab 装配/信号绑定/视觉适配（骨架零接线）
+func _get_tabs():
+	if _tabs == null:
+		_tabs = QuestCausalityTabsClass.new()
+		_tabs.setup(self)
+	return _tabs
+
 func _ready() -> void:
 	# 1. 应用主题
 	_apply_theme()
@@ -171,127 +181,11 @@ func _init_tab_titles() -> void:
 
 ## 初始化全部静态文案（15 个非唯一标签 + 各 Tab 动态默认值，i18n 全驱动）
 func _init_static_text() -> void:
-	# --- 全局 ---
-	UIIntermediary.resolve(_header_title_label, "ui.fe07.header.title")
-	UIIntermediary.resolve(_btn_back, "ui.fe07.header.back")
+	_get_tabs().init_static_text()
 
-	# --- Tab 0: 任务列表 ---
-	UIIntermediary.resolve(_quest_list_section_label, "ui.fe07.quest_list.section")
-	UIIntermediary.resolve(_quest_filter_label, "ui.fe07.quest_list.filter_label")
-
-	# --- Tab 1: 任务详情 ---
-	UIIntermediary.resolve(_label_quest_title, "ui.fe07.quest_detail.title_default")
-	UIIntermediary.resolve(_label_quest_giver, "ui.fe07.quest.giver", {"name": "-"})
-	UIIntermediary.resolve(_label_quest_level, "ui.fe07.quest.level", {"level": 0})
-	UIIntermediary.resolve(_label_quest_desc, "ui.fe07.quest_detail.desc_default")
-	UIIntermediary.resolve(_objectives_label, "ui.fe07.quest_detail.objectives_label")
-	UIIntermediary.resolve(_rewards_label, "ui.fe07.quest_detail.rewards_label")
-	UIIntermediary.resolve(_btn_quest_accept, "ui.fe07.quest_detail.btn_accept")
-	UIIntermediary.resolve(_btn_quest_abandon, "ui.fe07.quest_detail.btn_abandon")
-	UIIntermediary.resolve(_btn_quest_submit, "ui.fe07.quest_detail.btn_submit")
-
-	# --- Tab 2: 因果环 DAG ---
-	UIIntermediary.resolve(_dag_section_label, "ui.fe07.dag.section")
-	UIIntermediary.resolve(_dag_placeholder_label, "ui.fe07.dag.placeholder")
-	UIIntermediary.resolve(_chk_show_completed, "ui.fe07.dag.show_completed")
-	UIIntermediary.resolve(_dag_node_list_label, "ui.fe07.dag.node_list_label")
-	UIIntermediary.resolve(_label_dag_node_name, "ui.fe07.dag.node_name_default")
-	UIIntermediary.resolve(_label_dag_node_status, "ui.fe07.dag.node_status_none")
-	UIIntermediary.resolve(_label_dag_chain_desc, "ui.fe07.dag.chain_desc_default")
-
-	# --- Tab 3: 悬赏通缉 ---
-	UIIntermediary.resolve(_bounty_section_label, "ui.fe07.bounty.section")
-	UIIntermediary.resolve(_tier1_desc_label, "ui.fe07.bounty.tier1_desc")
-	UIIntermediary.resolve(_tier2_desc_label, "ui.fe07.bounty.tier2_desc")
-	UIIntermediary.resolve(_tier3_desc_label, "ui.fe07.bounty.tier3_desc")
-	UIIntermediary.resolve(_tier4_desc_label, "ui.fe07.bounty.tier4_desc")
-	UIIntermediary.resolve(_tier5_desc_label, "ui.fe07.bounty.tier5_desc")
-	UIIntermediary.resolve(_bounty_target_list_label, "ui.fe07.bounty.target_list_label")
-	UIIntermediary.resolve(_label_bounty_target, "ui.fe07.bounty.target_default")
-	UIIntermediary.resolve(_label_bounty_reward, "ui.fe07.bounty.reward_none")
-	UIIntermediary.resolve(_label_bounty_time, "ui.fe07.bounty.time_none")
-	UIIntermediary.resolve(_btn_bounty_accept, "ui.fe07.bounty.btn_accept")
-
-# ==============================================================================
-# Mock 数据（骨架阶段内联，不接后端）
-# ==============================================================================
-
-## 加载骨架 Mock 数据：任务/因果 DAG 节点/悬赏目标三表深拷贝
 func _load_mock_data() -> void:
-	quest_list = _mock_quests.duplicate(true)
-	causality_dag_nodes = _mock_dag_nodes.duplicate(true)
-	bounty_targets = _mock_bounty_targets.duplicate(true)
+	_get_tabs().load_mock_data()
 
-# --- 6 个任务 ---
-var _mock_quests: Array = [
-	{
-		"quest_id": "Q_MAIN_01", "title": "ui.fe07.mock.quest.q_main_01.title", "category": "MAIN", "status": "ACTIVE",
-		"giver": "ui.fe07.mock.quest.q_main_01.giver", "level_req": 20,
-		"desc": "ui.fe07.mock.quest.q_main_01.desc",
-		"objectives": ["ui.fe07.mock.quest.q_main_01.obj1", "ui.fe07.mock.quest.q_main_01.obj2"],
-		"rewards": ["ui.fe07.mock.quest.q_main_01.rwd1", "ui.fe07.mock.quest.q_main_01.rwd2", "ui.fe07.mock.quest.q_main_01.rwd3"]
-	},
-	{
-		"quest_id": "Q_MAIN_02", "title": "ui.fe07.mock.quest.q_main_02.title", "category": "MAIN", "status": "AVAILABLE",
-		"giver": "ui.fe07.mock.quest.q_main_02.giver", "level_req": 15,
-		"desc": "ui.fe07.mock.quest.q_main_02.desc",
-		"objectives": ["ui.fe07.mock.quest.q_main_02.obj1", "ui.fe07.mock.quest.q_main_02.obj2"],
-		"rewards": ["ui.fe07.mock.quest.q_main_02.rwd1", "ui.fe07.mock.quest.q_main_02.rwd2"]
-	},
-	{
-		"quest_id": "Q_SIDE_01", "title": "ui.fe07.mock.quest.q_side_01.title", "category": "SIDE", "status": "ACTIVE",
-		"giver": "ui.fe07.mock.quest.q_side_01.giver", "level_req": 5,
-		"desc": "ui.fe07.mock.quest.q_side_01.desc",
-		"objectives": ["ui.fe07.mock.quest.q_side_01.obj1"],
-		"rewards": ["ui.fe07.mock.quest.q_side_01.rwd1", "ui.fe07.mock.quest.q_side_01.rwd2"]
-	},
-	{
-		"quest_id": "Q_SIDE_02", "title": "ui.fe07.mock.quest.q_side_02.title", "category": "SIDE", "status": "AVAILABLE",
-		"giver": "ui.fe07.mock.quest.q_side_02.giver", "level_req": 8,
-		"desc": "ui.fe07.mock.quest.q_side_02.desc",
-		"objectives": ["ui.fe07.mock.quest.q_side_02.obj1", "ui.fe07.mock.quest.q_side_02.obj2"],
-		"rewards": ["ui.fe07.mock.quest.q_side_02.rwd1", "ui.fe07.mock.quest.q_side_02.rwd2"]
-	},
-	{
-		"quest_id": "Q_COM_01", "title": "ui.fe07.mock.quest.q_com_01.title", "category": "COMMISSION", "status": "COMPLETED",
-		"giver": "ui.fe07.mock.quest.q_com_01.giver", "level_req": 10,
-		"desc": "ui.fe07.mock.quest.q_com_01.desc",
-		"objectives": ["ui.fe07.mock.quest.q_com_01.obj1"],
-		"rewards": ["ui.fe07.mock.quest.q_com_01.rwd1"]
-	},
-	{
-		"quest_id": "Q_COM_02", "title": "ui.fe07.mock.quest.q_com_02.title", "category": "COMMISSION", "status": "ACTIVE",
-		"giver": "ui.fe07.mock.quest.q_com_02.giver", "level_req": 12,
-		"desc": "ui.fe07.mock.quest.q_com_02.desc",
-		"objectives": ["ui.fe07.mock.quest.q_com_02.obj1"],
-		"rewards": ["ui.fe07.mock.quest.q_com_02.rwd1", "ui.fe07.mock.quest.q_com_02.rwd2"]
-	}
-]
-
-# --- 7 个 DAG 节点 ---
-var _mock_dag_nodes: Array = [
-	{ "node_id": "DAG_01", "name": "ui.fe07.mock.dag.dag_01.name", "status": "COMPLETED", "chain_desc": "ui.fe07.mock.dag.dag_01.chain_desc" },
-	{ "node_id": "DAG_02", "name": "ui.fe07.mock.dag.dag_02.name", "status": "COMPLETED", "chain_desc": "ui.fe07.mock.dag.dag_02.chain_desc" },
-	{ "node_id": "DAG_03", "name": "ui.fe07.mock.dag.dag_03.name", "status": "ACTIVE", "chain_desc": "ui.fe07.mock.dag.dag_03.chain_desc" },
-	{ "node_id": "DAG_04", "name": "ui.fe07.mock.dag.dag_04.name", "status": "ACTIVE", "chain_desc": "ui.fe07.mock.dag.dag_04.chain_desc" },
-	{ "node_id": "DAG_05", "name": "ui.fe07.mock.dag.dag_05.name", "status": "LOCKED", "chain_desc": "ui.fe07.mock.dag.dag_05.chain_desc" },
-	{ "node_id": "DAG_06", "name": "ui.fe07.mock.dag.dag_06.name", "status": "LOCKED", "chain_desc": "ui.fe07.mock.dag.dag_06.chain_desc" },
-	{ "node_id": "DAG_07", "name": "ui.fe07.mock.dag.dag_07.name", "status": "LOCKED", "chain_desc": "ui.fe07.mock.dag.dag_07.chain_desc" }
-]
-
-# --- 7 个悬赏目标 ---
-var _mock_bounty_targets: Array = [
-	{ "target_id": "B_T1_01", "name": "ui.fe07.mock.bounty.b_t1_01.name", "tier": 1, "reward_gold": 500, "time_remain": "ui.fe07.mock.bounty.b_t1_01.time", "desc": "ui.fe07.mock.bounty.b_t1_01.desc" },
-	{ "target_id": "B_T2_01", "name": "ui.fe07.mock.bounty.b_t2_01.name", "tier": 2, "reward_gold": 1500, "time_remain": "ui.fe07.mock.bounty.b_t2_01.time", "desc": "ui.fe07.mock.bounty.b_t2_01.desc" },
-	{ "target_id": "B_T2_02", "name": "ui.fe07.mock.bounty.b_t2_02.name", "tier": 2, "reward_gold": 2000, "time_remain": "ui.fe07.mock.bounty.b_t2_02.time", "desc": "ui.fe07.mock.bounty.b_t2_02.desc" },
-	{ "target_id": "B_T3_01", "name": "ui.fe07.mock.bounty.b_t3_01.name", "tier": 3, "reward_gold": 5000, "time_remain": "ui.fe07.mock.bounty.b_t3_01.time", "desc": "ui.fe07.mock.bounty.b_t3_01.desc" },
-	{ "target_id": "B_T4_01", "name": "ui.fe07.mock.bounty.b_t4_01.name", "tier": 4, "reward_gold": 12000, "time_remain": "ui.fe07.mock.bounty.b_t4_01.time", "desc": "ui.fe07.mock.bounty.b_t4_01.desc" },
-	{ "target_id": "B_T5_01", "name": "ui.fe07.mock.bounty.b_t5_01.name", "tier": 5, "reward_gold": 50000, "time_remain": "ui.fe07.mock.bounty.b_t5_01.time", "desc": "ui.fe07.mock.bounty.b_t5_01.desc" },
-	{ "target_id": "B_T5_02", "name": "ui.fe07.mock.bounty.b_t5_02.name", "tier": 5, "reward_gold": 80000, "time_remain": "ui.fe07.mock.bounty.b_t5_02.time", "desc": "ui.fe07.mock.bounty.b_t5_02.desc" }
-]
-
-# ==============================================================================
-# Tab 0: 任务列表 - 初始化
 # ==============================================================================
 
 ## 初始化任务列表 Tab：状态筛选器/分类列表填充 + 任务列表首刷
@@ -329,6 +223,8 @@ func _refresh_quest_list() -> void:
 		count += 1
 	if _label_quest_count:
 		UIIntermediary.resolve(_label_quest_count, "ui.fe07.quest_list.count", {"count": count})
+	if _tabs != null:
+		_tabs.sync_quest_virtual_list(count)
 
 ## 状态筛选匹配（ALL 恒真，其余按任务状态精确比对）
 func _match_filter(status: String) -> bool:
@@ -407,61 +303,24 @@ func _clear_container_children(container: Node) -> void:
 # ==============================================================================
 # Tab 2: 因果环 DAG - 初始化
 # ==============================================================================
+# Tab 2 & 3 委托给 QuestCausalityTabs
+# ==============================================================================
 
-## 初始化因果环 DAG Tab：回填显示已完成勾选态并首刷节点列表
 func _init_causality_dag_tab() -> void:
-	_chk_show_completed.button_pressed = show_completed_dag
-	_refresh_dag_node_list()
+	_get_tabs().init_causality_dag_tab()
 
-## 刷新 DAG 节点列表：按显示已完成开关过滤并渲染名称/状态
 func _refresh_dag_node_list() -> void:
-	_dag_node_list.clear()
-	for node in causality_dag_nodes:
-		var status: String = node.get("status", "")
-		if not show_completed_dag and status == "COMPLETED":
-			continue
-		var status_name := _dag_status_name(status)
-		var name: String = node.get("name", "")
-		var display := UIIntermediary.text("ui.fe07.dag.node", {"name": UIIntermediary.text(name), "status": status_name})
-		_dag_node_list.add_item(display)
+	_get_tabs().refresh_dag_node_list()
 
-## DAG 状态码 → i18n 状态名（COMPLETED/ACTIVE/LOCKED，未命中回传原码）
 func _dag_status_name(code: String) -> String:
-	match code:
-		"COMPLETED": return UIIntermediary.text("ui.fe07.dag.status.completed")
-		"ACTIVE": return UIIntermediary.text("ui.fe07.dag.status.active")
-		"LOCKED": return UIIntermediary.text("ui.fe07.dag.status.locked")
-		_: return code
+	return _get_tabs().dag_status_name(code)
 
-# ==============================================================================
-# Tab 3: 悬赏通缉 - 初始化
-# ==============================================================================
-
-## 初始化悬赏通缉 Tab：五档 Tier 标题 + 默认展示 Tier 1 目标
 func _init_bounty_tab() -> void:
-	# 设置悬赏等级 Tab 标题
-	for i in range(5):
-		UIIntermediary.resolve_tab(_bounty_tier_tab, i, "ui.fe07.bounty.tier", {"tier": i + 1})
-	# 默认显示 Tier 1 目标
-	_refresh_bounty_targets(1)
+	_get_tabs().init_bounty_tab()
 
-## 按 Tier 刷新悬赏目标列表并重置详情为占位、禁用接取按钮
 func _refresh_bounty_targets(tier: int) -> void:
-	_bounty_target_list.clear()
-	for target in bounty_targets:
-		if int(target.get("tier", 0)) == tier:
-			_bounty_target_list.add_item(UIIntermediary.text(target.get("name", "")))
-	# 重置详情
-	if _label_bounty_target:
-		UIIntermediary.resolve(_label_bounty_target, "ui.fe07.bounty.target_default")
-	if _label_bounty_reward:
-		UIIntermediary.resolve(_label_bounty_reward, "ui.fe07.bounty.reward_none")
-	if _label_bounty_time:
-		UIIntermediary.resolve(_label_bounty_time, "ui.fe07.bounty.time_none")
-	_btn_bounty_accept.disabled = true
+	_get_tabs().refresh_bounty_targets(tier)
 
-# ==============================================================================
-# 信号绑定（零接线：所有信号在本地脚本闭环，不接 EventBus）
 # ==============================================================================
 
 ## 绑定本地 UI 交互信号（零接线：四 Tab 全部控件在本地脚本闭环）
@@ -564,58 +423,20 @@ func _sync_quest_status(quest: Dictionary) -> void:
 # ==============================================================================
 # 因果环 DAG 交互
 # ==============================================================================
+# Tab 2 & 3 交互回调委托
+# ==============================================================================
 
-## 显示已完成节点开关切换：更新标志并刷新节点列表
 func _on_show_completed_toggled(pressed: bool) -> void:
-	show_completed_dag = pressed
-	_refresh_dag_node_list()
+	_get_tabs().on_show_completed_toggled(pressed)
 
-## DAG 节点选中：按可见列表定位节点并渲染名称/状态/因果链描述
 func _on_dag_node_selected(index: int) -> void:
-	# 查找当前可见列表中的节点
-	var visible_nodes: Array = []
-	for node in causality_dag_nodes:
-		var status: String = node.get("status", "")
-		if not show_completed_dag and status == "COMPLETED":
-			continue
-		visible_nodes.append(node)
-	if index >= 0 and index < visible_nodes.size():
-		var node: Dictionary = visible_nodes[index]
-		if _label_dag_node_name:
-			_label_dag_node_name.text = UIIntermediary.text(node.get("name", ""))
-		if _label_dag_node_status:
-			UIIntermediary.resolve(_label_dag_node_status, "ui.fe07.dag.node_status", {"status": _dag_status_name(node.get("status", ""))})
-		if _label_dag_chain_desc:
-			_label_dag_chain_desc.text = UIIntermediary.text(node.get("chain_desc", ""))
+	_get_tabs().on_dag_node_selected(index)
 
-# ==============================================================================
-# 悬赏交互
-# ==============================================================================
+func _on_bounty_tier_changed(tab: int) -> void:
+	_get_tabs().on_bounty_tier_changed(tab)
 
-## 悬赏 Tier 切换：按当前 Tab 刷新目标列表
-func _on_bounty_tier_changed(_tab: int) -> void:
-	var tier := _bounty_tier_tab.current_tab + 1
-	_refresh_bounty_targets(tier)
-
-## 悬赏目标选中：渲染名称/赏金/时限详情并启用接取按钮
 func _on_bounty_target_selected(index: int) -> void:
-	var tier := _bounty_tier_tab.current_tab + 1
-	var filtered: Array = []
-	for target in bounty_targets:
-		if int(target.get("tier", 0)) == tier:
-			filtered.append(target)
-	if index >= 0 and index < filtered.size():
-		var target: Dictionary = filtered[index]
-		if _label_bounty_target:
-			_label_bounty_target.text = UIIntermediary.text(target.get("name", ""))
-		if _label_bounty_reward:
-			UIIntermediary.resolve(_label_bounty_reward, "ui.fe07.bounty.reward", {"gold": target.get("reward_gold", 0)})
-		if _label_bounty_time:
-			UIIntermediary.resolve(_label_bounty_time, "ui.fe07.bounty.time", {"time": UIIntermediary.text(target.get("time_remain", "-"))})
-		_btn_bounty_accept.disabled = false
+	_get_tabs().on_bounty_target_selected(index)
 
-## 接取悬赏：骨架阶段模拟接取（按钮置已接取态并禁用）
 func _on_bounty_accept() -> void:
-	# 骨架阶段：模拟接取悬赏
-	UIIntermediary.resolve(_btn_bounty_accept, "ui.fe07.bounty.accepted")
-	_btn_bounty_accept.disabled = true
+	_get_tabs().on_bounty_accept()

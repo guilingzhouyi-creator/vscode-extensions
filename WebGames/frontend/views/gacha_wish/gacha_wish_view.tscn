@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://cgachawishview06"]
+[gd_scene load_steps=3 format=3 uid="uid://cgachawishview06"]
 
 [ext_resource type="Script" path="res://frontend/views/gacha_wish/gacha_wish_view.gd" id="1_gacha_wish"]
+[ext_resource type="Script" path="res://frontend/components/k_back_button.gd" id="2_kback"]
 
 [node name="GachaWishView" type="Control"]
 layout_mode = 3
@@ -66,6 +67,8 @@ text = ""
 unique_name_in_owner = true
 layout_mode = 2
 text = ""
+script = ExtResource("2_kback")
+auto_pop = false
 
 ; -------------------------------------------------------------------------
 ; 主体内容区:祈愿主界面 + 历史侧面板
