@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebGames 前端组件完整性与复用性审查报告</title>
+<style>
+  :root{
+    --bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--card:#1e293b;--border:#334155;
+    --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+    --accent:#38bdf8;--accent2:#818cf8;--success:#34d399;--warn:#fbbf24;--error:#f87171;
+    --radius:12px;--mono:'SF Mono','Fira Code',Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',system-ui,sans-serif;line-height:1.7;font-size:15px}
+  .wrap{max-width:1200px;margin:0 auto;padding:32px 24px 80px}
+  h1{font-size:28px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+  h2{font-size:22px;font-weight:700;color:var(--text);margin:40px 0 16px;padding-bottom:10px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:10px}
+  h2 .num{background:var(--accent);color:var(--bg);font-size:13px;font-weight:800;padding:2px 8px;border-radius:6px;min-width:28px;text-align:center}
+  h3{font-size:17px;font-weight:600;color:var(--accent);margin:24px 0 12px}
+  .subtitle{color:var(--text2);font-size:14px;margin-bottom:32px}
+  .subtitle span{color:var(--accent)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+  .card-title{font-size:14px;font-weight:700;color:var(--accent2);margin-bottom:12px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.5px}
+  .grid{display:grid;gap:16px}
+  .grid-2{grid-template-columns:repeat(2,1fr)}
+  .grid-3{grid-template-columns:repeat(3,1fr)}
+  .grid-4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:768px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}}
+
+  .score-ring{width:160px;height:160px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;margin:0 auto}
+  .score-ring::before{content:'';position:absolute;width:124px;height:124px;border-radius:50%;background:var(--bg)}
+  .score-val{position:relative;z-index:1;text-align:center}
+  .score-val .num{font-size:36px;font-weight:800;line-height:1}
+  .score-val .lbl{font-size:11px;color:var(--text2);margin-top:4px}
+  .score-board{display:grid;grid-template-columns:160px 1fr;gap:24px;align-items:center;background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px}
+  @media(max-width:768px){.score-board{grid-template-columns:1fr;text-align:center}}
+  .grade{display:inline-block;font-weight:800;font-size:14px;padding:2px 10px;border-radius:6px;margin-left:8px}
+  .badge{font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px}
+  .badge.green{background:rgba(52,211,153,.15);color:var(--success);border:1px solid rgba(52,211,153,.3)}
+  .badge.yellow{background:rgba(251,191,36,.15);color:var(--warn);border:1px solid rgba(251,191,36,.3)}
+  .badge.red{background:rgba(248,113,113,.15);color:var(--error);border:1px solid rgba(248,113,113,.3)}
+
+  .metric{margin-bottom:10px}
+  .metric-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  .metric-head .name{color:var(--text2)}
+  .metric-head .val{font-weight:700;color:var(--text)}
+  .metric-bar{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+  .metric-bar .fill{height:100%;border-radius:4px;transition:width .6s ease}
+  .fill.green{background:linear-gradient(90deg,#34d399,#10b981)}
+  .fill.yellow{background:linear-gradient(90deg,#fbbf24,#f59e0b)}
+  .fill.red{background:linear-gradient(90deg,#f87171,#ef4444)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:var(--bg2);color:var(--text2);font-weight:600;text-align:left;padding:10px 12px;border-bottom:2px solid var(--border);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+  tr:hover td{background:rgba(56,189,248,.05)}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap}
+  .tag.pass{background:rgba(52,211,153,.15);color:var(--success)}
+  .tag.warn{background:rgba(251,191,36,.15);color:var(--warn)}
+  .tag.fail{background:rgba(248,113,113,.15);color:var(--error)}
+  .tag.info{background:rgba(56,189,248,.15);color:var(--accent)}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:4px 12px;border-radius:20px}
+  .pill.ok{background:rgba(52,211,153,.12);color:var(--success)}
+  .pill.warn{background:rgba(251,191,36,.12);color:var(--warn)}
+  .pill.fail{background:rgba(248,113,113,.12);color:var(--error)}
+  .pill::before{content:'';width:8px;height:8px;border-radius:50%}
+  .pill.ok::before{background:var(--success)}
+  .pill.warn::before{background:var(--warn)}
+  .pill.fail::before{background:var(--error)}
+
+  .note{background:rgba(56,189,248,.06);border-left:3px solid var(--accent);padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:13px;color:var(--text2)}
+  .note.warn{background:rgba(251,191,36,.06);border-left-color:var(--warn)}
+  .note.error{background:rgba(248,113,113,.06);border-left-color:var(--error)}
+
+  code{font-family:var(--mono);background:var(--bg2);padding:1px 6px;border-radius:4px;font-size:12px;color:var(--accent)}
+
+  .heatmap{width:100%;border-collapse:separate;border-spacing:4px;margin:16px 0}
+  .heatmap th{background:transparent;color:var(--text2);font-size:11px;padding:4px;text-align:center;border:none}
+  .heatmap td{background:var(--bg2);border:1px solid var(--border);padding:6px;text-align:center;font-size:11px;border-radius:4px;min-width:50px}
+  .heatmap td.view-name{text-align:left;font-weight:600;color:var(--text2);min-width:140px}
+  .heatmap td.yes{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--success)}
+  .heatmap td.no{background:rgba(248,113,113,.06);border-color:rgba(248,113,113,.15);color:var(--text3)}
+
+  .gap{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)}
+  .gap:last-child{border-bottom:none}
+  .gap .id{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700;min-width:60px}
+  .gap .desc{font-size:13px;color:var(--text)}
+  .gap .desc .detail{display:block;color:var(--text2);font-size:12px;margin-top:2px}
+  .gap .sev{font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap}
+
+  .toc{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:32px}
+  .toc h3{margin:0 0 12px;color:var(--accent2);font-size:14px;text-transform:uppercase;letter-spacing:.5px}
+  .toc ol{padding-left:20px}
+  .toc li{margin-bottom:6px}
+  .toc a{color:var(--accent);text-decoration:none;font-size:14px}
+  .toc a:hover{text-decoration:underline}
+  .footer{text-align:center;color:var(--text3);font-size:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>WebGames 前端组件完整性与复用性审查报告</h1>
+<div class="subtitle">审查范围: <span>frontend/components</span> (4 文件) + 17 视图内联 UI 模式扫描 · 生成日期: 2026-09-29</div>
+
+<div class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">综合评分仪表盘</a></li>
+  <li><a href="#s2">现有 K-组件深度评估</a></li>
+  <li><a href="#s3">视图内联 UI 模式热力图</a></li>
+  <li><a href="#s4">10 大重复模式分析</a></li>
+  <li><a href="#s5">K-组件引用率分析</a></li>
+  <li><a href="#s6">缺口清单与优先级</a></li>
+  <li><a href="#s7">组件抽离路线图</a></li>
+</ol>
+</div>
+
+<!-- ============ 1. Score Dashboard ============ -->
+<h2 id="s1"><span class="num">1</span>综合评分仪表盘</h2>
+
+<div class="score-board" style="border-color:var(--warn)">
+  <div class="score-ring" style="background:conic-gradient(var(--warn) 0deg 252deg,var(--bg3) 252deg 360deg)">
+    <div class="score-val">
+      <div class="num" style="color:var(--warn)">58</div>
+      <div class="lbl">组件复用指数</div>
+    </div>
+  </div>
+  <div>
+    <h3 style="margin:0 0 8px">前端组件完整性与复用性评级 <span class="grade" style="background:var(--warn)">C+</span></h3>
+    <p style="color:var(--text2);font-size:14px;margin-bottom:12px">4 个 K-组件已建立但引用率极低，17 个视图中大量 UI 模式内联重复，缺少 8+ 类通用组件</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="badge green">KVirtualList 质量 8/10</span>
+      <span class="badge yellow">KButton 质量 7/10</span>
+      <span class="badge yellow">KItemSlot 质量 6/10</span>
+      <span class="badge red">KBadge 质量 5/10</span>
+      <span class="badge red">.tscn 引用率 0%</span>
+      <span class="badge red">.gd 引用率 47%</span>
+      <span class="badge red">缺失组件 8+ 类</span>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">组件层质量维度</div>
+    <div class="metric"><div class="metric-head"><span class="name">KButton (防连击+音效+loading)</span><span class="val">7/10</span></div><div class="metric-bar"><div class="fill yellow" style="width:70%"></div></div></div>
+    <div class="metric"><div class="metric-head"><span class="name">KBadge (红点自动同步)</span><span class="val">5/10</span></div><div class="metric-bar"><div class="fill red" style="width:50%"></div></div></div>
+    <div class="metric"><div class="metric-head"><span class="name">KItemSlot (品质色阶+Tooltip)</span><span class="val">6/10</span></div><div class="metric-bar"><div class="fill yellow" style="width:60%"></div></div></div>
+    <div class="metric"><div class="metric-head"><span class="name">KVirtualList (对象池+可视范围)</span><span class="val">8/10</span></div><div class="metric-bar"><div class="fill green" style="width:80%"></div></div></div>
+    <div class="metric"><div class="metric-head"><span class="name">平均质量</span><span class="val">6.5/10</span></div><div class="metric-bar"><div class="fill yellow" style="width:65%"></div></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">复用率维度</div>
+    <div class="metric"><div class="metric-head"><span class="name">.tscn 场景引用 K-组件</span><span class="val">0 / 17</span></div><div class="metric-bar"><div class="fill red" style="width:0%"></div></div></div>
+    <div class="metric"><div class="metric-head"><span class="name">.gd 代码引用 K-组件</span><span class="val">8 / 17</span></div><div class="metric-bar"><div class="fill yellow" style="width:47%"></div></div></div>
+    <div class="metric"><div class="metric-head"><span class="name">视图内联重复模式</span><span class="val">10 类</span></div><div class="metric-bar"><div class="fill red" style="width:100%"></div></div></div>
+    <div class="metric"><div class="metric-head"><span class="name">缺失通用组件</span><span class="val">8+ 类</span></div><div class="metric-bar"><div class="fill red" style="width:80%"></div></div></div>
+    <div class="metric"><div class="metric-head"><span class="name">主题/i18n 集成率</span><span class="val">25%</span></div><div class="metric-bar"><div class="fill red" style="width:25%"></div></div></div>
+  </div>
+</div>
+
+<!-- ============ 2. Existing K-Components ============ -->
+<h2 id="s2"><span class="num">2</span>现有 K-组件深度评估</h2>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">KButton — 防连击按钮 (87 行)</div>
+    <table>
+      <tbody>
+        <tr><td>继承</td><td><code>extends Button</code></td></tr>
+        <tr><td>信号</td><td><code>debounced_pressed()</code></td></tr>
+        <tr><td>样式变体</td><td>PRIMARY / SECONDARY / DANGER / FLAT</td></tr>
+        <tr><td>防连击</td><td><span class="tag pass">有</span> 0.3s 去重</td></tr>
+        <tr><td>音效</td><td><span class="tag pass">有</span> click + hover</td></tr>
+        <tr><td>Loading 状态</td><td><span class="tag pass">有</span> 文本+disabled 切换</td></tr>
+        <tr><td>ThemeManager</td><td><span class="tag fail">未接入</span> 直接用 DesignTokens</td></tr>
+        <tr><td>i18n</td><td><span class="tag warn">部分</span> 仅 loading 文本</td></tr>
+        <tr><td>Hover 视觉动画</td><td><span class="tag fail">无</span> 仅音效</td></tr>
+        <tr><td>四态样式 (normal/hover/pressed/disabled)</td><td><span class="tag fail">缺失</span> 仅 normal</td></tr>
+        <tr><td>信号断连</td><td><span class="tag warn">未处理</span> _exit_tree 无断连</td></tr>
+        <tr><td>复用性评分</td><td><strong>7/10</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">KBadge — 红点徽标 (72 行)</div>
+    <table>
+      <tbody>
+        <tr><td>继承</td><td><code>extends Control</code></td></tr>
+        <tr><td>配置</td><td>red_dot_path + show_count</td></tr>
+        <tr><td>自动同步</td><td><span class="tag pass">有</span> RedDotTreeManager 信号</td></tr>
+        <tr><td>99+ 上限</td><td><span class="tag pass">有</span></td></tr>
+        <tr><td>鼠标穿透</td><td><span class="tag pass">有</span> MOUSE_FILTER_IGNORE</td></tr>
+        <tr><td>ThemeManager</td><td><span class="tag fail">未接入</span> 硬编码红色</td></tr>
+        <tr><td>显示/隐藏动画</td><td><span class="tag fail">无</span> 直接 visible 切换</td></tr>
+        <tr><td>对外信号</td><td><span class="tag fail">无</span> count_changed 缺失</td></tr>
+        <tr><td>严重等级区分</td><td><span class="tag fail">无</span> 全部 ERROR 色</td></tr>
+        <tr><td>信号断连</td><td><span class="tag fail">严重</span> _exit_tree 未断开</td></tr>
+        <tr><td>复用性评分</td><td><strong>5/10</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">KItemSlot — 物品格子 (122 行)</div>
+    <table>
+      <tbody>
+        <tr><td>继承</td><td><code>extends Control</code></td></tr>
+        <tr><td>信号</td><td><code>slot_clicked</code> + <code>slot_right_clicked</code></td></tr>
+        <tr><td>品质色阶</td><td><span class="tag pass">有</span> 5 级 DesignTokens</td></tr>
+        <tr><td>Tooltip</td><td><span class="tag pass">有</span> TooltipManager 集成</td></tr>
+        <tr><td>数量显示</td><td><span class="tag pass">有</span> count>1 显示</td></tr>
+        <tr><td>ThemeManager</td><td><span class="tag fail">未接入</span></td></tr>
+        <tr><td>i18n</td><td><span class="tag fail">未接入</span> 纯字符串赋值</td></tr>
+        <tr><td>动画</td><td><span class="tag fail">无</span> 更新无淡入/缩放</td></tr>
+        <tr><td>disabled/empty/locked 状态</td><td><span class="tag fail">缺失</span></td></tr>
+        <tr><td>选中高亮</td><td><span class="tag fail">无</span></td></tr>
+        <tr><td>拖拽支持</td><td><span class="tag fail">无</span></td></tr>
+        <tr><td>caption setter null 风险</td><td><span class="tag warn">有</span> _ready 前调用可能 null</td></tr>
+        <tr><td>复用性评分</td><td><strong>6/10</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">KVirtualList — 虚拟滚动列表 (211 行)</div>
+    <table>
+      <tbody>
+        <tr><td>继承</td><td><code>extends ScrollContainer</code></td></tr>
+        <tr><td>信号</td><td><code>range_changed(start, end)</code></td></tr>
+        <tr><td>对象池</td><td><span class="tag pass">有</span> LIFO 栈 + POOL_HARD_CAP=128</td></tr>
+        <tr><td>可视范围算法</td><td><span class="tag pass">精确</span> floor/ceil/clamp + buffer</td></tr>
+        <tr><td>内存安全</td><td><span class="tag pass">优秀</span> PREDELETE 清理 + is_instance_valid</td></tr>
+        <tr><td>幂等设计</td><td><span class="tag pass">有</span> reset_state()</td></tr>
+        <tr><td>变量高度行</td><td><span class="tag fail">不支持</span> 固定 item_height</td></tr>
+        <tr><td>行内交互</td><td><span class="tag fail">无</span> 仅被动容器</td></tr>
+        <tr><td>加载/空/错误状态</td><td><span class="tag fail">缺失</span></td></tr>
+        <tr><td>平滑滚动</td><td><span class="tag fail">无</span></td></tr>
+        <tr><td>复用性评分</td><td><strong>8/10</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============ 3. Heatmap ============ -->
+<h2 id="s3"><span class="num">3</span>视图内联 UI 模式热力图</h2>
+
+<div class="card">
+  <div class="card-title">17 视图 × 8 UI 控件交叉矩阵 (从 .tscn 场景扫描)</div>
+  <table class="heatmap">
+    <thead>
+      <tr>
+        <th>视图</th>
+        <th>Header</th>
+        <th>Back</th>
+        <th>TabContainer</th>
+        <th>Search/LineEdit</th>
+        <th>ProgressBar</th>
+        <th>ItemList</th>
+        <th>RichTextLabel</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="view-name">account_entry</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">character_progression</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">combat</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td></tr>
+      <tr><td class="view-name">crafting_workshop</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">economy_trade</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">gacha_wish</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">grimoire_authoring</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">guild_social</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td></tr>
+      <tr><td class="view-name">mail_system</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td></tr>
+      <tr><td class="view-name">main_hud</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td></tr>
+      <tr><td class="view-name">misc_edge</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">monster_ecology</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">notification_bulletin</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td></tr>
+      <tr><td class="view-name">quest_causality</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td class="view-name">settings_center</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td class="view-name">system_save</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td></tr>
+      <tr><td class="view-name">world_map</td><td class="no">—</td><td class="no">—</td><td class="yes">Y</td><td class="no">—</td><td class="yes">Y</td><td class="yes">Y</td><td class="no">—</td></tr>
+      <tr><td style="background:var(--bg3);font-weight:700;text-align:right">合计</td><td style="background:var(--bg3);font-weight:700;color:var(--success)">9</td><td style="background:var(--bg3);font-weight:700;color:var(--success)">11</td><td style="background:var(--bg3);font-weight:700;color:var(--success)">13</td><td style="background:var(--bg3);font-weight:700;color:var(--success)">12</td><td style="background:var(--bg3);font-weight:700;color:var(--success)">9</td><td style="background:var(--bg3);font-weight:700;color:var(--success)">15</td><td style="background:var(--bg3);font-weight:700;color:var(--success)">5</td></tr>
+    </tbody>
+  </table>
+  <div class="note error"><strong>关键发现</strong>：17 个 .tscn 场景文件中 <strong>零个</strong>引用了 K-组件（KButton/KBadge/KItemSlot/KVirtualList）。所有视图使用原生 Godot 控件（Button/Label/ItemList/ProgressBar），K-组件仅在 .gd 代码中通过 preload 部分引用。</div>
+</div>
+
+<!-- ============ 4. Duplicate Patterns ============ -->
+<h2 id="s4"><span class="num">4</span>10 大重复模式分析</h2>
+
+<div class="card">
+  <div class="card-title">重复 UI 模式汇总 (按优先级排序)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>模式</th>
+        <th>涉及视图数</th>
+        <th>重复程度</th>
+        <th>建议组件名</th>
+        <th>预估减少行数</th>
+        <th>优先级</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>返回按钮 (BtnBack + _on_back_pressed)</td>
+        <td>15</td>
+        <td><span class="tag fail">高</span></td>
+        <td><code>KBackButton</code> 或 BaseScreen 方法</td>
+        <td>60-90</td>
+        <td><span class="tag fail">P0</span></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Tab 初始化 (TabContainer + _init_xxx_tab)</td>
+        <td>11</td>
+        <td><span class="tag fail">高</span></td>
+        <td><code>KTabBar</code> 或 BaseTabScreen 基类</td>
+        <td>200-400</td>
+        <td><span class="tag fail">P0</span></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>标题栏 (HeaderPanel + TitleLabel + BtnBack)</td>
+        <td>9</td>
+        <td><span class="tag fail">高</span></td>
+        <td><code>KPageHeader</code></td>
+        <td>45-90</td>
+        <td><span class="tag fail">P0</span></td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>列表+详情分栏 (ItemList + 右侧面板)</td>
+        <td>12</td>
+        <td><span class="tag fail">高</span></td>
+        <td><code>KSplitPanel</code></td>
+        <td>180-360</td>
+        <td><span class="tag warn">P1</span></td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>进度条 (ProgressBar + 数值标签)</td>
+        <td>9</td>
+        <td><span class="tag fail">高</span></td>
+        <td><code>KStatusBar</code></td>
+        <td>45-135</td>
+        <td><span class="tag warn">P1</span></td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>搜索栏 (LineEdit + 过滤回调)</td>
+        <td>5</td>
+        <td><span class="tag warn">中</span></td>
+        <td><code>KSearchBar</code></td>
+        <td>40-75</td>
+        <td><span class="tag warn">P1</span></td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>空状态/加载/面板显隐</td>
+        <td>6</td>
+        <td><span class="tag warn">中</span></td>
+        <td><code>KStatePanel</code></td>
+        <td>30-60</td>
+        <td><span class="tag info">P2</span></td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>稀有度标签 (颜色+文字)</td>
+        <td>4</td>
+        <td><span class="tag warn">中</span></td>
+        <td><code>KRarityTag</code></td>
+        <td>25-50</td>
+        <td><span class="tag info">P2</span></td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>货币显示 (金/银/铜 + 图标)</td>
+        <td>4</td>
+        <td><span class="tag warn">中</span></td>
+        <td><code>KCurrencyBar</code></td>
+        <td>20-40</td>
+        <td><span class="tag info">P2</span></td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>分页器 (页码+翻页)</td>
+        <td>1</td>
+        <td><span class="tag pass">低</span></td>
+        <td><code>KPagination</code></td>
+        <td>15-25</td>
+        <td><span class="tag pass">P3</span></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr style="background:var(--bg2);font-weight:700">
+        <td colspan="4">合计</td>
+        <td>7 个新组件 + 1 个基类</td>
+        <td>660-925 行</td>
+        <td>—</td>
+      </tr>
+    </tfoot>
+  </table>
+  <div class="note">抽离 7 个新组件 + 1 个 BaseTabScreen 基类后，预计可减少 <strong>660-925 行</strong>重复代码，同时将 17 个视图的平均行数从 660 行降至约 550 行。</div>
+</div>
+
+<!-- ============ 5. K-Component Reference Analysis ============ -->
+<h2 id="s5"><span class="num">5</span>K-组件引用率分析</h2>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">.tscn 场景引用 (0/17 = 0%)</div>
+    <table>
+      <thead><tr><th>组件</th><th>.tscn 引用</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>KButton</td><td>0/17</td><td><span class="pill fail">未引用</span></td></tr>
+        <tr><td>KBadge</td><td>0/17</td><td><span class="pill fail">未引用</span></td></tr>
+        <tr><td>KItemSlot</td><td>0/17</td><td><span class="pill fail">未引用</span></td></tr>
+        <tr><td>KVirtualList</td><td>0/17</td><td><span class="pill fail">未引用</span></td></tr>
+      </tbody>
+    </table>
+    <div class="note error">所有 .tscn 场景文件使用原生 Godot 控件，未通过场景编辑器接入任何 K-组件。</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">.gd 代码引用 (8/17 = 47%)</div>
+    <table>
+      <thead><tr><th>组件</th><th>引用视图</th><th>引用方式</th></tr></thead>
+      <tbody>
+        <tr><td>KButton</td><td>7 视图</td><td>preload + .new()</td></tr>
+        <tr><td>KBadge</td><td>2 视图</td><td>preload + .new()</td></tr>
+        <tr><td>KItemSlot</td><td>1 视图</td><td>preload + .new()</td></tr>
+        <tr><td>KVirtualList</td><td>0 视图</td><td><span class="pill fail">完全未引用</span></td></tr>
+      </tbody>
+    </table>
+    <div class="note warn">KButton 在 7 个视图中通过代码 preload 使用，但 .tscn 中仍用原生 Button。KVirtualList 完全未被任何视图引用，为"僵尸组件"。</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">K-组件引用详情</div>
+  <table>
+    <thead><tr><th>视图</th><th>KButton</th><th>KBadge</th><th>KItemSlot</th><th>KVirtualList</th><th>引用数</th></tr></thead>
+    <tbody>
+      <tr><td>character_progression</td><td><span class="tag pass">Y</span></td><td>—</td><td><span class="tag pass">Y</span></td><td>—</td><td>2</td></tr>
+      <tr><td>crafting_workshop</td><td><span class="tag pass">Y</span></td><td>—</td><td>—</td><td>—</td><td>1</td></tr>
+      <tr><td>economy_trade</td><td>—</td><td>—</td><td>—</td><td>—</td><td>0</td></tr>
+      <tr><td>gacha_wish</td><td><span class="tag pass">Y</span></td><td>—</td><td>—</td><td>—</td><td>1</td></tr>
+      <tr><td>guild_social</td><td><span class="tag pass">Y</span></td><td>—</td><td>—</td><td>—</td><td>1</td></tr>
+      <tr><td>guild_social_tabs</td><td><span class="tag pass">Y</span></td><td>—</td><td>—</td><td>—</td><td>1</td></tr>
+      <tr><td>main_hud</td><td>—</td><td><span class="tag pass">Y</span></td><td>—</td><td>—</td><td>1</td></tr>
+      <tr><td>monster_ecology</td><td><span class="tag pass">Y</span></td><td>—</td><td>—</td><td>—</td><td>1</td></tr>
+      <tr><td>notification_bulletin</td><td>—</td><td><span class="tag pass">Y</span></td><td>—</td><td>—</td><td>1</td></tr>
+      <tr><td>world_map</td><td><span class="tag pass">Y</span></td><td>—</td><td>—</td><td>—</td><td>1</td></tr>
+      <tr><td>其余 7 视图</td><td>—</td><td>—</td><td>—</td><td>—</td><td>0</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============ 6. Gap List ============ -->
+<h2 id="s6"><span class="num">6</span>缺口清单与优先级</h2>
+
+<div class="card">
+  <div class="card-title">P0 — 高复用性组件 (立即创建)</div>
+  <div class="gap"><span class="id">C-01</span><span class="desc"><strong>KBackButton</strong> — 统一返回按钮<div class="detail">15 个视图重复实现 _on_back_pressed + ViewRouter.pop_view()。抽离为 KBackButton 或 BaseScreen.back() 方法，支持默认 SLIDE_RIGHT 转场</div></span><span class="sev" style="background:rgba(248,113,113,.15);color:var(--error)">P0</span></div>
+  <div class="gap"><span class="id">C-02</span><span class="desc"><strong>KPageHeader</strong> — 统一页面标题栏<div class="detail">9 个视图重复 HeaderPanel + TitleLabel + BtnBack 布局。抽离为 KPageHeader，支持 title/icon/back_visible 配置 + i18n 自动绑定</div></span><span class="sev" style="background:rgba(248,113,113,.15);color:var(--error)">P0</span></div>
+  <div class="gap"><span class="id">C-03</span><span class="desc"><strong>KTabBar / BaseTabScreen</strong> — 统一 Tab 初始化<div class="detail">11 个视图重复 TabContainer + _init_xxx_tab + _init_tab_titles 模式。抽离为 KTabBar 组件或 BaseTabScreen 基类，支持 i18n 标题 + 动态 Tab 注册</div></span><span class="sev" style="background:rgba(248,113,113,.15);color:var(--error)">P0</span></div>
+</div>
+
+<div class="card">
+  <div class="card-title">P1 — 高频复用组件</div>
+  <div class="gap"><span class="id">C-04</span><span class="desc"><strong>KSplitPanel</strong> — 列表+详情分栏容器<div class="detail">12 个视图重复 ItemList + 右侧详情面板布局 + _on_item_selected 回调。抽离为 KSplitPanel，支持 left/right 比例配置 + 选中回调</div></span><span class="sev" style="background:rgba(251,191,36,.15);color:var(--warn)">P1</span></div>
+  <div class="gap"><span class="id">C-05</span><span class="desc"><strong>KStatusBar</strong> — 进度条+数值标签<div class="detail">9 个视图重复 ProgressBar + Label 刷新逻辑。抽离为 KStatusBar，支持 set_progress(value, max) + 格式化标签 + 主题色</div></span><span class="sev" style="background:rgba(251,191,36,.15);color:var(--warn)">P1</span></div>
+  <div class="gap"><span class="id">C-06</span><span class="desc"><strong>KSearchBar</strong> — 搜索输入栏<div class="detail">5 个视图重复 LineEdit + placeholder + text_changed + strip_edges/to_lower 过滤。抽离为 KSearchBar，支持防抖 + i18n placeholder + 过滤回调</div></span><span class="sev" style="background:rgba(251,191,36,.15);color:var(--warn)">P1</span></div>
+</div>
+
+<div class="card">
+  <div class="card-title">P2 — 中频复用组件</div>
+  <div class="gap"><span class="id">C-07</span><span class="desc"><strong>KStatePanel</strong> — 空状态/加载/错误面板<div class="detail">6 个视图重复 visible 切换面板逻辑。抽离为 KStatePanel，统一 empty/loading/error/ready 四态</div></span><span class="sev" style="background:rgba(56,189,248,.15);color:var(--accent)">P2</span></div>
+  <div class="gap"><span class="id">C-08</span><span class="desc"><strong>KRarityTag</strong> — 稀有度标签<div class="detail">4 个视图重复 _rarity_color + _rarity_to_name 逻辑。抽离为 KRarityTag，统一颜色+文字+边框，接入 ThemeManager</div></span><span class="sev" style="background:rgba(56,189,248,.15);color:var(--accent)">P2</span></div>
+  <div class="gap"><span class="id">C-09</span><span class="desc"><strong>KCurrencyBar</strong> — 货币显示条<div class="detail">4 个视图重复金/银/铜/水晶 Label 刷新。抽离为 KCurrencyBar，支持多货币图标+数值+格式化</div></span><span class="sev" style="background:rgba(56,189,248,.15);color:var(--accent)">P2</span></div>
+</div>
+
+<div class="card">
+  <div class="card-title">P3 — 低频/改进型组件</div>
+  <div class="gap"><span class="id">C-10</span><span class="desc"><strong>KPagination</strong> — 分页器<div class="detail">仅 main_hud 使用，优先级低</div></span><span class="sev" style="background:rgba(100,116,139,.15);color:var(--text3)">P3</span></div>
+  <div class="gap"><span class="id">C-11</span><span class="desc"><strong>现有组件改进</strong> — KButton/KBadge/KItemSlot<div class="detail">KBadge 需修复信号断连 + 接入 ThemeManager；KButton 需补全 hover/pressed 四态 + ThemeManager；KItemSlot 需接入 i18n + 选中/disabled 状态</div></span><span class="sev" style="background:rgba(100,116,139,.15);color:var(--text3)">P3</span></div>
+  <div class="gap"><span class="id">C-12</span><span class="desc"><strong>KVirtualList 激活</strong> — 僵尸组件复活<div class="detail">KVirtualList 质量最高(8/10)但 0 视图引用。应将其接入 ItemList 密集的视图（15 个视图使用 ItemList），替代原生 ItemList</div></span><span class="sev" style="background:rgba(100,116,139,.15);color:var(--text3)">P3</span></div>
+</div>
+
+<!-- ============ 7. Roadmap ============ -->
+<h2 id="s7"><span class="num">7</span>组件抽离路线图</h2>
+
+<div class="grid grid-4">
+  <div class="card" style="border-top:3px solid var(--error)">
+    <div class="card-title" style="color:var(--error)">Phase 1: P0 组件</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">预计 2-3 天</p>
+    <ul style="font-size:13px;padding-left:16px;line-height:2">
+      <li><strong>C-01</strong> KBackButton 组件</li>
+      <li><strong>C-02</strong> KPageHeader 组件</li>
+      <li><strong>C-03</strong> KTabBar / BaseTabScreen 基类</li>
+      <li>迁移 15 个视图的返回按钮</li>
+      <li>迁移 9 个视图的标题栏</li>
+      <li>迁移 11 个视图的 Tab 初始化</li>
+    </ul>
+    <p style="font-size:12px;color:var(--success);margin-top:8px">预估减少 305-580 行</p>
+  </div>
+  <div class="card" style="border-top:3px solid var(--warn)">
+    <div class="card-title" style="color:var(--warn)">Phase 2: P1 组件</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">预计 3-4 天</p>
+    <ul style="font-size:13px;padding-left:16px;line-height:2">
+      <li><strong>C-04</strong> KSplitPanel 组件</li>
+      <li><strong>C-05</strong> KStatusBar 组件</li>
+      <li><strong>C-06</strong> KSearchBar 组件</li>
+      <li>迁移 12 个视图的分栏布局</li>
+      <li>迁移 9 个视图的进度条</li>
+      <li>迁移 5 个视图的搜索栏</li>
+    </ul>
+    <p style="font-size:12px;color:var(--success);margin-top:8px">预估减少 265-570 行</p>
+  </div>
+  <div class="card" style="border-top:3px solid var(--accent)">
+    <div class="card-title" style="color:var(--accent)">Phase 3: P2 组件</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">预计 2-3 天</p>
+    <ul style="font-size:13px;padding-left:16px;line-height:2">
+      <li><strong>C-07</strong> KStatePanel 组件</li>
+      <li><strong>C-08</strong> KRarityTag 组件</li>
+      <li><strong>C-09</strong> KCurrencyBar 组件</li>
+      <li>迁移 6 个视图的状态面板</li>
+      <li>迁移 4 个视图的稀有度标签</li>
+      <li>迁移 4 个视图的货币显示</li>
+    </ul>
+    <p style="font-size:12px;color:var(--success);margin-top:8px">预估减少 75-150 行</p>
+  </div>
+  <div class="card" style="border-top:3px solid var(--text3)">
+    <div class="card-title" style="color:var(--text3)">Phase 4: 改进+激活</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">持续</p>
+    <ul style="font-size:13px;padding-left:16px;line-height:2">
+      <li><strong>C-10</strong> KPagination (按需)</li>
+      <li><strong>C-11</strong> KButton 四态+ThemeManager</li>
+      <li><strong>C-11</strong> KBadge 信号断连修复</li>
+      <li><strong>C-11</strong> KItemSlot i18n+状态</li>
+      <li><strong>C-12</strong> KVirtualList 激活接入</li>
+      <li>.tscn 场景文件替换原生控件</li>
+    </ul>
+    <p style="font-size:12px;color:var(--text3);margin-top:8px">质量提升为主</p>
+  </div>
+</div>
+
+<div class="card" style="border:1px solid var(--accent)">
+  <div class="card-title">审查总结</div>
+  <p style="font-size:14px;line-height:1.8">WebGames 前端组件层存在 <strong style="color:var(--warn)">"有组件但不用"</strong> 的核心问题：4 个 K-组件已实现，但 .tscn 场景引用率 <strong style="color:var(--error)">0%</strong>，.gd 代码引用率仅 <strong style="color:var(--warn)">47%</strong>（KVirtualList 完全未引用）。同时 17 个视图中存在 <strong style="color:var(--warn)">10 类</strong>重复 UI 模式，合计 <strong style="color:var(--warn)">660-925 行</strong>可消除的重复代码。</p>
+  <p style="font-size:14px;line-height:1.8;margin-top:12px">现有 4 个组件平均质量 <strong>6.5/10</strong>，主要缺陷为：KBadge 信号断连不安全（内存泄漏风险）、KButton 缺少 hover/pressed 四态、KItemSlot 未接入 i18n、全部组件未接入 ThemeManager。KVirtualList 质量最高(8/10)但沦为僵尸组件。</p>
+  <p style="font-size:14px;line-height:1.8;margin-top:12px">建议按 Phase 1-4 路线图执行：先创建 3 个 P0 组件（KBackButton/KPageHeader/KTabBar）消除最高频重复，再创建 3 个 P1 组件（KSplitPanel/KStatusBar/KSearchBar），最后改进现有组件并激活 KVirtualList。完成后组件复用指数预计可从 <strong style="color:var(--warn)">58</strong> 提升至 <strong style="color:var(--success)">85+</strong>。</p>
+</div>
+
+<div class="footer">
+  WebGames Frontend Component Audit · Generated by TRAE · 2026-09-29
+</div>
+
+</div>
+</body>
+</html>
