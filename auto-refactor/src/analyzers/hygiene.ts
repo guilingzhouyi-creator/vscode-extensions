@@ -25,6 +25,7 @@ import { isVocabularyEnumeration } from '../core/governance/markerScope';
 import { auditVacuousWrappers } from '../core/rules/evolution/wrapperRule';
 import { auditRegexSafety, isRegexSafe } from '../utils/safe-regex';
 import { nativeCore } from '../core/native';
+import { auditPythonHygiene } from './hygiene-python-helper';
 
 interface HygieneOptions {
     checkDeadCode?: boolean;
@@ -100,96 +101,6 @@ function buildJargonRe(patterns?: string[]): RegExp {
     }
 }
 
-/**
- * Python naming-guard constants.
- * `PY_BUILTIN_NAMES` is the commonly shadowed slice of `dir(builtins)`; `PY_PROTOCOL_FIELDS`
- * holds the protocol-style parameter names exempted from shadow reporting.
- */
-const PY_BUILTIN_NAMES = new Set([
-    'abs',
-    'aiter',
-    'all',
-    'anext',
-    'any',
-    'ascii',
-    'bin',
-    'bool',
-    'breakpoint',
-    'bytearray',
-    'bytes',
-    'callable',
-    'chr',
-    'classmethod',
-    'compile',
-    'complex',
-    'delattr',
-    'dict',
-    'dir',
-    'divmod',
-    'enumerate',
-    'eval',
-    'exec',
-    'filter',
-    'float',
-    'format',
-    'frozenset',
-    'getattr',
-    'globals',
-    'hasattr',
-    'hash',
-    'help',
-    'hex',
-    'id',
-    'input',
-    'int',
-    'isinstance',
-    'issubclass',
-    'iter',
-    'len',
-    'list',
-    'locals',
-    'map',
-    'max',
-    'memoryview',
-    'min',
-    'next',
-    'object',
-    'oct',
-    'open',
-    'ord',
-    'pow',
-    'print',
-    'property',
-    'range',
-    'repr',
-    'reversed',
-    'round',
-    'set',
-    'setattr',
-    'slice',
-    'sorted',
-    'staticmethod',
-    'str',
-    'sum',
-    'super',
-    'tuple',
-    'type',
-    'vars',
-    'zip',
-]);
-const PY_PROTOCOL_FIELDS = new Set(['id', 'type', 'help', 'format', 'input', 'next']);
-const PY_SHORT_ALLOWED = new Set(['i', 'j', 'k', '_']);
-const PY_EXCEPT_NAME = 'exc';
-const PY_ASSIGN_RE = /^([A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=)/;
-const PY_FOR_RE = /^for\s+([A-Za-z_]\w*)\s+in\b/;
-const PY_EXCEPT_AS_RE = /^except\b[^:]*\bas\s+([A-Za-z_]\w*)\s*:/;
-const PY_CLASS_RE = /^class\s+[A-Za-z_]\w*/;
-const PY_DEF_LINE_RE = /^(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(([^)]*)\)/;
-const PY_WITH_AS_RE = /\bas\s+([A-Za-z_]\w*)\s*(?:,|:)/g;
-
-/** Python binding kind for assignment/loop/with targets, as opposed to parameters. */
-const PY_BINDING_ASSIGNMENT = 'assignment';
-
 /** Fast 32-bit integer line hasher to eliminate string concatenations during clone detection */
 function hashString32(str: string): number {
     let h = FNV1A_32_OFFSET_BASIS;
@@ -261,6 +172,21 @@ export class HygieneAnalyzer implements Analyzer {
         const len = content.length;
         const file = ctx.filePath.replace(/\\/g, '/');
 
+        const trimmed = content.trim();
+        if (len === 0 || trimmed.length === 0) {
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    0,
+                    'HYG-EMP-001',
+                    `Source file '${file}' is empty (0 bytes or whitespace only) and contains no valid executable code.`,
+                    'error',
+                    { file, length: len },
+                ),
+            );
+            return issues;
+        }
+
         if (checkNaming) {
             this.auditFileNaming(file, ctx, issues);
             if (file.endsWith('.py')) this.auditPythonNaming(content, file, ctx, issues);
@@ -315,198 +241,7 @@ export class HygieneAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        const lines = content.split('\n');
-        const blocks: Array<{ indent: number; kind: 'class' | 'def' }> = [];
-        let inTriple: '"' | "'" | null = null;
-        let bracketDepth = 0;
-
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i];
-            if (line.endsWith('\r')) line = line.slice(0, -1);
-            const trimmed = line.trim();
-
-            const docResult = this.updateDocstringState(line, trimmed, inTriple);
-            inTriple = docResult.inTriple;
-            if (docResult.skip || trimmed === '' || trimmed.startsWith('#')) continue;
-
-            const depthAtStart = bracketDepth;
-            const codeOnly = trimmed.split('#')[0];
-            bracketDepth += this.bracketDelta(codeOnly);
-
-            const indent = line.length - line.trimStart().length;
-            const inClassBody = this.updateBlockNesting(indent, blocks);
-
-            // Inside an open call/collection every `name=` is a keyword argument, not a binding.
-            if (depthAtStart > 0) continue;
-
-            this.auditPythonLineBindings(trimmed, i, inClassBody, file, ctx, issues);
-
-            if (PY_CLASS_RE.test(trimmed)) blocks.push({ indent, kind: 'class' });
-            else if (PY_DEF_LINE_RE.test(trimmed)) blocks.push({ indent, kind: 'def' });
-        }
-    }
-
-    private updateDocstringState(
-        line: string,
-        trimmed: string,
-        inTriple: '"' | "'" | null,
-    ): { inTriple: '"' | "'" | null; skip: boolean } {
-        if (inTriple) {
-            const closers =
-                inTriple === '"' ? line.split('"""').length - 1 : line.split("'''").length - 1;
-            return { inTriple: closers > 0 ? null : inTriple, skip: true };
-        }
-        if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
-            const marker = trimmed.startsWith('"""') ? '"""' : "'''";
-            const nextTriple =
-                trimmed.split(marker).length - 1 < 2 ? (marker === '"""' ? '"' : "'") : null;
-            return { inTriple: nextTriple, skip: true };
-        }
-        return { inTriple: null, skip: false };
-    }
-
-    private updateBlockNesting(
-        indent: number,
-        blocks: Array<{ indent: number; kind: 'class' | 'def' }>,
-    ): boolean {
-        while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) blocks.pop();
-        return blocks.length > 0 && blocks[blocks.length - 1].kind === 'class';
-    }
-
-    private checkPythonName(
-        lineIdx: number,
-        name: string,
-        kind: typeof PY_BINDING_ASSIGNMENT | 'parameter',
-        inClassBody: boolean,
-        file: string,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        if (name === 'self' || name === 'cls') return;
-        const builtinExempt = inClassBody || (kind === 'parameter' && PY_PROTOCOL_FIELDS.has(name));
-        if (!builtinExempt && PY_BUILTIN_NAMES.has(name)) {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    'HYG-BLT-001',
-                    `Name '${name}' shadows a Python builtin`,
-                    SEVERITY_WARNING,
-                    { file, name, kind },
-                    'Rename the binding (e.g. add a domain qualifier); shadowing builtins hides the standard meaning.',
-                ),
-            );
-        }
-        if (name.length === 1 && !PY_SHORT_ALLOWED.has(name)) {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    'HYG-SGL-001',
-                    `Single-letter name '${name}' hurts readability`,
-                    SEVERITY_WARNING,
-                    { file, name, kind },
-                    "Use a descriptive name; only 'i'/'j'/'k' and '_' are tolerated as throwaways.",
-                ),
-            );
-        }
-    }
-
-    private auditPythonLineBindings(
-        trimmed: string,
-        lineIdx: number,
-        inClassBody: boolean,
-        file: string,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        const exceptMatch = PY_EXCEPT_AS_RE.exec(trimmed);
-        if (exceptMatch && exceptMatch[1] !== PY_EXCEPT_NAME) {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    'HYG-EXC-001',
-                    `Exception variable '${exceptMatch[1]}' should be named '${PY_EXCEPT_NAME}'`,
-                    SEVERITY_WARNING,
-                    { file, name: exceptMatch[1] },
-                    `Rename the handler binding to '${PY_EXCEPT_NAME}' so error-handling code reads uniformly.`,
-                ),
-            );
-        }
-
-        const defMatch = PY_DEF_LINE_RE.exec(trimmed);
-        if (defMatch) {
-            this.auditPythonDefParameters(defMatch[1], lineIdx, file, ctx, issues);
-        }
-
-        const assignMatch = PY_ASSIGN_RE.exec(trimmed);
-        if (assignMatch) {
-            this.checkPythonName(
-                lineIdx,
-                assignMatch[1],
-                PY_BINDING_ASSIGNMENT,
-                inClassBody,
-                file,
-                ctx,
-                issues,
-            );
-        }
-
-        const forMatch = PY_FOR_RE.exec(trimmed);
-        if (forMatch) {
-            this.checkPythonName(
-                lineIdx,
-                forMatch[1],
-                PY_BINDING_ASSIGNMENT,
-                inClassBody,
-                file,
-                ctx,
-                issues,
-            );
-        }
-
-        if (/^(?:async\s+)?with\b/.test(trimmed)) {
-            this.auditPythonWithBindings(trimmed, lineIdx, inClassBody, file, ctx, issues);
-        }
-    }
-
-    private auditPythonDefParameters(
-        rawArgsList: string,
-        lineIdx: number,
-        file: string,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        for (const rawArg of rawArgsList.split(',')) {
-            const cleaned = rawArg.trim().replace(/^\*{0,2}/, '');
-            const name = cleaned.split(/[:=]/)[0].trim();
-            if (!name || name === '/') continue;
-            this.checkPythonName(lineIdx, name, 'parameter', false, file, ctx, issues);
-        }
-    }
-
-    private auditPythonWithBindings(
-        trimmed: string,
-        lineIdx: number,
-        inClassBody: boolean,
-        file: string,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        PY_WITH_AS_RE.lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = PY_WITH_AS_RE.exec(trimmed)) !== null) {
-            this.checkPythonName(
-                lineIdx,
-                match[1],
-                PY_BINDING_ASSIGNMENT,
-                inClassBody,
-                file,
-                ctx,
-                issues,
-            );
-        }
+        auditPythonHygiene(content, file, ctx, this.mkIssue.bind(this), issues);
     }
 
     /**
