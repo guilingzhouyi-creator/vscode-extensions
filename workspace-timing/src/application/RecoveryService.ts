@@ -33,9 +33,6 @@ import { migrateToFolded } from '../domain/HistoryFolder';
 import { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/Logger';
 
-/** journal 片段分组断点阈值：相邻片段起始间隔超过该值视为中断（如系统休眠） */
-const JOURNAL_RUN_GAP_MS = MS_PER_MINUTE;
-
 /** 主数据源端口（StorageCoordinator 天然满足：load=主存+文件兜底并报告来源，save=级联落盘） */
 export interface IRecoveryStore {
   load(): Promise<{ data: WorkspaceTimingData | null; source: string }>;
@@ -133,7 +130,7 @@ export class RecoveryService {
     for (const s of slices) {
       const start = s.timestamp - s.deltaMs;
       const last = runs[runs.length - 1];
-      if (last && start <= last.endMs + JOURNAL_RUN_GAP_MS) {
+      if (last && start <= last.endMs + MS_PER_MINUTE) {
         last.endMs = Math.max(last.endMs, s.timestamp);
       } else {
         runs.push({ startMs: start, endMs: s.timestamp });

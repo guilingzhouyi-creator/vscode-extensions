@@ -105,6 +105,26 @@ export interface LayerRules {
   matchingSemantics?: string;
 }
 
+export interface ScalingConstants {
+  baseOmnibus: number;
+  alpha: number;
+  scaleInflectionK: number;
+  capMax: number;
+  baseFragment: number;
+  floorMin: number;
+  maxNamingDepth: number;
+  maxWordsInName: number;
+  minStructuralPurity: number;
+}
+
+export interface ResourceTopologyConfig {
+  enabled?: boolean;
+  asyncPass?: boolean;
+  languageMultipliers?: Record<string, number>;
+  scalingConstants?: ScalingConstants;
+  exemptions?: string[];
+}
+
 export interface ReviewRules {
   schema?: string;
   version?: number;
@@ -114,6 +134,7 @@ export interface ReviewRules {
   layers?: LayerRules;
   hardcode?: HardcodeRules;
   perfPatterns?: PerfRules;
+  resourceTopology?: ResourceTopologyConfig;
 }
 
 /** 适配层豁免条目：downgradeTo 降级留痕 / 无 downgradeTo 完全豁免进 suppressed 列表 */

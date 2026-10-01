@@ -12,7 +12,7 @@ import {
     DAYS_PER_WEEK,
     DEFAULT_HEATMAP_WEEKS,
     DEFAULT_TREND_WEEKS,
-} from './chartConstants';
+} from './constants-chart';
 
 /** 按日聚合统计 */
 export interface DailyStats {

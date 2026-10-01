@@ -1,8 +1,8 @@
 {
   "schema": "wt-review-rules/v1",
   "name": "workspace-timing 自动化审查规则注册表（唯一事实源）",
-  "version": 7,
-  "description": "L0语法构建 / L1代码质量(由tsc+eslint承载) / L2结构 / L3工程治理 / L4性能 / L5重构审查。规则ID命名空间：LAY-结构 HC-硬编码 SCR-脚本规范 RCFG-审查配置 PERF-性能 TB-测试预算 ARF-auto-refactor 映射",
+  "version": 8,
+  "description": "L0语法构建 / L1代码质量(由tsc+eslint承载) / L2结构 / L3工程治理与资源拓扑 / L4性能 / L5重构审查。规则ID命名空间：LAY-结构 HC-硬编码 SCR-脚本规范 RCFG-审查配置 RES-资源拓扑 PERF-性能 TB-测试预算 ARF-auto-refactor 映射",
   "gate": {
     "blockOnSeverity": "error",
     "strict": "ALL 非 PASS 状态（含 SKIP/NOT_AVAILABLE）一律阻断，供 CI 使用",
@@ -122,6 +122,23 @@
         "RCFG-RULE-DRIFT",
         "RCFG-GLOBS",
         "RCFG-TOOL-PATH"
+      ]
+    },
+    {
+      "id": "L3-RESOURCE-TOPO",
+      "layer": "L3",
+      "title": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀",
+      "checker": "audit/resource-topology.ts",
+      "stage": 1,
+      "enabled": true,
+      "timeoutMs": 60000,
+      "origin": "native",
+      "ruleIds": [
+        "RES-TOPO-OVER-GENERIC",
+        "RES-TOPO-OVER-SPECIALIZED",
+        "RES-TOPO-NAMING-DEPTH",
+        "RES-TOPO-OVER-DESCRIPTIVE",
+        "RES-TOPO-RESP-MISMATCH"
       ]
     },
     {
@@ -310,5 +327,31 @@
       "sk-[A-Za-z0-9]{20,}",
       "AKIA[0-9A-Z]{16}"
     ]
+  },
+  "resourceTopology": {
+    "enabled": true,
+    "asyncPass": true,
+    "languageMultipliers": {
+      "cpp": 2.5,
+      "c": 2.5,
+      "rust": 2.0,
+      "go": 1.6,
+      "typescript": 1.0,
+      "javascript": 1.0,
+      "gdscript": 0.9,
+      "python": 0.85
+    },
+    "scalingConstants": {
+      "baseOmnibus": 350,
+      "alpha": 0.85,
+      "scaleInflectionK": 5000,
+      "capMax": 2000,
+      "baseFragment": 25,
+      "floorMin": 20,
+      "maxNamingDepth": 3,
+      "maxWordsInName": 4,
+      "minStructuralPurity": 0.85
+    },
+    "exemptions": []
   }
 }

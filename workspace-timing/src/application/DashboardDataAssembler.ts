@@ -20,7 +20,7 @@ import {
 } from '../domain/models';
 import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
 import { DashboardData, WeeklyTrendEntry } from '../domain/dashboard-types';
-import { DEFAULT_HEATMAP_WEEKS, DEFAULT_TREND_WEEKS } from '../domain/chartConstants';
+import { DEFAULT_HEATMAP_WEEKS, DEFAULT_TREND_WEEKS } from '../domain/constants-chart';
 import { GlobalSnapshot } from './GlobalAggregator';
 
 /** 组装面板 DTO 所需的最小快照（由 Orchestrator 采集） */

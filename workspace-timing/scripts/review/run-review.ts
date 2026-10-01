@@ -92,6 +92,14 @@ async function selfTest(): Promise<never> {
     // 违规夹具 4：循环依赖（无层目录——验证建边与层检查解耦后的环检测）
     'src/cyc/a.ts': "import { b } from './b';\nexport const a = 1;\n",
     'src/cyc/b.ts': "import { a } from './a';\nexport const b = 2;\n",
+    // 违规夹具 7：资源命名层级超标 (RES-TOPO-NAMING-DEPTH)
+    'src/domain/constants-network-http-request-v1.ts': "export const API_V1 = 'v1';\n",
+    // 违规夹具 8：资源名实相符度不达标 (RES-TOPO-RESP-MISMATCH)
+    'src/domain/constants-bad-logic.ts': "export const A = 1;\n" + "export function executeTask() {\n  return 42;\n}\n".repeat(20),
+    // 违规夹具 9：资源大杂烩异常 (RES-TOPO-OVER-GENERIC)
+    'src/domain/constants.ts': Array.from({ length: 400 }, (_, i) => `export const CONST_${i} = ${i};`).join('\n') + '\n',
+    // 违规夹具 10：三级资源过度碎片化异常 (RES-TOPO-OVER-SPECIALIZED)
+    'src/domain/constants-network-http.ts': "export const HTTP_OK = 200;\n",
   };
   for (const [rel, content] of Object.entries(files)) {
     const abs = path.join(fixtureRoot, rel);
@@ -104,6 +112,10 @@ async function selfTest(): Promise<never> {
     { checker: 'audit/hardcode.js', expectRule: 'HC-UI-STRING' },
     { checker: 'audit/text-layout.js', expectRule: 'DOC-CL-002' },
     { checker: 'audit/text-layout.js', expectRule: 'DOC-RD-001' },
+    { checker: 'audit/resource-topology.js', expectRule: 'RES-TOPO-NAMING-DEPTH' },
+    { checker: 'audit/resource-topology.js', expectRule: 'RES-TOPO-RESP-MISMATCH' },
+    { checker: 'audit/resource-topology.js', expectRule: 'RES-TOPO-OVER-GENERIC' },
+    { checker: 'audit/resource-topology.js', expectRule: 'RES-TOPO-OVER-SPECIALIZED' },
   ];
   let ok = true;
   for (const c of cases) {
