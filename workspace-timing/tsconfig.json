@@ -1,31 +1,32 @@
 {
-    "compilerOptions": {
-        "module": "commonjs",
-        "target": "ES2021",
-        "outDir": "out",
-        "rootDir": "src",
-        "lib": [
-            "ES2021"
-        ],
-        "types": [
-            "node"
-        ],
-        "sourceMap": true,
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "declaration": true,
-        "resolveJsonModule": true,
-        "incremental": true,
-        "tsBuildInfoFile": "out/.tsbuildinfo"
-    },
-    "include": [
-        "src/**/*"
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2021",
+    "outDir": "out",
+    "rootDir": "src",
+    "lib": [
+      "ES2021"
     ],
-    "exclude": [
-        "node_modules",
-        "out",
-        "test"
-    ]
+    "types": [
+      "node"
+    ],
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": false,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "incremental": true,
+    "tsBuildInfoFile": "out/.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "out",
+    "test"
+  ]
 }
