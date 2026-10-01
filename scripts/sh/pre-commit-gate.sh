@@ -109,7 +109,7 @@ done <<< "$STAGED_FILES"
 
 # --- Gate 6: 密钥与敏感 Token 防泄漏扫描 ---
 echo "[6/8] 扫描高危密钥与敏感 Token 防泄漏..."
-SECRET_PATTERN='(AIza[0-9A-Za-z-_]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----)'
+SECRET_PATTERN='(AIza[0-9A-Za-z_-]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----)'
 SECRET_MATCH=$(echo "$ADDED_DIFF" | grep -E "$SECRET_PATTERN" | grep -v -E "(\$\{env:|CODEX_API_KEY|OPENAI_API_KEY|test-secret|mock-key|placeholder)" || true)
 if [[ -n "$SECRET_MATCH" ]]; then
     echo "❌ [FAIL] Gate 6: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！"
