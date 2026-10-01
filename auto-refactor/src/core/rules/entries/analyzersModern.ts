@@ -9,7 +9,10 @@
 
 import type { RuleDefinition } from '../types';
 import { ANALYZER_MODERN_LANGUAGE_RULES } from './analyzers-modern-languages';
-import { ANALYZER_MODERN_GDSCRIPT_RULES, REMEDIATION_STANDARD_AND_ABOVE } from './analyzers-modern-gdscript';
+import {
+    ANALYZER_MODERN_GDSCRIPT_RULES,
+    REMEDIATION_STANDARD_AND_ABOVE,
+} from './analyzers-modern-gdscript';
 import { ANALYZER_MODERN_ARCHITECTURE_RULES } from './analyzers-modern-architecture';
 
 export { REMEDIATION_STANDARD_AND_ABOVE };

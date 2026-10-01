@@ -853,3 +853,7 @@ export const DEDUCTION_HARDCODED_PIXELS = 8;
 /** Points deducted for in-place mutation on Snapshot DTOs. */
 export const DEDUCTION_DTO_IN_PLACE_MUTATION = 12;
 
+/** Rule id for physical 0-byte or vacuous empty files. */
+export const RULE_HYG_EMP_001 = 'HYG-EMP-001';
+/** Points deducted for empty or vacuous file placeholders. */
+export const DEDUCTION_EMPTY_FILE_PLACEHOLDER = 15;

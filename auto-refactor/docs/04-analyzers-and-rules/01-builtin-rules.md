@@ -162,6 +162,7 @@
 | `HYG-STB-002` | <a id="hyg-stb-002"></a>`hygiene` | `HYG` | `warning` | `all` | 使用中立、长效的业务领域术语替换临时工单代号。 | 全域代码与注释中泄漏临时施工工单黑话 (`pXX`, `phaseXX`, `stXX`, `wip`)。词汇表可用 `hygiene.options.jargonPatterns`（正则源数组）替换为**项目自有**词表，避免项目词被误判或被整条规则静音。 |
 | `HYG-WRAP-001` | <a id="hyg-wrap-001"></a>`hygiene` | `HYG` | `warning` | `all` | Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density. | 直接调用被封装的目标方法，或在封装层补充必要的数据校验、状态转换与上下文日志。 |
 | `HYG-WRAP-002` | <a id="hyg-wrap-002"></a>`hygiene` | `HYG` | `info` | `all` | Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction. | 若无多态或抽象解耦必要，直接暴露被委托方或内联调用；若确需封装，请补充守卫逻辑、状态转换或上下文日志。 |
+| `HYG-EMP-001` | <a id="hyg-emp-001"></a>`hygiene` | `HYG` | `error` | `all` | 源码、脚本或配置目录中存在物理 0 字节、仅含空白注释或缺乏有效 AST 语义载荷的虚空占位文件。 | 完善该文件的实际业务实现与导出定义，或直接从仓库中物理删除无效的占位文件。 |
 | `SEC-LEAK-001` | <a id="sec-leak-001"></a>`security` | `SEC` | `warning` | `all` | 日志/异常中输出敏感数据（密码、令牌、个人标识）。 | 脱敏后再记录，或只记录标识符与哈希。 |
 | `SEC-VUL-001` | <a id="sec-vul-001"></a>`security` | `SEC` | `error` | `all` | 任意动态代码执行（eval/exec/Function 构造）。 | 改为显式分支或查表；确需动态求值时使用受限解析器。 |
 | `SEC-VUL-002` | <a id="sec-vul-002"></a>`security` | `SEC` | `error` | `all` | 命令注入：拼接外部输入后交给 shell/子进程执行。 | 使用参数数组形式（execFile/spawn 无 shell）并对输入做白名单校验。 |
@@ -233,6 +234,11 @@
 | `NAM-GLB-002` | <a id="nam-glb-002"></a>`naming` | `NAM` | `warning` | `all` | 严禁在模块顶层声明可变 `let` 或 `var` 变量（隐式全局共享状态）。 | 重构顶层可变状态为函数作用域变量、类实例属性或显式单例状态持有者。 |
 | `NAM-JRG-002` | <a id="nam-jrg-002"></a>`naming` | `NAM` | `warning` | `all` | 工程资产与测试用例中严禁包含施工批次与临时黑话标记（禁止词如阶段批次号、临时变量及在制品缩写标记等），覆盖测试套件名、函数符号与标识符。 | 将施工批次标记替换为具有实际业务与领域架构含义的语义命名，杜绝将临时施工代号固化为资产。 |
 | `NAM-MBR-001` | <a id="nam-mbr-001"></a>`naming` | `NAM` | `warning` | `all` | 类属性、对象字段与方法名必须遵循 camelCase 小驼峰命名规范。 | 将属性和方法名调整为清晰有意义的小驼峰命名。 |
+| `NAM-RES-001` | <a id="nam-res-001"></a>`naming` | `NAM` | `warning` | `all` | 结构化资源库（常量/字符串/规则/配置/枚举等）过于笼统且规模与语义体积膨胀，驱动按业务领域拆分。 | 根据功能负责域与倒排调用关系，将笼统大文件拆分为二级拓扑模块（如 constants_network.ts、constants_ui.ts）。 |
+| `NAM-RES-002` | <a id="nam-res-002"></a>`naming` | `NAM` | `info` | `all` | 结构化资源库过度细化导致碎片化，微小文件使用了三级深层命名，建议合并至父域。 | 将低容量、高内聚的细分子库合并回二级领域模块（如合并至 constants_network.ts），降低架构认知成本。 |
+| `NAM-RES-003` | <a id="nam-res-003"></a>`naming` | `NAM` | `warning` | `all` | 结构化资源库命名层级溢出（超过基础类型+功能域+可选子域的三层上限）。 | 简化命名拓扑至最多三层（基础类型名 + 功能负责域 + 可选精细化领域），消除过深层级。 |
+| `NAM-RES-004` | <a id="nam-res-004"></a>`naming` | `NAM` | `warning` | `all` | 结构化资源库文件名过度描述堆叠（如 constants_network_http_request_response_...），造成维护负担。 | 去除冗余堆叠的描述词，改用精炼的领域命名表达架构职责。 |
+| `NAM-RES-005` | <a id="nam-res-005"></a>`naming` | `NAM` | `warning` | `all` | 结构化资源库文件职责不匹配（声明为纯常量库却混入大量可执行业务函数与类）。 | 将可执行业务计算下沉至领域服务或工具类中，保持结构化资源库纯粹性。 |
 | `NAM-SGL-001` | <a id="nam-sgl-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 占位符豁免）。 | 改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。 |
 | `NAM-TYP-001` | <a id="nam-typ-001"></a>`naming` | `NAM` | `warning` | `all` | 类型定义与类声明必须遵循 PascalCase 大驼峰命名。 | 将类、接口、类型别名或枚举重命名为大驼峰格式（如 `Scanner`、`RuleDefinition`）。 |
 | `NAM-VAG-001` | <a id="nam-vag-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁使用无业务语义的模糊泛化变量名（如 data、res、ret、tmp、item 等裸词）。 | 结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。 |

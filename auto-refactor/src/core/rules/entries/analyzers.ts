@@ -282,6 +282,18 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-wrap-002',
     }),
     defineRule({
+        id: 'HYG-EMP-001',
+        family: RULE_FAMILY_HYGIENE,
+        analyzer: ANALYZER_HYGIENE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            '源码、脚本或配置目录中存在物理 0 字节、仅含空白注释或缺乏有效 AST 语义载荷的虚空占位文件。',
+        remediation: '完善该文件的实际业务实现与导出定义，或直接从仓库中物理删除无效的占位文件。',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-emp-001',
+    }),
+    defineRule({
         id: 'ERR-PRP-001',
         family: RULE_FAMILY_ERROR,
         analyzer: ANALYZER_HYGIENE,

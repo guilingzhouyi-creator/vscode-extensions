@@ -452,7 +452,7 @@ function loadConfigFile(
         } catch (e) {
             console.warn(
                 `[auto-refactor] config file exists but is invalid/unreadable, falling back to defaults: ${existingFile} ` +
-                `(${e instanceof Error ? e.message : String(e)})`,
+                    `(${e instanceof Error ? e.message : String(e)})`,
             );
         }
     }

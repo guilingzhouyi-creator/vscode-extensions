@@ -320,6 +320,27 @@ function applySeverityDeductions(
 export interface IssueDeductionOptions {
     evolutionMultiplier?: number;
     impactMultiplier?: number;
+    compoundOccurrenceIndex?: number;
+    alphaCompounding?: number;
+}
+
+/**
+ * Calculates non-linear compounding deduction points:
+ * Deduction_total = BaseDeduction * (1 + alpha * ln(1 + N))
+ *
+ * @param basePoints - Base point deduction from rule table
+ * @param occurrenceIndex - 0-based repeat index N of the issue family in the same scope
+ * @param alpha - Logarithmic compounding dampening factor (default 0.5)
+ * @returns Non-linear compounded point deduction
+ */
+export function calculateCompoundedDeduction(
+    basePoints: number,
+    occurrenceIndex: number = 0,
+    alpha: number = 0.5,
+): number {
+    if (occurrenceIndex <= 0) return basePoints;
+    const multiplier = 1 + alpha * Math.log(1 + occurrenceIndex);
+    return Math.round(basePoints * multiplier);
 }
 
 /**
@@ -337,17 +358,20 @@ export function applyIssueDeductions(
     const evoMul = options?.evolutionMultiplier ?? 1.0;
     const impMul = options?.impactMultiplier ?? 1.0;
     const combinedMultiplier = evoMul * impMul;
+    const occurrenceIndex = options?.compoundOccurrenceIndex ?? 0;
+    const alpha = options?.alphaCompounding ?? 0.5;
 
     const effectiveApply: DeductionApplier =
-        combinedMultiplier !== 1.0
+        combinedMultiplier !== 1.0 || occurrenceIndex > 0
             ? (dim, points, reason, rule, line) => {
-                  const amplifiedPoints = Math.round(points * combinedMultiplier);
-                  const amplifiedReason =
-                      combinedMultiplier > 1.0
-                          ? `${reason} [Vulnerability x${combinedMultiplier.toFixed(2)}]`
-                          : reason;
-                  apply(dim, amplifiedPoints, amplifiedReason, rule, line);
-              }
+                const compoundedPoints = calculateCompoundedDeduction(points, occurrenceIndex, alpha);
+                const amplifiedPoints = Math.round(compoundedPoints * combinedMultiplier);
+                const amplifiedReason =
+                    combinedMultiplier > 1.0
+                        ? `${reason} [Vulnerability x${combinedMultiplier.toFixed(2)}]`
+                        : reason;
+                apply(dim, amplifiedPoints, amplifiedReason, rule, line);
+            }
             : apply;
 
     // A single finding can match both a family applier and a rule-table row, and the two

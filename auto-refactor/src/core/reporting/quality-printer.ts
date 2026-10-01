@@ -61,17 +61,17 @@ function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
     const wsPct = (triPlane.weights.Ws * PERCENT_SCALE).toFixed(0);
     process.stdout.write(
         `  • Static Plane Q_s (${wsPct}% wt)   : ${triPlane.staticScore.toFixed(1)} ` +
-        `[A:${sv.A.toFixed(0)} M:${sv.M.toFixed(0)} P:${sv.P.toFixed(0)} ` +
-        `D:${sv.D.toFixed(0)} T:${sv.T.toFixed(0)} R:${sv.R.toFixed(0)} ` +
-        `E:${sv.E.toFixed(0)}]\n`,
+            `[A:${sv.A.toFixed(0)} M:${sv.M.toFixed(0)} P:${sv.P.toFixed(0)} ` +
+            `D:${sv.D.toFixed(0)} T:${sv.T.toFixed(0)} R:${sv.R.toFixed(0)} ` +
+            `E:${sv.E.toFixed(0)}]\n`,
     );
     const wdPct = (triPlane.weights.Wd * PERCENT_SCALE).toFixed(0);
     if (triPlane.dynamicVector) {
         const dv = triPlane.dynamicVector;
         process.stdout.write(
             `  • Dynamic Plane Q_d (${wdPct}% wt)  : ${triPlane.dynamicScore.toFixed(1)} ` +
-            `[L:${dv.L.toFixed(0)} T:${dv.T.toFixed(0)} M:${dv.M.toFixed(0)} ` +
-            `C:${dv.C.toFixed(0)} E:${dv.E.toFixed(0)}]\n`,
+                `[L:${dv.L.toFixed(0)} T:${dv.T.toFixed(0)} M:${dv.M.toFixed(0)} ` +
+                `C:${dv.C.toFixed(0)} E:${dv.E.toFixed(0)}]\n`,
         );
     } else {
         process.stdout.write(`  • Dynamic Plane Q_d (${wdPct}% wt)  : N/A (Offline Static Only)\n`);
@@ -96,7 +96,9 @@ export function printQualityScoreAssessment(
     triPlane?: UnifiedQualityAssessment,
     reviewProfile?: string,
 ): void {
-    process.stdout.write(`\n=== Transparent Code Quality Assessment${reviewProfile ? ` [Profile: ${reviewProfile}]` : ''} ===\n`);
+    process.stdout.write(
+        `\n=== Transparent Code Quality Assessment${reviewProfile ? ` [Profile: ${reviewProfile}]` : ''} ===\n`,
+    );
     // A NaN composite means no dimension carried a weight (a narrow scan witnesses none of
     // the ten axes). Printing "NaN / 100" would read as a corrupt number, so state plainly
     // that nothing was measured instead.
@@ -105,7 +107,7 @@ export function printQualityScoreAssessment(
         : `${q.compositeScore.toFixed(1)} / 100`;
     process.stdout.write(
         `Composite Quality Index: ${compositeText} [Grade: ${q.grade}] ` +
-        `(Confidence: ${(q.confidence * PERCENT_SCALE).toFixed(0)}%)\n`,
+            `(Confidence: ${(q.confidence * PERCENT_SCALE).toFixed(0)}%)\n`,
     );
     process.stdout.write(`-------------------------------------------\n`);
     for (const [dim, val] of Object.entries(q.indices)) {
@@ -137,25 +139,25 @@ export function printAutonomyAssessment(a: AutonomyEvaluation): void {
     process.stdout.write(`\n=== In-House Self-Development Assessment (CAI 2.0) ===\n`);
     process.stdout.write(
         `Composite Autonomy Index: ${a.compositeAutonomyIndex.toFixed(1)}% ` +
-        `[Grade: ${a.grade}]\n`,
+            `[Grade: ${a.grade}]\n`,
     );
     process.stdout.write(`Status: ${a.gradeDescription}\n`);
     if (a.confidence) {
         const confTag = a.confidence.isLowConfidence ? ' [Sparse Sample - Smoothed]' : '';
         process.stdout.write(
             `Bayesian Credible Bounds : [${a.confidence.lowerBound.toFixed(1)}% ~ ` +
-            `${a.confidence.upperBound.toFixed(1)}%] ` +
-            `(Sample Sufficiency: ${(a.confidence.sampleSufficiency * 100).toFixed(0)}%)${confTag}\n`,
+                `${a.confidence.upperBound.toFixed(1)}%] ` +
+                `(Sample Sufficiency: ${(a.confidence.sampleSufficiency * 100).toFixed(0)}%)${confTag}\n`,
         );
     }
     process.stdout.write(`-------------------------------------------\n`);
     process.stdout.write(
         `  • Effective LOC Autonomy : ${a.dimensions.effectiveLocAutonomy.toFixed(1)}% ` +
-        `(${a.stats.proprietaryEffectiveLoc} / ${a.stats.totalEffectiveLoc} ELOC)\n`,
+            `(${a.stats.proprietaryEffectiveLoc} / ${a.stats.totalEffectiveLoc} ELOC)\n`,
     );
     process.stdout.write(
         `  • Symbol Call Autonomy   : ${a.dimensions.symbolCallAutonomy.toFixed(1)}% ` +
-        `(${a.stats.internalSymbolCalls} int vs ${a.stats.externalSdkCalls} ext SDK)\n`,
+            `(${a.stats.internalSymbolCalls} int vs ${a.stats.externalSdkCalls} ext SDK)\n`,
     );
     process.stdout.write(
         `  • Domain Kernel Density  : ${a.dimensions.domainKernelDensity.toFixed(1)}%\n`,
@@ -165,13 +167,13 @@ export function printAutonomyAssessment(a: AutonomyEvaluation): void {
     );
     process.stdout.write(
         `  • Supply Chain Resilience: ${a.dimensions.supplyChainResilience.toFixed(1)}% ` +
-        `(${a.supplyChain?.directDependencies || 0} direct, ` +
-        `${a.supplyChain?.transitiveDependencies || 0} transitive, ` +
-        `depth: ${a.supplyChain?.estimatedDepth || 1})\n`,
+            `(${a.supplyChain?.directDependencies || 0} direct, ` +
+            `${a.supplyChain?.transitiveDependencies || 0} transitive, ` +
+            `depth: ${a.supplyChain?.estimatedDepth || 1})\n`,
     );
     process.stdout.write(
         `  • Critical Path Autonomy : ${a.dimensions.criticalPathAutonomy.toFixed(1)}% ` +
-        `(${a.stats.criticalPathFiles || 0} files in security/runtime core)\n`,
+            `(${a.stats.criticalPathFiles || 0} files in security/runtime core)\n`,
     );
     if (a.externalSdkInventory.length > 0) {
         process.stdout.write(`-------------------------------------------\n`);

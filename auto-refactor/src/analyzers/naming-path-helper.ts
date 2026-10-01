@@ -7,11 +7,17 @@
  * Responsibilities:
  *   1. Audit file names for kebab-case (TS/JS), snake_case (Py/Rust/GDScript), and jargon.
  *   2. Audit directory components for kebab-case and process jargon.
+ *   3. Audit structured resource topology (NAM-RES-001..005) with analyzer whitelist.
  * Exit Semantics & Design Rationale: Pure functional helper emitting Issue[]; zero side effects.
  */
 
 import * as path from 'path';
 import type { AnalyzerContext, Issue } from '../core/types';
+import {
+    parseStructuredResourceNaming,
+    RECOGNIZED_RESOURCE_BASE_TYPES,
+    auditStructuredResourceTopology,
+} from '../core/architecture/structured-resource-topology';
 
 /**
  * Options configuring path and directory name checks.
@@ -20,6 +26,7 @@ export interface PathNamingOptions {
     checkFiles?: boolean;
     checkDirectories?: boolean;
     checkJargon?: boolean;
+    checkResourceTopology?: boolean;
 }
 
 const JARGON_PATTERN_STR =
@@ -70,6 +77,91 @@ const JS_TS_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const SNAKE_EXTS = new Set(['.py', '.rs', '.gd']);
 
 /**
+ * Determines if a file is an analyzer implementation or core engine component
+ * where base types (e.g. constants, rules, config) form the architectural engine
+ * rather than pure structured resource tables.
+ *
+ * @param filePath - Normalized file path to check.
+ * @returns True when file is part of analyzer/engine implementations.
+ */
+export function isAnalyzerOrEngineFile(filePath: string): boolean {
+    const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+    if (
+        normalized.includes('/analyzers/') ||
+        normalized.includes('/core/') ||
+        normalized.includes('/engine/') ||
+        normalized.includes('/tests/') ||
+        normalized.includes('/scripts/') ||
+        normalized.includes('/test/')
+    ) {
+        return true;
+    }
+    return (
+        normalized.endsWith('-analyzer.ts') ||
+        normalized.endsWith('-rules.ts') ||
+        normalized.endsWith('-helper.ts')
+    );
+}
+
+/**
+ * Audits single file for structured resource topology compliance.
+ *
+ * @param filePath - File path to inspect.
+ * @param content - File content.
+ * @param mkIssue - Issue factory.
+ * @param issues - Issue output accumulator.
+ */
+export function auditStructuredResourceFile(
+    filePath: string,
+    content: string,
+    mkIssue: (
+        line: number,
+        rule: string,
+        message: string,
+        detail: Record<string, unknown>,
+        suggestion?: string,
+    ) => Issue,
+    issues: Issue[],
+): void {
+    if (isAnalyzerOrEngineFile(filePath)) return;
+    const parts = parseStructuredResourceNaming(filePath);
+    if (!RECOGNIZED_RESOURCE_BASE_TYPES.has(parts.baseType.toLowerCase())) return;
+
+    const lines = (content || '').split('\n');
+    const eloc = Math.max(
+        1,
+        lines.filter((l) => l.trim().length > 0 && !l.trim().startsWith('//')).length,
+    );
+    const findings = auditStructuredResourceTopology(
+        [
+            {
+                filePath,
+                eloc,
+                astNodeCount: eloc * 4,
+                symbolCount: 5,
+                literalCount: 10,
+                astDepth: 3,
+                language: path.extname(filePath).slice(1) || 'typescript',
+                isExecutableLogic: false,
+            },
+        ],
+        1000,
+    );
+
+    for (const f of findings) {
+        issues.push(
+            mkIssue(
+                1,
+                f.ruleId,
+                f.message,
+                f.details,
+                `Align '${filePath}' with 3-tier structured resource topology standard.`,
+            ),
+        );
+    }
+}
+
+/**
  * Audits file and directory path naming conventions and transient jargon violations.
  *
  * @param filePath - Normalized path to audit.
@@ -93,6 +185,9 @@ export function auditFileAndDirectoryPaths(
 ): void {
     auditFileName(filePath, opts, ctx, mkIssue, issues);
     auditDirectoryName(filePath, opts, ctx, mkIssue, issues);
+    if (opts.checkFiles !== false && opts.checkResourceTopology !== false) {
+        auditStructuredResourceFile(filePath, ctx.content || '', mkIssue, issues);
+    }
 }
 
 const CAMEL_TO_KEBAB_PATTERN = '$1-$2';
@@ -220,3 +315,4 @@ function auditDirectoryName(
         }
     }
 }
+

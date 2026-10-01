@@ -1,12 +1,14 @@
 /**
- * Module: Core Scoring — Effective Code Density Calculation
+ * Module: Core Scoring — Effective Code Density & Noise Index Calculation
  * File Path: src/core/scoring/effectiveDensity.ts
  * Architecture Role: Quantifies true semantic contribution versus maintained boilerplate,
  *   penalizing artificial function splitting, empty forwarding wrappers, and trivial getters.
+ *   Calculates effective code density ratio, non-ELOC noise index, and Gaussian health score.
  * Dependencies & Triggers: Pure function over source code string and language tag.
  * Responsibilities: Count total LOC, detect forwarding methods and trivial boilerplate,
- *   and compute effective code density ratio.
- * Exit Semantics & Design Rationale: Bounded 0.0-1.0 ratio, deterministic line analysis.
+ *   compute effective code density ratio (rho_eff), noise index (kappa_noise),
+ *   and continuous Gaussian density health (eta_health).
+ * Exit Semantics & Design Rationale: Bounded 0.0-1.0 ratios, deterministic line analysis.
  */
 
 /**
@@ -18,6 +20,8 @@ export interface EffectiveDensityResult {
     boilerplateLoc: number;
     forwardingCount: number;
     effectiveDensity: number;
+    noiseIndex: number;
+    gaussianHealth: number;
     isLowDensity: boolean;
 }
 
@@ -33,6 +37,9 @@ const TRIVIAL_FORWARD_PATTERNS: RegExp[] = [
 
 /**
  * Checks if a trimmed line is empty or purely a comment.
+ *
+ * @param line - Text line to check.
+ * @returns True when line is whitespace-only or a comment.
  */
 function isCommentOrBlank(line: string): boolean {
     const trimmed = line.trim();
@@ -47,6 +54,9 @@ function isCommentOrBlank(line: string): boolean {
 
 /**
  * Checks if a code statement is a trivial forwarder or stub.
+ *
+ * @param line - Code statement line to inspect.
+ * @returns True when the line matches trivial forwarder pattern.
  */
 function isTrivialForwarder(line: string): boolean {
     for (const pattern of TRIVIAL_FORWARD_PATTERNS) {
@@ -58,11 +68,46 @@ function isTrivialForwarder(line: string): boolean {
 }
 
 /**
- * Calculates effective code density across source content.
+ * Calculates the Noise Index: kappa_noise = NonELOC / max(1, ELOC).
+ * Measures the dilution ratio of boilerplate, trivial lines, and noise relative to logic.
+ *
+ * @param totalLoc - Physical line count excluding blanks and comments.
+ * @param usefulLoc - Effective semantic code line count.
+ * @returns Computed noise index.
+ */
+export function calculateNoiseIndex(totalLoc: number, usefulLoc: number): number {
+    const nonEloc = Math.max(0, totalLoc - usefulLoc);
+    const denominator = Math.max(1, usefulLoc);
+    return Math.round((nonEloc / denominator) * 1000) / 1000;
+}
+
+/**
+ * Calculates continuous Gaussian Density Health:
+ * eta_health = exp( - (kappa_noise - kappa_target)^2 / (2 * sigma^2) )
+ * Default target kappa = 0.35 (optimal density with structure), sigma = 0.45.
+ *
+ * @param noiseIndex - Calculated noise index kappa_noise.
+ * @param kappaTarget - Target optimal noise ratio (default 0.35).
+ * @param sigma - Standard deviation scaling factor (default 0.45).
+ * @returns Continuous Gaussian health ratio in [0, 1].
+ */
+export function calculateGaussianDensityHealth(
+    noiseIndex: number,
+    kappaTarget: number = 0.35,
+    sigma: number = 0.45,
+): number {
+    const delta = noiseIndex - kappaTarget;
+    const variance = 2 * sigma * sigma;
+    const health = Math.exp(-(delta * delta) / variance);
+    return Math.round(health * 1000) / 1000;
+}
+
+/**
+ * Calculates effective code density and noise metrics across source content.
  *
  * @param content - Source code text to analyze.
  * @param _language - Optional programming language tag.
- * @returns Breakdown of useful LOC, boilerplate LOC, and density ratio.
+ * @returns Breakdown of useful LOC, boilerplate LOC, density ratio, noise index, and health.
  */
 export function computeEffectiveCodeDensity(
     content: string,
@@ -97,6 +142,8 @@ export function computeEffectiveCodeDensity(
 
     const usefulLoc = Math.max(0, totalLoc - Math.floor(boilerplateLoc));
     const effectiveDensity = totalLoc > 0 ? Math.round((usefulLoc / totalLoc) * 100) / 100 : 1.0;
+    const noiseIndex = calculateNoiseIndex(totalLoc, usefulLoc);
+    const gaussianHealth = calculateGaussianDensityHealth(noiseIndex);
 
     return {
         totalLoc,
@@ -104,6 +151,9 @@ export function computeEffectiveCodeDensity(
         boilerplateLoc: Math.floor(boilerplateLoc),
         forwardingCount,
         effectiveDensity,
+        noiseIndex,
+        gaussianHealth,
         isLowDensity: totalLoc >= 15 && effectiveDensity < 0.55,
     };
 }
+

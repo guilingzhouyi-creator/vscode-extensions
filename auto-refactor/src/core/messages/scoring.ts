@@ -229,6 +229,14 @@ export const ScoringRationales = {
      */
     LINE_COUNT_OVERFLOW: (msg: string) =>
         `Single file line count exceeds repository limits: ${msg}`,
+    /**
+     * Format the rationale for an empty or vacuous file placeholder.
+     *
+     * @param msg - Analyzer finding text embedded after the rationale prefix.
+     * @returns Deduction rationale for the standardization dimension.
+     */
+    EMPTY_FILE_PLACEHOLDER: (msg: string) =>
+        `Source directory contains empty or vacuous file placeholders: ${msg}`,
 
     // 6. Modernity
     /**

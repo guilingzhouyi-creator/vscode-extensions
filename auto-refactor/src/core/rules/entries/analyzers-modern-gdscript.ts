@@ -16,10 +16,7 @@ import {
 } from '../types';
 import type { RuleDefinition } from '../types';
 
-import {
-    ANALYZER_GDSCRIPT_MODERN,
-    ANALYZER_GDSCRIPT_GAME,
-} from '../../scoring/dimensionLiterals';
+import { ANALYZER_GDSCRIPT_MODERN, ANALYZER_GDSCRIPT_GAME } from '../../scoring/dimensionLiterals';
 
 export const REMEDIATION_STANDARD_AND_ABOVE = '`standard` 及以上';
 
@@ -164,7 +161,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
         summary: '表现层视图就地修改只读 Snapshot DTO 属性，破坏 CQRS 单向数据流与单一真源。',
-        remediation: '视图应将快照视为不可变只读数据，通过派发 Command 意图或调用领域边界服务请求变更。',
+        remediation:
+            '视图应将快照视为不可变只读数据，通过派发 Command 意图或调用领域边界服务请求变更。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-uni-001',
     }),
     defineRule({
@@ -186,7 +184,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
         summary: '表现层主视图控制器未继承 BaseScreen 或 BaseModal 基类。',
-        remediation: '主视图控制器应继承 BaseScreen（全屏视图）或 BaseModal（模态弹窗），接入标准生命周期与快照装配契约。',
+        remediation:
+            '主视图控制器应继承 BaseScreen（全屏视图）或 BaseModal（模态弹窗），接入标准生命周期与快照装配契约。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-ext-001',
     }),
     defineRule({
@@ -197,7 +196,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
         summary: '表现层视图硬编码 Color(...) 字面量或裸色值，破坏 DesignTokens 单一真源。',
-        remediation: '从 DesignTokens 获取语义化色彩常量（如 DesignTokens.COLOR_*），确保主题与多端视觉统一。',
+        remediation:
+            '从 DesignTokens 获取语义化色彩常量（如 DesignTokens.COLOR_*），确保主题与多端视觉统一。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-tok-001',
     }),
     defineRule({
@@ -219,7 +219,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
         summary: '长列表场景全量就地实例化节点，未接入 KVirtualList 虚拟化滚动与对象池复用。',
-        remediation: '长列表容器应接入 KVirtualList 配合对象池池化复用（ADV-POOL-001），禁止无界瞬态节点创建。',
+        remediation:
+            '长列表容器应接入 KVirtualList 配合对象池池化复用（ADV-POOL-001），禁止无界瞬态节点创建。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-vrt-001',
     }),
     defineRule({
@@ -240,8 +241,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '视图层脚本中出现飘移的相对节点路径（如 get_parent()、find_child() 或长跨级相对索引）。',
-        remediation: '节点引用应使用显式 @onready %UniqueNode 或类型化依赖注入，禁止易脆弱的相对层级寻址。',
+        summary:
+            '视图层脚本中出现飘移的相对节点路径（如 get_parent()、find_child() 或长跨级相对索引）。',
+        remediation:
+            '节点引用应使用显式 @onready %UniqueNode 或类型化依赖注入，禁止易脆弱的相对层级寻址。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-nod-001',
     }),
     defineRule({
@@ -252,7 +255,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
         summary: '表现层视图直接耦合后端领域单例或跨层订阅 EventBus 全局业务事件。',
-        remediation: '表现层仅通过 BaseScreen.apply_snapshot() 单向接收数据，用户操作经由显式回调或 UI 意图派发。',
+        remediation:
+            '表现层仅通过 BaseScreen.apply_snapshot() 单向接收数据，用户操作经由显式回调或 UI 意图派发。',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-bnd-001',
     }),
     defineRule({

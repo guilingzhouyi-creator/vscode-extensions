@@ -13,8 +13,8 @@ import type { Issue } from '../types';
 import { computeEffectiveCodeDensity } from './effectiveDensity';
 import { evaluateNetCognitiveCost } from './cognitive-cost-model';
 import {
-  extractConstantEntities,
-  analyzeConstantTransitions,
+    extractConstantEntities,
+    analyzeConstantTransitions,
 } from '../diff/constant-relocation-detector';
 
 import { evaluateEffectiveCommentDensity } from '../comments/comment-density-model';
@@ -41,122 +41,122 @@ const GAMING_KIND_RELOCATION_PADDING: GamingPatternKind = 'artificial_relocation
  * Kinds of score gaming recognized.
  */
 export type GamingPatternKind =
-  | 'artificial_function_splitting'
-  | 'tautological_test_padding'
-  | 'spurious_empty_interface'
-  | 'artificial_relocation_padding'
-  | 'tautological_comment_padding'
-  | 'naming_entropy_anomaly';
+    | 'artificial_function_splitting'
+    | 'tautological_test_padding'
+    | 'spurious_empty_interface'
+    | 'artificial_relocation_padding'
+    | 'tautological_comment_padding'
+    | 'naming_entropy_anomaly';
 
 /**
  * Result of anti-gaming detection.
  */
 export interface AntiGamingResult {
-  hasGaming: boolean;
-  issues: Issue[];
-  gamingKinds: GamingPatternKind[];
-  gamingPenalty: number;
+    hasGaming: boolean;
+    issues: Issue[];
+    gamingKinds: GamingPatternKind[];
+    gamingPenalty: number;
 }
 
 /**
  * Detects artificial function splitting by analyzing density and forwarding counts.
  */
 function checkArtificialSplitting(
-  filePath: string,
-  content: string,
-  issues: Issue[],
-  gamingKinds: GamingPatternKind[],
+    filePath: string,
+    content: string,
+    issues: Issue[],
+    gamingKinds: GamingPatternKind[],
 ): number {
-  const density = computeEffectiveCodeDensity(content);
-  // Check mechanical call hop inflation (CPX-HOP-001)
-  if (density.forwardingCount >= 3) {
-    const hopCost = evaluateNetCognitiveCost(
-      filePath,
-      Array.from({ length: density.forwardingCount }, (_, i) => ({
-        name: `forwarder_${i + 1}`,
-        loc: 2,
-        cc: 1,
-        callDepth: 1,
-        isForwardingWrapper: true,
-      })),
-    );
-    issues.push(...hopCost.issues);
-  }
+    const density = computeEffectiveCodeDensity(content);
+    // Check mechanical call hop inflation (CPX-HOP-001)
+    if (density.forwardingCount >= 3) {
+        const hopCost = evaluateNetCognitiveCost(
+            filePath,
+            Array.from({ length: density.forwardingCount }, (_, i) => ({
+                name: `forwarder_${i + 1}`,
+                loc: 2,
+                cc: 1,
+                callDepth: 1,
+                isForwardingWrapper: true,
+            })),
+        );
+        issues.push(...hopCost.issues);
+    }
 
-  // If there are 5 or more trivial forwarders and density drops below 0.65
-  if (density.forwardingCount >= 5 && density.effectiveDensity < 0.65) {
-    gamingKinds.push('artificial_function_splitting');
-    issues.push({
-      id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:1`,
-      analyzer: ANALYZER_GOVERNANCE,
-      rule: RULE_GOV_GAM_001,
-      severity: SEVERITY_WARNING,
-      message:
-        `Anti-gaming violation: detected artificial function splitting with ` +
-        `${density.forwardingCount} trivial forwarding methods (density: ${density.effectiveDensity}).`,
-      location: {
-        file: filePath,
-        start: { line: 1, column: 1 },
-        end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
-      },
-      detail: {
-        gamingType: 'artificial_function_splitting',
-        forwardingCount: density.forwardingCount,
-        effectiveDensity: density.effectiveDensity,
-        totalLoc: density.totalLoc,
-      },
-      suggestion:
-        'Avoid mechanically chopping cohesive logic into trivial forwarding wrappers; focus on domain cohesion.',
-    });
-    return 15.0;
-  }
-  return 0.0;
+    // If there are 5 or more trivial forwarders and density drops below 0.65
+    if (density.forwardingCount >= 5 && density.effectiveDensity < 0.65) {
+        gamingKinds.push('artificial_function_splitting');
+        issues.push({
+            id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:1`,
+            analyzer: ANALYZER_GOVERNANCE,
+            rule: RULE_GOV_GAM_001,
+            severity: SEVERITY_WARNING,
+            message:
+                `Anti-gaming violation: detected artificial function splitting with ` +
+                `${density.forwardingCount} trivial forwarding methods (density: ${density.effectiveDensity}).`,
+            location: {
+                file: filePath,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
+            },
+            detail: {
+                gamingType: 'artificial_function_splitting',
+                forwardingCount: density.forwardingCount,
+                effectiveDensity: density.effectiveDensity,
+                totalLoc: density.totalLoc,
+            },
+            suggestion:
+                'Avoid mechanically chopping cohesive logic into trivial forwarding wrappers; focus on domain cohesion.',
+        });
+        return 15.0;
+    }
+    return 0.0;
 }
 
 /**
  * Detects tautological test padding (fake tests with constant assertions).
  */
 function checkTautologicalTestPadding(
-  filePath: string,
-  content: string,
-  issues: Issue[],
-  gamingKinds: GamingPatternKind[],
+    filePath: string,
+    content: string,
+    issues: Issue[],
+    gamingKinds: GamingPatternKind[],
 ): number {
-  const isTest =
-    filePath.includes('test') || filePath.includes('spec') || filePath.includes('__tests__');
-  if (!isTest) {
-    return 0.0;
-  }
+    const isTest =
+        filePath.includes('test') || filePath.includes('spec') || filePath.includes('__tests__');
+    if (!isTest) {
+        return 0.0;
+    }
 
-  const tautologyMatches = content.match(
-    /(?:expect\(true\)\.toBe\(true\)|assert\s+1\s*==\s*1|assert\(true\)|expect\(1\)\.toBe\(1\))/g,
-  );
-  const count = tautologyMatches ? tautologyMatches.length : 0;
-  if (count >= 3) {
-    gamingKinds.push('tautological_test_padding');
-    issues.push({
-      id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:tautology`,
-      analyzer: ANALYZER_GOVERNANCE,
-      rule: RULE_GOV_GAM_001,
-      severity: SEVERITY_WARNING,
-      message:
-        `Anti-gaming violation: detected ${count} tautological non-verifying assertions ` +
-        `inflating test coverage artificially.`,
-      location: {
-        file: filePath,
-        start: { line: 1, column: 1 },
-        end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
-      },
-      detail: {
-        gamingType: 'tautological_test_padding',
-        tautologyCount: count,
-      },
-      suggestion:
-        'Replace tautological assertions with real behavioral input/output assertions.',
-    });
-    return 20.0;
-  }
-  return 0.0;
+    const tautologyMatches = content.match(
+        /(?:expect\(true\)\.toBe\(true\)|assert\s+1\s*==\s*1|assert\(true\)|expect\(1\)\.toBe\(1\))/g,
+    );
+    const count = tautologyMatches ? tautologyMatches.length : 0;
+    if (count >= 3) {
+        gamingKinds.push('tautological_test_padding');
+        issues.push({
+            id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:tautology`,
+            analyzer: ANALYZER_GOVERNANCE,
+            rule: RULE_GOV_GAM_001,
+            severity: SEVERITY_WARNING,
+            message:
+                `Anti-gaming violation: detected ${count} tautological non-verifying assertions ` +
+                `inflating test coverage artificially.`,
+            location: {
+                file: filePath,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
+            },
+            detail: {
+                gamingType: 'tautological_test_padding',
+                tautologyCount: count,
+            },
+            suggestion:
+                'Replace tautological assertions with real behavioral input/output assertions.',
+        });
+        return 20.0;
+    }
+    return 0.0;
 }
 
 /**
@@ -164,120 +164,121 @@ function checkTautologicalTestPadding(
  * merely to inflate diff line counts.
  */
 function checkRelocationPadding(
-  filePath: string,
-  beforeContent: string,
-  afterContent: string,
-  issues: Issue[],
-  gamingKinds: GamingPatternKind[],
+    filePath: string,
+    beforeContent: string,
+    afterContent: string,
+    issues: Issue[],
+    gamingKinds: GamingPatternKind[],
 ): number {
-  const beforeEntities = extractConstantEntities(beforeContent, filePath);
-  const afterEntities = extractConstantEntities(afterContent, filePath);
-  const analysis = analyzeConstantTransitions(beforeEntities, afterEntities);
+    const beforeEntities = extractConstantEntities(beforeContent, filePath);
+    const afterEntities = extractConstantEntities(afterContent, filePath);
+    const analysis = analyzeConstantTransitions(beforeEntities, afterEntities);
 
-  if (
-    analysis.hasPureRelocationsOnly &&
-    analysis.relocatedCount >= RELOCATION_PADDING_MIN_COUNT
-  ) {
-    gamingKinds.push(GAMING_KIND_RELOCATION_PADDING);
-    issues.push({
-      id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:relocation`,
-      analyzer: ANALYZER_GOVERNANCE,
-      rule: RULE_GOV_GAM_001,
-      severity: SEVERITY_WARNING,
-      message:
-        `Anti-gaming violation: detected artificial relocation padding with ` +
-        `${analysis.relocatedCount} constants moved across lines without functional or semantic changes.`,
-      location: {
-        file: filePath,
-        start: { line: 1, column: 1 },
-        end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
-      },
-      detail: {
-        gamingType: GAMING_KIND_RELOCATION_PADDING,
-        relocatedCount: analysis.relocatedCount,
-      },
-      suggestion:
-        'Do not artificially move constants to inflate diff volume; pure relocations earn zero positive quality score.',
-    });
-    return RELOCATION_PADDING_PENALTY;
-  }
-  return 0.0;
+    if (
+        analysis.hasPureRelocationsOnly &&
+        analysis.relocatedCount >= RELOCATION_PADDING_MIN_COUNT
+    ) {
+        gamingKinds.push(GAMING_KIND_RELOCATION_PADDING);
+        issues.push({
+            id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:relocation`,
+            analyzer: ANALYZER_GOVERNANCE,
+            rule: RULE_GOV_GAM_001,
+            severity: SEVERITY_WARNING,
+            message:
+                `Anti-gaming violation: detected artificial relocation padding with ` +
+                `${analysis.relocatedCount} constants moved across lines without functional or semantic changes.`,
+            location: {
+                file: filePath,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
+            },
+            detail: {
+                gamingType: GAMING_KIND_RELOCATION_PADDING,
+                relocatedCount: analysis.relocatedCount,
+            },
+            suggestion:
+                'Do not artificially move constants to inflate diff volume; pure relocations earn zero positive quality score.',
+        });
+        return RELOCATION_PADDING_PENALTY;
+    }
+    return 0.0;
 }
 
 /**
  * Detects tautological comment padding and water-logging (ECR < 0.40).
  */
 function checkTautologicalCommentPadding(
-  filePath: string,
-  content: string,
-  issues: Issue[],
-  gamingKinds: GamingPatternKind[],
+    filePath: string,
+    content: string,
+    issues: Issue[],
+    gamingKinds: GamingPatternKind[],
 ): number {
-  const metrics = evaluateEffectiveCommentDensity(content);
-  if (metrics.hasWaterLogging && metrics.totalCommentLines >= 5) {
-    issues.push({
-      id: `governance:${RULE_GOV_GAM_001}:${filePath}:1`,
-      analyzer: ANALYZER_GOVERNANCE,
-      rule: RULE_GOV_GAM_001,
-      severity: SEVERITY_WARNING,
-      message: `Detected tautological comment padding or water-logging (ECR: ${metrics.effectiveCommentRatio}).`,
-      location: {
-        file: filePath,
-        start: { line: 1, column: 1 },
-        end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
-      },
-      detail: {
-        gamingKind: 'tautological_comment_padding',
-        effectiveCommentRatio: metrics.effectiveCommentRatio,
-        totalCommentLines: metrics.totalCommentLines,
-      },
-      suggestion:
-        'Replace tautological line-by-line echoes with substantive design rationale and invariants.',
-    });
-    gamingKinds.push('tautological_comment_padding');
-    return 10.0;
-  }
-  return 0.0;
+    const metrics = evaluateEffectiveCommentDensity(content);
+    if (metrics.hasWaterLogging && metrics.totalCommentLines >= 5) {
+        issues.push({
+            id: `governance:${RULE_GOV_GAM_001}:${filePath}:1`,
+            analyzer: ANALYZER_GOVERNANCE,
+            rule: RULE_GOV_GAM_001,
+            severity: SEVERITY_WARNING,
+            message: `Detected tautological comment padding or water-logging (ECR: ${metrics.effectiveCommentRatio}).`,
+            location: {
+                file: filePath,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
+            },
+            detail: {
+                gamingKind: 'tautological_comment_padding',
+                effectiveCommentRatio: metrics.effectiveCommentRatio,
+                totalCommentLines: metrics.totalCommentLines,
+            },
+            suggestion:
+                'Replace tautological line-by-line echoes with substantive design rationale and invariants.',
+        });
+        gamingKinds.push('tautological_comment_padding');
+        return 10.0;
+    }
+    return 0.0;
 }
 
 /**
  * Detects degenerate identifier naming entropy gaming (e.g. var a1, a2, a3, a4, a5...).
  */
 function checkNamingEntropyAnomaly(
-  filePath: string,
-  content: string,
-  issues: Issue[],
-  gamingKinds: GamingPatternKind[],
+    filePath: string,
+    content: string,
+    issues: Issue[],
+    gamingKinds: GamingPatternKind[],
 ): number {
-  const varMatches = content.match(/\b(?:var|let|const)\s+([a-zA-Z0-9_]+)\b/g);
-  if (!varMatches || varMatches.length < 6) return 0.0;
-  const names = varMatches.map((m) => m.replace(/\b(?:var|let|const)\s+/, ''));
-  const concatenated = names.join('');
-  const entropy = calculateShannonEntropy(concatenated);
-  const isDegenerate = names.filter((n) => /^[a-zA-Z]\d+$/.test(n)).length >= 6;
-  if ((entropy < 2.8 && isDegenerate) || entropy < 1.5) {
-    issues.push({
-      id: `governance:${RULE_GOV_GAM_001}:${filePath}:1`,
-      analyzer: ANALYZER_GOVERNANCE,
-      rule: RULE_GOV_GAM_001,
-      severity: SEVERITY_WARNING,
-      message: `Anti-gaming violation: detected low-entropy identifier sequence (entropy: ${entropy} bits/char).`,
-      location: {
-        file: filePath,
-        start: { line: 1, column: 1 },
-        end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
-      },
-      detail: {
-        gamingKind: 'naming_entropy_anomaly',
-        entropy,
-        identifierCount: names.length,
-      },
-      suggestion: 'Use meaningful semantic domain variable names instead of synthetic sequenced identifiers.',
-    });
-    gamingKinds.push('naming_entropy_anomaly');
-    return 10.0;
-  }
-  return 0.0;
+    const varMatches = content.match(/\b(?:var|let|const)\s+([a-zA-Z0-9_]+)\b/g);
+    if (!varMatches || varMatches.length < 6) return 0.0;
+    const names = varMatches.map((m) => m.replace(/\b(?:var|let|const)\s+/, ''));
+    const concatenated = names.join('');
+    const entropy = calculateShannonEntropy(concatenated);
+    const isDegenerate = names.filter((n) => /^[a-zA-Z]\d+$/.test(n)).length >= 6;
+    if ((entropy < 2.8 && isDegenerate) || entropy < 1.5) {
+        issues.push({
+            id: `governance:${RULE_GOV_GAM_001}:${filePath}:1`,
+            analyzer: ANALYZER_GOVERNANCE,
+            rule: RULE_GOV_GAM_001,
+            severity: SEVERITY_WARNING,
+            message: `Anti-gaming violation: detected low-entropy identifier sequence (entropy: ${entropy} bits/char).`,
+            location: {
+                file: filePath,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
+            },
+            detail: {
+                gamingKind: 'naming_entropy_anomaly',
+                entropy,
+                identifierCount: names.length,
+            },
+            suggestion:
+                'Use meaningful semantic domain variable names instead of synthetic sequenced identifiers.',
+        });
+        gamingKinds.push('naming_entropy_anomaly');
+        return 10.0;
+    }
+    return 0.0;
 }
 
 /**
@@ -288,21 +289,21 @@ function checkNamingEntropyAnomaly(
  * @returns Anti-gaming analysis result including penalty and identified issues.
  */
 export function detectScoreGaming(filePath: string, content: string): AntiGamingResult {
-  const issues: Issue[] = [];
-  const gamingKinds: GamingPatternKind[] = [];
+    const issues: Issue[] = [];
+    const gamingKinds: GamingPatternKind[] = [];
 
-  const splitPenalty = checkArtificialSplitting(filePath, content, issues, gamingKinds);
-  const testPenalty = checkTautologicalTestPadding(filePath, content, issues, gamingKinds);
-  const commentPenalty = checkTautologicalCommentPadding(filePath, content, issues, gamingKinds);
-  const entropyPenalty = checkNamingEntropyAnomaly(filePath, content, issues, gamingKinds);
-  const gamingPenalty = splitPenalty + testPenalty + commentPenalty + entropyPenalty;
+    const splitPenalty = checkArtificialSplitting(filePath, content, issues, gamingKinds);
+    const testPenalty = checkTautologicalTestPadding(filePath, content, issues, gamingKinds);
+    const commentPenalty = checkTautologicalCommentPadding(filePath, content, issues, gamingKinds);
+    const entropyPenalty = checkNamingEntropyAnomaly(filePath, content, issues, gamingKinds);
+    const gamingPenalty = splitPenalty + testPenalty + commentPenalty + entropyPenalty;
 
-  return {
-    hasGaming: issues.length > 0,
-    issues,
-    gamingKinds,
-    gamingPenalty,
-  };
+    return {
+        hasGaming: issues.length > 0,
+        issues,
+        gamingKinds,
+        gamingPenalty,
+    };
 }
 
 /**
@@ -314,30 +315,30 @@ export function detectScoreGaming(filePath: string, content: string): AntiGaming
  * @returns Anti-gaming analysis result for the diff.
  */
 export function detectDiffScoreGaming(
-  filePath: string,
-  beforeContent: string,
-  afterContent: string,
+    filePath: string,
+    beforeContent: string,
+    afterContent: string,
 ): AntiGamingResult {
-  const issues: Issue[] = [];
-  const gamingKinds: GamingPatternKind[] = [];
+    const issues: Issue[] = [];
+    const gamingKinds: GamingPatternKind[] = [];
 
-  const snapshotGaming = detectScoreGaming(filePath, afterContent);
-  issues.push(...snapshotGaming.issues);
-  gamingKinds.push(...snapshotGaming.gamingKinds);
+    const snapshotGaming = detectScoreGaming(filePath, afterContent);
+    issues.push(...snapshotGaming.issues);
+    gamingKinds.push(...snapshotGaming.gamingKinds);
 
-  const relocationPenalty = checkRelocationPadding(
-    filePath,
-    beforeContent,
-    afterContent,
-    issues,
-    gamingKinds,
-  );
-  const gamingPenalty = snapshotGaming.gamingPenalty + relocationPenalty;
+    const relocationPenalty = checkRelocationPadding(
+        filePath,
+        beforeContent,
+        afterContent,
+        issues,
+        gamingKinds,
+    );
+    const gamingPenalty = snapshotGaming.gamingPenalty + relocationPenalty;
 
-  return {
-    hasGaming: issues.length > 0,
-    issues,
-    gamingKinds,
-    gamingPenalty,
-  };
+    return {
+        hasGaming: issues.length > 0,
+        issues,
+        gamingKinds,
+        gamingPenalty,
+    };
 }
