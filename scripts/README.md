@@ -14,7 +14,7 @@
 | `sh/` | Bash | `gate-common.sh` | gate（冲突分级单源规则库，被 source） | `pr-gate.sh` / `auto-merge-gate.sh` |
 | `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与质量前置门禁） | `.githooks/pre-commit`、本地 CLI |
 | `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |
-| `sh/` | Bash | `commit-msg-gate.sh` | gate（本地提交信息格式与零黑话门禁） | `.githooks/commit-msg`、本地 CLI |
+| `sh/` | Bash | `commit-msg-gate.sh` | gate（生产工程级结构化提交信息格式、区块与字数门禁） | `.githooks/commit-msg`、本地 CLI |
 | `ps1/` | PowerShell | `commit-msg-gate.ps1` | gate（commit-msg-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `pre-push-gate.sh` | gate（本地推送前置全量回归与质量门禁） | `.githooks/pre-push`、本地 CLI |
 | `ps1/` | PowerShell | `pre-push-gate.ps1` | gate（pre-push-gate.sh 同构双实现） | 本地 CLI（Windows） |

@@ -13,7 +13,7 @@
 ## 二、 跨项目全局通用契约
 
 ### 1. 命名与代码排版
-- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 中文正文引需求 ID；
+- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 生产工程级结构化正文（必须包含 [Why]/[Added]/[Changed]/[Fixed]/[Verification] 结构化区块，非轻量提交正文有效字数 $\ge 30$ 字符，受 `commit-msg-gate` 本地与 CI 强阻断）；
 - **物理命名**：全局严格 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）；
 - **缩进换行**：TypeScript 4 空格，其余 2 空格；`ps1` 严格 CRLF，`sh`/`gd`/`md`/`json`/`ts` 严格 LF。
 

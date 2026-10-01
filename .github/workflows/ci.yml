@@ -288,9 +288,20 @@ jobs:
           bash scripts/sh/install-hooks.sh
           # 2. pre-commit-gate.sh 自检 (无暂存应 exit 0)
           bash scripts/sh/pre-commit-gate.sh
-          # 3. commit-msg-gate.sh 规范自检
+          # 3. commit-msg-gate.sh 生产工程级结构化合规自检
           MSG_TEMP=$(mktemp)
-          echo "feat(ci): 自检提交信息规范门禁" > "$MSG_TEMP"
+          cat << 'EOF' > "$MSG_TEMP"
+feat(ci): 引入生产工程级提交信息门禁
+
+[Why / 动机背景]
+- 规范全仓 Git 提交信息格式，杜绝敷衍低密度提交。
+
+[Added / 新增内容]
+- 新增结构化正文区块校验与字数底线检测。
+
+[Verification / 验证结论]
+- 本地与 CI 自动化自测通过。
+EOF
           bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP"
           # 4. commit-msg-gate.sh 非法信息阻断自检 (非法应 exit 1)
           echo "bad message" > "$MSG_TEMP"
@@ -300,6 +311,11 @@ jobs:
           echo "wip: 临时改动" > "$MSG_TEMP"
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截 wip 黑话信息"; exit 1
+          fi
+          # 5. feat 缺少正文阻断自检
+          echo "feat(ci): 只有标题没有正文" > "$MSG_TEMP"
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截缺少正文的 feat 提交"; exit 1
           fi
           rm -f "$MSG_TEMP"
           echo "✔ Git 本地门禁脚本自检全部通过"
