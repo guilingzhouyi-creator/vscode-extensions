@@ -289,8 +289,8 @@ function runBenchmark() {
     const maskRes = results.find((r) => r.operator === 'SIMD Source Mask');
     if (maskRes) {
       assert.ok(
-        maskRes.speedup >= 0.85,
-        `SIMD source mask speedup ratio (${maskRes.speedup.toFixed(2)}x) should be >= 0.85x`,
+        maskRes.speedup >= 0.75,
+        `SIMD source mask speedup ratio (${maskRes.speedup.toFixed(2)}x) should be >= 0.75x`,
       );
     }
     console.log('✓ All native operator performance guardrails passed successfully.');

@@ -55,7 +55,6 @@ const { GdscriptModernAnalyzer } = require(
 
 console.log('=== Running Frontend Architecture & Governance Validation Pipeline (29 Gates) ===');
 
-
 // Gate 1: Debounce protection index boundary and scaling invariants
 {
   const perfect = calculateDebounceProtectionIndex(10, 5, 10);
@@ -63,7 +62,11 @@ console.log('=== Running Frontend Architecture & Governance Validation Pipeline 
   const zeroActions = calculateDebounceProtectionIndex(0, 0, 0);
   assert.strictEqual(zeroActions, 100, 'Gate 1 Failed: Zero actions must yield 100.0 default');
   const unprotected = calculateDebounceProtectionIndex(0, 0, 10);
-  assert.strictEqual(unprotected, 0, 'Gate 1 Failed: Completely unprotected actions must yield 0.0');
+  assert.strictEqual(
+    unprotected,
+    0,
+    'Gate 1 Failed: Completely unprotected actions must yield 0.0',
+  );
   console.log('  [PASS] Gate 1: Debounce protection index invariant');
 }
 
@@ -114,7 +117,13 @@ console.log('=== Running Frontend Architecture & Governance Validation Pipeline 
 
 // Gate 7: Registry contains all 5 original GDM rules
 {
-  const expectedRules = ['GDM-DEB-001', 'GDM-FSM-001', 'GDM-WEAK-001', 'GDM-RES-001', 'GDM-UNI-001'];
+  const expectedRules = [
+    'GDM-DEB-001',
+    'GDM-FSM-001',
+    'GDM-WEAK-001',
+    'GDM-RES-001',
+    'GDM-UNI-001',
+  ];
   for (const ruleId of expectedRules) {
     const found = RULE_REGISTRY.find((r) => r.id === ruleId);
     assert.ok(found, `Gate 7 Failed: Expected rule ${ruleId} not registered in RULE_REGISTRY`);
@@ -125,10 +134,20 @@ console.log('=== Running Frontend Architecture & Governance Validation Pipeline 
 
 // Gate 8: Family dimension routing agreement for GDM rules
 {
-  const expectedRules = ['GDM-DEB-001', 'GDM-FSM-001', 'GDM-WEAK-001', 'GDM-RES-001', 'GDM-UNI-001'];
+  const expectedRules = [
+    'GDM-DEB-001',
+    'GDM-FSM-001',
+    'GDM-WEAK-001',
+    'GDM-RES-001',
+    'GDM-UNI-001',
+  ];
   for (const ruleId of expectedRules) {
     const routed = familyDimensionOf(ruleId);
-    assert.strictEqual(routed, 'modernity', `Gate 8 Failed: Rule ${ruleId} must route to modernity`);
+    assert.strictEqual(
+      routed,
+      'modernity',
+      `Gate 8 Failed: Rule ${ruleId} must route to modernity`,
+    );
   }
   console.log('  [PASS] Gate 8: Family dimension routing agreement for GDM rules');
 }
@@ -151,8 +170,15 @@ func _ready():
     afterContent: afterCode,
   });
   assert.ok(recipe, 'Gate 9 Failed: Trajectory recipe extractor must synthesize debounce recipe');
-  assert.strictEqual(recipe.category, 'interaction-debounce', 'Gate 9 Failed: Category must be interaction-debounce');
-  assert.ok(recipe.recipeId.startsWith('REC-DEB'), 'Gate 9 Failed: RecipeId must start with REC-DEB');
+  assert.strictEqual(
+    recipe.category,
+    'interaction-debounce',
+    'Gate 9 Failed: Category must be interaction-debounce',
+  );
+  assert.ok(
+    recipe.recipeId.startsWith('REC-DEB'),
+    'Gate 9 Failed: RecipeId must start with REC-DEB',
+  );
   console.log('  [PASS] Gate 9: Trajectory recipe extractor synthesizes REC-DEB');
 }
 
@@ -173,9 +199,19 @@ func trigger_combat():
     beforeContent: beforeCode,
     afterContent: afterCode,
   });
-  assert.ok(recipe, 'Gate 10 Failed: Trajectory recipe extractor must synthesize FSM discipline recipe');
-  assert.strictEqual(recipe.category, 'state-machine-discipline', 'Gate 10 Failed: Category must be state-machine-discipline');
-  assert.ok(recipe.recipeId.startsWith('REC-FSM'), 'Gate 10 Failed: RecipeId must start with REC-FSM');
+  assert.ok(
+    recipe,
+    'Gate 10 Failed: Trajectory recipe extractor must synthesize FSM discipline recipe',
+  );
+  assert.strictEqual(
+    recipe.category,
+    'state-machine-discipline',
+    'Gate 10 Failed: Category must be state-machine-discipline',
+  );
+  assert.ok(
+    recipe.recipeId.startsWith('REC-FSM'),
+    'Gate 10 Failed: RecipeId must start with REC-FSM',
+  );
   console.log('  [PASS] Gate 10: Trajectory recipe extractor synthesizes REC-FSM');
 }
 
@@ -197,8 +233,15 @@ func register_listener(node):
     afterContent: afterCode,
   });
   assert.ok(recipe, 'Gate 11 Failed: Trajectory recipe extractor must synthesize weakref recipe');
-  assert.strictEqual(recipe.category, 'weakref-observer', 'Gate 11 Failed: Category must be weakref-observer');
-  assert.ok(recipe.recipeId.startsWith('REC-WEAK'), 'Gate 11 Failed: RecipeId must start with REC-WEAK');
+  assert.strictEqual(
+    recipe.category,
+    'weakref-observer',
+    'Gate 11 Failed: Category must be weakref-observer',
+  );
+  assert.ok(
+    recipe.recipeId.startsWith('REC-WEAK'),
+    'Gate 11 Failed: RecipeId must start with REC-WEAK',
+  );
   console.log('  [PASS] Gate 11: Trajectory recipe extractor synthesizes REC-WEAK');
 }
 
@@ -219,22 +262,55 @@ func _on_buy():
     beforeContent: beforeCode,
     afterContent: afterCode,
   });
-  assert.ok(recipe, 'Gate 12 Failed: Trajectory recipe extractor must synthesize unidirectional-flow recipe');
-  assert.strictEqual(recipe.category, 'unidirectional-flow', 'Gate 12 Failed: Category must be unidirectional-flow');
-  assert.ok(recipe.recipeId.startsWith('REC-UNI'), 'Gate 12 Failed: RecipeId must start with REC-UNI');
+  assert.ok(
+    recipe,
+    'Gate 12 Failed: Trajectory recipe extractor must synthesize unidirectional-flow recipe',
+  );
+  assert.strictEqual(
+    recipe.category,
+    'unidirectional-flow',
+    'Gate 12 Failed: Category must be unidirectional-flow',
+  );
+  assert.ok(
+    recipe.recipeId.startsWith('REC-UNI'),
+    'Gate 12 Failed: RecipeId must start with REC-UNI',
+  );
   console.log('  [PASS] Gate 12: Trajectory recipe extractor synthesizes REC-UNI');
 }
 
 // Gate 13: WebGames test_frontend_boundary_guard.gd contains 18 tests
 {
-  const guardPath = path.join(__dirname, '..', '..', 'WebGames', 'tests', 'guards', 'test_frontend_boundary_guard.gd');
+  const guardPath = path.join(
+    __dirname,
+    '..',
+    '..',
+    'WebGames',
+    'tests',
+    'guards',
+    'test_frontend_boundary_guard.gd',
+  );
   if (fs.existsSync(guardPath)) {
     const content = fs.readFileSync(guardPath, 'utf8');
-    assert.ok(content.includes('_test_ui_buttons_debounce_discipline'), 'Gate 13 Failed: Missing debounce guard test');
-    assert.ok(content.includes('_test_fsm_zero_wild_state_mutations'), 'Gate 13 Failed: Missing FSM guard test');
-    assert.ok(content.includes('_test_ui_binding_registry_weakref_compliance'), 'Gate 13 Failed: Missing weakref guard test');
-    assert.ok(content.includes('_test_presentation_no_dto_in_place_mutation'), 'Gate 13 Failed: Missing DTO mutation guard test');
-    assert.ok(content.includes('_test_views_responsive_layout_discipline'), 'Gate 13 Failed: Missing responsive layout guard test');
+    assert.ok(
+      content.includes('_test_ui_buttons_debounce_discipline'),
+      'Gate 13 Failed: Missing debounce guard test',
+    );
+    assert.ok(
+      content.includes('_test_fsm_zero_wild_state_mutations'),
+      'Gate 13 Failed: Missing FSM guard test',
+    );
+    assert.ok(
+      content.includes('_test_ui_binding_registry_weakref_compliance'),
+      'Gate 13 Failed: Missing weakref guard test',
+    );
+    assert.ok(
+      content.includes('_test_presentation_no_dto_in_place_mutation'),
+      'Gate 13 Failed: Missing DTO mutation guard test',
+    );
+    assert.ok(
+      content.includes('_test_views_responsive_layout_discipline'),
+      'Gate 13 Failed: Missing responsive layout guard test',
+    );
     console.log('  [PASS] Gate 13: WebGames boundary guard contains all 18 test gate declarations');
   } else {
     console.log('  [SKIP] Gate 13: WebGames directory not present in current test scope');
@@ -253,7 +329,10 @@ func _on_buy():
   for (const file of filesToCheck) {
     if (fs.existsSync(file)) {
       const lineCount = fs.readFileSync(file, 'utf8').split('\n').length;
-      assert.ok(lineCount < 900, `Gate 14 Failed: ${path.basename(file)} has ${lineCount} lines (>= 900 limit)`);
+      assert.ok(
+        lineCount < 900,
+        `Gate 14 Failed: ${path.basename(file)} has ${lineCount} lines (>= 900 limit)`,
+      );
     }
   }
   console.log('  [PASS] Gate 14: All source files stay strictly within < 900 LOC budget');
@@ -270,7 +349,10 @@ func _on_buy():
   for (const file of filesToCheck) {
     if (fs.existsSync(file)) {
       const content = fs.readFileSync(file, 'utf8');
-      assert.ok(!bannedPattern.test(content), `Gate 15 Failed: Found banned construction jargon in ${path.basename(file)}`);
+      assert.ok(
+        !bannedPattern.test(content),
+        `Gate 15 Failed: Found banned construction jargon in ${path.basename(file)}`,
+      );
     }
   }
   console.log('  [PASS] Gate 15: Zero banned construction jargon across modified files');
@@ -283,18 +365,26 @@ func _on_buy():
     assert.ok(!ruleIds.has(rule.id), `Gate 16 Failed: Duplicate rule ID found: ${rule.id}`);
     ruleIds.add(rule.id);
   }
-  assert.strictEqual(ruleIds.size, 256, `Gate 16 Failed: Expected 256 rules, got ${ruleIds.size}`);
+  assert.strictEqual(ruleIds.size, 262, `Gate 16 Failed: Expected 262 rules, got ${ruleIds.size}`);
   console.log(`  [PASS] Gate 16: Zero duplicate rule IDs (Total: ${ruleIds.size} unique rules)`);
 }
 
 // Gate 17: Component Adoption Index (CAI) mathematical invariants
 {
   const fullAdoption = calculateComponentAdoptionIndex(10, 10, 0);
-  assert.strictEqual(fullAdoption, 100, 'Gate 17 Failed: 100% K-component adoption must yield 100.0');
+  assert.strictEqual(
+    fullAdoption,
+    100,
+    'Gate 17 Failed: 100% K-component adoption must yield 100.0',
+  );
   const zeroAdoption = calculateComponentAdoptionIndex(0, 10, 10);
   assert.strictEqual(zeroAdoption, 0, 'Gate 17 Failed: 0% K-component adoption must yield 0.0');
   const partialAdoption = calculateComponentAdoptionIndex(5, 10, 5);
-  assert.strictEqual(partialAdoption, 25, 'Gate 17 Failed: 50% ratio * 50% coverage must yield 25.0');
+  assert.strictEqual(
+    partialAdoption,
+    25,
+    'Gate 17 Failed: 50% ratio * 50% coverage must yield 25.0',
+  );
   const emptyView = calculateComponentAdoptionIndex(0, 0, 0);
   assert.strictEqual(emptyView, 100, 'Gate 17 Failed: Empty view should default to 100.0');
   console.log('  [PASS] Gate 17: Component Adoption Index (CAI) invariants');
@@ -314,7 +404,11 @@ func _on_buy():
 // Gate 19: i18n Symmetry Index (ISI) mathematical invariants
 {
   const fullyLocalized = calculateI18nSymmetryIndex(20, 0, 0);
-  assert.strictEqual(fullyLocalized, 100, 'Gate 19 Failed: Fully localized UI text must yield 100.0');
+  assert.strictEqual(
+    fullyLocalized,
+    100,
+    'Gate 19 Failed: Fully localized UI text must yield 100.0',
+  );
   const rawStringsOnly = calculateI18nSymmetryIndex(0, 10, 0);
   assert.strictEqual(rawStringsOnly, 0, 'Gate 19 Failed: Unlocalized strings only must yield 0.0');
   const mixed = calculateI18nSymmetryIndex(10, 2, 0); // 10 / (10 + 5) = 66.666... -> 66.7
@@ -325,9 +419,16 @@ func _on_buy():
 // Gate 20: Presentation Decoupling Index (PDI) mathematical invariants
 {
   const perfectlyDecoupled = calculatePresentationDecouplingIndex(0, 0, 5);
-  assert.strictEqual(perfectlyDecoupled, 100, 'Gate 20 Failed: Completely decoupled views must yield 100.0');
+  assert.strictEqual(
+    perfectlyDecoupled,
+    100,
+    'Gate 20 Failed: Completely decoupled views must yield 100.0',
+  );
   const coupled = calculatePresentationDecouplingIndex(2, 1, 1);
-  assert.ok(coupled < 10, 'Gate 20 Failed: Direct backend/eventbus coupling must exponentially decay PDI');
+  assert.ok(
+    coupled < 10,
+    'Gate 20 Failed: Direct backend/eventbus coupling must exponentially decay PDI',
+  );
   console.log('  [PASS] Gate 20: Presentation Decoupling Index (PDI) invariants');
 }
 
@@ -342,8 +443,15 @@ func _on_buy():
     afterContent: 'var bar = KStatusBar.new()\nbar.set_progress(0.5)\n',
   });
   assert.ok(barRecipe, 'Gate 21 Failed: Must synthesize status-bar recipe');
-  assert.strictEqual(barRecipe.category, 'status-bar-component', 'Gate 21 Failed: Wrong category for status bar');
-  assert.ok(barRecipe.recipeId.startsWith('REC-BAR'), 'Gate 21 Failed: Recipe ID must start with REC-BAR');
+  assert.strictEqual(
+    barRecipe.category,
+    'status-bar-component',
+    'Gate 21 Failed: Wrong category for status bar',
+  );
+  assert.ok(
+    barRecipe.recipeId.startsWith('REC-BAR'),
+    'Gate 21 Failed: Recipe ID must start with REC-BAR',
+  );
 
   // Test REC-TOK
   const tokRecipe = extractor.extractRecipeFromTrajectory({
@@ -353,8 +461,15 @@ func _on_buy():
     afterContent: 'var c = DesignTokens.COLOR_ACCENT\nlabel.modulate = c\n',
   });
   assert.ok(tokRecipe, 'Gate 21 Failed: Must synthesize token recipe');
-  assert.strictEqual(tokRecipe.category, 'token-standardization', 'Gate 21 Failed: Wrong category for token');
-  assert.ok(tokRecipe.recipeId.startsWith('REC-TOK'), 'Gate 21 Failed: Recipe ID must start with REC-TOK');
+  assert.strictEqual(
+    tokRecipe.category,
+    'token-standardization',
+    'Gate 21 Failed: Wrong category for token',
+  );
+  assert.ok(
+    tokRecipe.recipeId.startsWith('REC-TOK'),
+    'Gate 21 Failed: Recipe ID must start with REC-TOK',
+  );
 
   // Test REC-EXT
   const extRecipe = extractor.extractRecipeFromTrajectory({
@@ -364,8 +479,15 @@ func _on_buy():
     afterContent: 'extends BaseScreen\nfunc _ready(): pass\n',
   });
   assert.ok(extRecipe, 'Gate 21 Failed: Must synthesize screen base recipe');
-  assert.strictEqual(extRecipe.category, 'screen-base-inheritance', 'Gate 21 Failed: Wrong category for screen base');
-  assert.ok(extRecipe.recipeId.startsWith('REC-EXT'), 'Gate 21 Failed: Recipe ID must start with REC-EXT');
+  assert.strictEqual(
+    extRecipe.category,
+    'screen-base-inheritance',
+    'Gate 21 Failed: Wrong category for screen base',
+  );
+  assert.ok(
+    extRecipe.recipeId.startsWith('REC-EXT'),
+    'Gate 21 Failed: Recipe ID must start with REC-EXT',
+  );
   console.log('  [PASS] Gate 21: Trajectory extractor synthesizes REC-BAR, REC-TOK, REC-EXT');
 }
 
@@ -385,7 +507,11 @@ func _on_buy():
     const found = RULE_REGISTRY.find((r) => r.id === ruleId);
     assert.ok(found, `Gate 22 Failed: Rule ${ruleId} not registered in RULE_REGISTRY`);
     assert.strictEqual(found.family, 'GDM', `Gate 22 Failed: Rule ${ruleId} has wrong family`);
-    assert.strictEqual(found.defaultSeverity, 'warning', `Gate 22 Failed: Rule ${ruleId} has wrong defaultSeverity`);
+    assert.strictEqual(
+      found.defaultSeverity,
+      'warning',
+      `Gate 22 Failed: Rule ${ruleId} has wrong defaultSeverity`,
+    );
   }
   console.log('  [PASS] Gate 22: RULE_REGISTRY contains all 8 new GDM frontend governance rules');
 }
@@ -440,9 +566,14 @@ func _on_buy():
   // Check GDM-LOC-001 with 451-line file
   const longFileCode = Array.from({ length: 452 }, (_, i) => `var x_${i} = ${i}`).join('\n');
   const locIssues = analyzer.finalize({ filePath: 'views/large_view.gd', content: longFileCode });
-  assert.ok(locIssues.some((i) => i.rule === 'GDM-LOC-001'), 'Gate 23 Failed: Analyzer did not emit GDM-LOC-001 on LOC > 450');
+  assert.ok(
+    locIssues.some((i) => i.rule === 'GDM-LOC-001'),
+    'Gate 23 Failed: Analyzer did not emit GDM-LOC-001 on LOC > 450',
+  );
 
-  console.log('  [PASS] Gate 23: GdscriptModernAnalyzer live detection correctly triggers all 8 rules');
+  console.log(
+    '  [PASS] Gate 23: GdscriptModernAnalyzer live detection correctly triggers all 8 rules',
+  );
 }
 
 // Gate 24: Real WebGames presentation views have zero violations across all 8 rules
@@ -488,7 +619,9 @@ func _on_buy():
       0,
       `Gate 24 Failed: WebGames presentation views had ${totalViolations} violations:\n  ${violationDetails.join('\n  ')}`,
     );
-    console.log(`  [PASS] Gate 24: Scanned ${viewFiles.length} WebGames presentation views with 0 violations`);
+    console.log(
+      `  [PASS] Gate 24: Scanned ${viewFiles.length} WebGames presentation views with 0 violations`,
+    );
   } else {
     console.log('  [SKIP] Gate 24: WebGames views directory not found');
   }
@@ -519,13 +652,23 @@ func _on_buy():
   const highEntropy = calculateShannonEntropy('abcdefgh');
   assert.strictEqual(highEntropy, 3.0, 'Gate 27 Failed: 8 distinct chars must have 3.0 entropy');
   const astDensity = calculateAstLocDensityIndex(500, 100);
-  assert.strictEqual(astDensity, 5.0, 'Gate 27 Failed: 500 nodes / 100 lines must yield 5.0 density');
+  assert.strictEqual(
+    astDensity,
+    5.0,
+    'Gate 27 Failed: 500 nodes / 100 lines must yield 5.0 density',
+  );
 
   // Anti-gaming detector check
   const gamingSample = Array.from({ length: 10 }, (_, i) => `var a${i} = ${i};`).join('\n');
   const result = detectScoreGaming('src/sample.ts', gamingSample);
-  assert.ok(result.hasGaming, 'Gate 27 Failed: Low-entropy synthetic variable names must trigger anti-gaming');
-  assert.ok(result.gamingKinds.includes('naming_entropy_anomaly'), 'Gate 27 Failed: Must flag naming_entropy_anomaly');
+  assert.ok(
+    result.hasGaming,
+    'Gate 27 Failed: Low-entropy synthetic variable names must trigger anti-gaming',
+  );
+  assert.ok(
+    result.gamingKinds.includes('naming_entropy_anomaly'),
+    'Gate 27 Failed: Must flag naming_entropy_anomaly',
+  );
   console.log('  [PASS] Gate 27: Shannon Information Entropy & AST Density anti-gaming invariants');
 }
 
@@ -540,8 +683,15 @@ func _on_buy():
     afterContent: 'var vlist = KVirtualList.new()\nvlist.sync(items)\n',
   });
   assert.ok(vrtRecipe, 'Gate 28 Failed: Must synthesize virtual list recipe');
-  assert.strictEqual(vrtRecipe.category, 'virtual-list-pooling', 'Gate 28 Failed: Wrong category for VRT');
-  assert.ok(vrtRecipe.recipeId.startsWith('REC-VRT'), 'Gate 28 Failed: Recipe ID must start with REC-VRT');
+  assert.strictEqual(
+    vrtRecipe.category,
+    'virtual-list-pooling',
+    'Gate 28 Failed: Wrong category for VRT',
+  );
+  assert.ok(
+    vrtRecipe.recipeId.startsWith('REC-VRT'),
+    'Gate 28 Failed: Recipe ID must start with REC-VRT',
+  );
 
   // Test REC-I18N
   const i18nRecipe = extractor.extractRecipeFromTrajectory({
@@ -551,8 +701,15 @@ func _on_buy():
     afterContent: 'label.text = tr("HELLO_WORLD")\n',
   });
   assert.ok(i18nRecipe, 'Gate 28 Failed: Must synthesize i18n recipe');
-  assert.strictEqual(i18nRecipe.category, 'i18n-localization', 'Gate 28 Failed: Wrong category for I18N');
-  assert.ok(i18nRecipe.recipeId.startsWith('REC-I18N'), 'Gate 28 Failed: Recipe ID must start with REC-I18N');
+  assert.strictEqual(
+    i18nRecipe.category,
+    'i18n-localization',
+    'Gate 28 Failed: Wrong category for I18N',
+  );
+  assert.ok(
+    i18nRecipe.recipeId.startsWith('REC-I18N'),
+    'Gate 28 Failed: Recipe ID must start with REC-I18N',
+  );
 
   // Test REC-NOD
   const nodRecipe = extractor.extractRecipeFromTrajectory({
@@ -562,8 +719,15 @@ func _on_buy():
     afterContent: '@onready var p = %HeaderNode\n',
   });
   assert.ok(nodRecipe, 'Gate 28 Failed: Must synthesize explicit node recipe');
-  assert.strictEqual(nodRecipe.category, 'explicit-node-unique', 'Gate 28 Failed: Wrong category for NOD');
-  assert.ok(nodRecipe.recipeId.startsWith('REC-NOD'), 'Gate 28 Failed: Recipe ID must start with REC-NOD');
+  assert.strictEqual(
+    nodRecipe.category,
+    'explicit-node-unique',
+    'Gate 28 Failed: Wrong category for NOD',
+  );
+  assert.ok(
+    nodRecipe.recipeId.startsWith('REC-NOD'),
+    'Gate 28 Failed: Recipe ID must start with REC-NOD',
+  );
 
   // Test REC-BND
   const bndRecipe = extractor.extractRecipeFromTrajectory({
@@ -573,28 +737,54 @@ func _on_buy():
     afterContent: 'func apply_snapshot(snap):\n\tupdate_ui(snap)\n',
   });
   assert.ok(bndRecipe, 'Gate 28 Failed: Must synthesize domain decoupling recipe');
-  assert.strictEqual(bndRecipe.category, 'presentation-decoupling', 'Gate 28 Failed: Wrong category for BND');
-  assert.ok(bndRecipe.recipeId.startsWith('REC-BND'), 'Gate 28 Failed: Recipe ID must start with REC-BND');
+  assert.strictEqual(
+    bndRecipe.category,
+    'presentation-decoupling',
+    'Gate 28 Failed: Wrong category for BND',
+  );
+  assert.ok(
+    bndRecipe.recipeId.startsWith('REC-BND'),
+    'Gate 28 Failed: Recipe ID must start with REC-BND',
+  );
 
-  console.log('  [PASS] Gate 28: Trajectory extractor synthesizes REC-VRT, REC-I18N, REC-NOD, REC-BND');
+  console.log(
+    '  [PASS] Gate 28: Trajectory extractor synthesizes REC-VRT, REC-I18N, REC-NOD, REC-BND',
+  );
 }
 
 // Gate 29: Archetype weight tuner supports frontend, backend, composite profiles
 {
   const tuner = new ArchetypeWeightTuner();
   const feWeights = tuner.tuneWeights('frontend');
-  assert.ok(feWeights.techDebtRisk > feWeights.codeSecurity, 'Gate 29 Failed: Frontend profile must prioritize techDebt/PDI over backend security');
-  assert.ok(feWeights.standardization > feWeights.architectureConsistency, 'Gate 29 Failed: Frontend profile must prioritize standardization/DTC');
+  assert.ok(
+    feWeights.techDebtRisk > feWeights.codeSecurity,
+    'Gate 29 Failed: Frontend profile must prioritize techDebt/PDI over backend security',
+  );
+  assert.ok(
+    feWeights.standardization > feWeights.architectureConsistency,
+    'Gate 29 Failed: Frontend profile must prioritize standardization/DTC',
+  );
 
   const beWeights = tuner.tuneWeights('backend');
-  assert.ok(beWeights.performanceEfficiency > beWeights.standardization, 'Gate 29 Failed: Backend profile must prioritize performanceEfficiency');
-  assert.ok(beWeights.maintainability > beWeights.commentQuality, 'Gate 29 Failed: Backend profile must prioritize maintainability over commentQuality');
+  assert.ok(
+    beWeights.performanceEfficiency > beWeights.standardization,
+    'Gate 29 Failed: Backend profile must prioritize performanceEfficiency',
+  );
+  assert.ok(
+    beWeights.maintainability > beWeights.commentQuality,
+    'Gate 29 Failed: Backend profile must prioritize maintainability over commentQuality',
+  );
 
   const compWeights = tuner.tuneWeights('composite');
-  assert.ok(compWeights.architectureConsistency > 0, 'Gate 29 Failed: Composite profile must have valid weights');
-  console.log('  [PASS] Gate 29: Archetype weight tuner supports frontend, backend, composite profiles');
+  assert.ok(
+    compWeights.architectureConsistency > 0,
+    'Gate 29 Failed: Composite profile must have valid weights',
+  );
+  console.log(
+    '  [PASS] Gate 29: Archetype weight tuner supports frontend, backend, composite profiles',
+  );
 }
 
-console.log('\n=== All 29 Frontend Architecture & Quantification Governance Gates PASSED Successfully ===');
-
-
+console.log(
+  '\n=== All 29 Frontend Architecture & Quantification Governance Gates PASSED Successfully ===',
+);

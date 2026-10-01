@@ -86,7 +86,9 @@ function auditLocBudget(allFiles) {
     }
     return false;
   }
-  console.log(`  ✔ [PASS] 100% files conform to LOC budget (Max observed: ${fileLocs[0].loc} LOC < ${MAX_LOC_BUDGET})\n`);
+  console.log(
+    `  ✔ [PASS] 100% files conform to LOC budget (Max observed: ${fileLocs[0].loc} LOC < ${MAX_LOC_BUDGET})\n`,
+  );
   return true;
 }
 
@@ -109,13 +111,19 @@ function auditShannonEntropy(allFiles) {
   }
 
   const meanEntropy = auditedCount > 0 ? totalEntropy / auditedCount : 0;
-  console.log(`  Mean Shannon entropy: ${meanEntropy.toFixed(3)} bits/char across ${auditedCount} files`);
+  console.log(
+    `  Mean Shannon entropy: ${meanEntropy.toFixed(3)} bits/char across ${auditedCount} files`,
+  );
 
   if (lowEntropyFiles.length > 0 || meanEntropy < 3.5 || meanEntropy > 6.5) {
-    console.error(`  ❌ [FAIL] Entropy bounds violated: low count: ${lowEntropyFiles.length}, mean: ${meanEntropy}`);
+    console.error(
+      `  ❌ [FAIL] Entropy bounds violated: low count: ${lowEntropyFiles.length}, mean: ${meanEntropy}`,
+    );
     return false;
   }
-  console.log(`  ✔ [PASS] Shannon entropy healthy (mean ${meanEntropy.toFixed(2)} in [3.5, 6.5], 0 files < 3.0)\n`);
+  console.log(
+    `  ✔ [PASS] Shannon entropy healthy (mean ${meanEntropy.toFixed(2)} in [3.5, 6.5], 0 files < 3.0)\n`,
+  );
   return true;
 }
 
@@ -170,16 +178,24 @@ function auditAstDensity(allFiles) {
   }
 
   const meanDensity = densityAudited > 0 ? totalDensity / densityAudited : 0;
-  console.log(`  Mean AST syntax density: ${meanDensity.toFixed(2)} nodes/effective LOC across ${densityAudited} files`);
+  console.log(
+    `  Mean AST syntax density: ${meanDensity.toFixed(2)} nodes/effective LOC across ${densityAudited} files`,
+  );
 
   if (outlierDensityFiles.length > 0 || meanDensity < 1.0 || meanDensity > 20.0) {
-    console.error(`  ❌ [FAIL] AST density outliers detected: ${outlierDensityFiles.length}, mean: ${meanDensity}`);
+    console.error(
+      `  ❌ [FAIL] AST density outliers detected: ${outlierDensityFiles.length}, mean: ${meanDensity}`,
+    );
     for (const item of outlierDensityFiles) {
-      console.error(`     - ${item.relPath}: ${item.density.toFixed(2)} nodes/LOC (${item.nodeCount} nodes, ${item.effectiveLoc} LOC)`);
+      console.error(
+        `     - ${item.relPath}: ${item.density.toFixed(2)} nodes/LOC (${item.nodeCount} nodes, ${item.effectiveLoc} LOC)`,
+      );
     }
     return false;
   }
-  console.log(`  ✔ [PASS] AST syntax density verified (mean ${meanDensity.toFixed(2)} nodes/LOC in [1.0, 20.0])\n`);
+  console.log(
+    `  ✔ [PASS] AST syntax density verified (mean ${meanDensity.toFixed(2)} nodes/LOC in [1.0, 20.0])\n`,
+  );
   return true;
 }
 
@@ -209,8 +225,13 @@ function auditBoundaryInteroperability(allFiles) {
     }
   }
 
-  const bif = coreFiles.length > 0 ? ((coreFiles.length - boundaryViolations.length) / coreFiles.length) * 100 : 100;
-  console.log(`  Boundary Interoperability Factor (BIF): ${bif.toFixed(1)}% (${coreFiles.length} core files audited)`);
+  const bif =
+    coreFiles.length > 0
+      ? ((coreFiles.length - boundaryViolations.length) / coreFiles.length) * 100
+      : 100;
+  console.log(
+    `  Boundary Interoperability Factor (BIF): ${bif.toFixed(1)}% (${coreFiles.length} core files audited)`,
+  );
 
   if (boundaryViolations.length > 0) {
     console.error(`  ❌ [FAIL] Reverse layer coupling detected from core:`);
@@ -219,7 +240,9 @@ function auditBoundaryInteroperability(allFiles) {
     }
     return false;
   }
-  console.log(`  ✔ [PASS] Boundary Interoperability clean (BIF = 100.0%, 0 reverse dependencies)\n`);
+  console.log(
+    `  ✔ [PASS] Boundary Interoperability clean (BIF = 100.0%, 0 reverse dependencies)\n`,
+  );
   return true;
 }
 
@@ -227,7 +250,10 @@ function auditProfileScoringPrecision() {
   console.log('[Gate 5] Profile Scoring Precision & Bias Asymmetry Guard');
   const { ArchetypeWeightTuner } = require('../dist/core/scoring/archetype-weight-tuner');
   const { QualityScorer } = require('../dist/core/scoring/qualityScorer');
-  const { DEFAULT_QUALITY_WEIGHTS, ALL_QUALITY_DIMENSIONS } = require('../dist/core/scoring/scoringTypes');
+  const {
+    DEFAULT_QUALITY_WEIGHTS,
+    ALL_QUALITY_DIMENSIONS,
+  } = require('../dist/core/scoring/scoringTypes');
 
   const tuner = new ArchetypeWeightTuner();
   const profiles = ['frontend', 'backend', 'composite'];
@@ -244,14 +270,18 @@ function auditProfileScoringPrecision() {
     }
 
     if (Math.abs(tunedMass - baseMass) > 0.001) {
-      console.error(`  ❌ [FAIL] Profile '${profile}' violated mass preservation: base=${baseMass}, tuned=${tunedMass}`);
+      console.error(
+        `  ❌ [FAIL] Profile '${profile}' violated mass preservation: base=${baseMass}, tuned=${tunedMass}`,
+      );
       return false;
     }
 
     const scorer = new QualityScorer(undefined, profile);
     const cleanEval = scorer.evaluateFile('dummy.ts', [], null);
     if (Number.isNaN(cleanEval.compositeScore) || cleanEval.compositeScore !== 100.0) {
-      console.error(`  ❌ [FAIL] Profile '${profile}' clean score was not 100.0: ${cleanEval.compositeScore}`);
+      console.error(
+        `  ❌ [FAIL] Profile '${profile}' clean score was not 100.0: ${cleanEval.compositeScore}`,
+      );
       return false;
     }
   }
@@ -268,7 +298,9 @@ function auditProfileScoringPrecision() {
     return false;
   }
 
-  console.log(`  ✔ [PASS] Profile weight mass invariant preserved (Δ < 0.001) and domain bias asymmetry confirmed\n`);
+  console.log(
+    `  ✔ [PASS] Profile weight mass invariant preserved (Δ < 0.001) and domain bias asymmetry confirmed\n`,
+  );
   return true;
 }
 

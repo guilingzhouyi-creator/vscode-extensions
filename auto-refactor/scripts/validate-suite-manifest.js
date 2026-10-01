@@ -99,7 +99,7 @@ function checkRegisteredScriptsExist(registered) {
     missing,
     [],
     `test-parallel.js registers ${missing.length} script(s) that do not exist:\n  ${missing.join('\n  ')}\n` +
-    'Either the suite was removed or it was renamed; drop the entry or fix the path.',
+      'Either the suite was removed or it was renamed; drop the entry or fix the path.',
   );
   console.log(`  [PASS] all ${registered.size} registered suite(s) exist on disk`);
 }
@@ -126,11 +126,11 @@ function checkNoOrphanSuites(registered) {
     orphans,
     [],
     `${orphans.length} validation script(s) exist but never run in the gate:\n  ${orphans.join('\n  ')}\n` +
-    'Register them in test-parallel.js, or add them to EXEMPT with a reason.',
+      'Register them in test-parallel.js, or add them to EXEMPT with a reason.',
   );
   console.log(
     `  [PASS] every script under scripts/ is accounted for (${onDisk.length} total, ` +
-    `${registered.size} registered, ${EXEMPT.size} exempt, ${BENCHMARKS.length} benchmarks)`,
+      `${registered.size} registered, ${EXEMPT.size} exempt, ${BENCHMARKS.length} benchmarks)`,
   );
 }
 

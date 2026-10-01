@@ -511,11 +511,26 @@ function evaluateContext(rawInput: TypedContextView): any {
 
   // Gate 14: Precondition Matching on All Learned Patterns
   console.log('\n[Gate 14] Verifying recipe precondition matching across all patterns...');
-  [recipe1, recipe2, recipe3, recipePool, recipeCas, recipeHotCfg, recipeDto, recipeHook, recipeShim, recipeDirect, recipeDepr, recipeZcost].forEach(r => service.registerRecipe(r));
+  [
+    recipe1,
+    recipe2,
+    recipe3,
+    recipePool,
+    recipeCas,
+    recipeHotCfg,
+    recipeDto,
+    recipeHook,
+    recipeShim,
+    recipeDirect,
+    recipeDepr,
+    recipeZcost,
+  ].forEach((r) => service.registerRecipe(r));
   const candidatePoolCode = `func emit_sparks():\n    for i in range(10):\n        var s = Particle.new()\n        s.duplicate(true)\n// line 5\n// line 6\n// line 7\n// line 8\n// line 9\n// line 10\n// line 11\n// line 12\n// line 13\n// line 14\n// line 15\n`;
   const poolRecs = service.matchRecipes(candidatePoolCode, 'gdscript');
   assert(poolRecs.some((r) => r.category === 'object-pool-lifecycle'));
-  console.log(`  ✔ Precondition matching passed for object-pool-lifecycle (${poolRecs.length} matches)`);
+  console.log(
+    `  ✔ Precondition matching passed for object-pool-lifecycle (${poolRecs.length} matches)`,
+  );
 
   const candidateShimCode = `func call_legacy():\n    var x = from_stat_mutation("a", "b", 1, 2.0, 3, {})\n// line 3\n// line 4\n// line 5\n// line 6\n`;
   const shimRecs = service.matchRecipes(candidateShimCode, 'gdscript');
@@ -525,9 +540,33 @@ function evaluateContext(rawInput: TypedContextView): any {
   // Gate 15: Cyclic Flip-Flop Detection (GOV-TRJ-001)
   console.log('\n[Gate 15] Verifying cyclic oscillation & flip-flop detection (GOV-TRJ-001)...');
   const revisions = [
-    { revisionId: 'rev-001', fileHash: 'hash-aaa', astDigest: 'ast-aaa', timestamp: 1000, agentUid: 'agent-alice', qualityScore: { compositeScore: 70, dimensions: {} }, ruleHitIds: [] },
-    { revisionId: 'rev-002', fileHash: 'hash-bbb', astDigest: 'ast-bbb', timestamp: 2000, agentUid: 'agent-bob', qualityScore: { compositeScore: 85, dimensions: {} }, ruleHitIds: [] },
-    { revisionId: 'rev-003', fileHash: 'hash-aaa', astDigest: 'ast-aaa', timestamp: 3000, agentUid: 'agent-charlie', qualityScore: { compositeScore: 68, dimensions: {} }, ruleHitIds: [] },
+    {
+      revisionId: 'rev-001',
+      fileHash: 'hash-aaa',
+      astDigest: 'ast-aaa',
+      timestamp: 1000,
+      agentUid: 'agent-alice',
+      qualityScore: { compositeScore: 70, dimensions: {} },
+      ruleHitIds: [],
+    },
+    {
+      revisionId: 'rev-002',
+      fileHash: 'hash-bbb',
+      astDigest: 'ast-bbb',
+      timestamp: 2000,
+      agentUid: 'agent-bob',
+      qualityScore: { compositeScore: 85, dimensions: {} },
+      ruleHitIds: [],
+    },
+    {
+      revisionId: 'rev-003',
+      fileHash: 'hash-aaa',
+      astDigest: 'ast-aaa',
+      timestamp: 3000,
+      agentUid: 'agent-charlie',
+      qualityScore: { compositeScore: 68, dimensions: {} },
+      ruleHitIds: [],
+    },
   ];
   const regIssues = detector.detectRegressions('src/core/payment.ts', revisions);
   assert(regIssues.length >= 1 && regIssues[0].rule === 'GOV-TRJ-001');
@@ -538,7 +577,9 @@ function evaluateContext(rawInput: TypedContextView): any {
   const verdict = await service.learnFromTrajectory({ ...poolInput, churnRatio: 0.4 });
   assert.strictEqual(verdict.hasBadToGoodImprovement, true);
   assert(verdict.qualityDelta > 0 && verdict.qualityVelocity > 0);
-  console.log(`  ✔ Praxis Verdict: ΔScore=+${verdict.qualityDelta.toFixed(1)} | Velocity=${verdict.qualityVelocity.toFixed(1)} | GenIndex=${verdict.generalizationIndex.toFixed(1)} | Recipe=${verdict.extractedRecipe.recipeId}`);
+  console.log(
+    `  ✔ Praxis Verdict: ΔScore=+${verdict.qualityDelta.toFixed(1)} | Velocity=${verdict.qualityVelocity.toFixed(1)} | GenIndex=${verdict.generalizationIndex.toFixed(1)} | Recipe=${verdict.extractedRecipe.recipeId}`,
+  );
 
   const tStart = Date.now();
   for (let i = 0; i < 100; i++) {
@@ -547,7 +588,9 @@ function evaluateContext(rawInput: TypedContextView): any {
     detector.detectRegressions('src/test.ts', revisions);
   }
   const avgMs = (Date.now() - tStart) / 100;
-  console.log(`  ✔ Processed 100 cycles in ${Date.now() - tStart}ms (Average: ${avgMs.toFixed(2)}ms per cycle)`);
+  console.log(
+    `  ✔ Processed 100 cycles in ${Date.now() - tStart}ms (Average: ${avgMs.toFixed(2)}ms per cycle)`,
+  );
   assert(avgMs < 15.0);
 
   console.log('\n================================================================');
