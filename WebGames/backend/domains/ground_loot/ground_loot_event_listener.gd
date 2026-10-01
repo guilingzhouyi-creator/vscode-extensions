@@ -13,9 +13,9 @@ class_name GroundLootEventListener extends RefCounted
 # 一、状态与依赖
 # ==============================================================================
 
-var _catalog: ItemRegistryCatalog = null                 # 物品注册表（声明登记校验用）
+var _catalog: ItemRegistryCatalog = null # 物品注册表（声明登记校验用）
 var _active_drops: Array[GroundDroppedItemAggregate] = [] # 活跃掉落物清单（拾取/衰变回收消费）
-var _sub_token: EventBusSubscriptionToken = null         # 新总线订阅令牌（幂等解绑）
+var _sub_token: EventBusSubscriptionToken = null # 新总线订阅令牌（幂等解绑）
 
 # ==============================================================================
 # 二、生命周期（构造订阅 / 销毁解绑）
@@ -75,7 +75,7 @@ func get_active_drops() -> Array[GroundDroppedItemAggregate]:
 	return _active_drops
 
 ## 清理已衰变掉落物（由衰变时钟/回收调度方周期调用）
-## P7：常态零分配——先扫有无衰变项，无则直接返回（不重建数组）；有才单遍过滤重建
+## 常态零分配——先扫有无衰变项，无则直接返回（不重建数组）；有才单遍过滤重建
 func cleanup_decayed() -> void:
 	var has_decayed := false
 	for drop in _active_drops:
@@ -90,7 +90,7 @@ func cleanup_decayed() -> void:
 			alive.append(drop)
 	_active_drops = alive
 
-## Phase 43 N2：按 drop_id 查找活跃掉落物（查询不出队；未命中返回 null）
+## N2：按 drop_id 查找活跃掉落物（查询不出队；未命中返回 null）
 func find_active_drop(drop_id: String) -> GroundDroppedItemAggregate:
 	if drop_id.is_empty():
 		return null
@@ -99,7 +99,7 @@ func find_active_drop(drop_id: String) -> GroundDroppedItemAggregate:
 			return drop
 	return null
 
-## Phase 43 N2：按 drop_id 出队并返回实例（拾取成功后移除；未命中返回 null）
+## N2：按 drop_id 出队并返回实例（拾取成功后移除；未命中返回 null）
 func claim_drop(drop_id: String) -> GroundDroppedItemAggregate:
 	var drop := find_active_drop(drop_id)
 	if drop == null:
@@ -108,11 +108,15 @@ func claim_drop(drop_id: String) -> GroundDroppedItemAggregate:
 	return drop
 
 ## 内部：按已查实例直接出队（复用外部已查结果，避免二次线性扫描）
-func _claim_drop_instance(drop: GroundDroppedItemAggregate) -> void:
+func _claim_drop_instance(drop: GroundDroppedItemAggregate) -> bool:
+	if drop == null:
+		return false
+	var had := _active_drops.has(drop)
 	_active_drops.erase(drop)
+	return had
 
-## Phase 43 N2：拾取便捷入口——查找 → GroundLootPickupSolver.attempt_pickup →
-## 成功后出队，拾取链与监听器活跃掉落状态闭环（TC-P43-S2-02/S4-05）。
+## N2：拾取便捷入口——查找 → GroundLootPickupSolver.attempt_pickup →
+## 成功后出队，拾取链与监听器活跃掉落状态闭环（TC-/）。
 ## 优化：复用已查 drop 实例直接出队，避免 claim_drop 二次查找
 func attempt_pickup_from_ground(
 	player_account_id: String,

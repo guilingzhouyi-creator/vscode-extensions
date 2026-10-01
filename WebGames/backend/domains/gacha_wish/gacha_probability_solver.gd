@@ -41,7 +41,7 @@ static func calculate_current_5star_rate(pity_count: int) -> float:
 	var soft := _soft_pity_threshold()
 	if pity_count < soft:
 		return _base_5star_rate()
-	var excess = pity_count - soft + 1
+	var excess := pity_count - soft + 1
 	var base := _base_5star_rate()
 	var inc := _soft_increment()
 	return clamp(base + float(excess) * inc, base, 1.0)
@@ -59,7 +59,7 @@ static func roll_single_draw(banner: GachaBannerAggregate, rng_or_seed: Variant 
 	banner.total_lifetime_pulls += 1
 	banner.current_pity_count += 1
 
-	var rate_5 = calculate_current_5star_rate(banner.current_pity_count)
+	var rate_5 := calculate_current_5star_rate(banner.current_pity_count)
 	var roll := rng.randf()
 
 	if roll < rate_5:

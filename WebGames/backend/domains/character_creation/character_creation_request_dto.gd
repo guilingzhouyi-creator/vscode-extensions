@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/character_creation/character_creation_request_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
-# 职责说明: 创角请求入参契约。角色名为游戏内展示名唯一源头（character_name == display_name，严禁并行第二套名称体系）；请求体严禁携带战斗属性字段 （stats/attributes 一律由安全守卫丢弃并告警，属性后端权威派生）。 关联细则: Phase 48 阶段1 §1.2（创角请求契约）
+# 职责说明: 创角请求入参契约。角色名为游戏内展示名唯一源头（character_name == display_name，严禁并行第二套名称体系）；请求体严禁携带战斗属性字段 （stats/attributes 一律由安全守卫丢弃并告警，属性后端权威派生）。 关联细则: 阶段1 §1.2（创角请求契约）
 # 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
 # ==============================================================================
 

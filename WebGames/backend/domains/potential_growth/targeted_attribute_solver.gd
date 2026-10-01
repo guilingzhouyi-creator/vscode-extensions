@@ -22,7 +22,7 @@ const DEFAULT_STAT_LIST: Array[String] = [STAT_STR, STAT_CON, STAT_INT, STAT_AGI
 ## 默认 1 + floor((L-1)/2)：1~2 级 1 点 / 3~4 级 2 点 / 5~6 级 3 点
 static func calculate_point_cost_for_next_stat(current_level: int) -> int:
 	var base := GameConfig.get_int("domains.potential", "point_cost/base", 1)
-	# L1（Phase 55）：分母下限守卫（Inv-VD-1）——tier_size=0 配置会 int/int 除零（对齐 respec maxf(1,…) 惯例）
+	# L1（）：分母下限守卫（Inv-VD-1）——tier_size=0 配置会 int/int 除零（对齐 respec maxf(1,…) 惯例）
 	var tier_size := maxi(1, GameConfig.get_int("domains.potential", "point_cost/tier_size", 2))
 	return base + int(floor(max(0, current_level - base) / tier_size))
 
@@ -42,7 +42,7 @@ static func allocate_targeted_point(
 		var msg_max := GameConfig.get_string("narratives.potential", "max_level_reached", "Attribute %s already at max level %d") % [stat_name, AttributeConversionEngine.max_level()]
 		return { "success": false, "reason": msg_max }
 
-	var cost = calculate_point_cost_for_next_stat(cur_level)
+	var cost := calculate_point_cost_for_next_stat(cur_level)
 	if engine.unassigned_potential_points < cost:
 		var msg2 := GameConfig.get_string("narratives.potential", "not_enough_points", "Not enough potential points. Need %d, have %d") % [cost, engine.unassigned_potential_points]
 		return { "success": false, "reason": msg2 }

@@ -22,7 +22,7 @@ static func translate(
 	if catalog == null:
 		return "[%s]" % loc_key
 
-	var target_loc = locale_override if locale_override != "" else catalog.current_locale
+	var target_loc := locale_override if locale_override != "" else catalog.current_locale
 	var dict: Dictionary = catalog._locale_dictionaries.get(target_loc, {})
 
 	var raw_template := ""
@@ -38,9 +38,9 @@ static func translate(
 			return "[%s]" % loc_key
 
 	# 动态参数插值 {param_name}
-	var formatted_text = raw_template
+	var formatted_text := raw_template
 	for k in params.keys():
-		var token = "{" + str(k) + "}"
+		var token := "{" + str(k) + "}"
 		formatted_text = formatted_text.replace(token, str(params[k]))
 
 	return formatted_text

@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/character_creation/race_definition_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
-# 职责说明: 承载配置驱动种族定义（races_catalog 词条）的元数据： - race_id / canonical_name_key：种族标识与本地化名称键 - is_enabled / canary_feature_tag：启用态与灰度扩展标签（多种族灰度预留） - base_stat_modifiers：六维基础属性修正（配置驱动，不写死种族） - innate_traits / allowed_genders：默认先天特质与可选性别枚举 关联细则: Phase 48 阶段1 §1.1（RaceDefinitionDTO 元数据契约）
+# 职责说明: 承载配置驱动种族定义（races_catalog 词条）的元数据： - race_id / canonical_name_key：种族标识与本地化名称键 - is_enabled / canary_feature_tag：启用态与灰度扩展标签（多种族灰度预留） - base_stat_modifiers：六维基础属性修正（配置驱动，不写死种族） - innate_traits / allowed_genders：默认先天特质与可选性别枚举 关联细则: 阶段1 §1.1（RaceDefinitionDTO 元数据契约）
 # 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
 # ==============================================================================
 

@@ -4,12 +4,13 @@
 # 架构定位: Domain Registry / Specification Catalog
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/contract_registry.json | 信号: EventBus 领域广播
 # 职责说明: 集中加载、持有并提供全域 46 域 ↔ 17 视图契约条目的只读检索与审计接口
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务域第一性原理 / 契约注册表架构规范
 # ==============================================================================
 
 class_name ContractRegistryIndex
 extends RefCounted
 
+const DOMAIN_NAME: String = "contract_registry_index"
 const EntryClass = preload("res://backend/domains/contract_registry/contract_registry_entry.gd")
 
 const SUPPORTED_SCHEMA_VERSION: int = 1
@@ -51,15 +52,15 @@ func _read_config_file_text() -> String:
 	var path := CONTRACT_CONFIG_PATH_PRIMARY
 	if not FileAccess.file_exists(path):
 		path = CONTRACT_CONFIG_PATH_FALLBACK
-		ErrorReporter.emit_error("contract_registry_index", "CONFIG_FALLBACK_USED", "ContractRegistryIndex: 主配置缺失 %s，回退后备路径 %s（请收敛双配置源）" % [CONTRACT_CONFIG_PATH_PRIMARY, CONTRACT_CONFIG_PATH_FALLBACK])
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FALLBACK_USED", "ContractRegistryIndex: 主配置缺失 %s，回退后备路径 %s（请收敛双配置源）" % [CONTRACT_CONFIG_PATH_PRIMARY, CONTRACT_CONFIG_PATH_FALLBACK])
 
 	if not FileAccess.file_exists(path):
-		ErrorReporter.emit_error("contract_registry_index", "CONFIG_FILE_NOT_FOUND", "ContractRegistryIndex: 未找到配置文件: %s" % path)
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FILE_NOT_FOUND", "ContractRegistryIndex: 未找到配置文件: %s" % path)
 		return ""
 
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		ErrorReporter.emit_error("contract_registry_index", "CONFIG_FILE_READ_FAIL", "ContractRegistryIndex: 无法读取配置文件: %s" % path)
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FILE_READ_FAIL", "ContractRegistryIndex: 无法读取配置文件: %s" % path)
 		return ""
 
 	var text := file.get_as_text()
@@ -71,12 +72,12 @@ func _parse_json_dict(text: String) -> Dictionary:
 	var json := JSON.new()
 	var err := json.parse(text)
 	if err != OK:
-		ErrorReporter.emit_error("contract_registry_index", "CONFIG_JSON_PARSE_FAIL", "ContractRegistryIndex: JSON 解析失败: %s" % json.get_error_message())
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_JSON_PARSE_FAIL", "ContractRegistryIndex: JSON 解析失败: %s" % json.get_error_message())
 		return {}
 
 	var data = json.get_data()
 	if not (data is Dictionary):
-		ErrorReporter.emit_error("contract_registry_index", "CONFIG_ROOT_NOT_DICT", "ContractRegistryIndex: 配置根节点必须为 Dictionary")
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_ROOT_NOT_DICT", "ContractRegistryIndex: 配置根节点必须为 Dictionary")
 		return {}
 
 	return data as Dictionary
@@ -85,7 +86,7 @@ func _parse_json_dict(text: String) -> Dictionary:
 func _unpack_registry_sections(dict: Dictionary) -> bool:
 	_schema_version = int(dict.get("$schema_version", 0))
 	if _schema_version != SUPPORTED_SCHEMA_VERSION:
-		ErrorReporter.emit_error("contract_registry_index", "CONFIG_SCHEMA_UNSUPPORTED", "ContractRegistryIndex: schema_version %d 不受支持 (期望 %d)" % [_schema_version, SUPPORTED_SCHEMA_VERSION])
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_SCHEMA_UNSUPPORTED", "ContractRegistryIndex: schema_version %d 不受支持 (期望 %d)" % [_schema_version, SUPPORTED_SCHEMA_VERSION])
 		return false
 
 	var raw_infra = dict.get("infra_domains", [])
@@ -96,7 +97,7 @@ func _unpack_registry_sections(dict: Dictionary) -> bool:
 	var vres := validate_config(dict)
 	if not bool(vres.get("valid", false)):
 		var errs: Array = vres.get("errors", [])
-		ErrorReporter.emit_error("contract_registry_index", "CONFIG_VALIDATION_FAILED", "ContractRegistryIndex: 契约配置结构校验失败: %s" % "; ".join(errs))
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_VALIDATION_FAILED", "ContractRegistryIndex: 契约配置结构校验失败: %s" % "; ".join(errs))
 		return false
 
 	var raw_entries = dict.get("entries", [])
@@ -110,7 +111,8 @@ func _unpack_registry_sections(dict: Dictionary) -> bool:
 	if raw_orphans is Array:
 		for item in raw_orphans:
 			if item is Dictionary:
-				_reverse_orphans.append((item as Dictionary).duplicate(false))
+				var d: Dictionary = item as Dictionary
+				_reverse_orphans.append(d)
 
 	_rebuild_indexes()
 	return true
@@ -224,7 +226,7 @@ static func get_reverse_orphans() -> Array[Dictionary]:
 	ensure_loaded()
 	var out: Array[Dictionary] = []
 	for o in _reverse_orphans:
-		out.append(o.duplicate(true))
+		out.append(o)
 	return out
 
 

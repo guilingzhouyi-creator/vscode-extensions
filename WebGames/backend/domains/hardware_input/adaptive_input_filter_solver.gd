@@ -20,17 +20,17 @@ static func filter_radial_deadzone(
 	var cfg_outer := GameConfig.get_float("domains.hardware_input", "stick_deadzone/outer", 0.95)
 	var inner := inner_deadzone if inner_deadzone >= 0.0 else cfg_inner
 	var outer := outer_deadzone if outer_deadzone >= 0.0 else cfg_outer
-	var raw_mag = raw_stick_vector.length()
+	var raw_mag: float = raw_stick_vector.length()
 	if raw_mag <= inner:
 		return Vector2.ZERO
 
 	if raw_mag >= outer:
 		return raw_stick_vector.normalized()
 
-	# L1（Phase 55）：死区区间守卫（Inv-VD-1）——outer<=inner（倒置/相等配置/热重载）时
+	# L1（）：死区区间守卫（Inv-VD-1）——outer<=inner（倒置/相等配置/热重载）时
 	# 旧实现分母 ≤0 → 除零或负 magnitude（标量反向后摇杆反向）；下限 EPS 只防崩溃不改正常映射精度
 	var deadzone_span := maxf(0.01, outer - inner)
-	var normalized_mag = (raw_mag - inner) / deadzone_span
+	var normalized_mag: float = (raw_mag - inner) / deadzone_span
 	return raw_stick_vector.normalized() * normalized_mag
 
 ## 设备输入事件分派：按键类型 → 活跃设备热切换（返回是否发生切换）

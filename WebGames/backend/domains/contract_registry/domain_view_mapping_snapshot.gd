@@ -61,7 +61,7 @@ func to_dto() -> Dictionary:
 ## 从字典重建快照（覆盖状态单形态 String 契约，数组逐元素转型）
 ## 单形态契约：int 形态已退役——生产端恒产 String；非 String 一律 DtoShapeViolation 审计拒绝
 static func from_dto(dict: Dictionary) -> Resource:
-	var snap = new()
+	var snap := new()
 	if dict == null or dict.is_empty():
 		return snap
 

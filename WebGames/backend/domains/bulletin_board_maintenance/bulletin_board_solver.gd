@@ -20,7 +20,7 @@ static func check_login_permission(
 
 	if board.server_maintenance_mode:
 		if not is_gm_account:
-			var remain_secs = maxi(0, board.maintenance_end_timestamp_utc - current_utc)
+			var remain_secs := maxi(0, board.maintenance_end_timestamp_utc - current_utc)
 			return {
 				"allow_login": false,
 				"error_code": "ERR_SERVER_MAINTENANCE",

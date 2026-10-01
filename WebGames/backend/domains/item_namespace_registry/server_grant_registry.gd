@@ -22,7 +22,7 @@ func register_grant(grant_id: String, uid: String, source: String) -> Dictionary
 	if grants.has(grant_id):
 		return {"success": false, "error_code": "GRANT_ALREADY_EXISTS", "grant_id": grant_id, "uid": grants[grant_id]["uid"]}
 	grants[grant_id] = {"uid": uid, "source": source, "claimed_at": int(Time.get_unix_time_from_system())}
-	# P6：无界补上限——登记后按 server_grant/max_entries 最旧先出裁剪（FifoBudget 单次快照）
+	# 无界补上限——登记后按 server_grant/max_entries 最旧先出裁剪（FifoBudget 单次快照）
 	FifoBudget.trim_oldest(grants, GameConfig.get_int("domains.item_namespace_registry", "server_grant/max_entries", 10000))
 	return {"success": true, "grant_id": grant_id, "uid": uid, "source": source}
 

@@ -44,14 +44,14 @@ static func clawback_currency(
 	if not gate.success:
 		return gate
 	if wallet == null or amount <= 0 or not _currency_keys().has(currency_key):
-		return { "success": false, "error_code": "CLAWBACK_INVALID_TARGET" }
+		return {"success": false, "error_code": "CLAWBACK_INVALID_TARGET"}
 	var tx_id := audit_id if not audit_id.is_empty() else "CLAWBACK_%s_%s" % [currency_key, str(Time.get_ticks_usec())]
 	if _processed_audits.has(tx_id):
 		return {"success": false, "error_code": "IDEMPOTENCY_REPLAY", "audit_id": tx_id}
 
 	var balance_before := _wallet_balance(wallet, currency_key)
 	var delta := {}
-	delta[currency_key] = -amount
+	delta[currency_key] = - amount
 	var applied := wallet.apply_transaction(delta, true)
 	if not applied.get("success", false):
 		return {"success": false, "error_code": applied.get("error_code", "CLAWBACK_NOT_ATOMIC"), "audit_id": tx_id}
@@ -185,7 +185,7 @@ static func clawback_item_instance(
 	})
 	_processed_audits[tx_id] = true
 	_prune_processed_audits()
-	return { "success": true, "item_id": item_id, "item_uid": item.item_uid, "template_id": item.template_id, "actual_clawed": 1, "audit_id": tx_id }
+	return {"success": true, "item_id": item_id, "item_uid": item.item_uid, "template_id": item.template_id, "actual_clawed": 1, "audit_id": tx_id}
 
 # ==============================================================================
 # 内部实现
@@ -207,7 +207,7 @@ static func _gate(admin: AdminPermissionAggregate, mode: String) -> Dictionary:
 			"error_code": "CLAWBACK_PERMISSION_DENIED",
 			"message": _msg("clawback_permission_denied")
 		}
-	return { "success": true }
+	return {"success": true}
 
 static func _currency_keys() -> Array:
 	return GameConfig.get_array("domains.currency", "debt/allowed_currencies", CharacterWalletEntity.CURRENCY_FIELDS)

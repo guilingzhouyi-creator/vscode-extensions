@@ -17,10 +17,10 @@ static func publish_manuscript_book(
 	base_market_price: int = -1,
 	royalty_rate: float = -1.0
 ) -> SkillSubgraphAST.ManuscriptItemEntity:
-	var price = base_market_price
+	var price := base_market_price
 	if price < 0:
 		price = GameConfig.get_int("domains.lattice", "manuscript_defaults/default_price", 100)
-	var royalty = royalty_rate
+	var royalty := royalty_rate
 	if royalty < 0.0:
 		royalty = GameConfig.get_float("domains.lattice", "manuscript_defaults/default_royalty_rate", 0.20)
 	royalty = clampf(royalty, 0.0, 1.0)
@@ -52,8 +52,8 @@ static func publish_manuscript_book(
 	return manuscript
 
 static func settle_book_royalties(manuscript: SkillSubgraphAST.ManuscriptItemEntity, copies_sold: int) -> int:
-	var total_gross = copies_sold * manuscript.market_base_price
-	var author_payout = int(floor(float(total_gross) * manuscript.royalty_percent))
+	var total_gross := copies_sold * manuscript.market_base_price
+	var author_payout := int(floor(float(total_gross) * manuscript.royalty_percent))
 	manuscript.copy_circulation_count += copies_sold
 
 	EventBusCore.get_instance().emit_narrative_by_key(

@@ -14,8 +14,8 @@ class_name ItemInstanceFactory extends RefCounted
 # ==============================================================================
 
 ## 构建实例：proto 原型 + 显示名 + UID 前缀（必为已登记前缀）+ 兼容 item_id 前缀
-## 品质透传（Phase 17）：proto 声明 quality_tier 时经统一基线解析写入快照；未声明零影响。
-## Phase 44 P1：新增可选参 quality_registry——发放热循环（十连/批量邮件/任务奖励）可传入
+## 品质透传（）：proto 声明 quality_tier 时经统一基线解析写入快照；未声明零影响。
+## 新增可选参 quality_registry——发放热循环（十连/批量邮件/任务奖励）可传入
 ## 装配期单例复用，缺省经 GameBootstrap.quality_tier_registry() 懒装配兜底，杜绝每实例
 ## new()+reload_configuration() 整表重建（调用方既有签名零破坏）。
 static func build_instance(

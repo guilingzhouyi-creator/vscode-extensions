@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: config/domains/workshop.json | 信号: EventBus 领域广播
 # 职责说明: 词条洗练随机重掷与装备分解返还强化材料与金币 词条池/返还率由 config/domains/workshop.json 驱动，文案由 narratives/workshop.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name ReforgingAndSalvagePipeline extends RefCounted
@@ -12,16 +12,16 @@ class_name ReforgingAndSalvagePipeline extends RefCounted
 ## 洗练词缀池（domains.workshop reforge/pool 配置驱动）
 static func _pool() -> Array:
 	return GameConfig.get_array("domains.workshop", "reforge/pool", [
-		{ "bonus_str": [2.0, 8.0] },
-		{ "bonus_int": [2.0, 8.0] },
-		{ "bonus_agi": [2.0, 8.0] },
-		{ "slash_boost": [0.05, 0.20] },
-		{ "mana_efficiency": [0.05, 0.15] }
+		{"bonus_str": [2.0, 8.0]},
+		{"bonus_int": [2.0, 8.0]},
+		{"bonus_agi": [2.0, 8.0]},
+		{"slash_boost": [0.05, 0.20]},
+		{"mana_efficiency": [0.05, 0.15]}
 	])
 
 ## rng 为空时回退共享实例；传入实例即可复现洗练结果。
 ## 空词缀池时跳过生成而非崩溃（原实现 randi() % 0 会直接报错）
-## P39 清单4 闭环：lock_count > 0 表示锁定前 N 条既有词缀（保护符/魔单晶
+## 清单4 闭环：lock_count > 0 表示锁定前 N 条既有词缀（保护符/魔单晶
 ## 消耗按配置收取并在同一事务内扣除），其余槽位重掷；余额不足拒绝且不改动物品。
 static func reforge_affixes(
 	item: ItemEntity,
@@ -47,7 +47,7 @@ static func reforge_affixes(
 		var total_lock_cost := lock_cost_per * lock_count
 		if wallet.mana_monocrystals < total_lock_cost:
 			return {"success": false, "error_code": "INSUFFICIENT_RESOURCES"}
-		var pay := wallet.apply_transaction({"mana_monocrystals": -total_lock_cost}, true)
+		var pay := wallet.apply_transaction({"mana_monocrystals": - total_lock_cost}, true)
 		if not pay.get("success", false):
 			return {"success": false, "error_code": pay.get("error_code", "INSUFFICIENT_RESOURCES")}
 	var reforge_rng := DeterministicRNG.resolve(rng)
@@ -58,14 +58,7 @@ static func reforge_affixes(
 		var picked = reforge_rng.pick(pool)
 		if picked == null:
 			continue
-		var entry: Dictionary = picked as Dictionary
-		var crafted := {}
-		for k in entry:
-			var v = entry[k]
-			if v is Array and v.size() == 2:
-				crafted[k] = reforge_rng.randf_range(float(v[0]), float(v[1]))
-			else:
-				crafted[k] = v
+		var crafted := _craft_affix_from_entry(picked as Dictionary, reforge_rng)
 		new_affixes.append(crafted)
 
 	item.affix_sockets["dynamic_affixes"] = new_affixes
@@ -73,7 +66,17 @@ static func reforge_affixes(
 	EventBusCore.get_instance().emit_narrative_by_key(
 		"workshop/reforge_success", "economy", [item.custom_name, new_affixes.size()]
 	)
-	return { "success": true, "affixes": new_affixes, "locked_count": lock_count }
+	return {"success": true, "affixes": new_affixes, "locked_count": lock_count}
+
+static func _craft_affix_from_entry(entry: Dictionary, reforge_rng: DeterministicRNG) -> Dictionary:
+	var crafted := {}
+	for k in entry:
+		var v = entry[k]
+		if v is Array and v.size() == 2:
+			crafted[k] = reforge_rng.randf_range(float(v[0]), float(v[1]))
+		else:
+			crafted[k] = v
+	return crafted
 
 ## 装备分解：锁定态拦截 → 原子移除（失败回滚库存快照）→ 返还材料金币并记物品销毁遥测
 static func salvage_equipment(
@@ -96,11 +99,11 @@ static func salvage_equipment(
 
 	var refund_rate := clampf(GameConfig.get_float("domains.workshop", "salvage/refund_rate", 0.5), 0.0, 1.0)
 	var gold_rate := GameConfig.get_int("domains.currency", "rates/gold", 10000)
-	var refund_copper = int(item.market_base_price * gold_rate * refund_rate)
+	var refund_copper := int(item.market_base_price * gold_rate * refund_rate)
 	var enhance_lvl = int(item.combat_metrics.get("enhance_level", 0))
 	var divisor := maxf(1.0, GameConfig.get_float("domains.workshop", "salvage/crystal_divisor", 3.0))
-	var refunded_crystals = int(floor(float(enhance_lvl) / divisor))
-	var wallet_result := wallet.apply_delta({ "copper": refund_copper, "mana_monocrystals": refunded_crystals })
+	var refunded_crystals := int(floor(float(enhance_lvl) / divisor))
+	var wallet_result := wallet.apply_delta({"copper": refund_copper, "mana_monocrystals": refunded_crystals})
 	if not wallet_result.get("success", false):
 		inventory.restore(inventory_snapshot)
 		return {"success": false, "error_code": "SALVAGE_NOT_ATOMIC"}
@@ -108,7 +111,7 @@ static func salvage_equipment(
 	EventBusCore.get_instance().emit_narrative_by_key(
 		"workshop/salvage_success", "economy", [item.custom_name, refund_copper, refunded_crystals]
 	)
-	return { "success": true, "refund_copper": refund_copper, "refund_crystals": refunded_crystals }
+	return {"success": true, "refund_copper": refund_copper, "refund_crystals": refunded_crystals}
 
 ## 物品移除：背包优先，装备槽兜底（置 DESTROYED 态）
 static func _remove_owned_item(inventory: WearableInventoryAggregate, item: ItemEntity) -> bool:

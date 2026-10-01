@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/matter_disposal/disposal_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/matter_disposal.json | 信号: EventBus 领域广播
-# 职责说明: 执行物品销毁、从背包扣除并将生成的炉渣与魔素尘埃按产量逐件回流进背包 （Phase 43：产物实例数 == yield_count == 统计记账数，物质守恒； 已穿戴物品销毁时与 loadout 侧联动清槽，杜绝双簿记悬挂引用）
+# 职责说明: 执行物品销毁、从背包扣除并将生成的炉渣与魔素尘埃按产量逐件回流进背包 （：产物实例数 == yield_count == 统计记账数，物质守恒； 已穿戴物品销毁时与 loadout 侧联动清槽，杜绝双簿记悬挂引用）
 # 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
 # ==============================================================================
 
@@ -35,7 +35,7 @@ static func process_item_disposal(
 			"error_message": _msg("item_not_in_inventory")
 		}
 
-	# P39 清单4：锁定状态校验（与分解/追缴同语义），锁定物品严禁销毁
+	# 清单4：锁定状态校验（与分解/追缴同语义），锁定物品严禁销毁
 	if target_item.container_state == "LOCKED":
 		return {"success": false, "error_code": "ITEM_LOCKED"}
 

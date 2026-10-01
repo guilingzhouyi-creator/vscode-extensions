@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/contract_registry.json | 信号: EventBus 领域广播
 # 职责说明: 统一解析 DTO 字段映射、EventBus 事件订阅路由、UI 命令分发校验三核心算法
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务域第一性原理 / 契约映射与路由解析规范
 # ==============================================================================
 
 class_name ContractParser
@@ -14,7 +14,7 @@ const EntryClass = preload("res://backend/domains/contract_registry/contract_reg
 const IndexClass = preload("res://backend/domains/contract_registry/contract_registry_index.gd")
 
 static var _dispatched_events: Dictionary = {}
-# I3：幂等事件表有界上限（超出逐出最旧，防长会话无界增长；Dictionary 保持插入序）
+# 幂等事件表有界上限（超出逐出最旧，防长会话无界增长；Dictionary 保持插入序）
 const DISPATCH_MEMO_MAX: int = 4096
 static var _dispatch_seq: int = 0
 
@@ -38,10 +38,10 @@ static func resolve_dto_mapping(backend_dto: Dictionary, entry: Variant) -> Dict
 		var trans_cfg: Dictionary = fm.get("transform_config", {}) if fm.get("transform_config", {}) is Dictionary else {}
 
 		# 按点分或直接取值
-		var raw_val = _get_nested_field(backend_dto, src_field)
+		var raw_val: Variant = _get_nested_field(backend_dto, src_field)
 
 		# 类型转换与安全守卫
-		var transformed_val = _apply_transform(raw_val, trans_kind, trans_cfg)
+		var transformed_val: Variant = _apply_transform(raw_val, trans_kind, trans_cfg)
 		result[tgt_field] = transformed_val
 
 	return result
@@ -51,8 +51,8 @@ static func resolve_dto_mapping(backend_dto: Dictionary, entry: Variant) -> Dict
 static func _get_nested_field(dict: Dictionary, path: String) -> Variant:
 	if path.is_empty():
 		return null
-	var parts := path.split(".")
-	var cur = dict
+	var parts: PackedStringArray = path.split(".")
+	var cur: Variant = dict
 	for p in parts:
 		if cur is Dictionary and cur.has(p):
 			cur = cur[p]
@@ -61,39 +61,62 @@ static func _get_nested_field(dict: Dictionary, path: String) -> Variant:
 	return cur
 
 
+static func _cast_int_with_clamp(val: Variant, cfg: Dictionary) -> Variant:
+	if val is String and not val.is_valid_int():
+		return null
+	var num: int = int(val)
+	if cfg.has("clamp_min") and num < int(cfg["clamp_min"]):
+		num = int(cfg["clamp_min"])
+	if cfg.has("clamp_max") and num > int(cfg["clamp_max"]):
+		num = int(cfg["clamp_max"])
+	return num
+
+
+static func _apply_cast_transform(val: Variant, cfg: Dictionary) -> Variant:
+	var target_type: String = String(cfg.get("to", "string")).to_lower()
+	match target_type:
+		"int":
+			return _cast_int_with_clamp(val, cfg)
+		"float":
+			if val is String and not val.is_valid_float():
+				return null
+			return float(val)
+		"string":
+			return String(val)
+		"bool":
+			return bool(val)
+		_:
+			return val
+
+
 ## 应用 transform
 static func _apply_transform(val: Variant, kind: String, cfg: Dictionary) -> Variant:
-	if val == null:
-		return null
-	match kind:
-		"identity":
-			return val
-		"cast":
-			var target_type := String(cfg.get("to", "string")).to_lower()
-			match target_type:
-				"int":
-					# S1：非法数字字符串显式拒绝（GDScript int("10abc") 会静默得 0）
-					if val is String and not val.is_valid_int():
-						return null
-					var num := int(val)
-					if cfg.has("clamp_min") and num < int(cfg["clamp_min"]):
-						num = int(cfg["clamp_min"])
-					if cfg.has("clamp_max") and num > int(cfg["clamp_max"]):
-						num = int(cfg["clamp_max"])
-					return num
-				"float":
-					if val is String and not val.is_valid_float():
-						return null
-					return float(val)
-				"string":
-					return String(val)
-				"bool":
-					return bool(val)
-				_:
-					return val
-		_:
-			# 未识别 transform 类型时保守返回原值（新类型待后续阶段登记）
-			return val
+	if val == null or kind == "identity":
+		return val
+	if kind == "cast":
+		return _apply_cast_transform(val, cfg)
+	return val
+
+
+## 校验事件载荷是否满足前置过滤器条件
+static func _matches_event_filter(filter: Dictionary, payload: Dictionary) -> bool:
+	for k in filter.keys():
+		if payload.get(k) != filter[k]:
+			return false
+	return true
+
+
+static func _is_channel_matching(channel: String, event_name: String) -> bool:
+	if event_name.is_empty():
+		return false
+	return channel == event_name or channel.ends_with("." + event_name) or event_name == "*"
+
+
+static func _record_dispatched_event_id(event_id: String) -> void:
+	if _dispatched_events.size() >= DISPATCH_MEMO_MAX:
+		var oldest_key: String = String(_dispatched_events.keys()[0])
+		_dispatched_events.erase(oldest_key)
+	_dispatched_events[event_id] = true
 
 
 ## EventBus 事件路由求解器（Inv-CP-2 幂等去重）
@@ -103,47 +126,27 @@ static func route_domain_event(event: Dictionary) -> Dictionary:
 
 	var event_id: String = String(event.get("event_id", ""))
 	if event_id.is_empty():
-		# S3：兜底键附加自增序号，避免同毫秒同通道事件误判重复
 		_dispatch_seq += 1
 		event_id = "%s:%d:%d" % [String(event.get("channel", "")), Time.get_ticks_msec(), _dispatch_seq]
 
 	if _dispatched_events.has(event_id):
 		return {"already_dispatched": true, "matched_contract_ids": [], "signals_to_emit": []}
 
-	# I3：有界幂等表——达到上限逐出最旧事件
-	if _dispatched_events.size() >= DISPATCH_MEMO_MAX:
-		var oldest_key: String = String(_dispatched_events.keys()[0])
-		_dispatched_events.erase(oldest_key)
-	_dispatched_events[event_id] = true
+	_record_dispatched_event_id(event_id)
 
 	var channel: String = String(event.get("channel", ""))
 	var payload: Dictionary = event.get("payload", {}) if event.get("payload", {}) is Dictionary else {}
-
 	var matched_ids: Array[String] = []
 	var signals_to_emit: Array[Dictionary] = []
 
-## 校验事件载荷是否满足前置过滤器条件
-static func _matches_event_filter(filter: Dictionary, payload: Dictionary) -> bool:
-	for k in filter.keys():
-		if payload.get(k) != filter[k]:
-			return false
-	return true
-
-	# 事件路由覆盖任何携带 event_name 的契约条目（配置模型：DTO 条目同样承载事件订阅元数据；
-	# 原 find_by_endpoint(EVENT) 在当前无 EVENT 类条目的配置下路由恒为空——B1 验证修复死代码）
-	var all_events: Array = IndexClass.find_all()
-	for e in all_events:
-		if e.event_name.is_empty():
-			continue
-		# 匹配事件名或通道
-		if channel == e.event_name or channel.ends_with("." + e.event_name) or e.event_name == "*":
-			if _matches_event_filter(e.event_filter, payload):
-				matched_ids.append(e.contract_id)
-				signals_to_emit.append({
-					"view_name": e.view_name,
-					"signal_name": e.signal_name,
-					"payload": payload
-				})
+	for e in IndexClass.find_all():
+		if _is_channel_matching(channel, e.event_name) and _matches_event_filter(e.event_filter, payload):
+			matched_ids.append(e.contract_id)
+			signals_to_emit.append({
+				"view_name": e.view_name,
+				"signal_name": e.signal_name,
+				"payload": payload
+			})
 
 	return {
 		"matched_contract_ids": matched_ids,
@@ -160,7 +163,7 @@ static func dispatch_ui_command(command: Dictionary) -> Dictionary:
 	var command_id: String = String(command.get("command_id", ""))
 	var params: Dictionary = command.get("params", {}) if command.get("params", {}) is Dictionary else {}
 
-	var target_entry = _resolve_command_entry(view_name, command_id)
+	var target_entry: Variant = _resolve_command_entry(view_name, command_id)
 	if target_entry == null:
 		return {"accepted": false, "error_code": "CT_ERR_UNKNOWN_COMMAND"}
 
@@ -182,7 +185,7 @@ static func _resolve_command_entry(view_name: String, command_id: String) -> Var
 	for e in entries:
 		if e.endpoint_kind == EntryClass.EndpointKind.COMMAND and (e.contract_id == command_id or e.method_name == command_id):
 			return e
-	var direct = IndexClass.get_contract(command_id)
+	var direct: Variant = IndexClass.get_contract(command_id)
 	if direct != null and direct.endpoint_kind == EntryClass.EndpointKind.COMMAND:
 		return direct
 	return null
@@ -221,4 +224,3 @@ static func _validate_field_type(val: Variant, expected_type: String) -> bool:
 			return val is String
 		_:
 			return false
-

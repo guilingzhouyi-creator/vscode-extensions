@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/equipment_loadout/equipment_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/equipment.json | 信号: EventBus 领域广播
-# 职责说明: 穿戴与背包物品互换、负重过载拦截与一键战备预设切换状态机 文案由 config/narratives/equipment.json 驱动。 容量唯一事实源为 WearableInventoryAggregate.equipped_slots（Phase 43）： 本状态机对每次穿/脱/换承担 loadout.slots 与 inventory.equipped_slots 的镜像同步义务（仅容量相关槽位交集；HANDS/NECK/RING_* 容忍不同步）， 任一步失败按快照整体回滚，槽位分歧返回 EQUIP_STATE_DIVERGENCE。
+# 职责说明: 穿戴与背包物品互换、负重过载拦截与一键战备预设切换状态机 文案由 config/narratives/equipment.json 驱动。 容量唯一事实源为 WearableInventoryAggregate.equipped_slots（）： 本状态机对每次穿/脱/换承担 loadout.slots 与 inventory.equipped_slots 的镜像同步义务（仅容量相关槽位交集；HANDS/NECK/RING_* 容忍不同步）， 任一步失败按快照整体回滚，槽位分歧返回 EQUIP_STATE_DIVERGENCE。
 # 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
 # ==============================================================================
 
@@ -48,7 +48,7 @@ static func equip_from_inventory(
 
 	var old_item: ItemEntity = loadout.get_equipped_item(slot_name)
 
-	# P5：分歧预检（纯读）先行——命中即零快照受控失败；原步骤2分歧检查保留为防御
+	# 分歧预检（纯读）先行——命中即零快照受控失败；原步骤2分歧检查保留为防御
 	# （分歧时快照未发生任何变更，restore 无实际效果——直接返回与回滚路径状态完全等价）
 	if inventory.equipped_slots.has(slot_name):
 		var inv_pre: ItemEntity = inventory.equipped_slots[slot_name]
@@ -118,7 +118,7 @@ static func unequip_to_inventory(
 		var msg := GameConfig.get_string("narratives.equipment", "no_item_in_slot", "No item equipped in slot: %s") % slot_name
 		return { "success": false, "error_code": "NO_ITEM_IN_SLOT", "reason": msg }
 
-	# P5：分歧预检（纯读）先行——命中即零快照受控失败；原步骤1分歧检查保留为防御
+	# 分歧预检（纯读）先行——命中即零快照受控失败；原步骤1分歧检查保留为防御
 	if inventory.equipped_slots.has(slot_name):
 		var inv_pre: ItemEntity = inventory.equipped_slots[slot_name]
 		if _is_slot_divergent(inv_pre, item):

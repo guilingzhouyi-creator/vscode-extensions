@@ -27,11 +27,11 @@ static func evaluate_experience_rank(
 	var delta := GameConfig.get_float("domains.inventory", "formula/delta_mastery", 0.05)
 	var age_normalize := GameConfig.get_float("domains.inventory", "formula/age_normalize", 100.0)
 
-	var safe_rep = max(0.0, reputation)
-	var rep_term = alpha * log(1.0 + safe_rep)
-	var age_ratio = clamp(normalized_age / age_normalize, 0.0, 1.0)
-	var growth_term = beta * pow(age_ratio, gamma) * max(0.0, exploration_index)
-	var mastery_term = delta * max(0.0, skill_mastery_sum)
+	var safe_rep: float = maxf(0.0, reputation)
+	var rep_term: float = alpha * log(1.0 + safe_rep)
+	var age_ratio: float = clampf(normalized_age / age_normalize, 0.0, 1.0)
+	var growth_term: float = beta * pow(age_ratio, gamma) * maxf(0.0, exploration_index)
+	var mastery_term: float = delta * maxf(0.0, skill_mastery_sum)
 	return int(floor(rep_term + growth_term + mastery_term))
 
 # ==============================================================================
@@ -45,7 +45,7 @@ static func calculate_memory_decay(initial_mastery: float, elapsed_days: float, 
 	var forget_base := GameConfig.get_float("domains.inventory", "formula/forget_base_rate", 0.05)
 	var int_coef := GameConfig.get_float("domains.inventory", "formula/int_coefficient", 0.1)
 
-	var safe_int = max(1.0, int_stat * int_coef)
-	var lambda_decay = forget_base / safe_int
-	var safe_days = max(0.0, elapsed_days)
-	return max(0.0, initial_mastery * exp(-lambda_decay * safe_days))
+	var safe_int: float = maxf(1.0, int_stat * int_coef)
+	var lambda_decay: float = forget_base / safe_int
+	var safe_days: float = maxf(0.0, elapsed_days)
+	return maxf(0.0, initial_mastery * exp(-lambda_decay * safe_days))

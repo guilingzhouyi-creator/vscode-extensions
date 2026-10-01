@@ -60,7 +60,7 @@ func tick_revert_timer(delta: float, settings: GameSettingsAggregate) -> bool:
 	if not is_pending_confirm:
 		return false
 
-	# 契约（Phase 31 S3）：回滚计时器只接受非负 delta（负 delta 拒绝，防时间倒退拖延回滚）
+	# 契约（）：回滚计时器只接受非负 delta（负 delta 拒绝，防时间倒退拖延回滚）
 	if delta < 0.0:
 		return false
 	pending_revert_timer -= delta

@@ -22,20 +22,20 @@ static func execute_marching_step(
 	destination_node: WorldMapGraphNode,
 	distance_km: float
 ) -> Dictionary:
-	# 0. 输入校验（Phase 32 S2）：失败返回确定错误码，不修改队伍状态（前四步任一失败都不扣口粮/移动）
+	# 0. 输入校验（）：失败返回确定错误码，不修改队伍状态（前四步任一失败都不扣口粮/移动）
 	if party == null or party.party_id.is_empty() or party.party_size <= 0:
-		return { "success": false, "code": "EMPTY_PARTY" }
+		return {"success": false, "code": "EMPTY_PARTY"}
 	if destination_node == null or destination_node.node_id.is_empty():
-		return { "success": false, "code": "DESTINATION_NOT_FOUND" }
+		return {"success": false, "code": "DESTINATION_NOT_FOUND"}
 	if not is_finite(distance_km) or distance_km < 0.0:
-		return { "success": false, "code": "NEGATIVE_DISTANCE" }
+		return {"success": false, "code": "NEGATIVE_DISTANCE"}
 
 	var base_speed := maxf(0.1, GameConfig.get_float("domains.world", "marching/base_speed_kmh", 5.0))
 	var ration_per_hour := GameConfig.get_float("domains.world", "marching/ration_per_person_hour", 0.1)
 
-	var impedance = MapAndEcologySolver.get_terrain_impedance(destination_node.terrain_type)
-	var travel_hours = int(ceil((distance_km / base_speed) * impedance)) # 基准时速 5km/h
-	var ration_consumed = float(party.party_size) * float(travel_hours) * ration_per_hour * impedance
+	var impedance: float = MapAndEcologySolver.get_terrain_impedance(destination_node.terrain_type)
+	var travel_hours := int(ceil((distance_km / base_speed) * impedance)) # 基准时速 5km/h
+	var ration_consumed: float = float(party.party_size) * float(travel_hours) * ration_per_hour * impedance
 
 	party.ration_units -= ration_consumed
 	if party.ration_units < 0.0:

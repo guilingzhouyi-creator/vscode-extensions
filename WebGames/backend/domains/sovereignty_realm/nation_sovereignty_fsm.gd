@@ -17,7 +17,7 @@ static func establish_new_sovereign_nation(
 	initial_town_ids: Array,
 	initial_treasury_gold: int = -1
 ) -> KnighthoodTitle.NationRealmAggregate:
-	var treasury_gold = initial_treasury_gold
+	var treasury_gold := initial_treasury_gold
 	if treasury_gold < 0:
 		treasury_gold = GameConfig.get_int("domains.sovereignty", "nation_defaults/founding_treasury_gold", 20000)
 	var founding_stability := GameConfig.get_float("domains.sovereignty", "nation_defaults/founding_stability_percent", 100.0)
@@ -46,7 +46,7 @@ static func execute_palace_coup(
 	rng: DeterministicRNG = null
 ) -> Dictionary:
 	var coup_rng := DeterministicRNG.resolve(rng)
-	var chance = success_chance
+	var chance := success_chance
 	if chance < 0.0:
 		chance = GameConfig.get_float("domains.sovereignty", "coup/default_success_chance", 0.8)
 	chance = clampf(chance, 0.0, 1.0)
@@ -56,7 +56,7 @@ static func execute_palace_coup(
 	var failure_floor := GameConfig.get_float("domains.sovereignty", "coup/failure_stability_floor", 40.0)
 	var failure_drop := GameConfig.get_float("domains.sovereignty", "coup/failure_stability_drop", 15.0)
 
-	var is_success = (coup_rng.randf() < chance)
+	var is_success := (coup_rng.randf() < chance)
 	if is_success:
 		var old_ruler = nation.sovereign_ruler_id
 		nation.sovereign_ruler_id = usurper_id
@@ -74,7 +74,7 @@ static func execute_palace_coup(
 		)
 		return { "success": false, "stability": nation.stability_percent }
 
-## M7（Phase 53）稳定性单调衰减（Inv-ON-3）：下限只约束「从上方下跌」的止点，
+## M7（）稳定性单调衰减（Inv-ON-3）：下限只约束「从上方下跌」的止点，
 ## 绝不在现值已低于下限时抬升（旧 max(floor, cur - drop) 会让失败政变把 20 → 40 反弹）。
 static func _apply_stability_drop(cur: float, drop: float, floor: float) -> float:
 	if cur <= floor:

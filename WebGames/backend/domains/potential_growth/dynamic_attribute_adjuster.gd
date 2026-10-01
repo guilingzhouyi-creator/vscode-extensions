@@ -37,7 +37,7 @@ static func consume_event_channel(
 	var applied: Array = []
 	var total_delta := 0.0
 	for stat in adjustments:
-		var res = apply_dynamic_adjustment(sheet, str(stat), float(adjustments[stat]))
+		var res: Variant = apply_dynamic_adjustment(sheet, str(stat), float(adjustments[stat]))
 		if res.success:
 			applied.append(res)
 			total_delta += float(res.actual_delta)

@@ -22,11 +22,11 @@ static func advance_caravan_progress(
 	var guard_protection := GameConfig.get_float("domains.trading", "caravan/guard_protection", 0.02)
 	var ambush_chance_max := GameConfig.get_float("domains.trading", "caravan/ambush_chance_max", 0.8)
 
-	caravan.progress_ratio = min(max_progress, caravan.progress_ratio + delta_progress)
+	caravan.progress_ratio = minf(max_progress, caravan.progress_ratio + delta_progress)
 
 	# 劫镖风险判定: 护卫越少，危险度越高，遇袭概率越大
-	var ambush_chance = clamp(route_danger_level * danger_coefficient - float(caravan.guards_count) * guard_protection, 0.0, ambush_chance_max)
-	var is_ambushed = (caravan_rng.randf() < ambush_chance) and not caravan.is_intercepted
+	var ambush_chance: float = clampf(route_danger_level * danger_coefficient - float(caravan.guards_count) * guard_protection, 0.0, ambush_chance_max)
+	var is_ambushed: bool = (caravan_rng.randf() < ambush_chance) and not caravan.is_intercepted
 
 	if is_ambushed:
 		caravan.is_intercepted = true
@@ -34,10 +34,10 @@ static func advance_caravan_progress(
 			"trading/caravan_ambushed", "caravan", [caravan.caravan_id]
 		)
 
-	var arrived = (caravan.progress_ratio >= max_progress)
+	var arrived := (caravan.progress_ratio >= max_progress)
 	if arrived:
 		EventBusCore.get_instance().emit_narrative_by_key(
 			"trading/caravan_arrived", "caravan", [caravan.caravan_id, caravan.destination_town_id]
 		)
 
-	return { "progress": caravan.progress_ratio, "is_ambushed": is_ambushed, "arrived": arrived }
+	return {"progress": caravan.progress_ratio, "is_ambushed": is_ambushed, "arrived": arrived}

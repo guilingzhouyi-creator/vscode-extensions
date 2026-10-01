@@ -18,7 +18,7 @@ static func apply_quest_settlement(
 	var bounty_threshold := GameConfig.get_int("domains.quest", "bounty/trigger_threshold", -50)
 	var bounty_triggered := false
 	for faction in quest.faction_reputation_rewards:
-		var delta = int(quest.faction_reputation_rewards[faction])
+		var delta: Variant = int(quest.faction_reputation_rewards[faction])
 		var current = reputation_dict.get(faction, 0) + delta
 		reputation_dict[faction] = current
 

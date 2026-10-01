@@ -11,15 +11,15 @@ class_name TertiaryTimelineEngine
 extends RefCounted
 
 enum TimelineEventType {
-	RANDOM_DISPATCH,     # 随机发放点 (触发随机卡池抽取并推入手牌待发栏)
-	TENSION_PULSE,       # 回内紧张点 (触发战场压力突变、环境脉冲、强行转回合等)
+	RANDOM_DISPATCH, # 随机发放点 (触发随机卡池抽取并推入手牌待发栏)
+	TENSION_PULSE, # 回内紧张点 (触发战场压力突变、环境脉冲、强行转回合等)
 }
 
 class TimelineEventPointDTO extends RefCounted:
 	var event_id: String = ""
 	var event_type: TimelineEventType = TimelineEventType.RANDOM_DISPATCH
-	var trigger_time_ms: int = 0               # 绝对战斗时间点 (ms)
-	var payload: Dictionary = {}               # 附带参数 (抽卡策略/紧张事件类型)
+	var trigger_time_ms: int = 0 # 绝对战斗时间点 (ms)
+	var payload: Dictionary = {} # 附带参数 (抽卡策略/紧张事件类型)
 	var is_processed: bool = false
 
 	func to_dto() -> Dictionary:
@@ -36,7 +36,7 @@ var scheduled_events: Array[TimelineEventPointDTO] = []
 var rng: DeterministicRNG = null
 var event_counter: int = 0
 
-## 时间轴排期参数静态缓存（Phase 64 P2 模式：配置热重载版本推进自动失效重建）。
+## 时间轴排期参数静态缓存（模式：配置热重载版本推进自动失效重建）。
 ## _build_next_* 每次事件触发重排期原本 5 次 GameConfig 路径查找（dispatch/tension 区间
 ## 与 tension_types）——缓存后每次重排期仅一次版本比对 + 字段复制。
 class TimelineParams extends RefCounted:
@@ -129,5 +129,5 @@ func _build_next_tension_event() -> TimelineEventPointDTO:
 	evt.event_id = "EVT_TENSION_%d" % event_counter
 	evt.event_type = TimelineEventType.TENSION_PULSE
 	evt.trigger_time_ms = current_timeline_ms + delta
-	evt.payload = { "tension_type": selected_type }
+	evt.payload = {"tension_type": selected_type}
 	return evt

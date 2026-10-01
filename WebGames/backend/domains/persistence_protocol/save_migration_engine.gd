@@ -17,10 +17,12 @@ static var _domain_migrations: Dictionary = {} # key = "domain:ver" -> { "to": i
 ## 注册域级数据迁移（单域独立演进，Inv-SV-4）
 static func register_domain_migration(domain_id: String, from_ver: int, to_ver: int, migrate_fn: Callable) -> void:
 	var key := "%s:%d" % [domain_id, from_ver]
-	_domain_migrations[key] = { "to": to_ver, "fn": migrate_fn }
+	_domain_migrations[key] = {"to": to_ver, "fn": migrate_fn}
 
 ## 检查是否存在域级迁移
 static func has_domain_migration(mig_key: String) -> bool:
+	if mig_key.is_empty():
+		return false
 	return _domain_migrations.has(mig_key)
 
 ## 获取域级迁移条目
@@ -57,13 +59,13 @@ static func migrate_domain(domain_id: String, domain_data: Dictionary, from_ver:
 			working = step_result as Dictionary
 		ver = int(step.get("to", ver + 1))
 
-	return { "success": true, "data": working, "final_version": ver }
+	return {"success": true, "data": working, "final_version": ver}
 
 ## 整档迁移执行：复制 -> 链式迁移 -> 校验 -> 提交/回滚（Inv-SV-7）
 static func migrate(data: Dictionary, detected_version: String) -> Dictionary:
 	var target_version: String = GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
 	if detected_version.is_empty() or detected_version == target_version:
-		return { "success": true, "data": data.duplicate(true), "steps": [] }
+		return {"success": true, "data": data.duplicate(true), "steps": []}
 
 	# 1. 深度复制工作副本，绝不原地污染（Inv-SV-7）
 	var working: Dictionary = data.duplicate(true)
@@ -100,7 +102,7 @@ static func migrate(data: Dictionary, detected_version: String) -> Dictionary:
 static func load_rules_from_config() -> Dictionary:
 	var rules: Dictionary = GameConfig.get_dict("infrastructure.persistence", "migration_rules", {})
 	if not bool(rules.get("enabled", true)):
-		return { "success": true, "chain": [], "issues": [] }
+		return {"success": true, "chain": [], "issues": []}
 	var chain: Array = rules.get("save_version_chain", [])
 	var issues: Array[String] = []
 	var current := GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
@@ -119,8 +121,10 @@ static func load_rules_from_config() -> Dictionary:
 		ErrorReporter.emit_error("save_migration_engine", "MIGRATION_PATH_BROKEN", "迁移链静态校验发现断链", {
 			"issues": issues
 		})
-	return { "success": issues.is_empty(), "chain": chain, "issues": issues }
+	return {"success": issues.is_empty(), "chain": chain, "issues": issues}
 
-## 测试重置
-static func reset_for_tests() -> void:
+## 测试重置，返回清空的条目数
+static func reset_for_tests() -> int:
+	var count := _domain_migrations.size()
 	_domain_migrations.clear()
+	return count

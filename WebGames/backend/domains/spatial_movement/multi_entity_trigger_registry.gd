@@ -41,11 +41,13 @@ func remove_trigger(trigger_id: String) -> void:
 	for rk in to_erase:
 		_state_table.erase(rk)
 
-func clear() -> void:
+func clear() -> int:
+	var count := _state_table.size()
 	_state_table.clear()
+	return count
 
 func get_total_tracked_count() -> int:
-	return _state_table.size()
+	return max(0, _state_table.size())
 
 static func _make_key(trigger_id: String, entity_id: String) -> String:
 	return "%s::%s" % [trigger_id, entity_id]

@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/character_creation/save_slot_character_binder.gd
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
-# 职责说明: 完成「后端派生属性 → 构造角色档案 → 绑定目标档位 → 生成开局事件包」 的原子落档。档位状态以 Dictionary 数据契约传入/回写，键集与 Phase 47 `SaveSlotStateDTO.to_dto()` 对齐（slot_id/account_id/bound_world_id/ bound_character_id/is_occupied/is_first_creation/last_played_timestamp_utc）， 规避对 P47 world_gateway 域（在途未 import）的跨文件类引用。 关联细则: Phase 48 阶段2 §2.3（档位绑定与开局事件触发器）
+# 职责说明: 完成「后端派生属性 → 构造角色档案 → 绑定目标档位 → 生成开局事件包」 的原子落档。档位状态以 Dictionary 数据契约传入/回写，键集与 `SaveSlotStateDTO.to_dto()` 对齐（slot_id/account_id/bound_world_id/ bound_character_id/is_occupied/is_first_creation/last_played_timestamp_utc）， 规避对 world_gateway 域（在途未 import）的跨文件类引用。 关联细则: 阶段2 §2.3（档位绑定与开局事件触发器）
 # 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
 # ==============================================================================
 
@@ -26,15 +26,15 @@ static func commit_creation_and_bind_slot(
 ) -> Dictionary:
 	var res := {}
 	if request == null or slot_state.is_empty():
-		return { "success": false, "error_code": "INVALID_INPUT", "message": "请求或档位数据为空" }
+		return {"success": false, "error_code": "INVALID_INPUT", "message": "请求或档位数据为空"}
 
 	var slot_id := str(slot_state.get("slot_id", ""))
 	var account_id := str(slot_state.get("account_id", ""))
 	if slot_id.is_empty():
-		return { "success": false, "error_code": "INVALID_SLOT_ID", "message": "档位 ID 缺失" }
+		return {"success": false, "error_code": "INVALID_SLOT_ID", "message": "档位 ID 缺失"}
 
 	if bool(slot_state.get("is_occupied", false)) and not str(slot_state.get("bound_character_id", "")).is_empty():
-		return { "success": false, "error_code": "SLOT_ALREADY_OCCUPIED", "message": "目标档位已存在角色，禁止覆盖创建" }
+		return {"success": false, "error_code": "SLOT_ALREADY_OCCUPIED", "message": "目标档位已存在角色，禁止覆盖创建"}
 
 	# 1. 派生唯一角色 ID（档位维度稳定；账号下 slot 唯一 → 角色 ID 唯一）
 	var new_char_id := "CHAR_%s_%s" % [account_id, slot_id]
@@ -43,7 +43,7 @@ static func commit_creation_and_bind_slot(
 	var baseline_stats := CharacterBaselineAttributeSolver.generate_baseline_attributes(race_def)
 	var attribute_levels: Dictionary = baseline_stats.get("attribute_levels", {})
 
-	# 3. 构造角色档案（character_id/character_name 直挂，种族/性别/属性入 attributes）
+	# 3. 构造角色档案与生理表/钱包实体（打通 Stage ④ -> Stage ⑥ HUD 同步）
 	var profile := CharacterProfile.new()
 	profile.character_id = new_char_id
 	profile.character_name = request.character_name
@@ -52,6 +52,9 @@ static func commit_creation_and_bind_slot(
 		"gender": request.selected_gender,
 		"attribute_levels": attribute_levels.duplicate(true)
 	}
+	var sheet := _build_physiology_sheet(request.selected_race_id, attribute_levels)
+	var wallet := CharacterWalletEntity.new()
+	wallet.gold = GameConfig.get_int("domains.character_creation", "defaults/initial_gold_fallback", 50)
 
 	# 4. 绑定档位（原地回写；首次创建标记消费后置 false）
 	var was_first_creation := bool(slot_state.get("is_first_creation", true))
@@ -68,6 +71,7 @@ static func commit_creation_and_bind_slot(
 	opening.world_id = str(slot_state.get("bound_world_id", request.world_id))
 	opening.character_id = new_char_id
 	opening.character_name = request.character_name
+	opening.race_id = request.selected_race_id
 	opening.is_first_time_creation = was_first_creation
 	opening.starting_location_id = GameConfig.get_string("domains.character_creation", "defaults/starting_location", "CENTRAL_CITY_PLAZA")
 	opening.opening_quest_line_id = GameConfig.get_string("domains.character_creation", "defaults/initial_quest_line", "QUEST_PROLOGUE_01")
@@ -78,7 +82,23 @@ static func commit_creation_and_bind_slot(
 
 	res["success"] = true
 	res["character_profile"] = profile
+	res["physiology_sheet"] = sheet
+	res["wallet"] = wallet
 	res["opening_event"] = opening
 	res["attribute_levels"] = attribute_levels
 	res["slot_state"] = slot_state
 	return res
+
+
+static func _build_physiology_sheet(race_id: String, attribute_levels: Dictionary) -> CharacterPhysiologySheet:
+	var sheet := CharacterPhysiologySheet.new()
+	sheet.race_id = race_id
+	for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
+		var lv := int(attribute_levels.get(stat_key, AttributeConversionEngine.min_level()))
+		if not sheet.set_level(stat_key, lv):
+			sheet.set_level(stat_key, AttributeConversionEngine.min_level())
+		sheet.base_coefficients[stat_key] = AttributeConversionEngine.race_coefficient(race_id, stat_key)
+	var lifespan_scales: Dictionary = GameConfig.get_dict("domains.character_creation", "defaults/lifespan_scales", {})
+	sheet.lifespan_scale = float(lifespan_scales.get(race_id, lifespan_scales.get("DEFAULT", 1.0)))
+	LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
+	return sheet

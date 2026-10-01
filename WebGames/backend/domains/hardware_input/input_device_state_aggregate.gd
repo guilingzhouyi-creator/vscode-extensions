@@ -4,7 +4,7 @@
 # 架构定位: Domain Entity / Aggregate Root
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/hardware_input.json | 信号: EventBus 领域广播
 # 职责说明: 监听键盘/鼠标/手柄/触屏输入状态、死区滤波配置与动作重映射表
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name InputDeviceStateAggregate
@@ -13,7 +13,7 @@ extends RefCounted
 enum ActiveInputDevice {
 	KEYBOARD_AND_MOUSE, # 键盘与鼠标
 	GAMEPAD_CONTROLLER, # 游戏手柄 (XInput / DualShock / DirectInput)
-	TOUCH_SCREEN        # 移动端/触摸屏
+	TOUCH_SCREEN # 移动端/触摸屏
 }
 
 var current_device: ActiveInputDevice = ActiveInputDevice.KEYBOARD_AND_MOUSE
@@ -21,11 +21,11 @@ var last_input_timestamp_ms: int = 0
 var gamepad_device_id: int = 0
 
 # 摇杆滤波配置
-var stick_deadzone_inner: float = GameConfig.get_float("domains.hardware_input", "stick_deadzone/inner", 0.15)       # 内部死区 (防物理漂移)
-var stick_deadzone_outer: float = GameConfig.get_float("domains.hardware_input", "stick_deadzone/outer", 0.95)       # 外部死区 (全速饱和)
+var stick_deadzone_inner: float = GameConfig.get_float("domains.hardware_input", "stick_deadzone/inner", 0.15) # 内部死区 (防物理漂移)
+var stick_deadzone_outer: float = GameConfig.get_float("domains.hardware_input", "stick_deadzone/outer", 0.95) # 外部死区 (全速饱和)
 var mouse_sensitivity_scalar: float = GameConfig.get_float("domains.hardware_input", "mouse/sensitivity_scalar", 1.0)
 
-# 动作按键映射字典 (action_name -> Array[String])
+# 动作按键映射字典 (action_name -> Array[String])，支持配置表 keyboard_shortcuts 覆盖扩展
 var action_mappings: Dictionary = {
 	"move_north": ["Key_W", "Joypad_Up"],
 	"move_south": ["Key_S", "Joypad_Down"],
@@ -33,11 +33,38 @@ var action_mappings: Dictionary = {
 	"move_west": ["Key_A", "Joypad_Left"],
 	"interact": ["Key_E", "Joypad_ButtonA"],
 	"open_inventory": ["Key_I", "Joypad_ButtonY"],
-	"cast_spell": ["Key_Q", "Joypad_ButtonX"]
+	"cast_spell": ["Key_Q", "Joypad_ButtonX"],
+	"toggle_escape_menu": ["Key_Escape", "Joypad_Start"]
 }
 
 # Tab 双击组合检测器（聊天命令智能补全联动，窗口期配置驱动）
 var tab_double_tap: TabDoubleTapDetector = TabDoubleTapDetector.new()
+
+static func _merge_joypad_keys(raw_keys: Array, existing: Array) -> Array:
+	var merged: Array = raw_keys.duplicate()
+	for item in existing:
+		if str(item).begins_with("Joypad_") and not (item in merged):
+			merged.append(item)
+	return merged
+
+func _init() -> void:
+	var cfg_shortcuts: Dictionary = GameConfig.get_dict("domains.hardware_input", "keyboard_shortcuts", {})
+	for act_key in cfg_shortcuts.keys():
+		var raw_keys: Variant = cfg_shortcuts[act_key]
+		if raw_keys is Array:
+			var existing: Array = action_mappings.get(act_key, [])
+			action_mappings[str(act_key)] = _merge_joypad_keys(raw_keys as Array, existing)
+
+## 解析 ESC 菜单栏动作路由配置（domains.hardware_input escape_menu_actions）
+static func resolve_escape_menu_action(action_key: String) -> Dictionary:
+	var menu_cfg: Dictionary = GameConfig.get_dict("domains.hardware_input", "escape_menu_actions", {})
+	if not menu_cfg.has(action_key):
+		return {"success": false, "error_code": "UNKNOWN_ESCAPE_ACTION", "action_key": action_key}
+	var entry: Dictionary = menu_cfg[action_key]
+	var out := entry.duplicate(true)
+	out["success"] = true
+	out["action_key"] = action_key
+	return out
 
 ## 按当前设备输出 UI 按键提示（手柄/键鼠各自首选绑定，空映射占位）
 func get_ui_button_prompt(action_name: String) -> String:

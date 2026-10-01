@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_statistics.json | 信号: EventBus 领域广播
 # 职责说明: 物品全生命周期事件契约（获得/消耗/销毁/交易/锻造/追缴）： - 事件接入 record_item_event：更新账号 UID 物品 ID 库（递归挂载/落账）+ 旁路遥测 TelemetrySidecarEngine 落点； - 查询按账号 UID 隔离（直接操作该账号的库）；跨账号全局聚合需 RBAC 门禁； - 事件名约定 "<域>.<事件>"（与 EventBus 领域事件约定一致）。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name ItemStatisticsSolver
@@ -39,9 +39,9 @@ static func record_item_event(
 	meta: Dictionary = {}
 ) -> Dictionary:
 	if not GameConfig.get_bool("domains.item_statistics", "enabled", true):
-		return { "success": false, "reason": "item_statistics disabled" }
+		return {"success": false, "reason": "item_statistics disabled"}
 	if not EVENT_TO_STAT_KEY.has(event_name) or quantity <= 0:
-		return { "success": false, "reason": "invalid event" }
+		return {"success": false, "reason": "invalid event"}
 
 	var major := "UNCATEGORIZED"
 	var minor := "UNSPECIFIED"
@@ -80,8 +80,8 @@ static func record_item_event(
 static func query_account_item_stats(library: AccountItemLibraryAggregate, canonical_id: String) -> Dictionary:
 	var found := library.find_item_node(canonical_id)
 	if found.is_empty():
-		return { "found": false, "canonical_id": canonical_id }
-	return { "found": true, "canonical_id": canonical_id, "stats": found["node"]["stats"].duplicate() }
+		return {"found": false, "canonical_id": canonical_id}
+	return {"found": true, "canonical_id": canonical_id, "stats": found["node"]["stats"].duplicate()}
 
 static func query_account_subtree(
 	library: AccountItemLibraryAggregate,
@@ -97,13 +97,17 @@ static func query_account_all(library: AccountItemLibraryAggregate) -> Array:
 # 全局聚合（跨账号，按 canonical_id）：RBAC 门禁
 # ==============================================================================
 
+static func _accumulate_library_stats(agg: Dictionary, stats: Dictionary) -> void:
+	for k in AccountItemLibraryAggregate.STAT_KEYS:
+		agg[k] = int(agg[k]) + int(stats.get(k, 0))
+
 static func query_global_item_stats(
 	libraries: Array,
 	canonical_id: String,
 	admin_level: int = 0
 ) -> Dictionary:
 	if admin_level < _min_global_level():
-		return { "success": false, "error_code": "STATS_GLOBAL_FORBIDDEN" }
+		return {"success": false, "error_code": "STATS_GLOBAL_FORBIDDEN"}
 	var agg := {
 		"current_quantity": 0, "total_gained": 0, "total_consumed": 0, "total_destroyed": 0,
 		"total_traded": 0, "total_forged": 0, "total_clawed_back": 0, "account_count": 0
@@ -112,11 +116,9 @@ static func query_global_item_stats(
 		var found: Dictionary = lib.find_item_node(canonical_id)
 		if found.is_empty():
 			continue
-		var stats: Dictionary = found["node"]["stats"]
-		for k in AccountItemLibraryAggregate.STAT_KEYS:
-			agg[k] = int(agg[k]) + int(stats.get(k, 0))
+		_accumulate_library_stats(agg, found["node"]["stats"])
 		agg["account_count"] = int(agg["account_count"]) + 1
-	return { "success": true, "canonical_id": canonical_id, "agg": agg }
+	return {"success": true, "canonical_id": canonical_id, "agg": agg}
 
 # ==============================================================================
 # 配置

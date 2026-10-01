@@ -4,7 +4,7 @@
 # 架构定位: Domain Registry / Specification Catalog
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 加载 config/domains/item_attributes.json 中的属性全量定义，支持热重载与快速索引。 倒置区间定义（value_min > value_max）拒绝登记并告警（Inv-VD-3 区间有序不变量）。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name ItemAttributeRegistry
@@ -30,13 +30,16 @@ func reload_configuration() -> void:
 	_definitions.clear()
 	var raw_attrs: Dictionary = GameConfig.get_dict("domains.item_attributes", "attributes", {})
 	for attr_uid in raw_attrs.keys():
-		var d: Dictionary = (raw_attrs[attr_uid] as Dictionary).duplicate(true)
-		d["attribute_uid"] = str(attr_uid)
-		var def := ItemAttributeDefinition.from_dto(d)
-		# L11（Phase 55）：clamp 区间有序不变量（Inv-VD-3）——value_min > value_max 的倒置定义
+		var raw_item = raw_attrs[attr_uid]
+		if not (raw_item is Dictionary):
+			continue
+		var def := ItemAttributeDefinition.from_dto(raw_item as Dictionary)
+		if def.attribute_uid.is_empty():
+			def.attribute_uid = str(attr_uid)
+		# L11: clamp 区间有序不变量（Inv-VD-3）——value_min > value_max 的倒置定义
 		# 拒绝登记并告警（旧实现静默登记 → 求值 clampf 恒返 value_max 的静默数值错误）
 		if def.value_min > def.value_max:
-			push_warning("item_attributes: %s 倒置定义 value_min(%s) > value_max(%s)，拒绝登记" % [str(attr_uid), def.value_min, def.value_max])
+			ErrorReporter.emit_warning("inventory", "INVALID_RANGE", "item_attributes: %s 倒置定义 value_min(%s) > value_max(%s)，拒绝登记" % [str(attr_uid), def.value_min, def.value_max])
 			continue
 		_definitions[str(attr_uid)] = def
 

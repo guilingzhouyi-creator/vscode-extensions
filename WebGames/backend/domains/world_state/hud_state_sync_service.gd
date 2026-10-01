@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/world_state/hud_state_sync_service.gd
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
-# 职责说明: 承担主页 HUD 双轨中枢： 拉轨（Pull Facade） -> get_hud_status_snapshot()：只读快照，字段 100% 真实溯源 推轨（Push EventBus）-> publish_hud_snapshot / publish_stat_mutation / publish_wallet_mutation 事实溯源（Phase 71 审查整改版，零臆造）： - 六维实值/层级 -> CharacterPhysiologySheet.get_actual_values()/get_all_levels() - hp_max -> domains.combat participant_defaults/max_hp（配置真源 + 下限守卫） - ap_max -> domains.world_state hud_defaults/ap_max（配置真源 + 下限守卫） - 钱包   -> CharacterWalletEntity.gold / mana_monocrystals 广播契约：payload 必带 category_key 与 args（EventBusCore.render_domain_event_text）
+# 职责说明: 承担主页 HUD 双轨中枢： 拉轨（Pull Facade） -> get_hud_status_snapshot()：只读快照，字段 100% 真实溯源 推轨（Push EventBus）-> publish_hud_snapshot / publish_stat_mutation / publish_wallet_mutation 事实溯源（审查整改版，零臆造）： - 六维实值/层级 -> CharacterPhysiologySheet.get_actual_values()/get_all_levels() - hp_max -> domains.combat participant_defaults/max_hp（配置真源 + 下限守卫） - ap_max -> domains.world_state hud_defaults/ap_max（配置真源 + 下限守卫） - 钱包   -> CharacterWalletEntity.gold / mana_monocrystals 广播契约：payload 必带 category_key 与 args（EventBusCore.render_domain_event_text）
 # 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
 # ==============================================================================
 
@@ -18,13 +18,20 @@ static func get_hud_status_snapshot(
 	race_id: String,
 	physiology: CharacterPhysiologySheet,
 	wallet: CharacterWalletEntity,
-	location_id: String = ""
+	location_id: String = "",
+	allow_default_fallback: bool = true
 ) -> HudStatusSnapshotDTO:
 	var snapshot := HudStatusSnapshotDTO.new()
 	snapshot.account_id = account_id
 	snapshot.character_id = character_id
 	snapshot.character_name = character_name
-	snapshot.race_id = race_id if not race_id.is_empty() else "HUMAN"
+	var resolved_race := race_id
+	if resolved_race.is_empty() and physiology != null and not physiology.race_id.is_empty():
+		resolved_race = physiology.race_id
+	if resolved_race.is_empty() or resolved_race == "UNBOUND":
+		snapshot.race_id = "HUMAN" if allow_default_fallback else "UNBOUND"
+	else:
+		snapshot.race_id = resolved_race
 	snapshot.current_location_id = location_id
 
 	# 六维实值与层级（真实 API，零臆造）
@@ -82,22 +89,29 @@ static func publish_wallet_mutation(account_id: String, currency_type: String, o
 		"args": [currency_type, new_amt - old_amt]
 	})
 
-## 5. 世界网关进世界首帧联动（复用既有 world_gateway.world_entered 触发点）
+## 5. 世界网关进世界首帧联动（透传真实 race_id 或从 physiology.race_id 提取，消除 HUMAN 硬编码覆盖）
 static func trigger_initial_world_sync(
 	account_id: String,
 	character_id: String,
 	character_name: String,
 	physiology: CharacterPhysiologySheet,
 	wallet: CharacterWalletEntity,
-	location_id: String = ""
+	location_id: String = "",
+	race_id: String = "",
+	allow_default_fallback: bool = true
 ) -> HudStatusSnapshotDTO:
-	var snapshot := get_hud_status_snapshot(account_id, character_id, character_name, "HUMAN", physiology, wallet, location_id)
+	var effective_race := race_id
+	if effective_race.is_empty() and physiology != null and not physiology.race_id.is_empty():
+		effective_race = physiology.race_id
+	var snapshot := get_hud_status_snapshot(
+		account_id, character_id, character_name, effective_race, physiology, wallet, location_id, allow_default_fallback
+	)
 	publish_hud_snapshot(snapshot)
 	return snapshot
 
 # ==============================================================================
-# Phase 72 首批现代接口接入示范（EventBus 2.0 整型信道 + 对象池借还闭环）
-# 说明: 与上方 P71 字符串频道方法共存（迁移期双轨），borrow→dispatch→recycle
+# 首批现代接口接入示范（EventBus 2.0 整型信道 + 对象池借还闭环）
+# 说明: 与上方 字符串频道方法共存（迁移期双轨），borrow→dispatch→recycle
 #       借还守恒；后续 P73/P74 迁移完成后字符串版本退役。
 # ==============================================================================
 

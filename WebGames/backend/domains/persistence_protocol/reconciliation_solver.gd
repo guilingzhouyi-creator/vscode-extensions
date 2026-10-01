@@ -25,8 +25,8 @@ static func reconcile_client_state(
 			remaining_unacked.append(cmd)
 
 	# 重放未确认指令
-	var predicted_hp = base_hp
-	var predicted_ap = base_ap
+	var predicted_hp := base_hp
+	var predicted_ap := base_ap
 	var default_verb := GameConfig.get_string("infrastructure.persistence", "reconciliation/default_verb", "SLASH")
 	var base_ap_fallback := GameConfig.get_int("infrastructure.persistence", "reconciliation/base_ap_fallback", -2)
 	for cmd in remaining_unacked:

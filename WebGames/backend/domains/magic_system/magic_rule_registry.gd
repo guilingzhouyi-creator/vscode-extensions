@@ -4,7 +4,7 @@
 # 架构定位: Domain Registry / Specification Catalog
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 加载 config/domains/magic_rules.json 唯一事实源，启动校验结构不变量 （属性大类成员闭合 / 变体源体系闭合 / 条件树结构 / 位阶形态合法 / 组合语义枚举 / 数值域），为魔法规则引擎提供统一配置查询。 位阶维度复用 MagicTierRegistry（不复制阶位表），禁止把示例数值或 固定属性组合固化为系统唯一规则。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name MagicRuleRegistry
@@ -15,9 +15,9 @@ const COMBO_DEFINED: String = "DEFINED"
 const COMBO_PARTIAL: String = "PARTIAL"
 const COMBO_UNDEFINED: String = "BND_NOT_DEFINED"
 
-var _schools: Dictionary = {}     # school_id -> {name_key, members[]}
-var _attributes: Dictionary = {}  # attribute_id -> {name_key, school}
-var _variants: Dictionary = {}    # variant_id -> {source_schools, fusion_mode, fusion_conditions, variant_of_form, name_key}
+var _schools: Dictionary = {} # school_id -> {name_key, members[]}
+var _attributes: Dictionary = {} # attribute_id -> {name_key, school}
+var _variants: Dictionary = {} # variant_id -> {source_schools, fusion_mode, fusion_conditions, variant_of_form, name_key}
 var _multi_cast: Dictionary = {}
 var _seal: Dictionary = {}
 var _ascension: Dictionary = {}
@@ -77,6 +77,18 @@ func _validate_sections_non_empty() -> bool:
 		return false
 	return true
 
+func _school_members_valid(school: Dictionary) -> bool:
+	for member in school.get("members", []):
+		if not _attributes.has(String(member)):
+			return false
+	return true
+
+func _variant_sources_valid(variant: Dictionary) -> bool:
+	for src in variant.get("source_schools", []):
+		if not _schools.has(String(src)):
+			return false
+	return true
+
 ## 校验属性与大类双向闭合
 func _validate_school_attribute_closure() -> bool:
 	for attr_id in _attributes:
@@ -85,18 +97,16 @@ func _validate_school_attribute_closure() -> bool:
 			return false
 	for school_id in _schools:
 		var school: Dictionary = _schools[school_id]
-		for member in school.get("members", []):
-			if not _attributes.has(String(member)):
-				return false
+		if not _school_members_valid(school):
+			return false
 	return true
 
 ## 校验变体结构合法性（源体系/条件树/位阶形态）
 func _validate_variants() -> bool:
 	for variant_id in _variants:
 		var variant: Dictionary = _variants[variant_id]
-		for src in variant.get("source_schools", []):
-			if not _schools.has(String(src)):
-				return false
+		if not _variant_sources_valid(variant):
+			return false
 		if not _valid_condition_tree(variant.get("fusion_conditions", {})):
 			return false
 		var vof := int(variant.get("variant_of_form", 0))
@@ -163,14 +173,20 @@ func get_variant(variant_id: String) -> Dictionary:
 
 ## 属性 ID 是否已登记
 func has_attribute(attribute_id: String) -> bool:
+	if attribute_id.is_empty():
+		return false
 	return _attributes.has(attribute_id)
 
 ## 大类 ID 是否已登记
 func has_school(school_id: String) -> bool:
+	if school_id.is_empty():
+		return false
 	return _schools.has(school_id)
 
 ## 变体 ID 是否已登记
 func has_variant(variant_id: String) -> bool:
+	if variant_id.is_empty():
+		return false
 	return _variants.has(variant_id)
 
 ## 大类成员清单（未登记返回空数组）
@@ -193,7 +209,7 @@ func attribute_ids() -> Array:
 func variant_ids() -> Array:
 	return _variants.keys()
 
-## 段配置查询（P7：零拷贝只读共享——内部段引用直出，消费方不得就地修改；
+## 段配置查询（零拷贝只读共享——内部段引用直出，消费方不得就地修改；
 ## reload_configuration 整体替换段引用，写时复制语义保证旧引用不受热重载污染）
 func multi_cast_config() -> Dictionary:
 	return _multi_cast

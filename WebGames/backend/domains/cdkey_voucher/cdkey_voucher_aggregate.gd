@@ -28,7 +28,7 @@ var current_global_redemptions: int = GameConfig.get_int("domains.cdkey_voucher"
 var required_character_level: int = GameConfig.get_int("domains.cdkey_voucher", "defaults/required_character_level", 1)
 var is_active: bool = GameConfig.get_bool("domains.cdkey_voucher", "defaults/is_active", true)
 
-# 兑换码级复合门槛规则（Phase 36 S2）：按 rule_id 覆盖全局 eligibility_rules；
+# 兑换码级复合门槛规则（）：按 rule_id 覆盖全局 eligibility_rules；
 # 空字典 = 无兑换码级规则（仅全局生效）
 var eligibility_rules: Dictionary = {}
 

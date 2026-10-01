@@ -41,12 +41,12 @@ static func evaluate_spatial_audio(
 		}
 
 	# 线性几何声学距离衰减：1.0（贴脸）→ 0.0（可听半径边缘）
-	var dist_factor = clampf(1.0 - (dist / cmd.max_audible_distance), 0.0, 1.0)
+	var dist_factor := clampf(1.0 - (dist / cmd.max_audible_distance), 0.0, 1.0)
 	var eff_vol = cmd.volume_scale * dist_factor * master_volume
 
 	# 左右声道水平声相 (Pan: -1.0 左, +1.0 右)
 	var delta_x = cmd.source_pos.x - listener_pos.x
-	var pan = clampf(delta_x / cmd.max_audible_distance, -1.0, 1.0)
+	var pan := clampf(delta_x / cmd.max_audible_distance, -1.0, 1.0)
 
 	return {
 		"play": eff_vol > 0.001,
@@ -56,7 +56,7 @@ static func evaluate_spatial_audio(
 	}
 
 # ==============================================================================
-# 二、EventBus 2.0 空间声学分发接入 (Phase 72 示范)
+# 二、EventBus 2.0 空间声学分发接入 (示范)
 # ==============================================================================
 
 ## 空间声学事件广播：经 EventBusCore 对象池与空间哈希网格派发

@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/narrative_orchestration/event_description_resolver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
-# 职责说明: 根据实际事件/上下文/结果（result.outcome 分支）生成事件描述——**不承担 事件判定**（生成于事件执行之后，result 由事件层写入，只读消费）。 Phase 24：文本生成收敛至统一文案核心 CopywritingResolver（结果分支/条件段/ {param} 填充/未填充拦截/键登记一处实现）；本类保留 EVENT_DESC_MISSING 配置存在性检查（测试断言兼容）与零判定时序（result 只读合并）。
+# 职责说明: 根据实际事件/上下文/结果（result.outcome 分支）生成事件描述——**不承担 事件判定**（生成于事件执行之后，result 由事件层写入，只读消费）。 ：文本生成收敛至统一文案核心 CopywritingResolver（结果分支/条件段/ {param} 填充/未填充拦截/键登记一处实现）；本类保留 EVENT_DESC_MISSING 配置存在性检查（测试断言兼容）与零判定时序（result 只读合并）。
 # 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
 # ==============================================================================
 
@@ -26,7 +26,7 @@ static func resolve(
 	# 参数注入：context + result 只读合并（outcome 为分支选择键，不入文本参数）
 	var params := _build_params(context, result)
 
-	# 文本生成：统一文案核心（Phase 24）——outcome 结果分支（缺省 base 兜底）+ 未填充
+	# 文本生成：统一文案核心（）——outcome 结果分支（缺省 base 兜底）+ 未填充
 	# 拦截 + 描述键登记（跨域唯一）在共享核心一处实现。
 	# 统一文案键三段式：<域 narrative>.<条目 事件ID>.<字段 desc>
 	return CopywritingResolver.resolve(

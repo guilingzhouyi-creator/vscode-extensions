@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
 # 职责说明: 将文字方位动词解析为连续物理速度向量，计算地形阻抗与负重衰减 优化: 引入 DirectionAliasIndex 静态倒排映射缓存与结构化参数，消除热路径高频配置读与循环比对
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name MovementVectorBridgeSolver
@@ -23,7 +23,7 @@ class MovementParams extends RefCounted:
 
 static var _alias_table: Dictionary = {}
 static var _params_cache: MovementParams = null
-## 缓存构建时的配置热重载版本（不一致即重建，Phase 64 P2 修复热重载失效）
+## 缓存构建时的配置热重载版本（不一致即重建，修复热重载失效）
 static var _cached_config_version: int = -1
 
 ## 缓存新鲜度守卫：未构建或配置热重载版本推进时触发重建
@@ -37,12 +37,9 @@ static func init_or_rebuild_cache() -> void:
 	var table: Dictionary = {}
 	for dir_key in aliases:
 		var raw_alias: Variant = aliases[dir_key]
-		if raw_alias is not Array:
-			continue
-		var dir_vec := _map_dir_key_to_vector(str(dir_key))
-		for alias in (raw_alias as Array):
-			var key := str(alias).strip_edges().to_upper()
-			table[key] = dir_vec
+		if raw_alias is Array:
+			var dir_vec := _map_dir_key_to_vector(str(dir_key))
+			_register_aliases_for_vector(table, raw_alias as Array, dir_vec)
 
 	# 默认方向回退保障（配置缺失时零退化）
 	var fallback_map := {
@@ -72,6 +69,11 @@ static func init_or_rebuild_cache() -> void:
 	p.facing_thresh_sq = GameConfig.get_float("domains.spatial_movement", "movement/facing_threshold_sq", 0.0001)
 	_params_cache = p
 	_cached_config_version = GameConfig.config_reload_version()
+
+static func _register_aliases_for_vector(table: Dictionary, raw_aliases: Array, dir_vec: Vector2) -> void:
+	for alias in raw_aliases:
+		var key := str(alias).strip_edges().to_upper()
+		table[key] = dir_vec
 
 ## 方向键到向量映射
 static func _map_dir_key_to_vector(dir_key: String) -> Vector2:

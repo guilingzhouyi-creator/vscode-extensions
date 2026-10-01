@@ -46,6 +46,8 @@ static func get_active_mounted_version() -> String:
 static func get_mounted_packs() -> Array[Dictionary]:
 	return _mounted_packs.duplicate(true)
 
-## 重置清空挂载记录 (供单元测试或深度回滚使用)
-static func reset_for_tests() -> void:
+## 重置清空挂载记录 (供单元测试或深度回滚使用)，返回清理的挂载包数量
+static func reset_for_tests() -> int:
+	var count := _mounted_packs.size()
 	_mounted_packs.clear()
+	return count

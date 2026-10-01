@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/cdkey_voucher/redemption_flow_orchestrator.gd
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
-# 职责说明: 统一兑换生命周期编排：事务键去重 -> 资格判定/原子核销 -> 成功记录 -> 邮件投递 -> DISPATCH_PENDING 恢复重发。流程一致性契约（Phase 37 S2）： - 门槛未达标/判定失败：可重试失败态，零核销写入（对齐 Phase 35） - 核销成功即写记录（transaction_id 唯一）；投递失败标记 DISPATCH_PENDING， 恢复后按记录重发，不重复核销 - 审计：判定原因/状态跃迁/投递操作结构化留痕（供日志/审计，不暴露客户端）
+# 职责说明: 统一兑换生命周期编排：事务键去重 -> 资格判定/原子核销 -> 成功记录 -> 邮件投递 -> DISPATCH_PENDING 恢复重发。流程一致性契约（）： - 门槛未达标/判定失败：可重试失败态，零核销写入（对齐 ） - 核销成功即写记录（transaction_id 唯一）；投递失败标记 DISPATCH_PENDING， 恢复后按记录重发，不重复核销 - 审计：判定原因/状态跃迁/投递操作结构化留痕（供日志/审计，不暴露客户端）
 # 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
 # ==============================================================================
 
@@ -24,9 +24,9 @@ static func reset_records() -> void:
 static func process_redemption(request: Dictionary) -> Dictionary:
 	var tx_id := String(request.get("transaction_id", ""))
 	if tx_id.is_empty():
-		return { "success": false, "code": "TRANSACTION_ID_REQUIRED", "precise_reason": "TRANSACTION_ID_REQUIRED" }
+		return {"success": false, "code": "TRANSACTION_ID_REQUIRED", "precise_reason": "TRANSACTION_ID_REQUIRED"}
 	if _records.has(tx_id):
-		return { "success": false, "code": "DUPLICATE_TRANSACTION", "precise_reason": "DUPLICATE_TRANSACTION:%s" % tx_id }
+		return {"success": false, "code": "DUPLICATE_TRANSACTION", "precise_reason": "DUPLICATE_TRANSACTION:%s" % tx_id}
 
 	# 1. 资格判定 + 原子核销（内部精确原因由 solver 保留）
 	var res := CDKeyRedemptionSolver.resolve_redemption(
@@ -42,7 +42,7 @@ static func process_redemption(request: Dictionary) -> Dictionary:
 		request.get("eligibility_rules_override", {})
 	)
 	if not res.get("success", false):
-		return res  # 判定失败透传（未达标/无效等——均未核销）
+		return res # 判定失败透传（未达标/无效等——均未核销）
 
 	# 2. 成功记录（transaction_id 唯一）
 	_records[tx_id] = {
@@ -84,10 +84,10 @@ static func process_redemption(request: Dictionary) -> Dictionary:
 ## 投递失败恢复重发：按记录重发邮件，不重复核销（事务键去重保证单次核销）
 static func retry_dispatch(tx_id: String, mailbox: MailboxManager) -> Dictionary:
 	if not _records.has(tx_id):
-		return { "success": false, "code": "RECORD_NOT_FOUND", "precise_reason": "RECORD_NOT_FOUND:%s" % tx_id }
+		return {"success": false, "code": "RECORD_NOT_FOUND", "precise_reason": "RECORD_NOT_FOUND:%s" % tx_id}
 	var record: Dictionary = _records[tx_id]
 	if record.get("status", "") != "DISPATCH_PENDING":
-		return { "success": false, "code": "NOT_PENDING", "precise_reason": "NOT_PENDING:%s" % tx_id }
+		return {"success": false, "code": "NOT_PENDING", "precise_reason": "NOT_PENDING:%s" % tx_id}
 
 	var dispatched := VoucherDispatchPipeline.dispatch_rewards_via_mail(
 		record.get("payload", {}),
@@ -95,14 +95,14 @@ static func retry_dispatch(tx_id: String, mailbox: MailboxManager) -> Dictionary
 		String(record.get("account_id", ""))
 	)
 	if not dispatched.get("success", false):
-		return { "success": false, "code": "DISPATCH_PENDING", "precise_reason": "RETRY_FAILED:%s" % tx_id, "retryable": true }
+		return {"success": false, "code": "DISPATCH_PENDING", "precise_reason": "RETRY_FAILED:%s" % tx_id, "retryable": true}
 
 	record["status"] = "DISPATCHED"
 	record["mail_id"] = dispatched.get("mail_id", "")
 	prune_records()
-	return { "success": true, "code": "OK", "mail_id": dispatched.get("mail_id", ""), "record_status": "DISPATCHED" }
+	return {"success": true, "code": "OK", "mail_id": dispatched.get("mail_id", ""), "record_status": "DISPATCHED"}
 
-## M4（Phase 52）悬挂补偿通道：DISPATCH_PENDING 驻留超 TTL 自动重试；
+## M4（）悬挂补偿通道：DISPATCH_PENDING 驻留超 TTL 自动重试；
 ## 重试达上限仍失败即回滚核销（码 RELEASED、记录清除）——补偿性两阶段闭环，
 ## 杜绝「码已烧、奖励永失」的永久悬挂（含 M3 修复后 mail_id 唯一化对重试的解锁）。
 ## 阈值配置：domains.cdkey_voucher → redemption/compensation/{enabled,ttl_seconds,max_retry}。
@@ -114,7 +114,7 @@ static func compensate_stale_pending(
 	account_redemption_history: Dictionary = {}
 ) -> Dictionary:
 	if not GameConfig.get_bool("domains.cdkey_voucher", "redemption/compensation/enabled", true):
-		return { "success": true, "scanned": 0, "retried": 0, "released": 0, "skipped": 0 }
+		return {"success": true, "scanned": 0, "retried": 0, "released": 0, "skipped": 0}
 	var ttl_seconds := maxi(0, GameConfig.get_int("domains.cdkey_voucher", "redemption/compensation/ttl_seconds", 180))
 	var max_retry := maxi(0, GameConfig.get_int("domains.cdkey_voucher", "redemption/compensation/max_retry", 3))
 	var scanned := 0
@@ -151,7 +151,7 @@ static func compensate_stale_pending(
 			record["retry_count"] = retries + 1
 			record["pending_since_utc"] = current_time_utc # 冷却：下轮按新 TTL 再判
 		retried += 1
-	return { "success": true, "scanned": scanned, "retried": retried, "released": released, "skipped": skipped }
+	return {"success": true, "scanned": scanned, "retried": retried, "released": released, "skipped": skipped}
 
 ## 保留窗口压缩（评审优化 #1）：按配置上限清理最旧已完成记录；
 ## DISPATCH_PENDING 记录保留（待恢复重发——不被压缩清除）。

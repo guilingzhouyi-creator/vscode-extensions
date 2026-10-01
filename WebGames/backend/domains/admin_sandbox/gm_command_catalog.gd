@@ -42,23 +42,23 @@ static func unregister_default_commands() -> void:
 static func _give_handler(ast: Variant, context: Dictionary) -> Dictionary:
 	var admin: AdminPermissionAggregate = context.get("admin", null)
 	if admin == null:
-		return { "success": false, "reason": "NO_ADMIN_CONTEXT" }
+		return {"success": false, "reason": "NO_ADMIN_CONTEXT"}
 	return SandboxCheatSolver.execute_cheat_command(admin, "GIVE_ITEM", ast.raw_arguments, context)
 
 static func _gold_handler(ast: Variant, context: Dictionary) -> Dictionary:
 	var admin: AdminPermissionAggregate = context.get("admin", null)
 	if admin == null:
-		return { "success": false, "reason": "NO_ADMIN_CONTEXT" }
+		return {"success": false, "reason": "NO_ADMIN_CONTEXT"}
 	return SandboxCheatSolver.execute_cheat_command(admin, "GIVE_GOLD", ast.raw_arguments, context)
 
 static func _god_handler(ast: Variant, context: Dictionary) -> Dictionary:
 	var admin: AdminPermissionAggregate = context.get("admin", null)
 	if admin == null:
-		return { "success": false, "reason": "NO_ADMIN_CONTEXT" }
+		return {"success": false, "reason": "NO_ADMIN_CONTEXT"}
 	return SandboxCheatSolver.execute_cheat_command(admin, "GOD_MODE", ast.raw_arguments, context)
 
 static func _time_handler(ast: Variant, context: Dictionary) -> Dictionary:
 	var admin: AdminPermissionAggregate = context.get("admin", null)
 	if admin == null:
-		return { "success": false, "reason": "NO_ADMIN_CONTEXT" }
+		return {"success": false, "reason": "NO_ADMIN_CONTEXT"}
 	return SandboxCheatSolver.execute_cheat_command(admin, "ADVANCE_TIME", ast.raw_arguments, context)

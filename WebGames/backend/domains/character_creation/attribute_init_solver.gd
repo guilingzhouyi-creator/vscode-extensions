@@ -39,7 +39,7 @@ static func roll_4d6_drop_lowest(rng: DeterministicRNG = null) -> int:
 	for i in range(cnt):
 		rolls.append(dice_rng.randi_range(1, sides))
 	rolls.sort()
-	# L1（Phase 55）：drop_lowest 域收敛（Inv-VD-1/域内）——负值配置以负起点 range 越界访问
+	# L1（）：drop_lowest 域收敛（Inv-VD-1/域内）——负值配置以负起点 range 越界访问
 	#（rolls[-size-1] 运行错误）；≥cnt 则静默全丢（sum=0 恒 1 级）。收敛保底至少保留 1 骰
 	var drop := clampi(_drop_lowest(), 0, maxi(0, rolls.size() - 1))
 	var sum := 0

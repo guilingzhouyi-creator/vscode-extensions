@@ -9,7 +9,7 @@
 
 class_name PhysicsAndThermodynamicsSolver extends RefCounted
 
-## 侵彻求解静态参数缓存（Phase 64 P2 模式：配置热重载版本推进自动失效重建）。
+## 侵彻求解静态参数缓存（模式：配置热重载版本推进自动失效重建）。
 ## calculate_penetration_damage 每击原本 3 次 GameConfig 路径查找（kinetic 段）——
 ## 缓存后每击仅一次版本比对 + 字段复制（动词常数仍走 get_verb 字典引用）。
 class KineticParams extends RefCounted:
@@ -47,8 +47,8 @@ static func calculate_penetration_damage(
 	_ensure_kinetic_cache()
 	var p := _kinetic_cache
 	var kinetic_energy = p.energy_coef * max(p.mass_floor, weapon_mass_kg) * pow(max(p.velocity_floor, velocity_m_s), 2.0)
-	var sharpness_boost = 1.0 + k_edge * max(0.0, edge_sharpness)
-	var armor_divisor = 1.0 + max(0.0, effective_armor)
+	var sharpness_boost: float = 1.0 + k_edge * maxf(0.0, edge_sharpness)
+	var armor_divisor: float = 1.0 + maxf(0.0, effective_armor)
 
 	return (kinetic_energy * k_mom * sharpness_boost) / armor_divisor
 
@@ -80,8 +80,8 @@ static func calculate_mana_phase_transition_loss(
 		GameConfig.get_float("domains.combat", "phase_transition/step2_min", 0.10),
 		GameConfig.get_float("domains.combat", "phase_transition/step2_max", 0.30)
 	)
-	var total_loss_ratio = clampf(1.0 - (1.0 - eta_1) * (1.0 - eta_2), min_loss_floor, 0.9999)
-	var effective_energy_output = raw_mana_input * (1.0 - total_loss_ratio)
+	var total_loss_ratio := clampf(1.0 - (1.0 - eta_1) * (1.0 - eta_2), min_loss_floor, 0.9999)
+	var effective_energy_output := raw_mana_input * (1.0 - total_loss_ratio)
 
 	return {
 		"raw_input": raw_mana_input,

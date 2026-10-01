@@ -4,11 +4,13 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
 # 职责说明: 兑换码检定、复合门槛规则引擎、防枚举、频控/时效/全服上限与邮件发放； 全部运营 CDKey 兑换必须经此域，禁止绕过（chat_command 路径仅为开发/测试通道）。 频控防爆破、时效门槛检定、原子核销记录与防并发重放  配置驱动: 频控阈值与锁定时长 -> config/domains/cdkey_voucher.json 的 rate_limit.* 全部错误/成功文案   -> config/narratives/cdkey_voucher.json 代码零硬编码，改文案与调阈值无需重新编译。
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务域第一性原理 / 经济交易兑换码架构规范
 # ==============================================================================
 
 class_name CDKeyRedemptionSolver
 extends RefCounted
+
+const MSG_INVALID_CODE: String = "invalid_code"
 
 # 频控与核销状态记录结构 (在生产环境中由全局持久化状态维护)
 # account_failed_attempts: account_id -> { "count": int, "lock_until_utc": int }
@@ -21,22 +23,22 @@ static func resolve_redemption(
 	character_level: int,
 	raw_input_code: String,
 	current_time_utc: int,
-	voucher_registry: Dictionary,        # voucher_code -> CDKeyVoucherAggregate
-	rate_limit_state: Dictionary,        # account_id -> Dictionary
+	voucher_registry: Dictionary, # voucher_code -> CDKeyVoucherAggregate
+	rate_limit_state: Dictionary, # account_id -> Dictionary
 	account_redemption_history: Dictionary, # account_id -> Array[String]
-	global_unique_redeemed: Dictionary,   # voucher_code -> bool
-	eligibility_metrics: Dictionary = {},  # 复合门槛判定指标（Phase 35 S2，调用方注入）
-	eligibility_rules_override: Dictionary = {}  # 测试/装配层注入规则；空则读配置（示例配置自动跳过）
+	global_unique_redeemed: Dictionary, # voucher_code -> bool
+	eligibility_metrics: Dictionary = {}, # 复合门槛判定指标（，调用方注入）
+	eligibility_rules_override: Dictionary = {} # 测试/装配层注入规则；空则读配置（示例配置自动跳过）
 ) -> Dictionary:
 	var code = raw_input_code.strip_edges().to_upper()
 
 	# 1. 检查频控锁定
-	var limit_info: Dictionary = rate_limit_state.get(account_id, { "count": 0, "lock_until_utc": 0 })
+	var limit_info: Dictionary = rate_limit_state.get(account_id, {"count": 0, "lock_until_utc": 0})
 	if limit_info.get("lock_until_utc", 0) > current_time_utc:
 		return {
 			"success": false,
 			"error_code": "RATE_LIMITED",
-			"error_message": _msg("invalid_code"),
+			"error_message": _msg(MSG_INVALID_CODE),
 			"precise_reason": "RATE_LIMITED",
 			"payload": {}
 		}
@@ -47,7 +49,7 @@ static func resolve_redemption(
 		return {
 			"success": false,
 			"error_code": "INVALID_CODE",
-			"error_message": _msg("invalid_code"),
+			"error_message": _msg(MSG_INVALID_CODE),
 			"precise_reason": "INVALID_CODE",
 			"payload": {}
 		}
@@ -59,7 +61,7 @@ static func resolve_redemption(
 		return {
 			"success": false,
 			"error_code": "VOUCHER_REVOKED",
-			"error_message": _msg("invalid_code"),
+			"error_message": _msg(MSG_INVALID_CODE),
 			"precise_reason": "VOUCHER_REVOKED",
 			"payload": {}
 		}
@@ -68,12 +70,12 @@ static func resolve_redemption(
 		return {
 			"success": false,
 			"error_code": "EXPIRED",
-			"error_message": _msg("invalid_code"),
+			"error_message": _msg(MSG_INVALID_CODE),
 			"precise_reason": "EXPIRED",
 			"payload": {}
 		}
 
-	# 4. 复合门槛评估（Phase 35 S2 / Phase 36 S2）：规则引擎只解释配置；
+	# 4. 复合门槛评估（/ ）：规则引擎只解释配置；
 	#    作用域合并（兑换码级覆盖全局同 rule_id）；未达标 = 可重试判定（不消耗/不作废/可重新兑换），零核销写入
 	var rules: Dictionary = eligibility_rules_override \
 		if not eligibility_rules_override.is_empty() \
@@ -84,7 +86,7 @@ static func resolve_redemption(
 			return {
 				"success": false,
 				"error_code": "ELIGIBILITY_NOT_MET",
-				"error_message": _msg("invalid_code"),
+				"error_message": _msg(MSG_INVALID_CODE),
 				"precise_reason": "ELIGIBILITY_NOT_MET:%s:%s" % [elig.get("failed_rule_id", ""), elig.get("failed_metric", "")],
 				"payload": {}
 			}
@@ -94,7 +96,7 @@ static func resolve_redemption(
 		return {
 			"success": false,
 			"error_code": "LEVEL_TOO_LOW",
-			"error_message": _msg("invalid_code"),
+			"error_message": _msg(MSG_INVALID_CODE),
 			"precise_reason": "LEVEL_TOO_LOW",
 			"payload": {}
 		}
@@ -104,7 +106,7 @@ static func resolve_redemption(
 		return {
 			"success": false,
 			"error_code": "GLOBAL_LIMIT_REACHED",
-			"error_message": _msg("invalid_code"),
+			"error_message": _msg(MSG_INVALID_CODE),
 			"precise_reason": "GLOBAL_LIMIT_REACHED",
 			"payload": {}
 		}
@@ -116,7 +118,7 @@ static func resolve_redemption(
 			return {
 				"success": false,
 				"error_code": "ALREADY_REDEEMED",
-				"error_message": _msg("invalid_code"),
+				"error_message": _msg(MSG_INVALID_CODE),
 				"precise_reason": "ALREADY_REDEEMED",
 				"payload": {}
 			}
@@ -125,7 +127,7 @@ static func resolve_redemption(
 			return {
 				"success": false,
 				"error_code": "ALREADY_USED_GLOBALLY",
-				"error_message": _msg("invalid_code"),
+				"error_message": _msg(MSG_INVALID_CODE),
 				"precise_reason": "ALREADY_USED_GLOBALLY",
 				"payload": {}
 			}
@@ -140,7 +142,7 @@ static func resolve_redemption(
 	account_redemption_history[account_id].append(code)
 
 	# 重置失败频控计数
-	rate_limit_state[account_id] = { "count": 0, "lock_until_utc": 0 }
+	rate_limit_state[account_id] = {"count": 0, "lock_until_utc": 0}
 
 	return {
 		"success": true,
@@ -150,7 +152,7 @@ static func resolve_redemption(
 		"voucher_title": voucher.localized_title
 	}
 
-## M4（Phase 52）：补偿回滚（RELEASED）——投递补偿判定达上限后释放已核销资源：
+## M4（）：补偿回滚（RELEASED）——投递补偿判定达上限后释放已核销资源：
 ## 递减全服计数（下界 0）、清除 UNIQUE_ONE_TIME 占用、移除账户历史末次记录。
 ## 仅由补偿通道在确认「该笔兑换不会再投递」后调用；幂等（重复调用安全）。
 static func rollback_redemption(
@@ -173,7 +175,7 @@ static func rollback_redemption(
 			break
 	if idx >= 0:
 		history.remove_at(idx)
-	return { "success": true, "error_code": "CODE_RELEASED_AFTER_FAILURE", "voucher_code": code }
+	return {"success": true, "error_code": "CODE_RELEASED_AFTER_FAILURE", "voucher_code": code}
 
 const MAX_RATE_LIMIT_ENTRIES: int = 5000
 
@@ -197,13 +199,13 @@ static func _record_failure(account_id: String, current_time_utc: int, rate_limi
 			# 逐出任一在锁条目都会静默解除防爆破锁（攻击者灌满表即可轮换逐出受害者锁），
 			# 故放弃记录本次新失败（fail-closed），绝不主动解除既有锁定。
 			return
-	var info: Dictionary = rate_limit_state.get(account_id, { "count": 0, "lock_until_utc": 0 })
+	var info: Dictionary = rate_limit_state.get(account_id, {"count": 0, "lock_until_utc": 0})
 	var cnt = info.get("count", 0) + 1
 	var lock_until := 0
 	if cnt >= _max_failed_attempts():
 		lock_until = current_time_utc + _lockout_duration_seconds()
 		cnt = 0
-	rate_limit_state[account_id] = { "count": cnt, "lock_until_utc": lock_until }
+	rate_limit_state[account_id] = {"count": cnt, "lock_until_utc": lock_until}
 
 # ==============================================================================
 # 配置读取

@@ -14,11 +14,11 @@ static func calculate_respec_cost(engine: PotentialGrowthEngine, respec_count_hi
 	var base_gold := GameConfig.get_int("domains.potential", "respec/base_gold", 100)
 	var exp_base := GameConfig.get_float("domains.potential", "respec/gold_exp_base", 2.0)
 	var max_exp := GameConfig.get_int("domains.potential", "respec/max_history_exponent", 5)
-	var gold_cost = base_gold * int(pow(exp_base, min(max_exp, respec_count_history)))
+	var gold_cost := base_gold * int(pow(exp_base, min(max_exp, respec_count_history)))
 	var divisor := maxf(1.0, GameConfig.get_float("domains.potential", "respec/crystal_divisor", 20.0))
 	# M9 双保险：分子钳 0（Inv-TX-2）——即使调用方绕过 deserialize 直接构造越序 engine，
 	# 成本亦不可能为负（负成本扣减 = 反向增发魔单晶）
-	var crystal_cost = int(floor(float(maxi(0, engine.lifetime_potential_earned - engine.unassigned_potential_points)) / divisor))
+	var crystal_cost := int(floor(float(maxi(0, engine.lifetime_potential_earned - engine.unassigned_potential_points)) / divisor))
 	return { "gold_cost": gold_cost, "crystal_cost": crystal_cost }
 
 ## 心核重构执行：扣费 → 全额返还潜能点 → L1 等级回退/L2 阅历重置/L3 动态保留 → 重算体魄
@@ -28,7 +28,7 @@ static func execute_heart_core_respec(
 	wallet: CharacterWalletEntity,
 	respec_count_history: int = 0
 ) -> Dictionary:
-	var cost = calculate_respec_cost(engine, respec_count_history)
+	var cost := calculate_respec_cost(engine, respec_count_history)
 	if wallet.gold < cost.gold_cost or wallet.mana_monocrystals < cost.crystal_cost:
 		var msg := GameConfig.get_string("narratives.potential", "insufficient_gold_crystal", "Insufficient gold or mana crystals for respec.")
 		return { "success": false, "reason": msg }

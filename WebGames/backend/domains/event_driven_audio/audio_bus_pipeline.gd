@@ -14,7 +14,7 @@ extends RefCounted
 # 一、并发水位释放（计数配对）
 # ==============================================================================
 
-## L9-a（Phase 53）并发水位显式释放路径（Inv-ON-4）：与 dispatch 的 +1 计数配对——
+## L9-a（）并发水位显式释放路径（Inv-ON-4）：与 dispatch 的 +1 计数配对——
 ## 播放宿主在音频自然结束/截停时经生命周期事件回传调用；归零删键（防 0 值堆积）、永不 < 0。
 static func release_sound_instance(active_sound_counts: Dictionary, sound_id: String) -> void:
 	if sound_id.is_empty():

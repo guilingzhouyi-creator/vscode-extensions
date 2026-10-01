@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/elite_mutation/generic_affix_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
-# 职责说明: 吸血/熔火/迅捷/荆棘/虚化等通用变异词缀的定义读取与后端概率滚动（纯函数）； 词缀定义与词缀池权重由 config/domains/elite.json 的 affixes / affix_pool 段驱动。 Phase 88 角色归位：原 apply_elite_affixes（原地改写入参状态）已迁入 EliteMonsterAggregate.apply_affixes，本文件收敛为纯求解器。
+# 职责说明: 吸血/熔火/迅捷/荆棘/虚化等通用变异词缀的定义读取与后端概率滚动（纯函数）； 词缀定义与词缀池权重由 config/domains/elite.json 的 affixes / affix_pool 段驱动。 角色归位：原 apply_elite_affixes（原地改写入参状态）已迁入 EliteMonsterAggregate.apply_affixes，本文件收敛为纯求解器。
 # 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
 # ==============================================================================
 
@@ -28,7 +28,7 @@ static func get_affix(aff_id: String) -> Dictionary:
 # 二、词缀注入与概率滚动
 # ==============================================================================
 
-## 精英词缀注入已迁出（Phase 88 角色归位）：原 apply_elite_affixes(monster, affix_ids) 原地改写
+## 精英词缀注入已迁出（角色归位）：原 apply_elite_affixes(monster, affix_ids) 原地改写
 ## 入参聚合，违反「solver 禁 mutator」红线，已迁入 EliteMonsterAggregate.apply_affixes。
 ## 本文件收敛为纯求解器：仅承担词缀定义读取与后端概率滚动（无任何入参状态改写）。
 

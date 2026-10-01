@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 表达剧情节点之间的单向流转关系、分支条件与仲裁权重
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name NarrativeDAGEdge
@@ -36,8 +36,8 @@ static func from_dto(d: Dictionary) -> NarrativeDAGEdge:
 	var edge := NarrativeDAGEdge.new()
 	if d.is_empty():
 		return edge
-	edge.from_node_id = str(d.get("from_node_id", ""))
-	edge.to_node_id = str(d.get("to_node_id", ""))
+	edge.from_node_id = str(d.get("from_node_id", d.get("from", "")))
+	edge.to_node_id = str(d.get("to_node_id", d.get("to", "")))
 	edge.branch_condition = (d.get("branch_condition", {}) as Dictionary).duplicate(true)
 	edge.priority_weight = int(d.get("priority_weight", 100))
 	return edge

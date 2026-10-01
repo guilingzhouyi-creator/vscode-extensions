@@ -31,14 +31,14 @@ static func execute_multi_pull(
 	if _completed_transactions.has(operation_id):
 		return _completed_transactions[operation_id]
 	var pull_rng := DeterministicRNG.resolve(rng)
-	var total_gold_cost = banner.cost_per_pull_gold * pull_count
-	var total_copper_value = wallet.get_total_copper_value()
-	var gold_rate := GameConfig.get_int("domains.currency", "rates/gold", 10000)
-	var needed_copper = total_gold_cost * gold_rate
+	var total_gold_cost: int = banner.cost_per_pull_gold * pull_count
+	var total_copper_value: int = wallet.get_total_copper_value()
+	var gold_rate: int = GameConfig.get_int("domains.currency", "rates/gold", 10000)
+	var needed_copper: int = total_gold_cost * gold_rate
 
 	if total_copper_value < needed_copper:
 		var msg := GameConfig.get_string("narratives.gacha", "insufficient_funds", "Insufficient funds for %d pulls.")
-		return { "success": false, "reason": msg % pull_count }
+		return {"success": false, "reason": msg % pull_count}
 
 	var wallet_snapshot := wallet.to_dictionary()
 	var inventory_snapshot := inventory.snapshot()
@@ -81,10 +81,10 @@ static func execute_multi_pull(
 		return {"success": false, "error_code": "REWARD_COMMIT_FAILED", "grant_failed_count": grant_failed_count, "transaction_id": operation_id}
 
 	EventBusCore.get_instance().emit_narrative_by_key(
-		"gacha/multi_pull_result", "gacha", [banner.banner_title, pull_count, highest_rarity], { "drops": drop_results }
+		"gacha/multi_pull_result", "gacha", [banner.banner_title, pull_count, highest_rarity], {"drops": drop_results}
 	)
 
-	# P2-2 补发（Phase 43）：纯结构化通道——narratives.gacha 无 pull_resolved 文案键，
+	# 补发（）：纯结构化通道——narratives.gacha 无 pull_resolved 文案键，
 	# EventBus 解析不出文案即只广播 domain_event，不与 multi_pull_result 叙事重复落战报
 	EventBusCore.get_instance().emit_domain_event("gacha_wish.pull_resolved", {
 		"args": [operation_id, pull_count],
@@ -106,6 +106,6 @@ static func execute_multi_pull(
 		"transaction_id": operation_id
 	}
 	_completed_transactions[operation_id] = result.duplicate(true)
-	# S3-03 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长；P4 单次快照裁剪）
+	# 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长；单次快照裁剪）
 	FifoBudget.trim_oldest(_completed_transactions, GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000))
 	return result

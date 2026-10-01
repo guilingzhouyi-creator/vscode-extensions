@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 融合 A类增量、B类减量与已鉴定的 C类特殊词缀，实施互斥过滤与严格非负截断 (max(0.0, ...))。 三阶段流水：词缀收集与互斥 → 数值累加与单条上下界钳制 → 合并与非负硬截断。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name ItemAttributeEvaluationSolver
@@ -13,6 +13,16 @@ extends RefCounted
 # ==============================================================================
 # 一、最终生效面板属性求解
 # ==============================================================================
+
+static func _has_tag_conflict(conflict_tags: Array, active_tags: Dictionary) -> bool:
+	for ctag in conflict_tags:
+		if active_tags.has(ctag):
+			return true
+	return false
+
+static func _register_synergy_tags(synergy_tags: Array, active_tags: Dictionary) -> void:
+	for stag in synergy_tags:
+		active_tags[stag] = true
 
 ## 求解物品最终生效面板属性
 static func evaluate_effective_stats(
@@ -46,20 +56,13 @@ static func evaluate_effective_stats(
 				continue
 
 		# 互斥标签冲突校验
-		var conflict_hit := false
-		for ctag in def.conflict_tags:
-			if active_tags.has(ctag):
-				conflict_hit = true
-				break
-
-		if conflict_hit:
+		if _has_tag_conflict(def.conflict_tags, active_tags):
 			suppressed_affixes.append(mount.attribute_uid)
 			continue
 
 		# 记录激活词缀
 		active_affixes.append(mount.attribute_uid)
-		for stag in def.synergy_tags:
-			active_tags[stag] = true
+		_register_synergy_tags(def.synergy_tags, active_tags)
 
 		# 阶段二：数值累加与单条上下界钳制
 		var effective_val: float = mount.current_value
@@ -81,7 +84,7 @@ static func evaluate_effective_stats(
 				elif def.calculation_type == ItemAttributeDefinition.CalculationType.PERCENT_ADD:
 					final_stats[stat_name] = float(final_stats.get(stat_name, 0.0)) + effective_val
 
-	# 阶段三：合并计算与非负下界硬性截断 (P8.6 铁律：所有属性不得低于 0.0)
+	# 阶段三：合并计算与非负下界硬性截断 (铁律：所有属性不得低于 0.0)
 	var all_stat_keys := {}
 	for k in final_stats.keys():
 		all_stat_keys[k] = true

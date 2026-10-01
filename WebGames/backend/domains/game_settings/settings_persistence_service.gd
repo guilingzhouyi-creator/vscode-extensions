@@ -22,7 +22,7 @@ static func load_from_memory_string(settings: GameSettingsAggregate, json_str: S
 		return true
 	return false
 
-## 真实文件落盘（Phase 31 S2）：固定路径 user://settings.kalar_cfg，写后 flush/close。
+## 真实文件落盘（）：固定路径 user://settings.kalar_cfg，写后 flush/close。
 ## 返回 { "success": bool, "path": String [, "error_code"] }
 static func save_to_file(settings: GameSettingsAggregate) -> Dictionary:
 	var file := FileAccess.open(DEFAULT_SETTINGS_PATH, FileAccess.WRITE)
@@ -33,7 +33,7 @@ static func save_to_file(settings: GameSettingsAggregate) -> Dictionary:
 	file.close()
 	return { "success": true, "path": DEFAULT_SETTINGS_PATH }
 
-## 真实文件读取并应用（Phase 31 S2）：缺失/解析失败返回受控错误码，不抛 Fatal。
+## 真实文件读取并应用（）：缺失/解析失败返回受控错误码，不抛 Fatal。
 static func load_from_file(settings: GameSettingsAggregate) -> Dictionary:
 	if not FileAccess.file_exists(DEFAULT_SETTINGS_PATH):
 		return { "success": false, "error_code": "FILE_NOT_EXIST", "path": DEFAULT_SETTINGS_PATH }

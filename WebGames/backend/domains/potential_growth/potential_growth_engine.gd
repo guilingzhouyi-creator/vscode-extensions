@@ -17,7 +17,7 @@ var allocated_points_history: Dictionary = {
 
 ## 潜能点发放：负值归零 + 终生累计 + 阅历突破文案广播
 func grant_potential_points(points: int, reason: String = "") -> int:
-	var safe_points = max(0, points)
+	var safe_points: int = maxi(0, points)
 	unassigned_potential_points += safe_points
 	lifetime_potential_earned += safe_points
 

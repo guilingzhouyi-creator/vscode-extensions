@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 掌握技能图云特征聚类、动态授予 Sword Master / Holy Archmage / Spellblade 位格。 阈值/符号表/职业称号与叙述文案由 config/domains/inventory.json、 config/narratives/inventory.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务域第一性原理 / 多职业引擎规范
 # ==============================================================================
 
 class_name MultiProfessionEngine extends RefCounted
@@ -33,6 +33,27 @@ class ProfessionArchetype extends RefCounted:
 # 二、技能图云聚类评估与职业同步
 # ==============================================================================
 
+static func _count_ast_symbols(
+	ast: Variant,
+	phys_node_type: String,
+	magic_node_type: String,
+	phys_symbols: Array,
+	magic_symbols: Array
+) -> Vector2i:
+	if ast == null:
+		return Vector2i.ZERO
+	var nodes_dict = ast.nodes if "nodes" in ast else {}
+	var phys := 0
+	var magic := 0
+	for node in nodes_dict.values():
+		var ntype = node.get("node_type", "")
+		var symbol = node.get("symbol", "")
+		if ntype == phys_node_type or symbol in phys_symbols:
+			phys += 1
+		elif ntype == magic_node_type or symbol in magic_symbols:
+			magic += 1
+	return Vector2i(phys, magic)
+
 ## 技能图云聚类评估：物理/魔法符号计数达阈值授予 Sword Master/Archmage/Spellblade 位格
 static func evaluate_active_professions(mastered_asts: Array) -> Array[ProfessionArchetype]:
 	var result: Array[ProfessionArchetype] = []
@@ -54,16 +75,9 @@ static func evaluate_active_professions(mastered_asts: Array) -> Array[Professio
 	var spellblade: Dictionary = GameConfig.get_dict("domains.inventory", "profession/titles/spellblade", {})
 
 	for ast in mastered_asts:
-		if ast == null:
-			continue
-		var nodes_dict = ast.nodes if "nodes" in ast else {}
-		for node in nodes_dict.values():
-			var ntype = node.get("node_type", "")
-			var symbol = node.get("symbol", "")
-			if ntype == phys_node_type or symbol in phys_symbols:
-				phys_count += 1
-			elif ntype == magic_node_type or symbol in magic_symbols:
-				magic_count += 1
+		var counts := _count_ast_symbols(ast, phys_node_type, magic_node_type, phys_symbols, magic_symbols)
+		phys_count += counts.x
+		magic_count += counts.y
 
 	if phys_count >= phys_threshold:
 		var p := ProfessionArchetype.new()
@@ -93,7 +107,7 @@ static func evaluate_active_professions(mastered_asts: Array) -> Array[Professio
 
 ## 同步角色职业：评估后逐位格广播晋升事件与叙事文案
 static func sync_character_professions(character_id: String, mastered_asts: Array) -> Array[ProfessionArchetype]:
-	var archetypes = evaluate_active_professions(mastered_asts)
+	var archetypes: Array[ProfessionArchetype] = evaluate_active_professions(mastered_asts)
 	for p in archetypes:
 		EventBusCore.get_instance().emit_profession_promoted(character_id, p.serialize())
 		EventBusCore.get_instance().emit_narrative_by_key(

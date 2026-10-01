@@ -15,8 +15,8 @@ class_name AuthorityTriStateMachine extends RefCounted
 
 ## 权威来源三态：决定输入审计与状态回放的裁决方
 enum AuthorityMode {
-	LOCAL_STANDALONE,   # 单机完全权威（本机裁决，无网络校验）
-	CLIENT_PREDICTED,   # 客户端前瞻预测（先本地表现，待服务器裁决）
+	LOCAL_STANDALONE, # 单机完全权威（本机裁决，无网络校验）
+	CLIENT_PREDICTED, # 客户端前瞻预测（先本地表现，待服务器裁决）
 	SERVER_AUTHORITATIVE # 服务器最终裁决（联机权威，防作弊）
 }
 
@@ -40,7 +40,7 @@ var max_allowed_desync_ticks: int = GameConfig.get_int("domains.deterministic", 
 func transition_mode(new_mode: int) -> bool:
 	if new_mode < AuthorityMode.LOCAL_STANDALONE or new_mode > AuthorityMode.SERVER_AUTHORITATIVE:
 		return false
-	var old_mode = current_mode
+	var old_mode := current_mode
 	current_mode = new_mode
 	var keys := AuthorityMode.keys()
 	EventBusCore.get_instance().emit_narrative_by_key(
@@ -55,9 +55,9 @@ func transition_mode(new_mode: int) -> bool:
 ##       状态/原因文案键来自 config/deterministic.json 的 authority.status / reasons。
 ## 性能：常量级判定，无循环与瞬态分配。
 func audit_input_continuity(client_tick: int, server_tick: int, command_ap_cost: int, current_ap: int) -> Dictionary:
-	var ap_overflow_threshold := GameConfig.get_int("domains.deterministic", "authority/ap_overflow_threshold", -10)
+	var ap_overflow_threshold: int = GameConfig.get_int("domains.deterministic", "authority/ap_overflow_threshold", -10)
 
-	var tick_gap = abs(client_tick - server_tick)
+	var tick_gap: int = absi(client_tick - server_tick)
 	if tick_gap > max_allowed_desync_ticks:
 		return {
 			"status": GameConfig.get_string("domains.deterministic", "authority/status/desync", "DESYNC_DETECTED"),
@@ -73,4 +73,4 @@ func audit_input_continuity(client_tick: int, server_tick: int, command_ap_cost:
 			"reason": GameConfig.get_string("domains.deterministic", "authority/reasons/cheat", "AP exhaustion overflow")
 		}
 
-	return { "status": GameConfig.get_string("domains.deterministic", "authority/status/valid", "VERIFIED_VALID"), "valid": true }
+	return {"status": GameConfig.get_string("domains.deterministic", "authority/status/valid", "VERIFIED_VALID"), "valid": true}

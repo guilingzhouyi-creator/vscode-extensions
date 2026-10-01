@@ -15,7 +15,7 @@ static func apply_boss_damage(
 	attacker_id: String,
 	damage: float
 ) -> Dictionary:
-	# L9-b（Phase 53）：击败终态锁存——已击败首领不再受理伤害/结算（一次性语义 Inv-ON-1）
+	# L9-b（）：击败终态锁存——已击败首领不再受理伤害/结算（一次性语义 Inv-ON-1）
 	if boss.is_defeated:
 		return {
 			"actual_damage": 0.0,
@@ -25,20 +25,20 @@ static func apply_boss_damage(
 			"defeated": true,
 			"error_code": "BOSS_ALREADY_DEFEATED"
 		}
-	var ledger = boss.battle_contribution_ledger.get(attacker_id, { "damage": 0.0, "tanking": 0.0, "heal": 0.0 })
+	var ledger: Dictionary = boss.battle_contribution_ledger.get(attacker_id, {"damage": 0.0, "tanking": 0.0, "heal": 0.0})
 	ledger["damage"] += damage
 	boss.battle_contribution_ledger[attacker_id] = ledger
 
-	var actual_damage = damage
+	var actual_damage: float = damage
 	if boss.mechanism_shield_hp > 0.0:
-		var shield_absorb = min(boss.mechanism_shield_hp, actual_damage)
+		var shield_absorb: float = minf(boss.mechanism_shield_hp, actual_damage)
 		boss.mechanism_shield_hp = maxf(0.0, boss.mechanism_shield_hp - shield_absorb)
 		actual_damage -= shield_absorb
 
 	if boss.is_invulnerable:
 		actual_damage = 0.0
 
-	boss.phase_current_hp = max(0.0, boss.phase_current_hp - actual_damage)
+	boss.phase_current_hp = maxf(0.0, boss.phase_current_hp - actual_damage)
 
 	var phase_transition_triggered := false
 	var is_boss_defeated := false
@@ -58,7 +58,7 @@ static func apply_boss_damage(
 			EventBusCore.get_instance().emit_narrative_by_key(
 				"world_boss/phase_transition", "eco_swarm", [boss.boss_title, boss.current_phase_index]
 			)
-			# P2-3 补发（Phase 43）：纯结构化通道——narratives 无 world_boss.phase_transition
+			# 补发（）：纯结构化通道——narratives 无 world_boss.phase_transition
 			# 文案键（既有斜杠叙事键保留），EventBus 解析不出即只广播 domain_event
 			EventBusCore.get_instance().emit_domain_event("world_boss.phase_transition", {
 				"args": [boss.boss_title, boss.current_phase_index],

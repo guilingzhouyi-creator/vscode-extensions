@@ -25,9 +25,9 @@ static func check_and_trigger_berserk(
 	if monster.is_berserk:
 		return true
 
-	var hp_ratio = current_hp / max(1.0, max_hp)
+	var hp_ratio: float = current_hp / maxf(1.0, max_hp)
 	var ticks_threshold := GameConfig.get_int("domains.elite", "berserk_fsm/duration_ticks_threshold", 500)
-	var time_exceeded = (combat_duration_ticks >= ticks_threshold)
+	var time_exceeded := (combat_duration_ticks >= ticks_threshold)
 
 	if hp_ratio <= monster.berserk_health_threshold or time_exceeded:
 		monster.is_berserk = true

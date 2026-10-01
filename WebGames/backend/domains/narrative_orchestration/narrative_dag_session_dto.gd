@@ -36,7 +36,7 @@ func to_dto() -> Dictionary:
 	}
 
 static func from_dto(data: Dictionary) -> RefCounted:
-	var dto = load("res://backend/domains/narrative_orchestration/narrative_dag_session_dto.gd").new()
+	var dto: NarrativeDagSessionDTO = NarrativeDagSessionDTO.new()
 	if data.is_empty():
 		return dto
 	dto.graph_id = str(data.get("graph_id", ""))

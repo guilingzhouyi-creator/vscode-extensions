@@ -41,7 +41,7 @@ static func withdraw_from_treasury(
 			"error_message": _msg("treasury_permission_denied")
 		}
 
-	# L3（Phase 55）：取款符号守卫（Inv-VD-2）——负金额此前恒通过余额比较，
+	# L3（）：取款符号守卫（Inv-VD-2）——负金额此前恒通过余额比较，
 	# `-=` 负值等价凭空入账（绕过 DEPOSIT 权限/出纳审计语义），一律 INVALID_AMOUNT 拦截
 	if amount_gold < 0 or amount_crystals < 0:
 		return {

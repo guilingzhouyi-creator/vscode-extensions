@@ -24,7 +24,7 @@ static func get_verb(verb_id: String) -> Dictionary:
 		return verbs[verb_id]
 	return verbs.get("_fallback", {})
 
-## 卡牌默认值静态缓存（Phase 64 P2 模式：配置热重载版本推进自动失效重建）。
+## 卡牌默认值静态缓存（模式：配置热重载版本推进自动失效重建）。
 ## CombatActionCardEntity 每张构造原本触发 10 次 GameConfig 路径查找（其中多数字段
 ## 被调用方立即覆写）——热路径每回合 ~50~90 次查找，无头后端并发战斗线性放大；
 ## 缓存后构造仅一次版本比对 + 字段复制，配置变更经 config_reload_version 自动重建。
@@ -71,7 +71,7 @@ class CombatActionCardEntity extends RefCounted:
 	var ap_cost: int = -2
 	var base_potency: float = 20.0
 	var required_weapon_category: String = "WEAPON_BLADE"
-	# ---- Phase 42 收编扩展（可选字段，非魔法卡保持默认，配置段兜底） ----
+	# ---- 收编扩展（可选字段，非魔法卡保持默认，配置段兜底） ----
 	var card_category: String = "ATTACK"
 	var magic_ref: String = ""
 	var effects: Array = []

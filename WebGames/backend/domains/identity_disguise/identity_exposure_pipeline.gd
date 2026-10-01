@@ -18,7 +18,7 @@ static func record_deed(
 ) -> void:
 	if identity.active_alias_id != "" and identity.alias_slots.has(identity.active_alias_id):
 		var profile: CharacterIdentityAggregate.AliasProfile = identity.alias_slots[identity.active_alias_id]
-		# M6（Phase 53）：已败露假名不再累积——恶名/声望直记真身（锁存后通道防二次搬运）
+		# M6（）：已败露假名不再累积——恶名/声望直记真身（锁存后通道防二次搬运）
 		if profile.is_compromised:
 			identity.base_true_reputation += reputation_delta
 			identity.base_true_infamy_bounty += infamy_bounty_delta
@@ -41,7 +41,7 @@ static func trigger_unmask_exposure(
 		}
 
 	var profile: CharacterIdentityAggregate.AliasProfile = identity.alias_slots[compromised_alias_id]
-	# M6（Phase 53）：锁存入口——已败露直接幂等返回（0 搬运），杜绝重复曝光 double-count
+	# M6（）：锁存入口——已败露直接幂等返回（0 搬运），杜绝重复曝光 double-count
 	if profile.is_compromised:
 		return {
 			"success": true,

@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/mail_system.json | 信号: EventBus 领域广播
 # 职责说明: 一键提取邮件附件、随身背包满仓安全保护（未提取附件安全留存）； 附件物品发放走物品注册表三元组（template_id 必填为已登记 canonical_id， 未登记附件不可提取，安全留存于邮件等待修复后重试）。
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name MailDeliveryPipeline
@@ -12,7 +12,7 @@ extends RefCounted
 
 static var _claimed_results: Dictionary = {}
 
-## M3（Phase 52）幂等缓存键：复合键 = 收件人账户 + mail_id（维度升级）。
+## M3: 幂等缓存键：复合键 = 收件人账户 + mail_id（维度升级）。
 ## 旧键仅 mail.mail_id——CDK 邮件默认 id 曾为秒级时间戳，跨账户同秒错配会命中他人领取结果。
 static func _claim_cache_key(mail: MailItemAggregate) -> String:
 	return "%s::%s" % [mail.recipient_account_id, mail.mail_id]
@@ -62,22 +62,14 @@ static func claim_single_mail(
 			remaining_items.append(item_dict)
 			continue
 		var display_name := str(item_dict.get("name", _msg("attachment_item")))
-		var delivered := 0
-		for i in range(item_count):
-			var item := ItemInstanceFactory.build_instance(proto, display_name, "MAIL_")
-			if not inventory.add_item(item):
-				break
-			delivered += 1
-			claimed_items_count += 1
-			if library != null:
-				ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, item_id, 1, catalog, null, {
-					"uid": item.item_uid,
-					"transaction_id": mail.mail_id,
-					"rule_id": "rule_mail_claim"
-				})
+		var delivered := _deliver_items(proto, display_name, item_id, item_count, mail.mail_id, inventory, library, catalog)
+		claimed_items_count += delivered
 		if delivered < item_count:
-			var remaining: Dictionary = item_dict.duplicate(true)
-			remaining["count"] = item_count - delivered
+			var remaining: Dictionary = {
+				"template_id": item_id,
+				"count": item_count - delivered,
+				"name": display_name
+			}
 			remaining_items.append(remaining)
 	var wallet_result := wallet.apply_delta({
 		"gold": claimed_gold,
@@ -112,7 +104,7 @@ static func claim_single_mail(
 	}
 	if mail.status == MailItemAggregate.MailStatus.READ_CLAIMED:
 		_claimed_results[_claim_cache_key(mail)] = result.duplicate(true)
-		# S3-03 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长；P4 单次快照裁剪）
+		# 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长；单次快照裁剪）
 		FifoBudget.trim_oldest(_claimed_results, GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000))
 	return result
 
@@ -130,7 +122,7 @@ static func claim_all_mails(
 
 	for mail in mailbox.stored_mails:
 		if mail.has_unclaimed_attachment():
-			var res = claim_single_mail(mail, wallet, inventory, catalog, library)
+			var res := claim_single_mail(mail, wallet, inventory, catalog, library)
 			if res.success:
 				total_gold += res.claimed_gold
 				total_crystals += res.claimed_crystals
@@ -144,6 +136,30 @@ static func claim_all_mails(
 		"total_crystals": total_crystals,
 		"total_items": total_items
 	}
+
+static func _deliver_items(
+	proto: ItemRegistryCatalog.ItemPrototypeTemplate,
+	display_name: String,
+	item_id: String,
+	item_count: int,
+	mail_id: String,
+	inventory: WearableInventoryAggregate,
+	library: AccountItemLibraryAggregate,
+	catalog: ItemRegistryCatalog
+) -> int:
+	var delivered := 0
+	for i in range(item_count):
+		var item := ItemInstanceFactory.build_instance(proto, display_name, "MAIL_")
+		if not inventory.add_item(item):
+			break
+		delivered += 1
+		if library != null:
+			ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, item_id, 1, catalog, null, {
+				"uid": item.item_uid,
+				"transaction_id": mail_id,
+				"rule_id": "rule_mail_claim"
+			})
+	return delivered
 
 # ==============================================================================
 # 配置读取

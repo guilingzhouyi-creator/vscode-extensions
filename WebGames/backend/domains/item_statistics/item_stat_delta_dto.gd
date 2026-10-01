@@ -47,7 +47,7 @@ func to_dto() -> Dictionary:
 	}
 
 static func from_dto(data: Dictionary) -> RefCounted:
-	var dto = load("res://backend/domains/item_statistics/item_stat_delta_dto.gd").new()
+	var dto: ItemStatDeltaDTO = load("res://backend/domains/item_statistics/item_stat_delta_dto.gd").new()
 	if data.is_empty():
 		return dto
 	dto.canonical_id = str(data.get("canonical_id", ""))

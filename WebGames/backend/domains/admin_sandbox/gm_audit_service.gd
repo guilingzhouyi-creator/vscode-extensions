@@ -13,7 +13,7 @@ static var audit_log: Array = []
 
 ## 记录 GM 操作流水：规范化载荷签名（缺钥失败关闭）+ 有界裁剪（O(1) 批量切片）+ 日志广播
 static func record_audit(admin_id: String, action: String, details: Dictionary) -> Dictionary:
-	# P39 清单 6：签名覆盖规范化完整载荷（含 details——JSON 排序键确定性）+ key_id 支持轮换验证
+	# 清单 6：签名覆盖规范化完整载荷（含 details——JSON 排序键确定性）+ key_id 支持轮换验证
 	var key_id := GameConfig.get_string("infrastructure.admin", "security/seal_key_id", "")
 	var canonical := "%s:%s:%s" % [admin_id, action, JSON.stringify(details, "", true)]
 	var entry := {
@@ -25,7 +25,7 @@ static func record_audit(admin_id: String, action: String, details: Dictionary) 
 		"signature": _sign(canonical)
 	}
 	audit_log.append(entry)
-	# Phase 43 P2-12：审计有界化——按 infrastructure.admin audit/max_entries（默认 500）
+	# 审计有界化——按 infrastructure.admin audit/max_entries（默认 500）
 	# 从头裁剪，最旧先出，长运行审计内存受控（recent_limit 仍只控制查询窗口）
 	# 有界裁剪 O(max_entries) 浅拷贝（500 引用级，可忽略），避免 while+pop_front O(n²) 移位
 	var audit_max := maxi(1, GameConfig.get_int("infrastructure.admin", "audit/max_entries", 500))
@@ -35,7 +35,7 @@ static func record_audit(admin_id: String, action: String, details: Dictionary) 
 	EventBusCore.get_instance().emit_log("warn", tmpl % [admin_id, action])
 	return entry
 
-## P39 清单 6：带密钥 HMAC 签名（受控环境密钥提供器——缺钥失败关闭，不降级公开摘要）
+## 清单 6：带密钥 HMAC 签名（受控环境密钥提供器——缺钥失败关闭，不降级公开摘要）
 static func _sign(canonical: String) -> String:
 	var env_name := GameConfig.get_string("infrastructure.admin", "security/seal_key_env", "")
 	var key := OS.get_environment(env_name) if not env_name.is_empty() else ""
@@ -50,5 +50,5 @@ static func _sign(canonical: String) -> String:
 static func get_recent_audits(limit: int = -1) -> Array:
 	var cfg_limit := GameConfig.get_int("infrastructure.admin", "audit/recent_limit", 20)
 	var lim := limit if limit >= 0 else cfg_limit
-	var count = min(lim, audit_log.size())
+	var count: int = mini(lim, audit_log.size())
 	return audit_log.slice(audit_log.size() - count, audit_log.size())

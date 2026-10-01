@@ -18,7 +18,7 @@ const CONFIG_TABLE: String = "domains.magic_tiers"
 
 ## 经验性弱映射：从阶位推断能力分级候选集合（命中参考区间 → 候选；允许重叠；
 ## 区间查询，非逐阶固定映射表；空/越界阶位返回空集合）。
-## Phase 33 性能：registry 必填（O(1) 反查索引唯一路径；旧读配置遍历分支已退役）。
+## 性能：registry 必填（O(1) 反查索引唯一路径；旧读配置遍历分支已退役）。
 static func infer_tier_candidates(rank: int, registry: MagicTierRegistry) -> Array:
 	return registry.query_tier_candidates(rank)
 

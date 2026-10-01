@@ -32,7 +32,7 @@ var fallback_locale: String = GameConfig.get_string("domains.localization_i18n",
 # 例如: "zh_CN" -> {"item.iron_sword.name": "铁铸长剑", "combat.hit": "{attacker} 击中了 {target}，造成 {dmg} 点物理伤害"}
 var _locale_dictionaries: Dictionary = {}
 
-# 全局名称键注册表（Phase 19 统一名称注册表）：
+# 全局名称键注册表（统一名称注册表）：
 # _name_key_owners: key -> domain（跨域唯一，冲突检测）；registered_name_keys: 已登记键清单（audit 只读）
 var _name_key_owners: Dictionary = {}
 var registered_name_keys: Array = []

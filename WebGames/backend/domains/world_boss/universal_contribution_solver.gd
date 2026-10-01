@@ -16,26 +16,26 @@ static func calculate_leaderboard(boss: WorldBossAggregate) -> Array[Dictionary]
 	var w_tank := GameConfig.get_float("domains.world_boss", "contribution/weights/tanking", 0.5)
 	var w_heal := GameConfig.get_float("domains.world_boss", "contribution/weights/heal", 0.8)
 	for p_id in boss.battle_contribution_ledger:
-		var data = boss.battle_contribution_ledger[p_id]
-		var dmg = float(data.get("damage", 0.0))
-		var tank = float(data.get("tanking", 0.0))
-		var heal = float(data.get("heal", 0.0))
-		var score = dmg * w_dmg + tank * w_tank + heal * w_heal
-		board.append({ "participant_id": p_id, "score": score, "damage": dmg })
+		var data: Dictionary = boss.battle_contribution_ledger[p_id]
+		var dmg: float = float(data.get("damage", 0.0))
+		var tank: float = float(data.get("tanking", 0.0))
+		var heal: float = float(data.get("heal", 0.0))
+		var score: float = dmg * w_dmg + tank * w_tank + heal * w_heal
+		board.append({"participant_id": p_id, "score": score, "damage": dmg})
 
 	board.sort_custom(func(a, b): return a["score"] > b["score"])
 	return board
 
 ## BOSS 掉落分配：MVP 评定 + 广播贡献 MVP 叙事
 static func distribute_boss_loot(boss: WorldBossAggregate) -> Dictionary:
-	var leaderboard = calculate_leaderboard(boss)
+	var leaderboard := calculate_leaderboard(boss)
 	if leaderboard.is_empty():
-		return { "mvp_id": "", "distributed_count": 0 }
+		return {"mvp_id": "", "distributed_count": 0}
 
-	var mvp_id = leaderboard[0].get("participant_id", "")
+	var mvp_id: String = String(leaderboard[0].get("participant_id", ""))
 
 	EventBusCore.get_instance().emit_narrative_by_key(
 		"world_boss/contribution_mvp", "quest", [mvp_id, leaderboard[0].get("score", 0.0)]
 	)
 
-	return { "mvp_id": mvp_id, "leaderboard": leaderboard, "distributed_count": leaderboard.size() }
+	return {"mvp_id": mvp_id, "leaderboard": leaderboard, "distributed_count": leaderboard.size()}

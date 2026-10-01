@@ -36,7 +36,7 @@ static func execute_cheat_command(
 		"GIVE_GOLD":
 			var wallet: CharacterWalletEntity = context.get("wallet", null)
 			var default_gold := GameConfig.get_int("infrastructure.admin", "sandbox/give_gold_default", 10000)
-			var amount = int(args[0]) if args.size() > 0 else default_gold
+			var amount: Variant = int(args[0]) if args.size() > 0 else default_gold
 			if wallet:
 				wallet.apply_delta({ "gold": amount })
 				EventBusCore.get_instance().emit_narrative_by_key("admin/give_gold", "system", [amount])
@@ -52,7 +52,7 @@ static func execute_cheat_command(
 				var no_reg := GameConfig.get_string("narratives.admin", "give_item_no_registry", "No item registry context for give item.")
 				return { "success": false, "reason": no_reg }
 			var default_name := GameConfig.get_string("infrastructure.admin", "sandbox/give_item_default_name", "【GM创世神器】")
-			var item_name = str(args[0]) if args.size() > 0 else default_name
+			var item_name: Variant = str(args[0]) if args.size() > 0 else default_name
 			var count := int(args[1]) if args.size() > 1 else 1
 			count = maxi(1, count)
 			# 严格按统一英文名解析（唯一合法输入）：中文别名、数字 ID、canonical_id 一律拒绝
@@ -76,7 +76,7 @@ static func execute_cheat_command(
 		"ADVANCE_TIME":
 			var clock: WorldClockMaster = context.get("clock", null)
 			var default_months := GameConfig.get_int("infrastructure.admin", "sandbox/advance_time_default_months", 12)
-			var months = int(args[0]) if args.size() > 0 else default_months
+			var months: Variant = int(args[0]) if args.size() > 0 else default_months
 			if clock:
 				clock.advance_calendar_months(months)
 				EventBusCore.get_instance().emit_narrative_by_key("admin/advance_time", "system", [months])

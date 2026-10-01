@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/character_creation/starter_loadout_dispatcher.gd
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
-# 职责说明: 配置驱动（starter_loadout.json）的新手初始物资发放，含绝对幂等保护： 首次发放 KIT_DISPATCHED；同上下文二次调用 ALREADY_GRANTED 零重复赠予。 种族经 race_kit_map 映射套件，未知种族/缺失套件走安全兜底默认。 关联细则: Phase 49 阶段2 §三（配置驱动新手装备发放算法）
+# 职责说明: 配置驱动（starter_loadout.json）的新手初始物资发放，含绝对幂等保护： 首次发放 KIT_DISPATCHED；同上下文二次调用 ALREADY_GRANTED 零重复赠予。 种族经 race_kit_map 映射套件，未知种族/缺失套件走安全兜底默认。 关联细则: 阶段2 §三（配置驱动新手装备发放算法）
 # 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
 # ==============================================================================
 

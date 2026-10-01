@@ -50,16 +50,16 @@ static func registered_count() -> int:
 static func dispatch_command(ast: ChatCommandParser.CommandAST, admin: AdminPermissionAggregate, context: Dictionary) -> Dictionary:
 	if not ast.is_command:
 		var msg := GameConfig.get_string("narratives.chat_command", "not_a_command", "Not a command")
-		return { "success": false, "reason": msg }
+		return {"success": false, "reason": msg}
 
 	var cmd = registered_commands.get(ast.command_name, null)
 	if cmd == null:
 		var template := GameConfig.get_string("narratives.chat_command", "unknown_chat_command", "Unknown command: /%s")
-		return { "success": false, "reason": template % ast.command_name }
+		return {"success": false, "reason": template % ast.command_name}
 
 	if not admin.has_permission(cmd.min_level):
 		var tmpl2 := GameConfig.get_string("narratives.chat_command", "permission_denied", "Permission denied for command: /%s")
-		return { "success": false, "reason": tmpl2 % ast.command_name }
+		return {"success": false, "reason": tmpl2 % ast.command_name}
 
 	var handler: Callable = cmd.handler
 	return handler.call(ast, context)

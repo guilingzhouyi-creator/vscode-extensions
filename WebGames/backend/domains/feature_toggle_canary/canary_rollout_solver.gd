@@ -29,8 +29,8 @@ static func is_feature_enabled_for_account(
 			if flag.whitelist_account_ids.has(account_id):
 				return true
 			# 确定性哈希散列
-			var seed_str = account_id + ":" + flag.feature_key
-			var bucket = int(abs(seed_str.hash())) % _bucket_size()
+			var seed_str := account_id + ":" + flag.feature_key
+			var bucket := int(abs(seed_str.hash())) % _bucket_size()
 			return bucket < flag.rollout_percentage
 
 	return false

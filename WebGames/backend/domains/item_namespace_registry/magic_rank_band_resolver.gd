@@ -17,7 +17,7 @@ extends RefCounted
 const CONFIG_TABLE: String = "domains.magic_tiers"
 
 ## 确定性档次判定：rank -> band（区间分段，非逐阶枚举表）；越界/未配置返回 0（UNREGISTERED_BAND）。
-## Phase 33 性能：registry 必填（O(1) 反查索引唯一路径；旧读配置遍历分支已退役）。
+## 性能：registry 必填（O(1) 反查索引唯一路径；旧读配置遍历分支已退役）。
 static func rank_to_band(rank: int, registry: MagicTierRegistry) -> int:
 	return registry.query_band(rank)
 

@@ -30,7 +30,7 @@ class MagicVariant:
 
 var school_id: String = ""
 var name_key: String = ""
-var members: Array = []          # 属性键数组（顺序由配置决定）
+var members: Array = [] # 属性键数组（顺序由配置决定）
 
 ## 由注册表配置条目构造属性大类（未登记键受控拒绝）
 static func from_registry_entry(school_id_in: String, entry: Dictionary) -> MagicAttributeSchool:
@@ -52,4 +52,6 @@ static func variant_from_registry_entry(variant_id_in: String, entry: Dictionary
 	return v
 
 func has_attribute(attribute_id: String) -> bool:
+	if attribute_id.is_empty():
+		return false
 	return members.has(attribute_id)

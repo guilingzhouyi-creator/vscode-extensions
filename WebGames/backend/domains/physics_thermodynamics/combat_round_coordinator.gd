@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 协调玩家操作轴、小回合轴与第三时间轴的三轴联动，判定小回合终点， 支持回合开局预排期离散事件与 0 手牌持续推演保活，防止时间轴中断。 配置由 config/domains/combat.json round_lifecycle 驱动，代码零硬编码。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name CombatRoundCoordinator
@@ -16,7 +16,7 @@ class CombatRoundCoordinatorSnapshotDTO extends RefCounted:
 	var round_duration_ms: int = 0
 	var active_mover_id: String = ""
 	var is_round_concluded: bool = false
-	var conclude_reason: String = ""           # "HAND_EXHAUSTED" / "AP_DEPLETED" / "TIME_LIMIT" / "TENSION_INTERRUPT"
+	var conclude_reason: String = "" # "HAND_EXHAUSTED" / "AP_DEPLETED" / "TIME_LIMIT" / "TENSION_INTERRUPT"
 	var timeline_state: Dictionary = {}
 	var player_staging_state: Dictionary = {}
 	var enemy_staging_state: Dictionary = {}
@@ -45,15 +45,15 @@ var round_start_timeline_ms: int = 0
 var max_round_ms: int = 10000
 var rng: DeterministicRNG = null
 
-# Phase 65 扩展：离散预排期计划与脱敏历史
+# 离散预排期计划与脱敏历史
 var current_schedule: TimelineEventScheduleDTO = null
 var resolved_client_events: Array[Dictionary] = []
 ## 自动发牌自增序号（与 timeline_engine.event_counter 解耦——该计数器只在引擎排期新事件时递增，
-## 不随抽牌递增；P2 修复：同一步 ADD_DRAW 循环/多事件并发/无引擎模式下保证每次发放 ID 唯一。
-## B2 修复：序号在战斗实例内单调递增、不随回合复位——跨轮卡牌（end_of_round_policy=KEEP）
+## 不随抽牌递增；同一步 ADD_DRAW 循环/多事件并发/无引擎模式下保证每次发放 ID 唯一。
+## 序号在战斗实例内单调递增、不随回合复位——跨轮卡牌（end_of_round_policy=KEEP）
 ## 不再出现 CARD_AUTO_N 重复，引用唯一性跨轮成立）
 var _card_id_seq: int = 0
-## 回合结算可观察状态（P2 修复：切轮会立即归零计时，结算标志先落盘供表现层快照读取）
+## 回合结算可观察状态（切轮会立即归零计时，结算标志先落盘供表现层快照读取）
 var is_round_concluded_state: bool = false
 var last_round_end_reason: String = ""
 
@@ -78,11 +78,11 @@ func initialize(
 	is_round_concluded_state = false
 	last_round_end_reason = ""
 
-## Phase 65 扩展：装配单回合开局离散事件预排期
+## 装配单回合开局离散事件预排期
 func set_round_schedule(schedule: TimelineEventScheduleDTO) -> void:
 	current_schedule = schedule
 	resolved_client_events.clear()
-	# 新回合装配排期：复位结算观察态（发牌序号保持单调递增，B2 修复：跨轮 ID 不重复）
+	# 新回合装配排期：复位结算观察态（发牌序号保持单调递增，跨轮 ID 不重复）
 	is_round_concluded_state = false
 	last_round_end_reason = ""
 
@@ -133,7 +133,7 @@ func step_coordinator(
 				should_end_round = true
 				end_reason = "TENSION_FORCE_ADVANCE"
 
-	# 2. 处理 Phase 65 单回合开局预排期离散事件（hand_cap 循环外一次读取，回合内常量）
+	# 2. 处理单回合开局预排期离散事件（hand_cap 循环外一次读取，回合内常量）
 	var hand_cap := GameConfig.get_int("domains.combat", "round_hand/hand_cap", 5)
 	if current_schedule != null:
 		for pt in current_schedule.scheduled_points:
@@ -154,12 +154,9 @@ func step_coordinator(
 						"public_message": "战场节拍触发：补充了行动手牌"
 					})
 				elif pt.event_kind == TimelineEventScheduleDTO.EventKind.ADD_DRAW:
-					# B3 修复：bonus_cards 无界钳制——payload 来自外部 DTO，防御性封口到 [0, hand_cap]
+					# bonus_cards 无界钳制——payload 来自外部 DTO，防御性封口到 [0, hand_cap]
 					var bonus_cards := clampi(int(pt.payload.get("extra_bonus_cards", 1)), 0, hand_cap)
-					for b in range(bonus_cards):
-						var bonus_card := _draw_random_card_from_pool()
-						if player_staging:
-							player_staging.enqueue_card(bonus_card)
+					_draw_bonus_cards(bonus_cards)
 					processed_events.append({
 						"event_id": pt.point_id,
 						"type": "CARD_DISPATCHED",
@@ -250,6 +247,14 @@ func _draw_random_card_from_pool() -> PhysicalVerbRegistry.CombatActionCardEntit
 	card.base_potency = 20.0
 	return card
 
+## 批量发放加发牌并入队
+func _draw_bonus_cards(bonus_cards: int) -> void:
+	if not player_staging:
+		return
+	for _i in range(bonus_cards):
+		var bonus_card := _draw_random_card_from_pool()
+		player_staging.enqueue_card(bonus_card)
+
 ## 回合协调快照（轮次/计时/时间轴/双方待发栏状态）
 func get_snapshot() -> CombatRoundCoordinatorSnapshotDTO:
 	var snap := CombatRoundCoordinatorSnapshotDTO.new()
@@ -268,12 +273,12 @@ func get_snapshot() -> CombatRoundCoordinatorSnapshotDTO:
 		snap.enemy_staging_state = enemy_staging.get_snapshot().to_dto()
 	return snap
 
-## Phase 65 表现层只读脱敏快照（技术上封死未决事件倒计时与未来卡牌预测）
+## 表现层只读脱敏快照（技术上封死未决事件倒计时与未来卡牌预测）
 func get_client_snapshot() -> CombatTimelineClientDTO.PresenterSnapshotDTO:
 	var snap := CombatTimelineClientDTO.PresenterSnapshotDTO.new()
 	snap.round_number = current_round
 	snap.progress_ratio = clampf(float(round_elapsed_ms) / float(maxi(1, max_round_ms)), 0.0, 1.0)
-	# 读取落盘结算态（而非用已复位的计时重算，P2 修复：切轮归零后仍可观察本次结算）
+	# 读取落盘结算态（而非用已复位的计时重算，切轮归零后仍可观察本次结算）
 	snap.is_round_concluded = is_round_concluded_state
 	snap.conclude_reason = last_round_end_reason
 	snap.current_hand_count = player_staging.cards.size() if player_staging else 0

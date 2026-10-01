@@ -20,9 +20,9 @@ class CombatParticipant extends RefCounted:
 	var edge_sharpness: float = GameConfig.get_float("domains.combat", "participant_defaults/edge_sharpness", 1.2)
 	var armor_rating: float = GameConfig.get_float("domains.combat", "participant_defaults/armor_rating", 5.0)
 	var is_staggered: bool = GameConfig.get_bool("domains.combat", "participant_defaults/is_staggered", false)
-	var is_monster: bool = GameConfig.get_bool("domains.combat", "participant_defaults/is_monster", false) # Phase 43 N2：怪物标记（击杀掉落发射判据，配置兜底）
+	var is_monster: bool = GameConfig.get_bool("domains.combat", "participant_defaults/is_monster", false) # N2：怪物标记（击杀掉落发射判据，配置兜底）
 
-## 结算参数静态缓存（Phase 64 P2 模式：配置热重载版本推进自动失效重建）。
+## 结算参数静态缓存（模式：配置热重载版本推进自动失效重建）。
 ## execute_action_round 每击原本 4 次 GameConfig 路径查找（interrupt_verbs/ap_penalty/
 ## defense_multipliers）——缓存后每次动作仅一次版本比对 + 字段复制。
 class CombatSettlementParams extends RefCounted:
@@ -90,8 +90,8 @@ static func execute_action_round(
 		elif defender_verb == "PARRY":
 			defense_mult = p.parry_mult
 
-		var final_dmg = raw_dmg * defense_mult
-		defender.current_hp = max(0.0, defender.current_hp - final_dmg)
+		var final_dmg: float = raw_dmg * defense_mult
+		defender.current_hp = maxf(0.0, defender.current_hp - final_dmg)
 
 		packet.raw_damage = raw_dmg
 		packet.absorbed_damage = raw_dmg - final_dmg
@@ -100,7 +100,7 @@ static func execute_action_round(
 			attacker.name, a_verb_info.name, final_dmg, defender.name, defender.current_hp
 		])
 
-		# Phase 43 N2：怪物阵亡 → 发射 monster.killed（掉落声明由监听器登记为活跃掉落物）
+		# N2：怪物阵亡 → 发射 monster.killed（掉落声明由监听器登记为活跃掉落物）
 		if defender.current_hp <= 0.0 and defender.is_monster:
 			_emit_monster_killed(attacker, defender)
 
@@ -111,7 +111,7 @@ static func execute_action_round(
 	})
 	return packet
 
-## Phase 43 N2：击杀发射——读 domains.monster loot/default_drop_canonical_ids，
+## N2：击杀发射——读 domains.monster loot/default_drop_canonical_ids，
 ## 逐项经 catalog 校验后组 drop_declarations 发射 monster.killed；
 ## 未装配/未登记项安全跳过（零无效掉落声明）。
 static func _emit_monster_killed(attacker: CombatParticipant, defender: CombatParticipant) -> void:

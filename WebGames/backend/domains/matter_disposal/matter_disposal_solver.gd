@@ -51,15 +51,15 @@ static func execute_disposal(
 		}
 
 	# 4. 物质守恒质量换算
-	var total_mass = target_item.mass_kg
-	var slag_mass = total_mass * facility.slag_ash_yield_ratio
-	var dust_mass = total_mass * facility.mana_dust_yield_ratio
+	var total_mass: float = target_item.mass_kg
+	var slag_mass: float = total_mass * facility.slag_ash_yield_ratio
+	var dust_mass: float = total_mass * facility.mana_dust_yield_ratio
 
 	var slag_per_kg := GameConfig.get_float("domains.matter_disposal", "conversion/slag_per_kg", 2.0)
 	var dust_per_kg := GameConfig.get_float("domains.matter_disposal", "conversion/dust_per_kg", 5.0)
 	var min_yield := GameConfig.get_int("domains.matter_disposal", "conversion/min_yield", 1)
-	var slag_count = maxi(min_yield, int(round(slag_mass * slag_per_kg)))
-	var dust_count = maxi(min_yield, int(round(dust_mass * dust_per_kg)))
+	var slag_count := maxi(min_yield, int(round(slag_mass * slag_per_kg)))
+	var dust_count := maxi(min_yield, int(round(dust_mass * dust_per_kg)))
 
 	return {
 		"success": true,

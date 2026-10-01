@@ -16,14 +16,14 @@ extends RefCounted
 
 const CONFIG_TABLE: String = "domains.magic_tiers"
 
-var _ranks: Dictionary = {}            # rank(int) -> {name_key, strength_weight, ...}（阶位梯度）
-var _tiers: Dictionary = {}            # tier(int) -> {name_key, reference_interval, weight, ...}（能力分级）
-var _bands: Dictionary = {}            # band(int) -> {name_key, interval, ...}（阶位档次）
-var _aptitudes: Dictionary = {}        # aptitude(int) -> {name_key, backfire_threshold, mana_gate, rarity}
-var _forms: Dictionary = {}            # form(int) -> {name_key, phase_loss_min, phase_loss_max}
+var _ranks: Dictionary = {} # rank(int) -> {name_key, strength_weight, ...}（阶位梯度）
+var _tiers: Dictionary = {} # tier(int) -> {name_key, reference_interval, weight, ...}（能力分级）
+var _bands: Dictionary = {} # band(int) -> {name_key, interval, ...}（阶位档次）
+var _aptitudes: Dictionary = {} # aptitude(int) -> {name_key, backfire_threshold, mana_gate, rarity}
+var _forms: Dictionary = {} # form(int) -> {name_key, phase_loss_min, phase_loss_max}
 var _profession_ranks: Dictionary = {} # rank(int) -> {name_key, magic_domain}
-var _rank_tier_index: Dictionary = {}  # rank(1~11) -> Array[int]（能力分级候选——装配期构建，O(1) 查询）
-var _rank_band_index: Dictionary = {}  # rank(1~11) -> int（阶位档次——装配期构建，O(1) 查询）
+var _rank_tier_index: Dictionary = {} # rank(1~11) -> Array[int]（能力分级候选——装配期构建，O(1) 查询）
+var _rank_band_index: Dictionary = {} # rank(1~11) -> int（阶位档次——装配期构建，O(1) 查询）
 var _ready: bool = false
 
 # ==============================================================================
@@ -68,28 +68,32 @@ func reload_configuration() -> void:
 		_build_rank_indexes()
 		_register_name_keys()
 
-## Phase 33 性能优化：装配期构建 rank 反查索引（能力分级候选 / 阶位档次）——
-## 运行时解析器 O(1) 查询，不再每次读配置遍历（细则 S1 性能项）
+func _collect_tier_candidates_for_rank(rank: int) -> Array:
+	var candidates: Array = []
+	for tier in _tiers:
+		var entry: Dictionary = _tiers[tier]
+		var interval: Array = entry.get("reference_interval", [])
+		if interval.size() >= 2 and rank >= int(interval[0]) and rank <= int(interval[1]):
+			candidates.append(int(entry.get("tier", 0)))
+	candidates.sort()
+	return candidates
+
+func _find_band_for_rank(rank: int) -> int:
+	for b in _bands:
+		var b_entry: Dictionary = _bands[b]
+		var b_interval: Array = b_entry.get("interval", [])
+		if b_interval.size() >= 2 and rank >= int(b_interval[0]) and rank <= int(b_interval[1]):
+			return int(b_entry.get("band", 0))
+	return 0
+
+## 装配期构建 rank 反查索引（能力分级候选 / 阶位档次）——
+## 运行时解析器 O(1) 查询，不再每次读配置遍历
 func _build_rank_indexes() -> void:
 	_rank_tier_index.clear()
 	_rank_band_index.clear()
 	for rank in range(1, 12):
-		var candidates: Array = []
-		for tier in _tiers:
-			var entry: Dictionary = _tiers[tier]
-			var interval: Array = entry.get("reference_interval", [])
-			if interval.size() >= 2 and rank >= int(interval[0]) and rank <= int(interval[1]):
-				candidates.append(int(entry.get("tier", 0)))
-		candidates.sort()
-		_rank_tier_index[rank] = candidates
-		var band := 0
-		for b in _bands:
-			var b_entry: Dictionary = _bands[b]
-			var b_interval: Array = b_entry.get("interval", [])
-			if b_interval.size() >= 2 and rank >= int(b_interval[0]) and rank <= int(b_interval[1]):
-				band = int(b_entry.get("band", 0))
-				break
-		_rank_band_index[rank] = band
+		_rank_tier_index[rank] = _collect_tier_candidates_for_rank(rank)
+		_rank_band_index[rank] = _find_band_for_rank(rank)
 
 ## 注册表是否就绪（不变量全通过且名称键登记无跨域冲突）
 func is_ready() -> bool:
@@ -210,11 +214,11 @@ func get_tier_baseline(tier: int) -> Dictionary:
 func get_band_baseline(band: int) -> Dictionary:
 	return _bands.get(band, {})
 
-## Phase 33：rank 反查能力分级候选（装配期索引 O(1)——供解析器注入查询）
+## rank 反查能力分级候选（装配期索引 O(1)——供解析器注入查询）
 func query_tier_candidates(rank: int) -> Array:
 	return _rank_tier_index.get(rank, [])
 
-## Phase 33：rank 反查阶位档次（装配期索引 O(1)——供解析器注入查询；越界返回 0）
+## rank 反查阶位档次（装配期索引 O(1)——供解析器注入查询；越界返回 0）
 func query_band(rank: int) -> int:
 	return int(_rank_band_index.get(rank, 0))
 
@@ -238,7 +242,7 @@ func is_mana_gate_passed(aptitude: int) -> bool:
 # 四、名称键登记与全量导出
 # ==============================================================================
 
-## Phase 19 统一名称注册表接线：魔法 name_key 全量登记（域所有者 = magic）。
+## 统一名称注册表接线：魔法 name_key 全量登记（域所有者 = magic）。
 ## 英文兜底 = 键本体（英文即机器可读名）；跨域冲突 → 注册表拒绝就绪并告警。
 func _register_name_keys() -> void:
 	var shared := LocalizationRegistryCatalog.get_shared()
@@ -257,7 +261,7 @@ func _register_name_keys() -> void:
 		_register_one(shared, entry, collisions)
 	if not collisions.is_empty():
 		_ready = false
-		push_warning("MagicTierRegistry: 名称键跨域冲突 %s" % JSON.stringify(collisions))
+		ErrorReporter.emit_warning("item_namespace_registry", "NAME_KEY_COLLISION", "MagicTierRegistry: 名称键跨域冲突 %s" % JSON.stringify(collisions))
 
 ## 单条目名称键登记（域所有者 magic，英文兜底键本体；跨域冲突入列）
 func _register_one(shared: LocalizationRegistryCatalog, entry: Dictionary, collisions: Array) -> void:

@@ -15,7 +15,7 @@ static var _completed_transactions: Dictionary = {}
 
 ## 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长）
 static func _prune_completed() -> void:
-	# P4：单次 keys 快照裁剪最旧溢出项（消除 while keys()[0] 每轮重建的 O(k×N)）
+	# 单次 keys 快照裁剪最旧溢出项（消除 while keys()[0] 每轮重建的 O(k×N)）
 	FifoBudget.trim_oldest(_completed_transactions, GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000))
 
 ## 接取委托：幂等键 → 状态/资质/保证金逐级校验 → 扣保证金置进行中并写期限

@@ -39,13 +39,13 @@ func flush_events_batch() -> Array:
 
 ## 当前缓冲内事件数
 func get_buffer_count() -> int:
-	return _event_ring_buffer.size()
+	return maxi(0, _event_ring_buffer.size())
 
 # ==============================================================================
 # 配置读取
 # ==============================================================================
 
 static func _salt_modulus() -> int:
-	# L1（Phase 55）：取模除数下限守卫（Inv-VD-1）——配置 0 时 % 除零崩溃
+	# L1（）：取模除数下限守卫（Inv-VD-1）——配置 0 时 % 除零崩溃
 	#（对照 deterministic_replay_engine.gd:32 maxi(1,…) 惯例）
 	return maxi(1, GameConfig.get_int("domains.telemetry_account_lifecycle", "event_id/salt_modulus", 10000))

@@ -52,7 +52,7 @@ func is_in_debt() -> bool:
 
 ## 获取净负债额（折合铜币数；非负数，无负债时返回 0）
 func get_net_debt_copper() -> int:
-	var total = get_total_copper_value()
+	var total := get_total_copper_value()
 	return abs(total) if total < 0 else 0
 
 ## 允许突破下界的强制记账扣款（违约/罚金/欠款直接借记铜币赤字）
@@ -154,13 +154,13 @@ func from_dictionary(values: Dictionary) -> void:
 func try_spend(cost_copper: int) -> bool:
 	if cost_copper <= 0:
 		return false
-	var total_val = get_total_copper_value()
+	var total_val := get_total_copper_value()
 	if total_val < cost_copper:
 		return false
 
-	var remaining_to_deduct = cost_copper
+	var remaining_to_deduct := cost_copper
 
-	var deduct_copper = min(copper, remaining_to_deduct)
+	var deduct_copper: int = min(copper, remaining_to_deduct)
 	copper -= deduct_copper
 	remaining_to_deduct -= deduct_copper
 
@@ -180,12 +180,12 @@ func try_spend(cost_copper: int) -> bool:
 ## 在单个金属层级上按汇率扣减；超额找零回铜币，返回剩余未清偿金额
 func _deduct_ladder(metal: String, remaining_to_deduct: int) -> int:
 	# 汇率来自配置且可热重载，为 0 时下面的除法会产出 inf/NaN 并污染钱包结算
-	var rate := maxi(1, GameConfig.get_int("domains.currency", "rates/" + metal, 1))
+	var rate: int = maxi(1, GameConfig.get_int("domains.currency", "rates/" + metal, 1))
 	var available: int = get(metal)
-	var metal_needed = int(ceil(float(remaining_to_deduct) / float(rate)))
-	var deduct_metal = min(available, metal_needed)
+	var metal_needed: int = int(ceil(float(remaining_to_deduct) / float(rate)))
+	var deduct_metal: int = min(available, metal_needed)
 	set(metal, available - deduct_metal)
-	var metal_val = deduct_metal * rate
+	var metal_val: int = deduct_metal * rate
 	if metal_val > remaining_to_deduct:
 		copper += (metal_val - remaining_to_deduct)
 		return 0
@@ -196,7 +196,7 @@ func _deduct_ladder(metal: String, remaining_to_deduct: int) -> int:
 # ==============================================================================
 
 func _rate(metal: String) -> int:
-	# L3（Phase 55）：折算率非负下限（Inv-VD-2）——键缺失/写 0 时 0 折算，防负数错乘放大债务
+	# L3（）：折算率非负下限（Inv-VD-2）——键缺失/写 0 时 0 折算，防负数错乘放大债务
 	return maxi(0, GameConfig.get_int("domains.currency", "rates/" + metal, 1))
 
 func _mass_kg(metal: String) -> float:

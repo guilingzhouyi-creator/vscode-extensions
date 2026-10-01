@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_statistics.json | 信号: EventBus 领域广播
 # 职责说明: 每个账号 UID 下挂载一棵物品 ID 库树： 根(account_id) → category_major → category_minor → canonical_id 叶节点； 分类节点沿路径递归聚合子树统计（current_quantity 与各事件累计量）； 递归操作：mount_item 递归建路径 / apply_item_delta 递归定位并自底向上重算 / query_subtree 递归遍历聚合 / query_all_items 递归收集叶节点。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name AccountItemLibraryAggregate
@@ -30,29 +30,29 @@ const STAT_KEYS: Array[String] = [
 
 var account_id: String = ""
 var root_node: Dictionary = {}
-## Phase 44 P3：canonical_id → [major_key, minor_key] 定位索引（消除 find 全树线性扫）。
+## canonical_id → [major_key, minor_key] 定位索引（消除 find 全树线性扫）。
 ## 运行时加速结构，不入 serialize（root_node 为持久事实源）；挂载路径写入、
 ## 反序列化/restore 后由 _ensure_index 懒重建。
 var _canonical_index: Dictionary = {}
 
 func _init(p_account_id: String = "") -> void:
 	account_id = p_account_id
-	root_node = { "type": NODE_ROOT, "children": {} }
+	root_node = {"type": NODE_ROOT, "children": {}}
 
 ## 递归挂载物品：沿 category_major → category_minor → canonical_id 建路径（幂等）
 func mount_item(canonical_id: String, category_major: String, category_minor: String) -> Dictionary:
 	if canonical_id.is_empty():
-		return { "success": false, "reason": "empty canonical_id" }
+		return {"success": false, "reason": "empty canonical_id"}
 	var major_key := category_major if not category_major.is_empty() else "UNCATEGORIZED"
 	var minor_key := category_minor if not category_minor.is_empty() else "UNSPECIFIED"
 
 	var major: Dictionary = root_node["children"].get(major_key, {})
 	if major.is_empty():
-		major = { "type": NODE_CATEGORY_MAJOR, "name": major_key, "children": {}, "stats": _zero_stats() }
+		major = {"type": NODE_CATEGORY_MAJOR, "name": major_key, "children": {}, "stats": _zero_stats()}
 		root_node["children"][major_key] = major
 	var minor: Dictionary = major["children"].get(minor_key, {})
 	if minor.is_empty():
-		minor = { "type": NODE_CATEGORY_MINOR, "name": minor_key, "children": {}, "stats": _zero_stats() }
+		minor = {"type": NODE_CATEGORY_MINOR, "name": minor_key, "children": {}, "stats": _zero_stats()}
 		major["children"][minor_key] = minor
 	var item_node: Dictionary = minor["children"].get(canonical_id, {})
 	if item_node.is_empty():
@@ -62,18 +62,18 @@ func mount_item(canonical_id: String, category_major: String, category_minor: St
 			"stats": _zero_stats()
 		}
 		minor["children"][canonical_id] = item_node
-	_canonical_index[canonical_id] = [major_key, minor_key] # P3：索引写入（幂等覆盖）
+	_canonical_index[canonical_id] = [major_key, minor_key] # 索引写入（幂等覆盖）
 	_recalc_upwards(root_node, [major_key, minor_key])
-	return { "success": true, "canonical_id": canonical_id }
+	return {"success": true, "canonical_id": canonical_id}
 
 ## 物品事件落账：递归定位叶节点 → 更新该事件累计与当前持有（减量下限 0）→ 自底向上递归聚合
 ## 返回实际生效数量（减量触底时 actual < quantity）
 func apply_item_delta(canonical_id: String, event_stat_key: String, quantity: int) -> Dictionary:
 	if quantity <= 0 or not STAT_KEYS.has(event_stat_key):
-		return { "success": false, "reason": "invalid delta" }
+		return {"success": false, "reason": "invalid delta"}
 	var found: Dictionary = find_item_node(canonical_id)
 	if found.is_empty():
-		return { "success": false, "reason": "item not mounted" }
+		return {"success": false, "reason": "item not mounted"}
 	var stats: Dictionary = found["node"]["stats"]
 	var consumes_current := event_stat_key != STAT_GAINED and event_stat_key != STAT_FORGED
 	var prev_current: int = int(stats.get(STAT_CURRENT, 0))
@@ -90,7 +90,7 @@ func apply_item_delta(canonical_id: String, event_stat_key: String, quantity: in
 	}
 
 ## 递归定位叶节点（返回 {"node": ..., "path": [major, minor]}，未挂载返回空）
-## Phase 44 P3：经 _canonical_index O(1) 定位（懒重建兜底），语义与线性扫等价
+## 经 _canonical_index O(1) 定位（懒重建兜底），语义与线性扫等价
 func find_item_node(canonical_id: String) -> Dictionary:
 	_ensure_index()
 	if _canonical_index.has(canonical_id):
@@ -104,19 +104,22 @@ func find_item_node(canonical_id: String) -> Dictionary:
 		if minor.is_empty():
 			return {}
 		if minor["children"].has(canonical_id):
-			return { "node": minor["children"][canonical_id], "path": [major_key, minor_key] }
+			return {"node": minor["children"][canonical_id], "path": [major_key, minor_key]}
 	return {}
 
-## P3：索引懒重建——树有内容而索引为空（反序列化/restore 后）时全树收集一次
+func _index_major_node(major_key: String, major: Dictionary) -> void:
+	for minor_key in major["children"]:
+		var minor: Dictionary = major["children"][minor_key]
+		for canonical_id in minor["children"]:
+			_canonical_index[canonical_id] = [major_key, minor_key]
+
+## 索引懒重建——树有内容而索引为空（反序列化/restore 后）时全树收集一次
 func _ensure_index() -> void:
 	if not _canonical_index.is_empty() or root_node["children"].is_empty():
 		return
 	for major_key in root_node["children"]:
 		var major: Dictionary = root_node["children"][major_key]
-		for minor_key in major["children"]:
-			var minor: Dictionary = major["children"][minor_key]
-			for canonical_id in minor["children"]:
-				_canonical_index[canonical_id] = [major_key, minor_key]
+		_index_major_node(major_key, major)
 
 ## 递归聚合分类子树统计（category_major 可选；缺省 = 全树）
 func query_subtree(category_major: String = "", category_minor: String = "") -> Dictionary:
@@ -138,7 +141,7 @@ func query_all_items() -> Array:
 	return out
 
 func serialize() -> Dictionary:
-	return { "account_id": account_id, "root_node": root_node }
+	return {"account_id": account_id, "root_node": root_node}
 
 # ==============================================================================
 # 内部实现
@@ -150,6 +153,10 @@ static func _zero_stats() -> Dictionary:
 		s[k] = 0
 	return s
 
+static func _accumulate_stats(agg: Dictionary, sub: Dictionary) -> void:
+	for k in STAT_KEYS:
+		agg[k] = int(agg[k]) + int(sub[k])
+
 ## 递归聚合节点（分类节点 = 子树之和；叶节点 = 自身统计）
 static func _aggregate_recursive(node: Dictionary) -> Dictionary:
 	var agg := _zero_stats()
@@ -159,8 +166,7 @@ static func _aggregate_recursive(node: Dictionary) -> Dictionary:
 		return agg
 	for child in node["children"].values():
 		var sub := _aggregate_recursive(child)
-		for k in STAT_KEYS:
-			agg[k] = int(agg[k]) + int(sub[k])
+		_accumulate_stats(agg, sub)
 	return agg
 
 ## 递归收集物品叶节点

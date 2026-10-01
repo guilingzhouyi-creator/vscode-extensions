@@ -68,8 +68,8 @@ static func buy_item(
 		return {"success": false, "error_code": "INVALID_PRICE"}
 	var unit_gold: int = raw_gold
 	var unit_silver: int = raw_silver
-	var total_gold = unit_gold * buy_count
-	var total_silver = unit_silver * buy_count
+	var total_gold := unit_gold * buy_count
+	var total_silver := unit_silver * buy_count
 
 	if wallet.gold < total_gold or wallet.silver < total_silver:
 		return {

@@ -102,10 +102,10 @@ static func _apply_single_trait_modifiers(
 const FORGED_STAT_KEYS: Array[String] = ["STR", "CON", "INT", "AGI", "SPR", "VIT"]
 
 # ==============================================================================
-# 三、配置驱动创角主入口（P9 升级增量）
+# 三、配置驱动创角主入口（升级增量）
 # ==============================================================================
 
-## P9 升级增量：配置驱动创角主入口（直接内化于 CharacterCreationService，杜绝 V2 割裂）
+## 升级增量：配置驱动创角主入口（直接内化于 CharacterCreationService，杜绝 V2 割裂）
 ## 整合防伪属性守卫、种族 Canary 灰度校验、顺序状态机流转、原子落档与全域双事件广播。
 ## 契约：输入为空返回 INVALID_INPUT；种族未配置返回 RACE_NOT_FOUND；灰度未开放返回
 ##       RACE_CANARY_RESTRICTED；状态机任一环节失败即短路返回；成功后依次广播
@@ -116,7 +116,7 @@ static func process_character_creation(
 	canary_flags: Dictionary
 ) -> Dictionary:
 	if request == null or slot_state.is_empty():
-		return { "success": false, "error_code": "INVALID_INPUT", "message": "请求或档位数据为空" }
+		return {"success": false, "error_code": "INVALID_INPUT", "message": "请求或档位数据为空"}
 
 	# 0. 防伪守卫：前端注入战斗属性一律丢弃并告警（后端权威派生，不入任何派生路径）
 	var forged_dropped: Array = []
@@ -135,7 +135,7 @@ static func process_character_creation(
 	var races_dict: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog", {})
 	var race_data: Dictionary = races_dict.get(request.selected_race_id, {})
 	if race_data.is_empty():
-		return { "success": false, "error_code": "RACE_NOT_FOUND", "message": "目标种族不存在: %s" % request.selected_race_id }
+		return {"success": false, "error_code": "RACE_NOT_FOUND", "message": "目标种族不存在: %s" % request.selected_race_id}
 
 	var race_def := RaceDefinitionDTO.from_dto(race_data)
 	if not race_def.is_enabled:
@@ -172,19 +172,24 @@ static func process_character_creation(
 	# 3. 提交持久化与档位绑定（原子：占用拦截/唯一 ID/事件包生成）
 	var bind_res := SaveSlotCharacterBinder.commit_creation_and_bind_slot(request, slot_state, race_def)
 	if not bind_res.get("success", false):
-		return { "success": false, "error_code": bind_res.get("error_code", ""), "message": bind_res.get("message", "") }
+		return {"success": false, "error_code": bind_res.get("error_code", ""), "message": bind_res.get("message", "")}
 
 	fsm.mark_persisted_completed()
 
 	var profile: CharacterProfile = bind_res.get("character_profile")
 	var opening: OpeningEventStreamDTO = bind_res.get("opening_event")
+	var sheet: CharacterPhysiologySheet = bind_res.get("physiology_sheet")
+	var wallet: CharacterWalletEntity = bind_res.get("wallet")
+	var creation_hooks: Dictionary = GameConfig.get_dict("domains.character_creation", "creation_hooks", {})
 
 	# 4. 事件总线广播：角色创建完成事件
 	EventBusCore.get_instance().emit_domain_event("character_creation.completed", {
 		"account_id": request.account_id,
 		"slot_id": str(slot_state.get("slot_id", "")),
 		"character_id": profile.character_id,
-		"character_name": profile.character_name
+		"character_name": profile.character_name,
+		"race_id": request.selected_race_id,
+		"configured_hooks": creation_hooks.get("on_character_created", [])
 	})
 
 	# 5. 广播开局事件流（首次创建标记 + 完整上下文）
@@ -196,8 +201,12 @@ static func process_character_creation(
 		"success": true,
 		"character_name": profile.character_name,
 		"character_profile": profile,
+		"physiology_sheet": sheet,
+		"wallet": wallet,
+		"race_id": request.selected_race_id,
 		"opening_event": opening,
 		"attribute_levels": profile.attributes.get("attribute_levels", {}),
+		"configured_hooks": creation_hooks,
 		"final_step": fsm.current_step,
 		"fsm_step": fsm.current_step,
 		"slot_state": slot_state

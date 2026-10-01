@@ -43,7 +43,7 @@ static func calculate_trait_karma_balance(selected_trait_ids: Array) -> int:
 ## 契约：超限返回 { valid:false, balance, reason }（文案来自 narratives 配置键
 ##       karma_exceed）；通过返回 { valid:true, balance }，无副作用。
 static func validate_traits_selection(selected_trait_ids: Array, max_allowed_karma: int = 0) -> Dictionary:
-	var balance = calculate_trait_karma_balance(selected_trait_ids)
+	var balance := calculate_trait_karma_balance(selected_trait_ids)
 	if balance > max_allowed_karma:
 		var msg := GameConfig.get_string("narratives.character_creation", "karma_exceed", "Karma cost %d exceeds allowance %d") % [balance, max_allowed_karma]
 		return { "valid": false, "balance": balance, "reason": msg }

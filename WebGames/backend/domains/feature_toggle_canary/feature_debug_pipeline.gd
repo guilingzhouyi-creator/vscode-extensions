@@ -31,7 +31,7 @@ static func apply_debug_command(
 			flag.strategy = FeatureToggleAggregate.RolloutStrategy.GLOBAL_DISABLED
 			return { "success": true, "feature_key": feature_key, "strategy": "GLOBAL_DISABLED" }
 		"SET_PERCENTAGE":
-			var pct = clampi(int(param_value), 0, 100)
+			var pct := clampi(int(param_value), 0, 100)
 			flag.strategy = FeatureToggleAggregate.RolloutStrategy.PERCENTAGE_CANARY
 			flag.rollout_percentage = pct
 			flag.is_circuit_broken = false

@@ -16,15 +16,15 @@ static func check_qualification(commission: CommissionAggregate, adventurer_tier
 
 ## 佣金分成计算：组织税率钳制 [0,1] 后拆税金/净赏金（金库与冒险者钱包划拨）
 static func calculate_payout_split(commission: CommissionAggregate) -> Dictionary:
-	var total_gold = commission.reward_gold
-	var total_crystals = commission.reward_mana_crystals
+	var total_gold: int = commission.reward_gold
+	var total_crystals: int = commission.reward_mana_crystals
 
 	var safe_tax_rate: float = clampf(commission.org_tax_rate, 0.0, 1.0)
-	var tax_gold = int(round(float(total_gold) * safe_tax_rate))
-	var net_gold = total_gold - tax_gold
+	var tax_gold: int = int(round(float(total_gold) * safe_tax_rate))
+	var net_gold: int = total_gold - tax_gold
 
-	var tax_crystals = int(round(float(total_crystals) * safe_tax_rate))
-	var net_crystals = total_crystals - tax_crystals
+	var tax_crystals: int = int(round(float(total_crystals) * safe_tax_rate))
+	var net_crystals: int = total_crystals - tax_crystals
 
 	return {
 		"total_gold": total_gold,

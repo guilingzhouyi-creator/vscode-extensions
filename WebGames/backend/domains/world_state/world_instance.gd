@@ -18,7 +18,7 @@ func _init(p_world_id: String = "") -> void:
 	world_id = p_world_id
 
 ## 世界时间推进（单调递增，死亡不重置；tick 每 ticks_per_day 联动 day）。
-## 契约（Phase 31 S3）：旧档缺字段按默认归一化补齐，tick/day/month/year 不允许负值或倒退。
+## 契约（）：旧档缺字段按默认归一化补齐，tick/day/month/year 不允许负值或倒退。
 func advance_world_time(units: int = 1) -> void:
 	if units <= 0:
 		return

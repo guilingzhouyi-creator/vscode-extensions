@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 随身穿戴暗格动态聚合、裸身容量 0 约束、负重超标拦截。 槽位清单/负重上限/分类判定由 config/domains/inventory.json 的 wearable 段驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务域第一性原理 / 穿戴背包聚合根架构规范
 # ==============================================================================
 
 class_name WearableInventoryAggregate extends RefCounted
@@ -12,7 +12,7 @@ class_name WearableInventoryAggregate extends RefCounted
 const InventoryMetricSnapshotClass = preload("res://backend/domains/inventory/inventory_metric_snapshot.gd")
 
 # ==============================================================================
-# 一、仓储状态（含 Phase 64 增量度量缓存）
+# 一、仓储状态（含增量度量缓存）
 # ==============================================================================
 
 var baseline_capacity: int = 0 # 裸身初始容量严格为 0，符合第一性原理约束
@@ -21,7 +21,7 @@ var equipped_slots: Dictionary = _build_slot_map()
 var storage_items: Array = []
 var owner_account_id: String = ""
 
-# Phase 64 性能加固：增量累加度量缓存与脏标记
+# 性能加固：增量累加度量缓存与脏标记
 var _cached_storage_volume: int = 0
 var _cached_total_weight: float = 0.0
 var _is_metric_dirty: bool = true
@@ -52,7 +52,7 @@ func refresh_cached_metrics() -> void:
 	_cached_total_weight = wt
 	_is_metric_dirty = false
 
-## 获取当前背包度量快照不可变 DTO（Phase 64；脏标记仅内部使用，不入快照——refresh 后恒 false）
+## 获取当前背包度量快照不可变 DTO（脏标记仅内部使用，不入快照——refresh 后恒 false）
 func get_metric_snapshot(race_bonus: float = 0.0) -> RefCounted:
 	if _is_metric_dirty:
 		refresh_cached_metrics()
@@ -69,7 +69,7 @@ func get_metric_snapshot(race_bonus: float = 0.0) -> RefCounted:
 func calculate_total_capacity(race_bonus: float = 0.0) -> int:
 	var armor_category := GameConfig.get_string("domains.inventory", "wearable/armor_category", "ARMOR_EQUIPMENT")
 	var capacity_slots: Array = GameConfig.get_array("domains.inventory", "wearable/capacity_slots", ["BACKPACK"])
-	var total = baseline_capacity
+	var total: int = baseline_capacity
 	for slot_key in equipped_slots:
 		var slot_val = equipped_slots[slot_key]
 		if slot_val is ItemEntity:
@@ -92,7 +92,7 @@ func can_add_item(item: ItemEntity, race_bonus: float = 0.0) -> bool:
 	if _is_metric_dirty:
 		refresh_cached_metrics()
 	var current_vol := _cached_storage_volume
-	var max_vol = calculate_total_capacity(race_bonus)
+	var max_vol: int = calculate_total_capacity(race_bonus)
 	if current_vol + item.volume_slots > max_vol:
 		return false
 	if _cached_total_weight + item.mass_kg > max_carry_weight_kg:
@@ -205,7 +205,7 @@ func _contains_uid(item_uid: String) -> bool:
 
 ## 深快照：物品级序列化往返（serialize/deserialize 重建），快照与运行实例完全解耦。
 ## 回滚可完整恢复装备槽、所有权、锁定与词缀/符文/耐久等深层字段，而非仅恢复数组结构
-## （P39 清单2：原 duplicate() 浅拷贝对物品深层字段的就地变更无法回滚）。
+## （深快照设计：就地深层字段支持完整回滚，浅拷贝对物品深层字段的就地变更无法回滚）。
 func snapshot() -> Dictionary:
 	var storage_payloads: Array = []
 	for item in storage_items:
@@ -242,7 +242,7 @@ func restore(snapshot_data: Dictionary) -> void:
 		equipped_slots = rebuilt_slots
 	else:
 		# 无深载荷：空容器恢复 + 审计警告（不静默吞掉畸形快照；旧引用路径已退役）
-		push_warning("RestorePayloadMissing: wearable_inventory 快照缺失 storage_payloads，已按空容器恢复")
+		ErrorReporter.emit_warning("wearable_inventory", "RESTORE_PAYLOAD_MISSING", "wearable_inventory 快照缺失 storage_payloads，已按空容器恢复")
 		storage_items = []
 		equipped_slots = {}
 	for item in storage_items:

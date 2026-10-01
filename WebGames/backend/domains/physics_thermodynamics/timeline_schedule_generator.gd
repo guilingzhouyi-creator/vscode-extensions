@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 回合开局一次性生成本回合离散时间轴事件，集成最小间距约束与加发牌点/紧张点排期
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name TimelineScheduleGenerator
@@ -52,7 +52,7 @@ static func generate_round_schedule(
 	var timestamps: Array[int] = _sample_discrete_timestamps(target_count, max_duration_ms, min_spacing, rng)
 
 	# 2. 为每个时间戳分配事件类型 (包含普通发牌点、加发牌点或紧张点)
-	#    事件类型按配置权重表 event_type_weights 加权采样（零硬编码阈值，P2 修复）
+	#    事件类型按配置权重表 event_type_weights 加权采样（零硬编码阈值，修复）
 	var event_weights: Dictionary = GameConfig.get_dict("domains.combat", "tertiary_timeline/event_type_weights", {
 		"NORMAL_DRAW": 0.5,
 		"ADD_DRAW": 0.25,

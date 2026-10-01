@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 从配置字典/JSON 批量加载并实例化物品注册表；提供 config/items/*.json 自动发现装配入口（build_catalog_from_config）与配置热重载回收 （reload_from_config：配置删除的物品自动注销、回收数字 ID 与名称键）
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name ItemLoaderPipeline
@@ -23,6 +23,7 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array)
 	)
 	var loaded_count := 0
 	var error_list: Array[Dictionary] = []
+	var default_minor: String = GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")
 
 	for item_dict in sorted_data:
 		var proto = ItemRegistryCatalog.ItemPrototypeTemplate.new(
@@ -30,7 +31,7 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array)
 			item_dict.get("numeric_id", 0),
 			item_dict.get("loc_name_key", ""),
 			item_dict.get("category_major", ItemRegistryCatalog.CATEGORY_MAJOR_EQUIPMENT),
-			item_dict.get("category_minor", GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")),
+			item_dict.get("category_minor", default_minor),
 			item_dict.get("tier_rank", ItemRegistryCatalog.DEFAULT_TIER_RANK),
 			item_dict.get("default_mass_kg", ItemRegistryCatalog.DEFAULT_MASS_KG),
 			item_dict.get("default_volume_slots", ItemRegistryCatalog.DEFAULT_VOLUME_SLOTS),
@@ -42,7 +43,7 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array)
 		var res = ItemRegistrySolver.register_prototype(catalog, proto)
 		if res.success:
 			loaded_count += 1
-			# Phase 19 统一名称注册表接线：物品名称键登记（域所有者 = item，en_US 英文底座必达）
+			# 统一名称注册表接线：物品名称键登记（域所有者 = item，en_US 英文底座必达）
 			var loc_key: String = str(item_dict.get("loc_name_key", ""))
 			if not loc_key.is_empty():
 				LocalizationRegistryCatalog.get_shared().register_name_key(
@@ -82,14 +83,21 @@ static func load_all_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 ## 配置中已删除的物品自动注销（数字 ID 与名称键回空闲池），新增物品自动注册。
 static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	var all_items: Array = []
+	var configured_ids: Dictionary = {}
 	for table_name in GameConfig.get_table_names():
 		if not str(table_name).begins_with("items."):
 			continue
-		all_items.append_array(GameConfig.get_array(str(table_name), "items", []))
+		var items_arr := GameConfig.get_array(str(table_name), "items", [])
+		for it in items_arr:
+			if it is Dictionary:
+				var cid := str((it as Dictionary).get("canonical_id", ""))
+				if not cid.is_empty():
+					configured_ids[cid] = true
+		all_items.append_array(items_arr)
 
 	var unregistered: Array = []
 	for canonical_id in catalog._canonical_registry.keys():
-		if not _has_item(all_items, str(canonical_id)):
+		if not configured_ids.has(str(canonical_id)):
 			var res = ItemRegistrySolver.unregister_prototype(catalog, str(canonical_id))
 			if res.success:
 				unregistered.append(str(canonical_id))
@@ -100,7 +108,7 @@ static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 		var cid := str(item_dict.get("canonical_id", ""))
 		if not cid.is_empty() and not catalog._canonical_registry.has(cid):
 			new_items.append(item_dict)
-	var load_res = load_from_dict_list(catalog, new_items)
+	var load_res := load_from_dict_list(catalog, new_items)
 	return {
 		"unregistered": unregistered,
 		"registered_count": load_res.get("loaded_count", 0),

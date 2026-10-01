@@ -21,10 +21,10 @@ static func calculate_cross_continent_arbitrage(
 	export_continent_rate: float,
 	import_continent_rate: float
 ) -> Dictionary:
-	var buy_cost = base_price_gold * export_continent_rate
-	var sell_revenue = base_price_gold * import_continent_rate
-	var gross_profit = sell_revenue - buy_cost
-	var profit_margin = gross_profit / max(1.0, buy_cost)
+	var buy_cost := base_price_gold * export_continent_rate
+	var sell_revenue := base_price_gold * import_continent_rate
+	var gross_profit := sell_revenue - buy_cost
+	var profit_margin: float = gross_profit / maxf(1.0, buy_cost)
 
 	return {
 		"buy_cost_gold": buy_cost,

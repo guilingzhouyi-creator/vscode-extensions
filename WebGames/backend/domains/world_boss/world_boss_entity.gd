@@ -20,7 +20,7 @@ var phase_current_hp: float = GameConfig.get_float("domains.world_boss", "entity
 var mechanism_shield_hp: float = GameConfig.get_float("domains.world_boss", "entity_defaults/mechanism_shield_hp", 0.0)
 var is_invulnerable: bool = GameConfig.get_bool("domains.world_boss", "entity_defaults/is_invulnerable", false)
 var is_channeling_wipe_spell: bool = GameConfig.get_bool("domains.world_boss", "entity_defaults/is_channeling_wipe_spell", false)
-var is_defeated: bool = false # L9-b（Phase 53）击败终态锁存：置位后重复受击不再结算（一次性语义 Inv-ON-1）
+var is_defeated: bool = false # L9-b（）击败终态锁存：置位后重复受击不再结算（一次性语义 Inv-ON-1）
 
 var battle_contribution_ledger: Dictionary = {}
 

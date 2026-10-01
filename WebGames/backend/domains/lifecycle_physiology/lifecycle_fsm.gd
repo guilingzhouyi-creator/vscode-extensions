@@ -19,8 +19,8 @@ static func age_character_years(sheet: CharacterPhysiologySheet, years: float) -
 
 	var safe_lifespan: float = maxf(0.1, sheet.lifespan_scale)
 	var age_progression: float = sheet.raw_chronological_age / safe_lifespan
-	var is_near_end_of_life = age_progression >= eol_ratio
-	var is_deceased = new_sf <= 0.0 or age_progression >= death_ratio
+	var is_near_end_of_life := age_progression >= eol_ratio
+	var is_deceased := new_sf <= 0.0 or age_progression >= death_ratio
 
 	EventBusCore.get_instance().emit_narrative_by_key(
 		"lifecycle/age_advance", "lifecycle",

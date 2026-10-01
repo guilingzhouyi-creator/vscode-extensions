@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/character_creation/opening_event_stream_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
-# 职责说明: 首次角色创建成功后向后端 EventBus 发布的结构化开局事件包： 账号/档位/世界/角色/首次标记/起始地点/开局主线引导 + 开局文案上下文。 前端仅订阅事件驱动开局剧情，禁止反向写入剧情执行标志。 关联细则: Phase 48 阶段1 §1.3（开局事件流数据契约）
+# 职责说明: 首次角色创建成功后向后端 EventBus 发布的结构化开局事件包： 账号/档位/世界/角色/首次标记/起始地点/开局主线引导 + 开局文案上下文。 前端仅订阅事件驱动开局剧情，禁止反向写入剧情执行标志。 关联细则: 阶段1 §1.3（开局事件流数据契约）
 # 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
 # ==============================================================================
 
@@ -14,17 +14,18 @@ extends RefCounted
 # 一、字段（开局事件流数据契约）
 # ==============================================================================
 
-var event_id: String = ""               # 事件唯一 ID（EVT_OPENING_ 前缀）
-var account_id: String = ""             # 归属账号 ID
-var slot_id: String = ""                # 绑定档位 ID
-var world_id: String = ""               # 目标世界 ID
-var character_id: String = ""           # 新角色唯一 ID
-var character_name: String = ""         # 角色展示名
+var event_id: String = "" # 事件唯一 ID（EVT_OPENING_ 前缀）
+var account_id: String = "" # 归属账号 ID
+var slot_id: String = "" # 绑定档位 ID
+var world_id: String = "" # 目标世界 ID
+var character_id: String = "" # 新角色唯一 ID
+var character_name: String = "" # 角色展示名
+var race_id: String = "" # 角色种族 ID（透传至序章与 HUD）
 var is_first_time_creation: bool = true # 首次创建标记（决定开场动画/引导分支）
-var starting_location_id: String = ""   # 起始地点 ID
-var opening_quest_line_id: String = ""  # 开局主线引导 ID
-var timestamp_utc: int = 0              # 事件时间戳（Unix UTC 秒）
-var narrative_context: Dictionary = {}  # 开局文案上下文（欢迎语等）
+var starting_location_id: String = "" # 起始地点 ID
+var opening_quest_line_id: String = "" # 开局主线引导 ID
+var timestamp_utc: int = 0 # 事件时间戳（Unix UTC 秒）
+var narrative_context: Dictionary = {} # 开局文案上下文（欢迎语等）
 
 # ==============================================================================
 # 二、序列化与反序列化
@@ -39,6 +40,7 @@ func to_dto() -> Dictionary:
 		"world_id": world_id,
 		"character_id": character_id,
 		"character_name": character_name,
+		"race_id": race_id,
 		"is_first_time_creation": is_first_time_creation,
 		"starting_location_id": starting_location_id,
 		"opening_quest_line_id": opening_quest_line_id,
@@ -58,6 +60,7 @@ static func from_dto(d: Dictionary) -> OpeningEventStreamDTO:
 	dto.world_id = str(d.get("world_id", ""))
 	dto.character_id = str(d.get("character_id", ""))
 	dto.character_name = str(d.get("character_name", ""))
+	dto.race_id = str(d.get("race_id", ""))
 	dto.is_first_time_creation = bool(d.get("is_first_time_creation", true))
 	dto.starting_location_id = str(d.get("starting_location_id", ""))
 	dto.opening_quest_line_id = str(d.get("opening_quest_line_id", ""))

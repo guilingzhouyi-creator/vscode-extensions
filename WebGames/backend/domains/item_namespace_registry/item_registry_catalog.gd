@@ -38,7 +38,7 @@ class ItemPrototypeTemplate extends RefCounted:
 	var category_major: String = CATEGORY_MAJOR_EQUIPMENT
 	var category_minor: String = GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")
 	var tier_rank: int = GameConfig.get_int("domains.item_namespace_registry", "defaults/tier_rank", DEFAULT_TIER_RANK)                     # 品阶 (1:普通, 2:精良, 3:稀有, 4:史诗, 5:传说, 6:神圣)
-	var quality_tier: int = -1     # 品质等级 (Phase 17: 1普通~6古代；-1=未声明，默认不参与解析)
+	var quality_tier: int = -1     # 品质等级 (: 1普通~6古代；-1=未声明，默认不参与解析)
 	var mythic_interval: int = 0   # 神话区间端点 (0=无, 1=准神器, 2=真神器；仅 quality_tier=5 神话级生效)
 	var default_mass_kg: float = GameConfig.get_float("domains.item_namespace_registry", "defaults/default_mass_kg", DEFAULT_MASS_KG)
 	var default_volume_slots: int = GameConfig.get_int("domains.item_namespace_registry", "defaults/default_volume_slots", DEFAULT_VOLUME_SLOTS)

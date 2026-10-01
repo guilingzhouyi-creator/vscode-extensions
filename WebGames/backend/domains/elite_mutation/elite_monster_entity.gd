@@ -37,7 +37,7 @@ var is_berserk: bool = GameConfig.get_bool("domains.elite", "entity_defaults/is_
 var minion_count: int = GameConfig.get_int("domains.elite", "entity_defaults/minion_count", 0)
 
 # ==============================================================================
-# 三、精英词缀注入（Phase 88 角色归位）
+# 三、精英词缀注入（角色归位）
 # ==============================================================================
 
 ## 精英词缀注入：L2 系数乘性修正（STR/CON/AGI/SPR）后重算体魄。

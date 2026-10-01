@@ -98,14 +98,38 @@ static func register_account(request: AccountRegistrationDTO.Request, account_st
 	resp.created_timestamp_utc = acc.created_timestamp_utc
 
 	# 统一 EventBus 广播（叙事渲染契约：args + category_key）
+	var post_reg_hooks: Array = GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "auth/hooks/post_register", [])
 	EventBusCore.get_instance().emit_domain_event(HudEventContract.channel_auth_registered(), {
 		"account_id": acc.account_id,
 		"username": acc.username,
 		"timestamp_utc": acc.created_timestamp_utc,
+		"configured_hooks": post_reg_hooks,
 		"category_key": "auth",
 		"args": [acc.username]
 	})
+	_dispatch_auth_hooks("post_register", {"account_id": acc.account_id, "username": acc.username, "hooks": post_reg_hooks})
 	return resp
+
+static var _auth_hooks: Dictionary = {}
+
+## 注册鉴权阶段自定义扩展 Hook（post_register / post_login）
+static func register_hook(stage_key: String, callback: Callable) -> void:
+	if stage_key.is_empty() or not callback.is_valid():
+		return
+	if not _auth_hooks.has(stage_key):
+		_auth_hooks[stage_key] = []
+	var hooks_list: Array = _auth_hooks[stage_key]
+	hooks_list.append(callback)
+
+## 清空已注册的鉴权自定义扩展 Hook
+static func clear_hooks() -> void:
+	_auth_hooks.clear()
+
+static func _dispatch_auth_hooks(stage_key: String, payload: Dictionary) -> void:
+	var hooks_list: Array = _auth_hooks.get(stage_key, [])
+	for cb in hooks_list:
+		if cb is Callable and cb.is_valid():
+			cb.call(payload)
 
 ## 会话有界化——先擦除已过期项，再按 issued_at 最旧优先裁剪至上限。
 ## 上限读 infrastructure.admin session/max_entries（默认 1000），长会话内存受控。
@@ -167,6 +191,8 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 		}
 		var code_ok := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK")
 		_prune_sessions(issued_at) # 签发后收敛会话容器（过期优先清理）
+		var auto_enter := GameConfig.get_bool("domains.world_gateway", "gateway_policy/auto_enter_gateway_on_login", true)
+		var post_login_hooks: Array = GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "auth/hooks/post_login", [])
 
 		# 统一 EventBus 广播鉴权登录成功（token_prefix 脱敏 Inv-HDS-4）
 		EventBusCore.get_instance().emit_domain_event(HudEventContract.channel_auth_login_succeeded(), {
@@ -175,11 +201,14 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 			"token_prefix": token.substr(0, mini(8, token.length())),
 			"issued_at": issued_at,
 			"expires_at": issued_at + ttl,
+			"auto_enter_gateway": auto_enter,
+			"configured_hooks": post_login_hooks,
 			"category_key": "auth",
 			"args": [account.username]
 		})
+		_dispatch_auth_hooks("post_login", {"account_id": account.account_id, "username": account.username, "token": token, "auto_enter_gateway": auto_enter})
 
-		return {"success": true, "code": code_ok, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + ttl, "rehashed": needs_rehash}
+		return {"success": true, "code": code_ok, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + ttl, "rehashed": needs_rehash, "auto_enter_gateway": auto_enter}
 	var code_inv := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
 	return {"success": false, "code": code_inv, "token": ""}
 

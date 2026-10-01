@@ -56,7 +56,7 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化（缺省字段回退默认；空字典返回全默认快照）
 static func from_dto(data: Dictionary) -> RefCounted:
-	var snap = load("res://backend/domains/inventory/inventory_metric_snapshot.gd").new()
+	var snap: InventoryMetricSnapshot = InventoryMetricSnapshot.new()
 	if data.is_empty():
 		return snap
 	snap.total_capacity_slots = int(data.get("total_capacity_slots", 0))

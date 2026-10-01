@@ -4,19 +4,19 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 剧情因果有向无环图节点实体，表达标准步进、条件分支、并行与汇聚
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name NarrativeDAGNode
 extends RefCounted
 
 enum NodeType {
-	START_ENTRY = 0,      ## 起始入口节点 (入度为 0)
-	STANDARD_STEP = 1,    ## 普通剧情步进节点 (单入单出)
-	BRANCH_CHOICE = 2,    ## 条件分支选择节点 (根据运行时条件选择出边)
-	PARALLEL_FORK = 3,    ## 并行分流节点 (同时激活多条下游分支)
+	START_ENTRY = 0, ## 起始入口节点 (入度为 0)
+	STANDARD_STEP = 1, ## 普通剧情步进节点 (单入单出)
+	BRANCH_CHOICE = 2, ## 条件分支选择节点 (根据运行时条件选择出边)
+	PARALLEL_FORK = 3, ## 并行分流节点 (同时激活多条下游分支)
 	CONVERGENCE_JOIN = 4, ## 汇聚同步节点 (等待必要前置全部完成)
-	TERMINAL_EXIT = 5     ## 终态退出节点 (出度为 0，标志剧情完结)
+	TERMINAL_EXIT = 5 ## 终态退出节点 (出度为 0，标志剧情完结)
 }
 
 var node_id: String = ""
@@ -79,6 +79,7 @@ static func from_dto(d: Dictionary) -> NarrativeDAGNode:
 	node.completion_condition_ast = (d.get("completion_condition_ast", {}) as Dictionary).duplicate(true)
 	node.mutations_on_complete.clear()
 	for m in (d.get("mutations_on_complete", []) as Array):
-		node.mutations_on_complete.append((m as Dictionary).duplicate(true))
+		if m is Dictionary:
+			node.mutations_on_complete.append(m as Dictionary)
 	node.is_optional = bool(d.get("is_optional", false))
 	return node

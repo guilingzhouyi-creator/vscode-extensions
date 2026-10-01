@@ -16,7 +16,7 @@ var supply_units: float = GameConfig.get_float("domains.trading", "commodity_def
 var demand_units: float = GameConfig.get_float("domains.trading", "commodity_defaults/demand_units", 50.0)
 var elasticity_coef: float = GameConfig.get_float("domains.trading", "commodity_defaults/elasticity_coef", 0.5)
 
-# Phase 38 动态市场反馈字段（运行时状态——交易行为与时间演化反向影响市场）
+# 动态市场反馈字段（运行时状态——交易行为与时间演化反向影响市场）
 var last_price: int = -1              # 上次成交价（变化率上限比较基准；-1 = 未定价）
 var accumulated_volume: float = 0.0   # 累计成交量（成交量反馈输入）
 var last_price_tick: int = 0          # 上次定价的世界刻度（时间演化相位基准）

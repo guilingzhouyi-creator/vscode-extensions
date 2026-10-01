@@ -103,8 +103,8 @@ func reset_cursor() -> void:
 func apply_recent_completion(prefix: String) -> Dictionary:
 	var matched := _filtered(prefix)
 	if matched.is_empty():
-		return { "success": false, "command": "" }
-	return { "success": true, "command": "/" + str(matched[0]) }
+		return {"success": false, "command": ""}
+	return {"success": true, "command": "/" + str(matched[0])}
 
 # ==============================================================================
 # 内部实现

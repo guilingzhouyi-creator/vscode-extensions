@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/item_namespace_registry/magic_tier_snapshot.gd
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
-# 职责说明: 魔法体系统一基线数据契约——施法形态（4）、魔法资质（4 档，魔适者为 修炼门槛）、**阶位梯度（连续 1~11 阶，纯强度/规模/技术层级梯度， 无能力分级前缀）、能力分级（异能/英雄/神圣/真神 + 超位，独立平行维度）**、 施法者战斗实力称号（13 级，前三档魔术师 = 非魔法范畴） + Phase 26 用户纠正（双维度平行体系：阶位梯度 × 能力分级）
+# 职责说明: 魔法体系统一基线数据契约——施法形态（4）、魔法资质（4 档，魔适者为 修炼门槛）、**阶位梯度（连续 1~11 阶，纯强度/规模/技术层级梯度， 无能力分级前缀）、能力分级（异能/英雄/神圣/真神 + 超位，独立平行维度）**、 施法者战斗实力称号（13 级，前三档魔术师 = 非魔法范畴） + 用户纠正（双维度平行体系：阶位梯度 × 能力分级）
 # 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
 # ==============================================================================
 
@@ -30,14 +30,14 @@ enum ManaAptitude {
 	HEAVEN_RULER,      # 天权者（位阶压制 · 稀有度未指定）
 }
 
-# 3. 阶位梯度（Phase 26 去嵌套化：连续 1~11 阶纯梯度，无能力分级前缀；
+# 3. 阶位梯度（去嵌套化：连续 1~11 阶纯梯度，无能力分级前缀；
 #    量化魔法强度/规模/技术层级；枚举值 = 阶位号，严格递增）
 enum MagicRank {
 	RANK_1 = 1, RANK_2, RANK_3, RANK_4, RANK_5,
 	RANK_6, RANK_7, RANK_8, RANK_9, RANK_10, RANK_11,
 }
 
-# 3b. 能力分级（Phase 26 独立平行维度：描述施法主体/存在总体能力层次与身份范畴；
+# 3b. 能力分级（独立平行维度：描述施法主体/存在总体能力层次与身份范畴；
 #    不直接决定具体魔法的阶位；SUPERTIER 为超位高级位阶）
 enum AbilityTier {
 	ESP = 1,      # 异能
@@ -47,7 +47,7 @@ enum AbilityTier {
 	SUPERTIER,    # 超位（真神之上/超越位阶上限的特殊存在）
 }
 
-# 3c. 阶位档次（Phase 27 第三平行维度：按阶位确定性区间分段——低阶 1~3 / 中阶 4~6 /
+# 3c. 阶位档次（第三平行维度：按阶位确定性区间分段——低阶 1~3 / 中阶 4~6 /
 #     高阶 7~9 / 超位 10~11 统称；互斥全覆盖，禁嵌套命名（低阶一阶禁止））
 enum MagicRankBand {
 	LOW = 1,        # 低阶魔法（1~3 阶）
@@ -82,7 +82,7 @@ var canonical_id: String = ""
 var magic_form: MagicForm = MagicForm.INCANTATION
 var magic_rank: MagicRank = MagicRank.RANK_1
 var ability_tier: AbilityTier = AbilityTier.ESP   # 能力分级（独立平行维度）
-# Phase 33：弱映射候选集合——与 ability_tier 标量分离（候选可有空/多项，顺序稳定排序；禁止隐式类型转换）
+# ：弱映射候选集合——与 ability_tier 标量分离（候选可有空/多项，顺序稳定排序；禁止隐式类型转换）
 var ability_tier_candidates: Array = []
 var rank_band: MagicRankBand = MagicRankBand.LOW   # 阶位档次（第三平行维度）
 var mana_aptitude: ManaAptitude = ManaAptitude.MANA_ADAPTOR
@@ -97,7 +97,7 @@ var backfire_threshold: int = 1        # 资质反噬阈值（配置驱动）
 # ==============================================================================
 
 ## 阶位单调映射：MagicRank -> 1~11（唯一事实源，严格递增，禁跨级倒置）。
-## Phase 33：非法值返回 0（显式未登记哨兵——不静默伪装为一阶；仅展示层允许配置化安全兜底）
+## ：非法值返回 0（显式未登记哨兵——不静默伪装为一阶；仅展示层允许配置化安全兜底）
 static func rank_to_level(rank: MagicRank) -> int:
 	var v: int = int(rank)
 	return v if v >= 1 and v <= 11 else 0

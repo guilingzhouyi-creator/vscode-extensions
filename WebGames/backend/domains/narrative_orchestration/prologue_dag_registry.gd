@@ -4,7 +4,7 @@
 # 架构定位: Domain Registry / Specification Catalog
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 依据角色种族/身世路由规则，从配置加载并装配专属剧情 DAG
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
 class_name PrologueDagRegistry
@@ -48,21 +48,19 @@ static func get_graph_by_id(dag_id: String) -> NarrativeDAGGraphDTO:
 
 	var raw_nodes: Dictionary = raw.get("nodes", {})
 	for nid in raw_nodes.keys():
-		var nd_dict: Dictionary = (raw_nodes[nid] as Dictionary).duplicate(true)
-		# 配置词条以键控形式存在（node_id 隐含在键中），补齐后走全字段 from_dto
-		nd_dict["node_id"] = str(nid)
-		var node := NarrativeDAGNode.from_dto(nd_dict)
+		var raw_node = raw_nodes[nid]
+		if not (raw_node is Dictionary):
+			continue
+		var node := NarrativeDAGNode.from_dto(raw_node as Dictionary)
+		if node.node_id.is_empty():
+			node.node_id = str(nid)
 		g.add_node(node)
 
 	var raw_edges: Array = raw.get("edges", [])
 	for ed in raw_edges:
-		var ed_dict: Dictionary = (ed as Dictionary).duplicate(true)
-		# 配置边用 from/to 键；对齐 NarrativeDAGEdge.from_dto 的 from_node_id/to_node_id 契约
-		if not ed_dict.has("from_node_id") and ed_dict.has("from"):
-			ed_dict["from_node_id"] = str(ed_dict.get("from", ""))
-		if not ed_dict.has("to_node_id") and ed_dict.has("to"):
-			ed_dict["to_node_id"] = str(ed_dict.get("to", ""))
-		var edge := NarrativeDAGEdge.from_dto(ed_dict)
+		if not (ed is Dictionary):
+			continue
+		var edge := NarrativeDAGEdge.from_dto(ed as Dictionary)
 		g.add_edge(edge)
 
 	return g

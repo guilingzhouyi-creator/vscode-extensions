@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/cdkey_voucher/cdkey_eligibility_rule_engine.gd
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
-# 职责说明: 解释 config/domains/cdkey_voucher.json 的 eligibility_rules 复合门槛配置， 逐条判定 + AND/OR 短路聚合。规则引擎能力与具体业务规则分离—— 引擎只解释配置，不内嵌任何业务条件；示例配置须显式标注 example_only。  契约（Phase 35 S2）: - 未达标返回 allowed=false + failed_rule_id/metric_key（不写任何核销状态） - operator 白名单: gte/lte/eq/neq/contains；未知 operator 受控判定失败 - 无状态纯函数：判定指标由调用方注入，引擎不持有玩家数据
+# 职责说明: 解释 config/domains/cdkey_voucher.json 的 eligibility_rules 复合门槛配置， 逐条判定 + AND/OR 短路聚合。规则引擎能力与具体业务规则分离—— 引擎只解释配置，不内嵌任何业务条件；示例配置须显式标注 example_only。  契约（）: - 未达标返回 allowed=false + failed_rule_id/metric_key（不写任何核销状态） - operator 白名单: gte/lte/eq/neq/contains；未知 operator 受控判定失败 - 无状态纯函数：判定指标由调用方注入，引擎不持有玩家数据
 # 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
 # ==============================================================================
 
@@ -15,14 +15,14 @@ const OPERATOR_WHITELIST: Array[String] = ["gte", "lte", "eq", "neq", "contains"
 
 ## 读取配置复合门槛段：{ "combinator": "AND"|"OR", "rules": [...], "example_only": bool }。
 ## example_only=true 的示例配置（仅验证框架能力）不参与判定——返回空表，
-## 引擎不将示例升级为隐式全局约束（Phase 35 S3 契约）。
+## 引擎不将示例升级为隐式全局约束（契约）。
 static func load_rules(table_id: String = "domains.cdkey_voucher") -> Dictionary:
 	var rules := GameConfig.get_dict(table_id, "eligibility_rules", {})
 	if rules.get("example_only", false):
 		return {}
 	return rules
 
-## 作用域合并（Phase 36 S2）：兑换码级规则按 rule_id 覆盖全局规则。
+## 作用域合并（）：兑换码级规则按 rule_id 覆盖全局规则。
 ## global_rules/voucher_rules 为 { combinator, rules: [...] } 形态；返回合并后规则集：
 ## combinator 取 voucher（若有）；rules = voucher 规则 + 全局中未被 voucher 覆盖的规则。
 static func merge_rules(global_rules: Dictionary, voucher_rules: Dictionary) -> Dictionary:

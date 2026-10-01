@@ -32,7 +32,7 @@ const CATEGORY_QUEST_MISC: String = "QUEST_MISC"
 # ==============================================================================
 
 var item_id: String = ""
-# 实例全局唯一 UID（权威/可追溯/幂等，Phase 09）：发放来源前缀 + 单调计数 + 校验尾
+# 实例全局唯一 UID（权威/可追溯/幂等，）：发放来源前缀 + 单调计数 + 校验尾
 var item_uid: String = ""
 var template_id: String = ""
 var custom_name: String = GameConfig.get_string("domains.inventory", "item_defaults/custom_name", "未命名物品")
@@ -55,10 +55,10 @@ var affix_sockets: Dictionary = {
 	"dynamic_affixes": []
 }
 var market_base_price: int = GameConfig.get_int("domains.inventory", "item_defaults/market_base_price", 10)
-var quality_snapshot: Dictionary = {} # 品质等级统一度量快照（Phase 17：空=未声明，行为不变）
+var quality_snapshot: Dictionary = {} # 品质等级统一度量快照（：空=未声明，行为不变）
 var container_state: String = "UNOWNED"
 var owner_account_id: String = ""
-var attribute_mounts: Array = [] # Phase 46: 物品属性双 UID 挂载条目 (Array[ItemAttributeMountInstance])
+var attribute_mounts: Array = [] # : 物品属性双 UID 挂载条目 (Array[ItemAttributeMountInstance])
 
 # ==============================================================================
 # 三、序列化 / 反序列化 / 工厂
