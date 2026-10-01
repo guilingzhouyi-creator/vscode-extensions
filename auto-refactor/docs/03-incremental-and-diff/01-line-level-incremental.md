@@ -1,47 +1,61 @@
-# 行级增量子树复用机制 (Line-Level Incremental Analysis)
+# 01. 行级增量子树复用与 AST 切片提取
 
-> **所属模块**：`03-incremental-and-diff`  
-> **核心源码**：`src/core/incremental.ts`, `src/core/incrementalState.ts`, `src/core/lineMap.ts`, `src/core/editDiff.ts`  
-> **文档状态**：✅ **已落地实施 (Implemented & Verified)**
-
----
-
-## 1. 为什么需要行级增量？
-
-对于 5,000 行以上的大型代码文件，即使开发者只微调了其中 1 行代码：
-* 全量重新解析与全量规则评估依然需要花费数十毫秒甚至更久；
-* 绝大部分未修改的顶层函数与类方法的 AST 结构及其分析发现与上一版本**完全等价**。
-
-行级增量技术旨在识别文件内部的具体编辑区间，**仅对被修改命中的函数子树执行重新分析，无缝复用未变子树的分析结果**。
+> **所属层级**：L3 增量计算与向量化 Diff (`docs/03-incremental-and-diff/`)  
+> **对应代码真源**：`src/core/diff/incremental.ts`、`src/core/diff/line-map.ts`、`src/core/router/sliceExtractor.ts`、`src/core/intelligence/callChainImpactTracer.ts`
 
 ---
 
-## 2. 核心架构与复用决策 (`reuseSubtree`)
+## 1. 行级增量子树复用 (`reuseSubtree`)
 
-```
-   旧文件版本 (oldContent)                    新文件版本 (newContent)
-  ┌─ Block A: function A() ─┐              ┌─ Block A: function A() ─┐
-  │ 保持未变                │ ───────────► │ 复用旧子树 AST & 诊断   │
-  ╞═ Block B: function B() ═╡              ╞═ Block B: function B() ═╡
-  │ 产生修改 (Old Version)  │ ─ (编辑突变) ─► │ 重新物化与执行深度分析 │
-  ╠═ Block C: function C() ═╣              ╠═ Block C: function C() ═╣
-  │ 保持未变 (行号向下平移) │ ───────────► │ LineMap 坐标平移后复用  │
-  └─────────────────────────┘              └─────────────────────────┘
+在 IDE 实时编辑与智能体连续多轮微调场景中，单次修改往往只涉及数千行文件中的 5 ~ 30 行。`src/core/diff/incremental.ts` 通过将编辑区间（`EditRange`）与上一轮缓存的语法树结合，实现了**未触碰语法子树零重算（Subtree Reuse）**：
+
+```mermaid
+flowchart LR
+    OLD_AST["旧版 AST + 历史 Issue 集合"]
+    EDIT["EditRanges (变更行区间)"]
+    LINEMAP["LineMap (SWAR 64-bit 行号平移表)"]
+    REUSE["未相交子树: 直接平移起止行号复用 Issues"]
+    SLICE["相交子树: ASTSliceExtractor 提取最小语法切片重审"]
+    MERGED["合并输出 (与全量重扫 100% 字节等价)"]
+
+    OLD_AST --> REUSE
+    EDIT --> LINEMAP
+    LINEMAP --> REUSE
+    EDIT --> SLICE
+    REUSE & SLICE --> MERGED
 ```
 
-### 2.1 复用判定三要素
-一个 AST 函数子树是否能够安全复用，必须同时满足：
-1. **起始特征对齐**：函数的 `startLine` 与 `startColumn` 坐标通过 `LineMap` 校验映射；
-2. **源码字节等价**：提取的源码切片 `sourceText` 与旧版本子树严格逐字节相同；
-3. **独立性边界完整**：该子树不依赖外部被修改作用域的符号定义或破坏性签名变更。
+### 1.1 双向坐标平移映射 (`LineMap`)
+
+位于 `src/core/diff/line-map.ts` 的行映射器维护新旧文本的行偏移差分表：
+
+1. **不相交判定**：对于旧文件中位于 `[startLine, endLine]` 的函数或类节点，若该区间与所有 `EditRange` 均无交集，则其内部局部规则（如圈复杂度、局部变量命名、函数内魔法数）的结果必然不变。
+2. **坐标平移复用**：直接将该子树关联的历史 `Issue` 行号按 `LineMap.oldToNew(line)` 平移 $\Delta L$ 行，跳过对该子树的二次遍历。
+3. **全文件耦合规则重算补偿**：对于依赖全文件聚合统计的规则（如 `large-file` 总行数、文件级重复字面量计数 `duplicate-literal`），增量合并器会自动汇总复用子树与新切片的统计计数后统一判定，确保增量输出与全量冷扫 **100% 逐字节一致**（由 `npm run validate-diff` 严格验证）。
 
 ---
 
-## 3. 64 位 SWAR ASCII 向量化扫描与 LineMap 坐标平移
+## 2. 最小语法包围盒切片提取 (`ASTSliceExtractor`)
 
-在处理大文件差分时，文本逐字符遍历往往成为瓶颈。引擎引入了硬件对齐的 **64-bit SWAR (SIMD Within A Register)** 算法：
+位于 `src/core/router/sliceExtractor.ts` 的切片提取器负责将一组离散的变更行号 `changedLines: number[]` 扩展为**语义自洽的最小 AST 语法单元（`ASTSlice`）**：
 
-* **8 字节单周期扫描**：通过 64 位整型位运算，每次时钟周期并行扫描 8 个字节的 ASCII 文本；
-* **极速吞吐**：在 600KB+ 源码缓冲区上达到 **6,448.4 MB/s** 的纯 ASCII 判定吞吐；
-* **LineMap 坐标精准平移**：
-  当文件上方发生插入或删除时，`LineMap` 自动累加并记录物理位移 `lineDelta`，无损平移复用子树上的所有 Issue 位置，确保报告中的物理行列号始终指向当前最新版本。
+1. **向上闭包寻址**：从每个变更行向上回溯至外围最近的函数声明（`FunctionDeclaration`）、类方法（`MethodDefinition`）、接口定义或顶层语句块。
+2. **签名突变指纹比对**：对比新旧切片中外围符号的名称、导出修饰符（`export`）、参数个数与类型注解，自动判定 `hasSignatureMutation` 与 `isBreakingChange`。
+3. **容错词法回退**：若 Agent 输入的新代码正处于未写完的半闭合状态，提取器自动切换至括号平衡深度扫描，确保在任何残缺代码下均能稳定切出局部上下文。
+
+---
+
+## 3. 逆向调用链爆炸半径追踪 (`CallChainImpactTracer`)
+
+当 `ASTSliceExtractor` 标记某个导出符号发生签名突变时，`src/core/intelligence/callChainImpactTracer.ts` 立即在 `CallGraph` 上执行广度优先逆向闭包搜索：
+
+- **直接冲击层（Depth = 1）**：直接调用或导入该符号的上游文件与函数集合。
+- **传递冲击闭包（Depth $\ge 2$）**：沿着调用链向上游传递受波及的业务入口。
+- **自动门禁升级**：一旦确认破坏性签名修改影响了至少一个外部调用方，立即生成 `GOV-SLC-001` 违规并将 `PraxisSliceAuditVerdict.requiresFullRepoScan` 置为 `true`。
+
+---
+
+## 4. 关联文档导航
+
+- [02. 高性能差分算法栈与流式 Diff 规格](./02-diff-interface-spec.md)
+- [03. Praxis 增量 Diff 管道与环形缓冲接入指南](./03-praxis-integration-guide.md)

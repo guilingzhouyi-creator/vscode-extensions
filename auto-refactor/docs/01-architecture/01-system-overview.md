@@ -1,93 +1,102 @@
-# 系统架构总览 (System Architecture Overview)
+# 01. 系统六层架构全景与核心数据流
 
-> **所属模块**：`01-architecture`  
-> **核心源码**：`src/core/scanner/`, `src/core/pipeline/dualTrackPipeline.ts`, `src/core/router/sparseRuleRouter.ts`, `src/api.ts`, `src/index.ts`  
-> **文档状态**：✅ **已落地实施 (Implemented & Verified)**
+> **所属层级**：L1 核心架构与原生内核 (`docs/01-architecture/`)  
+> **对应代码真源**：`src/api.ts`、`src/core/analyzer.ts`、`src/core/pipeline/dualTrackPipeline.ts`、`src/core/router/sparseMoEGate.ts`、`src/core/scheduler/`
 
 ---
 
-## 1. 系统定位与核心设计哲学
+## 1. 架构设计哲学与六层拓扑
 
-`auto-refactor` 是一个**高性能、声明式、项目无关且面向 CI/CD 与 IDE 的自动化代码审查与静态质量分析引擎**。其核心哲学是：
+`auto-refactor` 是一套面向多语言大型代码库与多智能体协作环境的工业级静态审查、重构指导与量化治理引擎。整个系统严格遵循**自底向上的六层单向依赖拓扑**，保证核心算子零外部耦合、跨语言规则统一复用、冷热扫描字节级 100% 等价。
 
-1. **确定性与零黑话（Determinism & Clean Terminology）**：严格遵循单一真源，不依赖随机性，不使用任何临时批次黑话标记；
-2. **零堆分配与高承压（Zero Transient Heap Allocation）**：核心遍历与高频规则扫描采用单例复用与不可变切片，拒绝热路径临时对象膨胀；
-3. **分层稀疏计算（Sparse MoE Execution）**：通过 AST 切片与特征提取器（CED），在前台极速跳过无需激活的重型分析器；
-4. **多语言大一统拓扑（Universal Multi-Language Semantic IR）**：通过 `NormalizedNode` 抹平 TypeScript、Python、Rust、GDScript 与 Markdown 的语法树差异。
+```mermaid
+flowchart TD
+    subgraph L6["L6. 交付与编排门面层 (Delivery & Orchestration Facade)"]
+        CLI["src/index.ts (CLI)"]
+        API["src/api.ts (scan / scanWarm / scanDiff / scanAndRender)"]
+        PRAXIS["src/core/praxis/* (6 大治理门面 + 5 大 SPI)"]
+        DAEMON["src/daemon/* (NDJSON IPC 守护进程)"]
+    end
 
+    subgraph L5["L5. 三平面质量度量与演化层 (Tri-Plane Scoring & Evolution)"]
+        STATIC["src/core/scoring/* (10 大战略支柱 + 倒数饱和曲线 + 短板几何平均)"]
+        DYNAMIC["src/core/dynamic/* & telemetry/* (覆盖率与运行时延迟遥测)"]
+        EVOL["src/core/evolution/* & feedback-adaptive-supervisor.ts (Git 历史演化 + 梯度调权 + CAI 自治度)"]
+    end
+
+    subgraph L4["L4. 稀疏路由与双轨并发调度层 (Sparse MoE & Dual-Track Scheduler)"]
+        MOE["src/core/router/sparseMoEGate.ts (CED 变更熵密稀疏路由)"]
+        SLICE["src/core/router/sliceExtractor.ts (<10ms 局部 AST 切片提取)"]
+        DUAL["src/core/pipeline/dualTrackPipeline.ts (Fast Track + Deep Track + EscalationChannel)"]
+        SCHED["src/core/scheduler/* & profiler/* (WorkerPool + ScaleTuner + LoadGovernor)"]
+    end
+
+    subgraph L3["L3. 四层规则金字塔与内置分析器矩阵 (Rule Pyramid & 26 Built-in Analyzers)"]
+        REG["src/core/rules/registry.ts (243 条单一真源规则注册表)"]
+        PYR["src/core/rules/pyramid/* (L1 全域安全 / L2 语言族 / L3 架构与数据 / L4 领域量化)"]
+        ANA["src/analyzers/*.ts (26 个内置分析器包)"]
+    end
+
+    subgraph L2["L2. 跨语言语义 IR 与图分析层 (Multi-Language AST & Semantic Graph)"]
+        NODE["src/core/ast/multilang.ts (NormalizedNode 统一语法树)"]
+        SEM["src/core/semantic/semanticGraph.ts (8 语言适配器 + 统一语义拓扑)"]
+        FLOW["src/core/cfg/* & intelligence/dataFlow.ts & callGraph.ts (CFG / DFG / CallGraph)"]
+    end
+
+    subgraph L1["L1. Rust N-API 原生加速算子层 (Rust Cargo Workspace + Dual-Track Shim)"]
+        CRATES["crates/* (auto-refactor-core / ops-diff / ops-graph / ops-pattern / ops-mask / ops-clone)"]
+        SHIM["src/core/native/* (NativeBridge + 纯 TS 100% 字节等价回退桥)"]
+    end
+
+    L6 --> L5
+    L6 --> L4
+    L5 --> L3
+    L4 --> L3
+    L3 --> L2
+    L2 --> L1
 ```
-                       【auto-refactor 系统全景架构】
-  ┌── 入口层 (CLI / API / Daemon IPC) ─────────────────────────────────────┐
-  │     auto-refactor scan       scanWarm()       scanDiff() / scanDiffDelta│
-  └── (入参分发: CLI / API / IPC) ────┬────────────────────────────────────┘
-                                      ▼
-  ┌── DualTrack Pipeline 非对称双轨执行流水线 ──────────────────────────────┐
-  │  ┌───────────────────────────────┐  ┌────────────────────────────────┐ │
-  │  │ FastTrack 前台快轨 (< 15ms)    │  │ DeepTrack 后台深轨 (全量图分析)│ │
-  │  │ • Sparse MoE CED 稀疏条件路由  │  │ • 全量 AST 依赖图与反向调用链   │ │
-  │  │ • 纯字面量突变绕过 70% 分析器  │  │ • 跨文件语义切片自审闭包       │ │
-  │  │ • 投机性预判与即时响应反馈    │  │ • 深度复杂度与架构环路检测     │ │
-  │  └───────────────────────────────┘  └────────────────────────────────┘ │
-  └── (路由决策: FastTrack / DeepTrack) ──┬────────────────────────────────┘
-                                          ▼
-  ┌── 核心调度与增量缓存 (Scanner Engine) ─────────────────────────────────┐
-  │  • L1 内存缓存 (毫秒级 mtime+size 判定)   • L2 磁盘持久缓存 (ContentHash)│
-  │  • 非对称探针 (CacheProbe 流水线)        • 内存自愈看守 (RSS Self-Healing)│
-  │  • 多核并发 Worker 调度池 (WorkerPool)   • AST 语义切片提取器与自审门禁  │
-  └── (缓存复用与多核并发分发) ───────────┬────────────────────────────────┘
-                                          ▼
-  ┌── 多语言语法解析与 AST 适配层 (Adapters) ──────────────────────────────┐
-  │  • TypeScript 适配器 (TS API)            • Rust oxc-parser 极速流式解析│
-  │  • Python (Tree-Sitter Python)           • Rust (Tree-Sitter Rust)     │
-  │  • GDScript (Godot 语法适配)             • Markdown (文档规范解析器)   │
-  │  • 零物化懒投影机制 (NodeProjector)      • 64-bit SWAR / SIMD 向量加速 │
-  └── (归一化 NormalizedNode 投影) ───────┬────────────────────────────────┘
-                                          ▼
-  ┌── 三层规则金字塔 (Three-Layer Rule Pyramid) ───────────────────────────┐
-  │  • Layer 1: 全域安全与跨语言不变量 (Security / Secrets / 循环内开销)    │
-  │  • Layer 2: 语言族约束 (静态类型系统 / GC 运行时)                       │
-  │  • Layer 3: 方言与工程治理 (Governance / Hygiene / Comments)           │
-  │  ── 项目级定制 (非规则层，实现在 src/core/scoring/ 与 src/core/config/) │
-  │     十维质量评分 / 声明式门禁策略 / 原型自适应权重                      │
-  └────────────────────────────────────────────────────────────────────────┘
-```
 
 ---
 
-## 2. 核心执行模式 (Execution Modes)
+## 2. 核心执行流水线详解
 
-引擎根据环境入参和上下文智能决策最优执行路径：
+### 2.1 冷/热/增量多模态入口 (`src/api.ts`)
 
-| 模式 | 触发机制 | 架构特性与延迟指标 |
-| :--- | :--- | :--- |
-| **冷扫描 (Cold Scan)** | 首次启动或显式传递 `cache: false` | 全量遍历与 AST 解析，输出全量基准报告，建立 L1/L2 缓存基线。 |
-| **热扫描 (Warm Scan)** | 默认开启 `cache: true` | 通过 L1 `mtime+size` 与 L2 `ContentHash` 双重校验，跳过未修改文件，毫秒级响应。 |
-| **Diff 增量扫描 (Diff Scan)** | 调用 `scanDiff()` / `scanDiffDelta()` | 接收 Git Diff 补丁，行级增量子树复用（`reuseSubtree`），精准判定受影响范围。 |
-| **DualTrack 非对称扫描** | 调用 `scanAsymmetric()` | 前台 FastTrack（Sparse MoE 稀疏激活）$<15\text{ms}$ 返回投机结论，后台异步完成 DeepTrack 深度校验。 |
-| **Daemon 守护进程** | `--daemon` 或连接 IPC 管道 | 预热 Node.js 虚拟机、V8 JIT 及 Native 模块，通过 NDJSON 管道实现 $<10\text{ms}$ 极致响应。 |
+1. **`scan(options)`**：纯进程内确定性扫描。默认不触发后台守护进程连接（通过懒加载隔离 `net` 与 `child_process` 模块开销），确保库调用者具备「单次冷启动零额外成本」。
+2. **`scanWarm(options)`**：优先通过命名管道或 Unix Domain Socket 请求常驻 Daemon (`src/daemon/server.ts`)，命中 `L1` 内存缓存与 `L2` 磁盘缓存（`.auto-refactor-cache`）；若 Daemon 不可达则自动降级至进程内冷扫，且输出的 `ScanReport` 逐字节一致。
+3. **`scanDiff(diffs, options)` / `scanDiffStream(diffs, options)`**：面向增量补丁与 Praxis 实时代码流的向量化差分扫描通道。
 
----
+### 2.2 双轨并发分析管道 (`DualTrackPipeline`)
 
-## 3. 并发调度与 Worker 线程池
+位于 `src/core/pipeline/dualTrackPipeline.ts` 的双轨流水线将审查任务拆分为两条协同轨道：
 
-* **自适应并发度**：默认并发数为 `os.cpus().length`，支持通过 CLI 参数 `--workers` 或配置文件自由调控。
-* **分块流式派发（Chunked Batching）**：主调度器根据文件大小与 AST 复杂度动态计算加权批次，避免 Worker 饥饿或单核过载。
-* **Native 模块按需懒装载**：Worker 线程内部对重型 Native 解析库（`oxc-parser`、`tree-sitter`）执行延迟装载，降低基础内存占用。
+| 轨道名称 | 目标延迟 | 核心处理构件 | 职责与升级机制 |
+| :--- | :---: | :--- | :--- |
+| **快速切片轨 (Fast Track)** | `< 10 ms` | `ASTSliceExtractor` + `SparseMoEGateRouter` | 提取受修改行影响的最小 AST 语法包围盒，仅激活与变更特征匹配的局部专家分析器，立即向 Agent 返回内环反馈 |
+| **深度全图轨 (Deep Track)** | `50 ~ 300 ms` | `SemanticGraph` + `CallGraph` + `ModuleDependencyGraph` | 执行跨文件循环依赖检测（`runCyclePass`）、逆向调用冲击半径追踪与全仓数据流污点传播 |
+| **升级通道 (`EscalationChannel`)** | 异步实时 | `src/core/pipeline/escalationChannel.ts` | 当快速轨发现导出签名破坏性变更（`GOV-SLC-001`）或高危安全特征时，立即提升至深度轨并触发 Praxis `L3A` 仲裁告警 |
 
----
+### 2.3 Sparse MoE 变更熵密稀疏路由 (`SparseMoEGateRouter`)
 
-## 4. 内存自愈与稳定性保障 (RSS Self-Healing)
+位于 `src/core/router/sparseMoEGate.ts` 的混合专家门控路由器根据文件角色（`file-role-inference.ts`）、项目原型（`detectProjectArchetype`）以及变更熵密度（Change Entropy Density, CED），动态计算本次扫描需激活的分析器子集：
 
-在大规模项目（成千上万文件）持续扫描或长周期守护进程运行场景下，V8 堆内存容易出现碎片化膨胀。系统内置严格的内存自愈契约：
-
-* **常驻内存监控**：主进程周期性采样 RSS（Resident Set Size）；
-* **自动驱逐与回收**：当 RSS 超过配置的安全阈值（默认 512MB）时，系统自动释放空闲 Worker 进程池并清空 AST 子树缓存，主动触发强制垃圾回收，杜绝进程 OOM。
+- **始终在线核心基座（Always-On Safety Core）**：`security`、`secrets`、`governance`、`hygiene` 等安全与底线分析器恒定激活。
+- **条件激活领域专家（Conditional Domain Experts）**：仅当切片包含特定语法特征（如异步 I/O、SQL/ORM 查询、测试断言、GDScript 节点生命周期、VS Code `package.json` 贡献点）时，才按需唤醒 `data-architecture`、`test-modernity`、`gdscript-game`、`vscode-extension` 等领域专家。
+- **路由效率指标**：在典型增量修改场景下，无关分析器绕过率（`bypassRatio`）稳定达到 **$\ge 70\%$**，且保证与全量分析器开启时的有效违规集合零漏报。
 
 ---
 
-## 5. 跨模块治理与演化感知
+## 3. 规模自适应调优与负载总督 (`ScaleTuner` & `LoadGovernor`)
 
-系统深度整合 Praxis 与智能体工程规范：
-* **多 Agent 协同治理 (`GOV-AGN-001`)**：检测多智能体并发改动造成的循环依赖、分层倒置或公共契约漂移；
-* **AST 切片增量自审 (`GOV-SLC-001`)**：毫秒级捕获破坏性函数签名漂移与副作用扩散；
-* **重构轨迹配方学习 (`GOV-TRJ-001`)**：追踪 Bad $\to$ Good 演进轨迹，拦截循环修改震荡与反模式复燃。
+1. **项目画像与成熟度识别 (`src/core/profiler/projectProfiler.ts`)**：自动探测仓库规模等级（`micro` / `small` / `medium` / `large` / `monolith`）、成熟度层级（`demo` / `prototype` / `production` / `industrial`）及工程原型（CLI、Web 前端、游戏引擎、系统库等）。
+2. **弹性复杂度预算矩阵 (`src/core/intelligence/elastic-budget-matrix.ts`)**：结合文件语义角色（如核心算法内核、状态机派发表、声明式配置表、测试夹具），动态分配圈复杂度（CC）与文件有效行数（Effective LOC）预算，避免对合理算法模块产生机械式误报。
+3. **RSS 内存水位与并发限流 (`src/core/profiler/loadGovernor.ts`)**：实时监控工作线程池（`WorkerPool`）队列深度与进程 RSS 内存占用，超阈值时自动回收冷 AST 缓存并收缩并发度，杜绝 OOM 崩溃。
+
+---
+
+## 4. 关联文档导航
+
+- [02. 两级增量缓存与配置指纹拓扑](./02-pipeline-and-caching.md)
+- [03. 跨平台守护进程与 NDJSON IPC 协议](./03-daemon-and-ipc.md)
+- [04. 分形 Git 工作树与多级门禁回滚规范](./04-praxis-git-fractal-and-gating-spec.md)
+- [05. Rust N-API 原生加速内核与双轨等价桥](./05-rust-native-operator-kernel.md)

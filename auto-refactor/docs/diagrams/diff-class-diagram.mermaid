@@ -1,77 +1,42 @@
 classDiagram
-    class EditRange {
-        +number startLine
-        +number oldEndLine
-        +number newEndLine
-        +number startByte
-        +number oldEndByte
-        +number newEndByte
+    class IPraxisDiffGovernanceService {
+        <<interface>>
+        +reviewDiff(input, options) Promise~PraxisDiffGovernanceResult~
+        +enrichHunks(filePath, hunks, graph) ReviewDiffHunk[]
+        +createHooks(graph) PraxisPluginHooks
     }
 
-    class DiffInput_Full {
-        +string kind = "full"
-        +string filePath
-        +string oldContent
-        +string newContent
-        +string oldContentHash
-        +string newContentHash
+    class IPraxisSliceAuditService {
+        <<interface>>
+        +auditSlice(input, callGraph) Promise~PraxisSliceAuditVerdict~
+        +auditAgentSlice(input, callGraph) Promise~CompactAgentPrompt~
+        +traceCallImpact(file, symbol, breaking, graph) CallChainImpactResult
     }
 
-    class DiffInput_Ranges {
-        +string kind = "ranges"
-        +string filePath
-        +string newContent
-        +EditRange[] editRanges
-        +string oldContent
-        +string oldContentHash
-        +string newContentHash
+    class IPraxisMultiAgentGovernanceService {
+        <<interface>>
+        +reviewMultiAgentPatches(patches, options) Promise~PraxisMultiAgentGovernanceResult~
+        +detectAgentCollisions(patches, baseEdges) AgentCollision[]
+        +arbitrateCompetingPatches(patches) PatchArbitrationCandidate[]
     }
 
-    class DiffStats {
-        +number diffFiles
-        +number diffIgnored
-        +number byteEqual
-        +number diffIncremental
-        +number diffFull
-        +number rangesProvided
-        +number rangesFallback
-        +number oldContentFromDaemon
+    class IPraxisTrajectoryLearningService {
+        <<interface>>
+        +learnFromTrajectory(input) Promise~PraxisTrajectoryVerdict~
+        +detectRegressions(filePath, revisions) Issue[]
+        +matchRecipes(code, language) RefactoringRecipe[]
     }
 
-    class ResolvedDiff {
-        +string mode
-        +EditRange[] edits
-        +string oldContent
-        +string newContent
+    class FeedbackAdaptiveSupervisor {
+        +recordIncident(record) AdaptiveEvolutionStep
+        +saveSnapshot(filePath) void
+        +loadSnapshot(filePath) GovernanceLedgerSnapshot
     }
 
-    class diff_routeDiff {
-        +resolveDiff(input, state) ResolvedDiff
-        +normalizeEditRanges(ranges) EditRange[]
-        +validateEditRanges(ranges) boolean
+    class PraxisRollbackEngine {
+        +recordCardHunk(cardId, filePath, content, hunk) void
+        +revertCard(cardId) CardRollbackResult
     }
 
-    class Scanner {
-        +scanWithDiff(opts) Promise
-        +scanWithCache(opts) Promise
-    }
-
-    class DaemonClient {
-        +scanDiff(diffs, options) Promise
-        +scan(config, options) Promise
-    }
-
-    class handleScanDiff {
-        +handleScanDiff(ctx, config, diffs, options) Promise
-    }
-
-    DiffInput_Full ..> EditRange
-    DiffInput_Ranges ..> EditRange
-    ResolvedDiff ..> EditRange
-    diff_routeDiff ..> ResolvedDiff
-    diff_routeDiff ..> EditRange
-    Scanner ..> diff_routeDiff : 调用
-    Scanner ..> ResolvedDiff
-    handleScanDiff ..> Scanner : 装配 session/pools/cache + diffHints
-    DaemonClient ..> handleScanDiff : scan_diff 消息
-    DaemonClient ..> DiffStats : 返回
+    IPraxisDiffGovernanceService ..> PraxisRollbackEngine : coordinates rollback
+    IPraxisSliceAuditService ..> IPraxisDiffGovernanceService : escalates L3A

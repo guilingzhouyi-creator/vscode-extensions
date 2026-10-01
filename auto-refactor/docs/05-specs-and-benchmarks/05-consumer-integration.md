@@ -1,89 +1,57 @@
-# 消费方接入规范（Consumer Integration）
+# 05. 外部工程接入与基线棘轮指南
 
-> **用途**：把本引擎接入任意语言/项目时，项目侧**只**需要三样东西——一份配置、一个 runner 调用、一条基线；引擎仓库保持项目无关。
-> **随仓库提供**：[`templates/consumer/run.mjs`](../../templates/consumer/run.mjs)（通用 runner）、[`templates/consumer/config.template.json`](../../templates/consumer/config.template.json)（配置模板）、语言级预设 [`presets/`](../../presets)。
-> **中立性判据**：新接入第 N 个语言/项目时，引擎仓库零改动（`npm test` 的 `validate-project-neutrality` 强制）。
+> **所属层级**：L5 规范、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)  
+> **对应代码真源**：`src/core/reporting/reportFinalizer.ts`、`scripts/gate-self.js`、`scripts/validate-baseline-ratchet.js`、`scripts/validate-consumer-runner.js`
 
 ---
 
-## 1. 快速开始
+## 1. 存量工程无痛接入：基线棘轮机制 (Baseline Ratchet v1.2.0)
+
+存量大型项目在首次引入 243 条规则时，往往存在数百至数千条历史存量警告。若直接开启全量阻断会导致 CI 瘫痪；若完全关闭规则又会导致新代码继续腐化。`auto-refactor` 通过 **单向收紧基线棘轮（Monotonic Downward Ratchet）** 完美解决该矛盾：
+
+### 1.1 棘轮信用消耗语义 (`baseline.json` 1.2.0)
+
+棘轮将 `baseline.json` 中的每一条历史记录视为**一张不可跨级透支的信用额度（Credit）**：
+
+| 对比情形 | 门禁判定结果 | 判定依据 |
+| :--- | :---: | :--- |
+| 某「分析器\|规则\|文件」存量记录为 $N$ 次，本次扫描出现 $N+1$ 次 | **阻断 (`newBlocking`)** | 前 $N$ 次消耗历史信用，第 $N+1$ 次无信用可用，精确识别为本次提交新增违规 |
+| 同一行已有 1 条违规，本次在同一行又新增 1 条同规则违规 | **阻断 (`newBlocking`)** | 1.2.0 基线按严重度直方图记录重数（Multiplicity），不再因行号相同而漏放 |
+| 历史 `warning` 级发现因文件继续膨胀越过 `fileLinesFail` 升级为 `error` | **阻断 (`newBlocking`)** | 低严重度信用严禁抵扣高严重度违规 |
+| 历史违规被修复，当前数量为 $N-1$ 次 | **通过 (PASS)** | 存量真实下降，可通过 `baselineRatchetDown: true` 自动收紧基线水位 |
+
+---
+
+## 2. 工作区兄弟项目联动接入范式
+
+### 2.1 `workspace-timing/`（VS Code 扩展 L0~L5 六层门禁联动）
+
+- 接入方式：通过 `workspace-timing/scripts/` 调用 `auto-refactor` 扫描 `src/**/*.ts`；
+- 核心启用分析器：`secrets`（L0 密钥扫描）、`dependency-graph`（`cycles` 循环依赖与 `unused-export` 无用导出检测）、`architecture`（五层单向依赖守护 `UI -> Engine -> Storage -> Analytics -> Shared`）以及 `governance`。
+
+### 2.2 `WebGames/`（Godot 4.7 GDScript 引擎接入）
+
+- 接入方式：识别 `.gd` 与 `config/**/*.json`；
+- 核心启用分析器：`gdscript-modern`、`gdscript-game`（强制循环内零瞬态堆分配 `GME-PRF-001`、对象池 `reset_state()` 契约与前端仅经 `apply_snapshot()` 渲染边界）。
+
+---
+
+## 3. 标准 CI 集成命令模板
 
 ```bash
-# ① 部署项目侧目录
-mkdir -p <project>/.auto-refactor
-cp <engine>/templates/consumer/config.template.json <project>/.auto-refactor/config.json
-# ② 编辑 include / exclude / thresholds / analyzers（层映射与注释门禁按项目政策决定）
-# ③ 冻结基线（可先只读跑一遍看量）
-node <engine>/templates/consumer/run.mjs --root <project> --update-baseline
-# ④ 日常执行：只对「新增」发现阻断
-node <engine>/templates/consumer/run.mjs --root <project> --fail-on-severity warning
+# 1. 日常增量 PR 门禁：对比 baseline.json，仅当出现新增 error 时阻断 (Exit 1)
+npx auto-refactor scan --config auto-refactor.config.json --baseline baseline.json --fail-on-issue
+
+# 2. 导出 GitHub Code Scanning 标准 SARIF 2.1.0 报告
+npx auto-refactor scan --format sarif --out sarif/auto-refactor.sarif
+
+# 3. 存量历史债务清理后，单向收紧更新基线（严禁未经 --force-expand 扩大基线）
+npx auto-refactor scan --update-baseline baseline.json --baseline-ratchet-down
 ```
 
-引擎定位顺序：`--engine <dir>` → `$AUTO_REFACTOR_ENGINE` → 从项目根逐级向上查找 `package.json` 名为 `auto-refactor` 的目录。
+---
 
-## 2. 退出码契约
+## 4. 关联文档导航
 
-| 退出码 | 含义 | 触发条件 |
-| ---: | :--- | :--- |
-| **0** | 通过 | 无达到阈值的发现；有基线时仅比较**新增**发现 |
-| **1** | 阻断 | 存在达到 `--fail-on-severity`（默认 `warning`）的发现 |
-| **2** | 用法/环境错误 | 配置缺失、engine 未构建、参数非法、阈值双处声明不一致 |
-
-> `--report-only` 下不会出现 1：引擎不再按阈值退出，消费方读取报告自行裁决。
-
-> **fail-closed**：engine 缺失默认退出 2——"没跑"绝不能等于"通过"。仅当工具确实可选时才用 `--allow-missing-engine` 显式降级。
-
-**两个逃生阀**（供已有自研桥接的项目按需使用）：
-
-- `--report-only`：不向引擎传 `--fail-on-severity`，退出码只反映引擎故障（0/2），裁决交给消费方——适用于把发现映射进自有信封、由自己判定阻断的项目。
-- `--engine-arg <arg>`（可重复，亦支持 `--engine-arg=value`）：把引擎 CLI 原生参数原样透传（如 `--engine-arg --analyzers --engine-arg "complexity,constants"`），消费方无需为本 runner 未建模的开关等待升级。
-
-## 3. 基线棘轮（Ratchet）
-
-- 基线文件默认 `<project>/.auto-refactor/baseline.json`，粒度默认 `grouped`（`analyzer|rule|file` 计数），对行号漂移容忍、对**新增**敏感。
-- 刷新基线：`--update-baseline`（**必须走评审**：基线变大等于接受新债务）。
-- 只收紧不放宽：存量收敛后同步刷新基线，避免历史发现长期占用额度。
-
-## 4. 阈值单一来源
-
-阈值优先声明在 `analyzers.*.options`（生效位置）。若项目同时在全局 `thresholds` 与 `options` 声明同名键，runner 的 `--check-threshold-parity` 会在扫描前拒绝**取值不一致**的双处声明，防止口径漂移。
-
-## 5. CI 集成
-
-引擎与项目不在同一仓库时，CI 需要同时检出两者（私有仓库用 PAT/App token）：
-
-```yaml
-  auto-refactor:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout target project repository
-        uses: actions/checkout@v4
-        with: { path: project }
-      - name: Checkout auto-refactor engine repository
-        uses: actions/checkout@v4.2.2
-        with:
-          repository: <org>/vscode-extensions
-          path: engine
-          token: ${{ secrets.ENGINE_CHECKOUT_TOKEN }}
-      - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - run: npm ci && npm run build
-        working-directory: engine/auto-refactor
-      - run: node engine/auto-refactor/templates/consumer/run.mjs --root project --fail-on-severity warning
-```
-
-工作区风格（多仓同机）可省去第二次 checkout，直接用相对路径 `--engine ../vscode-extensions/auto-refactor`。
-
-## 6. 与自研桥接脚本的关系
-
-项目已自建桥接（如在扫描前后做 SARIF 上传、徽章、报告渲染）时，**保留项目特有部分**，把「定位引擎 + 组装参数 + 基线 + 退出码映射」交给本 runner：典型退化是自研脚本只做 `spawnSync(node, [runner, ...])` 再消费 `report.json`。这样引擎升级时，只有 runner 需要跟进。
-
-## 7. 常见反模式
-
-| 反模式 | 后果 | 正确做法 |
-| :--- | :--- | :--- |
-| 语言包默认关闭却当作已审查 | 把「没跑」读成「零违规」 | 看 `summary.disabledAnalyzers` 与 `analyzer coverage:` 提示，或直接启用该语言包 |
-| 无基线直接用 `--fail-on-issue` | 存量债务导致 CI 永远红 | 先冻结基线，再按新增阻断 |
-| suppression 不带 reason | 豁免变成静默丢弃 | `reason` 必填，说明项目政策依据 |
-| 阈值在全局与 options 双处声明 | 生效值随合并顺序漂移 | 单一来源 + `--check-threshold-parity` |
-| 缺 engine 时静默跳过 | 门禁形同虚设 | 默认 fail-closed；确需可选才 `--allow-missing-engine` |
+- [01. 配置模式与多格式报告契约](./01-config-and-reports.md)
+- [06. 多语言现代化规则包与常量单源治理](./06-modernization-program.md)

@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790599425279",
-  "timestamp": "2026-09-28T12:43:49.630Z",
+  "snapshotId": "snapshot-v0.4.0-1790830838479",
+  "timestamp": "2026-10-01T05:00:42.876Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,30 +8,30 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "0c4322224e9071a16d49340e5cda2236cd4a824ad27087090e7a2c5c21406e31",
+  "rulesDigest": "4bca30ea588a32260bba0927f5a52fd5c5794074c048dbd4adca0946cbe0a48f",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 530,
-    "durationMs": 4012
+    "filesScanned": 538,
+    "durationMs": 4078
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
-    "effectiveCodeDensity": 0.95,
-    "totalIssues": 10011,
-    "suppressedIssues": 5662,
-    "unsuppressedIssues": 4349,
+    "effectiveCodeDensity": 0.96,
+    "totalIssues": 10587,
+    "suppressedIssues": 5970,
+    "unsuppressedIssues": 4617,
     "bySeverity": {
-      "info": 397,
-      "warning": 9614,
+      "info": 415,
+      "warning": 10172,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 63,
-      "medium": 9302,
-      "low": 646
+      "high": 67,
+      "medium": 9806,
+      "low": 714
     }
   },
   "eightPillars": {
@@ -60,9 +60,18 @@
   },
   "topHotspots": [
     {
+      "filePath": "src/core/trajectory/recipeExtractor.ts",
+      "domain": "trajectory",
+      "totalIssues": 159,
+      "criticalCount": 0,
+      "highCount": 1,
+      "compositeScore": 99.6,
+      "effectiveDensity": 0.97
+    },
+    {
       "filePath": "scripts/test-parallel.js",
       "domain": "scripts",
-      "totalIssues": 155,
+      "totalIssues": 157,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -114,6 +123,24 @@
       "effectiveDensity": 0.98
     },
     {
+      "filePath": "scripts/validate-frontend-architecture-governance.js",
+      "domain": "scripts",
+      "totalIssues": 135,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.92
+    },
+    {
+      "filePath": "scripts/validate-trajectory-learning.js",
+      "domain": "scripts",
+      "totalIssues": 132,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.97
+    },
+    {
       "filePath": "scripts/validate-multi-agent.js",
       "domain": "scripts",
       "totalIssues": 130,
@@ -121,41 +148,14 @@
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.96
-    },
-    {
-      "filePath": "scripts/bench-fastpath.js",
-      "domain": "scripts",
-      "totalIssues": 116,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.96
-    },
-    {
-      "filePath": "scripts/validate-native-operator.js",
-      "domain": "scripts",
-      "totalIssues": 98,
-      "criticalCount": 0,
-      "highCount": 1,
-      "compositeScore": 99.6,
-      "effectiveDensity": 0.96
-    },
-    {
-      "filePath": "scripts/validate-generalized.js",
-      "domain": "scripts",
-      "totalIssues": 84,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.98
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 63,
-      "medium": 9302,
-      "low": 646
+      "high": 67,
+      "medium": 9806,
+      "low": 714
     },
     "criticalItems": [],
     "highItems": [
@@ -196,6 +196,24 @@
         "message": "Function \"main\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
+        "id": "complexity:high-complexity:scripts/validate-scoring-coverage.js:358",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-scoring-coverage.js",
+        "line": 358,
+        "message": "Function \"checkCoverageModel\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:186",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-self-multidimensional-audit.js",
+        "line": 186,
+        "message": "Function \"auditBoundaryInteroperability\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
         "id": "complexity:high-complexity:src/analyzers/constants.ts:552",
         "rule": "high-complexity",
         "tier": "high",
@@ -221,6 +239,15 @@
         "file": "src/analyzers/naming-path-helper.ts",
         "line": 100,
         "message": "Function \"auditFileName\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/cli/cli-parser.ts:338",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/cli/cli-parser.ts",
+        "line": 338,
+        "message": "Function \"parseArgs\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/architecture/naming-decoupling-auditor.ts:184",
@@ -581,33 +608,6 @@
         "file": "src/core/profiler/maturityClassifier.ts",
         "line": 179,
         "message": "Unbounded control-flow nesting: function 'detectMaturityTier' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/reporters.ts:74",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/reporters.ts",
-        "line": 74,
-        "message": "Function \"toText\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/router/sparseRuleRouter.ts:309",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/router/sparseRuleRouter.ts",
-        "line": 309,
-        "message": "Function \"routeDiffToAnalyzers\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/rules/evolution/silentExceptionRule.ts:124",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/rules/evolution/silentExceptionRule.ts",
-        "line": 124,
-        "message": "Function \"checkPythonSilentExceptions\" has cyclomatic complexity 14 (threshold 12)."
       }
     ]
   },
@@ -618,7 +618,7 @@
         "compositeScore": 100,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.9,
+          "maintainability": 99.8,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -660,10 +660,10 @@
       },
       {
         "domainName": "cli",
-        "compositeScore": 100,
+        "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 100,
+          "maintainability": 99,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1158,7 +1158,7 @@
         "compositeScore": 100,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.6,
+          "maintainability": 99.7,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -1230,10 +1230,10 @@
       },
       {
         "domainName": "trajectory",
-        "compositeScore": 100,
+        "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.8,
+          "maintainability": 99.5,
           "performance": 100,
           "data": 100,
           "testing": 100,

@@ -1,249 +1,74 @@
-# Praxis 分形 Git 门禁工作树、三层联动回滚与智能体生命周期技术规范
-## (Praxis Fractal Git Worktree, 3-Tier Rollback & Agent Lifecycle Specification)
+# 04. 分形 Git 工作树与多级门禁回滚规范
 
-> **对齐需求**：`1.md` §4.1, §4.2, §4.2补充, §4.3补充  
-> **文档性质**：系统设计与工程实施技术白皮书 (System Design & Implementation Spec)  
-> **适用模块**：Praxis 调度核心 (Praxis Kernel)、Git 协调引擎 (Git Coordinator)、Diff 底座 (Diff Substrate)  
-> **版本**：v1.0.0-PROD-SPEC
+> **所属层级**：L1 核心架构与原生内核 (`docs/01-architecture/`)  
+> **对应代码真源**：`src/core/rollback.ts`、`src/core/praxis/contracts.ts`、`src/core/praxis/diffGovernance.ts`、`src/core/ring-buffer.ts`
 
 ---
 
-## 📑 核心规范全景目录
+## 1. 分形 Git 工作树拓扑 (Fractal Git Worktree Topology)
 
-1. [分形 Git 工作树与分支拓扑体系 (Fractal Git Topology)](#1-分形-git-工作树与分支拓扑体系-fractal-git-topology)
-2. [两道门禁与有序协调提交队列 (Dual-Gate & Ordered Queue)](#2-两道门禁与有序协调提交队列-dual-gate--ordered-queue)
-3. [卡级-检查点-Diff 三层联动回滚架构 (3-Tier Rollback Matrix)](#3-卡级-检查点-diff-三层联动回滚架构-3-tier-rollback-matrix)
-4. [跨文件夹内容重叠与功能重复检测系统 (Overlap Detection)](#4-跨文件夹内容重叠与功能重复检测系统-overlap-detection)
-5. [SubAgent 委托管理与工作树生命周期回收协议 (Lifecycle & GC)](#5-subagent-委托管理与工作树生命周期回收协议-lifecycle--gc)
-6. [旁路监控规则引擎与配置文件 Schema (Bypass Monitor & Config)](#6-旁路监控规则引擎与配置文件-schema-bypass-monitor--config)
+在 Praxis 多智能体协作体系中，代码演进不再是单一线性分支，而是呈**分形树状拓扑（Fractal Branching）**：主干分支（`Trunk`）向下派生功能单元分支（`Cell Branch`），每个单元分支再向并发执行的智能体派生沙箱任务卡工作树（`TaskCard Worktree`）。
 
----
+```mermaid
+flowchart TD
+    TRUNK["主干稳定分支 (Trunk / Main)<br/>三平面质量分 >= 85 | Error = 0"]
+    CELL_A["单元集成分支 (Cell-Alpha)<br/>L2 多 Agent 协同仲裁门禁"]
+    CELL_B["单元集成分支 (Cell-Beta)<br/>L2 多 Agent 协同仲裁门禁"]
+    CARD_1["Agent-1 工作树 (Card-101)<br/>L1 <10ms 切片自审门禁"]
+    CARD_2["Agent-2 工作树 (Card-102)<br/>L1 <10ms 切片自审门禁"]
+    L3A["L3A 首席架构仲裁通道<br/>(跨模块破坏性变更 / 循环依赖裁决)"]
 
-## 1. 分形 Git 工作树与分支拓扑体系 (Fractal Git Topology)
-
-对齐 `1.md §4.2` 与 `§4.2补充`：摒弃传统单主干争抢模式，采用 **4 层分形分支与物理隔离工作树（Worktree）拓扑**：
-
-```
-                    ┌── Layer 0: 系统主干 (System main) ─────────────────────┐
-                    │ (永远常驻，仅接受 Cell 主分支合入)                     │
-                    └─── (Gate 2: 待主干合入) ──┬────────────────────────────┘
-                                                ▼
-                    ┌── Layer 1: Cell 主工作树 (cell/{cellId}/main) ─────────┐
-                    │ (Cell 内主分支，常驻直到 Cell 任务全清)                │
-                    └─── (Gate 1: 待 Cell 合入) ┬────────────────────────────┘
-                                                ▼
-                    ┌── Layer 2: Agent 平权工作树 (cell/{c}/agent/{aId}) ────┐
-                    │ (生命周期 = 1 张 TaskCard，合入 Cell 主树后回收)       │
-                    └─── (父 Agent 审查 Diff) ──┬────────────────────────────┘
-                                                ▼
-                    ┌── Layer 3: SubAgent 委托树 (cell/{c}/sub/{taskId}) ────┐
-                    │ (极速生命周期 = 1 个委托任务，合入父 Agent 后即回收)   │
-                    └────────────────────────────────────────────────────────┘
-```
-
-### 1.1 Git Ref 命名空间规范
-* **系统主干**：`refs/heads/main`
-* **Cell 主工作树**：`refs/heads/cell/{cellId}/main`
-* **Agent 隔离分支**：`refs/heads/cell/{cellId}/agent/{agentUid}`
-* **SubAgent 委托分支**：`refs/heads/cell/{cellId}/sub/{parentAgentUid}/{subTaskId}`
-
-### 1.2 磁盘物理 Worktree 隔离布局
-每个活跃的 Agent / SubAgent 在独立工作区运行，防止文件写入锁冲突：
-```
-.praxis/worktrees/
-├── cell-01/
-│   ├── main/                    # Cell 01 主工作树 (常驻)
-│   ├── agent-arch/              # 架构 Agent 工作树 (绑定卡片生命周期)
-│   ├── agent-coder/             # 编码 Agent 工作树
-│   └── sub-task-9021/           # SubAgent 委托工作树 (任务完成即物理销毁)
-└── cell-02/
-    └── main/
+    TRUNK --> CELL_A
+    TRUNK --> CELL_B
+    CELL_A --> CARD_1
+    CELL_A --> CARD_2
+    CARD_1 -. "shouldEscalateToL3A = true" .-> L3A
+    CARD_2 -. "GOV-AGN-001 跨卡冲突" .-> L3A
+    L3A ==> CELL_A
 ```
 
 ---
 
-## 2. 两道门禁与有序协调提交队列 (Dual-Gate & Ordered Queue)
+## 2. 三级递进门禁体系 (L1 / L2 / L3A Gating)
 
-对齐 `1.md §4.2`：严格禁止 Agent 自由并发强推 Git，所有变更必须通过 **两道门禁 + 有序协调队列**。
-
-### 2.1 门禁流水线流程图
-```
-  [Agent 提交申请] 
-         │
-         ▼
-  【第一道门禁: Cell 内合入门禁 (Gate 1)】
-  ├── 1. 身份与范围核验: 检查修改文件是否超出 Agent 的所属部门/角色白名单
-  ├── 2. 旁路关键词命中: 检查代码及 Commit 是否命中阻断违规规则
-  ├── 3. 提交频率限制: 限制单个 Agent 单位时间最大 Commit 频次
-  └── 4. SES 行级 Diff 审核: 跑 auto-refactor 定制 Diff，输出 ReviewDiffHunk
-         │
-         ├── ❌ 未通过 ──> 拒绝提交 + 消息总线报警 + 阻断 Agent Loop
-         └── ✅ 通过 ────> 入队 Cell 协调提交队列 (非破坏性 Fast-Forward 合入 Cell 主树)
-                                │
-                                ▼
-  【第二道门禁: 系统主干合入门禁 (Gate 2)】
-  ├── 1. 全局回归扫描: 调用 auto-refactor scanDiff(full) 确保 0 规则违规
-  ├── 2. 跨 Cell 冲突与重叠检测: 检查与其他 Cell 的公共接口冲突
-  └── 3. L3A / 人类决策批准: 必须由人类或 L3A 决策层签署数字证书
-         │
-         ├── ❌ 未通过 ──> 触发卡级回滚或退回 Cell 重构
-         └── ✅ 通过 ────> 合入系统主干 main
-```
-
-### 2.2 有序协调提交队列 (Ordered Coordination Queue) 状态机
-为了防止多个 Agent 同时合入 Cell 主分支造成锁竞争或交叉覆盖，每个 Cell 内置 FIFO 协调队列：
-```typescript
-export interface ICellCommitQueue {
-  enqueueCommit(request: {
-    cardId: string;
-    agentUid: string;
-    sourceBranch: string;
-    targetBranch: string;
-    hunks: ReviewDiffHunk[];
-  }): Promise<CommitQueueResult>;
-}
-```
-* **状态转移**：`PENDING -> AUDIT_GATE1 -> SERIALIZED_MERGE -> BROADCAST_BUS -> RELEASE_LOCK`。
-* **冲突防护**：合入前自动执行 `git merge-base` 检查；若主分支有更新，自动触发本地工作树 `rebase` 并重新过门禁，**杜绝破坏性强推（Force Push）**。
+| 门禁级别 | 触发时机与作用边界 | 核心执行服务 | 阻断判据与自动处置动作 |
+| :--- | :--- | :--- | :--- |
+| **L1 切片内环门禁** | Agent 在 `TaskCard` 沙箱内每次局部编辑保存时 | `PraxisSliceAuditService.auditSlice` | 耗时 `< 10ms`；若出现局部语法破损或未处理的 `error` 级违规，立即通过 CAPP 提示词要求当前 Agent 原地修正 |
+| **L2 单元合入仲裁门禁** | 多个 `TaskCard` 补丁申请合入 `Cell` 分支时 | `PraxisMultiAgentGovernanceService.reviewMultiAgentPatches` | 检测并发补丁冲突、重复开发重叠率与跨 Agent 循环依赖（`GOV-AGN-001`）；未通过者置为 `rework_needed` |
+| **L3A 首席架构升级门禁** | 变更跨越模块边界、修改公共导出签名或单 Hunk 膨胀超阈值时 | `PraxisDiffGovernanceService` + `IPraxisThresholdPolicy` | 当 `verdict.shouldEscalateToL3A === true` 或触发 `GOV-SLC-001`（下游调用链破坏）时，挂起自动合入并转交 L3A 架构师/高阶智能体终审 |
 
 ---
 
-## 3. 卡级-检查点-Diff 三层联动回滚架构 (3-Tier Rollback Matrix)
+## 3. 三级联动原子回滚规范 (`PraxisRollbackEngine`)
 
-对齐 `1.md §4.1`：支持从 **微观代码行** 到 **整张任务卡** 再到 **全局依赖 DAG** 的三层递进回滚机制：
+当某个已合入 `Cell` 分支的补丁在后续集成测试或动态遥测中触发故障时，`src/core/rollback.ts` 提供无需暴力重置整条分支的三级精准手术刀回滚：
 
-| 回滚层级 | 触发场景 | 底层执行机理 |
-| :--- | :--- | :--- |
-| **Level 1: 行/块微观回滚** | 人类/Agent 仅想撤销某个特定函数或几行有问题的改动 | 调用 `revertDiffHunk(hunk)`，原生逆序重排并对冲字节补丁 |
-| **Level 2: 卡级原子回滚** | 某张 TaskCard 审查被拒，需要撤销该卡涉及的全部文件 | 调用 `revertTaskCard(cardId)`，跨文件搜集全部归属 Hunk，一次性原子撤销 |
-| **Level 3: 级联依赖回滚** | 架构重构失败，需要联动撤销所有下游依赖卡与会话检查点 | 沿 `dependencyGraph` 与卡片前导/后导关系，拓扑逆序批量执行 Level 2，还原会话快照 |
+### 3.1 Level 1：Hunk 级原子反转 (`revertDiffHunk`)
 
-### 3.1 级联依赖回滚算法伪代码
-```typescript
-export async function cascadeRollback(
-  targetCardId: string,
-  cardDependencyGraph: Map<string, string[]>, // cardId -> downstreamCardIds
-  rollbackEngine: PraxisRollbackEngine
-): Promise<RollbackReport> {
-  // 1. 获取所有受牵连的后导卡（拓扑排序）
-  const affectedCards = getDownstreamCards(targetCardId, cardDependencyGraph);
-  const rollbackOrder = [targetCardId, ...affectedCards].reverse();
+- **原理**：针对指定文件的单个 `ReviewDiffHunk`，将 `lines` 中的 `'insert'` 与 `'delete'` 操作精确互换，校验上下文锚点行（`'context'`）一致后原地生成还原文本。
+- **适用场景**：单函数微调引入局部逻辑回归，其余同文件修改仍需保留。
 
-  // 2. 逆序依次执行卡级原子回滚
-  for (const cardId of rollbackOrder) {
-    const res = await rollbackEngine.revertTaskCard(cardId, fsReader);
-    if (!res.success) throw new Error(`Rollback failed at card: ${cardId}`);
-  }
+### 3.2 Level 2：TaskCard 级跨文件逆序撤回 (`revertTaskCard`)
 
-  // 3. 恢复会话检查点与工作树重置
-  return { success: true, rolledBackCards: rollbackOrder };
-}
-```
+- **原理**：`PraxisRollbackEngine` 维护每张 `cardId` 写入的所有文件与 Hunk 序列；执行 `revertCard(cardId)` 时，严格按照 **后进先出（LIFO / 逆行号偏移）** 顺序逐一逆转该任务卡涉及的全部文件 Hunk，保证行号坐标零漂移。
+- **返回契约**：返回 `{ success, restoredContents: Map<filePath, content>, rolledBackHunkIds }`。
+
+### 3.3 Level 3：依赖闭包级联撤回 (`parentCardIds` Cascading Rollback)
+
+- **原理**：根据 `PraxisCardContext.parentCardIds` 构建任务卡依赖有向图；当父卡 `Card-A` 被撤回时，自动遍历所有直接或间接依赖 `Card-A` 导出符号的子卡集合 `{Card-B, Card-C}`，按逆拓扑序一并执行原子回滚并归档关联 `checkpointId`。
 
 ---
 
-## 4. 跨文件夹内容重叠与功能重复检测系统 (Overlap Detection)
+## 4. 环形缓冲与 R4 冷存淘汰联动 (`CircularDiffBuffer`)
 
-对齐 `1.md §4.1`（特别是 2+ 个 Cell 时跨文件夹文件内容重复判断）：
+在高频分形分支演进过程中，`src/core/ring-buffer.ts` 负责维护固定容量（`capacity`）的活跃 `ReviewDiffHunk` 环形窗口：
 
-### 4.1 双层重叠匹配引擎
-1. **第一层：AST 导出符号签名哈希比对 (Signature Exact Match)**：
-   * 提取所有文件导出的函数名、类名、入参签名生成 64 位 FNV-1a 哈希；若两个不同路径的文件包含相同的导出函数签名，直接判定为**功能重叠候选**。
-2. **第二层：SWAR 文本分块相似度 (Jaccard / MinHash on FastDiff)**：
-   * 对两个跨文件夹文件的行哈希集合计算 Jaccard 相似度；若相似度 $> 80\%$，提示“存在跨文件夹功能冗余，建议取优合并”。
+1. **热区零分配驻留**：最近产生的 $N$ 个 Hunk 驻留于内存环形数组，供人机审查面板毫秒级拉取。
+2. **R4 二进制紧凑归档**：当第 $N+1$ 个 Hunk 写入触发容量驱逐时，最旧的 Hunk 自动编码为 UTF-8 `Uint8Array` 二进制流并调用 `IPraxisHumanFaceStorage.evictToR4Archive(payload)`，换取 `archiveId` 存入回滚台账，实现内存占用恒定 $O(1)$ 且历史回滚链永不丢失。
 
 ---
 
-## 5. SubAgent 委托管理与工作树生命周期回收协议 (Lifecycle & GC)
+## 5. 关联文档导航
 
-对齐 `1.md §4.2补充` 与 `§4.3补充`：
-
-### 5.1 委托任务分类与分支生命周期状态机
-```
-  [父 Agent 发起委托]
-         │
-         ├── 探索委托 (Exploration) ──> 0 磁盘 Worktree，仅返回只读上下文/搜索结果
-         │
-         └── 改动委托 (Modification) ──> 动态建立 SubAgent 独立分支与工作树
-                                              │
-                                              ▼
-                                 【SubAgent 执行改动】
-                                              │
-                                              ▼
-                                 【父 Agent 审查 SubAgent Diff】
-                                              │
-                                 ├── ❌ 拒绝 ──> 物理销毁工作树 + 释放磁盘
-                                 └── ✅ 批准 ──> Fast-Forward 合入父 Agent 分支
-                                                      │
-                                                      ▼
-                                         【自动触发生命周期回收】
-                                         - 物理删除 `.praxis/worktrees/sub-xxx`
-                                         - 释放磁盘空间 (Disk Freed)
-                                         - 保留 `refs/tags/archive/sub-xxx` (可选留痕)
-```
-
-### 5.2 生命周期垃圾回收 (Worktree GC) 规则表
-| 工作树层级 | 常驻状态 | 生命周期起点 | 生命周期终点与回收触发条件 | 磁盘回收行为 |
-| :--- | :--- | :--- | :--- | :--- |
-| **System main** | **永久常驻** | 项目初始化 | 永不回收 | 不释放 |
-| **Cell main** | **Cell级常驻**| Cell 创建 | 整个 Cell 任务卡全部清空且合入 System main | 执行 `git worktree remove` 物理清理 |
-| **Agent 工作树** | **卡级临时** | TaskCard 派发 | 本卡改动合入 Cell main 且过门禁 | **合入即回收**，释放磁盘空间 |
-| **SubAgent 树** | **瞬态临时** | 委托任务下发 | 任务完成并合入父 Agent 分支 | **秒级回收**，物理目录直接清空 |
-
----
-
-## 6. 旁路监控规则引擎与配置文件 Schema (Bypass Monitor & Config)
-
-对齐设计规范：提供统一的 `.praxis/config.json`（示例配置文件）驱动配置：
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "PraxisGatingConfig",
-  "type": "object",
-  "properties": {
-    "gating": {
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean", "default": true },
-        "maxCommitsPerMinute": { "type": "number", "default": 30 },
-        "blockedKeywords": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": ["TODO_BYPASS_AUTH", "INTERNAL_FORCE_OVERRIDE", "DROP_DATABASE"]
-        },
-        "rolePathRestrictions": {
-          "type": "object",
-          "description": "Agent 身份允许修改的文件 Glob 路径",
-          "properties": {
-            "AGENT_FRONTEND": { "type": "array", "items": { "type": "string" }, "default": ["src/ui/**", "src/views/**"] },
-            "AGENT_BACKEND": { "type": "array", "items": { "type": "string" }, "default": ["src/core/**", "src/api/**"] }
-          }
-        }
-      }
-    },
-    "lifecycle": {
-      "type": "object",
-      "properties": {
-        "autoPruneSubAgentWorktree": { "type": "boolean", "default": true },
-        "autoPruneAgentWorktreeOnCardDone": { "type": "boolean", "default": true },
-        "retainGitArchiveTags": { "type": "boolean", "default": true }
-      }
-    },
-    "diffSubstrate": {
-      "type": "object",
-      "properties": {
-        "streamingMode": { "type": "string", "enum": ["full", "issues_only", "summary_only", "disabled"], "default": "full" },
-        "maxStreamEvents": { "type": "number", "default": 500 },
-        "enableRingBuffer": { "type": "boolean", "default": true }
-      }
-    }
-  }
-}
-```
-
----
-
-## 7. 交付对接总结
-
-上述规范已经与 `auto-refactor` 定制 Diff 系统中的 [`PraxisRollbackEngine`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/rollback.ts)、[`scanDiffStream`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/stream.ts)、[`ModuleDependencyGraph`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/dependencyGraph.ts) 以及 [`CircularDiffBuffer`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ringBuffer.ts) 进行了 100% 的数据模型与接口对齐。Praxis 团队可直接依照此标准进行调度层与 Git 门禁系统的无缝落地！
+- [01. Praxis 对接架构全景与五大 SPI 契约手册](../06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md)
+- [02. Praxis 六大核心治理服务门面 API 手册](../06-praxis-delivery/02-praxis-six-governance-services-api.md)

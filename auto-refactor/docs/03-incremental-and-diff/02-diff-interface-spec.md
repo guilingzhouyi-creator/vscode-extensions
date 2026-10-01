@@ -1,75 +1,50 @@
-# Diff 系统接口接入规格 (Diff Interface Integration Spec)
+# 02. 高性能差分算法栈与流式 Diff 规格
 
-> **所属模块**：`03-incremental-and-diff`  
-> **核心源码**：`src/core/diff.ts`, `src/core/utf8.ts`, `src/core/editDiff.ts`, `src/api.ts`  
-> **文档状态**：✅ **已落地实施 (Implemented & Verified)**
+> **所属层级**：L3 增量计算与向量化 Diff (`docs/03-incremental-and-diff/`)  
+> **对应代码真源**：`src/core/diff/edit-diff.ts`、`src/core/ast/swar.ts`、`src/core/stream.ts`、`crates/ops-diff/`
 
 ---
 
-## 1. 概览与核心 API 契约
+## 1. 四级向量化差分算法栈
 
-为了深度集成外部 Git 管道、CI 增量审查与编辑器实时保存，系统提供标准的 Diff 审查接口：
+为了同时满足微秒级局部编辑定界与万行级大文件精确重构比对，`src/core/diff/edit-diff.ts` 与 `crates/ops-diff/` 实现了四级自适应差分算子栈：
 
-```typescript
-// 1. 全量合成扫描接口（报告结果逐字节等价于全仓冷扫描）
-export async function scanDiff(
-  diffs: DiffInput[],
-  options?: ScanDiffOptions,
-): Promise<{ report: ScanReport; stats: DiffStats }>;
+| 算法层级 | 导出函数 (`src/api.ts`) | 时间复杂度 | 适用场景与核心加速原理 |
+| :--- | :--- | :---: | :--- |
+| **L0. SWAR 64-bit 行边界与哈希** | `computeLineStarts`<br/>`computeLineStartsAndHashes`<br/>`fnv1a32` / `hashLines` | $O(N / 8)$ | 利用 64 位寄存器字内并行（SIMD Within A Register）一次扫描 8 字节定位 `\n`，同步计算每行 32 位 FNV-1a 哈希，将字符串比较降维为 `Uint32Array` 整数比较 |
+| **L1. 前后缀剥离极速差分 (`fastDiff`)** | `fastDiff`<br/>`computeEditRanges` | $O(N)$ | 先通过 64 位步进剥离首尾完全相同的公共前缀（Common Prefix）与公共后缀（Common Suffix），对单点连续插入/删除直接以 $O(1)$ 确定变更区间 |
+| **L2. 64 位字并行 Myers (`myersDiff`)** | `myersDiff`<br/>`computeEditRangesWithOps` | $O\left(\lceil M/64 \rceil \cdot N\right)$ | 基于 Hyyrö / Myers Bit-Parallel 位向量并行算法与对角线贪婪搜索，在 `Uint32Array` 行哈希上求解最短编辑脚本（SES），较传统动态规划提速 **2.4x+** |
+| **L3. 低频锚点直方图差分 (`histogramDiff`)** | `histogramDiff`<br/>`computeDetailedHunks` | $O(N \log N)$ | 优先选取出现频次最低的唯一代码行（如函数签名、唯一声明）作为对齐锚点递归切分，彻底消除大段大括号 `{}` / 空行移动导致的错位面条式 Diff |
 
-// 2. 局部变更子集接口（仅返回发生修改的文件集诊断发现）
-export async function scanDiffDelta(
-  diffs: DiffInput[],
-  deltaOptions?: ScanDiffDeltaOptions,
-): Promise<{ report: DiffDeltaReport; stats: DiffStats }>;
+---
 
-// 3. 响应式事件推流接口（异步生成器按文件流式产出）
-export async function* scanDiffStream(
-  diffs: DiffInput[],
-  streamOptions?: ScanDiffStreamOptions,
-): AsyncGenerator<DiffStreamEvent, ScanReport, void>;
+## 2. 统一 Diff 输入契约 (`DiffInput`)
+
+`scanDiff`、`scanDiffDelta` 与 `scanDiffStream` 接受三种形态的增量输入载荷（定义于 `src/core/types.ts`）：
+
+1. **`kind: 'full'`（双文本内存对比）**：直接传入 `{ kind: 'full', filePath, oldContent, newContent }`（支持 `string` 或 `Uint8Array` Buffer 零拷贝传入），由引擎内部调用 `computeDetailedHunks` 实时计算差分。
+2. **`kind: 'ranges'`（已知编辑行区间）**：传入 `{ kind: 'ranges', filePath, newContent, editRanges }`，直接跳过差分计算进入子树复用与切片审查。
+3. **`kind: 'unified'`（标准 Unified Diff 补丁文本）**：传入 Git 标准 `@@ -a,b +c,d @@` 补丁文本，自动解析还原变更区间。
+
+---
+
+## 3. 响应式异步流式管道 (`scanDiffStream`)
+
+位于 `src/core/stream.ts` 的 `scanDiffStream(inputs, options)` 采用 `AsyncGenerator` 流式架构，使消费方无需等待全部文件扫描结束即可实时消费每一个审查完成的 Hunk：
+
+```ts
+export type DiffStreamEvent =
+    | { type: 'file_start'; filePath: string; timestamp: number }
+    | { type: 'hunk_ready'; filePath: string; hunk: ReviewDiffHunk; verdict: PraxisVerdict }
+    | { type: 'file_done'; filePath: string; hunkCount: number; durationMs: number }
+    | { type: 'stream_end'; totalFiles: number; totalHunks: number; totalMs: number };
 ```
 
-> **后处理管线契约**：增量入口共享同一套终态语义，由 `summary.postScanPasses` 显式声明：
->
-> | 入口 | suppressions | baseline 棘轮 | 依赖图分析（环 / 未使用导出） | `postScanPasses` 声明 |
-> | :--- | :---: | :---: | :---: | :--- |
-> | `scan()` / `scanWarm()` / CLI 全量 | ✅ | ✅ | ✅（开启相应规则时） | `['dependency-graph','suppressions','baseline']` |
-> | `scanDiff()` / `scanDiffDelta()` | ✅ | ✅ | ⛔ 增量范围自动跳过 | `['suppressions','baseline']` |
->
-> 增量口径必须跳过全仓跨文件通道，避免因局部文件缺失导致虚假成环。跳过事实会如实写入 `summary.warnings`。
+- **背压感知（Backpressure-Aware）**：基于 `for await (const ev of scanDiffStream(...))` 协议，当下游 UI 渲染或网络传输繁忙暂停拉取时，上游差分计算自动挂起让出事件循环，保证高并发下内存水位平稳。
 
 ---
 
-## 2. 联合输入模型 (`DiffInput`) 与 UTF-8 字节转码
+## 4. 关联文档导航
 
-```typescript
-export type DiffInput =
-  | {
-      kind: 'full';
-      filePath: string;
-      oldContent: string;
-      newContent: string | Buffer;
-    }
-  | {
-      kind: 'ranges';
-      filePath: string;
-      newContent: Buffer | string;
-      ranges: EditRange[]; // [startLine, endLine] 物理编辑区间
-    };
-```
-
-系统内部对 `newContent` 的 Buffer 输入进行无拷贝 UTF-8 快速校验，若输入已经是 UTF-8 字节切片，则直接借用指针，避免额外的字符串重复分配。
-
----
-
-## 3. 高性能差分算法：FastDiff 与 Bit-Parallel Myers (BPM)
-
-针对不同规模的编辑场景，系统在底层组合了多阶差分引擎：
-
-1. **FastDiff (哈希前缀/后缀收缩)**：
-   在 $O(N)$ 时间内剥离文件首尾完全相同的行，将实际比对区间缩小至极小的中间核心（Kernel）；
-2. **Bit-Parallel Myers (BPM) 64 位向量差分**：
-   对于 $\le 64$ 行的小规模局部突变，使用 64 位整型掩码并行模拟 Myers 编辑图的对角线探索，执行耗时仅 **17.8 微秒**，较传统 Myers 算法提速 **2.42x**；
-3. **Myers 线性空间回退**：
-   对于超大跨度修改，回退至经典 Myers 差分，保障绝对正确的最小编辑距离。
+- [01. 行级增量子树复用与 AST 切片提取](./01-line-level-incremental.md)
+- [03. Praxis 增量 Diff 管道与环形缓冲接入指南](./03-praxis-integration-guide.md)

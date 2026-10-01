@@ -1,131 +1,59 @@
-# 注释与文件头工业契约标准 (Comment & Header Standard) v1.0.0
+# 03. 工业级文件头与有效注释密度 (ECD-C) 规范
 
-> **适用范围**：`src/**/*.ts` 与 `scripts/*.js`。`scripts/.corpus/**` 为等价性验证的逆向夹具语料（内含故意违规样本），永久豁免。
-> **契约真源**：判定逻辑 `src/analyzers/comments.ts`，字段与文案 `src/core/messages/comments.ts`，配置级联 `src/core/config.ts`。
-> **强制门禁**：`npm run gate`（`lint` + `format:check` + `gate:comments` + `build` + `npm test`）。
-
----
-
-## 一、语言与格式基线 (Language & Format)
-
-| 维度 | 规则 | 判定方式 |
-| :--- | :--- | :--- |
-| 注释语言 | **英文单语**；禁止新增中文/日文等 CJK 注释（`src/core/messages/comments.ts` 中的中文字段常量属于契约数据，豁免） | 人工审查 + `npm run lint` |
-| 行宽 | 代码与注释 **≤ 100 列** | Prettier `printWidth: 100` + `CMT-WID-001`（工具指令行豁免） |
-| 缩进 | TypeScript **4 空格**、JavaScript/脚本 **2 空格**（对齐 AGENTS.md §4.1），禁用 Tab | Prettier `tabWidth` + 覆盖规则 |
-| 引号与分号 | 单引号；语句尾分号；多行尾随逗号 | Prettier |
-| 换行符 | LF | Prettier `endOfLine: lf` |
-| 分隔线 | 同一文件内风格自洽：短分隔 `// ── 标题 ──` 或长分隔 `// ──────` 二选一，禁止混用；裸分隔线（上下无标题）允许 | `CMT-SEP-001`（语言无关） |
-| 编码 | 禁止 mojibake（替换符 / UTF-8 误按 Latin-1 解码 / 智能引号乱码） | `CMT-MOJI-001`（error，`basic` 起） |
-| 文件横幅 | 不足 150 行的小文件禁用 `═` 文件级横幅 | `CMT-BAN-001` |
-| 禁止标记 | 严禁 `TODO` / `FIXME` / `XXX` / `HACK` 与施工批次黑话（`Phase NN`、`pNN`、`wip`、`临时`） | `hygiene` 分析器 `HYG-STB-001/002` |
+> **所属层级**：L5 规范、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)  
+> **对应代码真源**：`src/core/comments/`、`src/analyzers/comments.ts`、`scripts/gate-comments.js`、`scripts/validate-comment-hygiene.js`
 
 ---
 
-## 二、六字段文件头契约 (Six-Field File Header)
+## 1. 六字段模块文件头契约 (`CMT-HDR-001`)
 
-每个文件**首 30 行内**必须存在完整注释块，且包含以下六个字段（大小写不敏感，判定为子串匹配）。
-
-| # | 字段 (Field) | 语义 | 写作要求 |
-| :---: | :--- | :--- | :--- |
-| 1 | `Module:` | 模块归属域 | 该文件属于哪个职责域（如 Core Engine / CLI / Verification Harness） |
-| 2 | `File Path:` | 物理路径 | **仓库根相对 POSIX 路径**，必须与真实路径一致（CMT-HDR-003，error 级） |
-| 3 | `Architecture Role:` | 架构定位 | 分层定位与在数据流中的角色（入口/编排/适配器/单源契约） |
-| 4 | `Dependencies & Triggers:` | 依赖与触发 | 上游/下游模块与触发时机（CLI / CI / post-scan / 守护进程） |
-| 5 | `Responsibilities:` | 职责说明 | 必须覆盖的职责清单；一条职责对应一个可验证行为 |
-| 6 | `Exit Semantics & Design Rationale:` | 退出语义与设计依据 | 成功/失败/降级语义 + 第一性原理依据（为何这样设计，而非实现复述） |
-
-**标准模板（TypeScript）**
+在 `commentLevel: 'standard'` 及以上档位，每一个核心源码文件顶部必须具备包含以下六个标准语义字段的 JSDoc / 模块文档头，使人类开发者与 LLM Agent 无需通读全文即可建立准确的架构心智模型：
 
 ```ts
 /**
- * Module: Core Engine — Declarative Configuration Resolution
- * File Path: src/core/config.ts
- * Architecture Role: Configuration single source of truth; read by every entry point
- * Dependencies & Triggers: CLI --config / auto-discovery / daemon startup
- * Responsibilities: Layered merge (defaults < file < CLI), analyzer registry merge,
- *                    comment/security level cascade, scale & maturity auto-tuning
- * Exit Semantics & Design Rationale: Never throws on malformed config; falls back to
- *                    defaults with a warning (fail-soft) so CI never dies on a broken file.
+ * Module: <所属子系统与模块名称>
+ * File Path: <仓库相对路径，POSIX 斜杠>
+ * Architecture Role: <在六层架构或领域中的职责定位>
+ * Dependencies & Triggers: <上下游依赖模块与调用触发时机>
+ * Responsibilities: <核心职责清单与不变量约束>
+ * Exit Semantics & Design Rationale: <异常/退出语义及核心设计取舍理由>
  */
-```
-
-**标准模板（Node.js 脚本）**
-
-```js
-#!/usr/bin/env node
-/**
- * Module: Verification Harness — Generalized Capability Equivalence Checks
- * File Path: scripts/validate-generalized.js
- * ...
- */
-```
-
-**判定细节（与引擎实现一致）**
-
-* 头部扫描窗口为文件**首个 30 行**；`#!` shebang 行不计为注释，但计入窗口。
-* 头块缺失 → `CMT-HDR-001`（strict 档为 warning）。
-* 字段缺失 → `CMT-HDR-002`（warning，逐字段报告）。
-* `File Path` 与扫描期路径不一致 → `CMT-HDR-003`（error，直接阻断）。
-
----
-
-## 三、公有 API 文档契约 (Public API JSDoc)
-
-**必须**为以下声明提供紧邻注释（中间不得有空行）：`export function` / `export class` / `export interface` / `export type` / `export enum` / `export const|let|var`，以及 `class` / `func` / `def` / `pub fn` 等跨语言公有声明。
-
-1. **紧邻性**：注释块与声明之间不得有空行或非装饰器代码，否则 `CMT-DOC-001`（strict 档 warning）。
-2. **语义增量**：文档不得是符号名的机械复述（如 `/** calculateTotal */`）→ `CMT-DOC-002`（warning）。
-3. **参数与返回值**：带参数或返回值的函数应写明 `@param` / `@returns`；异常路径写明 `@throws`。ESLint `jsdoc/*` 规则兜底校验。
-4. **并发语义**：`async` 声明必须在注释中显式说明并发/重入语义（关键词之一：`async`、`await`、`thread`、`reentrant`、`idempotent`、`lock`、`mutex`、`atomic`、`race`、`sync`）→ 否则 `CMT-CON-001`（strict 档 info，本次规范化一并清零）。
-5. **导出常量/类型**：一句话说明其契约含义与取值边界；避免复述字面量。
-
-**推荐写法**
-
-```ts
-/**
- * Resolve the final scan config by layering defaults, the config file, and CLI overrides.
- *
- * @param overrides - CLI/API overrides; `analyzers` acts as an explicit allow-list.
- * @returns The merged immutable scan config; never throws on a malformed config file.
- */
-export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {}
 ```
 
 ---
 
-## 四、私有实现注释 (Internal Comments)
+## 2. 有效注释密度模型 (Effective Comment Density — ECD-C)
 
-* **只写 why**：算法选择、边界条件、反直觉行为的成因；禁止复述代码的 what。
-* **失效即删**：注释与实现漂移时同步修正或删除；禁止留存过期表述与死注释。
-* **私有 helper**：非导出 helper 至少保留一行意图说明（推荐，非门禁强制项）。
+传统「注释行数 / 代码行数」指标极易被无意义的样板注释、被注释掉的死代码或分隔符横幅刷高。`src/core/comments/` 实现了基于信息熵与结构语义的 **有效注释密度（ECD-C）** 评估算法：
+
+1. **高价值注释加权（Positive Signal）**：
+   - 解释「为什么（Why）」的设计权衡、并发不变量（Concurrency Contract）、复杂度来源说明、公有导出 API 的 `@param` / `@returns` / `@throws` 契约均计入有效注释分子。
+2. **噪声与反模式剔除（Noise Filtering & Penalties）**：
+   - **`CMT-BAN-001`（过度装饰横幅）**：不足 150 行的小文件滥用 `══════` 装饰横幅不仅不计入有效密度，反而触发警告；
+   - **`CMT-DEAD-001`（注释掉的死代码）**：包含语句块结构的废弃代码注释直接判定为卫生违规；
+   - **`CMT-MOJI-001`（乱码与损坏编码）**：包含 UTF-8 解码替换符 `\uFFFD` 或常见 Mojibake 字符序列的注释立即拦截；
+   - **`HYG-STB-002`（遗留施工黑话与空洞 TODO）**：拦截缺少上下文或包含临时批次黑话的占位注释。
 
 ---
 
-## 五、门禁与棘轮 (Gate & Ratchet)
+## 3. 四档注释审计等级 (`CommentLevel`)
 
-| 命令 | 内容 | 失败语义 |
+| 档位 (`commentLevel`) | 适用项目阶段 | 强制执行的检查集 |
 | :--- | :--- | :--- |
-| `npm run format:check` | Prettier 全量格式校验 | 非 0 即阻断 |
-| `npm run lint` | ESLint（typescript-eslint + jsdoc + prettier 冲突消解） | 非 0 即阻断 |
-| `npm run gate:comments` | 自举 strict 注释门禁，对照 `baselines/comments.strict.baseline.json` | 新增项 ≥ warning 即阻断 |
-| `npm run gate` | 上述三项 + `build` + `npm test` | 任一失败即阻断 |
-
-**棘轮纪律**
-
-* 基线为 `--baseline-granularity grouped`（`analyzer｜rule｜file` 计数），对行号漂移免疫。
-* 只允许**单调下降**：每批次清理后执行
-  `node dist/index.js scan --root . --include "src/**/*.ts,scripts/*.js" --analyzers comments --comment-level strict --baseline baselines/comments.strict.baseline.json --update-baseline baselines/comments.strict.baseline.json --no-cache --no-daemon`
-  重新固化。
-* 严禁手工编辑基线文件消音新增违规；基线内容必须可由上述命令复现。
-* 终态目标：基线为空（0 组），即全域 125 个文件在 strict 档零新增、零存量。
+| **`off`** | 临时脚手架 / 外部第三方生成代码 | 关闭全部注释类规则 |
+| **`basic`** | 原型验证 (`prototype`) | 仅拦截乱码 (`CMT-MOJI-001`)、死代码注释与空洞占位符 |
+| **`standard`（默认）** | 生产级工程 (`production`) | 强制六字段模块头、公有导出符号 JSDoc、ECD-C 密度下限与小文件横幅禁令 |
+| **`strict`** | 工业级核心基座 (`industrial`) | 额外要求内部复杂算法函数（CC $\ge 12$）必须显式注明时间复杂度与边界不变量 |
 
 ---
 
-## 六、新增/改造文件检查清单 (Checklist)
+## 4. 注释门禁棘轮 (`npm run gate:comments`)
 
-- [ ] 头注释六字段齐全，`File Path` 与物理路径一致
-- [ ] 公有声明具备语义化 JSDoc（含 `@param` / `@returns` / 并发语义）
-- [ ] 注释为英文，行宽 ≤ 100，无 `TODO`/批次黑话
-- [ ] `npm run format` 与 `npm run lint` 通过
-- [ ] `npm run gate:comments` 无新增（如已清理存量，同步 `--update-baseline` 收敛基线）
+`scripts/gate-comments.js` 作为 `npm run gate` 的必经环节，对全仓源码执行注释一致性扫描：任何新增文件缺失六字段头或新增导出函数缺失 JSDoc 契约，门禁立即以非零退出码阻断提交。
+
+---
+
+## 5. 关联文档导航
+
+- [01. 四层规则金字塔、26 个内置分析器与 243 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
+- [07. 三平面质量量化模型与代码自治度 (CAI) 规范](./07-quantified-quality-standard.md)
