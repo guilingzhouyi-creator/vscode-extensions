@@ -3,7 +3,7 @@
 # 文件路径: res://backend/infrastructure/fifo_budget.gd
 # 架构定位: Infrastructure Service
 # 跨域依赖: 上游: 全域业务域 (Domains) | 下游: GameConfig, EventBusCore | 配置: config/infrastructure/*.json | 信号: 无直接信号 (由子系统广播)
-# 职责说明: 幂等台账/审计容器超容裁剪的统一实现——单次 keys 快照后按插入序 擦除最旧溢出项（Dictionary 保持插入序），消除既有「while…erase(keys()[0])」 每轮整表重建 keys 数组的 O(k×N) 反模式（Phase 44 P4）。
+# 职责说明: 幂等台账/审计容器超容裁剪的统一实现——单次 keys 快照后按插入序 擦除最旧溢出项（Dictionary 保持插入序），消除既有「while…erase(keys()[0])」 每轮整表重建 keys 数组的 O(k×N) 反模式（）。
 # 设计依据: WebGames 基础设施分层架构规范
 # ==============================================================================
 

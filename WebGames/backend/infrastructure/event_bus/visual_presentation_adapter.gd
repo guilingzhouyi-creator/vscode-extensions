@@ -4,7 +4,7 @@
 # 架构定位: Event Broker / Decoupling Foundation
 # 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 事件总线表现适配门面：桥接领域业务逻辑与表现层接口，提供空间裁剪计算与提示合并分发。
-# 设计依据: Phase 20 事件总线解耦规范 / Phase 77 前后端通信隔离契约
+# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
 class_name IVisualPresentationAdapter

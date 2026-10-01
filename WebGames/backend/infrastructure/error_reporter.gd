@@ -4,7 +4,7 @@
 # 架构定位: Error Code Registry / Reporter
 # 跨域依赖: 上游: 全域后端与前端边界 | 下游: UnifiedLoggerService | 配置: config/infrastructure/errors.json | 信号: 严重错误上报信号
 # 职责说明: 统一全域运行时异常与错误上报入口，将存量 push_error/push_warning 散落 收敛至 EventBus 结构化日志底座，执行错误码登记校验与 i18n 解析（Inv-LG-1, Inv-LG-2）。
-# 设计依据: Phase 75 错误码统一与可证伪契约
+# 设计依据: 错误码统一与可证伪契约
 # ==============================================================================
 
 class_name ErrorReporter extends RefCounted
@@ -40,9 +40,9 @@ static func emit_error(
 	record.channel = channel
 	record.error_code = final_code
 	record.message = final_message
-	# 所有权隔离 + 构造期脱敏（Phase 87 · Inv-LS-2 安全红线）：
+	# 所有权隔离 + 构造期脱敏（· Inv-LS-2 安全红线）：
 	# 本路径不经 LogCollector，若仅依赖规范链路脱敏，context 中的 token/secret
-	# 会经 EventBus → LogFileExporter 明文落盘（Phase 87 审查发现的脱敏接线缺口）。
+	# 会经 EventBus → LogFileExporter 明文落盘（审查发现的脱敏接线缺口）。
 	var redacted := RedactionRule.apply(context)
 	record.context = redacted["dict"]
 
@@ -86,3 +86,6 @@ static func migrate_push_error(channel: String, msg: String) -> void:
 static func emit(error_code: String, context: Dictionary = {}, message: String = "") -> void:
 	emit_error("infrastructure", error_code, message, context)
 
+## 便捷告警入口：严重度由 errors_catalog.json 中登记的 warn 级错误码决定
+static func emit_warning(channel: String, error_code: String, message: String = "", context: Dictionary = {}) -> void:
+	emit_error(channel, error_code, message, context)

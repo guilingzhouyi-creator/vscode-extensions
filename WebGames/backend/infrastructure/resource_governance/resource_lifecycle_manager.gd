@@ -4,7 +4,7 @@
 # 架构定位: Memory Governor / Bounded Cache
 # 跨域依赖: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
 # 职责说明: 全域资源生命周期中心治理器：负责跨场景资源预加载、按需引用计数管理、异步流式解构与峰值内存主动 GC 协同触发。
-# 设计依据: Phase 56 有界资源与内存生命周期治理标准
+# 设计依据: 有界资源与内存生命周期治理标准
 # ==============================================================================
 
 class_name ResourceLifecycleManager extends RefCounted

@@ -4,7 +4,7 @@
 # 架构定位: Deterministic Clock Master
 # 跨域依赖: 上游: CombatCore, QuestCausality, WorldNavigation | 下游: 无 | 配置: config/infrastructure/clock.json | 信号: 游戏虚拟时钟心跳与昼夜更迭信号
 # 职责说明: 统一调度微观战斗时钟 (Δt=20ms)、行军探索时钟 (1h) 与生理年轮时钟 (1mo)。 历法常数与事件文案由 config/infrastructure/clock.json、config/narratives/clock.json 驱动。
-# 设计依据: Phase 18 确定性虚拟时钟驱动协议
+# 设计依据: 确定性虚拟时钟驱动协议
 # ==============================================================================
 
 class_name WorldClockMaster extends RefCounted
@@ -35,13 +35,13 @@ func tick_combat(delta_ticks: int = 1) -> int:
 ## 行军探索时钟推进（小时累计→按每日小时数进位天数），广播 clock/travel_calendar 叙事
 func advance_travel_hours(hours: int = 1) -> Dictionary:
 	travel_hours += hours
-	var days_passed = travel_hours / _get_hours_per_day()
+	var days_passed := travel_hours / _get_hours_per_day()
 	travel_hours = travel_hours % _get_hours_per_day()
 
 	if days_passed > 0:
 		advance_calendar_days(days_passed)
 
-	var status = get_calendar_time_dict()
+	var status := get_calendar_time_dict()
 	EventBusCore.get_instance().emit_world_clock_advanced(
 		EventBusCore.get_category_name("travel"), calendar_days,
 		EventBusCore.render_narrative("clock/travel_calendar", [calendar_years, calendar_months, calendar_days, travel_hours])
@@ -64,7 +64,7 @@ func advance_calendar_months(months: int = 1) -> Dictionary:
 	while calendar_months > _get_months_per_year():
 		calendar_months -= _get_months_per_year()
 		calendar_years += 1
-	var status = get_calendar_time_dict()
+	var status := get_calendar_time_dict()
 	EventBusCore.get_instance().emit_world_clock_advanced(
 		EventBusCore.get_category_name("bio"), calendar_months,
 		EventBusCore.render_narrative("clock/bio_epoch", [calendar_years, calendar_months])

@@ -4,10 +4,14 @@
 # 架构定位: Log Collector & Stream Processor
 # 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 依据 log.json redaction 段配置对结构化日志 context 执行构造期脱敏， 支持 mask、drop、hash 三种安全模式，杜绝凭证落盘（Inv-LS-2 安全红线）。
-# 设计依据: Phase 52 统一结构化日志规范 / Phase 60 性能基准审计
+# 设计依据: 业务域第一性原理 / 统一结构化日志规范
 # ==============================================================================
 
 class_name RedactionRule extends RefCounted
+
+const MODE_MASK: String = "mask"
+const MODE_DROP: String = "drop"
+const MODE_HASH: String = "hash"
 
 # ==============================================================================
 # 一、脱敏规则条目实体
@@ -16,7 +20,7 @@ class_name RedactionRule extends RefCounted
 ## 单条脱敏规则：字段正则 + 脱敏模式（mask/drop/hash）与掩码参数
 class RuleEntry extends RefCounted:
 	var regex: RegEx = null
-	var mask_mode: String = "mask"    # mask | drop | hash
+	var mask_mode: String = MODE_MASK # mask | drop | hash
 	var mask_prefix_len: int = 4
 	var mask_suffix_len: int = 4
 	var replace_with: String = "****"
@@ -27,14 +31,14 @@ class RuleEntry extends RefCounted:
 
 static var _rules: Array[RuleEntry] = []
 static var _enabled: bool = true
-static var _default_mode: String = "mask"
+static var _default_mode: String = MODE_MASK
 static var _cached_version: int = -2
 
 ## 测试复位：清空规则并恢复默认配置（避免跨用例状态残留）
 static func reset_state() -> void:
 	_rules.clear()
 	_enabled = true
-	_default_mode = "mask"
+	_default_mode = MODE_MASK
 	_cached_version = -2
 
 ## 规则新鲜度守卫：热重载版本变化时按 log.json redaction 段重建规则集
@@ -44,16 +48,16 @@ static func _ensure_loaded() -> void:
 		return
 	_cached_version = current_version
 	_rules.clear()
-	
+
 	var redaction_cfg := GameConfig.get_dict("infrastructure.log", "redaction", {})
 	if redaction_cfg.is_empty():
 		_enabled = true
-		_default_mode = "mask"
+		_default_mode = MODE_MASK
 		_init_default_rules()
 		return
-		
+
 	_enabled = bool(redaction_cfg.get("enabled", true))
-	_default_mode = str(redaction_cfg.get("default_mode", "mask"))
+	_default_mode = str(redaction_cfg.get("default_mode", MODE_MASK))
 	var rules_arr = redaction_cfg.get("rules", [])
 	if rules_arr is Array:
 		for item in rules_arr:
@@ -66,7 +70,7 @@ static func _ensure_loaded() -> void:
 			if re.compile("(?i)^(" + pattern + ")$") == OK:
 				var entry := RuleEntry.new()
 				entry.regex = re
-				entry.mask_mode = str(item.get("mask_mode", "mask"))
+				entry.mask_mode = str(item.get("mask_mode", MODE_MASK))
 				entry.mask_prefix_len = int(item.get("mask_prefix_len", 4))
 				entry.mask_suffix_len = int(item.get("mask_suffix_len", 4))
 				entry.replace_with = str(item.get("replace_with", "****"))
@@ -74,11 +78,11 @@ static func _ensure_loaded() -> void:
 
 ## 内置默认脱敏规则（配置段缺失时兜底：令牌/指纹掩码、口令丢弃、账号哈希）
 static func _init_default_rules() -> void:
-	var defaults = [
-		{ "field_pattern": "token|session_token", "mask_mode": "mask", "mask_prefix_len": 4, "mask_suffix_len": 4, "replace_with": "****" },
-		{ "field_pattern": "fingerprint|device_fingerprint", "mask_mode": "mask", "mask_prefix_len": 4, "mask_suffix_len": 0, "replace_with": "****" },
-		{ "field_pattern": "password|password_hash|secret|seal_key", "mask_mode": "drop" },
-		{ "field_pattern": "account_id", "mask_mode": "hash" }
+	var defaults: Array[Dictionary] = [
+		{"field_pattern": "token|session_token", "mask_mode": MODE_MASK, "mask_prefix_len": 4, "mask_suffix_len": 4, "replace_with": "****"},
+		{"field_pattern": "fingerprint|device_fingerprint", "mask_mode": MODE_MASK, "mask_prefix_len": 4, "mask_suffix_len": 0, "replace_with": "****"},
+		{"field_pattern": "password|password_hash|secret|seal_key", "mask_mode": MODE_DROP},
+		{"field_pattern": "account_id", "mask_mode": MODE_HASH}
 	]
 	for item in defaults:
 		var re := RegEx.new()
@@ -103,7 +107,7 @@ static func apply(dict: Dictionary) -> Dictionary:
 			"dict": dict.duplicate(true),
 			"redacted_keys": []
 		}
-	
+
 	var redacted_keys: Array[String] = []
 	var result_dict := _redact_dict(dict, redacted_keys)
 	return {
@@ -111,13 +115,19 @@ static func apply(dict: Dictionary) -> Dictionary:
 		"redacted_keys": redacted_keys
 	}
 
+static func _find_matching_rule(key_str: String) -> RuleEntry:
+	for rule in _rules:
+		if rule.regex != null and rule.regex.search(key_str) != null:
+			return rule
+	return null
+
 ## 递归脱敏字典：嵌套字典/数组继续下钻；命中规则按模式处理（drop 整键丢弃 / hash 摘要 / mask 前后缀留）
 static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -> Dictionary:
 	var target: Dictionary = {}
 	for k in source.keys():
 		var key_str := str(k)
 		var val = source[k]
-		
+
 		# 递归处理嵌套字典
 		if val is Dictionary:
 			target[k] = _redact_dict(val, out_redacted_keys)
@@ -125,21 +135,16 @@ static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -
 		elif val is Array:
 			target[k] = _redact_array(val, out_redacted_keys)
 			continue
-			
-		var matched_rule: RuleEntry = null
-		for rule in _rules:
-			if rule.regex != null and rule.regex.search(key_str) != null:
-				matched_rule = rule
-				break
-				
+
+		var matched_rule := _find_matching_rule(key_str)
 		if matched_rule == null:
 			target[k] = val
 			continue
-			
+
 		# 命中脱敏规则
 		if not (key_str in out_redacted_keys):
 			out_redacted_keys.append(key_str)
-			
+
 		match matched_rule.mask_mode:
 			"drop":
 				# 整键丢弃，不写入 target

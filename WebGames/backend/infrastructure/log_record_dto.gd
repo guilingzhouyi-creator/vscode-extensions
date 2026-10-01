@@ -4,7 +4,7 @@
 # 架构定位: Log Collector & Stream Processor
 # 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 承载全域单调递增序号的结构化日志与错误记录，实现 error_code 与 message 分离， 支持原子落盘导出、前端渲染与调试追踪对账（Inv-LG-1, Inv-LG-2, Inv-LG-3）。
-# 设计依据: Phase 52 统一结构化日志规范 / Phase 60 性能基准审计
+# 设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 class_name LogRecordDTO extends RefCounted

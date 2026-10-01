@@ -4,7 +4,7 @@
 # 架构定位: Log Collector & Stream Processor
 # 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 承载结构化日志多维检索入参与分页查询结果 DTO（Inv-LS-5 检索只读不变量）。
-# 设计依据: Phase 52 统一结构化日志规范 / Phase 60 性能基准审计
+# 设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 class_name LogQueryDTO extends RefCounted

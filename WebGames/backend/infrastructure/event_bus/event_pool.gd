@@ -4,7 +4,7 @@
 # 架构定位: Event Broker / Decoupling Foundation
 # 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 事件包高频复用对象池，严格遵循 ADV-POOL-001 规范。 提供 borrow/recycle/get_free_count/get_borrowed_count 核心 API， 通过 is_borrowed 状态位防止双重归还，保障借还守恒与零热路径堆分配。
-# 设计依据: Phase 20 事件总线解耦规范 / Phase 77 前后端通信隔离契约
+# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
 class_name EventPool
@@ -42,10 +42,10 @@ func recycle(packet: EventPacket) -> bool:
 	return true
 
 func get_free_count() -> int:
-	return _free.size()
+	return maxi(0, _free.size())
 
 func get_borrowed_count() -> int:
-	return _borrowed
+	return maxi(0, _borrowed)
 
 func _push_pool_overflow_hint() -> void:
 	# 池满新建属池外分配，经 ErrorReporter 统一通道遥测告警

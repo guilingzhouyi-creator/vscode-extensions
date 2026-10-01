@@ -4,7 +4,7 @@
 # 架构定位: Log Collector & Stream Processor
 # 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 继承 LogRecordDTO 并扩展全域结构化字段，承载链路追踪 ID (trace_id)、 父跨度 (parent_span_id)、事件分类、耗时指标 (duration_ms)、调用源定位 以及脱敏审计键清单 (redacted_keys)（Inv-LS-1, Inv-LS-2, Inv-LS-3）。
-# 设计依据: Phase 52 统一结构化日志规范 / Phase 60 性能基准审计
+# 设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 class_name StructuredLogRecord extends LogRecordDTO

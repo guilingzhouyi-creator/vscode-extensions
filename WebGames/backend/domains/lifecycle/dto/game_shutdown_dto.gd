@@ -51,10 +51,17 @@ class Request extends RefCounted:
 class Response extends RefCounted:
 	var success: bool = false
 	var error_code: String = "OK"
+	var failed_stage: String = ""
 	var current_phase: int = GameLifecycleModel.LifecyclePhase.STOPPED
 	var is_save_completed: bool = false
 	var save_sha256: String = ""
 	var remaining_resources: Array[String] = []
+	var retained_resources: Array[String] = []
+	var timed_out_resources: Array[String] = []
+	var timed_out_stages: Array[String] = []
+	var unexecuted_resources: Array[String] = []
+	var degraded_resources: Array[String] = []
+	var stage_results: Array[Dictionary] = []
 	var elapsed_milliseconds: int = 0
 
 	## 序列化停机响应为字典（remaining_resources 副本）
@@ -62,10 +69,17 @@ class Response extends RefCounted:
 		return {
 			"success": success,
 			"error_code": error_code,
+			"failed_stage": failed_stage,
 			"current_phase": current_phase,
 			"is_save_completed": is_save_completed,
 			"save_sha256": save_sha256,
 			"remaining_resources": remaining_resources.duplicate(),
+			"retained_resources": retained_resources.duplicate(),
+			"timed_out_resources": timed_out_resources.duplicate(),
+			"timed_out_stages": timed_out_stages.duplicate(),
+			"unexecuted_resources": unexecuted_resources.duplicate(),
+			"degraded_resources": degraded_resources.duplicate(),
+			"stage_results": stage_results.duplicate(true),
 			"elapsed_milliseconds": elapsed_milliseconds
 		}
 
@@ -74,6 +88,7 @@ class Response extends RefCounted:
 		var resp := Response.new()
 		resp.success = bool(data.get("success", false))
 		resp.error_code = String(data.get("error_code", "OK"))
+		resp.failed_stage = String(data.get("failed_stage", ""))
 		resp.current_phase = int(data.get("current_phase", GameLifecycleModel.LifecyclePhase.STOPPED))
 		resp.is_save_completed = bool(data.get("is_save_completed", false))
 		resp.save_sha256 = String(data.get("save_sha256", ""))
@@ -81,5 +96,33 @@ class Response extends RefCounted:
 		resp.remaining_resources = []
 		for r in raw_res:
 			resp.remaining_resources.append(String(r))
+		var raw_retained_resources: Variant = data.get("retained_resources", [])
+		if raw_retained_resources is Array:
+			for resource_id in raw_retained_resources:
+				resp.retained_resources.append(String(resource_id))
+		for field_name in ["timed_out_resources", "timed_out_stages", "unexecuted_resources", "degraded_resources"]:
+			var raw_values: Variant = data.get(field_name, [])
+			if not raw_values is Array:
+				continue
+			for value in raw_values:
+				var string_value: String = String(value)
+				match field_name:
+					"timed_out_resources":
+						resp.timed_out_resources.append(string_value)
+					"timed_out_stages":
+						resp.timed_out_stages.append(string_value)
+					"unexecuted_resources":
+						resp.unexecuted_resources.append(string_value)
+					"degraded_resources":
+						resp.degraded_resources.append(string_value)
+		var raw_stage_results: Variant = data.get("stage_results", [])
+		if raw_stage_results is Array:
+			var valid_stage_results: Array = []
+			for stage_result in raw_stage_results:
+				if stage_result is Dictionary:
+					valid_stage_results.append(stage_result)
+			var copied_stage_results: Array = valid_stage_results.duplicate(true)
+			for stage_result in copied_stage_results:
+				resp.stage_results.append(stage_result as Dictionary)
 		resp.elapsed_milliseconds = int(data.get("elapsed_milliseconds", 0))
 		return resp

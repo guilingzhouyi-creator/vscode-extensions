@@ -4,7 +4,7 @@
 # 架构定位: Event Broker / Decoupling Foundation
 # 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 事件总线专用双缓冲环形队列：隔离事件发布线程与分发消费循环，保证事件批量派发期间新发布的事件写入后台缓冲零冲突。
-# 设计依据: Phase 20 事件总线解耦规范 / Phase 77 前后端通信隔离契约
+# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
 class_name PingPongRingBuffer

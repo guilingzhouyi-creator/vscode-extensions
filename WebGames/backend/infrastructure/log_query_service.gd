@@ -4,7 +4,7 @@
 # 架构定位: Log Collector & Stream Processor
 # 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 跨介质合并内存环形缓冲实时数据与磁盘 NDJSON 导出历史数据， 执行六维过滤、分页切片与截断保护（Inv-LS-5 检索只读不变量）。
-# 设计依据: Phase 52 统一结构化日志规范 / Phase 60 性能基准审计
+# 设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 class_name LogQueryService extends RefCounted
@@ -54,12 +54,12 @@ static func query(criteria: LogQueryDTO.Criteria) -> LogQueryDTO.Result:
 	var result := LogQueryDTO.Result.new()
 	if criteria == null:
 		return result
-		
+
 	result.page = criteria.page
-	
+
 	# 收集两路数据
 	var records_by_seq: Dictionary = {}
-	
+
 	# 源 1：内存环形缓冲
 	var ring_records := LogRingBuffer.query(criteria.from_utc, criteria.levels, criteria.channels)
 	for rec in ring_records:
@@ -67,38 +67,38 @@ static func query(criteria: LogQueryDTO.Criteria) -> LogQueryDTO.Result:
 			var dto: Dictionary = rec.to_dto()
 			var seq: int = int(dto.get("sequence", 0))
 			records_by_seq[seq] = dto
-			
+
 	# 源 2：磁盘导出文件（若存在）
 	var disk_records := _read_disk_logs()
 	for dto in disk_records:
 		var seq: int = int(dto.get("sequence", 0))
 		if not records_by_seq.has(seq):
 			records_by_seq[seq] = dto
-			
+
 	# 统一过滤
 	var filtered: Array[Dictionary] = []
 	for seq in records_by_seq.keys():
 		var dto: Dictionary = records_by_seq[seq]
 		if _matches_criteria(dto, criteria):
 			filtered.append(dto)
-			
+
 	# 排序：按 sequence 单调升序
 	filtered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return int(a.get("sequence", 0)) < int(b.get("sequence", 0))
 	)
-	
+
 	result.total = filtered.size()
 	result.truncated = filtered.size() > MAX_RESULTS
-	
+
 	var page_size := criteria.page_size
 	var start_idx := (criteria.page - 1) * page_size
 	var max_capped := mini(filtered.size(), MAX_RESULTS)
-	
+
 	if start_idx < max_capped:
 		var end_idx := mini(start_idx + page_size, max_capped)
 		for i in range(start_idx, end_idx):
-			result.records.append(filtered[i].duplicate(true))
-			
+			result.records.append(filtered[i])
+
 	return result
 
 # ==============================================================================
@@ -178,6 +178,7 @@ static func _read_disk_logs() -> Array[Dictionary]:
 		return out
 
 	var files := da.get_files()
+	var json_inst := JSON.new()
 	for f in files:
 		if f.begins_with(prefix) and f.ends_with(".log"):
 			var full_path := "%s/%s" % [dir_path, f]
@@ -190,7 +191,6 @@ static func _read_disk_logs() -> Array[Dictionary]:
 				var line := fa.get_line().strip_edges()
 				if line.is_empty():
 					continue
-				var json_inst := JSON.new()
 				if json_inst.parse(line) == OK:
 					if json_inst.data is Dictionary:
 						out.append(json_inst.data)

@@ -4,7 +4,7 @@
 # 架构定位: Snowflake-Style UUID Generator
 # 跨域依赖: 上游: ItemLoaderPipeline, CombatCore, NetworkAdapter | 下游: WorldClockMaster | 配置: config/infrastructure/id.json | 信号: 无
 # 职责说明: 消灭「前缀 + 毫秒时间戳」自造 ID 在同一毫秒内的碰撞隐患。 同一毫秒内首次生成保持旧格式 "<prefix><毫秒>"；第二次起追加自增序号 后缀 "_<n>"。既有存档与测试对单发 ID 形态的预期不受影响。  用法: var id := UniqueIdGenerator.next_id(item_id_prefix)   # 例: GM_ITEM_172... 不适用场景: 以时间戳作为哈希签名因子（gm_audit / token）——签名输入变化会 改变既有签名值，此类调用继续手写 str(Time.get_ticks_msec())。
-# 设计依据: Phase 10 全局实体唯一标识规范
+# 设计依据: 全局实体唯一标识规范
 # ==============================================================================
 
 class_name UniqueIdGenerator extends RefCounted

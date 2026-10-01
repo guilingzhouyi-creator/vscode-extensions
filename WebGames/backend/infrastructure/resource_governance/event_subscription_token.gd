@@ -4,7 +4,7 @@
 # 架构定位: Memory Governor / Bounded Cache
 # 跨域依赖: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
 # 职责说明: 资源域事件订阅治理令牌：绑定订阅者上下文与资源生命周期，确保在宿主销毁时自动反注册，消除跨域弱引用悬挂。
-# 设计依据: Phase 56 有界资源与内存生命周期治理标准
+# 设计依据: 有界资源与内存生命周期治理标准
 # ==============================================================================
 
 class_name EventSubscriptionToken extends RefCounted

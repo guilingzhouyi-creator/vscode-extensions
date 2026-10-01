@@ -4,7 +4,7 @@
 # 架构定位: Event Broker / Decoupling Foundation
 # 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 路由唯一真源常量表。整型信道热路径零字符串切分与匹配。 与旧版/P71字符串频道的迁移对齐映射表置于 config/infrastructure/event_bus_config.json。
-# 设计依据: Phase 20 事件总线解耦规范 / Phase 77 前后端通信隔离契约
+# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
 class_name EventChannelDefinition
@@ -22,12 +22,12 @@ const SPATIAL_TRIGGER_ENTERED: int    = 0x0203
 const SPATIAL_EXPLOSION_IMPACT: int   = 0x0204
 const SPATIAL_AUDIO_PLAY: int         = 0x0205
 
-# ---- 三、HUD 与数值状态信道 (0x0300 ~ 0x03FF，承接 P71) ----
+# ---- 三、HUD 与数值状态信道 (0x0300 ~ 0x03FF，承接 ) ----
 const HUD_STATUS_SNAPSHOT: int        = 0x0301
 const HUD_STAT_MUTATED: int           = 0x0302
 const HUD_WALLET_MUTATED: int         = 0x0303
 
-# ---- 四、账户与生命周期信道 (0x0400 ~ 0x04FF，承接 P71) ----
+# ---- 四、账户与生命周期信道 (0x0400 ~ 0x04FF，承接 ) ----
 const AUTH_REGISTERED: int            = 0x0401
 const AUTH_LOGIN_SUCCEEDED: int       = 0x0402
 const LIFECYCLE_SHUTDOWN_STARTED: int = 0x0403

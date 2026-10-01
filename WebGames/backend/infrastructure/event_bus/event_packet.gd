@@ -4,16 +4,16 @@
 # 架构定位: Event Broker / Decoupling Foundation
 # 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 紧凑型强类型事件数据载体。原生承载 2D/3D 空间标头、多态业务载荷与池化生命周期 （遵循 ADV-POOL-001 规范，零循环内堆分配），彻底告别裸 Dictionary 历史包袱。
-# 设计依据: Phase 20 事件总线解耦规范 / Phase 77 前后端通信隔离契约
+# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
 class_name EventPacket
 extends RefCounted
 
 # ---- 一、核心元数据头 (定长标量) ----
-var event_id: int = 0              # 全局单调递增逻辑事件序号
-var channel_id: int = 0            # EventChannelDefinition 整型信道常量
-var category_mask: int = 0         # EventCategoryMask 位掩码
+var event_id: int = 0 # 全局单调递增逻辑事件序号
+var channel_id: int = 0 # EventChannelDefinition 整型信道常量
+var category_mask: int = 0 # EventCategoryMask 位掩码
 var timestamp_tick: int = 0
 var source_entity_id: String = ""
 
@@ -24,10 +24,10 @@ var effect_radius: float = 0.0
 
 # ---- 三、多态载荷（双通道：强类型 DTO 优先，轻量载荷兜底，二选一） ----
 var payload_dto: RefCounted = null # 强类型业务 DTO（如 VisualCueDTO / 领域 DTO）
-var payload_data: Variant = null   # 轻量载荷（Dictionary/Array），与 payload_dto 互斥使用
+var payload_data: Variant = null # 轻量载荷（Dictionary/Array），与 payload_dto 互斥使用
 
-# ---- 四、叙事/日志契约（可选，承接 P71 文案通道；渲染接线归 P74） ----
-var narrative_key: String = ""     # 对应 narratives.<域> 模板键
+# ---- 四、叙事/日志契约（可选，承接多语言文案通道与渲染适配） ----
+var narrative_key: String = "" # 对应 narratives.<域> 模板键
 var narrative_args: Array = []
 
 # ---- 五、池化生命周期状态 (ADV-POOL-001) ----

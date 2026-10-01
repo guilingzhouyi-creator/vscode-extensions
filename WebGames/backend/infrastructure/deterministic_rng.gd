@@ -4,7 +4,7 @@
 # 架构定位: Deterministic PRNG Engine
 # 跨域依赖: 上游: CombatCore, LootTable, DropResolver | 下游: 无 | 配置: 无 | 信号: 无
 # 职责说明: 以配置驱动的 LCG 提供可复现随机源，取代 Godot 全局 randf()/randi()。  为什么不能用全局 randf()/randi(): 全局随机依赖引擎内部状态，未显式 seed 时每次进程启动序列都不同， 导致抽卡、属性掷骰、强化成败等结果不可复现、不可回放， 与本项目「全域确定性」的核心契约直接冲突。  用法: var rng := DeterministicRNG.from_seed(12345)   # 独立实例，完全隔离 rng.randf(); rng.randi_range(1, 6); rng.pick(arr)  DeterministicRNG.global().randf()              # 共享实例（业务默认入口） DeterministicRNG.reseed_global(seed)           # 整局复现开关  LCG 常数（multiplier / increment / mask / 默认种子）由 config/domains/deterministic.json 的 lcg.* 驱动。
-# 设计依据: Phase 08 确定性离散随机数规范
+# 设计依据: 确定性离散随机数规范
 # ==============================================================================
 
 class_name DeterministicRNG extends RefCounted
@@ -17,7 +17,7 @@ static var _global: DeterministicRNG = null
 
 var _state: int = 1
 
-## L8（Phase 56）：LCG 参数实例固化快照（Inv-DF-5）——set_seed/首次推进时一次性读取，
+## L8（）：LCG 参数实例固化快照（Inv-DF-5）——set_seed/首次推进时一次性读取，
 ## 运行期 reload_config 不再静默改变同种子序列（原每步实时读配置破坏整局复现契约）
 var _lcg_multiplier_snap: int = 0
 var _lcg_increment_snap: int = 0
@@ -100,7 +100,7 @@ func randf_range(lo: float, hi: float) -> float:
 func randi_range(lo: int, hi: int) -> int:
 	if hi <= lo:
 		return lo
-	# M2（Phase 54）：randf 全精度缩放替代 state % range 低比特取模（Inv-RG-1）——
+	# M2（）：randf 全精度缩放替代 state % range 低比特取模（Inv-RG-1）——
 	# LCG 低比特每步翻转，旧实现 (hi-lo+1) 为偶时输出奇偶严格交替（硬币 0,1,0,1 完全可预测）
 	var span := hi - lo + 1
 	var scaled := int(self.randf() * float(span))
@@ -110,7 +110,7 @@ func randi_range(lo: int, hi: int) -> int:
 func pick(arr: Array) -> Variant:
 	if arr.is_empty():
 		return null
-	# M2（Phase 54）：高位缩放索引替代 state % size 低比特路径（偶数池下标不再奇偶周期交替）
+	# M2（）：高位缩放索引替代 state % size 低比特路径（偶数池下标不再奇偶周期交替）
 	var idx := int(self.randf() * float(arr.size()))
 	return arr[mini(arr.size() - 1, idx)]
 
@@ -145,7 +145,7 @@ func pick_weighted(pool: Array, weight_key: String = "weight") -> Variant:
 # 五、配置读取（一次性固化）
 # ==============================================================================
 
-## L8（Phase 56）：LCG 参数首次使用/设种子时固化快照；此后不再读配置。
+## L8（）：LCG 参数首次使用/设种子时固化快照；此后不再读配置。
 ## 以 _lcg_mask_snap == 0 作为「未固化」哨兵（默认 mask 恒 >0）。
 func _ensure_lcg_params() -> void:
 	if _lcg_mask_snap != 0:

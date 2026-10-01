@@ -4,10 +4,12 @@
 # 架构定位: Persistence Facade / Save Engine
 # 跨域依赖: 上游: WorldState, CharacterProgression, Inventory | 下游: FileAccess, VersionedRuntimeContext | 配置: config/infrastructure/save.json | 信号: 存档开始 / 成功 / 失败事件
 # 职责说明: 负责 .kalar_save 自洽存档文件的原子读写与 SHA-256 数据完整性校验。 存档目录/扩展名/信封版本/引擎标识/日志文案全部由 config/infrastructure/persistence.json 驱动。  完整性契约（重要）: 信封中【只存 data_json 一个数据字段】，不存在与之平行的 "data" 对象。 校验与消费必须指向同一字节序列：校验 data_json 的 SHA-256，并从 该字符串反序列化返回。若同时存在可写的 "data" 字段，攻击者只需改写 data 而不动 data_json 即可绕过校验，校验将形同虚设。  原子写契约: 写入 .tmp -> flush/close -> 备份旧档为 .bak -> rename 原子替换。 任一步失败都不会破坏已存在的正档（rename 是文件系统级原子操作）。  旧档兼容: 仅含 "data" 而无 "data_json" 的历史存档按 legacy 降级读取， 无法校验（缺少被签名的原始字节序列），返回 verified=false 并告警。
-# 设计依据: Phase 14 事务型存档原子写入规范
+# 设计依据: 事务型存档原子写入规范
 # ==============================================================================
 
 class_name SaveManager extends RefCounted
+
+const OP_RESTORE: String = "restore"
 
 # ==============================================================================
 # 一、状态与常量
@@ -25,7 +27,7 @@ static func ensure_save_directory() -> void:
 		DirAccess.make_dir_recursive_absolute(save_dir)
 	_cleanup_orphan_tmp_files(save_dir)
 
-## 孤儿临时文件清理（Phase 88 · A5 存档韧性）：原子写在 rename 前被中断会遗留 *{tmp_suffix}
+## 孤儿临时文件清理（· A5 存档韧性）：原子写在 rename 前被中断会遗留 *{tmp_suffix}
 ## 文件，既不参与校验也不被任何流程回收，长期累积占用存档目录。启动/写档入口按配置清理并留痕。
 static func _cleanup_orphan_tmp_files(save_dir: String) -> void:
 	if not GameConfig.get_bool("infrastructure.persistence", "recovery/orphan_tmp_cleanup", true):
@@ -142,7 +144,7 @@ static func load_game(save_name: String) -> Dictionary:
 		return _fail_or_recover("load", "INVALID_ENVELOPE", _msg("invalid_envelope"), save_name)
 	var env: Dictionary = envelope
 
-	# L6（Phase 56）：format_version 方向闸门（Inv-DF-4）——旧引擎不得静默直通未来版本存档，
+	# L6（）：format_version 方向闸门（Inv-DF-4）——旧引擎不得静默直通未来版本存档，
 	# 低于最低支持版本亦拒绝（迁移链外）。当前单版本：min == current（配置驱动）
 	var current_version := GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
 	var min_supported := GameConfig.get_string("infrastructure.persistence", "min_supported_version", "1.0.0")
@@ -161,12 +163,12 @@ static func load_game(save_name: String) -> Dictionary:
 		if env.has("data"):
 			push_warning("SaveManager: %s (%s)" % [_msg("legacy_unverified"), file_path])
 			EventBusCore.get_instance().emit_log("warn", _msg("legacy_unverified"))
-			return { "success": true, "data": env.get("data", {}), "meta": env, "verified": false, "stage": "LOAD", "error_code": "LEGACY_UNVERIFIED" }
+			return {"success": true, "data": env.get("data", {}), "meta": env, "verified": false, "stage": "LOAD", "error_code": "LEGACY_UNVERIFIED"}
 		return _fail("load", "INVALID_ENVELOPE", _msg("invalid_envelope"))
 
 	var calculated_hash := compute_sha256(raw_data_str)
 	if calculated_hash != recorded_hash:
-		return _fail_or_recover("load", "CHECKSUM_MISMATCH", _msg("checksum_mismatch"), save_name, { "recorded": recorded_hash, "calculated": calculated_hash })
+		return _fail_or_recover("load", "CHECKSUM_MISMATCH", _msg("checksum_mismatch"), save_name, {"recorded": recorded_hash, "calculated": calculated_hash})
 
 	# 从已被校验的字节序列反序列化，杜绝 data / data_json 不一致
 	var data_json := JSON.new()
@@ -177,52 +179,52 @@ static func load_game(save_name: String) -> Dictionary:
 		return _fail_or_recover("load", "INVALID_ENVELOPE", _msg("invalid_envelope"), save_name)
 
 	EventBusCore.get_instance().emit_log("info", _msg("load_success") % file_path)
-	return { "success": true, "data": parsed, "meta": env, "verified": true, "stage": "LOAD", "error_code": "" }
+	return {"success": true, "data": parsed, "meta": env, "verified": true, "stage": "LOAD", "error_code": ""}
 
 # ==============================================================================
 # 四、备份恢复
 # ==============================================================================
 
 ## 从备份恢复上一次的正档（用于新档写坏或误覆盖时回滚）。
-## 契约（Phase 31 S2）：先验证备份可读、写恢复临时文件，再原子交换到正档——
+## 契约（）：先验证备份可读、写恢复临时文件，再原子交换到正档——
 ## 不执行“先删除正档”（rename 覆盖即原子替换，旧正档保留到新正档就位）。
 static func restore_backup(save_name: String) -> Dictionary:
 	if not is_valid_save_name(save_name):
-		return _fail("restore", "INVALID_SAVE_NAME", _msg("invalid_save_name") % save_name)
+		return _fail(OP_RESTORE, "INVALID_SAVE_NAME", _msg("invalid_save_name") % save_name)
 	var file_path := _save_dir() + save_name + _save_extension()
 	var backup_path := file_path + _backup_suffix()
 	if not FileAccess.file_exists(backup_path):
-		return _fail("restore", "FILE_NOT_EXIST", _msg("file_not_exist") % backup_path)
+		return _fail(OP_RESTORE, "FILE_NOT_EXIST", _msg("file_not_exist") % backup_path)
 
 	# 1. 验证备份可读（不完整备份不进入恢复）
 	var backup_file := FileAccess.open(backup_path, FileAccess.READ)
 	if not backup_file:
-		return _fail("restore", "BACKUP_UNREADABLE", _msg("open_read_fail"))
+		return _fail(OP_RESTORE, "BACKUP_UNREADABLE", _msg("open_read_fail"))
 	var backup_content := backup_file.get_as_text()
 	backup_file.close()
 
-	# L6（Phase 56）：恢复前可解析性预检（Inv-DF-4）——截断/损坏的 .bak 即使可 open
+	# L6（）：恢复前可解析性预检（Inv-DF-4）——截断/损坏的 .bak 即使可 open
 	# 也拒绝覆盖正档（坏数据不得替换好数据）；预检失败正档保持原样
 	var backup_json := JSON.new()
 	if backup_json.parse(backup_content) != OK:
-		return _fail("restore", "BACKUP_CORRUPT", _msg("backup_corrupt") % backup_json.get_error_message())
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % backup_json.get_error_message())
 	var backup_data: Variant = backup_json.get_data()
 	if not backup_data is Dictionary:
-		return _fail("restore", "BACKUP_CORRUPT", _msg("backup_corrupt") % "顶层非对象")
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % "顶层非对象")
 	var env_b: Dictionary = backup_data
 	var backup_data_json: String = String(env_b.get("data_json", ""))
 	if not backup_data_json.is_empty():
 		var inner := JSON.new()
 		if inner.parse(backup_data_json) != OK:
-			return _fail("restore", "BACKUP_CORRUPT", _msg("backup_corrupt") % inner.get_error_message())
+			return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % inner.get_error_message())
 	elif not (env_b.get("data") is Dictionary):
-		return _fail("restore", "BACKUP_CORRUPT", _msg("backup_corrupt") % "无合法载荷")
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % "无合法载荷")
 
 	# 2. 写恢复临时文件（校验中间产物可写）
 	var tmp_path := file_path + _tmp_suffix()
 	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
 	if not tmp_file:
-		return _fail("restore", "OPEN_WRITE_FAIL", _msg("open_write_fail") % str(FileAccess.get_open_error()))
+		return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail") % str(FileAccess.get_open_error()))
 	tmp_file.store_string(backup_content)
 	tmp_file.flush()
 	tmp_file.close()
@@ -231,8 +233,8 @@ static func restore_backup(save_name: String) -> Dictionary:
 	var err := DirAccess.rename_absolute(tmp_path, file_path)
 	if err != OK:
 		DirAccess.remove_absolute(tmp_path)
-		return _fail("restore", "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail") % str(err))
-	return { "success": true, "stage": "RESTORE_COMMIT", "error_code": "", "path": file_path }
+		return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail") % str(err))
+	return {"success": true, "stage": "RESTORE_COMMIT", "error_code": "", "path": file_path}
 
 # ==============================================================================
 # 五、内部实现（原子写 / 失败构造 / 配置读取）
@@ -248,7 +250,7 @@ static func _fail(stage: String, error_code: String, error_text: String) -> Dict
 		"recovery": ""
 	}
 
-## Phase 88 · A5 读取失败统一出口：对「正档损坏」类失败按配置尝试从 .bak 自动恢复并重读一次。
+## · A5 读取失败统一出口：对「正档损坏」类失败按配置尝试从 .bak 自动恢复并重读一次。
 ## 契约：① 仅损坏类错误码走本出口（版本方向闸门 / 文件缺失不参与，避免掩盖真实错误）；
 ## ② 恢复深度硬上限 1（_recovering 守卫，防 .bak 亦坏时的无界递归）；
 ## ③ 恢复或重读任一不成功，一律回退原始失败结果，绝不美化失败语义。
@@ -302,7 +304,7 @@ static func _atomic_write(file_path: String, content: String) -> Dictionary:
 
 	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
 	if not tmp_file:
-		return { "success": false, "error": _msg("open_write_fail") % str(FileAccess.get_open_error()) }
+		return {"success": false, "error": _msg("open_write_fail") % str(FileAccess.get_open_error())}
 	tmp_file.store_string(content)
 	tmp_file.flush()
 	tmp_file.close()
@@ -321,14 +323,14 @@ static func _atomic_write(file_path: String, content: String) -> Dictionary:
 	var rename_err := DirAccess.rename_absolute(tmp_path, file_path)
 	if rename_err != OK:
 		DirAccess.remove_absolute(tmp_path)
-		return { "success": false, "error": _msg("atomic_replace_fail") % str(rename_err) }
+		return {"success": false, "error": _msg("atomic_replace_fail") % str(rename_err)}
 	return {}
 
 ## 直写模式（atomic_write 禁用时）：直接写文件（无备份/无原子替换保护）
 static func _write_direct(file_path: String, content: String) -> Dictionary:
 	var file := FileAccess.open(file_path, FileAccess.WRITE)
 	if not file:
-		return { "success": false, "error": _msg("open_write_fail") % str(FileAccess.get_open_error()) }
+		return {"success": false, "error": _msg("open_write_fail") % str(FileAccess.get_open_error())}
 	file.store_string(content)
 	file.flush()
 	file.close()
@@ -354,7 +356,7 @@ static func _backup_suffix() -> String:
 static func _max_name_len() -> int:
 	return GameConfig.get_int("infrastructure.persistence", "atomic_write/max_save_name_length", 64)
 
-## L6（Phase 56）：点分版本比较（a > b 返回 true；非数字段按 0 处理）
+## L6（）：点分版本比较（a > b 返回 true；非数字段按 0 处理）
 static func _version_newer_than(a: String, b: String) -> bool:
 	var pa := a.split(".")
 	var pb := b.split(".")

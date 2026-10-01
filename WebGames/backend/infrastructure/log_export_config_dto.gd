@@ -4,7 +4,7 @@
 # 架构定位: Log Collector & Stream Processor
 # 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 映射 config/infrastructure/log.json 中 export 段配置，驱动文件落盘、 轮转与过滤策略，支持热重载自愈（Inv-LG-4）。
-# 设计依据: Phase 52 统一结构化日志规范 / Phase 60 性能基准审计
+# 设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 class_name LogExportConfigDTO extends RefCounted

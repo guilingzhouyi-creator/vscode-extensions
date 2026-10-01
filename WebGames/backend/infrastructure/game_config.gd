@@ -18,12 +18,12 @@ const CONFIG_DIR: String = "res://config/"
 static var _tables: Dictionary = {}
 static var _loaded: bool = false
 
-## Phase 44 P2：路径分段解析缓存（table:path 每调用 split 重建的消除）。
+## 路径分段解析缓存（table:path 每调用 split 重建的消除）。
 ## 键域 = 代码内静态字面量路径（有界）；只缓存分段不含值——热重载表值变化天然生效，
 ## 成功交换后仍清空为防御（表键集可能变化）。
 static var _path_cache: Dictionary = {}
 
-## 路径分段缓存上限（Phase 56 L8）：防运行期动态键（msg/拼接路径）无界增长
+## 路径分段缓存上限：防运行期动态键（msg/拼接路径）无界增长
 const PATH_CACHE_MAX_ENTRIES: int = 4096
 
 ## 必需配置表清单（分层规范：infrastructure.* / domains.* / frontend.* / items.*）。
@@ -148,7 +148,7 @@ static func describe() -> Dictionary:
 static var _reload_counter: int = 0
 
 ## 当前热重载版本只读访问（供各域静态缓存做版本比对自动失效重建，
-## 与 reload_config 成功发布保持同源，Phase 64 P2 修复）
+## 与 reload_config 成功发布保持同源）
 static func config_reload_version() -> int:
 	return _reload_counter
 
@@ -160,7 +160,7 @@ static var _scan_failures: Array = []
 ## 命名注意：不可命名为 reload()——GDScript 内建 GDScript.reload() 会遮蔽同名静态方法
 ## （调用被解析到脚本资源重载并返回 Error，导致热重载永远不生效），故统一使用 reload_config()。
 static func reload_config() -> Dictionary:
-	# 深拷贝旧快照（Phase 87 修复）：GDScript Dictionary 为引用类型，若直接赋值则与 _tables 同体，
+	# 深拷贝旧快照：GDScript Dictionary 为引用类型，若直接赋值则与 _tables 同体，
 	# 后续 _tables.clear() 会连带清空旧快照，使失败路径回滚退化为空操作、added/changed/removed 恒空。
 	var old_tables: Dictionary = _tables.duplicate(true)
 	var old_loaded: bool = _loaded
@@ -170,7 +170,7 @@ static func reload_config() -> Dictionary:
 	_tables.clear()
 	_scan_dir(CONFIG_DIR, "")
 	var built: Dictionary = _tables
-	_tables = old_tables  # 先还原旧表（构建阶段不污染运行快照）
+	_tables = old_tables # 先还原旧表（构建阶段不污染运行快照）
 
 	if not _scan_failures.is_empty():
 		# 构建失败（存在坏配置：JSON 解析失败/顶层非对象）——保留旧快照继续服务，版本不推进
@@ -234,7 +234,7 @@ static func reload_config() -> Dictionary:
 	_reload_counter += 1
 	_tables = built
 	_loaded = true
-	_path_cache.clear() # P2：表键集可能变化，防御性清空分段缓存
+	_path_cache.clear() # 表键集可能变化，防御性清空分段缓存
 	EventBusCore.get_instance().emit_domain_event("config.security_reloaded", {"version": _reload_counter, "changed": changed})
 	return {
 		"success": true,
@@ -245,7 +245,7 @@ static func reload_config() -> Dictionary:
 		"table_count": _tables.size()
 	}
 
-## Phase 74: 别名委托 reload_config()
+## 别名委托 reload_config()
 static func reload_all_configurations() -> Dictionary:
 	return reload_config()
 
@@ -339,7 +339,7 @@ static func get_array(table_name: String, path: String, default: Array = []) -> 
 	var v: Variant = get_value(table_name, path, default)
 	return v if v is Array else default
 
-## Phase 44 P2：批量取值（热路径一次取参）。单次 ensure_loaded + 单次取表根，
+## 批量取值（热路径一次取参）。单次 ensure_loaded + 单次取表根，
 ## 逐路径复用 _split_path 分段缓存，与逐键 get_value(table, p, null) 逐位等价
 ## （含数组下标路径；缺失路径不含键、不抛错——调用方自带默认回退）。
 static func get_many(table_name: String, paths: PackedStringArray) -> Dictionary:
@@ -349,24 +349,25 @@ static func get_many(table_name: String, paths: PackedStringArray) -> Dictionary
 	for path in paths:
 		if path.is_empty():
 			continue
-		var cur: Variant = table
-		var hit := true
-		for part in _split_path(path):
-			if cur is Dictionary and cur.has(part):
-				cur = cur[part]
-			elif cur is Array and part.is_valid_int():
-				var idx := part.to_int()
-				if idx >= 0 and idx < (cur as Array).size():
-					cur = (cur as Array)[idx]
-				else:
-					hit = false
-					break
-			else:
-				hit = false
-				break
-		if hit:
-			out[path] = cur
+		var val: Variant = _lookup_path_in_table(table, path)
+		if val != null:
+			out[path] = val
 	return out
+
+static func _lookup_path_in_table(table: Variant, path: String) -> Variant:
+	var cur: Variant = table
+	for part in _split_path(path):
+		if cur is Dictionary and cur.has(part):
+			cur = cur[part]
+		elif cur is Array and part.is_valid_int():
+			var idx := part.to_int()
+			if idx >= 0 and idx < (cur as Array).size():
+				cur = (cur as Array)[idx]
+			else:
+				return null
+		else:
+			return null
+	return cur
 
 ## 领域文案统一读取：表 = narratives.<domain_id>，未命中回退键名本身。
 ## 各领域 `_msg(key)` 私有助手一律一行委托到此（语义单点化，改动只需改这一处）；
@@ -384,8 +385,8 @@ static func _split_path(path: String) -> PackedStringArray:
 	if _path_cache.has(path):
 		return _path_cache[path]
 	var parts := path.split("/")
-	# L8（Phase 56/69 优化）：路径缓存有界 FIFO——动态文案键可无限增长，超限时仅淘汰最旧一条
-	# （原 clear() 粗暴清空 4096 导致抖动；现 O(1) 均摊淘汰，对齐 BoundedResourceCache 语义，热重载仍整体清空）
+	# 路径缓存有界 FIFO——动态文案键可无限增长，超限时仅淘汰最旧一条
+	# （超限时淘汰最旧条目，对齐 BoundedResourceCache 语义，热重载仍整体清空）
 	if _path_cache.size() >= PATH_CACHE_MAX_ENTRIES:
 		var oldest: String = ""
 		for k in _path_cache:

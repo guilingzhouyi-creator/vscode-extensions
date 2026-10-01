@@ -4,7 +4,7 @@
 # 架构定位: Log Collector & Stream Processor
 # 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 统一采集全域日志，业务入口签发并维护 trace_id，构造期脱敏 (RedactionRule)， 提取仅含 basename 的源文件与行号，下游多路分发至 EventBus、LogRingBuffer 与 TelemetryAggregate。
-# 设计依据: Phase 52 统一结构化日志规范 / Phase 60 性能基准审计
+# 设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 class_name LogCollector extends RefCounted

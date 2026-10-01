@@ -4,7 +4,7 @@
 # 架构定位: Event Broker / Decoupling Foundation
 # 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 全域解耦事件中枢核心单例：提供强类型事件订阅、通道路由、同步即时派发与异步队列缓冲支持；包含强弱引用生命周期管理，彻底防范观察者内存泄漏与悬挂指针双重广播。
-# 设计依据: Phase 20 事件总线解耦规范 / Phase 77 前后端通信隔离契约
+# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
 class_name EventBusCore
@@ -12,15 +12,15 @@ extends RefCounted
 
 static var _instance: EventBusCore = null
 
-var _channel_routes: Dictionary = {}   # channel_id(int) -> Array[EventBusSubscriptionToken]（掩码过滤按 token 内联判定）
+var _channel_routes: Dictionary = {} # channel_id(int) -> Array[EventBusSubscriptionToken]（掩码过滤按 token 内联判定）
 var _spatial_grid: HeadlessSpatialHashGrid3D = null
 var _ring_buffer: PingPongRingBuffer = null
 var _pool: EventPool = null
 var _seq_counter: int = 0
 var _dispatch_depth: int = 0
 var _max_depth: int = 16
-var _target_scratch: Array = []    # 按递归深度索引的目标暂存池（复用免热路径堆分配）
-var _seen_scratch: Array = []      # 按递归深度索引的通配去重池（O(n) 去重，替代线性 has 扫描）
+var _target_scratch: Array = [] # 按递归深度索引的目标暂存池（复用免热路径堆分配）
+var _seen_scratch: Array = [] # 按递归深度索引的通配去重池（O(n) 去重，替代线性 has 扫描）
 
 # ---- 叙事表缓存（自旧总线迁正：域 id → 文案表名，按配置重载版本失效） ----
 static var _record_seq: int = 0
@@ -68,6 +68,8 @@ func borrow_packet(channel_id: int, category_mask: int, payload: Variant = null)
 	return packet
 
 func recycle_packet(packet: EventPacket) -> void:
+	if packet == null:
+		return
 	_pool.recycle(packet)
 
 # ==============================================================================
@@ -83,7 +85,7 @@ func subscribe(channel_id: int, category_mask: int, callback: Callable) -> Event
 	_channel_routes[channel_id].append(token)
 	return token
 
-## 便捷全通订阅接口 (Phase 74 治理信令监听)
+## 便捷全通订阅接口 (治理信令监听)
 func on(channel_id: int, callback: Callable) -> EventBusSubscriptionToken:
 	return subscribe(channel_id, EventCategoryMask.MASK_ALL, callback)
 
@@ -166,7 +168,7 @@ func dispatch_now(packet: EventPacket) -> void:
 
 	targets.clear()
 	seen.clear()
-	_dispatch_depth = depth  # 自愈式恢复：无论回调如何扰动计数，退出时锚定进入前快照
+	_dispatch_depth = depth # 自愈式恢复：无论回调如何扰动计数，退出时锚定进入前快照
 
 # ==============================================================================
 # 原语 ②：enqueue_frame + flush_frame_events（帧级双缓冲合批）

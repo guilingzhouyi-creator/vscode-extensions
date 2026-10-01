@@ -4,7 +4,7 @@
 # 架构定位: Log Collector & Stream Processor
 # 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 维持内存中最近 N 条结构化日志（有界收敛），支撑实时检索与运维查询， 容量由 log.json structured/ring_buffer_capacity 配置驱动（有界收敛惯例）。
-# 设计依据: Phase 52 统一结构化日志规范 / Phase 60 性能基准审计
+# 设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 class_name LogRingBuffer extends RefCounted
@@ -24,10 +24,12 @@ static func reset_state() -> void:
 	clear()
 	set_capacity_override_for_test(-1)
 
-## 清空缓冲（容量配置保留）
-static func clear() -> void:
+## 清空缓冲（容量配置保留），返回清空条目数
+static func clear() -> int:
+	var count := _buffer.size()
 	_buffer.clear()
 	_head = 0
+	return count
 
 ## 测试专用容量覆盖（cap<=0 恢复配置驱动；cap>0 强制容量并重建）
 static func set_capacity_override_for_test(cap: int) -> void:
@@ -49,7 +51,7 @@ static func _ensure_capacity_fresh() -> void:
 	if _cached_version == current_version:
 		return
 	_cached_version = current_version
-	
+
 	var new_cap := GameConfig.get_int("infrastructure.log", "structured/ring_buffer_capacity", 1000)
 	new_cap = maxi(1, new_cap)
 	if new_cap != _capacity:
@@ -90,17 +92,10 @@ static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -
 			continue
 		if from_utc > 0 and rec.timestamp_utc < from_utc:
 			continue
-		if not levels.is_empty():
-			var hit_lvl := false
-			for lvl in levels:
-				if rec.level.nocasecmp_to(str(lvl)) == 0:
-					hit_lvl = true
-					break
-			if not hit_lvl:
-				continue
-		if not channels.is_empty():
-			if not (rec.channel in channels):
-				continue
+		if not levels.is_empty() and not _matches_level(rec.level, levels):
+			continue
+		if not channels.is_empty() and not (rec.channel in channels):
+			continue
 		out.append(rec)
 	# 环绕覆盖后存储序非时间序：按 sequence 重排，保证调用方拿到时间序
 	out.sort_custom(func(a: Variant, b: Variant) -> bool:
@@ -108,13 +103,19 @@ static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -
 	)
 	return out
 
+static func _matches_level(rec_level: String, levels: Array) -> bool:
+	for lvl in levels:
+		if rec_level.nocasecmp_to(str(lvl)) == 0:
+			return true
+	return false
+
 ## 全量复制返回（只读语义，调用方改副本不影响缓冲）
 static func get_all() -> Array:
 	return _buffer.duplicate()
 
 ## 当前缓冲条目数
 static func size() -> int:
-	return _buffer.size()
+	return maxi(0, _buffer.size())
 
 ## 当前容量（配置驱动，含热重载刷新）
 static func get_capacity() -> int:

@@ -4,7 +4,7 @@
 # 架构定位: Error Code Registry / Reporter
 # 跨域依赖: 上游: 全域后端与前端边界 | 下游: UnifiedLoggerService | 配置: config/infrastructure/errors.json | 信号: 严重错误上报信号
 # 职责说明: 维护由 config/infrastructure/errors_catalog.json 驱动的全域英文协议错误码， 提供错误码校验、严重度映射、i18n 键定位与未登记遥测断点（Inv-LG-2）。
-# 设计依据: Phase 75 错误码统一与可证伪契约
+# 设计依据: 错误码统一与可证伪契约
 # ==============================================================================
 
 class_name ErrorCodeRegistry extends RefCounted

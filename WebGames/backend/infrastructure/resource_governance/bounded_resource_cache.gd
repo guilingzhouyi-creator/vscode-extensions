@@ -4,7 +4,7 @@
 # 架构定位: Memory Governor / Bounded Cache
 # 跨域依赖: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
 # 职责说明: 有界资源缓存容器：基于 LRU 权重算法管理已载入的只读静态配置与纹理/音效资源，强制受控于内存配额上限，防无界内存泄漏。
-# 设计依据: Phase 56 有界资源与内存生命周期治理标准
+# 设计依据: 有界资源与内存生命周期治理标准
 # ==============================================================================
 
 class_name BoundedResourceCache extends RefCounted
@@ -14,7 +14,7 @@ const CachePolicySpec = preload("res://backend/infrastructure/resource_governanc
 var _spec: CachePolicySpec
 var _store: Dictionary = {}
 var _access_order_dict: Dictionary = {} # 有序集合（Dictionary 保持插入序）用于 LRU/FIFO 追踪，O(1) 触达/淘汰
-var _timestamps: Dictionary = {}     # key -> float (秒)
+var _timestamps: Dictionary = {} # key -> float (秒)
 
 func _init(p_spec: CachePolicySpec = null) -> void:
 	if p_spec != null:
@@ -30,7 +30,7 @@ func get_spec() -> CachePolicySpec:
 func put(p_key: String, p_value: Variant) -> void:
 	if p_key.is_empty():
 		return
-	
+
 	# 若已存在，更新值与访问顺序（LRU 需触达，FIFO 保持插入序不变）
 	if _store.has(p_key):
 		_store[p_key] = p_value
@@ -38,11 +38,11 @@ func put(p_key: String, p_value: Variant) -> void:
 		if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.LRU:
 			_touch(p_key)
 		return
-	
+
 	# 容量已满，执行驱逐
 	while _store.size() >= _spec.max_capacity:
 		_evict_one()
-	
+
 	_store[p_key] = p_value
 	_timestamps[p_key] = Time.get_unix_time_from_system()
 	_access_order_dict[p_key] = true
@@ -51,7 +51,7 @@ func put(p_key: String, p_value: Variant) -> void:
 func get_val(p_key: String, p_default: Variant = null) -> Variant:
 	if not _store.has(p_key):
 		return p_default
-	
+
 	# TTL 过期检查
 	if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.TTL:
 		var created_time: float = float(_timestamps.get(p_key, 0.0))
@@ -59,10 +59,10 @@ func get_val(p_key: String, p_default: Variant = null) -> Variant:
 		if current_time - created_time > _spec.ttl_seconds:
 			_remove_internal(p_key)
 			return p_default
-	
+
 	if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.LRU:
 		_touch(p_key)
-	
+
 	return _store[p_key]
 
 ## 判定条目是否存在且未过期
@@ -113,13 +113,15 @@ func clear_on_hot_reload() -> void:
 	if _spec.allow_hot_reload_clear:
 		clear()
 
-func clear() -> void:
+func clear() -> int:
+	var count := _store.size()
 	_store.clear()
 	_timestamps.clear()
 	_access_order_dict.clear()
+	return count
 
 func size() -> int:
-	return _store.size()
+	return maxi(0, _store.size())
 
 func keys() -> Array[String]:
 	var res: Array[String] = []

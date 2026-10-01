@@ -4,7 +4,7 @@
 # 架构定位: Memory Governor / Bounded Cache
 # 跨域依赖: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
 # 职责说明: 作用域事件订阅门面：为短生命周期对象（UI 视图、瞬态战斗实体）提供集中订阅托管，在实体退出场景树时一键清空全部监听信号。
-# 设计依据: Phase 56 有界资源与内存生命周期治理标准
+# 设计依据: 有界资源与内存生命周期治理标准
 # ==============================================================================
 
 class_name ScopedEventSubscriber extends RefCounted

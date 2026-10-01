@@ -4,7 +4,7 @@
 # 架构定位: Lifecycle Orchestrator / Assembly Engine
 # 跨域依赖: 上游: Main Scene, Headless Test Runner | 下游: GameConfig, ItemRegistryCatalog, VersionGovernance | 配置: config/infrastructure/admin.json, config/infrastructure/domains.json | 信号: 全域启动装配完成事件
 # 职责说明: 引擎全域生命周期唯一启动装配入口（幂等安全）：执行配置就绪核验 → 物品与魔法注册表装配 → 内置 GM 审计命令加载 → 版本化上下文激活。
-# 设计依据: Phase 74 版本化上下文 / Phase 83 启动幂等性装配契约
+# 设计依据: 版本化上下文 / 启动幂等性装配契约
 # ==============================================================================
 
 class_name GameBootstrap
@@ -20,11 +20,11 @@ const VersionActivationGate = preload("res://backend/domains/version_governance/
 
 static var _assembled: bool = false
 static var _catalog: ItemRegistryCatalog = null
-static var _magic_registry: MagicTierRegistry = null  # Phase 33：魔法体系统一登记注册表（唯一装配）
-static var _magic_rules: MagicRuleRegistry = null     # Phase 41：统一魔法规则注册表（唯一装配）
+static var _magic_registry: MagicTierRegistry = null  # ：魔法体系统一登记注册表（唯一装配）
+static var _magic_rules: MagicRuleRegistry = null     # ：统一魔法规则注册表（唯一装配）
 static var _ground_loot_listener: GroundLootEventListener = null  # GAP-05：地面掉落事件监听器
-static var _quality_registry: QualityTierRegistry = null  # Phase 44 P1：品质登记表装配期单例（懒装配，见 quality_tier_registry()）
-static var _active_context: VersionedRuntimeContext = null # Phase 74：当前激活的版本化运行时上下文
+static var _quality_registry: QualityTierRegistry = null  # 品质登记表装配期单例（懒装配，见 quality_tier_registry()）
+static var _active_context: VersionedRuntimeContext = null # ：当前激活的版本化运行时上下文
 
 # ==============================================================================
 # 二、装配 / 反装配
@@ -40,16 +40,16 @@ static func assemble() -> Dictionary:
 			"registered_commands": CommandRegistryEngine.registered_count()
 		}
 	GameConfig.ensure_loaded()
-	# Phase 72：EventBus 2.0 生产单例装配（配置驱动参数；幂等，get_instance 惰性创建）
+	# ：EventBus 2.0 生产单例装配（配置驱动参数；幂等，get_instance 惰性创建）
 	EventBusCore.get_instance().initialize_from_config()
 	if not _security_ready():
 		return {"success": false, "error_code": "SECURITY_CONFIG_INVALID"}
-	# Phase 33：魔法体系统一登记注册表唯一装配——就绪失败阻断装配（不暴露半成品）
+	# ：魔法体系统一登记注册表唯一装配——就绪失败阻断装配（不暴露半成品）
 	_magic_registry = MagicTierRegistry.new()
 	_magic_registry.reload_configuration()
 	if not _magic_registry.is_ready():
 		return {"success": false, "error_code": "MAGIC_REGISTRY_INVALID"}
-	# Phase 41：统一魔法规则注册表唯一装配——就绪失败阻断装配（不暴露半成品）
+	# ：统一魔法规则注册表唯一装配——就绪失败阻断装配（不暴露半成品）
 	_magic_rules = MagicRuleRegistry.new()
 	_magic_rules.reload_configuration()
 	if not _magic_rules.is_ready():
@@ -66,7 +66,7 @@ static func assemble() -> Dictionary:
 		"registered_commands": CommandRegistryEngine.registered_count()
 	}
 
-## Phase 74: 版本化装配入口 (前置版本门禁拦截)
+## : 版本化装配入口 (前置版本门禁拦截)
 static func assemble_versioned(target_version: String, token: ActivationTokenDTO) -> Dictionary:
 	# 1. 基础配置预加载
 	GameConfig.ensure_loaded()
@@ -107,7 +107,7 @@ static func assemble_versioned(target_version: String, token: ActivationTokenDTO
 		"item_count": _catalog._canonical_registry.size() if _catalog != null else 0
 	}
 
-## Phase 74: 获取当前活跃的版本运行时上下文
+## : 获取当前活跃的版本运行时上下文
 static func get_active_context() -> VersionedRuntimeContext:
 	return _active_context
 
@@ -128,12 +128,12 @@ static func catalog() -> ItemRegistryCatalog:
 	assemble()
 	return _catalog
 
-## Phase 33：访问装配后的魔法登记注册表（解析器/消费方经此注入 registry 查询接口——禁直接读配置）
+## ：访问装配后的魔法登记注册表（解析器/消费方经此注入 registry 查询接口——禁直接读配置）
 static func magic_registry() -> MagicTierRegistry:
 	assemble()
 	return _magic_registry
 
-## Phase 41：访问装配后的统一魔法规则注册表（规则引擎/求解器经此查询配置段）
+## ：访问装配后的统一魔法规则注册表（规则引擎/求解器经此查询配置段）
 static func magic_rules_registry() -> MagicRuleRegistry:
 	assemble()
 	return _magic_rules
@@ -143,7 +143,7 @@ static func ground_loot_listener() -> GroundLootEventListener:
 	assemble()
 	return _ground_loot_listener
 
-## Phase 44 P1：访问装配后的品质登记注册表单例（懒装配 + 幂等，装配失败不阻断）。
+## 访问装配后的品质登记注册表单例（懒装配 + 幂等，装配失败不阻断）。
 ## ItemInstanceFactory 发放热路径经此取单例，杜绝「每实例 new()+reload_configuration()」
 ## 整表重建（原 item_instance_factory.gd:17-23 反模式）；就绪失败返回 null 由调用方兜底。
 static func quality_tier_registry() -> QualityTierRegistry:
@@ -156,7 +156,7 @@ static func quality_tier_registry() -> QualityTierRegistry:
 static func is_assembled() -> bool:
 	return _assembled
 
-## Phase 58：全域反装配（对称幂等）：释放静态单例、解绑全局事件监听器并重置装配标记
+## ：全域反装配（对称幂等）：释放静态单例、解绑全局事件监听器并重置装配标记
 static func teardown() -> Dictionary:
 	if not _assembled:
 		return {
