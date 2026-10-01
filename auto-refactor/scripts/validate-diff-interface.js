@@ -25,6 +25,15 @@ const path = require('path');
 
 const { scan, scanDiff, scanDiffDelta, scanAndRender } = require('../dist/api');
 
+const DEFAULT_TMP_DIR =
+  process.env.AUTO_REFACTOR_TMPDIR ||
+  (fs.existsSync('D:/') ? 'D:/temp' : path.join(__dirname, '..', '.tmp-diffif'));
+try {
+  fs.mkdirSync(DEFAULT_TMP_DIR, { recursive: true });
+} catch {
+  // best-effort
+}
+
 /**
  * Write a set of fixture files into a directory tree.
  *
@@ -81,7 +90,7 @@ const CONFIG = {
 
 async function main() {
   // ── 1. Full scan: all passes, cross-file findings included ──
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-diffif-'));
+  const root = fs.mkdtempSync(path.join(DEFAULT_TMP_DIR, 'ar-diffif-'));
   const configPath = path.join(root, 'auto-refactor.config.json');
   const baselinePath = path.join(root, 'baseline.json');
   const reportPath = path.join(root, 'report.json');
@@ -167,7 +176,7 @@ async function main() {
     console.log('  [PASS] delta report is a strict filter of the diff report');
 
     // ── 4. CLI changed-set mode: exact paths, incremental scope declared ──
-    const gitRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-diffcli-'));
+    const gitRoot = fs.mkdtempSync(path.join(DEFAULT_TMP_DIR, 'ar-diffcli-'));
     // A fixture repository must not inherit the developer's global git identity, and must never
     // block: with `commit.gpgsign=true` globally and an unavailable keyring, `git commit` waits for
     // a passphrase forever and hangs the entire gate. The timeout turns any future hang into a loud

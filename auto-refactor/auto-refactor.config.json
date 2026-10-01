@@ -4,8 +4,20 @@
   "failOnIssue": false,
   "commentLevel": "standard",
   "autoTuneScale": true,
-  "include": ["src/**/*.ts", "scripts/*.js", "crates/**/*.rs"],
-  "exclude": ["node_modules", ".git", "dist", "build", "coverage", "testdata"],
+  "include": [
+    "src/**/*.ts",
+    "scripts/*.js",
+    "crates/**/*.rs"
+  ],
+  "exclude": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    "coverage",
+    "testdata",
+    "archive"
+  ],
   "thresholds": {
     "magicNumberMin": 3,
     "duplicateLiteralThreshold": 4,
@@ -17,8 +29,18 @@
     "fileFunctionsWarn": 20,
     "complexityWarn": 12,
     "complexityFail": 25,
-    "blockingIoAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**", "src/core/intelligence/**"],
-    "allocationAllowPatterns": ["scripts/**", "src/cli/**", "src/core/profiler/**", "src/core/intelligence/**"]
+    "blockingIoAllowPatterns": [
+      "scripts/**",
+      "src/cli/**",
+      "src/core/profiler/**",
+      "src/core/intelligence/**"
+    ],
+    "allocationAllowPatterns": [
+      "scripts/**",
+      "src/cli/**",
+      "src/core/profiler/**",
+      "src/core/intelligence/**"
+    ]
   },
   "analyzers": {
     "constants": {

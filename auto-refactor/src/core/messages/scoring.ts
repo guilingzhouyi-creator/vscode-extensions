@@ -421,6 +421,16 @@ export const ScoringRationales = {
         `Object-pool contract breached: a pooled instance is reused without a full reset, so state leaks from the previous owner: ${msg}`,
     GDSCRIPT_MODERNIZATION: (msg: string) =>
         `Godot engine host contract or migration requirement violated: ${msg}`,
+    GDSCRIPT_DEBOUNCE_MISSING: (msg: string) =>
+        `Interactive action missing debounce or concurrent loading fence: ${msg}`,
+    GDSCRIPT_FSM_WILD_MUTATION: (msg: string) =>
+        `Finite state machine invariant breached: state modified directly without transition guard: ${msg}`,
+    GDSCRIPT_WEAKREF_MISSING: (msg: string) =>
+        `Dynamic observer or registry holds strong Node reference risking leak: ${msg}`,
+    GDSCRIPT_HARDCODED_PIXELS: (msg: string) =>
+        `Hardcoded fixed pixel dimensions violate responsive layout contracts: ${msg}`,
+    GDSCRIPT_DTO_IN_PLACE_MUTATION: (msg: string) =>
+        `Presentation layer performs in-place mutation on immutable Snapshot DTO: ${msg}`,
 
     // ── 冗余（redundancy）族 ────────────────────────────────────────────────────────
 

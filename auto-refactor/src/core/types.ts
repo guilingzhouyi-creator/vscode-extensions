@@ -742,6 +742,8 @@ export interface ScanConfig {
     archetype?: ProjectArchetype;
     /** Whether to activate sparse rule routing based on project archetype. */
     sparseRouting?: boolean;
+    /** Explicit review profile targeting frontend, backend, or composite quality audit. */
+    reviewProfile?: import('./scoring/scoringTypes').QualityReviewProfile;
 }
 
 /**
@@ -865,6 +867,7 @@ export interface ScanReport {
 }
 
 export * from './scoring/scoringTypes';
+export type { QualityReviewProfile } from './scoring/scoringTypes';
 export * from './memory/types';
 export * from './trajectory/types';
 export * from './praxis/contracts';

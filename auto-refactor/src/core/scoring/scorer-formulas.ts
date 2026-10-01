@@ -16,10 +16,10 @@
 
 import type { FileMetric, ScanConfig } from '../types';
 import type {
-    QualityDimension,
-    QualityGrade,
-    QualityScoreRationale,
-    QualityWeights,
+  QualityDimension,
+  QualityGrade,
+  QualityScoreRationale,
+  QualityWeights,
 } from './scoringTypes';
 import { ALL_QUALITY_DIMENSIONS, DIMENSION_ANALYZERS, DIMENSION_SCALE_MODE } from './scoringTypes';
 
@@ -69,23 +69,23 @@ export const PERCENT_SCALE = 100;
  * @returns Partitioned dimensions and active analyzer sets.
  */
 export function calculateEvaluatedDimensions(config?: ScanConfig): {
-    evaluatedBy: Partial<Record<QualityDimension, string[]>>;
-    notEvaluated: QualityDimension[];
-    evaluatedDimensions: QualityDimension[];
+  evaluatedBy: Partial<Record<QualityDimension, string[]>>;
+  notEvaluated: QualityDimension[];
+  evaluatedDimensions: QualityDimension[];
 } {
-    const evaluatedBy: Partial<Record<QualityDimension, string[]>> = {};
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        evaluatedBy[dim] = DIMENSION_ANALYZERS[dim].filter((id) => {
-            if (config === undefined) return true;
-            const declaration = config.analyzers?.[id];
-            return declaration !== undefined && declaration.enabled !== false;
-        });
-    }
-    const notEvaluated = ALL_QUALITY_DIMENSIONS.filter(
-        (dim) => (evaluatedBy[dim] ?? []).length === 0,
-    );
-    const evaluatedDimensions = ALL_QUALITY_DIMENSIONS.filter((dim) => !notEvaluated.includes(dim));
-    return { evaluatedBy, notEvaluated, evaluatedDimensions };
+  const evaluatedBy: Partial<Record<QualityDimension, string[]>> = {};
+  for (const dim of ALL_QUALITY_DIMENSIONS) {
+    evaluatedBy[dim] = DIMENSION_ANALYZERS[dim].filter((id) => {
+      if (config === undefined) return true;
+      const declaration = config.analyzers?.[id];
+      return declaration !== undefined && declaration.enabled !== false;
+    });
+  }
+  const notEvaluated = ALL_QUALITY_DIMENSIONS.filter(
+    (dim) => (evaluatedBy[dim] ?? []).length === 0,
+  );
+  const evaluatedDimensions = ALL_QUALITY_DIMENSIONS.filter((dim) => !notEvaluated.includes(dim));
+  return { evaluatedBy, notEvaluated, evaluatedDimensions };
 }
 
 /**
@@ -104,39 +104,39 @@ export function calculateEvaluatedDimensions(config?: ScanConfig): {
  * @returns Audit trail map partitioned by quality dimension.
  */
 export function groupDeductionsByDimension(
-    rationales: QualityScoreRationale[],
-    linearPoints: Record<QualityDimension, number>,
-    effectivePoints: Record<QualityDimension, number>,
+  rationales: QualityScoreRationale[],
+  linearPoints: Record<QualityDimension, number>,
+  effectivePoints: Record<QualityDimension, number>,
 ): Record<
+  QualityDimension,
+  {
+    points: number;
+    effectivePoints: number;
+    entries: { rule: string; points: number; reason: string }[];
+  }
+> {
+  const deductionsByDimension = {} as Record<
     QualityDimension,
     {
-        points: number;
-        effectivePoints: number;
-        entries: { rule: string; points: number; reason: string }[];
+      points: number;
+      effectivePoints: number;
+      entries: { rule: string; points: number; reason: string }[];
     }
-> {
-    const deductionsByDimension = {} as Record<
-        QualityDimension,
-        {
-            points: number;
-            effectivePoints: number;
-            entries: { rule: string; points: number; reason: string }[];
-        }
-    >;
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        deductionsByDimension[dim] = { points: 0, effectivePoints: 0, entries: [] };
-    }
-    for (const entry of rationales) {
-        const bucket = deductionsByDimension[entry.dimension];
-        const points = -entry.delta;
-        bucket.points += points;
-        bucket.entries.push({ rule: entry.rule ?? 'metric', points, reason: entry.reason });
-    }
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        deductionsByDimension[dim].points = linearPoints[dim];
-        deductionsByDimension[dim].effectivePoints = effectivePoints[dim];
-    }
-    return deductionsByDimension;
+  >;
+  for (const dim of ALL_QUALITY_DIMENSIONS) {
+    deductionsByDimension[dim] = { points: 0, effectivePoints: 0, entries: [] };
+  }
+  for (const entry of rationales) {
+    const bucket = deductionsByDimension[entry.dimension];
+    const points = -entry.delta;
+    bucket.points += points;
+    bucket.entries.push({ rule: entry.rule ?? 'metric', points, reason: entry.reason });
+  }
+  for (const dim of ALL_QUALITY_DIMENSIONS) {
+    deductionsByDimension[dim].points = linearPoints[dim];
+    deductionsByDimension[dim].effectivePoints = effectivePoints[dim];
+  }
+  return deductionsByDimension;
 }
 
 /**
@@ -165,56 +165,56 @@ export const COMPOSITE_INDEX_FLOOR = 15;
  * @returns Composite score rounded to one decimal and coverage ratio.
  */
 export function computeCompositeScore(
-    rawScores: Record<QualityDimension, number>,
-    evaluatedDimensions: QualityDimension[],
-    weights: QualityWeights,
+  rawScores: Record<QualityDimension, number>,
+  evaluatedDimensions: QualityDimension[],
+  weights: QualityWeights,
 ): { compositeScore: number; coverage: number } {
-    // A negative or non-finite weight makes the weighted mean meaningless rather than
-    // merely skewed, and the previous `totalWeight || 1` fallback silently turned that
-    // into an arbitrary score, so reject the configuration at the boundary instead.
-    let overallWeight = 0;
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        const w = weights[dim];
-        if (typeof w !== 'number' || !Number.isFinite(w) || w < 0) {
-            throw new RangeError(
-                `quality weight for "${dim}" must be a finite non-negative number, got ${String(w)}`,
-            );
-        }
-        overallWeight += w;
+  // A negative or non-finite weight makes the weighted mean meaningless rather than
+  // merely skewed, and the previous `totalWeight || 1` fallback silently turned that
+  // into an arbitrary score, so reject the configuration at the boundary instead.
+  let overallWeight = 0;
+  for (const dim of ALL_QUALITY_DIMENSIONS) {
+    const w = weights[dim];
+    if (typeof w !== 'number' || !Number.isFinite(w) || w < 0) {
+      throw new RangeError(
+        `quality weight for "${dim}" must be a finite non-negative number, got ${String(w)}`,
+      );
     }
+    overallWeight += w;
+  }
 
-    let logSum = 0;
-    let totalWeight = 0;
-    for (const dim of evaluatedDimensions) {
-        const w = weights[dim];
-        const index = Math.max(
-            COMPOSITE_INDEX_FLOOR,
-            Math.min(DIMENSION_MAX_SCORE, rawScores[dim]),
-        );
-        logSum += w * Math.log(index);
-        totalWeight += w;
-    }
-    const coverage =
-        overallWeight === 0
-            ? 1
-            : Math.round((totalWeight / overallWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
+  let logSum = 0;
+  let totalWeight = 0;
+  for (const dim of evaluatedDimensions) {
+    const w = weights[dim];
+    const index = Math.max(
+      COMPOSITE_INDEX_FLOOR,
+      Math.min(DIMENSION_MAX_SCORE, rawScores[dim]),
+    );
+    logSum += w * Math.log(index);
+    totalWeight += w;
+  }
+  const coverage =
+    overallWeight === 0
+      ? 1
+      : Math.round((totalWeight / overallWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
 
-    // A zero total weight means no dimension was measured at all, which happens on a narrow
-    // scan (e.g. only the simplify analyzer runs, and it witnesses none of the ten axes).
-    // That is missing data, not a misconfiguration, so it reports as no score with full
-    // coverage rather than being coerced to 0 and graded F. A negative or non-finite weight
-    // is a genuine misconfiguration and was already rejected above.
-    if (evaluatedDimensions.length === 0) {
-        return { compositeScore: Number.NaN, coverage };
-    }
-    if (totalWeight <= 0) {
-        throw new RangeError(
-            'composite score is undefined: every measured dimension has zero weight',
-        );
-    }
-    const compositeScore =
-        Math.round(Math.exp(logSum / totalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
-    return { compositeScore, coverage };
+  // A zero total weight means no dimension was measured at all, which happens on a narrow
+  // scan (e.g. only the simplify analyzer runs, and it witnesses none of the ten axes).
+  // That is missing data, not a misconfiguration, so it reports as no score with full
+  // coverage rather than being coerced to 0 and graded F. A negative or non-finite weight
+  // is a genuine misconfiguration and was already rejected above.
+  if (evaluatedDimensions.length === 0) {
+    return { compositeScore: Number.NaN, coverage };
+  }
+  if (totalWeight <= 0) {
+    throw new RangeError(
+      'composite score is undefined: every measured dimension has zero weight',
+    );
+  }
+  const compositeScore =
+    Math.round(Math.exp(logSum / totalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
+  return { compositeScore, coverage };
 }
 
 /**
@@ -230,7 +230,7 @@ export function computeCompositeScore(
  * @returns True when the score is a real measurement.
  */
 export function isMeasured(score: number): boolean {
-    return Number.isFinite(score);
+  return Number.isFinite(score);
 }
 
 /**
@@ -244,10 +244,10 @@ export function isMeasured(score: number): boolean {
  * @returns The signed difference, or null when either side is unmeasured.
  */
 export function scoreDelta(before: number, after: number): number | null {
-    if (!isMeasured(before) || !isMeasured(after)) {
-        return null;
-    }
-    return after - before;
+  if (!isMeasured(before) || !isMeasured(after)) {
+    return null;
+  }
+  return after - before;
 }
 
 /**
@@ -261,13 +261,13 @@ export function scoreDelta(before: number, after: number): number | null {
  * @returns Matching QualityGrade, or 'N/A' when no dimension contributed a weight.
  */
 export function resolveQualityGrade(compositeScore: number): QualityGrade {
-    if (Number.isNaN(compositeScore)) return 'N/A';
-    if (compositeScore >= GRADE_A_PLUS_MIN) return 'A+';
-    if (compositeScore >= GRADE_A_MIN) return 'A';
-    if (compositeScore >= GRADE_B_MIN) return 'B';
-    if (compositeScore >= GRADE_C_MIN) return 'C';
-    if (compositeScore >= GRADE_D_MIN) return 'D';
-    return 'F';
+  if (Number.isNaN(compositeScore)) return 'N/A';
+  if (compositeScore >= GRADE_A_PLUS_MIN) return 'A+';
+  if (compositeScore >= GRADE_A_MIN) return 'A';
+  if (compositeScore >= GRADE_B_MIN) return 'B';
+  if (compositeScore >= GRADE_C_MIN) return 'C';
+  if (compositeScore >= GRADE_D_MIN) return 'D';
+  return 'F';
 }
 
 /**
@@ -288,26 +288,26 @@ export function resolveQualityGrade(compositeScore: number): QualityGrade {
  * @returns Confidence score clamped between floor and 1.
  */
 export function calculateConfidenceFromVolume(
-    lines: number,
-    coverage: number,
-    scope: 'file' | 'project',
+  lines: number,
+  coverage: number,
+  scope: 'file' | 'project',
 ): number {
-    const effective = scope === 'file' ? Math.min(lines, CONFIDENCE_LINE_CAP) : lines;
-    // A repository's total is unbounded, so the ramp is scaled by an order of magnitude
-    // relative to the file case to keep the curve in a comparable range.
-    const scale =
-        scope === 'file' ? CONFIDENCE_LINE_SCALE : CONFIDENCE_LINE_SCALE * PROJECT_SCALE_FACTOR;
-    const baseConfidence = Math.min(
-        1.0,
-        Math.max(
-            CONFIDENCE_FLOOR,
-            Math.round((CONFIDENCE_FLOOR + effective / scale) * PERCENT_SCALE) / PERCENT_SCALE,
-        ),
-    );
-    return (
-        Math.round(Math.max(CONFIDENCE_FLOOR, baseConfidence * coverage) * PERCENT_SCALE) /
-        PERCENT_SCALE
-    );
+  const effective = scope === 'file' ? Math.min(lines, CONFIDENCE_LINE_CAP) : lines;
+  // A repository's total is unbounded, so the ramp is scaled by an order of magnitude
+  // relative to the file case to keep the curve in a comparable range.
+  const scale =
+    scope === 'file' ? CONFIDENCE_LINE_SCALE : CONFIDENCE_LINE_SCALE * PROJECT_SCALE_FACTOR;
+  const baseConfidence = Math.min(
+    1.0,
+    Math.max(
+      CONFIDENCE_FLOOR,
+      Math.round((CONFIDENCE_FLOOR + effective / scale) * PERCENT_SCALE) / PERCENT_SCALE,
+    ),
+  );
+  return (
+    Math.round(Math.max(CONFIDENCE_FLOOR, baseConfidence * coverage) * PERCENT_SCALE) /
+    PERCENT_SCALE
+  );
 }
 
 /**
@@ -318,14 +318,14 @@ export function calculateConfidenceFromVolume(
  * @returns Confidence score clamped between floor and 1.
  */
 export function calculateConfidence(
-    metric: FileMetric | null | undefined,
-    coverage: number,
+  metric: FileMetric | null | undefined,
+  coverage: number,
 ): number {
-    return calculateConfidenceFromVolume(
-        metric?.nonBlankLines ?? DEFAULT_METRIC_LINES,
-        coverage,
-        'file',
-    );
+  return calculateConfidenceFromVolume(
+    metric?.nonBlankLines ?? DEFAULT_METRIC_LINES,
+    coverage,
+    'file',
+  );
 }
 
 /**
@@ -356,25 +356,25 @@ export const SATURATION_HALFPOINT = 30;
  * @returns Dimension scores mapped in [0, 100].
  */
 export function applyScaleDampedScores(
-    deductionPoints: Record<QualityDimension, number>,
-    scaleFactor: number,
+  deductionPoints: Record<QualityDimension, number>,
+  scaleFactor: number,
 ): Record<QualityDimension, number> {
-    const rawScores = {} as Record<QualityDimension, number>;
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        const rawPoints = deductionPoints[dim];
-        if (rawPoints <= 0) {
-            rawScores[dim] = DIMENSION_MAX_SCORE;
-            continue;
-        }
-        if (scaleFactor <= 1 || DIMENSION_SCALE_MODE[dim] === 'absolute') {
-            rawScores[dim] = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
-        } else {
-            const density = rawPoints / scaleFactor;
-            rawScores[dim] =
-                (DIMENSION_MAX_SCORE * SATURATION_HALFPOINT) / (SATURATION_HALFPOINT + density);
-        }
+  const rawScores = {} as Record<QualityDimension, number>;
+  for (const dim of ALL_QUALITY_DIMENSIONS) {
+    const rawPoints = deductionPoints[dim];
+    if (rawPoints <= 0) {
+      rawScores[dim] = DIMENSION_MAX_SCORE;
+      continue;
     }
-    return rawScores;
+    if (scaleFactor <= 1 || DIMENSION_SCALE_MODE[dim] === 'absolute') {
+      rawScores[dim] = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
+    } else {
+      const density = rawPoints / scaleFactor;
+      rawScores[dim] =
+        (DIMENSION_MAX_SCORE * SATURATION_HALFPOINT) / (SATURATION_HALFPOINT + density);
+    }
+  }
+  return rawScores;
 }
 
 /**
@@ -389,8 +389,8 @@ export function applyScaleDampedScores(
  * @returns Penalty in index units, in [0, 100].
  */
 export function effectivePenaltyFromIndex(index: number): number {
-    const clamped = Math.max(0, Math.min(DIMENSION_MAX_SCORE, index));
-    return DIMENSION_MAX_SCORE - clamped;
+  const clamped = Math.max(0, Math.min(DIMENSION_MAX_SCORE, index));
+  return DIMENSION_MAX_SCORE - clamped;
 }
 
 /**
@@ -402,47 +402,49 @@ export function effectivePenaltyFromIndex(index: number): number {
  *   were present in `fileMetrics` but had no score entry.
  */
 export function accumulateProjectMetrics(
-    fileQualityScores: Record<string, import('./scoringTypes').QualityScoreBreakdown>,
-    fileMetrics: FileMetric[],
+  fileQualityScores: Record<string, import('./scoringTypes').QualityScoreBreakdown>,
+  fileMetrics: FileMetric[],
 ): {
-    rawScores: Record<QualityDimension, number>;
-    totalWeight: number;
-    allRationales: QualityScoreRationale[];
-    skippedFiles: string[];
+  rawScores: Record<QualityDimension, number>;
+  totalWeight: number;
+  allRationales: QualityScoreRationale[];
+  skippedFiles: string[];
 } {
-    const rawScores = {} as Record<QualityDimension, number>;
+  const rawScores = {} as Record<QualityDimension, number>;
+  for (const dim of ALL_QUALITY_DIMENSIONS) {
+    rawScores[dim] = 0;
+  }
+  let totalWeight = 0;
+  const allRationales: QualityScoreRationale[] = [];
+  // A file present in `fileMetrics` but absent from `fileQualityScores` would otherwise
+  // vanish from the project score while still being counted in `filesScanned`, leaving
+  // no trace anywhere in the report. This cannot happen on the current cold path (both
+  // are driven from the same array) but the warm/incremental path rebuilds the score map
+  // separately, where a key mismatch (notably `\` vs `/` separators on Windows) would drop
+  // the file silently. Counted and reported rather than skipped quietly.
+  const skippedFiles: string[] = [];
+
+  for (const m of fileMetrics) {
+    const fScore = fileQualityScores[m.file];
+    if (!fScore) {
+      skippedFiles.push(m.file);
+      continue;
+    }
+
+    const weight = Math.max(1, m.nonBlankLines || m.lines || 1);
+    totalWeight += weight;
+
     for (const dim of ALL_QUALITY_DIMENSIONS) {
-        rawScores[dim] = 0;
-    }
-    let totalWeight = 0;
-    const allRationales: QualityScoreRationale[] = [];
-    // A file present in `fileMetrics` but absent from `fileQualityScores` would otherwise
-    // vanish from the project score while still being counted in `filesScanned`, leaving
-    // no trace anywhere in the report. This cannot happen on the current cold path (both
-    // are driven from the same array) but the warm/incremental path rebuilds the score map
-    // separately, where a key mismatch (notably `\` vs `/` separators on Windows) would drop
-    // the file silently. Counted and reported rather than skipped quietly.
-    const skippedFiles: string[] = [];
-
-    for (const m of fileMetrics) {
-        const fScore = fileQualityScores[m.file];
-        if (!fScore) {
-            skippedFiles.push(m.file);
-            continue;
-        }
-
-        const weight = Math.max(1, m.nonBlankLines || m.lines || 1);
-        totalWeight += weight;
-
-        for (const dim of ALL_QUALITY_DIMENSIONS) {
-            const dimScore = fScore.indices[dim] ?? DIMENSION_MAX_SCORE;
-            rawScores[dim] += dimScore * weight;
-        }
-
-        if (fScore.rationales) {
-            allRationales.push(...fScore.rationales);
-        }
+      const dimScore = fScore.indices[dim] ?? DIMENSION_MAX_SCORE;
+      rawScores[dim] += dimScore * weight;
     }
 
-    return { rawScores, totalWeight, allRationales, skippedFiles };
+    if (fScore.rationales) {
+      allRationales.push(...fScore.rationales);
+    }
+  }
+
+  return { rawScores, totalWeight, allRationales, skippedFiles };
 }
+
+export * from './modernization-formulas';

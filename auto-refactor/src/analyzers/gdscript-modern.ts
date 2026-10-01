@@ -27,8 +27,8 @@ const SOURCE_EXTENSION = '.gd';
 
 /** Masking syntax for GDScript: `#` line comments and the three quote characters. */
 const GDSCRIPT_MASK: SourceMaskConfig = {
-    lineComment: '#',
-    quoteChars: '"\'`',
+  lineComment: '#',
+  quoteChars: '"\'`',
 };
 
 /** `yield(...)`, replaced by `await`. */
@@ -48,70 +48,70 @@ const POOL_ARRAY_RE = /\bPool(?:Byte|Int|Real|String|Vector2|Vector3|Color)Array
 
 /** Godot 3 RPC/modifier keywords ahead of `func`, replaced by the `@rpc` annotation. */
 const RPC_MODIFIER_RE =
-    /^\s*(?:remote|master|puppet|slave|remotesync|mastersync|puppetsync|sync)\s+func\b/;
+  /^\s*(?:remote|master|puppet|slave|remotesync|mastersync|puppetsync|sync)\s+func\b/;
 
 /** Godot 3 `connect("signal", self, "method")` call, whose arguments are string literals. */
 const LEGACY_CONNECT_RE = /\.connect\s*\(\s*"[^"]*"\s*,\s*(?:self|[A-Za-z_]\w*)\s*,\s*"[^"]*"\s*\)/;
 
 /** One keyword-anchored rule: pattern to match on the masked line plus its report text. */
 interface LineRule {
-    /** Canonical rule id (`GDM-TOPIC-NNN`). */
-    rule: string;
-    /** Finding severity. */
-    severity: Severity;
-    /** Pattern run against the masked line. */
-    pattern: RegExp;
-    /** Why the Godot 4 form is preferable. */
-    message: string;
-    /** One-line migration guidance. */
-    suggestion: string;
+  /** Canonical rule id (`GDM-TOPIC-NNN`). */
+  rule: string;
+  /** Finding severity. */
+  severity: Severity;
+  /** Pattern run against the masked line. */
+  pattern: RegExp;
+  /** Why the Godot 4 form is preferable. */
+  message: string;
+  /** One-line migration guidance. */
+  suggestion: string;
 }
 
 /** Keyword rules, all of which fit on one physical line. */
 const LINE_RULES: LineRule[] = [
-    {
-        rule: 'GDM-YIELD-001',
-        severity: SEVERITY_WARNING,
-        pattern: YIELD_RE,
-        message: '`yield` was removed in Godot 4: coroutines are plain `await` expressions.',
-        suggestion: 'Rewrite `yield(obj, "signal")` as `await obj.signal`.',
-    },
-    {
-        rule: 'GDM-EXPORT-001',
-        severity: SEVERITY_WARNING,
-        pattern: EXPORT_RE,
-        message: 'The `export` statement syntax is gone; Godot 4 uses annotations.',
-        suggestion: 'Write `@export var x: int`, keeping the type in the declaration itself.',
-    },
-    {
-        rule: 'GDM-ONREADY-001',
-        severity: SEVERITY_WARNING,
-        pattern: ONREADY_RE,
-        message: '`onready` became the `@onready` annotation in Godot 4.',
-        suggestion: 'Write `@onready var node = $Path`.',
-    },
-    {
-        rule: 'GDM-TOOL-001',
-        severity: SEVERITY_WARNING,
-        pattern: TOOL_RE,
-        message: 'The `tool` keyword became the `@tool` annotation in Godot 4.',
-        suggestion: 'Put `@tool` on the first line of the script.',
-    },
-    {
-        rule: 'GDM-POOL-001',
-        severity: SEVERITY_WARNING,
-        pattern: POOL_ARRAY_RE,
-        message: '`Pool*Array` types were renamed to `Packed*Array` in Godot 4.',
-        suggestion: 'Use the `PackedByteArray` / `PackedVector2Array` family of names.',
-    },
-    {
-        rule: 'GDM-RPC-001',
-        severity: SEVERITY_WARNING,
-        pattern: RPC_MODIFIER_RE,
-        message: 'RPC keywords before `func` were replaced by the `@rpc` annotation.',
-        suggestion:
-            'Annotate the function (`@rpc("any_peer", "call_local")`) and drop the keyword.',
-    },
+  {
+    rule: 'GDM-YIELD-001',
+    severity: SEVERITY_WARNING,
+    pattern: YIELD_RE,
+    message: '`yield` was removed in Godot 4: coroutines are plain `await` expressions.',
+    suggestion: 'Rewrite `yield(obj, "signal")` as `await obj.signal`.',
+  },
+  {
+    rule: 'GDM-EXPORT-001',
+    severity: SEVERITY_WARNING,
+    pattern: EXPORT_RE,
+    message: 'The `export` statement syntax is gone; Godot 4 uses annotations.',
+    suggestion: 'Write `@export var x: int`, keeping the type in the declaration itself.',
+  },
+  {
+    rule: 'GDM-ONREADY-001',
+    severity: SEVERITY_WARNING,
+    pattern: ONREADY_RE,
+    message: '`onready` became the `@onready` annotation in Godot 4.',
+    suggestion: 'Write `@onready var node = $Path`.',
+  },
+  {
+    rule: 'GDM-TOOL-001',
+    severity: SEVERITY_WARNING,
+    pattern: TOOL_RE,
+    message: 'The `tool` keyword became the `@tool` annotation in Godot 4.',
+    suggestion: 'Put `@tool` on the first line of the script.',
+  },
+  {
+    rule: 'GDM-POOL-001',
+    severity: SEVERITY_WARNING,
+    pattern: POOL_ARRAY_RE,
+    message: '`Pool*Array` types were renamed to `Packed*Array` in Godot 4.',
+    suggestion: 'Use the `PackedByteArray` / `PackedVector2Array` family of names.',
+  },
+  {
+    rule: 'GDM-RPC-001',
+    severity: SEVERITY_WARNING,
+    pattern: RPC_MODIFIER_RE,
+    message: 'RPC keywords before `func` were replaced by the `@rpc` annotation.',
+    suggestion:
+      'Annotate the function (`@rpc("any_peer", "call_local")`) and drop the keyword.',
+  },
 ];
 
 /**
@@ -127,142 +127,500 @@ const LINE_RULES: LineRule[] = [
  * @returns The finding, ready to be pushed onto the result list.
  */
 function makeIssue(
-    file: string,
-    lineIndex: number,
-    rule: string,
-    severity: Severity,
-    message: string,
-    suggestion: string,
-    detail: Record<string, unknown>,
+  file: string,
+  lineIndex: number,
+  rule: string,
+  severity: Severity,
+  message: string,
+  suggestion: string,
+  detail: Record<string, unknown>,
 ): Issue {
-    const line = lineIndex + 1;
-    return {
-        id: `${ANALYZER_GDSCRIPT_MODERN}:${rule}:${file}:${line}`,
-        analyzer: ANALYZER_GDSCRIPT_MODERN,
-        rule,
-        severity,
-        message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-        detail,
-        suggestion,
-    };
+  const line = lineIndex + 1;
+  return {
+    id: `${ANALYZER_GDSCRIPT_MODERN}:${rule}:${file}:${line}`,
+    analyzer: ANALYZER_GDSCRIPT_MODERN,
+    rule,
+    severity,
+    message,
+    location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
+    detail,
+    suggestion,
+  };
 }
 
 /** GDScript modernization pack: seven rules over a masked view of the file. */
 export class GdscriptModernAnalyzer implements Analyzer {
-    name = ANALYZER_GDSCRIPT_MODERN;
+  name = ANALYZER_GDSCRIPT_MODERN;
 
-    /**
-     * Streaming-path entry point: the engine invokes this once per file. Content-only analyzers
-     * must expose it, because the legacy `analyze` path covers the TS-family adapters only.
-     *
-     * @param ctx - Analyzer context carrying the file content and path.
-     * @returns All findings for the file.
-     */
-    finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined, ctx);
+  /**
+   * Streaming-path entry point: the engine invokes this once per file. Content-only analyzers
+   * must expose it, because the legacy `analyze` path covers the TS-family adapters only.
+   *
+   * @param ctx - Analyzer context carrying the file content and path.
+   * @returns All findings for the file.
+   */
+  finalize(ctx: AnalyzerContext): Issue[] {
+    return this.analyze(undefined, ctx);
+  }
+
+  /**
+   * Scan one GDScript file for Godot 3 → 4 migration findings.
+   *
+   * @param _sf - Unused TypeScript source file (kept for the analyzer contract).
+   * @param ctx - Analyzer context carrying the file content and path.
+   * @returns All findings for the file.
+   */
+  analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
+    const file = ctx.filePath.replace(/\\/g, '/');
+    if (!file.endsWith(SOURCE_EXTENSION)) return [];
+    const content = ctx.content || '';
+    if (content.length === 0) return [];
+    const { raw, masked } = maskSourceText(content, GDSCRIPT_MASK);
+    const out: Issue[] = [];
+    for (let index = 0; index < masked.length; index += 1) {
+      const code = masked[index];
+      if (code.trim().length === 0) continue;
+      for (const rule of LINE_RULES) {
+        if (!rule.pattern.test(code)) continue;
+        out.push(
+          makeIssue(
+            file,
+            index,
+            rule.rule,
+            rule.severity,
+            rule.message,
+            rule.suggestion,
+            {
+              line: raw[index].trim(),
+            },
+          ),
+        );
+      }
+      if (masked[index].includes('.connect(') && LEGACY_CONNECT_RE.test(raw[index])) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-CONNECT-001',
+            SEVERITY_INFO,
+            'Godot 3 `connect` passes the method as a string, which no checker validates.',
+            'Use `signal.connect(method.callable())` or `signal.connect(_on_signal)`.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
     }
 
-    /**
-     * Scan one GDScript file for Godot 3 → 4 migration findings.
-     *
-     * @param _sf - Unused TypeScript source file (kept for the analyzer contract).
-     * @param ctx - Analyzer context carrying the file content and path.
-     * @returns All findings for the file.
-     */
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
-        const file = ctx.filePath.replace(/\\/g, '/');
-        if (!file.endsWith(SOURCE_EXTENSION)) return [];
-        const content = ctx.content || '';
-        if (content.length === 0) return [];
-        const { raw, masked } = maskSourceText(content, GDSCRIPT_MASK);
-        const out: Issue[] = [];
-        for (let index = 0; index < masked.length; index += 1) {
-            const code = masked[index];
-            if (code.trim().length === 0) continue;
-            for (const rule of LINE_RULES) {
-                if (!rule.pattern.test(code)) continue;
-                out.push(
-                    makeIssue(
-                        file,
-                        index,
-                        rule.rule,
-                        rule.severity,
-                        rule.message,
-                        rule.suggestion,
-                        {
-                            line: raw[index].trim(),
-                        },
-                    ),
-                );
-            }
-            if (masked[index].includes('.connect(') && LEGACY_CONNECT_RE.test(raw[index])) {
-                out.push(
-                    makeIssue(
-                        file,
-                        index,
-                        'GDM-CONNECT-001',
-                        SEVERITY_INFO,
-                        'Godot 3 `connect` passes the method as a string, which no checker validates.',
-                        'Use `signal.connect(method.callable())` or `signal.connect(_on_signal)`.',
-                        { line: raw[index].trim() },
-                    ),
-                );
-            }
-        }
+    // Check for Object Pool contract violation: reset_state without super call
+    this.checkResetStateSuperContract(masked, raw, file, out);
+    this.checkDebounceDiscipline(masked, raw, file, out);
+    this.checkFsmStateMutation(masked, raw, file, out);
+    this.checkWeakRefObserverHygiene(masked, raw, file, out);
+    this.checkResponsiveLayoutDiscipline(masked, raw, file, out);
+    this.checkUnidirectionalFlowIntegrity(masked, raw, file, out);
+    this.checkViewLocBudget(masked, raw, file, out);
+    this.checkScreenBaseInheritance(masked, raw, file, out);
+    this.checkDesignTokenCompliance(masked, raw, file, out);
+    this.checkStatusBarComponentAdoption(masked, raw, file, out);
+    this.checkVirtualListAdoption(masked, raw, file, out);
+    this.checkI18nBindingDiscipline(masked, raw, file, out);
+    this.checkExplicitNodePathDiscipline(masked, raw, file, out);
+    this.checkPresentationDecoupling(masked, raw, file, out);
+    return out;
+  }
 
-        // Check for Object Pool contract violation: reset_state without super call
-        this.checkResetStateSuperContract(masked, raw, file, out);
-        return out;
+  private checkResetStateSuperContract(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    const hasExtends = masked.some((l) => /^\s*extends\s+[A-Za-z0-9_]/.test(l));
+    if (!hasExtends) return;
+
+    for (let index = 0; index < masked.length; index += 1) {
+      const code = masked[index];
+      if (!/^\s*func\s+reset_state\s*\(/.test(code)) continue;
+
+      const funcIndent = code.search(/\S/);
+      const hasSuperCall = this.hasSuperCallInResetState(masked, index + 1, funcIndent);
+      if (!hasSuperCall) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-POOL-002',
+            SEVERITY_WARNING,
+            'Object pool `reset_state()` method should invoke `super.reset_state()` to maintain parent state cleanup contract.',
+            'Add `super.reset_state()` to ensure inherited entity properties are safely reset before reuse.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
     }
+  }
 
-    private checkResetStateSuperContract(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        const hasExtends = masked.some((l) => /^\s*extends\s+[A-Za-z0-9_]/.test(l));
-        if (!hasExtends) return;
-
-        for (let index = 0; index < masked.length; index += 1) {
-            const code = masked[index];
-            if (!/^\s*func\s+reset_state\s*\(/.test(code)) continue;
-
-            const funcIndent = code.search(/\S/);
-            const hasSuperCall = this.hasSuperCallInResetState(masked, index + 1, funcIndent);
-            if (!hasSuperCall) {
-                out.push(
-                    makeIssue(
-                        file,
-                        index,
-                        'GDM-POOL-002',
-                        SEVERITY_WARNING,
-                        'Object pool `reset_state()` method should invoke `super.reset_state()` to maintain parent state cleanup contract.',
-                        'Add `super.reset_state()` to ensure inherited entity properties are safely reset before reuse.',
-                        { line: raw[index].trim() },
-                    ),
-                );
-            }
-        }
+  private hasSuperCallInResetState(
+    masked: string[],
+    startIndex: number,
+    funcIndent: number,
+  ): boolean {
+    for (let j = startIndex; j < masked.length; j += 1) {
+      const bodyLine = masked[j];
+      if (bodyLine.trim().length === 0 || bodyLine.trim().startsWith('#')) continue;
+      const bodyIndent = bodyLine.search(/\S/);
+      if (bodyIndent <= funcIndent) {
+        break;
+      }
+      if (/\bsuper(?:\.reset_state\s*\(|\s*\()/.test(bodyLine)) {
+        return true;
+      }
     }
+    return false;
+  }
 
-    private hasSuperCallInResetState(
-        masked: string[],
-        startIndex: number,
-        funcIndent: number,
-    ): boolean {
-        for (let j = startIndex; j < masked.length; j += 1) {
-            const bodyLine = masked[j];
-            if (bodyLine.trim().length === 0 || bodyLine.trim().startsWith('#')) continue;
-            const bodyIndent = bodyLine.search(/\S/);
-            if (bodyIndent <= funcIndent) {
-                break;
-            }
-            if (/\bsuper(?:\.reset_state\s*\(|\s*\()/.test(bodyLine)) {
-                return true;
-            }
-        }
-        return false;
+  private checkDebounceDiscipline(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!file.includes('/views/') && !file.includes('/frontend/')) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      const line = masked[index];
+      if (
+        /\b(?:submit|buy|purchase|login|register|transfer|confirm|delete)_btn\b.*\.pressed\.connect\s*\(/.test(
+          line,
+        ) ||
+        /\.pressed\.connect\s*\(\s*(?:_on_submit|_on_buy|_on_purchase|_on_confirm|_on_transfer|_on_login)\b/.test(
+          line,
+        )
+      ) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-DEB-001',
+            SEVERITY_WARNING,
+            'Critical business action button connects bare `pressed` signal without debounce or loading fencing.',
+            'Wrap with KButton or connect to debounced_pressed signal to guard against rapid duplicate clicks.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
     }
+  }
+
+  private checkFsmStateMutation(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    for (let index = 0; index < masked.length; index += 1) {
+      const line = masked[index];
+      if (
+        /^\s*(?:self\.)?_current_state\s*=\s*(?:State\.|STATE_|[A-Z0-9_]+)/.test(line) &&
+        !file.includes('/fsm/') &&
+        !file.includes('state_machine')
+      ) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-FSM-001',
+            SEVERITY_WARNING,
+            'Direct mutation of private FSM state variable bypasses lifecycle transition guards.',
+            'Invoke `fsm.transition_to(target_state, payload)` to ensure entry/exit guards execute.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkWeakRefObserverHygiene(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!file.includes('registry') && !file.includes('manager') && !file.includes('bus')) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      const line = masked[index];
+      if (
+        /\b(?:_observers|_listeners|_bindings|_subscribers)\.append\s*\(\s*(?:node|listener|control|view|target)\s*\)/.test(
+          line,
+        ) &&
+        !line.includes('weakref')
+      ) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-WEAK-001',
+            SEVERITY_WARNING,
+            'Dynamic observer registry holds strong reference to Node instance without `weakref`.',
+            'Store `weakref(node)` and verify `.get_ref() != null` before dispatching updates.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private isViewFile(file: string): boolean {
+    return /(?:^|\/)views\//.test(file);
+  }
+
+  private checkResponsiveLayoutDiscipline(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      const line = masked[index];
+      if (
+        /\b(?:size|custom_minimum_size)\s*=\s*Vector2\s*\(\s*(?:1920|2560|3840|1280)\s*,\s*(?:1080|1440|2160|720)\s*\)/.test(
+          line,
+        )
+      ) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-RES-001',
+            SEVERITY_WARNING,
+            'Hardcoded absolute screen resolution in view layout breaks responsive multi-aspect scaling.',
+            'Use Anchors Preset (`set_anchors_preset(PRESET_FULL_RECT)`) and adaptive container layout.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkUnidirectionalFlowIntegrity(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      const line = masked[index];
+      if (
+        /\b(?:snapshot|dto|_snapshot|_dto)\s*\.\s*(?:hp|mp|gold|score|level|exp|status|currency)\s*(?:=|\+=|-=|\*=)/.test(
+          line,
+        )
+      ) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-UNI-001',
+            SEVERITY_WARNING,
+            'In-place mutation of immutable Snapshot DTO field violates unidirectional data flow.',
+            'Dispatch an intention Command or call domain boundary service instead of modifying snapshot directly.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkViewLocBudget(
+    _masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    if (raw.length > 450) {
+      out.push(
+        makeIssue(
+          file,
+          0,
+          'GDM-LOC-001',
+          SEVERITY_WARNING,
+          'Presentation view script exceeds physical line budget limit of 450 LOC.',
+          'Decompose complex subpanels, item renderers, or companion controllers into separate modules.',
+          { lineCount: raw.length },
+        ),
+      );
+    }
+  }
+
+  private checkScreenBaseInheritance(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      const line = masked[index];
+      if (/^\s*extends\s+Control\b/.test(line)) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-EXT-001',
+            SEVERITY_WARNING,
+            'Presentation view controller directly extends Control instead of BaseScreen or BaseModal.',
+            'Extend BaseScreen for full-screen views or BaseModal for dialogs to integrate standard lifecycle.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkDesignTokenCompliance(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      if (/\bColor\s*\(/.test(masked[index])) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-TOK-001',
+            SEVERITY_WARNING,
+            'Hardcoded Color(...) literal in presentation view violates DesignTokens single source of truth.',
+            'Use semantic color constants from DesignTokens (e.g., DesignTokens.COLOR_*).',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkStatusBarComponentAdoption(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      if (/\bProgressBar\.new\s*\(/.test(masked[index])) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-BAR-001',
+            SEVERITY_WARNING,
+            'Direct instantiation of bare ProgressBar violates KStatusBar standardized component contract.',
+            'Use KStatusBarClass.create_bar(...) or instantiate KStatusBar to ensure uniform styling and smooth tweens.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkVirtualListAdoption(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      if (/\b(?:list|_list)\.add_child\s*\(\s*item\s*\)/.test(masked[index])) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-VRT-001',
+            SEVERITY_WARNING,
+            'Unbounded dynamic node instantiation in list container without KVirtualList recycling.',
+            'Use KVirtualList with object pooling to recycle list item nodes efficiently.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkI18nBindingDiscipline(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      const rawLine = raw[index];
+      if (/^\s*(?:title|heading|text|subtitle)\s*=\s*"[A-Z][A-Za-z0-9 ]{3,}"/.test(rawLine)) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-I18N-001',
+            SEVERITY_WARNING,
+            'Hardcoded user-facing string assigned directly without i18n localization wrapper.',
+            'Wrap UI text with tr("KEY") or bind through UIIntermediary for reactive locale switching.',
+            { line: rawLine.trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkExplicitNodePathDiscipline(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      if (/\b(?:get_parent\s*\(\s*\)|find_child\s*\()/.test(masked[index])) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-NOD-001',
+            SEVERITY_WARNING,
+            'Fragile relative node traversal (get_parent/find_child) breaks presentation encapsulation.',
+            'Use explicit %UniqueNode naming or typed dependency injection instead of relative path lookup.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
+
+  private checkPresentationDecoupling(
+    masked: string[],
+    raw: string[],
+    file: string,
+    out: Issue[],
+  ): void {
+    if (!this.isViewFile(file)) return;
+    for (let index = 0; index < masked.length; index += 1) {
+      if (/\bGameState\.[A-Za-z0-9_]+\s*\(/.test(masked[index])) {
+        out.push(
+          makeIssue(
+            file,
+            index,
+            'GDM-BND-001',
+            SEVERITY_WARNING,
+            'Presentation view directly couples to backend GameState singleton.',
+            'Consume data via BaseScreen.apply_snapshot() and emit UI intentions instead of mutating backend state.',
+            { line: raw[index].trim() },
+          ),
+        );
+      }
+    }
+  }
 }
+

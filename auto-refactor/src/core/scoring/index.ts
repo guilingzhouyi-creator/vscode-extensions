@@ -30,3 +30,4 @@ export * from './dual-track-test-evaluator';
 export * from './archetype-weight-tuner';
 export * from './logistic-deduction-curve';
 export * from './topological-churn-evaluator';
+export * from './modernization-formulas';

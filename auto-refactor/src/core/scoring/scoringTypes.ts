@@ -22,16 +22,21 @@
  * instead of relying on the declaration order of the union members.
  */
 export type QualityDimension =
-    | 'architectureConsistency'
-    | 'semanticPurity'
-    | 'codeSecurity'
-    | 'performanceEfficiency'
-    | 'standardization'
-    | 'modernity'
-    | 'maintainability'
-    | 'commentQuality'
-    | 'duplication'
-    | 'techDebtRisk';
+  | 'architectureConsistency'
+  | 'semanticPurity'
+  | 'codeSecurity'
+  | 'performanceEfficiency'
+  | 'standardization'
+  | 'modernity'
+  | 'maintainability'
+  | 'commentQuality'
+  | 'duplication'
+  | 'techDebtRisk';
+
+/**
+ * Quality review profile targeting specific system layers or composite audits.
+ */
+export type QualityReviewProfile = 'frontend' | 'backend' | 'composite';
 
 /**
  * Canonical ordered enumeration of all quality dimensions, used whenever every axis must be
@@ -46,16 +51,16 @@ export type QualityDimension =
  * cover every member.
  */
 export const ALL_QUALITY_DIMENSIONS: readonly QualityDimension[] = [
-    'architectureConsistency',
-    'semanticPurity',
-    'codeSecurity',
-    'performanceEfficiency',
-    'standardization',
-    'modernity',
-    'maintainability',
-    'commentQuality',
-    'duplication',
-    'techDebtRisk',
+  'architectureConsistency',
+  'semanticPurity',
+  'codeSecurity',
+  'performanceEfficiency',
+  'standardization',
+  'modernity',
+  'maintainability',
+  'commentQuality',
+  'duplication',
+  'techDebtRisk',
 ] as const;
 
 /**
@@ -70,39 +75,39 @@ export const ALL_QUALITY_DIMENSIONS: readonly QualityDimension[] = [
  * its list names the analyzer that owns debt routing, not the whole set.
  */
 export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = {
-    architectureConsistency: [
-        'architecture',
-        'dependency-graph',
-        'dependency-layout',
-        'data-architecture',
-        'stdlib',
-        'naming',
-        'gdscript-game',
-        'vscode-extension',
-    ],
-    semanticPurity: ['governance', 'hygiene', 'dependency-graph', 'stdlib'],
-    codeSecurity: ['architecture', 'security', 'secrets'],
-    performanceEfficiency: [
-        'performance',
-        'data-architecture',
-        'complexity',
-        'gdscript-game',
-        'vscode-extension',
-    ],
-    standardization: ['hygiene', 'large-file', 'dependency-layout', 'stdlib', 'naming', 'docs'],
-    modernity: [
-        'governance',
-        'ts-modern',
-        'python-modern',
-        'rust-modern',
-        'gdscript-modern',
-        'gdscript-game',
-        'test-modernity',
-    ],
-    maintainability: ['complexity', 'large-file', 'test-modernity', 'stdlib', 'gdscript-game'],
-    commentQuality: ['comments', 'vscode-extension'],
-    duplication: ['constants', 'hygiene'],
-    techDebtRisk: ['governance'],
+  architectureConsistency: [
+    'architecture',
+    'dependency-graph',
+    'dependency-layout',
+    'data-architecture',
+    'stdlib',
+    'naming',
+    'gdscript-game',
+    'vscode-extension',
+  ],
+  semanticPurity: ['governance', 'hygiene', 'dependency-graph', 'stdlib'],
+  codeSecurity: ['architecture', 'security', 'secrets'],
+  performanceEfficiency: [
+    'performance',
+    'data-architecture',
+    'complexity',
+    'gdscript-game',
+    'vscode-extension',
+  ],
+  standardization: ['hygiene', 'large-file', 'dependency-layout', 'stdlib', 'naming', 'docs'],
+  modernity: [
+    'governance',
+    'ts-modern',
+    'python-modern',
+    'rust-modern',
+    'gdscript-modern',
+    'gdscript-game',
+    'test-modernity',
+  ],
+  maintainability: ['complexity', 'large-file', 'test-modernity', 'stdlib', 'gdscript-game'],
+  commentQuality: ['comments', 'vscode-extension'],
+  duplication: ['constants', 'hygiene'],
+  techDebtRisk: ['governance'],
 };
 
 /**
@@ -114,16 +119,16 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
  * Declaring this here keeps the curve reading configuration rather than a hardcoded rule id.
  */
 export const DIMENSION_SCALE_MODE: Record<QualityDimension, 'absolute' | 'density'> = {
-    architectureConsistency: 'density',
-    semanticPurity: 'density',
-    codeSecurity: 'absolute',
-    performanceEfficiency: 'density',
-    standardization: 'density',
-    modernity: 'density',
-    maintainability: 'density',
-    commentQuality: 'density',
-    duplication: 'density',
-    techDebtRisk: 'density',
+  architectureConsistency: 'density',
+  semanticPurity: 'density',
+  codeSecurity: 'absolute',
+  performanceEfficiency: 'density',
+  standardization: 'density',
+  modernity: 'density',
+  maintainability: 'density',
+  commentQuality: 'density',
+  duplication: 'density',
+  techDebtRisk: 'density',
 };
 
 /** Dimension weights for the composite Quality Index (default balanced) */
@@ -138,26 +143,26 @@ export type QualityWeights = Record<QualityDimension, number>;
  * partial `customWeights` passed to the `QualityScorer` constructor.
  */
 export const DEFAULT_QUALITY_WEIGHTS: QualityWeights = {
-    architectureConsistency: 0.111,
-    semanticPurity: 0.093,
-    codeSecurity: 0.139,
-    performanceEfficiency: 0.102,
-    standardization: 0.083,
-    modernity: 0.074,
-    maintainability: 0.111,
-    commentQuality: 0.074,
-    duplication: 0.093,
-    techDebtRisk: 0.12,
+  architectureConsistency: 0.111,
+  semanticPurity: 0.093,
+  codeSecurity: 0.139,
+  performanceEfficiency: 0.102,
+  standardization: 0.083,
+  modernity: 0.074,
+  maintainability: 0.111,
+  commentQuality: 0.074,
+  duplication: 0.093,
+  techDebtRisk: 0.12,
 };
 
 /** Traceable deduction or bonus explanation */
 export interface QualityScoreRationale {
-    dimension: QualityDimension;
-    delta: number; // e.g. -15 or +5
-    reason: string;
-    rule?: string;
-    line?: number;
-    domainId?: string;
+  dimension: QualityDimension;
+  delta: number; // e.g. -15 or +5
+  reason: string;
+  rule?: string;
+  line?: number;
+  domainId?: string;
 }
 
 /**
@@ -174,74 +179,74 @@ export type QualityGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F' | 'N/A';
 
 /** Complete breakdown of a quality assessment */
 export interface QualityScoreBreakdown {
-    /** 10 individual independent indices (0.0 to 100.0) */
-    indices: Record<QualityDimension, number>;
-    /** Weighted composite quality score (0.0 to 100.0) */
-    compositeScore: number;
-    /** Letter grade based on composite score */
-    grade: QualityGrade;
-    /** Statistical confidence (0.0 to 1.0) based on code volume and analyzer coverage */
-    confidence: number;
-    /** Normalized weights applied during evaluation */
-    weights: QualityWeights;
-    /** Complete transparent audit trail explaining all deductions */
-    rationales: QualityScoreRationale[];
-    /** Evaluation timestamp (epoch ms) */
-    evaluatedAt: number;
-    /**
-     * Present when the project aggregate excluded files that had metrics but no per-file
-     * score. Such files still count towards `filesScanned`, so their absence would bias the
-     * composite downward with no visible cause; this makes the gap auditable.
-     */
-    skippedFileWarning?: string; /** Dimensions whose analyzers did not run; excluded from the weighted
+  /** 10 individual independent indices (0.0 to 100.0) */
+  indices: Record<QualityDimension, number>;
+  /** Weighted composite quality score (0.0 to 100.0) */
+  compositeScore: number;
+  /** Letter grade based on composite score */
+  grade: QualityGrade;
+  /** Statistical confidence (0.0 to 1.0) based on code volume and analyzer coverage */
+  confidence: number;
+  /** Normalized weights applied during evaluation */
+  weights: QualityWeights;
+  /** Complete transparent audit trail explaining all deductions */
+  rationales: QualityScoreRationale[];
+  /** Evaluation timestamp (epoch ms) */
+  evaluatedAt: number;
+  /**
+   * Present when the project aggregate excluded files that had metrics but no per-file
+   * score. Such files still count towards `filesScanned`, so their absence would bias the
+   * composite downward with no visible cause; this makes the gap auditable.
+   */
+  skippedFileWarning?: string; /** Dimensions whose analyzers did not run; excluded from the weighted
         composite. */
-    notEvaluated?: QualityDimension[];
-    /** Share of the total weight that was actually measured (0.0-1.0). */
-    coverage?: number;
+  notEvaluated?: QualityDimension[];
+  /** Share of the total weight that was actually measured (0.0-1.0). */
+  coverage?: number;
+  /**
+   * Enabled analyzers that witness each dimension, so "security disabled but secrets enabled"
+   * reconciles instead of reading as a contradiction; empty means the dimension was not measured.
+   */
+  evaluatedBy?: Partial<Record<QualityDimension, string[]>>;
+  /**
+   * Machine-readable definition of the quantified standard this score was produced under:
+   * the composite/coverage/confidence formulas, the per-dimension weights and the grade
+   * cut-offs, so a consumer can re-derive the grade instead of trusting the label.
+   */
+  /**
+   * Per-dimension deduction audit: which rules took how many points and why, so an index of 0 can
+   * be traced to the exact rules instead of being an unexplained number.
+   */
+  deductionsByDimension?: Record<
+    QualityDimension,
+    {
+      /** Linear sum of the audit-trail entries, before the index curve compresses them. */
+      points: number;
+      /**
+       * Penalty the index curve actually consumed; `100 - indices[dim]` reconciles to it.
+       */
+      effectivePoints: number;
+      entries: { rule: string; points: number; reason: string }[];
+    }
+  >;
+  formulas?: {
+    /** How a linear point total becomes a 0-100 index, per scaling mode. */
+    indexMapping: string;
+    /** Half-point `H` of the density curve: at density H the index is exactly 50. */
+    saturationHalfpoint: number;
     /**
-     * Enabled analyzers that witness each dimension, so "security disabled but secrets enabled"
-     * reconciles instead of reading as a contradiction; empty means the dimension was not measured.
+     * Index floor applied before the composite's geometric mean. Publishing it lets a
+     * consumer re-derive the score; the index floor is what keeps a collapsed axis from
+     * driving the whole aggregate to zero.
      */
-    evaluatedBy?: Partial<Record<QualityDimension, string[]>>;
-    /**
-     * Machine-readable definition of the quantified standard this score was produced under:
-     * the composite/coverage/confidence formulas, the per-dimension weights and the grade
-     * cut-offs, so a consumer can re-derive the grade instead of trusting the label.
-     */
-    /**
-     * Per-dimension deduction audit: which rules took how many points and why, so an index of 0 can
-     * be traced to the exact rules instead of being an unexplained number.
-     */
-    deductionsByDimension?: Record<
-        QualityDimension,
-        {
-            /** Linear sum of the audit-trail entries, before the index curve compresses them. */
-            points: number;
-            /**
-             * Penalty the index curve actually consumed; `100 - indices[dim]` reconciles to it.
-             */
-            effectivePoints: number;
-            entries: { rule: string; points: number; reason: string }[];
-        }
-    >;
-    formulas?: {
-        /** How a linear point total becomes a 0-100 index, per scaling mode. */
-        indexMapping: string;
-        /** Half-point `H` of the density curve: at density H the index is exactly 50. */
-        saturationHalfpoint: number;
-        /**
-         * Index floor applied before the composite's geometric mean. Publishing it lets a
-         * consumer re-derive the score; the index floor is what keeps a collapsed axis from
-         * driving the whole aggregate to zero.
-         */
-        compositeIndexFloor?: number;
-        /** Which dimensions score by absolute count versus defect density. */
-        dimensionScaleMode: Record<QualityDimension, 'absolute' | 'density'>;
-        composite: string;
-        coverage: string;
-        confidence: string;
-        gradeCutoffs: { grade: string; min: number }[];
-        dimensionWeights: Record<string, number>;
-        familyDimensions: Record<string, string>;
-    };
+    compositeIndexFloor?: number;
+    /** Which dimensions score by absolute count versus defect density. */
+    dimensionScaleMode: Record<QualityDimension, 'absolute' | 'density'>;
+    composite: string;
+    coverage: string;
+    confidence: string;
+    gradeCutoffs: { grade: string; min: number }[];
+    dimensionWeights: Record<string, number>;
+    familyDimensions: Record<string, string>;
+  };
 }

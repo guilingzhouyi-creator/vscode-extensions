@@ -36,6 +36,7 @@ const EXEMPT = new Map([
   ['test-result-codec.js', 'library consumed by test-parallel.js, not a standalone suite'],
   // Fixture builders and shared helpers, not suites.
   ['build-native.js', 'native build helper invoked by npm run build:native'],
+  ['compile-project.js', 'programmatic TypeScript compiler helper invoked before tests'],
   ['run-self-audit.js', 'helper invoked by validate-self-audit.js and validate-self-refactor.js'],
   ['test-rust.js', 'invoked by gate:rust rather than by the parallel engine'],
   // Gate entry points already wired into `npm run gate`; running them again inside
@@ -98,7 +99,7 @@ function checkRegisteredScriptsExist(registered) {
     missing,
     [],
     `test-parallel.js registers ${missing.length} script(s) that do not exist:\n  ${missing.join('\n  ')}\n` +
-      'Either the suite was removed or it was renamed; drop the entry or fix the path.',
+    'Either the suite was removed or it was renamed; drop the entry or fix the path.',
   );
   console.log(`  [PASS] all ${registered.size} registered suite(s) exist on disk`);
 }
@@ -125,11 +126,11 @@ function checkNoOrphanSuites(registered) {
     orphans,
     [],
     `${orphans.length} validation script(s) exist but never run in the gate:\n  ${orphans.join('\n  ')}\n` +
-      'Register them in test-parallel.js, or add them to EXEMPT with a reason.',
+    'Register them in test-parallel.js, or add them to EXEMPT with a reason.',
   );
   console.log(
     `  [PASS] every script under scripts/ is accounted for (${onDisk.length} total, ` +
-      `${registered.size} registered, ${EXEMPT.size} exempt, ${BENCHMARKS.length} benchmarks)`,
+    `${registered.size} registered, ${EXEMPT.size} exempt, ${BENCHMARKS.length} benchmarks)`,
   );
 }
 

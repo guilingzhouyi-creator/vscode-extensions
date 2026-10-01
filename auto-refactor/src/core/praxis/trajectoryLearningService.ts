@@ -23,7 +23,11 @@ import type { TrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import { defaultTrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import type { RegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
 import { defaultRegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
-import { scoreDelta } from '../scoring/scorer-formulas';
+import {
+    calculateRecipeGeneralizationIndex,
+    calculateTrajectoryQualityVelocity,
+    scoreDelta,
+} from '../scoring/scorer-formulas';
 
 /**
  * Public service interface provided to the Praxis team for trajectory learning governance.
@@ -105,6 +109,14 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
         }
 
         const qualityDelta = this.calculateDelta(input);
+        const qualityVelocity = calculateTrajectoryQualityVelocity(
+            input.beforeScore,
+            input.afterScore,
+            input.churnRatio ?? 0,
+        );
+        const generalizationIndex = extractedRecipe
+            ? calculateRecipeGeneralizationIndex(1, 1, 0.1, extractedRecipe.expectedQualityGain)
+            : 0;
         const hasImprovement = qualityDelta > 0 && extractedRecipe !== undefined;
 
         // Recommend existing recipes for the beforeContent if relevant
@@ -115,6 +127,8 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
         return {
             hasBadToGoodImprovement: hasImprovement,
             qualityDelta,
+            qualityVelocity,
+            generalizationIndex,
             extractedRecipe,
             regressionIssues: [],
             recommendations,

@@ -830,3 +830,26 @@ export const DEDUCTION_UNPOOLED_RESOURCE = 15;
 export const DEDUCTION_UNSOUND_POOLING = 15;
 /** Points deducted for negative-ROI excessive pooling of tiny objects. */
 export const DEDUCTION_NEGATIVE_ROI_POOLING = 10;
+
+/** Rule id for interactive action missing debounce or loading lock. */
+export const RULE_GDM_DEB_001 = 'GDM-DEB-001';
+/** Rule id for finite state machine direct state mutation bypassing transitions. */
+export const RULE_GDM_FSM_001 = 'GDM-FSM-001';
+/** Rule id for dynamic observer holding strong Node reference without weakref. */
+export const RULE_GDM_WEAK_001 = 'GDM-WEAK-001';
+/** Rule id for hardcoded absolute pixel bounds violating responsive scaling. */
+export const RULE_GDM_RES_001 = 'GDM-RES-001';
+/** Rule id for presentation layer in-place mutation on immutable Snapshot DTOs. */
+export const RULE_GDM_UNI_001 = 'GDM-UNI-001';
+
+/** Points deducted for missing interactive debounce or loading lock. */
+export const DEDUCTION_DEBOUNCE_MISSING = 8;
+/** Points deducted for finite state machine direct wild mutation. */
+export const DEDUCTION_FSM_WILD_MUTATION = 12;
+/** Points deducted for missing weakref in dynamic observer registration. */
+export const DEDUCTION_WEAKREF_MISSING = 10;
+/** Points deducted for hardcoded absolute pixel bounds. */
+export const DEDUCTION_HARDCODED_PIXELS = 8;
+/** Points deducted for in-place mutation on Snapshot DTOs. */
+export const DEDUCTION_DTO_IN_PLACE_MUTATION = 12;
+

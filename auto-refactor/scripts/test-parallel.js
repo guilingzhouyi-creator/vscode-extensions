@@ -86,6 +86,8 @@ const PARALLEL_SUITES = [
   { name: 'validate-native-bridge', script: 'scripts/validate-native-bridge.js' },
   { name: 'validate-native-parity', script: 'scripts/validate-native-parity.js' },
   { name: 'validate-dimension-consistency', script: 'scripts/validate-dimension-consistency.js' },
+  { name: 'validate-frontend-architecture-governance', script: 'scripts/validate-frontend-architecture-governance.js' },
+  { name: 'validate-self-multidimensional-audit', script: 'scripts/validate-self-multidimensional-audit.js' },
   { name: 'validate-suite-manifest', script: 'scripts/validate-suite-manifest.js' },
   { name: 'validate-report-schema', script: 'scripts/validate-report-schema.js' },
   // Language-pack suites: these are the only coverage the Go and shell/powershell rule

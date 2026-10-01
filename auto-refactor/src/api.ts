@@ -33,6 +33,7 @@ import type {
     UnsupportedLanguageSeverity,
     MaturityTier,
     DynamicEvidenceDTO,
+    QualityReviewProfile,
 } from './core/types';
 import { resolveConfig, TOOL_VERSION } from './core/config/config';
 import { Scanner } from './core/analyzer';
@@ -159,6 +160,11 @@ export interface ScanOptions {
     agentUid?: string;
     /** Custom dimension weights for transparent quality scoring. */
     scoringWeights?: Record<string, number>;
+    /**
+     * Target quality review profile: 'frontend' | 'backend' | 'composite'.
+     * When specified, tunes 10-dimension weights specifically for the given architecture plane.
+     */
+    reviewProfile?: QualityReviewProfile;
     /** Optional AbortSignal for cooperative cancellation. */
     signal?: AbortSignal;
     /**
@@ -607,7 +613,7 @@ function logWarmStats(logger: Logger, stats?: WarmStats | null): void {
     if (!stats) return;
     logger.info(
         `warm: daemonUsed=${stats.daemonUsed} cacheHit=${stats.cacheHit}/${stats.cacheTotal} ` +
-            `l1=${stats.l1Hit} l2=${stats.l2Hit} analyzed=${stats.analyzed} poolWarm=${stats.poolWarm} daemonMs=${stats.daemonMs}`,
+        `l1=${stats.l1Hit} l2=${stats.l2Hit} analyzed=${stats.analyzed} poolWarm=${stats.poolWarm} daemonMs=${stats.daemonMs}`,
     );
 }
 
@@ -658,7 +664,11 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
         await outputRenderedReport(report, config, logger);
 
         if (options.showScore && report.qualityScore) {
-            printQualityScoreAssessment(report.qualityScore, report.triPlaneQuality);
+            printQualityScoreAssessment(
+                report.qualityScore,
+                report.triPlaneQuality,
+                config.reviewProfile,
+            );
             // The report already carries the autonomy assessment (reportBuilder computes it
             // alongside the quality score), so `--score` printed the quality side and silently
             // dropped the CAI side even though both were requested by the same flag.
