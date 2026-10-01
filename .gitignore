@@ -24,7 +24,7 @@ sarif/
 # 本地插件管理与下载临时产物（不入库）
 .dsh-plugin-download/
 dsh-uninstall-*.tsv
-.trae-html-share-packages/
+**/.trae-html-share-packages/
 status_summary.txt
 
 # auto-refactor 运行时缓存、测试语料与基准临时文件（不入库）
