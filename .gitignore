@@ -21,6 +21,12 @@ sarif/
 # AI 助手的本地偏好记忆（沟通风格与工作流约定，逐机不同，不属于项目代码）
 .commandcode/
 
+# 本地插件管理与下载临时产物（不入库）
+.dsh-plugin-download/
+dsh-uninstall-*.tsv
+.trae-html-share-packages/
+status_summary.txt
+
 # auto-refactor 运行时缓存、测试语料与基准临时文件（不入库）
 **/.auto-refactor-cache/
 **/.auto-refactor-cache-*/
@@ -41,6 +47,7 @@ out.txt
 
 # 版本归档（历史快照 / 备份 / 演示材料，统一集中管理）
 /archive/
+**/archive/
 
 # ============ 密钥与凭证（防误提交泄露；示例模板与公钥除外） ============
 # 环境变量 / 本地覆盖配置（.env.example 等示例模板仍可提交）
