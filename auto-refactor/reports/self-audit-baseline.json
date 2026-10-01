@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790842252110",
-  "timestamp": "2026-10-01T08:10:57.078Z",
+  "snapshotId": "snapshot-v0.4.0-1790844050500",
+  "timestamp": "2026-10-01T08:40:55.351Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,26 +12,26 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 546,
-    "durationMs": 4553
+    "filesScanned": 557,
+    "durationMs": 4466
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 10859,
-    "suppressedIssues": 6054,
-    "unsuppressedIssues": 4805,
+    "totalIssues": 11132,
+    "suppressedIssues": 6191,
+    "unsuppressedIssues": 4941,
     "bySeverity": {
-      "info": 499,
-      "warning": 10360,
+      "info": 511,
+      "warning": 10621,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 73,
-      "medium": 9966,
-      "low": 820
+      "high": 75,
+      "medium": 10197,
+      "low": 860
     }
   },
   "eightPillars": {
@@ -62,7 +62,7 @@
     {
       "filePath": "scripts/test-parallel.js",
       "domain": "scripts",
-      "totalIssues": 159,
+      "totalIssues": 163,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 100,
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 73,
-      "medium": 9966,
-      "low": 820
+      "high": 75,
+      "medium": 10197,
+      "low": 860
     },
     "criticalItems": [],
     "highItems": [
@@ -221,15 +221,6 @@
         "file": "scripts/validate-self-multidimensional-audit.js",
         "line": 202,
         "message": "Function \"auditBoundaryInteroperability\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:scripts/validate-staged-slice.js:56",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-staged-slice.js",
-        "line": 56,
-        "message": "Function \"walk\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/analyzers/constants.ts:381",
@@ -466,6 +457,24 @@
         "message": "High algorithmic complexity risk: Found 3 levels of nested loops (potential O(N^3) compute hotspot, threshold 3)"
       },
       {
+        "id": "complexity:CPX-NEST-001:src/core/diff/semantic-delta-classifier.ts:121",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/diff/semantic-delta-classifier.ts",
+        "line": 121,
+        "message": "Unbounded control-flow nesting: function 'classifySemanticDelta' has nesting depth 5 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/diff/semantic-delta-classifier.ts:121",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/diff/semantic-delta-classifier.ts",
+        "line": 121,
+        "message": "Function \"classifySemanticDelta\" has cyclomatic complexity 21 (threshold 12)."
+      },
+      {
         "id": "complexity:CPX-NEST-001:src/core/file-discovery.ts:149",
         "rule": "CPX-NEST-001",
         "tier": "high",
@@ -599,15 +608,6 @@
         "file": "src/core/patterns/pattern-matcher.ts",
         "line": 158,
         "message": "Unbounded control-flow nesting: function 'matchHotPathAllocations' has nesting depth 6 exceeding elastic budget 5 for context 'ast-parser'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/patterns/pattern-matcher.ts:158",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/patterns/pattern-matcher.ts",
-        "line": 158,
-        "message": "Function \"matchHotPathAllocations\" has cyclomatic complexity 12 (threshold 12)."
       }
     ]
   },
@@ -795,10 +795,10 @@
       },
       {
         "domainName": "diff",
-        "compositeScore": 99.9,
+        "compositeScore": 99.8,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.5,
+          "maintainability": 99,
           "performance": 99.7,
           "data": 100,
           "testing": 100,

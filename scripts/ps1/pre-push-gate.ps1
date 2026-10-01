@@ -41,7 +41,7 @@ if ($res.ExitCode -ne 0) {
 }
 
 # --- Gate 3: auto-refactor 引擎全量并行测试套件 ---
-Write-Host "[3/6] 执行 auto-refactor 全量回归测试套件 (134 套)..." -ForegroundColor Gray
+Write-Host "[3/6] 执行 auto-refactor 全量回归测试套件 (138 套)..." -ForegroundColor Gray
 $res = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "test" -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ [FAIL] Gate 3: auto-refactor 回归测试套件未全部通过！" -ForegroundColor Red

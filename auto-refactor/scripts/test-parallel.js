@@ -291,6 +291,22 @@ const PARALLEL_SUITES = [
     name: 'validate-structured-resource-topology',
     script: 'scripts/validate-structured-resource-topology.js',
   },
+  {
+    name: 'validate-semantic-eloc',
+    script: 'scripts/validate-semantic-eloc.js',
+  },
+  {
+    name: 'validate-quality-efficiency',
+    script: 'scripts/validate-quality-efficiency.js',
+  },
+  {
+    name: 'validate-compact-ledger',
+    script: 'scripts/validate-compact-ledger.js',
+  },
+  {
+    name: 'validate-composite-gate',
+    script: 'scripts/validate-composite-gate.js',
+  },
 ];
 
 // Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)

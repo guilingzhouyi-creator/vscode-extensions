@@ -39,7 +39,7 @@ else
 fi
 
 # --- Gate 3: auto-refactor 引擎全量并行测试套件 ---
-echo "[3/6] 执行 auto-refactor 全量回归测试套件 (134 套)..."
+echo "[3/6] 执行 auto-refactor 全量回归测试套件 (138 套)..."
 if ! (cd auto-refactor && npm test >/dev/null 2>&1); then
     echo "❌ [FAIL] Gate 3: auto-refactor 回归测试套件未全部通过！"
     FAILED=1
