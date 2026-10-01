@@ -3,6 +3,14 @@
 *.vsix binary
 *.ico binary
 
+# TypeScript / JavaScript / Rust / Python 源码强制 LF —— 确保跨端与 Agent 写入 100% 字节哈希等价
+*.ts text eol=lf
+*.js text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+*.rs text eol=lf
+*.py text eol=lf
+
 # shell 脚本强制 LF —— Linux CI / CNB 容器中执行必需，防 Windows CRLF 破坏脚本
 *.sh text eol=lf
 

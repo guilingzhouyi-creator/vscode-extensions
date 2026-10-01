@@ -15,6 +15,19 @@
         "**/.vscode/workspace-timing.json": true,
         "**/.vscode/workspace-timing.journal": true
     },
+    // Agent 写入与编辑器并发安全配置（防 0 字节倒挂冲刷与保存冲突）
+    "files.autoSave": "off",
+    "files.saveConflictResolution": "askUser",
+    "workbench.editor.restoreViewState": true,
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/*/**": true,
+        "**/dist/**": true,
+        "**/out/**": true,
+        "**/target/**": true,
+        "**/.godot/**": true
+    },
     // 统一换行与编码（配合 .editorconfig / .gitattributes）
     "files.eol": "\n",
     "files.encoding": "utf8",

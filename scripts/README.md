@@ -12,6 +12,12 @@
 | 目录 | 语言 | 脚本 | 职能域 | 调用方 |
 |------|------|------|--------|--------|
 | `sh/` | Bash | `gate-common.sh` | gate（冲突分级单源规则库，被 source） | `pr-gate.sh` / `auto-merge-gate.sh` |
+| `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与质量前置门禁） | `.githooks/pre-commit`、本地 CLI |
+| `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |
+| `sh/` | Bash | `commit-msg-gate.sh` | gate（本地提交信息格式与零黑话门禁） | `.githooks/commit-msg`、本地 CLI |
+| `ps1/` | PowerShell | `commit-msg-gate.ps1` | gate（commit-msg-gate.sh 同构双实现） | 本地 CLI（Windows） |
+| `sh/` | Bash | `install-hooks.sh` | gate（一键激活仓库级 Git Hooks） | 本地 CLI |
+| `ps1/` | PowerShell | `install-hooks.ps1` | gate（install-hooks.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | `check-display-assets.sh` | ci（打包资产校验） | `.github/workflows/ci.yml`、`release.yml` |
 | `sh/` | Bash | `package.sh` | package（扩展打包） | 本地 CLI（README） |
 | `sh/` | Bash | `version-bump.sh` | release（语义递增 + CHANGELOG 迁移） | 本地 CLI / `release-tag.sh` |

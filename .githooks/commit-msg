@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Git Commit-Msg Hook — 路由至 scripts/sh/commit-msg-gate.sh
+set -e
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+exec bash "$ROOT_DIR/scripts/sh/commit-msg-gate.sh" "$1"

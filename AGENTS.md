@@ -1,58 +1,54 @@
-# AGENTS.md — 工作区指针索引（精简·泛化·严格）
+# AGENTS.md — 工作区治理总规与指针索引（精简·权威·高内聚）
 
-> 三项目共存，本文件为工作区全局治理总规与指针索引；详情以各项目真源文档为准。修改前必读对应指针。
+> 三项目共存，本文件为工作区全局唯一的顶层治理总规与架构指针；详情以各项目真源文档为准，修改前必读对应指针。
 
-## 一、 仓库概况与构建门禁矩阵
+## 一、 仓库拓扑与工程全景
 
-| 项目目录 | 类型与核心架构 | 构建与验证流水线 | 权威真源指针 |
-| :--- | :--- | :--- | :--- |
-| `workspace-timing/` | VS Code 扩展（TS 五层架构，RingBuffer+Journal 双写无损，L0~L5 门禁） | `npm run compile → test:unit → lint` (`sync` / `test:fast` / `review`) | `workspace-timing/README.md` |
-| `auto-refactor/` | Node CLI 静态分析审查引擎（oxc+ts-morph 混合解析，跨语言语义 IR，4 层规则金字塔） | `npm run build → npm test → npm run benchmark` | `auto-refactor/DOCS.md` |
-| `WebGames/` | Godot 4.7 引擎（纯逻辑无头解耦，配置驱动，GDScript，20 项静态门禁） | `test-run.sh → check-gdscript.sh → bench-sweep.sh`<br/>一键门禁：`audit-all.sh` / `audit-all.ps1` | `WebGames/docs/README.md`<br/>`WebGames/config/README.md`<br/>`WebGames/scripts/README.md` |
+- **三项目独立自治**：
+  - `workspace-timing/`：VS Code 扩展，独立运行时，RingBuffer+Journal 内存双写崩溃安全，L0~L5 门禁；
+  - `auto-refactor/`：Node CLI 静态重构与审查引擎（非扩展，独立工具），TS+Rust 双轨内核，4 层规则金字塔；
+  - `WebGames/`：Godot 4.7 卡拉尔世界引擎（纯逻辑无头解耦，配置驱动，20 项静态门禁，四阶段案卷施工）；
+- **根级发布与门禁工具链（`scripts/`）**：`pre-commit-gate`/`commit-msg-gate`（本地提交前置物理卫生、零空文件、换行契约与信息规范门禁，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
 
-- **统一发布工具链（根 `scripts/`）**：`package.sh`/`package.ps1`（本地打包至 `dist/<ext>/`，支持 `-HotSync`/`--hot-sync` 双端秒级热同步与 `-Install`/`--install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁+自检）；`release-tag.sh`（发布闭环，`--no-push` 留痕）；`check-display-assets.sh`（资产校验）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
-- **门禁通用契约**：执行各项目专属构建门禁，失败重跑；警告即错误；禁止跨项目越界引入未经测试的代码变更。
+## 二、 跨项目全局通用契约
 
-## 二、 跨项目通用契约与命名规范
+### 1. 命名与代码排版
+- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 中文正文引需求 ID；
+- **物理命名**：全局严格 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）；
+- **缩进换行**：TypeScript 4 空格，其余 2 空格；`ps1` 严格 CRLF，`sh`/`gd`/`md`/`json`/`ts` 严格 LF。
 
-### 1. 命名与格式规范
-- **分支与提交**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 中文正文引需求ID；
-- **物理文件名**：全局严格遵循 `kebab-case`；
-  - *例外豁免*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case`（对齐领域 id 与 Godot 惯例）；
-- **排版与换行符**：
-  - 代码缩进：TypeScript 4 空格，其余语言/格式 2 空格；
-  - 物理换行符：`ps1` 严格 CRLF，`sh`/`gd`/`md`/`json`/`ts` 严格 LF；
-- **零黑话铁律**：测试文件、代码符号与路径**严禁包含施工批次与临时性标记**（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 规范名除外）。
+### 2. 文档与黑话边界隔离
+- **零黑话铁律**：测试文件、代码符号与路径**严禁包含施工批次与临时性标记**（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 规范名除外）；
+- **面向用户文档纯粹性**：面向用户的文档（README / CHANGELOG / UI 提示）必须纯粹基于功能特性与产品交付价值撰写，严禁出现内部工程黑话、编译器参数（如 tsconfig 选项）或审查门禁代号（如 L0~L5）；工程细节统一收口至内部真源指针。
 
-## 三、 三项目专属核心架构契约
+### 3. 执行环境与子进程契约
+- **终端非阻塞**：全局与项目级脚本、环境配置必须具备非交互与重定向守卫（`[Environment]::UserInteractive -and -not [Console]::IsOutputRedirected`），严禁在重定向子进程中加载交互式 UI/补全模块；
+- **构建防重入**：发布与打包流水线触发子构建时必须传递幂等标记（`WT_COMPILED=1`），严禁在生命周期钩子中多重递归编译；
+- **并发与去重**：审查系统与自检测试套件必须按唯一实例去重，统一采用 `Promise.all` 异步并发执行。
 
-| 项目 | 核心硬性架构契约 | 红线约束与设计边界 | 权威指针 |
-| :--- | :--- | :--- | :--- |
-| **`workspace-timing/`** | ① **五层分层解耦**（UI / Engine / Storage / Analytics / Shared）；<br/>② **三级存储与双写**：`RingBuffer` 内存无 I/O 缓冲 + `Journal` (NDJSON) 追加崩溃即时回放 + 全量检查点存盘；<br/>③ **六层审查门禁**（L0~L5）联动 auto-refactor 扫描密钥、循环依赖与无用导出。 | 严禁破坏五层单向依赖；破坏性操作前必须写安全快照；UI 文本 100% 接入双语字典（zh-CN/en），严禁硬编码未翻译文案。 | `workspace-timing/README.md`<br/>`workspace-timing/package.json` |
-| **`auto-refactor/`** | ① **规则金字塔与单一真源**：Layer 1~4 四层规则金字塔（166 条规则全量自测，零孤儿规则）；<br/>② **双轨解析与 Rust 算子库等价**：oxc 及 Rust 原生算子库（auto-refactor-ops Cargo Workspace）与 pure-js-shim/ts-morph 必须保持 100% 语义与字节等价；<br/>③ **核心层模块化拓扑**：`src/core/` 领域子目录（`ast/`、`config/`、`diff/`、`policy/`、`native/`），平铺兼容 shim 零运行时开销。 | 严禁私改 baseline 掩盖回归；物理文件名必须通过 `validate-physical-naming.js` 看守；新增/修改规则与原生算子必须具备对等正反向测试用例。 | `auto-refactor/DOCS.md`<br/>`auto-refactor/package.json` |
-| **`WebGames/`** | ① **配置驱动零硬编码**：全域数据统一经 `GameConfig.get_*` 从 `config/<层>/<域>.json` 读取，物品经管线自动发现；<br/>② **前端可视化边界**：前端仅作数据显示，数据统一经 `apply_snapshot()` 注入；<br/>③ **高承压与对象池**：循环内零瞬态堆分配（`ADV-PRF-002`），池化对象必接 `reset_state()`；<br/>④ **短期施工规范**：改动必先立四阶段案卷细则，必须获批后方可编码实施；每积 10 卷归档一次。 | 严禁 `get_value` 与直读未登记配置；前端严禁业务计算、后端类直连与 EventBus 订阅；严禁循环内 `.new()`/`.duplicate(true)`；案卷目录严格仅 4 份细则文件（禁自造额外文件）。 | `WebGames/docs/README.md`<br/>`WebGames/config/README.md`<br/>`WebGames/docs/路线图/路线图总索引.md` |
+## 三、 三项目专属工程矩阵（一表合一）
 
-## 四、 测试工程化拓扑与护栏守卫
+| 项目与定位 | 核心硬性架构契约 | 构建与测试流水线 | 拓扑规范与专属约束 | 权威真源指针 |
+| :--- | :--- | :--- | :--- | :--- |
+| **`workspace-timing/`**<br/>*(VS Code 扩展)* | ① 五层解耦（UI / Engine / Storage / Analytics / Shared）；<br/>② RingBuffer 内存缓冲 + Journal (NDJSON) 追加崩溃即时回放 + 全量检查点；<br/>③ L0~L5 六层权重审查门禁；<br/>④ `tsconfig.json` 保持 `declaration: false` 与 `isolatedModules: true` 极速构建。 | `npm run compile`<br/>`npm run test:fast`<br/>`npm run review`<br/>`npm run sync` | ① 单元测试放 `tests/unit/*.test.ts`；<br/>② UI 文本 100% 接入双语字典（zh-CN/en），严禁硬编码未翻译文案与内部技术黑话；<br/>③ SVG 图标/文字保持暗色高对比度；<br/>④ 审查规则单一真源登记于 `review-rules.json`。 | `workspace-timing/README.md`<br/>`workspace-timing/package.json` |
+| **`auto-refactor/`**<br/>*(Node CLI 分析引擎)* | ① Layer 1~4 四层规则金字塔（26 分析器，243 规则全自测，零孤儿）；<br/>② Rust 原生算子内核与 pure-TS shim 100% 字节等价；<br/>③ 三平面质量度量（静态十支柱 + 动态遥测 + 演化反馈 CAI）；<br/>④ 变更熵密（CED）路由与 AST 局部切片快轨。 | `npm run gate`<br/>`npm run build`<br/>`npm test`<br/>`npm run benchmark` | ① 测试放 `test/`（`validate-*.ts` / `test-*.ts`），在 `test-parallel.js` 登记防孤儿（135+ 套）；<br/>② 物理文件名受 `validate-physical-naming.js` 看守；<br/>③ 项目中立性受 `validate-project-neutrality.ts` 护栏管束；<br/>④ 单分析器扣分遵 `MAX_AXES_PER_FINDING <= 4`。 | `auto-refactor/DOCS.md`<br/>`auto-refactor/package.json` |
+| **`WebGames/`**<br/>*(Godot 游戏引擎)* | ① 全域配置驱动：统一经 `GameConfig.get_*` 从 `config/<层>/<域>.json` 读取；<br/>② 前端可视化边界：视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池：循环内零瞬态堆分配（`ADV-PRF-002`），池化对象必接 `reset_state()`；<br/>④ 统一继承 `TestCase`（`pack_results` 打包）。 | `test-run.sh`<br/>`check-gdscript.sh`<br/>`bench-sweep.sh`<br/>`audit-all.sh` / `.ps1` | ① `tests/unit/` 根目录散落脚本数恒为 0，按 domains/frontend/infrastructure 归位；<br/>② 改动必须先立四阶段案卷细则，获批后方可编码（案卷严格仅 4 份细则文件）；<br/>③ 严禁直读未登记配置与循环内 `.new()`；<br/>④ 新增领域在 `domains.json` 与 `test_registry.gd` 双向对齐。 | `WebGames/docs/README.md`<br/>`WebGames/config/README.md`<br/>`WebGames/docs/路线图/路线图总索引.md` |
 
-| 项目 | 测试目录与组织拓扑 | 命名公式与规范示范 | 契约基座与护栏约束 |
-| :--- | :--- | :--- | :--- |
-| **`workspace-timing/`** | `tests/unit/`（单元测试）<br/>`tests/e2e/`（端到端测试） | `*.test.ts`<br/>示例：`ring-buffer.test.ts`, `journal.test.ts` | Mocha/Chai 底座；异步与定时器精准清理；覆盖率看守。 |
-| **`auto-refactor/`** | `test/`（单元与集成测试）<br/>`scripts/test-parallel.js` | `validate-*.ts` / `test-*.ts`<br/>示例：`validate-physical-naming.js`, `validate-praxis.ts` | 91 套并行异步流水线；全量 PASS 门禁；基线防回退（ratchet）。 |
-| **`WebGames/`** | `tests/unit/domains/`（领域单测）<br/>`tests/unit/frontend/`（前端视图/基建）<br/>`tests/unit/infrastructure/`（基础设施）<br/>`tests/guards/`（架构与配置长效护栏）<br/>`tests/integration/pipelines/`（跨域管线）<br/>`tests/fixtures/factories/`（测试工厂） | 领域：`test_<domain_id>.gd`<br/>前端视图：`test_fe_NN_<view>.gd`<br/>前端基建：`test_frontend_<topic>.gd`<br/>基础设施：`test_<service>.gd`<br/>长效护栏：`test_<topic>_guard.gd`<br/>跨域管线：`test_<topic>_pipeline.gd`<br/>测试工厂：`<entity>_factory.gd`（禁 `test_`） | 统一继承 `TestCase`（`pack_results` 打包）；`tests/unit/` 根目录散落文件数恒为 0；护栏单源演进（严禁随案卷分裂新建护栏文件）；新增领域在 `domains.json` 与 `test_registry.gd` 双向对齐。 |
+## 四、 工作区绝对红线禁令
 
-## 五、 Agent 行为边界与绝对红线清单
-
-### 1. 范围与事前原则
-- **默认单项目**：操作必须严格限定在当前任务所属的项目内，严禁跨项目扩散修改；
-- **先契约后编码**：涉及架构或流程调整时，严格遵守先规划细则并获批后实施的工程闭环；
-- **改前与改后门禁**：改前通读对应项目 SOP 与真源指针，改后必须跑通该项目全量构建门禁且 0 违规。
-
-### 2. 绝对红线禁令
 1. **路径与引用红线**：严禁在代码或配置中书写绝对路径、盘符或 `file:///`；重命名或删除文件必须同步修正全库所有引用点；严禁未经授权修改 baseline/基线文件以消音违规；
 2. **规范与门禁红线**：严禁私自放宽各项目的 linter、formatter、naming 规则或门禁脚本；严禁向配置表臆造未在架构规范中定义的新字段；
 3. **交付与占位符红线**：严禁提交包含 `<...>` 占位符、未决 TODO 或伪实现的半成品；严禁未获批准提前在任务路线图上标记完成；严禁仅跑通局部测试的缩水 MVP 敷衍实现；
-4. **案卷与测试红线**：案卷目录下严格仅允许四阶段细则文件（严禁自造 README 等多余文件）；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁在测试名称与代码标识符中使用施工批次黑话（`pXX`/`phaseXX` 等）。
+4. **案卷与黑话红线**：案卷目录下严格仅允许四阶段细则文件（严禁自造多余文件）；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁在测试名称、代码标识符及面向用户的文档（README/CHANGELOG/UI）中使用施工批次黑话与内部工程代号；
+5. **构建配置与性能红线**：严禁在 VS Code 扩展或无外部类型依赖的项目中开启 `"declaration": true` 导致构建膨胀；严禁在 CI/Agent 自动执行环境中使用未加非交互守卫的全局 Shell 启动挂钩；
+6. **审查规则一致性红线**：严禁在检查器代码中发射未在 `review-rules.json` 元数据中登记的规则 ID（违者触发 `RCFG-RULE-DRIFT` 门禁熔断）。
 
-## 六、 维护规则
+## 五、 Agent 行为边界与维护规则
 
-本文件为工作区指针索引与跨项目治理底座。任何项目结构、全局命令、架构边界或发布工具链变更时，必须同次提交同步更新本文件，确保指针长效准确。
+### 1. 行为边界原则
+- **默认单项目**：操作必须严格限定在当前任务所属的项目内，严禁跨项目扩散修改；
+- **先契约后编码**：涉及架构或流程调整时，严格遵守先规划细则并获批后实施的工程闭环；
+- **改前与改后门禁**：改前通读对应项目真源指针，改后必须跑通该项目专属全量构建门禁且 0 违规。
+
+### 2. 指针长效维护
+本文件为工作区全局治理总规与指针索引底座。任何项目结构、全局命令、架构边界或发布工具链变更时，必须同次提交同步更新本文件，确保指针长效准确。
