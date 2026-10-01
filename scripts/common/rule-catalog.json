@@ -1,0 +1,2364 @@
+{
+  "schema": "workspace-rule-catalog/v1",
+  "generatedAt": "2026-10-01T08:11:50.504Z",
+  "totalRules": 336,
+  "counts": {
+    "autoRefactor": 262,
+    "workspaceTiming": 45,
+    "webGames": 56
+  },
+  "rules": [
+    {
+      "id": "ADV-BND-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+    },
+    {
+      "id": "ADV-CFG-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_71_用户会话全生命周期与主页HUD事件流双轨闭环治理/KALAR-DEV-2026-ST67-003_阶段3_配置驱动扩展与全域EventBus无头接线工程化.md)"
+    },
+    {
+      "id": "ADV-CFG-002",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_70_配置库唯一事实提纯与冗余收敛治理/KALAR-DEV-2026-ST66-002_阶段2_配置血缘静态判重引擎与漂移检测算法实现.md)"
+    },
+    {
+      "id": "ADV-DEC-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-EVT-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/backend/infrastructure/event_bus/event_bus_core.gd)"
+    },
+    {
+      "id": "ADV-EVT-002",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-EVT-003",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-EVT-004",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-LAM-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+    },
+    {
+      "id": "ADV-NAM-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-POOL-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/backend/infrastructure/event_bus/event_packet.gd)"
+    },
+    {
+      "id": "ADV-PRF-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+    },
+    {
+      "id": "ADV-PRF-002",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/.auto-refactor-cache/frontend-scan-report-v2.json)"
+    },
+    {
+      "id": "ADV-PRF-003",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md)"
+    },
+    {
+      "id": "ADV-PRF-004",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md)"
+    },
+    {
+      "id": "ADV-RNG-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第08期_75到84/Phase_77_前端基础架构重构与根骨架施工细则/KALAR-DEV-2026-ST73-003_阶段3_UI可视化状态容器与全域Mock闭环工程化.md)"
+    },
+    {
+      "id": "ADV-SIG-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+    },
+    {
+      "id": "ADV-TYP-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-TYP-002",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-TYP-003",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+    },
+    {
+      "id": "ADV-UI-001",
+      "project": "WebGames",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md)"
+    },
+    {
+      "id": "analyzer-error",
+      "project": "auto-refactor",
+      "family": "LANG",
+      "severity": "error",
+      "summary": "分析器在单文件上抛异常（failOnAnalyzerError 可升为 error）。"
+    },
+    {
+      "id": "ARCH-ABS-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。"
+    },
+    {
+      "id": "ARCH-BLR-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "文件边界失衡：单文件内多个高复杂度函数缺乏语义关联，职责异常聚合。"
+    },
+    {
+      "id": "ARCH-BND-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "跨业务域内部穿透：绕过公共导出 Facade 契约直接访问非公开内部实现。"
+    },
+    {
+      "id": "ARCH-CFG-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "环境配置泄漏：纯领域业务模型内部直接读取环境变量或底层磁盘配置。"
+    },
+    {
+      "id": "ARCH-CFG-002",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "声明的配置项在全库代码中从未参与任何决策、控制流或计算（死配置）。"
+    },
+    {
+      "id": "ARCH-CFG-003",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "同一配置项在多处重复定义，破坏配置单一真源。"
+    },
+    {
+      "id": "ARCH-CFG-004",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "隐式配置散落：业务代码中散落硬编码环境变量读取或隐式调优参数。"
+    },
+    {
+      "id": "ARCH-CFG-005",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "配置访问散落：未通过统一配置层或注册表，跨层无序散落访问配置。"
+    },
+    {
+      "id": "ARCH-CFG-006",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "配置业务强耦合：领域模型直接绑定具体配置文件物理格式或磁盘解析。"
+    },
+    {
+      "id": "ARCH-CFG-007",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "配置过度抽象：简单静态配置引入多重不必要间接封装与透传层。"
+    },
+    {
+      "id": "ARCH-DEC-002",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "多语言 AST 解析与适配器逻辑必须独立解耦为适配器模块，分析器主体严禁混杂语法树构造细节或深耦合特定语言适配器实现。"
+    },
+    {
+      "id": "ARCH-DIR-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "倒置依赖，在领域层定义接口契约，由外层实现。"
+    },
+    {
+      "id": "ARCH-DIR-002",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "引入用例服务 (Application Service) 统筹业务流。"
+    },
+    {
+      "id": "ARCH-DIR-003",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "形式分层假象：目录结构表面隔离，但调用关系与数据流发生逆向越层。"
+    },
+    {
+      "id": "ARCH-DISP-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle."
+    },
+    {
+      "id": "ARCH-DSP-002",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation."
+    },
+    {
+      "id": "ARCH-GLB-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "隐式全局可变状态：模块间通过顶层全局变量或单例产生隐式强耦合。"
+    },
+    {
+      "id": "ARCH-HDL-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "无头架构违规：核心业务逻辑或计算模块直接绑定 UI/IDE 视图框架。"
+    },
+    {
+      "id": "ARCH-LEAK-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "领域模型使用 POJO/原生实体，隔离外部框架专有类型。"
+    },
+    {
+      "id": "ARCH-LEAK-002",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "分层越界：外层实现被内层直接反向引用（Clean/DDD 层序反转）。"
+    },
+    {
+      "id": "ARCH-ROL-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "文件本体角色失衡与伪共享库：文件承担过多易变状态或高耦合业务逻辑，却被跨域频繁引用作为共享库。"
+    },
+    {
+      "id": "ARCH-ROL-002",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "业务模块承载无界公共能力：领域业务模块内部私自承载与导出通用基础设施或公共计算能力。"
+    },
+    {
+      "id": "ARCH-SKL-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "策略骨架复用候选：检测到具有同构前置校验与收尾步骤的复杂流程。"
+    },
+    {
+      "id": "ARCH-TMP-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "巨石视图/模板渲染器未解耦：单函数规模超标且包含深度 HTML/SVG/DSL 模板字符串拼接，缺少局部组件化。"
+    },
+    {
+      "id": "ARCH-UTL-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "万能工具库反模式：检测到承担混杂异构逻辑的 utils/common 垃圾桶文件。"
+    },
+    {
+      "id": "ARF-*",
+      "project": "workspace-timing",
+      "family": "L5",
+      "severity": "error",
+      "summary": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级） (ARF-*)"
+    },
+    {
+      "id": "clean-layer-violation",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "增量管线中的分层越界（clean-layer 口径）。"
+    },
+    {
+      "id": "CMP-CAL-001",
+      "project": "auto-refactor",
+      "family": "CMP",
+      "severity": "error",
+      "summary": "Deeply nested inline callback chains create callback hell, complicate exception propagation, and mask race conditions."
+    },
+    {
+      "id": "CMP-DEN-001",
+      "project": "auto-refactor",
+      "family": "CMP",
+      "severity": "error",
+      "summary": "Dense syntactic packing of bitwise, arithmetic and conditional operators without naming or spacing exceeds human cognitive chunking capacity."
+    },
+    {
+      "id": "CMP-EXP-001",
+      "project": "auto-refactor",
+      "family": "CMP",
+      "severity": "error",
+      "summary": "Giant expressions with deeply nested ternaries or unbounded logical chains create cognitive overload and obscure branching logic."
+    },
+    {
+      "id": "CMP-LIN-001",
+      "project": "auto-refactor",
+      "family": "CMP",
+      "severity": "error",
+      "summary": "Cramming multiple distinct statements or side-effects onto a single line impairs stack traces, debug stepping, and code readability."
+    },
+    {
+      "id": "CMT-BAN-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "不足 150 行的小文件使用 `═` 文件级横幅。"
+    },
+    {
+      "id": "CMT-CON-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "异步导出方法未注明并发调度假设、可重入性或幂等语义。"
+    },
+    {
+      "id": "CMT-DOC-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "核心公开导出符号缺少功能描述、参数或返回值 Docstring/JSDoc 说明。"
+    },
+    {
+      "id": "CMT-DOC-002",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "机械无意义冗余注释 (注释文本仅重复函数名或符号名)。"
+    },
+    {
+      "id": "CMT-HDR-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "源码文件顶部缺少文件层级职责与设计意图注释。"
+    },
+    {
+      "id": "CMT-HDR-002",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "工业级严格题头契约缺失六字段之一 (模块归属、文件路径、架构定位、依赖与触发、职责说明、退出语义与设计依据)。"
+    },
+    {
+      "id": "CMT-HDR-003",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "题头声明路径与物理文件路径失真不一致。"
+    },
+    {
+      "id": "CMT-INT-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "注释声称的职责特征（如纯函数、无副作用、并发安全）与 AST 实际数据流/副作用特征矛盾。"
+    },
+    {
+      "id": "CMT-LNG-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "注释书写语言显著偏离项目或代码域的主导规范（例如英文主导库中突兀插入中文注释）。"
+    },
+    {
+      "id": "CMT-LNG-002",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "单个文件内部中英文注释无序交错混杂（中文与英文占比均较高且缺乏分层规律）。"
+    },
+    {
+      "id": "CMT-MOJI-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "编码损坏（U+FFFD 替换符、UTF-8 被按 Latin-1 解码的 `Ã`+高位字节、Windows-1252 智能引号乱码）。跨语言通用。"
+    },
+    {
+      "id": "CMT-SEP-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "同一文件混用短标题分隔（`── 标题 ──`）与长串分隔（`──── 标题`）；纯分隔线豁免。"
+    },
+    {
+      "id": "CMT-VMD-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "有效注释密度过低或存在逐行直译代码名的注水现象（未解释设计原因与边界不变量）。"
+    },
+    {
+      "id": "CMT-WID-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "注释/docstring 物理行宽超过 100 列；工具指令行（`noqa`/`type: ignore`/`eslint-disable`/`@ts-expect-error` 等）以及 `comments.options.directiveTokens` 声明的项目自有指令豁免。"
+    },
+    {
+      "id": "CONST-CLU-001",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "error",
+      "summary": "同调用域内存在未抽取的同源硬编码字面量（状态码/协议值/路径/事件名），应一揽子打包抽取。"
+    },
+    {
+      "id": "CONST-DRF-001",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "error",
+      "summary": "跨文件同源语义常量存在命名分裂或数值微小漂移，必须建立单一真源（SSOT）。"
+    },
+    {
+      "id": "CONST-LAY-001",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "error",
+      "summary": "模块级稳定常量在依赖区后必须进入首个正式代码声明域，严禁散落在函数内部、文件中段或业务逻辑之间。"
+    },
+    {
+      "id": "CONST-LIB-001",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "error",
+      "summary": "大规模常量散落于业务代码文件中，缺乏集中分层的常量库目录结构。"
+    },
+    {
+      "id": "CONST-OWN-001",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "error",
+      "summary": "共享常量所有权分层错误，严禁塞入全局大杂烩 constants 文件或藏匿在底层私有模块。"
+    },
+    {
+      "id": "CONST-SCP-001",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "error",
+      "summary": "单函数局部不变量、延迟初始化值或受限生命周期资源禁止滥用扩大作用域提升至顶层。"
+    },
+    {
+      "id": "CONST-SCP-002",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "error",
+      "summary": "单函数体内散落的多处同类局部硬编码应在函数头部统一定义为局部常量。"
+    },
+    {
+      "id": "CPX-AMP-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "复杂度放大陷阱：在迭代或热点调用链中隐式嵌套阻塞 I/O 或序列化。"
+    },
+    {
+      "id": "CPX-BUD-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "超出弹性复杂度预算：综合语言、角色、代码域与清晰度测算的预算超标。"
+    },
+    {
+      "id": "CPX-HOP-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "机械式拆分投机：通过制造大量单行薄转发包装函数人为压低复杂度。"
+    },
+    {
+      "id": "CPX-JST-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "非必要设计失控复杂度：高复杂度来自无序嵌套和职责堆积，缺乏算法/状态机证明。"
+    },
+    {
+      "id": "CPX-NEST-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "失控深层控制流嵌套：控制流嵌套层级超出该上下文类型的弹性预算（业务代码>3层，状态机/解析器>5层）。"
+    },
+    {
+      "id": "CPX-NEST-002",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "深层长跨度控制流跳跃：在深层嵌套（>=4层）且距函数头超长跨度处执行非结构化控制流逃逸（return/break/throw）。"
+    },
+    {
+      "id": "CPX-REC-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "跨函数/跨文件无终止保障的递归或互递归调用链。"
+    },
+    {
+      "id": "CPX-RED-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "分布式冗余复杂度超标：跨多个文件存在高度相似的算法流程、计算或校验逻辑，累积形成隐性系统复杂度。"
+    },
+    {
+      "id": "CPX-SPACE-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "热点循环内无界瞬态内存分配与重复全量物化。"
+    },
+    {
+      "id": "CPX-STM-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "状态机分派结构规范：状态机多层分支内存在过长单分支逻辑（>30 LOC），降低了分派骨架的清晰度。"
+    },
+    {
+      "id": "CPX-TIME-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "跨函数/跨文件无界多项式时间复杂度：嵌套迭代调用链引发高开销。"
+    },
+    {
+      "id": "DAT-DEF-001",
+      "project": "auto-refactor",
+      "family": "DAT",
+      "severity": "error",
+      "summary": "受信内部领域边界内的冗余重复防御性校验。"
+    },
+    {
+      "id": "DAT-LAY-001",
+      "project": "auto-refactor",
+      "family": "DAT",
+      "severity": "error",
+      "summary": "数据访问抽象泄漏：业务核心直接操纵持久化驱动或底层存储细节。"
+    },
+    {
+      "id": "DAT-NPL-001",
+      "project": "auto-refactor",
+      "family": "DAT",
+      "severity": "error",
+      "summary": "迭代与映射上下文中的 N+1 查询与重复存储调用。"
+    },
+    {
+      "id": "DAT-QRY-001",
+      "project": "auto-refactor",
+      "family": "DAT",
+      "severity": "error",
+      "summary": "在线请求链路中的无界数据读取或全表内存过滤。"
+    },
+    {
+      "id": "DAT-SER-001",
+      "project": "auto-refactor",
+      "family": "DAT",
+      "severity": "error",
+      "summary": "跨层调用链中的重复序列化与反序列化转换。"
+    },
+    {
+      "id": "DEP-INV-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "依赖倒置违规：底层基础设施或公共模块反向依赖高层业务模块。"
+    },
+    {
+      "id": "DEP-LAZ-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "未提供审计声明或合规理由的函数内部临时导入。"
+    },
+    {
+      "id": "DEP-ORD-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "文件布局与导入分组不符合当前语言现代化工程规范。"
+    },
+    {
+      "id": "DEP-RES-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。"
+    },
+    {
+      "id": "DEP-WLD-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "使用通配符导入破坏显式依赖跟踪与树摇优化。"
+    },
+    {
+      "id": "disallowed-import",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "声明式导入边界违规：跨组依赖或未授权外部包。"
+    },
+    {
+      "id": "DOC-CL-001",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-001)"
+    },
+    {
+      "id": "DOC-CL-002",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-002)"
+    },
+    {
+      "id": "DOC-CL-003",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-003)"
+    },
+    {
+      "id": "DOC-CL-004",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-004)"
+    },
+    {
+      "id": "DOC-CL-005",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-005)"
+    },
+    {
+      "id": "DOC-CL-006",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-006)"
+    },
+    {
+      "id": "DOC-DUP-001",
+      "project": "auto-refactor",
+      "family": "DOC",
+      "severity": "error",
+      "summary": "同一文档内正文行重复（≥24 字符）。"
+    },
+    {
+      "id": "DOC-FEN-001",
+      "project": "auto-refactor",
+      "family": "DOC",
+      "severity": "error",
+      "summary": "Markdown 代码围栏未闭合。"
+    },
+    {
+      "id": "DOC-LNK-001",
+      "project": "auto-refactor",
+      "family": "DOC",
+      "severity": "error",
+      "summary": "反引号路径或相对链接指向不存在的文件。"
+    },
+    {
+      "id": "DOC-RD-001",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-001)"
+    },
+    {
+      "id": "DOC-RD-002",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-002)"
+    },
+    {
+      "id": "duplicate-literal",
+      "project": "auto-refactor",
+      "family": "LEGACY",
+      "severity": "error",
+      "summary": "自动聚合多处行号并提示提取共享常量。"
+    },
+    {
+      "id": "ERR-PRP-001",
+      "project": "auto-refactor",
+      "family": "ERR",
+      "severity": "error",
+      "summary": "错误码跨声明重复抛出（分类法冲突）或沿调用链向上传播过多跳数。"
+    },
+    {
+      "id": "expensive-loop-operation",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "循环体内执行昂贵深拷贝（.duplicate(true)）或阻塞式序列化与IO。"
+    },
+    {
+      "id": "GDM-BAR-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "表现层直接离散操作裸 ProgressBar 实例，破坏 KStatusBar 标准交互与平滑动画规范。"
+    },
+    {
+      "id": "GDM-BND-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "表现层视图直接耦合后端领域单例或跨层订阅 EventBus 全局业务事件。"
+    },
+    {
+      "id": "GDM-CONNECT-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "使用 Godot 3 connect 签名（方法名以字符串传入）。"
+    },
+    {
+      "id": "GDM-DEB-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "高频业务按钮裸连信号，缺少防抖机制或 loading 状态互斥控制。"
+    },
+    {
+      "id": "GDM-EXPORT-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "使用 Godot 3 的 export 语句。"
+    },
+    {
+      "id": "GDM-EXT-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "表现层主视图控制器未继承 BaseScreen 或 BaseModal 基类。"
+    },
+    {
+      "id": "GDM-FSM-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "有限状态机私有状态变量被就地直接赋值，破坏状态迁移守卫与进出钩子。"
+    },
+    {
+      "id": "GDM-I18N-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "表现层 UI 文本未通过 UIIntermediary / 国际化键名绑定，存在裸字符串硬编码。"
+    },
+    {
+      "id": "GDM-ISO-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "无头领域逻辑层直接引用视图层或场景树节点破坏解耦架构。"
+    },
+    {
+      "id": "GDM-LOC-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "表现层视图脚本行数超出物理预算上限（LOC <= 450 行）。"
+    },
+    {
+      "id": "GDM-NOD-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "视图层脚本中出现飘移的相对节点路径（如 get_parent()、find_child() 或长跨级相对索引）。"
+    },
+    {
+      "id": "GDM-ONREADY-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "使用 onready 关键字。"
+    },
+    {
+      "id": "GDM-POL-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "对象池获取后未实现或未调用 reset_state 契约。"
+    },
+    {
+      "id": "GDM-POOL-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "使用 Pool*Array 类型。"
+    },
+    {
+      "id": "GDM-POOL-002",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "对象池 reset_state 未调用基类重置方法破坏契约。"
+    },
+    {
+      "id": "GDM-PRF-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "循环或高频执行路径中瞬态堆分配导致掉帧风险。"
+    },
+    {
+      "id": "GDM-RES-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "UI 布局脚本中硬编码固定分辨率或绝对像素尺寸，破坏多端响应式适配。"
+    },
+    {
+      "id": "GDM-RPC-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "使用 remote/master/puppet/slave 函数修饰符。"
+    },
+    {
+      "id": "GDM-SIG-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "信号连接后缺少对应断开逻辑导致生命周期悬挂泄漏。"
+    },
+    {
+      "id": "GDM-TOK-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "表现层视图硬编码 Color(...) 字面量或裸色值，破坏 DesignTokens 单一真源。"
+    },
+    {
+      "id": "GDM-TOOL-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "使用裸 tool 关键字。"
+    },
+    {
+      "id": "GDM-UNI-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "表现层视图就地修改只读 Snapshot DTO 属性，破坏 CQRS 单向数据流与单一真源。"
+    },
+    {
+      "id": "GDM-VRT-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "长列表场景全量就地实例化节点，未接入 KVirtualList 虚拟化滚动与对象池复用。"
+    },
+    {
+      "id": "GDM-WEAK-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "动态观察者或全局管理器强引用持有 Node 实例，未采用 weakref 防内存泄漏。"
+    },
+    {
+      "id": "GDM-YIELD-001",
+      "project": "auto-refactor",
+      "family": "GDM",
+      "severity": "error",
+      "summary": "使用 Godot 3 的 yield 协程写法。"
+    },
+    {
+      "id": "GOM-CTX-001",
+      "project": "auto-refactor",
+      "family": "GOM",
+      "severity": "error",
+      "summary": "context.Context 不是函数的首个形参。"
+    },
+    {
+      "id": "GOM-ERR-001",
+      "project": "auto-refactor",
+      "family": "GOM",
+      "severity": "error",
+      "summary": "使用 _ 静默丢弃错误返回值。"
+    },
+    {
+      "id": "GOM-STYLE-001",
+      "project": "auto-refactor",
+      "family": "GOM",
+      "severity": "error",
+      "summary": "方法接收器命名不符合 Go 惯例。"
+    },
+    {
+      "id": "GOM-STYLE-002",
+      "project": "auto-refactor",
+      "family": "GOM",
+      "severity": "error",
+      "summary": "错误变量未以 err 开头。"
+    },
+    {
+      "id": "GOM-STYLE-003",
+      "project": "auto-refactor",
+      "family": "GOM",
+      "severity": "error",
+      "summary": "导出包注释或包命名不符合规范。"
+    },
+    {
+      "id": "GOV-AGN-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Concurrent modifications by multiple agents produce architectural boundary breaches, cross-module dependency cycles, or contract incompatibilities."
+    },
+    {
+      "id": "GOV-DAT-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Functions declaring excessive discrete scalar parameters (>= 5) exhibit Data Clumps smell; parameters should be aggregated into a named Context or Options interface."
+    },
+    {
+      "id": "GOV-DBG-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Debug and console print statements clutter standard outputs, leak diagnostics, and can degrade I/O throughput."
+    },
+    {
+      "id": "GOV-EXC-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Empty catch blocks silently swallow exceptions, causing silent data corruption or masking critical failures. A catch whose body carries an explicit rationale marker (best-effort / ignore / intentional / expected) is treated as a documented decision instead of a silent swallow."
+    },
+    {
+      "id": "GOV-EXC-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Naked `.unwrap()` causes unrecoverable process panics in production upon Err or None."
+    },
+    {
+      "id": "GOV-EXC-003",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Pseudo-catch blocks containing only dummy non-handling statements (void 0, dead assignment) silently swallow exceptions without logging or documented rationale."
+    },
+    {
+      "id": "GOV-FIL-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Inconsistent file naming causes cross-platform casing issues and impairs modular discovery."
+    },
+    {
+      "id": "GOV-FIL-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Substantial production modules must declare their architectural role and responsibility boundary."
+    },
+    {
+      "id": "GOV-GAM-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Anti-gaming violation: artificial function splitting, tautological test padding, or empty boilerplate gaming quality metrics."
+    },
+    {
+      "id": "GOV-HOK-001",
+      "project": "WebGames",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/路线图/01_短期施工区/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/阶段3_审查系统能力内化与全域通用规则演进.md)"
+    },
+    {
+      "id": "GOV-LOG-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Deeply nested control flows (> 5 levels) create high cognitive load and increase defect risk."
+    },
+    {
+      "id": "GOV-LOG-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Vacuous wrapper methods that purely forward calls without validation or translation add unnecessary indirection."
+    },
+    {
+      "id": "GOV-MNT-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Deep class inheritance hierarchies (> 2 levels) introduce fragile base class problems; composition is preferred."
+    },
+    {
+      "id": "GOV-MNT-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Domain layer must remain clean and portable; importing UI or CLI presentation frameworks introduces severe coupling."
+    },
+    {
+      "id": "GOV-MSG-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "底层诊断消息与修复建议必须统一采用标准英文并由常量字典集中管控，严禁在分析器发射点硬编码内联或非 ASCII 文本。"
+    },
+    {
+      "id": "GOV-PRF-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Performing invariant I/O, regex construction, or repetitive configuration lookups in loops incurs severe CPU/throughput penalties."
+    },
+    {
+      "id": "GOV-PRF-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M); pre-indexing in Map/Set optimizes to O(N)."
+    },
+    {
+      "id": "GOV-PRF-003",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Numeric timer delays bypass centralized clamping; a literal of <=0 triggers a ~1ms busy loop (CPU/IO hotspot)."
+    },
+    {
+      "id": "GOV-PRF-004",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Sync fs calls block the host event loop (UI jank in IDE extensions, request stalls on servers)."
+    },
+    {
+      "id": "GOV-PRF-005",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Calling array linear lookups (.includes / .indexOf) inside loops creates quadratic O(N*M) overhead; pre-indexing into a Set hoisted outside the loop optimizes membership tests to O(1)."
+    },
+    {
+      "id": "GOV-RTC-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Baseline debt entries must track physical file rename operations without artificial inflation or false positive churn. Monotonic downward ratchets must remap prior baselines to new paths upon refactoring."
+    },
+    {
+      "id": "GOV-SAN-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architectural longevity and create documentation drift."
+    },
+    {
+      "id": "GOV-SLC-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "AST slice mutation introduces breaking signature drift or uncontained side-effects propagating across external call chains."
+    },
+    {
+      "id": "GOV-STD-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Redundant if-then-else returning boolean literals increases cyclomatic complexity and mental overhead."
+    },
+    {
+      "id": "GOV-STD-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Legacy constructs (e.g. `var` in modern TS/JS, dead `pass` in GDScript) violate language idiomatic standards."
+    },
+    {
+      "id": "GOV-TRJ-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Historical trajectory exhibits cyclic regressions, flip-flop oscillations, or re-introduces previously eliminated architectural anti-patterns."
+    },
+    {
+      "id": "GOV-TYP-001",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Implicit loose typing hides type errors at runtime and weakens static safety guarantees."
+    },
+    {
+      "id": "GOV-TYP-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Unannotated function signatures compromise API boundaries and allow unintended type drift."
+    },
+    {
+      "id": "GOV-TYP-003",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Naked `any` bypasses the entire compiler type checker, leaking type instability."
+    },
+    {
+      "id": "GOV-TYP-004",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Passing or assigning `undefined as any` or `null as any` indicates an Interface Segregation Principle (ISP) violation."
+    },
+    {
+      "id": "GOV-TYP-005",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Accessing properties via `(expr as any).prop` bypasses compiler type safety and indicates missing type narrowing guards."
+    },
+    {
+      "id": "GOV-TYP-006",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Exported functions, classes, and public methods must specify explicit return types to protect public API contracts."
+    },
+    {
+      "id": "HC-ABS-PATH",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-ABS-PATH)"
+    },
+    {
+      "id": "HC-CJK-LITERAL",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-CJK-LITERAL)"
+    },
+    {
+      "id": "HC-MAGIC-NUM",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-MAGIC-NUM)"
+    },
+    {
+      "id": "HC-SECRET",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-SECRET)"
+    },
+    {
+      "id": "HC-UI-STRING",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-UI-STRING)"
+    },
+    {
+      "id": "high-algorithmic-complexity",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "循环多重嵌套引发潜在 O(N^2)/O(N^3) 复杂度热点或循环体内隐式线性查找。"
+    },
+    {
+      "id": "high-complexity",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "error",
+      "summary": "函数圈复杂度超过阈值。"
+    },
+    {
+      "id": "high-entropy-token",
+      "project": "auto-refactor",
+      "family": "LEGACY",
+      "severity": "error",
+      "summary": "高熵字符串疑似密钥/令牌。"
+    },
+    {
+      "id": "HYG-BLT-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "局部变量/参数遮蔽 Python 内建名（docstring 示例与类体协议字段豁免）。"
+    },
+    {
+      "id": "HYG-CLN-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "抽象提炼共享通用函数或工具类。"
+    },
+    {
+      "id": "HYG-DED-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "清理冗余死代码，重构控制流分支。"
+    },
+    {
+      "id": "HYG-EMP-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "源码、脚本或配置目录中存在物理 0 字节、仅含空白注释或缺乏有效 AST 语义载荷的虚空占位文件。"
+    },
+    {
+      "id": "HYG-EXC-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "except 变量命名不是 exc。"
+    },
+    {
+      "id": "HYG-NAM-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "对齐各语言官方主流工程命名契约。"
+    },
+    {
+      "id": "HYG-SGL-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "单字母绑定（仅 i/j/k/_ 放行）。"
+    },
+    {
+      "id": "HYG-STB-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "闭环开发任务，清理临时桩。"
+    },
+    {
+      "id": "HYG-STB-002",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "使用中立、长效的业务领域术语替换临时工单代号。"
+    },
+    {
+      "id": "HYG-WRAP-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density."
+    },
+    {
+      "id": "HYG-WRAP-002",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction."
+    },
+    {
+      "id": "import-cycle",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "模块级循环依赖（Python 相对导入与包解析同样覆盖）。"
+    },
+    {
+      "id": "L0-COMPILE",
+      "project": "workspace-timing",
+      "family": "L0",
+      "severity": "error",
+      "summary": "TypeScript 编译零错误（tsc）"
+    },
+    {
+      "id": "L0-TEST",
+      "project": "workspace-timing",
+      "family": "L0",
+      "severity": "error",
+      "summary": "单元测试全绿（mocha 全量）"
+    },
+    {
+      "id": "L1-*",
+      "project": "workspace-timing",
+      "family": "L1",
+      "severity": "error",
+      "summary": "代码质量（eslint 全量：命名/未用/错误处理等规则族） (L1-*)"
+    },
+    {
+      "id": "L1-LINT",
+      "project": "workspace-timing",
+      "family": "L1",
+      "severity": "error",
+      "summary": "代码质量（eslint 全量：命名/未用/错误处理等规则族）"
+    },
+    {
+      "id": "L2-LAYERS",
+      "project": "workspace-timing",
+      "family": "L2",
+      "severity": "error",
+      "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明）"
+    },
+    {
+      "id": "L3-DOC-LAYOUT",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步"
+    },
+    {
+      "id": "L3-HARDCODE",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定"
+    },
+    {
+      "id": "L3-RESOURCE-TOPO",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀"
+    },
+    {
+      "id": "L3-REVIEW-CONFIG",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康"
+    },
+    {
+      "id": "L3-SCRIPT-STANDARD",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断）"
+    },
+    {
+      "id": "L4-TEST-BUDGET",
+      "project": "workspace-timing",
+      "family": "L4",
+      "severity": "error",
+      "summary": "测试套件时长预算回归（基线棘轮）"
+    },
+    {
+      "id": "L5-REFACTOR",
+      "project": "workspace-timing",
+      "family": "L5",
+      "severity": "error",
+      "summary": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级）"
+    },
+    {
+      "id": "large-file",
+      "project": "auto-refactor",
+      "family": "BIG",
+      "severity": "error",
+      "summary": "文件行数/函数数超过阈值。"
+    },
+    {
+      "id": "LAY-CYCLE",
+      "project": "workspace-timing",
+      "family": "L2",
+      "severity": "error",
+      "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-CYCLE)"
+    },
+    {
+      "id": "LAY-IMPORT",
+      "project": "workspace-timing",
+      "family": "L2",
+      "severity": "error",
+      "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-IMPORT)"
+    },
+    {
+      "id": "LAY-UNRESOLVED",
+      "project": "workspace-timing",
+      "family": "L2",
+      "severity": "error",
+      "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-UNRESOLVED)"
+    },
+    {
+      "id": "loop-transient-allocation",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。"
+    },
+    {
+      "id": "NAM-COL-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "集合（Array/Set）建议使用复数或 List 后缀，映射（Map/Dict）建议表达对应关系。"
+    },
+    {
+      "id": "NAM-DEC-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "标识符长度膨胀（30~40+ 字符）或同文件多符号共享长前缀，表明缺乏目录与模块分层解耦，驱动架构拆分。"
+    },
+    {
+      "id": "NAM-DIR-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "源码目录名必须为全小写 kebab-case 或单名，严禁 CamelCase、空格及临时批次词。"
+    },
+    {
+      "id": "NAM-FIL-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "文件命名必须符合语言惯例（TS/JS 强制 kebab-case，Python/Rust/GDScript 强制 snake_case），严禁临时批次黑话。"
+    },
+    {
+      "id": "NAM-GLB-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "模块顶层不可变常量必须遵循 UPPER_SNAKE_CASE 命名规范。"
+    },
+    {
+      "id": "NAM-GLB-002",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "严禁在模块顶层声明可变 `let` 或 `var` 变量（隐式全局共享状态）。"
+    },
+    {
+      "id": "NAM-JRG-002",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "工程资产与测试用例中严禁包含施工批次与临时黑话标记（禁止词如阶段批次号、临时变量及在制品缩写标记等），覆盖测试套件名、函数符号与标识符。"
+    },
+    {
+      "id": "NAM-MBR-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "类属性、对象字段与方法名必须遵循 camelCase 小驼峰命名规范。"
+    },
+    {
+      "id": "NAM-RES-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "结构化资源库（常量/字符串/规则/配置/枚举等）过于笼统且规模与语义体积膨胀，驱动按业务领域拆分。"
+    },
+    {
+      "id": "NAM-RES-002",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "结构化资源库过度细化导致碎片化，微小文件使用了三级深层命名，建议合并至父域。"
+    },
+    {
+      "id": "NAM-RES-003",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "结构化资源库命名层级溢出（超过基础类型+功能域+可选子域的三层上限）。"
+    },
+    {
+      "id": "NAM-RES-004",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "结构化资源库文件名过度描述堆叠（如 constants_network_http_request_response_...），造成维护负担。"
+    },
+    {
+      "id": "NAM-RES-005",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "结构化资源库文件职责不匹配（声明为纯常量库却混入大量可执行业务函数与类）。"
+    },
+    {
+      "id": "NAM-SGL-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 占位符豁免）。"
+    },
+    {
+      "id": "NAM-TYP-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "类型定义与类声明必须遵循 PascalCase 大驼峰命名。"
+    },
+    {
+      "id": "NAM-VAG-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "严禁使用无业务语义的模糊泛化变量名（如 data、res、ret、tmp、item 等裸词）。"
+    },
+    {
+      "id": "nested-constant",
+      "project": "auto-refactor",
+      "family": "LEGACY",
+      "severity": "error",
+      "summary": "严禁常量化嵌套：禁止冗余常量别名引用、深层嵌套常量对象与作用域内部伪常量。"
+    },
+    {
+      "id": "PRF-ALG-001",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。"
+    },
+    {
+      "id": "PRF-DUP-001",
+      "project": "WebGames",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/路线图/01_短期施工区/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/阶段3_审查系统能力内化与全域通用规则演进.md)"
+    },
+    {
+      "id": "PRF-IO-001",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "切换为异步非阻塞对应 API，避免锁死 Node.js 事件循环或游戏主线程。"
+    },
+    {
+      "id": "PRF-LEAK-001",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "检测循环或定时器内的集合无界追加，防范 O(t) 或 O(n) 内存泄漏。"
+    },
+    {
+      "id": "PRF-MEM-001",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "将缓冲区/对象提升至循环外部复用，循环内仅清空重置。"
+    },
+    {
+      "id": "PRF-MEM-002",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "循环热路径严禁瞬态实例化与深复制，必须使用对象池或外部复用（ADV-PRF-002）。"
+    },
+    {
+      "id": "PRF-POL-001",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "热路径高频昂贵资源缺乏复用池化：循环内或高频调用中频繁分配重型对象、缓冲区或连接。"
+    },
+    {
+      "id": "PRF-POL-002",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "资源池缺乏状态重置契约或容量上限：池化机制缺失 reset_state 回收契约或无界增长导致数据污染与泄漏。"
+    },
+    {
+      "id": "PRF-POL-003",
+      "project": "auto-refactor",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "负收益过度池化：对极小轻量纯值对象或冷路径过度引入池化管理开销，得不偿失。"
+    },
+    {
+      "id": "PS-ALIAS-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "PowerShell 脚本使用了不推荐的命令别名。"
+    },
+    {
+      "id": "PS-CMDLET-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "函数命名不符合 Verb-Noun 动名词规范。"
+    },
+    {
+      "id": "PS-ERROR-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "PowerShell 中存在空 catch 或未捕获的错误。"
+    },
+    {
+      "id": "PS-PARAM-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "参数块缺失 [CmdletBinding()] 或参数未声明强类型。"
+    },
+    {
+      "id": "PS-VERB-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "使用了未批准的 PowerShell 动词。"
+    },
+    {
+      "id": "PYM-ABC-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "从 typing 导入 collections.abc 抽象类型。"
+    },
+    {
+      "id": "PYM-ASYNC-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "async 函数内阻塞调用或未 await 的同步 ORM 调用。"
+    },
+    {
+      "id": "PYM-DATETIME-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "timezone.utc 用法。"
+    },
+    {
+      "id": "PYM-DEFAULT-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "可变默认参数（=[]/={}/=set()）。"
+    },
+    {
+      "id": "PYM-FSTRING-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "% 格式化字符串。"
+    },
+    {
+      "id": "PYM-GENERIC-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "旧式容器泛型 List/Dict/Set/Tuple/Type[...]。"
+    },
+    {
+      "id": "PYM-IMPORT-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "模块级 import 未按三段式分组或段内未按字典序（函数内惰性导入不参与）。"
+    },
+    {
+      "id": "PYM-OPEN-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "open() 未处于 with 块内。"
+    },
+    {
+      "id": "PYM-PATH-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "os.path 用法。"
+    },
+    {
+      "id": "PYM-RAISE-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "except 块内 raise X 缺少 from，异常链丢失。"
+    },
+    {
+      "id": "PYM-SHADOW-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "变量或参数遮蔽了 Python 核心内置标识符。"
+    },
+    {
+      "id": "PYM-SLOTS-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "无继承的 @dataclass 未声明 slots=True。"
+    },
+    {
+      "id": "PYM-UNION-001",
+      "project": "auto-refactor",
+      "family": "PYM",
+      "severity": "error",
+      "summary": "注解或类型别名位置使用 Optional[...]/Union[...]。"
+    },
+    {
+      "id": "RCFG-GLOBS",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-GLOBS)"
+    },
+    {
+      "id": "RCFG-MATRIX",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-MATRIX)"
+    },
+    {
+      "id": "RCFG-RULE-DRIFT",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-RULE-DRIFT)"
+    },
+    {
+      "id": "RCFG-SCHEMA",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-SCHEMA)"
+    },
+    {
+      "id": "RCFG-TOOL-PATH",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-TOOL-PATH)"
+    },
+    {
+      "id": "RES-SHUT-001",
+      "project": "WebGames",
+      "family": "RES",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/路线图/01_短期施工区/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/阶段3_审查系统能力内化与全域通用规则演进.md)"
+    },
+    {
+      "id": "RES-TOPO-NAMING-DEPTH",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-NAMING-DEPTH)"
+    },
+    {
+      "id": "RES-TOPO-OVER-DESCRIPTIVE",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-DESCRIPTIVE)"
+    },
+    {
+      "id": "RES-TOPO-OVER-GENERIC",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-GENERIC)"
+    },
+    {
+      "id": "RES-TOPO-OVER-SPECIALIZED",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-SPECIALIZED)"
+    },
+    {
+      "id": "RES-TOPO-RESP-MISMATCH",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-RESP-MISMATCH)"
+    },
+    {
+      "id": "RSM-CLONE-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "clone() 结果只用于比较或取长度。"
+    },
+    {
+      "id": "RSM-EXTERN-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "使用 extern crate 声明。"
+    },
+    {
+      "id": "RSM-FORMAT-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "格式化宏使用位置参数 {}。"
+    },
+    {
+      "id": "RSM-MACRO-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "使用 #[macro_use] 文本导入宏。"
+    },
+    {
+      "id": "RSM-STR-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "签名使用 &String 参数。"
+    },
+    {
+      "id": "RSM-TRY-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "使用 try! 宏。"
+    },
+    {
+      "id": "RSM-UNWRAP-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "对可失败结果调用 unwrap()。"
+    },
+    {
+      "id": "SCR-DANGLING",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-DANGLING)"
+    },
+    {
+      "id": "SCR-HEADER",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-HEADER)"
+    },
+    {
+      "id": "SCR-NAMING",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-NAMING)"
+    },
+    {
+      "id": "SCR-ORPHAN",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-ORPHAN)"
+    },
+    {
+      "id": "SEC-LEAK-001",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "日志/异常中输出敏感数据（密码、令牌、个人标识）。"
+    },
+    {
+      "id": "SEC-VUL-001",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "任意动态代码执行（eval/exec/Function 构造）。"
+    },
+    {
+      "id": "SEC-VUL-002",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "命令注入：拼接外部输入后交给 shell/子进程执行。"
+    },
+    {
+      "id": "SEC-VUL-003",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "原型污染：给对象原型写入来自外部的键。"
+    },
+    {
+      "id": "SEC-VUL-004",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "不安全随机数：用 Math.random 生成安全敏感值。"
+    },
+    {
+      "id": "SEC-VUL-005",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "弱哈希：md5/sha1 用于完整性或口令场景。"
+    },
+    {
+      "id": "SEC-VUL-006",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "路径穿越：用外部输入拼接文件路径。"
+    },
+    {
+      "id": "secret-detected",
+      "project": "auto-refactor",
+      "family": "LEGACY",
+      "severity": "error",
+      "summary": "疑似硬编码凭据（按模式识别）。"
+    },
+    {
+      "id": "SH-ARRAY-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "使用 $* 代替了 \"$@\" 导致单词分割失效。"
+    },
+    {
+      "id": "SH-CMD-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "使用了已过时的反引号命令替换语法。"
+    },
+    {
+      "id": "SH-DEPR-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "使用了单中括号 [ 或旧式废弃测试语法。"
+    },
+    {
+      "id": "SH-ECHO-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "使用了不可移植的 echo -e / echo -n。"
+    },
+    {
+      "id": "SH-ERR-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "关键命令执行后未进行错误退出码判定。"
+    },
+    {
+      "id": "SH-INIT-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "Shell 脚本头部未声明 set -euo pipefail 严格模式。"
+    },
+    {
+      "id": "SH-QUOTE-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "参数展开未加双引号保护存在单词拆分与通配隐患。"
+    },
+    {
+      "id": "SH-READ-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "read 命令未携带 -r 参数导致反斜杠被转义篡改。"
+    },
+    {
+      "id": "SIM-BOOL-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "冗余的布尔字面量显式比对。"
+    },
+    {
+      "id": "SIM-CMP-001",
+      "project": "WebGames",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+    },
+    {
+      "id": "SIM-COMC-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "直接删除（历史在 git 里）或恢复为真实代码"
+    },
+    {
+      "id": "SIM-DED-001",
+      "project": "WebGames",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+    },
+    {
+      "id": "SIM-ELSE-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "提前终止语句之后存在冗余 else 分支。"
+    },
+    {
+      "id": "SIM-EMPTY-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "实现函数体、显式抛「未实现」异常，或删除声明"
+    },
+    {
+      "id": "SIM-FLAT-002",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "深层嵌套的条件分支与 AST 访问流应使用卫语句（Guard Clause）提前返回或短路扁平化，控制嵌套深度 ≤ 3。"
+    },
+    {
+      "id": "SIM-GUARD-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "倒置的前置守卫条件导致深层嵌套。"
+    },
+    {
+      "id": "SIM-IMM-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "通过三元表达式折叠消除未初始化的局部可变绑定，提纯为不可变 const"
+    },
+    {
+      "id": "SIM-INH-001",
+      "project": "WebGames",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "SIM-LONG-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "抽取内聚步骤为具名 helper，让顶层流程只剩意图序列"
+    },
+    {
+      "id": "SIM-PRNT-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "改用结构化 logger 或删除；调试输出绕过日志级别并泄漏到生产 stdout"
+    },
+    {
+      "id": "SIM-TRN-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "冗长且无副作用的 if-else 分支可折叠为浅层单行三元表达式"
+    },
+    {
+      "id": "SIM-WRP-001",
+      "project": "WebGames",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+    },
+    {
+      "id": "STDLIB-ALLOC-001",
+      "project": "auto-refactor",
+      "family": "STDLIB",
+      "severity": "error",
+      "summary": "裸机与 no_std 系统运行环境下隐式堆逃逸与动态重分配静态拦截。"
+    },
+    {
+      "id": "STDLIB-CONST-001",
+      "project": "auto-refactor",
+      "family": "STDLIB",
+      "severity": "error",
+      "summary": "标准库密码学与哈希敏感比较严禁分支时间泄漏，强制常量时间恒定延迟比对。"
+    },
+    {
+      "id": "STDLIB-PANIC-001",
+      "project": "auto-refactor",
+      "family": "STDLIB",
+      "severity": "error",
+      "summary": "系统标准库公开接口严禁逃逸裸 panic/unwrap/abort，强制 Result/Option 或有界 error 返回。"
+    },
+    {
+      "id": "STDLIB-PORT-001",
+      "project": "auto-refactor",
+      "family": "STDLIB",
+      "severity": "error",
+      "summary": "底层平台条件编译 #[cfg(...)] 缺少未知平台或未支持目标架构时的 fallback 阻断。"
+    },
+    {
+      "id": "STDLIB-RECURSION-001",
+      "project": "auto-refactor",
+      "family": "STDLIB",
+      "severity": "error",
+      "summary": "底层核心算法无界深层递归缺乏显式栈深检查或上限防卫。"
+    },
+    {
+      "id": "STDLIB-UNSAFE-001",
+      "project": "auto-refactor",
+      "family": "STDLIB",
+      "severity": "error",
+      "summary": "Rust/C++ 底层 unsafe 块强制附带 SAFETY: 契约证明，缺失即阻断。"
+    },
+    {
+      "id": "TB-NO-BASELINE",
+      "project": "workspace-timing",
+      "family": "L4",
+      "severity": "error",
+      "summary": "测试套件时长预算回归（基线棘轮） (TB-NO-BASELINE)"
+    },
+    {
+      "id": "TB-REGRESSION",
+      "project": "workspace-timing",
+      "family": "L4",
+      "severity": "error",
+      "summary": "测试套件时长预算回归（基线棘轮） (TB-REGRESSION)"
+    },
+    {
+      "id": "TSM-ANY-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "显式 any 关闭了该值的类型检查。"
+    },
+    {
+      "id": "TSM-ARGS-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "使用 arguments 对象。"
+    },
+    {
+      "id": "TSM-CTOR-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "用 new 调用 Array/Object/String/Number/Boolean 包装构造器。"
+    },
+    {
+      "id": "TSM-DISP-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "VS Code 监听器或 Disposable 对象未注册至 subscriptions 容器。"
+    },
+    {
+      "id": "TSM-INCLUDES-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "indexOf 与 -1/0 比较来判断成员存在。"
+    },
+    {
+      "id": "TSM-REPLACE-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "字符串模式 replace 只替换首个匹配。"
+    },
+    {
+      "id": "TSM-REQUIRE-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "ESM 模块内混用 CommonJS require() 调用。"
+    },
+    {
+      "id": "TSM-SPREAD-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "用 Object.assign({}, …) 做浅合并。"
+    },
+    {
+      "id": "TSM-SUBSTR-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "使用已弃用的 String.prototype.substr。"
+    },
+    {
+      "id": "TSM-TYPE-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "具名导入仅用于类型位置。"
+    },
+    {
+      "id": "TSM-VAR-001",
+      "project": "auto-refactor",
+      "family": "TSM",
+      "severity": "error",
+      "summary": "使用 var 声明（函数作用域、存在变量提升）。"
+    },
+    {
+      "id": "TST-DBT-001",
+      "project": "auto-refactor",
+      "family": "TST",
+      "severity": "error",
+      "summary": "未登记里程碑收敛计划或责任人的滞后测试技术债务。"
+    },
+    {
+      "id": "TST-DEN-001",
+      "project": "auto-refactor",
+      "family": "TST",
+      "severity": "error",
+      "summary": "关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。"
+    },
+    {
+      "id": "TST-ILS-001",
+      "project": "auto-refactor",
+      "family": "TST",
+      "severity": "error",
+      "summary": "测试完整性幻觉：测试仅校验 Mock 配置或绑定已废弃业务契约。"
+    },
+    {
+      "id": "TST-SKP-001",
+      "project": "auto-refactor",
+      "family": "TST",
+      "severity": "error",
+      "summary": "核心业务域中长期滞留的跳过、隔离或未执行测试用例。"
+    },
+    {
+      "id": "TST-TAU-001",
+      "project": "auto-refactor",
+      "family": "TST",
+      "severity": "error",
+      "summary": "缺乏真实业务断言或包含恒真断言的无效测试。"
+    },
+    {
+      "id": "TST-TOP-001",
+      "project": "auto-refactor",
+      "family": "TST",
+      "severity": "error",
+      "summary": "多语言测试拓扑双轨纪律：严禁在 TS/GDScript 等语言生产代码中内嵌测试代码域，强化 Rust 计算库物理分区与面向 Agent 可读注释契约。"
+    },
+    {
+      "id": "unused-export",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "导出符号无人引用（TS/JS 口径；Python 无 export 关键字不参与）。"
+    },
+    {
+      "id": "unused-module",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "模块无人导入（非入口白名单内）。"
+    },
+    {
+      "id": "UUID-REENTRANT-001",
+      "project": "WebGames",
+      "family": "UUID",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/tests/integration/pipelines/test_game_lifecycle_pipeline.gd)"
+    },
+    {
+      "id": "VSC-I18N-001",
+      "project": "auto-refactor",
+      "family": "VSC",
+      "severity": "error",
+      "summary": "用户可见消息使用硬编码字符串字面量未接入国际化字典。"
+    },
+    {
+      "id": "VSC-MEM-001",
+      "project": "auto-refactor",
+      "family": "VSC",
+      "severity": "error",
+      "summary": "VS Code Disposable 资源创建后未压入 context.subscriptions。"
+    },
+    {
+      "id": "VSC-PERF-001",
+      "project": "auto-refactor",
+      "family": "VSC",
+      "severity": "error",
+      "summary": "在 Extension Host 主线程执行同步文件 I/O 阻塞编辑器 UI。"
+    }
+  ]
+}

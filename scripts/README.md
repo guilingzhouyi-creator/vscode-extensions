@@ -11,12 +11,17 @@
 
 | 目录 | 语言 | 脚本 | 职能域 | 调用方 |
 |------|------|------|--------|--------|
+| `sh/` | Bash | `audit-all.sh` | audit / review（全工作区跨项目统一审查中枢） | 本地 CLI、CI |
+| `ps1/` | PowerShell | `audit-all.ps1` | audit / review（audit-all.sh 同构双实现） | 本地 CLI（Windows） |
+| `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区 336+ 条规则单源目录聚合器） | 本地 CLI、pre-push 门禁 |
+| `common/` | Node.js | `validate-commit-msg-rules.js` | gate / ssot（提交信息规则 ID 反虚构校验器） | `commit-msg-gate` |
+| `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
 | `sh/` | Bash | `gate-common.sh` | gate（冲突分级单源规则库，被 source） | `pr-gate.sh` / `auto-merge-gate.sh` |
-| `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与质量前置门禁） | `.githooks/pre-commit`、本地 CLI |
+| `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与 9 重安全门禁，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
 | `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |
-| `sh/` | Bash | `commit-msg-gate.sh` | gate（生产工程级结构化提交信息格式、区块与字数门禁） | `.githooks/commit-msg`、本地 CLI |
+| `sh/` | Bash | `commit-msg-gate.sh` | gate（生产工程级结构化提交信息格式、区块、字数与反虚构 7 项门禁） | `.githooks/commit-msg`、本地 CLI |
 | `ps1/` | PowerShell | `commit-msg-gate.ps1` | gate（commit-msg-gate.sh 同构双实现） | 本地 CLI（Windows） |
-| `sh/` | Bash | `pre-push-gate.sh` | gate（本地推送前置全量回归与质量门禁） | `.githooks/pre-push`、本地 CLI |
+| `sh/` | Bash | `pre-push-gate.sh` | gate（本地推送前置全量 6 重回归与十维质量基线门禁） | `.githooks/pre-push`、本地 CLI |
 | `ps1/` | PowerShell | `pre-push-gate.ps1` | gate（pre-push-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `install-hooks.sh` | gate（一键激活仓库级 Git Hooks） | 本地 CLI |
 | `ps1/` | PowerShell | `install-hooks.ps1` | gate（install-hooks.sh 同构双实现） | 本地 CLI（Windows） |

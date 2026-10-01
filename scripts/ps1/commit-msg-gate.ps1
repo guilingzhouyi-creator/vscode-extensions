@@ -1,4 +1,4 @@
-﻿# <#
+# <#
 # .SYNOPSIS
 #   commit-msg-gate.ps1 — 生产工程级 Git 提交信息格式与结构化内容门禁 (PowerShell 同构实现)
 # .DESCRIPTION
@@ -147,11 +147,29 @@ if ($commitType -in @('feat', 'fix', 'refactor')) {
     }
 }
 
+# --- Rule 6: 正文零黑话与无批次代号 ---
+if ($bodyText -match '(?i)\b(phase\d+|st\d+|p\d+)\b') {
+    Write-Host "❌ [FAIL] Rule 6: 提交正文包含违规施工批次代号/黑话 (phaseN/stN/pN)！" -ForegroundColor Red
+    Write-Host "   必须基于功能特性与交付价值进行纯粹描述。" -ForegroundColor Yellow
+    Show-CommitTemplateGuide
+    exit 1
+}
+
+# --- Rule 7: 规则 ID 单源目录防虚构校验 ---
+$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
+$process = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-msg-rules.js", $MsgFile -NoNewWindow -PassThru -Wait
+if ($process.ExitCode -ne 0) {
+    Show-CommitTemplateGuide
+    exit 1
+}
+
 Write-Host "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规" -ForegroundColor Green
 Write-Host "  ✔ Rule 2: 零黑话与空洞词检测通过" -ForegroundColor Green
 Write-Host "  ✔ Rule 3: Header-Body 空行分割契约合规" -ForegroundColor Green
 Write-Host "  ✔ Rule 4: 正文有效字数与信息密度 ($bodyCharCount 字符) 达标" -ForegroundColor Green
 Write-Host "  ✔ Rule 5: 生产工程级结构化区块校验通过" -ForegroundColor Green
+Write-Host "  ✔ Rule 6: 正文零施工批次黑话校验通过" -ForegroundColor Green
+Write-Host "  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "✅ 【门禁结论】Commit-Msg 生产级格式与结构化内容校验全部 PASS！" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan

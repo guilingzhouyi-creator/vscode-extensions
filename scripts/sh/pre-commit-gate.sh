@@ -12,8 +12,11 @@
 set -uo pipefail
 
 echo "================================================================="
-echo "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (8 重纵深防御)"
+echo "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (9 重纵深防御)"
 echo "================================================================="
+
+NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
+NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
 
 # 获取当前暂存区中的文件列表（新增、修改、重命名）
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
@@ -49,7 +52,10 @@ echo "[2/8] 检查换行符 (EOL: ps1->CRLF, 其余->LF) 契约..."
 while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     if [[ -f "$file" ]]; then
-        HAS_CR=$(node -e 'const b=require("fs").readFileSync(process.argv[1]); process.stdout.write(b.includes(13)?"1":"0")' "$file" 2>/dev/null || echo "0")
+        HAS_CR=0
+        if grep -q $'\r' "$file" 2>/dev/null; then
+            HAS_CR=1
+        fi
         if [[ "$file" == *.ps1 ]]; then
             if [[ "$HAS_CR" != "1" ]]; then
                 echo "❌ [FAIL] Gate 2: PowerShell 脚本必须使用 CRLF 换行符: $file"
@@ -122,7 +128,7 @@ fi
 # --- Gate 7: 单源规则漂移熔断 ---
 echo "[7/8] 校验单源规则元数据一致性..."
 if [[ "$STAGED_FILES" =~ auto-refactor/src/core/rules/ || "$STAGED_FILES" =~ auto-refactor/src/analyzers/ ]]; then
-    if ! node auto-refactor/scripts/validate-rules-registry.js >/dev/null 2>&1; then
+    if ! "$NODE_BIN" auto-refactor/scripts/validate-rules-registry.js >/dev/null 2>&1; then
         echo "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！"
         FAILED=1
     else
@@ -131,13 +137,13 @@ if [[ "$STAGED_FILES" =~ auto-refactor/src/core/rules/ || "$STAGED_FILES" =~ aut
 fi
 
 # --- Gate 8: 项目增量编译与语法验证 ---
-echo "[8/8] 检查相关项目增量编译与语法..."
+echo "[8/9] 检查相关项目增量编译与语法..."
 TOUCHED_WT=$(echo "$STAGED_FILES" | grep '^workspace-timing/' || true)
 TOUCHED_AR=$(echo "$STAGED_FILES" | grep '^auto-refactor/' || true)
 
 if [[ -n "$TOUCHED_WT" ]]; then
     echo "  ▶ 触发 workspace-timing 增量编译校验..."
-    if ! npm --prefix workspace-timing run compile >/dev/null 2>&1; then
+    if ! "$NPM_BIN" --prefix workspace-timing run compile >/dev/null 2>&1; then
         echo "❌ [FAIL] Gate 8: workspace-timing 编译失败！"
         FAILED=1
     fi
@@ -145,10 +151,22 @@ fi
 
 if [[ -n "$TOUCHED_AR" ]]; then
     echo "  ▶ 触发 auto-refactor 增量编译校验..."
-    if ! npm --prefix auto-refactor run build >/dev/null 2>&1; then
+    if ! "$NPM_BIN" --prefix auto-refactor run build >/dev/null 2>&1; then
         echo "❌ [FAIL] Gate 8: auto-refactor 编译失败！"
         FAILED=1
     fi
+fi
+
+# --- Gate 9: 暂存区增量 AST 切片质量与复杂度审查 ---
+echo "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15, Depth<=4, Noise<=4.0)..."
+TOUCHED_CODE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
+if [[ -n "$TOUCHED_CODE" ]]; then
+    if ! "$NODE_BIN" auto-refactor/scripts/validate-staged-slice.js; then
+        echo "❌ [FAIL] Gate 9: 暂存区 AST 切片审查未通过！"
+        FAILED=1
+    fi
+else
+    echo "  ✔ [PASS] 无暂存 TS/JS 代码需执行 AST 切片审查"
 fi
 
 echo "================================================================="
@@ -157,7 +175,7 @@ if [[ "$FAILED" -ne 0 ]]; then
     echo "================================================================="
     exit 1
 else
-    echo "✅ 【门禁结论】Pre-Commit 八项安全与质量门禁全部 PASS！"
+    echo "✅ 【门禁结论】Pre-Commit 九项安全与质量门禁全部 PASS！"
     echo "================================================================="
     exit 0
 fi

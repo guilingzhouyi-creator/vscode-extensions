@@ -151,11 +151,27 @@ if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor)$ ]]; then
     fi
 fi
 
+# --- Rule 6: 正文零黑话与无批次代号 ---
+if echo "$BODY_TEXT" | grep -iE "\b(phase[0-9]+|st[0-9]+|p[0-9]+)\b" >/dev/null 2>&1; then
+    echo "❌ [FAIL] Rule 6: 提交正文包含违规施工批次代号/黑话 (phaseN/stN/pN)！"
+    echo "   必须基于功能特性与交付价值进行纯粹描述。"
+    print_template_guide
+    exit 1
+fi
+
+# --- Rule 7: 规则 ID 单源目录防虚构校验 ---
+if ! node scripts/common/validate-commit-msg-rules.js "$MSG_FILE"; then
+    print_template_guide
+    exit 1
+fi
+
 echo "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规"
 echo "  ✔ Rule 2: 零黑话与空洞词检测通过"
 echo "  ✔ Rule 3: Header-Body 空行分割契约合规"
 echo "  ✔ Rule 4: 正文有效字数与信息密度 ($BODY_CHAR_COUNT 字符) 达标"
 echo "  ✔ Rule 5: 生产工程级结构化区块校验通过"
+echo "  ✔ Rule 6: 正文零施工批次黑话校验通过"
+echo "  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过"
 echo "================================================================="
 echo "✅ 【门禁结论】Commit-Msg 生产级格式与结构化内容校验全部 PASS！"
 echo "================================================================="

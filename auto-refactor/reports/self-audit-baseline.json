@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790841168579",
-  "timestamp": "2026-10-01T07:52:53.174Z",
+  "snapshotId": "snapshot-v0.4.0-1790842252110",
+  "timestamp": "2026-10-01T08:10:57.078Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,32 +12,32 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 545,
-    "durationMs": 4261
+    "filesScanned": 546,
+    "durationMs": 4553
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 10845,
-    "suppressedIssues": 6043,
-    "unsuppressedIssues": 4802,
+    "totalIssues": 10859,
+    "suppressedIssues": 6054,
+    "unsuppressedIssues": 4805,
     "bySeverity": {
       "info": 499,
-      "warning": 10346,
+      "warning": 10360,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 72,
-      "medium": 9954,
-      "low": 819
+      "high": 73,
+      "medium": 9966,
+      "low": 820
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 99.7,
+      "maintainability": 99.6,
       "performance": 99.9,
       "data": 100,
       "testing": 100,
@@ -60,6 +60,15 @@
   },
   "topHotspots": [
     {
+      "filePath": "scripts/test-parallel.js",
+      "domain": "scripts",
+      "totalIssues": 159,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.94
+    },
+    {
       "filePath": "src/core/trajectory/recipeExtractor.ts",
       "domain": "trajectory",
       "totalIssues": 159,
@@ -67,15 +76,6 @@
       "highCount": 1,
       "compositeScore": 99.6,
       "effectiveDensity": 0.97
-    },
-    {
-      "filePath": "scripts/test-parallel.js",
-      "domain": "scripts",
-      "totalIssues": 158,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.94
     },
     {
       "filePath": "scripts/validate-review-memory.js",
@@ -153,9 +153,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 72,
-      "medium": 9954,
-      "low": 819
+      "high": 73,
+      "medium": 9966,
+      "low": 820
     },
     "criticalItems": [],
     "highItems": [
@@ -221,6 +221,15 @@
         "file": "scripts/validate-self-multidimensional-audit.js",
         "line": 202,
         "message": "Function \"auditBoundaryInteroperability\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:scripts/validate-staged-slice.js:56",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-staged-slice.js",
+        "line": 56,
+        "message": "Function \"walk\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/analyzers/constants.ts:381",
@@ -599,15 +608,6 @@
         "file": "src/core/patterns/pattern-matcher.ts",
         "line": 158,
         "message": "Function \"matchHotPathAllocations\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/patterns/pattern-matcher.ts:218",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/patterns/pattern-matcher.ts",
-        "line": 218,
-        "message": "Unbounded control-flow nesting: function 'isProtectedLayer' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
       }
     ]
   },

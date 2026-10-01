@@ -1,4 +1,4 @@
-﻿# <#
+# <#
 # .SYNOPSIS
 #   pre-commit-gate.ps1 — 本地 Git 提交前置物理卫生与质量安全门禁 (8 重防御，PowerShell 同构实现)
 # .DESCRIPTION
@@ -13,7 +13,7 @@ param()
 $ErrorActionPreference = "Stop"
 
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (8 重纵深防御，PowerShell 版)" -ForegroundColor Cyan
+Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (9 重纵深防御，PowerShell 版)" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # 获取暂存区文件列表
@@ -143,7 +143,7 @@ if ($touchesRules) {
 }
 
 # --- Gate 8: 项目增量编译与语法验证 ---
-Write-Host "[8/8] 检查相关项目增量编译与语法..." -ForegroundColor Gray
+Write-Host "[8/9] 检查相关项目增量编译与语法..." -ForegroundColor Gray
 $hasWt = $stagedFiles | Where-Object { $_ -match "^workspace-timing/" }
 $hasAr = $stagedFiles | Where-Object { $_ -match "^auto-refactor/" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
@@ -166,13 +166,27 @@ if ($hasAr) {
     }
 }
 
+# --- Gate 9: 暂存区增量 AST 切片质量与复杂度审查 ---
+Write-Host "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15, Depth<=4, Noise<=4.0)..." -ForegroundColor Gray
+$touchedCode = $stagedFiles | Where-Object { ($_ -match '\.(ts|js)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') }
+if ($touchedCode) {
+    $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
+    $process = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-staged-slice.js" -NoNewWindow -PassThru -Wait
+    if ($process.ExitCode -ne 0) {
+        Write-Host "❌ [FAIL] Gate 9: 暂存区 AST 切片审查未通过！" -ForegroundColor Red
+        $failed = $true
+    }
+} else {
+    Write-Host "  ✔ [PASS] 无暂存 TS/JS 代码需执行 AST 切片审查" -ForegroundColor Green
+}
+
 Write-Host "=================================================================" -ForegroundColor Cyan
 if ($failed) {
     Write-Host "❌ 【门禁结论】Pre-Commit 校验未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
     Write-Host "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
-    Write-Host "✅ 【门禁结论】Pre-Commit 八项安全与质量门禁全部 PASS！" -ForegroundColor Green
+    Write-Host "✅ 【门禁结论】Pre-Commit 九项安全与质量门禁全部 PASS！" -ForegroundColor Green
     Write-Host "=================================================================" -ForegroundColor Cyan
     exit 0
 }

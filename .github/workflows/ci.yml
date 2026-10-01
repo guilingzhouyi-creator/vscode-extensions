@@ -317,8 +317,28 @@ EOF
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截缺少正文的 feat 提交"; exit 1
           fi
+          # 6. Rule 7 规则 ID 反虚构自检 (未知规则 ID 应 exit 1)
+          cat << 'EOF' > "$MSG_TEMP"
+feat(ci): 测试虚构规则拦截
+
+[Why]
+- 验证未知规则 ID 拦截能力。
+
+[Added]
+- 新增 fake rule FAKE-XYZ-999。
+
+[Verification]
+- CI 自检测试。
+EOF
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截虚构规则 ID"; exit 1
+          fi
+          # 7. 单源规则目录生成自检
+          node scripts/common/generate-rule-catalog.js
+          # 8. AST 切片审查自检
+          node auto-refactor/scripts/validate-staged-slice.js auto-refactor/scripts/validate-staged-slice.js
           rm -f "$MSG_TEMP"
-          echo "✔ Git 本地门禁脚本自检全部通过"
+          echo "✔ Git 本地门禁脚本与审查联动自检全部通过"
 
   # ─── auto-refactor 工具门禁（与扩展矩阵解耦；仅改动 auto-refactor/ 时执行）───
   # 该目录不是 VS Code 扩展（无 engines.vscode），故不参与上方扩展矩阵。

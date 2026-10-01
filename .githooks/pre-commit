@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Git Pre-Commit Hook — 路由至 scripts/sh/pre-commit-gate.sh
-set -e
+# Git Pre-Commit Hook — 智能双运行期路由 (pwsh / sh)
 ROOT_DIR="$(git rev-parse --show-toplevel)"
-exec bash "$ROOT_DIR/scripts/sh/pre-commit-gate.sh"
+if command -v pwsh >/dev/null 2>&1 && [ -f "$ROOT_DIR/scripts/ps1/pre-commit-gate.ps1" ]; then
+    exec pwsh -File "$ROOT_DIR/scripts/ps1/pre-commit-gate.ps1"
+else
+    exec sh "$ROOT_DIR/scripts/sh/pre-commit-gate.sh"
+fi

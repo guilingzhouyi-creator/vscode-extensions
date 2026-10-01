@@ -8,7 +8,7 @@
   - `workspace-timing/`：VS Code 扩展，独立运行时，RingBuffer+Journal 内存双写崩溃安全，L0~L5 门禁；
   - `auto-refactor/`：Node CLI 静态重构与审查引擎（非扩展，独立工具），TS+Rust 双轨内核，4 层规则金字塔；
   - `WebGames/`：Godot 4.7 卡拉尔世界引擎（纯逻辑无头解耦，配置驱动，20 项静态门禁，四阶段案卷施工）；
-- **根级发布与门禁工具链（`scripts/`）**：`pre-commit-gate`/`commit-msg-gate`/`pre-push-gate`（本地提交与推送前置物理卫生、零空文件、换行契约、密钥防泄漏与回归门禁，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
+- **根级发布与门禁工具链（`scripts/`）**：`audit-all.sh`/`audit-all.ps1`（全工作区跨项目统一审查中枢与质量看板）；`pre-commit-gate`（9 重物理卫生、换行契约、密钥防泄漏与 AST 局部切片审查）；`commit-msg-gate`（7 项生产工程级结构化正文、零黑话与规则 ID 反虚构防漂移门禁，依单源注册表 `scripts/common/rule-catalog.json` 核验）；`pre-push-gate`（6 重全量回归与十维质量基线 Ratchet 门禁，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
 
 ## 二、 跨项目全局通用契约
 
@@ -41,7 +41,7 @@
 3. **交付与占位符红线**：严禁提交包含 `<...>` 占位符、未决 TODO 或伪实现的半成品；严禁未获批准提前在任务路线图上标记完成；严禁仅跑通局部测试的缩水 MVP 敷衍实现；
 4. **案卷与黑话红线**：案卷目录下严格仅允许四阶段细则文件（严禁自造多余文件）；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁在测试名称、代码标识符及面向用户的文档（README/CHANGELOG/UI）中使用施工批次黑话与内部工程代号；
 5. **构建配置与性能红线**：严禁在 VS Code 扩展或无外部类型依赖的项目中开启 `"declaration": true` 导致构建膨胀；严禁在 CI/Agent 自动执行环境中使用未加非交互守卫的全局 Shell 启动挂钩；
-6. **审查规则一致性红线**：严禁在检查器代码中发射未在 `review-rules.json` 元数据中登记的规则 ID（违者触发 `RCFG-RULE-DRIFT` 门禁熔断）。
+6. **审查规则一致性红线**：严禁在检查器代码中发射或在提交信息中书写未在 `scripts/common/rule-catalog.json` / `review-rules.json` 元数据中登记的规则 ID（违者触发 `RCFG-RULE-DRIFT` 门禁熔断）。
 
 ## 五、 Agent 行为边界与维护规则
 

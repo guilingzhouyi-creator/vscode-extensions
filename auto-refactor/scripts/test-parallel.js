@@ -115,6 +115,7 @@ const PARALLEL_SUITES = [
     script: 'scripts/validate-literal-policy-declarative.js',
   },
   { name: 'validate-self-slice-audit', script: 'scripts/validate-self-slice-audit.js' },
+  { name: 'validate-staged-slice', script: 'scripts/validate-staged-slice.js' },
   { name: 'validate-diff-interface', script: 'scripts/validate-diff-interface.js' },
   { name: 'validate-baseline-ratchet', script: 'scripts/validate-baseline-ratchet.js' },
   { name: 'validate-suppression-gate', script: 'scripts/validate-suppression-gate.js' },
