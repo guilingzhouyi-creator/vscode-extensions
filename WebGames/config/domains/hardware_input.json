@@ -41,7 +41,35 @@
     ],
     "quick_load": [
       "Key_F9"
+    ],
+    "toggle_escape_menu": [
+      "Key_Escape",
+      "Joypad_Start"
     ]
+  },
+  "escape_menu_actions": {
+    "resume_game": {
+      "target_phase": "RUNNING",
+      "trigger_shutdown": false
+    },
+    "open_settings": {
+      "target_phase": "PAUSED",
+      "trigger_shutdown": false
+    },
+    "manual_save": {
+      "target_phase": "PAUSED",
+      "trigger_shutdown": false
+    },
+    "return_to_world_gateway": {
+      "target_phase": "STOPPING",
+      "exit_reason": 2,
+      "trigger_shutdown": true
+    },
+    "quit_to_desktop": {
+      "target_phase": "STOPPING",
+      "exit_reason": 0,
+      "trigger_shutdown": true
+    }
   },
   "tab_double_tap": {
     "window_ms": 300

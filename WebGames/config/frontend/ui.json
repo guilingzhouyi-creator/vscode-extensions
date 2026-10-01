@@ -1,4 +1,5 @@
 {
+  "service_mode": "mock",
   "player": {
     "name": "阿尔托莉雅",
     "display_name": "阿尔托莉雅 (玩家同构体)",

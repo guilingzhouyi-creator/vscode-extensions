@@ -20,5 +20,149 @@
     "ERR_SHUTDOWN_TIMEOUT": "安全停机超时，已触发强制保护性退出",
     "ERR_SAVE_FLUSH_FAILED": "退出存盘失败，已生成紧急恢复快照",
     "ERR_INVALID_TRANSITION": "生命周期状态机发生非法跃迁尝试"
+  },
+  "shutdown_hooks": {
+    "stage_order": [
+      "freeze_inputs",
+      "flush_saves",
+      "execute_resource_descriptors",
+      "revoke_session",
+      "teardown_bootstrap"
+    ],
+    "resource_policies": {},
+    "unwired_slot_sentinel": "UNBOUND",
+    "require_explicit_save_slot": false
+  },
+  "session_context_pool": {
+    "max_free": 1
+  },
+  "session_stage_pipeline": {
+    "STAGE_01_REGISTER": {
+      "stage_index": 1,
+      "description": "用户注册与账号创建",
+      "aliases": [
+        "STAGE_01",
+        "REGISTER"
+      ],
+      "required_slots": [
+        "username",
+        "password_hash"
+      ]
+    },
+    "STAGE_02_INIT_SLOT": {
+      "stage_index": 2,
+      "description": "账号默认角色世界创建档案界面与槽位封面绑定",
+      "aliases": [
+        "STAGE_02",
+        "INIT_SLOT",
+        "SLOT_ARCHIVE"
+      ],
+      "required_slots": [
+        "slot_id",
+        "character_name",
+        "world_id"
+      ]
+    },
+    "STAGE_03_SELECT_WORLD": {
+      "stage_index": 3,
+      "description": "世界选择界面与运行模式路由",
+      "aliases": [
+        "STAGE_03",
+        "SELECT_WORLD"
+      ],
+      "required_slots": [
+        "world_id",
+        "game_mode",
+        "slot_id"
+      ]
+    },
+    "STAGE_04_CREATE_CHAR": {
+      "stage_index": 4,
+      "description": "人物创建界面与属性派生",
+      "aliases": [
+        "STAGE_04",
+        "CREATE_CHAR",
+        "CREATE_CHARACTER"
+      ],
+      "required_slots": [
+        "character_name",
+        "gender",
+        "race_id"
+      ]
+    },
+    "STAGE_05_PROLOGUE": {
+      "stage_index": 5,
+      "description": "序章剧情播放与叙事事件流初始化",
+      "aliases": [
+        "STAGE_05",
+        "PROLOGUE"
+      ],
+      "required_slots": [
+        "character_id",
+        "race_id"
+      ]
+    },
+    "STAGE_06_HUD_SYNC": {
+      "stage_index": 6,
+      "description": "游戏主界面HUD状态快照与双轨同步",
+      "aliases": [
+        "STAGE_06",
+        "HUD_SYNC",
+        "MAIN_HUD"
+      ],
+      "required_slots": [
+        "account_id",
+        "character_id",
+        "race_id"
+      ]
+    },
+    "STAGE_07_ESC_MENU": {
+      "stage_index": 7,
+      "description": "ESC菜单栏与全局状态栈挂起",
+      "aliases": [
+        "STAGE_07",
+        "ESC_MENU"
+      ],
+      "required_slots": [
+        "menu_state"
+      ]
+    },
+    "STAGE_08_EXIT_REQUEST": {
+      "stage_index": 8,
+      "description": "退出游戏意图发起与前置状态守卫",
+      "aliases": [
+        "STAGE_08",
+        "EXIT_REQUEST",
+        "EXIT_GAME"
+      ],
+      "required_slots": [
+        "exit_mode"
+      ]
+    },
+    "STAGE_09_SAVE_FLUSH": {
+      "stage_index": 9,
+      "description": "退出存盘落盘与持久化校验",
+      "aliases": [
+        "STAGE_09",
+        "SAVE_FLUSH",
+        "SAVE_COMPLETED"
+      ],
+      "required_slots": [
+        "account_id",
+        "character_id",
+        "slot_id"
+      ]
+    },
+    "STAGE_10_FULL_EXIT": {
+      "stage_index": 10,
+      "description": "受控资源释放、会话注销与引擎反装配完全退出",
+      "aliases": [
+        "STAGE_10",
+        "FULL_EXIT"
+      ],
+      "required_slots": [
+        "reason"
+      ]
+    }
   }
 }

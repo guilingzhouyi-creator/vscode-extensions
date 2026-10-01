@@ -257,5 +257,54 @@
         "VIT"
       ]
     }
+  },
+  "prologue_stages": {
+    "1": {
+      "narrative_key": "narrative/prologue/awakening",
+      "available_actions": [
+        "WAKE_UP",
+        "NEXT"
+      ],
+      "mutation_type": "CharacterAwakened",
+      "is_terminal": false
+    },
+    "2": {
+      "narrative_key": "narrative/prologue/environment",
+      "available_actions": [
+        "LOOK_AROUND",
+        "APPROACH_GUARD",
+        "NEXT"
+      ],
+      "mutation_type": "EnvironmentExplored",
+      "is_terminal": false
+    },
+    "3": {
+      "narrative_key": "narrative/prologue/first_encounter",
+      "available_actions": [
+        "TALK_GUARD",
+        "ACCEPT_KIT",
+        "NEXT"
+      ],
+      "mutation_type": "DialogueTriggered",
+      "is_terminal": false
+    },
+    "4": {
+      "narrative_key": "narrative/prologue/completed",
+      "available_actions": [
+        "ENTER_WORLD"
+      ],
+      "mutation_type": "PrologueCompleted",
+      "is_terminal": true
+    }
+  },
+  "creation_hooks": {
+    "on_character_created": [
+      "derive_physiology_and_wallet",
+      "emit_opening_narrative"
+    ],
+    "on_prologue_completed": [
+      "attach_ready_character",
+      "enter_world"
+    ]
   }
 }

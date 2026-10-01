@@ -9,6 +9,23 @@
     "allow_direct_world_bypass": false,
     "session_timeout_seconds": 3600
   },
+  "gateway_modes": {
+    "available_modes": [
+      1,
+      2
+    ]
+  },
+  "gateway_hooks": {
+    "on_gateway_entered": [
+      "prepare_slot_catalog"
+    ],
+    "on_mode_selected": [
+      "bind_slot_context"
+    ],
+    "on_world_entered": [
+      "trigger_initial_hud_sync"
+    ]
+  },
   "single_player": {
     "default_world_id": "WORLD_DEFAULT_SP_01",
     "default_slot_id": "SLOT_SP_01",

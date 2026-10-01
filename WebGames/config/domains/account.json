@@ -34,11 +34,25 @@
       "registered": "account.registered",
       "login_succeeded": "account.login_succeeded",
       "session_revoked": "account.session_revoked"
+    },
+    "hooks": {
+      "post_register": [
+        "emit_register_event",
+        "sync_session_context"
+      ],
+      "post_login": [
+        "emit_login_event",
+        "auto_enter_world_gateway"
+      ]
     }
   },
   "save_slot": {
     "max_slots": 3,
     "id_prefix": "SLOT_",
+    "unwired_policy": {
+      "require_explicit_character_name": false,
+      "require_explicit_world_ref": false
+    },
     "defaults": {
       "slot_id": "SLOT_01",
       "character_name": "Nameless Wanderer",

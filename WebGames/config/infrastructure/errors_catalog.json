@@ -256,6 +256,16 @@
       "severity": "error",
       "message_key": "errors/version_state_machine_illegal_transition",
       "domain": "infrastructure"
+    },
+    "NAME_KEY_COLLISION": {
+      "severity": "warn",
+      "message_key": "",
+      "domain": "item_namespace_registry"
+    },
+    "RESTORE_PAYLOAD_MISSING": {
+      "severity": "warn",
+      "message_key": "",
+      "domain": "inventory"
     }
   }
 }
