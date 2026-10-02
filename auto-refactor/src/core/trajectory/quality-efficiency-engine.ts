@@ -5,14 +5,13 @@
  *   and anti-gaming metrics over multi-tier ELOC and 10-dimensional quality score vectors.
  * Dependencies & Triggers: Consumes eloc-types and scoringTypes; called by composite gate,
  *   review runner, and trajectory compactor.
- * Exit Semantics: Pure mathematical calculations; zero I/O; deterministic and strictly bounded.
+ * Responsibilities: Compute QED, review yield, regression density, and anti-gaming penalties
+ *   across 10-dimensional quality score vectors.
+ * Exit Semantics & Design Rationale: Pure mathematical calculations; zero I/O; deterministic,
+ *   finite bounds, and free of division-by-zero errors.
  */
 
-import type {
-    ElocCounters,
-    TechnicalDebtDelta,
-    TrajectoryQualityMetrics,
-} from './eloc-types';
+import type { ElocCounters, TechnicalDebtDelta, TrajectoryQualityMetrics } from './eloc-types';
 import {
     ALL_QUALITY_DIMENSIONS,
     DEFAULT_QUALITY_WEIGHTS,
@@ -28,7 +27,9 @@ import {
 export function recordToVector(record: Partial<Record<QualityDimension, number>>): number[] {
     return ALL_QUALITY_DIMENSIONS.map((dim) => {
         const val = record[dim];
-        return typeof val === 'number' && Number.isFinite(val) ? Math.max(0, Math.min(100, val)) : 100;
+        return typeof val === 'number' && Number.isFinite(val)
+            ? Math.max(0, Math.min(100, val))
+            : 100;
     });
 }
 
@@ -119,6 +120,12 @@ function computeDimensionDeltas(
  * Computes comprehensive trajectory quality metrics from Before/After states and ELOC counters.
  *
  * @param params - Input parameters for quality trajectory evaluation.
+ * @param params.beforeScore - Baseline composite score before run.
+ * @param params.afterScore - Composite score after run.
+ * @param params.scoreVector - 10-dimensional score vector after run.
+ * @param params.beforeVector - 10-dimensional score vector before run.
+ * @param params.counters - Four-tier orthogonal ELOC counters.
+ * @param params.debtDelta - Technical debt additions and resolutions.
  * @returns Fully computed TrajectoryQualityMetrics record.
  */
 export function computeTrajectoryQualityMetrics(params: {
@@ -143,7 +150,8 @@ export function computeTrajectoryQualityMetrics(params: {
 
     const rawDeltaQ = Math.round((afterScore - beforeScore) * 100) / 100;
 
-    // Mathematical Anti-Gaming Rule: If semantic ELOC is 0 but changed > 0, positive rawDeltaQ is suppressed.
+    // Mathematical Anti-Gaming Rule: If semantic ELOC is 0 but changed > 0,
+    // positive rawDeltaQ is suppressed.
     let deltaQSemantic = rawDeltaQ;
     if (counters.semantic === 0 && counters.changed > 0 && rawDeltaQ > 0) {
         deltaQSemantic = 0;

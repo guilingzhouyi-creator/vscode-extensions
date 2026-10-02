@@ -6,7 +6,8 @@
  *   compatibility layer technical debt decay, deprecation lifecycle governance, regression
  *   detection (GOV-TRJ-001), and Praxis trajectory learning facade SPI integration.
  * Dependencies & Triggers: Consumes ../dist/api; executed in test-parallel runner.
- * Responsibilities: Validate all 16 core functional gates and mathematical models of Trajectory Learning.
+ * Responsibilities: Validate all 16 core functional gates and mathematical
+ *   models of Trajectory Learning.
  * Exit Semantics & Design Rationale: Exits 0 on all assertions passing,
  *   throws AssertionError on failure.
  */
@@ -61,7 +62,16 @@ function processBatchOrder(orders: any[], config: any) {
     }
     return total;
 }
-// Line 14\n// Line 15\n// Line 16\n// Line 17\n// Line 18\n// Line 19\n// Line 20\n// Line 21\n// Line 22\n// Line 23
+// Line 14
+// Line 15
+// Line 16
+// Line 17
+// Line 18
+// Line 19
+// Line 20
+// Line 21
+// Line 22
+// Line 23
 `;
   const afterDecomposed = `
 function calculateItemDiscount(item: any): number {

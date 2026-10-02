@@ -401,10 +401,16 @@ function printTerminalDashboard(report) {
   if (report.trajectory && report.trajectory.lifetime) {
     const lt = report.trajectory.lifetime;
     console.log('\n--- [Cumulative ELOC & Long-Term Trajectory Ledger] ---');
-    console.log(`  Run Processed ELOC    : ${report.trajectory.runEloc.processed.toLocaleString()} lines`);
+    console.log(
+      `  Run Processed ELOC    : ${report.trajectory.runEloc.processed.toLocaleString()} lines`,
+    );
     console.log(`  Lifetime Total Runs   : ${lt.totalRuns}`);
-    console.log(`  Lifetime Processed    : ${lt.eloc.processedTotal.toLocaleString()} lines (Additive Accumulation)`);
-    console.log(`  Lifetime Unique (AST) : ${lt.eloc.uniqueTotal.toLocaleString()} lines (Deduplicated Coverage)`);
+    console.log(
+      `  Lifetime Processed    : ${lt.eloc.processedTotal.toLocaleString()} lines (Additive Accumulation)`,
+    );
+    console.log(
+      `  Lifetime Unique (AST) : ${lt.eloc.uniqueTotal.toLocaleString()} lines (Deduplicated Coverage)`,
+    );
     console.log(`  Lifetime Gate Pass %  : ${lt.gatePassRate.toFixed(1)}%`);
   }
 

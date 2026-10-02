@@ -1,22 +1,15 @@
 /**
- * Suite: Structured Resource Topology & Scale-Adaptive Governance Test Suite
- * Path: scripts/validate-structured-resource-topology.js
- * Invariants Tested:
- *   1. Snapshot Invariance (d(ELOC_core)/d(ELOC(r)) | R_t == 0)
- *   2. Semantic Volume anti-packing defense (ELOC compression captured by SV)
- *   3. Inverted caller index O(|E_s|) sparse graph generation
- *   4. Multi-modal cohesion formula weights and bounding
- *   5. Tarjan SCC cycle decomposition & 6 resolution strategies
- *   6. Bayesian language density prior update (EMA decay)
- *   7. 3-tier structured resource naming parsing and bounding
- *   8. Tripartite risk separation (Confidence, Severity, Impact)
- *   9. Full audit runner with adversarial test cases
+ * Module: Architecture Validation — Structured Resource Topology Suite
+ * File Path: scripts/validate-structured-resource-topology.js
+ * Architecture Role: Verifies scale-adaptive resource governance and graph invariants.
+ * Dependencies & Triggers: Consumes dist/core/architecture/structured-resource-topology.
+ * Responsibilities: Test snapshot invariance, semantic volume, and SCC cycle diagnosis.
+ * Exit Semantics & Design Rationale: Exits 0 on all invariants verified, throws on failure.
  */
 const assert = require('node:assert');
 const {
   parseStructuredResourceNaming,
   calculateSnapshotCoreELOC,
-  calculateOmnibusCapacityThreshold,
   calculateSemanticVolume,
   buildSparseCallerGraph,
   calculateMultiModalCohesion,

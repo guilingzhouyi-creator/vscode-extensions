@@ -145,8 +145,6 @@ const RULES_GOV_TYPE_SAFETY = [
 const RULES_UNUSED_BINDING = ['unused-export', 'unused-module'];
 /** Comment rules for banned vocabulary and temporary markers, in precedence order. */
 const RULES_COMMENT_BANNED = ['CMT-BAN-001'];
-/** Comment rules for a missing public API docstring. */
-const RULES_COMMENT_MISSING_DOC = ['CMT-DOC-001', 'CMT-DOC-002'];
 /** Constants rules with their own deduction, ahead of the hardcoded-string fallback. */
 const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
 const RULE_MAGIC_NUMBER = 'magic-number';
@@ -595,7 +593,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
         rationale: ScoringRationales.STDLIB_GENERIC_MISMATCH,
     },
 
-    // ── 宿主语言包（VS Code 扩展 / Godot）───────────────────────────────────────────
+    // ── Host language packs (VS Code extension / Godot) ───────────────────────────
     // `vscode-extension` and `gdscript-game` were declared in DIMENSION_ANALYZERS as the
     // evidence for architectureConsistency / performanceEfficiency / commentQuality, but had
     // no row here and none in the family appliers. Enabling them therefore raised `coverage`

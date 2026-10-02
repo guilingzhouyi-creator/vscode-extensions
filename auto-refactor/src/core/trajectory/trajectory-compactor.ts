@@ -1,18 +1,18 @@
 /**
  * Module: Core Trajectory — Trajectory Compactor & Lifetime Aggregator
  * File Path: src/core/trajectory/trajectory-compactor.ts
- * Architecture Role: Aggregates rolling review runs into weekly summaries and global lifetime ledgers,
+ * Architecture Role: Aggregates rolling review runs into weekly summaries and global ledgers,
  *   enforcing bounded O(Runs + Milestones) storage constraints and calculating macro trends.
  * Dependencies & Triggers: Consumes eloc-types and compact-ledger-store.
- * Exit Semantics: Deterministic reduction of discrete runs into statistical summaries; safe file atomic writes.
+ * Responsibilities: Aggregate rolling records into weekly statistical snapshots, prune
+ *   old runs, and update lifetime summary statistics.
+ * Exit Semantics & Design Rationale: Deterministic reduction of discrete runs into statistical
+ *   summaries; safe file atomic writes prevent partial state corruption.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type {
-    CompactTrajectoryRecord,
-    WeeklyTrajectorySummary,
-} from './eloc-types';
+import type { CompactTrajectoryRecord, WeeklyTrajectorySummary } from './eloc-types';
 import {
     ensureLedgerDirectory,
     readRecentRecords,
@@ -150,6 +150,8 @@ export function aggregateRecords(
 
 /**
  * Compacts the active ledger into weekly partition files and lifetime summary.
+ * Idempotent compaction process; requires external synchronization to prevent
+ * overlapping compactions.
  *
  * @param ledgerDir - Root trajectory ledger directory.
  * @returns Array of generated weekly summaries.

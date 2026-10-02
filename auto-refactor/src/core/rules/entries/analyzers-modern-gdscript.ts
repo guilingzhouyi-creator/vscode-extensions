@@ -1,14 +1,15 @@
 /**
  * Module: Core Rules — GDScript Modern & Architecture Rule Entries
  * File Path: src/core/rules/entries/analyzers-modern-gdscript.ts
- * Architecture Role: Modular rule catalog for GDScript modernization, frontend architecture, and game domain.
+ * Architecture Role: Modular rule catalog for GDScript modernization, frontend architecture,
+ *   and game domain rules.
  * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzersModern facade.
- * Responsibilities: Export rule definitions for GDScript rules to stay within LOC budget (< 900 LOC).
+ * Responsibilities: Export rule definitions for GDScript rules within LOC budget (< 900 LOC).
+ * Exit Semantics & Design Rationale: Immutable rule catalog array; zero runtime side-effects.
  */
 
 import {
     defineRule,
-    SEVERITY_INFO,
     SEVERITY_WARNING,
     SEVERITY_ERROR,
     RULE_FAMILY_GDSCRIPT_MODERN,
@@ -18,8 +19,12 @@ import type { RuleDefinition } from '../types';
 
 import { ANALYZER_GDSCRIPT_MODERN, ANALYZER_GDSCRIPT_GAME } from '../../scoring/dimensionLiterals';
 
+/** Shared remediation level descriptor for GDScript rules. */
 export const REMEDIATION_STANDARD_AND_ABOVE = '`standard` 及以上';
 
+/**
+ * Modern GDScript and game domain rule definitions.
+ */
 export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
     defineRule({
         id: 'GDM-YIELD-001',

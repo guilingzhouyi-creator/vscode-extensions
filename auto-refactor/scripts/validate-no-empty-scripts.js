@@ -1,10 +1,10 @@
 /**
- * Suite: Full-Workspace Empty & Vacuous File Governance Guard
- * Path: scripts/validate-no-empty-scripts.js
- * Invariants Tested:
- *   1. Zero Physical 0-byte files across source, test, script, and documentation trees
- *   2. Zero Semantic empty (whitespace-only or comment-only with 0 ELOC) source files
- *   3. Exemption rules (e.g. .git, build lock artifacts in target/) are strictly audited
+ * Module: Governance Guard — Zero Empty Files Guard
+ * File Path: scripts/validate-no-empty-scripts.js
+ * Architecture Role: Workspace guard preventing zero-byte and zero-ELOC files.
+ * Dependencies & Triggers: Consumes Node.js fs/path; executed in test suite.
+ * Responsibilities: Audit workspace trees for zero-byte or empty semantic files.
+ * Exit Semantics & Design Rationale: Exits 0 on clean check, 1 on empty file detection.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -22,39 +22,51 @@ const IGNORED_DIRS = new Set([
   '.cargo-lock',
 ]);
 
-function scanDirectory(dir, findings = []) {
+function inspectFileForEmptiness(fullPath, findings) {
   try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (IGNORED_DIRS.has(entry.name)) {
-        continue;
-      }
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        scanDirectory(fullPath, findings);
-      } else if (entry.isFile()) {
-        const stat = fs.statSync(fullPath);
-        if (stat.size === 0) {
-          findings.push({
-            path: fullPath,
-            reason: 'Physical 0-byte file',
-            size: 0,
-          });
-        } else {
-          const content = fs.readFileSync(fullPath, 'utf8');
-          const trimmed = content.trim();
-          if (trimmed.length === 0) {
-            findings.push({
-              path: fullPath,
-              reason: 'Whitespace-only empty file',
-              size: stat.size,
-            });
-          }
-        }
-      }
+    const stat = fs.statSync(fullPath);
+    if (stat.size === 0) {
+      findings.push({
+        path: fullPath,
+        reason: 'Physical 0-byte file',
+        size: 0,
+      });
+      return;
+    }
+    const content = fs.readFileSync(fullPath, 'utf8');
+    if (content.trim().length === 0) {
+      findings.push({
+        path: fullPath,
+        reason: 'Whitespace-only empty file',
+        size: stat.size,
+      });
     }
   } catch (err) {
+    console.error(`Error reading file ${fullPath}: ${err.message}`);
+  }
+}
+
+function scanDirectory(dir, findings = []) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
     console.error(`Error reading directory ${dir}: ${err.message}`);
+    return findings;
+  }
+
+  for (const entry of entries) {
+    if (IGNORED_DIRS.has(entry.name)) {
+      continue;
+    }
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      scanDirectory(fullPath, findings);
+      continue;
+    }
+    if (entry.isFile()) {
+      inspectFileForEmptiness(fullPath, findings);
+    }
   }
   return findings;
 }

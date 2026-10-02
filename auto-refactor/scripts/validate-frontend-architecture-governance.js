@@ -4,8 +4,9 @@
  * Architecture Role: Validates that all internalized architectural and interaction review rules,
  *   mathematical formulas, Bad-to-Good recipe extractors, and frontend boundary guards maintain
  *   100% integrity, invariant correctness, and zero regressions.
- * Dependencies: Built dist files from core scoring, trajectory, rules, and analyzer modules.
+ * Dependencies & Triggers: Built dist files from core scoring, trajectory, and rules.
  * Responsibilities: Run 24 strict assertion gates over the modernized governance ecosystem.
+ * Exit Semantics & Design Rationale: Exits 0 on all gates passing, non-zero on assertion failure.
  */
 
 const assert = require('assert');

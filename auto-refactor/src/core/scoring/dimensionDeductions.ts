@@ -364,14 +364,18 @@ export function applyIssueDeductions(
     const effectiveApply: DeductionApplier =
         combinedMultiplier !== 1.0 || occurrenceIndex > 0
             ? (dim, points, reason, rule, line) => {
-                const compoundedPoints = calculateCompoundedDeduction(points, occurrenceIndex, alpha);
-                const amplifiedPoints = Math.round(compoundedPoints * combinedMultiplier);
-                const amplifiedReason =
-                    combinedMultiplier > 1.0
-                        ? `${reason} [Vulnerability x${combinedMultiplier.toFixed(2)}]`
-                        : reason;
-                apply(dim, amplifiedPoints, amplifiedReason, rule, line);
-            }
+                  const compoundedPoints = calculateCompoundedDeduction(
+                      points,
+                      occurrenceIndex,
+                      alpha,
+                  );
+                  const amplifiedPoints = Math.round(compoundedPoints * combinedMultiplier);
+                  const amplifiedReason =
+                      combinedMultiplier > 1.0
+                          ? `${reason} [Vulnerability x${combinedMultiplier.toFixed(2)}]`
+                          : reason;
+                  apply(dim, amplifiedPoints, amplifiedReason, rule, line);
+              }
             : apply;
 
     // A single finding can match both a family applier and a rule-table row, and the two

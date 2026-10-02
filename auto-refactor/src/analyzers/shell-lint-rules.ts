@@ -7,11 +7,14 @@
  *   and individual lint rule validators.
  * Exit Semantics & Design Rationale: Pure scanners and regex tables, never throws.
  */
-import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import type { SEVERITY_INFO } from '../core/types';
+import { SEVERITY_WARNING } from '../core/types';
 
 /* ---- Shell extension detection ---- */
 
+/** Set of standard Unix shell script extensions. */
 export const SHELL_EXTS = new Set(['.sh', '.bash', '.zsh']);
+/** Set of standard PowerShell script extensions. */
 export const POWERSHELL_EXTS = new Set(['.ps1', '.psm1', '.psd1']);
 
 /**
@@ -54,10 +57,15 @@ export function isPowerShellFile(filePath: string): boolean {
 
 /* ---- Shell patterns ---- */
 
+/** Regular expression matching executable shell script shebang line. */
 export const SHEBANG_RE = /^#!\s*\/.*(?:bash|sh|zsh|ksh|env\s+\w*sh)\b/;
+/** Regular expression matching 'set -e' or 'set -o errexit'. */
 export const SET_E_RE = /\bset\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)\b/;
+/** Regular expression matching 'set -u' or 'set -o nounset'. */
 export const SET_U_RE = /\bset\s+(-[a-zA-Z]*u[a-zA-Z]*|-o\s+nounset)\b/;
+/** Regular expression matching 'set -o pipefail'. */
 export const SET_PIPEFAIL_RE = /\bset\s+(-o\s+pipefail|-[a-zA-Z]*o[a-zA-Z]*\s+pipefail)\b/;
+/** Regular expression matching legacy backtick command substitution. */
 export const BACKTICK_CMD_RE = /`[^`]+`/;
 export const DEPRECATED_TEST_RE = /(?:^|[\s;|&(])\[[!\s\w]/;
 export const MODERN_TEST_RE = /\[\[/;
@@ -380,4 +388,3 @@ export function checkUnquotedVariables(
         }
     }
 }
-

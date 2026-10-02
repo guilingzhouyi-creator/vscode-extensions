@@ -156,4 +156,3 @@ export function computeEffectiveCodeDensity(
         isLowDensity: totalLoc >= 15 && effectiveDensity < 0.55,
     };
 }
-

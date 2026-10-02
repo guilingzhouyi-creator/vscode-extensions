@@ -1,10 +1,11 @@
 /**
  * Module: Core Rules — Complexity, Data Architecture & Performance Rule Entries
  * File Path: src/core/rules/entries/analyzers-modern-architecture.ts
- * Architecture Role: Modular rule catalog for cyclomatic complexity, data architecture, test modernity,
- *   dependency structure, architecture discipline, and performance.
+ * Architecture Role: Modular rule catalog for cyclomatic complexity, data architecture,
+ *   test modernity, dependency structure, architecture discipline, and performance.
  * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzersModern facade.
- * Responsibilities: Export rule definitions for architectural rules to stay within LOC budget (< 900 LOC).
+ * Responsibilities: Export rule definitions for architectural rules within LOC budget (< 900 LOC).
+ * Exit Semantics & Design Rationale: Immutable rule catalog array; zero runtime side-effects.
  */
 
 import {
@@ -88,6 +89,9 @@ function definePerformanceRule(
     );
 }
 
+/**
+ * Modern architecture rule definitions covering complexity, data, and performance.
+ */
 export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
     defineRule({
         id: 'CPX-TIME-001',

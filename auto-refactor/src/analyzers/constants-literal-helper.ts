@@ -24,6 +24,7 @@ import {
     SEVERITY_WARNING,
 } from '../core/constants';
 
+/** Set of trivial numbers exempt from duplicate constant extraction. */
 export const TRIVIAL_NUMBERS = new Set(['0', '1', '-1']);
 
 /** Benign common token set exempt from duplicate-literal flagging in test suites. */
@@ -121,13 +122,21 @@ export const SCHEMA_PROPERTY_TOKENS = new Set([
     'data',
 ]);
 
+/** Character code for ASCII single quote. */
 export const CHAR_CODE_SINGLE_QUOTE = 39;
+/** Character code for ASCII double quote. */
 export const CHAR_CODE_DOUBLE_QUOTE = 34;
+/** Character code for ASCII backtick. */
 export const CHAR_CODE_BACKTICK = 96;
+/** Upper bound for integer literal suggested names. */
 export const SUGGESTED_NAME_INTEGER_LIMIT = 1000;
+/** Maximum word count in suggested constant names. */
 export const SUGGESTED_NAME_MAX_WORDS = 4;
+/** Identifier for general literal kind. */
 export const LITERAL_KIND_GENERAL = 'general';
+/** Identifier for numeric literal kind. */
 export const NUM_KIND = 'number';
+/** Identifier for string literal kind. */
 export const STR_KIND = 'string';
 
 /**
@@ -174,6 +183,7 @@ export function stripQuotes(str: string): string {
     return start > 0 || end < len ? str.slice(start, end) : str;
 }
 
+/** Result of resolving a literal duplicate issue. */
 export interface LiteralResolution {
     rule: string;
     message: string;
@@ -252,21 +262,21 @@ export function resolveLiteralIssueData(
 
     const detail: Record<string, unknown> = numeric
         ? {
-            value,
-            numeric: true,
-            suggestedName: suggested,
-            ...(classification
-                ? { semanticKind: classification.kind, rationale: classification.rationale }
-                : {}),
-        }
+              value,
+              numeric: true,
+              suggestedName: suggested,
+              ...(classification
+                  ? { semanticKind: classification.kind, rationale: classification.rationale }
+                  : {}),
+          }
         : {
-            value,
-            length: stripQuotes(value).length,
-            suggestedName: suggested,
-            ...(classification
-                ? { semanticKind: classification.kind, rationale: classification.rationale }
-                : {}),
-        };
+              value,
+              length: stripQuotes(value).length,
+              suggestedName: suggested,
+              ...(classification
+                  ? { semanticKind: classification.kind, rationale: classification.rationale }
+                  : {}),
+          };
 
     return { rule, message, detail, suggested };
 }
@@ -463,4 +473,3 @@ export function buildDuplicateIssue(
         },
     };
 }
-

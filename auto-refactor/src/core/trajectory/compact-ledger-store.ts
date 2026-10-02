@@ -3,9 +3,12 @@
  * File Path: src/core/trajectory/compact-ledger-store.ts
  * Architecture Role: High-performance, zero-bloat persistence engine for long-term ELOC reviews
  *   and quality trajectory metrics. Enforces strict O(Runs + Milestones) storage constraints.
- * Dependencies & Triggers: Consumes eloc-types; called by quality gates, review runners, and compactor.
- * Exit Semantics: File I/O operations safely guard against race conditions and corrupt lines;
- *   guarantees NDJSON records stay under 350 bytes per entry.
+ * Dependencies & Triggers: Consumes eloc-types; called by quality gates, review runners,
+ *   and compactor.
+ * Responsibilities: Serialize NDJSON records under 350 bytes, manage rolling file retention,
+ *   and persist aggregated weekly and lifetime summaries.
+ * Exit Semantics & Design Rationale: File I/O operations safely guard against corrupt lines;
+ *   bounded rolling window prevents disk bloat.
  */
 
 import * as fs from 'fs';
@@ -17,16 +20,25 @@ import type {
     WeeklyTrajectorySummary,
 } from './eloc-types';
 
-/** Default maximum number of recent runs to keep in active rolling NDJSON file before compaction. */
+/** Default maximum number of recent runs to keep in active rolling NDJSON file. */
 export const DEFAULT_MAX_ROLLING_RUNS = 100;
 
 /** Default relative directory name for refactor trajectory storage. */
 export const DEFAULT_LEDGER_DIR_NAME = '.refactor-trajectory';
 
 /**
- * Serializes multi-tier counters, quality metrics, and metadata into a compact, space-efficient record.
+ * Serializes multi-tier counters, quality metrics, and metadata into a compact record.
  *
  * @param params - Execution context, counters, and quality metrics.
+ * @param params.runId - Unique run identifier.
+ * @param params.revision - Commit hash or revision short SHA.
+ * @param params.module - Module or domain identifier.
+ * @param params.agent - Actor or Agent identifier.
+ * @param params.timestamp - Run timestamp in milliseconds.
+ * @param params.counters - Four-tier orthogonal ELOC counters.
+ * @param params.metrics - Trajectory quality metrics.
+ * @param params.gatePass - Composite gate pass boolean.
+ * @param params.gateCode - Composite gate outcome code.
  * @returns Ultra-compact CompactTrajectoryRecord.
  */
 export function formatCompactRecord(params: {
@@ -40,17 +52,22 @@ export function formatCompactRecord(params: {
     gatePass: boolean;
     gateCode?: string;
 }): CompactTrajectoryRecord {
-    const { runId, revision, module, agent, timestamp, counters, metrics, gatePass, gateCode } = params;
+    const { runId, revision, module, agent, timestamp, counters, metrics, gatePass, gateCode } =
+        params;
 
     // Truncate scoreVector values to 1 decimal place to guarantee ultra-compact JSON size
     const compactVector = metrics.scoreVector.map((v: number) => Math.round(v * 10) / 10);
+    const boundedId = runId.length > 16 ? runId.slice(-16) : runId;
+    const boundedRev = revision.slice(0, 8);
+    const boundedMod = module.length > 14 ? module.slice(0, 14) : module;
+    const boundedAgent = agent.length > 14 ? agent.slice(0, 14) : agent;
 
     return {
         t: timestamp ?? Date.now(),
-        rev: revision.slice(0, 12),
-        id: runId,
-        mod: module,
-        agent,
+        rev: boundedRev,
+        id: boundedId,
+        mod: boundedMod,
+        agent: boundedAgent,
         eloc: {
             proc: counters.processed,
             uniq: counters.unique,
@@ -60,10 +77,10 @@ export function formatCompactRecord(params: {
             cosm: counters.cosmetic,
         },
         score: {
-            bef: metrics.beforeScore,
-            aft: metrics.afterScore,
+            bef: Math.round(metrics.beforeScore * 10) / 10,
+            aft: Math.round(metrics.afterScore * 10) / 10,
             vec: compactVector,
-            qed: metrics.qed,
+            qed: Math.round(metrics.qed * 10000) / 10000,
         },
         debt: {
             add: metrics.debtDelta.addedDebtPoints,
@@ -105,10 +122,16 @@ export function ensureLedgerDirectory(ledgerDir: string): void {
 /**
  * Truncates active runs file to retention limit if oversized.
  */
-async function pruneActiveRunsIfOversized(activeFile: string, maxRollingRuns: number): Promise<void> {
+async function pruneActiveRunsIfOversized(
+    activeFile: string,
+    maxRollingRuns: number,
+): Promise<void> {
     try {
         const content = await fs.promises.readFile(activeFile, 'utf8');
-        const lines = content.trim().split('\n').filter((l) => l.trim().length > 0);
+        const lines = content
+            .trim()
+            .split('\n')
+            .filter((l) => l.trim().length > 0);
         if (lines.length > maxRollingRuns * 1.5) {
             const recentLines = lines.slice(-maxRollingRuns);
             await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
@@ -122,6 +145,7 @@ async function pruneActiveRunsIfOversized(activeFile: string, maxRollingRuns: nu
 
 /**
  * Appends a trajectory record to the active rolling NDJSON ledger file.
+ * Thread-safe append operation; requires external synchronization for multi-process pruning.
  *
  * @param ledgerDir - Ledger directory path.
  * @param record - Compact record to persist.
@@ -142,6 +166,7 @@ export async function appendTrajectoryRecord(
 
 /**
  * Reads recent trajectory records from active NDJSON file.
+ * Reentrant and idempotent async read-only routine.
  *
  * @param ledgerDir - Ledger directory path.
  * @param limit - Max number of records to return.
@@ -158,7 +183,10 @@ export async function readRecentRecords(
 
     try {
         const content = await fs.promises.readFile(activeFile, 'utf8');
-        const lines = content.trim().split('\n').filter((l) => l.trim().length > 0);
+        const lines = content
+            .trim()
+            .split('\n')
+            .filter((l) => l.trim().length > 0);
         const records: CompactTrajectoryRecord[] = [];
 
         for (const line of lines) {
@@ -184,6 +212,7 @@ export async function readRecentRecords(
 
 /**
  * Reads the lifetime summary if present.
+ * Reentrant and idempotent async read-only routine.
  *
  * @param ledgerDir - Ledger directory path.
  * @returns Lifetime summary or null if not yet initialized.
@@ -208,6 +237,7 @@ export async function readLifetimeSummary(
 
 /**
  * Writes or updates the lifetime summary file.
+ * Idempotent async overwrite; requires external synchronization against concurrent writers.
  *
  * @param ledgerDir - Ledger directory path.
  * @param summary - Updated WeeklyTrajectorySummary instance.
@@ -220,4 +250,3 @@ export async function writeLifetimeSummary(
     const lifetimeFile = path.join(ledgerDir, 'lifetime.summary.json');
     await fs.promises.writeFile(lifetimeFile, JSON.stringify(summary, null, 2), 'utf8');
 }
-

@@ -1,3 +1,14 @@
+/**
+ * Module: Tooling — Project Compiler Runner
+ * File Path: scripts/compile-project.js
+ * Architecture Role: Programmatic TypeScript project compiler enforcing clean emit
+ *   without stale .tsbuildinfo artifacts.
+ * Dependencies & Triggers: Consumes typescript and tsconfig.json; invoked by build scripts.
+ * Responsibilities: Locate tsconfig, clear stale incremental cache, compile TypeScript AST,
+ *   and report compiler diagnostics.
+ * Exit Semantics & Design Rationale: Exits 0 on clean compilation, exits 1 on diagnostic errors.
+ */
+
 const ts = require('typescript');
 const path = require('path');
 const fs = require('fs');

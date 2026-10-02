@@ -3,18 +3,24 @@
  * File Path: src/core/praxis/composite-quality-gate.ts
  * Architecture Role: Evaluates multi-stage composite gate decisions combining static checks,
  *   dynamic tests, regression density, and long-term semantic QED trajectory thresholds.
- * Dependencies & Triggers: Consumes eloc-types and quality-efficiency-engine; called by Git hook scripts
+ * Dependencies & Triggers: Consumes eloc-types and quality-efficiency-engine; called by Git hooks
  *   (pre-commit, pre-push) and audit-all.
- * Exit Semantics: Deterministic gate evaluation; returns structured result with zero unhandled exceptions.
+ * Responsibilities: Evaluate multi-stage gate policies, enforce regression density limits,
+ *   and block gaming or quality degradation.
+ * Exit Semantics & Design Rationale: Deterministic gate evaluation; returns structured result
+ *   without throwing unhandled exceptions.
  */
 
-import type {
-    ElocCounters,
-    TrajectoryQualityMetrics,
-} from '../trajectory/eloc-types';
+import type { ElocCounters, TrajectoryQualityMetrics } from '../trajectory/eloc-types';
 
+/**
+ * Lifecycle stage for composite gate threshold evaluation.
+ */
 export type GateStage = 'development' | 'pre-commit' | 'pre-push' | 'release';
 
+/**
+ * Standardized verdict codes returned by composite gate evaluations.
+ */
 export type CompositeVerdictCode =
     | 'PASS'
     | 'WARN_QUALITY_DRIFT'
@@ -24,6 +30,9 @@ export type CompositeVerdictCode =
     | 'BLOCK_QUALITY_DEGRADATION'
     | 'BLOCK_GAMING_DETECTED';
 
+/**
+ * Gate threshold criteria configuring acceptance limits per stage.
+ */
 export interface StageThresholds {
     minQed: number;
     maxRegressionDensity: number;
@@ -31,6 +40,9 @@ export interface StageThresholds {
     allowGamingWarning: boolean;
 }
 
+/**
+ * Default threshold configurations calibrated across development stages.
+ */
 export const STAGE_THRESHOLDS: Record<GateStage, StageThresholds> = {
     development: {
         minQed: -0.05,
@@ -58,6 +70,9 @@ export const STAGE_THRESHOLDS: Record<GateStage, StageThresholds> = {
     },
 };
 
+/**
+ * Options supplied to execute composite gate verification.
+ */
 export interface CompositeGateOptions {
     stage?: GateStage;
     staticPass: boolean;
@@ -67,6 +82,9 @@ export interface CompositeGateOptions {
     customThresholds?: Partial<StageThresholds>;
 }
 
+/**
+ * Comprehensive verdict result from composite gate verification.
+ */
 export interface CompositeGateResult {
     passed: boolean;
     verdictCode: CompositeVerdictCode;
@@ -140,9 +158,15 @@ function resolveVerdictCode(
 ): CompositeVerdictCode {
     if (!options.staticPass) return 'BLOCK_STATIC_FAILURE';
     if (!options.dynamicPass) return 'BLOCK_DYNAMIC_FAILURE';
-    if (options.metrics.regressionDensity > thresholds.maxRegressionDensity) return 'BLOCK_REGRESSION';
-    if (options.metrics.gamingPenalty > 0 && violations.some((v) => v.includes('Anti-gaming'))) return 'BLOCK_GAMING_DETECTED';
-    if (options.metrics.qed < thresholds.minQed || options.metrics.deltaQSemantic < thresholds.minDeltaQ) return 'BLOCK_QUALITY_DEGRADATION';
+    if (options.metrics.regressionDensity > thresholds.maxRegressionDensity)
+        return 'BLOCK_REGRESSION';
+    if (options.metrics.gamingPenalty > 0 && violations.some((v) => v.includes('Anti-gaming')))
+        return 'BLOCK_GAMING_DETECTED';
+    if (
+        options.metrics.qed < thresholds.minQed ||
+        options.metrics.deltaQSemantic < thresholds.minDeltaQ
+    )
+        return 'BLOCK_QUALITY_DEGRADATION';
     if (warnings.length > 0) return 'WARN_QUALITY_DRIFT';
     return 'PASS';
 }
@@ -197,7 +221,14 @@ export function evaluateCompositeGate(options: CompositeGateOptions): CompositeG
     const { violations, warnings } = collectGateViolations(options, thresholds, stage);
     const verdictCode = resolveVerdictCode(options, violations, warnings, thresholds);
     const passed = violations.length === 0;
-    const summaryText = formatGateSummaryText(stage, passed, verdictCode, options, violations, warnings);
+    const summaryText = formatGateSummaryText(
+        stage,
+        passed,
+        verdictCode,
+        options,
+        violations,
+        warnings,
+    );
 
     return {
         passed,

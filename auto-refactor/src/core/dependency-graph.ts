@@ -23,34 +23,14 @@
  * - Operates in < 0.5ms query time for 1000+ files to supply Review Cell impact analysis.
  */
 
-import * as fs from 'fs';
 import * as path from 'path';
 import { normalizePath } from './file-discovery';
 import { PYTHON_STDLIB_MODULES } from './intelligence/python-stdlib';
-import type { Issue, ScanConfig, ScanReport, Severity } from './types';
 import { nativeCore } from './native/native-bridge';
 import type { NativeGraphAnalysis } from './native/native-types';
 
 /** Default maximum traversal depth for transitive affected-file queries. */
 const DEFAULT_MAX_AFFECTED_DEPTH = 10;
-
-/** Maximum exported symbols sampled into an unused-module detail payload. */
-const EXPORTED_SYMBOL_DETAIL_LIMIT = 10;
-
-/** Maximum unused exports reported per module before moving to the next module. */
-const MAX_UNUSED_EXPORTS_PER_MODULE = 10;
-
-/** Maximum importer files sampled into an unused-export detail payload. */
-const IMPORTER_DETAIL_LIMIT = 5;
-
-/** Default cap on import cycles reported per scan. */
-const DEFAULT_MAX_CYCLES_REPORTED = 20;
-
-/** Registered analyzer id, used as the config key and on every emitted issue. */
-const DEPENDENCY_GRAPH_ANALYZER_ID = 'dependency-graph';
-
-/** Arrow separator used to format circular dependency chain paths. */
-const CYCLE_ARROW_SEPARATOR = ' -> ';
 
 /**
  * Per-module inventory: the file's exported symbol names plus the normalized specifiers of

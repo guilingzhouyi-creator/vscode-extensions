@@ -2,11 +2,14 @@
  * Module: Core Engine — Structured Resource Topology & Scale-Adaptive Analyzer
  * File Path: src/core/architecture/structured-resource-topology.ts
  * Architecture Role: Evaluates naming hierarchy, dynamic scale thresholds, semantic volume,
- *   caller inverted index, multi-modal cohesion, Tarjan SCC cycle decomposition, and tripartite risk.
+ *   caller inverted index, multi-modal cohesion, Tarjan SCC decomposition, and risk.
+ * Dependencies & Triggers: Consumes internal typing and utility functions.
+ * Responsibilities: Enforce architectural resource topology and scale-adaptive rules.
  * Exit Semantics & Design Rationale: Pure architectural analysis engine. Cyclomatic complexity
  *   is strictly bounded (CC <= 10 per function) with full mathematical invariances.
  */
 
+/** Structured breakdown of a resource file path and name. */
 export interface StructuredResourceNamingParts {
     readonly baseType: string;
     readonly domain: string | null;
@@ -17,6 +20,7 @@ export interface StructuredResourceNamingParts {
     readonly rawBaseName: string;
 }
 
+/** Weighting parameters for semantic volume calculation. */
 export interface SemanticVolumeWeights {
     readonly we: number;
     readonly wa: number;
@@ -25,6 +29,7 @@ export interface SemanticVolumeWeights {
     readonly wd: number;
 }
 
+/** Default weighting configuration for semantic volume. */
 export const DEFAULT_SV_WEIGHTS: SemanticVolumeWeights = {
     we: 0.25,
     wa: 0.3,
@@ -33,6 +38,7 @@ export const DEFAULT_SV_WEIGHTS: SemanticVolumeWeights = {
     wd: 0.1,
 };
 
+/** Weighting parameters for multi-modal cohesion index. */
 export interface CohesionWeights {
     readonly wn: number;
     readonly wt: number;
@@ -41,6 +47,7 @@ export interface CohesionWeights {
     readonly wh: number;
 }
 
+/** Default weighting configuration for multi-modal cohesion. */
 export const DEFAULT_COHESION_WEIGHTS: CohesionWeights = {
     wn: 0.1,
     wt: 0.25,
@@ -49,6 +56,7 @@ export const DEFAULT_COHESION_WEIGHTS: CohesionWeights = {
     wh: 0.1,
 };
 
+/** Set of recognized base architectural resource categories. */
 export const RECOGNIZED_RESOURCE_BASE_TYPES: ReadonlySet<string> = new Set([
     'constants',
     'strings',
@@ -64,6 +72,9 @@ export const RECOGNIZED_RESOURCE_BASE_TYPES: ReadonlySet<string> = new Set([
 
 /**
  * Parses file basename into 3-tier structured resource topology.
+ *
+ * @param fileName - Target file name or relative path.
+ * @returns Parsed resource naming parts.
  */
 export function parseStructuredResourceNaming(fileName: string): StructuredResourceNamingParts {
     const rawName = fileName.split(/[/\\]/).pop() || fileName;
@@ -105,6 +116,10 @@ export function parseStructuredResourceNaming(fileName: string): StructuredResou
 /**
  * Snapshot-conditioned core ELOC baseline calculation.
  * Invariant: d(ELOC_core) / d(ELOC(r)) | R_t == 0
+ *
+ * @param allFiles - Collection of files with ELOC.
+ * @param frozenResourcePaths - Frozen resource paths set.
+ * @returns Baseline core ELOC.
  */
 export function calculateSnapshotCoreELOC(
     allFiles: readonly {
@@ -125,6 +140,11 @@ export function calculateSnapshotCoreELOC(
 
 /**
  * Calculates dynamic omnibus capacity threshold.
+ *
+ * @param language - Target programming language.
+ * @param coreELOC - Core codebase effective line count.
+ * @param densityPrior - Language density prior.
+ * @returns Omnibus capacity threshold in ELOC.
  */
 export function calculateOmnibusCapacityThreshold(
     language: string,
@@ -139,6 +159,14 @@ export function calculateOmnibusCapacityThreshold(
 
 /**
  * Calculates Semantic Volume (SV) against line-packing/minification evasion.
+ *
+ * @param eloc - Effective logic lines.
+ * @param astNodeCount - Total AST node count.
+ * @param symbolCount - Declared symbol count.
+ * @param literalCount - Total literal count.
+ * @param astDepth - Maximum AST depth.
+ * @param weights - Semantic volume weights.
+ * @returns Semantic volume score.
  */
 export function calculateSemanticVolume(
     eloc: number,
@@ -160,6 +188,9 @@ export function calculateSemanticVolume(
 /**
  * Inverted caller index builder and sparse candidate graph generator.
  * Time Complexity: O(|E_s|) where |E_s| = sum(|I(c)|^2) << |S|^2.
+ *
+ * @param callerImports - File import dependency entries.
+ * @returns Sparse caller graph with inverted index.
  */
 export function buildSparseCallerGraph(
     callerImports: readonly {
@@ -204,6 +235,14 @@ export function buildSparseCallerGraph(
 
 /**
  * Multi-modal semantic cohesion calculator.
+ *
+ * @param nameJaccard - Identifier Jaccard similarity.
+ * @param typeAffinity - Type graph affinity score.
+ * @param callerOverlap - Inverted caller overlap ratio.
+ * @param domainPurity - Domain co-location purity.
+ * @param historyCovariance - Commit co-change history covariance.
+ * @param weights - Multi-modal cohesion weights.
+ * @returns Composite cohesion score.
  */
 export function calculateMultiModalCohesion(
     nameJaccard: number,
@@ -222,6 +261,7 @@ export function calculateMultiModalCohesion(
     return Math.round(score * 1000) / 1000;
 }
 
+/** Architectural strategy recommended to break a strongly connected cycle. */
 export type SccResolutionStrategy =
     | 'TYPE_SINKING'
     | 'INTERFACE_INVERSION'
@@ -230,6 +270,7 @@ export type SccResolutionStrategy =
     | 'REGISTRY_EXTRACTION'
     | 'RE_MERGING';
 
+/** Diagnostic report containing discovered SCC cycle components and remedies. */
 export interface SccCycleDiagnosis {
     readonly stronglyConnectedComponents: readonly (readonly string[])[];
     readonly cyclicComponents: readonly {
@@ -239,8 +280,123 @@ export interface SccCycleDiagnosis {
     }[];
 }
 
+/** Tarjan SCC cycle decomposition engine on directed dependency graph. */
+class TarjanSccComputer {
+    private index = 0;
+    private readonly indices = new Map<string, number>();
+    private readonly lowlink = new Map<string, number>();
+    private readonly onStack = new Set<string>();
+    private readonly stack: string[] = [];
+    private readonly sccs: string[][] = [];
+
+    constructor(private readonly adjList: ReadonlyMap<string, readonly string[]>) {}
+
+    compute(): string[][] {
+        for (const node of this.adjList.keys()) {
+            if (!this.indices.has(node)) {
+                this.strongConnect(node);
+            }
+        }
+        return this.sccs;
+    }
+
+    private strongConnect(v: string): void {
+        this.indices.set(v, this.index);
+        this.lowlink.set(v, this.index);
+        this.index++;
+        this.stack.push(v);
+        this.onStack.add(v);
+
+        const neighbors = this.adjList.get(v) ?? [];
+        for (const w of neighbors) {
+            if (!this.indices.has(w)) {
+                this.strongConnect(w);
+                this.lowlink.set(v, Math.min(this.lowlink.get(v)!, this.lowlink.get(w)!));
+            } else if (this.onStack.has(w)) {
+                this.lowlink.set(v, Math.min(this.lowlink.get(v)!, this.indices.get(w)!));
+            }
+        }
+
+        if (this.lowlink.get(v) === this.indices.get(v)) {
+            this.popComponent(v);
+        }
+    }
+
+    private popComponent(root: string): void {
+        const component: string[] = [];
+        let w: string;
+        do {
+            w = this.stack.pop()!;
+            this.onStack.delete(w);
+            component.push(w);
+        } while (w !== root);
+        this.sccs.push(component);
+    }
+}
+
+function resolveCycleStrategy(
+    nodes: readonly string[],
+    nodeTypes?: ReadonlyMap<
+        string,
+        'pure-type' | 'high-layer' | 'runtime-instance' | 'event' | 'strategy' | 'small-leaf'
+    >,
+): { nodes: string[]; strategy: SccResolutionStrategy; rationale: string } {
+    const types = nodes.map((n) => nodeTypes?.get(n) ?? 'pure-type');
+    if (types.every((t) => t === 'pure-type')) {
+        return {
+            nodes: [...nodes],
+            strategy: 'TYPE_SINKING',
+            rationale: 'Extract common interfaces/types into types-base module',
+        };
+    }
+    if (types.includes('high-layer')) {
+        return {
+            nodes: [...nodes],
+            strategy: 'INTERFACE_INVERSION',
+            rationale: 'Apply Dependency Inversion Principle (DIP) to decouple layers',
+        };
+    }
+    if (types.includes('runtime-instance')) {
+        return {
+            nodes: [...nodes],
+            strategy: 'DEPENDENCY_INJECTION',
+            rationale: 'Pass instances via dependency injection rather than direct imports',
+        };
+    }
+    if (types.includes('event')) {
+        return {
+            nodes: [...nodes],
+            strategy: 'EVENT_DECOUPLING',
+            rationale: 'Decouple state changes using event emitter pub/sub',
+        };
+    }
+    if (types.includes('strategy')) {
+        return {
+            nodes: [...nodes],
+            strategy: 'REGISTRY_EXTRACTION',
+            rationale: 'Extract dynamic strategies into centralized registry',
+        };
+    }
+    if (types.every((t) => t === 'small-leaf')) {
+        return {
+            nodes: [...nodes],
+            strategy: 'RE_MERGING',
+            rationale: 'Micro sub-libraries are highly cohesive; re-merge into parent domain',
+        };
+    }
+    return {
+        nodes: [...nodes],
+        strategy: 'TYPE_SINKING',
+        rationale: 'Extract common types into base type definition file',
+    };
+}
+
 /**
  * Tarjan SCC cycle decomposition on sub-library dependency graph.
+ *
+ * @param adjList - Directed dependency adjacency list.
+ * @param nodeTypes - Optional node archetype classification map.
+ * @returns Strongly connected components and cycle resolution strategies.
  */
 export function diagnoseSccDependencyCycles(
     adjList: ReadonlyMap<string, readonly string[]>,
@@ -249,77 +405,11 @@ export function diagnoseSccDependencyCycles(
         'pure-type' | 'high-layer' | 'runtime-instance' | 'event' | 'strategy' | 'small-leaf'
     >,
 ): SccCycleDiagnosis {
-    let index = 0;
-    const indices = new Map<string, number>();
-    const lowlink = new Map<string, number>();
-    const onStack = new Set<string>();
-    const stack: string[] = [];
-    const sccs: string[][] = [];
-
-    function strongConnect(v: string): void {
-        indices.set(v, index);
-        lowlink.set(v, index);
-        index++;
-        stack.push(v);
-        onStack.add(v);
-
-        const neighbors = adjList.get(v) ?? [];
-        for (const w of neighbors) {
-            if (!indices.has(w)) {
-                strongConnect(w);
-                lowlink.set(v, Math.min(lowlink.get(v)!, lowlink.get(w)!));
-            } else if (onStack.has(w)) {
-                lowlink.set(v, Math.min(lowlink.get(v)!, indices.get(w)!));
-            }
-        }
-
-        if (lowlink.get(v) === indices.get(v)) {
-            const component: string[] = [];
-            let w: string;
-            do {
-                w = stack.pop()!;
-                onStack.delete(w);
-                component.push(w);
-            } while (w !== v);
-            sccs.push(component);
-        }
-    }
-
-    for (const node of adjList.keys()) {
-        if (!indices.has(node)) {
-            strongConnect(node);
-        }
-    }
-
+    const computer = new TarjanSccComputer(adjList);
+    const sccs = computer.compute();
     const cyclicComponents = sccs
         .filter((comp) => comp.length > 1)
-        .map((nodes) => {
-            const types = nodes.map((n) => nodeTypes?.get(n) ?? 'pure-type');
-            let strategy: SccResolutionStrategy = 'TYPE_SINKING';
-            let rationale = 'Extract common types into base type definition file';
-
-            if (types.every((t) => t === 'pure-type')) {
-                strategy = 'TYPE_SINKING';
-                rationale = 'Extract common interfaces/types into types-base module';
-            } else if (types.includes('high-layer')) {
-                strategy = 'INTERFACE_INVERSION';
-                rationale = 'Apply Dependency Inversion Principle (DIP) to decouple layers';
-            } else if (types.includes('runtime-instance')) {
-                strategy = 'DEPENDENCY_INJECTION';
-                rationale = 'Pass instances via dependency injection rather than direct imports';
-            } else if (types.includes('event')) {
-                strategy = 'EVENT_DECOUPLING';
-                rationale = 'Decouple state changes using event emitter pub/sub';
-            } else if (types.includes('strategy')) {
-                strategy = 'REGISTRY_EXTRACTION';
-                rationale = 'Extract dynamic strategies into centralized registry';
-            } else if (types.every((t) => t === 'small-leaf')) {
-                strategy = 'RE_MERGING';
-                rationale = 'Micro sub-libraries are highly cohesive; re-merge into parent domain';
-            }
-
-            return { nodes, strategy, rationale };
-        });
+        .map((nodes) => resolveCycleStrategy(nodes, nodeTypes));
 
     return {
         stronglyConnectedComponents: sccs,
@@ -329,6 +419,11 @@ export function diagnoseSccDependencyCycles(
 
 /**
  * Bayesian prior update for language density coefficient.
+ *
+ * @param prior - Prior language density estimate.
+ * @param sampleDensity - Sample observed density.
+ * @param learningRate - Update learning rate lambda.
+ * @returns Posterior updated density prior.
  */
 export function updateLanguageDensityPrior(
     prior: number,
@@ -343,6 +438,14 @@ export function updateLanguageDensityPrior(
 /**
  * Tripartite orthogonal risk calculator.
  * Risk = Confidence^alpha * Severity^beta * Impact^gamma
+ *
+ * @param confidence - Finding confidence in [0, 1].
+ * @param severity - Normalized severity in [0, 1].
+ * @param impact - Structural impact in [0, 1].
+ * @param alpha - Confidence exponent.
+ * @param beta - Severity exponent.
+ * @param gamma - Impact exponent.
+ * @returns Tripartite risk breakdown.
  */
 export function calculateTripartiteRisk(
     confidence: number,
@@ -369,6 +472,7 @@ export function calculateTripartiteRisk(
     };
 }
 
+/** Diagnostic finding emitted by resource topology validation. */
 export interface ResourceTopologyFinding {
     readonly ruleId: string;
     readonly filePath: string;
@@ -379,6 +483,10 @@ export interface ResourceTopologyFinding {
 
 /**
  * Full audit executor for structured resource topology.
+ *
+ * @param files - All candidate files with AST metrics.
+ * @param coreELOC - Baseline core effective lines of code.
+ * @returns Detected resource topology findings.
  */
 export function auditStructuredResourceTopology(
     files: readonly {

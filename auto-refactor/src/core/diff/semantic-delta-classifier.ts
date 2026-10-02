@@ -3,10 +3,13 @@
  * File Path: src/core/diff/semantic-delta-classifier.ts
  * Architecture Role: Distinguishes genuine semantic code changes from pure entity relocations,
  *   formatting/comment whitespace changes, and empty forwarders.
- *   Calculates orthogonal ELOC counters (processed, unique, changed, semantic, relocated, cosmetic).
+ *   Calculates orthogonal ELOC counters (processed, unique, changed, semantic, relocated).
  * Dependencies & Triggers: Consumes edit-diff (fastDiff), constant-relocation-detector,
  *   block-fingerprint-cache, and eloc-types.
- * Exit Semantics: Pure deterministic mathematical analysis over before/after string pairs; zero I/O.
+ * Responsibilities: Classify code differences into semantic, relocated, cosmetic, and boilerplate
+ *   categories, decomposing lines into orthogonal ELOC counters.
+ * Exit Semantics & Design Rationale: Pure deterministic mathematical analysis over string pairs;
+ *   zero I/O; never throws unhandled exceptions during classification.
  */
 
 import type {
@@ -15,10 +18,7 @@ import type {
     SemanticDeltaResult,
     BlockFingerprint,
 } from '../trajectory/eloc-types';
-import {
-    extractBlockFingerprints,
-    countBlockEloc,
-} from '../trajectory/block-fingerprint-cache';
+import { extractBlockFingerprints, countBlockEloc } from '../trajectory/block-fingerprint-cache';
 import {
     extractConstantEntities,
     analyzeConstantTransitions,
@@ -54,7 +54,9 @@ function isBoilerplateLine(line: string): boolean {
         trimmed === 'pass;' ||
         trimmed === 'export {};' ||
         trimmed === 'return;' ||
-        /^(?:public|private|protected)?\s*(?:get|set)?\s*\w+\(\)\s*:\s*\w+\s*\{\s*return\s+this\.\w+;\s*\}$/.test(trimmed)
+        /^(?:public|private|protected)?\s*(?:get|set)?\s*\w+\(\)\s*:\s*\w+\s*\{\s*return\s+this\.\w+;\s*\}$/.test(
+            trimmed,
+        )
     );
 }
 
@@ -64,7 +66,7 @@ function isBoilerplateLine(line: string): boolean {
 function detectRelocatedBlocks(
     oldBlocks: BlockFingerprint[],
     newBlocks: BlockFingerprint[],
-    filePath: string,
+    _filePath: string,
 ): {
     relocatedBlocks: SemanticDeltaResult['relocatedBlocks'];
     relocatedEloc: number;
@@ -133,11 +135,7 @@ function classifySingleLine(line: string): { isCosmetic: boolean; isBoilerplate:
 /**
  * Applies line classification findings into cumulative line metrics.
  */
-function applyLineMetrics(
-    line: string,
-    isInsert: boolean,
-    metrics: LineDiffMetrics,
-): void {
+function applyLineMetrics(line: string, isInsert: boolean, metrics: LineDiffMetrics): void {
     const res = classifySingleLine(line);
     if (res.isCosmetic) {
         metrics.cosmeticEloc++;
@@ -154,7 +152,8 @@ function applyLineMetrics(
 }
 
 /**
- * Inspects diff operations and line content to count added, deleted, cosmetic, and boilerplate lines.
+ * Inspects diff operations and line content to count added, deleted,
+ * cosmetic, and boilerplate lines.
  */
 function analyzeDiffOperations(
     diffOps: DiffOp[],
@@ -192,13 +191,17 @@ function resolveSemanticCategory(
     if (semanticEloc === 0 && totalRelocated > 0 && cosmeticEloc === 0) {
         return {
             category: 'pure-relocation',
-            rationales: [`Detected pure relocation of ${relocatedBlocksCount} blocks (${totalRelocated} ELOC).`],
+            rationales: [
+                `Detected pure relocation of ${relocatedBlocksCount} blocks (${totalRelocated} ELOC).`,
+            ],
         };
     }
     if (semanticEloc === 0 && cosmeticEloc > 0 && totalRelocated === 0) {
         return {
             category: 'pure-cosmetic',
-            rationales: [`Detected ${cosmeticEloc} lines of non-semantic formatting/comment changes.`],
+            rationales: [
+                `Detected ${cosmeticEloc} lines of non-semantic formatting/comment changes.`,
+            ],
         };
     }
     if (semanticEloc > 0 && totalRelocated === 0 && cosmeticEloc === 0 && boilerplateEloc === 0) {
@@ -263,7 +266,11 @@ export function classifySemanticDelta(
     const newBlocks = extractBlockFingerprints(normPath, newContent);
 
     // 1. Detect AST block & constant relocations
-    const { relocatedBlocks, relocatedEloc } = detectRelocatedBlocks(oldBlocks, newBlocks, normPath);
+    const { relocatedBlocks, relocatedEloc } = detectRelocatedBlocks(
+        oldBlocks,
+        newBlocks,
+        normPath,
+    );
     const oldConstants = extractConstantEntities(oldContent, normPath);
     const newConstants = extractConstantEntities(newContent, normPath);
     const constantTransitions = analyzeConstantTransitions(oldConstants, newConstants);

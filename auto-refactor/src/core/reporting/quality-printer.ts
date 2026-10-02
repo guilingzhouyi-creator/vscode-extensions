@@ -90,6 +90,7 @@ function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
  *
  * @param q - Overall project quality score breakdown.
  * @param triPlane - Optional tri-plane unified quality assessment.
+ * @param reviewProfile - Optional active review profile name.
  */
 export function printQualityScoreAssessment(
     q: QualityScoreBreakdown,

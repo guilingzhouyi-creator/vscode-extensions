@@ -724,7 +724,7 @@ export const DEDUCTION_REDUNDANT_ALIAS = 5;
 /** Points deducted for redundant boolean logic (SIM-DED lineage). */
 export const DEDUCTION_REDUNDANT_BOOLEAN = 5;
 
-// ── 宿主语言包（VS Code 扩展 / Godot）专用 ────────────────────────────────────────
+// ── Host language packs (VS Code extension / Godot) specialized ──────────────────
 
 /** Points deducted when a Disposable or listener is never registered for cleanup. */
 export const DEDUCTION_UNDISPOSED_RESOURCE = 15;

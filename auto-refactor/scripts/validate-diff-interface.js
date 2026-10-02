@@ -20,7 +20,6 @@
 const assert = require('assert');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 
 const { scan, scanDiff, scanDiffDelta, scanAndRender } = require('../dist/api');

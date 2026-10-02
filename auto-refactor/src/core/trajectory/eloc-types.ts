@@ -1,12 +1,13 @@
 /**
  * Module: Core Trajectory — ELOC Accounting & Quality Trajectory Type Contracts
  * File Path: src/core/trajectory/eloc-types.ts
- * Architecture Role: Single source of truth for ELOC multi-tier accounting, AST block fingerprinting,
- *   semantic change classification, and compact quality trajectory ledger data structures.
- * Dependencies & Triggers: Pure type contract declarations; imported by semantic-delta-classifier,
- *   block-fingerprint-cache, quality-efficiency-engine, compact-ledger-store, and composite-quality-gate.
- * Exit Semantics: Compile-time types; pure zero-dependency definitions to prevent
- *   circular imports and maintain project neutrality.
+ * Architecture Role: Single source of truth for ELOC multi-tier accounting,
+ *   AST block fingerprinting, semantic change classification, and compact ledger structures.
+ * Dependencies & Triggers: Pure type contract declarations; imported across core trajectory.
+ * Responsibilities: Declare interfaces and types for ELOC counters, semantic delta results,
+ *   compact trajectory records, and quality metrics.
+ * Exit Semantics & Design Rationale: Compile-time types; zero-runtime overhead; prevents
+ *   circular imports and maintains project neutrality.
  */
 
 import type { QualityDimension } from '../scoring/scoringTypes';
@@ -15,15 +16,15 @@ import type { QualityDimension } from '../scoring/scoringTypes';
  * Four-tier orthogonal ELOC accounting counters.
  */
 export interface ElocCounters {
-    /** Cumulative computational throughput (sum of ELOC across all files scanned in all runs). */
+    /** Cumulative computational throughput (sum of ELOC across all files scanned). */
     processed: number;
-    /** Total unique effective logic lines covered in the codebase history (de-duplicated by AST block fingerprints). */
+    /** Unique effective logic lines covered (de-duplicated by AST block fingerprints). */
     unique: number;
     /** Physical changed effective logic lines (added + deleted + modified). */
     changed: number;
     /** Pure semantic effective logic lines (changed - relocated - cosmetic - boilerplate). */
     semantic: number;
-    /** Lines of pure relocated entities (constants, functions, methods moved without semantic logic changes). */
+    /** Lines of pure relocated entities (constants, methods moved without semantic changes). */
     relocated: number;
     /** Lines of cosmetic non-semantic changes (formatting, comments, whitespace, styling). */
     cosmetic: number;
@@ -41,14 +42,7 @@ export interface ElocCounters {
  * Structural category of an AST code block.
  */
 export type AstBlockKind =
-    | 'function'
-    | 'method'
-    | 'class'
-    | 'interface'
-    | 'type'
-    | 'enum'
-    | 'constant'
-    | 'top-level-decl';
+    'function' | 'method' | 'class' | 'interface' | 'type' | 'enum' | 'constant' | 'top-level-decl';
 
 /**
  * Content-invariant structural fingerprint of an AST code block for de-duplication.
@@ -76,11 +70,7 @@ export interface BlockFingerprint {
  * Classification category for a code change slice.
  */
 export type SemanticChangeCategory =
-    | 'pure-semantic'
-    | 'pure-relocation'
-    | 'pure-cosmetic'
-    | 'mixed'
-    | 'unchanged';
+    'pure-semantic' | 'pure-relocation' | 'pure-cosmetic' | 'mixed' | 'unchanged';
 
 /**
  * Granular analysis result of semantic delta classification for a single file or diff slice.

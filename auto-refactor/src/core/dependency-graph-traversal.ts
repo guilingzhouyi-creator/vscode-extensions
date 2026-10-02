@@ -17,12 +17,12 @@ import * as path from 'path';
 import type { Issue, ScanConfig, ScanReport, Severity } from './types';
 import type { ModuleDependencyGraph } from './dependency-graph';
 
-export const EXPORTED_SYMBOL_DETAIL_LIMIT = 10;
-export const MAX_UNUSED_EXPORTS_PER_MODULE = 10;
-export const IMPORTER_DETAIL_LIMIT = 5;
-export const DEFAULT_MAX_CYCLES_REPORTED = 20;
-export const DEPENDENCY_GRAPH_ANALYZER_ID = 'dependency-graph';
-export const CYCLE_ARROW_SEPARATOR = ' -> ';
+const EXPORTED_SYMBOL_DETAIL_LIMIT = 10;
+const MAX_UNUSED_EXPORTS_PER_MODULE = 10;
+const IMPORTER_DETAIL_LIMIT = 5;
+const DEFAULT_MAX_CYCLES_REPORTED = 20;
+const DEPENDENCY_GRAPH_ANALYZER_ID = 'dependency-graph';
+const CYCLE_ARROW_SEPARATOR = ' -> ';
 
 /**
  * Convert a minimal glob into an anchored RegExp for entry whitelists.
@@ -234,7 +234,7 @@ function auditModuleSymbols(
     return flagged;
 }
 
-export function auditUnusedExports(
+function auditUnusedExports(
     graph: ModuleDependencyGraph,
     contents: Map<string, string>,
     opts: CyclePassOptions,
@@ -291,7 +291,7 @@ export function auditUnusedExports(
     }
 }
 
-export function auditImportCycles(
+function auditImportCycles(
     graph: ModuleDependencyGraph,
     opts: CyclePassOptions,
     issues: Issue[],
@@ -322,10 +322,14 @@ export function auditImportCycles(
     }
 }
 
+/**
+ * Logger sink accepting diagnostic info messages from cycle detection.
+ */
 export type CyclePassLogger = { info: (msg: string) => void };
 
 /**
  * Post-scan pass reporting import cycles and, when enabled, unused modules/exports.
+ * Concurrency: Thread-safe async analysis pass operating on independent AST structures.
  *
  * @param report - Scan report whose file metrics define the analyzed file set.
  * @param config - Resolved scan configuration.
@@ -362,4 +366,3 @@ export async function runCyclePass(
 
     return { issues, warnings };
 }
-

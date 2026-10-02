@@ -1,13 +1,16 @@
 /**
  * Module: Core Trajectory — ELOC Review Trajectory Accumulator & Baseline Engine
  * File Path: src/core/trajectory/trajectory-accumulator.ts
- * Architecture Role: Central accumulator for continuous code review accounting and quality trajectory tracking.
- *   Accumulates scanned effective logic lines (ELOC), tracks deduplicated unique coverage across revisions,
- *   computes long-term QED / ReviewYield / RegressionDensity trajectories, and initializes/maintains
- *   the baseline ledger across the workspace.
- * Dependencies & Triggers: Consumes eloc-types, block-fingerprint-cache, quality-efficiency-engine,
- *   compact-ledger-store, and trajectory-compactor.
- * Exit Semantics: Deterministic, crash-resilient file persistence; guarantees strict O(Runs + Milestones) storage bounds.
+ * Architecture Role: Central accumulator for continuous code review accounting
+ *   and quality trajectory tracking. Accumulates scanned effective logic lines (ELOC),
+ *   tracks deduplicated unique coverage across revisions, computes long-term trajectories,
+ *   and initializes/maintains the baseline ledger across the workspace.
+ * Dependencies & Triggers: Consumes eloc-types, block-fingerprint-cache,
+ *   quality-efficiency-engine, compact-ledger-store, and trajectory-compactor.
+ * Responsibilities: Accumulate multi-run ELOC metrics, record review events,
+ *   and provide unified API for query and compaction.
+ * Exit Semantics & Design Rationale: Deterministic, crash-resilient file persistence;
+ *   guarantees strict O(Runs + Milestones) storage bounds without memory leakage.
  */
 
 import * as path from 'path';
@@ -22,9 +25,7 @@ import {
     BlockFingerprintCache,
     countBlockEloc,
 } from './block-fingerprint-cache';
-import {
-    computeTrajectoryQualityMetrics,
-} from './quality-efficiency-engine';
+import { computeTrajectoryQualityMetrics } from './quality-efficiency-engine';
 import {
     appendTrajectoryRecord,
     readRecentRecords,
@@ -131,9 +132,7 @@ function resolveScoreVector(scoreVector?: number[], fallbackScore = 100): number
 /**
  * Constructs cumulative lifetime summary from initial record.
  */
-function createInitialLifetimeSummary(
-    record: CompactTrajectoryRecord,
-): WeeklyTrajectorySummary {
+function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTrajectorySummary {
     const netDebt = record.debt.res - record.debt.add;
     const processedKiloEloc = Math.max(1, record.eloc.proc / 1000);
     const netYield = Math.round((netDebt / processedKiloEloc) * 100) / 100;
@@ -193,8 +192,9 @@ function updateLifetimeSummary(
     const netYield = Math.round((netDebt / processedKiloEloc) * 100) / 100;
 
     const meanCompositeScore =
-        Math.round(((prev.meanCompositeScore * prev.totalRuns + record.score.aft) / totalRuns) * 100) /
-        100;
+        Math.round(
+            ((prev.meanCompositeScore * prev.totalRuns + record.score.aft) / totalRuns) * 100,
+        ) / 100;
 
     const prevPassedCount = (prev.gatePassRate / 100.0) * prev.totalRuns;
     const newPassedCount = prevPassedCount + (record.gate.pass ? 1 : 0);
@@ -274,7 +274,10 @@ function deriveDebtDelta(options: AuditRunOptions) {
 /**
  * Derives composite gate pass and status code.
  */
-function deriveGateDecision(options: AuditRunOptions, regressionCount: number): {
+function deriveGateDecision(
+    options: AuditRunOptions,
+    regressionCount: number,
+): {
     gatePass: boolean;
     gateCode: string;
 } {
@@ -296,13 +299,13 @@ export class TrajectoryAccumulator {
     private readonly fingerprintCache: BlockFingerprintCache;
 
     constructor(customLedgerDir?: string) {
-        this.ledgerDir =
-            customLedgerDir ?? path.join(process.cwd(), DEFAULT_LEDGER_DIR_NAME);
+        this.ledgerDir = customLedgerDir ?? path.join(process.cwd(), DEFAULT_LEDGER_DIR_NAME);
         this.fingerprintCache = new BlockFingerprintCache();
     }
 
     /**
-     * Records an audit run into the persistent trajectory ledger, calculating incremental and cumulative ELOC.
+     * Records an audit run into the persistent trajectory ledger,
+     * calculating incremental and cumulative ELOC.
      */
     public async recordAuditRun(options: AuditRunOptions): Promise<AuditRunResult> {
         const targetLedgerDir = options.ledgerDir ?? this.ledgerDir;

@@ -26,7 +26,7 @@ export type HygieneIssueFactory = (
     suggestion?: string,
 ) => Issue;
 
-export const PY_BUILTIN_NAMES = new Set([
+const PY_BUILTIN_NAMES = new Set([
     'abs',
     'aiter',
     'all',
@@ -99,16 +99,16 @@ export const PY_BUILTIN_NAMES = new Set([
     'zip',
 ]);
 
-export const PY_PROTOCOL_FIELDS = new Set(['id', 'type', 'help', 'format', 'input', 'next']);
-export const PY_SHORT_ALLOWED = new Set(['i', 'j', 'k', '_']);
-export const PY_EXCEPT_NAME = 'exc';
-export const PY_ASSIGN_RE = /^([A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=)/;
-export const PY_FOR_RE = /^for\s+([A-Za-z_]\w*)\s+in\b/;
-export const PY_EXCEPT_AS_RE = /^except\b[^:]*\bas\s+([A-Za-z_]\w*)\s*:/;
-export const PY_CLASS_RE = /^class\s+[A-Za-z_]\w*/;
-export const PY_DEF_LINE_RE = /^(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(([^)]*)\)/;
-export const PY_WITH_AS_RE = /\bas\s+([A-Za-z_]\w*)\s*(?:,|:)/g;
-export const PY_BINDING_ASSIGNMENT = 'assignment';
+const PY_PROTOCOL_FIELDS = new Set(['id', 'type', 'help', 'format', 'input', 'next']);
+const PY_SHORT_ALLOWED = new Set(['i', 'j', 'k', '_']);
+const PY_EXCEPT_NAME = 'exc';
+const PY_ASSIGN_RE = /^([A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=)/;
+const PY_FOR_RE = /^for\s+([A-Za-z_]\w*)\s+in\b/;
+const PY_EXCEPT_AS_RE = /^except\b[^:]*\bas\s+([A-Za-z_]\w*)\s*:/;
+const PY_CLASS_RE = /^class\s+[A-Za-z_]\w*/;
+const PY_DEF_LINE_RE = /^(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(([^)]*)\)/;
+const PY_WITH_AS_RE = /\bas\s+([A-Za-z_]\w*)\s*(?:,|:)/g;
+const PY_BINDING_ASSIGNMENT = 'assignment';
 
 function updateDocstringState(
     line: string,

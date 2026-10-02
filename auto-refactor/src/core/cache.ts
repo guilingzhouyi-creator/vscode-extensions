@@ -41,6 +41,7 @@ import {
     removeCacheDir,
 } from './cache-persistence';
 
+/** File metadata fingerprint used for L1 freshness checks. */
 export interface Fingerprint {
     /** Last-modification time in milliseconds since the Unix epoch. */
     mtimeMs: number;
@@ -50,6 +51,7 @@ export interface Fingerprint {
     ino?: number;
 }
 
+/** Scan result cached for a file in L2 storage. */
 export interface CachedResult {
     /** Issues emitted for the file, preserved in analyzer emission order. */
     issues: Issue[];
@@ -59,6 +61,7 @@ export interface CachedResult {
 
 type L2Entry = L2EntryRecord;
 
+/** Configuration options controlling CacheStore retention and sizing. */
 export interface CacheStoreOptions {
     maxEntries?: number;
     maxAgeDays?: number;
@@ -78,6 +81,12 @@ const HOURS_PER_DAY = 24;
 const SECONDS_PER_HOUR = 3600;
 const MILLIS_PER_SECOND = 1000;
 
+/**
+ * Computes a deterministic truncated SHA-256 hash identifying a project root.
+ *
+ * @param root - Project root directory path.
+ * @returns 24-character hexadecimal digest.
+ */
 export function projectHashFor(root: string): string {
     const abs = path.resolve(root);
     return sha256Hex(abs).slice(0, PROJECT_HASH_HEX_CHARS);
@@ -496,6 +505,13 @@ export class CacheStore {
     }
 }
 
+/**
+ * Resolves effective cache directory path from user option or default.
+ *
+ * @param cacheDir - Explicitly configured cache directory.
+ * @param root - Project root directory path.
+ * @returns Resolved cache directory path.
+ */
 export function resolveCacheDir(cacheDir: string | undefined, root: string): string {
     return cacheDir || path.join(root, '.auto-refactor-cache');
 }

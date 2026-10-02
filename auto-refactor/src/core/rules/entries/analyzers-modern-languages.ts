@@ -1,13 +1,14 @@
 /**
  * Module: Core Rules — Polyglot Language Modernization Rule Entries
  * File Path: src/core/rules/entries/analyzers-modern-languages.ts
- * Architecture Role: Modular rule catalog for TS/JS, Rust, Go, PowerShell, Python, Shell, and VSCode.
+ * Architecture Role: Modular rule catalog for TS/JS, Rust, Go, PowerShell,
+ *   Python, Shell, and VSCode extension rules.
  * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzersModern facade.
- * Responsibilities: Export rule definitions for language modernizers to stay within LOC budget (< 900 LOC).
+ * Responsibilities: Export rule definitions for language modernizers within LOC budget (< 900 LOC).
+ * Exit Semantics & Design Rationale: Immutable rule catalog array; zero runtime side-effects.
  */
 
 import {
-    ALL_LANGUAGES,
     defineRule,
     SEVERITY_INFO,
     SEVERITY_WARNING,
@@ -38,6 +39,9 @@ const ANALYZER_PYTHON_MODERN = 'python-modern';
 
 const LANGUAGES_TS_FAMILY: readonly string[] = [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT];
 
+/**
+ * Polyglot language modernization rule definitions.
+ */
 export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
     defineRule({
         id: 'TSM-VAR-001',

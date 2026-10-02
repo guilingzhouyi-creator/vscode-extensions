@@ -13,12 +13,15 @@ import * as path from 'path';
 import type { Issue, FileMetric } from './types';
 import type { Fingerprint } from './cache';
 
+/** Type constant for string type checking. */
 export const TYPEOF_STRING = 'string';
+/** Type constant for number type checking. */
 export const TYPEOF_NUMBER = 'number';
-export const RANDOM_STRING_RADIX = 36;
-export const TMP_SUFFIX_END_INDEX = 8;
-export const CACHE_CLEAR_SUFFIX_END_INDEX = 6;
+const RANDOM_STRING_RADIX = 36;
+const TMP_SUFFIX_END_INDEX = 8;
+const CACHE_CLEAR_SUFFIX_END_INDEX = 6;
 
+/** Cache entry record persisted in L2 scan cache. */
 export interface L2EntryRecord {
     k: string;
     p: string;
@@ -29,14 +32,26 @@ export interface L2EntryRecord {
     fs?: number;
 }
 
+/**
+ * Reads file contents synchronously as UTF-8 string.
+ *
+ * @param filePath - Path to file.
+ * @returns File content.
+ */
 export function readTextFileSync(filePath: string): string {
     return fs.readFileSync(filePath, 'utf8');
 }
 
-export function writeTextFileSync(filePath: string, data: string): void {
+function writeTextFileSync(filePath: string, data: string): void {
     fs.writeFileSync(filePath, data, 'utf8');
 }
 
+/**
+ * Reads lines from a file synchronously, returning empty array on failure.
+ *
+ * @param filePath - Path to file.
+ * @returns Array of lines.
+ */
 export function readLinesSafe(filePath: string): string[] {
     try {
         return readTextFileSync(filePath).split('\n');
@@ -45,7 +60,7 @@ export function readLinesSafe(filePath: string): string[] {
     }
 }
 
-export function cleanupTmpFile(tmp: string): void {
+function cleanupTmpFile(tmp: string): void {
     try {
         fs.rmSync(tmp, { force: true });
     } catch {
@@ -70,7 +85,7 @@ export function writeFileAtomic(file: string, data: string): void {
     }
 }
 
-export function writeProbe(probe: string): boolean {
+function writeProbe(probe: string): boolean {
     try {
         writeTextFileSync(probe, 'ok');
         return true;
@@ -79,7 +94,7 @@ export function writeProbe(probe: string): boolean {
     }
 }
 
-export function removeProbe(probe: string): boolean {
+function removeProbe(probe: string): boolean {
     try {
         fs.rmSync(probe, { force: true });
     } catch {
@@ -88,6 +103,12 @@ export function removeProbe(probe: string): boolean {
     return true;
 }
 
+/**
+ * Probes whether a directory is writable by attempting a probe file write.
+ *
+ * @param dir - Directory path to probe.
+ * @returns True if writable, false otherwise.
+ */
 export function probeWritable(dir: string): boolean {
     try {
         const probe = path.join(dir, '.probe');
@@ -97,9 +118,7 @@ export function probeWritable(dir: string): boolean {
     }
 }
 
-export function isValidL1(
-    o: unknown,
-): o is { t: string; p: string; m: number; s: number; i?: number } {
+function isValidL1(o: unknown): o is { t: string; p: string; m: number; s: number; i?: number } {
     const obj = o as Record<string, unknown> | null;
     return Boolean(
         obj &&
@@ -110,6 +129,12 @@ export function isValidL1(
     );
 }
 
+/**
+ * Parses a line from the L1 fingerprint cache into the target map.
+ *
+ * @param line - Raw line from cache file.
+ * @param targetMap - Map to populate with parsed fingerprint.
+ */
 export function parseL1Line(line: string, targetMap: Map<string, Fingerprint>): void {
     try {
         const o = JSON.parse(line);
@@ -124,6 +149,12 @@ export function parseL1Line(line: string, targetMap: Map<string, Fingerprint>): 
     }
 }
 
+/**
+ * Type guard validating whether an object is a valid L2 cache record.
+ *
+ * @param o - Object to inspect.
+ * @returns True if object conforms to L2 record schema.
+ */
 export function isValidL2(o: unknown): o is {
     t: string;
     k: string;
@@ -144,16 +175,25 @@ export function isValidL2(o: unknown): o is {
     );
 }
 
+/**
+ * Type guard validating whether an object is a valid path index record.
+ *
+ * @param o - Object to inspect.
+ * @returns True if object conforms to path entry schema.
+ */
 export function isValidPathEntry(o: unknown): o is { t: string; pk: string; k: string } {
     const obj = o as Record<string, unknown> | null;
     return Boolean(
-        obj &&
-        obj.t === 'x' &&
-        typeof obj.pk === TYPEOF_STRING &&
-        typeof obj.k === TYPEOF_STRING,
+        obj && obj.t === 'x' && typeof obj.pk === TYPEOF_STRING && typeof obj.k === TYPEOF_STRING,
     );
 }
 
+/**
+ * Serializes L1 fingerprint entries into newline-delimited JSON.
+ *
+ * @param l1 - Map of file paths to fingerprints.
+ * @returns Serialized NDJSON string.
+ */
 export function serializeL1(l1: Map<string, Fingerprint>): string {
     const lines: string[] = [];
     for (const [p, fp] of l1) {
@@ -164,6 +204,12 @@ export function serializeL1(l1: Map<string, Fingerprint>): string {
     return lines.join('\n') + (lines.length ? '\n' : '');
 }
 
+/**
+ * Serializes L2 cache entries into newline-delimited JSON.
+ *
+ * @param l2 - Map of cache keys to L2 records.
+ * @returns Serialized NDJSON string.
+ */
 export function serializeL2(l2: Map<string, L2EntryRecord>): string {
     const lines: string[] = [];
     for (const e of l2.values()) {
@@ -182,6 +228,12 @@ export function serializeL2(l2: Map<string, L2EntryRecord>): string {
     return lines.join('\n') + (lines.length ? '\n' : '');
 }
 
+/**
+ * Serializes path index entries into newline-delimited JSON.
+ *
+ * @param l2ByPath - Map of normalized paths to L2 records.
+ * @returns Serialized NDJSON string.
+ */
 export function serializePaths(l2ByPath: Map<string, L2EntryRecord>): string {
     const lines: string[] = [];
     for (const [pk, e] of l2ByPath) {
@@ -190,7 +242,7 @@ export function serializePaths(l2ByPath: Map<string, L2EntryRecord>): string {
     return lines.join('\n') + (lines.length ? '\n' : '');
 }
 
-export function renameStaleCacheDir(dir: string): boolean {
+function renameStaleCacheDir(dir: string): boolean {
     try {
         const stale = path.join(
             path.dirname(dir),
@@ -203,6 +255,12 @@ export function renameStaleCacheDir(dir: string): boolean {
     }
 }
 
+/**
+ * Safely removes or renames a cache directory.
+ *
+ * @param dir - Cache directory path.
+ * @returns True if removed or renamed successfully, false otherwise.
+ */
 export function removeCacheDir(dir: string): boolean {
     if (!fs.existsSync(dir)) return true;
     try {
@@ -212,4 +270,3 @@ export function removeCacheDir(dir: string): boolean {
         return renameStaleCacheDir(dir);
     }
 }
-

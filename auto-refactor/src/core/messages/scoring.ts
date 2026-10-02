@@ -417,7 +417,7 @@ export const ScoringRationales = {
     STDLIB_GENERIC_MISMATCH: (msg: string) =>
         `Standard library and system runtime specification check failed: ${msg}`,
 
-    // ── 宿主语言包（VS Code 扩展 / Godot）───────────────────────────────────────────
+    // ── Host language packs (VS Code extension / Godot) ───────────────────────────
 
     VSCODE_UNDISPOSED_RESOURCE: (msg: string) =>
         `Extension host resource lifecycle broken: a Disposable or listener is never registered for cleanup, so it leaks across deactivations: ${msg}`,

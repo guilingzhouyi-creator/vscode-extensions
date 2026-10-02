@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790926345314",
-  "timestamp": "2026-10-02T07:32:31.085Z",
+  "snapshotId": "snapshot-v0.4.0-1790933377778",
+  "timestamp": "2026-10-02T09:29:42.347Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,32 +12,32 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 559,
-    "durationMs": 4880
+    "filesScanned": 560,
+    "durationMs": 3987
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11200,
+    "totalIssues": 11061,
     "suppressedIssues": 6232,
-    "unsuppressedIssues": 4968,
+    "unsuppressedIssues": 4829,
     "bySeverity": {
-      "info": 512,
-      "warning": 10688,
+      "info": 429,
+      "warning": 10632,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 74,
-      "medium": 10255,
-      "low": 871
+      "high": 71,
+      "medium": 10262,
+      "low": 728
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 99.6,
+      "maintainability": 99.7,
       "performance": 99.9,
       "data": 100,
       "testing": 100,
@@ -132,15 +132,6 @@
       "effectiveDensity": 0.94
     },
     {
-      "filePath": "scripts/validate-trajectory-learning.js",
-      "domain": "scripts",
-      "totalIssues": 132,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 100,
-      "effectiveDensity": 0.97
-    },
-    {
       "filePath": "scripts/validate-multi-agent.js",
       "domain": "scripts",
       "totalIssues": 130,
@@ -148,14 +139,23 @@
       "highCount": 0,
       "compositeScore": 100,
       "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "scripts/validate-trajectory-learning.js",
+      "domain": "scripts",
+      "totalIssues": 130,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 100,
+      "effectiveDensity": 0.97
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 74,
-      "medium": 10255,
-      "low": 871
+      "high": 71,
+      "medium": 10262,
+      "low": 728
     },
     "criticalItems": [],
     "highItems": [
@@ -178,15 +178,6 @@
         "message": "Function \"main\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:scripts/run-self-audit.js:157",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/run-self-audit.js",
-        "line": 157,
-        "message": "Function \"runSelfAudit\" has cyclomatic complexity 21 (threshold 12)."
-      },
-      {
         "id": "complexity:high-complexity:scripts/validate-native-operator.js:156",
         "rule": "high-complexity",
         "tier": "high",
@@ -194,15 +185,6 @@
         "file": "scripts/validate-native-operator.js",
         "line": 156,
         "message": "Function \"runValidation\" has cyclomatic complexity 23 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-NEST-001:scripts/validate-no-empty-scripts.js:25",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-no-empty-scripts.js",
-        "line": 25,
-        "message": "Unbounded control-flow nesting: function 'scanDirectory' has nesting depth 6 exceeding elastic budget 3 for context 'general-business'."
       },
       {
         "id": "complexity:high-complexity:scripts/validate-oxc-keypoints.js:140",
@@ -223,12 +205,12 @@
         "message": "Function \"checkCoverageModel\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:202",
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:203",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 202,
+        "line": 203,
         "message": "Function \"auditBoundaryInteroperability\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
@@ -286,39 +268,30 @@
         "message": "Function \"NamingDecouplingAuditor.auditClusters\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-001:src/core/architecture/structured-resource-topology.ts:187",
+        "id": "performance:PRF-ALG-001:src/core/architecture/structured-resource-topology.ts:218",
         "rule": "PRF-ALG-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/architecture/structured-resource-topology.ts",
-        "line": 187,
+        "line": 218,
         "message": "High algorithmic complexity risk: Found 3 levels of nested loops (potential O(N^3) compute hotspot, threshold 3)"
       },
       {
-        "id": "complexity:CPX-NEST-001:src/core/architecture/structured-resource-topology.ts:296",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/architecture/structured-resource-topology.ts",
-        "line": 296,
-        "message": "Unbounded control-flow nesting: function 'anonymous' has nesting depth 6 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/cache-persistence.ts:33",
+        "id": "performance:PRF-IO-001:src/core/cache-persistence.ts:42",
         "rule": "PRF-IO-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/cache-persistence.ts",
-        "line": 33,
+        "line": 42,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
       },
       {
-        "id": "performance:PRF-IO-001:src/core/cache-persistence.ts:37",
+        "id": "performance:PRF-IO-001:src/core/cache-persistence.ts:46",
         "rule": "PRF-IO-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/cache-persistence.ts",
-        "line": 37,
+        "line": 46,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
       },
       {
@@ -430,12 +403,12 @@
         "message": "Function \"parseHumanMetric\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/core/dependency-graph.ts:143",
+        "id": "complexity:high-complexity:src/core/dependency-graph.ts:123",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/dependency-graph.ts",
-        "line": 143,
+        "line": 123,
         "message": "Function \"collectPythonImports\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
@@ -608,6 +581,33 @@
         "file": "src/core/patterns/pattern-matcher.ts",
         "line": 158,
         "message": "Function \"matchHotPathAllocations\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/patterns/pattern-matcher.ts:218",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/patterns/pattern-matcher.ts",
+        "line": 218,
+        "message": "Unbounded control-flow nesting: function 'isProtectedLayer' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/pipeline/cycle-detector.ts:173",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/pipeline/cycle-detector.ts",
+        "line": 173,
+        "message": "Function \"detectDependencyCyclesAsync\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/policy/source-mask.ts:335",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/policy/source-mask.ts",
+        "line": 335,
+        "message": "Unbounded control-flow nesting: function 'scanRegexSpan' has nesting depth 5 exceeding elastic budget 3 for context 'general-business'."
       }
     ]
   },
@@ -618,7 +618,7 @@
         "compositeScore": 100,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.8,
+          "maintainability": 99.9,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -693,7 +693,7 @@
         "compositeScore": 99.9,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.3,
+          "maintainability": 99.6,
           "performance": 99.7,
           "data": 100,
           "testing": 100,
@@ -1277,7 +1277,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 106822,
+      "processed": 107020,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1291,10 +1291,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1790922053371,
-      "endMs": 1790926345313,
-      "totalRuns": 14,
+      "endMs": 1790933377777,
+      "totalRuns": 22,
       "eloc": {
-        "processedTotal": 1619184,
+        "processedTotal": 2475132,
         "uniqueTotal": 96698,
         "changedTotal": 119162,
         "semanticTotal": 119162
@@ -1305,10 +1305,10 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 259536,
+        "totalAdded": 343344,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -160.29
+        "netYield": -138.72
       },
       "meanCompositeScore": 99.9,
       "gatePassRate": 100

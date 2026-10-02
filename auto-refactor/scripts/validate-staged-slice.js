@@ -6,10 +6,10 @@
  *   - Function cyclomatic complexity (> 15)
  *   - Control flow nesting depth (> 4)
  *   - Code dilution / noise index (kappa_noise > 4.0)
- *   - Loop transient allocations (ADV-PRF-002)
- * Dependencies & Triggers: Invoked by scripts/sh/pre-commit-gate.sh and scripts/ps1/pre-commit-gate.ps1;
+ * Dependencies & Triggers: Invoked by pre-commit-gate scripts (sh / ps1);
  *   uses TypeScript Compiler API and local scoring utilities.
- * Exit Semantics: 0 = PASS (clean AST slice), 1 = FAIL (critical architectural violation).
+ * Responsibilities: Enforce CC <= 15, depth <= 4, and noise index on staged slices.
+ * Exit Semantics & Design Rationale: 0 = PASS (clean AST slice), 1 = FAIL on violations.
  */
 'use strict';
 
@@ -211,7 +211,9 @@ function run() {
   }
 
   if (totalErrors > 0) {
-    console.error(`\n❌ [AST 切片审查阻断] 共发现 ${totalErrors} 处关键架构/复杂度违规！请重构后重新提交。`);
+    console.error(
+      `\n❌ [AST 切片审查阻断] 共发现 ${totalErrors} 处关键架构/复杂度违规！请重构后重新提交。`,
+    );
     process.exit(1);
   } else {
     console.log(`  ✔ [PASS] 暂存区 AST 切片审查通过（圈复杂度 <= 15, 嵌套 <= 4, 噪声比 <= 4.0）`);

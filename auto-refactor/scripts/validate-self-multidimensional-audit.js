@@ -9,12 +9,13 @@
  * Responsibilities:
  *   1. Gate 1 (LOC Budget Guard): Strict assertion that 0 files in src/ exceed 900 LOC.
  *   2. Gate 2 (Shannon Entropy Guard): Information entropy verification across all source files
- *      (>= 3.0 bits/char, mean in [3.5, 6.5]) to guard against degeneration and obfuscation.
- *   3. Gate 3 (AST / LOC Density Guard): Validates AST node-to-LOC syntax density within [0.5, 40.0].
+ *   3. Gate 3 (AST / LOC Density Guard): Validates AST node-to-LOC syntax
+ *      density within [0.5, 40.0].
  *   4. Gate 4 (Boundary Interoperability Guard): Unidirectional layer decoupling; ensures zero
  *      reverse imports from src/core/ to cli/ or api (BIF = 100.0%).
- *   5. Gate 5 (Profile Scoring Precision Guard): Validates mass preservation, finite reproducibility,
- *      and domain-specific bias asymmetry for frontend, backend, and composite review profiles.
+ *   5. Gate 5 (Profile Scoring Precision Guard): Validates mass preservation,
+ *      finite reproducibility, and domain-specific bias asymmetry for frontend, backend,
+ *      and composite review profiles.
  * Exit Semantics & Design Rationale: Modular function decomposition (< 10 cyclomatic complexity per
  *   function); process exits 0 if all 5 gates pass, 1 on regression.
  */

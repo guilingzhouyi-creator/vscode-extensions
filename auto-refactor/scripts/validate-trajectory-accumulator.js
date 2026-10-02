@@ -1,10 +1,11 @@
 /**
  * Module: Static Quality Assurance — Trajectory Accumulator & Progressive ELOC Validation
  * File Path: scripts/validate-trajectory-accumulator.js
- * Architecture Role: Validates the TrajectoryAccumulator engine, testing first baseline initialization,
- *   progressive multi-run ELOC accumulation, AST deduplication, QED calculation, and storage limits.
+ * Architecture Role: Validates TrajectoryAccumulator engine, testing baseline setup,
+ *   multi-run ELOC accumulation, AST deduplication, QED calculation, and storage limits.
  * Dependencies & Triggers: Consumes ../dist/api; executed via test-parallel and npm test.
- * Exit Semantics: Exits with code 0 on all assertions pass, non-zero on failure.
+ * Responsibilities: Validate TrajectoryAccumulator multi-run state accumulation.
+ * Exit Semantics & Design Rationale: Exits with code 0 on assertions pass, non-zero on failure.
  */
 
 'use strict';
@@ -12,11 +13,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const {
-  TrajectoryAccumulator,
-  readLifetimeSummary,
-  readRecentRecords,
-} = require('../dist/api');
+const { TrajectoryAccumulator, readLifetimeSummary, readRecentRecords } = require('../dist/api');
 
 const TEST_LEDGER_DIR = path.join(__dirname, '..', 'tmp', 'test-trajectory-accumulator');
 
@@ -128,7 +125,10 @@ async function runValidation() {
     'Unique ELOC should increase when new files are introduced',
   );
   assert.ok(thirdRunRes.qualityMetrics.qed >= 0, 'QED should be non-negative for score increase');
-  assert.ok(thirdRunRes.lifetimeSummary.debt.netYield >= 0, 'Net yield should reflect debt resolution');
+  assert.ok(
+    thirdRunRes.lifetimeSummary.debt.netYield >= 0,
+    'Net yield should reflect debt resolution',
+  );
 
   console.log('--- [4/5] Testing Ledger Persistence & Compaction ---');
   const recentRecords = await readRecentRecords(TEST_LEDGER_DIR);

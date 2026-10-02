@@ -6,7 +6,10 @@
  *   to guarantee true deduplication (ELOC_unique vs ELOC_processed).
  * Dependencies & Triggers: Consumes eloc-types; called by semantic-delta-classifier,
  *   trajectory metrics engine, and quality reviewers.
- * Exit Semantics: In-memory AST/tokenization and SHA-256 fingerprint hashing; zero external I/O.
+ * Responsibilities: Extract AST block structural spans, compute normalized SHA-256 fingerprints,
+ *   and maintain in-memory block deduplication cache.
+ * Exit Semantics & Design Rationale: In-memory AST tokenization and SHA-256 hashing; zero I/O;
+ *   never throws unhandled exceptions during block analysis.
  */
 
 import * as crypto from 'crypto';
@@ -14,7 +17,8 @@ import type { AstBlockKind, BlockFingerprint } from './eloc-types';
 
 /** Regular expressions for extracting high-level AST blocks in TS/JS/GDScript/Python */
 const FN_DECL_RE = /^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/;
-const METHOD_DECL_RE = /^(?:public|private|protected|static|async|\s)*([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^,{]+)?\s*\{/;
+const METHOD_DECL_RE =
+    /^(?:public|private|protected|static|async|\s)*([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^,{]+)?\s*\{/;
 const CLASS_DECL_RE = /^(?:export\s+)?(?:abstract\s+)?class\s+([A-Za-z0-9_$]+)/;
 const INTERFACE_DECL_RE = /^(?:export\s+)?interface\s+([A-Za-z0-9_$]+)/;
 const TYPE_DECL_RE = /^(?:export\s+)?type\s+([A-Za-z0-9_$]+)\s*=/;
@@ -24,7 +28,8 @@ const PYTHON_DEF_RE = /^def\s+([A-Za-z0-9_$]+)\s*\(/;
 const PYTHON_CLASS_RE = /^class\s+([A-Za-z0-9_$]+)/;
 
 /**
- * Computes a normalized structural fingerprint hash of code text, invariant to comments and formatting.
+ * Computes a normalized structural fingerprint hash of code text,
+ * invariant to comments and formatting.
  *
  * @param text - Raw code snippet.
  * @returns SHA-256 hex digest of normalized token string.
@@ -32,9 +37,9 @@ const PYTHON_CLASS_RE = /^class\s+([A-Za-z0-9_$]+)/;
 export function computeNormalizedFingerprint(text: string): string {
     const normalized = text
         .replace(/\/\*[\s\S]*?\*\//g, '') // remove multi-line comments
-        .replace(/\/\/[^\n]*/g, '')        // remove single-line comments
-        .replace(/#[^\n]*/g, '')          // remove script comments (#)
-        .replace(/\s+/g, ' ')             // collapse all whitespace/indentation
+        .replace(/\/\/[^\n]*/g, '') // remove single-line comments
+        .replace(/#[^\n]*/g, '') // remove script comments (#)
+        .replace(/\s+/g, ' ') // collapse all whitespace/indentation
         .trim();
 
     return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex').slice(0, 16);
@@ -74,7 +79,11 @@ function detectBlockDeclaration(trimmed: string): { kind: AstBlockKind; name: st
     if ((match = trimmed.match(FN_DECL_RE))) {
         return { kind: 'function', name: match[1] };
     }
-    if ((match = trimmed.match(CLASS_DECL_RE)) || (match = trimmed.match(GDSCRIPT_CLASS_RE)) || (match = trimmed.match(PYTHON_CLASS_RE))) {
+    if (
+        (match = trimmed.match(CLASS_DECL_RE)) ||
+        (match = trimmed.match(GDSCRIPT_CLASS_RE)) ||
+        (match = trimmed.match(PYTHON_CLASS_RE))
+    ) {
         return { kind: 'class', name: match[1] };
     }
     if ((match = trimmed.match(INTERFACE_DECL_RE))) {
@@ -119,7 +128,13 @@ function checkBlockTermination(
         return true;
     }
     const isIndentedLanguage = normPath.endsWith('.py') || normPath.endsWith('.gd');
-    if (isIndentedLanguage && trimmed.length > 0 && !trimmed.startsWith('#') && line.search(/\S/) <= indent && lineCount > 1) {
+    if (
+        isIndentedLanguage &&
+        trimmed.length > 0 &&
+        !trimmed.startsWith('#') &&
+        line.search(/\S/) <= indent &&
+        lineCount > 1
+    ) {
         return true;
     }
     return false;
@@ -137,7 +152,11 @@ interface ActiveBlockState {
 /**
  * Converts accumulated block state into a BlockFingerprint record.
  */
-function finalizeBlockRecord(normPath: string, state: ActiveBlockState, endLine: number): BlockFingerprint {
+function finalizeBlockRecord(
+    normPath: string,
+    state: ActiveBlockState,
+    endLine: number,
+): BlockFingerprint {
     const blockContent = state.lines.join('\n');
     const fp = computeNormalizedFingerprint(blockContent);
     const eloc = countBlockEloc(blockContent);
@@ -177,7 +196,16 @@ export function extractBlockFingerprints(filePath: string, content: string): Blo
             currentBlock.lines.push(line);
             currentBlock.braceDepth += computeBraceBalance(line);
 
-            if (checkBlockTermination(normPath, currentBlock.braceDepth, currentBlock.indent, line, trimmed, currentBlock.lines.length)) {
+            if (
+                checkBlockTermination(
+                    normPath,
+                    currentBlock.braceDepth,
+                    currentBlock.indent,
+                    line,
+                    trimmed,
+                    currentBlock.lines.length,
+                )
+            ) {
                 blocks.push(finalizeBlockRecord(normPath, currentBlock, lineNo));
                 currentBlock = null;
             }
