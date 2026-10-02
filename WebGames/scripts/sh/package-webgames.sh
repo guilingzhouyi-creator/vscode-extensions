@@ -56,6 +56,13 @@ if [ $code -eq 0 ] && [ -f "$PCK_PATH" ]; then
   echo "  • 文件大小: $FILE_SIZE 字节"
   echo "  • SHA-256: $SHA"
 
+  # 验证 dev_harness 绝对排除 (零测试/调试脚手架污染)
+  if grep -aq "res://dev_harness/" "$PCK_PATH" 2>/dev/null; then
+    echo "【package-webgames】安全门禁拦截：PCK 包含 dev_harness 调试脚手架代码！"
+    exit 1
+  fi
+  echo "  • 安全门禁: dev_harness 零调试脚手架排除验证通过"
+
   # 追加式构建元数据指纹留痕（字节级开销，杜绝二进制归档膨胀）
   GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
   MANIFEST_PATH="$OUT_DIR/build_manifest.jsonl"

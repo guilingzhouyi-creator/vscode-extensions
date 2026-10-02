@@ -106,7 +106,8 @@
       "enabled": true,
       "severity": "warning",
       "options": {
-        "checkJargon": true
+        "checkJargon": true,
+        "checkDirectories": false
       }
     },
     "comments": {

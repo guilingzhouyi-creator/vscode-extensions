@@ -52,6 +52,15 @@ if ($code -eq 0 -and (Test-Path $pckPath)) {
   Write-Host "  • 文件大小: $($item.Length) 字节"
   Write-Host "  • SHA-256: $hash"
 
+  # 验证 dev_harness 绝对排除 (零测试/调试脚手架污染)
+  $pckBytes = [System.IO.File]::ReadAllBytes($pckPath)
+  $pckString = [System.Text.Encoding]::ASCII.GetString($pckBytes)
+  if ($pckString -match "res://dev_harness/") {
+    Write-Host "【package-webgames】安全门禁拦截：PCK 包含 dev_harness 调试脚手架代码！"
+    exit 1
+  }
+  Write-Host "  • 安全门禁: dev_harness 零调试脚手架排除验证通过"
+
   # 追加式构建元数据指纹留痕（字节级开销，杜绝二进制归档膨胀）
   $gitCommit = (& git rev-parse --short HEAD 2>$null)
   if (-not $gitCommit) { $gitCommit = "unknown" }
