@@ -307,6 +307,10 @@ const PARALLEL_SUITES = [
     name: 'validate-composite-gate',
     script: 'scripts/validate-composite-gate.js',
   },
+  {
+    name: 'validate-trajectory-accumulator',
+    script: 'scripts/validate-trajectory-accumulator.js',
+  },
 ];
 
 // Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)
