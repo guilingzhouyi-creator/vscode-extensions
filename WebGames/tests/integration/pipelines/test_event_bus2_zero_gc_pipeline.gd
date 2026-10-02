@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 72 新一代EventBus 2.0空间分发与零GC流水线验收套件
+# 单元测试：新一代EventBus 2.0空间分发与零GC流水线验收套件
 # 文件路径: res://tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd
 # 职责: 验证新一代分发中枢的高性能、池化守恒、空间精确裁剪与因果时序一致性（12项断言）。
 # ==============================================================================
@@ -50,7 +50,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_headless_presentation_api_control_without_models())
 	_release_test_subscriptions()
 
-	return TestCase.pack_results("Phase 72: 新一代EventBus 2.0空间分发测试套件", results)
+	return TestCase.pack_results("新一代EventBus 2.0空间分发测试套件", results)
 
 # ---- 1. 池化守恒与零深拷贝 ----
 static func _test_event_pool_zero_deep_copy_conservation() -> Dictionary:
@@ -175,18 +175,18 @@ static func _test_subscription_token_lifecycle() -> Dictionary:
 	var token := _track_subscription(bus.subscribe(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY,
 		func(_p: EventPacket) -> void: counter["n"] += 1)
 	)
-	var p1 := bus.borrow_packet(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY, {})
-	bus.dispatch_now(p1)
-	bus.recycle_packet(p1)
+	var packet_first := bus.borrow_packet(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY, {})
+	bus.dispatch_now(packet_first)
+	bus.recycle_packet(packet_first)
 	if counter["n"] != 1:
 		return {"name": tname, "test": tname, "passed": false, "message": "解绑前未触发 count=%d" % counter["n"]}
 	if not token.unbind():
 		return {"name": tname, "test": tname, "passed": false, "message": "首次解绑应返回 true"}
 	if token.unbind():
 		return {"name": tname, "test": tname, "passed": false, "message": "重复解绑应返回 false"}
-	var p2 := bus.borrow_packet(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY, {})
-	bus.dispatch_now(p2)
-	bus.recycle_packet(p2)
+	var packet_second := bus.borrow_packet(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY, {})
+	bus.dispatch_now(packet_second)
+	bus.recycle_packet(packet_second)
 	if counter["n"] != 1:
 		return {"name": tname, "test": tname, "passed": false, "message": "解绑后仍触发 count=%d" % counter["n"]}
 	return {"name": tname, "test": tname, "passed": true, "message": "订阅令牌幂等解绑闭环通过"}

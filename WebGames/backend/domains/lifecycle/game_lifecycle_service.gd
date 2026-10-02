@@ -84,13 +84,9 @@ static func _prepare_shutdown_resources() -> Dictionary:
 		descriptor.priority = int(policy["priority"])
 		descriptor.timeout_ms = int(policy["timeout_ms"])
 		descriptor.is_critical = bool(policy["is_critical"])
-	for index in range(1, _shutdown_resources.size()):
-		var descriptor: ShutdownResourceDescriptor = _shutdown_resources[index]
-		var insert_at: int = index
-		while insert_at > 0 and _shutdown_resources[insert_at - 1].priority < descriptor.priority:
-			_shutdown_resources[insert_at] = _shutdown_resources[insert_at - 1]
-			insert_at -= 1
-		_shutdown_resources[insert_at] = descriptor
+	_shutdown_resources.sort_custom(func(a: ShutdownResourceDescriptor, b: ShutdownResourceDescriptor) -> bool:
+		return a.priority > b.priority
+	)
 	return {"success": true, "error_code": ""}
 
 static func _validate_shutdown_stage_order(shutdown_hooks: Dictionary) -> Dictionary:
@@ -188,67 +184,68 @@ static func _execute_registered_shutdown_resources(resp: GameShutdownDTO.Respons
 		return {"success": false, "error_code": critical_error_code}
 	return {"success": true, "error_code": ""}
 
-static func _execute_shutdown_stage(
-	stage: String,
-	request: GameShutdownDTO.Request,
-	providers: Dictionary,
-	allow_default_fallback: bool,
-	fsm: Variant,
-	resp: GameShutdownDTO.Response,
-	bus: Variant,
-	save_timeout: float,
-	force_timeout: float
-) -> Dictionary:
+class ShutdownStageContext extends RefCounted:
+	var stage: String = ""
+	var request: GameShutdownDTO.Request
+	var providers: Dictionary = {}
+	var allow_default_fallback: bool = true
+	var fsm: Variant
+	var resp: GameShutdownDTO.Response
+	var bus: Variant
+	var save_timeout: float = 3.0
+	var force_timeout: float = 2.0
+
+static func _execute_shutdown_stage(ctx: ShutdownStageContext) -> Dictionary:
 	var stage_started_ms: int = Time.get_ticks_msec()
 	var stage_success: bool = true
 	var stage_error: String = ""
-	match stage:
+	match ctx.stage:
 		"freeze_inputs":
 			_freeze_world_and_inputs()
 		"flush_saves":
 			var save_result: Dictionary = {}
 			if GameConfig.get_bool("infrastructure.lifecycle", "policies/auto_save_on_exit", true):
-				save_result = _flush_domain_saves(request.target_save_slot, providers, allow_default_fallback)
-				resp.is_save_completed = bool(save_result.get("success", false))
-				resp.save_sha256 = String(save_result.get("sha256", ""))
-				if not resp.is_save_completed:
+				save_result = _flush_domain_saves(ctx.request.target_save_slot, ctx.providers, ctx.allow_default_fallback)
+				ctx.resp.is_save_completed = bool(save_result.get("success", false))
+				ctx.resp.save_sha256 = String(save_result.get("sha256", ""))
+				if not ctx.resp.is_save_completed:
 					stage_success = false
 					stage_error = String(save_result.get("error_code", "SAVE_FLUSH_FAILED"))
-					resp.degraded_resources.append("flush_saves")
-			if bus != null:
-				bus.emit_domain_event("lifecycle.save_completed", {
-					"success": resp.is_save_completed,
-					"slot": request.target_save_slot,
-					"sha256": resp.save_sha256,
+					ctx.resp.degraded_resources.append("flush_saves")
+			if ctx.bus != null:
+				ctx.bus.emit_domain_event("lifecycle.save_completed", {
+					"success": ctx.resp.is_save_completed,
+					"slot": ctx.request.target_save_slot,
+					"sha256": ctx.resp.save_sha256,
 					"error_code": stage_error
 				})
 		"execute_resource_descriptors":
-			var resource_result: Dictionary = _execute_registered_shutdown_resources(resp)
+			var resource_result: Dictionary = _execute_registered_shutdown_resources(ctx.resp)
 			stage_success = bool(resource_result.get("success", false))
 			stage_error = String(resource_result.get("error_code", ""))
 		"revoke_session":
-			if not request.session_token.is_empty():
-				AuthService.revoke_token(request.session_token)
-				if bus != null:
-					bus.emit_domain_event("lifecycle.session_revoked", {
-						"token_prefix": request.session_token.substr(0, min(8, request.session_token.length()))
+			if not ctx.request.session_token.is_empty():
+				AuthService.revoke_token(ctx.request.session_token)
+				if ctx.bus != null:
+					ctx.bus.emit_domain_event("lifecycle.session_revoked", {
+						"token_prefix": ctx.request.session_token.substr(0, min(8, ctx.request.session_token.length()))
 					})
 		"teardown_bootstrap":
 			var teardown_result: Dictionary = GameBootstrap.teardown()
 			if not bool(teardown_result.get("success", false)):
 				stage_success = false
 				stage_error = "BOOTSTRAP_TEARDOWN_FAILED"
-				resp.remaining_resources.append("bootstrap_teardown_failed")
-				resp.retained_resources.append("bootstrap_teardown_failed")
-				_record_shutdown_failure(resp, stage, stage_error)
+				ctx.resp.remaining_resources.append("bootstrap_teardown_failed")
+				ctx.resp.retained_resources.append("bootstrap_teardown_failed")
+				_record_shutdown_failure(ctx.resp, ctx.stage, stage_error)
 	var elapsed_ms: int = Time.get_ticks_msec() - stage_started_ms
-	var timeout_seconds: float = save_timeout if stage == "flush_saves" else (force_timeout if stage == "teardown_bootstrap" else 0.0)
+	var timeout_seconds: float = ctx.save_timeout if ctx.stage == "flush_saves" else (ctx.force_timeout if ctx.stage == "teardown_bootstrap" else 0.0)
 	if timeout_seconds > 0.0 and elapsed_ms > int(timeout_seconds * 1000.0):
 		stage_success = false
 		stage_error = "STAGE_TIMEOUT"
-		_mark_phase_timeout(fsm, resp, bus, stage)
+		_mark_phase_timeout(ctx.fsm, ctx.resp, ctx.bus, ctx.stage)
 	return {
-		"stage": stage,
+		"stage": ctx.stage,
 		"success": stage_success,
 		"error_code": stage_error,
 		"elapsed_milliseconds": elapsed_ms
@@ -301,12 +298,21 @@ static func execute_graceful_shutdown(
 		})
 		bus.emit_log("info", "安全停机管线启动，原因: %s" % GameLifecycleModel.get_reason_name(request.exit_reason))
 
+	var ctx := ShutdownStageContext.new()
+	ctx.request = request
+	ctx.providers = providers
+	ctx.allow_default_fallback = allow_default_fallback
+	ctx.fsm = fsm
+	ctx.resp = resp
+	ctx.bus = bus
+	ctx.save_timeout = save_timeout
+	ctx.force_timeout = force_timeout
+
 	var total_timeout_recorded: bool = false
 	var stage_order: Array[String] = shutdown_plan["stage_order"]
 	for stage in stage_order:
-		var stage_result: Dictionary = _execute_shutdown_stage(
-			stage, request, providers, allow_default_fallback, fsm, resp, bus, save_timeout, force_timeout
-		)
+		ctx.stage = stage
+		var stage_result: Dictionary = _execute_shutdown_stage(ctx)
 		resp.stage_results.append(stage_result)
 		if not total_timeout_recorded and _deadline_exceeded(start_time, shutdown_timeout):
 			_mark_phase_timeout(fsm, resp, bus, "shutdown_total")

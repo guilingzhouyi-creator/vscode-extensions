@@ -62,6 +62,8 @@ static func release(context: SessionFlowContextDTO) -> bool:
 	return true
 
 static func get_pool_size() -> int:
+	if _free_pool.is_empty():
+		return 0
 	return _free_pool.size()
 
 static func get_borrowed_count() -> int:

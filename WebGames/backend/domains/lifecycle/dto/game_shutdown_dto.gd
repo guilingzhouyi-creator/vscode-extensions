@@ -92,37 +92,24 @@ class Response extends RefCounted:
 		resp.current_phase = int(data.get("current_phase", GameLifecycleModel.LifecyclePhase.STOPPED))
 		resp.is_save_completed = bool(data.get("is_save_completed", false))
 		resp.save_sha256 = String(data.get("save_sha256", ""))
-		var raw_res: Array = data.get("remaining_resources", [])
-		resp.remaining_resources = []
-		for r in raw_res:
-			resp.remaining_resources.append(String(r))
-		var raw_retained_resources: Variant = data.get("retained_resources", [])
-		if raw_retained_resources is Array:
-			for resource_id in raw_retained_resources:
-				resp.retained_resources.append(String(resource_id))
-		for field_name in ["timed_out_resources", "timed_out_stages", "unexecuted_resources", "degraded_resources"]:
-			var raw_values: Variant = data.get(field_name, [])
-			if not raw_values is Array:
-				continue
-			for value in raw_values:
-				var string_value: String = String(value)
-				match field_name:
-					"timed_out_resources":
-						resp.timed_out_resources.append(string_value)
-					"timed_out_stages":
-						resp.timed_out_stages.append(string_value)
-					"unexecuted_resources":
-						resp.unexecuted_resources.append(string_value)
-					"degraded_resources":
-						resp.degraded_resources.append(string_value)
+		resp.remaining_resources = _extract_string_array(data.get("remaining_resources", []))
+		resp.retained_resources = _extract_string_array(data.get("retained_resources", []))
+		resp.timed_out_resources = _extract_string_array(data.get("timed_out_resources", []))
+		resp.timed_out_stages = _extract_string_array(data.get("timed_out_stages", []))
+		resp.unexecuted_resources = _extract_string_array(data.get("unexecuted_resources", []))
+		resp.degraded_resources = _extract_string_array(data.get("degraded_resources", []))
 		var raw_stage_results: Variant = data.get("stage_results", [])
 		if raw_stage_results is Array:
-			var valid_stage_results: Array = []
-			for stage_result in raw_stage_results:
+			var copied_results: Array = (raw_stage_results as Array).duplicate(true)
+			for stage_result in copied_results:
 				if stage_result is Dictionary:
-					valid_stage_results.append(stage_result)
-			var copied_stage_results: Array = valid_stage_results.duplicate(true)
-			for stage_result in copied_stage_results:
-				resp.stage_results.append(stage_result as Dictionary)
+					resp.stage_results.append(stage_result as Dictionary)
 		resp.elapsed_milliseconds = int(data.get("elapsed_milliseconds", 0))
 		return resp
+
+	static func _extract_string_array(raw_values: Variant) -> Array[String]:
+		var result: Array[String] = []
+		if raw_values is Array:
+			for value in raw_values:
+				result.append(String(value))
+		return result

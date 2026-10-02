@@ -127,6 +127,74 @@ static func _extract_required_slots(cfg: Dictionary) -> Array[String]:
 		result.append(String(slot))
 	return result
 
+static func _validate_stage_index(stage_config: Dictionary, stage_key: String, seen_indices: Dictionary) -> int:
+	var raw_stage_index: Variant = stage_config.get("stage_index", null)
+	var stage_index_type: int = typeof(raw_stage_index)
+	if (stage_index_type != TYPE_INT and stage_index_type != TYPE_FLOAT) \
+		or float(raw_stage_index) <= 0.0 \
+		or not is_equal_approx(float(raw_stage_index), floor(float(raw_stage_index))):
+		_config_error = "INVALID_STAGE_INDEX:" + stage_key
+		return -1
+	var stage_index: int = int(raw_stage_index)
+	if seen_indices.has(stage_index):
+		_config_error = "DUPLICATE_STAGE_INDEX:" + str(stage_index)
+		return -1
+	seen_indices[stage_index] = true
+	return stage_index
+
+static func _validate_required_slots(stage_config: Dictionary, stage_key: String) -> Array[String]:
+	var raw_slots: Variant = stage_config.get("required_slots", null)
+	if not raw_slots is Array or raw_slots.is_empty():
+		_config_error = "INVALID_REQUIRED_SLOTS:" + stage_key
+		return []
+	var required_slots: Array[String] = []
+	var seen_slots: Dictionary = {}
+	for raw_slot in (raw_slots as Array):
+		if not raw_slot is String:
+			_config_error = "INVALID_REQUIRED_SLOT:" + stage_key
+			return []
+		var slot: String = String(raw_slot).strip_edges()
+		if slot.is_empty() or seen_slots.has(slot):
+			_config_error = "EMPTY_OR_DUPLICATE_REQUIRED_SLOT:" + stage_key
+			return []
+		seen_slots[slot] = true
+		required_slots.append(slot)
+	return required_slots
+
+static func _validate_stage_aliases(stage_config: Dictionary, stage_key: String) -> Array[String]:
+	var raw_aliases: Variant = stage_config.get("aliases", [])
+	if not raw_aliases is Array:
+		_config_error = "INVALID_STAGE_ALIASES:" + stage_key
+		return []
+	var aliases: Array[String] = []
+	var seen_aliases: Dictionary = {}
+	for raw_alias in (raw_aliases as Array):
+		if not raw_alias is String:
+			_config_error = "INVALID_STAGE_ALIAS:" + stage_key
+			return []
+		var alias: String = String(raw_alias).strip_edges().to_upper()
+		if alias.is_empty() or seen_aliases.has(alias):
+			_config_error = "EMPTY_OR_DUPLICATE_STAGE_ALIAS:" + stage_key
+			return []
+		seen_aliases[alias] = true
+		aliases.append(alias)
+	return aliases
+
+static func _register_stage_aliases(stage_key: String, aliases: Array[String], next_aliases: Dictionary) -> bool:
+	for alias in aliases:
+		if next_aliases.has(alias):
+			_config_error = "STAGE_ALIAS_COLLISION:" + alias
+			return false
+		next_aliases[alias] = stage_key
+	return true
+
+static func _register_alias_mappings(next_configs: Dictionary, next_aliases: Dictionary) -> bool:
+	for stage_key in next_configs:
+		var stage_config: Dictionary = next_configs[stage_key]
+		if not _register_stage_aliases(stage_key, stage_config["aliases"], next_aliases):
+			return false
+	return true
+
 static func _ensure_config_index() -> bool:
 	var current_version: int = GameConfig.config_reload_version()
 	if current_version == _config_version and not _stage_configs.is_empty():
@@ -150,48 +218,18 @@ static func _ensure_config_index() -> bool:
 			_config_error = "STAGE_CONFIG_NOT_OBJECT:" + stage_key
 			return false
 		var stage_config: Dictionary = raw_stage_config
-		var raw_stage_index: Variant = stage_config.get("stage_index", null)
-		var stage_index_type: int = typeof(raw_stage_index)
-		if (stage_index_type != TYPE_INT and stage_index_type != TYPE_FLOAT) \
-			or float(raw_stage_index) <= 0.0 \
-			or not is_equal_approx(float(raw_stage_index), floor(float(raw_stage_index))):
-			_config_error = "INVALID_STAGE_INDEX:" + stage_key
-			return false
-		var stage_index: int = int(raw_stage_index)
-		if seen_indices.has(stage_index):
-			_config_error = "DUPLICATE_STAGE_INDEX:" + str(stage_index)
-			return false
-		seen_indices[stage_index] = true
 
-		var raw_slots: Variant = stage_config.get("required_slots", null)
-		if not raw_slots is Array or raw_slots.is_empty():
-			_config_error = "INVALID_REQUIRED_SLOTS:" + stage_key
+		var stage_index := _validate_stage_index(stage_config, stage_key, seen_indices)
+		if stage_index < 0:
 			return false
-		var required_slots: Array[String] = []
-		for raw_slot in raw_slots:
-			if not raw_slot is String:
-				_config_error = "INVALID_REQUIRED_SLOT:" + stage_key
-				return false
-			var slot: String = String(raw_slot).strip_edges()
-			if slot.is_empty() or required_slots.has(slot):
-				_config_error = "EMPTY_OR_DUPLICATE_REQUIRED_SLOT:" + stage_key
-				return false
-			required_slots.append(slot)
 
-		var raw_aliases: Variant = stage_config.get("aliases", [])
-		if not raw_aliases is Array:
-			_config_error = "INVALID_STAGE_ALIASES:" + stage_key
+		var required_slots := _validate_required_slots(stage_config, stage_key)
+		if not _config_error.is_empty():
 			return false
-		var aliases: Array[String] = []
-		for raw_alias in raw_aliases:
-			if not raw_alias is String:
-				_config_error = "INVALID_STAGE_ALIAS:" + stage_key
-				return false
-			var alias: String = String(raw_alias).strip_edges().to_upper()
-			if alias.is_empty() or aliases.has(alias):
-				_config_error = "EMPTY_OR_DUPLICATE_STAGE_ALIAS:" + stage_key
-				return false
-			aliases.append(alias)
+
+		var aliases := _validate_stage_aliases(stage_config, stage_key)
+		if not _config_error.is_empty():
+			return false
 
 		next_configs[stage_key] = {
 			"stage_index": stage_index,
@@ -200,14 +238,8 @@ static func _ensure_config_index() -> bool:
 		}
 		next_aliases[stage_key] = stage_key
 
-	for stage_key in next_configs:
-		var stage_config: Dictionary = next_configs[stage_key]
-		var aliases: Array[String] = stage_config["aliases"]
-		for alias in aliases:
-			if next_aliases.has(alias):
-				_config_error = "STAGE_ALIAS_COLLISION:" + alias
-				return false
-			next_aliases[alias] = stage_key
+	if not _register_alias_mappings(next_configs, next_aliases):
+		return false
 
 	_stage_configs = next_configs
 	_stage_aliases = next_aliases

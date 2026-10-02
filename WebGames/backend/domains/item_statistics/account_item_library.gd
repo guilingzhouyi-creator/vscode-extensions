@@ -83,7 +83,7 @@ func apply_item_delta(canonical_id: String, event_stat_key: String, quantity: in
 		actual_delta = mini(quantity, prev_current) # 下限 0：当前持有不可减成负数
 	var current_delta := quantity if not consumes_current else -actual_delta
 	stats[STAT_CURRENT] = prev_current + current_delta
-	_apply_delta_upwards(root_node, [found["path"][0], found["path"][1]], event_stat_key, quantity, current_delta)
+	_apply_delta_upwards(root_node, [found["path"][0], found["path"][1]], event_stat_key, Vector2i(quantity, current_delta))
 	return {
 		"success": true, "canonical_id": canonical_id,
 		"event_stat": event_stat_key, "actual_quantity": actual_delta
@@ -107,11 +107,14 @@ func find_item_node(canonical_id: String) -> Dictionary:
 			return {"node": minor["children"][canonical_id], "path": [major_key, minor_key]}
 	return {}
 
+func _index_minor_node(major_key: String, minor_key: String, minor: Dictionary) -> void:
+	for canonical_id in minor["children"]:
+		_canonical_index[canonical_id] = [major_key, minor_key]
+
 func _index_major_node(major_key: String, major: Dictionary) -> void:
 	for minor_key in major["children"]:
 		var minor: Dictionary = major["children"][minor_key]
-		for canonical_id in minor["children"]:
-			_canonical_index[canonical_id] = [major_key, minor_key]
+		_index_minor_node(major_key, String(minor_key), minor)
 
 ## 索引懒重建——树有内容而索引为空（反序列化/restore 后）时全树收集一次
 func _ensure_index() -> void:
@@ -183,7 +186,7 @@ static func _collect_items_recursive(node: Dictionary, out: Array) -> void:
 		_collect_items_recursive(child, out)
 
 ## 自底向上常数时间 O(1) 路径增量累加（消除全量子树递归求和性能开销）
-static func _apply_delta_upwards(root: Dictionary, path: Array, event_stat_key: String, event_delta: int, current_delta: int) -> void:
+static func _apply_delta_upwards(root: Dictionary, path: Array, event_stat_key: String, deltas: Vector2i) -> void:
 	if path.size() < 2:
 		return
 	var major_key: String = str(path[0])
@@ -194,11 +197,11 @@ static func _apply_delta_upwards(root: Dictionary, path: Array, event_stat_key: 
 	var minor: Dictionary = major["children"].get(minor_key, {})
 	if not minor.is_empty():
 		var ms: Dictionary = minor["stats"]
-		ms[event_stat_key] = int(ms.get(event_stat_key, 0)) + event_delta
-		ms[STAT_CURRENT] = int(ms.get(STAT_CURRENT, 0)) + current_delta
+		ms[event_stat_key] = int(ms.get(event_stat_key, 0)) + deltas.x
+		ms[STAT_CURRENT] = int(ms.get(STAT_CURRENT, 0)) + deltas.y
 	var maj_s: Dictionary = major["stats"]
-	maj_s[event_stat_key] = int(maj_s.get(event_stat_key, 0)) + event_delta
-	maj_s[STAT_CURRENT] = int(maj_s.get(STAT_CURRENT, 0)) + current_delta
+	maj_s[event_stat_key] = int(maj_s.get(event_stat_key, 0)) + deltas.x
+	maj_s[STAT_CURRENT] = int(maj_s.get(STAT_CURRENT, 0)) + deltas.y
 
 ## 自底向上递归重算路径上各分类节点的聚合统计（保留作为重构校验与全量同步基准）
 static func _recalc_upwards(root: Dictionary, path: Array) -> void:

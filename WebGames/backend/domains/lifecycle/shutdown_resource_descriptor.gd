@@ -12,17 +12,16 @@ extends RefCounted
 
 var resource_id: String = ""
 var priority: int = 0
-var timeout_ms: int = 0
+var timeout_ms: int = 2000
 var is_critical: bool = false
 var cleanup_action: Callable = Callable()
 
 ## 资源描述符构造（注册时由 lifecycle 配置覆盖策略字段）
-func _init(id: String = "", prio: int = 100, critical: bool = true, action: Callable = Callable(), timeout: int = 2000) -> void:
+func _init(id: String = "", prio: int = 100, critical: bool = true, action: Callable = Callable()) -> void:
 	resource_id = id
 	priority = prio
 	is_critical = critical
 	cleanup_action = action
-	timeout_ms = timeout
 
 ## 执行释放回调：无效回调或非 Dictionary 结果均按失败处理
 func execute_cleanup() -> Dictionary:
