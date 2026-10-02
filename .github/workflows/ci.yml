@@ -291,18 +291,17 @@ jobs:
           bash scripts/sh/pre-commit-gate.sh
           # 3. commit-msg-gate.sh 生产工程级结构化合规自检
           MSG_TEMP=$(mktemp)
-          cat << 'EOF' | sed 's/^ *//' > "$MSG_TEMP"
-          feat(ci): 引入生产工程级提交信息门禁
-
-          [Why / 动机背景]
-          - 规范全仓 Git 提交信息格式，杜绝敷衍低密度提交。
-
-          [Added / 新增内容]
-          - 新增结构化正文区块校验与字数底线检测。
-
-          [Verification / 验证结论]
-          - 本地与 CI 自动化自测通过。
-          EOF
+          printf "%s\n" \
+            "feat(ci): 引入生产工程级提交信息门禁" \
+            "" \
+            "[Why / 动机背景]" \
+            "- 规范全仓 Git 提交信息格式，杜绝敷衍低密度提交。" \
+            "" \
+            "[Added / 新增内容]" \
+            "- 新增结构化正文区块校验与字数底线检测。" \
+            "" \
+            "[Verification / 验证结论]" \
+            "- 本地与 CI 自动化自测通过。" > "$MSG_TEMP"
           bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP"
           # 4. commit-msg-gate.sh 非法信息阻断自检 (非法应 exit 1)
           echo "bad message" > "$MSG_TEMP"
@@ -319,18 +318,17 @@ jobs:
             echo "::error::commit-msg-gate 未拦截缺少正文的 feat 提交"; exit 1
           fi
           # 6. Rule 7 规则 ID 反虚构自检 (未知规则 ID 应 exit 1)
-          cat << 'EOF' | sed 's/^ *//' > "$MSG_TEMP"
-          feat(ci): 测试虚构规则拦截
-
-          [Why]
-          - 验证未知规则 ID 拦截能力。
-
-          [Added]
-          - 新增 fake rule FAKE-XYZ-999。
-
-          [Verification]
-          - CI 自检测试。
-          EOF
+          printf "%s\n" \
+            "feat(ci): 测试虚构规则拦截" \
+            "" \
+            "[Why]" \
+            "- 验证未知规则 ID 拦截能力。" \
+            "" \
+            "[Added]" \
+            "- 新增 fake rule FAKE-XYZ-999。" \
+            "" \
+            "[Verification]" \
+            "- CI 自检测试。" > "$MSG_TEMP"
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截虚构规则 ID"; exit 1
           fi

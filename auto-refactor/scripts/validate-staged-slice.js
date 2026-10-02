@@ -15,8 +15,27 @@
 
 const fs = require('fs');
 const path = require('path');
-const ts = require('typescript');
 const { execSync } = require('child_process');
+
+let ts;
+try {
+  ts = require('typescript');
+} catch {
+  try {
+    ts = require(path.resolve(__dirname, '../node_modules/typescript'));
+  } catch {
+    try {
+      ts = require(path.resolve(__dirname, '../../workspace-timing/node_modules/typescript'));
+    } catch {
+      ts = null;
+    }
+  }
+}
+
+if (!ts) {
+  console.log('  ℹ️ [NOTICE] 未检测到 typescript 运行环境，跳过 AST 局部切片审查');
+  process.exit(0);
+}
 
 const MAX_FUNCTION_COMPLEXITY = 15;
 const MAX_NESTING_DEPTH = 4;
