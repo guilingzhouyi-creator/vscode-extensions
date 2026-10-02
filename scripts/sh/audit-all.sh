@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# =============================================================================
-# audit-all.sh — 全工作区统一审查与质量治理中枢 (Unified Workspace Review Orchestrator)
-# -----------------------------------------------------------------------------
-# 职能域：audit / review
-# 适用范围：workspace-timing, auto-refactor, WebGames 三项目全域
-# 用法：
-#   bash scripts/sh/audit-all.sh [--fast] [--json]
-# 依赖：bash, node, npm
-# 退出码：0=全部通过；1=存在审查未通过项
-# =============================================================================
+# ==============================================================================
+# 模块归属: 工程效能与统一质量治理 (Tooling · 全工作区跨项目审查中枢)
+# 文件路径: scripts/sh/audit-all.sh
+# 架构定位: 全工作区跨项目统一审查 Runner (Linux Bash)
+# 依赖与触发: 触发方: 本地 CLI / CI 门禁 | 上游: 三项目专属门禁套件 | 下游: 统一质量看板 | 运行时: Bash 4+
+# 职责说明: 调度执行全工作区跨项目质量审查，聚合 workspace-timing、auto-refactor 与 WebGames 门禁结论
+# 退出语义与设计依据: 退出码: 0=全项审查通过, 1=存在审查违规 | 设计依据: AGENTS.md 工作区全局治理总规
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   bash scripts/sh/audit-all.sh
+#   bash scripts/sh/audit-all.sh --fast
+#   bash scripts/sh/audit-all.sh --json
+# ==============================================================================
 set -uo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)

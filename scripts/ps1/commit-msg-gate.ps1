@@ -1,19 +1,22 @@
-# <#
-# .SYNOPSIS
-#   commit-msg-gate.ps1 — 生产工程级 Git 提交信息格式与结构化内容门禁 (PowerShell 同构实现)
-# .DESCRIPTION
-#   职能域：gate
-#   触发方：.githooks/commit-msg 或 本地 CLI 手动触发
-#   退出码：0=通过；1=门禁阻断
-# #>
-
+# ==============================================================================
+# 模块归属: 工程效能与统一质量治理 (Tooling · Git 提交信息门禁)
+# 文件路径: scripts/ps1/commit-msg-gate.ps1
+# 架构定位: Git commit-msg 钩子门禁验证器 (Windows PowerShell)
+# 依赖与触发: 触发方: .githooks/commit-msg / 本地 CLI / CI 门禁 | 上游: git commit | 下游: 提交历史 | 运行时: PowerShell 7+
+# 职责说明: 校验 Git 提交信息的 Conventional 格式、结构化正文区块、字数底线与规则 ID 反虚构
+# 退出语义与设计依据: 退出码: 0=提交信息合规, 1=信息格式违规阻断 | 设计依据: AGENTS.md 生产工程级提交规范
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   pwsh -File scripts/ps1/commit-msg-gate.ps1 .git/COMMIT_EDITMSG
+# ==============================================================================
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
     [string]$MsgFile
 )
+Set-StrictMode -Version Latest
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path $MsgFile -PathType Leaf)) {
     Write-Host "❌ [FAIL] 提交信息文件不存在: $MsgFile" -ForegroundColor Red

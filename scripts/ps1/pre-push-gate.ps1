@@ -1,16 +1,19 @@
-# <#
-# .SYNOPSIS
-#   pre-push-gate.ps1 — 本地 Git 推送前置全量回归与质量门禁 (PowerShell 同构实现)
-# .DESCRIPTION
-#   职能域：gate
-#   触发方：.githooks/pre-push 或 本地 CLI 手动触发
-#   退出码：0=通过；1=门禁阻断
-# #>
-
+# ==============================================================================
+# 模块归属: 工程效能与统一质量治理 (Tooling · 本地推送前置门禁)
+# 文件路径: scripts/ps1/pre-push-gate.ps1
+# 架构定位: 本地 Git 推送前置全量回归与质量门禁 (Windows PowerShell)
+# 依赖与触发: 触发方: .githooks/pre-push / 本地 CLI 手动触发 | 上游: git push | 下游: 远程主干分支 | 运行时: PowerShell 7+
+# 职责说明: 执行 8 重全量回归门禁（零空文件、规则目录、auto-refactor 全套、十维自审、timing 测试与审查、账本边界、WebGames 配置）
+# 退出语义与设计依据: 退出码: 0=通过门禁, 1=存在未通过项阻断推送 | 设计依据: AGENTS.md 工作区治理总规
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   pwsh -File scripts/ps1/pre-push-gate.ps1
+# ==============================================================================
 [CmdletBinding()]
 param()
+Set-StrictMode -Version Latest
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "🚀 执行本地 Pre-Push 远程推送前置全量质量与回归门禁 (PowerShell 版)" -ForegroundColor Cyan

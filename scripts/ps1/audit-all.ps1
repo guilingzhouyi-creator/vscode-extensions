@@ -1,21 +1,24 @@
-# <#
-# .SYNOPSIS
-#   audit-all.ps1 — 全工作区统一审查与质量治理中枢 (Unified Workspace Review Orchestrator，PowerShell 版)
-# .DESCRIPTION
-#   职能域：audit / review
-#   适用范围：workspace-timing, auto-refactor, WebGames 三项目全域
-#   用法：
-#     pwsh -File scripts/ps1/audit-all.ps1 [-Fast] [-Json]
-#   退出码：0=全部通过；1=存在审查未通过项
-# #>
-
+# ==============================================================================
+# 模块归属: 工程效能与统一质量治理 (Tooling · 全工作区跨项目审查中枢)
+# 文件路径: scripts/ps1/audit-all.ps1
+# 架构定位: 全工作区跨项目统一审查 Runner (Windows PowerShell)
+# 依赖与触发: 触发方: 本地 CLI / CI 门禁 | 上游: 三项目专属门禁套件 | 下游: 统一质量看板 | 运行时: PowerShell 7+
+# 职责说明: 调度执行全工作区跨项目质量审查，聚合 workspace-timing、auto-refactor 与 WebGames 门禁结论
+# 退出语义与设计依据: 退出码: 0=全项审查通过, 1=存在审查违规 | 设计依据: AGENTS.md 工作区全局治理总规
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   pwsh -File scripts/ps1/audit-all.ps1
+#   pwsh -File scripts/ps1/audit-all.ps1 -Fast
+#   pwsh -File scripts/ps1/audit-all.ps1 -Json
+# ==============================================================================
 [CmdletBinding()]
 param(
     [switch]$Fast,
     [switch]$Json
 )
+Set-StrictMode -Version Latest
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }

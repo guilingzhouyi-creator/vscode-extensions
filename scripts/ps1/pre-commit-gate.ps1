@@ -1,16 +1,19 @@
-# <#
-# .SYNOPSIS
-#   pre-commit-gate.ps1 — 本地 Git 提交前置物理卫生与质量安全门禁 (8 重防御，PowerShell 同构实现)
-# .DESCRIPTION
-#   职能域：gate
-#   触发方：.githooks/pre-commit 或 本地 CLI 手动触发
-#   退出码：0=通过；1=门禁阻断
-# #>
-
+# ==============================================================================
+# 模块归属: 工程效能与统一质量治理 (Tooling · 本地提交前置门禁)
+# 文件路径: scripts/ps1/pre-commit-gate.ps1
+# 架构定位: 本地 Git 提交前置物理卫生与质量安全门禁 (Windows PowerShell)
+# 依赖与触发: 触发方: .githooks/pre-commit / 本地 CLI 手动触发 | 上游: git commit | 下游: 提交暂存区 | 运行时: PowerShell 7+
+# 职责说明: 执行 9 重纵深防御链（换行契约、BOM、物理空文件、尾随空白、敏感词、AST 局部切片等）
+# 退出语义与设计依据: 退出码: 0=通过门禁, 1=存在卫生或质量违规阻断 | 设计依据: AGENTS.md 跨项目全局通用契约
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   pwsh -File scripts/ps1/pre-commit-gate.ps1
+# ==============================================================================
 [CmdletBinding()]
 param()
+Set-StrictMode -Version Latest
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (9 重纵深防御，PowerShell 版)" -ForegroundColor Cyan

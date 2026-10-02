@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# =============================================================================
-# commit-msg-gate.sh — 生产工程级 Git 提交信息格式与结构化内容门禁
-# -----------------------------------------------------------------------------
-# 职能域：gate
-# 触发方：.githooks/commit-msg 或 本地 CLI 手动触发
-# 用法：
+# ==============================================================================
+# 模块归属: 工程效能与统一质量治理 (Tooling · Git 提交信息门禁)
+# 文件路径: scripts/sh/commit-msg-gate.sh
+# 架构定位: Git commit-msg 钩子门禁验证器 (Linux Bash)
+# 依赖与触发: 触发方: .githooks/commit-msg / 本地 CLI / CI 门禁 | 上游: git commit | 下游: 提交历史 | 运行时: Bash 4+
+# 职责说明: 校验 Git 提交信息的 Conventional 格式、结构化正文区块、字数底线与规则 ID 反虚构
+# 退出语义与设计依据: 退出码: 0=提交信息合规, 1=信息格式违规阻断 | 设计依据: AGENTS.md 生产工程级提交规范
+# ------------------------------------------------------------------------------
+# 用法示例:
 #   bash scripts/sh/commit-msg-gate.sh <commit-msg-file>
-# 依赖：bash, grep, wc
-# 退出码：0=通过；1=门禁阻断
-# =============================================================================
+# ==============================================================================
 set -uo pipefail
 
 MSG_FILE="${1:?用法错误: 请传入 commit-msg 文件路径}"
@@ -17,6 +18,8 @@ if [[ ! -f "$MSG_FILE" ]]; then
     echo "❌ [FAIL] 提交信息文件不存在: $MSG_FILE"
     exit 1
 fi
+
+NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 
 echo "================================================================="
 echo "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁"
@@ -160,7 +163,7 @@ if echo "$BODY_TEXT" | grep -iE "\b(phase[0-9]+|st[0-9]+|p[0-9]+)\b" >/dev/null 
 fi
 
 # --- Rule 7: 规则 ID 单源目录防虚构校验 ---
-if ! node scripts/common/validate-commit-msg-rules.js "$MSG_FILE"; then
+if ! "$NODE_BIN" scripts/common/validate-commit-msg-rules.js "$MSG_FILE"; then
     print_template_guide
     exit 1
 fi
