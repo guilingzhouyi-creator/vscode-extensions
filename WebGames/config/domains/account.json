@@ -64,7 +64,18 @@
       "is_permadeath_mode": false,
       "is_fallen": false,
       "last_saved_time_utc": 0,
-      "save_file_sha256": ""
+      "save_file_sha256": "",
+      "prologue_completed": false,
+      "world_slot_status": "OCCUPIED",
+      "world_id": "WORLD_DEFAULT_SP_01"
+    },
+    "multi_world": {
+      "default_world_id": "WORLD_DEFAULT_SP_01",
+      "placeholder_world_ids": [
+        "WORLD_RESERVED_SP_02",
+        "WORLD_RESERVED_SP_03"
+      ],
+      "max_worlds": 3
     }
   },
   "entitlements": {

@@ -67,7 +67,8 @@ const CROSS_CUTTING_SUITES: Array[String] = [
 	"res://tests/integration/pipelines/test_game_loop_fsm_pipeline.gd",
 	"res://tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd",
 	"res://tests/integration/pipelines/test_session_lifecycle_and_hud_sync_pipeline.gd",
-	"res://tests/integration/pipelines/test_version_governance_pipeline.gd"
+	"res://tests/integration/pipelines/test_version_governance_pipeline.gd",
+	"res://tests/integration/pipelines/test_save_secondary_load_and_dual_stream_pipeline.gd"
 ]
 
 ## 唯一允许出现全局随机字面调用的实现文件（内部为配置驱动的 LCG）

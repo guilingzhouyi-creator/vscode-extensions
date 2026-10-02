@@ -100,12 +100,14 @@ const TestResourceLifecycleGovernance = preload("res://tests/unit/infrastructure
 const TestBoundedCacheAndIdempotency = preload("res://tests/unit/infrastructure/test_bounded_cache_and_idempotency.gd")
 const TestBackendRobustnessGuard = preload("res://tests/guards/test_backend_robustness_guard.gd")
 const TestUnifiedLoggerService = preload("res://tests/unit/infrastructure/test_unified_logger_service.gd")
-# Phase 72: 新一代EventBus 2.0空间分发与零GC流水线
+# EventBus 2.0 空间分发与零GC流水线
 const TestEventBus2ZeroGCPipeline = preload("res://tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd")
-# Phase 71: 用户会话生命周期与主页HUD双轨同步流水线
+# 用户会话生命周期与主页HUD双轨同步流水线
 const TestSessionLifecycleAndHudSyncPipeline = preload("res://tests/integration/pipelines/test_session_lifecycle_and_hud_sync_pipeline.gd")
-# Phase 74: 灰度发布版本编排与底层动态更新流水线
+# 灰度发布版本编排与底层动态更新流水线
 const TestVersionGovernancePipeline = preload("res://tests/integration/pipelines/test_version_governance_pipeline.gd")
+# 存档二次载入与复合鉴权双轨分流全链路流水线
+const TestSaveSecondaryLoadAndDualStreamPipeline = preload("res://tests/integration/pipelines/test_save_secondary_load_and_dual_stream_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -162,11 +164,11 @@ static func get_all_test_classes() -> Array:
 		TestRuleScopeDomain,
 		TestFlowOrchestrationDomain,
 		TestDynamicEconomyDomain,
-		# Phase 41: 统一魔法规则模型与行动卡机制（新增 magic_system 域）
+		# 统一魔法规则模型与行动卡机制（新增 magic_system 域）
 		TestMagicRuleSystemDomain,
-		# Phase 47: 登录后世界入口模式隔离与状态架构完善
+		# 登录后世界入口模式隔离与状态架构完善
 		TestWorldGatewayAndModeIsolation,
-		# Phase 45~50 专属流水线套件（评审收敛 B1 补登记；TestContractRegistryFactory 为
+		# 业务流水线套件（评审收敛补登记；TestContractRegistryFactory 为
 		# 数据工厂非套件，由 TestContractRegistryPipeline 注入消费，不单独登记）
 		TestCombatTertiaryTimelinePipeline, TestItemAttributeAffixSystemPipeline,
 		TestCharacterCreationAndOpeningPipeline, TestPrologueCoreAndPlaceholderPipeline,
@@ -180,10 +182,11 @@ static func get_all_test_classes() -> Array:
 		TestResourceLifecycleGovernance, TestBoundedCacheAndIdempotency, TestBackendRobustnessGuard, TestUnifiedLoggerService,
 		TestEventBus2ZeroGCPipeline,
 		TestSessionLifecycleAndHudSyncPipeline,
-		TestVersionGovernancePipeline
+		TestVersionGovernancePipeline,
+		TestSaveSecondaryLoadAndDualStreamPipeline
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 86 后端与横切 + 23 前端 = 109 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 87 后端与横切 + 23 前端 = 110 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -197,7 +200,7 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 109 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 110 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())

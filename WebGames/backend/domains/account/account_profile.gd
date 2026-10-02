@@ -10,6 +10,9 @@
 class_name AccountProfileAggregate extends RefCounted
 
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
+const WORLD_DEFAULT_SP_01: String = "WORLD_DEFAULT_SP_01"
+const UNBOUND_WORLD_SLOT: String = "UNBOUND_WORLD_SLOT"
+const RESERVED_PLACEHOLDER: String = "RESERVED_PLACEHOLDER"
 
 # ==============================================================================
 # 一、账户身份与设备绑定
@@ -33,6 +36,10 @@ var is_guest_mode: bool = false
 # 多角色存档插槽映射 (slot_id -> SaveSlotSummaryDTO)
 var save_slot_summaries: Dictionary = {}
 var active_slot_id: String = ""
+# 多世界存档插槽映射与占位符元数据 (world_id -> slot_id)
+var world_slots: Dictionary = {
+	WORLD_DEFAULT_SP_01: "SLOT_01"
+}
 
 # ==============================================================================
 # 三、权限与传承状态
@@ -91,6 +98,32 @@ func is_slot_occupied(slot_id: String) -> bool:
 		return false
 	return save_slot_summaries.has(slot_id)
 
+## 获取全量世界槽位状态
+func get_world_slots(deep_copy: bool = true) -> Dictionary:
+	if world_slots.is_empty():
+		return {}
+	return world_slots.duplicate(deep_copy)
+
+## 获取当前活跃世界槽位
+func get_active_world_slot() -> String:
+	if not world_state_ref.is_empty():
+		return world_state_ref
+	return GameConfig.get_string("domains.world_gateway", "single_player/default_world_id", WORLD_DEFAULT_SP_01)
+
+## 检查目标世界槽位是否为占位符/未决状态
+func is_world_slot_placeholder(world_id: String) -> bool:
+	if world_id.is_empty() or not world_slots.has(world_id):
+		return true
+	var val = str(world_slots.get(world_id, ""))
+	return val == RESERVED_PLACEHOLDER or val == UNBOUND_WORLD_SLOT
+
+## 绑定世界槽位
+func bind_world_slot(world_id: String, slot_id: String) -> bool:
+	if world_id.is_empty() or slot_id.is_empty():
+		return false
+	world_slots[world_id] = slot_id
+	return true
+
 ## 序列化账户聚合为字典（含槽位摘要序列化与权限密封 entitlements_seal）
 func serialize() -> Dictionary:
 	var slots_dict := {}
@@ -115,7 +148,8 @@ func serialize() -> Dictionary:
 		"unlocked_heritage_traits": unlocked_heritage_traits,
 		"entitlements": entitlements.duplicate(),
 		"entitlements_seal": EntitlementService.seal_entitlements(self),
-		"world_state_ref": world_state_ref
+		"world_state_ref": world_state_ref,
+		"world_slots": world_slots.duplicate()
 	}
 
 ## 从字典反序列化账户聚合：权限密封校验失败回退空集 + 白名单过滤（fail-safe，防存档自造权限）
@@ -142,6 +176,14 @@ static func deserialize(d: Dictionary) -> AccountProfileAggregate:
 	# 白名单过滤：allowed 非空时拒绝未列出资格（防存档自造权限；空列表=放行全部）
 	acc.entitlements.assign(EntitlementService.filter_allowed(acc.entitlements))
 	acc.world_state_ref = d.get("world_state_ref", "")
+
+	var raw_world_slots: Variant = d.get("world_slots", {})
+	if raw_world_slots is Dictionary and not (raw_world_slots as Dictionary).is_empty():
+		acc.world_slots = (raw_world_slots as Dictionary).duplicate()
+	else:
+		acc.world_slots = {
+			WORLD_DEFAULT_SP_01: "SLOT_01"
+		}
 
 	var raw_slots = d.get("save_slot_summaries", {})
 	for k in raw_slots:

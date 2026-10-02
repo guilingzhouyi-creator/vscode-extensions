@@ -10,6 +10,7 @@
 class_name AuthService extends RefCounted
 
 const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
+const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
 const HudEventContract = preload("res://backend/domains/world_state/hud_event_contract.gd")
 
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
@@ -123,7 +124,8 @@ static func register_hook(stage_key: String, callback: Callable) -> void:
 
 ## 清空已注册的鉴权自定义扩展 Hook
 static func clear_hooks() -> void:
-	_auth_hooks.clear()
+	if not _auth_hooks.is_empty():
+		_auth_hooks.clear()
 
 static func _dispatch_auth_hooks(stage_key: String, payload: Dictionary) -> void:
 	var hooks_list: Array = _auth_hooks.get(stage_key, [])
@@ -212,6 +214,56 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 	var code_inv := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
 	return {"success": false, "code": code_inv, "token": ""}
 
+## 复合鉴权接口：支持自动注册/纯登录/纯注册三模流转
+static func composite_authenticate(request: AccountCompositeAuthDTO.Request, account_store: Dictionary = {}) -> AccountCompositeAuthDTO.Response:
+	var resp := AccountCompositeAuthDTO.Response.new()
+	if request == null or request.username.is_empty() or request.password_plain.is_empty():
+		resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
+		return resp
+
+	var target_account: AccountProfileAggregate = null
+	for acc_id in account_store.keys():
+		var existing: AccountProfileAggregate = account_store[acc_id]
+		if existing != null and existing.username.to_lower() == request.username.to_lower():
+			target_account = existing
+			break
+
+	if target_account == null:
+		if request.action_mode == AccountCompositeAuthDTO.MODE_LOGIN_ONLY:
+			resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_not_found", "ERR_ACCOUNT_NOT_FOUND")
+			return resp
+		var reg_req := AccountRegistrationDTO.Request.new()
+		reg_req.username = request.username
+		reg_req.password_plain = request.password_plain
+		reg_req.device_fingerprint = request.device_fingerprint
+		reg_req.initial_entitlements = request.initial_entitlements
+		var reg_resp := register_account(reg_req, account_store)
+		if not reg_resp.success:
+			resp.error_code = reg_resp.error_code
+			return resp
+		target_account = account_store.get(reg_resp.account_id, null)
+		resp.is_new_registration = true
+
+	if request.action_mode == AccountCompositeAuthDTO.MODE_REGISTER_ONLY and not resp.is_new_registration:
+		resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_already_exists", "ERR_ACCOUNT_ALREADY_EXISTS")
+		return resp
+
+	var auth_res := authenticate_local(target_account.username, request.password_plain, target_account, request.device_fingerprint)
+	if not bool(auth_res.get("success", false)):
+		resp.error_code = String(auth_res.get("code", "ERR_AUTH_FAILED"))
+		return resp
+
+	resp.success = true
+	resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK")
+	resp.account_id = target_account.account_id
+	resp.username = target_account.username
+	resp.session_token = String(auth_res.get("token", ""))
+	resp.created_timestamp_utc = target_account.created_timestamp_utc
+	resp.last_login_timestamp_utc = target_account.last_login_timestamp_utc
+	resp.world_state_ref = target_account.world_state_ref
+	resp.save_slot_summaries = target_account.save_slot_summaries.duplicate()
+	return resp
+
 # ==============================================================================
 # 三、会话校验 / 撤销 / 设备绑定
 # ==============================================================================
@@ -266,7 +318,8 @@ static func revoke_token(token: String) -> bool:
 
 ## 清空全部会话（登出/重置场景）
 static func clear_sessions() -> void:
-	_sessions.clear()
+	if not _sessions.is_empty():
+		_sessions.clear()
 
 ## 绑定设备指纹（单机隔离强校验，后续鉴权强校验匹配）
 static func bind_device_fingerprint(account: AccountProfileAggregate, fingerprint: String) -> Dictionary:

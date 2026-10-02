@@ -24,6 +24,9 @@ var is_permadeath_mode: bool = GameConfig.get_bool("domains.account", "save_slot
 var is_fallen: bool = GameConfig.get_bool("domains.account", "save_slot/defaults/is_fallen", false)
 var last_saved_time_utc: int = GameConfig.get_int("domains.account", "save_slot/defaults/last_saved_time_utc", 0)
 var save_file_sha256: String = GameConfig.get_string("domains.account", "save_slot/defaults/save_file_sha256", "")
+var prologue_completed: bool = GameConfig.get_bool("domains.account", "save_slot/defaults/prologue_completed", false)
+var world_slot_status: String = GameConfig.get_string("domains.account", "save_slot/defaults/world_slot_status", "OCCUPIED")
+var world_id: String = GameConfig.get_string("domains.account", "save_slot/defaults/world_id", "WORLD_DEFAULT_SP_01")
 
 # 角色本体档案（角色生命周期隔离域：与账号/世界数据严格分离，死亡按白名单精确清理）
 var character_profile: CharacterProfile = null
@@ -59,6 +62,9 @@ func serialize() -> Dictionary:
 		"is_fallen": is_fallen,
 		"last_saved_time_utc": last_saved_time_utc,
 		"save_file_sha256": save_file_sha256,
+		"prologue_completed": prologue_completed,
+		"world_slot_status": world_slot_status,
+		"world_id": world_id,
 		"character_profile": character_profile.serialize() if character_profile != null else {}
 	}
 
@@ -76,7 +82,29 @@ static func deserialize(d: Dictionary) -> SaveSlotSummaryDTO:
 	dto.is_fallen = d.get("is_fallen", dto.is_fallen)
 	dto.last_saved_time_utc = d.get("last_saved_time_utc", dto.last_saved_time_utc)
 	dto.save_file_sha256 = d.get("save_file_sha256", dto.save_file_sha256)
+	dto.prologue_completed = bool(d.get("prologue_completed", dto.prologue_completed))
+	dto.world_slot_status = String(d.get("world_slot_status", dto.world_slot_status))
+	dto.world_id = String(d.get("world_id", dto.world_id))
 	var raw_profile: Variant = d.get("character_profile", {})
 	if raw_profile is Dictionary and not (raw_profile as Dictionary).is_empty():
 		dto.character_profile = CharacterProfile.deserialize(raw_profile as Dictionary)
 	return dto
+
+## 对象池生命周期重置
+func reset_state() -> void:
+	slot_id = GameConfig.get_string("domains.account", "save_slot/defaults/slot_id", "SLOT_01")
+	character_name = GameConfig.get_string("domains.account", "save_slot/defaults/character_name", "Nameless Wanderer")
+	title_prefix = GameConfig.get_string("domains.account", "save_slot/defaults/title_prefix", "Apprentice Adventurer")
+	profession_tier_name = GameConfig.get_string("domains.account", "save_slot/defaults/profession_tier_name", "Novice Walker Tier 1")
+	apparent_age = GameConfig.get_int("domains.account", "save_slot/defaults/apparent_age", 20)
+	current_location_name = GameConfig.get_string("domains.account", "save_slot/defaults/current_location_name", "中洲·卡拉尔圣城")
+	play_time_seconds = GameConfig.get_int("domains.account", "save_slot/defaults/play_time_seconds", 0)
+	is_permadeath_mode = GameConfig.get_bool("domains.account", "save_slot/defaults/is_permadeath_mode", false)
+	is_fallen = GameConfig.get_bool("domains.account", "save_slot/defaults/is_fallen", false)
+	last_saved_time_utc = GameConfig.get_int("domains.account", "save_slot/defaults/last_saved_time_utc", 0)
+	save_file_sha256 = GameConfig.get_string("domains.account", "save_slot/defaults/save_file_sha256", "")
+	prologue_completed = GameConfig.get_bool("domains.account", "save_slot/defaults/prologue_completed", false)
+	world_slot_status = GameConfig.get_string("domains.account", "save_slot/defaults/world_slot_status", "OCCUPIED")
+	world_id = GameConfig.get_string("domains.account", "save_slot/defaults/world_id", "WORLD_DEFAULT_SP_01")
+	character_profile = null
+
