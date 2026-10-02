@@ -20,11 +20,13 @@ const {
   scoreFileQuality,
   aggregateProjectScore,
   extractDomainName,
+  TrajectoryAccumulator,
 } = require('../dist/api');
 
 const ROOT = path.join(__dirname, '..');
 const REPORTS_DIR = path.join(ROOT, 'reports');
 const BASELINE_OUTPUT = path.join(REPORTS_DIR, 'self-audit-baseline.json');
+const TRAJECTORY_DIR = path.join(ROOT, '.refactor-trajectory');
 
 const CRITICAL_RULE_RE = /^(?:ARCH-|clean-layer-violation$|expensive-loop-operation$)/;
 const HIGH_RULE_RE = /^(?:high-complexity$|CPX-|PRF-|DAT-|TST-TAU|GOV-GAM)/;
@@ -147,43 +149,93 @@ function computeTopHotspots(fileScores) {
 }
 
 /**
- * Run comprehensive self-audit over auto-refactor repository.
- *
- * @param options - Optional overrides for audit run.
- * @returns Complete self-audit baseline report.
+ * Collects scanned file contents for AST block fingerprinting and ELOC evaluation.
  */
-async function runSelfAudit(options = {}) {
-  const startTime = Date.now();
-  fs.mkdirSync(REPORTS_DIR, { recursive: true });
+function collectScannedFiles(fileMetrics) {
+  const scannedFilesList = [];
+  if (!fileMetrics || !Array.isArray(fileMetrics)) {
+    return scannedFilesList;
+  }
+  for (const fm of fileMetrics) {
+    const filePath = fm.file || fm.filePath;
+    if (!filePath) {
+      continue;
+    }
+    const absPath = path.isAbsolute(filePath) ? filePath : path.join(ROOT, filePath);
+    try {
+      if (fs.existsSync(absPath)) {
+        scannedFilesList.push({
+          filePath,
+          content: fs.readFileSync(absPath, 'utf8'),
+        });
+      }
+    } catch (e) {
+      void e;
+    }
+  }
+  return scannedFilesList;
+}
 
-  // 1. Create Immutable Audit Snapshot (E, R, C, L, S)
-  const snapshot = createAuditSnapshot();
+/**
+ * Records an audit run into the persistent trajectory accumulator ledger.
+ */
+async function recordRunToTrajectory(
+  snapshot,
+  projectScore,
+  debtByTier,
+  scannedFilesList,
+  startTime,
+) {
+  const trajectoryAccumulator = new TrajectoryAccumulator(TRAJECTORY_DIR);
+  const p = projectScore.eightPillars.pillars;
+  const scoreVector = [
+    p.architecture || 100,
+    p.maintainability || 100,
+    p.performance || 100,
+    p.data || 100,
+    p.testing || 100,
+    p.security || 100,
+    p.governance || 100,
+    p.evolution || 100,
+    100,
+    100,
+  ];
 
-  // 2. Execute Full Production Scan over Engine Sources
-  const scanReport = await scan({
-    root: ROOT,
-    include: ['src/**/*.ts', 'scripts/*.js'],
-    autoTune: false,
-    logLevel: 'warn',
-    ...options.scanOptions,
+  return trajectoryAccumulator.recordAuditRun({
+    runId: `run-${snapshot.snapshotId}`,
+    revision: snapshot.rulesDigest.slice(0, 8),
+    module: 'auto-refactor-engine',
+    agent: 'self-audit-engine',
+    timestamp: startTime,
+    scannedFiles: scannedFilesList,
+    beforeScore: projectScore.compositeScore,
+    afterScore: projectScore.compositeScore,
+    scoreVector,
+    addedDebtPoints: debtByTier.critical * 10 + debtByTier.high * 3 + debtByTier.medium,
+    resolvedDebtPoints: 0,
+    regressionFindingsCount: 0,
   });
+}
 
-  const durationMs = Date.now() - startTime;
-  const issues = scanReport.issues || [];
-  const filesScanned = scanReport.summary.filesScanned || 0;
+/**
+ * Builds the final self-audit baseline report object.
+ */
+function buildBaselineReport(params) {
+  const {
+    snapshot,
+    projectScore,
+    filesScanned,
+    durationMs,
+    issues,
+    scanReport,
+    debtByTier,
+    criticalItems,
+    highItems,
+    topHotspots,
+    trajectoryRes,
+  } = params;
 
-  // 3. Classify Technical Debt Ledger
-  const { debtByTier, criticalItems, highItems, fileIssuesMap } = buildDebtLedger(issues);
-
-  // 4. File-Level and Hierarchical Eight-Pillar Scoring
-  const fileScores = computeFileScores(fileIssuesMap);
-  const projectScore = aggregateProjectScore(fileScores);
-
-  // 5. Identify Top Refactoring Hotspots for Self-Refactoring
-  const topHotspots = computeTopHotspots(fileScores);
-
-  // 6. Build Baseline Report Object
-  const baselineReport = {
+  return {
     snapshotId: snapshot.snapshotId,
     timestamp: new Date().toISOString(),
     versions: snapshot.versions,
@@ -224,9 +276,76 @@ async function runSelfAudit(options = {}) {
         moduleCount: d.modules.length,
       })),
     },
+    trajectory: {
+      runEloc: trajectoryRes.runEloc,
+      lifetime: trajectoryRes.lifetimeSummary,
+      isFirstBaseline: trajectoryRes.isFirstBaseline,
+    },
   };
+}
 
-  // 7. Write to reports/self-audit-baseline.json
+/**
+ * Run comprehensive self-audit over auto-refactor repository.
+ *
+ * @param options - Optional overrides for audit run.
+ * @returns Complete self-audit baseline report.
+ */
+async function runSelfAudit(options = {}) {
+  const startTime = Date.now();
+  fs.mkdirSync(REPORTS_DIR, { recursive: true });
+
+  // 1. Create Immutable Audit Snapshot (E, R, C, L, S)
+  const snapshot = createAuditSnapshot();
+
+  // 2. Execute Full Production Scan over Engine Sources
+  const scanReport = await scan({
+    root: ROOT,
+    include: ['src/**/*.ts', 'scripts/*.js'],
+    autoTune: false,
+    logLevel: 'warn',
+    ...options.scanOptions,
+  });
+
+  const durationMs = Date.now() - startTime;
+  const issues = scanReport.issues || [];
+  const filesScanned = scanReport.summary.filesScanned || 0;
+
+  // 3. Classify Technical Debt Ledger
+  const { debtByTier, criticalItems, highItems, fileIssuesMap } = buildDebtLedger(issues);
+
+  // 4. File-Level and Hierarchical Eight-Pillar Scoring
+  const fileScores = computeFileScores(fileIssuesMap);
+  const projectScore = aggregateProjectScore(fileScores);
+
+  // 5. Identify Top Refactoring Hotspots for Self-Refactoring
+  const topHotspots = computeTopHotspots(fileScores);
+
+  // 6. Automatically Record Run into Trajectory Accumulator
+  const scannedFilesList = collectScannedFiles(scanReport.fileMetrics);
+  const trajectoryRes = await recordRunToTrajectory(
+    snapshot,
+    projectScore,
+    debtByTier,
+    scannedFilesList,
+    startTime,
+  );
+
+  // 7. Build Baseline Report Object
+  const baselineReport = buildBaselineReport({
+    snapshot,
+    projectScore,
+    filesScanned,
+    durationMs,
+    issues,
+    scanReport,
+    debtByTier,
+    criticalItems,
+    highItems,
+    topHotspots,
+    trajectoryRes,
+  });
+
+  // 8. Write to reports/self-audit-baseline.json
   fs.writeFileSync(BASELINE_OUTPUT, JSON.stringify(baselineReport, null, 2), 'utf8');
 
   return baselineReport;
@@ -277,6 +396,16 @@ function printTerminalDashboard(report) {
       `  ${idx + 1}. ${h.filePath} (${h.totalIssues} issues, ` +
         `critical=${h.criticalCount}, high=${h.highCount}, score=${h.compositeScore})`,
     );
+  }
+
+  if (report.trajectory && report.trajectory.lifetime) {
+    const lt = report.trajectory.lifetime;
+    console.log('\n--- [Cumulative ELOC & Long-Term Trajectory Ledger] ---');
+    console.log(`  Run Processed ELOC    : ${report.trajectory.runEloc.processed.toLocaleString()} lines`);
+    console.log(`  Lifetime Total Runs   : ${lt.totalRuns}`);
+    console.log(`  Lifetime Processed    : ${lt.eloc.processedTotal.toLocaleString()} lines (Additive Accumulation)`);
+    console.log(`  Lifetime Unique (AST) : ${lt.eloc.uniqueTotal.toLocaleString()} lines (Deduplicated Coverage)`);
+    console.log(`  Lifetime Gate Pass %  : ${lt.gatePassRate.toFixed(1)}%`);
   }
 
   console.log('\n================================================================');
