@@ -196,11 +196,11 @@ jobs:
       - name: version-bump.sh fixture self-test
         run: |
           set -euo pipefail
-          FIX=$(mktemp -d)
+          export FIX=$(mktemp -d)
           trap 'rm -rf "$FIX"' EXIT
-          FIX_DIR="$FIX" node -e '
+          node -e '
             const fs = require("fs");
-            const d = process.env.FIX_DIR;
+            const d = process.env.FIX;
             fs.mkdirSync(d + "/demo-ext", { recursive: true });
             fs.writeFileSync(d + "/demo-ext/package.json",
               JSON.stringify({ name: "demo-ext", version: "1.2.3", engines: { vscode: "^1.85.0" } }, null, 4));
@@ -219,12 +219,13 @@ jobs:
             echo "::error::版本回退未被拦截"; exit 1
           fi
           # ③ 非法模式 → exit 2
-          bash scripts/sh/version-bump.sh demo-ext banana --root "$FIX" >/dev/null 2>&1
-          if [[ $? -ne 2 ]]; then echo "::error::非法模式应 exit 2"; exit 1; fi
+          STATUS=0
+          bash scripts/sh/version-bump.sh demo-ext banana --root "$FIX" >/dev/null 2>&1 || STATUS=$?
+          if [[ $STATUS -ne 2 ]]; then echo "::error::非法模式应 exit 2 (got $STATUS)"; exit 1; fi
           # ④ 非扩展目录拒绝
-          FIX_DIR="$FIX" node -e '
+          node -e '
             const fs = require("fs");
-            const d = process.env.FIX_DIR;
+            const d = process.env.FIX;
             fs.mkdirSync(d + "/not-ext", { recursive: true });
             fs.writeFileSync(d + "/not-ext/package.json",
               JSON.stringify({ name: "not-ext", version: "0.1.0" }));
@@ -237,7 +238,7 @@ jobs:
       - name: release-tag.sh fixture self-test (dry-run gates)
         run: |
           set -euo pipefail
-          FIX=$(mktemp -d)
+          export FIX=$(mktemp -d)
           trap 'rm -rf "$FIX"' EXIT
           mkdir -p "$FIX/scripts/sh" "$FIX/demo-ext"
           cp scripts/sh/release-tag.sh scripts/sh/version-bump.sh scripts/sh/check-display-assets.sh "$FIX/scripts/sh/"
@@ -271,8 +272,7 @@ jobs:
           echo "dirty" > dirty.txt
           bash scripts/sh/release-tag.sh demo-ext patch --message "v1.2.4 — Test | Test" --dry-run >/dev/null 2>&1 && { echo "::error::脏树门禁未拦截"; exit 1; }
           # ⑦ 无 CHANGELOG → exit 1
-          git rm -q dirty.txt
-          git commit -qm "clean" >/dev/null
+          rm -f dirty.txt
           mkdir -p no-cl
           FIX_DIR="$PWD" node -e '
             const fs = require("fs");
