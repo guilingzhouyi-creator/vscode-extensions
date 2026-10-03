@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-02T09:28:43.923Z",
+  "generatedAt": "2026-10-03T06:10:26.002Z",
   "totalRules": 336,
   "counts": {
     "autoRefactor": 262,
@@ -1056,7 +1056,7 @@
       "project": "WebGames",
       "family": "GOV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/路线图/01_短期施工区/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/阶段3_审查系统能力内化与全域通用规则演进.md)"
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md)"
     },
     {
       "id": "GOV-LOG-001",
@@ -1602,7 +1602,7 @@
       "project": "WebGames",
       "family": "PRF",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/路线图/01_短期施工区/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/阶段3_审查系统能力内化与全域通用规则演进.md)"
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md)"
     },
     {
       "id": "PRF-IO-001",
@@ -1819,7 +1819,7 @@
       "project": "WebGames",
       "family": "RES",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/路线图/01_短期施工区/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/阶段3_审查系统能力内化与全域通用规则演进.md)"
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md)"
     },
     {
       "id": "RES-TOPO-NAMING-DEPTH",

@@ -13,7 +13,7 @@
 ## 二、 跨项目全局通用契约
 
 ### 1. 命名与代码排版
-- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 生产工程级结构化正文（必须包含 [Why]/[Added]/[Changed]/[Fixed]/[Verification] 结构化区块，非轻量提交正文有效字数 $\ge 30$ 字符，受 `commit-msg-gate` 本地与 CI 强阻断）；
+- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 生产工程级结构化正文（必须包含 [Why]/[Added]/[Changed]/[Fixed]/[Verification] 结构化区块，非轻量提交正文有效字数 $\ge 30$ 字符，受 `commit-msg-gate` 本地与 CI 强阻断）；大型改动必须按架构依赖拓扑严格分批原子提交，每次提交前须先用门禁脚本（`commit-msg-gate` 与 `pre-commit-gate`）执行离线预审；
 - **物理命名**：全局严格 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）；
 - **缩进换行**：TypeScript 4 空格，其余 2 空格；`ps1` 严格 CRLF，`sh`/`gd`/`md`/`json`/`ts` 严格 LF。
 
@@ -22,7 +22,7 @@
 - **平铺控制流**：循环体内涉及多条件派发或单项分类时，必须采用卫语句（Guard Clauses）提前返回，并将处理逻辑提取为独立纯函数，严禁深层多重 `if-else` / `switch` 嵌套。
 
 ### 3. 文档与黑话边界隔离
-- **零黑话铁律**：测试文件、代码符号与路径**严禁包含施工批次与临时性标记**（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 规范名除外）；
+- **零黑话铁律**：测试文件、代码符号、路径与提交信息**严禁包含施工批次与临时性标记**（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 规范名除外；历史归档案卷文件名在 `docs/归档库/` 与 `docs/路线图/` 中受物理豁免，但提交信息中严禁直录该类批次代号，必须提炼为纯粹产品特性与功能价值表述）；
 - **面向用户文档纯粹性**：面向用户的文档（README / CHANGELOG / UI 提示）必须纯粹基于功能特性与产品交付价值撰写，严禁出现内部工程黑话、编译器参数（如 tsconfig 选项）或审查门禁代号（如 L0~L5）；工程细节统一收口至内部真源指针。
 
 ### 4. 执行环境与子进程契约
@@ -43,7 +43,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **`workspace-timing/`**<br/>*(VS Code 扩展)* | ① 五层解耦（UI / Engine / Storage / Analytics / Shared）；<br/>② RingBuffer 内存缓冲 + Journal (NDJSON) 追加崩溃即时回放 + 全量检查点；<br/>③ L0~L5 六层权重审查门禁；<br/>④ `tsconfig.json` 保持 `declaration: false` 与 `isolatedModules: true` 极速构建。 | `npm run compile`<br/>`npm run test:fast`<br/>`npm run review`<br/>`npm run sync` | ① 单元测试放 `tests/unit/*.test.ts`；<br/>② UI 文本 100% 接入双语字典（zh-CN/en），严禁硬编码未翻译文案与内部技术黑话；<br/>③ SVG 图标/文字保持暗色高对比度；<br/>④ 审查规则单一真源登记于 `review-rules.json`。 | `workspace-timing/README.md`<br/>`workspace-timing/package.json` |
 | **`auto-refactor/`**<br/>*(Node CLI 分析引擎)* | ① Layer 1~4 四层规则金字塔（26 分析器，243 规则全自测，零孤儿）；<br/>② 四层正交 ELOC 空间（$\text{ELOC}_{processed}, \text{unique}, \text{changed}, \text{semantic}$）与长期质量轨迹（QED / ReviewYield / RegressionDensity）；<br/>③ $\mathcal{O}(\text{Runs} + \text{Milestones})$ 分层滚动持久化（NDJSON $<350\text{B}$/条，总空间 $\le 2\text{MB}$）；<br/>④ 四要素复合门禁（Static $\land$ Dynamic $\land$ Regression $\land$ QualityDeltaPass）与 Anti-Gaming 防刷分去抖；<br/>⑤ Rust 原生算子内核与 pure-TS shim 100% 字节等价。 | `npm run gate`<br/>`npm run build`<br/>`npm test`<br/>`npm run benchmark` | ① 测试放 `scripts/validate-*.js`，在 `test-parallel.js` 登记防孤儿（138+ 套）；<br/>② 物理文件名受 `validate-physical-naming.js` 看守；<br/>③ 项目中立性受 `validate-project-neutrality.ts` 护栏管束；<br/>④ 单分析器扣分遵 `MAX_AXES_PER_FINDING <= 4`。 | `auto-refactor/DOCS.md`<br/>`auto-refactor/package.json` |
-| **`WebGames/`**<br/>*(Godot 游戏引擎)* | ① 全域配置驱动：统一经 `GameConfig.get_*` 从 `config/<层>/<域>.json` 读取；<br/>② 前端可视化边界：视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池：循环内零瞬态堆分配（`ADV-PRF-002`），池化对象必接 `reset_state()`；<br/>④ 统一继承 `TestCase`（`pack_results` 打包）。 | `test-run.sh`<br/>`check-gdscript.sh`<br/>`bench-sweep.sh`<br/>`audit-all.sh` / `.ps1` | ① `tests/unit/` 根目录散落脚本数恒为 0，按 domains/frontend/infrastructure 归位；<br/>② 改动必须先立四阶段案卷细则，获批后方可编码（案卷严格仅 4 份细则文件）；<br/>③ 严禁直读未登记配置与循环内 `.new()`；<br/>④ 新增领域在 `domains.json` 与 `test_registry.gd` 双向对齐。 | `WebGames/docs/README.md`<br/>`WebGames/config/README.md`<br/>`WebGames/docs/路线图/路线图总索引.md` |
+| **`WebGames/`**<br/>*(Godot 游戏引擎)* | ① 全域配置驱动与同构目录化：统一经 `GameConfig.get_*` 从 `config/domains/<域>/core.json` 及子表读取，严禁根目录平铺配置表；支持点分路径泛化路由与细粒度热重载；<br/>② 前端可视化边界：视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池：循环内零瞬态堆分配（`ADV-PRF-002`），池化对象必接 `reset_state()`；<br/>④ 统一继承 `TestCase`（`pack_results` 打包）。 | `test-run.sh`<br/>`check-gdscript.sh`<br/>`bench-sweep.sh`<br/>`audit-all.sh` / `.ps1` | ① `tests/unit/` 根目录散落脚本数恒为 0，按 domains/frontend/infrastructure 归位；<br/>② 改动必须先立四阶段案卷细则，获批后方可编码（案卷严格仅 4 份细则文件）；<br/>③ 严禁直读未登记配置与循环内 `.new()`；<br/>④ 新增领域在 `domains.json` 与 `test_registry.gd` 双向对齐。 | `WebGames/docs/README.md`<br/>`WebGames/config/README.md`<br/>`WebGames/docs/路线图/路线图总索引.md` |
 
 ## 四、 工作区绝对红线禁令
 
@@ -55,6 +55,7 @@
 6. **审查规则一致性红线**：严禁在检查器代码中发射或在提交信息中书写未在 `scripts/common/rule-catalog.json` / `review-rules.json` 元数据中登记的规则 ID（违者触发 `RCFG-RULE-DRIFT` 门禁熔断）；
 7. **质量度量防刷分红线**：严禁通过大面积搬移常量、调整格式空白或生成空壳桩代码制造表面虚假产出；改动若 $\text{ELOC}_{semantic} \le 15\%$ 且无真实技术债净消除，强制冻结 $\Delta Q$ 收益并触发 `BLOCK_GAMING_DETECTED` 熔断。
 8. **双重门禁与推送合规红线**：严禁使用 `--no-verify` 或任何跳过本地 Tier 1 门禁的手段推送代码；向 `origin/main` 推送后必须确保 GitHub Actions 远端 Tier 2 流水线 100% SUCCESS，任何失败必须同次闭环修复；严禁对未跟踪文件执行 `git rm`。
+9. **原子提交与预审红线**：严禁将涉及多个不同层次架构（如文档索引、底层基础设施、业务领域逻辑与静态重构）的跨域大型改动一次性巨石提交；严禁在未通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审的情况下裸调 `git commit`。
 
 ## 五、 Agent 行为边界与维护规则
 

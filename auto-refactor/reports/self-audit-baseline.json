@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1790933377778",
-  "timestamp": "2026-10-02T09:29:42.347Z",
+  "snapshotId": "snapshot-v0.4.0-1791007894827",
+  "timestamp": "2026-10-03T06:11:39.132Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,24 +13,24 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 560,
-    "durationMs": 3987
+    "durationMs": 3774
   },
   "metrics": {
     "compositeScore": 99.9,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11061,
-    "suppressedIssues": 6232,
+    "totalIssues": 11063,
+    "suppressedIssues": 6234,
     "unsuppressedIssues": 4829,
     "bySeverity": {
       "info": 429,
-      "warning": 10632,
+      "warning": 10634,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 71,
-      "medium": 10262,
+      "medium": 10264,
       "low": 728
     }
   },
@@ -154,7 +154,7 @@
     "summary": {
       "critical": 0,
       "high": 71,
-      "medium": 10262,
+      "medium": 10264,
       "low": 728
     },
     "criticalItems": [],
@@ -1277,7 +1277,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 107020,
+      "processed": 107037,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1291,10 +1291,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1790922053371,
-      "endMs": 1790933377777,
-      "totalRuns": 22,
+      "endMs": 1791007894826,
+      "totalRuns": 24,
       "eloc": {
-        "processedTotal": 2475132,
+        "processedTotal": 2689206,
         "uniqueTotal": 96698,
         "changedTotal": 119162,
         "semanticTotal": 119162
@@ -1305,10 +1305,10 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 343344,
+        "totalAdded": 364298,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -138.72
+        "netYield": -135.47
       },
       "meanCompositeScore": 99.9,
       "gatePassRate": 100
