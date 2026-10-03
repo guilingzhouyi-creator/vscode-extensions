@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791035877949",
-  "timestamp": "2026-10-03T13:58:03.584Z",
+  "snapshotId": "snapshot-v0.4.0-1791039076697",
+  "timestamp": "2026-10-03T14:51:22.260Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,25 +13,25 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 574,
-    "durationMs": 4773
+    "durationMs": 4788
   },
   "metrics": {
     "compositeScore": 99.2,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11795,
+    "totalIssues": 11794,
     "suppressedIssues": 6446,
-    "unsuppressedIssues": 5349,
+    "unsuppressedIssues": 5348,
     "bySeverity": {
       "info": 443,
-      "warning": 11352,
+      "warning": 11351,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 202,
       "medium": 10744,
-      "low": 849
+      "low": 848
     }
   },
   "eightPillars": {
@@ -167,7 +167,7 @@
       "critical": 0,
       "high": 202,
       "medium": 10744,
-      "low": 849
+      "low": 848
     },
     "criticalItems": [],
     "highItems": [
@@ -1304,7 +1304,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 112250,
+      "processed": 112248,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1318,10 +1318,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1790922053371,
-      "endMs": 1791035877948,
-      "totalRuns": 103,
+      "endMs": 1791039076696,
+      "totalRuns": 105,
       "eloc": {
-        "processedTotal": 11343479,
+        "processedTotal": 11567975,
         "uniqueTotal": 96698,
         "changedTotal": 119162,
         "semanticTotal": 119162
@@ -1332,10 +1332,10 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 1238721,
+        "totalAdded": 1261421,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -109.2
+        "netYield": -109.04
       },
       "meanCompositeScore": 99.52,
       "gatePassRate": 100
