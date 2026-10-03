@@ -108,7 +108,7 @@ foreach ($file in $stagedFiles) {
     if (Test-Path $file -PathType Leaf) {
         if ($file.EndsWith(".ts") -or $file.EndsWith(".gd") -or $file.EndsWith(".js")) {
             if ($file -match "dist/|out/|fixtures/|baseline|reports/") { continue }
-            $lineCount = (Get-Content $file).Count
+            $lineCount = @(Get-Content $file).Count
             if ($lineCount -ge $maxLocBudget) {
                 Write-Host "❌ [FAIL] Gate 5: 单文件行数超标 ($lineCount >= $maxLocBudget LOC): $file" -ForegroundColor Red
                 $failed = $true
