@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-03T10:52:37.776Z",
-  "totalRules": 345,
+  "generatedAt": "2026-10-03T12:00:08.866Z",
+  "totalRules": 364,
   "counts": {
-    "autoRefactor": 271,
+    "autoRefactor": 290,
     "workspaceTiming": 45,
     "webGames": 56
   },
@@ -805,6 +805,69 @@
       "family": "PRF",
       "severity": "error",
       "summary": "Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop."
+    },
+    {
+      "id": "GATE-BUDGET-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
+    },
+    {
+      "id": "GATE-ERR-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Gate script lacks strict error termination flags, risking silent failures and false-positive gate passes."
+    },
+    {
+      "id": "GATE-HOOK-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Repository lacks local left-shift Git hooks; all defect feedback relies solely on remote CI."
+    },
+    {
+      "id": "GATE-HYG-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Pre-commit gate does not enforce physical hygiene: lacks zero-byte empty file detection."
+    },
+    {
+      "id": "GATE-ISO-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks."
+    },
+    {
+      "id": "GATE-MSG-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene."
+    },
+    {
+      "id": "GATE-ROUTE-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Git hook router invokes fragile shell or Windows PS 5.1 directly without cross-platform safety fallback."
+    },
+    {
+      "id": "GATE-SSOT-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift."
+    },
+    {
+      "id": "GATE-SYS-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected)."
     },
     {
       "id": "GDM-BAR-001",
@@ -1731,6 +1794,13 @@
       "summary": "Function name does not conform to standard Verb-Noun naming convention."
     },
     {
+      "id": "PS-DOC-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "PowerShell script or function lacks standard documentation comment header."
+    },
+    {
       "id": "PS-ERROR-001",
       "project": "auto-refactor",
       "family": "PS",
@@ -1743,6 +1813,27 @@
       "family": "PS",
       "severity": "error",
       "summary": "Param block lacks [CmdletBinding()] or parameters lack explicit types."
+    },
+    {
+      "id": "PS-SAFE-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "Interactive input cmdlet used without non-interactive terminal guard."
+    },
+    {
+      "id": "PS-SEC-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "Dynamic Invoke-Expression (iex) with variable input risks code injection."
+    },
+    {
+      "id": "PS-TRAP-001",
+      "project": "auto-refactor",
+      "family": "PS",
+      "severity": "error",
+      "summary": "Critical system handle created without try-finally resource disposal."
     },
     {
       "id": "PS-VERB-001",
@@ -2074,6 +2165,13 @@
       "summary": "Using single bracket [ or legacy test syntax in Bash scripts."
     },
     {
+      "id": "SH-DOC-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "Shell script lacks standard module documentation contract header."
+    },
+    {
       "id": "SH-ECHO-001",
       "project": "auto-refactor",
       "family": "SH",
@@ -2081,11 +2179,25 @@
       "summary": "Non-portable echo -e or echo -n flag used."
     },
     {
+      "id": "SH-EOL-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "Shell script contains CRLF line endings; execution fails on POSIX platforms."
+    },
+    {
       "id": "SH-ERR-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "error",
       "summary": "Critical command execution lacks exit code validation."
+    },
+    {
+      "id": "SH-EXIT-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "Command expected to return non-zero exit codes executed bare under set -e."
     },
     {
       "id": "SH-INIT-001",
@@ -2107,6 +2219,27 @@
       "family": "SH",
       "severity": "error",
       "summary": "read command lacks -r flag, allowing backslashes to be mangled."
+    },
+    {
+      "id": "SH-SAFE-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "Interactive read command lacks timeout or TTY detection guard."
+    },
+    {
+      "id": "SH-SEC-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "Dynamic eval execution with variable expansion risks command injection."
+    },
+    {
+      "id": "SH-TRAP-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "Temporary resource created without registering EXIT cleanup trap."
     },
     {
       "id": "SIM-BOOL-001",

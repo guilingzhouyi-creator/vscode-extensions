@@ -103,18 +103,28 @@
 | `nested-constant` | <a id="nested-constant"></a>`constants` | `LEGACY` | `warning` | `all` | 严禁常量化嵌套：禁止冗余常量别名引用、深层嵌套常量对象与作用域内部伪常量。（计划迁移至 `CST-NST-001`） | 将常量直接内联或提升至模块顶层单源声明，消除无意义的间接别名与深层对象嵌套。 |
 | `PS-ALIAS-001` | <a id="ps-alias-001"></a>`shell-lint` | `PS` | `info` | `powershell` | PowerShell 脚本使用了不推荐的命令别名。 | 替换为规范的 Cmdlet 全称。 |
 | `PS-CMDLET-001` | <a id="ps-cmdlet-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 函数命名不符合 Verb-Noun 动名词规范。 | 使用标准审批动词与名词重构函数名。 |
+| `PS-DOC-001` | <a id="ps-doc-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | PowerShell 脚本缺少标准帮助文档注释块（.SYNOPSIS / .DESCRIPTION）。 | 在脚本头部编写标准帮助注释块（<# .SYNOPSIS ... #>）。 |
 | `PS-ERROR-001` | <a id="ps-error-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | PowerShell 中存在空 catch 或未捕获的错误。 | 补充错误捕获处理与告警日志。 |
 | `PS-PARAM-001` | <a id="ps-param-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 参数块缺失 [CmdletBinding()] 或参数未声明强类型。 | 添加 [CmdletBinding()] 并为参数声明类型。 |
+| `PS-SAFE-001` | <a id="ps-safe-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | 非交互式或无终端环境下裸用 Read-Host 阻塞执行。 | 增加交互式宿主守卫（$Host.UI）或改用参数传递输入。 |
+| `PS-SEC-001` | <a id="ps-sec-001"></a>`shell-lint` | `PS` | `error` | `powershell` | 使用 Invoke-Expression (iex) 动态执行不可信变量，存在代码注入隐患。 | 避免使用 Invoke-Expression，改用参数化 Cmdlet 或 call operator (&)。 |
+| `PS-TRAP-001` | <a id="ps-trap-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | 申请受控系统资源（FileStream/Mutex 等）后缺少 try-finally 释放保护。 | 使用 try/finally 块或 Dispose() 确保异常路径下资源可靠释放。 |
 | `PS-VERB-001` | <a id="ps-verb-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 使用了未批准的 PowerShell 动词。 | 改用 Get-Verb 批准的标准动词。 |
 | `secret-detected` | <a id="secret-detected"></a>`secrets` | `LEGACY` | `error` | `all` | 疑似硬编码凭据（按模式识别）。（计划迁移至 `SEC-TOK-001`） | 撤销并轮换该凭据；改为从环境/密钥管理读取。 |
 | `SH-ARRAY-001` | <a id="sh-array-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用 $* 代替了 "$@" 导致单词分割失效。 | 使用 "$@" 保持各个位置参数的独立性。 |
 | `SH-CMD-001` | <a id="sh-cmd-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了已过时的反引号命令替换语法。 | 改用现代标准的 $(...) 命令替换语法。 |
 | `SH-DEPR-001` | <a id="sh-depr-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了单中括号 [ 或旧式废弃测试语法。 | 在 Bash 脚本中改用现代标准的 [[ 测试语法。 |
+| `SH-DOC-001` | <a id="sh-doc-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Shell 脚本头部缺少模块与职责元数据说明注释。 | 在脚本头部添加包含模块、描述与退出语义的规范注释。 |
 | `SH-ECHO-001` | <a id="sh-echo-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了不可移植的 echo -e / echo -n。 | 改用 POSIX 标准统一的 printf 命令。 |
+| `SH-EOL-001` | <a id="sh-eol-001"></a>`shell-lint` | `SH` | `error` | `shell` | Shell 脚本包含 Windows CRLF 换行符，在 Linux 运行期引发语法解析崩溃。 | 严格采用 LF (0x0A) 换行符保存 Shell 脚本。 |
 | `SH-ERR-001` | <a id="sh-err-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 关键命令执行后未进行错误退出码判定。 | 通过 \|\| exit 或 set -e 强化错误退出机制。 |
+| `SH-EXIT-001` | <a id="sh-exit-001"></a>`shell-lint` | `SH` | `warning` | `shell` | set -e 模式下裸调预期可能失败的命令，引发脚本意外熔断。 | 采用 command \|\| status=$? 或 if 判定安全捕获退出码。 |
 | `SH-INIT-001` | <a id="sh-init-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Shell 脚本头部未声明 set -euo pipefail 严格模式。 | 在脚本开头声明 set -euo pipefail 提升鲁棒性。 |
 | `SH-QUOTE-001` | <a id="sh-quote-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 参数展开未加双引号保护存在单词拆分与通配隐患。 | 对变量引用使用 "$var" 进行双引号保护。 |
 | `SH-READ-001` | <a id="sh-read-001"></a>`shell-lint` | `SH` | `info` | `shell` | read 命令未携带 -r 参数导致反斜杠被转义篡改。 | 使用 read -r 读取原始输入文本。 |
+| `SH-SAFE-001` | <a id="sh-safe-001"></a>`shell-lint` | `SH` | `warning` | `shell` | read 命令缺少超时 (-t) 或终端守护，CI 环境下易导致死锁。 | 为交互式读取添加超时或增加 [ -t 0 ] 终端判断。 |
+| `SH-SEC-001` | <a id="sh-sec-001"></a>`shell-lint` | `SH` | `error` | `shell` | 使用 eval 拼接变量执行动态指令，存在任意命令注入高危漏洞。 | 消除 eval 动态拼接，改用函数、数组或直接参数化调用。 |
+| `SH-TRAP-001` | <a id="sh-trap-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 创建临时文件/目录后缺少 EXIT 陷阱清理，导致磁盘垃圾残留。 | 声明 trap 'rm -rf "$tmp"' EXIT 确保退出时清理临时文件。 |
 | `STDLIB-ALLOC-001` | <a id="stdlib-alloc-001"></a>`stdlib` | `STDLIB` | `error` | `all` | 裸机与 no_std 系统运行环境下隐式堆逃逸与动态重分配静态拦截。 | 在 no_std / core 作用域下使用固定容量栈缓冲、借用切片或预分配内存池，避免裸调 Box::new / malloc。 |
 | `STDLIB-CONST-001` | <a id="stdlib-const-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 标准库密码学与哈希敏感比较严禁分支时间泄漏，强制常量时间恒定延迟比对。 | 使用恒定时间累加比对（如 constant_time_eq / subtle::ConstantTimeEq），严禁在字节不匹配时提前 return false。 |
 | `STDLIB-PANIC-001` | <a id="stdlib-panic-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 系统标准库公开接口严禁逃逸裸 panic/unwrap/abort，强制 Result/Option 或有界 error 返回。 | 对可能失败的公开 API 采用 Result<T, E> 或显式 error code 表达错误，内部调用使用 match 或 ? 操作符解包。 |
@@ -259,6 +269,15 @@
 | `PRF-POL-002` | <a id="prf-pol-002"></a>`performance` | `PRF` | `error` | `all` | 资源池缺乏状态重置契约或容量上限：池化机制缺失 reset_state 回收契约或无界增长导致数据污染与泄漏。 | 补全对象归还重置逻辑并设定池容量高水位淘汰限制。 |
 | `PRF-POL-003` | <a id="prf-pol-003"></a>`performance` | `PRF` | `warning` | `all` | 负收益过度池化：对极小轻量纯值对象或冷路径过度引入池化管理开销，得不偿失。 | 移除负收益池化包装层，直接采用值对象或短生命周期瞬态分配。 |
 | `PRF-POL-004` | <a id="prf-pol-004"></a>`performance` | `PRF` | `warning` | `all` | 流式数据分块加载缺乏环形缓冲复用：在流式 I/O、分块循环读取或异步回调中反复实例化临时 Buffer，造成高频内存碎片与 GC 停顿。 | 引入环形缓冲区（RingBuffer）或接入定长字节缓冲池（BufferPool），实现零拷贝槽位循环复用。 |
+| `GATE-BUDGET-001` | <a id="gate-budget-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 预提交门禁运行无界全量回归耗时超标，未实施暂存区分层过滤。 | 实施分层门禁：预提交专注增量暂存切片审查（< 2s），全量回归递延至预推送。 |
+| `GATE-ERR-001` | <a id="gate-err-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁执行脚本缺失严格错误终止控制标志，存在命令静默失败隐患。 | Shell 脚本声明 set -euo pipefail，PowerShell 声明 $ErrorActionPreference = 'Stop'。 |
+| `GATE-HOOK-001` | <a id="gate-hook-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 仓库缺失本地左移 Git Hooks 拦截防线，缺陷反馈过度后置。 | 配置 .githooks 或 .husky 激活本地左移防御，提交前拦截低级卫生与回归缺陷。 |
+| `GATE-HYG-001` | <a id="gate-hyg-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少 0 字节物理空文件与换行符卫生看守。 | 在 pre-commit 门禁中加入零空文件与换行符契约（CRLF/LF）检查。 |
+| `GATE-ISO-001` | <a id="gate-iso-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 双层门禁边界不同构，远端 CI 关键检查未在本地钩子中对等镜像。 | 确保本地门禁脚本镜像覆盖远端 CI 关键步骤，实现双层防御同构性。 |
+| `GATE-MSG-001` | <a id="gate-msg-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁系统缺少提交信息 Conventional 规范与零黑话结构化正文校验。 | 配置 commit-msg 门禁校验 Conventional 格式、结构化正文区块与零临时黑话。 |
+| `GATE-ROUTE-001` | <a id="gate-route-001"></a>`gate-architecture` | `GATE` | `error` | `all` | Git 钩子直接裸调脆弱环境或 Windows PS 5.1，缺少跨平台路由保护。 | 采用跨平台 pwsh 优先并优雅降级至 bash 的双执行器路由，禁止裸调 powershell.exe。 |
+| `GATE-SSOT-001` | <a id="gate-ssot-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁引用规则目录校验但缺少单源注册表文件或未登记对应规则。 | 建立并维护单一真源规则目录（如 rule-catalog.json），门禁依据单源校验。 |
+| `GATE-SYS-001` | <a id="gate-sys-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 仓库完全缺失门禁防御系统（无任何本地 Git 钩子且无远端 CI 流水线）。 | 接入标准化双层门禁脚手架（pre-commit, commit-msg, pre-push 及 CI 工作流）。 |
 
 ### Layer 2 — 语言族惯用法与现代化演进层 (Language-Family Modernization)
 

@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791025167876",
-  "timestamp": "2026-10-03T10:59:33.042Z",
+  "snapshotId": "snapshot-v0.4.0-1791031300688",
+  "timestamp": "2026-10-03T12:41:46.862Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,30 +8,30 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "e3bd900b4975d683ec7ed2deacfeda2287098edfba52e174680213d7bb7d8263",
+  "rulesDigest": "30d07ab94f3450a29aa7038657858b08204909320a78ada470583a25cd61fb9d",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 568,
-    "durationMs": 4487
+    "filesScanned": 574,
+    "durationMs": 5329
   },
   "metrics": {
     "compositeScore": 99.2,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11457,
-    "suppressedIssues": 6302,
-    "unsuppressedIssues": 5155,
+    "totalIssues": 11758,
+    "suppressedIssues": 6428,
+    "unsuppressedIssues": 5330,
     "bySeverity": {
-      "info": 435,
-      "warning": 11022,
+      "info": 440,
+      "warning": 11318,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 200,
-      "medium": 10455,
-      "low": 802
+      "high": 203,
+      "medium": 10708,
+      "low": 847
     }
   },
   "eightPillars": {
@@ -43,7 +43,7 @@
       "testing": 100,
       "reliability": 99.9,
       "security": 100,
-      "extensibility": 94.1
+      "extensibility": 94
     },
     "compositeScore": 99.2,
     "weights": {
@@ -63,7 +63,7 @@
     "semanticPurity": 99.9,
     "codeSecurity": 100,
     "performanceEfficiency": 99,
-    "standardization": 82.2,
+    "standardization": 82.1,
     "modernity": 100,
     "maintainability": 99.7,
     "commentQuality": 100,
@@ -74,7 +74,7 @@
     {
       "filePath": "scripts/test-parallel.js",
       "domain": "scripts",
-      "totalIssues": 166,
+      "totalIssues": 167,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 98.6,
@@ -165,9 +165,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 200,
-      "medium": 10455,
-      "low": 802
+      "high": 203,
+      "medium": 10708,
+      "low": 847
     },
     "criticalItems": [],
     "highItems": [
@@ -630,8 +630,8 @@
         "compositeScore": 99,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.8,
-          "performance": 99.4,
+          "maintainability": 99.9,
+          "performance": 99.3,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -651,7 +651,7 @@
           "testing": 100,
           "reliability": 99.8,
           "security": 100,
-          "extensibility": 94.7
+          "extensibility": 94.8
         },
         "moduleCount": 1
       },
@@ -852,16 +852,16 @@
       },
       {
         "domainName": "governance",
-        "compositeScore": 99.3,
+        "compositeScore": 98.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 100,
-          "performance": 99.9,
-          "data": 99.7,
+          "maintainability": 99.6,
+          "performance": 97.5,
+          "data": 99.8,
           "testing": 100,
-          "reliability": 99.7,
+          "reliability": 99.8,
           "security": 100,
-          "extensibility": 93.8
+          "extensibility": 92.1
         },
         "moduleCount": 1
       },
@@ -1131,7 +1131,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 96.6
+          "extensibility": 96.8
         },
         "moduleCount": 1
       },
@@ -1304,7 +1304,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 109998,
+      "processed": 112053,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1318,10 +1318,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1790922053371,
-      "endMs": 1791025167875,
-      "totalRuns": 82,
+      "endMs": 1791031300686,
+      "totalRuns": 83,
       "eloc": {
-        "processedTotal": 8988268,
+        "processedTotal": 9100321,
         "uniqueTotal": 96698,
         "changedTotal": 119162,
         "semanticTotal": 119162
@@ -1332,10 +1332,10 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 1000644,
+        "totalAdded": 1011961,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -111.33
+        "netYield": -111.2
       },
       "meanCompositeScore": 99.6,
       "gatePassRate": 100
