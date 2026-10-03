@@ -61,7 +61,9 @@ jobs:
         run: bash ../scripts/sh/check-display-assets.sh . pre
 
       - name: Package (verify only, not published)
-        run: npx --yes @vscode/vsce package -o "../dist/${{ matrix.ext }}/"
+        run: |
+          mkdir -p "../dist/${{ matrix.ext }}"
+          npx --yes @vscode/vsce package -o "../dist/${{ matrix.ext }}/"
 
       - name: Verify display assets (post-package)
         run: |
