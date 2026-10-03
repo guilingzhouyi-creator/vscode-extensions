@@ -1,0 +1,38 @@
+{
+  "buff_types": {
+    "bleed": {
+      "name": "流血",
+      "category": "DEBUFF",
+      "max_stacks": 5,
+      "tick_timing": "TURN_END",
+      "base_decay_rate": 1.0,
+      "dispel_priority": 1
+    },
+    "stagger": {
+      "name": "失衡",
+      "category": "DEBUFF",
+      "max_stacks": 1,
+      "tick_timing": "ACTION_START",
+      "base_decay_rate": 1.0,
+      "dispel_priority": 2
+    },
+    "empower": {
+      "name": "强能",
+      "category": "BUFF",
+      "max_stacks": 3,
+      "tick_timing": "ACTION_END",
+      "base_decay_rate": 0.5,
+      "dispel_priority": 3
+    }
+  },
+  "resistance_coefficients": {
+    "physical": 1.0,
+    "thermal": 1.0,
+    "magnetic": 1.0,
+    "void": 0.8
+  },
+  "dispel_rules": {
+    "cleanse_removes_debuffs": true,
+    "purge_removes_buffs": true
+  }
+}

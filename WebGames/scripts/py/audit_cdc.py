@@ -88,7 +88,9 @@ def check_ast_kind_single_source(violations: list) -> set:
 
 def check_gacha_rates_and_pity(violations: list) -> dict:
     """校验 domains.gacha 概率表值域与保底阶梯单调性"""
-    gacha_file = CONFIG / "domains" / "gacha.json"
+    gacha_file = CONFIG / "domains" / "gacha" / "core.json"
+    if not gacha_file.exists():
+        gacha_file = CONFIG / "domains" / "gacha.json"
     if not gacha_file.exists():
         violations.append(f"[配置缺失] 找不到 Gacha 配置文件: {gacha_file}")
         return {}

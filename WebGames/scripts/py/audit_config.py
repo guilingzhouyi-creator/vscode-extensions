@@ -35,7 +35,7 @@ KEY_RE = re.compile(
 )
 # 尾逗号可选：GDScript 数组末项通常不写尾逗号，若强制要求会漏掉 _required_tables
 # 的最后一张表（该表因此永远不被校验，删了也没人告警）。
-REQUIRED_RE = re.compile(r'^\s*"([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*)",?\s*$')
+REQUIRED_RE = re.compile(r'^\s*"([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)",?\s*$')
 
 
 def parse_required_tables() -> list[str]:
@@ -367,10 +367,9 @@ def main() -> int:
         rel = f.relative_to(CONFIG_DIR)
         rel_posix = str(rel).replace("\\", "/")
         layer = rel.parts[0] if len(rel.parts) > 1 else ""
-        name = f.stem
         if layer not in LAYERS:
             violations.append(f"配置文件层级非法: {rel_posix}（应为 {sorted(LAYERS)} 之一）")
-        table = f"{layer}.{name}" if layer else name
+        table = ".".join(rel.with_suffix("").parts)
         found_tables.add(table)
         try:
             raw = f.read_bytes()

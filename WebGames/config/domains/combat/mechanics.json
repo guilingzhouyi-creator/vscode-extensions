@@ -90,27 +90,6 @@
   "interrupt": {
     "ap_penalty": 2
   },
-  "defense_multipliers": {
-    "block": 0.35,
-    "parry": 0.5
-  },
-  "kinetic": {
-    "energy_coef": 0.5,
-    "mass_floor": 0.1,
-    "velocity_floor": 0.1
-  },
-  "phase_transition": {
-    "primordial_min_loss_floor": 0.001,
-    "primordial_step1_loss": 0.03,
-    "incantation_step1_base": 0.25,
-    "incantation_step1_per_sentence": 0.03,
-    "incantation_step1_min": 0.25,
-    "incantation_step1_max": 0.5,
-    "step2_base": 0.1,
-    "step2_per_meter": 0.01,
-    "step2_min": 0.1,
-    "step2_max": 0.3
-  },
   "card_pool_defaults": {
     "card_category": "ATTACK",
     "magic_ref": "",

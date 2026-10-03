@@ -309,9 +309,9 @@ def reindex_archive_keywords(target_cycle: str = None, apply: bool = True) -> bo
             att_files = list(vol_dir.glob("*ATT*.md"))
             if att_files:
                 att_file = att_files[0]
-                m_att = re.search(r"(KALAR-DEV-\d{4}-ST\d{2}-ATT)", att_file.name)
+                m_att = re.search(r"(KALAR-DEV-\d{4}-ST\d{2,3}-ATT)", att_file.name)
                 att_code = m_att.group(1) if m_att else ""
-                st_id_m = re.search(r"-(ST\d{2})-", att_file.name)
+                st_id_m = re.search(r"-(ST\d{2,3})-", att_file.name)
                 st_id = st_id_m.group(1) if st_id_m else "ST??"
 
                 att_kws = extract_att_keywords(vol_dir, vol_dir.name, st_id)
@@ -329,7 +329,7 @@ def reindex_archive_keywords(target_cycle: str = None, apply: bool = True) -> bo
             # 2. 提纯 4 个阶段正文文件的关键词
             stages = sorted([f for f in vol_dir.glob("*.md") if "阶段" in f.name and "ATT" not in f.name])
             for sf in stages:
-                m_stage = re.search(r"(KALAR-DEV-\d{4}-ST\d{2}-\d{3})_阶段(\d)_(.+)\.md$", sf.name)
+                m_stage = re.search(r"(KALAR-DEV-\d{4}-ST\d{2,3}-\d{3})_阶段(\d)_(.+)\.md$", sf.name)
                 if not m_stage:
                     continue
                 stage_code = m_stage.group(1)
@@ -354,7 +354,7 @@ def reindex_archive_keywords(target_cycle: str = None, apply: bool = True) -> bo
         cat_lines = MASTER_CATALOG.read_text(encoding="utf-8").splitlines()
         new_cat_lines = []
         for line in cat_lines:
-            m = re.search(r"\|\s*`?(KALAR-DEV-\d{4}-ST\d{2}-[A-Z0-9]+)`?\s*\|", line)
+            m = re.search(r"\|\s*`?(KALAR-DEV-\d{4}-ST\d{2,3}-[A-Z0-9]+)`?\s*\|", line)
             if m:
                 code = m.group(1)
                 if code in file_keywords_map:

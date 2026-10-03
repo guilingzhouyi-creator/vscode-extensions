@@ -28,7 +28,7 @@
 ## 📌 第一性原理溯源指针
 
 * **精准上游规范指针**：
-  * [config/domains/combat.json](../../../../../config/domains/combat.json)（战斗领域权威真源配置表）
+  * [config/domains/combat/mechanics.json](../../../../../config/domains/combat/mechanics.json)（战斗领域权威真源配置表）
   * [config/README.md](../../../../../config/README.md)（配置层级约定、单一真源与只读规范）
   * [backend/infrastructure/game_config.gd](../../../../../backend/infrastructure/game_config.gd)（类型化获取器与热重载接口）
   * [backend/infrastructure/deterministic_rng.gd](../../../../../backend/infrastructure/deterministic_rng.gd)（确定性随机种子与序列发生器）

@@ -66,9 +66,15 @@ def collect_config_channels(domain_map: dict) -> list[dict]:
        - event_bus_config.json channel_registry[].legacy
     其余配置（contracts.json 契约字段等）非频道声明，禁止误判为事件频道。
     """
+    account_path = CONFIG / "domains" / "account" / "core.json"
+    if not account_path.exists():
+        account_path = CONFIG / "domains" / "account.json"
+    world_state_path = CONFIG / "domains" / "world_state" / "core.json"
+    if not world_state_path.exists():
+        world_state_path = CONFIG / "domains" / "world_state.json"
     channel_sources: list[tuple[Path, str]] = [
-        (CONFIG / "domains" / "account.json", "auth/channels"),
-        (CONFIG / "domains" / "world_state.json", "hud/channels"),
+        (account_path, "auth/channels"),
+        (world_state_path, "hud/channels"),
         (CONFIG / "infrastructure" / "event_bus_config.json", None),  # 特例：channel_registry.legacy
     ]
     channels: list[dict] = []

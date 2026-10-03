@@ -91,7 +91,7 @@ Write-Host "[4/8] 检查零黑话与规范命名..." -ForegroundColor Gray
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
     $baseName = [System.IO.Path]::GetFileName($file)
-    if ($file -match "WebGames/docs/路线图/" -or $baseName -match "^fe_\d{2}") {
+    if ($file -match "WebGames/docs/路线图/" -or $file -match "WebGames/docs/归档库/" -or $baseName -match "^fe_\d{2}") {
         continue
     }
     if ($baseName -match "(^|[-_.])(temp|wip|new|st\d+|p\d+)([-_.]|$)") {

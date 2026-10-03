@@ -81,9 +81,11 @@ def run_event_probability_audit() -> int:
     print("=" * 80)
 
     violations = []
-    path = CONFIG / "domains" / "event_probability.json"
+    path = CONFIG / "domains" / "event_probability" / "core.json"
     if not path.exists():
-        print("【审查结论】未通过（config/domains/event_probability.json 缺失，已阻断！）")
+        path = CONFIG / "domains" / "event_probability.json"
+    if not path.exists():
+        print("【审查结论】未通过（config/domains/event_probability/core.json 缺失，已阻断！）")
         return 1
     data = json.loads(path.read_text(encoding="utf-8"))
     events = data.get("events", {})

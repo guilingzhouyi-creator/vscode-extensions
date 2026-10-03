@@ -26,6 +26,19 @@ static var _path_cache: Dictionary = {}
 ## 路径分段缓存上限：防运行期动态键（msg/拼接路径）无界增长
 const PATH_CACHE_MAX_ENTRIES: int = 4096
 
+const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
+
+const PATH_STORAGE_CATALOG_SCRIPT: String = "res://backend/domains/persistence_protocol/storage_resource_catalog.gd"
+const PATH_AUX_WORKER_POOL_SCRIPT: String = "res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd"
+const PATH_BATCH_LOAD_REQUEST_SCRIPT: String = "res://backend/domains/persistence_protocol/dto/batch_load_request_dto.gd"
+const CAT_CONFIG: String = "config"
+const EVENT_ALL_TABLES_READY: String = "config.all_tables_ready"
+const EXT_JSON: String = ".json"
+const METHOD_GET_INSTANCE: String = "get_instance"
+const METHOD_RESOLVE_CONFIG_TABLE_ENTRY: String = "resolve_config_table_entry"
+const METHOD_GET_CRITICAL_BOOT_ENTRIES: String = "get_critical_boot_entries"
+const BATCH_ID_CONFIG_BULK: String = "config_bulk_async"
+
 ## 必需配置表清单（分层规范：infrastructure.* / domains.* / frontend.* / items.*）。
 ## 分层目录规则：
 ##   config/infrastructure/<name>.json -> 表名 "infrastructure.<name>"
@@ -50,59 +63,64 @@ static var _required_tables: Array = [
 	"infrastructure.event_bus_config",
 	"infrastructure.release_policy",
 	"infrastructure.version_manifest",
+	"infrastructure.object_pool",
 	"items.core",
 	"frontend.ui",
 	"frontend.views",
-	"domains.account",
-	"domains.attribute",
-	"domains.bulletin_board_maintenance",
-	"domains.cdkey_voucher",
-	"domains.character_creation",
-	"domains.chat_command",
-	"domains.combat",
-	"domains.commission_quest",
-	"domains.currency",
-	"domains.deterministic",
-	"domains.elite",
-	"domains.equipment",
-	"domains.event_driven_audio",
-	"domains.event_extractor",
-	"domains.event_probability",
-	"domains.feature_toggle_canary",
-	"domains.gacha",
-	"domains.game_settings",
-	"domains.ground_loot",
-	"domains.hardware_input",
-	"domains.identity_disguise",
-	"domains.inventory",
-	"domains.item_attributes",
-	"domains.item_namespace_registry",
-	"domains.item_statistics",
-	"domains.lattice",
-	"domains.lifecycle",
-	"domains.localization_i18n",
-	"domains.magic_rules",
-	"domains.magic_tiers",
-	"domains.mail_system",
-	"domains.matter_disposal",
-	"domains.monster",
-	"domains.narrative_orchestration",
-	"domains.notification_red_dot",
-	"domains.npc",
-	"domains.organization_guild",
-	"domains.potential",
-	"domains.quality_tiers",
-	"domains.quest",
-	"domains.sovereignty",
-	"domains.spatial_merchant",
-	"domains.spatial_movement",
-	"domains.starter_loadout",
-	"domains.telemetry_account_lifecycle",
-	"domains.trading",
-	"domains.workshop",
-	"domains.world",
-	"domains.world_boss",
-	"domains.world_gateway"
+	"domains.account.core",
+	"domains.attribute.core",
+	"domains.bulletin_board_maintenance.core",
+	"domains.cdkey_voucher.core",
+	"domains.character_creation.core",
+	"domains.chat_command.core",
+	"domains.combat.mechanics",
+	"domains.combat.damage_formulas",
+	"domains.combat.buff_definitions",
+	"domains.commission_quest.core",
+	"domains.currency.core",
+	"domains.deterministic.core",
+	"domains.economy.core",
+	"domains.elite.core",
+	"domains.equipment.core",
+	"domains.event_driven_audio.core",
+	"domains.event_extractor.core",
+	"domains.event_probability.core",
+	"domains.feature_toggle_canary.core",
+	"domains.gacha.core",
+	"domains.game_settings.core",
+	"domains.ground_loot.core",
+	"domains.hardware_input.core",
+	"domains.identity_disguise.core",
+	"domains.inventory.core",
+	"domains.item_attributes.core",
+	"domains.item_namespace_registry.core",
+	"domains.item_statistics.core",
+	"domains.lattice.core",
+	"domains.lifecycle.core",
+	"domains.localization_i18n.core",
+	"domains.magic_rules.core",
+	"domains.magic_tiers.core",
+	"domains.mail_system.core",
+	"domains.matter_disposal.core",
+	"domains.monster.core",
+	"domains.narrative_orchestration.core",
+	"domains.notification_red_dot.core",
+	"domains.npc.core",
+	"domains.organization_guild.core",
+	"domains.potential.core",
+	"domains.quality_tiers.core",
+	"domains.quest.core",
+	"domains.sovereignty.core",
+	"domains.spatial_merchant.core",
+	"domains.spatial_movement.core",
+	"domains.starter_loadout.core",
+	"domains.telemetry_account_lifecycle.core",
+	"domains.trading.core",
+	"domains.workshop.core",
+	"domains.world.core",
+	"domains.world_boss.core",
+	"domains.world_gateway.core",
+	"domains.world_state.core"
 ]
 
 # ==============================================================================
@@ -126,6 +144,84 @@ static func _validate_required_tables() -> void:
 			missing.append(table_name)
 	if not missing.is_empty():
 		ErrorReporter.emit_error("game_config", "REQUIRED_TABLE_MISSING", "GameConfig: 缺少必需配置表: %s" % ", ".join(missing))
+
+## 获取统一资源目录实例（动态解耦，杜绝跨层静态强引用）
+static func _get_catalog() -> Variant:
+	if ResourceLoader.exists(PATH_STORAGE_CATALOG_SCRIPT):
+		var s = load(PATH_STORAGE_CATALOG_SCRIPT)
+		if s != null and s.has_method(METHOD_GET_INSTANCE):
+			return s.get_instance()
+	return null
+
+## JIT 靶向按需加载单个配置表（按需即时读盘，消除全局阻塞）
+static func _ensure_table_loaded_jit(table_name: String) -> void:
+	var target_name := ConfigRouterEngine.resolve_table_name(table_name)
+	if _tables.has(target_name):
+		return
+	var catalog: Variant = _get_catalog()
+	if catalog != null and catalog.has_method(METHOD_RESOLVE_CONFIG_TABLE_ENTRY):
+		var entry = catalog.resolve_config_table_entry(target_name)
+		if entry != null and not str(entry.physical_path).is_empty() and FileAccess.file_exists(entry.physical_path):
+			_load_table(entry.physical_path, target_name)
+			return
+
+	# 回退至约定物理路径
+	var parts := target_name.split(".")
+	var fallback_path := CONFIG_DIR + "/".join(parts) + EXT_JSON
+	if FileAccess.file_exists(fallback_path):
+		_load_table(fallback_path, target_name)
+
+## 同步极速加载 L0 核心底座配置表（耗时 <= 5.0ms，建立最小可运行世界状态）
+static func ensure_l0_loaded_sync() -> int:
+	var catalog: Variant = _get_catalog()
+	var loaded_count := 0
+	if catalog != null and catalog.has_method(METHOD_GET_CRITICAL_BOOT_ENTRIES):
+		for entry in catalog.get_critical_boot_entries():
+			var t_name: String = str(entry.metadata.get("table_name", ""))
+			if not t_name.is_empty() and not _tables.has(t_name):
+				_load_table(entry.physical_path, t_name)
+				loaded_count += 1
+	_loaded = true
+	return loaded_count
+
+## 借助双域储存并发工作池异步装载全部业务与文案配置表
+static func load_via_storage_async(on_completed: Callable = Callable()) -> void:
+	ensure_l0_loaded_sync()
+	var catalog: Variant = _get_catalog()
+	if catalog == null or not ResourceLoader.exists(PATH_AUX_WORKER_POOL_SCRIPT):
+		ensure_loaded()
+		if on_completed.is_valid():
+			on_completed.call(_tables.size())
+		return
+
+	var pool_script = load(PATH_AUX_WORKER_POOL_SCRIPT)
+	var pool: Variant = pool_script.get_instance() if pool_script != null else null
+	var batch_script = load(PATH_BATCH_LOAD_REQUEST_SCRIPT)
+	if pool == null or batch_script == null:
+		ensure_loaded()
+		if on_completed.is_valid():
+			on_completed.call(_tables.size())
+		return
+
+	var batch_req = batch_script.new(BATCH_ID_CONFIG_BULK)
+	for entry in catalog.get_entries_by_category(CAT_CONFIG):
+		var t_name: String = str(entry.metadata.get("table_name", ""))
+		if not t_name.is_empty() and not _tables.has(t_name):
+			batch_req.add_entry(entry)
+
+	batch_req.on_item_loaded = func(entry: Variant, ok: bool, data: Variant, _err: String) -> void:
+		if ok and (data is Dictionary):
+			var t_name: String = str(entry.metadata.get("table_name", ""))
+			if not t_name.is_empty():
+				_tables[t_name] = data
+
+	batch_req.on_batch_completed = func(_bid: String, total: int, _failed: int) -> void:
+		_validate_required_tables()
+		EventBusCore.get_instance().emit_domain_event(EVENT_ALL_TABLES_READY, {"total": total})
+		if on_completed.is_valid():
+			on_completed.call(total)
+
+	pool.enqueue_batch(batch_req)
 
 ## 加载报告：全部表名 / 缺失必需表 / 表总数（运维与调试用）
 static func describe() -> Dictionary:
@@ -249,6 +345,53 @@ static func reload_config() -> Dictionary:
 static func reload_all_configurations() -> Dictionary:
 	return reload_config()
 
+## 单子表靶向热重载（零污染、单子表原子替换）
+static func reload_subtable(subtable_name: String) -> Dictionary:
+	var resolved: String = ConfigRouterEngine.resolve_table_name(subtable_name)
+	var parts := resolved.split(".")
+	var file_path := CONFIG_DIR + "/".join(parts) + EXT_JSON
+
+	if not FileAccess.file_exists(file_path):
+		return {
+			"success": false,
+			"subtable": resolved,
+			"error": "FILE_NOT_FOUND",
+			"file_path": file_path
+		}
+
+	var json := JSON.new()
+	var text := FileAccess.get_file_as_string(file_path)
+	if json.parse(text) != OK:
+		return {
+			"success": false,
+			"subtable": resolved,
+			"error": "JSON_PARSE_FAILED",
+			"details": json.get_error_message()
+		}
+
+	var data: Variant = json.get_data()
+	if not (data is Dictionary):
+		return {
+			"success": false,
+			"subtable": resolved,
+			"error": "NOT_A_JSON_OBJECT"
+		}
+
+	_tables[resolved] = data
+	_reload_counter += 1
+	_path_cache.clear()
+
+	EventBusCore.get_instance().emit_domain_event("config.subtable_reloaded", {
+		"subtable": resolved,
+		"version": _reload_counter
+	})
+
+	return {
+		"success": true,
+		"subtable": resolved,
+		"version": _reload_counter
+	}
+
 # ==============================================================================
 # 四、泛用取值与类型化取值
 # ==============================================================================
@@ -264,41 +407,52 @@ static func get_table_names() -> Array:
 ## 返回整张配置表（path 为空即取表根）
 static func get_table(table_name: String, default: Variant = {}) -> Variant:
 	ensure_loaded()
-	return _tables.get(table_name, default)
+	var target_table := ConfigRouterEngine.resolve_table_name(table_name)
+	if not _tables.has(target_table):
+		_ensure_table_loaded_jit(target_table)
+	return _tables.get(target_table, default)
 
 ## 判断「表 + 多级路径」是否存在
 static func has(table_name: String, path: String) -> bool:
 	ensure_loaded()
-	var cur: Variant = _tables.get(table_name, {})
-	for part in _split_path(path):
-		if cur is Dictionary and cur.has(part):
-			cur = cur[part]
-		elif cur is Array and part.is_valid_int():
-			var idx := part.to_int()
-			if idx >= 0 and idx < (cur as Array).size():
-				cur = (cur as Array)[idx]
-			else:
-				return false
-		else:
-			return false
-	return true
+	var route: Variant = ConfigRouterEngine.resolve_route(table_name, path)
+	var target_table: String = str(route.resolved_table)
+	if not _tables.has(target_table):
+		_ensure_table_loaded_jit(target_table)
+	if _lookup_path_in_table(_tables.get(target_table, {}), path) != null:
+		return true
+	var subtables: Array = ConfigRouterEngine.get_subtables_for_domain(table_name)
+	for sub in subtables:
+		var s_name := String(sub)
+		if s_name == target_table:
+			continue
+		if not _tables.has(s_name):
+			_ensure_table_loaded_jit(s_name)
+		if _lookup_path_in_table(_tables.get(s_name, {}), path) != null:
+			return true
+	return false
 
 ## 泛用取值：任意类型，未命中或类型不符时返回 default（不抛错）
 static func get_value(table_name: String, path: String, default: Variant = null) -> Variant:
 	ensure_loaded()
-	var cur: Variant = _tables.get(table_name, {})
-	for part in _split_path(path):
-		if cur is Dictionary and cur.has(part):
-			cur = cur[part]
-		elif cur is Array and part.is_valid_int():
-			var idx := part.to_int()
-			if idx >= 0 and idx < (cur as Array).size():
-				cur = (cur as Array)[idx]
-			else:
-				return default
-		else:
-			return default
-	return cur
+	var route: Variant = ConfigRouterEngine.resolve_route(table_name, path)
+	var target_table: String = str(route.resolved_table)
+	if not _tables.has(target_table):
+		_ensure_table_loaded_jit(target_table)
+	var val: Variant = _lookup_path_in_table(_tables.get(target_table, {}), path)
+	if val != null:
+		return val
+	var subtables: Array = ConfigRouterEngine.get_subtables_for_domain(table_name)
+	for sub in subtables:
+		var s_name := String(sub)
+		if s_name == target_table:
+			continue
+		if not _tables.has(s_name):
+			_ensure_table_loaded_jit(s_name)
+		var sub_val: Variant = _lookup_path_in_table(_tables.get(s_name, {}), path)
+		if sub_val != null:
+			return sub_val
+	return default
 
 ## 类型化取值（带数值/字符串宽松转换与默认值回退，未命中一律回退 default）
 static func get_string(table_name: String, path: String, default: String = "") -> String:
@@ -345,11 +499,10 @@ static func get_array(table_name: String, path: String, default: Array = []) -> 
 static func get_many(table_name: String, paths: PackedStringArray) -> Dictionary:
 	ensure_loaded()
 	var out: Dictionary = {}
-	var table: Variant = _tables.get(table_name, {})
 	for path in paths:
 		if path.is_empty():
 			continue
-		var val: Variant = _lookup_path_in_table(table, path)
+		var val: Variant = get_value(table_name, path, null)
 		if val != null:
 			out[path] = val
 	return out

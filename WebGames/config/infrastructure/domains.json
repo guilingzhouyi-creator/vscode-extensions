@@ -12,7 +12,8 @@
       "depends_on": "配置表借用关系：本域代码直接读取了哪个他域的 config 表（不含本域自有表与基础设施层表），必须是本清单中已登记的 id",
       "config_exempt": "为 true 时表示本域属基础设施层，复用 infrastructure.* 表为合法设计，不做 domains.* 归属要求",
       "exempt_reason": "豁免理由（config_exempt 为 true 时必填）",
-      "shared_tables": "跨域共享数值表豁免契约（P2-1）：domains.attribute / domains.economy / domains.event_probability / domains.magic_tiers / domains.quality_tiers 为无单一属主域的共享数值表，借用方无需声明 depends_on；该豁免与基础设施层 infrastructure.* 豁免同构"
+      "shared_tables": "跨域共享数值表豁免契约（P2-1）：domains.attribute / domains.economy / domains.event_probability / domains.item_attributes / domains.magic_tiers / domains.quality_tiers / domains.starter_loadout 为无单一属主域的共享数值表，借用方无需声明 depends_on；该豁免与基础设施层 infrastructure.* 豁免同构",
+      "sub_tables": "超大型多表子域专属清单：显式声明该领域拆分包含的所有细分子表全路径表名（如 domains.combat.mechanics），供架构护栏进行物理文件、代码引用与资源目录三向一致性校验"
     },
     "naming_aliases": "目录名与表名允许不同（历史演进产物）。已知别名：physics_thermodynamics->combat、world_navigation->world、gacha_wish->gacha、currency_economy->currency、elite_mutation->elite、equipment_loadout->equipment、lattice_skill_book->lattice、lifecycle_physiology->lifecycle、monster_ecology->monster、npc_simulation->npc、potential_growth->potential、quest_causality->quest、sovereignty_realm->sovereignty、trading_logistics->trading、workshop_forge->workshop、deterministic_sandbox->deterministic",
     "infra_dirs_exempt": "全域基础设施目录豁免声明（TC-ARCH-01 双向差集校验按此豁免）：contract_registry（契约注册表）、lifecycle（生命周期治理）、version_governance（版本治理与灰度流水线）为横跨多域的基础设施目录，非单一业务领域，故不登记为领域；与 persistence_protocol / admin_sandbox 的 config_exempt 同构，复用 infrastructure.* 配置为分层规范所要求"
@@ -35,11 +36,19 @@
           "allow": false,
           "requires_rebuild": false
         }
-      }
+      },
+      "sub_tables": [
+        "domains.inventory.core"
+      ]
     },
     {
       "id": "physics_thermodynamics",
       "config": "domains.combat",
+      "sub_tables": [
+        "domains.combat.mechanics",
+        "domains.combat.damage_formulas",
+        "domains.combat.buff_definitions"
+      ],
       "narrative": "narratives.combat",
       "test": "res://tests/unit/domains/test_physics_thermodynamics.gd",
       "test_symbol": "TestPhysicsDomain",
@@ -63,7 +72,10 @@
           "allow": false,
           "requires_rebuild": true
         }
-      }
+      },
+      "sub_tables": [
+        "domains.world.core"
+      ]
     },
     {
       "id": "lattice_skill_book",
@@ -82,7 +94,10 @@
           "allow": false,
           "requires_rebuild": true
         }
-      }
+      },
+      "sub_tables": [
+        "domains.lattice.core"
+      ]
     },
     {
       "id": "deterministic_sandbox",
@@ -91,7 +106,10 @@
       "test": "res://tests/unit/domains/test_deterministic_sandbox.gd",
       "test_symbol": "TestDeterministicDomain",
       "phase": 1,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.deterministic.core"
+      ]
     },
     {
       "id": "persistence_protocol",
@@ -131,7 +149,10 @@
           "allow": false,
           "requires_rebuild": false
         }
-      }
+      },
+      "sub_tables": [
+        "domains.lifecycle.core"
+      ]
     },
     {
       "id": "monster_ecology",
@@ -140,7 +161,10 @@
       "test": "res://tests/unit/domains/test_monster_ecology.gd",
       "test_symbol": "TestMonsterDomain",
       "phase": 1,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.monster.core"
+      ]
     },
     {
       "id": "quest_causality",
@@ -161,7 +185,10 @@
           "allow": true,
           "requires_rebuild": false
         }
-      }
+      },
+      "sub_tables": [
+        "domains.quest.core"
+      ]
     },
     {
       "id": "currency_economy",
@@ -180,7 +207,10 @@
           "allow": false,
           "requires_rebuild": true
         }
-      }
+      },
+      "sub_tables": [
+        "domains.currency.core"
+      ]
     },
     {
       "id": "trading_logistics",
@@ -189,7 +219,10 @@
       "test": "res://tests/unit/domains/test_trading_logistics.gd",
       "test_symbol": "TestTradingDomain",
       "phase": 1,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.trading.core"
+      ]
     },
     {
       "id": "npc_simulation",
@@ -198,7 +231,10 @@
       "test": "res://tests/unit/domains/test_npc_simulation.gd",
       "test_symbol": "TestNPCDomain",
       "phase": 1,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.npc.core"
+      ]
     },
     {
       "id": "sovereignty_realm",
@@ -207,7 +243,10 @@
       "test": "res://tests/unit/domains/test_sovereignty_realm.gd",
       "test_symbol": "TestSovereigntyDomain",
       "phase": 1,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.sovereignty.core"
+      ]
     },
     {
       "id": "account",
@@ -228,7 +267,10 @@
           "allow": false,
           "requires_rebuild": false
         }
-      }
+      },
+      "sub_tables": [
+        "domains.account.core"
+      ]
     },
     {
       "id": "character_creation",
@@ -247,7 +289,10 @@
           "allow": false,
           "requires_rebuild": true
         }
-      }
+      },
+      "sub_tables": [
+        "domains.character_creation.core"
+      ]
     },
     {
       "id": "potential_growth",
@@ -256,7 +301,10 @@
       "test": "res://tests/unit/domains/test_potential_growth.gd",
       "test_symbol": "TestPotentialGrowthDomain",
       "phase": 2,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.potential.core"
+      ]
     },
     {
       "id": "gacha_wish",
@@ -268,6 +316,9 @@
       "depends_on": [
         "currency_economy",
         "inventory"
+      ],
+      "sub_tables": [
+        "domains.gacha.core"
       ]
     },
     {
@@ -277,7 +328,10 @@
       "test": "res://tests/unit/domains/test_equipment_loadout.gd",
       "test_symbol": "TestEquipmentLoadoutDomain",
       "phase": 2,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.equipment.core"
+      ]
     },
     {
       "id": "workshop_forge",
@@ -288,6 +342,9 @@
       "phase": 2,
       "depends_on": [
         "currency_economy"
+      ],
+      "sub_tables": [
+        "domains.workshop.core"
       ]
     },
     {
@@ -310,7 +367,10 @@
       "test": "res://tests/unit/domains/test_chat_command.gd",
       "test_symbol": "TestChatCommandDomain",
       "phase": 2,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.chat_command.core"
+      ]
     },
     {
       "id": "elite_mutation",
@@ -319,7 +379,10 @@
       "test": "res://tests/unit/domains/test_elite_mutation.gd",
       "test_symbol": "TestEliteMutationDomain",
       "phase": 2,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.elite.core"
+      ]
     },
     {
       "id": "world_boss",
@@ -328,7 +391,10 @@
       "test": "res://tests/unit/domains/test_world_boss.gd",
       "test_symbol": "TestWorldBossDomain",
       "phase": 2,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.world_boss.core"
+      ]
     },
     {
       "id": "cdkey_voucher",
@@ -337,7 +403,10 @@
       "test": "res://tests/unit/domains/test_cdkey_voucher.gd",
       "test_symbol": "TestCDKeyVoucherDomain",
       "phase": 3,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.cdkey_voucher.core"
+      ]
     },
     {
       "id": "mail_system",
@@ -348,6 +417,9 @@
       "phase": 3,
       "depends_on": [
         "inventory"
+      ],
+      "sub_tables": [
+        "domains.mail_system.core"
       ]
     },
     {
@@ -367,7 +439,10 @@
           "allow": true,
           "requires_rebuild": false
         }
-      }
+      },
+      "sub_tables": [
+        "domains.game_settings.core"
+      ]
     },
     {
       "id": "organization_guild",
@@ -378,6 +453,9 @@
       "phase": 3,
       "depends_on": [
         "world_navigation"
+      ],
+      "sub_tables": [
+        "domains.organization_guild.core"
       ]
     },
     {
@@ -387,7 +465,10 @@
       "test": "res://tests/unit/domains/test_commission_quest.gd",
       "test_symbol": "TestCommissionQuestDomain",
       "phase": 3,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.commission_quest.core"
+      ]
     },
     {
       "id": "identity_disguise",
@@ -396,7 +477,10 @@
       "test": "res://tests/unit/domains/test_identity_disguise.gd",
       "test_symbol": "TestIdentityDisguiseDomain",
       "phase": 3,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.identity_disguise.core"
+      ]
     },
     {
       "id": "spatial_merchant",
@@ -407,6 +491,9 @@
       "phase": 3,
       "depends_on": [
         "world_navigation"
+      ],
+      "sub_tables": [
+        "domains.spatial_merchant.core"
       ]
     },
     {
@@ -418,6 +505,9 @@
       "phase": 3,
       "depends_on": [
         "world_navigation"
+      ],
+      "sub_tables": [
+        "domains.spatial_movement.core"
       ]
     },
     {
@@ -427,7 +517,10 @@
       "test": "res://tests/unit/domains/test_hardware_input.gd",
       "test_symbol": "TestHardwareInputDomain",
       "phase": 3,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.hardware_input.core"
+      ]
     },
     {
       "id": "ground_loot",
@@ -438,6 +531,9 @@
       "phase": 3,
       "depends_on": [
         "world_navigation"
+      ],
+      "sub_tables": [
+        "domains.ground_loot.core"
       ]
     },
     {
@@ -449,6 +545,9 @@
       "phase": 3,
       "depends_on": [
         "world_navigation"
+      ],
+      "sub_tables": [
+        "domains.matter_disposal.core"
       ]
     },
     {
@@ -458,7 +557,10 @@
       "test": "res://tests/unit/domains/test_narrative_orchestration.gd",
       "test_symbol": "TestNarrativeOrchestrationDomain",
       "phase": 3,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.narrative_orchestration.core"
+      ]
     },
     {
       "id": "item_namespace_registry",
@@ -467,7 +569,10 @@
       "test": "res://tests/unit/domains/test_item_namespace_registry.gd",
       "test_symbol": "TestItemNamespaceRegistryDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.item_namespace_registry.core"
+      ]
     },
     {
       "id": "feature_toggle_canary",
@@ -476,7 +581,10 @@
       "test": "res://tests/unit/domains/test_feature_toggle_canary.gd",
       "test_symbol": "TestFeatureToggleCanaryDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.feature_toggle_canary.core"
+      ]
     },
     {
       "id": "localization_i18n",
@@ -485,7 +593,10 @@
       "test": "res://tests/unit/domains/test_localization_i18n.gd",
       "test_symbol": "TestLocalizationI18nDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.localization_i18n.core"
+      ]
     },
     {
       "id": "event_driven_audio",
@@ -494,7 +605,10 @@
       "test": "res://tests/unit/domains/test_event_driven_audio.gd",
       "test_symbol": "TestEventDrivenAudioDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.event_driven_audio.core"
+      ]
     },
     {
       "id": "notification_red_dot",
@@ -503,7 +617,10 @@
       "test": "res://tests/unit/domains/test_notification_red_dot.gd",
       "test_symbol": "TestNotificationRedDotDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.notification_red_dot.core"
+      ]
     },
     {
       "id": "bulletin_board_maintenance",
@@ -512,7 +629,10 @@
       "test": "res://tests/unit/domains/test_bulletin_board_maintenance.gd",
       "test_symbol": "TestBulletinBoardMaintenanceDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.bulletin_board_maintenance.core"
+      ]
     },
     {
       "id": "telemetry_account_lifecycle",
@@ -521,7 +641,10 @@
       "test": "res://tests/unit/domains/test_telemetry_account_lifecycle.gd",
       "test_symbol": "TestTelemetryAccountLifecycleDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.telemetry_account_lifecycle.core"
+      ]
     },
     {
       "id": "world_state",
@@ -532,6 +655,9 @@
       "phase": 4,
       "depends_on": [
         "world_navigation"
+      ],
+      "sub_tables": [
+        "domains.world_state.core"
       ]
     },
     {
@@ -544,6 +670,9 @@
       "depends_on": [
         "item_statistics",
         "telemetry_account_lifecycle"
+      ],
+      "sub_tables": [
+        "domains.event_extractor.core"
       ]
     },
     {
@@ -553,7 +682,10 @@
       "test": "res://tests/unit/domains/test_item_statistics.gd",
       "test_symbol": "TestItemStatisticsDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.item_statistics.core"
+      ]
     },
     {
       "id": "magic_system",
@@ -562,7 +694,10 @@
       "test": "res://tests/unit/domains/test_magic_system.gd",
       "test_symbol": "TestMagicRuleSystemDomain",
       "phase": 4,
-      "depends_on": []
+      "depends_on": [],
+      "sub_tables": [
+        "domains.magic_rules.core"
+      ]
     },
     {
       "id": "world_gateway",
@@ -574,6 +709,9 @@
       "depends_on": [
         "account",
         "feature_toggle_canary"
+      ],
+      "sub_tables": [
+        "domains.world_gateway.core"
       ]
     }
   ]

@@ -21,11 +21,12 @@ config/  # 统一小写目录（已归一，历史大写 Configs/ 已移除，Ga
 │   ├── persistence.json         # 存档目录/扩展名/版本/协议契约/错误文案
 │   ├── release_policy.json      # 灰度发布策略与版本编排契约
 │   └── version_manifest.json    # 版本清单（灰度挂载双保险激活门禁依据）
-├── domains/                 # 领域层（52 张平衡表，覆盖 47 领域）-> 表名 domains.<name>
-│   ├── 基础域：currency/combat/inventory/monster/lifecycle/npc/quest/sovereignty/world/lattice/deterministic/trading
-│   ├── 演进扩展域：equipment/gacha/workshop/elite/world_boss/potential/character_creation/account/attribute/
+├── domains/                 # 领域层（业务领域与共享数值域，全量 1:1 独立目录同构）-> 表名 domains.<name>.core 或多子表
+│   ├── 各领域均拥有独立子目录（如 domains/inventory/core.json、domains/combat/mechanics.json 等）
+│   ├── 基础业务域：currency/combat/inventory/monster/lifecycle/npc/quest/sovereignty/world/lattice/deterministic/trading
+│   ├── 核心扩展域：equipment/gacha/workshop/elite/world_boss/potential/character_creation/account/attribute/
 │   │   quality_tiers/magic_rules/magic_tiers/item_attributes/item_statistics/starter_loadout/economy/chat_command
-│   ├── 第二轮演进域：bulletin_board_maintenance/cdkey_voucher/commission_quest/event_driven_audio/event_extractor/
+│   ├── 全域治理域：bulletin_board_maintenance/cdkey_voucher/commission_quest/event_driven_audio/event_extractor/
 │   │   event_probability/feature_toggle_canary/game_settings/ground_loot/hardware_input/identity_disguise/
 │   │   item_namespace_registry/localization_i18n/mail_system/matter_disposal/narrative_orchestration/
 │   │   notification_red_dot/organization_guild/spatial_merchant/spatial_movement/telemetry_account_lifecycle/
@@ -51,9 +52,10 @@ config/  # 统一小写目录（已归一，历史大写 Configs/ 已移除，Ga
 表数与领域数不相等是**合法**的：少数领域复用基础设施表或别名表（如 `physics_thermodynamics`
 复用 `domains.combat`、`admin_sandbox` 复用 `infrastructure.admin`），映射关系一律以清单为准。
 
-**表名规则**：`<层目录>.<文件名>`，例如 `config/domains/combat.json` → 表名
-`domains.combat`；`config/frontend/ui.json` → 表名 `frontend.ui`。
-`GameConfig` 递归扫描目录自动生成表名，新增文件无需注册代码。
+**表名规则**：`<层目录>.<子目录>.<文件名>`，例如 `config/domains/combat/mechanics.json` → 表名
+`domains.combat.mechanics`；`config/domains/inventory/core.json` → 表名 `domains.inventory.core`；
+`config/frontend/ui.json` → 表名 `frontend.ui`。
+`GameConfig` 递归扫描目录自动生成表名，并通过 `ConfigRouterEngine` 智能路由兼容旧格式表名。
 
 ## 二、键路径规范
 

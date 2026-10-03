@@ -110,6 +110,14 @@ const TestVersionGovernancePipeline = preload("res://tests/integration/pipelines
 const TestSaveSecondaryLoadAndDualStreamPipeline = preload("res://tests/integration/pipelines/test_save_secondary_load_and_dual_stream_pipeline.gd")
 # 快照测试工程模式与全域数据流插桩全链路流水线
 const TestSnapshotEngineeringHarnessPipeline = preload("res://tests/integration/pipelines/test_snapshot_engineering_harness_pipeline.gd")
+# 双域储存架构与异步流式加载全链路流水线
+const TestDualDomainStoragePipeline = preload("res://tests/integration/pipelines/test_dual_domain_storage_pipeline.gd")
+# 统一资源索引中心与配置系统异步流式加载全链路流水线
+const TestResourceCatalogAndAsyncConfigPipeline = preload("res://tests/integration/pipelines/test_resource_catalog_and_async_config_pipeline.gd")
+# 演进 03: 高承压对象池与数据导向无头处理器架构
+const TestObjectPoolAndBatchPipeline = preload("res://tests/unit/infrastructure/test_object_pool_and_batch_pipeline.gd")
+# 演进 01: 超大型子域多配置表目录拆分与泛化路由架构
+const TestConfigSubtablesDomain = preload("res://tests/unit/infrastructure/test_config_subtables.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -186,10 +194,14 @@ static func get_all_test_classes() -> Array:
 		TestSessionLifecycleAndHudSyncPipeline,
 		TestVersionGovernancePipeline,
 		TestSaveSecondaryLoadAndDualStreamPipeline,
-		TestSnapshotEngineeringHarnessPipeline
+		TestSnapshotEngineeringHarnessPipeline,
+		TestDualDomainStoragePipeline,
+		TestResourceCatalogAndAsyncConfigPipeline,
+		TestObjectPoolAndBatchPipeline,
+		TestConfigSubtablesDomain
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 88 后端与横切 + 23 前端 = 111 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 92 后端与横切 + 23 前端 = 115 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -203,7 +215,7 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 111 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 115 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())

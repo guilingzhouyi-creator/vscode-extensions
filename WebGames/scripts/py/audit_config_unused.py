@@ -48,7 +48,7 @@ GETTER_RE = re.compile(
 )
 MSG_RE = re.compile(r'GameConfig\.msg\(\s*"([a-z0-9_]+)"')
 NARRATIVE_RE = re.compile(r'(?:render_narrative|emit_narrative_by_key)\(\s*"([a-z0-9_]+)/')
-FULLNAME_RE = re.compile(r'"(infrastructure|domains|frontend|narratives|items)\.[a-z0-9_]+"')
+FULLNAME_RE = re.compile(r'"(infrastructure|domains|frontend|narratives|items)(?:\.[a-z0-9_]+)+"')
 # Phase 71 对齐：配置驱动频道引用识别——<domain_id>.<event_name> 形态（如 account.registered）
 # 首段必须是 domains.json 已登记领域 id，解析为对 narratives.<首段> 的动态叙事引用。
 CHANNEL_RE = re.compile(r"^([a-z][a-z0-9_]*)\.([a-z0-9_]+(?:\.[a-z0-9_]+)*)$")
@@ -85,9 +85,15 @@ def collect_channel_narrative_refs() -> set[str]:
         elif isinstance(o, str):
             out.append(o)
 
+    account_path = CONFIG_DIR / "domains" / "account" / "core.json"
+    if not account_path.exists():
+        account_path = CONFIG_DIR / "domains" / "account.json"
+    world_state_path = CONFIG_DIR / "domains" / "world_state" / "core.json"
+    if not world_state_path.exists():
+        world_state_path = CONFIG_DIR / "domains" / "world_state.json"
     channel_sources: list[tuple[Path, str]] = [
-        (CONFIG_DIR / "domains" / "account.json", "auth/channels"),
-        (CONFIG_DIR / "domains" / "world_state.json", "hud/channels"),
+        (account_path, "auth/channels"),
+        (world_state_path, "hud/channels"),
         (CONFIG_DIR / "infrastructure" / "event_bus_config.json", None),
     ]
     for path, subkey in channel_sources:
@@ -121,12 +127,11 @@ def collect_channel_narrative_refs() -> set[str]:
 
 
 def collect_tables() -> list[tuple[str, str]]:
-    """返回 [(表名, 相对路径)]，表名 = <层>.<文件名>。"""
+    """返回 [(表名, 相对路径)]，表名 = 点分相对路径。"""
     out: list[tuple[str, str]] = []
     for f in sorted(CONFIG_DIR.rglob("*.json")):
         rel = f.relative_to(CONFIG_DIR)
-        layer = rel.parts[0] if len(rel.parts) > 1 else ""
-        out.append((f"{layer}.{f.stem}" if layer else f.stem, str(rel)))
+        out.append((".".join(rel.with_suffix("").parts), str(rel)))
     return out
 
 
@@ -156,10 +161,23 @@ def main() -> int:
             for m in FULLNAME_RE.finditer(text):
                 weak.add(m.group(0).strip('"'))
 
-    # Phase 71 对齐：配置驱动频道（HudEventContract/channel_registry.legacy）→ 叙事表动态引用
     channel_refs: set[str] = collect_channel_narrative_refs()
     dynamic_narratives |= channel_refs
     referenced |= dynamic_narratives | weak
+
+    # 演进 01 对齐：若领域主配置表被引用，其声明的 sub_tables 均视为动态路由引用
+    try:
+        domains_manifest = json.loads((CONFIG_DIR / "infrastructure" / "domains.json").read_text(encoding="utf-8"))
+        for d_entry in domains_manifest.get("domains", []):
+            if isinstance(d_entry, dict) and d_entry.get("config") in referenced:
+                for st in d_entry.get("sub_tables", []):
+                    referenced.add(str(st))
+    except Exception:
+        pass
+    for t in list(referenced):
+        core_candidate = f"{t}.core"
+        if core_candidate in all_names:
+            referenced.add(core_candidate)
     # 单机聚焦：预留叙事表不计入未引用（需显式保留，避免误删联机文案）
     unused = [t for t in sorted(all_names) if t not in referenced and t not in RESERVED_NARRATIVES]
     reserved_hit = sorted(t for t in RESERVED_NARRATIVES if t not in referenced)

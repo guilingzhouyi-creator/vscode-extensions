@@ -88,7 +88,7 @@ echo "[4/8] 检查零黑话与规范命名..."
 while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     basename_file=$(basename "$file")
-    if [[ "$file" =~ WebGames/docs/路线图/ || "$basename_file" =~ ^fe_[0-9]{2} ]]; then
+    if [[ "$file" =~ WebGames/docs/路线图/ || "$file" =~ WebGames/docs/归档库/ || "$basename_file" =~ ^fe_[0-9]{2} ]]; then
         continue
     fi
     if echo "$basename_file" | grep -iE "(^|[-_.])(temp|wip|new|st[0-9]+|p[0-9]+)([-_.]|$)" >/dev/null 2>&1; then

@@ -69,8 +69,14 @@ const CROSS_CUTTING_SUITES: Array[String] = [
 	"res://tests/integration/pipelines/test_session_lifecycle_and_hud_sync_pipeline.gd",
 	"res://tests/integration/pipelines/test_version_governance_pipeline.gd",
 	"res://tests/integration/pipelines/test_save_secondary_load_and_dual_stream_pipeline.gd",
-	"res://tests/integration/pipelines/test_snapshot_engineering_harness_pipeline.gd"
+	"res://tests/integration/pipelines/test_snapshot_engineering_harness_pipeline.gd",
+	"res://tests/integration/pipelines/test_dual_domain_storage_pipeline.gd",
+	"res://tests/integration/pipelines/test_resource_catalog_and_async_config_pipeline.gd",
+	"res://tests/unit/infrastructure/test_object_pool_and_batch_pipeline.gd",
+	"res://tests/unit/infrastructure/test_config_subtables.gd"
 ]
+
+const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
 
 ## 唯一允许出现全局随机字面调用的实现文件（内部为配置驱动的 LCG）
 const RNG_IMPL_FILE: String = "deterministic_rng.gd"
@@ -182,8 +188,13 @@ static func test_config_tables_exist(manifest: Array) -> Dictionary:
 		var config_table := _entry_str(entry, "config")
 		var narrative_table := _entry_str(entry, "narrative")
 
+		var sub_tables := _entry_array(entry, "sub_tables")
 		if config_table.is_empty():
 			violations.append("%s: 清单缺少 config 表名" % id)
+		elif not sub_tables.is_empty():
+			for sub in sub_tables:
+				if not _table_file_exists(sub):
+					violations.append("%s: 子配置表缺失 %s -> %s" % [id, sub, _table_path(sub)])
 		elif not _table_file_exists(config_table):
 			violations.append("%s: 配置表缺失 %s -> %s" % [id, config_table, _table_path(config_table)])
 
@@ -194,7 +205,8 @@ static func test_config_tables_exist(manifest: Array) -> Dictionary:
 
 		# 扫描本领域全部 .gd，抽取 "domains.<x>" 字面量并断言对应表存在
 		for table in _scan_domain_config_literals(id):
-			if not _table_file_exists(table):
+			var exists: bool = _table_file_exists(table) or (ConfigRouterEngine.get_subtables_for_domain(table).size() > 0)
+			if not exists:
 				violations.append("%s: 代码引用了不存在的配置表 %s -> %s" % [id, table, _table_path(table)])
 
 	return _result("TC-ARCH-02: 配置表与文案表齐备且代码字面量全部落地", violations)
@@ -464,6 +476,16 @@ static func _table_keys(table_name: String) -> Variant:
 			var flat := {}
 			_flatten_keys(json.get_data(), "", flat)
 			keys = flat
+	else:
+		var subtables: Array = ConfigRouterEngine.get_subtables_for_domain(table_name)
+		if not subtables.is_empty():
+			var flat_merged := {}
+			for sub in subtables:
+				var sub_keys: Variant = _table_keys(String(sub))
+				if sub_keys is Dictionary:
+					for k in sub_keys:
+						flat_merged[k] = true
+			keys = flat_merged
 	_table_key_cache[table_name] = keys
 	return keys
 
@@ -566,7 +588,7 @@ static func _collect_gd_files(root: String) -> Array[String]:
 static func _table_path(table_name: String) -> String:
 	var parts := table_name.split(".")
 	if parts.size() >= 2:
-		return CONFIG_ROOT + parts[0] + "/" + parts[1] + ".json"
+		return CONFIG_ROOT + "/".join(parts) + ".json"
 	return CONFIG_ROOT + table_name + ".json"
 
 
@@ -580,7 +602,7 @@ static func _table_file_exists(table_name: String) -> bool:
 ## 一起扫描会产生误报；而字符串内的字面量可能是动态表名拼接，必须保留。
 static func _scan_domain_config_literals(domain_id: String) -> Array[String]:
 	var out: Array[String] = []
-	var re := RegEx.create_from_string("\"(domains\\.[A-Za-z0-9_]+)\"")
+	var re := RegEx.create_from_string("\"(domains\\.[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)*)\"")
 	for file_path in _collect_gd_files(DOMAINS_DIR.path_join(domain_id)):
 		var source := _strip_comments(FileAccess.get_file_as_string(file_path))
 		for m in re.search_all(source):

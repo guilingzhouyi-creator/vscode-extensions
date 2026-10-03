@@ -19,7 +19,7 @@
     {
       "rule_id": "VD_POTENTIAL_TIER_SIZE",
       "primitive": "positive_num",
-      "target_file": "domains/potential.json",
+      "target_file": "domains/potential/core.json",
       "key_path": "point_cost/tier_size",
       "params": { "allow_float": false, "min_exclusive": 0 },
       "severity": "ERROR",
@@ -28,7 +28,7 @@
     {
       "rule_id": "VD_TELEMETRY_SALT_MODULUS",
       "primitive": "positive_num",
-      "target_file": "domains/telemetry_account_lifecycle.json",
+      "target_file": "domains/telemetry_account_lifecycle/core.json",
       "key_path": "event_id/salt_modulus",
       "params": { "allow_float": false, "min_exclusive": 0 },
       "severity": "ERROR",
@@ -37,7 +37,7 @@
     {
       "rule_id": "VD_LATTICE_LEARNER_NORMALIZE",
       "primitive": "positive_num",
-      "target_file": "domains/lattice.json",
+      "target_file": "domains/lattice/core.json",
       "key_path": "decompiler/learner_normalize",
       "params": { "allow_float": true, "min_exclusive": 0.0 },
       "severity": "ERROR",
@@ -46,7 +46,7 @@
     {
       "rule_id": "VD_TRADING_SAFE_SUPPLY_FLOOR",
       "primitive": "positive_num",
-      "target_file": "domains/trading.json",
+      "target_file": "domains/trading/core.json",
       "key_path": "market/safe_supply_floor",
       "params": { "allow_float": true, "min_exclusive": 0.0 },
       "severity": "ERROR",
@@ -55,7 +55,7 @@
     {
       "rule_id": "VD_HARDWARE_STICK_DEADZONE",
       "primitive": "range_ordered",
-      "target_file": "domains/hardware_input.json",
+      "target_file": "domains/hardware_input/core.json",
       "key_path_left": "stick_deadzone/inner",
       "key_path_right": "stick_deadzone/outer",
       "params": { "strict_less": true },
@@ -65,7 +65,7 @@
     {
       "rule_id": "VD_CHAR_DICE_DROP_LOWEST",
       "primitive": "bounded_range",
-      "target_file": "domains/character_creation.json",
+      "target_file": "domains/character_creation/core.json",
       "key_path": "attribute_init/dice/drop_lowest",
       "params": { "min_val": 0, "max_val_reference": "attribute_init/dice/count", "max_val_offset": -1, "inclusive": true },
       "severity": "ERROR",
@@ -176,7 +176,7 @@
     {
       "rule_id": "VD_CDKEY_ELIGIBILITY",
       "primitive": "array_elements_schema",
-      "target_file": "domains/cdkey_voucher.json",
+      "target_file": "domains/cdkey_voucher/core.json",
       "array_path": "eligibility_rules/rules",
       "params": {
         "required_fields": {
@@ -193,7 +193,7 @@
     {
       "rule_id": "VD_ECONOMY_DYNAMIC_MARKET",
       "primitive": "bounded_range",
-      "target_file": "domains/economy.json",
+      "target_file": "domains/economy/core.json",
       "key_path": "dynamic_market/time_decay_factor",
       "params": { "min_val": 0.0, "max_val": 1.0, "inclusive": true },
       "severity": "ERROR",
@@ -202,7 +202,7 @@
     {
       "rule_id": "VD_ECONOMY_TIME_CYCLE_TICKS",
       "primitive": "positive_num",
-      "target_file": "domains/economy.json",
+      "target_file": "domains/economy/core.json",
       "key_path": "dynamic_market/time_cycle_ticks",
       "params": { "allow_float": false, "min_exclusive": 0 },
       "severity": "ERROR",
@@ -211,7 +211,7 @@
     {
       "rule_id": "VD_MAGIC_REQUIRED_SECTIONS",
       "primitive": "required_sections",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "params": {
         "sections": {
           "attribute_schools": "dict",
@@ -230,7 +230,7 @@
     {
       "rule_id": "VD_MAGIC_ATTR_SCHOOL_REF",
       "primitive": "foreign_key_reference",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "source_dict_path": "attributes",
       "source_item_key": "school",
       "target_dict_path": "attribute_schools",
@@ -241,7 +241,7 @@
     {
       "rule_id": "VD_MAGIC_SCHOOL_MEMBERS_REF",
       "primitive": "foreign_key_reference",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "source_dict_path": "attribute_schools",
       "source_item_key": "members",
       "target_dict_path": "attributes",
@@ -252,7 +252,7 @@
     {
       "rule_id": "VD_MAGIC_SCHOOL_NORMATIVE_FORM",
       "primitive": "enum_whitelist",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "array_path": "",
       "item_key_path": "attribute_schools/*/normative_form",
       "params": { "whitelist": ["LIGHT", "DARK"] },
@@ -262,7 +262,7 @@
     {
       "rule_id": "VD_MAGIC_VARIANT_SOURCE_SCHOOLS",
       "primitive": "foreign_key_reference",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "source_dict_path": "variants",
       "source_item_key": "source_schools",
       "target_dict_path": "attribute_schools",
@@ -273,7 +273,7 @@
     {
       "rule_id": "VD_MAGIC_VARIANT_OF_FORM",
       "primitive": "enum_whitelist",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "item_key_path": "variants/*/variant_of_form",
       "params": { "whitelist": [1, 2, 3, 4] },
       "severity": "ERROR",
@@ -282,7 +282,7 @@
     {
       "rule_id": "VD_MAGIC_VARIANT_RANKED_BRANCH",
       "primitive": "enum_whitelist",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "item_key_path": "variants/*/ranked_form_branch",
       "params": { "whitelist": ["HOLY", "ABYSSAL"] },
       "severity": "ERROR",
@@ -291,7 +291,7 @@
     {
       "rule_id": "VD_MAGIC_VARIANT_FUSION_CONDITIONS",
       "primitive": "condition_tree",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "key_path": "variants/*/fusion_conditions",
       "params": {},
       "severity": "ERROR",
@@ -300,7 +300,7 @@
     {
       "rule_id": "VD_MAGIC_COMBO_SEMANTICS",
       "primitive": "enum_whitelist",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "item_key_path": "combo_semantics/*",
       "params": { "whitelist": ["DEFINED", "PARTIAL", "BND_NOT_DEFINED"] },
       "severity": "ERROR",
@@ -309,7 +309,7 @@
     {
       "rule_id": "VD_MAGIC_MULTI_CAST_BOUND",
       "primitive": "bounded_range",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "key_path": "multi_cast/max_casts",
       "params": { "min_val": 1, "max_val": 10, "allow_float": false, "inclusive": true },
       "severity": "ERROR",
@@ -318,7 +318,7 @@
     {
       "rule_id": "VD_MAGIC_ASCENSION_MAX_RANK",
       "primitive": "bounded_range",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "key_path": "ascension/max_rank",
       "params": { "min_val": 1, "max_val": 11, "allow_float": false, "inclusive": true },
       "severity": "ERROR",
@@ -327,7 +327,7 @@
     {
       "rule_id": "VD_MAGIC_ASCENSION_CONDITIONS",
       "primitive": "condition_tree",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "key_path": "ascension/conditions",
       "params": {},
       "severity": "ERROR",
@@ -336,7 +336,7 @@
     {
       "rule_id": "VD_MAGIC_DELAY_ORDER",
       "primitive": "range_ordered",
-      "target_file": "domains/magic_rules.json",
+      "target_file": "domains/magic_rules/core.json",
       "key_path_left": "delay/min_steps",
       "key_path_right": "delay/max_steps",
       "params": { "strict_less": false },
@@ -346,7 +346,7 @@
     {
       "rule_id": "VD_COMBAT_REQUIRED_SECTIONS",
       "primitive": "required_sections",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "params": {
         "sections": {
           "card_pool_defaults": "dict",
@@ -362,7 +362,7 @@
     {
       "rule_id": "VD_COMBAT_CARD_POOL_DEFAULTS",
       "primitive": "array_elements_schema",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "array_path": "card_pool_defaults",
       "params": {
         "required_fields": {
@@ -378,7 +378,7 @@
     {
       "rule_id": "VD_COMBAT_CARD_POOL_KIND",
       "primitive": "enum_whitelist",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "card_pool_defaults/card_pool",
       "params": { "whitelist": ["random", "skill", "ultimate"] },
       "severity": "ERROR",
@@ -387,7 +387,7 @@
     {
       "rule_id": "VD_COMBAT_ROUND_HAND_CAP",
       "primitive": "positive_num",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "round_hand/hand_cap",
       "params": { "allow_float": false, "min_exclusive": 0 },
       "severity": "ERROR",
@@ -396,7 +396,7 @@
     {
       "rule_id": "VD_COMBAT_DRAW_PER_ROUND",
       "primitive": "positive_num",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "round_hand/draw_per_round",
       "params": { "allow_float": false, "min_exclusive": 0 },
       "severity": "ERROR",
@@ -405,7 +405,7 @@
     {
       "rule_id": "VD_COMBAT_DRAW_POLICY",
       "primitive": "enum_whitelist",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "round_hand/end_of_round_policy",
       "params": { "whitelist": ["DISCARD", "KEEP"] },
       "severity": "ERROR",
@@ -414,7 +414,7 @@
     {
       "rule_id": "VD_COMBAT_DRAW_MODE",
       "primitive": "enum_whitelist",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "draw_algorithm/mode",
       "params": { "whitelist": ["PURE", "PRD", "HYBRID"] },
       "severity": "ERROR",
@@ -423,7 +423,7 @@
     {
       "rule_id": "VD_COMBAT_AP_AXIS_ORDER",
       "primitive": "range_ordered",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path_left": "ap_axis/init_min",
       "key_path_right": "ap_axis/init_max",
       "params": { "strict_less": false },
@@ -433,7 +433,7 @@
     {
       "rule_id": "VD_COMBAT_CARD_WEIGHTS_SUM",
       "primitive": "weights_sum",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "card_pool_weights",
       "params": { "target_sum": 1.0, "tolerance": 0.01 },
       "severity": "ERROR",
@@ -442,7 +442,7 @@
     {
       "rule_id": "VD_COMBAT_ULTIMATE_TRIGGER",
       "primitive": "condition_tree",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "ultimate_slot/trigger",
       "params": {},
       "severity": "ERROR",
@@ -451,7 +451,7 @@
     {
       "rule_id": "VD_COMBAT_HAND_DISTRIBUTION_SUM",
       "primitive": "weights_sum",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "round_hand/hand_count_distribution",
       "params": { "target_sum": 1.0, "tolerance": 0.01 },
       "severity": "ERROR",
@@ -460,7 +460,7 @@
     {
       "rule_id": "VD_COMBAT_TIMELINE_EVENT_WEIGHTS_SUM",
       "primitive": "weights_sum",
-      "target_file": "domains/combat.json",
+      "target_file": "domains/combat/mechanics.json",
       "key_path": "tertiary_timeline/event_type_weights",
       "params": { "target_sum": 1.0, "tolerance": 0.01 },
       "severity": "ERROR",

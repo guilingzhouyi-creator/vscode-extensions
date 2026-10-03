@@ -32,7 +32,9 @@ MAGIC_TABLES = ("rank_tiers", "mana_aptitudes", "magic_forms", "profession_ranks
 
 def collect_magic_keys() -> list:
     """魔法域名称键：magic_tiers.json 四表 entry.name_key"""
-    path = CONFIG / "domains" / "magic_tiers.json"
+    path = CONFIG / "domains" / "magic_tiers" / "core.json"
+    if not path.exists():
+        path = CONFIG / "domains" / "magic_tiers.json"
     keys = []
     if not path.exists():
         return keys

@@ -36,9 +36,11 @@ def run_magic_dimensions_audit() -> int:
     print("=" * 80)
 
     violations = []
-    cfg_path = CONFIG / "domains" / "magic_tiers.json"
+    cfg_path = CONFIG / "domains" / "magic_tiers" / "core.json"
     if not cfg_path.exists():
-        print("【审查结论】未通过（config/domains/magic_tiers.json 缺失，已阻断！）")
+        cfg_path = CONFIG / "domains" / "magic_tiers.json"
+    if not cfg_path.exists():
+        print("【审查结论】未通过（config/domains/magic_tiers/core.json 缺失，已阻断！）")
         return 1
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
 

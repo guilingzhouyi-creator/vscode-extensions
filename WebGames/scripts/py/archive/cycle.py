@@ -63,7 +63,7 @@ def _phase_num_of(vol_dir: Path) -> int:
 
 def archive_short_term_cycle(apply: bool) -> bool:
     """对短期施工区已满 10 卷的案卷执行周期性批量归档。"""
-    short_term_vols = sorted([d for d in SHORT_TERM_DIR.glob("Phase_*") if d.is_dir()]) if SHORT_TERM_DIR.exists() else []
+    short_term_vols = sorted([d for d in SHORT_TERM_DIR.glob("Phase_*") if d.is_dir()], key=_phase_num_of) if SHORT_TERM_DIR.exists() else []
 
     if len(short_term_vols) < 10:
         print(f"【archive-cycle】当前短期施工区案卷数为 {len(short_term_vols)} / 10，未达到周期归档阈值（每 10 卷一个归档周期）。")
@@ -271,7 +271,7 @@ def sync_metadata_after_cycle(cycle_num: int, start_idx: int, cycle_dir_name: st
 
         # 增量去重追加 ST 记录行
         lines = cat_text.splitlines()
-        existing_codes = set(re.findall(r"`(KALAR-DEV-\d{4}-ST\d{2}-[A-Z0-9]+)`", cat_text))
+        existing_codes = set(re.findall(r"`(KALAR-DEV-\d{4}-ST\d{2,3}-[A-Z0-9]+)`", cat_text))
         current_seq = len([l for l in lines if l.startswith("|") and not l.startswith("| 序号") and not l.startswith("| :---")])
         new_lines = []
 
@@ -294,7 +294,7 @@ def sync_metadata_after_cycle(cycle_num: int, start_idx: int, cycle_dir_name: st
             # 登记 4 阶段正件
             stages = sorted([f for f in vol_target_dir.glob("*.md") if "阶段" in f.name and "ATT" not in f.name])
             for stage_file in stages:
-                m = re.search(KALAR_DEV_PREFIX + r"-(ST\d{2})-(\d{3})_阶段(\d)_(.+)\.md$", stage_file.name)
+                m = re.search(KALAR_DEV_PREFIX + r"-(ST\d{2,3})-(\d{3})_阶段(\d)_(.+)\.md$", stage_file.name)
                 if not m:
                     continue
                 code = f"{KALAR_DEV_PREFIX}-{st_id}-{m.group(2)}"
@@ -316,13 +316,13 @@ def sync_metadata_after_cycle(cycle_num: int, start_idx: int, cycle_dir_name: st
         next_cycle = len(st_cycles) + 1
         # ★ 下一周期目录名的范围段同样取实际 Phase 号推算（当前在飞首卷 Phase 号 + 10）
         remaining_vols = len([d for d in SHORT_TERM_DIR.glob("Phase_*") if d.is_dir()]) if SHORT_TERM_DIR.exists() else 0
-        in_flight_first = sorted([d for d in SHORT_TERM_DIR.glob("Phase_*") if d.is_dir()])[:1]
+        in_flight_first = sorted([d for d in SHORT_TERM_DIR.glob("Phase_*") if d.is_dir()], key=_phase_num_of)[:1]
         next_start = _phase_num_of(in_flight_first[0]) if in_flight_first else end_phase + 1
         next_end = next_start + 9
 
         tree_lines = ["docs/归档库/03_短期施工档案卷/"]
         for c in st_cycles:
-            vols = sorted([v.name for v in c.glob("Phase_*")])
+            vols = sorted([v.name for v in c.glob("Phase_*")], key=lambda n: int(re.search(r"Phase_(\d+)_", n).group(1)) if re.search(r"Phase_(\d+)_", n) else 0)
             tree_lines.append(f"├── {c.name}/                        # 归档周期 (收录 {len(vols)} 案卷 · ✅ 已封存)")
             for v in vols:
                 tree_lines.append(f"│   ├── {v}/")

@@ -13,6 +13,7 @@ extends RefCounted
 const ActivationTokenDTO = preload("res://backend/domains/version_governance/activation_token_dto.gd")
 const VersionedRuntimeContext = preload("res://backend/domains/version_governance/version_runtime_context.gd")
 const VersionActivationGate = preload("res://backend/domains/version_governance/version_activation_gate.gd")
+const ObjectPoolManager = preload("res://backend/infrastructure/object_pool_manager.gd")
 
 # ==============================================================================
 # 一、装配状态与单例引用
@@ -40,6 +41,7 @@ static func assemble() -> Dictionary:
 			"registered_commands": CommandRegistryEngine.registered_count()
 		}
 	GameConfig.ensure_loaded()
+	ObjectPoolManager.initialize()
 	# ：EventBus 2.0 生产单例装配（配置驱动参数；幂等，get_instance 惰性创建）
 	EventBusCore.get_instance().initialize_from_config()
 	if not _security_ready():
@@ -177,7 +179,7 @@ static func teardown() -> Dictionary:
 	if _active_context != null:
 		_active_context.dispose()
 		_active_context = null
-
+	ObjectPoolManager.teardown()
 
 	# 3. 复位装配标记
 	_assembled = false
