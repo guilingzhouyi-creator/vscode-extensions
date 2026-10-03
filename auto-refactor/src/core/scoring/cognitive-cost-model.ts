@@ -43,6 +43,7 @@ export interface CognitiveCostEvaluation {
     netCognitiveGain: number;
     hopPenalty: number;
     wrapperCount: number;
+    fileTrampolineHops?: number;
     cfni: number;
     nestingPenalty: number;
     issues: Issue[];
@@ -124,12 +125,14 @@ export function isTrivialForwardingWrapper(content: string): boolean {
  * @param filePath - Physical file path.
  * @param metrics - Metrics for all functions in the file.
  * @param previousMaxCC - Previous maximum CC before refactoring (if known).
+ * @param fileTrampolineHops - Count of empty forwarding trampoline hops.
  * @returns Comprehensive cognitive cost evaluation.
  */
 export function evaluateNetCognitiveCost(
     filePath: string,
     metrics: FunctionDecompositionMetric[],
     previousMaxCC?: number,
+    fileTrampolineHops: number = 0,
 ): CognitiveCostEvaluation {
     const issues: Issue[] = [];
     const forwardingWrappers = metrics.filter(
@@ -137,8 +140,10 @@ export function evaluateNetCognitiveCost(
     );
     const wrapperCount = forwardingWrappers.length;
 
-    // Call hop penalty: 1.5 cognitive units per trivial forwarding wrapper
-    const hopPenalty = wrapperCount * 1.5;
+    // Call hop penalty: 1.5 cognitive units per trivial forwarding wrapper,
+    // plus 3.0 units per file-level vacuous trampoline hop
+    const fileHopPenalty = fileTrampolineHops * 3.0;
+    const hopPenalty = wrapperCount * 1.5 + fileHopPenalty;
 
     // Current maximum and total CC
     const currentMaxCC = metrics.length > 0 ? Math.max(...metrics.map((m) => m.cc)) : 0;

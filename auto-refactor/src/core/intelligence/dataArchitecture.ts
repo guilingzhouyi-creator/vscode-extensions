@@ -224,6 +224,52 @@ function createLeakyAbstractionIssue(filePath: string, line: number, text: strin
     );
 }
 
+/** Regex pattern detecting resource registration call sites. */
+export const DANGLING_RESOURCE_PATH_RE =
+    /(?:register_resource|registerResource|addAsset|bindResource)\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*(?:['"]([^'"]*)['"]|null|undefined))?\s*\)/i;
+
+const DANGLING_TARGET_RE = /^(?:""|''|res:\/\/?|\/)?$|\/$/;
+
+function createResourceRegistryIssue(
+    filePath: string,
+    line: number,
+    text: string,
+    detailMsg: string,
+): Issue {
+    return createDataArchitectureIssue(
+        filePath,
+        line,
+        'DAT-RES-001',
+        'warning',
+        `Resource registry bidirectional mapping inconsistency: ${detailMsg} ('${text}').`,
+        `Resource registry broken or dangling mapping in '${filePath}': '${text}'`,
+        'Broken asset loading, dangling memory pointer, or orphan assets.',
+        'Ensure bidirectional registration in resource center and eliminate dangling asset paths.',
+    );
+}
+
+/**
+ * Checks a data access site for dangling or unmapped physical asset paths.
+ *
+ * @param site - Data access site descriptor.
+ * @returns Detected DAT-RES-001 issue or null.
+ */
+export function checkResourceRegistrySite(site: DataAccessSite): Issue | null {
+    if (site.operationKind !== 'resource-registry') return null;
+    const match = DANGLING_RESOURCE_PATH_RE.exec(site.expressionText);
+    if (!match) return null;
+    const key = match[1]?.trim();
+    const tp = match[2]?.trim();
+    return !key || tp === undefined || DANGLING_TARGET_RE.test(tp)
+        ? createResourceRegistryIssue(
+              site.file,
+              site.line,
+              site.expressionText,
+              `Empty or unmapped physical asset path for resource key '${key}'`,
+          )
+        : null;
+}
+
 /**
  * Context descriptor for a data access operation.
  */
@@ -234,7 +280,7 @@ export interface DataAccessSite {
     isOnlinePath: boolean;
     isLoopContext: boolean;
     isUnboundedQuery: boolean;
-    operationKind: 'query' | 'serialization' | 'validation' | 'driver-call';
+    operationKind: 'query' | 'serialization' | 'validation' | 'driver-call' | 'resource-registry';
     targetEntity?: string;
     expressionText: string;
 }
@@ -505,6 +551,32 @@ function checkLeakyAbstractionSite(site: DataAccessSite): Issue | null {
     );
 }
 
+function collectSiteIssues(
+    site: DataAccessSite,
+    options: DataArchitectureOptions,
+    validationCounts: Map<string, number>,
+    issues: Issue[],
+): void {
+    const unb = options.checkUnboundedQueries !== false ? checkUnboundedQuerySite(site) : null;
+    if (unb) issues.push(unb);
+    const n1 = options.checkNPlusOne !== false ? checkNPlusOneSite(site) : null;
+    if (n1) issues.push(n1);
+    const red =
+        options.checkRedundantSerialization !== false
+            ? checkRedundantSerializationSite(site)
+            : null;
+    if (red) issues.push(red);
+    const def =
+        options.checkDefensiveExcess !== false
+            ? checkDefensiveExcessSite(site, validationCounts)
+            : null;
+    if (def) issues.push(def);
+    const leaky = checkLeakyAbstractionSite(site);
+    if (leaky) issues.push(leaky);
+    const res = checkResourceRegistrySite(site);
+    if (res) issues.push(res);
+}
+
 /**
  * Scan a list of data access sites in a file and generate diagnostic issues.
  *
@@ -517,33 +589,10 @@ export function analyzeDataAccessSites(
     options: DataArchitectureOptions = {},
 ): Issue[] {
     const issues: Issue[] = [];
-    const checkUnbounded = options.checkUnboundedQueries ?? true;
-    const checkNPlusOne = options.checkNPlusOne ?? true;
-    const checkRedundantSer = options.checkRedundantSerialization ?? true;
-    const checkDefensive = options.checkDefensiveExcess ?? true;
-
-    // Track consecutive validations to identify excessive defense vs perimeter defense
     const validationCountInSymbol = new Map<string, number>();
 
     for (const site of sites) {
-        if (checkUnbounded) {
-            const issue = checkUnboundedQuerySite(site);
-            if (issue) issues.push(issue);
-        }
-        if (checkNPlusOne) {
-            const issue = checkNPlusOneSite(site);
-            if (issue) issues.push(issue);
-        }
-        if (checkRedundantSer) {
-            const issue = checkRedundantSerializationSite(site);
-            if (issue) issues.push(issue);
-        }
-        if (checkDefensive) {
-            const issue = checkDefensiveExcessSite(site, validationCountInSymbol);
-            if (issue) issues.push(issue);
-        }
-        const leakyIssue = checkLeakyAbstractionSite(site);
-        if (leakyIssue) issues.push(leakyIssue);
+        collectSiteIssues(site, options, validationCountInSymbol, issues);
     }
 
     return issues;
@@ -761,6 +810,21 @@ function auditDataArchitectureLine(
     if (isDriverCallLine(trimmed) && isPureDomainFile(filePath)) {
         issues.push(createLeakyAbstractionIssue(filePath, lineNo, trimmed));
     }
+
+    if (DANGLING_RESOURCE_PATH_RE.test(trimmed)) {
+        const dummy: DataAccessSite = {
+            file: filePath,
+            line: lineNo,
+            symbol: 'global',
+            isOnlinePath: isOnline,
+            isLoopContext: inLoop > 0,
+            isUnboundedQuery: false,
+            operationKind: 'resource-registry',
+            expressionText: trimmed,
+        };
+        const resIssue = checkResourceRegistrySite(dummy);
+        if (resIssue) issues.push(resIssue);
+    }
 }
 
 /**
@@ -817,15 +881,10 @@ export class DataArchitectureEvaluator {
         graph?: SemanticGraph,
         options: DataArchitectureOptions = {},
     ): Issue[] {
-        const issues: Issue[] = [];
-        const sourceIssues = auditDataArchitectureSource(filePath, content, options);
-        issues.push(...sourceIssues);
-
+        const issues: Issue[] = [...auditDataArchitectureSource(filePath, content, options)];
         if (graph) {
-            const graphIssues = analyzeDataArchitectureWithGraph(graph, options);
-            issues.push(...graphIssues);
+            issues.push(...analyzeDataArchitectureWithGraph(graph, options));
         }
-
         return issues;
     }
 }

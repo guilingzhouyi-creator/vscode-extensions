@@ -204,49 +204,59 @@ fn node_dominates(doms: &[usize], mut u: usize, v: usize) -> bool {
     false
 }
 
-pub fn compute_dominator_tree(
-    entry: &str,
-    nodes: &[String],
-    edges: &[Vec<String>],
-) -> DominatorTreeResult {
-    // 1. Collect all node names and assign indices
-    let mut node_set: BTreeSet<String> = BTreeSet::new();
-    node_set.insert(entry.to_string());
-    for n in nodes {
-        node_set.insert(n.clone());
-    }
-    for edge in edges {
-        if edge.len() >= 2 {
-            node_set.insert(edge[0].clone());
-            node_set.insert(edge[1].clone());
+struct IndexedGraph {
+    all_node_names: Vec<String>,
+    name_to_id: HashMap<String, usize>,
+    succs: Vec<Vec<usize>>,
+    preds: Vec<Vec<usize>>,
+}
+
+impl IndexedGraph {
+    fn build(entry: &str, nodes: &[String], edges: &[Vec<String>]) -> Self {
+        let mut node_set: BTreeSet<String> = BTreeSet::new();
+        node_set.insert(entry.to_string());
+        for n in nodes {
+            node_set.insert(n.clone());
         }
-    }
-
-    let all_node_names: Vec<String> = node_set.into_iter().collect();
-    let name_to_id: HashMap<String, usize> = all_node_names
-        .iter()
-        .enumerate()
-        .map(|(idx, name)| (name.clone(), idx))
-        .collect();
-
-    let entry_id = *name_to_id.get(entry).unwrap_or(&0);
-    let total_all = all_node_names.len();
-
-    let mut succs: Vec<Vec<usize>> = vec![Vec::new(); total_all];
-    let mut preds: Vec<Vec<usize>> = vec![Vec::new(); total_all];
-
-    for edge in edges {
-        if edge.len() >= 2 {
-            if let (Some(&u), Some(&v)) = (name_to_id.get(&edge[0]), name_to_id.get(&edge[1])) {
-                succs[u].push(v);
-                preds[v].push(u);
+        for edge in edges {
+            if edge.len() >= 2 {
+                node_set.insert(edge[0].clone());
+                node_set.insert(edge[1].clone());
             }
         }
-    }
 
-    // 2. DFS from entry to discover reachable nodes and compute RPO
-    let mut visited = vec![false; total_all];
-    let mut post_order = Vec::with_capacity(total_all);
+        let all_node_names: Vec<String> = node_set.into_iter().collect();
+        let name_to_id: HashMap<String, usize> = all_node_names
+            .iter()
+            .enumerate()
+            .map(|(idx, name)| (name.clone(), idx))
+            .collect();
+
+        let total = all_node_names.len();
+        let mut succs: Vec<Vec<usize>> = vec![Vec::new(); total];
+        let mut preds: Vec<Vec<usize>> = vec![Vec::new(); total];
+
+        for edge in edges {
+            if edge.len() >= 2 {
+                if let (Some(&u), Some(&v)) = (name_to_id.get(&edge[0]), name_to_id.get(&edge[1])) {
+                    succs[u].push(v);
+                    preds[v].push(u);
+                }
+            }
+        }
+
+        Self {
+            all_node_names,
+            name_to_id,
+            succs,
+            preds,
+        }
+    }
+}
+
+fn compute_rpo(entry_id: usize, succs: &[Vec<usize>], total: usize) -> (Vec<usize>, Vec<usize>) {
+    let mut visited = vec![false; total];
+    let mut post_order = Vec::with_capacity(total);
 
     fn dfs_rpo(
         node: usize,
@@ -263,19 +273,25 @@ pub fn compute_dominator_tree(
         post_order.push(node);
     }
 
-    dfs_rpo(entry_id, &succs, &mut visited, &mut post_order);
-
+    dfs_rpo(entry_id, succs, &mut visited, &mut post_order);
     let mut rpo = post_order;
     rpo.reverse();
 
-    let _reachable_count = rpo.len();
-    let mut rpo_index = vec![usize::MAX; total_all];
+    let mut rpo_index = vec![usize::MAX; total];
     for (idx, &node) in rpo.iter().enumerate() {
         rpo_index[node] = idx;
     }
+    (rpo, rpo_index)
+}
 
-    // 3. Cooper-Harvey-Kennedy Iterative Dominator computation
-    let mut doms = vec![usize::MAX; total_all];
+fn compute_immediate_dominators(
+    entry_id: usize,
+    rpo: &[usize],
+    rpo_index: &[usize],
+    preds: &[Vec<usize>],
+    total: usize,
+) -> Vec<usize> {
+    let mut doms = vec![usize::MAX; total];
     doms[entry_id] = entry_id;
 
     let mut changed = true;
@@ -293,7 +309,7 @@ pub fn compute_dominator_tree(
             if new_idom != usize::MAX {
                 for &p in &preds[b] {
                     if p != new_idom && doms[p] != usize::MAX {
-                        new_idom = intersect_idom(p, new_idom, &doms, &rpo_index);
+                        new_idom = intersect_idom(p, new_idom, &doms, rpo_index);
                     }
                 }
 
@@ -304,10 +320,17 @@ pub fn compute_dominator_tree(
             }
         }
     }
+    doms
+}
 
-    // 4. Dominance Frontiers (DF)
-    let mut df: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); total_all];
-    for &b in &rpo {
+fn compute_dominance_frontiers(
+    rpo: &[usize],
+    preds: &[Vec<usize>],
+    doms: &[usize],
+    total: usize,
+) -> Vec<BTreeSet<usize>> {
+    let mut df: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); total];
+    for &b in rpo {
         if preds[b].len() >= 2 {
             for &p in &preds[b] {
                 let mut runner = p;
@@ -321,15 +344,21 @@ pub fn compute_dominator_tree(
             }
         }
     }
+    df
+}
 
-    // 5. Back-edges & Loop Headers
+fn detect_back_edges(
+    edges: &[Vec<String>],
+    name_to_id: &HashMap<String, usize>,
+    doms: &[usize],
+) -> (Vec<(String, String)>, Vec<String>) {
     let mut back_edges = Vec::new();
     let mut loop_headers_set = BTreeSet::new();
 
     for edge in edges {
         if edge.len() >= 2 {
             if let (Some(&u), Some(&v)) = (name_to_id.get(&edge[0]), name_to_id.get(&edge[1])) {
-                if doms[u] != usize::MAX && doms[v] != usize::MAX && node_dominates(&doms, u, v) {
+                if doms[u] != usize::MAX && doms[v] != usize::MAX && node_dominates(doms, u, v) {
                     back_edges.push((edge[0].clone(), edge[1].clone()));
                     loop_headers_set.insert(edge[1].clone());
                 }
@@ -337,12 +366,34 @@ pub fn compute_dominator_tree(
         }
     }
 
-    // Convert results to name maps
-    let reachable_names: Vec<String> = rpo.iter().map(|&idx| all_node_names[idx].clone()).collect();
+    (back_edges, loop_headers_set.into_iter().collect())
+}
+
+pub fn compute_dominator_tree(
+    entry: &str,
+    nodes: &[String],
+    edges: &[Vec<String>],
+) -> DominatorTreeResult {
+    let graph = IndexedGraph::build(entry, nodes, edges);
+    let entry_id = *graph.name_to_id.get(entry).unwrap_or(&0);
+    let total = graph.all_node_names.len();
+
+    let (rpo, rpo_index) = compute_rpo(entry_id, &graph.succs, total);
+    let doms = compute_immediate_dominators(entry_id, &rpo, &rpo_index, &graph.preds, total);
+    let df = compute_dominance_frontiers(&rpo, &graph.preds, &doms, total);
+    let (back_edges, loop_headers) = detect_back_edges(edges, &graph.name_to_id, &doms);
+
+    let reachable_names: Vec<String> = rpo
+        .iter()
+        .map(|&idx| graph.all_node_names[idx].clone())
+        .collect();
     let mut idom_map = HashMap::new();
     for &b in &rpo {
         if b != entry_id && doms[b] != usize::MAX {
-            idom_map.insert(all_node_names[b].clone(), all_node_names[doms[b]].clone());
+            idom_map.insert(
+                graph.all_node_names[b].clone(),
+                graph.all_node_names[doms[b]].clone(),
+            );
         }
     }
 
@@ -350,9 +401,9 @@ pub fn compute_dominator_tree(
     for &b in &rpo {
         let targets: Vec<String> = df[b]
             .iter()
-            .map(|&idx| all_node_names[idx].clone())
+            .map(|&idx| graph.all_node_names[idx].clone())
             .collect();
-        df_map.insert(all_node_names[b].clone(), targets);
+        df_map.insert(graph.all_node_names[b].clone(), targets);
     }
 
     DominatorTreeResult {
@@ -360,7 +411,7 @@ pub fn compute_dominator_tree(
         reachable_nodes: reachable_names,
         idom: idom_map,
         dominance_frontiers: df_map,
-        loop_headers: loop_headers_set.into_iter().collect(),
+        loop_headers,
         back_edges,
     }
 }
@@ -373,37 +424,11 @@ pub fn solve_dataflow(
     gen_map: &HashMap<String, Vec<String>>,
     kill_map: &HashMap<String, Vec<String>>,
 ) -> DataflowResult {
-    let mut node_set: BTreeSet<String> = BTreeSet::new();
-    node_set.insert(entry.to_string());
-    for n in nodes {
-        node_set.insert(n.clone());
-    }
-    for edge in edges {
-        if edge.len() >= 2 {
-            node_set.insert(edge[0].clone());
-            node_set.insert(edge[1].clone());
-        }
-    }
-
-    let all_node_names: Vec<String> = node_set.into_iter().collect();
-    let name_to_id: HashMap<String, usize> = all_node_names
-        .iter()
-        .enumerate()
-        .map(|(idx, name)| (name.clone(), idx))
-        .collect();
-
-    let total = all_node_names.len();
-    let mut succs: Vec<Vec<usize>> = vec![Vec::new(); total];
-    let mut preds: Vec<Vec<usize>> = vec![Vec::new(); total];
-
-    for edge in edges {
-        if edge.len() >= 2 {
-            if let (Some(&u), Some(&v)) = (name_to_id.get(&edge[0]), name_to_id.get(&edge[1])) {
-                succs[u].push(v);
-                preds[v].push(u);
-            }
-        }
-    }
+    let graph = IndexedGraph::build(entry, nodes, edges);
+    let total = graph.all_node_names.len();
+    let all_node_names = &graph.all_node_names;
+    let succs = &graph.succs;
+    let preds = &graph.preds;
 
     let mut in_sets: Vec<BTreeSet<String>> = vec![BTreeSet::new(); total];
     let mut out_sets: Vec<BTreeSet<String>> = vec![BTreeSet::new(); total];

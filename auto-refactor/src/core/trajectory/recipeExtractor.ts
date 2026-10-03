@@ -32,6 +32,17 @@ type RecipeMeta = {
     operations: TransformOp[];
 };
 
+interface PatternDescriptor {
+    match: (beforeLines: string[], afterLines: string[]) => boolean;
+    name: string;
+    category: RecipeCategory;
+    description: string;
+    minLines: number;
+    antiPatternTags: string[];
+    operations: TransformOp[];
+    minComplexity?: number;
+}
+
 /**
  * Extractor engine that derives reusable refactoring recipes from code evolution history.
  */
@@ -193,496 +204,451 @@ export class TrajectoryRecipeExtractor {
     /**
      * Detect specific transformation pattern from before and after line content.
      */
+    private static readonly PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
+        {
+            match: (b, a) => RecipePatternDetectors.isFunctionSplit(b, a),
+            name: 'Large Function Decomposition into Focused Sub-methods',
+            category: 'extract-method',
+            description:
+                'Splits monolithic routine exceeding complexity limits into modular sub-tasks.',
+            minLines: 20,
+            antiPatternTags: ['monolithic-function', 'high-cyclomatic-complexity'],
+            operations: [
+                {
+                    opKind: 'split-function',
+                    targetSymbol: 'main-routine',
+                    description: 'Extract business sub-logic into separate cohesive helper methods',
+                },
+            ],
+            minComplexity: 8,
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isParameterObjectIntroduction(b, a),
+            name: 'Parameter List Encapsulation into Options Object',
+            category: 'parameter-object',
+            description:
+                'Replaces lengthy positional parameter list with a structured options record.',
+            minLines: 8,
+            antiPatternTags: ['long-parameter-list', 'positional-drift'],
+            operations: [
+                {
+                    opKind: 'introduce-parameter-object',
+                    targetSymbol: 'function-signature',
+                    description:
+                        'Consolidate 4+ positional arguments into a strongly typed options interface',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isStrategyDispatchConversion(b, a),
+            name: 'Conditional Cascade Replacement with Strategy Map',
+            category: 'strategy-dispatch',
+            description:
+                'Replaces rigid switch/if-else cascades with declarative strategy handlers.',
+            minLines: 15,
+            antiPatternTags: ['deep-branching', 'cyclomatic-cascade'],
+            operations: [
+                {
+                    opKind: 'extract-strategy',
+                    targetSymbol: 'branching-core',
+                    description:
+                        'Extract conditional branches into handler dictionary / strategy dispatch',
+                },
+            ],
+            minComplexity: 6,
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isDefensiveGuardAddition(b, a),
+            name: 'Defensive Guard and Safe Exception Boundary Injection',
+            category: 'defensive-guard',
+            description:
+                'Adds early return boundary guards and safe exception wrappers around unsafe ops.',
+            minLines: 5,
+            antiPatternTags: ['missing-guard', 'unhandled-rejection'],
+            operations: [
+                {
+                    opKind: 'inject-null-guard',
+                    targetSymbol: 'entry-parameters',
+                    description:
+                        'Add early exit guards for null, undefined, or corrupt boundary payloads',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isObjectPoolIntroduction(b, a),
+            name: 'Object Pool & State Reset Lifecycle Implementation',
+            category: 'object-pool-lifecycle',
+            description:
+                'Introduces static bounded object pool with acquire/release and reset_state to eliminate transient GC allocations.',
+            minLines: 15,
+            antiPatternTags: ['transient-heap-allocation', 'hot-loop-gc-pressure'],
+            operations: [
+                {
+                    opKind: 'introduce-object-pool',
+                    targetSymbol: 'class-definition',
+                    description:
+                        'Add static pool container with bounded capacity and acquire/release methods',
+                },
+                {
+                    opKind: 'inject-reset-state',
+                    targetSymbol: 'lifecycle-hooks',
+                    description:
+                        'Implement state clean-up in reset_state to ensure clean object reuse',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isCasReentrancyGuardIntroduction(b, a),
+            name: 'Atomic CAS State Machine Reentrancy Guard',
+            category: 'cas-reentrancy-guard',
+            description:
+                'Adds atomic compare-and-swap boolean flags to prevent recursive or concurrent state machine reentrancy.',
+            minLines: 8,
+            antiPatternTags: ['unprotected-reentrancy', 'recursive-state-mutation'],
+            operations: [
+                {
+                    opKind: 'inject-cas-guard',
+                    targetSymbol: 'state-machine-entry',
+                    description:
+                        'Add boolean CAS flag check and short-circuit guard at critical section entry',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isConfigCacheInvalidationIntroduction(b, a),
+            name: 'Config-Driven Cache Invalidation & Lazy Self-Healing',
+            category: 'config-cache-invalidation',
+            description:
+                'Replaces hot-loop config dictionary queries with version-checked static cache and invalidate_cache hook.',
+            minLines: 12,
+            antiPatternTags: ['hot-path-config-query', 'stale-cache-risk'],
+            operations: [
+                {
+                    opKind: 'inject-cache-invalidation',
+                    targetSymbol: 'cache-management',
+                    description:
+                        'Implement version-checked ensure_cache and explicit invalidate_cache hook',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isDtoContextAggregationIntroduction(b, a),
+            name: 'Data Clump to Typed Context DTO Aggregation',
+            category: 'dto-context-aggregation',
+            description:
+                'Encapsulates 5+ loose scalar parameters into a typed Context DTO while maintaining 1-to-N backward-compatible bridges.',
+            minLines: 12,
+            antiPatternTags: ['data-clump', 'parameter-overload'],
+            operations: [
+                {
+                    opKind: 'introduce-dto-context',
+                    targetSymbol: 'service-api',
+                    description:
+                        'Consolidate multi-parameter signatures into ContextDTO and delegate legacy calls to context overload',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isHookDecouplingIntroduction(b, a),
+            name: 'Hardcoded Pipeline Branch to Dynamic Hook Dispatch Decoupling',
+            category: 'hook-decoupling',
+            description:
+                'Replaces hardcoded downstream consequence branches with schema-validated dynamic hook dispatcher.',
+            minLines: 10,
+            antiPatternTags: ['hardcoded-pipeline-branch', 'tight-lifecycle-coupling'],
+            operations: [
+                {
+                    opKind: 'inject-hook-dispatch',
+                    targetSymbol: 'pipeline-flow',
+                    description:
+                        'Dispatch lifecycle transitions via HookBus/ConfigHook rather than hardcoded direct calls',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isShimEliminationIntroduction(b, a),
+            name: 'Compatibility Layer Shim Elimination and Obsolete Bridge Purge',
+            category: 'shim-elimination',
+            description:
+                'Removes legacy compatibility shims, bridge adapters, and redundant scalar delegation wrappers.',
+            minLines: 5,
+            antiPatternTags: ['stale-shim-layer', 'obsolete-compatibility-bridge'],
+            operations: [
+                {
+                    opKind: 'remove-stale-shim',
+                    targetSymbol: 'compatibility-layer',
+                    description:
+                        'Purge deprecated compatibility adapters and scalar bridging overloads',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isDirectModernMigrationIntroduction(b, a),
+            name: 'Direct Modern Architecture API Migration',
+            category: 'direct-modern-migration',
+            description:
+                'Migrates call sites from transitional bridging shims to canonical direct modern DTO APIs.',
+            minLines: 3,
+            antiPatternTags: ['indirect-shim-wrapper', 'transitional-scaffolding'],
+            operations: [
+                {
+                    opKind: 'bypass-shim-to-direct',
+                    targetSymbol: 'call-sites',
+                    description:
+                        'Replace indirect shim method calls with direct canonical context DTO invocations',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isDeprecationLifecycleAnnotation(b, a),
+            name: 'Deprecation Lifecycle Metadata and Sunset Plan Governance',
+            category: 'deprecation-lifecycle',
+            description:
+                'Enforces formal deprecation tagging with Since/Sunset versions and migration guide references.',
+            minLines: 3,
+            antiPatternTags: ['unannotated-deprecation', 'missing-sunset-plan'],
+            operations: [
+                {
+                    opKind: 'inject-deprecated-annotation',
+                    targetSymbol: 'deprecated-symbol',
+                    description:
+                        'Attach formal @deprecated JSDoc tag with Since version and Sunset target',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isZeroCostModernization(b, a),
+            name: 'Zero-Cost Modern Abstraction and Direct Context View',
+            category: 'zero-cost-modernization',
+            description:
+                'Replaces heap-allocating bridge boxing wrappers with zero-cost typed views and direct solvers.',
+            minLines: 3,
+            antiPatternTags: ['transient-bridge-boxing', 'heavyweight-wrapper'],
+            operations: [
+                {
+                    opKind: 'introduce-zero-cost-view',
+                    targetSymbol: 'data-binding',
+                    description:
+                        'Replace dictionary boxing with strongly-typed zero-overhead context view',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isInteractionDebounceIntroduction(b, a),
+            name: 'Interactive Action Debounce and Loading State Guard',
+            category: 'interaction-debounce',
+            description:
+                'Protects high-frequency buttons and RPC triggers with debounce timeout and loading mutex fencing.',
+            minLines: 3,
+            antiPatternTags: ['missing-debounce'],
+            operations: [
+                {
+                    opKind: 'inject-debounce-lock',
+                    targetSymbol: 'event-handler',
+                    description:
+                        'Upgrade bare button connection to debounced handler with loading state lock',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isStateMachineDisciplineIntroduction(b, a),
+            name: 'Finite State Machine Transition Guard Discipline',
+            category: 'state-machine-discipline',
+            description:
+                'Replaces wild direct state variable mutations with formal guarded transition_to calls.',
+            minLines: 3,
+            antiPatternTags: ['wild-state-mutation'],
+            operations: [
+                {
+                    opKind: 'inject-transition-guard',
+                    targetSymbol: 'state-machine',
+                    description:
+                        'Enforce transition_to guard flow and entry/exit invariant execution',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isWeakRefObserverIntroduction(b, a),
+            name: 'Dynamic Observer WeakRef Reference Decoupling',
+            category: 'weakref-observer',
+            description:
+                'Replaces strong Node references in dynamic registries with weakref wrappers to prevent zombie leaks.',
+            minLines: 3,
+            antiPatternTags: ['strong-observer-leak'],
+            operations: [
+                {
+                    opKind: 'wrap-weakref-observer',
+                    targetSymbol: 'observer-registry',
+                    description:
+                        'Wrap registered Node listener in weakref and add dead reference cleanup',
+                },
+            ],
+        },
+        {
+            match: (b, a) => RecipePatternDetectors.isUnidirectionalFlowIntroduction(b, a),
+            name: 'Presentation Unidirectional Flow and Snapshot Immutability',
+            category: 'unidirectional-flow',
+            description:
+                'Eliminates in-place mutation of Snapshot DTOs in presentation layer in favor of intent commands.',
+            minLines: 3,
+            antiPatternTags: ['dto-mutation-leak'],
+            operations: [
+                {
+                    opKind: 'introduce-intent-command',
+                    targetSymbol: 'presentation-view',
+                    description:
+                        'Replace in-place DTO field mutation with intention Command dispatch to domain service',
+                },
+            ],
+        },
+        {
+            match: (b, a) =>
+                b.some((l) => /\bProgressBar\b/.test(l)) && a.some((l) => /\bKStatusBar\b/.test(l)),
+            name: 'Bare ProgressBar to KStatusBar Refactoring',
+            category: 'status-bar-component',
+            description: 'Upgrades discrete ProgressBar manipulation to KStatusBar component.',
+            minLines: 2,
+            antiPatternTags: ['bare-progress-bar'],
+            operations: [
+                {
+                    opKind: 'introduce-status-bar',
+                    targetSymbol: 'progress-bar',
+                    description: 'Replace ProgressBar with KStatusBar',
+                },
+            ],
+        },
+        {
+            match: (b, a) =>
+                b.some((l) => /Color\s*\(/.test(l)) && a.some((l) => /DesignTokens\./.test(l)),
+            name: 'Hardcoded Color to DesignTokens Refactoring',
+            category: 'token-standardization',
+            description: 'Replaces raw Color literals with DesignTokens constants.',
+            minLines: 2,
+            antiPatternTags: ['hardcoded-color-token'],
+            operations: [
+                {
+                    opKind: 'replace-color-token',
+                    targetSymbol: 'design-tokens',
+                    description: 'Adopt DesignTokens constants',
+                },
+            ],
+        },
+        {
+            match: (b, a) =>
+                b.some((l) => /extends\s+Control\b/.test(l)) &&
+                a.some((l) => /extends\s+(BaseScreen|BaseModal)\b/.test(l)),
+            name: 'Bare Control to BaseScreen Refactoring',
+            category: 'screen-base-inheritance',
+            description: 'Replaces bare Control inheritance with BaseScreen/BaseModal framework.',
+            minLines: 2,
+            antiPatternTags: ['bare-control-inheritance'],
+            operations: [
+                {
+                    opKind: 'extend-base-screen',
+                    targetSymbol: 'base-screen',
+                    description: 'Extend BaseScreen or BaseModal',
+                },
+            ],
+        },
+        {
+            match: (b, a) =>
+                b.some((l) => /\badd_child\b/.test(l)) && a.some((l) => /\bKVirtualList\b/.test(l)),
+            name: 'List Node Virtualization & Pooling Refactoring',
+            category: 'virtual-list-pooling',
+            description:
+                'Converts unbounded dynamic node instantiation into KVirtualList with object pooling.',
+            minLines: 2,
+            antiPatternTags: ['unbounded-list-instantiation'],
+            operations: [
+                {
+                    opKind: 'introduce-virtual-list',
+                    targetSymbol: 'virtual-list',
+                    description: 'Adopt KVirtualList with object pool',
+                },
+            ],
+        },
+        {
+            match: (b, a) =>
+                b.some((l) => /=\s*"[A-Z]/.test(l)) &&
+                a.some((l) => /\b(?:tr\s*\(|UIIntermediary)/.test(l)),
+            name: 'UI Text i18n Localization Refactoring',
+            category: 'i18n-localization',
+            description:
+                'Wraps raw display strings into localized tr(KEY) or UIIntermediary bindings.',
+            minLines: 2,
+            antiPatternTags: ['unlocalized-ui-string'],
+            operations: [
+                {
+                    opKind: 'introduce-i18n-binding',
+                    targetSymbol: 'i18n-service',
+                    description: 'Bind UI text to i18n dictionary',
+                },
+            ],
+        },
+        {
+            match: (b, a) =>
+                b.some((l) => /\b(?:get_parent|find_child)\b/.test(l)) &&
+                a.some((l) => /%[A-Za-z0-9_]+/.test(l)),
+            name: 'Explicit Unique Node Path Refactoring',
+            category: 'explicit-node-unique',
+            description: 'Replaces fragile node traversal with explicit %UniqueNode references.',
+            minLines: 2,
+            antiPatternTags: ['fragile-node-path'],
+            operations: [
+                {
+                    opKind: 'replace-relative-node-path',
+                    targetSymbol: 'node-path',
+                    description: 'Use %UniqueNode reference',
+                },
+            ],
+        },
+        {
+            match: (b, a) =>
+                b.some((l) => /\bGameState\./.test(l)) &&
+                a.some((l) => /\bapply_snapshot\b/.test(l)),
+            name: 'Presentation Domain Boundary Decoupling Refactoring',
+            category: 'presentation-decoupling',
+            description:
+                'Decouples presentation views from backend singletons via apply_snapshot contract.',
+            minLines: 2,
+            antiPatternTags: ['backend-singleton-coupling'],
+            operations: [
+                {
+                    opKind: 'isolate-domain-boundary',
+                    targetSymbol: 'presentation-view',
+                    description: 'Decouple view via snapshot flow',
+                },
+            ],
+        },
+    ];
+
+    /**
+     * Detect specific transformation pattern from before and after line content.
+     */
     private detectTransformationPattern(
         beforeLines: string[],
         afterLines: string[],
         language?: string,
     ): RecipeMeta | undefined {
-        if (RecipePatternDetectors.isFunctionSplit(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Large Function Decomposition into Focused Sub-methods',
-                'extract-method',
-                'Splits monolithic routine exceeding complexity limits into modular sub-tasks.',
-                language,
-                20,
-                ['monolithic-function', 'high-cyclomatic-complexity'],
-                [
-                    this.createOp(
-                        'split-function',
-                        'main-routine',
-                        'Extract business sub-logic into separate cohesive helper methods',
-                    ),
-                ],
-                8,
-            );
+        for (const desc of TrajectoryRecipeExtractor.PATTERN_DESCRIPTORS) {
+            if (desc.match(beforeLines, afterLines)) {
+                return {
+                    name: desc.name,
+                    category: desc.category,
+                    description: desc.description,
+                    precondition: {
+                        targetLanguage: language,
+                        minLines: desc.minLines,
+                        ...(desc.minComplexity === undefined
+                            ? {}
+                            : { minComplexity: desc.minComplexity }),
+                        antiPatternTags: desc.antiPatternTags,
+                    },
+                    operations: desc.operations,
+                };
+            }
         }
-
-        if (RecipePatternDetectors.isParameterObjectIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Parameter List Encapsulation into Options Object',
-                'parameter-object',
-                'Replaces lengthy positional parameter list with a structured options record.',
-                language,
-                8,
-                ['long-parameter-list', 'positional-drift'],
-                [
-                    this.createOp(
-                        'introduce-parameter-object',
-                        'function-signature',
-                        'Consolidate 4+ positional arguments into a strongly typed options interface',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isStrategyDispatchConversion(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Conditional Cascade Replacement with Strategy Map',
-                'strategy-dispatch',
-                'Replaces rigid switch/if-else cascades with declarative strategy handlers.',
-                language,
-                15,
-                ['deep-branching', 'cyclomatic-cascade'],
-                [
-                    this.createOp(
-                        'extract-strategy',
-                        'branching-core',
-                        'Extract conditional branches into handler dictionary / strategy dispatch',
-                    ),
-                ],
-                6,
-            );
-        }
-
-        if (RecipePatternDetectors.isDefensiveGuardAddition(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Defensive Guard and Safe Exception Boundary Injection',
-                'defensive-guard',
-                'Adds early return boundary guards and safe exception wrappers around unsafe ops.',
-                language,
-                5,
-                ['missing-guard', 'unhandled-rejection'],
-                [
-                    this.createOp(
-                        'inject-null-guard',
-                        'entry-parameters',
-                        'Add early exit guards for null, undefined, or corrupt boundary payloads',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isObjectPoolIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Object Pool & State Reset Lifecycle Implementation',
-                'object-pool-lifecycle',
-                'Introduces static bounded object pool with acquire/release and reset_state to eliminate transient GC allocations.',
-                language,
-                15,
-                ['transient-heap-allocation', 'hot-loop-gc-pressure'],
-                [
-                    this.createOp(
-                        'introduce-object-pool',
-                        'class-definition',
-                        'Add static pool container with bounded capacity and acquire/release methods',
-                    ),
-                    this.createOp(
-                        'inject-reset-state',
-                        'lifecycle-hooks',
-                        'Implement state clean-up in reset_state to ensure clean object reuse',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isCasReentrancyGuardIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Atomic CAS State Machine Reentrancy Guard',
-                'cas-reentrancy-guard',
-                'Adds atomic compare-and-swap boolean flags to prevent recursive or concurrent state machine reentrancy.',
-                language,
-                8,
-                ['unprotected-reentrancy', 'recursive-state-mutation'],
-                [
-                    this.createOp(
-                        'inject-cas-guard',
-                        'state-machine-entry',
-                        'Add boolean CAS flag check and short-circuit guard at critical section entry',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isConfigCacheInvalidationIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Config-Driven Cache Invalidation & Lazy Self-Healing',
-                'config-cache-invalidation',
-                'Replaces hot-loop config dictionary queries with version-checked static cache and invalidate_cache hook.',
-                language,
-                12,
-                ['hot-path-config-query', 'stale-cache-risk'],
-                [
-                    this.createOp(
-                        'inject-cache-invalidation',
-                        'cache-management',
-                        'Implement version-checked ensure_cache and explicit invalidate_cache hook',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isDtoContextAggregationIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Data Clump to Typed Context DTO Aggregation',
-                'dto-context-aggregation',
-                'Encapsulates 5+ loose scalar parameters into a typed Context DTO while maintaining 1-to-N backward-compatible bridges.',
-                language,
-                12,
-                ['data-clump', 'parameter-overload'],
-                [
-                    this.createOp(
-                        'introduce-dto-context',
-                        'service-api',
-                        'Consolidate multi-parameter signatures into ContextDTO and delegate legacy calls to context overload',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isHookDecouplingIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Hardcoded Pipeline Branch to Dynamic Hook Dispatch Decoupling',
-                'hook-decoupling',
-                'Replaces hardcoded downstream consequence branches with schema-validated dynamic hook dispatcher.',
-                language,
-                10,
-                ['hardcoded-pipeline-branch', 'tight-lifecycle-coupling'],
-                [
-                    this.createOp(
-                        'inject-hook-dispatch',
-                        'pipeline-flow',
-                        'Dispatch lifecycle transitions via HookBus/ConfigHook rather than hardcoded direct calls',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isShimEliminationIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Compatibility Layer Shim Elimination and Obsolete Bridge Purge',
-                'shim-elimination',
-                'Removes legacy compatibility shims, bridge adapters, and redundant scalar delegation wrappers.',
-                language,
-                5,
-                ['stale-shim-layer', 'obsolete-compatibility-bridge'],
-                [
-                    this.createOp(
-                        'remove-stale-shim',
-                        'compatibility-layer',
-                        'Purge deprecated compatibility adapters and scalar bridging overloads',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isDirectModernMigrationIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Direct Modern Architecture API Migration',
-                'direct-modern-migration',
-                'Migrates call sites from transitional bridging shims to canonical direct modern DTO APIs.',
-                language,
-                3,
-                ['indirect-shim-wrapper', 'transitional-scaffolding'],
-                [
-                    this.createOp(
-                        'bypass-shim-to-direct',
-                        'call-sites',
-                        'Replace indirect shim method calls with direct canonical context DTO invocations',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isDeprecationLifecycleAnnotation(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Deprecation Lifecycle Metadata and Sunset Plan Governance',
-                'deprecation-lifecycle',
-                'Enforces formal deprecation tagging with Since/Sunset versions and migration guide references.',
-                language,
-                3,
-                ['unannotated-deprecation', 'missing-sunset-plan'],
-                [
-                    this.createOp(
-                        'inject-deprecated-annotation',
-                        'deprecated-symbol',
-                        'Attach formal @deprecated JSDoc tag with Since version and Sunset target',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isZeroCostModernization(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Zero-Cost Modern Abstraction and Direct Context View',
-                'zero-cost-modernization',
-                'Replaces heap-allocating bridge boxing wrappers with zero-cost typed views and direct solvers.',
-                language,
-                3,
-                ['transient-bridge-boxing', 'heavyweight-wrapper'],
-                [
-                    this.createOp(
-                        'introduce-zero-cost-view',
-                        'data-binding',
-                        'Replace dictionary boxing with strongly-typed zero-overhead context view',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isInteractionDebounceIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Interactive Action Debounce and Loading State Guard',
-                'interaction-debounce',
-                'Protects high-frequency buttons and RPC triggers with debounce timeout and loading mutex fencing.',
-                language,
-                3,
-                ['missing-debounce'],
-                [
-                    this.createOp(
-                        'inject-debounce-lock',
-                        'event-handler',
-                        'Upgrade bare button connection to debounced handler with loading state lock',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isStateMachineDisciplineIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Finite State Machine Transition Guard Discipline',
-                'state-machine-discipline',
-                'Replaces wild direct state variable mutations with formal guarded transition_to calls.',
-                language,
-                3,
-                ['wild-state-mutation'],
-                [
-                    this.createOp(
-                        'inject-transition-guard',
-                        'state-machine',
-                        'Enforce transition_to guard flow and entry/exit invariant execution',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isWeakRefObserverIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Dynamic Observer WeakRef Reference Decoupling',
-                'weakref-observer',
-                'Replaces strong Node references in dynamic registries with weakref wrappers to prevent zombie leaks.',
-                language,
-                3,
-                ['strong-observer-leak'],
-                [
-                    this.createOp(
-                        'wrap-weakref-observer',
-                        'observer-registry',
-                        'Wrap registered Node listener in weakref and add dead reference cleanup',
-                    ),
-                ],
-            );
-        }
-
-        if (RecipePatternDetectors.isUnidirectionalFlowIntroduction(beforeLines, afterLines)) {
-            return this.createPatternMeta(
-                'Presentation Unidirectional Flow and Snapshot Immutability',
-                'unidirectional-flow',
-                'Eliminates in-place mutation of Snapshot DTOs in presentation layer in favor of intent commands.',
-                language,
-                3,
-                ['dto-mutation-leak'],
-                [
-                    this.createOp(
-                        'introduce-intent-command',
-                        'presentation-view',
-                        'Replace in-place DTO field mutation with intention Command dispatch to domain service',
-                    ),
-                ],
-            );
-        }
-
-        if (
-            beforeLines.some((line) => /\bProgressBar\b/.test(line)) &&
-            afterLines.some((line) => /\bKStatusBar\b/.test(line))
-        ) {
-            return this.createPatternMeta(
-                'Bare ProgressBar to KStatusBar Refactoring',
-                'status-bar-component',
-                'Upgrades discrete ProgressBar manipulation to KStatusBar component.',
-                language,
-                2,
-                ['bare-progress-bar'],
-                [
-                    this.createOp(
-                        'introduce-status-bar',
-                        'progress-bar',
-                        'Replace ProgressBar with KStatusBar',
-                    ),
-                ],
-            );
-        }
-
-        if (
-            beforeLines.some((line) => /Color\s*\(/.test(line)) &&
-            afterLines.some((line) => /DesignTokens\./.test(line))
-        ) {
-            return this.createPatternMeta(
-                'Hardcoded Color to DesignTokens Refactoring',
-                'token-standardization',
-                'Replaces raw Color literals with DesignTokens constants.',
-                language,
-                2,
-                ['hardcoded-color-token'],
-                [
-                    this.createOp(
-                        'replace-color-token',
-                        'design-tokens',
-                        'Adopt DesignTokens constants',
-                    ),
-                ],
-            );
-        }
-
-        if (
-            beforeLines.some((line) => /extends\s+Control\b/.test(line)) &&
-            afterLines.some((line) => /extends\s+(BaseScreen|BaseModal)\b/.test(line))
-        ) {
-            return this.createPatternMeta(
-                'Bare Control to BaseScreen Refactoring',
-                'screen-base-inheritance',
-                'Replaces bare Control inheritance with BaseScreen/BaseModal framework.',
-                language,
-                2,
-                ['bare-control-inheritance'],
-                [
-                    this.createOp(
-                        'extend-base-screen',
-                        'base-screen',
-                        'Extend BaseScreen or BaseModal',
-                    ),
-                ],
-            );
-        }
-
-        if (
-            beforeLines.some((line) => /\badd_child\b/.test(line)) &&
-            afterLines.some((line) => /\bKVirtualList\b/.test(line))
-        ) {
-            return this.createPatternMeta(
-                'List Node Virtualization & Pooling Refactoring',
-                'virtual-list-pooling',
-                'Converts unbounded dynamic node instantiation into KVirtualList with object pooling.',
-                language,
-                2,
-                ['unbounded-list-instantiation'],
-                [
-                    this.createOp(
-                        'introduce-virtual-list',
-                        'virtual-list',
-                        'Adopt KVirtualList with object pool',
-                    ),
-                ],
-            );
-        }
-
-        if (
-            beforeLines.some((line) => /=\s*"[A-Z]/.test(line)) &&
-            afterLines.some((line) => /\b(?:tr\s*\(|UIIntermediary)/.test(line))
-        ) {
-            return this.createPatternMeta(
-                'UI Text i18n Localization Refactoring',
-                'i18n-localization',
-                'Wraps raw display strings into localized tr(KEY) or UIIntermediary bindings.',
-                language,
-                2,
-                ['unlocalized-ui-string'],
-                [
-                    this.createOp(
-                        'introduce-i18n-binding',
-                        'i18n-service',
-                        'Bind UI text to i18n dictionary',
-                    ),
-                ],
-            );
-        }
-
-        if (
-            beforeLines.some((line) => /\b(?:get_parent|find_child)\b/.test(line)) &&
-            afterLines.some((line) => /%[A-Za-z0-9_]+/.test(line))
-        ) {
-            return this.createPatternMeta(
-                'Explicit Unique Node Path Refactoring',
-                'explicit-node-unique',
-                'Replaces fragile node traversal with explicit %UniqueNode references.',
-                language,
-                2,
-                ['fragile-node-path'],
-                [
-                    this.createOp(
-                        'replace-relative-node-path',
-                        'node-path',
-                        'Use %UniqueNode reference',
-                    ),
-                ],
-            );
-        }
-
-        if (
-            beforeLines.some((line) => /\bGameState\./.test(line)) &&
-            afterLines.some((line) => /\bapply_snapshot\b/.test(line))
-        ) {
-            return this.createPatternMeta(
-                'Presentation Domain Boundary Decoupling Refactoring',
-                'presentation-decoupling',
-                'Decouples presentation views from backend singletons via apply_snapshot contract.',
-                language,
-                2,
-                ['backend-singleton-coupling'],
-                [
-                    this.createOp(
-                        'isolate-domain-boundary',
-                        'presentation-view',
-                        'Decouple view via snapshot flow',
-                    ),
-                ],
-            );
-        }
-
         return undefined;
-    }
-
-    private createPatternMeta(
-        name: string,
-        category: RecipeCategory,
-        description: string,
-        language: string | undefined,
-        minLines: number,
-        antiPatternTags: string[],
-        operations: TransformOp[],
-        minComplexity?: number,
-    ): RecipeMeta {
-        return {
-            name,
-            category,
-            description,
-            precondition: {
-                targetLanguage: language,
-                minLines,
-                ...(minComplexity === undefined ? {} : { minComplexity }),
-                antiPatternTags,
-            },
-            operations,
-        };
     }
 
     private detectTagInCode(tag: string, code: string, lines: string[]): boolean {

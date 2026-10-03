@@ -37,6 +37,8 @@ export interface PerformanceOptions {
     checkTransientAllocations?: boolean;
     /** Opt-in check for unbounded memory growth leaks in loops and timers (PRF-LEAK-001). */
     checkUnboundedGrowth?: boolean;
+    /** Check for linear collection lookups in loops (PRF-ALG-002). */
+    checkLinearLookups?: boolean;
     /**
      * Path globs whose synchronous I/O is a documented policy (CLI entry points, validation and
      * benchmark harnesses are synchronous by design). Shared with the governance rule GOV-PRF-004
@@ -156,6 +158,7 @@ export interface PerformanceScanConfig {
     syncIoAllowlisted: boolean;
     allocAllowlisted: boolean;
     isIndentBased: boolean;
+    checkLinearLookups: boolean;
 }
 
 /**
@@ -169,6 +172,7 @@ export function createScanConfig(opts: PerformanceOptions, file: string): Perfor
     const maxNesting = opts.maxLoopNesting ?? DEFAULT_MAX_LOOP_NESTING;
     const checkIO = opts.checkBlockingIO !== false;
     const checkAlloc = opts.checkTransientAllocations !== false;
+    const checkLinearLookups = opts.checkLinearLookups !== false;
 
     const syncIoAllowPatterns = (opts.blockingIoAllowPatterns ?? []).map((g) => globToRegExp(g));
     const syncIoAllowlisted = syncIoAllowPatterns.length > 0 && matchAny(syncIoAllowPatterns, file);
@@ -185,5 +189,73 @@ export function createScanConfig(opts: PerformanceOptions, file: string): Perfor
         syncIoAllowlisted,
         allocAllowlisted,
         isIndentBased,
+        checkLinearLookups,
     };
+}
+
+/**
+ * Computes leading indentation column count for space/tab formatted lines.
+ *
+ * @param lineText - Raw line string.
+ * @returns Number of leading indentation spaces/tabs.
+ */
+export function calculateIndent(lineText: string): number {
+    let indent = 0;
+    while (
+        indent < lineText.length &&
+        (lineText.charCodeAt(indent) === CHAR_CODE_SPACE ||
+            lineText.charCodeAt(indent) === CHAR_CODE_TAB)
+    ) {
+        indent++;
+    }
+    return indent;
+}
+
+/**
+ * Updates loop frame stack for indentation-scoped languages (Python, GDScript).
+ *
+ * @param lineText - Current line text.
+ * @param isIndentBased - Flag indicating indentation-based language.
+ * @param loopStack - Mutable loop scope stack.
+ */
+export function updateIndentLoops(
+    lineText: string,
+    isIndentBased: boolean,
+    loopStack: LoopScope[],
+): void {
+    if (!isIndentBased || loopStack.length === 0) return;
+    const indent = calculateIndent(lineText);
+    while (loopStack.length > 0 && indent <= loopStack[loopStack.length - 1].indent) {
+        loopStack.pop();
+    }
+}
+
+/**
+ * Updates loop frame stack for brace-delimited languages (TS, JS, Rust, Go).
+ *
+ * @param trimmed - Line text trimmed of whitespace.
+ * @param loopStack - Mutable loop scope stack.
+ */
+export function updateBraceLoops(trimmed: string, loopStack: LoopScope[]): void {
+    if (!trimmed.includes('}')) return;
+    const closes = (trimmed.match(/\}/g) || []).length;
+    for (let c = 0; c < closes; c++) {
+        if (loopStack.length > 0) {
+            loopStack.pop();
+        }
+    }
+}
+
+const LINEAR_LOOKUP_RE = /\.(?:find|filter|indexOf|lastIndexOf|includes|some|every)\s*\(/;
+
+/**
+ * Extracts linear lookup method name from an expression string if present.
+ *
+ * @param trimmed - Expression text trimmed of leading whitespace.
+ * @returns Detected linear method name or null.
+ */
+export function extractLinearLookupMethod(trimmed: string): string | null {
+    const match = LINEAR_LOOKUP_RE.exec(trimmed);
+    if (!match) return null;
+    return match[0].replace(/^[.\s]+|\s*[(:]$/g, '');
 }

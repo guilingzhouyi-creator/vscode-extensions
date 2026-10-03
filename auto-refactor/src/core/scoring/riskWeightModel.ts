@@ -12,6 +12,8 @@
 
 import type { Issue } from '../types';
 import type { PillarCeilingConstraint, PrimaryQualityPillar } from './eightPillarModel';
+import type { QualityDimension } from './scoringTypes';
+import { familyDimensionOf } from './dimensionDeductions';
 
 /**
  * Reach / blast radius scope of an issue.
@@ -155,9 +157,21 @@ export interface RiskPenaltyResult {
     totalPenalty: number;
     assessments: IssueRiskAssessment[];
     pillarPenalties: Record<PrimaryQualityPillar, number>;
+    dimensionPenalties: Record<QualityDimension, number>;
     ceilings: PillarCeilingConstraint[];
     fatalIssueCount: number;
 }
+
+const PILLAR_TO_DIMENSION_MAP: Record<PrimaryQualityPillar, QualityDimension> = {
+    architecture: 'architectureConsistency',
+    maintainability: 'maintainability',
+    performance: 'performanceEfficiency',
+    data: 'performanceEfficiency',
+    testing: 'modernity',
+    reliability: 'semanticPurity',
+    security: 'codeSecurity',
+    extensibility: 'standardization',
+};
 
 /**
  * Maps a rule id to the primary quality pillar it impacts.
@@ -272,6 +286,18 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
         security: 0,
         extensibility: 0,
     };
+    const dimensionPenalties: Record<QualityDimension, number> = {
+        architectureConsistency: 0,
+        semanticPurity: 0,
+        codeSecurity: 0,
+        performanceEfficiency: 0,
+        standardization: 0,
+        modernity: 0,
+        maintainability: 0,
+        commentQuality: 0,
+        duplication: 0,
+        techDebtRisk: 0,
+    };
 
     const ruleFrequencies = new Map<string, number>();
     for (let i = 0; i < issues.length; i++) {
@@ -288,6 +314,12 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
         const result = evaluateSingleIssue(issue, count);
 
         pillarPenalties[result.assessment.affectedPillar] += result.assessment.effectivePenalty;
+        const dim =
+            familyDimensionOf(issue.rule) ||
+            PILLAR_TO_DIMENSION_MAP[result.assessment.affectedPillar] ||
+            'maintainability';
+        dimensionPenalties[dim] += result.assessment.effectivePenalty;
+
         assessments.push(result.assessment);
         if (result.isFatal) fatalIssueCount++;
         if (result.ceiling) ceilings.push(result.ceiling);
@@ -298,10 +330,16 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
         totalPenalty += p;
     }
 
+    for (const d of Object.keys(dimensionPenalties) as QualityDimension[]) {
+        dimensionPenalties[d] =
+            Math.round(dimensionPenalties[d] * DAMPENING_SCALE) / DAMPENING_SCALE;
+    }
+
     return {
         totalPenalty: Math.round(totalPenalty * DAMPENING_SCALE) / DAMPENING_SCALE,
         assessments,
         pillarPenalties,
+        dimensionPenalties,
         ceilings,
         fatalIssueCount,
     };

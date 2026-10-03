@@ -24,6 +24,7 @@ import { FORBIDDEN_HEADLESS_IMPORTS } from '../core/intelligence/semanticArchite
 import { auditDispatchComplexity } from '../core/rules/evolution/dispatchComplexityRule';
 import { auditTemplateComplexity } from '../core/rules/evolution/template-complexity-rule';
 import { auditConfigDrivenArchitecture } from '../core/architecture/config-driven-architecture';
+import { auditFacadeGovernance } from '../core/architecture/facade-governance-evaluator';
 import {
     extractSpecifiers,
     type SpecifierInfo,
@@ -103,6 +104,10 @@ function auditEvolutionaryArchitectureRules(
     }
     if (opts.flagTemplateComplexity !== false) {
         issues.push(...auditTemplateComplexity(content, file, ctx));
+    }
+    const facadeResult = auditFacadeGovernance(file, content);
+    if (facadeResult.issues.length > 0) {
+        issues.push(...facadeResult.issues);
     }
     return issues;
 }

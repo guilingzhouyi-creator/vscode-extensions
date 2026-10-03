@@ -19,6 +19,7 @@ import {
     RULE_PRF_POL_001,
     RULE_PRF_POL_002,
     RULE_PRF_POL_003,
+    RULE_PRF_POL_004,
 } from '../scoring/dimensionLiterals';
 
 /**
@@ -46,6 +47,8 @@ export interface AllocationSiteContext {
     isPrimitiveOrTiny: boolean;
     hasExpensiveConstructor: boolean;
     estimatedAllocFrequency: 'loop_hot' | 'request_medium' | 'init_cold';
+    isStreamingOrChunkedBuffer?: boolean;
+    hasRingBufferOrReuse?: boolean;
 }
 
 /**
@@ -80,16 +83,47 @@ export interface ResourcePoolingAuditResult {
  * Audits unpooled allocation sites in hot paths to identify genuine pooling candidates.
  *
  * @param sites - Array of allocation sites inspected during traversal.
- * @returns Detected unpooled performance issues (PRF-POL-001).
+ * @returns Detected unpooled performance issues (PRF-POL-001 and PRF-POL-004).
  */
 export function auditUnpooledHotspots(sites: AllocationSiteContext[]): Issue[] {
     const issues: Issue[] = [];
 
     for (const site of sites) {
-        // Only trigger for non-tiny, expensive allocations in loops or hot paths
+        // 1. Check for unbuffered stream chunk ingestion lacking ring buffer reuse (PRF-POL-004)
+        if (
+            site.isInLoopOrHotPath &&
+            site.isStreamingOrChunkedBuffer &&
+            !site.hasRingBufferOrReuse
+        ) {
+            issues.push({
+                id: `performance:${RULE_PRF_POL_004}:${site.filePath}:${site.line}`,
+                analyzer: ANALYZER_PERFORMANCE,
+                rule: RULE_PRF_POL_004,
+                severity: SEVERITY_WARNING,
+                message:
+                    `Unbuffered stream ingestion in "${site.functionName}": chunk allocation of ` +
+                    `"${site.allocatedType}" inside streaming loop lacks circular ring buffer or pool recycling.`,
+                location: {
+                    file: site.filePath,
+                    start: { line: site.line, column: 1 },
+                    end: { line: site.line, column: 80 },
+                },
+                detail: {
+                    functionName: site.functionName,
+                    allocatedType: site.allocatedType,
+                    streamChunk: true,
+                },
+                suggestion:
+                    'Adopt a circular ring buffer (RingBuffer) or fixed-capacity buffer pool to recycle streaming chunks without GC jitter.',
+            });
+            continue;
+        }
+
+        // 2. Standard expensive unpooled allocation in loop or hot path (PRF-POL-001)
         if (
             site.isInLoopOrHotPath &&
             !site.isPrimitiveOrTiny &&
+            !site.hasRingBufferOrReuse &&
             (site.hasExpensiveConstructor || site.fieldCount >= 4)
         ) {
             issues.push({

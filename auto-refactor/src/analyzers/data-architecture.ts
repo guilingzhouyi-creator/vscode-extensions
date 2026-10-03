@@ -22,6 +22,7 @@ import type {
 import {
     analyzeDataAccessSites,
     isOfflineOrMigrationContext,
+    DANGLING_RESOURCE_PATH_RE,
 } from '../core/intelligence/dataArchitecture';
 
 /** Pattern detecting query or fetch calls against database/storage. */
@@ -137,7 +138,7 @@ interface SiteMeta {
     isLoopContext: boolean;
 }
 
-type OperationKind = 'query' | 'serialization' | 'validation' | 'driver-call';
+type OperationKind = 'query' | 'serialization' | 'validation' | 'driver-call' | 'resource-registry';
 
 function pushSite(
     sites: DataAccessSite[],
@@ -170,6 +171,9 @@ function checkAndPushSite(trimmed: string, meta: SiteMeta, sites: DataAccessSite
     }
     if (VALIDATION_RE.test(trimmed)) {
         pushSite(sites, meta, trimmed, 'validation');
+    }
+    if (DANGLING_RESOURCE_PATH_RE.test(trimmed)) {
+        pushSite(sites, meta, trimmed, 'resource-registry');
     }
 }
 

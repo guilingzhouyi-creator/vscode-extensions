@@ -23,6 +23,8 @@ import {
     RULE_ARCH_CFG_005,
     RULE_ARCH_CFG_006,
     RULE_ARCH_CFG_007,
+    RULE_ARCH_CFG_008,
+    RULE_ARCH_CFG_009,
 } from '../scoring/dimensionLiterals';
 
 /**
@@ -89,6 +91,10 @@ export interface ConfigDrivenOptions {
     configFilePatterns?: RegExp[];
     /** Custom keywords identifying implicit configuration access. */
     implicitConfigKeywords?: string[];
+    /**
+     * Threshold of flat config tables in a single directory before flagging sprawl (default: 12).
+     */
+    maxFlatConfigThreshold?: number;
 }
 
 const DEFAULT_CONFIG_FILE_PATTERNS = [
@@ -462,6 +468,107 @@ function detectOverAbstraction(
     });
 }
 
+function detectFlatConfigSprawl(
+    configFiles: ConfigScanFile[],
+    issues: Issue[],
+    maxFlatThreshold = 12,
+): number {
+    const dirMap = new Map<string, string[]>();
+    for (const f of configFiles) {
+        const norm = f.filePath.replace(/\\/g, '/');
+        const lastSlash = norm.lastIndexOf('/');
+        const dir = lastSlash >= 0 ? norm.slice(0, lastSlash) : '.';
+        const list = dirMap.get(dir) ?? [];
+        list.push(norm);
+        dirMap.set(dir, list);
+    }
+
+    let flatSprawlCount = 0;
+    for (const [dir, filesInDir] of dirMap.entries()) {
+        if (filesInDir.length >= maxFlatThreshold) {
+            flatSprawlCount++;
+            const sample = filesInDir
+                .slice(0, 3)
+                .map((p) => p.split('/').pop())
+                .join(', ');
+            issues.push({
+                id: `architecture:${RULE_ARCH_CFG_008}:${filesInDir[0]}:1`,
+                analyzer: ANALYZER_ARCHITECTURE,
+                rule: RULE_ARCH_CFG_008,
+                severity: SEVERITY_WARNING,
+                message:
+                    `Flat configuration sprawl anti-pattern: Directory '${dir}' contains ` +
+                    `${filesInDir.length} flat configuration tables without isomorphic domain subdirectories (e.g. ${sample}).`,
+                location: {
+                    file: filesInDir[0],
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 80 },
+                },
+                detail: { directory: dir, tableCount: filesInDir.length },
+                suggestion:
+                    'Partition configuration tables into domain-isomorphic subdirectories (<domain>/core.json + subtables).',
+            });
+        }
+    }
+    return flatSprawlCount;
+}
+
+const SUBTABLE_PATH_RE =
+    /(?:load|read|readFile|readFileSync|open)\s*\(\s*['"][^'"]*[/\\](?:domains|config)[/\\]([a-zA-Z0-9_-]+)[/\\]((?!core\b)[a-zA-Z0-9_-]+)\.json['"]/i;
+const UNROUTED_CALL_KEYWORDS = [
+    'get_subtable',
+    'ConfigRouter',
+    'config_router',
+    'routes.',
+    'router.',
+];
+
+function detectUnroutedSubtables(sourceFiles: ConfigScanFile[], issues: Issue[]): number {
+    let unroutedCount = 0;
+    for (const src of sourceFiles) {
+        const normPath = src.filePath.replace(/\\/g, '/');
+        if (
+            normPath.includes('router') ||
+            normPath.includes('config_router') ||
+            normPath.includes('test') ||
+            normPath.includes('tests')
+        ) {
+            continue;
+        }
+
+        const lines = src.content.split('\n');
+        for (let idx = 0; idx < lines.length; idx++) {
+            const line = lines[idx];
+            const match = SUBTABLE_PATH_RE.exec(line);
+            if (match) {
+                if (UNROUTED_CALL_KEYWORDS.some((kw) => line.includes(kw))) {
+                    continue;
+                }
+                unroutedCount++;
+                const domain = match[1];
+                const subtable = match[2];
+                issues.push({
+                    id: `architecture:${RULE_ARCH_CFG_009}:${src.filePath}:${idx + 1}`,
+                    analyzer: ANALYZER_ARCHITECTURE,
+                    rule: RULE_ARCH_CFG_009,
+                    severity: SEVERITY_WARNING,
+                    message:
+                        `Direct subtable access bypasses router contract: Subtable '${domain}/${subtable}.json' ` +
+                        `is loaded directly via physical path instead of unified config router or dotted notation.`,
+                    location: {
+                        file: src.filePath,
+                        start: { line: idx + 1, column: 1 },
+                        end: { line: idx + 1, column: line.length || 1 },
+                    },
+                    detail: { domain, subtable, line: idx + 1 },
+                    suggestion: `Use unified config router (e.g. get_subtable("${domain}.${subtable}") or dotted path) to access subtable.`,
+                });
+            }
+        }
+    }
+    return unroutedCount;
+}
+
 function calculateMaturityGrade(score: number): { level: number; grade: ConfigMaturityGrade } {
     if (score >= 90) return { level: 4, grade: 'L4' };
     if (score >= 75) return { level: 3, grade: 'L3' };
@@ -478,6 +585,8 @@ function calculateMaturityScores(
     duplicateCount: number,
     directEnvCount: number,
     directIOCount: number,
+    flatSprawlCount: number = 0,
+    unroutedSubtableCount: number = 0,
 ) {
     const isSmallProject = scale.fileCount <= 25 && scale.domainCount <= 2;
     const activeRefRatio =
@@ -490,11 +599,17 @@ function calculateMaturityScores(
     const decisionParticipationScore = Math.max(0, Math.min(100, Math.round(activeRefRatio * 100)));
     const hygieneScore = Math.max(
         0,
-        Math.min(100, 100 - duplicateCount * 10 - directEnvCount * 15),
+        Math.min(100, 100 - duplicateCount * 10 - directEnvCount * 15 - flatSprawlCount * 15),
     );
     const decouplingScore = isSmallProject
-        ? Math.max(0, Math.min(100, 100 - directIOCount * 10))
-        : Math.max(0, Math.min(100, 100 - directIOCount * 20 - directEnvCount * 15));
+        ? Math.max(0, Math.min(100, 100 - directIOCount * 10 - unroutedSubtableCount * 10))
+        : Math.max(
+              0,
+              Math.min(
+                  100,
+                  100 - directIOCount * 20 - directEnvCount * 15 - unroutedSubtableCount * 12,
+              ),
+          );
     const scaleCalibrationScore = isSmallProject
         ? SCALE_SCORE_SMALL_PROJECT
         : SCALE_SCORE_STANDARD_PROJECT;
@@ -534,6 +649,8 @@ function buildRecommendations(
     directIOCount: number,
     deadCount: number,
     duplicateCount: number,
+    flatSprawlCount: number = 0,
+    unroutedSubtableCount: number = 0,
 ): string[] {
     const recs: string[] = [];
     if (directEnvCount > 0) {
@@ -548,6 +665,16 @@ function buildRecommendations(
     if (duplicateCount > 0) {
         recs.push(
             `Consolidate ${duplicateCount} duplicated configuration keys across config files.`,
+        );
+    }
+    if (flatSprawlCount > 0) {
+        recs.push(
+            `Eliminate flat config sprawl across ${flatSprawlCount} directories; modularize into domain subdirectories.`,
+        );
+    }
+    if (unroutedSubtableCount > 0) {
+        recs.push(
+            `Route ${unroutedSubtableCount} direct subtable file accesses through unified config router.`,
         );
     }
     return recs;
@@ -584,6 +711,10 @@ export function auditConfigDrivenArchitecture(
     detectScatteredConfig(domainConfigAccesses, issues);
     detectOverAbstraction(scale, configFiles, issues);
 
+    const flatSprawlThreshold = options.maxFlatConfigThreshold ?? 12;
+    const flatSprawlCount = detectFlatConfigSprawl(configFiles, issues, flatSprawlThreshold);
+    const unroutedSubtableCount = detectUnroutedSubtables(sourceFiles, issues);
+
     const totalDeclared = declaredKeys.size;
     const { maturityScore, maturityGrade, maturityLevel, breakdown } = calculateMaturityScores(
         scale,
@@ -593,6 +724,8 @@ export function auditConfigDrivenArchitecture(
         duplicateKeyCount,
         domainFilesWithDirectEnv.length,
         domainFilesWithDirectIO.length,
+        flatSprawlCount,
+        unroutedSubtableCount,
     );
 
     const recommendations = buildRecommendations(
@@ -600,6 +733,8 @@ export function auditConfigDrivenArchitecture(
         domainFilesWithDirectIO.length,
         deadKeys.length,
         duplicateKeyCount,
+        flatSprawlCount,
+        unroutedSubtableCount,
     );
 
     return {

@@ -19,9 +19,8 @@ import { detectUnboundedGrowth } from '../core/intelligence/dataFlow';
 
 import {
     LOOP_DEPTH_ERROR_THRESHOLD,
-    CHAR_CODE_SPACE,
-    CHAR_CODE_TAB,
     type PerformanceOptions,
+    type PerformanceScanConfig,
     LOOP_KEYWORD_RE,
     TRANSIENT_ALLOC_RE,
     HIGH_RISK_OBJECT_ALLOC_RE,
@@ -30,6 +29,10 @@ import {
     extractNextLine,
     handleComments,
     createScanConfig,
+    calculateIndent,
+    updateIndentLoops,
+    updateBraceLoops,
+    extractLinearLookupMethod,
 } from './performance-helpers';
 
 const NAME_FS_READ = 'fs.readFileSync';
@@ -59,6 +62,7 @@ const SEVERITY_INFO = 'info' as const;
 const SEVERITY_ERROR = 'error' as const;
 
 const RULE_PRF_ALG_001 = 'PRF-ALG-001';
+const RULE_PRF_ALG_002 = 'PRF-ALG-002';
 const RULE_PRF_MEM_001 = 'PRF-MEM-001';
 const RULE_PRF_MEM_002 = 'PRF-MEM-002';
 const RULE_PRF_IO_001 = 'PRF-IO-001';
@@ -130,19 +134,12 @@ export class PerformanceAnalyzer implements Analyzer {
         nextLine: { lineText: string; trimmed: string },
         lineIdx: number,
         ctx: AnalyzerContext,
-        scanConfig: {
-            maxNesting: number;
-            checkAlloc: boolean;
-            checkIO: boolean;
-            syncIoAllowlisted: boolean;
-            allocAllowlisted: boolean;
-            isIndentBased: boolean;
-        },
+        scanConfig: PerformanceScanConfig,
         scanState: LineScanState,
         loopStack: LoopScope[],
         issues: Issue[],
     ): void {
-        this.updateIndentLoops(nextLine.lineText, scanConfig.isIndentBased, loopStack);
+        updateIndentLoops(nextLine.lineText, scanConfig.isIndentBased, loopStack);
         if (this.isAsyncDeclaration(nextLine.trimmed)) {
             scanState.inAsyncFunction = true;
         }
@@ -161,6 +158,20 @@ export class PerformanceAnalyzer implements Analyzer {
             this.checkTransientAllocation(nextLine.trimmed, lineIdx, ctx, loopStack.length, issues);
         }
 
+        if (
+            loopStack.length > 0 &&
+            scanConfig.checkLinearLookups &&
+            !LOOP_KEYWORD_RE.test(nextLine.trimmed)
+        ) {
+            this.checkLinearCollectionLookup(
+                nextLine.trimmed,
+                lineIdx,
+                ctx,
+                loopStack.length,
+                issues,
+            );
+        }
+
         if (scanConfig.checkIO && !scanConfig.syncIoAllowlisted) {
             this.checkBlockingIo(
                 nextLine.trimmed,
@@ -173,7 +184,7 @@ export class PerformanceAnalyzer implements Analyzer {
         }
 
         if (!scanConfig.isIndentBased) {
-            this.updateBraceLoops(nextLine.trimmed, loopStack);
+            updateBraceLoops(nextLine.trimmed, loopStack);
             if (
                 loopStack.length > 0 &&
                 !loopStack[loopStack.length - 1].usesBrace &&
@@ -181,30 +192,6 @@ export class PerformanceAnalyzer implements Analyzer {
             ) {
                 loopStack.pop();
             }
-        }
-    }
-
-    private calculateIndent(lineText: string): number {
-        let indent = 0;
-        while (
-            indent < lineText.length &&
-            (lineText.charCodeAt(indent) === CHAR_CODE_SPACE ||
-                lineText.charCodeAt(indent) === CHAR_CODE_TAB)
-        ) {
-            indent++;
-        }
-        return indent;
-    }
-
-    private updateIndentLoops(
-        lineText: string,
-        isIndentBased: boolean,
-        loopStack: LoopScope[],
-    ): void {
-        if (!isIndentBased || loopStack.length === 0) return;
-        const indent = this.calculateIndent(lineText);
-        while (loopStack.length > 0 && indent <= loopStack[loopStack.length - 1].indent) {
-            loopStack.pop();
         }
     }
 
@@ -226,7 +213,7 @@ export class PerformanceAnalyzer implements Analyzer {
     ): void {
         if (!LOOP_KEYWORD_RE.test(trimmed)) return;
 
-        const indent = this.calculateIndent(lineText);
+        const indent = calculateIndent(lineText);
         const currentDepth = loopStack.length + 1;
         loopStack.push({
             depth: currentDepth,
@@ -321,14 +308,28 @@ export class PerformanceAnalyzer implements Analyzer {
         }
     }
 
-    private updateBraceLoops(trimmed: string, loopStack: LoopScope[]): void {
-        if (!trimmed.includes('}')) return;
-        const closes = (trimmed.match(/\}/g) || []).length;
-        for (let c = 0; c < closes; c++) {
-            if (loopStack.length > 0) {
-                loopStack.pop();
-            }
-        }
+    private checkLinearCollectionLookup(
+        trimmed: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        loopDepth: number,
+        issues: Issue[],
+    ): void {
+        const methodName = extractLinearLookupMethod(trimmed);
+        if (!methodName) return;
+
+        const desc = PerformanceMessages.LINEAR_COLLECTION_LOOKUP_IN_LOOP(methodName, loopDepth);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                RULE_PRF_ALG_002,
+                desc.message,
+                SEVERITY_WARNING,
+                { loopDepth, methodName },
+                desc.suggestion,
+            ),
+        );
     }
 
     /**

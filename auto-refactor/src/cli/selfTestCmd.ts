@@ -75,47 +75,47 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
             rel: 'src/syncio.ts',
             content:
                 "import * as fs from 'fs';\nexport function loadCfg(): string { return fs.readFileSync('cfg.json', 'utf8'); }\n",
-            why: 'governance:GOV-PRF-004（同步 IO 阻塞宿主）',
+            why: 'governance:GOV-PRF-004 (synchronous I/O blocks host)',
         },
         {
             rel: 'src/dead.ts',
             content: 'export function neverUsedGlobally(): void {}\n',
-            why: 'dependency-graph:unused-module（全仓无导入方）',
+            why: 'dependency-graph:unused-module (no global importers)',
         },
         {
             rel: 'src/magic.ts',
             content: 'export function run(cb: () => void): void { setTimeout(cb, 999999); }\n',
-            why: 'constants:magic-number（调用点字面量）',
+            why: 'constants:magic-number (callsite literal)',
         },
         {
             rel: 'src/complex.ts',
             content: `export function tangled(x: number): number {\n${ifs}\n  return x;\n}\n`,
-            why: 'complexity:high-complexity（25 分支 ≥ fail 阈值 20）',
+            why: 'complexity:high-complexity (25 branches >= fail threshold 20)',
         },
         {
             rel: 'src/toolarge.ts',
             content: `${filler}export const end = 1;\n`,
-            why: 'large-file:large-file（820+ 行 ≥ fail 阈值 800）',
+            why: 'large-file:large-file (820+ lines >= fail threshold 800)',
         },
         {
             rel: 'src/swallow.ts',
             content: `export function risky(): void { try { JSON.parse("{"); } ${'catch'} { } }\n`,
-            why: 'governance:GOV-EXC-001（空 catch）',
+            why: 'governance:GOV-EXC-001 (empty catch block)',
         },
         {
             rel: 'src/creds.ts',
             content: `export const token = "${['ghp', 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4'].join('_')}";\n`,
-            why: 'secrets:secret-detected（GitHub token 特征）',
+            why: 'secrets:secret-detected (GitHub token signature)',
         },
         {
             rel: 'src/cyc/a.ts',
             content: "import { b } from './b';\nexport const a = 1;\n",
-            why: 'dependency-graph:import-cycle（a→b→a）',
+            why: 'dependency-graph:import-cycle (a->b->a)',
         },
         {
             rel: 'src/cyc/b.ts',
             content: "import { a } from './a';\nexport const b = 2;\n",
-            why: 'dependency-graph:import-cycle（同上，闭环侧）',
+            why: 'dependency-graph:import-cycle (same as above, cycle closing edge)',
         },
     ];
     const config = {
@@ -139,15 +139,15 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
  * Stable `analyzer:rule` pairs every analyzer family must hit; a miss means the engine regressed.
  */
 export const EXPECTED_PAIRS: Array<{ pair: string; why: string }> = [
-    { pair: 'constants:magic-number', why: '魔法数检测' },
-    { pair: 'complexity:high-complexity', why: '圈复杂度 fail 阈值' },
-    { pair: 'large-file:large-file', why: '超大文件 fail 阈值' },
-    { pair: 'governance:GOV-EXC-001', why: '空 catch 治理规则' },
-    { pair: 'governance:GOV-PRF-003', why: '定时器字面量（无钳制）' },
-    { pair: 'governance:GOV-PRF-004', why: '同步 IO 阻塞宿主' },
-    { pair: 'secrets:secret-detected', why: '密钥特征扫描' },
-    { pair: 'dependency-graph:import-cycle', why: '循环依赖 post-scan 检测' },
-    { pair: 'dependency-graph:unused-module', why: '未使用模块检测（post-scan）' },
+    { pair: 'constants:magic-number', why: 'Magic number detection' },
+    { pair: 'complexity:high-complexity', why: 'Cyclomatic complexity fail threshold' },
+    { pair: 'large-file:large-file', why: 'Large file fail threshold' },
+    { pair: 'governance:GOV-EXC-001', why: 'Empty catch block governance rule' },
+    { pair: 'governance:GOV-PRF-003', why: 'Timer literal (unclamped)' },
+    { pair: 'governance:GOV-PRF-004', why: 'Synchronous I/O blocks host' },
+    { pair: 'secrets:secret-detected', why: 'Secret pattern detection' },
+    { pair: 'dependency-graph:import-cycle', why: 'Circular dependency post-scan detection' },
+    { pair: 'dependency-graph:unused-module', why: 'Unused module post-scan detection' },
 ];
 
 /**
@@ -192,19 +192,23 @@ export async function selfTestCommand(_args: string[]): Promise<{ code: number; 
                 lines.push(`  PASS  ${pair.padEnd(PAIR_LABEL_WIDTH)} ${why}`);
             } else {
                 ok = false;
-                lines.push(`  MISS  ${pair.padEnd(PAIR_LABEL_WIDTH)} ${why} —— 分析器失效！`);
+                lines.push(
+                    `  MISS  ${pair.padEnd(PAIR_LABEL_WIDTH)} ${why} -- Analyzer regression!`,
+                );
             }
         }
         const unexpectedFamilies = new Set(report.issues.map((i) => i.analyzer));
         lines.push(
-            `  ── 夹具共 ${report.summary.filesScanned} 文件 / ${report.issues.length} 发现，覆盖家族: ${[...unexpectedFamilies].join(', ')}`,
+            `  -- Fixture total ${report.summary.filesScanned} files / ${report.issues.length} findings, covering families: ${[...unexpectedFamilies].join(', ')}`,
         );
         return {
             code: ok ? 0 : 1,
             text: [
-                `auto-refactor self-test（已知违规夹具 → 引擎命中断言）`,
+                `auto-refactor self-test (known violation fixtures -> engine hit assertion)`,
                 ...lines,
-                ok ? '结论: 引擎全部命中 ✅' : '结论: 存在失效分析器 ❌',
+                ok
+                    ? 'Conclusion: All expected engine rules fired [PASS]'
+                    : 'Conclusion: Regressed analyzer detected [FAIL]',
             ].join('\n'),
         };
     } catch (err) {
