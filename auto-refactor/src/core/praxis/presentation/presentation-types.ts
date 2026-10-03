@@ -30,7 +30,7 @@ export interface PraxisDiagnosticCard {
     ruleId: string;
     /** Mapped presentation severity level */
     severity: PraxisPresentationSeverity;
-    /** Localized visual badge label (e.g., "[BLOCK]" or "[阻断]") */
+    /** Localized visual badge label (e.g., "[BLOCK]" or "[WARN]") */
     badgeText: string;
     /** Semantic color mapping for frontend CSS binding */
     badgeColor: PraxisBadgeColor;

@@ -11,7 +11,7 @@
 
 import type { PraxisCommonI18nStrings, PraxisRuleI18nEntry } from '../i18n-types';
 
-/** 英文通用短语表 */
+/** English common phrases dictionary */
 export const EN_COMMON: PraxisCommonI18nStrings = {
     verdictPass: 'All compliance checks passed with zero violations',
     verdictWarn: 'Non-blocking governance warnings detected',
@@ -27,7 +27,7 @@ export const EN_COMMON: PraxisCommonI18nStrings = {
     defaultCategoryTitle: 'Code Governance',
 };
 
-/** 英文核心规则条目字典 */
+/** English core rule dictionary */
 export const EN_RULES: Record<string, PraxisRuleI18nEntry> = {
     'SEC-CST-001': {
         name: 'Hardcoded Secret Prohibited',
