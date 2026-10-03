@@ -1,0 +1,26 @@
+{
+  "pools": {
+    "combat_events": {
+      "enabled": true,
+      "preallocate_size": 64,
+      "max_capacity": 512,
+      "allow_overflow_alloc": true,
+      "overflow_warning_threshold": 256
+    },
+    "spatial_triggers": {
+      "enabled": true,
+      "preallocate_size": 32,
+      "max_capacity": 256,
+      "allow_overflow_alloc": true,
+      "overflow_warning_threshold": 128
+    },
+    "soa_batch": {
+      "default_buffer_capacity": 2048,
+      "damping_factor": 0.95
+    }
+  },
+  "telemetry": {
+    "emit_stats_interval_ticks": 100,
+    "warn_on_overflow": true
+  }
+}
