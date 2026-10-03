@@ -149,7 +149,8 @@ export type AgentActionType =
     | 'insert_comment_contract'
     | 'guard_recursion'
     | 'use_constant_time_comparison'
-    | 'scaffold_constant_library';
+    | 'scaffold_constant_library'
+    | 'scaffold_gate_system';
 
 /**
  * Machine-actionable mutation payload tailored for AI Agents and automated codemods.

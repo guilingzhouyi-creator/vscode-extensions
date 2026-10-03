@@ -26,3 +26,6 @@ export * from './rules/debugLogging';
 export * from './rules/performance';
 export * from './rules/maintainability';
 export * from './rules/compressionBounds';
+export * from './repo-archetype';
+export * from './gate-scaffold';
+export * from './gate-governance';

@@ -57,6 +57,7 @@ import {
     ANALYZER_STDLIB,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GATE_ARCHITECTURE,
 } from '../scoring/dimensionLiterals';
 
 /** Decimal places retained when rounding the activation ratio for stable reporting. */
@@ -102,6 +103,7 @@ export const ALL_BUILTIN_ANALYZERS = [
     ANALYZER_STDLIB,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GATE_ARCHITECTURE,
 ] as const;
 
 /**

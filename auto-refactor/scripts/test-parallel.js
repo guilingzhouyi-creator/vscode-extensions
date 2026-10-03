@@ -100,6 +100,7 @@ const PARALLEL_SUITES = [
   // families have, so leaving them unregistered meant GOM-*/SH-*/PS-* could regress silently.
   { name: 'validate-go-support', script: 'scripts/validate-go-support.js' },
   { name: 'validate-shell-lint', script: 'scripts/validate-shell-lint.js' },
+  { name: 'validate-gate-governance', script: 'scripts/validate-gate-governance.js' },
   { name: 'validate-scope-graph', script: 'scripts/validate-scope-graph.js' },
   { name: 'validate-scope-graph-streaming', script: 'scripts/validate-scope-graph-streaming.js' },
   { name: 'validate-redos-security', script: 'scripts/validate-redos-security.js' },

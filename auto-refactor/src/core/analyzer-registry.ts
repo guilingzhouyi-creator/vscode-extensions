@@ -49,6 +49,7 @@ import { ShellLintAnalyzer } from '../analyzers/shell-lint';
 import { StdlibAnalyzer } from '../analyzers/stdlib';
 import { GdscriptGameAnalyzer } from '../analyzers/gdscript-game';
 import { VscodeExtensionAnalyzer } from '../analyzers/vscode-extension';
+import { GateArchitectureAnalyzer } from '../analyzers/gate-architecture';
 
 /**
  * Resolved metadata and fresh instance factory for a declared analyzer.
@@ -110,6 +111,7 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
     stdlib: () => new StdlibAnalyzer(),
     'gdscript-game': () => new GdscriptGameAnalyzer(),
     'vscode-extension': () => new VscodeExtensionAnalyzer(),
+    'gate-architecture': () => new GateArchitectureAnalyzer(),
 };
 
 /**
@@ -150,6 +152,7 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     stdlib: '../analyzers/stdlib',
     'gdscript-game': '../analyzers/gdscript-game',
     'vscode-extension': '../analyzers/vscode-extension',
+    'gate-architecture': '../analyzers/gate-architecture',
 };
 
 const dynamicRequire = createRequire(__filename);

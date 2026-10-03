@@ -560,6 +560,8 @@ export const ANALYZER_DEPENDENCY_LAYOUT = 'dependency-layout';
 export const ANALYZER_SHELL_LINT = 'shell-lint';
 /** Analyzer id for standard library and systems runtime verification. */
 export const ANALYZER_STDLIB = 'stdlib';
+/** Analyzer id for repository gate architecture governance. */
+export const ANALYZER_GATE_ARCHITECTURE = 'gate-architecture';
 
 /** Rule id for bare panic/unwrap escaping public API. */
 export const RULE_STDLIB_PANIC_001 = 'STDLIB-PANIC-001';

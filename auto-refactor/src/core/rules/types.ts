@@ -57,7 +57,11 @@ export type RuleFamily =
     | 'SH'
     | 'PS'
     | 'STDLIB'
+    | 'GATE'
     | 'LEGACY';
+
+/** Canonical rule-family prefix for repository gate architecture governance. */
+export const RULE_FAMILY_GATE = 'GATE';
 
 /** Canonical rule-family prefix for standard library and runtime verification. */
 export const RULE_FAMILY_STDLIB = 'STDLIB';

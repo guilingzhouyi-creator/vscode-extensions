@@ -63,6 +63,7 @@ import {
     ANALYZER_STDLIB,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GATE_ARCHITECTURE,
 } from '../scoring/dimensionLiterals';
 import {
     applySemanticAndSecurityLevels,
@@ -116,6 +117,7 @@ export const BUILTIN_ANALYZERS = [
     ANALYZER_STDLIB,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GATE_ARCHITECTURE,
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──

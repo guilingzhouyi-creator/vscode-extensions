@@ -716,6 +716,7 @@ export { SecurityAnalyzer } from './analyzers/security';
 export { DataArchitectureAnalyzer } from './analyzers/data-architecture';
 export { TestModernityAnalyzer } from './analyzers/test-modernity';
 export { DependencyLayoutAnalyzer } from './analyzers/dependency-layout';
+export { GateArchitectureAnalyzer } from './analyzers/gate-architecture';
 export * from './core/intelligence/semanticComplexity';
 export * from './core/intelligence/dataArchitecture';
 export * from './core/intelligence/testModernity';

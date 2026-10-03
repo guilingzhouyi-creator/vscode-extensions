@@ -15,6 +15,7 @@
  */
 import { ANALYZER_RULES } from './entries/analyzers';
 import { CONSTANT_GOVERNANCE_RULES } from './entries/constant-governance';
+import { GATE_GOVERNANCE_RULES } from './entries/gate-governance';
 import { GOVERNANCE_RULES } from './entries/governance';
 import { NAMING_RULES } from './entries/naming';
 import { PLATFORM_RULES } from './entries/platform';
@@ -28,6 +29,7 @@ export { RULE_ID_PATTERN, defineRule } from './types';
 export const RULE_REGISTRY: readonly RuleDefinition[] = [
     ...ANALYZER_RULES,
     ...CONSTANT_GOVERNANCE_RULES,
+    ...GATE_GOVERNANCE_RULES,
     ...GOVERNANCE_RULES,
     ...NAMING_RULES,
     ...PLATFORM_RULES,

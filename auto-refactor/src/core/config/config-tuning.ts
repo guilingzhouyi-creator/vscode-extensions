@@ -53,6 +53,7 @@ import {
     ANALYZER_STDLIB,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GATE_ARCHITECTURE,
 } from '../scoring/dimensionLiterals';
 
 export {
@@ -95,6 +96,7 @@ export const SPECIALIZED_ANALYZERS = new Set<string>([
     ANALYZER_STDLIB,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GATE_ARCHITECTURE,
 ]);
 
 /** Auto-tune estimate: source lines per profiled language entry. */
