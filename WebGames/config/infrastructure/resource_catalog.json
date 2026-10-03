@@ -1,0 +1,79 @@
+{
+  "_meta": {
+    "version": 1,
+    "description": "全域统一资源索引目录与分级加载编排表，提供逻辑资源键与物理路径解耦映射",
+    "updated_at": "2026-10-03"
+  },
+  "default_roots": {
+    "config": "res://config/",
+    "asset": "res://frontend/assets/",
+    "data": "res://backend/data/"
+  },
+  "critical_boot_tables": [
+    "infrastructure.storage",
+    "infrastructure.persistence",
+    "infrastructure.domains",
+    "infrastructure.lifecycle",
+    "infrastructure.version_manifest",
+    "infrastructure.event_bus_config",
+    "infrastructure.event_categories",
+    "infrastructure.log",
+    "infrastructure.clock",
+    "infrastructure.errors_catalog"
+  ],
+  "resource_categories": {
+    "config": {
+      "default_priority": 2,
+      "decoder": "JSONResourceDecoder",
+      "cache_ttl_sec": -1
+    },
+    "text": {
+      "default_priority": 3,
+      "decoder": "TextResourceDecoder",
+      "cache_ttl_sec": 300
+    },
+    "mesh": {
+      "default_priority": 1,
+      "decoder": "GodotResourceDecoder",
+      "cache_ttl_sec": 600
+    },
+    "texture": {
+      "default_priority": 1,
+      "decoder": "GodotResourceDecoder",
+      "cache_ttl_sec": 600
+    },
+    "audio": {
+      "default_priority": 3,
+      "decoder": "GodotResourceDecoder",
+      "cache_ttl_sec": 1200
+    }
+  },
+  "custom_entries": [
+    {
+      "resource_id": "config.infrastructure.storage",
+      "physical_path": "res://config/infrastructure/storage.json",
+      "category": "config",
+      "priority": 0,
+      "estimated_bytes": 1024,
+      "dependencies": []
+    },
+    {
+      "resource_id": "config.infrastructure.domains",
+      "physical_path": "res://config/infrastructure/domains.json",
+      "category": "config",
+      "priority": 0,
+      "estimated_bytes": 20480,
+      "dependencies": []
+    },
+    {
+      "resource_id": "config.items.core",
+      "physical_path": "res://config/items/core.json",
+      "category": "config",
+      "priority": 1,
+      "estimated_bytes": 16384,
+      "dependencies": [
+        "config.infrastructure.domains"
+      ]
+    }
+  ]
+}
