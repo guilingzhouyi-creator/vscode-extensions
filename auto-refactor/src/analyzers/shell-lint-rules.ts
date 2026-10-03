@@ -327,8 +327,8 @@ export function checkDeprecatedSyntax(
         }
     }
 
-    if (DEPRECATED_TEST_RE.test(trimmed) && !MODERN_TEST_RE.test(trimmed)) {
-        if (/\[[^\]]*\]/.test(trimmed)) {
+    if (DEPRECATED_TEST_RE.test(maskedTrimmed) && !MODERN_TEST_RE.test(maskedTrimmed)) {
+        if (/\[[^\]]*\]/.test(maskedTrimmed)) {
             emit(
                 i,
                 'SH-DEPR-001',

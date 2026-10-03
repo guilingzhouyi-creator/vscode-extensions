@@ -311,7 +311,9 @@ function verifyCoreCategories(govIssues) {
 function hasValidGovernanceCore(issue) {
   if (!issue || typeof issue !== 'object') return false;
   if (issue.analyzer !== 'governance') return false;
-  return Boolean(issue.id && issue.rule && issue.severity && issue.message && issue.suggestion);
+  return Boolean(
+    issue.id && issue.rule && issue.severity && issue.message && issue.suggestion,
+  );
 }
 
 /**
