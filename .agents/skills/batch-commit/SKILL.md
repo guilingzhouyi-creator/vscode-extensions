@@ -77,6 +77,15 @@ pwsh -File scripts/ps1/pre-commit-gate.ps1
 ```
 *预审看守：零空文件、换行符契约（ps1 严格 CRLF，其余严格 LF）、密钥防泄漏、行数红线预算及 AST 切片复杂度。*
 
+#### 暂存区 AST 切片复杂度阻断自愈指引 (AST Complexity Remediation)
+当预审报告 `[ADV-CMP-001]` (CC > 15) 或 `[ADV-NST-001]` (Depth > 4) 阻断时，严格按以下两步平铺控制流：
+1. **卫语句提前返回 (Guard Clauses)**:
+   - 将嵌套在 `try-catch` 或顶层循环分支内的深层多路分支改为逆向断言提前 `return` 或 `continue`；
+2. **纯判定提取 (Pure Predicate Extraction)**:
+   - 将复合正则匹配、路径豁免检测或特征判定提取为独立的模块级纯函数（如 `isExemptTestPath`、`detectVacuousTrampoline`），单函数保持单一职责与 0 外部状态依赖；
+3. **重新暂存与二次预审**:
+   - 重构后运行 `git add <file>` 重新暂存，再次调用 `pre-commit-gate.ps1`，直至全部通过。
+
 ### Step 4: 原子提交与状态推进 (`git commit`)
 使用准备好的说明文件进行提交，严禁带 `--no-verify`：
 ```powershell
