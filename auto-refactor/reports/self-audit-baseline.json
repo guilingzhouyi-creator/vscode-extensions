@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791040602768",
-  "timestamp": "2026-10-03T15:16:48.399Z",
+  "snapshotId": "snapshot-v0.4.0-1791041185874",
+  "timestamp": "2026-10-03T15:26:31.474Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,25 +13,25 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 574,
-    "durationMs": 4790
+    "durationMs": 4803
   },
   "metrics": {
     "compositeScore": 99.2,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11794,
+    "totalIssues": 11797,
     "suppressedIssues": 6446,
-    "unsuppressedIssues": 5348,
+    "unsuppressedIssues": 5351,
     "bySeverity": {
       "info": 443,
-      "warning": 11351,
+      "warning": 11354,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 202,
-      "medium": 10744,
-      "low": 848
+      "medium": 10746,
+      "low": 849
     }
   },
   "eightPillars": {
@@ -166,8 +166,8 @@
     "summary": {
       "critical": 0,
       "high": 202,
-      "medium": 10744,
-      "low": 848
+      "medium": 10746,
+      "low": 849
     },
     "criticalItems": [],
     "highItems": [
@@ -951,7 +951,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 92.3
+          "extensibility": 92
         },
         "moduleCount": 1
       },
@@ -1304,7 +1304,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 112248,
+      "processed": 112250,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1318,10 +1318,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1790922053371,
-      "endMs": 1791040602767,
-      "totalRuns": 111,
+      "endMs": 1791041185873,
+      "totalRuns": 113,
       "eloc": {
-        "processedTotal": 12241463,
+        "processedTotal": 12465963,
         "uniqueTotal": 96698,
         "changedTotal": 119162,
         "semanticTotal": 119162
@@ -1332,10 +1332,10 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 1329521,
+        "totalAdded": 1352225,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -108.61
+        "netYield": -108.47
       },
       "meanCompositeScore": 99.5,
       "gatePassRate": 100
