@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-03T14:49:27.044Z",
+  "generatedAt": "2026-10-03T14:54:38.897Z",
   "totalRules": 364,
   "counts": {
     "autoRefactor": 290,
