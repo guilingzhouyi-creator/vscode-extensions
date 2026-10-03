@@ -11,6 +11,29 @@ const assert = require('assert');
 const { TimerEngine } = require('../../out/domain/TimerEngine.js');
 const { createEmptyTimingData } = require('../../out/domain/models.js');
 
+/**
+ * 在固定时刻内运行回调：冻结 Date（覆盖 Date.now() 与 new Date()），
+ * 防止用例在午夜前后的前 10~30 分钟执行时跨越自然日边界导致今日累计切分偏差。
+ */
+function withFixedNow(iso, fn) {
+  const RealDate = Date;
+  const fixedMs = new RealDate(iso).getTime();
+  class FixedDate extends RealDate {
+    constructor(...args) {
+      super(...(args.length ? args : [fixedMs]));
+    }
+    static now() {
+      return fixedMs;
+    }
+  }
+  global.Date = FixedDate;
+  try {
+    return fn();
+  } finally {
+    global.Date = RealDate;
+  }
+}
+
 describe('TimerEngine（计时核心）', () => {
   it('初始状态：未运行、累计为 0、无会话', () => {
     const eng = new TimerEngine();
@@ -101,34 +124,40 @@ describe('TimerEngine（计时核心）', () => {
   });
 
   it('今日累计增量：stop 后 getTodayMs 精确等于今日已结束段', () => {
-    const eng = new TimerEngine();
-    eng.start();
-    eng._sessionStartMs = Date.now() - 600000; // 10 分钟前开始
-    const elapsed = eng.stop();
-    assert.strictEqual(eng.getTodayMs(), 600000, '今日已结束段应精确累加');
-    assert.strictEqual(elapsed, 600000);
+    withFixedNow('2026-10-04T12:00:00', () => {
+      const eng = new TimerEngine();
+      eng.start();
+      eng._sessionStartMs = Date.now() - 600000; // 10 分钟前开始
+      const elapsed = eng.stop();
+      assert.strictEqual(eng.getTodayMs(), 600000, '今日已结束段应精确累加');
+      assert.strictEqual(elapsed, 600000);
+    });
   });
 
   it('今日累计：昨日会话不计入今日（replaceData 后惰性重算）', () => {
-    const eng = new TimerEngine();
-    const now = Date.now();
-    eng.replaceData({
-      version: 2, totalMs: 7200000, currentSessionStartMs: 0, lastSavedAtMs: 0, isEnabled: true,
-      sessions: [{ startMs: now - 86400000 - 3600000, endMs: now - 86400000, durationMs: 3600000 }],
+    withFixedNow('2026-10-04T12:00:00', () => {
+      const eng = new TimerEngine();
+      const now = Date.now();
+      eng.replaceData({
+        version: 2, totalMs: 7200000, currentSessionStartMs: 0, lastSavedAtMs: 0, isEnabled: true,
+        sessions: [{ startMs: now - 86400000 - 3600000, endMs: now - 86400000, durationMs: 3600000 }],
+      });
+      assert.strictEqual(eng.getTodayMs(), 0, '昨日会话不得计入今日');
     });
-    assert.strictEqual(eng.getTodayMs(), 0, '昨日会话不得计入今日');
   });
 
   it('今日累计：rotate 密封段计入今日已结束累计（真实跨日归零由日键重算保证）', () => {
-    const eng = new TimerEngine();
-    const now = Date.now();
-    eng.start();
-    eng._sessionStartMs = now - 1800000; // 今日 30 分钟
-    eng.rotateSession(now);              // 封存进今日 sessions
-    assert.strictEqual(eng.getTodayEndedMs(), 1800000, '密封段今日部分计入已结束累计');
-    // rotate 后会话仍进行中（起点=now），getTodayMs 含实时残段 ≥ 0；
-    // 精确相等存在毫秒边界竞态，故断言下限而非严格相等（见评审 P3-5）。
-    assert.ok(eng.getTodayMs() >= 1800000, '进行中会话残段叠加在已结束累计之上');
+    withFixedNow('2026-10-04T12:00:00', () => {
+      const eng = new TimerEngine();
+      const now = Date.now();
+      eng.start();
+      eng._sessionStartMs = now - 1800000; // 今日 30 分钟
+      eng.rotateSession(now);              // 封存进今日 sessions
+      assert.strictEqual(eng.getTodayEndedMs(), 1800000, '密封段今日部分计入已结束累计');
+      // rotate 后会话仍进行中（起点=now），getTodayMs 含实时残段 ≥ 0；
+      // 精确相等存在毫秒边界竞态，故断言下限而非严格相等（见评审 P3-5）。
+      assert.ok(eng.getTodayMs() >= 1800000, '进行中会话残段叠加在已结束累计之上');
+    });
   });
 
 });

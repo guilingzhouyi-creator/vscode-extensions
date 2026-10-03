@@ -134,15 +134,34 @@ function collectWebGamesRules() {
   return rules;
 }
 
+function collectCommitMsgRules() {
+  const termsFile = path.join(__dirname, 'commit-msg-forbidden-terms.json');
+  if (!fs.existsSync(termsFile)) return [];
+  try {
+    const config = JSON.parse(fs.readFileSync(termsFile, 'utf8'));
+    return (config.rules || []).map((r) => ({
+      id: r.id,
+      project: 'global-tooling',
+      family: 'CMG',
+      severity: r.severity || 'error',
+      summary: r.title || 'Commit message style and text governance rule',
+    }));
+  } catch (err) {
+    console.warn('Warning: Could not load commit-msg-forbidden-terms.json:', err.message);
+    return [];
+  }
+}
+
 function generate() {
   console.log('🔄 Consolidating workspace rule catalog...');
   const arRules = collectAutoRefactorRules();
   const wtRules = collectWorkspaceTimingRules();
   const wgRules = collectWebGamesRules();
+  const cmgRules = collectCommitMsgRules();
 
   const ruleMap = new Map();
 
-  for (const r of [...arRules, ...wtRules, ...wgRules]) {
+  for (const r of [...arRules, ...wtRules, ...wgRules, ...cmgRules]) {
     if (!ruleMap.has(r.id)) {
       ruleMap.set(r.id, r);
     }
@@ -156,6 +175,7 @@ function generate() {
       autoRefactor: arRules.length,
       workspaceTiming: wtRules.length,
       webGames: wgRules.length,
+      globalTooling: cmgRules.length,
     },
     rules: Array.from(ruleMap.values()).sort((a, b) => a.id.localeCompare(b.id)),
   };

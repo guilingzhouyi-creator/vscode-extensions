@@ -334,11 +334,71 @@ jobs:
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截虚构规则 ID"; exit 1
           fi
-          # 7. 单源规则目录生成自检
+          # 7. Rule 8 风格与文本约束自检 (validate-commit-msg-style --test 与四类阻断)
+          node scripts/common/validate-commit-msg-style.js --test
+          # 7.1 验证风格元叙事口号拦截 (CAT-04)
+          printf "%s\n" \
+            "docs(readme): 调整整体文案语调为低调中肯、求真务实，移除宣扬性词汇" \
+            "" \
+            "[Why]" \
+            "- 规范文档风格。" \
+            "" \
+            "[Changed]" \
+            "- 调整整体文案语调为低调中肯、求真务实，移除宣扬性词汇。" \
+            "" \
+            "[Verification]" \
+            "- CI 自检。" > "$MSG_TEMP"
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截风格元叙事口号"; exit 1
+          fi
+          # 7.2 验证过度肯定绝对化词汇拦截 (CAT-02)
+          printf "%s\n" \
+            "feat(ci): 彻底完美解决所有崩溃" \
+            "" \
+            "[Why]" \
+            "- 打造工业级架构。" \
+            "" \
+            "[Added]" \
+            "- 新增模块。" \
+            "" \
+            "[Verification]" \
+            "- CI 自检。" > "$MSG_TEMP"
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截过度肯定绝对化词汇"; exit 1
+          fi
+          # 7.3 验证合法复合技术术语白名单放行
+          printf "%s\n" \
+            "fix(path): 修复跨平台文件查找未能转换为绝对路径的问题" \
+            "" \
+            "[Why]" \
+            "- 生成的临时文件需支持绝对路径计算。" \
+            "" \
+            "[Fixed]" \
+            "- 修复绝对路径解析函数。" \
+            "" \
+            "[Verification]" \
+            "- 单元测试通过。" > "$MSG_TEMP"
+          bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP"
+          # 7.4 验证英文风格元叙事口号拦截 (CAT-04 English Bypass)
+          printf "%s\n" \
+            "docs(readme): tone down wording to be humble and pragmatic" \
+            "" \
+            "[Why]" \
+            "- Update documentation wording." \
+            "" \
+            "[Changed]" \
+            "- Tone down wording to be humble and pragmatic." \
+            "" \
+            "[Verification]" \
+            "- CI self-test." > "$MSG_TEMP"
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截英文风格元叙事口号"; exit 1
+          fi
+          # 8. 单源规则目录生成自检
           node scripts/common/generate-rule-catalog.js
-          # 8. AST 切片审查自检
+          # 9. AST 切片审查自检
           node auto-refactor/scripts/validate-staged-slice.js auto-refactor/scripts/validate-staged-slice.js
-          # 9. 长期轨迹账本物理约束自检
+          # 10. 长期轨迹账本物理约束自检
           node scripts/common/validate-trajectory-ledger.js
           rm -f "$MSG_TEMP"
           echo "✔ Git 本地门禁脚本与审查联动自检全部通过"

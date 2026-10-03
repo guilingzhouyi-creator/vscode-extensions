@@ -1,11 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-03T15:25:19.982Z",
-  "totalRules": 364,
+  "generatedAt": "2026-10-03T16:13:22.157Z",
+  "totalRules": 368,
   "counts": {
     "autoRefactor": 290,
     "workspaceTiming": 45,
-    "webGames": 56
+    "webGames": 56,
+    "globalTooling": 4
   },
   "rules": [
     {
@@ -371,6 +372,34 @@
       "family": "ARCH",
       "severity": "error",
       "summary": "Layering boundary breach in incremental pipeline (clean-layer semantics)."
+    },
+    {
+      "id": "CMG-STY-001",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "临时性与敷衍口吻词汇拦截"
+    },
+    {
+      "id": "CMG-STY-002",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "过度肯定与绝对化夸大表述拦截"
+    },
+    {
+      "id": "CMG-STY-003",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "过度否定与情绪化贬损表述拦截"
+    },
+    {
+      "id": "CMG-STY-004",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "风格元叙事、口号与宣传套话拦截"
     },
     {
       "id": "CMP-CAL-001",

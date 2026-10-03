@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791041185874",
-  "timestamp": "2026-10-03T15:26:31.474Z",
+  "snapshotId": "snapshot-v0.4.0-1791044063911",
+  "timestamp": "2026-10-03T16:14:29.567Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,24 +13,24 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 574,
-    "durationMs": 4803
+    "durationMs": 4879
   },
   "metrics": {
     "compositeScore": 99.2,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11797,
-    "suppressedIssues": 6446,
+    "totalIssues": 11798,
+    "suppressedIssues": 6447,
     "unsuppressedIssues": 5351,
     "bySeverity": {
       "info": 443,
-      "warning": 11354,
+      "warning": 11355,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 202,
-      "medium": 10746,
+      "medium": 10747,
       "low": 849
     }
   },
@@ -166,7 +166,7 @@
     "summary": {
       "critical": 0,
       "high": 202,
-      "medium": 10746,
+      "medium": 10747,
       "low": 849
     },
     "criticalItems": [],
@@ -1304,7 +1304,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 112250,
+      "processed": 112251,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1318,10 +1318,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1790922053371,
-      "endMs": 1791041185873,
-      "totalRuns": 113,
+      "endMs": 1791044063910,
+      "totalRuns": 119,
       "eloc": {
-        "processedTotal": 12465963,
+        "processedTotal": 13139467,
         "uniqueTotal": 96698,
         "changedTotal": 119162,
         "semanticTotal": 119162
@@ -1332,12 +1332,12 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 1352225,
+        "totalAdded": 1420341,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -108.47
+        "netYield": -108.1
       },
-      "meanCompositeScore": 99.5,
+      "meanCompositeScore": 99.48,
       "gatePassRate": 100
     },
     "isFirstBaseline": false

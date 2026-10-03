@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "commit-msg-forbidden-terms/v1",
+  "version": "1.2.0",
+  "rules": [
+    {
+      "id": "CMG-STY-001",
+      "category": "temporary",
+      "severity": "error",
+      "title": "临时性与敷衍口吻词汇拦截",
+      "patterns": [
+        "临时",
+        "暂存",
+        "暂时",
+        "凑合",
+        "随便",
+        "粗略",
+        "先这样",
+        "待处理",
+        "后续再看",
+        "占位",
+        "随便改改",
+        "打补丁",
+        "临时方案",
+        "草率"
+      ],
+      "asciiPatterns": [
+        "\\b(wip|temp|tmp|quick\\s*fix|quick-and-dirty|hack|hacky|hacks|placeholder|placeholders|band-?aid|for\\s*now|tentative|provisional|ad-?hoc|stopgap|patchy|half-?baked|rough\\s*draft|casual\\s*commit)\\b"
+      ],
+      "reason": "提交说明是长期技术档案，严禁使用敷衍、临时性或未决用语替代客观技术事实。",
+      "guidance": "请陈述当前具体的改动范围与已知边界，例如：'实现基础分支调度，暂未支持异步流'。"
+    },
+    {
+      "id": "CMG-STY-002",
+      "category": "hyperbolic_affirmative",
+      "severity": "error",
+      "title": "过度肯定与绝对化夸大表述拦截",
+      "patterns": [
+        "绝对",
+        "彻底",
+        "完美",
+        "完美无瑕",
+        "极致",
+        "终极",
+        "史无前例",
+        "彻底解决",
+        "完全消除",
+        "永不",
+        "绝不",
+        "绝无",
+        "100%",
+        "工业级",
+        "顶尖",
+        "顶级",
+        "天花板",
+        "最强",
+        "无懈可击",
+        "超强",
+        "万能",
+        "零缺陷",
+        "永不崩溃"
+      ],
+      "asciiPatterns": [
+        "\\b(flawless|perfect|perfection|ultimate|bulletproof|unbeatable|invincible|god-?tier|peerless|silver\\s*bullet|zero-?bug|industrial-?grade|enterprise-?grade|state-?of-?the-?art|best-?in-?class)\\b",
+        "\\b(completely\\s*solved|fully\\s*eliminated|never\\s*fails?|absolutely\\s*(safe|correct|flawless))\\b",
+        "\\b100%\\s*(safe|secure|fixed|working|reliable|guaranteed)\\b"
+      ],
+      "reason": "严禁使用绝对化、神话或过度肯定的商业宣扬词汇，技术陈述必须客观严谨。",
+      "guidance": "请陈述具体的技术解决手段与覆盖用例，例如：'在配置解析前增加非空校验，规避缺少可选字段时的异常'。"
+    },
+    {
+      "id": "CMG-STY-003",
+      "category": "hyperbolic_negative",
+      "severity": "error",
+      "title": "过度否定与情绪化贬损表述拦截",
+      "patterns": [
+        "垃圾",
+        "一团糟",
+        "稀烂",
+        "毫无意义",
+        "彻底失败",
+        "毫无价值",
+        "致命缺陷",
+        "严重崩溃",
+        "烂代码",
+        "废物",
+        "稀碎"
+      ],
+      "asciiPatterns": [
+        "\\b(rubbish|garbage|total\\s*crap|trash|shitty|horrible|terrible|worthless|complete\\s*mess|disaster|catastrophe|useless\\s*code|broken\\s*beyond\\s*repair|idiotic)\\b"
+      ],
+      "reason": "严禁在提交信息中夹带情绪化贬损或过度否定的非客观用语。",
+      "guidance": "请客观说明待优化或重构的技术动因，例如：'重构深层循环嵌套以降低圈复杂度'。"
+    },
+    {
+      "id": "CMG-STY-004",
+      "category": "meta_narrative",
+      "severity": "error",
+      "title": "风格元叙事、口号与宣传套话拦截",
+      "patterns": [
+        "低调中肯",
+        "求真务实",
+        "宣扬性词汇",
+        "移除宣扬性词汇",
+        "调整文案语调",
+        "风格升级",
+        "实事求是",
+        "语调优化",
+        "拒绝浮夸",
+        "自吹自擂",
+        "标杆",
+        "跨时代",
+        "划时代",
+        "重磅",
+        "里程碑式",
+        "突破性",
+        "颠覆性",
+        "重塑",
+        "飞跃",
+        "震撼",
+        "史诗级",
+        "跨越式"
+      ],
+      "asciiPatterns": [
+        "\\b(game-?changer|groundbreaking|paradigm\\s*shift|revolutionary|epoch-?making|monumental|quantum\\s*leap|milestone\\s*breakthrough)\\b",
+        "\\b(tone\\s*down|low-?key|pragmatic|pragmatism|humble|stay\\s*humble|truth-?seeking|down-?to-?earth)\\b",
+        "\\b(remove\\s*(boastful|promotional|hyped)\\s*(words?|vocabulary|terms?|language)?)\\b",
+        "\\b(adjust(ing)?\\s*(the\\s*)?(tone|wording\\s*tone|writing\\s*style))\\b",
+        "\\b(meta-?narrative|style\\s*refactoring|style\\s*upgrade|factual\\s*and\\s*pragmatic)\\b"
+      ],
+      "reason": "严禁将治理要求、自省表态或文风口号当作改动正文提交（无论中英文），提交说明必须纯粹记录技术改动事实。",
+      "guidance": "请直接列出修改的具体文件与小节内容，例如：'更新 README.md 中各项目状态标注，说明部分模块仍处于探索与未完成阶段'。"
+    }
+  ],
+  "whitelist": [
+    "绝对路径",
+    "绝对地址",
+    "绝对值",
+    "临时文件",
+    "临时目录",
+    "临时表",
+    "全量编译",
+    "全量检查点",
+    "完全限定名",
+    "absolute path",
+    "absolute address",
+    "absolute value",
+    "temp file",
+    "temporary file",
+    "temporary directory",
+    "temporary table",
+    "full build",
+    "full checkpoint"
+  ]
+}
+

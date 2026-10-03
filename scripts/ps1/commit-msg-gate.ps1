@@ -168,6 +168,13 @@ if ($process.ExitCode -ne 0) {
     exit 1
 }
 
+# --- Rule 8: 提交文本求真务实与禁词审查 (CMG-STY-TMP/HYP/NEG/MET) ---
+$processStyle = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-msg-style.js", $MsgFile -NoNewWindow -PassThru -Wait
+if ($processStyle.ExitCode -ne 0) {
+    Show-CommitTemplateGuide
+    exit 1
+}
+
 Write-Host "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规" -ForegroundColor Green
 Write-Host "  ✔ Rule 2: 零黑话与空洞词检测通过" -ForegroundColor Green
 Write-Host "  ✔ Rule 3: Header-Body 空行分割契约合规" -ForegroundColor Green
@@ -175,6 +182,7 @@ Write-Host "  ✔ Rule 4: 正文有效字数与信息密度 ($bodyCharCount 字�
 Write-Host "  ✔ Rule 5: 生产工程级结构化区块校验通过" -ForegroundColor Green
 Write-Host "  ✔ Rule 6: 正文零施工批次黑话校验通过" -ForegroundColor Green
 Write-Host "  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过" -ForegroundColor Green
+Write-Host "  ✔ Rule 8: 提交文本求真务实与禁词审查通过 (零临时/零夸大/零元叙事口号)" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "✅ 【门禁结论】Commit-Msg 生产级格式与结构化内容校验全部 PASS！" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan

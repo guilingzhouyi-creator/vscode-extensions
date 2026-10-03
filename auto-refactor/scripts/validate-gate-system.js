@@ -133,12 +133,13 @@ function verifyPrePushParity() {
   ]) {
     assert(fs.existsSync(p), `${name} must exist`);
     const content = fs.readFileSync(p, 'utf8');
-    for (let i = 1; i <= 8; i++) {
-      assert(content.includes(`[${i}/8]`), `${name} must contain Gate [${i}/8]`);
+    for (let i = 1; i <= 9; i++) {
+      assert(content.includes(`[${i}/9]`), `${name} must contain Gate [${i}/9]`);
     }
     assert(content.includes('workspace-timing'), `${name} must verify workspace-timing`);
     assert(content.includes('auto-refactor'), `${name} must verify auto-refactor`);
     assert(content.includes('WebGames'), `${name} must verify WebGames`);
+    assert(content.includes('validate-commit-msg-style'), `${name} must verify commit msg style`);
   }
 }
 
@@ -178,9 +179,9 @@ function runAll() {
   verifyPreCommitParity();
   console.log('  ✔ Pre-Commit: [1/9]..[9/9] normalized, Gate 8 covers all 3 projects.');
 
-  console.log('6. Verifying pre-push-gate 8-gate parity...');
+  console.log('6. Verifying pre-push-gate 9-gate parity...');
   verifyPrePushParity();
-  console.log('  ✔ Pre-Push: 8 gates covering all 3 projects.');
+  console.log('  ✔ Pre-Push: 9 gates covering all 3 projects.');
 
   console.log('\n✅ All gate system verification checks passed successfully.');
 }

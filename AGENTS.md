@@ -8,12 +8,12 @@
   - `workspace-timing/`：VS Code 扩展，独立运行时，RingBuffer+Journal 内存双写崩溃安全，L0~L5 门禁；
   - `auto-refactor/`：Node CLI 静态重构与审查引擎（非扩展，独立工具），TS+Rust 双轨内核，4 层规则金字塔；
   - `WebGames/`：Godot 4.7 卡拉尔世界引擎（纯逻辑无头解耦，配置驱动，20 项静态门禁，四阶段案卷施工）；
-- **根级发布与门禁工具链（`scripts/`）**：`audit-all.sh`/`audit-all.ps1`（全工作区跨项目统一审查中枢与质量看板）；`pre-commit-gate`（9 重物理卫生、换行契约、密钥防泄漏与 AST 局部切片审查）；`commit-msg-gate`（7 项生产工程级结构化正文、零黑话与规则 ID 反虚构防漂移门禁，依单源注册表 `scripts/common/rule-catalog.json` 核验）；`pre-push-gate`（8 重全量回归与十维质量基线 Ratchet 门禁，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
+- **根级发布与门禁工具链（`scripts/`）**：`audit-all.sh`/`audit-all.ps1`（全工作区跨项目统一审查中枢与质量看板）；`pre-commit-gate`（9 重物理卫生、换行契约、密钥防泄漏与 AST 局部切片审查）；`commit-msg-gate`（8 项生产工程级结构化正文、零黑话、文本风格求真务实与规则 ID 反虚构防漂移门禁，依单源注册表 `scripts/common/rule-catalog.json` 与 `commit-msg-forbidden-terms.json` 核验）；`pre-push-gate`（9 重全量回归、待推送分支提交历史文本规范扫描与十维质量基线 Ratchet 门禁，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
 
 ## 二、 跨项目全局通用契约
 
 ### 1. 命名与代码排版
-- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 生产工程级结构化正文（必须包含 [Why]/[Added]/[Changed]/[Fixed]/[Verification] 结构化区块，非轻量提交正文有效字数 $\ge 30$ 字符，受 `commit-msg-gate` 本地与 CI 强阻断）；大型改动必须按架构依赖拓扑严格分批原子提交，每次提交前须先用门禁脚本（`commit-msg-gate` 与 `pre-commit-gate`）执行离线预审；
+- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 生产工程级结构化正文（必须包含 [Why]/[Added]/[Changed]/[Fixed]/[Verification] 结构化区块，非轻量提交正文有效字数 $\ge 30$ 字符，受 `commit-msg-gate` 本地与 CI 强阻断）；提交信息必须严格秉承**纯粹技术事实原则**，严禁使用临时性/敷衍用语（`CMG-STY-001`）、过度肯定与绝对化夸大吹嘘（`CMG-STY-002`）、过度否定与情绪化贬损（`CMG-STY-003`），**严禁以“调整整体文案语调为低调中肯、求真务实，移除宣扬性词汇”等风格元叙事口号替代具体技术与文件改动事实**（`CMG-STY-004`）（中英文同规，严禁通过英文换词如 tone down / humble / pragmatic / ultimate / hacky 等尝试绕过）；大型改动必须按架构依赖拓扑严格分批原子提交，每次提交前须先用门禁脚本（`commit-msg-gate` 与 `pre-commit-gate`）执行离线预审；
 - **物理命名**：全局严格 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）；
 - **缩进换行**：TypeScript 4 空格，其余 2 空格；`ps1` 严格 CRLF，`sh`/`gd`/`md`/`json`/`ts` 严格 LF。
 
@@ -62,6 +62,7 @@
 8. **双重门禁与推送合规红线**：严禁使用 `--no-verify` 或任何跳过本地 Tier 1 门禁的手段推送代码；向 `origin/main` 推送后必须确保 GitHub Actions 远端 Tier 2 流水线 100% SUCCESS，任何失败必须同次闭环修复；严禁对未跟踪文件执行 `git rm`。
 9. **原子提交与预审红线**：严禁将涉及多个不同层次架构（如文档索引、底层基础设施、业务领域逻辑与静态重构）的跨域大型改动一次性巨石提交；严禁在未通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审的情况下裸调 `git commit`。
 10. **空包转发与伪门面红线**：严禁在任何项目中创建或提交无本地声明、无数据校验、无不可变冻结且仅向单一文件透传导出的空包转发文件；门面层违反实质承载预算强制触发 `ARCH-FAC-001` 阻断。
+11. **提交文本事实与客观性红线**：严禁在 Git 提交信息中夹带任何临时敷衍词汇（`CMG-STY-001`）、过度肯定与绝对化夸大吹嘘（`CMG-STY-002`）、过度否定与情绪化贬损（`CMG-STY-003`），严禁以“调整整体文案语调为低调中肯、求真务实，移除宣扬性词汇”等风格元叙事口号替代具体技术与文件改动事实（`CMG-STY-004`）（中英文双语同构拦截，严禁尝试使用英文同义词绕过）；所有提交信息必须纯粹记录客观技术事实。
 
 ## 五、 Agent 行为边界与维护规则
 
