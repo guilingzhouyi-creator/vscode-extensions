@@ -72,7 +72,7 @@ const SHELL_GOOD = [
   'cd /tmp/some_dir || exit 1',
   'ls',
   '',
-  'read -r name',
+  'read -r -t 10 name',
   '',
   'for arg in "$@"; do',
   '  echo "$arg"',
@@ -155,6 +155,122 @@ const PSM1_BAD = [
   '',
 ].join('\n');
 
+/**
+ * Shell engineering issues fixture
+ * (SH-DOC-001, SH-EOL-001, SH-EXIT-001, SH-SAFE-001, SH-SEC-001, SH-TRAP-001).
+ */
+const SHELL_ENG_BAD = [
+  '#!/usr/bin/env bash\r',
+  'set -euo pipefail\r',
+  '# Over 30 lines without module metadata header\r',
+  'TEMP_DIR=$(mktemp -d)\r',
+  'eval "$EXTERNAL_SCRIPT"\r',
+  'read interactive_name\r',
+  'git diff --quiet\r',
+  'line8=1\r',
+  'line9=1\r',
+  'line10=1\r',
+  'line11=1\r',
+  'line12=1\r',
+  'line13=1\r',
+  'line14=1\r',
+  'line15=1\r',
+  'line16=1\r',
+  'line17=1\r',
+  'line18=1\r',
+  'line19=1\r',
+  'line20=1\r',
+  'line21=1\r',
+  'line22=1\r',
+  'line23=1\r',
+  'line24=1\r',
+  'line25=1\r',
+  'line26=1\r',
+  'line27=1\r',
+  'line28=1\r',
+  'line29=1\r',
+  'line30=1\r',
+  'line31=1\r',
+  'echo "done"\r',
+].join('\n');
+
+/** Shell engineering clean fixture. */
+const SHELL_ENG_GOOD = [
+  '#!/usr/bin/env bash',
+  '# Module: clean-runner',
+  '# Description: Clean shell engineering fixture',
+  '# Usage: ./clean-runner.sh',
+  'set -euo pipefail',
+  '',
+  'TEMP_DIR=$(mktemp -d)',
+  'trap \'rm -rf "$TEMP_DIR"\' EXIT',
+  '',
+  'STATUS=0; git diff --quiet || STATUS=$?',
+  'read -r -t 5 safe_input',
+  'CMD=("echo" "safe")',
+  '"${CMD[@]}"',
+  '',
+].join('\n');
+
+/** PowerShell engineering issues fixture (PS-DOC-001, PS-SAFE-001, PS-SEC-001, PS-TRAP-001). */
+const PS_ENG_BAD = [
+  '$ErrorActionPreference = "Stop"',
+  '# Over 30 lines without help or module block',
+  '$stream = [System.IO.FileStream]::new("data.bin", [System.IO.FileMode]::Open)',
+  'iex "$dynamicCommand"',
+  'Read-Host "Enter confirmation"',
+  '$l6=1',
+  '$l7=1',
+  '$l8=1',
+  '$l9=1',
+  '$l10=1',
+  '$l11=1',
+  '$l12=1',
+  '$l13=1',
+  '$l14=1',
+  '$l15=1',
+  '$l16=1',
+  '$l17=1',
+  '$l18=1',
+  '$l19=1',
+  '$l20=1',
+  '$l21=1',
+  '$l22=1',
+  '$l23=1',
+  '$l24=1',
+  '$l25=1',
+  '$l26=1',
+  '$l27=1',
+  '$l28=1',
+  '$l29=1',
+  '$l30=1',
+  '$l31=1',
+  'Write-Output "done"',
+].join('\r\n');
+
+/** PowerShell engineering clean fixture. */
+const PS_ENG_GOOD = [
+  '<#',
+  '.SYNOPSIS',
+  'Clean PowerShell fixture.',
+  '.DESCRIPTION',
+  'Validates that engineering rules pass cleanly.',
+  '#>',
+  '$ErrorActionPreference = "Stop"',
+  '',
+  'try {',
+  '  $stream = [System.IO.FileStream]::new("data.bin", [System.IO.FileMode]::Open)',
+  '} finally {',
+  '  if ($stream) { $stream.Dispose() }',
+  '}',
+  '',
+  'if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected) {',
+  '  $key = Read-Host "Safe prompt"',
+  '}',
+  '',
+  '& $cmd @params',
+].join('\r\n');
+
 /* =========================================================================
  * Workspace setup
  * ========================================================================= */
@@ -171,11 +287,15 @@ function writeWorkspace(root) {
   fs.writeFileSync(path.join(root, 'good.sh'), SHELL_GOOD);
   fs.writeFileSync(path.join(root, 'zscript.zsh'), SHELL_BAD);
   fs.writeFileSync(path.join(root, 'noshebang.sh'), SHELL_NOSHEBANG);
+  fs.writeFileSync(path.join(root, 'eng_bad.sh'), SHELL_ENG_BAD);
+  fs.writeFileSync(path.join(root, 'eng_good.sh'), SHELL_ENG_GOOD);
 
   // PowerShell files
   fs.writeFileSync(path.join(root, 'bad.ps1'), PS_BAD);
   fs.writeFileSync(path.join(root, 'good.ps1'), PS_GOOD);
   fs.writeFileSync(path.join(root, 'mymodule.psm1'), PSM1_BAD);
+  fs.writeFileSync(path.join(root, 'eng_bad.ps1'), PS_ENG_BAD);
+  fs.writeFileSync(path.join(root, 'eng_good.ps1'), PS_ENG_GOOD);
 
   // Decoy: should not be analyzed
   fs.writeFileSync(path.join(root, 'decoy.js'), 'const name = "hello"; console.log(name);\n');
@@ -374,6 +494,102 @@ async function run() {
     );
     console.log('    [PASS] non-shell/PS files are never inspected');
 
+    // --- Shell: Engineering rules positive tests on eng_bad.sh ---
+    console.log('  [TEST] Shell engineering rules positive tests on eng_bad.sh');
+
+    assert.strictEqual(
+      byRuleInFile('SH-EOL-001', 'eng_bad.sh'),
+      1,
+      'SH-EOL-001 should fire on CRLF in shell script',
+    );
+    console.log('    [PASS] SH-EOL-001 fires on CRLF in shell script');
+
+    assert.strictEqual(
+      byRuleInFile('SH-DOC-001', 'eng_bad.sh'),
+      1,
+      'SH-DOC-001 should fire on script > 30 lines without module doc header',
+    );
+    console.log('    [PASS] SH-DOC-001 fires on missing module doc header');
+
+    assert.strictEqual(
+      byRuleInFile('SH-TRAP-001', 'eng_bad.sh'),
+      1,
+      'SH-TRAP-001 should fire on mktemp without EXIT trap',
+    );
+    console.log('    [PASS] SH-TRAP-001 fires on missing EXIT trap for mktemp');
+
+    assert.strictEqual(
+      byRuleInFile('SH-SEC-001', 'eng_bad.sh'),
+      1,
+      'SH-SEC-001 should fire on dynamic eval with variable expansion',
+    );
+    console.log('    [PASS] SH-SEC-001 fires on dynamic eval with variable');
+
+    assert.strictEqual(
+      byRuleInFile('SH-SAFE-001', 'eng_bad.sh'),
+      1,
+      'SH-SAFE-001 should fire on interactive read without timeout or tty guard',
+    );
+    console.log('    [PASS] SH-SAFE-001 fires on read without timeout or tty guard');
+
+    assert.strictEqual(
+      byRuleInFile('SH-EXIT-001', 'eng_bad.sh'),
+      1,
+      'SH-EXIT-001 should fire on bare git diff --quiet under set -e',
+    );
+    console.log('    [PASS] SH-EXIT-001 fires on bare predicate command under set -e');
+
+    // --- Shell: Engineering rules negative tests on eng_good.sh ---
+    console.log('  [TEST] Shell engineering rules negative tests on eng_good.sh');
+    const engGoodShIssues = inFile('eng_good.sh');
+    assert.strictEqual(
+      engGoodShIssues.length,
+      0,
+      `eng_good.sh should have zero issues, got: ${engGoodShIssues.map((i) => i.rule).join(', ')}`,
+    );
+    console.log('    [PASS] eng_good.sh produces zero findings');
+
+    // --- PowerShell: Engineering rules positive tests on eng_bad.ps1 ---
+    console.log('  [TEST] PowerShell engineering rules positive tests on eng_bad.ps1');
+
+    assert.strictEqual(
+      byRuleInFile('PS-DOC-001', 'eng_bad.ps1'),
+      1,
+      'PS-DOC-001 should fire on script > 30 lines without doc header',
+    );
+    console.log('    [PASS] PS-DOC-001 fires on missing PowerShell doc header');
+
+    assert.strictEqual(
+      byRuleInFile('PS-TRAP-001', 'eng_bad.ps1'),
+      1,
+      'PS-TRAP-001 should fire on FileStream creation without finally disposal',
+    );
+    console.log('    [PASS] PS-TRAP-001 fires on missing finally for FileStream');
+
+    assert.strictEqual(
+      byRuleInFile('PS-SEC-001', 'eng_bad.ps1'),
+      1,
+      'PS-SEC-001 should fire on iex with variable input',
+    );
+    console.log('    [PASS] PS-SEC-001 fires on dynamic iex with variable input');
+
+    assert.strictEqual(
+      byRuleInFile('PS-SAFE-001', 'eng_bad.ps1'),
+      1,
+      'PS-SAFE-001 should fire on Read-Host without interactive guard',
+    );
+    console.log('    [PASS] PS-SAFE-001 fires on unguarded Read-Host');
+
+    // --- PowerShell: Engineering rules negative tests on eng_good.ps1 ---
+    console.log('  [TEST] PowerShell engineering rules negative tests on eng_good.ps1');
+    const engGoodPsIssues = inFile('eng_good.ps1');
+    assert.strictEqual(
+      engGoodPsIssues.length,
+      0,
+      `eng_good.ps1 should have zero issues, got: ${engGoodPsIssues.map((i) => i.rule).join(', ')}`,
+    );
+    console.log('    [PASS] eng_good.ps1 produces zero findings');
+
     // --- Count total test cases ---
     const testCases = [
       'SH-DEPR-001 positive',
@@ -397,6 +613,18 @@ async function run() {
       '.psm1 extension',
       'JS decoy negative',
       'Python decoy negative',
+      'SH-EOL-001 positive',
+      'SH-DOC-001 positive',
+      'SH-TRAP-001 positive',
+      'SH-SEC-001 positive',
+      'SH-SAFE-001 positive',
+      'SH-EXIT-001 positive',
+      'eng_good.sh negative (all silent)',
+      'PS-DOC-001 positive',
+      'PS-TRAP-001 positive',
+      'PS-SEC-001 positive',
+      'PS-SAFE-001 positive',
+      'eng_good.ps1 negative (all silent)',
     ];
     console.log(`\n  Total test cases: ${testCases.length} (>= 15 required)`);
     assert.ok(testCases.length >= 15, 'At least 15 test cases must be covered');

@@ -232,7 +232,14 @@ export function classifyCommentSnippet(
     lineIdx = 1,
 ): CommentSnippetAnalysis {
     const trimmed = lineText.trim();
-    if (trimmed === '/**' || trimmed === '*/' || trimmed === '/*' || trimmed === '*') {
+    if (
+        trimmed === '/**' ||
+        trimmed === '*/' ||
+        trimmed === '/*' ||
+        trimmed === '*' ||
+        trimmed === '<#' ||
+        trimmed === '#>'
+    ) {
         return {
             line: lineIdx,
             text: lineText,
@@ -273,8 +280,8 @@ function extractCommentLineInfo(
     inBlockComment: boolean,
 ): { isComment: boolean; text: string; nextInBlock: boolean; shouldSkip: boolean } {
     if (inBlockComment) {
-        const nextInBlock = !trimmed.includes('*/');
-        if (trimmed === '*/' || trimmed === '*') {
+        const nextInBlock = !trimmed.includes('*/') && !trimmed.includes('#>');
+        if (trimmed === '*/' || trimmed === '*' || trimmed === '#>') {
             return { isComment: false, text: '', nextInBlock, shouldSkip: true };
         }
         return { isComment: true, text: trimmed, nextInBlock, shouldSkip: false };
@@ -286,7 +293,14 @@ function extractCommentLineInfo(
         }
         return { isComment: true, text: trimmed, nextInBlock, shouldSkip: false };
     }
+    if (trimmed.startsWith('<#')) {
+        const nextInBlock = !trimmed.includes('#>');
+        return { isComment: false, text: '', nextInBlock, shouldSkip: true };
+    }
     if (trimmed.startsWith('//') || (trimmed.startsWith('#') && !trimmed.startsWith('#!'))) {
+        if (trimmed === '#>') {
+            return { isComment: false, text: '', nextInBlock: false, shouldSkip: true };
+        }
         return { isComment: true, text: trimmed, nextInBlock: false, shouldSkip: false };
     }
     return { isComment: false, text: '', nextInBlock: false, shouldSkip: false };

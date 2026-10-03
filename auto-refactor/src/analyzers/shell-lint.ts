@@ -18,7 +18,7 @@
  *     [] for non-shell content. Heuristics are conservative — a missed finding is
  *     preferred over a false positive.
  */
-import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
@@ -38,11 +38,24 @@ import {
     PS_PARAM_WITH_TYPE_RE,
     PS_PARAM_SIMPLE_RE,
     PS_ERROR_ACTION_RE,
+    SH_TTY_GUARD_RE,
+    PS_INTERACTIVE_GUARD_RE,
+    PS_NON_INTERACTIVE_FLAG_RE,
     type ShellEmitter,
     type PowerShellScanState,
     scanStrictErrorFlags,
     checkDeprecatedSyntax,
     checkUnquotedVariables,
+    checkShellDocContract,
+    checkPowerShellDocContract,
+    checkShellLineEndings,
+    checkShellStrictExitCapture,
+    checkShellResourceCleanup,
+    checkPowerShellResourceDisposal,
+    checkShellDynamicSecurity,
+    checkPowerShellDynamicSecurity,
+    checkPowerShellInteractiveSafety,
+    checkShellInteractiveSafety,
 } from './shell-lint-rules';
 
 /**
@@ -84,7 +97,7 @@ export class ShellLintAnalyzer implements Analyzer {
             lineIdx: number,
             rule: string,
             message: string,
-            severity: typeof SEVERITY_WARNING | typeof SEVERITY_INFO,
+            severity: Severity,
             suggestion: string,
             detail: Record<string, unknown>,
         ): void => {
@@ -115,8 +128,14 @@ export class ShellLintAnalyzer implements Analyzer {
         const maskedLines = masked;
 
         // --- File-level checks ---
+        checkShellLineEndings(content, emit);
         this.checkShebang(lines, file, emit);
         this.checkSetEuoPipefail(lines, maskedLines, emit);
+        checkShellDocContract(lines, file, emit);
+        checkShellResourceCleanup(lines, maskedLines, emit);
+
+        const { hasE } = scanStrictErrorFlags(maskedLines);
+        const hasTtyGuard = maskedLines.some((l) => SH_TTY_GUARD_RE.test(l));
 
         // --- Line-level checks ---
         for (let i = 0; i < lines.length; i++) {
@@ -133,6 +152,9 @@ export class ShellLintAnalyzer implements Analyzer {
             this.checkArraySyntax(trimmed, i, emit);
             this.checkEchoVsPrintf(trimmed, i, emit);
             checkUnquotedVariables(line, maskedTrimmed, i, emit);
+            checkShellDynamicSecurity(trimmed, i, emit);
+            checkShellInteractiveSafety(trimmed, maskedTrimmed, i, hasTtyGuard, emit);
+            checkShellStrictExitCapture(trimmed, i, hasE, emit);
         }
     }
 
@@ -230,7 +252,7 @@ export class ShellLintAnalyzer implements Analyzer {
      * PowerShell rule implementation
      * ========================================================================= */
 
-    private analyzePowerShell(content: string, _file: string, emit: ShellEmitter): void {
+    private analyzePowerShell(content: string, file: string, emit: ShellEmitter): void {
         const { raw, masked } = maskSourceText(content, {
             lineComment: '#',
             blockComment: { open: '<#', close: '#>' },
@@ -240,6 +262,12 @@ export class ShellLintAnalyzer implements Analyzer {
         const maskedLines = masked;
 
         this.checkErrorActionPreference(lines, emit);
+        checkPowerShellDocContract(lines, file, emit);
+        checkPowerShellResourceDisposal(lines, maskedLines, emit);
+
+        const hasInteractiveGuard = maskedLines.some(
+            (l) => PS_INTERACTIVE_GUARD_RE.test(l) || PS_NON_INTERACTIVE_FLAG_RE.test(l),
+        );
 
         const state: PowerShellScanState = {
             inFunction: false,
@@ -260,6 +288,8 @@ export class ShellLintAnalyzer implements Analyzer {
 
             this.updatePowerShellFunctionState(state, line, trimmed, maskedTrimmed, i, emit);
             this.checkPowerShellAliases(trimmed, maskedTrimmed, i, emit);
+            checkPowerShellDynamicSecurity(trimmed, i, emit);
+            checkPowerShellInteractiveSafety(trimmed, maskedTrimmed, i, hasInteractiveGuard, emit);
         }
     }
 
