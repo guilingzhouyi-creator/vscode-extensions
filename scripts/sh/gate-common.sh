@@ -11,7 +11,7 @@
 #   source "$(dirname "${BASH_SOURCE[0]}")/gate-common.sh"
 #   CONFLICT_LEVEL=$(gate_classify_conflicts "$CONFLICT_FILES")
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 # 高危冲突文件模式（单源）：数据迁移 / schema / 数据库 / 核心逻辑 / 依赖清单 → 升 C3
 # 注意：pr-gate 与 auto-merge-gate 必须共用本模式，两侧各自维护已发生过漂移事故

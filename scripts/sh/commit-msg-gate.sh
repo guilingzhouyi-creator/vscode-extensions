@@ -10,7 +10,7 @@
 # 用法示例:
 #   bash scripts/sh/commit-msg-gate.sh <commit-msg-file>
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 MSG_FILE="${1:?用法错误: 请传入 commit-msg 文件路径}"
 

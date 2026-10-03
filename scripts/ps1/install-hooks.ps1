@@ -30,9 +30,9 @@ if (-not $gitRoot) {
 git config core.hooksPath .githooks
 
 Write-Host "✅ 已配置 git config core.hooksPath = .githooks" -ForegroundColor Green
-Write-Host "✅ Pre-Commit 门禁 (.githooks/pre-commit -> scripts/sh/pre-commit-gate.sh)" -ForegroundColor Green
-Write-Host "✅ Commit-Msg 门禁 (.githooks/commit-msg -> scripts/sh/commit-msg-gate.sh)" -ForegroundColor Green
-Write-Host "✅ Pre-Push 门禁 (.githooks/pre-push -> scripts/sh/pre-push-gate.sh)" -ForegroundColor Green
+Write-Host "✅ Pre-Commit 门禁 (.githooks/pre-commit -> pwsh / bash 双运行期路由)" -ForegroundColor Green
+Write-Host "✅ Commit-Msg 门禁 (.githooks/commit-msg -> pwsh / bash 双运行期路由)" -ForegroundColor Green
+Write-Host "✅ Pre-Push 门禁 (.githooks/pre-push -> pwsh / bash 双运行期路由)" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "🎉 本地 Git 提交门禁激活成功！后续每次 commit 将自动执行前置安全自检。" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan

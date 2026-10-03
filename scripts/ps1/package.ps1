@@ -40,6 +40,7 @@ foreach ($iv in $invariants) {
 }
 
 function Repair-ExtensionRegistry {
+    [CmdletBinding()]
     param([string]$FullExtId)
     foreach ($ideDir in @("$env:USERPROFILE\.vscode\extensions", "$env:USERPROFILE\.cursor\extensions")) {
         $extJsonPath = Join-Path $ideDir 'extensions.json'
@@ -67,6 +68,7 @@ function Repair-ExtensionRegistry {
 }
 
 function Sync-InstalledExtensionFiles {
+    [CmdletBinding()]
     param([string]$SourceDir, [string]$FullExtId)
     $syncedCount = 0
     foreach ($ideDir in @("$env:USERPROFILE\.vscode\extensions", "$env:USERPROFILE\.cursor\extensions")) {

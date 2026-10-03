@@ -10,14 +10,14 @@
 # 用法示例:
 #   bash scripts/sh/pre-push-gate.sh
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 echo "================================================================="
 echo "🚀 执行本地 Pre-Push 远程推送前置全量质量与回归门禁"
 echo "================================================================="
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || exit 1
 
 NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
@@ -44,12 +44,12 @@ else
 fi
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
-echo "[3/8] 执行 auto-refactor 全量门禁与回归套件 (139 套，Rust/Build/Lint/Comments/Self/Tests)..."
+echo "[3/8] 执行 auto-refactor 全量门禁与回归套件 (141 套，Rust/Build/Lint/Comments/Self/Tests)..."
 if ! (cd auto-refactor && "$NPM_BIN" run gate >/dev/null 2>&1); then
     echo "❌ [FAIL] Gate 3: auto-refactor 全量门禁与回归套件未全部通过！"
     FAILED=1
 else
-    echo "  ✔ [PASS] auto-refactor 全量门禁与 139 套测试全部通过"
+    echo "  ✔ [PASS] auto-refactor 全量门禁与 141 套测试全部通过"
 fi
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 Ratchet ---

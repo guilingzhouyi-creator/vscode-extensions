@@ -22,6 +22,7 @@ $ErrorActionPreference = 'Stop'
 
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
+$pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "py" }
 
 if (-not $Json) {
     Write-Host "=================================================================" -ForegroundColor Cyan
@@ -33,7 +34,7 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 $failed = $false
 
 # 1. 物理卫生与零空文件看守
-if (-not $Json) { Write-Host "▶ [1/4] 检查全工作区物理卫生与零空文件..." -ForegroundColor Gray }
+if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生与零空文件..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-no-empty-scripts.js" -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     $statusHygiene = "FAIL"
@@ -43,7 +44,7 @@ if ($res.ExitCode -ne 0) {
 }
 
 # 2. 单源规则注册表与目录一致性
-if (-not $Json) { Write-Host "▶ [2/4] 聚合与校验全工作区单源规则目录..." -ForegroundColor Gray }
+if (-not $Json) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     $statusRules = "FAIL"
@@ -53,7 +54,7 @@ if ($res.ExitCode -ne 0) {
 }
 
 # 3. auto-refactor 静态重构与审查引擎自检
-if (-not $Json) { Write-Host "▶ [3/4] 执行 auto-refactor 十维质量基线与多维自审..." -ForegroundColor Gray }
+if (-not $Json) { Write-Host "▶ [3/5] 执行 auto-refactor 十维质量基线与多维自审..." -ForegroundColor Gray }
 if ($Fast) {
     $res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -NoNewWindow -PassThru -Wait
     if ($res.ExitCode -ne 0) {
@@ -74,7 +75,7 @@ if ($Fast) {
 }
 
 # 4. workspace-timing L0~L5 六层审查门禁
-if (-not $Json) { Write-Host "▶ [4/4] 执行 workspace-timing L0~L5 六层审查门禁与单元自检..." -ForegroundColor Gray }
+if (-not $Json) { Write-Host "▶ [4/5] 执行 workspace-timing L0~L5 六层审查门禁与单元自检..." -ForegroundColor Gray }
 $res1 = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "workspace-timing", "run", "review" -NoNewWindow -PassThru -Wait
 $res2 = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "workspace-timing", "run", "test:fast" -NoNewWindow -PassThru -Wait
 if ($res1.ExitCode -ne 0 -or $res2.ExitCode -ne 0) {
@@ -82,6 +83,16 @@ if ($res1.ExitCode -ne 0 -or $res2.ExitCode -ne 0) {
     $failed = $true
 } else {
     $statusWt = "PASS"
+}
+
+# 5. WebGames 领域配置架构与规范审查
+if (-not $Json) { Write-Host "▶ [5/5] 执行 WebGames 领域配置架构与规范审查..." -ForegroundColor Gray }
+$resWg = Start-Process -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -NoNewWindow -PassThru -Wait
+if ($resWg.ExitCode -ne 0) {
+    $statusWg = "FAIL"
+    $failed = $true
+} else {
+    $statusWg = "PASS"
 }
 
 $startTime.Stop()
@@ -95,6 +106,7 @@ $cHygiene = if ($statusHygiene -eq "PASS") { "Green" } else { "Red" }
 $cRules = if ($statusRules -eq "PASS") { "Green" } else { "Red" }
 $cAr = if ($statusAr -eq "PASS") { "Green" } else { "Red" }
 $cWt = if ($statusWt -eq "PASS") { "Green" } else { "Red" }
+$cWg = if ($statusWg -eq "PASS") { "Green" } else { "Red" }
 
 if ($Json) {
     $summary = @{
@@ -106,6 +118,7 @@ if ($Json) {
             rulesCatalog = $statusRules
             autoRefactor = $statusAr
             workspaceTiming = $statusWt
+            webGames = $statusWg
         }
     }
     $summary | ConvertTo-Json -Depth 3
@@ -119,9 +132,10 @@ Write-Host "├─────────────────────�
 Write-Host "│ 审查检查项 / 子系统         │ 判定结果    │ 覆盖范围          │" -ForegroundColor Cyan
 Write-Host "├─────────────────────────────┼─────────────┼───────────────────┤" -ForegroundColor Cyan
 Write-Host ("│ 1. 工作区零空文件物理卫生   │ {0,-11} │ 全仓代码/脚本/配置│" -f $statusHygiene) -ForegroundColor $cHygiene
-Write-Host ("│ 2. 单源规则目录一致性 (SSOT)│ {0,-11} │ 336+ 条规则总目录 │" -f $statusRules) -ForegroundColor $cRules
-Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 10 维模型 / 134套 │" -f $statusAr) -ForegroundColor $cAr
+Write-Host ("│ 2. 单源规则目录一致性 (SSOT)│ {0,-11} │ 单源规则总目录    │" -f $statusRules) -ForegroundColor $cRules
+Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 10 维模型 / 141套 │" -f $statusAr) -ForegroundColor $cAr
 Write-Host ("│ 4. workspace-timing 审查门禁│ {0,-11} │ L0~L5 六层权重门禁│" -f $statusWt) -ForegroundColor $cWt
+Write-Host ("│ 5. WebGames 配置架构审查    │ {0,-11} │ 核心领域配置真源  │" -f $statusWg) -ForegroundColor $cWg
 Write-Host "├─────────────────────────────┴─────────────┴───────────────────┤" -ForegroundColor Cyan
 Write-Host ("│ 耗时: {0}s  |  全局状态: {1}           │" -f $elapsedSec, $globalStatus) -ForegroundColor $globalColor
 Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan

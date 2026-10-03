@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Git Commit-Msg Hook — 智能双运行期路由 (pwsh / sh)
+# Git Commit-Msg Hook — 智能双运行期路由 (pwsh / bash)
+set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
-if command -v pwsh >/dev/null 2>&1 && [ -f "$ROOT_DIR/scripts/ps1/commit-msg-gate.ps1" ]; then
+if command -v pwsh >/dev/null 2>&1 && [[ -f "$ROOT_DIR/scripts/ps1/commit-msg-gate.ps1" ]]; then
     exec pwsh -File "$ROOT_DIR/scripts/ps1/commit-msg-gate.ps1" "$1"
 else
-    exec sh "$ROOT_DIR/scripts/sh/commit-msg-gate.sh" "$1"
+    exec bash "$ROOT_DIR/scripts/sh/commit-msg-gate.sh" "$1"
 fi
+

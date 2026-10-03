@@ -10,7 +10,7 @@
 # 用法示例:
 #   bash scripts/sh/auto-label.sh
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 # ---------- 0. 基础信息 ----------
 REPO_SLUG="${CNB_REPO_SLUG:-}"

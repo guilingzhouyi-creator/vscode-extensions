@@ -11,7 +11,7 @@
 #   bash scripts/sh/version-bump.sh workspace-timing patch
 #   bash scripts/sh/version-bump.sh workspace-timing 1.0.0 --dry-run
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 EXT="${1:-}"
 MODE="${2:-}"
@@ -110,8 +110,13 @@ CL_PLAN=""
 if [[ -f "$CHANGELOG_FILE" ]]; then
   # 提取 [Unreleased] 段内容（至下一个 `## [` 为止）
   UNRELEASED_LINES=$(awk '/^## \[Unreleased\]/{flag=1; next} /^## \[/{if(flag){exit}} flag && NF{print}' "$CHANGELOG_FILE" | wc -l | tr -d ' ')
+  if [[ "$UNRELEASED_LINES" -gt 0 ]]; then
+    MIGRATE_MSG="[Unreleased] 现有 $UNRELEASED_LINES 行内容将迁入新段落，[Unreleased] 置空保留"
+  else
+    MIGRATE_MSG="[Unreleased] 当前为空，仅插入新段落头"
+  fi
   CL_PLAN="新版本段落: ## [$NEW_VER] — $TODAY
-$([ "$UNRELEASED_LINES" -gt 0 ] && echo "[Unreleased] 现有 $UNRELEASED_LINES 行内容将迁入新段落，[Unreleased] 置空保留" || echo "[Unreleased] 当前为空，仅插入新段落头")"
+$MIGRATE_MSG"
 else
   CL_PLAN="警告：$EXT 无 CHANGELOG.md（仓库约定要求 keep-a-changelog，仅警告不阻断）"
 fi

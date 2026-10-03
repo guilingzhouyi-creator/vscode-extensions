@@ -13,31 +13,33 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../..');
 const OUTPUT_FILE = path.join(__dirname, 'rule-catalog.json');
+const MATCH_EXTENSIONS = new Set(['.gd', '.sh', '.json', '.md']);
+
+function mapRuleEntry(r) {
+  if (!r || !r.id) return null;
+  return {
+    id: r.id,
+    project: 'auto-refactor',
+    family: r.family || 'general',
+    severity: r.severity || 'error',
+    summary: r.summary || '',
+  };
+}
 
 function collectAutoRefactorRules() {
-  const rules = [];
   const registryPath = path.join(ROOT, 'auto-refactor/dist/core/rules/registry.js');
   if (!fs.existsSync(registryPath)) {
-    return rules;
+    return [];
   }
 
   try {
     const { RULE_REGISTRY } = require(registryPath);
     const list = Array.isArray(RULE_REGISTRY) ? RULE_REGISTRY : Object.values(RULE_REGISTRY);
-    for (const r of list) {
-      if (!r || !r.id) continue;
-      rules.push({
-        id: r.id,
-        project: 'auto-refactor',
-        family: r.family || 'general',
-        severity: r.severity || 'error',
-        summary: r.summary || '',
-      });
-    }
+    return list.map(mapRuleEntry).filter(Boolean);
   } catch (err) {
     console.warn('Warning: Could not load auto-refactor compiled registry:', err.message);
+    return [];
   }
-  return rules;
 }
 
 function processCheckerRules(checker, rules) {
@@ -91,35 +93,35 @@ function scanFileForRules(fullPath, rulePattern, found) {
   }
 }
 
-function scanDirectoryForRules(dir, rulePattern, found) {
-  for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, f.name);
-    if (f.isDirectory()) {
-      if (f.name !== '.git' && f.name !== 'node_modules') {
-        scanDirectoryForRules(full, rulePattern, found);
-      }
-      continue;
-    }
-
-    const isMatch = f.name.endsWith('.gd') || f.name.endsWith('.sh') || f.name.endsWith('.json') || f.name.endsWith('.md');
-    if (isMatch) {
-      scanFileForRules(full, rulePattern, found);
+function collectCandidateFiles(dir, accumulator = []) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectCandidateFiles(full, accumulator);
+    } else if (MATCH_EXTENSIONS.has(path.extname(entry.name))) {
+      accumulator.push(full);
     }
   }
+  return accumulator;
 }
 
 function collectWebGamesRules() {
-  const rules = [];
   const webgamesDir = path.join(ROOT, 'WebGames');
   if (!fs.existsSync(webgamesDir)) {
-    return rules;
+    return [];
   }
 
   const rulePattern = /\b([A-Z]{2,4}-[A-Z0-9]+-[0-9]{3})\b/g;
   const found = new Map();
+  const candidateFiles = collectCandidateFiles(webgamesDir);
 
-  scanDirectoryForRules(webgamesDir, rulePattern, found);
+  for (const file of candidateFiles) {
+    scanFileForRules(file, rulePattern, found);
+  }
 
+  const rules = [];
   for (const [id, source] of found.entries()) {
     rules.push({
       id,

@@ -29,7 +29,7 @@ if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1
 $failed = $false
 
 # --- Gate 1: 零 0 字节与纯空白空文件一票阻断 ---
-Write-Host "[1/8] 检查暂存区零空文件守卫..." -ForegroundColor Gray
+Write-Host "[1/9] 检查暂存区零空文件守卫..." -ForegroundColor Gray
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
     if (Test-Path $file -PathType Leaf) {
@@ -48,7 +48,7 @@ foreach ($file in $stagedFiles) {
 }
 
 # --- Gate 2: 换行符 (EOL: ps1->CRLF, 其余->LF) 契约看守 ---
-Write-Host "[2/8] 检查换行符 (EOL: ps1->CRLF, 其余->LF) 契约..." -ForegroundColor Gray
+Write-Host "[2/9] 检查换行符 (EOL: ps1->CRLF, 其余->LF) 契约..." -ForegroundColor Gray
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
     if (Test-Path $file -PathType Leaf) {
@@ -76,7 +76,7 @@ foreach ($file in $stagedFiles) {
 }
 
 # --- Gate 3: 绝对路径与盘符防泄漏 ---
-Write-Host "[3/8] 检查绝对路径与协议防泄漏..." -ForegroundColor Gray
+Write-Host "[3/9] 检查绝对路径与协议防泄漏..." -ForegroundColor Gray
 $addedDiff = @(git diff --cached -U0 --no-color 2>$null | Where-Object { $_ -match '^\+[^+]' })
 foreach ($line in $addedDiff) {
     if ($line -match "(\b[A-Za-z]:[\\/][a-zA-Z0-9_-]+|file:///)" -and $line -notmatch "node_modules|\.gemini|file://") {
@@ -87,7 +87,7 @@ foreach ($line in $addedDiff) {
 }
 
 # --- Gate 4: 零黑话与规范命名 ---
-Write-Host "[4/8] 检查零黑话与规范命名..." -ForegroundColor Gray
+Write-Host "[4/9] 检查零黑话与规范命名..." -ForegroundColor Gray
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
     $baseName = [System.IO.Path]::GetFileName($file)
@@ -101,7 +101,7 @@ foreach ($file in $stagedFiles) {
 }
 
 # --- Gate 5: 单文件行数红线预算 (源文件 < 900 LOC) ---
-Write-Host "[5/8] 检查源文件行数红线预算 (< 900 LOC)..." -ForegroundColor Gray
+Write-Host "[5/9] 检查源文件行数红线预算 (< 900 LOC)..." -ForegroundColor Gray
 $maxLocBudget = 900
 foreach ($file in $stagedFiles) {
     if ([string]::IsNullOrWhiteSpace($file)) { continue }
@@ -118,7 +118,7 @@ foreach ($file in $stagedFiles) {
 }
 
 # --- Gate 6: 密钥与敏感 Token 防泄漏扫描 ---
-Write-Host "[6/8] 扫描高危密钥与敏感 Token 防泄漏..." -ForegroundColor Gray
+Write-Host "[6/9] 扫描高危密钥与敏感 Token 防泄漏..." -ForegroundColor Gray
 $secretPattern = '(AIza[0-9A-Za-z_-]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----)'
 foreach ($line in $addedDiff) {
     if ($line -match $secretPattern -and $line -notmatch '\$\{env:|CODEX_API_KEY|OPENAI_API_KEY|test-secret|mock-key|placeholder') {
@@ -133,7 +133,7 @@ if (-not $failed) {
 }
 
 # --- Gate 7: 单源规则漂移熔断 ---
-Write-Host "[7/8] 校验单源规则元数据一致性..." -ForegroundColor Gray
+Write-Host "[7/9] 校验单源规则元数据一致性..." -ForegroundColor Gray
 $touchesRules = $stagedFiles | Where-Object { $_ -match "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/" }
 if ($touchesRules) {
     $res = Start-Process -FilePath "node" -ArgumentList "auto-refactor/scripts/validate-rules-registry.js" -NoNewWindow -PassThru -Wait
@@ -149,6 +149,7 @@ if ($touchesRules) {
 Write-Host "[8/9] 检查相关项目增量编译与语法..." -ForegroundColor Gray
 $hasWt = $stagedFiles | Where-Object { $_ -match "^workspace-timing/" }
 $hasAr = $stagedFiles | Where-Object { $_ -match "^auto-refactor/" }
+$hasWg = $stagedFiles | Where-Object { $_ -match "^WebGames/" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 
 if ($hasWt) {
@@ -165,6 +166,16 @@ if ($hasAr) {
     $process = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "run", "build" -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 8: auto-refactor 编译失败！" -ForegroundColor Red
+        $failed = $true
+    }
+}
+
+if ($hasWg) {
+    Write-Host "  ▶ 触发 WebGames 增量配置架构审查..." -ForegroundColor Cyan
+    $pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "py" }
+    $process = Start-Process -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -NoNewWindow -PassThru -Wait
+    if ($process.ExitCode -ne 0) {
+        Write-Host "❌ [FAIL] Gate 8: WebGames 配置架构审查未通过！" -ForegroundColor Red
         $failed = $true
     }
 }

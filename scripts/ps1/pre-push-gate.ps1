@@ -44,14 +44,14 @@ if ($res.ExitCode -ne 0) {
     Write-Host "  ✔ [PASS] 全工作区单源规则目录同步通过" -ForegroundColor Green
 }
 
-# --- Gate 3: auto-refactor 引擎全量门禁与回归套件 (139 套) ---
-Write-Host "[3/8] 执行 auto-refactor 全量门禁与回归套件 (139 套，Rust/Build/Lint/Comments/Self/Tests)..." -ForegroundColor Gray
+# --- Gate 3: auto-refactor 引擎全量门禁与回归套件 (141 套) ---
+Write-Host "[3/8] 执行 auto-refactor 全量门禁与回归套件 (141 套，Rust/Build/Lint/Comments/Self/Tests)..." -ForegroundColor Gray
 $res = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "run", "gate" -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ [FAIL] Gate 3: auto-refactor 全量门禁或测试套件未全部通过！" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] auto-refactor 全量门禁与 139 套测试全部通过" -ForegroundColor Green
+    Write-Host "  ✔ [PASS] auto-refactor 全量门禁与 141 套测试全部通过" -ForegroundColor Green
 }
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 Ratchet ---

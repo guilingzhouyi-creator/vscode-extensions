@@ -10,7 +10,7 @@
 # 用法示例:
 #   bash scripts/sh/pr-gate.sh
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 # 冲突分级单源规则（与 auto-merge-gate.sh 共享，防两道门禁规则漂移）
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-common.sh"

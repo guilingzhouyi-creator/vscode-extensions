@@ -10,7 +10,7 @@
 # 用法示例:
 #   bash scripts/sh/release.sh
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 # ---------- 0. 基础配置 ----------
 REPO_SLUG="${CNB_REPO_SLUG:-}"

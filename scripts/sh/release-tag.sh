@@ -11,7 +11,7 @@
 #   bash scripts/sh/release-tag.sh workspace-timing patch --message 'release note'
 #   bash scripts/sh/release-tag.sh workspace-timing patch --no-push
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 EXT="${1:-}"
 MODE="${2:-}"
@@ -153,7 +153,8 @@ VSIX="$OUT_DIR/$EXT-$TARGET_VER.vsix"
 
 # SHA256 校验和（与 release.yml 同构）
 HASH=$(sha256sum "$VSIX" | awk '{print $1}')
-echo "$HASH  $(basename "$VSIX")" > "$OUT_DIR/SHA256SUMS.txt"
+VSIX_NAME=$(basename "$VSIX")
+echo "$HASH  $VSIX_NAME" > "$OUT_DIR/SHA256SUMS.txt"
 
 # ─── 步骤 5：资产后检（icon 与 README 图片必须真实打进 vsix）───
 echo "【$EXT】步骤 5/6: 展示资产后检 ..."

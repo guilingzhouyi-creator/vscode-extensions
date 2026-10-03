@@ -10,7 +10,7 @@
 # 用法示例:
 #   bash scripts/sh/install-hooks.sh
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 echo "================================================================="
 echo "🔧 正在激活仓库级 Git 本地提交门禁 (.githooks)..."
@@ -26,9 +26,9 @@ chmod +x .githooks/* scripts/sh/*.sh 2>/dev/null || true
 git config core.hooksPath .githooks
 
 echo "✅ 已配置 git config core.hooksPath = .githooks"
-echo "✅ Pre-Commit 门禁 (.githooks/pre-commit -> scripts/sh/pre-commit-gate.sh)"
-echo "✅ Commit-Msg 门禁 (.githooks/commit-msg -> scripts/sh/commit-msg-gate.sh)"
-echo "✅ Pre-Push 门禁 (.githooks/pre-push -> scripts/sh/pre-push-gate.sh)"
+echo "✅ Pre-Commit 门禁 (.githooks/pre-commit -> pwsh / bash 双运行期路由)"
+echo "✅ Commit-Msg 门禁 (.githooks/commit-msg -> pwsh / bash 双运行期路由)"
+echo "✅ Pre-Push 门禁 (.githooks/pre-push -> pwsh / bash 双运行期路由)"
 echo "================================================================="
 echo "🎉 本地 Git 提交门禁激活成功！后续每次 commit 将自动执行前置安全自检。"
 echo "================================================================="

@@ -12,10 +12,13 @@
 #   bash scripts/sh/audit-all.sh --fast
 #   bash scripts/sh/audit-all.sh --json
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || exit 1
+
+NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
+PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
 
 FAST_MODE=0
 JSON_MODE=0
@@ -42,11 +45,11 @@ if [[ "$JSON_MODE" -eq 0 ]]; then
 fi
 
 FAILED=0
-START_TIME=$(node -e 'process.stdout.write(Date.now().toString())')
+START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
 # 1. 物理卫生与零空文件看守
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/4] 检查全工作区物理卫生与零空文件..."; fi
-if ! node auto-refactor/scripts/validate-no-empty-scripts.js >/dev/null 2>&1; then
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生与零空文件..."; fi
+if ! "$NODE_BIN" auto-refactor/scripts/validate-no-empty-scripts.js >/dev/null 2>&1; then
     STATUS_HYGIENE="FAIL"
     FAILED=1
 else
@@ -54,8 +57,8 @@ else
 fi
 
 # 2. 单源规则注册表与目录一致性
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [2/4] 聚合与校验全工作区单源规则目录..."; fi
-if ! node scripts/common/generate-rule-catalog.js >/dev/null 2>&1; then
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [2/5] 聚合与校验全工作区单源规则目录..."; fi
+if ! "$NODE_BIN" scripts/common/generate-rule-catalog.js >/dev/null 2>&1; then
     STATUS_RULES="FAIL"
     FAILED=1
 else
@@ -63,16 +66,16 @@ else
 fi
 
 # 3. auto-refactor 静态重构与审查引擎自检
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [3/4] 执行 auto-refactor 十维质量基线与多维自审..."; fi
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [3/5] 执行 auto-refactor 十维质量基线与多维自审..."; fi
 if [[ "$FAST_MODE" -eq 1 ]]; then
-    if ! node auto-refactor/scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1; then
+    if ! "$NODE_BIN" auto-refactor/scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1; then
         STATUS_AR="FAIL"
         FAILED=1
     else
         STATUS_AR="PASS"
     fi
 else
-    if ! (cd auto-refactor && npm test >/dev/null 2>&1) || ! node auto-refactor/scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1; then
+    if ! (cd auto-refactor && npm test >/dev/null 2>&1) || ! "$NODE_BIN" auto-refactor/scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1; then
         STATUS_AR="FAIL"
         FAILED=1
     else
@@ -81,7 +84,7 @@ else
 fi
 
 # 4. workspace-timing L0~L5 六层审查门禁
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [4/4] 执行 workspace-timing L0~L5 六层审查门禁与单元自检..."; fi
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [4/5] 执行 workspace-timing L0~L5 六层审查门禁与单元自检..."; fi
 if ! (cd workspace-timing && npm run review >/dev/null 2>&1) || ! (cd workspace-timing && npm run test:fast >/dev/null 2>&1); then
     STATUS_WT="FAIL"
     FAILED=1
@@ -89,8 +92,17 @@ else
     STATUS_WT="PASS"
 fi
 
-END_TIME=$(node -e 'process.stdout.write(Date.now().toString())')
-ELAPSED_SEC=$(node -e "console.log((($END_TIME - $START_TIME) / 1000).toFixed(2))")
+# 5. WebGames 领域配置架构与规范审查
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [5/5] 执行 WebGames 领域配置架构与规范审查..."; fi
+if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >/dev/null 2>&1; then
+    STATUS_WG="FAIL"
+    FAILED=1
+else
+    STATUS_WG="PASS"
+fi
+
+END_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
+ELAPSED_SEC=$("$NODE_BIN" -e "console.log((($END_TIME - $START_TIME) / 1000).toFixed(2))")
 
 if [[ "$JSON_MODE" -eq 1 ]]; then
     cat <<EOF
@@ -102,12 +114,19 @@ if [[ "$JSON_MODE" -eq 1 ]]; then
     "hygiene": "$STATUS_HYGIENE",
     "rulesCatalog": "$STATUS_RULES",
     "autoRefactor": "$STATUS_AR",
-    "workspaceTiming": "$STATUS_WT"
+    "workspaceTiming": "$STATUS_WT",
+    "webGames": "$STATUS_WG"
   }
 }
 EOF
     exit "$FAILED"
 fi
+
+FMT_HYGIENE=$(printf '%-11s' "$STATUS_HYGIENE")
+FMT_RULES=$(printf '%-11s' "$STATUS_RULES")
+FMT_AR=$(printf '%-11s' "$STATUS_AR")
+FMT_WT=$(printf '%-11s' "$STATUS_WT")
+FMT_WG=$(printf '%-11s' "$STATUS_WG")
 
 echo ""
 echo "┌───────────────────────────────────────────────────────────────┐"
@@ -115,10 +134,11 @@ echo "│              全工作区统一审查报告与质量看板            
 echo "├─────────────────────────────┬─────────────┬───────────────────┤"
 echo "│ 审查检查项 / 子系统         │ 判定结果    │ 覆盖范围          │"
 echo "├─────────────────────────────┼─────────────┼───────────────────┤"
-echo "│ 1. 工作区零空文件物理卫生   │ $(printf '%-11s' "$STATUS_HYGIENE") │ 全仓代码/脚本/配置│"
-echo "│ 2. 单源规则目录一致性 (SSOT)│ $(printf '%-11s' "$STATUS_RULES") │ 336+ 条规则总目录 │"
-echo "│ 3. auto-refactor 质量基线   │ $(printf '%-11s' "$STATUS_AR") │ 10 维模型 / 134套 │"
-echo "│ 4. workspace-timing 审查门禁│ $(printf '%-11s' "$STATUS_WT") │ L0~L5 六层权重门禁│"
+echo "│ 1. 工作区零空文件物理卫生   │ $FMT_HYGIENE │ 全仓代码/脚本/配置│"
+echo "│ 2. 单源规则目录一致性 (SSOT)│ $FMT_RULES │ 单源规则总目录    │"
+echo "│ 3. auto-refactor 质量基线   │ $FMT_AR │ 10 维模型 / 141套 │"
+echo "│ 4. workspace-timing 审查门禁│ $FMT_WT │ L0~L5 六层权重门禁│"
+echo "│ 5. WebGames 配置架构审查    │ $FMT_WG │ 核心领域配置真源  │"
 echo "├─────────────────────────────┴─────────────┴───────────────────┤"
 echo "│ 耗时: ${ELAPSED_SEC}s  |  全局状态: $([[ $FAILED -eq 0 ]] && echo '✅ ALL PASS' || echo '❌ SOME CHECKS FAILED')           │"
 echo "└───────────────────────────────────────────────────────────────┘"
@@ -130,3 +150,4 @@ else
     echo "🎉 全工作区所有项目审查全部通过，代码库处于健康合规状态。"
     exit 0
 fi
+

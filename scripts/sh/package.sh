@@ -12,7 +12,7 @@
 #   bash scripts/sh/package.sh --name workspace-timing
 #   bash scripts/sh/package.sh --keep 3
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 KEEP=5
 NAME=""
@@ -64,7 +64,7 @@ fi
 if [[ -n "$NAME" ]]; then
   FOUND=false
   for e in "${EXTS[@]}"; do [[ "$e" == "$NAME" ]] && FOUND=true; done
-  if ! $FOUND; then
+  if [[ "$FOUND" != "true" ]]; then
     echo "未找到扩展目录: $NAME（可用: ${EXTS[*]}）" >&2
     exit 1
   fi
@@ -84,7 +84,7 @@ for EXT in "${EXTS[@]}"; do
 
   echo "── 打包 $EXT@$PKG_VER ──────────────────────────"
 
-  if ! $SKIP_BUILD; then
+  if [[ "$SKIP_BUILD" != "true" ]]; then
     LOCK="$DIR/package-lock.json"
     NM="$DIR/node_modules"
     NEED_CI=false
@@ -94,7 +94,7 @@ for EXT in "${EXTS[@]}"; do
       echo "  检测到 lockfile 比 node_modules 新 → 重新 npm ci"
       NEED_CI=true
     fi
-    if $NEED_CI; then
+    if [[ "$NEED_CI" == "true" ]]; then
       echo "  npm ci ..."
       (cd "$DIR" && npm ci)
     fi
@@ -108,7 +108,8 @@ for EXT in "${EXTS[@]}"; do
 
   # ─── SHA256 校验和 ───
   HASH=$(sha256sum "$VSIX" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
-  echo "$HASH  $(basename "$VSIX")" > "$OUT_DIR/SHA256SUMS.txt"
+  VSIX_NAME=$(basename "$VSIX")
+  echo "$HASH  $VSIX_NAME" > "$OUT_DIR/SHA256SUMS.txt"
 
   # ─── 清理旧版本：语义化版本排序保留最近 KEEP 个 ───
   # shellcheck disable=SC2012

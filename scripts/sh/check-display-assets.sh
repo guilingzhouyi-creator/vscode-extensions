@@ -11,7 +11,7 @@
 #   bash scripts/sh/check-display-assets.sh workspace-timing pre
 #   bash scripts/sh/check-display-assets.sh workspace-timing post dist/workspace-timing.vsix
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 EXT_DIR="${1:?用法: check-display-assets.sh <扩展目录> pre|post [vsix路径]}"
 MODE="${2:?用法: check-display-assets.sh <扩展目录> pre|post [vsix路径]}"
@@ -87,4 +87,4 @@ while IFS= read -r asset; do
   fi
 done <<< "$REF_ASSETS"
 
-exit $FAIL
+exit "$FAIL"

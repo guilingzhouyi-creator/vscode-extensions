@@ -10,7 +10,7 @@
 # 用法示例:
 #   bash scripts/sh/test-release.sh
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_SH="${SCRIPT_DIR}/release.sh"
@@ -89,9 +89,9 @@ run_release() {
   MAX_RETRY="${RUN_MAX_RETRY:-3}" \
   STEP_TIMEOUT="${RUN_STEP_TIMEOUT:-120}" \
   TOTAL_TIMEOUT="${RUN_TOTAL_TIMEOUT:-600}" \
-  IDEMPOTENT="${RUN_IDEMPOTENT:-true}" \
-  bash "$RELEASE_SH" > "${WORKDIR}/rel_out.txt" 2>&1
-  __code=$?
+  IDEMPOTENT="${RUN_IDEMPOTENT:-true}"
+  __code=0
+  bash "$RELEASE_SH" > "${WORKDIR}/rel_out.txt" 2>&1 || __code=$?
   __out="$(cat "${WORKDIR}/rel_out.txt")"
 }
 

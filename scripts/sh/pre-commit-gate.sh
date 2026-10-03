@@ -10,7 +10,7 @@
 # 用法示例:
 #   bash scripts/sh/pre-commit-gate.sh
 # ==============================================================================
-set -uo pipefail
+set -euo pipefail
 
 echo "================================================================="
 echo "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (9 重纵深防御)"
@@ -30,7 +30,7 @@ fi
 FAILED=0
 
 # --- Gate 1: 零 0 字节与纯空白空文件一票阻断 ---
-echo "[1/8] 检查暂存区零空文件守卫..."
+echo "[1/9] 检查暂存区零空文件守卫..."
 while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     if [[ -f "$file" ]]; then
@@ -49,7 +49,7 @@ while IFS= read -r file; do
 done <<< "$STAGED_FILES"
 
 # --- Gate 2: 换行符 (EOL: ps1->CRLF, 其余->LF) 契约看守 ---
-echo "[2/8] 检查换行符 (EOL: ps1->CRLF, 其余->LF) 契约..."
+echo "[2/9] 检查换行符 (EOL: ps1->CRLF, 其余->LF) 契约..."
 while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     if [[ -f "$file" ]]; then
@@ -72,7 +72,7 @@ while IFS= read -r file; do
 done <<< "$STAGED_FILES"
 
 # --- Gate 3: 绝对路径与盘符防泄漏 ---
-echo "[3/8] 检查绝对路径与协议防泄漏..."
+echo "[3/9] 检查绝对路径与协议防泄漏..."
 ADDED_DIFF=$(git diff --cached -U0 --no-color 2>/dev/null | grep '^+[^+]' || true)
 if echo "$ADDED_DIFF" | grep -E "(file:///|[c-zC-Z]:\\\\|[c-zC-Z]:/)" | grep -v -E "(file://|\.gemini|node_modules)" >/dev/null 2>&1; then
     VIOLATING_LINES=$(echo "$ADDED_DIFF" | grep -E "(\b[A-Za-z]:[\\\\/][a-zA-Z0-9_-]+|file:///)" | grep -v "file://" || true)
@@ -84,7 +84,7 @@ if echo "$ADDED_DIFF" | grep -E "(file:///|[c-zC-Z]:\\\\|[c-zC-Z]:/)" | grep -v 
 fi
 
 # --- Gate 4: 零黑话与规范命名 ---
-echo "[4/8] 检查零黑话与规范命名..."
+echo "[4/9] 检查零黑话与规范命名..."
 while IFS= read -r file; do
     [[ -z "$file" ]] && continue
     basename_file=$(basename "$file")
@@ -98,7 +98,7 @@ while IFS= read -r file; do
 done <<< "$STAGED_FILES"
 
 # --- Gate 5: 单文件行数红线预算 (< 900 LOC) ---
-echo "[5/8] 检查源文件行数红线预算 (< 900 LOC)..."
+echo "[5/9] 检查源文件行数红线预算 (< 900 LOC)..."
 MAX_LOC_BUDGET=900
 while IFS= read -r file; do
     [[ -z "$file" ]] && continue
@@ -115,7 +115,7 @@ while IFS= read -r file; do
 done <<< "$STAGED_FILES"
 
 # --- Gate 6: 密钥与敏感 Token 防泄漏扫描 ---
-echo "[6/8] 扫描高危密钥与敏感 Token 防泄漏..."
+echo "[6/9] 扫描高危密钥与敏感 Token 防泄漏..."
 SECRET_PATTERN='(AIza[0-9A-Za-z_-]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----)'
 SECRET_MATCH=$(echo "$ADDED_DIFF" | grep -E "$SECRET_PATTERN" | grep -v -E "(\$\{env:|CODEX_API_KEY|OPENAI_API_KEY|test-secret|mock-key|placeholder)" || true)
 if [[ -n "$SECRET_MATCH" ]]; then
@@ -127,7 +127,7 @@ else
 fi
 
 # --- Gate 7: 单源规则漂移熔断 ---
-echo "[7/8] 校验单源规则元数据一致性..."
+echo "[7/9] 校验单源规则元数据一致性..."
 if [[ "$STAGED_FILES" =~ auto-refactor/src/core/rules/ || "$STAGED_FILES" =~ auto-refactor/src/analyzers/ ]]; then
     if ! "$NODE_BIN" auto-refactor/scripts/validate-rules-registry.js >/dev/null 2>&1; then
         echo "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！"
@@ -141,6 +141,7 @@ fi
 echo "[8/9] 检查相关项目增量编译与语法..."
 TOUCHED_WT=$(echo "$STAGED_FILES" | grep '^workspace-timing/' || true)
 TOUCHED_AR=$(echo "$STAGED_FILES" | grep '^auto-refactor/' || true)
+TOUCHED_WG=$(echo "$STAGED_FILES" | grep '^WebGames/' || true)
 
 if [[ -n "$TOUCHED_WT" ]]; then
     echo "  ▶ 触发 workspace-timing 增量编译校验..."
@@ -154,6 +155,15 @@ if [[ -n "$TOUCHED_AR" ]]; then
     echo "  ▶ 触发 auto-refactor 增量编译校验..."
     if ! "$NPM_BIN" --prefix auto-refactor run build >/dev/null 2>&1; then
         echo "❌ [FAIL] Gate 8: auto-refactor 编译失败！"
+        FAILED=1
+    fi
+fi
+
+if [[ -n "$TOUCHED_WG" ]]; then
+    echo "  ▶ 触发 WebGames 增量配置架构审查..."
+    PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
+    if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >/dev/null 2>&1; then
+        echo "❌ [FAIL] Gate 8: WebGames 配置架构审查未通过！"
         FAILED=1
     fi
 fi

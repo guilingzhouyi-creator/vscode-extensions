@@ -24,6 +24,8 @@ if (-not (Test-Path $MsgFile -PathType Leaf)) {
 }
 
 function Show-CommitTemplateGuide {
+    [CmdletBinding()]
+    param()
     Write-Host ""
     Write-Host "💡 【生产工程级提交信息标准模板指引】:" -ForegroundColor Yellow
     Write-Host "-----------------------------------------------------------------" -ForegroundColor Gray
