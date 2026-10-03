@@ -335,6 +335,8 @@ export class PureJsNativeShim implements INativeCore {
                 'simd-source-mask',
                 'clone-detection',
                 'minhash-lsh',
+                'dominator-tree',
+                'dataflow-solver',
             ],
         };
     }
