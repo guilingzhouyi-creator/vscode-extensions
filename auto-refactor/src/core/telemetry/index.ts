@@ -12,7 +12,7 @@
  *   or defensively validated views.
  */
 
-import { CoverageDampingResult, FileCoverageProfile, LcovIngester } from './lcov-ingester';
+import type { CoverageDampingResult, FileCoverageProfile } from './lcov-ingester';
 
 export * from './lcov-ingester';
 

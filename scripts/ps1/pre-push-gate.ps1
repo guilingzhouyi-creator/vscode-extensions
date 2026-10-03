@@ -24,9 +24,13 @@ $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "n
 $pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "py" }
 $failed = $false
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+$autoRefactorDir = Join-Path $repoRoot "auto-refactor"
+$workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
+
 # --- Gate 1: 全工作区零空文件与物理卫生守卫 ---
 Write-Host "[1/8] 校验全工作区零物理空文件与空白脚本守卫..." -ForegroundColor Gray
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-no-empty-scripts.js" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-no-empty-scripts.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ [FAIL] Gate 1: 发现物理 0 字节或语义虚空文件！" -ForegroundColor Red
     $failed = $true
@@ -36,7 +40,7 @@ if ($res.ExitCode -ne 0) {
 
 # --- Gate 2: 规则单源目录一致性同步 ---
 Write-Host "[2/8] 校验全工作区单源规则目录同步..." -ForegroundColor Gray
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ [FAIL] Gate 2: 单源规则目录生成失败！" -ForegroundColor Red
     $failed = $true
@@ -46,7 +50,7 @@ if ($res.ExitCode -ne 0) {
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 (142 套) ---
 Write-Host "[3/8] 执行 auto-refactor 全量门禁与回归套件 (142 套，Rust/Build/Lint/Comments/Self/Tests)..." -ForegroundColor Gray
-$res = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "run", "gate" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $npmCmd -ArgumentList "run", "gate" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ [FAIL] Gate 3: auto-refactor 全量门禁或测试套件未全部通过！" -ForegroundColor Red
     $failed = $true
@@ -56,7 +60,7 @@ if ($res.ExitCode -ne 0) {
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 Ratchet ---
 Write-Host "[4/8] 执行 auto-refactor 十维质量基线与多维自审 (LOC预算/熵/密度/BIF)..." -ForegroundColor Gray
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ [FAIL] Gate 4: auto-refactor 多维自审或十维质量基线未达标！" -ForegroundColor Red
     $failed = $true
@@ -66,7 +70,7 @@ if ($res.ExitCode -ne 0) {
 
 # --- Gate 5: workspace-timing 单元测试套件 ---
 Write-Host "[5/8] 执行 workspace-timing 单元测试回归..." -ForegroundColor Gray
-$res = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "workspace-timing", "test" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $npmCmd -ArgumentList "test" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ [FAIL] Gate 5: workspace-timing 单元测试失败！" -ForegroundColor Red
     $failed = $true
@@ -76,7 +80,7 @@ if ($res.ExitCode -ne 0) {
 
 # --- Gate 6: workspace-timing L0~L5 六层审查门禁 ---
 Write-Host "[6/8] 执行 workspace-timing L0~L5 六层审查门禁..." -ForegroundColor Gray
-$res = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "workspace-timing", "run", "review" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $npmCmd -ArgumentList "run", "review" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ [FAIL] Gate 6: workspace-timing L0~L5 审查门禁未通过！" -ForegroundColor Red
     $failed = $true

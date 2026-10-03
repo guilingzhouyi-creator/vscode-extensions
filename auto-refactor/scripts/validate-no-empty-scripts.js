@@ -22,6 +22,49 @@ const IGNORED_DIRS = new Set([
   '.cargo-lock',
 ]);
 
+const LOCAL_DECL_RE =
+  /(?:^|\s)(?:function|class|interface|type|const|let|var|enum|def|struct|fn)\s+[a-zA-Z0-9_$]+/;
+const REEXPORT_RE =
+  /^(?:export\s+\*\s+from|export\s*\{[^}]*\}\s*from|module\.exports\s*=)\s*['"](\.\/[^'"]+)['"]/;
+
+function isExemptTestPath(fullPath) {
+  const norm = fullPath.replace(/\\/g, '/');
+  return (
+    norm.includes('/tests/') ||
+    norm.includes('/test/') ||
+    norm.includes('/fixtures/') ||
+    norm.endsWith('.test.ts') ||
+    norm.endsWith('.spec.ts')
+  );
+}
+
+function detectVacuousTrampoline(fullPath, content) {
+  if (!fullPath.endsWith('.ts') && !fullPath.endsWith('.js')) return null;
+  if (isExemptTestPath(fullPath)) return null;
+
+  const stripped = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').trim();
+  const codeLines = stripped
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (codeLines.length === 0 || codeLines.length > 3) return null;
+
+  const hasLocalDecl = codeLines.some(
+    (l) => LOCAL_DECL_RE.test(l) && !l.startsWith('export {') && !l.startsWith('export *'),
+  );
+  if (hasLocalDecl) return null;
+
+  const targets = new Set();
+  for (const l of codeLines) {
+    const m = l.match(REEXPORT_RE);
+    if (m) targets.add(m[1]);
+  }
+
+  if (targets.size !== 1) return null;
+  return [...targets][0];
+}
+
 function inspectFileForEmptiness(fullPath, findings) {
   try {
     const stat = fs.statSync(fullPath);
@@ -43,29 +86,13 @@ function inspectFileForEmptiness(fullPath, findings) {
       return;
     }
 
-    // Detect vacuous trampoline / forwarding shim files (ARCH-ABS-001):
-    // <= 2 lines of code purely forwarding to a child/sub index.
-    if (fullPath.endsWith('.ts') || fullPath.endsWith('.js')) {
-      const stripped = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').trim();
-      const codeLines = stripped
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
-      if (
-        codeLines.length <= 2 &&
-        codeLines.some((l) =>
-          /^(?:export\s+\*\s+from|export\s*\{[^}]*\}\s*from|module\.exports\s*=)\s*['"]\.\/[^'"]+\/index['"]/.test(
-            l,
-          ),
-        )
-      ) {
-        findings.push({
-          path: fullPath,
-          reason:
-            'Vacuous forwarding trampoline (ARCH-ABS-001): file only re-exports sub-index without local orchestration or substance',
-          size: stat.size,
-        });
-      }
+    const trampolineTarget = detectVacuousTrampoline(fullPath, content);
+    if (trampolineTarget) {
+      findings.push({
+        path: fullPath,
+        reason: `Vacuous forwarding trampoline (ARCH-ABS-001): file only re-exports single target '${trampolineTarget}' without local orchestration or substance`,
+        size: stat.size,
+      });
     }
   } catch (err) {
     console.error(`Error reading file ${fullPath}: ${err.message}`);

@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791034124979",
-  "timestamp": "2026-10-03T13:28:50.924Z",
+  "snapshotId": "snapshot-v0.4.0-1791035591595",
+  "timestamp": "2026-10-03T13:53:16.540Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,24 +13,24 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 574,
-    "durationMs": 5108
+    "durationMs": 4331
   },
   "metrics": {
     "compositeScore": 99.2,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11785,
-    "suppressedIssues": 6440,
-    "unsuppressedIssues": 5345,
+    "totalIssues": 11796,
+    "suppressedIssues": 6446,
+    "unsuppressedIssues": 5350,
     "bySeverity": {
       "info": 442,
-      "warning": 11343,
+      "warning": 11354,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 202,
-      "medium": 10735,
+      "high": 204,
+      "medium": 10744,
       "low": 848
     }
   },
@@ -165,8 +165,8 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 202,
-      "medium": 10735,
+      "high": 204,
+      "medium": 10744,
       "low": 848
     },
     "criticalItems": [],
@@ -341,6 +341,24 @@
         "file": "scripts/validate-native-operator.js",
         "line": 156,
         "message": "Function \"runValidation\" has cyclomatic complexity 23 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-NEST-001:scripts/validate-no-empty-scripts.js:25",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-no-empty-scripts.js",
+        "line": 25,
+        "message": "Unbounded control-flow nesting: function 'inspectFileForEmptiness' has nesting depth 6 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:scripts/validate-no-empty-scripts.js:25",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-no-empty-scripts.js",
+        "line": 25,
+        "message": "Function \"inspectFileForEmptiness\" has cyclomatic complexity 17 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:scripts/validate-oxc-keypoints.js:140",
@@ -602,24 +620,6 @@
         "file": "src/analyzers/docs.ts",
         "line": 221,
         "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-game.ts:118",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/gdscript-game.ts",
-        "line": 118,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-game.ts:146",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/gdscript-game.ts",
-        "line": 146,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       }
     ]
   },
@@ -630,7 +630,7 @@
         "compositeScore": 99,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.9,
+          "maintainability": 99.8,
           "performance": 99.3,
           "data": 100,
           "testing": 100,
@@ -1242,16 +1242,16 @@
       },
       {
         "domainName": "telemetry",
-        "compositeScore": 98.7,
+        "compositeScore": 99.3,
         "pillars": {
           "architecture": 100,
           "maintainability": 100,
-          "performance": 97,
+          "performance": 98.5,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 91.8
+          "extensibility": 95.2
         },
         "moduleCount": 1
       },
@@ -1304,7 +1304,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 112162,
+      "processed": 112242,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1318,10 +1318,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1790922053371,
-      "endMs": 1791034124977,
-      "totalRuns": 93,
+      "endMs": 1791035591594,
+      "totalRuns": 101,
       "eloc": {
-        "processedTotal": 10221085,
+        "processedTotal": 11118979,
         "uniqueTotal": 96698,
         "changedTotal": 119162,
         "semanticTotal": 119162
@@ -1332,12 +1332,12 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 1125179,
+        "totalAdded": 1216021,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -110.08
+        "netYield": -109.36
       },
-      "meanCompositeScore": 99.56,
+      "meanCompositeScore": 99.53,
       "gatePassRate": 100
     },
     "isFirstBaseline": false
