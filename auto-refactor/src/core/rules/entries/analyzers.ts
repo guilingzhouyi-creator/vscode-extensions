@@ -48,7 +48,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '不足 150 行的小文件使用 `═` 文件级横幅。',
+        summary: 'Banner divider (═) used in small file (< 150 lines).',
         remediation: REMEDIATION_STANDARD_AND_ABOVE,
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-ban-001',
     }),
@@ -59,7 +59,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '异步导出方法未注明并发调度假设、可重入性或幂等语义。',
+        summary:
+            'Async exported function lacks concurrency scheduling assumptions, reentrancy, or idempotence contract.',
         remediation: '`strict`',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-con-001',
     }),
@@ -70,7 +71,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '核心公开导出符号缺少功能描述、参数或返回值 Docstring/JSDoc 说明。',
+        summary:
+            'Public exported symbol lacks Docstring/JSDoc description, parameters, or return type documentation.',
         remediation: REMEDIATION_STANDARD_AND_ABOVE,
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-doc-001',
     }),
@@ -81,7 +83,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '机械无意义冗余注释 (注释文本仅重复函数名或符号名)。',
+        summary: 'Tautological redundant comment merely repeating symbol or function name.',
         remediation: REMEDIATION_STANDARD_AND_ABOVE,
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-doc-002',
     }),
@@ -92,8 +94,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '源码文件顶部缺少文件层级职责与设计意图注释。',
-        remediation: '`basic` 及以上',
+        summary:
+            'Source file missing top-level file header comment explaining responsibility and design intent.',
+        remediation: '`basic` and above',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-001',
     }),
     defineRule({
@@ -104,7 +107,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '工业级严格题头契约缺失六字段之一 (模块归属、文件路径、架构定位、依赖与触发、职责说明、退出语义与设计依据)。',
+            'Industrial strict file header missing one of six mandatory fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale).',
         remediation: '`strict`',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-002',
     }),
@@ -115,7 +118,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '题头声明路径与物理文件路径失真不一致。',
+        summary: 'File header declared path does not match actual physical file path.',
         remediation: '`strict`',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-003',
     }),
@@ -127,8 +130,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '编码损坏（U+FFFD 替换符、UTF-8 被按 Latin-1 解码的 `Ã`+高位字节、Windows-1252 智能引号乱码）。跨语言通用。',
-        remediation: '`basic` 及以上',
+            'Encoding corruption detected (U+FFFD replacement characters, UTF-8 decoded as Latin-1, or Windows-1252 mojibake).',
+        remediation: '`basic` and above',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-moji-001',
     }),
     defineRule({
@@ -138,7 +141,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '同一文件混用短标题分隔（`── 标题 ──`）与长串分隔（`──── 标题`）；纯分隔线豁免。',
+        summary:
+            'Inconsistent section separator styles mixed in same file (short ── title ── vs long ──── title).',
         remediation: REMEDIATION_STANDARD_AND_ABOVE,
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-sep-001',
     }),
@@ -149,8 +153,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary:
-            '注释/docstring 物理行宽超过 100 列；工具指令行（`noqa`/`type: ignore`/`eslint-disable`/`@ts-expect-error` 等）以及 `comments.options.directiveTokens` 声明的项目自有指令豁免。',
+        summary: 'Comment or docstring physical line length exceeds 100 columns.',
         remediation: REMEDIATION_STANDARD_AND_ABOVE,
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-wid-001',
     }),
@@ -161,8 +164,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '注释书写语言显著偏离项目或代码域的主导规范（例如英文主导库中突兀插入中文注释）。',
-        remediation: '将注释语言对齐项目推荐规范，保持代码域内部风格一致性。',
+        summary: 'Comment language deviates from dominant project or domain standard.',
+        remediation: 'Align comment language with the project standard to maintain consistency.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-lng-001',
     }),
     defineRule({
@@ -172,8 +175,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '单个文件内部中英文注释无序交错混杂（中文与英文占比均较高且缺乏分层规律）。',
-        remediation: '统一单文件内的注释语言规范，避免局部多语言风格碎片化。',
+        summary: 'Unordered interleaving of languages in comments within a single file.',
+        remediation: 'Standardize on a single comment language per file to avoid fragmentation.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-lng-002',
     }),
     defineRule({
@@ -183,8 +186,10 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '有效注释密度过低或存在逐行直译代码名的注水现象（未解释设计原因与边界不变量）。',
-        remediation: '减少重复代码名的冗余直译，重点补充“为什么这样设计”与“哪些边界不能破坏”。',
+        summary:
+            'Low semantic comment density or verbatim line-by-line translation without explaining intent.',
+        remediation:
+            'Focus comments on design rationale and boundary invariants rather than restating code.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-vmd-001',
     }),
     defineRule({
@@ -195,8 +200,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '注释声称的职责特征（如纯函数、无副作用、并发安全）与 AST 实际数据流/副作用特征矛盾。',
-        remediation: '修正注释使其真实反映实现行为，或重构代码消除未声明的副作用与竞态条件。',
+            'Documented contract (pure, side-effect free, thread-safe) contradicts actual AST data flow or side effects.',
+        remediation:
+            'Update comments to reflect actual behavior, or refactor code to eliminate undeclared side effects.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-int-001',
     }),
     defineRule({
@@ -206,8 +212,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '抽象提炼共享通用函数或工具类。',
-        remediation: '基于 32-bit 滚动多项式哈希检测到连续多行代码完全重复 (Copy-Paste)。',
+        summary:
+            'Duplicated code clone detected across multiple lines based on rolling polynomial hash.',
+        remediation: 'Extract duplicate code into shared helper functions or utilities.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-cln-001',
     }),
     defineRule({
@@ -217,8 +224,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '清理冗余死代码，重构控制流分支。',
-        remediation: '终结控制流 (`return/throw/break/raise/exit`) 之后存在不可达死代码。',
+        summary:
+            'Unreachable dead code detected after terminating control flow (return, throw, break, raise).',
+        remediation: 'Remove dead code and clean up redundant branches.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-ded-001',
     }),
     defineRule({
@@ -228,8 +236,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '对齐各语言官方主流工程命名契约。',
-        remediation: '命名风格失真 (TS/JS 源码非 kebab-case，GDScript/Python/Rust 非 snake_case)。',
+        summary:
+            'File naming convention distortion (kebab-case for TS/JS, snake_case for GDScript/Python/Rust).',
+        remediation: 'Rename file to align with target language engineering conventions.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-nam-001',
     }),
     defineRule({
@@ -239,8 +248,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '闭环开发任务，清理临时桩。',
-        remediation: '代码或注释中残留 `TODO`, `FIXME`, `XXX`, `HACK` 等临时未决桩标记。',
+        summary: 'Temporary stub markers (TODO, FIXME, XXX, HACK) lingering in code or comments.',
+        remediation: 'Resolve pending task and remove temporary stub markers.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-stb-001',
     }),
     defineRule({
@@ -250,9 +259,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用中立、长效的业务领域术语替换临时工单代号。',
-        remediation:
-            '全域代码与注释中泄漏临时施工工单黑话 (`pXX`, `phaseXX`, `stXX`, `wip`)。词汇表可用 `hygiene.options.jargonPatterns`（正则源数组）替换为**项目自有**词表，避免项目词被误判或被整条规则静音。',
+        summary:
+            'Temporary construction phase jargon (pXX, phaseXX, stXX, wip) leaking into code or comments.',
+        remediation: 'Replace temporary construction jargon with enduring domain terms.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-stb-002',
     }),
     defineRule({
@@ -265,7 +274,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         summary:
             'Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density.',
         remediation:
-            '直接调用被封装的目标方法，或在封装层补充必要的数据校验、状态转换与上下文日志。',
+            'Call the target directly, or add validation, transformations, or logging to the wrapper.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-wrap-001',
     }),
     defineRule({
@@ -278,7 +287,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         summary:
             'Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction.',
         remediation:
-            '若无多态或抽象解耦必要，直接暴露被委托方或内联调用；若确需封装，请补充守卫逻辑、状态转换或上下文日志。',
+            'Expose delegate directly if polymorphism is not required, or add guard logic and transformation.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-wrap-002',
     }),
     defineRule({
@@ -289,8 +298,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
         summary:
-            '源码、脚本或配置目录中存在物理 0 字节、仅含空白注释或缺乏有效 AST 语义载荷的虚空占位文件。',
-        remediation: '完善该文件的实际业务实现与导出定义，或直接从仓库中物理删除无效的占位文件。',
+            'Zero-byte empty file, blank comment-only file, or placeholder file lacking AST semantic payload.',
+        remediation:
+            'Implement full business logic and exports for the file, or delete the empty placeholder.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-emp-001',
     }),
     defineRule({
@@ -300,8 +310,10 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '错误码跨声明重复抛出（分类法冲突）或沿调用链向上传播过多跳数。',
-        remediation: '统一错误分类法，使用具名错误类型并在边界层显式捕获转换。',
+        summary:
+            'Error code re-thrown across declarations or propagating through excessive call stack hops.',
+        remediation:
+            'Unify error taxonomy with named error types and transform errors at boundary layers.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#err-prp-001',
     }),
     defineRule({
@@ -311,8 +323,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。',
-        remediation: '发现 $\\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。',
+        summary:
+            'Deep nested loops (>= 3 levels) detected, creating potential O(N^3) computational hotspots.',
+        remediation: 'Pre-index inner data using Map/Set to reduce search complexity to O(1).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-alg-001',
     }),
     defineRule({
@@ -322,9 +335,10 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '切换为异步非阻塞对应 API，避免锁死 Node.js 事件循环或游戏主线程。',
+        summary:
+            'Synchronous blocking I/O invoked inside async context or high-frequency frame loop.',
         remediation:
-            '事件循环同步阻塞风险：在 `async` 上下文或高频帧循环内调用同步阻塞 I/O (如 `readFileSync`, `time.sleep`)。`thresholds.blockingIoAllowPatterns` 声明的路径 glob（CLI/校验器/基准脚本等进程式工具）豁免；该键同时下发给治理规则 `GOV-PRF-004`，属单一策略源。',
+            'Migrate to asynchronous non-blocking APIs to avoid blocking the event loop or main thread.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-io-001',
     }),
     defineRule({
@@ -334,9 +348,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '将缓冲区/对象提升至循环外部复用，循环内仅清空重置。',
-        remediation:
-            '高频热路径瞬态堆对象分配 (循环体内 `new Array`, `new Object`, `.duplicate(true)` 等)。',
+        summary:
+            'Transient heap allocation inside high-frequency loop (new Array, new Object, .duplicate(true)).',
+        remediation: 'Hoist buffers or objects outside loop and reset in-place inside loop.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-mem-001',
     }),
     defineRule({
@@ -346,9 +360,10 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '循环热路径严禁瞬态实例化与深复制，必须使用对象池或外部复用（ADV-PRF-002）。',
+        summary:
+            'Transient heap allocation in high-load hot paths; object pooling required (ADV-PRF-002).',
         remediation:
-            '高承压热路径瞬态堆对象分配 (循环体内 `new Class()`, `.new()`, `.duplicate(true)` 等)。采用对象池模式并在借出/归还时调用 `reset_state()` 重置状态。',
+            'Adopt object pool pattern and invoke reset_state() upon acquisition and release.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-mem-002',
     }),
     defineRule({
@@ -358,8 +373,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '检测循环或定时器内的集合无界追加，防范 O(t) 或 O(n) 内存泄漏。',
-        remediation: '为集合设置容量上限/LRU淘汰/定期重置，或避免在循环与定时器内无界追加。',
+        summary:
+            'Unbounded collection growth inside loop or timer, risking O(t) or O(n) memory leaks.',
+        remediation: 'Enforce capacity limits, LRU eviction, or periodic pruning on collections.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-leak-001',
     }),
     defineRule({
@@ -369,8 +385,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '日志/异常中输出敏感数据（密码、令牌、个人标识）。',
-        remediation: '脱敏后再记录，或只记录标识符与哈希。',
+        summary: 'Sensitive data (passwords, tokens, PII) logged or exposed in exceptions.',
+        remediation:
+            'Sanitize sensitive fields before logging, or log only identifiers and hashes.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sec-leak-001',
     }),
     defineRule({
@@ -380,8 +397,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '任意动态代码执行（eval/exec/Function 构造）。',
-        remediation: '改为显式分支或查表；确需动态求值时使用受限解析器。',
+        summary: 'Arbitrary dynamic code execution detected (eval, exec, Function constructor).',
+        remediation:
+            'Use explicit branches or table dispatch; use sandboxed interpreters if dynamic evaluation is required.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sec-vul-001',
     }),
     defineRule({
@@ -391,8 +409,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '命令注入：拼接外部输入后交给 shell/子进程执行。',
-        remediation: '使用参数数组形式（execFile/spawn 无 shell）并对输入做白名单校验。',
+        summary: 'Command injection: concatenating external input into shell/subprocess execution.',
+        remediation:
+            'Use argument arrays (execFile/spawn without shell) and validate input against allowlists.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sec-vul-002',
     }),
     defineRule({
@@ -402,8 +421,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '原型污染：给对象原型写入来自外部的键。',
-        remediation: '拒绝 __proto__/constructor/prototype 键，或改用 Map 承载外部数据。',
+        summary: 'Prototype pollution: writing externally controlled keys to object prototypes.',
+        remediation:
+            'Reject __proto__, constructor, and prototype keys, or use Map for external data.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sec-vul-003',
     }),
     defineRule({
@@ -413,8 +433,10 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '不安全随机数：用 Math.random 生成安全敏感值。',
-        remediation: '改用 crypto.randomUUID/randomBytes 等密码学安全随机源。',
+        summary:
+            'Insecure pseudo-random number generator (Math.random) used in security-sensitive context.',
+        remediation:
+            'Use cryptographically secure random sources such as crypto.randomUUID or randomBytes.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sec-vul-004',
     }),
     defineRule({
@@ -424,8 +446,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '弱哈希：md5/sha1 用于完整性或口令场景。',
-        remediation: '改用 sha256 及以上；口令使用 bcrypt/argon2 等加盐慢哈希。',
+        summary: 'Weak hash algorithm (MD5/SHA-1) used for integrity or password hashing.',
+        remediation:
+            'Use SHA-256 or higher for digests, and salted slow hashes (bcrypt/argon2) for passwords.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sec-vul-005',
     }),
     defineRule({
@@ -435,8 +458,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '路径穿越：用外部输入拼接文件路径。',
-        remediation: '规范化后校验是否仍位于允许的根目录内，并拒绝 .. 片段。',
+        summary: 'Path traversal: concatenating external input directly into file paths.',
+        remediation:
+            'Normalize and verify path stays within allowed root directory, rejecting parent directory (..) segments.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sec-vul-006',
     }),
     defineRule({
@@ -446,9 +470,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '直接删除（历史在 git 里）或恢复为真实代码',
+        summary: 'Consecutive lines of commented-out code detected.',
         remediation:
-            '连续 ≥ `commentedCodeMinLines`（默认 3）行「代码形状」注释。关键字锚定（`def`/`function`/`return`/`if`/`import`… 或 `NAME =` 形式），散文注释不会命中。',
+            'Delete commented code (relying on git history) or restore it as executable code.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-comc-001',
     }),
     defineRule({
@@ -458,8 +482,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '实现函数体、显式抛「未实现」异常，或删除声明',
-        remediation: '函数体只剩 `pass`/`...`（跳过前置 docstring）或空 `{}`。',
+        summary: 'Empty function body containing only pass, ellipsis (...), or empty block.',
+        remediation:
+            'Implement function body, throw NotImplemented error explicitly, or delete the stub.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-empty-001',
     }),
     defineRule({
@@ -469,9 +494,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '抽取内聚步骤为具名 helper，让顶层流程只剩意图序列',
+        summary: 'Function physical line count exceeds maximum threshold (default 60 lines).',
         remediation:
-            '函数物理跨度超过 `thresholds.maxFunctionLines`（默认 60）。跨度取适配器物化的起止行，覆盖 TS/JS/Python/Rust/GDScript。',
+            'Extract cohesive steps into named helper functions, keeping top-level flow concise.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-long-001',
     }),
     defineRule({
@@ -481,9 +506,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '改用结构化 logger 或删除；调试输出绕过日志级别并泄漏到生产 stdout',
-        remediation:
-            '非豁免路径出现调试输出（`print`/`pprint`/`breakpoint`/`console.log`/`println!`/`dbg!` 等）。默认豁免 `**/cli/**`、`**/scripts/**`、`**/tests/**`、`**/bench/**`、`*.test.*`、`*.spec.*`，可用 `printAllowPatterns` 覆盖。',
+        summary: 'Raw debug print statements leaking into production outputs.',
+        remediation: 'Use structured logging or remove debug prints.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-prnt-001',
     }),
     defineRule({
@@ -493,10 +517,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary:
-            '深层嵌套的条件分支与 AST 访问流应使用卫语句（Guard Clause）提前返回或短路扁平化，控制嵌套深度 ≤ 3。',
-        remediation:
-            '将深层嵌套的 if/else 重构为反向条件的前置卫语句（提前 return/continue/break），保持主逻辑扁平清晰。',
+        summary: 'Deeply nested branching logic exceeds nesting threshold (depth <= 3).',
+        remediation: 'Refactor nested if/else statements using guard clauses with early returns.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-flat-002',
     }),
     defineRule({
@@ -506,9 +528,10 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '冗长且无副作用的 if-else 分支可折叠为浅层单行三元表达式',
+        summary:
+            'Redundant if-else branch can be simplified into a single-line ternary expression.',
         remediation:
-            '双分支为同变量单一赋值或纯返回值时，在无副作用、单层深度且行长 ≤ 80 字符的前提下折叠为三元表达式，降低控制流复杂度。',
+            'Collapse single-assignment or return branches into a clean ternary expression.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-trn-001',
     }),
     defineRule({
@@ -518,9 +541,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '通过三元表达式折叠消除未初始化的局部可变绑定，提纯为不可变 const',
-        remediation:
-            '将 let x; if (c) { x = a; } else { x = b; } 提纯为 const x = c ? a : b;，消除可变状态生命周期。',
+        summary:
+            'Eliminate uninitialized mutable let bindings by folding if-else into immutable const ternary.',
+        remediation: 'Refactor let x; if (c) x = a; else x = b; into const x = c ? a : b;.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-imm-001',
     }),
     defineRule({
@@ -530,8 +553,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ['markdown'],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '同一文档内正文行重复（≥24 字符）。',
-        remediation: '收敛为单一章节 + 指针，避免副本漂移。',
+        summary: 'Duplicate content lines (>= 24 chars) detected in documentation.',
+        remediation: 'Consolidate duplicate sections into a single source with cross-references.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-dup-001',
     }),
     defineRule({
@@ -541,8 +564,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ['markdown'],
         defaultSeverity: SEVERITY_ERROR,
-        summary: 'Markdown 代码围栏未闭合。',
-        remediation: '补上闭合围栏，避免后续章节被吞进代码块。',
+        summary: 'Unclosed Markdown code fence detected.',
+        remediation:
+            'Add closing code fence backticks to prevent subsequent sections from being swallowed.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-fen-001',
     }),
     defineRule({
@@ -552,8 +576,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ['markdown'],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '反引号路径或相对链接指向不存在的文件。',
-        remediation: '更新为现路径，或在行内标注已废止/示例。',
+        summary: 'Backtick path or relative link points to non-existent file.',
+        remediation: 'Update link to valid target path or annotate as example/deprecated.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-lnk-001',
     }),
     defineRule({
@@ -563,8 +587,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '局部变量/参数遮蔽 Python 内建名（docstring 示例与类体协议字段豁免）。',
-        remediation: '重命名绑定（加领域限定词），避免掩盖内建语义。',
+        summary: 'Local variable or parameter shadows Python built-in name.',
+        remediation:
+            'Rename variable with domain qualifiers to avoid obscuring built-in semantics.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-blt-001',
     }),
     defineRule({
@@ -574,8 +599,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: 'except 变量命名不是 exc。',
-        remediation: '统一命名为 exc，让错误处理读起来一致。',
+        summary: 'Exception variable in except clause is not named exc.',
+        remediation: 'Standardize exception variable name to exc.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-exc-001',
     }),
     defineRule({
@@ -585,8 +610,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '单字母绑定（仅 i/j/k/_ 放行）。',
-        remediation: '使用描述性命名。',
+        summary:
+            'Single-letter variable name in business logic (only loop indices i/j/k and discard _ allowed).',
+        remediation: 'Use descriptive identifier communicating variable purpose.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-sgl-001',
     }),
     defineRule({
@@ -596,8 +622,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_ERROR,
-        summary: '从 typing 导入 collections.abc 抽象类型。',
-        remediation: '改从 collections.abc 导入。',
+        summary: 'Importing abstract collections from typing instead of collections.abc.',
+        remediation: 'Import abstract collections directly from collections.abc.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-abc-001',
     }),
     defineRule({
@@ -607,8 +633,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_ERROR,
-        summary: 'async 函数内阻塞调用或未 await 的同步 ORM 调用。',
-        remediation: '改用 async 等价物（asyncio/httpx/异步仓储）。',
+        summary: 'Blocking call or un-awaited synchronous call executed inside async function.',
+        remediation: 'Migrate to asynchronous equivalents (asyncio, httpx, async repositories).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-async-001',
     }),
     defineRule({
@@ -618,8 +644,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_ERROR,
-        summary: 'timezone.utc 用法。',
-        remediation: '改用 datetime.UTC（PEP 615）。',
+        summary: 'Legacy timezone.utc usage detected.',
+        remediation: 'Migrate to datetime.UTC (PEP 615).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-datetime-001',
     }),
     defineRule({
@@ -629,8 +655,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '可变默认参数（=[]/={}/=set()）。',
-        remediation: '改用 None 哨兵，在函数体内构造。',
+        summary: 'Mutable default argument (=[], ={}, =set()) detected in function signature.',
+        remediation:
+            'Use None as sentinel default and construct mutable collection inside function body.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-default-001',
     }),
     defineRule({
@@ -640,8 +667,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '% 格式化字符串。',
-        remediation: '改写为 f-string。',
+        summary: 'Legacy % string formatting detected.',
+        remediation: 'Migrate to modern f-strings.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-fstring-001',
     }),
     defineRule({
@@ -651,8 +678,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_ERROR,
-        summary: '旧式容器泛型 List/Dict/Set/Tuple/Type[...]。',
-        remediation: '改用内置泛型 list[...] 等（PEP 585）。',
+        summary: 'Legacy container generics from typing (List, Dict, Set, Tuple) detected.',
+        remediation: 'Use built-in generic types (list, dict, set, tuple) (PEP 585).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-generic-001',
     }),
     defineRule({
@@ -662,8 +689,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '模块级 import 未按三段式分组或段内未按字典序（函数内惰性导入不参与）。',
-        remediation: '按 PEP 8 分组并段内排序。',
+        summary: 'Module-level imports not grouped into 3 sections or not sorted alphabetically.',
+        remediation: 'Group imports according to PEP 8 and sort alphabetically within sections.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-import-001',
     }),
     defineRule({
@@ -673,8 +700,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: 'open() 未处于 with 块内。',
-        remediation: '包进 with open(...) as handle:。',
+        summary: 'open() call not managed within a with statement block.',
+        remediation:
+            'Wrap open() in with open(...) as handle: block to guarantee resource cleanup.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-open-001',
     }),
     defineRule({
@@ -684,8 +712,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: 'os.path 用法。',
-        remediation: '迁移到 pathlib.Path（Path(...) / name）。',
+        summary: 'Legacy os.path usage detected.',
+        remediation: 'Migrate to pathlib.Path for object-oriented filesystem operations.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-path-001',
     }),
     defineRule({
@@ -695,8 +723,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: 'except 块内 raise X 缺少 from，异常链丢失。',
-        remediation: '写 raise X from exc，或裸 raise 原样上抛。',
+        summary:
+            'Exception raised inside except block without from clause, losing exception chain.',
+        remediation: 'Use raise X from exc to preserve chain, or bare raise to rethrow.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-raise-001',
     }),
     defineRule({
@@ -706,8 +735,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '无继承的 @dataclass 未声明 slots=True。',
-        remediation: '加 slots=True；确需 __dict__ 时显式 slots=False。',
+        summary: 'Non-inheriting @dataclass does not declare slots=True.',
+        remediation:
+            'Add slots=True to @dataclass; if __dict__ is required, declare slots=False explicitly.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-slots-001',
     }),
     defineRule({
@@ -717,8 +747,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_PYTHON],
         defaultSeverity: SEVERITY_ERROR,
-        summary: '注解或类型别名位置使用 Optional[...]/Union[...]。',
-        remediation: '改用 PEP 604 写法 X | None。',
+        summary: 'Legacy Optional[...] or Union[...] used in type annotation or alias.',
+        remediation: 'Migrate to PEP 604 pipe syntax (X | None).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-union-001',
     }),
     ...ANALYZER_MODERN_RULES,

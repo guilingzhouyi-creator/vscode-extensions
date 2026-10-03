@@ -49,8 +49,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '分析器在单文件上抛异常（failOnAnalyzerError 可升为 error）。',
-        remediation: '修复分析器缺陷；已知外部数据问题可保持 info 留痕。',
+        summary:
+            'Analyzer threw an unhandled exception on a single file (escalates to error if failOnAnalyzerError is set).',
+        remediation:
+            'Fix the analyzer defect; for known external data issues, keep info severity for tracking.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#analyzer-error',
     }),
     defineRule({
@@ -60,8 +62,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '倒置依赖，在领域层定义接口契约，由外层实现。',
-        remediation: '核心逆流：领域层 (Domain) 反向依赖外层应用层/基础设施/接口层。',
+        summary:
+            'Core reverse flow: domain layer inversely depends on outer application, infrastructure, or interface layers.',
+        remediation:
+            'Invert dependencies: declare interface contracts in the domain layer and implement them in outer layers.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dir-001',
     }),
     defineRule({
@@ -71,8 +75,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '引入用例服务 (Application Service) 统筹业务流。',
-        remediation: '越层穿透：接口层控制器绕过应用层直接直连基础设施实现。',
+        summary:
+            'Layer bypass: interface layer controllers bypass application services to directly couple with infrastructure implementations.',
+        remediation:
+            'Introduce application services to orchestrate business workflows between controllers and infrastructure.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dir-002',
     }),
     defineRule({
@@ -82,8 +88,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '领域模型使用 POJO/原生实体，隔离外部框架专有类型。',
-        remediation: '职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。',
+        summary:
+            'Responsibility leak: pure domain models directly reference or leak external frameworks (Express, Vue, Godot, ORM).',
+        remediation:
+            'Use POJO or native language entities for domain models, isolating external framework types via adapters.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-leak-001',
     }),
     defineRule({
@@ -93,8 +101,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '分层越界：外层实现被内层直接反向引用（Clean/DDD 层序反转）。',
-        remediation: '把依赖改回单向（内层定义接口、外层实现），或把该文件移入正确层。',
+        summary:
+            'Layer boundary breach: outer implementations are directly referenced by inner layers (Clean/DDD inverted hierarchy).',
+        remediation:
+            'Restore unidirectional dependencies (inner declares interface, outer implements) or move file to appropriate layer.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-leak-002',
     }),
     defineRule({
@@ -104,8 +114,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '无头架构违规：核心业务逻辑或计算模块直接绑定 UI/IDE 视图框架。',
-        remediation: '解除核心计算与展示框架依赖，保持无头独立执行与测试能力。',
+        summary:
+            'Headless architecture breach: core business logic or calculation modules directly bind to UI/IDE view frameworks.',
+        remediation:
+            'Decouple core logic from display frameworks, maintaining headless standalone execution and testability.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-hdl-001',
     }),
     defineRule({
@@ -115,8 +127,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '跨业务域内部穿透：绕过公共导出 Facade 契约直接访问非公开内部实现。',
-        remediation: '通过模块顶层公共导出 API 访问，禁止直接引用 /internal/ 或 /private/。',
+        summary:
+            'Cross-domain internal penetration: bypassing public export facade contracts to directly access private internal implementations.',
+        remediation:
+            'Access domain capabilities exclusively through public export facade APIs; avoid direct imports from /internal/ or /private/.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-bnd-001',
     }),
     defineRule({
@@ -126,8 +140,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '隐式全局可变状态：模块间通过顶层全局变量或单例产生隐式强耦合。',
-        remediation: '重构为依赖注入或按需创建实例，消除共享可变静态单例。',
+        summary:
+            'Implicit global mutable state: modules are tightly coupled via top-level global variables or static singletons.',
+        remediation:
+            'Refactor to dependency injection or on-demand instances, eliminating shared mutable static singletons.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-glb-001',
     }),
     defineRule({
@@ -137,8 +153,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '形式分层假象：目录结构表面隔离，但调用关系与数据流发生逆向越层。',
-        remediation: '调整调用依赖流向，由内层领域定义契约接口并交由基础设施层实现。',
+        summary:
+            'Formal layering illusion: directory structure appears separated, but call graphs and data flows violate layer boundaries.',
+        remediation:
+            'Align call dependency flows so inner domain defines contracts and outer infrastructure implements them.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dir-003',
     }),
     defineRule({
@@ -148,8 +166,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '环境配置泄漏：纯领域业务模型内部直接读取环境变量或底层磁盘配置。',
-        remediation: '将环境配置提升到应用装配层解析，并以强类型参数注入领域对象。',
+        summary:
+            'Environment configuration leak: pure domain models directly read environment variables or disk configuration files.',
+        remediation:
+            'Parse environment configurations at the application assembly layer and inject strongly-typed values into domain models.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-001',
     }),
     defineRule({
@@ -162,7 +182,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         summary:
             'Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle.',
         remediation:
-            '重构为基于字典/Map 的查表分发 (Table-Driven) 或策略模式 (Strategy Pattern)，解耦各分支业务逻辑。',
+            'Refactor to dictionary/Map table-driven dispatch or Strategy pattern, decoupling branch business logic.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-disp-001',
     }),
     defineRule({
@@ -175,7 +195,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         summary:
             'Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation.',
         remediation:
-            '重构为按职责正交划分的 switch 分发函数（单函数圈复杂度 <= 10）或顶层具名处理函数，消除闭包碎片化。',
+            'Refactor into cohesive switch dispatchers (CC <= 10) or top-level named handler functions to eliminate closure fragmentation.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dsp-002',
     }),
     defineRule({
@@ -186,9 +206,9 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '巨石视图/模板渲染器未解耦：单函数规模超标且包含深度 HTML/SVG/DSL 模板字符串拼接，缺少局部组件化。',
+            'Monolithic template renderer coupling: oversized function concatenates deep HTML/SVG/DSL templates without subcomponent decomposition.',
         remediation:
-            '拆解为领域正交的局部组件（Header/Card/Graph Partials），由结构化 ViewModel 驱动渲染。',
+            'Decompose into domain-orthogonal partial components (Header/Card/Graph Partials) driven by structured ViewModels.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-tmp-001',
     }),
     defineRule({
@@ -199,8 +219,9 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '增量管线中的分层越界（clean-layer 口径）。',
-        remediation: '按层序调整依赖方向或把实现下沉/上提到正确层。',
+        summary: 'Layering boundary breach in incremental pipeline (clean-layer semantics).',
+        remediation:
+            'Adjust dependency direction according to layer hierarchy or hoist/sink implementations to proper layers.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#clean-layer-violation',
     }),
     defineRule({
@@ -211,8 +232,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '声明式导入边界违规：跨组依赖或未授权外部包。',
-        remediation: '按配置的 allowGroups/allowExternal 调整导入，或显式登记豁免。',
+        summary:
+            'Declarative import boundary violation: cross-group dependency or unauthorized external package import.',
+        remediation:
+            'Adjust imports according to allowGroups/allowExternal configurations or explicitly register an exemption.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#disallowed-import',
     }),
     defineRule({
@@ -223,8 +246,9 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '自动聚合多处行号并提示提取共享常量。',
-        remediation: '同一文件内相同字面量出现频次超标（默认 ≥ 3 次）。',
+        summary:
+            'Identical literal frequency exceeds threshold in the same file (default >= 3 occurrences).',
+        remediation: 'Aggregate repeated literals and extract them into shared constants.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#duplicate-literal',
     }),
     defineRule({
@@ -235,8 +259,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '严禁常量化嵌套：禁止冗余常量别名引用、深层嵌套常量对象与作用域内部伪常量。',
-        remediation: '将常量直接内联或提升至模块顶层单源声明，消除无意义的间接别名与深层对象嵌套。',
+        summary:
+            'Redundant constant nesting: indirect constant aliases, deep constant objects, or pseudo-constants in nested scopes.',
+        remediation:
+            'Inline redundant aliases or hoist constants to module-level single sources of truth, eliminating deep object nesting.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nested-constant',
     }),
     defineRule({
@@ -247,8 +273,9 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '函数圈复杂度超过阈值。',
-        remediation: '抽取具名步骤、早返回替代嵌套分支，或按职责拆分函数。',
+        summary: 'Function cyclomatic complexity exceeds threshold.',
+        remediation:
+            'Extract named helper functions, use early returns instead of deep nesting, or split functions by responsibility.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#high-complexity',
     }),
     defineRule({
@@ -259,8 +286,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '高熵字符串疑似密钥/令牌。',
-        remediation: '移入配置/密钥管理；确为误报时用 matchRule 抑制并写明理由。',
+        summary:
+            'High-entropy string detected, suspected of being a secret credential or API token.',
+        remediation:
+            'Move credentials to configuration or secret managers; if a false positive, suppress with matchRule and documented rationale.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#high-entropy-token',
     }),
     defineRule({
@@ -271,8 +300,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '模块级循环依赖（Python 相对导入与包解析同样覆盖）。',
-        remediation: '把共享契约下沉为独立模块，或用惰性导入打断环（惰性导入不建边）。',
+        summary:
+            'Module-level cyclic dependency detected (covering Python relative imports and package resolution).',
+        remediation:
+            'Extract shared contracts into independent submodules or use lazy imports to break dependency cycles.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#import-cycle',
     }),
     defineRule({
@@ -283,8 +314,9 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '文件行数/函数数超过阈值。',
-        remediation: '按职责拆分模块，或把工具函数迁到专属文件。',
+        summary: 'File physical line count or function count exceeds architecture threshold.',
+        remediation:
+            'Decompose module by cohesive responsibilities, or move utility functions to dedicated files.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#large-file',
     }),
     defineRule({
@@ -295,8 +327,9 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '疑似硬编码凭据（按模式识别）。',
-        remediation: '撤销并轮换该凭据；改为从环境/密钥管理读取。',
+        summary: 'Suspected hardcoded credential detected based on pattern matching.',
+        remediation:
+            'Revoke and rotate the exposed credential; load sensitive tokens from environment variables or vaults.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#secret-detected',
     }),
     defineRule({
@@ -307,8 +340,8 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '导出符号无人引用（TS/JS 口径；Python 无 export 关键字不参与）。',
-        remediation: '删除无人使用的导出，或把它收回模块内部。',
+        summary: 'Exported symbol has zero external references across the workspace (TS/JS scope).',
+        remediation: 'Remove unused exports or restrict symbol visibility to module-private scope.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#unused-export',
     }),
     defineRule({
@@ -319,8 +352,8 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '模块无人导入（非入口白名单内）。',
-        remediation: '删除该模块，或把入口 glob 加入 entryGlobs。',
+        summary: 'Module is never imported by any other file (outside entry whitelist).',
+        remediation: 'Delete the dead module or add its entry pattern to entryGlobs.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#unused-module',
     }),
     defineRule({
@@ -331,8 +364,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '循环体内执行昂贵深拷贝（.duplicate(true)）或阻塞式序列化与IO。',
-        remediation: '消除热路径内的深拷贝操作，改用只读视图或轻量引用。',
+        summary:
+            'Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop.',
+        remediation:
+            'Eliminate deep copies on hot paths; use read-only views or lightweight references instead.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#expensive-loop-operation',
     }),
     defineRule({
@@ -343,8 +378,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '循环多重嵌套引发潜在 O(N^2)/O(N^3) 复杂度热点或循环体内隐式线性查找。',
-        remediation: '重构循环嵌套或预先构建 Map/Set 索引将查找降为 O(1)。',
+        summary:
+            'Multiple nested loops create potential O(N^2)/O(N^3) complexity hotspots or implicit linear searches.',
+        remediation:
+            'Refactor nested loops or pre-build Map/Set indexes to reduce lookups to O(1).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#high-algorithmic-complexity',
     }),
     defineRule({
@@ -355,8 +392,10 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。',
-        remediation: '将对象实例化提升到循环外或使用对象池模式（ADV-POOL-001）。',
+        summary:
+            'Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract.',
+        remediation:
+            'Hoist object instantiation outside the loop or utilize object pool patterns (ADV-POOL-001).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#loop-transient-allocation',
     }),
 ];

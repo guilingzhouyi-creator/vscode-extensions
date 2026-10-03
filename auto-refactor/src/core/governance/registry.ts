@@ -16,8 +16,12 @@
  *     rule sets isolated.
  */
 import type { GovernanceRule } from './types';
-import { RedundantBooleanRule, ModernConstructRule } from './rules/standardization';
-import { FileNamingRule, ModuleHeaderRule } from './rules/fileStructure';
+import {
+    RedundantBooleanRule,
+    ModernConstructRule,
+    RuleCatalogIntegrityRule,
+} from './rules/standardization';
+import { FileNamingRule, ModuleHeaderRule, BlastRadiusGuardRule } from './rules/fileStructure';
 import { ExcessiveNestingRule, VacuousWrapperRule } from './rules/codeLogic';
 import { TYPE_SYSTEM_GOVERNANCE_RULES } from './rules/typeSystem';
 import {
@@ -38,7 +42,11 @@ import {
     DomainDecouplingRule,
     DataClumpsRule,
 } from './rules/maintainability';
-import { LexicalHygieneRule, DiagnosticMessageRule } from './rules/sanitization';
+import {
+    LexicalHygieneRule,
+    DiagnosticMessageRule,
+    DossierBoundaryIsolationRule,
+} from './rules/sanitization';
 import {
     GiantExpressionRule,
     SingleLineMultiSemanticRule,
@@ -59,9 +67,11 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     RedundantBooleanRule,
     ModernConstructRule,
     DiagnosticMessageRule,
+    RuleCatalogIntegrityRule,
     // 2. File Structure
     FileNamingRule,
     ModuleHeaderRule,
+    BlastRadiusGuardRule,
     // 3. Code Logic
     ExcessiveNestingRule,
     VacuousWrapperRule,
@@ -84,6 +94,7 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     DomainDecouplingRule,
     DataClumpsRule,
     LexicalHygieneRule,
+    DossierBoundaryIsolationRule,
     GiantExpressionRule,
     SingleLineMultiSemanticRule,
     CallbackDepthRule,

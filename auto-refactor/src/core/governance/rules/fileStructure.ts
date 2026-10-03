@@ -259,3 +259,89 @@ function hasTypeDecl(content: string, name: string): boolean {
     const patterns = [`class ${name}`, `interface ${name}`, `type ${name}`, `enum ${name}`];
     return patterns.some((p) => content.includes(p));
 }
+
+const IMPORT_OR_REQUIRE_RE =
+    /(?:import\s+(?:[\w*\s{},]*from\s+)?['"]([^'"]+)['"]|require\(['"]([^'"]+)['"]\)|(?:load|preload)\(['"]([^'"]+)['"]\))/g;
+
+const TIER_DOCS_RE = /(?:^|\/)(?:docs?|specifications?)(?:\/|$)|(?:\.md)$/i;
+const TIER_CONFIG_RE = /(?:^|\/)(?:configs?)(?:\/|$)|(?:\.(?:json|ya?ml|toml))$/i;
+const TIER_TEST_RE = /(?:^|\/)(?:tests?|fixtures?|__tests__)(?:\/|$)/i;
+const TIER_TOOLING_RE = /(?:^|\/)(?:scripts?|\.github|\.githooks|tools?)(?:\/|$)/i;
+const TIER_CONTRACTS_RE = /(?:^|\/)(?:core|infrastructures?|infra|shared)(?:\/|$)/i;
+const TIER_DOMAIN_RE = /(?:^|\/)(?:domains?|features?|services?|models?)(?:\/|$)/i;
+
+/**
+ * Classifies a file path into an architectural tier for blast radius governance.
+ *
+ * @param filePath - File path or import specifier to classify.
+ * @returns Architectural tier name or 'other'.
+ */
+export function classifyArchitecturalTier(filePath: string): string {
+    const normalized = filePath.replace(/\\/g, '/');
+    if (TIER_DOCS_RE.test(normalized)) return 'docs';
+    if (TIER_CONFIG_RE.test(normalized)) return 'config';
+    if (TIER_TEST_RE.test(normalized)) return 'test';
+    if (TIER_TOOLING_RE.test(normalized)) return 'tooling';
+    if (TIER_CONTRACTS_RE.test(normalized)) return 'contracts';
+    if (TIER_DOMAIN_RE.test(normalized)) return 'domain';
+    return 'other';
+}
+
+/**
+ * GOV-BLS-001: Cross-Tier Monolithic Staging Blast Radius Guard.
+ * Flags single files that directly couple >= 3 orthogonal architectural tiers.
+ */
+export const BlastRadiusGuardRule: GovernanceRule = {
+    id: 'GOV-BLS-001',
+    name: 'Cross-Tier Monolithic Change Blast Radius Guard',
+    category: 'file_structure',
+    severity: 'warning',
+    risk: 'medium',
+    rationale:
+        'Monolithic coupling across multiple orthogonal tiers (docs, config, domain, contracts, tooling) increases blast radius and impedes atomic review.',
+    isFixable: false,
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (isToolOrTestScript(ctx.filePath)) {
+            return null;
+        }
+
+        const currentTier = classifyArchitecturalTier(ctx.filePath);
+        const tiers = new Set<string>();
+        if (currentTier !== 'other') {
+            tiers.add(currentTier);
+        }
+
+        const lines = ctx.lines;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            let match: RegExpExecArray | null;
+            IMPORT_OR_REQUIRE_RE.lastIndex = 0;
+            while ((match = IMPORT_OR_REQUIRE_RE.exec(line)) !== null) {
+                const targetPath = match[1] || match[2] || match[3];
+                if (targetPath) {
+                    const tier = classifyArchitecturalTier(targetPath);
+                    if (tier !== 'other') {
+                        tiers.add(tier);
+                    }
+                }
+            }
+        }
+
+        if (tiers.size >= 3) {
+            const tierList = Array.from(tiers).sort().join(', ');
+            return [
+                {
+                    ruleId: 'GOV-BLS-001',
+                    message: `Cross-tier coupling detected across ${tiers.size} architectural tiers (${tierList}). Breach of atomic tier boundary.`,
+                    line: 1,
+                    column: 1,
+                    suggestion:
+                        'Decouple cross-tier imports through domain interfaces, dependency injection, or split into atomic modules.',
+                    fixable: false,
+                },
+            ];
+        }
+
+        return null;
+    },
+};

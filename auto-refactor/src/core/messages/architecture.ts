@@ -145,4 +145,48 @@ export const ArchitectureMessages = {
             ' AST parser implementations to facilitate modular evolution.',
         risk: RISK_MEDIUM,
     }),
+
+    // ARCH-ABS-001: Vacuous forwarding trampoline module
+    /**
+     * Build the ARCH-ABS-001 descriptor for a vacuous single-file re-export trampoline.
+     *
+     * @param file - File path containing the trampoline.
+     * @param targetPath - Sub-module or index path being re-exported.
+     * @returns Fresh descriptor with High risk and trampoline elimination guidance.
+     */
+    VACUOUS_TRAMPOLINE_MODULE: (file: string, targetPath: string): DiagnosticDescriptor => ({
+        message:
+            `Vacuous forwarding trampoline detected in '${file}': ` +
+            `file only re-exports sub-module '${targetPath}' without local orchestration.`,
+        suggestion:
+            'Eliminate this vacuous trampoline file and import the target module directly, ' +
+            'or consolidate sub-module aggregation logic into this file.',
+        rationale:
+            'Empty forwarding trampolines add gratuitous indirection hops to the import graph ' +
+            'and obscure true module topology.',
+        risk: RISK_HIGH,
+    }),
+
+    // ARCH-FAC-001: Hollow facade payload and insufficient density
+    /**
+     * Build the ARCH-FAC-001 descriptor for a facade lacking substantive payload.
+     *
+     * @param file - File path of the hollow facade.
+     * @param eloc - Observed effective lines of code.
+     * @param minEloc - Minimum required effective lines of code.
+     * @returns Fresh descriptor with Medium risk and substantive payload guidance.
+     */
+    HOLLOW_FACADE_PAYLOAD: (file: string, eloc: number, minEloc: number): DiagnosticDescriptor => ({
+        message:
+            `Hollow facade module '${file}' has insufficient effective density ` +
+            `(${eloc} ELOC < ${minEloc}) and lacks domain orchestration, schema validation, ` +
+            `or immutability.`,
+        suggestion:
+            'Consolidate pass-through logic into callers, or implement substantive schema validation, ' +
+            'immutability freezing, and multi-subdomain orchestration.',
+        rationale:
+            'Facade and gateway modules must carry substantive architectural value; vacuous ' +
+            'pass-through wrappers inflate cognitive complexity without adding resilience.',
+        risk: RISK_MEDIUM,
+    }),
 } as const;

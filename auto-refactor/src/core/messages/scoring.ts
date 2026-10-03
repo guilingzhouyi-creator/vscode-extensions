@@ -440,7 +440,7 @@ export const ScoringRationales = {
     GDSCRIPT_DTO_IN_PLACE_MUTATION: (msg: string) =>
         `Presentation layer performs in-place mutation on immutable Snapshot DTO: ${msg}`,
 
-    // ── 冗余（redundancy）族 ────────────────────────────────────────────────────────
+    // ── Redundancy family ────────────────────────────────────────────────────────
 
     DUPLICATE_CODE_BLOCK: (msg: string) =>
         `Repeated code block inside one file; extract the shared logic instead of maintaining parallel copies: ${msg}`,

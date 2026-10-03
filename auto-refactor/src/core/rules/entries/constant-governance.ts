@@ -55,38 +55,38 @@ function createGovernanceRule(
 export const CONSTANT_GOVERNANCE_RULES: readonly RuleDefinition[] = [
     createGovernanceRule(
         RULE_ID_CONST_LAY_001,
-        '模块级稳定常量在依赖区后必须进入首个正式代码声明域，严禁散落在函数内部、文件中段或业务逻辑之间。',
-        '将模块级常量统一定义在文件导入声明（import/require）之后、任何函数/类声明之前的常量区。',
+        'Module-level constants must be placed in the primary declaration section immediately following imports, not scattered within functions or business logic.',
+        'Hoist module-level constants to the designated declaration block after import/require statements and before function/class definitions.',
     ),
     createGovernanceRule(
         RULE_ID_CONST_SCP_001,
-        '单函数局部不变量、延迟初始化值或受限生命周期资源禁止滥用扩大作用域提升至顶层。',
-        '保持局部不变量在单函数或局部代码块内部的作用域范围，避免盲目提升至文件全局。',
+        'Local invariants, lazily initialized values, or short-lived resources must not be needlessly hoisted to module scope.',
+        'Keep scoped invariants inside their respective functions or blocks; avoid escalating local constants to global scope.',
     ),
     createGovernanceRule(
         RULE_ID_CONST_SCP_002,
-        '单函数体内散落的多处同类局部硬编码应在函数头部统一定义为局部常量。',
-        '在当前函数头部集中声明局部 const 常量并替换函数内部各处的散落字面量。',
+        'Multiple identical local literals in a function should be consolidated as local constants at the function header.',
+        'Declare local const variables at the beginning of the function and replace repeated inline literals.',
         SEVERITY_INFO,
     ),
     createGovernanceRule(
         RULE_ID_CONST_CLU_001,
-        '同调用域内存在未抽取的同源硬编码字面量（状态码/协议值/路径/事件名），应一揽子打包抽取。',
-        '结合临近代码域聚类建议，将同一语义族的同源字面量一并抽离为常量，避免遗留散乱硬编码。',
+        'Multiple homogeneous unextracted literals (status codes, protocols, paths, events) in the same call scope should be clustered and extracted together.',
+        'Cluster related literals into cohesive domain constants or enums instead of leaving scattered literals.',
     ),
     createGovernanceRule(
         RULE_ID_CONST_DRF_001,
-        '跨文件同源语义常量存在命名分裂或数值微小漂移，必须建立单一真源（SSOT）。',
-        '将多文件维护的同源常量统一定义在领域或协议共享常量库中，并消除数值或命名漂移。',
+        'Homogeneous semantic constants across files have naming splits or minor value drifts, violating single source of truth (SSOT).',
+        'Consolidate drifting constants into a shared domain or protocol library to establish a single source of truth.',
     ),
     createGovernanceRule(
         RULE_ID_CONST_OWN_001,
-        '共享常量所有权分层错误，严禁塞入全局大杂烩 constants 文件或藏匿在底层私有模块。',
-        '按照所有权四层模型，分流至 Module-Private、Domain-Shared、Protocol-Shared 或 System-Config。',
+        'Shared constant ownership is misclassified; avoid dumping constants into kitchen-sink files or hiding them in private modules.',
+        'Categorize constants into the appropriate ownership tier: Module-Private, Domain-Shared, Protocol-Shared, or System-Config.',
     ),
     createGovernanceRule(
         RULE_ID_CONST_LIB_001,
-        '大规模常量散落于业务代码文件中，缺乏集中分层的常量库目录结构。',
-        '根据 Agent 建议的目录拓扑与分片模块，在 constants/ 集中归档并提供统一 index.ts 导出。',
+        'Large volumes of constants are scattered across business files without a structured, tiered constant library.',
+        'Consolidate constants into modular files under constants/ with a unified barrel export in index.ts.',
     ),
 ];

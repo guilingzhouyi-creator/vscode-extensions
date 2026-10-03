@@ -41,9 +41,9 @@ const CHAR_CODE_SLASH = 47;
 const CHAR_CODE_ASTERISK = 42;
 
 /**
- * Checks whether a single source line contains temporary task jargon or WIP markers in comments.
+ * Checks whether a single source line starts with comment delimiters.
  */
-function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViolation | null {
+function isCommentLinePrefix(line: string): boolean {
     let startIdx = 0;
     while (
         startIdx < line.length &&
@@ -52,24 +52,33 @@ function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViol
     ) {
         startIdx++;
     }
-    if (startIdx >= line.length) return null;
+    if (startIdx >= line.length) return false;
     const c0 = line.charCodeAt(startIdx);
     const c1 = line.charCodeAt(startIdx + 1);
-    const isComment =
+    return (
         c0 === CHAR_CODE_HASH ||
         (c0 === CHAR_CODE_SLASH && (c1 === CHAR_CODE_SLASH || c1 === CHAR_CODE_ASTERISK)) ||
-        c0 === CHAR_CODE_ASTERISK;
+        c0 === CHAR_CODE_ASTERISK
+    );
+}
 
-    if (!isComment) return null;
-
-    if (
+/**
+ * Checks whether a line references internal jargon governance identifiers.
+ */
+function isJargonSelfReference(line: string): boolean {
+    return (
         line.includes('JARGON_RE') ||
         line.includes('LexicalHygieneRule') ||
         line.includes('GOV-SAN-001') ||
         line.includes('COMMENT-JARGON')
-    ) {
-        return null;
-    }
+    );
+}
+
+/**
+ * Checks whether a single source line contains temporary task jargon or WIP markers in comments.
+ */
+function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViolation | null {
+    if (!isCommentLinePrefix(line) || isJargonSelfReference(line)) return null;
 
     const match = JARGON_RE.exec(line);
     if (!match || isVocabularyEnumeration(line, match.index, match[0])) return null;
@@ -190,6 +199,67 @@ export const DiagnosticMessageRule: GovernanceRule = {
                     line: i + 1,
                     column: line.search(CHINESE_CHAR_RE) + 1,
                     suggestion: GOV_MSG_001_SUGGESTION,
+                    fixable: false,
+                });
+            }
+        }
+
+        return violations.length > 0 ? violations : null;
+    },
+};
+
+const DOSSIER_JARGON_RE =
+    /\b(st_[0-9]+[a-z0-9_]*|phase[\s_]*[0-9]+|p[0-9]{2,}|四阶段案卷|案卷细则)\b/i;
+
+function isExemptDossierPath(filePath: string): boolean {
+    const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+    return (
+        normalized.includes('docs/归档库') ||
+        normalized.includes('docs/路线图') ||
+        normalized.includes('/archive/') ||
+        normalized.startsWith('archive/') ||
+        fileNameEndsWith(filePath, ['sanitization.ts'])
+    );
+}
+
+/**
+ * GOV-ARC-001: Historical Dossier Nomenclature Boundary Isolation Guard.
+ * Restricts historical dossier batch jargon and milestone codes to archived directories.
+ */
+export const DossierBoundaryIsolationRule: GovernanceRule = {
+    id: 'GOV-ARC-001',
+    name: 'Historical Dossier Nomenclature Boundary Isolation Guard',
+    category: 'maintainability',
+    severity: 'warning',
+    risk: 'medium',
+    rationale:
+        'Historical dossier batch jargon and milestone codes outside archive directories violate user-facing clarity and architectural neutrality.',
+    isFixable: false,
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (isExemptDossierPath(ctx.filePath)) return null;
+        if (!DOSSIER_JARGON_RE.test(ctx.content)) return null;
+
+        const violations: GovernanceViolation[] = [];
+        const lines = ctx.lines;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (
+                line.includes('DOSSIER_JARGON_RE') ||
+                line.includes('GOV-ARC-001') ||
+                line.includes('DossierBoundaryIsolationRule')
+            ) {
+                continue;
+            }
+            const match = DOSSIER_JARGON_RE.exec(line);
+            if (match) {
+                violations.push({
+                    ruleId: 'GOV-ARC-001',
+                    message: `Historical dossier nomenclature or batch tag \`${match[0]}\` found outside archived directory white-list.`,
+                    line: i + 1,
+                    column: match.index != null ? match.index + 1 : 1,
+                    suggestion:
+                        'Remove milestone/batch tags from active code; use canonical product features and functional domain naming.',
                     fixable: false,
                 });
             }

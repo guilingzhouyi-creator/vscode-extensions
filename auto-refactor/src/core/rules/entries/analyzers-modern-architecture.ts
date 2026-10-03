@@ -100,8 +100,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '跨函数/跨文件无界多项式时间复杂度：嵌套迭代调用链引发高开销。',
-        remediation: '将内层数据预先构建为 Map/Set 索引，降低复合复杂度至 O(N)。',
+        summary:
+            'Unbounded polynomial time complexity across function/file boundaries: nested iteration call chains incur prohibitive overhead.',
+        remediation:
+            'Pre-build inner dataset into Map/Set indices to reduce composite complexity to O(N).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-time-001',
     }),
     defineRule({
@@ -111,8 +113,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '热点循环内无界瞬态内存分配与重复全量物化。',
-        remediation: '将对象/缓冲区分配提升到循环外，循环内执行就地重置与复用。',
+        summary:
+            'Unbounded transient memory allocation and repeated full materialization inside hot loops.',
+        remediation:
+            'Hoist object/buffer allocations outside the loop and execute in-place reset and reuse inside the loop.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-space-001',
     }),
     defineRule({
@@ -122,8 +126,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '跨函数/跨文件无终止保障的递归或互递归调用链。',
-        remediation: '引入显式深度累加参数与终止保护，或改写为迭代工作列表。',
+        summary:
+            'Recursive or mutually recursive call chain without guaranteed termination guards across functions/files.',
+        remediation:
+            'Introduce explicit depth accumulator parameters with termination bounds, or refactor into an iterative worklist.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-rec-001',
     }),
     defineRule({
@@ -133,8 +139,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '复杂度放大陷阱：在迭代或热点调用链中隐式嵌套阻塞 I/O 或序列化。',
-        remediation: '将 I/O 与序列化批量汇聚在循环外部执行。',
+        summary:
+            'Complexity amplification trap: blocking I/O or serialization implicitly nested in iteration or hot call chains.',
+        remediation: 'Batch I/O and serialization calls outside the loop.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-amp-001',
     }),
     defineRule({
@@ -144,8 +151,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '在线请求链路中的无界数据读取或全表内存过滤。',
-        remediation: '增加游标分页或 Limit/Offset 条件，强制限制单次读取上限。',
+        summary:
+            'Unbounded data retrieval or full-table in-memory filtering in online request paths.',
+        remediation:
+            'Add cursor pagination or Limit/Offset clauses to strictly bound retrieval volumes per query.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-qry-001',
     }),
     defineRule({
@@ -155,8 +164,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '迭代与映射上下文中的 N+1 查询与重复存储调用。',
-        remediation: '将循环内查询提升至外层使用批量 IN 查询或 DataLoader 批量加载。',
+        summary:
+            'N+1 query pattern and repeated storage calls within iteration or mapping contexts.',
+        remediation:
+            'Hoist queries outside the loop using batch IN queries or DataLoader batching patterns.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-npl-001',
     }),
     defineRule({
@@ -166,8 +177,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '跨层调用链中的重复序列化与反序列化转换。',
-        remediation: '在内部调用链路传递强类型原生对象，仅在网络边界执行序列化。',
+        summary: 'Repeated serialization and deserialization cycles across internal call chains.',
+        remediation:
+            'Pass strongly typed native objects through internal call chains, serializing exclusively at network boundaries.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-ser-001',
     }),
     defineRule({
@@ -177,8 +189,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '受信内部领域边界内的冗余重复防御性校验。',
-        remediation: '在信任边界执行一次性完整校验，内部领域对象依托不可变类型保证。',
+        summary: 'Redundant defensive validations within trusted internal domain boundaries.',
+        remediation:
+            'Perform comprehensive validation once at trust boundaries; rely on immutable types within internal domains.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-def-001',
     }),
     defineRule({
@@ -188,8 +201,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '数据访问抽象泄漏：业务核心直接操纵持久化驱动或底层存储细节。',
-        remediation: '将存储驱动调用封装在仓储接口实现内，领域层仅依赖仓储契约。',
+        summary:
+            'Data access abstraction leak: business core directly manipulates persistence drivers or storage details.',
+        remediation:
+            'Encapsulate storage driver interactions within repository implementations; domain layer must only depend on repository contracts.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-lay-001',
     }),
     defineRule({
@@ -199,8 +214,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '测试完整性幻觉：测试仅校验 Mock 配置或绑定已废弃业务契约。',
-        remediation: '将测试迁移至验证活跃业务契约与实际领域状态变化。',
+        summary:
+            'Test completeness illusion: tests solely verify mock configurations or bind to deprecated business contracts.',
+        remediation:
+            'Migrate tests to verify active business contracts and actual domain state transitions.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-ils-001',
     }),
     defineRule({
@@ -210,8 +227,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '核心业务域中长期滞留的跳过、隔离或未执行测试用例。',
-        remediation: '修复并恢复测试用例，或正式登记入测试债务清单并设定收敛里程碑。',
+        summary:
+            'Skipped, quarantined, or disabled test cases lingering indefinitely in core business domains.',
+        remediation:
+            'Fix and reactivate test cases, or formally register them into the test debt backlog with milestone targets.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-skp-001',
     }),
     defineRule({
@@ -221,8 +240,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '缺乏真实业务断言或包含恒真断言的无效测试。',
-        remediation: '替换恒真断言为针对业务实体输出和错误边界的有效验证。',
+        summary:
+            'Ineffective test lacking substantive business assertions or containing tautological assertions.',
+        remediation:
+            'Replace tautological assertions with substantive verification of business entity outputs and error boundaries.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-tau-001',
     }),
     defineRule({
@@ -232,8 +253,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。',
-        remediation: '补齐高风险语义单元的契约测试与边界测试，提高实际故障感知能力。',
+        summary:
+            'Effective Modern Test Density (EMTD) or Current Business Coverage Ratio (CBCR) below threshold in critical business modules.',
+        remediation:
+            'Add contract tests and boundary tests for high-risk semantic units to enhance fault detection capability.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-den-001',
     }),
     defineRule({
@@ -243,8 +266,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '未登记里程碑收敛计划或责任人的滞后测试技术债务。',
-        remediation: '在测试债务登记表中补全责任 Agent 及目标收敛里程碑。',
+        summary:
+            'Lagging test technical debt without registered milestone convergence plan or assigned owner.',
+        remediation:
+            'Assign responsible agent and target convergence milestone in the test debt registry.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-dbt-001',
     }),
     defineRule({
@@ -255,9 +280,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '多语言测试拓扑双轨纪律：严禁在 TS/GDScript 等语言生产代码中内嵌测试代码域，强化 Rust 计算库物理分区与面向 Agent 可读注释契约。',
+            'Polyglot test topology dual-track discipline: embedding test code blocks in TS/GDScript production files is strictly prohibited.',
         remediation:
-            '将内嵌在非 Rust 生产文件中的测试逻辑迁移至显式独立测试文件（如 *.test.ts），Rust 计算库测试必须置于 #[cfg(test)] 尾部分区并补充 Agent 可读注释。',
+            'Migrate embedded test logic in non-Rust production files to standalone test files (*.test.ts); place Rust tests in #[cfg(test)] sections with Agent-readable comments.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-top-001',
     }),
     defineRule({
@@ -267,8 +292,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '文件布局与导入分组不符合当前语言现代化工程规范。',
-        remediation: '调整导入顺序为 Stdlib -> ThirdParty -> InternalShared -> Local。',
+        summary:
+            'File layout and import grouping do not conform to modern polyglot engineering standards.',
+        remediation: 'Reorder imports to: Stdlib -> ThirdParty -> InternalShared -> Local.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-ord-001',
     }),
     defineRule({
@@ -278,8 +304,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '未提供审计声明或合规理由的函数内部临时导入。',
-        remediation: '将导入提升至文件顶部，或添加 @lazy/@optional 注释标注意图。',
+        summary: 'Function-scoped lazy import without audit declaration or documented rationale.',
+        remediation:
+            'Hoist imports to file header, or annotate with @lazy/@optional documenting architectural intent.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-laz-001',
     }),
     defineRule({
@@ -289,8 +316,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。',
-        remediation: '将外部资源地址统一抽取至配置文件或服务资源注册中心。',
+        summary:
+            'Scattered hardcoded unmanaged external URLs, file paths, or connection strings in business logic.',
+        remediation:
+            'Extract external resource addresses into configuration files or a service discovery registry.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-res-001',
     }),
     defineRule({
@@ -300,8 +329,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用通配符导入破坏显式依赖跟踪与树摇优化。',
-        remediation: '改用显式具名导入 (Named Imports)，明确模块依赖面。',
+        summary:
+            'Wildcard import impairs explicit dependency tracking and tree-shaking optimization.',
+        remediation: 'Use explicit named imports to clearly declare module dependency surface.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-wld-001',
     }),
     defineRule({
@@ -311,8 +341,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
-        summary: '依赖倒置违规：底层基础设施或公共模块反向依赖高层业务模块。',
-        remediation: '解除反向依赖，通过控制反转或事件总线进行解耦。',
+        summary:
+            'Dependency inversion violation: lower-level infrastructure or common modules inversely depend on high-level business modules.',
+        remediation:
+            'Eliminate inverted dependency via Inversion of Control (IoC) or event bus decoupling.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-inv-001',
     }),
     defineRule({
@@ -322,8 +354,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '声明的配置项在全库代码中从未参与任何决策、控制流或计算（死配置）。',
-        remediation: '移除无用死配置项或补充对应业务开关/策略引用。',
+        summary:
+            'Declared configuration property is never referenced in decisions, control flow, or calculations across the codebase (dead configuration).',
+        remediation:
+            'Remove unused dead configuration entries or wire them to corresponding business switches/policies.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-002',
     }),
     defineRule({
@@ -333,8 +367,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '同一配置项在多处重复定义，破坏配置单一真源。',
-        remediation: '收敛重复配置到单一配置表或继承层级中。',
+        summary:
+            'Duplicate configuration entries declared across multiple locations, violating single source of truth.',
+        remediation:
+            'Consolidate duplicate configuration entries into a single configuration table or inheritance hierarchy.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-003',
     }),
     defineRule({
@@ -344,8 +380,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '隐式配置散落：业务代码中散落硬编码环境变量读取或隐式调优参数。',
-        remediation: '将散落的环境变量与调优参数提取至统一配置对象并通过参数注入。',
+        summary:
+            'Implicit configuration scatter: business code directly reads environment variables or tuning constants.',
+        remediation:
+            'Extract scattered environment variables and tuning parameters into a unified configuration object injected via parameters.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-004',
     }),
     defineRule({
@@ -355,8 +393,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '配置访问散落：未通过统一配置层或注册表，跨层无序散落访问配置。',
-        remediation: '建立统一配置访问层或注册表，集中收口配置读取。',
+        summary:
+            'Unstructured configuration access: accessing configuration in an ad-hoc manner across layers without a centralized registry.',
+        remediation:
+            'Establish a unified configuration access layer or registry to centralize configuration reads.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-005',
     }),
     defineRule({
@@ -366,8 +406,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '配置业务强耦合：领域模型直接绑定具体配置文件物理格式或磁盘解析。',
-        remediation: '通过接口或类型化策略对象解耦，由外层装配并注入领域核心。',
+        summary:
+            'Configuration tightly coupled with domain logic: domain models directly bind to specific config file formats or disk parsers.',
+        remediation:
+            'Decouple using interfaces or typed policy objects assembled by outer layers and injected into domain core.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-006',
     }),
     defineRule({
@@ -377,8 +419,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '配置过度抽象：简单静态配置引入多重不必要间接封装与透传层。',
-        remediation: '按项目规模裁剪冗余封装，平铺轻量配置访问。',
+        summary:
+            'Configuration over-abstraction: simple static configuration introduces excessive unnecessary indirection and forwarding layers.',
+        remediation:
+            'Prune redundant wrapper layers to match project scale and provide direct, lightweight configuration access.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-007',
     }),
     defineRule({
@@ -389,9 +433,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '多语言 AST 解析与适配器逻辑必须独立解耦为适配器模块，分析器主体严禁混杂语法树构造细节或深耦合特定语言适配器实现。',
+            'Polyglot AST parsing and adapter logic must be decoupled into independent adapter modules; analyzer core must not mix AST construction details.',
         remediation:
-            '将多语言 AST 构造逻辑抽取至 `src/core/semantic/adapters/` 独立适配器，分析器仅面向 `NormalizedNode` 或多态接口。',
+            'Extract multi-language AST construction into src/core/semantic/adapters/ independent adapters; analyzers must only interact with NormalizedNode interfaces.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dec-002',
     }),
     defineRule({
@@ -401,8 +445,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '超出弹性复杂度预算：综合语言、角色、代码域与清晰度测算的预算超标。',
-        remediation: '根据角色与职责拆分函数，或将多重嵌套扁平化为策略表/状态机。',
+        summary:
+            'Elastic complexity budget exceeded based on comprehensive language, role, scope, and clarity metrics.',
+        remediation:
+            'Split functions by responsibility or flatten nested branching into strategy tables or state machines.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-bud-001',
     }),
     defineRule({
@@ -412,8 +458,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '非必要设计失控复杂度：高复杂度来自无序嵌套和职责堆积，缺乏算法/状态机证明。',
-        remediation: '梳理核心职责，解离混合流程并分离副作用。',
+        summary:
+            'Uncontrolled complexity without architectural justification: high complexity originates from chaotic nesting and responsibility piling.',
+        remediation:
+            'Streamline core responsibilities, isolate mixed control flows, and separate side effects.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-jst-001',
     }),
     defineRule({
@@ -423,8 +471,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '文件边界失衡：单文件内多个高复杂度函数缺乏语义关联，职责异常聚合。',
-        remediation: '按语义与状态边界将文件拆分为高内聚的独立领域模块。',
+        summary:
+            'File boundary imbalance: multiple high-complexity functions in a single file lack semantic cohesion, abnormally aggregating responsibilities.',
+        remediation:
+            'Split file into highly cohesive independent domain modules based on semantic and state boundaries.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-blr-001',
     }),
     defineRule({
@@ -434,8 +484,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '策略骨架复用候选：检测到具有同构前置校验与收尾步骤的复杂流程。',
-        remediation: '提取公共执行骨架（模板方法/高阶函数编排），将差异步骤作为策略注入。',
+        summary:
+            'Strategy skeleton candidate: detected complex workflows sharing isomorphic pre-validation and post-execution teardown steps.',
+        remediation:
+            'Extract common execution skeleton (template method or higher-order function orchestration), injecting divergent steps as strategies.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-skl-001',
     }),
     defineRule({
@@ -445,8 +497,10 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '机械式拆分投机：通过制造大量单行薄转发包装函数人为压低复杂度。',
-        remediation: '消除无意义的透传转发包装，聚焦于语义重用与领域内聚。',
+        summary:
+            'Artificial splitting gaming: artificially deflating complexity by generating excessive single-line pass-through forwarding functions.',
+        remediation:
+            'Eliminate trivial pass-through wrappers; focus on semantic reusability and domain cohesion.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-hop-001',
     }),
     defineRule({
@@ -457,9 +511,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '失控深层控制流嵌套：控制流嵌套层级超出该上下文类型的弹性预算（业务代码>3层，状态机/解析器>5层）。',
+            'Uncontrolled deep control flow nesting: control flow nesting level exceeds elastic budget for context type (business > 3, state machine > 5).',
         remediation:
-            '利用提前返回（Guard Clauses）扁平化控制流，或将复杂分支独立为子状态处理函数。',
+            'Flatten control flow using guard clauses with early returns, or isolate complex branching into substate handlers.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-nest-001',
     }),
     defineRule({
@@ -470,9 +524,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '深层长跨度控制流跳跃：在深层嵌套（>=4层）且距函数头超长跨度处执行非结构化控制流逃逸（return/break/throw）。',
+            'Deep long-span control flow escape: unstructured control flow escape (return/break/throw) executed in deep nesting (>= 4) far from function header.',
         remediation:
-            '利用局部卫语句提前校验，或将深层长跨度闭环提取为纯函数子算子以缩短认知跳跃距离。',
+            'Use localized guard clauses for early validation, or extract deep long-span blocks into pure helper operators to shorten cognitive span.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-nest-002',
     }),
     defineRule({
@@ -483,8 +537,9 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
         summary:
-            '状态机分派结构规范：状态机多层分支内存在过长单分支逻辑（>30 LOC），降低了分派骨架的清晰度。',
-        remediation: '将状态机单分支过长逻辑提取为独立动作处理器，保留纯粹的状态转移分派骨架。',
+            'State machine dispatch structure standard: single branch within state machine branches exceeds 30 LOC, degrading dispatch skeleton clarity.',
+        remediation:
+            'Extract long single-branch logic into dedicated action handlers, preserving a pure state transition dispatch skeleton.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-stm-001',
     }),
     defineRule({
@@ -495,53 +550,99 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '分布式冗余复杂度超标：跨多个文件存在高度相似的算法流程、计算或校验逻辑，累积形成隐性系统复杂度。',
-        remediation: '评估逻辑共性并依据领域边界进行抽离，或消除局部开发复制。',
+            'Distributed redundant complexity: highly similar algorithms, calculations, or validations scattered across multiple files creating latent complexity.',
+        remediation:
+            'Evaluate shared logic and extract into domain utilities, eliminating copy-paste duplication.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-red-001',
     }),
     defineArchitectureRule(
         'ARCH-ROL-001',
-        '文件本体角色失衡与伪共享库：文件承担过多易变状态或高耦合业务逻辑，却被跨域频繁引用作为共享库。',
-        '剥离核心领域状态，明确稳定输入输出边界，构建真正低耦合的共享库。',
+        'File entity role imbalance and pseudo-shared library: file carries excessive mutable state or coupled logic but is heavily imported as a shared library.',
+        'Strip domain mutable state, define stable input/output boundaries, and construct genuinely low-coupling shared libraries.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-rol-001',
     ),
     defineArchitectureRule(
         'ARCH-ROL-002',
-        '业务模块承载无界公共能力：领域业务模块内部私自承载与导出通用基础设施或公共计算能力。',
-        '将通用能力下沉至对应共享层或基础设施层，确保领域模块职责专注单一。',
+        'Business module harboring unbounded common capabilities: domain module internally hosts and exports general infrastructure or utilities.',
+        'Sink common utilities into appropriate shared or infrastructure layers, keeping domain modules focused and single-purpose.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-rol-002',
     ),
     defineArchitectureRule(
         'ARCH-UTL-001',
-        '万能工具库反模式：检测到承担混杂异构逻辑的 utils/common 垃圾桶文件。',
-        '按四分流治理原则重构：纯算子进入算法库、常量进入常量库、规则进入策略库、通用转换进入基础层。',
+        'Kitchen-sink utility antipattern: detected utils/common dumping ground file accumulating heterogeneous unstructured logic.',
+        'Refactor following 4-tier diversion: pure operators to algorithms, constants to constant library, rules to policies, converters to infra.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-utl-001',
     ),
     defineArchitectureRule(
         'ARCH-ABS-001',
-        '过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。',
-        '消除负收益间接跳板与人为抽象，容许领域隔离的局部正当实现。',
+        'Over-abstraction and redundant indirection: introducing cross-layer forwarding trampolines, inverted dependencies, or cycles for trivial commonalities.',
+        'Eliminate negative-return trampolines and artificial abstractions; allow legitimate localized implementations within isolated domains.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-abs-001',
+    ),
+    defineArchitectureRule(
+        'ARCH-FAC-001',
+        'Hollow facade payload and insufficient density: facade module lacks substantive domain orchestration, schema validation, or immutability contracts.',
+        'Implement substantive orchestration, immutability freezing, and schema validation or eliminate the vacuous facade wrapper.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-fac-001',
     ),
     definePerformanceRule(
         'PRF-POL-001',
         SEVERITY_WARNING,
-        '热路径高频昂贵资源缺乏复用池化：循环内或高频调用中频繁分配重型对象、缓冲区或连接。',
-        '引入对应对象池/缓冲池机制并在生命周期结束时回收复用。',
+        'Hot path expensive resources lack reuse pooling: frequent allocation of heavy objects, buffers, or connections in loops or hot calls.',
+        'Introduce object/buffer pooling mechanisms and reclaim resources at lifecycle termination.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-pol-001',
     ),
     definePerformanceRule(
         'PRF-POL-002',
         SEVERITY_ERROR,
-        '资源池缺乏状态重置契约或容量上限：池化机制缺失 reset_state 回收契约或无界增长导致数据污染与泄漏。',
-        '补全对象归还重置逻辑并设定池容量高水位淘汰限制。',
+        'Resource pool lacks state reset contract or capacity ceiling: missing reset_state contract or unbounded growth causes data corruption and leaks.',
+        'Implement object return reset logic and enforce high-watermark eviction limits on pool capacity.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-pol-002',
     ),
     definePerformanceRule(
         'PRF-POL-003',
         SEVERITY_WARNING,
-        '负收益过度池化：对极小轻量纯值对象或冷路径过度引入池化管理开销，得不偿失。',
-        '移除负收益池化包装层，直接采用值对象或短生命周期瞬态分配。',
+        'Negative-return excessive pooling: introducing pooling overhead for tiny, lightweight value objects or cold paths.',
+        'Remove negative-return pooling wrappers; use direct value objects or short-lived transient allocations.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-pol-003',
+    ),
+    defineArchitectureRule(
+        'ARCH-CFG-008',
+        'Flat configuration sprawl antipattern: large volume of configuration files sprawled across root directory without domain isomorphic hierarchy.',
+        'Establish domain isomorphic directory structure (e.g. config/domains/<domain>/core.json), centralizing configuration per domain.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-008',
+    ),
+    defineArchitectureRule(
+        'ARCH-CFG-009',
+        'Configuration sub-table routing contract breach: unregistered sub-table detached from core routing contract, lacking dot-notation routing.',
+        'Register sub-table in main configuration table and connect to dot-notation routing and fine-grained hot-reload guards.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-009',
+    ),
+    defineRule({
+        id: 'DAT-RES-001',
+        family: RULE_FAMILY_DATA_ARCHITECTURE,
+        analyzer: ANALYZER_DATA_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Resource registry bidirectional mapping inconsistency or dangling asset: resource center contains empty paths or dangling references.',
+        remediation:
+            'Ensure symmetric bidirectional registration in resource center; repair or prune dangling paths and orphaned assets.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-res-001',
+    }),
+    definePerformanceRule(
+        'PRF-POL-004',
+        SEVERITY_WARNING,
+        'Streaming chunk loading lacks ring buffer reuse: repeated instantiation of temporary buffers during streaming I/O or chunked reading.',
+        'Introduce circular ring buffer (RingBuffer) or fixed-size buffer pool (BufferPool) to achieve zero-copy slot reuse.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-pol-004',
+    ),
+    definePerformanceRule(
+        'PRF-ALG-002',
+        SEVERITY_WARNING,
+        'Linear collection scan antipattern in loop: performing linear searches (find/includes/has/in list) inside loops degrading complexity to O(N*M).',
+        'Pre-build external collection into Map or Dictionary hash index before the loop to reduce inner lookup to O(1) and overall to O(N+M).',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-alg-002',
     ),
 ];

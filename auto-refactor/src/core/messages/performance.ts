@@ -125,4 +125,24 @@ export const PerformanceMessages = {
             'Unbounded element retention leads to progressive heap fragmentation, garbage-collector pressure, and eventual out-of-memory crashes',
         risk: 'High',
     }),
+
+    // PRF-ALG-002
+    /**
+     * Build the PRF-ALG-002 descriptor for linear collection lookup in loop.
+     *
+     * @param methodName - Name of linear lookup method (e.g. find, indexOf, includes, has).
+     * @param loopDepth - Current loop nesting depth.
+     * @returns Fresh descriptor with Warning severity and Map/Set pre-indexing guidance.
+     */
+    LINEAR_COLLECTION_LOOKUP_IN_LOOP: (
+        methodName: string,
+        loopDepth: number,
+    ): DiagnosticDescriptor => ({
+        message: `Nested collection linear lookup anti-pattern: Calling '${methodName}()' inside loop (depth ${loopDepth}) causes O(N*M) polynomial complexity`,
+        suggestion:
+            'Pre-build a Map, Set, or Dictionary index outside the loop to reduce lookup complexity from linear O(M) to constant O(1)',
+        rationale:
+            'Linear collection lookups inside iterative loops degrade algorithm performance from linear O(N+M) to quadratic/polynomial O(N*M).',
+        risk: RISK_MEDIUM,
+    }),
 } as const;

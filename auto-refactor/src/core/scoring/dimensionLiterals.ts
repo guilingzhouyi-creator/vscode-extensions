@@ -684,7 +684,7 @@ export const DEDUCTION_HEADLESS_DECOUPLING_VIOLATION = 20;
 /** Points deducted for direct configuration access violation. */
 export const DEDUCTION_CONFIG_LEAK_VIOLATION = 20;
 
-// ── 冗余（redundancy）族 ────────────────────────────────────────────────────────
+// ── Redundancy family ────────────────────────────────────────────────────────
 // These rules were registered but had no explicit deduction row, so each one fell through
 // to whichever `anyFinding` catch-all happened to sit in its analyzer's block and was charged
 // to a semantically wrong axis. Each now names its own axis and weight.
@@ -857,3 +857,37 @@ export const DEDUCTION_DTO_IN_PLACE_MUTATION = 12;
 export const RULE_HYG_EMP_001 = 'HYG-EMP-001';
 /** Points deducted for empty or vacuous file placeholders. */
 export const DEDUCTION_EMPTY_FILE_PLACEHOLDER = 15;
+
+/** Rule id for config directory sprawl / flat tables anti-pattern. */
+export const RULE_ARCH_CFG_008 = 'ARCH-CFG-008';
+/** Rule id for unrouted config subtables bypassing domain routers. */
+export const RULE_ARCH_CFG_009 = 'ARCH-CFG-009';
+/** Rule id for resource registry bidirectional integrity & orphan asset guard. */
+export const RULE_DAT_RES_001 = 'DAT-RES-001';
+/** Rule id for polynomial algorithmic complexity linear search in loop. */
+export const RULE_PRF_ALG_002 = 'PRF-ALG-002';
+/** Rule id for unpooled streaming buffer allocating in hot ingestion loop. */
+export const RULE_PRF_POL_004 = 'PRF-POL-004';
+/** Rule id for cross-tier monolithic staging blast radius guard. */
+export const RULE_GOV_BLS_001 = 'GOV-BLS-001';
+/** Rule id for rule catalog anti-drift and anti-hallucination guard. */
+export const RULE_GOV_RUL_001 = 'GOV-RUL-001';
+/** Rule id for historical dossier nomenclature boundary isolation guard. */
+export const RULE_GOV_ARC_001 = 'GOV-ARC-001';
+
+/** Points deducted for flat config directory sprawl. */
+export const DEDUCTION_FLAT_CONFIG_SPRAWL = 10;
+/** Points deducted for unrouted config subtables. */
+export const DEDUCTION_UNROUTED_CONFIG_SUBTABLE = 12;
+/** Points deducted for dangling or unmapped resource assets. */
+export const DEDUCTION_DANGLING_RESOURCE_ASSET = 10;
+/** Points deducted for polynomial algorithmic complexity in loops. */
+export const DEDUCTION_POLYNOMIAL_ALG_COMPLEXITY = 15;
+/** Points deducted for streaming unpooled buffer allocation. */
+export const DEDUCTION_STREAMING_UNPOOLED_BUFFER = 12;
+/** Points deducted for cross-tier monolithic blast radius. */
+export const DEDUCTION_CROSS_TIER_BLAST_RADIUS = 15;
+/** Points deducted for rule identifier drift or hallucination. */
+export const DEDUCTION_RULE_CATALOG_DRIFT = 20;
+/** Points deducted for historical dossier nomenclature boundary breach. */
+export const DEDUCTION_DOSSIER_BOUNDARY_BREACH = 10;

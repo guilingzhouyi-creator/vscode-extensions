@@ -20,7 +20,7 @@ import type { RuleDefinition } from '../types';
 import { ANALYZER_GDSCRIPT_MODERN, ANALYZER_GDSCRIPT_GAME } from '../../scoring/dimensionLiterals';
 
 /** Shared remediation level descriptor for GDScript rules. */
-export const REMEDIATION_STANDARD_AND_ABOVE = '`standard` 及以上';
+export const REMEDIATION_STANDARD_AND_ABOVE = '`standard` and above';
 
 /**
  * Modern GDScript and game domain rule definitions.
@@ -33,8 +33,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用 Godot 3 的 yield 协程写法。',
-        remediation: '改用 await 表达式。',
+        summary: 'Legacy Godot 3 yield coroutine syntax detected.',
+        remediation: 'Migrate to the modern Godot 4 await expression.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-yield-001',
     }),
     defineRule({
@@ -44,8 +44,9 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用 Godot 3 的 export 语句。',
-        remediation: '改用 @export 注解并保留类型声明。',
+        summary: 'Legacy Godot 3 export statement detected.',
+        remediation:
+            'Use the @export annotation while preserving explicit static type declarations.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-export-001',
     }),
     defineRule({
@@ -55,8 +56,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用 onready 关键字。',
-        remediation: '改用 @onready 注解。',
+        summary: 'Legacy onready keyword detected.',
+        remediation: 'Migrate to the modern @onready annotation.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-onready-001',
     }),
     defineRule({
@@ -66,8 +67,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用裸 tool 关键字。',
-        remediation: '改用首行 @tool 注解。',
+        summary: 'Bare tool keyword detected.',
+        remediation: 'Use the @tool annotation on the first line of the script.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-tool-001',
     }),
     defineRule({
@@ -77,8 +78,9 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用 Pool*Array 类型。',
-        remediation: '改用 Packed*Array 系列类型。',
+        summary: 'Deprecated Pool*Array type detected.',
+        remediation:
+            'Migrate to the modern Packed*Array series (e.g., PackedStringArray, PackedByteArray).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-pool-001',
     }),
     defineRule({
@@ -88,8 +90,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用 Godot 3 connect 签名（方法名以字符串传入）。',
-        remediation: '改用信号 connect(Callable) 形式。',
+        summary: 'Legacy Godot 3 signal connect signature passing method name as a string.',
+        remediation: 'Use the modern signal connect(Callable) syntax.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-connect-001',
     }),
     defineRule({
@@ -99,8 +101,8 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '使用 remote/master/puppet/slave 函数修饰符。',
-        remediation: '改用 @rpc 注解。',
+        summary: 'Legacy remote/master/puppet/slave function modifiers detected.',
+        remediation: 'Migrate to the modern @rpc annotation.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-rpc-001',
     }),
     defineRule({
@@ -110,8 +112,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '对象池 reset_state 未调用基类重置方法破坏契约。',
-        remediation: '在 reset_state() 内部添加 super.reset_state() 调用以确保父类状态正确清理。',
+        summary:
+            'Object pool reset_state does not invoke super.reset_state(), violating inheritance contract.',
+        remediation:
+            'Add super.reset_state() call inside reset_state() to ensure base state is properly cleaned up.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-pool-002',
     }),
     defineRule({
@@ -121,8 +125,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '高频业务按钮裸连信号，缺少防抖机制或 loading 状态互斥控制。',
-        remediation: '改用 KButton 原子组件或接入 debounced_pressed 信号以防连击重复提交。',
+        summary:
+            'High-frequency UI button directly connected to signal without debounce mechanism or loading state lock.',
+        remediation:
+            'Use KButton atomic component or connect to debounced_pressed signal to prevent repeated submissions.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-deb-001',
     }),
     defineRule({
@@ -132,8 +138,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '有限状态机私有状态变量被就地直接赋值，破坏状态迁移守卫与进出钩子。',
-        remediation: '必须通过 fsm.transition_to(target_state, payload) 方法触发合法状态流转。',
+        summary:
+            'FSM private state variable mutated directly in-place, bypassing transition guards and lifecycle hooks.',
+        remediation:
+            'Trigger valid state transitions exclusively through fsm.transition_to(target_state, payload).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-fsm-001',
     }),
     defineRule({
@@ -143,8 +151,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '动态观察者或全局管理器强引用持有 Node 实例，未采用 weakref 防内存泄漏。',
-        remediation: '使用 weakref(node) 包装动态注册对象并在派发时校验 get_ref() 是否存活。',
+        summary:
+            'Dynamic observer or global manager holds strong reference to Node instance without weakref, risking memory leaks.',
+        remediation:
+            'Wrap registered nodes with weakref(node) and verify get_ref() is valid before dispatching events.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-weak-001',
     }),
     defineRule({
@@ -154,8 +164,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: 'UI 布局脚本中硬编码固定分辨率或绝对像素尺寸，破坏多端响应式适配。',
-        remediation: '改用 Anchors Preset 锚点系统、自适应容器或 DesignTokens 相对尺寸基准。',
+        summary:
+            'UI layout script hardcodes fixed resolutions or absolute pixel dimensions, breaking responsive multi-screen layout.',
+        remediation:
+            'Use Anchors Preset system, responsive containers, or DesignTokens relative scale references.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-res-001',
     }),
     defineRule({
@@ -165,9 +177,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '表现层视图就地修改只读 Snapshot DTO 属性，破坏 CQRS 单向数据流与单一真源。',
+        summary:
+            'Presentation view mutates read-only Snapshot DTO properties in-place, violating CQRS unidirectional data flow.',
         remediation:
-            '视图应将快照视为不可变只读数据，通过派发 Command 意图或调用领域边界服务请求变更。',
+            'Treat snapshots as immutable read-only data; request changes via Command intents or domain boundary services.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-uni-001',
     }),
     defineRule({
@@ -177,8 +190,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '表现层视图脚本行数超出物理预算上限（LOC <= 450 行）。',
-        remediation: '将复杂子组件、列表项渲染、数据转换器或伴生逻辑拆分为独立组件或伴生控制器。',
+        summary:
+            'Presentation view script line count exceeds physical budget limit (LOC <= 450 lines).',
+        remediation:
+            'Decompose complex subcomponents, item renderers, data converters, or companion controllers into modular files.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-loc-001',
     }),
     defineRule({
@@ -188,9 +203,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '表现层主视图控制器未继承 BaseScreen 或 BaseModal 基类。',
+        summary:
+            'Presentation main view controller does not inherit from BaseScreen or BaseModal base class.',
         remediation:
-            '主视图控制器应继承 BaseScreen（全屏视图）或 BaseModal（模态弹窗），接入标准生命周期与快照装配契约。',
+            'Inherit from BaseScreen (fullscreen) or BaseModal (popup) to bind to standard lifecycle and snapshot assembly contracts.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-ext-001',
     }),
     defineRule({
@@ -200,9 +216,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '表现层视图硬编码 Color(...) 字面量或裸色值，破坏 DesignTokens 单一真源。',
+        summary:
+            'Presentation view hardcodes Color(...) literals or raw hex codes, breaking DesignTokens single source of truth.',
         remediation:
-            '从 DesignTokens 获取语义化色彩常量（如 DesignTokens.COLOR_*），确保主题与多端视觉统一。',
+            'Reference semantic color constants from DesignTokens (e.g., DesignTokens.COLOR_*), ensuring consistent themes.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-tok-001',
     }),
     defineRule({
@@ -212,8 +229,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '表现层直接离散操作裸 ProgressBar 实例，破坏 KStatusBar 标准交互与平滑动画规范。',
-        remediation: '改用 KStatusBar 标准化组件，统一进度条生命周期、平滑补间动效与样式契约。',
+        summary:
+            'Presentation layer directly manipulates bare ProgressBar instance, bypassing KStatusBar standard animations.',
+        remediation:
+            'Use KStatusBar standard component to unify progress bar lifecycle, smooth tweening, and styling contracts.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-bar-001',
     }),
     defineRule({
@@ -223,9 +242,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '长列表场景全量就地实例化节点，未接入 KVirtualList 虚拟化滚动与对象池复用。',
+        summary:
+            'Large list instances created all-at-once without KVirtualList virtualization and object pool reuse.',
         remediation:
-            '长列表容器应接入 KVirtualList 配合对象池池化复用（ADV-POOL-001），禁止无界瞬态节点创建。',
+            'Integrate KVirtualList container with object pooling (ADV-POOL-001); prohibit unbounded transient node instantiation.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-vrt-001',
     }),
     defineRule({
@@ -235,8 +255,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '表现层 UI 文本未通过 UIIntermediary / 国际化键名绑定，存在裸字符串硬编码。',
-        remediation: 'UI 文本必须采用 tr(KEY) 或通过 UIIntermediary 进行响应式国际化绑定。',
+        summary:
+            'Presentation UI text hardcodes raw strings without UIIntermediary or i18n translation key binding.',
+        remediation:
+            'Bind UI text using tr(KEY) or via UIIntermediary for responsive internationalization.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-i18n-001',
     }),
     defineRule({
@@ -247,9 +269,9 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '视图层脚本中出现飘移的相对节点路径（如 get_parent()、find_child() 或长跨级相对索引）。',
+            'View script contains drifting relative node paths (e.g., get_parent(), find_child(), or multi-tier indices).',
         remediation:
-            '节点引用应使用显式 @onready %UniqueNode 或类型化依赖注入，禁止易脆弱的相对层级寻址。',
+            'Reference nodes using explicit @onready %UniqueNode or typed dependency injection, avoiding brittle relative hierarchy navigation.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-nod-001',
     }),
     defineRule({
@@ -259,9 +281,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '表现层视图直接耦合后端领域单例或跨层订阅 EventBus 全局业务事件。',
+        summary:
+            'Presentation view directly couples with backend domain singletons or cross-layer global EventBus subscriptions.',
         remediation:
-            '表现层仅通过 BaseScreen.apply_snapshot() 单向接收数据，用户操作经由显式回调或 UI 意图派发。',
+            'Receive data unidirectionally via BaseScreen.apply_snapshot(); dispatch user actions via explicit callbacks or UI intents.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-bnd-001',
     }),
     defineRule({
@@ -271,8 +294,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_ERROR,
-        summary: '循环或高频执行路径中瞬态堆分配导致掉帧风险。',
-        remediation: '在循环外预分配集合、使用对象池或复用缓冲区实例。',
+        summary:
+            'Transient heap allocation in loop or high-frequency execution path risks frame rate drops.',
+        remediation:
+            'Pre-allocate collections outside loops, use object pools, or reuse buffer instances.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-prf-001',
     }),
     defineRule({
@@ -282,8 +307,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_ERROR,
-        summary: '对象池获取后未实现或未调用 reset_state 契约。',
-        remediation: '池化对象实现 reset_state() 并确保在 acquire/release 时重置状态。',
+        summary:
+            'Pooled object does not implement or invoke reset_state contract upon acquisition or release.',
+        remediation:
+            'Implement reset_state() on pooled objects and ensure state is reset on acquire and release.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-pol-001',
     }),
     defineRule({
@@ -293,8 +320,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: '信号连接后缺少对应断开逻辑导致生命周期悬挂泄漏。',
-        remediation: '在生命周期结束前调用 disconnect 或接入自动管理连接。',
+        summary:
+            'Signal connection lacks corresponding disconnect logic, causing dangling lifecycle leaks.',
+        remediation:
+            'Invoke disconnect() before lifecycle ends or use automatically managed signal connections.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-sig-001',
     }),
     defineRule({
@@ -304,8 +333,10 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_ERROR,
-        summary: '无头领域逻辑层直接引用视图层或场景树节点破坏解耦架构。',
-        remediation: '领域逻辑与表现层解耦，通过数据快照或纯状态机通信。',
+        summary:
+            'Headless domain logic layer directly references view layer or SceneTree nodes, breaking decoupled architecture.',
+        remediation:
+            'Decouple domain logic from presentation layer; communicate exclusively via data snapshots or pure state machines.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-iso-001',
     }),
 ];

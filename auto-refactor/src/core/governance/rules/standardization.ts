@@ -21,6 +21,8 @@
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { NodeKind } from '../../ast/multilang';
+import { isToolOrTestScript } from '../pathScope';
+import { getRule } from '../../rules/registry';
 
 const IF_TRUE_RE = /^\s*if\s+(.+?)\s*:\s*return\s+true\s*$/i;
 const ELSE_FALSE_RE = /^\s*else\s*:\s*return\s+false\s*$/i;
@@ -208,6 +210,75 @@ export const ModernConstructRule: GovernanceRule = {
             collectModernJsTsViolations(ctx, violations);
         } else if (lang === 'gdscript') {
             collectGdscriptViolations(ctx, violations);
+        }
+
+        return violations.length > 0 ? violations : null;
+    },
+};
+
+const CANDIDATE_RULE_RE = /\b([A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3})\b/g;
+
+const EXEMPT_RULE_CATALOG_RE =
+    /(?:standardization|registry|dimensionLiterals|rule-catalog|builtin-rules|DOCS|dictionaries|def-use-chain|src\/core\/types)/i;
+const EXEMPT_DIR_RE = /(?:^|\/)(?:rules|reports)(?:\/|$)/i;
+
+function isExemptRuleCatalogPath(filePath: string): boolean {
+    const normalized = filePath.replace(/\\/g, '/');
+    return (
+        EXEMPT_RULE_CATALOG_RE.test(normalized) ||
+        EXEMPT_DIR_RE.test(normalized) ||
+        isToolOrTestScript(filePath)
+    );
+}
+
+/**
+ * GOV-RUL-001: Rule Catalog Anti-Drift and Anti-Hallucination Guard.
+ * Ensures all mentioned rule identifiers exist in the single-source rule catalog.
+ */
+export const RuleCatalogIntegrityRule: GovernanceRule = {
+    id: 'GOV-RUL-001',
+    name: 'Rule Catalog Anti-Drift and Anti-Hallucination Guard',
+    category: 'standardization',
+    severity: 'error',
+    risk: 'high',
+    rationale:
+        'Referencing unregistered or hallucinated rule identifiers causes documentation drift and breaks single-source governance verification.',
+    isFixable: false,
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (isExemptRuleCatalogPath(ctx.filePath)) return null;
+
+        const violations: GovernanceViolation[] = [];
+        const lines = ctx.lines;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (
+                line.includes('CANDIDATE_RULE_RE') ||
+                line.includes('GOV-RUL-001') ||
+                line.includes('RuleCatalogIntegrityRule')
+            ) {
+                continue;
+            }
+            let match: RegExpExecArray | null;
+            CANDIDATE_RULE_RE.lastIndex = 0;
+            while ((match = CANDIDATE_RULE_RE.exec(line)) !== null) {
+                const candidateId = match[1];
+                if (candidateId.startsWith('ADV-') || candidateId.startsWith('WT-')) {
+                    continue;
+                }
+                const registered = getRule(candidateId);
+                if (!registered) {
+                    violations.push({
+                        ruleId: 'GOV-RUL-001',
+                        message: `Reference to unregistered rule ID \`${candidateId}\` detected. Possible rule drift or hallucination.`,
+                        line: i + 1,
+                        column: match.index + 1,
+                        suggestion:
+                            'Verify rule ID against scripts/common/rule-catalog.json and use registered rules only.',
+                        fixable: false,
+                    });
+                }
+            }
         }
 
         return violations.length > 0 ? violations : null;

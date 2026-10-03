@@ -20,8 +20,8 @@
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 
-- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/` 与 `src/core/guidance/`，采用 **100% 纯英文**编写，输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词。
-- **人读/治理轨（Human & Governance Track）**：位于 `src/core/rules/entries/` 与本文档字典，采用**标准中文**呈现每条规则的业务摘要（`summary`）与重构修复指南（`remediation`）。
+- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`）的唯一真源底座。
+- **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
 ---
 
@@ -50,12 +50,15 @@
 | `ARCH-CFG-005` | <a id="arch-cfg-005"></a>`architecture` | `ARCH` | `warning` | `all` | 配置访问散落：未通过统一配置层或注册表，跨层无序散落访问配置。 | 建立统一配置访问层或注册表，集中收口配置读取。 |
 | `ARCH-CFG-006` | <a id="arch-cfg-006"></a>`architecture` | `ARCH` | `warning` | `all` | 配置业务强耦合：领域模型直接绑定具体配置文件物理格式或磁盘解析。 | 通过接口或类型化策略对象解耦，由外层装配并注入领域核心。 |
 | `ARCH-CFG-007` | <a id="arch-cfg-007"></a>`architecture` | `ARCH` | `info` | `all` | 配置过度抽象：简单静态配置引入多重不必要间接封装与透传层。 | 按项目规模裁剪冗余封装，平铺轻量配置访问。 |
+| `ARCH-CFG-008` | <a id="arch-cfg-008"></a>`architecture` | `ARCH` | `warning` | `all` | 配置表根目录平铺蔓延反模式：超过阈值的大量配置平铺于根目录，缺乏领域同构分层。 | 建立领域同构目录（如 config/domains/<域>/core.json），统一分域收拢并消除根目录平铺散落。 |
+| `ARCH-CFG-009` | <a id="arch-cfg-009"></a>`architecture` | `ARCH` | `warning` | `all` | 配置子表路由契约违规：未登记的子表配置脱离主核心路由契约，缺乏点分泛化路由与热重载看守。 | 将子表登记至主配置表并接入点分路由与细粒度热重载守卫。 |
 | `ARCH-DEC-002` | <a id="arch-dec-002"></a>`architecture` | `ARCH` | `warning` | `all` | 多语言 AST 解析与适配器逻辑必须独立解耦为适配器模块，分析器主体严禁混杂语法树构造细节或深耦合特定语言适配器实现。 | 将多语言 AST 构造逻辑抽取至 `src/core/semantic/adapters/` 独立适配器，分析器仅面向 `NormalizedNode` 或多态接口。 |
 | `ARCH-DIR-001` | <a id="arch-dir-001"></a>`architecture` | `ARCH` | `warning` | `all` | 倒置依赖，在领域层定义接口契约，由外层实现。 | 核心逆流：领域层 (Domain) 反向依赖外层应用层/基础设施/接口层。 |
 | `ARCH-DIR-002` | <a id="arch-dir-002"></a>`architecture` | `ARCH` | `warning` | `all` | 引入用例服务 (Application Service) 统筹业务流。 | 越层穿透：接口层控制器绕过应用层直接直连基础设施实现。 |
 | `ARCH-DIR-003` | <a id="arch-dir-003"></a>`architecture` | `ARCH` | `error` | `all` | 形式分层假象：目录结构表面隔离，但调用关系与数据流发生逆向越层。 | 调整调用依赖流向，由内层领域定义契约接口并交由基础设施层实现。 |
 | `ARCH-DISP-001` | <a id="arch-disp-001"></a>`architecture` | `ARCH` | `warning` | `all` | Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle. | 重构为基于字典/Map 的查表分发 (Table-Driven) 或策略模式 (Strategy Pattern)，解耦各分支业务逻辑。 |
 | `ARCH-DSP-002` | <a id="arch-dsp-002"></a>`architecture` | `ARCH` | `warning` | `all` | Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation. | 重构为按职责正交划分的 switch 分发函数（单函数圈复杂度 <= 10）或顶层具名处理函数，消除闭包碎片化。 |
+| `ARCH-FAC-001` | <a id="arch-fac-001"></a>`architecture` | `ARCH` | `warning` | `all` | 门面层实质性承载缺失：门面/网关模块缺乏领域编排、模式自验或不可变性冻结，退化为无意义转发层。 | 实现实质性编排、不可变冻结与模式自验，或消除空壳转发门面包装。 |
 | `ARCH-GLB-001` | <a id="arch-glb-001"></a>`architecture` | `ARCH` | `warning` | `all` | 隐式全局可变状态：模块间通过顶层全局变量或单例产生隐式强耦合。 | 重构为依赖注入或按需创建实例，消除共享可变静态单例。 |
 | `ARCH-HDL-001` | <a id="arch-hdl-001"></a>`architecture` | `ARCH` | `error` | `all` | 无头架构违规：核心业务逻辑或计算模块直接绑定 UI/IDE 视图框架。 | 解除核心计算与展示框架依赖，保持无头独立执行与测试能力。 |
 | `ARCH-LEAK-001` | <a id="arch-leak-001"></a>`architecture` | `ARCH` | `warning` | `all` | 领域模型使用 POJO/原生实体，隔离外部框架专有类型。 | 职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。 |
@@ -189,6 +192,7 @@
 | `DAT-LAY-001` | <a id="dat-lay-001"></a>`data-architecture` | `DAT` | `warning` | `all` | 数据访问抽象泄漏：业务核心直接操纵持久化驱动或底层存储细节。 | 将存储驱动调用封装在仓储接口实现内，领域层仅依赖仓储契约。 |
 | `DAT-NPL-001` | <a id="dat-npl-001"></a>`data-architecture` | `DAT` | `error` | `all` | 迭代与映射上下文中的 N+1 查询与重复存储调用。 | 将循环内查询提升至外层使用批量 IN 查询或 DataLoader 批量加载。 |
 | `DAT-QRY-001` | <a id="dat-qry-001"></a>`data-architecture` | `DAT` | `warning` | `all` | 在线请求链路中的无界数据读取或全表内存过滤。 | 增加游标分页或 Limit/Offset 条件，强制限制单次读取上限。 |
+| `DAT-RES-001` | <a id="dat-res-001"></a>`data-architecture` | `DAT` | `warning` | `all` | 资源注册表双向映射不一致或悬空资产：资源登记中心存在空路径、悬空引用或双向映射断裂。 | 确保资源中心双向对称登记，修复或移除悬空资源路径与孤儿资产。 |
 | `DAT-SER-001` | <a id="dat-ser-001"></a>`data-architecture` | `DAT` | `info` | `all` | 跨层调用链中的重复序列化与反序列化转换。 | 在内部调用链路传递强类型原生对象，仅在网络边界执行序列化。 |
 | `DEP-INV-001` | <a id="dep-inv-001"></a>`dependency-layout` | `DEP` | `error` | `all` | 依赖倒置违规：底层基础设施或公共模块反向依赖高层业务模块。 | 解除反向依赖，通过控制反转或事件总线进行解耦。 |
 | `DEP-LAZ-001` | <a id="dep-laz-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 未提供审计声明或合规理由的函数内部临时导入。 | 将导入提升至文件顶部，或添加 @lazy/@optional 注释标注意图。 |
@@ -196,6 +200,8 @@
 | `DEP-RES-001` | <a id="dep-res-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。 | 将外部资源地址统一抽取至配置文件或服务资源注册中心。 |
 | `DEP-WLD-001` | <a id="dep-wld-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 使用通配符导入破坏显式依赖跟踪与树摇优化。 | 改用显式具名导入 (Named Imports)，明确模块依赖面。 |
 | `GOV-AGN-001` | <a id="gov-agn-001"></a>`governance` | `GOV` | `error` | `all` | Concurrent modifications by multiple agents produce architectural boundary breaches, cross-module dependency cycles, or contract incompatibilities. | 协调并行 Agent 的架构边界与修改职责，消解跨模块并发循环依赖并维护单向分层契约。 |
+| `GOV-ARC-001` | <a id="gov-arc-001"></a>`governance` | `GOV` | `warning` | `all` | Historical dossier nomenclature leaks into production sources, tests, or commit headers outside the archived directory white-list. | 历史施工批次代号仅在归档白名单目录中受物理豁免，面向用户的文档、代码与提交信息统一使用纯粹产品特性与功能价值表述。 |
+| `GOV-BLS-001` | <a id="gov-bls-001"></a>`governance` | `GOV` | `warning` | `all` | Cross-tier monolithic change blast radius breaches atomic staging boundaries across docs, contracts, config, domains, and tooling. | 按架构依赖拓扑（文档 -> 核心抽象 -> 基础设施 -> 配置表 -> 业务实现 -> 质量重构）拆分为多批次原子提交。 |
 | `GOV-DAT-001` | <a id="gov-dat-001"></a>`governance` | `GOV` | `info` | `all` | Functions declaring excessive discrete scalar parameters (>= 5) exhibit Data Clumps smell; parameters should be aggregated into a named Context or Options interface. | 将离散参数群聚合为强类型的结构化上下文模型（如 Context 或 Options 接口对象），提高契约内聚性。 |
 | `GOV-DBG-001` | <a id="gov-dbg-001"></a>`governance` | `GOV` | `warning` | `all` | Debug and console print statements clutter standard outputs, leak diagnostics, and can degrade I/O throughput. | 删除调试输出，或改用结构化日志并按级别输出。 |
 | `GOV-EXC-001` | <a id="gov-exc-001"></a>`governance` | `GOV` | `error` | `typescript, javascript, python` | Empty catch blocks silently swallow exceptions, causing silent data corruption or masking critical failures. A catch whose body carries an explicit rationale marker (best-effort / ignore / intentional / expected) is treated as a documented decision instead of a silent swallow. | 处理/记录/显式重抛；确属 best-effort 时在 catch 内写明理由标记。 |
@@ -214,6 +220,7 @@
 | `GOV-PRF-003` | <a id="gov-prf-003"></a>`governance` | `GOV` | `error` | `typescript, javascript` | Numeric timer delays bypass centralized clamping; a literal of <=0 triggers a ~1ms busy loop (CPU/IO hotspot). | 定时器延时常量具名或走集中配置，避免绕过统一钳制。 |
 | `GOV-PRF-004` | <a id="gov-prf-004"></a>`governance` | `GOV` | `warning` | `typescript, javascript` | Sync fs calls block the host event loop (UI jank in IDE extensions, request stalls on servers). | 改用异步 IO；进程式 CLI 路径可用 blockingIoAllowPatterns 声明豁免。 |
 | `GOV-PRF-005` | <a id="gov-prf-005"></a>`governance` | `GOV` | `info` | `all` | Calling array linear lookups (.includes / .indexOf) inside loops creates quadratic O(N*M) overhead; pre-indexing into a Set hoisted outside the loop optimizes membership tests to O(1). | 在循环前将只读数组提升为 Set 预建索引（const set = new Set(arr)），循环内改用 set.has() 进行 O(1) 检索。 |
+| `GOV-RUL-001` | <a id="gov-rul-001"></a>`governance` | `GOV` | `error` | `all` | Static review rule identifier drift or hallucination: mentioned rule ID is not registered in the single-source rule catalog. | 核对单源规则注册表，使用已登记的规范化规则 ID，禁止臆造虚构不存在的规则代号。 |
 | `GOV-RTC-002` | <a id="gov-rtc-002"></a>`governance` | `GOV` | `warning` | `all` | Baseline debt entries must track physical file rename operations without artificial inflation or false positive churn. Monotonic downward ratchets must remap prior baselines to new paths upon refactoring. | 在基线更新与门禁收敛中应用重命名路径规范化映射 (pathRemap)，确保文件重构后既有基线连续继承，严禁因重命名引发基线虚增或债务逃逸。 |
 | `GOV-SAN-001` | <a id="gov-san-001"></a>`governance` | `GOV` | `warning` | `all` | Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architectural longevity and create documentation drift. | 移除临时工单/批次黑话，改用长效领域术语。 |
 | `GOV-SLC-001` | <a id="gov-slc-001"></a>`governance` | `GOV` | `error` | `all` | AST slice mutation introduces breaking signature drift or uncontained side-effects propagating across external call chains. | 确保切片改动向后兼容，或同步重构受影响调用链上的全部外部调用者。 |
@@ -242,7 +249,8 @@
 | `NAM-SGL-001` | <a id="nam-sgl-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 占位符豁免）。 | 改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。 |
 | `NAM-TYP-001` | <a id="nam-typ-001"></a>`naming` | `NAM` | `warning` | `all` | 类型定义与类声明必须遵循 PascalCase 大驼峰命名。 | 将类、接口、类型别名或枚举重命名为大驼峰格式（如 `Scanner`、`RuleDefinition`）。 |
 | `NAM-VAG-001` | <a id="nam-vag-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁使用无业务语义的模糊泛化变量名（如 data、res、ret、tmp、item 等裸词）。 | 结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。 |
-| `PRF-ALG-001` | <a id="prf-alg-001"></a>`performance` | `PRF` | `warning` | `all` | 将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。 | 发现 $\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。 |
+| `PRF-ALG-001` | <a id="prf-alg-001"></a>`performance` | `PRF` | `warning` | `all` | 发现 $\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。 | 将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。 |
+| `PRF-ALG-002` | <a id="prf-alg-002"></a>`performance` | `PRF` | `warning` | `all` | 循环内集合线性遍历反模式：在循环结构内部对外部集合进行线性检索（find/includes/has/in list 等），导致整体算法复杂度恶化至 O(N*M)。 | 在循环外预先将外部集合构建为 Map 或 Dictionary 哈希索引，将内层查找降至 O(1)，算法总体降至 O(N+M)。 |
 | `PRF-IO-001` | <a id="prf-io-001"></a>`performance` | `PRF` | `warning` | `all` | 切换为异步非阻塞对应 API，避免锁死 Node.js 事件循环或游戏主线程。 | 事件循环同步阻塞风险：在 `async` 上下文或高频帧循环内调用同步阻塞 I/O (如 `readFileSync`, `time.sleep`)。`thresholds.blockingIoAllowPatterns` 声明的路径 glob（CLI/校验器/基准脚本等进程式工具）豁免；该键同时下发给治理规则 `GOV-PRF-004`，属单一策略源。 |
 | `PRF-LEAK-001` | <a id="prf-leak-001"></a>`performance` | `PRF` | `warning` | `all` | 检测循环或定时器内的集合无界追加，防范 O(t) 或 O(n) 内存泄漏。 | 为集合设置容量上限/LRU淘汰/定期重置，或避免在循环与定时器内无界追加。 |
 | `PRF-MEM-001` | <a id="prf-mem-001"></a>`performance` | `PRF` | `warning` | `all` | 将缓冲区/对象提升至循环外部复用，循环内仅清空重置。 | 高频热路径瞬态堆对象分配 (循环体内 `new Array`, `new Object`, `.duplicate(true)` 等)。 |
@@ -250,6 +258,7 @@
 | `PRF-POL-001` | <a id="prf-pol-001"></a>`performance` | `PRF` | `warning` | `all` | 热路径高频昂贵资源缺乏复用池化：循环内或高频调用中频繁分配重型对象、缓冲区或连接。 | 引入对应对象池/缓冲池机制并在生命周期结束时回收复用。 |
 | `PRF-POL-002` | <a id="prf-pol-002"></a>`performance` | `PRF` | `error` | `all` | 资源池缺乏状态重置契约或容量上限：池化机制缺失 reset_state 回收契约或无界增长导致数据污染与泄漏。 | 补全对象归还重置逻辑并设定池容量高水位淘汰限制。 |
 | `PRF-POL-003` | <a id="prf-pol-003"></a>`performance` | `PRF` | `warning` | `all` | 负收益过度池化：对极小轻量纯值对象或冷路径过度引入池化管理开销，得不偿失。 | 移除负收益池化包装层，直接采用值对象或短生命周期瞬态分配。 |
+| `PRF-POL-004` | <a id="prf-pol-004"></a>`performance` | `PRF` | `warning` | `all` | 流式数据分块加载缺乏环形缓冲复用：在流式 I/O、分块循环读取或异步回调中反复实例化临时 Buffer，造成高频内存碎片与 GC 停顿。 | 引入环形缓冲区（RingBuffer）或接入定长字节缓冲池（BufferPool），实现零拷贝槽位循环复用。 |
 
 ### Layer 2 — 语言族惯用法与现代化演进层 (Language-Family Modernization)
 

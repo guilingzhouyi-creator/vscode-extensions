@@ -31,9 +31,9 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            '文件命名必须符合语言惯例（TS/JS 强制 kebab-case，Python/Rust/GDScript 强制 snake_case），严禁临时批次黑话。',
+            'File names must follow target language conventions (kebab-case for TS/JS, snake_case for Python/Rust/GDScript) and contain no temporary construction jargon.',
         remediation:
-            '将文件名规范重命名为对应语言的标准格式（如 `foo-bar.ts` 或 `foo_bar.py`），且不可带有临时标记。',
+            'Rename file to follow standard language conventions (e.g., foo-bar.ts or foo_bar.py) without temporary phase tags.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-fil-001',
     }),
     defineRule({
@@ -43,8 +43,9 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '源码目录名必须为全小写 kebab-case 或单名，严禁 CamelCase、空格及临时批次词。',
-        remediation: '将目录重命名为全小写短横线风格（如 `ast-utils`、`pipeline`）。',
+        summary:
+            'Source directory names must be lowercase kebab-case or single words; CamelCase, spaces, and temporary phase words are prohibited.',
+        remediation: 'Rename directory to lowercase hyphenated style (e.g., ast-utils, pipeline).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-dir-001',
     }),
     defineRule({
@@ -54,9 +55,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '模块顶层不可变常量必须遵循 UPPER_SNAKE_CASE 命名规范。',
+        summary:
+            'Module-level immutable constants must adhere to UPPER_SNAKE_CASE naming conventions.',
         remediation:
-            '将模块级原始常量重命名为大写蛇形命名（如 `MAX_RETRIES`、`DEFAULT_TIMEOUT`）。',
+            'Rename module-level primitive constants to uppercase snake_case (e.g., MAX_RETRIES, DEFAULT_TIMEOUT).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-glb-001',
     }),
     defineRule({
@@ -66,8 +68,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '严禁在模块顶层声明可变 `let` 或 `var` 变量（隐式全局共享状态）。',
-        remediation: '重构顶层可变状态为函数作用域变量、类实例属性或显式单例状态持有者。',
+        summary:
+            'Mutable let or var declarations at module scope are prohibited (avoid implicit global shared mutable state).',
+        remediation:
+            'Refactor top-level mutable state into function-scoped variables, class properties, or explicit singleton state holders.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-glb-002',
     }),
     defineRule({
@@ -77,9 +81,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '类型定义与类声明必须遵循 PascalCase 大驼峰命名。',
+        summary:
+            'Type definitions, interfaces, and class declarations must follow PascalCase naming conventions.',
         remediation:
-            '将类、接口、类型别名或枚举重命名为大驼峰格式（如 `Scanner`、`RuleDefinition`）。',
+            'Rename classes, interfaces, type aliases, and enums to PascalCase (e.g., Scanner, RuleDefinition).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-typ-001',
     }),
     defineRule({
@@ -89,8 +94,9 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '类属性、对象字段与方法名必须遵循 camelCase 小驼峰命名规范。',
-        remediation: '将属性和方法名调整为清晰有意义的小驼峰命名。',
+        summary:
+            'Class properties, object fields, and methods must follow camelCase naming conventions.',
+        remediation: 'Adjust property and method names to clear, descriptive camelCase.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-mbr-001',
     }),
     defineRule({
@@ -100,9 +106,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '严禁使用无业务语义的模糊泛化变量名（如 data、res、ret、tmp、item 等裸词）。',
+        summary:
+            'Vague or meaningless generic variable names (such as bare data, res, ret, tmp, item) are prohibited.',
         remediation:
-            '结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。',
+            'Append domain-specific prefixes or suffixes reflecting semantic intent (e.g., parseResult, tokenPayload, ruleEntry).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-vag-001',
     }),
     defineRule({
@@ -112,8 +119,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: '严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 占位符豁免）。',
-        remediation: '改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。',
+        summary:
+            'Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard placeholders).',
+        remediation:
+            'Use descriptive identifiers communicating intent; reserve single letters strictly for loop indices (i, j) or discard (_).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-sgl-001',
     }),
     defineRule({
@@ -123,8 +132,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_INFO,
-        summary: '集合（Array/Set）建议使用复数或 List 后缀，映射（Map/Dict）建议表达对应关系。',
-        remediation: '为数组集合增加复数形态，为字典映射添加 `*To*` 或 `*By*` 表达关联意图。',
+        summary:
+            'Collections (Array/Set) should use plural nouns or List suffixes; mappings (Map/Dict) should express key-to-value relationships.',
+        remediation:
+            'Pluralize array collections and name mappings using *To* or *By* to clarify associations.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-col-001',
     }),
     defineRule({
@@ -135,9 +146,9 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
         summary:
-            '工程资产与测试用例中严禁包含施工批次与临时黑话标记（禁止词如阶段批次号、临时变量及在制品缩写标记等），覆盖测试套件名、函数符号与标识符。',
+            'Engineering assets and test suites must not contain construction phase or temporary jargon markers (phase numbers, temporary tokens, wip markers).',
         remediation:
-            '将施工批次标记替换为具有实际业务与领域架构含义的语义命名，杜绝将临时施工代号固化为资产。',
+            'Replace phase markers with semantic names representing actual domain capabilities and architecture features.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-jrg-002',
     }),
     defineRule({
@@ -148,9 +159,9 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
         summary:
-            '标识符长度膨胀（30~40+ 字符）或同文件多符号共享长前缀，表明缺乏目录与模块分层解耦，驱动架构拆分。',
+            'Identifier length inflation (30-40+ characters) or multiple symbols sharing long prefixes indicates insufficient modular decomposition.',
         remediation:
-            '提炼公共领域模块或下沉子目录，将冗长的前缀转化为模块/包命名空间，降低单个符号长度并实现物理分层解耦。',
+            'Extract shared domain modules or subdirectories, turning redundant prefixes into module namespaces and reducing individual symbol length.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-dec-001',
     }),
     defineRule({
@@ -161,9 +172,9 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
         summary:
-            '结构化资源库（常量/字符串/规则/配置/枚举等）过于笼统且规模与语义体积膨胀，驱动按业务领域拆分。',
+            'Structured resource repositories (constants, strings, rules, configs) are overly broad and bloated, requiring decomposition by domain.',
         remediation:
-            '根据功能负责域与倒排调用关系，将笼统大文件拆分为二级拓扑模块（如 constants_network.ts、constants_ui.ts）。',
+            'Decompose monolithic files into secondary topology modules (e.g., constants-network.ts, constants-ui.ts) based on functional domains.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-res-001',
     }),
     defineRule({
@@ -173,9 +184,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         family: RULE_FAMILY_NAMING,
         languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
-        summary: '结构化资源库过度细化导致碎片化，微小文件使用了三级深层命名，建议合并至父域。',
+        summary:
+            'Over-fragmentation in structured resource repositories where tiny files use 3-level deep names; consolidate into parent domain.',
         remediation:
-            '将低容量、高内聚的细分子库合并回二级领域模块（如合并至 constants_network.ts），降低架构认知成本。',
+            'Merge low-volume, highly cohesive sub-repositories into secondary domain modules to minimize cognitive overhead.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-res-002',
     }),
     defineRule({
@@ -185,9 +197,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         family: RULE_FAMILY_NAMING,
         languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
-        summary: '结构化资源库命名层级溢出（超过基础类型+功能域+可选子域的三层上限）。',
+        summary:
+            'Resource repository naming depth exceeds limit (maximum 3 tiers: base type + functional domain + optional subdomain).',
         remediation:
-            '简化命名拓扑至最多三层（基础类型名 + 功能负责域 + 可选精细化领域），消除过深层级。',
+            'Flatten naming topology to at most three tiers (base type + domain + optional subdomain) to eliminate excessive nesting.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-res-003',
     }),
     defineRule({
@@ -198,8 +211,9 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
         summary:
-            '结构化资源库文件名过度描述堆叠（如 constants_network_http_request_response_...），造成维护负担。',
-        remediation: '去除冗余堆叠的描述词，改用精炼的领域命名表达架构职责。',
+            'Resource repository file name has excessive descriptive word stacking, creating maintenance burden.',
+        remediation:
+            'Remove redundant descriptor stacking and use concise domain terminology reflecting architectural responsibilities.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-res-004',
     }),
     defineRule({
@@ -209,8 +223,10 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         family: RULE_FAMILY_NAMING,
         languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
-        summary: '结构化资源库文件职责不匹配（声明为纯常量库却混入大量可执行业务函数与类）。',
-        remediation: '将可执行业务计算下沉至领域服务或工具类中，保持结构化资源库纯粹性。',
+        summary:
+            'Resource repository file responsibility mismatch (declared as pure constant library but contains substantial executable functions/classes).',
+        remediation:
+            'Move executable logic into domain services or utility modules, preserving purity of structured resource repositories.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-res-005',
     }),
 ];
