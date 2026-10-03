@@ -409,6 +409,13 @@ export class ShellLintAnalyzer implements Analyzer {
 
         for (const match of aliasMatches) {
             const alias = match[1].toLowerCase();
+            // In PowerShell, `foreach ($var in $col)` is a language statement keyword,
+            // not a pipeline alias for `ForEach-Object`.
+            const isForeachStatement =
+                alias === 'foreach' && /(?:^|[\s;{}])foreach\s*\(/i.test(trimmed);
+            if (isForeachStatement) {
+                continue;
+            }
             const canonical = POWERSHELL_ALIASES[alias];
             if (canonical) {
                 emit(

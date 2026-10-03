@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791024264211",
-  "timestamp": "2026-10-03T10:44:29.763Z",
+  "snapshotId": "snapshot-v0.4.0-1791025167876",
+  "timestamp": "2026-10-03T10:59:33.042Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,25 +13,25 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 568,
-    "durationMs": 4793
+    "durationMs": 4487
   },
   "metrics": {
     "compositeScore": 99.2,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11459,
+    "totalIssues": 11457,
     "suppressedIssues": 6302,
-    "unsuppressedIssues": 5157,
+    "unsuppressedIssues": 5155,
     "bySeverity": {
       "info": 435,
-      "warning": 11024,
+      "warning": 11022,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 200,
       "medium": 10455,
-      "low": 804
+      "low": 802
     }
   },
   "eightPillars": {
@@ -167,7 +167,7 @@
       "critical": 0,
       "high": 200,
       "medium": 10455,
-      "low": 804
+      "low": 802
     },
     "criticalItems": [],
     "highItems": [
@@ -253,48 +253,48 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:66",
+        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:65",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-gate-system.js",
-        "line": 66,
+        "line": 65,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:74",
+        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:70",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-gate-system.js",
-        "line": 74,
+        "line": 70,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:85",
+        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:79",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-gate-system.js",
-        "line": 85,
+        "line": 79,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:105",
+        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:99",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-gate-system.js",
-        "line": 105,
+        "line": 99,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:121",
+        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:118",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-gate-system.js",
-        "line": 121,
+        "line": 118,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
@@ -631,7 +631,7 @@
         "pillars": {
           "architecture": 100,
           "maintainability": 99.8,
-          "performance": 99.3,
+          "performance": 99.4,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -1304,7 +1304,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 109996,
+      "processed": 109998,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1318,10 +1318,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1790922053371,
-      "endMs": 1791024264209,
-      "totalRuns": 78,
+      "endMs": 1791025167875,
+      "totalRuns": 82,
       "eloc": {
-        "processedTotal": 8548286,
+        "processedTotal": 8988268,
         "uniqueTotal": 96698,
         "changedTotal": 119162,
         "semanticTotal": 119162
@@ -1332,12 +1332,12 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 956426,
+        "totalAdded": 1000644,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -111.89
+        "netYield": -111.33
       },
-      "meanCompositeScore": 99.62,
+      "meanCompositeScore": 99.6,
       "gatePassRate": 100
     },
     "isFirstBaseline": false

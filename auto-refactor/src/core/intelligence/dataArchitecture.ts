@@ -557,8 +557,7 @@ function collectSiteIssues(
     validationCounts: Map<string, number>,
     issues: Issue[],
 ): void {
-    const unb =
-        options.checkUnboundedQueries !== false ? checkUnboundedQuerySite(site) : null;
+    const unb = options.checkUnboundedQueries !== false ? checkUnboundedQuerySite(site) : null;
     if (unb) issues.push(unb);
     const n1 = options.checkNPlusOne !== false ? checkNPlusOneSite(site) : null;
     if (n1) issues.push(n1);
