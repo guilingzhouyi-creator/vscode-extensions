@@ -133,7 +133,7 @@ Write-Host "│ 审查检查项 / 子系统         │ 判定结果    │ 覆�
 Write-Host "├─────────────────────────────┼─────────────┼───────────────────┤" -ForegroundColor Cyan
 Write-Host ("│ 1. 工作区零空文件物理卫生   │ {0,-11} │ 全仓代码/脚本/配置│" -f $statusHygiene) -ForegroundColor $cHygiene
 Write-Host ("│ 2. 单源规则目录一致性 (SSOT)│ {0,-11} │ 单源规则总目录    │" -f $statusRules) -ForegroundColor $cRules
-Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 10 维模型 / 141套 │" -f $statusAr) -ForegroundColor $cAr
+Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 10 维模型 / 142套 │" -f $statusAr) -ForegroundColor $cAr
 Write-Host ("│ 4. workspace-timing 审查门禁│ {0,-11} │ L0~L5 六层权重门禁│" -f $statusWt) -ForegroundColor $cWt
 Write-Host ("│ 5. WebGames 配置架构审查    │ {0,-11} │ 核心领域配置真源  │" -f $statusWg) -ForegroundColor $cWg
 Write-Host "├─────────────────────────────┴─────────────┴───────────────────┤" -ForegroundColor Cyan

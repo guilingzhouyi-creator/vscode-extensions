@@ -249,11 +249,11 @@ def _check_bash_safety(lines: list[str], text: str, path: Path) -> list[dict[str
             "rule": "BASH-SHEBANG",
             "detail": f"Shebang 非法（须为 #!/usr/bin/env bash）：{shebang[:40]}"
         })
-    if "set -uo pipefail" not in text:
+    if not ("set -uo pipefail" in text or "set -euo pipefail" in text):
         violations.append({
             "file": str(path),
             "rule": "BASH-SAFE-OPTIONS",
-            "detail": "缺少 set -uo pipefail 安全选项声明"
+            "detail": "缺少 set -uo pipefail 或 set -euo pipefail 安全选项声明"
         })
     if re.search(r"^\s*set -e\b", text, re.M):
         violations.append({

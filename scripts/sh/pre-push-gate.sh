@@ -44,12 +44,12 @@ else
 fi
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
-echo "[3/8] 执行 auto-refactor 全量门禁与回归套件 (141 套，Rust/Build/Lint/Comments/Self/Tests)..."
+echo "[3/8] 执行 auto-refactor 全量门禁与回归套件 (142 套，Rust/Build/Lint/Comments/Self/Tests)..."
 if ! (cd auto-refactor && "$NPM_BIN" run gate >/dev/null 2>&1); then
     echo "❌ [FAIL] Gate 3: auto-refactor 全量门禁与回归套件未全部通过！"
     FAILED=1
 else
-    echo "  ✔ [PASS] auto-refactor 全量门禁与 141 套测试全部通过"
+    echo "  ✔ [PASS] auto-refactor 全量门禁与 142 套测试全部通过"
 fi
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 Ratchet ---
