@@ -416,7 +416,11 @@ export function checkUnquotedVariables(
  * @param filePath - Path to file being scanned.
  * @param emit - Issue emission callback.
  */
-export function checkShellDocContract(lines: string[], filePath: string, emit: ShellEmitter): void {
+export function checkShellDocContract(
+    lines: string[],
+    filePath: string,
+    emit: ShellEmitter,
+): void {
     const isScriptDir = filePath.includes('/scripts/') || filePath.startsWith('scripts/');
     if (lines.length < 30 && !isScriptDir) return;
 
