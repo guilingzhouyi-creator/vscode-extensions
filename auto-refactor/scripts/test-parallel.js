@@ -317,6 +317,10 @@ const PARALLEL_SUITES = [
     name: 'validate-gate-system',
     script: 'scripts/validate-gate-system.js',
   },
+  {
+    name: 'validate-preflight-audit-index',
+    script: 'scripts/validate-preflight-audit-index.js',
+  },
 ];
 
 // Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)
