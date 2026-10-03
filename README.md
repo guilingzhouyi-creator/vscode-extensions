@@ -21,6 +21,10 @@
 |------|------|:--:|------|
 | **[Workspace Timing](./workspace-timing)** | v0.4.9 | 🟢 已发布 | ⏱ 轻量化工作区时长追踪：自动计时、跨工作区聚合对比、12周热力图、24小时分布、双语界面热切换、周上限健康提醒；RingBuffer + Journal 双写入，崩溃保护 |
 
+> 🧰 **非扩展模块**：[a10-web-engine](./a10-web-engine) — 基于 three.js 的 A-10C 工程化三维模型（spec 数据层驱动、
+> LOD/机构/剖切/爆炸/挂载/战损系统、同源 SVG 设计图纸、`npm test` 头路验收 20 项）。同样**无 `engines.vscode`**，
+> 不参与扩展 CI/发布。
+>
 > 🧰 **非扩展模块**：[auto-refactor](./auto-refactor) — 高性能、声明式、项目无关的自动化代码重构与静态质量分析引擎（常量提取 / 大文件拆分 / 圈复杂度），面向 CI/CD 与 IDE。能力：多语言适配（TS / JS / Rust，内置 oxc 快速路径）、warm daemon（IPC 常驻进程）、行级增量（reuseSubtree 子树复用）、**高性能自定义 Diff 基座（SWAR + BPM 向量化 + AST 语义）**、三级回滚（3-tier rollback）、Praxis 集成与分形 Git 工作树/门禁规范、CI 就绪结构化输出（JSON / SARIF / text），支持自定义分析器插件。**不含 `engines.vscode`，不会被 CI/打包/发布自动发现**，仅作为工具模块与本仓库并存。
 
 ---

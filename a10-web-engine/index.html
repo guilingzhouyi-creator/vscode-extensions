@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A-10 Thunderbolt II — Engineering Model | 工程化三维模型</title>
+  <style>
+    :root {
+      --bg: #0c0f13; --panel: #14181f; --panel2: #1a2029; --line: #2a3442;
+      --text: #cfd8e3; --dim: #7d8899; --acc: #ffb02e; --acc2: #4ec9b0; --warn: #ff5d5d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+      font: 12px/1.5 "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif; }
+    #viewport { position: absolute; inset: 0; }
+    #viewport canvas { display: block; }
+
+    .panel { position: absolute; background: color-mix(in srgb, var(--panel) 88%, transparent);
+      border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(6px); }
+    #hud-left { left: 12px; top: 12px; width: 268px; max-height: calc(100% - 24px); display: flex; flex-direction: column; }
+    #hud-right { right: 12px; top: 12px; width: 300px; max-height: calc(100% - 24px); display: flex; flex-direction: column; }
+    .panel header { padding: 8px 10px; font-weight: 600; letter-spacing: .4px; border-bottom: 1px solid var(--line);
+      color: var(--acc); display:flex; justify-content:space-between; align-items:center; gap:8px; flex:none; }
+    .panel .body { padding: 8px 10px; overflow-y: auto; overscroll-behavior: contain; }
+    .sec { margin: 6px 0 10px; }
+    .sec > h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin-bottom: 6px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+    .row label { flex: 1; color: var(--text); cursor: default; }
+    .row output { min-width: 46px; text-align: right; color: var(--acc2); font-variant-numeric: tabular-nums; }
+    input[type=range] { flex: 1.4; accent-color: var(--acc); height: 16px; }
+    .btn { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+      padding: 3px 9px; cursor: pointer; font: inherit; }
+    .btn:hover { border-color: var(--acc); color: var(--acc); }
+    .btn.on { border-color: var(--acc2); color: var(--acc2); }
+    .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+    select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font: inherit; max-width: 100%; }
+    .tree { font-size: 11.5px; }
+    .tree .node { padding: 1px 4px; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tree .node:hover { background: var(--panel2); }
+    .tree .node.sel { background: #2b3444; color: var(--acc); }
+    .tree .grp { color: var(--dim); margin-top: 4px; cursor: pointer; }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+    .kv b { color: var(--dim); font-weight: 500; }
+    .tag { display: inline-block; padding: 0 6px; border-radius: 8px; border: 1px solid var(--line); color: var(--dim); font-size: 10.5px; }
+    .tag.doc { color: #7fb4ff; border-color: #33507c; }
+    .tag.der { color: var(--acc2); border-color: #2c5c52; }
+    .tag.eng { color: var(--acc); border-color: #6b5524; }
+    #stats { position: absolute; right: 12px; bottom: 12px; padding: 6px 10px; color: var(--dim);
+      font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+    #stats b { color: var(--acc2); font-weight: 600; }
+    #title { position: absolute; left: 50%; transform: translateX(-50%); top: 10px; text-align: center; pointer-events: none; }
+    #title h1 { font-size: 15px; letter-spacing: 3px; color: var(--text); font-weight: 600; }
+    #title p { font-size: 10.5px; color: var(--dim); letter-spacing: 1.5px; }
+    #sheet-modal { position: absolute; inset: 0; background: rgba(4,6,9,.9); display: none; z-index: 30; }
+    #sheet-modal.show { display: flex; }
+    #sheet-modal .wrap { margin: auto; width: min(1180px, 94vw); height: min(86vh, 900px); display: flex; flex-direction: column; }
+    #sheet-contents { flex: 1; background: #0a1622; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    #sheet-contents svg { width: 100%; height: 100%; }
+    #err { position:absolute; left:50%; top:40%; transform:translate(-50%,-50%); color:var(--warn); display:none;
+      background:var(--panel); padding:14px 18px; border:1px solid var(--warn); border-radius:8px; max-width:70vw; white-space:pre-wrap; }
+    .hint { color: var(--dim); font-size: 10.5px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #3a4655; display: inline-block; }
+    .dot.live { background: var(--acc2); }
+  </style>
+</head>
+<body>
+  <div id="viewport"></div>
+  <div id="title"><h1>A-10 THUNDERBOLT II</h1><p>FAIRCHILD REPUBLIC · 工程化三维模型 · THREE.JS r182</p></div>
+
+  <aside class="panel" id="hud-left">
+    <header>部件树 · ASSEMBLY TREE <button class="btn" id="btn-collapse" title="折叠全部">≡</button></header>
+    <div class="body tree" id="part-tree"></div>
+  </aside>
+
+  <aside class="panel" id="hud-right">
+    <header>控制台 · CONTROL
+      <span>
+        <button class="btn" id="btn-sheet">图纸</button>
+        <button class="btn" id="btn-shot" title="保存PNG">📷</button>
+      </span>
+    </header>
+    <div class="body" id="controls">
+      <div class="sec">
+        <h4>视图 View</h4>
+        <div class="row"><label>拆解 Exploded</label><input type="range" id="sl-explode" min="0" max="1" step="0.001" value="0"><output id="o-explode">0%</output></div>
+        <div class="row"><label>剖切 X Cut</label><input type="range" id="sl-cutx" min="0" max="16.2" step="0.01" value="16.2"><output id="o-cutx">—</output></div>
+        <div class="row"><label>剖切 Y Cut</label><input type="range" id="sl-cuty" min="-9" max="9" step="0.01" value="9"><output id="o-cuty">—</output></div>
+        <div class="row"><label>剖切 Z Cut</label><input type="range" id="sl-cutz" min="0" max="4.6" step="0.01" value="4.6"><output id="o-cutz">—</output></div>
+        <div class="btnrow">
+          <button class="btn" id="btn-cutx">剖切X</button><button class="btn" id="btn-cuty">剖切Y</button><button class="btn" id="btn-cutz">剖切Z</button>
+          <button class="btn" id="btn-cutsides" title="左右剖切">左右</button>
+          <button class="btn on" id="btn-xray">内部X光</button>
+        </div>
+      </div>
+      <div class="sec">
+        <h4>LOD / 性能</h4>
+        <div class="btnrow" id="lodrow">
+          <button class="btn" data-lod="auto">自动</button><button class="btn" data-lod="0">LOD0</button><button class="btn" data-lod="1">LOD1</button><button class="btn" data-lod="2">LOD2</button>
+        </div>
+        <div class="row"><label>铆钉/紧固件</label><button class="btn on" id="btn-rivets">开</button></div>
+        <div class="row"><label>地面/网格</label><button class="btn on" id="btn-ground">开</button></div>
+        <div class="row"><label>阴影 Shadows</label><button class="btn" id="btn-shadow">关</button></div>
+      </div>
+      <div class="sec">
+        <h4>机构动画 Rig</h4>
+        <div class="row"><label>起落架 Gear</label><button class="btn on" data-rig="gear" data-v="0">放下</button><button class="btn" data-rig="gear" data-v="1">收起</button></div>
+        <div class="row"><label>襟翼 Flaps</label><input type="range" id="sl-flap" min="0" max="1" step="0.01" value="0"><output id="o-flap">0°</output></div>
+        <div class="row"><label>副翼 Aileron</label><input type="range" id="sl-ail" min="-1" max="1" step="0.01" value="0"><output id="o-ail">0°</output></div>
+        <div class="row"><label>扰流襟翼 Spoileron</label><input type="range" id="sl-sp" min="0" max="1" step="0.01" value="0"><output id="o-sp">0°</output></div>
+        <div class="row"><label>升降舵 Elevator</label><input type="range" id="sl-elev" min="-1" max="1" step="0.01" value="0"><output id="o-elev">0°</output></div>
+        <div class="row"><label>方向舵 Rudder</label><input type="range" id="sl-rud" min="-1" max="1" step="0.01" value="0"><output id="o-rud">0°</output></div>
+        <div class="row"><label>座舱盖 Canopy</label><input type="range" id="sl-canopy" min="0" max="1" step="0.01" value="0"><output id="o-canopy">0°</output></div>
+        <div class="row"><label>短舱舱门 Nacelle doors</label><button class="btn" data-rig="nacelle" data-v="1">开</button><button class="btn on" data-rig="nacelle" data-v="0">关</button></div>
+        <div class="row"><label>发动机转子 N1</label><input type="range" id="sl-n1" min="0" max="1" step="0.01" value="0"><output id="o-n1">0%</output></div>
+        <div class="row"><label>GAU-8 旋转</label><input type="range" id="sl-gun" min="0" max="1" step="0.01" value="0"><output id="o-gun">0%</output></div>
+      </div>
+      <div class="sec">
+        <h4>挂载 Loadout</h4>
+        <div class="btnrow">
+          <button class="btn" data-loadout="clean">净挂</button>
+          <button class="btn on" data-loadout="cas">CAS标准</button>
+          <button class="btn" data-loadout="max">最大挂载</button>
+          <button class="btn" data-loadout="training">训练</button>
+        </div>
+        <div class="row"><label>挂点显示</label><button class="btn on" data-rig="stations" data-v="1">开</button></div>
+      </div>
+      <div class="sec">
+        <h4>损伤 Damage</h4>
+        <div class="btnrow">
+          <button class="btn" id="btn-dmg-hit">随机战损</button>
+          <button class="btn" id="btn-dmg-clear">修复</button>
+          <span class="hint" id="dmg-count">0 hits</span>
+        </div>
+      </div>
+      <div class="sec">
+        <h4>选件 Options</h4>
+        <div class="row"><label>涂装 Livery</label>
+          <select id="sel-livery">
+            <option value="europe1">EUROPEAN ONE (绿/灰)</option>
+            <option value="grey">TACTICAL GREY (低可视)</option>
+            <option value="primer">底漆 PRIMER</option>
+          </select>
+        </div>
+        <div class="row"><label>俯视视角</label><button class="btn" data-view="top">顶</button><button class="btn" data-view="front">前</button><button class="btn" data-view="side">侧</button><button class="btn" data-view="iso">斜</button></div>
+      </div>
+      <div class="sec">
+        <h4>部件信息 · 点击模型查询</h4>
+        <div id="part-info" class="kv"><b>—</b><span class="hint">点击模型上的部件 / Click a part</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="panel" id="stats"></div>
+
+  <div id="sheet-modal">
+    <div class="wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 2px;">
+        <b style="color:var(--acc)">A-10 外观/三视图 · DESIGN SHEET（与三维模型同源数据生成）</b>
+        <button class="btn" id="btn-sheet-close">关闭 ✕</button>
+      </div>
+      <div id="sheet-contents"></div>
+    </div>
+  </div>
+  <div id="err"></div>
+  <script type="module" src="/src/app/main.js"></script>
+</body>
+</html>
