@@ -254,7 +254,7 @@ func restore(snapshot_data: Dictionary) -> void:
 	_is_metric_dirty = true
 	refresh_cached_metrics()
 
-## 统一数据标准序列化（Inv-SV-2）：接入 SaveDomainContract 统一接口
+## 统一数据标准序列化（Inv-SV-2）：接入 SaveDomainContract 统一接口（adapter: 契约规范对齐 snapshot）
 func serialize() -> Dictionary:
 	return snapshot()
 

@@ -86,6 +86,7 @@ func rollback(error_code: String = "TRANSACTION_ROLLED_BACK") -> Dictionary:
 		_wallet.from_dictionary(_wallet_values)
 	return {"success": false, "error_code": error_code, "rolled_back": true, "transaction_id": transaction_id}
 
-## 清空全部幂等记录（测试/重置场景）
+## 清空全部幂等记录（facade: 测试隔离与环境重置统一收口）
 static func clear_completed() -> void:
-	_completed.clear()
+	if not _completed.is_empty():
+		_completed.clear()

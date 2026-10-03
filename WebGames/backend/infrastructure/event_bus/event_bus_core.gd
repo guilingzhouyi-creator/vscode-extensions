@@ -219,9 +219,11 @@ func dispatch_spatial_2d(packet: EventPacket, origin_2d: Vector2, radius: float,
 # 配置 Getters（供测试断言与遥测监控）
 # ==============================================================================
 
+## 获取空间网格单元大小（facade: 供测试断言与遥测监控）
 func get_spatial_cell_size() -> float:
 	return _spatial_grid.get_cell_size()
 
+## 获取帧缓冲容量（facade: 供测试断言与遥测监控）
 func get_frame_buffer_capacity() -> int:
 	return _ring_buffer.capacity()
 

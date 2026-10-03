@@ -55,12 +55,16 @@ static func is_acyclic_dag(ast: SkillSubgraphAST) -> bool:
 	while queue.size() > 0:
 		var curr = queue.pop_front()
 		visited_count += 1
-		for nxt in adj.get(curr, []):
-			in_degree[nxt] -= 1
-			if in_degree[nxt] == 0:
-				queue.append(nxt)
+		_process_topological_neighbors(curr, adj, in_degree, queue)
 
 	return visited_count == ast.nodes.size()
+
+## 消耗拓扑排序当前节点的后继入度
+static func _process_topological_neighbors(curr: String, adj: Dictionary, in_degree: Dictionary, queue: Array[String]) -> void:
+	for nxt in adj.get(curr, []):
+		in_degree[nxt] -= 1
+		if in_degree[nxt] == 0:
+			queue.append(nxt)
 
 static func generate_ast_signature(ast: SkillSubgraphAST) -> String:
 	var prefix := GameConfig.get_string("domains.lattice", "decompiler/signature_prefix", "AST:")

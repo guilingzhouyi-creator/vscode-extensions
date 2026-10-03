@@ -197,15 +197,15 @@ func school_members(school_id: String) -> Array:
 func attribute_school(attribute_id: String) -> String:
 	return String(get_attribute(attribute_id).get("school", ""))
 
-## 全部大类 ID（keys 引用）
+## 全部大类 ID（facade: keys 引用供遍历查询）
 func school_ids() -> Array:
 	return _schools.keys()
 
-## 全部属性 ID（keys 引用）
+## 全部属性 ID（facade: keys 引用供遍历查询）
 func attribute_ids() -> Array:
 	return _attributes.keys()
 
-## 全部变体 ID（keys 引用）
+## 全部变体 ID（facade: keys 引用供遍历查询）
 func variant_ids() -> Array:
 	return _variants.keys()
 

@@ -26,20 +26,7 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array)
 	var default_minor: String = GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")
 
 	for item_dict in sorted_data:
-		var proto = ItemRegistryCatalog.ItemPrototypeTemplate.new(
-			item_dict.get("canonical_id", ""),
-			item_dict.get("numeric_id", 0),
-			item_dict.get("loc_name_key", ""),
-			item_dict.get("category_major", ItemRegistryCatalog.CATEGORY_MAJOR_EQUIPMENT),
-			item_dict.get("category_minor", default_minor),
-			item_dict.get("tier_rank", ItemRegistryCatalog.DEFAULT_TIER_RANK),
-			item_dict.get("default_mass_kg", ItemRegistryCatalog.DEFAULT_MASS_KG),
-			item_dict.get("default_volume_slots", ItemRegistryCatalog.DEFAULT_VOLUME_SLOTS),
-			item_dict.get("base_market_value", ItemRegistryCatalog.DEFAULT_MARKET_VALUE),
-			item_dict.get("search_aliases", []),
-			item_dict.get("english_name", "")
-		)
-
+		var proto = _build_prototype(item_dict, default_minor)
 		var res = ItemRegistrySolver.register_prototype(catalog, proto)
 		if res.success:
 			loaded_count += 1
@@ -56,6 +43,22 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array)
 		"loaded_count": loaded_count,
 		"errors": error_list
 	}
+
+## 单个物品原型模板构建工厂（从热循环解耦实例化开销）
+static func _build_prototype(item_dict: Dictionary, default_minor: String) -> ItemRegistryCatalog.ItemPrototypeTemplate:
+	return ItemRegistryCatalog.ItemPrototypeTemplate.new(
+		item_dict.get("canonical_id", ""),
+		item_dict.get("numeric_id", 0),
+		item_dict.get("loc_name_key", ""),
+		item_dict.get("category_major", ItemRegistryCatalog.CATEGORY_MAJOR_EQUIPMENT),
+		item_dict.get("category_minor", default_minor),
+		item_dict.get("tier_rank", ItemRegistryCatalog.DEFAULT_TIER_RANK),
+		item_dict.get("default_mass_kg", ItemRegistryCatalog.DEFAULT_MASS_KG),
+		item_dict.get("default_volume_slots", ItemRegistryCatalog.DEFAULT_VOLUME_SLOTS),
+		item_dict.get("base_market_value", ItemRegistryCatalog.DEFAULT_MARKET_VALUE),
+		item_dict.get("search_aliases", []),
+		item_dict.get("english_name", "")
+	)
 
 # ==============================================================================
 # 二、装配与热重载
@@ -83,17 +86,16 @@ static func load_all_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 ## 配置中已删除的物品自动注销（数字 ID 与名称键回空闲池），新增物品自动注册。
 static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	var all_items: Array = []
-	var configured_ids: Dictionary = {}
 	for table_name in GameConfig.get_table_names():
-		if not str(table_name).begins_with("items."):
-			continue
-		var items_arr := GameConfig.get_array(str(table_name), "items", [])
-		for it in items_arr:
-			if it is Dictionary:
-				var cid := str((it as Dictionary).get("canonical_id", ""))
-				if not cid.is_empty():
-					configured_ids[cid] = true
-		all_items.append_array(items_arr)
+		if str(table_name).begins_with("items."):
+			all_items.append_array(GameConfig.get_array(str(table_name), "items", []))
+
+	var configured_ids: Dictionary = {}
+	for it in all_items:
+		if it is Dictionary:
+			var cid := str((it as Dictionary).get("canonical_id", ""))
+			if not cid.is_empty():
+				configured_ids[cid] = true
 
 	var unregistered: Array = []
 	for canonical_id in catalog._canonical_registry.keys():

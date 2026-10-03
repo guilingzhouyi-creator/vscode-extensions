@@ -26,14 +26,17 @@ static func load_default_canary_flags() -> Dictionary:
 	var flags := {}
 	for feature_key in raw.keys():
 		var cfg: Dictionary = raw[feature_key]
-		var flag := FeatureToggleAggregate.FeatureFlagEntry.new(
-			str(feature_key),
-			_strategy_from_name(str(cfg.get("strategy", "GLOBAL_DISABLED"))),
-			int(cfg.get("rollout_percentage", 0)),
-			(cfg.get("whitelist", []) as Array).duplicate()
-		)
-		flags[str(feature_key)] = flag
+		flags[str(feature_key)] = _create_flag_entry(str(feature_key), cfg)
 	return flags
+
+## 构建灰度旗标条目（解耦循环内瞬态分配）
+static func _create_flag_entry(feature_key: String, cfg: Dictionary) -> FeatureToggleAggregate.FeatureFlagEntry:
+	return FeatureToggleAggregate.FeatureFlagEntry.new(
+		feature_key,
+		_strategy_from_name(str(cfg.get("strategy", "GLOBAL_DISABLED"))),
+		int(cfg.get("rollout_percentage", 0)),
+		(cfg.get("whitelist", []) as Array).duplicate()
+	)
 
 
 static func _strategy_from_name(name: String) -> int:

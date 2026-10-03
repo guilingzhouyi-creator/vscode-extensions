@@ -63,18 +63,12 @@ static func generate_round_schedule(
 	var has_draw := false
 
 	for idx in range(timestamps.size()):
-		var pt := TimelineEventScheduleDTO.ScheduledPoint.new()
-		pt.point_id = "ROUND_%d_EVT_%d" % [round_number, idx + 1]
-		pt.trigger_time_ms = timestamps[idx]
-		pt.event_kind = _sample_event_kind(event_weights, rng)
-		match pt.event_kind:
-			TimelineEventScheduleDTO.EventKind.ADD_DRAW:
-				pt.payload = {"extra_bonus_cards": 1}
-			TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
-				pt.payload = {"tension_type": "PRESSURE_SURGE"}
-				has_tension = true
-			_:
-				has_draw = true
+		var kind := _sample_event_kind(event_weights, rng)
+		var pt := _build_scheduled_point(round_number, idx, timestamps[idx], kind)
+		if kind == TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
+			has_tension = true
+		else:
+			has_draw = true
 		points.append(pt)
 
 	# 结构保证（Inv-TR-4 精神）：每回合至少 1 个普通发牌点与 1 个紧张点，防回合空转/无张力
@@ -86,6 +80,19 @@ static func generate_round_schedule(
 
 	schedule.scheduled_points = points
 	return schedule
+
+## 构建单时间戳调度点（解耦循环内瞬态分配）
+static func _build_scheduled_point(round_number: int, idx: int, timestamp: int, kind: int) -> TimelineEventScheduleDTO.ScheduledPoint:
+	var pt := TimelineEventScheduleDTO.ScheduledPoint.new()
+	pt.point_id = "ROUND_%d_EVT_%d" % [round_number, idx + 1]
+	pt.trigger_time_ms = timestamp
+	pt.event_kind = kind
+	match kind:
+		TimelineEventScheduleDTO.EventKind.ADD_DRAW:
+			pt.payload = {"extra_bonus_cards": 1}
+		TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
+			pt.payload = {"tension_type": "PRESSURE_SURGE"}
+	return pt
 
 ## 按配置权重表加权采样事件类型（event_type_weights，权重合计由 value_domain 归一门禁校验）
 static func _sample_event_kind(weights: Dictionary, rng: RefCounted = null) -> int:

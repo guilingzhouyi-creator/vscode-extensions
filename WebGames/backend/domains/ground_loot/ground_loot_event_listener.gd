@@ -49,22 +49,27 @@ func _on_domain_packet(packet: EventPacket) -> void:
 	for decl in declarations:
 		if not decl is Dictionary:
 			continue
-		var canonical_id := str(decl.get("canonical_id", ""))
-		if canonical_id.is_empty():
-			continue
-		var result := GroundDroppedItemAggregate.create_from_declaration(
-			canonical_id, _catalog, str(decl.get("display_name", ""))
-		)
-		if not result.get("success", false):
-			continue
-		var drop := GroundDroppedItemAggregate.new(
-			UniqueIdGenerator.next_id("DRP_"),
-			result["item_entity"],
-			Vector2(float(decl.get("x", 0.0)), float(decl.get("y", 0.0))),
-			str(decl.get("killer_id", "")),
-			int(decl.get("decay_cat", GroundDroppedItemAggregate.LootDecayCategory.STANDARD_MINERAL_EQUIP))
-		)
-		_active_drops.append(drop)
+		var drop := _instantiate_drop_from_decl(decl)
+		if drop != null:
+			_active_drops.append(drop)
+
+## 从掉落声明单项构建掉落物聚合实体
+func _instantiate_drop_from_decl(decl: Dictionary) -> GroundDroppedItemAggregate:
+	var canonical_id := str(decl.get("canonical_id", ""))
+	if canonical_id.is_empty():
+		return null
+	var result := GroundDroppedItemAggregate.create_from_declaration(
+		canonical_id, _catalog, str(decl.get("display_name", ""))
+	)
+	if not result.get("success", false):
+		return null
+	return GroundDroppedItemAggregate.new(
+		UniqueIdGenerator.next_id("DRP_"),
+		result["item_entity"],
+		Vector2(float(decl.get("x", 0.0)), float(decl.get("y", 0.0))),
+		str(decl.get("killer_id", "")),
+		int(decl.get("decay_cat", GroundDroppedItemAggregate.LootDecayCategory.STANDARD_MINERAL_EQUIP))
+	)
 
 # ==============================================================================
 # 四、活跃掉落管理（查询 / 回收 / 拾取）

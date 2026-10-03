@@ -86,6 +86,6 @@ static func migrate_push_error(channel: String, msg: String) -> void:
 static func emit(error_code: String, context: Dictionary = {}, message: String = "") -> void:
 	emit_error("infrastructure", error_code, message, context)
 
-## 便捷告警入口：严重度由 errors_catalog.json 中登记的 warn 级错误码决定
+## 便捷告警入口（facade: 严重度由 errors_catalog.json 中登记的 warn 级错误码决定）
 static func emit_warning(channel: String, error_code: String, message: String = "", context: Dictionary = {}) -> void:
 	emit_error(channel, error_code, message, context)

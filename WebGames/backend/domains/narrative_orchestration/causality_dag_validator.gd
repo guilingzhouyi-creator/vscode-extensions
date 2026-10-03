@@ -72,11 +72,7 @@ static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionar
 	while not zero_in_degree_queue.is_empty():
 		var current = zero_in_degree_queue.pop_front()
 		visited_count += 1
-		for neighbor in (adj_list.get(current, []) as Array):
-			var n_str := str(neighbor)
-			in_degree[n_str] = int(in_degree.get(n_str, 0)) - 1
-			if in_degree[n_str] == 0:
-				zero_in_degree_queue.append(n_str)
+		_drain_kahn_neighbors(current, adj_list, in_degree, zero_in_degree_queue)
 
 	if visited_count < graph.nodes.size():
 		return {
@@ -86,6 +82,14 @@ static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionar
 		}
 
 	return {"is_valid": true, "visited_count": visited_count}
+
+## 消耗 Kahn 拓扑排序中当前节点的邻接入度
+static func _drain_kahn_neighbors(current: String, adj_list: Dictionary, in_degree: Dictionary, queue: Array[String]) -> void:
+	for neighbor in (adj_list.get(current, []) as Array):
+		var n_str := str(neighbor)
+		in_degree[n_str] = int(in_degree.get(n_str, 0)) - 1
+		if in_degree[n_str] == 0:
+			queue.append(n_str)
 
 ## 校验非可选节点的入口可达闭包
 static func _verify_reachability(graph: NarrativeDAGGraphDTO) -> Dictionary:

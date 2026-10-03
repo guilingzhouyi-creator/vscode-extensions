@@ -34,15 +34,16 @@ static func register_command(
 static func unregister_command(cmd_name: String) -> bool:
 	return registered_commands.erase(cmd_name.to_lower())
 
-## 清空全部注册（退出前或测试套件收尾调用，避免静态表持留 Callable）
+## 清空全部注册（facade: 测试隔离与引擎重置统一收口）
 static func clear_registry() -> void:
-	registered_commands.clear()
+	if not registered_commands.is_empty():
+		registered_commands.clear()
 
 ## 指令是否已注册（小写匹配）
 static func has_command(cmd_name: String) -> bool:
 	return registered_commands.has(cmd_name.to_lower())
 
-## 已注册指令总数
+## 已注册指令总数（facade: 供测试断言与状态自检读取）
 static func registered_count() -> int:
 	return registered_commands.size()
 

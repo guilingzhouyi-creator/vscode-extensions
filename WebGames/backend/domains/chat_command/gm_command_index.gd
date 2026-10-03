@@ -55,11 +55,11 @@ func record_usage(command_name: String) -> void:
 	while _recent_commands.size() > limit:
 		_recent_commands.pop_back()
 
-## 最近命令窗口条目数
+## 最近命令窗口条目数（facade: 供测试断言与状态自检读取）
 func recent_count() -> int:
 	return _recent_commands.size()
 
-## 页缓冲池已用容量
+## 页缓冲池已用容量（facade: 供池化健康度监控与测试断言读取）
 func page_pool_size() -> int:
 	return _page_pool.size()
 

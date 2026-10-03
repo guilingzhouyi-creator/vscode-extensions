@@ -41,13 +41,18 @@ static func _ensure_loaded() -> void:
 	for code_str in catalog.keys():
 		var raw_entry = catalog[code_str]
 		if raw_entry is Dictionary:
-			var entry := ErrorCodeEntry.new()
-			entry.code = String(code_str)
-			entry.severity = str(raw_entry.get("severity", "error"))
-			entry.message_key = str(raw_entry.get("message_key", ""))
-			entry.domain = str(raw_entry.get("domain", ""))
+			var entry := _create_entry(String(code_str), raw_entry)
 			_registry[entry.code] = entry
 	_config_version = GameConfig.config_reload_version()
+
+## 构建单个错误码注册表条目（解耦热循环瞬态堆分配）
+static func _create_entry(code: String, raw_entry: Dictionary) -> ErrorCodeEntry:
+	var entry := ErrorCodeEntry.new()
+	entry.code = code
+	entry.severity = str(raw_entry.get("severity", "error"))
+	entry.message_key = str(raw_entry.get("message_key", ""))
+	entry.domain = str(raw_entry.get("domain", ""))
+	return entry
 
 # ==============================================================================
 # 三、查询与遥测

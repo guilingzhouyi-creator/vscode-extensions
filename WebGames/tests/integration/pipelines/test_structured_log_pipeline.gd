@@ -744,6 +744,20 @@ static func _test_ls_22_backend_zero_print_statements_guard() -> Dictionary:
 		"details": "hits_count=%d, hits=%s" % [print_hits.size(), str(print_hits)]
 	}
 
+static func _check_gd_file_for_print(full_path: String, item: String, out_hits: Array[String]) -> void:
+	var fa := FileAccess.open(full_path, FileAccess.READ)
+	if fa == null:
+		return
+	var line_num := 0
+	while not fa.eof_reached() and line_num < 100000:
+		line_num += 1
+		var line := fa.get_line().strip_edges()
+		if line.begins_with("#"):
+			continue
+		if line.begins_with("print(") or line.contains(" print(") or line.contains("\tprint("):
+			out_hits.append("%s:%d %s" % [item, line_num, line])
+	fa.close()
+
 static func _scan_gd_files_for_print(dir_path: String, out_hits: Array[String]) -> void:
 	var da := DirAccess.open(dir_path)
 	if da == null:
@@ -758,18 +772,7 @@ static func _scan_gd_files_for_print(dir_path: String, out_hits: Array[String]) 
 		if da.current_is_dir():
 			_scan_gd_files_for_print(full, out_hits)
 		elif item.ends_with(".gd"):
-			var fa := FileAccess.open(full, FileAccess.READ)
-			if fa != null:
-				var line_num := 0
-				while not fa.eof_reached() and line_num < 100000:
-					line_num += 1
-					var line := fa.get_line().strip_edges()
-					if line.begins_with("#"):
-						continue
-					# 检查 bare print(
-					if line.begins_with("print(") or line.contains(" print(") or line.contains("\tprint("):
-						out_hits.append("%s:%d %s" % [item, line_num, line])
-				fa.close()
+			_check_gd_file_for_print(full, item, out_hits)
 		item = da.get_next()
 	da.list_dir_end()
 

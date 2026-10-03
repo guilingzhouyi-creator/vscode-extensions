@@ -13,8 +13,10 @@ extends RefCounted
 ## 流程记录（内存态；生产环境由外部持久化接入——记录按 transaction_id 唯一）
 static var _records: Dictionary = {}
 
+## 流程记录重置（facade: 测试隔离与生命周期重置统一收口）
 static func reset_records() -> void:
-	_records.clear()
+	if not _records.is_empty():
+		_records.clear()
 
 ## 统一兑换入口：
 ## request 键：transaction_id / account_id / character_level / voucher_code /
