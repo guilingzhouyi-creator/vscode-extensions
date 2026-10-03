@@ -1,0 +1,42 @@
+{
+  "deterministic": {
+    "force_sync_in_tests": true
+  },
+  "primary": {
+    "archive_dir": "user://saves",
+    "extension": ".kalar_save",
+    "atomic_rename": true,
+    "backup_suffix": ".bak",
+    "temp_suffix": ".tmp",
+    "hash_algorithm": "sha256",
+    "signature_salt": "kalar_primary_v1",
+    "minimal_state": {
+      "max_restore_budget_ms": 10.0
+    }
+  },
+  "auxiliary": {
+    "thread_pool": {
+      "max_workers": 4,
+      "queue_capacity": 256
+    },
+    "frame_budget": {
+      "max_ms_per_frame": 2.0
+    },
+    "preload_window": {
+      "radius_meters": 100.0,
+      "forward_radius": 2,
+      "history_retention": 8,
+      "eviction_threshold_mb": 100
+    },
+    "io_timeout_sec": 15.0,
+    "max_batch_size": 32,
+    "cache_capacity_mb": 128,
+    "default_priority": 5,
+    "retry_limit": 3,
+    "backpressure_threshold": 256
+  },
+  "telemetry": {
+    "metrics_export_interval_sec": 1.0,
+    "enabled": true
+  }
+}
