@@ -51,7 +51,10 @@ function checkDiagnosticCleanliness(filePath) {
       trimmed.startsWith('suggestion:') ||
       trimmed.startsWith('reason:') ||
       trimmed.startsWith('rationale:') ||
-      trimmed.startsWith('description:');
+      trimmed.startsWith('description:') ||
+      trimmed.startsWith('summary:') ||
+      trimmed.startsWith('remediation:') ||
+      trimmed.startsWith('name:');
 
     if (isDiagnosticField && CHINESE_CHAR_RE.test(trimmed)) {
       violations.push({
@@ -92,11 +95,37 @@ function main() {
   );
 
   // Check presentation dictionary
-  const dictPath = path.join(SRC_DIR, 'core', 'praxis', 'presentation', 'dictionaries', 'zh-cn.ts');
-  assert.ok(fs.existsSync(dictPath), 'zh-cn.ts presentation dictionary must exist');
-  const dictContent = fs.readFileSync(dictPath, 'utf8');
-  assert.ok(dictContent.includes('STDLIB-PANIC-001'), 'zh-cn.ts must register STDLIB translations');
-  console.log('✔ [PASS] Presentation dictionary is properly populated and decoupled.');
+  const dictFacadePath = path.join(
+    SRC_DIR,
+    'core',
+    'praxis',
+    'presentation',
+    'dictionaries',
+    'zh-cn.ts',
+  );
+  assert.ok(fs.existsSync(dictFacadePath), 'zh-cn.ts presentation facade must exist');
+  const dictModularDir = path.join(
+    SRC_DIR,
+    'core',
+    'praxis',
+    'presentation',
+    'dictionaries',
+    'zh-cn',
+  );
+  assert.ok(fs.existsSync(dictModularDir), 'zh-cn/ modular dictionary directory must exist');
+
+  const { ZH_CN_RULES } = require('../dist/core/praxis/presentation/dictionaries/zh-cn');
+  assert.ok(ZH_CN_RULES, 'ZH_CN_RULES must be exported');
+  assert.ok(
+    ZH_CN_RULES['STDLIB-PANIC-001'],
+    'zh-cn dictionary must register STDLIB-PANIC-001 translation',
+  );
+
+  const ruleCount = Object.keys(ZH_CN_RULES).length;
+  assert.ok(ruleCount >= 270, `ZH_CN_RULES must cover at least 270 rules, found: ${ruleCount}`);
+  console.log(
+    `✔ [PASS] Presentation dictionary is properly populated (${ruleCount} rules decoupled).`,
+  );
 
   console.log('✔ [PASS] Internationalization cleanliness guard passed completely.');
 }

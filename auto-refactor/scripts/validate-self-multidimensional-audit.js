@@ -16,8 +16,11 @@
  *   5. Gate 5 (Profile Scoring Precision Guard): Validates mass preservation,
  *      finite reproducibility, and domain-specific bias asymmetry for frontend, backend,
  *      and composite review profiles.
+ *   6. Gate 6 (Ten-Dimensional Trajectory Fidelity Guard): Asserts that .refactor-trajectory
+ *      records full 10-dimensional dynamic scores with zero mock padding and
+ *      at least 3 reactive dimensions.
  * Exit Semantics & Design Rationale: Modular function decomposition (< 10 cyclomatic complexity per
- *   function); process exits 0 if all 5 gates pass, 1 on regression.
+ *   function); process exits 0 if all 6 gates pass, 1 on regression.
  */
 'use strict';
 
@@ -305,6 +308,63 @@ function auditProfileScoringPrecision() {
   return true;
 }
 
+function auditTenDimensionalFidelity() {
+  console.log('[Gate 6] Ten-Dimensional Trajectory & Score Fidelity Guard');
+  const trajectoryFile = path.join(ROOT, '.refactor-trajectory', 'active-runs.ndjson');
+  if (!fs.existsSync(trajectoryFile)) {
+    console.error(`  ❌ [FAIL] Trajectory file not found at ${trajectoryFile}`);
+    return false;
+  }
+
+  const lines = fs.readFileSync(trajectoryFile, 'utf8').trim().split('\n').filter(Boolean);
+  if (lines.length === 0) {
+    console.error('  ❌ [FAIL] Trajectory file is empty');
+    return false;
+  }
+
+  const latestRun = JSON.parse(lines[lines.length - 1]);
+  if (!latestRun.score || !Array.isArray(latestRun.score.vec)) {
+    console.error('  ❌ [FAIL] Latest trajectory entry missing score.vec array');
+    return false;
+  }
+
+  const vec = latestRun.score.vec;
+  if (vec.length !== 10) {
+    console.error(`  ❌ [FAIL] score.vec has length ${vec.length}, expected 10 dimensions`);
+    return false;
+  }
+
+  for (let i = 0; i < vec.length; i++) {
+    const val = vec[i];
+    if (typeof val !== 'number' || Number.isNaN(val) || val < 0 || val > 100) {
+      console.error(`  ❌ [FAIL] Dimension index ${i} has invalid score: ${val}`);
+      return false;
+    }
+  }
+
+  const reactiveDimensions = vec.filter((v) => v < 100.0);
+  if (reactiveDimensions.length < 3) {
+    console.error(
+      `  ❌ [FAIL] Insufficient dynamic dimension reaction: only ${reactiveDimensions.length} < 100.0 (minimum 3 required for real ten-dimensional measurement)`,
+    );
+    return false;
+  }
+
+  const baselineFile = path.join(ROOT, 'reports', 'self-audit-baseline.json');
+  if (fs.existsSync(baselineFile)) {
+    const baseline = JSON.parse(fs.readFileSync(baselineFile, 'utf8'));
+    if (!baseline.tenDimensions || Object.keys(baseline.tenDimensions).length !== 10) {
+      console.error('  ❌ [FAIL] Baseline report missing complete tenDimensions map');
+      return false;
+    }
+  }
+
+  console.log(
+    `  ✔ [PASS] 10-dimensional vector confirmed (10 dims, ${reactiveDimensions.length} reactive dimensions, vector: [${vec.join(', ')}])\n`,
+  );
+  return true;
+}
+
 function runAudit() {
   console.log('=== auto-refactor Multidimensional Self-Audit Guard ===\n');
   const allFiles = getAllTsFiles(SRC_DIR);
@@ -316,6 +376,7 @@ function runAudit() {
     auditAstDensity(allFiles),
     auditBoundaryInteroperability(allFiles),
     auditProfileScoringPrecision(),
+    auditTenDimensionalFidelity(),
   ];
 
   const failedCount = results.filter((r) => !r).length;
@@ -325,7 +386,7 @@ function runAudit() {
   }
 
   console.log('=======================================================');
-  console.log(' ALL 5 MULTIDIMENSIONAL SELF-AUDIT GATES PASSED (100%)');
+  console.log(' ALL 6 MULTIDIMENSIONAL SELF-AUDIT GATES PASSED (100%)');
   console.log('=======================================================');
 }
 

@@ -223,6 +223,39 @@ def process_task(task_id: str):
 `,
   );
 
+  // Historical dossier nomenclature boundary violation (GOV-ARC-001)
+  write(
+    'src/domain/dossier_leak.ts',
+    `// Implements st_01_core milestone requirements
+export class MilestoneService {
+    public run(): void {}
+}
+`,
+  );
+
+  // Rule catalog drift and hallucination violation (GOV-RUL-001)
+  write(
+    'src/domain/rule_drift.ts',
+    `// Referencing unregistered rule FAKE-RUL-001
+export class DriftRuleService {
+    public run(): void {}
+}
+`,
+  );
+
+  // Cross-tier monolithic import blast radius violation (GOV-BLS-001)
+  write(
+    'src/domain/blast_radius_monolith.ts',
+    `import { DocSpec } from '../docs/specification';
+import { ConfigTable } from '../config/settings';
+import { OrderModel } from './models/order';
+
+export class MonolithService {
+    public run(): void {}
+}
+`,
+  );
+
   // Configuration enabling governance analyzer
   const config = {
     include: ['**/*.ts', '**/*.gd', '**/*.rs', '**/*.py'],
@@ -273,37 +306,43 @@ function verifyCoreCategories(govIssues) {
 }
 
 /**
+ * Checks whether an issue contains valid top-level governance properties.
+ */
+function hasValidGovernanceCore(issue) {
+  if (!issue || typeof issue !== 'object') return false;
+  if (issue.analyzer !== 'governance') return false;
+  return Boolean(issue.id && issue.rule && issue.severity && issue.message && issue.suggestion);
+}
+
+/**
+ * Checks whether an issue contains valid location and detail payloads.
+ */
+function hasValidGovernanceDetail(issue) {
+  const loc = issue.location;
+  if (!loc || !loc.file || !loc.start) return false;
+  const d = issue.detail;
+  if (!d || typeof d.fixable !== 'boolean' || !d.targetLanguage) return false;
+  return Boolean(d.category && d.risk && d.rationale);
+}
+
+/**
+ * Checks whether an issue strictly satisfies the governance diagnostic contract.
+ */
+function isValidGovernanceIssue(issue) {
+  return hasValidGovernanceCore(issue) && hasValidGovernanceDetail(issue);
+}
+
+/**
  * Verify the diagnostic schema contract on every governance finding.
  */
 function verifyOutputSchema(govIssues) {
   console.log('\n--- 3. Verifying the Diagnostic Output Schema ---');
-  let contractValid = true;
-  for (const issue of govIssues) {
-    const { id, analyzer, rule, severity, message, location, detail, suggestion } = issue;
-    if (
-      !id ||
-      analyzer !== 'governance' ||
-      !rule ||
-      !severity ||
-      !message ||
-      !location ||
-      !location.file ||
-      !location.start ||
-      !detail ||
-      !detail.category ||
-      !detail.risk ||
-      !detail.rationale ||
-      typeof detail.fixable !== 'boolean' ||
-      !detail.targetLanguage ||
-      !suggestion
-    ) {
-      contractValid = false;
-      console.error('Invalid issue contract:', issue);
-      break;
-    }
+  const invalid = govIssues.find((issue) => !isValidGovernanceIssue(issue));
+  if (invalid) {
+    console.error('Invalid issue contract:', invalid);
   }
   assert(
-    contractValid,
+    !invalid,
     'All findings strictly comply with the diagnostic output schema (location -> ' +
       'category -> risk -> rationale -> suggestion -> fixable)',
   );
@@ -503,8 +542,31 @@ async function run() {
   // 6. Verify Auto-Fixability Annotations
   verifyAutoFixability(issues);
 
-  // 7. Clean up and exit
+  // 7. Verify Modern Governance Enhancements (GOV-ARC-001, GOV-RUL-001, GOV-BLS-001)
+  verifyModernGovernanceEnhancements(govIssues);
+
+  // 8. Clean up and exit
   cleanupAndExit();
+}
+
+function verifyModernGovernanceEnhancements(govIssues) {
+  console.log(
+    '\n--- Verifying Modern Governance Enhancements (GOV-ARC-001, GOV-RUL-001, GOV-BLS-001) ---',
+  );
+  const arcIssues = govIssues.filter((i) => i.rule === 'GOV-ARC-001');
+  assert(
+    arcIssues.length >= 1,
+    'Must detect GOV-ARC-001 for historical dossier nomenclature outside archive',
+  );
+  assert(arcIssues[0]?.severity === 'warning', 'GOV-ARC-001 must have warning severity');
+
+  const rulIssues = govIssues.filter((i) => i.rule === 'GOV-RUL-001');
+  assert(rulIssues.length >= 1, 'Must detect GOV-RUL-001 for unregistered rule ID drift');
+  assert(rulIssues[0]?.severity === 'error', 'GOV-RUL-001 must have error severity');
+
+  const blsIssues = govIssues.filter((i) => i.rule === 'GOV-BLS-001');
+  assert(blsIssues.length >= 1, 'Must detect GOV-BLS-001 for cross-tier monolithic blast radius');
+  assert(blsIssues[0]?.severity === 'warning', 'GOV-BLS-001 must have warning severity');
 }
 
 run().catch((err) => {

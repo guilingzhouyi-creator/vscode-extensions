@@ -21,6 +21,7 @@ const {
   aggregateProjectScore,
   extractDomainName,
   TrajectoryAccumulator,
+  ALL_QUALITY_DIMENSIONS,
 } = require('../dist/api');
 
 const ROOT = path.join(__dirname, '..');
@@ -187,19 +188,9 @@ async function recordRunToTrajectory(
   startTime,
 ) {
   const trajectoryAccumulator = new TrajectoryAccumulator(TRAJECTORY_DIR);
-  const p = projectScore.eightPillars.pillars;
-  const scoreVector = [
-    p.architecture || 100,
-    p.maintainability || 100,
-    p.performance || 100,
-    p.data || 100,
-    p.testing || 100,
-    p.security || 100,
-    p.governance || 100,
-    p.evolution || 100,
-    100,
-    100,
-  ];
+  const scoreVector = ALL_QUALITY_DIMENSIONS.map((dim) => {
+    return projectScore.tenDimensions?.[dim] ?? 100.0;
+  });
 
   return trajectoryAccumulator.recordAuditRun({
     runId: `run-${snapshot.snapshotId}`,
@@ -262,6 +253,7 @@ function buildBaselineReport(params) {
       weights: projectScore.eightPillars.weights,
       ceilingsApplied: projectScore.eightPillars.ceilingsApplied,
     },
+    tenDimensions: projectScore.tenDimensions,
     topHotspots,
     technicalDebtLedger: {
       summary: debtByTier,
@@ -382,6 +374,17 @@ function printTerminalDashboard(report) {
     const bar = '█'.repeat(barLen) + '░'.repeat(20 - barLen);
     const pName = (pillar.charAt(0).toUpperCase() + pillar.slice(1)).padEnd(16, ' ');
     console.log(`  ${pName} : [${bar}] ${val.toFixed(1)}`);
+  }
+
+  if (report.tenDimensions) {
+    console.log('\n--- [Ten-Dimensional Micro-Quality Indices] ---');
+    for (const [dim, val] of Object.entries(report.tenDimensions)) {
+      const numVal = typeof val === 'number' ? val : 100;
+      const barLen = Math.round(numVal / 5);
+      const bar = '█'.repeat(barLen) + '░'.repeat(20 - barLen);
+      const dName = dim.padEnd(24, ' ');
+      console.log(`  ${dName} : [${bar}] ${numVal.toFixed(1)}`);
+    }
   }
 
   console.log('\n--- [Technical Debt Ledger Breakdown] ---');

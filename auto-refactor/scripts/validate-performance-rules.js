@@ -276,7 +276,57 @@ export function spawnEnemies(waves: number[]): void {
     gdMem002.some((i) => i.suggestion && i.suggestion.includes('object pool')),
     'GDScript PRF-MEM-002 must recommend object pool',
   );
-  console.log('✔ Cross-language PRF-MEM-002 (ADV-PRF-002) object pooling contracts verified.');
+  // 8. Test PRF-ALG-002: Linear Collection Lookup inside Loop Body (O(N*M))
+  const tsLinearLookupCode = `
+export function matchEntities(users: any[], profiles: any[]): any[] {
+    const results = [];
+    for (let i = 0; i < users.length; i++) {
+        const profile = profiles.find((p) => p.userId === users[i].id);
+        const hasRole = users[i].roles.includes('admin');
+        if (profile) results.push({ user: users[i], profile });
+    }
+    return results;
+}
+`;
+  const tsLinearCtx = {
+    filePath: 'src/matcher.ts',
+    content: tsLinearLookupCode,
+    options: { checkLinearLookups: true },
+    config: {},
+  };
+  const tsLinearIssues = perfAnalyzer.analyze(null, tsLinearCtx);
+  const alg002Issues = tsLinearIssues.filter((i) => i.rule === 'PRF-ALG-002');
+  assert.strictEqual(
+    alg002Issues.length,
+    2,
+    'Must detect 2 linear collection lookups (.find and .includes)',
+  );
+  assert.strictEqual(alg002Issues[0].severity, 'warning');
+  assert.ok(alg002Issues[0].message.includes('find'));
+  assert.ok(alg002Issues[0].suggestion.includes('Map'));
+  assert.ok(alg002Issues[1].message.includes('includes'));
+
+  // Pre-indexed Map lookup should NOT trigger PRF-ALG-002
+  const cleanMapLookupCode = `
+export function matchEntitiesClean(users: any[], profileMap: Map<string, any>): any[] {
+    const results = [];
+    for (let i = 0; i < users.length; i++) {
+        const profile = profileMap.get(users[i].id);
+        if (profile) results.push({ user: users[i], profile });
+    }
+    return results;
+}
+`;
+  const cleanLinearCtx = {
+    filePath: 'src/cleanMatcher.ts',
+    content: cleanMapLookupCode,
+    options: { checkLinearLookups: true },
+    config: {},
+  };
+  const cleanLinearIssues = perfAnalyzer.analyze(null, cleanLinearCtx);
+  const cleanAlg002 = cleanLinearIssues.filter((i) => i.rule === 'PRF-ALG-002');
+  assert.strictEqual(cleanAlg002.length, 0, 'Pre-indexed Map lookups must not trigger PRF-ALG-002');
+  console.log('✔ PRF-ALG-002 linear collection lookup in loop detected and verified.');
 
   console.log('\n=== All Performance Rules Performance & Algorithmic Auditing Tests PASSED ===');
 }

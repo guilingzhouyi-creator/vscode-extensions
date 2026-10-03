@@ -40,6 +40,32 @@ function inspectFileForEmptiness(fullPath, findings) {
         reason: 'Whitespace-only empty file',
         size: stat.size,
       });
+      return;
+    }
+
+    // Detect vacuous trampoline / forwarding shim files (ARCH-ABS-001):
+    // <= 2 lines of code purely forwarding to a child/sub index.
+    if (fullPath.endsWith('.ts') || fullPath.endsWith('.js')) {
+      const stripped = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').trim();
+      const codeLines = stripped
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (
+        codeLines.length <= 2 &&
+        codeLines.some((l) =>
+          /^(?:export\s+\*\s+from|export\s*\{[^}]*\}\s*from|module\.exports\s*=)\s*['"]\.\/[^'"]+\/index['"]/.test(
+            l,
+          ),
+        )
+      ) {
+        findings.push({
+          path: fullPath,
+          reason:
+            'Vacuous forwarding trampoline (ARCH-ABS-001): file only re-exports sub-index without local orchestration or substance',
+          size: stat.size,
+        });
+      }
     }
   } catch (err) {
     console.error(`Error reading file ${fullPath}: ${err.message}`);

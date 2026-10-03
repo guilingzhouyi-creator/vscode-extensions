@@ -141,6 +141,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-data-architecture', script: 'scripts/validate-data-architecture.js' },
   { name: 'validate-test-modernity', script: 'scripts/validate-test-modernity.js' },
   { name: 'validate-meta-architecture', script: 'scripts/validate-meta-architecture.js' },
+  { name: 'validate-facade-governance', script: 'scripts/validate-facade-governance.js' },
   { name: 'validate-quality-quantification', script: 'scripts/validate-quality-quantification.js' },
   { name: 'validate-static-quality-model', script: 'scripts/validate-static-quality-model.js' },
   { name: 'validate-dynamic-quality-model', script: 'scripts/validate-dynamic-quality-model.js' },

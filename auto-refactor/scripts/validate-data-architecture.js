@@ -18,7 +18,6 @@ const {
   SemanticGraph,
   analyzeDataArchitectureWithGraph,
   auditDataArchitectureSource,
-  defaultDataArchitectureEvaluator,
   defaultPraxisGovernanceService,
 } = require('../dist/api');
 
@@ -217,10 +216,26 @@ export class CleanInvoiceService {
   );
   console.log('✔ Clean batch data access diff passed successfully.');
 
-  // 6. Evaluator Object Contract Audit
-  const evalIssues = defaultDataArchitectureEvaluator.audit('src/services/test.ts', 'const x = 1;');
-  assert.strictEqual(Array.isArray(evalIssues), true);
-  console.log('✔ defaultDataArchitectureEvaluator instance interface verified.');
+  // 7. Resource Registry Bidirectional Integrity & Dangling Path (DAT-RES-001)
+  const danglingResourceCode = `
+export class AssetRegistry {
+    public registerAll(): void {
+        register_resource("hero_sprite", "");
+        register_resource("valid_sprite", "res://assets/sprites/valid.png");
+        registerResource("dangling_ui", "res://");
+    }
+}
+`;
+  const resIssues = auditDataArchitectureSource(
+    'src/domains/assets/registry.ts',
+    danglingResourceCode,
+  );
+  const datResIssues = resIssues.filter((i) => i.rule === 'DAT-RES-001');
+  assert.strictEqual(datResIssues.length, 2, 'Must detect 2 dangling/empty resource registrations');
+  assert.strictEqual(datResIssues[0].severity, 'warning');
+  assert.ok(datResIssues[0].message.includes('hero_sprite'));
+  assert.ok(datResIssues[1].message.includes('dangling_ui'));
+  console.log('✔ Resource registry dangling/empty asset detection (DAT-RES-001) verified.');
 
   console.log('\n=== All Data Architecture Data Architecture & Query Governance Tests PASSED ===');
 }
