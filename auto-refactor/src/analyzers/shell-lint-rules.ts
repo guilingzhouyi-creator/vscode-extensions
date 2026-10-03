@@ -417,7 +417,8 @@ export function checkUnquotedVariables(
  * @param emit - Issue emission callback.
  */
 export function checkShellDocContract(lines: string[], filePath: string, emit: ShellEmitter): void {
-    const isScriptDir = filePath.includes('/scripts/') || filePath.startsWith('scripts/');
+    const norm = filePath.replace(/\\/g, '/');
+    const isScriptDir = norm.includes('/scripts/') || norm.startsWith('scripts/');
     if (lines.length < 30 && !isScriptDir) return;
 
     const maxScan = Math.min(lines.length, 30);
@@ -447,7 +448,8 @@ export function checkPowerShellDocContract(
     filePath: string,
     emit: ShellEmitter,
 ): void {
-    const isScriptDir = filePath.includes('/scripts/') || filePath.startsWith('scripts/');
+    const norm = filePath.replace(/\\/g, '/');
+    const isScriptDir = norm.includes('/scripts/') || norm.startsWith('scripts/');
     if (lines.length < 30 && !isScriptDir) return;
 
     const maxScan = Math.min(lines.length, 30);

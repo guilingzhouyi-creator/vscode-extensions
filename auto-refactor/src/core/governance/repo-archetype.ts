@@ -323,7 +323,52 @@ function detectCi(root: string): RepoArchetypeContext['ci'] {
 }
 
 /**
- * Discover gate/audit/check runner scripts in scripts/ or tools/.
+ * Predicate checking whether a file name matches gate runner or catalog patterns.
+ *
+ * @param entry - Base file name.
+ * @returns True if entry is relevant to gate infrastructure.
+ */
+function isCandidateGateFileName(entry: string): boolean {
+    return (
+        /gate|audit|check|verify|lint|hygiene|commit|push|catalog|review-rules/i.test(entry) &&
+        /\.(?:sh|ps1|py|js|mjs|ts|json)$/i.test(entry)
+    );
+}
+
+/**
+ * Recursively collect candidate gate script paths up to bounded depth.
+ *
+ * @param dirPath - Current directory path.
+ * @param depth - Current recursion depth (0-indexed).
+ * @param maxDepth - Maximum recursion depth.
+ * @returns Array of absolute file paths matching gate patterns.
+ */
+function collectCandidateGateFiles(dirPath: string, depth = 0, maxDepth = 2): string[] {
+    if (depth > maxDepth || !fs.existsSync(dirPath)) return [];
+    const files: string[] = [];
+    const entries = safeReadDir(dirPath);
+
+    for (const entry of entries) {
+        if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') {
+            continue;
+        }
+        const full = path.join(dirPath, entry);
+        try {
+            const stat = fs.statSync(full);
+            if (stat.isDirectory()) {
+                files.push(...collectCandidateGateFiles(full, depth + 1, maxDepth));
+            } else if (stat.isFile() && isCandidateGateFileName(entry)) {
+                files.push(full);
+            }
+        } catch {
+            // Ignored on stat permission failure
+        }
+    }
+    return files;
+}
+
+/**
+ * Discover gate/audit/check runner scripts in scripts/ or tools/ recursively.
  */
 function detectGateScripts(root: string): RepoArchetypeContext['gateScripts'] {
     const result: RepoArchetypeContext['gateScripts'] = {
@@ -339,17 +384,13 @@ function detectGateScripts(root: string): RepoArchetypeContext['gateScripts'] {
     ];
 
     for (const dir of scriptDirs) {
-        if (!fs.existsSync(dir)) continue;
-        const entries = safeReadDir(dir);
-        for (const entry of entries) {
-            if (/gate|audit|check|verify|lint|hygiene|commit|push/i.test(entry)) {
-                const filePath = path.join(dir, entry);
-                const content = safeReadFile(filePath);
-                if (content !== undefined) {
-                    const rel = path.relative(root, filePath).replace(/\\/g, '/');
-                    result.files.push(rel);
-                    result.contents[rel] = content;
-                }
+        const candidatePaths = collectCandidateGateFiles(dir);
+        for (const filePath of candidatePaths) {
+            const content = safeReadFile(filePath);
+            if (content !== undefined) {
+                const rel = path.relative(root, filePath).replace(/\\/g, '/');
+                result.files.push(rel);
+                result.contents[rel] = content;
             }
         }
     }

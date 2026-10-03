@@ -70,12 +70,22 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 
     // 1.2 Polyglot project (Node + Rust)
     fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "test-rust"');
+    // Nested gate scripts under scripts/ps1 and scripts/sh
+    fs.mkdirSync(path.join(dir, 'scripts', 'ps1'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'scripts', 'sh'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'scripts', 'ps1', 'pre-commit-gate.ps1'), '# ps1 gate');
+    fs.writeFileSync(path.join(dir, 'scripts', 'sh', 'pre-commit-gate.sh'), '# sh gate');
+
     ctx = inspectRepoArchetype(dir);
     assert.strictEqual(ctx.primaryArchetype, 'polyglot');
     assert.ok(ctx.archetypes.includes('node'));
     assert.ok(ctx.archetypes.includes('rust'));
+    assert.ok(ctx.gateScripts.files.some((f) => f.includes('pre-commit-gate.ps1')));
+    assert.ok(ctx.gateScripts.files.some((f) => f.includes('pre-commit-gate.sh')));
 
-    console.log('  [PASS] 1. Universal repository archetype detection (Node, Rust, Polyglot)');
+    console.log(
+      '  [PASS] 1. Universal repository archetype detection (Node, Rust, Polyglot, Nested Gate Scripts)',
+    );
   } finally {
     cleanTempDir(dir);
   }
@@ -265,6 +275,32 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     const isoIssue = result.issues.find((i) => i.rule === 'GATE-ISO-001');
     assert.ok(isoIssue, 'Expected GATE-ISO-001 for unmirrored CI lint check');
     assert.strictEqual(isoIssue.severity, 'warning');
+
+    // Subtest: Hooks exist, but CI workflow is missing completely
+    const dirNoCi = createTempDir('hooks-no-ci');
+    try {
+      fs.mkdirSync(path.join(dirNoCi, '.githooks'), { recursive: true });
+      fs.writeFileSync(
+        path.join(dirNoCi, '.githooks', 'pre-commit'),
+        '#!/usr/bin/env bash\nset -euo pipefail\nif [ ! -s "$1" ]; then exit 1; fi\n',
+      );
+      fs.writeFileSync(
+        path.join(dirNoCi, '.githooks', 'commit-msg'),
+        '#!/usr/bin/env bash\nset -euo pipefail\n# feat: test\n',
+      );
+      fs.writeFileSync(
+        path.join(dirNoCi, '.githooks', 'pre-push'),
+        '#!/usr/bin/env bash\nset -euo pipefail\nnpm test\n',
+      );
+      const resultNoCi = auditGateArchitecture(dirNoCi);
+      const isoNoCiIssue = resultNoCi.issues.find((i) => i.rule === 'GATE-ISO-001');
+      assert.ok(isoNoCiIssue, 'Expected GATE-ISO-001 when CI workflow is missing completely');
+      assert.strictEqual(isoNoCiIssue.severity, 'warning');
+      assert.ok(isoNoCiIssue.actionable, 'Expected actionable payload for missing CI');
+      assert.strictEqual(isoNoCiIssue.actionable.code, 'GATE-ISO-001');
+    } finally {
+      cleanTempDir(dirNoCi);
+    }
 
     console.log('  [PASS] 8. GATE-ISO-001: Discrepancy between CI and local hooks identified');
   } finally {

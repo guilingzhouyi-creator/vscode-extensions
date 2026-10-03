@@ -16,6 +16,7 @@
  *   never throws. Attaches structured scaffolding instructions for automated remediation.
  */
 
+import * as path from 'path';
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { auditGateArchitecture } from '../core/governance/gate-governance';
@@ -38,7 +39,39 @@ const GATE_PATH_PATTERN = /(?:\.githooks|\.husky|\.github\/workflows|\.gitlab-ci
  * @returns True if the path warrants gate architecture audit.
  */
 function isGateCandidateFile(normPath: string): boolean {
-    return GATE_MANIFEST_NAMES.has(normPath) || GATE_PATH_PATTERN.test(normPath);
+    const base = path.basename(normPath);
+    return GATE_MANIFEST_NAMES.has(base) || GATE_PATH_PATTERN.test(normPath);
+}
+
+/**
+ * Checks whether the relative path represents a root-level primary project manifest.
+ *
+ * @param relPath - Path relative to repo root.
+ * @returns True if file is a primary manifest anchor.
+ */
+function isPrimaryManifestFile(relPath: string): boolean {
+    return (
+        relPath === 'package.json' ||
+        relPath === 'Cargo.toml' ||
+        relPath === 'pyproject.toml' ||
+        relPath === 'go.mod' ||
+        relPath === 'project.godot'
+    );
+}
+
+/**
+ * Checks whether an issue location represents a repository-wide logical anchor.
+ *
+ * @param locationFile - Issue location file string.
+ * @returns True if location is a repo-level anchor.
+ */
+function isRepoLevelAnchor(locationFile: string): boolean {
+    return (
+        locationFile === '.' ||
+        locationFile === 'scripts' ||
+        locationFile === '.githooks' ||
+        locationFile === '.husky'
+    );
 }
 
 /**
@@ -71,19 +104,29 @@ export class GateArchitectureAnalyzer implements Analyzer {
         const options = (ctx.config?.analyzers?.['gate-architecture']?.options ||
             {}) as GateGovernanceOptions;
 
-        // Resolve workspace/repo root from process.cwd() or filePath context
-        const repoRoot = process.cwd();
+        // Resolve workspace/repo root from config or process.cwd()
+        const repoRoot = (ctx.config?.root || process.cwd()).replace(/\\/g, '/');
+        const absFilePath = path.resolve(ctx.filePath).replace(/\\/g, '/');
+        const relPath = path.relative(repoRoot, absFilePath).replace(/\\/g, '/');
 
         // Cached lookup per root directory to prevent redundant audits across multiple files
-        if (GateArchitectureAnalyzer.auditCache.has(repoRoot)) {
-            const cachedIssues = GateArchitectureAnalyzer.auditCache.get(repoRoot)!;
-            // Only return issues matching current file context to avoid duplicate reporting
-            return cachedIssues.filter((issue) => issue.location.file === normPath);
-        }
+        const issues = GateArchitectureAnalyzer.auditCache.has(repoRoot)
+            ? GateArchitectureAnalyzer.auditCache.get(repoRoot)!
+            : this.executeAndCacheAudit(repoRoot, options);
 
+        const isManifest = isPrimaryManifestFile(relPath);
+
+        return issues.filter((issue) => {
+            const issueFile = issue.location.file;
+            if (issueFile === relPath || issueFile === normPath) return true;
+            if (isManifest && isRepoLevelAnchor(issueFile)) return true;
+            return false;
+        });
+    }
+
+    private executeAndCacheAudit(repoRoot: string, options: GateGovernanceOptions): Issue[] {
         const result = auditGateArchitecture(repoRoot, options);
         GateArchitectureAnalyzer.auditCache.set(repoRoot, result.issues);
-
-        return result.issues.filter((issue) => issue.location.file === normPath);
+        return result.issues;
     }
 }

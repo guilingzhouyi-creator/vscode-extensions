@@ -139,6 +139,31 @@ function auditMissingGates(context: RepoArchetypeContext, issues: Issue[]): bool
                 scaffold,
             ),
         );
+        return false;
+    }
+
+    // Local hooks exist, but remote CI pipeline is completely missing
+    if (hasHooks && !hasCi) {
+        const scaffold = generateGateScaffold(context, 'GATE-ISO-001');
+        issues.push(
+            createGateIssue(
+                'GATE-ISO-001',
+                context.manifests.packageJson
+                    ? 'package.json'
+                    : context.manifests.cargoToml
+                      ? 'Cargo.toml'
+                      : '.',
+                1,
+                SEVERITY_WARNING,
+                'high',
+                'architecture',
+                `Repository has local Git hooks but lacks a remote CI pipeline (Tier 2 Remote Gate missing for ${context.primaryArchetype} project).`,
+                'Set up a remote CI workflow (e.g. .github/workflows/ci.yml) to mirror local gate checks on pull requests and pushes.',
+                'Relying solely on local hooks cannot enforce quality standards against bypassed commits (--no-verify) or external contributions.',
+                scaffold,
+            ),
+        );
+        return false;
     }
 
     return false;
