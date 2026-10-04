@@ -23,6 +23,8 @@ import type { IPraxisSliceAuditService } from '../sliceAuditService';
 import { defaultPraxisSliceAuditService } from '../sliceAuditService';
 import type { IPraxisI18nProvider, PraxisLocale } from './i18n-types';
 import { defaultPraxisI18nProvider } from './i18n-provider';
+import type { ScanReport } from '../../types';
+import { resolveRuleTaxonomy } from '../../governance/standard-terminology';
 import type {
     IPraxisPresentationService,
     PraxisBadgeColor,
@@ -99,9 +101,10 @@ function buildDiagnosticCard(
     const message = ruleInfo?.summary || directive.summary;
     const remediation = ruleInfo?.remediation || directive.fixHint || common.defaultCategoryTitle;
 
+    const act = directive.actionable;
     let quickFixSnippet: string | undefined;
-    if (options?.includeQuickFix !== false && directive.fixHint) {
-        quickFixSnippet = directive.fixHint;
+    if (options?.includeQuickFix !== false) {
+        quickFixSnippet = act?.templateSnippet || directive.fixHint;
     }
 
     let docsUrl: string | undefined;
@@ -110,6 +113,10 @@ function buildDiagnosticCard(
         docsUrl = `${cleanBase}/${directive.ruleId}`;
     }
 
+    const taxonomy = act?.taxonomy ?? resolveRuleTaxonomy(directive.ruleId);
+    const actionVerb = act?.action;
+    const safeToAutomate = act?.safeToAutomate;
+    const targetArguments = act?.targetArguments;
     const id = `${directive.file}:${directive.line}:${directive.ruleId}`;
 
     return {
@@ -125,6 +132,10 @@ function buildDiagnosticCard(
         remediation,
         quickFixSnippet,
         docsUrl,
+        taxonomy,
+        actionVerb,
+        safeToAutomate,
+        targetArguments,
         sourceAgentDirective: directive.renderedDirective,
     };
 }
@@ -243,6 +254,18 @@ export class PraxisPresentationAdapter implements IPraxisPresentationService {
         options?: PraxisPresentationOptions,
     ): PraxisPresentationPayload {
         const agentPrompt = formatCompactAgentPrompt(target, verdict.issues);
+        return this.toPresentation(agentPrompt, options);
+    }
+
+    /**
+     * Converts a full ScanReport to a rich UI presentation payload.
+     */
+    public fromScanReport(
+        report: ScanReport,
+        options?: PraxisPresentationOptions,
+    ): PraxisPresentationPayload {
+        const target = report.root || 'workspace';
+        const agentPrompt = formatCompactAgentPrompt(target, report.issues);
         return this.toPresentation(agentPrompt, options);
     }
 

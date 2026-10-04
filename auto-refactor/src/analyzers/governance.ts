@@ -30,6 +30,14 @@ import { maskedLinesOf } from '../core/policy/source-mask';
 import { TypeScriptAdapter } from '../core/ast/typescript-adapter';
 import type { GovernanceRegistry } from '../core/governance/registry';
 import { getDefaultGovernanceRegistry } from '../core/governance/registry';
+import type { AgentActionablePayload } from '../core/types';
+import { resolveRuleTaxonomy } from '../core/governance/standard-terminology';
+import {
+    CODE_NUM_PRECISION_LOSSY,
+    CODE_GOV_PROSE_SANITIZATION,
+    CODE_GOV_LOGIC_GUARD,
+    CODE_GOV_FACADE_DECOUPLING,
+} from '../core/constants/rule-codes';
 
 /**
  * Modern Governance & Code Quality Analyzer for registry-driven cross-language gating.
@@ -212,6 +220,75 @@ export class GovernanceAnalyzer implements Analyzer {
         }
     }
 
+    private deriveGovernanceActionable(
+        v: GovernanceViolation,
+        _loc: IssueLocation,
+    ): AgentActionablePayload | undefined {
+        if (v.actionable) {
+            return v.actionable;
+        }
+
+        const taxonomy = resolveRuleTaxonomy(v.ruleId);
+        if (v.ruleId === 'NUM-PREC-001') {
+            return {
+                action: 'align_numeric_precision',
+                code: CODE_NUM_PRECISION_LOSSY,
+                taxonomy,
+                safeToAutomate: true,
+                templateSnippet: 'Math.round(val * 100) / 100 + 0',
+                targetArguments: {
+                    matchedExpression: v.customDetail?.matchedExpression,
+                    standardPrecision: 0.01,
+                },
+            };
+        }
+        if (v.ruleId === 'GOV-SAN-002') {
+            return {
+                action: 'sanitize_prose_terminology',
+                code: CODE_GOV_PROSE_SANITIZATION,
+                taxonomy,
+                safeToAutomate: false,
+                templateSnippet: 'State verifiable technical scope and bounds.',
+                targetArguments: {
+                    forbiddenTerm: v.customDetail?.term,
+                    category: v.customDetail?.category,
+                },
+            };
+        }
+        if (v.ruleId === 'GOV-LOG-001') {
+            return {
+                action: 'apply_guard_clause',
+                code: CODE_GOV_LOGIC_GUARD,
+                taxonomy,
+                safeToAutomate: true,
+                templateSnippet: 'if (!condition) return defaultValue;',
+                targetArguments: {
+                    maxNesting: v.customDetail?.maxNesting,
+                    threshold: v.customDetail?.threshold,
+                },
+            };
+        }
+        if (v.ruleId === 'GOV-LOG-002' || v.ruleId === 'ARCH-FAC-001') {
+            return {
+                action: 'decouple_facade',
+                code: CODE_GOV_FACADE_DECOUPLING,
+                taxonomy,
+                safeToAutomate: false,
+                templateSnippet: 'Inline export target or add substantive contract logic.',
+            };
+        }
+        if (v.suggestedPatch) {
+            return {
+                action: 'replace_token',
+                code: `AR:GOV:${v.ruleId.replace(/[^A-Za-z0-9]/g, '_')}`,
+                taxonomy,
+                safeToAutomate: Boolean(v.fixable),
+                templateSnippet: v.suggestedPatch,
+            };
+        }
+        return undefined;
+    }
+
     private recordViolationIssue(
         v: GovernanceViolation,
         ctx: AnalyzerContext,
@@ -257,6 +334,10 @@ export class GovernanceAnalyzer implements Analyzer {
             detail,
             suggestion: v.suggestion,
         };
+        const actionable = this.deriveGovernanceActionable(v, loc);
+        if (actionable) {
+            issue.actionable = actionable;
+        }
         if (v.evidence) {
             issue.evidence = v.evidence;
         }

@@ -18,6 +18,7 @@
  */
 
 import type { ScanReport } from '../types';
+import { toAgentReview, toCapp, toPraxisPresentation } from './agent-review-reporter';
 
 /**
  * Public contract for a pluggable report renderer: a stable, case-insensitive `name` used as
@@ -255,5 +256,29 @@ registerReporter({
     <text x="86.5" y="14">${score}</text>
   </g>
 </svg>`;
+    },
+});
+
+// 5. Agent Reporter
+registerReporter({
+    name: 'agent',
+    format(report: ScanReport, options?: Record<string, unknown>): string {
+        return toAgentReview(report, options as any);
+    },
+});
+
+// 6. CAPP Reporter
+registerReporter({
+    name: 'capp',
+    format(report: ScanReport): string {
+        return toCapp(report);
+    },
+});
+
+// 7. Praxis Presentation Reporter
+registerReporter({
+    name: 'praxis',
+    format(report: ScanReport, options?: Record<string, unknown>): string {
+        return toPraxisPresentation(report, options as any);
     },
 });

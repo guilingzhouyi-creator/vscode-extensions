@@ -25,6 +25,11 @@ import type {
     TestDebtTicket,
     TestModernityMetricSummary,
 } from '../types';
+import {
+    CODE_TST_SKIPPED,
+    CODE_TST_TAUTOLOGICAL,
+    CODE_TST_FRAGILE_FLOAT,
+} from '../constants/rule-codes';
 
 /**
  * Descriptor of a test case or suite site.
@@ -249,6 +254,13 @@ function createSkippedTestIssue(site: TestSite): Issue {
             confidence: 1.0,
             requiresRuntime: false,
         },
+        actionable: {
+            action: 'simplify_control_flow',
+            code: CODE_TST_SKIPPED,
+            taxonomy: 'TEST_MODERN',
+            safeToAutomate: false,
+            templateSnippet: 'Re-enable test and verify assertions.',
+        },
     };
 }
 
@@ -302,6 +314,13 @@ function createTautologicalIssue(site: TestSite): Issue {
         evidence: {
             confidence: 1.0,
             requiresRuntime: false,
+        },
+        actionable: {
+            action: 'extract_pure_predicate',
+            code: CODE_TST_TAUTOLOGICAL,
+            taxonomy: 'TEST_MODERN',
+            safeToAutomate: false,
+            templateSnippet: 'expect(result).toBe(expectedBusinessValue);',
         },
     };
 }
@@ -358,6 +377,17 @@ function createFragileFloatIssue(site: TestSite): Issue {
         evidence: {
             confidence: 1.0,
             requiresRuntime: false,
+        },
+        actionable: {
+            action: 'replace_with_tolerance_assertion',
+            code: CODE_TST_FRAGILE_FLOAT,
+            taxonomy: 'TEST_MODERN',
+            safeToAutomate: true,
+            templateSnippet: `expect(actual).toBeCloseTo(${floatLit}, 2);`,
+            targetArguments: {
+                targetLiteral: floatLit,
+                toleranceDecimals: 2,
+            },
         },
     };
 }

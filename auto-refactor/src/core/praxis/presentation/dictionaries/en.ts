@@ -113,4 +113,61 @@ export const EN_RULES: Record<string, PraxisRuleI18nEntry> = {
         rationale:
             'Wildcard re-exports increase name collisions and enlarge final distribution bundles.',
     },
+    'NUM-PREC-001': {
+        name: 'Lossy Precision Truncation Governance',
+        summary:
+            'Low-precision rounding (* 10 / 10 or toFixed(1)) or mismatched scaling detected, introducing IEEE 754 truncation drift.',
+        remediation:
+            'Align numeric rounding to standard 0.01 precision (e.g. SCORE_ROUNDING = 100) and normalize -0 differences.',
+        rationale:
+            'Lossy 0.1 truncation leads to false equivalence and corrupted multi-axis score arbitration.',
+    },
+    'TST-FLT-001': {
+        name: 'Fragile Floating-Point Assertion',
+        summary:
+            'Test case performs direct strict equality assertion against naked float literal without tolerance.',
+        remediation:
+            'Replace with tolerance matcher (e.g. toBeCloseTo(expected, 2)) or shared formula derivation.',
+        rationale:
+            'Subtle cross-platform floating-point epsilon variations cause intermittent test suite failures.',
+    },
+    'GOV-SAN-002': {
+        name: 'Objective Technical Prose Sanitization',
+        summary:
+            'Comments or documentation contain promotional slogans, hyperbole, or casual markers.',
+        remediation:
+            'Replace with objective, verifiable technical statements specifying exact boundaries and mechanisms.',
+        rationale:
+            'Documentation and source comments must remain purely factual and avoid subjective claims.',
+    },
+    'ADV-CMP-001': {
+        name: 'High Cyclomatic Complexity',
+        summary: 'Function cyclomatic complexity exceeds budget, creating high cognitive load.',
+        remediation: 'Extract pure predicate helpers or use lookup table strategy pattern.',
+        rationale: 'High cyclomatic complexity exponentially multiplies untested control branches.',
+    },
+    'ADV-NST-001': {
+        name: 'Excessive Control Flow Nesting',
+        summary: 'Control flow nesting depth exceeds budget, impeding readability.',
+        remediation: 'Use guard clauses with early returns to flatten nested indentation.',
+        rationale:
+            'Deep indentation strains cognitive reasoning and impedes automated refactoring.',
+    },
+    'GOV-LOG-001': {
+        name: 'Control Flow Nesting Depth Constraint',
+        summary:
+            'Deeply nested control flows (> 5 levels) create high cognitive load and defect risk.',
+        remediation:
+            'Refactor with guard clauses (early returns) or extract nested logic into sub-functions.',
+        rationale: 'Flat control flows improve readability and isolate failure domains.',
+    },
+    'GOV-LOG-002': {
+        name: 'Vacuous Pass-through Wrapper Governance',
+        summary:
+            'Function or facade layer merely forwards calls without translation, validation, or contract checks.',
+        remediation:
+            'Inline call sites and remove trampoline module, or add substantive validation logic.',
+        rationale:
+            'Vacuous wrapper files introduce indirection without delivering architectural value.',
+    },
 };

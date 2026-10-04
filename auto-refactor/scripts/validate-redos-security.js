@@ -271,7 +271,7 @@ const jargonPatterns = [
 
 const safeJargon = jargonPatterns.filter((p) => isRegexSafe(p));
 assert(safeJargon.length > 0, 'Should find safe jargon patterns');
-// (wip|todo)+ has alternation inside + quantifier → should be flagged
+// Alternation inside a quantifier is flagged as vulnerable to polynomial backtracking
 const hasUnsafe = jargonPatterns.some((p) => !isRegexSafe(p));
 assert(hasUnsafe, 'At least one jargon pattern is correctly flagged as unsafe');
 

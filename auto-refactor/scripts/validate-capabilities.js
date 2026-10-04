@@ -122,7 +122,7 @@ async function main() {
   console.log('✔ AbortSignal cooperative cancellation verified.');
 
   console.log('\n=== [4/7] Testing Maturity Tiers Dynamic Tuning ===');
-  // Demo tier
+  // Assert prototype sample directory classifies as demo maturity tier
   const demoTier = detectMaturityTier(path.join(__dirname, '../samples'));
   assert.strictEqual(demoTier, 'demo');
 

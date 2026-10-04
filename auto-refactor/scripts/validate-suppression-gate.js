@@ -11,9 +11,10 @@
  *     four, then assert the suppressed tree exits 0 with the finding still visible and marked new,
  *     and that the unsuppressed control tree exits 1 under the same severity threshold
  * Exit Semantics & Design Rationale: Rejects on the first failed assertion and exits 1 so CI fails
- *     loudly. The control tree keeps the case honest: without it, a gate that never fails anything
- *     would pass the suppression assertion. The ratchet-credit half of the same contract lives in
- *     validate-baseline-ratchet.js so neither file outgrows the large-file threshold.
+ *     loudly. The control tree keeps the case valid: without it, a gate that misses all
+ *     failure conditions would trivially pass the suppression assertion. The ratchet-credit
+ *     half of the same contract lives in validate-baseline-ratchet.js so neither file
+ *     outgrows the large-file threshold.
  */
 'use strict';
 

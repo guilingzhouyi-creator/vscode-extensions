@@ -18,7 +18,7 @@
  */
 import type { ReviewMemoryRecord, CodeDomainFingerprint } from '../memory/types';
 import type { FileChangeTrajectory } from '../trajectory/types';
-import type { Issue } from '../types';
+import type { Issue, AgentActionablePayload } from '../types';
 import { GuidanceMessages } from '../messages';
 
 /** Maximum number of memory rule hits rendered as frequent violations in the guidance prompt. */
@@ -276,7 +276,7 @@ const VERDICT_PASS = 'PASS' as const;
 const SEVERITY_ERROR = 'error' as const;
 const SEVERITY_WARNING = 'warning' as const;
 const CHARS_PER_TOKEN = 4;
-const BASELINE_CHARS_PER_DIRECTIVE = 350;
+const BASELINE_CHARS_PER_DIRECTIVE = 600;
 const BASELINE_HEADER_CHARS = 200;
 const ZERO_DIRECTIVE_SAVINGS_RATIO = 0.95;
 
@@ -294,6 +294,7 @@ export interface CompactGuardDirective {
     line: number;
     summary: string;
     fixHint?: string;
+    actionable?: AgentActionablePayload;
     renderedDirective: string;
 }
 
@@ -304,7 +305,7 @@ export interface CompactGuardDirective {
  * focusing exclusively on actionable directives within active edit scopes.
  */
 export interface CompactAgentPrompt {
-    protocolVersion: '1.0';
+    protocolVersion: '1.0' | '2.0';
     target: string;
     verdict: typeof VERDICT_PASS | typeof VERDICT_WARN | typeof VERDICT_BLOCK;
     directives: CompactGuardDirective[];
@@ -337,7 +338,11 @@ export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective
     const summary = (issue.message || '').replace(/\s+/g, ' ').trim();
     const fixHint = issue.suggestion ? issue.suggestion.replace(/\s+/g, ' ').trim() : undefined;
     const fixPart = fixHint ? ` Fix: ${fixHint}` : '';
-    const renderedDirective = `[GUARD|${sev}|${ruleId}] ${file}:${line} -> ${summary}.${fixPart}`;
+    const actionable = issue.actionable;
+    const actionPart = actionable
+        ? ` -> action:${actionable.action} [safe=${actionable.safeToAutomate}]`
+        : '';
+    const renderedDirective = `[GUARD|${sev}|${ruleId}] ${file}:${line} -> ${summary}.${fixPart}${actionPart}`;
 
     return {
         severity: sev,
@@ -346,6 +351,7 @@ export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective
         line,
         summary,
         fixHint,
+        actionable,
         renderedDirective,
     };
 }

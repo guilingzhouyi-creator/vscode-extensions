@@ -15,6 +15,11 @@ import type { CallGraph } from '../../intelligence/callGraph';
 import type { CompactAgentPrompt } from '../../guidance/agentConstraintGenerator';
 import type { PraxisSliceAuditInput, PraxisSliceAuditVerdict } from '../../router/sliceTypes';
 import type { IPraxisI18nProvider, PraxisLocale } from './i18n-types';
+import type { ScanReport } from '../../types';
+import type {
+    DefectTaxonomyCategory,
+    StandardActionVerb,
+} from '../../governance/standard-terminology';
 
 /** Diagnostic severity level for presentation card */
 export type PraxisPresentationSeverity = 'block' | 'warn' | 'info' | 'pass';
@@ -50,6 +55,14 @@ export interface PraxisDiagnosticCard {
     quickFixSnippet?: string;
     /** Documentation URL link (optional) */
     docsUrl?: string;
+    /** Defect taxonomy domain category */
+    taxonomy?: DefectTaxonomyCategory;
+    /** Standardized machine-actionable remediation verb */
+    actionVerb?: StandardActionVerb;
+    /** Whether this card's fix can be safely automated by an Agent */
+    safeToAutomate?: boolean;
+    /** Standardized execution arguments for automation engines */
+    targetArguments?: Record<string, unknown>;
     /** Underlying machine-oriented CAPP directive for bidirectional traceability */
     sourceAgentDirective: string;
 }
@@ -121,6 +134,18 @@ export interface IPraxisPresentationService {
     fromSliceVerdict(
         verdict: PraxisSliceAuditVerdict,
         target: string,
+        options?: PraxisPresentationOptions,
+    ): PraxisPresentationPayload;
+
+    /**
+     * Converts a full ScanReport to a rich UI presentation payload.
+     *
+     * @param report - Underlying ScanReport
+     * @param options - Presentation options
+     * @returns Rich UI presentation payload
+     */
+    fromScanReport(
+        report: ScanReport,
         options?: PraxisPresentationOptions,
     ): PraxisPresentationPayload;
 

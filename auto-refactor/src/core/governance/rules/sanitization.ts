@@ -23,6 +23,7 @@ import { isVocabularyEnumeration } from '../markerScope';
 import { CONSTRUCTION_JARGON_RE, auditTerminologyProse } from '../terminology-engine';
 import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
+import { CODE_GOV_PROSE_SANITIZATION } from '../../constants/rule-codes';
 
 /** ASCII code for a space, skipped while advancing past a line's leading whitespace. */
 const CHAR_CODE_SPACE = 32;
@@ -320,6 +321,18 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
                 category: f.category,
                 term: f.term,
                 snippet: f.contextSnippet,
+            },
+            actionable: {
+                action: 'sanitize_prose_terminology',
+                code: CODE_GOV_PROSE_SANITIZATION,
+                taxonomy: 'GOV_NORM',
+                safeToAutomate: false,
+                templateSnippet:
+                    'Use objective, factual technical statements instead of promotional or casual phrasing.',
+                targetArguments: {
+                    forbiddenTerm: f.term,
+                    category: f.category,
+                },
             },
         }));
     },

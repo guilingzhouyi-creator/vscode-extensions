@@ -175,21 +175,21 @@ function detectArchetypes(root: string): {
         if (!packageManager) packageManager = 'cargo';
     }
 
-    // Python
+    // Python ecosystem archetype detection
     const pyPm = detectPythonArchetype(root, manifests);
     if (pyPm) {
         archetypes.push('python');
         if (!packageManager) packageManager = pyPm;
     }
 
-    // Go
+    // Go modules archetype detection
     if (fs.existsSync(path.join(root, 'go.mod'))) {
         manifests.goMod = true;
         archetypes.push('go');
         if (!packageManager) packageManager = 'gomod';
     }
 
-    // Godot
+    // Godot engine archetype detection
     if (fs.existsSync(path.join(root, 'project.godot'))) {
         manifests.projectGodot = true;
         archetypes.push('godot');

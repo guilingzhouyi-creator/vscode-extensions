@@ -17,6 +17,7 @@ import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from 
 import { isToolOrTestScript } from '../pathScope';
 import type { NormalizedNode } from '../../ast/multilang';
 import { NodeKind } from '../../ast/multilang';
+import { CODE_NUM_PRECISION_LOSSY } from '../../constants/rule-codes';
 
 /** Default nesting-depth threshold for GOV-LOG-001 when `maxNestingDepth` is not configured. */
 const DEFAULT_MAX_NESTING_DEPTH = 5;
@@ -234,6 +235,17 @@ export const LossyPrecisionRoundingRule: GovernanceRule = {
                     fixable: false,
                     customDetail: {
                         matchedExpression: match[0],
+                    },
+                    actionable: {
+                        action: 'align_numeric_precision',
+                        code: CODE_NUM_PRECISION_LOSSY,
+                        taxonomy: 'NUM_PREC',
+                        safeToAutomate: true,
+                        templateSnippet: 'Math.round(val * 100) / 100 + 0',
+                        targetArguments: {
+                            matchedExpression: match[0],
+                            standardPrecision: 0.01,
+                        },
                     },
                 });
             }

@@ -16,7 +16,13 @@
  *   stay byte-identical to cold ones.
  */
 import type * as ts from 'typescript';
-import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import type {
+    Analyzer,
+    AnalyzerContext,
+    Issue,
+    Severity,
+    AgentActionablePayload,
+} from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR, SEVERITY_INFO } from '../core/types';
 import {
     ANALYZER_COMPLEXITY,
@@ -24,6 +30,7 @@ import {
     RULE_CPX_NEST_002,
     RULE_CPX_STM_001,
 } from '../core/scoring/dimensionLiterals';
+import { CODE_CPX_HIGH_COMPLEXITY, CODE_CPX_DEEP_NESTING } from '../core/constants/rule-codes';
 import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
 import { locN } from '../utils/normalized';
@@ -117,6 +124,20 @@ function buildComplexityIssue(
         ? 'Function has flat control flow but high branching. ' +
           'Consider a lookup table (map/strategy pattern) to eliminate branches.'
         : formatOptimizationHint(cc);
+    const actionable: AgentActionablePayload = {
+        action: clarity.isStructurallyClear ? 'extract_pure_predicate' : 'apply_guard_clause',
+        code: CODE_CPX_HIGH_COMPLEXITY,
+        taxonomy: 'CTRL_FLOW',
+        safeToAutomate: false,
+        templateSnippet: clarity.isStructurallyClear
+            ? 'const strategyMap: Record<string, () => Result> = { ... };'
+            : 'if (!condition) return defaultValue;',
+        targetArguments: {
+            cyclomaticComplexity: cc,
+            threshold: t.complexityWarn,
+            functionName: name,
+        },
+    };
 
     return {
         id: `complexity:high-complexity:${ctx.filePath}:${node.start?.line ?? 1}`,
@@ -127,6 +148,7 @@ function buildComplexityIssue(
         location: locN(startNode, ctx.filePath),
         detail: buildComplexityDetail(name, cc, t.complexityWarn, t.complexityFail, clarity),
         suggestion,
+        actionable,
     };
 }
 
@@ -388,6 +410,18 @@ export class ComplexityAnalyzer implements Analyzer {
             },
             suggestion:
                 'Flatten control flow using early returns (guard clauses) or extract nested blocks.',
+            actionable: {
+                action: 'apply_guard_clause',
+                code: CODE_CPX_DEEP_NESTING,
+                taxonomy: 'CTRL_FLOW',
+                safeToAutomate: false,
+                templateSnippet: 'if (!condition) return defaultValue;',
+                targetArguments: {
+                    maxDepth,
+                    depthBudget,
+                    functionName: name,
+                },
+            },
         });
     }
 

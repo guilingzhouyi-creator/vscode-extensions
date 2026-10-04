@@ -827,6 +827,10 @@ export * from './core/semantic/adapters';
 // ---- Universal Rule Pyramid & Hierarchy ----
 export * from './core/rules/pyramid';
 
+// ---- Standard Terminology SSOT & Dual-Faced Architecture ----
+export * from './core/governance/standard-terminology';
+export { toAgentReview, toCapp, toPraxisPresentation } from './core/reporters';
+
 // ---- Praxis Diff Governance Subsystem Facade & SPI ----
 export * from './core/praxis';
 

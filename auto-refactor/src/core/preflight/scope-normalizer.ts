@@ -212,7 +212,8 @@ export function normalizeScopeQuality(params: ScopeNormalizationParams): ScopeNo
 
         const deltaMuProject = deltaQ * semanticRatio;
 
-        // Prior uncertainty
+        // Scales prior variance according to uncalibrated confidence
+        // and project distance from ceiling
         const priorUncertainty =
             ((100 - priorProjectMean) / 2) * (1 - priorProjectConfidence) + 0.1;
         const sigma0 = Math.max(0.1, priorUncertainty);

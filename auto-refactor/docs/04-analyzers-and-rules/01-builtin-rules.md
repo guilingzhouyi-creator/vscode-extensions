@@ -133,6 +133,7 @@
 | `STDLIB-UNSAFE-001` | <a id="stdlib-unsafe-001"></a>`stdlib` | `STDLIB` | `error` | `all` | Rust/C++ 底层 unsafe 块强制附带 SAFETY: 契约证明，缺失即阻断。 | 在每个 unsafe 块或函数前编写 SAFETY: 契约注释，明确记录调用者必须保证的前置条件与内存安全不变量。 |
 | `TST-DBT-001` | <a id="tst-dbt-001"></a>`test-modernity` | `TST` | `info` | `all` | 未登记里程碑收敛计划或责任人的滞后测试技术债务。 | 在测试债务登记表中补全责任 Agent 及目标收敛里程碑。 |
 | `TST-DEN-001` | <a id="tst-den-001"></a>`test-modernity` | `TST` | `info` | `all` | 关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。 | 补齐高风险语义单元的契约测试与边界测试，提高实际故障感知能力。 |
+| `TST-FLT-001` | <a id="tst-flt-001"></a>`test-modernity` | `TST` | `warning` | `all` | 浮点断言脆弱性：测试直接对裸浮点字面量进行全等断言而缺乏容差控制或公式推导。 | 通过数学公式推导预期值或使用容差断言（如 toBeCloseTo 或 is_equal_approx）。 |
 | `TST-ILS-001` | <a id="tst-ils-001"></a>`test-modernity` | `TST` | `warning` | `all` | 测试完整性幻觉：测试仅校验 Mock 配置或绑定已废弃业务契约。 | 将测试迁移至验证活跃业务契约与实际领域状态变化。 |
 | `TST-SKP-001` | <a id="tst-skp-001"></a>`test-modernity` | `TST` | `warning` | `all` | 核心业务域中长期滞留的跳过、隔离或未执行测试用例。 | 修复并恢复测试用例，或正式登记入测试债务清单并设定收敛里程碑。 |
 | `TST-TAU-001` | <a id="tst-tau-001"></a>`test-modernity` | `TST` | `warning` | `all` | 缺乏真实业务断言或包含恒真断言的无效测试。 | 替换恒真断言为针对业务实体输出和错误边界的有效验证。 |
@@ -235,6 +236,7 @@
 | `GOV-RUL-001` | <a id="gov-rul-001"></a>`governance` | `GOV` | `error` | `all` | Static review rule identifier drift or hallucination: mentioned rule ID is not registered in the single-source rule catalog. | 核对单源规则注册表，使用已登记的规范化规则 ID，禁止臆造虚构不存在的规则代号。 |
 | `GOV-RTC-002` | <a id="gov-rtc-002"></a>`governance` | `GOV` | `warning` | `all` | Baseline debt entries must track physical file rename operations without artificial inflation or false positive churn. Monotonic downward ratchets must remap prior baselines to new paths upon refactoring. | 在基线更新与门禁收敛中应用重命名路径规范化映射 (pathRemap)，确保文件重构后既有基线连续继承，严禁因重命名引发基线虚增或债务逃逸。 |
 | `GOV-SAN-001` | <a id="gov-san-001"></a>`governance` | `GOV` | `warning` | `all` | Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architectural longevity and create documentation drift. | 移除临时工单/批次黑话，改用长效领域术语。 |
+| `GOV-SAN-002` | <a id="gov-san-002"></a>`governance` | `GOV` | `warning` | `all` | 客观技术文案守卫：文本包含宣传性吹嘘、绝对化定性、情绪化贬损或工程流程黑话。 | 替换宣传口号与绝对定性表述为客观技术事实与可重现验证信息。 |
 | `GOV-SLC-001` | <a id="gov-slc-001"></a>`governance` | `GOV` | `error` | `all` | AST slice mutation introduces breaking signature drift or uncontained side-effects propagating across external call chains. | 确保切片改动向后兼容，或同步重构受影响调用链上的全部外部调用者。 |
 | `GOV-STD-001` | <a id="gov-std-001"></a>`governance` | `GOV` | `warning` | `all` | Redundant if-then-else returning boolean literals increases cyclomatic complexity and mental overhead. | 直接 return 布尔表达式，去掉 if/else 包装。 |
 | `GOV-STD-002` | <a id="gov-std-002"></a>`governance` | `GOV` | `warning` | `all` | Legacy constructs (e.g. `var` in modern TS/JS, dead `pass` in GDScript) violate language idiomatic standards. | 替换废弃构造（var、legacy 键名等）为现代等价写法。 |
@@ -261,6 +263,7 @@
 | `NAM-SGL-001` | <a id="nam-sgl-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 占位符豁免）。 | 改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。 |
 | `NAM-TYP-001` | <a id="nam-typ-001"></a>`naming` | `NAM` | `warning` | `all` | 类型定义与类声明必须遵循 PascalCase 大驼峰命名。 | 将类、接口、类型别名或枚举重命名为大驼峰格式（如 `Scanner`、`RuleDefinition`）。 |
 | `NAM-VAG-001` | <a id="nam-vag-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁使用无业务语义的模糊泛化变量名（如 data、res、ret、tmp、item 等裸词）。 | 结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。 |
+| `NUM-PREC-001` | <a id="num-prec-001"></a>`governance` | `NUM` | `warning` | `typescript, javascript` | 数值截断精度失衡：数学计算路径中存在丢精度的四舍五入或比例失配风险。 | 使用标准 0.01 精度舍入（如 * 100 / 100）或显式容差界限以保留有效精度。 |
 | `PRF-ALG-001` | <a id="prf-alg-001"></a>`performance` | `PRF` | `warning` | `all` | 发现 $\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。 | 将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。 |
 | `PRF-ALG-002` | <a id="prf-alg-002"></a>`performance` | `PRF` | `warning` | `all` | 循环内集合线性遍历反模式：在循环结构内部对外部集合进行线性检索（find/includes/has/in list 等），导致整体算法复杂度恶化至 O(N*M)。 | 在循环外预先将外部集合构建为 Map 或 Dictionary 哈希索引，将内层查找降至 O(1)，算法总体降至 O(N+M)。 |
 | `PRF-IO-001` | <a id="prf-io-001"></a>`performance` | `PRF` | `warning` | `all` | 切换为异步非阻塞对应 API，避免锁死 Node.js 事件循环或游戏主线程。 | 事件循环同步阻塞风险：在 `async` 上下文或高频帧循环内调用同步阻塞 I/O (如 `readFileSync`, `time.sleep`)。`thresholds.blockingIoAllowPatterns` 声明的路径 glob（CLI/校验器/基准脚本等进程式工具）豁免；该键同时下发给治理规则 `GOV-PRF-004`，属单一策略源。 |

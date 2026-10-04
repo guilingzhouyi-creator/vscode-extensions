@@ -14,7 +14,7 @@
  *     rule modules and keeps every category bound to one stable contract.
  */
 import type { NormalizedNode } from '../ast/multilang';
-import type { AnalyzerContext, Severity, IssueEvidence } from '../types';
+import type { AnalyzerContext, Severity, IssueEvidence, AgentActionablePayload } from '../types';
 
 /**
  * The eight core governance categories that every rule maps to.
@@ -114,6 +114,7 @@ export interface GovernanceViolation {
     suggestedPatch?: string;
     customDetail?: Record<string, any>;
     evidence?: IssueEvidence;
+    actionable?: AgentActionablePayload;
 }
 
 /**

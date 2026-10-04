@@ -2,7 +2,7 @@
  * Module: Core Constants — Analyzer Names and Standardized Rule Codes
  * File Path: src/core/constants/rule-codes.ts
  * Architecture Role: Single source of truth for built-in analyzer IDs, raw rule identifiers,
- *     and unified machine-actionable diagnostic codes (AR-<DOMAIN>-<ID>).
+ *     and unified machine-actionable diagnostic codes (AR:<DOMAIN>:<ID>).
  * Dependencies & Triggers: Zero runtime dependencies; imported by all analyzers, rules
  *     registry, diagnostic formatters, and agent consumers.
  * Responsibilities: Centralize canonical strings for built-in analyzer names, existing rule
@@ -185,3 +185,20 @@ export const CODE_STB_CONDITIONAL_COMPILATION = 'AR:STB:007';
 
 /** Agent-actionable diagnostic code for nam:decoupling. */
 export const CODE_NAM_DECOUPLING = 'AR:NAM:001';
+
+/** Agent-actionable diagnostic code for tst:skipped. */
+export const CODE_TST_SKIPPED = 'AR:TST:002';
+/** Agent-actionable diagnostic code for tst:tautological. */
+export const CODE_TST_TAUTOLOGICAL = 'AR:TST:003';
+/** Agent-actionable diagnostic code for tst:fragile:float. */
+export const CODE_TST_FRAGILE_FLOAT = 'AR:TST:004';
+
+/** Agent-actionable diagnostic code for num:precision:lossy. */
+export const CODE_NUM_PRECISION_LOSSY = 'AR:NUM:001';
+
+/** Agent-actionable diagnostic code for gov:sanitization:prose. */
+export const CODE_GOV_PROSE_SANITIZATION = 'AR:GOV:001';
+/** Agent-actionable diagnostic code for gov:logic:guard. */
+export const CODE_GOV_LOGIC_GUARD = 'AR:GOV:002';
+/** Agent-actionable diagnostic code for gov:facade:decoupling. */
+export const CODE_GOV_FACADE_DECOUPLING = 'AR:GOV:003';

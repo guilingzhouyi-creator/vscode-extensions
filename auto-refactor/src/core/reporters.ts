@@ -14,6 +14,9 @@
  */
 
 import type { ScanReport, Issue, Severity, OutputFormat } from './types';
+import { toAgentReview, toCapp, toPraxisPresentation } from './reporters/agent-review-reporter';
+
+export { toAgentReview, toCapp, toPraxisPresentation };
 
 const SARIF_LEVEL: Record<Severity, string> = {
     info: 'note',
@@ -29,8 +32,8 @@ const SARIF_LEVEL: Record<Severity, string> = {
  *
  * @param report - Complete scan result to serialize; its summary and issues are assumed to be
  *   well-formed and are never mutated.
- * @param format - Requested wire format (`json`, `sarif` or `text`); any other value selects
- *   the text renderer.
+ * @param format - Requested wire format (`json`, `sarif`, `text`, `agent`, `capp`, `praxis`);
+ *   any other value selects the text renderer.
  * @returns The rendered report string in the selected format.
  */
 export function render(report: ScanReport, format: OutputFormat): string {
@@ -39,6 +42,12 @@ export function render(report: ScanReport, format: OutputFormat): string {
             return toJson(report);
         case 'sarif':
             return toSarif(report);
+        case 'agent':
+            return toAgentReview(report);
+        case 'capp':
+            return toCapp(report);
+        case 'praxis':
+            return toPraxisPresentation(report);
         case 'text':
         default:
             return toText(report);

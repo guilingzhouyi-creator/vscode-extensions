@@ -57,7 +57,7 @@ const MODE_AUTO = 'auto';
 const MODE_ON = 'on';
 
 const VALID_SEVERITIES = new Set<string>([SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR]);
-const VALID_FORMATS = new Set<string>([STR_JSON, STR_SARIF, STR_TEXT]);
+const VALID_FORMATS = new Set<string>([STR_JSON, STR_SARIF, STR_TEXT, 'agent', 'capp', 'praxis']);
 const VALID_COMMENT_LEVELS = new Set<string>([
     COMMENT_LEVEL_OFF,
     STR_BASIC,
@@ -329,6 +329,33 @@ function resolveBooleanFlagValue(
     return { enabled: true, consumedNext: false };
 }
 
+function handleProfileArgument(
+    opt: CliOptions,
+    arg: string,
+    hasInline: boolean,
+    value: string,
+    nextArg: string | undefined,
+): { handled: boolean; consumedNext: boolean } {
+    if (arg === 'profile') {
+        const candidate = hasInline ? value : nextArg;
+        if (candidate && VALID_PROFILES.has(candidate)) {
+            opt.reviewProfile = candidate as QualityReviewProfile;
+            opt.showProfile = true;
+            return { handled: true, consumedNext: !hasInline };
+        }
+        return { handled: true, consumedNext: false };
+    }
+    if (arg === 'review-profile') {
+        const candidate = hasInline ? value : nextArg;
+        if (candidate && VALID_PROFILES.has(candidate)) {
+            opt.reviewProfile = candidate as QualityReviewProfile;
+            return { handled: true, consumedNext: !hasInline };
+        }
+        return { handled: true, consumedNext: false };
+    }
+    return { handled: false, consumedNext: false };
+}
+
 /**
  * Minimal argv parser: supports `--key value`, `--key=value`, and repeated `--include`.
  *
@@ -350,30 +377,9 @@ export function parseArgs(argv: string[]): CliOptions {
             hasInline = true;
         }
 
-        if (arg === 'profile') {
-            if (hasInline) {
-                if (VALID_PROFILES.has(value)) {
-                    opt.reviewProfile = value as QualityReviewProfile;
-                    opt.showProfile = true;
-                    continue;
-                }
-            } else {
-                const nxt = argv[i + 1];
-                if (nxt && VALID_PROFILES.has(nxt)) {
-                    opt.reviewProfile = nxt as QualityReviewProfile;
-                    opt.showProfile = true;
-                    i++;
-                    continue;
-                }
-            }
-        }
-
-        if (arg === 'review-profile') {
-            const val = hasInline ? value : argv[i + 1];
-            if (val && VALID_PROFILES.has(val)) {
-                opt.reviewProfile = val as QualityReviewProfile;
-                if (!hasInline) i++;
-            }
+        const profileRes = handleProfileArgument(opt, arg, hasInline, value, argv[i + 1]);
+        if (profileRes.handled) {
+            if (profileRes.consumedNext) i++;
             continue;
         }
 
@@ -423,7 +429,7 @@ Options:
   --exclude <glob|dir>        Exclude glob or directory name (repeatable)
   --analyzers <a,b,c>         Allow-list by name (built-in or custom). Declared but
                               unlisted analyzers are disabled for this run.
-  --format <json|sarif|text>  Output format (default: text)
+  --format <json|sarif|text|agent|capp|praxis>  Output format (default: text)
   --out <file>                Write report to a file instead of stdout
   --fail-on-issue             Exit non-zero if any 'error' issue (CI gate)
   --fail-on-severity <lvl>    Exit non-zero if any issue >= lvl (info|warning|error); with a

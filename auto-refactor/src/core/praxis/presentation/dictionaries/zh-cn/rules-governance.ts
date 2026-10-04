@@ -587,4 +587,37 @@ export const ZH_CN_GOVERNANCE_RULES: Record<string, PraxisRuleI18nEntry> = {
         summary: '文件行数/函数数超过阈值。',
         remediation: '按职责拆分模块，或把工具函数迁到专属文件。',
     },
+    'NUM-PREC-001': {
+        name: '数值截断精度失衡',
+        summary:
+            '检测到低精度舍入截断（如 * 10 / 10 或 toFixed(1)）或缩放系数失衡，引入 IEEE 754 截断漂移。',
+        remediation:
+            '统一采用 0.01 两位小数精度对齐（如 SCORE_ROUNDING = 100）并消除 -0 符号差异。',
+        rationale: '粗暴的 0.1 截断会造成多维度评分仲裁失真以及机器比较的虚假等价。',
+    },
+    'TST-FLT-001': {
+        name: '脆弱浮点等值断言',
+        summary: '测试用例直接对裸浮点字面量进行绝对等值断言，缺少容差比对与公式推导。',
+        remediation:
+            '将绝对等值断言替换为容差匹配器（如 toBeCloseTo(expected, 2)）或共享数学推导。',
+        rationale: '不同平台与机器 epsilon 的微小舍入误差会导致脆弱浮点断言偶发失败。',
+    },
+    'GOV-SAN-002': {
+        name: '源码与注释技术用语客观化',
+        summary: '注释或文档中包含临时性用词、宣扬夸大词或主观评价，偏离客观技术事实。',
+        remediation: '移除宣扬性词汇与临时标记，秉承纯粹技术事实说明实现机制、范围与设计边界。',
+        rationale: '工程文档与源码注释必须客观可证，杜绝主观口号与元叙事宣称。',
+    },
+    'ADV-CMP-001': {
+        name: '单函数圈复杂度超标',
+        summary: '单函数圈复杂度超出预算阈值，代码分支过多造成认知负荷过高。',
+        remediation: '提取无状态纯判定函数，或将分支派发重构为字典映射/策略模式。',
+        rationale: '圈复杂度过高的函数分支组合数激增，容易隐藏未测试的边界缺陷。',
+    },
+    'ADV-NST-001': {
+        name: '控制流深层嵌套超标',
+        summary: '控制流嵌套深度超出阈值，深层 if/else/switch 阻碍可读性与自愈。',
+        remediation: '利用卫语句提前返回（Guard Clauses）平铺控制流，或提取内部子过程。',
+        rationale: '深层嵌套急剧消耗心智栈深度，不利于静态分析与自动化重构。',
+    },
 };

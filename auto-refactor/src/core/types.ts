@@ -1,6 +1,7 @@
 import type * as ts from 'typescript';
 import type { NormalizedNode, LanguageAdapter, Position } from './ast/multilang';
 import type { IncrementalFileState } from './diff/incremental-state';
+import type { DefectTaxonomyCategory, StandardActionVerb } from './governance/standard-terminology';
 
 /**
  * Module: Core Engine — Shared Type Contracts and Domain Model
@@ -139,18 +140,7 @@ export interface IssueEvidence {
 /**
  * Canonical action types that an Agent or automated refactoring bot can execute deterministically.
  */
-export type AgentActionType =
-    | 'extract_constant'
-    | 'hoist_declaration'
-    | 'narrow_scope'
-    | 'split_function'
-    | 'simplify_control_flow'
-    | 'replace_token'
-    | 'insert_comment_contract'
-    | 'guard_recursion'
-    | 'use_constant_time_comparison'
-    | 'scaffold_constant_library'
-    | 'scaffold_gate_system';
+export type AgentActionType = StandardActionVerb;
 
 /**
  * Machine-actionable mutation payload tailored for AI Agents and automated codemods.
@@ -161,8 +151,10 @@ export type AgentActionType =
 export interface AgentActionablePayload {
     /** Atomic refactoring action category */
     action: AgentActionType;
-    /** Standardized machine rule code (e.g. AR-CONST-001) */
+    /** Standardized machine rule code (e.g. AR:CONST:001) */
     code: string;
+    /** Optional defect taxonomy category */
+    taxonomy?: DefectTaxonomyCategory;
     /** Target scope for declaration or hoisting */
     targetScope?: 'module_top_level' | 'function_local' | 'block_local' | 'shared_domain';
     /** Recommended variable/constant identifier */
@@ -181,6 +173,10 @@ export interface AgentActionablePayload {
         range: { startLine: number; startCol: number; endLine: number; endCol: number };
         replacementText: string;
     };
+    /** Remediation code snippet template for UI and Agent rendering */
+    templateSnippet?: string;
+    /** Standardized execution arguments for automation engines */
+    targetArguments?: Record<string, unknown>;
     /** Whether an automated Agent can safely apply this patch without human arbitration */
     safeToAutomate: boolean;
 }
@@ -317,9 +313,10 @@ export interface Thresholds {
 
 /**
  * Report serialization format: `json` for structured consumers, `sarif` for CI code scanning,
- * or `text` for human-readable stdout.
+ * `text` for human-readable stdout, `agent` for LLM Agent context, `capp` for ultra-compact
+ * directives, or `praxis` for rich frontend UI payloads.
  */
-export type OutputFormat = 'json' | 'sarif' | 'text';
+export type OutputFormat = 'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'praxis';
 
 /**
  * Depth of the comments analyzer: `off` disables it, `basic` reports header/doc gaps at info

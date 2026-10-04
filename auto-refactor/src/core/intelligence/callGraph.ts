@@ -15,8 +15,7 @@
  *     a call site whose enclosing declaration the adapter did not materialize keeps `caller: null`
  *     and is counted as unattributed rather than being attached to an arbitrary symbol; in the same
  *     spirit an unresolvable callee keeps `calleeFile: null` and is counted as unresolved instead
-     of
- *     being silently dropped, because a silently dropped call is a false negative in every
+ *     of being silently dropped, because a silently dropped call is a false negative in every
  *     downstream propagation question.
  */
 import type { SymbolIndex } from './symbolIndex';

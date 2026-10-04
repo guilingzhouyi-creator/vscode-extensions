@@ -251,7 +251,9 @@ async function benchmarkTrajectoryLearning(trajectoryService) {
 }
 
 /**
- * Verify cyclic oscillation detection.
+ * Asserts regression detector flags A-B-A flip-flop cycles across sequential revisions.
+ *
+ * @param regressionDetector - Detector instance evaluating trajectory regressions
  */
 function verifyCyclicOscillationDetection(regressionDetector) {
   const revisions = [
