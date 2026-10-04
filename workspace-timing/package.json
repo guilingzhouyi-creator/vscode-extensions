@@ -162,7 +162,7 @@
         },
         "workspaceTiming.storage.maxSessions": {
           "type": "number",
-          "default": 5000,
+          "default": 140,
           "minimum": 0,
           "description": "Max session history entries to retain (0 = unlimited)"
         },

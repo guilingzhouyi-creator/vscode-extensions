@@ -27,6 +27,21 @@ export class CommandRegistrar {
         statusBar: StatusBarController | null,
         globalAggregator: GlobalAggregator | null,
     ): void {
+        this.registerSwitchCommands(orchestrator, statusBar);
+        this.registerDataControlCommands(orchestrator, statusBar, globalAggregator);
+        this.registerViewAndExportCommands(context, orchestrator, statusBar);
+
+        for (const d of this.disposables) {
+            context.subscriptions.push(d);
+        }
+
+        log(LogLevel.Info, 'CommandRegistrar: all commands registered');
+    }
+
+    private registerSwitchCommands(
+        orchestrator: TimerOrchestrator | null,
+        statusBar: StatusBarController | null,
+    ): void {
         // 启用
         this.registerCommand('workspaceTiming.enable', async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
@@ -74,21 +89,13 @@ export class CommandRegistrar {
                 format(t()['cmd.modeSwitched'], statusBarModeLabel(newMode))
             );
         });
+    }
 
-        // 打开配置面板
-        this.registerCommand('workspaceTiming.openDashboard', () => {
-            DashboardPanel.createOrShow(context.extensionUri);
-        });
-
-        // 导出 CSV（与 Dashboard 导出按钮共用逻辑）
-        this.registerCommand('workspaceTiming.export', () => {
-            void exportTimingToFile({
-                getOrchestrator: () => orchestrator,
-                getStatusBar: () => statusBar,
-                getDashboard: () => DashboardPanel.currentPanel ?? null,
-            });
-        });
-
+    private registerDataControlCommands(
+        orchestrator: TimerOrchestrator | null,
+        statusBar: StatusBarController | null,
+        globalAggregator: GlobalAggregator | null,
+    ): void {
         // 调试：手动存盘
         this.registerCommand('workspaceTiming.debugSave', async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
@@ -150,49 +157,27 @@ export class CommandRegistrar {
         // 从备份文件还原（默认定位 .vscode/workspace-timing.json；还原前自动安全快照）
         this.registerCommand('workspaceTiming.restore', async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
-            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-            if (!workspaceRoot) { this.noWorkspaceMsg(); return; }
+            await this.handleRestoreCommand(orchestrator, statusBar);
+        });
+    }
 
-            const defaultUri = vscode.Uri.joinPath(workspaceRoot, '.vscode', 'workspace-timing.json');
-            const picked = await vscode.window.showOpenDialog({
-                defaultUri,
-                canSelectMany: false,
-                filters: { [t()['export.filter.json']]: ['json'], [t()['export.filter.all']]: ['*'] },
-                openLabel: t()['toast.exportSaveLabel'],
+    private registerViewAndExportCommands(
+        context: vscode.ExtensionContext,
+        orchestrator: TimerOrchestrator | null,
+        statusBar: StatusBarController | null,
+    ): void {
+        // 打开配置面板
+        this.registerCommand('workspaceTiming.openDashboard', () => {
+            DashboardPanel.createOrShow(context.extensionUri);
+        });
+
+        // 导出 CSV（与 Dashboard 导出按钮共用逻辑）
+        this.registerCommand('workspaceTiming.export', () => {
+            void exportTimingToFile({
+                getOrchestrator: () => orchestrator,
+                getStatusBar: () => statusBar,
+                getDashboard: () => DashboardPanel.currentPanel ?? null,
             });
-            if (!picked || picked.length === 0) return;
-
-            let raw: unknown;
-            try {
-                const bytes = await vscode.workspace.fs.readFile(picked[0]);
-                raw = JSON.parse(Buffer.from(bytes).toString('utf-8'));
-            } catch (err) {
-                vscode.window.showErrorMessage(format(t()['toast.restoreFailed'], (err as Error).message));
-                return;
-            }
-
-            // 双侧摘要确认（当前 vs 文件）
-            const dash = await orchestrator.getDashboardData();
-            const fileData = (raw && typeof raw === 'object') ? (raw as { totalMs?: unknown; sessions?: unknown[] }) : undefined;
-            const fileTotal = fileData && typeof fileData.totalMs === 'number' ? fileData.totalMs : 0;
-            const fileSessions = Array.isArray(fileData?.sessions) ? fileData!.sessions!.length : 0;
-            // 占位顺序：{0}=当前累计 {1}=当前会话数 {2}=文件累计 {3}=文件会话数
-            const summary = format(t()['confirm.restore'],
-                TimeAggregator.formatDurationCompact(dash.totalMs), String(dash.sessionsCount),
-                TimeAggregator.formatDurationCompact(fileTotal), String(fileSessions));
-            const title = t()['confirm.restore.title'];
-            const confirm = await vscode.window.showWarningMessage(summary, { modal: true }, title);
-            if (confirm !== title) return;
-
-            try {
-                const data = await orchestrator.restoreFrom(raw);
-                statusBar.updateTime(data.todayMs, data.totalMs);
-                vscode.window.showInformationMessage(format(t()['toast.restored'], picked[0].fsPath));
-            } catch (err) {
-                log(LogLevel.Error, 'restore failed', err as Error);
-                vscode.window.showErrorMessage(
-                    format(t()['toast.restoreFailed'], (err as Error).message));
-            }
         });
 
         // 导出全历史聚合日报 CSV
@@ -218,13 +203,6 @@ export class CommandRegistrar {
                 vscode.window.showErrorMessage(t()['toast.exportFailed']);
             }
         });
-
-        // 将 disposables 注册到 context.subscriptions
-        for (const d of this.disposables) {
-            context.subscriptions.push(d);
-        }
-
-        log(LogLevel.Info, 'CommandRegistrar: all commands registered');
     }
 
     private registerCommand(id: string, handler: (...args: unknown[]) => unknown): void {
@@ -235,6 +213,55 @@ export class CommandRegistrar {
     /** 降级模式提示：当前未打开工作区 */
     private noWorkspaceMsg(): void {
         vscode.window.showWarningMessage(t()['cmd.noWorkspace']);
+    }
+
+    private async handleRestoreCommand(
+        orchestrator: TimerOrchestrator,
+        statusBar: StatusBarController,
+    ): Promise<void> {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+        if (!workspaceRoot) { this.noWorkspaceMsg(); return; }
+
+        const defaultUri = vscode.Uri.joinPath(workspaceRoot, '.vscode', 'workspace-timing.json');
+        const picked = await vscode.window.showOpenDialog({
+            defaultUri,
+            canSelectMany: false,
+            filters: { [t()['export.filter.json']]: ['json'], [t()['export.filter.all']]: ['*'] },
+            openLabel: t()['toast.exportSaveLabel'],
+        });
+        if (!picked || picked.length === 0) return;
+
+        let raw: unknown;
+        try {
+            const bytes = await vscode.workspace.fs.readFile(picked[0]);
+            raw = JSON.parse(Buffer.from(bytes).toString('utf-8'));
+        } catch (err) {
+            vscode.window.showErrorMessage(format(t()['toast.restoreFailed'], (err as Error).message));
+            return;
+        }
+
+        // 双侧摘要确认（当前 vs 文件）
+        const dash = await orchestrator.getDashboardData();
+        const fileData = (raw && typeof raw === 'object') ? (raw as { totalMs?: unknown; sessions?: unknown[] }) : undefined;
+        const fileTotal = fileData && typeof fileData.totalMs === 'number' ? fileData.totalMs : 0;
+        const fileSessions = Array.isArray(fileData?.sessions) ? fileData!.sessions!.length : 0;
+        // 占位顺序：{0}=当前累计 {1}=当前会话数 {2}=文件累计 {3}=文件会话数
+        const summary = format(t()['confirm.restore'],
+            TimeAggregator.formatDurationCompact(dash.totalMs), String(dash.sessionsCount),
+            TimeAggregator.formatDurationCompact(fileTotal), String(fileSessions));
+        const title = t()['confirm.restore.title'];
+        const confirm = await vscode.window.showWarningMessage(summary, { modal: true }, title);
+        if (confirm !== title) return;
+
+        try {
+            const data = await orchestrator.restoreFrom(raw);
+            statusBar.updateTime(data.todayMs, data.totalMs);
+            vscode.window.showInformationMessage(format(t()['toast.restored'], picked[0].fsPath));
+        } catch (err) {
+            log(LogLevel.Error, 'restore failed', err as Error);
+            vscode.window.showErrorMessage(
+                format(t()['toast.restoreFailed'], (err as Error).message));
+        }
     }
 
     dispose(): void {

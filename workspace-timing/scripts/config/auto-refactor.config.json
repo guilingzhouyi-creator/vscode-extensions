@@ -6,7 +6,8 @@
     ],
     "exclude": [
         "src/i18n/**",
-        "src/presentation/dashboardTemplate.ts"
+        "src/presentation/dashboardTemplate.ts",
+        "src/presentation/dashboard-*.ts"
     ],
     "analyzers": {
         "constants": {
