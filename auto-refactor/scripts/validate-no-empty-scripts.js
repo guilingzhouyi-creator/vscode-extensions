@@ -20,6 +20,12 @@ const IGNORED_DIRS = new Set([
   'target',
   '.godot',
   '.cargo-lock',
+  '.mypy_cache',
+  '.dsh-plugin-download',
+  '.workbuddy',
+  '.commandcode',
+  '.auto-refactor-cache',
+  'archive',
 ]);
 
 const LOCAL_DECL_RE =
