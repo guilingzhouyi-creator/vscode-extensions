@@ -3,8 +3,8 @@
 # 文件路径: scripts/ps1/pre-push-gate.ps1
 # 架构定位: 本地 Git 推送前置全量回归与质量门禁 (Windows PowerShell)
 # 依赖与触发: 触发方: .githooks/pre-push / 本地 CLI 手动触发 | 上游: git push | 下游: 远程主干分支 | 运行时: PowerShell 7+
-# 职责说明: 执行 9 重全量回归门禁（零空文件、规则目录、auto-refactor 全套、十维自审、timing 测试与审查、账本边界、WebGames 配置、提交文本风格）
-# 退出语义与设计依据: 退出码: 0=通过门禁, 1=存在未通过项阻断推送 | 设计依据: AGENTS.md 工作区治理总规
+# 职责说明: 执行推送前全量回归检查（零空文件、规则目录、auto-refactor 全套、质量基线、timing 测试与审查、账本边界、WebGames 配置、提交文本风格）
+# 退出语义与设计依据: 退出码: 0=通过检查, 1=存在未通过项阻断推送 | 设计依据: AGENTS.md 工作区治理总规
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   pwsh -File scripts/ps1/pre-push-gate.ps1
@@ -16,7 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "🚀 执行本地 Pre-Push 远程推送前置全量质量与回归门禁 (PowerShell 版)" -ForegroundColor Cyan
+Write-Host "🔒 执行本地 Pre-Push 推送前全量回归检查 (PowerShell 版)" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
@@ -32,80 +32,80 @@ $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
 Write-Host "[1/9] 校验全工作区零物理空文件与空白脚本守卫..." -ForegroundColor Gray
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-no-empty-scripts.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] Gate 1: 发现物理 0 字节或语义虚空文件！" -ForegroundColor Red
+    Write-Host "❌ Gate 1: 发现物理 0 字节或语义虚空文件" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] 全工作区零空文件校验通过" -ForegroundColor Green
+    Write-Host "  ✔ 全工作区零空文件校验通过" -ForegroundColor Green
 }
 
 # --- Gate 2: 规则单源目录一致性同步 ---
 Write-Host "[2/9] 校验全工作区单源规则目录同步..." -ForegroundColor Gray
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] Gate 2: 单源规则目录生成失败！" -ForegroundColor Red
+    Write-Host "❌ Gate 2: 单源规则目录生成失败" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] 全工作区单源规则目录同步通过" -ForegroundColor Green
+    Write-Host "  ✔ 全工作区单源规则目录同步通过" -ForegroundColor Green
 }
 
-# --- Gate 3: auto-refactor 引擎全量门禁与回归套件 (142 套) ---
-Write-Host "[3/9] 执行 auto-refactor 全量门禁与回归套件 (142 套，Rust/Build/Lint/Comments/Self/Tests)..." -ForegroundColor Gray
+# --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
+Write-Host "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Lint/Comments/Self/Tests)..." -ForegroundColor Gray
 $res = Start-Process -FilePath $npmCmd -ArgumentList "run", "gate" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] Gate 3: auto-refactor 全量门禁或测试套件未全部通过！" -ForegroundColor Red
+    Write-Host "❌ Gate 3: auto-refactor 门禁或测试套件未通过" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] auto-refactor 全量门禁与 142 套测试全部通过" -ForegroundColor Green
+    Write-Host "  ✔ auto-refactor 全量门禁与测试套件通过" -ForegroundColor Green
 }
 
-# --- Gate 4: auto-refactor 多维自审与质量基线 Ratchet ---
-Write-Host "[4/9] 执行 auto-refactor 十维质量基线与多维自审 (LOC预算/熵/密度/BIF)..." -ForegroundColor Gray
+# --- Gate 4: auto-refactor 多维自审与质量基线 ---
+Write-Host "[4/9] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..." -ForegroundColor Gray
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] Gate 4: auto-refactor 多维自审或十维质量基线未达标！" -ForegroundColor Red
+    Write-Host "❌ Gate 4: auto-refactor 多维自审或质量基线未达标" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] auto-refactor 十维质量基线多维自审全部达标" -ForegroundColor Green
+    Write-Host "  ✔ auto-refactor 质量基线与自审达标" -ForegroundColor Green
 }
 
 # --- Gate 5: workspace-timing 单元测试套件 ---
 Write-Host "[5/9] 执行 workspace-timing 单元测试回归..." -ForegroundColor Gray
 $res = Start-Process -FilePath $npmCmd -ArgumentList "test" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] Gate 5: workspace-timing 单元测试失败！" -ForegroundColor Red
+    Write-Host "❌ Gate 5: workspace-timing 单元测试未通过" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] workspace-timing 130 套单元测试全部通过" -ForegroundColor Green
+    Write-Host "  ✔ workspace-timing 单元测试通过" -ForegroundColor Green
 }
 
 # --- Gate 6: workspace-timing L0~L5 六层审查门禁 ---
 Write-Host "[6/9] 执行 workspace-timing L0~L5 六层审查门禁..." -ForegroundColor Gray
 $res = Start-Process -FilePath $npmCmd -ArgumentList "run", "review" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] Gate 6: workspace-timing L0~L5 审查门禁未通过！" -ForegroundColor Red
+    Write-Host "❌ Gate 6: workspace-timing L0~L5 审查门禁未通过" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] workspace-timing 审查门禁全部 PASS" -ForegroundColor Green
+    Write-Host "  ✔ workspace-timing 审查门禁通过" -ForegroundColor Green
 }
 
 # --- Gate 7: auto-refactor 长期轨迹账本物理约束守卫 ---
 Write-Host "[7/9] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..." -ForegroundColor Gray
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-trajectory-ledger.js" -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] Gate 7: auto-refactor 轨迹账本物理约束未达标！" -ForegroundColor Red
+    Write-Host "❌ Gate 7: auto-refactor 轨迹账本物理约束未达标" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] auto-refactor 长期轨迹账本物理约束通过" -ForegroundColor Green
+    Write-Host "  ✔ auto-refactor 长期轨迹账本物理约束通过" -ForegroundColor Green
 }
 
 # --- Gate 8: WebGames 配置架构与必需表一致性审查 ---
 Write-Host "[8/9] 执行 WebGames 配置架构与必需表一致性审查..." -ForegroundColor Gray
 $res = Start-Process -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] Gate 8: WebGames 配置架构审查未通过！" -ForegroundColor Red
+    Write-Host "❌ Gate 8: WebGames 配置架构审查未通过" -ForegroundColor Red
     $failed = $true
 } else {
-    Write-Host "  ✔ [PASS] WebGames 配置架构审查全部 PASS" -ForegroundColor Green
+    Write-Host "  ✔ WebGames 配置架构审查通过" -ForegroundColor Green
 }
 
 # --- Gate 9: 待推送提交历史风格与禁词审查 ---
@@ -132,32 +132,32 @@ if ($range) {
             [System.IO.File]::WriteAllText($tempFile, $msg, [System.Text.Encoding]::UTF8)
             $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-msg-style.js", $tempFile -NoNewWindow -PassThru -Wait
             if ($res.ExitCode -ne 0) {
-                Write-Host "❌ [FAIL] 提交 $c 包含违规文本或风格元叙事！" -ForegroundColor Red
+                Write-Host "❌ 提交 $c 包含违规文本或风格元叙事" -ForegroundColor Red
                 $styleFail = $true
             }
             Remove-Item -Path $tempFile -Force -ErrorAction SilentlyContinue
         }
         if ($styleFail) {
-            Write-Host "❌ [FAIL] Gate 9: 待推送分支提交历史存在风格与文本约束违规！" -ForegroundColor Red
+            Write-Host "❌ Gate 9: 待推送分支提交历史存在风格与文本约束违规" -ForegroundColor Red
             $failed = $true
         } else {
-            Write-Host "  ✔ [PASS] 待推送分支提交历史风格审查全部 PASS" -ForegroundColor Green
+            Write-Host "  ✔ 待推送分支提交历史风格审查通过" -ForegroundColor Green
         }
     } else {
-        Write-Host "  ✔ [PASS] 无新增提交需要扫描" -ForegroundColor Green
+        Write-Host "  ✔ 无新增提交需要扫描" -ForegroundColor Green
     }
 } else {
-    Write-Host "  ✔ [PASS] 首次推送或无上游对比基准" -ForegroundColor Green
+    Write-Host "  ✔ 首次推送或无上游对比基准" -ForegroundColor Green
 }
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 if ($failed) {
-    Write-Host "❌ 【推送阻断】Pre-Push 全量门禁校验失败，已阻止推送至远程分支！" -ForegroundColor Red
-    Write-Host "   请在本地修复上述失败项并通过自测后再执行 git push。" -ForegroundColor Red
+    Write-Host "❌ Pre-Push 检查未通过，已阻止推送至远程分支" -ForegroundColor Red
+    Write-Host "   请在本地修复上述失败项后重试推送。" -ForegroundColor Red
     Write-Host "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
-    Write-Host "🎉 【门禁放行】Pre-Push 9 重质量与回归门禁全部 PASS！允许推送至远程。" -ForegroundColor Green
+    Write-Host "✅ Pre-Push 检查通过，允许推送至远程" -ForegroundColor Green
     Write-Host "=================================================================" -ForegroundColor Cyan
     exit 0
 }

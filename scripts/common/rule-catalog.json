@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-04T07:41:48.512Z",
-  "totalRules": 375,
+  "generatedAt": "2026-10-04T09:24:02.838Z",
+  "totalRules": 377,
   "counts": {
-    "autoRefactor": 296,
+    "autoRefactor": 299,
     "workspaceTiming": 45,
     "webGames": 56,
-    "globalTooling": 5
+    "globalTooling": 4
   },
   "rules": [
     {
@@ -400,13 +400,6 @@
       "family": "CMG",
       "severity": "error",
       "summary": "风格元叙事、口号与宣传套话拦截"
-    },
-    {
-      "id": "CMG-STY-005",
-      "project": "global-tooling",
-      "family": "CMG",
-      "severity": "error",
-      "summary": "门禁结论口号与主观断言拦截"
     },
     {
       "id": "CMP-CAL-001",
@@ -1333,6 +1326,13 @@
       "summary": "Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architectural longevity and create documentation drift."
     },
     {
+      "id": "GOV-SAN-002",
+      "project": "auto-refactor",
+      "family": "GOV",
+      "severity": "error",
+      "summary": "Objective technical language guard: text contains promotional rhetoric, absolute claims, emotional disparagement, or process buzzwords."
+    },
+    {
       "id": "GOV-SLC-001",
       "project": "auto-refactor",
       "family": "GOV",
@@ -1779,6 +1779,13 @@
       "family": "LEGACY",
       "severity": "error",
       "summary": "Redundant constant nesting: indirect constant aliases, deep constant objects, or pseudo-constants in nested scopes."
+    },
+    {
+      "id": "NUM-PREC-001",
+      "project": "auto-refactor",
+      "family": "NUM",
+      "severity": "error",
+      "summary": "Lossy precision rounding or mismatched scaling detected in mathematical calculation path, risking IEEE 754 drift."
     },
     {
       "id": "PRF-ALG-001",
@@ -2563,6 +2570,13 @@
       "family": "TST",
       "severity": "error",
       "summary": "Effective Modern Test Density (EMTD) or Current Business Coverage Ratio (CBCR) below threshold in critical business modules."
+    },
+    {
+      "id": "TST-FLT-001",
+      "project": "auto-refactor",
+      "family": "TST",
+      "severity": "error",
+      "summary": "Fragile floating-point assertion: test directly asserts equality on raw float literals without tolerance or formula derivation."
     },
     {
       "id": "TST-ILS-001",

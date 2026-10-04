@@ -3,7 +3,7 @@
 # 文件路径: scripts/ps1/pre-commit-gate.ps1
 # 架构定位: 本地 Git 提交前置物理卫生与质量安全门禁 (Windows PowerShell)
 # 依赖与触发: 触发方: .githooks/pre-commit / 本地 CLI 手动触发 | 上游: git commit | 下游: 提交暂存区 | 运行时: PowerShell 7+
-# 职责说明: 执行 9 重纵深防御链（换行契约、BOM、物理空文件、尾随空白、敏感词、AST 局部切片等）
+# 职责说明: 执行提交前物理卫生与质量安全检查（换行契约、BOM、物理空文件、尾随空白、敏感词、AST 局部切片等）
 # 退出语义与设计依据: 退出码: 0=通过门禁, 1=存在卫生或质量违规阻断 | 设计依据: AGENTS.md 跨项目全局通用契约
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -16,7 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生门禁 (9 重纵深防御，PowerShell 版)" -ForegroundColor Cyan
+Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # 获取暂存区文件列表
@@ -196,11 +196,11 @@ if ($touchedCode) {
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 if ($failed) {
-    Write-Host "❌ 【门禁结论】Pre-Commit 校验未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
+    Write-Host "❌ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
     Write-Host "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
-    Write-Host "✅ 【门禁结论】Pre-Commit 九项安全与质量门禁全部 PASS！" -ForegroundColor Green
+    Write-Host "✅ Pre-Commit 检查通过" -ForegroundColor Green
     Write-Host "=================================================================" -ForegroundColor Cyan
     exit 0
 }

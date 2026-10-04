@@ -66,7 +66,7 @@ else
 fi
 
 # 3. auto-refactor 静态重构与审查引擎自检
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [3/5] 执行 auto-refactor 十维质量基线与多维自审..."; fi
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [3/5] 执行 auto-refactor 质量基线与多维自审..."; fi
 if [[ "$FAST_MODE" -eq 1 ]]; then
     if ! "$NODE_BIN" auto-refactor/scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1; then
         STATUS_AR="FAIL"
@@ -136,18 +136,18 @@ echo "│ 审查检查项 / 子系统         │ 判定结果    │ 覆盖范�
 echo "├─────────────────────────────┼─────────────┼───────────────────┤"
 echo "│ 1. 工作区零空文件物理卫生   │ $FMT_HYGIENE │ 全仓代码/脚本/配置│"
 echo "│ 2. 单源规则目录一致性 (SSOT)│ $FMT_RULES │ 单源规则总目录    │"
-echo "│ 3. auto-refactor 质量基线   │ $FMT_AR │ 10 维模型 / 142套 │"
+echo "│ 3. auto-refactor 质量基线   │ $FMT_AR │ 质量模型 / 145套  │"
 echo "│ 4. workspace-timing 审查门禁│ $FMT_WT │ L0~L5 六层权重门禁│"
 echo "│ 5. WebGames 配置架构审查    │ $FMT_WG │ 核心领域配置真源  │"
 echo "├─────────────────────────────┴─────────────┴───────────────────┤"
-echo "│ 耗时: ${ELAPSED_SEC}s  |  全局状态: $([[ $FAILED -eq 0 ]] && echo '✅ ALL PASS' || echo '❌ SOME CHECKS FAILED')           │"
+echo "│ 耗时: ${ELAPSED_SEC}s  |  全局状态: $([[ $FAILED -eq 0 ]] && echo '✅ 检查通过' || echo '❌ 检查未通过')           │"
 echo "└───────────────────────────────────────────────────────────────┘"
 
 if [[ "$FAILED" -ne 0 ]]; then
-    echo "❌ 审查中枢检测到违规，请按上述失败项目逐一排查修复！"
+    echo "❌ 审查中枢检测到未通过项，请排查修复对应项目"
     exit 1
 else
-    echo "🎉 全工作区所有项目审查全部通过，代码库处于健康合规状态。"
+    echo "✅ 全工作区审查完成，所有项目健康合规"
     exit 0
 fi
 

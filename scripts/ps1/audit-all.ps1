@@ -54,7 +54,7 @@ if ($res.ExitCode -ne 0) {
 }
 
 # 3. auto-refactor 静态重构与审查引擎自检
-if (-not $Json) { Write-Host "▶ [3/5] 执行 auto-refactor 十维质量基线与多维自审..." -ForegroundColor Gray }
+if (-not $Json) { Write-Host "▶ [3/5] 执行 auto-refactor 质量基线与多维自审..." -ForegroundColor Gray }
 if ($Fast) {
     $res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -NoNewWindow -PassThru -Wait
     if ($res.ExitCode -ne 0) {
@@ -99,7 +99,7 @@ $startTime.Stop()
 $elapsedSec = [math]::Round($startTime.Elapsed.TotalSeconds, 2)
 
 $exitCode = if ($failed) { 1 } else { 0 }
-$globalStatus = if ($failed) { "❌ SOME CHECKS FAILED" } else { "✅ ALL PASS" }
+$globalStatus = if ($failed) { "❌ 检查未通过" } else { "✅ 检查通过" }
 $globalColor = if ($failed) { "Red" } else { "Green" }
 
 $cHygiene = if ($statusHygiene -eq "PASS") { "Green" } else { "Red" }
@@ -133,7 +133,7 @@ Write-Host "│ 审查检查项 / 子系统         │ 判定结果    │ 覆�
 Write-Host "├─────────────────────────────┼─────────────┼───────────────────┤" -ForegroundColor Cyan
 Write-Host ("│ 1. 工作区零空文件物理卫生   │ {0,-11} │ 全仓代码/脚本/配置│" -f $statusHygiene) -ForegroundColor $cHygiene
 Write-Host ("│ 2. 单源规则目录一致性 (SSOT)│ {0,-11} │ 单源规则总目录    │" -f $statusRules) -ForegroundColor $cRules
-Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 10 维模型 / 142套 │" -f $statusAr) -ForegroundColor $cAr
+Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 质量模型 / 145套  │" -f $statusAr) -ForegroundColor $cAr
 Write-Host ("│ 4. workspace-timing 审查门禁│ {0,-11} │ L0~L5 六层权重门禁│" -f $statusWt) -ForegroundColor $cWt
 Write-Host ("│ 5. WebGames 配置架构审查    │ {0,-11} │ 核心领域配置真源  │" -f $statusWg) -ForegroundColor $cWg
 Write-Host "├─────────────────────────────┴─────────────┴───────────────────┤" -ForegroundColor Cyan
@@ -141,9 +141,9 @@ Write-Host ("│ 耗时: {0}s  |  全局状态: {1}           │" -f $elapsedSe
 Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
 
 if ($failed) {
-    Write-Host "❌ 审查中枢检测到违规，请按上述失败项目逐一排查修复！" -ForegroundColor Red
+    Write-Host "❌ 审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red
     exit 1
 } else {
-    Write-Host "🎉 全工作区所有项目审查全部通过，代码库处于健康合规状态。" -ForegroundColor Green
+    Write-Host "✅ 全工作区审查完成，所有项目健康合规" -ForegroundColor Green
     exit 0
 }

@@ -8,12 +8,12 @@
   - `workspace-timing/`：VS Code 扩展，独立运行时，RingBuffer+Journal 内存双写崩溃安全，L0~L5 门禁；
   - `auto-refactor/`：Node CLI 静态重构与审查引擎（非扩展，独立工具），TS+Rust 双轨内核，4 层规则金字塔；
   - `WebGames/`：Godot 4.7 卡拉尔世界引擎（纯逻辑无头解耦，配置驱动，20 项静态门禁，四阶段案卷施工）；
-- **根级发布与门禁工具链（`scripts/`）**：`audit-all.sh`/`audit-all.ps1`（全工作区跨项目统一审查中枢与质量看板）；`pre-commit-gate`（9 重物理卫生、换行契约、密钥防泄漏与 AST 局部切片审查）；`commit-msg-gate`（8 项生产工程级结构化正文、零黑话、文本风格求真务实与规则 ID 反虚构防漂移门禁，依单源注册表 `scripts/common/rule-catalog.json` 与 `commit-msg-forbidden-terms.json` 核验）；`pre-push-gate`（9 重全量回归、待推送分支提交历史文本规范扫描与十维质量基线 Ratchet 门禁，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，三门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
+- **根级发布与门禁工具链（`scripts/`）**：`audit-all.sh`/`audit-all.ps1`（全工作区跨项目统一审查中枢与质量看板）；`pre-commit-gate`（提交前文件物理卫生、换行契约、密钥防泄漏与 AST 局部切片审查）；`commit-msg-gate`（生产工程级结构化正文、零黑话、文本风格求真务实与规则 ID 反虚构防漂移门禁，依单源注册表 `scripts/common/rule-catalog.json` 与 `commit-msg-forbidden-terms.json` 核验）；`pre-push-gate`（推送前全量回归测试、待推送分支提交历史规范扫描与质量基线检查，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
 
 ## 二、 跨项目全局通用契约
 
 ### 1. 命名与代码排版
-- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 生产工程级结构化正文（必须包含 [Why]/[Added]/[Changed]/[Fixed]/[Verification] 结构化区块，非轻量提交正文有效字数 $\ge 30$ 字符，受 `commit-msg-gate` 本地与 CI 强阻断）；提交信息必须严格秉承**纯粹技术事实原则**，严禁使用临时性/敷衍用语（`CMG-STY-001`）、过度肯定与绝对化夸大吹嘘（`CMG-STY-002`）、过度否定与情绪化贬损（`CMG-STY-003`），**严禁以“调整整体文案语调为低调中肯、求真务实，移除宣扬性词汇”等风格元叙事口号替代具体技术与文件改动事实**（`CMG-STY-004`），**严禁使用“PASS / PASSED / 全部通过 / 门禁全通”等主观门禁结论口号与口号式自夸**（`CMG-STY-005`，必须客观记录所执行的具体验证命令、测试覆盖套件数与退出码 0）（中英文同规，严禁通过英文换词如 tone down / humble / pragmatic / ultimate / hacky / all passed 等尝试绕过）；大型改动必须按架构依赖拓扑严格分批原子提交，每次提交前须先用门禁脚本（`commit-msg-gate` 与 `pre-commit-gate`）执行离线预审；
+- **Git 规范**：分支 `<type>/<scope>-简述`；提交 `<type>(<scope>): 简述`（feat/fix/refactor/docs/test/chore/style/perf）+ 生产工程级结构化正文（必须包含 [Why]/[Added]/[Changed]/[Fixed]/[Verification] 结构化区块，非轻量提交正文有效字数 $\ge 30$ 字符，受 `commit-msg-gate` 本地与 CI 强阻断）；提交信息必须严格秉承**纯粹技术事实原则**，客观记录修改动机、文件与逻辑变更及具体验证步骤，严禁使用临时性/敷衍用语（`CMG-STY-001`）、过度肯定与绝对化夸大吹嘘（`CMG-STY-002`）、过度否定与情绪化贬损（`CMG-STY-003`），严禁以“调整整体文案语调为低调中肯、求真务实，移除宣扬性词汇”等风格元叙事口号替代具体技术与文件改动事实（`CMG-STY-004`）（中英文同规）；大型改动必须按架构依赖拓扑严格分批原子提交，每次提交前须先用门禁脚本（`commit-msg-gate` 与 `pre-commit-gate`）执行离线预审；
 - **物理命名**：全局严格 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）；
 - **缩进换行**：TypeScript 4 空格，其余 2 空格；`ps1` 严格 CRLF，`sh`/`gd`/`md`/`json`/`ts` 严格 LF。
 
@@ -31,8 +31,8 @@
 - **并发与去重**：审查系统与自检测试套件必须按唯一实例去重，统一采用 `Promise.all` 异步并发执行；
 - **子进程工作目录显式隔离**：父级脚本或门禁调度器（如 `pre-push-gate` / `audit-all`）跨目录调用子项目命令时，必须显式传递 `-WorkingDirectory`（PowerShell）或 `(cd <subproject> && ...)`（Bash），严禁仅依赖 `--prefix` 导致子工具（如 Prettier / ESLint / Jest）的配置文件解析与相对 glob 路径发生跨目录漂移。
 
-### 5. 双重门禁体系与流水线健壮性契约
-- **双重门禁架构**：严格落实“第一层：本地左移物理卫生与全量回归（Tier 1 Local Gate）+ 第二层：远端主干多工作流强看守（Tier 2 Remote CI Gate）”双重防线。Git Hooks 必须优先路由至跨平台 `pwsh`，严禁回退至对无 BOM UTF-8 解析脆弱的 Windows PowerShell 5.1；
+### 5. 双层门禁机制与流水线健壮性契约
+- **双层门禁机制**：严格落实本地提交前检查（Tier 1 Local Gate）与远端 CI 流水线（Tier 2 Remote CI Gate）两道质量把关防线。Git Hooks 必须优先路由至跨平台 `pwsh`，严禁回退至对无 BOM UTF-8 解析脆弱的 Windows PowerShell 5.1；
 - **子进程环境显式继承**：Bash 脚本与 CI 步骤中临时生成并由子进程（如 Node）读取的环境变量必须显式 `export`（如 `export FIX=$(mktemp -d)`），严禁使用隐式局部变量导致 `process.env` 为 `undefined`；
 - **Bash `set -e` 退出码平铺捕获**：在 `set -euo pipefail` 脚本中，预期失败并断言非 0 退出码的指令严禁裸调，必须通过 `STATUS=0; cmd || STATUS=$?` 平铺捕获或 `if cmd; then` 守卫，杜绝断言前异常熔断；
 - **CI 多行文本确定性输出**：YAML 步骤中动态生成多行文件时统一使用 `printf "%s\n"` 语法，严禁依赖受 YAML 缩进剥离影响的多行 Heredoc；
@@ -47,22 +47,22 @@
 | 项目与定位 | 核心硬性架构契约 | 构建与测试流水线 | 拓扑规范与专属约束 | 权威真源指针 |
 | :--- | :--- | :--- | :--- | :--- |
 | **`workspace-timing/`**<br/>*(VS Code 扩展)* | ① 五层解耦（UI / Engine / Storage / Analytics / Shared）；<br/>② RingBuffer 内存缓冲 + Journal (NDJSON) 追加崩溃即时回放 + 全量检查点；<br/>③ L0~L5 六层权重审查门禁；<br/>④ `tsconfig.json` 保持 `declaration: false` 与 `isolatedModules: true` 极速构建。 | `npm run compile`<br/>`npm run test:fast`<br/>`npm run review`<br/>`npm run sync` | ① 单元测试放 `tests/unit/*.test.ts`；<br/>② UI 文本 100% 接入双语字典（zh-CN/en），严禁硬编码未翻译文案与内部技术黑话；<br/>③ SVG 图标/文字保持暗色高对比度；<br/>④ 审查规则单一真源登记于 `review-rules.json`。 | `workspace-timing/README.md`<br/>`workspace-timing/package.json` |
-| **`auto-refactor/`**<br/>*(Node CLI 分析引擎)* | ① Layer 1~4 四层规则金字塔（26 分析器，243 规则全自测，零孤儿）；<br/>② 四层正交 ELOC 空间（$\text{ELOC}_{processed}, \text{unique}, \text{changed}, \text{semantic}$）与长期质量轨迹（QED / ReviewYield / RegressionDensity）；<br/>③ $\mathcal{O}(\text{Runs} + \text{Milestones})$ 分层滚动持久化（NDJSON $<350\text{B}$/条，总空间 $\le 2\text{MB}$）；<br/>④ 四要素复合门禁（Static $\land$ Dynamic $\land$ Regression $\land$ QualityDeltaPass）与 Anti-Gaming 防刷分去抖；<br/>⑤ Rust 原生算子内核与 pure-TS shim 100% 字节等价。 | `npm run gate`<br/>`npm run build`<br/>`npm test`<br/>`npm run benchmark` | ① 测试放 `scripts/validate-*.js`，在 `test-parallel.js` 登记防孤儿（138+ 套）；<br/>② 物理文件名受 `validate-physical-naming.js` 看守；<br/>③ 项目中立性受 `validate-project-neutrality.ts` 护栏管束；<br/>④ 单分析器扣分遵 `MAX_AXES_PER_FINDING <= 4`。 | `auto-refactor/DOCS.md`<br/>`auto-refactor/package.json` |
-| **`WebGames/`**<br/>*(Godot 游戏引擎)* | ① 全域配置驱动与同构目录化：统一经 `GameConfig.get_*` 从 `config/domains/<域>/core.json` 及子表读取，严禁根目录平铺配置表；支持点分路径泛化路由与细粒度热重载；<br/>② 前端可视化边界：视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池：循环内零瞬态堆分配（`ADV-PRF-002`），池化对象必接 `reset_state()`；<br/>④ 统一继承 `TestCase`（`pack_results` 打包）。 | `test-run.sh`<br/>`check-gdscript.sh`<br/>`bench-sweep.sh`<br/>`audit-all.sh` / `.ps1` | ① `tests/unit/` 根目录散落脚本数恒为 0，按 domains/frontend/infrastructure 归位；<br/>② 改动必须先立四阶段案卷细则，获批后方可编码（案卷严格仅 4 份细则文件）；<br/>③ 严禁直读未登记配置与循环内 `.new()`；<br/>④ 新增领域在 `domains.json` 与 `test_registry.gd` 双向对齐。 | `WebGames/docs/README.md`<br/>`WebGames/config/README.md`<br/>`WebGames/docs/路线图/路线图总索引.md` |
+| **`auto-refactor/`**<br/>*(Node CLI 分析引擎)* | ① Layer 1~4 四层规则体系（26 分析器，243 规则全自测，零孤儿）；<br/>② 四层正交 ELOC 空间（$\text{ELOC}_{processed}, \text{unique}, \text{changed}, \text{semantic}$）与长期质量轨迹（QED / ReviewYield / RegressionDensity）；<br/>③ $\mathcal{O}(\text{Runs} + \text{Milestones})$ 分层滚动持久化（NDJSON $<350\text{B}$/条，总空间 $\le 2\text{MB}$）；<br/>④ 四要素复合门禁（Static $\land$ Dynamic $\land$ Regression $\land$ QualityDeltaPass）与 Anti-Gaming 防刷分去抖；<br/>⑤ Rust 原生算子内核与 pure-TS shim 100% 字节等价。 | `npm run gate`<br/>`npm run build`<br/>`npm test`<br/>`npm run benchmark` | ① 测试放 `scripts/validate-*.js`，在 `test-parallel.js` 登记防孤儿（138+ 套）；<br/>② 物理文件名受 `validate-physical-naming.js` 看守；<br/>③ 项目中立性受 `validate-project-neutrality.ts` 护栏管束；<br/>④ 单分析器扣分遵 `MAX_AXES_PER_FINDING <= 4`。 | `auto-refactor/DOCS.md`<br/>`auto-refactor/package.json` |
+| **`WebGames/`**<br/>*(Godot 游戏引擎)* | ① 全域配置驱动与同构目录化：统一经 `GameConfig.get_*` 从 `config/domains/<域>/core.json` 及子表读取，严禁根目录平铺配置表；支持点分路径泛化路由与细粒度热重载；<br/>② 前端可视化边界：视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池：循环内零瞬态堆分配（`ADV-PRF-002`），池化对象必接 `reset_state()`；<br/>④ 统一继承 `TestCase`（`pack_results` 打包）。 | `test-run.sh`<br/>`check-gdscript.sh`<br/>`bench-sweep.sh`<br/>`audit-all.sh` / `.ps1` | ① `tests/unit/` 根目录散落脚本数恒为 0，按 domains/frontend/infrastructure 归位；<br/>② 改动必须先立四阶段方案细则，获批后方可编码（方案细则严格仅 4 份文件）；<br/>③ 严禁直读未登记配置与循环内 `.new()`；<br/>④ 新增领域在 `domains.json` 与 `test_registry.gd` 双向对齐。 | `WebGames/docs/README.md`<br/>`WebGames/config/README.md`<br/>`WebGames/docs/路线图/路线图总索引.md` |
 
 ## 四、 工作区绝对红线禁令
 
 1. **路径与引用红线**：严禁在代码或配置中书写绝对路径、盘符或 `file:///`；重命名或删除文件必须同步修正全库所有引用点；严禁未经授权修改 baseline/基线文件以消音违规；
 2. **规范与门禁红线**：严禁私自放宽各项目的 linter、formatter、naming 规则或门禁脚本；严禁向配置表臆造未在架构规范中定义的新字段；
 3. **交付与占位符红线**：严禁在磁盘创建或遗留 0 字节物理空文件、纯空白虚空文件（0 ELOC）或仅含 `<...>` 占位符、未决 TODO 的半成品代码；所有文件必须一次性原子落地完整实现且通过 `validate-no-empty-scripts` 看守；严禁未获批准提前在任务路线图上标记完成；严禁仅跑通局部测试的缩水 MVP 敷衍实现；
-4. **案卷与黑话红线**：案卷目录下严格仅允许四阶段细则文件（严禁自造多余文件）；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁在测试名称、代码标识符及面向用户的文档（README/CHANGELOG/UI）中使用施工批次黑话与内部工程代号；
+4. **方案与黑话红线**：方案目录下严格仅允许四阶段细则文件（严禁自造多余文件）；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁在测试名称、代码标识符及面向用户的文档（README/CHANGELOG/UI）中使用施工批次黑话与内部工程代号；
 5. **构建配置与性能红线**：严禁在 VS Code 扩展或无外部类型依赖的项目中开启 `"declaration": true` 导致构建膨胀；严禁在 CI/Agent 自动执行环境中使用未加非交互守卫的全局 Shell 启动挂钩；
 6. **审查规则一致性红线**：严禁在检查器代码中发射或在提交信息中书写未在 `scripts/common/rule-catalog.json` / `review-rules.json` 元数据中登记的规则 ID（违者触发 `RCFG-RULE-DRIFT` 门禁熔断）；
 7. **质量度量防刷分红线**：严禁通过大面积搬移常量、调整格式空白或生成空壳桩代码制造表面虚假产出；改动若 $\text{ELOC}_{semantic} \le 15\%$ 且无真实技术债净消除，强制冻结 $\Delta Q$ 收益并触发 `BLOCK_GAMING_DETECTED` 熔断。
-8. **双重门禁与推送合规红线**：严禁使用 `--no-verify` 或任何跳过本地 Tier 1 门禁的手段推送代码；向 `origin/main` 推送后必须确保 GitHub Actions 远端 Tier 2 流水线 100% SUCCESS，任何失败必须同次闭环修复；严禁对未跟踪文件执行 `git rm`。
+8. **双层门禁与推送合规红线**：严禁使用 `--no-verify` 或任何跳过本地 Tier 1 门禁的手段推送代码；向 `origin/main` 推送后必须确保 GitHub Actions 远端 Tier 2 流水线 100% SUCCESS，任何失败必须同次闭环修复；严禁对未跟踪文件执行 `git rm`。
 9. **原子提交与预审红线**：严禁将涉及多个不同层次架构（如文档索引、底层基础设施、业务领域逻辑与静态重构）的跨域大型改动一次性巨石提交；严禁在未通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审的情况下裸调 `git commit`。
 10. **空包转发与伪门面红线**：严禁在任何项目中创建或提交无本地声明、无数据校验、无不可变冻结且仅向单一文件透传导出的空包转发文件；门面层违反实质承载预算强制触发 `ARCH-FAC-001` 阻断。
-11. **提交文本事实与客观性红线**：严禁在 Git 提交信息中夹带任何临时敷衍词汇（`CMG-STY-001`）、过度肯定与绝对化夸大吹嘘（`CMG-STY-002`）、过度否定与情绪化贬损（`CMG-STY-003`），严禁以“调整整体文案语调为低调中肯、求真务实，移除宣扬性词汇”等风格元叙事口号替代具体技术与文件改动事实（`CMG-STY-004`），严禁使用“PASS / PASSED / 全部通过 / 门禁全通”等主观门禁结论口号与宣称（`CMG-STY-005`）（中英文双语同构拦截，严禁尝试使用英文同义词绕过）；所有提交信息必须纯粹记录客观技术事实。
+11. **提交文本事实与客观性红线**：严禁在 Git 提交信息中夹带任何临时敷衍词汇（`CMG-STY-001`）、过度肯定与绝对化夸大吹嘘（`CMG-STY-002`）、过度否定与情绪化贬损（`CMG-STY-003`），严禁以“调整整体文案语调为低调中肯、求真务实，移除宣扬性词汇”等风格元叙事口号替代具体技术与文件改动事实（`CMG-STY-004`）（中英文双语同构拦截，严禁尝试使用英文同义词绕过）；所有提交信息必须纯粹客观记录技术改动事实。
 
 ## 五、 Agent 行为边界与维护规则
 
