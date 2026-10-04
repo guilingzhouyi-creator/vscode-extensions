@@ -279,13 +279,13 @@ export function synthesizeStaticQualityVector(
         );
 
     return {
-        A: Math.round(A * 10) / 10,
-        M: Math.round(M * 10) / 10,
-        P: Math.round(P * 10) / 10,
-        D: Math.round(D * 10) / 10,
-        T: Math.round(T * 10) / 10,
-        R: Math.round(R * 10) / 10,
-        E: Math.round(E * 10) / 10,
+        A: Math.round(A * 100) / 100,
+        M: Math.round(M * 100) / 100,
+        P: Math.round(P * 100) / 100,
+        D: Math.round(D * 100) / 100,
+        T: Math.round(T * 100) / 100,
+        R: Math.round(R * 100) / 100,
+        E: Math.round(E * 100) / 100,
     };
 }
 
@@ -311,7 +311,7 @@ export function computeStaticQualityScore(
     }
 
     if (weightSum <= 0) return 0;
-    return Math.round((weightedScore / weightSum) * 10) / 10;
+    return Math.round((weightedScore / weightSum) * 100) / 100;
 }
 
 /**
@@ -336,13 +336,13 @@ export function computeStaticVectorDelta(
     after: StaticQualityVector,
 ): StaticVectorDelta {
     const deltaVector: StaticQualityVector = {
-        A: Math.round((after.A - before.A) * 10) / 10,
-        M: Math.round((after.M - before.M) * 10) / 10,
-        P: Math.round((after.P - before.P) * 10) / 10,
-        D: Math.round((after.D - before.D) * 10) / 10,
-        T: Math.round((after.T - before.T) * 10) / 10,
-        R: Math.round((after.R - before.R) * 10) / 10,
-        E: Math.round((after.E - before.E) * 10) / 10,
+        A: Math.round((after.A - before.A) * 100) / 100,
+        M: Math.round((after.M - before.M) * 100) / 100,
+        P: Math.round((after.P - before.P) * 100) / 100,
+        D: Math.round((after.D - before.D) * 100) / 100,
+        T: Math.round((after.T - before.T) * 100) / 100,
+        R: Math.round((after.R - before.R) * 100) / 100,
+        E: Math.round((after.E - before.E) * 100) / 100,
     };
 
     let sumDiffSq = 0;
@@ -366,8 +366,8 @@ export function computeStaticVectorDelta(
         denominator > 0 ? Math.round((dotProduct / denominator) * 1000) / 1000 : 1.0;
 
     const scalarDelta =
-        Math.round((computeStaticQualityScore(after) - computeStaticQualityScore(before)) * 10) /
-        10;
+        Math.round((computeStaticQualityScore(after) - computeStaticQualityScore(before)) * 100) /
+        100;
 
     return {
         deltaVector,

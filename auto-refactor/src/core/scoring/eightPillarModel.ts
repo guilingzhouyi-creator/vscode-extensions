@@ -135,7 +135,7 @@ export function synthesizeEightPillars(
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const values = pillarBuckets[pillar];
         const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
-        pillars[pillar] = Math.round(avg * 10) / 10;
+        pillars[pillar] = Math.round(avg * 100) / 100;
     }
 
     const appliedCeilings: { pillar: PrimaryQualityPillar; maxScore: number; reason: string }[] =
@@ -157,7 +157,7 @@ export function synthesizeEightPillars(
     }
 
     const compositeScore =
-        totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 10) / 10 : 100.0;
+        totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100) / 100 : 100.0;
 
     return {
         pillars,

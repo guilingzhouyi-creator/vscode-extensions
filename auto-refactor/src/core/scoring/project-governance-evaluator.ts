@@ -190,7 +190,7 @@ export function evaluateProjectGovernance(
     const { cleanReuseBonus, antiGamingWarnings } = calculateCleanReuseBonuses(input);
 
     const rawScore = 100 - totalDeductions + cleanReuseBonus;
-    const compositeScore = Math.max(0, Math.min(100, Math.round(rawScore * 10) / 10));
+    const compositeScore = Math.max(0, Math.min(100, Math.round(rawScore * 100) / 100));
     const grade = assignGovernanceGrade(compositeScore);
     const calibratedIssues = calibrateStageIssues(input.issues, input.stage);
 

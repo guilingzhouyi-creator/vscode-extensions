@@ -194,14 +194,14 @@ export function fuseIssueRisks(
         rawFused *= 1.3;
     }
 
-    const fusedScore = Math.round(Math.min(100.0, rawFused) * 10) / 10;
+    const fusedScore = Math.round(Math.min(100.0, rawFused) * 100) / 100;
     const level = classifyFusedRiskLevel(fusedScore, isDualConfirmed);
 
     return {
         issueId: staticRisk.issueId,
         rule: staticRisk.rule,
-        staticRisk: Math.round(staticRisk.normalizedRisk * 10) / 10,
-        dynamicRisk: dynamicRisk ? Math.round(dynamicRisk.normalizedRisk * 10) / 10 : 0.0,
+        staticRisk: Math.round(staticRisk.normalizedRisk * 100) / 100,
+        dynamicRisk: dynamicRisk ? Math.round(dynamicRisk.normalizedRisk * 100) / 100 : 0.0,
         historicalFactor: Math.round(H * 100) / 100,
         fusedScore,
         level,
@@ -288,7 +288,7 @@ function buildEffectiveDynamicHotspot(
         R: selfDynamicRisk?.R ?? 2.0,
         V: selfDynamicRisk?.V ?? 2.0,
         rawRisk: Math.round(effectiveDynamic * 25.0 * 100) / 100,
-        normalizedRisk: Math.round(effectiveDynamic * 10) / 10,
+        normalizedRisk: Math.round(effectiveDynamic * 100) / 100,
         evidenceConfidence: selfDynamicRisk?.evidenceConfidence ?? (callersCount > 0 ? 0.9 : 0.6),
     };
 }
@@ -340,8 +340,8 @@ export function fuseCascadedRisks(
     return {
         ...baseFused,
         rationale: updatedRationale,
-        upstreamCascadedDynamicRisk: Math.round(cascadedDynamicSum * 10) / 10,
-        effectiveDynamicRisk: Math.round(effectiveDynamic * 10) / 10,
+        upstreamCascadedDynamicRisk: Math.round(cascadedDynamicSum * 100) / 100,
+        effectiveDynamicRisk: Math.round(effectiveDynamic * 100) / 100,
         contributingCallers,
     };
 }

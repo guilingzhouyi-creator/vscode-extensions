@@ -120,7 +120,7 @@ function expectedComposite(indices, evaluated) {
     weight += DEFAULT_QUALITY_WEIGHTS[dim];
   }
   if (weight <= 0) return Number.NaN;
-  return Math.round(Math.exp(logSum / weight) * 10) / 10;
+  return Math.round(Math.exp(logSum / weight) * 100) / 100;
 }
 
 /**

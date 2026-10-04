@@ -41,8 +41,8 @@ export const GRADE_B_MIN = 70;
 export const GRADE_C_MIN = 60;
 /** Grade D minimum threshold. */
 export const GRADE_D_MIN = 50;
-/** Composite rounding: one decimal place. */
-export const SCORE_ROUNDING = 10;
+/** Composite rounding: two decimal places (0.01 precision). */
+export const SCORE_ROUNDING = 100;
 /** Confidence floor threshold. */
 export const CONFIDENCE_FLOOR = 0.6;
 /** Confidence line cap upper bound. */

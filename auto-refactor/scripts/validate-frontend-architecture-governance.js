@@ -412,8 +412,8 @@ func _on_buy():
   );
   const rawStringsOnly = calculateI18nSymmetryIndex(0, 10, 0);
   assert.strictEqual(rawStringsOnly, 0, 'Gate 19 Failed: Unlocalized strings only must yield 0.0');
-  const mixed = calculateI18nSymmetryIndex(10, 2, 0); // 10 / (10 + 5) = 66.666... -> 66.7
-  assert.strictEqual(mixed, 66.7, 'Gate 19 Failed: Expected 66.7 symmetry');
+  const mixed = calculateI18nSymmetryIndex(10, 2, 0); // 10 / (10 + 5) = 66.666... -> 66.67
+  assert.strictEqual(mixed, 66.67, 'Gate 19 Failed: Expected 66.67 symmetry');
   console.log('  [PASS] Gate 19: i18n Symmetry Index (ISI) invariants');
 }
 

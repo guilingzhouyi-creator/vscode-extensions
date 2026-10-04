@@ -260,7 +260,7 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
     // narrow analyzer selection. Subtracting it would yield NaN, and a NaN delta satisfies
     // neither `> 0.5` nor `< -0.5`, so the patch would be reported as `neutral`.
     const rawDelta = scoreDelta(beforeScore, afterScore);
-    let deltaScore = rawDelta === null ? null : Math.round(rawDelta * 10) / 10;
+    let deltaScore = rawDelta === null ? null : Math.round(rawDelta * 100) / 100;
 
     // Pure relocation debouncing: moving constants without quality improvement
     // earns 0 positive score
@@ -279,7 +279,7 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
         const pAfter = afterDetails.eightPillars.pillars[pillar];
         // An unmeasured side yields NaN here too; keep it NaN rather than coercing to 0,
         // which would read as "this pillar did not change".
-        pillarDeltas[pillar] = Math.round((pAfter - pBefore) * 10) / 10;
+        pillarDeltas[pillar] = Math.round((pAfter - pBefore) * 100) / 100;
     }
 
     let verdict = resolvePatchVerdict(deltaScore, gaming.length);

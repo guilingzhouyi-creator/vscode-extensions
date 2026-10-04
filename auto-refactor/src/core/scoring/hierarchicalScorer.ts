@@ -22,7 +22,7 @@ import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
 // carry its own copy (95/85/75/65/50) which disagreed with the snapshot model, so the same
 // 92 points read as A+ on one surface and A on the other. It also had no NaN case, which
 // graded unmeasured input as F.
-import { resolveQualityGrade } from './scorer-formulas';
+import { resolveQualityGrade, SCORE_ROUNDING } from './scorer-formulas';
 
 /**
  * Scored function-level quality record.
@@ -119,7 +119,7 @@ export function scoreFileQuality(
         if (dim === 'maintainability' && densityResult.isLowDensity) {
             dimPenalty += 15;
         }
-        indices[dim] = Math.max(0, Math.round((100 - dimPenalty) * 10) / 10);
+        indices[dim] = Math.max(0, Math.round((100 - dimPenalty) * SCORE_ROUNDING) / SCORE_ROUNDING);
     }
 
     const dataScore = Math.max(0, 100 - riskResult.pillarPenalties.data);
@@ -175,7 +175,7 @@ function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQuali
         for (const p of ALL_PRIMARY_PILLARS) {
             const avgP =
                 files.reduce((sum, f) => sum + f.eightPillars.pillars[p], 0) / files.length;
-            pillars[p] = Math.round(avgP * 10) / 10;
+            pillars[p] = Math.round(avgP * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
         const tenDimensions: Record<QualityDimension, number> = {} as Record<
             QualityDimension,
@@ -184,12 +184,12 @@ function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQuali
         for (const d of ALL_QUALITY_DIMENSIONS) {
             const avgD =
                 files.reduce((sum, f) => sum + (f.tenDimensions?.[d] ?? 100), 0) / files.length;
-            tenDimensions[d] = Math.round(avgD * 10) / 10;
+            tenDimensions[d] = Math.round(avgD * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
         modules.push({
             moduleName,
             fileCount: files.length,
-            compositeScore: Math.round(avgComposite * 10) / 10,
+            compositeScore: Math.round(avgComposite * SCORE_ROUNDING) / SCORE_ROUNDING,
             pillars,
             tenDimensions,
             files,
@@ -215,17 +215,17 @@ function buildDomainScores(
         >;
         for (const p of ALL_PRIMARY_PILLARS) {
             const avgP = modules.reduce((sum, m) => sum + m.pillars[p], 0) / modules.length;
-            domainPillars[p] = Math.round(avgP * 10) / 10;
+            domainPillars[p] = Math.round(avgP * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
         const domainDims: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
         for (const d of ALL_QUALITY_DIMENSIONS) {
             const avgD =
                 modules.reduce((sum, m) => sum + (m.tenDimensions?.[d] ?? 100), 0) / modules.length;
-            domainDims[d] = Math.round(avgD * 10) / 10;
+            domainDims[d] = Math.round(avgD * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
         domains.push({
             domainName,
-            compositeScore: Math.round(domainComposite * 10) / 10,
+            compositeScore: Math.round(domainComposite * SCORE_ROUNDING) / SCORE_ROUNDING,
             pillars: domainPillars,
             tenDimensions: domainDims,
             modules,
@@ -263,7 +263,8 @@ function computeProjectPillars(
         number
     >;
     for (const p of ALL_PRIMARY_PILLARS) {
-        projectPillars[p] = Math.round((globalPillarSums[p] / fileScores.length) * 10) / 10;
+        projectPillars[p] =
+            Math.round((globalPillarSums[p] / fileScores.length) * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
 
     if (fatalCount > 0) {
@@ -335,7 +336,7 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
         const avgD =
             fileScores.reduce((sum, f) => sum + (f.tenDimensions?.[d] ?? 100), 0) /
             fileScores.length;
-        projectDimensions[d] = Math.round(avgD * 10) / 10;
+        projectDimensions[d] = Math.round(avgD * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
 
     const synthesized = synthesizeEightPillars(
@@ -350,8 +351,8 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
             ALL_PRIMARY_PILLARS.reduce(
                 (sum, p) => sum + projectPillars[p] * synthesized.weights[p],
                 0,
-            ) * 10,
-        ) / 10;
+            ) * SCORE_ROUNDING,
+        ) / SCORE_ROUNDING;
     synthesized.compositeScore = finalComposite;
 
     return {
