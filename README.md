@@ -25,6 +25,8 @@ This monorepo groups several self-contained personal projects that build and run
    *Experimental static code analysis and refactoring CLI, exploring TS + Rust native operators (in active experimentation).*
 3. **[WebGames](./WebGames)**：基于 Godot 4.7 的游戏逻辑解耦原型（探索纯逻辑无头测试与配置驱动设计，处于早期开发阶段）；  
    *Early-stage Godot 4.7 game logic prototype exploring headless decoupling and data-driven configuration.*
+4. **[架构蓝图](./docs/agent-native-system-blueprint.md)**：面向 AI/Agent 时代的自治体系、一体两面三层拓扑 Diff 与记忆提纯顶层设计案卷；  
+   *Architecture blueprint for agent-native autonomous systems and multi-tier diff review pipelines.*
 
 ---
 
@@ -32,7 +34,7 @@ This monorepo groups several self-contained personal projects that build and run
 
 | 项目 | 类型 | 状态 | 涉及技术 | 简要说明 |
 | :--- | :--- | :---: | :--- | :--- |
-| **[Workspace Timing](./workspace-timing)** | VS Code 扩展<br/>*Extension* | `v0.4.12`<br/>日常维护 | TypeScript<br/>VS Code API | 记录编码时长，提供热力图、周上限健康提醒、多工作区聚合与四级崩溃安全存储，支持中英双语切换。 |
+| **[Workspace Timing](./workspace-timing)** | VS Code 扩展<br/>*Extension* | `v0.5.0`<br/>日常维护 | TypeScript<br/>VS Code API | 记录编码时长，提供热力图、周上限健康提醒、多工作区聚合与四级崩溃安全存储，支持中英双语切换。 |
 | **[auto-refactor](./auto-refactor)** | 静态分析 CLI<br/>*CLI Tool* | `v0.4.0`<br/>实验探索中 | Node.js / TS<br/>Rust (Crates) | 探索 TS 编排与 Rust 原生算子结合的静态检查工具，含差分、支配树与克隆检测实验，支持 SARIF 导出。 |
 | **[WebGames](./WebGames)** | 游戏原型工程<br/>*Game Prototype* | `Godot 4.7`<br/>早期构建中 | GDScript<br/>JSON Config | 游戏世界逻辑原型，尝试将业务模型与画面表现彻底隔离，探索全域配置驱动与对象池复用。 |
 
