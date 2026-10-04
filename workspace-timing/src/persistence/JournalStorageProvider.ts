@@ -83,7 +83,7 @@ export class JournalStorageProvider implements IJournalStore {
         try {
             await vscode.workspace.fs.createDirectory(dotVscode);
         } catch {
-            // 目录已存在
+            // ignore: 目录已存在无需重新创建
         }
 
         // 修复 O(n) 全量重写：改用 Node fs.appendFile 直接追加（O(1)）。

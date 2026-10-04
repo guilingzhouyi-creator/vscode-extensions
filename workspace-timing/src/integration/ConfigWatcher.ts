@@ -25,6 +25,7 @@ import { LogLevel, log } from './Logger';
 import { t, setLocale, resolveLocale } from '../i18n/index';
 
 const CONFIG_SECTION = 'workspaceTiming';
+const CONFIG_KEY_ENABLED = 'enabled';
 
 /**
  * 读取当前用户配置（唯一入口，避免多处重复实现导致配置漂移）。
@@ -40,7 +41,7 @@ export function readTimingConfig(): TimingConfig {
     const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
 
     return {
-        enabled: cfg.get<boolean>('enabled', DEFAULT_CONFIG.enabled),
+        enabled: cfg.get<boolean>(CONFIG_KEY_ENABLED, DEFAULT_CONFIG.enabled),
         globalDisabled: cfg.get<boolean>('globalDisabled', DEFAULT_CONFIG.globalDisabled),
         locale: sanitizeLocale(cfg.get('locale', DEFAULT_CONFIG.locale)),
         statusBarEnabled: cfg.get<boolean>('statusBar.enabled', DEFAULT_CONFIG.statusBarEnabled),
@@ -75,8 +76,8 @@ const PERSIST_FIELDS: ReadonlyArray<{
     key: string;
     sanitize?: (v: unknown) => unknown;
 }> = [
-    { field: 'isEnabled', key: 'enabled' },   // DashboardData 历史触达名
-    { field: 'enabled', key: 'enabled' },     // TimingConfig 本名
+    { field: 'isEnabled', key: CONFIG_KEY_ENABLED },   // DashboardData 历史触达名
+    { field: CONFIG_KEY_ENABLED, key: CONFIG_KEY_ENABLED },     // TimingConfig 本名
     { field: 'globalDisabled', key: 'globalDisabled' },
     { field: 'locale', key: 'locale' },
     { field: 'statusBarEnabled', key: 'statusBar.enabled' },
@@ -219,7 +220,7 @@ export class ConfigWatcher {
         if (!e.affectsConfiguration('workspaceTiming.cloudSync')) return;
 
         const cfg = vscode.workspace.getConfiguration('workspaceTiming.cloudSync');
-        const enabled = cfg.get<boolean>('enabled', false);
+        const enabled = cfg.get<boolean>(CONFIG_KEY_ENABLED, false);
 
         if (enabled) {
             // 占位提示：云端同步即将推出

@@ -13,6 +13,7 @@ const { DisableManager } = require('../../out/application/DisableManager.js');
 const { SessionManager } = require('../../out/application/SessionManager.js');
 const { Scheduler } = require('../../out/application/Scheduler.js');
 const { GlobalAggregator } = require('../../out/application/GlobalAggregator.js');
+const { TimeAggregator } = require('../../out/domain/TimeAggregator.js');
 const { init, setLocale } = require('../../out/i18n/index.js');
 
 /**
@@ -228,19 +229,62 @@ describe('TimerOrchestrator（周工作上限模块）', () => {
         assert.strictEqual(notified, false, '上周的历史时长绝不应触发本周上限提醒');
     });
 
-    it('会话数统计口径统一：包含 dailyTotals 折叠层与内存原始会话数', async () => {
-        timer.data.dailyTotals = {
-            '2026-08-01': { totalMs: 3600000, sessionCount: 5 },
-            '2026-08-02': { totalMs: 7200000, sessionCount: 10 },
-        };
-        timer.data.sessions = [
-            { startMs: 1000, endMs: 2000, durationMs: 1000 },
-            { startMs: 3000, endMs: 4000, durationMs: 1000 },
-        ];
-        timer.data.currentSessionStartMs = 5000;
+    it('打开界面自动回收：单日超过 20 条会话自动淘汰最远条目，保留最新 20 条且工时无损', async () => {
+        const todayNoon = new Date();
+        todayNoon.setHours(12, 0, 0, 0);
+        const t0 = todayNoon.getTime();
+
+        const sessions = [];
+        for (let i = 0; i < 25; i++) {
+            sessions.push({
+                startMs: t0 + i * 60_000,
+                endMs: t0 + (i + 1) * 60_000,
+                durationMs: 60_000,
+            });
+        }
+        timer.data.sessions = sessions;
+        timer.data.currentSessionStartMs = 0;
 
         const data = await orchestrator.getDashboardData();
-        // 5 + 10 (folded) + 2 (raw) + 1 (active) = 18
-        assert.strictEqual(data.sessionsCount, 18, '会话数应包含折叠日桶会话、原始会话与进行中会话');
+        // 25 条中有 5 条最远会话被回收进 dailyTotals，内存仅保留最新 20 条
+        assert.strictEqual(data.sessionsCount, 20, '超过 20 条应截断保留最新 20 条');
+        assert.strictEqual(timer.data.sessions.length, 20, '内存会话应削减为 20 条');
+        assert.strictEqual(timer.data.sessions[0].startMs, t0 + 5 * 60_000, '应淘汰最早的 5 条会话');
+
+        // 验证淘汰的 5 条会话工时沉淀入 dailyTotals，总工时守恒
+        const todayKey = TimeAggregator.todayStr();
+        assert.strictEqual(timer.data.dailyTotals[todayKey].sessionCount, 5);
+        assert.strictEqual(timer.data.dailyTotals[todayKey].totalMs, 5 * 60_000);
+    });
+
+    it('打开界面自动回收：跨周会话自动全条目清理归零，时长沉淀入 dailyTotals', async () => {
+        const twoWeeksAgo = Date.now() - 14 * 86400_000;
+        timer.data.sessions = [
+            { startMs: twoWeeksAgo, endMs: twoWeeksAgo + 1000, durationMs: 1000 },
+            { startMs: twoWeeksAgo + 2000, endMs: twoWeeksAgo + 3000, durationMs: 1000 },
+        ];
+        timer.data.currentSessionStartMs = 0;
+
+        const data = await orchestrator.getDashboardData();
+        // 旧周会话被自动清理折叠入 dailyTotals，当期保留 0 条历史会话
+        assert.strictEqual(data.sessionsCount, 0, '跨周旧会话应统一清理归零');
+        assert.strictEqual(timer.data.sessions.length, 0, '旧周会话应已被从内存数组中移除');
+        assert.strictEqual(Object.keys(timer.data.dailyTotals).length > 0, true, '旧周时长应沉淀入 dailyTotals');
+    });
+
+    it('会话数统计口径：当期保留有效会话数与进行中会话之和', async () => {
+        const todayNoon = new Date();
+        todayNoon.setHours(12, 0, 0, 0);
+        const t0 = todayNoon.getTime();
+
+        timer.data.sessions = [
+            { startMs: t0 + 1000, endMs: t0 + 2000, durationMs: 1000 },
+            { startMs: t0 + 3000, endMs: t0 + 4000, durationMs: 1000 },
+        ];
+        timer.data.currentSessionStartMs = t0 + 5000;
+
+        const data = await orchestrator.getDashboardData();
+        // 2 (当期保留有效) + 1 (进行中) = 3
+        assert.strictEqual(data.sessionsCount, 3, '会话数应为当期保留的有效会话数与进行中会话之和');
     });
 });

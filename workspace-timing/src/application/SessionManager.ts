@@ -10,6 +10,7 @@ import {
   WorkspaceTimingData,
   DEFAULT_RAW_RETENTION_DAYS,
   DEFAULT_SESSION_CAP,
+  MAX_SESSIONS_PER_DAY,
   FOLD_CHECKPOINT_MOD,
 } from '../domain/models';
 import { TimeAggregator, parseLocalDate } from '../domain/TimeAggregator';
@@ -67,14 +68,22 @@ export class SessionManager {
   }
 
   /**
-   * 双阈值折叠过期与溢出容量的会话进 dailyTotals 沉淀层（无损回收、幂等）。
+   * 自动回收与折叠：
+   * 1. 跨周归零（旧周全条目沉淀入 dailyTotals）；
+   * 2. 单日上限截断（每日最高 20 条，淘汰最远条目入 dailyTotals）；
+   * 3. 双阈值折叠过期与溢出容量的会话进 dailyTotals 沉淀层（无损回收、幂等）。
    * 无过期或溢出会话时不写回、不触发任何存盘。
    */
   foldIfNeeded(): void {
     const data = this.timer.data;
     const res = migrateToFolded(
       { sessions: data.sessions, dailyTotals: data.dailyTotals },
-      { retentionDays: this._rawRetentionDays, maxSessions: this.maxSessions },
+      {
+        retentionDays: this._rawRetentionDays,
+        maxSessions: this.maxSessions,
+        maxPerDay: MAX_SESSIONS_PER_DAY,
+        pruneWeekly: true,
+      },
     );
     if (res.foldedSessionCount === 0) return;
     this.timer.replaceData({
@@ -85,6 +94,13 @@ export class SessionManager {
     log(LogLevel.Info,
       `SessionManager: folded ${res.foldedSessionCount} expired/overflow session(s) into ` +
       `${Object.keys(res.dailyTotals).length} daily bucket(s)`);
+  }
+
+  /**
+   * 显式触发会话自动回收（供打开界面或生命周期事件调用）
+   */
+  autoRecycleSessions(): void {
+    this.foldIfNeeded();
   }
 
   /** 是否处于活跃会话中 */

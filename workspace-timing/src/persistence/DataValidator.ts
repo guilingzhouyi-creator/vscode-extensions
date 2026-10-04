@@ -6,7 +6,7 @@
  *       校验失败时绝不触碰现网数据。
  */
 
-import { WorkspaceTimingData, LATEST_VERSION, DailyTotalsMap } from '../domain/models';
+import { WorkspaceTimingData, LATEST_VERSION, DailyTotalsMap, TimeSession } from '../domain/models';
 
 export interface ValidationResult {
     ok: boolean;
@@ -16,69 +16,97 @@ export interface ValidationResult {
     data?: WorkspaceTimingData;
 }
 
+const ERROR_NOT_AN_OBJECT = 'not an object';
+const ERROR_INVALID_VERSION = 'invalid version';
+const ERROR_INVALID_TOTAL_MS = 'invalid totalMs';
+const ERROR_INVALID_CURRENT_SESSION = 'invalid currentSessionStartMs';
+const ERROR_MISSING_SESSIONS = 'missing sessions';
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 function isFiniteNumber(v: unknown): v is number {
     return typeof v === 'number' && Number.isFinite(v);
 }
 
-/** 校验并净化一份外部计时数据 */
-export function validateTimingData(raw: unknown): ValidationResult {
-    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-        return { ok: false, error: 'not an object' };
-    }
-    const o = raw as Record<string, unknown>;
+function isRecord(v: unknown): v is Record<string, unknown> {
+    return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
 
-    // 版本：接受 >=1 的有限数（未知更高版本按最新语义尽力解析）
+function validateTopLevelFields(o: Record<string, unknown>): string | null {
     if (!isFiniteNumber(o.version) || o.version < 1) {
-        return { ok: false, error: 'invalid version' };
+        return ERROR_INVALID_VERSION;
     }
-
     if (!isFiniteNumber(o.totalMs) || o.totalMs < 0) {
-        return { ok: false, error: 'invalid totalMs' };
+        return ERROR_INVALID_TOTAL_MS;
     }
     if (!isFiniteNumber(o.currentSessionStartMs) || o.currentSessionStartMs < 0) {
-        return { ok: false, error: 'invalid currentSessionStartMs' };
+        return ERROR_INVALID_CURRENT_SESSION;
     }
     if (!Array.isArray(o.sessions)) {
-        return { ok: false, error: 'missing sessions' };
+        return ERROR_MISSING_SESSIONS;
     }
+    return null;
+}
 
-    // 条目级净化：丢弃非法会话（负值/非有限/区间倒挂），不整体拒绝
-    const sessions = [];
-    for (const s of o.sessions as unknown[]) {
-        if (typeof s !== 'object' || s === null) continue;
-        const r = s as Record<string, unknown>;
-        const { startMs, endMs, durationMs } = r as { startMs?: unknown; endMs?: unknown; durationMs?: unknown };
-        if (!isFiniteNumber(startMs) || !isFiniteNumber(endMs) || !isFiniteNumber(durationMs)) continue;
-        if (startMs <= 0 || endMs < startMs || durationMs < 0) continue;
-        sessions.push({ startMs, endMs, durationMs });
+function sanitizeSessionEntry(s: unknown): TimeSession | null {
+    if (!isRecord(s)) return null;
+    const { startMs, endMs, durationMs } = s;
+    if (!isFiniteNumber(startMs) || !isFiniteNumber(endMs) || !isFiniteNumber(durationMs)) return null;
+    if (startMs <= 0 || endMs < startMs || durationMs < 0) return null;
+    return { startMs, endMs, durationMs };
+}
+
+function sanitizeSessions(rawSessions: unknown[]): TimeSession[] {
+    const sessions: TimeSession[] = [];
+    for (const s of rawSessions) {
+        const clean = sanitizeSessionEntry(s);
+        if (clean) sessions.push(clean);
     }
-
-    // 排序不变量固化：按起始时间升序。内部路径天然有序，外部文件不保证——
-    // weeklySummary 的逆序 break 提前退出与折叠 FIFO 溢出语义均依赖有序输入。
+    // 排序不变量固化：按起始时间升序
     sessions.sort((a, b) => a.startMs - b.startMs);
+    return sessions;
+}
 
-    // 日桶校验：非对象忽略；单桶非法值跳过该桶
-    let dailyTotals: DailyTotalsMap | undefined;
-    if (typeof o.dailyTotals === 'object' && o.dailyTotals !== null && !Array.isArray(o.dailyTotals)) {
-        dailyTotals = {};
-        for (const [key, v] of Object.entries(o.dailyTotals as Record<string, unknown>)) {
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || typeof v !== 'object' || v === null) continue;
-            const b = v as Record<string, unknown>;
-            if (!isFiniteNumber(b.totalMs) || b.totalMs < 0) continue;
-            if (!isFiniteNumber(b.sessionCount) || b.sessionCount < 0) continue;
-            dailyTotals[key] = { totalMs: b.totalMs, sessionCount: Math.floor(b.sessionCount) };
-        }
+function sanitizeDailyTotals(rawTotals: unknown): DailyTotalsMap | undefined {
+    if (!isRecord(rawTotals)) return undefined;
+    const dailyTotals: DailyTotalsMap = {};
+    for (const [key, v] of Object.entries(rawTotals)) {
+        if (!ISO_DATE_PATTERN.test(key) || !isRecord(v)) continue;
+        if (!isFiniteNumber(v.totalMs) || v.totalMs < 0) continue;
+        if (!isFiniteNumber(v.sessionCount) || v.sessionCount < 0) continue;
+        dailyTotals[key] = { totalMs: v.totalMs, sessionCount: Math.floor(v.sessionCount) };
     }
+    return dailyTotals;
+}
+
+/** 校验并净化一份外部计时数据 */
+export function validateTimingData(raw: unknown): ValidationResult {
+    if (!isRecord(raw)) {
+        return { ok: false, error: ERROR_NOT_AN_OBJECT };
+    }
+
+    const fieldError = validateTopLevelFields(raw);
+    if (fieldError) {
+        return { ok: false, error: fieldError };
+    }
+
+    const sessions = sanitizeSessions(raw.sessions as unknown[]);
+    const dailyTotals = sanitizeDailyTotals(raw.dailyTotals);
 
     const data: WorkspaceTimingData = {
         version: LATEST_VERSION,
-        totalMs: o.totalMs,
+        totalMs: raw.totalMs as number,
         currentSessionStartMs: 0, // 还原后一律从干净状态重新开始
         lastSavedAtMs: Date.now(),
-        isEnabled: o.isEnabled !== false,
+        isEnabled: raw.isEnabled !== false,
         sessions,
         ...(dailyTotals ? { dailyTotals } : {}),
     };
 
     return { ok: true, data };
 }
+
+/** 计时数据校验器接口契约 */
+export interface DataValidator {
+    validateTimingData: typeof validateTimingData;
+}
+

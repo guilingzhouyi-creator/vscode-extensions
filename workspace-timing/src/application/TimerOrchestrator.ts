@@ -22,22 +22,24 @@ import {
   sanitizeWeeklyLimitHours,
   sanitizeWeeklyLimitEnabled,
   LATEST_VERSION,
+  ORCHESTRATOR_STATES,
+  OrchestratorState,
 } from '../domain/models';
 import { validateTimingData } from '../persistence/DataValidator';
 import { migrateToFolded } from '../domain/HistoryFolder';
-import { AggregatedCsvExporter } from './exporters/AggregatedCsvExporter';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler } from './Scheduler';
-import { CsvExporter } from './exporters/CsvExporter';
-import { ReportExporter, ReportKind } from './exporters/ReportExporter';
-import { buildDashboardData, buildWeeklyTrendEntries } from './DashboardDataAssembler';
+import { ReportKind } from './exporters/ReportExporter';
+import { OrchestratorReportHandler } from './orchestrator/OrchestratorReportHandler';
+import { buildDashboardData } from './DashboardDataAssembler';
 import { LogLevel, log } from '../integration/Logger';
 import { t, format } from '../i18n/index';
 
-export type OrchestratorState = 'idle' | 'running' | 'disabled' | 'saving';
+export type { OrchestratorState };
+export { ORCHESTRATOR_STATES };
 
 export class TimerOrchestrator {
   private readonly timer: TimerEngine;
@@ -48,7 +50,7 @@ export class TimerOrchestrator {
   private readonly scheduler: Scheduler;
   private readonly global: GlobalAggregator;
 
-  private _state: OrchestratorState = 'idle';
+  private _state: OrchestratorState = ORCHESTRATOR_STATES.IDLE;
   /** 破坏性操作前自动安全快照开关（workspaceTiming.safetySnapshot） */
   private _safetySnapshotEnabled: boolean = true;
   private _onStateChange: ((state: OrchestratorState) => void) | null = null;
@@ -109,7 +111,7 @@ export class TimerOrchestrator {
 
     // 禁用判定
     if (!this.disableManager.shouldCount()) {
-      this._state = 'disabled';
+      this._state = ORCHESTRATOR_STATES.DISABLED;
       log(LogLevel.Info, 'TimerOrchestrator: timing is disabled, skipping');
       this._onStateChange?.(this._state);
       return;
@@ -132,11 +134,11 @@ export class TimerOrchestrator {
       });
       this.scheduler.start();
 
-      this._state = 'running';
+      this._state = ORCHESTRATOR_STATES.RUNNING;
       log(LogLevel.Info, 'TimerOrchestrator: started successfully');
     } catch (err) {
       log(LogLevel.Error, 'TimerOrchestrator: start failed', err as Error);
-      this._state = 'idle';
+      this._state = ORCHESTRATOR_STATES.IDLE;
     }
 
     this._onStateChange?.(this._state);
@@ -155,7 +157,7 @@ export class TimerOrchestrator {
   async stop(): Promise<SessionResult> {
     log(LogLevel.Info, 'TimerOrchestrator: stop requested');
 
-    this._state = 'saving';
+    this._state = ORCHESTRATOR_STATES.SAVING;
     this._onStateChange?.(this._state);
 
     // 停止调度器
@@ -166,7 +168,7 @@ export class TimerOrchestrator {
     try {
       return await this.sessionManager.endSession();
     } finally {
-      this._state = 'idle';
+      this._state = ORCHESTRATOR_STATES.IDLE;
       this._onStateChange?.(this._state);
     }
   }
@@ -177,10 +179,10 @@ export class TimerOrchestrator {
   async onDisableStateChanged(newState: DisableState): Promise<void> {
     log(LogLevel.Info, `TimerOrchestrator: disable state changed to ${newState}`);
 
-    if (newState === 'enabled' && this._state === 'disabled') {
+    if (newState === 'enabled' && this._state === ORCHESTRATOR_STATES.DISABLED) {
       // 从禁用恢复 → 重新启动
       await this.start();
-    } else if (newState !== 'enabled' && this._state === 'running') {
+    } else if (newState !== 'enabled' && this._state === ORCHESTRATOR_STATES.RUNNING) {
       // 从运行变为禁用 → 停止
       await this.stop();
     }
@@ -191,6 +193,9 @@ export class TimerOrchestrator {
    * DTO 组装委托给 DashboardDataAssembler（纯函数），本类只负责采集各源快照。
    */
   async getDashboardData(): Promise<DashboardData> {
+    // 打开面板时自动触发会话回收（单日上限 20 条淘汰最远条目 + 跨周归零）
+    this.sessionManager.autoRecycleSessions();
+
     const snap = this.sessionManager.snapshot;
     const globalSnap = await this.global.snapshot();
 
@@ -208,34 +213,8 @@ export class TimerOrchestrator {
    * @param kind 报告类型：'daily' 日报 / 'weekly' 周报
    */
   async exportReport(kind: ReportKind): Promise<string> {
-    const sessions = this.timer.data.sessions;
-    const today = TimeAggregator.todayStr();
-
-    if (kind === 'daily') {
-      const detail = TimeAggregator.dailyDetail(
-        sessions,
-        today,
-        this.timer.data.currentSessionStartMs,
-      );
-      log(LogLevel.Info, `TimerOrchestrator: exported daily report (${detail.date})`);
-      return ReportExporter.buildDailyReport(detail);
-    }
-
-    // weekly（趋势组装复用 DashboardDataAssembler，与面板口径一致）
-    const summary = TimeAggregator.weeklySummary(
-      sessions,
-      this.timer.data.currentSessionStartMs,
-    );
-    const trend = buildWeeklyTrendEntries(
-      sessions,
-      4,
-      this.timer.data.currentSessionStartMs,
-      this.timer.data.dailyTotals,
-    );
     const locale = this.disable.config.locale === 'en' ? 'en' : 'zh-CN';
-    const dailyStats = TimeAggregator.last7Days(sessions, this.timer.data.currentSessionStartMs, locale);
-    log(LogLevel.Info, `TimerOrchestrator: exported weekly report (${summary.weekStart})`);
-    return ReportExporter.buildWeeklyReport(summary, trend, dailyStats);
+    return OrchestratorReportHandler.exportReport(this.timer.data, kind, locale);
   }
 
   /**
@@ -243,7 +222,7 @@ export class TimerOrchestrator {
    * 返回面向用户的友好提示文案（经 i18n 格式化累计时长，不暴露内部状态字段）。
    */
   async saveNow(): Promise<string> {
-    if (this._state !== 'running') {
+    if (this._state !== ORCHESTRATOR_STATES.RUNNING) {
       return t()['debugSave.notRunning'];
     }
     try {
@@ -310,110 +289,65 @@ export class TimerOrchestrator {
         fullSaveIntervalMs: cfg.fullSaveIntervalMs,
       });
     }
-    if (cfg.maxSessions !== undefined) {
-      this.sessionManager.setMaxSessions(Math.max(0, cfg.maxSessions));
-    }
-    if (cfg.safetySnapshot !== undefined) {
-      this._safetySnapshotEnabled = cfg.safetySnapshot;
-    }
-    if (cfg.weeklyLimitHours !== undefined || cfg.weeklyLimitEnabled !== undefined) {
-      this.checkWeeklyLimit();
-    }
+    if (cfg.maxSessions !== undefined) this.sessionManager.setMaxSessions(Math.max(0, cfg.maxSessions));
+    if (cfg.safetySnapshot !== undefined) this._safetySnapshotEnabled = cfg.safetySnapshot;
+    if (cfg.weeklyLimitHours !== undefined || cfg.weeklyLimitEnabled !== undefined) this.checkWeeklyLimit();
   }
 
-  /** 检测周工作时长是否超限并按需触发健康休息提醒（每周仅提醒一次，严格校验上下界与跨周边界） */
+  /** 检测周工作时长是否超限并按需触发健康休息提醒（每周仅提醒一次） */
   checkWeeklyLimit(): void {
     const cfg = this.disable.config;
     const isEnabled = sanitizeWeeklyLimitEnabled(cfg.weeklyLimitEnabled);
     const limitHours = sanitizeWeeklyLimitHours(cfg.weeklyLimitHours);
-    if (!isEnabled || limitHours < MIN_WEEKLY_LIMIT_HOURS || limitHours > MAX_WEEKLY_LIMIT_HOURS) {
-      return;
-    }
+    if (!isEnabled || limitHours < MIN_WEEKLY_LIMIT_HOURS || limitHours > MAX_WEEKLY_LIMIT_HOURS) return;
 
-    const now = new Date();
-    const currentWeek = TimeAggregator.weekStartStr(now);
-    // 本周已提醒过则零开销立即退出
-    if (this._weeklyLimitNotifiedWeek === currentWeek) {
-      return;
-    }
+    const currentWeek = TimeAggregator.weekStartStr(new Date());
+    if (this._weeklyLimitNotifiedWeek === currentWeek) return;
 
-    const limitMs = limitHours * MS_PER_HOUR;
-    const weekTotalMs = TimeAggregator.weeklySummary(
+    const summary = TimeAggregator.weeklySummary(
       this.timer.data.sessions,
       this.timer.data.currentSessionStartMs,
       this.timer.data.dailyTotals,
-    ).totalMs;
+    );
 
-    if (weekTotalMs >= limitMs) {
+    if (summary.totalMs >= limitHours * MS_PER_HOUR) {
       this._weeklyLimitNotifiedWeek = currentWeek;
-      const durStr = TimeAggregator.formatDuration(weekTotalMs);
+      const durStr = TimeAggregator.formatDuration(summary.totalMs);
       const limitStr = `${limitHours}h`;
-      const message = format(t()['notify.weeklyLimitExceeded'], durStr, limitStr);
       log(LogLevel.Warn, `TimerOrchestrator: weekly work limit exceeded (${durStr} >= ${limitStr})`);
-      this._onWeeklyLimitExceeded?.(message);
+      this._onWeeklyLimitExceeded?.(format(t()['notify.weeklyLimitExceeded'], durStr, limitStr));
     }
   }
 
   /**
    * 导出当前工作区计时数据为 CSV 字符串
-   * 配合 CsvExporter 使用，供 UI / 命令面板触发导出。
-   *
-   * @param workspaceName 工作区名称（用于 CSV 头部注释）
    */
   async exportCSV(workspaceName: string): Promise<string> {
-    // 取当前计时数据的只读快照，避免导出时与计时器内部状态耦合
-    const data: WorkspaceTimingData = {
-      ...this.timer.data,
-      sessions: [...this.timer.data.sessions],
-    };
-
-    const exporter = new CsvExporter();
-    const csv = await exporter.export(data, workspaceName);
-    log(LogLevel.Info, `TimerOrchestrator: exported CSV (${csv.length} bytes)`);
-    return csv;
+    const targetWorkspace = workspaceName.trim() || 'workspace';
+    return OrchestratorReportHandler.exportCSV(this.timer.data, targetWorkspace);
   }
 
   /**
-   * 新建计时周期：结束当前会话 → 重置 totalMs → 重新开始
-   * 历史会话记录保留在 sessions[] 中
+   * 新建计时周期：结束当前会话 → 重置 totalMs → 重新开始（历史会话保留）
    */
   async newPeriod(): Promise<void> {
     log(LogLevel.Info, 'TimerOrchestrator: new period requested');
-
     await this.enqueue(async () => {
-      await this.doNewPeriod();
+      await this.stop();
+      const prevData = this.timer.data;
+      const historySessions = [...prevData.sessions];
+      this.timer.reset();
+      this.timer.replaceData({
+        ...this.timer.data,
+        isEnabled: prevData.isEnabled,
+        sessions: historySessions,
+      });
+      this.sessionManager.invalidateTodayCache();
+      await this.global.sync(0, true);
+      const freshData: WorkspaceTimingData = { ...this.timer.data, sessions: [...this.timer.data.sessions] };
+      await this.storage.save(freshData, true);
+      await this.start();
     });
-  }
-
-  private async doNewPeriod(): Promise<void> {
-    // 1. 结束当前会话（记录 sessions、存盘）
-    await this.stop();
-
-    // 2. 重置计时器数据（保留 history，totalMs 归零）
-    //    修复：原实现直接 timer.reset() 会清空 sessions[]，与注释"历史会话记录保留"
-    //    相矛盾。此处先保存历史会话，reset 后再恢复，实现"累计归零、历史保留"。
-    //    同时保留用户的启用/禁用状态（reset 会把 isEnabled 恢复为默认 true）。
-    const prevData = this.timer.data;
-    const historySessions = [...prevData.sessions];
-    this.timer.reset();
-    this.timer.replaceData({
-      ...this.timer.data,
-      isEnabled: prevData.isEnabled,
-      sessions: historySessions,
-    });
-    this.sessionManager.invalidateTodayCache();
-
-    // 3. 同步全局（重置为 0）。
-    //    force：绕过"值未变化"守卫——若上一轮周期恰好也同步过 0，
-    //    守卫会吞掉本次清零，全局聚合中本工作区残留旧累计。
-    await this.global.sync(0, true);
-
-    // 4. 新建空数据存盘（关键事件，强制 JSON 备份）
-    const freshData: WorkspaceTimingData = { ...this.timer.data, sessions: [...this.timer.data.sessions] };
-    await this.storage.save(freshData, true);
-
-    // 5. 重新启动
-    await this.start();
   }
 
   /**
@@ -558,14 +492,7 @@ export class TimerOrchestrator {
    * 导出全历史聚合日报序列 CSV（折叠桶 ∪ 当期原始计算，日期升序）。
    */
   async exportAggregatedCSV(workspaceName: string): Promise<string> {
-    const data = this.timer.data;
-    const series = TimeAggregator.fullDailySeries(
-      data.sessions,
-      data.currentSessionStartMs,
-      data.dailyTotals,
-    );
-    const csv = new AggregatedCsvExporter().build(series, workspaceName);
-    log(LogLevel.Info, `TimerOrchestrator: exported aggregated CSV (${series.length} days, ${csv.length} bytes)`);
-    return csv;
+    const targetWorkspace = workspaceName.trim() || 'workspace';
+    return OrchestratorReportHandler.exportAggregatedCSV(this.timer.data, targetWorkspace);
   }
 }

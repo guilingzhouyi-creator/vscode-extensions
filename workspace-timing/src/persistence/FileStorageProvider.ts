@@ -85,7 +85,7 @@ export class FileStorageProvider implements IStorageProvider {
             try {
                 await vscode.workspace.fs.createDirectory(dotVscode);
             } catch {
-                // 目录已存在
+                // ignore: 目录已存在无需重新创建
             }
 
             // 原子写：先写同目录临时文件再 rename 覆盖，避免崩溃/断电留下半截 JSON

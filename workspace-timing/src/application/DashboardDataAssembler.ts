@@ -20,25 +20,26 @@ import {
 } from '../domain/models';
 import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
 import { DashboardData, WeeklyTrendEntry } from '../domain/dashboard-types';
-import { DEFAULT_HEATMAP_WEEKS, DEFAULT_TREND_WEEKS } from '../domain/constants-chart';
+import { DEFAULT_HEATMAP_WEEKS, DEFAULT_TREND_WEEKS, ISO_DATE_MD_START } from '../domain/constants-chart';
 import { GlobalSnapshot } from './GlobalAggregator';
 
-/** 组装面板 DTO 所需的最小快照（由 Orchestrator 采集） */
-export interface DashboardAssemblerInput {
-    /** 计时器只读数据视图（含 sessions / dailyTotals / currentSessionStartMs） */
+export interface DashboardDataAssembler {
+    buildDashboardData: typeof buildDashboardData;
+    buildWeeklyTrendEntries: typeof buildWeeklyTrendEntries;
+}
+
+/** 入参聚合上下文：隔离外部对象直接传入，显式声明依赖字段 */
+export interface AssembleContext {
     data: ReadonlyTimingData;
-    /** 当前累计总时长（含进行中会话） */
     currentTotalMs: number;
-    /** 今日累计（SessionManager 3s TTL 缓存值） */
     todayMs: number;
-    /** 当前配置快照 */
-    config: Readonly<TimingConfig>;
-    /** 跨工作区聚合快照 */
+    config: TimingConfig;
     global: GlobalSnapshot;
 }
 
 /**
- * 近 N 周趋势（面板与周报导出共用，消除两处重复拼装）。
+ * 组装近 N 周趋势列表（纯函数，无 I/O）。
+ * 从 TimeAggregator.weeklyTrend 获取原始周统计，映射为带紧凑日期范围 label 的 DTO：
  * label 取 "MM-DD ~ MM-DD" 紧凑区间。
  */
 export function buildWeeklyTrendEntries(
@@ -50,7 +51,7 @@ export function buildWeeklyTrendEntries(
     return TimeAggregator.weeklyTrend(sessions, weeks, currentSessionStartMs, dailyTotals).map((w) => ({
         weekStart: w.weekStart,
         weekEnd: w.weekEnd,
-        label: `${w.weekStart.slice(5)} ~ ${w.weekEnd.slice(5)}`,
+        label: `${w.weekStart.slice(ISO_DATE_MD_START)} ~ ${w.weekEnd.slice(ISO_DATE_MD_START)}`,
         totalMs: w.totalMs,
         sessionCount: w.sessionCount,
     }));
@@ -83,50 +84,46 @@ function buildTodayDetail(data: ReadonlyTimingData): DashboardData['todayDetail'
     };
 }
 
-/** 组装完整面板 DTO（纯函数，无副作用） */
-export function buildDashboardData(input: DashboardAssemblerInput): DashboardData {
-    const { data, config, global } = input;
-    const sessions = data.sessions;
+/**
+ * 组装完整的 DashboardData 视图模型（纯函数，无状态，不触发任何副作用）。
+ */
+export function buildDashboardData(ctx: AssembleContext): DashboardData {
+    const { data, currentTotalMs, todayMs, config, global } = ctx;
 
-    // 本周合计（自然周一至今，含进行中会话与折叠层）
-    const weeklySummary: WeeklySummary = TimeAggregator.weeklySummary(
-        sessions,
-        data.currentSessionStartMs,
-        data.dailyTotals,
-    );
-
-    // 最近 7 天每日统计（柱状图，跟随界面语言）
-    const locale = config.locale === 'en' ? 'en' : 'zh-CN';
-    const dailyStats = TimeAggregator.last7Days(sessions, data.currentSessionStartMs, locale);
-
-    // 活动时间线热力图（近 12 周，含本周；窗口化聚合，复用按日口径）
     const heatmap = TimeAggregator.heatmapDays(
-        sessions,
+        data.sessions,
         data.currentSessionStartMs,
         data.dailyTotals,
         DEFAULT_HEATMAP_WEEKS,
     );
 
-    // 周报多周趋势（近 4 周）+ 今日明细
+    const weeklySummary: WeeklySummary = TimeAggregator.weeklySummary(
+        data.sessions,
+        data.currentSessionStartMs,
+        data.dailyTotals,
+    );
+
     const weeklyTrend = buildWeeklyTrendEntries(
-        sessions,
+        data.sessions,
         DEFAULT_TREND_WEEKS,
         data.currentSessionStartMs,
         data.dailyTotals,
     );
+
     const todayDetail = buildTodayDetail(data);
 
-    const foldedSessionCount = Object.values(data.dailyTotals ?? {})
-        .reduce((sum, b) => sum + (b.sessionCount || 0), 0);
-    const currentSessionActive = data.currentSessionStartMs > 0 ? 1 : 0;
-    const totalSessionsCount = foldedSessionCount + sessions.length + currentSessionActive;
+    // 面板会话数与当期有效会话严格对齐（已结束条目 + 进行中会话）
+    const effectiveSessions = data.sessions.length + (data.currentSessionStartMs > 0 ? 1 : 0);
 
     return {
-        totalMs: input.currentTotalMs,
-        todayMs: input.todayMs,
-        // 会话数口径统一：折叠层会话数 + 未折叠原始会话数 + 进行中会话（1）
-        sessionsCount: totalSessionsCount,
-        dailyStats,
+        totalMs: currentTotalMs,
+        todayMs,
+        sessionsCount: effectiveSessions,
+        dailyStats: TimeAggregator.last7Days(
+            data.sessions,
+            data.currentSessionStartMs,
+            config.locale === 'en' ? 'en' : 'zh-CN',
+        ),
         heatmap,
         weekTotalMs: weeklySummary.totalMs,
         weeklyTrend,
