@@ -157,7 +157,6 @@
       ],
       "asciiPatterns": [
         "\\b(all\\s*pass(ed)?|gate\\s*pass(ed)?|100%\\s*pass(ed)?|checks?\\s*pass(ed)?|tests?\\s*pass(ed)?|suites?\\s*pass(ed)?|verdict\\s*pass(ed)?)\\b",
-        "\\b(passed|passing)\\b",
         "\\b(PASS|PASSED|PASSING)\\b"
       ],
       "reason": "提交说明是长期技术档案，严禁使用“PASS / PASSED / 全部通过 / 门禁全通”等主观裁决口号或口号式自夸；必须客观记录所执行的具体验证指令、覆盖阶段数与退出码。",
@@ -227,7 +226,13 @@
     "pass argument",
     "pass arguments",
     "pass through",
-    "pass-through"
+    "pass-through",
+    "passing parameter",
+    "passing parameters",
+    "passing argument",
+    "passing arguments",
+    "passing options",
+    "message passing"
   ]
 }
 

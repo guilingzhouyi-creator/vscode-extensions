@@ -119,7 +119,10 @@ export function scoreFileQuality(
         if (dim === 'maintainability' && densityResult.isLowDensity) {
             dimPenalty += 15;
         }
-        indices[dim] = Math.max(0, Math.round((100 - dimPenalty) * SCORE_ROUNDING) / SCORE_ROUNDING);
+        indices[dim] = Math.max(
+            0,
+            Math.round((100 - dimPenalty) * SCORE_ROUNDING) / SCORE_ROUNDING,
+        );
     }
 
     const dataScore = Math.max(0, 100 - riskResult.pillarPenalties.data);
