@@ -3,7 +3,7 @@
     "files.exclude": {
         "**/node_modules": true,
         "**/out": true,
-        "**/dist": true,
+        "**/dist": false,
         "**/.vscode-test": true,
         "**/coverage": true,
         "**/archive": false
@@ -15,27 +15,47 @@
         "**/.vscode/workspace-timing.json": true,
         "**/.vscode/workspace-timing.journal": true
     },
-    // Agent 写入与编辑器并发安全配置（防 0 字节倒挂冲刷与保存冲突）
-    "files.autoSave": "off",
+    // Agent 写入与编辑器并发安全配置（防 0 字节倒挂冲刷、保存冲突与幽灵空标签）
+    "files.autoSave": "onWindowChange",
     "files.saveConflictResolution": "askUser",
+    "workbench.editor.closeOnFileDelete": false,
     "workbench.editor.restoreViewState": true,
     "files.watcherExclude": {
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
         "**/node_modules/*/**": true,
-        "**/dist/**": true,
         "**/out/**": true,
         "**/target/**": true,
         "**/.godot/**": true
     },
-    // 统一换行与编码（配合 .editorconfig / .gitattributes）
+    // 统一换行与编码（严格匹配 AGENTS.md 契约）
     "files.eol": "\n",
     "files.encoding": "utf8",
     "editor.insertSpaces": true,
     "editor.tabSize": 2,
     "editor.detectIndentation": false,
+    "[typescript]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
+    },
+    "[typescriptreact]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
+    },
+    "[powershell]": {
+        "files.eol": "\r\n"
+    },
+    "[shellscript]": {
+        "files.eol": "\n"
+    },
+    // 多项目 ESLint 解析隔离（防跨目录配置漂移）
+    "eslint.workingDirectories": [
+        { "pattern": "./workspace-timing" },
+        { "pattern": "./auto-refactor" }
+    ],
     // 扩展开发：TS 校验
     "typescript.tsdk": "workspace-timing/node_modules/typescript/lib",
+    "typescript.suggest.autoImports": true,
     // Godot 引擎文件类型与语法高亮关联
     "files.associations": {
         "*.gd": "gdscript",
@@ -48,6 +68,8 @@
     "godotTools.lsp.serverPort": 6005,
     "workbench.iconTheme": "vscode-icons",
     "editor.semanticHighlighting.enabled": true,
+    // 默认终端集成与 PowerShell 契约
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
     // Codex / OpenAI 插件 API 代理与脱敏环境变量映射
     "codex.apiKey": "${env:CODEX_API_KEY}",
     "codex.apiBaseUrl": "${env:CODEX_BASE_URL}",
