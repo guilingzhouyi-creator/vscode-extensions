@@ -182,8 +182,8 @@ Write-Host "  ✔ Rule 4: 正文有效字数与信息密度 ($bodyCharCount 字�
 Write-Host "  ✔ Rule 5: 生产工程级结构化区块校验通过" -ForegroundColor Green
 Write-Host "  ✔ Rule 6: 正文零施工批次黑话校验通过" -ForegroundColor Green
 Write-Host "  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过" -ForegroundColor Green
-Write-Host "  ✔ Rule 8: 提交文本求真务实与禁词审查通过 (零临时/零夸大/零元叙事口号)" -ForegroundColor Green
+Write-Host "  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (零临时/零夸大/零元叙事/零裁决断言)" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "✅ 【门禁结论】Commit-Msg 生产级格式与结构化内容校验全部 PASS！" -ForegroundColor Green
+Write-Host "✅ 【门禁结论】Commit-Msg 生产级格式与结构化内容 8 项审查阶段全部验证完毕 (退出码 0)" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
 exit 0

@@ -17,7 +17,7 @@ import { isVocabularyEnumeration } from './markerScope';
 
 /** Categorical classifications for terminology defects */
 export type TerminologyCategory =
-    'temporary' | 'hyperbolic_affirmative' | 'hyperbolic_negative' | 'meta_narrative';
+    'temporary' | 'hyperbolic_affirmative' | 'hyperbolic_negative' | 'meta_narrative' | 'verdict_slogans';
 
 /** Diagnostic severity for terminology violation findings */
 export type TerminologySeverity = 'error' | 'warning' | 'info';
@@ -166,6 +166,37 @@ export const DEFAULT_TERMINOLOGY_RULES: readonly TerminologyRule[] = Object.free
         reason: 'Governance slogans and meta-narrative declarations must not substitute concrete technical facts.',
         guidance: 'Directly describe the concrete changes and file sections modified.',
     },
+    {
+        category: 'verdict_slogans',
+        severity: 'warning',
+        title: 'Gate Verdict Slogans and Self-Assertion Blocking Constraint',
+        patterns: [
+            '全部通过',
+            '全量通过',
+            '门禁通过',
+            '测试通过',
+            '自检通过',
+            '完美通过',
+            '顺利通过',
+            '验证通过',
+            '预审通过',
+            '阶段通过',
+            '全部PASS',
+            '全量PASS',
+            '门禁PASS',
+            '测试PASS',
+            '通过测试',
+            '通过门禁',
+            '通过验证',
+        ],
+        asciiPatterns: [
+            '\\b(all\\s*pass(ed)?|gate\\s*pass(ed)?|100%\\s*pass(ed)?|checks?\\s*pass(ed)?|tests?\\s*pass(ed)?|suites?\\s*pass(ed)?|verdict\\s*pass(ed)?)\\b',
+            '\\b(passed|passing)\\b',
+            '\\b(PASS|PASSED|PASSING)\\b',
+        ],
+        reason: 'Technical records must convey objective execution metrics rather than subjective verdict slogans.',
+        guidance: 'State concrete verification commands, test counts, and exit codes.',
+    },
 ]);
 
 /** Canonical technical compound terms exempted from false positive triggers */
@@ -227,6 +258,17 @@ export const DEFAULT_TECHNICAL_WHITELIST: readonly string[] = Object.freeze([
     '占位文件',
     '占位注释',
     '占位符',
+    'two-pass',
+    'multi-pass',
+    'single-pass',
+    'pass by value',
+    'pass by reference',
+    'pass parameter',
+    'pass parameters',
+    'pass argument',
+    'pass arguments',
+    'pass through',
+    'pass-through',
 ]);
 
 /** Matches transient batch milestones and work-in-progress markers */
@@ -319,7 +361,9 @@ function checkLineAsciiPatterns(
     const findings: TerminologyFinding[] = [];
     for (const asciiPat of rule.asciiPatterns) {
         if (!asciiPat) continue;
-        const re = new RegExp(asciiPat, 'gi');
+        const isExactCase = /^[A-Z0-9_\-\s\\b()|?+*]+$/.test(asciiPat);
+        const flags = isExactCase ? 'g' : 'gi';
+        const re = new RegExp(asciiPat, flags);
         let match: RegExpExecArray | null;
         while ((match = re.exec(sanitized)) !== null) {
             const term = match[0];

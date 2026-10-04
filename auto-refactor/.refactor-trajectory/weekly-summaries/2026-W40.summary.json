@@ -1,13 +1,13 @@
 {
   "weekId": "2026-W40",
   "startMs": 1791014792895,
-  "endMs": 1791099050077,
-  "totalRuns": 139,
+  "endMs": 1791099159382,
+  "totalRuns": 141,
   "eloc": {
-    "processedTotal": 15734614,
+    "processedTotal": 15966718,
     "uniqueTotal": 96698,
-    "changedTotal": 17639,
-    "semanticTotal": 14110
+    "changedTotal": 18992,
+    "semanticTotal": 15193
   },
   "qed": {
     "mean": 0,
@@ -18,7 +18,7 @@
     "totalAdded": 1361727,
     "totalResolved": 39,
     "totalRegressions": 0,
-    "netYield": -86.54
+    "netYield": -85.28
   },
   "meanCompositeScore": 99.2,
   "gatePassRate": 100

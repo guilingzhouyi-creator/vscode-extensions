@@ -43,7 +43,7 @@ function sanitizeLineForChecking(line, whitelist) {
   // 4. Mask whitelisted technical compound terms
   for (const term of whitelist) {
     if (!term) continue;
-    if (/^[a-zA-Z\s]+$/.test(term)) {
+    if (/^[a-zA-Z\s-]+$/.test(term)) {
       const reg = new RegExp(`\\b${term.replace(/\s+/g, '\\s+')}\\b`, 'gi');
       sanitized = sanitized.replace(reg, ' __WHITELIST_TERM__ ');
     } else {
@@ -85,7 +85,11 @@ function checkAsciiMatch(sanitizedLine, rawLine, lineNum, rule) {
 
   for (const asciiPat of rule.asciiPatterns) {
     if (!asciiPat) continue;
-    const match = sanitizedLine.match(new RegExp(asciiPat, 'i'));
+    // If the ASCII pattern consists exclusively of uppercase letters/boundary symbols (e.g. \b(PASS|PASSED|PASSING)\b),
+    // enforce exact-case matching so legitimate lowercase uses (like 'pass options') are not falsely triggered.
+    const isExactCase = Boolean(rule.caseSensitiveAscii || /^[A-Z0-9_\-\s\\b()|?+*]+$/.test(asciiPat));
+    const flags = isExactCase ? '' : 'i';
+    const match = sanitizedLine.match(new RegExp(asciiPat, flags));
     if (!match) continue;
     matches.push({
       lineNum,
@@ -157,7 +161,7 @@ function formatDiagnosticReport(findings) {
   }
 
   lines.push('📌 核心准则: 提交说明是长期技术档案，必须纯粹陈述客观技术事实与具体文件逻辑改动。');
-  lines.push('   严禁使用临时性/敷衍用语、绝对化夸大/吹嘘词汇或以“低调中肯/求真务实”等元叙事口号替代具体工作（中英双语同构拦截）。');
+  lines.push('   严禁使用临时性/敷衍用语、绝对化夸大/吹嘘词汇、“低调中肯/求真务实”等元叙事口号，或“PASS / 全部通过”等门禁裁决口号（中英双语同构拦截）。');
   lines.push('=================================================================');
   return lines.join('\n');
 }
@@ -188,6 +192,12 @@ const TEST_CASES = [
     expectValid: false,
   },
   {
+    name: 'CAT-05 Chinese (全部通过/门禁PASS)',
+    msg: 'fix: 修复解析器空指针\n\n[Verification]\n- 单元测试全部通过，门禁全量通过，全部PASS。',
+    expectRule: 'CMG-STY-005',
+    expectValid: false,
+  },
+  {
     name: 'CAT-01 English (quick fix/for now)',
     msg: 'fix(api): quick and dirty hack for now',
     expectRule: 'CMG-STY-001',
@@ -212,8 +222,14 @@ const TEST_CASES = [
     expectValid: false,
   },
   {
+    name: 'CAT-05 English (all passed/PASS token)',
+    msg: 'fix(core): resolve race condition in worker loop\n\n[Verification]\n- All tests passed, 9/9 PASS, verification passed.',
+    expectRule: 'CMG-STY-005',
+    expectValid: false,
+  },
+  {
     name: 'Whitelist Chinese (绝对路径/临时文件)',
-    msg: 'fix(path): 修复跨平台文件查找未能转换为绝对路径的问题\n\n[Why]\n- `createTempFile` 生成的临时文件需支持绝对路径。\n\n[Verification]\n- 单元测试通过。',
+    msg: 'fix(path): 修复跨平台文件查找未能转换为绝对路径的问题\n\n[Why]\n- `createTempFile` 生成的临时文件需支持绝对路径。\n\n[Verification]\n- 运行单元测试套件，零失败退出码 0。',
     expectValid: true,
   },
   {
@@ -222,8 +238,18 @@ const TEST_CASES = [
     expectValid: true,
   },
   {
+    name: 'Whitelist English (two-pass/pass parameters/pass through)',
+    msg: 'feat(compiler): implement two-pass syntax analysis and pass parameters by reference\n\n[Verification]\n- Execute test-parallel runner covering 145 suites with exit code 0.',
+    expectValid: true,
+  },
+  {
+    name: 'Whitelist Chinese (单趟扫描与透传参数)',
+    msg: 'feat(core): 实现单趟语法审查并在模块间透传配置上下文\n\n[Verification]\n- 执行 node scripts/test-parallel.js 运行 145 套套件，退出码 0。',
+    expectValid: true,
+  },
+  {
     name: 'Valid Technical Fact',
-    msg: 'docs(readme): 更新各子模块状态标注并补充实验性质说明\n\n[Why]\n- 准确说明模块开发阶段。\n\n[Changed]\n- 更新 README.md 中的项目矩阵说明。\n\n[Verification]\n- 本地预审通过。',
+    msg: 'docs(readme): 更新各子模块状态标注并补充实验性质说明\n\n[Why]\n- 准确说明模块开发阶段。\n\n[Changed]\n- 更新 README.md 中的项目矩阵说明。\n\n[Verification]\n- 运行本地预审脚本覆盖 9 项阶段审查，退出码 0。',
     expectValid: true,
   },
 ];
@@ -246,7 +272,7 @@ function runSelfTest() {
   for (const tc of TEST_CASES) {
     runSingleTestCase(tc);
   }
-  console.log(`✔ 全部 ${TEST_CASES.length} 组中英双语风格自检用例（8 类中英拦截 + 3 类中英合规放行）100% 通过！`);
+  console.log(`✔ 全部 ${TEST_CASES.length} 组中英双语风格自检用例（10 类中英拦截 + 5 类中英合规放行）验证完毕，退出码 0！`);
 }
 
 function main() {
@@ -281,7 +307,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log('  ✔ Rule 8: 提交文本求真务实与禁词审查通过 (中英双语零临时/零夸大/零元叙事口号)');
+  console.log('  ✔ Rule 8: 提交文本求真务实与禁词审查通过 (中英双语零临时/零夸大/零元叙事口号/零裁决断言)');
   process.exit(0);
 }
 
