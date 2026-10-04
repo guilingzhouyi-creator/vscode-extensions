@@ -158,7 +158,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired).',
         remediation:

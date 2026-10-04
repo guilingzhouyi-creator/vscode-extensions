@@ -277,7 +277,7 @@
 | `GATE-HYG-001` | <a id="gate-hyg-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少 0 字节物理空文件与换行符卫生看守。 | 在 pre-commit 门禁中加入零空文件与换行符契约（CRLF/LF）检查。 |
 | `GATE-ISO-001` | <a id="gate-iso-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 双层门禁边界不同构，远端 CI 关键检查未在本地钩子中对等镜像。 | 确保本地门禁脚本镜像覆盖远端 CI 关键步骤，实现双层防御同构性。 |
 | `GATE-MSG-001` | <a id="gate-msg-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁系统缺少提交信息 Conventional 规范与零黑话结构化正文校验。 | 配置 commit-msg 门禁校验 Conventional 格式、结构化正文区块与零临时黑话。 |
-| `GATE-MSG-002` | <a id="gate-msg-002"></a>`gate-architecture` | `GATE` | `warning` | `all` | 提交信息门禁未接入中英双语求真务实词汇约束表（commit-msg-forbidden-terms.json）。 | 接入双语词表看守，阻断敷衍用语、过度肯定/否定及元风格标语。 |
+| `GATE-MSG-002` | <a id="gate-msg-002"></a>`gate-architecture` | `GATE` | `error` | `all` | 提交信息门禁未接入中英双语求真务实词汇约束表（commit-msg-forbidden-terms.json）。 | 接入双语词表看守，阻断敷衍用语、过度肯定/否定及元风格标语。 |
 | `GATE-PROC-001` | <a id="gate-proc-001"></a>`gate-architecture` | `GATE` | `error` | `all` | PowerShell 门禁脚本使用交互式提示而缺少输出重定向非交互守卫。 | 增加 [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected 守卫，杜绝子进程死锁。 |
 | `GATE-ROUTE-001` | <a id="gate-route-001"></a>`gate-architecture` | `GATE` | `error` | `all` | Git 钩子直接裸调脆弱环境或 Windows PS 5.1，缺少跨平台路由保护。 | 采用跨平台 pwsh 优先并优雅降级至 bash 的双执行器路由，禁止裸调 powershell.exe。 |
 | `GATE-SSOT-001` | <a id="gate-ssot-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁引用规则目录校验但缺少单源注册表文件或未登记对应规则。 | 建立并维护单一真源规则目录（如 rule-catalog.json），门禁依据单源校验。 |

@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-03T17:44:46.337Z",
+  "generatedAt": "2026-10-04T05:22:27.035Z",
   "totalRules": 372,
   "counts": {
     "autoRefactor": 294,
@@ -895,7 +895,7 @@
       "id": "GATE-MSG-002",
       "project": "auto-refactor",
       "family": "GATE",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired)."
     },
     {
