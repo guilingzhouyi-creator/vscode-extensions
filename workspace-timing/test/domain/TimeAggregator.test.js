@@ -10,18 +10,16 @@ const assert = require('assert');
 const { TimeAggregator, parseLocalDate, localDateStr } = require('../../out/domain/TimeAggregator.js');
 
 /**
- * 计算当前周周一的 UTC 中午时间戳。
- * 选 12:00 UTC 使 toISOString().slice(0,10) 稳定落在周一当天，规避常见时区偏移边界。
+ * 计算当前周周一的本地中午时间戳 (12:00)。
+ * 与被测实现 (weekStartStr/localDateStr) 保持严格同口径本地时区，避免 UTC/Local 跨界偏移。
  */
 function currentWeekMondayNoonMs() {
-    const today = new Date();
-    const day = today.getUTCDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    const startOfToday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-    return startOfToday + diff * 86400000 + 12 * 3600000;
+    const mondayStr = TimeAggregator.weekStartStr(new Date());
+    const mondayStartMs = parseLocalDate(mondayStr);
+    return mondayStartMs + 12 * 3600000;
 }
 
-// 会话基准：当前周周一 12:00 UTC
+// 会话基准：当前周周一 12:00 本地时间
 const BASE_WEEK = currentWeekMondayNoonMs();
 
 /** 构造会话：dayOffset 天偏移（0=周一），hourOffset 小时偏移，durationMs 时长 */

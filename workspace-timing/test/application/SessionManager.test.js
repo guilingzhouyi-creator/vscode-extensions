@@ -103,11 +103,21 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         // 执行跨午夜轮转（通常在 00:00:00 由 Scheduler 触发）
         await sessionManager.rotateSessionAtMidnight();
 
-        // 验证：昨晚 1 小时已被封存进 sessions
-        assert.strictEqual(timer.data.sessions.length, 1);
-        assert.strictEqual(timer.data.sessions[0].startMs, yesterday23h);
-        assert.strictEqual(timer.data.sessions[0].endMs, todayZero);
-        assert.strictEqual(timer.data.sessions[0].durationMs, 3600000);
+        // 验证：昨晚 1 小时已被封存（若遇周日跨周一则按 pruneWeekly 折叠至 dailyTotals，否则留在 sessions）
+        const yesterdayDateStr = localDateStr(yesterday23h);
+        const foldedYesterday = timer.data.dailyTotals?.[yesterdayDateStr];
+        if (foldedYesterday) {
+            // 恰逢跨周日界（如周日跨入周一），旧周会话被 pruneWeekly 自动沉淀入 dailyTotals
+            assert.strictEqual(foldedYesterday.totalMs, 3600000);
+            assert.strictEqual(foldedYesterday.sessionCount, 1);
+            assert.strictEqual(timer.data.sessions.length, 0);
+        } else {
+            // 周内跨午夜，会话直接保留在 sessions 活跃列表中
+            assert.strictEqual(timer.data.sessions.length, 1);
+            assert.strictEqual(timer.data.sessions[0].startMs, yesterday23h);
+            assert.strictEqual(timer.data.sessions[0].endMs, todayZero);
+            assert.strictEqual(timer.data.sessions[0].durationMs, 3600000);
+        }
         assert.strictEqual(timer.data.totalMs, 3600000);
 
         // 验证：journal 水位线推进到今日零点（崩溃恢复时跳过封存段，防双重计数）
