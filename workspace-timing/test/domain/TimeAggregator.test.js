@@ -325,10 +325,34 @@ describe('TimeAggregator：fullDailySeries 双源合并', () => {
     });
 });
 
+// 模拟面板中的 scaleMax 与 dividerPct 核心计算逻辑
+function computeTrendScale(trendMsList, limitHours, limitEnabled) {
+    const isLimitOn = Boolean(limitEnabled) && typeof limitHours === 'number' && Number.isFinite(limitHours) && limitHours >= 1 && limitHours <= 168;
+    const safeLimitHours = isLimitOn ? Math.min(168, Math.max(1, Math.round(limitHours))) : 40;
+    const limitMs = isLimitOn ? safeLimitHours * 3600000 : 0;
+    const maxTrendMs = Math.max(...trendMsList.map(v => (Number.isFinite(v) && v > 0 ? v : 0)), 0);
+
+    const TARGET_DIVIDER_RATIO = 0.75;
+    const scaleMax = isLimitOn
+        ? Math.max(limitMs / TARGET_DIVIDER_RATIO, maxTrendMs * 1.15, 1)
+        : Math.max(maxTrendMs, 1);
+
+    const dividerPct = isLimitOn ? Math.min(95, Math.max(10, (limitMs / scaleMax) * 100)) : 0;
+    const pcts = trendMsList.map(rawMs => Math.min(100, Math.max((rawMs / scaleMax) * 100, rawMs > 0 ? 2 : 0)));
+
+    return { scaleMax, dividerPct, pcts };
+}
+
 describe('TimeAggregator：heatmapDays 活动热力图', () => {
     const now = new Date();
     const Y = now.getFullYear(), M = now.getMonth(), D = now.getDate();
     const dow = (now.getDay() + 6) % 7; // 0=周一 … 6=周日
+
+    it('默认生成 24 周 × 7 天网格（全宽活动热力图），首格为周一', () => {
+        const days = TimeAggregator.heatmapDays([]);
+        assert.strictEqual(days.length, 168, '24 周 × 7 天 = 168 格');
+        assert.strictEqual(days[0].weekday, 0, '首格为周一');
+    });
 
     it('生成 12 周 × 7 天网格，首格为窗口起始周一，future 天不计时长', () => {
         const days = TimeAggregator.heatmapDays([], 0, undefined, 12);
@@ -389,6 +413,11 @@ describe('TimeAggregator：heatmapDays 活动热力图', () => {
         const total = days.reduce((s, d) => s + d.totalMs, 0);
         assert.strictEqual(total, 0, '窗口外会话不计入');
     });
+});
+
+describe('TimeAggregator：last7Days 7天序列', () => {
+    const now = new Date();
+    const Y = now.getFullYear(), M = now.getMonth(), D = now.getDate();
 
     it('last7Days：生成按升序排列的 7 天日期序列，支持中英文星期', () => {
         const todayStart = new Date(Y, M, D, 10, 0).getTime();
@@ -409,7 +438,9 @@ describe('TimeAggregator：heatmapDays 活动热力图', () => {
         assert.strictEqual(statsEn.length, 7);
         assert.ok(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].includes(statsEn[6].weekday));
     });
+});
 
+describe('TimeAggregator：weeklySummary 周报跨界与聚合', () => {
     it('weeklySummary：跨周日界跨午夜会话仅计入本周部分，且支持 dailyTotals 折叠层', () => {
         const mondayMs = parseLocalDate(TimeAggregator.weekStartStr(new Date()));
         const mDate = new Date(mondayMs);
@@ -427,26 +458,10 @@ describe('TimeAggregator：heatmapDays 活动热力图', () => {
         const summary = TimeAggregator.weeklySummary(s, 0);
         assert.strictEqual(summary.totalMs, 2 * 3600000, '上周日 1h 被剔除，仅本周一 2h 计入本周摘要');
     });
+});
 
+describe('TimeAggregator：多周趋势与比例刻度计算', () => {
     it('多周趋势周上限比例计算：未超限时达标分割线恒定居中靠右 75%，超限时等比向左收敛', () => {
-        // 模拟面板中的 scaleMax 与 dividerPct 核心计算逻辑
-        const computeTrendScale = (trendMsList, limitHours, limitEnabled) => {
-            const isLimitOn = Boolean(limitEnabled) && typeof limitHours === 'number' && Number.isFinite(limitHours) && limitHours >= 1 && limitHours <= 168;
-            const safeLimitHours = isLimitOn ? Math.min(168, Math.max(1, Math.round(limitHours))) : 40;
-            const limitMs = isLimitOn ? safeLimitHours * 3600000 : 0;
-            const maxTrendMs = Math.max(...trendMsList.map(v => (Number.isFinite(v) && v > 0 ? v : 0)), 0);
-
-            const TARGET_DIVIDER_RATIO = 0.75;
-            const scaleMax = isLimitOn
-                ? Math.max(limitMs / TARGET_DIVIDER_RATIO, maxTrendMs * 1.15, 1)
-                : Math.max(maxTrendMs, 1);
-
-            const dividerPct = isLimitOn ? Math.min(95, Math.max(10, (limitMs / scaleMax) * 100)) : 0;
-            const pcts = trendMsList.map(rawMs => Math.min(100, Math.max((rawMs / scaleMax) * 100, rawMs > 0 ? 2 : 0)));
-
-            return { scaleMax, dividerPct, pcts };
-        };
-
         // 场景 1：用户截图场景（设定 40h，本周 2h 40m，其余周 0s）
         const r1 = computeTrendScale([2 * 3600000 + 40 * 60000, 0, 0, 0], 40, true);
         assert.strictEqual(r1.dividerPct, 75.0, '未超限时达标线必须精确位于 75% 居中偏右位置');
