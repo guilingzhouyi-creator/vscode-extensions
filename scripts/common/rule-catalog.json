@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-04T17:05:27.791Z",
-  "totalRules": 377,
+  "generatedAt": "2026-10-04T17:33:10.285Z",
+  "totalRules": 378,
   "counts": {
     "autoRefactor": 299,
     "workspaceTiming": 45,
     "webGames": 56,
-    "globalTooling": 4
+    "globalTooling": 5
   },
   "rules": [
     {
@@ -400,6 +400,13 @@
       "family": "CMG",
       "severity": "error",
       "summary": "风格元叙事、口号与宣传套话拦截"
+    },
+    {
+      "id": "CMG-STY-005",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "程序化流水账与形式主义元叙事拦截"
     },
     {
       "id": "CMP-CAL-001",

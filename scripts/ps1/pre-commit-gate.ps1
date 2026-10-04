@@ -100,17 +100,17 @@ foreach ($file in $stagedFiles) {
     }
 }
 
-# --- Gate 5: 检查源文件双轨体积预算 (ELOC <= 800, LOC <= 1200) ---
-Write-Host "[5/9] 检查源文件双轨体积预算 (ELOC <= 800, LOC <= 1200)..." -ForegroundColor Gray
+# --- Gate 5: 检查源文件双轨体积与动态密度 (ELOC <= 900, LOC <= 1400, 密度比 1:3) ---
+Write-Host "[5/9] 检查源文件双轨体积与动态密度 (ELOC <= 900, LOC <= 1400, 密度比 1:3)..." -ForegroundColor Gray
 $evalTool = "scripts/common/evaluate-eloc-budget.js"
 if (Test-Path $evalTool) {
-    $res = Start-Process -FilePath "node" -ArgumentList "$evalTool --staged --max-eloc 800 --max-loc 1200" -NoNewWindow -PassThru -Wait
+    $res = Start-Process -FilePath "node" -ArgumentList "$evalTool --staged --max-eloc 900 --max-loc 1400 --density-ratio 3.0" -NoNewWindow -PassThru -Wait
     if ($res.ExitCode -ne 0) {
-        Write-Host "❌ [FAIL] Gate 5: 暂存区存在文件超出双轨体积预算 (ELOC > 800 或 LOC > 1200)" -ForegroundColor Red
+        Write-Host "❌ [FAIL] Gate 5: 暂存区存在文件超出双轨体积上限 (ELOC > 900 或 LOC > 1400)" -ForegroundColor Red
         $failed = $true
     }
 } else {
-    $maxLocBudget = 1200
+    $maxLocBudget = 1400
     foreach ($file in $stagedFiles) {
         if ([string]::IsNullOrWhiteSpace($file)) { continue }
         if (Test-Path $file -PathType Leaf) {

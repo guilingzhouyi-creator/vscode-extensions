@@ -143,6 +143,44 @@
       ],
       "reason": "严禁将治理要求、自省表态或文风口号当作改动正文提交（无论中英文），提交说明必须纯粹记录技术改动事实。",
       "guidance": "请直接列出修改的具体文件与小节内容，例如：'更新 README.md 中各项目状态标注，说明部分模块仍处于探索与未完成阶段'。"
+    },
+    {
+      "id": "CMG-STY-005",
+      "category": "procedural_boilerplate",
+      "severity": "error",
+      "title": "程序化流水账与形式主义元叙事拦截",
+      "patterns": [
+        "退出码0",
+        "退出码 0",
+        "返回退出码",
+        "均返回",
+        "双端返回",
+        "双端脚本均返回",
+        "返回0",
+        "返回 0",
+        "无报错",
+        "运行完成",
+        "正常状态",
+        "项检查",
+        "项自检",
+        "大项",
+        "套测试",
+        "套套件",
+        "套并行",
+        "项自测",
+        "全部通过",
+        "套件通过",
+        "检查通过"
+      ],
+      "asciiPatterns": [
+        "\\b(?:exit|return)\\s*(?:code\\s*)?0\\b",
+        "\\bexit\\s*status\\s*0\\b",
+        "\\bwithout\\s*errors?\\b",
+        "\\b\\d+\\s*(?:tests?|suites?|items?|checks?)\\s*pass(?:ed)?\\b",
+        "\\ball\\s*\\d*\\s*(?:checks?|tests?|suites?)\\s*pass(?:ed)?\\b"
+      ],
+      "reason": "提交说明是长期技术档案，[Verification] 区块严禁使用'退出码0'、'双端返回0'、'XX项检查通过'等程序化流水账替代具体输入输出与断言细节。",
+      "guidance": "请陈述具体的验证边界用例、输入参数与功能断言，例如：'运行 node scripts/test-parallel.js，断言 4 个 Rust 嵌入式测试用例与 9 个量化维度路由断言成立'。"
     }
   ],
   "whitelist": [

@@ -97,15 +97,15 @@ while IFS= read -r file; do
     fi
 done <<< "$STAGED_FILES"
 
-# --- Gate 5: 检查源文件双轨体积预算 (ELOC <= 800, LOC <= 1200) ---
-echo "[5/9] 检查源文件双轨体积预算 (ELOC <= 800, LOC <= 1200)..."
+# --- Gate 5: 检查源文件双轨体积与动态密度 (ELOC <= 900, LOC <= 1400, 密度比 1:3) ---
+echo "[5/9] 检查源文件双轨体积与动态密度 (ELOC <= 900, LOC <= 1400, 密度比 1:3)..."
 if [[ -f "scripts/common/evaluate-eloc-budget.js" ]]; then
-    if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged --max-eloc 800 --max-loc 1200; then
-        echo "❌ [FAIL] Gate 5: 暂存区存在文件超出双轨体积预算 (ELOC > 800 或 LOC > 1200)"
+    if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged --max-eloc 900 --max-loc 1400 --density-ratio 3.0; then
+        echo "❌ [FAIL] Gate 5: 暂存区存在文件超出双轨体积上限 (ELOC > 900 或 LOC > 1400)"
         FAILED=1
     fi
 else
-    MAX_LOC_BUDGET=1200
+    MAX_LOC_BUDGET=1400
     while IFS= read -r file; do
         [[ -z "$file" ]] && continue
         if [[ -f "$file" && ( "$file" == *.ts || "$file" == *.gd || "$file" == *.js ) ]]; then

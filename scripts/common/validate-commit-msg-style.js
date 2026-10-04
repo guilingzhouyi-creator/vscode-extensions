@@ -217,6 +217,18 @@ const TEST_CASES = [
     expectValid: false,
   },
   {
+    name: 'CAT-05 Chinese (退出码与项检查流水账)',
+    msg: 'refactor(gate): 更新检查规则\n\n[Verification]\n- 6 项检查均返回退出码 0，双端脚本均返回 0。',
+    expectRule: 'CMG-STY-005',
+    expectValid: false,
+  },
+  {
+    name: 'CAT-05 English (exit code 0 / all checks passed)',
+    msg: 'refactor(gate): update rules\n\n[Verification]\n- all 9 checks passed with exit code 0 without errors.',
+    expectRule: 'CMG-STY-005',
+    expectValid: false,
+  },
+  {
     name: 'Whitelist Chinese (绝对路径/临时文件)',
     msg: 'fix(path): 修复跨平台文件查找未能转换为绝对路径的问题\n\n[Why]\n- `createTempFile` 生成的临时文件需支持绝对路径。\n\n[Verification]\n- 运行单元测试套件。',
     expectValid: true,
@@ -228,12 +240,12 @@ const TEST_CASES = [
   },
   {
     name: 'Whitelist English (two-pass/pass parameters/pass through)',
-    msg: 'feat(compiler): implement two-pass syntax analysis and pass parameters by reference\n\n[Verification]\n- Execute test-parallel runner covering 145 suites.',
+    msg: 'feat(compiler): implement two-pass syntax analysis and pass parameters by reference\n\n[Verification]\n- Execute test-parallel runner covering regression suites.',
     expectValid: true,
   },
   {
     name: 'Whitelist Chinese (单趟扫描与透传参数)',
-    msg: 'feat(core): 实现单趟语法审查并在模块间透传配置上下文\n\n[Verification]\n- 执行 node scripts/test-parallel.js 运行 145 套套件。',
+    msg: 'feat(core): 实现单趟语法审查并在模块间透传配置上下文\n\n[Verification]\n- 执行 node scripts/test-parallel.js 运行回归套件。',
     expectValid: true,
   },
   {

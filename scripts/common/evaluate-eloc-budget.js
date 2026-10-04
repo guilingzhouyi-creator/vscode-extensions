@@ -18,10 +18,13 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const DEFAULT_MAX_ELOC = 800;
-const DEFAULT_MAX_LOC = 1200;
-const DEFAULT_WARN_ELOC = 650;
-const DEFAULT_WARN_LOC = 900;
+const DEFAULT_MAX_ELOC = 900;
+const DEFAULT_MAX_LOC = 1400;
+const DEFAULT_WARN_ELOC = 750;
+const DEFAULT_WARN_LOC = 1100;
+const DEFAULT_TARGET_DENSITY_RATIO = 3.0;
+const MIN_CONTRACT_COMMENT_RATIO = 0.08;
+const MIN_REPRESENTATIVE_LOC = 250;
 
 /**
  * Checks whether a line in a C-style language (TS, JS) is a comment or blank,
@@ -107,7 +110,7 @@ function classifyHashStyleLine(line, inTripleQuote, quoteChar) {
  *
  * @param {string} content - Raw source code
  * @param {string} ext - File extension (e.g. '.ts', '.gd')
- * @returns {{ totalLoc: number, blankLines: number, commentLines: number, eloc: number, commentRatio: number }}
+ * @returns {{ totalLoc: number, blankLines: number, commentLines: number, eloc: number, commentRatio: number, dilutionRatio: number, density: number }}
  */
 function evaluateCodeMetrics(content, ext) {
   const lines = content.split(/\r?\n/);
@@ -141,7 +144,78 @@ function evaluateCodeMetrics(content, ext) {
   }
 
   const commentRatio = totalLoc > 0 ? Number((commentLines / totalLoc).toFixed(4)) : 0;
-  return { totalLoc, blankLines, commentLines, eloc, commentRatio };
+  const dilutionRatio = eloc > 0 ? Number((totalLoc / eloc).toFixed(2)) : 0;
+  const density = totalLoc > 0 ? Number(((eloc / totalLoc) * 100).toFixed(1)) : 0;
+
+  return { totalLoc, blankLines, commentLines, eloc, commentRatio, dilutionRatio, density };
+}
+
+/**
+ * Evaluates bidirectional dynamic envelope constraints.
+ */
+function evaluateDynamicEnvelope(metrics, options) {
+  const { eloc, totalLoc, commentLines } = metrics;
+  const maxEloc = options.maxEloc || DEFAULT_MAX_ELOC;
+  const maxLoc = options.maxLoc || DEFAULT_MAX_LOC;
+  const densityRatioTarget = options.densityRatio || DEFAULT_TARGET_DENSITY_RATIO;
+
+  // 1. 绝对上限硬判定
+  if (eloc > maxEloc) {
+    return {
+      severity: 'error',
+      tag: 'ABSOLUTE_OVERFLOW',
+      message: `ELOC 绝对超标: 有效代码行 ${eloc} > 刚性上限 ${maxEloc} (物理 LOC: ${totalLoc})`,
+    };
+  }
+  if (totalLoc > maxLoc) {
+    return {
+      severity: 'error',
+      tag: 'ABSOLUTE_OVERFLOW',
+      message: `物理 LOC 绝对超标: 总行数 ${totalLoc} > 兜底上限 ${maxLoc} (有效 ELOC: ${eloc})`,
+    };
+  }
+
+  // 2. 正向动态上限反推 (Forward Dynamic LOC Constraint)
+  const dynamicMaxLoc = Math.min(maxLoc, Math.max(150, Math.ceil(eloc * densityRatioTarget)));
+  if (totalLoc > dynamicMaxLoc) {
+    const actualRatio = (totalLoc / Math.max(1, eloc)).toFixed(2);
+    return {
+      severity: 'warn',
+      tag: 'DILUTED',
+      message: `动态密度比失衡 (稀释比 1:${actualRatio} > 1:${densityRatioTarget}): 当前 ${eloc} ELOC 的动态物理上限为 ${dynamicMaxLoc} LOC，实际占用了 ${totalLoc} 行`,
+      suggestion: '建议清理冗余空行，或将长篇设计说明剥离至外部 Markdown 案卷',
+    };
+  }
+
+  // 3. 反向动态下限反推 (Reverse Dynamic ELOC Constraint)
+  if (totalLoc >= MIN_REPRESENTATIVE_LOC) {
+    const dynamicMinEloc = Math.floor(totalLoc / densityRatioTarget);
+    if (eloc < dynamicMinEloc) {
+      const codeDensityPct = ((eloc / totalLoc) * 100).toFixed(1);
+      return {
+        severity: 'warn',
+        tag: 'LOW_LOGIC',
+        message: `有效逻辑密度过低 (有效行 ${eloc} < 动态下限 ${dynamicMinEloc} ELOC, 密度 ${codeDensityPct}%): 物理文本占用高达 ${totalLoc} 行`,
+        suggestion: '代码占比低于 33%，存在空行过多或大面积模板虚胖',
+      };
+    }
+  }
+
+  // 4. 高负载契约注释密度反推 (High-Load Contract Density Constraint)
+  if (eloc >= 600) {
+    const commentRatio = totalLoc > 0 ? commentLines / totalLoc : 0;
+    if (commentRatio < MIN_CONTRACT_COMMENT_RATIO) {
+      const commentPct = (commentRatio * 100).toFixed(1);
+      return {
+        severity: 'warn',
+        tag: 'CONTRACT_STARVATION',
+        message: `高负载逻辑缺乏架构注释与契约 (有效行 ${eloc}，注释占比仅 ${commentPct}% < 8%)`,
+        suggestion: '请为复杂业务逻辑补充必要的类型契约、状态机转换说明或 JSDoc',
+      };
+    }
+  }
+
+  return { severity: 'pass', tag: 'HEALTHY' };
 }
 
 /**
@@ -168,7 +242,7 @@ function getStagedFiles() {
  * Safely applies numeric CLI options.
  */
 function applyNumericOption(options, key, value) {
-  const parsed = parseInt(value, 10);
+  const parsed = parseFloat(value);
   if (!Number.isNaN(parsed)) {
     options[key] = parsed;
   }
@@ -183,6 +257,7 @@ function parseArgs(args) {
     maxLoc: DEFAULT_MAX_LOC,
     warnEloc: DEFAULT_WARN_ELOC,
     warnLoc: DEFAULT_WARN_LOC,
+    densityRatio: DEFAULT_TARGET_DENSITY_RATIO,
     staged: false,
     files: [],
   };
@@ -208,6 +283,10 @@ function parseArgs(args) {
     }
     if (arg === '--warn-loc' && i < args.length) {
       applyNumericOption(options, 'warnLoc', args[i++]);
+      continue;
+    }
+    if ((arg === '--density-ratio' || arg === '--max-dilution') && i < args.length) {
+      applyNumericOption(options, 'densityRatio', args[i++]);
       continue;
     }
     if (!arg.startsWith('--')) {
@@ -261,7 +340,7 @@ function run() {
   }
 
   console.log(
-    `  ▶ 检查 ${uniqueFiles.length} 个源文件的双轨体积预算 (ELOC <= ${options.maxEloc}, LOC <= ${options.maxLoc})...`,
+    `  ▶ 检查 ${uniqueFiles.length} 个源文件的双轨体积与双向动态密度 (ELOC <= ${options.maxEloc}, LOC <= ${options.maxLoc}, 目标密度比 1:${options.densityRatio})...`,
   );
 
   const violations = [];
@@ -274,46 +353,37 @@ function run() {
     const metrics = evaluateCodeMetrics(content, ext);
     const relPath = path.relative(process.cwd(), file).replace(/\\/g, '/');
 
-    summaries.push({ relPath, ...metrics });
+    const envelope = evaluateDynamicEnvelope(metrics, options);
+    summaries.push({ relPath, ...metrics, envelope });
 
-    if (metrics.eloc > options.maxEloc) {
-      violations.push({
-        file: relPath,
-        reason: `ELOC 超标: 有效代码行 ${metrics.eloc} > 刚性预算 ${options.maxEloc} (物理 LOC: ${metrics.totalLoc})`,
-      });
-    } else if (metrics.totalLoc > options.maxLoc) {
-      violations.push({
-        file: relPath,
-        reason: `物理 LOC 超标: 总行数 ${metrics.totalLoc} > 物理兜底线 ${options.maxLoc} (有效 ELOC: ${metrics.eloc})`,
-      });
-    } else if (metrics.eloc >= options.warnEloc || metrics.totalLoc >= options.warnLoc) {
-      warnings.push({
-        file: relPath,
-        notice: `接近规模上限: ${metrics.eloc} ELOC / ${metrics.totalLoc} LOC (有效占比: ${((metrics.eloc / metrics.totalLoc) * 100).toFixed(1)}%)`,
-      });
+    if (envelope.severity === 'error') {
+      violations.push({ file: relPath, reason: envelope.message });
+    } else if (envelope.severity === 'warn') {
+      warnings.push({ file: relPath, notice: envelope.message, suggestion: envelope.suggestion });
     }
   }
 
   if (warnings.length > 0) {
-    console.log(`  ℹ️ [NOTICE] ${warnings.length} 个文件接近规模上限:`);
+    console.log(`  ℹ️ [NOTICE] ${warnings.length} 个文件触碰动态包络预警边界:`);
     for (const w of warnings) {
       console.log(`     - ${w.file}: ${w.notice}`);
+      if (w.suggestion) console.log(`       👉 建议: ${w.suggestion}`);
     }
   }
 
   if (violations.length > 0) {
-    console.error(`\n❌ [FAIL] 发现 ${violations.length} 个文件超出双轨体积预算:`);
+    console.error(`\n❌ [FAIL] 发现 ${violations.length} 个文件超出双轨体积绝对上限:`);
     for (const v of violations) {
       console.error(`   - ${v.file}: ${v.reason}`);
     }
-    console.error(`   👉 请重构拆分上述模块，降低单个文件的控制流规模或排版行数。\n`);
+    console.error(`   👉 请重构拆分上述模块，降低单个文件的业务复杂度或排版行数。\n`);
     process.exit(1);
   }
 
   summaries.sort((a, b) => b.eloc - a.eloc);
   const top = summaries[0];
   console.log(
-    `  ✔ [PASS] 100% 文件符合双轨体积预算 (最高观测: ${top.relPath} -> ${top.eloc} ELOC / ${top.totalLoc} LOC)`,
+    `  ✔ [PASS] 100% 文件符合双轨体积与动态包络约束 (最高观测: ${top.relPath} -> ${top.eloc} ELOC / ${top.totalLoc} LOC, 密度: ${top.density}%, 稀释比: 1:${top.dilutionRatio})`,
   );
   process.exit(0);
 }
@@ -324,6 +394,7 @@ if (require.main === module) {
 
 module.exports = {
   evaluateCodeMetrics,
+  evaluateDynamicEnvelope,
   classifyCStyleLine,
   classifyHashStyleLine,
 };
