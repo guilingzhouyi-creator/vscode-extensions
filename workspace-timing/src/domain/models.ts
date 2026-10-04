@@ -9,21 +9,44 @@
 /** 数据格式当前版本（v2：新增 dailyTotals 沉淀层） */
 export const LATEST_VERSION = 2;
 
+// ─── 基础单位转换常数（消灭魔法数字）──────────────
+export const SECONDS_PER_MINUTE = 60;
+export const MINUTES_PER_HOUR = 60;
+export const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+export const HOURS_PER_DAY = 24;
+export const BYTES_PER_KB = 1024;
+export const BYTES_PER_MB = BYTES_PER_KB * BYTES_PER_KB;
+export const DEFAULT_JOURNAL_FLUSH_SECONDS = 10;
+export const JOURNAL_WARN_MB = 5;
+export const SLEEP_DETECT_GAP_SECONDS = 15;
+export const RADIX_DECIMAL = 10;
+
+// ─── 计时状态机枚举（单一真源）────────────────────────
+export const ORCHESTRATOR_STATES = {
+    IDLE: 'idle',
+    RUNNING: 'running',
+    DISABLED: 'disabled',
+    SAVING: 'saving',
+} as const;
+export type OrchestratorState = typeof ORCHESTRATOR_STATES[keyof typeof ORCHESTRATOR_STATES];
+
 // ─── 时间常量（唯一来源，禁止下游硬编码）──────────────
 export const MS_PER_SECOND = 1000;
-export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
-export const MS_PER_HOUR = 60 * MS_PER_MINUTE;
-export const MS_PER_DAY = 24 * MS_PER_HOUR;
+export const MS_PER_MINUTE = SECONDS_PER_MINUTE * MS_PER_SECOND;
+export const MS_PER_HOUR = MINUTES_PER_HOUR * MS_PER_MINUTE;
+export const MS_PER_DAY = HOURS_PER_DAY * MS_PER_HOUR;
 
 // ─── 默认值（引用时间常量）──────────────
 export const DEFAULT_RING_BUFFER_CAP = 1024;
-export const DEFAULT_JOURNAL_FLUSH_MS = 10 * MS_PER_SECOND;  // 10s — journal 落盘
-/** 会话明细保留上限——兜底安全值；常规历史治理由 historyRawRetentionDays 折叠承担 */
-export const DEFAULT_MAX_SESSIONS = 5000;
+export const DEFAULT_JOURNAL_FLUSH_MS = DEFAULT_JOURNAL_FLUSH_SECONDS * MS_PER_SECOND;  // 10s — journal 落盘
+/** 单日原始会话保留上限（每日最高 20 条，超出将自动清除最远会话条目） */
+export const MAX_SESSIONS_PER_DAY = 20;
+/** 会话明细保留上限——兜底安全值（每周 7 天 * 20 条 = 140 条） */
+export const DEFAULT_MAX_SESSIONS = 140;
 /** 原始会话保留窗（天）：超出窗口的会话按日折叠进 dailyTotals；0=永不折叠 */
 export const DEFAULT_RAW_RETENTION_DAYS = 45;
 /** journal 文件大小告警阈值 */
-export const JOURNAL_WARN_BYTES = 5 * 1024 * 1024;
+export const JOURNAL_WARN_BYTES = JOURNAL_WARN_MB * BYTES_PER_MB;
 /** 周工作时长上限下限 (1h) */
 export const MIN_WEEKLY_LIMIT_HOURS = 1;
 /** 周工作时长上限上限 (168h = 7天*24小时) */
@@ -34,11 +57,11 @@ export const DEFAULT_WEEKLY_LIMIT_HOURS = 40;
 export const GLOBAL_STALE_DAYS = 30;
 export const GLOBAL_STALE_TTL_MS = GLOBAL_STALE_DAYS * MS_PER_DAY;
 /** 系统休眠/挂起恢复检测间隔阈值 (15s) */
-export const SLEEP_DETECT_GAP_MS = 15 * MS_PER_SECOND;
+export const SLEEP_DETECT_GAP_MS = SLEEP_DETECT_GAP_SECONDS * MS_PER_SECOND;
 /** 检查点周期性折叠触发步长 (每 50 次 checkpoint) */
 export const FOLD_CHECKPOINT_MOD = 50;
 /** 恢复与会话管理器默认容量兜底上限 */
-export const DEFAULT_SESSION_CAP = 1000;
+export const DEFAULT_SESSION_CAP = 140;
 /** 日志 ISO 时间戳截取切片起止索引 (HH:mm:ss.sss) */
 export const ISO_TIME_START = 11;
 export const ISO_TIME_END = 23;
@@ -126,7 +149,7 @@ export function sanitizeWeeklyLimitHours(val: unknown): number {
   if (typeof val === 'number') {
     n = val;
   } else if (isString(val)) {
-    n = parseInt(val, 10);
+    n = parseInt(val, RADIX_DECIMAL);
   } else {
     return DEFAULT_WEEKLY_LIMIT_HOURS;
   }
