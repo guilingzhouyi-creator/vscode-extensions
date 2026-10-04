@@ -11,7 +11,7 @@
  *   with fallback to business_module.
  */
 
-/** Eight distinct fine-grained architectural file roles */
+/** Distinct fine-grained architectural file roles */
 export type FineGrainedFileRole =
     | 'core_trunk'
     | 'business_module'
@@ -20,7 +20,8 @@ export type FineGrainedFileRole =
     | 'rules_registry'
     | 'config_constant'
     | 'test_suite'
-    | 'auto_generated';
+    | 'auto_generated'
+    | 'gate_infrastructure';
 
 /** Result of fine-grained file role inference */
 export interface FileRoleInferenceResult {
@@ -37,6 +38,10 @@ export interface FileRoleInferenceResult {
 /** Core application entry and trunk pattern */
 const CORE_TRUNK_PATTERN =
     /(?:^|[\\/])(?:api|index|main|cli|app|server|entry|bootstrap)\.[a-z0-9]+$/i;
+
+/** Gate infrastructure and workflow script pattern */
+const GATE_INFRASTRUCTURE_PATTERN =
+    /(?:^|[\\/])(?:\.githooks|\.husky|\.github[\\/]workflows|\.gitlab-ci)(?:[\\/]|$)|(?:^|[\\/])scripts[\\/].*(?:gate|commit-msg|pre-push|audit-all)\.[a-z0-9]+$/i;
 
 /** Algorithmic and computation-intensive path pattern */
 const ALGORITHM_PATTERN =
@@ -88,7 +93,17 @@ export function inferFineGrainedFileRole(
         };
     }
 
-    // 2. Test suite and test utility files
+    // 2. Gate infrastructure and CI/CD pipelines
+    if (GATE_INFRASTRUCTURE_PATTERN.test(normalized)) {
+        return {
+            role: 'gate_infrastructure',
+            reason: 'Path identifies Git hooks, gate scripts, or CI workflow definitions',
+            hasRelaxedBudget: false,
+            shouldSkipHeavyAudit: true,
+        };
+    }
+
+    // 3. Test suite and test utility files
     if (TEST_SUITE_PATTERN.test(normalized)) {
         return {
             role: 'test_suite',
@@ -156,3 +171,16 @@ export function inferFineGrainedFileRole(
         shouldSkipHeavyAudit: false,
     };
 }
+
+/**
+ * Checks whether a file belongs to repository gate infrastructure.
+ *
+ * @param filePath - Path to file
+ * @returns True if path matches gate scripts or hook patterns
+ */
+export function isGateInfrastructure(filePath: string): boolean {
+    return GATE_INFRASTRUCTURE_PATTERN.test(filePath.replace(/\\/g, '/'));
+}
+
+/** Semantic alias for inferFineGrainedFileRole */
+export const inferFileRole = inferFineGrainedFileRole;

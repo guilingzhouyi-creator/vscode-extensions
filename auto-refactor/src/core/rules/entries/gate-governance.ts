@@ -5,16 +5,20 @@
  *   concatenated into RULE_REGISTRY single source of truth.
  * Dependencies & Triggers: core rule types, defineRule(); consumed by ../registry.ts.
  * Responsibilities: Declare identity, severity, summary, remediation, and doc anchors for
- *   all 9 canonical GATE-* rules:
+ *   all 13 canonical GATE-* rules:
  *   - GATE-SYS-001: Missing gate system (no hooks and no CI);
  *   - GATE-HOOK-001: Missing local left-shift Git hooks;
  *   - GATE-ISO-001: Dual-tier isomorphism between local gates and remote CI;
  *   - GATE-ROUTE-001: Hook runtime routing safety and degradation guard;
  *   - GATE-MSG-001: Commit-msg engineering structure and anti-jargon guard;
+ *   - GATE-MSG-002: Commit-msg objective style and bidirectional bilingual term constraints;
  *   - GATE-HYG-001: Physical hygiene guard (0-byte file and line ending enforcement);
  *   - GATE-BUDGET-001: Gate performance tiering (fast staged pre-commit vs full pre-push);
  *   - GATE-ERR-001: Strict error handling discipline in gate scripts;
- *   - GATE-SSOT-001: Rule SSOT catalog synchronization.
+ *   - GATE-SSOT-001: Rule SSOT catalog synchronization;
+ *   - GATE-AST-001: Pre-commit AST staged slice complexity and nesting budget guard;
+ *   - GATE-FAC-001: Gate pipeline facade substantive bearing and vacuous forwarding elimination;
+ *   - GATE-PROC-001: PowerShell gate script non-interactive execution safety guard.
  * Exit Semantics & Design Rationale: Pure metadata; zero runtime execution logic.
  */
 
@@ -147,5 +151,57 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'Gate system lacks single-source-of-truth rule catalog verification, risking rule drift.',
         remediation: 'Synchronize gate rule validation with a centralized single-source catalog.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-ssot-001',
+    }),
+    defineRule({
+        id: 'GATE-MSG-002',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired).',
+        remediation:
+            'Integrate commit-msg-forbidden-terms.json into commit-msg-gate to audit objective factual language.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-msg-002',
+    }),
+    defineRule({
+        id: 'GATE-AST-001',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4).',
+        remediation:
+            'Configure validate-staged-slice guard in pre-commit hook to reject commits exceeding AST complexity budgets.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-ast-001',
+    }),
+    defineRule({
+        id: 'GATE-FAC-001',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination.',
+        remediation:
+            'Incorporate validate-facade-discipline in gate pipelines to ensure facades satisfy substantive bearing budgets.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-fac-001',
+    }),
+    defineRule({
+        id: 'GATE-PROC-001',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'PowerShell gate script uses interactive prompts without output redirection guard.',
+        remediation:
+            'Guard PowerShell interactive prompts with [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-proc-001',
     }),
 ];

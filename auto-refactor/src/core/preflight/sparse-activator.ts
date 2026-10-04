@@ -52,10 +52,12 @@ export interface SparseActivationResult {
 /** Mapping of language-specific analyzers to supported languages */
 const LANGUAGE_ANALYZER_MATRIX: Record<string, readonly LanguageKind[]> = {
     'typescript-modern': ['typescript', 'javascript'],
+    'ts-modern': ['typescript', 'javascript'],
     'python-modern': ['python'],
     'rust-modern': ['rust'],
     'gdscript-modern': ['gdscript'],
     'gdscript-game': ['gdscript'],
+    'go-modern': ['go'],
     'shell-lint': ['shell'],
     'vscode-extension': ['typescript', 'javascript', 'json'],
 };
@@ -69,6 +71,54 @@ function isLanguageCompatible(analyzerId: string, lang: LanguageKind): boolean {
         return true;
     }
     return supported.includes(lang);
+}
+
+/** Calculate change indicator weight */
+function resolveChangeIndicator(isDirectlyChanged: boolean, isNeighbor: boolean): number {
+    if (isDirectlyChanged) return 1.0;
+    if (isNeighbor) return 0.5;
+    return 0.0;
+}
+
+/** Calculate dependency proximity weight */
+function resolveDependencyProximity(isDirectlyChanged: boolean, fanIn: number): number {
+    if (isDirectlyChanged) return 1.0;
+    return fanIn > 0 ? 0.6 : 0.2;
+}
+
+/** Check if analyzer/role matches active audit domain */
+function matchesDomainScope(analyzerId: string, role: string, domain: string): boolean {
+    if (domain === 'gates') {
+        return (
+            analyzerId === 'gate-architecture' ||
+            analyzerId === 'shell-lint' ||
+            role === 'gate_infrastructure'
+        );
+    }
+    return analyzerId.includes(domain) || role.includes(domain);
+}
+
+/** Calculate scope affinity factor */
+function resolveScopeAffinity(
+    analyzerId: string,
+    fileEntry: AuditIndexEntry,
+    isDirectlyChanged: boolean,
+    scopeDecision: AuditScopeDecision,
+): number {
+    if (scopeDecision.mode === 'PROJECT') {
+        return 0.9;
+    }
+    if (scopeDecision.mode === 'DOMAIN' && scopeDecision.domain) {
+        const dom = scopeDecision.domain.toLowerCase();
+        return matchesDomainScope(analyzerId, fileEntry.role, dom) ? 1.0 : 0.1;
+    }
+    if (fileEntry.role === 'gate_infrastructure' && analyzerId === 'gate-architecture') {
+        return 1.0;
+    }
+    if (isDirectlyChanged) {
+        return 0.8;
+    }
+    return 0.5;
 }
 
 /** Computes single analyzer-file affinity score A(r, f) */
@@ -85,32 +135,20 @@ function computeAffinityScore(
         return 0.0;
     }
 
-    // 1. Change Indicator (I_change)
-    const iChange = isDirectlyChanged ? 1.0 : isNeighbor ? 0.5 : 0.0;
-
-    // 2. Risk factor (R_risk)
-    const rRisk = fileEntry.risk.inherentRisk;
-
-    // 3. Dependency Proximity (D_dep)
-    const dDep = isDirectlyChanged ? 1.0 : fileEntry.deps.fanIn > 0 ? 0.6 : 0.2;
-
-    // 4. History (H_hist)
-    const hHist = Math.min(1.0, fileEntry.history.recentFindingCount / 5);
-
-    // 5. Scope Affinity (S_scope)
-    let sScope = 0.5;
-    if (scopeDecision.mode === 'PROJECT') {
-        sScope = 0.9;
-    } else if (scopeDecision.mode === 'DOMAIN' && scopeDecision.domain) {
-        const dom = scopeDecision.domain.toLowerCase();
-        if (analyzerId.includes(dom) || fileEntry.role.includes(dom)) {
-            sScope = 1.0;
-        } else {
-            sScope = 0.1;
-        }
-    } else if (isDirectlyChanged) {
-        sScope = 0.8;
+    // Gate analyzer specificity: never audit pure application business files in changeset mode
+    if (
+        analyzerId === 'gate-architecture' &&
+        scopeDecision.mode === 'CHANGESET' &&
+        fileEntry.role !== 'gate_infrastructure'
+    ) {
+        return 0.0;
     }
+
+    const iChange = resolveChangeIndicator(isDirectlyChanged, isNeighbor);
+    const rRisk = fileEntry.risk.inherentRisk;
+    const dDep = resolveDependencyProximity(isDirectlyChanged, fileEntry.deps.fanIn);
+    const hHist = Math.min(1.0, fileEntry.history.recentFindingCount / 5);
+    const sScope = resolveScopeAffinity(analyzerId, fileEntry, isDirectlyChanged, scopeDecision);
 
     const rawScore =
         weights.changeIndicator * iChange +

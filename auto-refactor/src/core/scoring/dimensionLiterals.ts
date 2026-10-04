@@ -10,69 +10,31 @@
  *   module so both deduction modules share a single definition site and no import cycle.
  */
 
-/**
- * Points deducted when the circular dependency signal is present.
- */
+/** Points deducted when the circular dependency signal is present. */
 export const DEDUCTION_CIRCULAR_DEPENDENCY = 25;
-
-/**
- * Points deducted when the critical code execution signal is present.
- */
+/** Points deducted when the critical code execution signal is present. */
 export const DEDUCTION_CRITICAL_CODE_EXECUTION = 40;
-
-/**
- * Points deducted when the critical command injection signal is present.
- */
+/** Points deducted when the critical command injection signal is present. */
 export const DEDUCTION_CRITICAL_COMMAND_INJECTION = 40;
-
-/**
- * Points deducted when the prototype pollution signal is present.
- */
+/** Points deducted when the prototype pollution signal is present. */
 export const DEDUCTION_PROTOTYPE_POLLUTION = 35;
-
-/**
- * Points deducted when the insecure randomness signal is present.
- */
+/** Points deducted when the insecure randomness signal is present. */
 export const DEDUCTION_INSECURE_RANDOMNESS = 25;
-
-/**
- * Points deducted when the generic security signal is present.
- */
+/** Points deducted when the generic security signal is present. */
 export const DEDUCTION_GENERIC_SECURITY = 25;
-
-/**
- * Points deducted when the hardcoded credential signal is present.
- */
+/** Points deducted when the hardcoded credential signal is present. */
 export const DEDUCTION_HARDCODED_CREDENTIAL = 50;
-
-/**
- * Points deducted when the missing public api doc signal is present.
- */
+/** Points deducted when the missing public api doc signal is present. */
 export const DEDUCTION_MISSING_PUBLIC_API_DOC = 8;
-
-/**
- * Points deducted when the duplicate literal signal is present.
- */
+/** Points deducted when the duplicate literal signal is present. */
 export const DEDUCTION_DUPLICATE_LITERAL = 8;
-
-/**
- * Points deducted when the magic number signal is present.
- */
+/** Points deducted when the magic number signal is present. */
 export const DEDUCTION_MAGIC_NUMBER = 4;
-
-/**
- * Points deducted when the hardcoded string signal is present.
- */
+/** Points deducted when the hardcoded string signal is present. */
 export const DEDUCTION_HARDCODED_STRING = 3;
-
-/**
- * Quality dimension id for architecture consistency.
- */
+/** Quality dimension id for architecture consistency. */
 export const DIMENSION_ARCHITECTURE_CONSISTENCY = 'architectureConsistency';
-
-/**
- * Quality dimension id for code security.
- */
+/** Quality dimension id for code security. */
 export const DIMENSION_CODE_SECURITY = 'codeSecurity';
 
 /**
@@ -893,3 +855,25 @@ export const DEDUCTION_CROSS_TIER_BLAST_RADIUS = 15;
 export const DEDUCTION_RULE_CATALOG_DRIFT = 20;
 /** Points deducted for historical dossier nomenclature boundary breach. */
 export const DEDUCTION_DOSSIER_BOUNDARY_BREACH = 10;
+
+/** Points deducted for gate architecture structural violations. */
+export const DEDUCTION_GATE_ARCHITECTURE = 20;
+/** Points deducted for gate execution reliability or AST complexity budget breached. */
+export const DEDUCTION_GATE_RELIABILITY = 15;
+/** Points deducted for gate standardization, SSOT catalog or commit style contract breach. */
+export const DEDUCTION_GATE_STANDARDIZATION = 12;
+
+/** Points deducted for shell script error discipline or trap exit guard breached. */
+export const DEDUCTION_SHELL_ERROR_DISCIPLINE = 12;
+/** Points deducted for shell script standardization or non-interactive guard breach. */
+export const DEDUCTION_SHELL_STANDARDIZATION = 10;
+
+/** Points deducted for code simplification maintainability defects. */
+export const DEDUCTION_SIMPLIFY_MAINTAINABILITY = 10;
+/** Points deducted for dead or redundant comments identified by simplify analyzer. */
+export const DEDUCTION_SIMPLIFY_COMMENT = 8;
+/** Points deducted for standardization smells identified by simplify analyzer. */
+export const DEDUCTION_SIMPLIFY_STANDARDIZATION = 10;
+
+/** Points deducted for outdated Go idioms or patterns. */
+export const DEDUCTION_GO_MODERNITY = 12;

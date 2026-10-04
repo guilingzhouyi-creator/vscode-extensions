@@ -366,7 +366,7 @@ func _on_buy():
     assert.ok(!ruleIds.has(rule.id), `Gate 16 Failed: Duplicate rule ID found: ${rule.id}`);
     ruleIds.add(rule.id);
   }
-  assert.strictEqual(ruleIds.size, 290, `Gate 16 Failed: Expected 290 rules, got ${ruleIds.size}`);
+  assert.strictEqual(ruleIds.size, 294, `Gate 16 Failed: Expected 294 rules, got ${ruleIds.size}`);
   console.log(`  [PASS] Gate 16: Zero duplicate rule IDs (Total: ${ruleIds.size} unique rules)`);
 }
 

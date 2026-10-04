@@ -27,7 +27,7 @@ export type SliceCategory =
     | 'security_safety';
 
 /** Canonical mapping from analyzer ID to primary slice domain */
-const ANALYZER_SLICE_DOMAIN: Record<string, SliceCategory> = {
+export const ANALYZER_SLICE_DOMAIN: Record<string, SliceCategory> = {
     // Slice 1: Lexical Hygiene
     comments: 'lexical_hygiene',
     naming: 'lexical_hygiene',
@@ -39,6 +39,7 @@ const ANALYZER_SLICE_DOMAIN: Record<string, SliceCategory> = {
     complexity: 'ast_complexity',
     simplify: 'ast_complexity',
     'large-file': 'ast_complexity',
+    performance: 'ast_complexity',
 
     // Slice 3: Architecture & Coupling
     architecture: 'architecture_coupling',
@@ -47,6 +48,7 @@ const ANALYZER_SLICE_DOMAIN: Record<string, SliceCategory> = {
     'data-architecture': 'architecture_coupling',
     constants: 'architecture_coupling',
     stdlib: 'architecture_coupling',
+    'gate-architecture': 'architecture_coupling',
 
     // Slice 4: Modernity & Governance
     governance: 'modernity_governance',
@@ -58,6 +60,7 @@ const ANALYZER_SLICE_DOMAIN: Record<string, SliceCategory> = {
     'gdscript-game': 'modernity_governance',
     'test-modernity': 'modernity_governance',
     'vscode-extension': 'modernity_governance',
+    'go-modern': 'modernity_governance',
 
     // Slice 5: Security & Safety
     security: 'security_safety',

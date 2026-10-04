@@ -269,12 +269,16 @@
 | `PRF-POL-002` | <a id="prf-pol-002"></a>`performance` | `PRF` | `error` | `all` | 资源池缺乏状态重置契约或容量上限：池化机制缺失 reset_state 回收契约或无界增长导致数据污染与泄漏。 | 补全对象归还重置逻辑并设定池容量高水位淘汰限制。 |
 | `PRF-POL-003` | <a id="prf-pol-003"></a>`performance` | `PRF` | `warning` | `all` | 负收益过度池化：对极小轻量纯值对象或冷路径过度引入池化管理开销，得不偿失。 | 移除负收益池化包装层，直接采用值对象或短生命周期瞬态分配。 |
 | `PRF-POL-004` | <a id="prf-pol-004"></a>`performance` | `PRF` | `warning` | `all` | 流式数据分块加载缺乏环形缓冲复用：在流式 I/O、分块循环读取或异步回调中反复实例化临时 Buffer，造成高频内存碎片与 GC 停顿。 | 引入环形缓冲区（RingBuffer）或接入定长字节缓冲池（BufferPool），实现零拷贝槽位循环复用。 |
+| `GATE-AST-001` | <a id="gate-ast-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少暂存区 AST 局部切片复杂度与嵌套深度刚性预算检查（CC <= 15, Depth <= 4）。 | 在 pre-commit 钩子中配置 validate-staged-slice 切片看守，阻断超标改动。 |
 | `GATE-BUDGET-001` | <a id="gate-budget-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 预提交门禁运行无界全量回归耗时超标，未实施暂存区分层过滤。 | 实施分层门禁：预提交专注增量暂存切片审查（< 2s），全量回归递延至预推送。 |
 | `GATE-ERR-001` | <a id="gate-err-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁执行脚本缺失严格错误终止控制标志，存在命令静默失败隐患。 | Shell 脚本声明 set -euo pipefail，PowerShell 声明 $ErrorActionPreference = 'Stop'。 |
+| `GATE-FAC-001` | <a id="gate-fac-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁流水线缺少门面层实质承载（ELOC >= 15）与空包跳板静态审查。 | 接入 validate-facade-discipline 看守，强制门面层实质承载并消除虚空转发层。 |
 | `GATE-HOOK-001` | <a id="gate-hook-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 仓库缺失本地左移 Git Hooks 拦截防线，缺陷反馈过度后置。 | 配置 .githooks 或 .husky 激活本地左移防御，提交前拦截低级卫生与回归缺陷。 |
 | `GATE-HYG-001` | <a id="gate-hyg-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少 0 字节物理空文件与换行符卫生看守。 | 在 pre-commit 门禁中加入零空文件与换行符契约（CRLF/LF）检查。 |
 | `GATE-ISO-001` | <a id="gate-iso-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 双层门禁边界不同构，远端 CI 关键检查未在本地钩子中对等镜像。 | 确保本地门禁脚本镜像覆盖远端 CI 关键步骤，实现双层防御同构性。 |
 | `GATE-MSG-001` | <a id="gate-msg-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁系统缺少提交信息 Conventional 规范与零黑话结构化正文校验。 | 配置 commit-msg 门禁校验 Conventional 格式、结构化正文区块与零临时黑话。 |
+| `GATE-MSG-002` | <a id="gate-msg-002"></a>`gate-architecture` | `GATE` | `warning` | `all` | 提交信息门禁未接入中英双语求真务实词汇约束表（commit-msg-forbidden-terms.json）。 | 接入双语词表看守，阻断敷衍用语、过度肯定/否定及元风格标语。 |
+| `GATE-PROC-001` | <a id="gate-proc-001"></a>`gate-architecture` | `GATE` | `error` | `all` | PowerShell 门禁脚本使用交互式提示而缺少输出重定向非交互守卫。 | 增加 [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected 守卫，杜绝子进程死锁。 |
 | `GATE-ROUTE-001` | <a id="gate-route-001"></a>`gate-architecture` | `GATE` | `error` | `all` | Git 钩子直接裸调脆弱环境或 Windows PS 5.1，缺少跨平台路由保护。 | 采用跨平台 pwsh 优先并优雅降级至 bash 的双执行器路由，禁止裸调 powershell.exe。 |
 | `GATE-SSOT-001` | <a id="gate-ssot-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁引用规则目录校验但缺少单源注册表文件或未登记对应规则。 | 建立并维护单一真源规则目录（如 rule-catalog.json），门禁依据单源校验。 |
 | `GATE-SYS-001` | <a id="gate-sys-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 仓库完全缺失门禁防御系统（无任何本地 Git 钩子且无远端 CI 流水线）。 | 接入标准化双层门禁脚手架（pre-commit, commit-msg, pre-push 及 CI 工作流）。 |

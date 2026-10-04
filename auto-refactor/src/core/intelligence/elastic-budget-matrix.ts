@@ -112,6 +112,14 @@ const BASE_ROLE_BUDGETS: Record<FineGrainedFileRole, RoleBudgetThresholds> = {
         complexityBudget: Number.MAX_SAFE_INTEGER,
         nestingDepthBudget: Number.MAX_SAFE_INTEGER,
     },
+    gate_infrastructure: {
+        physicalLinesWarn: 500,
+        physicalLinesFail: 800,
+        effectiveLocWarn: 350,
+        effectiveLocFail: 600,
+        complexityBudget: 15,
+        nestingDepthBudget: 4,
+    },
 };
 
 /**

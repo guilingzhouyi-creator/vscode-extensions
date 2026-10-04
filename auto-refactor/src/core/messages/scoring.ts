@@ -465,4 +465,29 @@ export const ScoringRationales = {
     UNUSED_LOCAL: (msg: string) => `Local variable is declared and never read again: ${msg}`,
     CROSS_FILE_CLONE: (msg: string) =>
         `Near-identical code block appears in more than one file: ${msg}`,
+
+    // ── Repository Gate Architecture & Governance ────────────────────────────────
+    GATE_ARCHITECTURE_INTEGRITY: (msg: string) =>
+        `Repository gate architecture integrity breach: ${msg}`,
+    GATE_EXECUTION_RELIABILITY: (msg: string) =>
+        `Gate execution reliability or AST complexity budget breached: ${msg}`,
+    GATE_STANDARDIZATION_INTEGRITY: (msg: string) =>
+        `Gate standardization, SSOT catalog or commit style contract breach: ${msg}`,
+    GATE_GENERIC_MISMATCH: (msg: string) => `Repository gate contract finding: ${msg}`,
+
+    // ── Shell / PowerShell Lint Governance ───────────────────────────────────────
+    SHELL_ERROR_DISCIPLINE: (msg: string) =>
+        `Shell script error discipline or trap exit guard breached: ${msg}`,
+    SHELL_STANDARDIZATION: (msg: string) =>
+        `Shell script standardization or non-interactive guard breach: ${msg}`,
+
+    // ── Code Simplification & Structure Smells ──────────────────────────────────
+    SIMPLIFY_MAINTAINABILITY: (msg: string) => `Code simplification maintainability defect: ${msg}`,
+    SIMPLIFY_COMMENT: (msg: string) =>
+        `Comment quality defect detected by simplify analyzer: ${msg}`,
+    SIMPLIFY_STANDARDIZATION: (msg: string) =>
+        `Standardization smell detected by simplify analyzer: ${msg}`,
+
+    // ── Go Modern Language Pack ──────────────────────────────────────────────────
+    GO_MODERNITY: (msg: string) => `Go modernization or idiom recommendation: ${msg}`,
 } as const;

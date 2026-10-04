@@ -39,6 +39,10 @@ export interface GateGovernanceOptions {
     enforceRoutingSafety?: boolean;
     enforceBudgetTiering?: boolean;
     enforceSsotSync?: boolean;
+    enforceCommitMsgStyle?: boolean;
+    enforceAstSlice?: boolean;
+    enforceFacadeDiscipline?: boolean;
+    enforceProcessGuard?: boolean;
 }
 
 /** Comprehensive audit result. */
@@ -535,6 +539,176 @@ function auditSsotSync(context: RepoArchetypeContext, issues: Issue[]): void {
 }
 
 /**
+ * Dimension 8: GATE-MSG-002: Commit Message Style Constraints & Bilingual Terms Guard.
+ */
+function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue[]): void {
+    if (context.hooks.allHookFiles.length === 0) return;
+
+    const gateScriptsContent = Object.values(context.gateScripts.contents).join('\n');
+    const commitMsgHookContent = context.hooks.commitMsg?.content || '';
+    const combined = `${gateScriptsContent}\n${commitMsgHookContent}`;
+
+    // Verify whether commit-msg-forbidden-terms.json or validate-commit-msg-style is wired
+    const wiresStyleCheck = /commit-msg-forbidden-terms\.json|validate-commit-msg-style/i.test(
+        combined,
+    );
+
+    const relHookPath = context.hooks.commitMsg
+        ? path.relative(context.root, context.hooks.commitMsg.filePath).replace(/\\/g, '/')
+        : 'scripts/ps1/commit-msg-gate.ps1';
+
+    if (!wiresStyleCheck) {
+        issues.push(
+            createGateIssue(
+                'GATE-MSG-002',
+                relHookPath,
+                1,
+                SEVERITY_WARNING,
+                'medium',
+                'standardization',
+                'Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired).',
+                'Wire validate-commit-msg-style.js or commit-msg-forbidden-terms.json into commit-msg-gate to intercept temporary and non-factual language.',
+                'Unchecked commit style leads to casual jargon, hyperbolic exaggerations, and circumvented quality constraints.',
+            ),
+        );
+        return;
+    }
+
+    // Verify the dictionary file has bilingual patterns if present in gateScripts
+    const termsContent = Object.entries(context.gateScripts.contents).find(([f]) =>
+        /commit-msg-forbidden-terms\.json/i.test(f),
+    )?.[1];
+
+    if (termsContent) {
+        const hasEnglish = /asciiPatterns|temporary|hyperbolic|meta_narrative/i.test(termsContent);
+        const hasChinese = /[\u4e00-\u9fa5]/.test(termsContent);
+
+        if (!hasEnglish || !hasChinese) {
+            issues.push(
+                createGateIssue(
+                    'GATE-MSG-002',
+                    'scripts/common/commit-msg-forbidden-terms.json',
+                    1,
+                    SEVERITY_WARNING,
+                    'medium',
+                    'standardization',
+                    'Forbidden terms dictionary lacks bidirectional bilingual coverage (must contain both English and Chinese constraints).',
+                    'Include both asciiPatterns (English) and patterns (Chinese) in forbidden terms dictionary to prevent language bypass.',
+                    'Agents or contributors can bypass single-language filters by substituting equivalent foreign terms.',
+                ),
+            );
+        }
+    }
+}
+
+/**
+ * Dimension 9: GATE-AST-001: AST Staged Slice Complexity & Nesting Guard.
+ */
+function auditAstSliceGuard(context: RepoArchetypeContext, issues: Issue[]): void {
+    if (context.hooks.allHookFiles.length === 0) return;
+
+    const preCommitContent = [
+        context.hooks.preCommit?.content || '',
+        ...Object.entries(context.gateScripts.contents)
+            .filter(([k]) => /pre-commit/i.test(k))
+            .map(([, v]) => v),
+    ].join('\n');
+
+    const relPath = context.hooks.preCommit
+        ? path.relative(context.root, context.hooks.preCommit.filePath).replace(/\\/g, '/')
+        : 'scripts/ps1/pre-commit-gate.ps1';
+
+    // Verify whether pre-commit gate inspects staged AST slices
+    const hasAstSliceCheck =
+        /validate-staged-slice|ast[-_]slice|complexity.*depth|CC\s*<=\s*15/i.test(preCommitContent);
+
+    if (!hasAstSliceCheck) {
+        issues.push(
+            createGateIssue(
+                'GATE-AST-001',
+                relPath,
+                1,
+                SEVERITY_ERROR,
+                'high',
+                'maintainability',
+                'Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4).',
+                'Integrate validate-staged-slice.js into pre-commit gate to reject over-complex staged functions prior to commit.',
+                'Allowing complex methods to be committed defers technical debt detection to late-stage full regression reviews.',
+            ),
+        );
+    }
+}
+
+/**
+ * Dimension 10: GATE-FAC-001: Facade Substantive Bearing & Vacuous Forwarding Elimination.
+ */
+function auditFacadeDisciplineGuard(context: RepoArchetypeContext, issues: Issue[]): void {
+    const combinedScripts = [
+        ...Object.values(context.gateScripts.contents),
+        context.hooks.preCommit?.content || '',
+        context.hooks.prePush?.content || '',
+    ].join('\n');
+
+    // Look for facade discipline or ARCH-FAC / ARCH-ABS verification in gate scripts
+    const hasFacadeCheck =
+        /validate-facade|facade-discipline|ARCH-FAC-001|ARCH-ABS-001|facade-governance/i.test(
+            combinedScripts,
+        );
+
+    if (!hasFacadeCheck) {
+        issues.push(
+            createGateIssue(
+                'GATE-FAC-001',
+                context.hooks.prePush
+                    ? path
+                          .relative(context.root, context.hooks.prePush.filePath)
+                          .replace(/\\/g, '/')
+                    : 'scripts',
+                1,
+                SEVERITY_ERROR,
+                'high',
+                'architecture',
+                'Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination.',
+                'Incorporate facade discipline verification into pre-push or self-audit gates to eliminate pass-through shims.',
+                'Vacuous forwarding shims add unnecessary indirection layers without domain logic, increasing maintenance overhead.',
+            ),
+        );
+    }
+}
+
+/**
+ * Dimension 11: GATE-PROC-001: PowerShell Terminal Non-Interactive & Output Redirection Guard.
+ */
+function auditProcessInteractiveSafety(context: RepoArchetypeContext, issues: Issue[]): void {
+    const ps1Scripts = Object.entries(context.gateScripts.contents).filter(([f]) =>
+        f.endsWith('.ps1'),
+    );
+
+    for (const [relPath, content] of ps1Scripts) {
+        // Detect interactive commands that lack non-interactive redirection guard
+        if (/\b(?:Read-Host|pause|choice\.exe)\b/i.test(content)) {
+            const hasRedirectGuard = /IsOutputRedirected|UserInteractive/i.test(content);
+
+            if (!hasRedirectGuard) {
+                issues.push(
+                    createGateIssue(
+                        'GATE-PROC-001',
+                        relPath,
+                        1,
+                        SEVERITY_ERROR,
+                        'medium',
+                        'reliability',
+                        `PowerShell gate script '${path.basename(relPath)}' uses interactive prompts without output redirection guard.`,
+                        'Wrap interactive prompt blocks with: if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected).',
+                        'Interactive prompts in headless CI or Agent child processes cause silent hangs and pipeline timeouts.',
+                    ),
+                );
+            }
+        }
+    }
+}
+
+/**
  * Complete standalone audit of repository gate architecture.
  *
  * @param root - Path to repository root.
@@ -551,7 +725,7 @@ export function auditGateArchitecture(
     // Scenario A: Missing gates
     const isMissingSystem = auditMissingGates(context, issues);
 
-    // Scenario B: If gate system is present, execute 7-dimensional audits
+    // Scenario B: If gate system is present, execute multi-dimensional audits
     if (!isMissingSystem) {
         if (options.enforceIsomorphism !== false) auditIsomorphism(context, issues);
         if (options.enforceRoutingSafety !== false) auditRoutingSafety(context, issues);
@@ -560,6 +734,10 @@ export function auditGateArchitecture(
         if (options.enforceBudgetTiering !== false) auditBudgetTiering(context, issues);
         if (options.enforceStrictError !== false) auditStrictErrorDiscipline(context, issues);
         if (options.enforceSsotSync !== false) auditSsotSync(context, issues);
+        if (options.enforceCommitMsgStyle !== false) auditCommitMsgStyle(context, issues);
+        if (options.enforceAstSlice !== false) auditAstSliceGuard(context, issues);
+        if (options.enforceFacadeDiscipline !== false) auditFacadeDisciplineGuard(context, issues);
+        if (options.enforceProcessGuard !== false) auditProcessInteractiveSafety(context, issues);
     }
 
     const hasLocalGates = context.hooks.allHookFiles.length > 0;
@@ -571,7 +749,7 @@ export function auditGateArchitecture(
         issues,
         passed: issues.length === 0,
         metrics: {
-            totalRulesAudited: 9,
+            totalRulesAudited: 13,
             violationsCount: issues.length,
             hasLocalGates,
             hasCiPipelines,

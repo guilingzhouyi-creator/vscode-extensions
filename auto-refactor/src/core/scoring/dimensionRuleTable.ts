@@ -43,6 +43,10 @@ import {
     ANALYZER_VSCODE_EXTENSION,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_NAMING,
+    ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_SHELL_LINT,
+    ANALYZER_SIMPLIFY,
+    ANALYZER_GO_MODERN,
     RULE_CPX_TIME_001,
     RULE_CPX_SPACE_001,
     RULE_CPX_AMP_001,
@@ -121,6 +125,15 @@ import {
     DEDUCTION_NAMING_DECOUPLING,
     RULE_HYG_EMP_001,
     DEDUCTION_EMPTY_FILE_PLACEHOLDER,
+    DEDUCTION_GATE_ARCHITECTURE,
+    DEDUCTION_GATE_RELIABILITY,
+    DEDUCTION_GATE_STANDARDIZATION,
+    DEDUCTION_SHELL_ERROR_DISCIPLINE,
+    DEDUCTION_SHELL_STANDARDIZATION,
+    DEDUCTION_SIMPLIFY_MAINTAINABILITY,
+    DEDUCTION_SIMPLIFY_COMMENT,
+    DEDUCTION_SIMPLIFY_STANDARDIZATION,
+    DEDUCTION_GO_MODERNITY,
 } from './dimensionLiterals';
 import type { QualityDimension } from './scoringTypes';
 
@@ -152,7 +165,13 @@ const RULE_MAGIC_NUMBER = 'magic-number';
  * Modernization analyzers: every rule they emit is deprecated-language-feature evidence, which
  * is what the `modernity` axis is declared to measure in DIMENSION_ANALYZERS.
  */
-const MODERNITY_ANALYZERS = ['ts-modern', 'python-modern', 'rust-modern', 'gdscript-modern'];
+const MODERNITY_ANALYZERS = [
+    'ts-modern',
+    'python-modern',
+    'rust-modern',
+    'gdscript-modern',
+    ANALYZER_GO_MODERN,
+];
 
 const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
 
@@ -636,5 +655,118 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_MODERNITY,
         points: DEDUCTION_HOST_LIFECYCLE_BREACH,
         rationale: ScoringRationales.GDSCRIPT_MODERNIZATION,
+    },
+
+    // ── Repository Gate Architecture & Governance ────────────────────────────────
+    {
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        covers: ruleMatches(
+            ['GATE-SYS-001', 'GATE-HOOK-001', 'GATE-ISO-001', 'GATE-FAC-001'],
+            ['system', 'hook', 'isolate', 'facade'],
+        ),
+        dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+        points: DEDUCTION_GATE_ARCHITECTURE,
+        rationale: ScoringRationales.GATE_ARCHITECTURE_INTEGRITY,
+    },
+    {
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        covers: ruleMatches(
+            ['GATE-ERR-001', 'GATE-ROUTE-001', 'GATE-BUDGET-001', 'GATE-AST-001', 'GATE-PROC-001'],
+            ['error', 'route', 'budget', 'ast', 'interactive'],
+        ),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_GATE_RELIABILITY,
+        rationale: ScoringRationales.GATE_EXECUTION_RELIABILITY,
+    },
+    {
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        covers: ruleMatches(
+            ['GATE-MSG-001', 'GATE-MSG-002', 'GATE-SSOT-001', 'GATE-HYG-001'],
+            ['msg', 'message', 'ssot', 'catalog', 'hygiene'],
+        ),
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_GATE_STANDARDIZATION,
+        rationale: ScoringRationales.GATE_STANDARDIZATION_INTEGRITY,
+    },
+    {
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        covers: anyFinding,
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_GATE_STANDARDIZATION,
+        rationale: ScoringRationales.GATE_GENERIC_MISMATCH,
+    },
+
+    // ── Shell / PowerShell Lint Governance ───────────────────────────────────────
+    {
+        analyzer: ANALYZER_SHELL_LINT,
+        covers: ruleMatches(
+            ['SH-ERR-001', 'SH-EXIT-001', 'SH-INIT-001', 'PS-ERROR-001'],
+            ['err', 'exit', 'init'],
+        ),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_SHELL_ERROR_DISCIPLINE,
+        rationale: ScoringRationales.SHELL_ERROR_DISCIPLINE,
+    },
+    {
+        analyzer: ANALYZER_SHELL_LINT,
+        covers: anyFinding,
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_SHELL_STANDARDIZATION,
+        rationale: ScoringRationales.SHELL_STANDARDIZATION,
+    },
+
+    // ── Code Simplification & Structure Smells ──────────────────────────────────
+    {
+        analyzer: ANALYZER_SIMPLIFY,
+        covers: ruleMatches(
+            [
+                'SIM-TRN-001',
+                'SIM-BOOL-001',
+                'SIM-ELSE-001',
+                'SIM-GUARD-001',
+                'SIM-IMM-001',
+                'SIM-FLAT-002',
+            ],
+            ['ternary', 'boolean', 'condition', 'return', 'guard', 'function', 'else'],
+        ),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_SIMPLIFY_MAINTAINABILITY,
+        rationale: ScoringRationales.SIMPLIFY_MAINTAINABILITY,
+    },
+    {
+        analyzer: ANALYZER_SIMPLIFY,
+        covers: ruleMatches(['SIM-COMC-001'], ['comment', 'dead']),
+        dimension: DIMENSION_COMMENT_QUALITY,
+        points: DEDUCTION_SIMPLIFY_COMMENT,
+        rationale: ScoringRationales.SIMPLIFY_COMMENT,
+    },
+    {
+        analyzer: ANALYZER_SIMPLIFY,
+        covers: ruleMatches(
+            ['SIM-LONG-001', 'SIM-EMPTY-001', 'SIM-PRNT-001'],
+            ['long', 'empty', 'print'],
+        ),
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_SIMPLIFY_STANDARDIZATION,
+        rationale: ScoringRationales.SIMPLIFY_STANDARDIZATION,
+    },
+    {
+        analyzer: ANALYZER_SIMPLIFY,
+        covers: anyFinding,
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_SIMPLIFY_STANDARDIZATION,
+        rationale: ScoringRationales.SIMPLIFY_STANDARDIZATION,
+    },
+
+    // ── Go Modern Language Pack ──────────────────────────────────────────────────
+    {
+        analyzer: ANALYZER_GO_MODERN,
+        covers: ruleMatches(
+            ['GOM-CTX-001', 'GOM-ERR-001', 'GOM-STYLE-001', 'GOM-STYLE-002', 'GOM-STYLE-003'],
+            ['gom', 'context', 'err', 'style'],
+        ),
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_GO_MODERNITY,
+        rationale: ScoringRationales.GO_MODERNITY,
     },
 ];

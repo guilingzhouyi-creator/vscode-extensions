@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791049523543",
-  "timestamp": "2026-10-03T17:45:23.543Z",
+  "snapshotId": "snapshot-v0.4.0-1791090945647",
+  "timestamp": "2026-10-04T05:15:45.647Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "30d07ab94f3450a29aa7038657858b08204909320a78ada470583a25cd61fb9d",
+  "rulesDigest": "13fe6db7e711f4a11ec02a5674d13540b7853ef954dbe7b244f9a62193932e7f",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 290,
+    "ruleCount": 294,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -111,12 +111,16 @@
     "duplicate-literal",
     "ERR-PRP-001",
     "expensive-loop-operation",
+    "GATE-AST-001",
     "GATE-BUDGET-001",
     "GATE-ERR-001",
+    "GATE-FAC-001",
     "GATE-HOOK-001",
     "GATE-HYG-001",
     "GATE-ISO-001",
     "GATE-MSG-001",
+    "GATE-MSG-002",
+    "GATE-PROC-001",
     "GATE-ROUTE-001",
     "GATE-SSOT-001",
     "GATE-SYS-001",

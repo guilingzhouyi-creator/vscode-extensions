@@ -22,7 +22,8 @@ import {
 } from '../intelligence/file-role-inference';
 
 /** File broad categorization */
-export type FileAuditType = 'source' | 'test' | 'config' | 'doc' | 'script' | 'generated' | 'asset';
+export type FileAuditType =
+    'source' | 'test' | 'config' | 'doc' | 'script' | 'generated' | 'asset' | 'gate';
 
 /** Supported language kind */
 export type LanguageKind =
@@ -31,6 +32,7 @@ export type LanguageKind =
     | 'rust'
     | 'gdscript'
     | 'python'
+    | 'go'
     | 'shell'
     | 'json'
     | 'yaml'
@@ -111,6 +113,7 @@ const EXTENSION_LANGUAGE_MAP: Record<string, LanguageKind> = {
     '.rs': 'rust',
     '.gd': 'gdscript',
     '.py': 'python',
+    '.go': 'go',
     '.sh': 'shell',
     '.bash': 'shell',
     '.ps1': 'shell',
@@ -143,6 +146,7 @@ export function resolveLanguageFromPath(filePath: string): LanguageKind {
  * @returns Resolved FileAuditType category.
  */
 export function resolveFileAuditType(filePath: string, role: FineGrainedFileRole): FileAuditType {
+    if (role === 'gate_infrastructure') return 'gate';
     if (role === 'test_suite') return 'test';
     if (role === 'auto_generated') return 'generated';
     if (role === 'config_constant') return 'config';
@@ -240,6 +244,7 @@ const ROLE_BASE_RISK: Record<FineGrainedFileRole, number> = {
     auto_generated: 0.05,
     business_module: 0.2,
     shared_library: 0.2,
+    gate_infrastructure: 0.9,
 };
 
 /** Computes file inherent risk factor */
