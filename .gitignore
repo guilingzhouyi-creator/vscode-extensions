@@ -23,6 +23,7 @@ sarif/
 .mypy_cache/
 .atomcode/
 /deliverables/
+WebGames/.agents/
 
 # 本地插件管理与下载临时产物（不入库）
 .dsh-plugin-download/
