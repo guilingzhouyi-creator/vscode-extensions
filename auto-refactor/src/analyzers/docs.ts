@@ -19,6 +19,20 @@ import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { globToRegExp } from '../core/file-discovery';
+import { auditTerminologyProse } from '../core/governance/terminology-engine';
+
+function isExemptDocsPath(filePath: string): boolean {
+    const normalized = filePath.replace(/\\/g, '/');
+    return (
+        normalized.includes('docs/归档库/') ||
+        normalized.includes('docs/路线图/') ||
+        normalized.includes('/archive/') ||
+        normalized.includes('archive/') ||
+        normalized.includes('/fixtures/') ||
+        normalized.includes('/tests/') ||
+        normalized.includes('/test/')
+    );
+}
 
 const FENCE_RE = /^\s*(`{3,}|~{3,})/;
 const INLINE_CODE_RE = /`([^`\n]+)`/g;
@@ -120,6 +134,7 @@ export class DocsAnalyzer implements Analyzer {
             emit,
         );
         this.checkDuplicateProse(lines, emit);
+        this.checkTerminologyProse(lines, file, emit);
 
         return issues;
     }
@@ -241,6 +256,42 @@ export class DocsAnalyzer implements Analyzer {
             'Collapse the repetition into one canonical section and reference it, so the copy cannot drift.',
             { repeated: repeated.length, sample: sample.slice(0, DUP_DETAIL_SAMPLE_CHARS) },
         );
+    }
+
+    /**
+     * Flag non-objective terminology, casual phrasing, or hyperbolic claims in markdown prose.
+     *
+     * @param lines - Markdown lines.
+     * @param file - Normalized file path.
+     * @param emit - Issue factory.
+     */
+    private checkTerminologyProse(lines: string[], file: string, emit: Emit): void {
+        if (isExemptDocsPath(file)) return;
+        let inFence = false;
+        for (let i = 0; i < lines.length; i++) {
+            const rawLine = lines[i];
+            if (FENCE_RE.test(rawLine)) {
+                inFence = !inFence;
+                continue;
+            }
+            if (inFence || rawLine.trim() === '') continue;
+
+            const findings = auditTerminologyProse(rawLine);
+            for (const finding of findings) {
+                emit(
+                    i,
+                    'DOC-TRM-001',
+                    `Documentation prose contains non-objective terminology '${finding.term}': ${finding.message}`,
+                    SEVERITY_WARNING,
+                    finding.guidance,
+                    {
+                        term: finding.term,
+                        category: finding.category,
+                        sample: finding.contextSnippet,
+                    },
+                );
+            }
+        }
     }
 }
 

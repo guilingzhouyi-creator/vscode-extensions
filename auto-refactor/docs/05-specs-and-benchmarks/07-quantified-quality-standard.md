@@ -82,7 +82,7 @@ $$S_{\text{static}} = (1 - \lambda) \cdot M_{\text{arith}} + \lambda \cdot M_{\t
 $$\Delta Q_{\text{velocity}} = (S_{\text{after}} - S_{\text{before}}) \cdot \frac{1}{1 + \gamma \cdot \text{churnRatio}}$$
 
 - 其中 $\text{churnRatio} = \frac{\Delta \text{LOC}_{\text{modified}} + \Delta \text{LOC}_{\text{deleted}}}{\text{LOC}_{\text{total}}}$，$\gamma = 0.5$（默认阻尼系数）。
-- **性质**：净收益相同时，改动局部、低侵入性的重构获得最高演进速度得分；大范围颠覆性改动将受到指数衰减惩罚。
+- **性质**：净收益相同时，改动局部、低侵入性的重构获得最高演进速度得分；大范围高扰动改动将受到阻尼衰减惩罚。
 
 ### 2.5 重构配方泛化指数 (Recipe Generalization Index)
 

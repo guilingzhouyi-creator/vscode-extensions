@@ -11,7 +11,7 @@
  *   symbol, and literal stores.
  * Exit Semantics & Design Rationale: Projector failures degrade to the materialized path (same
  *   output, only a performance regression) and analyzer errors become issues instead of aborting
- *   the scan; index seeding stays best-effort so it can never fail a scan.
+ *   the scan; index seeding stays best-effort so it does not abort a scan.
  */
 
 import type * as ts from 'typescript';

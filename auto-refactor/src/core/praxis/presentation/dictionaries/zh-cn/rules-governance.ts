@@ -41,7 +41,7 @@ export const ZH_CN_GOVERNANCE_RULES: Record<string, PraxisRuleI18nEntry> = {
     'CMT-HDR-002': {
         name: 'CMT-HDR-002',
         summary:
-            '工业级严格题头契约缺失六字段之一 (模块归属、文件路径、架构定位、依赖与触发、职责说明、退出语义与设计依据)。',
+            '规范严格六字段题头契约缺失六字段之一 (模块归属、文件路径、架构定位、依赖与触发、职责说明、退出语义与设计依据)。',
         remediation: '`strict`',
     },
     'CMT-HDR-003': {
@@ -75,6 +75,11 @@ export const ZH_CN_GOVERNANCE_RULES: Record<string, PraxisRuleI18nEntry> = {
         name: 'CMT-SEP-001',
         summary: '同一文件混用短标题分隔（`── 标题 ──`）与长串分隔（`──── 标题`）；纯分隔线豁免。',
         remediation: '`standard` 及以上',
+    },
+    'CMT-TRM-001': {
+        name: 'CMT-TRM-001',
+        summary: '注释或文档中包含临时敷衍口吻、过度肯定吹嘘、情绪化贬损或非客观元叙事用语。',
+        remediation: '使用求真客观的技术事实陈述，说明具体技术范围、实现机制与设计不变量。',
     },
     'CMT-VMD-001': {
         name: 'CMT-VMD-001',
@@ -145,6 +150,11 @@ export const ZH_CN_GOVERNANCE_RULES: Record<string, PraxisRuleI18nEntry> = {
         name: 'DOC-LNK-001',
         summary: '反引号路径或相对链接指向不存在的文件。',
         remediation: '更新为现路径，或在行内标注已废止/示例。',
+    },
+    'DOC-TRM-001': {
+        name: 'DOC-TRM-001',
+        summary: '文档正文包含宣传性修辞、夸大承诺或非规范工单批次黑话。',
+        remediation: '秉承纯粹技术事实原则，客观陈述功能特性与边界规范。',
     },
     'GOV-AGN-001': {
         name: 'GOV-AGN-001',
@@ -378,8 +388,8 @@ export const ZH_CN_GOVERNANCE_RULES: Record<string, PraxisRuleI18nEntry> = {
     'HYG-EMP-001': {
         name: 'HYG-EMP-001',
         summary:
-            '源码、脚本或配置目录中存在物理 0 字节、仅含空白注释或缺乏有效 AST 语义载荷的虚空占位文件。',
-        remediation: '完善该文件的实际业务实现与导出定义，或直接从仓库中物理删除无效的占位文件。',
+            '源码、脚本或配置目录中存在物理 0 字节、仅含空白注释或缺乏有效 AST 语义载荷的虚空空白文件。',
+        remediation: '完善该文件的实际业务实现与导出定义，或直接从仓库中物理删除无效的空壳文件。',
     },
     'HYG-EXC-001': {
         name: 'HYG-EXC-001',
@@ -500,7 +510,7 @@ export const ZH_CN_GOVERNANCE_RULES: Record<string, PraxisRuleI18nEntry> = {
     },
     'NAM-SGL-001': {
         name: 'NAM-SGL-001',
-        summary: '严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 占位符豁免）。',
+        summary: '严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 丢弃符豁免）。',
         remediation: '改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。',
     },
     'NAM-TYP-001': {

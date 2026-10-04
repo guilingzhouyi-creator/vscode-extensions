@@ -1,4 +1,4 @@
-# 03. 工业级文件头与有效注释密度 (ECD-C) 规范
+# 03. 规范文件头与有效注释密度 (ECD-C) 规范
 
 > **所属层级**：L5 规范、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)  
 > **对应代码真源**：`src/core/comments/`、`src/analyzers/comments.ts`、`scripts/gate-comments.js`、`scripts/validate-comment-hygiene.js`
@@ -43,7 +43,7 @@
 | **`off`** | 临时脚手架 / 外部第三方生成代码 | 关闭全部注释类规则 |
 | **`basic`** | 原型验证 (`prototype`) | 仅拦截乱码 (`CMT-MOJI-001`)、死代码注释与空洞占位符 |
 | **`standard`（默认）** | 生产级工程 (`production`) | 强制六字段模块头、公有导出符号 JSDoc、ECD-C 密度下限与小文件横幅禁令 |
-| **`strict`** | 工业级核心基座 (`industrial`) | 额外要求内部复杂算法函数（CC $\ge 12$）必须显式注明时间复杂度与边界不变量 |
+| **`strict`** | 严格质量基座 (`industrial`) | 额外要求内部复杂算法函数（CC $\ge 12$）必须显式注明时间复杂度与边界不变量 |
 
 ---
 

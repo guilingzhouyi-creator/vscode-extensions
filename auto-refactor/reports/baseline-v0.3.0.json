@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791091383827",
-  "timestamp": "2026-10-04T05:23:03.826Z",
+  "snapshotId": "snapshot-v0.4.0-1791096592170",
+  "timestamp": "2026-10-04T06:49:52.170Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "13fe6db7e711f4a11ec02a5674d13540b7853ef954dbe7b244f9a62193932e7f",
+  "rulesDigest": "14ecf9cd3bd9e62ea49eab80fbd7d960c1af2fb40e93163a5446eb1c2099eb53",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 294,
+    "ruleCount": 296,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -73,6 +73,7 @@
     "CMT-LNG-002",
     "CMT-MOJI-001",
     "CMT-SEP-001",
+    "CMT-TRM-001",
     "CMT-VMD-001",
     "CMT-WID-001",
     "CONST-CLU-001",
@@ -108,6 +109,7 @@
     "DOC-DUP-001",
     "DOC-FEN-001",
     "DOC-LNK-001",
+    "DOC-TRM-001",
     "duplicate-literal",
     "ERR-PRP-001",
     "expensive-loop-operation",

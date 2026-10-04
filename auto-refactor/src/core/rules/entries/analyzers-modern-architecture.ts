@@ -394,7 +394,7 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Unstructured configuration access: accessing configuration in an ad-hoc manner across layers without a centralized registry.',
+            'Unstructured configuration access: accessing configuration in an unstructured, arbitrary manner across layers without a centralized registry.',
         remediation:
             'Establish a unified configuration access layer or registry to centralize configuration reads.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-005',

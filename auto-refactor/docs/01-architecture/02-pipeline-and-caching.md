@@ -52,7 +52,7 @@ sequenceDiagram
     Finalizer-->>Caller: 4. 执行全库循环依赖检测 + 基线棘轮 + 质量评分
 ```
 
-- **单次冷跑零开销保障（Single-Run Zero Cost）**：当 `cache: false` 且 `daemon: 'off'`（默认配置）时，引擎不初始化任何磁盘缓存目录、不加载 `src/daemon/*` 网络通信模块，保持纯内存流水线的极致轻量。
+- **单次冷跑零开销保障（Single-Run Zero Cost）**：当 `cache: false` 且 `daemon: 'off'`（默认配置）时，引擎不初始化任何磁盘缓存目录、不加载 `src/daemon/*` 网络通信模块，保持纯内存流水线的轻量运行。
 
 ---
 

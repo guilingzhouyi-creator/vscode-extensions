@@ -46,7 +46,7 @@ export interface PraxisDiagnosticCard {
     message: string;
     /** Localized remediation guidance */
     remediation: string;
-    /** Suggested quick fix code snippet or instruction (optional) */
+    /** Suggested `quick-fix` code snippet or instruction (optional) */
     quickFixSnippet?: string;
     /** Documentation URL link (optional) */
     docsUrl?: string;

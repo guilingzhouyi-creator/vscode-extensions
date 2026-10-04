@@ -31,7 +31,7 @@
 ### 📊 L5. 配置契约、三平面质量度量与性能基准 (`05-specs-and-benchmarks/`)
 * [01-config-and-reports.md](./05-specs-and-benchmarks/01-config-and-reports.md)：`auto-refactor.config.json` 完整 Schema、阈值与作用域抑制 (`suppressions`)、JSON / SARIF 2.1.0 / Text 报告与退出码契约。
 * [02-performance-benchmarks.md](./05-specs-and-benchmarks/02-performance-benchmarks.md)：6 大核心算子性能基准台账、消融测试与防劣化回归护栏。
-* [03-comment-and-header-standard.md](./05-specs-and-benchmarks/03-comment-and-header-standard.md)：工业级六字段文件头契约、有效注释密度 (ECD-C) 算法与 `gate:comments` 门禁。
+* [03-comment-and-header-standard.md](./05-specs-and-benchmarks/03-comment-and-header-standard.md)：规范六字段文件头契约、有效注释密度 (ECD-C) 算法与 `gate:comments` 门禁。
 * [04-cross-language-generalization.md](./05-specs-and-benchmarks/04-cross-language-generalization.md)：项目中立性不变量 (`validate-project-neutrality`) 与文件语义角色自动推导 (`file-role-inference.ts`)。
 * [05-consumer-integration.md](./05-specs-and-benchmarks/05-consumer-integration.md)：`baseline.json` 1.2.0 信用消耗语义、单向收紧棘轮以及 `workspace-timing` / `WebGames` 兄弟工程接入范式。
 * [06-modernization-program.md](./05-specs-and-benchmarks/06-modernization-program.md)：五大语言现代化规则包 (`*-modern`)、常量单一真源拓扑治理与结构债 ABC 分类治理法。

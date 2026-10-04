@@ -20,10 +20,9 @@
  *     than runtime defects.
  */
 import { isVocabularyEnumeration } from '../markerScope';
+import { CONSTRUCTION_JARGON_RE } from '../terminology-engine';
 import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
-
-const JARGON_RE = /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|wip)\b/i;
 
 /** ASCII code for a space, skipped while advancing past a line's leading whitespace. */
 const CHAR_CODE_SPACE = 32;
@@ -75,12 +74,12 @@ function isJargonSelfReference(line: string): boolean {
 }
 
 /**
- * Checks whether a single source line contains temporary task jargon or WIP markers in comments.
+ * Checks whether a single source line contains temporary task jargon or `WIP` markers in comments.
  */
 function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViolation | null {
     if (!isCommentLinePrefix(line) || isJargonSelfReference(line)) return null;
 
-    const match = JARGON_RE.exec(line);
+    const match = CONSTRUCTION_JARGON_RE.exec(line);
     if (!match || isVocabularyEnumeration(line, match.index, match[0])) return null;
 
     return {
@@ -115,7 +114,7 @@ export const LexicalHygieneRule: GovernanceRule = {
             return null;
         }
 
-        if (!JARGON_RE.test(ctx.content)) {
+        if (!CONSTRUCTION_JARGON_RE.test(ctx.content)) {
             return null;
         }
 

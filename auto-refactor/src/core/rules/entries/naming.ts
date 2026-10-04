@@ -120,7 +120,7 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard placeholders).',
+            'Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard symbols).',
         remediation:
             'Use descriptive identifiers communicating intent; reserve single letters strictly for loop indices (i, j) or discard (_).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-sgl-001',
@@ -146,7 +146,7 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
         summary:
-            'Engineering assets and test suites must not contain construction phase or temporary jargon markers (phase numbers, temporary tokens, wip markers).',
+            'Engineering assets and test suites must not contain construction phase or temporary jargon markers (phase numbers, temporary tokens, `wip` markers).',
         remediation:
             'Replace phase markers with semantic names representing actual domain capabilities and architecture features.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-jrg-002',

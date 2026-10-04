@@ -26,6 +26,7 @@ import {
     auditCommentDensity,
     auditCommentSemanticDuty,
 } from '../core/comments/comment-auditor';
+import { auditTerminologyProse } from '../core/governance/terminology-engine';
 import type { CommentLanguageKind } from '../core/comments/comment-types';
 
 interface CommentOptions {
@@ -162,6 +163,17 @@ const SINGLE_QUOTE = "'";
  * Failure semantics: deterministic line scan that never throws, including for languages
  * it only partially understands.
  */
+function isExemptCommentTerminologyPath(filePath: string): boolean {
+    const normalized = filePath.replace(/\\/g, '/');
+    return (
+        normalized.includes('/tests/') ||
+        normalized.includes('/test/') ||
+        normalized.includes('/fixtures/') ||
+        normalized.includes('scripts/validate-') ||
+        normalized.includes('src/core/praxis/presentation/dictionaries/')
+    );
+}
+
 function shouldRunSubAudit(
     override: boolean | undefined,
     level: CommentLevel,
@@ -391,6 +403,34 @@ export class CommentAnalyzer implements Analyzer {
                     desc.message,
                     SEVERITY_WARNING,
                     { file, lineCount, limit: BANNER_LINE_LIMIT },
+                    desc.suggestion,
+                ),
+            );
+        }
+
+        if (!isExemptCommentTerminologyPath(file)) {
+            this.auditCommentTerminology(body, lineIdx, file, ctx, issues);
+        }
+    }
+
+    private auditCommentTerminology(
+        body: string,
+        lineIdx: number,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const findings = auditTerminologyProse(body);
+        for (const finding of findings) {
+            const desc = CommentMessages.BANNED_TERMINOLOGY(finding.term, finding.message);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'CMT-TRM-001',
+                    desc.message,
+                    SEVERITY_WARNING,
+                    { file, term: finding.term, category: finding.category, line: lineIdx + 1 },
                     desc.suggestion,
                 ),
             );

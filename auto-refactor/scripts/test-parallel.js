@@ -163,6 +163,10 @@ const PARALLEL_SUITES = [
     script: 'scripts/validate-nested-constant-cleanliness.js',
   },
   {
+    name: 'validate-terminology-governance',
+    script: 'scripts/validate-terminology-governance.js',
+  },
+  {
     name: 'validate-constant-library-topology',
     script: 'scripts/validate-constant-library-topology.js',
   },

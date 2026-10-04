@@ -684,7 +684,7 @@ export interface ScanConfig {
     /**
      * If true, an analyzer that throws is reported as an `error`-severity Issue
      * (and therefore can fail the CI gate via `failOnIssue`). If false (default),
-     * such faults are reported as `info` and never fail the build.
+     * such faults are reported as `info` and do not fail the build.
      */
     failOnAnalyzerError: boolean;
     /**

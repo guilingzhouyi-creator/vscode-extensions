@@ -61,7 +61,7 @@ const STATUS_PASS = 'PASS';
 const STATUS_WARN = 'WARN';
 /** Maximum issues listed in the Markdown report before the tail is truncated. */
 const MARKDOWN_MAX_ISSUES = 100;
-/** Fallback badge score when a report carries no quality score; 100 is a perfect composite. */
+/** Fallback badge score when a report carries no quality score; 100 is a baseline composite. */
 const BADGE_DEFAULT_SCORE = 100;
 
 /**

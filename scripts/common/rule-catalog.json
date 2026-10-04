@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-04T05:22:27.035Z",
-  "totalRules": 372,
+  "generatedAt": "2026-10-04T06:39:06.302Z",
+  "totalRules": 374,
   "counts": {
-    "autoRefactor": 294,
+    "autoRefactor": 296,
     "workspaceTiming": 45,
     "webGames": 56,
     "globalTooling": 4
@@ -217,7 +217,7 @@
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Unstructured configuration access: accessing configuration in an ad-hoc manner across layers without a centralized registry."
+      "summary": "Unstructured configuration access: accessing configuration in an unstructured, arbitrary manner across layers without a centralized registry."
     },
     {
       "id": "ARCH-CFG-006",
@@ -469,7 +469,7 @@
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "error",
-      "summary": "Industrial strict file header missing one of six mandatory fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale)."
+      "summary": "Standard strict six-field file header missing one of six mandatory fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale)."
     },
     {
       "id": "CMT-HDR-003",
@@ -512,6 +512,13 @@
       "family": "CMT",
       "severity": "error",
       "summary": "Inconsistent section separator styles mixed in same file (short ── title ── vs long ──── title)."
+    },
+    {
+      "id": "CMT-TRM-001",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "error",
+      "summary": "Comment or docstring contains non-factual terminology, casual phrasing, hyperbolic assertions, or emotional slurs."
     },
     {
       "id": "CMT-VMD-001",
@@ -813,6 +820,13 @@
       "family": "L3",
       "severity": "error",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-002)"
+    },
+    {
+      "id": "DOC-TRM-001",
+      "project": "auto-refactor",
+      "family": "DOC",
+      "severity": "error",
+      "summary": "Documentation prose contains promotional slogans, hyperbolic claims, or unstandardized milestone jargon."
     },
     {
       "id": "duplicate-literal",
@@ -1463,7 +1477,7 @@
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Zero-byte empty file, blank comment-only file, or placeholder file lacking AST semantic payload."
+      "summary": "Zero-byte empty file, blank comment-only file, or hollow shell file lacking AST semantic payload."
     },
     {
       "id": "HYG-EXC-001",
@@ -1491,14 +1505,14 @@
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Temporary stub markers (TODO, FIXME, XXX, HACK) lingering in code or comments."
+      "summary": "Temporary stub markers (`TODO`, `FIXME`, `XXX`, `HACK`) lingering in code or comments."
     },
     {
       "id": "HYG-STB-002",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Temporary construction phase jargon (pXX, phaseXX, stXX, wip) leaking into code or comments."
+      "summary": "Temporary construction phase jargon (`pXX`, `phaseXX`, `stXX`, `wip`) leaking into code or comments."
     },
     {
       "id": "HYG-WRAP-001",
@@ -1687,7 +1701,7 @@
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "error",
-      "summary": "Engineering assets and test suites must not contain construction phase or temporary jargon markers (phase numbers, temporary tokens, wip markers)."
+      "summary": "Engineering assets and test suites must not contain construction phase or temporary jargon markers (phase numbers, temporary tokens, `wip` markers)."
     },
     {
       "id": "NAM-MBR-001",
@@ -1736,7 +1750,7 @@
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "error",
-      "summary": "Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard placeholders)."
+      "summary": "Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard symbols)."
     },
     {
       "id": "NAM-TYP-001",

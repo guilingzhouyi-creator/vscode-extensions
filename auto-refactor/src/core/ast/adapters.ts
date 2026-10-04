@@ -173,7 +173,7 @@ export function adapterFor(filePath: string, parser: ParserKind = 'typescript'):
 /**
  * Report whether a real language adapter claims this file's extension.
  *
- * `adapterFor` never fails: unknown extensions fall back to the TypeScript adapter for backward
+ * `adapterFor` never throws: unknown extensions fall back to the TypeScript adapter for backward
  * compatibility. Callers that must distinguish "parsed by a language adapter" from "silently
  * parsed as TypeScript" use this predicate to fail closed instead of reporting zero findings.
  *

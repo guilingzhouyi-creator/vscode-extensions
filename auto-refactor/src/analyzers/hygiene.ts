@@ -22,6 +22,7 @@ import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import { HygieneMessages } from '../core/messages';
 import { isVocabularyEnumeration } from '../core/governance/markerScope';
+import { CONSTRUCTION_JARGON_RE } from '../core/governance/terminology-engine';
 import { auditVacuousWrappers } from '../core/rules/evolution/wrapperRule';
 import { auditRegexSafety, isRegexSafe } from '../utils/safe-regex';
 import { nativeCore } from '../core/native';
@@ -45,8 +46,6 @@ interface HygieneOptions {
 
 const TERMINAL_STMT_RE = /^\s*(?:return\b|throw\s+|break;|continue;|raise\s+|exit\b)/;
 const TEMP_STUB_RE = /\b(TODO|FIXME|XXX|HACK|unimplemented)\b/i;
-/** Built-in transient-process jargon vocabulary; overridable per project. */
-const DEFAULT_JARGON_RE = /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|wip)\b/i;
 /** Default number of consecutive meaningful lines that counts as a duplicate block. */
 const DEFAULT_MIN_CLONE_LINES = 6;
 /** 32-bit FNV-1a offset basis used to seed the line hasher. */
@@ -75,7 +74,7 @@ const CLONE_ROLLING_HASH_MULTIPLIER = 31;
  */
 function buildJargonRe(patterns?: string[]): RegExp {
     const list = (patterns || []).map((pattern) => String(pattern).trim()).filter(Boolean);
-    if (list.length === 0) return DEFAULT_JARGON_RE;
+    if (list.length === 0) return CONSTRUCTION_JARGON_RE;
 
     // Validate each user-supplied pattern for ReDoS safety. Unsafe patterns
     // are dropped with a console warning; if all patterns are unsafe we fall
@@ -92,12 +91,12 @@ function buildJargonRe(patterns?: string[]): RegExp {
         }
     }
 
-    if (safePatterns.length === 0) return DEFAULT_JARGON_RE;
+    if (safePatterns.length === 0) return CONSTRUCTION_JARGON_RE;
 
     try {
         return new RegExp(`\\b(?:${safePatterns.join('|')})\\b`, 'i');
     } catch {
-        return DEFAULT_JARGON_RE;
+        return CONSTRUCTION_JARGON_RE;
     }
 }
 

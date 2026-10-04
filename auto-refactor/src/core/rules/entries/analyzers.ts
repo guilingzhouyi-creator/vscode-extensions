@@ -107,7 +107,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Industrial strict file header missing one of six mandatory fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale).',
+            'Standard strict six-field file header missing one of six mandatory fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale).',
         remediation: '`strict`',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-002',
     }),
@@ -156,6 +156,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         summary: 'Comment or docstring physical line length exceeds 100 columns.',
         remediation: REMEDIATION_STANDARD_AND_ABOVE,
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-wid-001',
+    }),
+    defineRule({
+        id: 'CMT-TRM-001',
+        family: RULE_FAMILY_COMMENTS,
+        analyzer: ANALYZER_COMMENTS,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Comment or docstring contains non-factual terminology, casual phrasing, hyperbolic assertions, or emotional slurs.',
+        remediation:
+            'Express technical specifications, design rationale, and boundary invariants using neutral and verifiable terms.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-trm-001',
     }),
     defineRule({
         id: 'CMT-LNG-001',
@@ -248,7 +261,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
-        summary: 'Temporary stub markers (TODO, FIXME, XXX, HACK) lingering in code or comments.',
+        summary:
+            'Temporary stub markers (`TODO`, `FIXME`, `XXX`, `HACK`) lingering in code or comments.',
         remediation: 'Resolve pending task and remove temporary stub markers.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-stb-001',
     }),
@@ -260,7 +274,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Temporary construction phase jargon (pXX, phaseXX, stXX, wip) leaking into code or comments.',
+            'Temporary construction phase jargon (`pXX`, `phaseXX`, `stXX`, `wip`) leaking into code or comments.',
         remediation: 'Replace temporary construction jargon with enduring domain terms.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-stb-002',
     }),
@@ -298,9 +312,9 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_ERROR,
         summary:
-            'Zero-byte empty file, blank comment-only file, or placeholder file lacking AST semantic payload.',
+            'Zero-byte empty file, blank comment-only file, or hollow shell file lacking AST semantic payload.',
         remediation:
-            'Implement full business logic and exports for the file, or delete the empty placeholder.',
+            'Implement full business logic and exports for the file, or delete the empty file.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-emp-001',
     }),
     defineRule({
@@ -579,6 +593,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         summary: 'Backtick path or relative link points to non-existent file.',
         remediation: 'Update link to valid target path or annotate as example/deprecated.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-lnk-001',
+    }),
+    defineRule({
+        id: 'DOC-TRM-001',
+        family: 'DOC',
+        analyzer: 'docs',
+        canonical: true,
+        languages: ['markdown'],
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Documentation prose contains promotional slogans, hyperbolic claims, or unstandardized milestone jargon.',
+        remediation:
+            'Adopt neutral and pragmatic technical descriptions, describing concrete capabilities and verifiable architectures.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-trm-001',
     }),
     defineRule({
         id: 'HYG-BLT-001',

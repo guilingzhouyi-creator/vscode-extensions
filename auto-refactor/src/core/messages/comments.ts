@@ -71,7 +71,7 @@ export const CommentMessages = {
         message: `Strict header contract violation: Missing required standard header field '${field}'`,
         suggestion: `Ensure standard 6-field header contract is present: ${SIX_FIELD_HEADERS_EN.join(', ')} (or Chinese equivalent: ${SIX_FIELD_HEADERS_ZH.join(', ')})`,
         rationale:
-            'Industrial-grade module headers require complete metadata to support automated tooling and cross-team maintenance.',
+            'Standard module headers require complete metadata to support automated tooling and cross-team maintenance.',
         risk: 'Medium',
     }),
 
@@ -149,6 +149,15 @@ export const CommentMessages = {
             'Drop the banner and rely on the module header contract; keep banners for large files only',
         rationale:
             'Banners consume a disproportionate share of a small file and push the actual contract below the fold.',
+        risk: RISK_LOW,
+    }),
+
+    // CMT-TRM-001
+    BANNED_TERMINOLOGY: (term: string, reason: string): DiagnosticDescriptor => ({
+        message: `Comment prose contains non-objective terminology '${term}': ${reason}`,
+        suggestion: 'Replace with objective technical facts and concrete operational descriptions',
+        rationale:
+            'Code comments must convey enduring technical facts without casual, hyperbolic, or meta-narrative phrasing.',
         risk: RISK_LOW,
     }),
 } as const;

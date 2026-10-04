@@ -180,8 +180,8 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
             '拆解为领域正交的局部组件（Header/Card/Graph Partials），由结构化 ViewModel 驱动渲染。',
     },
     'ARCH-UTL-001': {
-        name: '万能工具库反模式',
-        summary: '万能工具库反模式：检测到承担混杂异构逻辑的 utils/common 垃圾桶文件。',
+        name: '高异构耦合工具库反模式',
+        summary: '高异构耦合工具库反模式：检测到承担混杂异构逻辑的 utils/common 聚合文件。',
         remediation:
             '按四分流治理原则重构：纯算子进入算法库、常量进入常量库、规则进入策略库、通用转换进入基础层。',
     },

@@ -23,7 +23,7 @@
  *
  * The optional fields let every catalog share one render path, so consumers must tolerate
  * their absence. `risk` is deliberately narrowed to four literals, which validates severity
- * through the compiler instead of ad-hoc runtime checks.
+ * through the compiler instead of informal runtime checks.
  */
 export interface DiagnosticDescriptor {
     readonly message: string;

@@ -157,7 +157,7 @@ const RULES_GOV_TYPE_SAFETY = [
 /** Dependency-graph rules for exported symbols nothing consumes. */
 const RULES_UNUSED_BINDING = ['unused-export', 'unused-module'];
 /** Comment rules for banned vocabulary and temporary markers, in precedence order. */
-const RULES_COMMENT_BANNED = ['CMT-BAN-001'];
+const RULES_COMMENT_BANNED = ['CMT-BAN-001', 'CMT-TRM-001'];
 /** Constants rules with their own deduction, ahead of the hardcoded-string fallback. */
 const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
 const RULE_MAGIC_NUMBER = 'magic-number';
@@ -469,6 +469,15 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_STANDARDIZATION,
         points: DEDUCTION_DOCUMENT_DUPLICATION,
         rationale: ScoringRationales.DOCUMENT_DUPLICATION,
+    },
+    {
+        // DOC-TRM-001: non-objective terminology or hyperbolic assertions in markdown
+        // documentation prose.
+        analyzer: ANALYZER_DOCS,
+        covers: ruleMatches(['DOC-TRM-001'], ['terminology', 'prose', 'objective', 'hyperbolic']),
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_DOCUMENT_DUPLICATION,
+        rationale: ScoringRationales.BANNED_JARGON_IN_COMMENT,
     },
     // Comment quality — banned vocabulary, then missing public docs, then everything else.
     {

@@ -154,7 +154,7 @@ export const COMPOSITE_INDEX_FLOOR = 15;
  * Calculate the weighted composite score and measured weight coverage.
  *
  * The composite is a weighted geometric mean rather than an arithmetic one. An arithmetic
- * mean lets nine perfect axes hide a collapsed one (0 plus nine 100s averaged to 90), which
+ * mean lets nine full-score axes hide a collapsed one (0 plus nine 100s averaged to 90), which
  * overstates a repository whose weakest axis is failing. The geometric mean is bounded by the
  * minimum index, so a single weak axis necessarily pulls the aggregate down in proportion to
  * how weak it is, while `coverage` stays an arithmetic weight ratio and is unaffected.

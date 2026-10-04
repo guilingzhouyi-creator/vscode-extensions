@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791091407062",
-  "timestamp": "2026-10-04T05:23:32.016Z",
+  "snapshotId": "snapshot-v0.4.0-1791096617713",
+  "timestamp": "2026-10-04T06:50:24.299Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,30 +8,30 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "13fe6db7e711f4a11ec02a5674d13540b7853ef954dbe7b244f9a62193932e7f",
+  "rulesDigest": "14ecf9cd3bd9e62ea49eab80fbd7d960c1af2fb40e93163a5446eb1c2099eb53",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 586,
-    "durationMs": 4337
+    "filesScanned": 588,
+    "durationMs": 5833
   },
   "metrics": {
     "compositeScore": 99.2,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 12221,
-    "suppressedIssues": 6708,
-    "unsuppressedIssues": 5513,
+    "totalIssues": 12360,
+    "suppressedIssues": 6750,
+    "unsuppressedIssues": 5610,
     "bySeverity": {
-      "info": 456,
-      "warning": 11765,
+      "info": 461,
+      "warning": 11899,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 207,
-      "medium": 11147,
-      "low": 867
+      "high": 214,
+      "medium": 11269,
+      "low": 877
     }
   },
   "eightPillars": {
@@ -63,7 +63,7 @@
     "semanticPurity": 99.9,
     "codeSecurity": 100,
     "performanceEfficiency": 99,
-    "standardization": 82.1,
+    "standardization": 82,
     "modernity": 100,
     "maintainability": 99.5,
     "commentQuality": 100,
@@ -74,7 +74,7 @@
     {
       "filePath": "scripts/test-parallel.js",
       "domain": "scripts",
-      "totalIssues": 169,
+      "totalIssues": 170,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 98.6,
@@ -144,6 +144,15 @@
       "effectiveDensity": 0.98
     },
     {
+      "filePath": "src/core/scoring/dimensionRuleTable.ts",
+      "domain": "scoring",
+      "totalIssues": 133,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 98.6,
+      "effectiveDensity": 0.95
+    },
+    {
       "filePath": "scripts/validate-multi-agent.js",
       "domain": "scripts",
       "totalIssues": 130,
@@ -151,23 +160,14 @@
       "highCount": 0,
       "compositeScore": 97.9,
       "effectiveDensity": 0.96
-    },
-    {
-      "filePath": "scripts/validate-trajectory-learning.js",
-      "domain": "scripts",
-      "totalIssues": 130,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.8,
-      "effectiveDensity": 0.97
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 207,
-      "medium": 11147,
-      "low": 867
+      "high": 214,
+      "medium": 11269,
+      "low": 877
     },
     "criticalItems": [],
     "highItems": [
@@ -496,39 +496,39 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:479",
+        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:519",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/comments.ts",
-        "line": 479,
+        "line": 519,
         "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:509",
+        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:549",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/comments.ts",
-        "line": 509,
+        "line": 549,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:568",
+        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:608",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/comments.ts",
-        "line": 568,
+        "line": 608,
         "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:703",
+        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:743",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/comments.ts",
-        "line": 703,
+        "line": 743,
         "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
@@ -577,30 +577,30 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:169",
+        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:184",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/docs.ts",
-        "line": 169,
+        "line": 184,
         "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:172",
+        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:187",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/docs.ts",
-        "line": 172,
+        "line": 187,
         "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:221",
+        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:236",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/docs.ts",
-        "line": 221,
+        "line": 236,
         "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
@@ -852,16 +852,16 @@
       },
       {
         "domainName": "governance",
-        "compositeScore": 98.8,
+        "compositeScore": 98.5,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.8,
-          "performance": 97.5,
+          "maintainability": 99.5,
+          "performance": 96.5,
           "data": 99.8,
           "testing": 100,
           "reliability": 99.8,
           "security": 100,
-          "extensibility": 92.3
+          "extensibility": 91.6
         },
         "moduleCount": 1
       },
@@ -1071,7 +1071,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 94.1
+          "extensibility": 94.2
         },
         "moduleCount": 1
       },
@@ -1319,7 +1319,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 115162,
+      "processed": 115884,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1332,14 +1332,14 @@
     },
     "lifetime": {
       "weekId": "LIFETIME",
-      "startMs": 1790922053371,
-      "endMs": 1791091407061,
-      "totalRuns": 145,
+      "startMs": 1791014792895,
+      "endMs": 1791096617712,
+      "totalRuns": 115,
       "eloc": {
-        "processedTotal": 16117213,
+        "processedTotal": 12951005,
         "uniqueTotal": 96698,
-        "changedTotal": 119162,
-        "semanticTotal": 119162
+        "changedTotal": 0,
+        "semanticTotal": 0
       },
       "qed": {
         "mean": 0,
@@ -1347,12 +1347,12 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 1723601,
+        "totalAdded": 1314012,
         "totalResolved": 0,
         "totalRegressions": 0,
-        "netYield": -106.94
+        "netYield": -101.46
       },
-      "meanCompositeScore": 99.43,
+      "meanCompositeScore": 99.2,
       "gatePassRate": 100
     },
     "isFirstBaseline": false

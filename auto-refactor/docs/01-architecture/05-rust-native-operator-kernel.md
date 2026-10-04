@@ -7,7 +7,7 @@
 
 ## 1. Cargo Workspace 六大成员 Crate 拓扑
 
-为了突破 JavaScript 单线程在密集图算法、海量行差分、词法脱敏与代码克隆检测上的算力天花板，`auto-refactor` 在 `crates/` 下构建了基于 Rust 2021 Edition 的 **6 Crate 原生算子工作区**，并通过 N-API 编译为原生插件 (`index.node`)：
+为了扩展 JavaScript 单线程在密集图算法、海量行差分、词法脱敏与代码克隆检测上的计算吞吐能力，`auto-refactor` 在 `crates/` 下构建了基于 Rust 2021 Edition 的 **6 Crate 原生算子工作区**，并通过 N-API 编译为原生插件 (`index.node`)：
 
 ```mermaid
 flowchart TD

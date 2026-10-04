@@ -6,7 +6,7 @@
  *   by Scanner.scan (and reused by the warm/diff pipelines through the same host surface).
  * Responsibilities: Derive worker descriptors, pick the effective thread count, run the pool
  *   with an in-process fallback, merge index-aligned results, and sort issues deterministically.
- * Exit Semantics & Design Rationale: A worker-pool failure never fails the scan — it degrades to
+ * Exit Semantics & Design Rationale: A worker-pool failure does not abort the scan — it degrades to
  *   the in-process path with identical output; the sort order (file, line, analyzer, rule) is the
  *   byte-stability contract every cache/diff comparison relies on.
  */

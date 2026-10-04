@@ -150,12 +150,27 @@ function computeAffinityScore(
     const hHist = Math.min(1.0, fileEntry.history.recentFindingCount / 5);
     const sScope = resolveScopeAffinity(analyzerId, fileEntry, isDirectlyChanged, scopeDecision);
 
+    let deltaTerm = 0.0;
+    if (
+        (analyzerId === 'comments' || analyzerId === 'docs') &&
+        isDirectlyChanged &&
+        fileEntry.risk.isTerminologySensitive
+    ) {
+        deltaTerm = 0.25;
+    } else if (
+        (analyzerId === 'governance' || analyzerId === 'naming') &&
+        fileEntry.risk.isTerminologySensitive
+    ) {
+        deltaTerm = 0.15;
+    }
+
     const rawScore =
         weights.changeIndicator * iChange +
         weights.fileRisk * rRisk +
         weights.dependencyProximity * dDep +
         weights.historyFindings * hHist +
-        weights.scopeAffinity * sScope;
+        weights.scopeAffinity * sScope +
+        deltaTerm;
 
     return Math.round(rawScore * 1000) / 1000;
 }

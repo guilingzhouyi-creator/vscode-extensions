@@ -52,6 +52,7 @@ export interface FileRiskProfile {
     readonly inherentRisk: number; // [0.0, 1.0]
     readonly isHighFanIn: boolean;
     readonly isSecuritySensitive: boolean;
+    readonly isTerminologySensitive: boolean;
     readonly historicalDefectDensity: number;
 }
 
@@ -207,6 +208,7 @@ interface ShallowElocResult {
     physicalLines: number;
     nonBlankLines: number;
     estimatedEloc: number;
+    commentLines: number;
 }
 
 /** Computes shallow ELOC metrics without heavy parsing */
@@ -231,7 +233,7 @@ function computeShallowEloc(content: string): ShallowElocResult {
     }
 
     const estimatedEloc = Math.max(0, nonBlankLines - commentLines);
-    return { physicalLines, nonBlankLines, estimatedEloc };
+    return { physicalLines, nonBlankLines, estimatedEloc, commentLines };
 }
 
 /** Base risk weights per fine-grained role */
@@ -293,10 +295,16 @@ export function buildFileAuditIndex(filePath: string, content: string, fanIn = 0
         fanOut: imports.length,
     });
 
+    const isTerminologySensitive =
+        type === 'doc' ||
+        roleInference.role === 'gate_infrastructure' ||
+        (eloc.nonBlankLines > 0 && eloc.commentLines / eloc.nonBlankLines >= 0.15);
+
     const risk: FileRiskProfile = Object.freeze({
         inherentRisk,
         isHighFanIn,
         isSecuritySensitive,
+        isTerminologySensitive,
         historicalDefectDensity: 0.0,
     });
 

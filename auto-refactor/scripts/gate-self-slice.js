@@ -12,7 +12,7 @@
  *   3. Route slices to active analyzers using SparseMoEGateRouter.
  *   4. Execute targeted scan on changed files with active analyzer subset and ratchet baseline.
  * Exit Semantics & Design Rationale:
- *   0 = PASS (no new blocking findings, or 100% safe bypass on non-code/clean tree).
+ *   0 = PASS (no new blocking findings, or verified safe bypass on non-code/clean tree).
  *   1 = FAIL (new blocking finding detected in changed slice).
  *   2 = usage/precondition error (e.g. missing dist/index.js or invalid arguments).
  */
