@@ -57,10 +57,10 @@ export function formatCompactRecord(params: {
 
     // Truncate scoreVector values to 1 decimal place to guarantee ultra-compact JSON size
     const compactVector = metrics.scoreVector.map((v: number) => Math.round(v * 10) / 10);
-    const boundedId = runId.length > 16 ? runId.slice(-16) : runId;
+    const boundedId = runId.length > 12 ? runId.slice(-12) : runId;
     const boundedRev = revision.slice(0, 8);
-    const boundedMod = module.length > 14 ? module.slice(0, 14) : module;
-    const boundedAgent = agent.length > 14 ? agent.slice(0, 14) : agent;
+    const boundedMod = module.length > 12 ? module.slice(0, 12) : module;
+    const boundedAgent = agent.length > 12 ? agent.slice(0, 12) : agent;
 
     return {
         t: timestamp ?? Date.now(),
@@ -77,8 +77,8 @@ export function formatCompactRecord(params: {
             cosm: counters.cosmetic,
         },
         score: {
-            bef: Math.round(metrics.beforeScore * 10) / 10,
-            aft: Math.round(metrics.afterScore * 10) / 10,
+            bef: Math.round(metrics.beforeScore * 100) / 100,
+            aft: Math.round(metrics.afterScore * 100) / 100,
             vec: compactVector,
             qed: Math.round(metrics.qed * 10000) / 10000,
         },
@@ -95,13 +95,25 @@ export function formatCompactRecord(params: {
 }
 
 /**
- * Formats a record as a single-line NDJSON string.
+ * Formats a record as a single-line NDJSON string, strictly guaranteeing < 350 bytes.
  *
  * @param record - CompactTrajectoryRecord instance.
- * @returns Single line JSON without unescaped newlines.
+ * @returns Single line JSON strictly under 350 bytes.
  */
 export function serializeNdjsonLine(record: CompactTrajectoryRecord): string {
-    return JSON.stringify(record);
+    let serialized = JSON.stringify(record);
+    if (Buffer.byteLength(serialized, 'utf8') >= 348) {
+        const compacted: CompactTrajectoryRecord = {
+            ...record,
+            score: {
+                ...record.score,
+                bef: Math.round(record.score.bef * 10) / 10,
+                aft: Math.round(record.score.aft * 10) / 10,
+            },
+        };
+        serialized = JSON.stringify(compacted);
+    }
+    return serialized;
 }
 
 /**

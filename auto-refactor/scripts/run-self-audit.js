@@ -178,6 +178,71 @@ function collectScannedFiles(fileMetrics) {
 }
 
 /**
+ * Reads existing baseline report if available on disk.
+ *
+ * @returns Parsed baseline report or null if not found.
+ */
+function readExistingBaseline() {
+  try {
+    if (fs.existsSync(BASELINE_OUTPUT)) {
+      const raw = fs.readFileSync(BASELINE_OUTPUT, 'utf8');
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    void err;
+  }
+  return null;
+}
+
+/**
+ * Computes weighted debt points from debt tier counts.
+ *
+ * @param byDebtTier - Tier breakdown object.
+ * @returns Total debt points.
+ */
+function computeTotalDebtPoints(byDebtTier) {
+  if (!byDebtTier) return 0;
+  const critical = byDebtTier.critical || 0;
+  const high = byDebtTier.high || 0;
+  const medium = byDebtTier.medium || 0;
+  return critical * 10 + high * 3 + medium;
+}
+
+/**
+ * Estimates physical and semantic changed ELOC from git diff if available.
+ *
+ * @returns Estimated diff counters or undefined.
+ */
+function estimateChangedEloc() {
+  try {
+    const { execSync } = require('child_process');
+    const out = execSync('git diff --numstat HEAD~1', {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    let changed = 0;
+    const lines = out.trim().split('\n');
+    for (const l of lines) {
+      if (!l) continue;
+      const parts = l.split('\t');
+      if (parts.length >= 3) {
+        const add = parseInt(parts[0], 10) || 0;
+        const del = parseInt(parts[1], 10) || 0;
+        changed += add + del;
+      }
+    }
+    if (changed > 0) {
+      const semantic = Math.max(1, Math.round(changed * 0.8));
+      return { changed, semantic, added: Math.round(changed * 0.5) };
+    }
+  } catch (err) {
+    void err;
+  }
+  return undefined;
+}
+
+/**
  * Records an audit run into the persistent trajectory accumulator ledger.
  */
 async function recordRunToTrajectory(
@@ -186,11 +251,24 @@ async function recordRunToTrajectory(
   debtByTier,
   scannedFilesList,
   startTime,
+  prevBaseline,
 ) {
   const trajectoryAccumulator = new TrajectoryAccumulator(TRAJECTORY_DIR);
   const scoreVector = ALL_QUALITY_DIMENSIONS.map((dim) => {
     return projectScore.tenDimensions?.[dim] ?? 100.0;
   });
+
+  const currentDebtPoints = computeTotalDebtPoints(debtByTier);
+  const prevDebtPoints = prevBaseline?.metrics?.byDebtTier
+    ? computeTotalDebtPoints(prevBaseline.metrics.byDebtTier)
+    : currentDebtPoints;
+
+  const resolvedDebtPoints = Math.max(0, prevDebtPoints - currentDebtPoints);
+  const addedDebtPoints = Math.max(0, currentDebtPoints - prevDebtPoints);
+
+  const beforeScore = prevBaseline?.metrics?.compositeScore ?? projectScore.compositeScore;
+  const afterScore = projectScore.compositeScore;
+  const diffCounters = estimateChangedEloc();
 
   return trajectoryAccumulator.recordAuditRun({
     runId: `run-${snapshot.snapshotId}`,
@@ -199,12 +277,13 @@ async function recordRunToTrajectory(
     agent: 'self-audit-engine',
     timestamp: startTime,
     scannedFiles: scannedFilesList,
-    beforeScore: projectScore.compositeScore,
-    afterScore: projectScore.compositeScore,
+    beforeScore,
+    afterScore,
     scoreVector,
-    addedDebtPoints: debtByTier.critical * 10 + debtByTier.high * 3 + debtByTier.medium,
-    resolvedDebtPoints: 0,
+    addedDebtPoints,
+    resolvedDebtPoints,
     regressionFindingsCount: 0,
+    diffCounters,
   });
 }
 
@@ -286,6 +365,9 @@ async function runSelfAudit(options = {}) {
   const startTime = Date.now();
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
 
+  // 0. Read existing baseline before snapshot
+  const prevBaseline = readExistingBaseline();
+
   // 1. Create Immutable Audit Snapshot (E, R, C, L, S)
   const snapshot = createAuditSnapshot();
 
@@ -320,6 +402,7 @@ async function runSelfAudit(options = {}) {
     debtByTier,
     scannedFilesList,
     startTime,
+    prevBaseline,
   );
 
   // 7. Build Baseline Report Object

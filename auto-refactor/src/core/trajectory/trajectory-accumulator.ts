@@ -70,6 +70,8 @@ export interface AuditRunOptions {
     gatePass?: boolean;
     /** Composite gate code. */
     gateCode?: string;
+    /** Explicit or incremental diff ELOC counters (if available from baseline or git diff). */
+    diffCounters?: Partial<ElocCounters>;
 }
 
 /**
@@ -235,23 +237,26 @@ function deriveElocCounters(
     uniqueIncrement: number,
     isFirstBaseline: boolean,
     existingLifetime: WeeklyTrajectorySummary | null,
+    diffCounters?: Partial<ElocCounters>,
 ): ElocCounters {
     let uniqueCount = uniqueIncrement;
     if (!isFirstBaseline && existingLifetime) {
         uniqueCount = Math.max(existingLifetime.eloc.uniqueTotal, uniqueIncrement);
     }
-    const baseCount = isFirstBaseline ? processedEloc : 0;
+    const defaultChanged = isFirstBaseline ? processedEloc : 0;
+    const defaultSemantic = isFirstBaseline ? processedEloc : 0;
+
     return {
         processed: processedEloc,
         unique: uniqueCount,
-        changed: baseCount,
-        semantic: baseCount,
-        relocated: 0,
-        cosmetic: 0,
-        boilerplate: 0,
-        added: baseCount,
-        deleted: 0,
-        modified: 0,
+        changed: diffCounters?.changed ?? defaultChanged,
+        semantic: diffCounters?.semantic ?? defaultSemantic,
+        relocated: diffCounters?.relocated ?? 0,
+        cosmetic: diffCounters?.cosmetic ?? 0,
+        boilerplate: diffCounters?.boilerplate ?? 0,
+        added: diffCounters?.added ?? defaultChanged,
+        deleted: diffCounters?.deleted ?? 0,
+        modified: diffCounters?.modified ?? 0,
     };
 }
 
@@ -324,6 +329,7 @@ export class TrajectoryAccumulator {
             uniqueIncrement,
             isFirstBaseline,
             existingLifetime,
+            options.diffCounters,
         );
 
         // 3. Compute Quality Efficiency & Technical Debt Delta
