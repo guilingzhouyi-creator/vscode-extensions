@@ -16,6 +16,7 @@ import {
     defineRule,
     RULE_FAMILY_GOVERNANCE,
     RULE_FAMILY_CMP,
+    RULE_FAMILY_NUMERIC,
     SEVERITY_INFO,
     SEVERITY_WARNING,
     SEVERITY_ERROR,
@@ -380,4 +381,25 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         'Restrict historical dossier nomenclature strictly to archive white-list paths; express user-facing docs and commit messages in terms of product features.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-arc-001',
     ),
+    defineGov(
+        'GOV-SAN-002',
+        ALL_LANGUAGES,
+        SEVERITY_WARNING,
+        'Objective technical language guard: text contains promotional rhetoric, absolute claims, emotional disparagement, or process buzzwords.',
+        'Replace promotional rhetoric and absolute assertions with objective technical descriptions and reproducible verification facts.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-san-002',
+    ),
+    defineRule({
+        id: 'NUM-PREC-001',
+        family: RULE_FAMILY_NUMERIC,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: LANGUAGES_TS_JS,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Lossy precision rounding or mismatched scaling detected in mathematical calculation path, risking IEEE 754 drift.',
+        remediation:
+            'Use standard 0.01 precision rounding (e.g. * 100 / 100) or explicit tolerance bounds to preserve precision.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#num-prec-001',
+    }),
 ];

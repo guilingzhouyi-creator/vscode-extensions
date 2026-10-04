@@ -181,3 +181,64 @@ export const VacuousWrapperRule: GovernanceRule = {
         return violation ? [violation] : null;
     },
 };
+
+const LOSSY_ROUNDING_RE =
+    /\bMath\.(?:round|floor|ceil)\s*\([^()]*(?:\([^()]*\)[^()]*)*\*\s*10(?:\.0)?\s*\)\s*\/\s*10(?:\.0)?\b/;
+const MISMATCHED_SCALING_RE =
+    /\bMath\.(?:round|floor|ceil)\s*\([^()]*(?:\([^()]*\)[^()]*)*\*\s*100(?:\.0)?\s*\)\s*\/\s*10(?:\.0)?\b/;
+const LOSSY_NUMBER_TOFIXED_RE =
+    /(?:Number|\+)?\s*(?:[a-zA-Z0-9_.]+|\([^)]*\))\s*\.toFixed\s*\(\s*1\s*\)/;
+
+/**
+ * NUM-PREC-001: Lossy Precision Truncation Governance.
+ * Detects low-precision rounding (such as Math.round(... * 10) / 10 or Number(...toFixed(1)))
+ * and mismatched scaling in calculations, which causes truncation errors and IEEE 754 drift.
+ */
+export const LossyPrecisionRoundingRule: GovernanceRule = {
+    id: 'NUM-PREC-001',
+    name: 'Lossy Precision Truncation Governance',
+    category: 'code_logic',
+    severity: 'warning',
+    risk: 'medium',
+    rationale:
+        'Lossy precision rounding (such as * 10 / 10 or toFixed(1)) introduces truncation errors,' +
+        ' IEEE 754 drift, and false equivalence in score arbitration.',
+    isFixable: false,
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (isToolOrTestScript(ctx.filePath)) return null;
+        if (ctx.filePath.includes('compact-ledger-store.ts')) return null;
+
+        const violations: GovernanceViolation[] = [];
+        const lines = ctx.masked;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            let match = LOSSY_ROUNDING_RE.exec(line);
+            if (!match) {
+                match = MISMATCHED_SCALING_RE.exec(line);
+            }
+            if (!match) {
+                match = LOSSY_NUMBER_TOFIXED_RE.exec(line);
+            }
+            if (match) {
+                violations.push({
+                    ruleId: 'NUM-PREC-001',
+                    message:
+                        `Lossy precision rounding \`${match[0]}\` detected. Calculation path` +
+                        ' truncates to 0.1 precision or exhibits mismatched scaling.',
+                    line: i + 1,
+                    column: match.index + 1,
+                    suggestion:
+                        'Use standard 0.01 precision rounding (such as SCORE_ROUNDING = 100)' +
+                        ' or explicit tolerance bound.',
+                    fixable: false,
+                    customDetail: {
+                        matchedExpression: match[0],
+                    },
+                });
+            }
+        }
+
+        return violations.length > 0 ? violations : null;
+    },
+};

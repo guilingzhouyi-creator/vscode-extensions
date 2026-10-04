@@ -91,6 +91,10 @@ const PARALLEL_SUITES = [
     script: 'scripts/validate-frontend-architecture-governance.js',
   },
   {
+    name: 'validate-precision-governance',
+    script: 'scripts/validate-precision-governance.js',
+  },
+  {
     name: 'validate-self-multidimensional-audit',
     script: 'scripts/validate-self-multidimensional-audit.js',
   },

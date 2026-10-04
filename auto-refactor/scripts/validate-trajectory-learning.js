@@ -508,8 +508,10 @@ function evaluateContext(rawInput: TypedContextView): any {
   // Modernization Formulas
   const shimFresh = calculateShimDebtDecayPenalty(10, 0, 5, 10);
   const shimOld = calculateShimDebtDecayPenalty(10, 50, 5, 10);
-  assert.strictEqual(shimFresh, 4.55);
-  assert.strictEqual(shimOld, 9.09);
+  const expectedFresh = Math.round(10 * 1.0 * (5 / 11) * 100) / 100;
+  const expectedOld = Math.round(10 * (1.0 + 0.02 * 50) * (5 / 11) * 100) / 100;
+  assert.strictEqual(shimFresh, expectedFresh);
+  assert.strictEqual(shimOld, expectedOld);
 
   assert.strictEqual(calculateArchitectureDirectnessIndex(80, 20, 0), 0.8);
   assert.strictEqual(calculateDeprecationConvergenceHealth(10, 0, 0, 100), 1.0);

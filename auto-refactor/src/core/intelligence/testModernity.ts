@@ -40,6 +40,8 @@ export interface TestSite {
     contractVersion?: string;
     activeContractVersion?: string;
     testedSymbol?: string;
+    isFragileFloatAssertion?: boolean;
+    fragileFloatLiteral?: string;
 }
 
 /**
@@ -79,6 +81,359 @@ export interface BusinessTestMappingResult {
     uncoveredSymbols: string[];
 }
 
+function createDeprecatedContractIssue(site: TestSite): Issue {
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'call',
+            description: `Test '${site.testName}' verifies obsolete contract version ${site.contractVersion}`,
+            file: site.file,
+            line: site.line,
+            symbol: site.testName,
+        },
+        {
+            kind: 'condition',
+            description: `Active production contract version is ${site.activeContractVersion}`,
+            file: site.file,
+            line: site.line,
+            symbol: site.testName,
+        },
+    ];
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'test-suite',
+        symbol: site.testName,
+        codeDomain: 'test-modernity',
+        currentBehavior: `Test suite verifies deprecated contract ${site.contractVersion} while production code is on ${site.activeContractVersion}.`,
+        semanticEvidenceChain: evidence,
+        triggerCondition:
+            'Test targets obsolete contract version without explicit legacy compatibility declaration',
+        risk: 'Test integrity illusion: test passes successfully against obsolete APIs, falsely creating confidence of coverage for active V3 code.',
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix: `Update test signatures to match active contract ${site.activeContractVersion}, or move to legacy compatibility suite.`,
+        impactedCallers: [],
+        impactedTests: [site.file],
+        verificationMethod:
+            'Execute test runner and assert test verifies active business schema fields.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    return {
+        id: `test-modernity:TST-ILS-001:${site.file}:${site.line}`,
+        analyzer: 'test-modernity',
+        rule: 'TST-ILS-001',
+        severity: 'warning',
+        message: `Test integrity illusion: '${site.testName}' asserts deprecated contract (${site.contractVersion} vs active ${site.activeContractVersion}).`,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: 80 },
+        },
+        detail,
+        suggestion: `Migrate test assertions to verify current contract ${site.activeContractVersion}.`,
+        evidence: {
+            confidence: 0.95,
+            requiresRuntime: false,
+        },
+    };
+}
+
+function createMockOnlyIssue(site: TestSite): Issue {
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'call',
+            description: `Test '${site.testName}' configures mock and asserts only mock configuration`,
+            file: site.file,
+            line: site.line,
+            symbol: site.testName,
+        },
+    ];
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'test-suite',
+        symbol: site.testName,
+        codeDomain: 'test-modernity',
+        currentBehavior: `Test '${site.testName}' asserts only the mock stub's own return value without exercising business state transitions.`,
+        semanticEvidenceChain: evidence,
+        triggerCondition:
+            'Assertion verifies mock instance rather than actual domain invariants or state',
+        risk: 'Mock-only validation masks real production bugs when business domain logic breaks.',
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix:
+            'Assert on real domain outputs, state mutations, or event emissions rather than mock stubs.',
+        impactedCallers: [],
+        impactedTests: [site.file],
+        verificationMethod:
+            'Introduce an intentional bug in domain logic and verify the test catches it.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    return {
+        id: `test-modernity:TST-ILS-001:${site.file}:${site.line}`,
+        analyzer: 'test-modernity',
+        rule: 'TST-ILS-001',
+        severity: 'warning',
+        message: `Test integrity illusion: '${site.testName}' verifies mock stubs only without real domain assertions.`,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: 80 },
+        },
+        detail,
+        suggestion:
+            'Verify actual business invariants and side-effects rather than mock parameters.',
+        evidence: {
+            confidence: 0.9,
+            requiresRuntime: false,
+        },
+    };
+}
+
+function createSkippedTestIssue(site: TestSite): Issue {
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'condition',
+            description: `Test '${site.testName}' explicitly skipped or disabled`,
+            file: site.file,
+            line: site.line,
+            symbol: site.testName,
+        },
+    ];
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'test-suite',
+        symbol: site.testName,
+        codeDomain: 'test-modernity',
+        currentBehavior: `Permanently skipped or disabled test case in '${site.file}'.`,
+        semanticEvidenceChain: evidence,
+        triggerCondition: 'Test suite contains skipped tests (.skip, xit, @pytest.mark.skip)',
+        risk: 'Skipped tests decay over time and mask regressions in active business domains.',
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix:
+            'Re-enable and fix the test, or formally register as a tracked test debt ticket.',
+        impactedCallers: [],
+        impactedTests: [site.file],
+        verificationMethod: 'Execute test suite and confirm test runs to completion.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    return {
+        id: `test-modernity:TST-SKP-001:${site.file}:${site.line}`,
+        analyzer: 'test-modernity',
+        rule: 'TST-SKP-001',
+        severity: 'warning',
+        message: `Orphaned skipped test case '${site.testName}' in active test suite.`,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: 80 },
+        },
+        detail,
+        suggestion:
+            'Re-enable the test case or document milestone convergence in test debt registry.',
+        evidence: {
+            confidence: 1.0,
+            requiresRuntime: false,
+        },
+    };
+}
+
+function createTautologicalIssue(site: TestSite): Issue {
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'condition',
+            description: `Tautological assertion in test '${site.testName}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.testName,
+        },
+    ];
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'test-suite',
+        symbol: site.testName,
+        codeDomain: 'test-modernity',
+        currentBehavior: `Test contains non-verifying or tautological assertion (e.g. expect(true).toBe(true)).`,
+        semanticEvidenceChain: evidence,
+        triggerCondition:
+            'Assertion expression evaluates to an invariant constant truth without testing runtime logic',
+        risk: 'Artificially inflates assertion metrics without testing functional behavior.',
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix:
+            'Replace tautological assertion with meaningful verification of domain outcomes.',
+        impactedCallers: [],
+        impactedTests: [site.file],
+        verificationMethod: 'Run test with fault injection to verify failure capability.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    return {
+        id: `test-modernity:TST-TAU-001:${site.file}:${site.line}`,
+        analyzer: 'test-modernity',
+        rule: 'TST-TAU-001',
+        severity: 'warning',
+        message: `Tautological or non-verifying assertion in '${site.testName}'.`,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: 80 },
+        },
+        detail,
+        suggestion: 'Assert specific business values and invariants rather than constant truth.',
+        evidence: {
+            confidence: 1.0,
+            requiresRuntime: false,
+        },
+    };
+}
+
+function createFragileFloatIssue(site: TestSite): Issue {
+    const floatLit = site.fragileFloatLiteral ?? 'float';
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'condition',
+            description: `Fragile floating-point assertion against naked literal '${floatLit}' in test '${site.testName}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.testName,
+        },
+    ];
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'test-suite',
+        symbol: site.testName,
+        codeDomain: 'test-modernity',
+        currentBehavior: `Test asserts calculated floating-point result against naked magic literal '${floatLit}' without formula derivation or tolerance.`,
+        semanticEvidenceChain: evidence,
+        triggerCondition:
+            'Assertion performs direct strict equality against a naked floating-point literal',
+        risk: 'Floating-point roundoff errors and machine epsilon variance cause brittle test failures across platforms.',
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix:
+            'Use tolerance matcher (e.g. toBeCloseTo, isScoreEqual) or derive expectation via shared formula.',
+        impactedCallers: [],
+        impactedTests: [site.file],
+        verificationMethod:
+            'Assert test failure with epsilon perturbation or replace with toBeCloseTo matcher.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    return {
+        id: `test-modernity:TST-FLT-001:${site.file}:${site.line}`,
+        analyzer: 'test-modernity',
+        rule: 'TST-FLT-001',
+        severity: 'warning',
+        message: `Fragile floating-point assertion: '${site.testName}' asserts naked float literal '${floatLit}' without epsilon tolerance.`,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: 80 },
+        },
+        detail,
+        suggestion: `Derive expected value via mathematical formula (e.g. Math.round(formula * 100) / 100) or use tolerance assertion.`,
+        evidence: {
+            confidence: 1.0,
+            requiresRuntime: false,
+        },
+    };
+}
+
+function createTestDebtIssue(debt: TestDebtTicket): Issue {
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'governance',
+        symbol: debt.domain,
+        codeDomain: 'test-debt',
+        currentBehavior: `Deferred test coverage for domain '${debt.domain}' lacks owner or milestone convergence target.`,
+        semanticEvidenceChain: [],
+        triggerCondition:
+            'Test debt ticket lacks responsible agent owner or target convergence milestone',
+        risk: 'Test coverage gap becomes permanent technical debt without accountability.',
+        blastRadius: [debt.domain],
+        isDeterministic: true,
+        requiresManualConfirm: true,
+        suggestedFix:
+            'Assign responsible agent/owner and specify milestone target for test suite completion.',
+        impactedCallers: [],
+        impactedTests: [],
+        verificationMethod: 'Audit test debt registry for milestone completeness.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    return {
+        id: `test-modernity:TST-DBT-001:${debt.domain}:1`,
+        analyzer: 'test-modernity',
+        rule: 'TST-DBT-001',
+        severity: 'info',
+        message: `Unindexed test debt: domain '${debt.domain}' deferred test coverage lacks milestone target.`,
+        location: {
+            file: `docs/test-debt/${debt.domain}.md`,
+            start: { line: 1, column: 1 },
+            end: { line: 1, column: 80 },
+        },
+        detail,
+        suggestion: 'Specify target milestone and responsible owner for test debt convergence.',
+        evidence: {
+            confidence: 0.95,
+            requiresRuntime: false,
+        },
+    };
+}
+
+function evaluateSingleSiteModernity(
+    site: TestSite,
+    flagDeprecated: boolean,
+    flagTautological: boolean,
+    flagSkipped: boolean,
+): Issue | null {
+    if (flagDeprecated && site.referencesDeprecatedContract) {
+        return createDeprecatedContractIssue(site);
+    }
+    if (site.isMockOnly) {
+        return createMockOnlyIssue(site);
+    }
+    if (flagSkipped && site.isSkipped) {
+        return createSkippedTestIssue(site);
+    }
+    if (flagTautological && site.isTautological) {
+        return createTautologicalIssue(site);
+    }
+    if (site.isFragileFloatAssertion) {
+        return createFragileFloatIssue(site);
+    }
+    return null;
+}
+
+function isUnindexedDebt(debt: TestDebtTicket): boolean {
+    return !debt.targetMilestone || !debt.owner;
+}
+
 /**
  * Analyze test sites within a repository and produce modernity findings.
  *
@@ -93,286 +448,26 @@ export function analyzeTestModernitySites(
     options: TestModernityOptions = {},
 ): Issue[] {
     const issues: Issue[] = [];
-    const flagDeprecated = options.flagDeprecatedContractTests ?? true;
-    const flagTautological = options.flagTautologicalAssertions ?? true;
-    const flagSkipped = options.flagSkippedTests ?? true;
+    const flagDeprecated = options.flagDeprecatedContractTests !== false;
+    const flagTautological = options.flagTautologicalAssertions !== false;
+    const flagSkipped = options.flagSkippedTests !== false;
 
     for (const site of sites) {
-        // 1. Test integrity illusion: testing a mock only, or testing deprecated
-        //    contracts (TST-ILS-001).
-        if (flagDeprecated && site.referencesDeprecatedContract) {
-            const evidence: SemanticEvidenceStep[] = [
-                {
-                    kind: 'call',
-                    description: `Test '${site.testName}' verifies obsolete contract version ${site.contractVersion}`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.testName,
-                },
-                {
-                    kind: 'condition',
-                    description: `Active production contract version is ${site.activeContractVersion}`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.testName,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'test-suite',
-                symbol: site.testName,
-                codeDomain: 'test-modernity',
-                currentBehavior: `Test suite verifies deprecated contract ${site.contractVersion} while production code is on ${site.activeContractVersion}.`,
-                semanticEvidenceChain: evidence,
-                triggerCondition:
-                    'Test targets obsolete contract version without explicit legacy compatibility declaration',
-                risk: 'Test integrity illusion: test passes successfully against obsolete APIs, falsely creating confidence of coverage for active V3 code.',
-                blastRadius: [site.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix: `Update test signatures to match active contract ${site.activeContractVersion}, or move to legacy compatibility suite.`,
-                impactedCallers: [],
-                impactedTests: [site.file],
-                verificationMethod:
-                    'Execute test runner and assert test verifies active business schema fields.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `test-modernity:TST-ILS-001:${site.file}:${site.line}`,
-                analyzer: 'test-modernity',
-                rule: 'TST-ILS-001',
-                severity: 'warning',
-                message: `Test integrity illusion: '${site.testName}' asserts deprecated contract (${site.contractVersion} vs active ${site.activeContractVersion}).`,
-                location: {
-                    file: site.file,
-                    start: { line: site.line, column: 1 },
-                    end: { line: site.line, column: 80 },
-                },
-                detail,
-                suggestion: `Migrate test assertions to verify current contract ${site.activeContractVersion}.`,
-                evidence: {
-                    confidence: 0.95,
-                    requiresRuntime: false,
-                },
-            });
-        } else if (site.isMockOnly) {
-            const evidence: SemanticEvidenceStep[] = [
-                {
-                    kind: 'call',
-                    description: `Test '${site.testName}' configures mock and asserts only mock configuration`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.testName,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'test-suite',
-                symbol: site.testName,
-                codeDomain: 'test-modernity',
-                currentBehavior: `Test '${site.testName}' asserts only the mock stub's own return value without exercising business state transitions.`,
-                semanticEvidenceChain: evidence,
-                triggerCondition:
-                    'Assertion verifies mock instance rather than actual domain invariants or state',
-                risk: 'Mock-only validation masks real production bugs when business domain logic breaks.',
-                blastRadius: [site.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix:
-                    'Assert on real domain outputs, state mutations, or event emissions rather than mock stubs.',
-                impactedCallers: [],
-                impactedTests: [site.file],
-                verificationMethod:
-                    'Introduce an intentional bug in domain logic and verify the test catches it.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `test-modernity:TST-ILS-001:${site.file}:${site.line}`,
-                analyzer: 'test-modernity',
-                rule: 'TST-ILS-001',
-                severity: 'warning',
-                message: `Test integrity illusion: '${site.testName}' verifies mock stubs only without real domain assertions.`,
-                location: {
-                    file: site.file,
-                    start: { line: site.line, column: 1 },
-                    end: { line: site.line, column: 80 },
-                },
-                detail,
-                suggestion:
-                    'Verify actual business invariants and side-effects rather than mock parameters.',
-                evidence: {
-                    confidence: 0.9,
-                    requiresRuntime: false,
-                },
-            });
-        }
-
-        // 2. Orphaned skipped or unexecuted tests (TST-SKP-001)
-        if (flagSkipped && site.isSkipped) {
-            const evidence: SemanticEvidenceStep[] = [
-                {
-                    kind: 'condition',
-                    description: `Test '${site.testName}' explicitly skipped or disabled`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.testName,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'test-suite',
-                symbol: site.testName,
-                codeDomain: 'test-modernity',
-                currentBehavior: `Permanently skipped or disabled test case in '${site.file}'.`,
-                semanticEvidenceChain: evidence,
-                triggerCondition:
-                    'Test suite contains skipped tests (.skip, xit, @pytest.mark.skip)',
-                risk: 'Skipped tests decay over time and mask regressions in active business domains.',
-                blastRadius: [site.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix:
-                    'Re-enable and fix the test, or formally register as a tracked test debt ticket.',
-                impactedCallers: [],
-                impactedTests: [site.file],
-                verificationMethod: 'Execute test suite and confirm test runs to completion.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `test-modernity:TST-SKP-001:${site.file}:${site.line}`,
-                analyzer: 'test-modernity',
-                rule: 'TST-SKP-001',
-                severity: 'warning',
-                message: `Orphaned skipped test case '${site.testName}' in active test suite.`,
-                location: {
-                    file: site.file,
-                    start: { line: site.line, column: 1 },
-                    end: { line: site.line, column: 80 },
-                },
-                detail,
-                suggestion:
-                    'Re-enable the test case or document milestone convergence in test debt registry.',
-                evidence: {
-                    confidence: 1.0,
-                    requiresRuntime: false,
-                },
-            });
-        }
-
-        // 3. Tautological or non-verifying assertions (TST-TAU-001)
-        if (flagTautological && site.isTautological) {
-            const evidence: SemanticEvidenceStep[] = [
-                {
-                    kind: 'condition',
-                    description: `Tautological assertion in test '${site.testName}'`,
-                    file: site.file,
-                    line: site.line,
-                    symbol: site.testName,
-                },
-            ];
-
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'test-suite',
-                symbol: site.testName,
-                codeDomain: 'test-modernity',
-                currentBehavior: `Test contains non-verifying or tautological assertion (e.g. expect(true).toBe(true)).`,
-                semanticEvidenceChain: evidence,
-                triggerCondition:
-                    'Assertion expression evaluates to an invariant constant truth without testing runtime logic',
-                risk: 'Artificially inflates assertion metrics without testing functional behavior.',
-                blastRadius: [site.file],
-                isDeterministic: true,
-                requiresManualConfirm: false,
-                suggestedFix:
-                    'Replace tautological assertion with meaningful verification of domain outcomes.',
-                impactedCallers: [],
-                impactedTests: [site.file],
-                verificationMethod: 'Run test with fault injection to verify failure capability.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `test-modernity:TST-TAU-001:${site.file}:${site.line}`,
-                analyzer: 'test-modernity',
-                rule: 'TST-TAU-001',
-                severity: 'warning',
-                message: `Tautological or non-verifying assertion in '${site.testName}'.`,
-                location: {
-                    file: site.file,
-                    start: { line: site.line, column: 1 },
-                    end: { line: site.line, column: 80 },
-                },
-                detail,
-                suggestion:
-                    'Assert specific business values and invariants rather than constant truth.',
-                evidence: {
-                    confidence: 1.0,
-                    requiresRuntime: false,
-                },
-            });
+        const issue = evaluateSingleSiteModernity(
+            site,
+            flagDeprecated,
+            flagTautological,
+            flagSkipped,
+        );
+        if (issue) {
+            issues.push(issue);
         }
     }
 
-    // 4. Overdue or unindexed test debt tracking (TST-DBT-001)
+    // Overdue or unindexed test debt tracking (TST-DBT-001)
     for (const debt of debts) {
-        if (!debt.targetMilestone || !debt.owner) {
-            const detail: SemanticReviewDetail = {
-                language: 'typescript',
-                module: 'governance',
-                symbol: debt.domain,
-                codeDomain: 'test-debt',
-                currentBehavior: `Deferred test coverage for domain '${debt.domain}' lacks owner or milestone convergence target.`,
-                semanticEvidenceChain: [],
-                triggerCondition:
-                    'Test debt ticket lacks responsible agent owner or target convergence milestone',
-                risk: 'Test coverage gap becomes permanent technical debt without accountability.',
-                blastRadius: [debt.domain],
-                isDeterministic: true,
-                requiresManualConfirm: true,
-                suggestedFix:
-                    'Assign responsible agent/owner and specify milestone target for test suite completion.',
-                impactedCallers: [],
-                impactedTests: [],
-                verificationMethod: 'Audit test debt registry for milestone completeness.',
-                ruleVersion: '1.0.0',
-                configVersion: '0.3.0',
-                canAutofix: false,
-            };
-
-            issues.push({
-                id: `test-modernity:TST-DBT-001:${debt.domain}:1`,
-                analyzer: 'test-modernity',
-                rule: 'TST-DBT-001',
-                severity: 'info',
-                message: `Unindexed test debt: domain '${debt.domain}' deferred test coverage lacks milestone target.`,
-                location: {
-                    file: `docs/test-debt/${debt.domain}.md`,
-                    start: { line: 1, column: 1 },
-                    end: { line: 1, column: 80 },
-                },
-                detail,
-                suggestion:
-                    'Specify target milestone and responsible owner for test debt convergence.',
-                evidence: {
-                    confidence: 0.95,
-                    requiresRuntime: false,
-                },
-            });
+        if (isUnindexedDebt(debt)) {
+            issues.push(createTestDebtIssue(debt));
         }
     }
 

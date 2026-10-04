@@ -366,7 +366,7 @@ func _on_buy():
     assert.ok(!ruleIds.has(rule.id), `Gate 16 Failed: Duplicate rule ID found: ${rule.id}`);
     ruleIds.add(rule.id);
   }
-  assert.strictEqual(ruleIds.size, 296, `Gate 16 Failed: Expected 296 rules, got ${ruleIds.size}`);
+  assert.strictEqual(ruleIds.size, 299, `Gate 16 Failed: Expected 299 rules, got ${ruleIds.size}`);
   console.log(`  [PASS] Gate 16: Zero duplicate rule IDs (Total: ${ruleIds.size} unique rules)`);
 }
 
@@ -412,8 +412,13 @@ func _on_buy():
   );
   const rawStringsOnly = calculateI18nSymmetryIndex(0, 10, 0);
   assert.strictEqual(rawStringsOnly, 0, 'Gate 19 Failed: Unlocalized strings only must yield 0.0');
-  const mixed = calculateI18nSymmetryIndex(10, 2, 0); // 10 / (10 + 5) = 66.666... -> 66.67
-  assert.strictEqual(mixed, 66.67, 'Gate 19 Failed: Expected 66.67 symmetry');
+  const mixed = calculateI18nSymmetryIndex(10, 2, 0); // 10 / (10 + 2.5 * 2) = 66.666... -> 66.67
+  const expectedSymmetry = Math.round((10 / (10 + 2.5 * 2)) * 100 * 100) / 100;
+  assert.strictEqual(
+    mixed,
+    expectedSymmetry,
+    `Gate 19 Failed: Expected ${expectedSymmetry} symmetry`,
+  );
   console.log('  [PASS] Gate 19: i18n Symmetry Index (ISI) invariants');
 }
 

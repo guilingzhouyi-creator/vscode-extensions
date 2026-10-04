@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791099580902",
-  "timestamp": "2026-10-04T07:39:40.902Z",
+  "snapshotId": "snapshot-v0.4.0-1791105885172",
+  "timestamp": "2026-10-04T09:24:45.172Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "14ecf9cd3bd9e62ea49eab80fbd7d960c1af2fb40e93163a5446eb1c2099eb53",
+  "rulesDigest": "c07567c9bbacc172ded7e0d6c91ebfa8d316e327150e64a16f1106d4c8456f8a",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 296,
+    "ruleCount": 299,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -180,6 +180,7 @@
     "GOV-RTC-002",
     "GOV-RUL-001",
     "GOV-SAN-001",
+    "GOV-SAN-002",
     "GOV-SLC-001",
     "GOV-STD-001",
     "GOV-STD-002",
@@ -224,6 +225,7 @@
     "NAM-TYP-001",
     "NAM-VAG-001",
     "nested-constant",
+    "NUM-PREC-001",
     "PRF-ALG-001",
     "PRF-ALG-002",
     "PRF-IO-001",
@@ -314,6 +316,7 @@
     "TSM-VAR-001",
     "TST-DBT-001",
     "TST-DEN-001",
+    "TST-FLT-001",
     "TST-ILS-001",
     "TST-SKP-001",
     "TST-TAU-001",

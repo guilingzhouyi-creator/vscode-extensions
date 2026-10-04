@@ -65,7 +65,7 @@ const NEW_EXTRACTED = [
  * @returns The expected dimension delta.
  */
 function expectedDelta(metricValue, perUnit) {
-  return Math.round(-metricValue * perUnit * 10) / 10;
+  return Math.round(-metricValue * perUnit * 100) / 100;
 }
 
 const defaultWeights = {

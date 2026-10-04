@@ -286,6 +286,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-top-001',
     }),
     defineRule({
+        id: 'TST-FLT-001',
+        family: RULE_FAMILY_TEST_MODERNITY,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Fragile floating-point assertion: test directly asserts equality on raw float literals without tolerance or formula derivation.',
+        remediation:
+            'Derive expected values via mathematical formula or use tolerance assertions (such as toBeCloseTo or is_equal_approx).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-flt-001',
+    }),
+    defineRule({
         id: 'DEP-ORD-001',
         family: RULE_FAMILY_DEPENDENCY,
         analyzer: ANALYZER_DEPENDENCY_LAYOUT,

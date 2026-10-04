@@ -20,7 +20,7 @@
  *     than runtime defects.
  */
 import { isVocabularyEnumeration } from '../markerScope';
-import { CONSTRUCTION_JARGON_RE } from '../terminology-engine';
+import { CONSTRUCTION_JARGON_RE, auditTerminologyProse } from '../terminology-engine';
 import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 
@@ -265,5 +265,62 @@ export const DossierBoundaryIsolationRule: GovernanceRule = {
         }
 
         return violations.length > 0 ? violations : null;
+    },
+};
+
+/**
+ * GOV-SAN-002: Source Prose Terminology & Objective Technical Language Guard.
+ * Analyzes comments and documentation in source files to enforce objective, factual,
+ * non-hyperbolic terminology and eliminate promotional slogans or casual markers.
+ */
+export const ProseTerminologySanitizationRule: GovernanceRule = {
+    id: 'GOV-SAN-002',
+    name: 'Prose Terminology & Objective Technical Language Guard',
+    category: 'maintainability',
+    severity: 'warning',
+    risk: 'medium',
+    rationale:
+        'Technical prose in source comments and docstrings must remain objective, factual, and free of hyperbolic slogans or unsubstantiated marketing claims.',
+    isFixable: false,
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (
+            isToolOrTestScript(ctx.filePath) ||
+            fileNameEndsWith(ctx.filePath, [SANITIZATION_FILENAME, 'terminology-engine.ts'])
+        ) {
+            return null;
+        }
+
+        const commentLines: string[] = [];
+        for (let i = 0; i < ctx.lines.length; i++) {
+            const line = ctx.lines[i];
+            if (isCommentLine(line) || isCommentLinePrefix(line)) {
+                commentLines.push(line);
+            } else {
+                commentLines.push('');
+            }
+        }
+
+        const commentContent = commentLines.join('\n');
+        if (!commentContent.trim()) return null;
+
+        const findings = auditTerminologyProse(commentContent, {
+            allowedCategories: ['hyperbolic_affirmative', 'hyperbolic_negative', 'meta_narrative'],
+        });
+
+        if (findings.length === 0) return null;
+
+        return findings.map((f) => ({
+            ruleId: 'GOV-SAN-002',
+            message: f.message,
+            line: f.line,
+            column: f.column,
+            suggestion: f.guidance,
+            fixable: false,
+            customDetail: {
+                category: f.category,
+                term: f.term,
+                snippet: f.contextSnippet,
+            },
+        }));
     },
 };

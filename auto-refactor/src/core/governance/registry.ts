@@ -22,7 +22,11 @@ import {
     RuleCatalogIntegrityRule,
 } from './rules/standardization';
 import { FileNamingRule, ModuleHeaderRule, BlastRadiusGuardRule } from './rules/fileStructure';
-import { ExcessiveNestingRule, VacuousWrapperRule } from './rules/codeLogic';
+import {
+    ExcessiveNestingRule,
+    VacuousWrapperRule,
+    LossyPrecisionRoundingRule,
+} from './rules/codeLogic';
 import { TYPE_SYSTEM_GOVERNANCE_RULES } from './rules/typeSystem';
 import {
     SwallowedExceptionRule,
@@ -46,6 +50,7 @@ import {
     LexicalHygieneRule,
     DiagnosticMessageRule,
     DossierBoundaryIsolationRule,
+    ProseTerminologySanitizationRule,
 } from './rules/sanitization';
 import {
     GiantExpressionRule,
@@ -75,6 +80,7 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     // 3. Code Logic
     ExcessiveNestingRule,
     VacuousWrapperRule,
+    LossyPrecisionRoundingRule,
     // 4. Type System
     ...TYPE_SYSTEM_GOVERNANCE_RULES,
     // 5. Exception Safety
@@ -95,6 +101,7 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     DataClumpsRule,
     LexicalHygieneRule,
     DossierBoundaryIsolationRule,
+    ProseTerminologySanitizationRule,
     GiantExpressionRule,
     SingleLineMultiSemanticRule,
     CallbackDepthRule,

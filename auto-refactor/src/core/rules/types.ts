@@ -58,6 +58,7 @@ export type RuleFamily =
     | 'PS'
     | 'STDLIB'
     | 'GATE'
+    | 'NUM'
     | 'LEGACY';
 
 /** Canonical rule-family prefix for repository gate architecture governance. */
@@ -114,6 +115,8 @@ export const RULE_FAMILY_RUST_MODERN = 'RSM';
 export const RULE_FAMILY_GDSCRIPT_MODERN = 'GDM';
 /** Canonical rule-family prefix for backward-compatible legacy rules. */
 export const RULE_FAMILY_LEGACY = 'LEGACY';
+/** Canonical rule-family prefix for numeric precision and calculation governance rules. */
+export const RULE_FAMILY_NUMERIC = 'NUM';
 
 /**
  * Rule family owning VS Code extension host contracts (host lifecycle, extension

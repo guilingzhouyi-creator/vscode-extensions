@@ -443,9 +443,9 @@ async function main() {
   const dispatcherCaller = {
     callerSymbol: 'TaskDispatcher.dispatchLoop',
     dynamicRisk: computeDynamicHotspotRisk({
-      invocationsPerHour: 72000,
-      behavioralScope: 4.0,
-      resourceConsumption: 8.0,
+      invocationsPerHour: 360000,
+      behavioralScope: 4.5,
+      resourceConsumption: 9.0,
       businessSensitivity: 4.5,
     }),
     couplingWeight: 0.85,

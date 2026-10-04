@@ -150,6 +150,22 @@ export class HeavyService {
     `✔ Maintenance debt penalized: -${debtChange.maintenanceDebt} points (ChangeScore = ${debtChange.changeScore})`,
   );
 
+  // 5. Micro-increment Quality Precision (0.01 scale preserved without collapsing to 0.0)
+  console.log('5. Testing Micro-increment Precision (0.01 scale)...');
+  const microChange = evaluateChangeQuality({
+    filePath: 'src/utils/math.ts',
+    beforeContent: genuineBefore,
+    afterContent: genuineAfter,
+    beforeScore: 85.12,
+    afterScore: 85.16, // deltaQ = 0.04
+  });
+  assert.strictEqual(microChange.deltaQ, 0.04);
+  assert.strictEqual(microChange.changeScore, 0.04);
+  assert.strictEqual(microChange.verdict, 'neutral');
+  console.log(
+    `✔ Micro-increment preserved: ChangeScore = +${microChange.changeScore} (${microChange.verdict})`,
+  );
+
   console.log('\n🎉 ALL CHANGE QUALITY ARBITER & ANTI-GAMING TESTS PASSED!');
 }
 

@@ -48,6 +48,10 @@ const MOCK_ONLY_ASSERT_RE =
 const OBSOLETE_CONTRACT_RE =
     /\b(?:v1_contract|legacy_v1_api|contract_v1|apiVersion:\s*['"]v1['"])\b/;
 
+/** Pattern identifying fragile equality assertions against floating point literals. */
+const FRAGILE_FLOAT_ASSERT_RE =
+    /\b(?:expect\([^)]+\)\.to(?:Be|Equal|toStrictEqual)\s*\(\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\([^,)]+,\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\(\s*([0-9]+\.[0-9]+)\s*,|assert_true\s*\([^,)]*==\s*([0-9]+\.[0-9]+))/;
+
 /** Test block names recognized during AST traversal. */
 const TEST_BLOCK_NAMES = new Set([
     'it',
@@ -397,6 +401,22 @@ export class TestModernityAnalyzer implements Analyzer {
             if (currentCase) currentCase.mockAssertionsCount++;
         }
 
+        const fragileFloat = this.checkFragileFloatAssertion(node, sf);
+        if (fragileFloat) {
+            sites.push({
+                file: ctx.filePath,
+                line,
+                testName,
+                isSkipped: false,
+                isTautological: false,
+                isMockOnly: false,
+                referencesDeprecatedContract: false,
+                isFragileFloatAssertion: true,
+                fragileFloatLiteral: fragileFloat,
+            });
+            return;
+        }
+
         if (OBSOLETE_CONTRACT_RE.test(node.getText(sf))) {
             if (currentCase) currentCase.obsoleteCount++;
             sites.push({
@@ -411,6 +431,46 @@ export class TestModernityAnalyzer implements Analyzer {
                 activeContractVersion: 'V3',
             });
         }
+    }
+
+    private extractFragileFloatLiteral(node: ts.Node): string | null {
+        if (!ts.isNumericLiteral(node)) {
+            return null;
+        }
+        const text = node.text;
+        if (text.includes('.') && !isNaN(Number(text)) && Number(text) % 1 !== 0) {
+            return text;
+        }
+        return null;
+    }
+
+    private checkFragileFloatMatcher(node: ts.CallExpression): string | null {
+        if (!ts.isPropertyAccessExpression(node.expression)) {
+            return null;
+        }
+        const method = node.expression.name.text;
+        if (!EQUALITY_MATCHERS.has(method) || node.arguments.length === 0) {
+            return null;
+        }
+        return this.extractFragileFloatLiteral(node.arguments[0]);
+    }
+
+    private checkFragileFloatAssertCall(node: ts.CallExpression, sf: ts.SourceFile): string | null {
+        const text = node.expression.getText(sf);
+        if (text !== 'assert.strictEqual' && text !== 'assert.equal' && text !== 'assert') {
+            return null;
+        }
+        if (node.arguments.length < 2) {
+            return null;
+        }
+        return (
+            this.extractFragileFloatLiteral(node.arguments[0]) ??
+            this.extractFragileFloatLiteral(node.arguments[1])
+        );
+    }
+
+    private checkFragileFloatAssertion(node: ts.CallExpression, sf: ts.SourceFile): string | null {
+        return this.checkFragileFloatMatcher(node) ?? this.checkFragileFloatAssertCall(node, sf);
     }
 
     private checkDirectAssertTautological(node: ts.CallExpression, sf: ts.SourceFile): boolean {
@@ -515,6 +575,11 @@ export class TestModernityAnalyzer implements Analyzer {
             const isTautological = TAUTOLOGICAL_ASSERT_RE.test(line);
             const isMockOnly = MOCK_ONLY_ASSERT_RE.test(line);
             const isObsolete = OBSOLETE_CONTRACT_RE.test(line);
+            const floatMatch = FRAGILE_FLOAT_ASSERT_RE.exec(line);
+            const isFragileFloat = floatMatch !== null;
+            const fragileFloatLit = floatMatch
+                ? floatMatch.slice(1).find(Boolean) || 'float'
+                : undefined;
 
             if (currentCase) {
                 this.updateCaseCounts(line, currentCase, isMockOnly, isTautological, isObsolete);
@@ -529,6 +594,8 @@ export class TestModernityAnalyzer implements Analyzer {
                 isMockOnly,
                 isObsolete,
                 sites,
+                isFragileFloat,
+                fragileFloatLit,
             );
         }
     }
@@ -542,8 +609,10 @@ export class TestModernityAnalyzer implements Analyzer {
         isMockOnly: boolean,
         isObsolete: boolean,
         sites: TestSite[],
+        isFragileFloat: boolean = false,
+        fragileFloatLit?: string,
     ): void {
-        if (!isSkipped && !isTautological && !isMockOnly && !isObsolete) return;
+        if (!isSkipped && !isTautological && !isMockOnly && !isObsolete && !isFragileFloat) return;
         sites.push({
             file: filePath,
             line: lineNum,
@@ -554,6 +623,8 @@ export class TestModernityAnalyzer implements Analyzer {
             referencesDeprecatedContract: isObsolete,
             contractVersion: isObsolete ? 'V1' : undefined,
             activeContractVersion: isObsolete ? 'V3' : undefined,
+            isFragileFloatAssertion: isFragileFloat,
+            fragileFloatLiteral: fragileFloatLit,
         });
     }
 
