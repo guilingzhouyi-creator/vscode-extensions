@@ -234,6 +234,14 @@ export interface RecycleOptions {
  * 1. 跨周全条目归零（每周统一清理旧周会话入 dailyTotals）；
  * 2. 单日会话上限（每日最高 20 条，淘汰最远条目入 dailyTotals）；
  * 3. 时间窗与总容量上限截断。
+ *
+ * 数学守恒定理：dailyStats(keptSessions) ∪ updatedDailyTotals ≡ dailyStats(originalSessions)
+ * 会话总时长在裁剪前后严格无损，会话计数不重不漏。
+ *
+ * @param sessions - 待处理会话序列
+ * @param existingTotals - 既有日汇总桶集合
+ * @param options - 回收策略选项（跨周/单日上限/容量阈值）
+ * @returns 截断后保留的会话集与更新后的日汇总桶
  */
 export function recycleSessions(
     sessions: readonly TimeSession[],

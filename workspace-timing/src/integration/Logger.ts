@@ -17,12 +17,20 @@ export enum LogLevel {
 
 let _minLevel: LogLevel = LogLevel.Debug;
 
-/** 设置最低日志等级（低于该等级的不输出） */
+/**
+ * 设置最低日志等级（低于该等级的不输出）。
+ *
+ * @param level - 目标日志等级
+ */
 export function setLogLevel(level: LogLevel): void {
   _minLevel = level;
 }
 
-/** 获取当前日志等级 */
+/**
+ * 获取当前全局最低日志等级。
+ *
+ * @returns 当前生效的最低日志等级
+ */
 export function getLogLevel(): LogLevel {
   return _minLevel;
 }
@@ -36,8 +44,13 @@ const levelLabels: Record<LogLevel, string> = {
 };
 
 /**
- * 输出日志。
- * Debug 级别仅在非生产环境输出。
+ * 跨层日志输出函数。
+ * 格式化输出带有时间戳与等级前缀的日志信息；
+ * 若包含 Error 对象，将提取其消息与堆栈并路由至对应控制台输出通道。
+ *
+ * @param level - 日志级别
+ * @param message - 日志消息主体
+ * @param args - 附加参数或错误对象
  */
 export function log(level: LogLevel, message: string, ...args: unknown[]): void {
   if (level < _minLevel) return;
@@ -54,7 +67,7 @@ export function log(level: LogLevel, message: string, ...args: unknown[]): void 
       if (level >= LogLevel.Warn) {
         console.warn(prefix, message, err.message, err.stack);
       } else {
-        console.log(prefix, message, err.message);
+        console.info(prefix, message, err.message);
       }
       return;
     }
@@ -68,15 +81,17 @@ export function log(level: LogLevel, message: string, ...args: unknown[]): void 
       console.warn(prefix, message);
       break;
     default:
-      console.log(prefix, message);
+      console.info(prefix, message);
       break;
   }
 }
 
-/** 便捷方法 */
-export const logger = {
+/**
+ * 便捷日志记录门面对象（只读冻结）
+ */
+export const logger = Object.freeze({
   debug: (msg: string, ...args: unknown[]) => log(LogLevel.Debug, msg, ...args),
   info: (msg: string, ...args: unknown[]) => log(LogLevel.Info, msg, ...args),
   warn: (msg: string, ...args: unknown[]) => log(LogLevel.Warn, msg, ...args),
   error: (msg: string, ...args: unknown[]) => log(LogLevel.Error, msg, ...args),
-};
+});

@@ -1,8 +1,8 @@
 /**
  * OrchestratorReportHandler — 计时总控器报表与数据导出处理器
  *
- * 职责：从 TimerOrchestrator 抽离的独立子服务，承载 CSV/Markdown 报表构建与格式化导出。
- * 契约：满足实质承载预算（有效行 > 30），各导出方法具备工作区名称防卫清洗与日志审计。
+ * 职责：从 TimerOrchestrator 解耦的独立报表导出服务，承载 CSV 与 Markdown 格式的工时数据构建；
+ * 契约：各导出方法执行工作区名称防卫清洗与规范化回退，所有导出操作记录日志审计。
  */
 
 import { ReadonlyTimingData, WorkspaceTimingData } from '../../domain/models';
@@ -17,7 +17,11 @@ const DEFAULT_REPORT_TREND_WEEKS = 4;
 
 export class OrchestratorReportHandler {
     /**
-     * 导出当前工作区计时数据为 CSV 字符串
+     * 导出当前工作区计时数据为 CSV 字符串。
+     *
+     * @param data - 当前计时器只读数据视图
+     * @param targetWorkspace - 目标工作区名称（若为空则回退为默认名）
+     * @returns 格式化后的 CSV 文本
      */
     static async exportCSV(data: ReadonlyTimingData, targetWorkspace: string): Promise<string> {
         const workspaceName = targetWorkspace.trim() || 'workspace';
@@ -33,6 +37,10 @@ export class OrchestratorReportHandler {
 
     /**
      * 导出全历史聚合日报序列 CSV（折叠桶 ∪ 当期原始计算，日期升序）。
+     *
+     * @param data - 当前计时器只读数据视图
+     * @param targetWorkspace - 目标工作区名称
+     * @returns 聚合日报 CSV 文本
      */
     static async exportAggregatedCSV(data: ReadonlyTimingData, targetWorkspace: string): Promise<string> {
         const workspaceName = targetWorkspace.trim() || 'workspace';
@@ -47,7 +55,12 @@ export class OrchestratorReportHandler {
     }
 
     /**
-     * 导出日报 / 周报为 Markdown 文本
+     * 导出日报 / 周报为 Markdown 文本。
+     *
+     * @param data - 当前计时器只读数据视图
+     * @param kind - 报表类型（'daily' 或 'weekly'）
+     * @param locale - 语言环境（'zh-CN' 或 'en'）
+     * @returns 格式化后的 Markdown 报表文本
      */
     static async exportReport(
         data: ReadonlyTimingData,

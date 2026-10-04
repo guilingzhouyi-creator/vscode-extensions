@@ -1,5 +1,5 @@
 /**
- * TimeAggregator — 时间聚合器统一门面（Facade）
+ * TimeAggregator — 时间聚合领域统一门面（Facade）
  *
  * 职责：作为时间聚合领域的对外统一入口与聚合出口，聚合子领域模块：
  *   - date-utils: 本地时区日期解析、展开与切分
@@ -7,9 +7,8 @@
  *   - daily-aggregator: 日报统计、小时分布与会话裁剪
  *   - weekly-aggregator: 周报统计、多周趋势与全历史日报序列
  *   - heatmap-aggregator: 24 周活动热力图网格构建与聚合
- * 契约：对全库已有调用点 100% 保持签名向后兼容；满足实质承载预算（聚合 5 个子领域模块）。
  */
-// 子模块重导出（保证既有消费端解构 import 无损兼容）
+// 子领域纯函数与类型对外统一导出
 export {
     localDateStr,
     parseLocalDate,
@@ -64,7 +63,7 @@ import * as WeeklyAgg from './aggregator/weekly-aggregator';
 import * as HeatmapAgg from './aggregator/heatmap-aggregator';
 
 /**
- * 时间聚合器统一门面对象（不可变冻结保障，聚合 5 个子领域纯函数模块）
+ * 时间聚合器统一门面对象（深层只读冻结，聚合 5 个子领域纯函数模块）
  */
 export const TimeAggregator = Object.freeze({
     /** 今天的本地日期字符串 (YYYY-MM-DD) */
@@ -76,7 +75,7 @@ export const TimeAggregator = Object.freeze({
     /** 计算时间戳所在周的起始日（周一）本地日期字符串 */
     weekStartStr: DateUtils.weekStartStr,
 
-    /** 展开自然日分段（内部辅助，保留访问以兼容旧单测/子系统） */
+    /** 展开自然日分段迭代器，供外部统计与图表遍历使用 */
     eachDaySegment: DateUtils.eachDaySegment,
 
     /** 格式化毫秒为人类可读字符串 (如 "1h 1m 1s") */
@@ -109,8 +108,14 @@ export const TimeAggregator = Object.freeze({
     /** 周报文字摘要 */
     weeklySummary: WeeklyAgg.weeklySummary,
 
+    /** 格式化绝对时间点 (如 "14:30:00") */
+    formatTime: DurationFormatter.formatTime,
+
     /** 活动时间线热力图 */
     heatmapDays: HeatmapAgg.heatmapDays,
+
+    /** 根据当日累计时长计算 5 档热力图活跃等级 (0~4) */
+    heatmapLevel: HeatmapAgg.heatmapLevel,
 });
 
 export type TimeAggregator = typeof TimeAggregator;

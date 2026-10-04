@@ -196,7 +196,7 @@ export interface TimeSession {
 
 /** 工作区计时主数据 */
 export interface WorkspaceTimingData {
-  /** 数据格式版本，用于向后兼容 */
+  /** 持久化数据结构演进版本号（当前版本：LATEST_VERSION） */
   version: number;
 
   /** 累计总时长 (ms) */

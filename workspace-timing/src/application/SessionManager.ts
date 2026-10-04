@@ -97,7 +97,9 @@ export class SessionManager {
   }
 
   /**
-   * 显式触发会话自动回收（供打开界面或生命周期事件调用）
+   * 显式触发会话生命周期自动回收。
+   * 供打开统计仪表板、周期性存盘或状态恢复等关键时机显式调用，
+   * 确保内存中数据即时完成跨周归零与超额会话折叠。
    */
   autoRecycleSessions(): void {
     this.foldIfNeeded();
@@ -108,18 +110,23 @@ export class SessionManager {
     return this._sessionActive;
   }
 
-  /** 运行期热更新会话历史上限（0 = 不限），立即触发容量自动回收 */
+  /**
+   * 运行期热更新会话历史保留条数上限（0 = 不限）。
+   * 更新内部配置后立即触发容量自动回收与会话折叠。
+   *
+   * @param maxSessions - 新的会话保留条数上限
+   */
   setMaxSessions(maxSessions: number): void {
     this.maxSessions = maxSessions;
     this.foldIfNeeded();
   }
 
   /**
-   * 兼容占位（0.4.9 起今日累计由 TimerEngine 增量计数器维护，
-   * replaceData/reset 已自动置脏）——保留方法避免调用方连锁改动。
+   * 今日累计缓存失效通知（由 TimerEngine 增量计数器内部维护，
+   * replaceData/reset 已自动置脏；提供显式同步接口供调用方刷新状态）。
    */
   invalidateTodayCache(): void {
-    /* no-op：计数器失效已内建于 TimerEngine */
+    /* 计数器失效由 TimerEngine 内建维护 */
   }
 
   /** 获取计时器快照 */
@@ -128,8 +135,10 @@ export class SessionManager {
   }
 
   /**
-   * 执行崩溃恢复并开始新会话
-   * 这是启动路径的核心方法
+   * 执行崩溃恢复流程并开启当前工作区新会话。
+   * 启动路径核心方法：依序完成增量日志回放、历史数据双阈值折叠、主存装载与新会话启动。
+   *
+   * @returns 恢复并初始化完毕的工作区计时数据
    */
   async startSession(): Promise<WorkspaceTimingData> {
     log(LogLevel.Info, 'SessionManager: starting session');

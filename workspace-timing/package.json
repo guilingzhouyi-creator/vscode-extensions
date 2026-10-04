@@ -2,7 +2,7 @@
   "name": "workspace-timing",
   "displayName": "Workspace Timing",
   "description": "⏱ 轻量化工作区时长追踪 — 自动计时、周报图表、多工作区统计与数据安全保护 | Lightweight cross-workspace time tracker with automatic tracking, weekly charts, and data protection",
-  "version": "0.4.12",
+  "version": "0.5.0",
   "publisher": "guilingzhouyi",
   "repository": {
     "type": "git",

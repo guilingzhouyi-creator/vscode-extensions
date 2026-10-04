@@ -215,6 +215,13 @@ export class CommandRegistrar {
         vscode.window.showWarningMessage(t()['cmd.noWorkspace']);
     }
 
+    /**
+     * 处理从备份文件恢复计时数据的完整交互流程。
+     * 包括：文件选择对话框、JSON 解析、双侧差异确认提示、数据应用与状态栏刷新。
+     *
+     * @param orchestrator - 计时总控器实例
+     * @param statusBar - 状态栏控制器实例
+     */
     private async handleRestoreCommand(
         orchestrator: TimerOrchestrator,
         statusBar: StatusBarController,
