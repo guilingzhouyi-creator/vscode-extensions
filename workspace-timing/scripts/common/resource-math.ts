@@ -8,18 +8,35 @@ import type { ScalingConstants } from './config.js';
 
 export type SupportedLanguage = 'typescript' | 'javascript' | 'rust' | 'cpp' | 'c' | 'go' | 'gdscript' | 'python' | 'json';
 
+const EXTENSION_LANGUAGE_MAP: Record<string, SupportedLanguage> = {
+    '.ts': 'typescript',
+    '.tsx': 'typescript',
+    '.mts': 'typescript',
+    '.cts': 'typescript',
+    '.js': 'javascript',
+    '.jsx': 'javascript',
+    '.mjs': 'javascript',
+    '.cjs': 'javascript',
+    '.rs': 'rust',
+    '.cpp': 'cpp',
+    '.cc': 'cpp',
+    '.cxx': 'cpp',
+    '.hpp': 'cpp',
+    '.hxx': 'cpp',
+    '.c': 'c',
+    '.h': 'c',
+    '.go': 'go',
+    '.gd': 'gdscript',
+    '.py': 'python',
+    '.json': 'json',
+};
+
 /** [Hard Invariant] 根据物理文件扩展名识别目标语言类型 */
 export function detectLanguage(filePath: string): SupportedLanguage {
-    const lower = filePath.toLowerCase();
-    if (lower.endsWith('.ts') || lower.endsWith('.tsx') || lower.endsWith('.mts') || lower.endsWith('.cts')) return 'typescript';
-    if (lower.endsWith('.js') || lower.endsWith('.jsx') || lower.endsWith('.mjs') || lower.endsWith('.cjs')) return 'javascript';
-    if (lower.endsWith('.rs')) return 'rust';
-    if (lower.endsWith('.cpp') || lower.endsWith('.cc') || lower.endsWith('.cxx') || lower.endsWith('.hpp') || lower.endsWith('.hxx')) return 'cpp';
-    if (lower.endsWith('.c') || lower.endsWith('.h')) return 'c';
-    if (lower.endsWith('.go')) return 'go';
-    if (lower.endsWith('.gd')) return 'gdscript';
-    if (lower.endsWith('.py')) return 'python';
-    if (lower.endsWith('.json')) return 'json';
+    const extMatch = filePath.toLowerCase().match(/\.[a-z0-9]+$/);
+    if (extMatch && EXTENSION_LANGUAGE_MAP[extMatch[0]]) {
+        return EXTENSION_LANGUAGE_MAP[extMatch[0]];
+    }
     return 'typescript';
 }
 
@@ -38,6 +55,93 @@ export interface SemanticVolumeResult {
     isLinePacked: boolean;      // 抗压行攻击标记
 }
 
+const DECL_PATTERNS: readonly RegExp[] = [
+    /^\s*(?:export\s+)?(?:const|let|var|enum|type|interface)\b/,
+    /^\s*(?:pub\s+)?(?:const|static|enum|type|struct)\b/,
+    /^\s*(?:constexpr|const|enum\s+class|#define|struct\s+\w+\s*\{)\b/,
+    /^\s*(?:const|var|enum)\b/,
+    /^\s*(?:[A-Z0-9_]+\s*=|class\s+\w+\(Enum\):)/,
+    /^\s*['"][^'"]+['"]\s*:/,
+    /^\s*(?:readonly\s+)?[a-zA-Z0-9_$]+\??\s*:/,
+    /^\s*(?:import\b|export\s*[{*]|export\s+default\b)/,
+    /^\s*[}{\]),;]+\s*$/,
+];
+
+const EXECUTABLE_PATTERNS: readonly RegExp[] = [
+    /\b(?:function|class|async\s+function|while\s*\(|for\s*\(|if\s*\(|switch\s*\(|try\s*\{|catch\s*\(|throw\s+new)\b/,
+    /\b(?:fn\s+\w+\s*\(|impl\s+\w+)\b/,
+    /\b(?:func\s+\w+\s*\(|def\s+\w+\s*\()\b/,
+];
+
+function checkCommentLine(trimmed: string, inBlockComment: boolean): { isComment: boolean; nextInBlock: boolean } {
+    if (inBlockComment) {
+        return { isComment: true, nextInBlock: !trimmed.includes('*/') };
+    }
+    if (trimmed.startsWith('/*')) {
+        return { isComment: true, nextInBlock: !trimmed.includes('*/') };
+    }
+    const isSingleComment = (
+        trimmed.startsWith('//') ||
+        trimmed.startsWith('#') ||
+        trimmed.startsWith(';') ||
+        trimmed.startsWith('--')
+    );
+    if (isSingleComment) {
+        return { isComment: true, nextInBlock: false };
+    }
+    if (isDirectiveComment(trimmed)) {
+        return { isComment: true, nextInBlock: false };
+    }
+    return { isComment: false, nextInBlock: false };
+}
+
+function isDirectiveComment(trimmed: string): boolean {
+    return (
+        trimmed.startsWith('#pragma once') ||
+        trimmed.startsWith('#ifndef') ||
+        (trimmed.startsWith('#define') && trimmed.endsWith('_H')) ||
+        trimmed.startsWith('#endif') ||
+        trimmed.startsWith('#![') ||
+        trimmed.startsWith('#[derive(')
+    );
+}
+
+interface DepthTracker {
+    currentDepth: number;
+    maxDepth: number;
+}
+
+function updateNestingDepth(line: string, tracker: DepthTracker): void {
+    for (const ch of line) {
+        if (ch === '{' || ch === '(' || ch === '[') {
+            tracker.currentDepth++;
+            if (tracker.currentDepth > tracker.maxDepth) {
+                tracker.maxDepth = tracker.currentDepth;
+            }
+        } else if ((ch === '}' || ch === ')' || ch === ']') && tracker.currentDepth > 0) {
+            tracker.currentDepth--;
+        }
+    }
+}
+
+function countLiteralsInLine(line: string): number {
+    const stringLiterals = line.match(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g) ?? [];
+    const numericLiterals = line.match(/\b\d+(?:\.\d+)?(?:e[+-]?\d+)?\b/g) ?? [];
+    return stringLiterals.length + numericLiterals.length;
+}
+
+function countSymbolsInLine(line: string): number {
+    const symMatches = line.matchAll(/\b(?:const|let|var|enum|type|interface|fn|func|def)\s+([a-zA-Z0-9_$]+)/g);
+    return Array.from(symMatches).length;
+}
+
+function isDeclarationLine(trimmed: string, lang: SupportedLanguage): boolean {
+    if (lang === 'json') return true;
+    const isDecl = DECL_PATTERNS.some((re) => re.test(trimmed));
+    const isExec = EXECUTABLE_PATTERNS.some((re) => re.test(trimmed));
+    return isDecl && !isExec;
+}
+
 /**
  * [Heuristic] 计算语义体积 (Semantic Volume, SV) 与纯净有效行 (ELOC)
  * SV(f) = w_e * ELOC + w_a * N_AST + w_s * N_symbol + w_l * N_literal + w_d * Depth_AST
@@ -54,26 +158,7 @@ export function computeSemanticVolume(content: string, lang: SupportedLanguage):
     let astNodeCount = 0;
     let symbolCount = 0;
     let literalCount = 0;
-    let currentDepth = 0;
-    let maxDepth = 0;
-
-    const declPatterns: RegExp[] = [
-        /^\s*(?:export\s+)?(?:const|let|var|enum|type|interface)\b/,
-        /^\s*(?:pub\s+)?(?:const|static|enum|type|struct)\b/,
-        /^\s*(?:constexpr|const|enum\s+class|#define|struct\s+\w+\s*\{)\b/,
-        /^\s*(?:const|var|enum)\b/,
-        /^\s*(?:[A-Z0-9_]+\s*=|class\s+\w+\(Enum\):)/,
-        /^\s*['"][^'"]+['"]\s*:/,
-        /^\s*(?:readonly\s+)?[a-zA-Z0-9_$]+\??\s*:/,
-        /^\s*(?:import\b|export\s*[{*]|export\s+default\b)/,
-        /^\s*[}{\]),;]+\s*$/,
-    ];
-
-    const executablePatterns: RegExp[] = [
-        /\b(?:function|class|async\s+function|while\s*\(|for\s*\(|if\s*\(|switch\s*\(|try\s*\{|catch\s*\(|throw\s+new)\b/,
-        /\b(?:fn\s+\w+\s*\(|impl\s+\w+)\b/,
-        /\b(?:func\s+\w+\s*\(|def\s+\w+\s*\()\b/,
-    ];
+    const depthTracker: DepthTracker = { currentDepth: 0, maxDepth: 0 };
 
     for (const rawLine of rawLines) {
         const trimmed = rawLine.trim();
@@ -82,69 +167,23 @@ export function computeSemanticVolume(content: string, lang: SupportedLanguage):
             continue;
         }
 
-        if (inBlockComment) {
+        const commentCheck = checkCommentLine(trimmed, inBlockComment);
+        if (commentCheck.isComment) {
             commentLines++;
-            if (trimmed.includes('*/')) inBlockComment = false;
-            continue;
-        }
-        if (trimmed.startsWith('/*')) {
-            commentLines++;
-            if (!trimmed.includes('*/')) inBlockComment = true;
-            continue;
-        }
-
-        if (
-            trimmed.startsWith('//') ||
-            trimmed.startsWith('#') ||
-            trimmed.startsWith(';') ||
-            trimmed.startsWith('--')
-        ) {
-            commentLines++;
-            continue;
-        }
-
-        if (
-            trimmed.startsWith('#pragma once') ||
-            trimmed.startsWith('#ifndef') ||
-            trimmed.startsWith('#define') && trimmed.endsWith('_H') ||
-            trimmed.startsWith('#endif') ||
-            trimmed.startsWith('#![') ||
-            trimmed.startsWith('#[derive(')
-        ) {
-            commentLines++;
+            inBlockComment = commentCheck.nextInBlock;
             continue;
         }
 
         pureEloc++;
+        updateNestingDepth(trimmed, depthTracker);
 
-        // 统计 AST 语法块深度
-        for (const ch of trimmed) {
-            if (ch === '{' || ch === '(' || ch === '[') {
-                currentDepth++;
-                if (currentDepth > maxDepth) maxDepth = currentDepth;
-            } else if (ch === '}' || ch === ')' || ch === ']') {
-                if (currentDepth > 0) currentDepth--;
-            }
-        }
-
-        // 统计语句数与 Token 节点数（分号、逗号、操作符）
         const statementTokens = trimmed.split(/[;,]/).filter((t) => t.trim().length > 0);
         astNodeCount += Math.max(1, statementTokens.length);
 
-        // 统计字面量
-        const stringLiterals = trimmed.match(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g) ?? [];
-        const numericLiterals = trimmed.match(/\b\d+(?:\.\d+)?(?:e[+-]?\d+)?\b/g) ?? [];
-        literalCount += stringLiterals.length + numericLiterals.length;
+        literalCount += countLiteralsInLine(trimmed);
+        symbolCount += countSymbolsInLine(trimmed);
 
-        // 统计声明符号
-        const symMatches = trimmed.matchAll(/\b(?:const|let|var|enum|type|interface|fn|func|def)\s+([a-zA-Z0-9_$]+)/g);
-        for (const _ of symMatches) symbolCount++;
-
-        const isDecl = declPatterns.some((re) => re.test(trimmed));
-        const isExec = executablePatterns.some((re) => re.test(trimmed));
-        if (isDecl && !isExec) {
-            declLines++;
-        } else if (lang === 'json') {
+        if (isDeclarationLine(trimmed, lang)) {
             declLines++;
         }
     }
@@ -157,7 +196,7 @@ export function computeSemanticVolume(content: string, lang: SupportedLanguage):
         0.30 * astNodeCount +
         0.20 * symbolCount +
         0.15 * literalCount +
-        0.10 * maxDepth
+        0.10 * depthTracker.maxDepth
     ).toFixed(2));
 
     // 压行检测：若 AST 节点数显著超过行数（如 1 行塞了 5 个以上声明语句），判定为压行攻击
@@ -173,13 +212,13 @@ export function computeSemanticVolume(content: string, lang: SupportedLanguage):
         astNodeCount,
         symbolCount,
         literalCount,
-        maxDepth,
+        maxDepth: depthTracker.maxDepth,
         semanticVolume,
         isLinePacked,
     };
 }
 
-/** 兼容旧接口的轻量别名 */
+/** 语法语义体积计算辅助别名 */
 export function computeFileEloc(content: string, lang: SupportedLanguage): SemanticVolumeResult {
     return computeSemanticVolume(content, lang);
 }
@@ -639,16 +678,15 @@ export function checkAllowedDependency(
     return { isAllowed: false, violation: 1 };
 }
 
-/** 生成无损兼容的 Barrel 重导出门面代码 */
+/** 生成模块统一聚合重导出代码 */
 export function generateBarrelFacade(clusters: SymbolCluster[], fileExtension: string = '.ts'): string {
     const ext = fileExtension.startsWith('.') ? fileExtension : `.${fileExtension}`;
     const importExt = (ext === '.ts' || ext === '.js') ? '' : ext;
 
     const lines: string[] = [
         '/**',
-        ' * @deprecated [Auto-Refactor Architecture Notice]',
-        ' * 此文件已完成架构职责解耦拆分，原大杂烩已下沉为高内聚领域子库。',
-        ' * 存量引用保持 100% 兼容；新代码请直接按领域精准导入对应子文件。',
+        ' * 模块统一聚合导出（Barrel Facade）',
+        ' * 导出子领域全部公共 API，支持统一命名空间解构使用。',
         ' */',
     ];
 
