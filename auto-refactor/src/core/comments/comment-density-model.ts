@@ -355,7 +355,7 @@ export function evaluateEffectiveCommentDensity(content: string): EffectiveComme
         weightedSum += analysis.weight;
     }
 
-    const effectiveCommentLines = Math.max(0, Math.round(weightedSum * 10) / 10);
+    const effectiveCommentLines = Math.max(0, Math.round(weightedSum * 100) / 100);
     const effectiveCommentRatio =
         totalCommentLines > 0
             ? Number((effectiveCommentLines / totalCommentLines).toFixed(3))

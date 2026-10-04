@@ -157,7 +157,7 @@ export class FeedbackIncidentLedger {
     public recordIncident(
         input: Omit<FeedbackIncidentRecord, 'id' | 'timestamp' | 'error'>,
     ): FeedbackIncidentRecord {
-        const error = Math.round((input.actualOutcomeScore - input.predictedScore) * 10) / 10;
+        const error = Math.round((input.actualOutcomeScore - input.predictedScore) * 100) / 100;
         const record: FeedbackIncidentRecord = {
             ...input,
             id: `INC-${Date.now()}-${this.nextIdCounter++}`,
@@ -395,7 +395,7 @@ export class FeedbackAdaptiveSupervisor {
     public applyArchitectureBoost(patternId: string, baseScore: number): number {
         const stats = this.ledger.getPatternStability(patternId);
         const boosted = baseScore * stats.stabilityBoostFactor;
-        return Math.max(0.0, Math.min(100.0, Math.round(boosted * 10) / 10));
+        return Math.max(0.0, Math.min(100.0, Math.round(boosted * 100) / 100));
     }
 
     /**

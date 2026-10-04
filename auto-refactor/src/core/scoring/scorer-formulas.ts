@@ -233,6 +233,21 @@ export function isMeasured(score: number): boolean {
     return Number.isFinite(score);
 }
 
+/** Floating-point precision epsilon for score comparisons */
+export const SCORE_EPSILON = 1e-4;
+
+/**
+ * Checks whether two score values are equal within precision tolerance.
+ *
+ * @param a - First score value.
+ * @param b - Second score value.
+ * @param tolerance - Comparison precision tolerance bound.
+ * @returns True if absolute difference is within tolerance.
+ */
+export function isScoreEqual(a: number, b: number, tolerance = SCORE_EPSILON): boolean {
+    return Math.abs(a - b) <= tolerance;
+}
+
 /**
  * Difference between two composite scores, or null when either side is unmeasured.
  *
@@ -247,7 +262,7 @@ export function scoreDelta(before: number, after: number): number | null {
     if (!isMeasured(before) || !isMeasured(after)) {
         return null;
     }
-    return after - before;
+    return Math.round((after - before) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
 
 /**

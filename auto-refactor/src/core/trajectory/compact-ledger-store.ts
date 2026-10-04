@@ -55,8 +55,8 @@ export function formatCompactRecord(params: {
     const { runId, revision, module, agent, timestamp, counters, metrics, gatePass, gateCode } =
         params;
 
-    // Truncate scoreVector values to 1 decimal place to guarantee ultra-compact JSON size
-    const compactVector = metrics.scoreVector.map((v: number) => Math.round(v * 10) / 10);
+    // Round scoreVector values to 2 decimal places to maintain 0.01 precision within compact budget
+    const compactVector = metrics.scoreVector.map((v: number) => Math.round(v * 100) / 100);
     const boundedId = runId.length > 12 ? runId.slice(-12) : runId;
     const boundedRev = revision.slice(0, 8);
     const boundedMod = module.length > 12 ? module.slice(0, 12) : module;

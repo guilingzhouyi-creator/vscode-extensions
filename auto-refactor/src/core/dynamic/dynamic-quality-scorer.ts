@@ -25,6 +25,7 @@ import type {
     DynamicIssueRisk,
 } from './dynamic-types';
 import { ALL_DYNAMIC_QUALITY_AXES, DEFAULT_DYNAMIC_WEIGHTS } from './dynamic-types';
+import { SCORE_ROUNDING } from '../scoring/scorer-formulas';
 
 /**
  * Result of evaluating observation completeness of dynamic telemetry evidence.
@@ -155,11 +156,11 @@ export function computeDynamicQualityVector(
     const scoreE = evaluateExecutionScore(dto, priorScore);
 
     return {
-        L: Math.round(scoreL * 10) / 10,
-        T: Math.round(scoreT * 10) / 10,
-        M: Math.round(scoreM * 10) / 10,
-        C: Math.round(scoreC * 10) / 10,
-        E: Math.round(scoreE * 10) / 10,
+        L: Math.round(scoreL * SCORE_ROUNDING) / SCORE_ROUNDING,
+        T: Math.round(scoreT * SCORE_ROUNDING) / SCORE_ROUNDING,
+        M: Math.round(scoreM * SCORE_ROUNDING) / SCORE_ROUNDING,
+        C: Math.round(scoreC * SCORE_ROUNDING) / SCORE_ROUNDING,
+        E: Math.round(scoreE * SCORE_ROUNDING) / SCORE_ROUNDING,
     };
 }
 
@@ -185,7 +186,7 @@ export function computeDynamicQualityScore(
     }
 
     if (weightSum <= 0) return 0;
-    return Math.round((weightedScore / weightSum) * 10) / 10;
+    return Math.round((weightedScore / weightSum) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
 
 /**
@@ -224,8 +225,9 @@ export function computeDynamicHotspotRisk(
     const V = Math.max(1.0, Math.min(5.0, params.businessSensitivity ?? 2.0));
 
     const rawRisk = B * F * R * V;
-    // Bounded normalization: 5 * 10 * 10 * 5 = 2500 max raw -> normalize to 0..10 scale
-    const normalizedRisk = Math.min(10.0, Math.round((rawRisk / 250.0) * 100) / 10);
+    // Bounded normalization: 5 * 10 * 10 * 5 = 2500 max raw -> normalize to 0..10
+    // scale with standard 0.01 precision
+    const normalizedRisk = Math.min(10.0, Math.max(0.0, Math.round((rawRisk / 250.0) * 100) / 100));
     const hasEvidence =
         params.invocationsPerHour !== undefined || params.frequencyFactor !== undefined;
     const evidenceConfidence = hasEvidence ? 1.0 : 0.6;

@@ -177,7 +177,7 @@ export function normalizeScopeQuality(params: ScopeNormalizationParams): ScopeNo
         projectMean = sliceAfterScore;
         const errFactor = ((100 - projectMean) / 3) * (1 - compositeConfidence);
         standardError = Math.max(0.05, Math.round(errFactor * 100) / 100);
-        explanation = `Full PROJECT review completed; baseline updated directly to ${projectMean.toFixed(1)}`;
+        explanation = `Full PROJECT review completed; baseline updated directly to ${projectMean.toFixed(2)}`;
     } else if (mode === 'CHANGESET') {
         // Incremental mode: compute delta and Bayesian update
         const beforeComp = sliceBeforeScores
@@ -187,14 +187,14 @@ export function normalizeScopeQuality(params: ScopeNormalizationParams): ScopeNo
             ? beforeComp.compositeScore
             : priorProjectMean;
 
-        const deltaQ = Math.round((sliceAfterScore - sliceBeforeScore) * 10) / 10;
+        const deltaQ = Math.round((sliceAfterScore - sliceBeforeScore) * 100) / 100;
         const qed = Math.round((deltaQ / Math.max(1, elocSemantic)) * 1000) / 1000;
 
         const dimensionDeltas: Partial<Record<QualityDimension, number>> = {};
         for (const dim of activeDims) {
             const b = sliceBeforeScores?.[dim] ?? sliceAfterScores[dim];
             const a = sliceAfterScores[dim];
-            dimensionDeltas[dim] = Math.round((a - b) * 10) / 10;
+            dimensionDeltas[dim] = Math.round((a - b) * 100) / 100;
         }
 
         changesetDelta = Object.freeze({
@@ -228,11 +228,11 @@ export function normalizeScopeQuality(params: ScopeNormalizationParams): ScopeNo
         const weightedObs = (priorProjectMean + deltaMuProject) / varSlice;
         const updatedMu = posteriorVar * (weightedPrior + weightedObs);
 
-        projectMean = Math.round(Math.max(0, Math.min(100, updatedMu)) * 10) / 10;
+        projectMean = Math.round(Math.max(0, Math.min(100, updatedMu)) * 100) / 100;
         standardError = Math.round(Math.sqrt(posteriorVar) * 100) / 100;
         explanation =
             `CHANGESET review evaluated ${elocAudited} lines (ΔQ: ${deltaQ >= 0 ? '+' : ''}${deltaQ}, ` +
-            `QED: ${qed}); global baseline gently shifted by ${deltaMuProject.toFixed(3)} to ${projectMean.toFixed(1)}`;
+            `QED: ${qed}); global baseline gently shifted by ${deltaMuProject.toFixed(3)} to ${projectMean.toFixed(2)}`;
     } else if (mode === 'DOMAIN') {
         const domName = domain || 'specialized';
         domainAssessment = Object.freeze({
@@ -247,8 +247,8 @@ export function normalizeScopeQuality(params: ScopeNormalizationParams): ScopeNo
             `global project baseline left unperturbed`;
     }
 
-    const ciLower = Math.max(0, Math.round((projectMean - 1.96 * standardError) * 10) / 10);
-    const ciUpper = Math.min(100, Math.round((projectMean + 1.96 * standardError) * 10) / 10);
+    const ciLower = Math.max(0, Math.round((projectMean - 1.96 * standardError) * 100) / 100);
+    const ciUpper = Math.min(100, Math.round((projectMean + 1.96 * standardError) * 100) / 100);
 
     const projectBaseline: ProjectBaselineAssessment = Object.freeze({
         mean: projectMean,

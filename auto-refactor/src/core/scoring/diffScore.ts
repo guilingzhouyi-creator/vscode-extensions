@@ -77,8 +77,8 @@ const DEFAULT_WEIGHTS: DiffScoreWeights = {
     duplicationPerLine: 1,
 };
 
-/** Round dimension deltas to one decimal, matching the snapshot scorer's precision. */
-const DELTA_SCALE = 10;
+/** Round dimension deltas to two decimals, matching the snapshot scorer's 0.01 precision. */
+const DELTA_SCALE = 100;
 
 /**
  * Round a signed delta to the shared precision.

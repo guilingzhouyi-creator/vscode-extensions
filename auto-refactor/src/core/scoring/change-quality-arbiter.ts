@@ -23,6 +23,7 @@ import type { GamingPatternKind } from './antiGaming';
 import { detectScoreGaming, detectDiffScoreGaming } from './antiGaming';
 import { evaluateNetCognitiveCost } from './cognitive-cost-model';
 import { computeEffectiveCodeDensity } from './effectiveDensity';
+import { SCORE_ROUNDING } from './scorer-formulas';
 
 /**
  * Approved architectural refactoring pattern declaration.
@@ -180,7 +181,7 @@ function computeRegressionPenalty(
             penalty += 1.0;
         }
     }
-    const rounded = Math.round(penalty * 10) / 10;
+    const rounded = Math.round(penalty * SCORE_ROUNDING) / SCORE_ROUNDING;
     if (rounded > 0) {
         explanation.push(
             `Regression penalty: -${rounded} (${totalRegressions.length} introduced issues)`,
@@ -226,7 +227,7 @@ function computeComplexityCost(
                 isForwardingWrapper: true,
             })),
         );
-        cost = Math.round(hopEval.hopPenalty * 10) / 10;
+        cost = Math.round(hopEval.hopPenalty * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
     if (cost > 0) {
         explanation.push(`Complexity cost (cognitive jump overhead): -${cost}`);
@@ -312,7 +313,7 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
     const explanation: string[] = [];
 
     // 1. Calculate raw quality delta: deltaQ = Q_after - Q_before
-    const deltaQ = Math.round((afterScore - beforeScore) * 10) / 10;
+    const deltaQ = Math.round((afterScore - beforeScore) * SCORE_ROUNDING) / SCORE_ROUNDING;
     explanation.push(
         `Raw quality delta: ΔQ = ${deltaQ > 0 ? '+' : ''}${deltaQ} (${beforeScore} -> ${afterScore})`,
     );
@@ -351,7 +352,7 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
             `Refactoring incentive: +${refactoringBonus} pts for validated architectural decoupling.`,
         );
     }
-    const preliminaryScore = Math.round(netDelta * 10) / 10;
+    const preliminaryScore = Math.round(netDelta * SCORE_ROUNDING) / SCORE_ROUNDING;
 
     // 7. Anti-Gaming Verdict Enforcement
     const { verdict, finalScore } = resolveArbiterVerdict(

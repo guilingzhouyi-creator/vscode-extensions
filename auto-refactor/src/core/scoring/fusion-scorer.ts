@@ -18,6 +18,7 @@ import type { StaticQualityVector } from './static-quality-model';
 import { computeStaticQualityScore } from './static-quality-model';
 import type { DynamicQualityVector } from '../dynamic/dynamic-types';
 import { computeDynamicQualityScore } from '../dynamic/dynamic-quality-scorer';
+import { SCORE_ROUNDING } from './scorer-formulas';
 
 /**
  * Contextual project characteristics driving dynamic weight adaptation.
@@ -160,7 +161,7 @@ export function computeUnifiedQualityScore(
     const totalRaw =
         weights.Ws * staticScore + weights.Wd * dynamicScore + weights.Wf * feedbackScore;
 
-    const totalScore = Math.round(totalRaw * 10) / 10;
+    const totalScore = Math.round(totalRaw * SCORE_ROUNDING) / SCORE_ROUNDING;
 
     const explanation =
         `Unified quality synthesized: Q_total=${totalScore} ` +

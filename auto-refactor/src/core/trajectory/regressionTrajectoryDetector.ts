@@ -67,7 +67,7 @@ export class RegressionTrajectoryDetector {
                 this.createRegressionIssue(
                     comparison.filePath,
                     1,
-                    `Logical rollback or heavy quality regression detected (Δ${comparison.compositeDelta.toFixed(1)}). ` +
+                    `Logical rollback or heavy quality regression detected (Δ${comparison.compositeDelta.toFixed(2)}). ` +
                         `Trajectory broke evolutionary invariants.`,
                 ),
             );
@@ -139,8 +139,8 @@ export class RegressionTrajectoryDetector {
             return this.createRegressionIssue(
                 filePath,
                 1,
-                `Severe quality regression detected (Score dropped from ${previous.qualityScore.compositeScore.toFixed(1)} ` +
-                    `to ${current.qualityScore.compositeScore.toFixed(1)}, Δ${delta.toFixed(1)}).`,
+                `Severe quality regression detected (Score dropped from ${previous.qualityScore.compositeScore.toFixed(2)} ` +
+                    `to ${current.qualityScore.compositeScore.toFixed(2)}, Δ${delta.toFixed(2)}).`,
             );
         }
 

@@ -80,26 +80,12 @@ const LINE_WEIGHTS: Record<LineClassificationKind, number> = {
 };
 
 /**
- * Classifies an individual physical line of source text.
- *
- * @param line - Raw line text without trailing line break
- * @param inBlockComment - Whether currently inside a multi-line block comment
- * @param isFileGenerated - Whether entire file is flagged as auto-generated
- * @returns Classification kind and next block comment state
+ * Classifies block comment continuation or opening.
  */
-function classifyLine(
-    line: string,
+function classifyBlockComment(
+    trimmed: string,
     inBlockComment: boolean,
-    isFileGenerated: boolean,
-): { kind: LineClassificationKind; nextInBlockComment: boolean } {
-    const trimmed = line.trim();
-
-    // 1. Blank line
-    if (!trimmed) {
-        return { kind: 'BLANK_LINE', nextInBlockComment: inBlockComment };
-    }
-
-    // 2. Block comment continuation or opening
+): { kind: LineClassificationKind; nextInBlockComment: boolean } | null {
     if (inBlockComment) {
         const commentEndIndex = trimmed.indexOf('*/');
         if (commentEndIndex !== -1) {
@@ -124,43 +110,68 @@ function classifyLine(
         return { kind: 'COMMENT_LINE', nextInBlockComment: true };
     }
 
-    // 3. Global generated code marker
+    return null;
+}
+
+/**
+ * Classifies an individual non-comment physical line.
+ */
+function classifySingleLine(trimmed: string, isFileGenerated: boolean): LineClassificationKind {
     if (isFileGenerated || AUTO_GENERATED_PATTERN.test(trimmed)) {
-        return { kind: 'AUTO_GENERATED', nextInBlockComment: false };
+        return 'AUTO_GENERATED';
     }
-
-    // 4. Line comment
     if (LINE_COMMENT_PATTERN.test(trimmed)) {
-        return { kind: 'COMMENT_LINE', nextInBlockComment: false };
+        return 'COMMENT_LINE';
     }
-
-    // 5. Formatted closing / wrap line
     if (FORMATTED_WRAP_PATTERN.test(trimmed)) {
-        return { kind: 'FORMATTED_WRAP', nextInBlockComment: false };
+        return 'FORMATTED_WRAP';
     }
-
-    // 6. Config declaration line
     if (CONFIG_DECLARATION_PATTERN.test(trimmed)) {
-        return { kind: 'CONFIG_DECLARATION', nextInBlockComment: false };
+        return 'CONFIG_DECLARATION';
     }
-
-    // 7. Data entry literal
     if (DATA_ENTRY_PATTERN.test(trimmed)) {
-        return { kind: 'DATA_DECLARATION', nextInBlockComment: false };
+        return 'DATA_DECLARATION';
     }
-
-    // 8. Framework scaffold and empty interfaces
     if (FRAMEWORK_SCAFFOLD_PATTERN.test(trimmed)) {
-        return { kind: 'FRAMEWORK_SCAFFOLD', nextInBlockComment: false };
+        return 'FRAMEWORK_SCAFFOLD';
     }
-
-    // 9. Template DSL code
     if (TEMPLATE_DSL_PATTERN.test(trimmed)) {
-        return { kind: 'TEMPLATE_DSL', nextInBlockComment: false };
+        return 'TEMPLATE_DSL';
+    }
+    return 'EFFECTIVE_CODE';
+}
+
+/**
+ * Classifies an individual physical line of source text.
+ *
+ * @param line - Raw line text without trailing line break
+ * @param inBlockComment - Whether currently inside a multi-line block comment
+ * @param isFileGenerated - Whether entire file is flagged as auto-generated
+ * @returns Classification kind and next block comment state
+ */
+function classifyLine(
+    line: string,
+    inBlockComment: boolean,
+    isFileGenerated: boolean,
+): { kind: LineClassificationKind; nextInBlockComment: boolean } {
+    const trimmed = line.trim();
+
+    // 1. Blank line
+    if (!trimmed) {
+        return { kind: 'BLANK_LINE', nextInBlockComment: inBlockComment };
     }
 
-    // 10. Default to effective logic code
-    return { kind: 'EFFECTIVE_CODE', nextInBlockComment: false };
+    // 2. Block comment check
+    const blockResult = classifyBlockComment(trimmed, inBlockComment);
+    if (blockResult) {
+        return blockResult;
+    }
+
+    // 3. Single-line pattern dispatch
+    return {
+        kind: classifySingleLine(trimmed, isFileGenerated),
+        nextInBlockComment: false,
+    };
 }
 
 /**
@@ -207,7 +218,7 @@ export function analyzeCodeDensity(content: string, filePath?: string): CodeDens
         weightedSum += LINE_WEIGHTS[kind];
     }
 
-    const effectiveCodeLines = Math.max(1, Math.round(weightedSum * 10) / 10);
+    const effectiveCodeLines = Math.max(1, Math.round(weightedSum * 100) / 100);
     const effectiveDensity = Number((effectiveCodeLines / Math.max(1, physicalLines)).toFixed(3));
     const commentRatio = Number((counts.COMMENT_LINE / Math.max(1, physicalLines)).toFixed(3));
     const blankRatio = Number((counts.BLANK_LINE / Math.max(1, physicalLines)).toFixed(3));

@@ -13,6 +13,7 @@
 
 import type { AgentPatchSlice, PatchArbitrationCandidate } from './types';
 import { evaluatePatchQuality } from '../scoring/patchQuality';
+import { SCORE_ROUNDING } from '../scoring/scorer-formulas';
 
 /** Weight coefficients for patch arbitration scoring */
 const WEIGHT_COMPOSITE = 0.4;
@@ -22,8 +23,14 @@ const PENALTY_PER_ISSUE = 2.0;
 
 /**
  * Computes the unified arbitration composite score for ranking.
+ *
+ * @param compositeScore - Base composite quality score
+ * @param deltaScore - Delta score from baseline
+ * @param densityRatio - Code density ratio
+ * @param issuesCount - Number of detected issues
+ * @returns Rounded arbitration score
  */
-function computeArbitrationScore(
+export function computeArbitrationScore(
     compositeScore: number,
     deltaScore: number,
     densityRatio: number,
@@ -34,7 +41,7 @@ function computeArbitrationScore(
         WEIGHT_DELTA * Math.max(0, deltaScore) +
         WEIGHT_DENSITY * (densityRatio * 100) -
         PENALTY_PER_ISSUE * issuesCount;
-    return Math.round(raw * 10) / 10;
+    return Math.round(raw * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
 
 /**

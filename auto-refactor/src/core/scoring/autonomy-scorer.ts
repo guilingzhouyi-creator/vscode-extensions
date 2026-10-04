@@ -451,7 +451,7 @@ function synthesizeAutonomyEvaluation(
         rPure * w.codeOriginality +
         rSupply * w.supplyChainResilience +
         rCritical * w.criticalPathAutonomy
-    ).toFixed(1);
+    ).toFixed(2);
 
     const boundedComposite = Math.max(0, Math.min(100, compositeScore));
     const { grade, description } = resolveAutonomyGrade(boundedComposite);
@@ -465,10 +465,10 @@ function synthesizeAutonomyEvaluation(
     const credibleScore = +(
         sampleSufficiency * boundedComposite +
         (1 - sampleSufficiency) * priorBaseline
-    ).toFixed(1);
-    const margin = +(2.5 + (1 - sampleSufficiency) * 18.0).toFixed(1);
-    const lowerBound = +Math.max(0.0, credibleScore - margin).toFixed(1);
-    const upperBound = +Math.min(100.0, credibleScore + margin).toFixed(1);
+    ).toFixed(2);
+    const margin = +(2.5 + (1 - sampleSufficiency) * 18.0).toFixed(2);
+    const lowerBound = +Math.max(0.0, credibleScore - margin).toFixed(2);
+    const upperBound = +Math.min(100.0, credibleScore + margin).toFixed(2);
 
     const confidence: AutonomyConfidence = {
         sampleSufficiency,
@@ -491,12 +491,12 @@ function synthesizeAutonomyEvaluation(
         grade,
         gradeDescription: description,
         dimensions: {
-            effectiveLocAutonomy: +rLoc.toFixed(1),
-            symbolCallAutonomy: +rCall.toFixed(1),
-            domainKernelDensity: +rDomain.toFixed(1),
-            codeOriginality: +rPure.toFixed(1),
-            supplyChainResilience: +rSupply.toFixed(1),
-            criticalPathAutonomy: +rCritical.toFixed(1),
+            effectiveLocAutonomy: +rLoc.toFixed(2),
+            symbolCallAutonomy: +rCall.toFixed(2),
+            domainKernelDensity: +rDomain.toFixed(2),
+            codeOriginality: +rPure.toFixed(2),
+            supplyChainResilience: +rSupply.toFixed(2),
+            criticalPathAutonomy: +rCritical.toFixed(2),
         },
         weights: w,
         confidence,

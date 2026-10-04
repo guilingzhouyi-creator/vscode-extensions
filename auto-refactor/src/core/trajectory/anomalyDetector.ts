@@ -40,8 +40,8 @@ const DIMENSION_REGRESSION_THRESHOLD = 10.0;
 /** Standardization or comment-quality drop magnitude that triggers an agent style-drift anomaly. */
 const STYLE_DRIFT_THRESHOLD = 5;
 
-/** Scale factor used to round score deltas to one decimal place (multiply, then divide). */
-const SCORE_DELTA_ROUND_SCALE = 10;
+/** Scale factor used to round score deltas to two decimal places (multiply, then divide). */
+const SCORE_DELTA_ROUND_SCALE = 100;
 
 /** Base-10 radix for parsing the trailing line number out of a rule-hit id. */
 const DECIMAL_RADIX = 10;
