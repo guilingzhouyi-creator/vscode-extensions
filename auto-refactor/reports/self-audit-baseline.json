@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791111275250",
-  "timestamp": "2026-10-04T10:54:45.939Z",
+  "snapshotId": "snapshot-v0.4.0-1791133569569",
+  "timestamp": "2026-10-04T17:06:19.169Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,25 +13,25 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 592,
-    "durationMs": 9577
+    "durationMs": 8449
   },
   "metrics": {
     "compositeScore": 99.17,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 12602,
-    "suppressedIssues": 6888,
-    "unsuppressedIssues": 5714,
+    "totalIssues": 12607,
+    "suppressedIssues": 6891,
+    "unsuppressedIssues": 5716,
     "bySeverity": {
       "info": 462,
-      "warning": 12140,
+      "warning": 12145,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 213,
-      "medium": 11503,
-      "low": 886
+      "medium": 11507,
+      "low": 887
     }
   },
   "eightPillars": {
@@ -63,7 +63,7 @@
     "semanticPurity": 99.89,
     "codeSecurity": 100,
     "performanceEfficiency": 99,
-    "standardization": 81.87,
+    "standardization": 81.86,
     "modernity": 100,
     "maintainability": 99.55,
     "commentQuality": 99.98,
@@ -166,8 +166,8 @@
     "summary": {
       "critical": 0,
       "high": 213,
-      "medium": 11503,
-      "low": 886
+      "medium": 11507,
+      "low": 887
     },
     "criticalItems": [],
     "highItems": [
@@ -415,39 +415,39 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:142",
+        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:149",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 142,
+        "line": 149,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:206",
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:213",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 206,
+        "line": 213,
         "message": "Function \"auditBoundaryInteroperability\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:219",
+        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:226",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 219,
+        "line": 226,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:311",
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:318",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 311,
+        "line": 318,
         "message": "Function \"auditTenDimensionalFidelity\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
@@ -636,7 +636,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 91.13
+          "extensibility": 91.11
         },
         "moduleCount": 1
       },
@@ -1319,27 +1319,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 117642,
+      "processed": 117655,
       "unique": 96698,
-      "changed": 4737,
-      "semantic": 3790,
+      "changed": 215,
+      "semantic": 172,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 2369,
+      "added": 108,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791035877948,
-      "endMs": 1791111275247,
-      "totalRuns": 138,
+      "endMs": 1791133569566,
+      "totalRuns": 142,
       "eloc": {
-        "processedTotal": 15939135,
+        "processedTotal": 16409755,
         "uniqueTotal": 96698,
-        "changedTotal": 133713,
-        "semanticTotal": 106970
+        "changedTotal": 134471,
+        "semanticTotal": 107576
       },
       "qed": {
         "mean": 0,
@@ -1347,10 +1347,10 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 794260,
+        "totalAdded": 794264,
         "totalResolved": 222,
         "totalRegressions": 0,
-        "netYield": -49.82
+        "netYield": -48.39
       },
       "meanCompositeScore": 99.19,
       "gatePassRate": 100

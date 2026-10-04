@@ -11,7 +11,7 @@
 - **顶层架构蓝图与全宗交付物**：
   - `docs/agent-native-system-blueprint.md`：多 Agent 自治体系、一体两面三层拓扑 Diff 差分系统与 R1~R5 记忆提纯顶层设计案卷；
   - `archive/deliverables/`：历史阶段性审查报告、重构治理方案与评审交付物集中归档留痕；
-- **根级发布与门禁工具链（`scripts/`）**：`scripts/sh/audit-all.sh` / `scripts/ps1/audit-all.ps1`（全工作区跨项目统一审查中枢与质量看板）；`pre-commit-gate`（提交前文件物理卫生、换行契约、密钥防泄漏与 AST 局部切片审查，含 `sh/` 与 `ps1/` 同构双实现）；`commit-msg-gate`（生产工程级结构化正文、零黑话、文本风格求真务实与规则 ID 反虚构防漂移门禁，依单源注册表 `scripts/common/rule-catalog.json` 与 `commit-msg-forbidden-terms.json` 核验）；`pre-push-gate`（推送前全量回归测试、待推送分支提交历史规范扫描与质量基线检查，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
+- **根级发布与门禁工具链（`scripts/`）**：`scripts/sh/audit-all.sh` / `scripts/ps1/audit-all.ps1`（全工作区跨项目统一审查中枢与质量看板）；`pre-commit-gate`（提交前文件物理卫生、换行契约、双轨体积与 ELOC 预算、密钥防泄漏与 AST 局部切片审查，含 `sh/` 与 `ps1/` 同构双实现）；`commit-msg-gate`（生产工程级结构化正文、零黑话、文本风格求真务实与规则 ID 反虚构防漂移门禁，依单源注册表 `scripts/common/rule-catalog.json` 与 `commit-msg-forbidden-terms.json` 核验）；`pre-push-gate`（推送前全量回归测试、待推送分支提交历史规范扫描与质量基线检查，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
 
 ## 二、 跨项目全局通用契约
 
@@ -22,6 +22,7 @@
 
 ### 2. 代码复杂度与控制流刚性预算
 - **AST 切片预算**：所有生产与工具脚本必须严格受 AST 局部切片门禁约束：单函数圈复杂度 $\text{CC} \le 15$（`ADV-CMP-001`）、控制流嵌套深度 $\text{Depth} \le 4$（`ADV-NST-001`）、单行噪声比 $\text{Noise} \le 4.0$；
+- **单文件双轨体积预算**：全工作区源码文件（`.ts`, `.js`, `.gd`, `.py` 等）的单文件规模以**有效代码行（$\text{ELOC} \le 800$）**作为第一刚性业务复杂度预算（$\text{ELOC}$ 严格剔除单行与多行注释及空行，彻底消除对编写高价值 JSDoc 与架构契约文档的惩罚）；以**物理总行数（$\text{LOC} \le 1200$）**作为编辑器排版与滚屏人体工程学宽限防膨胀兜底红线。任何新写或重构模块单文件严禁超出预算，由 `pre-commit-gate` 与多维自检工具自动化核验阻断；
 - **平铺控制流**：循环体内涉及多条件派发或单项分类时，必须采用卫语句（Guard Clauses）提前返回，并将处理逻辑提取为独立纯函数，严禁深层多重 `if-else` / `switch` 嵌套。
 
 ### 3. 文档与黑话边界隔离

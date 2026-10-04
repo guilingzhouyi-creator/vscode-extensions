@@ -7,7 +7,7 @@
  * Dependencies & Triggers: `npm run audit:self` or `npm test`; imports dist scoring modules,
  *   TypeScript compiler API, and scans src/**\/*.ts.
  * Responsibilities:
- *   1. Gate 1 (LOC Budget Guard): Strict assertion that 0 files in src/ exceed 900 LOC.
+ *   1. Gate 1 (Dual-Scale Volume Guard): Strict assertion that 0 files in src/ exceed 800 ELOC or 1200 LOC.
  *   2. Gate 2 (Shannon Entropy Guard): Information entropy verification across all source files
  *   3. Gate 3 (AST / LOC Density Guard): Validates AST node-to-LOC syntax
  *      density within [0.5, 40.0].
@@ -30,7 +30,8 @@ const ts = require('typescript');
 
 const ROOT = path.join(__dirname, '..');
 const SRC_DIR = path.join(ROOT, 'src');
-const MAX_LOC_BUDGET = 900;
+const MAX_ELOC_BUDGET = 800;
+const MAX_PHYSICAL_LOC_BUDGET = 1200;
 
 function getAllTsFiles(dir) {
   const files = [];
@@ -62,36 +63,42 @@ function calculateShannonEntropy(str) {
   return entropy;
 }
 
-function auditLocBudget(allFiles) {
-  console.log('[Gate 1] LOC Budget Guard (Max <= 900 LOC)');
-  const fileLocs = [];
+function auditFileVolumeBudget(allFiles) {
+  console.log(`[Gate 1] Dual-Scale Volume & ELOC Budget Guard (Max <= ${MAX_ELOC_BUDGET} ELOC, <= ${MAX_PHYSICAL_LOC_BUDGET} LOC)`);
+  const fileStats = [];
   const overBudgetFiles = [];
 
   for (const filePath of allFiles) {
     const content = fs.readFileSync(filePath, 'utf8');
     const loc = content.split('\n').length;
+    const eloc = countEffectiveLoc(content);
     const relPath = path.relative(ROOT, filePath).replace(/\\/g, '/');
-    fileLocs.push({ relPath, loc });
-    if (loc >= MAX_LOC_BUDGET) {
-      overBudgetFiles.push({ relPath, loc });
+    const ratio = loc > 0 ? ((eloc / loc) * 100).toFixed(1) + '%' : '0.0%';
+    fileStats.push({ relPath, eloc, loc, ratio });
+
+    if (eloc > MAX_ELOC_BUDGET) {
+      overBudgetFiles.push({ relPath, reason: `${eloc} ELOC > ${MAX_ELOC_BUDGET} ELOC (LOC: ${loc})` });
+    } else if (loc > MAX_PHYSICAL_LOC_BUDGET) {
+      overBudgetFiles.push({ relPath, reason: `${loc} LOC > ${MAX_PHYSICAL_LOC_BUDGET} LOC (ELOC: ${eloc})` });
     }
   }
 
-  fileLocs.sort((a, b) => b.loc - a.loc);
-  console.log('  Top 5 largest files:');
-  for (let i = 0; i < Math.min(5, fileLocs.length); i++) {
-    console.log(`    ${i + 1}. ${fileLocs[i].relPath} (${fileLocs[i].loc} LOC)`);
+  fileStats.sort((a, b) => b.eloc - a.eloc);
+  console.log('  Top 5 largest files by semantic ELOC:');
+  for (let i = 0; i < Math.min(5, fileStats.length); i++) {
+    const s = fileStats[i];
+    console.log(`    ${i + 1}. ${s.relPath} (${s.eloc} ELOC / ${s.loc} LOC, effective: ${s.ratio})`);
   }
 
   if (overBudgetFiles.length > 0) {
-    console.error(`  ❌ [FAIL] ${overBudgetFiles.length} file(s) exceeded ${MAX_LOC_BUDGET} LOC:`);
+    console.error(`  ❌ [FAIL] ${overBudgetFiles.length} file(s) exceeded volume budget:`);
     for (const f of overBudgetFiles) {
-      console.error(`     - ${f.relPath}: ${f.loc} LOC`);
+      console.error(`     - ${f.relPath}: ${f.reason}`);
     }
     return false;
   }
   console.log(
-    `  ✔ [PASS] 100% files conform to LOC budget (Max observed: ${fileLocs[0].loc} LOC < ${MAX_LOC_BUDGET})\n`,
+    `  ✔ [PASS] 100% files conform to dual-scale volume budget (Max: ${fileStats[0].eloc} ELOC < ${MAX_ELOC_BUDGET}, ${Math.max(...fileStats.map(f => f.loc))} LOC < ${MAX_PHYSICAL_LOC_BUDGET})\n`,
   );
   return true;
 }
@@ -371,7 +378,7 @@ function runAudit() {
   console.log(`Auditing ${allFiles.length} TypeScript source files in src/...\n`);
 
   const results = [
-    auditLocBudget(allFiles),
+    auditFileVolumeBudget(allFiles),
     auditShannonEntropy(allFiles),
     auditAstDensity(allFiles),
     auditBoundaryInteroperability(allFiles),

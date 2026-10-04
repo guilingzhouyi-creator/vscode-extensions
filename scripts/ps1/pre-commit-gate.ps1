@@ -100,18 +100,27 @@ foreach ($file in $stagedFiles) {
     }
 }
 
-# --- Gate 5: 单文件行数红线预算 (源文件 < 900 LOC) ---
-Write-Host "[5/9] 检查源文件行数红线预算 (< 900 LOC)..." -ForegroundColor Gray
-$maxLocBudget = 900
-foreach ($file in $stagedFiles) {
-    if ([string]::IsNullOrWhiteSpace($file)) { continue }
-    if (Test-Path $file -PathType Leaf) {
-        if ($file.EndsWith(".ts") -or $file.EndsWith(".gd") -or $file.EndsWith(".js")) {
-            if ($file -match "dist/|out/|fixtures/|baseline|reports/") { continue }
-            $lineCount = @(Get-Content $file).Count
-            if ($lineCount -ge $maxLocBudget) {
-                Write-Host "❌ [FAIL] Gate 5: 单文件行数超标 ($lineCount >= $maxLocBudget LOC): $file" -ForegroundColor Red
-                $failed = $true
+# --- Gate 5: 检查源文件双轨体积预算 (ELOC <= 800, LOC <= 1200) ---
+Write-Host "[5/9] 检查源文件双轨体积预算 (ELOC <= 800, LOC <= 1200)..." -ForegroundColor Gray
+$evalTool = "scripts/common/evaluate-eloc-budget.js"
+if (Test-Path $evalTool) {
+    $res = Start-Process -FilePath "node" -ArgumentList "$evalTool --staged --max-eloc 800 --max-loc 1200" -NoNewWindow -PassThru -Wait
+    if ($res.ExitCode -ne 0) {
+        Write-Host "❌ [FAIL] Gate 5: 暂存区存在文件超出双轨体积预算 (ELOC > 800 或 LOC > 1200)" -ForegroundColor Red
+        $failed = $true
+    }
+} else {
+    $maxLocBudget = 1200
+    foreach ($file in $stagedFiles) {
+        if ([string]::IsNullOrWhiteSpace($file)) { continue }
+        if (Test-Path $file -PathType Leaf) {
+            if ($file.EndsWith(".ts") -or $file.EndsWith(".gd") -or $file.EndsWith(".js")) {
+                if ($file -match "dist/|out/|fixtures/|baseline|reports/") { continue }
+                $lineCount = @(Get-Content $file).Count
+                if ($lineCount -gt $maxLocBudget) {
+                    Write-Host "❌ [FAIL] Gate 5: 单文件行数超标 ($lineCount > $maxLocBudget LOC): $file" -ForegroundColor Red
+                    $failed = $true
+                }
             }
         }
     }

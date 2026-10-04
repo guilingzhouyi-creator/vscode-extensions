@@ -97,22 +97,29 @@ while IFS= read -r file; do
     fi
 done <<< "$STAGED_FILES"
 
-# --- Gate 5: 单文件行数红线预算 (< 900 LOC) ---
-echo "[5/9] 检查源文件行数红线预算 (< 900 LOC)..."
-MAX_LOC_BUDGET=900
-while IFS= read -r file; do
-    [[ -z "$file" ]] && continue
-    if [[ -f "$file" && ( "$file" == *.ts || "$file" == *.gd || "$file" == *.js ) ]]; then
-        if [[ "$file" == *dist/* || "$file" == *out/* || "$file" == *fixtures/* || "$file" == *baseline* || "$file" == *reports/* ]]; then
-            continue
-        fi
-        loc=$(wc -l < "$file" 2>/dev/null || echo "0")
-        if [[ "$loc" -ge "$MAX_LOC_BUDGET" ]]; then
-            echo "❌ [FAIL] Gate 5: 单文件行数超标 ($loc >= $MAX_LOC_BUDGET LOC): $file"
-            FAILED=1
-        fi
+# --- Gate 5: 检查源文件双轨体积预算 (ELOC <= 800, LOC <= 1200) ---
+echo "[5/9] 检查源文件双轨体积预算 (ELOC <= 800, LOC <= 1200)..."
+if [[ -f "scripts/common/evaluate-eloc-budget.js" ]]; then
+    if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged --max-eloc 800 --max-loc 1200; then
+        echo "❌ [FAIL] Gate 5: 暂存区存在文件超出双轨体积预算 (ELOC > 800 或 LOC > 1200)"
+        FAILED=1
     fi
-done <<< "$STAGED_FILES"
+else
+    MAX_LOC_BUDGET=1200
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        if [[ -f "$file" && ( "$file" == *.ts || "$file" == *.gd || "$file" == *.js ) ]]; then
+            if [[ "$file" == *dist/* || "$file" == *out/* || "$file" == *fixtures/* || "$file" == *baseline* || "$file" == *reports/* ]]; then
+                continue
+            fi
+            loc=$(wc -l < "$file" 2>/dev/null || echo "0")
+            if [[ "$loc" -gt "$MAX_LOC_BUDGET" ]]; then
+                echo "❌ [FAIL] Gate 5: 单文件行数超标 ($loc > $MAX_LOC_BUDGET LOC): $file"
+                FAILED=1
+            fi
+        fi
+    done <<< "$STAGED_FILES"
+fi
 
 # --- Gate 6: 密钥与敏感 Token 防泄漏扫描 ---
 echo "[6/9] 扫描高危密钥与敏感 Token 防泄漏..."
