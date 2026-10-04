@@ -21,6 +21,8 @@ sarif/
 # AI 助手的本地偏好记忆（沟通风格与工作流约定，逐机不同，不属于项目代码）
 .commandcode/
 .mypy_cache/
+.atomcode/
+/deliverables/
 
 # 本地插件管理与下载临时产物（不入库）
 .dsh-plugin-download/

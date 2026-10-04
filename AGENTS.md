@@ -10,7 +10,7 @@
   - `WebGames/`：Godot 4.7 卡拉尔世界引擎（纯逻辑无头解耦，配置驱动，20 项静态门禁，四阶段案卷施工）；
 - **顶层架构蓝图与全宗交付物**：
   - `docs/agent-native-system-blueprint.md`：多 Agent 自治体系、一体两面三层拓扑 Diff 差分系统与 R1~R5 记忆提纯顶层设计案卷；
-  - `deliverables/`：历史阶段性审查报告、重构治理方案与评审交付物索引归档（`deliverables/README.md`）；
+  - `archive/deliverables/`：历史阶段性审查报告、重构治理方案与评审交付物集中归档留痕；
 - **根级发布与门禁工具链（`scripts/`）**：`scripts/sh/audit-all.sh` / `scripts/ps1/audit-all.ps1`（全工作区跨项目统一审查中枢与质量看板）；`pre-commit-gate`（提交前文件物理卫生、换行契约、密钥防泄漏与 AST 局部切片审查，含 `sh/` 与 `ps1/` 同构双实现）；`commit-msg-gate`（生产工程级结构化正文、零黑话、文本风格求真务实与规则 ID 反虚构防漂移门禁，依单源注册表 `scripts/common/rule-catalog.json` 与 `commit-msg-forbidden-terms.json` 核验）；`pre-push-gate`（推送前全量回归测试、待推送分支提交历史规范扫描与质量基线检查，经 `.githooks/` 与 `install-hooks` 激活）；`package.ps1`/`package.sh`（打包至 `dist/<ext>/`，支持 `-HotSync` 双端热同步与 `-Install` 自愈安装）；`version-bump.sh`（语义递增+CHANGELOG，门禁自检）；`release-tag.sh`（发布留痕）；提交前缀 `vX.Y.Z` 触发 GitHub Actions 自动发布；`.github/workflows/ci.yml` 永久看守 hygiene 作业。
 
 ## 二、 跨项目全局通用契约
