@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791133569569",
-  "timestamp": "2026-10-04T17:06:19.169Z",
+  "snapshotId": "snapshot-v0.4.0-1791135035768",
+  "timestamp": "2026-10-04T17:30:44.869Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,7 +13,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 592,
-    "durationMs": 8449
+    "durationMs": 8156
   },
   "metrics": {
     "compositeScore": 99.17,
@@ -415,39 +415,39 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:149",
+        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:156",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 149,
+        "line": 156,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:213",
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:220",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 213,
+        "line": 220,
         "message": "Function \"auditBoundaryInteroperability\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:226",
+        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:233",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 226,
+        "line": 233,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:318",
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:325",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 318,
+        "line": 325,
         "message": "Function \"auditTenDimensionalFidelity\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
@@ -1319,27 +1319,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 117655,
+      "processed": 117661,
       "unique": 96698,
-      "changed": 215,
-      "semantic": 172,
+      "changed": 668,
+      "semantic": 534,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 108,
+      "added": 334,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791035877948,
-      "endMs": 1791133569566,
-      "totalRuns": 142,
+      "endMs": 1791135035767,
+      "totalRuns": 150,
       "eloc": {
-        "processedTotal": 16409755,
+        "processedTotal": 17351053,
         "uniqueTotal": 96698,
-        "changedTotal": 134471,
-        "semanticTotal": 107576
+        "changedTotal": 139891,
+        "semanticTotal": 111913
       },
       "qed": {
         "mean": 0,
@@ -1347,12 +1347,12 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 794264,
-        "totalResolved": 222,
+        "totalAdded": 794267,
+        "totalResolved": 225,
         "totalRegressions": 0,
-        "netYield": -48.39
+        "netYield": -45.76
       },
-      "meanCompositeScore": 99.19,
+      "meanCompositeScore": 99.18,
       "gatePassRate": 100
     },
     "isFirstBaseline": false

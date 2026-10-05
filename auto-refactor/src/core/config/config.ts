@@ -127,12 +127,12 @@ const DEFAULT_DUPLICATE_LITERAL_THRESHOLD = 3;
 const DEFAULT_HARDCODED_STRING_MIN_LENGTH = 3;
 /** large-file analyzer defaults. */
 const DEFAULT_FILE_LINES_WARN = 400;
-const DEFAULT_FILE_LINES_FAIL = 800;
+const DEFAULT_FILE_LINES_FAIL = 1400;
 const DEFAULT_FILE_FUNCTIONS_WARN = 15;
 /** Default warning threshold for effective lines of code. */
-export const DEFAULT_EFFECTIVE_LOC_WARN = 800;
+export const DEFAULT_EFFECTIVE_LOC_WARN = 750;
 /** Default failure threshold for effective lines of code. */
-export const DEFAULT_EFFECTIVE_LOC_FAIL = 1600;
+export const DEFAULT_EFFECTIVE_LOC_FAIL = 900;
 /** complexity analyzer defaults. */
 const DEFAULT_COMPLEXITY_WARN = 10;
 const DEFAULT_COMPLEXITY_FAIL = 20;
