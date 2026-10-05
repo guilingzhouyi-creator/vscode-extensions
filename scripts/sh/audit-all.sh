@@ -49,7 +49,7 @@ START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
 # 1. 物理卫生与零空文件看守
 if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生与零空文件..."; fi
-if ! "$NODE_BIN" auto-refactor/scripts/validate-no-empty-scripts.js >/dev/null 2>&1; then
+if ! "$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1; then
     STATUS_HYGIENE="FAIL"
     FAILED=1
 else
@@ -68,14 +68,14 @@ fi
 # 3. auto-refactor 静态重构与审查引擎自检
 if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [3/5] 执行 auto-refactor 质量基线与多维自审..."; fi
 if [[ "$FAST_MODE" -eq 1 ]]; then
-    if ! "$NODE_BIN" auto-refactor/scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1; then
+    if ! (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1); then
         STATUS_AR="FAIL"
         FAILED=1
     else
         STATUS_AR="PASS"
     fi
 else
-    if ! (cd auto-refactor && npm test >/dev/null 2>&1) || ! "$NODE_BIN" auto-refactor/scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1; then
+    if ! (cd auto-refactor && npm test >/dev/null 2>&1) || ! (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1); then
         STATUS_AR="FAIL"
         FAILED=1
     else

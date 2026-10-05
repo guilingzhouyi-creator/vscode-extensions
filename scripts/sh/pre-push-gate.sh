@@ -27,7 +27,7 @@ FAILED=0
 
 # --- Gate 1: 全工作区零空文件与物理卫生守卫 ---
 echo "[1/9] 校验全工作区零物理空文件与空白脚本守卫..."
-if ! "$NODE_BIN" auto-refactor/scripts/validate-no-empty-scripts.js >/dev/null 2>&1; then
+if ! "$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1; then
     echo "❌ Gate 1: 发现物理 0 字节或语义虚空文件"
     FAILED=1
 else
@@ -54,7 +54,7 @@ fi
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 ---
 echo "[4/9] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..."
-if ! "$NODE_BIN" auto-refactor/scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1; then
+if ! (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1); then
     echo "❌ Gate 4: auto-refactor 多维自审或质量基线未达标"
     FAILED=1
 else

@@ -136,7 +136,7 @@ fi
 # --- Gate 7: 单源规则漂移熔断 ---
 echo "[7/9] 校验单源规则元数据一致性..."
 if [[ "$STAGED_FILES" =~ auto-refactor/src/core/rules/ || "$STAGED_FILES" =~ auto-refactor/src/analyzers/ ]]; then
-    if ! "$NODE_BIN" auto-refactor/scripts/validate-rules-registry.js >/dev/null 2>&1; then
+    if ! "$NPM_BIN" --prefix auto-refactor run validate-rules-registry >/dev/null 2>&1; then
         echo "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！"
         FAILED=1
     else
@@ -179,7 +179,7 @@ fi
 echo "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15 [分发器<=25], Depth<=4, Noise<=4.0)..."
 TOUCHED_CODE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
 if [[ -n "$TOUCHED_CODE" ]]; then
-    if ! "$NODE_BIN" auto-refactor/scripts/validate-staged-slice.js; then
+    if ! "$NODE_BIN" scripts/common/validate-staged-slice.js; then
         echo "❌ [FAIL] Gate 9: 暂存区 AST 切片审查未通过！"
         FAILED=1
     fi

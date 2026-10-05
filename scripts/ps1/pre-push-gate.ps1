@@ -30,7 +30,7 @@ $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
 
 # --- Gate 1: 全工作区零空文件与物理卫生守卫 ---
 Write-Host "[1/9] 校验全工作区零物理空文件与空白脚本守卫..." -ForegroundColor Gray
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-no-empty-scripts.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ Gate 1: 发现物理 0 字节或语义虚空文件" -ForegroundColor Red
     $failed = $true
@@ -60,7 +60,7 @@ if ($res.ExitCode -ne 0) {
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 ---
 Write-Host "[4/9] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..." -ForegroundColor Gray
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/validate-self-multidimensional-audit.js" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     Write-Host "❌ Gate 4: auto-refactor 多维自审或质量基线未达标" -ForegroundColor Red
     $failed = $true

@@ -140,8 +140,17 @@ foreach ($ext in $exts) {
             }
             Write-Host '  npm run compile ...'; npm run compile
             if ($LASTEXITCODE -ne 0) { throw "compile 失败 ($ext)" }
+            $env:EXT_COMPILED = '1'
             $env:WT_COMPILED = '1'
         } finally { Pop-Location }
+    }
+
+    # ─── 校验展示资产 (pre 模式) ───
+    $assetChecker = Join-Path $PSScriptRoot 'check-display-assets.ps1'
+    if (Test-Path $assetChecker) {
+        Write-Host "  核验展示资产 (pre) ..." -ForegroundColor Cyan
+        & $assetChecker $dir 'pre'
+        if ($LASTEXITCODE -ne 0) { throw "展示资产预检失败 ($ext)" }
     }
 
     if ($HotSync) {
@@ -160,8 +169,16 @@ foreach ($ext in $exts) {
         npx @vscode/vsce package -o $vsix
         if ($LASTEXITCODE -ne 0) { throw "vsce package 失败 ($ext)" }
     } finally {
+        Remove-Item Env:\EXT_COMPILED -ErrorAction SilentlyContinue
         Remove-Item Env:\WT_COMPILED -ErrorAction SilentlyContinue
         Pop-Location
+    }
+
+    # ─── 校验展示资产 (post 模式，验证 vsix 包内是否包含) ───
+    if (Test-Path $assetChecker) {
+        Write-Host "  核验展示资产 (post) ..." -ForegroundColor Cyan
+        & $assetChecker $dir 'post' $vsix
+        if ($LASTEXITCODE -ne 0) { throw "展示资产包内校验失败 ($ext)" }
     }
 
     # ─── 清理旧版本：语义化版本排序保留最近 $Keep 个 ───

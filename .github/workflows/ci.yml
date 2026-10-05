@@ -441,8 +441,10 @@ jobs:
           fi
           # 8. 单源规则目录生成自检
           node scripts/common/generate-rule-catalog.js
-          # 9. AST 切片审查自检
-          node auto-refactor/scripts/validate-staged-slice.js auto-refactor/scripts/validate-staged-slice.js
+          # 8.1 平台级零空文件与跳板物理卫生自检
+          node scripts/common/validate-no-empty-files.js
+          # 9. 平台级 AST 切片审查自检
+          node scripts/common/validate-staged-slice.js scripts/common/validate-staged-slice.js
           # 10. 长期轨迹账本物理约束自检
           node scripts/common/validate-trajectory-ledger.js
           rm -f "$MSG_TEMP"

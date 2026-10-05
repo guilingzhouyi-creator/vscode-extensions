@@ -102,9 +102,21 @@ for EXT in "${EXTS[@]}"; do
     (cd "$DIR" && npm run compile)
   fi
 
+  # ─── 校验展示资产 (pre 模式) ───
+  if [[ -f "$ROOT/scripts/sh/check-display-assets.sh" ]]; then
+    echo "  核验展示资产 (pre) ..."
+    bash "$ROOT/scripts/sh/check-display-assets.sh" "$DIR" pre
+  fi
+
   VSIX="$OUT_DIR/$EXT-$PKG_VER.vsix"
   echo "  vsce package → $EXT-$PKG_VER.vsix ..."
   (cd "$DIR" && npx --yes @vscode/vsce package -o "$VSIX")
+
+  # ─── 校验展示资产 (post 模式) ───
+  if [[ -f "$ROOT/scripts/sh/check-display-assets.sh" ]]; then
+    echo "  核验展示资产 (post) ..."
+    bash "$ROOT/scripts/sh/check-display-assets.sh" "$DIR" post "$VSIX"
+  fi
 
   # ─── SHA256 校验和 ───
   HASH=$(sha256sum "$VSIX" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')

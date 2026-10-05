@@ -144,8 +144,9 @@ if (-not $failed) {
 # --- Gate 7: 单源规则漂移熔断 ---
 Write-Host "[7/9] 校验单源规则元数据一致性..." -ForegroundColor Gray
 $touchesRules = $stagedFiles | Where-Object { $_ -match "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/" }
+$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 if ($touchesRules) {
-    $res = Start-Process -FilePath "node" -ArgumentList "auto-refactor/scripts/validate-rules-registry.js" -NoNewWindow -PassThru -Wait
+    $res = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "run", "validate-rules-registry" -NoNewWindow -PassThru -Wait
     if ($res.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！" -ForegroundColor Red
         $failed = $true
@@ -159,7 +160,6 @@ Write-Host "[8/9] 检查相关项目增量编译与语法..." -ForegroundColor G
 $hasWt = $stagedFiles | Where-Object { $_ -match "^workspace-timing/" }
 $hasAr = $stagedFiles | Where-Object { $_ -match "^auto-refactor/" }
 $hasWg = $stagedFiles | Where-Object { $_ -match "^WebGames/" }
-$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 
 if ($hasWt) {
     Write-Host "  ▶ 触发 workspace-timing 增量编译校验..." -ForegroundColor Cyan
@@ -194,7 +194,7 @@ Write-Host "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15 [�
 $touchedCode = $stagedFiles | Where-Object { ($_ -match '\.(ts|js)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') }
 if ($touchedCode) {
     $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-    $process = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-staged-slice.js" -NoNewWindow -PassThru -Wait
+    $process = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-staged-slice.js" -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 9: 暂存区 AST 切片审查未通过！" -ForegroundColor Red
         $failed = $true

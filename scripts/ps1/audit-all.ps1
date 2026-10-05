@@ -35,7 +35,7 @@ $failed = $false
 
 # 1. 物理卫生与零空文件看守
 if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生与零空文件..." -ForegroundColor Gray }
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-no-empty-scripts.js" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -NoNewWindow -PassThru -Wait
 if ($res.ExitCode -ne 0) {
     $statusHygiene = "FAIL"
     $failed = $true
@@ -54,9 +54,11 @@ if ($res.ExitCode -ne 0) {
 }
 
 # 3. auto-refactor 静态重构与审查引擎自检
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$autoRefactorDir = Join-Path $repoRoot "auto-refactor"
 if (-not $Json) { Write-Host "▶ [3/5] 执行 auto-refactor 质量基线与多维自审..." -ForegroundColor Gray }
 if ($Fast) {
-    $res = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -NoNewWindow -PassThru -Wait
+    $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/validate-self-multidimensional-audit.js" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
     if ($res.ExitCode -ne 0) {
         $statusAr = "FAIL"
         $failed = $true
@@ -64,10 +66,8 @@ if ($Fast) {
         $statusAr = "PASS"
     }
 } else {
-    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-    $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
     $res1 = Start-Process -FilePath $npmCmd -ArgumentList "test" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
-    $res2 = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -NoNewWindow -PassThru -Wait
+    $res2 = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/validate-self-multidimensional-audit.js" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
     if ($res1.ExitCode -ne 0 -or $res2.ExitCode -ne 0) {
         $statusAr = "FAIL"
         $failed = $true
@@ -78,7 +78,6 @@ if ($Fast) {
 
 # 4. workspace-timing L0~L5 六层审查门禁
 if (-not $Json) { Write-Host "▶ [4/5] 执行 workspace-timing L0~L5 六层审查门禁与单元自检..." -ForegroundColor Gray }
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
 $res1 = Start-Process -FilePath $npmCmd -ArgumentList "run", "review" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
 $res2 = Start-Process -FilePath $npmCmd -ArgumentList "run", "test:fast" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait

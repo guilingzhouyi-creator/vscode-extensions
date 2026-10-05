@@ -13,7 +13,10 @@
 |------|------|------|--------|--------|
 | `sh/` | Bash | `audit-all.sh` | audit / review（全工作区跨项目统一审查中枢） | 本地 CLI、CI |
 | `ps1/` | PowerShell | `audit-all.ps1` | audit / review（audit-all.sh 同构双实现） | 本地 CLI（Windows） |
-| `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区 368+ 条规则单源目录聚合器） | 本地 CLI、pre-push 门禁 |
+| `common/` | Node.js | `validate-no-empty-files.js` | audit / hygiene（全工作区零物理空文件与空包跳板守卫） | `pre-push-gate`、`audit-all`、CI |
+| `common/` | Node.js | `validate-staged-slice.js` | gate / complexity（平台级增量 AST 切片圈复杂度/嵌套/噪声比审查器） | `pre-commit-gate`、CI |
+| `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络评估器） | `pre-commit-gate`、CI |
+| `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区 380+ 条规则单源目录聚合器） | 本地 CLI、pre-push 门禁 |
 | `common/` | Node.js | `validate-commit-msg-rules.js` | gate / ssot（提交信息规则 ID 反虚构校验器） | `commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-style.js` | gate / style（提交信息文本风格与四维禁词核验器） | `commit-msg-gate`、`pre-push-gate`、CI |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
@@ -27,16 +30,10 @@
 | `ps1/` | PowerShell | `pre-push-gate.ps1` | gate（pre-push-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `install-hooks.sh` | gate（一键激活仓库级 Git Hooks） | 本地 CLI |
 | `ps1/` | PowerShell | `install-hooks.ps1` | gate（install-hooks.sh 同构双实现） | 本地 CLI（Windows） |
-| `sh/` | `check-display-assets.sh` | ci（打包资产校验） | `.github/workflows/ci.yml`、`release.yml` |
-| `sh/` | Bash | `package.sh` | package（扩展打包） | 本地 CLI（README） |
-| `sh/` | Bash | `version-bump.sh` | release（语义递增 + CHANGELOG 迁移） | 本地 CLI / `release-tag.sh` |
-| `sh/` | Bash | `release-tag.sh` | release（bump→构建→打包→提交→Tag→推送） | 本地 CLI |
-| `sh/` | Bash | `auto-label.sh` | gate（Issue/PR 自动打标签） | 手动 / CI |
-| `sh/` | Bash | `pr-gate.sh` | gate（PR 前置门禁：冲突检测+Diff 初筛） | 手动 / CI |
-| `sh/` | Bash | `auto-merge-gate.sh` | gate（合入安全门禁 C0-C3） | 手动 / CI |
-| `sh/` | Bash | `release.sh` | release（打标后发布自动化骨架） | 手动 / CI |
-| `sh/` | Bash | `test-release.sh` | validate（release.sh 异常兜底用例） | 本地 CLI |
-| `ps1/` | PowerShell | `package.ps1` | package（扩展打包，与 package.sh 同约定） | 本地 CLI（Windows） |
+| `sh/` | Bash | `check-display-assets.sh` | ci（打包资产校验） | `.github/workflows/ci.yml`、`package.sh` |
+| `ps1/` | PowerShell | `check-display-assets.ps1` | ci（check-display-assets.sh 同构双实现） | `package.ps1`、本地 CLI（Windows） |
+| `sh/` | Bash | `package.sh` | package（扩展打包，联动展示资产校验） | 本地 CLI（README） |
+| `ps1/` | PowerShell | `package.ps1` | package（package.sh 同构双实现，联动资产校验与热同步） | 本地 CLI（Windows） |
 | `py/` | Python | （预留，暂无脚本） | — | — |
 
 > 职能域语义：`gate`=协作门禁（CNB 流水线触发）、`release`=发布流程、
