@@ -57,6 +57,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Review (L0~L5 Quality Gates)
+        run: |
+          if jq -e '.scripts.review' package.json >/dev/null 2>&1; then
+            npm run review
+          else
+            echo "::notice::No review script in package.json, skipping."
+          fi
+
       - name: Verify display assets (pre-package)
         run: bash ../scripts/sh/check-display-assets.sh . pre
 
@@ -446,6 +454,11 @@ jobs:
           # 9. 平台级 AST 切片审查自检
           node scripts/common/validate-staged-slice.js scripts/common/validate-staged-slice.js
           # 10. 长期轨迹账本物理约束自检
+          node scripts/common/validate-trajectory-ledger.js
+          # 11. WebGames 配置架构与规范审查
+          python3 WebGames/scripts/py/audit_config.py --strict
+          # 12. 工作区统一轨迹记录与边界自检
+          node scripts/common/record-workspace-trajectory.js
           node scripts/common/validate-trajectory-ledger.js
           rm -f "$MSG_TEMP"
           echo "✔ Git 本地门禁脚本与审查联动自检全部通过"
