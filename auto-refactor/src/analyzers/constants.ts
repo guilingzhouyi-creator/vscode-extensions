@@ -180,8 +180,7 @@ export class ConstantsAnalyzer implements Analyzer {
             /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i.test(ctx.filePath) ||
             /\.(?:test|spec)\.[a-z0-9]+$/i.test(ctx.filePath);
         const isStyle =
-            ctx.filePath.includes('-styles.') ||
-            /\.(?:css|scss|less|sass)\b/i.test(ctx.filePath);
+            ctx.filePath.includes('-styles.') || /\.(?:css|scss|less|sass)\b/i.test(ctx.filePath);
         if (isTest || isStyle) return;
 
         const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
