@@ -50,7 +50,11 @@ for (const c of checkers) {
     if (c.layer && !LAYERS.includes(c.layer)) push('RCFG-SCHEMA', 'error', `非法审查层 ${c.layer}（应为 L0~L5）`, 'scripts/config/review-rules.json');
     if (c.timeoutMs !== undefined && !(Number(c.timeoutMs) > 0)) push('RCFG-SCHEMA', 'error', `timeoutMs 必须为正数: ${c.id}`, 'scripts/config/review-rules.json');
 }
-for (const [id, count] of [...ids.reduce((m, i) => m.set(i, (m.get(i) ?? 0) + 1), new Map<string, number>())]) {
+const idCounts = new Map<string, number>();
+for (const id of ids) {
+    idCounts.set(id, (idCounts.get(id) ?? 0) + 1);
+}
+for (const [id, count] of idCounts) {
     if (count > 1) push('RCFG-SCHEMA', 'error', `规则 ID 重复: ${id}（审查来源不可追踪）`, 'scripts/config/review-rules.json');
 }
 // 跨检查器静态规则 ID 重复检测（同一发现归属两个检查器 = 证据链断裂）

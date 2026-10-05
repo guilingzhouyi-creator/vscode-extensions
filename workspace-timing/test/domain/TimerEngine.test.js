@@ -123,6 +123,22 @@ describe('TimerEngine（计时核心）', () => {
     assert.strictEqual(eng.data.currentSessionStartMs, resumeMs, '新起点为唤醒时刻');
   });
 
+  it('resumeFromSleep 跨自然日休眠切分：休眠前跨午夜段按自然日切分原子入账', () => {
+    withFixedNow('2026-10-05T08:00:00', () => {
+      const eng = new TimerEngine();
+      eng.start();
+      const t1 = new Date('2026-10-03T23:00:00').getTime();
+      const t2 = new Date('2026-10-04T01:00:00').getTime();
+      const tWake = new Date('2026-10-05T08:00:00').getTime();
+      eng._sessionStartMs = t1;
+      const elapsed = eng.resumeFromSleep(t2, tWake);
+      assert.strictEqual(elapsed, 7200000, '封存休眠前 2 小时');
+      assert.strictEqual(eng.data.sessions.length, 2, '休眠前跨日段应被切分为 2 个会话片段');
+      assert.strictEqual(eng.data.totalMs, 7200000);
+      assert.strictEqual(eng.data.currentSessionStartMs, tWake);
+    });
+  });
+
   it('今日累计增量：stop 后 getTodayMs 精确等于今日已结束段', () => {
     withFixedNow('2026-10-04T12:00:00', () => {
       const eng = new TimerEngine();

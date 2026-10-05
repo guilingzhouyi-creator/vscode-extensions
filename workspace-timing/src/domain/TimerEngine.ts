@@ -7,7 +7,7 @@
  */
 
 import { WorkspaceTimingData, ReadonlyTimingData, TimeSession, MS_PER_DAY, createEmptyTimingData } from './models';
-import { localDateStr, parseLocalDate } from './TimeAggregator';
+import { localDateStr, parseLocalDate, splitByNaturalDay } from './TimeAggregator';
 
 export interface TimerSnapshot {
     /** 当前累计总时长 (ms) */
@@ -197,9 +197,13 @@ export class TimerEngine {
         this._data.totalMs += elapsed;
 
         if (elapsed > 0) {
+            const segs = splitByNaturalDay(this._sessionStartMs, sleepStartMs);
+            const newSessions = segs.length > 0
+                ? segs
+                : [{ startMs: this._sessionStartMs, endMs: sleepStartMs, durationMs: elapsed }];
             this._data.sessions = TimerEngine.frozenSessions([
                 ...this._data.sessions,
-                { startMs: this._sessionStartMs, endMs: sleepStartMs, durationMs: elapsed },
+                ...newSessions,
             ]);
             this._todayEndedMs += sealedToday;
         }

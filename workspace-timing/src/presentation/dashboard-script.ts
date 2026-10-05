@@ -141,10 +141,11 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           return;
         }
 
-        // 大数组防护：workspaces 数量无上限，用循环求最大而非 Math.max(...spread)（防栈溢出）
+        // 大数组防护：workspaces 数量无上限，用索引循环求最大而非 Math.max(...spread)（防栈溢出）
         let maxVal = 1;
-        for (const ws of workspaces) {
-          if (ws.totalMs > maxVal) maxVal = ws.totalMs;
+        for (let i = 0; i < workspaces.length; i++) {
+          const t = workspaces[i].totalMs || 0;
+          if (t > maxVal) maxVal = t;
         }
         const grandTotal = globalTotalMs || workspaces.reduce((sum, ws) => sum + (ws.totalMs || 0), 0);
 
@@ -159,13 +160,13 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], wsCount) + '</span>';
         }
 
-        let html = '';
+        const rows = new Array(workspaces.length);
         for (let i = 0; i < workspaces.length; i++) {
           const ws = workspaces[i];
           const pct = Math.max((ws.totalMs / maxVal) * 100, 2);
           const share = grandTotal > 0 ? Math.round((ws.totalMs / grandTotal) * 100) : 0;
           const extraCls = i >= 5 ? ' ws-extra' : '';
-          html +=
+          rows[i] =
             '<div class="ws-compare-row' + extraCls + '">' +
               '<div class="ws-compare-header">' +
                 '<div class="ws-compare-name" title="' + escapeHtml(ws.name) + '">' + escapeHtml(ws.name) + '</div>' +
@@ -177,6 +178,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
               '</div>' +
             '</div>';
         }
+        let html = rows.join('');
 
         if (workspaces.length > 5) {
           html += renderFoldToggle(
@@ -264,16 +266,16 @@ export function buildDashboardScript(labels: Record<string, string>): string {
                    ' L ' + pList[1][0].toFixed(1) + ',' + pList[1][1].toFixed(1);
           }
 
-          const dx = [];
-          const dy = [];
-          const delta = [];
+          const dx = new Float64Array(n - 1);
+          const dy = new Float64Array(n - 1);
+          const delta = new Float64Array(n - 1);
           for (let i = 0; i < n - 1; i++) {
             dx[i] = pList[i + 1][0] - pList[i][0];
             dy[i] = pList[i + 1][1] - pList[i][1];
             delta[i] = dx[i] !== 0 ? dy[i] / dx[i] : 0;
           }
 
-          const m = new Array(n);
+          const m = new Float64Array(n);
           m[0] = delta[0];
           m[n - 1] = delta[n - 2];
           for (let i = 1; i < n - 1; i++) {
@@ -305,7 +307,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             }
           }
 
-          let path = 'M ' + pList[0][0].toFixed(1) + ',' + pList[0][1].toFixed(1);
+          const segs = new Array(n - 1);
           for (let i = 0; i < n - 1; i++) {
             const p1 = pList[i];
             const p2 = pList[i + 1];
@@ -319,11 +321,11 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             if (c1y > bY) c1y = bY;
             if (c2y > bY) c2y = bY;
 
-            path += ' C ' + c1x.toFixed(1) + ',' + c1y.toFixed(1) +
-                    ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) +
-                    ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+            segs[i] = ' C ' + c1x.toFixed(1) + ',' + c1y.toFixed(1) +
+                      ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) +
+                      ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
           }
-          return path;
+          return 'M ' + pList[0][0].toFixed(1) + ',' + pList[0][1].toFixed(1) + segs.join('');
         }
 
         const linePath = buildMonotonePath(pts, BASE_Y);
@@ -438,17 +440,19 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         }
 
         // 按 7 天一组切成「周」列（数据已按周一为首行排布）
-        const weeks = [];
+        const weekCols = [];
         for (let i = 0; i < data.length; i += 7) {
-          weeks.push(data.slice(i, i + 7));
-        }
-        el.innerHTML = weeks.map(week =>
-          '<div class="heatmap-week">' + week.map(d => {
+          let cellHtml = '';
+          const end = Math.min(i + 7, data.length);
+          for (let j = i; j < end; j++) {
+            const d = data[j];
             const cls = 'hm-cell l' + d.level + (d.future ? ' future' : '');
             const tip = d.future ? d.dateStr : (d.dateStr + ' · ' + formatDuration(d.totalMs));
-            return '<div class="' + cls + '" title="' + tip + '"></div>';
-          }).join('') + '</div>'
-        ).join('');
+            cellHtml += '<div class="' + cls + '" title="' + tip + '"></div>';
+          }
+          weekCols.push('<div class="heatmap-week">' + cellHtml + '</div>');
+        }
+        el.innerHTML = weekCols.join('');
 
         // 日期范围（首日 ~ 末日）
         if (rangeEl) {
@@ -566,16 +570,17 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           emptyEl.style.display = 'none';
           listEl.style.display = 'block';
 
-          let listHtml = '';
+          const sessionRows = new Array(detail.sessions.length);
           for (let i = 0; i < detail.sessions.length; i++) {
             const s = detail.sessions[i];
             const extraCls = i >= 5 ? ' session-extra' : '';
-            listHtml +=
+            sessionRows[i] =
               '<div class="session-row' + extraCls + '">' +
                 '<div class="session-time">' + escapeHtml(s.startLabel) + ' → ' + escapeHtml(s.endLabel) + '</div>' +
                 '<div class="session-dur">' + formatDuration(s.durationMs) + '</div>' +
               '</div>';
           }
+          let listHtml = sessionRows.join('');
 
           if (detail.sessions.length > 5) {
             listHtml += renderFoldToggle(
