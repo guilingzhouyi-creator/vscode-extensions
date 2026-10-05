@@ -6,7 +6,10 @@
  */
 
 export const DASHBOARD_CHART_STYLES = /* css */ `
-    /* 实时活跃曲线（对标参考图二高级可视化） */
+    /* ==============================================================================
+     * 1. 活跃曲线层 (Active Curve Canvas & Grids)
+     * 职责：承载动态 SVG 样条平滑曲线、毛玻璃背景、Y 轴参考刻度线与悬浮同心发光锚点。
+     * ============================================================================== */
     .active-curve {
       display: block;
       width: 100%;
@@ -28,15 +31,18 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       height: 100%;
       overflow: visible;
     }
+    /* 标尺虚线：水平分档等分刻度线，辅以暗色高对比度半透明纯白 */
     .ac-grid-line {
       stroke: rgba(255, 255, 255, 0.08);
       stroke-dasharray: 4 4;
       stroke-width: 1;
     }
+    /* 基准轴线：0刻度底部坚实基线，界定图表下界 */
     .ac-grid-base {
       stroke: rgba(255, 255, 255, 0.18);
       stroke-width: 1;
     }
+    /* Y轴标签：高对比度等宽数字字体，支持暗色主题高可读性 */
     .ac-grid-label {
       font-size: 10.5px;
       font-weight: 500;
@@ -44,6 +50,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       fill: #ffffff;
       opacity: 0.85;
     }
+    /* 曲线描边：单调三次样条拟合路径，搭配青蓝向亮绿渐变与发光微阴影 */
     .ac-line {
       fill: none;
       stroke: url(#acLineGradient);
@@ -52,10 +59,11 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       stroke-linecap: round;
       filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.45));
     }
+    /* 渐变面积填充：自曲线向下衰减至透明底的 SVG LinearGradient Mask */
     .ac-area {
       fill: url(#acGradient);
     }
-    /* 微型精致同心发光数据节点（仅活跃日展示，零值平原无节点） */
+    /* 微型同心发光数据节点：仅在非零活跃日展示，零值平原无噪点 */
     .ac-dot-halo {
       fill: rgba(56, 189, 248, 0.22);
       stroke: rgba(56, 189, 248, 0.75);
@@ -141,7 +149,10 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       fill: rgba(255, 255, 255, 0.55);
     }
 
-    /* 活动热力图（GitHub 风格现代化） */
+    /* ==============================================================================
+     * 2. 活动热力图层 (Heatmap Activity Matrix)
+     * 职责：GitHub 风格现代化 24 周全宽活动矩阵、色阶浓度等级与弹性留白自适应。
+     * ============================================================================== */
     .heatmap-range {
       font-size: 11px;
       color: var(--description);
@@ -275,7 +286,10 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       display: none;
     }
 
-    /* 按小时分布容器与骨架槽位 */
+    /* ==============================================================================
+     * 3. 今日明细与小时活跃分布 (Today Detail & Hourly Distribution)
+     * 职责：24小时槽位骨架、峰值小时微光指示、今日会话列表与有界折叠容器。
+     * ============================================================================== */
     .hourly-wrapper {
       position: relative;
       margin: 10px 0 6px 0;
@@ -498,7 +512,10 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       text-shadow: 0 0 6px rgba(239, 68, 68, 0.35);
     }
 
-    /* 跨工作区对比视图 */
+    /* ==============================================================================
+     * 4. 跨工作区对比视图 (Cross-Workspace Comparison View)
+     * 职责：各工作区工时横向对比条、占比比例、进度微光及有界折叠展开机制。
+     * ============================================================================== */
     .ws-compare-row {
       padding: 8px 0;
       border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);

@@ -23,7 +23,16 @@ export function buildDashboardScript(labels: Record<string, string>): string {
       let isTodaySessionsExpanded = false;
       let isWsExpanded = false;
 
-      // 通用折叠切换条渲染与事件绑定
+      /**
+       * 渲染折叠/展开交互按钮 HTML。
+       *
+       * @param {string} id - 切换条 DOM 唯一标识
+       * @param {boolean} isExpanded - 当前展开状态
+       * @param {string} showLessText - 收起态文案
+       * @param {string} showMoreText - 展开态模板文案
+       * @param {number} count - 列表总元素计数
+       * @returns {string} 格式化后的按钮 HTML
+       */
       function renderFoldToggle(id, isExpanded, showLessText, showMoreText, count) {
         const text = isExpanded ? showLessText : fmt(showMoreText, count);
         const arrow = isExpanded ? '▲' : '▼';
@@ -33,6 +42,14 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         '</div>';
       }
 
+      /**
+       * 绑定折叠切换按钮的点击事件并实时更新样式类与提示词条。
+       *
+       * @param {string} id - 切换条元素标识
+       * @param {HTMLElement} container - 宿主容器元素
+       * @param {() => boolean} onToggle - 状态切换回调
+       * @param {() => { less: string, more: string }} getTexts - 国际化文本提供者
+       */
       function bindFoldToggle(id, container, onToggle, getTexts) {
         const btn = document.getElementById(id);
         if (!btn) return;
