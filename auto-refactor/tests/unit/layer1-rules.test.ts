@@ -203,6 +203,12 @@ describe('Layer 1 evaluator registration', () => {
 `,
         );
         const issues = evaluator.evaluateAllLayer1(emptyGraph(), { currentFilePath: path });
-        expect(Array.isArray(issues)).toBe(true);
+        expect(issues).toHaveLength(1);
+        expect(issues[0].rule).toBe('high-algorithmic-complexity');
+        expect(issues[0].analyzer).toBe('performance');
+        expect(issues[0].severity).toBe('warning');
+        expect(issues[0].location.start.line).toBe(4);
+        const summary = evaluator.summarizeByLayer(issues);
+        expect(summary['layer1_universal']).toBe(1);
     });
 });

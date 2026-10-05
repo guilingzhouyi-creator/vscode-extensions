@@ -87,8 +87,8 @@ async function main() {
   console.log('\n3. Validating High Debt Reduction & Key Hotspot Resolution...');
   const highCount = report.metrics.byDebtTier.high;
   assert.ok(
-    highCount <= 220,
-    `High debt must be <= 220 (with Rule Generalization/12 rule expansion), found: ${highCount}`,
+    highCount <= INITIAL_SELF_AUDIT_BASELINE.highDebt,
+    `High debt must achieve net reduction (<= ${INITIAL_SELF_AUDIT_BASELINE.highDebt}), found: ${highCount}`,
   );
 
   // Assert target hotspots resolved high issues

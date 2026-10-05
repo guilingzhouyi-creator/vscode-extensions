@@ -128,9 +128,10 @@ try {
     newBlocking: blocking.length,
   };
   for (const issue of blocking.slice(0, 10)) {
+    const fix = issue.suggestedFix ? ` -> 建议: ${issue.suggestedFix}` : '';
     process.stdout.write(
       `[gate:self]   NEW ${issue.severity}: ${issue.analyzer}/${issue.rule} ` +
-        `${issue.location.file}:${issue.location.start.line} — ${issue.message}\n`,
+        `${issue.location.file}:${issue.location.start.line} — ${issue.message}${fix}\n`,
     );
   }
   if (blocking.length > 10) {
@@ -164,7 +165,8 @@ if (update) {
   }
 }
 
+const finalCode = summary && summary.newBlocking > 0 ? Math.max(1, code) : code;
 process.stdout.write(
-  `[gate:self] ${update ? 'baseline updated' : `self-scan ratchet (severity=${severity})`} → ${code === 0 ? 'PASS' : 'FAIL'}\n`,
+  `[gate:self] ${update ? 'baseline updated' : `self-scan ratchet (severity=${severity})`} → ${finalCode === 0 ? 'PASS' : 'FAIL'}\n`,
 );
-process.exit(code);
+process.exit(finalCode);

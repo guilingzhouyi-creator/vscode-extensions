@@ -276,6 +276,12 @@ describe('End-to-end: key analyzer regexes on long pathological strings', () => 
         });
 
         expect(ms).toBeLessThan(TIMEOUT_MS);
-        expect(tokenCount).toBeGreaterThanOrEqual(0);
+        expect(tokenCount).toBe(1);
+
+        // Also assert that iteration cap is strictly enforced on high-frequency matching tokens
+        const tokenReMulti = /[A-Za-z0-9_\-=]{16,}/g;
+        const manyTokens = 'abcdefghijklmnop '.repeat(100);
+        const cappedCount = safeRegexExecLoop(tokenReMulti, manyTokens, () => true, 50);
+        expect(cappedCount).toBe(50);
     });
 });

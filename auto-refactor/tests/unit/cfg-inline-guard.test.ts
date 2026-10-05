@@ -67,7 +67,9 @@ describe('inline early-return guards', () => {
             '    return list[key];',
             '}',
         ]);
-        expect(Array.isArray(result.unguardedDereferences)).toBe(true);
+        expect(result.unguardedDereferences).toHaveLength(1);
+        expect(result.unguardedDereferences[0].variable).toBe('list');
+        expect(result.unguardedDereferences[0].line).toBe(2);
     });
 });
 
