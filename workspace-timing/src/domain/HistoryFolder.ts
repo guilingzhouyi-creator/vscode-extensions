@@ -223,7 +223,7 @@ export function pruneDailyOverflowSessions(
  * 数学守恒定理：dailyStats(keptSessions) ∪ updatedDailyTotals ≡ dailyStats(originalSessions)
  * 会话总时长在裁剪前后严格无损，会话计数不重不漏。
  *
- * @param sessions - 待处理会话序列
+ * @param sessions - 输入会话序列
  * @param existingTotals - 既有日汇总桶集合
  * @param options - 回收策略选项（跨周/单日上限/容量阈值）
  * @returns 截断后保留的会话集与更新后的日汇总桶

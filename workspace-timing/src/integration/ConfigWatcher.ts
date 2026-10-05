@@ -160,7 +160,7 @@ export class ConfigWatcher {
                 if (!e.affectsConfiguration(CONFIG_SECTION)) return;
 
                 try {
-                    // 云端同步占位：检测用户尝试开启云端同步 → 提示即将推出
+                    // 云端同步检测：检测用户尝试开启云端同步 → 提示即将推出
                     this.checkCloudSyncPlaceholder(e);
 
                     const config = this.readConfig();
@@ -212,9 +212,9 @@ export class ConfigWatcher {
     }
 
     /**
-     * 云端同步占位检测：
+     * 云端同步开关变更检测：
      * 用户尝试开启 cloudSync.enabled 时给出「即将推出」提示。
-     * v0.2.0 阶段仅为扩展点占位，不实现真实同步。
+     * 当前阶段仅作为后续云端同步的扩展接口预留，未启用远端传输通道。
      */
     private checkCloudSyncPlaceholder(e: vscode.ConfigurationChangeEvent): void {
         if (!e.affectsConfiguration('workspaceTiming.cloudSync')) return;
@@ -223,9 +223,9 @@ export class ConfigWatcher {
         const enabled = cfg.get<boolean>(CONFIG_KEY_ENABLED, false);
 
         if (enabled) {
-            // 占位提示：云端同步即将推出
+            // 提示用户：云端同步功能即将推出
             vscode.window.showInformationMessage(t()['toast.cloudSyncPlaceholder']);
-            log(LogLevel.Info, 'ConfigWatcher: cloud sync placeholder triggered');
+            log(LogLevel.Info, 'ConfigWatcher: cloud sync prompt triggered');
         }
     }
 

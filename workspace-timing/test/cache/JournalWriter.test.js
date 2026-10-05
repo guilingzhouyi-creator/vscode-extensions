@@ -78,7 +78,7 @@ describe('JournalWriter（IJournalStore 端口）', () => {
 
     it('flushAll：绕过策略立即清空缓冲', async () => {
         const store = new FakeJournalStore();
-        // interval 极大 → tryFlush 永不触发；flushAll 应不受策略限制
+        // interval 极大 → tryFlush 保持未就绪；flushAll 应不受策略限制
         const w = new JournalWriter(store, 16, new TimeBasedCacheStrategy(60_000));
         w.push(slice(Date.now(), 500));
         assert.strictEqual(await w.tryFlush(), 0, '策略未到间隔应跳过');

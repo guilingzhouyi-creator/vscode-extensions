@@ -236,7 +236,7 @@ export class CommandRegistrar {
         const fileData = (raw && typeof raw === 'object') ? (raw as { totalMs?: unknown; sessions?: unknown[] }) : undefined;
         const fileTotal = fileData && typeof fileData.totalMs === 'number' ? fileData.totalMs : 0;
         const fileSessions = Array.isArray(fileData?.sessions) ? fileData!.sessions!.length : 0;
-        // 占位顺序：{0}=当前累计 {1}=当前会话数 {2}=文件累计 {3}=文件会话数
+        // 模板参数索引：{0}=当前累计 {1}=当前会话数 {2}=文件累计 {3}=文件会话数
         const summary = format(t()['confirm.restore'],
             TimeAggregator.formatDurationCompact(dash.totalMs), String(dash.sessionsCount),
             TimeAggregator.formatDurationCompact(fileTotal), String(fileSessions));

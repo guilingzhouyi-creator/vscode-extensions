@@ -47,7 +47,7 @@ describe('ConfigBounds（配置边界单一真源）', () => {
         assert.strictEqual(m.sanitizeMaxSessions(-10), 0, '负值钳到 0');
     });
 
-    it('非法输入（NaN/Infinity/字符串垃圾）一律回退默认值', () => {
+    it('非法输入（NaN/Infinity/非数值畸形字符串）一律回退默认值', () => {
         const cases = [
             [m.sanitizeRingBufferCapacity, m.DEFAULT_RING_BUFFER_CAP],
             [m.sanitizeJournalFlushIntervalMs, m.DEFAULT_JOURNAL_FLUSH_MS],
@@ -66,7 +66,7 @@ describe('ConfigBounds（配置边界单一真源）', () => {
 
     it('数字字符串可解析（面板手写 JSON 场景）', () => {
         assert.strictEqual(m.sanitizeRingBufferCapacity('2048'), 2048, '数字字符串解析');
-        assert.strictEqual(m.sanitizeFullSaveIntervalMs('abc'), m.MS_PER_MINUTE, '垃圾字符串回退');
+        assert.strictEqual(m.sanitizeFullSaveIntervalMs('abc'), m.MS_PER_MINUTE, '非数值字符串安全回退');
     });
 
     it('weeklyLimitHours：钳制到 [1, 168]', () => {

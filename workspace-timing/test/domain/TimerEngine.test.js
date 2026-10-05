@@ -171,7 +171,7 @@ describe('TimerEngine（计时核心）', () => {
       eng.rotateSession(now);              // 封存进今日 sessions
       assert.strictEqual(eng.getTodayEndedMs(), 1800000, '密封段今日部分计入已结束累计');
       // rotate 后会话仍进行中（起点=now），getTodayMs 含实时残段 ≥ 0；
-      // 精确相等存在毫秒边界竞态，故断言下限而非严格相等（见评审 P3-5）。
+      // 精确相等存在毫秒边界时钟抖动，依据单调推进断言历时下限。
       assert.ok(eng.getTodayMs() >= 1800000, '进行中会话残段叠加在已结束累计之上');
     });
   });

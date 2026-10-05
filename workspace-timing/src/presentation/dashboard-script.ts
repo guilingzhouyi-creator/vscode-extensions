@@ -327,13 +327,13 @@ export function buildDashboardScript(labels: Record<string, string>): string {
 
           let pathResult = 'M ' + pList[0][0].toFixed(1) + ',' + pList[0][1].toFixed(1);
           for (let i = 0; i < n - 1; i++) {
-            const p1 = pList[i];
-            const p2 = pList[i + 1];
+            const currPt = pList[i];
+            const nextPt = pList[i + 1];
             const h = dx[i];
-            const c1x = p1[0] + h / 3;
-            let c1y = p1[1] + (m[i] * h) / 3;
-            const c2x = p2[0] - h / 3;
-            let c2y = p2[1] - (m[i + 1] * h) / 3;
+            const c1x = currPt[0] + h / 3;
+            let c1y = currPt[1] + (m[i] * h) / 3;
+            const c2x = nextPt[0] - h / 3;
+            let c2y = nextPt[1] - (m[i + 1] * h) / 3;
 
             // 零下冲防护：控制点 Y 不可超越基线
             if (c1y > bY) c1y = bY;
@@ -341,7 +341,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
 
             pathResult += ' C ' + c1x.toFixed(1) + ',' + c1y.toFixed(1) +
                           ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) +
-                          ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+                          ' ' + nextPt[0].toFixed(1) + ',' + nextPt[1].toFixed(1);
           }
           return pathResult;
         }
@@ -381,7 +381,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           const hasTime = d.totalMs > 0;
           const durStr = hasTime ? formatDuration(d.totalMs) : '0';
 
-          // 悬浮胶囊标签：仅在有工时的活跃日展示，彻底消除 0 值平原的药丸堆积（鲜亮纯白字体）
+          // 悬浮胶囊标签：仅在有工时的活跃日展示，避免零工时日期出现冗余堆叠（鲜亮纯白字体）
           let pillGroup = '';
           if (hasTime) {
             const pillY = Math.max(cy - 16, 15);
@@ -396,7 +396,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
               '</g>';
           }
 
-          // 数据节点：0 工时日绝不画圆圈！仅活跃日绘制精致白核发光点
+          // 数据节点：零工时日期不绘制节点，仅在活跃日绘制高亮光点
           let dotGroup = '';
           if (hasTime) {
             dotGroup =

@@ -226,7 +226,7 @@ describe('TimerOrchestrator（周工作上限模块）', () => {
         });
 
         orchestrator.checkWeeklyLimit();
-        assert.strictEqual(notified, false, '上周的历史时长绝不应触发本周上限提醒');
+        assert.strictEqual(notified, false, '上周的历史时长不应触发本周上限提醒');
     });
 
     it('打开界面自动回收：单日超过 20 条会话自动淘汰最远条目，保留最新 20 条且工时无损', async () => {

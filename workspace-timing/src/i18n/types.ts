@@ -40,7 +40,7 @@ export interface I18nStrings {
     'export.filter.md': string;
     'export.filter.json': string;
     'export.filter.all': string;
-    // 云端同步占位
+    // 云端同步提示文案
     'toast.cloudSyncPlaceholder': string;
 
     // 报表导出（Markdown）
