@@ -90,7 +90,10 @@ async function main() {
     : path.resolve(process.cwd(), 'reports');
   const targetReportPath = path.join(targetReportDir, 'baseline-v0.3.0.json');
 
-  assert.ok(fs.existsSync(targetReportPath), `Production baseline must exist at: ${targetReportPath}`);
+  assert.ok(
+    fs.existsSync(targetReportPath),
+    `Production baseline must exist at: ${targetReportPath}`,
+  );
   const existingBaseline = loadFrozenBaseline(targetReportPath);
   assert.ok(existingBaseline !== null, 'Production baseline must parse successfully');
   const baselineCheck = verifyAuditSnapshot(existingBaseline);
@@ -133,7 +136,10 @@ async function main() {
     assert.strictEqual(reloaded.snapshotId, frozen.snapshotId);
     assert.strictEqual(reloaded.rulesDigest, frozen.rulesDigest);
     assert.strictEqual(reloaded.baselineMetrics.compositeScore, testMetrics.compositeScore);
-    assert.strictEqual(reloaded.baselineMetrics.testSuiteLatencySec, testMetrics.testSuiteLatencySec);
+    assert.strictEqual(
+      reloaded.baselineMetrics.testSuiteLatencySec,
+      testMetrics.testSuiteLatencySec,
+    );
     assert.strictEqual(
       reloaded.baselineMetrics.incrementalBuildLatencySec,
       testMetrics.incrementalBuildLatencySec,

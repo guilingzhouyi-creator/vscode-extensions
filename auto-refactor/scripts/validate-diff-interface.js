@@ -20,13 +20,12 @@
 const assert = require('assert');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const { scan, scanDiff, scanDiffDelta, scanAndRender } = require('../dist/api');
 
-const DEFAULT_TMP_DIR =
-  process.env.AUTO_REFACTOR_TMPDIR ||
-  (fs.existsSync('D:/') ? 'D:/temp' : path.join(__dirname, '..', '.tmp-diffif'));
+const DEFAULT_TMP_DIR = process.env.AUTO_REFACTOR_TMPDIR || path.join(os.tmpdir(), 'ar-diffif');
 try {
   fs.mkdirSync(DEFAULT_TMP_DIR, { recursive: true });
 } catch {
@@ -186,7 +185,12 @@ async function main() {
         stdio: 'pipe',
         encoding: 'utf8',
         timeout: 20000,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+        env: {
+          ...process.env,
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+          GIT_CONFIG_SYSTEM: process.platform === 'win32' ? 'NUL' : '/dev/null',
+        },
       });
     try {
       writeFiles(gitRoot, {

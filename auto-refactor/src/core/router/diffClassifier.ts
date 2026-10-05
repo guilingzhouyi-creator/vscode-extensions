@@ -156,6 +156,28 @@ function inspectLines(lines: string[]): DiffLineObservation {
     };
 }
 
+const PATH_EXTENSION_LANGUAGE_MAP: Record<string, string> = {
+    '.ts': 'typescript',
+    '.tsx': 'typescript',
+    '.mts': 'typescript',
+    '.cts': 'typescript',
+    '.js': 'javascript',
+    '.jsx': 'javascript',
+    '.mjs': 'javascript',
+    '.cjs': 'javascript',
+    '.py': 'python',
+    '.rs': 'rust',
+    '.go': 'go',
+    '.gd': 'gdscript',
+    '.sh': 'shell',
+    '.bash': 'shell',
+    '.zsh': 'shell',
+    '.ps1': 'shell',
+    '.psm1': 'shell',
+    '.psd1': 'shell',
+    '.md': 'markdown',
+};
+
 /**
  * Infer source language from file path extension.
  */
@@ -164,14 +186,7 @@ function inferLanguageFromPath(filePath?: string): string | undefined {
     const dot = filePath.lastIndexOf('.');
     if (dot < 0) return undefined;
     const ext = filePath.slice(dot).toLowerCase();
-    if (ext === '.ts' || ext === '.tsx' || ext === '.mts' || ext === '.cts') return 'typescript';
-    if (ext === '.js' || ext === '.jsx' || ext === '.mjs' || ext === '.cjs') return 'javascript';
-    if (ext === '.py') return 'python';
-    if (ext === '.rs') return 'rust';
-    if (ext === '.go') return 'go';
-    if (ext === '.gd') return 'gdscript';
-    if (ext === '.md') return 'markdown';
-    return undefined;
+    return PATH_EXTENSION_LANGUAGE_MAP[ext];
 }
 
 /**

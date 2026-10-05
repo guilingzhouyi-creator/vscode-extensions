@@ -160,6 +160,8 @@ export const LANGUAGE_EXCLUSIVE_ANALYZERS: Record<string, readonly string[]> = {
     python: [ANALYZER_PYTHON_MODERN],
     rust: [ANALYZER_RUST_MODERN],
     gdscript: [ANALYZER_GDSCRIPT_MODERN],
+    go: [ANALYZER_GO_MODERN],
+    shell: [ANALYZER_SHELL_LINT],
 };
 
 /**
@@ -171,6 +173,8 @@ export const ALL_LANGUAGE_SPECIFIC_ANALYZERS: readonly string[] = [
     ANALYZER_PYTHON_MODERN,
     ANALYZER_RUST_MODERN,
     ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_GO_MODERN,
+    ANALYZER_SHELL_LINT,
 ] as const;
 
 /**

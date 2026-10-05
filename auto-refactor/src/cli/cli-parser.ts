@@ -454,6 +454,7 @@ Usage:
   auto-refactor trajectory [<file>|--summary]            Inspect global review ledger or file revision history
   auto-refactor memory                                  Inspect active review memory and cache capacity
   auto-refactor stats [--root <dir>]                     Compute code volume, LOC, ELOC and density dashboard
+  auto-refactor gate [--stage <stage>] [--root <dir>]    Evaluate composite quality gate thresholds
 
 Options:
   --root <dir>                 Root directory to scan (default: cwd)

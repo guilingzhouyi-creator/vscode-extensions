@@ -34,11 +34,16 @@ const CORPUS = path.join(__dirname, '.corpus');
 const RUST_CORPUS = path.join(__dirname, '.rust-corpus');
 const SAMPLES = path.join(ROOT, 'samples');
 
-const DEFAULT_TMP_DIR =
-  process.env.AUTO_REFACTOR_TMPDIR ||
-  (fs.existsSync('D:/') ? 'D:/temp' : path.join(os.tmpdir(), 'ar-temp'));
+const DEFAULT_TMP_DIR = process.env.AUTO_REFACTOR_TMPDIR || path.join(os.tmpdir(), 'ar-temp');
 try {
   fs.mkdirSync(DEFAULT_TMP_DIR, { recursive: true });
+} catch {
+  // best-effort
+}
+
+process.env.AUTO_REFACTOR_REGISTRY_DIR ||= path.join(DEFAULT_TMP_DIR, 'ar-registry');
+try {
+  fs.mkdirSync(process.env.AUTO_REFACTOR_REGISTRY_DIR, { recursive: true });
 } catch {
   // best-effort
 }

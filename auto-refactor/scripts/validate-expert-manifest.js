@@ -32,7 +32,11 @@ const { EXPERT_MANIFEST, validateExpertManifest, deriveCategoryMatrix, deriveArc
 console.log('=== Validating MoE Expert Manifest Integrity (C-01, C-02, C-04, N-08) ===');
 
 assert(Array.isArray(EXPERT_MANIFEST), 'EXPERT_MANIFEST must be an array');
-assert(EXPERT_MANIFEST.length >= 21, `Expected >= 21 experts, found ${EXPERT_MANIFEST.length}`);
+assert.strictEqual(
+  EXPERT_MANIFEST.length,
+  27,
+  `Expected exactly 27 experts, found ${EXPERT_MANIFEST.length}`,
+);
 
 // 1. Validate manifest integrity constraints
 try {

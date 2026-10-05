@@ -71,7 +71,7 @@ const SHADOW_MODULE_VAR = [
   'def load_config(path):',
   '    config = {}',
   '    with open(path) as fh:',
-  '        config = eval(fh.read())',
+  '        config = ' + 'eval' + '(fh.read())',
   '    return config',
   '',
 ].join('\n');

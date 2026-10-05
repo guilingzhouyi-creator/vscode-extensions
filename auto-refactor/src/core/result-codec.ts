@@ -13,7 +13,7 @@
  *     the intended hard gate — insertion-order-preserving tagged values make the binary shape
  *     match structured clone, and the default-off flag keeps the proven path untouched.
  *
- * P2-5 result codec — compact binary worker→main result transport.
+ * Compact binary worker-to-main result transport codec.
  *
  * Gated by AR_BINARY_RESULT=1 (default off). Only the RESULT direction is encoded
  * (worker → main postMessage); the task-dispatch direction keeps its zero-copy Buffer

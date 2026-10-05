@@ -82,6 +82,9 @@ export function projectHashFor(root: string): string {
  * @returns Absolute platform-specific directory path; the directory is not created here.
  */
 export function registryDir(): string {
+    if (process.env.AUTO_REFACTOR_REGISTRY_DIR) {
+        return process.env.AUTO_REFACTOR_REGISTRY_DIR;
+    }
     if (process.platform === 'win32') {
         const local = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
         return path.join(local, 'auto-refactor');

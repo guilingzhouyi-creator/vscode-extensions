@@ -7,6 +7,7 @@
   "include": [
     "src/**/*.ts",
     "scripts/*.js",
+    "tests/**/*.ts",
     "crates/**/*.rs"
   ],
   "exclude": [
@@ -31,12 +32,14 @@
     "complexityFail": 25,
     "blockingIoAllowPatterns": [
       "scripts/**",
+      "tests/**",
       "src/cli/**",
       "src/core/profiler/**",
       "src/core/intelligence/**"
     ],
     "allocationAllowPatterns": [
       "scripts/**",
+      "tests/**",
       "src/cli/**",
       "src/core/profiler/**",
       "src/core/intelligence/**"
@@ -69,6 +72,24 @@
     },
     "simplify": {
       "enabled": true
+    },
+    "ts-modern": {
+      "enabled": true
+    },
+    "naming": {
+      "enabled": true
+    },
+    "secrets": {
+      "enabled": true
+    },
+    "security": {
+      "enabled": true
+    },
+    "docs": {
+      "enabled": true
+    },
+    "gate-architecture": {
+      "enabled": true
     }
   },
   "logLevel": "info",
@@ -90,6 +111,26 @@
       "matchFile": "scripts/validate-security-levels.js",
       "matchRule": "secret-detected",
       "reason": "该文件是密钥扫描器的夹具：内含形如 ghp_ 的假样本用于断言 SEC 规则命中，并非真实凭据"
+    },
+    {
+      "matchFile": "scripts/validate-security-levels.js",
+      "matchRule": "SEC-VUL-001",
+      "reason": "该文件承载安全扫描规则的验证夹具：内含故意构造的 eval 与 dynamic code execution 用例断言规则命中"
+    },
+    {
+      "matchFile": "scripts/validate-security-levels.js",
+      "matchRule": "SEC-VUL-002",
+      "reason": "该文件承载安全扫描规则的验证夹具：内含动态命令拼接测试用例用于断言注入规则命中"
+    },
+    {
+      "matchFile": "scripts/validate-security-levels.js",
+      "matchRule": "SEC-VUL-003",
+      "reason": "该文件承载安全扫描规则的验证夹具：内含原型链操作用于断言原型污染规则命中"
+    },
+    {
+      "matchFile": "scripts/validate-shadowing.js",
+      "matchRule": "SEC-VUL-001",
+      "reason": "该文件承载影子与动态作用域扫描规则的验证夹具：需通过动态表达式断言隔离语义"
     },
     {
       "matchFile": "scripts/validate-governance.js",

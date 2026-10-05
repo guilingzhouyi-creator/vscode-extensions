@@ -37,6 +37,9 @@ import {
     ANALYZER_STDLIB,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GO_MODERN,
+    ANALYZER_SHELL_LINT,
+    ANALYZER_GATE_ARCHITECTURE,
 } from '../scoring/dimensionLiterals';
 
 const TRACK_FAST = 'fast' as const;
@@ -374,6 +377,35 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         weight: 2.0,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'VS Code extension disposable lifecycle, blocking I/O, and UI localization',
+    },
+    {
+        id: ANALYZER_GO_MODERN,
+        signals: [SIG_GENERAL_CODE],
+        track: TRACK_DEEP,
+        steadyCostUs: COST_95,
+        weight: 2.0,
+        fallback: FALLBACK_ESCALATE_DEEP,
+        description: 'Go modernization, idioms, error handling, and goroutine safety',
+    },
+    {
+        id: ANALYZER_SHELL_LINT,
+        signals: [SIG_CONTROL_FLOW, SIG_GENERAL_CODE],
+        track: TRACK_FAST,
+        steadyCostUs: COST_60,
+        weight: 1.5,
+        fallback: FALLBACK_BLOCK,
+        isSecurityFamily: false,
+        description:
+            'Shell script and PowerShell governance, error trapping, and cross-platform safety',
+    },
+    {
+        id: ANALYZER_GATE_ARCHITECTURE,
+        signals: [SIG_IMPORT_EXPORT, SIG_GENERAL_CODE],
+        track: TRACK_DEEP,
+        steadyCostUs: COST_110,
+        weight: 2.5,
+        fallback: FALLBACK_ESCALATE_DEEP,
+        description: 'Gate architecture boundaries, subprocess isolation, and CI/local parity',
     },
 ];
 

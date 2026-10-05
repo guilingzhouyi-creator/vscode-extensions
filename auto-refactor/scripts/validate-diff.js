@@ -31,9 +31,7 @@ const CORPUS = path.join(__dirname, '.diff-corpus');
 const BIG = path.join(CORPUS, 'src', 'big.ts');
 const SMALL = path.join(CORPUS, 'src', 'small.ts');
 
-const DEFAULT_TMP_DIR =
-  process.env.AUTO_REFACTOR_TMPDIR ||
-  (fs.existsSync('D:/') ? 'D:/temp' : path.join(os.tmpdir(), 'ar-temp'));
+const DEFAULT_TMP_DIR = process.env.AUTO_REFACTOR_TMPDIR || path.join(os.tmpdir(), 'ar-temp');
 try {
   fs.mkdirSync(DEFAULT_TMP_DIR, { recursive: true });
 } catch {

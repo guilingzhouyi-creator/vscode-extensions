@@ -491,9 +491,24 @@ async function collectGitChangedFiles(root: string): Promise<string[]> {
         const cp = require('child_process');
         const { promisify } = require('util');
         const execFileAsync = promisify(cp.execFile);
+        const gitEnv = {
+            ...process.env,
+            GIT_TERMINAL_PROMPT: '0',
+            ...(process.env.GIT_CONFIG_GLOBAL
+                ? {}
+                : {
+                      GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+                  }),
+            ...(process.env.GIT_CONFIG_SYSTEM
+                ? {}
+                : {
+                      GIT_CONFIG_SYSTEM: process.platform === 'win32' ? 'NUL' : '/dev/null',
+                  }),
+        };
         const { stdout: out } = await execFileAsync('git', ['status', '--porcelain'], {
             cwd: root,
             encoding: 'utf8',
+            env: gitEnv,
         });
         for (const line of (out || '').split(/\r?\n/)) {
             const trimmed = line.trim();

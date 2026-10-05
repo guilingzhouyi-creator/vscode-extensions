@@ -2,7 +2,8 @@
  * Module: Verification Harness — Incremental AST Slice Review Gate (SSOT Bridge)
  * File Path: scripts/validate-staged-slice.js
  * Architecture Role: Single-source-of-truth delegation bridge connecting auto-refactor
- *   to the platform-level incremental AST slice complexity gate (scripts/common/validate-staged-slice.js).
+ *   to the platform incremental AST slice complexity gate
+ *   (scripts/common/validate-staged-slice.js).
  * Dependencies & Triggers: Invoked by test-parallel.js, unit tests, and pre-commit-gate.
  * Responsibilities:
  *   1. Resolve and dynamically verify the shared common AST slice validator;
@@ -45,8 +46,8 @@ for (const exportName of REQUIRED_EXPORTS) {
 /**
  * Execution wrapper providing localized timing and platform diagnostic logging.
  *
- * @param {string[]} [argv] Optional explicit arguments to pass through to the runner.
- * @returns {void}
+ * @param argv Optional explicit arguments to pass through to the runner.
+ * @returns Execution outcome.
  */
 function runWithDiagnostics(argv) {
   if (Array.isArray(argv) && argv.length > 0) {

@@ -30,6 +30,8 @@ import { scanNearLiteralClusters } from '../core/intelligence/near-literal-clust
 import { checkConstantLayoutAndScope } from '../core/governance/constant-layout-guard';
 import { extractConstantEntities } from '../core/diff/constant-relocation-detector';
 import { inspectConstantLibraryTopology } from '../core/architecture/constant-library-auditor';
+import { detectConstantDrift } from '../core/architecture/constant-drift-guard';
+import { arbitrateConstantOwnership } from '../core/architecture/constant-ownership-arbiter';
 import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
 import { formatConstantDeclarationSuggestion } from '../core/intelligence/constant-identity';
 
@@ -166,6 +168,17 @@ export class ConstantsAnalyzer implements Analyzer {
                 isExported: e.identity.isExported,
             }));
             issues.push(...inspectConstantLibraryTopology(observed, ctx.filePath));
+            issues.push(...detectConstantDrift(observed));
+            for (const item of observed) {
+                const { issue } = arbitrateConstantOwnership(
+                    item.name,
+                    item.normalizedValue,
+                    item.filePath,
+                    item.line,
+                    [item.filePath],
+                );
+                if (issue) issues.push(issue);
+            }
         }
     }
 

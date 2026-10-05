@@ -147,7 +147,7 @@ function handleEvent(type: string, data: any) {
     },
 ];
 
-/** Initial foundational candidates extracted from Phase 10 self-refactoring */
+/** Initial foundational candidates extracted from self-refactoring generalization */
 const FOUNDATIONAL_CANDIDATES: readonly RuleCandidate[] = [
     {
         id: 'cand-hyg-wrap',
@@ -157,7 +157,7 @@ const FOUNDATIONAL_CANDIDATES: readonly RuleCandidate[] = [
         targetAnalyzer: 'hygiene',
         level: 'universal',
         status: 'promoted',
-        origin: 'Phase 10 Self-Refactor',
+        origin: 'Generalization Self-Refactor',
         badPattern: 'Transparent 1:1 parameter passthrough wrapper with zero added semantics.',
         goodPattern: 'Direct callee invocation, decorator pattern, or validation in wrapper.',
         fixtures: WRAPPER_FIXTURES,
@@ -181,7 +181,7 @@ const FOUNDATIONAL_CANDIDATES: readonly RuleCandidate[] = [
         targetAnalyzer: 'governance',
         level: 'language_family',
         status: 'promoted',
-        origin: 'Phase 10 Self-Refactor',
+        origin: 'Generalization Self-Refactor',
         badPattern: 'Catch block containing only dummy statements (void 0, dummy assignment).',
         goodPattern: 'Structured logging, re-throw, or explicit rationale comment.',
         fixtures: SILENT_EXC_FIXTURES,
@@ -205,7 +205,7 @@ const FOUNDATIONAL_CANDIDATES: readonly RuleCandidate[] = [
         targetAnalyzer: 'architecture',
         level: 'universal',
         status: 'promoted',
-        origin: 'Phase 10 Self-Refactor',
+        origin: 'Generalization Self-Refactor',
         badPattern: 'Large monolithic switch dispatcher with > 8 procedural branches.',
         goodPattern: 'Table-driven lookup or Strategy Pattern.',
         fixtures: DISP_FIXTURES,

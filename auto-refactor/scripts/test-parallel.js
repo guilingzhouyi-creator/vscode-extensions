@@ -16,22 +16,10 @@
 'use strict';
 
 const { spawn } = require('child_process');
-const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-
-// ── Offload temporary drive cache if D: drive exists to prevent C: I/O thrashing ──
-if (!process.env.AUTO_REFACTOR_TMPDIR && fs.existsSync('D:/')) {
-  const dTemp = 'D:/temp';
-  try {
-    fs.mkdirSync(dTemp, { recursive: true });
-    process.env.AUTO_REFACTOR_TMPDIR = dTemp;
-  } catch {
-    // ignore
-  }
-}
 
 // ── CLI Arguments ──
 const rawArgs = process.argv.slice(2);
