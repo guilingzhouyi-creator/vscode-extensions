@@ -151,7 +151,7 @@ fi
 # ---------- 5. 执行发布（失败重试 + 超时兜底） ----------
 START_TIME=$(date +%s)
 
-# 构建 release notes（简单占位：模块名 + 版本 + 目标分支），供 post-release 使用
+# 构建 release notes 默认模板（模块名 + 版本 + 目标分支），供 post-release 使用
 RELEASE_BODY="## ${RELEASE_NAME} ${RELEASE_VERSION}
 
 自动发布（release.sh · 意图 #17 M2 打标发布自动化）。

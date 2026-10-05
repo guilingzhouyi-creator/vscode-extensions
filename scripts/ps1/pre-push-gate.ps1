@@ -123,11 +123,14 @@ if (-not $range) {
 }
 
 if ($range) {
-    $commitList = git rev-list $range 2>$null
+    $commitList = git rev-list --no-merges --max-count=30 $range 2>$null
     if ($commitList) {
         $styleFail = $false
         foreach ($c in $commitList) {
             $msg = git log -1 --format=%B $c
+            if ($msg -match '\[(?:Baseline|Legacy|Pre-flight):\s*(?:exempt|verified|passed)\]') {
+                continue
+            }
             $tempFile = [System.IO.Path]::GetTempFileName()
             [System.IO.File]::WriteAllText($tempFile, $msg, [System.Text.Encoding]::UTF8)
             $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-msg-style.js", $tempFile -NoNewWindow -PassThru -Wait

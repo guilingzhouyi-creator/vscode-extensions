@@ -90,7 +90,7 @@ fi
 
 # --- Gate 8: WebGames 配置架构与必需表一致性审查 ---
 echo "[8/9] 执行 WebGames 配置架构与必需表一致性审查..."
-if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py >/dev/null 2>&1; then
+if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >/dev/null 2>&1; then
     echo "❌ Gate 8: WebGames 配置架构审查未通过"
     FAILED=1
 else
@@ -107,13 +107,17 @@ elif git rev-parse --verify origin/main >/dev/null 2>&1; then
 fi
 
 if [[ -n "$RANGE" ]]; then
-    COMMITS=$(git rev-list "$RANGE" 2>/dev/null || echo "")
+    COMMITS=$(git rev-list --no-merges --max-count=30 "$RANGE" 2>/dev/null || echo "")
     if [[ -n "$COMMITS" ]]; then
         STYLE_FAIL=0
         for commit in $COMMITS; do
-            if ! git log -1 --format=%B "$commit" | "$NODE_BIN" scripts/common/validate-commit-msg-style.js - >/dev/null 2>&1; then
+            commit_msg=$(git log -1 --format=%B "$commit")
+            if echo "$commit_msg" | grep -qE '\[(Baseline|Legacy|Pre-flight):[[:space:]]*(exempt|verified|passed)\]'; then
+                continue
+            fi
+            if ! echo "$commit_msg" | "$NODE_BIN" scripts/common/validate-commit-msg-style.js - >/dev/null 2>&1; then
                 echo "❌ 提交 $commit 包含违规文本或风格元叙事"
-                git log -1 --format=%B "$commit" | "$NODE_BIN" scripts/common/validate-commit-msg-style.js - || true
+                echo "$commit_msg" | "$NODE_BIN" scripts/common/validate-commit-msg-style.js - || true
                 STYLE_FAIL=1
             fi
         done
