@@ -143,6 +143,10 @@ Write-Host "├─────────────────────�
 Write-Host ("│ 耗时: {0}s  |  全局状态: {1}           │" -f $elapsedSec, $globalStatus) -ForegroundColor $globalColor
 Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
 
+# 6. 汇流记录工作区统一质量轨迹
+$trajArg = if ($failed) { "scripts/common/record-workspace-trajectory.js", "--failed" } else { "scripts/common/record-workspace-trajectory.js" }
+Start-Process -FilePath $nodeCmd -ArgumentList $trajArg -NoNewWindow -PassThru -Wait | Out-Null
+
 if ($failed) {
     Write-Host "❌ 审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red
     exit 1

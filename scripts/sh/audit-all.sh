@@ -143,6 +143,13 @@ echo "├───────────────────────�
 echo "│ 耗时: ${ELAPSED_SEC}s  |  全局状态: $([[ $FAILED -eq 0 ]] && echo '✅ 检查通过' || echo '❌ 检查未通过')           │"
 echo "└───────────────────────────────────────────────────────────────┘"
 
+# 6. 汇流记录工作区统一质量轨迹
+if [[ "$FAILED" -ne 0 ]]; then
+    "$NODE_BIN" scripts/common/record-workspace-trajectory.js --failed >/dev/null 2>&1 || true
+else
+    "$NODE_BIN" scripts/common/record-workspace-trajectory.js >/dev/null 2>&1 || true
+fi
+
 if [[ "$FAILED" -ne 0 ]]; then
     echo "❌ 审查中枢检测到未通过项，请排查修复对应项目"
     exit 1
