@@ -132,6 +132,33 @@ export function ensureLedgerDirectory(ledgerDir: string): void {
 }
 
 /**
+ * Prunes the active runs NDJSON file to the given retention limit.
+ *
+ * @param activeFile - Path to active-runs.ndjson.
+ * @param maxRollingRuns - Maximum number of recent lines to keep.
+ */
+export async function pruneActiveRuns(
+    activeFile: string,
+    maxRollingRuns = DEFAULT_MAX_ROLLING_RUNS,
+): Promise<void> {
+    try {
+        const content = await fs.promises.readFile(activeFile, 'utf8');
+        const lines = content
+            .trim()
+            .split('\n')
+            .filter((l) => l.trim().length > 0);
+        if (lines.length > maxRollingRuns) {
+            const recentLines = lines.slice(-maxRollingRuns);
+            await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
+        }
+    } catch (err: unknown) {
+        if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+            return;
+        }
+    }
+}
+
+/**
  * Truncates active runs file to retention limit if oversized.
  */
 async function pruneActiveRunsIfOversized(
@@ -145,8 +172,7 @@ async function pruneActiveRunsIfOversized(
             .split('\n')
             .filter((l) => l.trim().length > 0);
         if (lines.length > maxRollingRuns * 1.5) {
-            const recentLines = lines.slice(-maxRollingRuns);
-            await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
+            await pruneActiveRuns(activeFile, maxRollingRuns);
         }
     } catch (err: unknown) {
         if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
