@@ -60,9 +60,10 @@ async function main() {
     RULE_REGISTRY.length >= snapshot.registeredRuleIds.length,
     'Current registry must preserve and supersede baseline rules',
   );
+  const registeredRuleSet = new Set(RULE_REGISTRY.map((r) => r.id));
   for (const baseId of snapshot.registeredRuleIds) {
     assert.ok(
-      RULE_REGISTRY.some((r) => r.id === baseId),
+      registeredRuleSet.has(baseId),
       `Baseline rule ${baseId} must remain registered`,
     );
   }
@@ -74,8 +75,9 @@ async function main() {
 
   // 3. Verify supported languages array
   const expectedLangs = ['typescript', 'javascript', 'python', 'rust', 'gdscript'];
+  const supportedLangsSet = new Set(snapshot.supportedLanguages);
   for (const lang of expectedLangs) {
-    assert(snapshot.supportedLanguages.includes(lang), `Missing language: ${lang}`);
+    assert(supportedLangsSet.has(lang), `Missing language: ${lang}`);
   }
   console.log(`✔ Supported languages locked (${snapshot.supportedLanguages.join(', ')})`);
 
@@ -85,11 +87,26 @@ async function main() {
   assert.strictEqual(checkResult.errors.length, 0, 'No errors expected on clean snapshot');
 
   // 5. Test freeze and reload to reports/baseline-v0.3.0.json
-  const targetReportDir = path.resolve(process.cwd(), 'reports');
+  const targetReportDir = fs.existsSync(path.resolve(__dirname, '../reports'))
+    ? path.resolve(__dirname, '../reports')
+    : path.resolve(process.cwd(), 'reports');
   const targetReportPath = path.join(targetReportDir, 'baseline-v0.3.0.json');
+  const selfAuditPath = path.join(targetReportDir, 'self-audit-baseline.json');
+
+  let realScore = 99.16;
+  if (fs.existsSync(selfAuditPath)) {
+    try {
+      const selfAudit = JSON.parse(fs.readFileSync(selfAuditPath, 'utf8'));
+      if (typeof selfAudit.metrics?.compositeScore === 'number') {
+        realScore = selfAudit.metrics.compositeScore;
+      }
+    } catch {
+      /* ignored: baseline file parse optional fallback */
+    }
+  }
 
   const frozen = freezeBaselineToFile(targetReportPath, {
-    compositeScore: 88.5,
+    compositeScore: realScore,
     testSuiteLatencySec: 11.09,
     incrementalBuildLatencySec: 1.36,
   });
@@ -99,10 +116,10 @@ async function main() {
   assert(reloaded !== null, 'Reloaded baseline must not be null');
   assert.strictEqual(reloaded.snapshotId, frozen.snapshotId);
   assert.strictEqual(reloaded.rulesDigest, frozen.rulesDigest);
-  assert.strictEqual(reloaded.baselineMetrics.compositeScore, 88.5);
+  assert.strictEqual(reloaded.baselineMetrics.compositeScore, realScore);
   assert.strictEqual(reloaded.baselineMetrics.testSuiteLatencySec, 11.09);
   assert.strictEqual(reloaded.baselineMetrics.incrementalBuildLatencySec, 1.36);
-  console.log(`✔ Baseline successfully frozen and verified at: ${targetReportPath}`);
+  console.log(`✔ Baseline successfully frozen and verified at: ${targetReportPath} (score: ${realScore})`);
 
   // 6. Test tampered snapshot detection
   const tampered = {

@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791183420667",
-  "timestamp": "2026-10-05T06:57:09.246Z",
+  "snapshotId": "snapshot-v0.4.0-1791185838531",
+  "timestamp": "2026-10-05T07:37:27.542Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,25 +13,25 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 595,
-    "durationMs": 7675
+    "durationMs": 8112
   },
   "metrics": {
     "compositeScore": 99.16,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 12810,
+    "totalIssues": 12823,
     "suppressedIssues": 7006,
-    "unsuppressedIssues": 5804,
+    "unsuppressedIssues": 5817,
     "bySeverity": {
       "info": 466,
-      "warning": 12344,
+      "warning": 12357,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 216,
-      "medium": 11684,
-      "low": 910
+      "high": 215,
+      "medium": 11693,
+      "low": 915
     }
   },
   "eightPillars": {
@@ -43,7 +43,7 @@
       "testing": 100,
       "reliability": 99.95,
       "security": 100,
-      "extensibility": 93.93
+      "extensibility": 93.92
     },
     "compositeScore": 99.16,
     "weights": {
@@ -63,7 +63,7 @@
     "semanticPurity": 99.89,
     "codeSecurity": 100,
     "performanceEfficiency": 98.99,
-    "standardization": 81.81,
+    "standardization": 81.79,
     "modernity": 100,
     "maintainability": 99.54,
     "commentQuality": 99.98,
@@ -165,9 +165,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 216,
-      "medium": 11684,
-      "low": 910
+      "high": 215,
+      "medium": 11693,
+      "low": 915
     },
     "criticalItems": [],
     "highItems": [
@@ -206,24 +206,6 @@
         "file": "scripts/test-result-codec.js",
         "line": 69,
         "message": "Nested collection linear lookup anti-pattern: Calling 'filter()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-baseline-freeze.js:65",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-baseline-freeze.js",
-        "line": 65,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-baseline-freeze.js:78",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-baseline-freeze.js",
-        "line": 78,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
         "id": "performance:PRF-ALG-002:scripts/validate-frontend-architecture-governance.js:129",
@@ -620,6 +602,24 @@
         "file": "src/analyzers/gdscript-game.ts",
         "line": 118,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-game.ts:146",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-game.ts",
+        "line": 146,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-game.ts:147",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-game.ts",
+        "line": 147,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       }
     ]
   },
@@ -627,11 +627,11 @@
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 98.99,
+        "compositeScore": 99,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.82,
-          "performance": 99.37,
+          "performance": 99.4,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -657,16 +657,16 @@
       },
       {
         "domainName": "src",
-        "compositeScore": 98.5,
+        "compositeScore": 98,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.75,
-          "performance": 95.91,
+          "performance": 93.5,
           "data": 98.94,
           "testing": 100,
           "reliability": 98.94,
           "security": 100,
-          "extensibility": 93.58
+          "extensibility": 92.27
         },
         "moduleCount": 1
       },
@@ -1272,10 +1272,10 @@
       },
       {
         "domainName": "trajectory",
-        "compositeScore": 99.35,
+        "compositeScore": 99.32,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.66,
+          "maintainability": 99.5,
           "performance": 99.14,
           "data": 99.92,
           "testing": 100,
@@ -1319,40 +1319,40 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 119001,
+      "processed": 119209,
       "unique": 96698,
-      "changed": 1223,
-      "semantic": 978,
+      "changed": 776,
+      "semantic": 621,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 612,
+      "added": 388,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791095213029,
-      "endMs": 1791183420665,
-      "totalRuns": 119,
+      "endMs": 1791185838529,
+      "totalRuns": 134,
       "eloc": {
-        "processedTotal": 13906260,
+        "processedTotal": 15693841,
         "uniqueTotal": 96698,
-        "changedTotal": 159721,
-        "semanticTotal": 127776
+        "changedTotal": 170657,
+        "semanticTotal": 136526
       },
       "qed": {
         "mean": 0,
-        "min": -0.0001,
-        "max": 0
+        "min": -0.002,
+        "max": 0.0013
       },
       "debt": {
-        "totalAdded": 203134,
-        "totalResolved": 230,
+        "totalAdded": 203329,
+        "totalResolved": 419,
         "totalRegressions": 0,
-        "netYield": -14.59
+        "netYield": -12.93
       },
-      "meanCompositeScore": 99.18,
+      "meanCompositeScore": 99.17,
       "gatePassRate": 100
     },
     "isFirstBaseline": false

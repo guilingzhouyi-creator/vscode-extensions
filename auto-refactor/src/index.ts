@@ -70,7 +70,7 @@ async function handleSymbolsCommand(args: string[]): Promise<void> {
         }
         process.stdout.write(
             `  coverage defs=${result.stats.definitions} refs=${result.stats.references} ` +
-                `crossFile=${result.stats.crossFileReferences} (${result.stats.builtFrom})\n`,
+            `crossFile=${result.stats.crossFileReferences} (${result.stats.builtFrom})\n`,
         );
         process.exit(0);
     } catch (error: unknown) {
@@ -97,13 +97,82 @@ function handleGuideCommand(args: string[]): void {
     process.exit(0);
 }
 
-function handleTrajectoryCommand(args: string[]): void {
-    const { getChangeTrajectory } = require('./api');
-    const targetFile = args[args.indexOf('trajectory') + 1];
-    if (!targetFile) {
-        process.stderr.write('Usage: auto-refactor trajectory <file>\n');
-        process.exit(2);
+async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
+    const fs = require('fs');
+    if (!fs.existsSync(activeRunsFile)) return;
+    const rawContent = await fs.promises.readFile(activeRunsFile, 'utf8');
+    const raw = rawContent.trim().split('\n').filter(Boolean);
+    const recent = raw.slice(-3);
+    if (recent.length === 0) return;
+    process.stdout.write(`\nRecent Active Runs (last ${recent.length}):\n`);
+    for (const line of recent) {
+        try {
+            const r = JSON.parse(line);
+            const dateStr = new Date(r.t).toISOString();
+            process.stdout.write(
+                `  • [${dateStr}] Rev ${r.rev} (${r.mod}): Score ${r.score.aft} | QED ${r.score.qed} | Proc ${r.eloc.proc} ELOC [Gate: ${r.gate.code}]\n`,
+            );
+        } catch {
+            /* ignored: malformed ndjson log entry */
+        }
     }
+}
+
+async function printLedgerSummary(customRoot?: string): Promise<void> {
+    const fs = require('fs');
+    const path = require('path');
+    const baseDir = customRoot ? path.resolve(customRoot) : process.cwd();
+    let ledgerDir = path.join(baseDir, '.refactor-trajectory');
+    if (!fs.existsSync(ledgerDir)) {
+        const sub = path.join(baseDir, 'auto-refactor', '.refactor-trajectory');
+        if (fs.existsSync(sub)) {
+            ledgerDir = sub;
+        }
+    }
+    const lifetimeFile = path.join(ledgerDir, 'lifetime.summary.json');
+    const activeRunsFile = path.join(ledgerDir, 'active-runs.ndjson');
+
+    if (!fs.existsSync(lifetimeFile)) {
+        process.stdout.write(`\nNo persistent refactoring ledger found at ${ledgerDir}\n`);
+        process.exit(0);
+    }
+
+    try {
+        const lifetimeContent = await fs.promises.readFile(lifetimeFile, 'utf8');
+        const lifetime = JSON.parse(lifetimeContent);
+        const equivLoc = ((lifetime.eloc.processedTotal * 1.37) / 1000000).toFixed(2);
+        process.stdout.write(`\n=== Workspace Refactoring Trajectory & Review Ledger ===\n`);
+        process.stdout.write(`Total Audit Runs       : ${lifetime.totalRuns}\n`);
+        process.stdout.write(
+            `Processed Code (ELOC)  : ${lifetime.eloc.processedTotal.toLocaleString()} lines (~${equivLoc}M equivalent LOC)\n`,
+        );
+        process.stdout.write(
+            `Unique Code Baseline   : ${lifetime.eloc.uniqueTotal.toLocaleString()} ELOC\n`,
+        );
+        process.stdout.write(
+            `Changed Code Audited   : ${lifetime.eloc.changedTotal.toLocaleString()} ELOC (Semantic: ${lifetime.eloc.semanticTotal.toLocaleString()})\n`,
+        );
+        process.stdout.write(
+            `Quality Efficiency QED : ${lifetime.qed.mean} [min: ${lifetime.qed.min}, max: ${lifetime.qed.max}]\n`,
+        );
+        process.stdout.write(
+            `Technical Debt Balance : Added ${lifetime.debt.totalAdded} | Resolved ${lifetime.debt.totalResolved} (Net Yield: ${lifetime.debt.netYield} pts/kELOC)\n`,
+        );
+        process.stdout.write(
+            `Mean Composite Score   : ${lifetime.meanCompositeScore} / 100 [Gate Pass Rate: ${lifetime.gatePassRate}%]\n`,
+        );
+
+        await printRecentActiveRuns(activeRunsFile);
+        process.stdout.write(`========================================================\n\n`);
+        process.exit(0);
+    } catch (err: unknown) {
+        process.stderr.write(`Failed to read trajectory summary: ${String(err)}\n`);
+        process.exit(1);
+    }
+}
+
+function printFileTrajectory(targetFile: string): void {
+    const { getChangeTrajectory } = require('./api');
     const traj = getChangeTrajectory(targetFile);
     if (!traj || traj.revisions.length === 0) {
         process.stdout.write(`No historical trajectory recorded for ${targetFile}\n`);
@@ -114,8 +183,6 @@ function handleTrajectoryCommand(args: string[]): void {
         `Total Revisions: ${traj.totalRevisions} | Agents: ${traj.participatingAgents.join(', ')}\n`,
     );
     for (const r of traj.revisions) {
-        // `??` only catches null/undefined, so an unmeasured composite (NaN) would print
-        // as the literal "NaN". A revision that measured no dimension is shown as N/A.
         const score = r.qualityScore?.compositeScore;
         const scoreText = typeof score === 'number' && Number.isFinite(score) ? score : 'N/A';
         process.stdout.write(
@@ -129,6 +196,133 @@ function handleTrajectoryCommand(args: string[]): void {
         }
     }
     process.stdout.write(`========================================\n\n`);
+    process.exit(0);
+}
+
+async function handleTrajectoryCommand(args: string[]): Promise<void> {
+    const rawTarget = args[args.indexOf('trajectory') + 1];
+    const isSummary =
+        !rawTarget ||
+        rawTarget === '--summary' ||
+        rawTarget === '-s' ||
+        rawTarget.startsWith('--');
+    if (isSummary) {
+        const rootIdx = args.indexOf('--root');
+        const customRoot = rootIdx !== -1 && args[rootIdx + 1] ? args[rootIdx + 1] : undefined;
+        await printLedgerSummary(customRoot);
+        return;
+    }
+    printFileTrajectory(rawTarget);
+}
+
+function countLinesEloc(content: string): { loc: number; eloc: number } {
+    const lines = content.split('\n');
+    let eloc = 0;
+    for (const l of lines) {
+        const t = l.trim();
+        if (t.length > 0 && !t.startsWith('//') && !t.startsWith('#') && !t.startsWith('*')) {
+            eloc++;
+        }
+    }
+    return { loc: lines.length, eloc };
+}
+
+async function processDirectoryEntries(
+    curr: string,
+    entries: import('fs').Dirent[],
+    queue: string[],
+    supportedExts: Set<string>,
+    ignoredDirs: Set<string>,
+): Promise<{ files: number; loc: number; eloc: number }> {
+    const path = require('path');
+    const fs = require('fs');
+    let files = 0;
+    let loc = 0;
+    let eloc = 0;
+    for (const e of entries) {
+        const full = path.join(curr, e.name);
+        if (e.isDirectory()) {
+            if (!ignoredDirs.has(e.name)) queue.push(full);
+            continue;
+        }
+        if (!e.isFile()) continue;
+        const ext = path.extname(e.name).toLowerCase();
+        if (!supportedExts.has(ext)) continue;
+
+        files++;
+        try {
+            const content = await fs.promises.readFile(full, 'utf8');
+            const counts = countLinesEloc(content);
+            loc += counts.loc;
+            eloc += counts.eloc;
+        } catch {
+            /* ignored: unreadable file */
+        }
+    }
+    return { files, loc, eloc };
+}
+
+async function collectDirectoryStats(
+    targetRoot: string,
+): Promise<{ totalFiles: number; totalLoc: number; totalEloc: number }> {
+    const fs = require('fs');
+    const SUPPORTED_EXTS = new Set(['.ts', '.js', '.mjs', '.cjs', '.gd', '.py', '.sh', '.ps1']);
+    const IGNORED_DIRS = new Set([
+        'node_modules',
+        '.git',
+        'dist',
+        'out',
+        'fixtures',
+        'baseline',
+        'archive',
+        'reports',
+    ]);
+
+    let totalFiles = 0;
+    let totalLoc = 0;
+    let totalEloc = 0;
+
+    const queue = [targetRoot];
+    while (queue.length > 0) {
+        const curr = queue.pop()!;
+        let entries: import('fs').Dirent[] = [];
+        try {
+            entries = await fs.promises.readdir(curr, { withFileTypes: true });
+        } catch {
+            /* ignored: unreadable directory permission */
+            continue;
+        }
+        const delta = await processDirectoryEntries(
+            curr,
+            entries,
+            queue,
+            SUPPORTED_EXTS,
+            IGNORED_DIRS,
+        );
+        totalFiles += delta.files;
+        totalLoc += delta.loc;
+        totalEloc += delta.eloc;
+    }
+    return { totalFiles, totalLoc, totalEloc };
+}
+
+async function handleStatsCommand(args: string[]): Promise<void> {
+    const rootIdx = args.indexOf('--root');
+    const targetRoot = rootIdx !== -1 && args[rootIdx + 1] ? args[rootIdx + 1] : process.cwd();
+
+    const { totalFiles, totalLoc, totalEloc } = await collectDirectoryStats(targetRoot);
+
+    const densityPct = totalLoc > 0 ? ((totalEloc / totalLoc) * 100).toFixed(1) : '0.0';
+    const dilutionRatio = totalEloc > 0 ? (totalLoc / totalEloc).toFixed(2) : '1.00';
+
+    process.stdout.write(`\n=== Code Volume & Complexity Statistics ===\n`);
+    process.stdout.write(`Target Scope Root       : ${targetRoot}\n`);
+    process.stdout.write(`Auditable Code Files    : ${totalFiles.toLocaleString()}\n`);
+    process.stdout.write(`Physical Lines (LOC)    : ${totalLoc.toLocaleString()}\n`);
+    process.stdout.write(`Effective Logic (ELOC)  : ${totalEloc.toLocaleString()}\n`);
+    process.stdout.write(`Effective Code Density  : ${densityPct}%\n`);
+    process.stdout.write(`Average Dilution Ratio  : 1 : ${dilutionRatio}\n`);
+    process.stdout.write(`============================================\n\n`);
     process.exit(0);
 }
 
@@ -315,11 +509,15 @@ async function main(): Promise<void> {
         return;
     }
     if (sub === 'trajectory') {
-        handleTrajectoryCommand(args);
+        await handleTrajectoryCommand(args);
         return;
     }
     if (sub === 'memory') {
         handleMemoryCommand();
+        return;
+    }
+    if (sub === 'stats') {
+        await handleStatsCommand(args);
         return;
     }
     if (sub !== 'scan') {

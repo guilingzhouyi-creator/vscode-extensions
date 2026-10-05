@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791183389233",
-  "timestamp": "2026-10-05T06:56:29.233Z",
+  "snapshotId": "snapshot-v0.4.0-1791185951217",
+  "timestamp": "2026-10-05T07:39:11.217Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -18,7 +18,7 @@
     "gdscript"
   ],
   "baselineMetrics": {
-    "compositeScore": 88.5,
+    "compositeScore": 99.16,
     "ruleCount": 304,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,

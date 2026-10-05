@@ -80,6 +80,7 @@ export interface CliOptions extends ScanOptions {
     fix?: boolean;
     fixDryRun?: boolean;
     fixRules?: string[];
+    recordTrajectory?: boolean;
 }
 
 /**
@@ -131,6 +132,9 @@ function applyBooleanFlag(opt: CliOptions, arg: string, enabled: boolean): boole
             return true;
         case 'memory':
             opt.memory = enabled;
+            return true;
+        case 'record-trajectory':
+            opt.recordTrajectory = enabled;
             return true;
         default:
             return false;
@@ -418,10 +422,14 @@ export function printUsage(): void {
         .write(`auto-refactor — automated code-refactoring analyzer (declarative, pluggable)
 
 Usage:
-  auto-refactor scan [options]
-  auto-refactor self-test            Run a known-violation fixture corpus and assert every
-                                     built-in analyzer still fires (engine quality guard)
-  auto-refactor daemon start|stop|status [--root <dir>]
+  auto-refactor scan [options]       Run static analysis and quality review on source files
+  auto-refactor self-test            Run known-violation fixture corpus to verify all analyzers
+  auto-refactor daemon start|stop|status [--root <dir>]  Manage background acceleration daemon
+  auto-refactor symbols <name> [--root <dir>]            Inspect definitions, calls and cross-file usages
+  auto-refactor guide <file> [--domain <d>] [--line <l>] Query agent guardrails and active rule guidance
+  auto-refactor trajectory [<file>|--summary]            Inspect global review ledger or file revision history
+  auto-refactor memory                                  Inspect active review memory and cache capacity
+  auto-refactor stats [--root <dir>]                     Compute code volume, LOC, ELOC and density dashboard
 
 Options:
   --root <dir>                 Root directory to scan (default: cwd)
@@ -459,6 +467,7 @@ Options:
   --profile [<profile>]       Display stack profile, or select review profile (frontend|backend|composite)
   --review-profile <profile>  Explicit quality review profile: frontend | backend | composite
   --score                     Output multi-dimensional quality assessment and Tri-Plane vectors
+  --record-trajectory         Persist review score and ELOC counters into .refactor-trajectory ledger
   --telemetry <file>          Ingest dynamic runtime telemetry profile (DynamicEvidenceDTO JSON)
   --fix                       Automatically apply guaranteed codemod fixes in-place
   --fix-dry-run               Compute and display unified diffs without modifying files

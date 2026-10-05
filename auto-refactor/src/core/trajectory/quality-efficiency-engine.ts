@@ -135,6 +135,7 @@ export function computeTrajectoryQualityMetrics(params: {
     beforeVector?: number[];
     counters: ElocCounters;
     debtDelta?: Partial<TechnicalDebtDelta>;
+    sliceDeltaQ?: number;
 }): TrajectoryQualityMetrics {
     const { beforeScore, afterScore, scoreVector, beforeVector, counters } = params;
 
@@ -148,7 +149,11 @@ export function computeTrajectoryQualityMetrics(params: {
         regressionFindingIds: params.debtDelta?.regressionFindingIds ?? [],
     };
 
-    const rawDeltaQ = Math.round((afterScore - beforeScore) * 100) / 100;
+    const unroundedDelta =
+        typeof params.sliceDeltaQ === 'number' && params.sliceDeltaQ !== 0
+            ? params.sliceDeltaQ
+            : afterScore - beforeScore;
+    const rawDeltaQ = Math.round(unroundedDelta * 10000) / 10000;
 
     // Mathematical Anti-Gaming Rule: If semantic ELOC is 0 but changed > 0,
     // positive rawDeltaQ is suppressed.
