@@ -49,6 +49,15 @@ const DEFAULT_CONFIG = Object.freeze({
   testMaxComplexity: 20,
 });
 
+function readJsonSafe(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Searches upwards for project configuration files with complexity overrides.
  */
@@ -56,26 +65,13 @@ function findProjectConfig(filePath) {
   let curr = path.dirname(path.resolve(filePath));
   const root = path.parse(curr).root;
   while (curr && curr !== root) {
-    const pkgPath = path.join(curr, 'package.json');
-    if (fs.existsSync(pkgPath)) {
-      try {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        const gov = pkg.governance?.complexity || pkg.governance?.astSlice;
-        if (gov) return gov;
-      } catch {
-        // ignore JSON parse errors
-      }
-    }
-    const cfgPath = path.join(curr, 'autoRefactor.config.json');
-    if (fs.existsSync(cfgPath)) {
-      try {
-        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
-        const thresh = cfg.thresholds;
-        if (thresh) return thresh;
-      } catch {
-        // ignore JSON parse errors
-      }
-    }
+    const pkg = readJsonSafe(path.join(curr, 'package.json'));
+    const gov = pkg?.governance?.complexity || pkg?.governance?.astSlice;
+    if (gov) return gov;
+
+    const cfg = readJsonSafe(path.join(curr, 'autoRefactor.config.json'));
+    if (cfg?.thresholds) return cfg.thresholds;
+
     curr = path.dirname(curr);
   }
   return null;
@@ -210,6 +206,25 @@ const LOGICAL_BINARY_OPS = new Set([
   ts.SyntaxKind.QuestionQuestionToken,
 ]);
 
+const LOOP_KINDS = new Set([
+  ts.SyntaxKind.ForStatement,
+  ts.SyntaxKind.ForInStatement,
+  ts.SyntaxKind.ForOfStatement,
+  ts.SyntaxKind.WhileStatement,
+  ts.SyntaxKind.DoStatement,
+]);
+
+const NESTING_BLOCK_KINDS = new Set([
+  ts.SyntaxKind.IfStatement,
+  ts.SyntaxKind.ForStatement,
+  ts.SyntaxKind.ForInStatement,
+  ts.SyntaxKind.ForOfStatement,
+  ts.SyntaxKind.WhileStatement,
+  ts.SyntaxKind.DoStatement,
+  ts.SyntaxKind.TryStatement,
+  ts.SyntaxKind.SwitchStatement,
+]);
+
 function isFunctionNode(n) {
   return (
     ts.isFunctionDeclaration(n) ||
@@ -243,13 +258,7 @@ function hasLoopConstruct(node) {
     if (n !== node && isFunctionNode(n)) {
       return;
     }
-    if (
-      n.kind === ts.SyntaxKind.ForStatement ||
-      n.kind === ts.SyntaxKind.ForInStatement ||
-      n.kind === ts.SyntaxKind.ForOfStatement ||
-      n.kind === ts.SyntaxKind.WhileStatement ||
-      n.kind === ts.SyntaxKind.DoStatement
-    ) {
+    if (LOOP_KINDS.has(n.kind)) {
       found = true;
       return;
     }
@@ -261,15 +270,7 @@ function hasLoopConstruct(node) {
 
 function checkNesting(node, currentDepth, maxObserved) {
   let depth = currentDepth;
-  const isBlock =
-    node.kind === ts.SyntaxKind.IfStatement ||
-    node.kind === ts.SyntaxKind.ForStatement ||
-    node.kind === ts.SyntaxKind.ForInStatement ||
-    node.kind === ts.SyntaxKind.ForOfStatement ||
-    node.kind === ts.SyntaxKind.WhileStatement ||
-    node.kind === ts.SyntaxKind.DoStatement ||
-    node.kind === ts.SyntaxKind.TryStatement ||
-    node.kind === ts.SyntaxKind.SwitchStatement;
+  const isBlock = NESTING_BLOCK_KINDS.has(node.kind);
 
   const isElseIf =
     node.kind === ts.SyntaxKind.IfStatement &&

@@ -64,7 +64,9 @@ if ($Fast) {
         $statusAr = "PASS"
     }
 } else {
-    $res1 = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "test" -NoNewWindow -PassThru -Wait
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+    $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
+    $res1 = Start-Process -FilePath $npmCmd -ArgumentList "test" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
     $res2 = Start-Process -FilePath $nodeCmd -ArgumentList "auto-refactor/scripts/validate-self-multidimensional-audit.js" -NoNewWindow -PassThru -Wait
     if ($res1.ExitCode -ne 0 -or $res2.ExitCode -ne 0) {
         $statusAr = "FAIL"
@@ -76,8 +78,10 @@ if ($Fast) {
 
 # 4. workspace-timing L0~L5 六层审查门禁
 if (-not $Json) { Write-Host "▶ [4/5] 执行 workspace-timing L0~L5 六层审查门禁与单元自检..." -ForegroundColor Gray }
-$res1 = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "workspace-timing", "run", "review" -NoNewWindow -PassThru -Wait
-$res2 = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "workspace-timing", "run", "test:fast" -NoNewWindow -PassThru -Wait
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
+$res1 = Start-Process -FilePath $npmCmd -ArgumentList "run", "review" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
+$res2 = Start-Process -FilePath $npmCmd -ArgumentList "run", "test:fast" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
 if ($res1.ExitCode -ne 0 -or $res2.ExitCode -ne 0) {
     $statusWt = "FAIL"
     $failed = $true
