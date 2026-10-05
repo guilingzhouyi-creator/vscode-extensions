@@ -181,6 +181,16 @@
       ],
       "reason": "提交说明是长期技术档案，[Verification] 区块严禁使用'退出码0'、'双端返回0'、'XX项检查通过'等程序化流水账替代具体输入输出与断言细节。",
       "guidance": "请陈述具体的验证边界用例、输入参数与功能断言，例如：'运行 node scripts/test-parallel.js，断言 4 个 Rust 嵌入式测试用例与 9 个量化维度路由断言成立'。"
+    },
+    {
+      "id": "CMG-STY-006",
+      "category": "execution_numeric_forbidden",
+      "severity": "error",
+      "title": "执行标签区域零执行数字纪律",
+      "patterns": [],
+      "asciiPatterns": [],
+      "reason": "提交说明是长期技术档案，执行标签区域（[Verification]）下严禁记录任何形式的执行数字、用例计数、测试套件数、行数、耗时、比例或百分比流水账。",
+      "guidance": "必须将执行结论提炼为纯粹的技术功能逻辑与输入输出断言事实描述，彻底移除所有执行数字与量词。例如将'断言419个文件通过'改为'断言全量源码文件合规'。"
     }
   ],
   "whitelist": [

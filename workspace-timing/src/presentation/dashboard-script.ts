@@ -20,6 +20,31 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         });
       }
       let pendingData = null;
+      let isTodaySessionsExpanded = false;
+      let isWsExpanded = false;
+
+      // 通用折叠切换条渲染与事件绑定
+      function renderFoldToggle(id, isExpanded, showLessText, showMoreText, count) {
+        const text = isExpanded ? showLessText : fmt(showMoreText, count);
+        const arrow = isExpanded ? '▲' : '▼';
+        return '<div class="fold-toggle" id="' + id + '" role="button" tabindex="0">' +
+          '<span>' + text + '</span>' +
+          '<span class="toggle-arrow">' + arrow + '</span>' +
+        '</div>';
+      }
+
+      function bindFoldToggle(id, container, onToggle, getTexts) {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+          const expanded = onToggle();
+          container.classList.toggle('is-collapsed', !expanded);
+          const textSpan = btn.querySelector('span:first-child');
+          const arrowSpan = btn.querySelector('.toggle-arrow');
+          if (textSpan) textSpan.textContent = expanded ? getTexts().less : getTexts().more;
+          if (arrowSpan) arrowSpan.textContent = expanded ? '▲' : '▼';
+        });
+      }
 
       // ---- 更新 UI ----
       function updateUI(data) {
@@ -91,9 +116,11 @@ export function buildDashboardScript(labels: Record<string, string>): string {
       // ---- 跨工作区对比视图渲染（R1：多工作区时长对比可视化） ----
       function renderWorkspaceCompare(workspaces, count, globalTotalMs) {
         const container = document.getElementById('workspaceList');
+        const badgeEl = document.getElementById('globalTotalBadge');
 
         if (!workspaces || workspaces.length <= 1) {
           container.innerHTML = '<div class="chart-empty">' + L['panel.global.empty'] + '</div>';
+          if (badgeEl) badgeEl.innerHTML = '';
           return;
         }
 
@@ -104,12 +131,25 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         }
         const grandTotal = globalTotalMs || workspaces.reduce((sum, ws) => sum + (ws.totalMs || 0), 0);
 
+        // ★ 兜底：count 必须为有限数字，否则 fmt 会输出字面量占位符（如 "（{0} 个工作区）"）。
+        //   宿主数据异常（旧版 globalState 缺 workspaces 字段）时以实际列表长度兜底。
+        const wsCount = typeof count === 'number' && Number.isFinite(count)
+            ? count
+            : (Array.isArray(workspaces) ? workspaces.length : 0);
+
+        if (badgeEl) {
+          badgeEl.innerHTML = L['panel.js.grandTotalPrefix'] + '<strong>' + formatDuration(grandTotal) +
+            '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], wsCount) + '</span>';
+        }
+
         let html = '';
-        for (const ws of workspaces) {
+        for (let i = 0; i < workspaces.length; i++) {
+          const ws = workspaces[i];
           const pct = Math.max((ws.totalMs / maxVal) * 100, 2);
           const share = grandTotal > 0 ? Math.round((ws.totalMs / grandTotal) * 100) : 0;
+          const extraCls = i >= 5 ? ' ws-extra' : '';
           html +=
-            '<div class="ws-compare-row">' +
+            '<div class="ws-compare-row' + extraCls + '">' +
               '<div class="ws-compare-header">' +
                 '<div class="ws-compare-name" title="' + escapeHtml(ws.name) + '">' + escapeHtml(ws.name) + '</div>' +
                 '<div class="ws-compare-value">' + formatDuration(ws.totalMs) +
@@ -121,17 +161,35 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             '</div>';
         }
 
-        // ★ 兜底：count 必须为有限数字，否则 fmt 会输出字面量占位符（如 "（{0} 个工作区）"）。
-        //   宿主数据异常（旧版 globalState 缺 workspaces 字段）时以实际列表长度兜底。
-        const wsCount = typeof count === 'number' && Number.isFinite(count)
-            ? count
-            : (Array.isArray(workspaces) ? workspaces.length : 0);
-
-        html +=
-          '<div class="ws-compare-total">' + L['panel.js.grandTotalPrefix'] + '<strong>' + formatDuration(grandTotal) +
-          '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], wsCount) + '</span></div>';
+        if (workspaces.length > 5) {
+          html += renderFoldToggle(
+            'wsFoldToggle',
+            isWsExpanded,
+            L['panel.global.showLess'],
+            L['panel.global.showMore'],
+            workspaces.length
+          );
+        }
 
         container.innerHTML = html;
+        container.classList.toggle('is-collapsed', workspaces.length > 5 && !isWsExpanded);
+
+        if (workspaces.length > 5) {
+          bindFoldToggle(
+            'wsFoldToggle',
+            container,
+            function() {
+              isWsExpanded = !isWsExpanded;
+              return isWsExpanded;
+            },
+            function() {
+              return {
+                less: L['panel.global.showLess'],
+                more: fmt(L['panel.global.showMore'], workspaces.length),
+              };
+            }
+          );
+        }
       }
 
       function escapeHtml(str) {
@@ -490,12 +548,47 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         if (detail.sessions.length > 0) {
           emptyEl.style.display = 'none';
           listEl.style.display = 'block';
-          listEl.innerHTML = detail.sessions.map(s =>
-            '<div class="session-row">' +
-              '<div class="session-time">' + escapeHtml(s.startLabel) + ' → ' + escapeHtml(s.endLabel) + '</div>' +
-              '<div class="session-dur">' + formatDuration(s.durationMs) + '</div>' +
-            '</div>'
-          ).join('');
+
+          let listHtml = '';
+          for (let i = 0; i < detail.sessions.length; i++) {
+            const s = detail.sessions[i];
+            const extraCls = i >= 5 ? ' session-extra' : '';
+            listHtml +=
+              '<div class="session-row' + extraCls + '">' +
+                '<div class="session-time">' + escapeHtml(s.startLabel) + ' → ' + escapeHtml(s.endLabel) + '</div>' +
+                '<div class="session-dur">' + formatDuration(s.durationMs) + '</div>' +
+              '</div>';
+          }
+
+          if (detail.sessions.length > 5) {
+            listHtml += renderFoldToggle(
+              'sessionFoldToggle',
+              isTodaySessionsExpanded,
+              L['panel.today.showLess'],
+              L['panel.today.showMore'],
+              detail.sessions.length
+            );
+          }
+
+          listEl.innerHTML = listHtml;
+          listEl.classList.toggle('is-collapsed', detail.sessions.length > 5 && !isTodaySessionsExpanded);
+
+          if (detail.sessions.length > 5) {
+            bindFoldToggle(
+              'sessionFoldToggle',
+              listEl,
+              function() {
+                isTodaySessionsExpanded = !isTodaySessionsExpanded;
+                return isTodaySessionsExpanded;
+              },
+              function() {
+                return {
+                  less: L['panel.today.showLess'],
+                  more: fmt(L['panel.today.showMore'], detail.sessions.length),
+                };
+              }
+            );
+          }
         } else {
           listEl.style.display = 'none';
           emptyEl.style.display = 'block';

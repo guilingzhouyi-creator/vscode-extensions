@@ -147,7 +147,10 @@ ${DASHBOARD_CHART_STYLES}
 
   <!-- 今日明细 -->
   <div class="section" id="todaySection" style="display:none">
-    <h2>${args.labels['panel.today.title']}</h2>
+    <div class="section-header-flex">
+      <h2>${args.labels['panel.today.title']}</h2>
+      <button class="btn btn-secondary btn-sm" id="btnExportDaily">${args.labels['panel.today.exportBtn']}</button>
+    </div>
     <div class="report-block">
       <div class="summary-grid">
         <div class="summary-item">
@@ -173,15 +176,15 @@ ${DASHBOARD_CHART_STYLES}
         <div id="hourlyChart" class="hourly-chart"></div>
         <div id="hourlyAxis" class="hourly-axis"></div>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-secondary" id="btnExportDaily">${args.labels['panel.today.exportBtn']}</button>
-      </div>
     </div>
   </div>
 
   <!-- 跨工作区 -->
   <div class="section" id="globalSection">
-    <h2>${args.labels['panel.global.title']}</h2>
+    <div class="section-header-flex">
+      <h2>${args.labels['panel.global.title']}</h2>
+      <div class="global-header-total" id="globalTotalBadge"></div>
+    </div>
     <div class="card-panel">
       <div id="workspaceList">
         <div class="chart-empty" id="globalEmpty">${args.labels['panel.global.empty']}</div>

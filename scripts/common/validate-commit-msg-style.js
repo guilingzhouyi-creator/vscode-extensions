@@ -106,7 +106,82 @@ function checkAsciiMatch(sanitizedLine, rawLine, lineNum, rule) {
 }
 
 /**
- * Checks a commit message string for prohibited terms.
+ * Masks legitimate technical tokens (rule IDs, file paths, command names, flags, Git SHAs)
+ * so they are not mistaken for execution numbers.
+ */
+function maskLegitimateTechnicalTokens(line) {
+  let masked = line;
+  // Mask URLs
+  masked = masked.replace(/https?:\/\/[^\s)]+/g, ' __URL__ ');
+  // Mask registered rule IDs: e.g. CMG-STY-005, ADV-CMP-001, L0-COMPILE, L0~L5
+  masked = masked.replace(/\b[A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}\b/g, ' __RULE_ID__ ');
+  masked = masked.replace(/\bL[0-5](?:-[A-Z0-9]+)?\b/g, ' __RULE_ID__ ');
+  masked = masked.replace(/\bL[0-5]~L[0-5]\b/g, ' __RULE_ID__ ');
+  // Mask standard protocol/encodings: e.g. UTF-8, SHA-256, RFC-123
+  masked = masked.replace(/\b(?:UTF|SHA|RFC|HTTP|TLS|AES)-\d+\b/g, ' __STD_TOKEN__ ');
+  // Mask file paths with extensions or directory paths (e.g. scripts/ps1/pre-commit-gate.ps1)
+  masked = masked.replace(/[a-zA-Z0-9_\-\.\/]+\.(?:ps1|sh|ts|js|json|md|py|gd|rs|toml|yaml|yml|html|css|txt)\b/g, ' __FILE_PATH__ ');
+  masked = masked.replace(/\bscripts\/(?:ps1|sh|common)\/[a-zA-Z0-9_\-\.\/]+\b/g, ' __FILE_PATH__ ');
+  // Mask command binaries: e.g. python3, node.exe
+  masked = masked.replace(/\b(?:python|node|pwsh|powershell|bash|sh|git)\d*(?:\.exe)?\b/gi, ' __BIN__ ');
+  // Mask CLI flags: e.g. --max-eloc, -F, --test
+  masked = masked.replace(/--[a-zA-Z0-9_\-]+/g, ' __FLAG__ ');
+  masked = masked.replace(/-[a-zA-Z0-9]\b/g, ' __FLAG__ ');
+  // Mask Git commit SHA hashes: e.g. db02361, f990985
+  masked = masked.replace(/\b[0-9a-f]{7,40}\b/g, ' __GIT_SHA__ ');
+  return masked;
+}
+
+/**
+ * Checks a line in the execution/verification section for prohibited execution numbers and statistics.
+ */
+function checkExecutionSectionNumeric(rawLine, lineNum, rule) {
+  const matches = [];
+  if (!rule) return matches;
+
+  const masked = maskLegitimateTechnicalTokens(rawLine);
+  const foundTerms = [];
+
+  // 1. Ratios: e.g. 1:3, 1:1.78
+  const ratioMatches = masked.match(/\b\d+(\.\d+)?\s*:\s*\d+(\.\d+)?\b/g);
+  if (ratioMatches) foundTerms.push(...ratioMatches);
+
+  // 2. Percentages: e.g. 100%, 99.5%
+  const pctMatches = masked.match(/\b\d+(\.\d+)?\s*[%％]/g);
+  if (pctMatches) foundTerms.push(...pctMatches);
+
+  // 3. Numbers with units/quantifiers
+  const unitMatches = masked.match(/\b\d+(\.\d+)?\s*(?:个|项|套|组|条|行|次|分|秒|s|ms|ELOC|LOC|个文件|个用例|个检查项|套套件|组用例|套测试|大项|个测试|个类|个函数)\b/g);
+  if (unitMatches) foundTerms.push(...unitMatches);
+
+  // 4. Standalone numbers / integers / floats
+  const numMatches = masked.match(/\b\d+(\.\d+)?\b/g);
+  if (numMatches) {
+    for (const n of numMatches) {
+      if (!foundTerms.includes(n)) foundTerms.push(n);
+    }
+  }
+
+  // 5. Chinese numbers with execution quantifiers
+  const cnMatches = masked.match(/[零一两二三四五六七八九十百千万]+\s*(?:个|项|套|组|条|行|次|套件|用例|检查项|大项|个文件|个用例|个场景|组用例|组边界)/g);
+  if (cnMatches) foundTerms.push(...cnMatches);
+
+  for (const term of foundTerms) {
+    matches.push({
+      lineNum,
+      rawLine: rawLine.trim(),
+      ruleId: rule.id,
+      category: rule.category,
+      term,
+      reason: rule.reason,
+      guidance: rule.guidance,
+    });
+  }
+  return matches;
+}
+
+/**
+ * Checks a commit message string for prohibited terms and execution numeric rules.
  * @param {string} content - Full commit message
  * @returns {{ valid: boolean, findings: Array<{ lineNum: number, rawLine: string, ruleId: string, category: string, term: string, reason: string, guidance: string }> }}
  */
@@ -114,19 +189,35 @@ function validateCommitMessageContent(content) {
   const config = loadTermsConfig();
   const rules = config.rules || [];
   const whitelist = config.whitelist || [];
+  const rule6 = rules.find((r) => r.id === 'CMG-STY-006');
 
   const lines = content.split(/\r?\n/);
   const findings = [];
+  let inExecutionSection = false;
+
+  const EXECUTION_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Verification|Execution|验证|执行|测试)(?:[\s\/\]:]|$)/i;
+  const OTHER_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Why|Added|Changed|Fixed|Removed|Refactor|Docs|Chore|动机|背景|新增|变更|修改|修复|删除)(?:[\s\/\]:]|$)/i;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
     if (/^\s*#/.test(rawLine) || !rawLine.trim()) continue;
+
+    if (EXECUTION_HEADER_REGEX.test(rawLine)) {
+      inExecutionSection = true;
+      continue;
+    } else if (OTHER_HEADER_REGEX.test(rawLine)) {
+      inExecutionSection = false;
+    }
 
     const sanitizedLine = sanitizeLineForChecking(rawLine, whitelist);
 
     for (const rule of rules) {
       findings.push(...checkPatternMatch(sanitizedLine, rawLine, i + 1, rule));
       findings.push(...checkAsciiMatch(sanitizedLine, rawLine, i + 1, rule));
+    }
+
+    if (inExecutionSection && rule6) {
+      findings.push(...checkExecutionSectionNumeric(rawLine, i + 1, rule6));
     }
   }
 
@@ -163,11 +254,35 @@ function formatDiagnosticReport(findings) {
 
   lines.push('📌 核心准则: 提交说明是长期技术档案，必须纯粹陈述客观技术事实与具体文件逻辑改动。');
   lines.push('   严禁使用临时性/敷衍用语、绝对化夸大/吹嘘词汇或“低调中肯/求真务实”等元叙事口号（中英双语同构拦截）。');
+  lines.push('   执行标签区域（[Verification]）严禁出现任何形式的执行数字、用例计数、行数、比例或百分比流水账（CMG-STY-006）。');
   lines.push('=================================================================');
   return lines.join('\n');
 }
 
 const TEST_CASES = [
+  {
+    name: 'CAT-06 Arabic Execution Numbers in Verification (17 组用例 / 419 个文件)',
+    msg: 'refactor(gate): 更新检查规则\n\n[Verification]\n- 执行 node test.js，断言 17 组用例成立并覆盖 419 个文件。',
+    expectRule: 'CMG-STY-006',
+    expectValid: false,
+  },
+  {
+    name: 'CAT-06 Execution Numbers and Ratios in Verification (763 ELOC / 1:1.78)',
+    msg: 'refactor(gate): 更新规则\n\n[Verification]\n- 断言单文件规模为 763 ELOC，平均稀释比 1:1.78。',
+    expectRule: 'CMG-STY-006',
+    expectValid: false,
+  },
+  {
+    name: 'CAT-06 Chinese Execution Numbers with Quantifiers (三组用例与两个场景)',
+    msg: 'refactor(gate): 更新规则\n\n[Verification]\n- 验证通过三组用例并覆盖两个边界场景。',
+    expectRule: 'CMG-STY-006',
+    expectValid: false,
+  },
+  {
+    name: 'CAT-06 Whitelist in Verification (Rule IDs and .ps1 extension)',
+    msg: 'refactor(gate): 更新规则\n\n[Verification]\n- 执行 pwsh scripts/ps1/commit-msg-gate.ps1，验证 CMG-STY-005 与 L0~L5 规则解析成立。',
+    expectValid: true,
+  },
   {
     name: 'CAT-01 Chinese (临时)',
     msg: 'fix: 临时修复空指针\n\n[Why]\n- 临时顶一下',

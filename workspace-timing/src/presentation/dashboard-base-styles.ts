@@ -124,6 +124,37 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       border-radius: 2px;
     }
 
+    .section-header-flex {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .section-header-flex h2 {
+      margin-bottom: 0;
+    }
+
+    .global-header-total {
+      font-size: 11.5px;
+      color: var(--description);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .global-header-total strong {
+      color: var(--success);
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-weight: 700;
+    }
+
+    .global-header-total .ws-compare-count {
+      color: var(--description);
+      opacity: 0.85;
+    }
+
     h3 {
       font-size: 12px;
       font-weight: 600;
@@ -373,6 +404,12 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       gap: 6px;
     }
     .btn:active { transform: scale(0.97); }
+    .btn-sm {
+      padding: 2px 8px;
+      font-size: 11px;
+      line-height: 1.5;
+      border-radius: var(--radius-sm);
+    }
     .btn-primary {
       background: var(--btn-bg);
       color: var(--btn-fg);

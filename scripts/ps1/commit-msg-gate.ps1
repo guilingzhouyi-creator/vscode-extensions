@@ -44,7 +44,7 @@ function Show-CommitTemplateGuide {
     Write-Host "- 修复的异常、崩溃、竞态条件或回归缺陷。" -ForegroundColor Gray
     Write-Host ""
     Write-Host "[Verification / 验证结论]" -ForegroundColor Cyan
-    Write-Host "- 说明本地运行的验证命令与测试结果。" -ForegroundColor Gray
+    Write-Host "- 说明本地运行的验证命令与断言事实，严禁出现任何执行数字、统计量词或百分比（CMG-STY-006）。" -ForegroundColor Gray
     Write-Host "-----------------------------------------------------------------" -ForegroundColor Gray
 }
 

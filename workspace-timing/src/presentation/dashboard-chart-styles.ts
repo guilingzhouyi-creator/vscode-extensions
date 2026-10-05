@@ -271,6 +271,9 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .session-row:last-child { border-bottom: none; }
     .session-time { color: var(--description); font-family: var(--vscode-editor-font-family, monospace); }
     .session-dur { font-family: var(--vscode-editor-font-family, monospace); font-weight: 600; color: var(--fg); }
+    .session-list.is-collapsed .session-extra {
+      display: none;
+    }
 
     /* 按小时分布容器与骨架槽位 */
     .hourly-wrapper {
@@ -556,6 +559,34 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .ws-compare-count {
       font-size: 10px;
       margin-left: 6px;
+    }
+
+    #workspaceList.is-collapsed .ws-extra {
+      display: none;
+    }
+
+    /* 通用折叠切换条 */
+    .fold-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 12px;
+      font-size: 11.5px;
+      color: var(--description);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.18s ease;
+      background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+      border-top: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+    }
+    .fold-toggle:hover {
+      color: var(--fg);
+      background: color-mix(in srgb, var(--card-bg-hover) 80%, transparent);
+    }
+    .fold-toggle .toggle-arrow {
+      font-size: 9px;
+      transition: transform 0.2s ease;
     }
 
     /* 帮助提示图标 Tooltip */

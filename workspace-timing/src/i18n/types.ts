@@ -130,12 +130,16 @@ export interface I18nStrings {
     'panel.today.activeWindow': string;
     'panel.today.empty': string;
     'panel.today.exportBtn': string;
+    'panel.today.showMore': string;
+    'panel.today.showLess': string;
     'panel.today.hourlyTitle': string;
     'panel.today.hourlyPeak': string;
     'panel.today.hourlyIdle': string;
     'panel.today.hourlyOverview': string;
     'panel.global.title': string;
     'panel.global.empty': string;
+    'panel.global.showMore': string;
+    'panel.global.showLess': string;
     'panel.section.basic': string;
     'panel.section.storage': string;
     'panel.section.actions': string;

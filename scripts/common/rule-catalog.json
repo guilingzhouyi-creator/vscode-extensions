@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-04T17:33:10.285Z",
-  "totalRules": 378,
+  "generatedAt": "2026-10-05T04:55:40.805Z",
+  "totalRules": 379,
   "counts": {
     "autoRefactor": 299,
     "workspaceTiming": 45,
     "webGames": 56,
-    "globalTooling": 5
+    "globalTooling": 6
   },
   "rules": [
     {
@@ -407,6 +407,13 @@
       "family": "CMG",
       "severity": "error",
       "summary": "程序化流水账与形式主义元叙事拦截"
+    },
+    {
+      "id": "CMG-STY-006",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "执行标签区域零执行数字纪律"
     },
     {
       "id": "CMP-CAL-001",
