@@ -7,7 +7,8 @@
  * Dependencies & Triggers: `npm run audit:self` or `npm test`; imports dist scoring modules,
  *   TypeScript compiler API, and scans src/**\/*.ts.
  * Responsibilities:
- *   1. Gate 1 (Dual-Scale Volume Guard): Strict assertion that 0 files in src/ exceed 800 ELOC or 1200 LOC.
+ *   1. Gate 1 (Dual-Scale Volume Guard): Strict assertion that 0 files in src/
+ *      exceed 800 ELOC or 1200 LOC.
  *   2. Gate 2 (Shannon Entropy Guard): Information entropy verification across all source files
  *   3. Gate 3 (AST / LOC Density Guard): Validates AST node-to-LOC syntax
  *      density within [0.5, 40.0].
@@ -65,7 +66,9 @@ function calculateShannonEntropy(str) {
 }
 
 function auditFileVolumeBudget(allFiles) {
-  console.log(`[Gate 1] Dual-Scale Volume & Bidirectional Dynamic Envelope Guard (Max <= ${MAX_ELOC_BUDGET} ELOC, <= ${MAX_PHYSICAL_LOC_BUDGET} LOC, Ratio ~ 1:${TARGET_DENSITY_RATIO})`);
+  console.log(
+    `[Gate 1] Dual-Scale Volume & Bidirectional Dynamic Envelope Guard (Max <= ${MAX_ELOC_BUDGET} ELOC, <= ${MAX_PHYSICAL_LOC_BUDGET} LOC, Ratio ~ 1:${TARGET_DENSITY_RATIO})`,
+  );
   const fileStats = [];
   const overBudgetFiles = [];
   let totalDilution = 0;
@@ -81,9 +84,15 @@ function auditFileVolumeBudget(allFiles) {
     fileStats.push({ relPath, eloc, loc, ratio, dilution });
 
     if (eloc > MAX_ELOC_BUDGET) {
-      overBudgetFiles.push({ relPath, reason: `${eloc} ELOC > ${MAX_ELOC_BUDGET} ELOC (LOC: ${loc})` });
+      overBudgetFiles.push({
+        relPath,
+        reason: `${eloc} ELOC > ${MAX_ELOC_BUDGET} ELOC (LOC: ${loc})`,
+      });
     } else if (loc > MAX_PHYSICAL_LOC_BUDGET) {
-      overBudgetFiles.push({ relPath, reason: `${loc} LOC > ${MAX_PHYSICAL_LOC_BUDGET} LOC (ELOC: ${eloc})` });
+      overBudgetFiles.push({
+        relPath,
+        reason: `${loc} LOC > ${MAX_PHYSICAL_LOC_BUDGET} LOC (ELOC: ${eloc})`,
+      });
     }
   }
 
@@ -91,11 +100,15 @@ function auditFileVolumeBudget(allFiles) {
   console.log('  Top 5 largest files by semantic ELOC:');
   for (let i = 0; i < Math.min(5, fileStats.length); i++) {
     const s = fileStats[i];
-    console.log(`    ${i + 1}. ${s.relPath} (${s.eloc} ELOC / ${s.loc} LOC, effective: ${s.ratio}, dilution: 1:${s.dilution})`);
+    console.log(
+      `    ${i + 1}. ${s.relPath} (${s.eloc} ELOC / ${s.loc} LOC, effective: ${s.ratio}, dilution: 1:${s.dilution})`,
+    );
   }
 
   const avgDilution = (totalDilution / (fileStats.length || 1)).toFixed(2);
-  console.log(`  Average dilution ratio across ${fileStats.length} files: 1:${avgDilution} (healthy golden range [1:1.0, 1:3.0])`);
+  console.log(
+    `  Average dilution ratio across ${fileStats.length} files: 1:${avgDilution} (healthy golden range [1:1.0, 1:3.0])`,
+  );
 
   if (overBudgetFiles.length > 0) {
     console.error(`  ❌ [FAIL] ${overBudgetFiles.length} file(s) exceeded volume budget:`);
@@ -105,7 +118,7 @@ function auditFileVolumeBudget(allFiles) {
     return false;
   }
   console.log(
-    `  ✔ [PASS] 100% files conform to dual-scale volume & bidirectional envelope (Max: ${fileStats[0].eloc} ELOC < ${MAX_ELOC_BUDGET}, ${Math.max(...fileStats.map(f => f.loc))} LOC < ${MAX_PHYSICAL_LOC_BUDGET})\n`,
+    `  ✔ [PASS] 100% files conform to dual-scale volume & bidirectional envelope (Max: ${fileStats[0].eloc} ELOC < ${MAX_ELOC_BUDGET}, ${Math.max(...fileStats.map((f) => f.loc))} LOC < ${MAX_PHYSICAL_LOC_BUDGET})\n`,
   );
   return true;
 }

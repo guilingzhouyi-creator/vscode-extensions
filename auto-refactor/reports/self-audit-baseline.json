@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791176181760",
-  "timestamp": "2026-10-05T04:56:31.816Z",
+  "snapshotId": "snapshot-v0.4.0-1791177315642",
+  "timestamp": "2026-10-05T05:15:23.726Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,7 +13,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 592,
-    "durationMs": 8988
+    "durationMs": 7270
   },
   "metrics": {
     "compositeScore": 99.17,
@@ -415,39 +415,39 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:156",
+        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:168",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 156,
+        "line": 168,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:220",
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:232",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 220,
+        "line": 232,
         "message": "Function \"auditBoundaryInteroperability\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:233",
+        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:245",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 233,
+        "line": 245,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:325",
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:337",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 325,
+        "line": 337,
         "message": "Function \"auditTenDimensionalFidelity\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
@@ -1319,27 +1319,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 117661,
+      "processed": 117673,
       "unique": 96698,
-      "changed": 549,
-      "semantic": 439,
+      "changed": 161,
+      "semantic": 129,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 275,
+      "added": 81,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791095213029,
-      "endMs": 1791176181759,
-      "totalRuns": 103,
+      "endMs": 1791177315641,
+      "totalRuns": 107,
       "eloc": {
-        "processedTotal": 12011444,
+        "processedTotal": 12482112,
         "uniqueTotal": 96698,
-        "changedTotal": 141709,
-        "semanticTotal": 113367
+        "changedTotal": 142403,
+        "semanticTotal": 113923
       },
       "qed": {
         "mean": 0,
@@ -1350,7 +1350,7 @@
         "totalAdded": 202943,
         "totalResolved": 225,
         "totalRegressions": 0,
-        "netYield": -16.88
+        "netYield": -16.24
       },
       "meanCompositeScore": 99.18,
       "gatePassRate": 100
