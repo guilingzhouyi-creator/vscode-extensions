@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/sovereignty.json | 信号: EventBus 领域广播
 # 职责说明: 荒原拓荒建国、领土自治、宫廷政变刺杀弑君与全域超级蝴蝶效应震荡。 建国/政变数值与叙事文案由 config/sovereignty.json、 config/narratives/sovereignty.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name NationSovereigntyAndCoupFSM extends RefCounted

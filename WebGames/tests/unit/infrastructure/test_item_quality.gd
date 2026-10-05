@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 物品品质等级统一度量标准单元测试
 # 文件路径: res://tests/unit/infrastructure/test_item_quality.gd
-# 覆盖: Phase 17 施工细则 阶段1~4（TC-ITEM-QT-01~06）
+# 覆盖: 阶段1~4 验收矩阵（TC-ITEM-QT-01~06）
 #       —— 六档单调序列 / 神话区间端点语义 / 唯一映射 / 禁跨级倒置 /
 #          配置完整与安全兜底 / 扩展受限（未登记与跨级区间拒绝）
 # ==============================================================================
@@ -10,7 +10,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 17: 物品品质等级统一度量标准"
+	var domain_name = "物品品质等级统一度量标准"
 
 	results.append(_test_tier_monotonic_sequence())
 	results.append(_test_mythic_interval_semantics())
@@ -18,7 +18,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_no_tier_inversion())
 	results.append(_test_config_completeness_and_fallback())
 	results.append(_test_extension_constraint())
-	# Phase 44 P1 新增：装配期单例复用（TC-P44-P1-01/02）
+	# 装配期单例复用
 	results.append(_test_singleton_registry_reuse())
 
 	var passed_cnt := 0
@@ -146,7 +146,7 @@ static func _test_extension_constraint() -> Dictionary:
 		"passed": passed
 	}
 
-## Phase 44 P1（TC-P44-P1-01/02）：QualityTierRegistry 装配期单例复用——
+## QualityTierRegistry 装配期单例复用——
 ## GameBootstrap.quality_tier_registry() 多次调用返回同一就绪实例；ItemInstanceFactory
 ## build_instance 不传 registry（兜底单例）时品质快照与显式注入单例产出一致。
 static func _test_singleton_registry_reuse() -> Dictionary:
@@ -159,8 +159,8 @@ static func _test_singleton_registry_reuse() -> Dictionary:
 	var proto: ItemRegistryCatalog.ItemPrototypeTemplate = catalog.get_prototype("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD")
 	var snapshot_ok := true
 	if proto != null and proto.quality_tier > 0:
-		var item_explicit := ItemInstanceFactory.build_instance(proto, "显式单例", "P44A_", "", reg_a)
-		var item_default := ItemInstanceFactory.build_instance(proto, "缺省单例", "P44B_")
+		var item_explicit := ItemInstanceFactory.build_instance(proto, "显式单例", "GRANT_A_", "", reg_a)
+		var item_default := ItemInstanceFactory.build_instance(proto, "缺省单例", "GRANT_B_")
 		var sa: Dictionary = item_explicit.quality_snapshot
 		var sb: Dictionary = item_default.quality_snapshot
 		snapshot_ok = (not sa.is_empty()) and sa.get("tier", -1) == sb.get("tier", -2) \
@@ -168,6 +168,6 @@ static func _test_singleton_registry_reuse() -> Dictionary:
 
 	var passed = reuse_ok and snapshot_ok
 	return {
-		"test": "TC-P44-P1-01/02: 品质注册表单例复用 + 工厂发放快照等价（显式/兜底一致）",
+		"test": "TC-ITEM-QT-07: 品质注册表单例复用 + 工厂发放快照等价（显式/兜底一致）",
 		"passed": passed
 	}

@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/monster.json | 信号: EventBus 领域广播
 # 职责说明: 兽潮共鸣天灾调度、怪物基于正负 AP 势能博弈的发卡池 AI。 AI 阈值/verb 字面量/共鸣增量与叙事文案由 config/domains/monster.json、 config/narratives/monster.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SwarmResonanceAndAIFSM extends RefCounted

@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 显式承载上一回合对下一回合时间轴的干预（事件密度/最小间距）， 包含来源、生命周期与单次消费标记——严禁通过隐式全局内存变量泄漏（Inv-TR-5）
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name PendingTimelineModifierDTO

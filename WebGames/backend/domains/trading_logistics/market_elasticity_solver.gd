@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/trading.json | 信号: EventBus 领域广播
 # 职责说明: 局部集市供需价格弹性方程、大宗倾销砸盘与平抑物价冲击求解。 定价 clamp 边界与保底价由 config/trading.json 的 market 段驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MarketElasticityAndTradingSolver extends RefCounted

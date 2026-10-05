@@ -12,7 +12,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_spatial_distance_attenuation_and_pan())
 	results.append(_test_concurrency_polyphony_limiter())
 	results.append(_test_four_track_bus_routing())
-	# Phase 53 L9-a 新增：并发水位显式释放路径
+	# 新增：并发水位显式释放路径
 	results.append(_test_sound_count_release_bounded())
 
 	var passed_cnt := 0
@@ -81,7 +81,7 @@ static func _test_four_track_bus_routing() -> Dictionary:
 		"passed": passed
 	}
 
-## L9-a（Phase 53）：并发水位显式释放路径（Inv-ON-4）——
+## L9-a：并发水位显式释放路径（Inv-ON-4）——
 ## 释放后计数归零删键（永不 < 0）、同音效可再次派发（红证：修复前只增不减，达限后永久拒播）
 static func _test_sound_count_release_bounded() -> Dictionary:
 	var active_counts := {}

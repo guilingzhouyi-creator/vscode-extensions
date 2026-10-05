@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/version_governance.json | 信号: EventBus 领域广播
 # 职责说明: 承载服务端下发或配置表定义的灰度分群拓扑，支持用户 ID、渠道、地域、发布环等多维正交判定
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GrayPolicyDTO

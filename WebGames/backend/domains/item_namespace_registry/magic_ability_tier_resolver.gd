@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 能力分级（异能/英雄/神圣/真神 + 超位）与阶位梯度（1~11）之间的 **弱映射关联**——仅经参考区间/权重/参考标签/越级容忍表达经验性关系， **严禁 Tier↔Rank 一对一枚举映射作为核心判定逻辑**；允许区间重叠与越级。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MagicAbilityTierResolver

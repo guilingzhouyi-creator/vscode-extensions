@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 种族与身世常数、初始金币/声望/阵营偏好、七大洲地缘出生点契约 全量数据由 config/domains/character_creation.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ReincarnationOriginEngine extends RefCounted

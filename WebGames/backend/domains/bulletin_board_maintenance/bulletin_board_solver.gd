@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/bulletin_board_maintenance.json | 信号: EventBus 领域广播
 # 职责说明: 检定维护模式状态、非 GM 账户强阻断与维护倒计时计算
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name BulletinBoardSolver

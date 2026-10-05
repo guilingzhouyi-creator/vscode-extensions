@@ -1,7 +1,7 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 事件流关联动态概率系统单元测试（Phase 22）
+# 卡拉尔世界引擎 (Kalar World Engine) - 事件流关联动态概率系统单元测试
 # 文件路径: res://tests/unit/infrastructure/test_event_probability.gd
-# 覆盖: Phase 22 施工细则 阶段1~4（TC-EVTPROB-01~06）
+# 覆盖: 阶段1~4 验收矩阵（TC-EVTPROB-01~06）
 #       —— 基础概率 / 条件修正 / 动态调整 / 事件关联 / 只算不执行 / 配置驱动值域
 # ==============================================================================
 class_name TestEventProbabilityDomain
@@ -9,7 +9,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 22: 事件流关联动态概率系统（事件侧三位一体）"
+	var domain_name = "事件流关联动态概率系统（事件侧三位一体）"
 
 	results.append(_test_base_probability())
 	results.append(_test_condition_modifier())

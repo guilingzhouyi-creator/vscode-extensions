@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 依据 persistence.json 校验规则执行缺失字段回退、类型强转与未知域治理。 支持迁移后校验与领域级恢复保障（Inv-SV-2/7/11）。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SaveValidationService extends RefCounted

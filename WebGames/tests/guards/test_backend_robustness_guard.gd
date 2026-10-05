@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 69 后端鲁棒性与异常隔离 (Backend Robustness Guard)
+# 单元测试：后端鲁棒性与异常隔离 (Backend Robustness Guard)
 # 文件路径: res://tests/guards/test_backend_robustness_guard.gd
 # 职责: 验证脏数据清洗、极值截断、异常分类与深拷贝防污染（TC-RM-21 ~ TC-RM-28）
 # ==============================================================================
@@ -24,7 +24,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "Phase 69: 后端鲁棒性与异常隔离",
+		"domain": "后端鲁棒性与异常隔离",
 		"all_passed": all_passed,
 		"results": results
 	}
@@ -130,14 +130,14 @@ static func test_error_classification() -> Dictionary:
 	var e_cfg: Dictionary = BackendRobustnessGuard.classify_error("CFG_TABLE_MISSING")
 	var e_rec: Dictionary = BackendRobustnessGuard.classify_error("RETRY_TIMEOUT")
 	
-	var p1: bool = (int(e_fatal.get("severity", -1)) == BackendRobustnessGuard.FaultSeverity.SYSTEM_FATAL) and (not bool(e_fatal.get("is_recoverable", true)))
-	var p2: bool = (int(e_biz.get("severity", -1)) == BackendRobustnessGuard.FaultSeverity.BUSINESS_REJECT) and bool(e_biz.get("is_recoverable", false))
-	var p3: bool = (int(e_cfg.get("severity", -1)) == BackendRobustnessGuard.FaultSeverity.CONFIG_ERROR)
-	var p4: bool = (int(e_rec.get("severity", -1)) == BackendRobustnessGuard.FaultSeverity.RECOVERABLE) and bool(e_rec.get("is_recoverable", false))
+	var fatal_ok: bool = (int(e_fatal.get("severity", -1)) == BackendRobustnessGuard.FaultSeverity.SYSTEM_FATAL) and (not bool(e_fatal.get("is_recoverable", true)))
+	var biz_ok: bool = (int(e_biz.get("severity", -1)) == BackendRobustnessGuard.FaultSeverity.BUSINESS_REJECT) and bool(e_biz.get("is_recoverable", false))
+	var cfg_ok: bool = (int(e_cfg.get("severity", -1)) == BackendRobustnessGuard.FaultSeverity.CONFIG_ERROR)
+	var rec_ok: bool = (int(e_rec.get("severity", -1)) == BackendRobustnessGuard.FaultSeverity.RECOVERABLE) and bool(e_rec.get("is_recoverable", false))
 	
-	var passed: bool = p1 and p2 and p3 and p4
+	var passed: bool = fatal_ok and biz_ok and cfg_ok and rec_ok
 	return {
 		"test": "TC-RM-28: 错误事件确定性分级与可恢复性判定",
 		"passed": passed,
-		"detail": "fatal_ok=%s, biz_ok=%s, cfg_ok=%s, rec_ok=%s" % [p1, p2, p3, p4]
+		"detail": "fatal_ok=%s, biz_ok=%s, cfg_ok=%s, rec_ok=%s" % [fatal_ok, biz_ok, cfg_ok, rec_ok]
 	}

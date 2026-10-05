@@ -4,7 +4,7 @@
 # 架构定位: Domain Registry / Specification Catalog
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 正面特质与负面缺陷因果点数守恒天平、属性与抗性修正 全量词条由 config/domains/character_creation.json 的 traits 段驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name InnateTraitRegistry extends RefCounted

@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 封装完整剧情有向无环图，包含节点集合、边集合、入口与终态标记
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name NarrativeDAGGraphDTO

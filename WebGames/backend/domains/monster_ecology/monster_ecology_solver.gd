@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/monster.json | 信号: EventBus 领域广播
 # 职责说明: 独立部位受击破坏 AP 惩罚判定、异兽吞噬过载爆体律。 容纳系数/爆体阈值/核心部位 ID 与状态字面量由 config/domains/monster.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MonsterEcologySolver extends RefCounted

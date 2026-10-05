@@ -1,7 +1,7 @@
 # ==============================================================================
-# 单元测试：Phase 41 统一魔法规则模型与行动卡机制 (Magic Rule System Tests)
+# 单元测试：统一魔法规则模型与行动卡机制 (Magic Rule System Tests)
 # 文件路径: res://tests/unit/domains/test_magic_system.gd
-# 覆盖: Phase 41 施工细则 阶段1~4（TC-MAGIC-S1-01~05 / S2-01~08 / S3-01~06）
+# 覆盖: 阶段1~4 验收矩阵（TC-MAGIC-S1-01~05 / S2-01~08 / S3-01~06）
 #       —— 属性大类与派生变体 / 几重化 / 封印与解放 / 升格化 / 延时调度 /
 #          统一结算器 / 组合语义（DEFINED/PARTIAL/BND_NOT_DEFINED）
 # ==============================================================================
@@ -10,7 +10,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 41/42: 魔法规则引擎与行动卡收编（统一魔法规则 + 攻击系统对接）"
+	var domain_name = "魔法规则引擎与行动卡收编（统一魔法规则 + 攻击系统对接）"
 
 	# 阶段1：数据契约
 	results.append(_test_registry_assembled_ready())
@@ -28,13 +28,13 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_delay_schedule_and_drain())
 	results.append(_test_delay_cancel_on_holder_lost())
 	results.append(_test_physical_damage_via_real_pipeline())
-	# Phase 42 收编验收（TC-CARD-S2-01/04/05）
+	# 收编验收（TC-CARD-S2-01/04/05）
 	results.append(_test_combat_card_authority())
 	results.append(_test_ap_stagger_validator())
 	results.append(_test_effect_layer_seal_ascend())
 	# 阶段3：工程化
 	results.append(_test_combo_semantics())
-	# Phase 44 P7 新增：SAME 模式 ctx 零拷贝共享 + registry 段查询零拷贝（TC-P44-P7-01/02）
+	# SAME 模式 ctx 零拷贝共享 + registry 段查询零拷贝
 	results.append(_test_multi_cast_same_shared_ctx())
 	results.append(_test_registry_config_shared_readonly())
 
@@ -74,7 +74,7 @@ static func _test_attribute_schools_loaded() -> Dictionary:
 	var dark_members: Array = dark.get("members", [])
 	var light_ok := light_members.size() == 5 and reg.attribute_school("FIRE") == "LIGHT_SCHOOL"
 	var dark_ok := dark_members.size() == 2 and reg.attribute_school("THUNDER") == "DARK_SCHOOL"
-	# Phase 42 S3：normative_form 层级对齐键（光/暗 → 元素/规范魔法法式分支）
+	# normative_form 层级对齐键（光/暗 → 元素/规范魔法法式分支）
 	var light_normative_ok: bool = light.get("normative_form", "") == "LIGHT"
 	var dark_normative_ok: bool = dark.get("normative_form", "") == "DARK"
 	var closed_ok := true
@@ -98,7 +98,7 @@ static func _test_variants_fusion_condition() -> Dictionary:
 	var abyssal_ok: bool = not abyssal.is_empty() and MagicRuleCondition.evaluate(
 		abyssal.get("fusion_conditions", {}), {"learned_by_school": {"DARK_SCHOOL": 1}}
 	)
-	# Phase 42 S3：ranked_form_branch 层级对齐键（神圣/暗黑 → 位阶魔法分支）
+	# ranked_form_branch 层级对齐键（神圣/暗黑 → 位阶魔法分支）
 	var holy_rfb_ok: bool = holy.get("ranked_form_branch", "") == "HOLY"
 	var abyssal_rfb_ok: bool = abyssal.get("ranked_form_branch", "") == "ABYSSAL"
 	var passed = holy_ok and holy_denied and abyssal_ok and holy_rfb_ok and abyssal_rfb_ok \
@@ -307,7 +307,7 @@ static func _test_physical_damage_via_real_pipeline() -> Dictionary:
 	var passed = pipeline_ok and dmg_ok
 	return {"test": "TC-CARD-S2-02: 物理伤害走真实侵彻管线（与 calculate_penetration_damage 一致）", "passed": passed}
 
-# ---------- Phase 42 收编验收（TC-CARD-S2-01/04/05） ----------
+# ---------- 收编验收（TC-CARD-S2-01/04/05） ----------
 
 static func _test_combat_card_authority() -> Dictionary:
 	# TC-CARD-S2-01：行动卡权威载体唯一（直构 CombatActionCardEntity，别名已退役，R-06）
@@ -379,7 +379,7 @@ static func _test_combo_semantics() -> Dictionary:
 	var passed = defined and partial and bnd
 	return {"test": "TC-MAGIC-S4: 组合语义矩阵（DEFINED/PARTIAL/BND_NOT_DEFINED 三分）", "passed": passed}
 
-## Phase 44 P7（TC-P44-P7-01）：SAME 模式（无 target_pool）逐击共享冻结 ctx 零拷贝——
+## SAME 模式（无 target_pool）逐击共享冻结 ctx 零拷贝——
 ## 2 次发动 hits 数与总伤与独立 ctx 语义等价（resolve_attack 只读 ctx；
 ## GDScript Dictionary 比较为内容比较——独立结算以「逐击 success + 总伤=Σ逐击」断言）
 static func _test_multi_cast_same_shared_ctx() -> Dictionary:
@@ -402,9 +402,9 @@ static func _test_multi_cast_same_shared_ctx() -> Dictionary:
 		and sum_damage > 0.0 \
 		and is_equal_approx(sum_damage, float(exec.get("total_damage", -1.0)))
 	var passed = ok
-	return {"test": "TC-P44-P7-01: SAME 模式 ctx 共享零拷贝（双击独立 success + 总伤=Σ逐击）", "passed": passed}
+	return {"test": "TC-MAGIC-SAME-01: SAME 模式 ctx 共享零拷贝（双击独立 success + 总伤=Σ逐击）", "passed": passed}
 
-## Phase 44 P7（TC-P44-P7-02）：registry 段查询零拷贝只读共享——返回内部引用
+## registry 段查询零拷贝只读共享——返回内部引用
 ## （消费方不改写）；查询内容与配置表一致（改读引用不破坏语义）
 static func _test_registry_config_shared_readonly() -> Dictionary:
 	var reg := _registry()
@@ -415,4 +415,4 @@ static func _test_registry_config_shared_readonly() -> Dictionary:
 	var mc2: Dictionary = reg.multi_cast_config()
 	var stable_ok: bool = mc2 == mc
 	var passed = content_ok and stable_ok
-	return {"test": "TC-P44-P7-02: registry 段查询零拷贝（内容=配置表且多次一致）", "passed": passed}
+	return {"test": "TC-MAGIC-REG-01: registry 段查询零拷贝（内容=配置表且多次一致）", "passed": passed}

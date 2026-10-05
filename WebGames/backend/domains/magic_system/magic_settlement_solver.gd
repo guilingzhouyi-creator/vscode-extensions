@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 单次攻击伤害解析的纯适配层——统一收口物理/魔法行动卡伤害到既有真实 管线入口（物理侵彻/魔素相变能损），供几重化等多击事务逐击调用。 收编声明：**不再自算 base_power × rank_weight 虚拟伤害**。本结算器为 纯适配层——物理/魔法伤害全部经既有真实管线入口： - 物理：PhysicsAndThermodynamicsSolver.calculate_penetration_damage（动量侵彻公式） - 魔法：PhysicsAndThermodynamicsSolver.calculate_mana_phase_transition_loss（相变能损） → 有效魔素输出 × (1 - 元素抗性)，能量密度伤害公式的引擎落地部分 魔法效果（几重化/封印/升格/延时）作为效果层由调用方按 combat_card.effects 分发， 本适配层只负责单次攻击的伤害解析（确定性：随机经 DeterministicRNG 注入）。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MagicSettlementSolver

@@ -1,7 +1,7 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 统一文案配置系统单元测试（Phase 24）
+# 卡拉尔世界引擎 (Kalar World Engine) - 统一文案配置系统单元测试
 # 文件路径: res://tests/unit/infrastructure/test_copywriting.gd
-# 覆盖: Phase 24 施工细则 阶段1~4（TC-COPY-01~06）
+# 覆盖: 阶段1~4 验收矩阵（TC-COPY-01~06）
 #       —— 统一键解析 / 条件段拼接 / 结果分支 / 未填充拦截 / 域解析器零回归 /
 #          热重载与键登记（适配层兜底）
 # ==============================================================================
@@ -10,7 +10,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 24: 统一文案配置系统"
+	var domain_name = "统一文案配置系统"
 
 	results.append(_test_unified_key_resolve())
 	results.append(_test_condition_segment())

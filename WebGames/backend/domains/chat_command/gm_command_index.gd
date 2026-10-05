@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/chat_command.json | 信号: EventBus 领域广播
 # 职责说明: 维护 GM 命令最近使用索引（MRU 窗口，默认仅最近 20 条）、分页滚动 （页缓冲池回收复用，内存有界）与「最近适配补全」解析 参数由 config/domains/chat_command.json 的 gm_index 段驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GmCommandIndexSolver

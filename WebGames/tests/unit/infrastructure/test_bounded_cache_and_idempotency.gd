@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 69 有界缓存与幂等性控制 (Bounded Cache & Idempotency)
+# 单元测试：有界缓存与幂等性控制 (Bounded Cache & Idempotency)
 # 文件路径: res://tests/unit/infrastructure/test_bounded_cache_and_idempotency.gd
 # 职责: 验证有界LRU/FIFO/TTL淘汰、热重载清理与幂等防重控制器（TC-RM-11 ~ TC-RM-20）
 # ==============================================================================
@@ -28,7 +28,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "Phase 69: 有界缓存与幂等性控制",
+		"domain": "有界缓存与幂等性控制",
 		"all_passed": all_passed,
 		"results": results
 	}
@@ -37,14 +37,14 @@ static func run_all_tests() -> Dictionary:
 static func test_basic_cache_ops() -> Dictionary:
 	var cache := BoundedResourceCache.new()
 	cache.put("k1", "v1")
-	var v1: Variant = cache.get_val("k1")
+	var cached_val: Variant = cache.get_val("k1")
 	var v_missing: Variant = cache.get_val("missing_key", "default_val")
 	
-	var passed: bool = (str(v1) == "v1") and (str(v_missing) == "default_val") and cache.has("k1") and (not cache.has("missing_key"))
+	var passed: bool = (str(cached_val) == "v1") and (str(v_missing) == "default_val") and cache.has("k1") and (not cache.has("missing_key"))
 	return {
 		"test": "TC-RM-11: 缓存基础读写与缺失键安全回退",
 		"passed": passed,
-		"detail": "v1=%s, v_missing=%s" % [v1, v_missing]
+		"detail": "cached_val=%s, v_missing=%s" % [cached_val, v_missing]
 	}
 
 ## TC-RM-12: LRU 容量上限硬约束淘汰

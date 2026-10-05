@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/ground_loot.json | 信号: EventBus 领域广播
 # 职责说明: 四重拾取检定——衰变失效、空间物理距离 (D <= pickup_radius_meters)、 击杀归属保护期（保护期内仅归属人可拾取）、背包空间与负重容量； 通过后移交物品实体并同步物品统计（GAP-01 注入式遥测）。 纯静态工具类（无状态），错误文案经 GameConfig.msg("ground_loot", key) 配置驱动。
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GroundLootPickupSolver

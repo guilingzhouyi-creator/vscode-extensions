@@ -10,9 +10,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_penetration_damage_calculation())
 	results.append(test_mana_phase_transition_loss())
 	results.append(test_ap_continuum_and_parry_interrupt())
-	# Phase 45: 核心战斗逻辑与第三时间轴动态博弈体系
-	var p45_res := TestCombatTertiaryTimelinePipeline.run_all_tests()
-	results.append_array(p45_res.get("results", []))
+	# 核心战斗逻辑与第三时间轴动态博弈体系
+	var combat_timeline_res := TestCombatTertiaryTimelinePipeline.run_all_tests()
+	results.append_array(combat_timeline_res.get("results", []))
 
 	var all_passed := true
 	for r in results:

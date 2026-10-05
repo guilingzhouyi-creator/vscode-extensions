@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 根据鉴定激活的高阶 C 类词缀综合评分，动态推导物品展示品质（品阶）升格。 评分阈值/词缀上限由 config/domains/item_attributes.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ItemQualityPromotionSolver

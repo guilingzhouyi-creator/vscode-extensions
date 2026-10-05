@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 校验服务端鉴定凭证完整性，拦截客户端直接篡改本地 is_appraised / is_active 状态。 非特殊词缀免签名校验；隐藏态严禁激活；已鉴定态必须携带服务端有效签名。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ItemAttributeSecurityGuard

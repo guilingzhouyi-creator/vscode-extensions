@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 世界数据与角色数据隔离容器：世界时间单调推进、世界持续状态保留、 历史影响片段只增不改。角色死亡不得回退本实例；新角色重新进入 已被影响的同一世界。配置由 config/domains/world.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name WorldInstance extends RefCounted

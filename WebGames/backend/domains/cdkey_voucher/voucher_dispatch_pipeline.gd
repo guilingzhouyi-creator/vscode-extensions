@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
 # 职责说明: 执行兑换结算，将货币与道具统一打包为邮件附件经邮件系统发放（唯一规范路径）； 道具发放走物品注册表三元组（template_id 必填为已登记 canonical_id， 未登记模板严格计入失败，不造临时物件）。
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name VoucherDispatchPipeline

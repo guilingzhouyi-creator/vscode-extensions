@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/deterministic.json | 信号: EventBus 领域广播
 # 职责说明: 单机/预测/权威三态解耦流转、时序攻击与 AP 透支作弊防御； 脱同步阈值/透支阈值/状态与原因文案由 config/deterministic.json、 config/narratives/deterministic.json 驱动（代码零硬编码）。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name AuthorityTriStateMachine extends RefCounted

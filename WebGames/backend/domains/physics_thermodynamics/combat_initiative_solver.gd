@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 依据双方角色综合属性（敏捷/感知/等级加权 + 装备修正 + 状态增益 + 确定性抖动） 计算先手权与初始 AP 势能差值，并提供三级平局决胜（Tie-breaker）算法。 配置由 config/domains/combat.json initiative_model 驱动，代码零硬编码。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CombatInitiativeSolver

@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 描述魔法属性大类（光系 金木水火土 / 暗系 风雷，成员配置化）与 派生变体（神圣/暗黑——融会贯通后的进一步变体，属既有位阶魔法大类→ 法式魔法→变体体系，非与光/暗平行的新顶层）。变体判定依据 magic_rules.json 的 fusion_conditions 可配置条件（引擎不写死组合）。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MagicAttributeSchool

@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
 # 职责说明: 统一六维属性底座（三层模型）+ 三大综合生理指标 + 寿命年轮 + 体质/资质。 - L1 等级层：attribute_levels（统一 1~6 级）+ attribute_progress（区间内连续值）； - L2 中间系数结构层（阅历重塑层）：experience_reshape，心核洗点重置，预留阅历联动； - L3 底层实际值域：dynamic_adjustments（随机动态加点永久实际值偏移，洗点不逆转）； - 实际值统一经 AttributeConversionEngine 换算（等级/系数/规则全配置驱动）。 生理初值由 config/lifecycle.json 的 physiology_defaults 段驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CharacterPhysiologySheet extends RefCounted

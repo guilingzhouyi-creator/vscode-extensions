@@ -17,7 +17,7 @@ const SCAN_DIRS: Array[String] = [
 
 func _initialize() -> void:
 	var scan_dirs: Array[String] = SCAN_DIRS
-	# P2 审查收敛：--scope 单域批处理模式——命令行用户参数（-- 后的 res:// 目录）优先，
+	# 审查收敛：--scope 单域批处理模式——命令行用户参数（-- 后的 res:// 目录）优先，
 	# 使单域检查同样走单进程批处理（消除逐文件冷启动）；参数非 res:// 前缀时忽略回退全量。
 	var user_args := OS.get_cmdline_user_args()
 	if not user_args.is_empty():

@@ -12,7 +12,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_mailbox_capacity_and_gc())
 	results.append(_test_attachment_claiming_and_overflow_protection())
 	results.append(_test_mail_expiry_update())
-	# Phase 52 M3 新增：幂等缓存键账户维度
+	# 新增：幂等缓存键账户维度
 	results.append(_test_claim_cache_owner_dimension())
 
 	var passed_cnt := 0
@@ -99,7 +99,7 @@ static func _test_mail_expiry_update() -> Dictionary:
 		"passed": passed
 	}
 
-## M3（Phase 52）：幂等缓存键必须含账户维度——
+## M3：幂等缓存键必须含账户维度——
 ## 跨账户同 mail_id（CDK 秒级时间戳碰撞场景）不得命中他人领取结果（红证：修复前 B 领到 A 的缓存）
 static func _test_claim_cache_owner_dimension() -> Dictionary:
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()

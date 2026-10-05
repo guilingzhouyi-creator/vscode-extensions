@@ -13,7 +13,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_stick_radial_deadzone_filter())
 	results.append(_test_action_rebinding())
 	results.append(_test_tab_double_tap_detection())
-	# Phase 55 L1 新增：死区区间倒置守卫
+	# 新增：死区区间倒置守卫
 	results.append(_test_deadzone_inverted_config_safe())
 
 	var passed_cnt := 0
@@ -33,17 +33,17 @@ static func _test_device_hot_swap_and_prompt() -> Dictionary:
 	var state := InputDeviceStateAggregate.new()
 
 	# 初始为键鼠
-	var p1 = state.get_ui_button_prompt("interact") # "[E]"
+	var prompt_kbd1 = state.get_ui_button_prompt("interact") # "[E]"
 
 	# 收到手柄摇杆事件 -> 热切换为手柄模式
 	var swapped_1 = AdaptiveInputFilterSolver.handle_device_input_event(state, "JOYPAD_BUTTON", 1000)
-	var p2 = state.get_ui_button_prompt("interact") # "(ButtonA)"
+	var prompt_joy = state.get_ui_button_prompt("interact") # "(ButtonA)"
 
 	# 收到键盘按下事件 -> 热切换回键鼠模式
 	var swapped_2 = AdaptiveInputFilterSolver.handle_device_input_event(state, "KEYBOARD", 1050)
-	var p3 = state.get_ui_button_prompt("interact") # "[E]"
+	var prompt_kbd2 = state.get_ui_button_prompt("interact") # "[E]"
 
-	var passed = (p1 == "[E]") and swapped_1 and (p2 == "(ButtonA)") and swapped_2 and (p3 == "[E]")
+	var passed = (prompt_kbd1 == "[E]") and swapped_1 and (prompt_joy == "(ButtonA)") and swapped_2 and (prompt_kbd2 == "[E]")
 	return {
 		"test": "TC-INPUT-01: 键鼠与手柄毫秒级自适应热切换与 UI 提示热更新",
 		"passed": passed
@@ -107,7 +107,7 @@ static func _test_tab_double_tap_detection() -> Dictionary:
 		"passed": passed
 	}
 
-## L1（Phase 55）：死区区间守卫——倒置/相等配置（outer<=inner）不得除零/负 magnitude（防崩溃回归）
+## L1：死区区间守卫——倒置/相等配置（outer<=inner）不得除零/负 magnitude（防崩溃回归）
 static func _test_deadzone_inverted_config_safe() -> Dictionary:
 	# 正常区间：raw 落中段 → 线性重映射 ∈ (0,1)，无 NaN
 	var normal := AdaptiveInputFilterSolver.filter_radial_deadzone(Vector2(0.5, 0.0), 0.15, 0.95)

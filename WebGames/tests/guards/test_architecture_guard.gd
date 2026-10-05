@@ -357,7 +357,7 @@ static func test_config_keys_exist(manifest: Array) -> Dictionary:
 
 
 # ------------------------------------------------------------------------------
-# TC-ARCH-07: 兼容层退役护栏断言（后端旧表/别名/直发/双路径/死配置彻底清零，Phase 83）
+# TC-ARCH-07: 兼容层退役护栏断言（后端旧表/别名/直发/双路径/死配置彻底清零）
 # ------------------------------------------------------------------------------
 static func test_compatibility_retirement_backend_clean() -> Dictionary:
 	var violations: Array[String] = []

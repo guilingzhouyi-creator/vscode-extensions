@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/organization_guild.json | 信号: EventBus 领域广播
 # 职责说明: 管理公会驻地科技升级、消耗金库资源并为全体成员计算被动光环增益
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name OrganizationTechFSM

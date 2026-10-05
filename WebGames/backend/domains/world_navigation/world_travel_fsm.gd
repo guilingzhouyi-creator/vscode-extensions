@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world.json | 信号: EventBus 领域广播
 # 职责说明: 队伍行军时间推进、地质阻抗口粮消耗与城镇抵达状态跃迁。 行军速度/口粮消耗与叙事文案由 config/world.json、 config/narratives/world.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name WorldTravelAndSettlementFSM extends RefCounted

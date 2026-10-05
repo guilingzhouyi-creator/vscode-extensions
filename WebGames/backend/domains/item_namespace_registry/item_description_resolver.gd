@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 基于已注册物品（ItemRegistryCatalog）及其状态生成/组织描述——只读消费 注册系统，不反向定义物品核心属性、不绕过注册系统建立独立物品身份。 ：文本生成收敛至统一文案核心 CopywritingResolver（模板/条件段/ {param} 填充/未填充拦截/键登记一处实现）；本类保留域红线（UNREGISTERED_ITEM 身份校验 + 已注册字段参数注入白名单）。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ItemDescriptionResolver

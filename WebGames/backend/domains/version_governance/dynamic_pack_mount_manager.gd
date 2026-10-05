@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/version_governance.json | 信号: EventBus 领域广播
 # 职责说明: 基于 Godot 4.7 原生虚拟文件系统 (VFS) 实现增量 PCK 物理覆盖挂载与版本堆栈管理
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name DynamicPackMountManager

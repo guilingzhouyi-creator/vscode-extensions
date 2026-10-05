@@ -4,7 +4,7 @@
 # 架构定位: Domain Entity / Aggregate Root
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
 # 职责说明: 玩家/巡查/GM/RootAdmin 4 级基于角色的权限访问控制 (RBAC) 矩阵契约 盐与口令由 config/infrastructure/admin.json 驱动（支持配置化轮换）。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name AdminPermissionAggregate extends RefCounted

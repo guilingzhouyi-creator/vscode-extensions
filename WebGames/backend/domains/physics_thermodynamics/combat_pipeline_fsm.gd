@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 正负 AP 动态势能博弈、防反架招打断/僵直状态机与战报文字流生成。 参与者默认属性、打断惩罚、减伤系数与叙事文案由 config/domains/combat.json、 config/narratives/combat.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CombatPipelineFSM extends RefCounted

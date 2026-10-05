@@ -328,7 +328,7 @@ static func _test_ui_audio_bridge_placeholder_alive() -> Dictionary:
 	ok = ok and TestCase.assert_gte(hits.size(), 1, "play_sfx 信号可发射且零运行时报错")
 	return TestCase.make_result("ui_audio_bridge_placeholder_alive", ok)
 
-## 13. 前端兼容层退役与快照单一真源断言 (Phase 83 / R-01, R-02)
+## 13. 前端兼容层退役与快照单一真源断言 (兼容层退役与快照单一真源)
 static func _test_frontend_compatibility_retirement() -> Dictionary:
 	# 1. 断言 frontend/mocks 目录不存在
 	var dir := DirAccess.open("res://frontend/mocks")

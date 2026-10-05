@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
 # 职责说明: 解释 config/domains/cdkey_voucher.json 的 eligibility_rules 复合门槛配置， 逐条判定 + AND/OR 短路聚合。规则引擎能力与具体业务规则分离—— 引擎只解释配置，不内嵌任何业务条件；示例配置须显式标注 example_only。  契约（）: - 未达标返回 allowed=false + failed_rule_id/metric_key（不写任何核销状态） - operator 白名单: gte/lte/eq/neq/contains；未知 operator 受控判定失败 - 无状态纯函数：判定指标由调用方注入，引擎不持有玩家数据
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CDKeyEligibilityRuleEngine

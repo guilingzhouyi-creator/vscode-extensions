@@ -1,7 +1,7 @@
 # ==============================================================================
 # 单元测试：世界栏网关、单联机模式隔离与五层状态流转测试套件
 # 文件路径: res://tests/unit/domains/test_world_gateway.gd
-# 职责: 验证 Phase 47 世界栏统一网关、单联机模式隔离、档位路由与灰度联动
+# 职责: 验证世界栏统一网关、单联机模式隔离、档位路由与灰度联动
 # ==============================================================================
 class_name TestWorldGatewayAndModeIsolation
 extends RefCounted
@@ -25,7 +25,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 
 	return {
-		"domain": "World Gateway & Mode Isolation (Phase 47)",
+		"domain": "World Gateway & Mode Isolation",
 		"all_passed": all_passed,
 		"passed_count": passed_cnt,
 		"total_count": results.size(),

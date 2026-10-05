@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 物品实例级全局唯一标识生成与校验（权威/可追溯/幂等）： UID = <域前缀> + <单调计数 8 位> + <校验尾 2 位>； - 前缀按发放来源隔离（GM_/CDK_/GAC_/MAIL_/SRV_），配置白名单登记； - 单调计数持久化（uid/persistent_counter 开关），重启不重复； - 校验尾 = sha256(prefix+count) 前 2 位（确定性可复现，禁全局随机）； 全部由 config/domains/item_namespace_registry.json 的 uid 段驱动。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ItemUIDGenerator extends RefCounted

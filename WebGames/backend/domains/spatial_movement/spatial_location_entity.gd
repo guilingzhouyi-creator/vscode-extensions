@@ -4,7 +4,7 @@
 # 架构定位: Domain Entity / Aggregate Root
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
 # 职责说明: 宏观离散图论索引与微观实数连续欧氏坐标并存，支持文字向 2D/3D 平滑演化
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SpatialLocationEntity

@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
 # 职责说明: 追缴由外挂 / 利用漏洞等机制非法刷取的资产（货币 / 原型物品 / 实例物品）， 供开发商运营部门使用。边界规范： - 仅联机模式（RUN_MODE_ONLINE）可用，单机沙盒一律拒绝； - 权限门槛 LEVEL_GAME_MASTER（追缴属运营重操作）； - 货币追缴全额扣减、支持扣至负数（超额部分记为欠账/赤字，钱包 is_in_debt 语义，允许突破下界）；物品追缴不得超过实际持有数（超额钳制）； - 全部追缴经 GMArbitrationAuditService 留痕（操作者 / 原因码 / 数量 / 签名）。 运行模式默认值由 config/infrastructure/admin.json 的 run/mode 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ClawbackService

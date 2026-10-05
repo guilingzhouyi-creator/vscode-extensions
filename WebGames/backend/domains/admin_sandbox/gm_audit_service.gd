@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
 # 职责说明: 记录全域管理员指令操作流水与防篡改留痕（单机：内存留痕+EventBus广播， 联机预留磁盘持久化与 HMAC；当前单机聚焦阶段以内存为准，重启不保留）。 审计模板与 recent_limit 由 config/narratives/admin.json 与 config/infrastructure/admin.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GMArbitrationAuditService extends RefCounted

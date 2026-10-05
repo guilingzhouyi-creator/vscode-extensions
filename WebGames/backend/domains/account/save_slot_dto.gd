@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 毫秒级轻量存档封面元数据契约，支持死斗模式与生平传记查看。 默认值由 config/domains/account.json 的 save_slot/defaults 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SaveSlotSummaryDTO extends RefCounted

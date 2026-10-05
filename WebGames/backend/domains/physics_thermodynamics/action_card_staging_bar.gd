@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 维护参与者手牌待发栏（Staging Bar）队列、容量上限与满载溢出缓冲机制。 待发栏满载时第三时间轴绝不阻塞，依配置执行 DISCARD_OLDEST 或 CONVERT_AP。 配置由 config/domains/combat.json staging_bar 驱动，代码零硬编码。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ActionCardStagingBar

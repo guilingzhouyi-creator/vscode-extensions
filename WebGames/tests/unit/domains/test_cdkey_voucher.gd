@@ -12,10 +12,10 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_universal_and_unique_redemption())
 	results.append(_test_rate_limit_and_lockout())
 	results.append(_test_reward_dispatch_via_mail_equivalent())
-	# Phase 52 M3/M4 新增：投递 mail_id 唯一化 + 悬挂补偿通道
+	# 新增：投递 mail_id 唯一化 + 悬挂补偿通道
 	results.append(_test_mail_id_unique_burst())
 	results.append(_test_compensation_releases_stale_pending())
-	# Phase 64 P2 修复回归：容量兜底绝不逐出在锁条目
+	# 修复回归：容量兜底绝不逐出在锁条目
 	results.append(_test_capacity_fallback_preserves_active_lockouts())
 
 	var passed_cnt := 0
@@ -81,7 +81,7 @@ static func _test_rate_limit_and_lockout() -> Dictionary:
 		"passed": passed
 	}
 
-## Phase 64 P2 修复回归（红证：修复前容量兜底逐出 keys()[0]，灌满表后
+## 修复回归（红证：修复前容量兜底逐出 keys()[0]，灌满表后
 ## 可静默解除在锁账户的防爆破锁，受害者可被立即继续爆破）：
 ## 表满且剩余条目全部在锁时，_record_failure 必须放弃记录新失败（fail-closed），
 ## 绝不逐出锁定条目；存在过期条目时 purge 腾位后新失败可正常落账。
@@ -112,7 +112,7 @@ static func _test_capacity_fallback_preserves_active_lockouts() -> Dictionary:
 
 	var passed: bool = size_ok and not_recorded and victim_ok and recorded_ok
 	return {
-		"test": "TC-CDKEY-03: 频控容量兜底绝不逐出在锁条目（P2 防爆破锁回归）",
+		"test": "TC-CDKEY-03: 频控容量兜底绝不逐出在锁条目（防爆破锁回归）",
 		"passed": passed
 	}
 
@@ -150,7 +150,7 @@ static func _test_reward_dispatch_via_mail_equivalent() -> Dictionary:
 		"passed": passed
 	}
 
-## M3（Phase 52）：默认 mail_id 走唯一 ID 生成器——同秒连发不得碰撞
+## M3：默认 mail_id 走唯一 ID 生成器——同秒连发不得碰撞
 ## （红证：修复前 "CDK_%d" % 秒级时间戳 同秒必同 id，receive_mail 同信箱拒绝）
 static func _test_mail_id_unique_burst() -> Dictionary:
 	var mailbox := MailboxManager.new()
@@ -169,7 +169,7 @@ static func _test_mail_id_unique_burst() -> Dictionary:
 		"passed": passed
 	}
 
-## M4（Phase 52）：投递失败进入 DISPATCH_PENDING 后，补偿通道超时重试、
+## M4：投递失败进入 DISPATCH_PENDING 后，补偿通道超时重试、
 ## 重试达上限回滚核销（码 RELEASED 可重新领取）——杜绝「码已烧、奖励永失」悬挂
 static func _test_compensation_releases_stale_pending() -> Dictionary:
 	RedemptionFlowOrchestrator.reset_records()

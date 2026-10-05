@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：动态市场经济与交易体系（Phase 38 S4 验收）
+# 单元测试：动态市场经济与交易体系
 # 文件路径: res://tests/unit/infrastructure/test_dynamic_economy.gd
 # 覆盖: TC-ECON-S4-01/02/03/07 —— 世界时间演化 / 成交量反馈 / 变化率上限 /
 #       静态路径零回归（不退化固定价格表语义）
@@ -9,7 +9,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 38: 动态市场经济与交易体系验收"
+	var domain_name = "动态市场经济与交易体系验收"
 
 	results.append(_test_time_evolution())
 	results.append(_test_volume_feedback())
@@ -37,7 +37,7 @@ static func _test_time_evolution() -> Dictionary:
 	var p_tick5_again := MarketElasticityAndTradingSolver.calculate_market_price(_build_commodity(), 5)
 	# 同 tick 同状态确定性一致；不同 tick 报价演化
 	var passed = p_tick5 == p_tick5_again and p_tick5 != p_tick17
-	return { "test": "TC-ECON-S4-01: 价格随世界时间演化（确定性且非固定值）", "passed": passed, "p5": p_tick5, "p17": p_tick17 }
+	return { "test": "TC-ECON-S4-01: 价格随世界时间演化（确定性且非固定值）", "passed": passed, "price_tick5": p_tick5, "price_tick17": p_tick17 }
 
 ## TC-ECON-S4-02: 成交量反馈（成交量变化反向影响报价）
 static func _test_volume_feedback() -> Dictionary:

@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 监听并检测单机编辑器配置变更，按领域白名单精确重载并广播业务刷新。 严格仅单机模式生效，联机模式物理阻断（Inv-SV-8/9/14）。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name EditorHotReloadManager extends RefCounted

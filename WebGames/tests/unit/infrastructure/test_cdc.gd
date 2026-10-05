@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：配置驱动收口与单一真源验收 (Phase 25)
+# 单元测试：配置驱动收口与单一真源验收
 # 文件路径: res://tests/unit/infrastructure/test_cdc.gd
 # 职责: 验证默认次分类配置驱动、Gacha 概率与保底零回归、代码 ID 引用一致性、
 #       AST Kind 单一真源判定、收口审计通过性及与 P24 边界隔离
@@ -13,14 +13,14 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_canonical_id_reference_consistency())
 	results.append(test_ast_condition_kind_single_source())
 	results.append(test_audit_cdc_integrity())
-	results.append(test_phase24_boundary_non_overlap())
+	results.append(test_copywriting_boundary_non_overlap())
 
 	var all_passed: bool = true
 	for r in results:
 		if not r.get("passed", false):
 			all_passed = false
 			break
-	return { "domain": "Phase 25: 配置驱动收口与单一真源", "all_passed": all_passed, "results": results }
+	return { "domain": "配置驱动收口与单一真源", "all_passed": all_passed, "results": results }
 
 ## TC-CDC-01: 默认次分类从 GameConfig 读取且缺失时回退默认值
 static func test_default_minor_category_configuration() -> Dictionary:
@@ -99,14 +99,14 @@ static func test_audit_cdc_integrity() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-CDC-06: 与 Phase 24 统一文案配置系统职责边界隔离（零重叠）
-static func test_phase24_boundary_non_overlap() -> Dictionary:
+## TC-CDC-06: 与统一文案配置系统职责边界隔离（零重叠）
+static func test_copywriting_boundary_non_overlap() -> Dictionary:
 	# 校验 CopywritingResolver 统一处理文案，本领域专注配置收口与注册防漂移
 	var copy_res: Dictionary = CopywritingResolver.resolve(
 		"bulletin.maintenance_notice.base", {}
 	)
 	var passed: bool = copy_res.get("success", false) and (copy_res.get("text", "") != "")
 	return {
-		"test": "TC-CDC-06: 与 Phase 24 统一文案职责边界清晰隔离",
+		"test": "TC-CDC-06: 与统一文案职责边界清晰隔离",
 		"passed": passed
 	}

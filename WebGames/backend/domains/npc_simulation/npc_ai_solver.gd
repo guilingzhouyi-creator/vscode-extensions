@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/npc.json | 信号: EventBus 领域广播
 # 职责说明: 基于五维性格矩阵与等效寿命的目标导向行动规划 (GOAP)。 阈值/权重/目标标识由 config/npc.json 的 goap 段驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name NPCAIAndEvolutionSolver extends RefCounted

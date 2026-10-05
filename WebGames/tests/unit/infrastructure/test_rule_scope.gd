@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：配置驱动与规则执行体系（Phase 36 S4 验收）
+# 单元测试：配置驱动与规则执行体系
 # 文件路径: res://tests/unit/infrastructure/test_rule_scope.gd
 # 覆盖: TC-RULE-S4-01~05 —— 作用域覆盖 / 组合 negate / 运行时注入无残留 /
 #       非法配置受控失败 / 无规则默认允许
@@ -17,7 +17,7 @@ const GLOBAL_RULES := {
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 36: 配置驱动与规则执行体系验收"
+	var domain_name = "配置驱动与规则执行体系验收"
 
 	results.append(_test_scope_override())
 	results.append(_test_negate_rule())

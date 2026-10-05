@@ -10,7 +10,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_deterministic_replay_hash_invariant())
 	results.append(test_energy_conservation_assertion())
 	results.append(test_authority_audit_defense())
-	# Phase 54 M2 新增：RNG 高位派生原语
+	# 新增：RNG 高位派生原语
 	results.append(test_rng_coin_no_alternation())
 	results.append(test_rng_pick_no_short_cycle())
 	results.append(test_rng_primitives_boundaries())
@@ -59,7 +59,7 @@ static func test_authority_audit_defense() -> Dictionary:
 	return { "test": "TC-DET-04: 时序攻击与透支作弊防御断言", "passed": passed }
 
 static func test_rng_coin_no_alternation() -> Dictionary:
-	# M2（Phase 54）：高位派生后 randi_range(0,1) 不再奇偶严格交替（红证：旧低比特取模输出 0,1,0,1 可预测）
+	# M2：高位派生后 randi_range(0,1) 不再奇偶严格交替（旧低比特取模输出 0,1,0,1 可预测）
 	var rng := DeterministicRNG.from_seed(20240917)
 	var seq: Array = []
 	for i in range(32):

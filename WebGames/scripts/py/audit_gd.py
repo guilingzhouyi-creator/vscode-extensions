@@ -69,7 +69,7 @@ PENDING_MARKER_RE = re.compile(r"#.*\b(TODO|FIXME|XXX|HACK)\b")
 # ---- Advanced 节正则/规则集 ----
 VAR_DECL_RE = re.compile(r"^\s*(?:static\s+)?var\s+([A-Za-z_][A-Za-z0-9_]*)")
 FUNC_DECL_RE = re.compile(r"^\s*(?:static\s+)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)(?:\s*->\s*([A-Za-z0-9_\[\],\s.]+))?:")
-LOOP_RE = GD_LOOP_HEAD_RE  # Phase 60：与 audit_perf_hotspots.py 同源（audit_common.GD_LOOP_HEAD_RE）
+LOOP_RE = GD_LOOP_HEAD_RE  # 与 audit_perf_hotspots.py 同源（audit_common.GD_LOOP_HEAD_RE）
 # ADV-PRF-002：循环体内的逐次瞬态堆分配。GDScript 写作 `ClassName.new()`（带类名前缀），
 # 故不能只匹配裸 `.new(`；深拷贝 `.duplicate(true)` 与 `.duplicate()` 同属逐次分配。
 ADV_PRF_002_ALLOC_RE = re.compile(r"(?:\.new\s*\(|\.duplicate\s*\()")
@@ -141,11 +141,11 @@ def audit_file(path: Path, violations: list[str]) -> None:
                     violations.append(f"{rel}:{i}: preload 常量引用应为 PascalCase（{name}）")
             elif not UPPER_RE.match(name):
                 violations.append(f"{rel}:{i}: 常量应为 UPPER_SNAKE_CASE（{name}）")
-        # COMMENT-PENDING-MARKER：生产代码注释禁止显式未决标记（TODO/FIXME/XXX/HACK 整词匹配），
-        # 未决事项须收敛为既有 Phase 编号追踪或移除；中文业务术语（占位符/临时物件/临时升格等）不受影响。
+        # COMMENT-PENDING-MARKER：代码与测试注释禁止显式未决标记（TODO/FIXME/XXX/HACK 整词匹配），
+        # 未决事项须落实为客观技术实现或移除；中文业务术语（占位符/临时物件/临时升格等）不受影响。
         pm = PENDING_MARKER_RE.search(ln)
-        if pm and not rel_posix.startswith("tests/"):
-            violations.append(f"{rel}:{i}: 注释含未决标记「{pm.group(1)}」——收敛为 Phase 编号追踪或移除（COMMENT-PENDING-MARKER）")
+        if pm:
+            violations.append(f"{rel}:{i}: 注释含未决标记「{pm.group(1)}」——须落实为客观技术实现或移除（COMMENT-PENDING-MARKER）")
 
 
 def run_style_audit(include_tests: bool = False) -> int:

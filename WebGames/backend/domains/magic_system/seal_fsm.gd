@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / State Advancer (角色归位：apply_/cleanup_ 状态推进，允许实例与注入状态)
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 魔法封印（打出封印行动卡 → 魔法进入封印状态）与魔法解放（释放封印 魔法）。封印行动卡 → 解放行动卡的语义常驻建模为 MagicRuleState 持续 状态（禁复制新卡）。持有对象/时长/可封印数量/重复封印/解放清理/异常 回退/与升格叠加关系均由配置与状态实体承载。 六角色归位（）：本文件对调用方注入的 seals 状态执行 apply_ / cleanup_ 推进，属 fsm 语义（《后端逻辑处理标准 v1》存量渐进归位），不再声明为纯求解器。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SealFsm

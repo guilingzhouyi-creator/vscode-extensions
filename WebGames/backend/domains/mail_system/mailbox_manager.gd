@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/mail_system.json | 信号: EventBus 领域广播
 # 职责说明: 维护信箱 100 封容量上限、已读无附件旧邮件自动 GC 清理、过期邮件失效
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MailboxManager

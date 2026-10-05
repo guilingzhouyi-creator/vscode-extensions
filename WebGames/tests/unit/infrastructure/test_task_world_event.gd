@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：任务世界与事件生命周期（Phase 32 S4 验收——覆盖 S2 已实现边界校验）
+# 单元测试：任务世界与事件生命周期
 # 文件路径: res://tests/unit/infrastructure/test_task_world_event.gd
 # 覆盖: TC-TWE-S4-01/02/03/04/06/07/08 —— 任务图结构校验 / 行军边界与零副作用 /
 #       重复传承幂等 / 回放非法输入整批拒绝 / 多段事件名解析 / 旧档时间字段归一化
@@ -9,7 +9,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 32: 任务世界与事件生命周期验收"
+	var domain_name = "任务世界与事件生命周期验收"
 
 	results.append(_test_quest_graph_invalid())
 	results.append(_test_march_boundary_no_side_effect())

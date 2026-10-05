@@ -4,7 +4,7 @@
 # 架构定位: Domain Entity / Aggregate Root
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/game_settings.json | 信号: EventBus 领域广播
 # 职责说明: 管理音频分轨混音、视效与 UI 缩放、多端渲染管线与画质参数
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GameSettingsAggregate

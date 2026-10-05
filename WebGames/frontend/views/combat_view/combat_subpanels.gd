@@ -21,34 +21,34 @@ func create_status_bar(label_key: String = "") -> KStatusBar:
 	return status_bar
 
 func init_text() -> void:
-	var v = _view
+	var view: CombatView = _view
 	var bindings := [
-		[v.get_node_or_null("BattleLogPanel/VBox/BattleLogTitle"), "ui.fe04.battle_log.title"],
-		[v._battle_scene_label, "ui.fe04.battle_scene.placeholder"],
-		[v.get_node_or_null("BossPartsPanel/VBox/PartsTitleLabel"), "ui.fe04.boss.parts_hp_title"],
-		[v.get_node_or_null("SettlementPanel/VBox/RewardsTitle"), "ui.fe04.settlement.rewards_title"],
-		[v._settlement_back_btn, "ui.fe04.settlement.back"],
-		[v._part_break_close_btn, "ui.fe04.part_break.close"],
-		[v._back_btn, "ui.fe04.back"]
+		[view.get_node_or_null("BattleLogPanel/VBox/BattleLogTitle"), "ui.fe04.battle_log.title"],
+		[view._battle_scene_label, "ui.fe04.battle_scene.placeholder"],
+		[view.get_node_or_null("BossPartsPanel/VBox/PartsTitleLabel"), "ui.fe04.boss.parts_hp_title"],
+		[view.get_node_or_null("SettlementPanel/VBox/RewardsTitle"), "ui.fe04.settlement.rewards_title"],
+		[view._settlement_back_btn, "ui.fe04.settlement.back"],
+		[view._part_break_close_btn, "ui.fe04.part_break.close"],
+		[view._back_btn, "ui.fe04.back"]
 	]
 	for b in bindings:
 		if b[0] != null:
 			UIIntermediary.resolve(b[0], b[1])
 
 func refresh_boss_parts() -> void:
-	var v = _view
-	if v._boss_parts_name_label != null:
-		v._boss_parts_name_label.text = UIIntermediary.text("ui.fe04.boss.parts_label", {"name": v.boss_name})
-	if v._boss_parts_total_bar != null:
-		KStatusBarClass.refresh_bar(v._boss_parts_total_bar, null, v.boss_total_hp, v.boss_max_hp)
+	var view: CombatView = _view
+	if view._boss_parts_name_label != null:
+		view._boss_parts_name_label.text = UIIntermediary.text("ui.fe04.boss.parts_label", {"name": view.boss_name})
+	if view._boss_parts_total_bar != null:
+		KStatusBarClass.refresh_bar(view._boss_parts_total_bar, null, view.boss_total_hp, view.boss_max_hp)
 
-	if not v._boss_parts_list:
+	if not view._boss_parts_list:
 		return
 
-	for child in v._boss_parts_list.get_children():
+	for child in view._boss_parts_list.get_children():
 		child.queue_free()
 
-	for part in v.boss_parts:
+	for part in view.boss_parts:
 		var row := HBoxContainer.new()
 		row.alignment = BoxContainer.ALIGNMENT_BEGIN
 		row.set("theme_override_constants/separation", 6)
@@ -80,62 +80,62 @@ func refresh_boss_parts() -> void:
 			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 				show_part_break_detail(part_name, is_broken))
 
-		v._boss_parts_list.add_child(row)
+		view._boss_parts_list.add_child(row)
 
 func show_part_break_detail(part_name: String, is_broken: bool) -> void:
-	var v = _view
-	if v._part_break_name_label != null:
-		v._part_break_name_label.text = part_name
+	var view: CombatView = _view
+	if view._part_break_name_label != null:
+		view._part_break_name_label.text = part_name
 	var status_text: String = UIIntermediary.text("ui.fe04.part_break.status_broken") if is_broken else UIIntermediary.text("ui.fe04.part_break.status_intact")
-	if v._part_break_status_label != null:
-		UIIntermediary.resolve(v._part_break_status_label, "ui.fe04.part_break.status", {"status": status_text})
-		v._part_break_status_label.add_theme_color_override("font_color",
+	if view._part_break_status_label != null:
+		UIIntermediary.resolve(view._part_break_status_label, "ui.fe04.part_break.status", {"status": status_text})
+		view._part_break_status_label.add_theme_color_override("font_color",
 			DesignTokens.COLOR_DANGER_DEFAULT if is_broken else DesignTokens.COLOR_SUCCESS_DEFAULT)
 	if is_broken:
-		if v._part_break_effect_label != null:
-			UIIntermediary.resolve(v._part_break_effect_label, "ui.fe04.part_break.effect_broken")
-		if v._part_break_weakness_label != null:
-			UIIntermediary.resolve(v._part_break_weakness_label, "ui.fe04.part_break.weakness_none")
+		if view._part_break_effect_label != null:
+			UIIntermediary.resolve(view._part_break_effect_label, "ui.fe04.part_break.effect_broken")
+		if view._part_break_weakness_label != null:
+			UIIntermediary.resolve(view._part_break_weakness_label, "ui.fe04.part_break.weakness_none")
 	else:
-		if v._part_break_effect_label != null:
-			UIIntermediary.resolve(v._part_break_effect_label, "ui.fe04.part_break.effect_intact")
-		if v._part_break_weakness_label != null:
-			UIIntermediary.resolve(v._part_break_weakness_label, "ui.fe04.part_break.weakness_slash")
-	if v._part_break_panel != null:
-		v._part_break_panel.visible = true
+		if view._part_break_effect_label != null:
+			UIIntermediary.resolve(view._part_break_effect_label, "ui.fe04.part_break.effect_intact")
+		if view._part_break_weakness_label != null:
+			UIIntermediary.resolve(view._part_break_weakness_label, "ui.fe04.part_break.weakness_slash")
+	if view._part_break_panel != null:
+		view._part_break_panel.visible = true
 
 func hide_part_break_detail() -> void:
 	if _view._part_break_panel != null:
 		_view._part_break_panel.visible = false
 
 func show_settlement() -> void:
-	var v = _view
-	if v.is_victory:
-		UIIntermediary.resolve(v._settlement_result_label, "ui.fe04.settlement.victory")
+	var view: CombatView = _view
+	if view.is_victory:
+		UIIntermediary.resolve(view._settlement_result_label, "ui.fe04.settlement.victory")
 	else:
-		UIIntermediary.resolve(v._settlement_result_label, "ui.fe04.settlement.defeat")
-	v._settlement_result_label.add_theme_color_override("font_color",
-		DesignTokens.COLOR_WARNING_DEFAULT if v.is_victory else DesignTokens.COLOR_DANGER_DEFAULT)
-	UIIntermediary.resolve(v._settlement_gold_label, "ui.fe04.settlement.gold", {"gold": v.reward_gold})
-	UIIntermediary.resolve(v._settlement_exp_label, "ui.fe04.settlement.exp", {"exp": v.reward_exp})
-	if v.reward_items.is_empty():
-		UIIntermediary.resolve(v._settlement_items_label, "ui.fe04.settlement.items_empty")
+		UIIntermediary.resolve(view._settlement_result_label, "ui.fe04.settlement.defeat")
+	view._settlement_result_label.add_theme_color_override("font_color",
+		DesignTokens.COLOR_WARNING_DEFAULT if view.is_victory else DesignTokens.COLOR_DANGER_DEFAULT)
+	UIIntermediary.resolve(view._settlement_gold_label, "ui.fe04.settlement.gold", {"gold": view.reward_gold})
+	UIIntermediary.resolve(view._settlement_exp_label, "ui.fe04.settlement.exp", {"exp": view.reward_exp})
+	if view.reward_items.is_empty():
+		UIIntermediary.resolve(view._settlement_items_label, "ui.fe04.settlement.items_empty")
 	else:
-		UIIntermediary.resolve(v._settlement_items_label, "ui.fe04.settlement.items", {"items": ", ".join(v.reward_items)})
-	if v.mvp_player_name.is_empty():
-		UIIntermediary.resolve(v._settlement_mvp_label, "ui.fe04.settlement.mvp_empty")
+		UIIntermediary.resolve(view._settlement_items_label, "ui.fe04.settlement.items", {"items": ", ".join(view.reward_items)})
+	if view.mvp_player_name.is_empty():
+		UIIntermediary.resolve(view._settlement_mvp_label, "ui.fe04.settlement.mvp_empty")
 	else:
-		UIIntermediary.resolve(v._settlement_mvp_label, "ui.fe04.settlement.mvp", {"name": v.mvp_player_name})
-	UIIntermediary.resolve(v._settlement_time_label, "ui.fe04.settlement.time", {"duration": v.battle_duration_sec})
-	v._settlement_panel.visible = true
+		UIIntermediary.resolve(view._settlement_mvp_label, "ui.fe04.settlement.mvp", {"name": view.mvp_player_name})
+	UIIntermediary.resolve(view._settlement_time_label, "ui.fe04.settlement.time", {"duration": view.battle_duration_sec})
+	view._settlement_panel.visible = true
 
 func hide_settlement() -> void:
 	if _view._settlement_panel != null:
 		_view._settlement_panel.visible = false
 
 func spawn_floating_label(dto: CombatFloatingTextDTO) -> void:
-	var v = _view
-	if not v._floating_text_layer:
+	var view: CombatView = _view
+	if not view._floating_text_layer:
 		return
 	var lbl := Label.new()
 	var prefix: String = "+" if dto.is_heal else "-"
@@ -150,11 +150,11 @@ func spawn_floating_label(dto: CombatFloatingTextDTO) -> void:
 	lbl.add_theme_color_override("font_color", color)
 	lbl.add_theme_color_override("font_outline_color", DesignTokens.COLOR_TEXT_OUTLINE)
 	lbl.add_theme_constant_override("outline_size", 3)
-	var local_pos: Vector2 = v._floating_text_layer.get_global_transform().affine_inverse() * dto.world_pos
+	var local_pos: Vector2 = view._floating_text_layer.get_global_transform().affine_inverse() * dto.world_pos
 	lbl.position = local_pos
 	lbl.z_index = 100
-	v._floating_text_layer.add_child(lbl)
-	var tween: Tween = v.create_tween()
+	view._floating_text_layer.add_child(lbl)
+	var tween: Tween = view.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(lbl, "position:y", lbl.position.y - 60.0, dto.lifetime)
 	tween.tween_property(lbl, "modulate:a", 0.0, dto.lifetime)

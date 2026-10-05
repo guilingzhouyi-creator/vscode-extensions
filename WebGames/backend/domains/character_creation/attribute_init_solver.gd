@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 天命掷骰（4d6-Drop-Lowest）随机模拟与天平购点（27 Point-Buy）平衡算法， 产出统一 1~6 级 L1 等级；骰制与购点表由 config/domains/character_creation.json 驱动（零硬编码），RNG 实例可注入以保证「一个种子 = 一整套属性」的确定性。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name AttributeInitializationSolver extends RefCounted

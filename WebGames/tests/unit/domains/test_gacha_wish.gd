@@ -55,7 +55,7 @@ static func test_multi_pull_execution() -> Dictionary:
 	var passed = res.success and (res.drops.size() == 10) and template_ok
 	return { "test": "TC-GACHA-03: 十连祈愿扣款与注册表三元组掉落实例化入包", "passed": passed }
 
-## M1（Phase 51）：十连失败整批退款时 banner 保底进度必须整面回滚——
+## M1：十连失败整批退款时 banner 保底进度必须整面回滚——
 ## 封堵「退款但保底免费累积」刷取（红证：修复前 pity/歪率锁存不随事务回滚）
 static func test_banner_rollback_on_refund() -> Dictionary:
 	var banner := GachaBannerAggregate.new()

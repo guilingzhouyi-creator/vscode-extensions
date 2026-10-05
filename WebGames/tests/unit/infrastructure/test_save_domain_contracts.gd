@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 68 数据域划分与统一域契约 (Save Domain Contracts)
+# 单元测试：数据域划分与统一域契约 (Save Domain Contracts)
 # 文件路径: res://tests/unit/infrastructure/test_save_domain_contracts.gd
 # 职责: 验证数据域单一所有权、统一域契约接口、信封契约保持、
 #       配置/运行时分离与三级版本模型（TC-SV-01 ~ TC-SV-05）。
@@ -27,7 +27,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "Phase 68: 存档数据域划分与统一数据契约",
+		"domain": "存档数据域划分与统一数据契约",
 		"all_passed": all_passed,
 		"results": results
 	}

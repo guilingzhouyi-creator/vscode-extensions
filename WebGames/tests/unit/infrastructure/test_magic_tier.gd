@@ -1,16 +1,16 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 魔法双维度体系单元测试
 # 文件路径: res://tests/unit/infrastructure/test_magic_tier.gd
-# 覆盖: Phase 26 施工细则 阶段1~4（TC-MD-01~06）
+# 覆盖: 阶段1~4 验收矩阵（TC-MD-01~06）
 #       —— 阶位纯梯度 / 能力分级独立 / 弱映射非 1:1 / 越级容忍 / 参考标签 /
-#          消费方零回归（Phase 18 语义保持：mana_gate/强度兜底/四维解析）
+#          消费方零回归（语义保持：mana_gate/强度兜底/四维解析）
 # ==============================================================================
 class_name TestMagicTierDomain
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 26: 魔法双维度体系（阶位梯度 × 能力分级）"
+	var domain_name = "魔法双维度体系（阶位梯度 × 能力分级）"
 
 	results.append(_test_rank_gradient_pure())
 	results.append(_test_ability_tier_independent())
@@ -24,7 +24,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_band_name_key())
 	results.append(_test_band_consumer_integration())
 	results.append(_test_three_dimensions_zero_regression())
-	# Phase 33：运行时门禁验收（TC-M3——装配/数量/索引/字段分离/非法值显式错误）
+	# 运行时门禁验收（TC-M3——装配/数量/索引/字段分离/非法值显式错误）
 	results.append(_test_registry_assembled_ready())
 	results.append(_test_rank_to_level_invalid_explicit())
 	results.append(_test_index_consistency())

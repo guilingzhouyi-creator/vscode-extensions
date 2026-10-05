@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/trading.json | 信号: EventBus 领域广播
 # 职责说明: 商队运输进度推进、沿途遇袭劫掠风险计算与货物运抵结算。 风险系数与叙事文案由 config/trading.json、config/narratives/trading.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CaravanLogisticsFSM extends RefCounted

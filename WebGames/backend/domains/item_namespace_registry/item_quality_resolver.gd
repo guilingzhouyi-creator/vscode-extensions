@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 将物品声明（canonical_id + 主品质 + 神话区间端点）确定性解析为 唯一品质快照与数值基线；强制规范约束——唯一映射、区间端点从属、 未登记品质拒绝、特殊物品仅既有标准内扩展（禁绕过/重定义）
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ItemQualityResolver

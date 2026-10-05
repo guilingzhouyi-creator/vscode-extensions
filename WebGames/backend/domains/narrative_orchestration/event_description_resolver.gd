@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 根据实际事件/上下文/结果（result.outcome 分支）生成事件描述——**不承担 事件判定**（生成于事件执行之后，result 由事件层写入，只读消费）。 ：文本生成收敛至统一文案核心 CopywritingResolver（结果分支/条件段/ {param} 填充/未填充拦截/键登记一处实现）；本类保留 EVENT_DESC_MISSING 配置存在性检查（测试断言兼容）与零判定时序（result 只读合并）。
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name EventDescriptionResolver

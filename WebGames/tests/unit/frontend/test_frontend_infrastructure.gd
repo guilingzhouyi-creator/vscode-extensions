@@ -1,8 +1,8 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端基础设施与解耦模型验收测试套件 (Phase 78)
+# 卡拉尔世界引擎 (Kalar World Engine) - 前端基础设施与解耦模型验收测试套件
 # 文件路径: res://tests/unit/frontend/test_frontend_infrastructure.gd
 # 职责: 验证 DesignTokens 设计令牌、AppLifecycleFSM 13 态状态机、八大 UI 基础设施管理器、
-#       三层解耦模型映射、Tooltip 防碰撞翻转与通用原子组件行为契约 (TC-P78-S1~S4)
+#       三层解耦模型映射、Tooltip 防碰撞翻转与通用原子组件行为契约
 # ==============================================================================
 class_name TestFrontendInfrastructure
 extends RefCounted
@@ -27,7 +27,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 
 	return {
-		"domain": "frontend_infrastructure_phase78",
+		"domain": "frontend_infrastructure",
 		"total": results.size(),
 		"passed": passed_cnt,
 		"all_passed": all_passed,
@@ -52,7 +52,7 @@ static func _test_design_tokens_contract() -> Dictionary:
 
 	return {"name": test_name, "passed": err.is_empty(), "error": err}
 
-## 2. 验证 AppLifecycleFSM 13 态状态机与跃迁守卫 (TC-P78-S3-01)
+## 2. 验证 AppLifecycleFSM 13 态状态机与跃迁守卫
 static func _test_app_lifecycle_fsm() -> Dictionary:
 	var test_name := "test_app_lifecycle_fsm"
 	var err := ""
@@ -87,7 +87,7 @@ static func _test_app_lifecycle_fsm() -> Dictionary:
 
 	return {"name": test_name, "passed": err.is_empty(), "error": err}
 
-## 3. 验证 ModalManager 与 DialogManager 弹窗调度 (TC-P78-S2-04)
+## 3. 验证 ModalManager 与 DialogManager 弹窗调度
 static func _test_modal_and_dialog_manager() -> Dictionary:
 	var test_name := "test_modal_and_dialog_manager"
 	var err := ""
@@ -117,7 +117,7 @@ static func _test_modal_and_dialog_manager() -> Dictionary:
 
 	return {"name": test_name, "passed": err.is_empty(), "error": err}
 
-## 4. 验证 TooltipManager 防碰撞翻转算法 (TC-P78-S2-02)
+## 4. 验证 TooltipManager 防碰撞翻转算法
 static func _test_tooltip_flip_algorithm() -> Dictionary:
 	var test_name := "test_tooltip_flip_algorithm"
 	var err := ""
@@ -204,7 +204,7 @@ static func _test_drawer_and_context_menu_manager() -> Dictionary:
 
 	return {"name": test_name, "passed": err.is_empty(), "error": err}
 
-## 7. 验证三层模型解耦与零除防御 (TC-P78-S1-02, TC-P78-S1-03)
+## 7. 验证三层模型解耦与零除防御
 static func _test_three_layer_model_decoupling() -> Dictionary:
 	var test_name := "test_three_layer_model_decoupling"
 	var err := ""
@@ -224,7 +224,7 @@ static func _test_three_layer_model_decoupling() -> Dictionary:
 	elif domain.get_health_ratio() != 0.2:
 		err = "血量百分比试算错误"
 
-	# 零除与极端负数防御守卫断言 (TC-P78-S1-03)
+	# 零除与极端负数防御守卫断言
 	domain.max_hp = 0.0 # 非法值
 	var safe_ratio := domain.get_health_ratio()
 	if is_nan(safe_ratio) or is_inf(safe_ratio):

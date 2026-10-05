@@ -76,19 +76,19 @@ static func _test_id_collision_prevention() -> Dictionary:
 
 static func _test_numeric_id_auto_increment() -> Dictionary:
 	var catalog := ItemRegistryCatalog.new()
-	var p1 = ItemRegistryCatalog.ItemPrototypeTemplate.new("KALAR:EQUIP:WEAPON_BLADE:SWORD_A", 0, "item.sword_a.name", "EQUIPMENT", "WEAPON_BLADE", 1, 1.5, 2, 100, [], "sword_a")
-	var p2 = ItemRegistryCatalog.ItemPrototypeTemplate.new("KALAR:EQUIP:WEAPON_BLADE:SWORD_B", 0, "item.sword_b.name", "EQUIPMENT", "WEAPON_BLADE", 1, 1.5, 2, 100, [], "sword_b")
-	var p3 = ItemRegistryCatalog.ItemPrototypeTemplate.new("KALAR:EQUIP:WEAPON_BLADE:SWORD_C", 50, "item.sword_c.name", "EQUIPMENT", "WEAPON_BLADE", 1, 1.5, 2, 100, [], "sword_c")
-	var p4 = ItemRegistryCatalog.ItemPrototypeTemplate.new("KALAR:EQUIP:WEAPON_BLADE:SWORD_D", 0, "item.sword_d.name", "EQUIPMENT", "WEAPON_BLADE", 1, 1.5, 2, 100, [], "sword_d")
+	var proto_a = ItemRegistryCatalog.ItemPrototypeTemplate.new("KALAR:EQUIP:WEAPON_BLADE:SWORD_A", 0, "item.sword_a.name", "EQUIPMENT", "WEAPON_BLADE", 1, 1.5, 2, 100, [], "sword_a")
+	var proto_b = ItemRegistryCatalog.ItemPrototypeTemplate.new("KALAR:EQUIP:WEAPON_BLADE:SWORD_B", 0, "item.sword_b.name", "EQUIPMENT", "WEAPON_BLADE", 1, 1.5, 2, 100, [], "sword_b")
+	var proto_c = ItemRegistryCatalog.ItemPrototypeTemplate.new("KALAR:EQUIP:WEAPON_BLADE:SWORD_C", 50, "item.sword_c.name", "EQUIPMENT", "WEAPON_BLADE", 1, 1.5, 2, 100, [], "sword_c")
+	var proto_d = ItemRegistryCatalog.ItemPrototypeTemplate.new("KALAR:EQUIP:WEAPON_BLADE:SWORD_D", 0, "item.sword_d.name", "EQUIPMENT", "WEAPON_BLADE", 1, 1.5, 2, 100, [], "sword_d")
 
-	var ok1 = ItemRegistrySolver.register_prototype(catalog, p1).success
-	var ok2 = ItemRegistrySolver.register_prototype(catalog, p2).success
-	var ok3 = ItemRegistrySolver.register_prototype(catalog, p3).success
-	var ok4 = ItemRegistrySolver.register_prototype(catalog, p4).success
+	var ok1 = ItemRegistrySolver.register_prototype(catalog, proto_a).success
+	var ok2 = ItemRegistrySolver.register_prototype(catalog, proto_b).success
+	var ok3 = ItemRegistrySolver.register_prototype(catalog, proto_c).success
+	var ok4 = ItemRegistrySolver.register_prototype(catalog, proto_d).success
 
 	var passed = ok1 and ok2 and ok3 and ok4 \
-		and p1.numeric_id == 1 and p2.numeric_id == 2 \
-		and p3.numeric_id == 50 and p4.numeric_id == 51
+		and proto_a.numeric_id == 1 and proto_b.numeric_id == 2 \
+		and proto_c.numeric_id == 50 and proto_d.numeric_id == 51
 	return {
 		"test": "TC-ITEM-REG-04: 数字 ID 自动递增分配（未填按序分配，显式 ID 抬高水位）",
 		"passed": passed
@@ -329,7 +329,7 @@ static func _test_uid_uniqueness_across_prefixes() -> Dictionary:
 				collision = true
 				break
 			seen[uid] = true
-	return {"test": "TC-P09-01: UID 同批零碰撞且跨前缀隔离（5x2000）", "passed": not collision and seen.size() == 10000}
+	return {"test": "TC-ITEM-UID-01: UID 同批零碰撞且跨前缀隔离（5x2000）", "passed": not collision and seen.size() == 10000}
 
 static func _test_uid_counter_monotonic() -> Dictionary:
 	var before := ItemUIDGenerator.current_counter()
@@ -340,7 +340,7 @@ static func _test_uid_counter_monotonic() -> Dictionary:
 	var restored_visible := ItemUIDGenerator.current_counter() == after + 1000
 	var restored_uid := ItemUIDGenerator.generate_uid("GM_")
 	var monotonic: bool = after > before and restored_visible and restored_uid != uid and ItemUIDGenerator.validate_uid(restored_uid)
-	return {"test": "TC-P09-02: UID 计数单调且重启续增可复现（恢复路径可观察）", "passed": monotonic}
+	return {"test": "TC-ITEM-UID-02: UID 计数单调且重启续增可复现（恢复路径可观察）", "passed": monotonic}
 
 static func _test_uid_checksum_anti_tamper() -> Dictionary:
 	var uid := ItemUIDGenerator.generate_uid("MAIL_")
@@ -348,7 +348,7 @@ static func _test_uid_checksum_anti_tamper() -> Dictionary:
 	var tail := tampered.substr(tampered.length() - 1, 1)
 	tampered = tampered.substr(0, tampered.length() - 1) + ("X" if tail != "X" else "Y")
 	var passed: bool = ItemUIDGenerator.validate_uid(uid) and not ItemUIDGenerator.validate_uid(tampered) and ItemUIDGenerator.prefix_of(uid) == "MAIL_"
-	return {"test": "TC-P09-03: UID 校验尾防篡改与来源追溯", "passed": passed}
+	return {"test": "TC-ITEM-UID-03: UID 校验尾防篡改与来源追溯", "passed": passed}
 
 static func _test_uid_legacy_migration() -> Dictionary:
 	var mig1 := ItemEntity.migrate_legacy_uid("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", "GM_ITEM_172")
@@ -361,7 +361,7 @@ static func _test_uid_legacy_migration() -> Dictionary:
 	var legacy_valid := ItemUIDGenerator.validate_uid(mig1) and ItemUIDGenerator.prefix_of(mig1) == "LGC_"
 	var passed: bool = mig1 == mig2 and mig1.begins_with("LGC_") and item.item_uid == mig1 \
 		and dup_a != dup_b and legacy_valid
-	return {"test": "TC-P09-04: 旧档无 uid 确定性迁移可复现且同模板多实例判别子防碰撞", "passed": passed}
+	return {"test": "TC-ITEM-UID-04: 旧档无 uid 确定性迁移可复现且同模板多实例判别子防碰撞", "passed": passed}
 
 static func _test_server_grant_idempotent() -> Dictionary:
 	var registry := ServerGrantRegistry.new()
@@ -370,7 +370,7 @@ static func _test_server_grant_idempotent() -> Dictionary:
 	var second := registry.register_grant("GRANT_A", uid, "CDKEY")
 	var found := registry.find_grant_by_uid(uid)
 	var passed: bool = first.success and (not second.success) and second.error_code == "GRANT_ALREADY_EXISTS" and found == "GRANT_A"
-	return {"test": "TC-P09-05: 服务器发放幂等只增（同 grant 拒绝重放）", "passed": passed}
+	return {"test": "TC-ITEM-UID-05: 服务器发放幂等只增（同 grant 拒绝重放）", "passed": passed}
 
 static func _test_factory_build_with_uid() -> Dictionary:
 	var catalog := ItemRegistryCatalog.new()
@@ -382,4 +382,4 @@ static func _test_factory_build_with_uid() -> Dictionary:
 	var item := ItemInstanceFactory.build_instance(proto, "秘银剑", "GM_", "GM_ITEM_")
 	var mail_item := ItemInstanceFactory.build_instance(proto, "礼物", "MAIL_")
 	var passed: bool = ItemUIDGenerator.validate_uid(item.item_uid) and ItemUIDGenerator.prefix_of(item.item_uid) == "GM_" 		and ItemUIDGenerator.prefix_of(mail_item.item_uid) == "MAIL_" and mail_item.item_uid != item.item_uid
-	return {"test": "TC-P09-06: 统一工厂发放链路携带权威 UID（GM/MAIL 前缀隔离）", "passed": passed}
+	return {"test": "TC-ITEM-UID-06: 统一工厂发放链路携带权威 UID（GM/MAIL 前缀隔离）", "passed": passed}

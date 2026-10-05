@@ -57,10 +57,12 @@ func generate_drops(count: int, pity_5star: int, pity_4star: int) -> Array:
 		elif roll < BASE_RATE_5STAR + BASE_RATE_4STAR or (pity_4star + i) >= PITY_4STAR_HARD - 1:
 			rarity = "4"
 			name_str = POOL_4[i % POOL_4.size()]
+		var is_recent: bool = rng.randf() < NEW_FLAG_RATE
 		drops.append({
 			"name": name_str,
 			"rarity": rarity,
-			"is_new": rng.randf() < NEW_FLAG_RATE,
+			"is_recently_added": is_recent,
+			"is_new": is_recent,
 		})
 	return drops
 

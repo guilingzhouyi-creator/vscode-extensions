@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/deterministic.json | 信号: EventBus 领域广播
 # 职责说明: 确定性输入动作快照与回放校验上下文（tick 对齐、固定种子、 状态指纹比对）；默认动作/种子/校验状态由 config/deterministic.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name DeterministicInputSnapshot extends RefCounted

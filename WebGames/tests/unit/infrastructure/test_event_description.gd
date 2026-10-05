@@ -1,7 +1,7 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 事件发生描述系统单元测试（Phase 23）
+# 卡拉尔世界引擎 (Kalar World Engine) - 事件发生描述系统单元测试
 # 文件路径: res://tests/unit/infrastructure/test_event_description.gd
-# 覆盖: Phase 23 施工细则 阶段1~4（TC-EVTDESC-01~06）
+# 覆盖: 阶段1~4 验收矩阵（TC-EVTDESC-01~06）
 #       —— 正常生成 / 结果分支 / 不承担判定 / 复用声明 / 配置为源 / 键登记
 # ==============================================================================
 class_name TestEventDescriptionDomain
@@ -9,7 +9,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 23: 事件发生描述系统（事件侧三位一体）"
+	var domain_name = "事件发生描述系统（事件侧三位一体）"
 
 	results.append(_test_normal_generation())
 	results.append(_test_outcome_branch())

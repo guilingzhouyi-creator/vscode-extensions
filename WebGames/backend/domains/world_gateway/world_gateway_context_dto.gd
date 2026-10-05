@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account, feature_toggle_canary | 配置: config/domains/world_gateway.json | 信号: EventBus 领域广播
 # 职责说明: 维持当前登录账号的世界栏会话状态、选定模式、档位、世界与角色关系
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name WorldGatewayContextDTO

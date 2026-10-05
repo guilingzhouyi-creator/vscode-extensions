@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/ground_loot.json | 信号: EventBus 领域广播
 # 职责说明: 随世界时钟推移推进保护倒计时与衰变存活计时，自动回收风化有机物。 纯静态工具类（无状态），由全局衰变时钟/回收调度方周期调用； 寿命阈值来自聚合体构造时配置（config/domains/ground_loot.json lifespan.*）。
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GroundLootDecayFSM

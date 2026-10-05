@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 建模「延时到期强制打出」等待触发行动——独立调度状态，与玩家主动出牌 解耦：触发时不得阻塞正常行动卡继续打出。由延时调度器驱动步进与到期 判定，携带目标策略、属性快照策略与释放失败处置，供边界状态消费。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MagicRuleTrigger

@@ -4,7 +4,7 @@
 # 架构定位: Domain Entity / Aggregate Root
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
 # 职责说明: 依据 (trigger_id, entity_id) 复合键维护各实体在各触发区的独立状态，消除单实体串扰
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MultiEntityTriggerRegistry

@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：CDKey 复合门槛与状态边界（Phase 35 S4 验收）
+# 单元测试：CDKey 复合门槛与状态边界
 # 文件路径: res://tests/unit/infrastructure/test_cdkey_eligibility.gd
 # 覆盖: TC-CDK-S4-01~06 —— 复合门槛组合 / 未达标不消耗 / 后续重新兑换 /
 #       防枚举提示 / 成功后统一邮件发放 / 禁绕过邮箱路径
@@ -17,7 +17,7 @@ const RULES_AND := {
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 35: CDKey 复合门槛与状态边界验收"
+	var domain_name = "CDKey 复合门槛与状态边界验收"
 
 	results.append(_test_composite_rules())
 	results.append(_test_not_met_no_consume())

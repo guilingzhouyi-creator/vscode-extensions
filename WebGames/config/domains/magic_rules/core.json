@@ -124,6 +124,7 @@
     "max_rank": 11,
     "max_steps_per_play": 1,
     "permanent": true,
+    "transient_duration_steps": 3,
     "temp_duration_steps": 3
   },
   "delay": {

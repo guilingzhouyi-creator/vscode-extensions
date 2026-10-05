@@ -12,7 +12,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_settings_serialization_and_persistence())
 	results.append(_test_settings_validation_and_clamp())
 	results.append(_test_auto_revert_safety_guard())
-	# Phase 56 L5 新增：反序列化子段类型守卫
+	# 新增：反序列化子段类型守卫
 	results.append(_test_corrupt_section_type_falls_back())
 
 	var passed_cnt := 0
@@ -75,7 +75,7 @@ static func _test_auto_revert_safety_guard() -> Dictionary:
 		"passed": passed
 	}
 
-## L5（Phase 56）：反序列化子段类型守卫——损坏文件（audio 非 Dictionary）不再 typed 崩溃，回退默认段
+## L5：反序列化子段类型守卫——损坏文件（audio 非 Dictionary）不再 typed 崩溃，回退默认段
 static func _test_corrupt_section_type_falls_back() -> Dictionary:
 	var s := GameSettingsAggregate.new()
 	var default_audio: float = s.audio_settings.get("master_volume", 0.0)

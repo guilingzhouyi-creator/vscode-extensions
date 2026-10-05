@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 可扩展账号权限/等级字段体系的统一鉴权入口（安全分责）： - 权限字段仅描述账号资格，不直担具体游戏逻辑； - 业务模块一律经 has_entitlement 判断，禁止直读 account.entitlements； - 本地存档为明文（entitlements/encrypted=false）：完整性靠存档密封 （seal 重算比对，防意外损坏/简单篡改），资格合法性靠 allowed 白名单 （空列表=放行全部）与消费端鉴权共同约束，配置由 config/domains/account.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name EntitlementService extends RefCounted

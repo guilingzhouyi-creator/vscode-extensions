@@ -75,7 +75,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_s4_10_missing_domains_explicitly_registered())
 	results.append(test_s4_11_reverse_orphan_world_map_registered())
 	results.append(test_s4_12_schema_version_upgrade_procedure())
-	# Phase 85 F-2（TC-P85-S4-02）：coverage_status 单形态 String 契约
+	# coverage_status 单形态 String 契约
 	results.append(test_s4_13_coverage_status_string_single_shape())
 
 	var all_passed: bool = true
@@ -87,7 +87,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 
 	return {
-		"domain": "Phase 57: 前后端契约接口层与域视图映射注册表",
+		"domain": "前后端契约接口层与域视图映射注册表",
 		"all_passed": all_passed,
 		"total_count": results.size(),
 		"passed_count": passed_count,
@@ -203,13 +203,13 @@ static func test_s1_08_audit_completeness_missing_domains() -> Dictionary:
 
 
 static func test_s1_09_version_compatibility_check() -> Dictionary:
-	var v1 = FactoryClass.create_valid_dto_entry("CT-V1")
-	v1.contract_version = 1
-	var v2 = FactoryClass.create_valid_dto_entry("CT-V2")
-	v2.contract_version = 2
-	v2.breaking_change_note = "Field renamed from hp to current_hp"
+	var entry_v1 = FactoryClass.create_valid_dto_entry("CT-V1")
+	entry_v1.contract_version = 1
+	var entry_v2 = FactoryClass.create_valid_dto_entry("CT-V2")
+	entry_v2.contract_version = 2
+	entry_v2.breaking_change_note = "Field renamed from hp to current_hp"
 
-	var is_breaking: bool = IndexClass.is_breaking_change(v1, v2)
+	var is_breaking: bool = IndexClass.is_breaking_change(entry_v1, entry_v2)
 	return {"test": "TC-CT-S1-09: 版本兼容性与破坏性变更仲裁", "passed": is_breaking}
 
 
@@ -460,7 +460,7 @@ static func test_s4_01_e2e_config_to_index_pipeline() -> Dictionary:
 
 
 static func test_s4_02_e2e_index_to_parser_consumption() -> Dictionary:
-	# P3-10 修复：原断言 `vm != null` 恒真（resolve_dto_mapping 任何路径均返回 Dictionary），
+	# 修复：原断言 `vm != null` 恒真（resolve_dto_mapping 任何路径均返回 Dictionary），
 	# 真空断言无法捕获映射回归。改为按 DTO 条目 field_mapping 语义断言解析键值
 	var all_entries: Array = IndexClass.find_all()
 	var target: Variant = null

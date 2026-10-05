@@ -88,48 +88,48 @@ func setup(view: BaseScreen) -> void:
 	_view = view
 
 func init_static_text() -> void:
-	var v = _view
+	var view: MailSystemView = _view
 	var bindings := [
-		[v.get_node_or_null("MainLayout/HeaderPanel/HeaderHBox/TitleLabel"), "ui.fe08.header.title"],
-		[v._btn_back, "ui.fe08.header.back"],
-		[v._btn_select_all, "ui.fe08.btn.select_all"],
-		[v._btn_batch_delete, "ui.fe08.btn.batch_delete"],
-		[v._btn_claim_all, "ui.fe08.btn.claim_all"],
-		[v.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/AttachmentSection/LabelAttachmentTitle"), "ui.fe08.detail.attachment_title"],
-		[v._btn_claim_attachment, "ui.fe08.btn.claim_attachment"],
-		[v._btn_reply, "ui.fe08.btn.reply"],
-		[v._btn_delete_mail, "ui.fe08.btn.delete"],
-		[v.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/ComposeTitle"), "ui.fe08.compose.title"],
-		[v.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/RecipientRow/Label"), "ui.fe08.compose.recipient_label"],
-		[v.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/SubjectRow/Label"), "ui.fe08.compose.subject_label"],
-		[v.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/BodyLabel"), "ui.fe08.compose.body_label"],
-		[v._btn_add_attachment, "ui.fe08.btn.add_attachment"],
-		[v._btn_send, "ui.fe08.btn.send"],
-		[v._btn_save_draft, "ui.fe08.btn.save_draft"]
+		[view.get_node_or_null("MainLayout/HeaderPanel/HeaderHBox/TitleLabel"), "ui.fe08.header.title"],
+		[view._btn_back, "ui.fe08.header.back"],
+		[view._btn_select_all, "ui.fe08.btn.select_all"],
+		[view._btn_batch_delete, "ui.fe08.btn.batch_delete"],
+		[view._btn_claim_all, "ui.fe08.btn.claim_all"],
+		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/AttachmentSection/LabelAttachmentTitle"), "ui.fe08.detail.attachment_title"],
+		[view._btn_claim_attachment, "ui.fe08.btn.claim_attachment"],
+		[view._btn_reply, "ui.fe08.btn.reply"],
+		[view._btn_delete_mail, "ui.fe08.btn.delete"],
+		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/ComposeTitle"), "ui.fe08.compose.title"],
+		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/RecipientRow/Label"), "ui.fe08.compose.recipient_label"],
+		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/SubjectRow/Label"), "ui.fe08.compose.subject_label"],
+		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/BodyLabel"), "ui.fe08.compose.body_label"],
+		[view._btn_add_attachment, "ui.fe08.btn.add_attachment"],
+		[view._btn_send, "ui.fe08.btn.send"],
+		[view._btn_save_draft, "ui.fe08.btn.save_draft"]
 	]
 	for b in bindings:
 		if b[0] != null:
 			UIIntermediary.resolve(b[0], b[1])
 
-	if v._search_edit != null:
-		UIIntermediary.resolve_placeholder(v._search_edit, "ui.fe08.search.placeholder")
-	KTabBar.init_titles(v._right_tab_container, PackedStringArray(["ui.fe08.tab.detail", "ui.fe08.tab.compose"]))
-	if v._line_edit_recipient != null:
-		UIIntermediary.resolve_placeholder(v._line_edit_recipient, "ui.fe08.compose.recipient_ph")
-	if v._line_edit_subject != null:
-		UIIntermediary.resolve_placeholder(v._line_edit_subject, "ui.fe08.compose.subject_ph")
-	if v._text_edit_body != null:
-		v._text_edit_body.placeholder_text = UIIntermediary.text("ui.fe08.compose.body_ph")
+	if view._search_edit != null:
+		UIIntermediary.resolve_placeholder(view._search_edit, "ui.fe08.search.placeholder")
+	KTabBar.init_titles(view._right_tab_container, PackedStringArray(["ui.fe08.tab.detail", "ui.fe08.tab.compose"]))
+	if view._line_edit_recipient != null:
+		UIIntermediary.resolve_placeholder(view._line_edit_recipient, "ui.fe08.compose.recipient_ph")
+	if view._line_edit_subject != null:
+		UIIntermediary.resolve_placeholder(view._line_edit_subject, "ui.fe08.compose.subject_ph")
+	if view._text_edit_body != null:
+		view._text_edit_body.placeholder_text = UIIntermediary.text("ui.fe08.compose.body_ph")
 
 func setup_category_tabs() -> void:
-	var v = _view
-	v._category_tab_bar.clear_tabs()
-	v._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.all"))
-	v._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.system"))
-	v._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.reward"))
-	v._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.guild"))
-	v._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.player"))
-	v._category_tab_bar.current_tab = 0
+	var view: MailSystemView = _view
+	view._category_tab_bar.clear_tabs()
+	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.all"))
+	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.system"))
+	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.reward"))
+	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.guild"))
+	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.player"))
+	view._category_tab_bar.current_tab = 0
 
 func category_code(tab_index: int) -> String:
 	match tab_index:
@@ -140,11 +140,11 @@ func category_code(tab_index: int) -> String:
 		_: return ""
 
 func init_mail_compose() -> void:
-	var v = _view
-	v._line_edit_recipient.text = ""
-	v._line_edit_subject.text = ""
-	v._text_edit_body.text = ""
-	clear_container_children(v._compose_attachment_list)
+	var view: MailSystemView = _view
+	view._line_edit_recipient.text = ""
+	view._line_edit_subject.text = ""
+	view._text_edit_body.text = ""
+	clear_container_children(view._compose_attachment_list)
 
 func clear_container_children(container: Node) -> void:
 	if container == null:
@@ -153,29 +153,29 @@ func clear_container_children(container: Node) -> void:
 		child.queue_free()
 
 func on_reply() -> void:
-	var v = _view
-	var filtered: Array = v._get_filtered_mails()
-	var idx: PackedInt32Array = v._mail_item_list.get_selected_items()
+	var view: MailSystemView = _view
+	var filtered: Array = view._get_filtered_mails()
+	var idx: PackedInt32Array = view._mail_item_list.get_selected_items()
 	if idx.size() > 0 and idx[0] < filtered.size():
 		var mail: Dictionary = filtered[idx[0]]
-		v._line_edit_recipient.text = UIIntermediary.text(str(mail.get("sender_key", "")))
-		v._line_edit_subject.text = "Re: %s" % UIIntermediary.text(str(mail.get("subject_key", "")))
-		v._right_tab_container.current_tab = 1
+		view._line_edit_recipient.text = UIIntermediary.text(str(mail.get("sender_key", "")))
+		view._line_edit_subject.text = "Re: %s" % UIIntermediary.text(str(mail.get("subject_key", "")))
+		view._right_tab_container.current_tab = 1
 
 func on_add_attachment() -> void:
-	var v = _view
+	var view: MailSystemView = _view
 	var lbl := Label.new()
-	lbl.text = UIIntermediary.text("ui.fe08.compose.attachment_item", {"count": v._compose_attachment_list.get_child_count() + 1})
-	v._compose_attachment_list.add_child(lbl)
+	lbl.text = UIIntermediary.text("ui.fe08.compose.attachment_item", {"count": view._compose_attachment_list.get_child_count() + 1})
+	view._compose_attachment_list.add_child(lbl)
 
 func on_send() -> void:
-	var v = _view
-	var recipient: String = v._line_edit_recipient.text.strip_edges()
-	var subject: String = v._line_edit_subject.text.strip_edges()
+	var view: MailSystemView = _view
+	var recipient: String = view._line_edit_recipient.text.strip_edges()
+	var subject: String = view._line_edit_subject.text.strip_edges()
 	if recipient.is_empty() or subject.is_empty():
 		return
 	init_mail_compose()
-	v._right_tab_container.current_tab = 0
+	view._right_tab_container.current_tab = 0
 
 func on_save_draft() -> void:
 	pass

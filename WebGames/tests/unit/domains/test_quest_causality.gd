@@ -86,4 +86,4 @@ static func test_quest_item_reward_dispatch() -> Dictionary:
 	var passed: bool = ok_res.success and ok_res.granted == 1 and inventory.storage_items.size() == 1 \
 		and inventory.storage_items[0].item_uid.begins_with("QST_") \
 		and (not bad_res.success) and bad_res.error_code == "ITEM_NOT_REGISTERED"
-	return {"test": "TC-P11-QST-01: 任务奖励统一事实源闭环（已登记+UID 前缀 QST_，未登记拒入账）", "passed": passed}
+	return {"test": "TC-QST-01: 任务奖励统一事实源闭环（已登记+UID 前缀 QST_，未登记拒入账）", "passed": passed}

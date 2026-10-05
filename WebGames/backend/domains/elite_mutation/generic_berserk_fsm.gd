@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
 # 职责说明: 基于血线阈值与战斗超时的通用狂暴触发判定、免疫控制与爆发伤害加成 （L2 系数乘性修正）；阈值与倍率由 config/domains/elite.json 的 berserk_fsm 段驱动，叙事文案由 config/narratives/elite.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GenericBerserkFSM extends RefCounted

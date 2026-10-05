@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
 # 职责说明: 历法年轮推进机能衰退、寿元大限判定、生机逆龄与丹药调和。 大限阈值/恢复量与叙事文案由 config/lifecycle.json、 config/narratives/lifecycle.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name LifeCycleEvolutionFSM extends RefCounted

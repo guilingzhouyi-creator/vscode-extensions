@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/potential.json | 信号: EventBus 领域广播
 # 职责说明: 扣除金币与魔单晶因果代价，全额返还已加潜能点；洗点洗的是中间系数结构层： - L1 等级回退至基础（min_level、进度归零）； - L2 阅历重塑层重置为 1.0（先天基础系数不重置）； - L3 随机动态加点实际值保留（永久性，洗点不逆转）。 代价公式由 config/domains/potential.json 驱动，文案由 narratives/potential.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name AttributeRespecPipeline extends RefCounted

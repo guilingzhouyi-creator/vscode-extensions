@@ -4,7 +4,7 @@
 # 架构定位: Domain Registry / Specification Catalog
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 加载 config/domains/quality_tiers.json 唯一事实源，启动时校验四项 硬性不变量（单调等级序/唯一主映射/区间端点从属/端点连续语义）， 为全局物品设计/数值平衡/效果评估提供统一强度与稀有度基线查询
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name QualityTierRegistry

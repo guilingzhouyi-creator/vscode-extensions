@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/potential.json | 信号: EventBus 领域广播
 # 职责说明: 击杀怪物 / 触发事件 → 系统直加或直减的**底层实际值域**（L3）永久调整： - 作用于实际能力值而非显示等级（等级不变，底层数值联动）； - 实际值下限 0（直减不可到负数），实际生效量记入 sheet.dynamic_adjustments； - 调整后实时重算生理机能 SF，并经 potential.dynamic_adjusted 领域事件广播； - 触发-幅值映射由 config/domains/potential.json 的 dynamic_adjust.channels 按事件频道（<域>.<事件>，如 monster.killed / world_boss.boss_defeated）驱动； - 永久性：心核洗点仅重置 L2 阅历重塑层与 L1 等级，L3 动态调整不逆转。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name DynamicAttributeAdjuster

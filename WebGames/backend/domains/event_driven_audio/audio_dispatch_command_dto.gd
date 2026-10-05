@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/event_driven_audio.json | 信号: EventBus 领域广播
 # 职责说明: 封装四轨总线类型、音量/音高微调、空间坐标与声学衰减参数的调度命令； 命令默认值由 config/domains/event_driven_audio.json 的 command_defaults 段驱动。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name AudioDispatchCommandDTO

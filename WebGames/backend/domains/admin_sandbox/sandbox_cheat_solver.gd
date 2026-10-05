@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
 # 职责说明: 无敌模式、任意金币道具生成、属性强行修改、世界时钟快进与穿墙瞬移 数值与文案由 config/infrastructure/admin.json、narratives/admin.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SandboxCheatSolver extends RefCounted

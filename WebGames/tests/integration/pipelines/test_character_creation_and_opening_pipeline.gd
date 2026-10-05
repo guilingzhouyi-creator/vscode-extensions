@@ -1,10 +1,10 @@
 # ==============================================================================
-# 单元测试：配置驱动角色创建系统升级与开局事件流接入 (Phase 48 专属测试套件)
+# 单元测试：配置驱动角色创建系统升级与开局事件流接入
 # 文件路径: res://tests/integration/pipelines/test_character_creation_and_opening_pipeline.gd
 # 职责: 验证 RaceDefinitionDTO 配置驱动种族元数据、创角顺序状态机防跃迁、
 #       后端权威属性派生防伪（前端伪造战斗属性零信任丢弃）、首次开档开局事件
 #       流广播、种族扩展灰度拦截，以及世界栏网关到开局叙事全链路无断裂。
-# 需求源: Phase 48 (TC-CC-01 ~ TC-CC-06 验收矩阵)
+# 需求源: 验收矩阵 TC-CC-01 ~ TC-CC-06
 # ==============================================================================
 class_name TestCharacterCreationAndOpeningPipeline
 extends RefCounted
@@ -27,7 +27,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 
 	return {
-		"domain": "Character Creation & Opening Event Stream Pipeline (Phase 48)",
+		"domain": "Character Creation & Opening Event Stream Pipeline",
 		"all_passed": all_passed,
 		"passed_count": passed_cnt,
 		"total_count": results.size(),
@@ -209,11 +209,11 @@ static func _test_race_expansion_canary_gating() -> Dictionary:
 	return { "test": "TC-CC-05: 种族灰度互锁（非白名单 RACE_CANARY_RESTRICTED / 白名单放行）", "passed": passed }
 
 
-## TC-CC-06: 世界栏网关到开局叙事全链路闭环（P47 网关 → P48 创角 → 开局事件）
+## TC-CC-06: 世界栏网关到开局叙事全链路闭环（网关 → 创角 → 开局事件）
 static func _test_full_lifecycle_gateway_to_opening_narrative() -> Dictionary:
 	var account_id := "ACC_FULL_FLOW_01"
 
-	# 1. 登录后进入世界栏网关（Phase 47 WorldGatewayFSM）
+	# 1. 登录后进入世界栏网关（WorldGatewayFSM）
 	var fsm := WorldGatewayFSM.new(account_id)
 	var gateway_ok: bool = bool(fsm.enter_gateway().get("success", false))
 
@@ -225,7 +225,7 @@ static func _test_full_lifecycle_gateway_to_opening_narrative() -> Dictionary:
 	if route_result != null and route_result.available_slots.size() > 0:
 		primary_slot = route_result.available_slots[0]
 
-	# 3. 创角（P48 CharacterCreationService）：以网关解析的档位状态字典入参
+	# 3. 创角（CharacterCreationService）：以网关解析的档位状态字典入参
 	var req := CharacterCreationRequestDTO.new()
 	req.account_id = account_id
 	req.slot_id = primary_slot.slot_id if primary_slot != null else "SLOT_SP_01"

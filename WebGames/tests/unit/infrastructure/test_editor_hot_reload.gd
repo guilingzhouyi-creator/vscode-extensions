@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 68 编辑器热更新与单机/联机四层隔离测试
+# 单元测试：编辑器热更新与单机/联机四层隔离测试
 # 文件路径: res://tests/unit/infrastructure/test_editor_hot_reload.gd
 # 职责: 验证变更检测、领域级精准重载、白名单阻断、失败回滚与
 #       单机/联机四层隔离体系（TC-SV-17 ~ TC-SV-27）。
@@ -35,7 +35,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "Phase 68: 编辑器热更新与单机/联机四层物理隔离",
+		"domain": "编辑器热更新与单机/联机四层物理隔离",
 		"all_passed": all_passed,
 		"results": results
 	}
@@ -261,12 +261,12 @@ static func test_four_layer_isolation_comprehensive() -> Dictionary:
 	}
 
 ## TC-SV-35: 配置热重载变更集精准识别
-## Phase 87 修复回归：reload_config() 曾因 Dictionary 引用别名使 added/changed/removed 恒空，
+## 修复回归：reload_config() 曾因 Dictionary 引用别名使 added/changed/removed 恒空，
 ## 导致各域静态缓存无法感知热重载。本用例以哨兵表制造「运行快照 vs 磁盘新扫描」可判定差集。
 static func test_config_reload_change_set_not_empty() -> Dictionary:
 	GameConfig.ensure_loaded()
 
-	var sentinel_key := "probe.phase87_change_set"
+	var sentinel_key := "probe.hot_reload_change_set"
 	var had_sentinel: bool = GameConfig._tables.has(sentinel_key)
 	var backup: Variant = GameConfig._tables.get(sentinel_key)
 	GameConfig._tables[sentinel_key] = { "marker": 8701 }
@@ -294,17 +294,17 @@ static func test_config_reload_change_set_not_empty() -> Dictionary:
 	}
 
 ## TC-SV-36: 热重载拒绝发布时保留旧运行快照与版本
-## Phase 87 修复回归：reload_config() 曾因 _tables.clear() 连带摧毁旧快照，
+## 修复回归：reload_config() 曾因 _tables.clear() 连带摧毁旧快照，
 ## 使失败路径回滚退化为空操作——坏配置会污染运行快照，业务随即静默回退代码默认值。
 static func test_config_reload_rollback_retains_snapshot() -> Dictionary:
 	GameConfig.ensure_loaded()
 	var version_before: int = GameConfig.config_reload_version()
 
 	# 双注入：哨兵表（磁盘不存在，用于判别旧快照是否被真实保留）+ 一条不存在的必需表（触发拒绝发布）
-	var sentinel_key := "probe.phase87_rollback"
+	var sentinel_key := "probe.hot_reload_rollback"
 	GameConfig._tables[sentinel_key] = { "marker": 8702 }
 	var required_backup: Array = GameConfig._required_tables.duplicate()
-	GameConfig._required_tables.append("domains.phase87_nonexistent_probe")
+	GameConfig._required_tables.append("domains.hot_reload_nonexistent_probe")
 
 	var result: Dictionary = GameConfig.reload_config()
 

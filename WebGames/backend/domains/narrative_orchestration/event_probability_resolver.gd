@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 事件在不同上下文/条件/状态下的概率计算、调整与关联——**只算不执行** （零动作派发/零生命周期指令/零触发写回），不得取代事件核心执行逻辑。 概率参数/条件/关联 100% 配置驱动（config/domains/event_probability.json）， 条件求值复用 NarrativeCausalityOrchestrator.evaluate_ast_condition。
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name EventProbabilityResolver

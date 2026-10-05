@@ -122,7 +122,7 @@ static func test_enlightenment_alignment() -> Dictionary:
 	return { "test": "TC-POT-06: 定向加点由阅历突破驱动（默认 reason=ENLIGHTENMENT）", "passed": passed }
 
 static func test_respec_cost_never_negative() -> Dictionary:
-	# M9（Phase 51）：越序 engine（lifetime < unassigned，绕过 deserialize 直接构造）
+	# M9：越序 engine（lifetime < unassigned，绕过 deserialize 直接构造）
 	# 成本分子钳 0 —— 负成本扣减等价反向增发魔单晶（红证：修复前 crystal_cost < 0）
 	var engine := PotentialGrowthEngine.new()
 	engine.lifetime_potential_earned = 5
@@ -141,7 +141,7 @@ static func test_respec_cost_never_negative() -> Dictionary:
 	return { "test": "TC-POT-07: 越序 engine 洗点成本钳 0（M9 负成本增发封堵）", "passed": passed }
 
 static func test_deserialize_convergence() -> Dictionary:
-	# M9（Phase 51）：反序列化收敛序关系（Inv-TX-3）——unassigned 夹紧 ∈ [0, lifetime]、负值归 0、合法存档零变化
+	# M9：反序列化收敛序关系（Inv-TX-3）——unassigned 夹紧 ∈ [0, lifetime]、负值归 0、合法存档零变化
 	var eng = PotentialGrowthEngine.deserialize({"unassigned_potential_points": 12, "lifetime_potential_earned": 5})
 	var conv_ok = eng.lifetime_potential_earned == 5 and eng.unassigned_potential_points == 5
 	var eng2 = PotentialGrowthEngine.deserialize({"unassigned_potential_points": -3, "lifetime_potential_earned": -7})

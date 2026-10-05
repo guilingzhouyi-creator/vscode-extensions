@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：兑换流程审计与测试体系（Phase 37 S4 验收）
+# 单元测试：兑换流程审计与测试体系
 # 文件路径: res://tests/unit/infrastructure/test_flow_orchestration.gd
 # 覆盖: TC-FLOW-S4-01/05/06/07 —— 流程闭环 / 重复事务键去重 /
 #       投递失败恢复（DISPATCH_PENDING + 重发）/ 审计记录可回溯
@@ -9,7 +9,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 37: 兑换流程审计与测试体系验收"
+	var domain_name = "兑换流程审计与测试体系验收"
 
 	results.append(_test_flow_full_cycle())
 	results.append(_test_duplicate_transaction())

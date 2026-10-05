@@ -6,7 +6,7 @@ class_name TestCommissionQuestDomain
 extends RefCounted
 
 static func _test_idempotent_accept() -> Dictionary:
-	# Phase 40 GAP-03（TC-GAP-S3-01 / TC-FINAL-COMM-01）：同 tx 重复提交只扣一次保证金
+	# 幂等验收：同 tx 重复提交只扣一次保证金
 	var comm := CommissionAggregate.new("COMM_IDEM_A", "幂等接取委托", CommissionAggregate.CommissionTier.WOOD, 200)
 	comm.security_deposit_required = 50
 	var wallet := CharacterWalletEntity.new()
@@ -18,7 +18,7 @@ static func _test_idempotent_accept() -> Dictionary:
 	return {"test": "TC-GAP-S3-01/TC-FINAL-COMM-01: 接取重复提交同 tx 保证金只扣一次", "passed": passed}
 
 static func _test_idempotent_settle() -> Dictionary:
-	# Phase 40 GAP-03（TC-GAP-S3-02 / TC-FINAL-COMM-02）：同 tx 重复结算奖励只发一次
+	# 幂等验收：同 tx 重复结算奖励只发一次
 	var guild := OrganizationAggregate.new("ORG_GUILD", "冒险者公会总部")
 	var comm := CommissionAggregate.new("COMM_IDEM_S", "幂等结算委托", CommissionAggregate.CommissionTier.WOOD, 200)
 	comm.reward_mana_crystals = 10
@@ -34,7 +34,7 @@ static func _test_idempotent_settle() -> Dictionary:
 	return {"test": "TC-GAP-S3-02/TC-FINAL-COMM-02: 结算重复提交同 tx 奖励/税费只入账一次", "passed": passed}
 
 static func _test_idempotent_breach() -> Dictionary:
-	# Phase 40 GAP-03（TC-GAP-S3-03 / TC-FINAL-COMM-03）：同 tx 重复违约没收只一次
+	# 幂等验收：同 tx 重复违约没收只一次
 	var guild := OrganizationAggregate.new("ORG_GUILD", "冒险者公会总部")
 	var comm := CommissionAggregate.new("COMM_IDEM_B", "幂等违约委托", CommissionAggregate.CommissionTier.WOOD, 100)
 	comm.security_deposit_required = 30

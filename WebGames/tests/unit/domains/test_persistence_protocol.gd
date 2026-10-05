@@ -14,7 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_atomic_write_produces_backup())
 	results.append(test_save_assembler_manifest_order_roundtrip())
 	results.append(test_save_version_migration_guard())
-	# Phase 56 L6 新增：损坏备份恢复预检 + 版本方向闸门
+	# 新增：损坏备份恢复预检 + 版本方向闸门
 	results.append(test_restore_backup_rejects_corrupt())
 	results.append(test_load_version_direction_gate())
 
@@ -216,7 +216,7 @@ static func test_client_prediction_reconciliation() -> Dictionary:
 	var passed = (rec.remaining_unacked_count == 2) and (rec.reconciled_ap == 2 + (-3 * 2)) # 2 - 6 = -4
 	return { "test": "TC-PERS-02: 客户端指令预测与服务器权威帧调和重放", "passed": passed, "reconciled_ap": rec.reconciled_ap }
 
-## L6（Phase 56）：restore_backup 恢复前可解析性预检——截断/损坏 .bak 拒绝覆盖正档（Inv-DF-4）
+## L6：restore_backup 恢复前可解析性预检——截断/损坏 .bak 拒绝覆盖正档（Inv-DF-4）
 static func test_restore_backup_rejects_corrupt() -> Dictionary:
 	var save_name := "P56_BAK_CORRUPT_DF4"
 	var ext := GameConfig.get_string("infrastructure.persistence", "save_extension", ".kalar_save")
@@ -240,7 +240,7 @@ static func test_restore_backup_rejects_corrupt() -> Dictionary:
 	var passed = corrupt_ok and intact_ok
 	return { "test": "TC-PERS-08: 恢复前预检拒坏备份（L6：损坏 .bak 不覆盖正档）", "passed": passed }
 
-## L6（Phase 56）：load_game format_version 方向闸门——未来版本存档拒绝直通（VERSION_TOO_NEW）
+## L6：load_game format_version 方向闸门——未来版本存档拒绝直通（VERSION_TOO_NEW）
 static func test_load_version_direction_gate() -> Dictionary:
 	var save_name := "P56_VERSION_GATE_DF4"
 	var ext := GameConfig.get_string("infrastructure.persistence", "save_extension", ".kalar_save")

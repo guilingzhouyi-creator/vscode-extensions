@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 角色死亡时仅精确清理角色本体数据（白名单），世界时间/状态零回退， 历史影响片段只增不改；新角色零继承死亡角色完整状态。 核心规则：清理玩家角色状态，不清理世界状态；角色重新开始， 不代表世界重新开始。禁止：回档世界/删整档/重置时间/撤销影响/完整继承。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CharacterDeathSolver extends RefCounted

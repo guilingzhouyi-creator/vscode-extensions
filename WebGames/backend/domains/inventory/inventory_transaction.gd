@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 保存库存、装备槽和钱包的变更前快照，提供幂等提交与失败回滚； 领域服务负责输入预检，本组件不创建隐式依赖或执行业务规则。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name InventoryTransaction extends RefCounted

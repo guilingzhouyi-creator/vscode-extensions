@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 69 统一英文日志基础设施与度量扩展 (Unified Logger & Profiling)
+# 单元测试：统一英文日志基础设施与度量扩展 (Unified Logger & Profiling)
 # 文件路径: res://tests/unit/infrastructure/test_unified_logger_service.gd
 # 职责: 验证统一英文日志格式化、分级过滤、单机/联机隔离与性能度量扩展（TC-RM-29 ~ TC-RM-36）
 # ==============================================================================
@@ -25,7 +25,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "Phase 69: 统一英文日志基础设施与度量扩展",
+		"domain": "统一英文日志基础设施与度量扩展",
 		"all_passed": all_passed,
 		"results": results
 	}

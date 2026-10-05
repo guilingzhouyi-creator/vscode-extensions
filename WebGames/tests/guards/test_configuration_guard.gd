@@ -14,9 +14,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_gacha_probability_bounds())
 	results.append(test_required_tables_present())
 	results.append(test_reload_version_monotonic())
-	# Phase 44 P2 新增：批量读等价 + 路径分段缓存（TC-P44-P2-01/02）
+	# 批量读等价 + 路径分段缓存
 	results.append(test_get_many_equivalence())
-	# Phase 44 P4 新增：FifoBudget 最旧先出单次裁剪（TC-P44-P4-01）
+	# FifoBudget 最旧先出单次裁剪
 	results.append(test_fifo_budget_trim_oldest())
 
 	var all_passed := true
@@ -86,10 +86,10 @@ static func test_required_tables_present() -> Dictionary:
 		"count": report.get("count", 0), "missing": missing
 	}
 
-## S3/S4 验收：热重载原子发布——版本单调递增且必需表保持零缺失（TC-QUAL-S4-08 单测面）
+## 热重载原子发布——版本单调递增且必需表保持零缺失
 static func test_reload_version_monotonic() -> Dictionary:
 	var before := GameConfig.describe()
-	var v0: int = GameConfig.get_int("infrastructure.admin", "config_version", 0)
+	var initial_config_version: int = GameConfig.get_int("infrastructure.admin", "config_version", 0)
 	var res := GameConfig.reload_config()
 	var ok_publish: bool = res.get("success", false)
 	var after := GameConfig.describe()
@@ -98,14 +98,14 @@ static func test_reload_version_monotonic() -> Dictionary:
 	# reload 成功路径已发布：必需表零缺失 + 表数不缩水 + 热重载广播版本存在
 	var passed: bool = ok_publish and missing.is_empty() \
 		and int(after.get("count", 0)) >= int(before.get("count", 0)) \
-		and (v0 > 0)
+		and (initial_config_version > 0)
 	return {
 		"test": "TC-CFG-05: 配置热重载原子发布（版本单调/必需表零缺失/无半更新）",
 		"passed": passed,
 		"version": res.get("version", -1), "missing": missing
 	}
 
-## Phase 44 P2（TC-P44-P2-01）：get_many 批量读与逐键 get_value 逐位等价
+## get_many 批量读与逐键 get_value 逐位等价
 ## （含数值/嵌套路径/缺失键不出现；单次 ensure_loaded 后热路径取参通道）
 static func test_get_many_equivalence() -> Dictionary:
 	var paths := PackedStringArray([
@@ -128,9 +128,9 @@ static func test_get_many_equivalence() -> Dictionary:
 	# 类型化宽松转换与逐键一致（int 键经 get_int 读取等价）
 	var int_ok: bool = int(many.get("participant_defaults/ap", -1)) == GameConfig.get_int("domains.combat", "participant_defaults/ap", -1)
 	var passed: bool = equal and no_leak and int_ok and many.size() == 4
-	return {"test": "TC-P44-P2-01: get_many 批量读与逐键等价（缺失键零泄漏）", "passed": passed}
+	return {"test": "TC-CFG-06: get_many 批量读与逐键等价（缺失键零泄漏）", "passed": passed}
 
-## Phase 44 P4（TC-P44-P4-01）：FifoBudget.trim_oldest 最旧先出单次裁剪——
+## FifoBudget.trim_oldest 最旧先出单次裁剪——
 ## 溢出裁最旧、未溢出零操作、max<0 无界、返回擦除数
 static func test_fifo_budget_trim_oldest() -> Dictionary:
 	var container := {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}
@@ -147,4 +147,4 @@ static func test_fifo_budget_trim_oldest() -> Dictionary:
 	var unbounded_rm: int = FifoBudget.trim_oldest(unbounded, -1)
 	var unbounded_ok: bool = unbounded_rm == 0 and unbounded.size() == 2
 	var passed: bool = cap_ok and noop_ok and unbounded_ok
-	return {"test": "TC-P44-P4-01: FifoBudget 最旧先出单次裁剪（溢出裁/未溢出零操作/无界）", "passed": passed}
+	return {"test": "TC-CFG-07: FifoBudget 最旧先出单次裁剪（溢出裁/未溢出零操作/无界）", "passed": passed}

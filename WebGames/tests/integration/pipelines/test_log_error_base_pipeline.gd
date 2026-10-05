@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - Phase 66 统一日志错误底座测试套件
+# 卡拉尔世界引擎 (Kalar World Engine) - 统一日志错误底座测试套件
 # 文件路径: res://tests/integration/pipelines/test_log_error_base_pipeline.gd
 # 职责: 验收统一日志记录模型（LogRecordDTO）、日志导出器（LogFileExporter）、
 #       错误码注册表（ErrorCodeRegistry）、统一爆错通道（ErrorReporter）与存量收敛
@@ -17,7 +17,7 @@ const GMArbitrationAuditServiceClass = preload("res://backend/domains/admin_sand
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name := "Phase 66: 统一日志错误底座与英文爆错收敛治理验收流水线"
+	var domain_name := "统一日志错误底座与英文爆错收敛治理验收流水线"
 
 	results.append(_test_lg_01_log_record_dto_serialization_and_deep_copy())
 	results.append(_test_lg_02_log_export_config_dto_from_config())
@@ -313,9 +313,9 @@ static func _test_lg_11_exporter_config_reload_reconstruction() -> Dictionary:
 	var exp := LogFileExporterClass.get_instance()
 	if exp == null:
 		return {"test": "TC-LG-11", "passed": false, "error": "Failed to get exporter instance"}
-	var v1: int = LogFileExporterClass._config_version
+	var current_cfg_version: int = LogFileExporterClass._config_version
 	# 模拟配置热重载版本推进
-	LogFileExporterClass._config_version = v1 - 1
+	LogFileExporterClass._config_version = current_cfg_version - 1
 	LogFileExporterClass._ensure_config_fresh()
 	if LogFileExporterClass._config_version != GameConfig.config_reload_version():
 		return {"test": "TC-LG-11", "passed": false, "error": "Exporter failed to refresh config on version bump"}

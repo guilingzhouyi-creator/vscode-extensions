@@ -356,16 +356,19 @@
           {
             "name": "ui.fe06.mock.item.flame_knight",
             "rarity": "5",
+            "is_recently_added": true,
             "is_new": true
           },
           {
             "name": "ui.fe06.mock.item.dragon_spine_greatsword",
             "rarity": "5",
+            "is_recently_added": false,
             "is_new": false
           },
           {
             "name": "ui.fe06.mock.item.wind_shortbow",
             "rarity": "4",
+            "is_recently_added": false,
             "is_new": false
           }
         ]
@@ -379,16 +382,19 @@
           {
             "name": "ui.fe06.mock.item.mithril_guardian",
             "rarity": "5",
+            "is_recently_added": false,
             "is_new": false
           },
           {
             "name": "ui.fe06.mock.item.arcane_staff",
             "rarity": "4",
+            "is_recently_added": true,
             "is_new": true
           },
           {
             "name": "ui.fe06.mock.item.healing_potion_l",
             "rarity": "3",
+            "is_recently_added": false,
             "is_new": false
           }
         ]

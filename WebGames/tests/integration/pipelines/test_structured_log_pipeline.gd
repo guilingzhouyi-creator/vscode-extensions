@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - Phase 67 全域结构化日志改造升级测试套件
+# 卡拉尔世界引擎 (Kalar World Engine) - 全域结构化日志改造升级测试套件
 # 文件路径: res://tests/integration/pipelines/test_structured_log_pipeline.gd
 # 职责: 验收全域结构化日志模型（StructuredLogRecord）、脱敏引擎（RedactionRule）、
 #       遥测聚合（TelemetryAggregate）、多维检索（LogQueryService）、环形缓冲
@@ -12,7 +12,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name := "Phase 67: 后端全域系统日志改造升级全量验收流水线"
+	var domain_name := "后端全域系统日志改造升级全量验收流水线"
 
 	results.append(_test_ls_01_structured_log_record_superset_compatibility())
 	results.append(_test_ls_02_redaction_rule_mask_mode())
@@ -776,7 +776,7 @@ static func _scan_gd_files_for_print(dir_path: String, out_hits: Array[String]) 
 		item = da.get_next()
 	da.list_dir_end()
 
-## TC-LS-23: 与 Phase 66 错误底座协同（错误码走 ErrorReporter，日志走 LogCollector）
+## TC-LS-23: 与错误底座协同（错误码走 ErrorReporter，日志走 LogCollector）
 static func _test_ls_23_synergy_with_phase_66_error_base() -> Dictionary:
 	var err_entry := ErrorCodeRegistry.lookup("ERR_ACCOUNT_NOT_FOUND")
 	var err_code_ok: bool = (err_entry != null and err_entry.code == "ERR_ACCOUNT_NOT_FOUND")
@@ -786,7 +786,7 @@ static func _test_ls_23_synergy_with_phase_66_error_base() -> Dictionary:
 	var rec_ok: bool = (rec.error_code == "" and rec.message == "Normal business event")
 
 	return {
-		"test": "TC-LS-23: 与 Phase 66 错误底座协同断言",
+		"test": "TC-LS-23: 与错误底座协同断言",
 		"passed": err_code_ok and rec_ok,
 		"details": "err_code_ok=%s, rec_ok=%s" % [str(err_code_ok), str(rec_ok)]
 	}

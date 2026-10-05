@@ -38,7 +38,7 @@ static func test_sovereignty_founding_and_palace_coup() -> Dictionary:
 	return { "test": "TC-SOV-03: 荒原建国与宫廷政变全域蝴蝶效应震荡", "passed": passed, "coup": coup_res }
 
 static func test_stability_monotonic_no_rise() -> Dictionary:
-	# M7（Phase 53）：政变稳定性单调不升（Inv-ON-3）——
+	# M7：政变稳定性单调不升（Inv-ON-3）——
 	# 红证：旧 max(floor, cur-drop) 使低于下限的稳定性被失败政变抬升（20 → 40）
 	var low := KnighthoodTitle.NationRealmAggregate.new()
 	low.stability_percent = 20.0 # 低于 failure_floor=40

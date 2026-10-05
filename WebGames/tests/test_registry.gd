@@ -6,7 +6,7 @@
 class_name TestRegistry
 extends RefCounted
 
-# Phase 1: 核心母机 13 大领域
+# 核心母机 13 大领域
 const TestInventoryDomain = preload("res://tests/unit/domains/test_inventory.gd")
 const TestPhysicsDomain = preload("res://tests/unit/domains/test_physics_thermodynamics.gd")
 const TestWorldNavigationDomain = preload("res://tests/unit/domains/test_world_navigation.gd")
@@ -21,7 +21,7 @@ const TestTradingDomain = preload("res://tests/unit/domains/test_trading_logisti
 const TestNPCDomain = preload("res://tests/unit/domains/test_npc_simulation.gd")
 const TestSovereigntyDomain = preload("res://tests/unit/domains/test_sovereignty_realm.gd")
 
-# Phase 2: 交互中枢、经济循环与首领引擎 10 大领域
+# 交互中枢、经济循环与首领引擎 10 大领域
 const TestAccountDomain = preload("res://tests/unit/domains/test_account.gd")
 const TestCharacterCreationDomain = preload("res://tests/unit/domains/test_character_creation.gd")
 const TestPotentialGrowthDomain = preload("res://tests/unit/domains/test_potential_growth.gd")
@@ -33,7 +33,7 @@ const TestChatCommandDomain = preload("res://tests/unit/domains/test_chat_comman
 const TestEliteMutationDomain = preload("res://tests/unit/domains/test_elite_mutation.gd")
 const TestWorldBossDomain = preload("res://tests/unit/domains/test_world_boss.gd")
 
-# Phase 3: 组织治理、空间移动与全域因果 12 大领域
+# 组织治理、空间移动与全域因果 12 大领域
 const TestCDKeyVoucherDomain = preload("res://tests/unit/domains/test_cdkey_voucher.gd")
 const TestMailSystemDomain = preload("res://tests/unit/domains/test_mail_system.gd")
 const TestGameSettingsDomain = preload("res://tests/unit/domains/test_game_settings.gd")
@@ -47,7 +47,7 @@ const TestGroundLootDomain = preload("res://tests/unit/domains/test_ground_loot.
 const TestMatterDisposalDomain = preload("res://tests/unit/domains/test_matter_disposal.gd")
 const TestNarrativeOrchestrationDomain = preload("res://tests/unit/domains/test_narrative_orchestration.gd")
 
-# Phase 4: 命名空间、灰度热更、国际化、音频、通知与遥测 8 大领域
+# 命名空间、灰度热更、国际化、音频、通知与遥测 8 大领域
 const TestItemNamespaceRegistryDomain = preload("res://tests/unit/domains/test_item_namespace_registry.gd")
 const TestFeatureToggleCanaryDomain = preload("res://tests/unit/domains/test_feature_toggle_canary.gd")
 const TestLocalizationI18nDomain = preload("res://tests/unit/domains/test_localization_i18n.gd")
@@ -74,7 +74,7 @@ const TestDynamicEconomyDomain = preload("res://tests/unit/infrastructure/test_d
 const TestMagicRuleSystemDomain = preload("res://tests/unit/domains/test_magic_system.gd")
 const TestWorldGatewayAndModeIsolation = preload("res://tests/unit/domains/test_world_gateway.gd")
 
-# Phase 45~50 专属流水线套件（评审收敛 B1：补登记既有未注册套件，全量测试口径覆盖）
+# 专属集成流水线套件（全量测试口径覆盖）
 const TestCombatTertiaryTimelinePipeline = preload("res://tests/integration/pipelines/test_combat_tertiary_timeline_pipeline.gd")
 const TestItemAttributeAffixSystemPipeline = preload("res://tests/integration/pipelines/test_item_attribute_affix_system_pipeline.gd")
 const TestCharacterCreationAndOpeningPipeline = preload("res://tests/integration/pipelines/test_character_creation_and_opening_pipeline.gd")
@@ -82,7 +82,7 @@ const TestPrologueCoreAndPlaceholderPipeline = preload("res://tests/integration/
 const TestNarrativeDagOrchestrationPipeline = preload("res://tests/integration/pipelines/test_narrative_dag_orchestration_pipeline.gd")
 const TestGameLoopFSMPipeline = preload("res://tests/integration/pipelines/test_game_loop_fsm_pipeline.gd")
 
-# 横切关注点：配置层护栏 + 架构护栏 + Phase 57 契约注册表
+# 横切关注点：配置层护栏 + 架构护栏 + 契约注册表
 const TestConfigurationGuard = preload("res://tests/guards/test_configuration_guard.gd")
 const TestArchitectureGuardDomain = preload("res://tests/guards/test_architecture_guard.gd")
 const TestFrontendBoundaryGuard = preload("res://tests/guards/test_frontend_boundary_guard.gd")

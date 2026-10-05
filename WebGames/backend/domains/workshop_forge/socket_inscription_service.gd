@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: config/domains/workshop.json | 信号: EventBus 领域广播
 # 职责说明: 装备孔位打孔开槽、符文铭刻与神圣附魔矩阵共鸣 孔位默认与上限由 config/domains/workshop.json 驱动，文案由 narratives/workshop.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SocketInscriptionService extends RefCounted

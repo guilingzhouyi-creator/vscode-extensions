@@ -10,7 +10,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_modifier_evaluation())
 	results.append(test_equipment_fsm_inventory_sync())
 	results.append(test_equipment_fsm_capacity_guard())
-	# Phase 43 N1 新增：镜像同步语义验收（TC-P43-S4-01/02/03 + TC-P43-S2-01）
+	# 镜像同步语义验收（扩容与双侧一致性）
 	results.append(test_fsm_wear_armor_expands_capacity())
 	results.append(test_fsm_unequip_full_storage_rejected_rollback())
 	results.append(test_fsm_slot_divergence_guard())
@@ -72,7 +72,7 @@ static func test_equipment_fsm_capacity_guard() -> Dictionary:
 	var passed = (not res.success) and (res.get("error_code") == "INVENTORY_CAPACITY_EXCEEDED") and (loadout.get_equipped_item("CHEST") == plate)
 	return { "test": "TC-EQUIP-04: 穿脱状态机负重与背包容量防御性拦截", "passed": passed }
 
-## Phase 43 N1（TC-P43-S4-01 适配）：穿容量护甲 → calculate_total_capacity 扩容且
+## 穿容量护甲 → calculate_total_capacity 扩容且
 ## inventory.equipped_slots 与 loadout.slots 对交集槽（CHEST）镜像一致。
 ## （细则示例槽 BACKPACK 仅存在于 inventory 键集、loadout 无此槽——FSM 同步义务
 ##   覆盖两键集交集；裸身容量 0 无法入包，需先有容量来源（inventory 独有 BACKPACK
@@ -100,9 +100,9 @@ static func test_fsm_wear_armor_expands_capacity() -> Dictionary:
 		and loadout.get_equipped_item("CHEST") == armor \
 		and inv.equipped_slots.get("CHEST") == armor \
 		and inv.storage_items.size() == 0
-	return { "test": "TC-P43-S4-01: 穿包扩容与镜像同步（容量 5→10，双侧同实例）", "passed": passed }
+	return { "test": "TC-EQUIP-05: 穿包扩容与镜像同步（容量 5→10，双侧同实例）", "passed": passed }
 
-## Phase 43 N1（TC-P43-S4-03）：穿戴扩容护甲且储物满载 → 卸下护甲后容量不足以装回
+## 穿戴扩容护甲且储物满载 → 卸下护甲后容量不足以装回
 ## 自身内容 → 合法拒斥 INVENTORY_CAPACITY_EXCEEDED 且双侧保持原穿戴（回滚不丢物）。
 static func test_fsm_unequip_full_storage_rejected_rollback() -> Dictionary:
 	var loadout := EquipmentLoadoutAggregate.new()
@@ -140,9 +140,9 @@ static func test_fsm_unequip_full_storage_rejected_rollback() -> Dictionary:
 		and chest_kept != null and chest_kept.custom_name == "满载胸甲" \
 		and inv.calculate_total_capacity() == 10 \
 		and inv.storage_items.size() == 10
-	return { "test": "TC-P43-S4-03: 满包卸下容量守卫回滚（合法拒斥，穿戴不变）", "passed": passed }
+	return { "test": "TC-EQUIP-06: 满包卸下容量守卫回滚（合法拒斥，穿戴不变）", "passed": passed }
 
-## Phase 43 N1（TC-P43-S2-01）：inventory.equipped_slots 与 loadout.slots 对同槽持不同
+## 槽位分歧守卫——inventory.equipped_slots 与 loadout.slots 对同槽持不同
 ## 实例（双簿记分歧）→ EQUIP_STATE_DIVERGENCE，双侧快照回滚不丢物。
 ## （回滚为深快照重建新实例——断言按 item_id 等价而非实例引用。）
 static func test_fsm_slot_divergence_guard() -> Dictionary:
@@ -166,7 +166,7 @@ static func test_fsm_slot_divergence_guard() -> Dictionary:
 		and chest_after != null and chest_after.custom_name == "分歧残留盔（仅 inventory 侧）" \
 		and _storage_has_id(inv, "NEW_CHEST_ARMOR") \
 		and loadout.get_equipped_item("CHEST") == null
-	return { "test": "TC-P43-S2-01: 槽位分歧守卫（单侧残留受控失败 + 快照回滚不丢物）", "passed": passed }
+	return { "test": "TC-EQUIP-07: 槽位分歧守卫（单侧残留受控失败 + 快照回滚不丢物）", "passed": passed }
 
 static func _storage_has_id(inv: WearableInventoryAggregate, item_id: String) -> bool:
 	for it in inv.storage_items:

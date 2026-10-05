@@ -101,63 +101,63 @@ func init_tab_titles() -> void:
 	]))
 
 func init_static_text() -> void:
-	var v = _view
+	var view: QuestCausalityView = _view
 	var bindings := [
-		[v._header_title_label, "ui.fe07.header.title"],
-		[v._btn_back, "ui.fe07.header.back"],
-		[v._quest_list_section_label, "ui.fe07.quest_list.section"],
-		[v._quest_filter_label, "ui.fe07.quest_list.filter_label"],
-		[v._label_quest_title, "ui.fe07.quest_detail.title_default"],
-		[v._label_quest_desc, "ui.fe07.quest_detail.desc_default"],
-		[v._objectives_label, "ui.fe07.quest_detail.objectives_label"],
-		[v._rewards_label, "ui.fe07.quest_detail.rewards_label"],
-		[v._btn_quest_accept, "ui.fe07.quest_detail.btn_accept"],
-		[v._btn_quest_abandon, "ui.fe07.quest_detail.btn_abandon"],
-		[v._btn_quest_submit, "ui.fe07.quest_detail.btn_submit"],
-		[v._dag_section_label, "ui.fe07.dag.section"],
-		[v._dag_placeholder_label, "ui.fe07.dag.placeholder"],
-		[v._chk_show_completed, "ui.fe07.dag.show_completed"],
-		[v._dag_node_list_label, "ui.fe07.dag.node_list_label"],
-		[v._label_dag_node_name, "ui.fe07.dag.node_name_default"],
-		[v._label_dag_node_status, "ui.fe07.dag.node_status_none"],
-		[v._label_dag_chain_desc, "ui.fe07.dag.chain_desc_default"],
-		[v._bounty_section_label, "ui.fe07.bounty.section"],
-		[v._tier1_desc_label, "ui.fe07.bounty.tier1_desc"],
-		[v._tier2_desc_label, "ui.fe07.bounty.tier2_desc"],
-		[v._tier3_desc_label, "ui.fe07.bounty.tier3_desc"],
-		[v._tier4_desc_label, "ui.fe07.bounty.tier4_desc"],
-		[v._tier5_desc_label, "ui.fe07.bounty.tier5_desc"],
-		[v._bounty_target_list_label, "ui.fe07.bounty.target_list_label"],
-		[v._label_bounty_target, "ui.fe07.bounty.target_default"],
-		[v._label_bounty_reward, "ui.fe07.bounty.reward_none"],
-		[v._label_bounty_time, "ui.fe07.bounty.time_none"],
-		[v._btn_bounty_accept, "ui.fe07.bounty.btn_accept"]
+		[view._header_title_label, "ui.fe07.header.title"],
+		[view._btn_back, "ui.fe07.header.back"],
+		[view._quest_list_section_label, "ui.fe07.quest_list.section"],
+		[view._quest_filter_label, "ui.fe07.quest_list.filter_label"],
+		[view._label_quest_title, "ui.fe07.quest_detail.title_default"],
+		[view._label_quest_desc, "ui.fe07.quest_detail.desc_default"],
+		[view._objectives_label, "ui.fe07.quest_detail.objectives_label"],
+		[view._rewards_label, "ui.fe07.quest_detail.rewards_label"],
+		[view._btn_quest_accept, "ui.fe07.quest_detail.btn_accept"],
+		[view._btn_quest_abandon, "ui.fe07.quest_detail.btn_abandon"],
+		[view._btn_quest_submit, "ui.fe07.quest_detail.btn_submit"],
+		[view._dag_section_label, "ui.fe07.dag.section"],
+		[view._dag_placeholder_label, "ui.fe07.dag.placeholder"],
+		[view._chk_show_completed, "ui.fe07.dag.show_completed"],
+		[view._dag_node_list_label, "ui.fe07.dag.node_list_label"],
+		[view._label_dag_node_name, "ui.fe07.dag.node_name_default"],
+		[view._label_dag_node_status, "ui.fe07.dag.node_status_none"],
+		[view._label_dag_chain_desc, "ui.fe07.dag.chain_desc_default"],
+		[view._bounty_section_label, "ui.fe07.bounty.section"],
+		[view._tier1_desc_label, "ui.fe07.bounty.tier1_desc"],
+		[view._tier2_desc_label, "ui.fe07.bounty.tier2_desc"],
+		[view._tier3_desc_label, "ui.fe07.bounty.tier3_desc"],
+		[view._tier4_desc_label, "ui.fe07.bounty.tier4_desc"],
+		[view._tier5_desc_label, "ui.fe07.bounty.tier5_desc"],
+		[view._bounty_target_list_label, "ui.fe07.bounty.target_list_label"],
+		[view._label_bounty_target, "ui.fe07.bounty.target_default"],
+		[view._label_bounty_reward, "ui.fe07.bounty.reward_none"],
+		[view._label_bounty_time, "ui.fe07.bounty.time_none"],
+		[view._btn_bounty_accept, "ui.fe07.bounty.btn_accept"]
 	]
 	for b in bindings:
 		if b[0] != null:
 			UIIntermediary.resolve(b[0], b[1])
 
-	if v._label_quest_giver != null:
-		UIIntermediary.resolve(v._label_quest_giver, "ui.fe07.quest.giver", {"name": "-"})
-	if v._label_quest_level != null:
-		UIIntermediary.resolve(v._label_quest_level, "ui.fe07.quest.level", {"level": 0})
+	if view._label_quest_giver != null:
+		UIIntermediary.resolve(view._label_quest_giver, "ui.fe07.quest.giver", {"name": "-"})
+	if view._label_quest_level != null:
+		UIIntermediary.resolve(view._label_quest_level, "ui.fe07.quest.level", {"level": 0})
 
 func init_causality_dag_tab() -> void:
-	var v = _view
-	v._chk_show_completed.button_pressed = v.show_completed_dag
+	var view: QuestCausalityView = _view
+	view._chk_show_completed.button_pressed = view.show_completed_dag
 	refresh_dag_node_list()
 
 func refresh_dag_node_list() -> void:
-	var v = _view
-	v._dag_node_list.clear()
-	for node in v.causality_dag_nodes:
+	var view: QuestCausalityView = _view
+	view._dag_node_list.clear()
+	for node in view.causality_dag_nodes:
 		var status: String = str(node.get("status", ""))
-		if not v.show_completed_dag and status == "COMPLETED":
+		if not view.show_completed_dag and status == "COMPLETED":
 			continue
 		var status_name: String = dag_status_name(status)
 		var name: String = str(node.get("name", ""))
 		var display: String = UIIntermediary.text("ui.fe07.dag.node", {"name": UIIntermediary.text(name), "status": status_name})
-		v._dag_node_list.add_item(display)
+		view._dag_node_list.add_item(display)
 
 func dag_status_name(code: String) -> String:
 	match code:
@@ -167,73 +167,73 @@ func dag_status_name(code: String) -> String:
 		_: return code
 
 func on_show_completed_toggled(pressed: bool) -> void:
-	var v = _view
-	v.show_completed_dag = pressed
+	var view: QuestCausalityView = _view
+	view.show_completed_dag = pressed
 	refresh_dag_node_list()
 
 func on_dag_node_selected(index: int) -> void:
-	var v = _view
+	var view: QuestCausalityView = _view
 	var visible_nodes: Array = []
-	for node in v.causality_dag_nodes:
+	for node in view.causality_dag_nodes:
 		var status: String = str(node.get("status", ""))
-		if not v.show_completed_dag and status == "COMPLETED":
+		if not view.show_completed_dag and status == "COMPLETED":
 			continue
 		visible_nodes.append(node)
 	if index >= 0 and index < visible_nodes.size():
 		var node: Dictionary = visible_nodes[index]
-		if v._label_dag_node_name != null:
-			v._label_dag_node_name.text = UIIntermediary.text(str(node.get("name", "")))
-		if v._label_dag_node_status != null:
-			UIIntermediary.resolve(v._label_dag_node_status, "ui.fe07.dag.node_status", {"status": dag_status_name(str(node.get("status", "")))})
-		if v._label_dag_chain_desc != null:
-			v._label_dag_chain_desc.text = UIIntermediary.text(str(node.get("chain_desc", "")))
+		if view._label_dag_node_name != null:
+			view._label_dag_node_name.text = UIIntermediary.text(str(node.get("name", "")))
+		if view._label_dag_node_status != null:
+			UIIntermediary.resolve(view._label_dag_node_status, "ui.fe07.dag.node_status", {"status": dag_status_name(str(node.get("status", "")))})
+		if view._label_dag_chain_desc != null:
+			view._label_dag_chain_desc.text = UIIntermediary.text(str(node.get("chain_desc", "")))
 
 func init_bounty_tab() -> void:
-	var v = _view
+	var view: QuestCausalityView = _view
 	for i in range(5):
-		UIIntermediary.resolve_tab(v._bounty_tier_tab, i, "ui.fe07.bounty.tier", {"tier": i + 1})
+		UIIntermediary.resolve_tab(view._bounty_tier_tab, i, "ui.fe07.bounty.tier", {"tier": i + 1})
 	refresh_bounty_targets(1)
 
 func refresh_bounty_targets(tier: int) -> void:
-	var v = _view
-	v._bounty_target_list.clear()
-	for target in v.bounty_targets:
+	var view: QuestCausalityView = _view
+	view._bounty_target_list.clear()
+	for target in view.bounty_targets:
 		if int(target.get("tier", 0)) == tier:
-			v._bounty_target_list.add_item(UIIntermediary.text(str(target.get("name", ""))))
-	if v._label_bounty_target != null:
-		UIIntermediary.resolve(v._label_bounty_target, "ui.fe07.bounty.target_default")
-	if v._label_bounty_reward != null:
-		UIIntermediary.resolve(v._label_bounty_reward, "ui.fe07.bounty.reward_none")
-	if v._label_bounty_time != null:
-		UIIntermediary.resolve(v._label_bounty_time, "ui.fe07.bounty.time_none")
-	v._btn_bounty_accept.disabled = true
+			view._bounty_target_list.add_item(UIIntermediary.text(str(target.get("name", ""))))
+	if view._label_bounty_target != null:
+		UIIntermediary.resolve(view._label_bounty_target, "ui.fe07.bounty.target_default")
+	if view._label_bounty_reward != null:
+		UIIntermediary.resolve(view._label_bounty_reward, "ui.fe07.bounty.reward_none")
+	if view._label_bounty_time != null:
+		UIIntermediary.resolve(view._label_bounty_time, "ui.fe07.bounty.time_none")
+	view._btn_bounty_accept.disabled = true
 
 func on_bounty_tier_changed(_tab: int) -> void:
-	var v = _view
-	var tier: int = v._bounty_tier_tab.current_tab + 1
+	var view: QuestCausalityView = _view
+	var tier: int = view._bounty_tier_tab.current_tab + 1
 	refresh_bounty_targets(tier)
 
 func on_bounty_target_selected(index: int) -> void:
-	var v = _view
-	var tier: int = v._bounty_tier_tab.current_tab + 1
+	var view: QuestCausalityView = _view
+	var tier: int = view._bounty_tier_tab.current_tab + 1
 	var filtered: Array = []
-	for target in v.bounty_targets:
+	for target in view.bounty_targets:
 		if int(target.get("tier", 0)) == tier:
 			filtered.append(target)
 	if index >= 0 and index < filtered.size():
 		var target: Dictionary = filtered[index]
-		if v._label_bounty_target != null:
-			v._label_bounty_target.text = UIIntermediary.text(str(target.get("name", "")))
-		if v._label_bounty_reward != null:
-			UIIntermediary.resolve(v._label_bounty_reward, "ui.fe07.bounty.reward", {"gold": target.get("reward_gold", 0)})
-		if v._label_bounty_time != null:
-			UIIntermediary.resolve(v._label_bounty_time, "ui.fe07.bounty.time", {"time": UIIntermediary.text(str(target.get("time_remain", "-")))})
-		v._btn_bounty_accept.disabled = false
+		if view._label_bounty_target != null:
+			view._label_bounty_target.text = UIIntermediary.text(str(target.get("name", "")))
+		if view._label_bounty_reward != null:
+			UIIntermediary.resolve(view._label_bounty_reward, "ui.fe07.bounty.reward", {"gold": target.get("reward_gold", 0)})
+		if view._label_bounty_time != null:
+			UIIntermediary.resolve(view._label_bounty_time, "ui.fe07.bounty.time", {"time": UIIntermediary.text(str(target.get("time_remain", "-")))})
+		view._btn_bounty_accept.disabled = false
 
 func on_bounty_accept() -> void:
-	var v = _view
-	UIIntermediary.resolve(v._btn_bounty_accept, "ui.fe07.bounty.accepted")
-	v._btn_bounty_accept.disabled = true
+	var view: QuestCausalityView = _view
+	UIIntermediary.resolve(view._btn_bounty_accept, "ui.fe07.bounty.accepted")
+	view._btn_bounty_accept.disabled = true
 
 ## 初始化虚拟列表并配置对象池 (ADV-POOL-001)
 func init_quest_virtual_list(container: Control = null) -> KVirtualList:

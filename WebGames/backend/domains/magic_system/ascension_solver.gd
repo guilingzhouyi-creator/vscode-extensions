@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 魔法升格化——消耗指定条件后使目标魔法的现有位阶提升一阶。位阶为独立 数据维度（复用 MagicTierRegistry 阶位梯度 1~11），升格后按新位阶计算 后续效果，**不把升格后的每一级制作为独立技能/新卡**。 最大位阶 / 条件 / 连续升格 / 永久性 / 最高位阶处理由 magic_rules.json 的 ascension 段驱动；与高阶级位形态不变量（god-form 须 SUPERTIER） 冲突时受控拒绝。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name AscensionSolver

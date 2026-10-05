@@ -12,7 +12,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_red_dot_recursive_bubble_up())
 	results.append(_test_red_dot_clear_and_parent_sync())
 	results.append(_test_four_tier_notification_push())
-	# Phase 56 L4 新增：递归环检测
+	# 新增：递归环检测
 	results.append(_test_upwards_cycle_terminates())
 
 	var passed_cnt := 0
@@ -90,7 +90,7 @@ static func _test_four_tier_notification_push() -> Dictionary:
 		"passed": passed
 	}
 
-## L4（Phase 56）：向上冒泡递归带环检测——parent_path 成环不再无限递归栈溢出（红证：修复前爆栈）
+## L4：向上冒泡递归带环检测——parent_path 成环不再无限递归栈溢出（修复前爆栈）
 static func _test_upwards_cycle_terminates() -> Dictionary:
 	var a := RedDotTreeNode.new("A")
 	var b := RedDotTreeNode.new("B")

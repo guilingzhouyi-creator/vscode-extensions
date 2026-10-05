@@ -1,10 +1,10 @@
 # ==============================================================================
-# 单元测试：文字版角色序章执行内核、占位符引擎与后端剧情 i18n (Phase 49)
+# 单元测试：文字版角色序章执行内核、占位符引擎与后端剧情 i18n
 # 文件路径: res://tests/integration/pipelines/test_prologue_core_and_placeholder_pipeline.gd
 # 职责: 验证角色专属序章上下文隔离（非世界序章）、占位符全量动态解析与缺失
 #       安全降级、新手装备发放幂等保护、后端剧情 i18n 与前端 UI i18n 隔离、
 #       结构化事件流输出与状态解耦（纯事件不指示前端页面）。
-# 需求源: Phase 49 (P10.1 ~ P10.10 验收矩阵 TC-PRO-01 ~ TC-PRO-06)
+# 需求源: 验收矩阵 TC-PRO-01 ~ TC-PRO-06
 # ==============================================================================
 class_name TestPrologueCoreAndPlaceholderPipeline
 extends RefCounted
@@ -29,7 +29,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 
 	return {
-		"domain": "Character Prologue Core & Placeholder Pipeline (Phase 49)",
+		"domain": "Character Prologue Core & Placeholder Pipeline",
 		"all_passed": all_passed,
 		"passed_count": passed_cnt,
 		"total_count": results.size(),
@@ -37,7 +37,7 @@ static func run_all_tests() -> Dictionary:
 	}
 
 
-## 构造一个标准开局事件包（Phase 48 OpeningEventStreamDTO）
+## 构造一个标准开局事件包（OpeningEventStreamDTO）
 static func _make_opening(account_id: String, character_id: String, c_name: String, loc: String = "CENTRAL_CITY_PLAZA") -> OpeningEventStreamDTO:
 	var opening := OpeningEventStreamDTO.new()
 	opening.account_id = account_id
@@ -205,22 +205,22 @@ static func _test_four_stage_progression_lifecycle() -> Dictionary:
 
 	# 推进至阶段 2: 环顾四周
 	var s2 := PrologueExecutionKernel.advance_prologue_step(ctx, "LOOK_AROUND")
-	var p2: PrologueEventPacketDTO = s2.get("packet", null)
+	var packet_stage2: PrologueEventPacketDTO = s2.get("packet", null)
 	var stage2_ok: bool = s2.get("success", false) and (ctx.current_stage == 2) \
-		and (p2 != null and not p2.narrative_text.is_empty())
+		and (packet_stage2 != null and not packet_stage2.narrative_text.is_empty())
 
 	# 推进至阶段 3: 卫兵相遇
 	var s3 := PrologueExecutionKernel.advance_prologue_step(ctx, "TALK_GUARD")
-	var p3: PrologueEventPacketDTO = s3.get("packet", null)
+	var packet_stage3: PrologueEventPacketDTO = s3.get("packet", null)
 	var stage3_ok: bool = s3.get("success", false) and (ctx.current_stage == 3) \
-		and (p3 != null and not p3.narrative_text.is_empty())
+		and (packet_stage3 != null and not packet_stage3.narrative_text.is_empty())
 
 	# 推进至阶段 4: 序章完结
 	var s4 := PrologueExecutionKernel.advance_prologue_step(ctx, "ENTER_WORLD")
-	var p4: PrologueEventPacketDTO = s4.get("packet", null)
+	var packet_stage4: PrologueEventPacketDTO = s4.get("packet", null)
 	var stage4_ok: bool = s4.get("success", false) and (ctx.current_stage == 4) \
 		and ctx.is_completed and not ctx.is_active \
-		and (p4 != null and not p4.narrative_text.is_empty())
+		and (packet_stage4 != null and not packet_stage4.narrative_text.is_empty())
 
 	# 完结后再次推进，应返回已完结拦截
 	var s5 := PrologueExecutionKernel.advance_prologue_step(ctx, "EXTRA")
@@ -231,13 +231,13 @@ static func _test_four_stage_progression_lifecycle() -> Dictionary:
 	return { "test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环", "passed": passed }
 
 
-## TC-PRO-08: 角色专属上下文与 Phase 50 通用因果 DAG 引擎会话桥接
+## TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接
 static func _test_phase_50_dag_session_bridge() -> Dictionary:
 	var opening := _make_opening("ACC_PRO_08", "CHAR_PRO_H", "精灵使者")
 	var boot_res := PrologueExecutionKernel.boot_character_prologue(opening, "ELF")
 	var ctx: CharacterPrologueContext = boot_res.get("context", null)
 	if ctx == null:
-		return { "test": "TC-PRO-08: 角色专属上下文与 Phase 50 通用因果 DAG 引擎会话桥接", "passed": false }
+		return { "test": "TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接", "passed": false }
 
 	var dag_engine := PrologueExecutionKernel.create_dag_session(ctx)
 	var engine_ok: bool = (dag_engine != null) and (dag_engine.graph != null) \
@@ -245,5 +245,5 @@ static func _test_phase_50_dag_session_bridge() -> Dictionary:
 		and (dag_engine.active_node_ids.has("NODE_AWAKEN_GROVE")) \
 		and (dag_engine.runtime_context.get("PLAYER_NAME", "") == "精灵使者")
 
-	return { "test": "TC-PRO-08: 角色专属上下文与 Phase 50 通用因果 DAG 引擎会话桥接", "passed": engine_ok }
+	return { "test": "TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接", "passed": engine_ok }
 

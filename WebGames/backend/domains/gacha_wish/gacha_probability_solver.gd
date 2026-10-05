@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy, inventory | 配置: config/domains/gacha.json | 信号: EventBus 领域广播
 # 职责说明: 工业级 PRNG 动态概率算法：小保底 70 抽软保底递增、90 抽硬保底、50/50 歪率与大保底机制 概率常数与保底阈值由 config/domains/gacha.json 驱动，代码零硬编码。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GachaProbabilitySolver extends RefCounted

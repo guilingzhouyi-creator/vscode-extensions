@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - Phase 65 战斗双随机与第三时间轴测试套件
+# 卡拉尔世界引擎 (Kalar World Engine) - 战斗双随机与第三时间轴测试套件
 # 文件路径: res://tests/integration/pipelines/test_combat_dual_random_and_timeline_pipeline.gd
 # 职责: 验收手牌数量随机与牌型抽取解耦、合法0手牌与保活推演、时间轴开局预排期及前端脱敏
 # ==============================================================================
@@ -17,7 +17,7 @@ const DeterministicRNGClass = preload("res://backend/infrastructure/deterministi
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name := "Phase 65: 战斗抽牌数量随机与第三时间轴事件调度重构验收流水线"
+	var domain_name := "战斗抽牌数量随机与第三时间轴事件调度重构验收流水线"
 
 	results.append(_test_tr_01_first_encounter_and_normal_quantity_random())
 	results.append(_test_tr_02_special_modifier_zero_hand_state())
@@ -205,7 +205,7 @@ static func _test_tr_05_add_draw_bonus_cards_trigger() -> Dictionary:
 	var bonus_dispatched: bool = (p_bar.cards.size() == 2)
 	var pt_done: bool = pt.is_executed
 
-	# P2 修复回归：跨过回合时限后，结算态必须可被表现层快照观察
+	# 修复回归：跨过回合时限后，结算态必须可被表现层快照观察
 	# （红证：修复前 get_client_snapshot 用已归零的 round_elapsed_ms 重算，is_round_concluded 恒 false）
 	# 注意：协调器时限取自配置 round_lifecycle/max_round_duration_ms（默认 10000），非 schedule DTO 的 8000；
 	# step1 已累计 2500ms，step2 需 ≥7500ms 才能越过 10000ms 时限触发 ROUND_TIME_LIMIT_REACHED

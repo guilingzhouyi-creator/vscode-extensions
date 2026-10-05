@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 判定 C 类特殊词缀鉴定条件、执行状态跃迁至 APPRAISED 并生成服务端防伪凭证。 条件：鉴定技能等级 + 专属知识体系（unlocked_lores），配置驱动零硬编码。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ItemAttributeAppraisalSolver

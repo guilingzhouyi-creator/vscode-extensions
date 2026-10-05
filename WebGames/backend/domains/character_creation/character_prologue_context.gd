@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 每个角色创建完成后独立建立序章执行上下文（非世界序章）：角色身份 唯一源头 + 运行时分配（起始地点/开局任务/新手套件）+ 单向阶段流转 + 占位符运行时缓存。严禁硬编码固定世界地点、坐标、NPC 或单一场景。 关联细则: 阶段1（角色序章上下文实体与生命周期模型）
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CharacterPrologueContext

@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 统一名称注册表单元测试
 # 文件路径: res://tests/unit/infrastructure/test_name_registry.gd
-# 覆盖: Phase 19 施工细则 阶段1~4（TC-NAM-01~06）
+# 覆盖: 阶段1~4 验收矩阵（TC-NAM-01~06）
 #       —— 既有键盘点 / 键规范唯一 / 英文 fallback 必达 / 未登记告警 /
 #          跨域冲突拦截 / 存量迁移批次 1
 # ==============================================================================
@@ -10,7 +10,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 19: 统一名称注册表"
+	var domain_name = "统一名称注册表"
 
 	results.append(_test_existing_keys_inventory())
 	results.append(_test_name_key_format_unique())

@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 74 灰度发布版本编排与底层动态更新流水线测试套件
+# 单元测试：灰度发布版本编排与底层动态更新流水线测试套件
 # 文件路径: res://tests/integration/pipelines/test_version_governance_pipeline.gd
 # 职责: 验证灰度分群、动态 PCK 挂载、版本激活门禁、单机/联机双轨隔离与 P72 推送信道全链路
 # ==============================================================================
@@ -37,7 +37,7 @@ static func run_all_tests() -> Dictionary:
 		if r.get("passed", false):
 			passed_cnt += 1
 	return {
-		"domain": "Phase 74: 灰度发布版本编排与底层动态更新流水线测试套件",
+		"domain": "灰度发布版本编排与底层动态更新流水线测试套件",
 		"all_passed": passed_cnt == results.size(),
 		"total": results.size(),
 		"total_count": results.size(),

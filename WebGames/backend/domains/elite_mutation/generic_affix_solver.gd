@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
 # 职责说明: 吸血/熔火/迅捷/荆棘/虚化等通用变异词缀的定义读取与后端概率滚动（纯函数）； 词缀定义与词缀池权重由 config/domains/elite.json 的 affixes / affix_pool 段驱动。 角色归位：原 apply_elite_affixes（原地改写入参状态）已迁入 EliteMonsterAggregate.apply_affixes，本文件收敛为纯求解器。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GenericAffixSolver extends RefCounted

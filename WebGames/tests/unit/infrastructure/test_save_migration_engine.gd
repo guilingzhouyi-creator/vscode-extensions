@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 68 存档迁移引擎与回滚机制 (Save Migration Engine Tests)
+# 单元测试：存档迁移引擎与回滚机制 (Save Migration Engine Tests)
 # 文件路径: res://tests/unit/infrastructure/test_save_migration_engine.gd
 # 职责: 验证 legacy 旧档降级兼容、整档迁移链、断链安全回滚、
 #       迁移后校验失败拦截与域级独立迁移（TC-SV-06 ~ TC-SV-11）。
@@ -30,7 +30,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "Phase 68: 存档版本迁移引擎与一致性回滚",
+		"domain": "存档版本迁移引擎与一致性回滚",
 		"all_passed": all_passed,
 		"results": results
 	}
@@ -192,7 +192,7 @@ static func test_migration_traceability_steps() -> Dictionary:
 	}
 
 
-## Phase 85 R-01（TC-P85-S4-05）：UID 单轨迁移判定器——LGC_ 计数/零计数判定/只读性。
+## UID 单轨迁移判定器——LGC_ 计数/零计数判定/只读性。
 static func test_legacy_uid_audit_detector() -> Dictionary:
 	var payload_legacy := {
 		"inventory": {"storage_payloads": [

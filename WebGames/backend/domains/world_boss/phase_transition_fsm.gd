@@ -4,7 +4,7 @@
 # 架构定位: Domain FSM / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world_boss.json | 信号: EventBus 领域广播
 # 职责说明: 判定首领血量归零切阶段、触发全屏转相清场机制与狂暴激怒 倍率与文案由 config/domains/world_boss.json、narratives/world_boss.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name ConfigurablePhaseTransitionFSM extends RefCounted

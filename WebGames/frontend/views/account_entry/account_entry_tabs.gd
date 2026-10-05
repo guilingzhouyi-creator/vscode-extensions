@@ -20,79 +20,79 @@ func init_all_text() -> void:
 	init_character_create_text()
 
 func init_splash_text() -> void:
-	var v = _view
-	UIIntermediary.resolve(v.splash_logo_label, "ui.fe01.splash.logo")
-	UIIntermediary.resolve(v.splash_status_label, "ui.fe01.splash.status")
-	UIIntermediary.resolve(v.splash_version_label, "ui.fe01.splash.version")
-	UIIntermediary.resolve(v.splash_enter_btn, "ui.fe01.splash.enter_btn")
+	var view: AccountEntryView = _view
+	UIIntermediary.resolve(view.splash_logo_label, "ui.fe01.splash.logo")
+	UIIntermediary.resolve(view.splash_status_label, "ui.fe01.splash.status")
+	UIIntermediary.resolve(view.splash_version_label, "ui.fe01.splash.version")
+	UIIntermediary.resolve(view.splash_enter_btn, "ui.fe01.splash.enter_btn")
 
 func init_login_text() -> void:
-	var v = _view
-	UIIntermediary.resolve(v.login_title_label, "ui.fe01.login.title")
-	UIIntermediary.resolve_placeholder(v.login_username_edit, "ui.fe01.login.username_ph")
-	UIIntermediary.resolve_placeholder(v.login_password_edit, "ui.fe01.login.password_ph")
-	UIIntermediary.resolve(v.login_remember_check, "ui.fe01.login.remember")
-	UIIntermediary.resolve(v.login_submit_btn, "ui.fe01.login.submit")
-	UIIntermediary.resolve(v.login_goto_register_btn, "ui.fe01.login.goto_register")
-	UIIntermediary.resolve(v.login_forgot_btn, "ui.fe01.login.forgot")
-	v.login_error_label.text = ""
+	var view: AccountEntryView = _view
+	UIIntermediary.resolve(view.login_title_label, "ui.fe01.login.title")
+	UIIntermediary.resolve_placeholder(view.login_username_edit, "ui.fe01.login.username_ph")
+	UIIntermediary.resolve_placeholder(view.login_password_edit, "ui.fe01.login.password_ph")
+	UIIntermediary.resolve(view.login_remember_check, "ui.fe01.login.remember")
+	UIIntermediary.resolve(view.login_submit_btn, "ui.fe01.login.submit")
+	UIIntermediary.resolve(view.login_goto_register_btn, "ui.fe01.login.goto_register")
+	UIIntermediary.resolve(view.login_forgot_btn, "ui.fe01.login.forgot")
+	view.login_error_label.text = ""
 
 func init_register_text() -> void:
-	var v = _view
-	UIIntermediary.resolve(v.register_title_label, "ui.fe01.register.title")
-	UIIntermediary.resolve_placeholder(v.register_username_edit, "ui.fe01.register.username_ph")
-	UIIntermediary.resolve_placeholder(v.register_password_edit, "ui.fe01.register.password_ph")
-	UIIntermediary.resolve_placeholder(v.register_confirm_edit, "ui.fe01.register.confirm_ph")
-	var mode_label: Label = v.get_node_or_null("RegisterPanel/CenterContainer/PanelContainer/VBox/ModeLabel")
+	var view: AccountEntryView = _view
+	UIIntermediary.resolve(view.register_title_label, "ui.fe01.register.title")
+	UIIntermediary.resolve_placeholder(view.register_username_edit, "ui.fe01.register.username_ph")
+	UIIntermediary.resolve_placeholder(view.register_password_edit, "ui.fe01.register.password_ph")
+	UIIntermediary.resolve_placeholder(view.register_confirm_edit, "ui.fe01.register.confirm_ph")
+	var mode_label: Label = view.get_node_or_null("RegisterPanel/CenterContainer/PanelContainer/VBox/ModeLabel")
 	if mode_label != null:
 		UIIntermediary.resolve(mode_label, "ui.fe01.register.mode_label")
-	UIIntermediary.resolve(v.register_agree_check, "ui.fe01.register.agree")
-	UIIntermediary.resolve(v.register_submit_btn, "ui.fe01.register.submit")
-	UIIntermediary.resolve(v.register_back_btn, "ui.fe01.register.back")
-	v.register_error_label.text = ""
-	v.register_mode_option.clear()
-	v.register_mode_option.add_item(UIIntermediary.text("ui.fe01.register.mode_offline"))
-	v.register_mode_option.add_item(UIIntermediary.text("ui.fe01.register.mode_online"))
+	UIIntermediary.resolve(view.register_agree_check, "ui.fe01.register.agree")
+	UIIntermediary.resolve(view.register_submit_btn, "ui.fe01.register.submit")
+	UIIntermediary.resolve(view.register_back_btn, "ui.fe01.register.back")
+	view.register_error_label.text = ""
+	view.register_mode_option.clear()
+	view.register_mode_option.add_item(UIIntermediary.text("ui.fe01.register.mode_offline"))
+	view.register_mode_option.add_item(UIIntermediary.text("ui.fe01.register.mode_online"))
 
 func init_server_select_text() -> void:
-	var v = _view
-	UIIntermediary.resolve(v.server_title_label, "ui.fe01.server_select.title")
-	UIIntermediary.resolve(v.server_confirm_btn, "ui.fe01.server_select.confirm")
-	UIIntermediary.resolve(v.server_back_btn, "ui.fe01.server_select.back")
+	var view: AccountEntryView = _view
+	UIIntermediary.resolve(view.server_title_label, "ui.fe01.server_select.title")
+	UIIntermediary.resolve(view.server_confirm_btn, "ui.fe01.server_select.confirm")
+	UIIntermediary.resolve(view.server_back_btn, "ui.fe01.server_select.back")
 
 func init_character_select_text() -> void:
-	var v = _view
-	UIIntermediary.resolve(v.char_select_title_label, "ui.fe01.char_select.title")
-	UIIntermediary.resolve(v.char_enter_btn, "ui.fe01.char_select.enter")
-	UIIntermediary.resolve(v.char_create_btn, "ui.fe01.char_select.create")
-	UIIntermediary.resolve(v.char_delete_btn, "ui.fe01.char_select.delete")
-	UIIntermediary.resolve(v.char_back_btn, "ui.fe01.char_select.back")
+	var view: AccountEntryView = _view
+	UIIntermediary.resolve(view.char_select_title_label, "ui.fe01.char_select.title")
+	UIIntermediary.resolve(view.char_enter_btn, "ui.fe01.char_select.enter")
+	UIIntermediary.resolve(view.char_create_btn, "ui.fe01.char_select.create")
+	UIIntermediary.resolve(view.char_delete_btn, "ui.fe01.char_select.delete")
+	UIIntermediary.resolve(view.char_back_btn, "ui.fe01.char_select.back")
 
 func init_character_create_text() -> void:
-	var v = _view
-	UIIntermediary.resolve(v.char_create_title_label, "ui.fe01.char_create.title")
-	var origin_label: Label = v.get_node_or_null("CharacterCreatePanel/CenterContainer/PanelContainer/VBox/OriginLabel")
+	var view: AccountEntryView = _view
+	UIIntermediary.resolve(view.char_create_title_label, "ui.fe01.char_create.title")
+	var origin_label: Label = view.get_node_or_null("CharacterCreatePanel/CenterContainer/PanelContainer/VBox/OriginLabel")
 	if origin_label != null:
 		UIIntermediary.resolve(origin_label, "ui.fe01.char_create.origin_label")
-	var attr_title: Label = v.get_node_or_null("CharacterCreatePanel/CenterContainer/PanelContainer/VBox/AttrTitle")
+	var attr_title: Label = view.get_node_or_null("CharacterCreatePanel/CenterContainer/PanelContainer/VBox/AttrTitle")
 	if attr_title != null:
 		UIIntermediary.resolve(attr_title, "ui.fe01.char_create.attr_title")
-	var talent_label: Label = v.get_node_or_null("CharacterCreatePanel/CenterContainer/PanelContainer/VBox/TalentLabel")
+	var talent_label: Label = view.get_node_or_null("CharacterCreatePanel/CenterContainer/PanelContainer/VBox/TalentLabel")
 	if talent_label != null:
 		UIIntermediary.resolve(talent_label, "ui.fe01.char_create.talent_label")
-	UIIntermediary.resolve_placeholder(v.char_name_edit, "ui.fe01.char_create.name_ph")
-	UIIntermediary.resolve(v.char_reroll_btn, "ui.fe01.char_create.reroll")
-	UIIntermediary.resolve(v.char_create_confirm_btn, "ui.fe01.char_create.create")
-	UIIntermediary.resolve(v.char_create_back_btn, "ui.fe01.char_create.back")
-	v.char_origin_option.clear()
+	UIIntermediary.resolve_placeholder(view.char_name_edit, "ui.fe01.char_create.name_ph")
+	UIIntermediary.resolve(view.char_reroll_btn, "ui.fe01.char_create.reroll")
+	UIIntermediary.resolve(view.char_create_confirm_btn, "ui.fe01.char_create.create")
+	UIIntermediary.resolve(view.char_create_back_btn, "ui.fe01.char_create.back")
+	view.char_origin_option.clear()
 	var origin_keys: Array = ["noble", "commoner", "orphan", "mercenary", "scholar"]
 	for k in origin_keys:
-		v.char_origin_option.add_item(UIIntermediary.text("ui.fe01.char_create.origin_" + str(k)))
+		view.char_origin_option.add_item(UIIntermediary.text("ui.fe01.char_create.origin_" + str(k)))
 
 func populate_server_list() -> void:
-	var v = _view
-	v.server_list_item.clear()
-	for sv in v.server_list:
+	var view: AccountEntryView = _view
+	view.server_list_item.clear()
+	for sv in view.server_list:
 		var status_key: String = "unknown"
 		match sv.get("status", "UNKNOWN"):
 			"ONLINE":
@@ -101,19 +101,19 @@ func populate_server_list() -> void:
 				status_key = "offline"
 		var status_label: String = UIIntermediary.text("ui.fe01.server_select.server_" + status_key)
 		var ping_label: String = UIIntermediary.text("ui.fe01.server_select.ping", {"ms": sv.get("ping_ms", 0)})
-		UIIntermediary.resolve_item(v.server_list_item, "ui.fe01.server_select.server_row", {
+		UIIntermediary.resolve_item(view.server_list_item, "ui.fe01.server_select.server_row", {
 			"name": sv.get("name", ""), "status": status_label, "ping": ping_label
 		})
-	if v.server_list_item.get_item_count() > 0:
-		v.server_list_item.select(0)
+	if view.server_list_item.get_item_count() > 0:
+		view.server_list_item.select(0)
 
 func populate_character_slots() -> void:
-	var v = _view
-	var slot_btns: Array = [v.char_slot_0_btn, v.char_slot_1_btn, v.char_slot_2_btn]
+	var view: AccountEntryView = _view
+	var slot_btns: Array = [view.char_slot_0_btn, view.char_slot_1_btn, view.char_slot_2_btn]
 	for i in range(slot_btns.size()):
 		var btn: Button = slot_btns[i]
-		if i < v.character_slots.size():
-			var slot: Dictionary = v.character_slots[i]
+		if i < view.character_slots.size():
+			var slot: Dictionary = view.character_slots[i]
 			if slot.get("empty", false) or str(slot.get("name", "")) == "":
 				UIIntermediary.resolve(btn, "ui.fe01.char_select.slot_empty", {"index": i + 1})
 			else:
@@ -124,17 +124,17 @@ func populate_character_slots() -> void:
 		else:
 			UIIntermediary.resolve(btn, "ui.fe01.char_select.slot_empty", {"index": i + 1})
 	on_char_slot_pressed(0)
-	v.char_slot_0_btn.button_pressed = true
+	view.char_slot_0_btn.button_pressed = true
 
 func populate_talent_list() -> void:
-	var v = _view
-	v.char_talent_list.clear()
+	var view: AccountEntryView = _view
+	view.char_talent_list.clear()
 	var talent_keys: Array = ["godly_strength", "eidetic", "sword", "magic", "iron", "wind"]
 	for k in talent_keys:
-		UIIntermediary.resolve_item(v.char_talent_list, "ui.fe01.char_create.talent_" + str(k))
+		UIIntermediary.resolve_item(view.char_talent_list, "ui.fe01.char_create.talent_" + str(k))
 
 func roll_attributes() -> void:
-	var v = _view
+	var view: AccountEntryView = _view
 	var service = MockServiceContainer.get_instance().auth()
 	if service == null:
 		return
@@ -142,7 +142,7 @@ func roll_attributes() -> void:
 	if not bool(result.get("success", false)):
 		return
 	var attrs: Dictionary = result.get("attrs", {})
-	v._rolled_attrs = {
+	view._rolled_attrs = {
 		"STR": int(attrs.get("STR", 10)),
 		"AGI": int(attrs.get("AGI", 10)),
 		"CON": int(attrs.get("CON", 10)),
@@ -153,32 +153,32 @@ func roll_attributes() -> void:
 	update_attr_labels()
 
 func update_attr_labels() -> void:
-	var v = _view
-	UIIntermediary.resolve(v.char_attr_str_label, "ui.fe01.char_create.attr_str", {"value": v._rolled_attrs.get("STR", 10)})
-	UIIntermediary.resolve(v.char_attr_agi_label, "ui.fe01.char_create.attr_agi", {"value": v._rolled_attrs.get("AGI", 10)})
-	UIIntermediary.resolve(v.char_attr_con_label, "ui.fe01.char_create.attr_con", {"value": v._rolled_attrs.get("CON", 10)})
-	UIIntermediary.resolve(v.char_attr_int_label, "ui.fe01.char_create.attr_int", {"value": v._rolled_attrs.get("INT", 10)})
-	UIIntermediary.resolve(v.char_attr_wis_label, "ui.fe01.char_create.attr_wis", {"value": v._rolled_attrs.get("WIS", 10)})
-	UIIntermediary.resolve(v.char_attr_cha_label, "ui.fe01.char_create.attr_cha", {"value": v._rolled_attrs.get("CHA", 10)})
+	var view: AccountEntryView = _view
+	UIIntermediary.resolve(view.char_attr_str_label, "ui.fe01.char_create.attr_str", {"value": view._rolled_attrs.get("STR", 10)})
+	UIIntermediary.resolve(view.char_attr_agi_label, "ui.fe01.char_create.attr_agi", {"value": view._rolled_attrs.get("AGI", 10)})
+	UIIntermediary.resolve(view.char_attr_con_label, "ui.fe01.char_create.attr_con", {"value": view._rolled_attrs.get("CON", 10)})
+	UIIntermediary.resolve(view.char_attr_int_label, "ui.fe01.char_create.attr_int", {"value": view._rolled_attrs.get("INT", 10)})
+	UIIntermediary.resolve(view.char_attr_wis_label, "ui.fe01.char_create.attr_wis", {"value": view._rolled_attrs.get("WIS", 10)})
+	UIIntermediary.resolve(view.char_attr_cha_label, "ui.fe01.char_create.attr_cha", {"value": view._rolled_attrs.get("CHA", 10)})
 
 func on_char_slot_pressed(index: int) -> void:
-	var v = _view
-	if index < 0 or index >= v.character_slots.size():
-		v.selected_character_slot = ""
-		UIIntermediary.resolve(v.char_info_label, "ui.fe01.char_select.char_info_empty")
-		v.char_enter_btn.disabled = true
-		v.char_delete_btn.disabled = true
-		v.char_create_btn.disabled = false
+	var view: AccountEntryView = _view
+	if index < 0 or index >= view.character_slots.size():
+		view.selected_character_slot = ""
+		UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
+		view.char_enter_btn.disabled = true
+		view.char_delete_btn.disabled = true
+		view.char_create_btn.disabled = false
 		return
-	var slot: Dictionary = v.character_slots[index]
+	var slot: Dictionary = view.character_slots[index]
 	if slot.get("empty", false) or str(slot.get("name", "")) == "":
-		v.selected_character_slot = ""
-		UIIntermediary.resolve(v.char_info_label, "ui.fe01.char_select.char_info_empty")
-		v.char_enter_btn.disabled = true
-		v.char_delete_btn.disabled = true
-		v.char_create_btn.disabled = false
+		view.selected_character_slot = ""
+		UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
+		view.char_enter_btn.disabled = true
+		view.char_delete_btn.disabled = true
+		view.char_create_btn.disabled = false
 	else:
-		v.selected_character_slot = str(slot.get("slot_id", ""))
+		view.selected_character_slot = str(slot.get("slot_id", ""))
 		var race_name: String = race_to_name(str(slot.get("race", "UNKNOWN")))
 		var town_name: String = town_to_name(str(slot.get("town", "UNKNOWN")))
 		var name_label: String = UIIntermediary.text("ui.fe01.char_select.char_name")
@@ -186,14 +186,14 @@ func on_char_slot_pressed(index: int) -> void:
 		var class_label: String = UIIntermediary.text("ui.fe01.char_select.char_class")
 		var level_label: String = UIIntermediary.text("ui.fe01.char_select.char_level", {"level": slot.get("level", 0)})
 		var town_label: String = UIIntermediary.text("ui.fe01.char_select.char_town")
-		UIIntermediary.resolve(v.char_info_label, "ui.fe01.char_select.char_info", {
+		UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info", {
 			"char_name": name_label, "char_race": race_label, "char_class": class_label,
 			"char_level": level_label, "char_town": town_label,
 			"name": slot.get("name", ""), "race": race_name, "class": slot.get("class", ""), "town": town_name
 		})
-		v.char_enter_btn.disabled = false
-		v.char_delete_btn.disabled = false
-		v.char_create_btn.disabled = true
+		view.char_enter_btn.disabled = false
+		view.char_delete_btn.disabled = false
+		view.char_create_btn.disabled = true
 
 func race_to_name(race_key: String) -> String:
 	match race_key.to_upper():

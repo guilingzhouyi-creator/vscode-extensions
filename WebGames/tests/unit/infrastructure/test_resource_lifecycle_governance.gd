@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 69 资源生命周期治理与释放 (Resource Lifecycle Governance)
+# 单元测试：资源生命周期治理与释放 (Resource Lifecycle Governance)
 # 文件路径: res://tests/unit/infrastructure/test_resource_lifecycle_governance.gd
 # 职责: 验证资源纳管、状态推进、安全销毁、批量释放、信号自动解绑、度量计算（TC-RM-01 ~ TC-RM-10）
 # ==============================================================================
@@ -28,7 +28,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "Phase 69: 资源生命周期治理与释放",
+		"domain": "资源生命周期治理与释放",
 		"all_passed": all_passed,
 		"results": results
 	}

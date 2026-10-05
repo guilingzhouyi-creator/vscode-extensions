@@ -10,12 +10,12 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_trait_karma_balance())
 	results.append(test_character_creation_output())
 	results.append(test_attribute_conversion_engine())
-	# Phase 48: 配置驱动角色创建系统升级与开局事件流接入（专属套件并入本域）
-	var p48_res := TestCharacterCreationAndOpeningPipeline.run_all_tests()
-	results.append_array(p48_res.get("results", []))
-	# Phase 49: 文字版角色序章执行内核与占位符引擎（专属套件并入本域）
-	var p49_res := TestPrologueCoreAndPlaceholderPipeline.run_all_tests()
-	results.append_array(p49_res.get("results", []))
+	# 配置驱动角色创建系统升级与开局事件流接入（专属套件并入本域）
+	var opening_pipeline_res := TestCharacterCreationAndOpeningPipeline.run_all_tests()
+	results.append_array(opening_pipeline_res.get("results", []))
+	# 文字版角色序章执行内核与占位符引擎（专属套件并入本域）
+	var prologue_pipeline_res := TestPrologueCoreAndPlaceholderPipeline.run_all_tests()
+	results.append_array(prologue_pipeline_res.get("results", []))
 
 	var all_passed := true
 	for r in results:

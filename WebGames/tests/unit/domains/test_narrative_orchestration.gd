@@ -13,9 +13,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_priority_weight_arbitration())
 	results.append(_test_chronicle_deterministic_hash_logging())
 
-	# Phase 50: 通用剧情因果 DAG 编排引擎与多角色差异化拓扑测试
-	var p50_res := TestNarrativeDagOrchestrationPipeline.run_all_tests()
-	results.append_array(p50_res.get("results", []))
+	# 通用剧情因果 DAG 编排引擎与多角色差异化拓扑测试
+	var dag_pipeline_res := TestNarrativeDagOrchestrationPipeline.run_all_tests()
+	results.append_array(dag_pipeline_res.get("results", []))
 
 	var passed_cnt := 0
 	for r in results:

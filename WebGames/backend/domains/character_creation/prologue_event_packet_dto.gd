@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 单个序章步骤的结构化事件包：角色归属 + 阶段步进 + 渲染后文案 + 可用动作 + 预留结构化突变载荷（CharacterCreated/EquipmentGranted/ LocationAssigned/DialogueReady），事件与状态解耦（不指示前端页面）。 关联细则: 阶段1（事件包契约）
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name PrologueEventPacketDTO

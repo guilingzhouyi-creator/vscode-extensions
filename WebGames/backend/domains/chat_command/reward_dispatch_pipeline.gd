@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/chat_command.json | 信号: EventBus 领域广播
 # 职责说明: CDKey 兑换码格式校验、防重放核销与全服/个人邮件道具发放 兑换表由 config/domains/chat_command.json 的 cdkeys 驱动，文案由 config/narratives/chat_command.json 驱动，礼包兜底名取自本域表。 发放走物品注册表三元组（item_id 必填为已登记 canonical_id，原型属性为 单一事实源，无效配置严格拒绝，无兼容临时物件路径）。 契约: 表内键值与下方各取值器的兜底默认值逐字一致——改表即改行为， TC-CMD-03（KALAR666 -> gold 500）守此契约，改表后该断言立即变红。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name RewardDispatchPipeline extends RefCounted

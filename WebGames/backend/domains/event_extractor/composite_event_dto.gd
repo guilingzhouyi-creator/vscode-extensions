@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: item_statistics, telemetry_account_lifecycle | 配置: config/domains/event_extractor.json | 信号: EventBus 领域广播
 # 职责说明: 组合事件数据契约：一次业务事务（同一 transaction_id）的全部原始事件 折叠为一个 CompositeEventDTO（物品流 + 货币增量 + 元数据）； 提供 DTO 与分组规则表的 Schema 校验（零硬编码，规则由 event_extractor.json 驱动）。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CompositeEventDTO

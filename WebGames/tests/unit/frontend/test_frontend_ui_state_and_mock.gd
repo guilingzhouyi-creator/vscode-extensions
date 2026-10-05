@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端 UI 状态与 Mock 服务测试套件 (Phase 77)
+# 卡拉尔世界引擎 (Kalar World Engine) - 前端 UI 状态与 Mock 服务测试套件
 # 文件路径: res://tests/unit/frontend/test_frontend_ui_state_and_mock.gd
 # 职责: 验证 UIStateContainer 5 态流转、HudViewModel P71 约束、Mock 服务与弱引用注册表
 # ==============================================================================

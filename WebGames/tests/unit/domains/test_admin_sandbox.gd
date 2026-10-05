@@ -11,7 +11,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_audit_logging())
 	results.append(test_bootstrap_assembly())
 	results.append(test_gm_give_item_registry_resolution())
-	# Phase 43 P2-12 新增：审计日志有界化（audit/max_entries 裁剪，最旧先出）
+	# 新增：审计日志有界化（audit/max_entries 裁剪，最旧先出）
 	results.append(test_audit_log_cap_pruning())
 	results.append(test_gm_command_catalog_dispatch())
 	results.append(test_clawback_service())
@@ -47,7 +47,7 @@ static func test_audit_logging() -> Dictionary:
 	var passed = (entry.admin_id == "GM_TEST_01") and (entry.signature != "")
 	return { "test": "TC-ADMIN-03: GM 仲裁日志审计与防篡改签名", "passed": passed }
 
-## Phase 43 P2-12（TC-P43-S4-07）：审计日志有界化——record_audit 后按
+## 审计日志有界化——record_audit 后按
 ## audit/max_entries 裁剪，最旧先出（注入超上限条数 → 尺寸≤上限且最早条目被裁）。
 static func test_audit_log_cap_pruning() -> Dictionary:
 	var max_entries := maxi(1, GameConfig.get_int("infrastructure.admin", "audit/max_entries", 500))
@@ -64,7 +64,7 @@ static func test_audit_log_cap_pruning() -> Dictionary:
 			break
 	# 既有最旧残留（如 TC-ADMIN-03 的 GIVE_GOLD）应已被裁出（若超上限成立）
 	var passed = size_ok and newest_kept and GMArbitrationAuditService.audit_log.size() == max_entries
-	return { "test": "TC-P43-S4-07: 审计有界化（尺寸≤上限，最旧先出）", "passed": passed, "before": before, "size": GMArbitrationAuditService.audit_log.size() }
+	return { "test": "TC-ADMIN-04: 审计有界化（尺寸≤上限，最旧先出）", "passed": passed, "before": before, "size": GMArbitrationAuditService.audit_log.size() }
 
 static func test_bootstrap_assembly() -> Dictionary:
 	var res := GameBootstrap.assemble()

@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 卡拉尔统一属性底座三层模型的唯一换算入口（L1 等级层 → L2 系数层 → L3 实际值域）； 人类基准/成长曲线/系数/死区等参数全部由 config/domains/attribute.json 驱动（零硬编码）， 与相邻模块以「后端权威派生、前端不注入」为边界约定。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name AttributeConversionEngine

@@ -12,7 +12,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_rbac_governance_and_treasury())
 	results.append(_test_diplomatic_relations_matrix())
 	results.append(_test_tech_upgrade_and_buff_calculation())
-	# Phase 55 L3 新增：金库取款符号守卫
+	# 新增：金库取款符号守卫
 	results.append(_test_negative_withdraw_rejected())
 
 	var passed_cnt := 0
@@ -77,7 +77,7 @@ static func _test_tech_upgrade_and_buff_calculation() -> Dictionary:
 		"passed": passed
 	}
 
-## L3（Phase 55）：金库取款符号守卫——负金额不得经「-=」凭空入账（红证：修复前恒通过余额比较）
+## L3：金库取款符号守卫——负金额不得经「-=」凭空入账（修复前恒通过余额比较）
 static func _test_negative_withdraw_rejected() -> Dictionary:
 	var guild := OrganizationAggregate.new("ORG_SIGN", "符号守卫团", OrganizationAggregate.OrganizationType.PLAYER_CREATED_CUSTOM)
 	guild.add_member("ACC_MASTER", "团长", OrganizationAggregate.GuildRole.GUILD_MASTER)

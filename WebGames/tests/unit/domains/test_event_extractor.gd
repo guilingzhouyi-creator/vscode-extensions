@@ -11,7 +11,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_materialize_floor_equivalence())
 	results.append(test_rule_driven_and_raw_fallback())
 	results.append(test_uid_isolation_and_idempotency())
-	# Phase 54 L10 新增：组合键分隔符碰撞消除
+	# 新增：组合键分隔符碰撞消除
 	results.append(test_composite_key_no_separator_collision())
 
 	var passed_cnt := 0
@@ -181,7 +181,7 @@ static func test_uid_isolation_and_idempotency() -> Dictionary:
 	}
 
 static func test_composite_key_no_separator_collision() -> Dictionary:
-	# L10（Phase 54）：长度前缀组合键消除 "|" 拼接碰撞——
+	# L10：长度前缀组合键消除 "|" 拼接碰撞——
 	# account="A|B"+txn="TX" 与 account="A"+txn="B|TX"（旧 KEY_SEP 拼接出同键 → 跨账号并组污染）
 	var lib_a := AccountItemLibraryAggregate.new("A|B")
 	var lib_b := AccountItemLibraryAggregate.new("A")

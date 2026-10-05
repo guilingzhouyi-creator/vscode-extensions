@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 回合抽卡卡牌打出制的出牌前置校验——**手牌持有 + AP 势能轴**双条件。 AP > 0  先攻主动态：可消耗 ap_cost 打出任意手牌； AP < 0  硬直受制态：禁止主动打出消耗 AP 的攻击/魔法卡，仅可打出 被动招架类防御卡（PARRY/BLOCK/INTER，verb 或效果层声明）； AP = 0  均势态：允许（先手判定由 CombatPipelineFSM 既有逻辑处理）。 区间与防御动词集配置化（combat.json ap_axis/guard_verbs），零硬编码。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CombatPlayValidator

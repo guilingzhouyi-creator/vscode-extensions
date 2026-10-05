@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lattice.json | 信号: EventBus 领域广播
 # 职责说明: 招式手稿物品实例化、藏经阁流通与作者版税分润结算。 ID/名称前缀、默认价格版税与叙事文案由 config/lattice.json、 config/narratives/lattice.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GrimoireAuthoringPipeline extends RefCounted

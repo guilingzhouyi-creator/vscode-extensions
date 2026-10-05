@@ -16,7 +16,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_toast_eviction_no_hang())
 	return TestCase.pack_results("frontend_robustness", results)
 
-## TC-P82-S4-02：i18n 三条格式化分支（千分位 / 百分比 / 时长 / 数值对）精确可达
+## TC-FE-ROB-02：i18n 三条格式化分支（千分位 / 百分比 / 时长 / 数值对）精确可达
 static func _test_i18n_exact_formatting() -> Dictionary:
 	var gold := PlaceholderFiller.fill("{amount}", {"amount": 5000})
 	var ok := TestCase.assert_eq(gold, "5,000", "千分位格式化生效")
@@ -28,7 +28,7 @@ static func _test_i18n_exact_formatting() -> Dictionary:
 	ok = ok and TestCase.assert_eq(pair, "30/100", "HP 数值对格式化生效")
 	return TestCase.make_result("i18n_exact_formatting", ok)
 
-## A / TC-P82-S4-02：子串误命中回归——展示型文本与无关键名不得被二次格式化
+## A / TC-FE-ROB-02：子串误命中回归——展示型文本与无关键名不得被二次格式化
 static func _test_i18n_counter_examples() -> Dictionary:
 	var ok := TestCase.assert_eq(PlaceholderFiller.fill("{time}", {"time": "刚刚"}), "刚刚", "time=展示文本 不被时长格式化")
 	ok = ok and TestCase.assert_eq(PlaceholderFiller.fill("{rate}", {"rate": "3.5000"}), "3.5000", "rate=展示文本 不被百分比格式化")
@@ -64,7 +64,7 @@ static func _test_nav_stack_consistency_on_failure() -> Dictionary:
 	ok = ok and TestCase.assert_eq(nav.get_stack_depth(), before, "失败路径栈深不变")
 	return TestCase.make_result("nav_stack_consistency_on_failure", ok)
 
-## R-01 / TC-P82-S4-03：连续压入超上限 Toast 不死循环，子节点数 ≤ MAX_TOASTS
+## R-01 / TC-FE-ROB-03：连续压入超上限 Toast 不死循环，子节点数 ≤ MAX_TOASTS
 static func _test_toast_eviction_no_hang() -> Dictionary:
 	var tree := Engine.get_main_loop() as SceneTree
 	var layer := ToastLayer.new()

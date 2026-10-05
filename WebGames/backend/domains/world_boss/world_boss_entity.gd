@@ -4,7 +4,7 @@
 # 架构定位: Domain Entity / Aggregate Root
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world_boss.json | 信号: EventBus 领域广播
 # 职责说明: 单机游荡天灾与联机大型 Raid 首领 100% 同构模型、多段血槽与机制护盾契约 默认值由 config/domains/world_boss.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name WorldBossAggregate extends MonsterAggregateEntity

@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - Phase 50: 通用剧情因果 DAG 编排与多角色差异化序章测试套件
+# 卡拉尔世界引擎 (Kalar World Engine) - 通用剧情因果 DAG 编排与多角色差异化序章测试套件
 # 文件路径: res://tests/integration/pipelines/test_narrative_dag_orchestration_pipeline.gd
 # 职责: 验证 DAG 静态拓扑排序、循环依赖环拦截、汇聚等待、条件分支、多角色路由与全生命周期闭环
 # ==============================================================================
@@ -25,7 +25,7 @@ static func run_all_tests() -> Dictionary:
 			passed_count += 1
 
 	return {
-		"domain": "Phase 50: 通用剧情因果 DAG 编排与多角色差异化序章",
+		"domain": "通用剧情因果 DAG 编排与多角色差异化序章",
 		"all_passed": passed_count == results.size(),
 		"total": results.size(),
 		"passed": passed_count,

@@ -6,7 +6,7 @@ class_name TestGroundLootDomain
 extends RefCounted
 
 static func _test_pickup_add_item_and_statistics() -> Dictionary:
-	# Phase 40 GAP-02/GAP-01（TC-GAP-S2-01~03 / TC-FINAL-LOOT-01/02）
+	# 地面掉落验收（TC-GAP-S2-01~03 / TC-FINAL-LOOT-01/02）
 	var canonical := "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
 	var item := ItemEntity.new()
 	item.template_id = canonical
@@ -41,7 +41,7 @@ static func _test_pickup_add_item_and_statistics() -> Dictionary:
 	return {"test": "TC-GAP-S2-01~03: 拾取 add_item 对齐 + 统计台账接入（含不传 library 兼容）", "passed": passed}
 
 static func _test_ground_loot_event_listener() -> Dictionary:
-	# Phase 40 GAP-05（TC-GAP-S3-05/06 + TC-FINAL-DROP-01~04）
+	# 掉落表生成验收（TC-GAP-S3-05/06 + TC-FINAL-DROP-01~04）
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	var listener := GroundLootEventListener.new(catalog)
 	var valid_id := "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
@@ -80,9 +80,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_drop_declaration_registry_closed_loop())
 	results.append(_test_pickup_add_item_and_statistics())
 	results.append(_test_ground_loot_event_listener())
-	# Phase 43 N2 新增：战斗击杀→监听器→按 id 拾取出队闭环（TC-P43-S2-02 / S4-05）
+	# 战斗击杀→监听器→按 id 拾取出队闭环
 	results.append(_test_monster_kill_to_pickup_closed_loop())
-	# Phase 44 P7 新增：cleanup_decayed 常态零分配（TC-P44-P7-03）
+	# cleanup_decayed 常态零分配
 	results.append(_test_cleanup_no_decay_zero_alloc())
 
 	var passed_cnt := 0
@@ -166,9 +166,9 @@ static func _test_drop_declaration_registry_closed_loop() -> Dictionary:
 	var bad_res := GroundDroppedItemAggregate.create_from_declaration("KALAR:EQUIP:WEAPON_BLADE:NOT_REGISTERED", catalog)
 	var passed: bool = ok_res.success and ok_res.item_entity.item_uid.begins_with("DRP_") \
 		and (not bad_res.success) and bad_res.error_code == "ITEM_NOT_REGISTERED"
-	return {"test": "TC-P11-LOOT-01: 掉落声明统一事实源（已登记成功 + UID，未登记拒绝）", "passed": passed}
+	return {"test": "TC-LOOT-DECL-01: 掉落声明统一事实源（已登记成功 + UID，未登记拒绝）", "passed": passed}
 
-## Phase 43 N2（TC-P43-S2-02 / S4-05）：CombatPipelineFSM 击杀 is_monster 受击者 →
+## 战斗击杀→监听器登记闭环与拾取出队：
 ## 发射 monster.killed（monster.json loot/default_drop_canonical_ids 均在册 → +2 活跃掉落）
 ## → attempt_pickup_from_ground 按 drop_id 拾取成功并出队（活跃掉落减一、GRANTED +1）。
 ## 全程经 GameBootstrap 装配的全局监听器，delta 断言规避跨套件累积影响。
@@ -192,7 +192,7 @@ static func _test_monster_kill_to_pickup_closed_loop() -> Dictionary:
 	var after_kill := listener.get_active_drops().size()
 	var kill_ok: bool = after_kill == baseline + 2 # 两件在册默认掉落均登记为活跃
 	if not kill_ok:
-		return {"test": "TC-P43-S4-05: 击杀发射→监听器登记闭环（kill +2）", "passed": false, "baseline": baseline, "after_kill": after_kill}
+		return {"test": "TC-LOOT-KILL-01: 击杀发射→监听器登记闭环（kill +2）", "passed": false, "baseline": baseline, "after_kill": after_kill}
 
 	# 拾取闭环：按首个 drop_id 拾取（击杀归属人即玩家 → 无保护期拦截）
 	var inv := WearableInventoryAggregate.new()
@@ -213,9 +213,9 @@ static func _test_monster_kill_to_pickup_closed_loop() -> Dictionary:
 			var stats = ItemStatisticsSolver.query_account_item_stats(lib, picked_item.template_id)
 			stats_ok = stats.found and int(stats.stats["total_gained"]) >= 1
 	var passed = kill_ok and picked_ok and stats_ok
-	return {"test": "TC-P43-S4-05: 击杀→掉落→按 id 拾取出队闭环（活跃减一 + GRANTED +1）", "passed": passed}
+	return {"test": "TC-LOOT-KILL-01: 击杀→掉落→按 id 拾取出队闭环（活跃减一 + GRANTED +1）", "passed": passed}
 
-## Phase 44 P7（TC-P44-P7-03）：cleanup_decayed 常态零分配——无衰变项时直接返回
+## cleanup_decayed 常态零分配——无衰变项时直接返回
 ## （活跃列表不变、drop 身份稳定）；有衰变项时单遍过滤清理
 static func _test_cleanup_no_decay_zero_alloc() -> Dictionary:
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
@@ -239,4 +239,4 @@ static func _test_cleanup_no_decay_zero_alloc() -> Dictionary:
 	var after := listener.get_active_drops()
 	var cleaned_ok: bool = after.size() == 1 and after[0].drop_id == drops[1].drop_id
 	var passed = noop_ok and cleaned_ok
-	return {"test": "TC-P44-P7-03: cleanup 常态零分配（无衰变早退 + 有衰变单遍过滤）", "passed": passed}
+	return {"test": "TC-LOOT-CLEANUP-01: cleanup 常态零分配（无衰变早退 + 有衰变单遍过滤）", "passed": passed}

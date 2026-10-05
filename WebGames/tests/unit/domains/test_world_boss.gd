@@ -39,7 +39,7 @@ static func test_universal_contribution_leaderboard() -> Dictionary:
 	return { "test": "TC-BOSS-02: 单机联机通用战功榜加权计算与 MVP 评定", "passed": passed }
 
 static func test_defeated_latch_blocks_resettlement() -> Dictionary:
-	# L9-b（Phase 53）：击败终态锁存——终态后重复受击不再结算
+	# L9-b：击败终态锁存——终态后重复受击不再结算
 	# 红证：修复前无 is_defeated 锁存，重复伤害重复触发击败叙事/渠道、战功榜继续累计
 	var boss := WorldBossAggregate.new()
 	boss.phase_max_hp = 500.0

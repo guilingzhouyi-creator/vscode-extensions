@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - Phase 64 全域核心算法性能加固与多实体扩展性测试套件
+# 卡拉尔世界引擎 (Kalar World Engine) - 全域核心算法性能加固与多实体扩展性测试套件
 # 文件路径: res://tests/integration/pipelines/test_performance_and_scalability_pipeline.gd
 # 职责: 验收物品统计O(1)增量累加、空间方位倒排索引、多实体状态机隔离、
 #       剧情因果DAG邻接表索引与轻量会话序列化、背包增量度量及频控有界缓存。
@@ -15,14 +15,14 @@ const NarrativeDagSessionDTOClass = preload("res://backend/domains/narrative_orc
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name := "Phase 64: 全域核心算法性能加固与多实体扩展性治理验收流水线"
+	var domain_name := "全域核心算法性能加固与多实体扩展性治理验收流水线"
 
 	results.append(_test_item_statistics_incremental_equivalence())
 	results.append(_test_spatial_direction_alias_index())
 	results.append(_test_spatial_multi_entity_trigger_isolation())
 	results.append(_test_narrative_dag_adjacency_and_session_dto())
 	results.append(_test_inventory_metric_snapshot_and_cdkey_rate_limits())
-	# Phase 64 P2 修复回归：移动求解器静态缓存随配置热重载版本推进自动重建
+	# 修复回归：移动求解器静态缓存随配置热重载版本推进自动重建
 	results.append(_test_movement_cache_rebuild_on_config_reload())
 
 	var passed_cnt := 0
@@ -249,7 +249,7 @@ static func _test_inventory_metric_snapshot_and_cdkey_rate_limits() -> Dictionar
 		"passed": passed
 	}
 
-## Phase 64 P2 修复回归（红证：修复前 init_or_rebuild_cache 零外部触发点，
+## 修复回归（红证：修复前 init_or_rebuild_cache 零外部触发点，
 ## 配置热重载后移动参数/别名静默冻结，与 S3「缓存热重载失效机制已闭环」不符）：
 ## 热重载版本推进后，下一次调用必须重建缓存并同步到新版本。
 static func _test_movement_cache_rebuild_on_config_reload() -> Dictionary:
@@ -267,6 +267,6 @@ static func _test_movement_cache_rebuild_on_config_reload() -> Dictionary:
 		and after_version == int(res.get("version", -1)) \
 		and after_version >= built_version
 	return {
-		"test": "TC-PF-06: 移动求解器静态缓存随配置热重载版本推进自动重建（P2 接线回归）",
+		"test": "TC-PF-06: 移动求解器静态缓存随配置热重载版本推进自动重建（接线回归）",
 		"passed": passed
 	}

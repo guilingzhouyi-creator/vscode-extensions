@@ -4,7 +4,7 @@
 # 架构定位: Domain Entity / Aggregate Root
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
 # 职责说明: 继承 MonsterAggregateEntity 微观生理底座，动态注入精英词缀与狂暴/召唤 状态字段；精英等级/词缀/血线阈值/小怪数量默认值由 config/domains/elite.json 的 entity_defaults 段驱动（代码零硬编码）。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name EliteMonsterAggregate extends MonsterAggregateEntity

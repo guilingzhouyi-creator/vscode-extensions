@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 角色创建阶段基础六维（STR/CON/INT/AGI/SPR/VIT）一律由后端依据种族 定义配置封闭派生（L1 等级层基线 + 种族修正），严禁信任前端传入的任何 初始属性值（前端伪造 STR/CON 等一律由请求侧丢弃，见 CharacterCreationService 防伪守卫）。 关联细则: 阶段2 §2.2（后端权威属性派生求解器）
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CharacterBaselineAttributeSolver

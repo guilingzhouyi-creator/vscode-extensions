@@ -12,7 +12,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_non_unique_names_and_uuid_integrity())
 	results.append(_test_alias_reputation_isolation())
 	results.append(_test_unmask_exposure_causal_merge())
-	# Phase 53 M6 新增：败露锁存幂等 + 搬运归零 + 记账路由
+	# 新增：败露锁存幂等 + 搬运归零 + 记账路由
 	results.append(_test_repeat_exposure_idempotent_and_routing())
 
 	var passed_cnt := 0
@@ -70,7 +70,7 @@ static func _test_unmask_exposure_causal_merge() -> Dictionary:
 		"passed": passed
 	}
 
-## M6（Phase 53）：败露锁存 + 搬运归零 + 已败露记账路由——
+## M6：败露锁存 + 搬运归零 + 已败露记账路由——
 ## 重复曝光幂等返回（0 搬运）、源字段清零、败露后 re-equip 的 record_deed 直记真身（红证：修复前二次曝光 double-count）
 static func _test_repeat_exposure_idempotent_and_routing() -> Dictionary:
 	var actor := CharacterIdentityAggregate.new("UUID_ACTOR_M6", "隐修士兰斯")

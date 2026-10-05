@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / State Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 承担主页 HUD 双轨中枢： 拉轨（Pull Facade） -> get_hud_status_snapshot()：只读快照，字段 100% 真实溯源 推轨（Push EventBus）-> publish_hud_snapshot / publish_stat_mutation / publish_wallet_mutation 事实溯源（审查整改版，零臆造）： - 六维实值/层级 -> CharacterPhysiologySheet.get_actual_values()/get_all_levels() - hp_max -> domains.combat participant_defaults/max_hp（配置真源 + 下限守卫） - ap_max -> domains.world_state hud_defaults/ap_max（配置真源 + 下限守卫） - 钱包   -> CharacterWalletEntity.gold / mana_monocrystals 广播契约：payload 必带 category_key 与 args（EventBusCore.render_domain_event_text）
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name HudStateSyncService

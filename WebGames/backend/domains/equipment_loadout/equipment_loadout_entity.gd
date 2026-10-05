@@ -4,7 +4,7 @@
 # 架构定位: Domain Entity / Aggregate Root
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/equipment.json | 信号: EventBus 领域广播
 # 职责说明: 战备槽位物理聚合（槽位清单、装备/卸下、序列化与槽位引用快照恢复）； 槽位清单与默认值由 config/domains/equipment.json 驱动（代码零硬编码）。
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name EquipmentLoadoutAggregate extends RefCounted

@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端架构与导航测试套件 (Phase 77)
+# 卡拉尔世界引擎 (Kalar World Engine) - 前端架构与导航测试套件
 # 文件路径: res://tests/unit/frontend/test_frontend_architecture_and_bootstrap.gd
 # 职责: 验证 AppRoot 6 层视口层级拓扑、NavManager 分层导航栈、ViewRouter 兼容代理
 # ==============================================================================

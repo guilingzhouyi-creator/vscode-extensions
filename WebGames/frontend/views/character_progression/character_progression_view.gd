@@ -134,9 +134,9 @@ var _pot_add_btns: Array[Button] = []
 var _pot_preview_labels: Array[Label] = []
 var _equip_slot_btns: Array[Button] = []
 
-var _tabs = null
+var _tabs: CharacterProgressionTabsClass = null
 
-func _new_tabs():
+func _create_tabs_controller() -> CharacterProgressionTabsClass:
 	return CharacterProgressionTabsClass.new()
 
 # ==============================================================================
@@ -213,7 +213,7 @@ func _ready() -> void:
 	_pot_preview_labels = [_pot_str_preview_label, _pot_agi_preview_label, _pot_con_preview_label, _pot_int_preview_label, _pot_wis_preview_label, _pot_cha_preview_label]
 	_equip_slot_btns = [_equip_main_hand_btn, _equip_off_hand_btn, _equip_head_btn, _equip_chest_btn, _equip_legs_btn, _equip_feet_btn, _equip_neck_btn, _equip_ring_l_btn, _equip_ring_r_btn]
 
-	_tabs = _new_tabs()
+	_tabs = _create_tabs_controller()
 	_tabs.setup(self)
 
 	_load_mock_snapshot()

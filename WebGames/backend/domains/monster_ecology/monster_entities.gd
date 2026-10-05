@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/monster.json | 信号: EventBus 领域广播
 # 职责说明: 怪物微观生理与玩家 100% 同构模型、多部位碰撞破坏体与基因吞噬池。 部位默认属性与物种生理初值由 config/domains/monster.json 驱动。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MonsterAggregateEntity extends RefCounted

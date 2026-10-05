@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: character_creation | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 封装角色生理属性与战斗属性换算引擎的输入与输出上下文（GOV-DAT-001）。
-# 设计依据: 业务领域第一性原理 / Phase 97 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name AttributeConversionDTO

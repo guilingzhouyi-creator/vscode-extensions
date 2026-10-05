@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：Phase 68 数据一致性、脏标记增量与异常恢复全量矩阵
+# 单元测试：数据一致性、脏标记增量与异常恢复全量矩阵
 # 文件路径: res://tests/unit/infrastructure/test_save_consistency_recovery.gd
 # 职责: 验证物品背包技能联动一致性、高频域增量保存、缺失字段默认值恢复、
 #       空壳档阻断与原子损坏恢复（TC-SV-12~16, TC-SV-28~34, TC-SV-37~38）。
@@ -36,7 +36,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "Phase 68: 物品背包技能数据一致性与异常容灾恢复",
+		"domain": "物品背包技能数据一致性与异常容灾恢复",
 		"all_passed": all_passed,
 		"results": results
 	}
@@ -212,8 +212,8 @@ static func test_isolated_domain_corruption_recovery() -> Dictionary:
 ## TC-SV-32: 原子写中断保护原档（SaveManager 契约保持）
 static func test_atomic_write_interruption_preserves_original() -> Dictionary:
 	var slot := "test_atomic_preserve_slot"
-	var p1 := { "data": { "round": 1 } }
-	var res1 := SaveDataAccessLayer.save_game(slot, p1)
+	var payload := { "data": { "round": 1 } }
+	var res1 := SaveDataAccessLayer.save_game(slot, payload)
 	if not bool(res1.get("success", false)):
 		return { "test": "TC-SV-32: 原子写中断原档保护", "passed": false, "reason": "first_save_failed" }
 
@@ -222,7 +222,7 @@ static func test_atomic_write_interruption_preserves_original() -> Dictionary:
 	var exists_before := FileAccess.file_exists(file_path)
 
 	# 尝试传入非法超长名或路径穿越名称
-	var bad_res := SaveDataAccessLayer.save_game("../bad_slot_traversal", p1)
+	var bad_res := SaveDataAccessLayer.save_game("../bad_slot_traversal", payload)
 	var bad_blocked := not bool(bad_res.get("success", false))
 
 	# 验证原有正档未受破坏
@@ -279,11 +279,11 @@ static func test_hot_reload_retry_after_failure() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-SV-37: 孤儿临时文件启动清理（Phase 88 · A5 存档韧性）
+## TC-SV-37: 孤儿临时文件启动清理（存档韧性）
 ## 背景：原子写流程在被外部中断（进程被杀/崩溃）时会在 rename 前遗留 *{tmp_suffix} 文件，
 ## 既不参与校验也不被任何流程回收；本用例断言启动入口按配置将其回收。
 static func test_orphan_tmp_cleanup() -> Dictionary:
-	var slot := "test_orphan_tmp_phase88"
+	var slot := "test_orphan_tmp_resilience"
 	SaveManager.ensure_save_directory()
 	var tmp_path := SaveManager._save_dir() + slot + SaveManager._save_extension() + SaveManager._tmp_suffix()
 
@@ -307,12 +307,12 @@ static func test_orphan_tmp_cleanup() -> Dictionary:
 		"cleaned_after": cleaned_after
 	}
 
-## TC-SV-38: 正档损坏时按配置自动从 .bak 恢复并重读（Phase 88 · A5 存档韧性）
+## TC-SV-38: 正档损坏时按配置自动从 .bak 恢复并重读（存档韧性）
 ## 背景：restore_backup 此前仅有测试调用，生产 load 路径缺自动恢复——坏档即不可自愈。
 ## 本用例断言：正档校验失败 → 自动恢复 .bak → 重读成功，并携带 auto_restored 留痕；
 ## 恢复内容必须为 .bak 对应的上一代正档（非当前坏档）。
 static func test_auto_restore_on_corrupt_primary() -> Dictionary:
-	var slot := "test_auto_restore_phase88"
+	var slot := "test_auto_restore_resilience"
 	SaveManager.ensure_save_directory()
 	# 连续两次写入：第二次会把第一次的正档备份为 .bak
 	var r1 := SaveManager.save_game(slot, { "data": { "round": 1 } })

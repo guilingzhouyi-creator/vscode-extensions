@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 记录并审计战斗全生命周期中的每一步时间戳、先手判定、发牌时序、出牌校验与 小回合切换动作，输出标准化的确定性重放 Payload，支持服务端无状态回放检验。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CombatTimelineReplayAudit

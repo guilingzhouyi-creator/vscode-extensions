@@ -5,7 +5,7 @@
 class_name TestEliteMutationDomain extends RefCounted
 
 static func test_backend_affix_roll() -> Dictionary:
-	# Phase 40 GAP-04 算法主权（TC-GAP-S2-04/05 + TC-FINAL-AFFIX-01/03）
+	# 算法主权（TC-GAP-S2-04/05 + TC-FINAL-AFFIX-01/03）
 	var first = GenericAffixSolver.roll_random_affixes(3, 2, DeterministicRNG.from_seed(20260902))
 	var second = GenericAffixSolver.roll_random_affixes(3, 2, DeterministicRNG.from_seed(20260902))
 	var det_ok := first.size() == 2 and second.size() == 2 and first == second
@@ -19,7 +19,7 @@ static func test_backend_affix_roll() -> Dictionary:
 	return {"test": "TC-GAP-S2-04/05: 后端词缀加权滚动（同种子确定性 + tier 回退 global + 容量截断）", "passed": passed}
 
 static func test_pick_weighted_zero_safe() -> Dictionary:
-	# Phase 40 TC-GAP-S2-06 / TC-FINAL-AFFIX-06：权重 0 不入选；全零退化均匀；空池返回 null
+	# 词缀选择退化守卫：权重 0 不入选；全零退化均匀；空池返回 null
 	var rng := DeterministicRNG.from_seed(7)
 	var mixed := [{"aff_id": "A", "weight": 0}, {"aff_id": "B", "weight": 10}, {"aff_id": "C", "weight": 0}]
 	var only_b := true

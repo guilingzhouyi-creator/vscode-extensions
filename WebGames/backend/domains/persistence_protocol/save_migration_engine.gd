@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 负责三级版本模型（Domain/Schema/Save）检测、链式演进调度、 迁移后校验与原子回滚机制，严格不破坏旧档（Inv-SV-4/7）。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SaveMigrationEngine extends RefCounted

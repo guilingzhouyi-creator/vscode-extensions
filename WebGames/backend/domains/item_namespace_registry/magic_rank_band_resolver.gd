@@ -4,7 +4,7 @@
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 阶位档次（第三平行维度：低阶 1~3 / 中阶 4~6 / 高阶 7~9 / 超位 10~11 统称）的 **确定性判定**——按 rank_bands 配置段区间分段（每阶恰属一档、互斥全覆盖）， 非逐阶枚举表；档次名经 magic.rank_band.* 键表达（禁嵌套命名，仅展示不作判定）。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name MagicRankBandResolver

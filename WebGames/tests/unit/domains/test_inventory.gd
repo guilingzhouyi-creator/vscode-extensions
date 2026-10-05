@@ -12,11 +12,11 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_memory_decay_curve())
 	results.append(test_multi_profession_clustering())
 	results.append(test_deep_snapshot_rollback())
-	# Phase 43 N3 配套新增：unequip_item_ref 聚合辅助（处置销毁已穿戴物品的清槽联动）
+	# 配套新增：unequip_item_ref 聚合辅助（处置销毁已穿戴物品的清槽联动）
 	results.append(test_unequip_item_ref_helper())
 	# F-1（TC-INV-11）：restore 深载荷唯一入口
 	results.append(test_restore_deep_payload_only())
-	# Phase 46: 物品属性双 UID 联动与隐藏特殊词缀体系
+	# 物品属性双 UID 联动与隐藏特殊词缀体系
 	var affix_res := TestItemAttributeAffixSystemPipeline.run_all_tests()
 	results.append_array(affix_res.get("results", []))
 
@@ -110,7 +110,7 @@ static func test_deep_snapshot_rollback() -> Dictionary:
 		"passed": passed
 	}
 
-## Phase 43 N3 配套（TC-P43-S4-xx）：EquipmentLoadoutAggregate.unequip_item_ref ——
+## unequip_item_ref 反查卸下——
 ## 按实例引用反查槽位并卸下（处置销毁已穿戴物品时双侧清槽联动），返回槽位名；
 ## 未持有该实例返回空串；container_state 复位 UNOWNED。
 static func test_unequip_item_ref_helper() -> Dictionary:
@@ -135,11 +135,11 @@ static func test_unequip_item_ref_helper() -> Dictionary:
 		and second == "MAIN_HAND" \
 		and loadout.get_equipped_item("MAIN_HAND") == null
 	return {
-		"test": "TC-P43-N3A: unequip_item_ref 反查卸下（命中槽位/清槽/未命中空串）",
+		"test": "TC-INV-10: unequip_item_ref 反查卸下（命中槽位/清槽/未命中空串）",
 		"passed": passed
 	}
 
-## Phase 85 F-1（TC-P85-S4-01）：restore 深载荷唯一入口——仅接受 snapshot() 深载荷；
+## restore 深载荷唯一入口——仅接受 snapshot() 深载荷；
 ## 无 storage_payloads 输入 → 空容器恢复（旧引用路径已退役，畸形快照不静默吞掉）。
 static func test_restore_deep_payload_only() -> Dictionary:
 	var inv := WearableInventoryAggregate.new()

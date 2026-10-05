@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: commission_quest | 配置: config/domains/commission_quest.json | 信号: EventBus 领域广播
 # 职责说明: 封装委托任务接取与派发的状态机构造上下文，消除多参泥团（GOV-DAT-001）。
-# 设计依据: 业务领域第一性原理 / Phase 97 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name CommissionAcceptanceDTO

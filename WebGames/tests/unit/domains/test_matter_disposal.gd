@@ -13,11 +13,11 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_furnace_disposal_and_residue_generation())
 	results.append(_test_valuable_item_security_lock())
 	results.append(_test_locked_container_state_rejection())
-	# Phase 43 N3 新增：多产量逐件守恒（TC-P43-S1-03 / S4-04）
+	# 多产量逐件守恒
 	results.append(_test_multi_yield_mass_conservation())
-	# Phase 51 M5 新增：穿戴销毁失败对称回滚
+	# 穿戴销毁失败对称回滚
 	results.append(_test_equipped_destroy_rollback_symmetry())
-	# Phase 64 P1 修复回归：装备销毁后增量负重缓存必须与地面真值一致（防旁路直写失配）
+	# 装备销毁后增量负重缓存必须与地面真值一致（防旁路直写失配）
 	results.append(_test_equipped_destroy_weight_cache_consistency())
 
 	var passed_cnt := 0
@@ -119,7 +119,7 @@ static func _test_valuable_item_security_lock() -> Dictionary:
 		"passed": passed
 	}
 
-## Phase 43 N3（TC-P43-S1-03 / S4-04）：多产量逐件守恒——
+## 多产量逐件守恒——
 ## 产物实例数 == yield_*_count == FORGED 台账记账数（大质量输入保证 slag_count ≥ 2）。
 static func _test_multi_yield_mass_conservation() -> Dictionary:
 	var inv := WearableInventoryAggregate.new()
@@ -162,11 +162,11 @@ static func _test_multi_yield_mass_conservation() -> Dictionary:
 		and dust_count == int(res.get("yield_mana_dust_count", 0)) \
 		and forge_ok
 	return {
-		"test": "TC-P43-S4-04: 多件产物逐件守恒（实例数==yield 数==FORGED 记账数）",
+		"test": "TC-MATTER-05: 多件产物逐件守恒（实例数==yield 数==FORGED 记账数）",
 		"passed": passed
 	}
 
-## M5（Phase 51）：穿戴物品销毁产物回流失败——回滚必须对称：
+## 穿戴物品销毁产物回流失败——回滚必须对称：
 ## inventory 重建式恢复后 loadout 槽按 item_uid 回挂同一实例（双簿记同源、无 DESTROYED 残留）
 ## 红证：修复前仅 inventory.restore()，loadout 槽位空置且与 equipped_slots 引用脱节
 static func _test_equipped_destroy_rollback_symmetry() -> Dictionary:
@@ -206,7 +206,7 @@ static func _test_equipped_destroy_rollback_symmetry() -> Dictionary:
 		"passed": passed
 	}
 
-## Phase 64 P1 回归（红证：修复前销毁装备直写 equipped_slots[slot]=null 绕过
+## 修复回归（红证：修复前销毁装备直写 equipped_slots[slot]=null 绕过
 ## unequip_item，增量负重缓存永久虚高 → 与地面真值偏离）：
 ## 装备销毁成功后，calculate_total_weight() 必须与 refresh_cached_metrics() 一致。
 static func _test_equipped_destroy_weight_cache_consistency() -> Dictionary:
@@ -237,6 +237,6 @@ static func _test_equipped_destroy_weight_cache_consistency() -> Dictionary:
 		and is_equal_approx(weight_with_sword, 12.0) \
 		and is_equal_approx(weight_after, ground_truth)
 	return {
-		"test": "TC-DISPOSAL-06: 装备销毁后增量负重缓存与地面真值一致（P1 旁路直写回归）",
+		"test": "TC-DISPOSAL-06: 装备销毁后增量负重缓存与地面真值一致（旁路直写回归）",
 		"passed": passed
 	}

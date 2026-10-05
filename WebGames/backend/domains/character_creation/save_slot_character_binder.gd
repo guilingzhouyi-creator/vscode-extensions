@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 完成「后端派生属性 → 构造角色档案 → 绑定目标档位 → 生成开局事件包」 的原子落档。档位状态以 Dictionary 数据契约传入/回写，键集与 `SaveSlotStateDTO.to_dto()` 对齐（slot_id/account_id/bound_world_id/ bound_character_id/is_occupied/is_first_creation/last_played_timestamp_utc）， 规避对 world_gateway 域（在途未 import）的跨文件类引用。 关联细则: 阶段2 §2.3（档位绑定与开局事件触发器）
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name SaveSlotCharacterBinder

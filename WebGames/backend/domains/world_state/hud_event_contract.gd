@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 消除散落魔法字符串，统一向表现层公开事件频道白名单。 频道命名遵循 EventBus 硬约定 "<domain_id>.<event_name>"（event_bus.gd:36）： account.*    -> 账户鉴权域（domains.account auth/channels） world_state.* -> 世界状态域（domains.world_state hud/channels） 契约权威: 演进02 S1 HudEventContract；值统一经 GameConfig 读取（零硬编码）。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name HudEventContract

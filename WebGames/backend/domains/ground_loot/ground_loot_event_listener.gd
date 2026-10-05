@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/ground_loot.json | 信号: EventBus 领域广播
 # 职责说明: 订阅 EventBusCore 泛化领域信道（DOMAIN_EVENT_GENERIC），过滤 monster.killed， 将 payload 中的 drop_declarations 声明转化为 GroundDroppedItemAggregate 实例 并登记为活跃掉落物（由战斗结算方触发，解耦掉落声明与地面拾取域）。
-# 设计依据: 业务域第一性原理 / Phase 03 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name GroundLootEventListener extends RefCounted

@@ -4,7 +4,7 @@
 # 架构定位: Fault-Tolerance Guard / Circuit Breaker
 # 跨域依赖: 上游: 全域后端高危调用点 | 下游: UnifiedLoggerService | 配置: config/infrastructure/robustness.json | 信号: 熔断触发与拦截日志
 # 职责说明: 后端高可用与防御健壮性护栏：提供除零防御钳制、浮点 NaN/INF 消毒清洗、递归深度监控与死循环自动熔断回滚保护。
-# 设计依据: Phase 70 / Phase 82 防御健壮性工程标准
+# 设计依据: 业务领域第一性原理与防御健壮性工程契约
 # ==============================================================================
 
 class_name BackendRobustnessGuard extends RefCounted

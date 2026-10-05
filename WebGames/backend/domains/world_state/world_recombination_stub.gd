@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 为「多次游玩/角色死亡/重开 → 多世界连续性」预留扩展位置： - 配置开关 world_continuity/enabled 关闭时仅返回官方默认世界（限制多独立世界）； - 开启时按「默认模板 + 历史世界可重组状态片段」生成 RECOMBINED_STUB， 不落地完整重组实现（防过度设计）；不污染现有 WorldInstance 模型。
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name WorldRecombinationStub extends RefCounted

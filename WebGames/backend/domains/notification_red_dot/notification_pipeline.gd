@@ -4,7 +4,7 @@
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/notification_red_dot.json | 信号: EventBus 领域广播
 # 职责说明: 派发 Toast / 二次确认弹窗 / 全服跑马灯 / 系统托盘通知 DTO 流
-# 设计依据: 业务域第一性原理 / Phase 04 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name NotificationPipeline

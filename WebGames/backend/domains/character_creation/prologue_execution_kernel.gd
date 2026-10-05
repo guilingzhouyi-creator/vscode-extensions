@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 承接 OpeningEventStreamDTO 编排角色专属序章启动：构建上下文、 提取并缓存初始占位符、发放新手装备、推进四阶段剧情状态跃迁、生成结构化突变事件流 （CharacterCreated / LocationAssigned / EquipmentGranted / DialogueReady / PrologueCompleted） 与首步/后继事件包。事件与状态解耦——仅产出纯结构化结果，不指示前端页面。 无缝衔接 通用因果 DAG 编排引擎会话。 关联细则: 阶段2 §四（序章执行内核与状态解耦）与 协作契约
-# 设计依据: 业务域第一性原理 / Phase 02 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name PrologueExecutionKernel

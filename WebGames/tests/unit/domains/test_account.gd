@@ -18,7 +18,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_character_creation_in_slot())
 	results.append(test_entitlements_round_trip())
 	results.append(test_entitlements_seal_tamper())
-	# Phase 43 N10 新增：会话有界化（TC-P43-S4-06，过期优先清理）
+	# 会话有界化：过期优先清理（TC-ACC-SESSION-01）
 	results.append(test_session_cap_pruning())
 	# R-02（TC-ACC-09）：盐重铸三态
 	results.append(test_salt_rehash_migration())
@@ -122,7 +122,7 @@ static func test_character_creation_in_slot() -> Dictionary:
 	var passed: bool = res.success and quick.success and quick.slot_id == "SLOT_02" and clear.success and not acc.is_slot_occupied("SLOT_01")
 	return {"test": "TC-ACC-06: 创建角色第一步槽位落盘与快建/清理", "passed": passed}
 
-## Phase 43 N10（TC-P43-S4-06）：会话有界化——签发超 session/max_entries 会话后
+## 会话有界化：签发超 session/max_entries 会话后
 ## 容器尺寸 ≤ 上限；过期条目先于有效条目被清理（过期优先裁剪语义）。
 static func test_session_cap_pruning() -> Dictionary:
 	AuthService.clear_sessions()
@@ -152,14 +152,14 @@ static func test_session_cap_pruning() -> Dictionary:
 				and AuthService._sessions.size() <= size_before
 	var passed = cap_ok and expired_ok
 	return {
-		"test": "TC-P43-S4-06: 会话有界化（≤max_entries，过期条目优先清理）",
+		"test": "TC-ACC-08: 会话有界化（≤max_entries，过期条目优先清理）",
 		"passed": passed,
 		"max_entries": max_entries,
 		"size": AuthService._sessions.size()
 	}
 
 
-## Phase 85 R-02（TC-P85-S4-03）：盐重铸三态——空盐档登录重铸/重铸后新盐校验/错口令拒绝。
+## 盐重铸三态：空盐档登录重铸/重铸后新盐校验/错口令拒绝
 static func test_salt_rehash_migration() -> Dictionary:
 	var acc := AccountProfileAggregate.new()
 	acc.account_id = "ACC_REHASH"
@@ -170,14 +170,14 @@ static func test_salt_rehash_migration() -> Dictionary:
 	var rehashed_ok: bool = r1.get("success", false) 		and r1.get("rehashed", false) == true 		and acc.salt_version == 1 		and acc.password_hash_sha256 == AuthService.hash_password("RehashPass123")
 	var r2 := AuthService.authenticate_local("RehashUser", "RehashPass123", acc)
 	var new_salt_ok: bool = r2.get("success", false) and r2.get("rehashed", true) == false
-	var bad_new: bool = not AuthService.authenticate_local("RehashUser", "WrongPass", acc).get("success", true)
+	var wrong_pass_rejected: bool = not AuthService.authenticate_local("RehashUser", "WrongPass", acc).get("success", true)
 	var legacy_acc := AccountProfileAggregate.new()
 	legacy_acc.account_id = "ACC_REHASH_B"
 	legacy_acc.username = "RehashUserB"
 	legacy_acc.salt_version = 0
 	legacy_acc.password_hash_sha256 = "RightPass".sha256_text()
 	var bad_legacy: bool = not AuthService.authenticate_local("RehashUserB", "WrongPass", legacy_acc).get("success", true)
-	var passed: bool = rehashed_ok and new_salt_ok and bad_new and bad_legacy
+	var passed: bool = rehashed_ok and new_salt_ok and wrong_pass_rejected and bad_legacy
 	return {
 		"test": "TC-ACC-09: 盐重铸三态（空盐档重铸/新盐校验/错口令拒绝）",
 		"passed": passed,

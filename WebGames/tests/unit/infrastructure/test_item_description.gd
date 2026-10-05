@@ -1,7 +1,7 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 物品描述系统单元测试（Phase 21）
+# 卡拉尔世界引擎 (Kalar World Engine) - 物品描述系统单元测试
 # 文件路径: res://tests/unit/infrastructure/test_item_description.gd
-# 覆盖: Phase 21 施工细则 阶段1~4（TC-ITEMDESC-01~06）
+# 覆盖: 阶段1~4 验收矩阵（TC-ITEMDESC-01~06）
 #       —— 已注册物品生成 / 不绕过注册系统 / 状态条件组合 / 不反向定义属性 /
 #          配置为源零内联 / 只读协作
 # ==============================================================================
@@ -12,7 +12,7 @@ const SWORD_ID: String = "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Phase 21: 物品描述系统（物品侧三位一体）"
+	var domain_name = "物品描述系统（物品侧三位一体）"
 
 	results.append(_test_registered_item_resolve())
 	results.append(_test_unregistered_intercept())

@@ -4,7 +4,7 @@
 # 架构定位: Domain Registry / Specification Catalog
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 八大物理动词侵彻常数、四大魔法形态枚举与动作卡牌实体。 动词常数与卡牌默认值由 config/domains/combat.json 驱动，代码零硬编码。
-# 设计依据: 业务域第一性原理 / Phase 01 施工细则规范
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name PhysicalVerbRegistry extends RefCounted
