@@ -15,6 +15,7 @@
 | **`workspace-timing/` 研发** | 五层解耦；RingBuffer+Journal 崩溃安全；UI 100% 双语字典 | [workspace-timing/README.md](workspace-timing/README.md) | [workspace-timing-dev](.agents/skills/workspace-timing-dev/SKILL.md) | `cd workspace-timing && npm run test:fast` |
 | **`auto-refactor/` 研发** | 243 规则自测全通过；Rust 与 TS 100% 等价；QED/CAI 质量模型 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `cd auto-refactor && npm test` |
 | **`WebGames/` 研发** | 全域配置驱动；循环内零堆分配 (`ADV-PRF-002`)；先四阶段方案后编码 | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[WebGames/config/README.md](WebGames/config/README.md) | [webgames-workflow](.agents/skills/webgames-workflow/SKILL.md) | `cd WebGames && pwsh scripts/ps1/audit-all.ps1` |
+| **度量评估与统计建模** | 零注水纯客观统计；主流统计学 Jeffreys Beta 后验模型 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `node auto-refactor/scripts/validate-autonomy-scorer.js` |
 | **扩展打包发布与热同步** | 产物自动轮转；`-HotSync` 注册表自愈；SemVer 干净树；资产健全 | [scripts/README.md](scripts/README.md) | [release-package-workflow](.agents/skills/release-package-workflow/SKILL.md) | `pwsh -File scripts/ps1/package.ps1 -HotSync` |
 | **单源规则目录与元治理** | 380+ 规则 SSOT；规则 ID 零虚构 (`RCFG-RULE-DRIFT`)；三项目对齐 | [rule-catalog.json](scripts/common/rule-catalog.json) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js` |
 | **全工作区统一质量审查** | 5 大支柱 100% 绿色通行；零规则漂移 (`RCFG-RULE-DRIFT`) | [scripts/README.md](scripts/README.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/audit-all.ps1` |
@@ -32,10 +33,14 @@
 
 ### 2. 代码复杂度与体积双轨预算
 - **AST 切片预算（`GATE-AST-001`）**：暂存区生产代码与工具脚本受 AST 局部切片守卫约束：单函数圈复杂度基准 $\text{CC} \le 15$（无循环且 $\text{Depth} \le 2$ 的平铺分发器/状态映射器与探针模块享 $\text{CC} \le 20 \sim 25$ 弹性包络）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；循环体与调度逻辑须平铺控制流并采用卫语句提前返回；
-- **单文件双轨体积与 1:3 动态包络**：全仓源码文件（`.ts`, `.js`, `.gd`, `.py` 等）以**有效代码行（$\text{ELOC} \le 900$）**为第一刚性复杂度红线，以**物理行（$\text{LOC} \le 1400$）**为防膨胀兜底线；在 [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) 中执行 1:3 密度比动态反推包络约束与高负荷契约注释密度约束；
+- **单文件双轨体积与 1:3 动态包络**：全仓源码文件（`.ts`, `.js`, `.gd`, `.py` 等）以**有效代码行（$\text{ELOC} \le 900$）**为第一刚性复杂度红线，以**物理行（$\text{LOC} \le 1400$）**为防膨胀兜底线；在 [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) 中执行 1:3 密度比动态反推包络约束与高负荷契约注释密度约束；处于合法包络内的高内聚模块禁止进行破坏内聚性的机械物理碎片化，重构优化必须以**消除循环内瞬态堆分配（`CPX-SPACE-001`）**与平铺控制流为第一优先级；
 - **门面实质承载与跳板消融（`ARCH-FAC-001` / `ARCH-ABS-001`）**：门面（Facade）或对外导出入口必须满足 $\text{ELOC} \ge 15$ 校验逻辑、聚合 $\ge 3$ 个子领域或包含 `Object.freeze`/`deepFreeze` 不可变保障；严禁保留或创建有效代码 $\le 3$ 行且仅向单一目标透传导出的空包跳板文件（详见 [facade-discipline](.agents/skills/facade-discipline/SKILL.md)）。
 
-### 3. Git 提交规范与技术事实纪律
+### 3. 指标度量求真与严谨数学公理
+- **客观统计零注水**：所有代码质量度量、自研率（CAI）与符号分析必须从 0 纯客观统计，严禁任何形式的倍数放大、基数注水或保底伪造；外部依赖调用必须基于 AST 真实符号索引（`symbolIndex`）精确追踪；
+- **主流统计数学模型**：度量系统的置信度与区间估计严禁主观写死常数误差，必须采用主流经典统计学模型（如无信息 Jeffreys 先验 $\text{Beta}(0.5, 0.5)$ 共轭后验均值与方差置信区间）。
+
+### 4. Git 提交规范与技术事实纪律
 - **提交格式**：`<type>(<scope>): <祈使句中文摘要标题>`（长度 5~80 字符，结尾不加句号；`<type>` 限于 feat/fix/refactor/docs/test/chore/style/perf）；
 - **结构化区块**：关键生产提交（feat/fix/refactor）正文首区块必须包含 `[Project: workspace-timing | auto-refactor | WebGames | governance]`（`CMG-PRJ-001`）；正文必须包含 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`（如有修复缺陷）、`[Verification]` 标签，非轻量提交正文有效字符 $\ge 30$；
 - **技术事实与零黑话**：
@@ -45,7 +50,7 @@
   ④ 提及的规则 ID 必须在 [rule-catalog.json](scripts/common/rule-catalog.json) 中真实登记，严禁虚构（`RCFG-RULE-DRIFT`）；
   ⑤ 跨架构层次改动必须依拓扑分批原子提交并执行离线预审（详见 [batch-commit](.agents/skills/batch-commit/SKILL.md)）。
 
-### 4. 执行环境与子进程契约
+### 5. 执行环境与子进程契约
 - **工作目录显式隔离**：父级脚本跨目录调用子项目时，必须显式传递 `-WorkingDirectory (Join-Path $repoRoot "<subproject>")`（PowerShell）或 `(cd "<subproject>" && ...)`（Bash），杜绝工具配置文件解析与相对路径发生跨目录漂移；
 - **平台与非阻塞守卫**：全局与项目级脚本必须带非交互守卫；Git 钩子优先路由至跨平台 `pwsh`（PowerShell 7+），严禁回退至 PS 5.1；Bash 脚本必须声明 `set -euo pipefail` 且预期允许失败指令必须通过 `STATUS=0; cmd || STATUS=$?` 平铺捕获（详见 [gate-governance](.agents/skills/gate-governance/SKILL.md)）。
 
@@ -71,7 +76,8 @@
 6. **防线与验证红线**：严禁使用 `--no-verify` 或跳过本地门禁提交或推送代码；向远端推送后必须确保 CI 流水线完全通过；严禁对未跟踪文件执行 `git rm`；
 7. **原子提交与归属红线**：关键生产级提交（feat/fix/refactor）必须显式声明 `[Project]` 并限定于四大受控项目（`CMG-PRJ-001`）；提交前必须先通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审；
 8. **跳板消融红线**：严禁创建或保留有效代码 $\le 3$ 行且仅向单一目标透传的空包跳板文件；门面层违反实质承载预算强制触发 `ARCH-FAC-001` 阻断；
-9. **客观求实红线**：提交信息严禁夹带敷衍（`CMG-STY-001`）、夸大（`CMG-STY-002`）、贬损（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；`[Verification]` 严禁程序化流水账（`CMG-STY-005`）与执行数字统计流水账（`CMG-STY-006`）。
+9. **客观求实红线**：提交信息严禁夹带敷衍（`CMG-STY-001`）、夸大（`CMG-STY-002`）、贬损（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；`[Verification]` 严禁程序化流水账（`CMG-STY-005`）与执行数字统计流水账（`CMG-STY-006`）；
+10. **度量求真红线**：严禁在评分算法与自研度量中注入虚假倍率或固定加分；严禁使用伪造的统计误差区间。
 
 ---
 
