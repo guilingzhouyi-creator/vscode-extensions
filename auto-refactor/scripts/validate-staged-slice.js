@@ -332,7 +332,8 @@ function analyzeFunction(node, sourceFile, cfg) {
       severity: 'error',
       message: `Function '${funcName}' cyclomatic complexity budget exceeded (CC = ${complexity} > ${effectiveMaxCC}, ${tag})`,
       line: lineNum,
-      suggestedFix: 'Decompose branching logic into lookup strategy tables or extract pure helper functions',
+      suggestedFix:
+        'Decompose branching logic into lookup strategy tables or extract pure helper functions',
     });
   }
 

@@ -62,10 +62,7 @@ async function main() {
   );
   const registeredRuleSet = new Set(RULE_REGISTRY.map((r) => r.id));
   for (const baseId of snapshot.registeredRuleIds) {
-    assert.ok(
-      registeredRuleSet.has(baseId),
-      `Baseline rule ${baseId} must remain registered`,
-    );
+    assert.ok(registeredRuleSet.has(baseId), `Baseline rule ${baseId} must remain registered`);
   }
   assert.strictEqual(snapshot.rulesDigest.length, 64, 'Rules digest must be 64-char hex SHA-256');
   assert.strictEqual(snapshot.configDigest.length, 64, 'Config digest must be 64-char hex SHA-256');
@@ -119,7 +116,9 @@ async function main() {
   assert.strictEqual(reloaded.baselineMetrics.compositeScore, realScore);
   assert.strictEqual(reloaded.baselineMetrics.testSuiteLatencySec, 11.09);
   assert.strictEqual(reloaded.baselineMetrics.incrementalBuildLatencySec, 1.36);
-  console.log(`✔ Baseline successfully frozen and verified at: ${targetReportPath} (score: ${realScore})`);
+  console.log(
+    `✔ Baseline successfully frozen and verified at: ${targetReportPath} (score: ${realScore})`,
+  );
 
   // 6. Test tampered snapshot detection
   const tampered = {

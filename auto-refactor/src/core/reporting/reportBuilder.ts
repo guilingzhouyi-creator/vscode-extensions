@@ -324,7 +324,7 @@ export function buildScanReport(
         100.0,
         resolveGovernanceProfile(cfg),
     );
-    const autonomy = evaluateProjectAutonomy(fileMetrics, issues, cfg);
+    const autonomy = evaluateProjectAutonomy(fileMetrics, issues, cfg, undefined, host.symbolIndex);
 
     host.reviewMemory.flush();
     return {

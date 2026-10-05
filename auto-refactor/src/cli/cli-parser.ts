@@ -360,18 +360,37 @@ function handleProfileArgument(
     return { handled: false, consumedNext: false };
 }
 
+/** Known CLI subcommands that should not be treated as target scan paths. */
+const KNOWN_CLI_SUBCOMMANDS = new Set([
+    'scan',
+    'daemon',
+    'self-test',
+    'symbols',
+    'guide',
+    'trajectory',
+    'memory',
+    'stats',
+]);
+
 /**
- * Minimal argv parser: supports `--key value`, `--key=value`, and repeated `--include`.
+ * Minimal argv parser: supports `--key value`, `--key=value`, repeated `--include`,
+ * and positional scan target directory path.
  *
  * @param argv - Command line argument tokens.
  * @returns Fully populated CLI options object.
  */
 export function parseArgs(argv: string[]): CliOptions {
     const opt: CliOptions = { cache: true, daemon: MODE_AUTO };
+    const positionalPaths: string[] = [];
 
     for (let i = 0; i < argv.length; i++) {
         let arg = argv[i];
-        if (!arg.startsWith('--')) continue;
+        if (!arg.startsWith('--')) {
+            if (!KNOWN_CLI_SUBCOMMANDS.has(arg) && !arg.startsWith('-')) {
+                positionalPaths.push(arg);
+            }
+            continue;
+        }
         arg = arg.slice(2);
 
         let value = '';
@@ -413,6 +432,11 @@ export function parseArgs(argv: string[]): CliOptions {
 
         applyValueFlag(opt, arg, takeValue());
     }
+
+    if (!opt.root && positionalPaths.length > 0) {
+        opt.root = positionalPaths[0];
+    }
+
     return opt;
 }
 

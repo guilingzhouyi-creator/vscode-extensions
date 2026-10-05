@@ -316,6 +316,36 @@ export function isDataOrConfigFile(role: string, filePath: string): boolean {
 }
 
 /**
+ * Checks if a file represents a test suite, fixture, or mock.
+ *
+ * @param role - Inferred file role identifier.
+ * @param filePath - Normalized path of the target file.
+ * @returns True if the file matches test suite or fixture characteristics.
+ */
+export function isTestFile(role: string, filePath: string): boolean {
+    return (
+        role === 'test_suite' ||
+        /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i.test(filePath) ||
+        /\.(?:test|spec)\.[a-z0-9]+$/i.test(filePath)
+    );
+}
+
+/**
+ * Checks if a file represents an internationalization dictionary or locale file.
+ *
+ * @param role - Inferred file role identifier.
+ * @param filePath - Normalized path of the target file.
+ * @returns True if the file matches internationalization patterns.
+ */
+export function isI18nFile(role: string, filePath: string): boolean {
+    return (
+        (role === 'config_constant' && /[\\/](?:i18n|locales|lang)[\\/]/i.test(filePath)) ||
+        /[\\/](?:i18n|locales|lang)[\\/]/i.test(filePath) ||
+        /(?:zh-CN|en-US|zh|en)\.[a-z0-9]+$/i.test(filePath)
+    );
+}
+
+/**
  * Checks if a numeric literal is a duplicate candidate.
  *
  * @param value - Numeric literal value.

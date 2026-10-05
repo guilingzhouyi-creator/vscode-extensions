@@ -70,7 +70,7 @@ async function handleSymbolsCommand(args: string[]): Promise<void> {
         }
         process.stdout.write(
             `  coverage defs=${result.stats.definitions} refs=${result.stats.references} ` +
-            `crossFile=${result.stats.crossFileReferences} (${result.stats.builtFrom})\n`,
+                `crossFile=${result.stats.crossFileReferences} (${result.stats.builtFrom})\n`,
         );
         process.exit(0);
     } catch (error: unknown) {
@@ -202,10 +202,7 @@ function printFileTrajectory(targetFile: string): void {
 async function handleTrajectoryCommand(args: string[]): Promise<void> {
     const rawTarget = args[args.indexOf('trajectory') + 1];
     const isSummary =
-        !rawTarget ||
-        rawTarget === '--summary' ||
-        rawTarget === '-s' ||
-        rawTarget.startsWith('--');
+        !rawTarget || rawTarget === '--summary' || rawTarget === '-s' || rawTarget.startsWith('--');
     if (isSummary) {
         const rootIdx = args.indexOf('--root');
         const customRoot = rootIdx !== -1 && args[rootIdx + 1] ? args[rootIdx + 1] : undefined;

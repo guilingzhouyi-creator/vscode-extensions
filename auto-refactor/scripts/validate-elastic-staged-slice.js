@@ -13,13 +13,7 @@
  */
 'use strict';
 
-const {
-  analyzeSourceText,
-  calculateComplexity,
-  checkNesting,
-  resolveConfig,
-  DEFAULT_CONFIG,
-} = require('./validate-staged-slice');
+const { analyzeSourceText } = require('./validate-staged-slice');
 
 let totalTests = 0;
 let passedTests = 0;

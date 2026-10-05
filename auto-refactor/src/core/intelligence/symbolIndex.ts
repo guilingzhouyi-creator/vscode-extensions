@@ -245,6 +245,24 @@ export class SymbolIndex {
     }
 
     /**
+     * Whether the index holds a declaration for the given symbol name.
+     */
+    hasDefinition(name: string): boolean {
+        return this.definitions.has(name);
+    }
+
+    /**
+     * Returns all indexed call references across all scanned files.
+     */
+    getAllReferences(): SymbolReference[] {
+        const result: SymbolReference[] = [];
+        for (const list of this.references.values()) {
+            result.push(...list);
+        }
+        return result;
+    }
+
+    /**
      * List the call sites of a name that sit in a file other than a given declaration's file.
      *
      * This is the cross-file impact question every reviewer asks ("who else calls this?"); a call

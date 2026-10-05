@@ -39,10 +39,7 @@ const INTEGRATION_HARNESSES = new Set([
   'validate-compact-ledger.js',
 ]);
 
-const INTEGRATION_DOCS = new Set([
-  '05-consumer-integration.md',
-  'README.md',
-]);
+const INTEGRATION_DOCS = new Set(['05-consumer-integration.md', 'README.md']);
 
 const SELF = 'validate-project-neutrality.js';
 

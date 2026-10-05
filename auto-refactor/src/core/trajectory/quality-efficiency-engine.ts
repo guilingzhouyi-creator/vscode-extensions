@@ -126,6 +126,7 @@ function computeDimensionDeltas(
  * @param params.beforeVector - 10-dimensional score vector before run.
  * @param params.counters - Four-tier orthogonal ELOC counters.
  * @param params.debtDelta - Technical debt additions and resolutions.
+ * @param params.sliceDeltaQ - Optional micro-slice quality delta override.
  * @returns Fully computed TrajectoryQualityMetrics record.
  */
 export function computeTrajectoryQualityMetrics(params: {

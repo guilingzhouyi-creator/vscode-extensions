@@ -260,6 +260,7 @@ export class DocsAnalyzer implements Analyzer {
      *
      * @param lines - Markdown lines.
      * @param file - Normalized file path.
+     * @param options - Documentation configuration options.
      * @param emit - Issue factory.
      */
     private checkTerminologyProse(

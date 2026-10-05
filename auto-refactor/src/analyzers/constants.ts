@@ -31,7 +31,6 @@ import { checkConstantLayoutAndScope } from '../core/governance/constant-layout-
 import { extractConstantEntities } from '../core/diff/constant-relocation-detector';
 import { inspectConstantLibraryTopology } from '../core/architecture/constant-library-auditor';
 import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
-import { isToolOrTestScript } from '../core/governance/pathScope';
 import { formatConstantDeclarationSuggestion } from '../core/intelligence/constant-identity';
 
 import {
@@ -57,6 +56,8 @@ import {
     resolveLiteralIssueData,
     resolveDuplicateThreshold,
     isDataOrConfigFile,
+    isTestFile,
+    isI18nFile,
     groupDuplicates,
     buildDuplicateIssue,
 } from './constants-literal-helper';
@@ -174,6 +175,15 @@ export class ConstantsAnalyzer implements Analyzer {
         out: Issue[],
     ): void {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
+        const isTest =
+            roleInference.role === 'test_suite' ||
+            /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i.test(ctx.filePath) ||
+            /\.(?:test|spec)\.[a-z0-9]+$/i.test(ctx.filePath);
+        const isStyle =
+            ctx.filePath.includes('-styles.') ||
+            /\.(?:css|scss|less|sass)\b/i.test(ctx.filePath);
+        if (isTest || isStyle) return;
+
         const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
         const min = ctx.options.magicNumberMin;
         const classify = !!ctx.options.classifyLiterals;
@@ -260,7 +270,10 @@ export class ConstantsAnalyzer implements Analyzer {
         out: Issue[],
     ): void {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
-        const isTest = roleInference.role === 'test_suite' || isToolOrTestScript(ctx.filePath);
+        const isTest = isTestFile(roleInference.role, ctx.filePath);
+        const isI18n = isI18nFile(roleInference.role, ctx.filePath);
+        if (isTest || isI18n) return;
+
         const isDataOrConfig =
             roleInference.role === 'config_constant' ||
             roleInference.role === 'rules_registry' ||
@@ -295,6 +308,24 @@ export class ConstantsAnalyzer implements Analyzer {
         }
     }
 
+    private isDiagnosticOrLogMessage(lit: LiteralRecord): boolean {
+        const text = lit.value;
+        const inner = stripQuotes(text);
+        if (inner.startsWith('[') && inner.includes(']')) return true;
+        if (/^(?:error|failed|warning|info|debug|trace|fatal|assert):/i.test(inner)) return true;
+        const parentText = lit.parent?.text?.toLowerCase();
+        if (
+            parentText &&
+            (parentText.includes('log(') ||
+                parentText.includes('console.') ||
+                parentText.includes('new error') ||
+                parentText.includes('reject('))
+        ) {
+            return true;
+        }
+        return false;
+    }
+
     private isHardcodedContextAllowed(
         lower: string,
         isTest: boolean,
@@ -317,6 +348,7 @@ export class ConstantsAnalyzer implements Analyzer {
         isAlgorithm = false,
     ): boolean {
         if (lit.numeric || lit.isConstBound || lit.tolerated || suppress.has(lit.node)) return true;
+        if (this.isDiagnosticOrLogMessage(lit)) return true;
         const text = lit.value;
         const inner = stripQuotes(text);
         if (inner.length < minLen || inner.trim().length === 0) return true;
@@ -384,7 +416,10 @@ export class ConstantsAnalyzer implements Analyzer {
         out: Issue[],
     ): void {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
-        const isTest = roleInference.role === 'test_suite' || isToolOrTestScript(ctx.filePath);
+        const isTest = isTestFile(roleInference.role, ctx.filePath);
+        const isI18n = isI18nFile(roleInference.role, ctx.filePath);
+        if (isTest || isI18n) return;
+
         const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
         const isAlgorithm =
             roleInference.role === 'algorithm_computation' ||

@@ -27,6 +27,56 @@ import {
     type SupplyChainProfile,
 } from '../intelligence/dependency-provenance';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
+import type { SymbolIndex } from '../intelligence/symbolIndex';
+
+/**
+ * Computes rigorous Bayesian Credible Interval for autonomy index using
+ * Beta conjugate prior (Jeffreys prior Beta(0.5, 0.5)) and normal posterior approximation.
+ */
+function computeBayesianAutonomyConfidence(
+    compositeScore: number,
+    effectiveLoc: number,
+    totalFiles: number,
+    totalScopedCalls: number,
+): AutonomyConfidence {
+    const locSufficiency = 1.0 - Math.exp(-effectiveLoc / 4000);
+    const fileSufficiency = 1.0 - Math.exp(-totalFiles / 8);
+    const sampleSufficiency = +(locSufficiency * fileSufficiency).toFixed(3);
+    const isLowConfidence = sampleSufficiency < 0.45;
+
+    // Beta conjugate Jeffreys prior: Alpha_0 = 0.5, Beta_0 = 0.5
+    const alpha0 = 0.5;
+    const beta0 = 0.5;
+
+    const effectiveSampleSize = Math.max(2, Math.round(effectiveLoc / 100 + totalScopedCalls));
+    const pObserved = Math.max(0.0, Math.min(1.0, compositeScore / 100));
+
+    const kSuccess = pObserved * effectiveSampleSize;
+    const alpha = kSuccess + alpha0;
+    const beta = effectiveSampleSize - kSuccess + beta0;
+    const posteriorTotal = alpha + beta;
+
+    const posteriorMean = alpha / posteriorTotal;
+    const credibleScore = +(posteriorMean * 100).toFixed(2);
+
+    const posteriorVariance =
+        (alpha * beta) / (posteriorTotal * posteriorTotal * (posteriorTotal + 1));
+    const standardError = Math.sqrt(posteriorVariance);
+
+    const z95 = 1.95996;
+    const margin = +(z95 * standardError * 100).toFixed(2);
+
+    const lowerBound = +Math.max(0.0, credibleScore - margin).toFixed(2);
+    const upperBound = +Math.min(100.0, credibleScore + margin).toFixed(2);
+
+    return {
+        sampleSufficiency,
+        lowerBound,
+        upperBound,
+        credibleScore,
+        isLowConfidence,
+    };
+}
 
 /** Qualitative autonomy grade tiers */
 export type AutonomyGrade =
@@ -303,8 +353,8 @@ function recordSingleSpecifier(
 ): void {
     const kind = classifyImportProvenance(spec, currentFile, manifestDeps);
     if (kind === 'internal') {
-        state.internalSymbolCalls += 2;
-        if (isCritical) state.criticalPathInternalCalls += 2;
+        state.internalSymbolCalls++;
+        if (isCritical) state.criticalPathInternalCalls++;
         return;
     }
     if (kind === 'stdlib') {
@@ -405,14 +455,6 @@ function synthesizeAutonomyEvaluation(
     issues: Issue[],
     supplyChain: SupplyChainProfile,
 ): AutonomyEvaluation {
-    if (
-        state.internalSymbolCalls === 0 &&
-        state.proprietaryFiles > 0 &&
-        state.externalSdkCalls === 0
-    ) {
-        state.internalSymbolCalls = state.proprietaryFiles * 5;
-    }
-
     const totalTreeEloc =
         state.proprietaryEffectiveLoc + state.vendorEffectiveLoc + state.generatedEffectiveLoc;
     const rLoc = totalTreeEloc > 0 ? (state.proprietaryEffectiveLoc / totalTreeEloc) * 100 : 100;
@@ -429,7 +471,7 @@ function synthesizeAutonomyEvaluation(
         (i) => i.rule === 'HYG-CLN-001' || i.rule === 'duplicate-literal',
     );
     const clonePenalty = Math.min(30, cloneIssues.length * 1.5);
-    const rPure = Math.max(70, 100 - clonePenalty);
+    const rPure = Math.max(0, 100 - clonePenalty);
 
     const rSupply = calculateSupplyChainResilience(supplyChain);
 
@@ -456,27 +498,13 @@ function synthesizeAutonomyEvaluation(
     const boundedComposite = Math.max(0, Math.min(100, compositeScore));
     const { grade, description } = resolveAutonomyGrade(boundedComposite);
 
-    // Bayesian Credible Interval and Sample Sufficiency
-    const sampleSufficiency = +(
-        Math.min(1.0, state.proprietaryEffectiveLoc / 1000) * Math.min(1.0, totalFiles / 5)
-    ).toFixed(3);
-    const isLowConfidence = sampleSufficiency < 0.5;
-    const priorBaseline = 65.0;
-    const credibleScore = +(
-        sampleSufficiency * boundedComposite +
-        (1 - sampleSufficiency) * priorBaseline
-    ).toFixed(2);
-    const margin = +(2.5 + (1 - sampleSufficiency) * 18.0).toFixed(2);
-    const lowerBound = +Math.max(0.0, credibleScore - margin).toFixed(2);
-    const upperBound = +Math.min(100.0, credibleScore + margin).toFixed(2);
-
-    const confidence: AutonomyConfidence = {
-        sampleSufficiency,
-        lowerBound,
-        upperBound,
-        credibleScore,
-        isLowConfidence,
-    };
+    // Rigorous Bayesian Credible Interval via Jeffreys conjugate prior
+    const confidence = computeBayesianAutonomyConfidence(
+        boundedComposite,
+        state.proprietaryEffectiveLoc,
+        totalFiles,
+        totalScopedCalls,
+    );
 
     const externalSdkInventory: ExternalSdkUsage[] = Array.from(state.sdkCallCounts.entries())
         .map(([name, callCount]) => ({
@@ -528,6 +556,141 @@ function synthesizeAutonomyEvaluation(
     };
 }
 
+const COMMON_STDLIB_SYMBOLS = new Set([
+    'push',
+    'pop',
+    'shift',
+    'unshift',
+    'slice',
+    'splice',
+    'join',
+    'map',
+    'filter',
+    'reduce',
+    'find',
+    'includes',
+    'forEach',
+    'indexOf',
+    'lastIndexOf',
+    'some',
+    'every',
+    'concat',
+    'reverse',
+    'sort',
+    'keys',
+    'values',
+    'entries',
+    'assign',
+    'freeze',
+    'seal',
+    'create',
+    'defineProperty',
+    'hasOwnProperty',
+    'toString',
+    'valueOf',
+    'trim',
+    'split',
+    'replace',
+    'replaceAll',
+    'toLowerCase',
+    'toUpperCase',
+    'startsWith',
+    'endsWith',
+    'substring',
+    'charAt',
+    'charCodeAt',
+    'match',
+    'test',
+    'exec',
+    'now',
+    'parse',
+    'stringify',
+    'log',
+    'info',
+    'warn',
+    'error',
+    'debug',
+    'trace',
+    'floor',
+    'ceil',
+    'round',
+    'abs',
+    'min',
+    'max',
+    'sqrt',
+    'pow',
+    'random',
+    'setTimeout',
+    'clearTimeout',
+    'setInterval',
+    'clearInterval',
+    'resolve',
+    'reject',
+    'then',
+    'catch',
+    'finally',
+    'all',
+    'race',
+    'has',
+    'get',
+    'set',
+    'add',
+    'delete',
+    'clear',
+    'size',
+    'length',
+    'bind',
+    'call',
+    'apply',
+    'close',
+    'open',
+    'read',
+    'write',
+]);
+
+/**
+ * Overwrites call metrics with true AST call references from the indexed symbol graph.
+ *
+ * @param symbolIndex - Materialized project symbol index.
+ * @param state - Autonomy evaluation state to update.
+ * @param fileToExtPackages - Mapping of file paths to external packages.
+ */
+function applySymbolIndexReferences(
+    symbolIndex: SymbolIndex,
+    state: AutonomyScanState,
+    fileToExtPackages: Map<string, string[]>,
+): void {
+    const refs = symbolIndex.getAllReferences();
+    if (refs.length === 0) return;
+
+    state.internalSymbolCalls = 0;
+    state.externalSdkCalls = 0;
+    state.stdlibCalls = 0;
+    state.criticalPathInternalCalls = 0;
+    state.criticalPathExternalCalls = 0;
+    state.sdkCallCounts.clear();
+    state.sdkFileSets.clear();
+
+    for (const ref of refs) {
+        const isCritical = CRITICAL_PATH_PATTERN.test(ref.file);
+        if (symbolIndex.hasDefinition(ref.name)) {
+            state.internalSymbolCalls++;
+            if (isCritical) state.criticalPathInternalCalls++;
+            continue;
+        }
+        if (COMMON_STDLIB_SYMBOLS.has(ref.name)) {
+            state.stdlibCalls++;
+            continue;
+        }
+        const extPkgs = fileToExtPackages.get(ref.file);
+        if (extPkgs && extPkgs.length > 0) {
+            recordSdkCall(state, extPkgs[0], ref.file, isCritical);
+        } else {
+            state.stdlibCalls++;
+        }
+    }
+}
+
 /**
  * Evaluates in-house code autonomy ratio (CAI 2.0) across six orthogonal dimensions.
  *
@@ -535,6 +698,7 @@ function synthesizeAutonomyEvaluation(
  * @param issues - Detected issue collection (used for clone and duplication penalty)
  * @param config - Scan configuration holding project root and options
  * @param fileContents - Optional map of file path to raw content for import extraction
+ * @param symbolIndex - Optional indexed project symbol graph for call reference analysis
  * @returns AutonomyEvaluation
  */
 export function evaluateProjectAutonomy(
@@ -542,6 +706,7 @@ export function evaluateProjectAutonomy(
     issues: Issue[],
     config: ScanConfig,
     fileContents?: Map<string, string>,
+    symbolIndex?: SymbolIndex,
 ): AutonomyEvaluation {
     const rootDir = config.root || process.cwd();
     const manifestDeps = loadProjectManifestDependencies(rootDir);
@@ -565,8 +730,26 @@ export function evaluateProjectAutonomy(
         sdkFileSets: new Map<string, Set<string>>(),
     };
 
+    const fileToExtPackages = new Map<string, string[]>();
     for (const metric of fileMetrics) {
+        const raw = loadFileRawContent(metric, config, fileContents);
+        const specs = raw ? extractImportSpecifiersFromContent(raw) : [];
+        const extPkgs: string[] = [];
+        for (const spec of specs) {
+            const kind = classifyImportProvenance(spec, metric.file, manifestDeps);
+            if (kind === 'external_sdk') {
+                const pkg = spec.startsWith('@')
+                    ? spec.split('/').slice(0, 2).join('/')
+                    : spec.split('/')[0].split('.')[0].toLowerCase();
+                extPkgs.push(pkg);
+            }
+        }
+        fileToExtPackages.set(metric.file, extPkgs);
         accumulateFileMetric(metric, config, manifestDeps, state, fileContents);
+    }
+
+    if (symbolIndex) {
+        applySymbolIndexReferences(symbolIndex, state, fileToExtPackages);
     }
 
     return synthesizeAutonomyEvaluation(state, fileMetrics.length, issues, supplyChain);
