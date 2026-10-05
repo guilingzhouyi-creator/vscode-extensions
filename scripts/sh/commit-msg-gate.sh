@@ -259,14 +259,9 @@ if echo "$BODY_TEXT" | grep -iE "\b(phase[0-9]+|st[0-9]+|p[0-9]+)\b" >/dev/null 
     exit 1
 fi
 
-# --- Rule 7: 规则 ID 单源目录防虚构校验 ---
-if ! "$NODE_BIN" scripts/common/validate-commit-msg-rules.js "$MSG_FILE"; then
-    print_template_guide
-    exit 1
-fi
-
-# --- Rule 8: 提交文本求真务实与禁词审查 (CMG-STY-TMP/HYP/NEG/MET) ---
-if ! "$NODE_BIN" scripts/common/validate-commit-msg-style.js "$MSG_FILE"; then
+# --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 (单次加载 SSOT & 禁词表) ---
+# 挂载 scripts/common/validate-commit-msg.js (融合 validate-commit-msg-rules.js 与 validate-commit-msg-style.js / commit-msg-forbidden-terms.json)
+if ! "$NODE_BIN" scripts/common/validate-commit-msg.js "$MSG_FILE"; then
     print_template_guide
     exit 1
 fi

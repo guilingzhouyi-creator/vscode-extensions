@@ -4,7 +4,7 @@
 # 文件路径: scripts/sh/audit-all.sh
 # 架构定位: 全工作区跨项目统一审查 Runner (Linux Bash)
 # 依赖与触发: 触发方: 本地 CLI / CI 门禁 | 上游: 三项目专属门禁套件 | 下游: 统一质量看板 | 运行时: Bash 4+
-# 职责说明: 调度执行全工作区跨项目质量审查，聚合 workspace-timing、auto-refactor 与 WebGames 门禁结论
+# 职责说明: 调度执行全工作区跨项目质量审查，多项目并行调度 workspace-timing、auto-refactor 与 WebGames
 # 退出语义与设计依据: 退出码: 0=全项审查通过, 1=存在审查违规 | 设计依据: AGENTS.md 工作区全局治理总规
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -17,7 +17,13 @@ set -euo pipefail
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT_DIR" || exit 1
 
+export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-NUL}"
+export GIT_CONFIG_SYSTEM="${GIT_CONFIG_SYSTEM:-NUL}"
+export GIT_CONFIG_NOSYSTEM="${GIT_CONFIG_NOSYSTEM:-1}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ROOT_DIR}"
+
 NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
+NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
 PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
 
 FAST_MODE=0
@@ -65,41 +71,46 @@ else
     STATUS_RULES="PASS"
 fi
 
-# 3. auto-refactor 静态重构与审查引擎自检
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [3/5] 执行 auto-refactor 质量基线与多维自审..."; fi
-if [[ "$FAST_MODE" -eq 1 ]]; then
-    if ! (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1); then
-        STATUS_AR="FAIL"
-        FAILED=1
-    else
-        STATUS_AR="PASS"
-    fi
-else
-    if ! (cd auto-refactor && npm test >/dev/null 2>&1) || ! (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1); then
-        STATUS_AR="FAIL"
-        FAILED=1
-    else
-        STATUS_AR="PASS"
-    fi
+# 3, 4, 5. 多项目并行并发审查调度 (auto-refactor [3/5], workspace-timing [4/5], WebGames [5/5])
+if [[ "$JSON_MODE" -eq 0 ]]; then
+    echo "▶ [3~5/5] 并行调度执行 auto-refactor、workspace-timing 与 WebGames 审查..."
 fi
 
-# 4. workspace-timing L0~L5 六层审查门禁
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [4/5] 执行 workspace-timing L0~L5 六层审查门禁与单元自检..."; fi
-if ! (cd workspace-timing && npm run review >/dev/null 2>&1) || ! (cd workspace-timing && npm run test:fast >/dev/null 2>&1); then
+LOG_AR=$(mktemp)
+LOG_WT=$(mktemp)
+LOG_WG=$(mktemp)
+trap 'rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"' EXIT
+
+if [[ "$FAST_MODE" -eq 1 ]]; then
+    (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1 & PID_AR=$!
+else
+    (cd auto-refactor && "$NPM_BIN" test && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1 & PID_AR=$!
+fi
+
+(cd workspace-timing && "$NPM_BIN" run review && "$NPM_BIN" run test:fast) >"$LOG_WT" 2>&1 & PID_WT=$!
+
+("$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict) >"$LOG_WG" 2>&1 & PID_WG=$!
+
+STATUS_AR="PASS"
+STATUS_WT="PASS"
+STATUS_WG="PASS"
+
+if ! wait "$PID_AR"; then
+    STATUS_AR="FAIL"
+    FAILED=1
+fi
+
+if ! wait "$PID_WT"; then
     STATUS_WT="FAIL"
     FAILED=1
-else
-    STATUS_WT="PASS"
 fi
 
-# 5. WebGames 领域配置架构与规范审查
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [5/5] 执行 WebGames 领域配置架构与规范审查..."; fi
-if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >/dev/null 2>&1; then
+if ! wait "$PID_WG"; then
     STATUS_WG="FAIL"
     FAILED=1
-else
-    STATUS_WG="PASS"
 fi
+
+rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
 
 END_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 ELAPSED_SEC=$("$NODE_BIN" -e "console.log((($END_TIME - $START_TIME) / 1000).toFixed(2))")
@@ -136,9 +147,9 @@ echo "│ 审查检查项 / 子系统         │ 判定结果    │ 覆盖范�
 echo "├─────────────────────────────┼─────────────┼───────────────────┤"
 echo "│ 1. 工作区零空文件物理卫生   │ $FMT_HYGIENE │ 全仓代码/脚本/配置│"
 echo "│ 2. 单源规则目录一致性 (SSOT)│ $FMT_RULES │ 单源规则总目录    │"
-echo "│ 3. auto-refactor 质量基线   │ $FMT_AR │ 质量模型 / 145套  │"
-echo "│ 4. workspace-timing 审查门禁│ $FMT_WT │ L0~L5 六层权重门禁│"
-echo "│ 5. WebGames 配置架构审查    │ $FMT_WG │ 核心领域配置真源  │"
+echo "│ 3. auto-refactor 质量基线   │ $FMT_AR │ 质量模型 / 并行自审│"
+echo "│ 4. workspace-timing 审查门禁│ $FMT_WT │ L0~L5 / 并行门禁  │"
+echo "│ 5. WebGames 配置架构审查    │ $FMT_WG │ 领域配置 / 并行审查│"
 echo "├─────────────────────────────┴─────────────┴───────────────────┤"
 echo "│ 耗时: ${ELAPSED_SEC}s  |  全局状态: $([[ $FAILED -eq 0 ]] && echo '✅ 检查通过' || echo '❌ 检查未通过')           │"
 echo "└───────────────────────────────────────────────────────────────┘"
@@ -157,4 +168,3 @@ else
     echo "✅ 全工作区审查完成，所有项目健康合规"
     exit 0
 fi
-

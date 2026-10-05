@@ -256,17 +256,11 @@ if ($bodyText -match '(?i)\b(phase\d+|st\d+|p\d+)\b') {
     exit 1
 }
 
-# --- Rule 7: 规则 ID 单源目录防虚构校验 ---
+# --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 (单次加载 SSOT & 禁词表) ---
+# 挂载 scripts/common/validate-commit-msg.js (融合 validate-commit-msg-rules.js 与 validate-commit-msg-style.js / commit-msg-forbidden-terms.json)
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-$process = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-msg-rules.js", $MsgFile -NoNewWindow -PassThru -Wait
+$process = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-msg.js", $MsgFile -NoNewWindow -PassThru -Wait
 if ($process.ExitCode -ne 0) {
-    Show-CommitTemplateGuide
-    exit 1
-}
-
-# --- Rule 8: 提交文本求真务实与禁词审查 (CMG-STY-TMP/HYP/NEG/MET) ---
-$processStyle = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-msg-style.js", $MsgFile -NoNewWindow -PassThru -Wait
-if ($processStyle.ExitCode -ne 0) {
     Show-CommitTemplateGuide
     exit 1
 }

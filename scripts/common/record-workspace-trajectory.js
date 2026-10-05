@@ -13,6 +13,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const MAX_RECORD_BYTE_SIZE = 350;
+const DEFAULT_MAX_ROLLING_RUNS = 100;
 
 function resolveLedgerDir() {
   const root = path.resolve(__dirname, '..', '..');
@@ -139,7 +140,25 @@ function main() {
   }
 
   fs.appendFileSync(activeRunsPath, line + '\n', 'utf8');
+  pruneActiveRunsIfExceeded(activeRunsPath, DEFAULT_MAX_ROLLING_RUNS);
   console.log(`  ✔ [Trajectory] Workspace audit run appended to ledger (${byteLen}B, rev: ${revision})`);
+}
+
+function pruneActiveRunsIfExceeded(activeFile, maxRuns = DEFAULT_MAX_ROLLING_RUNS) {
+  try {
+    if (!fs.existsSync(activeFile)) return;
+    const content = fs.readFileSync(activeFile, 'utf8');
+    const lines = content
+      .trim()
+      .split('\n')
+      .filter((l) => l.trim().length > 0);
+    if (lines.length > maxRuns) {
+      const recentLines = lines.slice(-maxRuns);
+      fs.writeFileSync(activeFile, recentLines.join('\n') + '\n', 'utf8');
+    }
+  } catch {
+    // best-effort
+  }
 }
 
 main();

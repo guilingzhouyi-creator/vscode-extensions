@@ -3,7 +3,7 @@
 # 文件路径: scripts/ps1/pre-commit-gate.ps1
 # 架构定位: 本地 Git 提交前置物理卫生与质量安全门禁 (Windows PowerShell)
 # 依赖与触发: 触发方: .githooks/pre-commit / 本地 CLI 手动触发 | 上游: git commit | 下游: 提交暂存区 | 运行时: PowerShell 7+
-# 职责说明: 执行提交前物理卫生与质量安全检查（换行契约、BOM、物理空文件、尾随空白、敏感词、AST 局部切片等）
+# 职责说明: 执行提交前物理卫生与质量安全检查（挂载 gate-fast-staged.js 极速流式验证 Gates 1-6、规则漂移熔断、精准增量编译、AST 局部切片）
 # 退出语义与设计依据: 退出码: 0=通过门禁, 1=存在卫生或质量违规阻断 | 设计依据: AGENTS.md 跨项目全局通用契约
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -15,138 +15,40 @@ Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
 
+if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
+if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
+if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
+if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
+
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # 获取暂存区文件列表
-$stagedFiles = @(git diff --cached --name-only --diff-filter=ACM 2>$null)
+$stagedFiles = @(git diff --cached --name-only "--diff-filter=ACM" 2>$null)
 if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1 -and [string]::IsNullOrWhiteSpace($stagedFiles[0]))) {
     Write-Host "ℹ️  暂存区无文件变更，跳过 pre-commit 检查。" -ForegroundColor Yellow
     exit 0
 }
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
+$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 $failed = $false
 
-# --- Gate 1: 零 0 字节与纯空白空文件一票阻断 ---
-Write-Host "[1/9] 检查暂存区零空文件守卫..." -ForegroundColor Gray
-foreach ($file in $stagedFiles) {
-    if ([string]::IsNullOrWhiteSpace($file)) { continue }
-    if (Test-Path $file -PathType Leaf) {
-        $item = Get-Item $file
-        if ($item.Length -eq 0) {
-            Write-Host "❌ [FAIL] Gate 1: 发现 0 字节物理空文件: $file" -ForegroundColor Red
-            $failed = $true
-        } else {
-            $content = [System.IO.File]::ReadAllText($item.FullName)
-            if ([string]::IsNullOrWhiteSpace($content)) {
-                Write-Host "❌ [FAIL] Gate 1: 发现仅含空白字符的虚空文件: $file" -ForegroundColor Red
-                $failed = $true
-            }
-        }
-    }
-}
-
-# --- Gate 2: 换行符 (EOL: ps1->CRLF, 其余->LF) 契约看守 ---
-Write-Host "[2/9] 检查换行符 (EOL: ps1->CRLF, 其余->LF) 契约..." -ForegroundColor Gray
-foreach ($file in $stagedFiles) {
-    if ([string]::IsNullOrWhiteSpace($file)) { continue }
-    if (Test-Path $file -PathType Leaf) {
-        $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $file).Path)
-        $hasCR = $false
-        for ($i = 0; $i -lt $bytes.Length; $i++) {
-            if ($bytes[$i] -eq 13) { # 0x0D '\r'
-                $hasCR = $true
-                break
-            }
-        }
-
-        if ($file.EndsWith(".ps1")) {
-            if (-not $hasCR) {
-                Write-Host "❌ [FAIL] Gate 2: PowerShell 脚本必须使用 CRLF 换行符: $file" -ForegroundColor Red
-                $failed = $true
-            }
-        } elseif ($file.EndsWith(".sh") -or $file.EndsWith(".ts") -or $file.EndsWith(".js") -or $file.EndsWith(".gd") -or $file.EndsWith(".json") -or $file.EndsWith(".md")) {
-            if ($hasCR) {
-                Write-Host "❌ [FAIL] Gate 2: 代码/文档必须使用 LF 换行符，检测到 CRLF: $file" -ForegroundColor Red
-                $failed = $true
-            }
-        }
-    }
-}
-
-# --- Gate 3: 绝对路径与盘符防泄漏 ---
-Write-Host "[3/9] 检查绝对路径与协议防泄漏..." -ForegroundColor Gray
-$addedDiff = @(git diff --cached -U0 --no-color 2>$null | Where-Object { $_ -match '^\+[^+]' })
-foreach ($line in $addedDiff) {
-    if ($line -match "(\b[A-Za-z]:[\\/][a-zA-Z0-9_-]+|file:///)" -and $line -notmatch "node_modules|\.gemini|file://") {
-        Write-Host "❌ [FAIL] Gate 3: 检测到新增代码中包含绝对路径或盘符泄漏: $line" -ForegroundColor Red
-        $failed = $true
-        break
-    }
-}
-
-# --- Gate 4: 零黑话与规范命名 ---
-Write-Host "[4/9] 检查零黑话与规范命名..." -ForegroundColor Gray
-foreach ($file in $stagedFiles) {
-    if ([string]::IsNullOrWhiteSpace($file)) { continue }
-    $baseName = [System.IO.Path]::GetFileName($file)
-    if ($file -match "WebGames/docs/路线图/" -or $file -match "WebGames/docs/归档库/" -or $baseName -match "^fe_\d{2}") {
-        continue
-    }
-    if ($baseName -match "(^|[-_.])(temp|wip|new|st\d+|p\d+)([-_.]|$)") {
-        Write-Host "❌ [FAIL] Gate 4: 文件名包含临时性违规黑话标记: $file" -ForegroundColor Red
-        $failed = $true
-    }
-}
-
-# --- Gate 5: 检查源文件双轨体积与动态密度 (ELOC <= 900, LOC <= 1400, 密度比 1:3) ---
-Write-Host "[5/9] 检查源文件双轨体积与动态密度 (ELOC <= 900, LOC <= 1400, 密度比 1:3)..." -ForegroundColor Gray
-$evalTool = "scripts/common/evaluate-eloc-budget.js"
-if (Test-Path $evalTool) {
-    $res = Start-Process -FilePath "node" -ArgumentList "$evalTool --staged --max-eloc 900 --max-loc 1400 --density-ratio 3.0" -NoNewWindow -PassThru -Wait
-    if ($res.ExitCode -ne 0) {
-        Write-Host "❌ [FAIL] Gate 5: 暂存区存在文件超出双轨体积上限 (ELOC > 900 或 LOC > 1400)" -ForegroundColor Red
-        $failed = $true
-    }
-} else {
-    $maxLocBudget = 1400
-    foreach ($file in $stagedFiles) {
-        if ([string]::IsNullOrWhiteSpace($file)) { continue }
-        if (Test-Path $file -PathType Leaf) {
-            if ($file.EndsWith(".ts") -or $file.EndsWith(".gd") -or $file.EndsWith(".js")) {
-                if ($file -match "dist/|out/|fixtures/|baseline|reports/") { continue }
-                $lineCount = @(Get-Content $file).Count
-                if ($lineCount -gt $maxLocBudget) {
-                    Write-Host "❌ [FAIL] Gate 5: 单文件行数超标 ($lineCount > $maxLocBudget LOC): $file" -ForegroundColor Red
-                    $failed = $true
-                }
-            }
-        }
-    }
-}
-
-# --- Gate 6: 密钥与敏感 Token 防泄漏扫描 ---
-Write-Host "[6/9] 扫描高危密钥与敏感 Token 防泄漏..." -ForegroundColor Gray
-$secretPattern = '(AIza[0-9A-Za-z_-]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (RSA|EC|OPENSSH|PRIVATE) KEY-----)'
-foreach ($line in $addedDiff) {
-    if ($line -match $secretPattern -and $line -notmatch '\$\{env:|CODEX_API_KEY|OPENAI_API_KEY|test-secret|mock-key|placeholder') {
-        Write-Host "❌ [FAIL] Gate 6: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！" -ForegroundColor Red
-        Write-Host "   $line" -ForegroundColor Yellow
-        $failed = $true
-        break
-    }
-}
-if (-not $failed) {
-    Write-Host "  ✔ [PASS] 密钥扫描无泄漏" -ForegroundColor Green
+# --- Gate 1~6: 快速暂存区统一流式审查 ([1/9] 零空文件, [2/9] 换行契约, [3/9] 绝对路径, [4/9] 零黑话, [5/9] 双轨体积, [6/9] 密钥防泄漏) ---
+Write-Host "[1-6/9] 执行暂存区内存流式物理卫生与质量安全检查..." -ForegroundColor Gray
+$resFast = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/gate-fast-staged.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+if ($resFast.ExitCode -ne 0) {
+    Write-Host "❌ [FAIL] 暂存区物理卫生与安全审查未通过！" -ForegroundColor Red
+    $failed = $true
 }
 
 # --- Gate 7: 单源规则漂移熔断 ---
 Write-Host "[7/9] 校验单源规则元数据一致性..." -ForegroundColor Gray
 $touchesRules = $stagedFiles | Where-Object { $_ -match "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/" }
-$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 if ($touchesRules) {
-    $res = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "run", "validate-rules-registry" -NoNewWindow -PassThru -Wait
+    $res = Start-Process -FilePath $npmCmd -ArgumentList "run", "validate-rules-registry" -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NoNewWindow -PassThru -Wait
     if ($res.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！" -ForegroundColor Red
         $failed = $true
@@ -155,34 +57,38 @@ if ($touchesRules) {
     }
 }
 
-# --- Gate 8: 项目增量编译与语法验证 ---
+# --- Gate 8: 项目增量编译与语法验证 (精准增量触发) ---
 Write-Host "[8/9] 检查相关项目增量编译与语法..." -ForegroundColor Gray
-$hasWt = $stagedFiles | Where-Object { $_ -match "^workspace-timing/" }
-$hasAr = $stagedFiles | Where-Object { $_ -match "^auto-refactor/" }
-$hasWg = $stagedFiles | Where-Object { $_ -match "^WebGames/" }
+$hasWtCompile = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(src/.+\.ts|tsconfig.*\.json)" }
+$hasArCompile = $stagedFiles | Where-Object { $_ -match "^auto-refactor/(src/.+\.ts|tsconfig.*\.json)" }
+$hasWgAudit = $stagedFiles | Where-Object { $_ -match "^WebGames/(config/|scripts/py/audit_config\.py)" }
 
-if ($hasWt) {
+if ($hasWtCompile) {
     Write-Host "  ▶ 触发 workspace-timing 增量编译校验..." -ForegroundColor Cyan
-    $process = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "workspace-timing", "run", "compile" -NoNewWindow -PassThru -Wait
+    $process = Start-Process -FilePath $npmCmd -ArgumentList "run", "compile" -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 8: workspace-timing 编译失败！" -ForegroundColor Red
         $failed = $true
     }
+} elseif ($stagedFiles | Where-Object { $_ -match "^workspace-timing/" }) {
+    Write-Host "  ✔ [Gate 8] workspace-timing 仅文档/配置变更，跳过增量编译" -ForegroundColor Green
 }
 
-if ($hasAr) {
+if ($hasArCompile) {
     Write-Host "  ▶ 触发 auto-refactor 增量编译校验..." -ForegroundColor Cyan
-    $process = Start-Process -FilePath $npmCmd -ArgumentList "--prefix", "auto-refactor", "run", "build" -NoNewWindow -PassThru -Wait
+    $process = Start-Process -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 8: auto-refactor 编译失败！" -ForegroundColor Red
         $failed = $true
     }
+} elseif ($stagedFiles | Where-Object { $_ -match "^auto-refactor/" }) {
+    Write-Host "  ✔ [Gate 8] auto-refactor 仅文档/配置变更，跳过增量编译" -ForegroundColor Green
 }
 
-if ($hasWg) {
+if ($hasWgAudit) {
     Write-Host "  ▶ 触发 WebGames 增量配置架构审查..." -ForegroundColor Cyan
     $pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "py" }
-    $process = Start-Process -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -NoNewWindow -PassThru -Wait
+    $process = Start-Process -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 8: WebGames 配置架构审查未通过！" -ForegroundColor Red
         $failed = $true
@@ -193,8 +99,7 @@ if ($hasWg) {
 Write-Host "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15 [分发器<=25], Depth<=4, Noise<=4.0)..." -ForegroundColor Gray
 $touchedCode = $stagedFiles | Where-Object { ($_ -match '\.(ts|js)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') }
 if ($touchedCode) {
-    $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-    $process = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-staged-slice.js" -NoNewWindow -PassThru -Wait
+    $process = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-staged-slice.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 9: 暂存区 AST 切片审查未通过！" -ForegroundColor Red
         $failed = $true

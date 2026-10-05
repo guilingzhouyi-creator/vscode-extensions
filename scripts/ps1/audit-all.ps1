@@ -3,7 +3,7 @@
 # 文件路径: scripts/ps1/audit-all.ps1
 # 架构定位: 全工作区跨项目统一审查 Runner (Windows PowerShell)
 # 依赖与触发: 触发方: 本地 CLI / CI 门禁 | 上游: 三项目专属门禁套件 | 下游: 统一质量看板 | 运行时: PowerShell 7+
-# 职责说明: 调度执行全工作区跨项目质量审查，聚合 workspace-timing、auto-refactor 与 WebGames 门禁结论
+# 职责说明: 调度执行全工作区跨项目质量审查，多项目并行调度 workspace-timing、auto-refactor 与 WebGames
 # 退出语义与设计依据: 退出码: 0=全项审查通过, 1=存在审查违规 | 设计依据: AGENTS.md 工作区全局治理总规
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -19,6 +19,11 @@ param(
 Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
+if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
+if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
+if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
 
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
@@ -53,50 +58,64 @@ if ($res.ExitCode -ne 0) {
     $statusRules = "PASS"
 }
 
-# 3. auto-refactor 静态重构与审查引擎自检
+# 3, 4, 5. 多项目并行并发审查调度 (auto-refactor [3/5], workspace-timing [4/5], WebGames [5/5])
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
-if (-not $Json) { Write-Host "▶ [3/5] 执行 auto-refactor 质量基线与多维自审..." -ForegroundColor Gray }
-if ($Fast) {
-    $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/validate-self-multidimensional-audit.js" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
-    if ($res.ExitCode -ne 0) {
-        $statusAr = "FAIL"
-        $failed = $true
-    } else {
-        $statusAr = "PASS"
-    }
-} else {
-    $res1 = Start-Process -FilePath $npmCmd -ArgumentList "test" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
-    $res2 = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/validate-self-multidimensional-audit.js" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
-    if ($res1.ExitCode -ne 0 -or $res2.ExitCode -ne 0) {
-        $statusAr = "FAIL"
-        $failed = $true
-    } else {
-        $statusAr = "PASS"
-    }
-}
-
-# 4. workspace-timing L0~L5 六层审查门禁
-if (-not $Json) { Write-Host "▶ [4/5] 执行 workspace-timing L0~L5 六层审查门禁与单元自检..." -ForegroundColor Gray }
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
-$res1 = Start-Process -FilePath $npmCmd -ArgumentList "run", "review" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
-$res2 = Start-Process -FilePath $npmCmd -ArgumentList "run", "test:fast" -WorkingDirectory $workspaceTimingDir -NoNewWindow -PassThru -Wait
-if ($res1.ExitCode -ne 0 -or $res2.ExitCode -ne 0) {
-    $statusWt = "FAIL"
-    $failed = $true
-} else {
-    $statusWt = "PASS"
+
+if (-not $Json) {
+    Write-Host "▶ [3~5/5] 并行调度执行 auto-refactor、workspace-timing 与 WebGames 审查..." -ForegroundColor Gray
 }
 
-# 5. WebGames 领域配置架构与规范审查
-if (-not $Json) { Write-Host "▶ [5/5] 执行 WebGames 领域配置架构与规范审查..." -ForegroundColor Gray }
-$resWg = Start-Process -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -NoNewWindow -PassThru -Wait
-if ($resWg.ExitCode -ne 0) {
-    $statusWg = "FAIL"
-    $failed = $true
+$tempDir = [System.IO.Path]::GetTempPath()
+$randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
+$logAr = Join-Path $tempDir "audit-ar-$randSuffix.log"
+$logWt = Join-Path $tempDir "audit-wt-$randSuffix.log"
+$logWg = Join-Path $tempDir "audit-wg-$randSuffix.log"
+
+$arScript = if ($Fast) {
+    "& '$nodeCmd' scripts/validate-self-multidimensional-audit.js *>&1"
 } else {
-    $statusWg = "PASS"
+    "& '$npmCmd' test *>&1; if (`$LASTEXITCODE -ne 0) { exit 1 }; & '$nodeCmd' scripts/validate-self-multidimensional-audit.js *>&1"
 }
+$wtScript = "& '$npmCmd' run review *>&1; if (`$LASTEXITCODE -ne 0) { exit 1 }; & '$npmCmd' run test:fast *>&1"
+$wgScript = "& '$pythonCmd' WebGames/scripts/py/audit_config.py --strict *>&1"
+
+$procAr = Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $arScript) -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logAr -PassThru
+$procWt = Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $wtScript) -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWt -PassThru
+$procWg = Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $wgScript) -WorkingDirectory $repoRoot -RedirectStandardOutput $logWg -PassThru
+
+$procAr.WaitForExit()
+$procWt.WaitForExit()
+$procWg.WaitForExit()
+
+$statusAr = if ($procAr.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+$statusWt = if ($procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+$statusWg = if ($procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+
+if ($statusAr -ne "PASS") {
+    $failed = $true
+    if (-not $Json -and (Test-Path $logAr)) {
+        Write-Host "❌ auto-refactor 审查未通过:" -ForegroundColor Red
+        Get-Content $logAr | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+    }
+}
+if ($statusWt -ne "PASS") {
+    $failed = $true
+    if (-not $Json -and (Test-Path $logWt)) {
+        Write-Host "❌ workspace-timing 审查未通过:" -ForegroundColor Red
+        Get-Content $logWt | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+    }
+}
+if ($statusWg -ne "PASS") {
+    $failed = $true
+    if (-not $Json -and (Test-Path $logWg)) {
+        Write-Host "❌ WebGames 审查未通过:" -ForegroundColor Red
+        Get-Content $logWg | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+    }
+}
+
+Remove-Item -Path $logAr, $logWt, $logWg -Force -ErrorAction SilentlyContinue
 
 $startTime.Stop()
 $elapsedSec = [math]::Round($startTime.Elapsed.TotalSeconds, 2)
@@ -136,9 +155,9 @@ Write-Host "│ 审查检查项 / 子系统         │ 判定结果    │ 覆�
 Write-Host "├─────────────────────────────┼─────────────┼───────────────────┤" -ForegroundColor Cyan
 Write-Host ("│ 1. 工作区零空文件物理卫生   │ {0,-11} │ 全仓代码/脚本/配置│" -f $statusHygiene) -ForegroundColor $cHygiene
 Write-Host ("│ 2. 单源规则目录一致性 (SSOT)│ {0,-11} │ 单源规则总目录    │" -f $statusRules) -ForegroundColor $cRules
-Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 质量模型 / 145套  │" -f $statusAr) -ForegroundColor $cAr
-Write-Host ("│ 4. workspace-timing 审查门禁│ {0,-11} │ L0~L5 六层权重门禁│" -f $statusWt) -ForegroundColor $cWt
-Write-Host ("│ 5. WebGames 配置架构审查    │ {0,-11} │ 核心领域配置真源  │" -f $statusWg) -ForegroundColor $cWg
+Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 质量模型 / 并行自审│" -f $statusAr) -ForegroundColor $cAr
+Write-Host ("│ 4. workspace-timing 审查门禁│ {0,-11} │ L0~L5 / 并行门禁  │" -f $statusWt) -ForegroundColor $cWt
+Write-Host ("│ 5. WebGames 配置架构审查    │ {0,-11} │ 领域配置 / 并行审查│" -f $statusWg) -ForegroundColor $cWg
 Write-Host "├─────────────────────────────┴─────────────┴───────────────────┤" -ForegroundColor Cyan
 Write-Host ("│ 耗时: {0}s  |  全局状态: {1}           │" -f $elapsedSec, $globalStatus) -ForegroundColor $globalColor
 Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
