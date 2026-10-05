@@ -6,7 +6,7 @@
  * Dependencies & Triggers: ./types (Issue, FileMetric); armed by AR_BINARY_RESULT=1 through
  *     BINARY_RESULT_ENABLED, so worker postMessage and parent result handling switch codec.
  * Responsibilities: Provide Writer/Reader primitives (u8/u32/f64/varint/UTF-8 string/tagged
- *     value); encodeResults emits the 0x50523530 ("P250") magic plus per-file metrics, issue
+ *     value); encodeResults emits the 0x50523530 ("PR50") magic plus per-file metrics, issue
  *     records, positions, detail and suggestions; decodeResults rebuilds that exact graph.
  * Exit Semantics & Design Rationale: encodeResults is total for JSON-representable results;
  *     decodeResults throws Error on bad magic, unknown type tag or varint overflow, which is
@@ -21,7 +21,7 @@
  * graph that structured clone would have delivered (validate 9/9 + W1-W9 + round-trip).
  *
  * Format (little-endian):
- *   Header : u32 magic(0x50523530 "P250")  u32 fileCount
+ *   Header : u32 magic(0x50523530 "PR50")  u32 fileCount
  *   Per file:
  *     varint fileLen, file(UTF-8)
  *     u8 hasMetric; if 1: varint lines, nonBlankLines, functions, maxNestingDepth,
@@ -47,7 +47,7 @@ import type { Issue, FileMetric } from './types';
  */
 export const BINARY_RESULT_ENABLED = process.env.AR_BINARY_RESULT === '1';
 
-const MAGIC = 0x50523530; // "P250"
+const MAGIC = 0x50523530; // "PR50"
 const T_NULL = 0x00;
 const T_TRUE = 0x01;
 const T_FALSE = 0x02;
@@ -59,7 +59,7 @@ const T_OBJECT = 0x07;
 
 type FileResult = { file: string; issues: Issue[]; metric: FileMetric | null };
 
-// ── Binary protocol constants (little-endian P250 transport) ──
+// ── Binary protocol constants (little-endian PR50 transport) ──
 /** Growable chunk size: 2^16 bytes = 64 KiB. */
 const CHUNK_SHIFT = 16;
 const CHUNK_BYTES = 1 << CHUNK_SHIFT;
@@ -82,7 +82,7 @@ const U8_MASK = 0xff;
 const HEX_RADIX = 16;
 
 /**
- * Growable little-endian binary writer backing the P250 result transport.
+ * Growable little-endian binary writer backing the PR50 result transport.
  *
  * Scalars, unsigned varints, UTF-8 strings, and tagged JSON values are appended into 64 KiB
  * chunks; `result()` flushes the tail and concatenates the chunks into one Buffer. The writer is

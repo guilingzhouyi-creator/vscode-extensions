@@ -809,19 +809,19 @@ export function processGoLine(
     const trimmed = rawLine.trim();
     if (!trimmed) return;
 
-    // Phase 1: comment lines (always handled or not — no further processing if comment)
+    // Pass 1: comment lines (always handled or not — no further processing if comment)
     if (handleCommentLine(trimmed, ctx)) return;
 
     const codeOnly = stripLineComment(trimmed);
     if (!codeOnly) return;
 
-    // Phase 2: top-level declarations (package, import, type, func, var, const)
+    // Pass 2: top-level declarations (package, import, type, func, var, const)
     if (handleDeclarationLine(codeOnly, rawLine, lineNum, ctx, children)) return;
 
-    // Phase 3: control flow (if/for/switch/select)
+    // Pass 3: control flow (if/for/switch/select)
     if (handleControlFlowLine(codeOnly, rawLine, lineNum, ctx, children)) return;
 
-    // Phase 4: other statements and structural elements
+    // Pass 4: other statements and structural elements
     const caseNode = parseCaseLabel(codeOnly, rawLine, lineNum, ctx.inSwitchSelect);
     if (caseNode) children.push(caseNode);
 
@@ -844,13 +844,13 @@ export function processGoLine(
         }
     }
 
-    // Phase 5: literals and calls (scanned on every code line)
+    // Pass 5: literals and calls (scanned on every code line)
     parseStringLiterals(codeOnly, rawLine, lineNum, children, ctx.inImport);
     parseNumericLiterals(codeOnly, rawLine, lineNum, children);
     parseNamedLiterals(codeOnly, rawLine, lineNum, children);
     parseCallExpressions(codeOnly, rawLine, lineNum, children);
 
-    // Phase 6: brace tracking for block nesting
+    // Pass 6: brace tracking for block nesting
     trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
 }
 

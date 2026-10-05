@@ -229,11 +229,13 @@ export interface NodeProjector {
 }
 
 /**
- * Shared T0 placeholder — a frozen process-wide singleton (zero allocation per use).
+ * Shared fallback Other node — a frozen process-wide singleton (zero allocation per use).
  * Safe for every visit + engine scope derivation: missing flags read as falsy (matching
  * real non-scope nodes), kind is always `Other` so it can never be confused with the
  * SourceFile root or a literal/function/scope node.
  */
+export const FALLBACK_OTHER_NODE: NormalizedNode = Object.freeze({ kind: NodeKind.Other });
+/** Shared fallback Other node placeholder. */
 export const OTHER_PLACEHOLDER: NormalizedNode = Object.freeze({ kind: NodeKind.Other });
 
 /**

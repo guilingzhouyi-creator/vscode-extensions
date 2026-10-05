@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Module: Verification Harness — Scope Graph Engine (Phase 1)
+ * Module: Verification Harness — Scope Graph Engine
  * File Path: scripts/validate-scope-graph.js
  * Architecture Role: Integration suite that locks the scope graph builder and query API:
  *     scope boundaries (module / function / class), binding recording, lookup across the
@@ -425,7 +425,7 @@ function testBindingKinds() {
 
 // ─── Run all tests ───────────────────────────────────────────────────
 function run() {
-  console.log('Scope Graph (Phase 1) validation\n');
+  console.log('Scope Graph validation\n');
 
   testModuleScope();
   testFunctionScope();

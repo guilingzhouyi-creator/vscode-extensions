@@ -18,7 +18,7 @@ export const TYPEOF_STRING = 'string';
 /** Type constant for number type checking. */
 export const TYPEOF_NUMBER = 'number';
 const RANDOM_STRING_RADIX = 36;
-const TMP_SUFFIX_END_INDEX = 8;
+const STAGING_SUFFIX_SLICE_END = 8;
 const CACHE_CLEAR_SUFFIX_END_INDEX = 6;
 
 /** Cache entry record persisted in L2 scan cache. */
@@ -60,9 +60,9 @@ export function readLinesSafe(filePath: string): string[] {
     }
 }
 
-function cleanupTmpFile(tmp: string): void {
+function cleanupStagingFile(stagingPath: string): void {
     try {
-        fs.rmSync(tmp, { force: true });
+        fs.rmSync(stagingPath, { force: true });
     } catch {
         /* ignore */
     }
@@ -75,12 +75,12 @@ function cleanupTmpFile(tmp: string): void {
  * @param data - Content string to write.
  */
 export function writeFileAtomic(file: string, data: string): void {
-    const tmp = `${file}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, TMP_SUFFIX_END_INDEX)}`;
-    writeTextFileSync(tmp, data);
+    const stagingPath = `${file}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, STAGING_SUFFIX_SLICE_END)}`;
+    writeTextFileSync(stagingPath, data);
     try {
-        fs.renameSync(tmp, file);
+        fs.renameSync(stagingPath, file);
     } catch (e) {
-        cleanupTmpFile(tmp);
+        cleanupStagingFile(stagingPath);
         throw e;
     }
 }

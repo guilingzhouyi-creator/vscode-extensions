@@ -197,11 +197,11 @@ function resolvePrimaryKind(vector: SliceFeatureVector): SliceMutationKind {
  */
 function deriveChangedLineNumbers(oldContent: string, newContent: string): number[] {
     const oldLines = new Set(oldContent.split(/\r?\n/).map((l) => l.trim()));
-    const newL = newContent.split(/\r?\n/);
+    const incomingLines = newContent.split(/\r?\n/);
     const changed: number[] = [];
 
-    for (let i = 0; i < newL.length; i++) {
-        const trimmed = newL[i].trim();
+    for (let i = 0; i < incomingLines.length; i++) {
+        const trimmed = incomingLines[i].trim();
         if (trimmed && !oldLines.has(trimmed)) {
             changed.push(i + 1);
         }
@@ -248,8 +248,8 @@ function createBoundarySliceNode(
     const sliceOldLines = oldLines.slice(match.startLine - 1, match.endLine);
     const sliceNewLines = newLines.slice(match.startLine - 1, match.endLine);
     const oldSig = sliceOldLines[0]?.trim() || '';
-    const newSig = sliceNewLines[0]?.trim() || '';
-    const signatureChanged = oldSig !== newSig;
+    const incomingSignature = sliceNewLines[0]?.trim() || '';
+    const signatureChanged = oldSig !== incomingSignature;
 
     const oldLinesSet = new Set(sliceOldLines);
     const addedLines = sliceNewLines.filter((l) => !oldLinesSet.has(l));

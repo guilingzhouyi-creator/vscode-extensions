@@ -152,7 +152,7 @@ export interface RuleDefinition {
     summary: string;
     /** One-line remediation hint. */
     remediation: string;
-    /** Documentation anchor, or 'TODO' when the rule still needs a docs row. */
+    /** Documentation section anchor identifier for the rule. */
     docsAnchor: string;
 }
 

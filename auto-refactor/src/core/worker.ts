@@ -319,9 +319,9 @@ function initAstOrProjector(
         rootForCtx = proj.project(proj.root, undefined, undefined);
         if (AR_TIMING) perf.adapterProject += nowMs() - tProj0;
     } else {
-        const tP0 = AR_TIMING ? nowMs() : 0;
+        const parseStartTimeMs = AR_TIMING ? nowMs() : 0;
         ast = adapter.parse(content, file);
-        if (AR_TIMING) perf.adapterParse += nowMs() - tP0;
+        if (AR_TIMING) perf.adapterParse += nowMs() - parseStartTimeMs;
         rootForCtx = ast.root;
     }
     return { proj, ast, rootForCtx };

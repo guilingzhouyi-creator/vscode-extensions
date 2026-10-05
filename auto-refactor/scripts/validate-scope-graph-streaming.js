@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Module: Verification Harness — Scope Graph Streaming Build (Phase 2)
+ * Module: Verification Harness — Scope Graph Streaming Build
  * File Path: scripts/validate-scope-graph-streaming.js
  * Architecture Role: Integration suite that locks the ScopeGraphStreamer + runStreaming
  *     integration: structural equivalence with the standalone buildScopeGraph(),
@@ -398,7 +398,7 @@ function testStreamingPerformance() {
 
 // ─── Run all tests ───────────────────────────────────────────────────
 function run() {
-  console.log('Scope Graph Streaming Build (Phase 2) validation\n');
+  console.log('Scope Graph Streaming Build validation\n');
 
   testStreamingEquivalenceTS();
   testStreamingLookupEquivalence();

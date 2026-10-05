@@ -4,14 +4,15 @@
  * Architecture Role: Single-pass scope graph builder and query interface for scope-aware
  *   analysis. Built on-demand when analyzers need scope-aware reasoning.
  * Dependencies & Triggers: NormalizedNode / NodeKind / LanguageAdapter from ./multilang.
- *   Standalone builder — no integration with runStreaming in Phase 1.
+ *   Standalone on-demand builder — operates independently from runStreaming.
  * Responsibilities: Build Scope nodes for each scope boundary (Module, Function, Class);
  *   track variable/constant/function/class bindings; provide lookup (walks up parent chain);
  *   provide shadow detection; provide scope-at-position lookup.
- * Exit Semantics & Design Rationale: Phase 1 is a standalone builder — call buildScopeGraph()
- *   when you need a scope graph. Scopes are plain objects with parent pointers (no cycles).
- *   Bindings use string → BindingInfo maps. Only Module + Function + Class scopes in Phase 1;
- *   Block scopes deferred to Phase 2. Zero overhead when no scope-aware analyzer is enabled.
+ * Exit Semantics & Design Rationale: Provides both a Standalone On-Demand Builder
+ *   (buildScopeGraph()) and a Streaming Pipelined Builder (ScopeGraphStreamer).
+ *   Scopes are plain objects with parent pointers (no cycles). Bindings use
+ *   string → BindingInfo maps. Captures Module + Function + Class scopes with
+ *   zero overhead when no scope-aware analyzer is enabled.
  */
 
 import type { AnalyzerContext, Issue } from '../types';
@@ -62,7 +63,8 @@ export interface LookupResult {
 
 /**
  * Determine if a node introduces a new scope boundary.
- * Phase 1: only Module (SourceFile), Function (functionLike), and Class (isClassDefining) scopes.
+ * Scope boundaries: Module (SourceFile), Function (functionLike), and Class
+ *   (isClassDefining) scopes.
  *
  * @param node - Normalized node to test.
  * @returns The scope kind or null if the node does not introduce a scope.
@@ -199,12 +201,11 @@ export class ScopeGraph {
 /**
  * Build a scope graph by walking the AST once.
  *
- * This is a standalone builder — call it when you need a scope graph for a file.
- * Phase 1 design: independent of runStreaming, no extra per-file overhead unless
- * a scope-aware analyzer explicitly requests it. Phase 2 will integrate into
- * runStreaming for zero extra traversal.
+ * This is a Standalone On-Demand Builder — call it when you need a scope graph for a file.
+ * Independent of runStreaming, with no extra per-file overhead unless a scope-aware analyzer
+ * explicitly requests it. For pipelined execution within traversal, see ScopeGraphStreamer.
  *
- * Scope boundaries (Phase 1):
+ * Scope boundaries:
  *   - SourceFile → module scope
  *   - functionLike nodes → function scope
  *   - isClassDefining nodes → class scope
@@ -327,8 +328,9 @@ function finalizeEndLines(scope: Scope, parentEnd: number): void {
  *   - its `visit` runs first (scope is pushed before other analyzers visit)
  *   - its `leave` runs last (scope is popped after other analyzers leave)
  *
- * This is a Phase 2 integration — replaces the standalone `buildScopeGraph()`
- * for scope-aware analyzers that already participate in the streaming pass.
+ * This is a Streaming Pipelined Builder integration — operates alongside or
+ * replaces the standalone on-demand `buildScopeGraph()` for scope-aware analyzers
+ * that participate in the streaming pass.
  */
 export class ScopeGraphStreamer {
     /** Analyzer name for registration / error reporting. */

@@ -812,7 +812,7 @@ function auditDataArchitectureLine(
     }
 
     if (DANGLING_RESOURCE_PATH_RE.test(trimmed)) {
-        const dummy: DataAccessSite = {
+        const syntheticSite: DataAccessSite = {
             file: filePath,
             line: lineNo,
             symbol: 'global',
@@ -822,7 +822,7 @@ function auditDataArchitectureLine(
             operationKind: 'resource-registry',
             expressionText: trimmed,
         };
-        const resIssue = checkResourceRegistrySite(dummy);
+        const resIssue = checkResourceRegistrySite(syntheticSite);
         if (resIssue) issues.push(resIssue);
     }
 }

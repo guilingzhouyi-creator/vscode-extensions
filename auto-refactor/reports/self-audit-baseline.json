@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791214176331",
-  "timestamp": "2026-10-05T15:29:49.453Z",
+  "snapshotId": "snapshot-v0.4.0-1791217211536",
+  "timestamp": "2026-10-05T16:20:24.423Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,25 +13,25 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 590,
-    "durationMs": 12002
+    "durationMs": 11465
   },
   "metrics": {
-    "compositeScore": 99.16,
+    "compositeScore": 99.17,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 9937,
+    "totalIssues": 9814,
     "suppressedIssues": 494,
-    "unsuppressedIssues": 9443,
+    "unsuppressedIssues": 9320,
     "bySeverity": {
-      "info": 1131,
-      "warning": 8806,
+      "info": 1130,
+      "warning": 8684,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 215,
       "medium": 5200,
-      "low": 4522
+      "low": 4399
     }
   },
   "eightPillars": {
@@ -43,9 +43,9 @@
       "testing": 100,
       "reliability": 99.95,
       "security": 100,
-      "extensibility": 93.82
+      "extensibility": 93.91
     },
-    "compositeScore": 99.16,
+    "compositeScore": 99.17,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -63,7 +63,7 @@
     "semanticPurity": 99.89,
     "codeSecurity": 100,
     "performanceEfficiency": 99.04,
-    "standardization": 81.48,
+    "standardization": 81.75,
     "modernity": 100,
     "maintainability": 99.54,
     "commentQuality": 99.98,
@@ -92,10 +92,10 @@
     {
       "filePath": "src/core/native/native-clone-shim.ts",
       "domain": "native",
-      "totalIssues": 161,
+      "totalIssues": 158,
       "criticalCount": 0,
       "highCount": 0,
-      "compositeScore": 98.1,
+      "compositeScore": 98.34,
       "effectiveDensity": 0.93
     },
     {
@@ -167,7 +167,7 @@
       "critical": 0,
       "high": 215,
       "medium": 5200,
-      "low": 4522
+      "low": 4399
     },
     "criticalItems": [],
     "highItems": [
@@ -627,7 +627,7 @@
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 99.41,
+        "compositeScore": 99.42,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.81,
@@ -636,7 +636,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 95.32
+          "extensibility": 95.44
         },
         "moduleCount": 1
       },
@@ -687,7 +687,7 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 98.81,
+        "compositeScore": 98.84,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.21,
@@ -696,7 +696,7 @@
           "testing": 100,
           "reliability": 99.84,
           "security": 100,
-          "extensibility": 93.12
+          "extensibility": 93.48
         },
         "moduleCount": 1
       },
@@ -717,7 +717,7 @@
       },
       {
         "domainName": "ast",
-        "compositeScore": 99.21,
+        "compositeScore": 99.29,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.59,
@@ -726,7 +726,7 @@
           "testing": 100,
           "reliability": 99.93,
           "security": 100,
-          "extensibility": 93.37
+          "extensibility": 94.14
         },
         "moduleCount": 1
       },
@@ -891,7 +891,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 94.48
+          "extensibility": 94.49
         },
         "moduleCount": 1
       },
@@ -927,7 +927,7 @@
       },
       {
         "domainName": "memory",
-        "compositeScore": 98.77,
+        "compositeScore": 98.81,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.4,
@@ -936,7 +936,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 93.55
+          "extensibility": 93.95
         },
         "moduleCount": 1
       },
@@ -957,7 +957,7 @@
       },
       {
         "domainName": "native",
-        "compositeScore": 98.74,
+        "compositeScore": 98.8,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.88,
@@ -966,7 +966,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 89.3
+          "extensibility": 89.9
         },
         "moduleCount": 1
       },
@@ -1302,7 +1302,7 @@
       },
       {
         "domainName": "daemon",
-        "compositeScore": 98.66,
+        "compositeScore": 98.7,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.4,
@@ -1311,7 +1311,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 91.91
+          "extensibility": 92.28
         },
         "moduleCount": 1
       },
@@ -1334,30 +1334,30 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 119209,
+      "processed": 119219,
       "unique": 96698,
-      "changed": 2401,
-      "semantic": 1921,
+      "changed": 3219,
+      "semantic": 2575,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 1201,
+      "added": 1610,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791214176330,
-      "totalRuns": 143,
+      "endMs": 1791217211534,
+      "totalRuns": 150,
       "eloc": {
-        "processedTotal": 16935137,
+        "processedTotal": 17774905,
         "uniqueTotal": 96698,
-        "changedTotal": 170520,
-        "semanticTotal": 136417
+        "changedTotal": 182324,
+        "semanticTotal": 145859
       },
       "qed": {
-        "mean": 0.0001,
+        "mean": 0.0002,
         "min": -0.01,
         "max": 0.03
       },
@@ -1365,10 +1365,10 @@
         "totalAdded": 1094,
         "totalResolved": 7223,
         "totalRegressions": 0,
-        "netYield": 0.36
+        "netYield": 0.34
       },
-      "meanCompositeScore": 99.2,
-      "gatePassRate": 97.9
+      "meanCompositeScore": 99.18,
+      "gatePassRate": 96
     },
     "isFirstBaseline": false
   }

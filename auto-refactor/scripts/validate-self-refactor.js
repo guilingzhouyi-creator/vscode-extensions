@@ -104,8 +104,7 @@ function isBaselineValid(report) {
   if (!hasValidMetrics(report.metrics)) return false;
   if (!hasValidPillarsAndDimensions(report)) return false;
   return (
-    Array.isArray(report.topHotspots) &&
-    Array.isArray(report.technicalDebtLedger?.criticalItems)
+    Array.isArray(report.topHotspots) && Array.isArray(report.technicalDebtLedger?.criticalItems)
   );
 }
 

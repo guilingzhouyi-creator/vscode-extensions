@@ -309,7 +309,7 @@ function evaluateCloneCandidates(
             pairs.push({ fileA: a, fileB: b, similarity });
         }
     }
-    pairs.sort((p1, p2) => p2.similarity - p1.similarity);
+    pairs.sort((pairA, pairB) => pairB.similarity - pairA.similarity);
     return pairs;
 }
 

@@ -74,15 +74,24 @@ function testAsymptoticSaturation() {
   console.log('4. Testing Asymptotic Saturation & Boundary Capping...');
 
   const L = 100;
-  const p50 = applyLogisticSaturation(50);
-  const p100 = applyLogisticSaturation(100);
-  const p200 = applyLogisticSaturation(200);
-  const p1000 = applyLogisticSaturation(1000);
+  const saturation50Pts = applyLogisticSaturation(50);
+  const saturation100Pts = applyLogisticSaturation(100);
+  const saturation200Pts = applyLogisticSaturation(200);
+  const saturation1000Pts = applyLogisticSaturation(1000);
 
-  assert.ok(p50 < p100, `p50 (${p50}) must be less than p100 (${p100})`);
-  assert.ok(p100 <= p200, `p100 (${p100}) must be <= p200 (${p200})`);
-  assert.ok(p200 <= L, `p200 must be bounded by ${L}, got ${p200}`);
-  assert.strictEqual(p1000, L, `Massive points (1000) must saturate at limit ${L}`);
+  assert.ok(
+    saturation50Pts < saturation100Pts,
+    `saturation50Pts (${saturation50Pts}) must be less than saturation100Pts (${saturation100Pts})`,
+  );
+  assert.ok(
+    saturation100Pts <= saturation200Pts,
+    `saturation100Pts (${saturation100Pts}) must be <= saturation200Pts (${saturation200Pts})`,
+  );
+  assert.ok(
+    saturation200Pts <= L,
+    `saturation200Pts must be bounded by ${L}, got ${saturation200Pts}`,
+  );
+  assert.strictEqual(saturation1000Pts, L, `Massive points (1000) must saturate at limit ${L}`);
 
   // Custom capacity limit
   const customLimit = 60;

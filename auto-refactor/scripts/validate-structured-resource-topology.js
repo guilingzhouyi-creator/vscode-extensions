@@ -124,27 +124,27 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
 
 // 7. 3-Tier Structured Resource Naming Parsing Test
 {
-  const p1 = parseStructuredResourceNaming('constants.ts');
-  assert.strictEqual(p1.baseType, 'constants');
-  assert.strictEqual(p1.depth, 1);
-  assert.strictEqual(p1.domain, null);
+  const parsedRootResource = parseStructuredResourceNaming('constants.ts');
+  assert.strictEqual(parsedRootResource.baseType, 'constants');
+  assert.strictEqual(parsedRootResource.depth, 1);
+  assert.strictEqual(parsedRootResource.domain, null);
 
-  const p2 = parseStructuredResourceNaming('constants_network.ts');
-  assert.strictEqual(p2.baseType, 'constants');
-  assert.strictEqual(p2.domain, 'network');
-  assert.strictEqual(p2.depth, 2);
+  const parsedDomainResource = parseStructuredResourceNaming('constants_network.ts');
+  assert.strictEqual(parsedDomainResource.baseType, 'constants');
+  assert.strictEqual(parsedDomainResource.domain, 'network');
+  assert.strictEqual(parsedDomainResource.depth, 2);
 
-  const p3 = parseStructuredResourceNaming('constants_network_http.ts');
-  assert.strictEqual(p3.baseType, 'constants');
-  assert.strictEqual(p3.domain, 'network');
-  assert.strictEqual(p3.subdomain, 'http');
-  assert.strictEqual(p3.depth, 3);
+  const parsedSubdomainResource = parseStructuredResourceNaming('constants_network_http.ts');
+  assert.strictEqual(parsedSubdomainResource.baseType, 'constants');
+  assert.strictEqual(parsedSubdomainResource.domain, 'network');
+  assert.strictEqual(parsedSubdomainResource.subdomain, 'http');
+  assert.strictEqual(parsedSubdomainResource.depth, 3);
 
-  const p4 = parseStructuredResourceNaming(
+  const parsedOverDescriptiveResource = parseStructuredResourceNaming(
     'constants_network_http_request_response_status_code.ts',
   );
-  assert.strictEqual(p4.isOverDescriptive, true);
-  assert.ok(p4.extraParts.length > 0);
+  assert.strictEqual(parsedOverDescriptiveResource.isOverDescriptive, true);
+  assert.ok(parsedOverDescriptiveResource.extraParts.length > 0);
   console.log('  [PASS] Invariant 7: 3-Tier Naming Hierarchy & Token Depth Parser');
 }
 

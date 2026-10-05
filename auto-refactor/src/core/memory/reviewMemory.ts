@@ -371,14 +371,14 @@ export class ReviewMemoryManager {
             const body = Array.from(this.records.values())
                 .map((record) => JSON.stringify(record))
                 .join('\n');
-            const tmp = `${this.memoryFilePath}.tmp`;
-            const fd = fs.openSync(tmp, 'w');
+            const compactStagingPath = `${this.memoryFilePath}.tmp`;
+            const fd = fs.openSync(compactStagingPath, 'w');
             try {
                 fs.writeSync(fd, `${body}\n`, undefined, 'utf8');
             } finally {
                 fs.closeSync(fd);
             }
-            fs.renameSync(tmp, this.memoryFilePath);
+            fs.renameSync(compactStagingPath, this.memoryFilePath);
             this.logLines = this.records.size;
         } catch {
             /* Best-effort: a failed compaction leaves the append-only log intact */

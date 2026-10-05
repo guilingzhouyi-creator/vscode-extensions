@@ -30,7 +30,7 @@ const {
   auditDispatchComplexity,
   ARCH_DISP_RULE_ID,
   auditTemplateComplexity,
-  ARCH_TMP_RULE_ID,
+  RULE_ARCH_TEMPLATE_COMPLEXITY,
   normalizeParameterNames,
   isTransparentForwarding,
   isPseudoCatchStatement,
@@ -441,7 +441,7 @@ function testArchTmpMonolithicTemplate() {
     'src/presentation/dashboard-template.ts',
     fakeCtx,
   );
-  const tmpIssue = badIssues.find((i) => i.rule === ARCH_TMP_RULE_ID);
+  const tmpIssue = badIssues.find((i) => i.rule === RULE_ARCH_TEMPLATE_COMPLEXITY);
   assert.ok(tmpIssue, 'Monolithic template function must emit ARCH-TMP-001');
   assert.strictEqual(tmpIssue.detail.ruleId, 'ARCH-TMP-001');
 

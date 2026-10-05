@@ -36,7 +36,7 @@ const PIPE_USER_MAX_LENGTH = 32;
 const RANDOM_SUFFIX_RADIX = 36;
 
 /** Exclusive end index of the random suffix in a `0.<base36>` temp-file token. */
-const TMP_SUFFIX_END_INDEX = 8;
+const REGISTRY_STAGING_SUFFIX_END = 8;
 
 /** Exclusive end index of the random suffix in a `0.<base36>` stale-file token. */
 const STALE_SUFFIX_END_INDEX = 6;
@@ -150,11 +150,11 @@ export function writeRegistry(projectHash: string, info: RegistryInfo): void {
     try {
         fs.mkdirSync(registryDir(), { recursive: true });
         const file = registryPath(projectHash);
-        const tmp = `${file}.tmp-${process.pid}-${Math.random()
+        const stagingRegistryPath = `${file}.tmp-${process.pid}-${Math.random()
             .toString(RANDOM_SUFFIX_RADIX)
-            .slice(2, TMP_SUFFIX_END_INDEX)}`;
-        fs.writeFileSync(tmp, JSON.stringify(info, null, 2), 'utf8');
-        fs.renameSync(tmp, file);
+            .slice(2, REGISTRY_STAGING_SUFFIX_END)}`;
+        fs.writeFileSync(stagingRegistryPath, JSON.stringify(info, null, 2), 'utf8');
+        fs.renameSync(stagingRegistryPath, file);
     } catch {
         /* Best-effort: registry write failure is non-fatal (client degrades to cold) */
     }

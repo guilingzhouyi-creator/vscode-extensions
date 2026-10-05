@@ -13,6 +13,8 @@ import type { AnalyzerContext, Issue } from '../../types';
 import { SEVERITY_WARNING } from '../../types';
 
 /** Canonical rule ID for monolithic template rendering complexity. */
+export const RULE_ARCH_TEMPLATE_COMPLEXITY = 'ARCH-TMP-001';
+/** @deprecated Backward-compatible alias for RULE_ARCH_TEMPLATE_COMPLEXITY. */
 export const ARCH_TMP_RULE_ID = 'ARCH-TMP-001';
 
 const ANALYZER_NAME = 'architecture';
@@ -113,9 +115,9 @@ function createTemplateIssue(
     lineSpan: number,
 ): Issue {
     return {
-        id: `${ANALYZER_NAME}:${ARCH_TMP_RULE_ID}:${filePath}:${state.startLine}`,
+        id: `${ANALYZER_NAME}:${RULE_ARCH_TEMPLATE_COMPLEXITY}:${filePath}:${state.startLine}`,
         analyzer: ANALYZER_NAME,
-        rule: ARCH_TMP_RULE_ID,
+        rule: RULE_ARCH_TEMPLATE_COMPLEXITY,
         severity: SEVERITY_WARNING,
         message: `Monolithic template/view renderer "${state.name}" spans ${lineSpan} lines with ${state.tagCount} markup tags without componentization.`,
         location: {
@@ -131,7 +133,7 @@ function createTemplateIssue(
             fixable: false,
             lineSpan,
             tagCount: state.tagCount,
-            ruleId: ARCH_TMP_RULE_ID,
+            ruleId: RULE_ARCH_TEMPLATE_COMPLEXITY,
         },
         suggestion: MSG_TEMPLATE_REFACTOR,
     };

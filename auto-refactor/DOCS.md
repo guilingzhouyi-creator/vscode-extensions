@@ -13,7 +13,7 @@
 | :--- | :--- | :--- |
 | **L1. Rust N-API 原生加速内核** | `crates/auto-refactor-core`<br/>`crates/ops-{diff,graph,pattern,mask,clone}`<br/>`src/core/native/` | **6 个 Cargo 成员 Crate**：64-bit SWAR 行扫描、Bit-Parallel Myers 差分、Lengauer-Tarjan 支配树、Tarjan SCC、单趟词法脱敏状态机、MinHash+LSH 克隆检测；配齐 `src/core/native/` 纯 TS 100% 字节等价回退桥 |
 | **L2. 跨语言解析与语义图底座** | `src/core/ast/`<br/>`src/core/semantic/`<br/>`src/core/cfg/` | **`NormalizedNode` + `SemanticGraph`**：支持 **TS/JS** (`oxc-parser` 0.144.0 + `typescript` 5.3)、**Python** (`tree-sitter-python`)、**Rust** (`tree-sitter-rust`)、**Go**、**GDScript 4**、**Shell**、**Markdown**、**JSON** 八大生态；按需投影 CFG / DFG / CallGraph |
-| **L3. 四层规则金字塔与分析器** | `src/core/rules/registry.ts`<br/>`src/analyzers/*.ts`<br/>`src/core/messages/` | **27 个内置分析器包**（完整覆盖包括 `ANALYZER_GO_MODERN`、`ANALYZER_SHELL_LINT`、`ANALYZER_GATE_ARCHITECTURE` 在内的领域专家）、**304 条注册规则**（289 Canonical `FAMILY-TOPIC-NNN` + 15 Legacy Aliases，文档覆盖率 **304/304**；全工作区 SSOT 单源目录统一收录 **385 条规则**）；机读纯英文（SARIF 2.1.0 / CAPP）+ 人读标准中文双轨文案解耦 |
+| **L3. 四层规则分层体系与分析器** | `src/core/rules/registry.ts`<br/>`src/analyzers/*.ts`<br/>`src/core/messages/` | **27 个内置分析器包**（完整覆盖包括 `ANALYZER_GO_MODERN`、`ANALYZER_SHELL_LINT`、`ANALYZER_GATE_ARCHITECTURE` 在内的领域专家）、**304 条注册规则**（289 Canonical `FAMILY-TOPIC-NNN` + 15 Legacy Aliases，文档覆盖率 **304/304**；全工作区 SSOT 单源目录统一收录 **385 条规则**）；机读纯英文（SARIF 2.1.0 / CAPP）+ 人读标准中文双轨文案解耦 |
 | **L4. 稀疏路由与双轨并发调度** | `src/core/router/sparseMoEGate.ts`<br/>`src/core/pipeline/dualTrackPipeline.ts`<br/>`src/core/scheduler/` | **27 专家 Sparse MoE 变更熵密（CED）路由器**（增量分析器绕过率 $\ge 70\%$）、`< 10ms` `ASTSliceExtractor` 局部切片快轨 + 全仓跨文件深轨、L1/L2 两级缓存与跨平台 NDJSON Daemon |
 | **L5. 三平面质量度量与自治度** | `src/core/scoring/`<br/>`src/core/dynamic/`<br/>`src/core/evolution/` | **静态平面**（10 大支柱 + 倒数型密度饱和曲线 + 算术/几何混合短板惩罚）+ **动态遥测平面** (`DynamicEvidenceDTO` + `RiskFusionEngine`) + **演化反馈平面**（Git 挖掘 + 梯度下降调权 + 代码自治度指数 **CAI**） |
 | **L6. Praxis 团队交付子系统** | `src/core/praxis/`<br/>`src/core/ring-buffer.ts`<br/>`src/core/rollback.ts` | **6 大正式治理服务门面** + **5 大 SPI 扩展端口**：涵盖语义 Diff 审查、Sub-10ms 切片审计与 CAPP 提示词、多 Agent 并发补丁冲突仲裁 (`GOV-AGN-001`)、重构轨迹配方学习 (`GOV-TRJ-001`)、反馈自适应监督器、`CircularDiffBuffer` R4 二进制转储与 TaskCard 原子级联回滚 |
@@ -48,11 +48,11 @@
 | [docs/03-incremental-and-diff/02-diff-interface-spec.md](./docs/03-incremental-and-diff/02-diff-interface-spec.md) | 64-bit SWAR、FNV-1a、Bit-Parallel Myers / Histogram Diff 算法栈与 `scanDiffStream` 事件流 | ✅ 已对齐 |
 | [docs/03-incremental-and-diff/03-praxis-integration-guide.md](./docs/03-incremental-and-diff/03-praxis-integration-guide.md) | `CircularDiffBuffer` 环形缓冲、`Uint8Array` R4 冷存淘汰与 `SemanticPraxisContextEnricher` | ✅ 已对齐 |
 
-### 🔍 第四层：四层规则金字塔与内置分析器矩阵 (`docs/04-analyzers-and-rules/`)
+### 🔍 第四层：四层规则分层体系与内置分析器矩阵 (`docs/04-analyzers-and-rules/`)
 
 | 文档路径 | 核心主题 | 状态 |
 | :--- | :--- | :---: |
-| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 四层规则金字塔、27 个内置分析器、双轨文案架构与 **304 条全量内置规则字典 (304/304)**（全工作区 SSOT 单源收录 385 条） | ✅ 已对齐 |
+| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 四层规则分层体系、27 个内置分析器、双轨文案架构与 **304 条全量内置规则字典 (304/304)**（全工作区 SSOT 单源收录 385 条） | ✅ 已对齐 |
 | [docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md](./docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md) | 声明式 `PatternKernel` 与编程式 `Analyzer` 插件契约、`cacheCustom` 隔离与评分表扩展 | ✅ 已对齐 |
 
 ### 📊 第五层：配置契约、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)
@@ -98,14 +98,14 @@
 | `npm run gate:comments` | 注释与六字段模块头一致性棘轮 (`scripts/gate-comments.js`) | 新增注释或模块头违规即阻断 |
 | `npm run validate-rules-registry` | 规则注册表、发射集与 `01-builtin-rules.md` 双向对齐校验 | 304/304 规则注册与文档覆盖率 100%，零孤儿规则，全工作区 385 规则对齐 |
 | `npm run validate-docs` | Markdown 文档围栏闭合 (`DOC-FEN-001`)、死链 (`DOC-LNK-001`) 与重复段落 (`DOC-DUP-001`) 校验 | 文档中心全量 `.md` 零违规 |
-| `npm run validate-praxis` | Praxis Diff 算子、五大 SPI、环形缓冲 R4 转储、流式事件与卡级回滚集成套件 | 6 大核心集成测试块全量 PASS |
+| `npm run validate-praxis` | Praxis Diff 算子、五大 SPI、环形缓冲 R4 转储、流式事件与卡级回滚集成套件 | 6 大核心集成测试套件断言成立 |
 | `auto-refactor gate` | `composite-quality-gate` 复合质量门禁结构化报告 | 统一评估静态分数、动态遥测、ELOC 密度、QED 投资回报、缺陷密度与债务变化，支持 `--stage pre-commit\|pre-push\|ci` |
 
 ---
 
 ## 💻 4. 生产级 CLI 命令全景 (CLI Commands Reference)
 
-`auto-refactor` 提供九大顶级 CLI 子命令，全量集成于统一参数解析与运行时分发引擎：
+`auto-refactor` 提供九大核心 CLI 子命令，全量集成于统一参数解析与运行时分发引擎：
 
 | 子命令 | 命令语法与参数示例 | 核心职责与交付输出 |
 | :--- | :--- | :--- |
