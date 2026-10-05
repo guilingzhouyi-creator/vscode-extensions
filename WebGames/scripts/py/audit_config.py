@@ -351,7 +351,7 @@ def main() -> int:
 
     rule_db = load_json(RULES_FILE)
 
-    # P2-5 修复：预加载全部配置文件构建 {rel_posix: data} 映射，供 foreign_key_reference
+    # 跨文件外键预加载：预加载全部配置文件构建 {rel_posix: data} 映射，供 foreign_key_reference
     # 的 target_file_override 跨文件校验解析目标文件（此前 all_configs 恒空导致机制失效——
     # 跨文件 FK 恒回退当前文件造成误报/漏报）；主循环仍会报告解析失败，此处仅预载可用配置
     all_configs: dict = {}

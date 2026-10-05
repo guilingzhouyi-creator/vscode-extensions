@@ -60,7 +60,6 @@ def find_node_executable() -> str:
     win_paths = [
         Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "nodejs" / "node.exe",
         Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "node" / "node.exe",
-        Path("E:/jiuguanNodeSystem/Node/node.exe"),
     ]
     for p in win_paths:
         if p.exists():

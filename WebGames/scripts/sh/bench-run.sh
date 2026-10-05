@@ -39,7 +39,7 @@ REPORT="$OUT_DIR/bench_${STAMP}.json"
 LATEST="$OUT_DIR/bench_latest.json"
 
 echo "【bench-run】开始运行基准（godot=$GODOT_BIN）..."
-# P39 S3：显式捕获真实退出码（禁止 if ! 取反吞码）
+# 显式捕获真实退出码（禁止 if ! 取反吞码）
 "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://benchmarks/bench_runner.gd -- "$REPORT"
 CODE=$?
 if [ "$CODE" -ne 0 ]; then

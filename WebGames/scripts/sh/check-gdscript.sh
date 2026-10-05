@@ -57,7 +57,7 @@ fi
 cd "$ROOT_DIR" || exit 1
 
 if [ "$PER_FILE" -eq 0 ]; then
-  # P2 审查收敛：--scope 单域同样走单进程批处理（batch_syntax_checker.gd 支持
+  # 批处理收敛：--scope 单域同样走单进程批处理（batch_syntax_checker.gd 支持
   # 命令行用户参数指定扫描目录），消除单域检查的逐文件冷启动；--per-file 显式
   # 逐文件模式不受影响（故障定位手段）。
   echo "【check-gdscript】执行单进程极速批处理语法检查（scope=$SCOPE）..."
@@ -84,7 +84,7 @@ if [ "$PER_FILE" -eq 0 ]; then
       [ -z "$res_path" ] && continue
       rel="${res_path#res://}"
       CHECKED=$((CHECKED + 1))
-      # P39 S3：显式捕获真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
+      # 显式捕获真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
       "$GODOT_BIN" --headless --quiet --check-only -s "$res_path" >"$LOG" 2>&1
       CODE=$?
       if [ "$CODE" -ne 0 ]; then
@@ -125,7 +125,7 @@ while IFS= read -r f; do
   rel="${f#"$ROOT_DIR"/}"
   rel_res="res://${rel//\\//}"
   CHECKED=$((CHECKED + 1))
-  # P39 S3：显式捕获真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
+  # 显式捕获真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
   "$GODOT_BIN" --headless --quiet --check-only -s "$rel_res" >"$LOG" 2>&1
   CODE=$?
   if [ "$CODE" -ne 0 ]; then

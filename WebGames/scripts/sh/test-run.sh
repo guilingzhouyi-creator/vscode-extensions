@@ -40,7 +40,7 @@ LATEST="$OUT_DIR/test_latest.json"
 LOG="$(mktemp)"
 
 echo "【test-run】开始运行单元测试（godot=$GODOT_BIN）..."
-# P39 S3：显式捕获 Godot 真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
+# 显式捕获 Godot 真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
 # 增加 180s 运行守护兜底，防死锁/阻塞挂起导致 CI 或终端永久卡死
 if command -v timeout >/dev/null 2>&1; then
   timeout 180s "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1

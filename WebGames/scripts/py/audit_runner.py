@@ -250,7 +250,7 @@ AUDIT_TASKS: List[AuditTask] = [
 def detect_git_changed_scope_tasks(root: Path) -> set[str]:
     """通过 git 状态分析返回 (scopes, engine_hits, scripts_need_full) 三要素。
 
-    P3.2（脚本库治理，2026-09-04）：scripts/ 变更定向映射——sh/ps1 同构对 → pair_parity；
+    脚本库变更定向映射：scripts/ 变更——sh/ps1 同构对 → pair_parity；
     引擎 py → 对应注册 task_id；audit_runner/audit_common 或未注册引擎 → scripts_need_full
     （调用方回退全量 audit 保守兜底）；gd/config/docs 切片语义保持原样。
     """
@@ -288,7 +288,7 @@ def detect_git_changed_scope_tasks(root: Path) -> set[str]:
             elif path_str.startswith("docs/") or path_str.endswith(".md"):
                 scopes.add("docs")
             elif path_str.startswith("scripts/"):
-                # P3.2：scripts 域定向映射（替代旧 else→all 全量回退）
+                # scripts 域定向映射（替代全量回退）
                 scopes.add("scripts")
                 base = path_str.rsplit("/", 1)[-1]
                 if base.endswith(".sh") or base.endswith(".ps1"):
@@ -391,7 +391,7 @@ def run_single_task(task: AuditTask, extra_args: List[str], py_exec: str) -> Tas
         )
 
 
-# P3.3（脚本库治理，2026-09-04）：通过任务 stderr 的 warning 级内容透出（失败任务保持全文）
+# 抽取任务 stderr 的 warning 级内容透出（失败任务保持全文）
 _WARN_PATTERN_RE = re.compile(r"WARN|Warning|warning|警告|提示级|⚠")
 
 

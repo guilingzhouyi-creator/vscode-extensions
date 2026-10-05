@@ -698,7 +698,7 @@ class SimplificationAuditor:
                     in_func = False
                 else:
                     if stripped.startswith(("if ", "for ", "while ", "match ", "elif ", "else:")):
-                        # 粗略估算缩进嵌套层级
+                        # 静态估算缩进嵌套层级
                         current_nesting = indent // 4 if "\t" not in ln[:indent] else len(ln[:indent].replace("    ", "\t"))
                         if current_nesting > max_func_nesting:
                             max_func_nesting = current_nesting

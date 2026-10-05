@@ -242,7 +242,7 @@ def main() -> int:
     # 频道候选 = 配置驱动频道 ∪ 代码字面量频道
     # 分级纪律（对齐存量收敛路线）：配置驱动频道（auth/hud/channels、channel_registry.legacy）
     # 与首段为已登记域 id 的代码频道走严格判定（ERROR）；存量宽松前缀频道（engine./lifecycle./
-    # prologue. 等历史频道）列入迁移收敛清单（WARN，P73/P74 归零），不阻断门禁。
+    # prologue. 等历史频道）列入迁移收敛清单（WARN，迁移收敛跟踪），不阻断门禁。
     channels: list[dict] = []
     seen: set[tuple] = set()
     for ch in collect_config_channels(domain_map) + collect_code_channels(domain_map):
@@ -280,7 +280,7 @@ def main() -> int:
                 findings.append({
                     "detector": "R1", "rule_id": "ADV-EVT-001", "severity": "WARN",
                     "channel": f"{ch['domain']}.{ch['event_name']}", "source": ch["source"],
-                    "message": f"存量宽松前缀频道 '{ch['domain']}' 未登记为领域 id——迁移收敛清单（P73/P74 归零），新代码禁止新增",
+                    "message": f"存量宽松前缀频道 '{ch['domain']}' 未登记为领域 id——迁移收敛清单（存量跟踪），新代码禁止新增",
                 })
 
     # R2 叙事键对齐：配置驱动频道严格 ERROR；存量代码频道缺键列入迁移收敛清单（WARN）
@@ -301,7 +301,7 @@ def main() -> int:
                 findings.append({
                     "detector": "R2", "rule_id": "ADV-EVT-002", "severity": "WARN",
                     "channel": f"{ch['domain']}.{ch['event_name']}", "source": ch["source"],
-                    "message": f"存量代码频道 '{ch['event_name']}' 在叙事表 {table} 中无对应模板键——迁移收敛清单（P73/P74 补键或显式结构化豁免），新代码禁止新增",
+                    "message": f"存量代码频道 '{ch['event_name']}' 在叙事表 {table} 中无对应模板键——迁移收敛清单（补键或显式结构化豁免），新代码禁止新增",
                 })
 
     # R3 注册表-常量对齐

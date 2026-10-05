@@ -51,7 +51,7 @@ RUN_FILES=()
 for i in $(seq 1 "$RUNS"); do
   TMP="$OUT_DIR/.bench_sweep_run_${STAMP}_${i}.json"
   echo "【bench-sweep】第 ${i}/${RUNS} 次运行基准..."
-  # P39 S3：显式捕获真实退出码（禁止 if ! 取反吞码）
+  # 显式捕获真实退出码（禁止 if ! 取反吞码）
   "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://benchmarks/bench_runner.gd -- "$TMP"
   CODE=$?
   if [ "$CODE" -ne 0 ]; then
