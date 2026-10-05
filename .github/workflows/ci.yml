@@ -296,6 +296,9 @@ jobs:
           printf "%s\n" \
             "feat(ci): 引入生产工程级提交信息门禁" \
             "" \
+            "[Project / 项目归属]" \
+            "- governance" \
+            "" \
             "[Why / 动机背景]" \
             "- 规范全仓 Git 提交信息格式，杜绝敷衍低密度提交。" \
             "" \
@@ -319,9 +322,45 @@ jobs:
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截缺少正文的 feat 提交"; exit 1
           fi
+          # 5.1 Rule 5.1 (CMG-PRJ-001) 项目归属格式区自检
+          # 5.1.1 缺少项目归属格式区应 exit 1
+          printf "%s\n" \
+            "feat(ci): 缺少项目归属格式区" \
+            "" \
+            "[Why / 动机背景]" \
+            "- 测试项目归属缺失拦截能力。" \
+            "" \
+            "[Added / 新增内容]" \
+            "- 验证拦截逻辑生效。" \
+            "" \
+            "[Verification / 验证结论]" \
+            "- CI 自动化自测。" > "$MSG_TEMP"
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截缺少项目归属的 feat 提交"; exit 1
+          fi
+          # 5.1.2 填入非法项目名称应 exit 1
+          printf "%s\n" \
+            "feat(ci): 填入非法项目名称" \
+            "" \
+            "[Project / 项目归属]: invalid-project-name" \
+            "" \
+            "[Why / 动机背景]" \
+            "- 测试非法项目名称拦截能力。" \
+            "" \
+            "[Added / 新增内容]" \
+            "- 验证拦截逻辑生效。" \
+            "" \
+            "[Verification / 验证结论]" \
+            "- CI 自动化自测。" > "$MSG_TEMP"
+          if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
+            echo "::error::commit-msg-gate 未拦截非法项目名称"; exit 1
+          fi
           # 6. Rule 7 规则 ID 反虚构自检 (未知规则 ID 应 exit 1)
           printf "%s\n" \
             "feat(ci): 测试虚构规则拦截" \
+            "" \
+            "[Project / 项目归属]" \
+            "- governance" \
             "" \
             "[Why]" \
             "- 验证未知规则 ID 拦截能力。" \
@@ -355,6 +394,9 @@ jobs:
           printf "%s\n" \
             "feat(ci): 彻底完美解决所有崩溃" \
             "" \
+            "[Project / 项目归属]" \
+            "- governance" \
+            "" \
             "[Why]" \
             "- 打造工业级架构。" \
             "" \
@@ -369,6 +411,9 @@ jobs:
           # 7.3 验证合法复合技术术语白名单放行
           printf "%s\n" \
             "fix(path): 修复跨平台文件查找未能转换为绝对路径的问题" \
+            "" \
+            "[Project / 项目归属]" \
+            "- governance" \
             "" \
             "[Why]" \
             "- 生成的临时文件需支持绝对路径计算。" \

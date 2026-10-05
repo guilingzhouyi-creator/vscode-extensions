@@ -162,10 +162,12 @@ fi
 FOUND_PROJECT_HEADER=false
 IN_PROJECT_SECTION=false
 DECLARED_PROJECTS=()
+PROJECT_HEADER_REGEX='^\[[[:space:]]*([pP][rR][oO][jJ][eE][cC][tT]|项目|项目归属)([[:space:]]*[/|][^]]*)?\]([[:space:]]*:[[:space:]]*(.*))?$'
 
-while IFS= read -r line || [[ -n "$line" ]]; do
-    trimmed_line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-    if [[ "$trimmed_line" =~ ^\[(Project|项目|项目归属)(/[^]]+)?\](:[[:space:]]*(.*))?$ ]]; then
+for ((i=2; i<TOTAL_LINES; i++)); do
+    cur_line="${CLEAN_LINES[$i]}"
+    trimmed_line=$(echo "$cur_line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    if [[ "$trimmed_line" =~ $PROJECT_HEADER_REGEX ]]; then
         FOUND_PROJECT_HEADER=true
         IN_PROJECT_SECTION=true
         inline_val="${BASH_REMATCH[4]}"
@@ -178,7 +180,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
                 fi
             done
         fi
-    elif [ "$IN_PROJECT_SECTION" = true ]; then
+    elif [[ "$IN_PROJECT_SECTION" == true ]]; then
         if [[ -z "$trimmed_line" ]]; then
             continue
         elif [[ "$trimmed_line" =~ ^\[.*\] ]]; then
@@ -196,10 +198,10 @@ while IFS= read -r line || [[ -n "$line" ]]; do
             IN_PROJECT_SECTION=false
         fi
     fi
-done <<< "$BODY_TEXT"
+done
 
 if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor)$ ]]; then
-    if [ "$FOUND_PROJECT_HEADER" = false ]; then
+    if [[ "$FOUND_PROJECT_HEADER" == false ]]; then
         echo "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($COMMIT_TYPE) 缺少项目归属格式区！"
         echo "   必须在正文首个结构化区块声明 [Project / 项目归属] 并指定所属项目："
         echo "   示例："

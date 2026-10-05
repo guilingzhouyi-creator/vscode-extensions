@@ -59,7 +59,8 @@ git add path/to/file1.gd path/to/file2.json
 ### Step 2: 提交信息编写与离线预审 (`commit-msg-gate`)
 在本地临时目录（如 scratch 目录）中创建提交信息文件 `commit_batch_N.txt`，必须满足以下硬性条件：
 - **标题**：`<type>(<scope>): <简述>`（长度 5~80 字符，不以句号结尾）；
-- **正文**：包含 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`、`[Verification]` 等标准区块；
+- **项目归属**：正文首个结构化区块必须显式声明 `[Project / 项目归属]`，枚举限定于四大受控项目：`workspace-timing | auto-refactor | WebGames | governance`（`CMG-PRJ-001`）；
+- **结构化区块**：包含 `[Project / 项目归属]`、`[Why]`、`[Added]`、`[Changed]`、`[Fixed]`、`[Verification]` 等标准区块；
 - **字数**：非轻量提交正文非空白字数 $\ge 30$；
 - **零黑话**：正文绝对严禁出现 `phase\d+`、`st\d+`、`p\d+`、`wip`、`temp` 等施工代号。归档案卷编号转换为纯粹产品价值表述；
 - **规则反虚构**：提及的规则 ID 必须在 `scripts/common/rule-catalog.json` 中真实存在。
