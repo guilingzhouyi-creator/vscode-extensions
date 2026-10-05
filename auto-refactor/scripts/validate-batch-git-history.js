@@ -164,7 +164,7 @@ function testNonExistentFileFallback() {
   assert.strictEqual(profile.totalCommits, 0);
   assert.strictEqual(profile.bugFixCommits, 0);
   assert.strictEqual(profile.uniqueAuthorsCount, 0);
-  assert.strictEqual(profile.isGitAvailable, true);
+  assert.strictEqual(profile.isGitAvailable, miner.isGitRepository(cwd));
 
   console.log('  ✔ [PASS] Non-existent file handled cleanly with 0 commits.');
 }

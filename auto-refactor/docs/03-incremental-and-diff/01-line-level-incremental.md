@@ -1,7 +1,7 @@
 # 01. 行级增量子树复用与 AST 切片提取
 
 > **所属层级**：L3 增量计算与向量化 Diff (`docs/03-incremental-and-diff/`)  
-> **对应代码真源**：`src/core/diff/incremental.ts`、`src/core/diff/line-map.ts`、`src/core/router/sliceExtractor.ts`、`src/core/intelligence/callChainImpactTracer.ts`
+> **对应代码真源**：`src/core/diff/incremental.ts`、`src/core/diff/edit-diff.ts`、`src/core/router/sliceExtractor.ts`、`src/core/intelligence/callChainImpactTracer.ts`
 
 ---
 
@@ -13,21 +13,21 @@
 flowchart LR
     OLD_AST["旧版 AST + 历史 Issue 集合"]
     EDIT["EditRanges (变更行区间)"]
-    LINEMAP["LineMap (SWAR 64-bit 行号平移表)"]
+    DIFF["EditDiff (SWAR 64-bit 行号差分表)"]
     REUSE["未相交子树: 直接平移起止行号复用 Issues"]
     SLICE["相交子树: ASTSliceExtractor 提取最小语法切片重审"]
     MERGED["合并输出 (与全量重扫 100% 字节等价)"]
 
     OLD_AST --> REUSE
-    EDIT --> LINEMAP
-    LINEMAP --> REUSE
+    EDIT --> DIFF
+    DIFF --> REUSE
     EDIT --> SLICE
     REUSE & SLICE --> MERGED
 ```
 
-### 1.1 双向坐标平移映射 (`LineMap`)
+### 1.1 双向坐标平移映射 (`EditRanges`)
 
-位于 `src/core/diff/line-map.ts` 的行映射器维护新旧文本的行偏移差分表：
+位于 `src/core/diff/edit-diff.ts` 的差分计算器维护新旧文本的行偏移差分表：
 
 1. **不相交判定**：对于旧文件中位于 `[startLine, endLine]` 的函数或类节点，若该区间与所有 `EditRange` 均无交集，则其内部局部规则（如圈复杂度、局部变量命名、函数内魔法数）的结果必然不变。
 2. **坐标平移复用**：直接将该子树关联的历史 `Issue` 行号按 `LineMap.oldToNew(line)` 平移 $\Delta L$ 行，跳过对该子树的二次遍历。

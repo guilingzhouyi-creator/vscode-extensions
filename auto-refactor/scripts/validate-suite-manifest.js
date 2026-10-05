@@ -32,11 +32,8 @@ const SCRIPTS_DIR = path.join(ROOT, 'scripts');
 const EXEMPT = new Map([
   // The parallel engine itself: registering it would recurse.
   ['test-parallel.js', 'the parallel engine itself; invoked by npm test, not by itself'],
-  // Entry point for the parallel engine's helpers.
-  ['test-result-codec.js', 'library consumed by test-parallel.js, not a standalone suite'],
   // Fixture builders and shared helpers, not suites.
   ['build-native.js', 'native build helper invoked by npm run build:native'],
-  ['compile-project.js', 'programmatic TypeScript compiler helper invoked before tests'],
   ['run-self-audit.js', 'helper invoked by validate-self-audit.js and validate-self-refactor.js'],
   ['test-rust.js', 'invoked by gate:rust rather than by the parallel engine'],
   // Gate entry points already wired into `npm run gate`; running them again inside
@@ -48,9 +45,6 @@ const EXEMPT = new Map([
     'gate-rust.js',
     'invoked by the gate chain as gate:rust; runs cargo stages, not a JS assertion suite',
   ],
-  // One-off maintenance script for the core layering migration.
-  ['migrate-core-m2.js', 'one-shot migration helper; not a recurring assertion'],
-  ['sample-expert-weights.js', 'sample data generator for experts-weights.json'],
 ]);
 
 /** Benchmark scripts: measured by `npm run benchmark`, not by correctness assertions. */

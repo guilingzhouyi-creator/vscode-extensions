@@ -128,6 +128,7 @@
     "hotpath-ablate": "node scripts/bench-hot-paths.js --ablate",
     "hotpath-baseline:update": "node scripts/bench-hot-paths.js --update",
     "bench-baselines": "node scripts/bench-baselines.js",
+    "bench-deep-stress": "node scripts/bench-deep-stress.js",
     "bench-warm": "node scripts/bench-warm.js",
     "bench-diff": "node scripts/bench-diff.js",
     "bench-quant": "node scripts/bench-quant.js",

@@ -173,6 +173,7 @@ export class SparseMoEGateRouter {
 
         const unionActive = new Set<string>();
         const allReasons: string[] = [];
+        const seenReasons = new Set<string>();
 
         for (const slice of slices) {
             const plan = this.routeSlice(slice, allAvailable);
@@ -180,7 +181,8 @@ export class SparseMoEGateRouter {
                 unionActive.add(a);
             }
             for (const r of plan.reasons) {
-                if (!allReasons.includes(r)) {
+                if (!seenReasons.has(r)) {
+                    seenReasons.add(r);
                     allReasons.push(r);
                 }
             }

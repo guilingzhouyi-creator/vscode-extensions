@@ -137,6 +137,7 @@ export class GitHistoryMiner {
 
     private batchCache: Map<string, GitFileHistoryProfile> | null = null;
     private batchCacheCwd: string | null = null;
+    private batchGitAvailable: boolean = false;
 
     /**
      * Check if batch history cache is currently loaded.
@@ -153,6 +154,7 @@ export class GitHistoryMiner {
     public clearCache(): void {
         this.batchCache = null;
         this.batchCacheCwd = null;
+        this.batchGitAvailable = false;
     }
 
     /**
@@ -190,7 +192,8 @@ export class GitHistoryMiner {
     ): Map<string, GitFileHistoryProfile> {
         const cwd = targetDir || this.repoRoot || process.cwd();
         const profilesMap = new Map<string, GitFileHistoryProfile>();
-        if (!this.isGitRepository(cwd)) {
+        this.batchGitAvailable = this.isGitRepository(cwd);
+        if (!this.batchGitAvailable) {
             this.batchCache = profilesMap;
             this.batchCacheCwd = cwd;
             return profilesMap;
@@ -296,7 +299,7 @@ export class GitHistoryMiner {
             }
             return {
                 filePath: targetFilePath,
-                isGitAvailable: true,
+                isGitAvailable: this.batchGitAvailable,
                 totalCommits: 0,
                 bugFixCommits: 0,
                 authorCommitCounts: {},
