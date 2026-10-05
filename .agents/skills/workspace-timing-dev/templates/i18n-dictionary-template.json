@@ -1,0 +1,10 @@
+{
+  "dashboard.title": "工作区工时统计",
+  "dashboard.today": "今日时长",
+  "dashboard.total": "累计时长",
+  "dashboard.weeklyLimit": "周工时上限",
+  "dashboard.commands.exportCsv": "导出 CSV 报表",
+  "dashboard.commands.reset": "重置计时数据",
+  "dashboard.tooltips.activityCurve": "活跃曲线 (纯白鲜亮刻度)",
+  "dialog.confirmReset": "确认重置当前工作区的所有计时数据吗？此操作前将自动生成安全快照。"
+}

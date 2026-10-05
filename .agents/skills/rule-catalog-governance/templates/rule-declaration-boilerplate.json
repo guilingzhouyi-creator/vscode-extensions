@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "ARCH-NEW-001",
+  "category": "architecture",
+  "severity": "error",
+  "title": "新规则描述概要 (祈使句)",
+  "analyzer": "architecture",
+  "family": "architecture",
+  "dimension": "topological_coupling",
+  "description": "详细说明该规则检测的反模式以及引发的工程隐患。",
+  "rationale": "解释为什么要在此处设立硬性门禁，设计依据与权威指针。",
+  "remediation": "提供具体的重构与消除建议代码示例。"
+}
