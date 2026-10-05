@@ -1,0 +1,117 @@
+---
+name: complexity-budget
+description: >-
+  代码复杂度与体积双轨预算控制工作流。指导 Agent 在编写、重构或审查代码时，
+  严格看守 AST 局部切片守卫（CC<=15, Depth<=4, Noise<=4.0）、单文件双轨体积（ELOC<=900, LOC<=1400）、
+  1:3 动态反推包络与高负荷契约注释密度，平铺控制流并拦截虚假重构刷分。
+---
+
+# complexity-budget — 代码复杂度与体积双轨预算控制工作流
+
+本技能规范了全仓源码文件的复杂度切片守卫、有效代码行（ELOC）与物理行（LOC）双轨预算控制以及控制流降维标准。
+
+---
+
+## 一、 适用场景与触发条件
+
+在以下任一场景中，必须激活本技能实施复杂度预算看守：
+1. **编写新功能或重构模块**：新增或修改任何语言（`.ts`, `.js`, `.gd`, `.py`, `.sh` 等）的源码文件；
+2. **函数逻辑扩张**：单函数出现多重嵌套判断（`if` / `switch` / `try`）、复杂循环体或长链路链式调用；
+3. **文件行数预警**：源码文件行数逼近或超过 600 行，需要进行模块化拆分或评估代码纯净密度；
+4. **提交前门禁自检**：在执行 `pre-commit` 门禁前，确保所有暂存区文件满足 AST 局部切片守卫。
+
+---
+
+## 二、 AST 局部切片刚性预算 (`GATE-AST-001`)
+
+暂存区生产代码与工具脚本均受 AST 局部切片守卫约束，以单个函数/方法为最小审计切片，指标一票否决：
+
+| 指标维度 | 刚性阈值 | 语义与违规后果 | 治理与修复手段 |
+| :--- | :---: | :--- | :--- |
+| **单函数圈复杂度 (CC)** | $\text{CC} \le 15$ | 判定分支与控制流节点过多，单测难以覆盖 | 提取子函数，采用表驱动或查表策略分派 |
+| **控制流嵌套深度 (Depth)** | $\text{Depth} \le 4$ | 缩进层次过深，认知负荷爆炸 | 采用卫语句提前返回（Early Return），平铺控制流 |
+| **单行代码噪声比 (Noise)** | $\text{Noise} \le 4.0$ | 单行非标识符标点/操作符符号过度堆叠 | 拆分为中间语义变量，避免超长内联复合表达式 |
+
+---
+
+## 三、 单文件双轨体积与 1:3 动态包络模型
+
+全仓源码以**有效代码行（ELOC）**为第一复杂度红线，以**物理总行数（LOC）**为编辑器防膨胀兜底线：
+
+### 1. 刚性红线绝对预算
+- **有效代码行预算**：$\text{ELOC} \le 900$（严格剔除单行与多行注释及空行，真实衡量纯净语义复杂度）；
+- **物理行数兜底线**：$\text{LOC} \le 1400$（保护编辑器排版与滚动体验，杜绝超大单体文件）。
+
+### 2. 1:3 密度比双向动态反推包络
+单靠固定上限会导致低逻辑文件恶意膨胀或高逻辑文件过度剔除注释，因此在 `scripts/common/evaluate-eloc-budget.js` 中实施 1:3 动态反推约束：
+
+1. **正向动态物理上限**：
+   $$\text{LOC}_{dynamic\_max} = \min(1400, \max(150, \lceil \text{ELOC} \times 3.0 \rceil))$$
+   低业务逻辑文件其物理行数被严格等比收敛，严禁通过插入无效空行注水扩张。
+2. **反向动态逻辑下限**：
+   当 $\text{LOC} \ge 250$ 时，要求 $\text{ELOC} \ge \lfloor \text{LOC} / 3.0 \rfloor$（即纯代码密度 $\ge 33.3\%$）。大文件必须承载相称的业务逻辑，杜绝大篇幅冗余排版。
+3. **高负荷契约注释密度约束**：
+   当 $\text{ELOC} \ge 600$ 时，反推要求注释占比 $\ge 8\%$（$\text{Comments} / \text{LOC} \ge 0.08$）。严禁为压低物理行数而恶意删减架构契约、状态机流转说明或 JSDoc。
+
+---
+
+## 四、 控制流平铺与认知降维设计模式
+
+### 1. 卫语句提前返回 (Guard Clauses)
+```typescript
+// ❌ 错误示范：深层嵌套，Depth >= 4
+function processEvent(event: Event) {
+    if (event.isValid) {
+        if (event.hasPayload) {
+            if (event.type === 'DATA') {
+                for (const item of event.items) {
+                    if (item.active) {
+                        handleItem(item);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ✅ 正确示范：平铺控制流，Depth <= 2
+function processEvent(event: Event): void {
+    if (!event.isValid || !event.hasPayload || event.type !== 'DATA') {
+        return;
+    }
+    for (const item of event.items) {
+        if (item.active) {
+            handleItem(item);
+        }
+    }
+}
+```
+
+### 2. 策略映射表替代多分支 Switch
+对于跨条件的多路分派，将分支处理逻辑下沉为独立的纯函数，顶层通过对象字典或 `Map` 驱动派发，圈复杂度降至 $\mathcal{O}(1)$。
+
+---
+
+## 五、 防刷分与虚假收益熔断守卫 (`BLOCK_GAMING_DETECTED`)
+
+在重构与优化作业中，严禁制造表面虚假产出：
+- **禁止手段**：单纯搬移常量、调整格式空白、重排 `import`、或生成无调用的空壳桩函数；
+- **熔断判定**：改动若语义有效代码变化量 $\text{ELOC}_{semantic} \le 15\%$ 且无真实技术债净消除，系统将强制冻结收益并触发 `BLOCK_GAMING_DETECTED` 熔断阻断。
+
+---
+
+## 六、 本地预审指令与断言标准
+
+在提交前，必须运行以下命令进行本地验证：
+
+```powershell
+# 1. 单独执行全仓双轨体积与 1:3 动态包络评估
+node scripts/common/evaluate-eloc-budget.js
+
+# 2. 检查暂存区 AST 局部切片与物理行数（Gate 5 与 Gate 9）
+pwsh -File scripts/ps1/pre-commit-gate.ps1
+```
+
+**质性断言标准**：
+- 控制台输出 `✔ [PASS]`，无任何函数触碰 CC>15、Depth>4 或 Noise>4.0 红线；
+- 暂存区所有修改文件其有效行与总行数严格位于 1:3 黄金包络带内，退出码为 0。

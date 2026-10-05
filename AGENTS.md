@@ -9,14 +9,14 @@
 | 作业场景与任务意图 | 刚性约束与一票否决指标 | 权威真源指针 (SSOT) | 关联技能 (Skill) | 本地预审与验证命令 |
 | :--- | :--- | :--- | :--- | :--- |
 | **Git 提交与分批工作流** | 必填 `[Project]`；有效字数 $\ge 30$；零黑话；纯客观技术事实 | [commit-msg-forbidden-terms.json](scripts/common/commit-msg-forbidden-terms.json)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [batch-commit](.agents/skills/batch-commit/SKILL.md) | `pwsh -File scripts/ps1/commit-msg-gate.ps1 <msg-file>` |
-| **代码编写与体积控制** | $\text{CC}\le 15, \text{Depth}\le 4, \text{Noise}\le 4.0$；$\text{ELOC}\le 900, \text{LOC}\le 1400$ | [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) | — | `node scripts/common/evaluate-eloc-budget.js` |
+| **代码编写与体积控制** | $\text{CC}\le 15, \text{Depth}\le 4, \text{Noise}\le 4.0$；$\text{ELOC}\le 900, \text{LOC}\le 1400$ | [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) | `node scripts/common/evaluate-eloc-budget.js` |
 | **模块导出与门面设计** | $\text{ELOC}\ge 15$ 或不可变冻结；单行跳板清零 (`ARCH-ABS-001`) | [facade-discipline](.agents/skills/facade-discipline/SKILL.md) | [facade-discipline](.agents/skills/facade-discipline/SKILL.md) | `node auto-refactor/scripts/validate-facade-governance.js` |
 | **门禁脚本与跨平台调用** | 子进程工作目录显式隔离；pwsh 7+ 优先；`set -euo pipefail` 平铺捕获 | [gate-governance](.agents/skills/gate-governance/SKILL.md)<br/>[scripts/README.md](scripts/README.md) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/pre-commit-gate.ps1` |
-| **`workspace-timing/` 研发** | 五层解耦；RingBuffer+Journal 崩溃安全；UI 100% 双语字典 | [workspace-timing/README.md](workspace-timing/README.md) | — | `cd workspace-timing && npm run test:fast` |
-| **`auto-refactor/` 研发** | 243 规则自测全通过；Rust 与 TS 100% 等价；QED/CAI 质量模型 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | — | `cd auto-refactor && npm test` |
-| **`WebGames/` 研发** | 全域配置驱动；循环内零堆分配 (`ADV-PRF-002`)；先四阶段方案后编码 | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[WebGames/config/README.md](WebGames/config/README.md) | — | `cd WebGames && pwsh scripts/ps1/audit-all.ps1` |
-| **全工作区统一质量审查** | 5 大支柱 100% 绿色通行；零规则漂移 (`RCFG-RULE-DRIFT`) | [scripts/README.md](scripts/README.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | — | `pwsh -File scripts/ps1/audit-all.ps1` |
-| **顶层蓝图与历史全宗** | Cell 平权自治体系；一体两面 Diff；归档案卷元数据规范 | [agent-native-system-blueprint.md](docs/agent-native-system-blueprint.md)<br/>[deliverables/README.md](archive/deliverables/README.md) | — | — |
+| **`workspace-timing/` 研发** | 五层解耦；RingBuffer+Journal 崩溃安全；UI 100% 双语字典 | [workspace-timing/README.md](workspace-timing/README.md) | [workspace-timing-dev](.agents/skills/workspace-timing-dev/SKILL.md) | `cd workspace-timing && npm run test:fast` |
+| **`auto-refactor/` 研发** | 243 规则自测全通过；Rust 与 TS 100% 等价；QED/CAI 质量模型 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `cd auto-refactor && npm test` |
+| **`WebGames/` 研发** | 全域配置驱动；循环内零堆分配 (`ADV-PRF-002`)；先四阶段方案后编码 | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[WebGames/config/README.md](WebGames/config/README.md) | [webgames-workflow](.agents/skills/webgames-workflow/SKILL.md) | `cd WebGames && pwsh scripts/ps1/audit-all.ps1` |
+| **全工作区统一质量审查** | 5 大支柱 100% 绿色通行；零规则漂移 (`RCFG-RULE-DRIFT`) | [scripts/README.md](scripts/README.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/audit-all.ps1` |
+| **顶层蓝图与历史全宗** | Cell 平权自治体系；一体两面 Diff；归档案卷元数据规范 | [agent-native-system-blueprint.md](docs/agent-native-system-blueprint.md)<br/>[deliverables/README.md](archive/deliverables/README.md) | [docs-archive-governance](.agents/skills/docs-archive-governance/SKILL.md) | — |
 
 ---
 
