@@ -1,5 +1,5 @@
 // @wt-script common/resource-math
-// @purpose 结构化资源拓扑数学库 v6.0：语义体积SV/倒排索引稀疏图/多模态内聚度/Tarjan SCC循环解耦/三元风险/贝叶斯先验
+// @purpose 结构化资源拓扑数学库：语义体积SV/倒排索引稀疏图/多模态内聚度/Tarjan SCC循环解耦/三元风险/贝叶斯先验
 // @origin native
 // @usage import { detectLanguage, computeSemanticVolume, computeDynamicThresholds, buildSparseCandidateGraph, tarjanSCC, computeTripartiteRisk } from './resource-math.js'
 // @exit 不适用（库模块）
@@ -145,7 +145,7 @@ function isDeclarationLine(trimmed: string, lang: SupportedLanguage): boolean {
 /**
  * [Heuristic] 计算语义体积 (Semantic Volume, SV) 与纯净有效行 (ELOC)
  * SV(f) = w_e * ELOC + w_a * N_AST + w_s * N_symbol + w_l * N_literal + w_d * Depth_AST
- * 彻底防御 Agent 通过压行、一行多声明规避基于纯行数的容量门禁
+ * 有效防御 Agent 通过压行、一行多声明规避基于纯行数的容量门禁
  */
 export function computeSemanticVolume(content: string, lang: SupportedLanguage): SemanticVolumeResult {
     const rawLines = content.split(/\r?\n/);
@@ -325,7 +325,7 @@ export interface SparseGraph {
 
 /**
  * [Hard Invariant & Heuristic] 基于倒排索引构建 O(|E_s|) 稀疏候选图
- * 仅对拥有共同调用方、共同类型或共同词根的符号建边，彻底消减 O(n^2) 稠密全量对比
+ * 仅对拥有共同调用方、共同类型或共同词根的符号建边，收敛边规模至稀疏图，消除 O(n^2) 稠密对比开销
  */
 export function buildSparseCandidateGraph(
     symbols: string[],

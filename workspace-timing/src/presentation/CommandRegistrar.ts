@@ -80,12 +80,12 @@ export class CommandRegistrar {
         // 切换状态栏显示模式（循环切换后持久化，重载窗口后保持用户选择）
         this.registerCommand('workspaceTiming.showStatus', () => {
             if (!statusBar) { this.noWorkspaceMsg(); return; }
-            const newMode = statusBar.cycleMode();
-            persistTimingConfig({ statusBarMode: newMode }).catch(err =>
+            const nextMode = statusBar.cycleMode();
+            persistTimingConfig({ statusBarMode: nextMode }).catch(err =>
                 log(LogLevel.Error, 'showStatus persist failed', err as Error)
             );
             vscode.window.showInformationMessage(
-                format(t()['cmd.modeSwitched'], statusBarModeLabel(newMode))
+                format(t()['cmd.modeSwitched'], statusBarModeLabel(nextMode))
             );
         });
     }

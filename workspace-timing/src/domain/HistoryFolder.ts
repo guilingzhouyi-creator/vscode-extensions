@@ -304,10 +304,10 @@ export function migrateToFolded(
     now = Date.now(),
 ): { sessions: TimeSession[]; dailyTotals: DailyTotalsMap; foldedSessionCount: number } {
     const opt = parseFoldOptions(options, now);
-    const res = recycleSessions(data.sessions ?? [], data.dailyTotals, opt);
+    const recycleResult = recycleSessions(data.sessions ?? [], data.dailyTotals, opt);
     return {
-        sessions: res.keptSessions,
-        dailyTotals: res.updatedDailyTotals,
-        foldedSessionCount: res.foldedSessionCount,
+        sessions: recycleResult.keptSessions,
+        dailyTotals: recycleResult.updatedDailyTotals,
+        foldedSessionCount: recycleResult.foldedSessionCount,
     };
 }

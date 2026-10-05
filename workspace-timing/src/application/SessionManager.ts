@@ -35,7 +35,7 @@ export class SessionManager {
     private readonly journal: JournalWriter;
     private readonly recovery: RecoveryService;
     private maxSessions: number;
-    /** 原始会话保留窗（天）；0=永不折叠 */
+    /** 原始会话保留窗（天）；0=不折叠 */
     private readonly _rawRetentionDays: number;
     /** checkpoint 计数：折叠按低频节流执行 */
     private _checkpointCount = 0;
@@ -75,7 +75,7 @@ export class SessionManager {
      */
     foldIfNeeded(): void {
         const data = this.timer.data;
-        const res = migrateToFolded(
+        const foldResult = migrateToFolded(
             { sessions: data.sessions, dailyTotals: data.dailyTotals },
             {
                 retentionDays: this._rawRetentionDays,
@@ -84,16 +84,16 @@ export class SessionManager {
                 pruneWeekly: true,
             },
         );
-        if (res.foldedSessionCount === 0) return;
+        if (foldResult.foldedSessionCount === 0) return;
         this.timer.replaceData({
             ...data,
-            sessions: res.sessions,
-            dailyTotals: res.dailyTotals,
+            sessions: foldResult.sessions,
+            dailyTotals: foldResult.dailyTotals,
         });
         log(
             LogLevel.Info,
-            `SessionManager: folded ${res.foldedSessionCount} expired/overflow session(s) into ` +
-                `${Object.keys(res.dailyTotals).length} daily bucket(s)`,
+            `SessionManager: folded ${foldResult.foldedSessionCount} expired/overflow session(s) into ` +
+                `${Object.keys(foldResult.dailyTotals).length} daily bucket(s)`,
         );
     }
 

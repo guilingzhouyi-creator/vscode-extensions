@@ -6,7 +6,7 @@
  * 零外部依赖。
  */
 
-/** 数据格式当前版本（v2：新增 dailyTotals 沉淀层） */
+/** 数据格式当前版本：数据存储格式版本 2（扩充 dailyTotals 沉淀层） */
 export const LATEST_VERSION = 2;
 
 // ─── 基础单位转换常数（消灭魔法数字）──────────────
@@ -45,7 +45,7 @@ export const DEFAULT_JOURNAL_FLUSH_MS = DEFAULT_JOURNAL_FLUSH_SECONDS * MS_PER_S
 export const MAX_SESSIONS_PER_DAY = 20;
 /** 会话明细保留上限——兜底安全值（每周 7 天 * 20 条 = 140 条） */
 export const DEFAULT_MAX_SESSIONS = 140;
-/** 原始会话保留窗（天）：超出窗口的会话按日折叠进 dailyTotals；0=永不折叠 */
+/** 原始会话保留窗（天）：超出窗口的会话按日折叠进 dailyTotals；0=不折叠（保留全量原始明细） */
 export const DEFAULT_RAW_RETENTION_DAYS = 45;
 /** journal 文件大小告警阈值 */
 export const JOURNAL_WARN_BYTES = JOURNAL_WARN_MB * BYTES_PER_MB;
@@ -217,8 +217,8 @@ export interface WorkspaceTimingData {
   sessions: TimeSession[];
 
   /**
-   * 日聚合沉淀层（v2+）：超出原始保留窗的会话按日折叠于此。
-   * 口径与 TimeAggregator 完全一致；缺省（v1 数据）表示尚未迁移。
+   * 日聚合沉淀层（数据存储格式版本 2 及以上）：超出原始保留窗的会话按日折叠于此。
+   * 口径与 TimeAggregator 完全一致；缺省（数据存储格式版本 1 数据）表示尚未迁移。
    */
   dailyTotals?: DailyTotalsMap;
 
@@ -285,7 +285,7 @@ export interface TimingConfig {
   statusBarMode: StatusBarMode;
   /** 历史会话保留上限（0 = 不限）。兜底安全值；常规治理走 rawRetentionDays 折叠 */
   maxSessions: number;
-  /** 原始会话保留窗（天）：超窗会话按日折叠进 dailyTotals；0 = 永不折叠 */
+  /** 原始会话保留窗（天）：超窗会话按日折叠进 dailyTotals；0=不折叠（保留全量原始明细） */
   historyRawRetentionDays: number;
   /** 破坏性操作（重置/清除历史/还原）前自动写安全快照 */
   safetySnapshot: boolean;

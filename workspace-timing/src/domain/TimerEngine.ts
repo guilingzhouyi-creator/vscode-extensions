@@ -207,12 +207,12 @@ export class TimerEngine {
 
         if (elapsed > 0) {
             const segs = splitByNaturalDay(this._sessionStartMs, sleepStartMs);
-            const newSessions = segs.length > 0
+            const segmentedSessions = segs.length > 0
                 ? segs
                 : [{ startMs: this._sessionStartMs, endMs: sleepStartMs, durationMs: elapsed }];
             this._data.sessions = TimerEngine.frozenSessions([
                 ...this._data.sessions,
-                ...newSessions,
+                ...segmentedSessions,
             ]);
             this._todayEndedMs += sealedToday;
         }

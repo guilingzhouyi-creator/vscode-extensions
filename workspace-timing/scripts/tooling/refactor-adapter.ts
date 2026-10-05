@@ -197,21 +197,21 @@ for (const issue of report.issues ?? []) {
     } else if (sup) {
         findings.push({ ...f, evidence: `${f.evidence ?? ''} | 豁免降级理由: ${sup.reason}` });
     } else if (issue.isNew) {
-        findings.push({ ...f, isNew: true, evidence: `${f.evidence ?? ''} | [NEW] 超出基线` });
+        findings.push({ ...f, isNew: true, evidence: `${f.evidence ?? ''} | [DELTA] 超出基线` });
     } else {
         findings.push(f);
     }
 }
 
 // ── 7. 裁决：阻断级严重度（引擎已按 suppressions 调整）+ 棘轮新增（blockOnNewSeverity）──
-const newFindings = findings.filter((f) => f.isNew === true);
-const newBlocking = newFindings.filter((f) => rankSev(f.severity) >= rankSev(ratchetCfg.blockOnNewSeverity ?? 'warning'));
+const deltaFindings = findings.filter((f) => f.isNew === true);
+const deltaBlocking = deltaFindings.filter((f) => rankSev(f.severity) >= rankSev(ratchetCfg.blockOnNewSeverity ?? 'warning'));
 const blockOn = gate.blockOnSeverity ?? 'error';
 const blocking = findings.filter((f) => rankSev(f.severity) >= rankSev(blockOn));
-const status = (blocking.length > 0 || newBlocking.length > 0) ? STATUS.FAIL : STATUS.PASS;
+const status = (blocking.length > 0 || deltaBlocking.length > 0) ? STATUS.FAIL : STATUS.PASS;
 
 const s = report.summary ?? {};
-log.info(`扫描 ${s.filesScanned ?? '?'} 文件 / ${s.issuesTotal ?? '?'} 发现（映射后 ${findings.length}，带理由豁免 ${suppressed.length}，新增阻断 ${newBlocking.length}）`);
+log.info(`扫描 ${s.filesScanned ?? '?'} 文件 / ${s.issuesTotal ?? '?'} 发现（映射后 ${findings.length}，带理由豁免 ${suppressed.length}，新增阻断 ${deltaBlocking.length}）`);
 
 finish(status, findings, {
     filesScanned: s.filesScanned ?? 0,
@@ -221,12 +221,12 @@ finish(status, findings, {
         args.updateBaseline
             ? `基线已由引擎记录至 ${toRel(baselinePath)}（禁止用于消音：仅应有理由时执行）`
             : baselineExists
-                ? `棘轮比对（grouped）：新增 ${newFindings.length} 条`
+                ? `棘轮比对（grouped）：新增 ${deltaFindings.length} 条`
                 : '无棘轮基线：新增判定本轮跳过（--update-baseline 记录）',
         ...(s.warnings ?? []),
     ],
     tool: { resolved: toRel(cliPath), version: toolVersion, durationMs: s.durationMs },
     engineSummary: s,
     suppressed,
-    ratchet: { newCount: newFindings.length, blockOnNewSeverity: ratchetCfg.blockOnNewSeverity ?? 'warning', baseline: toRel(baselinePath) },
+    ratchet: { newCount: deltaFindings.length, blockOnNewSeverity: ratchetCfg.blockOnNewSeverity ?? 'warning', baseline: toRel(baselinePath) },
 });

@@ -116,7 +116,7 @@ if (clText === null) {
 
   // DOC-CL-006：版本日期合法且不超前（防手滑写成未来日期）。
   // ★ 日期合法性用本地时区分量校验——经 toISOString 回转会在 UTC+8 把本地零点判成前一天
-  //   （本扩展 0.4.0 修过的同类时区错误，检查器自己也不能犯）。
+  //   （避免因 UTC 转换导致本地时区跨日边界判定偏差）。
   const todayStr = new Date().toISOString().slice(0, 10);
   for (const v of versions) {
     const m = v.date.match(/^(\d{4})-(\d{2})-(\d{2})$/);

@@ -178,10 +178,10 @@ export class TimerOrchestrator {
      * 禁用状态变更时的编排处理
      * 由 ConfigWatcher 或命令触发
      */
-    async onDisableStateChanged(newState: DisableState): Promise<void> {
-        log(LogLevel.Info, `TimerOrchestrator: disable state changed to ${newState}`);
+    async onDisableStateChanged(targetState: DisableState): Promise<void> {
+        log(LogLevel.Info, `TimerOrchestrator: disable state changed to ${targetState}`);
 
-        switch (newState) {
+        switch (targetState) {
             case 'enabled':
                 if (this._state === ORCHESTRATOR_STATES.DISABLED || this._state === ORCHESTRATOR_STATES.STOPPED) {
                     await this.start();

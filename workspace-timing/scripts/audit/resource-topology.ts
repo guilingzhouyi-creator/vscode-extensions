@@ -1,5 +1,5 @@
 // @wt-script audit/resource-topology
-// @purpose L3 结构化资源命名拓扑与智能拆分审查 v6.0：认识论四分类/语义体积SV抗压行/倒排索引稀疏图/三元风险/Tarjan SCC
+// @purpose L3 结构化资源命名拓扑与智能拆分审查：认识论四分类/语义体积SV抗压行/倒排索引稀疏图/三元风险/Tarjan SCC
 // @origin native
 // @usage node dist/audit/resource-topology.js [--json] [--strict] [--root <dir>]
 // @exit 0=PASS 1=存在 error/warning 阻断 2=配置错误
