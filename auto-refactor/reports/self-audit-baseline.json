@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791213911604",
-  "timestamp": "2026-10-05T15:25:24.036Z",
+  "snapshotId": "snapshot-v0.4.0-1791214176331",
+  "timestamp": "2026-10-05T15:29:49.453Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,7 +13,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 590,
-    "durationMs": 11409
+    "durationMs": 12002
   },
   "metrics": {
     "compositeScore": 99.16,
@@ -1336,25 +1336,25 @@
     "runEloc": {
       "processed": 119209,
       "unique": 96698,
-      "changed": 2391,
-      "semantic": 1913,
+      "changed": 2401,
+      "semantic": 1921,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 1196,
+      "added": 1201,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791213911603,
-      "totalRuns": 139,
+      "endMs": 1791214176330,
+      "totalRuns": 143,
       "eloc": {
-        "processedTotal": 16456719,
+        "processedTotal": 16935137,
         "uniqueTotal": 96698,
-        "changedTotal": 165722,
-        "semanticTotal": 132578
+        "changedTotal": 170520,
+        "semanticTotal": 136417
       },
       "qed": {
         "mean": 0.0001,
@@ -1365,10 +1365,10 @@
         "totalAdded": 1094,
         "totalResolved": 7223,
         "totalRegressions": 0,
-        "netYield": 0.37
+        "netYield": 0.36
       },
       "meanCompositeScore": 99.2,
-      "gatePassRate": 97.85
+      "gatePassRate": 97.9
     },
     "isFirstBaseline": false
   }
