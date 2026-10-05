@@ -21,16 +21,16 @@ import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { globToRegExp } from '../core/file-discovery';
 import { auditTerminologyProse } from '../core/governance/terminology-engine';
 
-function isExemptDocsPath(filePath: string): boolean {
+function isExemptDocsPath(filePath: string, options?: DocsOptions): boolean {
     const normalized = filePath.replace(/\\/g, '/');
+    if (options?.exemptPathPatterns) {
+        for (const pattern of options.exemptPathPatterns) {
+            if (new RegExp(pattern, 'i').test(normalized)) return true;
+        }
+    }
     return (
-        normalized.includes('docs/归档库/') ||
-        normalized.includes('docs/路线图/') ||
-        normalized.includes('/archive/') ||
-        normalized.includes('archive/') ||
-        normalized.includes('/fixtures/') ||
-        normalized.includes('/tests/') ||
-        normalized.includes('/test/')
+        /(?:\/|^)(?:archive|fixtures?|tests?|history)(?:\/|$)/i.test(normalized) ||
+        normalized.includes('/.auto-refactor-cache/')
     );
 }
 
@@ -50,17 +50,12 @@ const DUP_MESSAGE_SAMPLE_CHARS = 60;
 /** Maximum characters of the duplicated prose sample stored in the DOC-DUP-001 issue detail. */
 const DUP_DETAIL_SAMPLE_CHARS = 120;
 
-const EXEMPT_MARKERS = [
-    '不存在',
-    '已废止',
-    '已迁',
+const DEFAULT_EXEMPT_MARKERS = [
     'deprecated',
     'removed',
     'archived',
     'historical',
     'was ',
-    '示例',
-    '例如',
     'example',
     'e.g.',
     'for instance',
@@ -70,6 +65,10 @@ const EXEMPT_MARKERS = [
 interface DocsOptions {
     /** Glob patterns of reference targets that are intentionally external (other repos). */
     linkExemptTargets?: string[];
+    /** Glob patterns or substrings of file paths that are exempt from doc audits. */
+    exemptPathPatterns?: string[];
+    /** Additional contextual markers exempting lines from broken link checks. */
+    exemptMarkers?: string[];
 }
 
 /**
@@ -125,16 +124,11 @@ export class DocsAnalyzer implements Analyzer {
             });
         };
 
+        const options = (ctx.options || {}) as DocsOptions;
         this.checkFences(lines, emit);
-        this.checkReferences(
-            lines,
-            file,
-            ctx.config.root,
-            (ctx.options || {}) as DocsOptions,
-            emit,
-        );
+        this.checkReferences(lines, file, ctx.config.root, options, emit);
         this.checkDuplicateProse(lines, emit);
-        this.checkTerminologyProse(lines, file, emit);
+        this.checkTerminologyProse(lines, file, options, emit);
 
         return issues;
     }
@@ -179,9 +173,12 @@ export class DocsAnalyzer implements Analyzer {
     ): void {
         const docDir = path.dirname(path.resolve(root, file));
         const exempt = (options.linkExemptTargets ?? []).map((pattern) => globToRegExp(pattern));
+        const exemptMarkers = options.exemptMarkers
+            ? [...DEFAULT_EXEMPT_MARKERS, ...options.exemptMarkers]
+            : DEFAULT_EXEMPT_MARKERS;
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (EXEMPT_MARKERS.some((marker) => line.includes(marker))) continue;
+            if (exemptMarkers.some((marker) => line.includes(marker))) continue;
             for (const target of this.extractTargets(line, exempt)) {
                 const candidates = [path.resolve(root, target), path.resolve(docDir, target)];
                 if (candidates.some((candidate) => fs.existsSync(candidate))) continue;
@@ -265,8 +262,13 @@ export class DocsAnalyzer implements Analyzer {
      * @param file - Normalized file path.
      * @param emit - Issue factory.
      */
-    private checkTerminologyProse(lines: string[], file: string, emit: Emit): void {
-        if (isExemptDocsPath(file)) return;
+    private checkTerminologyProse(
+        lines: string[],
+        file: string,
+        options: DocsOptions,
+        emit: Emit,
+    ): void {
+        if (isExemptDocsPath(file, options)) return;
         let inFence = false;
         for (let i = 0; i < lines.length; i++) {
             const rawLine = lines[i];

@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791179766895",
-  "timestamp": "2026-10-05T05:56:16.292Z",
+  "snapshotId": "snapshot-v0.4.0-1791183420667",
+  "timestamp": "2026-10-05T06:57:09.246Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,26 +12,26 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 594,
-    "durationMs": 8458
+    "filesScanned": 595,
+    "durationMs": 7675
   },
   "metrics": {
     "compositeScore": 99.16,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 12784,
-    "suppressedIssues": 6983,
-    "unsuppressedIssues": 5801,
+    "totalIssues": 12810,
+    "suppressedIssues": 7006,
+    "unsuppressedIssues": 5804,
     "bySeverity": {
-      "info": 464,
-      "warning": 12320,
+      "info": 466,
+      "warning": 12344,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 215,
-      "medium": 11661,
-      "low": 908
+      "high": 216,
+      "medium": 11684,
+      "low": 910
     }
   },
   "eightPillars": {
@@ -74,7 +74,7 @@
     {
       "filePath": "scripts/test-parallel.js",
       "domain": "scripts",
-      "totalIssues": 174,
+      "totalIssues": 175,
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 98.4,
@@ -165,9 +165,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 215,
-      "medium": 11661,
-      "low": 908
+      "high": 216,
+      "medium": 11684,
+      "low": 910
     },
     "criticalItems": [],
     "highItems": [
@@ -577,30 +577,39 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
+        "id": "performance:PRF-MEM-001:src/analyzers/docs.ts:28",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/analyzers/docs.ts",
+        "line": 28,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:181",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/docs.ts",
+        "line": 181,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
         "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:184",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/docs.ts",
         "line": 184,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:187",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/docs.ts",
-        "line": 187,
         "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 2) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:236",
+        "id": "performance:PRF-ALG-002:src/analyzers/docs.ts:233",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/docs.ts",
-        "line": 236,
+        "line": 233,
         "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
@@ -610,15 +619,6 @@
         "severity": "warning",
         "file": "src/analyzers/gdscript-game.ts",
         "line": 118,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-game.ts:146",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/gdscript-game.ts",
-        "line": 146,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       }
     ]
@@ -630,28 +630,28 @@
         "compositeScore": 98.99,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.83,
+          "maintainability": 99.82,
           "performance": 99.37,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 91.13
+          "extensibility": 91.15
         },
         "moduleCount": 1
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 99.06,
+        "compositeScore": 99.05,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.33,
-          "performance": 98.3,
+          "performance": 98.23,
           "data": 99.78,
           "testing": 100,
           "reliability": 99.78,
           "security": 100,
-          "extensibility": 94.62
+          "extensibility": 94.63
         },
         "moduleCount": 1
       },
@@ -672,7 +672,7 @@
       },
       {
         "domainName": "cli",
-        "compositeScore": 99.52,
+        "compositeScore": 99.47,
         "pillars": {
           "architecture": 100,
           "maintainability": 100,
@@ -681,7 +681,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 96.68
+          "extensibility": 96.21
         },
         "moduleCount": 1
       },
@@ -867,7 +867,7 @@
       },
       {
         "domainName": "rules",
-        "compositeScore": 99.33,
+        "compositeScore": 99.34,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.51,
@@ -876,7 +876,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 96.69
+          "extensibility": 96.7
         },
         "moduleCount": 1
       },
@@ -1319,27 +1319,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 118595,
+      "processed": 119001,
       "unique": 96698,
-      "changed": 1935,
-      "semantic": 1548,
+      "changed": 1223,
+      "semantic": 978,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 968,
+      "added": 612,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791095213029,
-      "endMs": 1791179766892,
-      "totalRuns": 117,
+      "endMs": 1791183420665,
+      "totalRuns": 119,
       "eloc": {
-        "processedTotal": 13668258,
+        "processedTotal": 13906260,
         "uniqueTotal": 96698,
-        "changedTotal": 157404,
-        "semanticTotal": 125923
+        "changedTotal": 159721,
+        "semanticTotal": 127776
       },
       "qed": {
         "mean": 0,
@@ -1347,10 +1347,10 @@
         "max": 0
       },
       "debt": {
-        "totalAdded": 203108,
+        "totalAdded": 203134,
         "totalResolved": 230,
         "totalRegressions": 0,
-        "netYield": -14.84
+        "netYield": -14.59
       },
       "meanCompositeScore": 99.18,
       "gatePassRate": 100

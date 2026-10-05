@@ -209,14 +209,12 @@ export const DiagnosticMessageRule: GovernanceRule = {
 };
 
 const DOSSIER_JARGON_RE =
-    /\b(st_[0-9]+[a-z0-9_]*|phase[\s_]*[0-9]+|p[0-9]{2,}|四阶段案卷|案卷细则)\b/i;
+    /\b(st_[0-9]+[a-z0-9_]*|phase[\s_]*[0-9]+|p[0-9]{2,}|milestone[\s_]*[0-9]+)\b/i;
 
 function isExemptDossierPath(filePath: string): boolean {
     const normalized = filePath.replace(/\\/g, '/').toLowerCase();
     return (
-        normalized.includes('docs/归档库') ||
-        normalized.includes('docs/路线图') ||
-        normalized.includes('/archive/') ||
+        /(?:\/|^)(?:archive|fixtures?|tests?|history)(?:\/|$)/i.test(normalized) ||
         normalized.startsWith('archive/') ||
         fileNameEndsWith(filePath, ['sanitization.ts'])
     );

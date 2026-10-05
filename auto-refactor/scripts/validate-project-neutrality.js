@@ -22,9 +22,28 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-/** Consumer identifiers the shared engine must never mention; append when a new consumer lands. */
-const PROJECT_IDENTIFIERS = ['nomos', 'portal'];
-const SCANNED_DIRS = ['src', 'scripts', 'presets', 'docs', 'templates'];
+/** Core consumer identifiers the shared engine core (src/presets/templates) must never mention. */
+const CORE_CONSUMER_IDENTIFIERS = ['nomos', 'portal', 'workspace-timing', 'webgames', 'kalar'];
+/** Legacy forbidden identifiers that must never appear anywhere in the repository. */
+const LEGACY_FORBIDDEN_IDENTIFIERS = ['nomos', 'portal'];
+
+const CORE_DIRS = ['src', 'presets', 'templates'];
+const INTEGRATION_HARNESSES = new Set([
+  'validate-triplane-cross-project.js',
+  'validate-gate-system.js',
+  'validate-gate-governance.js',
+  'validate-feedback-adaptive-supervisor.js',
+  'validate-frontend-architecture-governance.js',
+  'validate-generalized.js',
+  'validate-precision-governance.js',
+  'validate-compact-ledger.js',
+]);
+
+const INTEGRATION_DOCS = new Set([
+  '05-consumer-integration.md',
+  'README.md',
+]);
+
 const SELF = 'validate-project-neutrality.js';
 
 /**
@@ -53,13 +72,16 @@ function walk(dir, out = []) {
  * @returns Nothing; throws on the first violation.
  */
 function run() {
-  const identifierRe = new RegExp(`\\b(?:${PROJECT_IDENTIFIERS.join('|')})\\b`, 'i');
+  const coreRe = new RegExp(`\\b(?:${CORE_CONSUMER_IDENTIFIERS.join('|')})\\b`, 'i');
+  const legacyRe = new RegExp(`\\b(?:${LEGACY_FORBIDDEN_IDENTIFIERS.join('|')})\\b`, 'i');
   const offenders = [];
-  for (const dir of SCANNED_DIRS) {
+
+  // 1. Verify engine core (src, presets, templates) strictly carries ZERO consumer identifiers
+  for (const dir of CORE_DIRS) {
     for (const file of walk(path.join(ROOT, dir))) {
       const lines = fs.readFileSync(file, 'utf8').split('\n');
       lines.forEach((line, index) => {
-        if (identifierRe.test(line)) {
+        if (coreRe.test(line)) {
           offenders.push(`${path.relative(ROOT, file)}:${index + 1}`);
         }
       });
@@ -68,9 +90,35 @@ function run() {
   assert.deepStrictEqual(
     offenders,
     [],
-    `engine must stay project-agnostic; consumer identifier found at: ${offenders.join(', ')}`,
+    `engine core (src/presets/templates) must stay strictly project-agnostic; consumer identifier found at: ${offenders.join(', ')}`,
   );
-  console.log('  [PASS] engine sources/docs never mention a consumer project');
+  console.log('  [PASS] engine core (src/presets/templates) is 100% project-agnostic');
+
+  // 2. Verify scripts and documentation: zero legacy forbidden tokens, and active consumer names
+  // allowed only inside explicit integration test harnesses and consumer specs.
+  const scriptAndDocOffenders = [];
+  for (const dir of ['scripts', 'docs']) {
+    for (const file of walk(path.join(ROOT, dir))) {
+      const base = path.basename(file);
+      const isIntegration =
+        (dir === 'scripts' && INTEGRATION_HARNESSES.has(base)) ||
+        (dir === 'docs' && INTEGRATION_DOCS.has(base));
+
+      const re = isIntegration ? legacyRe : coreRe;
+      const lines = fs.readFileSync(file, 'utf8').split('\n');
+      lines.forEach((line, index) => {
+        if (re.test(line)) {
+          scriptAndDocOffenders.push(`${path.relative(ROOT, file)}:${index + 1}`);
+        }
+      });
+    }
+  }
+  assert.deepStrictEqual(
+    scriptAndDocOffenders,
+    [],
+    `scripts and docs carry unauthorized consumer coupling at: ${scriptAndDocOffenders.join(', ')}`,
+  );
+  console.log('  [PASS] scripts and docs observe strict consumer boundary constraints');
 
   const presetDir = path.join(ROOT, 'presets');
   const presets = fs.readdirSync(presetDir).filter((name) => name.endsWith('.json'));

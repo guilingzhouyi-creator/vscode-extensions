@@ -297,7 +297,7 @@ export class GDScriptAdapter implements LanguageAdapter {
     ): void {
         // Check if line contains legacy tolerated idioms (preload/get_node/logging/$) — the whole
         // line is exempt. GameConfig.* / render_narrative / emit_narrative_by_key calls carry
-        // canonical config keys (cf. WebGames audit_config_unused.py three-tier references); they
+        // canonical config keys (cf. three-tier configuration reference hierarchy); they
         // are tolerated at token level only (isInsideTolerantCall), so stray hardcoded strings
         // elsewhere on the same line are still flagged.
         const isLegacyToleratedLine =

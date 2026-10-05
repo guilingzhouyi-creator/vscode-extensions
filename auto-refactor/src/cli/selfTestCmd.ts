@@ -19,7 +19,7 @@
  * Builds a temporary fixture project containing KNOWN violations (one per built-in
  * analyzer family), runs an in-process scan, and asserts each expected `analyzer:rule`
  * pair actually fires. Guards against "analyzer silently broken but gate reports PASS" —
- * the same methodology the workspace-timing review system proved out (it caught a real
+ * the same methodology proven in multi-layered review systems (it caught a real
  * three-color DFS defect there).
  */
 
@@ -68,7 +68,7 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
     ).join('\n');
     const filler = Array.from(
         { length: FIXTURE_FILLER_LINES },
-        (_, i) => `// filler line ${i}\n`,
+        (_, i) => `export const codeLine_${i} = ${i};\n`,
     ).join('');
     const files: FixtureFile[] = [
         {
@@ -123,7 +123,13 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
         analyzers: {
             constants: { enabled: true },
             complexity: { enabled: true },
-            'large-file': { enabled: true },
+            'large-file': {
+                enabled: true,
+                options: {
+                    fileLinesFail: 800,
+                    effectiveLocFail: 800,
+                },
+            },
             governance: { enabled: true },
             secrets: { enabled: true },
             'dependency-graph': {

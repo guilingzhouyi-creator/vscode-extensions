@@ -24,11 +24,7 @@ try {
   try {
     ts = require(path.resolve(__dirname, '../node_modules/typescript'));
   } catch {
-    try {
-      ts = require(path.resolve(__dirname, '../../workspace-timing/node_modules/typescript'));
-    } catch {
-      ts = null;
-    }
+    ts = null;
   }
 }
 
@@ -330,13 +326,13 @@ function analyzeFunction(node, sourceFile, cfg) {
     : cfg.maxFunctionComplexity;
 
   if (complexity > effectiveMaxCC) {
-    const tag = isFlatDispatcher ? '平铺分发器上限' : '标准基线上限';
+    const tag = isFlatDispatcher ? 'flat dispatcher envelope' : 'standard base limit';
     findings.push({
       rule: 'CPX-BUD-001',
       severity: 'error',
-      message: `函数 '${funcName}' 圈复杂度超标 (CC = ${complexity} > ${effectiveMaxCC}, ${tag})`,
+      message: `Function '${funcName}' cyclomatic complexity budget exceeded (CC = ${complexity} > ${effectiveMaxCC}, ${tag})`,
       line: lineNum,
-      suggestedFix: '拆分多分支判定为策略表或提取独立辅助纯函数',
+      suggestedFix: 'Decompose branching logic into lookup strategy tables or extract pure helper functions',
     });
   }
 
@@ -344,9 +340,9 @@ function analyzeFunction(node, sourceFile, cfg) {
     findings.push({
       rule: 'CPX-NEST-001',
       severity: 'error',
-      message: `函数 '${funcName}' 控制流嵌套过深 (Depth = ${maxNesting.val} > ${cfg.maxNestingDepth})`,
+      message: `Function '${funcName}' control-flow nesting budget exceeded (Depth = ${maxNesting.val} > ${cfg.maxNestingDepth})`,
       line: lineNum,
-      suggestedFix: '采用卫语句 (Guard Clause) 提前返回以平铺嵌套分支',
+      suggestedFix: 'Apply guard clauses with early returns to flatten nested control flow',
     });
   }
 
@@ -371,8 +367,9 @@ function analyzeSourceText(content, filePath = 'anonymous.ts', overrides = {}) {
     findings.push({
       rule: 'GATE-AST-001',
       severity: 'error',
-      message: `代码稀释/注水指数超标 (kappa_noise = ${noiseRatio.toFixed(2)} > ${cfg.maxNoiseRatio})，有效代码行过低 (${eloc}/${totalLines})`,
+      message: `Code noise/dilution ratio exceeded budget (kappa_noise = ${noiseRatio.toFixed(2)} > ${cfg.maxNoiseRatio}), effective lines too low (${eloc}/${totalLines})`,
       line: 1,
+      suggestedFix: 'Reduce trailing boilerplate and increase effective code density',
     });
   }
 

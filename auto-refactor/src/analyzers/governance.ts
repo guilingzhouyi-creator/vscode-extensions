@@ -46,7 +46,7 @@ import {
  * - standardization, file_structure, code_logic, type_system,
  * - exception_safety, debug_logging, performance, maintainability.
  *
- * Generalizes WebGames script audits into a cross-language, modern quality gate.
+ * Provides a generalized, cross-language modern quality gate for architecture and script audits.
  * Single-pass multiplexed traversal integration with zero duplicate walks.
  */
 function isGovernanceCandidate(node: NormalizedNode): boolean {
