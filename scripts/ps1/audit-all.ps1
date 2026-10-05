@@ -67,11 +67,11 @@ if (-not $Json) {
     Write-Host "▶ [3~5/5] 并行调度执行 auto-refactor、workspace-timing 与 WebGames 审查..." -ForegroundColor Gray
 }
 
-$tempDir = [System.IO.Path]::GetTempPath()
+$transientDir = [System.IO.Path]::GetTempPath()
 $randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
-$logAr = Join-Path $tempDir "audit-ar-$randSuffix.log"
-$logWt = Join-Path $tempDir "audit-wt-$randSuffix.log"
-$logWg = Join-Path $tempDir "audit-wg-$randSuffix.log"
+$logAr = Join-Path $transientDir "audit-ar-$randSuffix.log"
+$logWt = Join-Path $transientDir "audit-wt-$randSuffix.log"
+$logWg = Join-Path $transientDir "audit-wg-$randSuffix.log"
 
 $arScript = if ($Fast) {
     "& '$nodeCmd' scripts/validate-self-multidimensional-audit.js *>&1"
@@ -130,20 +130,120 @@ $cAr = if ($statusAr -eq "PASS") { "Green" } else { "Red" }
 $cWt = if ($statusWt -eq "PASS") { "Green" } else { "Red" }
 $cWg = if ($statusWg -eq "PASS") { "Green" } else { "Red" }
 
+function Get-SafeProp {
+    [CmdletBinding()]
+    param(
+        [psobject]$Target,
+        [string]$Name
+    )
+    if ($null -eq $Target) { return $null }
+    $p = $Target.PSObject.Properties[$Name]
+    if ($null -ne $p) { return $p.Value }
+    return $null
+}
+
+# 读取 auto-refactor 十维工程质量基线
+$baselinePath = Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.json"
+$baseline = $null
+$tenDimensions = $null
+$compositeScore = $null
+$totalDebt = $null
+$autonomyRate = $null
+$grade = $null
+
+try {
+    if (Test-Path $baselinePath) {
+        $rawJson = Get-Content -Path $baselinePath -Raw -Encoding utf8
+        $baselineData = $rawJson | ConvertFrom-Json
+        if ($baselineData) {
+            $metricsData = Get-SafeProp $baselineData 'metrics'
+            $compositeScore = if ($null -ne $metricsData) {
+                $cs = Get-SafeProp $metricsData 'compositeScore'
+                if ($null -ne $cs) { [double]$cs } else { $null }
+            } else {
+                $cs = Get-SafeProp $baselineData 'compositeScore'
+                if ($null -ne $cs) { [double]$cs } else { $null }
+            }
+
+            $grade = if ($null -ne $metricsData) {
+                $g = Get-SafeProp $metricsData 'grade'
+                if ($null -ne $g) { [string]$g } else { $null }
+            } else { $null }
+
+            $totalDebt = if ($null -ne $metricsData) {
+                $ti = Get-SafeProp $metricsData 'totalIssues'
+                if ($null -ne $ti) { [int]$ti } else {
+                    $ui = Get-SafeProp $metricsData 'unsuppressedIssues'
+                    if ($null -ne $ui) { [int]$ui } else { $null }
+                }
+            } else { $null }
+
+            $autonomyRate = Get-SafeProp $baselineData 'autonomyRate'
+            if ($null -eq $autonomyRate -and $null -ne $metricsData) {
+                $autonomyRate = Get-SafeProp $metricsData 'autonomyRate'
+            }
+            if ($null -eq $autonomyRate) {
+                $autonomyRate = Get-SafeProp $baselineData 'cai'
+            }
+
+            $tenDimensions = Get-SafeProp $baselineData 'tenDimensions'
+            if ($null -ne $tenDimensions) {
+                $baseline = $baselineData
+            }
+        }
+    }
+} catch {
+    $baseline = $null
+    $tenDimensions = $null
+}
+
+$dimDefinitions = @(
+    @{ num = "1.";  name = "架构一致"; pad = "    "; key = "architectureConsistency"; labelEn = "架构一致 (Architecture Consistency)" },
+    @{ num = "2.";  name = "语义纯度"; pad = "    "; key = "semanticPurity"; labelEn = "语义纯度 (Semantic Purity)" },
+    @{ num = "3.";  name = "代码安全"; pad = "    "; key = "codeSecurity"; labelEn = "代码安全 (Code Security)" },
+    @{ num = "4.";  name = "性能预算"; pad = "    "; key = "performanceEfficiency"; labelEn = "性能预算 (Performance Efficiency)" },
+    @{ num = "5.";  name = "标准化";   pad = "      "; key = "standardization"; labelEn = "标准化 (Standardization)" },
+    @{ num = "6.";  name = "现代化";   pad = "      "; key = "modernity"; labelEn = "现代化 (Modernity)" },
+    @{ num = "7.";  name = "可维护性"; pad = "    "; key = "maintainability"; labelEn = "可维护性 (Maintainability)" },
+    @{ num = "8.";  name = "注释质量"; pad = "    "; key = "commentQuality"; labelEn = "注释质量 (Comment Quality)" },
+    @{ num = "9.";  name = "重复率";   pad = "      "; key = "duplication"; labelEn = "重复率 (Duplication)" },
+    @{ num = "10."; name = "技术债风险"; pad = "  "; key = "techDebtRisk"; labelEn = "技术债风险 (Tech Debt Risk)" }
+)
+
 if ($Json) {
-    $summary = @{
+    $qualityVectorObj = if ($null -ne $tenDimensions) {
+        [ordered]@{
+            architectureConsistency = [double](Get-SafeProp $tenDimensions 'architectureConsistency')
+            semanticPurity = [double](Get-SafeProp $tenDimensions 'semanticPurity')
+            codeSecurity = [double](Get-SafeProp $tenDimensions 'codeSecurity')
+            performanceEfficiency = [double](Get-SafeProp $tenDimensions 'performanceEfficiency')
+            standardization = [double](Get-SafeProp $tenDimensions 'standardization')
+            modernity = [double](Get-SafeProp $tenDimensions 'modernity')
+            maintainability = [double](Get-SafeProp $tenDimensions 'maintainability')
+            commentQuality = [double](Get-SafeProp $tenDimensions 'commentQuality')
+            duplication = [double](Get-SafeProp $tenDimensions 'duplication')
+            techDebtRisk = [double](Get-SafeProp $tenDimensions 'techDebtRisk')
+        }
+    } else {
+        $null
+    }
+
+    $summary = [ordered]@{
         timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
         status = if ($failed) { "FAIL" } else { "PASS" }
         elapsedSeconds = $elapsedSec
-        projects = @{
+        projects = [ordered]@{
             hygiene = $statusHygiene
             rulesCatalog = $statusRules
             autoRefactor = $statusAr
             workspaceTiming = $statusWt
             webGames = $statusWg
         }
+        compositeScore = $compositeScore
+        tenDimensions = $qualityVectorObj
+        qualityVector = $qualityVectorObj
     }
-    $summary | ConvertTo-Json -Depth 3
+    $summary | ConvertTo-Json -Depth 4
     exit $exitCode
 }
 
@@ -161,6 +261,96 @@ Write-Host ("│ 5. WebGames 配置架构审查    │ {0,-11} │ 领域配置 
 Write-Host "├─────────────────────────────┴─────────────┴───────────────────┤" -ForegroundColor Cyan
 Write-Host ("│ 耗时: {0}s  |  全局状态: {1}           │" -f $elapsedSec, $globalStatus) -ForegroundColor $globalColor
 Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
+
+# 全工作区十维工程质量看板
+Write-Host ""
+Write-Host "┌───────────────────────────────────────────────────────────────┐" -ForegroundColor Cyan
+Write-Host "│                   全工作区十维工程质量看板                    │" -ForegroundColor Cyan
+Write-Host "├───────────────────────────────────────────────────────────────┤" -ForegroundColor Cyan
+
+if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
+    $summaryText = "综合健康分: {0}" -f $compositeScore
+    if ($grade) { $summaryText += " ({0})" -f $grade }
+    if ($autonomyRate) { $summaryText += "  |  自研率: {0}%" -f $autonomyRate }
+    if ($null -ne $totalDebt) { $summaryText += "  |  技术债总量: {0} 项" -f $totalDebt }
+
+    $sw = 0
+    foreach ($ch in $summaryText.ToCharArray()) {
+        if ([int]$ch -gt 127) { $sw += 2 } else { $sw += 1 }
+    }
+    $rightPad = [math]::Max(0, 61 - $sw)
+    Write-Host ("│ {0}{1} │" -f $summaryText, (" " * $rightPad)) -ForegroundColor White
+    Write-Host "├───────────────────────────────────────────────────────────────┤" -ForegroundColor Cyan
+
+    foreach ($d in $dimDefinitions) {
+        $score = [double](Get-SafeProp $tenDimensions $d.key)
+        $filled = [math]::Round(($score / 100.0) * 20)
+        if ($filled -lt 0) { $filled = 0 } elseif ($filled -gt 20) { $filled = 20 }
+        $empty = 20 - $filled
+        $bar = ("█" * $filled) + ("░" * $empty)
+        $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
+        $paddedScore = $scoreStr.PadLeft(5)
+        $lineColor = if ($score -ge 90) { "Green" } elseif ($score -ge 75) { "Yellow" } else { "Red" }
+        Write-Host ("│ {0,-4}{1}{2}[{3}] {4}{5} │" -f $d.num, $d.name, $d.pad, $bar, $paddedScore, (" " * 17)) -ForegroundColor $lineColor
+    }
+    Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
+} else {
+    Write-Host ("│ [离线基线快照未就绪 - 优雅降级模式]{0} │" -f (" " * 26)) -ForegroundColor Yellow
+    Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
+}
+
+if ($env:GITHUB_STEP_SUMMARY) {
+    try {
+        $md = New-Object System.Text.StringBuilder
+        [void]$md.AppendLine("## 🌐 全工作区跨项目统一审查与十维质量看板")
+        [void]$md.AppendLine()
+        [void]$md.AppendLine("### 📊 审查检查项 / 子系统判定")
+        [void]$md.AppendLine()
+        [void]$md.AppendLine("| 审查检查项 / 子系统 | 判定结果 | 覆盖范围 |")
+        [void]$md.AppendLine("| :--- | :---: | :--- |")
+        $badgeHygiene = if ($statusHygiene -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
+        $badgeRules = if ($statusRules -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
+        $badgeAr = if ($statusAr -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
+        $badgeWt = if ($statusWt -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
+        $badgeWg = if ($statusWg -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
+
+        [void]$md.AppendLine(("| **1. 工作区零空文件物理卫生** | {0} | 全仓代码/脚本/配置 |" -f $badgeHygiene))
+        [void]$md.AppendLine(("| **2. 单源规则目录一致性 (SSOT)** | {0} | 单源规则总目录 |" -f $badgeRules))
+        [void]$md.AppendLine(("| **3. auto-refactor 质量基线** | {0} | 质量模型 / 并行自审 |" -f $badgeAr))
+        [void]$md.AppendLine(("| **4. workspace-timing 审查门禁** | {0} | L0~L5 / 并行门禁 |" -f $badgeWt))
+        [void]$md.AppendLine(("| **5. WebGames 配置架构审查** | {0} | 领域配置 / 并行审查 |" -f $badgeWg))
+        [void]$md.AppendLine()
+        [void]$md.AppendLine(("> **耗时**: {0}s &nbsp;|&nbsp; **全局状态**: {1}" -f $elapsedSec, $globalStatus))
+        [void]$md.AppendLine()
+        [void]$md.AppendLine("### 🎯 全工作区十维工程质量看板")
+        [void]$md.AppendLine()
+        if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
+            $summaryMeta = "> **综合健康分**: **{0}**" -f $compositeScore
+            if ($grade) { $summaryMeta += " (Grade: **{0}**)" -f $grade }
+            if ($autonomyRate) { $summaryMeta += " &nbsp;|&nbsp; **自研率**: **{0}%**" -f $autonomyRate }
+            if ($null -ne $totalDebt) { $summaryMeta += " &nbsp;|&nbsp; **技术债总量**: **{0} 项**" -f $totalDebt }
+            [void]$md.AppendLine($summaryMeta)
+            [void]$md.AppendLine()
+            [void]$md.AppendLine("| 序号 | 质量维度 | 得分 | 进度可视化 |")
+            [void]$md.AppendLine("| :---: | :--- | :---: | :--- |")
+            foreach ($d in $dimDefinitions) {
+                $score = [double](Get-SafeProp $tenDimensions $d.key)
+                $filled = [math]::Round(($score / 100.0) * 20)
+                if ($filled -lt 0) { $filled = 0 } elseif ($filled -gt 20) { $filled = 20 }
+                $empty = 20 - $filled
+                $bar = ("█" * $filled) + ("░" * $empty)
+                $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
+                [void]$md.AppendLine(("| {0} | {1} | {2} | `[{3}]` |" -f $d.num.TrimEnd('.'), $d.labelEn, $scoreStr, $bar))
+            }
+        } else {
+            [void]$md.AppendLine("> ⚠️ [离线基线快照未就绪 - 优雅降级模式]")
+        }
+        [void]$md.AppendLine()
+        [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, $md.ToString(), [System.Text.Encoding]::UTF8)
+    } catch {
+        # 优雅降级：写入 Step Summary 失败绝不中断门禁
+    }
+}
 
 # 6. 汇流记录工作区统一质量轨迹
 $trajArg = if ($failed) { "scripts/common/record-workspace-trajectory.js", "--failed" } else { "scripts/common/record-workspace-trajectory.js" }

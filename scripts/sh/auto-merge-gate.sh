@@ -38,7 +38,7 @@ echo "事件      : ${EVENT}"
 # ---------- 1. 就绪判定（必须已过前置门禁，幂等防漏） ----------
 # 复用 pr-gate.sh 的幂等判定逻辑：存在 status/gate-ok 标签 或 本地缓存命中，
 # 才认为该 PR 已通过前置门禁（冲突检测 + Diff 初筛）。
-# 防呆：即使本仓库 pull_request 门禁未跑完，也绝不裸自动合入。
+# 守卫设计：即使本仓库 pull_request 门禁未跑完，亦不可执行自动合入。
 GATE_OK_LABEL="status/gate-ok"
 CACHE_DIR="${REPO_ROOT}/.workbuddy/pr-gate-cache"
 CACHE_FILE="${CACHE_DIR}/pr-gate-${PR_NUM}.last"
@@ -65,8 +65,8 @@ if [[ "$gate_passed" != "true" ]]; then
 fi
 echo "✅ 就绪判定：已通过前置门禁（gate-ok 命中），继续否决标签与冲突安全判定。"
 
-# ---------- 1.5 否决标签检查（NPC/人工可提前否决自动合入） ----------
-# status/merge-blocked 由「合入员」NPC 在合入门禁/自动合入复核中发现阻断时打标，
+# ---------- 1.5 否决标签检查（合流治理服务/人工可提前否决自动合入） ----------
+# status/merge-blocked 由合流治理服务 (Merge Agent) 在合入门禁/自动合入复核中发现阻断时打标，
 # 或由人工手动打标。存在该标签 → 即使满足 C0 也禁止自动合入（尊重否决权，fail-safe）。
 MERGE_BLOCKED_LABEL="status/merge-blocked"
 merge_blocked="false"
@@ -76,8 +76,8 @@ if command -v cnb >/dev/null 2>&1; then
   fi
 fi
 if [[ "$merge_blocked" == "true" ]]; then
-  echo "🛑 auto-merge-gate: 检测到 ${MERGE_BLOCKED_LABEL} 否决标签（合入员/人工否决），禁止自动合入。"
-  echo "  请人工确认后清除该标签（或由合入员修复阻断项后解除），再重试自动合入。"
+  echo "🛑 auto-merge-gate: 检测到 ${MERGE_BLOCKED_LABEL} 否决标签（合流治理服务/人工否决），禁止自动合入。"
+  echo "  请人工确认后清除该标签（或由合入检查器修复阻断项后解除），再重试自动合入。"
   exit 1
 fi
 echo "✅ 否决标签检查：无 ${MERGE_BLOCKED_LABEL}，继续冲突安全判定。"
@@ -99,7 +99,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
       # merge 成功（exit 0）已确证无冲突 → C0。
       # 但分两种情况回退：
       #   - 产生 MERGE_HEAD（真实合并）→ 用 merge --abort 清理；abort 失败则判 UNKNOWN 保守禁止，
-      #     不 resort 到 git reset --hard（破坏性，绝不静默清空工作区）。
+      #     避免使用破坏性 git reset --hard，防止清除未提交工作区数据。
       #   - "Already up to date"（无 MERGE_HEAD，目标分支为 HEAD 祖先）→ 本就不存在合并状态，
       #     无需回退，保持 C0（已确证无冲突）。
       CONFLICT_LEVEL="C0"
@@ -123,7 +123,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
     CONFLICT_LEVEL="UNKNOWN"
   fi
 else
-  # fail-safe：无 git 仓库/无法预演 → 保守拒绝，绝不裸放行。
+  # fail-safe：无 git 仓库/无法预演 → 保守拒绝，默认禁止未经验证放行。
   echo "⚠️ 当前环境无 git 仓库或无法预演合并 → 保守禁止自动合入（未知等级）。"
   CONFLICT_LEVEL="UNKNOWN"
 fi

@@ -22,11 +22,11 @@
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
 | `sh/` | Bash | `gate-common.sh` | gate（冲突分级单源规则库，被 source） | `pr-gate.sh` / `auto-merge-gate.sh` |
-| `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与 9 重安全门禁，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
+| `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与多项前置检查，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
 | `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `commit-msg-gate.sh` | gate（生产工程级结构化提交信息格式、区块、字数、反虚构与风格求实 8 项门禁） | `.githooks/commit-msg`、本地 CLI |
 | `ps1/` | PowerShell | `commit-msg-gate.ps1` | gate（commit-msg-gate.sh 同构双实现） | 本地 CLI（Windows） |
-| `sh/` | Bash | `pre-push-gate.sh` | gate（本地推送前置全量 9 重回归、提交历史风格扫描与十维质量基线门禁） | `.githooks/pre-push`、本地 CLI |
+| `sh/` | Bash | `pre-push-gate.sh` | gate（本地推送前置全量多项前置检查、提交历史风格扫描与基线核验） | `.githooks/pre-push`、本地 CLI |
 | `ps1/` | PowerShell | `pre-push-gate.ps1` | gate（pre-push-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `install-hooks.sh` | gate（一键激活仓库级 Git Hooks） | 本地 CLI |
 | `ps1/` | PowerShell | `install-hooks.ps1` | gate（install-hooks.sh 同构双实现） | 本地 CLI（Windows） |
@@ -114,6 +114,6 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
   可作为独立工具手动执行或接入 CI（`.github/workflows/*.yml`）。
 - 2026-09-09 补齐发布工具链：`version-bump.sh`（语义递增 + CHANGELOG 迁移，干净树/版本单调/扩展身份三门禁）
   与 `release-tag.sh`（本地发布闭环，与 `release.yml` 同规），修复 `package.sh`/`package.ps1`
-  在语言分域重构后的根路径失效（P1）与 `check-display-assets.sh` 的 icon 校验静默禁用（P2），
+  在语言分域重构后的根路径失效与 `check-display-assets.sh` 的 icon 校验静默禁用，
   并在 `.github/workflows/ci.yml` 增补 hygiene 作业永久看守三类回归。
 - 各脚本详细设计文档见 [`scripts/sh/README.md`](./sh/README.md)。

@@ -78,19 +78,19 @@ if [[ ! "$CUR_VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 # ─── 计算新版本 ───
-NEW_VER=""
+TARGET_VER=""
 case "$MODE" in
   major|minor|patch)
     IFS='.' read -r -a parts <<< "$CUR_VER"
     case "$MODE" in
-      major) NEW_VER="$((parts[0] + 1)).0.0" ;;
-      minor) NEW_VER="${parts[0]}.$((parts[1] + 1)).0" ;;
-      patch) NEW_VER="${parts[0]}.${parts[1]}.$((parts[2] + 1))" ;;
+      major) TARGET_VER="$((parts[0] + 1)).0.0" ;;
+      minor) TARGET_VER="${parts[0]}.$((parts[1] + 1)).0" ;;
+      patch) TARGET_VER="${parts[0]}.${parts[1]}.$((parts[2] + 1))" ;;
     esac
     ;;
   *)
     if [[ "$MODE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      NEW_VER="$MODE"
+      TARGET_VER="$MODE"
     else
       echo "::error::[$EXT] 无效递增模式: '$MODE'（须 major|minor|patch 或 X.Y.Z）" >&2
       exit 2
@@ -99,8 +99,8 @@ case "$MODE" in
 esac
 
 # ─── 严格门禁 3：版本单调递增（node 语义比较，杜绝回退/重复）───
-if ! node -e "const c=process.argv[1].split('.').map(Number); const n=process.argv[2].split('.').map(Number); process.exit(n[0]>c[0]||(n[0]===c[0]&&n[1]>c[1])||(n[0]===c[0]&&n[1]===c[1]&&n[2]>c[2])?0:1)" "$CUR_VER" "$NEW_VER"; then
-  echo "::error::[$EXT] 新版本 $NEW_VER 未严格大于现版本 $CUR_VER" >&2
+if ! node -e "const c=process.argv[1].split('.').map(Number); const n=process.argv[2].split('.').map(Number); process.exit(n[0]>c[0]||(n[0]===c[0]&&n[1]>c[1])||(n[0]===c[0]&&n[1]===c[1]&&n[2]>c[2])?0:1)" "$CUR_VER" "$TARGET_VER"; then
+  echo "::error::[$EXT] 新版本 $TARGET_VER 未严格大于现版本 $CUR_VER" >&2
   exit 1
 fi
 
@@ -115,14 +115,14 @@ if [[ -f "$CHANGELOG_FILE" ]]; then
   else
     MIGRATE_MSG="[Unreleased] 当前为空，仅插入新段落头"
   fi
-  CL_PLAN="新版本段落: ## [$NEW_VER] — $TODAY
+  CL_PLAN="新版本段落: ## [$TARGET_VER] — $TODAY
 $MIGRATE_MSG"
 else
   CL_PLAN="警告：$EXT 无 CHANGELOG.md（仓库约定要求 keep-a-changelog，仅警告不阻断）"
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
-  echo "【dry-run】$EXT $CUR_VER → $NEW_VER"
+  echo "【dry-run】$EXT $CUR_VER → $TARGET_VER"
   echo "【dry-run】package.json version 字段改写"
   echo "【dry-run】$CL_PLAN"
   exit 0
@@ -138,7 +138,7 @@ const text = fs.readFileSync(file, "utf8");
 const re = new RegExp(`^(\\s*"version"\\s*:\\s*")${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(")`, "m");
 if (!re.test(text)) { console.error("version 字段未按预期命中（格式漂移?）: " + from); process.exit(1); }
 fs.writeFileSync(file, text.replace(re, `$1${to}$2`), "utf8");
-' "$PKG_FILE" "$CUR_VER" "$NEW_VER" || exit 1
+' "$PKG_FILE" "$CUR_VER" "$TARGET_VER" || exit 1
 
 # ─── 落盘 2：CHANGELOG 段落迁移（keep-a-changelog）───
 if [[ -f "$CHANGELOG_FILE" ]]; then
@@ -163,9 +163,9 @@ const section = `## [${ver}] — ${today}\n${body}`;
 // 新段落落位：紧跟 [Unreleased] 头之后（原 body 被替换），[Unreleased] 置空
 text = text.slice(0, bodyStart) + "\n" + section + text.slice(bodyEnd);
 fs.writeFileSync(file, text, "utf8");
-' "$CHANGELOG_FILE" "$NEW_VER" "$TODAY" || exit 1
+' "$CHANGELOG_FILE" "$TARGET_VER" "$TODAY" || exit 1
 fi
 
-echo "【$EXT】版本递增完成: $CUR_VER → $NEW_VER"
+echo "【$EXT】版本递增完成: $CUR_VER → $TARGET_VER"
 echo "【$EXT】$CL_PLAN"
-echo "【$EXT】请检查 package.json 与 CHANGELOG.md 后提交（提交信息须以 v$NEW_VER 开头，release.yml 自动发布门禁）"
+echo "【$EXT】请检查 package.json 与 CHANGELOG.md 后提交（提交信息须以 v$TARGET_VER 开头，release.yml 自动发布门禁）"

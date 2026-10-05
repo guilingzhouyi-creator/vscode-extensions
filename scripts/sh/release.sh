@@ -35,7 +35,7 @@ TOTAL_TIMEOUT="${TOTAL_TIMEOUT:-600}"
 # 门禁全绿标志（pr-gate.sh 打出）
 GATE_OK_LABEL="status/gate-ok"
 # 发布允许的触发事件（PR 合入门禁全绿后）
-ALLOWED_EVENTS="pull_request.merged tag_push web_trigger api_trigger_npc"
+ALLOWED_EVENTS="pull_request.merged tag_push web_trigger api_trigger_agent"
 
 # 发布标签（auto-label.sh 打标结论中出现的发布触发标签）
 RELEASE_LABEL="status/ready"
@@ -141,7 +141,7 @@ fi
 if [[ "$IDEMPOTENT" == "true" ]]; then
   echo "--- 幂等去重：检查标签 ${TAG_NAME} 是否已发布 ---"
   if cnb releases get-release-by-tag --repo "$REPO_SLUG" --tag "$TAG_NAME" >/dev/null 2>&1; then
-    echo "🛑 release: 版本 ${RELEASE_VERSION}（${TAG_NAME}）已存在，同版本不重复发布（幂等 R16）。"
+    echo "🛑 release: 版本 ${RELEASE_VERSION}（${TAG_NAME}）已存在，同版本不重复发布（幂等保护）。"
     echo "【发布结论】跳过：版本已发布（幂等去重）。"
     exit 0
   fi
@@ -154,7 +154,7 @@ START_TIME=$(date +%s)
 # 构建 release notes 默认模板（模块名 + 版本 + 目标分支），供 post-release 使用
 RELEASE_BODY="## ${RELEASE_NAME} ${RELEASE_VERSION}
 
-自动发布（release.sh · 意图 #17 M2 打标发布自动化）。
+自动发布（release.sh · 打标发布自动化）。
 
 - 模块：${RELEASE_NAME}
 - 版本：${RELEASE_VERSION}
@@ -212,6 +212,6 @@ fi
 # ---------- 6. 唤醒提示（串联后续流程，仅提示不擅自触发） ----------
 echo "【唤醒提示】${RELEASE_NAME} ${RELEASE_VERSION} 已发布。"
 echo "规划者可通过确定性通道（pull_request.merged / web_trigger）接手："
-echo "  ① 需求池 R2 状态 → 已实现；② 路线图 M2 TODO 表回并；③ 合入后处理巡检。"
+echo "  ① 需求池状态同步；② 路线图任务项核对；③ 合入后处理巡检。"
 
 exit 0

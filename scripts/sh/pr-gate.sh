@@ -39,10 +39,10 @@ echo "目标分支  : ${TARGET_BRANCH}"
 echo "head commit: ${HEAD_COMMIT:-未知}"
 echo "事件      : ${EVENT}"
 
-# ---------- 1. 幂等去重（防卡死核心 · 对应容错兜底分册 §4 幂等保护 R16） ----------
+# ---------- 1. 幂等去重（防卡死核心 · 幂等保护机制） ----------
 # 规则：若该 PR 的 head commit 已审查过（存在 status/gate-ok 标签 或 本地缓存记录），
 # 说明本次触发是"重复事件"（如：同一 commit 被平台重复推送 / 编辑评论重触发），
-# 直接跳过，不再拉起任何 NPC，避免重复审查、重复修复、级联无限触发。
+# 直接跳过，不再拉起后续自动化流水线任务，避免重复审查、重复修复、级联无限触发。
 # 对应门禁治理分册 §4.7.3：门禁失败才需重跑；已通过则不重做。
 #
 # 幂等判断采用双保险：
@@ -62,7 +62,7 @@ fi
 
 if [[ "$already_gated" == "true" ]]; then
   echo "🛑 pr-gate: PR #${PR_NUM} 的 head commit（${HEAD_COMMIT}）已审查过，本次为重复触发，跳过（幂等防卡死）。"
-  echo "【门禁结论】跳过：重复触发，已审查，无需拉起 NPC。"
+  echo "【门禁结论】跳过：重复触发，已审查，无需拉起自动化代理 (Automation Agent)。"
   exit 0
 fi
 
@@ -73,7 +73,7 @@ if command -v cnb >/dev/null 2>&1; then
   CUR_LABELS=$(cnb pulls list-pull-labels --repo "$REPO_SLUG" --number "$PR_NUM" 2>/dev/null || true)
   if echo "$CUR_LABELS" | grep -q "$GATE_OK_LABEL"; then
     echo "🛑 pr-gate: PR #${PR_NUM} 已打 ${GATE_OK_LABEL} 标签（已审查），本次重复触发，跳过（幂等防卡死）。"
-    echo "【门禁结论】跳过：已审查（标签幂等），无需拉起 NPC。"
+    echo "【门禁结论】跳过：已审查（标签幂等），无需拉起自动化代理 (Automation Agent)。"
     exit 0
   fi
 fi
@@ -118,11 +118,11 @@ fi
 #   - 冲突文件少 → C1（冲突双方可自动化解，交由构建/测试主责处理）
 #   - 其余 → C2（需审查判断）
 if [[ "$CONFLICT_LEVEL" == "C2" ]]; then
-  NEW_LEVEL=$(gate_classify_conflicts "$CONFLICT_FILES")
-  if [[ "$NEW_LEVEL" == "C3" ]]; then
+  TARGET_LEVEL=$(gate_classify_conflicts "$CONFLICT_FILES")
+  if [[ "$TARGET_LEVEL" == "C3" ]]; then
     CONFLICT_LEVEL="C3"
     echo "⚠️ pr-gate: 冲突涉及高危文件（数据迁移/核心逻辑/依赖），升级为 C3 高危。"
-  elif [[ "$NEW_LEVEL" == "C1" ]]; then
+  elif [[ "$TARGET_LEVEL" == "C1" ]]; then
     CONFLICT_LEVEL="C1"
     echo "ℹ️ pr-gate: 冲突文件较少且非高危，判定为 C1（可自动化解）。"
   fi
@@ -158,25 +158,25 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
 
   # 质量信号初筛（关键词扫描 diff 文本，供审查聚焦；不替代正式审查）
   # 全量 diff 落临时文件一次，三类信号共用，避免重复生成 diff
-  QUALITY_TMP=$(mktemp)
-  trap 'rm -f "$QUALITY_TMP"' EXIT
+  DIFF_SNAPSHOT=$(mktemp)
+  trap 'rm -f "$DIFF_SNAPSHOT"' EXIT
   if [[ -n "$DIFF_BASE" ]]; then
-    git diff "${DIFF_BASE}...HEAD" > "$QUALITY_TMP" 2>/dev/null || true
+    git diff "${DIFF_BASE}...HEAD" > "$DIFF_SNAPSHOT" 2>/dev/null || true
   fi
   # 硬编码扫描：字符串字面量（单引号以变量传入正则，避免 \x27 转义在不同 grep 间的可移植差异）
   HC_QUOTE="'"
-  if grep -qE "^\+\s*(const|let|var).{0,20}=[\"${HC_QUOTE}][0-9a-zA-Z_./]{3,}[\"${HC_QUOTE}]" "$QUALITY_TMP"; then
+  if grep -qE "^\+\s*(const|let|var).{0,20}=[\"${HC_QUOTE}][0-9a-zA-Z_./]{3,}[\"${HC_QUOTE}]" "$DIFF_SNAPSHOT"; then
     QUALITY_FLAGS+=("疑似硬编码（字符串字面量，建议抽配置/常量）")
   fi
-  if grep -qE '^\+\s*(TODO|FIXME|HACK)\b' "$QUALITY_TMP"; then
+  if grep -qE '^\+\s*(TODO|FIXME|HACK)\b' "$DIFF_SNAPSHOT"; then
     QUALITY_FLAGS+=("新增 TODO/FIXME 待办（需确认是否遗留）")
   fi
-  if grep -qE '^\+\s*console\.(log|debug)\b' "$QUALITY_TMP"; then
+  if grep -qE '^\+\s*console\.(log|debug)\b' "$DIFF_SNAPSHOT"; then
     QUALITY_FLAGS+=("新增调试输出 console.log（生产代码建议移除）")
   fi
-  rm -f "$QUALITY_TMP"
+  rm -f "$DIFF_SNAPSHOT"
   if [[ "${CHANGED_FILES_CNT:-0}" -gt 30 ]]; then
-    QUALITY_FLAGS+=("改动文件数大（${CHANGED_FILES_CNT} 个）——疑似大重构/越权，需审查确认 R2")
+    QUALITY_FLAGS+=("改动文件数大（${CHANGED_FILES_CNT} 个）——疑似大重构/越权，需审查确认")
   fi
   if [[ "${ADDED_LINES:-0}" -gt 800 ]]; then
     QUALITY_FLAGS+=("净增行数大（${ADDED_LINES} 行）——疑似超大规模改动，需审查确认")
@@ -199,12 +199,12 @@ else
 fi
 
 # ---------- 4. 冲突分级派单（防卡死核心 · 对应门禁治理分册 §4.8.2） ----------
-# 核心目标：避免 4 个 NPC 全部并行拉起后互相等待。按分级只唤醒"本轮必须推进"的对象，
+# 核心目标：避免多类自动化流水线任务全部并行拉起后互相等待。按分级只唤醒"本轮必须推进"的对象，
 # 并明确"谁主导、谁补位"，其余不重复触发。
 case "$CONFLICT_LEVEL" in
   C0)
     WAKE_GUIDE="无冲突 → 由【协作员·审查】主导执行 PR 门禁（规范门禁主审+四眼复核），
-构建/测试补位各自门禁；合入员汇总合入门禁（决策，R21）。无重复触发。"
+构建/测试补位各自门禁；合入检查器汇总合入门禁决策。无重复触发。"
     ;;
   C1)
     WAKE_GUIDE="冲突可自动化解 → 由冲突双方【协作员·构建】/【协作员·测试】按主责定点化解并重跑门禁，
@@ -237,7 +237,7 @@ if command -v cnb >/dev/null 2>&1; then
   cnb pulls post-pull-labels --repo "$REPO_SLUG" --number "$PR_NUM" --labels "$GATE_OK_LABEL" >/dev/null 2>&1 || true
 fi
 
-# 5.3 输出门禁结论（供后续 NPC 读取，避免各自盲目重扫）
+# 5.3 输出门禁结论（供后续自动化代理读取，避免各自盲目重扫）
 echo ""
 echo "【门禁结论】PR #${PR_NUM}"
 echo "  冲突等级 : ${CONFLICT_LEVEL}"
@@ -245,12 +245,12 @@ echo "  冲突文件 : ${CONFLICT_FILES:-无}"
 echo "  变更规模 : ${CHANGED_FILES_CNT:-0} 文件 / +${ADDED_LINES:-0} -${DELETED_LINES:-0} 行"
 echo "  质量信号 : ${QUALITY_FLAGS[*]:-未发现明显信号}"
 echo "  唤醒建议 : ${WAKE_GUIDE}"
-echo "【唤醒提示】后续 NPC（审查/构建/测试/合入员）请读取本结论后再分工，避免重复拉起与互相等待；"
+echo "【唤醒提示】后续自动化流水线任务（审查/构建/测试/合流治理）请读取本结论后再分工，避免重复拉起与互相等待；"
 echo "  已打 ${GATE_OK_LABEL} 标签用于幂等防重（同一 head commit 重复触发将跳过）。"
 
 # ---------- 5.4 合入状态读取（专职合入员配套 · 2026-08-21 增强） ----------
 # 读取 PR 的合入决策标签（status/merge-ready / status/merge-blocked），
-# 供合入员 Stage 4 决策与 pull_request.mergeable 复核参考。
+# 供合入检查器合入决策与 pull_request.mergeable 复核参考。
 # 陈旧否决识别：本 PR 有新提交（已过幂等检查 = head commit 更新）却仍带 merge-blocked，
 # 说明否决可能针对旧 commit → 提示合入员复核；人工否决不自动清除（保否决权）。
 MERGE_STATE_LINE="无合入决策标签（尚未由合入员判定）"
@@ -258,7 +258,7 @@ if [[ -n "$CUR_LABELS" ]]; then
   if echo "$CUR_LABELS" | grep -q "status/merge-blocked"; then
     MERGE_STATE_LINE="status/merge-blocked（存在否决 → 自动合入被阻断）"
     echo "⚠️ 陈旧否决提示：PR #${PR_NUM} 存在 status/merge-blocked 否决标签，但本次为新提交（head ${HEAD_COMMIT:-未知}）。"
-    echo "  请【合入员】在 Stage 4 合入门禁复核该否决是否仍有效；人工否决需人工确认解除，脚本不自动清除。"
+    echo "  请合流治理服务在合入门禁复核该否决是否仍有效；人工否决需人工确认解除，脚本不自动清除。"
   elif echo "$CUR_LABELS" | grep -q "status/merge-ready"; then
     MERGE_STATE_LINE="status/merge-ready（已放行 → 满足条件可自动合入）"
   fi

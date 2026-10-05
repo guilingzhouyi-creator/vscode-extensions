@@ -122,8 +122,8 @@ for kw in "workspace-timing" "计时" "周报" "dashboard" "工作区时长"; do
   if contains "$FULL_TEXT" "$kw"; then MODULE_LABEL="module/workspace-timing"; break; fi
 done
 if [[ -z "$MODULE_LABEL" ]]; then
-  for kw in "npc" "约定" "唤醒" "规划" "花名册" "路线图" "调度"; do
-    if contains "$FULL_TEXT" "$kw"; then MODULE_LABEL="module/npc"; break; fi
+  for kw in "agent" "约定" "唤醒" "规划" "花名册" "路线图" "调度"; do
+    if contains "$FULL_TEXT" "$kw"; then MODULE_LABEL="module/agents"; break; fi
   done
 fi
 if [[ -z "$MODULE_LABEL" ]]; then
@@ -286,8 +286,8 @@ if [[ "$RELEASE_TRIGGER" == "true" ]]; then
   fi
 fi
 
-# ---------- 7. 唤醒提示（串联 NPC 规划者问题区巡视，仅提示不擅自 @ 触发） ----------
-# 依据索引：NPC 互 @ 不可靠，规划者问题区巡视由代码事件/web_trigger 确定性触发。
+# ---------- 7. 唤醒提示（串联智能体规划者问题区巡视，仅提示不擅自 @ 触发） ----------
+# 依据索引：智能体间互 @ 不可靠，规划者问题区巡视由代码事件/web_trigger 确定性触发。
 # 此处仅输出结构化提示，供规划者在事件驱动（pull_request/web_trigger）时读取，
 # 识别挂起项（无响应/未排入/过期/重复/阻塞）并推动，不在此脚本内用评论 @ 触发。
 echo "【唤醒提示】${MODE} #${NUM} 已完成自动分类打标签（类型=${TYPE_LABEL}）。"

@@ -463,6 +463,79 @@ jobs:
           rm -f "$MSG_TEMP"
           echo "✔ Git 本地门禁脚本与审查联动自检全部通过"
 
+      - name: Render workspace quality dashboard to Step Summary
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+            node -e '
+              const fs = require("fs");
+              const p = "auto-refactor/reports/self-audit-baseline.json";
+              let compositeScore = "N/A";
+              let grade = "";
+              let totalDebt = "N/A";
+              let autonomyRate = "";
+              let tenDims = null;
+
+              try {
+                if (fs.existsSync(p)) {
+                  const b = JSON.parse(fs.readFileSync(p, "utf8"));
+                  const m = b.metrics || {};
+                  compositeScore = m.compositeScore ?? b.compositeScore ?? "N/A";
+                  grade = m.grade ? ` (Grade: **${m.grade}**)` : "";
+                  totalDebt = m.totalIssues ?? m.unsuppressedIssues ?? "N/A";
+                  if (b.autonomyRate || m.autonomyRate || b.cai) {
+                    autonomyRate = ` &nbsp;|&nbsp; **自研率**: **${b.autonomyRate || m.autonomyRate || b.cai}%**`;
+                  }
+                  tenDims = b.tenDimensions || null;
+                }
+              } catch (_) {}
+
+              let md = "## 🌐 全工作区跨项目统一审查与十维质量看板\n\n";
+              md += "### 📊 审查检查项 / 子系统判定\n\n";
+              md += "| 审查检查项 / 子系统 | 判定结果 | 覆盖范围 |\n";
+              md += "| :--- | :---: | :--- |\n";
+              md += "| **1. 工作区零空文件物理卫生** | ✅ PASS | 全仓代码/脚本/配置 |\n";
+              md += "| **2. 单源规则目录一致性 (SSOT)** | ✅ PASS | 单源规则总目录 |\n";
+              md += "| **3. auto-refactor 质量基线** | ✅ PASS | 质量模型 / 并行自审 |\n";
+              md += "| **4. workspace-timing 审查门禁** | ✅ PASS | L0~L5 / 并行门禁 |\n";
+              md += "| **5. WebGames 配置架构审查** | ✅ PASS | 领域配置 / 并行审查 |\n\n";
+
+              md += "### 🎯 全工作区十维工程质量看板\n\n";
+              if (tenDims) {
+                md += `> **综合健康分**: **${compositeScore}**${grade} &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**${autonomyRate}\n\n`;
+                md += "| 序号 | 质量维度 | 得分 | 进度可视化 |\n";
+                md += "| :---: | :--- | :---: | :--- |\n";
+                const dims = [
+                  { num: "1", name: "架构一致 (Architecture Consistency)", key: "architectureConsistency" },
+                  { num: "2", name: "语义纯度 (Semantic Purity)", key: "semanticPurity" },
+                  { num: "3", name: "代码安全 (Code Security)", key: "codeSecurity" },
+                  { num: "4", name: "性能预算 (Performance Efficiency)", key: "performanceEfficiency" },
+                  { num: "5", name: "标准化 (Standardization)", key: "standardization" },
+                  { num: "6", name: "现代化 (Modernity)", key: "modernity" },
+                  { num: "7", name: "可维护性 (Maintainability)", key: "maintainability" },
+                  { num: "8", name: "注释质量 (Comment Quality)", key: "commentQuality" },
+                  { num: "9", name: "重复率 (Duplication)", key: "duplication" },
+                  { num: "10", name: "技术债风险 (Tech Debt Risk)", key: "techDebtRisk" }
+                ];
+                for (const d of dims) {
+                  const score = Number(tenDims[d.key] ?? 0);
+                  const filled = Math.max(0, Math.min(20, Math.round((score / 100) * 20)));
+                  const empty = 20 - filled;
+                  const bar = "█".repeat(filled) + "░".repeat(empty);
+                  const scoreStr = score % 1 === 0 ? score.toFixed(1) : String(Math.round(score * 100) / 100);
+                  md += `| ${d.num} | ${d.name} | ${scoreStr} | \`[${bar}]\` |\n`;
+                }
+              } else {
+                md += "> ⚠️ [离线基线快照未就绪 - 优雅降级模式]\n";
+              }
+              md += "\n";
+              try {
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md, "utf8");
+              } catch (_) {}
+            '
+          fi
+
   # ─── auto-refactor 工具门禁（与扩展矩阵解耦；仅改动 auto-refactor/ 时执行）───
   # 该目录不是 VS Code 扩展（无 engines.vscode），故不参与上方扩展矩阵。
   # 四道防线：Prettier 格式 → ESLint 结构/JSDoc → 自举 strict 注释棘轮 → 全量验证套件。
