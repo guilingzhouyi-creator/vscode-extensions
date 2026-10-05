@@ -10,7 +10,7 @@ dist/
 out/
 coverage/
 
-# 门禁 SARIF 报告产物（本地与 CI 运行 audit-all --sarif-out 生成，不入库）
+# 统一审查 SARIF 报告产物（本地与 CI 运行 audit-all --sarif-out 生成，不入库）
 sarif/
 
 # 本地运行时数据与工具目录（不入库）
@@ -30,6 +30,9 @@ WebGames/.agents/
 dsh-uninstall-*.tsv
 **/.trae-html-share-packages/
 status_summary.txt
+**/scratch/
+**/scratch_*.json
+scratch_*.json
 
 # auto-refactor 运行时缓存、测试语料与基准临时文件（不入库）
 **/.auto-refactor-cache/
