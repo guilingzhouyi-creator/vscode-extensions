@@ -196,7 +196,7 @@ function validateCommitMessageContent(content) {
   let inExecutionSection = false;
 
   const EXECUTION_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Verification|Execution|验证|执行|测试)(?:[\s\/\]:]|$)/i;
-  const OTHER_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Why|Added|Changed|Fixed|Removed|Refactor|Docs|Chore|动机|背景|新增|变更|修改|修复|删除)(?:[\s\/\]:]|$)/i;
+  const OTHER_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Project|Why|Added|Changed|Fixed|Removed|Refactor|Docs|Chore|项目|项目归属|动机|背景|新增|变更|修改|修复|删除)(?:[\s\/\]:]|$)/i;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];

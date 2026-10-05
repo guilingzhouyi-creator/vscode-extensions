@@ -49,6 +49,9 @@ print_template_guide() {
     echo "-----------------------------------------------------------------"
     echo "<type>(<scope>): <祈使句中文摘要标题，5~80 字符，不以句号结尾>"
     echo ""
+    echo "[Project / 项目归属]"
+    echo "- <workspace-timing | auto-refactor | WebGames | governance>"
+    echo ""
     echo "[Why / 动机背景]"
     echo "- 业务背景、关联需求 ID 或解决的核心痛点。"
     echo ""
@@ -140,15 +143,107 @@ if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor)$ ]]; then
     # --- Rule 5: 结构化区块完整性校验 ---
     # 必须包含结构化区块标识（如 [Why], [Added], [Changed], [Fixed], [Removed], [Verification] 或其中文对应）
     # 或者具备规范的列表小节（以 '- ' 开头的详细阐述）
-    STRUCTURE_PATTERN='(\[(Why|Added|Changed|Fixed|Removed|Verification|动机|背景|新增|变更|修改|修复|删除|验证).*?\]|^- )'
+    STRUCTURE_PATTERN='(\[(Project|Why|Added|Changed|Fixed|Removed|Verification|项目|项目归属|动机|背景|新增|变更|修改|修复|删除|验证).*?\]|^- )'
     if ! echo "$BODY_TEXT" | grep -iE "$STRUCTURE_PATTERN" >/dev/null 2>&1; then
         echo "❌ [FAIL] Rule 5: 关键提交 ($COMMIT_TYPE) 缺少生产级结构化区块！"
         echo "   请至少包含以下标准区块之一："
+        echo "   • [Project / 项目归属]"
         echo "   • [Why / 动机背景]"
         echo "   • [Added / 新增内容]"
         echo "   • [Changed / 变更调整]"
         echo "   • [Fixed / 修复缺陷]"
         echo "   • [Verification / 验证结论]"
+        print_template_guide
+        exit 1
+    fi
+fi
+
+# --- Rule 5.1: 项目归属格式区与合法枚举校验 (CMG-PRJ-001) ---
+FOUND_PROJECT_HEADER=false
+IN_PROJECT_SECTION=false
+DECLARED_PROJECTS=()
+
+while IFS= read -r line || [[ -n "$line" ]]; do
+    trimmed_line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    if [[ "$trimmed_line" =~ ^\[(Project|项目|项目归属)(/[^]]+)?\](:[[:space:]]*(.*))?$ ]]; then
+        FOUND_PROJECT_HEADER=true
+        IN_PROJECT_SECTION=true
+        inline_val="${BASH_REMATCH[4]}"
+        if [[ -n "$inline_val" ]]; then
+            IFS=',，、' read -ra parts <<< "$inline_val"
+            for p in "${parts[@]}"; do
+                p_clean=$(echo "$p" | sed -e 's/^[[:space:]-]*//' -e 's/[[:space:]]*$//' -e 's/[([（].*$//' -e 's/[[:space:]].*$//')
+                if [[ -n "$p_clean" ]]; then
+                    DECLARED_PROJECTS+=("$p_clean")
+                fi
+            done
+        fi
+    elif [ "$IN_PROJECT_SECTION" = true ]; then
+        if [[ -z "$trimmed_line" ]]; then
+            continue
+        elif [[ "$trimmed_line" =~ ^\[.*\] ]]; then
+            IN_PROJECT_SECTION=false
+        elif [[ "$trimmed_line" =~ ^-[[:space:]]*(.*) ]]; then
+            item_val="${BASH_REMATCH[1]}"
+            IFS=',，、' read -ra parts <<< "$item_val"
+            for p in "${parts[@]}"; do
+                p_clean=$(echo "$p" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[([（].*$//' -e 's/[[:space:]].*$//')
+                if [[ -n "$p_clean" ]]; then
+                    DECLARED_PROJECTS+=("$p_clean")
+                fi
+            done
+        else
+            IN_PROJECT_SECTION=false
+        fi
+    fi
+done <<< "$BODY_TEXT"
+
+if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor)$ ]]; then
+    if [ "$FOUND_PROJECT_HEADER" = false ]; then
+        echo "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($COMMIT_TYPE) 缺少项目归属格式区！"
+        echo "   必须在正文首个结构化区块声明 [Project / 项目归属] 并指定所属项目："
+        echo "   示例："
+        echo "   [Project / 项目归属]"
+        echo "   - workspace-timing"
+        echo ""
+        echo "   合法项目枚举列表："
+        echo "   • workspace-timing (VS Code 计时器插件)"
+        echo "   • auto-refactor    (Node CLI / Rust 静态重构与审查引擎)"
+        echo "   • WebGames         (Godot 卡拉尔世界游戏引擎)"
+        echo "   • governance       (工作区工程效能、门禁脚本、顶层案卷与全局工具链)"
+        print_template_guide
+        exit 1
+    fi
+
+    if [[ ${#DECLARED_PROJECTS[@]} -eq 0 ]]; then
+        echo "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！"
+        echo "   请至少指定一个合法项目："
+        echo "   • workspace-timing | auto-refactor | WebGames | governance"
+        print_template_guide
+        exit 1
+    fi
+fi
+
+if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
+    VALID_NORM=" workspace-timing auto-refactor webgames web-games governance "
+    INVALID_PROJECTS=()
+    for p in "${DECLARED_PROJECTS[@]}"; do
+        p_lower=$(echo "$p" | tr '[:upper:]' '[:lower:]')
+        if [[ ! "$VALID_NORM" =~ [[:space:]]"$p_lower"[[:space:]] ]]; then
+            INVALID_PROJECTS+=("$p")
+        fi
+    done
+
+    if [[ ${#INVALID_PROJECTS[@]} -gt 0 ]]; then
+        echo "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识！"
+        for inv in "${INVALID_PROJECTS[@]}"; do
+            echo "   • 未知项目标识: '$inv'"
+        done
+        echo "   合法项目枚举仅限于："
+        echo "   • workspace-timing (VS Code 计时器插件)"
+        echo "   • auto-refactor    (Node CLI / Rust 静态重构与审查引擎)"
+        echo "   • WebGames         (Godot 卡拉尔世界游戏引擎)"
+        echo "   • governance       (工作区工程效能、门禁脚本、顶层案卷与全局工具链)"
         print_template_guide
         exit 1
     fi
@@ -179,6 +274,12 @@ echo "  ✔ Rule 2: 零黑话与空洞词检测通过"
 echo "  ✔ Rule 3: Header-Body 空行分割契约合规"
 echo "  ✔ Rule 4: 正文有效字数与信息密度 ($BODY_CHAR_COUNT 字符) 达标"
 echo "  ✔ Rule 5: 生产工程级结构化区块校验通过"
+if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
+    PROJ_STR=$(IFS=', '; echo "${DECLARED_PROJECTS[*]}")
+    echo "  ✔ Rule 5.1: 项目归属格式区合规 ([Project: $PROJ_STR])"
+else
+    echo "  ✔ Rule 5.1: 项目归属格式区校验通过 (免检/非强制类型)"
+fi
 echo "  ✔ Rule 6: 正文零施工批次黑话校验通过"
 echo "  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过"
 echo "  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (零临时/零夸大/零贬损/零元叙事口号)"

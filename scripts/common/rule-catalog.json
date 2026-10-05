@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-05T04:55:40.805Z",
-  "totalRules": 379,
+  "generatedAt": "2026-10-05T05:09:10.350Z",
+  "totalRules": 380,
   "counts": {
     "autoRefactor": 299,
     "workspaceTiming": 45,
     "webGames": 56,
-    "globalTooling": 6
+    "globalTooling": 7
   },
   "rules": [
     {
@@ -372,6 +372,13 @@
       "family": "ARCH",
       "severity": "error",
       "summary": "Layering boundary breach in incremental pipeline (clean-layer semantics)."
+    },
+    {
+      "id": "CMG-PRJ-001",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "项目归属格式区与合法枚举校验"
     },
     {
       "id": "CMG-STY-001",

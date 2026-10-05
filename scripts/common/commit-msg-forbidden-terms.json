@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "schema": "commit-msg-forbidden-terms/v1",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "rules": [
     {
       "id": "CMG-STY-001",
@@ -191,6 +191,16 @@
       "asciiPatterns": [],
       "reason": "提交说明是长期技术档案，执行标签区域（[Verification]）下严禁记录任何形式的执行数字、用例计数、测试套件数、行数、耗时、比例或百分比流水账。",
       "guidance": "必须将执行结论提炼为纯粹的技术功能逻辑与输入输出断言事实描述，彻底移除所有执行数字与量词。例如将'断言419个文件通过'改为'断言全量源码文件合规'。"
+    },
+    {
+      "id": "CMG-PRJ-001",
+      "category": "project_governance",
+      "severity": "error",
+      "title": "项目归属格式区与合法枚举校验",
+      "patterns": [],
+      "asciiPatterns": [],
+      "reason": "提交说明必须明确项目归属元数据，杜绝项目归属缺失或捏造不存在的项目标识。",
+      "guidance": "请在正文第一区块添加 [Project / 项目归属]，并填入合法项目标识（workspace-timing | auto-refactor | WebGames | governance）。"
     }
   ],
   "whitelist": [
