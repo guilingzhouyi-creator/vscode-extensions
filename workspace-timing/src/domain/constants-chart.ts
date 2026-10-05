@@ -10,6 +10,9 @@ export const DAYS_PER_WEEK = 7;
 /** 一天小时数 */
 export const HOURS_PER_DAY = 24;
 
+/** 周日相对偏移量（用于星期转换） */
+export const DAYS_TO_SUNDAY = 6;
+
 /** 活动热力图默认回溯周数（半年视图，铺满全宽卡片） */
 export const DEFAULT_HEATMAP_WEEKS = 24;
 

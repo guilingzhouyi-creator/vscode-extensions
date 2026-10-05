@@ -6,10 +6,9 @@
 
 import { DailyTotalsMap, MS_PER_DAY, MS_PER_HOUR, TimeSession } from '../models';
 import { HeatmapDay } from '../dashboard-types';
-import { DAYS_PER_WEEK, DEFAULT_HEATMAP_WEEKS } from '../constants-chart';
+import { DAYS_PER_WEEK, DAYS_TO_SUNDAY, DEFAULT_HEATMAP_WEEKS } from '../constants-chart';
 import { eachDaySegment, localDateStr } from './date-utils';
 
-const DAYS_TO_SUNDAY = 6;
 const MAX_HEATMAP_LEVEL = 4;
 const HIGH_ACTIVITY_HOURS = 4;
 const MID_ACTIVITY_HOURS = 2;
@@ -63,28 +62,37 @@ function buildHeatmapWindow(weeks: number): HeatmapWindow {
     return { cells, windowDates, windowStartMs, windowEndMs };
 }
 
-/** 聚合折叠桶与原始会话时长到日期字典 */
-function aggregateWindowSessions(
-    window: HeatmapWindow,
-    sessions: readonly TimeSession[],
-    currentSessionStartMs: number,
+/** 从已折叠历史日汇总桶中初始化热力图基底数据 */
+function seedFromDailyTotals(
+    windowDates: ReadonlySet<string>,
     dailyTotals?: DailyTotalsMap,
 ): Map<string, number> {
-    const { windowDates, windowStartMs, windowEndMs } = window;
     const byDate = new Map<string, number>();
-
-    if (dailyTotals) {
-        for (const date of windowDates) {
-            const v = dailyTotals[date];
-            if (v && v.totalMs > 0) byDate.set(date, v.totalMs);
+    if (!dailyTotals) {
+        return byDate;
+    }
+    for (const date of windowDates) {
+        const v = dailyTotals[date];
+        if (v && v.totalMs > 0) {
+            byDate.set(date, v.totalMs);
         }
     }
+    return byDate;
+}
 
+/** 累加原始会话切片时长并覆盖或更新日总计 */
+function accumulateRawSessions(
+    window: HeatmapWindow,
+    sessions: readonly TimeSession[],
+    byDate: Map<string, number>,
+): void {
     const rawByDate = new Map<string, number>();
     for (const s of sessions) {
-        if (s.endMs <= windowStartMs || s.startMs >= windowEndMs) continue;
+        if (s.endMs <= window.windowStartMs || s.startMs >= window.windowEndMs) {
+            continue;
+        }
         eachDaySegment(s.startMs, s.endMs, (date, segStart, segEnd) => {
-            if (windowDates.has(date)) {
+            if (window.windowDates.has(date)) {
                 rawByDate.set(date, (rawByDate.get(date) ?? 0) + (segEnd - segStart));
             }
         });
@@ -92,15 +100,34 @@ function aggregateWindowSessions(
     for (const [date, ms] of rawByDate) {
         byDate.set(date, ms);
     }
+}
 
-    if (currentSessionStartMs > 0) {
-        eachDaySegment(currentSessionStartMs, Date.now(), (date, segStart, segEnd) => {
-            if (windowDates.has(date)) {
-                byDate.set(date, (byDate.get(date) ?? 0) + (segEnd - segStart));
-            }
-        });
+/** 叠加当前正在进行中的未闭合活跃会话 */
+function accumulateCurrentSession(
+    windowDates: ReadonlySet<string>,
+    currentSessionStartMs: number,
+    byDate: Map<string, number>,
+): void {
+    if (currentSessionStartMs <= 0) {
+        return;
     }
+    eachDaySegment(currentSessionStartMs, Date.now(), (date, segStart, segEnd) => {
+        if (windowDates.has(date)) {
+            byDate.set(date, (byDate.get(date) ?? 0) + (segEnd - segStart));
+        }
+    });
+}
 
+/** 聚合折叠桶与原始会话时长到日期字典 */
+function aggregateWindowSessions(
+    window: HeatmapWindow,
+    sessions: readonly TimeSession[],
+    currentSessionStartMs: number,
+    dailyTotals?: DailyTotalsMap,
+): Map<string, number> {
+    const byDate = seedFromDailyTotals(window.windowDates, dailyTotals);
+    accumulateRawSessions(window, sessions, byDate);
+    accumulateCurrentSession(window.windowDates, currentSessionStartMs, byDate);
     return byDate;
 }
 

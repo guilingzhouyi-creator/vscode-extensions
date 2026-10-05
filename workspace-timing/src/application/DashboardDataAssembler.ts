@@ -2,8 +2,7 @@
  * DashboardDataAssembler — 面板 DTO 组装器（应用层纯函数）
  *
  * 职责：把计时器只读快照 + 配置 + 跨工作区快照组装为 DashboardData 视图模型。
- * 边界：纯组装，无 I/O、无状态；此前该职责内联在 TimerOrchestrator.getDashboardData，
- *       抽出后导出（exportReport）与面板（getDashboardData）两条路径共用同一组装逻辑，
+ * 边界：纯组装，无 I/O、无状态；供导出与面板两条路径共用同一组装逻辑，
  *       消除 weeklyTrend 等字段的重复拼装。
  */
 
@@ -17,16 +16,12 @@ import {
     MS_PER_MINUTE,
     DEFAULT_MAX_SESSIONS,
     DEFAULT_WEEKLY_LIMIT_HOURS,
+    DEFAULT_RAW_RETENTION_DAYS,
 } from '../domain/models';
 import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
-import { DashboardData, WeeklyTrendEntry } from '../domain/dashboard-types';
+import { DashboardData, DailyDetail, WeeklyTrendEntry } from '../domain/dashboard-types';
 import { DEFAULT_HEATMAP_WEEKS, DEFAULT_TREND_WEEKS, ISO_DATE_MD_START } from '../domain/constants-chart';
 import { GlobalSnapshot } from './GlobalAggregator';
-
-export interface DashboardDataAssembler {
-    buildDashboardData: typeof buildDashboardData;
-    buildWeeklyTrendEntries: typeof buildWeeklyTrendEntries;
-}
 
 /** 入参聚合上下文：隔离外部对象直接传入，显式声明依赖字段 */
 export interface AssembleContext {
@@ -58,30 +53,16 @@ export function buildWeeklyTrendEntries(
 }
 
 /** 构建今日会话明细（供面板展示；无会话返回 null） */
-function buildTodayDetail(data: ReadonlyTimingData): DashboardData['todayDetail'] {
+function buildTodayDetail(data: ReadonlyTimingData): DailyDetail | null {
     const detail = TimeAggregator.dailyDetail(
         data.sessions,
         TimeAggregator.todayStr(),
         data.currentSessionStartMs,
     );
-    if (detail.sessionCount === 0) return null;
-    return {
-        date: detail.date,
-        totalMs: detail.totalMs,
-        sessionCount: detail.sessionCount,
-        sessions: detail.sessions.map((s) => ({
-            startLabel: s.startLabel,
-            endLabel: s.endLabel,
-            durationMs: s.durationMs,
-        })),
-        hourly: detail.hourly.map((h) => ({
-            hour: h.hour,
-            totalMs: h.totalMs,
-            sessionCount: h.sessionCount,
-        })),
-        peakHour: detail.peakHour,
-        activeWindow: detail.activeWindow,
-    };
+    if (detail.sessions.length === 0) {
+        return null;
+    }
+    return detail;
 }
 
 /**
@@ -127,14 +108,7 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
         heatmap,
         weekTotalMs: weeklySummary.totalMs,
         weeklyTrend,
-        weeklySummary: {
-            totalMs: weeklySummary.totalMs,
-            sessionCount: weeklySummary.sessionCount,
-            avgDailyMs: weeklySummary.avgDailyMs,
-            peakDate: weeklySummary.peakDate,
-            peakDateMs: weeklySummary.peakDateMs,
-            activeDays: weeklySummary.activeDays,
-        },
+        weeklySummary,
         todayDetail,
         globalTotalMs: global.totalMs,
         workspaceCount: global.workspaceCount,
@@ -149,6 +123,8 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
         journalFlushIntervalMs: config.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
         fullSaveIntervalMs: config.fullSaveIntervalMs ?? MS_PER_MINUTE,
         maxSessions: config.maxSessions ?? DEFAULT_MAX_SESSIONS,
+        historyRawRetentionDays: config.historyRawRetentionDays ?? DEFAULT_RAW_RETENTION_DAYS,
+        safetySnapshot: config.safetySnapshot ?? true,
         weeklyLimitEnabled: config.weeklyLimitEnabled ?? false,
         weeklyLimitHours: config.weeklyLimitHours ?? DEFAULT_WEEKLY_LIMIT_HOURS,
     };

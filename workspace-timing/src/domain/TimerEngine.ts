@@ -120,7 +120,11 @@ export class TimerEngine {
         return this._running;
     }
 
-    /** 开始计时 */
+    /**
+     * 开始计时。
+     * @precondition !this.isRunning
+     * @postcondition this.isRunning === true && this._data.currentSessionStartMs === Date.now()
+     */
     start(): void {
         if (this._running) return;
         this._running = true;
@@ -128,7 +132,12 @@ export class TimerEngine {
         this._data.currentSessionStartMs = this._sessionStartMs;
     }
 
-    /** 停止计时，返回本次会话历时 (ms) */
+    /**
+     * 停止计时并固化本次会话。
+     * @precondition 无要求（幂等；若未运行直接返回 0）
+     * @postcondition this.isRunning === false && this._data.currentSessionStartMs === 0 && this._data.totalMs >= prevTotalMs
+     * @returns 本次会话历时 (ms)
+     */
     stop(): number {
         if (!this._running) return 0;
         this._running = false;

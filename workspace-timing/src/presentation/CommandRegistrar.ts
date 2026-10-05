@@ -15,8 +15,7 @@ import { LogLevel, log } from '../integration/Logger';
 import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format } from '../i18n/index';
 import { TimeAggregator } from '../domain/TimeAggregator';
-import { exportTimingToFile } from './dashboardMessages';
-import { sanitizeFileName } from './fileUtils';
+import { exportTimingToFile, exportAggregatedToFile } from './dashboardMessages';
 
 export class CommandRegistrar {
     private readonly disposables: vscode.Disposable[] = [];
@@ -99,8 +98,8 @@ export class CommandRegistrar {
         // 调试：手动存盘
         this.registerCommand('workspaceTiming.debugSave', async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
-            const result = await orchestrator.saveNow();
-            vscode.window.showInformationMessage(format(t()['cmd.debugSaved'], result));
+            await orchestrator.saveNow();
+            vscode.window.showInformationMessage(format(t()['cmd.debugSaved'], 'OK'));
         });
 
         // 新建计时周期（重置累计，保留历史）
@@ -180,28 +179,13 @@ export class CommandRegistrar {
             });
         });
 
-        // 导出全历史聚合日报 CSV
-        this.registerCommand('workspaceTiming.exportAggregated', async () => {
-            if (!orchestrator) { this.noWorkspaceMsg(); return; }
-            const workspaceName = sanitizeFileName(vscode.workspace.workspaceFolders?.[0]?.name ?? 'workspace');
-            const defaultUri = vscode.Uri.file(
-                `${workspaceName}-timing-${t()['export.filename.aggregated']}-${TimeAggregator.todayStr()}.csv`,
-            );
-            const uri = await vscode.window.showSaveDialog({
-                defaultUri,
-                filters: { [t()['export.filter.csv']]: ['csv'] },
-                saveLabel: t()['toast.exportSaveLabel'],
+        // 导出全历史聚合日报 CSV（与 Dashboard 导出按钮共用管道）
+        this.registerCommand('workspaceTiming.exportAggregated', () => {
+            void exportAggregatedToFile({
+                getOrchestrator: () => orchestrator,
+                getStatusBar: () => statusBar,
+                getDashboard: () => DashboardPanel.currentPanel ?? null,
             });
-            if (!uri) return;
-            try {
-                const csv = await orchestrator.exportAggregatedCSV(workspaceName);
-                await vscode.workspace.fs.writeFile(uri, Buffer.from(csv, 'utf8'));
-                vscode.window.showInformationMessage(
-                    format(t()['toast.exportSuccess'], uri.fsPath));
-            } catch (err) {
-                log(LogLevel.Error, 'aggregated export failed', err as Error);
-                vscode.window.showErrorMessage(t()['toast.exportFailed']);
-            }
         });
     }
 

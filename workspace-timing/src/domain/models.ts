@@ -27,6 +27,8 @@ export const ORCHESTRATOR_STATES = {
     RUNNING: 'running',
     DISABLED: 'disabled',
     SAVING: 'saving',
+    STOPPED: 'stopped',
+    ERROR: 'error',
 } as const;
 export type OrchestratorState = typeof ORCHESTRATOR_STATES[keyof typeof ORCHESTRATOR_STATES];
 
@@ -221,7 +223,15 @@ export interface WorkspaceTimingData {
   dailyTotals?: DailyTotalsMap;
 
   /** 扩展元数据容器 — 供插件/第三方使用 */
-  metadata?: Record<string, string>;
+  metadata?: TimingMetadata;
+}
+
+/** 扩展元数据结构 */
+export interface TimingMetadata {
+  lastJournalTs?: number | string;
+  foldedSessionCount?: number;
+  journalPlaybackCount?: number;
+  [key: string]: unknown;
 }
 
 /** 创建一个空的 WorkspaceTimingData */
@@ -233,6 +243,7 @@ export function createEmptyTimingData(): WorkspaceTimingData {
     lastSavedAtMs: 0,
     isEnabled: true,
     sessions: [],
+    dailyTotals: {},
   };
 }
 

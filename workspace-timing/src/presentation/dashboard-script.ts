@@ -11,7 +11,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
       const vscode = acquireVsCodeApi();
       // 词条表（渲染时由扩展宿主按当前语言序列化注入）
       const L = ${JSON.stringify(labels)};
-      // {0}/{1} 占位符格式化（与宿主 i18n format 语义一致；curveSegTip 等词条含双占位符）
+      // {0}/{1} 占位符格式化（与宿主 i18n format 语义一致）
       function fmt(tpl) {
         const args = Array.prototype.slice.call(arguments, 1);
         return String(tpl).replace(/{([0-9]+)}/g, function(_, idx) {
@@ -141,13 +141,15 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           return;
         }
 
-        // 大数组防护：workspaces 数量无上限，用索引循环求最大而非 Math.max(...spread)（防栈溢出）
+        // 单趟循环合并求最大值与总和，消除 reduce 闭包与多次遍历开销 (CPX-SPACE-001)
         let maxVal = 1;
+        let sumTotal = 0;
         for (let i = 0; i < workspaces.length; i++) {
           const t = workspaces[i].totalMs || 0;
           if (t > maxVal) maxVal = t;
+          sumTotal += t;
         }
-        const grandTotal = globalTotalMs || workspaces.reduce((sum, ws) => sum + (ws.totalMs || 0), 0);
+        const grandTotal = globalTotalMs || sumTotal;
 
         // ★ 兜底：count 必须为有限数字，否则 fmt 会输出字面量占位符（如 "（{0} 个工作区）"）。
         //   宿主数据异常（旧版 globalState 缺 workspaces 字段）时以实际列表长度兜底。
@@ -160,17 +162,20 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             '</strong><span class="ws-compare-count">' + fmt(L['panel.js.workspaceCountFmt'], wsCount) + '</span>';
         }
 
-        const rows = new Array(workspaces.length);
+        // 循环流式字符串拼接，消除 new Array 堆分配与 .join('') (CPX-SPACE-001)
+        let html = '';
         for (let i = 0; i < workspaces.length; i++) {
           const ws = workspaces[i];
-          const pct = Math.max((ws.totalMs / maxVal) * 100, 2);
-          const share = grandTotal > 0 ? Math.round((ws.totalMs / grandTotal) * 100) : 0;
+          const totalMs = ws.totalMs || 0;
+          const pct = Math.max((totalMs / maxVal) * 100, 2);
+          const share = grandTotal > 0 ? Math.round((totalMs / grandTotal) * 100) : 0;
           const extraCls = i >= 5 ? ' ws-extra' : '';
-          rows[i] =
+          const escapedName = escapeHtml(ws.name);
+          html +=
             '<div class="ws-compare-row' + extraCls + '">' +
               '<div class="ws-compare-header">' +
-                '<div class="ws-compare-name" title="' + escapeHtml(ws.name) + '">' + escapeHtml(ws.name) + '</div>' +
-                '<div class="ws-compare-value">' + formatDuration(ws.totalMs) +
+                '<div class="ws-compare-name" title="' + escapedName + '">' + escapedName + '</div>' +
+                '<div class="ws-compare-value">' + formatDuration(totalMs) +
                   '<span class="ws-compare-share">' + share + '%</span></div>' +
               '</div>' +
               '<div class="ws-compare-track">' +
@@ -178,7 +183,6 @@ export function buildDashboardScript(labels: Record<string, string>): string {
               '</div>' +
             '</div>';
         }
-        let html = rows.join('');
 
         if (workspaces.length > 5) {
           html += renderFoldToggle(
@@ -212,9 +216,13 @@ export function buildDashboardScript(labels: Record<string, string>): string {
       }
 
       function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        if (!str) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
       }
 
       // ---- 周报活跃曲线渲染（常驻展示，5 级精细 Y 轴刻度，对标高级可视化）----
@@ -245,8 +253,18 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         const EFFECTIVE_H = BASE_Y - PEAK_Y; // 130px 有效曲线落差
         const DRAW_W = W - PAD_LEFT - PAD_RIGHT;
 
-        const maxVal = Math.max(...data.map(d => d.totalMs), 1);
-        const peakIndex = data.reduce((maxI, d, i, arr) => d.totalMs > arr[maxI].totalMs ? i : maxI, 0);
+        // 单趟循环合并极值查找与求和，消除 reduce 闭包与 map 瞬态堆分配 (CPX-SPACE-001)
+        let maxVal = 1;
+        let peakIndex = 0;
+        let totalMs = 0;
+        for (let i = 0; i < data.length; i++) {
+          const ms = data[i].totalMs || 0;
+          totalMs += ms;
+          if (ms > maxVal) maxVal = ms;
+          if (ms > (data[peakIndex] ? (data[peakIndex].totalMs || 0) : 0)) {
+            peakIndex = i;
+          }
+        }
 
         // 计算各天数据点物理坐标 (cx, cy)
         const pts = data.map((d, i) => {
@@ -267,12 +285,12 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           }
 
           const dx = new Float64Array(n - 1);
-          const dy = new Float64Array(n - 1);
           const delta = new Float64Array(n - 1);
           for (let i = 0; i < n - 1; i++) {
-            dx[i] = pList[i + 1][0] - pList[i][0];
-            dy[i] = pList[i + 1][1] - pList[i][1];
-            delta[i] = dx[i] !== 0 ? dy[i] / dx[i] : 0;
+            const hx = pList[i + 1][0] - pList[i][0];
+            const hy = pList[i + 1][1] - pList[i][1];
+            dx[i] = hx;
+            delta[i] = hx !== 0 ? hy / hx : 0;
           }
 
           const m = new Float64Array(n);
@@ -307,7 +325,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             }
           }
 
-          const segs = new Array(n - 1);
+          let pathResult = 'M ' + pList[0][0].toFixed(1) + ',' + pList[0][1].toFixed(1);
           for (let i = 0; i < n - 1; i++) {
             const p1 = pList[i];
             const p2 = pList[i + 1];
@@ -321,11 +339,11 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             if (c1y > bY) c1y = bY;
             if (c2y > bY) c2y = bY;
 
-            segs[i] = ' C ' + c1x.toFixed(1) + ',' + c1y.toFixed(1) +
-                      ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) +
-                      ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+            pathResult += ' C ' + c1x.toFixed(1) + ',' + c1y.toFixed(1) +
+                          ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) +
+                          ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
           }
-          return 'M ' + pList[0][0].toFixed(1) + ',' + pList[0][1].toFixed(1) + segs.join('');
+          return pathResult;
         }
 
         const linePath = buildMonotonePath(pts, BASE_Y);
@@ -342,18 +360,21 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           { ratio: 0.0, val: 0, isBase: true },
         ];
 
-        const gridSvg = yLevels.map(lvl => {
+        let gridSvg = '';
+        for (let i = 0; i < yLevels.length; i++) {
+          const lvl = yLevels[i];
           const y = BASE_Y - lvl.ratio * EFFECTIVE_H;
           const lineCls = lvl.isBase ? 'ac-grid-base' : 'ac-grid-line';
           const valText = lvl.val > 0 ? formatDuration(lvl.val) : '0';
-          return (
+          gridSvg +=
             '<line class="' + lineCls + '" x1="' + (PAD_LEFT - 10) + '" y1="' + y.toFixed(1) + '" x2="' + (W - PAD_RIGHT + 14) + '" y2="' + y.toFixed(1) + '"/>' +
-            '<text class="ac-grid-label" fill="#ffffff" x="' + (PAD_LEFT - 16) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end">' + valText + '</text>'
-          );
-        }).join('');
+            '<text class="ac-grid-label" fill="#ffffff" x="' + (PAD_LEFT - 16) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end">' + valText + '</text>';
+        }
 
-        // 7 组悬浮胶囊数值标签 + 同心圆节点 + 底部双层 X 轴标尺
-        const elementsSvg = data.map((d, i) => {
+        // 7 组悬浮胶囊数值标签 + 同心圆节点 + 底部双层 X 轴标尺，流式拼接消除 map 临时数组 (CPX-SPACE-001)
+        let elementsSvg = '';
+        for (let i = 0; i < data.length; i++) {
+          const d = data[i];
           const cx = pts[i][0];
           const cy = pts[i][1];
           const isPeak = i === peakIndex && d.totalMs > 0;
@@ -393,10 +414,9 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             '<text class="' + dateCls + '" fill="#ffffff" x="' + cx.toFixed(1) + '" y="196">' + escapeHtml(d.weekday) + '</text>' +
             '<text class="' + valCls + '" fill="' + valFill + '" x="' + cx.toFixed(1) + '" y="218">' + durStr + '</text>';
 
-          return pillGroup + dotGroup + axisGroup;
-        }).join('');
+          elementsSvg += pillGroup + dotGroup + axisGroup;
+        }
 
-        const totalMs = data.reduce((s, d) => s + d.totalMs, 0);
         const tip = L['panel.js.weekTotalPrefix'] + formatDuration(totalMs);
 
         if (weekTotalEl) {
@@ -439,8 +459,8 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           return;
         }
 
-        // 按 7 天一组切成「周」列（数据已按周一为首行排布）
-        const weekCols = [];
+        // 按 7 天一组切成「周」列，流式字符串拼接消除 weekCols 数组堆分配与 .join('') (CPX-SPACE-001)
+        let heatmapHtml = '';
         for (let i = 0; i < data.length; i += 7) {
           let cellHtml = '';
           const end = Math.min(i + 7, data.length);
@@ -450,9 +470,9 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             const tip = d.future ? d.dateStr : (d.dateStr + ' · ' + formatDuration(d.totalMs));
             cellHtml += '<div class="' + cls + '" title="' + tip + '"></div>';
           }
-          weekCols.push('<div class="heatmap-week">' + cellHtml + '</div>');
+          heatmapHtml += '<div class="heatmap-week">' + cellHtml + '</div>';
         }
-        el.innerHTML = weekCols.join('');
+        el.innerHTML = heatmapHtml;
 
         // 日期范围（首日 ~ 末日）
         if (rangeEl) {
@@ -487,7 +507,13 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           const isLimitOn = Boolean(weeklyLimitEnabled) && typeof weeklyLimitHours === 'number' && Number.isFinite(weeklyLimitHours) && weeklyLimitHours >= 1 && weeklyLimitHours <= 168;
           const safeLimitHours = isLimitOn ? Math.min(168, Math.max(1, Math.round(weeklyLimitHours))) : 40;
           const limitMs = isLimitOn ? safeLimitHours * 3600000 : 0;
-          const maxTrendMs = Math.max(...trend.map(w => (Number.isFinite(w.totalMs) && w.totalMs > 0 ? w.totalMs : 0)), 0);
+          let maxTrendMs = 0;
+          for (let i = 0; i < trend.length; i++) {
+            const tMs = trend[i].totalMs;
+            if (Number.isFinite(tMs) && tMs > maxTrendMs) {
+              maxTrendMs = tMs;
+            }
+          }
 
           // 达标点比例：居中靠右，默认处于总轨道宽度的 75% 处，右侧留出 25% 的超限预警缓冲空间
           const TARGET_DIVIDER_RATIO = 0.75;
@@ -502,7 +528,9 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           // 分割线百分比：未超限时精确位于 75%，超限时等比向左收敛
           const dividerPct = isLimitOn ? Math.min(95, Math.max(10, (limitMs / scaleMax) * 100)) : 0;
 
-          document.getElementById('trendList').innerHTML = trend.map(w => {
+          let trendHtml = '';
+          for (let i = 0; i < trend.length; i++) {
+            const w = trend[i];
             const rawMs = (typeof w.totalMs === 'number' && Number.isFinite(w.totalMs) && w.totalMs > 0) ? w.totalMs : 0;
             const pct = Math.min(100, Math.max((rawMs / scaleMax) * 100, rawMs > 0 ? 2 : 0));
             const tooltip = w.weekEnd ? (w.weekStart + ' ~ ' + w.weekEnd) : w.weekStart;
@@ -533,7 +561,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
               ? '<div class="trend-divider-mark" style="left:' + dividerPct.toFixed(2) + '%" title="' + escapeHtml(fmt(L['panel.trend.limitMarker'], safeLimitHours + 'h')) + '"></div>'
               : '';
 
-            return '<div class="trend-row">' +
+            trendHtml += '<div class="trend-row">' +
               '<div class="trend-label" title="' + escapeHtml(tooltip) + '">' + escapeHtml(w.label) + '</div>' +
               '<div class="trend-track">' +
                 '<div class="' + fillClass + '" style="' + fillStyle + '"></div>' +
@@ -541,7 +569,8 @@ export function buildDashboardScript(labels: Record<string, string>): string {
               '</div>' +
               '<div class="' + valueClass + '">' + formatDuration(rawMs) + '</div>' +
               '</div>';
-          }).join('');
+          }
+          document.getElementById('trendList').innerHTML = trendHtml;
         } else {
           trendEl.style.display = 'none';
         }
@@ -570,17 +599,22 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           emptyEl.style.display = 'none';
           listEl.style.display = 'block';
 
-          const sessionRows = new Array(detail.sessions.length);
+          let listHtml = '';
+          const runningText = (typeof window !== 'undefined' && window.__I18N__ && window.__I18N__.panelTodayRunning) ||
+            L['panel.today.running'] ||
+            ((typeof window !== 'undefined' && window.__LOCALE__ === 'zh-CN') ? '进行中' : 'Running');
+
           for (let i = 0; i < detail.sessions.length; i++) {
             const s = detail.sessions[i];
             const extraCls = i >= 5 ? ' session-extra' : '';
-            sessionRows[i] =
+            const isRunning = Boolean(s.isRunningTail || s.endLabel === '进行中' || s.endLabel === 'Running');
+            const endText = isRunning ? runningText : escapeHtml(s.endLabel);
+            listHtml +=
               '<div class="session-row' + extraCls + '">' +
-                '<div class="session-time">' + escapeHtml(s.startLabel) + ' → ' + escapeHtml(s.endLabel) + '</div>' +
+                '<div class="session-time">' + escapeHtml(s.startLabel) + ' → ' + endText + '</div>' +
                 '<div class="session-dur">' + formatDuration(s.durationMs) + '</div>' +
               '</div>';
           }
-          let listHtml = sessionRows.join('');
 
           if (detail.sessions.length > 5) {
             listHtml += renderFoldToggle(
@@ -637,12 +671,16 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         titleEl.style.display = 'block';
         el.style.display = 'flex';
 
-        // 展开为 0..23 的数组（缺省小时为 0）
-        const hours = new Array(24).fill(0);
-        for (const b of buckets) {
-          if (b.hour >= 0 && b.hour <= 23) hours[b.hour] = b.totalMs;
+        // 展开为 0..23 的类型化数组（缺省小时为 0），单趟循环合并填充与极值统计 (CPX-SPACE-001)
+        const hours = new Float64Array(24);
+        let maxVal = 1;
+        for (let i = 0; i < buckets.length; i++) {
+          const b = buckets[i];
+          if (b.hour >= 0 && b.hour <= 23) {
+            hours[b.hour] = b.totalMs;
+            if (b.totalMs > maxVal) maxVal = b.totalMs;
+          }
         }
-        const maxVal = Math.max(...hours, 1);
 
         const peakMs = (peakHour !== undefined && peakHour >= 0 && peakHour < 24) ? hours[peakHour] : 0;
         const peakHourStr = peakHour !== undefined && peakHour >= 0 ? String(peakHour).padStart(2, '0') + ':00' : '';
@@ -652,8 +690,10 @@ export function buildDashboardScript(labels: Record<string, string>): string {
 
         if (badgeEl) badgeEl.textContent = defaultBadgeText;
 
-        // 渲染 24 个槽位骨架（每个包含底轨、立柱、基线指示，并在每 4 小时边界处添加段落分隔）
-        el.innerHTML = hours.map((ms, h) => {
+        // 渲染 24 个槽位骨架（每个包含底轨、立柱、基线指示，并在每 4 小时边界处添加段落分隔），流式拼接消除 map 临时数组 (CPX-SPACE-001)
+        let hourlyHtml = '';
+        for (let h = 0; h < 24; h++) {
+          const ms = hours[h];
           const pct = ms > 0 ? Math.max((ms / maxVal) * 100, 6) : 0;
           const isPeak = (ms > 0 && h === peakHour) ? ' is-peak' : '';
           const isPeakSlot = (ms > 0 && h === peakHour) ? ' is-peak-slot' : '';
@@ -667,13 +707,14 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           const peakTag = (ms > 0 && h === peakHour) ? ' (' + L['panel.today.hourlyPeak'] + ')' : '';
           const tip = timeRange + ' : ' + durStr + peakTag;
 
-          return '<div class="hourly-slot' + isPeakSlot + hasAct + isPeriodDivider + '" data-timerange="' + timeRange + '" data-dur="' + durStr + peakTag + '" title="' + tip + '">' +
+          hourlyHtml += '<div class="hourly-slot' + isPeakSlot + hasAct + isPeriodDivider + '" data-timerange="' + timeRange + '" data-dur="' + durStr + peakTag + '" title="' + tip + '">' +
             '<div class="hourly-slot-track">' +
               '<div class="hourly-bar' + isPeak + '" style="height:' + pct + '%"></div>' +
             '</div>' +
             '<div class="hourly-slot-base"></div>' +
           '</div>';
-        }).join('');
+        }
+        el.innerHTML = hourlyHtml;
 
         // 槽位鼠标悬停交互：顶部徽章动态联动
         const slots = el.querySelectorAll('.hourly-slot');

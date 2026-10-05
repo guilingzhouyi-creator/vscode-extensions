@@ -134,4 +134,41 @@ describe('RingBuffer（泛型环形缓冲区）', () => {
         assert.strictEqual(rb.count, 1);
         assert.strictEqual(rb.peekOldest(), 99);
     });
+
+    it('两阶段提交：peekAll 预读不改变缓冲，advance 原子清退已确认条目', () => {
+        const rb = new RingBuffer(4);
+        rb.push('a');
+        rb.push('b');
+        rb.push('c');
+
+        // 1. 预读 peekAll
+        const peeked1 = rb.peekAll();
+        assert.deepStrictEqual(peeked1, ['a', 'b', 'c']);
+        assert.strictEqual(rb.count, 3, 'peekAll 不改变 count');
+        assert.strictEqual(rb.peekOldest(), 'a');
+
+        // 2. 幂等预读
+        const peeked2 = rb.peekAll();
+        assert.deepStrictEqual(peeked2, ['a', 'b', 'c']);
+
+        // 3. 部分推进 advance(2)
+        rb.advance(2);
+        assert.strictEqual(rb.count, 1);
+        assert.strictEqual(rb.peekOldest(), 'c');
+        assert.deepStrictEqual(rb.peekAll(), ['c']);
+
+        // 4. 满缓冲环绕场景两阶段提交
+        rb.push('d');
+        rb.push('e');
+        rb.push('f');
+        rb.push('g'); // 覆盖 'c' -> 当前为 d, e, f, g
+        assert.strictEqual(rb.isFull, true);
+
+        const all = rb.peekAll();
+        assert.deepStrictEqual(all, ['d', 'e', 'f', 'g']);
+        rb.advance(4);
+        assert.strictEqual(rb.count, 0);
+        assert.strictEqual(rb.isEmpty, true);
+        assert.deepStrictEqual(rb.peekAll(), []);
+    });
 });

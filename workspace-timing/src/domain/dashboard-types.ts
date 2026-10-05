@@ -29,27 +29,10 @@ export interface WeeklyTrendEntry {
     sessionCount: number;
 }
 
-/** 单日会话明细（供面板展示） */
-export interface DailyDetail {
-    date: string;
-    totalMs: number;
-    sessionCount: number;
-    sessions: Array<{ startLabel: string; endLabel: string; durationMs: number }>;
-    peakHour: number;
-    activeWindow: string;
-    /** 按小时分布（跨小时会话按实际经过时间分摊） */
-    hourly: Array<{ hour: number; totalMs: number; sessionCount: number }>;
-}
+import type { DailyDetail } from './aggregator/daily-aggregator';
+import type { WeeklySummary } from './aggregator/weekly-aggregator';
 
-/** 周报文字摘要 */
-export interface WeeklySummary {
-    totalMs: number;
-    sessionCount: number;
-    avgDailyMs: number;
-    peakDate: string;
-    peakDateMs: number;
-    activeDays: number;
-}
+export type { DailyDetail, WeeklySummary };
 
 /** 热力图单个格子（活动时间线） */
 export interface HeatmapDay {
@@ -100,9 +83,9 @@ export interface DashboardData {
     fullSaveIntervalMs: number;
     maxSessions: number;
     /** 原始会话保留天数（超出自动折叠入日统计） */
-    historyRawRetentionDays?: number;
+    historyRawRetentionDays: number;
     /** 危险操作前是否自动生成安全快照 */
-    safetySnapshot?: boolean;
+    safetySnapshot: boolean;
     /** 周工作时长上限开关 */
     weeklyLimitEnabled: boolean;
     /** 周工作时长上限（小时） */

@@ -10,7 +10,6 @@
 
 import { WorkspaceTimingData } from '../../domain/models';
 import { TimeAggregator } from '../../domain/TimeAggregator';
-import { IDataExporter } from './IDataExporter';
 
 /** 本地时区日期时间（YYYY-MM-DD HH:MM:SS） */
 function localDateTime(ts: number): string {
@@ -19,7 +18,7 @@ function localDateTime(ts: number): string {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
-export class CsvExporter implements IDataExporter {
+export class CsvExporter {
     readonly formatName = 'csv';
 
     async export(data: WorkspaceTimingData, workspaceName: string): Promise<string> {

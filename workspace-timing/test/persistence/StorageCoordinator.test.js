@@ -166,4 +166,15 @@ describe('StorageCoordinator（三级存储协同）', () => {
         await coord.save(makeData(42), true); // 主存失败不应向上抛
         assert.strictEqual(fileBackup.calls.saves.length, 1, 'JSON 备份不受主存失败影响');
     });
+
+    it('主存写入失败时自动触发紧急降级全量备份（即使未达降频阈值）', async () => {
+        const primary = makeProvider('primary', { failOnSave: true });
+        const fileBackup = makeProvider('fileBackup');
+        const coord = new StorageCoordinator(primary, fileBackup, makeJournalFake());
+
+        // 首次保存非强制模式，本应降频跳过 fileBackup
+        await coord.save(makeData(123), false);
+        assert.strictEqual(fileBackup.calls.saves.length, 1, '主存失败时必须立即紧急备份到文件，防止数据丢失');
+        assert.strictEqual(fileBackup.calls.saves[0].totalMs, 123);
+    });
 });

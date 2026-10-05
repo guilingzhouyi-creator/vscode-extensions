@@ -4,7 +4,7 @@
  * 职责：计算今日累计、按日汇总列表以及指定日期的会话切分与小时分布明细。
  */
 
-import { TimeSession } from '../models';
+import { TimeSession, MS_PER_HOUR } from '../models';
 import { eachDaySegment, localDateStr, parseLocalDate } from './date-utils';
 import { formatTime } from './duration-formatter';
 
@@ -22,6 +22,8 @@ export interface DailySessionEntry {
     durationMs: number;
     startLabel: string;
     endLabel: string;
+    /** 是否为当前正在进行中的活动尾部会话 */
+    isRunningTail?: boolean;
 }
 
 /** 按小时分布（每日 24 小时桶） */
@@ -104,7 +106,11 @@ function addToHourly(
         const d = new Date(cursor);
         const nextHourStart =
             new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime();
-        const segEnd = Math.min(endMs, nextHourStart);
+        let segEnd = Math.min(endMs, nextHourStart);
+        // 时钟突变或夏令时/闰秒防御：确保 segEnd 严格单调前进，防止死循环
+        if (segEnd <= cursor) {
+            segEnd = Math.min(endMs, cursor + MS_PER_HOUR);
+        }
         const entry = hourMap.get(d.getHours()) ?? { totalMs: 0, count: 0 };
         entry.totalMs += segEnd - cursor;
         if (first) entry.count++;
@@ -154,20 +160,20 @@ export function dailyDetail(
     const [y, m, d] = dateStr.split('-').map(Number);
     const dayEndMs = new Date(y, m - 1, d + 1).getTime();
 
-    type ClippedEntry = DailySessionEntry & { isRunningTail: boolean };
-    const entries: ClippedEntry[] = [];
+    const entries: DailySessionEntry[] = [];
 
     const clipToDay = (startMs: number, endMs: number, running: boolean): void => {
         if (startMs >= dayEndMs || endMs <= dayStartMs) return;
         const visStart = Math.max(startMs, dayStartMs);
         const visEnd = Math.min(endMs, dayEndMs);
+        const isRunningTail = running && visEnd >= Date.now();
         entries.push({
             startMs: visStart,
             endMs: visEnd,
             durationMs: visEnd - visStart,
             startLabel: formatTime(visStart),
-            endLabel: running && visEnd >= Date.now() ? '进行中' : formatTime(visEnd),
-            isRunningTail: running && visEnd >= Date.now(),
+            endLabel: formatTime(visEnd),
+            isRunningTail,
         });
     };
 
@@ -200,7 +206,7 @@ export function dailyDetail(
         date: dateStr,
         totalMs,
         sessionCount: entries.length,
-        sessions: entries.map(({ isRunningTail: _ignored, ...rest }) => rest),
+        sessions: entries,
         hourly,
         peakHour,
         activeWindow,

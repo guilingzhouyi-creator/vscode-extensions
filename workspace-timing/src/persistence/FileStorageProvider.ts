@@ -55,10 +55,6 @@ export class FileStorageProvider implements IStorageProvider {
         }
     }
 
-    /** 主备份文件路径（供还原命令做默认定位） */
-    get uri(): vscode.Uri {
-        return this.fileUri;
-    }
 
     async save(data: WorkspaceTimingData): Promise<void> {
         await this.writeTo(this.fileUri, data);

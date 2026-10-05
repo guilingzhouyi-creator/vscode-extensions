@@ -16,6 +16,7 @@ export interface I18nStrings {
     'statusBar.todayTotal': string;
     'statusBar.totalToday': string;
     'statusBar.tooltip': string;
+    'statusBar.tooltipWithMode': string;
 
     // Toast
     'toast.newPeriod': string;
@@ -129,6 +130,7 @@ export interface I18nStrings {
     'panel.today.duration': string;
     'panel.today.activeWindow': string;
     'panel.today.empty': string;
+    'panel.today.running': string;
     'panel.today.exportBtn': string;
     'panel.today.showMore': string;
     'panel.today.showLess': string;
@@ -199,10 +201,6 @@ export interface I18nStrings {
     'panel.js.grandTotalPrefix': string;
     'panel.js.workspaceCountFmt': string;
     'panel.js.weekTotalPrefix': string;
-    'panel.js.chartModeBars': string;
-    'panel.js.chartModeCurve': string;
-    'panel.js.curveEmpty': string;
-    'panel.js.curveSegTip': string;
     'panel.js.daysFmt': string;
     'panel.toast.newPeriodRequested': string;
     'panel.toast.exportCsvRequested': string;

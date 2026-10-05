@@ -3,17 +3,21 @@
  *
  * 职责：
  *   1. 协调三级存储：workspaceState（主）→ JSON 文件（备）→ journal（崩溃恢复）
- *   2. 级联写入主 + 备
+ *   2. 级联写入主 + 备，主存异常时自动触发紧急降级全量备份
  *
  * 崩溃恢复算法已上移至应用层 RecoveryService（领域规则不属于持久化层），
  * 本类只保留原始读写原语：load / save / restore / snapshot / deleteAll。
  */
 
 import { WorkspaceTimingData } from '../domain/models';
-import { WorkspaceStateProvider } from './WorkspaceStateProvider';
-import { FileStorageProvider } from './FileStorageProvider';
-import { JournalStorageProvider } from './JournalStorageProvider';
+import { IStorageProvider } from './IStorageProvider';
+import { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/Logger';
+
+/** 可生成命名快照的文件存储提供者接口 */
+export interface ISnapshotStorageProvider extends IStorageProvider {
+    saveAs(data: WorkspaceTimingData, fileName: string): Promise<void>;
+}
 
 /** 数据加载结果：data 为空表示无任何现网数据；source 供恢复诊断日志 */
 export interface LoadResult {
@@ -27,14 +31,14 @@ export class StorageCoordinator {
     private static readonly FILE_BACKUP_EVERY_N = 3;
     private _fileBackupCount = 0;
 
-    private readonly primary: WorkspaceStateProvider;
-    private readonly fileBackup: FileStorageProvider;
-    private readonly journal: JournalStorageProvider;
+    private readonly primary: IStorageProvider;
+    private readonly fileBackup: ISnapshotStorageProvider;
+    private readonly journal: IJournalStore;
 
     constructor(
-        primary: WorkspaceStateProvider,
-        fileBackup: FileStorageProvider,
-        journal: JournalStorageProvider,
+        primary: IStorageProvider,
+        fileBackup: ISnapshotStorageProvider,
+        journal: IJournalStore,
     ) {
         this.primary = primary;
         this.fileBackup = fileBackup;
@@ -43,7 +47,7 @@ export class StorageCoordinator {
 
     /**
      * 级联写入：主存储 + JSON 备份
-     * 主存储失败时不影响备份写入。
+     * 主存储失败时自动触发紧急降级，立即全量写入文件备份。
      * JSON 备份为二级兜底，每 FILE_BACKUP_EVERY_N 次落盘一次以降低磁盘抖动；
      * 会话结束/重置/恢复等关键事件用 forceFileBackup 强制写入。
      */
@@ -52,15 +56,21 @@ export class StorageCoordinator {
         const stamped: WorkspaceTimingData = { ...data, lastSavedAtMs: Date.now() };
 
         const errors: string[] = [];
+        let primaryFailed = false;
 
         try {
             await this.primary.save(stamped);
         } catch (err) {
+            primaryFailed = true;
             errors.push(`primary: ${(err as Error).message}`);
         }
 
-        this._fileBackupCount++;
-        if (forceFileBackup || this._fileBackupCount % StorageCoordinator.FILE_BACKUP_EVERY_N === 0) {
+        // 计数器模运算，防无界自增
+        this._fileBackupCount = (this._fileBackupCount + 1) % StorageCoordinator.FILE_BACKUP_EVERY_N;
+
+        // 主存失败时无条件紧急降级保存，或达到降频阈值/强制备份时保存
+        const shouldSaveBackup = forceFileBackup || primaryFailed || this._fileBackupCount === 0;
+        if (shouldSaveBackup) {
             try {
                 await this.fileBackup.save(stamped);
             } catch (err) {
@@ -101,13 +111,15 @@ export class StorageCoordinator {
     }
 
     /**
-     * 破坏性操作前的安全快照：把当前 JSON 备份复制为 .vscode/workspace-timing.before-<op>.json
+     * 破坏性操作前的安全快照：把当前权威数据复制为 .vscode/workspace-timing.before-<op>.json
      * （固定名轮转覆盖，不累积）。静默失败——快照属尽力而为，不阻塞主流程。
      */
     async snapshotBeforeDestructive(op: string): Promise<void> {
         try {
-            const current = await this.fileBackup.load();
-            if (!current) return; // 无现网数据则无需快照
+            const current = (await this.load()).data;
+            if (!current) {
+                return;
+            }
             await this.fileBackup.saveAs(current, `workspace-timing.before-${op}.json`);
             log(LogLevel.Info, `StorageCoordinator: safety snapshot written (op=${op})`);
         } catch (err) {

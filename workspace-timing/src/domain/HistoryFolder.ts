@@ -18,14 +18,9 @@
 import { TimeSession, DailyTotalsMap, MAX_SESSIONS_PER_DAY, DEFAULT_MAX_SESSIONS, MS_PER_DAY } from './models';
 import { TimeAggregator, localDateStr, parseLocalDate } from './TimeAggregator';
 
-export interface HistoryFolder {
-    migrateToFolded: typeof migrateToFolded;
-    recycleSessions: typeof recycleSessions;
-}
-
-export interface FoldOptions {
+export interface HistoryFoldOptions {
     /** 原始会话保留天数（0 = 不限天数） */
-    retentionDays: number;
+    retentionDays?: number;
     /** 原始会话最大保留条数（0 = 不限条数） */
     maxSessions?: number;
     /** 单日最大保留条数（0 = 不限） */
@@ -35,6 +30,9 @@ export interface FoldOptions {
     /** 当前时间戳，默认 Date.now() */
     now?: number;
 }
+
+export type FoldOptions = HistoryFoldOptions;
+export type RecycleOptions = HistoryFoldOptions;
 
 /**
  * 计算折叠截止点：今天本地零点 - retentionDays 天。
@@ -216,19 +214,6 @@ export function pruneDailyOverflowSessions(
     return { kept, foldedCount };
 }
 
-export interface RecycleOptions {
-    /** 原始会话保留天数（0 = 不限天数） */
-    retentionDays?: number;
-    /** 原始会话最大保留条数（0 = 不限条数） */
-    maxSessions?: number;
-    /** 单日最大保留条数（默认 MAX_SESSIONS_PER_DAY = 20；0 = 不限） */
-    maxPerDay?: number;
-    /** 是否清理旧周会话（每周归零，默认 true） */
-    pruneWeekly?: boolean;
-    /** 当前时间戳，默认 Date.now() */
-    now?: number;
-}
-
 /**
  * 完整会话自动回收引擎（纯函数）：
  * 1. 跨周全条目归零（每周统一清理旧周会话入 dailyTotals）；
@@ -246,7 +231,7 @@ export interface RecycleOptions {
 export function recycleSessions(
     sessions: readonly TimeSession[],
     existingTotals: DailyTotalsMap | undefined,
-    options?: RecycleOptions,
+    options?: HistoryFoldOptions,
 ): FoldResult {
     const totals: DailyTotalsMap = {};
     for (const [k, v] of Object.entries(existingTotals ?? {})) {
@@ -295,7 +280,7 @@ export function recycleSessions(
 /**
  * 解析并标准化折叠选项，消除外部多态入参在主流程的分支复杂度。
  */
-function parseFoldOptions(options: number | FoldOptions, defaultNow: number): RecycleOptions {
+function parseFoldOptions(options: number | HistoryFoldOptions, defaultNow: number): HistoryFoldOptions {
     if (typeof options === 'number') {
         return { retentionDays: options, now: defaultNow };
     }
@@ -309,28 +294,17 @@ function parseFoldOptions(options: number | FoldOptions, defaultNow: number): Re
 }
 
 /**
- * 迁移与标准化（v1→v2、启动恢复、还原或运行期回收）：
+ * 迁移与标准化（启动恢复、还原或运行期回收）：
  * 补齐 dailyTotals 并执行时间与容量双阈值折叠。
  * 幂等：对同一数据重复调用结果不变。
  */
 export function migrateToFolded(
     data: { sessions?: readonly TimeSession[]; dailyTotals?: DailyTotalsMap },
-    options: number | FoldOptions,
+    options: number | HistoryFoldOptions,
     now = Date.now(),
 ): { sessions: TimeSession[]; dailyTotals: DailyTotalsMap; foldedSessionCount: number } {
     const opt = parseFoldOptions(options, now);
-
-    if (opt.maxPerDay! > 0 || opt.pruneWeekly) {
-        const res = recycleSessions(data.sessions ?? [], data.dailyTotals, opt);
-        return {
-            sessions: res.keptSessions,
-            dailyTotals: res.updatedDailyTotals,
-            foldedSessionCount: res.foldedSessionCount,
-        };
-    }
-
-    const cutoff = foldCutoffStartMs(opt.retentionDays!, opt.now!);
-    const res = foldExpiredSessions(data.sessions ?? [], data.dailyTotals, cutoff, opt.maxSessions);
+    const res = recycleSessions(data.sessions ?? [], data.dailyTotals, opt);
     return {
         sessions: res.keptSessions,
         dailyTotals: res.updatedDailyTotals,
