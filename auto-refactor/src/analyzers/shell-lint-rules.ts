@@ -362,6 +362,63 @@ export function checkDeprecatedSyntax(
 }
 
 /**
+ * Checks for invalid or non-portable condition syntax inside test brackets (SH-COND-001).
+ * Specifically intercepts:
+ *   - `==` inside single brackets `[ ... ]` (POSIX portability hazard)
+ *   - `=~` inside single brackets `[ ... ]` (regex syntax error in `[`)
+ *   - `&&` or `||` inside single brackets `[ ... ]` (syntax error in `[`)
+ *
+ * @param trimmed - Trimmed line text.
+ * @param _maskedTrimmed - Masked trimmed line text.
+ * @param i - 0-based line index.
+ * @param emit - Issue emission callback.
+ */
+export function checkShellConditionSyntax(
+    trimmed: string,
+    _maskedTrimmed: string,
+    i: number,
+    emit: ShellEmitter,
+): void {
+    if (!/\[\s+.+\s+\]/.test(trimmed) || /\[\[/.test(trimmed)) {
+        return;
+    }
+
+    const match = /\[\s+(.+)\s+\](?:\s*;|\s+then|\s*$)/.exec(trimmed);
+    if (!match) return;
+
+    const inner = match[1];
+
+    if (/=~/.test(inner)) {
+        emit(
+            i,
+            'SH-COND-001',
+            'Regex operator `=~` is invalid inside single brackets `[ ... ]`; use `[[ ... ]]`.',
+            SEVERITY_ERROR,
+            'Upgrade condition to `[[ ... =~ ... ]]` to enable regex pattern matching.',
+            { line: trimmed },
+        );
+    } else if (/(?:&&|\|\|)/.test(inner)) {
+        emit(
+            i,
+            'SH-COND-001',
+            'Logical `&&` / `||` inside single brackets `[ ... ]` causes syntax errors; use `[[ ... ]]`.',
+            SEVERITY_ERROR,
+            'Upgrade condition to `[[ ... && ... ]]` or use separate test invocations.',
+            { line: trimmed },
+        );
+    } else if (/(?:^|\s)==(?:\s|$)/.test(inner)) {
+        emit(
+            i,
+            'SH-COND-001',
+            'Equality operator `==` inside single brackets `[ ... ]` violates POSIX portability.',
+            SEVERITY_WARNING,
+            'Use single `=` inside `[ ... ]` for portability, or upgrade to `[[ ... == ... ]]`.',
+            { line: trimmed },
+        );
+    }
+}
+
+/**
  * Checks for unquoted shell variables that risk word-splitting.
  *
  * @param _line - Raw line text.

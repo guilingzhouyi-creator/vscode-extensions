@@ -28,6 +28,37 @@ export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'cargo' | 'pip' | 'poetry
 /** CI platform classifications. */
 export type CiPlatform = 'github' | 'gitlab' | 'circleci' | 'azure' | 'jenkins';
 
+/** Supported repository monorepo classification types. */
+export type MonorepoType =
+    | 'npm-workspaces'
+    | 'pnpm-workspaces'
+    | 'yarn-workspaces'
+    | 'cargo-workspace'
+    | 'go-work'
+    | 'lerna'
+    | 'turbo'
+    | 'nx'
+    | 'directory-cluster'
+    | 'none';
+
+/** Details of a discovered subproject inside a repository. */
+export interface DiscoveredSubproject {
+    name: string;
+    relPath: string;
+    archetype: ProjectArchetype;
+    manifestPath: string;
+}
+
+/** Comprehensive repository topology and monorepo structure context. */
+export interface RepoTopology {
+    isMonorepo: boolean;
+    monorepoType: MonorepoType;
+    projectCount: number;
+    subprojects: DiscoveredSubproject[];
+    primaryProjectName?: string;
+    detectionSource: 'explicit-manifest' | 'directory-cluster' | 'single-root' | 'generic';
+}
+
 /** Hook file details. */
 export interface HookFileInfo {
     name: string;
@@ -40,6 +71,7 @@ export interface RepoArchetypeContext {
     root: string;
     archetypes: ('node' | 'rust' | 'python' | 'go' | 'godot')[];
     primaryArchetype: ProjectArchetype;
+    topology: RepoTopology;
     packageManager?: PackageManager;
     manifests: {
         packageJson?: boolean;
@@ -398,6 +430,251 @@ function detectGateScripts(root: string): RepoArchetypeContext['gateScripts'] {
     return result;
 }
 
+const TOPOLOGY_IGNORED_DIRS = new Set([
+    '.git',
+    '.githooks',
+    '.husky',
+    '.github',
+    '.gitlab',
+    '.vscode',
+    '.idea',
+    'node_modules',
+    'dist',
+    'build',
+    'target',
+    'vendor',
+    'coverage',
+    'reports',
+    'archive',
+    'docs',
+    'doc',
+    'scripts',
+    'tools',
+    '.agents',
+    '.gemini',
+    'tmp',
+    'temp',
+    'scratch',
+]);
+
+/**
+ * Sniff directory archetype and manifest path.
+ */
+function sniffDirectoryArchetype(
+    dirPath: string,
+): { archetype: ProjectArchetype; manifestPath: string; name?: string } | undefined {
+    const pkgPath = path.join(dirPath, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+        let name: string | undefined;
+        const content = safeReadFile(pkgPath);
+        if (content) {
+            try {
+                const parsed = JSON.parse(content);
+                if (typeof parsed.name === 'string' && parsed.name) {
+                    name = parsed.name;
+                }
+            } catch {
+                // ignore JSON parse failure
+            }
+        }
+        return { archetype: 'node', manifestPath: pkgPath, name };
+    }
+    const cargoPath = path.join(dirPath, 'Cargo.toml');
+    if (fs.existsSync(cargoPath)) {
+        return { archetype: 'rust', manifestPath: cargoPath };
+    }
+    const godotPath = path.join(dirPath, 'project.godot');
+    if (fs.existsSync(godotPath)) {
+        return { archetype: 'godot', manifestPath: godotPath };
+    }
+    const pyprojectPath = path.join(dirPath, 'pyproject.toml');
+    if (fs.existsSync(pyprojectPath)) {
+        return { archetype: 'python', manifestPath: pyprojectPath };
+    }
+    const reqPath = path.join(dirPath, 'requirements.txt');
+    if (fs.existsSync(reqPath)) {
+        return { archetype: 'python', manifestPath: reqPath };
+    }
+    const goModPath = path.join(dirPath, 'go.mod');
+    if (fs.existsSync(goModPath)) {
+        return { archetype: 'go', manifestPath: goModPath };
+    }
+    return undefined;
+}
+
+/**
+ * Scans top-level candidate directories for subproject manifests.
+ */
+function scanDirectoryClusterSubprojects(absRoot: string): DiscoveredSubproject[] {
+    const subprojects: DiscoveredSubproject[] = [];
+    const entries = safeReadDir(absRoot);
+
+    for (const entry of entries) {
+        if (TOPOLOGY_IGNORED_DIRS.has(entry)) continue;
+        const entryPath = path.join(absRoot, entry);
+        try {
+            if (!fs.statSync(entryPath).isDirectory()) continue;
+        } catch {
+            continue;
+        }
+
+        const sniffed = sniffDirectoryArchetype(entryPath);
+        if (sniffed) {
+            subprojects.push({
+                name: entry,
+                relPath: entry,
+                archetype: sniffed.archetype,
+                manifestPath: path.relative(absRoot, sniffed.manifestPath).replace(/\\/g, '/'),
+            });
+        }
+    }
+    return subprojects;
+}
+
+/**
+ * Scans a single nested workspace container directory for subprojects.
+ */
+function scanContainerEntries(absRoot: string, containerPath: string): DiscoveredSubproject[] {
+    if (!fs.existsSync(containerPath) || !fs.statSync(containerPath).isDirectory()) {
+        return [];
+    }
+    const subprojects: DiscoveredSubproject[] = [];
+    const entries = safeReadDir(containerPath);
+    for (const n of entries) {
+        const subPath = path.join(containerPath, n);
+        const sniffed = sniffDirectoryArchetype(subPath);
+        if (!sniffed) continue;
+        subprojects.push({
+            name: n,
+            relPath: path.relative(absRoot, subPath).replace(/\\/g, '/'),
+            archetype: sniffed.archetype,
+            manifestPath: path.relative(absRoot, sniffed.manifestPath).replace(/\\/g, '/'),
+        });
+    }
+    return subprojects;
+}
+
+/**
+ * Sniffs explicit workspace configuration and returns populated RepoTopology.
+ */
+function sniffExplicitWorkspaceSubprojects(
+    absRoot: string,
+    monorepoType: MonorepoType,
+    detectionSource: RepoTopology['detectionSource'],
+): RepoTopology {
+    const subprojects: DiscoveredSubproject[] = scanDirectoryClusterSubprojects(absRoot);
+    const nestedContainers = ['packages', 'apps', 'crates', 'services', 'libs'];
+    for (const container of nestedContainers) {
+        const containerPath = path.join(absRoot, container);
+        const nested = scanContainerEntries(absRoot, containerPath);
+        subprojects.push(...nested);
+    }
+
+    return {
+        isMonorepo: true,
+        monorepoType,
+        projectCount: subprojects.length,
+        subprojects,
+        detectionSource,
+    };
+}
+
+/**
+ * Detect explicit workspace configuration manifest files.
+ */
+function detectExplicitWorkspaceManifest(absRoot: string): MonorepoType | null {
+    const pkgPath = path.join(absRoot, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+        const pkgContent = safeReadFile(pkgPath);
+        if (pkgContent) {
+            try {
+                if (JSON.parse(pkgContent).workspaces) return 'npm-workspaces';
+            } catch {
+                // ignore
+            }
+        }
+    }
+    if (fs.existsSync(path.join(absRoot, 'pnpm-workspace.yaml'))) return 'pnpm-workspaces';
+    const cargoPath = path.join(absRoot, 'Cargo.toml');
+    if (fs.existsSync(cargoPath)) {
+        const cargoContent = safeReadFile(cargoPath);
+        if (cargoContent && /^\s*\[workspace\]/m.test(cargoContent)) return 'cargo-workspace';
+    }
+    if (fs.existsSync(path.join(absRoot, 'go.work'))) return 'go-work';
+    if (fs.existsSync(path.join(absRoot, 'turbo.json'))) return 'turbo';
+    if (fs.existsSync(path.join(absRoot, 'lerna.json'))) return 'lerna';
+    if (fs.existsSync(path.join(absRoot, 'nx.json'))) return 'nx';
+    return null;
+}
+
+/**
+ * Sniff repository topology to distinguish Monorepo from Single-Project.
+ *
+ * @param absRoot - Absolute root path of repository.
+ * @returns RepoTopology with isMonorepo boolean and discovered subprojects.
+ */
+export function detectRepoTopology(absRoot: string): RepoTopology {
+    // --- Tier 1: Explicit Monorepo Manifests ---
+    const explicitType = detectExplicitWorkspaceManifest(absRoot);
+    if (explicitType) {
+        return sniffExplicitWorkspaceSubprojects(absRoot, explicitType, 'explicit-manifest');
+    }
+
+    // --- Tier 2: Directory Cluster Sniffing (Implicit multi-project) ---
+    const subprojects = scanDirectoryClusterSubprojects(absRoot);
+    if (subprojects.length >= 2) {
+        return {
+            isMonorepo: true,
+            monorepoType: 'directory-cluster',
+            projectCount: subprojects.length,
+            subprojects,
+            detectionSource: 'directory-cluster',
+        };
+    }
+
+    // --- Tier 3: Single-Root or Single-Subproject Fallback ---
+    if (subprojects.length === 1) {
+        return {
+            isMonorepo: false,
+            monorepoType: 'none',
+            projectCount: 1,
+            subprojects,
+            primaryProjectName: subprojects[0].name,
+            detectionSource: 'directory-cluster',
+        };
+    }
+
+    const rootArchetype = sniffDirectoryArchetype(absRoot);
+    if (rootArchetype) {
+        const rootName = path.basename(absRoot);
+        return {
+            isMonorepo: false,
+            monorepoType: 'none',
+            projectCount: 1,
+            subprojects: [
+                {
+                    name: rootName,
+                    relPath: '.',
+                    archetype: rootArchetype.archetype,
+                    manifestPath: path
+                        .relative(absRoot, rootArchetype.manifestPath)
+                        .replace(/\\/g, '/'),
+                },
+            ],
+            primaryProjectName: rootName,
+            detectionSource: 'single-root',
+        };
+    }
+
+    return {
+        isMonorepo: false,
+        monorepoType: 'none',
+        projectCount: 0,
+        subprojects: [],
+        detectionSource: 'generic',
+    };
+}
+
 /**
  * Inspect a repository root and construct its complete archetype context.
  *
@@ -418,11 +695,13 @@ export function inspectRepoArchetype(root: string): RepoArchetypeContext {
     const hooks = detectHooks(absRoot);
     const ci = detectCi(absRoot);
     const gateScripts = detectGateScripts(absRoot);
+    const topology = detectRepoTopology(absRoot);
 
     return {
         root: absRoot,
         archetypes,
         primaryArchetype,
+        topology,
         packageManager,
         manifests,
         scriptsAvailable,

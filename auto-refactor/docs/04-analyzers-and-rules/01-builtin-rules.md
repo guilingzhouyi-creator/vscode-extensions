@@ -113,6 +113,7 @@
 | `secret-detected` | <a id="secret-detected"></a>`secrets` | `LEGACY` | `error` | `all` | 疑似硬编码凭据（按模式识别）。（计划迁移至 `SEC-TOK-001`） | 撤销并轮换该凭据；改为从环境/密钥管理读取。 |
 | `SH-ARRAY-001` | <a id="sh-array-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用 $* 代替了 "$@" 导致单词分割失效。 | 使用 "$@" 保持各个位置参数的独立性。 |
 | `SH-CMD-001` | <a id="sh-cmd-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了已过时的反引号命令替换语法。 | 改用现代标准的 $(...) 命令替换语法。 |
+| `SH-COND-001` | <a id="sh-cond-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Bash 脚本在复合条件或正则匹配中使用脆弱的单中括号 [ ... ] 语法。 | 在 Bash 脚本中改用标准的 [[ ... ]] 双中括号测试语法，或遵循严格 POSIX 测试规范。 |
 | `SH-DEPR-001` | <a id="sh-depr-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了单中括号 [ 或旧式废弃测试语法。 | 在 Bash 脚本中改用现代标准的 [[ 测试语法。 |
 | `SH-DOC-001` | <a id="sh-doc-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Shell 脚本头部缺少模块与职责元数据说明注释。 | 在脚本头部添加包含模块、描述与退出语义的规范注释。 |
 | `SH-ECHO-001` | <a id="sh-echo-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了不可移植的 echo -e / echo -n。 | 改用 POSIX 标准统一的 printf 命令。 |
@@ -143,6 +144,8 @@
 | `VSC-I18N-001` | <a id="vsc-i18n-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 用户可见消息使用硬编码字符串字面量未接入国际化字典。 | 使用 vscode.l10n.t(...) 或双语字典常量进行包装。 |
 | `VSC-MEM-001` | <a id="vsc-mem-001"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | VS Code Disposable 资源创建后未压入 context.subscriptions。 | 使用 context.subscriptions.push(...) 注册或纳入复合 Disposable 管理。 |
 | `VSC-PERF-001` | <a id="vsc-perf-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 在 Extension Host 主线程执行同步文件 I/O 阻塞编辑器 UI。 | 改用 fs.promises 或 vscode.workspace.fs 异步 I/O 接口。 |
+| `VSC-UI-001` | <a id="vsc-ui-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 集合列表渲染缺少有界密度控制或折叠收起能力（超过 5 项列表缺乏折叠与导出旁置布局）。 | 为 Webview 动态集合列表实现阈值折叠控件与紧凑密度布局，保障大数据集下信息层次清晰。 |
+| `VSC-UI-002` | <a id="vsc-ui-002"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | Webview 视图样式包含硬编码单色颜色值，破坏 VS Code 主题动态自适应契约。 | 将硬编码颜色替换为 VS Code CSS 主题变量（如 var(--vscode-editor-foreground) 等）。 |
 
 ### Layer 1 — 全域安全、密钥与卫生底线层 (Universal Safety & Hygiene)
 
@@ -283,6 +286,8 @@
 | `GATE-ISO-001` | <a id="gate-iso-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 双层门禁边界不同构，远端 CI 关键检查未在本地钩子中对等镜像。 | 确保本地门禁脚本镜像覆盖远端 CI 关键步骤，实现双层防御同构性。 |
 | `GATE-MSG-001` | <a id="gate-msg-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁系统缺少提交信息 Conventional 规范与零黑话结构化正文校验。 | 配置 commit-msg 门禁校验 Conventional 格式、结构化正文区块与零临时黑话。 |
 | `GATE-MSG-002` | <a id="gate-msg-002"></a>`gate-architecture` | `GATE` | `error` | `all` | 提交信息门禁未接入单源词汇约束表（commit-msg-forbidden-terms.json）。 | 接入双语词表看守，阻断敷衍用语、过度肯定/否定及元风格标语。 |
+| `GATE-MSG-003` | <a id="gate-msg-003"></a>`gate-architecture` | `GATE` | `error` | `all` | 多项目工作区提交信息门禁缺少所属项目格式区校验（[Project: <subproject>]），或单项目未自适应静默。 | 在 commit-msg 门禁中基于工作区拓扑探针配置自适应多项目格式区守卫，单项目自动静默，多项目强制校验。 |
+| `GATE-PAIR-001` | <a id="gate-pair-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 跨平台门禁脚本缺少双平台镜像配对实现（.ps1 与 .sh 未成对出现）。 | 为关键门禁脚本提供对称的 PowerShell (pwsh) 与 Bash 双平台镜像实现，杜绝跨平台单点盲区。 |
 | `GATE-PROC-001` | <a id="gate-proc-001"></a>`gate-architecture` | `GATE` | `error` | `all` | PowerShell 门禁脚本使用交互式提示而缺少输出重定向非交互守卫。 | 增加 [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected 守卫，杜绝子进程死锁。 |
 | `GATE-ROUTE-001` | <a id="gate-route-001"></a>`gate-architecture` | `GATE` | `error` | `all` | Git 钩子直接裸调脆弱环境或 Windows PS 5.1，缺少跨平台路由保护。 | 采用跨平台 pwsh 优先并优雅降级至 bash 的双执行器路由，禁止裸调 powershell.exe。 |
 | `GATE-SSOT-001` | <a id="gate-ssot-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁引用规则目录校验但缺少单源注册表文件或未登记对应规则。 | 建立并维护单一真源规则目录（如 rule-catalog.json），门禁依据单源校验。 |

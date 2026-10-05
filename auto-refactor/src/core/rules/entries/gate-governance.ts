@@ -204,4 +204,29 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'Guard PowerShell interactive prompts with [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-proc-001',
     }),
+    defineRule({
+        id: 'GATE-MSG-003',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary: 'Monorepo commit message gate lacks [Project] section or whitelist verification.',
+        remediation:
+            'Enforce [Project] header verification in commit-msg gate for multi-project repositories.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-msg-003',
+    }),
+    defineRule({
+        id: 'GATE-PAIR-001',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Dual-platform gate scripts are not paired; missing corresponding .sh or .ps1 gate implementation.',
+        remediation:
+            'Provide isomorphic dual-platform gate script implementations across scripts/sh and scripts/ps1.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-pair-001',
+    }),
 ];

@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-05T05:14:37.464Z",
-  "totalRules": 380,
+  "generatedAt": "2026-10-05T05:49:29.587Z",
+  "totalRules": 385,
   "counts": {
-    "autoRefactor": 299,
+    "autoRefactor": 304,
     "workspaceTiming": 45,
     "webGames": 56,
     "globalTooling": 7
@@ -932,6 +932,20 @@
       "family": "GATE",
       "severity": "error",
       "summary": "Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired)."
+    },
+    {
+      "id": "GATE-MSG-003",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Monorepo commit message gate lacks [Project] section or whitelist verification."
+    },
+    {
+      "id": "GATE-PAIR-001",
+      "project": "auto-refactor",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Dual-platform gate scripts are not paired; missing corresponding .sh or .ps1 gate implementation."
     },
     {
       "id": "GATE-PROC-001",
@@ -2264,6 +2278,13 @@
       "summary": "Deprecated backtick command substitution syntax detected."
     },
     {
+      "id": "SH-COND-001",
+      "project": "auto-refactor",
+      "family": "SH",
+      "severity": "error",
+      "summary": "Bash script uses fragile single bracket syntax [ ... ] with compound conditions or regex."
+    },
+    {
       "id": "SH-DEPR-001",
       "project": "auto-refactor",
       "family": "SH",
@@ -2668,6 +2689,20 @@
       "family": "VSC",
       "severity": "error",
       "summary": "Synchronous file I/O executed on Extension Host main thread blocks editor UI."
+    },
+    {
+      "id": "VSC-UI-001",
+      "project": "auto-refactor",
+      "family": "VSC",
+      "severity": "error",
+      "summary": "Webview collection list rendering lacks bounded density or folding controls (>5 items)."
+    },
+    {
+      "id": "VSC-UI-002",
+      "project": "auto-refactor",
+      "family": "VSC",
+      "severity": "error",
+      "summary": "Webview UI contains hardcoded monochrome colors instead of theme CSS variables."
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791177348140",
-  "timestamp": "2026-10-05T05:15:48.140Z",
+  "snapshotId": "snapshot-v0.4.0-1791179735653",
+  "timestamp": "2026-10-05T05:55:35.653Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "c07567c9bbacc172ded7e0d6c91ebfa8d316e327150e64a16f1106d4c8456f8a",
+  "rulesDigest": "7bdc4c339f370bb05f9e5cdb0d18c226c3e9d5949d8bbeaf7b756ad25f1ab2af",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 88.5,
-    "ruleCount": 299,
+    "ruleCount": 304,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -122,6 +122,8 @@
     "GATE-ISO-001",
     "GATE-MSG-001",
     "GATE-MSG-002",
+    "GATE-MSG-003",
+    "GATE-PAIR-001",
     "GATE-PROC-001",
     "GATE-ROUTE-001",
     "GATE-SSOT-001",
@@ -275,6 +277,7 @@
     "secret-detected",
     "SH-ARRAY-001",
     "SH-CMD-001",
+    "SH-COND-001",
     "SH-DEPR-001",
     "SH-DOC-001",
     "SH-ECHO-001",
@@ -325,6 +328,8 @@
     "unused-module",
     "VSC-I18N-001",
     "VSC-MEM-001",
-    "VSC-PERF-001"
+    "VSC-PERF-001",
+    "VSC-UI-001",
+    "VSC-UI-002"
   ]
 }

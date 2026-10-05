@@ -573,6 +573,19 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sh-trap-001',
     }),
     defineRule({
+        id: 'SH-COND-001',
+        family: 'SH',
+        analyzer: ANALYZER_SHELL_LINT,
+        canonical: true,
+        languages: [LANGUAGE_SHELL],
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Bash script uses fragile single bracket syntax [ ... ] with compound conditions or regex.',
+        remediation:
+            'Use standard [[ ... ]] syntax for bash scripts or strictly POSIX-compliant test constructs.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sh-cond-001',
+    }),
+    defineRule({
         id: 'SIM-BOOL-001',
         family: 'SIM',
         analyzer: ANALYZER_SIMPLIFY,
@@ -639,5 +652,30 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         summary: 'User-visible notification message hardcodes string literal without localization.',
         remediation: 'Wrap message with vscode.l10n.t(...) or bilingual dictionary constant.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-i18n-001',
+    }),
+    defineRule({
+        id: 'VSC-UI-001',
+        family: RULE_FAMILY_VSCODE_EXTENSION,
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        canonical: true,
+        languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Webview collection list rendering lacks bounded density or folding controls (>5 items).',
+        remediation:
+            'Implement bounded threshold folding or pagination controls for Webview dynamic collections.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-ui-001',
+    }),
+    defineRule({
+        id: 'VSC-UI-002',
+        family: RULE_FAMILY_VSCODE_EXTENSION,
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        canonical: true,
+        languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
+        defaultSeverity: SEVERITY_ERROR,
+        summary: 'Webview UI contains hardcoded monochrome colors instead of theme CSS variables.',
+        remediation:
+            'Replace hardcoded hex colors with VS Code CSS theme variables (var(--vscode-*)).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-ui-002',
     }),
 ];

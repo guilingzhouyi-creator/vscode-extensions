@@ -45,6 +45,7 @@ import {
     type PowerShellScanState,
     scanStrictErrorFlags,
     checkDeprecatedSyntax,
+    checkShellConditionSyntax,
     checkUnquotedVariables,
     checkShellDocContract,
     checkPowerShellDocContract,
@@ -147,6 +148,7 @@ export class ShellLintAnalyzer implements Analyzer {
             const maskedTrimmed = maskedLine.trim();
 
             checkDeprecatedSyntax(line, trimmed, maskedTrimmed, i, emit);
+            checkShellConditionSyntax(trimmed, maskedTrimmed, i, emit);
             this.checkCdWithoutCheck(trimmed, i, emit);
             this.checkReadWithoutR(trimmed, i, emit);
             this.checkArraySyntax(trimmed, i, emit);

@@ -43,6 +43,8 @@ export interface GateGovernanceOptions {
     enforceAstSlice?: boolean;
     enforceFacadeDiscipline?: boolean;
     enforceProcessGuard?: boolean;
+    enforceMonorepoScope?: boolean;
+    enforcePairing?: boolean;
 }
 
 /** Comprehensive audit result. */
@@ -347,6 +349,45 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
                 'Standardized commit message prefixes are required for automated auditing and semantic versioning.',
             ),
         );
+    }
+
+    // GATE-MSG-003: Monorepo Project Scope & Whitelist Verification (Adaptive to topology)
+    // If repository is Single-Project (not a Monorepo), auto-mute: zero findings emitted.
+    if (context.topology.isMonorepo) {
+        const combinedCommitScripts = [
+            content,
+            ...Object.entries(context.gateScripts.contents)
+                .filter(([k]) => /commit-msg/i.test(k))
+                .map(([, v]) => v),
+        ].join('\n');
+
+        const hasProjectScopeCheck =
+            /(?:\[Project|\[\s*Project\s*\/?\s*项目归属|IN_PROJECT_SECTION|FOUND_PROJECT_HEADER|VALID_PROJECTS)/i.test(
+                combinedCommitScripts,
+            );
+
+        if (!hasProjectScopeCheck) {
+            issues.push(
+                createGateIssue(
+                    'GATE-MSG-003',
+                    relPath,
+                    1,
+                    SEVERITY_ERROR,
+                    'high',
+                    'standardization',
+                    'Monorepo commit-msg gate lacks [Project / 项目归属] format section and subproject whitelist validation.',
+                    'Implement [Project] format section validation in commit-msg gate to demarcate subproject attribution.',
+                    'In multi-project repositories, unattributed commits blur architecture boundaries and cause cross-project contamination.',
+                    undefined,
+                    {
+                        action: 'add_project_scope_gate',
+                        targetFile: relPath,
+                        detectedSubprojects: context.topology.subprojects.map((s) => s.name),
+                        safeToAutomate: true,
+                    },
+                ),
+            );
+        }
     }
 }
 
@@ -709,6 +750,63 @@ function auditProcessInteractiveSafety(context: RepoArchetypeContext, issues: Is
 }
 
 /**
+ * Dimension 12: GATE-PAIR-001: Dual-Platform Gate Script Isomorphic Pairing Guard.
+ */
+function auditDualPlatformPairing(context: RepoArchetypeContext, issues: Issue[]): void {
+    const isCoreGateScript = (f: string) =>
+        /(?:pre-commit|commit-msg|pre-push|audit-all)[-_]gate|audit-all/i.test(f);
+
+    const shScripts = context.gateScripts.files.filter(
+        (f) => f.startsWith('scripts/sh/') && f.endsWith('.sh') && isCoreGateScript(f),
+    );
+    const ps1Scripts = context.gateScripts.files.filter(
+        (f) => f.startsWith('scripts/ps1/') && f.endsWith('.ps1') && isCoreGateScript(f),
+    );
+
+    // If neither exists, this repo does not use scripts/sh or scripts/ps1 dual structure
+    if (shScripts.length === 0 && ps1Scripts.length === 0) return;
+
+    const shBases = new Set(shScripts.map((f) => path.basename(f, '.sh')));
+    const ps1Bases = new Set(ps1Scripts.map((f) => path.basename(f, '.ps1')));
+
+    for (const base of shBases) {
+        if (!ps1Bases.has(base)) {
+            issues.push(
+                createGateIssue(
+                    'GATE-PAIR-001',
+                    `scripts/sh/${base}.sh`,
+                    1,
+                    SEVERITY_WARNING,
+                    'medium',
+                    'reliability',
+                    `Shell gate script 'scripts/sh/${base}.sh' lacks matching 'scripts/ps1/${base}.ps1'.`,
+                    `Provide isomorphic 'scripts/ps1/${base}.ps1' script for cross-platform parity.`,
+                    'Asymmetric gate scripts cause validation discrepancies across developer platforms.',
+                ),
+            );
+        }
+    }
+
+    for (const base of ps1Bases) {
+        if (!shBases.has(base)) {
+            issues.push(
+                createGateIssue(
+                    'GATE-PAIR-001',
+                    `scripts/ps1/${base}.ps1`,
+                    1,
+                    SEVERITY_WARNING,
+                    'medium',
+                    'reliability',
+                    `PowerShell gate script 'scripts/ps1/${base}.ps1' lacks matching 'scripts/sh/${base}.sh'.`,
+                    `Provide isomorphic 'scripts/sh/${base}.sh' script for cross-platform parity.`,
+                    'Asymmetric gate scripts cause validation discrepancies across developer platforms.',
+                ),
+            );
+        }
+    }
+}
+
+/**
  * Complete standalone audit of repository gate architecture.
  *
  * @param root - Path to repository root.
@@ -738,6 +836,7 @@ export function auditGateArchitecture(
         if (options.enforceAstSlice !== false) auditAstSliceGuard(context, issues);
         if (options.enforceFacadeDiscipline !== false) auditFacadeDisciplineGuard(context, issues);
         if (options.enforceProcessGuard !== false) auditProcessInteractiveSafety(context, issues);
+        if (options.enforcePairing !== false) auditDualPlatformPairing(context, issues);
     }
 
     const hasLocalGates = context.hooks.allHookFiles.length > 0;
@@ -749,7 +848,7 @@ export function auditGateArchitecture(
         issues,
         passed: issues.length === 0,
         metrics: {
-            totalRulesAudited: 13,
+            totalRulesAudited: 15,
             violationsCount: issues.length,
             hasLocalGates,
             hasCiPipelines,

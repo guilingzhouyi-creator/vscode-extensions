@@ -632,14 +632,20 @@ export const DIMENSION_RULES: DimensionRule[] = [
 
     {
         analyzer: ANALYZER_VSCODE_EXTENSION,
-        covers: ruleMatches(['VSC-MEM-001'], ['disposable', 'subscription', 'leak']),
+        covers: ruleMatches(
+            ['VSC-MEM-001', 'VSC-UI-002'],
+            ['disposable', 'subscription', 'leak', 'theme', 'color'],
+        ),
         dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
         points: DEDUCTION_UNDISPOSED_RESOURCE,
         rationale: ScoringRationales.VSCODE_UNDISPOSED_RESOURCE,
     },
     {
         analyzer: ANALYZER_VSCODE_EXTENSION,
-        covers: ruleMatches(['VSC-PERF-001'], ['blocking', 'synchronous', 'main thread']),
+        covers: ruleMatches(
+            ['VSC-PERF-001', 'VSC-UI-001'],
+            ['blocking', 'synchronous', 'main thread', 'fold', 'density'],
+        ),
         dimension: DIMENSION_PERFORMANCE_EFFICIENCY,
         points: DEDUCTION_MAIN_THREAD_BLOCKING_IO,
         rationale: ScoringRationales.VSCODE_MAIN_THREAD_BLOCKING_IO,
@@ -670,8 +676,8 @@ export const DIMENSION_RULES: DimensionRule[] = [
     {
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         covers: ruleMatches(
-            ['GATE-SYS-001', 'GATE-HOOK-001', 'GATE-ISO-001', 'GATE-FAC-001'],
-            ['system', 'hook', 'isolate', 'facade'],
+            ['GATE-SYS-001', 'GATE-HOOK-001', 'GATE-ISO-001', 'GATE-FAC-001', 'GATE-PAIR-001'],
+            ['system', 'hook', 'isolate', 'facade', 'pair'],
         ),
         dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
         points: DEDUCTION_GATE_ARCHITECTURE,
@@ -690,7 +696,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
     {
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         covers: ruleMatches(
-            ['GATE-MSG-001', 'GATE-MSG-002', 'GATE-SSOT-001', 'GATE-HYG-001'],
+            ['GATE-MSG-001', 'GATE-MSG-002', 'GATE-MSG-003', 'GATE-SSOT-001', 'GATE-HYG-001'],
             ['msg', 'message', 'ssot', 'catalog', 'hygiene'],
         ),
         dimension: DIMENSION_STANDARDIZATION,
@@ -709,8 +715,8 @@ export const DIMENSION_RULES: DimensionRule[] = [
     {
         analyzer: ANALYZER_SHELL_LINT,
         covers: ruleMatches(
-            ['SH-ERR-001', 'SH-EXIT-001', 'SH-INIT-001', 'PS-ERROR-001'],
-            ['err', 'exit', 'init'],
+            ['SH-ERR-001', 'SH-EXIT-001', 'SH-INIT-001', 'SH-COND-001', 'PS-ERROR-001'],
+            ['err', 'exit', 'init', 'cond'],
         ),
         dimension: DIMENSION_MAINTAINABILITY,
         points: DEDUCTION_SHELL_ERROR_DISCIPLINE,

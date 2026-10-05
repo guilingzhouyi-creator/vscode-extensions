@@ -337,6 +337,14 @@ const PARALLEL_SUITES = [
     name: 'validate-gate-architecture-enhancement',
     script: 'scripts/validate-gate-architecture-enhancement.js',
   },
+  {
+    name: 'validate-gate-project-scope',
+    script: 'scripts/validate-gate-project-scope.js',
+  },
+  {
+    name: 'validate-vscode-ui-folding',
+    script: 'scripts/validate-vscode-ui-folding.js',
+  },
 ];
 
 // Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)

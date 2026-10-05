@@ -182,6 +182,91 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
+        // 4. VSC-UI-001: Webview dynamic collection rendering bounded density & folding
+        const uiFoldingViolations = this.detectUnboundedCollectionRendering(raw, masked);
+        for (const f of uiFoldingViolations) {
+            issues.push(
+                makeVscIssue(
+                    file,
+                    f.line,
+                    'VSC-UI-001',
+                    SEVERITY_WARNING,
+                    'Webview collection list rendering lacks bounded density or folding controls.',
+                    'Add .slice(0, threshold) or collapse/expand controls to prevent unbounded UI height.',
+                    { line: f.line, text: f.text },
+                ),
+            );
+        }
+
+        // 5. VSC-UI-002: Webview CSS theme variable completeness & high-contrast guard
+        const colorViolations = this.detectHardcodedThemeColors(raw);
+        for (const c of colorViolations) {
+            issues.push(
+                makeVscIssue(
+                    file,
+                    c.line,
+                    'VSC-UI-002',
+                    SEVERITY_ERROR,
+                    `Webview UI contains hardcoded color '${c.color}' instead of theme CSS variables.`,
+                    'Replace hardcoded color with var(--vscode-*) or adaptive color scheme variable.',
+                    { line: c.line, text: c.text, color: c.color },
+                ),
+            );
+        }
+
         return issues;
+    }
+
+    private detectUnboundedCollectionRendering(
+        rawLines: string[],
+        maskedLines: string[],
+    ): Array<{ line: number; text: string }> {
+        const violations: Array<{ line: number; text: string }> = [];
+        for (let i = 0; i < rawLines.length; i++) {
+            const raw = rawLines[i];
+            const masked = maskedLines[i];
+            const isMapping =
+                /\.(?:map)\s*\([^)]*=>\s*`[^`]*(?:<tr|<li|<div|<option)/i.test(raw) ||
+                (/\.(?:map)\s*\([^)]*=>/i.test(masked) &&
+                    i + 1 < rawLines.length &&
+                    /`[^`]*(?:<tr|<li|<div|<option)/i.test(rawLines[i + 1]));
+
+            if (isMapping) {
+                const windowStart = Math.max(0, i - 4);
+                const windowEnd = Math.min(rawLines.length, i + 5);
+                const surrounding = rawLines.slice(windowStart, windowEnd).join('\n');
+                const hasBounds =
+                    /(?:\.slice\s*\(|isExpanded|expanded|fold|collapse|limit|maxCount|truncate|showAll|threshold)/i.test(
+                        surrounding,
+                    );
+                if (!hasBounds) {
+                    violations.push({ line: i + 1, text: raw.trim() });
+                }
+            }
+        }
+        return violations;
+    }
+
+    private detectHardcodedThemeColors(
+        rawLines: string[],
+    ): Array<{ line: number; text: string; color: string }> {
+        const violations: Array<{ line: number; text: string; color: string }> = [];
+        const colorRe =
+            /(?:style\s*=\s*['"][^'"]*?(?:color|background|fill|stroke)\s*:\s*|fill\s*=\s*['"]|stroke\s*=\s*['"])(#[0-9a-fA-F]{3,6}|black|white)\b/i;
+        for (let i = 0; i < rawLines.length; i++) {
+            const line = rawLines[i];
+            if (!/<(?:div|span|p|table|td|th|tr|svg|path|circle|rect|style)\b/i.test(line)) {
+                continue;
+            }
+            const m = colorRe.exec(line);
+            if (m) {
+                const matchedColor = m[1].toLowerCase();
+                const monochrome = ['#000', '#000000', '#fff', '#ffffff', 'black', 'white'];
+                if (monochrome.includes(matchedColor) && !line.includes('var(--vscode-')) {
+                    violations.push({ line: i + 1, text: line.trim(), color: m[1] });
+                }
+            }
+        }
+        return violations;
     }
 }
