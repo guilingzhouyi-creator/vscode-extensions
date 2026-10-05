@@ -176,7 +176,7 @@ if [[ -n "$TOUCHED_WG" ]]; then
 fi
 
 # --- Gate 9: 暂存区增量 AST 切片质量与复杂度审查 ---
-echo "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15, Depth<=4, Noise<=4.0)..."
+echo "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15 [分发器<=25], Depth<=4, Noise<=4.0)..."
 TOUCHED_CODE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
 if [[ -n "$TOUCHED_CODE" ]]; then
     if ! "$NODE_BIN" auto-refactor/scripts/validate-staged-slice.js; then

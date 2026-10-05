@@ -31,7 +31,7 @@
 - **文件命名**：全局遵循 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）。
 
 ### 2. 代码复杂度与体积双轨预算
-- **AST 切片预算（`GATE-AST-001`）**：暂存区生产代码与工具脚本受 AST 局部切片守卫约束：单函数圈复杂度 $\text{CC} \le 15$、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；循环体与调度逻辑须平铺控制流并采用卫语句提前返回；
+- **AST 切片预算（`GATE-AST-001`）**：暂存区生产代码与工具脚本受 AST 局部切片守卫约束：单函数圈复杂度基准 $\text{CC} \le 15$（无循环且 $\text{Depth} \le 2$ 的平铺分发器/状态映射器与探针模块享 $\text{CC} \le 20 \sim 25$ 弹性包络）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；循环体与调度逻辑须平铺控制流并采用卫语句提前返回；
 - **单文件双轨体积与 1:3 动态包络**：全仓源码文件（`.ts`, `.js`, `.gd`, `.py` 等）以**有效代码行（$\text{ELOC} \le 900$）**为第一刚性复杂度红线，以**物理行（$\text{LOC} \le 1400$）**为防膨胀兜底线；在 [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) 中执行 1:3 密度比动态反推包络约束与高负荷契约注释密度约束；
 - **门面实质承载与跳板消融（`ARCH-FAC-001` / `ARCH-ABS-001`）**：门面（Facade）或对外导出入口必须满足 $\text{ELOC} \ge 15$ 校验逻辑、聚合 $\ge 3$ 个子领域或包含 `Object.freeze`/`deepFreeze` 不可变保障；严禁保留或创建有效代码 $\le 3$ 行且仅向单一目标透传导出的空包跳板文件（详见 [facade-discipline](.agents/skills/facade-discipline/SKILL.md)）。
 

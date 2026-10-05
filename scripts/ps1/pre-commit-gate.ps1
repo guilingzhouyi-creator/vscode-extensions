@@ -190,7 +190,7 @@ if ($hasWg) {
 }
 
 # --- Gate 9: 暂存区增量 AST 切片质量与复杂度审查 ---
-Write-Host "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15, Depth<=4, Noise<=4.0)..." -ForegroundColor Gray
+Write-Host "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15 [分发器<=25], Depth<=4, Noise<=4.0)..." -ForegroundColor Gray
 $touchedCode = $stagedFiles | Where-Object { ($_ -match '\.(ts|js)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') }
 if ($touchedCode) {
     $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }

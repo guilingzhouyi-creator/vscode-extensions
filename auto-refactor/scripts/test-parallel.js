@@ -345,6 +345,10 @@ const PARALLEL_SUITES = [
     name: 'validate-vscode-ui-folding',
     script: 'scripts/validate-vscode-ui-folding.js',
   },
+  {
+    name: 'validate-elastic-staged-slice',
+    script: 'scripts/validate-elastic-staged-slice.js',
+  },
 ];
 
 // Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)
