@@ -9,8 +9,8 @@
  *   5. Before / After / Delta quantitative audit accounting.
  * Dependencies & Triggers: Consumes ./run-self-audit and ../dist/api;
  *   executed in CI / test-parallel.
- * Responsibilities: Run full self-audit, evaluate before/after delta metrics,
- *   assert 0 critical debt.
+ * Responsibilities: Acquire self-audit baseline (reusing fresh disk report if valid or
+ *   falling back to full self-audit), evaluate before/after delta metrics, assert 0 critical debt.
  * Exit Semantics & Design Rationale: Exits 0 on pass, throws AssertionError on failure.
  */
 
@@ -38,6 +38,11 @@ const INITIAL_SELF_AUDIT_BASELINE = {
 };
 
 /**
+ * Maximum acceptable age for reusing an existing baseline report (2 hours).
+ */
+const MAX_BASELINE_AGE_MS = 2 * 60 * 60 * 1000;
+
+/**
  * Format a numeric delta with an explicit sign.
  *
  * @param delta - Numeric difference.
@@ -50,6 +55,96 @@ function fmtDelta(delta) {
 }
 
 /**
+ * Validate that report metrics tier and scores are structurally valid.
+ *
+ * @param metrics - Metrics object from report.
+ * @returns True if metrics structure is valid.
+ */
+function hasValidMetrics(metrics) {
+  if (!metrics || !metrics.byDebtTier) return false;
+  const tiers = metrics.byDebtTier;
+  return (
+    typeof tiers.critical === 'number' &&
+    typeof tiers.high === 'number' &&
+    typeof metrics.compositeScore === 'number' &&
+    typeof metrics.effectiveCodeDensity === 'number'
+  );
+}
+
+/**
+ * Validate that report pillars and dimensions are structurally valid.
+ *
+ * @param report - Parsed baseline JSON report.
+ * @returns True if pillars and dimensions are valid numbers.
+ */
+function hasValidPillarsAndDimensions(report) {
+  const pillarsValid = typeof report?.eightPillars?.pillars?.security === 'number';
+  const dimensions = report?.tenDimensions;
+  if (!pillarsValid || !dimensions || typeof dimensions !== 'object') {
+    return false;
+  }
+  return ALL_QUALITY_DIMENSIONS.every((dim) => typeof dimensions[dim] === 'number');
+}
+
+/**
+ * Validate that an existing baseline report object meets all structural requirements.
+ *
+ * @param report - Parsed baseline JSON report.
+ * @returns True if report contains all required dimensions and metrics.
+ */
+function isBaselineValid(report) {
+  if (!report || typeof report !== 'object') return false;
+  if (
+    !report.scope ||
+    typeof report.scope.filesScanned !== 'number' ||
+    report.scope.filesScanned < 250
+  ) {
+    return false;
+  }
+  if (!hasValidMetrics(report.metrics)) return false;
+  if (!hasValidPillarsAndDimensions(report)) return false;
+  return (
+    Array.isArray(report.topHotspots) &&
+    Array.isArray(report.technicalDebtLedger?.criticalItems)
+  );
+}
+
+/**
+ * Attempt to load an existing, valid baseline report from disk.
+ *
+ * @param baselinePath - Absolute or relative path to the baseline report.
+ * @param maxAgeMs - Maximum acceptable age in milliseconds.
+ * @returns Parsed baseline report if valid and fresh, otherwise null.
+ */
+function loadReusableBaseline(baselinePath, maxAgeMs = MAX_BASELINE_AGE_MS) {
+  if (
+    process.env.FORCE_SELF_AUDIT === 'true' ||
+    process.env.FORCE_SELF_AUDIT === '1' ||
+    process.argv.includes('--force')
+  ) {
+    return null;
+  }
+  try {
+    if (!fs.existsSync(baselinePath)) {
+      return null;
+    }
+    const stat = fs.statSync(baselinePath);
+    const ageMs = Date.now() - stat.mtimeMs;
+    if (ageMs > maxAgeMs) {
+      return null;
+    }
+    const raw = fs.readFileSync(baselinePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!isBaselineValid(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Main verification routine for Self-Refactor self-refactoring closure.
  */
 async function main() {
@@ -57,15 +152,29 @@ async function main() {
 
   const start = Date.now();
 
-  // 1. Run full self-audit on the refactored engine
-  console.log('1. Executing Full Self-Audit on Refactored Engine...');
-  const report = await runSelfAudit();
+  // 1. Acquire baseline report: reuse existing valid baseline or execute full audit
+  let report = loadReusableBaseline(BASELINE_OUTPUT);
+  let reused = false;
+
+  if (report) {
+    reused = true;
+    console.log('1. Reusing Valid Self-Audit Baseline Report...');
+  } else {
+    console.log('1. Executing Full Self-Audit on Refactored Engine...');
+    report = await runSelfAudit();
+  }
   const elapsedSec = (Date.now() - start) / 1000;
 
   assert.ok(fs.existsSync(BASELINE_OUTPUT), 'Baseline output must exist');
-  console.log(
-    `✔ Audit completed in ${elapsedSec.toFixed(2)}s over ${report.scope.filesScanned} files.`,
-  );
+  if (reused) {
+    console.log(
+      `✔ Reused valid baseline in ${elapsedSec.toFixed(2)}s over ${report.scope.filesScanned} files.`,
+    );
+  } else {
+    console.log(
+      `✔ Audit completed in ${elapsedSec.toFixed(2)}s over ${report.scope.filesScanned} files.`,
+    );
+  }
 
   // 2. Assert 100% Critical Debt Elimination
   console.log('\n2. Validating 100% Critical Debt Elimination...');

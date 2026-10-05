@@ -227,7 +227,7 @@ foreach ($ext in $exts) {
         Sync-InstalledExtensionFiles -SourceDir $dir -FullExtId $fullExtId | Out-Null
     }
 
-    $count = (Get-ChildItem $outDir -Filter "$ext-*.vsix").Count
+    $count = @(Get-ChildItem $outDir -Filter "$ext-*.vsix").Count
     Write-Host "  ✔ 完成（保留 $count 个版本）→ $vsix" -ForegroundColor Green
 }
 

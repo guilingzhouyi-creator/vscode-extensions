@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791212335886",
-  "timestamp": "2026-10-05T14:59:08.999Z",
+  "snapshotId": "snapshot-v0.4.0-1791212735876",
+  "timestamp": "2026-10-05T15:05:48.014Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,31 +13,31 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 590,
-    "durationMs": 11817
+    "durationMs": 11040
   },
   "metrics": {
     "compositeScore": 99.16,
     "grade": "A+",
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 9936,
+    "totalIssues": 9939,
     "suppressedIssues": 494,
-    "unsuppressedIssues": 9442,
+    "unsuppressedIssues": 9445,
     "bySeverity": {
-      "info": 1130,
-      "warning": 8806,
+      "info": 1132,
+      "warning": 8807,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 215,
-      "medium": 5199,
+      "high": 216,
+      "medium": 5201,
       "low": 4522
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 99.54,
+      "maintainability": 99.53,
       "performance": 99.04,
       "data": 99.95,
       "testing": 100,
@@ -65,7 +65,7 @@
     "performanceEfficiency": 99.04,
     "standardization": 81.48,
     "modernity": 100,
-    "maintainability": 99.54,
+    "maintainability": 99.53,
     "commentQuality": 99.98,
     "duplication": 100,
     "techDebtRisk": 100
@@ -165,8 +165,8 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 215,
-      "medium": 5199,
+      "high": 216,
+      "medium": 5201,
       "low": 4522
     },
     "criticalItems": [],
@@ -433,6 +433,15 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
+        "id": "complexity:high-complexity:scripts/validate-self-refactor.js:63",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-self-refactor.js",
+        "line": 63,
+        "message": "Function \"isBaselineValid\" has cyclomatic complexity 22 (exceeds relaxed threshold 18 for shallow structure)."
+      },
+      {
         "id": "performance:PRF-ALG-002:scripts/validate-ts-modern.js:144",
         "rule": "PRF-ALG-002",
         "tier": "high",
@@ -611,15 +620,6 @@
         "file": "src/analyzers/gdscript-game.ts",
         "line": 146,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-game.ts:147",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/gdscript-game.ts",
-        "line": 147,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       }
     ]
   },
@@ -630,7 +630,7 @@
         "compositeScore": 99.41,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.81,
+          "maintainability": 99.79,
           "performance": 99.37,
           "data": 100,
           "testing": 100,
@@ -1334,7 +1334,7 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 119134,
+      "processed": 119220,
       "unique": 96698,
       "changed": 0,
       "semantic": 0,
@@ -1348,10 +1348,10 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791212335884,
-      "totalRuns": 131,
+      "endMs": 1791212735873,
+      "totalRuns": 132,
       "eloc": {
-        "processedTotal": 15500663,
+        "processedTotal": 15619883,
         "uniqueTotal": 96698,
         "changedTotal": 160543,
         "semanticTotal": 128435
@@ -1362,12 +1362,12 @@
         "max": 0.03
       },
       "debt": {
-        "totalAdded": 1089,
+        "totalAdded": 1094,
         "totalResolved": 7219,
         "totalRegressions": 0,
-        "netYield": 0.4
+        "netYield": 0.39
       },
-      "meanCompositeScore": 99.2,
+      "meanCompositeScore": 99.19,
       "gatePassRate": 100
     },
     "isFirstBaseline": false
