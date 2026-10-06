@@ -28,7 +28,7 @@ import {
     FRAGMENT_ERROR,
     FRAGMENT_WARNING,
 } from './dimensionLiterals';
-import { DIMENSION_RULES } from './dimensionRuleTable';
+import { DIMENSION_RULES, getDimensionRulesForAnalyzer } from './dimensionRuleTable';
 import {
     applyArchitectureDeductions,
     applySecurityDeductions,
@@ -43,6 +43,32 @@ export {
 import type { Issue, FileMetric } from '../types';
 import { ScoringRationales } from '../messages';
 import type { QualityDimension } from './scoringTypes';
+
+/**
+ * 32-bit Bitmask representation for the 10 quality dimensions (CPX-SPACE-001 zero heap allocation).
+ */
+export const DIMENSION_BIT_MAP: Record<QualityDimension, number> = {
+    architectureConsistency: 1 << 0,
+    semanticPurity: 1 << 1,
+    codeSecurity: 1 << 2,
+    performanceEfficiency: 1 << 3,
+    standardization: 1 << 4,
+    modernity: 1 << 5,
+    maintainability: 1 << 6,
+    commentQuality: 1 << 7,
+    duplication: 1 << 8,
+    techDebtRisk: 1 << 9,
+};
+
+/** Convert QualityDimension identifier to its bitmask flag. */
+export function dimensionToBit(dim: QualityDimension): number {
+    return DIMENSION_BIT_MAP[dim] || 0;
+}
+
+/** Check whether a bitmask contains the specified QualityDimension flag. */
+export function bitmaskHasDimension(mask: number, dim: QualityDimension): boolean {
+    return (mask & (DIMENSION_BIT_MAP[dim] || 0)) !== 0;
+}
 
 /**
  * Explicit rule-family -> quality dimension routing for the quantified standard.
@@ -183,20 +209,27 @@ export type DeductionApplier = (
 export function applyQualityDimensionDeductions(
     issue: Issue,
     apply: DeductionApplier,
-    seedClaimed?: Set<QualityDimension>,
+    seedClaimed?: Set<QualityDimension> | number,
 ): void {
     const line = issue.location?.start?.line;
-    // Seeded with the dimensions the family appliers already claimed, so a finding that
-    // lands in both buckets is charged once per dimension rather than once per bucket.
-    const claimed = new Set<QualityDimension>(seedClaimed);
-    for (const rule of DIMENSION_RULES) {
-        if (rule.analyzer !== issue.analyzer) continue;
-        if (claimed.has(rule.dimension)) continue;
+    let claimedMask = 0;
+    if (typeof seedClaimed === 'number') {
+        claimedMask = seedClaimed;
+    } else if (seedClaimed) {
+        for (const dim of seedClaimed) {
+            claimedMask |= (DIMENSION_BIT_MAP[dim] || 0);
+        }
+    }
+
+    const rules = getDimensionRulesForAnalyzer(issue.analyzer);
+    for (const rule of rules) {
+        const bit = DIMENSION_BIT_MAP[rule.dimension] || 0;
+        if ((claimedMask & bit) !== 0) continue;
         if (!rule.covers(issue)) continue;
-        claimed.add(rule.dimension);
+        claimedMask |= bit;
         apply(rule.dimension, rule.points, rule.rationale(issue.message), issue.rule, line);
     }
-    applySeverityDeductions(issue, apply, claimed, line);
+    applySeverityDeductions(issue, apply, claimedMask, line);
 }
 
 /**
@@ -299,7 +332,7 @@ export function classifyDebtTier(issue: Issue): DebtTier {
 function applySeverityDeductions(
     issue: Issue,
     apply: DeductionApplier,
-    claimed?: Set<QualityDimension>,
+    claimed?: Set<QualityDimension> | number,
     line?: number,
 ): void {
     // The table and the family map can name different axes for one id (GOV-TYP deducts
@@ -307,8 +340,10 @@ function applySeverityDeductions(
     // membership of the exact routed axis is not enough to detect an existing charge.
     // Any prior charge means this finding is already represented; the severity penalty
     // then belongs to debt rather than to a second quality axis.
+    const hasPriorClaim =
+        typeof claimed === 'number' ? claimed !== 0 : Boolean(claimed && claimed.size > 0);
     const debtDimension =
-        claimed && claimed.size > 0
+        hasPriorClaim
             ? DIMENSION_TECH_DEBT_RISK
             : (familyDimensionOf(issue.rule ?? '') ?? DIMENSION_TECH_DEBT_RISK);
 
@@ -424,16 +459,16 @@ export function applyIssueDeductions(
     // is seeded with them. `ARCH-LEAK-002` still deducts two dimensions on purpose — a
     // leaked credential is both an architecture breach and a security defect — because the
     // guard is per dimension, not per finding.
-    const claimedByFamily = new Set<QualityDimension>();
+    let claimedByFamilyMask = 0;
     const recordFamilyClaim: DeductionApplier = (dim, points, reason, rule, line) => {
-        claimedByFamily.add(dim);
+        claimedByFamilyMask |= (DIMENSION_BIT_MAP[dim] || 0);
         apply(dim, points, reason, rule, line);
     };
 
     applyArchitectureDeductions(issue, recordFamilyClaim);
     applySecurityDeductions(issue, recordFamilyClaim);
     applyPerformanceDeductions(issue, recordFamilyClaim);
-    applyQualityDimensionDeductions(issue, effectiveApply, claimedByFamily);
+    applyQualityDimensionDeductions(issue, effectiveApply, claimedByFamilyMask);
 }
 
 /**

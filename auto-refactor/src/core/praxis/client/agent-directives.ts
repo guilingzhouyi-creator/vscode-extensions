@@ -24,6 +24,10 @@ import type {
     PraxisDiagnosticCard,
     PraxisPresentationSeverity,
 } from '../presentation/presentation-types';
+import type {
+    AgentClarificationRequest,
+    CrossFileUsageContext,
+} from '../../reporters/agent-directives-types';
 import type { AgentDirectiveItem, AgentDirectivesBundle, DualFacedDiffResult } from './types';
 
 const DEFAULT_MAX_DIRECTIVES = 100;
@@ -102,6 +106,100 @@ function countIssueSeverities(issues: Issue[]): IssueSeverityCounts {
     return { errorCount, warnCount, infoCount };
 }
 
+function extractIssueClarification(issue: Issue): AgentClarificationRequest | undefined {
+    const raw =
+        (issue as unknown as Record<string, unknown>).clarificationRequest ??
+        issue.detail?.clarificationRequest ??
+        (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
+    if (raw && typeof raw === 'object' && 'promptQuestion' in (raw as Record<string, unknown>)) {
+        return raw as AgentClarificationRequest;
+    }
+    return undefined;
+}
+
+function extractIssueCrossFileContext(
+    issue: Issue,
+    clarification?: AgentClarificationRequest,
+): CrossFileUsageContext | undefined {
+    const raw =
+        (issue as unknown as Record<string, unknown>).crossFileUsageContext ??
+        issue.detail?.crossFileUsageContext ??
+        (issue.actionable as unknown as Record<string, unknown> | undefined)?.crossFileUsageContext;
+    if (raw && typeof raw === 'object') {
+        return raw as CrossFileUsageContext;
+    }
+    return clarification?.crossFileUsageContext;
+}
+
+function formatClarificationOptions(
+    clarification: AgentClarificationRequest,
+): string[] {
+    const lines: string[] = [];
+    if (!clarification.candidateOptions || clarification.candidateOptions.length === 0) {
+        return lines;
+    }
+    lines.push('  * Candidate Options:');
+    for (const opt of clarification.candidateOptions) {
+        const optObj = typeof opt === 'string' ? { key: opt, label: opt } : opt;
+        const rec = optObj.recommended ? ' (Recommended)' : '';
+        const def = optObj.key === clarification.defaultChoiceKey ? ' [Default]' : '';
+        const desc = optObj.description ? ` - ${optObj.description}` : '';
+        lines.push(`    - [${optObj.key}] ${optObj.label}${rec}${def}${desc}`);
+    }
+    return lines;
+}
+
+function formatCrossFileContextLines(
+    crossFileContext: CrossFileUsageContext,
+): string[] {
+    const lines: string[] = [
+        '  * Cross-File Impact:',
+        `    - Exported Symbol: ${crossFileContext.isExportedSymbol ? 'Yes' : 'No'}`,
+        `    - Reference Count: ${crossFileContext.referenceCount}`,
+        `    - Coordinated Rename Required: ${crossFileContext.requiresCoordinatedRename ? 'Yes' : 'No'}`,
+    ];
+
+    if (crossFileContext.impactedFiles && crossFileContext.impactedFiles.length > 0) {
+        lines.push(
+            `    - Impacted Files (${crossFileContext.impactedFiles.length}): ${crossFileContext.impactedFiles.join(', ')}`,
+        );
+    }
+    if (crossFileContext.sampleCallSites && crossFileContext.sampleCallSites.length > 0) {
+        lines.push('    - Sample Call Sites:');
+        for (const site of crossFileContext.sampleCallSites) {
+            const snippet = site.codeSnippet ? ` -> \`${site.codeSnippet.trim()}\`` : '';
+            lines.push(`      * ${site.filePath}:${site.line}${snippet}`);
+        }
+    }
+    return lines;
+}
+
+function formatClarificationInquiryBlock(
+    clarification: AgentClarificationRequest,
+    crossFileContext?: CrossFileUsageContext,
+): string[] {
+    const lines: string[] = [
+        '- Clarification Request:',
+        `  * Question: ${clarification.promptQuestion}`,
+    ];
+
+    if (clarification.questionType) {
+        lines.push(`  * Question Type: \`${clarification.questionType}\``);
+    }
+
+    lines.push(...formatClarificationOptions(clarification));
+
+    if (clarification.defaultChoiceKey) {
+        lines.push(`  * Default Choice: \`${clarification.defaultChoiceKey}\``);
+    }
+
+    if (crossFileContext) {
+        lines.push(...formatCrossFileContextLines(crossFileContext));
+    }
+
+    return lines;
+}
+
 function formatFindingItem(issue: Issue): string[] {
     const sev = issue.severity.toUpperCase();
     const file = issue.location?.file || 'unknown';
@@ -110,6 +208,25 @@ function formatFindingItem(issue: Issue): string[] {
         `### [${sev}|${issue.rule}] ${file}:${lineNo}`,
         `- Message: ${issue.message}`,
     ];
+
+    const clarification = extractIssueClarification(issue);
+    const crossFileContext = extractIssueCrossFileContext(issue, clarification);
+
+    if (clarification) {
+        lines.push(...formatClarificationInquiryBlock(clarification, crossFileContext));
+    } else if (crossFileContext) {
+        lines.push('- Cross-File Impact:');
+        lines.push(`  * Exported Symbol: ${crossFileContext.isExportedSymbol ? 'Yes' : 'No'}`);
+        lines.push(`  * Reference Count: ${crossFileContext.referenceCount}`);
+        lines.push(
+            `  * Coordinated Rename Required: ${crossFileContext.requiresCoordinatedRename ? 'Yes' : 'No'}`,
+        );
+        if (crossFileContext.impactedFiles && crossFileContext.impactedFiles.length > 0) {
+            lines.push(
+                `  * Impacted Files (${crossFileContext.impactedFiles.length}): ${crossFileContext.impactedFiles.join(', ')}`,
+            );
+        }
+    }
 
     if (issue.actionable) {
         const act = issue.actionable;
@@ -153,6 +270,11 @@ export function formatDirectivesMarkdown(
         `- Overall Verdict: ${verdict}`,
         `- Issues Total: ${issues.length} (Errors: ${counts.errorCount}, Warnings: ${counts.warnCount}, Info: ${counts.infoCount})`,
     ];
+
+    const clarifyCount = issues.filter((i) => Boolean(extractIssueClarification(i))).length;
+    if (clarifyCount > 0) {
+        lines.push(`- Clarification Requests: ${clarifyCount} pending decision`);
+    }
 
     if (cardContext) {
         const chk = cardContext.checkpointId ? ` | Checkpoint: ${cardContext.checkpointId}` : '';

@@ -183,7 +183,7 @@ function checkAndPushSite(trimmed: string, meta: SiteMeta, sites: DataAccessSite
 export class DataArchitectureAnalyzer implements Analyzer {
     name = 'data-architecture' as const;
 
-    analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         void sf;
         const options = (ctx.config.analyzers['data-architecture']?.options ||
             {}) as DataArchitectureOptions;
@@ -226,4 +226,12 @@ export class DataArchitectureAnalyzer implements Analyzer {
 
         return analyzeDataAccessSites(sites, options);
     }
+
+    /**
+     * Shared streaming traversal finalizer; delegates to standard analyze without requiring SourceFile.
+     */
+    finalize(ctx: AnalyzerContext): Issue[] {
+        return this.analyze(ctx.sourceFile, ctx);
+    }
 }
+

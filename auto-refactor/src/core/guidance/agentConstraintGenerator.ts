@@ -24,6 +24,7 @@ import type {
     AgentTopologyLayer,
     AgentImmutableConstraints,
     AgentVerificationDirective,
+    AgentClarificationRequest,
 } from '../reporters/agent-directives-types';
 
 /** Maximum number of memory rule hits rendered as frequent violations in the guidance prompt. */
@@ -300,6 +301,8 @@ export interface CompactGuardDirective {
     summary: string;
     fixHint?: string;
     actionable?: AgentActionablePayload;
+    directiveType?: 'GUARD' | 'CLARIFY';
+    clarificationRequest?: AgentClarificationRequest;
     renderedDirective: string;
 }
 
@@ -318,6 +321,23 @@ export interface CompactAgentPrompt {
     compactPromptText: string;
     estimatedTokens: number;
     tokenSavingsRatio: number;
+}
+
+/**
+ * Safely extracts clarification request from an Issue if present.
+ *
+ * @param issue - Static analysis finding.
+ * @returns AgentClarificationRequest or undefined.
+ */
+export function extractClarificationRequest(issue: Issue): AgentClarificationRequest | undefined {
+    const raw =
+        (issue as unknown as Record<string, unknown>).clarificationRequest ??
+        issue.detail?.clarificationRequest ??
+        (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
+    if (raw && typeof raw === 'object' && 'promptQuestion' in (raw as Record<string, unknown>)) {
+        return raw as AgentClarificationRequest;
+    }
+    return undefined;
 }
 
 /**
@@ -340,6 +360,37 @@ export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective
             : filePath;
     const line = issue.location?.start?.line ?? 1;
     const ruleId = issue.rule;
+
+    const clarify = extractClarificationRequest(issue);
+    if (clarify) {
+        const question = (clarify.promptQuestion || issue.message || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const optKeys = (clarify.candidateOptions || [])
+            .map((o) => (typeof o === 'string' ? o : o.key))
+            .join(',');
+        const defKey =
+            clarify.defaultChoiceKey ||
+            (clarify.candidateOptions?.[0]
+                ? typeof clarify.candidateOptions[0] === 'string'
+                    ? clarify.candidateOptions[0]
+                    : clarify.candidateOptions[0].key
+                : 'default');
+        const renderedDirective = `[CLARIFY|${sev}|${ruleId}] ${file}:${line} -> ${question} ?opts=[${optKeys}] def=${defKey}`;
+
+        return {
+            severity: sev,
+            ruleId,
+            file,
+            line,
+            summary: question,
+            actionable: issue.actionable,
+            directiveType: 'CLARIFY',
+            clarificationRequest: clarify,
+            renderedDirective,
+        };
+    }
+
     const summary = (issue.message || '').replace(/\s+/g, ' ').trim();
     const fixHint = issue.suggestion ? issue.suggestion.replace(/\s+/g, ' ').trim() : undefined;
     const fixPart = fixHint ? ` Fix: ${fixHint}` : '';
@@ -357,6 +408,7 @@ export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective
         summary,
         fixHint,
         actionable,
+        directiveType: 'GUARD',
         renderedDirective,
     };
 }
@@ -366,17 +418,25 @@ export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective
  *
  * @param target - Active file or symbol scope identifier.
  * @param issues - Filtered findings for the target slice.
+ * @param protocolVersion - Optional explicit CAPP protocol version.
  * @returns CompactAgentPrompt ready for agent prompt injection.
  */
-export function formatCompactAgentPrompt(target: string, issues: Issue[]): CompactAgentPrompt {
+export function formatCompactAgentPrompt(
+    target: string,
+    issues: Issue[],
+    protocolVersion?: '1.0' | '2.0',
+): CompactAgentPrompt {
     const directives = issues.map(formatCompactGuardDirective);
     const hasBlock = directives.some((d) => d.severity === VERDICT_BLOCK);
     const hasWarn = directives.some((d) => d.severity === VERDICT_WARN);
     const verdict = hasBlock ? VERDICT_BLOCK : hasWarn ? VERDICT_WARN : VERDICT_PASS;
 
+    const hasClarify = directives.some((d) => d.directiveType === 'CLARIFY');
+    const version: '1.0' | '2.0' = protocolVersion ?? (hasClarify ? '2.0' : '1.0');
+
     const renderedDirectives = directives.map((d) => d.renderedDirective);
     const count = directives.length;
-    const header = `[CAPP:v1.0] ${target} -> ${verdict} (${count} directive${count === 1 ? '' : 's'})`;
+    const header = `[CAPP:v${version}] ${target} -> ${verdict} (${count} directive${count === 1 ? '' : 's'})`;
     const compactPromptText =
         count > 0 ? `${header}\n${renderedDirectives.join('\n')}` : `${header} (all clear)`;
 
@@ -392,7 +452,7 @@ export function formatCompactAgentPrompt(target: string, issues: Issue[]): Compa
             : Number((1 - compactChars / baselineEquivalentChars).toFixed(2));
 
     return {
-        protocolVersion: '1.0',
+        protocolVersion: version,
         target,
         verdict,
         directives,

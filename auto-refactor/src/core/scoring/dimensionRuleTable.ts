@@ -741,8 +741,9 @@ export const DIMENSION_RULES: DimensionRule[] = [
                 'SIM-GUARD-001',
                 'SIM-IMM-001',
                 'SIM-FLAT-002',
+                'SIM-ARGS-001',
             ],
-            ['ternary', 'boolean', 'condition', 'return', 'guard', 'function', 'else'],
+            ['ternary', 'boolean', 'condition', 'return', 'guard', 'function', 'else', 'parameter', 'argument'],
         ),
         dimension: DIMENSION_MAINTAINABILITY,
         points: DEDUCTION_SIMPLIFY_MAINTAINABILITY,
@@ -785,3 +786,27 @@ export const DIMENSION_RULES: DimensionRule[] = [
         rationale: ScoringRationales.GO_MODERNITY,
     },
 ];
+
+/**
+ * Fast analyzer-indexed lookup table partitioning DIMENSION_RULES to avoid O(N) full-table scans.
+ */
+const RULES_BY_ANALYZER = new Map<string, DimensionRule[]>();
+for (const rule of DIMENSION_RULES) {
+    let list = RULES_BY_ANALYZER.get(rule.analyzer);
+    if (!list) {
+        list = [];
+        RULES_BY_ANALYZER.set(rule.analyzer, list);
+    }
+    list.push(rule);
+}
+
+/**
+ * Returns the dimension rules mapped to a specific analyzer in O(1) time.
+ *
+ * @param analyzer - Target analyzer identifier.
+ * @returns Partitioned dimension rules array for that analyzer.
+ */
+export function getDimensionRulesForAnalyzer(analyzer: string): readonly DimensionRule[] {
+    return RULES_BY_ANALYZER.get(analyzer) ?? [];
+}
+

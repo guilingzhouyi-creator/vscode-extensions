@@ -26,6 +26,15 @@ import {
 } from '../core/architecture/naming-decoupling-auditor';
 import { auditPythonSourceHelper } from './naming-python-helper';
 import { auditFileAndDirectoryPaths, hasTransientJargon } from './naming-path-helper';
+import {
+    NamingMessages,
+    auditFunctionNameLengthsAndAbbreviations,
+    auditVariableNameLengthsAndAbbreviations,
+    auditMemberAbbreviation,
+    type NamingActionablePayload,
+} from './naming-candidate-helper';
+
+export { NamingMessages };
 
 /**
  * Tunable options for NamingAnalyzer.
@@ -41,6 +50,8 @@ export interface NamingOptions {
     checkCollections?: boolean;
     checkJargon?: boolean;
     checkDecoupling?: boolean;
+    checkLengths?: boolean;
+    checkAbbreviations?: boolean;
     vagueBlacklist?: string[];
     singleLetterAllowed?: string[];
 }
@@ -117,6 +128,7 @@ export class NamingAnalyzer implements Analyzer {
         severity: Severity,
         detail: Record<string, unknown>,
         suggestion?: string,
+        actionable?: NamingActionablePayload,
     ): Issue {
         return {
             id: `naming:${rule}:${ctx.filePath}:${line}`,
@@ -131,7 +143,56 @@ export class NamingAnalyzer implements Analyzer {
             },
             detail,
             suggestion,
+            actionable,
         };
+    }
+
+    private getSymbolIndex(ctx: AnalyzerContext): any {
+        return (ctx as any).symbolIndex || (ctx.options as any)?.symbolIndex;
+    }
+
+    private checkFunctionName(
+        name: string,
+        node: ts.Node,
+        pos: { line: number; character: number },
+        ctx: AnalyzerContext,
+        issues: Issue[],
+        opts: NamingOptions,
+    ): void {
+        auditFunctionNameLengthsAndAbbreviations(
+            name,
+            node,
+            pos,
+            ctx,
+            opts,
+            this.getSymbolIndex(ctx),
+            (line, column, rule, message, severity, detail, suggestion, actionable) => {
+                issues.push(this.mkIssue(ctx, line, column, rule, message, severity, detail, suggestion, actionable));
+            },
+        );
+    }
+
+    private checkVariableName(
+        name: string,
+        decl: ts.Node,
+        isTopLevel: boolean,
+        pos: { line: number; character: number },
+        ctx: AnalyzerContext,
+        issues: Issue[],
+        opts: NamingOptions,
+    ): void {
+        auditVariableNameLengthsAndAbbreviations(
+            name,
+            decl,
+            isTopLevel,
+            pos,
+            ctx,
+            opts,
+            this.getSymbolIndex(ctx),
+            (line, column, rule, message, severity, detail, suggestion, actionable) => {
+                issues.push(this.mkIssue(ctx, line, column, rule, message, severity, detail, suggestion, actionable));
+            },
+        );
     }
 
     private checkDecouplingSymbol(
@@ -259,6 +320,7 @@ export class NamingAnalyzer implements Analyzer {
                     !elem.propertyName ||
                     (ts.isIdentifier(elem.propertyName) && elem.propertyName.text === elemName);
                 if (!isPropertyMatch) {
+                    this.checkVariableName(elemName, elem, false, elemPos, ctx, issues, opts);
                     this.checkIdentifierVagueness(elemName, elemPos, vagueSet, ctx, issues, opts);
                 }
                 this.checkSingleLetter(elemName, elemPos, inLoop, singleAllowed, ctx, issues, opts);
@@ -287,6 +349,7 @@ export class NamingAnalyzer implements Analyzer {
                 this.checkTopLevelConstant(decl, name, pos, ctx, issues);
             }
 
+            this.checkVariableName(name, decl, isTopLevel, pos, ctx, issues, opts);
             this.checkIdentifierVagueness(name, pos, vagueSet, ctx, issues, opts);
             this.checkSingleLetter(name, pos, inLoop, singleAllowed, ctx, issues, opts);
             this.checkCollectionNaming(name, decl.initializer, pos, ctx, issues, opts);
@@ -428,6 +491,28 @@ export class NamingAnalyzer implements Analyzer {
                     ),
                 );
             }
+            if (ts.isMethodDeclaration(member)) {
+                this.checkFunctionName(memberName, member, pos, ctx, issues, opts);
+                for (const param of member.parameters) {
+                    if (ts.isIdentifier(param.name)) {
+                        const paramName = param.name.text;
+                        const pPos = sf.getLineAndCharacterOfPosition(param.name.getStart(sf));
+                        this.checkVariableName(paramName, param, false, pPos, ctx, issues, opts);
+                    }
+                }
+            } else {
+                auditMemberAbbreviation(
+                    memberName,
+                    member,
+                    pos,
+                    ctx,
+                    opts,
+                    this.getSymbolIndex(ctx),
+                    (line, column, rule, message, severity, detail, suggestion, actionable) => {
+                        issues.push(this.mkIssue(ctx, line, column, rule, message, severity, detail, suggestion, actionable));
+                    },
+                );
+            }
             if (opts.checkJargon !== false) {
                 this.checkSymbolJargon(memberName, pos, ctx, issues);
             }
@@ -452,6 +537,7 @@ export class NamingAnalyzer implements Analyzer {
             | ts.MethodDeclaration;
         if (ts.isFunctionDeclaration(node) && node.name) {
             const pos = sf.getLineAndCharacterOfPosition(node.name.getStart(sf));
+            this.checkFunctionName(node.name.text, node, pos, ctx, issues, opts);
             if (opts.checkJargon !== false) {
                 this.checkSymbolJargon(node.name.text, pos, ctx, issues);
             }
@@ -461,6 +547,7 @@ export class NamingAnalyzer implements Analyzer {
             if (ts.isIdentifier(param.name)) {
                 const paramName = param.name.text;
                 const pos = sf.getLineAndCharacterOfPosition(param.name.getStart(sf));
+                this.checkVariableName(paramName, param, false, pos, ctx, issues, opts);
                 this.checkIdentifierVagueness(paramName, pos, vagueSet, ctx, issues, opts);
                 this.checkSingleLetter(paramName, pos, false, singleAllowed, ctx, issues, opts);
                 if (opts.checkJargon !== false) {

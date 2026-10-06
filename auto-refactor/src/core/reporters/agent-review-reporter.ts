@@ -41,6 +41,13 @@ import type {
     AgentReviewerCrossCheckPoint,
     AgentDirectivesMetrics,
     AgentReviewDirectivesPayload,
+    AgentDirectiveTrack,
+    CrossFileCallSite,
+    CrossFileUsageContext,
+    ClarificationOption,
+    AgentClarificationRequest,
+    AgentStandardizationProposal,
+    AgentExactPatch,
 } from './agent-directives-types';
 
 export type {
@@ -57,6 +64,13 @@ export type {
     AgentReviewerCrossCheckPoint,
     AgentDirectivesMetrics,
     AgentReviewDirectivesPayload,
+    AgentDirectiveTrack,
+    CrossFileCallSite,
+    CrossFileUsageContext,
+    ClarificationOption,
+    AgentClarificationRequest,
+    AgentStandardizationProposal,
+    AgentExactPatch,
 };
 
 /** Formatting options for Agent review reporter */
@@ -144,6 +158,74 @@ function buildRemediationRecipe(issue: Issue): AgentRemediationRecipe {
     };
 }
 
+function extractIssueClarification(issue: Issue): AgentClarificationRequest | undefined {
+    const raw =
+        (issue as unknown as Record<string, unknown>).clarificationRequest ??
+        issue.detail?.clarificationRequest ??
+        (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
+    if (raw && typeof raw === 'object' && 'promptQuestion' in (raw as Record<string, unknown>)) {
+        return raw as AgentClarificationRequest;
+    }
+    return undefined;
+}
+
+function extractIssueCrossFileContext(
+    issue: Issue,
+    clarification?: AgentClarificationRequest,
+): CrossFileUsageContext | undefined {
+    const raw =
+        (issue as unknown as Record<string, unknown>).crossFileUsageContext ??
+        issue.detail?.crossFileUsageContext ??
+        (issue.actionable as unknown as Record<string, unknown> | undefined)?.crossFileUsageContext;
+    if (raw && typeof raw === 'object') {
+        return raw as CrossFileUsageContext;
+    }
+    return clarification?.crossFileUsageContext;
+}
+
+function extractIssueStandardizationProposal(
+    issue: Issue,
+    directiveId: string,
+): AgentStandardizationProposal | undefined {
+    const raw =
+        (issue as unknown as Record<string, unknown>).standardizationProposal ??
+        issue.detail?.standardizationProposal ??
+        (issue.actionable as unknown as Record<string, unknown> | undefined)?.standardizationProposal;
+    if (raw && typeof raw === 'object') {
+        return raw as AgentStandardizationProposal;
+    }
+    const act = issue.actionable;
+    if (act?.patch || act?.action) {
+        return {
+            proposalId: `PROP:${issue.id || directiveId}`,
+            ...(act.patch ? { exactPatch: act.patch } : {}),
+            ...(act.action ? { transformOperator: act.action } : {}),
+            ...(act.templateSnippet ? { afterSnippet: act.templateSnippet } : {}),
+        };
+    }
+    return undefined;
+}
+
+function resolveDirectiveTrack(
+    issue: Issue,
+    clarificationRequest?: AgentClarificationRequest,
+    standardizationProposal?: AgentStandardizationProposal,
+): AgentDirectiveTrack | undefined {
+    const explicit = (issue as unknown as Record<string, unknown>).directiveTrack as
+        | AgentDirectiveTrack
+        | undefined;
+    if (explicit === 'clarification_request' || explicit === 'standardization_proposal') {
+        return explicit;
+    }
+    if (clarificationRequest) {
+        return 'clarification_request';
+    }
+    if (standardizationProposal || issue.actionable) {
+        return 'standardization_proposal';
+    }
+    return undefined;
+}
+
 /**
  * Maps a single Issue into a strongly-typed AgentActionableDirective.
  *
@@ -174,6 +256,15 @@ function mapIssueToDirective(
     const verificationDirective = generateVerificationDirective(issue, topologyLayer, reportRoot);
     const directiveId = `${issue.analyzer || 'diag'}:${issue.rule}:${targetContext.filePath}:${targetContext.startLine}`;
 
+    const clarificationRequest = extractIssueClarification(issue);
+    const crossFileUsageContext = extractIssueCrossFileContext(issue, clarificationRequest);
+    const standardizationProposal = extractIssueStandardizationProposal(issue, directiveId);
+    const directiveTrack = resolveDirectiveTrack(
+        issue,
+        clarificationRequest,
+        standardizationProposal,
+    );
+
     return {
         directiveId,
         targetContext,
@@ -181,6 +272,10 @@ function mapIssueToDirective(
         immutableConstraints,
         remediationRecipe,
         verificationDirective,
+        ...(directiveTrack ? { directiveTrack } : {}),
+        ...(standardizationProposal ? { standardizationProposal } : {}),
+        ...(clarificationRequest ? { clarificationRequest } : {}),
+        ...(crossFileUsageContext ? { crossFileUsageContext } : {}),
     };
 }
 
@@ -225,20 +320,33 @@ export function toStructuredAgentDirectives(
         return a.targetContext.startLine - b.targetContext.startLine;
     });
 
-    const builderDirectives: AgentBuilderDirective[] = sortedDirectives.map((d, idx) => ({
-        directiveId: d.directiveId,
-        sequence: idx + 1,
-        topologyLayer: d.ruleContract.topologyLayer,
-        targetFile: d.targetContext.filePath,
-        line: d.targetContext.startLine,
-        action: d.remediationRecipe.actionVerb || 'refactor',
-        safeToAutomate: d.remediationRecipe.safeToAutomate,
-        instruction: d.remediationRecipe.remediationSummary,
-        ...(d.remediationRecipe.templateSnippet
-            ? { templateSnippet: d.remediationRecipe.templateSnippet }
-            : {}),
-        constraints: d.immutableConstraints.contractRules,
-    }));
+    const builderDirectives: AgentBuilderDirective[] = sortedDirectives.map((d, idx) => {
+        const hasClarify = Boolean(d.clarificationRequest);
+        const action = hasClarify
+            ? 'request_clarification'
+            : (d.remediationRecipe.actionVerb || 'refactor');
+        const safeToAutomate = hasClarify ? false : d.remediationRecipe.safeToAutomate;
+        const instruction = hasClarify && d.clarificationRequest
+            ? `[Awaiting Clarification] ${d.clarificationRequest.promptQuestion}`
+            : d.remediationRecipe.remediationSummary;
+
+        return {
+            directiveId: d.directiveId,
+            sequence: idx + 1,
+            topologyLayer: d.ruleContract.topologyLayer,
+            targetFile: d.targetContext.filePath,
+            line: d.targetContext.startLine,
+            action,
+            safeToAutomate,
+            instruction,
+            ...(d.remediationRecipe.templateSnippet
+                ? { templateSnippet: d.remediationRecipe.templateSnippet }
+                : {}),
+            constraints: d.immutableConstraints.contractRules,
+            ...(hasClarify ? { requiresClarification: true } : {}),
+            ...(d.clarificationRequest ? { clarificationRequest: d.clarificationRequest } : {}),
+        };
+    });
 
     const reviewerDirectives: AgentReviewerCrossCheckPoint[] = directives.map((d) => ({
         checkPointId: `CP-${d.directiveId}`,
@@ -303,6 +411,63 @@ export function toStructuredAgentDirectivesJson(
     return JSON.stringify(payload, null, 2);
 }
 
+function formatDirectiveClarification(
+    req: AgentClarificationRequest,
+): string[] {
+    const lines: string[] = [
+        '- Clarification Request:',
+        `  * Question: ${req.promptQuestion} (Type: \`${req.questionType}\`)`,
+    ];
+    if (req.candidateOptions && req.candidateOptions.length > 0) {
+        lines.push('  * Candidate Options:');
+        for (const opt of req.candidateOptions) {
+            const rec = opt.recommended ? ' (recommended)' : '';
+            const def = opt.key === req.defaultChoiceKey ? ' [default]' : '';
+            lines.push(`    - \`${opt.key}\`: ${opt.label}${rec}${def}`);
+        }
+    }
+    return lines;
+}
+
+function formatDirectiveCrossFileImpact(
+    ctx: CrossFileUsageContext,
+): string[] {
+    const lines: string[] = [
+        '- Cross-File Impact:',
+        `  * Exported: ${ctx.isExportedSymbol}, References: ${ctx.referenceCount}, Coordinated Rename: ${ctx.requiresCoordinatedRename}`,
+    ];
+    if (ctx.impactedFiles && ctx.impactedFiles.length > 0) {
+        lines.push(
+            `  * Impacted Files (${ctx.impactedFiles.length}): ${ctx.impactedFiles.join(', ')}`,
+        );
+    }
+    return lines;
+}
+
+function formatDirectiveRemediation(
+    recipe: AgentRemediationRecipe,
+    includeSnippets: boolean,
+): string[] {
+    const lines: string[] = [];
+    if (recipe.actionVerb) {
+        lines.push(
+            `- Action: \`${recipe.actionVerb}\` (Safe to automate: ${recipe.safeToAutomate})`,
+        );
+        if (recipe.taxonomy) {
+            lines.push(`- Taxonomy: \`${recipe.taxonomy}\``);
+        }
+        if (includeSnippets && recipe.templateSnippet) {
+            lines.push('- Remediation Template:');
+            lines.push('```');
+            lines.push(recipe.templateSnippet);
+            lines.push('```');
+        }
+    } else {
+        lines.push(`- Suggestion: ${recipe.remediationSummary}`);
+    }
+    return lines;
+}
+
 /**
  * Formats a single actionable directive into an agent markdown block.
  *
@@ -344,23 +509,19 @@ function formatAgentDirectiveBlock(
         }
     }
 
-    const recipe = directive.remediationRecipe;
-    if (recipe.actionVerb) {
-        lines.push(
-            `- Action: \`${recipe.actionVerb}\` (Safe to automate: ${recipe.safeToAutomate})`,
-        );
-        if (recipe.taxonomy) {
-            lines.push(`- Taxonomy: \`${recipe.taxonomy}\``);
-        }
-        if (includeSnippets && recipe.templateSnippet) {
-            lines.push('- Remediation Template:');
-            lines.push('```');
-            lines.push(recipe.templateSnippet);
-            lines.push('```');
-        }
-    } else {
-        lines.push(`- Suggestion: ${recipe.remediationSummary}`);
+    if (directive.directiveTrack) {
+        lines.push(`- Directive Track: \`${directive.directiveTrack}\``);
     }
+
+    if (directive.clarificationRequest) {
+        lines.push(...formatDirectiveClarification(directive.clarificationRequest));
+    }
+
+    if (directive.crossFileUsageContext) {
+        lines.push(...formatDirectiveCrossFileImpact(directive.crossFileUsageContext));
+    }
+
+    lines.push(...formatDirectiveRemediation(directive.remediationRecipe, includeSnippets));
 
     lines.push(`- Verification Directive: \`${directive.verificationDirective.command}\``);
     if (directive.verificationDirective.assertionCriteria.length > 0) {

@@ -170,29 +170,62 @@ function getOrCreateDomainModuleMap(
 function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQualityScore[] {
     const modules: ModuleQualityScore[] = [];
     for (const [moduleName, files] of modMap.entries()) {
-        const avgComposite = files.reduce((sum, f) => sum + f.compositeScore, 0) / files.length;
+        const count = files.length;
+        let sumComposite = 0;
+        const pillarSums: Record<PrimaryQualityPillar, number> = {
+            architecture: 0,
+            maintainability: 0,
+            performance: 0,
+            data: 0,
+            testing: 0,
+            reliability: 0,
+            security: 0,
+            extensibility: 0,
+        };
+        const dimSums: Record<QualityDimension, number> = {
+            architectureConsistency: 0,
+            semanticPurity: 0,
+            codeSecurity: 0,
+            performanceEfficiency: 0,
+            standardization: 0,
+            modernity: 0,
+            maintainability: 0,
+            commentQuality: 0,
+            duplication: 0,
+            techDebtRisk: 0,
+        };
+
+        for (let i = 0; i < count; i++) {
+            const f = files[i];
+            sumComposite += f.compositeScore;
+            for (const p of ALL_PRIMARY_PILLARS) {
+                pillarSums[p] += f.eightPillars.pillars[p];
+            }
+            for (const d of ALL_QUALITY_DIMENSIONS) {
+                dimSums[d] += f.tenDimensions?.[d] ?? 100;
+            }
+        }
+
         const pillars: Record<PrimaryQualityPillar, number> = {} as Record<
             PrimaryQualityPillar,
             number
         >;
         for (const p of ALL_PRIMARY_PILLARS) {
-            const avgP =
-                files.reduce((sum, f) => sum + f.eightPillars.pillars[p], 0) / files.length;
-            pillars[p] = Math.round(avgP * SCORE_ROUNDING) / SCORE_ROUNDING;
+            pillars[p] = Math.round((pillarSums[p] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
+
         const tenDimensions: Record<QualityDimension, number> = {} as Record<
             QualityDimension,
             number
         >;
         for (const d of ALL_QUALITY_DIMENSIONS) {
-            const avgD =
-                files.reduce((sum, f) => sum + (f.tenDimensions?.[d] ?? 100), 0) / files.length;
-            tenDimensions[d] = Math.round(avgD * SCORE_ROUNDING) / SCORE_ROUNDING;
+            tenDimensions[d] = Math.round((dimSums[d] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
+
         modules.push({
             moduleName,
-            fileCount: files.length,
-            compositeScore: Math.round(avgComposite * SCORE_ROUNDING) / SCORE_ROUNDING,
+            fileCount: count,
+            compositeScore: Math.round((sumComposite / count) * SCORE_ROUNDING) / SCORE_ROUNDING,
             pillars,
             tenDimensions,
             files,
@@ -210,25 +243,58 @@ function buildDomainScores(
     const domains: DomainQualityScore[] = [];
     for (const [domainName, modMap] of domainMap.entries()) {
         const modules = buildModuleScores(modMap);
-        const domainComposite =
-            modules.reduce((sum, m) => sum + m.compositeScore, 0) / modules.length;
+        const mCount = modules.length;
+        let sumComposite = 0;
+        const pillarSums: Record<PrimaryQualityPillar, number> = {
+            architecture: 0,
+            maintainability: 0,
+            performance: 0,
+            data: 0,
+            testing: 0,
+            reliability: 0,
+            security: 0,
+            extensibility: 0,
+        };
+        const dimSums: Record<QualityDimension, number> = {
+            architectureConsistency: 0,
+            semanticPurity: 0,
+            codeSecurity: 0,
+            performanceEfficiency: 0,
+            standardization: 0,
+            modernity: 0,
+            maintainability: 0,
+            commentQuality: 0,
+            duplication: 0,
+            techDebtRisk: 0,
+        };
+
+        for (let i = 0; i < mCount; i++) {
+            const m = modules[i];
+            sumComposite += m.compositeScore;
+            for (const p of ALL_PRIMARY_PILLARS) {
+                pillarSums[p] += m.pillars[p];
+            }
+            for (const d of ALL_QUALITY_DIMENSIONS) {
+                dimSums[d] += m.tenDimensions?.[d] ?? 100;
+            }
+        }
+
         const domainPillars: Record<PrimaryQualityPillar, number> = {} as Record<
             PrimaryQualityPillar,
             number
         >;
         for (const p of ALL_PRIMARY_PILLARS) {
-            const avgP = modules.reduce((sum, m) => sum + m.pillars[p], 0) / modules.length;
-            domainPillars[p] = Math.round(avgP * SCORE_ROUNDING) / SCORE_ROUNDING;
+            domainPillars[p] = Math.round((pillarSums[p] / mCount) * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
+
         const domainDims: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
         for (const d of ALL_QUALITY_DIMENSIONS) {
-            const avgD =
-                modules.reduce((sum, m) => sum + (m.tenDimensions?.[d] ?? 100), 0) / modules.length;
-            domainDims[d] = Math.round(avgD * SCORE_ROUNDING) / SCORE_ROUNDING;
+            domainDims[d] = Math.round((dimSums[d] / mCount) * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
+
         domains.push({
             domainName,
-            compositeScore: Math.round(domainComposite * SCORE_ROUNDING) / SCORE_ROUNDING,
+            compositeScore: Math.round((sumComposite / mCount) * SCORE_ROUNDING) / SCORE_ROUNDING,
             pillars: domainPillars,
             tenDimensions: domainDims,
             modules,
