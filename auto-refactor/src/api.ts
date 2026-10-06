@@ -882,3 +882,15 @@ export * from './core/evolution';
 
 // ---- Coverage Telemetry Ingestion & Dynamic Feedback ----
 export * from './core/telemetry';
+
+// ---- Praxis Unified Review Client SDK Facade & Contracts ----
+export { PraxisReviewClient, createPraxisClient, defaultPraxisReviewClient } from './core/praxis';
+export type {
+    IPraxisReviewClient,
+    PraxisClientConfig,
+    PraxisWorkspaceReviewOptions,
+    PraxisWorkspaceReviewVerdict,
+    PraxisFileReviewOptions,
+    PraxisFileReviewVerdict,
+    PraxisMergeGateVerdict,
+} from './core/praxis';

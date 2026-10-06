@@ -8,8 +8,8 @@
  *   1. Re-export dynamic contracts, telemetry ingestor, and dynamic quality scorers;
  *   2. Enforce runtime type validation for dynamic evidence payloads;
  *   3. Enforce immutability guarantees on dynamic evidence objects via Object.freeze.
- * Exit Semantics & Design Rationale: Bounded defensive validation throwing TypeError on invalid input;
- *   re-exports provide a stable architectural boundary.
+ * Exit Semantics & Design Rationale: Bounded defensive validation throwing TypeError
+ *   on invalid input; re-exports provide a stable architectural boundary.
  */
 
 import type { DynamicEvidenceDTO } from './dynamic-types';

@@ -4,20 +4,60 @@
  * Architecture Role: Dual-faced review serialization engine providing high-density CAPP
  *   directives for autonomous AI Agents, structured agent context blocks, and JSON payloads
  *   for Praxis frontend UI presentation.
- * Dependencies & Triggers: Consumes ScanReport, Issue from types, formatCompactAgentPrompt from
- *   guidance, and defaultPraxisPresentationService from praxis; invoked by CLI/API formatters.
+ * Dependencies & Triggers: Consumes ScanReport, Issue from types, formatCompactAgentPrompt and
+ *   constraint/verification generators from guidance, and defaultPraxisPresentationService
+ *   from praxis; invoked by CLI/API formatters.
  * Responsibilities:
  *   1. Serialize scan reports into CAPP 2.0 ultra-compact DSL format (toCapp).
  *   2. Serialize scan reports into agent-friendly structured prompt blocks (toAgentReview).
  *   3. Serialize scan reports into Praxis presentation JSON payloads (toPraxisPresentation).
- * Exit Semantics & Design Rationale: Pure, synchronous, non-throwing string formatting;
+ *   4. Serialize scan reports into strongly-typed multi-agent directives payload
+ *      (toStructuredAgentDirectives / toStructuredAgentDirectivesJson).
+ * Exit Semantics & Design Rationale: Pure, synchronous, non-throwing formatting;
  *   adheres to CC <= 10 and Depth <= 3 complexity budgets with zero side-effects.
  */
 
 import type { ScanReport, Issue } from '../types';
-import { formatCompactAgentPrompt } from '../guidance/agentConstraintGenerator';
+import {
+    formatCompactAgentPrompt,
+    extractAnchorCodeSlice,
+    resolveTopologyLayer,
+    generateImmutableConstraints,
+    generateVerificationDirective,
+} from '../guidance/agentConstraintGenerator';
 import { defaultPraxisPresentationService } from '../praxis/presentation/presentation-adapter';
 import type { PraxisPresentationOptions } from '../praxis/presentation/presentation-types';
+import type {
+    AgentDirectiveSeverity,
+    AgentTopologyLayer,
+    AgentTargetContext,
+    AgentRuleContract,
+    AgentImmutableConstraints,
+    AgentRemediationRecipe,
+    AgentVerificationDirective,
+    AgentActionableDirective,
+    AgentDirectiveEnvelope,
+    AgentBuilderDirective,
+    AgentReviewerCrossCheckPoint,
+    AgentDirectivesMetrics,
+    AgentReviewDirectivesPayload,
+} from './agent-directives-types';
+
+export type {
+    AgentDirectiveSeverity,
+    AgentTopologyLayer,
+    AgentTargetContext,
+    AgentRuleContract,
+    AgentImmutableConstraints,
+    AgentRemediationRecipe,
+    AgentVerificationDirective,
+    AgentActionableDirective,
+    AgentDirectiveEnvelope,
+    AgentBuilderDirective,
+    AgentReviewerCrossCheckPoint,
+    AgentDirectivesMetrics,
+    AgentReviewDirectivesPayload,
+};
 
 /** Formatting options for Agent review reporter */
 export interface AgentReviewReporterOptions {
@@ -25,9 +65,21 @@ export interface AgentReviewReporterOptions {
     readonly maxDirectives?: number;
     /** Whether to include actionable code snippets (defaults to true) */
     readonly includeSnippets?: boolean;
+    /** Base directory to resolve source files for anchor code context extraction */
+    readonly baseDir?: string;
+    /** Context line radius for anchor code slice (defaults to 2) */
+    readonly contextRadius?: number;
 }
 
 const DEFAULT_MAX_DIRECTIVES = 100;
+
+const TOPOLOGY_RANK: Record<AgentTopologyLayer, number> = {
+    L1_CONTRACT: 1,
+    L2_OPERATOR: 2,
+    L3_CONFIG: 3,
+    L4_PRESENTATION: 4,
+    L5_GOVERNANCE: 5,
+};
 
 /**
  * Resolves overall report diagnostic verdict.
@@ -45,36 +97,276 @@ function resolveOverallVerdict(report: ScanReport): 'BLOCK' | 'WARN' | 'PASS' {
     return 'PASS';
 }
 
+function resolveDirectiveSeverity(severity: string | undefined): AgentDirectiveSeverity {
+    if (severity === 'error') return 'BLOCK';
+    if (severity === 'warning') return 'WARN';
+    return 'INFO';
+}
+
+function buildTargetContext(
+    issue: Issue,
+    reportRoot: string,
+    options?: AgentReviewReporterOptions,
+): AgentTargetContext {
+    const file = issue.location?.file || 'unknown';
+    const startLine = issue.location?.start?.line ?? 1;
+    const endLine = issue.location?.end?.line ?? startLine;
+    const startColumn = issue.location?.start?.column;
+    const endColumn = issue.location?.end?.column;
+    const baseDir = options?.baseDir || reportRoot;
+    const radius = options?.contextRadius ?? 2;
+    const anchorCodeSlice = extractAnchorCodeSlice(file, startLine, endLine, baseDir, radius);
+
+    return {
+        filePath: file,
+        startLine,
+        endLine,
+        ...(startColumn !== undefined ? { startColumn } : {}),
+        ...(endColumn !== undefined ? { endColumn } : {}),
+        ...(anchorCodeSlice !== undefined ? { anchorCodeSlice } : {}),
+        ...(issue.actionable?.targetSymbol ? { targetSymbol: issue.actionable.targetSymbol } : {}),
+    };
+}
+
+function buildRemediationRecipe(issue: Issue): AgentRemediationRecipe {
+    const act = issue.actionable;
+    let remediationSummary = issue.suggestion;
+    if (!remediationSummary) {
+        remediationSummary = act ? `Apply standard ${act.action} remediation` : issue.message;
+    }
+
+    return {
+        remediationSummary,
+        ...(act?.templateSnippet ? { templateSnippet: act.templateSnippet } : {}),
+        safeToAutomate: act?.safeToAutomate ?? false,
+        ...(act?.action ? { actionVerb: act.action } : {}),
+        ...(act?.taxonomy ? { taxonomy: act.taxonomy } : {}),
+    };
+}
+
 /**
- * Formats a single issue into an agent markdown block.
+ * Maps a single Issue into a strongly-typed AgentActionableDirective.
  *
- * @param issue - Diagnostic issue
+ * @param issue - Diagnostic finding
+ * @param reportRoot - Audited root path
+ * @param options - Formatting options
+ * @returns Complete AgentActionableDirective
+ */
+function mapIssueToDirective(
+    issue: Issue,
+    reportRoot: string,
+    options?: AgentReviewReporterOptions,
+): AgentActionableDirective {
+    const targetContext = buildTargetContext(issue, reportRoot, options);
+    const topologyLayer = resolveTopologyLayer(issue.rule, targetContext.filePath);
+    const severity = resolveDirectiveSeverity(issue.severity);
+
+    const ruleContract: AgentRuleContract = {
+        ruleId: issue.rule,
+        severity,
+        topologyLayer,
+        rootCause: issue.message,
+        ...(issue.analyzer ? { analyzer: issue.analyzer } : {}),
+    };
+
+    const immutableConstraints = generateImmutableConstraints(issue, topologyLayer);
+    const remediationRecipe = buildRemediationRecipe(issue);
+    const verificationDirective = generateVerificationDirective(issue, topologyLayer, reportRoot);
+    const directiveId = `${issue.analyzer || 'diag'}:${issue.rule}:${targetContext.filePath}:${targetContext.startLine}`;
+
+    return {
+        directiveId,
+        targetContext,
+        ruleContract,
+        immutableConstraints,
+        remediationRecipe,
+        verificationDirective,
+    };
+}
+
+/**
+ * Transforms a ScanReport into a structured multi-agent collaborative directives payload.
+ *
+ * @param report - Complete scan report
+ * @param options - Formatting options
+ * @returns AgentReviewDirectivesPayload with envelopes, builder tasks, reviewer points,
+ *   and metrics
+ */
+export function toStructuredAgentDirectives(
+    report: ScanReport,
+    options?: AgentReviewReporterOptions,
+): AgentReviewDirectivesPayload {
+    const maxDirectives = options?.maxDirectives ?? DEFAULT_MAX_DIRECTIVES;
+    const targetRoot = report.root || 'workspace';
+    const issuesSlice = report.issues.slice(0, maxDirectives);
+
+    const directives: AgentActionableDirective[] = issuesSlice.map((issue) =>
+        mapIssueToDirective(issue, targetRoot, options),
+    );
+
+    const overallVerdict = resolveOverallVerdict(report);
+    const envelope: AgentDirectiveEnvelope = {
+        protocolVersion: '2.0',
+        envelopeId: `ENV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        generatedAt: report.generatedAt || new Date().toISOString(),
+        targetRoot,
+        overallVerdict,
+        directives,
+    };
+
+    // Topological sort for Builder Agents (L1 -> L2 -> L3 -> L4 -> L5)
+    const sortedDirectives = [...directives].sort((a, b) => {
+        const rankDiff =
+            TOPOLOGY_RANK[a.ruleContract.topologyLayer] -
+            TOPOLOGY_RANK[b.ruleContract.topologyLayer];
+        if (rankDiff !== 0) return rankDiff;
+        const fileDiff = a.targetContext.filePath.localeCompare(b.targetContext.filePath);
+        if (fileDiff !== 0) return fileDiff;
+        return a.targetContext.startLine - b.targetContext.startLine;
+    });
+
+    const builderDirectives: AgentBuilderDirective[] = sortedDirectives.map((d, idx) => ({
+        directiveId: d.directiveId,
+        sequence: idx + 1,
+        topologyLayer: d.ruleContract.topologyLayer,
+        targetFile: d.targetContext.filePath,
+        line: d.targetContext.startLine,
+        action: d.remediationRecipe.actionVerb || 'refactor',
+        safeToAutomate: d.remediationRecipe.safeToAutomate,
+        instruction: d.remediationRecipe.remediationSummary,
+        ...(d.remediationRecipe.templateSnippet
+            ? { templateSnippet: d.remediationRecipe.templateSnippet }
+            : {}),
+        constraints: d.immutableConstraints.contractRules,
+    }));
+
+    const reviewerDirectives: AgentReviewerCrossCheckPoint[] = directives.map((d) => ({
+        checkPointId: `CP-${d.directiveId}`,
+        targetFile: d.targetContext.filePath,
+        relatedRule: d.ruleContract.ruleId,
+        severity: d.ruleContract.severity,
+        verificationCommand: d.verificationDirective.command,
+        qualitativeAssertion: d.verificationDirective.assertionCriteria.join('; '),
+        topologyLayer: d.ruleContract.topologyLayer,
+    }));
+
+    const byTopologyLayer: Record<AgentTopologyLayer, number> = {
+        L1_CONTRACT: 0,
+        L2_OPERATOR: 0,
+        L3_CONFIG: 0,
+        L4_PRESENTATION: 0,
+        L5_GOVERNANCE: 0,
+    };
+    for (const d of directives) {
+        byTopologyLayer[d.ruleContract.topologyLayer]++;
+    }
+
+    const totalDirectives = directives.length;
+    const safeToAutomateCount = directives.filter((d) => d.remediationRecipe.safeToAutomate).length;
+    const automationRatio =
+        totalDirectives === 0 ? 1.0 : Number((safeToAutomateCount / totalDirectives).toFixed(2));
+    const affectedFilesCount = new Set(directives.map((d) => d.targetContext.filePath)).size;
+
+    const metrics: AgentDirectivesMetrics = {
+        totalDirectives,
+        bySeverity: {
+            block: directives.filter((d) => d.ruleContract.severity === 'BLOCK').length,
+            warn: directives.filter((d) => d.ruleContract.severity === 'WARN').length,
+            info: directives.filter((d) => d.ruleContract.severity === 'INFO').length,
+        },
+        byTopologyLayer,
+        safeToAutomateCount,
+        automationRatio,
+        affectedFilesCount,
+    };
+
+    return {
+        envelope,
+        builderDirectives,
+        reviewerDirectives,
+        metrics,
+    };
+}
+
+/**
+ * Transforms a ScanReport into a formatted JSON string of the multi-agent directives payload.
+ *
+ * @param report - Complete scan report
+ * @param options - Formatting options
+ * @returns JSON serialized AgentReviewDirectivesPayload
+ */
+export function toStructuredAgentDirectivesJson(
+    report: ScanReport,
+    options?: AgentReviewReporterOptions,
+): string {
+    const payload = toStructuredAgentDirectives(report, options);
+    return JSON.stringify(payload, null, 2);
+}
+
+/**
+ * Formats a single actionable directive into an agent markdown block.
+ *
+ * @param directive - Actionable directive
  * @param includeSnippets - Whether to include code snippets
  * @returns Rendered markdown lines
  */
-function formatAgentIssueBlock(issue: Issue, includeSnippets: boolean): string[] {
-    const sev = issue.severity.toUpperCase();
-    const file = issue.location?.file || 'unknown';
-    const line = issue.location?.start?.line ?? 1;
+function formatAgentDirectiveBlock(
+    directive: AgentActionableDirective,
+    includeSnippets: boolean,
+): string[] {
+    const sev =
+        directive.ruleContract.severity === 'BLOCK'
+            ? 'ERROR'
+            : directive.ruleContract.severity === 'WARN'
+              ? 'WARNING'
+              : 'INFO';
+    const file = directive.targetContext.filePath;
+    const line = directive.targetContext.startLine;
+    const col = directive.targetContext.startColumn;
+
     const lines: string[] = [
-        `### [${sev}|${issue.rule}] ${file}:${line}`,
-        `- Message: ${issue.message}`,
+        `### [${sev}|${directive.ruleContract.ruleId}] ${file}:${line}`,
+        `- Message: ${directive.ruleContract.rootCause}`,
+        `- Target Context: \`${file}:${line}${col !== undefined ? `:${col}` : ''}\` (Layer: \`${directive.ruleContract.topologyLayer}\`, Span: L${line}-L${directive.targetContext.endLine})`,
     ];
 
-    if (issue.actionable) {
-        const act = issue.actionable;
-        lines.push(`- Action: \`${act.action}\` (Safe to automate: ${act.safeToAutomate})`);
-        if (act.taxonomy) {
-            lines.push(`- Taxonomy: \`${act.taxonomy}\``);
+    if (directive.targetContext.anchorCodeSlice) {
+        lines.push('- Anchor Code Slice:');
+        lines.push('```');
+        lines.push(directive.targetContext.anchorCodeSlice);
+        lines.push('```');
+    }
+
+    if (directive.immutableConstraints.contractRules.length > 0) {
+        lines.push('- Immutable Constraints:');
+        for (const rule of directive.immutableConstraints.contractRules) {
+            lines.push(`  * ${rule}`);
         }
-        if (includeSnippets && act.templateSnippet) {
+    }
+
+    const recipe = directive.remediationRecipe;
+    if (recipe.actionVerb) {
+        lines.push(
+            `- Action: \`${recipe.actionVerb}\` (Safe to automate: ${recipe.safeToAutomate})`,
+        );
+        if (recipe.taxonomy) {
+            lines.push(`- Taxonomy: \`${recipe.taxonomy}\``);
+        }
+        if (includeSnippets && recipe.templateSnippet) {
             lines.push('- Remediation Template:');
             lines.push('```');
-            lines.push(act.templateSnippet);
+            lines.push(recipe.templateSnippet);
             lines.push('```');
         }
-    } else if (issue.suggestion) {
-        lines.push(`- Suggestion: ${issue.suggestion}`);
+    } else {
+        lines.push(`- Suggestion: ${recipe.remediationSummary}`);
+    }
+
+    lines.push(`- Verification Directive: \`${directive.verificationDirective.command}\``);
+    if (directive.verificationDirective.assertionCriteria.length > 0) {
+        lines.push(
+            `  * Assertion: ${directive.verificationDirective.assertionCriteria.join('; ')}`,
+        );
     }
 
     return lines;
@@ -106,12 +398,13 @@ export function toAgentReview(report: ScanReport, options?: AgentReviewReporterO
         return lines.join('\n');
     }
 
+    const payload = toStructuredAgentDirectives(report, options);
+
     lines.push('## Actionable Findings');
     lines.push('');
 
-    const slice = report.issues.slice(0, maxDirectives);
-    for (const issue of slice) {
-        const block = formatAgentIssueBlock(issue, includeSnippets);
+    for (const directive of payload.envelope.directives) {
+        const block = formatAgentDirectiveBlock(directive, includeSnippets);
         lines.push(...block);
         lines.push('');
     }
@@ -121,6 +414,16 @@ export function toAgentReview(report: ScanReport, options?: AgentReviewReporterO
         lines.push(`*Note: ${remaining} additional findings omitted for token conservation.*`);
         lines.push('');
     }
+
+    lines.push('## Multi-Agent Execution Plan');
+    lines.push(
+        `- Builder Directives: ${payload.builderDirectives.length} tasks ordered topologically (L1_CONTRACT -> L5_GOVERNANCE)`,
+    );
+    lines.push(`- Reviewer Checkpoints: ${payload.reviewerDirectives.length} cross-check points`);
+    lines.push(
+        `- Automation Feasibility: ${payload.metrics.safeToAutomateCount}/${payload.metrics.totalDirectives} directives (${Math.round(payload.metrics.automationRatio * 100)}%) safe for autonomous application`,
+    );
+    lines.push('');
 
     lines.push('## Recommended Verification');
     lines.push('Execute localized verification suite to confirm invariant satisfaction.');

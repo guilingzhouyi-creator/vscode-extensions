@@ -8,8 +8,8 @@
  *   1. Re-export GitHistoryMiner and CodeEvolutionAnalyzer with all core contracts;
  *   2. Validate runtime shapes of CodeEvolutionMetrics;
  *   3. Provide frozen default metrics for fallback or unversioned files.
- * Exit Semantics & Design Rationale: Clean defensive validation throwing TypeError on invalid input;
- *   immutability guarantees via Object.freeze.
+ * Exit Semantics & Design Rationale: Clean defensive validation throwing TypeError
+ *   on invalid input; immutability guarantees via Object.freeze.
  */
 
 import type { CodeEvolutionMetrics } from './code-evolution-analyzer';
@@ -23,7 +23,9 @@ export * from './code-evolution-analyzer';
  * @param metrics - Candidate metrics object to validate.
  * @throws TypeError if metrics is not an object or lacks required attributes.
  */
-export function assertValidEvolutionMetrics(metrics: unknown): asserts metrics is CodeEvolutionMetrics {
+export function assertValidEvolutionMetrics(
+    metrics: unknown,
+): asserts metrics is CodeEvolutionMetrics {
     if (!metrics || typeof metrics !== 'object') {
         throw new TypeError('CodeEvolutionMetrics must be a non-null object');
     }
@@ -31,7 +33,10 @@ export function assertValidEvolutionMetrics(metrics: unknown): asserts metrics i
     if (typeof candidate.filePath !== 'string' || candidate.filePath.length === 0) {
         throw new TypeError('CodeEvolutionMetrics.filePath must be a non-empty string');
     }
-    if (typeof candidate.vulnerabilityMultiplier !== 'number' || Number.isNaN(candidate.vulnerabilityMultiplier)) {
+    if (
+        typeof candidate.vulnerabilityMultiplier !== 'number' ||
+        Number.isNaN(candidate.vulnerabilityMultiplier)
+    ) {
         throw new TypeError('CodeEvolutionMetrics.vulnerabilityMultiplier must be a valid number');
     }
 }
@@ -42,7 +47,9 @@ export function assertValidEvolutionMetrics(metrics: unknown): asserts metrics i
  * @param metrics - Mutable code evolution metrics.
  * @returns Frozen CodeEvolutionMetrics record.
  */
-export function freezeEvolutionMetrics(metrics: CodeEvolutionMetrics): Readonly<CodeEvolutionMetrics> {
+export function freezeEvolutionMetrics(
+    metrics: CodeEvolutionMetrics,
+): Readonly<CodeEvolutionMetrics> {
     assertValidEvolutionMetrics(metrics);
     if (metrics.actionableProposal) {
         Object.freeze(metrics.actionableProposal);

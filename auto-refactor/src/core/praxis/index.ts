@@ -23,3 +23,5 @@ export * from './sliceAuditService';
 export * from './trajectoryLearningService';
 export * from './presentation';
 export * from './feedback-adaptive-supervisor';
+export * from './client';
+export * from './praxis-review-client';

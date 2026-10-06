@@ -35,6 +35,15 @@ import { defaultTestModernityEvaluator, isTestFilePath } from '../intelligence/t
 import { defaultSemanticAdapterRegistry } from '../semantic/adapters/registry';
 import { defaultMetaArchitectureEvaluator, SemanticArchitectureGraph } from '../architecture';
 import { evaluatePatchQuality, type PatchQualityResult } from '../scoring/patchQuality';
+import { computeDetailedHunks } from '../diff/edit-diff';
+import {
+    buildThreeTierTopologicalDiff,
+    formatUnifiedDiff,
+    toAgentUnifiedPatch,
+    type ThreeTierTopologicalDiff,
+} from './diff-topology';
+
+export * from './diff-topology';
 
 /**
  * Options configuring the Praxis diff governance execution.
@@ -85,6 +94,10 @@ export interface PraxisDiffGovernanceResult {
     patchQuality?: PatchQualityResult;
     /** Delta score resulting from this diff */
     deltaScore?: number;
+    /** Three-Tier Topological Diff adhering to blueprint §2.1 */
+    topologicalDiff?: ThreeTierTopologicalDiff;
+    /** Standard unified diff patch consumable by git apply or autonomous agents */
+    unifiedPatch?: string;
 }
 
 /**
@@ -155,11 +168,11 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
         input: DiffInput,
         options: PraxisGovernanceOptions = {},
     ): Promise<PraxisDiffGovernanceResult> {
-        const filePath = input.filePath;
+        const filePath = input.filePath || 'workspace';
         const newContent = input.newContent;
         const graph = options.graph || new SemanticGraph();
 
-        if (newContent) {
+        if (newContent && input.filePath) {
             defaultSemanticAdapterRegistry.extractFileToGraph(filePath, newContent, graph);
         }
 
@@ -206,6 +219,32 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
         }
         const affectedFiles = this.computeAggregatedImpact(enrichedHunks);
 
+        const topologicalDiff = buildThreeTierTopologicalDiff({
+            filePath,
+            oldContent: input.oldContent,
+            newContent,
+            hunks: enrichedHunks,
+            issues,
+            graph,
+            impactFiles: affectedFiles,
+        });
+
+        const unifiedPatch =
+            input.oldContent !== undefined && newContent !== undefined
+                ? formatUnifiedDiff(input.oldContent, newContent, filePath)
+                : toAgentUnifiedPatch(enrichedHunks, filePath);
+
+        if (topologicalDiff.layer3.shouldEscalateToL3A && !verdict.shouldEscalateToL3A) {
+            verdict = {
+                ...verdict,
+                shouldEscalateToL3A: true,
+                violations: [
+                    ...(verdict.violations || []),
+                    ...topologicalDiff.layer3.escalationReasons,
+                ],
+            };
+        }
+
         return {
             hunks: enrichedHunks,
             issues,
@@ -218,6 +257,8 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
             // deltaScore is null when either side of the patch was not measured; the
             // optional field carries that as "no value" rather than coercing to zero.
             deltaScore: patchQuality?.deltaScore ?? undefined,
+            topologicalDiff,
+            unifiedPatch,
         };
     }
 
@@ -357,6 +398,15 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
      * Converts DiffInput into baseline ReviewDiffHunk structures.
      */
     private buildInitialHunks(input: DiffInput): ReviewDiffHunk[] {
+        if (input.oldContent !== undefined && input.newContent !== undefined) {
+            const computed = computeDetailedHunks(input.oldContent, input.newContent);
+            if (computed.length > 0) {
+                return computed;
+            }
+            if (input.oldContent === input.newContent) {
+                return [];
+            }
+        }
         const lines = (input.newContent || '').split(/\r?\n/);
         return [
             {

@@ -75,6 +75,7 @@
 | [docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md](./docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md) | Praxis 对接架构全景、核心数据契约（`PraxisCardContext` / `ReviewDiffHunk`）与五大 SPI 扩展插槽手册 | ✅ 已交付 |
 | [docs/06-praxis-delivery/02-praxis-six-governance-services-api.md](./docs/06-praxis-delivery/02-praxis-six-governance-services-api.md) | Praxis 六大核心治理服务门面（Diff、Slice、MultiAgent、Trajectory、FeedbackSupervisor、Rollback）API 手册 | ✅ 已交付 |
 | [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | Praxis 团队端到端 TypeScript 联调代码范例、异常降级 SLA 与自动化验收矩阵 | ✅ 已交付 |
+| [docs/praxis-integration-guide.md](./docs/praxis-integration-guide.md) | **Praxis 统一客户端 SDK (IPraxisReviewClient)、一体两面三层拓扑 Diff 与面向 Agent 结构化指令集成手册** | ✅ 已交付 |
 
 ### 📐 架构图表 (`docs/diagrams/`)
 

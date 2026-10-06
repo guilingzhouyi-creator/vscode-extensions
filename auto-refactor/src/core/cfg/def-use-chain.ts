@@ -252,7 +252,10 @@ export class DefUseAnalyzer {
         const uses = DefUseAnalyzer.extractUses(cfg);
         const floatingPromises = DefUseAnalyzer.collectFloatingPromises(cfg);
         const protectedVars = DefUseAnalyzer.collectProtectedVars(cfg);
-        const unguardedDereferences = DefUseAnalyzer.collectUnguardedDereferences(cfg, protectedVars);
+        const unguardedDereferences = DefUseAnalyzer.collectUnguardedDereferences(
+            cfg,
+            protectedVars,
+        );
         const unclosedResources = DefUseAnalyzer.collectUnclosedResources(cfg, defs, uses);
 
         return {

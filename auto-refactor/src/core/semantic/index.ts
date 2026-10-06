@@ -8,8 +8,8 @@
  *   1. Single point of export for semantic topology models;
  *   2. Validate runtime shapes of SemanticNode instances;
  *   3. Enforce immutability on NodeCoordinate records via Object.freeze.
- * Exit Semantics & Design Rationale: Clean defensive validation throwing TypeError on invalid input;
- *   Object.freeze immutability prevents coordinate tampering.
+ * Exit Semantics & Design Rationale: Clean defensive validation throwing TypeError
+ *   on invalid input; Object.freeze immutability prevents coordinate tampering.
  */
 
 import type { NodeCoordinate, SemanticNode } from './types';

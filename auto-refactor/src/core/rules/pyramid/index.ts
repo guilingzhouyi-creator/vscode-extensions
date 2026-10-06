@@ -2,14 +2,15 @@
  * Module: Core Engine — Rule Pyramid Subsystem Index & Substantive Facade
  * File Path: src/core/rules/pyramid/index.ts
  * Architecture Role: Central facade for the three-tier rule pyramid subsystem;
- *   re-exports rule hierarchy models and evaluators, validates rule layers, and guarantees immutability.
+ *   re-exports rule hierarchy models and evaluators, validates rule layers,
+ *   and guarantees immutability.
  * Dependencies & Triggers: Re-exports ./types, ./layer1Evaluator, and ./performanceRules.
  * Responsibilities:
  *   1. Single point of export for the universal rule pyramid;
  *   2. Validate runtime RuleLayer discriminator values;
  *   3. Enforce immutability on UniversalEvaluationContext via Object.freeze.
- * Exit Semantics & Design Rationale: Bounded defensive validation throwing TypeError on invalid input;
- *   Object.freeze immutability prevents evaluation context mutation.
+ * Exit Semantics & Design Rationale: Bounded defensive validation throwing TypeError
+ *   on invalid input; Object.freeze immutability prevents evaluation context mutation.
  */
 
 import {

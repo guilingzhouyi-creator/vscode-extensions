@@ -20,6 +20,11 @@ import type { ReviewMemoryRecord, CodeDomainFingerprint } from '../memory/types'
 import type { FileChangeTrajectory } from '../trajectory/types';
 import type { Issue, AgentActionablePayload } from '../types';
 import { GuidanceMessages } from '../messages';
+import type {
+    AgentTopologyLayer,
+    AgentImmutableConstraints,
+    AgentVerificationDirective,
+} from '../reporters/agent-directives-types';
 
 /** Maximum number of memory rule hits rendered as frequent violations in the guidance prompt. */
 const MAX_MEMORY_RULE_HITS = 5;
@@ -395,5 +400,273 @@ export function formatCompactAgentPrompt(target: string, issues: Issue[]): Compa
         compactPromptText,
         estimatedTokens,
         tokenSavingsRatio,
+    };
+}
+
+/**
+ * Safely format code lines into an anchor slice with surrounding context.
+ *
+ * @param content - Source file content string.
+ * @param startLine - 1-indexed starting line.
+ * @param endLine - 1-indexed ending line.
+ * @param radius - Number of surrounding context lines.
+ * @returns Formatted code anchor slice or undefined.
+ */
+export function formatAnchorSlice(
+    content: string,
+    startLine: number,
+    endLine: number,
+    radius = 2,
+): string | undefined {
+    if (!content) {
+        return undefined;
+    }
+    const lines = content.split(/\r?\n/);
+    const fromLine = Math.max(1, startLine - radius);
+    const toLine = Math.min(lines.length, endLine + radius);
+    if (fromLine > toLine) {
+        return undefined;
+    }
+    const slice: string[] = [];
+    for (let l = fromLine; l <= toLine; l++) {
+        const isTarget = l >= startLine && l <= endLine;
+        const prefix = isTarget ? '> ' : '  ';
+        slice.push(`${prefix}${l} | ${lines[l - 1]}`);
+    }
+    return slice.join('\n');
+}
+
+/**
+ * Extract anchor code slice with surrounding context lines.
+ *
+ * @param filePath - Repository-relative or absolute file path.
+ * @param startLine - 1-indexed starting line.
+ * @param endLine - 1-indexed ending line.
+ * @param baseDir - Optional base directory to resolve relative paths.
+ * @param radius - Number of surrounding context lines (defaults to 2).
+ * @param sourceContent - Optional in-memory source content.
+ * @returns Formatted code anchor slice or undefined if unreadable.
+ */
+export function extractAnchorCodeSlice(
+    filePath: string,
+    startLine: number,
+    endLine: number,
+    baseDir?: string,
+    radius = 2,
+    sourceContent?: string,
+): string | undefined {
+    if (!filePath || filePath === 'unknown' || !sourceContent) {
+        return undefined;
+    }
+    return formatAnchorSlice(sourceContent, startLine, endLine, radius);
+}
+
+const L1_RULE_RE = /^(?:ARCH-(?:FAC|ABS)|NUM-PREC|TYPE-|CONTRACT-)/;
+const L1_PATH_RE = /(?:types?(\.d)?\.ts$|\/types\/|\.schema\.json$)/;
+const L2_RULE_RE =
+    /^(?:ADV-(?:CMP|PRF)|CPX-|PRF-|HIGH-COMPLEXITY$|MAGIC-NUMBER$|DUPLICATE-LITERAL$|NESTED-LOOPS$)/;
+const L2_PATH_RE = /(?:\/operators\/|\/ast\/)/;
+const L3_RULE_RE = /^(?:ADV-CFG|CFG-|RCFG-)/;
+const L3_PATH_RE = /(?:\/config\/|\.config\.json$)/;
+const L4_RULE_RE = /^(?:UI-|PRES-|FE-)/;
+const L4_PATH_RE = /(?:\/reporters\/|\/presentation\/|\/views\/)/;
+
+/**
+ * Resolve architectural topology layer for deterministic ordering of refactoring batches.
+ *
+ * @param rule - Diagnostic rule identifier.
+ * @param filePath - Target file path.
+ * @returns One of the five architectural layers (L1 to L5).
+ */
+export function resolveTopologyLayer(rule: string, filePath?: string): AgentTopologyLayer {
+    const r = (rule || '').toUpperCase();
+    const p = (filePath || '').replace(/\\/g, '/').toLowerCase();
+
+    if (L1_RULE_RE.test(r) || L1_PATH_RE.test(p)) {
+        return 'L1_CONTRACT';
+    }
+    if (L2_RULE_RE.test(r) || L2_PATH_RE.test(p)) {
+        return 'L2_OPERATOR';
+    }
+    if (L3_RULE_RE.test(r) || L3_PATH_RE.test(p)) {
+        return 'L3_CONFIG';
+    }
+    if (L4_RULE_RE.test(r) || L4_PATH_RE.test(p)) {
+        return 'L4_PRESENTATION';
+    }
+    return 'L5_GOVERNANCE';
+}
+
+const PURITY_MSG_RE = /(?:pure|precision)/;
+const ZERO_HEAP_RULE_RE = /(?:PRF-MEM|ADV-PRF|CPX-SPACE-001)/;
+const ZERO_HEAP_MSG_RE = /(?:loop|allocation)/;
+const IMMUTABLE_MSG_RE = /(?:immutable|freeze)/;
+
+function isPurityRequired(layer: AgentTopologyLayer, msg: string): boolean {
+    return layer === 'L1_CONTRACT' || layer === 'L2_OPERATOR' || PURITY_MSG_RE.test(msg);
+}
+
+function isZeroHeapRequired(rule: string, layer: AgentTopologyLayer, msg: string): boolean {
+    return layer === 'L2_OPERATOR' || ZERO_HEAP_RULE_RE.test(rule) || ZERO_HEAP_MSG_RE.test(msg);
+}
+
+function isImmutableRequired(rule: string, layer: AgentTopologyLayer, msg: string): boolean {
+    return (
+        layer === 'L1_CONTRACT' ||
+        layer === 'L3_CONFIG' ||
+        rule === 'ARCH-FAC-001' ||
+        IMMUTABLE_MSG_RE.test(msg)
+    );
+}
+
+function buildContractRulesList(flags: {
+    zeroHeapAllocationInLoop: boolean;
+    preservesPurity: boolean;
+    immutableStateSnapshot: boolean;
+    noExternalSideEffects: boolean;
+}): string[] {
+    const rules: string[] = [
+        'ELOC <= 900, LOC <= 1400 (GATE-AST-001 dual-track volume budget)',
+        'CC <= 15, Depth <= 4 (AST localized control flow envelope)',
+    ];
+    if (flags.zeroHeapAllocationInLoop) {
+        rules.push(
+            'Zero transient heap allocation in hot loop bodies (PRF-MEM-002 / CPX-SPACE-001)',
+        );
+    }
+    if (flags.preservesPurity) {
+        rules.push('Preserve function purity and deterministic return values without side effects');
+    }
+    if (flags.immutableStateSnapshot) {
+        rules.push(
+            'Enforce immutable state snapshots via Object.freeze or deep freeze (ARCH-FAC-001)',
+        );
+    }
+    if (flags.noExternalSideEffects) {
+        rules.push(
+            'Prohibit introduction of unsolicited external dependencies or global state mutation',
+        );
+    }
+    return rules;
+}
+
+/**
+ * Generate immutable engineering constraints for a diagnostic finding.
+ *
+ * @param issue - Diagnostic finding.
+ * @param layer - Architectural topology layer.
+ * @returns Structured AgentImmutableConstraints contract.
+ */
+export function generateImmutableConstraints(
+    issue: Issue,
+    layer: AgentTopologyLayer,
+): AgentImmutableConstraints {
+    const rule = (issue.rule || '').toUpperCase();
+    const msg = (issue.message || '').toLowerCase();
+
+    const preservesPurity = isPurityRequired(layer, msg);
+    const zeroHeapAllocationInLoop = isZeroHeapRequired(rule, layer, msg);
+    const immutableStateSnapshot = isImmutableRequired(rule, layer, msg);
+    const elocBudgetConstraint = true;
+    const noExternalSideEffects =
+        layer === 'L1_CONTRACT' || layer === 'L2_OPERATOR' || layer === 'L5_GOVERNANCE';
+
+    const contractRules = buildContractRulesList({
+        zeroHeapAllocationInLoop,
+        preservesPurity,
+        immutableStateSnapshot,
+        noExternalSideEffects,
+    });
+
+    return {
+        preservesPurity,
+        zeroHeapAllocationInLoop,
+        immutableStateSnapshot,
+        elocBudgetConstraint,
+        noExternalSideEffects,
+        contractRules,
+    };
+}
+
+/**
+ * Generate targeted verification directive recommending exact qualitative test or gate commands.
+ *
+ * @param issue - Diagnostic finding.
+ * @param _layer - Architectural topology layer.
+ * @param _targetRoot - Workspace or repository root path.
+ * @returns Precise AgentVerificationDirective.
+ */
+export function generateVerificationDirective(
+    issue: Issue,
+    _layer: AgentTopologyLayer,
+    _targetRoot?: string,
+): AgentVerificationDirective {
+    const file = (issue.location?.file || '').replace(/\\/g, '/');
+    const rule = (issue.rule || '').toUpperCase();
+
+    if (file.endsWith('.gd')) {
+        return {
+            command: 'pwsh scripts/ps1/check-gdscript.ps1',
+            description: 'Static GDScript syntax, typing, and architectural rule verification.',
+            assertionCriteria: [
+                'Ensure strict typing on all function arguments and return types',
+                'Verify zero transient heap allocation in hot processing loops',
+            ],
+        };
+    }
+
+    if (rule === 'ARCH-FAC-001' || rule === 'ARCH-ABS-001') {
+        return {
+            command: 'node scripts/validate-facade-governance.js',
+            description:
+                'Facade discipline validation checking ELOC budget and trampoline elimination.',
+            assertionCriteria: [
+                'Ensure facade entry satisfies ELOC >= 15 or immutable freeze guarantee',
+                'Verify elimination of single-target pass-through trampolines',
+            ],
+        };
+    }
+
+    if (rule === 'NUM-PREC-001' || rule === 'TST-FLT-001') {
+        return {
+            command: 'node scripts/validate-dual-faced-presentation.js',
+            description: 'Dual-faced presentation and numeric precision governance verification.',
+            assertionCriteria: [
+                'Verify floating point tolerance assertion matches expected epsilon',
+                'Confirm numeric rounding produces non-lossy 0.01 precision',
+            ],
+        };
+    }
+
+    if (rule === 'HIGH-COMPLEXITY' || rule.startsWith('CPX-') || rule.startsWith('ADV-CMP')) {
+        return {
+            command: 'node scripts/common/evaluate-eloc-budget.js',
+            description: 'AST slice budget and cyclomatic complexity verification.',
+            assertionCriteria: [
+                'Confirm function cyclomatic complexity CC <= 15',
+                'Ensure control flow nesting depth Depth <= 4 with guard returns',
+            ],
+        };
+    }
+
+    if (rule.startsWith('GOV-SAN') || rule.startsWith('CMG-')) {
+        return {
+            command: 'node scripts/validate-governance-exemptions.js',
+            description:
+                'Technical prose hygiene validation checking promotional or hyperbolic phrases.',
+            assertionCriteria: [
+                'Confirm removal of non-objective or promotional phrases',
+                'Ensure purely technical, verifiable factual statements',
+            ],
+        };
+    }
+
+    return {
+        command: 'npm test',
+        description: `Execute test verification ensuring rule invariant satisfaction for ${issue.rule}.`,
+        assertionCriteria: [
+            `Verify static analysis invariant satisfaction for rule ${issue.rule}`,
+            'Ensure zero functional regression across existing test suites',
+        ],
     };
 }
