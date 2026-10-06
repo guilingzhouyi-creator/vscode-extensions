@@ -137,7 +137,7 @@ function inspectLoopBody(
  * @param fnNode - Function node being visited.
  * @param fnSymbol - Display name of the function.
  * @param filePath - File the function belongs to.
- * @param content - Raw file content.
+ * @param contentOrLines - Raw file content or pre-split lines.
  * @param masked - Masked lines of the same file.
  * @returns One site per detected loop header.
  */
@@ -145,10 +145,12 @@ export function findLoopSitesInFunction(
     fnNode: NormalizedNode,
     fnSymbol: string,
     filePath: string,
-    content: string,
+    contentOrLines: string | string[],
     masked: string[],
 ): LoopSite[] {
-    const lines = content.split('\n');
+    const lines = Array.isArray(contentOrLines)
+        ? contentOrLines
+        : (contentOrLines ? contentOrLines.split('\n') : []);
     const sites: LoopSite[] = [];
     const startLine = fnNode.start?.line ?? 1;
     const endLine = fnNode.end?.line ?? lines.length;

@@ -33,17 +33,30 @@ const PY_IMPORT_RE = /^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0
 const RUST_USE_RE = /^\s*use\s+([A-Za-z0-9_:]+)/;
 const GDSCRIPT_IMPORT_RE = /(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)/;
 
+/** Patterns detecting function or class declarations across indentation-based languages (CPX-SPACE-001). */
+const PY_DECL_RE = /^\s*(?:def|class)\s+[A-Za-z0-9_]+/;
+const GDSCRIPT_DECL_RE = /^\s*func\s+[A-Za-z0-9_]+/;
+const RUST_DECL_RE = /^\s*(?:pub\s+)?(?:async\s+)?fn\s+[A-Za-z0-9_]+/;
+const TS_IMPORT_RE =
+    /^\s*(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|const\s+.*=\s*require\()['"]([^'"]+)['"]/;
+const TS_WILDCARD_RE = /\b(?:import\s+\*\s+as|import\s+\*)/;
+
 /**
  * Analyzer enforcing file layout, import discipline, and external resource management.
  */
 export class DependencyLayoutAnalyzer implements Analyzer {
     name = 'dependency-layout' as const;
 
+    /** Cached split lines of current file under analysis to eliminate repeated full-file splits. */
+    private fileLines: string[] = [];
+
     analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         const options = (ctx.config.analyzers['dependency-layout']?.options ||
             {}) as DependencyLayoutOptions;
         const normPath = ctx.filePath.replace(/\\/g, '/');
         const language = inferLanguageFromPath(normPath);
+
+        this.fileLines = ctx.content ? ctx.content.split('\n') : [];
 
         const imports: ImportStatementInfo[] = [];
         const resources: ExternalResourceRef[] = [];
@@ -74,7 +87,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
         const rawText = node.getText(sf).trim();
         const category = categorizeImport(specifier, 'typescript');
-        const surroundingText = this.getSurroundingText(ctx.content, line);
+        const surroundingText = this.getSurroundingText(this.fileLines, line);
         const exemption = extractExemptionReason(surroundingText, options?.lazyImportExemptMarkers);
 
         return {
@@ -129,7 +142,9 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         imports: ImportStatementInfo[],
         options?: DependencyLayoutOptions,
     ): void {
-        const lines = ctx.content.split('\n');
+        const lines = this.fileLines.length > 0
+            ? this.fileLines
+            : (ctx.content ? ctx.content.split('\n') : []);
         let inFunction = false;
         let functionIndent = 0;
 
@@ -178,7 +193,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             return checkIndentFunctionState(
                 line,
                 trimmed,
-                /^\s*(?:def|class)\s+[A-Za-z0-9_]+/,
+                PY_DECL_RE,
                 currentIndent,
                 inFunction,
                 functionIndent,
@@ -188,7 +203,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             return checkIndentFunctionState(
                 line,
                 trimmed,
-                /^\s*func\s+[A-Za-z0-9_]+/,
+                GDSCRIPT_DECL_RE,
                 currentIndent,
                 inFunction,
                 functionIndent,
@@ -245,7 +260,9 @@ export class DependencyLayoutAnalyzer implements Analyzer {
     }
 
     private extractRemoteResources(ctx: AnalyzerContext, resources: ExternalResourceRef[]): void {
-        const lines = ctx.content.split('\n');
+        const lines = this.fileLines.length > 0
+            ? this.fileLines
+            : (ctx.content ? ctx.content.split('\n') : []);
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const lineNum = i + 1;
@@ -272,8 +289,10 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         }
     }
 
-    private getSurroundingText(content: string, line: number): string {
-        const lines = content.split('\n');
+    private getSurroundingText(contentOrLines: string | string[], line: number): string {
+        const lines = Array.isArray(contentOrLines)
+            ? contentOrLines
+            : (contentOrLines ? contentOrLines.split('\n') : this.fileLines);
         const prev = lines[line - 2] || '';
         const current = lines[line - 1] || '';
         const next = lines[line] || '';
@@ -369,7 +388,7 @@ function checkRustFunctionState(
     trimmed: string,
     inFunction: boolean,
 ): { inFunction: boolean; functionIndent: number } {
-    if (/^\s*(?:pub\s+)?(?:async\s+)?fn\s+[A-Za-z0-9_]+/.test(line)) {
+    if (RUST_DECL_RE.test(line)) {
         return { inFunction: true, functionIndent: 0 };
     }
     if (inFunction && trimmed === '}') {
@@ -463,13 +482,11 @@ function parseTsLineImport(
     filePath: string,
     lineNum: number,
 ): ImportStatementInfo | null {
-    const topMatch = trimmed.match(
-        /^\s*(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|const\s+.*=\s*require\()['"]([^'"]+)['"]/,
-    );
+    const topMatch = trimmed.match(TS_IMPORT_RE);
     if (!topMatch) return null;
     const specifier = topMatch[1];
     const category = categorizeImport(specifier, 'typescript');
-    const isWildcard = /\b(?:import\s+\*\s+as|import\s+\*)/.test(trimmed);
+    const isWildcard = TS_WILDCARD_RE.test(trimmed);
     return {
         file: filePath,
         line: lineNum,

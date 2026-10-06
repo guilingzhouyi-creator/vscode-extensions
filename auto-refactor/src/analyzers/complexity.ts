@@ -185,6 +185,8 @@ export class ComplexityAnalyzer implements Analyzer {
     private loopSites: Map<string, LoopSite[]> = new Map();
     /** Masked view of the current file, so loop-body braces can be matched without string noise. */
     private maskedLines: string[] = [];
+    /** Cached split lines of the current file to prevent repeated full-file splits. */
+    private cachedLines: string[] = [];
     /** File the cached masked view belongs to; the engine may reuse one instance across files. */
     private maskedFor = '';
     private functionCCs: number[] = [];
@@ -202,6 +204,8 @@ export class ComplexityAnalyzer implements Analyzer {
         this.functionCCs = [];
         this.fileFunctions = [];
         this.maskedLines = maskedLinesOfPath(ctx.filePath, ctx.content);
+        this.cachedLines = ctx.content ? ctx.content.split('\n') : [];
+        this.maskedFor = ctx.filePath;
 
         const { TypeScriptAdapter } =
             require('../core/ast/typescript-adapter') as typeof import('../core/ast/typescript-adapter');
@@ -228,6 +232,7 @@ export class ComplexityAnalyzer implements Analyzer {
     private ensureFileState(filePath: string, content?: string): void {
         if (this.maskedFor === filePath) return;
         this.maskedLines = maskedLinesOfPath(filePath, content || '');
+        this.cachedLines = content ? content.split('\n') : [];
         this.maskedFor = filePath;
         this.functionCCs = [];
         this.fileFunctions = [];
@@ -290,7 +295,7 @@ export class ComplexityAnalyzer implements Analyzer {
             node,
             name,
             ctx.filePath,
-            ctx.content,
+            this.cachedLines,
             this.maskedLines,
         );
         if (fnSites.length > 0) {
@@ -311,8 +316,7 @@ export class ComplexityAnalyzer implements Analyzer {
             ctx.options.complexityFail,
         );
 
-        const allLines = ctx.content ? ctx.content.split('\n') : [];
-        const fnLines = allLines.slice(startLine - 1, endLine);
+        const fnLines = this.cachedLines.slice(startLine - 1, endLine);
         this.fileFunctions.push({ name, startLine, endLine, cc, lines: fnLines });
 
         this.checkElasticBudget(node, ctx, name, cc, loc, clarity.maxDepth, startLine);
@@ -575,9 +579,12 @@ export class ComplexityAnalyzer implements Analyzer {
         );
 
         if (flagElasticBudget) {
+            const lineCount = this.cachedLines.length > 0
+                ? this.cachedLines.length
+                : (ctx.content ? ctx.content.split('\n').length : 1);
             const fileBudgetIssue = evaluateFileCumulativeBudget(
                 ctx.filePath,
-                ctx.content ? ctx.content.split('\n').length : 1,
+                lineCount,
                 this.functionCCs,
             );
             if (fileBudgetIssue) {
@@ -606,9 +613,12 @@ export class ComplexityAnalyzer implements Analyzer {
         if (!flagRedundancy || this.fileFunctions.length < 2) return;
 
         const descriptors = createRoutineDescriptors(this.fileFunctions, ctx.filePath);
+        const lineCount = this.cachedLines.length > 0
+            ? this.cachedLines.length
+            : (ctx.content ? ctx.content.split('\n').length : 100);
         const redundancyResult = evaluateDistributedRedundancy(
             descriptors,
-            ctx.content ? ctx.content.split('\n').length : 100,
+            lineCount,
         );
         this.issues.push(...redundancyResult.issues);
     }
