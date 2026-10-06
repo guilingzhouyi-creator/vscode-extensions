@@ -3,7 +3,7 @@ name: docs-archive-governance
 description: >-
   工作区全宗技术档案归档、顶层自治蓝图演进与文档门禁规范。指导 Agent 在维护顶层设计蓝图
   （agent-native-system-blueprint.md）、全宗交付物归档（archive/deliverables/）、
-  历史四阶段案卷封存、相对路径链接健康度与纯粹面向用户文档标准。
+  历史方案案卷封存、相对路径链接健康度与纯粹面向用户文档标准。
 ---
 
 # docs-archive-governance — 全宗技术档案、蓝图演进与文档门禁规范
@@ -32,7 +32,7 @@ description: >-
 4. **分形 Git 门禁架构**：工作树按 Agent 与 SubAgent 严格隔离，门禁逐级守卫合入主干。
 
 ### 顶层蓝图演进刚性纪律：
-- **纯粹系统架构表达**：蓝图必须保持高阶系统性、拓扑抽象性与规范严密性，**绝对严禁**写入施工过程随笔、调试杂记、对话草稿、未决会议讨论或散落的代码补丁碎片；
+- **纯粹系统架构表达**：蓝图必须保持高阶系统性、拓扑抽象性与规范严密性，**绝对严禁**写入施工过程随笔、调试杂记、对话草稿、未决会议讨论或敏捷冲刺代号（如 `W1~W9`、`Pass 1..6` 等）；
 - **状态机与拓扑显式化**：新机制引入必须具备完整的生命周期状态机模型与拓扑演进图（Mermaid），明确边界与接口契约；
 - **增量演化与单源权威**：修改蓝图必须反映经过全量验证并固化的架构事实，保持与实际运行机制高度自洽。
 
@@ -42,7 +42,7 @@ description: >-
 
 工作区建立了完善的双层全宗技术档案机制：
 - **仓库级历史全宗**：`archive/deliverables/`（重大架构方案、全面审查报告、里程碑交付物留痕）；
-- **项目级技术全宗**：`WebGames/docs/归档库/`（标准国家工程级技术案卷）。
+- **项目级技术全宗**：`WebGames/docs/归档库/`（标准工程级技术案卷）。
 
 ### 1. 历史档案只读不可变性（Freeze 铁律）
 - **已验收历史存证**：已归档案卷是特定历史节点的客观事实存证，具备法律与工程留痕意义；
@@ -88,7 +88,7 @@ description: >-
 
 1. **客观价值导向，剥离施工代号**：
    - 面向用户或外部贡献者的公开文档（README、CHANGELOG、API 指南）必须纯粹基于功能特性、架构价值与使用体验撰写；
-   - **绝对严禁**出现内部施工批次代号（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 除外）；
+   - **绝对严禁**出现内部施工批次代号与敏捷过程代号（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`W[0-9]+`、`Pass[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 除外）；
 2. **纯客观技术表达**：
    - 严禁敷衍词汇（`CMG-STY-001`）、夸大词汇（`CMG-STY-002`）、贬损词汇（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；
    - 技术事实陈述客观准确，以质性输入输出与断言说话。
@@ -104,9 +104,9 @@ description: >-
 bash scripts/sh/check-display-assets.sh
 
 # 2. 运行 WebGames 专项文档静态门禁（命名、布局、死链、mermaid 语法）
-pwsh -File WebGames/scripts/ps1/audit-docs.ps1
-# 或跨平台 Python:
 python WebGames/scripts/py/audit_docs.py
+# 或在 Windows PowerShell:
+pwsh -File WebGames/scripts/ps1/audit-docs.ps1
 
 # 3. 运行全仓文档多维排版与语法门禁验证
 node auto-refactor/scripts/validate-docs.js
@@ -114,4 +114,5 @@ node auto-refactor/scripts/validate-docs.js
 
 **质性断言标准**：
 - 控制台输出全部 `PASS`，0 死链、0 绝对路径 URI、0 破损锚点；
-- 历史归档案卷元数据头块 100% 健全，四阶段方案严格齐备。
+- 历史归档案卷元数据头块 100% 健全，四阶段方案严格齐备；
+- 无任何 0 字节空文件残留，排版格式合规统一。

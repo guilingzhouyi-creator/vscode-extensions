@@ -2,13 +2,13 @@
 name: gate-governance
 description: >-
   通用双层门禁架构与跨平台脚本工程化治理。指导 Agent 落实 Tier 1 本地左移极速流式判定（gate-fast-staged.js <90ms、
-  validate-commit-msg.js）与 Tier 2 远端 CI 同构防御，运用受影响项目智能分流（Impact-Driven Routing）、
+  validate-commit-msg.js）与 Tier 2 远端 CI 同构防御，运用受影响项目智能分流（auto-refactor 27 分析器与 304 规则自测）、
   子进程显式工作目录隔离（-WorkingDirectory）与 pwsh 7+ 优先原则，看守代码卫生与零黑话纪律。
 ---
 
 # gate-governance — 通用双层门禁架构与跨平台脚本工程治理
 
-本技能规定了跨项目通用的双层门禁体系架构标准、受影响项目智能分流机制、跨平台脚本工程契约及子进程执行上下文隔离原则。
+本技能规定了跨项目通用的双层同构门禁体系架构标准、受影响项目智能分流机制、跨平台脚本工程契约及子进程执行上下文隔离原则。
 
 ---
 
@@ -49,7 +49,7 @@ description: >-
 ### 1. 路径特征探测与精准映射
 通过 `git diff --cached --name-only` 提取暂存区文件路径向量，精确映射至四大受控域：
 - **`workspace-timing/**`** $\rightarrow$ 路由至 VS Code 扩展套件：触发快速增量编译（`npm run compile`）、单元测试（`npm run test:fast`）与双语字典审查（`npm run review`）；
-- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 26 分析器与 243 规则自测（`npm test`）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
+- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 27 分析器与 304 规则自测（`npm test`）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
 - **`WebGames/**`** $\rightarrow$ 路由至 Godot 引擎套件：触发 GDScript 语法审查（`check-gdscript.sh`）、无头回归套件（`test-run.ps1`）与配置同构审计；
 - **`scripts/**` / `.github/**` / `AGENTS.md` / 根目录配置** $\rightarrow$ 标记为 `governance` 域：触发工作区单源规则目录一致性核验与全宗审计（`audit-all.ps1`）。
 

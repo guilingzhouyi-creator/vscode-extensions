@@ -97,7 +97,26 @@ bash scripts/sh/release-tag.sh workspace-timing patch --message "v0.5.1 — 标�
 
 ---
 
-## 五、 关联模板与深度指引
+## 五、 本地验证指令与断言标准
+
+在打包或准备发布前，可执行以下命令完成前置自检：
+
+```powershell
+# 1. 验证静态打包展示资产健全性
+bash scripts/sh/check-display-assets.sh
+
+# 2. 演练本地干运行版本递增
+bash scripts/sh/version-bump.sh workspace-timing patch --dry-run
+```
+
+**质性断言标准**：
+- 产物目录结构完整，无失效幽灵注册表指针；
+- 打包展示资产（128x128 图标与横幅）齐全合规；
+- 工作树干净且流水线前置校验无未决异常。
+
+---
+
+## 六、 关联模板与深度指引
 
 - [package-release-runbook.md](templates/package-release-runbook.md)：端到端发布实操检查清单；
 - [extension-registry-repair.md](references/extension-registry-repair.md)：本地扩展注册表冲突自愈原理。

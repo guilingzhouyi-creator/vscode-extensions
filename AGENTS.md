@@ -11,16 +11,17 @@
 | **Git 提交与分批工作流** | 必填 `[Project]`；有效字数 $\ge 30$；零黑话；纯客观技术事实 | [commit-msg-forbidden-terms.json](scripts/common/commit-msg-forbidden-terms.json)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [batch-commit](.agents/skills/batch-commit/SKILL.md) | `pwsh -File scripts/ps1/commit-msg-gate.ps1 <msg-file>` |
 | **代码编写与体积控制** | $\text{CC}\le 15, \text{Depth}\le 4, \text{Noise}\le 4.0$；$\text{ELOC}\le 900, \text{LOC}\le 1400$ | [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) | `node scripts/common/evaluate-eloc-budget.js` |
 | **模块导出与门面设计** | $\text{ELOC}\ge 15$ 或不可变冻结；单行跳板清零 (`ARCH-ABS-001`) | [facade-discipline](.agents/skills/facade-discipline/SKILL.md) | [facade-discipline](.agents/skills/facade-discipline/SKILL.md) | `node auto-refactor/scripts/validate-facade-governance.js` |
+| **代码注释与架构契约** | 六字段 JSDoc 头部；零幽灵空分支；零敏捷冲刺代号；$\text{ECR}\ge 0.75$ | [rule-catalog.json](scripts/common/rule-catalog.json) | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) | `node auto-refactor/scripts/validate-comment-governance.js` |
 | **门禁脚本与跨平台调用** | 子进程工作目录显式隔离；pwsh 7+ 优先；`set -euo pipefail` 平铺捕获 | [gate-governance](.agents/skills/gate-governance/SKILL.md)<br/>[scripts/README.md](scripts/README.md) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/pre-commit-gate.ps1` |
 | **`workspace-timing/` 研发** | 五层解耦；RingBuffer+Journal 崩溃安全；UI 100% 双语字典 | [workspace-timing/README.md](workspace-timing/README.md) | [workspace-timing-dev](.agents/skills/workspace-timing-dev/SKILL.md) | `cd workspace-timing && npm run test:fast` |
-| **`auto-refactor/` 研发** | 243 规则自测全通过；Rust 与 TS 100% 等价；QED/CAI 质量模型 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `cd auto-refactor && npm test` |
+| **`auto-refactor/` 研发** | 27 分析器与 304 规则自测全通过；Rust 与 TS 100% 等价；Praxis 客户端 SDK | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `cd auto-refactor && npm test` |
 | **`WebGames/` 研发** | 全域配置驱动；循环内零堆分配 (`ADV-PRF-002`)；先四阶段方案后编码 | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[WebGames/config/README.md](WebGames/config/README.md) | [webgames-workflow](.agents/skills/webgames-workflow/SKILL.md) | `cd WebGames && pwsh scripts/ps1/audit-all.ps1` |
 | **度量评估与统计建模** | 零注水纯客观统计；主流统计学 Jeffreys Beta 后验模型 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `node auto-refactor/scripts/validate-autonomy-scorer.js` |
 | **扩展打包发布与热同步** | 产物自动轮转；`-HotSync` 注册表自愈；SemVer 干净树；资产健全 | [scripts/README.md](scripts/README.md) | [release-package-workflow](.agents/skills/release-package-workflow/SKILL.md) | `pwsh -File scripts/ps1/package.ps1 -HotSync` |
-| **单源规则目录与元治理** | 380+ 规则 SSOT；规则 ID 零虚构 (`RCFG-RULE-DRIFT`)；三项目对齐 | [rule-catalog.json](scripts/common/rule-catalog.json) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js` |
+| **单源规则目录与元治理** | 385 规则 SSOT；规则 ID 零虚构 (`RCFG-RULE-DRIFT`)；三项目对齐 | [rule-catalog.json](scripts/common/rule-catalog.json) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js` |
 | **全工作区统一质量审查** | 5 大支柱 100% 绿色通行；零规则漂移 (`RCFG-RULE-DRIFT`) | [scripts/README.md](scripts/README.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/audit-all.ps1` |
 | **顶层蓝图与历史全宗** | Cell 平权自治体系；一体两面 Diff；归档案卷元数据规范 | [agent-native-system-blueprint.md](docs/agent-native-system-blueprint.md)<br/>[deliverables/README.md](archive/deliverables/README.md) | [docs-archive-governance](.agents/skills/docs-archive-governance/SKILL.md) | — |
-| **通用 SubAgent 泛化调度** | (Archetype $\otimes$ Posture) 正交派生；主会话同构继承 (inherit/flash)；Path Jail 物理防冲突 | [subagent-catalog.json](.agents/subagents/subagent-catalog.json) | [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) | `node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js` |
+| **通用 SubAgent 泛化调度** | (Archetype $\otimes$ Posture) 正交派生；主会话同构继承 (inherit)；独占 Path Jail 防冲突 | [subagent-catalog.json](.agents/subagents/subagent-catalog.json) | [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) | `node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js` |
 
 ---
 
@@ -32,9 +33,13 @@
 - **缩进规范**：TypeScript 保持 4 空格缩进，其余源码与配置文件保持 2 空格缩进；
 - **文件命名**：全局遵循 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）。
 
-### 2. 代码复杂度与体积双轨预算
+### 2. 代码复杂度、体积与注释契约三轨预算
 - **AST 切片预算（`GATE-AST-001`）**：暂存区生产代码与工具脚本受 AST 局部切片守卫约束：单函数圈复杂度基准 $\text{CC} \le 15$（无循环且 $\text{Depth} \le 2$ 的平铺分发器/状态映射器与探针模块享 $\text{CC} \le 20 \sim 25$ 弹性包络）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；循环体与调度逻辑须平铺控制流并采用卫语句提前返回；
 - **单文件双轨体积与 1:3 动态包络**：全仓源码文件（`.ts`, `.js`, `.gd`, `.py` 等）以**有效代码行（$\text{ELOC} \le 900$）**为第一刚性复杂度红线，以**物理行（$\text{LOC} \le 1400$）**为防膨胀兜底线；在 [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) 中执行 1:3 密度比动态反推包络约束与高负荷契约注释密度约束；处于合法包络内的高内聚模块禁止进行破坏内聚性的机械物理碎片化，重构优化必须以**消除循环内瞬态堆分配（`CPX-SPACE-001`）**与平铺控制流为第一优先级；
+- **注释契约与架构自解释性**：
+  ① **六字段 JSDoc 模块头部契约**：核心模块、分析器与服务入口必须在首行呈现标准的六字段 JSDoc（`Module`, `File Path`, `Architecture Role`, `Dependencies & Triggers`, `Responsibilities`, `Exit Semantics & Design Rationale`），严禁私有辅助函数或非结构化散文插在模块头之前；
+  ② **算法边界与退化自适应声明**：核心复杂算法（如 Myers Diff, 依赖图遍历, 缓存调度）必须在 JSDoc 中显式声明退化保护阈值（如超过 1500 行或 2M 单元格自动回退至线性算法）、哈希等长等前置不变式约束；
+  ③ **幽灵代码与敏捷代号清零**：严禁在代码中保留无执行逻辑的假分支幽灵注释（如空 `if` 内仅写注释承诺处理）；严禁在 JSDoc、注释或错误文案中使用敏捷冲刺期过程性代号（如 `W1-W9`、`Pass 1..6`、`P250` 等笔误或阶段标记）；机械复述性单行注释清零；
 - **门面实质承载与跳板消融（`ARCH-FAC-001` / `ARCH-ABS-001`）**：门面（Facade）或对外导出入口必须满足 $\text{ELOC} \ge 15$ 校验逻辑、聚合 $\ge 3$ 个子领域或包含 `Object.freeze`/`deepFreeze` 不可变保障；严禁保留或创建有效代码 $\le 3$ 行且仅向单一目标透传导出的空包跳板文件（详见 [facade-discipline](.agents/skills/facade-discipline/SKILL.md)）。
 
 ### 3. 指标度量求真与严谨数学公理
@@ -58,7 +63,8 @@
 ### 6. SubAgent 委托与多智能体调度公理
 - **严禁裸调用原生 SubAgent**：在当前会话或任何新开会话中，当接收到 SubAgent 委托或并行施工指令时，严禁直接调用未经约束的原生 `self` 或擅自跨级切换高开销模型；SubAgent 在模型上必须与主会话保持同构一致，通过 `Model: "inherit"` 继承主会话配置（当前主会话为 Gemini 3.8 Flash，思考强度 effort=High），完整保留高强度深度推理能力并锁定 Flash 算力成本；必须依据任务所属领域（`vs-extension`, `cli-engine`, `game-engine`, `infra-tool`, `workspace-meta`）与姿态（`construct`, `review`, `refactor`, `explore`, `guardian`），通过 [subagent-catalog.json](.agents/subagents/subagent-catalog.json) 匹配或运行 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成出对应专员；
 - **四重防线契约注入**：派发前必须调用 `define_subagent` 注入 5 层系统契约（含 Path Jail 授权与禁止目录、所属领域专属公理、交割前强制自检命令）；审查（`review`）与探索（`explore`）姿态必须硬性配置 `enable_write_tools: false` 从物理工具层面剥夺写权限；`invoke_subagent` 必须显式指定 `Model: "inherit"`（或受控 `"flash"`），并使用包含范围与验收清单的标准任务外壳；
-- **物理沙箱防冲突（Path Jail）**：SubAgent 严禁触碰所属领域授权路径之外的任何文件，并行施工时如需写相同项目推荐使用 `Workspace: "branch"` 隔离。
+- **物理沙箱防冲突（Path Jail 与独占文件集）**：SubAgent 严禁触碰所属领域授权路径之外的任何文件；并行重构/施工（`construct`/`refactor`）时，每个 SubAgent 必须绑定完全正交、互不重叠的独占文件列表（Zero-Intersection Path Jail），严禁跨专员并发写入同一文件；跨项目并行写推荐使用 `Workspace: "branch"` 隔离；
+- **主 Agent 全量交叉复审闭环（Cross-Review Closed-Loop）**：任何 SubAgent 完成施工交割后，主 Agent 必须独立进行沙箱隔离审计、TypeScript 编译、门面治理检查、自审棘轮基线（`gate-self.js`）以及全量测试套件（150/150）的交叉复审，确认 100% 通过后方可交付。
 
 ---
 
@@ -67,7 +73,7 @@
 | 项目 | 核心专属约束与架构红线 | 专属构建/测试命令 | 权威真源指针 |
 | :--- | :--- | :--- | :--- |
 | **`workspace-timing/`**<br/>*(VS Code 扩展)* | ① UI 文本 100% 接入双语字典（zh-CN/en），严禁硬编码未翻译文案与内部技术黑话；<br/>② 审查规则单源登记于 `workspace-timing/scripts/config/review-rules.json`；<br/>③ `tsconfig.json` 保持 `declaration: false` 极速构建。 | `npm run compile`<br/>`npm run test:fast`<br/>`npm run review` | [workspace-timing/README.md](workspace-timing/README.md)<br/>[architecture.md](workspace-timing/docs/architecture.md) |
-| **`auto-refactor/`**<br/>*(Node CLI 引擎)* | ① 26 分析器与 243 条内置规则全量自测，零孤儿用例；<br/>② Rust 原生算子内核与 pure-TS shim 100% 字节等价；<br/>③ 单分析器扣分遵循 `MAX_AXES_PER_FINDING <= 4`；受 `validate-project-neutrality.js` 项目中立性守卫管束。 | `npm run gate`<br/>`npm run build`<br/>`npm test` | [auto-refactor/DOCS.md](auto-refactor/DOCS.md)<br/>[auto-refactor/package.json](auto-refactor/package.json) |
+| **`auto-refactor/`**<br/>*(Node CLI 引擎)* | ① 27 分析器与 304 条内置规则全量自测，零孤儿用例；<br/>② Rust 原生算子内核与 pure-TS shim 100% 字节等价；<br/>③ 时间戳强制携带 `*Ms` 物理量纲，紧凑账本遵循 `compactStagingPath` 暂存与原子落盘；Praxis 客户端 SDK 与拓扑差分协议对齐；<br/>④ 单分析器扣分遵循 `MAX_AXES_PER_FINDING <= 4`；受 `validate-project-neutrality.js` 项目中立性守卫管束。 | `npm run gate`<br/>`npm run build`<br/>`npm test` | [auto-refactor/DOCS.md](auto-refactor/DOCS.md)<br/>[auto-refactor/package.json](auto-refactor/package.json) |
 | **`WebGames/`**<br/>*(Godot 引擎)* | ① 统一经 `GameConfig.get_*` 读取配置，严禁根目录平铺配置；<br/>② 视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池循环内零瞬态堆分配（`ADV-PRF-002`），必须实现 `reset_state()`；<br/>④ 改动必须先立四阶段方案细则（严格仅 4 份文件），获批后方可编码。 | `check-gdscript.sh`<br/>`test-run.sh`<br/>`audit-all.sh` | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[路线图总索引.md](WebGames/docs/路线图/路线图总索引.md) |
 
 ---
@@ -77,14 +83,14 @@
 1. **路径与引用红线**：严禁在代码或配置中书写绝对路径、盘符或 `file:///`；重命名或删除文件必须同步修正全库所有引用点；严禁私自修改 baseline/基线文件以消音违规；
 2. **规则与防刷分红线**：严禁私自放宽各项目的 linter、formatter、naming 规则或门禁脚本阈值；改动若 $\text{ELOC}_{semantic} \le 15\%$ 且无真实技术债净消除，强制冻结收益并触发 `BLOCK_GAMING_DETECTED` 熔断；
 3. **交付与完整性红线**：严禁创建或遗留 0 字节文件、纯空白文件或仅含占位符、未决 TODO 的半成品代码；严禁未获批准提前在任务路线图上标记完成；严禁交付未通过全量回归测试的缩水实现；
-4. **方案与黑话红线**：方案目录下严格仅允许四阶段细则文件；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁在代码标识符、测试用例与提交信息中使用施工批次黑话代号；
+4. **方案、注释与黑话红线**：方案目录下严格仅允许四阶段细则文件；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁遗留假逻辑空分支与幽灵注释；严禁在代码标识符、测试用例、JSDoc 注释与提交信息中使用施工批次与敏捷工期黑话代号（如 `p[0-9]+`, `W1-W9`, `Pass 1..6`）；
 5. **规则一致性红线**：严禁在检查器代码中发射或在提交信息中书写未在 [rule-catalog.json](scripts/common/rule-catalog.json) 登记的规则 ID（违者触发 `RCFG-RULE-DRIFT` 阻断）；
 6. **防线与验证红线**：严禁使用 `--no-verify` 或跳过本地门禁提交或推送代码；向远端推送后必须确保 CI 流水线完全通过；严禁对未跟踪文件执行 `git rm`；
 7. **原子提交与归属红线**：关键生产级提交（feat/fix/refactor）必须显式声明 `[Project]` 并限定于四大受控项目（`CMG-PRJ-001`）；提交前必须先通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审；
 8. **跳板消融红线**：严禁创建或保留有效代码 $\le 3$ 行且仅向单一目标透传的空包跳板文件；门面层违反实质承载预算强制触发 `ARCH-FAC-001` 阻断；
 9. **客观求实红线**：提交信息严禁夹带敷衍（`CMG-STY-001`）、夸大（`CMG-STY-002`）、贬损（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；`[Verification]` 严禁程序化流水账（`CMG-STY-005`）与执行数字统计流水账（`CMG-STY-006`）；
 10. **度量求真红线**：严禁在评分算法与自研度量中注入虚假倍率或固定加分；严禁使用伪造的统计误差区间；
-11. **SubAgent 违规委派红线**：严禁在未装配 Path Jail 物理禁区、未注入领域公理或脱离主会话同构模型约束的情况下直接委派未经约束的原生 SubAgent（`self`）；审查类姿态严禁挂载写入权限（违者一票否决）。
+11. **SubAgent 违规委派红线**：严禁在未装配 Path Jail 物理禁区、未注入领域公理或脱离主会话同构模型约束的情况下直接委派未经约束的原生 SubAgent（`self`）；审查类姿态严禁挂载写入权限；并行施工专员严禁触碰重叠文件；SubAgent 交割后必须由主 Agent 开展全量交叉复审（违者一票否决）。
 
 ---
 
@@ -93,8 +99,9 @@
 1. **查验指针**：接到任务后，依据意图查阅 §一 路由矩阵，精读对应项目的 SSOT 指针与关联 Skill，明确架构边界与红线；
 2. **作业与委托分流**：
    - **单域直接作业**：操作严格限定在当前任务所属的项目内，严禁跨项目扩散修改；涉及方案调整严格遵守“先细则获批、后编码施工”；
-   - **多智能体/SubAgent 委派**：必须通过 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成专员并调用 `define_subagent` 注入契约，严格锁定 `Model: "inherit"`（同构继承主会话 Gemini 3.8 Flash + High effort）与只读权限后方可 `invoke_subagent`；
-3. **本地预审**：提交前必须在本地依次运行离线门禁预审：
+   - **多智能体/SubAgent 委派**：必须通过 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成专员并调用 `define_subagent` 注入契约，严格锁定 `Model: "inherit"`（同构继承主会话 Gemini 3.8 Flash + High effort）；审查类姿态剥夺写权限；施工类姿态分配完全正交的独占文件列表（Zero-Intersection Path Jail）；
+3. **主 Agent 交叉复审与本地预审**：SubAgent 施工交割后，主 Agent 必须独立执行沙箱隔离审计、构建自检与交叉验证；提交前在本地依次运行离线门禁预审：
    - 暂存区检查：`pwsh -File scripts/ps1/pre-commit-gate.ps1`
    - 提交信息检查：`pwsh -File scripts/ps1/commit-msg-gate.ps1 <path-to-msg>`
 4. **全量回归**：改动落地后，执行对应项目专属全量测试及全工作区统一审查（`pwsh -File scripts/ps1/audit-all.ps1`），确保 100% 绿色通行后方可交割。
+

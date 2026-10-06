@@ -3,8 +3,8 @@ name: subagent-orchestration
 description: >-
   全工作区通用泛化 SubAgent 动态装配、四重防线契约注入与多智能体调度工作流。
   在用户提及 SubAgent、并行任务、委派施工、后台审查或多智能体协作时激活本技能。
-  指导主 Agent 基于 (Archetype x Posture) 正交派生专员、全量锁定 flash 模型、
-  通过 Path Jail 物理防冲突与只读门控，并在当前及未来新会话中安全闭环调度。
+  指导主 Agent 基于 (Archetype x Posture) 正交派生专员、全量同构继承模型、
+  通过独占文件 Path Jail 物理防冲突、只读与写入协同流及主 Agent 交叉全量复审 SOP 安全闭环调度。
 ---
 
 # subagent-orchestration — 全工作区泛化 SubAgent 调度规范
@@ -63,9 +63,35 @@ description: >-
 
 ---
 
-## 三、 标准调度流水线 (Standard Operating Procedure)
+## 三、 独占文件 Path Jail 物理防冲突与只读/写入协同流
 
-当用户发出“审查”、“重构”或“施工”等委派指令时，按以下三步标准动作执行：
+多智能体协作的核心是**严格的物理隔离**与**有序的读写协同**，避免多 Agent 并发写入导致代码被踩踏或越界修改：
+
+### 1. 独占文件集合 Path Jail 物理防冲突机制
+- **显式独占授权**：向具有写权限的 SubAgent 下发任务时，主 Agent 必须在 Task Scope 中声明绝对严密的独占文件列表（Exclusive File List）：
+  ```markdown
+  [Task Scope & Path Jail]
+  - 授权独占文件列表（严格禁止触碰其它文件）：
+    1. path/to/fileA.ts
+    2. path/to/fileB.ts
+  ```
+- **禁止交叉重叠**：并行派生多个写专员时，各 SubAgent 的 Path Jail 文件集合必须两两正交，交集必须为空集（$\text{Jail}_A \cap \text{Jail}_B = \emptyset$）；
+- **系统契约硬绑定**：SubAgent 的 System Prompt Layer 1 强制注入 Path Jail Guard，越界修改任何文件将直接视为致命违规。
+
+### 2. 只读审查与施工重构协同工作流
+在大型特性演进或复杂重构中，推荐实施 **Explore/Review 先行 $\rightarrow$ Construct/Refactor 施工 $\rightarrow$ Guardian 复核** 闭环流：
+1. **第一阶段：只读审查勘测 (`enable_write_tools: false`)**：
+   - 调度 `review` 或 `explore` 姿态专员，物理拔除写入工具；
+   - 专员全量读取 AST、跨文件引用图与 385 规则库，输出精确违规行号、调用链以及质性重构方案；
+2. **第二阶段：定点施工重构 (`enable_write_tools: true`)**：
+   - 调度 `construct` 或 `refactor` 姿态专员，赋予独占文件列表的写权限；
+   - 专员严格按第一阶段输出的方案在 Path Jail 范围内实施小步改动，禁止蔓延扩写；
+3. **第三阶段：门禁自检与证据交割**：
+   - 施工专员在自身沙箱执行对应的 Layer 4 门禁自检命令，产出执行通过的日志证据后汇报主 Agent。
+
+---
+
+## 四、 标准调度流水线与主 Agent 交叉复审 SOP
 
 ### 步骤 1：JIT 合成 SubAgent 契约元数据
 在终端运行工作区装配脚本获取完整的结构化参数：
@@ -76,7 +102,7 @@ node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --inte
 # 模式 B: 精确预置别名装配
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --preset wt-refactor --task "优化时钟调度" --json
 
-# 模式 C: 全仓 11 项专员批量导出
+# 模式 C: 全仓专员批量导出
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
 ```
 
@@ -100,7 +126,7 @@ define_subagent({
 ```
 
 ### 步骤 3：启动隔离运行 (`invoke_subagent`)
-调用 `invoke_subagent` 委派具体任务。**指定 `Model: 'inherit'` 继承主会话配置**，并传入装配好的结构化任务 Prompt：
+调用 `invoke_subagent` 委派具体任务。**必须指定 `Model: 'inherit'` 继承主会话配置**，并传入装配好的结构化任务 Prompt：
 ```typescript
 invoke_subagent({
   Subagents: [{
@@ -113,16 +139,28 @@ invoke_subagent({
 });
 ```
 
+### 步骤 4：主 Agent 交叉全量复审 SOP (Cross-Review SOP)
+SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格执行以下交叉复审 SOP：
+1. **核实改动范围与 Path Jail 契约**：
+   - 主 Agent 执行 `git status` 与 `git diff --name-only`；
+   - 严密比对修改文件列表是否严格受限于原定独占 Path Jail 列表；若发现越界修改未授权文件，必须立即回滚越界部分；
+2. **核验改动质性内容与代码卫生**：
+   - 抽检核心文件的 Diff 内容，检查是否破坏已有注释、是否引入空文件、是否引入未经登记的规则 ID、控制流嵌套是否超标；
+3. **主会话独立执行验证验证命令**：
+   - 主 Agent 在自身会话中亲自运行验证命令（如 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`）；
+   - 确保测试与门禁真实退出码为 0，且无隐性断言失败；
+4. **统一提交或汇报**：
+   - 交叉复审全部合格后，由主 Agent 统一向用户交割或推进下一步作业。
+
 ---
 
-## 四、 防冲突与质量保障铁律
+## 五、 防冲突与质量保障铁律
 
-1. **同构模型继承纪律**：工作区委派 SubAgent 原则上严格指定 `Model: "inherit"` 继承主会话（当前主会话为 Gemini 3.8 Flash，思考强度 effort=High），完整保留深度推理能力同时锁定 Flash 算力成本，严禁擅自切换未受控模型；
-2. **物理沙箱禁越界**：SubAgent 提示词中已注入 Path Jail 严禁列表。SubAgent 若修改越界目录文件（如 `wg-` 修改了 `auto-refactor/`），主 Agent 必须在合入时予以拦截；
-3. **完成自检交割**：任何具有写权限的 SubAgent，在向主 Agent 汇报前必须在其自身提示词 Layer 4 的验证命令下完成全量自检并附带执行通过证据；
+1. **同构模型继承纪律**：工作区委派 SubAgent 必须严格指定 `Model: "inherit"` 继承主会话（当前主会话为 Gemini 3.8 Flash，思考强度 effort=High），完整保留深度推理能力同时锁定 Flash 算力成本，严禁擅自切换未受控模型；
+2. **物理沙箱禁越界**：SubAgent 提示词中已注入 Path Jail 严禁列表。SubAgent 若修改越界目录文件，主 Agent 必须在合入时予以拦截或还原；
+3. **完成自检交割**：任何具有写权限的 SubAgent，在向主 Agent 汇报前必须在其自身提示词 Layer 4 的验证命令下完成全量自检并附带真实执行通过证据；
 4. **单源一致性守护**：修改配置或扩展原型时，随时运行：
    ```bash
    node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
    ```
    确保 100% 通过验证。
-

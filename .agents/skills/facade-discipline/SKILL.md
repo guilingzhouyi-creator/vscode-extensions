@@ -1,13 +1,14 @@
 ---
 name: facade-discipline
 description: >-
-  门面层实质承载、空包跳板拦截与不可变性契约。指导 Agent 在重构、接口设计与模块导出时，
-  识别并消除虚空转发层，落实最低 ELOC 预算、运行时契约校验与不可变快照模式。
+  门面层实质承载、空包跳板消融与不可变性契约。指导 Agent 在重构、接口设计与模块导出时，
+  落实最低 ELOC 预算（ELOC>=15）、深度不可变冻结保障、守护进程高可用门面与
+  Praxis 客户端 SDK 门面实践，彻底根除单行空包跳板与虚空转发层。
 ---
 
 # facade-discipline — 门面层实质承载与跳板消融工作流
 
-本技能规范了系统架构中门面（Facade）、网关（Gateway）、适配器（Adapter）与顶层导出入口（Barrel Export）的设计与治理标准，建立实质业务承载底线，坚决清除单行空包跳板。
+本技能规范了系统架构中门面（Facade）、网关（Gateway）、适配器（Adapter）与顶层导出入口（Barrel Export）的设计与治理标准，建立实质业务承载底线，融入守护进程进程级容错与多智能体审查 SDK 门面工程实践，坚决清除单行空包跳板。
 
 ---
 
@@ -15,9 +16,10 @@ description: >-
 
 在以下任一架构调整或代码重构场景中，必须激活本技能实施审查：
 1. **创建或修改门面/网关模块**：凡模块命名或职责包含 `Facade`、`Gateway`、`Adapter`、`Manager` 或作为顶层公共入口 `index.ts`；
-2. **重构或重命名底层模块**：移动或提取模块时，拟创建中间导出垫片以兼容旧引用；
-3. **对外导出数据结构**：门面层向外部消费者返回系统核心状态快照或跨域组合数据；
-4. **门禁阻断排查**：本地或 CI 门禁触发 `ARCH-FAC-001`（门面虚假承载）或 `ARCH-ABS-001`（单行空包跳板）。
+2. **构建子系统聚合与客户端 SDK**：如常驻后台守护进程中枢（`src/daemon/index.ts`）或跨域审查客户端 SDK（`PraxisReviewClient`）；
+3. **重构或重命名底层模块**：移动或提取模块时，拟创建中间导出垫片以兼容旧引用；
+4. **对外导出数据结构与快照**：门面层向外部消费者返回系统核心状态快照或跨域组合数据；
+5. **门禁阻断排查**：本地或 CI 门禁触发 `ARCH-FAC-001`（门面虚假承载）或 `ARCH-ABS-001`（单行空包跳板）。
 
 ---
 
@@ -45,7 +47,7 @@ description: >-
 
 ### 2. 空包跳板架构危害与惩罚模型
 - **认知跃迁惩罚（Hop Penalty）**：在架构依赖分析中，跨层调用链每增加一层无实质承载的空包转发，产生认知跃迁惩罚（$\text{HopPenalty} = +3.0\text{ units/hop}$）；
-- **调试可追踪性损耗**：断点调试与 IDE 符号跳转（Go to Definition）陷入“跳板接力”，破坏调用栈直观性；
+- **调试可追踪性损耗**：断点调试与 IDE 符号跳转陷入“跳板接力”，破坏调用栈直观性；
 - **治理纪律**：全仓严禁保留或创建此类文件，跳板违规数必须严格归零。
 
 ### 3. 标准消融 SOP 作业流
@@ -60,16 +62,67 @@ description: >-
 
 ---
 
-## 四、 规范设计模式与参考实现
+## 四、 核心门面实战工程范式
 
-### 1. 优秀门面设计规范（实质承载范式）
-- 统一协调生命周期（初始化、注销、健康心跳）；
-- 防御性参数校验（卫语句提前抛出契约异常）；
-- 多子领域聚合计算与只读快照冻结返回。
+### 1. 守护进程中枢门面实践 (`src/daemon/index.ts`)
+守护进程门面不只是一个纯粹的 Barrel 导出，它同时承担**进程生命周期高可用韧性守卫**的实质职责：
+- **跨模块聚合**：同时聚合导出服务端（`server`）、客户端（`client`）、通信协议（`protocol`）、注册表（`registry`）与扫描处理器（`scanHandler`）等 5 大子模块；
+- **进程级未捕获异常守卫 (`installDaemonRejectionGuard`)**：
+  在模块加载期自动挂载 `unhandledRejection` 监听器，捕获全进程异步未决异常并记录至 stderr，阻止进程意外崩溃；
+- **不可变诊断快照保障**：
+  将异常上下文封装为不可变冻结对象，确保遥测链路安全：
 
-详见规范模板：[contract-facade.ts](templates/contract-facade.ts)。
+```typescript
+export function installDaemonRejectionGuard(
+  onRejection?: (record: DaemonRejectionRecord) => void,
+): () => void {
+  const handler = (reason: unknown): void => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    const record: DaemonRejectionRecord = Object.freeze({
+      timestamp: Date.now(),
+      message: error.message,
+      stack: error.stack,
+    });
+    process.stderr.write(`[auto-refactor daemon] unhandledRejection: ${record.message}\n`);
+    if (typeof onRejection === 'function') {
+      try {
+        onRejection(record);
+      } catch (callbackErr) {
+        process.stderr.write(
+          `[auto-refactor daemon] rejection callback failure: ${callbackErr instanceof Error ? callbackErr.message : String(callbackErr)}\n`,
+        );
+      }
+    }
+  };
 
-### 2. 消除跳板反模式前后对比
+  process.on('unhandledRejection', handler);
+  return () => {
+    process.off('unhandledRejection', handler);
+  };
+}
+
+// 模块初始化时自执行守卫安装，落实实质承载
+installDaemonRejectionGuard();
+```
+
+### 2. Praxis 统一审查客户端 SDK 门面实践 (`src/core/praxis/praxis-review-client.ts`)
+作为面向开发者与自动化系统的旗舰级 SDK 门面，`PraxisReviewClient` 体现了高内聚门面的典范设计：
+- **深度多系统编排（聚合度 $\ge 5$）**：
+  统一整合并编排工作区扫描器（`Scanner`）、多语言语义图谱（`SemanticGraph`）、差异治理服务（`IPraxisDiffGovernanceService`）、门控路由器（`SparseMoEGateRouter`）、AST 切片审计服务（`IPraxisSliceAuditService`）与智能体指令协议包生成器（`AgentDirectives`）；
+- **高阶统一语义 API**：
+  对外暴露清晰的高阶方法，屏蔽底层流水线编排细节：
+  - `reviewWorkspace(options)`：全工作区批量扫描与指令合成；
+  - `reviewFile(filePath, content, options)`：单文件深度 AST 切片与 MoE 路由分析；
+  - `reviewDiff(input, options)`：语义差异审查与爆炸半径（Blast Radius）控制；
+  - `evaluateMergeGate(source, target, hunks)`：分支合并门禁评估与回滚风险检查；
+- **双面 Diff (Dual-Faced Diff) 与 CAPP 协议合成**：
+  门面自动合成面向机器执行的 AST 规则修复指令与面向人类审阅的交互式 UI 诊断卡片；
+- **零配置工厂与开箱即用向后兼容**：
+  提供 `createPraxisClient()` 工厂函数与单例导出 `defaultPraxisReviewClient`；
+- **严格遵循复杂度与嵌套预算**：
+  门面内部所有方法严控在 $\text{CC} \le 15$ 与 $\text{Depth} \le 4$ 预算之内，全量应用卫语句与防御性参数校验。
+
+### 3. 消除跳板反模式前后对比
 ```typescript
 // ❌ 错误示范：跳板文件 internal/bridge.ts (ELOC = 1, ARCH-ABS-001 违规)
 export * from './real-service';
@@ -77,11 +130,11 @@ export * from './real-service';
 // ❌ 错误示范：虚假门面 gateway.ts (ELOC = 6, 仅透传单服务且无不可变保障)
 import { RealService } from './real-service';
 export class Gateway {
-    private svc = new RealService();
-    public run(): void { this.svc.run(); }
+  private svc = new RealService();
+  public run(): void { this.svc.run(); }
 }
 
-// ✅ 正确示范：消融跳板，上游调用方直接导入底层源头
+// ✅ 正确示范：消融跳板，上游调用方直接导入真实底层源头
 import { RealService } from './real-service';
 ```
 
@@ -102,4 +155,12 @@ pwsh -File scripts/ps1/pre-commit-gate.ps1
 **质性断言标准**：
 - 控制台输出 `✔ [PASS] Facade governance check passed`；
 - 全仓单行空包跳板数量为 0；
-- 门面模块代码行 $\text{ELOC} \ge 15$ 或通过 `Object.freeze` 落实深度不可变性，聚合 $\ge 3$ 个正交子系统。
+- 门面模块代码行 $\text{ELOC} \ge 15$ 或通过 `Object.freeze` 落实深度不可变性，聚合 $\ge 3$ 个正交子系统；
+- 关键守护中枢具备进程容错保护，审查 SDK 具备完备的多域协同编排能力。
+
+---
+
+## 六、 关联模板与深度指引
+
+- [contract-facade.ts](templates/contract-facade.ts)：实质承载门面标准实现模板；
+- [trampoline-elimination-guide.md](references/trampoline-elimination-guide.md)：单行跳板全局消融作业指南。

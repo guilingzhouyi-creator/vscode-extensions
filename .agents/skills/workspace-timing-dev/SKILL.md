@@ -3,12 +3,13 @@ name: workspace-timing-dev
 description: >-
   workspace-timing VS Code 计时扩展五层架构解耦、双写崩溃安全与双语字典规范。
   指导 Agent 在 workspace-timing 项目中维护时间聚合核心、RingBuffer 与日志追加崩溃防护、
-  规范化命名（stagingUri、segmentedSessions、[DELTA]）、100% 双语国际化（zh-CN/en）与暗色高对比度 UI。
+  规范化命名（stagingUri、segmentedSessions、[DELTA]）、100% 双语国际化（zh-CN/en）、
+  暗色高对比度 UI 以及与全仓双层同构门禁的深度对接。
 ---
 
 # workspace-timing-dev — VS Code 扩展五层架构与崩溃安全研发规范
 
-本技能规范了 `workspace-timing/` 扩展的五层解耦架构、高可靠内存与磁盘双写崩溃安全体系、命名规范化、双语国际化以及视觉对比度契约。
+本技能规范了 `workspace-timing/` 扩展的五层解耦架构、高可靠内存与磁盘双写崩溃安全体系、命名规范化、双语国际化、视觉对比度契约以及与全工作区双层同构门禁的深度对接。
 
 ---
 
@@ -19,7 +20,7 @@ description: >-
 2. **重构多级持久化存储、崩溃安全双写与日志回放逻辑**（`StorageCoordinator.ts`、`HistoryFolder.ts`、RingBuffer、Journal）；
 3. **新增或调整仪表板 Webview UI 或状态栏控制器**（`dashboard.html`、`StatusBarManager.ts`）；
 4. **新增用户界面提示、命令文案或设置选项**（双语字典严格覆盖）；
-5. **维护内部审查规则**（`workspace-timing/scripts/config/review-rules.json`）。
+5. **维护内部审查规则与全仓门禁对接**（`workspace-timing/scripts/config/review-rules.json`、`scripts/review.js`）。
 
 ---
 
@@ -56,7 +57,7 @@ description: >-
 ### 1. 内存零延迟与磁盘实时追加
 1. **内存零延迟缓存 (RingBuffer)**：秒级时间片增量仅在内存中聚合，避免频繁磁盘 I/O 导致编辑器掉帧；
 2. **轻量追加日志 (Journal NDJSON)**：每隔固定心跳将增量片段以带有 `[DELTA]` 标识前缀的单行追加形式写入本地日志文件；编辑器异常崩溃或断电时，下次启动可即时无损回放（Replay）；
-3. **全量快照降频原子写入**：由 `StorageCoordinator` 级联管理，写入前先落盘至 `stagingUri` 暂存文件，完成写入后再执行原子重命名替换；危险操作（重置、清除）前强制写入前置安全快照。
+3. **全量快照降频原子写入**：由 `StorageCoordinator` 级联管理，写入前先落盘至 `stagingUri` 暂存文件，完成完整性核验后再执行原子重命名替换；危险操作（重置、清除）前强制写入前置安全快照。
 
 ### 2. 有界内存与智能滚动折叠 (`HistoryFolder`)
 为防止长期运行导致内存膨胀，实施严格的时长守恒折叠策略：
@@ -68,38 +69,52 @@ description: >-
 
 ## 四、 生产命名规范化与跨日会话原子切分
 
-1. **统一生产命名契约**：
-   - `stagingUri`：磁盘写入与快照原子替换时的专用暂存 URI，禁止使用模糊的 `tmpPath` 或 `tempUri`；
-   - `segmentedSessions`：跨自然日切分或滚动折叠后的标准会话片段序列，替代歧义的 `sessions` 或 `splitSessions`；
-   - `[DELTA]`：日志追加与事件广播中的增量数据行前缀标记，供 Journal 日志回放器精确识别增量数据行；
-2. **跨自然日会话切分与休眠恢复**：
-   - 系统挂起、休眠唤醒（`resumeFromSleep`）或意外恢复时，若运行区间跨越自然日边界，严禁将多日时长作为单段长会话直接封存；
-   - 必须通过 `TimeAggregator.splitByNaturalDay(startMs, endMs)` 将跨日会话原子拆分为各自然日的 `segmentedSessions` 片段，分别封存并保证时长守恒；
-3. **日汇总计数器增量一致性**：
-   - 会话封存时，仅将归属于当前自然日的片段累加至今日计数器，非本日片段不得污染今日活跃统计。
+### 1. 统一生产命名契约
+- **`stagingUri`**：磁盘写入与快照原子替换时的专用暂存 URI，禁止使用模糊的 `tmpPath` 或 `tempUri`；
+- **`segmentedSessions`**：跨自然日切分或滚动折叠后的标准会话片段序列，替代歧义的 `sessions` 或 `splitSessions`；
+- **`[DELTA]`**：日志追加与事件广播中的增量数据行前缀标记，供 Journal 日志回放器精确识别增量数据行。
+
+### 2. 跨自然日会话切分与休眠恢复
+- 系统挂起、休眠唤醒（`resumeFromSleep`）或意外恢复时，若运行区间跨越自然日边界，严禁将多日时长作为单段长会话直接封存；
+- 必须通过 `TimeAggregator.splitByNaturalDay(startMs, endMs)` 将跨日会话原子拆分为各自然日的 `segmentedSessions` 片段，分别封存并保证时长守恒；
+- 会话封存时，仅将归属于当前自然日的片段累加至今日计数器，非本日片段不得污染今日活跃统计。
 
 ---
 
 ## 五、 UI 100% 双语字典与暗色对比度视觉契约
 
-1. **100% 双语字典覆盖**：
-   - 界面文案必须通过 `i18n.t(key)` 提取，严格在 `src/i18n/locales/zh-CN.json` 与 `en.json` 中镜像双向对齐；
-   - **一票否决**：严禁在 HTML 模板、TS 逻辑、状态栏提示或弹窗中使用硬编码中英文；
-   - 严禁向用户暴露底层存储术语（如 RingBuffer、NDJSON、dailyTotals 等内部技术实现）；
-2. **暗色高对比度视觉契约**：
-   - 面板样式所有色彩必须通过 `:root` 声明的主题 CSS 变量（`var(--vscode-*)`）驱动；
-   - SVG 图标与活跃折线图刻度文字强制使用纯白 `#ffffff` 或主题适配明亮变量，严禁默认回退为暗黑色文字（导致在深色主题下不可见）；
-   - 严格遵循 WCAG AA 级以上色彩对比度标准。
+### 1. 100% 双语字典覆盖
+- 界面文案必须通过 `i18n.t(key)` 提取，严格在 `src/i18n/locales/zh-CN.json` 与 `en.json` 中镜像双向对齐；
+- **一票否决**：严禁在 HTML 模板、TS 逻辑、状态栏提示或弹窗中使用硬编码中英文；
+- 严禁向用户暴露底层存储术语（如 RingBuffer、NDJSON、dailyTotals 等内部技术实现）。
+
+### 2. 暗色高对比度视觉契约
+- 面板样式所有色彩必须通过 `:root` 声明的主题 CSS 变量（`var(--vscode-*)`）驱动；
+- SVG 图标与活跃折线图刻度文字强制使用纯白 `#ffffff` 或主题适配明亮变量，严禁默认回退为暗黑色文字（导致在深色主题下不可见）；
+- 严格遵循 WCAG AA 级以上色彩对比度标准。
 
 ---
 
-## 六、 极速构建与审查规则单源登记
+## 六、 全仓双层同构门禁深度对接与审查规则
 
-1. **极速构建契约**：
-   - `tsconfig.json` 必须保持 `"declaration": false` 与 `"isolatedModules": true`，杜绝类型声明文件生成带来的无谓构建开销；
-2. **审查规则单一真源**：
-   - 扩展内部审查规则（L0~L5 六层权重）单一真源登记于 `workspace-timing/scripts/config/review-rules.json`；
-   - 严禁在脚本中发射未在注册表中登记的规则标识符。
+`workspace-timing` 深度融入全工作区的 Tier 1 本地左移与 Tier 2 远端同构门禁：
+
+### 1. 门禁分流调度与对应指令
+当修改触及 `workspace-timing/**` 路径时，门禁系统触发三阶递进校验：
+1. **增量极速编译**：`npm run compile`（严格基于 `tsconfig.json` 的 `isolatedModules` 与无 `declaration` 快速发射）；
+2. **单元测试与回归套件**：`npm run test:fast`（执行 90+ 单元测试，重点看守会话折叠、跨日切分、时长守恒与崩溃回放）；
+3. **专有规则审查门禁**：`npm run review`（执行 `scripts/review.js` 检查 L0~L5 六层共 38 条规则）。
+
+### 2. 38 条审查规则单一真源对齐 (SSOT)
+- 审查规则单一真源登记于 `workspace-timing/scripts/config/review-rules.json`，并自动聚合至全仓 `scripts/common/rule-catalog.json`；
+- 规则严格划分为六层前缀：
+  - `L0-COMPILE`：代码必须 100% 编译通过；
+  - `L1-STORAGE-CRASH`：原子替换、快照前置与崩溃安全防护；
+  - `L2-TIMING-CONSERVATION`：跨日拆分与时长守恒契约；
+  - `L3-I18N-COVERAGE`：中英文双语字典 100% 镜像与硬编码字面量拦截；
+  - `L4-PERF-RESOURCE`：定时器无泄漏清理与 Disposable 资源解耦；
+  - `L5-UI-CONTRAST`：主题 CSS 变量驱动与暗色高对比度视觉合规；
+- 严禁在审查脚本或提交说明中发射未在规则库登记的规则代号。
 
 ---
 
@@ -117,7 +132,7 @@ npm run compile
 # 2. 运行快速单元测试套件（90+ 用例，包含折叠/聚合/i18n契约）
 npm run test:fast
 
-# 3. 运行扩展 L0~L5 六层权重审查门禁
+# 3. 运行扩展 L0~L5 六层权重审查门禁（38 规则看守）
 npm run review
 
 # 4. 同步 Webview 静态资源
