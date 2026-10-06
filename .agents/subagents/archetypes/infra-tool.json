@@ -1,0 +1,21 @@
+{
+  "archetype": "infra-tool",
+  "displayName": "工程效能、门禁脚本与跨平台调用 (scripts/)",
+  "rootDirectory": "scripts",
+  "allowedExtensions": [".js", ".ps1", ".sh", ".py", ".json", ".md"],
+  "pathJail": {
+    "allowedPrefixes": ["scripts/"],
+    "forbiddenPrefixes": ["workspace-timing/src/", "auto-refactor/src/", "WebGames/backend/"]
+  },
+  "associatedSkills": ["gate-governance", "release-package-workflow"],
+  "rigidAxioms": [
+    "子进程工作目录显式隔离：父级调用必须显式传递 -WorkingDirectory (PowerShell) 或 (cd dir && ...) (Bash)",
+    "PowerShell 优先使用跨平台 pwsh (PowerShell 7+)，严禁回退至 PS 5.1；磁盘上 .ps1 严格保持 CRLF 换行",
+    "Bash 脚本必须声明 set -euo pipefail，允许失败命令平铺捕获；磁盘严格保持 LF 换行",
+    "脚本执行必须带非交互守卫，严禁挂起阻塞"
+  ],
+  "localVerification": [
+    "pwsh -File scripts/ps1/pre-commit-gate.ps1",
+    "pwsh -File scripts/ps1/audit-all.ps1 -Fast"
+  ]
+}

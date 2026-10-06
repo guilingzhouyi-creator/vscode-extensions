@@ -20,6 +20,7 @@
 | **单源规则目录与元治理** | 380+ 规则 SSOT；规则 ID 零虚构 (`RCFG-RULE-DRIFT`)；三项目对齐 | [rule-catalog.json](scripts/common/rule-catalog.json) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js` |
 | **全工作区统一质量审查** | 5 大支柱 100% 绿色通行；零规则漂移 (`RCFG-RULE-DRIFT`) | [scripts/README.md](scripts/README.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/audit-all.ps1` |
 | **顶层蓝图与历史全宗** | Cell 平权自治体系；一体两面 Diff；归档案卷元数据规范 | [agent-native-system-blueprint.md](docs/agent-native-system-blueprint.md)<br/>[deliverables/README.md](archive/deliverables/README.md) | [docs-archive-governance](.agents/skills/docs-archive-governance/SKILL.md) | — |
+| **通用 SubAgent 泛化调度** | (Archetype $\otimes$ Posture) 正交派生；主会话同构继承 (inherit/flash)；Path Jail 物理防冲突 | [subagent-catalog.json](.agents/subagents/subagent-catalog.json) | [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) | `node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js` |
 
 ---
 
@@ -54,6 +55,11 @@
 - **工作目录显式隔离**：父级脚本跨目录调用子项目时，必须显式传递 `-WorkingDirectory (Join-Path $repoRoot "<subproject>")`（PowerShell）或 `(cd "<subproject>" && ...)`（Bash），杜绝工具配置文件解析与相对路径发生跨目录漂移；
 - **平台与非阻塞守卫**：全局与项目级脚本必须带非交互守卫；Git 钩子优先路由至跨平台 `pwsh`（PowerShell 7+），严禁回退至 PS 5.1；Bash 脚本必须声明 `set -euo pipefail` 且预期允许失败指令必须通过 `STATUS=0; cmd || STATUS=$?` 平铺捕获（详见 [gate-governance](.agents/skills/gate-governance/SKILL.md)）。
 
+### 6. SubAgent 委托与多智能体调度公理
+- **严禁裸调用原生 SubAgent**：在当前会话或任何新开会话中，当接收到 SubAgent 委托或并行施工指令时，严禁直接调用未经约束的原生 `self` 或擅自跨级切换高开销模型；SubAgent 在模型上必须与主会话保持同构一致，通过 `Model: "inherit"` 继承主会话配置（当前主会话为 Gemini 3.8 Flash，思考强度 effort=High），完整保留高强度深度推理能力并锁定 Flash 算力成本；必须依据任务所属领域（`vs-extension`, `cli-engine`, `game-engine`, `infra-tool`, `workspace-meta`）与姿态（`construct`, `review`, `refactor`, `explore`, `guardian`），通过 [subagent-catalog.json](.agents/subagents/subagent-catalog.json) 匹配或运行 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成出对应专员；
+- **四重防线契约注入**：派发前必须调用 `define_subagent` 注入 5 层系统契约（含 Path Jail 授权与禁止目录、所属领域专属公理、交割前强制自检命令）；审查（`review`）与探索（`explore`）姿态必须硬性配置 `enable_write_tools: false` 从物理工具层面剥夺写权限；`invoke_subagent` 必须显式指定 `Model: "inherit"`（或受控 `"flash"`），并使用包含范围与验收清单的标准任务外壳；
+- **物理沙箱防冲突（Path Jail）**：SubAgent 严禁触碰所属领域授权路径之外的任何文件，并行施工时如需写相同项目推荐使用 `Workspace: "branch"` 隔离。
+
 ---
 
 ## 三、 三大项目专属核心约束速查
@@ -77,14 +83,17 @@
 7. **原子提交与归属红线**：关键生产级提交（feat/fix/refactor）必须显式声明 `[Project]` 并限定于四大受控项目（`CMG-PRJ-001`）；提交前必须先通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审；
 8. **跳板消融红线**：严禁创建或保留有效代码 $\le 3$ 行且仅向单一目标透传的空包跳板文件；门面层违反实质承载预算强制触发 `ARCH-FAC-001` 阻断；
 9. **客观求实红线**：提交信息严禁夹带敷衍（`CMG-STY-001`）、夸大（`CMG-STY-002`）、贬损（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；`[Verification]` 严禁程序化流水账（`CMG-STY-005`）与执行数字统计流水账（`CMG-STY-006`）；
-10. **度量求真红线**：严禁在评分算法与自研度量中注入虚假倍率或固定加分；严禁使用伪造的统计误差区间。
+10. **度量求真红线**：严禁在评分算法与自研度量中注入虚假倍率或固定加分；严禁使用伪造的统计误差区间；
+11. **SubAgent 违规委派红线**：严禁在未装配 Path Jail 物理禁区、未注入领域公理或脱离主会话同构模型约束的情况下直接委派未经约束的原生 SubAgent（`self`）；审查类姿态严禁挂载写入权限（违者一票否决）。
 
 ---
 
 ## 五、 Agent 标准作业闭环（SOP）
 
 1. **查验指针**：接到任务后，依据意图查阅 §一 路由矩阵，精读对应项目的 SSOT 指针与关联 Skill，明确架构边界与红线；
-2. **单域作业**：操作严格限定在当前任务所属的项目内，严禁跨项目扩散修改；涉及方案调整严格遵守“先细则获批、后编码施工”；
+2. **作业与委托分流**：
+   - **单域直接作业**：操作严格限定在当前任务所属的项目内，严禁跨项目扩散修改；涉及方案调整严格遵守“先细则获批、后编码施工”；
+   - **多智能体/SubAgent 委派**：必须通过 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成专员并调用 `define_subagent` 注入契约，严格锁定 `Model: "inherit"`（同构继承主会话 Gemini 3.8 Flash + High effort）与只读权限后方可 `invoke_subagent`；
 3. **本地预审**：提交前必须在本地依次运行离线门禁预审：
    - 暂存区检查：`pwsh -File scripts/ps1/pre-commit-gate.ps1`
    - 提交信息检查：`pwsh -File scripts/ps1/commit-msg-gate.ps1 <path-to-msg>`

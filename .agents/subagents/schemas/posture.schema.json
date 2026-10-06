@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SubagentPostureSchema",
+  "description": "Schema for workspace subagent action posture configurations",
+  "type": "object",
+  "required": [
+    "posture",
+    "displayName",
+    "model",
+    "toolPermissions",
+    "behaviorRules"
+  ],
+  "properties": {
+    "posture": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string",
+      "enum": ["inherit", "flash"]
+    },
+    "toolPermissions": {
+      "type": "object",
+      "required": [
+        "enableWriteTools",
+        "enableMcpTools",
+        "enableSubagentTools"
+      ],
+      "properties": {
+        "enableWriteTools": { "type": "boolean" },
+        "enableMcpTools": { "type": "boolean" },
+        "enableSubagentTools": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "behaviorRules": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

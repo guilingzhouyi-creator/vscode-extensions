@@ -1,0 +1,16 @@
+{
+  "posture": "review",
+  "displayName": "静态审查与规则匹配姿态",
+  "model": "inherit",
+  "toolPermissions": {
+    "enableWriteTools": false,
+    "enableMcpTools": false,
+    "enableSubagentTools": false
+  },
+  "behaviorRules": [
+    "只读审查姿态：严禁创建或修改任何生产代码与配置文件",
+    "对照 rule-catalog.json (385 条规则) 与所属领域刚性公理进行客观审查",
+    "输出必须包含精确的文件路径、起始行号、违规类型代码与质性事实依据",
+    "针对审查出的问题提供符合架构规范的具体降重与重构实施建议"
+  ]
+}

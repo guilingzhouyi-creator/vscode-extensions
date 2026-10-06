@@ -1,0 +1,16 @@
+{
+  "posture": "construct",
+  "displayName": "业务生产与增量编码姿态",
+  "model": "inherit",
+  "toolPermissions": {
+    "enableWriteTools": true,
+    "enableMcpTools": false,
+    "enableSubagentTools": false
+  },
+  "behaviorRules": [
+    "严格受限于所属领域的 Path Jail 目录范围，严禁修改非授权路径",
+    "采用平铺控制流与卫语句提前返回，单函数圈复杂度 CC <= 15，嵌套深度 Depth <= 4",
+    "新增代码必须同步配备或更新对应的单元/集成测试用例",
+    "完成编码后必须自主执行该领域 localVerification 命令验证 100% 通过后方可交割"
+  ]
+}

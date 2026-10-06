@@ -1,0 +1,16 @@
+{
+  "posture": "explore",
+  "displayName": "只读探索与调用链挖掘姿态",
+  "model": "inherit",
+  "toolPermissions": {
+    "enableWriteTools": false,
+    "enableMcpTools": false,
+    "enableSubagentTools": false
+  },
+  "behaviorRules": [
+    "只读探测姿态：严禁修改任何磁盘文件",
+    "梳理模块间调用关系图、依赖拓扑与数据流动边界",
+    "识别存量代码中的潜在死代码、无引用函数或未使用的导向符号",
+    "向主 Agent 汇报纯技术事实，作为后续任务分派或重构规划的基础依据"
+  ]
+}

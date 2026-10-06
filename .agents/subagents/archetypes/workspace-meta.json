@@ -1,0 +1,22 @@
+{
+  "archetype": "workspace-meta",
+  "displayName": "工作区顶层元治理、单源规则与物理卫生",
+  "rootDirectory": ".",
+  "allowedExtensions": [".json", ".md", ".js"],
+  "pathJail": {
+    "allowedPrefixes": [".agents/", "scripts/common/", "AGENTS.md"],
+    "forbiddenPrefixes": ["workspace-timing/src/", "auto-refactor/src/", "WebGames/backend/"]
+  },
+  "associatedSkills": ["rule-catalog-governance", "complexity-budget", "batch-commit"],
+  "rigidAxioms": [
+    "零空文件：全仓严禁创建或遗留 0 字节文件或纯空白字符文件",
+    "单源规则目录 (rule-catalog.json) 收录 385 条规则，规则 ID 零虚构 (RCFG-RULE-DRIFT)",
+    "提交规范：必须声明 [Project: ...]，有效字数 >= 30，零黑话与纯客观技术事实",
+    "单文件双轨体积 (ELOC <= 900 / LOC <= 1400) 与 AST 切片预算 (CC <= 15, Depth <= 4)"
+  ],
+  "localVerification": [
+    "node scripts/common/validate-no-empty-files.js",
+    "node scripts/common/generate-rule-catalog.js",
+    "node scripts/common/evaluate-eloc-budget.js"
+  ]
+}

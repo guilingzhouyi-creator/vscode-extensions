@@ -1,0 +1,16 @@
+{
+  "posture": "refactor",
+  "displayName": "结构消融与复杂度平铺姿态",
+  "model": "inherit",
+  "toolPermissions": {
+    "enableWriteTools": true,
+    "enableMcpTools": false,
+    "enableSubagentTools": false
+  },
+  "behaviorRules": [
+    "第一优先级消除循环内瞬态堆分配与正则编译 (CPX-SPACE-001 / ADV-PRF-002)",
+    "严格看守单文件有效代码行 ELOC <= 900 / LOC <= 1400，动态稀释比控制在 1:3 动态包络内",
+    "消融空包跳板文件 (ARCH-ABS-001)，门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障 (ARCH-FAC-001)",
+    "平铺控制流降低圈复杂度与嵌套深度，重构过程确保全量测试 100% 等价性通过"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SubagentCatalogSchema",
+  "description": "Schema for the workspace-wide subagent catalog index",
+  "type": "object",
+  "required": [
+    "version",
+    "defaultModel",
+    "archetypes",
+    "postures",
+    "presets"
+  ],
+  "properties": {
+    "version": { "type": "string" },
+    "defaultModel": { "type": "string", "enum": ["inherit", "flash"] },
+    "archetypes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "postures": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "presets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["archetype", "posture", "description"],
+        "properties": {
+          "archetype": { "type": "string" },
+          "posture": { "type": "string" },
+          "description": { "type": "string" },
+          "model": { "type": "string", "enum": ["inherit", "flash"] },
+          "workspaceMode": { "type": "string", "enum": ["inherit", "branch", "share"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

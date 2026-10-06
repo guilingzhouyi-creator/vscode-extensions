@@ -1,0 +1,98 @@
+{
+  "$schema": "./schemas/catalog.schema.json",
+  "version": "1.0.0",
+  "defaultModel": "inherit",
+  "archetypes": {
+    "vs-extension": "./archetypes/vs-extension.json",
+    "cli-engine": "./archetypes/cli-engine.json",
+    "game-engine": "./archetypes/game-engine.json",
+    "infra-tool": "./archetypes/infra-tool.json",
+    "workspace-meta": "./archetypes/workspace-meta.json"
+  },
+  "postures": {
+    "construct": "./postures/construct.json",
+    "review": "./postures/review.json",
+    "refactor": "./postures/refactor.json",
+    "explore": "./postures/explore.json",
+    "guardian": "./postures/guardian.json"
+  },
+  "presets": {
+    "wt-construct": {
+      "archetype": "vs-extension",
+      "posture": "construct",
+      "description": "workspace-timing 业务特性开发与功能增量编写专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "wt-review": {
+      "archetype": "vs-extension",
+      "posture": "review",
+      "description": "workspace-timing 扩展静态审查、分层边界与硬编码分析专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "wt-refactor": {
+      "archetype": "vs-extension",
+      "posture": "refactor",
+      "description": "workspace-timing 结构消融、复杂度平铺与性能加固专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "ar-construct": {
+      "archetype": "cli-engine",
+      "posture": "construct",
+      "description": "auto-refactor 新分析器开发、规则扩充与原生算子开发专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "ar-review": {
+      "archetype": "cli-engine",
+      "posture": "review",
+      "description": "auto-refactor 规则等价性、项目中立性与质量模型审查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "ar-refactor": {
+      "archetype": "cli-engine",
+      "posture": "refactor",
+      "description": "auto-refactor 算子性能排毒、门面规范化与双轨体积控制专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "wg-construct": {
+      "archetype": "game-engine",
+      "posture": "construct",
+      "description": "WebGames 游戏系统设计、四阶段方案落地与 GDScript 增量编码专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "wg-review": {
+      "archetype": "game-engine",
+      "posture": "review",
+      "description": "WebGames 游戏逻辑静态分析、GameConfig 单源与表现层架构审查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "wg-refactor": {
+      "archetype": "game-engine",
+      "posture": "refactor",
+      "description": "WebGames 循环瞬态分配消除 (ADV-PRF-002)、超大脚本解耦与视图透传消融专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "infra-guardian": {
+      "archetype": "infra-tool",
+      "posture": "guardian",
+      "description": "全工作区跨平台脚本工程化、工作目录隔离与双层门禁守卫专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "workspace-guardian": {
+      "archetype": "workspace-meta",
+      "posture": "guardian",
+      "description": "全仓五大支柱统一审查 (audit-all)、单源规则目录与物理卫生总看守",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    }
+  }
+}

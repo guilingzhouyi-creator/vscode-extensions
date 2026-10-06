@@ -1,0 +1,22 @@
+{
+  "archetype": "vs-extension",
+  "displayName": "VS Code 扩展领域 (workspace-timing)",
+  "rootDirectory": "workspace-timing",
+  "allowedExtensions": [".ts", ".js", ".json", ".md"],
+  "pathJail": {
+    "allowedPrefixes": ["workspace-timing/"],
+    "forbiddenPrefixes": ["auto-refactor/", "WebGames/", "scripts/"]
+  },
+  "associatedSkills": ["workspace-timing-dev"],
+  "rigidAxioms": [
+    "严格遵守五层架构单向依赖：presentation -> application -> domain -> persistence -> integration",
+    "UI 文本 100% 接入双语字典 (zh-CN/en)，严禁在 TS/Webview 中硬编码未翻译文案与内部黑话",
+    "时间统计核心必须保持 RingBuffer 与日志追加崩溃安全，跨午夜/休眠单测必须注入 withFixedNow 固定时钟 Mock",
+    "tsconfig.json 保持 declaration: false 极速构建"
+  ],
+  "localVerification": [
+    "npm run compile",
+    "npm run test:fast",
+    "npm run review"
+  ]
+}

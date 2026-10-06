@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SubagentArchetypeSchema",
+  "description": "Schema for workspace domain archetype configurations",
+  "type": "object",
+  "required": [
+    "archetype",
+    "displayName",
+    "rootDirectory",
+    "allowedExtensions",
+    "pathJail",
+    "associatedSkills",
+    "rigidAxioms",
+    "localVerification"
+  ],
+  "properties": {
+    "archetype": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "rootDirectory": {
+      "type": "string"
+    },
+    "allowedExtensions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "pathJail": {
+      "type": "object",
+      "required": ["allowedPrefixes", "forbiddenPrefixes"],
+      "properties": {
+        "allowedPrefixes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "forbiddenPrefixes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "associatedSkills": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "rigidAxioms": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "localVerification": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
