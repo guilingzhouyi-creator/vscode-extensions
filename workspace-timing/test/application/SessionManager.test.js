@@ -62,6 +62,37 @@ class FakeJournalStore {
     async appendBatch(batch) { this.slices.push(...batch); }
 }
 
+/**
+ * 在固定时刻内运行回调：冻结 Date（覆盖 Date.now() 与 new Date()），
+ * 防止用例在午夜前后的前 10~30 分钟执行时跨越自然日边界导致今日累计切分偏差。
+ */
+function withFixedNow(iso, fn) {
+    const RealDate = Date;
+    const fixedMs = new RealDate(iso).getTime();
+    class FixedDate extends RealDate {
+        constructor(...args) {
+            super(...(args.length ? args : [fixedMs]));
+        }
+        static now() {
+            return fixedMs;
+        }
+    }
+    global.Date = FixedDate;
+    try {
+        const res = fn();
+        if (res && typeof res.then === 'function') {
+            return res.finally(() => {
+                global.Date = RealDate;
+            });
+        }
+        global.Date = RealDate;
+        return res;
+    } catch (err) {
+        global.Date = RealDate;
+        throw err;
+    }
+}
+
 describe('SessionManager（跨午夜与休眠管理）', () => {
     let timer;
     let storage;
@@ -133,25 +164,27 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
     });
 
     it('handleSystemResume：系统休眠恢复后不计入休眠时长', async () => {
-        await sessionManager.startSession();
+        await withFixedNow('2026-10-05T10:00:00', async () => {
+            await sessionManager.startSession();
 
-        const startMs = Date.now();
-        timer._sessionStartMs = startMs;
-        timer.data.currentSessionStartMs = startMs;
+            const startMs = Date.now();
+            timer._sessionStartMs = startMs;
+            timer.data.currentSessionStartMs = startMs;
 
-        const sleepStart = startMs + 1800000; // 30 分钟后盒盖睡眠
-        const resumeMs = startMs + 28800000;  // 8 小时后唤醒
+            const sleepStart = startMs + 1800000; // 30 分钟后盒盖睡眠
+            const resumeMs = startMs + 28800000;  // 8 小时后唤醒
 
-        await sessionManager.handleSystemResume(sleepStart, resumeMs);
+            await sessionManager.handleSystemResume(sleepStart, resumeMs);
 
-        // 验证：仅累计了睡眠前 30 分钟，8 小时睡眠期间不计入
-        assert.strictEqual(timer.data.totalMs, 1800000);
-        assert.strictEqual(timer.data.sessions.length, 1);
-        assert.strictEqual(timer.data.sessions[0].durationMs, 1800000);
-        assert.strictEqual(timer.data.currentSessionStartMs, resumeMs, '新起点设为唤醒时刻');
+            // 验证：仅累计了睡眠前 30 分钟，8 小时睡眠期间不计入
+            assert.strictEqual(timer.data.totalMs, 1800000);
+            assert.strictEqual(timer.data.sessions.length, 1);
+            assert.strictEqual(timer.data.sessions[0].durationMs, 1800000);
+            assert.strictEqual(timer.data.currentSessionStartMs, resumeMs, '新起点设为唤醒时刻');
 
-        // 验证：journal 水位线推进到唤醒时刻（崩溃恢复时跳过休眠前封存段，防双重计数）
-        assert.strictEqual(timer.data.metadata.lastJournalTs, String(resumeMs));
+            // 验证：journal 水位线推进到唤醒时刻（崩溃恢复时跳过休眠前封存段，防双重计数）
+            assert.strictEqual(timer.data.metadata.lastJournalTs, String(resumeMs));
+        });
     });
 
     it('setMaxSessions / saveCheckpoint：容量超限时自动触发无损折叠回收入 dailyTotals', async () => {

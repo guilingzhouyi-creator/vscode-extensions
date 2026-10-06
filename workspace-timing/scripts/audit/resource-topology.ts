@@ -6,7 +6,6 @@
 
 import path from 'node:path';
 import { parseArgs, helpFromHeader } from '../common/cli.js';
-import { createLogger } from '../common/logger.js';
 import { ROOT, SCRIPTS_DIR } from '../common/paths.js';
 import { loadJson, ReviewRules, ScalingConstants } from '../common/config.js';
 import { collectFiles, readFileSafe } from '../common/scan.js';
@@ -16,7 +15,6 @@ import {
     computeSemanticVolume,
     computeDynamicThresholds,
     buildInvertedCallerIndex,
-    buildSparseCandidateGraph,
     computeMultiModalCohesion,
     computeCallerDisjointness,
     clusterSymbols,
@@ -30,7 +28,6 @@ if (args.help) {
     await helpFromHeader(import.meta.url);
     process.exit(0);
 }
-const log = createLogger({ quiet: args.json });
 const root = args.root ? path.resolve(args.root) : ROOT;
 const started = Date.now();
 
@@ -241,7 +238,7 @@ for (const rel of resourceFileSet) {
 
         const cohesion = computeMultiModalCohesion(exportedSymbols, symbolCallerMap, tokenMap);
         const disjointness = computeCallerDisjointness(exportedSymbols, symbolCallerMap);
-        const clusters = clusterSymbols(exportedSymbols, symbolCallerMap, baseName);
+        const clusters = clusterSymbols(exportedSymbols, baseName);
         const facadeCode = generateBarrelFacade(clusters, ext);
 
         // 计算三元正交风险

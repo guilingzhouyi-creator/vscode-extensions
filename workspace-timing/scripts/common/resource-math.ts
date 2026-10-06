@@ -1,7 +1,7 @@
 // @wt-script common/resource-math
 // @purpose 结构化资源拓扑数学库：语义体积SV/倒排索引稀疏图/多模态内聚度/Tarjan SCC循环解耦/三元风险/贝叶斯先验
 // @origin native
-// @usage import { detectLanguage, computeSemanticVolume, computeDynamicThresholds, buildSparseCandidateGraph, tarjanSCC, computeTripartiteRisk } from './resource-math.js'
+// @usage import { detectLanguage, computeSemanticVolume, computeDynamicThresholds, tarjanSCC, computeTripartiteRisk } from './resource-math.js'
 // @exit 不适用（库模块）
 
 import type { ScalingConstants } from './config.js';
@@ -317,74 +317,6 @@ export function buildInvertedCallerIndex(
     return symbolCallerMap;
 }
 
-export interface SparseGraph {
-    nodes: string[];
-    adjacency: Map<string, Map<string, number>>; // u -> (v -> weight)
-    edgeCount: number;
-}
-
-/**
- * [Hard Invariant & Heuristic] 基于倒排索引构建 O(|E_s|) 稀疏候选图
- * 仅对拥有共同调用方、共同类型或共同词根的符号建边，收敛边规模至稀疏图，消除 O(n^2) 稠密对比开销
- */
-export function buildSparseCandidateGraph(
-    symbols: string[],
-    symbolCallerMap: Map<string, Set<string>>,
-    tokenMap: Map<string, Set<string>>
-): SparseGraph {
-    const adjacency = new Map<string, Map<string, number>>();
-    for (const s of symbols) adjacency.set(s, new Map());
-    let edgeCount = 0;
-
-    // 建立 consumer -> symbols 倒排
-    const consumerToSymbols = new Map<string, Set<string>>();
-    for (const [sym, callers] of symbolCallerMap) {
-        for (const c of callers) {
-            if (!consumerToSymbols.has(c)) consumerToSymbols.set(c, new Set());
-            consumerToSymbols.get(c)!.add(sym);
-        }
-    }
-
-    // 仅针对共享调用方的符号对建边
-    const candidatePairs = new Set<string>();
-    for (const [_, symSet] of consumerToSymbols) {
-        const arr = [...symSet];
-        for (let i = 0; i < arr.length; i++) {
-            for (let j = i + 1; j < arr.length; j++) {
-                const u = arr[i];
-                const v = arr[j];
-                const key = u < v ? `${u}#${v}` : `${v}#${u}`;
-                candidatePairs.add(key);
-            }
-        }
-    }
-
-    for (const pair of candidatePairs) {
-        const [u, v] = pair.split('#');
-        const callersU = symbolCallerMap.get(u) ?? new Set();
-        const callersV = symbolCallerMap.get(v) ?? new Set();
-        const callerSim = jaccardSimilarity(callersU, callersV);
-
-        const tokensU = tokenMap.get(u) ?? new Set();
-        const tokensV = tokenMap.get(v) ?? new Set();
-        const tokenSim = jaccardSimilarity(tokensU, tokensV);
-
-        // 稀疏边权重
-        const weight = 0.6 * callerSim + 0.4 * tokenSim;
-        if (weight > 0.05) {
-            adjacency.get(u)!.set(v, weight);
-            adjacency.get(v)!.set(u, weight);
-            edgeCount++;
-        }
-    }
-
-    return {
-        nodes: symbols,
-        adjacency,
-        edgeCount,
-    };
-}
-
 /**
  * [Heuristic] 多模态语义内聚度方程
  * Cohesion = 0.10*C_name + 0.25*C_type + 0.30*C_caller + 0.25*C_domain + 0.10*C_history
@@ -453,7 +385,6 @@ export interface SymbolCluster {
  */
 export function clusterSymbols(
     symbols: string[],
-    callerMap: Map<string, Set<string>> = new Map(),
     categoryStem: string = 'constants'
 ): SymbolCluster[] {
     if (symbols.length <= 3) {
@@ -477,7 +408,7 @@ export function clusterSymbols(
     }
 
     const sortedStems = [...stemFrequency.entries()]
-        .filter(([_, count]) => count >= 1)
+        .filter(([, count]) => count >= 1)
         .sort((a, b) => b[1] - a[1]);
 
     const dominantStems = sortedStems.slice(0, 4).map(([stem]) => stem);

@@ -17,7 +17,6 @@ import { LogLevel, log } from '../integration/Logger';
 import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format, setLocale, resolveLocale } from '../i18n/index';
 import { DashboardPanel } from './DashboardPanel';
-import { sanitizeFileName } from './fileUtils';
 
 /** 路由依赖（组合根注入） */
 export interface MessageRouterContext {
@@ -116,6 +115,11 @@ export interface FileExportPipelineOptions {
     generator: (orch: TimerOrchestrator, workspaceName: string) => Promise<string>;
     successMessage?: (filePath: string) => string;
     logTag: string;
+}
+
+/** 清洗文件名中的非法字符（工作区名可能含 /\:*?"<>| 等）；空结果回退为 'workspace' */
+function sanitizeFileName(name: string): string {
+    return name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'workspace';
 }
 
 /**
