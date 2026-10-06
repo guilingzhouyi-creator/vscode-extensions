@@ -31,6 +31,7 @@ import {
     ANALYZER_SECURITY,
     ANALYZER_SIMPLIFY,
     ANALYZER_PYTHON_MODERN,
+    RULE_SIM_ARGS_001,
 } from '../../scoring/dimensionLiterals';
 import { REMEDIATION_STANDARD_AND_ABOVE, ANALYZER_MODERN_RULES } from './analyzersModern';
 
@@ -559,6 +560,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
             'Eliminate uninitialized mutable let bindings by folding if-else into immutable const ternary.',
         remediation: 'Refactor let x; if (c) x = a; else x = b; into const x = c ? a : b;.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-imm-001',
+    }),
+    defineRule({
+        id: RULE_SIM_ARGS_001,
+        family: RULE_FAMILY_SIMPLIFY,
+        analyzer: ANALYZER_SIMPLIFY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Function signature parameter count exceeds threshold (> 4 parameters); refactoring with a ParameterObject recommended.',
+        remediation:
+            'Group related parameters into a cohesive parameter object or options interface to simplify call-sites.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-args-001',
     }),
     defineRule({
         id: 'DOC-DUP-001',

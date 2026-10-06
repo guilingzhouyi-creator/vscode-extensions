@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-06T08:19:11.317Z",
-  "totalRules": 385,
+  "generatedAt": "2026-10-06T12:57:04.454Z",
+  "totalRules": 389,
   "counts": {
-    "autoRefactor": 304,
+    "autoRefactor": 308,
     "workspaceTiming": 45,
     "webGames": 56,
     "globalTooling": 7
@@ -1697,6 +1697,13 @@
       "summary": "Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract."
     },
     {
+      "id": "NAM-ABR-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "Identifier contains cryptic, incomplete, or non-standard abbreviations harming code readability."
+    },
+    {
       "id": "NAM-COL-001",
       "project": "auto-refactor",
       "family": "NAM",
@@ -1744,6 +1751,20 @@
       "family": "NAM",
       "severity": "error",
       "summary": "Engineering assets and test suites must not contain construction phase or temporary jargon markers (phase numbers, temporary tokens, `wip` markers)."
+    },
+    {
+      "id": "NAM-LEN-001",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "Variable identifier length is outside acceptable bounds (excessively short or excessively long)."
+    },
+    {
+      "id": "NAM-LEN-002",
+      "project": "auto-refactor",
+      "family": "NAM",
+      "severity": "error",
+      "summary": "Function or method identifier length is too short to communicate its operational responsibility."
     },
     {
       "id": "NAM-MBR-001",
@@ -2367,6 +2388,13 @@
       "family": "SH",
       "severity": "error",
       "summary": "Temporary resource created without registering EXIT cleanup trap."
+    },
+    {
+      "id": "SIM-ARGS-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "Function signature parameter count exceeds threshold (> 4 parameters); refactoring with a ParameterObject recommended."
     },
     {
       "id": "SIM-BOOL-001",

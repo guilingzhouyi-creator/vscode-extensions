@@ -16,8 +16,14 @@ import {
     SEVERITY_WARNING,
     SEVERITY_INFO,
     RULE_FAMILY_NAMING,
+    LEGACY_REASON_ID_NOT_CANONICAL,
 } from '../types';
-import { ANALYZER_NAMING } from '../../scoring/dimensionLiterals';
+import {
+    ANALYZER_NAMING,
+    RULE_NAM_LEN_001,
+    RULE_NAM_LEN_002,
+    RULE_NAM_ABR_001,
+} from '../../scoring/dimensionLiterals';
 
 /**
  * Naming governance rule table: every rule whose owner is the naming analyzer.
@@ -228,5 +234,44 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         remediation:
             'Move executable logic into domain services or utility modules, preserving purity of structured resource repositories.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-res-005',
+    }),
+    defineRule({
+        id: RULE_NAM_LEN_001,
+        family: RULE_FAMILY_NAMING,
+        analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Variable identifier length is outside acceptable bounds (excessively short or excessively long).',
+        remediation:
+            'Choose a descriptive, balanced variable name communicating clear semantic intent without extreme brevity or verbosity.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-len-001',
+    }),
+    defineRule({
+        id: RULE_NAM_LEN_002,
+        family: RULE_FAMILY_NAMING,
+        analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Function or method identifier length is too short to communicate its operational responsibility.',
+        remediation:
+            'Rename function with an expressive verb-noun phrase clearly describing its operation and side effects.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-len-002',
+    }),
+    defineRule({
+        id: RULE_NAM_ABR_001,
+        family: RULE_FAMILY_NAMING,
+        analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Identifier contains cryptic, incomplete, or non-standard abbreviations harming code readability.',
+        remediation:
+            'Expand cryptic abbreviations to standard unabbreviated domain terms or approved domain acronyms.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-abr-001',
     }),
 ];

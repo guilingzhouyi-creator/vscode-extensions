@@ -687,3 +687,12 @@ export const DEDUCTION_SIMPLIFY_STANDARDIZATION = 10;
 
 /** Points deducted for outdated Go idioms or patterns. */
 export const DEDUCTION_GO_MODERNITY = 12;
+
+/** Rule id for variable identifier length guard. */
+export const RULE_NAM_LEN_001 = 'NAM-LEN-001';
+/** Rule id for function identifier length guard. */
+export const RULE_NAM_LEN_002 = 'NAM-LEN-002';
+/** Rule id for cryptic or incomplete abbreviation guard. */
+export const RULE_NAM_ABR_001 = 'NAM-ABR-001';
+/** Rule id for excessive function parameters guard (>4 parameters). */
+export const RULE_SIM_ARGS_001 = 'SIM-ARGS-001';

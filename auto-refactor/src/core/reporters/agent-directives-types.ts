@@ -114,6 +114,107 @@ export interface AgentVerificationDirective {
 }
 
 /**
+ * Directive execution track distinguishing direct standardization proposals from interactive clarification requests.
+ */
+export type AgentDirectiveTrack = 'standardization_proposal' | 'clarification_request';
+
+/**
+ * Call site or symbol reference location across project files.
+ */
+export interface CrossFileCallSite {
+    /** File path of the call site or reference */
+    readonly filePath: string;
+    /** 1-indexed line number */
+    readonly line: number;
+    /** 1-indexed column number (optional) */
+    readonly column?: number;
+    /** Source code snippet or statement at the call site */
+    readonly codeSnippet?: string;
+}
+
+/**
+ * Cross-file symbol usage and blast-radius context for coordinated refactoring across files.
+ */
+export interface CrossFileUsageContext {
+    /** Target symbol identifier under analysis (optional) */
+    readonly targetSymbol?: string;
+    /** Whether the target symbol is exported across module/file boundaries */
+    readonly isExportedSymbol: boolean;
+    /** Total reference count across the workspace or semantic graph */
+    readonly referenceCount: number;
+    /** List of impacted dependent file paths */
+    readonly impactedFiles: readonly string[];
+    /** Representative sample call sites illustrating downstream usage */
+    readonly sampleCallSites: readonly CrossFileCallSite[];
+    /** Whether renaming or mutating this symbol requires coordinated cross-file edits */
+    readonly requiresCoordinatedRename: boolean;
+}
+
+/**
+ * Candidate resolution option for an interactive clarification request.
+ */
+export interface ClarificationOption {
+    /** Unique key identifying the candidate option (e.g., 'rename_symbol', 'keep_signature') */
+    readonly key: string;
+    /** Human- and agent-readable label or display title */
+    readonly label: string;
+    /** Detailed technical description or impact rationale (optional) */
+    readonly description?: string;
+    /** Whether this candidate is recommended by the analyzer or engine (optional) */
+    readonly recommended?: boolean;
+}
+
+/**
+ * Interactive clarification request asking for agent or human arbitration when certainty is low
+ * or changes cross architectural boundaries.
+ */
+export interface AgentClarificationRequest {
+    /** Unique clarification request identifier */
+    readonly requestId: string;
+    /** Categorical question type (e.g., 'rename', 'signature_change', 'architectural_split') */
+    readonly questionType: string;
+    /** Prompt question addressed to the Agent or human engineer */
+    readonly promptQuestion: string;
+    /** List of candidate resolution options */
+    readonly candidateOptions: readonly ClarificationOption[];
+    /** Default option key if no explicit decision is provided */
+    readonly defaultChoiceKey?: string;
+    /** Cross-file symbol usage and blast-radius context */
+    readonly crossFileUsageContext?: CrossFileUsageContext;
+}
+
+/**
+ * Exact patch range and replacement for deterministic standardization.
+ */
+export interface AgentExactPatch {
+    /** Edit range for replacement */
+    readonly range: {
+        readonly startLine: number;
+        readonly startCol: number;
+        readonly endLine: number;
+        readonly endCol: number;
+    };
+    /** Code content to substitute into the range */
+    readonly replacementText: string;
+}
+
+/**
+ * Deterministic standardization proposal carrying exact patch and AST transformation metadata.
+ */
+export interface AgentStandardizationProposal {
+    /** Unique proposal identifier */
+    readonly proposalId: string;
+    /** Exact byte/line patch or formatted patch definition */
+    readonly exactPatch?: AgentExactPatch | string;
+    /** Standard transformation operator name or codemod rule */
+    readonly transformOperator?: string;
+    /** Source snippet before transformation */
+    readonly beforeSnippet?: string;
+    /** Proposed target snippet after transformation */
+    readonly afterSnippet?: string;
+}
+
+/**
  * Single actionable directive encompassing the five complete dimensions.
  */
 export interface AgentActionableDirective {
@@ -129,6 +230,14 @@ export interface AgentActionableDirective {
     readonly remediationRecipe: AgentRemediationRecipe;
     /** ⑤ Precise verification command recommendation and qualitative criteria */
     readonly verificationDirective: AgentVerificationDirective;
+    /** Directive execution track distinguishing direct standardization proposal vs clarification request */
+    readonly directiveTrack?: AgentDirectiveTrack;
+    /** Standardization proposal payload carrying exact patch or transformation */
+    readonly standardizationProposal?: AgentStandardizationProposal;
+    /** Interactive clarification request asking for agent/developer decision */
+    readonly clarificationRequest?: AgentClarificationRequest;
+    /** Cross-file symbol and usage impact context */
+    readonly crossFileUsageContext?: CrossFileUsageContext;
 }
 
 /**
@@ -173,6 +282,10 @@ export interface AgentBuilderDirective {
     readonly templateSnippet?: string;
     /** Guardrail constraints to adhere to */
     readonly constraints: readonly string[];
+    /** Whether this directive is pending interactive clarification */
+    readonly requiresClarification?: boolean;
+    /** Clarification request details if pending arbitration */
+    readonly clarificationRequest?: AgentClarificationRequest;
 }
 
 /**

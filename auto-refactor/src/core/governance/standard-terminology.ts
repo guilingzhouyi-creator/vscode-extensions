@@ -96,7 +96,11 @@ export type StandardActionVerb =
     | 'guard_recursion'
     | 'use_constant_time_comparison'
     | 'scaffold_constant_library'
-    | 'scaffold_gate_system';
+    | 'scaffold_gate_system'
+    | 'request_clarification'
+    | 'rename_symbol'
+    | 'introduce_parameter_object'
+    | 'decompose_module';
 
 /** Specification contract for a standardized remediation action verb */
 export interface ActionVerbSpec {
@@ -108,7 +112,7 @@ export interface ActionVerbSpec {
     readonly typicalFixTemplate: string;
 }
 
-/** Canonical register of 17 machine-actionable remediation verbs */
+/** Canonical register of 21 machine-actionable remediation verbs */
 export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSpec>> =
     Object.freeze({
         extract_pure_predicate: Object.freeze({
@@ -259,6 +263,42 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             zhDescription: '落地标准化提交前或推送前双层质量守卫流水线。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'Wire script into hooks and manifest.',
+        }),
+        request_clarification: Object.freeze({
+            verb: 'request_clarification',
+            taxonomy: 'GOV_NORM',
+            description:
+                'Request clarification when specifications, naming intent, or structural requirements are ambiguous.',
+            zhDescription: '在规格要求、命名意图或结构定义模糊时发起澄清请求。',
+            safeToAutomateDefault: false,
+            typicalFixTemplate: 'Request clarification from team or domain specification.',
+        }),
+        rename_symbol: Object.freeze({
+            verb: 'rename_symbol',
+            taxonomy: 'GOV_NORM',
+            description:
+                'Rename symbol to adhere to canonical naming conventions and communicate clear semantic intent.',
+            zhDescription: '重命名符号以符合规范命名标准并表达明确语义意图。',
+            safeToAutomateDefault: true,
+            typicalFixTemplate: 'Rename identifier across declarations and references.',
+        }),
+        introduce_parameter_object: Object.freeze({
+            verb: 'introduce_parameter_object',
+            taxonomy: 'CTRL_FLOW',
+            description:
+                'Group multiple related function parameters into a cohesive parameter object or options interface.',
+            zhDescription: '将过多的关联函数参数归拢封装为参数对象或选项接口。',
+            safeToAutomateDefault: false,
+            typicalFixTemplate: 'interface Options { ... }\nfunction target(options: Options): void;',
+        }),
+        decompose_module: Object.freeze({
+            verb: 'decompose_module',
+            taxonomy: 'ARCH_LAYER',
+            description:
+                'Decompose an oversized or multi-responsibility module into cohesive single-responsibility submodules.',
+            zhDescription: '将过大或多职责模块拆解为内聚的单一职责子模块。',
+            safeToAutomateDefault: false,
+            typicalFixTemplate: 'Extract cohesive procedures and types into dedicated submodules.',
         }),
     });
 

@@ -4,9 +4,10 @@
  * Architecture Role: Public barrel for all message and type submodules; gives analyzers,
  *   scorers, and API consumers one stable import path for the message contract.
  * Dependencies & Triggers: Re-exports ./types, ./security, ./architecture, ./governance,
- *   ./performance, ./comments, ./hygiene, ./secrets, ./scoring, ./trajectory, and ./guidance.
+ *   ./performance, ./comments, ./hygiene, ./secrets, ./scoring, ./trajectory, ./guidance,
+ *   and ./naming.
  *   Evaluated whenever a consumer imports ../core/messages, including CLI/CI/daemon bootstrap.
- * Responsibilities: Publish the eleven listed submodules under one namespace, exposing strongly
+ * Responsibilities: Publish the twelve listed submodules under one namespace, exposing strongly
  *   typed descriptors, standardized English messages, remediation suggestions, scoring
  *   rationales, trajectory notifications, and agent guidance templates, with no filtering,
  *   transformation, or runtime side effects of its own.
@@ -27,3 +28,5 @@ export * from './secrets';
 export * from './scoring';
 export * from './trajectory';
 export * from './guidance';
+export * from './naming';
+
