@@ -54,20 +54,18 @@ static func execute_play(
 	var target_mode := String(mc_config.get("target_mode", "SAME"))
 	var target_pool: Array = ctx.get("target_pool", [])
 	var hit_results: Array = []
-	var snapshot_ctx := ctx.duplicate()
+	var hit_ctx := ctx.duplicate()
 	if snapshot_mode:
-		snapshot_ctx["snapshot_locked"] = true
-	# SEQUENTIAL 需逐击不同 target 才复制 ctx；SAME/无池共享冻结 ctx 零拷贝
-	# （MagicSettlementSolver.resolve_attack 仅只读 ctx，已核验无逐击就地写入）
+		hit_ctx["snapshot_locked"] = true
+	# SEQUENTIAL 逐击复用同一上下文就地更新 target_id；SAME/无池共享初始化 target_id
+	# （MagicSettlementSolver.resolve_attack 仅只读 ctx，已核验无逐击就地写入，循环内零堆分配）
 	var sequential := target_mode == "SEQUENTIAL" and not target_pool.is_empty()
+	if not sequential and target_mode == "SAME":
+		if not hit_ctx.has("target_id"):
+			hit_ctx["target_id"] = str(ctx.get("target_id", ""))
 	for i in range(cast_count):
-		var hit_ctx := snapshot_ctx
 		if sequential:
-			hit_ctx = snapshot_ctx.duplicate()
 			hit_ctx["target_id"] = str(target_pool[i % target_pool.size()])
-		elif target_mode == "SAME":
-			if not hit_ctx.has("target_id"):
-				hit_ctx["target_id"] = str(ctx.get("target_id", ""))
 		var hit := MagicSettlementSolver.resolve_attack(card, rank, hit_ctx)
 		if not hit.get("success", false):
 			return hit

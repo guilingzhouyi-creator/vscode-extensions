@@ -157,9 +157,6 @@
       ],
       "backend/infrastructure/game_bootstrap.gd": [
         "SIM-CMP-001"
-      ],
-      "backend/domains/spatial_movement/spatial_math.gd": [
-        "SIM-WRP-001"
       ]
     }
   }

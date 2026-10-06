@@ -26,7 +26,7 @@ static func execute_disposal(
 
 	# 2. 空间距离检定 (便携溶剂无距离限制)
 	if facility.method != ItemDisposalFacilityDTO.DisposalMethod.PORTABLE_ACID_SOLVENT:
-		if not SpatialMath.within_radius(player_pos, facility.facility_pos, facility.max_operate_radius):
+		if player_pos.distance_to(facility.facility_pos) > facility.max_operate_radius:
 			return {
 				"success": false,
 				"error_code": "OUT_OF_FACILITY_RANGE",

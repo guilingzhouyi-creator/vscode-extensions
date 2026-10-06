@@ -36,7 +36,6 @@ ENGINE_PREFIXES = ("audit_", "report_", "archive_")
 REGISTRY_EXEMPT = {
     "audit_runner.py",   # driver：统一调度入口
     "audit_common.py",   # 共享底座：resolve_repo_root/ensure_utf8_stdout 等
-    "audit_gd_style.py", # legacy 占位：质量门禁基准 并入 audit_gd.py；保留仅为 docs/归档库 历史卷相对链接可解析
     "audit_arch.py",     # headless runner：无头 Godot 运行器，保留供回归验证，调度中枢统一采用原生静态 audit_arch_static.py
 }
 

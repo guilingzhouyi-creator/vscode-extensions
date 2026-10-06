@@ -43,7 +43,7 @@ class SpatialTriggerArea extends RefCounted:
 static func evaluate_trigger_state(trigger: SpatialTriggerArea, entity_pos: Vector2) -> TriggerState:
 	var is_contained := false
 	if trigger.shape == TriggerShape.CIRCLE_RADIUS:
-		is_contained = SpatialMath.within_radius(entity_pos, trigger.center_pos, trigger.radius)
+		is_contained = entity_pos.distance_to(trigger.center_pos) <= trigger.radius
 	elif trigger.shape == TriggerShape.AABB_RECTANGLE:
 		is_contained = trigger.rect_extents.has_point(entity_pos)
 
@@ -70,7 +70,7 @@ static func evaluate_entity_trigger_state(
 ) -> TriggerState:
 	var is_contained := false
 	if trigger.shape == TriggerShape.CIRCLE_RADIUS:
-		is_contained = SpatialMath.within_radius(entity_pos, trigger.center_pos, trigger.radius)
+		is_contained = entity_pos.distance_to(trigger.center_pos) <= trigger.radius
 	elif trigger.shape == TriggerShape.AABB_RECTANGLE:
 		is_contained = trigger.rect_extents.has_point(entity_pos)
 

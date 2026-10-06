@@ -5,8 +5,8 @@
 ## 快速开始
 
 ```bash
-# 运行全域单元测试（109 个测试套件，断言数以 run_tests.sh 输出为准）
-./run_tests.sh
+# 运行全域单元测试（109 个测试套件，断言数以 test-run.sh 输出为准）
+bash scripts/sh/test-run.sh
 
 # 等价于
 godot --headless -s res://tests/test_runner.gd
@@ -37,7 +37,7 @@ WebGames/
 ├── config/                   # 全部配置表（见下）
 │   └── infrastructure/domains.json  # 领域清单唯一事实来源（架构护栏依据）
 ├── docs/                     # 设计文档
-└── run_tests.sh
+└── scripts/                  # 门禁、测试与工程化脚本（sh/py/ps1）
 ```
 
 ## 配置驱动约定
@@ -175,7 +175,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 | 步骤 | 命令 | 拦截内容 |
 |---|---|---|
 | 导入工程 | `godot --headless --import` | 脚本编译 / 全局类缓存（不重试：编译失败是确定性的） |
-| DoD 验收 | `bash run_tests.sh` | 全域测试套件 |
+| DoD 验收 | `bash scripts/sh/test-run.sh` | 全域测试套件 |
 | 架构护栏 | `bash scripts/sh/audit-arch.sh` | TC-ARCH-01~06：目录 / 配置表 / 测试注册 / 确定性 / 文档计数 / 键级漂移 |
 | 配置审查 | `python3 scripts/py/audit_config.py --strict` | JSON 可解析 / 键命名 / 必需表齐全 / 格式一致性（无 BOM · LF · 2 空格规范序列化） |
 | 全量审查聚合 | `bash scripts/sh/audit-all.sh` | 20 项静态门禁（配置 / 高级规范治理 / 简化防过度 / 硬编码 / 热点与堆分配 / 覆盖 / 死配置 / 密钥 / 上下界 / 物品三元组 / 文案 / 魔法维度 / 事件概率 / CDC / 头注释契约 / 信道审计 / 架构护栏 / 收口等）+ 文档四域基线棘轮门禁（`audit-docs.sh --baseline`，仅阻断新增违规；Agent 操作契约见 `docs/README.md`；bench/archive 须显式 `--group` 触发） |
@@ -201,5 +201,5 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 | 配置调用点 | 862（`backend/` + `frontend/` 内 `GameConfig.get_*` 与 `GameConfig.msg`；表缺失 0；`GameConfig.get_value` 违禁调用 0） |
 | 函数 / 参数类型注解 | 100% / 100% |
 
-实时数据以审查产物为准：`bash run_tests.sh`（单测 JSON 汇总写入 `tests/reports/test_latest.json`）
+实时数据以审查产物为准：`bash scripts/sh/test-run.sh`（单测 JSON 汇总写入 `tests/reports/test_latest.json`）
 与 `bash scripts/sh/audit-all.sh`（20 项静态门禁含文档四域棘轮门禁，见 `docs/README.md` 契约）。

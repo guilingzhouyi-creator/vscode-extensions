@@ -63,17 +63,8 @@ static func _ensure_loaded() -> void:
 		for item in rules_arr:
 			if not (item is Dictionary):
 				continue
-			var pattern := str(item.get("field_pattern", ""))
-			if pattern.is_empty():
-				continue
-			var re := RegEx.new()
-			if re.compile("(?i)^(" + pattern + ")$") == OK:
-				var entry := RuleEntry.new()
-				entry.regex = re
-				entry.mask_mode = str(item.get("mask_mode", MODE_MASK))
-				entry.mask_prefix_len = int(item.get("mask_prefix_len", 4))
-				entry.mask_suffix_len = int(item.get("mask_suffix_len", 4))
-				entry.replace_with = str(item.get("replace_with", "****"))
+			var entry := _build_rule_entry(item)
+			if entry != null:
 				_rules.append(entry)
 
 ## 内置默认脱敏规则（配置段缺失时兜底：令牌/指纹掩码、口令丢弃、账号哈希）
@@ -85,15 +76,25 @@ static func _init_default_rules() -> void:
 		{"field_pattern": "account_id", "mask_mode": MODE_HASH}
 	]
 	for item in defaults:
-		var re := RegEx.new()
-		if re.compile("(?i)^(" + item["field_pattern"] + ")$") == OK:
-			var entry := RuleEntry.new()
-			entry.regex = re
-			entry.mask_mode = item["mask_mode"]
-			entry.mask_prefix_len = int(item.get("mask_prefix_len", 4))
-			entry.mask_suffix_len = int(item.get("mask_suffix_len", 4))
-			entry.replace_with = str(item.get("replace_with", "****"))
+		var entry := _build_rule_entry(item)
+		if entry != null:
 			_rules.append(entry)
+
+## 规则条目工厂：编译正则并构造规则实例（单点装配，提取自循环外）
+static func _build_rule_entry(item: Dictionary) -> RuleEntry:
+	var pattern := str(item.get("field_pattern", ""))
+	if pattern.is_empty():
+		return null
+	var re := RegEx.new()
+	if re.compile("(?i)^(" + pattern + ")$") != OK:
+		return null
+	var entry := RuleEntry.new()
+	entry.regex = re
+	entry.mask_mode = str(item.get("mask_mode", MODE_MASK))
+	entry.mask_prefix_len = int(item.get("mask_prefix_len", 4))
+	entry.mask_suffix_len = int(item.get("mask_suffix_len", 4))
+	entry.replace_with = str(item.get("replace_with", "****"))
+	return entry
 
 # ==============================================================================
 # 三、脱敏处理算法

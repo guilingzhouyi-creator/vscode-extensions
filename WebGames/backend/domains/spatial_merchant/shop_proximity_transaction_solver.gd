@@ -15,7 +15,7 @@ static func check_spatial_proximity(
 	player_pos: Vector2,
 	shop: MerchantShopAggregate
 ) -> bool:
-	return SpatialMath.within_radius(player_pos, shop.local_position, shop.interaction_radius_meters)
+	return player_pos.distance_to(shop.local_position) <= shop.interaction_radius_meters
 
 ## 货架购买五段流水：邻近/货架库存/价格钱包/背包空间检定后原子扣款扣库存（失败回滚快照）
 static func buy_item(

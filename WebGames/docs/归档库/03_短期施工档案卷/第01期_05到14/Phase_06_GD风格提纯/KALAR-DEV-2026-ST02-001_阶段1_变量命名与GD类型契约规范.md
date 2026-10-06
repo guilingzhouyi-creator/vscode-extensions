@@ -83,5 +83,5 @@ class_name PhysicalVerbRegistry extends RefCounted:
 | 检验项 ID | 测试目标 | 上游真理约束指针 | 输入断言 | 预期输出断言 |
 | :--- | :--- | :--- | :--- | :--- |
 | `TC-P06-S1-01` | 命名全量合规 | [AGENTS.md 命名](..\..\..\..\..\..\AGENTS.md) | `rg "var [A-Z]"` 全仓扫描 | 0 命中，`audit_gd_style` 166 文件通过 |
-| `TC-P06-S1-02` | static 前缀覆盖 | [audit_gd_style.py:63](..\..\..\..\..\scripts\py\audit_gd_style.py) | `static var VERBS` | 报 `变量名应为 snake_case` |
+| `TC-P06-S1-02` | static 前缀覆盖 | [audit_gd.py](..\..\..\..\..\scripts\py\audit_gd.py) | `static var VERBS` | 报 `变量名应为 snake_case` |
 | `TC-P06-S1-03` | 类型化取值 | [config/README.md 取值规范](..\..\..\..\..\config\README.md) | `GameConfig.get_value` 外部调用 | 0 命中，仅底座内部回退 |
