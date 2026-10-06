@@ -253,13 +253,13 @@ async function main() {
       const devtoolsIssues = (rep.issues || []).filter(
         (i) => i.location && i.location.file.includes('devtools.ts'),
       );
-      // devtools previously had 4+ false positives ('function', '../vanilla', 'zustand/devtools')
+      const FALSE_POSITIVE_LITERALS = new Set([
+        "'function'",
+        "'../vanilla'",
+        "'zustand/devtools'",
+      ]);
       const falsePositives = devtoolsIssues.filter(
-        (i) =>
-          i.detail &&
-          (i.detail.value === "'function'" ||
-            i.detail.value === "'../vanilla'" ||
-            i.detail.value === "'zustand/devtools'"),
+        (i) => i.detail && FALSE_POSITIVE_LITERALS.has(i.detail.value),
       );
       assert.strictEqual(
         falsePositives.length,

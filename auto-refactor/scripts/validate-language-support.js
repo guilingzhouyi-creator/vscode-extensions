@@ -80,24 +80,31 @@ const ADAPTER_CLASSES = {
  *   adapter, or listed for an adapter that does not claim it.
  */
 function assertExtensionIndexMatchesAdapters() {
+  const adapterExtensionsMap = new Map();
   for (const [id, AdapterClass] of Object.entries(ADAPTER_CLASSES)) {
-    for (const extension of new AdapterClass().extensions) {
+    adapterExtensionsMap.set(id, new Set(new AdapterClass().extensions));
+  }
+
+  for (const [id, extSet] of adapterExtensionsMap.entries()) {
+    for (const extension of extSet) {
       // Every declared extension must be indexed, and the indexed adapter must claim it. The
       // TS/JS family intentionally resolves to `typescript` even though the oxc adapter declares
       // the same six extensions: that is the historical default-parser behaviour, and `parser:
       // 'oxc'` overrides it before the index is consulted.
       const indexed = EXTENSION_ADAPTER_IDS[extension];
       assert.ok(indexed, `every declared extension must be indexed: ${extension} (${id})`);
+      const indexedSet = adapterExtensionsMap.get(indexed);
       assert.ok(
-        new ADAPTER_CLASSES[indexed]().extensions.includes(extension),
+        indexedSet !== undefined && indexedSet.has(extension),
         `extension index maps ${extension} to ${indexed}, which must declare it`,
       );
     }
   }
   for (const [extension, id] of Object.entries(EXTENSION_ADAPTER_IDS)) {
     assert.ok(ADAPTER_CLASSES[id], `extension index names an unknown adapter id: ${id}`);
+    const adapterSet = adapterExtensionsMap.get(id);
     assert.ok(
-      new ADAPTER_CLASSES[id]().extensions.includes(extension),
+      adapterSet !== undefined && adapterSet.has(extension),
       `${id} must declare the indexed extension ${extension}`,
     );
   }

@@ -158,6 +158,9 @@ function auditShannonEntropy(allFiles) {
   return true;
 }
 
+const BLOCK_COMMENT_CLOSE_RE = /\*\//;
+const COMMENT_LINE_RE = /^(?:\/\/|\*)/;
+
 function countEffectiveLoc(content) {
   const lines = content.split('\n');
   let effectiveLoc = 0;
@@ -166,14 +169,14 @@ function countEffectiveLoc(content) {
     const line = rawLine.trim();
     if (!line) continue;
     if (inBlockComment) {
-      if (line.includes('*/')) inBlockComment = false;
+      if (BLOCK_COMMENT_CLOSE_RE.test(line)) inBlockComment = false;
       continue;
     }
     if (line.startsWith('/*')) {
-      if (!line.includes('*/')) inBlockComment = true;
+      if (!BLOCK_COMMENT_CLOSE_RE.test(line)) inBlockComment = true;
       continue;
     }
-    if (line.startsWith('//') || line.startsWith('*')) continue;
+    if (COMMENT_LINE_RE.test(line)) continue;
     effectiveLoc++;
   }
   return effectiveLoc;
@@ -230,6 +233,15 @@ function auditAstDensity(allFiles) {
   return true;
 }
 
+const FORBIDDEN_BOUNDARY_TARGETS = new Set([
+  '../cli',
+  '../../cli',
+  '../../api',
+  '../api',
+  './api',
+]);
+const FORBIDDEN_CLI_REGEX = /\/cli(?:\/|$)/;
+
 function auditBoundaryInteroperability(allFiles) {
   console.log('[Gate 4] Boundary Interoperability Guard (BIF)');
   const coreFiles = allFiles.filter((f) => f.includes(path.sep + 'core' + path.sep));
@@ -243,13 +255,8 @@ function auditBoundaryInteroperability(allFiles) {
     while ((match = importRegex.exec(content)) !== null) {
       const target = match[1];
       if (
-        target.includes('/cli/') ||
-        target.endsWith('/cli') ||
-        target === '../cli' ||
-        target === '../../cli' ||
-        target === '../../api' ||
-        target === '../api' ||
-        target === './api'
+        FORBIDDEN_BOUNDARY_TARGETS.has(target) ||
+        FORBIDDEN_CLI_REGEX.test(target)
       ) {
         boundaryViolations.push({ relPath, target });
       }

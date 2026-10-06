@@ -45,6 +45,7 @@ const { TrajectoryRecipeExtractor } = require(
 const { RULE_REGISTRY } = require(
   path.join(__dirname, '..', 'dist', 'core', 'rules', 'registry.js'),
 );
+const RULE_REGISTRY_MAP = new Map(RULE_REGISTRY.map((rule) => [rule.id, rule]));
 
 const { familyDimensionOf } = require(
   path.join(__dirname, '..', 'dist', 'core', 'scoring', 'dimensionDeductions.js'),
@@ -126,7 +127,7 @@ console.log('=== Running Frontend Architecture & Governance Validation Pipeline 
     'GDM-UNI-001',
   ];
   for (const ruleId of expectedRules) {
-    const found = RULE_REGISTRY.find((r) => r.id === ruleId);
+    const found = RULE_REGISTRY_MAP.get(ruleId);
     assert.ok(found, `Gate 7 Failed: Expected rule ${ruleId} not registered in RULE_REGISTRY`);
     assert.strictEqual(found.family, 'GDM', `Gate 7 Failed: Rule ${ruleId} has wrong family`);
   }
@@ -515,7 +516,7 @@ func _on_buy():
     'GDM-BND-001',
   ];
   for (const ruleId of expectedNewRules) {
-    const found = RULE_REGISTRY.find((r) => r.id === ruleId);
+    const found = RULE_REGISTRY_MAP.get(ruleId);
     assert.ok(found, `Gate 22 Failed: Rule ${ruleId} not registered in RULE_REGISTRY`);
     assert.strictEqual(found.family, 'GDM', `Gate 22 Failed: Rule ${ruleId} has wrong family`);
     assert.strictEqual(

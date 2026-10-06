@@ -149,9 +149,10 @@ function validateEmittedRules(ids) {
   const aliasTargets = new Set(Object.values(LEGACY_RULE_ALIASES));
   const aliasSource = 'src/core/rules/aliases.ts'; // stored repo-relative, POSIX separators
   const emitted = emittedRuleIds();
-  for (const [id, files] of [...emitted.entries()]) {
+  for (const [id, files] of emitted.entries()) {
     if (!aliasTargets.has(id)) continue;
-    const remaining = new Set([...files].filter((file) => file !== aliasSource));
+    const remaining = new Set(files);
+    remaining.delete(aliasSource);
     if (remaining.size === 0) emitted.delete(id);
     else emitted.set(id, remaining);
   }

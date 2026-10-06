@@ -44,6 +44,18 @@ const HARDCODED_PATH_DEBT = {
   'src/core/governance/rules/sanitization.ts': 'self-description name suffix (sanitization.ts)',
 };
 
+const HARDCODED_PATH_DEBT_SET = new Set(Object.keys(HARDCODED_PATH_DEBT));
+
+const NON_ASCII_REGEX = /[^\u0000-\u007f]/;
+const COMMENT_LINE_REGEX = /^\s*(?:\/\/|\*|\/\*)/;
+const NAMED_CONST_REGEX = /^const [A-Z0-9_]+\s*[:=]/;
+const INLINE_NUMERIC_THRESHOLD_REGEX = /[<>]=?\s*\d{2,}|\d{2,}\s*[<>]=?/;
+const HARDCODED_PATH_TEST_1 = /includes\(['"]\/(?:tests?|benchmarks?|scripts?|samples?)\/['"]\)/;
+const HARDCODED_PATH_TEST_2 = /endsWith\(['"][a-z0-9_.-]+\.(?:ts|py|gd|rs)['"]\)/;
+const HARDCODED_PATH_TEST_3 = /fileNameEndsWith\([^)]*\[[^\]]*['"][a-z0-9_.-]+\.(?:ts|py|gd|rs)['"]/;
+const ZH_CHAR_REGEX = /[\u4e00-\u9fa5]/;
+const ANALYZER_DIAGNOSTIC_ZH_REGEX = /(?:message|suggestion)\s*:\s*[`'"].*[\u4e00-\u9fa5]/;
+
 /**
  * Collect every TypeScript file under a directory.
  *
@@ -73,7 +85,7 @@ function checkAsciiCodePositions() {
     const { raw, masked } = maskSourceText(content, SOURCE_MASK_PRESETS.typescript);
     for (let i = 0; i < raw.length; i += 1) {
       const line = raw[i];
-      if (!/[^\u0000-\u007f]/.test(line)) continue;
+      if (!NON_ASCII_REGEX.test(line)) continue;
       const m = masked[i] ?? '';
       for (let c = 0; c < line.length; c += 1) {
         if (line.charCodeAt(c) < 0x80) continue;
@@ -98,9 +110,9 @@ function checkInlineThresholds() {
     const lines = fs.readFileSync(abs, 'utf8').split('\n');
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i];
-      if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) continue; // comment
-      if (/^const [A-Z0-9_]+\s*[:=]/.test(line)) continue; // the named constant itself
-      if (/[<>]=?\s*\d{2,}|\d{2,}\s*[<>]=?/.test(line)) {
+      if (COMMENT_LINE_REGEX.test(line)) continue; // comment
+      if (NAMED_CONST_REGEX.test(line)) continue; // the named constant itself
+      if (INLINE_NUMERIC_THRESHOLD_REGEX.test(line)) {
         violations.push(`${rel}:${i + 1} inline numeric threshold: ${line.trim().slice(0, 70)}`);
       }
     }
@@ -116,16 +128,15 @@ function checkInlineThresholds() {
 function checkHardcodedPaths() {
   const violations = [];
   const dir = path.join(ROOT, 'src/core/governance/rules');
-  const debt = Object.keys(HARDCODED_PATH_DEBT);
   for (const abs of tsFiles(dir)) {
     const rel = path.relative(ROOT, abs).replace(/\\/g, '/');
     const text = fs.readFileSync(abs, 'utf8');
     const hit =
-      /includes\(['"]\/(?:tests?|benchmarks?|scripts?|samples?)\/['"]\)/.test(text) ||
-      /endsWith\(['"][a-z0-9_.-]+\.(?:ts|py|gd|rs)['"]\)/.test(text) ||
-      /fileNameEndsWith\([^)]*\[[^\]]*['"][a-z0-9_.-]+\.(?:ts|py|gd|rs)['"]/.test(text);
+      HARDCODED_PATH_TEST_1.test(text) ||
+      HARDCODED_PATH_TEST_2.test(text) ||
+      HARDCODED_PATH_TEST_3.test(text);
     if (!hit) continue;
-    if (debt.includes(rel)) continue;
+    if (HARDCODED_PATH_DEBT_SET.has(rel)) continue;
     violations.push(`${rel} hardcodes a path fragment and is not in the recorded debt list`);
   }
   return violations;
@@ -159,7 +170,7 @@ function scanLineForChineseLiterals(rel, lineNum, line, violations) {
   let match;
   while ((match = strRegex.exec(codeOnly)) !== null) {
     const literalContent = match[2];
-    if (!/[\u4e00-\u9fa5]/.test(literalContent)) continue;
+    if (!ZH_CHAR_REGEX.test(literalContent)) continue;
     if (
       rel === 'src/core/messages/comments.ts' &&
       ALLOWED_ZH_LITERALS_IN_MESSAGES.has(literalContent.trim())
@@ -184,8 +195,8 @@ function checkSingleMessageFile(abs, violations) {
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) continue;
-    if (!/[\u4e00-\u9fa5]/.test(line)) continue;
+    if (COMMENT_LINE_REGEX.test(line)) continue;
+    if (!ZH_CHAR_REGEX.test(line)) continue;
     scanLineForChineseLiterals(rel, i + 1, line, violations);
   }
 }
@@ -219,8 +230,8 @@ function checkSingleAnalyzerFile(abs, violations) {
   const lines = fs.readFileSync(abs, 'utf8').split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) continue;
-    if (/(?:message|suggestion)\s*:\s*[`'"].*[\u4e00-\u9fa5]/.test(line)) {
+    if (COMMENT_LINE_REGEX.test(line)) continue;
+    if (ANALYZER_DIAGNOSTIC_ZH_REGEX.test(line)) {
       violations.push(
         `${rel}:${i + 1} analyzer issue message/suggestion contains Chinese text: ${line.trim().slice(0, 70)}`,
       );

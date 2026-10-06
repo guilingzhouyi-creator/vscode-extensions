@@ -62,11 +62,13 @@ async function handleSymbolsCommand(args: string[]): Promise<void> {
         });
 
         process.stdout.write(`\n=== Symbol: ${target} ===\n`);
-        for (const d of result.definitions) {
-            process.stdout.write(`  defined  ${d.kind.padEnd(9)} ${d.file}:${d.line ?? '?'}\n`);
+        for (const definition of result.definitions) {
+            process.stdout.write(
+                `  defined  ${definition.kind.padEnd(9)} ${definition.file}:${definition.line ?? '?'}\n`,
+            );
         }
-        for (const r of result.references) {
-            process.stdout.write(`  called   ${r.file}:${r.line ?? '?'}\n`);
+        for (const reference of result.references) {
+            process.stdout.write(`  called   ${reference.file}:${reference.line ?? '?'}\n`);
         }
         process.stdout.write(
             `  coverage defs=${result.stats.definitions} refs=${result.stats.references} ` +
@@ -107,10 +109,10 @@ async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
     process.stdout.write(`\nRecent Active Runs (last ${recent.length}):\n`);
     for (const line of recent) {
         try {
-            const r = JSON.parse(line);
-            const dateStr = new Date(r.t).toISOString();
+            const runRecord = JSON.parse(line);
+            const dateStr = new Date(runRecord.t).toISOString();
             process.stdout.write(
-                `  • [${dateStr}] Rev ${r.rev} (${r.mod}): Score ${r.score.aft} | QED ${r.score.qed} | Proc ${r.eloc.proc} ELOC [Gate: ${r.gate.code}]\n`,
+                `  • [${dateStr}] Rev ${runRecord.rev} (${runRecord.mod}): Score ${runRecord.score.aft} | QED ${runRecord.score.qed} | Proc ${runRecord.eloc.proc} ELOC [Gate: ${runRecord.gate.code}]\n`,
             );
         } catch {
             /* ignored: malformed ndjson log entry */
@@ -182,17 +184,17 @@ function printFileTrajectory(targetFile: string): void {
     process.stdout.write(
         `Total Revisions: ${traj.totalRevisions} | Agents: ${traj.participatingAgents.join(', ')}\n`,
     );
-    for (const r of traj.revisions) {
-        const score = r.qualityScore?.compositeScore;
+    for (const revision of traj.revisions) {
+        const score = revision.qualityScore?.compositeScore;
         const scoreText = typeof score === 'number' && Number.isFinite(score) ? score : 'N/A';
         process.stdout.write(
-            `  • [${new Date(r.timestamp).toISOString()}] Rev ${r.revisionId.slice(0, REVISION_ID_DISPLAY_LENGTH)} by Agent: ${r.agentUid} | Score: ${scoreText}\n`,
+            `  • [${new Date(revision.timestamp).toISOString()}] Rev ${revision.revisionId.slice(0, REVISION_ID_DISPLAY_LENGTH)} by Agent: ${revision.agentUid} | Score: ${scoreText}\n`,
         );
     }
     if (traj.activeAnomalies.length > 0) {
         process.stdout.write(`Active Anomalies:\n`);
-        for (const a of traj.activeAnomalies) {
-            process.stdout.write(`  ⚠️ [${a.kind}] ${a.message}\n`);
+        for (const anomaly of traj.activeAnomalies) {
+            process.stdout.write(`  ⚠️ [${anomaly.kind}] ${anomaly.message}\n`);
         }
     }
     process.stdout.write(`========================================\n\n`);
@@ -215,9 +217,14 @@ async function handleTrajectoryCommand(args: string[]): Promise<void> {
 function countLinesEloc(content: string): { loc: number; eloc: number } {
     const lines = content.split('\n');
     let eloc = 0;
-    for (const l of lines) {
-        const t = l.trim();
-        if (t.length > 0 && !t.startsWith('//') && !t.startsWith('#') && !t.startsWith('*')) {
+    for (const sourceLine of lines) {
+        const trimmedLine = sourceLine.trim();
+        if (
+            trimmedLine.length > 0 &&
+            !trimmedLine.startsWith('//') &&
+            !trimmedLine.startsWith('#') &&
+            !trimmedLine.startsWith('*')
+        ) {
             eloc++;
         }
     }
@@ -236,14 +243,14 @@ async function processDirectoryEntries(
     let files = 0;
     let loc = 0;
     let eloc = 0;
-    for (const e of entries) {
-        const full = path.join(curr, e.name);
-        if (e.isDirectory()) {
-            if (!ignoredDirs.has(e.name)) queue.push(full);
+    for (const entry of entries) {
+        const full = path.join(curr, entry.name);
+        if (entry.isDirectory()) {
+            if (!ignoredDirs.has(entry.name)) queue.push(full);
             continue;
         }
-        if (!e.isFile()) continue;
-        const ext = path.extname(e.name).toLowerCase();
+        if (!entry.isFile()) continue;
+        const ext = path.extname(entry.name).toLowerCase();
         if (!supportedExts.has(ext)) continue;
 
         files++;
@@ -501,9 +508,9 @@ function computeProcessedDensityAndRatio(
 ): { processedEloc: number; density: number; ratio: number } {
     let totalProcessedEloc = 0;
     let totalPhysicalLoc = 0;
-    for (const m of fileMetrics) {
-        totalProcessedEloc += m.nonBlankLines ?? m.lines ?? 0;
-        totalPhysicalLoc += m.lines ?? 0;
+    for (const metric of fileMetrics) {
+        totalProcessedEloc += metric.nonBlankLines ?? metric.lines ?? 0;
+        totalPhysicalLoc += metric.lines ?? 0;
     }
 
     const processedEloc = Math.max(totalFiles, totalProcessedEloc);
@@ -520,7 +527,7 @@ function computeProcessedDensityAndRatio(
     return { processedEloc, density, ratio };
 }
 
-async function readHistoricalTrajectoryMeanScore(root: string): Promise<number | undefined> {
+async function readHistoricalMeanScore(root: string): Promise<number | undefined> {
     const fs = require('fs');
     const path = require('path');
     const trajectoryDir = path.join(root, '.refactor-trajectory');
@@ -544,47 +551,8 @@ async function readHistoricalTrajectoryMeanScore(root: string): Promise<number |
     return undefined;
 }
 
-async function handleGateCommand(args: string[]): Promise<void> {
-    const { stage, root } = parseGateOptions(args);
-
-    const { evaluateCompositeGate } = require('./core/praxis/composite-quality-gate');
-    const { computeTrajectoryQualityMetrics, recordToVector } = require('./core/trajectory');
-    const { scan } = require('./api');
-    const fs = require('fs');
-    const path = require('path');
-
-    const configPath = path.join(root, 'auto-refactor.config.json');
-    const configFile = fs.existsSync(configPath) ? configPath : undefined;
-    const scanResult = await scan({ root, configFile, logLevel: 'warn' });
-    const issues = scanResult.issues || [];
-    const unsuppressedErrors = issues.filter((i: any) => i.severity === 'error' && !i.suppression);
-    const staticPass = unsuppressedErrors.length === 0;
-    const regressionCount = unsuppressedErrors.length;
-    const totalFiles = scanResult.summary?.filesScanned || 1;
-
-    const fileMetrics = scanResult.fileMetrics || [];
-    const { processedEloc, density, ratio } = computeProcessedDensityAndRatio(fileMetrics, totalFiles);
-
-    const historicalBeforeScore = await readHistoricalTrajectoryMeanScore(root);
-    let currentScore = staticPass ? 100.0 : 80.0;
-    if (
-        typeof scanResult.qualityScore?.compositeScore === 'number' &&
-        Number.isFinite(scanResult.qualityScore.compositeScore)
-    ) {
-        currentScore = scanResult.qualityScore.compositeScore;
-    }
-    const beforeScore = historicalBeforeScore ?? currentScore;
-
-    const resolvedDebtPoints = staticPass ? 10 : 0;
-    const addedDebtPoints = regressionCount * 5;
-    const netDebtPointsDelta = resolvedDebtPoints - addedDebtPoints;
-
-    let scoreVector = new Array(10).fill(currentScore);
-    if (scanResult.qualityScore?.indices) {
-        scoreVector = recordToVector(scanResult.qualityScore.indices);
-    }
-
-    const counters = {
+function buildTrajectoryCounters(processedEloc: number, density: number, ratio: number) {
+    return {
         processed: processedEloc,
         unique: processedEloc,
         changed: 0,
@@ -599,8 +567,21 @@ async function handleGateCommand(args: string[]): Promise<void> {
         density,
         ratio,
     };
+}
 
-    const metrics = computeTrajectoryQualityMetrics({
+function buildGateMetrics(
+    beforeScore: number,
+    currentScore: number,
+    scoreVector: number[],
+    counters: any,
+    resolvedDebtPoints: number,
+    addedDebtPoints: number,
+    regressionCount: number,
+    unsuppressedErrors: any[],
+) {
+    const { computeTrajectoryQualityMetrics } = require('./core/trajectory');
+    const netDebtPointsDelta = resolvedDebtPoints - addedDebtPoints;
+    return computeTrajectoryQualityMetrics({
         beforeScore,
         afterScore: currentScore,
         scoreVector,
@@ -610,9 +591,66 @@ async function handleGateCommand(args: string[]): Promise<void> {
             addedDebtPoints,
             netDebtCleared: netDebtPointsDelta,
             regressionFindingsCount: regressionCount,
-            regressionFindingIds: unsuppressedErrors.map((i: any) => i.id || i.rule || 'STATIC_ERROR'),
+            regressionFindingIds: unsuppressedErrors.map(
+                (issue: any) => issue.id || issue.rule || 'STATIC_ERROR',
+            ),
         },
     });
+}
+
+async function handleGateCommand(args: string[]): Promise<void> {
+    const { stage, root } = parseGateOptions(args);
+    const { evaluateCompositeGate } = require('./core/praxis/composite-quality-gate');
+    const { recordToVector } = require('./core/trajectory');
+    const { scan } = require('./api');
+    const fs = require('fs');
+    const path = require('path');
+
+    const configPath = path.join(root, 'auto-refactor.config.json');
+    const configFile = fs.existsSync(configPath) ? configPath : undefined;
+    const scanResult = await scan({ root, configFile, logLevel: 'warn' });
+    const issues = scanResult.issues || [];
+    const unsuppressedErrors = issues.filter(
+        (issue: any) => issue.severity === 'error' && !issue.suppression,
+    );
+    const staticPass = unsuppressedErrors.length === 0;
+    const regressionCount = unsuppressedErrors.length;
+    const totalFiles = scanResult.summary?.filesScanned || 1;
+
+    const fileMetrics = scanResult.fileMetrics || [];
+    const { processedEloc, density, ratio } = computeProcessedDensityAndRatio(
+        fileMetrics,
+        totalFiles,
+    );
+
+    const historicalBeforeScore = await readHistoricalMeanScore(root);
+    let currentScore = staticPass ? 100.0 : 80.0;
+    if (
+        typeof scanResult.qualityScore?.compositeScore === 'number' &&
+        Number.isFinite(scanResult.qualityScore.compositeScore)
+    ) {
+        currentScore = scanResult.qualityScore.compositeScore;
+    }
+    const beforeScore = historicalBeforeScore ?? currentScore;
+    const resolvedDebtPoints = staticPass ? 10 : 0;
+    const addedDebtPoints = regressionCount * 5;
+
+    let scoreVector = new Array(10).fill(currentScore);
+    if (scanResult.qualityScore?.indices) {
+        scoreVector = recordToVector(scanResult.qualityScore.indices);
+    }
+
+    const counters = buildTrajectoryCounters(processedEloc, density, ratio);
+    const metrics = buildGateMetrics(
+        beforeScore,
+        currentScore,
+        scoreVector,
+        counters,
+        resolvedDebtPoints,
+        addedDebtPoints,
+        regressionCount,
+        unsuppressedErrors,
+    );
 
     const result = evaluateCompositeGate({
         stage,
@@ -632,55 +670,57 @@ async function handleGateCommand(args: string[]): Promise<void> {
  */
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
-    const sub = args.find((a) => !a.startsWith('--')) || 'scan';
+    const subcommand = args.find((argument) => !argument.startsWith('--')) || 'scan';
 
-    if (sub === 'symbols') {
+    if (subcommand === 'symbols') {
         await handleSymbolsCommand(args);
         return;
     }
-    if (sub === DAEMON_SUBCOMMAND) {
+    if (subcommand === DAEMON_SUBCOMMAND) {
         const { daemonCommand } = require('./cli/daemonCmd');
-        const rest = args.slice(args.indexOf(DAEMON_SUBCOMMAND) + 1);
-        const r = await daemonCommand(rest);
-        if (r.text) process.stdout.write(r.text + '\n');
-        process.exit(r.code);
+        const restArgs = args.slice(args.indexOf(DAEMON_SUBCOMMAND) + 1);
+        const daemonResult = await daemonCommand(restArgs);
+        if (daemonResult.text) process.stdout.write(daemonResult.text + '\n');
+        process.exit(daemonResult.code);
     }
-    if (sub === 'self-test') {
+    if (subcommand === 'self-test') {
         const { selfTestCommand } = require('./cli/selfTestCmd');
-        const r = await selfTestCommand(args.slice(args.indexOf('self-test') + 1));
-        process.stderr.write(r.text + '\n');
-        process.exit(r.code);
+        const testArgs = args.slice(args.indexOf('self-test') + 1);
+        const selfTestResult = await selfTestCommand(testArgs);
+        process.stderr.write(selfTestResult.text + '\n');
+        process.exit(selfTestResult.code);
     }
-    if (sub === 'guide') {
+    if (subcommand === 'guide') {
         handleGuideCommand(args);
         return;
     }
-    if (sub === 'trajectory') {
+    if (subcommand === 'trajectory') {
         await handleTrajectoryCommand(args);
         return;
     }
-    if (sub === 'memory') {
+    if (subcommand === 'memory') {
         handleMemoryCommand();
         return;
     }
-    if (sub === 'stats') {
+    if (subcommand === 'stats') {
         await handleStatsCommand(args);
         return;
     }
-    if (sub === 'gate') {
+    if (subcommand === 'gate') {
         await handleGateCommand(args);
         return;
     }
-    if (sub !== 'scan') {
+    if (subcommand !== 'scan') {
         printUsage();
         process.exit(2);
     }
 
-    const code = await handleScanCommand(args);
-    process.exit(code);
+    const exitCode = await handleScanCommand(args);
+    process.exit(exitCode);
 }
 
-main().catch((e) => {
-    process.stderr.write(`[auto-refactor] FATAL: ${e?.stack || e}\n`);
+main().catch((error: unknown) => {
+    const errObj = error as { stack?: string } | undefined;
+    process.stderr.write(`[auto-refactor] FATAL: ${errObj?.stack || String(error)}\n`);
     process.exit(2);
 });

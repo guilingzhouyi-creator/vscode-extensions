@@ -200,13 +200,14 @@ const EXPECTED_DEDUCTIONS = [
 async function checkNarrowScan(root) {
   const narrow = (await scanWith(root, NARROW_ANALYZERS)).qualityScore;
   assert.ok(Array.isArray(narrow.notEvaluated), 'the score must publish notEvaluated');
+  const notEvaluatedSet = new Set(narrow.notEvaluated);
+  const evaluated = ALL_QUALITY_DIMENSIONS.filter((dim) => !notEvaluatedSet.has(dim));
   assert.deepStrictEqual(
-    ALL_QUALITY_DIMENSIONS.filter((dim) => !narrow.notEvaluated.includes(dim)).sort(),
+    [...evaluated].sort(),
     [...NARROW_EVALUATED].sort(),
     `only the constants-fed dimensions may stay evaluated, got ${JSON.stringify(narrow.notEvaluated)}`,
   );
   assert.ok(narrow.coverage < 1, `coverage must drop below one, got ${narrow.coverage}`);
-  const evaluated = ALL_QUALITY_DIMENSIONS.filter((dim) => !narrow.notEvaluated.includes(dim));
   for (const dim of evaluated) {
     assert.deepStrictEqual(
       narrow.evaluatedBy[dim],
@@ -371,10 +372,14 @@ function checkCoverageModel() {
   for (const [dimension, analyzers] of Object.entries(FAMILY_DEDUCTION_SOURCES)) {
     sources[dimension] = [...new Set([...(sources[dimension] ?? []), ...analyzers])].sort();
   }
+  const dimensionAnalyzersSet = new Map(
+    Object.entries(DIMENSION_ANALYZERS).map(([dim, list]) => [dim, new Set(list)]),
+  );
   for (const [dimension, analyzers] of Object.entries(sources)) {
+    const declaredAnalyzers = dimensionAnalyzersSet.get(dimension);
     for (const analyzer of analyzers) {
       assert.ok(
-        (DIMENSION_ANALYZERS[dimension] ?? []).includes(analyzer),
+        declaredAnalyzers !== undefined && declaredAnalyzers.has(analyzer),
         `${analyzer} deducts ${dimension} but the dimension does not declare it as evidence`,
       );
     }

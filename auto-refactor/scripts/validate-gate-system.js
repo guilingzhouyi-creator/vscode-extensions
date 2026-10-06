@@ -24,16 +24,28 @@ const { ShellLintAnalyzer } = require('../dist/analyzers/shell-lint');
 
 const ROOT_DIR = path.resolve(__dirname, '../..');
 
-function collectFiles(dir, extensions) {
+const CRLF_REGEX = /\r\n/;
+const CR_REGEX = /\r/;
+const FORBIDDEN_EXEC_SH = /exec sh /;
+const REQUIRED_EXEC_BASH = /exec bash /;
+const AUDIT_ALL_REGEX = /(?:workspace-timing|auto-refactor|WebGames|audit_config\.py|\[5\/5\])/g;
+const PRE_COMMIT_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames)/g;
+const PRE_PUSH_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames|validate-commit-msg-style)/g;
+
+function collectFiles(dir, extensions, extSet) {
   const results = [];
   if (!fs.existsSync(dir)) return results;
+  const targetSet = extSet || new Set(extensions);
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      results.push(...collectFiles(fullPath, extensions));
-    } else if (extensions.some((ext) => entry.name.endsWith(ext))) {
-      results.push(fullPath);
+      results.push(...collectFiles(fullPath, extensions, targetSet));
+    } else {
+      const ext = path.extname(entry.name);
+      if (targetSet.has(ext)) {
+        results.push(fullPath);
+      }
     }
   }
   return results;
@@ -62,12 +74,12 @@ function verifyLineEndings(psFiles, lfFiles) {
   for (const psFile of psFiles) {
     const content = fs.readFileSync(psFile, 'utf8');
     const rel = path.relative(ROOT_DIR, psFile).replace(/\\/g, '/');
-    assert(content.includes('\r\n'), `PowerShell script must use CRLF line endings: ${rel}`);
+    assert(CRLF_REGEX.test(content), `PowerShell script must use CRLF line endings: ${rel}`);
   }
   for (const lfFile of lfFiles) {
     const content = fs.readFileSync(lfFile, 'utf8');
     const rel = path.relative(ROOT_DIR, lfFile).replace(/\\/g, '/');
-    assert(!content.includes('\r'), `Script/code must use LF line endings, found CR: ${rel}`);
+    assert(!CR_REGEX.test(content), `Script/code must use LF line endings, found CR: ${rel}`);
   }
 }
 
@@ -76,10 +88,10 @@ function verifyHookRouting(hookFiles) {
     const content = fs.readFileSync(hookFile, 'utf8');
     const rel = path.relative(ROOT_DIR, hookFile).replace(/\\/g, '/');
     assert(
-      !content.includes('exec sh '),
+      !FORBIDDEN_EXEC_SH.test(content),
       `Git hook must not downgrade to POSIX sh (dash crash risk): ${rel}`,
     );
-    assert(content.includes('exec bash '), `Git hook must route fallback to bash: ${rel}`);
+    assert(REQUIRED_EXEC_BASH.test(content), `Git hook must route fallback to bash: ${rel}`);
   }
 }
 
@@ -96,11 +108,12 @@ function verifyAuditAllParity() {
     ['audit-all.ps1', psContent],
     ['audit-all.sh', shContent],
   ]) {
-    assert(content.includes('workspace-timing'), `${name} must cover workspace-timing`);
-    assert(content.includes('auto-refactor'), `${name} must cover auto-refactor`);
-    assert(content.includes('WebGames'), `${name} must cover WebGames`);
-    assert(content.includes('audit_config.py'), `${name} must run WebGames config audit`);
-    assert(content.includes('[5/5]'), `${name} must have 5 verification steps`);
+    const tokens = new Set(content.match(AUDIT_ALL_REGEX) || []);
+    assert(tokens.has('workspace-timing'), `${name} must cover workspace-timing`);
+    assert(tokens.has('auto-refactor'), `${name} must cover auto-refactor`);
+    assert(tokens.has('WebGames'), `${name} must cover WebGames`);
+    assert(tokens.has('audit_config.py'), `${name} must run WebGames config audit`);
+    assert(tokens.has('[5/5]'), `${name} must have 5 verification steps`);
   }
 }
 
@@ -114,12 +127,13 @@ function verifyPreCommitParity() {
   ]) {
     assert(fs.existsSync(p), `${name} must exist`);
     const content = fs.readFileSync(p, 'utf8');
+    const tokens = new Set(content.match(PRE_COMMIT_REGEX) || []);
     for (let i = 1; i <= 9; i++) {
-      assert(content.includes(`[${i}/9]`), `${name} must contain step [${i}/9]`);
+      assert(tokens.has(`[${i}/9]`), `${name} must contain step [${i}/9]`);
     }
-    assert(content.includes('workspace-timing'), `${name} Gate 8 must verify workspace-timing`);
-    assert(content.includes('auto-refactor'), `${name} Gate 8 must verify auto-refactor`);
-    assert(content.includes('WebGames'), `${name} Gate 8 must verify WebGames`);
+    assert(tokens.has('workspace-timing'), `${name} Gate 8 must verify workspace-timing`);
+    assert(tokens.has('auto-refactor'), `${name} Gate 8 must verify auto-refactor`);
+    assert(tokens.has('WebGames'), `${name} Gate 8 must verify WebGames`);
   }
 }
 
@@ -133,13 +147,14 @@ function verifyPrePushParity() {
   ]) {
     assert(fs.existsSync(p), `${name} must exist`);
     const content = fs.readFileSync(p, 'utf8');
+    const tokens = new Set(content.match(PRE_PUSH_REGEX) || []);
     for (let i = 1; i <= 9; i++) {
-      assert(content.includes(`[${i}/9]`), `${name} must contain Gate [${i}/9]`);
+      assert(tokens.has(`[${i}/9]`), `${name} must contain Gate [${i}/9]`);
     }
-    assert(content.includes('workspace-timing'), `${name} must verify workspace-timing`);
-    assert(content.includes('auto-refactor'), `${name} must verify auto-refactor`);
-    assert(content.includes('WebGames'), `${name} must verify WebGames`);
-    assert(content.includes('validate-commit-msg-style'), `${name} must verify commit msg style`);
+    assert(tokens.has('workspace-timing'), `${name} must verify workspace-timing`);
+    assert(tokens.has('auto-refactor'), `${name} must verify auto-refactor`);
+    assert(tokens.has('WebGames'), `${name} must verify WebGames`);
+    assert(tokens.has('validate-commit-msg-style'), `${name} must verify commit msg style`);
   }
 }
 

@@ -507,7 +507,7 @@ export class FeedbackAdaptiveSupervisor {
      */
     public generateGovernanceSummary(): FeedbackGovernanceSummary {
         const incidents = this.ledger.getAllIncidents();
-        const rollbacks = incidents.filter((i) => i.type === 'rollback');
+        const rollbacks = incidents.filter((incident) => incident.type === 'rollback');
 
         const rulesSet = new Set<string>();
         let dampenedCount = 0;
@@ -554,23 +554,25 @@ export class FeedbackAdaptiveSupervisor {
         const summary = this.generateGovernanceSummary();
         const incidents = this.ledger.getAllIncidents();
 
-        const demotedRules: string[] = [];
+        const demotedRulesSet = new Set<string>();
         for (const inc of incidents) {
-            if (inc.ruleId && !demotedRules.includes(inc.ruleId)) {
+            if (inc.ruleId && !demotedRulesSet.has(inc.ruleId)) {
                 if (this.ledger.getRuleReliability(inc.ruleId).confidenceMultiplier < 1.0) {
-                    demotedRules.push(inc.ruleId);
+                    demotedRulesSet.add(inc.ruleId);
                 }
             }
         }
+        const demotedRules = Array.from(demotedRulesSet);
 
-        const boostedPatterns: string[] = [];
+        const boostedPatternsSet = new Set<string>();
         for (const inc of incidents) {
-            if (inc.patternId && !boostedPatterns.includes(inc.patternId)) {
+            if (inc.patternId && !boostedPatternsSet.has(inc.patternId)) {
                 if (this.ledger.getPatternStability(inc.patternId).stabilityBoostFactor > 1.0) {
-                    boostedPatterns.push(inc.patternId);
+                    boostedPatternsSet.add(inc.patternId);
                 }
             }
         }
+        const boostedPatterns = Array.from(boostedPatternsSet);
 
         return {
             version: '1.0',

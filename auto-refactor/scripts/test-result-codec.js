@@ -64,9 +64,20 @@ function check(payload, label) {
     logLevel: 'silent',
     failOnIssue: false,
   });
+  const issuesByFile = new Map();
+  for (const issue of r.issues || []) {
+    const fileKey = issue.location?.file;
+    if (!fileKey) continue;
+    let fileBucket = issuesByFile.get(fileKey);
+    if (!fileBucket) {
+      fileBucket = [];
+      issuesByFile.set(fileKey, fileBucket);
+    }
+    fileBucket.push(issue);
+  }
   const perFile = [];
   for (const m of r.fileMetrics || []) {
-    const issues = r.issues.filter((i) => i.location.file === m.file);
+    const issues = issuesByFile.get(m.file) || [];
     perFile.push({ file: m.file, issues, metric: m });
   }
   check(perFile, 'samples-real');

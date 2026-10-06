@@ -139,10 +139,11 @@ async function main() {
 
     // ── 3. Language scope: JS keeps the syntax rules, drops the typed ones; .d.ts is excluded ──
     const jsHits = await scanFixture(root, { 'src/positive.js': POSITIVE }, packOn);
-    const jsIds = [...new Set(jsHits.map((issue) => issue.rule))].sort();
+    const jsIdSet = new Set(jsHits.map((issue) => issue.rule));
     for (const typed of TYPED_RULE_IDS) {
-      assert.ok(!jsIds.includes(typed), `${typed} must not run on plain JavaScript`);
+      assert.ok(!jsIdSet.has(typed), `${typed} must not run on plain JavaScript`);
     }
+    const jsIds = [...jsIdSet].sort();
     assert.strictEqual(
       jsIds.length,
       ALL_RULE_IDS.length - TYPED_RULE_IDS.length,

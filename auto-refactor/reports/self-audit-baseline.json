@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791264741841",
-  "timestamp": "2026-10-06T05:32:35.146Z",
+  "snapshotId": "snapshot-v0.4.0-1791268948956",
+  "timestamp": "2026-10-06T06:42:42.049Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -12,40 +12,40 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 600,
-    "durationMs": 12119
+    "filesScanned": 601,
+    "durationMs": 11912
   },
   "metrics": {
-    "compositeScore": 99.16,
+    "compositeScore": 99.18,
     "grade": "A+",
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 10099,
+    "totalIssues": 10011,
     "suppressedIssues": 494,
-    "unsuppressedIssues": 9605,
+    "unsuppressedIssues": 9517,
     "bySeverity": {
-      "info": 1161,
-      "warning": 8938,
+      "info": 1157,
+      "warning": 8854,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 214,
-      "medium": 5430,
-      "low": 4455
+      "high": 194,
+      "medium": 5425,
+      "low": 4392
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
       "maintainability": 99.54,
-      "performance": 99.06,
+      "performance": 99.13,
       "data": 99.94,
       "testing": 100,
       "reliability": 99.94,
       "security": 100,
-      "extensibility": 93.86
+      "extensibility": 93.88
     },
-    "compositeScore": 99.16,
+    "compositeScore": 99.18,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -60,10 +60,10 @@
   },
   "tenDimensions": {
     "architectureConsistency": 100,
-    "semanticPurity": 99.89,
+    "semanticPurity": 99.88,
     "codeSecurity": 100,
-    "performanceEfficiency": 99.06,
-    "standardization": 81.6,
+    "performanceEfficiency": 99.13,
+    "standardization": 81.64,
     "modernity": 100,
     "maintainability": 99.54,
     "commentQuality": 99.98,
@@ -71,15 +71,6 @@
     "techDebtRisk": 100
   },
   "topHotspots": [
-    {
-      "filePath": "src/core/trajectory/recipeExtractor.ts",
-      "domain": "trajectory",
-      "totalIssues": 222,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.22,
-      "effectiveDensity": 0.94
-    },
     {
       "filePath": "src/core/governance/repo-archetype.ts",
       "domain": "governance",
@@ -99,6 +90,15 @@
       "effectiveDensity": 0.93
     },
     {
+      "filePath": "src/core/trajectory/recipe-catalog.ts",
+      "domain": "trajectory",
+      "totalIssues": 154,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 98.14,
+      "effectiveDensity": 0.95
+    },
+    {
       "filePath": "src/core/scoring/dimensionRuleTable.ts",
       "domain": "scoring",
       "totalIssues": 145,
@@ -110,11 +110,11 @@
     {
       "filePath": "src/index.ts",
       "domain": "src",
-      "totalIssues": 126,
+      "totalIssues": 124,
       "criticalCount": 0,
       "highCount": 1,
-      "compositeScore": 94.22,
-      "effectiveDensity": 0.94
+      "compositeScore": 94.43,
+      "effectiveDensity": 0.93
     },
     {
       "filePath": "src/core/governance/terminology-engine.ts",
@@ -153,21 +153,21 @@
       "effectiveDensity": 0.96
     },
     {
-      "filePath": "src/core/praxis/feedback-adaptive-supervisor.ts",
-      "domain": "praxis",
-      "totalIssues": 71,
+      "filePath": "src/core/architecture/config-driven-architecture.ts",
+      "domain": "architecture",
+      "totalIssues": 70,
       "criticalCount": 0,
-      "highCount": 4,
-      "compositeScore": 95.78,
-      "effectiveDensity": 0.93
+      "highCount": 13,
+      "compositeScore": 96.15,
+      "effectiveDensity": 0.95
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 214,
-      "medium": 5430,
-      "low": 4455
+      "high": 194,
+      "medium": 5425,
+      "low": 4392
     },
     "criticalItems": [],
     "highItems": [
@@ -190,102 +190,12 @@
         "message": "Function \"main\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/test-result-codec.js:69",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/test-result-codec.js",
-        "line": 69,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'filter()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-frontend-architecture-governance.js:129",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-frontend-architecture-governance.js",
-        "line": 129,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'find()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-frontend-architecture-governance.js:518",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-frontend-architecture-governance.js",
-        "line": 518,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'find()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:35",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-gate-system.js",
-        "line": 35,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:65",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-gate-system.js",
-        "line": 65,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:70",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-gate-system.js",
-        "line": 70,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:79",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-gate-system.js",
-        "line": 79,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:99",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-gate-system.js",
-        "line": 99,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:118",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-gate-system.js",
-        "line": 118,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:137",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-gate-system.js",
-        "line": 137,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-language-support.js:224",
+        "id": "performance:PRF-ALG-002:scripts/validate-language-support.js:231",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-language-support.js",
-        "line": 224,
+        "line": 231,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
@@ -361,85 +271,22 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-rules-registry.js:154",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-rules-registry.js",
-        "line": 154,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'filter()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:scripts/validate-scoring-coverage.js:358",
+        "id": "complexity:high-complexity:scripts/validate-scoring-coverage.js:359",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-scoring-coverage.js",
-        "line": 358,
+        "line": 359,
         "message": "Function \"checkCoverageModel\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-scoring-coverage.js:377",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-scoring-coverage.js",
-        "line": 377,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:169",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 169,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:233",
+        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:345",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 233,
-        "message": "Function \"auditBoundaryInteroperability\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-multidimensional-audit.js:246",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 246,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:scripts/validate-self-multidimensional-audit.js:338",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-self-multidimensional-audit.js",
-        "line": 338,
+        "line": 345,
         "message": "Function \"auditTenDimensionalFidelity\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-self-norms.js:128",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-self-norms.js",
-        "line": 128,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:scripts/validate-ts-modern.js:144",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-ts-modern.js",
-        "line": 144,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
         "id": "performance:PRF-ALG-002:src/analyzers/architecture.ts:121",
@@ -620,6 +467,159 @@
         "file": "src/analyzers/gdscript-game.ts",
         "line": 147,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-modern.ts:324",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-modern.ts",
+        "line": 324,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-modern.ts:325",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-modern.ts",
+        "line": 325,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-modern.ts:356",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-modern.ts",
+        "line": 356,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/governance.ts:292",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/governance.ts",
+        "line": 292,
+        "message": "Function \"GovernanceAnalyzer.recordViolationIssue\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/large-file.ts:93",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/large-file.ts",
+        "line": 93,
+        "message": "Function \"collectWarnReasons\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/naming-path-helper.ts:195",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/naming-path-helper.ts",
+        "line": 195,
+        "message": "Function \"auditFileName\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/naming-python-helper.ts:221",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/naming-python-helper.ts",
+        "line": 221,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/naming.ts:523",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/naming.ts",
+        "line": 523,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/performance.ts:133",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/performance.ts",
+        "line": 133,
+        "message": "Function \"PerformanceAnalyzer.scanLineContent\" has cyclomatic complexity 14 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/simplify-linecheck.ts:514",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/simplify-linecheck.ts",
+        "line": 514,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/test-modernity.ts:277",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/test-modernity.ts",
+        "line": 277,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/test-modernity.ts:640",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/test-modernity.ts",
+        "line": 640,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/ts-modern.ts:286",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/ts-modern.ts",
+        "line": 286,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/ts-modern.ts:411",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/ts-modern.ts",
+        "line": 411,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/ts-modern.ts:490",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/ts-modern.ts",
+        "line": 490,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'filter()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/ts-modern.ts:491",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/ts-modern.ts",
+        "line": 491,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'filter()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/api.ts:519",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/api.ts",
+        "line": 519,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       }
     ]
   },
@@ -627,16 +627,16 @@
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 99.42,
+        "compositeScore": 99.45,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.81,
-          "performance": 99.37,
+          "maintainability": 99.82,
+          "performance": 99.57,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 95.44
+          "extensibility": 95.41
         },
         "moduleCount": 1
       },
@@ -657,16 +657,16 @@
       },
       {
         "domainName": "src",
-        "compositeScore": 96.3,
+        "compositeScore": 96.41,
         "pillars": {
           "architecture": 100,
           "maintainability": 98.25,
           "performance": 92.95,
-          "data": 98.03,
+          "data": 97.75,
           "testing": 100,
-          "reliability": 98.03,
+          "reliability": 97.75,
           "security": 100,
-          "extensibility": 80.15
+          "extensibility": 81.76
         },
         "moduleCount": 1
       },
@@ -822,16 +822,16 @@
       },
       {
         "domainName": "diff",
-        "compositeScore": 99.36,
+        "compositeScore": 99.34,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.25,
+          "maintainability": 99.32,
           "performance": 99.73,
           "data": 99.86,
           "testing": 100,
           "reliability": 99.86,
           "security": 100,
-          "extensibility": 95.34
+          "extensibility": 95.11
         },
         "moduleCount": 1
       },
@@ -1032,16 +1032,16 @@
       },
       {
         "domainName": "praxis",
-        "compositeScore": 98.93,
+        "compositeScore": 98.98,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.54,
-          "performance": 98.88,
+          "performance": 99.22,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 91.62
+          "extensibility": 91.69
         },
         "moduleCount": 1
       },
@@ -1302,16 +1302,16 @@
       },
       {
         "domainName": "trajectory",
-        "compositeScore": 99,
+        "compositeScore": 99.08,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.5,
-          "performance": 98.88,
-          "data": 99.92,
+          "maintainability": 99.53,
+          "performance": 98.93,
+          "data": 99.93,
           "testing": 100,
-          "reliability": 99.92,
+          "reliability": 99.93,
           "security": 100,
-          "extensibility": 92.55
+          "extensibility": 93.28
         },
         "moduleCount": 1
       },
@@ -1349,8 +1349,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 122226,
-      "unique": 98667,
+      "processed": 122432,
+      "unique": 98750,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -1363,26 +1363,26 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791264741839,
+      "endMs": 1791268948955,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 17833441,
-        "uniqueTotal": 98667,
-        "changedTotal": 172428,
-        "semanticTotal": 137943
+        "processedTotal": 17870948,
+        "uniqueTotal": 98750,
+        "changedTotal": 165572,
+        "semanticTotal": 132458
       },
       "qed": {
-        "mean": 0.0001,
+        "mean": 0.0003,
         "min": -0.03,
         "max": 0.03
       },
       "debt": {
-        "totalAdded": 831,
-        "totalResolved": 469,
+        "totalAdded": 747,
+        "totalResolved": 461,
         "totalRegressions": 4,
         "netYield": -0.02
       },
-      "meanCompositeScore": 99.18,
+      "meanCompositeScore": 99.16,
       "gatePassRate": 95.33
     },
     "isFirstBaseline": false
