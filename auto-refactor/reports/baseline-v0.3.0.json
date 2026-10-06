@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791188329871",
-  "timestamp": "2026-10-05T08:18:49.871Z",
+  "snapshotId": "snapshot-v0.4.0-1791291211545",
+  "timestamp": "2026-10-06T12:53:31.544Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,7 +8,7 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "7bdc4c339f370bb05f9e5cdb0d18c226c3e9d5949d8bbeaf7b756ad25f1ab2af",
+  "rulesDigest": "92e9403388bb3c068e2dc34643c88536318ccac88749ff0dc6557dd8ff03d683",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "supportedLanguages": [
     "typescript",
@@ -19,7 +19,7 @@
   ],
   "baselineMetrics": {
     "compositeScore": 99.35,
-    "ruleCount": 304,
+    "ruleCount": 308,
     "suppressedCount": 2029,
     "blockingErrorCount": 0,
     "blockingWarningCount": 23,
@@ -210,6 +210,7 @@
     "import-cycle",
     "large-file",
     "loop-transient-allocation",
+    "NAM-ABR-001",
     "NAM-COL-001",
     "NAM-DEC-001",
     "NAM-DIR-001",
@@ -217,6 +218,8 @@
     "NAM-GLB-001",
     "NAM-GLB-002",
     "NAM-JRG-002",
+    "NAM-LEN-001",
+    "NAM-LEN-002",
     "NAM-MBR-001",
     "NAM-RES-001",
     "NAM-RES-002",
@@ -290,6 +293,7 @@
     "SH-SAFE-001",
     "SH-SEC-001",
     "SH-TRAP-001",
+    "SIM-ARGS-001",
     "SIM-BOOL-001",
     "SIM-COMC-001",
     "SIM-ELSE-001",

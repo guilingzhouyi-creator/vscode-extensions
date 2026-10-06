@@ -199,6 +199,7 @@
 | `SIM-LONG-001` | <a id="sim-long-001"></a>`simplify` | `SIM` | `warning` | `all` | 抽取内聚步骤为具名 helper，让顶层流程只剩意图序列 | 函数物理跨度超过 `thresholds.maxFunctionLines`（默认 60）。跨度取适配器物化的起止行，覆盖 TS/JS/Python/Rust/GDScript。 |
 | `SIM-PRNT-001` | <a id="sim-prnt-001"></a>`simplify` | `SIM` | `warning` | `all` | 改用结构化 logger 或删除；调试输出绕过日志级别并泄漏到生产 stdout | 非豁免路径出现调试输出（`print`/`pprint`/`breakpoint`/`console.log`/`println!`/`dbg!` 等）。默认豁免 `**/cli/**`、`**/scripts/**`、`**/tests/**`、`**/bench/**`、`*.test.*`、`*.spec.*`，可用 `printAllowPatterns` 覆盖。 |
 | `SIM-TRN-001` | <a id="sim-trn-001"></a>`simplify` | `SIM` | `info` | `all` | 冗长且无副作用的 if-else 分支可折叠为浅层单行三元表达式 | 双分支为同变量单一赋值或纯返回值时，在无副作用、单层深度且行长 ≤ 80 字符的前提下折叠为三元表达式，降低控制流复杂度。 |
+| `SIM-ARGS-001` | <a id="sim-args-001"></a>`simplify` | `SIM` | `warning` | `all` | 单个函数入参超过 4 个（默认阈值 4），导致调用方参数传递脆弱且难以扩展。 | 将离散参数重构封装为强类型参数对象（ParameterObject 或 Options 结构体）。 |
 
 ### Layer 3 — 架构拓扑、工程治理、数据与性能层 (Architecture, Governance, Data & Performance)
 
@@ -266,6 +267,9 @@
 | `NAM-SGL-001` | <a id="nam-sgl-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 占位符豁免）。 | 改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。 |
 | `NAM-TYP-001` | <a id="nam-typ-001"></a>`naming` | `NAM` | `warning` | `all` | 类型定义与类声明必须遵循 PascalCase 大驼峰命名。 | 将类、接口、类型别名或枚举重命名为大驼峰格式（如 `Scanner`、`RuleDefinition`）。 |
 | `NAM-VAG-001` | <a id="nam-vag-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁使用无业务语义的模糊泛化变量名（如 data、res、ret、tmp、item 等裸词）。 | 结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。 |
+| `NAM-LEN-001` | <a id="nam-len-001"></a>`naming` | `NAM` | `warning` | `all` | 变量名长度异常：局部变量过短（≤ 2 字符且不在白名单内）缺乏语义，或过长（≥ 30 字符）过度限定。 | 规范变量长度至 3~28 字符，短变量补齐领域修饰，超长变量精简修饰语。 |
+| `NAM-LEN-002` | <a id="nam-len-002"></a>`naming` | `NAM` | `warning` | `all` | 函数/方法名长度异常：过短（< 3 字符如 f/do）缺乏明确动宾，或过长（≥ 38 字符）违反单一职责。 | 重构函数名为规范动宾短语（如 `calculateRisk`），超长复合函数按步骤拆分。 |
+| `NAM-ABR-001` | <a id="nam-abr-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁使用未批准的残缺缩写（如 usr/mgr/btn/cnt/ptr/cur 等），造成代码可读性衰减。 | 将隐晦残缺缩写展开为完整规范英文词汇（如 user/manager/button/count）。 |
 | `NUM-PREC-001` | <a id="num-prec-001"></a>`governance` | `NUM` | `warning` | `typescript, javascript` | 数值截断精度失衡：数学计算路径中存在丢精度的四舍五入或比例失配风险。 | 使用标准 0.01 精度舍入（如 * 100 / 100）或显式容差界限以保留有效精度。 |
 | `PRF-ALG-001` | <a id="prf-alg-001"></a>`performance` | `PRF` | `warning` | `all` | 发现 $\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。 | 将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。 |
 | `PRF-ALG-002` | <a id="prf-alg-002"></a>`performance` | `PRF` | `warning` | `all` | 循环内集合线性遍历反模式：在循环结构内部对外部集合进行线性检索（find/includes/has/in list 等），导致整体算法复杂度恶化至 O(N*M)。 | 在循环外预先将外部集合构建为 Map 或 Dictionary 哈希索引，将内层查找降至 O(1)，算法总体降至 O(N+M)。 |

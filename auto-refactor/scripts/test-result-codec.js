@@ -8,7 +8,8 @@
  *   runs after the validate scripts, over the samples/ corpus and crafted payloads.
  * Responsibilities: Recursively compare decoded graphs with the originals; check
  *   JSON serialization, null and empty containers, non-ASCII text, extreme numbers,
- *   and that an absent `suggestion` field stays absent after the round trip.
+ *   that absent `suggestion` and `symbols` fields stay absent after the round trip,
+ *   and that cross-file symbol graphs (definitions and references) preserve 100% deep equality.
  * Exit Semantics & Design Rationale: Prints 'ALL ROUND-TRIP CHECKS PASS' and lets
  *   Node exit 0 when every check holds; any mismatch sets process.exitCode = 1 and
  *   logs trimmed diffs. JSON equality is checked before deep equality so key-order
@@ -146,6 +147,54 @@ function check(payload, label) {
         exportedSymbols: 0,
       },
     },
+    {
+      file: 'cross/service.ts',
+      issues: [],
+      metric: {
+        file: 'cross/service.ts',
+        lines: 48,
+        nonBlankLines: 39,
+        functions: 3,
+        maxNestingDepth: 2,
+        topLevelDeclarations: 3,
+        exportedSymbols: 2,
+      },
+      symbols: {
+        definitions: [
+          { name: 'OrderService', kind: 'class', file: 'cross/service.ts', line: 10 },
+          { name: 'processPayment', kind: 'method', file: 'cross/service.ts', line: 22 },
+          { name: 'TAX_RATE', kind: 'constant', file: 'cross/service.ts', line: 4 },
+          { name: 'internalHelper', kind: 'function', file: 'cross/service.ts', line: null },
+        ],
+        references: [
+          { name: 'formatCurrency', file: 'cross/service.ts', line: 30, kind: 'call', caller: 'processPayment', column: 12 },
+          { name: 'auditLogger', file: 'cross/service.ts', line: 40, kind: 'call', caller: null, column: null },
+        ],
+      },
+    },
+    {
+      file: 'cross/utils.ts',
+      issues: [],
+      metric: {
+        file: 'cross/utils.ts',
+        lines: 32,
+        nonBlankLines: 26,
+        functions: 2,
+        maxNestingDepth: 1,
+        topLevelDeclarations: 2,
+        exportedSymbols: 2,
+      },
+      symbols: {
+        definitions: [
+          { name: 'formatCurrency', kind: 'function', file: 'cross/utils.ts', line: 8 },
+          { name: 'auditLogger', kind: 'function', file: 'cross/utils.ts', line: 18 },
+        ],
+        references: [
+          { name: 'TAX_RATE', file: 'cross/utils.ts', line: 12, kind: 'call', caller: 'formatCurrency', column: 8 },
+          { name: 'OrderService', file: 'cross/utils.ts', line: 24, kind: 'call', caller: 'auditLogger', column: 16 },
+        ],
+      },
+    },
   ];
   check(edges, 'edge-crafted');
 
@@ -170,6 +219,43 @@ function check(payload, label) {
   const sugBack = decodeResults(encodeResults(sug));
   console.log(('suggestion' in sugBack[0].issues[0] ? 'FAIL' : 'PASS') + ' suggestion-absent');
   if ('suggestion' in sugBack[0].issues[0]) process.exitCode = 1;
+
+  // 4) symbols presence and deep graph fidelity (undefined vs present, 100% equivalence)
+  const symPresPayload = [
+    {
+      file: 'has-sym.ts',
+      issues: [],
+      metric: null,
+      symbols: {
+        definitions: [
+          { name: 'entryPoint', kind: 'function', file: 'has-sym.ts', line: 1 },
+        ],
+        references: [
+          { name: 'depCall', file: 'has-sym.ts', line: 5, kind: 'call', caller: 'entryPoint', column: 2 },
+        ],
+      },
+    },
+    {
+      file: 'no-sym.ts',
+      issues: [],
+      metric: null,
+    },
+  ];
+  const symPresBack = decodeResults(encodeResults(symPresPayload));
+  const sym0HasProp = 'symbols' in symPresBack[0] && symPresBack[0].symbols !== undefined;
+  const sym1HasProp = 'symbols' in symPresBack[1];
+  if (!sym0HasProp || sym1HasProp) {
+    console.log('FAIL symbols-presence: presence/absence drift');
+    process.exitCode = 1;
+  } else {
+    console.log('PASS symbols-presence (present preserved, absent stays absent)');
+  }
+  if (!deepEqualStrict(symPresPayload[0].symbols, symPresBack[0].symbols)) {
+    console.log('FAIL symbols-deep-equivalence: fields or structure drifted');
+    process.exitCode = 1;
+  } else {
+    console.log('PASS symbols-deep-equivalence (definitions & references 100% preserved)');
+  }
 
   if (!process.exitCode) console.log('ALL ROUND-TRIP CHECKS PASS');
 })();

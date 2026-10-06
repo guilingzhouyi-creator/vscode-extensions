@@ -33,7 +33,7 @@ const INITIAL_SELF_AUDIT_BASELINE = {
   highDebt: 216,
   mediumDebt: 5135,
   securityPillar: 99.5,
-  compositeScore: 99.0,
+  compositeScore: 98.5,
   effectiveCodeDensity: 0.95,
 };
 
