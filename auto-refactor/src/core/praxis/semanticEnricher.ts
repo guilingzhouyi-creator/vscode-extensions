@@ -19,6 +19,20 @@ import { normalizeCanonicalPath } from '../semantic/adapters/path-utils';
 /** Threshold in diff line count above which rework is suggested instead of auto-fix */
 const HUNK_REWORK_LINE_THRESHOLD = 50;
 
+/** Granularity weight lookup for AST symbol prioritization */
+function getKindWeight(kind: string): number {
+    switch (kind) {
+        case 'function':
+            return 3;
+        case 'type':
+            return 2;
+        case 'module':
+            return 1;
+        default:
+            return 0;
+    }
+}
+
 /**
  * High-precision context enricher for the Praxis ecosystem backed by SemanticGraph topology.
  */
@@ -89,6 +103,7 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
 
     /**
      * Locates the most specific semantic node covering the given line span in the file.
+     * Leverages the file inverted index to eliminate full-graph scanning.
      */
     private findEnclosingNode(
         canonicalFile: string,
@@ -99,29 +114,26 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
             return undefined;
         }
 
-        const candidates = this.graph.getAllNodes().filter((n) => {
-            if (n.location.file !== canonicalFile) {
-                return false;
-            }
-            // Check if node encompasses or overlaps the diff hunk span
-            return n.location.start.line <= endLine && n.location.end.line >= startLine;
-        });
+        const fileNodes =
+            typeof this.graph.getNodesByFile === 'function'
+                ? this.graph.getNodesByFile(canonicalFile)
+                : this.graph
+                      .getAllNodes()
+                      .filter((n) => normalizeCanonicalPath(n.location?.file) === canonicalFile);
+
+        const candidates = fileNodes.filter(
+            (n) => n.location.start.line <= endLine && n.location.end.line >= startLine,
+        );
 
         if (candidates.length === 0) {
             return undefined;
         }
 
         // Prioritize more granular nodes: function > type > module
-        candidates.sort((a, b) => {
-            const kindWeight = (k: string): number => {
-                if (k === 'function') return 3;
-                if (k === 'type') return 2;
-                if (k === 'module') return 1;
-                return 0;
-            };
-            return kindWeight(b.kind) - kindWeight(a.kind);
-        });
+        const sorted = [...candidates].sort(
+            (a, b) => getKindWeight(b.kind) - getKindWeight(a.kind),
+        );
 
-        return candidates[0];
+        return sorted[0];
     }
 }

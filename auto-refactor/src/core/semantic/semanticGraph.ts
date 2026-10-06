@@ -19,6 +19,7 @@ import type {
     SemanticNode,
     SemanticSubgraph,
 } from './types';
+import { normalizeCanonicalPath } from './adapters/path-utils';
 
 const DIRECTION_FORWARD = 'forward';
 const DIRECTION_BACKWARD = 'backward';
@@ -55,11 +56,17 @@ export class SemanticGraph {
     private readonly nodes: Map<string, SemanticNode> = new Map();
     private readonly outgoing: Map<string, Map<string, SemanticEdge>> = new Map();
     private readonly incoming: Map<string, Map<string, SemanticEdge>> = new Map();
+    private readonly nodesByFile: Map<string, SemanticNode[]> = new Map();
 
     /**
-     * Inserts or replaces a node in the graph.
+     * Inserts or replaces a node in the graph, updating inverted file indices.
      */
     public addNode(node: SemanticNode): this {
+        const existing = this.nodes.get(node.id);
+        if (existing?.location?.file) {
+            this.removeNodeFromFileIndex(existing);
+        }
+
         this.nodes.set(node.id, node);
         if (!this.outgoing.has(node.id)) {
             this.outgoing.set(node.id, new Map());
@@ -67,7 +74,29 @@ export class SemanticGraph {
         if (!this.incoming.has(node.id)) {
             this.incoming.set(node.id, new Map());
         }
+
+        if (node.location?.file) {
+            const canonicalFile = normalizeCanonicalPath(node.location.file);
+            let fileNodes = this.nodesByFile.get(canonicalFile);
+            if (!fileNodes) {
+                fileNodes = [];
+                this.nodesByFile.set(canonicalFile, fileNodes);
+            }
+            fileNodes.push(node);
+        }
         return this;
+    }
+
+    private removeNodeFromFileIndex(node: SemanticNode): void {
+        const oldFile = normalizeCanonicalPath(node.location.file);
+        const list = this.nodesByFile.get(oldFile);
+        if (!list) {
+            return;
+        }
+        const idx = list.findIndex((n) => n.id === node.id);
+        if (idx >= 0) {
+            list.splice(idx, 1);
+        }
     }
 
     /**
@@ -89,6 +118,24 @@ export class SemanticGraph {
      */
     public getAllNodes(): SemanticNode[] {
         return Array.from(this.nodes.values());
+    }
+
+    /**
+     * Retrieves all nodes belonging to a specific canonical file path.
+     */
+    public getNodesByFile(filePath: string): readonly SemanticNode[] {
+        const canonicalFile = normalizeCanonicalPath(filePath);
+        return this.nodesByFile.get(canonicalFile) ?? [];
+    }
+
+    /**
+     * Clears all nodes, edges, and file indices.
+     */
+    public clear(): void {
+        this.nodes.clear();
+        this.outgoing.clear();
+        this.incoming.clear();
+        this.nodesByFile.clear();
     }
 
     /**
@@ -165,9 +212,10 @@ export class SemanticGraph {
         const visitedNodes = new Set<string>();
         const collectedEdges = new Set<SemanticEdge>();
         const queue: Array<{ id: string; depth: number }> = [{ id: seedNodeId, depth: 0 }];
+        let head = 0;
 
-        while (queue.length > 0) {
-            const current = queue.shift()!;
+        while (head < queue.length) {
+            const current = queue[head++];
             if (visitedNodes.has(current.id)) {
                 continue;
             }
@@ -220,54 +268,74 @@ export class SemanticGraph {
     }
 
     /**
-     * Detects cycles in the directed graph using Tarjan-style DFS.
+     * Detects cycles in the directed graph using iterative three-color DFS (WHITE/GRAY/BLACK).
+     * Bounded explicit stack prevents native call stack exhaustion on deep dependency graphs.
      */
     public findCycles(): string[][] {
+        const WHITE = 0;
+        const GRAY = 1;
+        const BLACK = 2;
+        const color = new Map<string, number>();
         const cycles: string[][] = [];
-        const visited = new Set<string>();
-        const inStack = new Set<string>();
-        const pathStack: string[] = [];
 
-        for (const nodeId of this.nodes.keys()) {
-            if (!visited.has(nodeId)) {
-                this.dfsCycleSearch(nodeId, visited, inStack, pathStack, cycles);
+        for (const start of this.nodes.keys()) {
+            if ((color.get(start) ?? WHITE) !== WHITE) {
+                continue;
             }
+            this.traverseCycleDfs(start, color, cycles, WHITE, GRAY, BLACK);
         }
 
         return cycles;
     }
 
-    /**
-     * Internal DFS recursion for cycle detection.
-     */
-    private dfsCycleSearch(
-        current: string,
-        visited: Set<string>,
-        inStack: Set<string>,
-        pathStack: string[],
+    private traverseCycleDfs(
+        start: string,
+        color: Map<string, number>,
         cycles: string[][],
+        white: number,
+        gray: number,
+        black: number,
     ): void {
-        visited.add(current);
-        inStack.add(current);
-        pathStack.push(current);
+        color.set(start, gray);
+        const pathArr: string[] = [start];
+        const stack: Array<{ node: string; nexts: string[]; idx: number }> = [
+            { node: start, nexts: this.getNodeNextIds(start), idx: 0 },
+        ];
 
-        const outEdges = this.getOutgoingEdges(current);
-        for (const edge of outEdges) {
-            const next = edge.toNodeId;
-            if (!visited.has(next)) {
-                this.dfsCycleSearch(next, visited, inStack, pathStack, cycles);
-            } else if (inStack.has(next)) {
-                const cycleStartIndex = pathStack.indexOf(next);
-                if (cycleStartIndex >= 0) {
-                    const cyclePath = pathStack.slice(cycleStartIndex);
-                    cyclePath.push(next);
-                    cycles.push(cyclePath);
+        while (stack.length > 0) {
+            const top = stack[stack.length - 1];
+            if (top.idx >= top.nexts.length) {
+                color.set(top.node, black);
+                stack.pop();
+                pathArr.pop();
+                continue;
+            }
+
+            const next = top.nexts[top.idx++];
+            const c = color.get(next) ?? white;
+            if (c === gray) {
+                const at = pathArr.indexOf(next);
+                if (at >= 0) {
+                    cycles.push([...pathArr.slice(at), next]);
                 }
+            } else if (c === white) {
+                color.set(next, gray);
+                pathArr.push(next);
+                stack.push({ node: next, nexts: this.getNodeNextIds(next), idx: 0 });
             }
         }
+    }
 
-        pathStack.pop();
-        inStack.delete(current);
+    private getNodeNextIds(nodeId: string): string[] {
+        const edgeMap = this.outgoing.get(nodeId);
+        if (!edgeMap) {
+            return [];
+        }
+        const nexts: string[] = [];
+        for (const edge of edgeMap.values()) {
+            nexts.push(edge.toNodeId);
+        }
+        return nexts;
     }
 
     /**
@@ -277,9 +345,10 @@ export class SemanticGraph {
         const inDegree = buildInDegreeMap(this.nodes.keys(), this.getAllEdges());
         const queue = collectZeroDegreeNodes(inDegree);
         const order: string[] = [];
+        let head = 0;
 
-        while (queue.length > 0) {
-            const u = queue.shift()!;
+        while (head < queue.length) {
+            const u = queue[head++];
             order.push(u);
 
             for (const edge of this.getOutgoingEdges(u)) {
@@ -297,19 +366,23 @@ export class SemanticGraph {
 
     /**
      * Computes holistic structural and graph density metrics.
+     * Uses map.size directly to eliminate transient array allocations.
      */
     public computeMetrics(): SemanticGraphMetrics {
         const nodeCount = this.nodes.size;
-        const allEdges = this.getAllEdges();
-        const edgeCount = allEdges.length;
-        const cycles = this.findCycles();
-
+        let edgeCount = 0;
         let totalIn = 0;
         let totalOut = 0;
-        for (const nodeId of this.nodes.keys()) {
-            totalIn += this.getIncomingEdges(nodeId).length;
-            totalOut += this.getOutgoingEdges(nodeId).length;
+
+        for (const edgeMap of this.outgoing.values()) {
+            edgeCount += edgeMap.size;
+            totalOut += edgeMap.size;
         }
+        for (const inMap of this.incoming.values()) {
+            totalIn += inMap.size;
+        }
+
+        const cycles = this.findCycles();
 
         const maxEdges = nodeCount > 1 ? nodeCount * (nodeCount - 1) : 1;
         const density = nodeCount > 1 ? Number((edgeCount / maxEdges).toFixed(4)) : 0;
@@ -330,9 +403,10 @@ export class SemanticGraph {
     private traverseComponent(startNode: string, visited: Set<string>): void {
         const queue: string[] = [startNode];
         visited.add(startNode);
+        let head = 0;
 
-        while (queue.length > 0) {
-            const cur = queue.shift()!;
+        while (head < queue.length) {
+            const cur = queue[head++];
             for (const edge of this.getOutgoingEdges(cur)) {
                 const n = edge.toNodeId;
                 if (this.nodes.has(n) && !visited.has(n)) {

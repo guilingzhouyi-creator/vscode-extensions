@@ -60,12 +60,39 @@ import {
 } from './client/agent-directives';
 import { resolvePraxisClientConfig } from './client/index';
 
+function clearGraphInstance(graph: SemanticGraph): void {
+    const raw = graph as unknown as {
+        nodes?: Map<unknown, unknown>;
+        outgoing?: Map<unknown, unknown>;
+        incoming?: Map<unknown, unknown>;
+    };
+    if (raw.nodes instanceof Map) {
+        raw.nodes.clear();
+    }
+    if (raw.outgoing instanceof Map) {
+        raw.outgoing.clear();
+    }
+    if (raw.incoming instanceof Map) {
+        raw.incoming.clear();
+    }
+}
+
+function countLinesFast(content: string): number {
+    let count = 1;
+    let pos = 0;
+    while ((pos = content.indexOf('\n', pos)) !== -1) {
+        count++;
+        pos++;
+    }
+    return count;
+}
+
 /**
  * High-performance, interface-driven standard implementation of IPraxisReviewClient.
  */
 export class PraxisReviewClient implements IPraxisReviewClient {
     private readonly root: string;
-    private readonly graph: SemanticGraph;
+    private graph: SemanticGraph;
     private readonly diffService: IPraxisDiffGovernanceService;
     private readonly sliceService: IPraxisSliceAuditService;
     private readonly sparseRouter: SparseMoEGateRouter;
@@ -95,6 +122,27 @@ export class PraxisReviewClient implements IPraxisReviewClient {
      */
     public get semanticGraph(): SemanticGraph {
         return this.graph;
+    }
+
+    /**
+     * Clears all accumulated AST symbols, edges, and topologies from the internal semantic graph.
+     * Prevents unbounded memory growth in long-running processes and batch review workflows.
+     */
+    public clearSemanticGraph(): void {
+        clearGraphInstance(this.graph);
+    }
+
+    /**
+     * Resets the semantic graph, clearing any existing nodes and optionally replacing
+     * the active graph instance.
+     *
+     * @param newGraph - Optional fresh SemanticGraph instance to install.
+     */
+    public resetSemanticGraph(newGraph?: SemanticGraph): void {
+        this.clearSemanticGraph();
+        if (newGraph) {
+            this.graph = newGraph;
+        }
     }
 
     /**
@@ -137,6 +185,9 @@ export class PraxisReviewClient implements IPraxisReviewClient {
     public async reviewWorkspace(
         options: PraxisWorkspaceReviewOptions = {},
     ): Promise<PraxisWorkspaceReviewVerdict> {
+        if ((options as { clearSemanticGraph?: boolean }).clearSemanticGraph) {
+            this.clearSemanticGraph();
+        }
         const root = options.root ?? this.root;
         const effectiveCardContext = options.cardContext ?? this.defaultCardContext;
         const config = resolveConfig({
@@ -218,7 +269,7 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         sparsePlan?: SparseRoutingPlan;
         issues: Issue[];
     }> {
-        const lineCount = fileContent.split(/\r?\n/).length;
+        const lineCount = countLinesFast(fileContent);
         const changedLines: number[] = new Array(lineCount);
         for (let i = 0; i < lineCount; i++) {
             changedLines[i] = i + 1;
@@ -283,66 +334,138 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         content?: string,
         options: PraxisFileReviewOptions = {},
     ): Promise<PraxisFileReviewVerdict> {
+        const opts = options as PraxisFileReviewOptions & {
+            resetGraph?: boolean;
+            clearGraphAfter?: boolean;
+            isolatedGraph?: boolean;
+        };
+
+        if (opts.resetGraph) {
+            this.clearSemanticGraph();
+        }
+
         const fileContent = await this.readFileContentSafe(filePath, content);
-        const graph = options.graph ?? this.graph;
+        const graph = opts.isolatedGraph
+            ? new SemanticGraph()
+            : (options.graph ?? this.graph);
+
         if (fileContent.length > 0) {
             defaultSemanticAdapterRegistry.extractFileToGraph(filePath, fileContent, graph);
         }
 
-        const effectiveCardContext = options.cardContext ?? this.defaultCardContext;
-        const useMoE = options.useSparseMoE ?? this.enableMoE;
+        try {
+            const effectiveCardContext = options.cardContext ?? this.defaultCardContext;
+            const useMoE = options.useSparseMoE ?? this.enableMoE;
 
-        let sliceAudit: PraxisSliceAuditVerdict | undefined;
-        let sparsePlan: SparseRoutingPlan | undefined;
-        const issues: Issue[] = [];
+            let sliceAudit: PraxisSliceAuditVerdict | undefined;
+            let sparsePlan: SparseRoutingPlan | undefined;
+            const issues: Issue[] = [];
 
-        if (useMoE && fileContent.length > 0) {
-            const moe = await this.auditMoESlice(filePath, fileContent);
-            sliceAudit = moe.sliceAudit;
-            sparsePlan = moe.sparsePlan;
-            for (let i = 0; i < moe.issues.length; i++) {
-                issues.push(moe.issues[i]);
+            if (useMoE && fileContent.length > 0) {
+                const moe = await this.auditMoESlice(filePath, fileContent);
+                sliceAudit = moe.sliceAudit;
+                sparsePlan = moe.sparsePlan;
+                issues.push(...moe.issues);
             }
+
+            const l1Issues = defaultPyramidEvaluator.evaluateAllLayer1(graph, {
+                currentFilePath: filePath,
+            });
+            issues.push(...l1Issues);
+
+            const contentIssues = this.collectContentAuditIssues(filePath, fileContent, graph);
+            issues.push(...contentIssues);
+
+            const status = this.resolveFileStatus(issues);
+            const verdict: PraxisFileReviewVerdict = {
+                filePath,
+                status,
+                issues,
+                sliceAudit,
+                sparsePlan,
+                cardContext: effectiveCardContext,
+                timestamp: Date.now(),
+            };
+
+            this.attachPresentationBundle(verdict, issues, filePath, effectiveCardContext, options);
+            return verdict;
+        } finally {
+            this.cleanupReviewGraph(opts, graph, options.graph);
         }
+    }
 
-        const l1Issues = defaultPyramidEvaluator.evaluateAllLayer1(graph, {
-            currentFilePath: filePath,
-        });
-        for (let i = 0; i < l1Issues.length; i++) {
-            issues.push(l1Issues[i]);
-        }
-
-        const contentIssues = this.collectContentAuditIssues(filePath, fileContent, graph);
-        for (let i = 0; i < contentIssues.length; i++) {
-            issues.push(contentIssues[i]);
-        }
-
-        const status = this.resolveFileStatus(issues);
-        const timestamp = Date.now();
-
-        const verdict: PraxisFileReviewVerdict = {
-            filePath,
-            status,
-            issues,
-            sliceAudit,
-            sparsePlan,
-            cardContext: effectiveCardContext,
-            timestamp,
-        };
-
+    private attachPresentationBundle(
+        verdict: PraxisFileReviewVerdict,
+        issues: Issue[],
+        filePath: string,
+        effectiveCardContext: PraxisCardContext | undefined,
+        options: PraxisFileReviewOptions,
+    ): void {
         const includePresentation =
             options.includeDualFacedPresentation ?? this.includeDualFacedPresentation;
-        if (includePresentation) {
-            const bundle = buildAgentDirectivesBundle(issues, filePath, effectiveCardContext, {
-                locale: options.presentationLocale ?? this.defaultLocale,
-            });
-            verdict.agentDirectives = bundle;
-            verdict.directivesMarkdown = bundle.renderedMarkdown;
-            verdict.cappDirectiveText = bundle.compactPromptText;
-            verdict.presentationPayload = bundle.presentationPayload;
+        if (!includePresentation) {
+            return;
         }
+        const bundle = buildAgentDirectivesBundle(issues, filePath, effectiveCardContext, {
+            locale: options.presentationLocale ?? this.defaultLocale,
+        });
+        verdict.agentDirectives = bundle;
+        verdict.directivesMarkdown = bundle.renderedMarkdown;
+        verdict.cappDirectiveText = bundle.compactPromptText;
+        verdict.presentationPayload = bundle.presentationPayload;
+    }
 
-        return verdict;
+    private cleanupReviewGraph(
+        opts: { clearGraphAfter?: boolean; isolatedGraph?: boolean },
+        graph: SemanticGraph,
+        externalGraph?: SemanticGraph,
+    ): void {
+        if (!opts.clearGraphAfter) {
+            return;
+        }
+        if (opts.isolatedGraph) {
+            clearGraphInstance(graph);
+            return;
+        }
+        if (!externalGraph) {
+            this.clearSemanticGraph();
+        }
+    }
+
+    /**
+     * Conducts batch static analysis review across multiple source files.
+     * Provides memory bounds by supporting periodic or per-file semantic graph clearing.
+     *
+     * @param files - Array of file paths or file input descriptors.
+     * @param options - File review options with optional graph lifecycle management:
+     *   - `clearBetweenFiles`: When true, resets graph between each file review.
+     *   - `autoResetGraph`: When true, resets graph after batch completion.
+     * @returns Array of review verdicts for all processed files.
+     */
+    public async reviewFiles(
+        files: Array<string | { filePath: string; content?: string }>,
+        options: PraxisFileReviewOptions & {
+            clearBetweenFiles?: boolean;
+            autoResetGraph?: boolean;
+        } = {},
+    ): Promise<PraxisFileReviewVerdict[]> {
+        const verdicts: PraxisFileReviewVerdict[] = [];
+        try {
+            for (const item of files) {
+                const filePath = typeof item === 'string' ? item : item.filePath;
+                const content = typeof item === 'string' ? undefined : item.content;
+                if (options.clearBetweenFiles) {
+                    this.clearSemanticGraph();
+                }
+                const verdict = await this.reviewFile(filePath, content, options);
+                verdicts.push(verdict);
+            }
+            return verdicts;
+        } finally {
+            if (options.autoResetGraph) {
+                this.clearSemanticGraph();
+            }
+        }
     }
 
     /**
@@ -565,13 +688,20 @@ export class PraxisReviewClient implements IPraxisReviewClient {
  * Factory creating a fresh instance conforming to IPraxisReviewClient.
  *
  * @param options - Optional configuration options
- * @returns Fully initialized IPraxisReviewClient instance
+ * @returns Fully initialized PraxisReviewClient instance
  */
-export function createPraxisClient(options?: PraxisClientConfig): IPraxisReviewClient {
+export function createPraxisClient(options?: PraxisClientConfig): PraxisReviewClient {
     return new PraxisReviewClient(options);
 }
 
 /**
  * Default singleton instance of Praxis Review Client.
  */
-export const defaultPraxisReviewClient: IPraxisReviewClient = createPraxisClient();
+export const defaultPraxisReviewClient: PraxisReviewClient = createPraxisClient();
+
+/**
+ * Convenience helper to clear accumulated state in the default singleton review client's semantic graph.
+ */
+export function clearDefaultPraxisClient(): void {
+    defaultPraxisReviewClient.clearSemanticGraph();
+}

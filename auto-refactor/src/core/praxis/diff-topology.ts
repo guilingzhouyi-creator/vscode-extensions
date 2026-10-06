@@ -19,6 +19,7 @@
 import type { Issue } from '../types';
 import type { ReviewDiffHunk, AttributedDiffLine } from './contracts';
 import type { SemanticGraph } from '../semantic/semanticGraph';
+import type { SemanticNode } from '../semantic/types';
 
 export * from './diff-topology-types';
 export * from './diff-unified-patch';
@@ -224,12 +225,52 @@ function extractContractConflicts(filePath: string, issues?: Issue[]): DiffContr
     return conflicts;
 }
 
+function findMatchingNode(
+    nodes: readonly SemanticNode[],
+    symbolName: string,
+): SemanticNode | undefined {
+    for (const node of nodes) {
+        if (node.id === symbolName || node.name === symbolName) {
+            return node;
+        }
+    }
+    const suffix = `#${symbolName}`;
+    for (const node of nodes) {
+        if (node.id.endsWith(suffix)) {
+            return node;
+        }
+    }
+    return undefined;
+}
+
+function resolveCanonicalNodeId(
+    graph: SemanticGraph,
+    symbolName: string,
+    filePath?: string,
+): string | undefined {
+    if (graph.hasNode(symbolName)) {
+        return symbolName;
+    }
+    if (filePath && typeof graph.getNodesByFile === 'function') {
+        const fileNodes = graph.getNodesByFile(filePath);
+        const match = findMatchingNode(fileNodes, symbolName);
+        if (match) {
+            return match.id;
+        }
+    }
+    const allNodes = graph.getAllNodes();
+    const match = findMatchingNode(allNodes, symbolName);
+    return match ? match.id : undefined;
+}
+
 /**
  * Extracts propagation paths across the semantic graph.
+ * Resolves symbols to standard Canonical Node IDs before slicing.
  */
 function extractPropagationPaths(
     graph: SemanticGraph | undefined,
     astMappings: DiffAstNodeMapping[],
+    filePath?: string,
 ): SemanticPropagationNode[] {
     if (!graph || astMappings.length === 0) {
         return [];
@@ -238,7 +279,11 @@ function extractPropagationPaths(
     const visited = new Set<string>();
 
     for (const mapping of astMappings) {
-        const slice = graph.getSlice(mapping.symbolName, 2, 'backward');
+        const seedId = resolveCanonicalNodeId(graph, mapping.symbolName, filePath);
+        if (!seedId) {
+            continue;
+        }
+        const slice = graph.getSlice(seedId, 2, 'backward');
         for (const edge of slice.edges) {
             const key = `${edge.fromNodeId}->${edge.toNodeId}`;
             if (visited.has(key)) {
@@ -246,8 +291,9 @@ function extractPropagationPaths(
             }
             visited.add(key);
 
+            const targetNode = graph.getNode(edge.toNodeId);
             paths.push({
-                file: edge.toNodeId,
+                file: targetNode?.location.file || edge.toNodeId,
                 symbol: mapping.symbolName,
                 distance: 1,
                 edgeKind: edge.kind,
@@ -276,7 +322,11 @@ function buildLayer2(
 
     const impactFiles = Array.from(impactSet);
     const contractConflicts = extractContractConflicts(input.filePath, input.issues);
-    const propagationPaths = extractPropagationPaths(input.graph, layer1.astNodeMappings);
+    const propagationPaths = extractPropagationPaths(
+        input.graph,
+        layer1.astNodeMappings,
+        input.filePath,
+    );
 
     const recommendedFocus: string[] = [];
     if (contractConflicts.length > 0) {
@@ -311,43 +361,76 @@ function buildLayer2(
 // Layer 3 Evaluation: Conflict and High-Risk Diff
 // ============================================================================
 
+function checkConflictLine(line: string, lineNumber: number): DiffConflictMarker | undefined {
+    const startMatch = line.match(CONFLICT_START_REGEX);
+    if (startMatch) {
+        return {
+            line: lineNumber,
+            markerType: 'start',
+            branchLabel: startMatch[1],
+        };
+    }
+
+    if (CONFLICT_MID_REGEX.test(line)) {
+        return {
+            line: lineNumber,
+            markerType: 'separator',
+        };
+    }
+
+    const endMatch = line.match(CONFLICT_END_REGEX);
+    if (endMatch) {
+        return {
+            line: lineNumber,
+            markerType: 'end',
+            branchLabel: endMatch[1],
+        };
+    }
+
+    return undefined;
+}
+
+function isConflictCandidate(content: string, start: number, len: number): boolean {
+    if (len < 7) {
+        return false;
+    }
+    const c = content.charCodeAt(start);
+    return c === 60 /* '<' */ || c === 61 /* '=' */ || c === 62; /* '>' */
+}
+
 /**
  * Detects git conflict markers in content or hunks.
+ * Streams through text using linear index pointers to avoid massive array allocations.
  */
 function detectConflictMarkers(content?: string, _hunks?: ReviewDiffHunk[]): DiffConflictMarker[] {
+    if (!content) {
+        return [];
+    }
+
     const markers: DiffConflictMarker[] = [];
-    const lines = content ? content.split(/\r?\n/) : [];
+    const len = content.length;
+    let lineStart = 0;
+    let lineNumber = 1;
 
-    if (lines.length > 0) {
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const startMatch = line.match(CONFLICT_START_REGEX);
-            if (startMatch) {
-                markers.push({
-                    line: i + 1,
-                    markerType: 'start',
-                    branchLabel: startMatch[1],
-                });
-                continue;
-            }
+    while (lineStart < len) {
+        const nextNewline = content.indexOf('\n', lineStart);
+        const lineEnd = nextNewline === -1 ? len : nextNewline;
+        let effectiveEnd = lineEnd;
 
-            if (CONFLICT_MID_REGEX.test(line)) {
-                markers.push({
-                    line: i + 1,
-                    markerType: 'separator',
-                });
-                continue;
-            }
+        if (effectiveEnd > lineStart && content.charCodeAt(effectiveEnd - 1) === 13 /* \r */) {
+            effectiveEnd--;
+        }
 
-            const endMatch = line.match(CONFLICT_END_REGEX);
-            if (endMatch) {
-                markers.push({
-                    line: i + 1,
-                    markerType: 'end',
-                    branchLabel: endMatch[1],
-                });
+        if (isConflictCandidate(content, lineStart, effectiveEnd - lineStart)) {
+            const line = content.slice(lineStart, effectiveEnd);
+            const marker = checkConflictLine(line, lineNumber);
+            if (marker) {
+                markers.push(marker);
             }
         }
+
+        lineStart = nextNewline === -1 ? len : nextNewline + 1;
+        lineNumber++;
     }
 
     return markers;
