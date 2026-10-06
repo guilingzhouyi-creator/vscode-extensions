@@ -217,11 +217,15 @@ export class DaemonServer {
                     });
                     continue;
                 }
-                this.handleMessage(msg, {
-                    write,
-                    close: () => socket.destroy(),
-                    id: () => this.nextId++,
-                }, socket);
+                this.handleMessage(
+                    msg,
+                    {
+                        write,
+                        close: () => socket.destroy(),
+                        id: () => this.nextId++,
+                    },
+                    socket,
+                );
             }
         });
         socket.on('close', () => {
@@ -503,7 +507,7 @@ export async function daemonMain(argv: string[]): Promise<void> {
         server.shutdown('uncaught-exception');
     });
     process.on('unhandledRejection', (reason: unknown) => {
-        const msg = reason instanceof Error ? (reason.stack || reason.message) : String(reason);
+        const msg = reason instanceof Error ? reason.stack || reason.message : String(reason);
         process.stderr.write(`[auto-refactor daemon] unhandledRejection: ${msg}\n`);
     });
 }

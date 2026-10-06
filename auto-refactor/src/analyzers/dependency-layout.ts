@@ -142,9 +142,8 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         imports: ImportStatementInfo[],
         options?: DependencyLayoutOptions,
     ): void {
-        const lines = this.fileLines.length > 0
-            ? this.fileLines
-            : (ctx.content ? ctx.content.split('\n') : []);
+        const lines =
+            this.fileLines.length > 0 ? this.fileLines : ctx.content ? ctx.content.split('\n') : [];
         let inFunction = false;
         let functionIndent = 0;
 
@@ -260,9 +259,8 @@ export class DependencyLayoutAnalyzer implements Analyzer {
     }
 
     private extractRemoteResources(ctx: AnalyzerContext, resources: ExternalResourceRef[]): void {
-        const lines = this.fileLines.length > 0
-            ? this.fileLines
-            : (ctx.content ? ctx.content.split('\n') : []);
+        const lines =
+            this.fileLines.length > 0 ? this.fileLines : ctx.content ? ctx.content.split('\n') : [];
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const lineNum = i + 1;
@@ -292,7 +290,9 @@ export class DependencyLayoutAnalyzer implements Analyzer {
     private getSurroundingText(contentOrLines: string | string[], line: number): string {
         const lines = Array.isArray(contentOrLines)
             ? contentOrLines
-            : (contentOrLines ? contentOrLines.split('\n') : this.fileLines);
+            : contentOrLines
+              ? contentOrLines.split('\n')
+              : this.fileLines;
         const prev = lines[line - 2] || '';
         const current = lines[line - 1] || '';
         const next = lines[line] || '';

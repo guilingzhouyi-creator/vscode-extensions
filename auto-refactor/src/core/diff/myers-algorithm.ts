@@ -230,9 +230,7 @@ function backtrackMyersTrace(
 
         const row = trace[di];
         const k = x - y;
-        const insertMove =
-            k === -di ||
-            (k !== di && row[k - 1 + di] < row[k + 1 + di]);
+        const insertMove = k === -di || (k !== di && row[k - 1 + di] < row[k + 1 + di]);
         const prevK = insertMove ? k + 1 : k - 1;
         const prevX = row[prevK + di];
         const prevY = prevX - prevK;

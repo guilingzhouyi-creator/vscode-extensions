@@ -220,8 +220,7 @@ export class ConstantsAnalyzer implements Analyzer {
             roleInference.role === 'test_suite' ||
             RE_TEST_PATH.test(ctx.filePath) ||
             RE_TEST_FILE_EXT.test(ctx.filePath);
-        const isStyle =
-            ctx.filePath.includes('-styles.') || RE_STYLE_FILE_EXT.test(ctx.filePath);
+        const isStyle = ctx.filePath.includes('-styles.') || RE_STYLE_FILE_EXT.test(ctx.filePath);
         if (isTest || isStyle) return;
 
         const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);

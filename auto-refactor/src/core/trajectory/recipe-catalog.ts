@@ -93,8 +93,7 @@ export const PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
             RecipePatternDetectors.isParameterObjectIntroduction(beforeLines, afterLines),
         name: 'Parameter List Encapsulation into Options Object',
         category: 'parameter-object',
-        description:
-            'Replaces lengthy positional parameter list with a structured options record.',
+        description: 'Replaces lengthy positional parameter list with a structured options record.',
         minLines: 8,
         antiPatternTags: ['long-parameter-list', 'positional-drift'],
         operations: [
@@ -111,8 +110,7 @@ export const PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
             RecipePatternDetectors.isStrategyDispatchConversion(beforeLines, afterLines),
         name: 'Conditional Cascade Replacement with Strategy Map',
         category: 'strategy-dispatch',
-        description:
-            'Replaces rigid switch/if-else cascades with declarative strategy handlers.',
+        description: 'Replaces rigid switch/if-else cascades with declarative strategy handlers.',
         minLines: 15,
         antiPatternTags: ['deep-branching', 'cyclomatic-cascade'],
         operations: [
@@ -162,8 +160,7 @@ export const PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
             {
                 opKind: 'inject-reset-state',
                 targetSymbol: 'lifecycle-hooks',
-                description:
-                    'Implement state clean-up in reset_state to ensure clean object reuse',
+                description: 'Implement state clean-up in reset_state to ensure clean object reuse',
             },
         ],
     },
@@ -342,8 +339,7 @@ export const PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
             {
                 opKind: 'inject-transition-guard',
                 targetSymbol: 'state-machine',
-                description:
-                    'Enforce transition_to guard flow and entry/exit invariant execution',
+                description: 'Enforce transition_to guard flow and entry/exit invariant execution',
             },
         ],
     },
@@ -458,8 +454,7 @@ export const PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
             afterLines.some((sourceLine) => /\b(?:tr\s*\(|UIIntermediary)/.test(sourceLine)),
         name: 'UI Text i18n Localization Refactoring',
         category: 'i18n-localization',
-        description:
-            'Wraps raw display strings into localized tr(KEY) or UIIntermediary bindings.',
+        description: 'Wraps raw display strings into localized tr(KEY) or UIIntermediary bindings.',
         minLines: 2,
         antiPatternTags: ['unlocalized-ui-string'],
         operations: [
@@ -506,4 +501,3 @@ export const PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
         ],
     },
 ];
-

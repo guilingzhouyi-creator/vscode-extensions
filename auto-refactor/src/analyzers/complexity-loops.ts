@@ -150,7 +150,9 @@ export function findLoopSitesInFunction(
 ): LoopSite[] {
     const lines = Array.isArray(contentOrLines)
         ? contentOrLines
-        : (contentOrLines ? contentOrLines.split('\n') : []);
+        : contentOrLines
+          ? contentOrLines.split('\n')
+          : [];
     const sites: LoopSite[] = [];
     const startLine = fnNode.start?.line ?? 1;
     const endLine = fnNode.end?.line ?? lines.length;

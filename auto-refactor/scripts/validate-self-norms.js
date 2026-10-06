@@ -52,7 +52,8 @@ const NAMED_CONST_REGEX = /^const [A-Z0-9_]+\s*[:=]/;
 const INLINE_NUMERIC_THRESHOLD_REGEX = /[<>]=?\s*\d{2,}|\d{2,}\s*[<>]=?/;
 const HARDCODED_PATH_TEST_1 = /includes\(['"]\/(?:tests?|benchmarks?|scripts?|samples?)\/['"]\)/;
 const HARDCODED_PATH_TEST_2 = /endsWith\(['"][a-z0-9_.-]+\.(?:ts|py|gd|rs)['"]\)/;
-const HARDCODED_PATH_TEST_3 = /fileNameEndsWith\([^)]*\[[^\]]*['"][a-z0-9_.-]+\.(?:ts|py|gd|rs)['"]/;
+const HARDCODED_PATH_TEST_3 =
+  /fileNameEndsWith\([^)]*\[[^\]]*['"][a-z0-9_.-]+\.(?:ts|py|gd|rs)['"]/;
 const ZH_CHAR_REGEX = /[\u4e00-\u9fa5]/;
 const ANALYZER_DIAGNOSTIC_ZH_REGEX = /(?:message|suggestion)\s*:\s*[`'"].*[\u4e00-\u9fa5]/;
 

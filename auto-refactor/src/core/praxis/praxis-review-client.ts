@@ -345,9 +345,7 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         }
 
         const fileContent = await this.readFileContentSafe(filePath, content);
-        const graph = opts.isolatedGraph
-            ? new SemanticGraph()
-            : (options.graph ?? this.graph);
+        const graph = opts.isolatedGraph ? new SemanticGraph() : (options.graph ?? this.graph);
 
         if (fileContent.length > 0) {
             defaultSemanticAdapterRegistry.extractFileToGraph(filePath, fileContent, graph);

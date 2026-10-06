@@ -16,12 +16,7 @@
 
 import { DaemonServer, daemonMain } from './server';
 import { DaemonClient } from './client';
-import {
-    PROTOCOL_VERSION,
-    PROTOCOL_SOFTWARE_VERSION,
-    encodeMessage,
-    decodeLine,
-} from './protocol';
+import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
 import type { DaemonMessage, HelloAckMessage } from './protocol';
 import {
     projectHashFor,
@@ -32,11 +27,7 @@ import {
     logFilePath,
 } from './registry';
 import type { RegistryInfo } from './registry';
-import {
-    createDaemonContext,
-    handleScan,
-    handleScanDiff,
-} from './scanHandler';
+import { createDaemonContext, handleScan, handleScanDiff } from './scanHandler';
 import type { DaemonScanContext } from './scanHandler';
 
 export {
@@ -58,12 +49,7 @@ export {
     handleScanDiff,
 };
 
-export type {
-    DaemonMessage,
-    HelloAckMessage,
-    RegistryInfo,
-    DaemonScanContext,
-};
+export type { DaemonMessage, HelloAckMessage, RegistryInfo, DaemonScanContext };
 
 /**
  * Diagnostics descriptor for unhandled promise rejection occurrences in the daemon.

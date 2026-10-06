@@ -30,7 +30,8 @@ const FORBIDDEN_EXEC_SH = /exec sh /;
 const REQUIRED_EXEC_BASH = /exec bash /;
 const AUDIT_ALL_REGEX = /(?:workspace-timing|auto-refactor|WebGames|audit_config\.py|\[5\/5\])/g;
 const PRE_COMMIT_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames)/g;
-const PRE_PUSH_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames|validate-commit-msg-style)/g;
+const PRE_PUSH_REGEX =
+  /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames|validate-commit-msg-style)/g;
 
 function collectFiles(dir, extensions, extSet) {
   const results = [];

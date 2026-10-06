@@ -233,13 +233,7 @@ function auditAstDensity(allFiles) {
   return true;
 }
 
-const FORBIDDEN_BOUNDARY_TARGETS = new Set([
-  '../cli',
-  '../../cli',
-  '../../api',
-  '../api',
-  './api',
-]);
+const FORBIDDEN_BOUNDARY_TARGETS = new Set(['../cli', '../../cli', '../../api', '../api', './api']);
 const FORBIDDEN_CLI_REGEX = /\/cli(?:\/|$)/;
 
 function auditBoundaryInteroperability(allFiles) {
@@ -254,10 +248,7 @@ function auditBoundaryInteroperability(allFiles) {
     let match;
     while ((match = importRegex.exec(content)) !== null) {
       const target = match[1];
-      if (
-        FORBIDDEN_BOUNDARY_TARGETS.has(target) ||
-        FORBIDDEN_CLI_REGEX.test(target)
-      ) {
+      if (FORBIDDEN_BOUNDARY_TARGETS.has(target) || FORBIDDEN_CLI_REGEX.test(target)) {
         boundaryViolations.push({ relPath, target });
       }
     }

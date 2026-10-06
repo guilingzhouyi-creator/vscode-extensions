@@ -377,14 +377,12 @@ export class ComplexityAnalyzer implements Analyzer {
         fnLines: string[],
     ): { depthBudget: number; contextKind: string; isStateMachine: boolean } {
         const isParserContext =
-            RE_PARSER_FILE_CONTEXT.test(ctx.filePath) ||
-            RE_PARSER_FUNCTION_NAME.test(name);
+            RE_PARSER_FILE_CONTEXT.test(ctx.filePath) || RE_PARSER_FUNCTION_NAME.test(name);
 
         const hasSwitchOrDispatch = fnLines.some((l) => RE_SWITCH_OR_DISPATCH_LINE.test(l));
         const isStateMachine = hasSwitchOrDispatch && fnLines.length >= 15;
         const isEventLoop =
-            RE_EVENT_LOOP_FILE_CONTEXT.test(ctx.filePath) ||
-            RE_EVENT_LOOP_FUNCTION_NAME.test(name);
+            RE_EVENT_LOOP_FILE_CONTEXT.test(ctx.filePath) || RE_EVENT_LOOP_FUNCTION_NAME.test(name);
 
         if (isParserContext) {
             return { depthBudget: 5, contextKind: 'ast-parser', isStateMachine };
@@ -579,9 +577,12 @@ export class ComplexityAnalyzer implements Analyzer {
         );
 
         if (flagElasticBudget) {
-            const lineCount = this.cachedLines.length > 0
-                ? this.cachedLines.length
-                : (ctx.content ? ctx.content.split('\n').length : 1);
+            const lineCount =
+                this.cachedLines.length > 0
+                    ? this.cachedLines.length
+                    : ctx.content
+                      ? ctx.content.split('\n').length
+                      : 1;
             const fileBudgetIssue = evaluateFileCumulativeBudget(
                 ctx.filePath,
                 lineCount,
@@ -613,13 +614,13 @@ export class ComplexityAnalyzer implements Analyzer {
         if (!flagRedundancy || this.fileFunctions.length < 2) return;
 
         const descriptors = createRoutineDescriptors(this.fileFunctions, ctx.filePath);
-        const lineCount = this.cachedLines.length > 0
-            ? this.cachedLines.length
-            : (ctx.content ? ctx.content.split('\n').length : 100);
-        const redundancyResult = evaluateDistributedRedundancy(
-            descriptors,
-            lineCount,
-        );
+        const lineCount =
+            this.cachedLines.length > 0
+                ? this.cachedLines.length
+                : ctx.content
+                  ? ctx.content.split('\n').length
+                  : 100;
+        const redundancyResult = evaluateDistributedRedundancy(descriptors, lineCount);
         this.issues.push(...redundancyResult.issues);
     }
 

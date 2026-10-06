@@ -299,10 +299,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
         }
     }
 
-    private static compareTaskPriority(
-        a: QueuedTask<any, any>,
-        b: QueuedTask<any, any>,
-    ): number {
+    private static compareTaskPriority(a: QueuedTask<any, any>, b: QueuedTask<any, any>): number {
         return (b.task.priority as number) - (a.task.priority as number);
     }
 
@@ -344,7 +341,10 @@ export class WorkerPoolManager implements IExecutionScheduler {
                 };
                 anyBoosted = true;
             }
-            if (priority < MAX_BOOSTED_PRIORITY && this.queue[i].enqueuedAt < minStarvableEnqueued) {
+            if (
+                priority < MAX_BOOSTED_PRIORITY &&
+                this.queue[i].enqueuedAt < minStarvableEnqueued
+            ) {
                 minStarvableEnqueued = this.queue[i].enqueuedAt;
             }
         }

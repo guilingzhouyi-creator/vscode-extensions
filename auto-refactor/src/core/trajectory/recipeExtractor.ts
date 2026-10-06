@@ -22,11 +22,7 @@ import type {
     TransformOpKind,
 } from './recipeTypes';
 import { scoreDelta } from '../scoring/scorer-formulas';
-import {
-    CATEGORY_PREFIXES,
-    PATTERN_DESCRIPTORS,
-    type PatternDescriptor,
-} from './recipe-catalog';
+import { CATEGORY_PREFIXES, PATTERN_DESCRIPTORS, type PatternDescriptor } from './recipe-catalog';
 
 type RecipeMeta = {
     name: string;
@@ -61,47 +57,136 @@ const TAG_RULES: Readonly<Record<string, TagPredicate>> = {
     'high-cyclomatic-complexity': { kind: PREDICATE_MIN_LINES, minLines: MIN_FUNCTION_LINES },
     'long-parameter-list': { kind: PREDICATE_PATTERN, pattern: /\(\s*[^)]{35,}\)/ },
     'positional-drift': { kind: PREDICATE_PATTERN, pattern: /\(\s*[^)]{35,}\)/ },
-    'deep-branching': { kind: PREDICATE_COUNT, pattern: /case\s+|else\s+if/g, minCount: MIN_BRANCH_COUNT },
-    'cyclomatic-cascade': { kind: PREDICATE_COUNT, pattern: /case\s+|else\s+if/g, minCount: MIN_BRANCH_COUNT },
+    'deep-branching': {
+        kind: PREDICATE_COUNT,
+        pattern: /case\s+|else\s+if/g,
+        minCount: MIN_BRANCH_COUNT,
+    },
+    'cyclomatic-cascade': {
+        kind: PREDICATE_COUNT,
+        pattern: /case\s+|else\s+if/g,
+        minCount: MIN_BRANCH_COUNT,
+    },
     'missing-guard': { kind: PREDICATE_ABSENT, pattern: /if\s*\(!\w+\)\s*return/ },
-    'unhandled-rejection': { kind: PREDICATE_DUAL, present: /\b(?:async|await|Promise)\b/, absent: /\bcatch\b/ },
-    'transient-heap-allocation': { kind: PREDICATE_PATTERN, pattern: /\bnew\s+\w+|\.duplicate\(true\)/ },
+    'unhandled-rejection': {
+        kind: PREDICATE_DUAL,
+        present: /\b(?:async|await|Promise)\b/,
+        absent: /\bcatch\b/,
+    },
+    'transient-heap-allocation': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\bnew\s+\w+|\.duplicate\(true\)/,
+    },
     'hot-loop-gc-pressure': { kind: PREDICATE_PATTERN, pattern: /\bnew\s+\w+|\.duplicate\(true\)/ },
-    'unprotected-reentrancy': { kind: PREDICATE_ABSENT, pattern: /(_is_executing|_is_stopping|_cas_lock)/ },
-    'recursive-state-mutation': { kind: PREDICATE_ABSENT, pattern: /(_is_executing|_is_stopping|_cas_lock)/ },
-    'hot-path-config-query': { kind: PREDICATE_COUNT, pattern: /GameConfig\.get_/g, minCount: MIN_BRANCH_COUNT },
-    'stale-cache-risk': { kind: PREDICATE_COUNT, pattern: /GameConfig\.get_/g, minCount: MIN_BRANCH_COUNT },
-    'data-clump': { kind: PREDICATE_PATTERN, pattern: /\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/ },
-    'parameter-overload': { kind: PREDICATE_PATTERN, pattern: /\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/ },
-    'hardcoded-pipeline-branch': { kind: PREDICATE_PATTERN, pattern: /\b(if\s+step\s*==|match\s+phase|switch\s*\(stage\))/ },
-    'tight-lifecycle-coupling': { kind: PREDICATE_PATTERN, pattern: /\b(if\s+step\s*==|match\s+phase|switch\s*\(stage\))/ },
-    'stale-shim-layer': { kind: PREDICATE_PATTERN, pattern: /\b(from_stat_mutation|apply_mutation_legacy)\b/ },
-    'obsolete-compatibility-bridge': { kind: PREDICATE_PATTERN, pattern: /\b(from_stat_mutation|apply_mutation_legacy)\b/ },
-    'indirect-shim-wrapper': { kind: PREDICATE_PATTERN, pattern: /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/ },
-    'transitional-scaffolding': { kind: PREDICATE_PATTERN, pattern: /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/ },
+    'unprotected-reentrancy': {
+        kind: PREDICATE_ABSENT,
+        pattern: /(_is_executing|_is_stopping|_cas_lock)/,
+    },
+    'recursive-state-mutation': {
+        kind: PREDICATE_ABSENT,
+        pattern: /(_is_executing|_is_stopping|_cas_lock)/,
+    },
+    'hot-path-config-query': {
+        kind: PREDICATE_COUNT,
+        pattern: /GameConfig\.get_/g,
+        minCount: MIN_BRANCH_COUNT,
+    },
+    'stale-cache-risk': {
+        kind: PREDICATE_COUNT,
+        pattern: /GameConfig\.get_/g,
+        minCount: MIN_BRANCH_COUNT,
+    },
+    'data-clump': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/,
+    },
+    'parameter-overload': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/,
+    },
+    'hardcoded-pipeline-branch': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\b(if\s+step\s*==|match\s+phase|switch\s*\(stage\))/,
+    },
+    'tight-lifecycle-coupling': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\b(if\s+step\s*==|match\s+phase|switch\s*\(stage\))/,
+    },
+    'stale-shim-layer': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\b(from_stat_mutation|apply_mutation_legacy)\b/,
+    },
+    'obsolete-compatibility-bridge': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\b(from_stat_mutation|apply_mutation_legacy)\b/,
+    },
+    'indirect-shim-wrapper': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/,
+    },
+    'transitional-scaffolding': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/,
+    },
     'unannotated-deprecation': { kind: PREDICATE_ABSENT, pattern: /@deprecated\b/ },
     'missing-sunset-plan': { kind: PREDICATE_ABSENT, pattern: /@deprecated\b/ },
-    'transient-bridge-boxing': { kind: PREDICATE_PATTERN, pattern: /var\s+\w+\s*=\s*\{\s*["']\w+["']\s*:\s*\w+/ },
-    'heavyweight-wrapper': { kind: PREDICATE_PATTERN, pattern: /var\s+\w+\s*=\s*\{\s*["']\w+["']\s*:\s*\w+/ },
-    'missing-debounce': { kind: PREDICATE_ABSENT, pattern: /\b(debounced_pressed|debounce|is_loading)\b/ },
+    'transient-bridge-boxing': {
+        kind: PREDICATE_PATTERN,
+        pattern: /var\s+\w+\s*=\s*\{\s*["']\w+["']\s*:\s*\w+/,
+    },
+    'heavyweight-wrapper': {
+        kind: PREDICATE_PATTERN,
+        pattern: /var\s+\w+\s*=\s*\{\s*["']\w+["']\s*:\s*\w+/,
+    },
+    'missing-debounce': {
+        kind: PREDICATE_ABSENT,
+        pattern: /\b(debounced_pressed|debounce|is_loading)\b/,
+    },
     'wild-state-mutation': { kind: PREDICATE_PATTERN, pattern: /_current_state\s*=/ },
     'strong-observer-leak': {
         kind: PREDICATE_DUAL,
         present: /\b(?:_observers|_listeners|_bindings)\.append\(/,
         absent: /weakref/,
     },
-    'dto-mutation-leak': { kind: PREDICATE_PATTERN, pattern: /\b(?:snapshot|dto|_snapshot|_dto)\.\w+\s*[+\-\*]?=/ },
-    'bare-progress-bar': { kind: PREDICATE_DUAL, present: /\bProgressBar\b/, absent: /\bKStatusBar\b/ },
-    'hardcoded-color-token': { kind: PREDICATE_DUAL, present: /Color\s*\(/, absent: /DesignTokens\./ },
+    'dto-mutation-leak': {
+        kind: PREDICATE_PATTERN,
+        pattern: /\b(?:snapshot|dto|_snapshot|_dto)\.\w+\s*[+\-\*]?=/,
+    },
+    'bare-progress-bar': {
+        kind: PREDICATE_DUAL,
+        present: /\bProgressBar\b/,
+        absent: /\bKStatusBar\b/,
+    },
+    'hardcoded-color-token': {
+        kind: PREDICATE_DUAL,
+        present: /Color\s*\(/,
+        absent: /DesignTokens\./,
+    },
     'bare-control-inheritance': {
         kind: PREDICATE_DUAL,
         present: /extends\s+Control\b/,
         absent: /extends\s+(BaseScreen|BaseModal)\b/,
     },
-    'unbounded-list-instantiation': { kind: PREDICATE_DUAL, present: /\badd_child\s*\(/, absent: /\bKVirtualList\b/ },
-    'unlocalized-ui-string': { kind: PREDICATE_DUAL, present: /\.text\s*=\s*["'][^"']+["']/, absent: /\btr\s*\(/ },
-    'fragile-node-path': { kind: PREDICATE_DUAL, present: /\b(?:get_parent|find_child)\b/, absent: /%[A-Za-z0-9_]+/ },
-    'backend-singleton-coupling': { kind: PREDICATE_DUAL, present: /\bGameState\./, absent: /\bapply_snapshot\b/ },
+    'unbounded-list-instantiation': {
+        kind: PREDICATE_DUAL,
+        present: /\badd_child\s*\(/,
+        absent: /\bKVirtualList\b/,
+    },
+    'unlocalized-ui-string': {
+        kind: PREDICATE_DUAL,
+        present: /\.text\s*=\s*["'][^"']+["']/,
+        absent: /\btr\s*\(/,
+    },
+    'fragile-node-path': {
+        kind: PREDICATE_DUAL,
+        present: /\b(?:get_parent|find_child)\b/,
+        absent: /%[A-Za-z0-9_]+/,
+    },
+    'backend-singleton-coupling': {
+        kind: PREDICATE_DUAL,
+        present: /\bGameState\./,
+        absent: /\bapply_snapshot\b/,
+    },
 };
 
 /**
@@ -250,11 +335,7 @@ export class TrajectoryRecipeExtractor {
         return undefined;
     }
 
-    private detectTagInCode(
-        tag: string,
-        code: string,
-        getLines: () => string[],
-    ): boolean {
+    private detectTagInCode(tag: string, code: string, getLines: () => string[]): boolean {
         const rule = TAG_RULES[tag];
         if (!rule) {
             return code.includes(tag);
@@ -280,7 +361,11 @@ export class TrajectoryRecipeExtractor {
         return rule.present.test(code) && !rule.absent.test(code);
     }
 
-    private createOp(opKind: TransformOpKind, targetSymbol: string, description: string): TransformOp {
+    private createOp(
+        opKind: TransformOpKind,
+        targetSymbol: string,
+        description: string,
+    ): TransformOp {
         return { opKind, targetSymbol, description };
     }
 
