@@ -141,6 +141,8 @@ export class TrajectoryRecipeExtractor {
             beforeLines,
             afterLines,
             input.language,
+            input.beforeContent,
+            input.afterContent,
         );
         if (!recipeMeta) {
             return undefined;
@@ -173,14 +175,25 @@ export class TrajectoryRecipeExtractor {
             return false;
         }
 
-        const lines = code.split('\n');
-        if (precondition.minLines && lines.length < precondition.minLines) {
-            return false;
+        if (precondition.minLines) {
+            let lineCount = 1;
+            for (let i = 0; i < code.length; i++) {
+                if (code.charCodeAt(i) === 10) lineCount++;
+                if (lineCount >= precondition.minLines) break;
+            }
+            if (lineCount < precondition.minLines) {
+                return false;
+            }
         }
 
         if (precondition.antiPatternTags.length > 0) {
+            let lazyLines: string[] | undefined;
+            const getLines = (): string[] => {
+                if (!lazyLines) lazyLines = code.split('\n');
+                return lazyLines;
+            };
             const hasMatchingTag = precondition.antiPatternTags.some((tag) =>
-                this.detectTagInCode(tag, code, lines),
+                this.detectTagInCode(tag, code, getLines),
             );
             if (!hasMatchingTag) {
                 return false;
@@ -213,9 +226,11 @@ export class TrajectoryRecipeExtractor {
         beforeLines: string[],
         afterLines: string[],
         language?: string,
+        beforeText?: string,
+        afterText?: string,
     ): RecipeMeta | undefined {
         for (const descriptor of PATTERN_DESCRIPTORS) {
-            if (descriptor.match(beforeLines, afterLines)) {
+            if (descriptor.match(beforeLines, afterLines, beforeText, afterText)) {
                 return {
                     name: descriptor.name,
                     category: descriptor.category,
@@ -235,13 +250,17 @@ export class TrajectoryRecipeExtractor {
         return undefined;
     }
 
-    private detectTagInCode(tag: string, code: string, lines: string[]): boolean {
+    private detectTagInCode(
+        tag: string,
+        code: string,
+        getLines: () => string[],
+    ): boolean {
         const rule = TAG_RULES[tag];
         if (!rule) {
             return code.includes(tag);
         }
         if (rule.kind === PREDICATE_MIN_LINES) {
-            return lines.length >= rule.minLines;
+            return getLines().length >= rule.minLines;
         }
         if (rule.kind === PREDICATE_PATTERN) {
             return rule.pattern.test(code);
@@ -250,7 +269,13 @@ export class TrajectoryRecipeExtractor {
             return !rule.pattern.test(code);
         }
         if (rule.kind === PREDICATE_COUNT) {
-            return (code.match(rule.pattern) || []).length >= rule.minCount;
+            let count = 0;
+            rule.pattern.lastIndex = 0;
+            while (rule.pattern.exec(code) !== null) {
+                count++;
+                if (count >= rule.minCount) break;
+            }
+            return count >= rule.minCount;
         }
         return rule.present.test(code) && !rule.absent.test(code);
     }

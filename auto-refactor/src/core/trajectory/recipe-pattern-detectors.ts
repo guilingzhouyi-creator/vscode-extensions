@@ -11,6 +11,20 @@
  *   from recipeExtractor to enforce physical line budget boundaries (< 900 LOC).
  */
 
+function resolveText(lines: string[], text?: string): string {
+    return text !== undefined ? text : lines.join('\n');
+}
+
+function countBranchMatches(text: string, minCount: number): number {
+    const re = /case\s+|else\s+if/g;
+    let count = 0;
+    while (re.exec(text) !== null) {
+        count++;
+        if (count >= minCount) break;
+    }
+    return count;
+}
+
 /**
  * Static heuristic detectors identifying refactoring patterns between code revisions.
  */
@@ -41,16 +55,21 @@ export class RecipePatternDetectors {
     /**
      * Pattern 2: Multi-parameter grouping into parameter object.
      */
-    public static isParameterObjectIntroduction(before: string[], after: string[]): boolean {
-        const beforeJoined = before.join('\n');
-        const afterJoined = after.join('\n');
+    public static isParameterObjectIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         const hasManyArgsBefore =
             /\(\s*\w+\s*(?::\s*[^,)]+)?,\s*\w+\s*(?::\s*[^,)]+)?,\s*\w+\s*(?::\s*[^,)]+)?,\s*\w+/.test(
-                beforeJoined,
+                b,
             );
         const hasOptionsInterfaceAfter =
             /interface\s+\w+Options|type\s+\w+Config\s*=|interface\s+\w+Config|\w+Options\b/.test(
-                afterJoined,
+                a,
             );
         return hasManyArgsBefore && hasOptionsInterfaceAfter;
     }
@@ -58,13 +77,18 @@ export class RecipePatternDetectors {
     /**
      * Pattern 3: Branching cascade converted to strategy dispatch.
      */
-    public static isStrategyDispatchConversion(before: string[], after: string[]): boolean {
-        const beforeJoined = before.join('\n');
-        const afterJoined = after.join('\n');
-        const beforeBranches = (beforeJoined.match(/case\s+|else\s+if/g) || []).length;
+    public static isStrategyDispatchConversion(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
+        const beforeBranches = countBranchMatches(b, 3);
         const afterHasMapOrRecord =
             /const\s+\w*(?:Handlers|_HANDLERS|Strategy|_STRATEGY|Dispatch)\s*:\s*Record|new\s+Map|\bMap<\w+,\s*\w+>|\w+_HANDLERS\b/i.test(
-                afterJoined,
+                a,
             );
         return beforeBranches >= 3 && afterHasMapOrRecord;
     }
@@ -72,19 +96,30 @@ export class RecipePatternDetectors {
     /**
      * Pattern 4: Defensive Guard / Error Wrap Injection.
      */
-    public static isDefensiveGuardAddition(before: string[], after: string[]): boolean {
-        const beforeJoined = before.join('\n');
-        const afterJoined = after.join('\n');
-        const beforeHasGuards = /if\s*\(!\w+\)\s*return|try\s*\{/.test(beforeJoined);
-        const afterHasGuards = /if\s*\(!\w+\)\s*return|try\s*\{/.test(afterJoined);
+    public static isDefensiveGuardAddition(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
+        const beforeHasGuards = /if\s*\(!\w+\)\s*return|try\s*\{/.test(b);
+        const afterHasGuards = /if\s*\(!\w+\)\s*return|try\s*\{/.test(a);
         return !beforeHasGuards && afterHasGuards;
     }
 
     /**
      * Pattern 5: Object Pool & Reset State Lifecycle (object-pool-lifecycle).
      */
-    public static isObjectPoolIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isObjectPoolIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         const beforeHasPool = /\b(acquire|release|_pool|reset_state)\b/.test(b);
         const afterHasPool =
             /\b(reset_state|acquire\s*\(|release\s*\(|_pool\b)/.test(a) &&
@@ -95,16 +130,19 @@ export class RecipePatternDetectors {
     /**
      * Pattern 6: CAS Reentrancy Guard (cas-reentrancy-guard).
      */
-    public static isCasReentrancyGuardIntroduction(before: string[], after: string[]): boolean {
-        const beforeJoined = before.join('\n');
-        const afterJoined = after.join('\n');
+    public static isCasReentrancyGuardIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
 
-        const beforeHasCas = /(_is_executing|_is_stopping|is_reentrant|_cas_lock)\b/.test(
-            beforeJoined,
-        );
+        const beforeHasCas = /(_is_executing|_is_stopping|is_reentrant|_cas_lock)\b/.test(b);
         const afterHasCas =
-            /(_is_executing|_is_stopping|is_reentrant|_cas_lock)\s*[:=]/.test(afterJoined) &&
-            /if\s+.*(_is_executing|_is_stopping|is_reentrant|_cas_lock)/.test(afterJoined);
+            /(_is_executing|_is_stopping|is_reentrant|_cas_lock)\s*[:=]/.test(a) &&
+            /if\s+.*(_is_executing|_is_stopping|is_reentrant|_cas_lock)/.test(a);
 
         return !beforeHasCas && afterHasCas;
     }
@@ -115,14 +153,16 @@ export class RecipePatternDetectors {
     public static isConfigCacheInvalidationIntroduction(
         before: string[],
         after: string[],
+        beforeText?: string,
+        afterText?: string,
     ): boolean {
-        const beforeJoined = before.join('\n');
-        const afterJoined = after.join('\n');
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
 
         const beforeHasInvalidate =
-            /\b(invalidate_cache|_ensure_\w+_cache|config_reload_version)\b/.test(beforeJoined);
+            /\b(invalidate_cache|_ensure_\w+_cache|config_reload_version)\b/.test(b);
         const afterHasInvalidate =
-            /\b(invalidate_cache|_ensure_\w+_cache|config_reload_version)\b/.test(afterJoined);
+            /\b(invalidate_cache|_ensure_\w+_cache|config_reload_version)\b/.test(a);
 
         return !beforeHasInvalidate && afterHasInvalidate;
     }
@@ -130,8 +170,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 8: DTO Context Aggregation & Backward-Compatible Bridge.
      */
-    public static isDtoContextAggregationIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isDtoContextAggregationIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             /\b(func|function)\s+\w+\s*\(\s*\w+[^,)]+,\s*\w+[^,)]+,\s*\w+[^,)]+,\s*\w+/.test(b) &&
             /\b(func|function)\s+\w+_context\b|\b\w+ContextDTO\b/.test(a) &&
@@ -142,8 +188,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 9: Dynamic Hook Decoupling (hook-decoupling).
      */
-    public static isHookDecouplingIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isHookDecouplingIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             /\b(if\s+step\s*==|match\s+phase|switch\s*\(stage\))/.test(b) &&
             /\b(dispatch_hook|invoke_hook|HookRegistry|_hook_bus|execute_pipeline_hook)\b/.test(a)
@@ -153,8 +205,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 10: Shim Elimination & Obsolete Bridge Purge (shim-elimination).
      */
-    public static isShimEliminationIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isShimEliminationIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             /\b(from_stat_mutation|from_wallet_mutation|apply_mutation_legacy|bridge_)\b/.test(b) &&
             !/\b(from_stat_mutation|from_wallet_mutation|apply_mutation_legacy|bridge_)\b/.test(
@@ -167,8 +225,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 11: Direct Modern Migration (direct-modern-migration).
      */
-    public static isDirectModernMigrationIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isDirectModernMigrationIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/.test(b) &&
             /\.apply_mutation_context\(\s*(?:new\s+\w+ContextDTO|\w+ContextDTO\.create|ctx\b)/.test(
@@ -180,8 +244,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 12: Deprecation Lifecycle Annotation (deprecation-lifecycle).
      */
-    public static isDeprecationLifecycleAnnotation(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isDeprecationLifecycleAnnotation(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             !/@deprecated\b/.test(b) &&
             /@deprecated\s+\[Since\s+v[^\]]+,\s*Sunset\s+v[^\]]+\]|@deprecated\b/.test(a)
@@ -191,8 +261,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 13: Zero-Cost Modern Abstraction (zero-cost-modernization).
      */
-    public static isZeroCostModernization(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isZeroCostModernization(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         const beforeHasBoxing =
             /\bvar\s+\w+\s*=\s*\{\s*["']\w+["']\s*:/.test(b) ||
             /new\s+Object\(\)|\.duplicate\(true\)/.test(b);
@@ -205,8 +281,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 14: Interaction Debounce Guard (interaction-debounce).
      */
-    public static isInteractionDebounceIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isInteractionDebounceIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             /\.pressed\.connect\s*\(/.test(b) &&
             !/\bdebounced_pressed\b/.test(b) &&
@@ -217,8 +299,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 15: State Machine Guard Discipline (state-machine-discipline).
      */
-    public static isStateMachineDisciplineIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isStateMachineDisciplineIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             /_current_state\s*=\s*(?:State\.|STATE_|\w+)/.test(b) &&
             !/transition_to\s*\(/.test(b) &&
@@ -229,8 +317,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 16: Observer WeakRef Reference Safety (weakref-observer).
      */
-    public static isWeakRefObserverIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isWeakRefObserverIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             /\b(?:_observers|_listeners|_bindings)\.append\s*\(\s*\w+\s*\)/.test(b) &&
             !/weakref\s*\(/.test(b) &&
@@ -241,8 +335,14 @@ export class RecipePatternDetectors {
     /**
      * Pattern 17: Unidirectional Data Flow Integrity (unidirectional-flow).
      */
-    public static isUnidirectionalFlowIntroduction(before: string[], after: string[]): boolean {
-        const [b, a] = [before.join('\n'), after.join('\n')];
+    public static isUnidirectionalFlowIntroduction(
+        before: string[],
+        after: string[],
+        beforeText?: string,
+        afterText?: string,
+    ): boolean {
+        const b = resolveText(before, beforeText);
+        const a = resolveText(after, afterText);
         return (
             /\b(?:snapshot|dto|_snapshot|_dto)\s*\.\s*\w+\s*(?:=|\+=|-=|\*=)/.test(b) &&
             /\b(?:dispatch_intent|send_command|request_\w+|call_domain)\b/.test(a) &&

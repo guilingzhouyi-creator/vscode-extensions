@@ -18,7 +18,12 @@ import { RecipePatternDetectors } from './recipe-pattern-detectors';
  * Transformation pattern descriptor defining precondition predicates and operations.
  */
 export interface PatternDescriptor {
-    match: (beforeLines: string[], afterLines: string[]) => boolean;
+    match: (
+        beforeLines: string[],
+        afterLines: string[],
+        beforeText?: string,
+        afterText?: string,
+    ) => boolean;
     name: string;
     category: RecipeCategory;
     description: string;

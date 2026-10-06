@@ -131,6 +131,12 @@ export function ensureLedgerDirectory(ledgerDir: string): void {
     }
 }
 
+/** Approximate byte size per NDJSON line used for stat heuristic before read. */
+const ESTIMATED_LINE_BYTES = 200;
+
+/** In-memory append counter to throttle stat/pruning checks. */
+let appendCounter = 0;
+
 /**
  * Prunes the active runs NDJSON file to the given retention limit.
  *
@@ -160,19 +166,26 @@ export async function pruneActiveRuns(
 
 /**
  * Truncates active runs file to retention limit if oversized.
+ * Avoids duplicate readFile by pruning directly from loaded buffer.
  */
 async function pruneActiveRunsIfOversized(
     activeFile: string,
     maxRollingRuns: number,
 ): Promise<void> {
     try {
+        const stat = await fs.promises.stat(activeFile);
+        if (stat.size < maxRollingRuns * 1.5 * ESTIMATED_LINE_BYTES) {
+            return;
+        }
+
         const content = await fs.promises.readFile(activeFile, 'utf8');
         const lines = content
             .trim()
             .split('\n')
             .filter((l) => l.trim().length > 0);
         if (lines.length > maxRollingRuns * 1.5) {
-            await pruneActiveRuns(activeFile, maxRollingRuns);
+            const recentLines = lines.slice(-maxRollingRuns);
+            await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
         }
     } catch (err: unknown) {
         if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -199,7 +212,10 @@ export async function appendTrajectoryRecord(
     const line = serializeNdjsonLine(record) + '\n';
 
     await fs.promises.appendFile(activeFile, line, 'utf8');
-    await pruneActiveRunsIfOversized(activeFile, maxRollingRuns);
+    appendCounter++;
+    if (appendCounter % 10 === 0) {
+        await pruneActiveRunsIfOversized(activeFile, maxRollingRuns);
+    }
 }
 
 /**
@@ -225,9 +241,10 @@ export async function readRecentRecords(
             .trim()
             .split('\n')
             .filter((l) => l.trim().length > 0);
+        const targetLines = limit > 0 && lines.length > limit ? lines.slice(-limit) : lines;
         const records: CompactTrajectoryRecord[] = [];
 
-        for (const line of lines) {
+        for (const line of targetLines) {
             try {
                 const parsed = JSON.parse(line) as CompactTrajectoryRecord;
                 records.push(parsed);
@@ -239,7 +256,7 @@ export async function readRecentRecords(
             }
         }
 
-        return records.slice(-limit);
+        return records;
     } catch (err: unknown) {
         if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
             return [];
