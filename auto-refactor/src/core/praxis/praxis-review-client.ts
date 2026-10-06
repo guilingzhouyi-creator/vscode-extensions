@@ -698,7 +698,8 @@ export function createPraxisClient(options?: PraxisClientConfig): PraxisReviewCl
 export const defaultPraxisReviewClient: PraxisReviewClient = createPraxisClient();
 
 /**
- * Convenience helper to clear accumulated state in the default singleton review client's semantic graph.
+ * Convenience helper to clear accumulated state in the default singleton review client's
+ * semantic graph.
  */
 export function clearDefaultPraxisClient(): void {
     defaultPraxisReviewClient.clearSemanticGraph();

@@ -139,6 +139,7 @@ let appendCounter = 0;
 
 /**
  * Prunes the active runs NDJSON file to the given retention limit.
+ * Idempotent async routine; requires external synchronization against concurrent writes.
  *
  * @param activeFile - Path to active-runs.ndjson.
  * @param maxRollingRuns - Maximum number of recent lines to keep.

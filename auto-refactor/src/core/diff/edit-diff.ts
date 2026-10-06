@@ -20,7 +20,6 @@ import {
     DIFF_OP_EQUAL,
     DIFF_OP_DELETE,
     DIFF_OP_INSERT,
-    MYERS_MAX_MID_LINES,
     myersDiff,
     myersDiffCore,
     trimPrefixSuffix,

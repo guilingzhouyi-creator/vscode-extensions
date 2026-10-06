@@ -371,6 +371,16 @@ export function myersDiff(
  * Core engine for Myers line diff operating on pre-trimmed middle slices.
  * Directly reuses precomputed hashes and prefixes without duplicate scanning,
  * and maintains pruning benefits if degrading to histogram diff.
+ *
+ * @param prefix - Length of identical common prefix.
+ * @param suffix - Length of identical common suffix.
+ * @param n - Original length of line array a.
+ * @param m - Original length of line array b.
+ * @param midA - Middle slice of line array a without prefix and suffix.
+ * @param midB - Middle slice of line array b without prefix and suffix.
+ * @param midHA - Hashes corresponding to midA lines.
+ * @param midHB - Hashes corresponding to midB lines.
+ * @returns Complete sequence of DiffOp operations reconstructing b from a.
  */
 export function myersDiffCore(
     prefix: number,
@@ -394,7 +404,7 @@ export function myersDiffCore(
     const midM = midB.length;
     const max = midN + midM;
 
-    // Guard against excessive iterations on large unpruned/disjoint matrices (>1500 lines or >2M cells).
+    // Guard against excessive iterations on large unpruned matrices (>1500 lines or >2M cells).
     // Degradation cleanly preserves trimmed prefix/suffix slices.
     if (max > MYERS_MAX_MID_LINES || (max + 1) * (2 * max + 1) > 2_000_000) {
         const midOps = histogramDiff(midA, midB, midHA, midHB);

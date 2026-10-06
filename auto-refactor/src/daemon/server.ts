@@ -53,6 +53,9 @@ const MESSAGE_TYPE_ERROR = 'error';
 
 const IDLE_TIMEOUT_MS = IDLE_TIMEOUT_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
+/**
+ * Represents an in-flight background scan or scan_diff task tracked by the daemon server.
+ */
 export interface PendingScan {
     requestId: string;
     id: number;

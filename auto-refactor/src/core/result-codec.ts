@@ -18,7 +18,8 @@
  * Gated by AR_BINARY_RESULT=1 (default off). Only the RESULT direction is encoded
  * (worker → main postMessage); the task-dispatch direction keeps its zero-copy Buffer
  * transfer. Byte-equivalence is the hard gate: decode must reproduce the exact object
- * graph that structured clone would have delivered (verified by test suite validation and round-trip checks).
+ * graph that structured clone would have delivered (verified by test suite
+ * validation and round-trip checks).
  *
  * Format (little-endian):
  *   Header : u32 magic(0x50523530 "PR50")  u32 fileCount

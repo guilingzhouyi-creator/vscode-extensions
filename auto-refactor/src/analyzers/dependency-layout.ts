@@ -33,7 +33,9 @@ const PY_IMPORT_RE = /^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0
 const RUST_USE_RE = /^\s*use\s+([A-Za-z0-9_:]+)/;
 const GDSCRIPT_IMPORT_RE = /(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)/;
 
-/** Patterns detecting function or class declarations across indentation-based languages (CPX-SPACE-001). */
+/**
+ * Patterns detecting function or class declarations across indentation-based languages.
+ */
 const PY_DECL_RE = /^\s*(?:def|class)\s+[A-Za-z0-9_]+/;
 const GDSCRIPT_DECL_RE = /^\s*func\s+[A-Za-z0-9_]+/;
 const RUST_DECL_RE = /^\s*(?:pub\s+)?(?:async\s+)?fn\s+[A-Za-z0-9_]+/;

@@ -148,7 +148,8 @@ export class ConstantsAnalyzer implements Analyzer {
         const duplicateNodes = new Set<NormalizedNode>();
         this.detectDuplicates(ctx, duplicateNodes, issues);
 
-        // Individual literal scanning: detect unextracted magic numbers and hardcoded strings (skipping duplicates).
+        // Individual literal scanning: detect unextracted magic numbers and
+        // hardcoded strings (skipping duplicates).
         this.detectMagicNumbers(ctx, duplicateNodes, issues);
         this.detectHardcodedStrings(ctx, duplicateNodes, issues);
 
