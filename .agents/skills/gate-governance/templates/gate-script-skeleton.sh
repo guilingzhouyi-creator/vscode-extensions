@@ -8,19 +8,32 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SUBPROJECT="$ROOT/subproject"
 
 echo "🔒 启动本地质量门禁检查..."
 
+# 1. 内存单遍流式暂存区预审
+FAST_GATE="$ROOT/scripts/common/gate-fast-staged.js"
+if [[ -f "$FAST_GATE" ]]; then
+  echo "⚡ 执行暂存区流式 6 大 Gate 快速判定..."
+  STATUS=0
+  node "$FAST_GATE" || STATUS=$?
+  if [[ "$STATUS" -ne 0 ]]; then
+    echo "❌ [FAIL] 暂存区流式门禁未通过" >&2
+    exit "$STATUS"
+  fi
+fi
+
+# 2. 受影响项目智能分流调度 (Impact-Driven Routing)
+SUBPROJECT="$ROOT/auto-refactor"
 if [[ -d "$SUBPROJECT" ]]; then
-  # 显式子 shell 隔离工作目录
+  echo "🔍 执行目标子项目隔离测试与审查..."
   STATUS=0
   (cd "$SUBPROJECT" && npm test) || STATUS=$?
   if [[ "$STATUS" -ne 0 ]]; then
     echo "❌ [FAIL] 子项目测试失败" >&2
-    exit 1
+    exit "$STATUS"
   fi
 fi
 
-echo "✅ [PASS] 门禁检查通过"
+echo "✅ [PASS] 全部门禁检查通过"
 exit 0

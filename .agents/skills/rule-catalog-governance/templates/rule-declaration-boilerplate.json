@@ -1,13 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "id": "ARCH-NEW-001",
+  "id": "ARCH-FAC-002",
   "category": "architecture",
   "severity": "error",
-  "title": "新规则描述概要 (祈使句)",
+  "title": "门面模块必须满足实质承载与不可变性预算",
   "analyzer": "architecture",
-  "family": "architecture",
+  "family": "ARCH",
   "dimension": "topological_coupling",
-  "description": "详细说明该规则检测的反模式以及引发的工程隐患。",
-  "rationale": "解释为什么要在此处设立硬性门禁，设计依据与权威指针。",
-  "remediation": "提供具体的重构与消除建议代码示例。"
+  "description": "门面或网关模块必须满足 ELOC >= 15 或包含不可变冻结保障，聚合至少 3 个正交子领域，严禁空壳透传。",
+  "rationale": "空壳转发模块增加认知跃迁负担（HopPenalty = +3.0），破坏调试堆栈与调用局部性。",
+  "remediation": "为门面添加输入参数契约断言、状态不可变冻结（Object.freeze），或彻底消融跳板直连底层服务。",
+  "tags": [
+    "architecture",
+    "facade",
+    "immutability"
+  ]
 }

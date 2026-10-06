@@ -3,12 +3,12 @@ name: workspace-timing-dev
 description: >-
   workspace-timing VS Code 计时扩展五层架构解耦、双写崩溃安全与双语字典规范。
   指导 Agent 在 workspace-timing 项目中维护时间聚合核心、RingBuffer 与日志追加崩溃防护、
-  有界内存折叠（dailyTotals）、100% 双语国际化（zh-CN/en）与暗色高对比度 UI。
+  规范化命名（stagingUri、segmentedSessions、[DELTA]）、100% 双语国际化（zh-CN/en）与暗色高对比度 UI。
 ---
 
 # workspace-timing-dev — VS Code 扩展五层架构与崩溃安全研发规范
 
-本技能规范了 `workspace-timing/` 扩展的五层解耦架构、高可靠内存与磁盘双写崩溃安全体系、双语国际化以及视觉对比度契约。
+本技能规范了 `workspace-timing/` 扩展的五层解耦架构、高可靠内存与磁盘双写崩溃安全体系、命名规范化、双语国际化以及视觉对比度契约。
 
 ---
 
@@ -16,9 +16,9 @@ description: >-
 
 在以下任一场景中，必须激活本技能：
 1. **修改核心计时或数据聚合引擎**（`TimerEngine.ts`、`TimeAggregator.ts`）；
-2. **重构多级持久化存储与崩溃恢复逻辑**（`StorageCoordinator.ts`、`HistoryFolder.ts`）；
+2. **重构多级持久化存储、崩溃安全双写与日志回放逻辑**（`StorageCoordinator.ts`、`HistoryFolder.ts`、RingBuffer、Journal）；
 3. **新增或调整仪表板 Webview UI 或状态栏控制器**（`dashboard.html`、`StatusBarManager.ts`）；
-4. **新增用户界面提示、命令文案或设置选项**；
+4. **新增用户界面提示、命令文案或设置选项**（双语字典严格覆盖）；
 5. **维护内部审查规则**（`workspace-timing/scripts/config/review-rules.json`）。
 
 ---
@@ -28,7 +28,7 @@ description: >-
 项目严格划分为五大架构层次，依赖必须保持严格的自顶向下单向流动：
 
 ```
-[UI 表现层] (Webview Dashboard, Status Bar Controller, Dialogs)
+[UI 表现层] (Webview Dashboard, Status Bar Manager, Modal Dialogs)
      │
      ▼
 [Engine 核心引擎] (TimerEngine 计时状态机, TimeAggregator 日报/周报聚合)
@@ -44,7 +44,7 @@ description: >-
 ```
 
 **架构红线**：
-- 底层模块（Storage / Engine）严禁反向引用上层 UI 模块或 VS Code 窗口 API；
+- 底层模块（Storage / Engine / Analytics / Shared）严禁反向引用上层 UI 模块或 VS Code 窗口 API；
 - 核心算法保持纯粹的数据输入与数据计算，具备 100% 独立于 VS Code 宿主的单元自测能力。
 
 ---
@@ -55,8 +55,8 @@ description: >-
 
 ### 1. 内存零延迟与磁盘实时追加
 1. **内存零延迟缓存 (RingBuffer)**：秒级时间片增量仅在内存中聚合，避免频繁磁盘 I/O 导致编辑器掉帧；
-2. **轻量追加日志 (Journal NDJSON)**：每隔固定心跳将增量片段以单行追加形式写入本地日志文件，编辑器异常崩溃或系统断电时，下次启动时可即时无损回放（Replay）；
-3. **全量快照降频同步**：由 `StorageCoordinator` 级联管理，常规状态降频同步至 VS Code 全局状态与本地 JSON 备份；危险操作（重置、清除）前强制写入前置安全快照。
+2. **轻量追加日志 (Journal NDJSON)**：每隔固定心跳将增量片段以带有 `[DELTA]` 标识前缀的单行追加形式写入本地日志文件；编辑器异常崩溃或断电时，下次启动可即时无损回放（Replay）；
+3. **全量快照降频原子写入**：由 `StorageCoordinator` 级联管理，写入前先落盘至 `stagingUri` 暂存文件，完成写入后再执行原子重命名替换；危险操作（重置、清除）前强制写入前置安全快照。
 
 ### 2. 有界内存与智能滚动折叠 (`HistoryFolder`)
 为防止长期运行导致内存膨胀，实施严格的时长守恒折叠策略：
@@ -66,18 +66,34 @@ description: >-
 
 ---
 
-## 四、 UI 100% 双语字典与暗色对比度视觉契约
+## 四、 生产命名规范化与跨日会话原子切分
 
-1. **100% 双语字典覆盖**：
-   - 界面文案必须通过 `i18n.t(key)` 提取，严格在 `src/i18n/locales/zh-CN.json` 与 `en.json` 中双向对齐；
-   - **一票否决**：严禁在 HTML 模板、TS 逻辑或弹窗中使用硬编码中英文；严禁向用户暴露底层存储术语（如 RingBuffer、NDJSON 等内部技术实现）；
-2. **暗色高对比度视觉契约**：
-   - 面板样式所有色彩必须通过 `:root` 声明的主题 CSS 变量（`var(--vscode-*)`）驱动；
-   - SVG 图标与活跃折线图刻度文字强制使用纯白 `#ffffff` 或主题适配变量，严禁默认回退为暗黑色文字（导致在深色主题下不可见）。
+1. **统一生产命名契约**：
+   - `stagingUri`：磁盘写入与快照原子替换时的专用暂存 URI，禁止使用模糊的 `tmpPath` 或 `tempUri`；
+   - `segmentedSessions`：跨自然日切分或滚动折叠后的标准会话片段序列，替代歧义的 `sessions` 或 `splitSessions`；
+   - `[DELTA]`：日志追加与事件广播中的增量数据行前缀标记，供 Journal 日志回放器精确识别增量数据行；
+2. **跨自然日会话切分与休眠恢复**：
+   - 系统挂起、休眠唤醒（`resumeFromSleep`）或意外恢复时，若运行区间跨越自然日边界，严禁将多日时长作为单段长会话直接封存；
+   - 必须通过 `TimeAggregator.splitByNaturalDay(startMs, endMs)` 将跨日会话原子拆分为各自然日的 `segmentedSessions` 片段，分别封存并保证时长守恒；
+3. **日汇总计数器增量一致性**：
+   - 会话封存时，仅将归属于当前自然日的片段累加至今日计数器，非本日片段不得污染今日活跃统计。
 
 ---
 
-## 五、 极速构建与审查规则单源登记
+## 五、 UI 100% 双语字典与暗色对比度视觉契约
+
+1. **100% 双语字典覆盖**：
+   - 界面文案必须通过 `i18n.t(key)` 提取，严格在 `src/i18n/locales/zh-CN.json` 与 `en.json` 中镜像双向对齐；
+   - **一票否决**：严禁在 HTML 模板、TS 逻辑、状态栏提示或弹窗中使用硬编码中英文；
+   - 严禁向用户暴露底层存储术语（如 RingBuffer、NDJSON、dailyTotals 等内部技术实现）；
+2. **暗色高对比度视觉契约**：
+   - 面板样式所有色彩必须通过 `:root` 声明的主题 CSS 变量（`var(--vscode-*)`）驱动；
+   - SVG 图标与活跃折线图刻度文字强制使用纯白 `#ffffff` 或主题适配明亮变量，严禁默认回退为暗黑色文字（导致在深色主题下不可见）；
+   - 严格遵循 WCAG AA 级以上色彩对比度标准。
+
+---
+
+## 六、 极速构建与审查规则单源登记
 
 1. **极速构建契约**：
    - `tsconfig.json` 必须保持 `"declaration": false` 与 `"isolatedModules": true`，杜绝类型声明文件生成带来的无谓构建开销；
@@ -87,17 +103,7 @@ description: >-
 
 ---
 
-## 七、 跨自然日会话切分与离线/休眠恢复原子性规范
-
-1. **休眠与离线恢复原子拆分**：
-   - 系统挂起、休眠唤醒（`resumeFromSleep`）或意外恢复时，若休眠前运行区间跨越自然日边界，严禁将多日时长作为单段长会话直接封存；
-   - 必须通过 `TimeAggregator.splitByNaturalDay(startMs, endMs)` 将跨日会话原子拆分为各自然日的独立片段，分别封存并保证时长守恒；
-2. **日汇总计数器增量一致性**：
-   - 会话封存时，仅将归属于当前自然日的片段累加至 `_todayEndedMs`，非本日片段不得污染今日活跃计数。
-
----
-
-## 八、 专属构建、测试与审查命令矩阵
+## 七、 专属构建、测试与审查命令矩阵
 
 在 `workspace-timing` 目录中作业时，遵循以下执行步骤：
 

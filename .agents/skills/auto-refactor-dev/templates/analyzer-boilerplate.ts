@@ -7,11 +7,11 @@ export class ExampleCustomAnalyzer implements Analyzer {
     analyze(file: string, ast: NormalizedNode, rawLines: string[]): Finding[] {
         const findings: Finding[] = [];
 
-        // 遍历语法树节点并匹配目标特征
+        // 遍历统一语法树节点并匹配目标特征
         ast.walk((node) => {
             if (node.kind === 'FunctionDeclaration' && node.text.includes('deprecatedOp')) {
                 findings.push({
-                    ruleId: 'EXM-CST-001',
+                    ruleId: 'GATE-AST-001',
                     file,
                     line: node.startLine,
                     column: node.startColumn,

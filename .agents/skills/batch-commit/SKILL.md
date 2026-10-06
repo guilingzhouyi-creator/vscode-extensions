@@ -1,98 +1,122 @@
 ---
 name: batch-commit
 description: >-
-  工作区大型改动分批原子提交与门禁离线预审工作流。当工作区累积了跨架构层次（文档、底层契约、基础设施、配置表、业务逻辑、静态治理）的大型改动时，
-  指导 Agent 按依赖拓扑拆分批次、生成结构化提交说明、执行离线门禁预审（pre-flight）并按序原子提交。
+  工作区大型改动分批原子提交与门禁离线预审工作流。指导 Agent 按依赖拓扑自底向上拆分批次（底层契约、基础设施、
+  配置、业务、文档）、编写高内聚结构化提交信息（严格限定四大项目归属、技术事实质性断言、零黑话），并执行离线门禁预审与原子提交闭环。
 ---
 
 # batch-commit — 大型改动分批原子提交与门禁预审工作流
 
-本技能规范了跨域大型改动的分批原子提交、门禁离线预审以及双重回归闭环的标准工程化作业流程。
+本技能规范了跨域大型改动的自底向上拓扑分批、高内聚结构化提交信息编写、门禁离线预审（Pre-flight Check）以及最终全域双重回归的标准工程化作业流程。
 
 ---
 
 ## 一、 适用场景与触发条件
 
 当出现以下任一场景时，严禁使用单次巨石提交（Monolithic Commit），必须激活本分批提交工作流：
-1. **跨层改动堆叠**：同时涉及文档/案卷索引、底层存储/契约抽象、通用基础设施、配置表同构化、业务领域实现或静态审查治理；
-2. **改动文件较多**：暂存区改动涉及超过 15 个文件或跨越 2 个以上顶层架构域；
-3. **高敏回滚需求**：改动包含底层数据结构重构，需保证每个提交点均可独立 `git bisect`、编译并 100% 通过测试。
+1. **跨架构层次改动堆叠**：同时涉及底层契约/存储、通用基础设施、配置资源同构、业务领域实现、静态审查治理或全宗文档；
+2. **改动文件跨度大**：工作区改动涉及超过 15 个文件或跨越 2 个以上顶层项目/架构域；
+3. **高敏回滚与独立验证诉求**：改动包含底层数据结构重构或破坏性变更，需保证每一个提交点均可独立编译、独立运行回归测试、且具备干净的 `git bisect` 故障隔离粒度。
 
 ---
 
-## 二、 依赖拓扑分批标准顺序
+## 二、 依赖拓扑分批标准体系 (Bottom-Up Dependency Topology)
 
-分批规划必须严格遵守自底向上、解耦可读的拓扑依赖顺序：
+分批规划必须严格遵守自底向上、解耦可读、自洽闭环的拓扑依赖顺序：
 
 ```
-[第 1 批: docs(archive)]  ───> 规范历史案卷物理命名、全宗目录与顶层索引
-          │
-          ▼
-[第 2 批: feat(persistence)] ─> 底层存储抽象契约、接口定义与流式加载管道
-          │
-          ▼
-[第 3 批: feat(infrastructure)] > 高承压对象池、内存重用与无头装配流水线
-          │
-          ▼
-[第 4 批: feat(config)]  ────> 统一配置资源索引中心与解码解码器
-          │
-          ▼
-[第 5 批: refactor(config)] ──> 配置表 1:1 同构目录化迁移与泛化动态路由
-          │
-          ▼
-[第 6 批: refactor(quality)] ─> 静态审查治理、热点循环降维与控制流平铺
+[第 1 批: Layer 1 底层契约与存储协议] (refactor/feat: contract, persistence, types)
+                    │
+                    ▼
+[第 2 批: Layer 2 通用基础设施与核心算子] (feat/refactor: infra, pool, alloc, runtime)
+                    │
+                    ▼
+[第 3 批: Layer 3 配置资源与同构规则] (feat/refactor: config, catalog, rules)
+                    │
+                    ▼
+[第 4 批: Layer 4 业务领域与视图表现] (feat/refactor: domain, logic, views)
+                    │
+                    ▼
+[第 5 批: Layer 5 静态治理与质量演进] (refactor/test: quality, complexity, coverage)
+                    │
+                    ▼
+[第 6 批: Layer 6 全宗文档与案卷归档] (docs: blueprint, archive, readme)
 ```
+
+### 分层落地原则：
+- **自洽闭环**：每一批提交入库后，工作树必须能独立通过类型编译与单元测试，严禁前序批次依赖后序批次的代码；
+- **原子回滚**：单批提交聚焦单一架构层次与功能主题，若发生线上异常可精准单 commit 回滚；
+- **显式边界**：各批次所含文件路径严格正交，禁止同一文件在多个批次间反复改动与暂存。
 
 ---
 
 ## 三、 标准分批执行四步闭环 (S-P-C-V)
 
-对每个规划批次，必须严格循环执行以下 4 步：
+对每个规划批次，必须严格循环执行以下 4 步作业闭环：
 
 ### Step 1: 显式精准暂存 (`git add`)
-严禁裸调 `git add .` 或 `git add -A`。必须显式列出属于当前批次的文件列表：
+严禁裸调 `git add .` 或 `git add -A`，防止将未准备就绪的跨层文件或临时残留意外打入暂存区。必须显式列出属于当前批次的文件列表：
 ```powershell
-git add path/to/file1.gd path/to/file2.json
+git add path/to/contract.ts path/to/storage.ts
 ```
 *注：若有处于 `.gitignore` 规则边界但确需入库的治理脚本，使用 `git add -f <file>` 显式添加。*
 
-### Step 2: 提交信息编写与离线预审 (`commit-msg-gate`)
-在本地临时目录（如 scratch 目录）中创建提交信息文件 `commit_batch_N.txt`，必须满足以下硬性条件：
-- **标题**：`<type>(<scope>): <简述>`（长度 5~80 字符，不以句号结尾）；
-- **项目归属**：正文首个结构化区块必须显式声明 `[Project / 项目归属]`，枚举限定于四大受控项目：`workspace-timing | auto-refactor | WebGames | governance`（`CMG-PRJ-001`）；
-- **结构化区块**：包含 `[Project / 项目归属]`、`[Why]`、`[Added]`、`[Changed]`、`[Fixed]`、`[Verification]` 等标准区块；
-- **字数**：非轻量提交正文非空白字数 $\ge 30$；
-- **零黑话**：正文绝对严禁出现 `phase\d+`、`st\d+`、`p\d+`、`wip`、`temp` 等施工代号。归档案卷编号转换为纯粹产品价值表述；
-- **规则反虚构**：提及的规则 ID 必须在 `scripts/common/rule-catalog.json` 中真实存在。
+### Step 2: 编写结构化提交信息与离线预审 (`commit-msg-gate`)
+在本地临时目录（如 scratch 目录）中创建提交信息文件 `commit_batch_N.txt`。必须满足以下刚性规范：
 
-**离线预审指令**：
+#### 1. 标题契约
+- **格式**：`<type>(<scope>): <祈使句中文摘要标题>`；
+- **长度约束**：5~80 字符，结尾严禁带句号；
+- **`<type>` 严格受限**：`feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `style` | `perf`。
+
+#### 2. 正文首区块：受控四大项目归属 (`CMG-PRJ-001`)
+关键生产级提交（feat/fix/refactor）正文首个结构化区块必须显式声明项目归属，枚举严格受限四大项目：
+```
+[Project]
+- <workspace-timing | auto-refactor | WebGames | governance>
+```
+*若遗漏或填写未受控名称，强制触发 `CMG-PRJ-001` 一票否决。*
+
+#### 3. 结构化必填区块
+- `[Why]`：阐明技术背景、驱动因素或解决的核心痛点，解释为何做此变更；
+- `[Added]`：列举新增的模块、接口、类型定义或测试用例；
+- `[Changed]`：列举重构的方法、算法实现替换、依赖调整或参数变更；
+- `[Fixed]`：若包含缺陷修复必须提供，详述修复的异常场景与根本原因；
+- `[Verification]`：详述本地运行的验证手段与质性技术断言；
+- **正文字数门槛**：非轻量提交正文非空白字数 $\ge 30$。
+
+#### 4. 技术事实纪律与零黑话规范
+- **禁止施工代号**：正文绝对严禁出现 `phase\d+`、`st\d+`、`p\d+`、`wip`、`temp`、`new` 等施工批次黑话代号；历史案卷编号必须转换为纯粹技术事实描述；
+- **禁止程序化流水账 (`CMG-STY-005`)**：严禁出现“退出码0”、“双端返回0”、“所有检查通过”等无实质信息的程序化套话；
+- **禁止数字量词流水账 (`CMG-STY-006`)**：严禁罗列“通过146套测试”、“耗时50.8s”、“覆盖率98%”等执行统计量词，必须采用**输入输出质性技术断言**（例如：“断言全量单元测试用例在边界输入下均产生符合契约的预期输出；断言暂存区无物理空文件且行号平移对齐”）；
+- **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：正文中引用的所有规则 ID（如 `GATE-AST-001`）必须在 `scripts/common/rule-catalog.json` 中真实存在，严禁凭空捏造；
+- **风格禁词拦截**：全面遵守 `commit-msg-forbidden-terms.json` 规定的 6 类禁词（临时敷衍、过度夸大、过度贬损、风格元叙事、程序化流水账、数字量词流水账）。
+
+#### 5. 离线预审验证
 ```powershell
 pwsh -File scripts/ps1/commit-msg-gate.ps1 "$dir\commit_batch_N.txt"
 ```
-*必须获得 `Commit-Msg 生产级格式与结构化内容校验全部 PASS！` 方可推进。*
+*必须获得 `Commit-Msg 生产级格式与结构化内容校验全部 PASS！` 方可进入下一步。*
 
 ### Step 3: 暂存区物理卫生预审 (`pre-commit-gate`)
-在调用 `git commit` 前，先手动触发 Pre-Commit 门禁脚本进行预审：
+在实际调用 `git commit` 前，手动触发 Pre-Commit 门禁脚本执行离线流式预审：
 ```powershell
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 ```
-*预审看守：零空文件、换行符契约（ps1 严格 CRLF，其余严格 LF）、密钥防泄漏、行数红线预算及 AST 切片复杂度。*
+*检查项目：零空文件、换行契约（ps1 CRLF，其余 LF）、TypeScript 4 空格缩进/其余 2 空格、敏感信息防泄漏、单文件双轨体积预算（ELOC<=900, LOC<=1400）及 AST 切片局部复杂度（CC<=15, Depth<=4, Noise<=4.0）。*
 
 #### 暂存区 AST 切片复杂度阻断自愈指引 (AST Complexity Remediation)
-当预审报告 `[ADV-CMP-001]` (CC > 15) 或 `[ADV-NST-001]` (Depth > 4) 阻断时，严格按以下两步平铺控制流：
-1. **卫语句提前返回 (Guard Clauses)**:
-   - 将嵌套在 `try-catch` 或顶层循环分支内的深层多路分支改为逆向断言提前 `return` 或 `continue`；
-2. **纯判定提取 (Pure Predicate Extraction)**:
-   - 将复合正则匹配、路径豁免检测或特征判定提取为独立的模块级纯函数（如 `isExemptTestPath`、`detectVacuousTrampoline`），单函数保持单一职责与 0 外部状态依赖；
-3. **重新暂存与二次预审**:
-   - 重构后运行 `git add <file>` 重新暂存，再次调用 `pre-commit-gate.ps1`，直至全部通过。
+若预审触发 `GATE-AST-001`（`CC > 15`）或控制流嵌套超标（`Depth > 4`）：
+1. **卫语句提前返回 (Guard Clauses)**：将深层嵌套的 `if-else` 或循环内分支改写为逆向断言提前 `return` 或 `continue`，压平控制流；
+2. **纯判定提取 (Pure Predicate Extraction)**：将复杂的组合条件表达式或路径判定拆分为无副作用的纯函数（如 `isTargetExtension`、`matchRulePattern`）；
+3. **重新暂存与二次预审**：重构后执行 `git add <file>`，重新运行 `pre-commit-gate.ps1`，直至绿色通过。
 
 ### Step 4: 原子提交与状态推进 (`git commit`)
-使用准备好的说明文件进行提交，严禁带 `--no-verify`：
+使用离线预审通过的说明文件执行提交，严禁添加 `--no-verify`：
 ```powershell
 git commit -F "$dir\commit_batch_N.txt"
 ```
-提交完成后调用 `git status -s` 核查工作树剩余文件，继续推进下一批。
+提交完成后执行 `git status -s` 核查工作树剩余文件，继续推进下一批。
 
 ---
 
@@ -101,11 +125,8 @@ git commit -F "$dir\commit_batch_N.txt"
 全部批次提交完成、工作树完全 clean 之后，必须同次执行工作区双重全量验证：
 1. **跨域全量静态审查门禁**：
    ```powershell
-   python WebGames/scripts/py/audit_runner.py
-   # 断言 20/20 PASS
+   pwsh -File scripts/ps1/audit-all.ps1
+   # 断言全仓 5 大支柱与所有子项目门禁 100% 绿色通行
    ```
-2. **引擎无头回归测试套件**：
-   ```powershell
-   pwsh .\WebGames\scripts\ps1\test-run.ps1
-   # 断言 115/115 套件 100% PASS
-   ```
+2. **引擎及子项目无头回归测试**：
+   依改动领域执行对应测试套件，断言全量测试通过且无未决缺陷。

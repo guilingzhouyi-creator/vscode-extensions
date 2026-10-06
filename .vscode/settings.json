@@ -16,7 +16,7 @@
         "**/.vscode/workspace-timing.journal": true
     },
     // Agent 写入与编辑器并发安全配置（防 0 字节倒挂冲刷、保存冲突与幽灵空标签）
-    "files.autoSave": "onWindowChange",
+    "files.autoSave": "off",
     "files.saveConflictResolution": "askUser",
     "workbench.editor.closeOnFileDelete": false,
     "workbench.editor.restoreViewState": true,
