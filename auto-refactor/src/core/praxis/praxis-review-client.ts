@@ -98,7 +98,41 @@ export class PraxisReviewClient implements IPraxisReviewClient {
     }
 
     /**
-     * Conducts comprehensive static analysis review across entire workspace.
+     * Conducts comprehensive static analysis review across the entire workspace directory.
+     *
+     * Scans source files using configured analyzers, aggregates rule violations into a
+     * finalized scan report, evaluates workspace pass/fail status against configured
+     * severity thresholds, and synthesizes machine-actionable Agent Directives (Markdown,
+     * CAPP DSL, and UI presentation cards) attributed to the active multi-agent card context.
+     *
+     * Concurrency & Reentrancy:
+     *   Thread-safe and re-entrant. Allocates an isolated scanner instance and logger per
+     *   review run; safe for concurrent invocation across distinct workspace roots.
+     *
+     * @param options - Configuration options controlling workspace scanning and directives:
+     *   - `root`: Root directory path to scan (defaults to client configured root).
+     *   - `configFile`: Optional path to custom configuration file overriding default settings.
+     *   - `analyzers`: Allow-list of specific analyzer names; unlisted ones are bypassed.
+     *   - `cardContext`: Task card metadata for multi-agent attribution;
+     *     falls back to `defaultCardContext`.
+     *   - `includeDualFacedPresentation`: Whether to generate presentation payload and
+     *     Agent Directives.
+     *   - `presentationLocale`: Target locale ('zh-CN' | 'en-US') for UI diagnostic cards.
+     *   - `maxDirectives`: Maximum number of actionable directives to produce in bundle.
+     *   - `failOnSeverity`: Minimum severity ('info' | 'warning' | 'error') triggering
+     *     'blocked' status (default: 'error').
+     * @returns Promise resolving to a deconstructed `PraxisWorkspaceReviewVerdict`:
+     *   - `scanReport`: Raw finalized scan report containing file metrics and issues.
+     *   - `status`: High-level evaluation outcome ('passed' | 'warning' | 'blocked').
+     *   - `issues`: Flat array of all detected static analysis issues across workspace.
+     *   - `cardContext`: Active task card context tagged on this review session.
+     *   - `timestamp`: Review completion timestamp in epoch milliseconds.
+     *   - `agentDirectives`: Optional structured AgentDirectives bundle conforming to CAPP.
+     *   - `directivesMarkdown`: Optional rendered Markdown representation of agent directives.
+     *   - `cappDirectiveText`: Optional compact single-line CAPP DSL text.
+     *   - `presentationPayload`: Optional rich UI diagnostic cards and presentation payload.
+     * @throws Rejection occurs only if critical configuration resolution or underlying
+     *   scanner initialization fails unrecoverably.
      */
     public async reviewWorkspace(
         options: PraxisWorkspaceReviewOptions = {},
@@ -205,7 +239,44 @@ export class PraxisReviewClient implements IPraxisReviewClient {
     }
 
     /**
-     * Conducts deep semantic & AST slice review for an individual file.
+     * Conducts deep semantic and AST slice review for an individual source file.
+     *
+     * Ingests file content directly or safely from disk, extracts symbols into the semantic
+     * graph, conditionally routes changed lines through the Sparse MoE expert gating router
+     * and AST slice audit service, evaluates Layer-1 pyramid architecture rules and content
+     * audits (performance, data architecture, and test modernity), and synthesizes localized
+     * dual-faced agent directives.
+     *
+     * Concurrency & Reentrancy:
+     *   Safe for concurrent async invocations across distinct files. Updates the provided
+     *   or client semantic graph during symbol extraction; concurrent reviews sharing the
+     *   same graph instance should ensure non-conflicting symbol namespace mutations.
+     *
+     * @param filePath - Target file path under review (relative or absolute).
+     * @param content - Optional in-memory file content string. If omitted, loaded from disk.
+     * @param options - File review configuration options:
+     *   - `cardContext`: Task card context for attribution; defaults to `defaultCardContext`.
+     *   - `useSparseMoE`: Whether to route slice audit through Sparse MoE conditional gating;
+     *     defaults to `enableMoE`.
+     *   - `includeDualFacedPresentation`: Whether to generate presentation and directives.
+     *   - `presentationLocale`: Preferred locale ('zh-CN' | 'en-US') for diagnostic cards.
+     *   - `graph`: Custom SemanticGraph instance; defaults to client internal graph.
+     *   - `root`: Optional workspace root for relative path resolution.
+     * @returns Promise resolving to a deconstructed `PraxisFileReviewVerdict`:
+     *   - `filePath`: Path of the reviewed file.
+     *   - `status`: Individual file verdict classification ('passed' | 'warning' | 'blocked').
+     *   - `issues`: Aggregated static analysis issues across AST, MoE, pyramid, and content.
+     *   - `sliceAudit`: Optional AST slice audit verdict if MoE slice audit was executed.
+     *   - `sparsePlan`: Optional Sparse MoE routing plan indicating active/bypassed analyzers.
+     *   - `cardContext`: Attached multi-agent task card context.
+     *   - `timestamp`: Review completion timestamp in epoch milliseconds.
+     *   - `agentDirectives`: Optional structured AgentDirectives bundle conforming to CAPP.
+     *   - `directivesMarkdown`: Optional rendered Markdown representation of directives.
+     *   - `cappDirectiveText`: Optional compact single-line CAPP DSL text.
+     *   - `presentationPayload`: Optional rich UI diagnostic cards and presentation payload.
+     * @throws File read failures are handled fail-safely (treated as empty content);
+     *   unhandled rejections occur only if underlying AST extractors or MoE router throw fatal
+     *   runtime errors.
      */
     public async reviewFile(
         filePath: string,
@@ -275,7 +346,31 @@ export class PraxisReviewClient implements IPraxisReviewClient {
     }
 
     /**
-     * Conducts semantic-aware diff governance review for code change.
+     * Conducts semantic-aware diff governance review for proposed code modifications.
+     *
+     * Delegates to the underlying `IPraxisDiffGovernanceService` to evaluate hunk-level blast
+     * radius, enforce architectural invariants and rollback safety thresholds, resolve symbol
+     * impact against the semantic graph, and enrich all review hunks with multi-agent task card
+     * attribution.
+     *
+     * Concurrency & Reentrancy:
+     *   Re-entrant and thread-safe. Operates purely on the provided diff inputs and reads the
+     *   semantic graph without mutating persistent state. Safe for concurrent worker calls.
+     *
+     * @param input - Diff input specification containing raw diff strings or patch hunks.
+     * @param options - Diff governance options:
+     *   - `graph`: SemanticGraph for cross-file symbol resolution (falls back to client graph).
+     *   - `cardContext`: Multi-agent task card context (falls back to `defaultCardContext`).
+     *   - `strict`: Optional boolean enforcing zero-tolerance governance checks.
+     *   - `maxHunks`: Maximum number of diff hunks to process before throttling.
+     * @returns Promise resolving to a deconstructed `PraxisDiffGovernanceResult`:
+     *   - `approved`: Boolean indicating if all diff changes comply with governance policies.
+     *   - `status`: Granular governance verdict status classification.
+     *   - `hunks`: Analyzed `ReviewDiffHunk` structures enriched with AST impact and tags.
+     *   - `violations`: Descriptions of any detected governance or safety policy violations.
+     *   - `metrics`: Quantitative metrics summarizing blast radius and line/symbol counts.
+     * @throws Fail-safe on malformed diffs (returns unparseable or rejected status); propagates
+     *   only fatal unexpected exceptions from custom governance hooks.
      */
     public async reviewDiff(
         input: DiffInput,
@@ -333,7 +428,37 @@ export class PraxisReviewClient implements IPraxisReviewClient {
     }
 
     /**
-     * Evaluates merge gate invariants across branches and diff hunks.
+     * Evaluates merge gate invariants across branch transitions and diff hunks.
+     *
+     * Validates proposed branch merges against rollback gatekeepers, checks hunk-level rework
+     * thresholds ('major_rework_needed'), collects impacted files, attaches multi-agent card
+     * context attribution to hunks, and constructs dual-faced diff representations
+     * partitioning technical AST diagnostics (Agent Face) and visual localized diagnostic
+     * cards (Human Face).
+     *
+     * Concurrency & Reentrancy:
+     *   Re-entrant and thread-safe. Pure coordination pipeline that executes gatekeeper hooks
+     *   and constructs presentation payloads without mutating shared client state.
+     *
+     * @param sourceBranch - Identifier of incoming feature or source branch.
+     * @param targetBranch - Identifier of base or target branch receiving merge.
+     * @param hunks - Array of `ReviewDiffHunk` objects representing proposed code changes to
+     *   evaluate against gate invariants.
+     * @returns Promise resolving to a deconstructed `PraxisMergeGateVerdict`:
+     *   - `approved`: Boolean flag indicating if merge is cleared without blocks/major rework.
+     *   - `status`: Tri-state merge status ('passed' | 'minor_fix_needed' | 'major_rework_needed').
+     *   - `sourceBranch`: Verified source branch identifier.
+     *   - `targetBranch`: Verified target branch identifier.
+     *   - `reason`: Explanatory rationale when merge gate blocks or approves request.
+     *   - `violations`: Aggregated list of gate violations from gatekeeper and hunks.
+     *   - `affectedFiles`: Deduplicated list of file paths impacted by evaluated hunks.
+     *   - `attributedHunks`: Diff hunks enriched with multi-agent context tagging.
+     *   - `dualFacedDiff`: Dual-faced diff representation partitioning Agent Face AST metrics
+     *     and Human Face UI cards.
+     *   - `cardContext`: Active multi-agent task card context.
+     *   - `timestamp`: Epoch timestamp in milliseconds when gate evaluation completed.
+     * @throws Propagates fatal rejections if underlying rollback gatekeepers fail
+     *   unrecoverably; hunks attribution and formatting are fail-safe.
      */
     public async evaluateMergeGate(
         sourceBranch: string,

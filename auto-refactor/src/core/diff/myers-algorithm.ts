@@ -53,49 +53,94 @@ export interface TrimmedSpans {
  * @param hashB - Hashes of new lines.
  * @returns Trimmed spans and middle slices.
  */
+function computeCommonPrefixLength(
+    a: string[],
+    b: string[],
+    hashA: Uint32Array,
+    hashB: Uint32Array,
+): number {
+    const minLen = Math.min(a.length, b.length);
+    let prefix = 0;
+    while (prefix < minLen) {
+        if (hashA[prefix] !== hashB[prefix] || a[prefix] !== b[prefix]) {
+            break;
+        }
+        prefix++;
+    }
+    return prefix;
+}
+
+function computeCommonSuffixLength(
+    a: string[],
+    b: string[],
+    hashA: Uint32Array,
+    hashB: Uint32Array,
+    prefix: number,
+): number {
+    const maxSuffix = Math.min(a.length - prefix, b.length - prefix);
+    let suffix = 0;
+    const n = a.length;
+    const m = b.length;
+    while (suffix < maxSuffix) {
+        const idxA = n - 1 - suffix;
+        const idxB = m - 1 - suffix;
+        if (hashA[idxA] !== hashB[idxB] || a[idxA] !== b[idxB]) {
+            break;
+        }
+        suffix++;
+    }
+    return suffix;
+}
+
+function sliceStringMiddle(
+    arr: string[],
+    prefix: number,
+    suffix: number,
+    midLen: number,
+): string[] {
+    if (prefix === 0 && suffix === 0) return arr;
+    if (midLen === 0) return [];
+    return arr.slice(prefix, arr.length - suffix);
+}
+
+function sliceUint32Middle(
+    arr: Uint32Array,
+    prefix: number,
+    suffix: number,
+    midLen: number,
+): Uint32Array {
+    if (prefix === 0 && suffix === 0) return arr;
+    if (midLen === 0) return new Uint32Array(0);
+    return arr.subarray(prefix, arr.length - suffix);
+}
+
+/**
+ * Trim common prefix and suffix between two line arrays using fast uint32 hashes.
+ *
+ * @param a - Old lines.
+ * @param b - New lines.
+ * @param hashA - Hashes of old lines.
+ * @param hashB - Hashes of new lines.
+ * @returns Trimmed spans and middle slices.
+ */
 export function trimPrefixSuffix(
     a: string[],
     b: string[],
     hashA: Uint32Array,
     hashB: Uint32Array,
 ): TrimmedSpans {
-    const n = a.length;
-    const m = b.length;
-    let prefix = 0;
-    while (prefix < n && prefix < m && hashA[prefix] === hashB[prefix] && a[prefix] === b[prefix]) {
-        prefix++;
-    }
-
-    let suffix = 0;
-    while (
-        suffix < n - prefix &&
-        suffix < m - prefix &&
-        hashA[n - 1 - suffix] === hashB[m - 1 - suffix] &&
-        a[n - 1 - suffix] === b[m - 1 - suffix]
-    ) {
-        suffix++;
-    }
-
-    const midN = n - prefix - suffix;
-    const midM = m - prefix - suffix;
+    const prefix = computeCommonPrefixLength(a, b, hashA, hashB);
+    const suffix = computeCommonSuffixLength(a, b, hashA, hashB, prefix);
+    const midN = a.length - prefix - suffix;
+    const midM = b.length - prefix - suffix;
 
     return {
         prefix,
         suffix,
-        midA: prefix === 0 && suffix === 0 ? a : midN === 0 ? [] : a.slice(prefix, n - suffix),
-        midB: prefix === 0 && suffix === 0 ? b : midM === 0 ? [] : b.slice(prefix, m - suffix),
-        midHA:
-            prefix === 0 && suffix === 0
-                ? hashA
-                : midN === 0
-                  ? new Uint32Array(0)
-                  : hashA.subarray(prefix, n - suffix),
-        midHB:
-            prefix === 0 && suffix === 0
-                ? hashB
-                : midM === 0
-                  ? new Uint32Array(0)
-                  : hashB.subarray(prefix, m - suffix),
+        midA: sliceStringMiddle(a, prefix, suffix, midN),
+        midB: sliceStringMiddle(b, prefix, suffix, midM),
+        midHA: sliceUint32Middle(hashA, prefix, suffix, midN),
+        midHB: sliceUint32Middle(hashB, prefix, suffix, midM),
     };
 }
 
@@ -287,13 +332,34 @@ function checkTrivialDiff(a: string[], b: string[]): DiffOp[] | null {
 }
 
 /**
- * Standard Myers O(ND) greedy diff algorithm with O(N) common prefix and suffix pruning.
+ * Computes an optimal line-level edit script using the standard Myers O(ND) greedy
+ * diff algorithm combined with O(N) common prefix and suffix pruning.
  *
- * @param a - Array of lines from the OLD content.
- * @param b - Array of lines from the NEW content.
- * @param hashA - Optional precomputed hashes for a.
- * @param hashB - Optional precomputed hashes for b.
- * @returns Ordered edit script describing how a becomes b.
+ * Preconditions:
+ *   - When precomputed line hash buffers (`hashA`, `hashB`) are provided, they MUST
+ *     be strictly equal in length to their corresponding line arrays
+ *     (`hashA.length === a.length` and `hashB.length === b.length`).
+ *     Providing mismatched hash buffers violates buffer alignment and causes
+ *     out-of-bounds indexing or erroneous line identity matches during prefix/suffix
+ *     stripping and snake advancement.
+ *
+ * Degradation & Fallback Strategy:
+ *   - Myers diagonal search allocates an internal trace buffer proportional to
+ *     `(max + 1) * (2 * max + 1)`, which exhibits quadratic worst-case memory
+ *     consumption on large or disjoint differences.
+ *   - If the trimmed middle section exceeds `MYERS_MAX_MID_LINES` (1500 lines total
+ *     across middle spans: `max = midN + midM > 1500`) or if the diagonal trace matrix
+ *     exceeds 2,000,000 cells (`(max + 1) * (2 * max + 1) > 2_000_000`), the
+ *     algorithm automatically degrades and falls back to `histogramDiff`
+ *     to prevent out-of-memory (OOM) failures and latency spikes on disjoint content.
+ *
+ * @param a - Array of lines from the original/old content.
+ * @param b - Array of lines from the modified/new content.
+ * @param hashA - Optional precomputed 32-bit FNV-1a hashes for lines in `a`.
+ *   Precondition: must equal `a.length`.
+ * @param hashB - Optional precomputed 32-bit FNV-1a hashes for lines in `b`.
+ *   Precondition: must equal `b.length`.
+ * @returns Ordered edit script (`DiffOp[]`) describing minimal edits to transform `a` into `b`.
  */
 export function myersDiff(
     a: string[],

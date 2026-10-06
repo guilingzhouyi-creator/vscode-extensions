@@ -19,16 +19,22 @@ import type { ElocCounters, TrajectoryQualityMetrics } from '../trajectory/eloc-
 export type GateStage = 'development' | 'pre-commit' | 'pre-push' | 'release';
 
 /**
+ * Immutable canonical verdict dictionary for composite quality gate evaluations.
+ */
+export const COMPOSITE_VERDICT = Object.freeze({
+    PASS: 'PASS',
+    WARN_QUALITY_DRIFT: 'WARN_QUALITY_DRIFT',
+    BLOCK_STATIC_FAILURE: 'BLOCK_STATIC_FAILURE',
+    BLOCK_DYNAMIC_FAILURE: 'BLOCK_DYNAMIC_FAILURE',
+    BLOCK_REGRESSION: 'BLOCK_REGRESSION',
+    BLOCK_QUALITY_DEGRADATION: 'BLOCK_QUALITY_DEGRADATION',
+    BLOCK_GAMING_DETECTED: 'BLOCK_GAMING_DETECTED',
+} as const);
+
+/**
  * Standardized verdict codes returned by composite gate evaluations.
  */
-export type CompositeVerdictCode =
-    | 'PASS'
-    | 'WARN_QUALITY_DRIFT'
-    | 'BLOCK_STATIC_FAILURE'
-    | 'BLOCK_DYNAMIC_FAILURE'
-    | 'BLOCK_REGRESSION'
-    | 'BLOCK_QUALITY_DEGRADATION'
-    | 'BLOCK_GAMING_DETECTED';
+export type CompositeVerdictCode = (typeof COMPOSITE_VERDICT)[keyof typeof COMPOSITE_VERDICT];
 
 /**
  * Gate threshold criteria configuring acceptance limits per stage.
@@ -156,19 +162,19 @@ function resolveVerdictCode(
     warnings: string[],
     thresholds: StageThresholds,
 ): CompositeVerdictCode {
-    if (!options.staticPass) return 'BLOCK_STATIC_FAILURE';
-    if (!options.dynamicPass) return 'BLOCK_DYNAMIC_FAILURE';
+    if (!options.staticPass) return COMPOSITE_VERDICT.BLOCK_STATIC_FAILURE;
+    if (!options.dynamicPass) return COMPOSITE_VERDICT.BLOCK_DYNAMIC_FAILURE;
     if (options.metrics.regressionDensity > thresholds.maxRegressionDensity)
-        return 'BLOCK_REGRESSION';
+        return COMPOSITE_VERDICT.BLOCK_REGRESSION;
     if (options.metrics.gamingPenalty > 0 && violations.some((v) => v.includes('Anti-gaming')))
-        return 'BLOCK_GAMING_DETECTED';
+        return COMPOSITE_VERDICT.BLOCK_GAMING_DETECTED;
     if (
         options.metrics.qed < thresholds.minQed ||
         options.metrics.deltaQSemantic < thresholds.minDeltaQ
     )
-        return 'BLOCK_QUALITY_DEGRADATION';
-    if (warnings.length > 0) return 'WARN_QUALITY_DRIFT';
-    return 'PASS';
+        return COMPOSITE_VERDICT.BLOCK_QUALITY_DEGRADATION;
+    if (warnings.length > 0) return COMPOSITE_VERDICT.WARN_QUALITY_DRIFT;
+    return COMPOSITE_VERDICT.PASS;
 }
 
 /**

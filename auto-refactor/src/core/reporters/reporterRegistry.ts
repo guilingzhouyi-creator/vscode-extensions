@@ -110,7 +110,6 @@ export function listReporters(): string[] {
 
 // ---- Register Built-in Reporters ----
 
-// 1. JSON Reporter
 registerReporter({
     name: 'json',
     format(report: ScanReport, options?: { pretty?: boolean }): string {
@@ -118,7 +117,6 @@ registerReporter({
     },
 });
 
-// 2. Markdown Reporter
 registerReporter({
     name: 'markdown',
     format(report: ScanReport): string {
@@ -175,7 +173,6 @@ registerReporter({
     },
 });
 
-// 3. SARIF (Static Analysis Results Interchange Format) Reporter
 registerReporter({
     name: 'sarif',
     format(report: ScanReport): string {
@@ -222,7 +219,6 @@ registerReporter({
     },
 });
 
-// 4. SVG Badge Reporter
 registerReporter({
     name: 'badge',
     format(report: ScanReport): string {
@@ -259,7 +255,6 @@ registerReporter({
     },
 });
 
-// 5. Agent Reporter
 registerReporter({
     name: 'agent',
     format(report: ScanReport, options?: Record<string, unknown>): string {
@@ -267,7 +262,6 @@ registerReporter({
     },
 });
 
-// 6. CAPP Reporter
 registerReporter({
     name: 'capp',
     format(report: ScanReport): string {
@@ -275,7 +269,6 @@ registerReporter({
     },
 });
 
-// 7. Praxis Presentation Reporter
 registerReporter({
     name: 'praxis',
     format(report: ScanReport, options?: Record<string, unknown>): string {

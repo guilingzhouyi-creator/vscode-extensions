@@ -6,7 +6,7 @@
  * Dependencies & Triggers: Imports `fs`, `os`, `path`, core config types, project profile
  *   detection, and scale/maturity tuners; triggered by `resolveConfig` from CLI `--config`
  *   and flags, API callers, and daemon startup, plus config auto-discovery.
- * Responsibilities: Export tool identity and the eleven built-in analyzer names; provide
+ * Responsibilities: Export tool identity and all 27 built-in polyglot analyzer identifiers; provide
  *   default thresholds, per-analyzer options, declarative analyzer registry, and full config;
  *   locate/parse an explicit or auto-discovered JSON config; merge defaults, file values,
  *   CLI overrides, custom analyzers, and deep-merged options; apply scale and maturity

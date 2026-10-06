@@ -116,8 +116,8 @@ export async function pMap<T, U>(
             if (signal?.aborted) {
                 throw new Error('Scan aborted by user');
             }
-            const cur = idx++;
-            out[cur] = await fn(items[cur]);
+            const currentItemIndex = idx++;
+            out[currentItemIndex] = await fn(items[currentItemIndex]);
         }
     };
     const n = Math.max(1, Math.min(limit, items.length));
@@ -165,13 +165,14 @@ export function analyzerCoverage(
  * for small files; transferring a pooled buffer would detach the WHOLE shared pool and
  * corrupt other buffers — so copy such buffers into a standalone allocation first.
  *
- * @param buf - Input buffer to verify.
+ * @param rawBuffer - Input buffer to verify.
  * @returns Self-contained transferable Buffer.
  */
-export function toTransferable(buf: Buffer): Buffer {
-    if (buf.byteOffset === 0 && buf.byteLength === buf.buffer.byteLength) return buf;
-    const copy = Buffer.allocUnsafeSlow(buf.byteLength);
-    buf.copy(copy);
+export function toTransferable(rawBuffer: Buffer): Buffer {
+    if (rawBuffer.byteOffset === 0 && rawBuffer.byteLength === rawBuffer.buffer.byteLength)
+        return rawBuffer;
+    const copy = Buffer.allocUnsafeSlow(rawBuffer.byteLength);
+    rawBuffer.copy(copy);
     return copy;
 }
 
@@ -228,7 +229,7 @@ interface SingleHybridOutcome {
 }
 
 async function processSingleHybridFile(
-    b: { idx: number; rel: string },
+    fileItem: { idx: number; rel: string },
     absRoot: string,
     optsPreloaded: Map<string, Buffer> | undefined,
     runAnalyzersFn: (
@@ -236,16 +237,16 @@ async function processSingleHybridFile(
         content: string,
     ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>,
 ): Promise<SingleHybridOutcome> {
-    const absPath = path.join(absRoot, b.rel);
+    const absPath = path.join(absRoot, fileItem.rel);
     let content: string;
     try {
-        const pre = optsPreloaded && optsPreloaded.get(b.rel);
+        const pre = optsPreloaded && optsPreloaded.get(fileItem.rel);
         content = pre ? pre.toString('utf8') : await fs.promises.readFile(absPath, 'utf8');
     } catch {
         return { result: { issues: [], metric: null } };
     }
     try {
-        const r = await runAnalyzersFn(b.rel, content);
+        const r = await runAnalyzersFn(fileItem.rel, content);
         return { result: r };
     } catch (e) {
         return { result: { issues: [], metric: null }, error: e };
@@ -296,19 +297,23 @@ interface WorkerTelemetrySnapshot {
     hybridDoneAtFirstMsg: number;
 }
 
-function updateArrivalTelemetry(T: WorkerTelemetrySnapshot | null, wk: number, tArr: number): void {
+function updateArrivalTelemetry(
+    T: WorkerTelemetrySnapshot | null,
+    wk: number,
+    workerArrivalTimestampMs: number,
+): void {
     if (!T) return;
     if (T.firstMsgMs[wk] === undefined) {
-        T.firstMsgMs[wk] = tArr - T.poolStart;
+        T.firstMsgMs[wk] = workerArrivalTimestampMs - T.poolStart;
         if (T.hybridDoneAtFirstMsg === -1) {
             T.hybridDoneAtFirstMsg = T.hybridDone;
         }
     }
     for (let i = T.timeline.length - 1; i >= 0; i--) {
-        const e = T.timeline[i];
-        if (e.worker === wk && e.arrive < 0) {
-            e.arrive = tArr - T.poolStart;
-            e.rt = tArr - T.lastDispatch[wk];
+        const entry = T.timeline[i];
+        if (entry.worker === wk && entry.arrive < 0) {
+            entry.arrive = workerArrivalTimestampMs - T.poolStart;
+            entry.rt = workerArrivalTimestampMs - T.lastDispatch[wk];
             break;
         }
     }
@@ -414,13 +419,13 @@ export async function dispatchBatches(
             const perWorkerGaps: number[] = new Array(n).fill(0);
             const lastArrive: number[] = new Array(n).fill(-1);
             const rtAll: number[] = [];
-            for (const e of T.timeline) {
-                if (e.arrive >= 0) {
-                    perWorkerBusy[e.worker] += e.rt;
-                    rtAll.push(e.rt);
-                    if (lastArrive[e.worker] >= 0)
-                        perWorkerGaps[e.worker] += e.dispatch - lastArrive[e.worker];
-                    lastArrive[e.worker] = e.arrive;
+            for (const entry of T.timeline) {
+                if (entry.arrive >= 0) {
+                    perWorkerBusy[entry.worker] += entry.rt;
+                    rtAll.push(entry.rt);
+                    if (lastArrive[entry.worker] >= 0)
+                        perWorkerGaps[entry.worker] += entry.dispatch - lastArrive[entry.worker];
+                    lastArrive[entry.worker] = entry.arrive;
                 }
             }
             const rtAvg = rtAll.length ? rtAll.reduce((a, b) => a + b, 0) / rtAll.length : 0;
@@ -431,9 +436,9 @@ export async function dispatchBatches(
                     `perWorkerWaitGaps=[${perWorkerGaps.map((x) => x.toFixed(0)).join(',')}]ms`,
             );
             const lines: string[] = [];
-            for (const e of T.timeline) {
+            for (const entry of T.timeline) {
                 lines.push(
-                    `b${e.seq} w${e.worker} +${e.dispatch.toFixed(0)}ms->+${e.arrive.toFixed(0)}ms rt=${e.rt.toFixed(1)}ms`,
+                    `b${entry.seq} w${entry.worker} +${entry.dispatch.toFixed(0)}ms->+${entry.arrive.toFixed(0)}ms rt=${entry.rt.toFixed(1)}ms`,
                 );
             }
             for (let i = 0; i < lines.length; i += TIMING_BATCH_LINES) {
@@ -512,8 +517,8 @@ export async function dispatchBatches(
             const absPath = path.join(absRoot, rel);
             try {
                 const pre = opts.preloaded && opts.preloaded.get(rel);
-                const buf = pre || (await fs.promises.readFile(absPath));
-                return { file: rel, absPath, buf: toTransferable(buf) };
+                const fileBuffer = pre || (await fs.promises.readFile(absPath));
+                return { file: rel, absPath, buf: toTransferable(fileBuffer) };
             } catch {
                 results[idx] = { issues: [] as Issue[], metric: null as FileMetric | null };
                 completed++;
@@ -524,11 +529,11 @@ export async function dispatchBatches(
         /** Hybrid startup: process the pre-reserved [0, hybridK) files in-process. */
         const processHybrid = async (batch: { idx: number; rel: string }[]): Promise<void> => {
             if (T) T.hybridFiles = batch.length;
-            const tH0 = T ? nowMs() : 0;
-            await pMap(batch, HYBRID_CONCURRENCY, async (b) => {
+            const hybridStartTimeMs = T ? nowMs() : 0;
+            await pMap(batch, HYBRID_CONCURRENCY, async (fileItem) => {
                 if (failed) return;
                 const { result, error } = await processSingleHybridFile(
-                    b,
+                    fileItem,
                     absRoot,
                     opts.preloaded,
                     runAnalyzersFn,
@@ -537,24 +542,26 @@ export async function dispatchBatches(
                     fail(error);
                     return;
                 }
-                results[b.idx] = result;
+                results[fileItem.idx] = result;
                 completed++;
                 if (T) T.hybridDone++;
             });
-            if (T) T.hybridMs = nowMs() - tH0;
+            if (T) T.hybridMs = nowMs() - hybridStartTimeMs;
             finishIfDone();
         };
 
         /** Claim + pre-read one batch of files (index order preserved). */
         const readNextBatch = async (): Promise<ReadyBatch> => {
-            const tR0 = T ? nowMs() : 0;
+            const readBatchStartTimeMs = T ? nowMs() : 0;
             const batchSize = Math.max(1, Math.min(WORKER_BATCH_SIZE, Math.ceil(files.length / n)));
             const batch: { idx: number; rel: string }[] = [];
             while (batch.length < batchSize && nextIdx < files.length) {
                 const i = nextIdx++;
                 batch.push({ idx: i, rel: files[i] });
             }
-            const reads = await Promise.all(batch.map((b) => readTask(b.idx, b.rel)));
+            const reads = await Promise.all(
+                batch.map((batchItem) => readTask(batchItem.idx, batchItem.rel)),
+            );
             const tasks: { file: string; absPath: string; buf: Buffer }[] = [];
             const transfer: ArrayBuffer[] = [];
             for (const r of reads) {
@@ -564,7 +571,7 @@ export async function dispatchBatches(
                 }
             }
             if (T) {
-                const d = nowMs() - tR0;
+                const d = nowMs() - readBatchStartTimeMs;
                 T.readTotal += d;
                 T.readCount++;
                 T.readTimes.push(d);
@@ -594,7 +601,7 @@ export async function dispatchBatches(
         };
 
         const postBatchToWorker = (w: Worker, ready: ReadyBatch): void => {
-            const tPost0 = T ? nowMs() : 0;
+            const postMessageStartTimeMs = T ? nowMs() : 0;
             const msg: Record<string, unknown> = { tasks: ready.tasks };
             if (fp !== undefined) {
                 msg.fp = fp;
@@ -603,15 +610,15 @@ export async function dispatchBatches(
             }
             w.postMessage(msg, ready.transfer);
             if (T) {
-                const tPost1 = nowMs();
-                T.dispatchSyncTotal += tPost1 - tPost0;
+                const postMessageEndTimeMs = nowMs();
+                T.dispatchSyncTotal += postMessageEndTimeMs - postMessageStartTimeMs;
                 const k = workerIdx.get(w) ?? 0;
                 const seq = ++T.seqCounter;
-                T.lastDispatch[k] = tPost1;
+                T.lastDispatch[k] = postMessageEndTimeMs;
                 T.timeline.push({
                     seq,
                     worker: k,
-                    dispatch: tPost1 - T.poolStart,
+                    dispatch: postMessageEndTimeMs - T.poolStart,
                     arrive: -1,
                     rt: -1,
                 });
@@ -640,19 +647,19 @@ export async function dispatchBatches(
         }
         void processHybrid(hybridBatch);
 
-        const wire = (w: Worker, k: number, tSpawn0: number) => {
+        const wire = (w: Worker, k: number, workerSpawnStartTimeMs: number) => {
             workerIdx.set(w, k);
             w.on('online', () => {
-                if (T) T.spawnMs[k] = nowMs() - tSpawn0;
+                if (T) T.spawnMs[k] = nowMs() - workerSpawnStartTimeMs;
             });
             w.on(
                 'message',
                 (res: {
                     results: { file: string; issues: Issue[]; metric: FileMetric | null }[];
                 }) => {
-                    const tArr = T ? nowMs() : 0;
+                    const workerArrivalTimestampMs = T ? nowMs() : 0;
                     const wk = workerIdx.get(w) ?? 0;
-                    updateArrivalTelemetry(T, wk, tArr);
+                    updateArrivalTelemetry(T, wk, workerArrivalTimestampMs);
 
                     const resArr = normalizeWorkerResults(res.results);
                     for (const r of resArr) {
@@ -662,7 +669,7 @@ export async function dispatchBatches(
                         }
                     }
                     completed += resArr.length;
-                    if (T) T.mergeTotal += nowMs() - tArr;
+                    if (T) T.mergeTotal += nowMs() - workerArrivalTimestampMs;
                     if (finishIfDone()) return;
                     void dispatch(w);
                 },
@@ -678,7 +685,7 @@ export async function dispatchBatches(
         } else {
             for (let k = 0; k < n; k++) {
                 let w: Worker;
-                const tSpawn0 = T ? nowMs() : 0;
+                const workerSpawnStartTimeMs = T ? nowMs() : 0;
                 try {
                     w = new Worker(workerPath, { workerData: { config, analyzerDescs: descs } });
                 } catch (e) {
@@ -686,7 +693,7 @@ export async function dispatchBatches(
                     return;
                 }
                 workers.push(w);
-                wire(w, k, tSpawn0);
+                wire(w, k, workerSpawnStartTimeMs);
             }
         }
     });

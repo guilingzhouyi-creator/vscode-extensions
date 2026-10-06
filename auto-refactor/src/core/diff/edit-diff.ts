@@ -122,9 +122,9 @@ export function countLines(content: string): number {
 export function linesOf(content: string, starts: number[]): string[] {
     const out: string[] = new Array(starts.length);
     for (let i = 0; i < starts.length; i++) {
-        const s = starts[i];
-        const e = i + 1 < starts.length ? starts[i + 1] - 1 : content.length;
-        out[i] = content.slice(s, e);
+        const startOffset = starts[i];
+        const endOffset = i + 1 < starts.length ? starts[i + 1] - 1 : content.length;
+        out[i] = content.slice(startOffset, endOffset);
     }
     return out;
 }
@@ -203,10 +203,10 @@ export function hashLinesDirect(content: string, starts: number[]): Uint32Array 
     const n = starts.length;
     const hashes = new Uint32Array(n);
     for (let i = 0; i < n; i++) {
-        const s = starts[i];
-        const e = i + 1 < n ? starts[i + 1] - 1 : content.length;
+        const startOffset = starts[i];
+        const endOffset = i + 1 < n ? starts[i + 1] - 1 : content.length;
         let hash = FNV1A_32_OFFSET_BASIS;
-        for (let j = s; j < e; j++) {
+        for (let j = startOffset; j < endOffset; j++) {
             hash ^= content.charCodeAt(j);
             hash = Math.imul(hash, FNV1A_32_PRIME);
         }
@@ -245,25 +245,55 @@ export function hashLines(lines: string[]): Uint32Array {
 }
 
 /**
- * Diff two line arrays after trimming their common prefix and suffix.
+ * Diffs two line arrays by trimming their common prefix and suffix, dynamically selecting
+ * between Myers and Histogram algorithms for the middle span.
  *
- * @param a - OLD lines.
- * @param b - NEW lines.
- * @param hA - Optional precomputed hashes for a.
- * @param hB - Optional precomputed hashes for b.
- * @returns Ordered edit script.
+ * Preconditions:
+ *   - When precomputed line hash buffers (`oldLineHashes`, `newLineHashes`) are provided,
+ *     they MUST be strictly equal in length to their corresponding line arrays
+ *     (`oldLineHashes.length === oldLines.length` and
+ *     `newLineHashes.length === newLines.length`). Mismatched lengths violate slice
+ *     indexing assumptions and cause out-of-bounds access or false matching during
+ *     prefix/suffix trimming.
+ *
+ * Degradation & Fallback Strategy:
+ *   - The middle modified section is inspected against Myers complexity thresholds.
+ *   - If either middle section exceeds `MYERS_MAX_MID_LINES` (1500 lines, `midN > 1500` or
+ *     `midM > 1500`) or if the search grid exceeds 2,000,000 cells
+ *     (`(midN + midM + 1) * (2 * (midN + midM) + 1) > 2_000_000`), the algorithm
+ *     automatically degrades and falls back to `histogramDiff` to prevent quadratic
+ *     O(ND) trace buffer explosion and eliminate the risk of out-of-memory (OOM) failures.
+ *
+ * @param oldLines - Array of lines from the original/old content.
+ * @param newLines - Array of lines from the modified/new content.
+ * @param oldLineHashes - Optional precomputed 32-bit FNV-1a hashes for `oldLines`.
+ *   Precondition: must equal `oldLines.length`.
+ * @param newLineHashes - Optional precomputed 32-bit FNV-1a hashes for `newLines`.
+ *   Precondition: must equal `newLines.length`.
+ * @returns Ordered edit script (`DiffOp[]`) expressing changes required to transform
+ *   `oldLines` into `newLines`.
  */
-export function fastDiff(a: string[], b: string[], hA?: Uint32Array, hB?: Uint32Array): DiffOp[] {
-    const n = a.length;
-    const m = b.length;
+export function fastDiff(
+    oldLines: string[],
+    newLines: string[],
+    oldLineHashes?: Uint32Array,
+    newLineHashes?: Uint32Array,
+): DiffOp[] {
+    const n = oldLines.length;
+    const m = newLines.length;
     if (n === 0 && m === 0) return [];
-    if (n === 0) return b.map((_, bIdx) => ({ type: DIFF_OP_INSERT, aIdx: 0, bIdx }));
-    if (m === 0) return a.map((_, aIdx) => ({ type: DIFF_OP_DELETE, aIdx, bIdx: 0 }));
+    if (n === 0) return newLines.map((_, bIdx) => ({ type: DIFF_OP_INSERT, aIdx: 0, bIdx }));
+    if (m === 0) return oldLines.map((_, aIdx) => ({ type: DIFF_OP_DELETE, aIdx, bIdx: 0 }));
 
-    const hashA = hA || hashLines(a);
-    const hashB = hB || hashLines(b);
+    const hashA = oldLineHashes || hashLines(oldLines);
+    const hashB = newLineHashes || hashLines(newLines);
 
-    const { prefix, suffix, midA, midB, midHA, midHB } = trimPrefixSuffix(a, b, hashA, hashB);
+    const { prefix, suffix, midA, midB, midHA, midHB } = trimPrefixSuffix(
+        oldLines,
+        newLines,
+        hashA,
+        hashB,
+    );
     const midN = midA.length;
     const midM = midB.length;
 
@@ -297,14 +327,14 @@ export function fastDiff(a: string[], b: string[], hA?: Uint32Array, hB?: Uint32
     return fullOps;
 }
 
-function hasInvalidCoordinates(e: EditRange): boolean {
+function hasInvalidCoordinates(editRange: EditRange): boolean {
     const coords = [
-        e.startLine,
-        e.oldEndLine,
-        e.newEndLine,
-        e.startByte,
-        e.oldEndByte,
-        e.newEndByte,
+        editRange.startLine,
+        editRange.oldEndLine,
+        editRange.newEndLine,
+        editRange.startByte,
+        editRange.oldEndByte,
+        editRange.newEndByte,
     ];
     for (let i = 0; i < coords.length; i++) {
         if (typeof coords[i] !== TYPEOF_NUMBER || !Number.isFinite(coords[i])) {
@@ -314,34 +344,38 @@ function hasInvalidCoordinates(e: EditRange): boolean {
     return false;
 }
 
-function validateEditLineBounds(e: EditRange): void {
-    if (e.startLine < 1) {
+function validateEditLineBounds(editRange: EditRange): void {
+    if (editRange.startLine < 1) {
         throw new Error('invalid edit range: startLine < 1');
     }
-    if (e.oldEndLine < e.startLine || e.newEndLine < e.startLine) {
+    if (editRange.oldEndLine < editRange.startLine || editRange.newEndLine < editRange.startLine) {
         throw new Error('invalid edit range: end line before start line');
     }
 }
 
-function validateEditByteBounds(e: EditRange, maxByte?: number): void {
-    if (e.startByte < 0) {
+function validateEditByteBounds(editRange: EditRange, maxByte?: number): void {
+    if (editRange.startByte < 0) {
         throw new Error('invalid edit range: negative byte offset');
     }
-    if (e.oldEndByte < e.startByte || e.newEndByte < e.startByte) {
+    if (editRange.oldEndByte < editRange.startByte || editRange.newEndByte < editRange.startByte) {
         throw new Error('invalid edit range: end byte before start byte');
     }
     if (maxByte === undefined) return;
-    if (e.startByte > maxByte || e.oldEndByte > maxByte || e.newEndByte > maxByte) {
+    if (
+        editRange.startByte > maxByte ||
+        editRange.oldEndByte > maxByte ||
+        editRange.newEndByte > maxByte
+    ) {
         throw new Error('invalid edit range: byte offset out of bounds');
     }
 }
 
-function validateSingleEditRange(e: EditRange, maxByte?: number): void {
-    if (!e || hasInvalidCoordinates(e)) {
+function validateSingleEditRange(editRange: EditRange, maxByte?: number): void {
+    if (!editRange || hasInvalidCoordinates(editRange)) {
         throw new Error('invalid edit range: non-numeric field');
     }
-    validateEditLineBounds(e);
-    validateEditByteBounds(e, maxByte);
+    validateEditLineBounds(editRange);
+    validateEditByteBounds(editRange, maxByte);
 }
 
 /**
@@ -351,8 +385,8 @@ function validateSingleEditRange(e: EditRange, maxByte?: number): void {
  * @param maxByte - Optional inclusive byte bound.
  */
 export function validateEditRanges(edits: EditRange[], maxByte?: number): void {
-    for (const e of edits) {
-        validateSingleEditRange(e, maxByte);
+    for (const edit of edits) {
+        validateSingleEditRange(edit, maxByte);
     }
 }
 
@@ -364,8 +398,8 @@ export function validateEditRanges(edits: EditRange[], maxByte?: number): void {
  */
 export function changedLineCount(edits: EditRange[]): number {
     let n = 0;
-    for (const e of edits) {
-        n += e.oldEndLine - e.startLine + 1 + (e.newEndLine - e.startLine + 1);
+    for (const edit of edits) {
+        n += edit.oldEndLine - edit.startLine + 1 + (edit.newEndLine - edit.startLine + 1);
     }
     return n;
 }
@@ -456,9 +490,9 @@ export function computeEditRangesWithOps(
 
     const oldIndex = computeLineStartsAndHashes(oldContent);
     const newIndex = computeLineStartsAndHashes(newContent);
-    const a = linesOf(oldContent, oldIndex.starts);
-    const b = linesOf(newContent, newIndex.starts);
-    const ops = fastDiff(a, b, oldIndex.hashes, newIndex.hashes);
+    const oldLines = linesOf(oldContent, oldIndex.starts);
+    const newLines = linesOf(newContent, newIndex.starts);
+    const ops = fastDiff(oldLines, newLines, oldIndex.hashes, newIndex.hashes);
     const edits = extractEditRanges(
         ops,
         oldIndex.starts,
@@ -527,9 +561,9 @@ export function computeDetailedHunks(
     if (!ops) {
         const oldIndex = computeLineStartsAndHashes(oldContent);
         const newIndex = computeLineStartsAndHashes(newContent);
-        const a = linesOf(oldContent, oldIndex.starts);
-        const b = linesOf(newContent, newIndex.starts);
-        ops = fastDiff(a, b, oldIndex.hashes, newIndex.hashes);
+        const oldLines = linesOf(oldContent, oldIndex.starts);
+        const newLines = linesOf(newContent, newIndex.starts);
+        ops = fastDiff(oldLines, newLines, oldIndex.hashes, newIndex.hashes);
     }
     return buildReviewHunksFromOps(oldContent, newContent, ops, oldStarts, newStarts, contextLines);
 }

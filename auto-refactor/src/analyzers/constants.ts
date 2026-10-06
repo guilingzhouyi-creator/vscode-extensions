@@ -13,7 +13,7 @@
  *   tolerated literals, plus the benign-vocabulary literals `classifyLiteral` marks reasonable;
  *   propose constant names, optionally classified semantically
  * Exit Semantics & Design Rationale: analyze() is the standalone contract and finalize() runs
- *   the three detection passes; duplicate-literal is a full-file multiset, so it is rebuilt
+ *   the literal detection stages; duplicate-literal is a full-file multiset, so it is rebuilt
  *   from reused plus fresh records instead of being reused wholesale, keeping warm scans
  *   byte-identical to a cold rescan.
  */
@@ -63,6 +63,34 @@ import {
     groupDuplicates,
     buildDuplicateIssue,
 } from './constants-literal-helper';
+
+/** Regular expression matching test directory path components. */
+const RE_TEST_PATH = /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i;
+
+/** Regular expression matching test file extension patterns. */
+const RE_TEST_FILE_EXT = /\.(?:test|spec)\.[a-z0-9]+$/i;
+
+/** Regular expression matching styling stylesheet extensions. */
+const RE_STYLE_FILE_EXT = /\.(?:css|scss|less|sass)\b/i;
+
+/** Regular expression identifying diagnostic or logging message prefixes. */
+const RE_DIAGNOSTIC_LOG_PREFIX = /^(?:error|failed|warning|info|debug|trace|fatal|assert):/i;
+
+/** Regular expression stripping enclosing quotes from string literals. */
+const RE_OUTER_QUOTES = /^['"`]|['"`]$/g;
+
+/** Regular expression matching non-alphanumeric character sequences for name cleanup. */
+const RE_NON_ALPHANUMERIC = /[^A-Za-z0-9]+/g;
+
+/** Regular expression splitting strings along whitespace boundaries. */
+const RE_WHITESPACE = /\s+/;
+
+/** Regular expression detecting identifiers starting with numeric digits. */
+const RE_LEADING_DIGIT = /^[0-9]/;
+
+/** Regular expression detecting redundant uppercase constant aliases. */
+const RE_CONSTANT_ALIAS =
+    /^(?:export\s+)?const\s+([A-Z][A-Z0-9_]{2,})\s*(?::\s*[^=]+)?\s*=\s*([A-Z][A-Z0-9_]{2,})\s*;?$/;
 
 /**
  * Detect inline literals that should be promoted to named constants.
@@ -115,16 +143,16 @@ export class ConstantsAnalyzer implements Analyzer {
         this.reconcileIncrementalLiterals(ctx.incremental);
         this.issues = issues;
 
-        // Pass 1: find duplicate groups, emit duplicate-literal findings, and collect the
-        // set of nodes that should be suppressed from the individual passes.
+        // Duplicate literal detection: identify repeated literal groups, emit
+        // duplicate findings, and collect nodes to suppress from individual checks.
         const duplicateNodes = new Set<NormalizedNode>();
         this.detectDuplicates(ctx, duplicateNodes, issues);
 
-        // Pass 2/3: individual magic-number / hardcoded-string findings (skip duplicates).
+        // Individual literal scanning: detect unextracted magic numbers and hardcoded strings (skipping duplicates).
         this.detectMagicNumbers(ctx, duplicateNodes, issues);
         this.detectHardcodedStrings(ctx, duplicateNodes, issues);
 
-        // Extended governance passes (4, 5, 6, 7)
+        // Extended constant governance: evaluate nested constants, layout, clusters, and topology.
         this.runExtendedGovernancePasses(ctx, issues);
 
         return issues;
@@ -190,10 +218,10 @@ export class ConstantsAnalyzer implements Analyzer {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
         const isTest =
             roleInference.role === 'test_suite' ||
-            /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i.test(ctx.filePath) ||
-            /\.(?:test|spec)\.[a-z0-9]+$/i.test(ctx.filePath);
+            RE_TEST_PATH.test(ctx.filePath) ||
+            RE_TEST_FILE_EXT.test(ctx.filePath);
         const isStyle =
-            ctx.filePath.includes('-styles.') || /\.(?:css|scss|less|sass)\b/i.test(ctx.filePath);
+            ctx.filePath.includes('-styles.') || RE_STYLE_FILE_EXT.test(ctx.filePath);
         if (isTest || isStyle) return;
 
         const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
@@ -324,7 +352,7 @@ export class ConstantsAnalyzer implements Analyzer {
         const text = lit.value;
         const inner = stripQuotes(text);
         if (inner.startsWith('[') && inner.includes(']')) return true;
-        if (/^(?:error|failed|warning|info|debug|trace|fatal|assert):/i.test(inner)) return true;
+        if (RE_DIAGNOSTIC_LOG_PREFIX.test(inner)) return true;
         const parentText = lit.parent?.text?.toLowerCase();
         if (
             parentText &&
@@ -474,15 +502,15 @@ export class ConstantsAnalyzer implements Analyzer {
             return 'EXTRACTED_NUMBER';
         }
         const cleaned = value
-            .replace(/^['"`]|['"`]$/g, '')
-            .replace(/[^A-Za-z0-9]+/g, ' ')
+            .replace(RE_OUTER_QUOTES, '')
+            .replace(RE_NON_ALPHANUMERIC, ' ')
             .trim()
-            .split(/\s+/)
+            .split(RE_WHITESPACE)
             .slice(0, SUGGESTED_NAME_MAX_WORDS)
             .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
             .join('');
         const name = cleaned ? `${cleaned.toUpperCase()}_TEXT` : 'EXTRACTED_STRING';
-        return /^[0-9]/.test(name) ? `CONST_${name}` : name;
+        return RE_LEADING_DIGIT.test(name) ? `CONST_${name}` : name;
     }
 
     private detectNestedConstants(ctx: AnalyzerContext, out: Issue[]): void {
@@ -503,9 +531,7 @@ export class ConstantsAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         out: Issue[],
     ): void {
-        const aliasMatch = trimmed.match(
-            /^(?:export\s+)?const\s+([A-Z][A-Z0-9_]{2,})\s*(?::\s*[^=]+)?\s*=\s*([A-Z][A-Z0-9_]{2,})\s*;?$/,
-        );
+        const aliasMatch = trimmed.match(RE_CONSTANT_ALIAS);
         if (!aliasMatch) return;
 
         const [, aliasName, targetName] = aliasMatch;

@@ -809,19 +809,19 @@ export function processGoLine(
     const trimmed = rawLine.trim();
     if (!trimmed) return;
 
-    // Pass 1: comment lines (always handled or not — no further processing if comment)
+    // Comments: check and consume comment lines (no further processing if comment)
     if (handleCommentLine(trimmed, ctx)) return;
 
     const codeOnly = stripLineComment(trimmed);
     if (!codeOnly) return;
 
-    // Pass 2: top-level declarations (package, import, type, func, var, const)
+    // Declarations: top-level declarations (package, import, type, func, var, const)
     if (handleDeclarationLine(codeOnly, rawLine, lineNum, ctx, children)) return;
 
-    // Pass 3: control flow (if/for/switch/select)
+    // Control flow: branch and loop constructs (if/for/switch/select)
     if (handleControlFlowLine(codeOnly, rawLine, lineNum, ctx, children)) return;
 
-    // Pass 4: other statements and structural elements
+    // Statements: case labels, simple statements, and struct field definitions
     const caseNode = parseCaseLabel(codeOnly, rawLine, lineNum, ctx.inSwitchSelect);
     if (caseNode) children.push(caseNode);
 
@@ -844,13 +844,13 @@ export function processGoLine(
         }
     }
 
-    // Pass 5: literals and calls (scanned on every code line)
+    // Literals and calls: string/numeric/named literals and function invocations
     parseStringLiterals(codeOnly, rawLine, lineNum, children, ctx.inImport);
     parseNumericLiterals(codeOnly, rawLine, lineNum, children);
     parseNamedLiterals(codeOnly, rawLine, lineNum, children);
     parseCallExpressions(codeOnly, rawLine, lineNum, children);
 
-    // Pass 6: brace tracking for block nesting
+    // Block nesting: brace depth tracking and block boundary management
     trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
 }
 

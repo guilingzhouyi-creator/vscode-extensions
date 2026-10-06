@@ -26,6 +26,14 @@ import {
     handleBaselineUpdate,
     handleBaselineRatchet,
 } from './baselineManager';
+import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
+import { QualityScorer } from '../scoring/qualityScorer';
+import { synthesizeStaticQualityVector } from '../scoring/static-quality-model';
+import { computeDynamicQualityVector } from '../dynamic/dynamic-quality-scorer';
+import {
+    computeUnifiedQualityScore,
+    type GovernanceProjectProfile,
+} from '../scoring/fusion-scorer';
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
 
@@ -47,8 +55,13 @@ const FINALIZED = Symbol('auto-refactor:finalized');
  */
 export function recomputeSummary(report: ScanReport): void {
     const by = { info: 0, warning: 0, error: 0 };
-    for (const i of report.issues) by[i.severity]++;
+    const byAnalyzer: Record<string, number> = {};
+    for (const i of report.issues) {
+        by[i.severity]++;
+        byAnalyzer[i.analyzer] = (byAnalyzer[i.analyzer] || 0) + 1;
+    }
     report.summary.bySeverity = by;
+    report.summary.byAnalyzer = byAnalyzer;
     report.summary.issuesTotal = report.issues.length;
     report.summary.uncertainty = summarizeUncertainty(report.issues);
 }
@@ -321,6 +334,82 @@ async function finalizeBaseline(
     }
 }
 
+function groupIssuesByFile(issues: Issue[]): Map<string, Issue[]> {
+    const byFile = new Map<string, Issue[]>();
+    for (const it of issues) {
+        const f = it.location?.file;
+        if (!f) continue;
+        const list = byFile.get(f);
+        if (list) list.push(it);
+        else byFile.set(f, [it]);
+    }
+    return byFile;
+}
+
+function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
+    const stage: GovernanceProjectProfile['stage'] =
+        cfg.maturityTier === 'industrial'
+            ? 'industrial_infrastructure'
+            : cfg.maturityTier === 'demo' || cfg.maturityTier === 'prototype'
+              ? 'prototype'
+              : 'production';
+
+    const scale: GovernanceProjectProfile['scale'] =
+        cfg.scaleGrade === 'enterprise'
+            ? 'massive'
+            : cfg.scaleGrade === 'large'
+              ? 'large'
+              : cfg.scaleGrade === 'medium'
+                ? 'medium'
+                : 'small';
+
+    let domain: GovernanceProjectProfile['domain'] = 'core_framework';
+    if (cfg.archetype === 'library') domain = 'algorithm_lib';
+    else if (cfg.archetype === 'game' || cfg.archetype === 'web') domain = 'business_app';
+
+    return { stage, scale, domain };
+}
+
+function refreshQualityScores(
+    report: ScanReport,
+    config: ScanConfig,
+    reportScanner: Scanner | null,
+): void {
+    const effectiveScorerArchetype = config.reviewProfile ?? config.archetype;
+    const scorer =
+        reportScanner && typeof reportScanner.getQualityScorer === 'function'
+            ? reportScanner.getQualityScorer()
+            : new QualityScorer(config.scoringWeights as any, effectiveScorerArchetype);
+
+    const issuesByFile = groupIssuesByFile(report.issues);
+    const fileQualityScores: Record<string, QualityScoreBreakdown> = {};
+    const fileMetrics = report.fileMetrics ?? [];
+    for (const m of fileMetrics) {
+        const fileIssues = issuesByFile.get(m.file) || [];
+        fileQualityScores[m.file] = scorer.evaluateFile(m.file, fileIssues, m, config);
+    }
+    report.fileQualityScores = fileQualityScores;
+    const projectQualityScore = scorer.evaluateProject(
+        fileQualityScores,
+        fileMetrics,
+        config,
+        report.issues,
+    );
+    report.qualityScore = projectQualityScore;
+
+    const staticVector = synthesizeStaticQualityVector(projectQualityScore.indices);
+    const dynamicTelemetry = config.telemetryData;
+    const dynamicVector = dynamicTelemetry
+        ? computeDynamicQualityVector(dynamicTelemetry)
+        : undefined;
+    report.triPlaneQuality = computeUnifiedQualityScore(
+        staticVector,
+        dynamicVector,
+        100.0,
+        resolveGovernanceProfile(config),
+    );
+}
+
 /**
  * Post-scan pipeline enriching and finalizing a raw ScanReport.
  *
@@ -393,6 +482,8 @@ export async function finalizeReport(
     report.summary.suppressedCount = suppressedCount;
     report.summary.postScanPasses = postScanPasses;
     if (warnings.length > 0) report.summary.warnings = warnings;
+
+    refreshQualityScores(report, config, reportScanner);
 
     await finalizeBaseline(report, config, options, logger, postScanPasses);
 }

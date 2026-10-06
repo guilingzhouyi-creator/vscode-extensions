@@ -82,6 +82,9 @@ export class QualityScorer {
      * @param issues - Detected issues for this file.
      * @param metric - Optional precomputed lexical file metric.
      * @param config - Optional ScanConfig to identify enabled analyzers.
+     * @param options - Optional deduction control settings and penalty adjustment
+     *   options (e.g. literal deduction suppression, evolutionary multipliers, and
+     *   compounding dampening).
      * @returns Complete auditable quality score breakdown.
      */
     evaluateFile(

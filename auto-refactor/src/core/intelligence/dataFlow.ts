@@ -91,10 +91,23 @@ export class DataFlowGraph {
     private readonly outgoing = new Map<string, DataFlowEdge[]>();
     private readonly incoming = new Map<string, DataFlowEdge[]>();
 
+    /**
+     * Registers a data flow node into the graph, keyed by its unique identifier.
+     * Overwrite behavior is idempotent: if a node with the same `id` already exists,
+     * its metadata is replaced in-place without invalidating existing edges.
+     *
+     * @param node - The data flow node descriptor to register or overwrite.
+     */
     public addNode(node: DataFlowNode): void {
         this.nodes.set(node.id, node);
     }
 
+    /**
+     * Appends a directed transfer edge between two data flow nodes and updates
+     * internal outgoing and incoming adjacency indexes.
+     *
+     * @param edge - The directed data flow edge linking source and target nodes.
+     */
     public addEdge(edge: DataFlowEdge): void {
         this.edges.push(edge);
         const outList = this.outgoing.get(edge.from) ?? [];
@@ -106,22 +119,50 @@ export class DataFlowGraph {
         this.incoming.set(edge.to, inList);
     }
 
+    /**
+     * Retrieves a registered data flow node by its unique identifier.
+     *
+     * @param id - Unique identifier of the node to look up.
+     * @returns The matching DataFlowNode if present in the graph, or undefined if not found.
+     */
     public getNode(id: string): DataFlowNode | undefined {
         return this.nodes.get(id);
     }
 
+    /**
+     * Retrieves all registered data flow nodes in insertion order.
+     *
+     * @returns Read-only array of all active DataFlowNode descriptors in the graph.
+     */
     public getNodes(): readonly DataFlowNode[] {
         return Array.from(this.nodes.values());
     }
 
+    /**
+     * Retrieves all registered directed data flow edges in the graph.
+     *
+     * @returns Read-only array of all DataFlowEdge descriptors in registration order.
+     */
     public getEdges(): readonly DataFlowEdge[] {
         return this.edges;
     }
 
+    /**
+     * Queries all directed edges originating from the specified source node.
+     *
+     * @param id - Identifier of the source node whose outgoing edges are requested.
+     * @returns Read-only array of outgoing DataFlowEdge instances, or an empty array if none exist.
+     */
     public getOutgoingEdges(id: string): readonly DataFlowEdge[] {
         return this.outgoing.get(id) ?? [];
     }
 
+    /**
+     * Queries all directed edges terminating at the specified destination node.
+     *
+     * @param id - Identifier of the destination node whose incoming edges are requested.
+     * @returns Read-only array of incoming DataFlowEdge instances, or an empty array if none exist.
+     */
     public getIncomingEdges(id: string): readonly DataFlowEdge[] {
         return this.incoming.get(id) ?? [];
     }

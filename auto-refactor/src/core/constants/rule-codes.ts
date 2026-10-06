@@ -41,23 +41,85 @@ export const ANALYZER_HYGIENE = 'hygiene';
 export const ANALYZER_PERFORMANCE = 'performance';
 /** Built-in analyzer name for secrets. */
 export const ANALYZER_SECRETS = 'secrets';
+/** Built-in analyzer name for architecture. */
+export const ANALYZER_ARCHITECTURE = 'architecture';
+/** Built-in analyzer name for security. */
+export const ANALYZER_SECURITY = 'security';
+/** Built-in analyzer name for python-modern. */
+export const ANALYZER_PYTHON_MODERN = 'python-modern';
+/** Built-in analyzer name for typescript-modern (ts-modern). */
+export const ANALYZER_TYPESCRIPT_MODERN = 'ts-modern';
+/** Built-in analyzer name for rust-modern. */
+export const ANALYZER_RUST_MODERN = 'rust-modern';
+/** Built-in analyzer name for gdscript-modern. */
+export const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
+/** Built-in analyzer name for go-modern. */
+export const ANALYZER_GO_MODERN = 'go-modern';
+/** Built-in analyzer name for data-architecture. */
+export const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';
+/** Built-in analyzer name for test-modernity. */
+export const ANALYZER_TEST_MODERNITY = 'test-modernity';
+/** Built-in analyzer name for dependency-layout. */
+export const ANALYZER_DEPENDENCY_LAYOUT = 'dependency-layout';
+/** Built-in analyzer name for naming. */
+export const ANALYZER_NAMING = 'naming';
+/** Built-in analyzer name for shell-lint. */
+export const ANALYZER_SHELL_LINT = 'shell-lint';
+/** Built-in analyzer name for gdscript-game. */
+export const ANALYZER_GDSCRIPT_GAME = 'gdscript-game';
+/** Built-in analyzer name for vscode-extension. */
+export const ANALYZER_VSCODE_EXTENSION = 'vscode-extension';
+/** Built-in analyzer name for gate-architecture. */
+export const ANALYZER_GATE_ARCHITECTURE = 'gate-architecture';
 
-/** Complete collection of built-in analyzer identifiers. */
-export const BUILTIN_ANALYZERS = [
+// Domain / Specialized analyzer identifiers
+/** Built-in / domain analyzer name for config. */
+export const ANALYZER_CONFIG = 'config';
+/** Built-in / domain analyzer name for patterns. */
+export const ANALYZER_PATTERNS = 'patterns';
+/** Built-in / domain analyzer name for mutation. */
+export const ANALYZER_MUTATION = 'mutation';
+/** Built-in / domain analyzer name for concurrency. */
+export const ANALYZER_CONCURRENCY = 'concurrency';
+/** Built-in / domain analyzer name for contract. */
+export const ANALYZER_CONTRACT = 'contract';
+/** Built-in / domain analyzer name for precision. */
+export const ANALYZER_PRECISION = 'precision';
+/** Built-in / domain analyzer name for evolution. */
+export const ANALYZER_EVOLUTION = 'evolution';
+/** Built-in / domain analyzer name for praxis. */
+export const ANALYZER_PRAXIS = 'praxis';
+
+/** Complete collection of built-in analyzer identifiers (27 built-in analyzers). */
+export const BUILTIN_ANALYZERS = Object.freeze([
     ANALYZER_CONSTANTS,
-    ANALYZER_COMPLEXITY,
     ANALYZER_LARGE_FILE,
-    ANALYZER_SIMPLIFY,
-    ANALYZER_COMMENTS,
-    ANALYZER_DOCS,
-    ANALYZER_STDLIB,
-    ANALYZER_RULES,
-    ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_COMPLEXITY,
     ANALYZER_GOVERNANCE,
-    ANALYZER_HYGIENE,
-    ANALYZER_PERFORMANCE,
+    ANALYZER_DEPENDENCY_GRAPH,
     ANALYZER_SECRETS,
-] as const;
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_COMMENTS,
+    ANALYZER_HYGIENE,
+    ANALYZER_SECURITY,
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_DOCS,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_NAMING,
+    ANALYZER_GO_MODERN,
+    ANALYZER_SHELL_LINT,
+    ANALYZER_STDLIB,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_GATE_ARCHITECTURE,
+] as const);
 
 // ============================================================================
 // Raw Rule Identifiers (Legacy / Engine Compatible)

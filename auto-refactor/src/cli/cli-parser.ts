@@ -407,7 +407,7 @@ export function parseArgs(argv: string[]): CliOptions {
         }
 
         if (applyBooleanFlag(opt, arg, true)) {
-            // Re-evaluate with proper truth value
+            // Probing matched a valid boolean flag; resolve explicit inline or positional boolean override and commit final state
             const { enabled, consumedNext } = resolveBooleanFlagValue(
                 hasInline,
                 value,

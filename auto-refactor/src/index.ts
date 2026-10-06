@@ -476,15 +476,79 @@ async function handleScanCommand(args: string[]): Promise<number> {
     return scanAndRender(cli);
 }
 
-async function handleGateCommand(args: string[]): Promise<void> {
+function parseGateOptions(args: string[]): {
+    stage: import('./core/praxis/composite-quality-gate').GateStage;
+    root: string;
+} {
     const stageIdx = args.indexOf('--stage');
-    const stage = (
-        stageIdx !== -1 && args[stageIdx + 1] ? args[stageIdx + 1] : 'pre-commit'
-    ) as import('./core/praxis/composite-quality-gate').GateStage;
+    let stage: import('./core/praxis/composite-quality-gate').GateStage = 'pre-commit';
+    if (stageIdx !== -1 && args[stageIdx + 1]) {
+        stage = args[stageIdx + 1] as any;
+    }
+
     const rootIdx = args.indexOf('--root');
-    const root = rootIdx !== -1 && args[rootIdx + 1] ? args[rootIdx + 1] : process.cwd();
+    let root = process.cwd();
+    if (rootIdx !== -1 && args[rootIdx + 1]) {
+        root = args[rootIdx + 1];
+    }
+
+    return { stage, root };
+}
+
+function computeProcessedDensityAndRatio(
+    fileMetrics: any[],
+    totalFiles: number,
+): { processedEloc: number; density: number; ratio: number } {
+    let totalProcessedEloc = 0;
+    let totalPhysicalLoc = 0;
+    for (const m of fileMetrics) {
+        totalProcessedEloc += m.nonBlankLines ?? m.lines ?? 0;
+        totalPhysicalLoc += m.lines ?? 0;
+    }
+
+    const processedEloc = Math.max(totalFiles, totalProcessedEloc);
+    let density = 0.8;
+    if (totalPhysicalLoc > 0) {
+        density = Math.round((processedEloc / totalPhysicalLoc) * 100) / 100;
+    }
+
+    let ratio = 1.25;
+    if (processedEloc > 0) {
+        ratio = Math.round((totalPhysicalLoc / processedEloc) * 100) / 100;
+    }
+
+    return { processedEloc, density, ratio };
+}
+
+async function readHistoricalTrajectoryMeanScore(root: string): Promise<number | undefined> {
+    const fs = require('fs');
+    const path = require('path');
+    const trajectoryDir = path.join(root, '.refactor-trajectory');
+    if (!fs.existsSync(trajectoryDir)) {
+        return undefined;
+    }
+
+    try {
+        const { readLifetimeSummary } = require('./core/trajectory');
+        const lifetime = await readLifetimeSummary(trajectoryDir);
+        if (
+            lifetime &&
+            typeof lifetime.meanCompositeScore === 'number' &&
+            Number.isFinite(lifetime.meanCompositeScore)
+        ) {
+            return lifetime.meanCompositeScore;
+        }
+    } catch {
+        /* ignore optional trajectory read failure */
+    }
+    return undefined;
+}
+
+async function handleGateCommand(args: string[]): Promise<void> {
+    const { stage, root } = parseGateOptions(args);
 
     const { evaluateCompositeGate } = require('./core/praxis/composite-quality-gate');
+    const { computeTrajectoryQualityMetrics, recordToVector } = require('./core/trajectory');
     const { scan } = require('./api');
     const fs = require('fs');
     const path = require('path');
@@ -496,36 +560,66 @@ async function handleGateCommand(args: string[]): Promise<void> {
     const unsuppressedErrors = issues.filter((i: any) => i.severity === 'error' && !i.suppression);
     const staticPass = unsuppressedErrors.length === 0;
     const regressionCount = unsuppressedErrors.length;
-    const totalFiles = scanResult.summary.filesScanned || 1;
+    const totalFiles = scanResult.summary?.filesScanned || 1;
+
+    const fileMetrics = scanResult.fileMetrics || [];
+    const { processedEloc, density, ratio } = computeProcessedDensityAndRatio(fileMetrics, totalFiles);
+
+    const historicalBeforeScore = await readHistoricalTrajectoryMeanScore(root);
+    let currentScore = staticPass ? 100.0 : 80.0;
+    if (
+        typeof scanResult.qualityScore?.compositeScore === 'number' &&
+        Number.isFinite(scanResult.qualityScore.compositeScore)
+    ) {
+        currentScore = scanResult.qualityScore.compositeScore;
+    }
+    const beforeScore = historicalBeforeScore ?? currentScore;
+
+    const resolvedDebtPoints = staticPass ? 10 : 0;
+    const addedDebtPoints = regressionCount * 5;
+    const netDebtPointsDelta = resolvedDebtPoints - addedDebtPoints;
+
+    let scoreVector = new Array(10).fill(currentScore);
+    if (scanResult.qualityScore?.indices) {
+        scoreVector = recordToVector(scanResult.qualityScore.indices);
+    }
+
+    const counters = {
+        processed: processedEloc,
+        unique: processedEloc,
+        changed: 0,
+        semantic: processedEloc,
+        relocated: 0,
+        cosmetic: 0,
+        boilerplate: 0,
+        added: 0,
+        deleted: 0,
+        modified: 0,
+        structural: 0,
+        density,
+        ratio,
+    };
+
+    const metrics = computeTrajectoryQualityMetrics({
+        beforeScore,
+        afterScore: currentScore,
+        scoreVector,
+        counters,
+        debtDelta: {
+            resolvedDebtPoints,
+            addedDebtPoints,
+            netDebtCleared: netDebtPointsDelta,
+            regressionFindingsCount: regressionCount,
+            regressionFindingIds: unsuppressedErrors.map((i: any) => i.id || i.rule || 'STATIC_ERROR'),
+        },
+    });
 
     const result = evaluateCompositeGate({
         stage,
         staticPass,
         dynamicPass: true,
-        counters: {
-            processed: totalFiles * 50,
-            semantic: totalFiles * 40,
-            changed: totalFiles * 10,
-            structural: totalFiles * 5,
-            density: 0.8,
-            ratio: 1.25,
-        },
-        metrics: {
-            beforeScore: 98.0,
-            afterScore: staticPass ? 99.0 : 90.0,
-            deltaQ: staticPass ? 1.0 : -8.0,
-            deltaQSemantic: staticPass ? 1.0 : -8.0,
-            qed: staticPass ? 0.05 : -0.2,
-            regressionDensity: regressionCount,
-            reviewYield: 1.0,
-            gamingPenalty: 0,
-            debtDelta: {
-                resolvedDebtPoints: 10,
-                addedDebtPoints: regressionCount * 5,
-                netDebtPointsDelta: 10 - regressionCount * 5,
-                regressionFindingsCount: regressionCount,
-            },
-        },
+        counters: counters as any,
+        metrics,
     });
 
     process.stdout.write(result.summaryText + '\n');

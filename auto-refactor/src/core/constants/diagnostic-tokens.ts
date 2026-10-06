@@ -25,6 +25,9 @@ export const SEVERITY_ERROR = 'error';
 /** All supported diagnostic severity tiers. */
 export const ALL_SEVERITIES = [SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR] as const;
 
+/** Canonical numerical ranking for diagnostic severities. */
+export const SEVERITY_RANK = Object.freeze({ info: 0, warning: 1, error: 2 } as const);
+
 // ============================================================================
 // Architecture Risk Levels
 // ============================================================================

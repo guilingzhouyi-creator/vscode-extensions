@@ -364,7 +364,6 @@ export class GoModernAnalyzer implements Analyzer {
 
         const { raw, masked } = maskSourceText(content, GO_MASK);
         const out: Issue[] = [];
-        let foundPackageComment = false;
 
         for (let index = 0; index < masked.length; index += 1) {
             const code = masked[index];
@@ -376,14 +375,7 @@ export class GoModernAnalyzer implements Analyzer {
 
             if (PACKAGE_DECL_RE.test(trimmed)) {
                 checkGoPackageComment(file, index, raw, rawLine, out);
-                foundPackageComment = true;
             }
-        }
-
-        // If no package declaration was found, don't report the rule
-        // (the file might not be a valid Go source, or might be a test file)
-        if (!foundPackageComment) {
-            // Remove any package-comment issues (there shouldn't be any if no package decl)
         }
 
         return out;

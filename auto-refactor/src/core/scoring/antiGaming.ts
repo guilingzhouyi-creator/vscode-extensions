@@ -37,6 +37,19 @@ const RELOCATION_PADDING_MIN_COUNT = 4;
 const RELOCATION_PADDING_PENALTY = 15.0;
 const GAMING_KIND_RELOCATION_PADDING: GamingPatternKind = 'artificial_relocation_padding';
 
+/** Regular expression matching tautological test assertions. */
+const RE_TAUTOLOGY_ASSERTIONS =
+    /(?:expect\(true\)\.toBe\(true\)|assert\s+1\s*==\s*1|assert\(true\)|expect\(1\)\.toBe\(1\))/g;
+
+/** Regular expression matching variable declaration bindings across lines. */
+const RE_VAR_DECLARATIONS = /\b(?:var|let|const)\s+([a-zA-Z0-9_]+)\b/g;
+
+/** Regular expression stripping variable declaration keyword prefix. */
+const RE_VAR_KEYWORD_PREFIX = /\b(?:var|let|const)\s+/;
+
+/** Regular expression testing single letter plus digit sequenced identifier. */
+const RE_DEGENERATE_IDENTIFIER = /^[a-zA-Z]\d+$/;
+
 /**
  * Kinds of score gaming recognized.
  */
@@ -128,9 +141,7 @@ function checkTautologicalTestPadding(
         return 0.0;
     }
 
-    const tautologyMatches = content.match(
-        /(?:expect\(true\)\.toBe\(true\)|assert\s+1\s*==\s*1|assert\(true\)|expect\(1\)\.toBe\(1\))/g,
-    );
+    const tautologyMatches = content.match(RE_TAUTOLOGY_ASSERTIONS);
     const count = tautologyMatches ? tautologyMatches.length : 0;
     if (count >= 3) {
         gamingKinds.push('tautological_test_padding');
@@ -249,12 +260,12 @@ function checkNamingEntropyAnomaly(
     issues: Issue[],
     gamingKinds: GamingPatternKind[],
 ): number {
-    const varMatches = content.match(/\b(?:var|let|const)\s+([a-zA-Z0-9_]+)\b/g);
+    const varMatches = content.match(RE_VAR_DECLARATIONS);
     if (!varMatches || varMatches.length < 6) return 0.0;
-    const names = varMatches.map((m) => m.replace(/\b(?:var|let|const)\s+/, ''));
+    const names = varMatches.map((m) => m.replace(RE_VAR_KEYWORD_PREFIX, ''));
     const concatenated = names.join('');
     const entropy = calculateShannonEntropy(concatenated);
-    const isDegenerate = names.filter((n) => /^[a-zA-Z]\d+$/.test(n)).length >= 6;
+    const isDegenerate = names.filter((n) => RE_DEGENERATE_IDENTIFIER.test(n)).length >= 6;
     if ((entropy < 2.8 && isDegenerate) || entropy < 1.5) {
         issues.push({
             id: `governance:${RULE_GOV_GAM_001}:${filePath}:1`,

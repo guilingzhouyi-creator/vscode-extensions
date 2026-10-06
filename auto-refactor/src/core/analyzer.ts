@@ -510,18 +510,23 @@ export class Scanner implements ScannerContext {
         preloaded?: Map<string, Buffer>,
     ): Promise<{ issues: Issue[]; metric: FileMetric | null }[]> {
         const cfg = this.config;
-        return pMap(files, Math.max(1, cfg.concurrency | 0), async (rel) => {
-            const abs = path.join(absRoot, rel);
-            let content: string;
-            try {
-                const pre = preloaded && preloaded.get(rel);
-                content = pre ? pre.toString('utf8') : await fs.promises.readFile(abs, 'utf8');
-            } catch (e) {
-                this.logger.warn(`skip unreadable file ${rel}: ${String(e)}`);
-                return { issues: [] as Issue[], metric: null as FileMetric | null };
-            }
-            return this.runAnalyzers(rel, content);
-        });
+        return pMap(
+            files,
+            Math.max(1, cfg.concurrency | 0),
+            async (rel) => {
+                const abs = path.join(absRoot, rel);
+                let content: string;
+                try {
+                    const pre = preloaded && preloaded.get(rel);
+                    content = pre ? pre.toString('utf8') : await fs.promises.readFile(abs, 'utf8');
+                } catch (e) {
+                    this.logger.warn(`skip unreadable file ${rel}: ${String(e)}`);
+                    return { issues: [] as Issue[], metric: null as FileMetric | null };
+                }
+                return this.runAnalyzers(rel, content);
+            },
+            cfg.signal,
+        );
     }
 
     /**

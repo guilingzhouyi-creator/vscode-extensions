@@ -1,19 +1,3 @@
-import * as path from 'path';
-import type * as ts from 'typescript';
-import type { Analyzer, AnalyzerContext, Issue, FileMetric, Severity } from '../core/types';
-import type { NormalizedNode } from '../core/ast/multilang';
-import { NodeKind } from '../core/ast/multilang';
-import { runStreaming } from '../core/ast/traverse';
-import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
-import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
-import { evaluateRoleElasticBudget } from '../core/intelligence/elastic-budget-matrix';
-import { partitionFileZones } from '../core/intelligence/zone-partitioner';
-
-function firstWord(name: string): string {
-    const m = name.match(/^[a-z]+|^[A-Z]+/) || ['misc'];
-    return m[0].toLowerCase();
-}
-
 /**
  * Module: Static Analysis — Large File & Decomposition Analyzer
  * File Path: src/analyzers/large-file.ts
@@ -42,6 +26,23 @@ function firstWord(name: string): string {
  *   - lines >= fileLinesFail                        -> error   (must split)
  *   - lines >= fileLinesWarn OR functions >= fileFunctionsWarn -> warning (should split)
  */
+
+import * as path from 'path';
+import type * as ts from 'typescript';
+import type { Analyzer, AnalyzerContext, Issue, FileMetric, Severity } from '../core/types';
+import type { NormalizedNode } from '../core/ast/multilang';
+import { NodeKind } from '../core/ast/multilang';
+import { runStreaming } from '../core/ast/traverse';
+import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
+import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
+import { evaluateRoleElasticBudget } from '../core/intelligence/elastic-budget-matrix';
+import { partitionFileZones } from '../core/intelligence/zone-partitioner';
+
+function firstWord(name: string): string {
+    const m = name.match(/^[a-z]+|^[A-Z]+/) || ['misc'];
+    return m[0].toLowerCase();
+}
+
 function shouldExemptElastic(
     t: Record<string, any>,
     density: any,

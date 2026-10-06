@@ -54,6 +54,29 @@ import { analyzeFunctionCohesionAndSkeleton } from '../core/intelligence/functio
 import { evaluateDistributedRedundancy } from '../core/intelligence/semantic-domain-detector';
 import { evaluateResourcePooling } from '../core/intelligence/resource-pooling-auditor';
 
+/** Regular expression matching parser/AST related file path components. */
+const RE_PARSER_FILE_CONTEXT =
+    /(?:adapter|parser|lexer|walker|codec|deserializer|ast|analyzer|audit|evaluator|graph|rule)/i;
+
+/** Regular expression matching parser/AST related function names. */
+const RE_PARSER_FUNCTION_NAME =
+    /(?:parse|tokenize|decode|visit|walk|match|audit|analyze|evaluate|dispatch)/i;
+
+/** Regular expression detecting switch, case, or match branch dispatches. */
+const RE_SWITCH_OR_DISPATCH_LINE = /^\s*(?:switch\b|case\b|match\b)/;
+
+/** Regular expression matching event-loop/daemon file path components. */
+const RE_EVENT_LOOP_FILE_CONTEXT = /(?:daemon|server|worker|poller|eventloop)/i;
+
+/** Regular expression matching event-loop/daemon function names. */
+const RE_EVENT_LOOP_FUNCTION_NAME = /(?:daemon|poll|listen|loop)/i;
+
+/** Regular expression detecting deep control-flow jump/escape statements. */
+const RE_CONTROL_FLOW_ESCAPE = /^(?:return\b|throw\b|break\b|continue\b)/;
+
+/** Regular expression detecting case or default labels in switch statements. */
+const RE_STATE_MACHINE_BRANCH = /^(?:case\b|default:)/;
+
 function formatAnonymous(className: string | null, binding: string | null): string {
     if (binding) return binding;
     return className ? `${className}.<anonymous>` : 'anonymous';
@@ -350,18 +373,14 @@ export class ComplexityAnalyzer implements Analyzer {
         fnLines: string[],
     ): { depthBudget: number; contextKind: string; isStateMachine: boolean } {
         const isParserContext =
-            /(?:adapter|parser|lexer|walker|codec|deserializer|ast|analyzer|audit|evaluator|graph|rule)/i.test(
-                ctx.filePath,
-            ) ||
-            /(?:parse|tokenize|decode|visit|walk|match|audit|analyze|evaluate|dispatch)/i.test(
-                name,
-            );
+            RE_PARSER_FILE_CONTEXT.test(ctx.filePath) ||
+            RE_PARSER_FUNCTION_NAME.test(name);
 
-        const hasSwitchOrDispatch = fnLines.some((l) => /^\s*(?:switch\b|case\b|match\b)/.test(l));
+        const hasSwitchOrDispatch = fnLines.some((l) => RE_SWITCH_OR_DISPATCH_LINE.test(l));
         const isStateMachine = hasSwitchOrDispatch && fnLines.length >= 15;
         const isEventLoop =
-            /(?:daemon|server|worker|poller|eventloop)/i.test(ctx.filePath) ||
-            /(?:daemon|poll|listen|loop)/i.test(name);
+            RE_EVENT_LOOP_FILE_CONTEXT.test(ctx.filePath) ||
+            RE_EVENT_LOOP_FUNCTION_NAME.test(name);
 
         if (isParserContext) {
             return { depthBudget: 5, contextKind: 'ast-parser', isStateMachine };
@@ -446,7 +465,7 @@ export class ComplexityAnalyzer implements Analyzer {
             const trimmed = line.trimStart();
             const indentSpaces = line.length - trimmed.length;
             if (indentSpaces < thresholdIndent) continue;
-            if (!/^(?:return\b|throw\b|break\b|continue\b)/.test(trimmed)) continue;
+            if (!RE_CONTROL_FLOW_ESCAPE.test(trimmed)) continue;
             if (depthBudget >= 5 && loc <= 120) continue;
 
             deepJumpLine = startLine + i;
@@ -491,7 +510,7 @@ export class ComplexityAnalyzer implements Analyzer {
 
         for (let i = 0; i < fnLines.length; i++) {
             const trimmed = fnLines[i].trim();
-            if (/^(?:case\b|default:)/.test(trimmed)) {
+            if (RE_STATE_MACHINE_BRANCH.test(trimmed)) {
                 if (currentCaseLength > 35 && currentCaseLine > 0) {
                     this.pushStateMachineCaseIssue(ctx, name, currentCaseLine, currentCaseLength);
                 }

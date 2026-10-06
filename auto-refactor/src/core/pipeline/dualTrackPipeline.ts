@@ -23,8 +23,8 @@
  *   throws; executeDualTrack resolves with a FastTrack verdict (SPECULATIVE_PASSED unless an
  *   error issue exists) plus a deepPromise, so callers must await it for CONFIRMED/ESCALATED;
  *   fast-track failures reject the outer promise while deep-track failures reject only that
- *   promise. Yielding the event loop before deep work keeps the speculative foreground
- *   response fast, matching the DeepSeek 4.1 asymmetric design.
+ *   promise. Yielding the event loop before deep work decouples foreground speculative
+ *   response latency from heavy background dependency and architecture graph evaluations.
  */
 
 import type { Scanner } from '../analyzer';
@@ -313,7 +313,7 @@ async function executeDeepTrack(
     memory: ReviewMemoryManager,
     trajectory: ChangeTrajectoryManager,
 ): Promise<DeepTrackVerdict> {
-    const deepT0 = Date.now();
+    const deepTrackStartTimeMs = Date.now();
     const deepIssues: Issue[] = [];
     const escalationEvents: EscalationEvent[] = [];
 
@@ -385,7 +385,7 @@ async function executeDeepTrack(
         );
     }
 
-    const deepLatencyMs = Date.now() - deepT0;
+    const deepLatencyMs = Date.now() - deepTrackStartTimeMs;
     return {
         status: escalationEvents.length > 0 ? STATUS_ESCALATED : STATUS_CONFIRMED,
         deepIssues,
@@ -555,13 +555,13 @@ function buildFastTrackVerdict(
     scorer: QualityScorer,
     memory: ReviewMemoryManager,
     trajectory: ChangeTrajectoryManager,
-    startTime: number,
+    fastTrackStartTimeMs: number,
 ): FastTrackVerdict {
     const firstPath = inputs[0]?.filePath || 'unknown';
     const overallFastScore =
         acc.lastScoreBreakdown ||
         scorer.evaluateFile(firstPath, acc.fastIssues, acc.fastMetrics[0] || null);
-    const fastLatencyMs = Date.now() - startTime;
+    const fastLatencyMs = Date.now() - fastTrackStartTimeMs;
 
     const agentPrompt = SHARED_AGENT_CONSTRAINT_GENERATOR.generate(
         { filePath: firstPath },
@@ -603,7 +603,7 @@ export async function executeDualTrack(
     inputs: DiffFileInput[],
     options: DualTrackOptions = {},
 ): Promise<DualTrackExecution> {
-    const t0 = Date.now();
+    const fastTrackStartTimeMs = Date.now();
     const governor = options.loadGovernor || new LoadGovernor();
     const channel = options.escalationChannel || new EscalationChannel();
     const memory = scanner.getReviewMemory();
@@ -636,7 +636,14 @@ export async function executeDualTrack(
         );
     }
 
-    const fastVerdict = buildFastTrackVerdict(acc, inputs, scorer, memory, trajectory, t0);
+    const fastVerdict = buildFastTrackVerdict(
+        acc,
+        inputs,
+        scorer,
+        memory,
+        trajectory,
+        fastTrackStartTimeMs,
+    );
 
     // ----------------------------------------------------------------------
     // TRACK 2: DeepTrack (Background Asynchronous Deep Analysis)

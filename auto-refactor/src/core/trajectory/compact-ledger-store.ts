@@ -286,5 +286,17 @@ export async function writeLifetimeSummary(
 ): Promise<void> {
     ensureLedgerDirectory(ledgerDir);
     const lifetimeFile = path.join(ledgerDir, 'lifetime.summary.json');
-    await fs.promises.writeFile(lifetimeFile, JSON.stringify(summary, null, 2), 'utf8');
+    const compactStagingPath = `${lifetimeFile}.compact-tmp-${process.pid}-${Date.now()}`;
+    const payload = JSON.stringify(summary, null, 2);
+    try {
+        await fs.promises.writeFile(compactStagingPath, payload, 'utf8');
+        await fs.promises.rename(compactStagingPath, lifetimeFile);
+    } catch (err: unknown) {
+        try {
+            await fs.promises.unlink(compactStagingPath);
+        } catch {
+            // Ignore staging cleanup failure
+        }
+        throw err;
+    }
 }

@@ -247,24 +247,32 @@ export class DaemonServer {
                 break;
             case 'scan':
                 this.touchIdle();
-                void this.runScan(
+                this.runScan(
                     msg.params.config,
                     msg.params.options,
                     msg.id,
                     msg.params.requestId,
                     io,
-                );
+                ).catch((err: unknown) => {
+                    this.logger.error(
+                        `unhandled error during scan ${msg.params.requestId}: ${String(err)}`,
+                    );
+                });
                 break;
             case 'scan_diff':
                 this.touchIdle();
-                void this.runScanDiff(
+                this.runScanDiff(
                     msg.params.config,
                     msg.params.diffs,
                     msg.params.options,
                     msg.id,
                     msg.params.requestId,
                     io,
-                );
+                ).catch((err: unknown) => {
+                    this.logger.error(
+                        `unhandled error during scan_diff ${msg.params.requestId}: ${String(err)}`,
+                    );
+                });
                 break;
             case 'shutdown':
                 this.logger.info(`shutdown requested (${msg.reason || 'client'}); exiting`);
@@ -435,8 +443,15 @@ export async function daemonMain(argv: string[]): Promise<void> {
         process.stderr.write(`[auto-refactor daemon] uncaught: ${e && e.stack ? e.stack : e}\n`);
         server.shutdown('uncaught-exception');
     });
+    process.on('unhandledRejection', (reason: unknown) => {
+        const msg = reason instanceof Error ? (reason.stack || reason.message) : String(reason);
+        process.stderr.write(`[auto-refactor daemon] unhandledRejection: ${msg}\n`);
+    });
 }
 
 if (require.main === module) {
-    void daemonMain(process.argv.slice(2));
+    daemonMain(process.argv.slice(2)).catch((err: unknown) => {
+        process.stderr.write(`[auto-refactor daemon] fatal: ${String(err)}\n`);
+        process.exit(1);
+    });
 }

@@ -18,7 +18,7 @@
  * Gated by AR_BINARY_RESULT=1 (default off). Only the RESULT direction is encoded
  * (worker → main postMessage); the task-dispatch direction keeps its zero-copy Buffer
  * transfer. Byte-equivalence is the hard gate: decode must reproduce the exact object
- * graph that structured clone would have delivered (validate 9/9 + W1-W9 + round-trip).
+ * graph that structured clone would have delivered (verified by test suite validation and round-trip checks).
  *
  * Format (little-endian):
  *   Header : u32 magic(0x50523530 "PR50")  u32 fileCount
@@ -306,7 +306,7 @@ class Reader {
 }
 
 /**
- * Encode a batch of per-file results into the P250 binary transport buffer.
+ * Encode a batch of per-file results into the PR50 binary transport buffer.
  *
  * Writes the magic header and file count, then per file its path, optional metric, and every
  * issue field in order; detail values are emitted as tagged JSON so key insertion order survives
@@ -428,7 +428,7 @@ function decodeSingleFileResult(r: Reader): FileResult {
 }
 
 /**
- * Decode a P250 buffer back into the exact per-file result shape.
+ * Decode a PR50 buffer back into the exact per-file result shape.
  *
  * The inverse of encodeResults: it rebuilds metrics, issue locations, severities, and tagged
  * detail values in insertion order without mutating the input. The reader walks the buffer
