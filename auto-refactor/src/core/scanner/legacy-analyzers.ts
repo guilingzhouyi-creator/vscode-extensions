@@ -65,7 +65,7 @@ export function runLegacyPhase(
     const issues: Issue[] = [];
     const sf = base.sourceFile;
     for (const p of legacy) {
-        if (!sf) continue; // external plug-ins cannot analyze non-TypeScript files
+        if (!sf && (p.instance as any).requiresSourceFile === true) continue;
         const ctx: AnalyzerContext = {
             filePath: base.rel,
             content: base.content,
@@ -79,6 +79,10 @@ export function runLegacyPhase(
         try {
             issues.push(...p.instance.analyze(sf, ctx));
         } catch (e) {
+            if (!sf && e instanceof TypeError) {
+                // Analyzer strictly expected SourceFile AST; safely ignore on non-TS/JS files
+                continue;
+            }
             const sev: Severity = base.config.failOnAnalyzerError ? 'error' : 'info';
             host.logger.error(`analyzer "${p.name}" threw on ${base.rel}: ${String(e)}`);
             issues.push({

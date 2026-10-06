@@ -94,6 +94,8 @@ export interface NormalizedNode {
  */
 export interface NormalizedAst {
     root: NormalizedNode;
+    /** Underlying native source file AST (e.g. ts.SourceFile) when available. */
+    sourceFile?: any;
 }
 
 /**

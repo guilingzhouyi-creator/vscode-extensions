@@ -148,7 +148,7 @@ export function trimPrefixSuffix(
  * Internal search result from Myers diagonal trace.
  */
 interface MyersSearchResult {
-    trace: Int32Array[];
+    flatTrace: Int32Array;
     d: number;
 }
 
@@ -165,31 +165,61 @@ interface MyersContext {
 }
 
 /**
+ * Advance diagonal snake along matched lines.
+ */
+function advanceSnake(
+    midA: string[],
+    midB: string[],
+    midHA: Uint32Array,
+    midHB: Uint32Array,
+    midN: number,
+    midM: number,
+    startX: number,
+    startY: number,
+): number {
+    let x = startX;
+    let y = startY;
+    while (x < midN && y < midM && midHA[x] === midHB[y] && midA[x] === midB[y]) {
+        x++;
+        y++;
+    }
+    return x;
+}
+
+/**
  * Execute forward diagonal trace for Myers greedy search with inlined diagonal snake advancement.
- * Allocates dynamic row slices per iteration to scale memory with O(D^2) instead of O(max^2).
+ * Employs a single contiguous flatTrace Int32Array buffer, eliminating transient row slice allocations.
  */
 function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
     const { midA, midB, midHA, midHB, midN, midM } = ctx;
     const offset = max;
     const rowSize = 2 * max + 1;
     const v = new Int32Array(rowSize);
-    const trace: Int32Array[] = [];
+    let flatTrace = new Int32Array(Math.min(1024, (max + 1) * (max + 1)));
     let d = 0;
 
     for (d = 0; d <= max; d++) {
-        trace.push(v.slice(offset - d, offset + d + 1));
+        const requiredCapacity = (d + 1) * (d + 1);
+        if (requiredCapacity > flatTrace.length) {
+            const nextCapacity = Math.max(requiredCapacity, flatTrace.length * 2);
+            const nextTrace = new Int32Array(nextCapacity);
+            nextTrace.set(flatTrace);
+            flatTrace = nextTrace;
+        }
+
+        const base = d * d + d;
+        for (let k = -d; k <= d; k++) {
+            flatTrace[base + k] = v[offset + k];
+        }
+
         let reached = false;
         for (let k = -d; k <= d; k += 2) {
             const initialX =
                 k === -d || (k !== d && v[k - 1 + offset] < v[k + 1 + offset])
                     ? v[k + 1 + offset]
                     : v[k - 1 + offset] + 1;
-            let x = initialX;
-            let y = x - k;
-            while (x < midN && y < midM && midHA[x] === midHB[y] && midA[x] === midB[y]) {
-                x++;
-                y++;
-            }
+            const x = advanceSnake(midA, midB, midHA, midHB, midN, midM, initialX, initialX - k);
+            const y = x - k;
             v[k + offset] = x;
             if (x >= midN && y >= midM) {
                 reached = true;
@@ -200,7 +230,7 @@ function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
             break;
         }
     }
-    return { trace, d };
+    return { flatTrace, d };
 }
 
 /**
@@ -213,7 +243,7 @@ function backtrackMyersTrace(
     midM: number,
     prefix: number,
 ): DiffOp[] {
-    const { trace, d } = search;
+    const { flatTrace, d } = search;
     const midOps: DiffOp[] = [];
     let x = midN;
     let y = midM;
@@ -228,11 +258,11 @@ function backtrackMyersTrace(
             break;
         }
 
-        const row = trace[di];
+        const base = di * di + di;
         const k = x - y;
-        const insertMove = k === -di || (k !== di && row[k - 1 + di] < row[k + 1 + di]);
+        const insertMove = k === -di || (k !== di && flatTrace[base + k - 1] < flatTrace[base + k + 1]);
         const prevK = insertMove ? k + 1 : k - 1;
-        const prevX = row[prevK + di];
+        const prevX = flatTrace[base + prevK];
         const prevY = prevX - prevK;
 
         while (x > prevX && y > prevY) {

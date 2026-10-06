@@ -67,7 +67,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     parse(content: string, filePath: string, seed?: ProjectionSeed): NormalizedAst {
         const sf = createSourceFile(filePath, content);
         const root = this.mapNode(sf, undefined, undefined, sf, seed);
-        return { root };
+        return { root, sourceFile: sf };
     }
 
     /**

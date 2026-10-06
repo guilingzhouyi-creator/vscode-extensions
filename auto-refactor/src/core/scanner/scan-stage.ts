@@ -20,6 +20,10 @@ import { AR_TIMING, effectiveWorkers, nowMs, runWorkerPool } from './worker-sche
 export interface PerFileResult {
     issues: Issue[];
     metric: FileMetric | null;
+    symbols?: {
+        definitions: import('../intelligence/symbolIndex').SymbolDefinition[];
+        references: import('../intelligence/symbolIndex').SymbolReference[];
+    };
 }
 
 /** Scanner surface the stage selector drives (structurally satisfied by Scanner). */
@@ -31,6 +35,10 @@ export interface ScanStageHost {
     runAnalyzers(rel: string, content: string): Promise<PerFileResult>;
     /** Main-thread scheduler used when no worker pool runs. */
     runInProcess(files: string[], absRoot: string): Promise<PerFileResult[]>;
+    recordWorkerSymbols?(
+        definitions: import('../intelligence/symbolIndex').SymbolDefinition[],
+        references: import('../intelligence/symbolIndex').SymbolReference[],
+    ): void;
 }
 
 /** Stage timestamps captured for the optional AR_TIMING table. */
@@ -95,6 +103,13 @@ export async function runParseAnalyzeStage(
             host.logger,
             host.runAnalyzers.bind(host),
         );
+        if (host.recordWorkerSymbols) {
+            for (const r of perFile) {
+                if (r.symbols) {
+                    host.recordWorkerSymbols(r.symbols.definitions, r.symbols.references);
+                }
+            }
+        }
         host.logger.debug(
             `parse+analyze stage ran across ${effWorkers} worker thread(s) (in-process fallback available)`,
         );

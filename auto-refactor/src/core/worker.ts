@@ -55,6 +55,7 @@ import type {
     NormalizedNode,
 } from './ast/multilang';
 import { encodeResults, BINARY_RESULT_ENABLED } from './result-codec';
+import { collectSymbols, type SymbolDefinition, type SymbolReference } from './intelligence/symbolIndex';
 
 type LineStats = ReturnType<typeof countLineStats>;
 
@@ -505,13 +506,20 @@ function recordWorkerPerf(
     perf.legacy += tLegacy;
 }
 
+interface WorkerResultItem {
+    file: string;
+    issues: Issue[];
+    metric: FileMetric | null;
+    symbols?: { definitions: SymbolDefinition[]; references: SymbolReference[] };
+}
+
 function runOne(
     file: string,
     absPath: string | undefined,
     content: string | undefined,
     cfg: ScanConfig,
     instances: LoadedAnalyzer[],
-): { file: string; issues: Issue[]; metric: FileMetric | null } {
+): WorkerResultItem {
     const c = loadFileContent(absPath, content);
     if (c === null) {
         return { file, issues: [] as Issue[], metric: null as FileMetric | null };
@@ -535,7 +543,7 @@ function runOne(
     if (languageIssue) issues.push(languageIssue);
 
     const tSf0 = AR_TIMING ? nowMs() : 0;
-    const sf = createLegacySourceFile(legacy.length, adapter.id, file, c);
+    const sf = ast?.sourceFile ?? createLegacySourceFile(legacy.length, adapter.id, file, c);
     const tSf = AR_TIMING ? nowMs() - tSf0 : 0;
 
     const tLine0 = AR_TIMING ? nowMs() : 0;
@@ -589,7 +597,13 @@ function runOne(
     recordWorkerPerf(tLine, tFilter, tSf, streaming.length, tStream, tLegacy);
 
     const metric = streamResult.metricCollector.metric;
-    return { file, issues, metric };
+    let symbols: { definitions: SymbolDefinition[]; references: SymbolReference[] } | undefined;
+    try {
+        symbols = proj === null ? collectSymbols(ast?.root || rootForCtx, file) : undefined;
+    } catch {
+        /* best-effort symbol collection */
+    }
+    return { file, issues, metric, symbols };
 }
 
 interface WorkerTaskMessage {
@@ -641,11 +655,12 @@ function recordBatchTiming(tMsg: number, tDecode0: number, tDecode1: number, tRu
 
 function postWorkerResults(
     port: import('worker_threads').MessagePort,
-    results: { file: string; issues: Issue[]; metric: FileMetric | null }[],
+    results: WorkerResultItem[],
 ): void {
     if (BINARY_RESULT_ENABLED) {
         const buf = encodeResults(results);
-        port.postMessage({ results: buf }, [buf.buffer as ArrayBuffer]);
+        const symbolsMap = results.map((r) => ({ file: r.file, symbols: r.symbols }));
+        port.postMessage({ results: buf, symbolsMap }, [buf.buffer as ArrayBuffer]);
     } else {
         port.postMessage({ results });
     }

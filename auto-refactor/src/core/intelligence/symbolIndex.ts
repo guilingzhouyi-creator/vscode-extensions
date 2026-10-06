@@ -186,6 +186,7 @@ export class SymbolIndex {
     private readonly seenDefinitions = new Set<string>();
 
     private readonly seenReferences = new Set<string>();
+    private readonly sortedReferences = new Map<string, SymbolReference[]>();
     private builtFrom: 'materialized' | 'projection' = 'materialized';
 
     /**
@@ -215,6 +216,7 @@ export class SymbolIndex {
             const key = `${reference.name}|${reference.file}|${reference.line ?? ''}|${reference.column ?? ''}|${reference.caller ?? ''}`;
             if (this.seenReferences.has(key)) continue;
             this.seenReferences.add(key);
+            this.sortedReferences.delete(reference.name);
             const list = this.references.get(reference.name);
             if (list) list.push(reference);
             else this.references.set(reference.name, [reference]);
@@ -274,9 +276,14 @@ export class SymbolIndex {
      */
     crossFileReferencesTo(name: string, definitionFile: string): SymbolReference[] {
         const home = definitionFile.replace(/\\/g, '/');
-        return (this.references.get(name) ?? [])
-            .filter((reference) => reference.file !== home)
-            .sort((a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0));
+        let sorted = this.sortedReferences.get(name);
+        if (!sorted) {
+            const raw = this.references.get(name);
+            if (!raw || raw.length === 0) return [];
+            sorted = [...raw].sort((a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0));
+            this.sortedReferences.set(name, sorted);
+        }
+        return sorted.filter((reference) => reference.file !== home);
     }
 
     /**

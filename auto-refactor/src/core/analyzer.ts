@@ -216,6 +216,17 @@ export class Scanner implements ScannerContext {
         return this.symbolIndex;
     }
 
+    /**
+     * Record symbol definitions and references collected across worker thread isolates.
+     */
+    recordWorkerSymbols(
+        definitions: import('./intelligence/symbolIndex').SymbolDefinition[],
+        references: import('./intelligence/symbolIndex').SymbolReference[],
+    ): void {
+        this.symbolIndex.addDefinitions(definitions);
+        this.symbolIndex.addReferences(references);
+    }
+
     getReviewMemory(): ReviewMemoryManager {
         return this.reviewMemory;
     }

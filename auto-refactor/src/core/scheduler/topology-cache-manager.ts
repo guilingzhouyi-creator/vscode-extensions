@@ -42,6 +42,7 @@ export interface TopologyCacheMetrics {
  */
 export class TopologyCacheManager<T = unknown> {
     private readonly l1Capacity: number;
+    private readonly l2Capacity: number;
     private readonly l1Store = new Map<string, TopologyCacheEntry<T>>();
     private readonly l2Store = new Map<string, TopologyCacheEntry<T>>();
 
@@ -56,8 +57,9 @@ export class TopologyCacheManager<T = unknown> {
     private misses = 0;
     private invalidations = 0;
 
-    public constructor(l1Capacity = 1000) {
+    public constructor(l1Capacity = 1000, l2Capacity = 4000) {
         this.l1Capacity = Math.max(50, l1Capacity);
+        this.l2Capacity = Math.max(this.l1Capacity, l2Capacity);
     }
 
     /**
@@ -101,6 +103,9 @@ export class TopologyCacheManager<T = unknown> {
         if (l1Entry && l1Entry.contentHash === contentHash) {
             l1Entry.hits++;
             this.hits++;
+            // Refresh LRU order in L1
+            this.l1Store.delete(normKey);
+            this.l1Store.set(normKey, l1Entry);
             return l1Entry.data;
         }
 
@@ -109,6 +114,9 @@ export class TopologyCacheManager<T = unknown> {
         if (l2Entry && l2Entry.contentHash === contentHash) {
             l2Entry.hits++;
             this.hits++;
+            // Refresh LRU order in L2
+            this.l2Store.delete(normKey);
+            this.l2Store.set(normKey, l2Entry);
             // Promote to L1
             this.putL1(normKey, l2Entry);
             return l2Entry.data;
@@ -138,7 +146,7 @@ export class TopologyCacheManager<T = unknown> {
         };
 
         this.putL1(normKey, entry);
-        this.l2Store.set(normKey, entry);
+        this.putL2(normKey, entry);
     }
 
     /**
@@ -156,20 +164,7 @@ export class TopologyCacheManager<T = unknown> {
         affected.add(root);
 
         if (signatureChanged) {
-            // Compute transitive reverse-dependency closure via BFS
-            const queue = [root];
-            while (queue.length > 0) {
-                const current = queue.shift()!;
-                const dependents = this.dependedBy.get(current);
-                if (dependents) {
-                    for (const dep of dependents) {
-                        if (!affected.has(dep)) {
-                            affected.add(dep);
-                            queue.push(dep);
-                        }
-                    }
-                }
-            }
+            this.collectTransitiveDependents(root, affected);
         }
 
         for (const file of affected) {
@@ -218,27 +213,51 @@ export class TopologyCacheManager<T = unknown> {
     }
 
     /**
-     * Inserts an entry into L1 with LRU eviction when capacity is reached.
+     * Inserts an entry into L1 with O(1) LRU eviction when capacity is reached.
      */
     private putL1(key: string, entry: TopologyCacheEntry<T>): void {
-        if (this.l1Store.size >= this.l1Capacity) {
-            // Evict least frequently used entry
-            let minHits = Number.MAX_SAFE_INTEGER;
-            let evictionKey: string | undefined;
-
-            for (const [k, v] of this.l1Store.entries()) {
-                if (v.hits < minHits) {
-                    minHits = v.hits;
-                    evictionKey = k;
-                }
-            }
-
-            if (evictionKey) {
-                this.l1Store.delete(evictionKey);
+        if (this.l1Store.has(key)) {
+            this.l1Store.delete(key);
+        } else if (this.l1Store.size >= this.l1Capacity) {
+            const oldestKey = this.l1Store.keys().next().value;
+            if (oldestKey !== undefined) {
+                this.l1Store.delete(oldestKey);
             }
         }
-
         this.l1Store.set(key, entry);
+    }
+
+    /**
+     * Inserts an entry into L2 with O(1) LRU eviction when capacity is reached.
+     */
+    private putL2(key: string, entry: TopologyCacheEntry<T>): void {
+        if (this.l2Store.has(key)) {
+            this.l2Store.delete(key);
+        } else if (this.l2Store.size >= this.l2Capacity) {
+            const oldestKey = this.l2Store.keys().next().value;
+            if (oldestKey !== undefined) {
+                this.l2Store.delete(oldestKey);
+            }
+        }
+        this.l2Store.set(key, entry);
+    }
+
+    /**
+     * Compute transitive reverse-dependency closure via BFS with flattened control flow.
+     */
+    private collectTransitiveDependents(root: string, affected: Set<string>): void {
+        const queue = [root];
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            const dependents = this.dependedBy.get(current);
+            if (!dependents) continue;
+            for (const dep of dependents) {
+                if (!affected.has(dep)) {
+                    affected.add(dep);
+                    queue.push(dep);
+                }
+            }
+        }
     }
 
     /**

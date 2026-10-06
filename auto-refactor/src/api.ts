@@ -849,6 +849,10 @@ export { toAgentReview, toCapp, toPraxisPresentation } from './core/reporters';
 // ---- Praxis Diff Governance Subsystem Facade & SPI ----
 export * from './core/praxis';
 
+// ---- Unified AST Visitor Dispatcher & Traversal Core ----
+export { UnifiedAstVisitor } from './core/ast/unified-ast-visitor';
+export type { AstNodeListener } from './core/ast/unified-ast-visitor';
+
 // ---- Semantic Architecture Graph & Meta-Architecture Rules ----
 export * from './core/architecture';
 
@@ -883,14 +887,3 @@ export * from './core/evolution';
 // ---- Coverage Telemetry Ingestion & Dynamic Feedback ----
 export * from './core/telemetry';
 
-// ---- Praxis Unified Review Client SDK Facade & Contracts ----
-export { PraxisReviewClient, createPraxisClient, defaultPraxisReviewClient } from './core/praxis';
-export type {
-    IPraxisReviewClient,
-    PraxisClientConfig,
-    PraxisWorkspaceReviewOptions,
-    PraxisWorkspaceReviewVerdict,
-    PraxisFileReviewOptions,
-    PraxisFileReviewVerdict,
-    PraxisMergeGateVerdict,
-} from './core/praxis';

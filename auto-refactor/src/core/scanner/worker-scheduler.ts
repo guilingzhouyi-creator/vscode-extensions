@@ -26,8 +26,11 @@ const EVENT_ERROR = 'error';
 /** Scale factor turning a 0-1 elapsed-time ratio into a whole percentage (AR-TIMING). */
 const TIMING_PERCENT_SCALE = 100;
 
-/** Maximum worker count auto mode (`workers <= 0`) starts, capped by available cores. */
-export const AUTO_WORKER_MAX = 8;
+/** Maximum worker count auto mode (`workers <= 0`) starts, dynamically scaling with available cores. */
+export const AUTO_WORKER_MAX = Math.min(
+    16,
+    Math.max(8, (os.availableParallelism ? os.availableParallelism() : os.cpus().length || 8) - 1),
+);
 
 /**
  * Files one worker must receive before auto mode adds another thread. A thread only pays for
@@ -328,7 +331,7 @@ function updateArrivalTelemetry(
  */
 export async function dispatchBatches(
     opts: DispatchOpts,
-): Promise<{ issues: Issue[]; metric: FileMetric | null }[]> {
+): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: any }[]> {
     const { files, absRoot, config, descs, numWorkers, runAnalyzersFn, hybridK, keepAlive, fp } =
         opts;
     if (files.length === 0) return [];
@@ -336,7 +339,7 @@ export async function dispatchBatches(
     const n = Math.max(1, Math.min(numWorkers, files.length));
     const idxByFile = new Map<string, number>();
     files.forEach((f, i) => idxByFile.set(f, i));
-    const results: ({ issues: Issue[]; metric: FileMetric | null } | null)[] = new Array(
+    const results: ({ issues: Issue[]; metric: FileMetric | null; symbols?: any } | null)[] = new Array(
         files.length,
     );
 
@@ -511,7 +514,7 @@ export async function dispatchBatches(
                         } catch {
                             /* ignore */
                         }
-                resolve(results as { issues: Issue[]; metric: FileMetric | null }[]);
+                resolve(results as { issues: Issue[]; metric: FileMetric | null; symbols?: any }[]);
                 return true;
             }
             if (!T.flushing) {
@@ -525,7 +528,7 @@ export async function dispatchBatches(
                             } catch {
                                 /* ignore */
                             }
-                    resolve(results as { issues: Issue[]; metric: FileMetric | null }[]);
+                    resolve(results as { issues: Issue[]; metric: FileMetric | null; symbols?: any }[]);
                 });
             }
             return true;
@@ -572,10 +575,12 @@ export async function dispatchBatches(
             finishIfDone();
         };
 
-        /** Claim + pre-read one batch of files (index order preserved). */
+        /** Claim + pre-read one batch of files (index order preserved, guided self-scheduling). */
         const readNextBatch = async (): Promise<ReadyBatch> => {
             const readBatchStartTimeMs = T ? nowMs() : 0;
-            const batchSize = Math.max(1, Math.min(WORKER_BATCH_SIZE, Math.ceil(files.length / n)));
+            const remaining = files.length - nextIdx;
+            const guidedSize = Math.ceil(remaining / (2 * n));
+            const batchSize = Math.max(1, Math.min(WORKER_BATCH_SIZE, guidedSize));
             const batch: { idx: number; rel: string }[] = [];
             while (batch.length < batchSize && nextIdx < files.length) {
                 const i = nextIdx++;
@@ -677,17 +682,20 @@ export async function dispatchBatches(
                 });
             }
             const onMessage = (res: {
-                results: { file: string; issues: Issue[]; metric: FileMetric | null }[];
+                results: { file: string; issues: Issue[]; metric: FileMetric | null; symbols?: any }[];
+                symbolsMap?: { file: string; symbols?: any }[];
             }) => {
                 const workerArrivalTimestampMs = T ? nowMs() : 0;
                 const wk = workerIdx.get(w) ?? 0;
                 updateArrivalTelemetry(T, wk, workerArrivalTimestampMs);
 
                 const resArr = normalizeWorkerResults(res.results);
-                for (const r of resArr) {
+                for (let k = 0; k < resArr.length; k++) {
+                    const r = resArr[k];
                     const i = idxByFile.get(r.file);
                     if (i !== undefined) {
-                        results[i] = { issues: r.issues || [], metric: r.metric || null };
+                        const sym = (r as any).symbols ?? res.symbolsMap?.[k]?.symbols;
+                        results[i] = { issues: r.issues || [], metric: r.metric || null, symbols: sym };
                     }
                 }
                 completed += resArr.length;
@@ -751,7 +759,7 @@ export async function runWorkerPool(
         content: string,
     ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>,
     preloaded?: Map<string, Buffer>,
-): Promise<{ issues: Issue[]; metric: FileMetric | null }[]> {
+): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: any }[]> {
     if (files.length === 0) return [];
     const n = Math.max(1, Math.min(numWorkers, files.length));
     const hybridK = computeHybridK(config, files.length, n);

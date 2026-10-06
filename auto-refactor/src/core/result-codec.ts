@@ -36,6 +36,8 @@
  *       varint startLine, startCol, endLine, endCol
  *       <detail value>   (tagged JSON value, insertion-order-preserving)
  *       u8 hasSuggestion; if 1: varint suggLen, sugg
+ *       u8 hasActionable; if 1: <actionable value>
+ *     u8 hasSymbols; if 1: <symbols value>
  */
 import type { Issue, FileMetric } from './types';
 
@@ -58,7 +60,12 @@ const T_STRING = 0x05;
 const T_ARRAY = 0x06;
 const T_OBJECT = 0x07;
 
-type FileResult = { file: string; issues: Issue[]; metric: FileMetric | null };
+type FileResult = {
+    file: string;
+    issues: Issue[];
+    metric: FileMetric | null;
+    symbols?: any;
+};
 
 // ── Binary protocol constants (little-endian PR50 transport) ──
 /** Growable chunk size: 2^16 bytes = 64 KiB. */
@@ -361,6 +368,12 @@ export function encodeResults(results: FileResult[]): Buffer {
                 w.u8(0);
             }
         }
+        if (r.symbols) {
+            w.u8(1);
+            w.value(r.symbols);
+        } else {
+            w.u8(0);
+        }
     }
     return w.result();
 }
@@ -425,7 +438,14 @@ function decodeSingleFileResult(r: Reader): FileResult {
     const file = r.str();
     const metric = decodeMetric(r, file);
     const issues = decodeFileIssues(r);
-    return { file, issues, metric };
+    const hasSym = r.u8();
+    const symbols = hasSym ? (r.value() as any) : undefined;
+    return {
+        file,
+        issues,
+        metric,
+        ...(symbols !== undefined ? { symbols } : {}),
+    };
 }
 
 /**
