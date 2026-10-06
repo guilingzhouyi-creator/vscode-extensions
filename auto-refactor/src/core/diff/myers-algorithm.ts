@@ -148,10 +148,8 @@ export function trimPrefixSuffix(
  * Internal search result from Myers diagonal trace.
  */
 interface MyersSearchResult {
-    trace: Int32Array;
+    trace: Int32Array[];
     d: number;
-    rowSize: number;
-    offset: number;
 }
 
 /**
@@ -168,17 +166,18 @@ interface MyersContext {
 
 /**
  * Execute forward diagonal trace for Myers greedy search with inlined diagonal snake advancement.
+ * Allocates dynamic row slices per iteration to scale memory with O(D^2) instead of O(max^2).
  */
 function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
     const { midA, midB, midHA, midHB, midN, midM } = ctx;
     const offset = max;
     const rowSize = 2 * max + 1;
     const v = new Int32Array(rowSize);
-    const trace = new Int32Array((max + 1) * rowSize);
+    const trace: Int32Array[] = [];
     let d = 0;
 
     for (d = 0; d <= max; d++) {
-        trace.set(v, d * rowSize);
+        trace.push(v.slice(offset - d, offset + d + 1));
         let reached = false;
         for (let k = -d; k <= d; k += 2) {
             const initialX =
@@ -201,32 +200,12 @@ function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
             break;
         }
     }
-    return { trace, d, rowSize, offset };
-}
-
-/**
- * Push equal ops while backtracking along common diagonal.
- */
-function collectEqualOps(
-    midOps: DiffOp[],
-    prefix: number,
-    startX: number,
-    startY: number,
-    prevX: number,
-    prevY: number,
-): { x: number; y: number } {
-    let x = startX;
-    let y = startY;
-    while (x > prevX && y > prevY) {
-        midOps.push({ type: DIFF_OP_EQUAL, aIdx: prefix + x - 1, bIdx: prefix + y - 1 });
-        x--;
-        y--;
-    }
-    return { x, y };
+    return { trace, d };
 }
 
 /**
  * Backtrack trace to reconstruct the optimal edit script for the middle block.
+ * Eliminates transient object allocations by inlining diagonal snake reversal.
  */
 function backtrackMyersTrace(
     search: MyersSearchResult,
@@ -234,26 +213,36 @@ function backtrackMyersTrace(
     midM: number,
     prefix: number,
 ): DiffOp[] {
-    const { trace, d, rowSize, offset } = search;
+    const { trace, d } = search;
     const midOps: DiffOp[] = [];
     let x = midN;
     let y = midM;
 
     for (let di = d; di >= 0; di--) {
-        const rowOffset = di * rowSize;
+        if (di === 0) {
+            while (x > 0 && y > 0) {
+                midOps.push({ type: DIFF_OP_EQUAL, aIdx: prefix + x - 1, bIdx: prefix + y - 1 });
+                x--;
+                y--;
+            }
+            break;
+        }
+
+        const row = trace[di];
         const k = x - y;
         const insertMove =
             k === -di ||
-            (k !== di && trace[rowOffset + k - 1 + offset] < trace[rowOffset + k + 1 + offset]);
+            (k !== di && row[k - 1 + di] < row[k + 1 + di]);
         const prevK = insertMove ? k + 1 : k - 1;
-        const prevX = trace[rowOffset + prevK + offset];
+        const prevX = row[prevK + di];
         const prevY = prevX - prevK;
 
-        const pos = collectEqualOps(midOps, prefix, x, y, prevX, prevY);
-        x = pos.x;
-        y = pos.y;
+        while (x > prevX && y > prevY) {
+            midOps.push({ type: DIFF_OP_EQUAL, aIdx: prefix + x - 1, bIdx: prefix + y - 1 });
+            x--;
+            y--;
+        }
 
-        if (di <= 0) continue;
         if (insertMove) {
             midOps.push({ type: DIFF_OP_INSERT, aIdx: prefix + x, bIdx: prefix + y - 1 });
             y--;
@@ -377,6 +366,24 @@ export function myersDiff(
     const trimmed = trimPrefixSuffix(a, b, effectiveHashA, effectiveHashB);
     const { prefix, suffix, midA, midB, midHA, midHB } = trimmed;
 
+    return myersDiffCore(prefix, suffix, n, m, midA, midB, midHA, midHB);
+}
+
+/**
+ * Core engine for Myers line diff operating on pre-trimmed middle slices.
+ * Directly reuses precomputed hashes and prefixes without duplicate scanning,
+ * and maintains pruning benefits if degrading to histogram diff.
+ */
+export function myersDiffCore(
+    prefix: number,
+    suffix: number,
+    n: number,
+    m: number,
+    midA: string[],
+    midB: string[],
+    midHA: Uint32Array,
+    midHB: Uint32Array,
+): DiffOp[] {
     if (prefix + suffix === n && prefix + suffix === m) {
         const fullOps: DiffOp[] = new Array(n);
         for (let i = 0; i < n; i++) {
@@ -389,9 +396,11 @@ export function myersDiff(
     const midM = midB.length;
     const max = midN + midM;
 
-    // Guard against OOM on large unpruned/disjoint matrices (>1500 lines or >2M cells).
+    // Guard against excessive iterations on large unpruned/disjoint matrices (>1500 lines or >2M cells).
+    // Degradation cleanly preserves trimmed prefix/suffix slices.
     if (max > MYERS_MAX_MID_LINES || (max + 1) * (2 * max + 1) > 2_000_000) {
-        return histogramDiff(a, b, effectiveHashA, effectiveHashB);
+        const midOps = histogramDiff(midA, midB, midHA, midHB);
+        return assembleDiffOps(prefix, suffix, n, m, midOps);
     }
 
     const search = computeMyersTrace({ midA, midB, midHA, midHB, midN, midM }, max);

@@ -19,6 +19,13 @@ import type {
     TaskPriority,
 } from './execution-scheduler';
 
+const MAX_BOOSTED_PRIORITY = 40;
+const PRIORITY_BOOST_STEP = 10;
+const DEFAULT_DRAIN_TIMEOUT_MS = 5000;
+const METRICS_WINDOW_RESET_MS = 5000;
+const DEFAULT_MAX_LATENCY_SAMPLES = 500;
+const MAX_ANALYZER_INSTANCES_PER_BUCKET = 32;
+
 /**
  * Configuration options for the WorkerPoolManager.
  */
@@ -51,6 +58,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
     private readonly defaultTaskTimeoutMs: number;
 
     private readonly queue: QueuedTask<any, any>[] = [];
+    private oldestStarvableEnqueuedAt = 0;
     private activeWorkersCount = 0;
     private isShuttingDown = false;
 
@@ -58,7 +66,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
     private completedCount = 0;
     private failedCount = 0;
     private readonly recordedDurations: number[] = [];
-    private readonly maxLatencySamples = 500;
+    private readonly maxLatencySamples = DEFAULT_MAX_LATENCY_SAMPLES;
     private windowStartTime = Date.now();
     private windowCompletedCount = 0;
 
@@ -141,7 +149,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
             bucket = [];
             this.analyzerInstancePool.set(domain, bucket);
         }
-        if (bucket.length < 32) {
+        if (bucket.length < MAX_ANALYZER_INSTANCES_PER_BUCKET) {
             bucket.push(instance);
         }
     }
@@ -180,7 +188,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
     /**
      * Gracefully shuts down workers and drains queues.
      */
-    public async shutdown(drainTimeoutMs = 5000): Promise<void> {
+    public async shutdown(drainTimeoutMs = DEFAULT_DRAIN_TIMEOUT_MS): Promise<void> {
         this.isShuttingDown = true;
 
         for (const item of this.queue) {
@@ -190,6 +198,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
             item.reject(new Error('Scheduler shutdown requested'));
         }
         this.queue.length = 0;
+        this.oldestStarvableEnqueuedAt = 0;
 
         const start = Date.now();
         while (this.activeWorkersCount > 0 && Date.now() - start < drainTimeoutMs) {
@@ -207,13 +216,20 @@ export class WorkerPoolManager implements IExecutionScheduler {
             return;
         }
 
-        while (this.activeWorkersCount < this.maxConcurrency && this.queue.length > 0) {
-            // Apply priority aging to prevent starvation
-            this.boostStarvedTasks();
+        if (this.activeWorkersCount >= this.maxConcurrency || this.queue.length === 0) {
+            return;
+        }
 
+        // Apply priority aging once per dispatch cycle to prevent starvation
+        this.boostStarvedTasks();
+
+        while (this.activeWorkersCount < this.maxConcurrency && this.queue.length > 0) {
             const next = this.queue.shift();
             if (!next) {
                 break;
+            }
+            if (this.queue.length === 0) {
+                this.oldestStarvableEnqueuedAt = 0;
             }
 
             this.activeWorkersCount++;
@@ -258,6 +274,18 @@ export class WorkerPoolManager implements IExecutionScheduler {
      * Inserts a task item into the priority queue with binary/linear order.
      */
     private insertPrioritized(item: QueuedTask<any, any>): void {
+        const priority = item.task.priority as number;
+        if (priority < MAX_BOOSTED_PRIORITY) {
+            const currentOldest = this.oldestStarvableEnqueuedAt;
+            if (
+                currentOldest === 0 ||
+                currentOldest === Number.MAX_SAFE_INTEGER ||
+                item.enqueuedAt < currentOldest
+            ) {
+                this.oldestStarvableEnqueuedAt = item.enqueuedAt;
+            }
+        }
+
         let inserted = false;
         for (let i = 0; i < this.queue.length; i++) {
             if (item.task.priority > this.queue[i].task.priority) {
@@ -271,28 +299,60 @@ export class WorkerPoolManager implements IExecutionScheduler {
         }
     }
 
+    private static compareTaskPriority(
+        a: QueuedTask<any, any>,
+        b: QueuedTask<any, any>,
+    ): number {
+        return (b.task.priority as number) - (a.task.priority as number);
+    }
+
     /**
      * Promotes older low-priority tasks to prevent starvation under heavy load.
      */
     private boostStarvedTasks(): void {
+        if (this.queue.length === 0) {
+            this.oldestStarvableEnqueuedAt = 0;
+            return;
+        }
+
         const now = Date.now();
+        if (
+            this.oldestStarvableEnqueuedAt > 0 &&
+            now - this.oldestStarvableEnqueuedAt < this.starvationAgeMs
+        ) {
+            return;
+        }
+
+        let anyBoosted = false;
+        let minStarvableEnqueued = Number.MAX_SAFE_INTEGER;
+
         for (let i = 0; i < this.queue.length; i++) {
             const item = this.queue[i];
-            if (now - item.enqueuedAt >= this.starvationAgeMs) {
-                // Remove and re-insert with boosted priority
-                this.queue.splice(i, 1);
-                const currentPriority = item.task.priority as number;
-                const boostedPriority = Math.min(40, currentPriority + 10) as TaskPriority;
+            let priority = item.task.priority as number;
+            if (priority < MAX_BOOSTED_PRIORITY && now - item.enqueuedAt >= this.starvationAgeMs) {
+                priority = Math.min(
+                    MAX_BOOSTED_PRIORITY,
+                    priority + PRIORITY_BOOST_STEP,
+                ) as TaskPriority;
                 const boostedTask: ExecutionTask<any, any> = {
                     ...item.task,
-                    priority: boostedPriority,
+                    priority: priority as TaskPriority,
                 };
-                const boostedItem: QueuedTask<any, any> = {
+                this.queue[i] = {
                     ...item,
                     task: boostedTask,
                 };
-                this.insertPrioritized(boostedItem);
+                anyBoosted = true;
             }
+            if (priority < MAX_BOOSTED_PRIORITY && this.queue[i].enqueuedAt < minStarvableEnqueued) {
+                minStarvableEnqueued = this.queue[i].enqueuedAt;
+            }
+        }
+
+        this.oldestStarvableEnqueuedAt = minStarvableEnqueued;
+
+        if (anyBoosted) {
+            this.queue.sort(WorkerPoolManager.compareTaskPriority);
         }
     }
 
@@ -305,6 +365,9 @@ export class WorkerPoolManager implements IExecutionScheduler {
             const removed = this.queue.splice(index, 1)[0];
             if (removed.timer) {
                 clearTimeout(removed.timer);
+            }
+            if (this.queue.length === 0) {
+                this.oldestStarvableEnqueuedAt = 0;
             }
         }
     }
@@ -321,7 +384,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
         this.recordedDurations.push(durationElapsed);
 
         // Reset rolling throughput window every 5 seconds
-        if (Date.now() - this.windowStartTime > 5000) {
+        if (Date.now() - this.windowStartTime > METRICS_WINDOW_RESET_MS) {
             this.windowStartTime = Date.now();
             this.windowCompletedCount = 0;
         }

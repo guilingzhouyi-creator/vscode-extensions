@@ -377,10 +377,31 @@ export async function dispatchBatches(
         let nextIdx = 0;
         let completed = 0;
         let failed = false;
+        let cleanedUp = false;
+
+        interface WorkerListenerBinding {
+            worker: Worker;
+            onMessage: (res: {
+                results: { file: string; issues: Issue[]; metric: FileMetric | null }[];
+            }) => void;
+            onError: (err: unknown) => void;
+        }
+        const listenerBindings: WorkerListenerBinding[] = [];
+
+        const cleanupListeners = (): void => {
+            if (cleanedUp) return;
+            cleanedUp = true;
+            for (const binding of listenerBindings) {
+                binding.worker.off('message', binding.onMessage);
+                binding.worker.off(EVENT_ERROR, binding.onError);
+            }
+            listenerBindings.length = 0;
+        };
 
         const fail = (e: unknown) => {
             if (failed) return;
             failed = true;
+            cleanupListeners();
             for (const w of workers)
                 try {
                     w.terminate();
@@ -481,6 +502,7 @@ export async function dispatchBatches(
 
         const finishIfDone = (): boolean => {
             if (completed < files.length) return false;
+            cleanupListeners();
             if (!T) {
                 if (!keepAlive)
                     for (const x of workers)
@@ -649,32 +671,36 @@ export async function dispatchBatches(
 
         const wire = (w: Worker, k: number, workerSpawnStartTimeMs: number) => {
             workerIdx.set(w, k);
-            w.on('online', () => {
-                if (T) T.spawnMs[k] = nowMs() - workerSpawnStartTimeMs;
-            });
-            w.on(
-                'message',
-                (res: {
-                    results: { file: string; issues: Issue[]; metric: FileMetric | null }[];
-                }) => {
-                    const workerArrivalTimestampMs = T ? nowMs() : 0;
-                    const wk = workerIdx.get(w) ?? 0;
-                    updateArrivalTelemetry(T, wk, workerArrivalTimestampMs);
+            if (!opts.workers) {
+                w.once('online', () => {
+                    if (T) T.spawnMs[k] = nowMs() - workerSpawnStartTimeMs;
+                });
+            }
+            const onMessage = (res: {
+                results: { file: string; issues: Issue[]; metric: FileMetric | null }[];
+            }) => {
+                const workerArrivalTimestampMs = T ? nowMs() : 0;
+                const wk = workerIdx.get(w) ?? 0;
+                updateArrivalTelemetry(T, wk, workerArrivalTimestampMs);
 
-                    const resArr = normalizeWorkerResults(res.results);
-                    for (const r of resArr) {
-                        const i = idxByFile.get(r.file);
-                        if (i !== undefined) {
-                            results[i] = { issues: r.issues || [], metric: r.metric || null };
-                        }
+                const resArr = normalizeWorkerResults(res.results);
+                for (const r of resArr) {
+                    const i = idxByFile.get(r.file);
+                    if (i !== undefined) {
+                        results[i] = { issues: r.issues || [], metric: r.metric || null };
                     }
-                    completed += resArr.length;
-                    if (T) T.mergeTotal += nowMs() - workerArrivalTimestampMs;
-                    if (finishIfDone()) return;
-                    void dispatch(w);
-                },
-            );
-            w.on(EVENT_ERROR, fail);
+                }
+                completed += resArr.length;
+                if (T) T.mergeTotal += nowMs() - workerArrivalTimestampMs;
+                if (finishIfDone()) return;
+                void dispatch(w);
+            };
+            const onError = (err: unknown) => {
+                fail(err);
+            };
+            w.on('message', onMessage);
+            w.on(EVENT_ERROR, onError);
+            listenerBindings.push({ worker: w, onMessage, onError });
             void dispatch(w);
         };
 

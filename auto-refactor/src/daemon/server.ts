@@ -53,10 +53,13 @@ const MESSAGE_TYPE_ERROR = 'error';
 
 const IDLE_TIMEOUT_MS = IDLE_TIMEOUT_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
-interface PendingScan {
+export interface PendingScan {
     requestId: string;
     id: number;
-    socket: net.Socket;
+    kind: 'scan' | 'scan_diff';
+    socket?: net.Socket;
+    startedAt: number;
+    abortController: AbortController;
 }
 
 interface TransportIo {
@@ -94,6 +97,11 @@ export class DaemonServer {
         this.stdioMode = opts.stdio === true;
         this.ctx = createDaemonContext();
         this.logger = new Logger('info', this.stdioMode ? undefined : this.logFile);
+    }
+
+    /** Returns the map of currently pending scan requests. */
+    public getPendingScans(): ReadonlyMap<string, PendingScan> {
+        return this.pending;
     }
 
     /** Start listening (net or stdio) + register. Resolves once bound. */
@@ -213,15 +221,34 @@ export class DaemonServer {
                     write,
                     close: () => socket.destroy(),
                     id: () => this.nextId++,
-                });
+                }, socket);
             }
         });
-        socket.on('close', () => this.touchIdle());
-        socket.on(ERROR_EVENT, () => this.touchIdle());
+        socket.on('close', () => {
+            this.abortSocketPending(socket);
+            this.touchIdle();
+        });
+        socket.on(ERROR_EVENT, () => {
+            this.abortSocketPending(socket);
+            this.touchIdle();
+        });
+    }
+
+    private abortSocketPending(socket: net.Socket): void {
+        for (const [requestId, scan] of this.pending.entries()) {
+            if (scan.socket === socket) {
+                try {
+                    scan.abortController.abort();
+                } catch {
+                    /* ignore */
+                }
+                this.pending.delete(requestId);
+            }
+        }
     }
 
     /** Dispatch one decoded NDJSON message (shared by net + stdio transports). */
-    private handleMessage(msg: DaemonMessage, io: TransportIo): void {
+    private handleMessage(msg: DaemonMessage, io: TransportIo, socket?: net.Socket): void {
         switch (msg.type) {
             case 'hello': {
                 const ack: HelloAckMessage = {
@@ -253,6 +280,7 @@ export class DaemonServer {
                     msg.id,
                     msg.params.requestId,
                     io,
+                    socket,
                 ).catch((err: unknown) => {
                     this.logger.error(
                         `unhandled error during scan ${msg.params.requestId}: ${String(err)}`,
@@ -268,6 +296,7 @@ export class DaemonServer {
                     msg.id,
                     msg.params.requestId,
                     io,
+                    socket,
                 ).catch((err: unknown) => {
                     this.logger.error(
                         `unhandled error during scan_diff ${msg.params.requestId}: ${String(err)}`,
@@ -301,8 +330,19 @@ export class DaemonServer {
         id: number,
         requestId: string,
         io: { write: (m: DaemonMessage) => void },
+        socket?: net.Socket,
     ): Promise<void> {
         const config = configJson as unknown as ScanConfig;
+        const abortController = new AbortController();
+        this.pending.set(requestId, {
+            requestId,
+            id,
+            kind: 'scan',
+            socket,
+            startedAt: Date.now(),
+            abortController,
+        });
+
         try {
             const { report, stats } = await handleScan(this.ctx, config, options);
             io.write({
@@ -313,7 +353,6 @@ export class DaemonServer {
                 report: report as unknown as Record<string, unknown>,
                 stats: stats as unknown as Record<string, unknown>,
             });
-            this.pending.delete(requestId);
             this.touchIdle();
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
@@ -326,8 +365,9 @@ export class DaemonServer {
                 message,
                 detail: { stack: e instanceof Error ? e.stack : undefined },
             });
-            this.pending.delete(requestId);
             this.touchIdle();
+        } finally {
+            this.pending.delete(requestId);
         }
     }
 
@@ -346,8 +386,19 @@ export class DaemonServer {
         id: number,
         requestId: string,
         io: { write: (m: DaemonMessage) => void },
+        socket?: net.Socket,
     ): Promise<void> {
         const config = configJson as unknown as ScanConfig;
+        const abortController = new AbortController();
+        this.pending.set(requestId, {
+            requestId,
+            id,
+            kind: 'scan_diff',
+            socket,
+            startedAt: Date.now(),
+            abortController,
+        });
+
         try {
             const { report, stats } = await handleScanDiff(this.ctx, config, diffs, options);
             io.write({
@@ -358,7 +409,6 @@ export class DaemonServer {
                 report: report as unknown as Record<string, unknown>,
                 stats: stats as unknown as Record<string, unknown>,
             });
-            this.pending.delete(requestId);
             this.touchIdle();
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
@@ -371,8 +421,9 @@ export class DaemonServer {
                 message,
                 detail: { stack: e instanceof Error ? e.stack : undefined },
             });
-            this.pending.delete(requestId);
             this.touchIdle();
+        } finally {
+            this.pending.delete(requestId);
         }
     }
 
@@ -394,6 +445,14 @@ export class DaemonServer {
         if (this.shuttingDown) return;
         this.shuttingDown = true;
         if (this.idleTimer) clearTimeout(this.idleTimer);
+        for (const scan of this.pending.values()) {
+            try {
+                scan.abortController.abort();
+            } catch {
+                /* ignore */
+            }
+        }
+        this.pending.clear();
         try {
             this.ctx.pools.shutdown();
         } catch {

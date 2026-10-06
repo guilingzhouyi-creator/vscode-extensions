@@ -22,6 +22,7 @@ import {
     DIFF_OP_INSERT,
     MYERS_MAX_MID_LINES,
     myersDiff,
+    myersDiffCore,
     trimPrefixSuffix,
 } from './myers-algorithm';
 import {
@@ -294,37 +295,17 @@ export function fastDiff(
         hashA,
         hashB,
     );
-    const midN = midA.length;
-    const midM = midB.length;
 
-    if (midN === 0 && midM === 0) {
-        const ops: DiffOp[] = new Array(n);
-        for (let i = 0; i < n; i++) ops[i] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
-        return ops;
-    }
-
-    const midOps =
-        midN > MYERS_MAX_MID_LINES || midM > MYERS_MAX_MID_LINES
-            ? histogramDiff(midA, midB, midHA, midHB)
-            : myersDiff(midA, midB, midHA, midHB);
-
-    const total = prefix + midOps.length + suffix;
-    const fullOps: DiffOp[] = new Array(total);
-    let idx = 0;
-    for (let i = 0; i < prefix; i++) fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
-    for (let i = 0; i < midOps.length; i++) {
-        const op = midOps[i];
-        fullOps[idx++] = {
-            type: op.type,
-            aIdx: prefix + op.aIdx,
-            bIdx: prefix + op.bIdx,
-        };
-    }
-    for (let i = 0; i < suffix; i++) {
-        fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i };
-    }
-
-    return fullOps;
+    return myersDiffCore(
+        prefix,
+        suffix,
+        n,
+        m,
+        midA,
+        midB,
+        midHA,
+        midHB,
+    );
 }
 
 function hasInvalidCoordinates(editRange: EditRange): boolean {
