@@ -36,6 +36,54 @@ const RESOURCE_CLEANUP_PATTERNS = [
 ];
 
 /**
+ * Checks if a character code represents an ECMAScript identifier word character [a-zA-Z0-9_].
+ */
+function isWordCharCode(code: number): boolean {
+    return (
+        (code >= 48 && code <= 57) ||
+        (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122) ||
+        code === 95
+    );
+}
+
+/**
+ * Checks if a character code represents a property name start/part character [a-zA-Z0-9_$].
+ */
+function isPropertyCharCode(code: number): boolean {
+    return (
+        (code >= 48 && code <= 57) ||
+        (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122) ||
+        code === 95 ||
+        code === 36
+    );
+}
+
+/**
+ * High-performance, zero-allocation lexical check testing whether rawText contains
+ * an explicit member dereference on the given variable (e.g. `\b${v}\.[a-zA-Z0-9_$]+`).
+ * Eliminates repeated RegExp compilation inside nested block * statement * variable loops.
+ */
+function hasMemberDereference(rawText: string, variable: string): boolean {
+    if (!rawText || !variable) return false;
+    let idx = 0;
+    while ((idx = rawText.indexOf(variable, idx)) !== -1) {
+        if (idx === 0 || !isWordCharCode(rawText.charCodeAt(idx - 1))) {
+            const dotIdx = idx + variable.length;
+            if (dotIdx < rawText.length && rawText.charCodeAt(dotIdx) === 46) {
+                const propIdx = dotIdx + 1;
+                if (propIdx < rawText.length && isPropertyCharCode(rawText.charCodeAt(propIdx))) {
+                    return true;
+                }
+            }
+        }
+        idx += variable.length;
+    }
+    return false;
+}
+
+/**
  * Analyzes variable definition-use chains and control-flow safety invariants.
  */
 export class DefUseAnalyzer {
@@ -78,7 +126,7 @@ export class DefUseAnalyzer {
                     let kind: VariableUse['kind'] = 'read';
                     if (RESOURCE_CLEANUP_PATTERNS.some((p) => p.test(stmt.rawText))) {
                         kind = 'cleanup';
-                    } else if (new RegExp(`\\b${v}\\.[a-zA-Z_$]`).test(stmt.rawText)) {
+                    } else if (hasMemberDereference(stmt.rawText, v)) {
                         kind = 'dereference';
                     }
                     uses.push({
@@ -99,22 +147,15 @@ export class DefUseAnalyzer {
      * unguarded null dereferences, and escaping unclosed resources.
      * Concurrency: Thread-safe, reentrant, zero mutable static state.
      *
-     * @param cfg - Control flow graph to audit.
-     * @returns Consolidated findings.
+    /**
+     * Identifies unhandled floating promise calls within the CFG.
      */
-    static analyze(cfg: ControlFlowGraph): FlowAnalysisResult {
-        const floatingPromises: FloatingPromiseFinding[] = [];
-        const unguardedDereferences: UnguardedNullFinding[] = [];
-        const unclosedResources: UnclosedResourceFinding[] = [];
-
-        const defs = DefUseAnalyzer.extractDefinitions(cfg);
-        const uses = DefUseAnalyzer.extractUses(cfg);
-
-        // 1. Detect floating promise expressions (ASY-FLW-001)
+    private static collectFloatingPromises(cfg: ControlFlowGraph): FloatingPromiseFinding[] {
+        const findings: FloatingPromiseFinding[] = [];
         for (const block of cfg.blocks) {
             for (const stmt of block.statements) {
                 if (stmt.isFloatingPromise) {
-                    floatingPromises.push({
+                    findings.push({
                         line: stmt.line,
                         rawText: stmt.rawText,
                         callName: stmt.calls[0] || 'anonymousAsyncCall',
@@ -122,17 +163,13 @@ export class DefUseAnalyzer {
                 }
             }
         }
+        return findings;
+    }
 
-        // 2. Detect unguarded null dereferences (SAF-NIL-001)
-        //
-        // A guard makes a variable safe only when the guarded branch leaves the function:
-        // `if (!x) return;` sends that branch straight to the exit, so x is proven non-null
-        // on the fall-through path. A non-terminating guard (`if (!x) log(...)`) falls through
-        // to a normal block, so a null still flows through. A variable with no guard at all is
-        // equally unsafe.
-        //
-        // The previous code gated the whole check on a non-empty guard set, so a file with no
-        // guard was never examined and the most direct null dereference produced no finding.
+    /**
+     * Determines which variables are safely guarded by terminating branches.
+     */
+    private static collectProtectedVars(cfg: ControlFlowGraph): Set<string> {
         const protectedVars = new Set<string>();
         for (const block of cfg.blocks) {
             const leavesOnGuard = block.successors.some((succ) => succ.id === cfg.exit.id);
@@ -147,15 +184,24 @@ export class DefUseAnalyzer {
                 }
             }
         }
+        return protectedVars;
+    }
 
+    /**
+     * Scans for dereference sites that occur without terminating null guards.
+     */
+    private static collectUnguardedDereferences(
+        cfg: ControlFlowGraph,
+        protectedVars: ReadonlySet<string>,
+    ): UnguardedNullFinding[] {
+        const findings: UnguardedNullFinding[] = [];
         for (const block of cfg.blocks) {
             for (const stmt of block.statements) {
                 if (stmt.isNullGuard) continue;
                 for (const v of stmt.usedVars) {
                     if (protectedVars.has(v)) continue;
-                    const derefPattern = new RegExp(`\\b${v}\\.[a-zA-Z0-9_$]+`);
-                    if (derefPattern.test(stmt.rawText)) {
-                        unguardedDereferences.push({
+                    if (hasMemberDereference(stmt.rawText, v)) {
+                        findings.push({
                             line: stmt.line,
                             variable: v,
                             rawText: stmt.rawText,
@@ -164,15 +210,25 @@ export class DefUseAnalyzer {
                 }
             }
         }
+        return findings;
+    }
 
-        // 3. Detect unclosed or unregistered resource handles escaping to exit
+    /**
+     * Checks whether resource handles acquire cleanup registration before exiting.
+     */
+    private static collectUnclosedResources(
+        cfg: ControlFlowGraph,
+        defs: readonly VariableDef[],
+        uses: readonly VariableUse[],
+    ): UnclosedResourceFinding[] {
+        const findings: UnclosedResourceFinding[] = [];
         for (const def of defs) {
             if (!def.isResource) continue;
             const hasCleanup = uses.some(
                 (u) => u.variable === def.variable && u.kind === 'cleanup',
             );
             if (!hasCleanup) {
-                unclosedResources.push({
+                findings.push({
                     variable: def.variable,
                     defLine: def.line,
                     exitBlockId: cfg.exit.id,
@@ -180,6 +236,24 @@ export class DefUseAnalyzer {
                 });
             }
         }
+        return findings;
+    }
+
+    /**
+     * Performs complete flow analysis over the graph to find floating promises,
+     * unguarded null dereferences, and escaping unclosed resources.
+     * Concurrency: Thread-safe, reentrant, zero mutable static state.
+     *
+     * @param cfg - Control flow graph to audit.
+     * @returns Consolidated findings.
+     */
+    static analyze(cfg: ControlFlowGraph): FlowAnalysisResult {
+        const defs = DefUseAnalyzer.extractDefinitions(cfg);
+        const uses = DefUseAnalyzer.extractUses(cfg);
+        const floatingPromises = DefUseAnalyzer.collectFloatingPromises(cfg);
+        const protectedVars = DefUseAnalyzer.collectProtectedVars(cfg);
+        const unguardedDereferences = DefUseAnalyzer.collectUnguardedDereferences(cfg, protectedVars);
+        const unclosedResources = DefUseAnalyzer.collectUnclosedResources(cfg, defs, uses);
 
         return {
             floatingPromises,

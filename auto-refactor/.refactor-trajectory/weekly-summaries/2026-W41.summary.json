@@ -1,13 +1,13 @@
 {
   "weekId": "2026-W41",
-  "startMs": 1791179128449,
-  "endMs": 1791218130063,
+  "startMs": 1791183626931,
+  "endMs": 1791256060192,
   "totalRuns": 101,
   "eloc": {
-    "processedTotal": 12031458,
+    "processedTotal": 12037386,
     "uniqueTotal": 96698,
-    "changedTotal": 69860,
-    "semanticTotal": 55888
+    "changedTotal": 62245,
+    "semanticTotal": 49797
   },
   "qed": {
     "mean": 0.0003,
@@ -15,11 +15,11 @@
     "max": 0.03
   },
   "debt": {
-    "totalAdded": 583,
-    "totalResolved": 7056,
+    "totalAdded": 563,
+    "totalResolved": 7051,
     "totalRegressions": 0,
     "netYield": 0.54
   },
   "meanCompositeScore": 99.19,
-  "gatePassRate": 94.06
+  "gatePassRate": 93.07
 }
