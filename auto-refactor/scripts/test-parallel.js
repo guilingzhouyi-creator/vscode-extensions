@@ -57,6 +57,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-python', script: 'scripts/validate-python.js' },
   { name: 'validate-comment-hygiene', script: 'scripts/validate-comment-hygiene.js' },
   { name: 'validate-simplify', script: 'scripts/validate-simplify.js' },
+  { name: 'validate-frontend-exposure', script: 'scripts/validate-frontend-exposure.js' },
   { name: 'validate-python-modern', script: 'scripts/validate-python-modern.js' },
   { name: 'validate-ts-modern', script: 'scripts/validate-ts-modern.js' },
   { name: 'validate-modern-packs', script: 'scripts/validate-modern-packs.js' },

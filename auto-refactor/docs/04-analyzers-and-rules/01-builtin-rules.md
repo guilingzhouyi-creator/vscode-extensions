@@ -364,6 +364,17 @@
 | `TSM-SUBSTR-001` | <a id="tsm-substr-001"></a>`ts-modern` | `TSM` | `warning` | `typescript, javascript` | 使用已弃用的 String.prototype.substr。 | 改用 slice(start, start + length)。 |
 | `TSM-TYPE-001` | <a id="tsm-type-001"></a>`ts-modern` | `TSM` | `warning` | `typescript, javascript` | 具名导入仅用于类型位置。 | 改为 import type { … }，让绑定在编译期被擦除。 |
 | `TSM-VAR-001` | <a id="tsm-var-001"></a>`ts-modern` | `TSM` | `warning` | `typescript, javascript` | 使用 var 声明（函数作用域、存在变量提升）。 | 改用 const；需要重新赋值时用 let。 |
+| `PROD-HYG-001` | <a id="prod-hyg-001"></a>`production-hygiene` | `PROD` | `error` | `all` | 生产构建产物包含调试输出、未决标记或绝对路径。 | 配置打包构建工具移除 console、注释与源码绝对路径。 |
+| `PROD-HYG-002` | <a id="prod-hyg-002"></a>`production-hygiene` | `PROD` | `error` | `all` | 生产环境暴露 Source Map 或 sourceMappingURL 指令。 | 关闭公共 Source Map 或仅上传至内部私有崩溃追踪服务。 |
+| `PROD-HYG-003` | <a id="prod-hyg-003"></a>`production-hygiene` | `PROD` | `error` | `all` | 敏感后端环境变量泄露至客户端代码包。 | 确保密钥留在服务端，前端仅使用公开环境变量前缀。 |
+| `SEC-EXP-001` | <a id="sec-exp-001"></a>`client-exposure` | `SEC` | `error` | `all` | 内部或管理 API 端点暴露在客户端代码中。 | 通过受保护的后端网关反向代理并移除内部暴露路径。 |
+| `SEC-EXP-002` | <a id="sec-exp-002"></a>`client-exposure` | `SEC` | `error` | `all` | 前端以 CSS 隐藏或按钮禁用代替服务端鉴权。 | 在服务端对敏感操作进行基于角色的鉴权校验。 |
+| `SEC-EXP-003` | <a id="sec-exp-003"></a>`client-exposure` | `SEC` | `warning` | `all` | 关闭的 Feature Flag 仍然将完整实现代码打包下发。 | 采用构建期代码擦除或动态代码分割隔离未发布功能。 |
+| `SEC-EXP-004` | <a id="sec-exp-004"></a>`client-exposure` | `SEC` | `error` | `all` | 未发布或测试演练路由静态打包暴露在生产路由中。 | 在构建期通过环境判定过滤排除开发与测试路由。 |
+| `UI-ENG-001` | <a id="ui-eng-001"></a>`frontend` | `UI` | `warning` | `all` | HTML 语义结构不当或交互元素缺失无障碍属性。 | 为图片补全 alt，为表单补全 label，为自定义控件指定 role。 |
+| `UI-ENG-002` | <a id="ui-eng-002"></a>`frontend` | `UI` | `warning` | `all` | DOM 层级深度超过 12 或 CSS 动画使用了重排属性。 | 扁平化 DOM 层次，动效改用 transform 与 opacity 合成属性。 |
+| `UI-ENG-003` | <a id="ui-eng-003"></a>`frontend` | `UI` | `warning` | `all` | 组件 Props 超过 10 个或存在复杂重复 DOM 模板。 | 拆分为单一职责微组件，提升组件复用率。 |
+| `UI-ENG-004` | <a id="ui-eng-004"></a>`frontend` | `UI` | `info` | `all` | 前端 Hook 或事件回调函数命名不符合规范。 | 自定义 Hook 以 use 开头，事件回调以 on 或 handle 开头。 |
 
 ---
 
