@@ -48,10 +48,11 @@ if ($res.ExitCode -ne 0) {
     $statusHygiene = "PASS"
 }
 
-# 2. 单源规则注册表与目录一致性
-if (-not $Json) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录..." -ForegroundColor Gray }
+# 2. 单源规则注册表与目录一致性及技能集规范
+if (-not $Json) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -NoNewWindow -PassThru -Wait
-if ($res.ExitCode -ne 0) {
+$resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -NoNewWindow -PassThru -Wait
+if ($res.ExitCode -ne 0 -or $resSkills.ExitCode -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {

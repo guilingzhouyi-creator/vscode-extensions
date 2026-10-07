@@ -62,9 +62,9 @@ else
     STATUS_HYGIENE="PASS"
 fi
 
-# 2. 单源规则注册表与目录一致性
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [2/5] 聚合与校验全工作区单源规则目录..."; fi
-if ! "$NODE_BIN" scripts/common/generate-rule-catalog.js >/dev/null 2>&1; then
+# 2. 单源规则注册表与目录一致性及技能集规范
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..."; fi
+if ! "$NODE_BIN" scripts/common/generate-rule-catalog.js >/dev/null 2>&1 || ! "$NODE_BIN" scripts/common/validate-skills.js >/dev/null 2>&1; then
     STATUS_RULES="FAIL"
     FAILED=1
 else

@@ -93,7 +93,7 @@ node scripts/common/generate-rule-catalog.js
 
 1. **自动正则捕获**：
    从提交信息正文中精确捕获所有符合工作区规则命名特征的词条：
-   - 家族型规则：`[A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}`（如 `ARCH-FAC-001`、`GATE-AST-001`、`TST-MOD-001`）
+   - 家族型规则：`[A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}`（如 `ARCH-FAC-001`、`GATE-AST-001`、`TST-TAU-001`）
    - 层级型规则：`L[0-5]-[A-Z0-9\-]+`（如 `L0-COMPILE`、`L1-STORAGE-CRASH`、`L3-I18N-COVERAGE`）
    - 元治理规则：`RCFG-[A-Z\-]+`（如 `RCFG-RULE-DRIFT`）
 2. **客观协议白名单过滤**：
