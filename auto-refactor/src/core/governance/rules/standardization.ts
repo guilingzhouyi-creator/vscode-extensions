@@ -1,14 +1,13 @@
 /**
  * Module: Core Engine - Governance Rules - Standardization
  * File Path: src/core/governance/rules/standardization.ts
- * Architecture Role: Rule provider exporting the node-level RedundantBooleanRule (GOV-STD-001)
- *     and the file-level ModernConstructRule (GOV-STD-002); the governance registry wires both
+ * Architecture Role: Rule provider exporting the file-level RedundantBooleanRule (GOV-STD-001)
+ *     and ModernConstructRule (GOV-STD-002); the governance registry wires both
  *     into the shared GovernanceAnalyzer pipeline.
  * Dependencies & Triggers: Imports GovernanceRule, GovernanceViolation and
- *     RuleEvaluationContext from ../types plus NodeKind from ../../multilang; checkNode runs
- *     from GovernanceAnalyzer.visit for ControlFlow, Function and Method nodes, while
- *     checkFile runs from finalize during any governance-enabled CLI, CI or daemon scan.
- * Responsibilities: GOV-STD-001 scans a node's start-to-end line span for single-line TS/JS
+ *     RuleEvaluationContext from ../types; checkFile runs from finalize during
+ *     any governance-enabled CLI, CI or daemon scan.
+ * Responsibilities: GOV-STD-001 scans a file's lines for single-line TS/JS
  *     `if (...) return true; else return false;` and Python/GDScript `if x: return true` plus
  *     `else: return false` pairs, emitting fixable simplifications; GOV-STD-002 flags TS/JS
  *     `var` declarations and GDScript `pass` lines left after a non-colon statement, skipping
@@ -20,7 +19,6 @@
  *     rules are marked fixable.
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
-import { NodeKind } from '../../ast/multilang';
 import { isToolOrTestScript } from '../pathScope';
 import { getRule } from '../../rules/registry';
 
@@ -90,27 +88,15 @@ export const RedundantBooleanRule: GovernanceRule = {
     rationale:
         'Redundant if-then-else returning boolean literals increases cyclomatic complexity and mental overhead.',
     isFixable: true,
-    targetKinds: [NodeKind.ControlFlow, NodeKind.Function, NodeKind.Method],
-    checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes('return true') && !ctx.content.includes('return True')) {
-            return null;
-        }
-        if (
-            ctx.node.kind !== NodeKind.ControlFlow &&
-            ctx.node.kind !== NodeKind.Function &&
-            ctx.node.kind !== NodeKind.Method
-        ) {
             return null;
         }
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
 
-        // Line-level pattern matching for boolean redundancy
-        const startLine = ctx.node.start?.line ?? 1;
-        const endLine = ctx.node.end?.line ?? lines.length;
-
-        for (let i = startLine - 1; i < endLine && i < lines.length; i++) {
+        for (let i = 0; i < lines.length; i++) {
             checkBooleanRedundancyLine(lines[i], i, lines, violations);
         }
 

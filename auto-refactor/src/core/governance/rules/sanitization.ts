@@ -20,7 +20,11 @@
  *     than runtime defects.
  */
 import { isVocabularyEnumeration } from '../markerScope';
-import { CONSTRUCTION_JARGON_RE, auditTerminologyProse } from '../terminology-engine';
+import {
+    CONSTRUCTION_JARGON_RE,
+    DEFAULT_RULES_FAST_CANDIDATE_RE,
+    auditTerminologyProse,
+} from '../terminology-engine';
 import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { CODE_GOV_PROSE_SANITIZATION } from '../../constants/rule-codes';
@@ -286,6 +290,10 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
             isToolOrTestScript(ctx.filePath) ||
             fileNameEndsWith(ctx.filePath, [SANITIZATION_FILENAME, 'terminology-engine.ts'])
         ) {
+            return null;
+        }
+
+        if (!DEFAULT_RULES_FAST_CANDIDATE_RE.test(ctx.content)) {
             return null;
         }
 

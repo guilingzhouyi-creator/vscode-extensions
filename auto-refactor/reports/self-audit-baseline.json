@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791355796238",
-  "timestamp": "2026-10-07T06:50:04.228Z",
+  "snapshotId": "snapshot-v0.4.0-1791357780474",
+  "timestamp": "2026-10-07T07:23:08.863Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,37 +13,37 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 607,
-    "durationMs": 6887
+    "durationMs": 7052
   },
   "metrics": {
     "compositeScore": 98.88,
     "grade": "A+",
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 12571,
+    "totalIssues": 12576,
     "suppressedIssues": 496,
-    "unsuppressedIssues": 12075,
+    "unsuppressedIssues": 12080,
     "bySeverity": {
-      "info": 1191,
-      "warning": 11380,
+      "info": 1192,
+      "warning": 11384,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 200,
-      "medium": 5992,
+      "high": 203,
+      "medium": 5994,
       "low": 6379
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 98.4,
+      "maintainability": 98.39,
       "performance": 99.25,
       "data": 99.91,
       "testing": 100,
       "reliability": 99.91,
       "security": 100,
-      "extensibility": 92.51
+      "extensibility": 92.5
     },
     "compositeScore": 98.88,
     "weights": {
@@ -65,7 +65,7 @@
     "performanceEfficiency": 99.25,
     "standardization": 77.53,
     "modernity": 100,
-    "maintainability": 98.4,
+    "maintainability": 98.39,
     "commentQuality": 99.98,
     "duplication": 100,
     "techDebtRisk": 100
@@ -165,8 +165,8 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 200,
-      "medium": 5992,
+      "high": 203,
+      "medium": 5994,
       "low": 6379
     },
     "criticalItems": [],
@@ -514,12 +514,12 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/governance.ts:293",
+        "id": "complexity:high-complexity:src/analyzers/governance.ts:290",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/governance.ts",
-        "line": 293,
+        "line": 290,
         "message": "Function \"GovernanceAnalyzer.recordViolationIssue\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
@@ -882,16 +882,16 @@
       },
       {
         "domainName": "rules",
-        "compositeScore": 98.7,
+        "compositeScore": 98.64,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.06,
-          "performance": 98.22,
+          "maintainability": 97.83,
+          "performance": 98.05,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 92.62
+          "extensibility": 92.6
         },
         "moduleCount": 1
       },
@@ -1231,12 +1231,12 @@
         "pillars": {
           "architecture": 100,
           "maintainability": 98.16,
-          "performance": 99.47,
+          "performance": 99.51,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 89.03
+          "extensibility": 89.02
         },
         "moduleCount": 1
       },
@@ -1349,8 +1349,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 126006,
-      "unique": 101511,
+      "processed": 126013,
+      "unique": 101515,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -1363,27 +1363,27 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791355796236,
+      "endMs": 1791357780472,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 18115026,
-        "uniqueTotal": 101511,
-        "changedTotal": 171040,
-        "semanticTotal": 136834
+        "processedTotal": 18155780,
+        "uniqueTotal": 101515,
+        "changedTotal": 162451,
+        "semanticTotal": 129963
       },
       "qed": {
-        "mean": -0.0019,
+        "mean": -0.002,
         "min": -0.18,
         "max": 0.02
       },
       "debt": {
-        "totalAdded": 1403,
+        "totalAdded": 1414,
         "totalResolved": 477,
         "totalRegressions": 4,
         "netYield": -0.05
       },
-      "meanCompositeScore": 99.11,
-      "gatePassRate": 98
+      "meanCompositeScore": 99.1,
+      "gatePassRate": 98.67
     },
     "isFirstBaseline": false
   }

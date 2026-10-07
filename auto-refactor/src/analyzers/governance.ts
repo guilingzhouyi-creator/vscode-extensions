@@ -50,11 +50,8 @@ import {
  * Single-pass multiplexed traversal integration with zero duplicate walks.
  */
 function isGovernanceCandidate(node: NormalizedNode): boolean {
-    return (
-        node.functionLike ||
-        node.kind === NodeKind.Function ||
-        node.kind === NodeKind.Method ||
-        node.kind === NodeKind.ControlFlow
+    return Boolean(
+        node.functionLike || node.kind === NodeKind.Function || node.kind === NodeKind.Method,
     );
 }
 

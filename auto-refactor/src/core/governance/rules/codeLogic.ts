@@ -215,11 +215,18 @@ export const LossyPrecisionRoundingRule: GovernanceRule = {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            let match = LOSSY_ROUNDING_RE.exec(line);
-            if (!match) {
-                match = MISMATCHED_SCALING_RE.exec(line);
+            const hasMath = line.includes('Math.');
+            const hasToFixed = line.includes('toFixed');
+            if (!hasMath && !hasToFixed) continue;
+
+            let match: RegExpExecArray | null = null;
+            if (hasMath) {
+                match = LOSSY_ROUNDING_RE.exec(line);
+                if (!match) {
+                    match = MISMATCHED_SCALING_RE.exec(line);
+                }
             }
-            if (!match) {
+            if (!match && hasToFixed) {
                 match = LOSSY_NUMBER_TOFIXED_RE.exec(line);
             }
             if (match) {

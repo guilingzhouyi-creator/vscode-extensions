@@ -290,7 +290,7 @@ function readFirstChunkFallback(absPath: string): string {
     let fd = -1;
     try {
         fd = fs.openSync(absPath, 'r');
-        const buf = Buffer.alloc(1024);
+        const buf = Buffer.allocUnsafe(1024);
         const bytesRead = fs.readSync(fd, buf, 0, 1024, 0);
         return buf.toString('utf8', 0, bytesRead);
     } catch {
@@ -310,16 +310,18 @@ function loadFileRawContent(
     metric: FileMetric,
     config: ScanConfig,
     fileContents?: Map<string, string>,
+    cache?: Map<string, string>,
 ): string {
     const raw = fileContents?.get(metric.file) || (metric as { content?: string }).content || '';
     if (raw) return raw;
+    if (cache && cache.has(metric.file)) return cache.get(metric.file)!;
     if (config.root) {
         const absPath = path.isAbsolute(metric.file)
             ? metric.file
             : path.join(config.root, metric.file);
-        if (fs.existsSync(absPath)) {
-            return readFirstChunkFallback(absPath);
-        }
+        const chunk = readFirstChunkFallback(absPath);
+        if (cache) cache.set(metric.file, chunk);
+        return chunk;
     }
     return '';
 }
@@ -393,8 +395,12 @@ function accumulateFileMetric(
     manifestDeps: Set<string>,
     state: AutonomyScanState,
     fileContents?: Map<string, string>,
+    prefetchedContent?: string,
 ): void {
-    const rawContent = loadFileRawContent(metric, config, fileContents);
+    const rawContent =
+        prefetchedContent !== undefined
+            ? prefetchedContent
+            : loadFileRawContent(metric, config, fileContents);
     const provenance = classifyFileProvenance(metric.file, rawContent.slice(0, 500));
     const eloc = metric.lines || 1;
 
@@ -731,8 +737,9 @@ export function evaluateProjectAutonomy(
     };
 
     const fileToExtPackages = new Map<string, string[]>();
+    const contentCache = new Map<string, string>();
     for (const metric of fileMetrics) {
-        const raw = loadFileRawContent(metric, config, fileContents);
+        const raw = loadFileRawContent(metric, config, fileContents, contentCache);
         const specs = raw ? extractImportSpecifiersFromContent(raw) : [];
         const extPkgs: string[] = [];
         for (const spec of specs) {
@@ -745,7 +752,7 @@ export function evaluateProjectAutonomy(
             }
         }
         fileToExtPackages.set(metric.file, extPkgs);
-        accumulateFileMetric(metric, config, manifestDeps, state, fileContents);
+        accumulateFileMetric(metric, config, manifestDeps, state, fileContents, raw);
     }
 
     if (symbolIndex) {

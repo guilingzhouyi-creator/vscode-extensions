@@ -247,8 +247,9 @@ export class TopologyCacheManager<T = unknown> {
      */
     private collectTransitiveDependents(root: string, affected: Set<string>): void {
         const queue = [root];
-        while (queue.length > 0) {
-            const current = queue.shift()!;
+        let head = 0;
+        while (head < queue.length) {
+            const current = queue[head++];
             const dependents = this.dependedBy.get(current);
             if (!dependents) continue;
             for (const dep of dependents) {
