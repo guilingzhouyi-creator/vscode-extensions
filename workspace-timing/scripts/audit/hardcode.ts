@@ -80,13 +80,17 @@ for (const file of files) {
 
         // 4. 魔法数值（warning 提示级，分类豁免：常量家园/模板/测试/基元值）
         if (!isExempt(file, MAGIC_EXEMPT)) {
-            for (const m of lineText.matchAll(/(?<![\w.])(\d{2,})(?![\w.]|\s*(?:px|em|rem|%))/g)) {
-                const val = Number(m[1]);
-                if (MAGIC_EXEMPT_VALUES.has(val)) continue;
-                push('HC-MAGIC-NUM', 'warning',
-                    `魔法数值 ${m[1]}：请判定其归属（结构性常量→domain/models.ts；可调阈值→TimingConfig；临时值→命名局部常量）`,
-                    '迁移至 src/domain/models.ts 常量并语义命名（如 MS_PER_X / DEFAULT_Y）');
-                break; // 每行至多报一条，避免刷屏
+            // 忽略 CSS font-weight 行以避免对标准字重(400/500/600/700)误报
+            const isCssWeightLine = /font-weight\s*:\s*\d{3}/i.test(lineText);
+            if (!isCssWeightLine) {
+                for (const m of lineText.matchAll(/(?<![\w.#])(\d{2,})(?![\w.]|\s*(?:px|em|rem|%|vh|vw|ms|s|fr|deg))/g)) {
+                    const val = Number(m[1]);
+                    if (MAGIC_EXEMPT_VALUES.has(val)) continue;
+                    push('HC-MAGIC-NUM', 'warning',
+                        `魔法数值 ${m[1]}：请判定其归属（结构性常量→domain/models.ts；可调阈值→TimingConfig；临时值→命名局部常量）`,
+                        '迁移至 src/domain/models.ts 常量并语义命名（如 MS_PER_X / DEFAULT_Y）');
+                    break; // 每行至多报一条，避免刷屏
+                }
             }
         }
     });

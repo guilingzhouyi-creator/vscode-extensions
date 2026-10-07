@@ -23,13 +23,13 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       --btn-secondary: var(--vscode-button-secondaryBackground, #3a3d41);
       --btn-secondary-hover: var(--vscode-button-secondaryHoverBackground, #45494e);
       --danger: var(--vscode-errorForeground, #f14c4c);
-      --success: #4ec9b0;
-      --success-glow: rgba(78, 201, 176, 0.4);
+      --success: var(--vscode-charts-green, #4ec9b0);
+      --success-glow: color-mix(in srgb, var(--success) 40%, transparent);
       --section-header: var(--vscode-settings-headerForeground, #e0e0e0);
       --label: var(--vscode-settings-labelForeground, #cccccc);
       --description: var(--vscode-descriptionForeground, #9d9d9d);
       --focus: var(--vscode-focusBorder, #007fd4);
-      --cyan: #38bdf8;
+      --cyan: var(--vscode-charts-blue, #38bdf8);
       --radius-sm: 4px;
       --radius: 8px;
       --radius-md: 10px;
@@ -52,6 +52,68 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       padding: var(--gap);
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
+    }
+
+    /* VS Code 浅色主题无障碍对比度增强 (WCAG AA >= 4.5:1) */
+    body.vscode-light {
+      --description: var(--vscode-descriptionForeground, #555555);
+      --section-header: var(--vscode-settings-headerForeground, #1e1e1e);
+      --label: var(--vscode-settings-labelForeground, #242424);
+      --success: var(--vscode-charts-green, #107c41);
+      --cyan: var(--vscode-charts-blue, #005fb8);
+      --card-bg: color-mix(in srgb, var(--vscode-editorWidget-background, #f3f3f3) 85%, var(--bg));
+      --card-bg-hover: color-mix(in srgb, var(--vscode-editorWidget-background, #eaeaea) 95%, var(--bg));
+      --card-border: color-mix(in srgb, var(--border) 80%, transparent);
+      --card-border-hover: var(--vscode-focusBorder, #007fd4);
+      --glass-bg: color-mix(in srgb, var(--vscode-editorWidget-background, #f9f9f9) 90%, var(--bg));
+      --glass-border: rgba(0, 0, 0, 0.12);
+      --glass-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.08);
+      --shadow-md: 0 3px 12px rgba(0, 0, 0, 0.12);
+    }
+
+    /* VS Code 高对比度主题实线边框适配 */
+    body.vscode-high-contrast,
+    body.vscode-high-contrast-light {
+      --card-border: var(--vscode-contrastBorder, #6fc1ff);
+      --card-border-hover: var(--vscode-focusBorder, #f38518);
+      --glass-border: var(--vscode-contrastBorder, #6fc1ff);
+      --glass-bg: var(--bg);
+      --card-bg: var(--bg);
+      --card-bg-hover: var(--bg);
+    }
+
+    body.vscode-high-contrast .stat-card,
+    body.vscode-high-contrast .card-panel,
+    body.vscode-high-contrast .chart-container,
+    body.vscode-high-contrast-light .stat-card,
+    body.vscode-high-contrast-light .card-panel,
+    body.vscode-high-contrast-light .chart-container {
+      border: 1px solid var(--vscode-contrastBorder, currentColor);
+    }
+
+    body.vscode-high-contrast .setting-row,
+    body.vscode-high-contrast-light .setting-row {
+      border-bottom: 1px solid var(--vscode-contrastBorder, currentColor);
+    }
+    body.vscode-high-contrast .setting-row:last-child,
+    body.vscode-high-contrast-light .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    body.vscode-high-contrast .btn,
+    body.vscode-high-contrast-light .btn {
+      border: 1px solid var(--vscode-contrastBorder, currentColor);
+    }
+
+    body.vscode-high-contrast .toggle .slider,
+    body.vscode-high-contrast-light .toggle .slider {
+      border: 1px solid var(--vscode-contrastBorder, currentColor);
+    }
+
+    body.vscode-high-contrast .help-icon .tooltip,
+    body.vscode-high-contrast-light .help-icon .tooltip {
+      border: 1px solid var(--vscode-contrastBorder, currentColor);
     }
 
     /* 页面入场交错动画 */
@@ -311,6 +373,72 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       line-height: 1.4;
     }
 
+    /* 帮助提示图标与 Tooltip 微组件规范 */
+    .help-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--input-bg) 90%, transparent);
+      border: 1px solid var(--input-border);
+      color: var(--description);
+      font-size: 9px;
+      font-weight: 700;
+      cursor: help;
+      margin-left: 6px;
+      flex-shrink: 0;
+      position: relative;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+    .help-icon:hover,
+    .help-icon:focus-visible {
+      border-color: var(--focus);
+      color: var(--fg);
+      background: var(--input-bg);
+      outline: none;
+    }
+    .help-icon:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .help-icon .tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: color-mix(in srgb, var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background, #252526)) 95%, var(--bg));
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--fg);
+      white-space: nowrap;
+      z-index: 100;
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .help-icon:hover .tooltip,
+    .help-icon:focus-visible .tooltip {
+      display: block;
+      animation: fadeInUp 0.15s ease both;
+    }
+    .help-icon .tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: var(--card-border);
+    }
+
     /* 现代开关 Toggle switch */
     .toggle {
       position: relative;
@@ -382,6 +510,11 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       border-color: var(--focus);
       box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
     }
+    .number-input:focus-visible, .select-input:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 1px;
+      border-color: var(--focus);
+    }
 
     /* 按钮系统 */
     .btn-row {
@@ -404,6 +537,10 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       gap: 6px;
     }
     .btn:active { transform: scale(0.97); }
+    .btn:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
     .btn-sm {
       padding: 2px 8px;
       font-size: 11px;

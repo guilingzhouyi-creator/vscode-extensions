@@ -52,10 +52,9 @@ export class StatusBarController {
             vscode.StatusBarAlignment.Right,
             STATUS_BAR_PRIORITY,
         );
+        this.statusBarItem.name = t()['panel.title'];
         this.statusBarItem.command = 'workspaceTiming.showStatus';
-        this.statusBarItem.tooltip = t()['statusBar.tooltipWithMode']
-            .replace('{time}', t()['statusBar.tooltip'])
-            .replace('{mode}', statusBarModeLabel(this._mode));
+        this.updateTooltipAndA11y('');
     }
 
     /** 更新配置（显示开关 / 显示模式；由 ConfigWatcher 配置热应用与命令循环切换共用） */
@@ -70,6 +69,29 @@ export class StatusBarController {
         this._todayMs = todayMs;
         this._totalMs = totalMs;
         this.refresh();
+    }
+
+    /** 同步更新 Tooltip、Name 与无障碍信息，确保语言热切换与模式切换即时生效 */
+    private updateTooltipAndA11y(rawText: string): void {
+        const nextTooltip = format(
+            t()['statusBar.tooltipWithMode'],
+            t()['statusBar.tooltip'],
+            statusBarModeLabel(this._mode),
+        );
+        if (this.statusBarItem.tooltip !== nextTooltip) {
+            this.statusBarItem.tooltip = nextTooltip;
+        }
+
+        const title = t()['panel.title'];
+        if (this.statusBarItem.name !== title) {
+            this.statusBarItem.name = title;
+        }
+
+        const a11yLabel = rawText ? `${title}: ${rawText}` : title;
+        this.statusBarItem.accessibilityInformation = {
+            label: a11yLabel,
+            role: 'button',
+        };
     }
 
     /** 刷新状态栏显示 */
@@ -107,11 +129,11 @@ export class StatusBarController {
         // 仅在文本实际变化时更新，避免每秒触发 VS Code 状态栏重绘
         if (displayText !== this._lastText) {
             this.statusBarItem.text = displayText;
-            this.statusBarItem.tooltip = t()['statusBar.tooltipWithMode']
-                .replace('{time}', t()['statusBar.tooltip'])
-                .replace('{mode}', statusBarModeLabel(this._mode));
             this._lastText = displayText;
         }
+
+        // 同步更新 tooltip、name 与无障碍信息（热切换语言或模式切换时确保即时生效）
+        this.updateTooltipAndA11y(text);
 
         // 仅在首次或从隐藏恢复时调用 .show()，避免冗余重排
         if (!this._visible) {

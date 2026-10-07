@@ -22,6 +22,8 @@ export function buildDashboardScript(labels: Record<string, string>): string {
       let pendingData = null;
       let isTodaySessionsExpanded = false;
       let isWsExpanded = false;
+      let cachedActiveCurveWidth = 0;
+      let activeCurveResizeObserver = null;
 
       /**
        * 渲染折叠/展开交互按钮 HTML。
@@ -65,6 +67,12 @@ export function buildDashboardScript(labels: Record<string, string>): string {
 
       // ---- 更新 UI ----
       function updateUI(data) {
+        // 读写分离预读：在批量写 DOM 之前预先读取曲线容器宽度，彻底消除强制同步布局 (FSL)
+        const acEl = document.getElementById('activeCurve');
+        if (!cachedActiveCurveWidth && acEl && acEl.clientWidth > 0) {
+          cachedActiveCurveWidth = acEl.clientWidth;
+        }
+
         // 统计卡片
         document.getElementById('statToday').textContent = formatDuration(data.todayMs);
         document.getElementById('statWeek').textContent = formatDuration(data.weekTotalMs || 0);
@@ -179,7 +187,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
                   '<span class="ws-compare-share">' + share + '%</span></div>' +
               '</div>' +
               '<div class="ws-compare-track">' +
-                '<div class="ws-compare-fill" style="width:' + pct + '%"></div>' +
+                '<div class="ws-compare-fill" style="--fill-scale:' + (pct / 100).toFixed(4) + ';"></div>' +
               '</div>' +
             '</div>';
         }
@@ -232,6 +240,24 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         const weekTotalEl = document.getElementById('weekTotal');
         if (!el) return;
 
+        if (typeof ResizeObserver !== 'undefined' && !activeCurveResizeObserver) {
+          activeCurveResizeObserver = new ResizeObserver(entries => {
+            for (let i = 0; i < entries.length; i++) {
+              const rect = entries[i].contentRect;
+              if (rect && rect.width > 0) {
+                const w = Math.round(rect.width);
+                if (Math.abs(w - cachedActiveCurveWidth) > 2) {
+                  cachedActiveCurveWidth = w;
+                  if (pendingData && pendingData.dailyStats) {
+                    renderActiveCurve(pendingData.dailyStats);
+                  }
+                }
+              }
+            }
+          });
+          activeCurveResizeObserver.observe(el);
+        }
+
         const data = dailyStats || [];
         const hasData = data.length > 0 && data.some(d => d.totalMs > 0);
         if (!hasData) {
@@ -243,8 +269,9 @@ export function buildDashboardScript(labels: Record<string, string>): string {
 
         if (emptyEl) emptyEl.style.display = 'none';
 
-        // 动态读取容器真实宽度，铺满整个面板横向空间，留足顶部胶囊与底部双层标尺高度
-        const rawW = el.clientWidth || (el.parentElement ? el.parentElement.clientWidth : 960);
+        // 动态读取容器真实宽度（尺寸缓存与 ResizeObserver 解耦，消除 FSL 强制同步布局）
+        const rawW = cachedActiveCurveWidth || el.clientWidth || (el.parentElement ? el.parentElement.clientWidth : 960);
+        if (rawW > 0) cachedActiveCurveWidth = rawW;
         const W = Math.max(Math.round(rawW - 32), 680);
         const H = 232;
         const PAD_LEFT = 56, PAD_RIGHT = 36;
@@ -535,8 +562,9 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             const pct = Math.min(100, Math.max((rawMs / scaleMax) * 100, rawMs > 0 ? 2 : 0));
             const tooltip = w.weekEnd ? (w.weekStart + ' ~ ' + w.weekEnd) : w.weekStart;
 
+            const fillScale = (pct / 100).toFixed(4);
             let fillClass = 'trend-fill';
-            let fillStyle = 'width:' + pct.toFixed(2) + '%;';
+            let fillStyle = '--fill-scale:' + fillScale + ';';
             let valueClass = 'trend-value';
 
             if (isLimitOn && rawMs > 0) {
@@ -655,6 +683,8 @@ export function buildDashboardScript(labels: Record<string, string>): string {
       }
 
       // ---- 按小时分布柱状图 ----
+      let currentHourlyBadgeDefault = '';
+
       function renderHourly(hourly, peakHour, el, titleEl, axisEl) {
         const wrapper = document.getElementById('hourlyWrapper');
         const badgeEl = document.getElementById('hourlyBadge');
@@ -688,13 +718,41 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           ? L['panel.today.hourlyPeak'] + ': ' + peakHourStr + ' · ' + formatDuration(peakMs)
           : L['panel.today.hourlyOverview'];
 
-        if (badgeEl) badgeEl.textContent = defaultBadgeText;
+        currentHourlyBadgeDefault = defaultBadgeText;
+        if (badgeEl && !el.__isHoveringSlot) badgeEl.textContent = defaultBadgeText;
 
-        // 渲染 24 个槽位骨架（每个包含底轨、立柱、基线指示，并在每 4 小时边界处添加段落分隔），流式拼接消除 map 临时数组 (CPX-SPACE-001)
+        // 父容器事件委托（仅绑定一次，彻底消除 48 个独立闭包注册）
+        if (!el.__hasHourlyDelegation) {
+          el.__hasHourlyDelegation = true;
+          el.__isHoveringSlot = false;
+          el.addEventListener('mouseover', (e) => {
+            const slot = e.target.closest('.hourly-slot');
+            if (slot && el.contains(slot)) {
+              el.__isHoveringSlot = true;
+              if (badgeEl) {
+                const tr = slot.getAttribute('data-timerange') || '';
+                const dur = slot.getAttribute('data-dur') || '';
+                badgeEl.textContent = tr + ' · ' + dur;
+              }
+            } else {
+              el.__isHoveringSlot = false;
+              if (badgeEl) badgeEl.textContent = currentHourlyBadgeDefault;
+            }
+          });
+          el.addEventListener('mouseleave', () => {
+            el.__isHoveringSlot = false;
+            if (badgeEl) badgeEl.textContent = currentHourlyBadgeDefault;
+          });
+        }
+
+        // 局部属性 patch：若已有 24 根柱子则原地更新 CSS 变量与属性，保持 DOM 存活让 CSS 过渡生效
+        const canPatch = el.children.length === 24;
         let hourlyHtml = '';
+
         for (let h = 0; h < 24; h++) {
           const ms = hours[h];
           const pct = ms > 0 ? Math.max((ms / maxVal) * 100, 6) : 0;
+          const scale = (pct / 100).toFixed(4);
           const isPeak = (ms > 0 && h === peakHour) ? ' is-peak' : '';
           const isPeakSlot = (ms > 0 && h === peakHour) ? ' is-peak-slot' : '';
           const hasAct = ms > 0 ? ' has-activity' : '';
@@ -706,56 +764,60 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           const durStr = ms > 0 ? formatDuration(ms) : L['panel.today.hourlyIdle'];
           const peakTag = (ms > 0 && h === peakHour) ? ' (' + L['panel.today.hourlyPeak'] + ')' : '';
           const tip = timeRange + ' : ' + durStr + peakTag;
+          const slotCls = 'hourly-slot' + isPeakSlot + hasAct + isPeriodDivider;
+          const barCls = 'hourly-bar' + isPeak;
 
-          hourlyHtml += '<div class="hourly-slot' + isPeakSlot + hasAct + isPeriodDivider + '" data-timerange="' + timeRange + '" data-dur="' + durStr + peakTag + '" title="' + tip + '">' +
-            '<div class="hourly-slot-track">' +
-              '<div class="hourly-bar' + isPeak + '" style="height:' + pct + '%"></div>' +
-            '</div>' +
-            '<div class="hourly-slot-base"></div>' +
-          '</div>';
+          if (canPatch) {
+            const slot = el.children[h];
+            if (slot.className !== slotCls) slot.className = slotCls;
+            slot.setAttribute('data-timerange', timeRange);
+            slot.setAttribute('data-dur', durStr + peakTag);
+            slot.title = tip;
+            const bar = slot.querySelector('.hourly-bar');
+            if (bar) {
+              if (bar.className !== barCls) bar.className = barCls;
+              bar.style.setProperty('--bar-scale', scale);
+            }
+          } else {
+            hourlyHtml += '<div class="' + slotCls + '" data-timerange="' + timeRange + '" data-dur="' + durStr + peakTag + '" title="' + tip + '">' +
+              '<div class="hourly-slot-track">' +
+                '<div class="' + barCls + '" style="--bar-scale:' + scale + ';"></div>' +
+              '</div>' +
+              '<div class="hourly-slot-base"></div>' +
+            '</div>';
+          }
         }
-        el.innerHTML = hourlyHtml;
 
-        // 槽位鼠标悬停交互：顶部徽章动态联动
-        const slots = el.querySelectorAll('.hourly-slot');
-        slots.forEach(slot => {
-          slot.addEventListener('mouseenter', () => {
-            if (badgeEl) {
-              const tr = slot.getAttribute('data-timerange') || '';
-              const dur = slot.getAttribute('data-dur') || '';
-              badgeEl.textContent = tr + ' · ' + dur;
-            }
-          });
-          slot.addEventListener('mouseleave', () => {
-            if (badgeEl) {
-              badgeEl.textContent = defaultBadgeText;
-            }
-          });
-        });
+        if (!canPatch) {
+          el.innerHTML = hourlyHtml;
+        }
 
         // 连续物理标尺：7 锚点精准对齐（00:00, 04:00, 08:00, 12:00, 16:00, 20:00, 24:00）
         if (axisEl) {
           axisEl.style.display = 'block';
-          const anchors = [
-            { pct: 0, label: '00:00', posClass: 'is-start' },
-            { pct: 16.6667, label: '04:00', posClass: 'is-mid' },
-            { pct: 33.3333, label: '08:00', posClass: 'is-mid' },
-            { pct: 50.0000, label: '12:00', posClass: 'is-mid is-noon' },
-            { pct: 66.6667, label: '16:00', posClass: 'is-mid' },
-            { pct: 83.3333, label: '20:00', posClass: 'is-mid' },
-            { pct: 100.000, label: '24:00', posClass: 'is-end' }
-          ];
+          if (!axisEl.__hasRendered) {
+            axisEl.__hasRendered = true;
+            const anchors = [
+              { pct: 0, label: '00:00', posClass: 'is-start' },
+              { pct: 16.6667, label: '04:00', posClass: 'is-mid' },
+              { pct: 33.3333, label: '08:00', posClass: 'is-mid' },
+              { pct: 50.0000, label: '12:00', posClass: 'is-mid is-noon' },
+              { pct: 66.6667, label: '16:00', posClass: 'is-mid' },
+              { pct: 83.3333, label: '20:00', posClass: 'is-mid' },
+              { pct: 100.000, label: '24:00', posClass: 'is-end' }
+            ];
 
-          axisEl.innerHTML = '<div class="hourly-axis-line"></div>' +
-            anchors.map(a => {
-              const posStyle = a.posClass.includes('is-start')
-                ? 'left:0;'
-                : (a.posClass.includes('is-end') ? 'right:0;' : 'left:' + a.pct + '%;');
-              return '<div class="hourly-notch-group ' + a.posClass + '" style="' + posStyle + '">' +
-                '<div class="hourly-notch"></div>' +
-                '<div class="hourly-tick-label">' + a.label + '</div>' +
-              '</div>';
-            }).join('');
+            axisEl.innerHTML = '<div class="hourly-axis-line"></div>' +
+              anchors.map(a => {
+                const posStyle = a.posClass.includes('is-start')
+                  ? 'left:0;'
+                  : (a.posClass.includes('is-end') ? 'right:0;' : 'left:' + a.pct + '%;');
+                return '<div class="hourly-notch-group ' + a.posClass + '" style="' + posStyle + '">' +
+                  '<div class="hourly-notch"></div>' +
+                  '<div class="hourly-tick-label">' + a.label + '</div>' +
+                '</div>';
+              }).join('');
+          }
         }
       }
 

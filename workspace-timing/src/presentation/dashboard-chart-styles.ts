@@ -6,6 +6,11 @@
  */
 
 export const DASHBOARD_CHART_STYLES = /* css */ `
+    :root {
+      --bar-scale: 0;
+      --fill-scale: 0;
+    }
+
     /* ==============================================================================
      * 1. 活跃曲线层 (Active Curve Canvas & Grids)
      * 职责：承载动态 SVG 样条平滑曲线、毛玻璃背景、Y 轴参考刻度线与悬浮同心发光锚点。
@@ -24,6 +29,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
       position: relative;
       overflow: hidden;
+      contain: layout paint;
     }
     .ac-svg {
       display: block;
@@ -68,22 +74,26 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       fill: rgba(56, 189, 248, 0.22);
       stroke: rgba(56, 189, 248, 0.75);
       stroke-width: 1.5;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), fill 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
       cursor: pointer;
     }
     .ac-dot-core {
       fill: #ffffff;
       pointer-events: none;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .ac-dot-group:hover .ac-dot-halo {
-      r: 7;
+      transform: scale(1.4);
       fill: rgba(56, 189, 248, 0.38);
       stroke: #38bdf8;
       filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.85));
     }
     .ac-dot-group:hover .ac-dot-core {
-      r: 3.2;
+      transform: scale(1.23);
     }
     .ac-dot-group.is-peak .ac-dot-halo {
       stroke: #34d399;
@@ -169,6 +179,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       box-shadow: var(--shadow-sm);
       width: 100%;
       box-sizing: border-box;
+      contain: layout paint;
     }
     .heatmap-weekdays {
       display: flex;
@@ -301,6 +312,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
       padding: 12px 14px 8px 14px;
       overflow: hidden;
+      contain: layout paint;
     }
     .hourly-header-row {
       display: flex;
@@ -369,10 +381,13 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .hourly-bar {
       width: 100%;
       min-width: 2px;
+      height: 100%;
       border-radius: 2px 2px 0 0;
       background: linear-gradient(180deg, rgba(56, 189, 248, 0.75), rgba(59, 130, 246, 0.5));
       box-shadow: 0 0 6px rgba(56, 189, 248, 0.25);
-      transition: height 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
+      transform: scaleY(var(/* @scale */--bar-scale, 0));
+      transform-origin: bottom;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
     }
     .hourly-slot:hover .hourly-bar {
       filter: brightness(1.25);
@@ -489,10 +504,13 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transform: translateX(-50%);
     }
     .trend-fill {
+      width: 100%;
       height: 100%;
       border-radius: 4px;
       background: linear-gradient(90deg, var(--btn-bg), var(--focus));
-      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
+      transform: scaleX(var(/* @scale */--fill-scale, 0));
+      transform-origin: left;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
       min-width: 2px;
     }
     .trend-fill.is-over {
@@ -556,10 +574,13 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       overflow: hidden;
     }
     .ws-compare-fill {
+      width: 100%;
       height: 100%;
       border-radius: 4px;
       background: linear-gradient(90deg, var(--btn-bg), var(--success));
-      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      transform: scaleX(var(/* @scale */--fill-scale, 0));
+      transform-origin: left;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       min-width: 2px;
     }
     .ws-compare-total {
@@ -649,6 +670,25 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       pointer-events: none;
       backdrop-filter: blur(10px);
     }
+    /* 气泡提示入场动画与同名动画隔离保护 */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translate(-50%, 4px);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+    }
+
+    /* 页面主要卡片防横移隔离保护（避免被包含 translate(-50%) 的 fadeInUp 误伤） */
+    .main-header,
+    .section,
+    .settings-card {
+      transform: none !important;
+    }
+
     .help-icon:hover .tooltip {
       display: block;
       animation: fadeInUp 0.15s ease both;
@@ -661,6 +701,14 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transform: translateX(-50%);
       border: 5px solid transparent;
       border-top-color: var(--card-border);
+    }
+
+    /* 导出操作防重态 */
+    button.is-busy,
+    .btn.is-busy {
+      opacity: 0.6;
+      pointer-events: none;
+      cursor: not-allowed;
     }
 
     /* Toast 浮动通知 */

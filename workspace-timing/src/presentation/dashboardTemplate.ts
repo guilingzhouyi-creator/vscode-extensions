@@ -30,6 +30,63 @@ export interface DashboardTemplateArgs {
     labels: Record<string, string>;
 }
 
+interface SettingRowSpec {
+    id: string;
+    dataKey: string;
+    name: string;
+    tip: string;
+    desc: string;
+    type: 'toggle' | 'number' | 'select';
+    min?: number;
+    max?: number;
+    options?: Array<{ value: string; label: string }>;
+}
+
+function renderStatCard(id: string, label: string): string {
+    return /* html */ `
+    <div class="stat-card">
+      <div class="value" id="${id}">--</div>
+      <div class="label">${label}</div>
+    </div>`;
+}
+
+function renderSettingRow(spec: SettingRowSpec): string {
+    const labelId = `${spec.id}-label`;
+    const descId = `${spec.id}-desc`;
+    let controlHtml = '';
+
+    if (spec.type === 'toggle') {
+        controlHtml = `
+        <label class="toggle">
+          <input type="checkbox" id="${spec.id}" data-key="${spec.dataKey}" role="switch" aria-labelledby="${labelId}" aria-describedby="${descId}">
+          <span class="slider"></span>
+        </label>`;
+    } else if (spec.type === 'number') {
+        const maxAttr = spec.max !== undefined ? ` max="${spec.max}"` : '';
+        controlHtml = `
+        <input class="number-input" type="number" id="${spec.id}" data-key="${spec.dataKey}" min="${spec.min ?? 0}"${maxAttr} aria-labelledby="${labelId}" aria-describedby="${descId}">`;
+    } else if (spec.type === 'select') {
+        const optionsHtml = (spec.options ?? [])
+            .map(opt => `<option value="${opt.value}">${opt.label}</option>`)
+            .join('\n          ');
+        controlHtml = `
+        <select class="select-input" id="${spec.id}" data-key="${spec.dataKey}" aria-labelledby="${labelId}" aria-describedby="${descId}">
+          ${optionsHtml}
+        </select>`;
+    }
+
+    return /* html */ `
+      <div class="setting-row">
+        <div class="setting-label">
+          <div class="setting-header-row">
+            <span id="${labelId}">${spec.name}</span>
+            <span class="help-icon" tabindex="0" role="button" aria-label="Help">?<span class="tooltip">${spec.tip}</span></span>
+          </div>
+          <div class="desc" id="${descId}">${spec.desc}</div>
+        </div>${controlHtml}
+      </div>`;
+}
+
 export function buildDashboardHtml(args: DashboardTemplateArgs): string {
     return /* html */ `
 <!DOCTYPE html>
@@ -56,30 +113,12 @@ ${DASHBOARD_CHART_STYLES}
 
   <!-- 统计卡片网格 -->
   <div class="stats-grid">
-    <div class="stat-card">
-      <div class="value" id="statToday">--</div>
-      <div class="label">${args.labels['panel.label.today']}</div>
-    </div>
-    <div class="stat-card">
-      <div class="value" id="statWeek">--</div>
-      <div class="label">${args.labels['panel.label.week']}</div>
-    </div>
-    <div class="stat-card">
-      <div class="value" id="statTotal">--</div>
-      <div class="label">${args.labels['panel.label.totalWs']}</div>
-    </div>
-    <div class="stat-card">
-      <div class="value" id="statGlobalTotal">--</div>
-      <div class="label">${args.labels['panel.label.global']}</div>
-    </div>
-    <div class="stat-card">
-      <div class="value" id="statSessions">--</div>
-      <div class="label">${args.labels['panel.label.sessions']}</div>
-    </div>
-    <div class="stat-card">
-      <div class="value" id="statStatus">--</div>
-      <div class="label">${args.labels['panel.label.status']}</div>
-    </div>
+    ${renderStatCard('statToday', args.labels['panel.label.today'])}
+    ${renderStatCard('statWeek', args.labels['panel.label.week'])}
+    ${renderStatCard('statTotal', args.labels['panel.label.totalWs'])}
+    ${renderStatCard('statGlobalTotal', args.labels['panel.label.global'])}
+    ${renderStatCard('statSessions', args.labels['panel.label.sessions'])}
+    ${renderStatCard('statStatus', args.labels['panel.label.status'])}
   </div>
 
   <!-- 周报 + 活跃曲线 -->
@@ -196,82 +235,61 @@ ${DASHBOARD_CHART_STYLES}
   <div class="section">
     <h2>${args.labels['panel.section.basic']}</h2>
     <div class="card-panel">
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.enabled.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.enabled.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.enabled.desc']}</div>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="chkEnabled" data-key="isEnabled">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.globalDisabled.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.globalDisabled.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.globalDisabled.desc']}</div>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="chkGlobalDisabled" data-key="globalDisabled">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.statusBar.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.statusBar.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.statusBar.desc']}</div>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="chkStatusBar" data-key="statusBarEnabled">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.locale.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.locale.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.locale.desc']}</div>
-        </div>
-        <select class="select-input" id="selLocale" data-key="locale">
-          <option value="auto">${args.labels['panel.set.locale.auto']}</option>
-          <option value="zh-CN">${args.labels['panel.set.locale.zhCN']}</option>
-          <option value="en">${args.labels['panel.set.locale.en']}</option>
-        </select>
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.weeklyLimit.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.weeklyLimit.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.weeklyLimit.desc']}</div>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="chkWeeklyLimit" data-key="weeklyLimitEnabled">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.weeklyLimitHours.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.weeklyLimitHours.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.weeklyLimitHours.desc']}</div>
-        </div>
-        <input class="number-input" type="number" id="numWeeklyLimitHours" data-key="weeklyLimitHours" min="1" max="168">
-      </div>
+      ${renderSettingRow({
+        id: 'chkEnabled',
+        dataKey: 'isEnabled',
+        type: 'toggle',
+        name: args.labels['panel.set.enabled.name'],
+        tip: args.labels['panel.set.enabled.tip'],
+        desc: args.labels['panel.set.enabled.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'chkGlobalDisabled',
+        dataKey: 'globalDisabled',
+        type: 'toggle',
+        name: args.labels['panel.set.globalDisabled.name'],
+        tip: args.labels['panel.set.globalDisabled.tip'],
+        desc: args.labels['panel.set.globalDisabled.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'chkStatusBar',
+        dataKey: 'statusBarEnabled',
+        type: 'toggle',
+        name: args.labels['panel.set.statusBar.name'],
+        tip: args.labels['panel.set.statusBar.tip'],
+        desc: args.labels['panel.set.statusBar.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'selLocale',
+        dataKey: 'locale',
+        type: 'select',
+        name: args.labels['panel.set.locale.name'],
+        tip: args.labels['panel.set.locale.tip'],
+        desc: args.labels['panel.set.locale.desc'],
+        options: [
+          { value: 'auto', label: args.labels['panel.set.locale.auto'] },
+          { value: 'zh-CN', label: args.labels['panel.set.locale.zhCN'] },
+          { value: 'en', label: args.labels['panel.set.locale.en'] },
+        ],
+      })}
+      ${renderSettingRow({
+        id: 'chkWeeklyLimit',
+        dataKey: 'weeklyLimitEnabled',
+        type: 'toggle',
+        name: args.labels['panel.set.weeklyLimit.name'],
+        tip: args.labels['panel.set.weeklyLimit.tip'],
+        desc: args.labels['panel.set.weeklyLimit.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'numWeeklyLimitHours',
+        dataKey: 'weeklyLimitHours',
+        type: 'number',
+        min: 1,
+        max: 168,
+        name: args.labels['panel.set.weeklyLimitHours.name'],
+        tip: args.labels['panel.set.weeklyLimitHours.tip'],
+        desc: args.labels['panel.set.weeklyLimitHours.desc'],
+      })}
     </div>
   </div>
 
@@ -279,72 +297,61 @@ ${DASHBOARD_CHART_STYLES}
   <div class="section">
     <h2>${args.labels['panel.section.storage']}</h2>
     <div class="card-panel">
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.journal.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.journal.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.journal.desc']}</div>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="chkJournal" data-key="journalEnabled">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.backup.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.backup.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.backup.desc']}</div>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="chkBackup" data-key="backupToFile">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.ringBuffer.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.ringBuffer.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.ringBuffer.desc']}</div>
-        </div>
-        <input class="number-input" type="number" id="numRingBuffer" data-key="ringBufferCapacity" min="64" max="65536">
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.journalInterval.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.journalInterval.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.journalInterval.desc']}</div>
-        </div>
-        <input class="number-input" type="number" id="numJournalInterval" data-key="journalFlushIntervalMs" min="1000" max="300000">
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.fullSaveInterval.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.fullSaveInterval.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.fullSaveInterval.desc']}</div>
-        </div>
-        <input class="number-input" type="number" id="numFullSaveInterval" data-key="fullSaveIntervalMs" min="5000" max="600000">
-      </div>
-      <div class="setting-row">
-        <div class="setting-label">
-          <div class="setting-header-row">
-            <span>${args.labels['panel.set.maxSessions.name']}</span>
-            <span class="help-icon">?<span class="tooltip">${args.labels['panel.set.maxSessions.tip']}</span></span>
-          </div>
-          <div class="desc">${args.labels['panel.set.maxSessions.desc']}</div>
-        </div>
-        <input class="number-input" type="number" id="numMaxSessions" data-key="maxSessions" min="0">
-      </div>
+      ${renderSettingRow({
+        id: 'chkJournal',
+        dataKey: 'journalEnabled',
+        type: 'toggle',
+        name: args.labels['panel.set.journal.name'],
+        tip: args.labels['panel.set.journal.tip'],
+        desc: args.labels['panel.set.journal.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'chkBackup',
+        dataKey: 'backupToFile',
+        type: 'toggle',
+        name: args.labels['panel.set.backup.name'],
+        tip: args.labels['panel.set.backup.tip'],
+        desc: args.labels['panel.set.backup.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'numRingBuffer',
+        dataKey: 'ringBufferCapacity',
+        type: 'number',
+        min: 64,
+        max: 65536,
+        name: args.labels['panel.set.ringBuffer.name'],
+        tip: args.labels['panel.set.ringBuffer.tip'],
+        desc: args.labels['panel.set.ringBuffer.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'numJournalInterval',
+        dataKey: 'journalFlushIntervalMs',
+        type: 'number',
+        min: 1000,
+        max: 300000,
+        name: args.labels['panel.set.journalInterval.name'],
+        tip: args.labels['panel.set.journalInterval.tip'],
+        desc: args.labels['panel.set.journalInterval.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'numFullSaveInterval',
+        dataKey: 'fullSaveIntervalMs',
+        type: 'number',
+        min: 5000,
+        max: 600000,
+        name: args.labels['panel.set.fullSaveInterval.name'],
+        tip: args.labels['panel.set.fullSaveInterval.tip'],
+        desc: args.labels['panel.set.fullSaveInterval.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'numMaxSessions',
+        dataKey: 'maxSessions',
+        type: 'number',
+        min: 0,
+        name: args.labels['panel.set.maxSessions.name'],
+        tip: args.labels['panel.set.maxSessions.tip'],
+        desc: args.labels['panel.set.maxSessions.desc'],
+      })}
     </div>
   </div>
 
@@ -361,7 +368,7 @@ ${DASHBOARD_CHART_STYLES}
       </div>
       <div style="margin-top:12px;font-size:11px;color:var(--description);line-height:1.6">
         <strong>${args.labels['panel.actions.newPeriod']}</strong>${args.labels['panel.actions.hintPeriodDesc']}<br>
-        <strong>${args.labels['panel.actions.clearHistory']}</strong>${args.labels['confirm.clearHistory']}<br>
+        <strong>${args.labels['panel.actions.clearHistory']}</strong>${args.labels['panel.actions.hintClearHistoryDesc']}<br>
         <strong>${args.labels['panel.actions.reset']}</strong>${args.labels['panel.actions.hintResetDesc']}
       </div>
     </div>

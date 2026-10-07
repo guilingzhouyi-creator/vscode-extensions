@@ -33,14 +33,20 @@ export class DashboardPanel {
 
   /**
    * 语言热切换后重建面板：用当前面板已持有的 extensionUri 重建，
+   * 保持旧实例 viewColumn 与 _onMessage 回调，
    * 使新语言词条渲染生效（webview 静态文案在渲染时注入，必须重建）。
    */
   static recreateForLocale(): void {
     const existing = DashboardPanel.currentPanel;
     if (!existing) return;
     const uri = existing._extensionUri;
+    const viewColumn = existing._panel.viewColumn;
+    const onMessage = existing._onMessage;
     DashboardPanel.disposeCurrent();
-    DashboardPanel.createOrShow(uri);
+    const newPanel = DashboardPanel.createOrShow(uri, viewColumn);
+    if (onMessage) {
+      newPanel.onMessage(onMessage);
+    }
   }
 
   /** 生成 CSP nonce（每次渲染 HTML 时唯一） */
@@ -82,10 +88,10 @@ export class DashboardPanel {
   }
 
   /** 创建或聚焦面板 */
-  static createOrShow(extensionUri: vscode.Uri): DashboardPanel {
-    const column = vscode.window.activeTextEditor
+  static createOrShow(extensionUri: vscode.Uri, viewColumn?: vscode.ViewColumn): DashboardPanel {
+    const column = viewColumn ?? (vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
-      : undefined;
+      : undefined);
 
     if (DashboardPanel.currentPanel) {
       DashboardPanel.currentPanel._panel.reveal(column);

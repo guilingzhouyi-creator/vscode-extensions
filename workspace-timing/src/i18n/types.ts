@@ -191,9 +191,8 @@ export interface I18nStrings {
     'panel.actions.reset': string;
     'panel.actions.clearHistory': string;
     'panel.actions.exportAggregated': string;
-    'panel.actions.hintPeriod': string;
     'panel.actions.hintPeriodDesc': string;
-    'panel.actions.hintReset': string;
+    'panel.actions.hintClearHistoryDesc': string;
     'panel.actions.hintResetDesc': string;
     'panel.js.badgeGlobalDisabled': string;
     'panel.js.badgeDisabled': string;
