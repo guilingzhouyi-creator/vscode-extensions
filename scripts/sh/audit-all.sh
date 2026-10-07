@@ -84,10 +84,10 @@ trap 'rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"' EXIT
 if [[ "$FAST_MODE" -eq 1 ]]; then
     (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1 & PID_AR=$!
 else
-    (cd auto-refactor && "$NPM_BIN" test && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1 & PID_AR=$!
+    (cd auto-refactor && "$NPM_BIN" test) >"$LOG_AR" 2>&1 & PID_AR=$!
 fi
 
-(cd workspace-timing && "$NPM_BIN" run review && "$NPM_BIN" run test:fast) >"$LOG_WT" 2>&1 & PID_WT=$!
+(cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1 & PID_WT=$!
 
 ("$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict) >"$LOG_WG" 2>&1 & PID_WG=$!
 

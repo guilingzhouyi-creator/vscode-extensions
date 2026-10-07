@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-07T06:51:11.668Z",
-  "totalRules": 389,
+  "generatedAt": "2026-10-07T08:20:43.850Z",
+  "totalRules": 391,
   "counts": {
-    "autoRefactor": 308,
+    "autoRefactor": 310,
     "workspaceTiming": 45,
     "webGames": 56,
     "globalTooling": 7
@@ -2719,6 +2719,13 @@
       "summary": "Synchronous file I/O executed on Extension Host main thread blocks editor UI."
     },
     {
+      "id": "VSC-PERF-002",
+      "project": "auto-refactor",
+      "family": "VSC",
+      "severity": "error",
+      "summary": "Webview CSS transition directly animates geometry layout property triggering browser reflow."
+    },
+    {
       "id": "VSC-UI-001",
       "project": "auto-refactor",
       "family": "VSC",
@@ -2731,6 +2738,13 @@
       "family": "VSC",
       "severity": "error",
       "summary": "Webview UI contains hardcoded monochrome colors instead of theme CSS variables."
+    },
+    {
+      "id": "VSC-UI-003",
+      "project": "auto-refactor",
+      "family": "VSC",
+      "severity": "error",
+      "summary": "Webview interactive form control lacks accessible label binding (WCAG 4.1.2)."
     }
   ]
 }

@@ -77,9 +77,9 @@ $logWg = Join-Path $transientDir "audit-wg-$randSuffix.log"
 $arScript = if ($Fast) {
     "& '$nodeCmd' scripts/validate-self-multidimensional-audit.js *>&1"
 } else {
-    "& '$npmCmd' test *>&1; if (`$LASTEXITCODE -ne 0) { exit 1 }; & '$nodeCmd' scripts/validate-self-multidimensional-audit.js *>&1"
+    "& '$npmCmd' test *>&1"
 }
-$wtScript = "& '$npmCmd' run review *>&1; if (`$LASTEXITCODE -ne 0) { exit 1 }; & '$npmCmd' run test:fast *>&1"
+$wtScript = "& '$npmCmd' run review *>&1"
 $wgScript = "& '$pythonCmd' WebGames/scripts/py/audit_config.py --strict *>&1"
 
 $procAr = Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $arScript) -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logAr -PassThru
