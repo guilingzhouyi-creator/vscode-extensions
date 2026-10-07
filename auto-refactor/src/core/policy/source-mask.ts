@@ -39,6 +39,8 @@ export interface SourceMaskConfig {
      * operators/braces will read a regex body as code.
      */
     regexLiterals?: boolean;
+    /** True to also blank HTML comments (<!-- ... -->). */
+    htmlComment?: boolean;
 }
 
 import { nativeCore } from '../native/native-bridge';
@@ -79,6 +81,7 @@ const C_FAMILY_MASK: SourceMaskConfig = {
     quoteChars: '\'"`',
     multilineTemplates: true,
     regexLiterals: true,
+    htmlComment: true,
 };
 
 /**
@@ -140,6 +143,10 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
     '.ps1': MASK_LANGUAGE_POWERSHELL,
     '.psm1': MASK_LANGUAGE_POWERSHELL,
     '.psd1': MASK_LANGUAGE_POWERSHELL,
+    '.html': MASK_LANGUAGE_JAVASCRIPT,
+    '.htm': MASK_LANGUAGE_JAVASCRIPT,
+    '.vue': MASK_LANGUAGE_TYPESCRIPT,
+    '.svelte': MASK_LANGUAGE_TYPESCRIPT,
 };
 
 /** Characters that, immediately before a `/`, mean the slash opens a regex literal. */
@@ -257,6 +264,8 @@ export function maskedLinesOfPath(filePath: string, content: string): string[] {
 interface MaskState {
     /** True while inside an unterminated block comment. */
     inBlockComment: boolean;
+    /** True while inside an unterminated HTML comment. */
+    inHtmlComment?: boolean;
     /** Active quote character, or null when scanning ordinary code. */
     quote: string | null;
 }
@@ -291,6 +300,7 @@ function triggerRegex(config: SourceMaskConfig): RegExp {
     chars.add(config.lineComment[0]);
     if (config.blockComment) chars.add(config.blockComment.open[0]);
     if (config.regexLiterals) chars.add('/');
+    if (config.htmlComment) chars.add('<');
 
     const escaped = [...chars]
         .map((char) => char.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&'))
@@ -442,6 +452,14 @@ function scanNextMaskSpan(
     if (state.inBlockComment) {
         return scanBlockCommentContinuation(line, index, close, state);
     }
+    if (config.htmlComment && state.inHtmlComment) {
+        const cIdx = line.indexOf('-->', index);
+        if (cIdx !== -1) {
+            state.inHtmlComment = false;
+            return cIdx + 3;
+        }
+        return line.length;
+    }
     if (line.startsWith(config.lineComment, index)) {
         return line.length;
     }
@@ -449,7 +467,35 @@ function scanNextMaskSpan(
     if (bcEnd !== -1) {
         return bcEnd;
     }
+    if (config.htmlComment && line.startsWith('<!--', index)) {
+        state.inHtmlComment = true;
+        const cIdx = line.indexOf('-->', index + 4);
+        if (cIdx !== -1) {
+            state.inHtmlComment = false;
+            return cIdx + 3;
+        }
+        return line.length;
+    }
     return scanQuoteOrRegex(line, index, config, state);
+}
+
+/**
+ * Decides whether line masking can be skipped entirely.
+ */
+function shouldSkipMasking(line: string, state: MaskState, config: SourceMaskConfig): boolean {
+    if (state.quote || state.inBlockComment || state.inHtmlComment) return false;
+    return !triggerRegex(config).test(line);
+}
+
+/**
+ * Checks if a line is completely enclosed inside a multi-line comment block.
+ */
+function isFullyCommentedLine(line: string, state: MaskState, close: string): boolean {
+    if (state.quote) return false;
+    if (state.inBlockComment && close.length > 0 && !line.includes(close)) {
+        return true;
+    }
+    return Boolean(state.inHtmlComment && !line.includes('-->'));
 }
 
 /**
@@ -461,10 +507,10 @@ function scanNextMaskSpan(
  * @returns A same-length copy whose comment and literal characters are spaces.
  */
 function maskLine(line: string, state: MaskState, config: SourceMaskConfig): string {
-    if (!state.quote && !state.inBlockComment && !triggerRegex(config).test(line)) return line;
+    if (shouldSkipMasking(line, state, config)) return line;
 
     const close = config.blockComment?.close ?? '';
-    if (state.inBlockComment && !state.quote && close.length > 0 && !line.includes(close)) {
+    if (isFullyCommentedLine(line, state, close)) {
         return ' '.repeat(line.length);
     }
 

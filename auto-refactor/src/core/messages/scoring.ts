@@ -490,4 +490,21 @@ export const ScoringRationales = {
 
     // ── Go Modern Language Pack ──────────────────────────────────────────────────
     GO_MODERNITY: (msg: string) => `Go modernization or idiom recommendation: ${msg}`,
+
+    // ── Frontend Engineering & UI/UX Governance ──────────────────────────────────
+    UI_A11Y_SEMANTICS: (msg: string) => `Frontend HTML semantics or accessibility violation: ${msg}`,
+    UI_DOM_DEPTH_REFLOW: (msg: string) => `Frontend DOM nesting depth or CSS animation reflow defect: ${msg}`,
+    UI_COMPONENT_REUSE: (msg: string) => `Frontend component props footprint or template duplication: ${msg}`,
+    UI_NAMING_CONVENTION: (msg: string) => `Frontend hook or event handler naming convention defect: ${msg}`,
+
+    // ── Production Build Hygiene ─────────────────────────────────────────────────
+    PROD_DEBUG_RESIDUE: (msg: string) => `Production build residue (debug logs, TODOs, or absolute paths): ${msg}`,
+    PROD_SOURCE_MAP_LEAK: (msg: string) => `Production source map exposure risk: ${msg}`,
+    PROD_ENV_SECRET_LEAK: (msg: string) => `Sensitive backend environment secret leaked in client bundle: ${msg}`,
+
+    // ── Client Exposure Risk Governance ──────────────────────────────────────────
+    CLIENT_INTERNAL_ENDPOINT: (msg: string) => `Internal backend API endpoint exposed in client code: ${msg}`,
+    CLIENT_CSS_AUTH_BYPASS: (msg: string) => `Client-side visual hiding used instead of real authorization: ${msg}`,
+    CLIENT_DISABLED_FLAG_LEAK: (msg: string) => `Disabled feature flag implementation code bundled to client: ${msg}`,
+    CLIENT_UNRELEASED_ROUTE: (msg: string) => `Unreleased or test route packaged into production router: ${msg}`,
 } as const;

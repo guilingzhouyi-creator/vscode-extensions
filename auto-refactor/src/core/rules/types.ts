@@ -59,7 +59,10 @@ export type RuleFamily =
     | 'STDLIB'
     | 'GATE'
     | 'NUM'
-    | 'LEGACY';
+    | 'LEGACY'
+    | 'VSC'
+    | 'UI'
+    | 'PROD';
 
 /** Canonical rule-family prefix for repository gate architecture governance. */
 export const RULE_FAMILY_GATE = 'GATE';
@@ -125,6 +128,10 @@ export const RULE_FAMILY_NUMERIC = 'NUM';
  * rather than an inline string literal.
  */
 export const RULE_FAMILY_VSCODE_EXTENSION = 'VSC';
+/** Canonical rule-family prefix for frontend UI and accessibility rules. */
+export const RULE_FAMILY_UI = 'UI';
+/** Canonical rule-family prefix for production build hygiene rules. */
+export const RULE_FAMILY_PRODUCTION = 'PROD';
 
 /** Canonical legacy reason string for backward-compatible non-canonical ids. */
 export const LEGACY_REASON_ID_NOT_CANONICAL = 'id-not-canonical';

@@ -230,6 +230,9 @@ function auditFileName(
     if (JS_TS_EXTS.has(ext)) {
         const isKebab = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(nameWithoutExt);
         if (isKebab) return;
+        const isPascalComponent =
+            (ext === '.tsx' || ext === '.jsx') && /^[A-Z][a-zA-Z0-9]+$/.test(nameWithoutExt);
+        if (isPascalComponent) return;
         const suggested = nameWithoutExt
             .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_KEBAB_PATTERN)
             .replace(/[_]/g, '-')

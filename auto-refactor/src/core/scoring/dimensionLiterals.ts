@@ -696,3 +696,60 @@ export const RULE_NAM_LEN_002 = 'NAM-LEN-002';
 export const RULE_NAM_ABR_001 = 'NAM-ABR-001';
 /** Rule id for excessive function parameters guard (>4 parameters). */
 export const RULE_SIM_ARGS_001 = 'SIM-ARGS-001';
+
+/** Analyzer id for frontend UI/UX and component hygiene. */
+export const ANALYZER_FRONTEND = 'frontend';
+/** Analyzer id for production build hygiene and residue detection. */
+export const ANALYZER_PRODUCTION_HYGIENE = 'production-hygiene';
+/** Analyzer id for client exposure risks and frontend security. */
+export const ANALYZER_CLIENT_EXPOSURE = 'client-exposure';
+
+/** Rule id for HTML semantics and accessibility violations. */
+export const RULE_UI_ENG_001 = 'UI-ENG-001';
+/** Rule id for DOM nesting depth and animation reflow properties. */
+export const RULE_UI_ENG_002 = 'UI-ENG-002';
+/** Rule id for God components and component duplication patterns. */
+export const RULE_UI_ENG_003 = 'UI-ENG-003';
+/** Rule id for frontend hook and event handler naming conventions. */
+export const RULE_UI_ENG_004 = 'UI-ENG-004';
+
+/** Rule id for production artifact debug logs, TODOs, and absolute paths. */
+export const RULE_PROD_HYG_001 = 'PROD-HYG-001';
+/** Rule id for public source map leakage in production builds. */
+export const RULE_PROD_HYG_002 = 'PROD-HYG-002';
+/** Rule id for backend environment variable leakage in client code. */
+export const RULE_PROD_HYG_003 = 'PROD-HYG-003';
+
+/** Rule id for internal API endpoint exposure in client bundles. */
+export const RULE_SEC_EXP_001 = 'SEC-EXP-001';
+/** Rule id for CSS-only authorization bypass in frontend code. */
+export const RULE_SEC_EXP_002 = 'SEC-EXP-002';
+/** Rule id for inactive feature flag payload leakage. */
+export const RULE_SEC_EXP_003 = 'SEC-EXP-003';
+/** Rule id for unreleased or test route packaging in production routers. */
+export const RULE_SEC_EXP_004 = 'SEC-EXP-004';
+
+/** Points deducted for UI accessibility and semantic structure violations. */
+export const DEDUCTION_UI_A11Y = 10;
+/** Points deducted for excessive DOM nesting depth or reflow CSS. */
+export const DEDUCTION_UI_DOM_DEPTH = 12;
+/** Points deducted for God components or component duplication. */
+export const DEDUCTION_UI_COMPONENT_REUSE = 10;
+/** Points deducted for frontend hook/event naming convention defects. */
+export const DEDUCTION_UI_NAMING = 5;
+
+/** Points deducted for debug residue or absolute paths in production. */
+export const DEDUCTION_PROD_DEBUG_RESIDUE = 15;
+/** Points deducted for source map exposure in production. */
+export const DEDUCTION_PROD_SOURCE_MAP = 20;
+/** Points deducted for backend environment secrets in client code. */
+export const DEDUCTION_PROD_ENV_SECRET = 35;
+
+/** Points deducted for internal backend API exposure in client bundles. */
+export const DEDUCTION_SEC_INTERNAL_ENDPOINT = 25;
+/** Points deducted for CSS-only authorization bypass. */
+export const DEDUCTION_SEC_CSS_AUTH_BYPASS = 30;
+/** Points deducted for inactive feature flag payload leakage. */
+export const DEDUCTION_SEC_DISABLED_FLAG = 15;
+/** Points deducted for unreleased test routes in production. */
+export const DEDUCTION_SEC_UNRELEASED_ROUTE = 25;
