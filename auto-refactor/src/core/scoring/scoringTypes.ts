@@ -87,13 +87,14 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         'gate-architecture',
     ],
     semanticPurity: ['governance', 'hygiene', 'dependency-graph', 'stdlib'],
-    codeSecurity: ['architecture', 'security', 'secrets'],
+    codeSecurity: ['architecture', 'security', 'secrets', 'production-hygiene', 'client-exposure'],
     performanceEfficiency: [
         'performance',
         'data-architecture',
         'complexity',
         'gdscript-game',
         'vscode-extension',
+        'frontend',
     ],
     standardization: [
         'hygiene',
@@ -105,6 +106,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         'gate-architecture',
         'shell-lint',
         'simplify',
+        'frontend',
     ],
     modernity: [
         'governance',
@@ -125,6 +127,8 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         'gate-architecture',
         'shell-lint',
         'simplify',
+        'frontend',
+        'production-hygiene',
     ],
     commentQuality: ['comments', 'vscode-extension', 'simplify'],
     duplication: ['constants', 'hygiene'],

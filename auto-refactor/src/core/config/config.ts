@@ -64,6 +64,9 @@ import {
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
     ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_FRONTEND,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_CLIENT_EXPOSURE,
 } from '../scoring/dimensionLiterals';
 import {
     applySemanticAndSecurityLevels,
@@ -118,6 +121,9 @@ export const BUILTIN_ANALYZERS = [
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
     ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_FRONTEND,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_CLIENT_EXPOSURE,
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──

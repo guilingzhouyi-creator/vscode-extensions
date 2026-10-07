@@ -135,6 +135,11 @@ import {
     DEDUCTION_SIMPLIFY_STANDARDIZATION,
     DEDUCTION_GO_MODERNITY,
 } from './dimensionLiterals';
+import {
+    FRONTEND_DIMENSION_RULES,
+    type DimensionRule,
+} from './dimension-rule-table-frontend';
+export type { DimensionRule };
 import type { QualityDimension } from './scoringTypes';
 
 /** Hygiene rule flagging naming drift (kebab-case / snake_case violations). */
@@ -222,18 +227,6 @@ const anyFinding = (): boolean => true;
  * keeps the table honest: prose fragments silently stopped matching once rule ids were
  * normalized, which made several axes undeductable while still reporting as measured.
  */
-export interface DimensionRule {
-    /** Analyzer that must own the finding. */
-    analyzer: string;
-    /** Whether this row covers the finding. */
-    covers: (issue: Issue) => boolean;
-    /** Dimension this row deducts from. */
-    dimension: QualityDimension;
-    /** Points removed from the dimension index. */
-    points: number;
-    /** Rationale builder, so every deduction stays explainable in the audit trail. */
-    rationale: (message: string) => string;
-}
 
 /**
  * The quantified standard's deduction table: which rule deducts what, and by how much.
@@ -785,6 +778,8 @@ export const DIMENSION_RULES: DimensionRule[] = [
         points: DEDUCTION_GO_MODERNITY,
         rationale: ScoringRationales.GO_MODERNITY,
     },
+
+    ...FRONTEND_DIMENSION_RULES,
 ];
 
 /**

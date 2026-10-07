@@ -54,6 +54,9 @@ import {
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
     ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_FRONTEND,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_CLIENT_EXPOSURE,
 } from '../scoring/dimensionLiterals';
 
 export {
@@ -97,6 +100,9 @@ export const SPECIALIZED_ANALYZERS = new Set<string>([
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
     ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_FRONTEND,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_CLIENT_EXPOSURE,
 ]);
 
 /** Auto-tune estimate: source lines per profiled language entry. */

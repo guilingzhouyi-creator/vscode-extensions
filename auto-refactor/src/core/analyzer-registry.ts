@@ -50,6 +50,9 @@ import { StdlibAnalyzer } from '../analyzers/stdlib';
 import { GdscriptGameAnalyzer } from '../analyzers/gdscript-game';
 import { VscodeExtensionAnalyzer } from '../analyzers/vscode-extension';
 import { GateArchitectureAnalyzer } from '../analyzers/gate-architecture';
+import { FrontendAnalyzer } from '../analyzers/frontend';
+import { ProductionHygieneAnalyzer } from '../analyzers/production-hygiene';
+import { ClientExposureAnalyzer } from '../analyzers/client-exposure';
 
 /**
  * Resolved metadata and fresh instance factory for a declared analyzer.
@@ -112,6 +115,9 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
     'gdscript-game': () => new GdscriptGameAnalyzer(),
     'vscode-extension': () => new VscodeExtensionAnalyzer(),
     'gate-architecture': () => new GateArchitectureAnalyzer(),
+    frontend: () => new FrontendAnalyzer(),
+    'production-hygiene': () => new ProductionHygieneAnalyzer(),
+    'client-exposure': () => new ClientExposureAnalyzer(),
 };
 
 /**
@@ -153,6 +159,9 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     'gdscript-game': '../analyzers/gdscript-game',
     'vscode-extension': '../analyzers/vscode-extension',
     'gate-architecture': '../analyzers/gate-architecture',
+    frontend: '../analyzers/frontend',
+    'production-hygiene': '../analyzers/production-hygiene',
+    'client-exposure': '../analyzers/client-exposure',
 };
 
 const dynamicRequire = createRequire(__filename);

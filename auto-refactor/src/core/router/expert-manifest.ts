@@ -40,6 +40,9 @@ import {
     ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
     ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_FRONTEND,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_CLIENT_EXPOSURE,
 } from '../scoring/dimensionLiterals';
 
 const TRACK_FAST = 'fast' as const;
@@ -406,6 +409,34 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         weight: 2.5,
         fallback: FALLBACK_ESCALATE_DEEP,
         description: 'Gate architecture boundaries, subprocess isolation, and CI/local parity',
+    },
+    {
+        id: ANALYZER_FRONTEND,
+        signals: [SIG_GENERAL_CODE, SIG_NON_SOURCE],
+        track: TRACK_FAST,
+        steadyCostUs: COST_60,
+        weight: 2.0,
+        fallback: FALLBACK_ESCALATE_DEEP,
+        description: 'Frontend UI/UX, A11y semantics, DOM depth, and component hygiene',
+    },
+    {
+        id: ANALYZER_PRODUCTION_HYGIENE,
+        signals: [SIG_GENERAL_CODE, SIG_MANIFEST, SIG_CONFIG_SECURITY],
+        track: TRACK_FAST,
+        steadyCostUs: COST_70,
+        weight: 2.5,
+        fallback: FALLBACK_ESCALATE_DEEP,
+        description: 'Production build hygiene, debug residue, source map, and secret leak guard',
+    },
+    {
+        id: ANALYZER_CLIENT_EXPOSURE,
+        signals: [SIG_CONFIG_SECURITY, SIG_GENERAL_CODE, SIG_IO],
+        track: TRACK_DEEP,
+        steadyCostUs: COST_90,
+        weight: 3.5,
+        isSecurityFamily: true,
+        fallback: FALLBACK_BLOCK,
+        description: 'Client exposure risk, internal API leaks, CSS auth bypass, and route exposure',
     },
 ];
 

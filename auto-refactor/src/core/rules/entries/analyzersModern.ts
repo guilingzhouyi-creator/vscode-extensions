@@ -15,11 +15,13 @@ import {
     REMEDIATION_STANDARD_AND_ABOVE,
 } from './analyzers-modern-gdscript';
 import { ANALYZER_MODERN_ARCHITECTURE_RULES } from './analyzers-modern-architecture';
+import { ANALYZER_MODERN_FRONTEND_RULES } from './analyzers-modern-frontend';
 
 export { REMEDIATION_STANDARD_AND_ABOVE };
 export { ANALYZER_MODERN_LANGUAGE_RULES } from './analyzers-modern-languages';
 export { ANALYZER_MODERN_GDSCRIPT_RULES } from './analyzers-modern-gdscript';
 export { ANALYZER_MODERN_ARCHITECTURE_RULES } from './analyzers-modern-architecture';
+export { ANALYZER_MODERN_FRONTEND_RULES } from './analyzers-modern-frontend';
 
 /**
  * Modern analyzer rule definitions cataloging TypeScript,
@@ -29,4 +31,5 @@ export const ANALYZER_MODERN_RULES: readonly RuleDefinition[] = [
     ...ANALYZER_MODERN_LANGUAGE_RULES,
     ...ANALYZER_MODERN_GDSCRIPT_RULES,
     ...ANALYZER_MODERN_ARCHITECTURE_RULES,
+    ...ANALYZER_MODERN_FRONTEND_RULES,
 ];

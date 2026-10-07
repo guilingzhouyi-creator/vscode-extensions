@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-07T08:20:43.850Z",
-  "totalRules": 391,
+  "generatedAt": "2026-10-07T09:53:01.714Z",
+  "totalRules": 402,
   "counts": {
-    "autoRefactor": 310,
+    "autoRefactor": 321,
     "workspaceTiming": 45,
     "webGames": 56,
     "globalTooling": 7
@@ -1921,6 +1921,27 @@
       "summary": "Streaming chunk loading lacks ring buffer reuse: repeated instantiation of temporary buffers during streaming I/O or chunked reading."
     },
     {
+      "id": "PROD-HYG-001",
+      "project": "auto-refactor",
+      "family": "PROD",
+      "severity": "error",
+      "summary": "Production build output must not contain console debug statements, TODO markers, or local absolute paths"
+    },
+    {
+      "id": "PROD-HYG-002",
+      "project": "auto-refactor",
+      "family": "PROD",
+      "severity": "error",
+      "summary": "Production build must not expose source map files or sourceMappingURL directives to clients"
+    },
+    {
+      "id": "PROD-HYG-003",
+      "project": "auto-refactor",
+      "family": "PROD",
+      "severity": "error",
+      "summary": "Sensitive backend environment variable references must not leak into client-facing bundles"
+    },
+    {
       "id": "PS-ALIAS-001",
       "project": "auto-refactor",
       "family": "PS",
@@ -2227,6 +2248,34 @@
       "family": "L3",
       "severity": "error",
       "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-ORPHAN)"
+    },
+    {
+      "id": "SEC-EXP-001",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "Internal, administrative, or unauthenticated backend endpoints must not be exposed in client code"
+    },
+    {
+      "id": "SEC-EXP-002",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "Visual hiding (display:none) or UI disabling must not be used as sole authorization mechanism"
+    },
+    {
+      "id": "SEC-EXP-003",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "Disabled feature flags must not bundle full implementation logic to client bundles"
+    },
+    {
+      "id": "SEC-EXP-004",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "Unreleased, experimental, or test preview routes must not be packaged into production routes"
     },
     {
       "id": "SEC-LEAK-001",
@@ -2675,6 +2724,34 @@
       "family": "TST",
       "severity": "error",
       "summary": "Polyglot test topology dual-track discipline: embedding test code blocks in TS/GDScript production files is strictly prohibited."
+    },
+    {
+      "id": "UI-ENG-001",
+      "project": "auto-refactor",
+      "family": "UI",
+      "severity": "error",
+      "summary": "HTML semantic structure and accessibility attributes must be present on interactive elements"
+    },
+    {
+      "id": "UI-ENG-002",
+      "project": "auto-refactor",
+      "family": "UI",
+      "severity": "error",
+      "summary": "DOM hierarchy nesting depth must not exceed 12 and CSS animations must avoid reflow properties"
+    },
+    {
+      "id": "UI-ENG-003",
+      "project": "auto-refactor",
+      "family": "UI",
+      "severity": "error",
+      "summary": "Component must not exceed 10 props or duplicate complex DOM subtrees without reuse"
+    },
+    {
+      "id": "UI-ENG-004",
+      "project": "auto-refactor",
+      "family": "UI",
+      "severity": "error",
+      "summary": "Frontend hooks must start with \"use\" and event handler callbacks must start with \"on\" or \"handle\""
     },
     {
       "id": "unused-export",

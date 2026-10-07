@@ -122,6 +122,10 @@ const EXTENSION_LANGUAGE_MAP: Record<string, LanguageKind> = {
     '.yml': 'yaml',
     '.yaml': 'yaml',
     '.md': 'markdown',
+    '.html': 'javascript',
+    '.htm': 'javascript',
+    '.vue': 'typescript',
+    '.svelte': 'typescript',
 };
 
 const CONFIG_EXTS = new Set(['.json', '.yaml', '.yml']);
