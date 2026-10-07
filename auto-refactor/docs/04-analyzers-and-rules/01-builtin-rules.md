@@ -144,8 +144,10 @@
 | `VSC-I18N-001` | <a id="vsc-i18n-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 用户可见消息使用硬编码字符串字面量未接入国际化字典。 | 使用 vscode.l10n.t(...) 或双语字典常量进行包装。 |
 | `VSC-MEM-001` | <a id="vsc-mem-001"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | VS Code Disposable 资源创建后未压入 context.subscriptions。 | 使用 context.subscriptions.push(...) 注册或纳入复合 Disposable 管理。 |
 | `VSC-PERF-001` | <a id="vsc-perf-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 在 Extension Host 主线程执行同步文件 I/O 阻塞编辑器 UI。 | 改用 fs.promises 或 vscode.workspace.fs 异步 I/O 接口。 |
+| `VSC-PERF-002` | <a id="vsc-perf-002"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview CSS 动效直接过渡或动画几何布局属性引发浏览器昂贵重排（Reflow）。 | 将几何属性（width/height/top/left 等）动效替换为 transform 或 opacity 等 GPU 合成层属性。 |
 | `VSC-UI-001` | <a id="vsc-ui-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 集合列表渲染缺少有界密度控制或折叠收起能力（超过 5 项列表缺乏折叠与导出旁置布局）。 | 为 Webview 动态集合列表实现阈值折叠控件与紧凑密度布局，保障大数据集下信息层次清晰。 |
 | `VSC-UI-002` | <a id="vsc-ui-002"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | Webview 视图样式包含硬编码单色颜色值，破坏 VS Code 主题动态自适应契约。 | 将硬编码颜色替换为 VS Code CSS 主题变量（如 var(--vscode-editor-foreground) 等）。 |
+| `VSC-UI-003` | <a id="vsc-ui-003"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 表单交互输入控件缺少无障碍名称或标签绑定（WCAG 4.1.2）。 | 为表单控件补充 aria-label、aria-labelledby 或显式绑定 <label for="...">。 |
 
 ### Layer 1 — 全域安全、密钥与卫生底线层 (Universal Safety & Hygiene)
 

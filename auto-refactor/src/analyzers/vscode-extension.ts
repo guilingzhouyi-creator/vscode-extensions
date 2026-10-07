@@ -7,6 +7,10 @@
  *   1. VSC-MEM-001: Guard against Disposable leaks via generalized lifecycle matcher.
  *   2. VSC-PERF-001: Guard against main thread blocking I/O via generalized blocking matcher.
  *   3. VSC-I18N-001: Guard against un-localized UI notifications via presentation literal matcher.
+ *   4. VSC-UI-001: Guard against unbounded Webview collection lists lacking folding/threshold.
+ *   5. VSC-UI-002: Guard against hardcoded colors without VS Code theme variables.
+ *   6. VSC-PERF-002: Guard against CSS transitions on geometry layout properties causing reflow.
+ *   7. VSC-UI-003: Guard against interactive form controls lacking accessible labels (A11y).
  * Exit Semantics & Design Rationale: Pure, fail-safe scanner returning Issue[]. Zero throw.
  */
 
@@ -214,6 +218,38 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
+        // 6. VSC-PERF-002: Webview CSS transition on geometry layout properties causing reflow
+        const layoutTransitionViolations = this.detectLayoutTransitions(raw);
+        for (const t of layoutTransitionViolations) {
+            issues.push(
+                makeVscIssue(
+                    file,
+                    t.line,
+                    'VSC-PERF-002',
+                    SEVERITY_WARNING,
+                    `Webview CSS transition directly animates geometry layout property '${t.prop}' triggering expensive browser reflow.`,
+                    "Replace geometry transition with GPU-accelerated 'transform' (e.g. scaleX/scaleY) or 'opacity'.",
+                    { line: t.line, text: t.text, prop: t.prop },
+                ),
+            );
+        }
+
+        // 7. VSC-UI-003: Webview interactive form controls missing accessible labels (A11y WCAG 4.1.2)
+        const a11yViolations = this.detectInaccessibleFormControls(raw);
+        for (const a of a11yViolations) {
+            issues.push(
+                makeVscIssue(
+                    file,
+                    a.line,
+                    'VSC-UI-003',
+                    SEVERITY_WARNING,
+                    `Webview interactive <${a.tag}> form control lacks accessible label binding (WCAG 4.1.2).`,
+                    "Add 'aria-label', 'aria-labelledby', or associate with a '<label for=\"...\">'.",
+                    { line: a.line, text: a.text, tag: a.tag },
+                ),
+            );
+        }
+
         return issues;
     }
 
@@ -264,6 +300,50 @@ export class VscodeExtensionAnalyzer implements Analyzer {
                 const monochrome = ['#000', '#000000', '#fff', '#ffffff', 'black', 'white'];
                 if (monochrome.includes(matchedColor) && !line.includes('var(--vscode-')) {
                     violations.push({ line: i + 1, text: line.trim(), color: m[1] });
+                }
+            }
+        }
+        return violations;
+    }
+
+    private detectLayoutTransitions(
+        rawLines: string[],
+    ): Array<{ line: number; text: string; prop: string }> {
+        const violations: Array<{ line: number; text: string; prop: string }> = [];
+        const re = /transition\s*:[^;]*\b(width|height|top|bottom|left|right|margin|padding)\b/i;
+        for (let i = 0; i < rawLines.length; i++) {
+            const line = rawLines[i];
+            const m = re.exec(line);
+            if (m) {
+                violations.push({ line: i + 1, text: line.trim(), prop: m[1] });
+            }
+        }
+        return violations;
+    }
+
+    private detectInaccessibleFormControls(
+        rawLines: string[],
+    ): Array<{ line: number; text: string; tag: string }> {
+        const violations: Array<{ line: number; text: string; tag: string }> = [];
+        for (let i = 0; i < rawLines.length; i++) {
+            const line = rawLines[i];
+            if (/<(?:input|select)\b/i.test(line)) {
+                if (/type\s*=\s*['"]hidden['"]/i.test(line)) continue;
+                const hasA11y =
+                    /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]/i.test(line) ||
+                    /<label\b[^>]*\bfor\s*=/i.test(line);
+                if (!hasA11y) {
+                    const windowStart = Math.max(0, i - 2);
+                    const windowEnd = Math.min(rawLines.length, i + 3);
+                    const surrounding = rawLines.slice(windowStart, windowEnd).join('\n');
+                    const windowHasA11y =
+                        /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]|<label\b[^>]*\bfor\s*=/i.test(
+                            surrounding,
+                        );
+                    if (!windowHasA11y) {
+                        const tag = /<([a-z]+)/i.exec(line)?.[1] ?? 'input';
+                        violations.push({ line: i + 1, text: line.trim(), tag });
+                    }
                 }
             }
         }

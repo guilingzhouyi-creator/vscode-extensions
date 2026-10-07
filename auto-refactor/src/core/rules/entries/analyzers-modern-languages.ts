@@ -678,4 +678,28 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
             'Replace hardcoded hex colors with VS Code CSS theme variables (var(--vscode-*)).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-ui-002',
     }),
+    defineRule({
+        id: 'VSC-PERF-002',
+        family: RULE_FAMILY_VSCODE_EXTENSION,
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        canonical: true,
+        languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Webview CSS transition directly animates geometry layout property triggering browser reflow.',
+        remediation:
+            'Replace geometry layout transition (width/height/top/left) with transform or opacity.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-perf-002',
+    }),
+    defineRule({
+        id: 'VSC-UI-003',
+        family: RULE_FAMILY_VSCODE_EXTENSION,
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        canonical: true,
+        languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
+        defaultSeverity: SEVERITY_WARNING,
+        summary: 'Webview interactive form control lacks accessible label binding (WCAG 4.1.2).',
+        remediation: 'Add aria-label, aria-labelledby, or bind with <label for="...">.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-ui-003',
+    }),
 ];

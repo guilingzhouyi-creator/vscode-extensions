@@ -23,13 +23,22 @@ export const DIFF_OP_DELETE = 'delete';
 /** DiffOp and hunk-line tag for a line added in the new content. */
 export const DIFF_OP_INSERT = 'insert';
 
-/** A single diff operation. */
+/** DiffOp tag for a compressed run of equal lines (eliminates transient heap allocation). */
+export const DIFF_OP_EQUAL_SPAN = 'equal_span';
+
+/** A single diff operation or compressed equal span. */
 export interface DiffOp {
-    type: typeof DIFF_OP_EQUAL | typeof DIFF_OP_DELETE | typeof DIFF_OP_INSERT;
-    /** Index into the OLD line array (for 'equal'/'delete'); insertion point for 'insert'. */
+    type:
+        | typeof DIFF_OP_EQUAL
+        | typeof DIFF_OP_DELETE
+        | typeof DIFF_OP_INSERT
+        | typeof DIFF_OP_EQUAL_SPAN;
+    /** Index into the OLD line array (for 'equal'/'delete'); insertion point for 'insert'; start index for 'equal_span'. */
     aIdx: number;
-    /** Index into the NEW line array (for 'equal'/'insert'). */
+    /** Index into the NEW line array (for 'equal'/'insert'); start index for 'equal_span'. */
     bIdx: number;
+    /** Optional span length for 'equal_span'. When omitted, length defaults to 1. */
+    length?: number;
 }
 
 /**
@@ -260,7 +269,8 @@ function backtrackMyersTrace(
 
         const base = di * di + di;
         const k = x - y;
-        const insertMove = k === -di || (k !== di && flatTrace[base + k - 1] < flatTrace[base + k + 1]);
+        const insertMove =
+            k === -di || (k !== di && flatTrace[base + k - 1] < flatTrace[base + k + 1]);
         const prevK = insertMove ? k + 1 : k - 1;
         const prevX = flatTrace[base + prevK];
         const prevY = prevX - prevK;
@@ -300,19 +310,61 @@ export function assembleDiffOps(
     m: number,
     midOps: DiffOp[],
 ): DiffOp[] {
-    const total = prefix + midOps.length + suffix;
-    const fullOps: DiffOp[] = new Array(total);
-    let idx = 0;
-    for (let i = 0; i < prefix; i++) {
-        fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
+    const compactEnabled = process.env.AR_COMPACT_DIFF !== '0';
+    const contextMargin = 3;
+
+    if (!compactEnabled || (prefix <= contextMargin * 2 && suffix <= contextMargin * 2)) {
+        const total = prefix + midOps.length + suffix;
+        const fullOps: DiffOp[] = new Array(total);
+        let idx = 0;
+        for (let i = 0; i < prefix; i++) {
+            fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
+        }
+        for (let i = 0; i < midOps.length; i++) {
+            fullOps[idx++] = midOps[i];
+        }
+        for (let i = 0; i < suffix; i++) {
+            fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i };
+        }
+        return fullOps;
     }
+
+    const ops: DiffOp[] = [];
+
+    if (prefix > contextMargin * 2) {
+        const spanLen = prefix - contextMargin;
+        ops.push({ type: DIFF_OP_EQUAL_SPAN, aIdx: 0, bIdx: 0, length: spanLen });
+        for (let i = spanLen; i < prefix; i++) {
+            ops.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
+        }
+    } else {
+        for (let i = 0; i < prefix; i++) {
+            ops.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
+        }
+    }
+
     for (let i = 0; i < midOps.length; i++) {
-        fullOps[idx++] = midOps[i];
+        ops.push(midOps[i]);
     }
-    for (let i = 0; i < suffix; i++) {
-        fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i };
+
+    if (suffix > contextMargin * 2) {
+        for (let i = 0; i < contextMargin; i++) {
+            ops.push({ type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i });
+        }
+        const spanLen = suffix - contextMargin;
+        ops.push({
+            type: DIFF_OP_EQUAL_SPAN,
+            aIdx: n - spanLen,
+            bIdx: m - spanLen,
+            length: spanLen,
+        });
+    } else {
+        for (let i = 0; i < suffix; i++) {
+            ops.push({ type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i });
+        }
     }
-    return fullOps;
+
+    return ops;
 }
 
 const FNV1A_32_PRIME = 0x01000193;

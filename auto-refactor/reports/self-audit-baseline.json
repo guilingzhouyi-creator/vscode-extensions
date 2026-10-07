@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791357780474",
-  "timestamp": "2026-10-07T07:23:08.863Z",
+  "snapshotId": "snapshot-v0.4.0-1791361287939",
+  "timestamp": "2026-10-07T08:21:35.424Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -8,42 +8,42 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "92e9403388bb3c068e2dc34643c88536318ccac88749ff0dc6557dd8ff03d683",
+  "rulesDigest": "8ad98631218d58f54cb594e31037d69d4aaee1a44affb9ddf48d31d630607bfd",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 607,
-    "durationMs": 7052
+    "durationMs": 6203
   },
   "metrics": {
     "compositeScore": 98.88,
     "grade": "A+",
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 12576,
+    "totalIssues": 12586,
     "suppressedIssues": 496,
-    "unsuppressedIssues": 12080,
+    "unsuppressedIssues": 12090,
     "bySeverity": {
-      "info": 1192,
-      "warning": 11384,
+      "info": 1191,
+      "warning": 11395,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 203,
-      "medium": 5994,
-      "low": 6379
+      "high": 204,
+      "medium": 5997,
+      "low": 6385
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 98.39,
+      "maintainability": 98.38,
       "performance": 99.25,
       "data": 99.91,
       "testing": 100,
       "reliability": 99.91,
       "security": 100,
-      "extensibility": 92.5
+      "extensibility": 92.49
     },
     "compositeScore": 98.88,
     "weights": {
@@ -63,9 +63,9 @@
     "semanticPurity": 99.82,
     "codeSecurity": 100,
     "performanceEfficiency": 99.25,
-    "standardization": 77.53,
+    "standardization": 77.5,
     "modernity": 100,
-    "maintainability": 98.39,
+    "maintainability": 98.38,
     "commentQuality": 99.98,
     "duplication": 100,
     "techDebtRisk": 100
@@ -165,9 +165,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 203,
-      "medium": 5994,
-      "low": 6379
+      "high": 204,
+      "medium": 5997,
+      "low": 6385
     },
     "criticalItems": [],
     "highItems": [
@@ -642,7 +642,7 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 97.86,
+        "compositeScore": 97.85,
         "pillars": {
           "architecture": 100,
           "maintainability": 94.73,
@@ -651,7 +651,7 @@
           "testing": 100,
           "reliability": 99.59,
           "security": 100,
-          "extensibility": 89.74
+          "extensibility": 89.68
         },
         "moduleCount": 1
       },
@@ -822,16 +822,16 @@
       },
       {
         "domainName": "diff",
-        "compositeScore": 98.57,
+        "compositeScore": 98.52,
         "pillars": {
           "architecture": 100,
-          "maintainability": 95.99,
+          "maintainability": 95.72,
           "performance": 99.75,
           "data": 99.86,
           "testing": 100,
           "reliability": 99.86,
           "security": 100,
-          "extensibility": 92.4
+          "extensibility": 92.27
         },
         "moduleCount": 1
       },
@@ -957,7 +957,7 @@
       },
       {
         "domainName": "native",
-        "compositeScore": 98.13,
+        "compositeScore": 98.14,
         "pillars": {
           "architecture": 100,
           "maintainability": 96.88,
@@ -966,7 +966,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 87.7
+          "extensibility": 87.74
         },
         "moduleCount": 1
       },
@@ -1167,7 +1167,7 @@
       },
       {
         "domainName": "entries",
-        "compositeScore": 99.51,
+        "compositeScore": 99.5,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.23,
@@ -1176,7 +1176,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 96.29
+          "extensibility": 96.19
         },
         "moduleCount": 1
       },
@@ -1272,7 +1272,7 @@
       },
       {
         "domainName": "snapshot",
-        "compositeScore": 98.1,
+        "compositeScore": 97.99,
         "pillars": {
           "architecture": 100,
           "maintainability": 100,
@@ -1281,7 +1281,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 92.01
+          "extensibility": 90.84
         },
         "moduleCount": 1
       },
@@ -1349,27 +1349,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 126013,
-      "unique": 101515,
-      "changed": 0,
-      "semantic": 0,
+      "processed": 126181,
+      "unique": 101647,
+      "changed": 1477,
+      "semantic": 1182,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 0,
+      "added": 739,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791357780472,
+      "endMs": 1791361287937,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 18155780,
-        "uniqueTotal": 101515,
-        "changedTotal": 162451,
-        "semanticTotal": 129963
+        "processedTotal": 18203936,
+        "uniqueTotal": 101647,
+        "changedTotal": 156080,
+        "semanticTotal": 124866
       },
       "qed": {
         "mean": -0.002,
@@ -1377,12 +1377,12 @@
         "max": 0.02
       },
       "debt": {
-        "totalAdded": 1414,
+        "totalAdded": 1420,
         "totalResolved": 477,
         "totalRegressions": 4,
         "netYield": -0.05
       },
-      "meanCompositeScore": 99.1,
+      "meanCompositeScore": 99.08,
       "gatePassRate": 98.67
     },
     "isFirstBaseline": false

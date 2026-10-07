@@ -20,6 +20,7 @@ import {
     DIFF_OP_EQUAL,
     DIFF_OP_DELETE,
     DIFF_OP_INSERT,
+    DIFF_OP_EQUAL_SPAN,
     myersDiff,
     myersDiffCore,
     trimPrefixSuffix,
@@ -33,7 +34,7 @@ import {
 import { nativeCore } from '../native';
 import type { NativeDiffHunk } from '../native';
 
-export { histogramDiff, myersDiff, DiffOp, getLine, formatUnifiedDiff };
+export { histogramDiff, myersDiff, DiffOp, DIFF_OP_EQUAL_SPAN, getLine, formatUnifiedDiff };
 
 /**
  * Computes line-level histogram diff hunks using the high-performance native Rust operator.
@@ -395,7 +396,7 @@ function scanContiguousEdits(
     let delCount = 0;
     let insCount = 0;
     let i = startIndex;
-    while (i < ops.length && ops[i].type !== DIFF_OP_EQUAL) {
+    while (i < ops.length && ops[i].type !== DIFF_OP_EQUAL && ops[i].type !== DIFF_OP_EQUAL_SPAN) {
         if (ops[i].type === DIFF_OP_DELETE) delCount++;
         else insCount++;
         i++;
@@ -416,7 +417,7 @@ function extractEditRanges(
     const edits: EditRange[] = [];
     let i = 0;
     while (i < ops.length) {
-        if (ops[i].type === DIFF_OP_EQUAL) {
+        if (ops[i].type === DIFF_OP_EQUAL || ops[i].type === DIFF_OP_EQUAL_SPAN) {
             i++;
             continue;
         }

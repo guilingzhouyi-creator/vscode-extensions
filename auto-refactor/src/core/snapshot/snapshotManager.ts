@@ -121,33 +121,53 @@ export function createAuditSnapshot(
     };
 }
 
+export interface VerifySnapshotOptions {
+    /** Whether to allow rule count/digest drift against current runtime (e.g. for historic frozen baselines). */
+    allowDrift?: boolean;
+}
+
 /**
  * Verify snapshot integrity against current compiled runtime state.
  *
  * @param snapshot - Snapshot to validate.
+ * @param options - Optional verification parameters.
  * @returns Verification result containing validity boolean and failure descriptions.
  */
-export function verifyAuditSnapshot(snapshot: AuditSnapshot): {
+export function verifyAuditSnapshot(
+    snapshot: AuditSnapshot,
+    options: VerifySnapshotOptions = {},
+): {
     valid: boolean;
     errors: string[];
 } {
     const errors: string[] = [];
 
-    if (snapshot.versions.engineVersion !== CURRENT_ENGINE_VERSION) {
+    if (!options.allowDrift && snapshot.versions.engineVersion !== CURRENT_ENGINE_VERSION) {
         errors.push(
             `Engine version mismatch: snapshot=${snapshot.versions.engineVersion}, current=${CURRENT_ENGINE_VERSION}`,
         );
     }
 
-    const currentRulesDigest = computeRuleRegistryDigest();
-    if (snapshot.rulesDigest !== currentRulesDigest) {
-        errors.push('Rule registry digest mismatch: compiled rules have diverged from snapshot');
-    }
+    if (!options.allowDrift) {
+        const currentRulesDigest = computeRuleRegistryDigest();
+        if (snapshot.rulesDigest !== currentRulesDigest) {
+            errors.push(
+                'Rule registry digest mismatch: compiled rules have diverged from snapshot',
+            );
+        }
 
-    if (snapshot.registeredRuleIds.length !== RULE_REGISTRY.length) {
-        errors.push(
-            `Rule count drift: snapshot has ${snapshot.registeredRuleIds.length}, runtime has ${RULE_REGISTRY.length}`,
-        );
+        if (snapshot.registeredRuleIds.length !== RULE_REGISTRY.length) {
+            errors.push(
+                `Rule count drift: snapshot has ${snapshot.registeredRuleIds.length}, runtime has ${RULE_REGISTRY.length}`,
+            );
+        }
+    } else {
+        if (!snapshot.rulesDigest || typeof snapshot.rulesDigest !== 'string') {
+            errors.push('Snapshot rulesDigest must be a non-empty string');
+        }
+        if (!Array.isArray(snapshot.registeredRuleIds) || snapshot.registeredRuleIds.length === 0) {
+            errors.push('Snapshot registeredRuleIds must be a non-empty array');
+        }
     }
 
     return {

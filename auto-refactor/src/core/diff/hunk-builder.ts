@@ -10,8 +10,13 @@
  */
 
 import type { ReviewDiffHunk, AttributedDiffLine } from '../praxis/contracts';
-import type { DiffOp } from './myers-algorithm';
-import { DIFF_OP_EQUAL, DIFF_OP_DELETE, DIFF_OP_INSERT } from './myers-algorithm';
+import {
+    DIFF_OP_EQUAL,
+    DIFF_OP_DELETE,
+    DIFF_OP_INSERT,
+    DIFF_OP_EQUAL_SPAN,
+    type DiffOp,
+} from './myers-algorithm';
 
 /** Default equal context lines kept on each side of a change when building review hunks. */
 export const DEFAULT_CONTEXT_LINES = 3;
@@ -43,9 +48,12 @@ export function getLine(content: string, starts: number[], idx: number): string 
 function findClusterEnd(ops: DiffOp[], startIdx: number, contextLines: number): number {
     let changeEnd = startIdx;
     while (changeEnd < ops.length) {
-        if (ops[changeEnd].type !== DIFF_OP_EQUAL) {
+        if (ops[changeEnd].type === DIFF_OP_DELETE || ops[changeEnd].type === DIFF_OP_INSERT) {
             changeEnd++;
             continue;
+        }
+        if (ops[changeEnd].type === DIFF_OP_EQUAL_SPAN) {
+            break;
         }
         let lookahead = changeEnd;
         while (lookahead < ops.length && ops[lookahead].type === DIFF_OP_EQUAL) {
@@ -142,7 +150,7 @@ export function buildReviewHunksFromOps(
     let i = 0;
 
     while (i < ops.length) {
-        if (ops[i].type === DIFF_OP_EQUAL) {
+        if (ops[i].type === DIFF_OP_EQUAL || ops[i].type === DIFF_OP_EQUAL_SPAN) {
             i++;
             continue;
         }

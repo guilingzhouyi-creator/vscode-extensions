@@ -30,8 +30,13 @@ import type {
 } from './native-types';
 import { computeLineStartsAndHashes, linesOf, type LineIndex } from '../diff/edit-diff';
 import { histogramDiff } from '../diff/histogram-diff';
-import type { DiffOp } from '../diff/myers-algorithm';
-import { DIFF_OP_EQUAL, DIFF_OP_DELETE, DIFF_OP_INSERT } from '../diff/myers-algorithm';
+import {
+    DIFF_OP_EQUAL,
+    DIFF_OP_DELETE,
+    DIFF_OP_INSERT,
+    DIFF_OP_EQUAL_SPAN,
+    type DiffOp,
+} from '../diff/myers-algorithm';
 import { countLineStats } from '../../utils/linestats';
 import { maskSourceTextJs } from '../policy/source-mask';
 import {
@@ -511,9 +516,15 @@ export class PureJsNativeShim implements INativeCore {
     private findClusterEnd(ops: DiffOp[], clusterStart: number, contextLines: number): number {
         let clusterEnd = clusterStart;
         while (clusterEnd < ops.length) {
-            if (ops[clusterEnd].type !== DIFF_OP_EQUAL) {
+            if (
+                ops[clusterEnd].type === DIFF_OP_DELETE ||
+                ops[clusterEnd].type === DIFF_OP_INSERT
+            ) {
                 clusterEnd++;
                 continue;
+            }
+            if (ops[clusterEnd].type === DIFF_OP_EQUAL_SPAN) {
+                break;
             }
             let equalLookahead = clusterEnd;
             while (equalLookahead < ops.length && ops[equalLookahead].type === DIFF_OP_EQUAL) {
@@ -609,7 +620,7 @@ export class PureJsNativeShim implements INativeCore {
 
         while (i < ops.length) {
             // Skip leading unchanged lines
-            if (ops[i].type === DIFF_OP_EQUAL) {
+            if (ops[i].type === DIFF_OP_EQUAL || ops[i].type === DIFF_OP_EQUAL_SPAN) {
                 i++;
                 continue;
             }
