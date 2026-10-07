@@ -243,12 +243,142 @@ export const DEFAULT_TECHNICAL_WHITELIST: readonly string[] = Object.freeze([
 /** Matches transient batch milestones and work-in-progress markers */
 export const CONSTRUCTION_JARGON_RE = /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|wip)\b/i;
 
+const ASCII_CORE_ROOT_PATTERNS: readonly string[] = Object.freeze([
+    'wip',
+    'quick[-\\s]*(?:fix|and[-\\s]*dirty)',
+    'hack(?:s|y)?',
+    'band-?aid',
+    'for\\s+now',
+    'tentative',
+    'provisional',
+    'ad-?hoc',
+    'stopgap',
+    'patchy',
+    'half-?baked',
+    'casual\\s+commit',
+    'placeholders?',
+    'flawless',
+    'perfect(?:ion)?',
+    'ultimate',
+    'bulletproof',
+    'unbeatable',
+    'invincible',
+    'god-?tier',
+    'peerless',
+    'silver\\s+bullet',
+    'zero-?bug',
+    'enterprise-?grade',
+    'state-?of-?the-?art',
+    'best-?in-?class',
+    'never\\s+fails?',
+    'absolutely',
+    'rubbish',
+    'garbage',
+    'crap',
+    'trash',
+    'shitty',
+    'horrible',
+    'terrible',
+    'worthless',
+    'complete\\s+mess',
+    'disaster',
+    'catastrophe',
+    'useless\\s+code',
+    'broken\\s+beyond\\s+repair',
+    'idiotic',
+    'game-?changer',
+    'groundbreaking',
+    'paradigm\\s+shift',
+    'revolutionary',
+    'epoch-?making',
+    'monumental',
+    'quantum\\s+leap',
+    'milestone\\s+breakthrough',
+    'tone\\s+down',
+    'low-?key',
+    'pragmatism',
+    'stay\\s+humble',
+    'truth-?seeking',
+    'down-?to-?earth',
+    'boastful',
+    'promotional',
+    'hyped',
+    'meta-?narrative',
+    'style\\s+refactoring',
+    'style\\s+upgrade',
+    'factual\\s+and\\s+pragmatic',
+]);
+
+function buildDefaultRulesCandidateRegex(): RegExp {
+    const chinesePatterns: string[] = [];
+    for (const rule of DEFAULT_TERMINOLOGY_RULES) {
+        for (const pattern of rule.patterns) {
+            if (pattern) {
+                chinesePatterns.push(pattern.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&'));
+            }
+        }
+    }
+    const parts = [
+        ...chinesePatterns,
+        `\\b(?:${ASCII_CORE_ROOT_PATTERNS.join('|')})\\b`,
+        '\\b100%',
+    ];
+    return new RegExp(parts.join('|'), 'i');
+}
+
+/**
+ * Top-level singleton regex matching candidate forbidden terms and roots across all default rules.
+ * Enables zero-overhead pre-filtering to short-circuit clean prose lines and documents.
+ */
+export const DEFAULT_RULES_FAST_CANDIDATE_RE: RegExp = buildDefaultRulesCandidateRegex();
+
+const EMPTY_TERMINOLOGY_FINDINGS: readonly TerminologyFinding[] = Object.freeze([]);
+
 const CODE_SPAN_RE = /`[^`]+`/g;
 const RULE_ID_RE = /\b[A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}\b/g;
 const QUOTE_SPAN_DOUBLE_RE = /"[^"]+"/g;
 const QUOTE_SPAN_SMART_RE = /“[^”]+”/g;
 const QUOTE_SPAN_SINGLE_TOKEN_RE = /'(?:[a-zA-Z0-9_\-\.\*\/]+|(?:\([^\)]+\)))'/g;
 const INLINE_FORMULA_RE = /\$[^$]+\$/g;
+
+function buildCompiledWhitelistRegexes(whitelist: readonly string[]): {
+    asciiRe: RegExp;
+    nonAsciiRe: RegExp;
+} {
+    const asciiTerms: string[] = [];
+    const nonAsciiTerms: string[] = [];
+
+    for (const term of whitelist) {
+        if (!term) continue;
+        const escaped = term
+            .replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&')
+            .replace(/\s+/g, '\\s+');
+        if (/^[a-zA-Z\s\-]+$/.test(term)) {
+            asciiTerms.push(escaped);
+        } else {
+            nonAsciiTerms.push(escaped);
+        }
+    }
+
+    const asciiRe = new RegExp(`\\b(?:${asciiTerms.join('|')})s?\\b`, 'gi');
+    const nonAsciiRe = new RegExp(`(?:${nonAsciiTerms.join('|')})`, 'gi');
+    return { asciiRe, nonAsciiRe };
+}
+
+const DEFAULT_WHITELIST_COMPILED = buildCompiledWhitelistRegexes(DEFAULT_TECHNICAL_WHITELIST);
+const ASCII_PATTERN_RE_CACHE = new Map<string, RegExp>();
+
+function getOrCompileAsciiPattern(asciiPat: string): RegExp {
+    let re = ASCII_PATTERN_RE_CACHE.get(asciiPat);
+    if (!re) {
+        const unescaped = asciiPat.replace(/\\[a-zA-Z]/g, '');
+        const isExactCase = !/[a-z]/.test(unescaped) && /[A-Z]/.test(unescaped);
+        const flags = isExactCase ? 'g' : 'gi';
+        re = new RegExp(asciiPat, flags);
+        ASCII_PATTERN_RE_CACHE.set(asciiPat, re);
+    }
+    return re;
+}
 
 /**
  * Mask explicit technical spans, rule codes, formulas, and whitelisted terms.
@@ -263,50 +393,52 @@ export function sanitizeLineForTerminology(
 ): string {
     let sanitized = line;
 
-    // Stage 1: Mask code spans, formulas, and rule IDs
-    sanitized = sanitized.replace(CODE_SPAN_RE, ' __CODE_SPAN__ ');
-    sanitized = sanitized.replace(INLINE_FORMULA_RE, ' __FORMULA_SPAN__ ');
-    sanitized = sanitized.replace(RULE_ID_RE, ' __RULE_ID__ ');
+    // Stage 1: Mask code spans, formulas, and rule IDs (short-circuited via substring pre-check)
+    if (sanitized.includes('`')) sanitized = sanitized.replace(CODE_SPAN_RE, ' __CODE_SPAN__ ');
+    if (sanitized.includes('$')) sanitized = sanitized.replace(INLINE_FORMULA_RE, ' __FORMULA_SPAN__ ');
+    if (sanitized.includes('-')) sanitized = sanitized.replace(RULE_ID_RE, ' __RULE_ID__ ');
 
-    // Stage 2: Mask explicit quotation marks
-    sanitized = sanitized.replace(QUOTE_SPAN_DOUBLE_RE, ' __QUOTE_SPAN__ ');
-    sanitized = sanitized.replace(QUOTE_SPAN_SMART_RE, ' __QUOTE_SPAN__ ');
-    sanitized = sanitized.replace(QUOTE_SPAN_SINGLE_TOKEN_RE, ' __QUOTE_SPAN__ ');
+    // Stage 2: Mask explicit quotation marks (short-circuited via substring pre-check)
+    if (sanitized.includes('"')) sanitized = sanitized.replace(QUOTE_SPAN_DOUBLE_RE, ' __QUOTE_SPAN__ ');
+    if (sanitized.includes('“')) sanitized = sanitized.replace(QUOTE_SPAN_SMART_RE, ' __QUOTE_SPAN__ ');
+    if (sanitized.includes("'")) sanitized = sanitized.replace(QUOTE_SPAN_SINGLE_TOKEN_RE, ' __QUOTE_SPAN__ ');
 
-    // Stage 3: Mask whitelisted technical compound terms
-    const mergedWhitelist = [...DEFAULT_TECHNICAL_WHITELIST, ...customWhitelist];
-    for (const term of mergedWhitelist) {
-        if (!term) continue;
-        const escaped = term
-            .replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&')
-            .replace(/\s+/g, '\\s+');
-        if (/^[a-zA-Z\s\-]+$/.test(term)) {
-            const reg = new RegExp(`\\b${escaped}s?\\b`, 'gi');
-            sanitized = sanitized.replace(reg, ' __WHITELIST_TERM__ ');
-        } else {
-            const reg = new RegExp(escaped, 'gi');
-            sanitized = sanitized.replace(reg, ' __WHITELIST_TERM__ ');
+    // Stage 3: Mask whitelisted technical compound terms using precompiled regexes
+    sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.asciiRe, ' __WHITELIST_TERM__ ');
+    sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.nonAsciiRe, ' __WHITELIST_TERM__ ');
+
+    // Stage 4: Process custom whitelist if provided
+    if (customWhitelist && customWhitelist.length > 0) {
+        for (const term of customWhitelist) {
+            if (!term) continue;
+            const escaped = term
+                .replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&')
+                .replace(/\s+/g, '\\s+');
+            const pattern = /^[a-zA-Z\s\-]+$/.test(term)
+                ? `\\b${escaped}s?\\b`
+                : escaped;
+            sanitized = sanitized.replace(new RegExp(pattern, 'gi'), ' __WHITELIST_TERM__ ');
         }
     }
 
     return sanitized;
 }
 
-/** Check pattern match on a single line */
-function checkLinePatterns(
+/** Check pattern match on a single line appending directly into accumulator */
+function collectLinePatterns(
+    outFindings: TerminologyFinding[],
     sanitized: string,
     rawLine: string,
     lineNum: number,
     rule: TerminologyRule,
-): TerminologyFinding[] {
-    const findings: TerminologyFinding[] = [];
+): void {
     for (const pattern of rule.patterns) {
         if (!pattern || !sanitized.includes(pattern)) continue;
         if (isVocabularyEnumeration(sanitized, sanitized.indexOf(pattern), pattern)) continue;
         const col = rawLine.indexOf(pattern);
         if (col >= 0 && isVocabularyEnumeration(rawLine, col, pattern)) continue;
 
-        findings.push({
+        outFindings.push({
             category: rule.category,
             severity: rule.severity,
             term: pattern,
@@ -317,22 +449,31 @@ function checkLinePatterns(
             contextSnippet: rawLine.trim().slice(0, 100),
         });
     }
-    return findings;
 }
 
-/** Check ascii regex patterns on a single line */
-function checkLineAsciiPatterns(
+/** Check pattern match on a single line */
+function checkLinePatterns(
     sanitized: string,
     rawLine: string,
     lineNum: number,
     rule: TerminologyRule,
 ): TerminologyFinding[] {
     const findings: TerminologyFinding[] = [];
+    collectLinePatterns(findings, sanitized, rawLine, lineNum, rule);
+    return findings;
+}
+
+/** Check ascii regex patterns on a single line appending directly into accumulator */
+function collectLineAsciiPatterns(
+    outFindings: TerminologyFinding[],
+    sanitized: string,
+    rawLine: string,
+    lineNum: number,
+    rule: TerminologyRule,
+): void {
     for (const asciiPat of rule.asciiPatterns) {
-        const unescaped = asciiPat.replace(/\\[a-zA-Z]/g, '');
-        const isExactCase = !/[a-z]/.test(unescaped) && /[A-Z]/.test(unescaped);
-        const flags = isExactCase ? 'g' : 'gi';
-        const re = new RegExp(asciiPat, flags);
+        const re = getOrCompileAsciiPattern(asciiPat);
+        re.lastIndex = 0;
         let match: RegExpExecArray | null;
         while ((match = re.exec(sanitized)) !== null) {
             const term = match[0];
@@ -341,7 +482,7 @@ function checkLineAsciiPatterns(
             const actualCol = col >= 0 ? col : match.index;
             if (isVocabularyEnumeration(rawLine, actualCol, term)) continue;
 
-            findings.push({
+            outFindings.push({
                 category: rule.category,
                 severity: rule.severity,
                 term,
@@ -353,7 +494,39 @@ function checkLineAsciiPatterns(
             });
         }
     }
+}
+
+/** Check ascii regex patterns on a single line */
+function checkLineAsciiPatterns(
+    sanitized: string,
+    rawLine: string,
+    lineNum: number,
+    rule: TerminologyRule,
+): TerminologyFinding[] {
+    const findings: TerminologyFinding[] = [];
+    collectLineAsciiPatterns(findings, sanitized, rawLine, lineNum, rule);
     return findings;
+}
+
+function auditLineAgainstRules(
+    findings: TerminologyFinding[],
+    sanitized: string,
+    rawLine: string,
+    lineNum: number,
+    rules: readonly TerminologyRule[],
+    options: TerminologyAuditOptions,
+): void {
+    for (const rule of rules) {
+        if (options.allowedCategories && !options.allowedCategories.includes(rule.category)) {
+            continue;
+        }
+        if (options.checkPatterns !== false) {
+            collectLinePatterns(findings, sanitized, rawLine, lineNum, rule);
+        }
+        if (options.checkAscii !== false) {
+            collectLineAsciiPatterns(findings, sanitized, rawLine, lineNum, rule);
+        }
+    }
 }
 
 /**
@@ -369,7 +542,12 @@ export function auditTerminologyProse(
     options: TerminologyAuditOptions = {},
     rules: readonly TerminologyRule[] = DEFAULT_TERMINOLOGY_RULES,
 ): readonly TerminologyFinding[] {
-    if (!content || content.length === 0) return [];
+    if (!content || content.length === 0) return EMPTY_TERMINOLOGY_FINDINGS;
+
+    const isDefaultRules = rules === DEFAULT_TERMINOLOGY_RULES;
+    if (isDefaultRules && !DEFAULT_RULES_FAST_CANDIDATE_RE.test(content)) {
+        return EMPTY_TERMINOLOGY_FINDINGS;
+    }
 
     const lines = content.split('\n');
     const findings: TerminologyFinding[] = [];
@@ -378,22 +556,11 @@ export function auditTerminologyProse(
     for (let i = 0; i < lines.length; i++) {
         const rawLine = lines[i];
         if (!rawLine || rawLine.trim().length === 0) continue;
+        if (isDefaultRules && !DEFAULT_RULES_FAST_CANDIDATE_RE.test(rawLine)) continue;
 
         const sanitized = sanitizeLineForTerminology(rawLine, customWhitelist);
-
-        for (const rule of rules) {
-            if (options.allowedCategories && !options.allowedCategories.includes(rule.category)) {
-                continue;
-            }
-
-            if (options.checkPatterns !== false) {
-                findings.push(...checkLinePatterns(sanitized, rawLine, i + 1, rule));
-            }
-            if (options.checkAscii !== false) {
-                findings.push(...checkLineAsciiPatterns(sanitized, rawLine, i + 1, rule));
-            }
-        }
+        auditLineAgainstRules(findings, sanitized, rawLine, i + 1, rules, options);
     }
 
-    return Object.freeze(findings);
+    return findings.length === 0 ? EMPTY_TERMINOLOGY_FINDINGS : Object.freeze(findings);
 }

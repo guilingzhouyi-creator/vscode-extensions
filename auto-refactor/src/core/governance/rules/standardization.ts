@@ -171,7 +171,7 @@ function collectModernJsTsViolations(
     ctx: RuleEvaluationContext,
     violations: GovernanceViolation[],
 ): void {
-    if (!ctx.content.includes('var')) return;
+    if (!/\bvar\s+[a-zA-Z_$]/.test(ctx.content)) return;
     const lines = ctx.masked;
     for (let i = 0; i < lines.length; i++) {
         checkModernJsTsLine(lines[i], i, violations);
@@ -246,6 +246,7 @@ export const RuleCatalogIntegrityRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (isExemptRuleCatalogPath(ctx.filePath)) return null;
+        if (!/-\d{3}\b/.test(ctx.content)) return null;
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.lines;

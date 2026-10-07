@@ -211,18 +211,27 @@ function detectReintroducedIssues(
 ): EvolutionAnomaly[] {
     const anomalies: EvolutionAnomaly[] = [];
 
-    for (const newId of newIssueIds) {
-        for (const oldRev of history) {
-            if (oldRev.revisionId !== previous.revisionId && oldRev.ruleHitIds.includes(newId)) {
-                anomalies.push({
-                    kind: ANOMALY_KIND_REINTRODUCED,
-                    severity: SEVERITY_ERROR,
-                    message: TrajectoryMessages.REINTRODUCED_ISSUE(newId, oldRev.revisionId),
-                    affectedAgents: [oldRev.agentUid, current.agentUid],
-                    details: { issueId: newId, originRevision: oldRev.revisionId },
-                });
-                break;
+    // Pre-build inverted map of ruleHitId -> first matching historical revision
+    const historyHitMap = new Map<string, FileRevision>();
+    for (const oldRev of history) {
+        if (oldRev.revisionId === previous.revisionId) continue;
+        for (const hitId of oldRev.ruleHitIds) {
+            if (!historyHitMap.has(hitId)) {
+                historyHitMap.set(hitId, oldRev);
             }
+        }
+    }
+
+    for (const newId of newIssueIds) {
+        const oldRev = historyHitMap.get(newId);
+        if (oldRev) {
+            anomalies.push({
+                kind: ANOMALY_KIND_REINTRODUCED,
+                severity: SEVERITY_ERROR,
+                message: TrajectoryMessages.REINTRODUCED_ISSUE(newId, oldRev.revisionId),
+                affectedAgents: [oldRev.agentUid, current.agentUid],
+                details: { issueId: newId, originRevision: oldRev.revisionId },
+            });
         }
     }
 

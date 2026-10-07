@@ -304,6 +304,9 @@ export const BlastRadiusGuardRule: GovernanceRule = {
         if (isToolOrTestScript(ctx.filePath)) {
             return null;
         }
+        if (!ctx.content.includes('import') && !ctx.content.includes('require')) {
+            return null;
+        }
 
         const currentTier = classifyArchitecturalTier(ctx.filePath);
         const tiers = new Set<string>();

@@ -207,11 +207,8 @@ function makeIssue(
  * @returns Number of matches.
  */
 function countMatches(code: string, pattern: RegExp): number {
-    const global = new RegExp(
-        pattern.source,
-        pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`,
-    );
-    return code.match(global)?.length ?? 0;
+    pattern.lastIndex = 0;
+    return code.match(pattern)?.length ?? 0;
 }
 
 /**
@@ -516,22 +513,23 @@ export class TsModernAnalyzer implements Analyzer {
      */
     private isTypeOnlyName(name: string, masked: string[], importLines: Set<number>): boolean {
         const escaped = escapeRegExp(name);
-        const word = new RegExp(`\\b${escaped}\\b`);
+        const word = new RegExp(`\\b${escaped}\\b`, 'g');
         const typePatterns = [
-            new RegExp(`:\\s*${escaped}\\b`),
-            new RegExp(`\\bas\\s+${escaped}\\b`),
-            new RegExp(`<\\s*${escaped}\\s*[,>]`),
-            new RegExp(`\\bextends\\s+${escaped}\\b`),
-            new RegExp(`\\bimplements\\s+${escaped}\\b`),
-            new RegExp(`[|&]\\s*${escaped}\\b`),
-            new RegExp(`\\b${escaped}\\s*[|&]`),
-            new RegExp(`\\b${escaped}\\s*\\[\\s*\\]`),
+            new RegExp(`:\\s*${escaped}\\b`, 'g'),
+            new RegExp(`\\bas\\s+${escaped}\\b`, 'g'),
+            new RegExp(`<\\s*${escaped}\\s*[,>]`, 'g'),
+            new RegExp(`\\bextends\\s+${escaped}\\b`, 'g'),
+            new RegExp(`\\bimplements\\s+${escaped}\\b`, 'g'),
+            new RegExp(`[|&]\\s*${escaped}\\b`, 'g'),
+            new RegExp(`\\b${escaped}\\s*[|&]`, 'g'),
+            new RegExp(`\\b${escaped}\\s*\\[\\s*\\]`, 'g'),
         ];
         let total = 0;
         let typed = 0;
         for (let index = 0; index < masked.length; index += 1) {
             if (importLines.has(index)) continue;
             const code = masked[index];
+            if (!code.includes(name)) continue;
             total += countMatches(code, word);
             for (const pattern of typePatterns) typed += countMatches(code, pattern);
         }

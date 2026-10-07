@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791301657700",
-  "timestamp": "2026-10-06T15:47:50.142Z",
+  "snapshotId": "snapshot-v0.4.0-1791355796238",
+  "timestamp": "2026-10-07T06:50:04.228Z",
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -13,39 +13,39 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 607,
-    "durationMs": 11334
+    "durationMs": 6887
   },
   "metrics": {
-    "compositeScore": 98.85,
+    "compositeScore": 98.88,
     "grade": "A+",
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 12592,
+    "totalIssues": 12571,
     "suppressedIssues": 496,
-    "unsuppressedIssues": 12096,
+    "unsuppressedIssues": 12075,
     "bySeverity": {
-      "info": 1184,
-      "warning": 11408,
+      "info": 1191,
+      "warning": 11380,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 199,
-      "medium": 5994,
-      "low": 6399
+      "high": 200,
+      "medium": 5992,
+      "low": 6379
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 100,
-      "maintainability": 98.32,
-      "performance": 99.12,
+      "maintainability": 98.4,
+      "performance": 99.25,
       "data": 99.91,
       "testing": 100,
       "reliability": 99.91,
       "security": 100,
-      "extensibility": 92.52
+      "extensibility": 92.51
     },
-    "compositeScore": 98.85,
+    "compositeScore": 98.88,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -62,10 +62,10 @@
     "architectureConsistency": 100,
     "semanticPurity": 99.82,
     "codeSecurity": 100,
-    "performanceEfficiency": 99.12,
-    "standardization": 77.57,
+    "performanceEfficiency": 99.25,
+    "standardization": 77.53,
     "modernity": 100,
-    "maintainability": 98.32,
+    "maintainability": 98.4,
     "commentQuality": 99.98,
     "duplication": 100,
     "techDebtRisk": 100
@@ -108,12 +108,21 @@
       "effectiveDensity": 0.95
     },
     {
+      "filePath": "src/core/governance/terminology-engine.ts",
+      "domain": "governance",
+      "totalIssues": 146,
+      "criticalCount": 0,
+      "highCount": 6,
+      "compositeScore": 95.62,
+      "effectiveDensity": 0.96
+    },
+    {
       "filePath": "src/index.ts",
       "domain": "src",
-      "totalIssues": 135,
+      "totalIssues": 134,
       "criticalCount": 0,
       "highCount": 1,
-      "compositeScore": 93.5,
+      "compositeScore": 93.81,
       "effectiveDensity": 0.93
     },
     {
@@ -144,15 +153,6 @@
       "effectiveDensity": 0.95
     },
     {
-      "filePath": "src/core/governance/terminology-engine.ts",
-      "domain": "governance",
-      "totalIssues": 91,
-      "criticalCount": 0,
-      "highCount": 7,
-      "compositeScore": 96.18,
-      "effectiveDensity": 0.97
-    },
-    {
       "filePath": "scripts/bench-baselines.js",
       "domain": "scripts",
       "totalIssues": 89,
@@ -165,9 +165,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 199,
-      "medium": 5994,
-      "low": 6399
+      "high": 200,
+      "medium": 5992,
+      "low": 6379
     },
     "criticalItems": [],
     "highItems": [
@@ -325,39 +325,48 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:519",
+        "id": "complexity:high-complexity:src/analyzers/comments.ts:362",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/comments.ts",
+        "line": 362,
+        "message": "Function \"CommentAnalyzer.auditCommentLine\" has cyclomatic complexity 14 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:522",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/comments.ts",
-        "line": 519,
+        "line": 522,
         "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:549",
+        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:552",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/comments.ts",
-        "line": 549,
+        "line": 552,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:608",
+        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:611",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/comments.ts",
-        "line": 608,
+        "line": 611,
         "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:743",
+        "id": "performance:PRF-ALG-002:src/analyzers/comments.ts:746",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/comments.ts",
-        "line": 743,
+        "line": 746,
         "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
@@ -505,12 +514,12 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/governance.ts:292",
+        "id": "complexity:high-complexity:src/analyzers/governance.ts:293",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/governance.ts",
-        "line": 292,
+        "line": 293,
         "message": "Function \"GovernanceAnalyzer.recordViolationIssue\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
@@ -586,31 +595,22 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "complexity:CPX-SPACE-001:src/analyzers/simplify-slice-helper.ts:311",
+        "id": "complexity:high-complexity:src/analyzers/simplify-slice-helper.ts:247",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/simplify-slice-helper.ts",
+        "line": 247,
+        "message": "Function \"evaluateSliceRange\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-SPACE-001:src/analyzers/simplify-slice-helper.ts:305",
         "rule": "CPX-SPACE-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/simplify-slice-helper.ts",
-        "line": 311,
+        "line": 305,
         "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'n'."
-      },
-      {
-        "id": "performance:PRF-MEM-001:src/analyzers/simplify-slice-helper.ts:312",
-        "rule": "PRF-MEM-001",
-        "tier": "high",
-        "severity": "info",
-        "file": "src/analyzers/simplify-slice-helper.ts",
-        "line": 312,
-        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
-      },
-      {
-        "id": "performance:PRF-MEM-001:src/analyzers/simplify-slice-helper.ts:321",
-        "rule": "PRF-MEM-001",
-        "tier": "high",
-        "severity": "info",
-        "file": "src/analyzers/simplify-slice-helper.ts",
-        "line": 321,
-        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
         "id": "performance:PRF-ALG-002:src/analyzers/test-modernity.ts:277",
@@ -627,11 +627,11 @@
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 99.32,
+        "compositeScore": 99.36,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.74,
-          "performance": 99.58,
+          "performance": 99.82,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -642,26 +642,26 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 97.69,
+        "compositeScore": 97.86,
         "pillars": {
           "architecture": 100,
-          "maintainability": 93.8,
-          "performance": 98.2,
+          "maintainability": 94.73,
+          "performance": 98.38,
           "data": 99.59,
           "testing": 100,
           "reliability": 99.59,
           "security": 100,
-          "extensibility": 89.75
+          "extensibility": 89.74
         },
         "moduleCount": 1
       },
       {
         "domainName": "src",
-        "compositeScore": 95.79,
+        "compositeScore": 95.95,
         "pillars": {
           "architecture": 100,
           "maintainability": 96.13,
-          "performance": 92.95,
+          "performance": 94,
           "data": 97.75,
           "testing": 100,
           "reliability": 97.75,
@@ -687,11 +687,11 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 98.42,
+        "compositeScore": 98.44,
         "pillars": {
           "architecture": 100,
           "maintainability": 97.85,
-          "performance": 97.63,
+          "performance": 97.79,
           "data": 99.78,
           "testing": 100,
           "reliability": 99.78,
@@ -717,16 +717,16 @@
       },
       {
         "domainName": "ast",
-        "compositeScore": 98.57,
+        "compositeScore": 98.63,
         "pillars": {
           "architecture": 100,
-          "maintainability": 96.59,
+          "maintainability": 96.97,
           "performance": 99.66,
           "data": 99.86,
           "testing": 100,
           "reliability": 99.86,
           "security": 100,
-          "extensibility": 91.63
+          "extensibility": 91.69
         },
         "moduleCount": 1
       },
@@ -867,31 +867,31 @@
       },
       {
         "domainName": "governance",
-        "compositeScore": 98.4,
+        "compositeScore": 98.36,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.95,
-          "performance": 97.26,
+          "maintainability": 98.55,
+          "performance": 97.58,
           "data": 99.88,
           "testing": 100,
           "reliability": 99.88,
           "security": 100,
-          "extensibility": 89.94
+          "extensibility": 89.63
         },
         "moduleCount": 1
       },
       {
         "domainName": "rules",
-        "compositeScore": 98.81,
+        "compositeScore": 98.7,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.43,
-          "performance": 98.39,
+          "maintainability": 98.06,
+          "performance": 98.22,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 92.9
+          "extensibility": 92.62
         },
         "moduleCount": 1
       },
@@ -912,11 +912,11 @@
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 98.59,
+        "compositeScore": 98.61,
         "pillars": {
           "architecture": 100,
           "maintainability": 97.91,
-          "performance": 99.26,
+          "performance": 99.41,
           "data": 100,
           "testing": 100,
           "reliability": 100,
@@ -1002,16 +1002,16 @@
       },
       {
         "domainName": "policy",
-        "compositeScore": 98.7,
+        "compositeScore": 98.64,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.83,
-          "performance": 96.48,
+          "maintainability": 97.77,
+          "performance": 97.47,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 94.08
+          "extensibility": 93.56
         },
         "moduleCount": 1
       },
@@ -1227,16 +1227,16 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 98.49,
+        "compositeScore": 98.55,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.83,
+          "maintainability": 98.16,
           "performance": 99.47,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 100,
-          "extensibility": 88.99
+          "extensibility": 89.03
         },
         "moduleCount": 1
       },
@@ -1302,11 +1302,11 @@
       },
       {
         "domainName": "trajectory",
-        "compositeScore": 98.87,
+        "compositeScore": 98.92,
         "pillars": {
           "architecture": 100,
           "maintainability": 98.93,
-          "performance": 98.93,
+          "performance": 99.31,
           "data": 99.93,
           "testing": 100,
           "reliability": 99.93,
@@ -1349,8 +1349,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 125692,
-      "unique": 101190,
+      "processed": 126006,
+      "unique": 101511,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -1363,27 +1363,27 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791301657699,
+      "endMs": 1791355796236,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 18061589,
-        "uniqueTotal": 101190,
-        "changedTotal": 175838,
-        "semanticTotal": 140673
+        "processedTotal": 18115026,
+        "uniqueTotal": 101511,
+        "changedTotal": 171040,
+        "semanticTotal": 136834
       },
       "qed": {
-        "mean": -0.0021,
+        "mean": -0.0019,
         "min": -0.18,
-        "max": 0.01
+        "max": 0.02
       },
       "debt": {
-        "totalAdded": 1353,
-        "totalResolved": 428,
+        "totalAdded": 1403,
+        "totalResolved": 477,
         "totalRegressions": 4,
         "netYield": -0.05
       },
-      "meanCompositeScore": 99.12,
-      "gatePassRate": 96.66
+      "meanCompositeScore": 99.11,
+      "gatePassRate": 98
     },
     "isFirstBaseline": false
   }

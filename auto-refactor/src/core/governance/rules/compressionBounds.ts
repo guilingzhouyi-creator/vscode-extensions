@@ -70,6 +70,62 @@ const DECLARATION_PREFIX_RE =
 
 const MULTI_TERNARY_RE = /\?[^:]+\?[^:]+:/;
 
+function hasCandidateOperatorCounts(code: string): boolean {
+    let qCount = 0;
+    let hasColon = false;
+    let logicalOpChars = 0;
+    for (let j = 0; j < code.length; j++) {
+        const ch = code.charCodeAt(j);
+        if (ch === 63) qCount++;
+        else if (ch === 58) hasColon = true;
+        else if (ch === 38 || ch === 124) logicalOpChars++;
+    }
+    return (qCount >= 2 && hasColon) || logicalOpChars >= MAX_LOGICAL_OPERATORS;
+}
+
+function classifyGiantExpression(code: string): { isNestedTernary: boolean; isUnboundedLogical: boolean } | null {
+    const withoutOptional = code.replace(/\?\./g, '  ').replace(/\?\?/g, '  ');
+    const clean = withoutOptional.replace(/[a-zA-Z0-9_$]+\s*\?\s*:/g, '  ');
+
+    const ternaryMatches = clean.match(/\?[^:]+:/g) || [];
+    const logicalMatches = clean.match(/&&|\|\|/g) || [];
+
+    const isNestedTernary =
+        ternaryMatches.length >= MAX_TERNARY_BRANCHES ||
+        (ternaryMatches.length >= 2 && MULTI_TERNARY_RE.test(clean));
+    const isUnboundedLogical = logicalMatches.length >= MAX_LOGICAL_OPERATORS;
+
+    if (!isNestedTernary && !isUnboundedLogical) return null;
+    return { isNestedTernary, isUnboundedLogical };
+}
+
+function evaluateGiantExpressionLine(
+    raw: string,
+    code: string,
+    lineIndex: number,
+): GovernanceViolation | null {
+    if (!hasCandidateOperatorCounts(code)) return null;
+    const kind = classifyGiantExpression(code);
+    if (!kind) return null;
+
+    return {
+        ruleId: 'CMP-EXP-001',
+        message: kind.isNestedTernary
+            ? 'Giant nested ternary expression exceeds readable lower bounds.'
+            : 'Unbounded boolean logical chain with excessive operators exceeds cognitive threshold.',
+        line: lineIndex + 1,
+        column: raw.search(/\S/) + 1,
+        suggestion: kind.isNestedTernary
+            ? 'Refactor nested ternary expressions into named pure functions, early-return guard clauses, or lookup tables.'
+            : 'Extract complex logical chains into semantic boolean predicates or helper functions.',
+        fixable: false,
+        evidence: {
+            confidence: 0.9,
+            requiresRuntime: false,
+        },
+    };
+}
+
 /**
  * CMP-EXP-001: Giant Unbounded Expression Rule.
  * Rejects giant expressions packed with deeply nested ternaries or long logical chains.
@@ -86,61 +142,18 @@ export const GiantExpressionRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         const violations: GovernanceViolation[] = [];
+        const masked = ctx.masked;
+        const len = ctx.lines.length;
 
-        for (let i = 0; i < ctx.lines.length; i++) {
-            const raw = ctx.lines[i];
-            // Only the masked view is trustworthy: it is the same length as the raw line, so
-            // evidence columns stay correct while prose and literals are already blank.
-            const code = (ctx.masked[i] ?? '').trim();
-            if (!code.includes('?') && !code.includes('&') && !code.includes('|')) continue;
-            if (DECLARATION_PREFIX_RE.test(code)) continue;
+        for (let i = 0; i < len; i++) {
+            const line = masked[i];
+            if (!line) continue;
+            if (!line.includes('?') && !line.includes('&') && !line.includes('|')) continue;
+            const code = line.trim();
+            if (!code || DECLARATION_PREFIX_RE.test(code)) continue;
 
-            // Single-pass char code inspection for candidate operators
-            let qCount = 0;
-            let hasColon = false;
-            let logicalOpChars = 0;
-            for (let j = 0; j < code.length; j++) {
-                const ch = code.charCodeAt(j);
-                if (ch === 63)
-                    qCount++; // '?'
-                else if (ch === 58)
-                    hasColon = true; // ':'
-                else if (ch === 38 || ch === 124) logicalOpChars++; // '&' or '|'
-            }
-
-            const hasPossibleTernary = qCount >= 2 && hasColon;
-            const hasPossibleLogical = logicalOpChars >= MAX_LOGICAL_OPERATORS;
-            if (!hasPossibleTernary && !hasPossibleLogical) continue;
-
-            const withoutOptional = code.replace(/\?\./g, '  ').replace(/\?\?/g, '  ');
-            const clean = withoutOptional.replace(/[a-zA-Z0-9_$]+\s*\?\s*:/g, '  ');
-
-            const ternaryMatches = clean.match(/\?[^:]+:/g) || [];
-            const logicalMatches = clean.match(/&&|\|\|/g) || [];
-
-            const isNestedTernary =
-                ternaryMatches.length >= MAX_TERNARY_BRANCHES ||
-                (ternaryMatches.length >= 2 && MULTI_TERNARY_RE.test(clean));
-            const isUnboundedLogical = logicalMatches.length >= MAX_LOGICAL_OPERATORS;
-
-            if (isNestedTernary || isUnboundedLogical) {
-                violations.push({
-                    ruleId: 'CMP-EXP-001',
-                    message: isNestedTernary
-                        ? 'Giant nested ternary expression exceeds readable lower bounds.'
-                        : 'Unbounded boolean logical chain with excessive operators exceeds cognitive threshold.',
-                    line: i + 1,
-                    column: raw.search(/\S/) + 1,
-                    suggestion: isNestedTernary
-                        ? 'Refactor nested ternary expressions into named pure functions, early-return guard clauses, or lookup tables.'
-                        : 'Extract complex logical chains into semantic boolean predicates or helper functions.',
-                    fixable: false,
-                    evidence: {
-                        confidence: 0.9,
-                        requiresRuntime: false,
-                    },
-                });
-            }
+            const violation = evaluateGiantExpressionLine(ctx.lines[i], code, i);
+            if (violation) violations.push(violation);
         }
 
         return violations.length > 0 ? violations : null;
@@ -217,11 +230,15 @@ export const SingleLineMultiSemanticRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         const violations: GovernanceViolation[] = [];
+        const masked = ctx.masked;
+        const len = ctx.lines.length;
 
-        for (let i = 0; i < ctx.lines.length; i++) {
-            const raw = ctx.lines[i];
-            const code = (ctx.masked[i] ?? '').trim();
-            checkSingleLineStatement(raw, code, i, violations);
+        for (let i = 0; i < len; i++) {
+            const line = masked[i];
+            if (!line || !line.includes(';')) continue;
+            const code = line.trim();
+            if (!code) continue;
+            checkSingleLineStatement(ctx.lines[i], code, i, violations);
         }
 
         return violations.length > 0 ? violations : null;
@@ -305,12 +322,18 @@ export const CallbackDepthRule: GovernanceRule = {
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         const violations: GovernanceViolation[] = [];
         let callbackDepth = 0;
+        const masked = ctx.masked;
+        const len = ctx.lines.length;
 
-        for (let i = 0; i < ctx.lines.length; i++) {
-            const raw = ctx.lines[i];
-            const code = (ctx.masked[i] ?? '').trim();
+        for (let i = 0; i < len; i++) {
+            const line = masked[i];
+            if (!line) continue;
+            if (callbackDepth === 0 && !line.includes('=>') && !line.includes('function')) {
+                continue;
+            }
+            const code = line.trim();
             if (!code) continue;
-            callbackDepth = evaluateCallbackLine(raw, code, i, callbackDepth, violations);
+            callbackDepth = evaluateCallbackLine(ctx.lines[i], code, i, callbackDepth, violations);
         }
 
         return violations.length > 0 ? violations : null;
@@ -369,12 +392,18 @@ export const CognitiveDensityRule: GovernanceRule = {
         'Dense syntactic packing of bitwise, arithmetic and conditional operators without naming or spacing exceeds human cognitive chunking capacity.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        const violations: GovernanceViolation[] = [];
+        if (!STRONG_BITWISE_RE.test(ctx.content)) return null;
 
-        for (let i = 0; i < ctx.lines.length; i++) {
-            const raw = ctx.lines[i];
-            const code = (ctx.masked[i] ?? '').trim();
-            const violation = checkDensityLine(raw, code, i);
+        const violations: GovernanceViolation[] = [];
+        const masked = ctx.masked;
+        const len = ctx.lines.length;
+
+        for (let i = 0; i < len; i++) {
+            const line = masked[i];
+            if (!line || line.length < DENSITY_MIN_LENGTH) continue;
+            if (!STRONG_BITWISE_RE.test(line)) continue;
+            const code = line.trim();
+            const violation = checkDensityLine(ctx.lines[i], code, i);
             if (violation) violations.push(violation);
         }
 

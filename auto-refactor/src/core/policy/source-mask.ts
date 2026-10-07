@@ -158,9 +158,18 @@ const REGEX_FLAG_RE = /[a-z]/i;
  * @returns Both views; `raw` feeds evidence text, `masked` feeds the rule patterns.
  */
 export function maskSourceTextJs(content: string, config: SourceMaskConfig): MaskedSource {
-    const raw = content.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+    const lines = content.split('\n');
+    const len = lines.length;
+    const raw: string[] = new Array(len);
+    const masked: string[] = new Array(len);
     const state: MaskState = { inBlockComment: false, quote: null };
-    return { raw, masked: raw.map((line) => maskLine(line, state, config)) };
+    for (let i = 0; i < len; i++) {
+        let line = lines[i];
+        if (line.endsWith('\r')) line = line.slice(0, -1);
+        raw[i] = line;
+        masked[i] = maskLine(line, state, config);
+    }
+    return { raw, masked };
 }
 
 /**
@@ -417,6 +426,33 @@ function scanQuoteOrRegex(
 }
 
 /**
+ * Scans the next masked span starting at `index`.
+ * Returns the end index of the span, or -1 if the current character is unmasked.
+ */
+function scanNextMaskSpan(
+    line: string,
+    index: number,
+    state: MaskState,
+    config: SourceMaskConfig,
+    close: string,
+): number {
+    if (state.quote) {
+        return scanQuotedSpan(line, index, state.quote, state);
+    }
+    if (state.inBlockComment) {
+        return scanBlockCommentContinuation(line, index, close, state);
+    }
+    if (line.startsWith(config.lineComment, index)) {
+        return line.length;
+    }
+    const bcEnd = scanOpeningBlockComment(line, index, config, state);
+    if (bcEnd !== -1) {
+        return bcEnd;
+    }
+    return scanQuoteOrRegex(line, index, config, state);
+}
+
+/**
  * Mask one raw line in place using contiguous span blanking to avoid array allocations.
  *
  * @param line - Raw source line without its trailing carriage return.
@@ -448,40 +484,13 @@ function maskLine(line: string, state: MaskState, config: SourceMaskConfig): str
 
     let index = 0;
     while (index < line.length) {
-        if (state.quote) {
-            const nextIdx = scanQuotedSpan(line, index, state.quote, state);
+        const nextIdx = scanNextMaskSpan(line, index, state, config, close);
+        if (nextIdx !== -1) {
             blankSpan(index, nextIdx);
             index = nextIdx;
-            continue;
+        } else {
+            index++;
         }
-
-        if (state.inBlockComment) {
-            const nextIdx = scanBlockCommentContinuation(line, index, close, state);
-            blankSpan(index, nextIdx);
-            index = nextIdx;
-            continue;
-        }
-
-        if (line.startsWith(config.lineComment, index)) {
-            blankSpan(index, line.length);
-            break;
-        }
-
-        const bcEnd = scanOpeningBlockComment(line, index, config, state);
-        if (bcEnd !== -1) {
-            blankSpan(index, bcEnd);
-            index = bcEnd;
-            continue;
-        }
-
-        const litEnd = scanQuoteOrRegex(line, index, config, state);
-        if (litEnd !== -1) {
-            blankSpan(index, litEnd);
-            index = litEnd;
-            continue;
-        }
-
-        index++;
     }
 
     if (!hasBlanked) return line;
@@ -490,3 +499,4 @@ function maskLine(line: string, state: MaskState, config: SourceMaskConfig): str
     }
     return pieces.join('');
 }
+

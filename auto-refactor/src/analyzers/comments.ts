@@ -26,7 +26,10 @@ import {
     auditCommentDensity,
     auditCommentSemanticDuty,
 } from '../core/comments/comment-auditor';
-import { auditTerminologyProse } from '../core/governance/terminology-engine';
+import {
+    auditTerminologyProse,
+    DEFAULT_RULES_FAST_CANDIDATE_RE,
+} from '../core/governance/terminology-engine';
 import type { CommentLanguageKind } from '../core/comments/comment-types';
 
 interface CommentOptions {
@@ -143,6 +146,9 @@ const DOUBLE_QUOTE = '"';
 /** Single-quote character used to track a Python triple-quoted docstring block. */
 const SINGLE_QUOTE = "'";
 
+/** Frozen singleton of comment prefix markers to eliminate transient allocations in commentBody */
+const COMMENT_MARKERS: readonly string[] = Object.freeze(['//', '/*', '*/', '#', '*']);
+
 /**
  * Self-referential analyzer that enforces this repository's comment and header contract.
  *
@@ -257,6 +263,8 @@ export class CommentAnalyzer implements Analyzer {
         const lines = content.split('\n');
         const lineCount = lines.length;
         const directiveRe = buildDirectiveRe(opts.directiveTokens);
+        const shouldCheckTerminology =
+            !isExemptCommentTerminologyPath(file) && DEFAULT_RULES_FAST_CANDIDATE_RE.test(content);
         let inTriple: typeof DOUBLE_QUOTE | typeof SINGLE_QUOTE | null = null;
         const shortLines: number[] = [];
         const longLines: number[] = [];
@@ -287,6 +295,7 @@ export class CommentAnalyzer implements Analyzer {
                 issues,
                 shortLines,
                 longLines,
+                shouldCheckTerminology,
             );
         }
 
@@ -362,6 +371,7 @@ export class CommentAnalyzer implements Analyzer {
         issues: Issue[],
         shortLines: number[],
         longLines: number[],
+        shouldCheckTerminology = true,
     ): void {
         const body = this.commentBody(trimmed);
         const lineNo = lineIdx + 1;
@@ -408,32 +418,25 @@ export class CommentAnalyzer implements Analyzer {
             );
         }
 
-        if (!isExemptCommentTerminologyPath(file)) {
-            this.auditCommentTerminology(body, lineIdx, file, ctx, issues);
-        }
-    }
-
-    private auditCommentTerminology(
-        body: string,
-        lineIdx: number,
-        file: string,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        const findings = auditTerminologyProse(body);
-        for (const finding of findings) {
-            const desc = CommentMessages.BANNED_TERMINOLOGY(finding.term, finding.message);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    'CMT-TRM-001',
-                    desc.message,
-                    SEVERITY_WARNING,
-                    { file, term: finding.term, category: finding.category, line: lineIdx + 1 },
-                    desc.suggestion,
-                ),
-            );
+        if (
+            shouldCheckTerminology &&
+            !isExemptCommentTerminologyPath(file) &&
+            DEFAULT_RULES_FAST_CANDIDATE_RE.test(body)
+        ) {
+            for (const finding of auditTerminologyProse(body)) {
+                const desc = CommentMessages.BANNED_TERMINOLOGY(finding.term, finding.message);
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'CMT-TRM-001',
+                        desc.message,
+                        SEVERITY_WARNING,
+                        { file, term: finding.term, category: finding.category, line: lineIdx + 1 },
+                        desc.suggestion,
+                    ),
+                );
+            }
         }
     }
 
@@ -468,7 +471,7 @@ export class CommentAnalyzer implements Analyzer {
      *     unchanged when no marker is present (e.g. Python docstring bodies).
      */
     private commentBody(trimmed: string): string {
-        for (const marker of ['//', '/*', '*/', '#', '*']) {
+        for (const marker of COMMENT_MARKERS) {
             if (trimmed.startsWith(marker)) return trimmed.slice(marker.length).trim();
         }
         return trimmed;

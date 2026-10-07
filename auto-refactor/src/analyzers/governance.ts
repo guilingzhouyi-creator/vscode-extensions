@@ -124,14 +124,15 @@ export class GovernanceAnalyzer implements Analyzer {
             this.fileTrigger = this.registry.buildTextTrigger(this.fileRules);
             this.nodeTrigger = this.registry.buildTextTrigger(this.nodeRules);
 
-            // Fast path: if no text trigger matches in the raw content, only the rules
-            // that have a textTrigger can be skipped (their trigger is a necessary condition).
-            // Rules without textTrigger always run because we cannot prove they won't fire.
-            if (this.fileTrigger && !this.fileTrigger.test(ctx.content)) {
-                this.fileRules = this.fileRules.filter((r) => !r.textTrigger);
-            }
-            if (this.nodeTrigger && !this.nodeTrigger.test(ctx.content)) {
-                this.nodeRules = this.nodeRules.filter((r) => !r.textTrigger);
+            // Fast path: if a rule has a textTrigger, it only runs when its trigger
+            // substring is present in the raw content. Rules without textTrigger always run.
+            if (ctx.content) {
+                this.fileRules = this.fileRules.filter(
+                    (r) => !r.textTrigger || ctx.content.includes(r.textTrigger),
+                );
+                this.nodeRules = this.nodeRules.filter(
+                    (r) => !r.textTrigger || ctx.content.includes(r.textTrigger),
+                );
             }
 
             // Group node-level rules by target kind for dispatch optimization.

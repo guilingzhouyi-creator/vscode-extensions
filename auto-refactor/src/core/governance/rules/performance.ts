@@ -133,7 +133,8 @@ export const LoopInvariantRule: GovernanceRule = {
         'Performing invariant I/O, regex construction, or repetitive configuration lookups in loops incurs severe CPU/throughput penalties.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        if (!ctx.content.includes('for') && !ctx.content.includes('while')) return null;
+        if (!EXPENSIVE_OPS_RE.test(ctx.content)) return null;
+        if (!LOOP_HEAD_RE.test(ctx.content)) return null;
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
@@ -250,6 +251,32 @@ function collectLinearSearchViolations(lines: string[]): GovernanceViolation[] {
     return violations;
 }
 
+const LINEAR_SEARCH_CACHE = new WeakMap<RuleEvaluationContext, GovernanceViolation[]>();
+
+const LOOP_DETECT_RE = /\b(?:for|while)\s*\(/;
+
+function hasLoopLinearSearchPreCheck(content: string): boolean {
+    if (
+        !content.includes('.indexOf(') &&
+        !content.includes('.includes(') &&
+        !content.includes('.find(') &&
+        !content.includes('.some(') &&
+        !content.includes('.filter(')
+    ) {
+        return false;
+    }
+    return LOOP_DETECT_RE.test(content);
+}
+
+function getOrCollectLinearSearches(ctx: RuleEvaluationContext): GovernanceViolation[] {
+    let violations = LINEAR_SEARCH_CACHE.get(ctx);
+    if (!violations) {
+        violations = collectLinearSearchViolations(ctx.masked);
+        LINEAR_SEARCH_CACHE.set(ctx, violations);
+    }
+    return violations;
+}
+
 /**
  * GOV-PRF-002: In-Loop Linear Array Lookup.
  * Flags nested linear searches inside loops that could benefit from Map/Set indexing.
@@ -264,9 +291,9 @@ export const InLoopLinearSearchRule: GovernanceRule = {
         'Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M); pre-indexing in Map/Set optimizes to O(N).',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        if (!ctx.content.includes('for') && !ctx.content.includes('while')) return null;
+        if (!hasLoopLinearSearchPreCheck(ctx.content)) return null;
 
-        const violations = collectLinearSearchViolations(ctx.masked);
+        const violations = getOrCollectLinearSearches(ctx);
         const filtered = violations.filter((v) => v.ruleId === 'GOV-PRF-002');
         return filtered.length > 0 ? filtered : null;
     },
@@ -286,9 +313,9 @@ export const InLoopArrayPreHashRule: GovernanceRule = {
         'Calling array linear search (.includes / .indexOf) inside a loop degrades performance to O(N*M); pre-indexing in a Set outside the loop optimizes to O(1).',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        if (!ctx.content.includes('for') && !ctx.content.includes('while')) return null;
+        if (!hasLoopLinearSearchPreCheck(ctx.content)) return null;
 
-        const violations = collectLinearSearchViolations(ctx.masked);
+        const violations = getOrCollectLinearSearches(ctx);
         const filtered = violations.filter((v) => v.ruleId === 'GOV-PRF-005');
         return filtered.length > 0 ? filtered : null;
     },

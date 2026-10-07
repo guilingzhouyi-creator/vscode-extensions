@@ -450,8 +450,18 @@ export class SimplifyAnalyzer implements Analyzer {
         const opts = (ctx.options || {}) as SimplifyOptions;
         const sourceFile = this.getOrParseSourceFile(ctx);
         if (sourceFile) {
-            detectTernaryOpportunities(sourceFile, ctx, opts, issues);
-            this.auditTypeScriptFunctions(sourceFile, ctx, opts, issues);
+            const content = ctx.content || '';
+            if (content.includes('?') || content.includes('if')) {
+                detectTernaryOpportunities(sourceFile, ctx, opts, issues);
+            }
+            if (
+                content.includes('function') ||
+                content.includes('=>') ||
+                content.includes('class') ||
+                content.includes('constructor')
+            ) {
+                this.auditTypeScriptFunctions(sourceFile, ctx, opts, issues);
+            }
         }
         return issues;
     }
@@ -473,8 +483,18 @@ export class SimplifyAnalyzer implements Analyzer {
             typeof (sf as Record<string, unknown>)[PROP_FOR_EACH_CHILD] === 'function';
         const sourceFile = isTsSource ? (sf as ts.SourceFile) : this.getOrParseSourceFile(ctx);
         if (sourceFile) {
-            detectTernaryOpportunities(sourceFile, ctx, opts, issues);
-            this.auditTypeScriptFunctions(sourceFile, ctx, opts, issues);
+            const content = ctx.content || '';
+            if (content.includes('?') || content.includes('if')) {
+                detectTernaryOpportunities(sourceFile, ctx, opts, issues);
+            }
+            if (
+                content.includes('function') ||
+                content.includes('=>') ||
+                content.includes('class') ||
+                content.includes('constructor')
+            ) {
+                this.auditTypeScriptFunctions(sourceFile, ctx, opts, issues);
+            }
         }
         return issues;
     }
@@ -486,6 +506,9 @@ export class SimplifyAnalyzer implements Analyzer {
      * @returns Parsed SourceFile or null for non-TS/JS sources.
      */
     private parseTsSource(ctx: AnalyzerContext): ts.SourceFile | null {
+        if (ctx.sourceFile) {
+            return ctx.sourceFile as ts.SourceFile;
+        }
         if (!ctx.content) return null;
         const p = ctx.filePath.toLowerCase();
         if (
@@ -518,9 +541,9 @@ export class SimplifyAnalyzer implements Analyzer {
         this.detectCommentedOutCode(lines, file, opts, ctx, issues);
         this.detectEmptyImplementations(lines, file, ctx, issues);
         this.detectDebugOutput(lines, file, opts, ctx, issues);
-        this.auditRedundantElse(lines, file, opts, issues);
-        this.auditBooleanReturn(lines, file, opts, issues);
-        this.auditGuardClausePatterns(lines, file, opts, issues);
+        auditRedundantElse(lines, file, opts, issues);
+        auditBooleanReturn(lines, file, opts, issues);
+        auditGuardClausePatterns(lines, file, opts, issues);
 
         return issues;
     }
@@ -837,44 +860,5 @@ export class SimplifyAnalyzer implements Analyzer {
         }
         if (node.kind === NodeKind.Function && node.name) return node.name;
         return binding ?? (className ? className + ANONYMOUS_SUFFIX : ANONYMOUS_NAME);
-    }
-
-    /**
-     * Flag redundant `else` after terminating statements (SIM-ELSE-001).
-     * Delegates to the linecheck helper module to keep this file lean.
-     */
-    private auditRedundantElse(
-        lines: string[],
-        file: string,
-        opts: SimplifyOptions,
-        issues: Issue[],
-    ): void {
-        auditRedundantElse(lines, file, opts, issues);
-    }
-
-    /**
-     * Flag simplifiable boolean return patterns (SIM-BOOL-001).
-     * Delegates to the linecheck helper module to keep this file lean.
-     */
-    private auditBooleanReturn(
-        lines: string[],
-        file: string,
-        opts: SimplifyOptions,
-        issues: Issue[],
-    ): void {
-        auditBooleanReturn(lines, file, opts, issues);
-    }
-
-    /**
-     * Flag consecutive if-return guard-clause patterns at function start (SIM-GUARD-001).
-     * Delegates to the linecheck helper module to keep this file lean.
-     */
-    private auditGuardClausePatterns(
-        lines: string[],
-        file: string,
-        opts: SimplifyOptions,
-        issues: Issue[],
-    ): void {
-        auditGuardClausePatterns(lines, file, opts, issues);
     }
 }

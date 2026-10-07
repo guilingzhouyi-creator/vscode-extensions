@@ -201,6 +201,49 @@ function buildExtractSignature(
     return { signature, template };
 }
 
+function resolveWritesBefore(
+    i: number,
+    stmtInfos: StatementVariableInfo[],
+    prefixWrites?: Set<string>[],
+): Set<string> {
+    if (prefixWrites) return prefixWrites[i];
+    const writesBefore = new Set<string>();
+    for (let k = 0; k < i; k++) {
+        for (const w of stmtInfos[k].writes) writesBefore.add(w);
+    }
+    return writesBefore;
+}
+
+function resolveReadsAfter(
+    j: number,
+    statementsLen: number,
+    stmtInfos: StatementVariableInfo[],
+    suffixReads?: Set<string>[],
+): Set<string> {
+    if (suffixReads) return suffixReads[j + 1];
+    const readsAfter = new Set<string>();
+    for (let k = j + 1; k < statementsLen; k++) {
+        for (const r of stmtInfos[k].reads) readsAfter.add(r);
+    }
+    return readsAfter;
+}
+
+function resolveLineSpan(
+    i: number,
+    j: number,
+    statements: readonly ts.Statement[],
+    sf: ts.SourceFile,
+    stmtStartLines?: Int32Array,
+    stmtEndLines?: Int32Array,
+): FunctionSliceRange {
+    if (stmtStartLines && stmtEndLines) {
+        return { startLine: stmtStartLines[i], endLine: stmtEndLines[j] };
+    }
+    const startPos = sf.getLineAndCharacterOfPosition(statements[i].getStart(sf));
+    const endPos = sf.getLineAndCharacterOfPosition(statements[j].getEnd());
+    return { startLine: startPos.line + 1, endLine: endPos.line + 1 };
+}
+
 function evaluateSliceRange(
     statements: readonly ts.Statement[],
     i: number,
@@ -208,9 +251,11 @@ function evaluateSliceRange(
     sf: ts.SourceFile,
     paramNames: Set<string>,
     stmtInfos: StatementVariableInfo[],
-    fnName: string,
+    helperName: string,
     prefixWrites?: Set<string>[],
     suffixReads?: Set<string>[],
+    stmtStartLines?: Int32Array,
+    stmtEndLines?: Int32Array,
 ): FunctionSliceCandidate {
     const sliceReads = new Set<string>();
     const sliceWrites = new Set<string>();
@@ -219,47 +264,31 @@ function evaluateSliceRange(
         for (const w of stmtInfos[k].writes) sliceWrites.add(w);
     }
 
-    let writesBefore: Set<string>;
-    if (prefixWrites) {
-        writesBefore = prefixWrites[i];
-    } else {
-        writesBefore = new Set<string>();
-        for (let k = 0; k < i; k++) {
-            for (const w of stmtInfos[k].writes) writesBefore.add(w);
+    const writesBefore = resolveWritesBefore(i, stmtInfos, prefixWrites);
+    const readsAfter = resolveReadsAfter(j, statements.length, stmtInfos, suffixReads);
+
+    const inputVars: string[] = [];
+    for (const v of sliceReads) {
+        if (!JS_GLOBALS.has(v) && (paramNames.has(v) || writesBefore.has(v) || !sliceWrites.has(v))) {
+            inputVars.push(v);
         }
     }
 
-    let readsAfter: Set<string>;
-    if (suffixReads) {
-        readsAfter = suffixReads[j + 1];
-    } else {
-        readsAfter = new Set<string>();
-        for (let k = j + 1; k < statements.length; k++) {
-            for (const r of stmtInfos[k].reads) readsAfter.add(r);
+    const outputVars: string[] = [];
+    for (const v of sliceWrites) {
+        if (readsAfter.has(v)) {
+            outputVars.push(v);
         }
     }
-
-    const inputVars = [...sliceReads].filter(
-        (v) => !JS_GLOBALS.has(v) && (paramNames.has(v) || writesBefore.has(v) || !sliceWrites.has(v)),
-    );
-    const outputVars = [...sliceWrites].filter((v) => readsAfter.has(v));
 
     const dependencyCount = inputVars.length + (outputVars.length > 1 ? outputVars.length * 2 : outputVars.length);
-
-    const startPos = sf.getLineAndCharacterOfPosition(statements[i].getStart(sf));
-    const endPos = sf.getLineAndCharacterOfPosition(statements[j].getEnd());
-    const sliceRange: FunctionSliceRange = {
-        startLine: startPos.line + 1,
-        endLine: endPos.line + 1,
-    };
-
-    const helperName = 'extract' + capitalize(fnName);
+    const sliceRange = resolveLineSpan(i, j, statements, sf, stmtStartLines, stmtEndLines);
     const { signature, template } = buildExtractSignature(helperName, inputVars, outputVars);
 
     return {
         sliceRange,
-        readVariables: [...sliceReads],
-        writtenVariables: [...sliceWrites],
+        readVariables: Array.from(sliceReads),
+        writtenVariables: Array.from(sliceWrites),
         extractSignature: signature,
         crossSliceDependencyCount: dependencyCount,
         inputVariables: inputVars,
@@ -268,6 +297,36 @@ function evaluateSliceRange(
         startIndex: i,
         endIndex: j,
     };
+}
+
+function precomputePrefixWrites(n: number, stmtInfos: StatementVariableInfo[]): Set<string>[] {
+    const prefixWrites: Set<string>[] = new Array(n + 1);
+    prefixWrites[0] = new Set<string>();
+    for (let k = 0; k < n; k++) {
+        if (stmtInfos[k].writes.size === 0) {
+            prefixWrites[k + 1] = prefixWrites[k];
+        } else {
+            const next = new Set<string>(prefixWrites[k]);
+            for (const w of stmtInfos[k].writes) next.add(w);
+            prefixWrites[k + 1] = next;
+        }
+    }
+    return prefixWrites;
+}
+
+function precomputeSuffixReads(n: number, stmtInfos: StatementVariableInfo[]): Set<string>[] {
+    const suffixReads: Set<string>[] = new Array(n + 1);
+    suffixReads[n] = new Set<string>();
+    for (let k = n - 1; k >= 0; k--) {
+        if (stmtInfos[k].reads.size === 0) {
+            suffixReads[k] = suffixReads[k + 1];
+        } else {
+            const next = new Set<string>(suffixReads[k + 1]);
+            for (const r of stmtInfos[k].reads) next.add(r);
+            suffixReads[k] = next;
+        }
+    }
+    return suffixReads;
 }
 
 function createSliceAnalysis(candidates: FunctionSliceCandidate[]): FunctionSliceAnalysis {
@@ -299,32 +358,29 @@ export function computeFunctionSlices(
     if (statements.length === 0) return null;
 
     const fnName = node.name && ts.isIdentifier(node.name) ? node.name.text : 'Helper';
+    const helperName = 'extract' + capitalize(fnName);
     const paramNames = collectFunctionParameterNames(node);
     const stmtInfos = statements.map((s) => collectVariablesInStatement(s));
 
     const candidates: FunctionSliceCandidate[] = [];
     const n = statements.length;
 
-    // Precompute prefix writes: prefixWrites[i] = cumulative writes in statements [0 .. i-1]
-    const prefixWrites: Set<string>[] = new Array(n + 1);
-    prefixWrites[0] = new Set<string>();
+    // Precompute statement line spans ONCE to eliminate redundant AST position queries in loops
+    const stmtStartLines = new Int32Array(n);
+    const stmtEndLines = new Int32Array(n);
     for (let k = 0; k < n; k++) {
-        const next = new Set<string>(prefixWrites[k]);
-        for (const w of stmtInfos[k].writes) next.add(w);
-        prefixWrites[k + 1] = next;
+        stmtStartLines[k] = sf.getLineAndCharacterOfPosition(statements[k].getStart(sf)).line + 1;
+        stmtEndLines[k] = sf.getLineAndCharacterOfPosition(statements[k].getEnd()).line + 1;
     }
 
-    // Precompute suffix reads: suffixReads[k] = cumulative reads in statements [k .. n-1]
-    const suffixReads: Set<string>[] = new Array(n + 1);
-    suffixReads[n] = new Set<string>();
-    for (let k = n - 1; k >= 0; k--) {
-        const next = new Set<string>(suffixReads[k + 1]);
-        for (const r of stmtInfos[k].reads) next.add(r);
-        suffixReads[k] = next;
-    }
+    const prefixWrites = precomputePrefixWrites(n, stmtInfos);
+    const suffixReads = precomputeSuffixReads(n, stmtInfos);
 
     if (n === 1) {
-        candidates.push(evaluateSliceRange(statements, 0, 0, sf, paramNames, stmtInfos, fnName, prefixWrites, suffixReads));
+        candidates.push(evaluateSliceRange(
+            statements, 0, 0, sf, paramNames, stmtInfos, helperName,
+            prefixWrites, suffixReads, stmtStartLines, stmtEndLines
+        ));
         return createSliceAnalysis(candidates);
     }
 
@@ -332,12 +388,18 @@ export function computeFunctionSlices(
     for (let len = 2; len <= maxLen; len++) {
         for (let i = 0; i <= n - len; i++) {
             const j = i + len - 1;
-            candidates.push(evaluateSliceRange(statements, i, j, sf, paramNames, stmtInfos, fnName, prefixWrites, suffixReads));
+            candidates.push(evaluateSliceRange(
+                statements, i, j, sf, paramNames, stmtInfos, helperName,
+                prefixWrites, suffixReads, stmtStartLines, stmtEndLines
+            ));
         }
     }
 
     if (candidates.length === 0) {
-        candidates.push(evaluateSliceRange(statements, 0, n - 1, sf, paramNames, stmtInfos, fnName, prefixWrites, suffixReads));
+        candidates.push(evaluateSliceRange(
+            statements, 0, n - 1, sf, paramNames, stmtInfos, helperName,
+            prefixWrites, suffixReads, stmtStartLines, stmtEndLines
+        ));
     }
 
     candidates.sort((a, b) => {
@@ -484,6 +546,11 @@ export function generateParameterObjectSnippet(
     ].join('\n');
 }
 
+const functionLineCache = new WeakMap<
+    ts.SourceFile,
+    Map<number, ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression | null>
+>();
+
 /**
  * Find the function-like AST node located closest to a specified line number.
  */
@@ -491,10 +558,28 @@ export function findTsFunctionAtLine(
     sf: ts.SourceFile,
     targetLine: number,
 ): ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression | null {
+    let sfCache = functionLineCache.get(sf);
+    if (!sfCache) {
+        sfCache = new Map();
+        functionLineCache.set(sf, sfCache);
+    } else if (sfCache.has(targetLine)) {
+        return sfCache.get(targetLine)!;
+    }
+
     let bestMatch: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression | null = null;
     let minDistance = Infinity;
 
-    function walk(n: ts.Node): void {
+    const lineStarts = sf.getLineStarts();
+    const minLine = Math.max(1, targetLine - 2);
+    const minPos = minLine <= lineStarts.length ? lineStarts[minLine - 1] : sf.end;
+    const maxLineIdx = targetLine + 2;
+    const maxPos = maxLineIdx < lineStarts.length ? lineStarts[maxLineIdx] : sf.end;
+
+    function walk(n: ts.Node): boolean | void {
+        if (n.end < minPos || n.pos > maxPos) {
+            return;
+        }
+
         if (
             ts.isFunctionDeclaration(n) ||
             ts.isMethodDeclaration(n) ||
@@ -507,11 +592,16 @@ export function findTsFunctionAtLine(
             if (distance < minDistance && distance <= 2) {
                 minDistance = distance;
                 bestMatch = n;
+                if (minDistance === 0) {
+                    return true;
+                }
             }
         }
-        ts.forEachChild(n, walk);
+
+        return ts.forEachChild(n, walk);
     }
 
     walk(sf);
+    sfCache.set(targetLine, bestMatch);
     return bestMatch;
 }

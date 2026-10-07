@@ -208,6 +208,7 @@ export const LossyPrecisionRoundingRule: GovernanceRule = {
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (isToolOrTestScript(ctx.filePath)) return null;
         if (ctx.filePath.includes('compact-ledger-store.ts')) return null;
+        if (!ctx.content.includes('Math.') && !ctx.content.includes('toFixed')) return null;
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;

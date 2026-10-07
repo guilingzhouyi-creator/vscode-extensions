@@ -164,6 +164,13 @@ export const LANGUAGE_EXCLUSIVE_ANALYZERS: Record<string, readonly string[]> = {
     shell: [ANALYZER_SHELL_LINT],
 };
 
+/** Pre-built read-only Set mapping to eliminate per-call Set allocations in language gating. */
+export const LANGUAGE_EXCLUSIVE_SETS: Record<string, ReadonlySet<string>> = Object.freeze(
+    Object.fromEntries(
+        Object.entries(LANGUAGE_EXCLUSIVE_ANALYZERS).map(([lang, list]) => [lang, new Set(list)]),
+    ),
+);
+
 /**
  * Union of all language-specific specialized modernizer analyzers.
  * Used by the Language Gating Filter to prune non-matching language analyzers.
@@ -275,9 +282,9 @@ export function applyLanguageGating(active: Set<string>, language?: string): voi
         }
         return;
     }
-    const allowed = new Set(LANGUAGE_EXCLUSIVE_ANALYZERS[language] || []);
+    const allowed = LANGUAGE_EXCLUSIVE_SETS[language];
     for (const spec of ALL_LANGUAGE_SPECIFIC_ANALYZERS) {
-        if (!allowed.has(spec)) {
+        if (!allowed || !allowed.has(spec)) {
             active.delete(spec);
         }
     }

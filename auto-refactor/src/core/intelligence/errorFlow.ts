@@ -96,15 +96,19 @@ function propagationChain(graph: CallGraph, raiser: string): string[] {
     const seen = new Set<string>([raiser]);
     let current = raiser;
     while (chain.length <= MAX_CHAIN_HOPS) {
-        const callers = graph
-            .callersOf(current)
-            .map((edge) => edge.caller)
-            .filter((caller): caller is string => caller !== null && !seen.has(caller));
-        if (callers.length === 0) break;
-        const next = deduplicateSorted(callers)[0];
-        seen.add(next);
-        chain.push(next);
-        current = next;
+        let bestCaller: string | null = null;
+        for (const edge of graph.callersOf(current)) {
+            const caller = edge.caller;
+            if (caller !== null && !seen.has(caller)) {
+                if (bestCaller === null || caller < bestCaller) {
+                    bestCaller = caller;
+                }
+            }
+        }
+        if (bestCaller === null) break;
+        seen.add(bestCaller);
+        chain.push(bestCaller);
+        current = bestCaller;
     }
     return chain;
 }
