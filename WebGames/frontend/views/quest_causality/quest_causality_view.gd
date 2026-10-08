@@ -109,7 +109,7 @@ func select_quest_detail(quest_id: String) -> Dictionary:
 func set_causality_dag_snapshot(nodes: Array) -> void:
 	apply_snapshot({"causality_dag": nodes})
 
-## 统一快照渲染映射（P81）：任务列表与因果 DAG → 视图状态
+## 统一快照渲染映射：任务列表与因果 DAG → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("quests"):
 		quest_list = FrontendSnapshot.read_array(snapshot, "quests")

@@ -151,7 +151,7 @@ func adjust_zoom(delta: float) -> void: map_zoom_level = clampf(map_zoom_level +
 func select_town(town_id: String) -> Dictionary: selected_town_id = town_id; return {"success": true, "town_id": town_id}
 func set_marching_route_snapshot(routes: Array) -> void: apply_snapshot({"marching_routes": routes})
 
-## 统一快照渲染映射（P81）：行军路线 → 视图状态
+## 统一快照渲染映射：行军路线 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("marching_routes"):
 		marching_routes = FrontendSnapshot.read_array(snapshot, "marching_routes")

@@ -216,7 +216,7 @@ def audit_file(path: Path, fix: bool = False) -> list[dict[str, Any]]:
 
 
 def _check_ps1_triad(text: str, path: Path) -> list[dict[str, Any]]:
-    """PowerShell 严格工程化标头三件套（Inv-P85-2-2）。"""
+    """PowerShell 严格工程化标头三件套契约。"""
     violations = []
     if "[CmdletBinding()]" not in text:
         violations.append({
@@ -240,7 +240,7 @@ def _check_ps1_triad(text: str, path: Path) -> list[dict[str, Any]]:
 
 
 def _check_bash_safety(lines: list[str], text: str, path: Path) -> list[dict[str, Any]]:
-    """Bash 统一安全标识与 Shebang 契约（Inv-P85-3-3）。"""
+    """Bash 统一安全标识与 Shebang 契约。"""
     violations = []
     shebang = lines[0] if lines else ""
     if not (shebang.startswith("#!/usr/bin/env bash") or shebang.startswith("#!/bin/bash")):
@@ -265,7 +265,7 @@ def _check_bash_safety(lines: list[str], text: str, path: Path) -> list[dict[str
 
 
 def _check_py_strict_typing(text: str, path: Path) -> list[dict[str, Any]]:
-    """Python 100% 强类型注解与零裸 except 治理（Inv-P85-3-1/2）。"""
+    """Python 100% 强类型注解与零裸 except 治理契约。"""
     violations = []
     try:
         tree = ast.parse(text)
@@ -323,7 +323,7 @@ ANNOTATION_NAMES = frozenset({
 
 
 def _check_py_annotation_bindings(text: str, path: Path) -> list[dict[str, Any]]:
-    """Python 注解名字绑定完备性（Inv-P87-3）。"""
+    """Python 注解名字绑定完备性校验。"""
     try:
         tree = ast.parse(text)
     except SyntaxError as exc:

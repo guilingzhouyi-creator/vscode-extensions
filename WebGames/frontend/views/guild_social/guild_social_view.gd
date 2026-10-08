@@ -158,7 +158,7 @@ func set_guild_snapshot(p_name: String, lvl: int, gold: int, members: Array, tec
 		"techs": techs,
 	})
 
-## 统一快照渲染映射（P81）：公会信息/成员/科技树 → 视图状态
+## 统一快照渲染映射：公会信息/成员/科技树 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("guild_name"):
 		guild_name = str(snapshot.get("guild_name", guild_name))
