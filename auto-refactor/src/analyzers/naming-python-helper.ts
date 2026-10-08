@@ -217,30 +217,36 @@ export function auditPythonSourceHelper(
 
     if (opts.checkDecoupling !== false && symbols.length >= 4) {
         const clusterFindings = decouplingAuditor.auditClusters(symbols);
-        for (const finding of clusterFindings) {
-            const alreadyFlagged = issues.some(
-                (issue) =>
-                    issue.rule === 'NAM-DEC-001' &&
-                    (issue.detail as Record<string, unknown>)?.symbol === finding.symbol,
-            );
-            if (!alreadyFlagged) {
-                issues.push(
-                    mkIssue(
-                        finding.line,
-                        'NAM-DEC-001',
-                        finding.message,
-                        {
-                            symbol: finding.symbol,
-                            length: finding.length,
-                            segments: finding.segments,
-                            suggestedDomainDirectory: finding.suggestedDomainDirectory,
-                            suggestedSymbol: finding.suggestedSymbol,
-                            actionableProposal: finding.actionableProposal,
-                        },
-                        finding.actionableProposal.rationale,
-                    ),
-                );
+        const flaggedSymbols = new Set<string>();
+        for (const issue of issues) {
+            if (issue.rule === 'NAM-DEC-001') {
+                const sym = (issue.detail as Record<string, unknown>)?.symbol;
+                if (typeof sym === 'string') {
+                    flaggedSymbols.add(sym);
+                }
             }
+        }
+        for (const finding of clusterFindings) {
+            if (flaggedSymbols.has(finding.symbol)) {
+                continue;
+            }
+            flaggedSymbols.add(finding.symbol);
+            issues.push(
+                mkIssue(
+                    finding.line,
+                    'NAM-DEC-001',
+                    finding.message,
+                    {
+                        symbol: finding.symbol,
+                        length: finding.length,
+                        segments: finding.segments,
+                        suggestedDomainDirectory: finding.suggestedDomainDirectory,
+                        suggestedSymbol: finding.suggestedSymbol,
+                        actionableProposal: finding.actionableProposal,
+                    },
+                    finding.actionableProposal.rationale,
+                ),
+            );
         }
     }
 }
