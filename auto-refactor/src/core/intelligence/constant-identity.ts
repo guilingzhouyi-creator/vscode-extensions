@@ -278,6 +278,35 @@ function countRegexMatches(text: string, regex: RegExp): number {
     return matches ? matches.length : 0;
 }
 
+/** Statement prefixes excluded when determining constant table dominance. */
+export const EXCLUDED_STATEMENT_PREFIXES: readonly string[] = [
+    'import ',
+    'export type ',
+    'type ',
+    'export interface ',
+    'interface ',
+];
+
+/** Statement prefixes indicating a constant or enum declaration. */
+export const CONSTANT_STATEMENT_PREFIXES: readonly string[] = [
+    'export const ',
+    'export enum ',
+    'enum ',
+];
+
+/** Regex identifying property assignments or variable equals assignments with literals. */
+const RE_KEY_VAL_CONSTANT = /^[A-Za-z0-9_$]+(?::\s*|\s*=\s*)['"`0-9]/;
+
+function isConstantStatement(line: string): boolean {
+    if (CONSTANT_STATEMENT_PREFIXES.some((prefix) => line.startsWith(prefix))) {
+        return true;
+    }
+    if (line.includes('as const')) {
+        return true;
+    }
+    return RE_KEY_VAL_CONSTANT.test(line);
+}
+
 /**
  * Checks whether content lines are predominantly constant or enum definitions.
  *
@@ -288,14 +317,7 @@ function isConstantContentDominant(lines: string[]): boolean {
     if (lines.length === 0) return false;
     let constLineCount = 0;
     for (const l of lines) {
-        if (
-            l.startsWith('export const ') ||
-            l.startsWith('export enum ') ||
-            l.startsWith('enum ') ||
-            l.includes('as const') ||
-            /^[A-Za-z0-9_$]+:\s*['"`0-9]/.test(l) ||
-            /^[A-Za-z0-9_$]+\s*=\s*['"`0-9]/.test(l)
-        ) {
+        if (isConstantStatement(l)) {
             constLineCount++;
         }
     }
@@ -335,11 +357,7 @@ function hasConstantTableCharacteristics(content: string): boolean {
         .filter(
             (l) =>
                 l.length > 0 &&
-                !l.startsWith('import ') &&
-                !l.startsWith('export type ') &&
-                !l.startsWith('type ') &&
-                !l.startsWith('export interface ') &&
-                !l.startsWith('interface '),
+                !EXCLUDED_STATEMENT_PREFIXES.some((prefix) => l.startsWith(prefix)),
         );
 
     return isConstantContentDominant(lines);

@@ -28,6 +28,45 @@ export interface ExtractConstantOptions {
     readonly ruleId?: string;
 }
 
+function isCommentOrEmptyLine(line: string): boolean {
+    if (line.length === 0) {
+        return true;
+    }
+    return line.startsWith('//') || line.startsWith('/*') || line.startsWith('*');
+}
+
+function isImportLine(line: string): boolean {
+    return line.startsWith('import ') || line.startsWith('import{');
+}
+
+/**
+ * Resolves the 1-indexed line number where a top-level constant should be inserted.
+ * Locates the first non-import line following file header comments and imports.
+ *
+ * @param lines - Array of source file lines.
+ * @returns 1-indexed target line number for constant declaration insertion.
+ */
+export function resolveConstantInsertionLine(lines: readonly string[]): number {
+    let insertLine = 1;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        if (isImportLine(line)) {
+            insertLine = i + 2;
+            continue;
+        }
+
+        if (isCommentOrEmptyLine(line)) {
+            continue;
+        }
+
+        return insertLine === 1 ? i + 1 : insertLine;
+    }
+
+    return insertLine;
+}
+
 /**
  * Creates a fix descriptor that hoists a literal to a top-level constant definition.
  *
@@ -39,27 +78,7 @@ export function createExtractConstantFix(
     context: TransformContext,
     options: ExtractConstantOptions,
 ): FixDescriptor {
-    const lines = context.lines;
-    let insertLine = 1;
-
-    // Locate the first non-import line following any file header comments or imports
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line.startsWith('import ') || line.startsWith('import{')) {
-            insertLine = i + 2;
-        } else if (
-            line.length > 0 &&
-            !line.startsWith('//') &&
-            !line.startsWith('/*') &&
-            !line.startsWith('*')
-        ) {
-            if (insertLine === 1) {
-                insertLine = i + 1;
-            }
-            break;
-        }
-    }
-
+    const insertLine = resolveConstantInsertionLine(context.lines);
     const constDeclaration = `const ${options.suggestedName} = ${options.literalValue};\n`;
 
     const insertEdit: TextEdit = {

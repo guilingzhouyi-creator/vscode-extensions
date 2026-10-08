@@ -46,6 +46,7 @@ const HAS_TABINDEX_RE = /\btabindex\s*=\s*(?:['"]?[-\d]+['"]?|\{[^}]+\})/i;
 const HOOK_DECLARATION_RE = /\bfunction\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{/g;
 const HANDLER_DECLARATION_RE =
     /\b(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/g;
+const INTERFACE_PROPS_RE = /interface\s+([A-Za-z0-9_]*Props)\s*\{([^}]+)\}/g;
 
 function makeFrontendIssue(
     file: string,
@@ -164,29 +165,70 @@ function auditDomDepthAndAnimationReflow(file: string, rawLines: string[], issue
 }
 
 /**
+ * Counts non-empty property declaration lines in an interface body in a single pass without heap allocation.
+ */
+function countInterfaceBodyProps(body: string): number {
+    let count = 0;
+    let lineStart = 0;
+    const len = body.length;
+
+    while (lineStart < len) {
+        let lineEnd = body.indexOf('\n', lineStart);
+        if (lineEnd === -1) {
+            lineEnd = len;
+        }
+        let hasContent = false;
+        for (let i = lineStart; i < lineEnd; i++) {
+            const ch = body.charCodeAt(i);
+            if (ch > 32) {
+                hasContent = true;
+                break;
+            }
+        }
+        if (hasContent) {
+            count++;
+        }
+        lineStart = lineEnd + 1;
+    }
+    return count;
+}
+
+/**
  * Audits component complexity and duplication patterns (UI-ENG-003).
  */
 function auditComponentPropsAndReuse(file: string, content: string, issues: Issue[]): void {
-    const interfaceMatches = content.match(/interface\s+([A-Za-z0-9_]*Props)\s*\{([^}]+)\}/g);
-    if (!interfaceMatches) return;
+    INTERFACE_PROPS_RE.lastIndex = 0;
+    const interfaceMap = new Map<string, string[]>();
+    let match: RegExpExecArray | null;
 
-    for (const block of interfaceMatches) {
-        const propLines = block
-            .split('\n')
-            .filter((l) => l.trim().length > 0 && !l.includes('interface') && !l.includes('}'));
-        if (propLines.length > 10) {
-            issues.push(
-                makeFrontendIssue(
-                    file,
-                    1,
-                    'UI-ENG-003',
-                    SEVERITY_WARNING,
-                    `${ExposureMessages.UI_COMPONENT_REUSE.message}: Component props footprint (${propLines.length}) exceeds 10`,
-                    ExposureMessages.UI_COMPONENT_REUSE.suggestion,
-                    { propCount: propLines.length },
-                ),
-            );
-            break;
+    while ((match = INTERFACE_PROPS_RE.exec(content)) !== null) {
+        const name = match[1];
+        const body = match[2];
+        const existing = interfaceMap.get(name);
+        if (existing) {
+            existing.push(body);
+        } else {
+            interfaceMap.set(name, [body]);
+        }
+    }
+
+    for (const bodies of interfaceMap.values()) {
+        for (const body of bodies) {
+            const propCount = countInterfaceBodyProps(body);
+            if (propCount > 10) {
+                issues.push(
+                    makeFrontendIssue(
+                        file,
+                        1,
+                        'UI-ENG-003',
+                        SEVERITY_WARNING,
+                        `${ExposureMessages.UI_COMPONENT_REUSE.message}: Component props footprint (${propCount}) exceeds 10`,
+                        ExposureMessages.UI_COMPONENT_REUSE.suggestion,
+                        { propCount },
+                    ),
+                );
+                return;
+            }
         }
     }
 }

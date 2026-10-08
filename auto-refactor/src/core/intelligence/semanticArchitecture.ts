@@ -58,6 +58,45 @@ export interface SemanticArchitectureOptions {
     scaleGrade?: ScaleGrade;
 }
 
+interface LayerDispatchRule {
+    readonly layer: ArchitectureLayer;
+    readonly matches: (lowerPath: string, imports: readonly string[]) => boolean;
+}
+
+const TEST_PATH_RE = /(?:test|spec|__tests__)/;
+const INTERFACE_PATH_RE = /(?:controller|router|cli|view|component)/;
+const INFRASTRUCTURE_PATH_RE = /(?:repository|database|driver|adapter|gateway|sql)/;
+const APPLICATION_PATH_RE = /(?:service|usecase|workflow|orchestrator)/;
+const SHARED_PATH_RE = /(?:util|helper|shared)/;
+
+/**
+ * Table-driven architectural layer dispatch rules.
+ */
+export const LAYER_DISPATCH_RULES: readonly LayerDispatchRule[] = [
+    {
+        layer: 'test',
+        matches: (lower) => TEST_PATH_RE.test(lower),
+    },
+    {
+        layer: 'interface',
+        matches: (lower, imports) =>
+            INTERFACE_PATH_RE.test(lower) ||
+            imports.some((i) => FORBIDDEN_HEADLESS_IMPORTS.has(i)),
+    },
+    {
+        layer: 'infrastructure',
+        matches: (lower) => INFRASTRUCTURE_PATH_RE.test(lower),
+    },
+    {
+        layer: 'application',
+        matches: (lower) => APPLICATION_PATH_RE.test(lower),
+    },
+    {
+        layer: 'shared',
+        matches: (lower) => SHARED_PATH_RE.test(lower),
+    },
+];
+
 /**
  * Infer true semantic architectural layer of a file based on symbols and imports.
  *
@@ -74,51 +113,12 @@ export function inferSemanticLayer(
     const lower = filePath.toLowerCase();
     void exports;
 
-    // Test layer
-    if (lower.includes('test') || lower.includes('spec') || lower.includes('__tests__')) {
-        return 'test';
+    for (const rule of LAYER_DISPATCH_RULES) {
+        if (rule.matches(lower, imports)) {
+            return rule.layer;
+        }
     }
 
-    // Interface layer (UI, CLI, API endpoints)
-    if (
-        lower.includes('controller') ||
-        lower.includes('router') ||
-        lower.includes('cli') ||
-        lower.includes('view') ||
-        lower.includes('component') ||
-        imports.some((i) => FORBIDDEN_HEADLESS_IMPORTS.has(i))
-    ) {
-        return 'interface';
-    }
-
-    // Infrastructure / Data Access
-    if (
-        lower.includes('repository') ||
-        lower.includes('database') ||
-        lower.includes('driver') ||
-        lower.includes('adapter') ||
-        lower.includes('gateway') ||
-        lower.includes('sql')
-    ) {
-        return 'infrastructure';
-    }
-
-    // Application Orchestration
-    if (
-        lower.includes('service') ||
-        lower.includes('usecase') ||
-        lower.includes('workflow') ||
-        lower.includes('orchestrator')
-    ) {
-        return 'application';
-    }
-
-    // Shared / Tooling
-    if (lower.includes('util') || lower.includes('helper') || lower.includes('shared')) {
-        return 'shared';
-    }
-
-    // Default to Domain
     return 'domain';
 }
 

@@ -159,10 +159,46 @@ function buildAlpacaSample(
  *                     read it.
  */
 export class TrainingDatasetExporter {
+    /** Memoized classification cache for hard vs empirical rule IDs. */
+    private readonly ruleCategoryCache = new Map<string, boolean>();
+
     constructor(
         private readonly memory: ReviewMemoryManager,
         private readonly trajectory?: ChangeTrajectoryManager,
     ) {}
+
+    /**
+     * Groups a record's rule hits in a single pass into deterministic hard rules and active rules.
+     *
+     * @param records - Stored review memory records to partition.
+     * @returns Map indexing each record to its partitioned hard and all rule hits.
+     */
+    private pregroupRecords(
+        records: ReviewMemoryRecord[],
+    ): Map<ReviewMemoryRecord, { hardRules: RuleHitRecord[]; allRules: RuleHitRecord[] }> {
+        const grouped = new Map<
+            ReviewMemoryRecord,
+            { hardRules: RuleHitRecord[]; allRules: RuleHitRecord[] }
+        >();
+
+        for (const rec of records) {
+            if (!rec.ruleHits || rec.ruleHits.length === 0) {
+                continue;
+            }
+            const hardRules: RuleHitRecord[] = [];
+            for (const hit of rec.ruleHits) {
+                if (this.isHardRule(hit.rule)) {
+                    hardRules.push(hit);
+                }
+            }
+            grouped.set(rec, {
+                hardRules,
+                allRules: rec.ruleHits,
+            });
+        }
+
+        return grouped;
+    }
 
     /**
      * Export training records into Alpaca dataset format.
@@ -181,18 +217,22 @@ export class TrainingDatasetExporter {
         const records: ReviewMemoryRecord[] = this.memory.getAll();
         const samples: AlpacaSample[] = [];
         const max = options.maxSamples || DEFAULT_MAX_SAMPLES;
+        const ruleGroupMap = this.pregroupRecords(records);
 
         for (const rec of records) {
-            if (samples.length >= max) break;
-            if (!rec.ruleHits || rec.ruleHits.length === 0) continue;
-
-            const hardRules = rec.ruleHits.filter((r: RuleHitRecord) => this.isHardRule(r.rule));
-            if (!options.includeEmpirical && hardRules.length === 0) {
+            if (samples.length >= max) {
+                break;
+            }
+            const group = ruleGroupMap.get(rec);
+            if (!group) {
+                continue;
+            }
+            if (!options.includeEmpirical && group.hardRules.length === 0) {
                 continue;
             }
 
-            const activeRules = options.includeEmpirical ? rec.ruleHits : hardRules;
-            samples.push(buildAlpacaSample(rec, activeRules, hardRules));
+            const activeRules = options.includeEmpirical ? group.allRules : group.hardRules;
+            samples.push(buildAlpacaSample(rec, activeRules, group.hardRules));
         }
 
         if (options.outputFile) {
@@ -243,14 +283,19 @@ export class TrainingDatasetExporter {
      * @returns True when the rule id belongs to a deterministic hard-rule family.
      */
     private isHardRule(ruleId: string): boolean {
+        const cached = this.ruleCategoryCache.get(ruleId);
+        if (cached !== undefined) {
+            return cached;
+        }
         const r = ruleId.toLowerCase();
-        return (
+        const isHard =
             r.startsWith('sec-') ||
             r.startsWith('arch-') ||
             r.startsWith('circular') ||
             r.includes('injection') ||
             r.includes('secret') ||
-            r.includes('leak')
-        );
+            r.includes('leak');
+        this.ruleCategoryCache.set(ruleId, isHard);
+        return isHard;
     }
 }

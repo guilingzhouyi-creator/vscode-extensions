@@ -25,6 +25,9 @@ const SENSITIVE_BACKEND_ENV_RE =
 const LOCAL_ABSOLUTE_PATH_RE =
     /(?:[A-Za-z]:[\\/]|(?:\/(?:Users|home|workspace|root)[\\/]))[a-zA-Z0-9_.-]+/;
 
+/** Regular expression matching public sourceMappingURL directives excluding inline data URIs. */
+export const SOURCE_MAP_PUBLIC_DIRECTIVE_RE = /\bsourceMappingURL=(?!data:application\/json)/;
+
 function makeProdHygieneIssue(
     file: string,
     line: number,
@@ -119,7 +122,7 @@ function auditDebugResidueAndPaths(file: string, rawLines: string[], issues: Iss
 function auditSourceMapLeakage(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (line.includes('sourceMappingURL=') && !line.includes('data:application/json')) {
+        if (SOURCE_MAP_PUBLIC_DIRECTIVE_RE.test(line)) {
             issues.push(
                 makeProdHygieneIssue(
                     file,

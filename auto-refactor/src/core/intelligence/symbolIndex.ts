@@ -78,32 +78,23 @@ export interface SymbolIndexStats {
     builtFrom: 'materialized' | 'projection';
 }
 
+/** Mapping of AST NodeKind to SymbolKind for declaration extraction. */
+export const DECLARATION_KIND_MAP: ReadonlyMap<NodeKind, SymbolKind> = new Map([
+    [NodeKind.Function, 'function'],
+    [NodeKind.Method, 'method'],
+    [NodeKind.Class, 'class'],
+    [NodeKind.Struct, 'struct'],
+    [NodeKind.Interface, 'interface'],
+    [NodeKind.Trait, 'trait'],
+    [NodeKind.Impl, 'impl'],
+    [NodeKind.Variable, 'variable'],
+    [NodeKind.Constant, 'constant'],
+    [NodeKind.Field, 'field'],
+]);
+
 /** Map a language-neutral node kind to a declaration kind, or null when it declares nothing. */
 function declarationKindOf(kind: NodeKind): SymbolKind | null {
-    switch (kind) {
-        case NodeKind.Function:
-            return 'function';
-        case NodeKind.Method:
-            return 'method';
-        case NodeKind.Class:
-            return 'class';
-        case NodeKind.Struct:
-            return 'struct';
-        case NodeKind.Interface:
-            return 'interface';
-        case NodeKind.Trait:
-            return 'trait';
-        case NodeKind.Impl:
-            return 'impl';
-        case NodeKind.Variable:
-            return 'variable';
-        case NodeKind.Constant:
-            return 'constant';
-        case NodeKind.Field:
-            return 'field';
-        default:
-            return null;
-    }
+    return DECLARATION_KIND_MAP.get(kind) ?? null;
 }
 
 interface CollectSymbolContext {
@@ -113,33 +104,47 @@ interface CollectSymbolContext {
     stack: Array<{ node: NormalizedNode; caller: string | null }>;
 }
 
+function pushChildFrames(
+    children: NormalizedNode[] | undefined,
+    caller: string | null,
+    stack: Array<{ node: NormalizedNode; caller: string | null }>,
+): void {
+    if (!children) return;
+    for (let i = 0; i < children.length; i += 1) {
+        stack.push({ node: children[i], caller });
+    }
+}
+
 function processSymbolFrame(
     frame: { node: NormalizedNode; caller: string | null },
     ctx: CollectSymbolContext,
 ): void {
-    const node = frame.node;
-    const kind = declarationKindOf(node.kind);
-    const name = node.name ?? node.bindingName ?? null;
-    let childCaller = frame.caller;
-    if (kind && typeof name === 'string' && name.length > 0) {
+    const { node, caller } = frame;
+    const name = node.name ?? node.bindingName;
+    if (!name) {
+        pushChildFrames(node.children, caller, ctx.stack);
+        return;
+    }
+
+    const kind = DECLARATION_KIND_MAP.get(node.kind);
+    if (kind) {
         ctx.definitions.push({ name, kind, file: ctx.file, line: node.start?.line ?? null });
-        childCaller = name;
-    } else if (node.kind === NodeKind.Call && typeof name === 'string' && name.length > 0) {
+        pushChildFrames(node.children, name, ctx.stack);
+        return;
+    }
+
+    if (node.kind === NodeKind.Call) {
         ctx.references.push({
             name,
             file: ctx.file,
             line: node.start?.line ?? null,
             column: node.start?.column ?? null,
             kind: 'call',
-            caller: frame.caller,
+            caller,
         });
     }
-    const children = node.children;
-    if (children) {
-        for (let i = 0; i < children.length; i += 1) {
-            ctx.stack.push({ node: children[i], caller: childCaller });
-        }
-    }
+
+    pushChildFrames(node.children, caller, ctx.stack);
 }
 
 /**

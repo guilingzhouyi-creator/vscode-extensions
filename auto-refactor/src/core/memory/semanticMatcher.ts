@@ -20,65 +20,98 @@ import type { CodeDomainFingerprint, DomainMatchResult, ReviewMemoryRecord } fro
 import { computeAstDigest } from './domainFingerprint';
 
 /**
- * Match a file's newly extracted domains against its historical review memory.
- * Decides which domains can be reused without re-analysis and which must be re-audited.
+ * Fast-path check for exact byte equality between old record and new content hash.
  *
- * Resolution order is deterministic: byte equality of `newContent` first, then AST-digest
- * equality with an unchanged domain count (line shift only), then per-domain key matching by
- * kind and name. Added and deleted domains are always reported as impacted, so stale findings
- * can never skip an audit when history does not explain the current shape.
- *
- * @param oldRecord - Cached record of the previous revision; supplies the byte hash, AST
- *   digest, domain fingerprints and historical violations that may be reused or line-remapped.
- * @param newContent - Current file text; hashed with SHA-256 for the byte-equality fast path.
- * @param newDomains - Domains extracted from the current text, in source order; that order
- *   defines the reported line-shift delta when the AST fast path applies.
- * @param newAstDigest - Optional pre-computed structural digest; when omitted it is derived
- *   from `newContent`, which costs an extra normalization pass.
- * @returns Which domains may be reused verbatim, which need re-audit and why, plus byte,
- *   semantic and line-shift equality flags with the averaged line delta.
+ * @param oldRecord - Cached review memory record.
+ * @param newContentHash - SHA-256 hex digest of current file content.
+ * @returns Verbatim domain match result if bytes match, null otherwise.
  */
-export function matchDomains(
+function checkFastPathByteMatch(
     oldRecord: ReviewMemoryRecord,
-    newContent: string,
+    newContentHash: string,
+): DomainMatchResult | null {
+    if (oldRecord.fileHash !== newContentHash) {
+        return null;
+    }
+    return {
+        unaffectedDomains: oldRecord.codeDomains,
+        impactedDomains: [],
+        isByteEqual: true,
+        isSemanticEqual: true,
+        isLineShiftOnly: false,
+        lineShiftDelta: 0,
+    };
+}
+
+/**
+ * Fast-path check for structural AST digest equality with unchanged domain counts.
+ *
+ * @param oldRecord - Cached review memory record.
+ * @param newDomains - Domains extracted from current text.
+ * @param currentAstDigest - AST digest for current text.
+ * @returns Line-shifted match result if AST digests match, null otherwise.
+ */
+function checkFastPathAstMatch(
+    oldRecord: ReviewMemoryRecord,
     newDomains: CodeDomainFingerprint[],
-    newAstDigest?: string,
-): DomainMatchResult {
-    const newContentHash = sha256Hex(Buffer.from(newContent, 'utf8'));
-
-    // 1. Exact byte equality
-    if (oldRecord.fileHash === newContentHash) {
-        return {
-            unaffectedDomains: oldRecord.codeDomains,
-            impactedDomains: [],
-            isByteEqual: true,
-            isSemanticEqual: true,
-            isLineShiftOnly: false,
-            lineShiftDelta: 0,
-        };
-    }
-
-    // 2. Structural AST digest equality
-    const currentAstDigest = newAstDigest || computeAstDigest(undefined, newContent);
+    currentAstDigest: string,
+): DomainMatchResult | null {
     if (
-        oldRecord.astDigest === currentAstDigest &&
-        oldRecord.codeDomains.length === newDomains.length
+        oldRecord.astDigest !== currentAstDigest ||
+        oldRecord.codeDomains.length !== newDomains.length
     ) {
-        return {
-            unaffectedDomains: newDomains,
-            impactedDomains: [],
-            isByteEqual: false,
-            isSemanticEqual: true,
-            isLineShiftOnly: true,
-            lineShiftDelta:
-                (newDomains[0]?.span.startLine ?? 1) -
-                (oldRecord.codeDomains[0]?.span.startLine ?? 1),
-        };
+        return null;
     }
+    const delta =
+        (newDomains[0]?.span.startLine ?? 1) -
+        (oldRecord.codeDomains[0]?.span.startLine ?? 1);
+    return {
+        unaffectedDomains: newDomains,
+        impactedDomains: [],
+        isByteEqual: false,
+        isSemanticEqual: true,
+        isLineShiftOnly: true,
+        lineShiftDelta: delta,
+    };
+}
 
-    // 3. Domain-level fine-grained matching
+/**
+ * Remap line numbers of historical rule violations when a domain shifts position.
+ *
+ * @param oldDomain - Historical domain fingerprint.
+ * @param newDomain - Current domain fingerprint.
+ * @param lineDelta - Vertical line offset between revisions.
+ * @returns Cloned domain fingerprint with remapped line violations.
+ */
+function remapDomainViolations(
+    oldDomain: CodeDomainFingerprint,
+    newDomain: CodeDomainFingerprint,
+    lineDelta: number,
+): CodeDomainFingerprint {
+    const remappedViolations = oldDomain.ruleViolations.map((v) => ({
+        ...v,
+        line: v.line + lineDelta,
+    }));
+    return {
+        ...newDomain,
+        cyclomaticComplexity: oldDomain.cyclomaticComplexity,
+        ruleViolations: remappedViolations,
+    };
+}
+
+/**
+ * Fine-grained per-domain matching between historical and newly extracted domains.
+ *
+ * @param oldDomains - Historical domain list from review memory record.
+ * @param newDomains - Newly extracted domain list.
+ * @returns Granular domain match result classifying added, modified, and deleted domains.
+ */
+function diffFineGrainedDomains(
+    oldDomains: CodeDomainFingerprint[],
+    newDomains: CodeDomainFingerprint[],
+): DomainMatchResult {
     const oldDomainMap = new Map<string, CodeDomainFingerprint>();
-    for (const d of oldRecord.codeDomains) {
+    for (const d of oldDomains) {
         oldDomainMap.set(`${d.kind}:${d.name}`, d);
     }
 
@@ -114,18 +147,7 @@ export function matchDomains(
             const lineDelta = newDomain.span.startLine - oldDomain.span.startLine;
             totalShiftDelta += lineDelta;
             shiftCount++;
-
-            // Remap line numbers for any historical violations in this domain
-            const remappedViolations = oldDomain.ruleViolations.map((v) => ({
-                ...v,
-                line: v.line + lineDelta,
-            }));
-
-            unaffectedDomains.push({
-                ...newDomain,
-                cyclomaticComplexity: oldDomain.cyclomaticComplexity,
-                ruleViolations: remappedViolations,
-            });
+            unaffectedDomains.push(remapDomainViolations(oldDomain, newDomain, lineDelta));
         } else {
             // Domain content was modified
             impactedDomains.push({
@@ -158,8 +180,52 @@ export function matchDomains(
         unaffectedDomains,
         impactedDomains,
         isByteEqual: false,
-        isSemanticEqual: allSemanticMatched && impactedDomains.length === 0,
+        isSemanticEqual: isLineShiftOnly,
         isLineShiftOnly,
         lineShiftDelta: avgShift,
     };
+}
+
+/**
+ * Match a file's newly extracted domains against its historical review memory.
+ * Decides which domains can be reused without re-analysis and which must be re-audited.
+ *
+ * Resolution order is deterministic: byte equality of `newContent` first, then AST-digest
+ * equality with an unchanged domain count (line shift only), then per-domain key matching by
+ * kind and name. Added and deleted domains are always reported as impacted, so stale findings
+ * can never skip an audit when history does not explain the current shape.
+ *
+ * @param oldRecord - Cached record of the previous revision; supplies the byte hash, AST
+ *   digest, domain fingerprints and historical violations that may be reused or line-remapped.
+ * @param newContent - Current file text; hashed with SHA-256 for the byte-equality fast path.
+ * @param newDomains - Domains extracted from the current text, in source order; that order
+ *   defines the reported line-shift delta when the AST fast path applies.
+ * @param newAstDigest - Optional pre-computed structural digest; when omitted it is derived
+ *   from `newContent`, which costs an extra normalization pass.
+ * @returns Which domains may be reused verbatim, which need re-audit and why, plus byte,
+ *   semantic and line-shift equality flags with the averaged line delta.
+ */
+export function matchDomains(
+    oldRecord: ReviewMemoryRecord,
+    newContent: string,
+    newDomains: CodeDomainFingerprint[],
+    newAstDigest?: string,
+): DomainMatchResult {
+    const newContentHash = sha256Hex(Buffer.from(newContent, 'utf8'));
+
+    // 1. Exact byte equality
+    const byteMatch = checkFastPathByteMatch(oldRecord, newContentHash);
+    if (byteMatch) {
+        return byteMatch;
+    }
+
+    // 2. Structural AST digest equality
+    const currentAstDigest = newAstDigest ?? computeAstDigest(undefined, newContent);
+    const astMatch = checkFastPathAstMatch(oldRecord, newDomains, currentAstDigest);
+    if (astMatch) {
+        return astMatch;
+    }
+
+    // 3. Domain-level fine-grained matching
+    return diffFineGrainedDomains(oldRecord.codeDomains, newDomains);
 }

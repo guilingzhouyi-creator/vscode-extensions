@@ -623,13 +623,19 @@ export class NamingAnalyzer implements Analyzer {
 
         if (opts.checkDecoupling !== false && discoveredSymbols.length >= 4) {
             const clusterFindings = this.decouplingAuditor.auditClusters(discoveredSymbols);
+            const flaggedDecouplingSymbols = new Set<string>();
+            for (const issue of issues) {
+                if (issue.rule === 'NAM-DEC-001') {
+                    const sym = (issue.detail as Record<string, unknown>)?.symbol;
+                    if (typeof sym === 'string') {
+                        flaggedDecouplingSymbols.add(sym);
+                    }
+                }
+            }
+
             for (const finding of clusterFindings) {
-                const alreadyFlagged = issues.some(
-                    (issue) =>
-                        issue.rule === 'NAM-DEC-001' &&
-                        (issue.detail as Record<string, unknown>)?.symbol === finding.symbol,
-                );
-                if (!alreadyFlagged) {
+                if (!flaggedDecouplingSymbols.has(finding.symbol)) {
+                    flaggedDecouplingSymbols.add(finding.symbol);
                     issues.push(
                         this.mkIssue(
                             ctx,

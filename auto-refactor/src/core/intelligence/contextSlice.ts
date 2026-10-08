@@ -19,7 +19,7 @@
  *     nature of every edge is stated in `constraints` rather than implying runtime verification.
  */
 import type { CallGraph } from './callGraph';
-import type { SymbolIndex } from './symbolIndex';
+import type { SymbolIndex, SymbolDefinition } from './symbolIndex';
 
 /** Role a region plays in the slice. */
 export type ContextRegionRole = 'definition' | 'dependency' | 'impact';
@@ -120,6 +120,120 @@ function intentTokens(intent: string, stopWords: readonly string[]): string[] {
     return tokens;
 }
 
+class SliceRegionCollector {
+    readonly regions: ContextSliceRegion[] = [];
+    readonly dependencies: string[] = [];
+    readonly impacts: string[] = [];
+    private readonly seen = new Set<string>();
+    private truncated = false;
+    private crossFileImpacts = 0;
+
+    constructor(
+        private readonly maxRegions: number,
+        private readonly maxDependencies: number,
+        private readonly maxImpacts: number,
+    ) {}
+
+    push(region: ContextSliceRegion): void {
+        const key = `${region.role}|${region.symbol}|${region.file}|${region.line ?? ''}`;
+        if (this.seen.has(key)) return;
+        if (this.regions.length >= this.maxRegions) {
+            this.truncated = true;
+            return;
+        }
+        this.seen.add(key);
+        this.regions.push(region);
+    }
+
+    collectDefinitions(symbol: string, definitions: readonly SymbolDefinition[]): void {
+        for (const definition of definitions) {
+            this.push({
+                file: definition.file,
+                symbol,
+                role: 'definition',
+                line: definition.line,
+                reason: `Task intent resolved definition of ${symbol} (${definition.kind})`,
+            });
+        }
+    }
+
+    collectDependencies(symbol: string, graph: CallGraph, index: SymbolIndex): void {
+        for (const edge of graph.calleesOf(symbol)) {
+            if (this.dependencies.length >= this.maxDependencies) break;
+            this.dependencies.push(edge.callee);
+            const target = index.resolve(edge.callee).definitions[0];
+            this.push({
+                file: target?.file ?? edge.callerFile,
+                symbol: edge.callee,
+                role: 'dependency',
+                line: target?.line ?? edge.line,
+                reason: `${symbol} calls ${edge.callee}${edge.resolved ? '' : ' (unresolved external/dynamic)'}`,
+            });
+        }
+    }
+
+    collectImpacts(
+        symbol: string,
+        definitions: readonly SymbolDefinition[],
+        graph: CallGraph,
+    ): void {
+        const primaryFile = definitions[0]?.file;
+        for (const edge of graph.callersOf(symbol)) {
+            if (this.impacts.length >= this.maxImpacts) break;
+            const caller = edge.caller ?? '(module-level)';
+            this.impacts.push(caller);
+            if (edge.callerFile !== (primaryFile ?? edge.callerFile)) {
+                this.crossFileImpacts += 1;
+            }
+            const isCross = edge.callerFile !== (primaryFile ?? '');
+            this.push({
+                file: edge.callerFile,
+                symbol: caller,
+                role: 'impact',
+                line: edge.line,
+                reason: `${caller} calls ${symbol} (impact scope${isCross ? ', cross-file' : ''})`,
+            });
+        }
+    }
+
+    buildConstraints(): string[] {
+        return [
+            `Budget: regions≤${this.maxRegions} (actual ${this.regions.length}${this.truncated ? ', truncated' : ''}), ` +
+                `dependencies≤${this.maxDependencies} (actual ${this.dependencies.length}), impacts≤${this.maxImpacts} (actual ${this.impacts.length})`,
+            `Cross-file impact scope: ${this.crossFileImpacts} call sites`,
+            'Static inference: derived from shared SymbolIndex/CallGraph without runtime validation; unresolved calls explicitly flagged',
+        ];
+    }
+
+    isTruncated(): boolean {
+        return this.truncated;
+    }
+}
+
+interface ClassifiedTokens {
+    symbols: string[];
+    unresolved: string[];
+    resolvedDefs: Map<string, SymbolDefinition[]>;
+}
+
+function resolveIntentTokens(tokens: string[], index: SymbolIndex): ClassifiedTokens {
+    const symbols: string[] = [];
+    const unresolved: string[] = [];
+    const resolvedDefs = new Map<string, SymbolDefinition[]>();
+
+    for (const token of tokens) {
+        const { definitions } = index.resolve(token);
+        if (definitions.length > 0) {
+            symbols.push(token);
+            resolvedDefs.set(token, definitions);
+        } else {
+            unresolved.push(token);
+        }
+    }
+
+    return { symbols, unresolved, resolvedDefs };
+}
+
 /**
  * Build a bounded semantic context slice for one task intent.
  *
@@ -135,92 +249,34 @@ export function buildContextSlice(
     graph: CallGraph,
     options: ContextSliceOptions = {},
 ): ContextSlice {
-    const maxRegions = options.maxRegions ?? DEFAULT_MAX_REGIONS;
-    const maxDependencies = options.maxDependencies ?? DEFAULT_MAX_DEPENDENCIES;
-    const maxImpacts = options.maxImpacts ?? DEFAULT_MAX_IMPACTS;
+    const {
+        maxRegions = DEFAULT_MAX_REGIONS,
+        maxDependencies = DEFAULT_MAX_DEPENDENCIES,
+        maxImpacts = DEFAULT_MAX_IMPACTS,
+        stopWords = [],
+    } = options;
 
-    const symbols: string[] = [];
-    const unresolved: string[] = [];
-    for (const token of intentTokens(intent, options.stopWords ?? [])) {
-        const { definitions } = index.resolve(token);
-        if (definitions.length > 0) symbols.push(token);
-        else unresolved.push(token);
-    }
+    const { symbols, unresolved, resolvedDefs } = resolveIntentTokens(
+        intentTokens(intent, stopWords),
+        index,
+    );
 
-    const regions: ContextSliceRegion[] = [];
-    const dependencies: string[] = [];
-    const impacts: string[] = [];
-    const seen = new Set<string>();
-    let truncated = false;
-    let crossFileImpacts = 0;
-
-    const push = (region: ContextSliceRegion): void => {
-        const key = `${region.role}|${region.symbol}|${region.file}|${region.line ?? ''}`;
-        if (seen.has(key)) return;
-        if (regions.length >= maxRegions) {
-            truncated = true;
-            return;
-        }
-        seen.add(key);
-        regions.push(region);
-    };
-
+    const collector = new SliceRegionCollector(maxRegions, maxDependencies, maxImpacts);
     for (const symbol of symbols) {
-        const { definitions } = index.resolve(symbol);
-        for (const definition of definitions) {
-            push({
-                file: definition.file,
-                symbol,
-                role: 'definition',
-                line: definition.line,
-                reason: `Task intent resolved definition of ${symbol} (${definition.kind})`,
-            });
-        }
-        const calleeEdges = graph.calleesOf(symbol);
-        for (const edge of calleeEdges) {
-            if (dependencies.length >= maxDependencies) break;
-            dependencies.push(edge.callee);
-            const target = index.resolve(edge.callee).definitions[0];
-            push({
-                file: target?.file ?? edge.callerFile,
-                symbol: edge.callee,
-                role: 'dependency',
-                line: target?.line ?? edge.line,
-                reason: `${symbol} calls ${edge.callee}${edge.resolved ? '' : ' (unresolved external/dynamic)'}`,
-            });
-        }
-        const callerEdges = graph.callersOf(symbol);
-        for (const edge of callerEdges) {
-            if (impacts.length >= maxImpacts) break;
-            const caller = edge.caller ?? '(module-level)';
-            impacts.push(caller);
-            if (edge.callerFile !== (definitions[0]?.file ?? edge.callerFile))
-                crossFileImpacts += 1;
-            push({
-                file: edge.callerFile,
-                symbol: caller,
-                role: 'impact',
-                line: edge.line,
-                reason: `${caller} calls ${symbol} (impact scope${edge.callerFile !== (definitions[0]?.file ?? '') ? ', cross-file' : ''})`,
-            });
-        }
+        const definitions = resolvedDefs.get(symbol) ?? [];
+        collector.collectDefinitions(symbol, definitions);
+        collector.collectDependencies(symbol, graph, index);
+        collector.collectImpacts(symbol, definitions, graph);
     }
-
-    const constraints = [
-        `Budget: regions≤${maxRegions} (actual ${regions.length}${truncated ? ', truncated' : ''}), ` +
-            `dependencies≤${maxDependencies} (actual ${dependencies.length}), impacts≤${maxImpacts} (actual ${impacts.length})`,
-        `Cross-file impact scope: ${crossFileImpacts} call sites`,
-        'Static inference: derived from shared SymbolIndex/CallGraph without runtime validation; unresolved calls explicitly flagged',
-    ];
 
     return {
         intent,
         symbols,
         unresolved,
-        regions,
-        dependencies: [...new Set(dependencies)],
-        impacts: [...new Set(impacts)],
-        constraints,
-        truncated,
+        regions: collector.regions,
+        dependencies: [...new Set(collector.dependencies)],
+        impacts: [...new Set(collector.impacts)],
+        constraints: collector.buildConstraints(),
+        truncated: collector.isTruncated(),
     };
 }

@@ -472,6 +472,9 @@ function auditBudgetTiering(context: RepoArchetypeContext, issues: Issue[]): voi
     }
 }
 
+const SHELL_SCRIPT_EXT = '.sh';
+const POWERSHELL_SCRIPT_EXT = '.ps1';
+
 /**
  * Dimension 6: GATE-ERR-001: Strict Error Discipline in Gate Scripts.
  */
@@ -490,10 +493,11 @@ function auditStrictErrorDiscipline(context: RepoArchetypeContext, issues: Issue
     for (const script of scriptsToCheck) {
         const content = script.content;
         const relPath = path.relative(context.root, script.filePath).replace(/\\/g, '/');
+        const scriptExt = path.extname(script.filePath);
 
         if (
-            script.filePath.endsWith('.sh') ||
-            (!script.filePath.includes('.') && content.startsWith('#!'))
+            scriptExt === SHELL_SCRIPT_EXT ||
+            (scriptExt === '' && content.startsWith('#!'))
         ) {
             // Shell script: must declare set -e or set -euo pipefail
             if (!/set\s+-[a-z]*e/m.test(content)) {
@@ -517,7 +521,7 @@ function auditStrictErrorDiscipline(context: RepoArchetypeContext, issues: Issue
                     ),
                 );
             }
-        } else if (script.filePath.endsWith('.ps1')) {
+        } else if (scriptExt === POWERSHELL_SCRIPT_EXT) {
             // PowerShell: must declare $ErrorActionPreference = 'Stop'
             if (!/\$ErrorActionPreference\s*=\s*['"]?Stop['"]?/i.test(content)) {
                 issues.push(

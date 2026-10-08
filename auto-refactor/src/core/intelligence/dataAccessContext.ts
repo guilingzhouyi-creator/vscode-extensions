@@ -30,7 +30,7 @@ const HINT_SCRIPT = 'script';
 const HINT_TOOL = 'tool';
 
 /** Fragments whose presence in a path or symbol marks an offline or migration context. */
-const OFFLINE_CONTEXT_HINTS = [
+export const OFFLINE_CONTEXT_HINTS: ReadonlySet<string> = new Set([
     HINT_MIGRATION,
     HINT_SEED,
     HINT_FIXTURE,
@@ -41,7 +41,10 @@ const OFFLINE_CONTEXT_HINTS = [
     HINT_CLI,
     HINT_SCRIPT,
     HINT_TOOL,
-];
+]);
+
+/** Precompiled case-insensitive regex for single-pass context matching. */
+const OFFLINE_CONTEXT_PATTERN = new RegExp([...OFFLINE_CONTEXT_HINTS].join('|'), 'i');
 
 /**
  * Identify whether a file or function belongs to an offline, migration, or admin task.
@@ -51,12 +54,5 @@ const OFFLINE_CONTEXT_HINTS = [
  * @returns True when the context is an offline or migration job.
  */
 export function isOfflineOrMigrationContext(filePath: string, symbol: string): boolean {
-    const lowerPath = filePath.toLowerCase();
-    const lowerSymbol = symbol.toLowerCase();
-    for (const hint of OFFLINE_CONTEXT_HINTS) {
-        if (lowerPath.includes(hint) || lowerSymbol.includes(hint)) {
-            return true;
-        }
-    }
-    return false;
+    return OFFLINE_CONTEXT_PATTERN.test(filePath) || OFFLINE_CONTEXT_PATTERN.test(symbol);
 }

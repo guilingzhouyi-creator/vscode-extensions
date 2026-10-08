@@ -82,16 +82,17 @@ const PYTHON_STDLIB: ReadonlySet<string> = new Set([
     'logging',
 ]);
 
-/** Exemption marker tuples mapping trigger tokens to canonical exemption reasons. */
-const EXEMPTION_RULES: ReadonlyArray<{
-    readonly markers: readonly string[];
-    readonly reason: ExemptionReason;
-}> = [
-    { markers: ['@lazy', 'deferred load'], reason: 'lazy' },
-    { markers: ['@optional', 'optional dependency'], reason: 'optional' },
-    { markers: ['@platform', 'platform-specific'], reason: 'platform' },
-    { markers: ['cycle', 'break circular'], reason: 'cycle-breaker' },
-];
+/** Exemption marker mapping from trigger tokens to canonical exemption reasons. */
+export const EXEMPTION_MARKER_MAP: ReadonlyMap<string, ExemptionReason> = new Map([
+    ['@lazy', 'lazy'],
+    ['deferred load', 'lazy'],
+    ['@optional', 'optional'],
+    ['optional dependency', 'optional'],
+    ['@platform', 'platform'],
+    ['platform-specific', 'platform'],
+    ['cycle', 'cycle-breaker'],
+    ['break circular', 'cycle-breaker'],
+]);
 
 /**
  * Determine import category based on language and module specifier.
@@ -147,11 +148,9 @@ export function extractExemptionReason(
     if (customExemptions && customExemptions.some((m) => lower.includes(m.toLowerCase()))) {
         return 'lazy';
     }
-    for (const rule of EXEMPTION_RULES) {
-        for (const marker of rule.markers) {
-            if (lower.includes(marker)) {
-                return rule.reason;
-            }
+    for (const [marker, reason] of EXEMPTION_MARKER_MAP) {
+        if (lower.includes(marker)) {
+            return reason;
         }
     }
     return undefined;

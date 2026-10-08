@@ -192,6 +192,119 @@ export function auditFileAndDirectoryPaths(
 
 const CAMEL_TO_KEBAB_PATTERN = '$1-$2';
 
+type IssueFactory = (
+    line: number,
+    rule: string,
+    message: string,
+    detail: Record<string, unknown>,
+    suggestion?: string,
+) => Issue;
+
+interface FileNamingTarget {
+    filePath: string;
+    baseName: string;
+    nameWithoutExt: string;
+    ext: string;
+}
+
+type FileNamingStrategy = (
+    target: FileNamingTarget,
+    mkIssue: IssueFactory,
+) => Issue | null;
+
+function auditJsTsFileName(
+    target: FileNamingTarget,
+    mkIssue: IssueFactory,
+): Issue | null {
+    const { filePath, baseName, nameWithoutExt, ext } = target;
+    const isKebab = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(nameWithoutExt);
+    if (isKebab) return null;
+    const isPascalComponent =
+        (ext === '.tsx' || ext === '.jsx') && /^[A-Z][a-zA-Z0-9]+$/.test(nameWithoutExt);
+    if (isPascalComponent) return null;
+    const suggested = nameWithoutExt
+        .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_KEBAB_PATTERN)
+        .replace(/[_]/g, '-')
+        .toLowerCase();
+    return mkIssue(
+        1,
+        'NAM-FIL-001',
+        `File name '${baseName}' violates strict kebab-case naming convention for TypeScript/JavaScript.`,
+        { file: filePath, baseName, suggested: `${suggested}${ext}` },
+        `Rename file to '${suggested}${ext}'.`,
+    );
+}
+
+function auditSnakeFileName(
+    target: FileNamingTarget,
+    mkIssue: IssueFactory,
+): Issue | null {
+    const { filePath, baseName, nameWithoutExt, ext } = target;
+    const cleaned = ext === '.py' ? nameWithoutExt.replace(/^_(?!_)/, '') : nameWithoutExt;
+    const isSnake =
+        /^[a-z0-9]+(_[a-z0-9]+)*$/.test(cleaned) ||
+        (ext === '.py' && /^__[a-z0-9_]+__$/.test(nameWithoutExt));
+    if (isSnake) return null;
+    const suggested = nameWithoutExt
+        .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
+        .replace(/[-]/g, '_')
+        .toLowerCase();
+    return mkIssue(
+        1,
+        'NAM-FIL-001',
+        `File name '${baseName}' violates strict snake_case naming convention for ${ext.slice(1)}.`,
+        { file: filePath, baseName, suggested: `${suggested}${ext}` },
+        `Rename file to '${suggested}${ext}'.`,
+    );
+}
+
+const FILE_NAMING_STRATEGIES = new Map<string, FileNamingStrategy>();
+for (const ext of JS_TS_EXTS) {
+    FILE_NAMING_STRATEGIES.set(ext, auditJsTsFileName);
+}
+for (const ext of SNAKE_EXTS) {
+    FILE_NAMING_STRATEGIES.set(ext, auditSnakeFileName);
+}
+
+function resolveFileNameWithoutExt(baseName: string, ext: string): string {
+    const raw = baseName.slice(0, baseName.length - ext.length);
+    return raw.endsWith('.d') ? raw.slice(0, -2) : raw;
+}
+
+function checkFileJargonOrIgnored(
+    filePath: string,
+    baseName: string,
+    nameWithoutExt: string,
+    mkIssue: IssueFactory,
+    issues: Issue[],
+): boolean {
+    if (IGNORED_FILE_BASENAMES.has(nameWithoutExt.toLowerCase())) return true;
+    if (TRANSIENT_JARGON_RE.test(nameWithoutExt)) {
+        issues.push(
+            mkIssue(
+                1,
+                'NAM-FIL-001',
+                `File name '${baseName}' contains transient process jargon or milestone tags.`,
+                { file: filePath, baseName },
+                'Remove temporary process markers from file name.',
+            ),
+        );
+        return true;
+    }
+    return false;
+}
+
+function dispatchNamingStrategy(
+    target: FileNamingTarget,
+    mkIssue: IssueFactory,
+    issues: Issue[],
+): void {
+    const strategy = FILE_NAMING_STRATEGIES.get(target.ext);
+    if (!strategy) return;
+    const issue = strategy(target, mkIssue);
+    if (issue) issues.push(issue);
+}
+
 function auditFileName(
     filePath: string,
     opts: PathNamingOptions,
@@ -208,64 +321,10 @@ function auditFileName(
     if (opts.checkFiles === false) return;
     const baseName = path.basename(filePath);
     const ext = path.extname(baseName);
-    let nameWithoutExt = baseName.slice(0, baseName.length - ext.length);
-    if (nameWithoutExt.endsWith('.d')) {
-        nameWithoutExt = nameWithoutExt.slice(0, -2);
-    }
-    if (IGNORED_FILE_BASENAMES.has(nameWithoutExt.toLowerCase())) return;
+    const nameWithoutExt = resolveFileNameWithoutExt(baseName, ext);
+    if (checkFileJargonOrIgnored(filePath, baseName, nameWithoutExt, mkIssue, issues)) return;
 
-    if (TRANSIENT_JARGON_RE.test(nameWithoutExt)) {
-        issues.push(
-            mkIssue(
-                1,
-                'NAM-FIL-001',
-                `File name '${baseName}' contains transient process jargon or milestone tags.`,
-                { file: filePath, baseName },
-                'Remove temporary process markers from file name.',
-            ),
-        );
-        return;
-    }
-
-    if (JS_TS_EXTS.has(ext)) {
-        const isKebab = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(nameWithoutExt);
-        if (isKebab) return;
-        const isPascalComponent =
-            (ext === '.tsx' || ext === '.jsx') && /^[A-Z][a-zA-Z0-9]+$/.test(nameWithoutExt);
-        if (isPascalComponent) return;
-        const suggested = nameWithoutExt
-            .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_KEBAB_PATTERN)
-            .replace(/[_]/g, '-')
-            .toLowerCase();
-        issues.push(
-            mkIssue(
-                1,
-                'NAM-FIL-001',
-                `File name '${baseName}' violates strict kebab-case naming convention for TypeScript/JavaScript.`,
-                { file: filePath, baseName, suggested: `${suggested}${ext}` },
-                `Rename file to '${suggested}${ext}'.`,
-            ),
-        );
-    } else if (SNAKE_EXTS.has(ext)) {
-        const cleaned = ext === '.py' ? nameWithoutExt.replace(/^_(?!_)/, '') : nameWithoutExt;
-        const isSnake =
-            /^[a-z0-9]+(_[a-z0-9]+)*$/.test(cleaned) ||
-            (ext === '.py' && /^__[a-z0-9_]+__$/.test(nameWithoutExt));
-        if (isSnake) return;
-        const suggested = nameWithoutExt
-            .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
-            .replace(/[-]/g, '_')
-            .toLowerCase();
-        issues.push(
-            mkIssue(
-                1,
-                'NAM-FIL-001',
-                `File name '${baseName}' violates strict snake_case naming convention for ${ext.slice(1)}.`,
-                { file: filePath, baseName, suggested: `${suggested}${ext}` },
-                `Rename file to '${suggested}${ext}'.`,
-            ),
-        );
-    }
+    dispatchNamingStrategy({ filePath, baseName, nameWithoutExt, ext }, mkIssue, issues);
 }
 
 function auditDirectoryName(

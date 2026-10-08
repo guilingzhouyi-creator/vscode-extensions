@@ -135,6 +135,55 @@ function shouldIncludeFile(
 }
 
 /**
+ * Reads directory entries safely, returning an empty list for unreadable or inaccessible directories.
+ *
+ * @param dir - Absolute path of directory to inspect.
+ * @returns Array of dirent items, or empty array if access fails.
+ */
+function readDirectoryEntries(dir: string): fs.Dirent[] {
+    try {
+        return fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Dispatches a single directory entry into the traversal queue or results list.
+ *
+ * @param e - Filesystem directory entry to evaluate.
+ * @param dir - Current directory path containing entry.
+ * @param absRoot - Root directory being traversed.
+ * @param includeRx - Include regex patterns.
+ * @param excludeRx - Exclude regex patterns.
+ * @param gitignore - Optional gitignore predicate.
+ * @param dirQueue - FIFO queue of directories to traverse.
+ * @param results - Accumulated output list of matched files.
+ */
+function dispatchDiscoveryEntry(
+    e: fs.Dirent,
+    dir: string,
+    absRoot: string,
+    includeRx: RegExp[],
+    excludeRx: RegExp[],
+    gitignore: ((rel: string) => boolean) | null,
+    dirQueue: string[],
+    results: string[],
+): void {
+    const abs = path.join(dir, e.name);
+    const rel = path.relative(absRoot, abs).split(path.sep).join('/');
+
+    if (e.isDirectory() && shouldTraverseDirectory(rel, e.name, excludeRx, gitignore)) {
+        dirQueue.push(abs);
+        return;
+    }
+
+    if (e.isFile() && shouldIncludeFile(rel, e.name, includeRx, excludeRx, gitignore)) {
+        results.push(rel);
+    }
+}
+
+/**
  * Iterative filesystem walker for discovering participating source files.
  * Replaces recursive traversal with an explicit FIFO directory queue,
  * eliminating call stack consumption and providing deterministic sorted output.
@@ -157,26 +206,19 @@ export function collectFiles(
 
     while (dirQueue.length > 0) {
         const dir = dirQueue.shift()!;
-        let entries: fs.Dirent[];
-        try {
-            entries = fs.readdirSync(dir, { withFileTypes: true });
-        } catch {
-            // Ignored for unreadable / permission-denied directories
-            continue;
-        }
+        const entries = readDirectoryEntries(dir);
 
         for (const e of entries) {
-            const abs = path.join(dir, e.name);
-            const rel = path.relative(absRoot, abs).split(path.sep).join('/');
-
-            if (e.isDirectory() && shouldTraverseDirectory(rel, e.name, excludeRx, gitignore)) {
-                dirQueue.push(abs);
-            } else if (
-                e.isFile() &&
-                shouldIncludeFile(rel, e.name, includeRx, excludeRx, gitignore)
-            ) {
-                results.push(rel);
-            }
+            dispatchDiscoveryEntry(
+                e,
+                dir,
+                absRoot,
+                includeRx,
+                excludeRx,
+                gitignore,
+                dirQueue,
+                results,
+            );
         }
     }
 

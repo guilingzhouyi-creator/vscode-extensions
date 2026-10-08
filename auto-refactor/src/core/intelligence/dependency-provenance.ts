@@ -170,44 +170,53 @@ function parseCargoToml(manifestPath: string, target: Set<string>): void {
     }
 }
 
+/** Safely read UTF-8 text from disk, returning null on error or non-existence. */
+function tryReadUtf8Text(filePath: string): string | null {
+    try {
+        if (!fs.existsSync(filePath)) return null;
+        return fs.readFileSync(filePath, 'utf8');
+    } catch {
+        return null;
+    }
+}
+
+/** Parse dependency names from pyproject.toml contents. */
+function parsePyprojectDeps(raw: string, target: Set<string>): void {
+    let inDeps = false;
+    for (const line of raw.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('[')) {
+            inDeps = /(?:dependencies|requires)/i.test(trimmed);
+            continue;
+        }
+        if (inDeps && trimmed && !trimmed.startsWith('#')) {
+            const match = /["']([a-zA-Z0-9_.-]+)(?:[><=~;]|$)/.exec(trimmed);
+            if (match) target.add(match[1].toLowerCase().replace(/[-.]/g, '_'));
+        }
+    }
+}
+
+/** Parse dependency names from requirements.txt contents. */
+function parseRequirementsDeps(raw: string, target: Set<string>): void {
+    for (const line of raw.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const match = /^([a-zA-Z0-9_.-]+)/.exec(trimmed);
+        if (match) target.add(match[1].toLowerCase().replace(/[-.]/g, '_'));
+    }
+}
+
 /**
  * Extract external package dependencies declared in pyproject.toml and requirements.txt.
  */
 function parsePythonManifests(rootDir: string, target: Set<string>): void {
-    const pyproject = path.join(rootDir, 'pyproject.toml');
-    if (fs.existsSync(pyproject)) {
-        try {
-            const raw = fs.readFileSync(pyproject, 'utf8');
-            let inDeps = false;
-            for (const line of raw.split('\n')) {
-                const trimmed = line.trim();
-                if (trimmed.startsWith('[')) {
-                    inDeps = /(?:dependencies|requires)/i.test(trimmed);
-                    continue;
-                }
-                if (inDeps && trimmed && !trimmed.startsWith('#')) {
-                    const match = /["']([a-zA-Z0-9_.-]+)(?:[><=~;]|$)/.exec(trimmed);
-                    if (match) target.add(match[1].toLowerCase().replace(/[-.]/g, '_'));
-                }
-            }
-        } catch {
-            // best-effort fallback: ignored when manifest is corrupt or unreadable
-        }
+    const pyproject = tryReadUtf8Text(path.join(rootDir, 'pyproject.toml'));
+    if (pyproject) {
+        parsePyprojectDeps(pyproject, target);
     }
-
-    const reqTxt = path.join(rootDir, 'requirements.txt');
-    if (fs.existsSync(reqTxt)) {
-        try {
-            const raw = fs.readFileSync(reqTxt, 'utf8');
-            for (const line of raw.split('\n')) {
-                const trimmed = line.trim();
-                if (!trimmed || trimmed.startsWith('#')) continue;
-                const match = /^([a-zA-Z0-9_.-]+)/.exec(trimmed);
-                if (match) target.add(match[1].toLowerCase().replace(/[-.]/g, '_'));
-            }
-        } catch {
-            // best-effort fallback: ignored when manifest is corrupt or unreadable
-        }
+    const reqTxt = tryReadUtf8Text(path.join(rootDir, 'requirements.txt'));
+    if (reqTxt) {
+        parseRequirementsDeps(reqTxt, target);
     }
 }
 

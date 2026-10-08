@@ -25,59 +25,130 @@ const LATIN_WORD_PATTERN = /\b[A-Za-z]{2,}\b/g;
 /** Dominant language ratio threshold */
 const DOMINANCE_RATIO_THRESHOLD = 0.7;
 
+function skipStringLiteral(content: string, startIdx: number): number {
+    const quote = content[startIdx];
+    let i = startIdx + 1;
+    const len = content.length;
+    while (i < len) {
+        const c = content[i];
+        if (c === '\\') {
+            i += 2;
+            continue;
+        }
+        if (c === quote) {
+            return i + 1;
+        }
+        if (quote !== '`' && (c === '\n' || c === '\r')) {
+            return i;
+        }
+        i++;
+    }
+    return i;
+}
+
+function scanLineComment(content: string, startIdx: number): { comment: string; nextIdx: number } {
+    let i = startIdx;
+    const len = content.length;
+    while (i < len && content[i] !== '\n' && content[i] !== '\r') {
+        i++;
+    }
+    return {
+        comment: content.slice(startIdx, i).trim(),
+        nextIdx: i,
+    };
+}
+
+function scanBlockComment(content: string, startIdx: number): { comment: string; nextIdx: number } {
+    let i = startIdx;
+    const len = content.length;
+    while (i + 1 < len) {
+        if (content[i] === '*' && content[i + 1] === '/') {
+            return {
+                comment: content.slice(startIdx, i).trim(),
+                nextIdx: i + 2,
+            };
+        }
+        i++;
+    }
+    return {
+        comment: content.slice(startIdx, len).trim(),
+        nextIdx: len,
+    };
+}
+
+function tryScanSlashComment(
+    content: string,
+    index: number,
+): { comment: string; nextIdx: number; isLineStart: boolean } | null {
+    const next = content[index + 1];
+    if (next === '/') {
+        const res = scanLineComment(content, index + 2);
+        return { comment: res.comment, nextIdx: res.nextIdx, isLineStart: true };
+    }
+    if (next === '*') {
+        const res = scanBlockComment(content, index + 2);
+        return { comment: res.comment, nextIdx: res.nextIdx, isLineStart: false };
+    }
+    return null;
+}
+
+function appendComment(comments: string[], text: string): void {
+    if (text.length > 0) {
+        comments.push(text);
+    }
+}
+
 /**
  * Rapidly extracts all raw comment text lines from source content.
+ * Single-pass cursor scanner skipping string literals and recognizing
+ * line comments (//, #) and block comments (/* *\/).
  *
  * @param content - Full source content
  * @returns Concatenated comment lines
  */
 export function extractRawCommentText(content: string): string {
-    const lines = content.split(/\r\n|\n/);
-    const commentLines: string[] = [];
-    let inBlockComment = false;
+    const comments: string[] = [];
+    const len = content.length;
+    let i = 0;
+    let isLineStart = true;
 
-    for (const line of lines) {
-        const trimmed = line.trim();
-        if (inBlockComment) {
-            const endIndex = trimmed.indexOf('*/');
-            if (endIndex !== -1) {
-                commentLines.push(trimmed.slice(0, endIndex));
-                inBlockComment = false;
-            } else {
-                commentLines.push(trimmed);
+    while (i < len) {
+        const ch = content[i];
+
+        if (ch === '"' || ch === "'" || ch === '`') {
+            i = skipStringLiteral(content, i);
+            isLineStart = false;
+            continue;
+        }
+
+        if (ch === '/') {
+            const slashRes = tryScanSlashComment(content, i);
+            if (slashRes) {
+                appendComment(comments, slashRes.comment);
+                i = slashRes.nextIdx;
+                isLineStart = slashRes.isLineStart;
+                continue;
             }
+        }
+
+        if (ch === '#' && isLineStart && content[i + 1] !== '!') {
+            const res = scanLineComment(content, i + 1);
+            appendComment(comments, res.comment);
+            i = res.nextIdx;
+            isLineStart = true;
             continue;
         }
 
-        if (trimmed.startsWith('/*')) {
-            const endIndex = trimmed.indexOf('*/', 2);
-            if (endIndex !== -1) {
-                commentLines.push(trimmed.slice(2, endIndex));
-            } else {
-                commentLines.push(trimmed.slice(2));
-                inBlockComment = true;
-            }
-            continue;
+        if (ch === '\n' || ch === '\r') {
+            isLineStart = true;
+        } else if (ch !== ' ' && ch !== '\t') {
+            isLineStart = false;
         }
 
-        if (trimmed.startsWith('//')) {
-            commentLines.push(trimmed.slice(2));
-            continue;
-        }
-
-        if (trimmed.startsWith('#') && !trimmed.startsWith('#!')) {
-            commentLines.push(trimmed.slice(1));
-            continue;
-        }
-
-        // Inline trailing comment (e.g., const x = 1; // note)
-        const inlineCommentIdx = trimmed.indexOf('//');
-        if (inlineCommentIdx > 0) {
-            commentLines.push(trimmed.slice(inlineCommentIdx + 2));
-        }
+        i++;
     }
 
-    return commentLines.join('\n');
+    return comments.join('\n');
 }
 
 /**

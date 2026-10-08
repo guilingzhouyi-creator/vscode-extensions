@@ -73,6 +73,65 @@ function findCallClosingParen(rawLine: string, openIdx: number): number {
     return -1;
 }
 
+/** Engine and framework method names whose argument lists carry canonical keys or tokens. */
+export const TOLERANT_CALL_NAMES: ReadonlySet<string> = new Set([
+    'render_narrative',
+    'emit_narrative_by_key',
+    'get',
+    'set',
+    'has',
+    'get_meta',
+    'set_meta',
+    'has_meta',
+    'emit_signal',
+    'connect',
+    'disconnect',
+    'is_action_pressed',
+    'is_action_just_pressed',
+    'is_action_just_released',
+    'play',
+    'play_backwards',
+    'change_scene_to_file',
+    'rpc',
+    'rpc_id',
+]);
+
+const TOLERANT_CALL_RE = new RegExp(
+    `\\b(?:GameConfig\\.[A-Za-z0-9_]+|${[...TOLERANT_CALL_NAMES].join('|')})\\s*\\(`,
+    'g',
+);
+
+interface TolerantCallSpan {
+    open: number;
+    close: number;
+}
+
+/**
+ * Line-level single-pass collection of argument spans for tolerant calls.
+ */
+function collectTolerantCallSpans(rawLine: string): TolerantCallSpan[] {
+    const spans: TolerantCallSpan[] = [];
+    const callRe = new RegExp(TOLERANT_CALL_RE.source, 'g');
+    let cm: RegExpExecArray | null;
+    while ((cm = callRe.exec(rawLine)) !== null) {
+        const openIdx = cm.index + cm[0].lastIndexOf('(');
+        const closeIdx = findCallClosingParen(rawLine, openIdx);
+        if (closeIdx !== -1) {
+            spans.push({ open: openIdx, close: closeIdx });
+        }
+    }
+    return spans;
+}
+
+function isInsideTolerantSpans(col0: number, spans: readonly TolerantCallSpan[]): boolean {
+    for (let i = 0; i < spans.length; i++) {
+        if (col0 >= spans[i].open && col0 <= spans[i].close) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function tryParseClassDecl(
     rawLine: string,
     lineNum: number,
@@ -302,6 +361,7 @@ export class GDScriptAdapter implements LanguageAdapter {
         // elsewhere on the same line are still flagged.
         const isLegacyToleratedLine =
             /\b(preload|load|get_node|push_error|push_warning|print|printerr)\b|\$/.test(rawLine);
+        const tolerantSpans = collectTolerantCallSpans(rawLine);
 
         // String literals ("..." or '...')
         const strRegex = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'/g;
@@ -326,7 +386,7 @@ export class GDScriptAdapter implements LanguageAdapter {
                     isLegacyToleratedLine ||
                     isDictOrIndex ||
                     strVal.length < MIN_SIGNIFICANT_STRING_LENGTH ||
-                    this.isInsideTolerantCall(rawLine, match.index),
+                    isInsideTolerantSpans(match.index, tolerantSpans),
                 start: { line: lineNum, column: col },
                 end: { line: lineNum, column: col + fullText.length },
             };
@@ -356,7 +416,7 @@ export class GDScriptAdapter implements LanguageAdapter {
                 tolerated:
                     isLegacyToleratedLine ||
                     isSubscriptIndex ||
-                    this.isInsideTolerantCall(rawLine, match.index),
+                    isInsideTolerantSpans(match.index, tolerantSpans),
                 start: { line: lineNum, column: col },
                 end: { line: lineNum, column: col + numText.length },
             };
@@ -372,16 +432,6 @@ export class GDScriptAdapter implements LanguageAdapter {
      * names/keys and are exempt; the rest of the line stays analyzable.
      */
     private isInsideTolerantCall(rawLine: string, col0: number): boolean {
-        const callRe =
-            /\b(?:GameConfig\.[A-Za-z0-9_]+|render_narrative|emit_narrative_by_key|get|set|has|get_meta|set_meta|has_meta|emit_signal|connect|disconnect|is_action_pressed|is_action_just_pressed|is_action_just_released|play|play_backwards|change_scene_to_file|rpc|rpc_id)\s*\(/g;
-        let cm: RegExpExecArray | null;
-        while ((cm = callRe.exec(rawLine)) !== null) {
-            const openIdx = cm.index + cm[0].lastIndexOf('(');
-            const closeIdx = findCallClosingParen(rawLine, openIdx);
-            if (closeIdx !== -1 && col0 >= openIdx && col0 <= closeIdx) {
-                return true;
-            }
-        }
-        return false;
+        return isInsideTolerantSpans(col0, collectTolerantCallSpans(rawLine));
     }
 }
