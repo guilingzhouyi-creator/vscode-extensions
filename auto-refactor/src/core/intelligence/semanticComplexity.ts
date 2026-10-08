@@ -78,6 +78,70 @@ export function isBoundedCollection(expr: string): boolean {
     return false;
 }
 
+function recordUnboundedCycleIssue(
+    u: string,
+    edge: { callerFile: string; line?: number | null },
+    cycle: string[],
+    callGraph: CallGraph,
+    issues: Issue[],
+): void {
+    const file = edge.callerFile;
+    const primaryLine = edge.line ?? 1;
+    const cycleKey = cycle.join(' -> ');
+
+    const evidence: SemanticEvidenceStep[] = cycle.map((sym, idx) => ({
+        kind: 'call',
+        description: `Step ${idx + 1}: calls '${sym}'`,
+        file,
+        line: primaryLine,
+        symbol: sym,
+    }));
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'core',
+        symbol: u,
+        codeDomain: 'recursion-lifecycle',
+        currentBehavior: `Mutual recursive invocation cycle: ${cycleKey}`,
+        semanticEvidenceChain: evidence,
+        triggerCondition:
+            'Cyclic call path detected without verifiable base-case depth guard',
+        risk: 'Potential call-stack exhaustion (StackOverflowError) under pathological or cyclic input graphs.',
+        blastRadius: [file],
+        isDeterministic: true,
+        requiresManualConfirm: true,
+        suggestedFix:
+            'Introduce an explicit depth accumulator parameter with termination threshold, or rewrite using an iterative worklist.',
+        impactedCallers: callGraph.callersOf(u).map((e) => e.caller ?? 'unknown'),
+        impactedTests: [],
+        verificationMethod:
+            'Test with deep tree or cyclic data structures to verify graceful termination.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    issues.push({
+        id: `complexity:CPX-REC-001:${file}:${primaryLine}`,
+        analyzer: 'complexity',
+        rule: 'CPX-REC-001',
+        severity: 'error',
+        message: `Potential unbounded recursion cycle: ${cycleKey}`,
+        location: {
+            file,
+            start: { line: primaryLine, column: 1 },
+            end: { line: primaryLine, column: MAX_SCORE_CAP },
+        },
+        detail,
+        suggestion:
+            'Convert to iterative stack loop or pass a bounded depth counter.',
+        evidence: {
+            confidence: 0.9,
+            requiresRuntime: false,
+        },
+    });
+}
+
 /**
  * Detect recursion cycles in the call graph that lack verified termination bounds.
  *
@@ -102,71 +166,21 @@ export function detectUnboundedRecursion(
         const neighbors = callGraph.calleesOf(u);
         for (const edge of neighbors) {
             const callee = edge.callee;
-            const file = edge.callerFile;
-            const line = edge.line;
             if (!visited.has(callee)) {
                 dfs(callee);
-            } else if (inStack.has(callee)) {
-                const cycleStartIndex = stack.indexOf(callee);
-                const cycle = stack.slice(cycleStartIndex).concat(callee);
-                const cycleKey = cycle.join(' -> ');
-
-                const hasGuard = cycle.some((sym) => recursiveSymbolsWithGuards.has(sym));
-                if (!hasGuard) {
-                    const primaryLine = line ?? 1;
-                    const evidence: SemanticEvidenceStep[] = cycle.map((sym, idx) => ({
-                        kind: 'call',
-                        description: `Step ${idx + 1}: calls '${sym}'`,
-                        file,
-                        line: primaryLine,
-                        symbol: sym,
-                    }));
-
-                    const detail: SemanticReviewDetail = {
-                        language: 'typescript',
-                        module: 'core',
-                        symbol: u,
-                        codeDomain: 'recursion-lifecycle',
-                        currentBehavior: `Mutual recursive invocation cycle: ${cycleKey}`,
-                        semanticEvidenceChain: evidence,
-                        triggerCondition:
-                            'Cyclic call path detected without verifiable base-case depth guard',
-                        risk: 'Potential call-stack exhaustion (StackOverflowError) under pathological or cyclic input graphs.',
-                        blastRadius: [file],
-                        isDeterministic: true,
-                        requiresManualConfirm: true,
-                        suggestedFix:
-                            'Introduce an explicit depth accumulator parameter with termination threshold, or rewrite using an iterative worklist.',
-                        impactedCallers: callGraph.callersOf(u).map((e) => e.caller ?? 'unknown'),
-                        impactedTests: [],
-                        verificationMethod:
-                            'Test with deep tree or cyclic data structures to verify graceful termination.',
-                        ruleVersion: '1.0.0',
-                        configVersion: '0.3.0',
-                        canAutofix: false,
-                    };
-
-                    issues.push({
-                        id: `complexity:CPX-REC-001:${file}:${primaryLine}`,
-                        analyzer: 'complexity',
-                        rule: 'CPX-REC-001',
-                        severity: 'error',
-                        message: `Potential unbounded recursion cycle: ${cycleKey}`,
-                        location: {
-                            file,
-                            start: { line: primaryLine, column: 1 },
-                            end: { line: primaryLine, column: MAX_SCORE_CAP },
-                        },
-                        detail,
-                        suggestion:
-                            'Convert to iterative stack loop or pass a bounded depth counter.',
-                        evidence: {
-                            confidence: 0.9,
-                            requiresRuntime: false,
-                        },
-                    });
-                }
+                continue;
             }
+            if (!inStack.has(callee)) {
+                continue;
+            }
+
+            const cycleStartIndex = stack.indexOf(callee);
+            const cycle = stack.slice(cycleStartIndex).concat(callee);
+            if (cycle.some((sym) => recursiveSymbolsWithGuards.has(sym))) {
+                continue;
+            }
+
+            recordUnboundedCycleIssue(u, edge, cycle, callGraph, issues);
         }
 
         stack.pop();

@@ -19,9 +19,6 @@ export const MULTIPLIER_LOOKUP: Readonly<Record<string, number>> = {
     M: 1_000_000,
 };
 
-/** Backward-compatible alias for metric multiplier table. */
-export const SUFFIX_MULTIPLIERS = MULTIPLIER_LOOKUP;
-
 /** Metric pattern with optional decimal point and case-insensitive suffix. */
 const METRIC_PATTERN = /^\s*(\d+(?:\.\d+)?)\s*([kKmM])?\s*$/;
 

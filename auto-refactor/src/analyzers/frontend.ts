@@ -165,7 +165,8 @@ function auditDomDepthAndAnimationReflow(file: string, rawLines: string[], issue
 }
 
 /**
- * Counts non-empty property declaration lines in an interface body in a single pass without heap allocation.
+ * Counts non-empty property declaration lines in an interface body in a single pass
+ * without heap allocation.
  */
 function countInterfaceBodyProps(body: string): number {
     let count = 0;

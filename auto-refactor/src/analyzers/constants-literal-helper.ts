@@ -428,7 +428,15 @@ export function isStringDuplicateCandidate(
 ): boolean {
     const str = stripQuotes(value).trim();
     if (isIgnoredLiteralCandidate(value, str, ignoreSet)) return false;
-    if (isDomainBenignToken(str.toLowerCase(), isTest, isDataOrConfig, isAlgorithm, isConstantFile)) {
+    if (
+        isDomainBenignToken(
+            str.toLowerCase(),
+            isTest,
+            isDataOrConfig,
+            isAlgorithm,
+            isConstantFile,
+        )
+    ) {
         return false;
     }
     return true;
