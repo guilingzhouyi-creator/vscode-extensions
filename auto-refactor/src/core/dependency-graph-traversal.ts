@@ -212,14 +212,21 @@ function auditModuleSymbols(
     severity: Severity,
     issues: Issue[],
 ): number {
+    const combinedTokens = new Set<string>();
+    for (const f of importerFiles) {
+        const tokens = getImporterTokens(f, contents, importerTokenSets);
+        if (tokens === undefined) {
+            return 0;
+        }
+        for (const tok of tokens) {
+            combinedTokens.add(tok);
+        }
+    }
+
     let flagged = 0;
     for (const sym of mod.exportedSymbols) {
         if (flagged >= MAX_UNUSED_EXPORTS_PER_MODULE) break;
-        const used = importerFiles.some((f) => {
-            const tokens = getImporterTokens(f, contents, importerTokenSets);
-            return tokens === undefined ? true : tokens.has(sym);
-        });
-        if (!used) {
+        if (!combinedTokens.has(sym)) {
             issues.push({
                 id: `dependency-graph:unused-export:${mod.file}:${sym}`,
                 analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,

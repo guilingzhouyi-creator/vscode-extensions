@@ -384,6 +384,30 @@ export function isNumericDuplicateCandidate(value: string, magicNumberMin: numbe
 }
 
 /**
+ * Checks if a string literal should be ignored regardless of domain context.
+ */
+function isIgnoredLiteralCandidate(value: string, str: string, ignoreSet: Set<string>): boolean {
+    return str.length === 0 || ignoreSet.has(value) || ignoreSet.has(str);
+}
+
+/**
+ * Determines whether a lowered string token is benign within the active domain scope.
+ */
+function isDomainBenignToken(
+    lower: string,
+    isTest: boolean,
+    isDataOrConfig: boolean,
+    isAlgorithm: boolean,
+    isConstantFile: boolean,
+): boolean {
+    if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return true;
+    if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return true;
+    if (isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lower)) return true;
+    if (isConstantFile && CONSTANT_DEFAULT_MAPPING_TOKENS.has(lower)) return true;
+    return false;
+}
+
+/**
  * Checks if a string literal is a duplicate candidate.
  *
  * @param value - String literal value.
@@ -403,12 +427,10 @@ export function isStringDuplicateCandidate(
     isConstantFile = false,
 ): boolean {
     const str = stripQuotes(value).trim();
-    if (str.length === 0 || ignoreSet.has(value) || ignoreSet.has(str)) return false;
-    const lower = str.toLowerCase();
-    if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return false;
-    if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return false;
-    if (isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lower)) return false;
-    if (isConstantFile && CONSTANT_DEFAULT_MAPPING_TOKENS.has(lower)) return false;
+    if (isIgnoredLiteralCandidate(value, str, ignoreSet)) return false;
+    if (isDomainBenignToken(str.toLowerCase(), isTest, isDataOrConfig, isAlgorithm, isConstantFile)) {
+        return false;
+    }
     return true;
 }
 
