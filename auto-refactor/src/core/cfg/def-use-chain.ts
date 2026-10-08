@@ -12,6 +12,8 @@
  */
 
 import type { ControlFlowGraph } from './cfg-builder';
+
+type BlockNode = ControlFlowGraph['blocks'][number];
 import type {
     FlowAnalysisResult,
     FloatingPromiseFinding,
@@ -21,19 +23,21 @@ import type {
     VariableUse,
 } from './types';
 
-/** Heuristic patterns identifying resource allocation or acquisition expressions. */
-const RESOURCE_ALLOC_PATTERNS = [
-    /\b(?:createStatusBarItem|createOutputChannel|createTerminal|createFileSystemWatcher)\b/,
-    /\b(?:registerCommand|registerTextEditorCommand|registerTreeDataProvider)\b/,
-    /\b(?:open|connect|acquire|subscribe|addListener)\b/,
-    /\bnew\s+(?:Disposable|EventEmitter|CancellationTokenSource)\b/,
-];
+/** Unified pattern matching resource allocation or acquisition expressions. */
+const COMBINED_RESOURCE_ALLOC_RE =
+    /\b(?:createStatusBarItem|createOutputChannel|createTerminal|createFileSystemWatcher|registerCommand|registerTextEditorCommand|registerTreeDataProvider|open|connect|acquire|subscribe|addListener)\b|\bnew\s+(?:Disposable|EventEmitter|CancellationTokenSource)\b/;
 
-/** Heuristic patterns identifying resource disposal or registration calls. */
-const RESOURCE_CLEANUP_PATTERNS = [
-    /\b(?:dispose|close|disconnect|release|destroy)\s*\(/,
-    /\bsubscriptions\.push\s*\(/,
-];
+/** Unified pattern matching resource disposal or registration calls. */
+const COMBINED_RESOURCE_CLEANUP_RE =
+    /\b(?:dispose|close|disconnect|release|destroy)\s*\(|\bsubscriptions\.push\s*\(/;
+
+function isResourceAllocStatement(rawText: string): boolean {
+    return COMBINED_RESOURCE_ALLOC_RE.test(rawText);
+}
+
+function isResourceCleanupStatement(rawText: string): boolean {
+    return COMBINED_RESOURCE_CLEANUP_RE.test(rawText);
+}
 
 /**
  * Checks if a character code represents an ECMAScript identifier word character [a-zA-Z0-9_].
@@ -96,20 +100,25 @@ export class DefUseAnalyzer {
     static extractDefinitions(cfg: ControlFlowGraph): VariableDef[] {
         const defs: VariableDef[] = [];
         for (const block of cfg.blocks) {
-            for (const stmt of block.statements) {
-                for (const v of stmt.definedVars) {
-                    const isResource = RESOURCE_ALLOC_PATTERNS.some((p) => p.test(stmt.rawText));
-                    defs.push({
-                        variable: v,
-                        blockId: block.id,
-                        statementId: stmt.id,
-                        line: stmt.line,
-                        isResource,
-                    });
-                }
-            }
+            this.collectBlockDefinitions(block, defs);
         }
         return defs;
+    }
+
+    private static collectBlockDefinitions(block: BlockNode, defs: VariableDef[]): void {
+        for (const stmt of block.statements) {
+            if (stmt.definedVars.length === 0) continue;
+            const isResource = isResourceAllocStatement(stmt.rawText);
+            for (let i = 0; i < stmt.definedVars.length; i++) {
+                defs.push({
+                    variable: stmt.definedVars[i],
+                    blockId: block.id,
+                    statementId: stmt.id,
+                    line: stmt.line,
+                    isResource,
+                });
+            }
+        }
     }
 
     /**
@@ -121,25 +130,32 @@ export class DefUseAnalyzer {
     static extractUses(cfg: ControlFlowGraph): VariableUse[] {
         const uses: VariableUse[] = [];
         for (const block of cfg.blocks) {
-            for (const stmt of block.statements) {
-                for (const v of stmt.usedVars) {
-                    let kind: VariableUse['kind'] = 'read';
-                    if (RESOURCE_CLEANUP_PATTERNS.some((p) => p.test(stmt.rawText))) {
-                        kind = 'cleanup';
-                    } else if (hasMemberDereference(stmt.rawText, v)) {
-                        kind = 'dereference';
-                    }
-                    uses.push({
-                        variable: v,
-                        blockId: block.id,
-                        statementId: stmt.id,
-                        line: stmt.line,
-                        kind,
-                    });
-                }
-            }
+            this.collectBlockUses(block, uses);
         }
         return uses;
+    }
+
+    private static collectBlockUses(block: BlockNode, uses: VariableUse[]): void {
+        for (const stmt of block.statements) {
+            if (stmt.usedVars.length === 0) continue;
+            const isCleanup = isResourceCleanupStatement(stmt.rawText);
+            for (let i = 0; i < stmt.usedVars.length; i++) {
+                const v = stmt.usedVars[i];
+                let kind: VariableUse['kind'] = 'read';
+                if (isCleanup) {
+                    kind = 'cleanup';
+                } else if (hasMemberDereference(stmt.rawText, v)) {
+                    kind = 'dereference';
+                }
+                uses.push({
+                    variable: v,
+                    blockId: block.id,
+                    statementId: stmt.id,
+                    line: stmt.line,
+                    kind,
+                });
+            }
+        }
     }
 
     /**
@@ -166,25 +182,62 @@ export class DefUseAnalyzer {
         return findings;
     }
 
+    private static hasExitSuccessor(block: BlockNode, exitId: number): boolean {
+        for (let i = 0; i < block.successors.length; i++) {
+            if (block.successors[i].id === exitId) return true;
+        }
+        return false;
+    }
+
+    private static updateProtectedVarsForBlock(
+        block: BlockNode,
+        leavesOnGuard: boolean,
+        protectedVars: Set<string>,
+    ): void {
+        for (const stmt of block.statements) {
+            if (!stmt.isNullGuard) continue;
+            for (let i = 0; i < stmt.usedVars.length; i++) {
+                const v = stmt.usedVars[i];
+                if (leavesOnGuard) {
+                    protectedVars.add(v);
+                } else {
+                    protectedVars.delete(v);
+                }
+            }
+        }
+    }
+
     /**
      * Determines which variables are safely guarded by terminating branches.
      */
     private static collectProtectedVars(cfg: ControlFlowGraph): Set<string> {
         const protectedVars = new Set<string>();
         for (const block of cfg.blocks) {
-            const leavesOnGuard = block.successors.some((succ) => succ.id === cfg.exit.id);
-            for (const stmt of block.statements) {
-                if (!stmt.isNullGuard) continue;
-                for (const v of stmt.usedVars) {
-                    if (leavesOnGuard) {
-                        protectedVars.add(v);
-                    } else {
-                        protectedVars.delete(v);
-                    }
+            const leavesOnGuard = this.hasExitSuccessor(block, cfg.exit.id);
+            this.updateProtectedVarsForBlock(block, leavesOnGuard, protectedVars);
+        }
+        return protectedVars;
+    }
+
+    private static scanBlockForUnguarded(
+        block: BlockNode,
+        protectedVars: ReadonlySet<string>,
+        findings: UnguardedNullFinding[],
+    ): void {
+        for (const stmt of block.statements) {
+            if (stmt.isNullGuard) continue;
+            for (let i = 0; i < stmt.usedVars.length; i++) {
+                const v = stmt.usedVars[i];
+                if (protectedVars.has(v)) continue;
+                if (hasMemberDereference(stmt.rawText, v)) {
+                    findings.push({
+                        line: stmt.line,
+                        variable: v,
+                        rawText: stmt.rawText,
+                    });
                 }
             }
         }
-        return protectedVars;
     }
 
     /**
@@ -196,19 +249,7 @@ export class DefUseAnalyzer {
     ): UnguardedNullFinding[] {
         const findings: UnguardedNullFinding[] = [];
         for (const block of cfg.blocks) {
-            for (const stmt of block.statements) {
-                if (stmt.isNullGuard) continue;
-                for (const v of stmt.usedVars) {
-                    if (protectedVars.has(v)) continue;
-                    if (hasMemberDereference(stmt.rawText, v)) {
-                        findings.push({
-                            line: stmt.line,
-                            variable: v,
-                            rawText: stmt.rawText,
-                        });
-                    }
-                }
-            }
+            this.scanBlockForUnguarded(block, protectedVars, findings);
         }
         return findings;
     }
@@ -222,12 +263,18 @@ export class DefUseAnalyzer {
         uses: readonly VariableUse[],
     ): UnclosedResourceFinding[] {
         const findings: UnclosedResourceFinding[] = [];
-        for (const def of defs) {
+        const cleanupVars = new Set<string>();
+        for (let i = 0; i < uses.length; i++) {
+            const u = uses[i];
+            if (u.kind === 'cleanup') {
+                cleanupVars.add(u.variable);
+            }
+        }
+
+        for (let i = 0; i < defs.length; i++) {
+            const def = defs[i];
             if (!def.isResource) continue;
-            const hasCleanup = uses.some(
-                (u) => u.variable === def.variable && u.kind === 'cleanup',
-            );
-            if (!hasCleanup) {
+            if (!cleanupVars.has(def.variable)) {
                 findings.push({
                     variable: def.variable,
                     defLine: def.line,

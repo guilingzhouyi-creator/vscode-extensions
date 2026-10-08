@@ -112,15 +112,57 @@ function auditEvolutionaryArchitectureRules(
     return issues;
 }
 
+function buildPathSegmentSet(norm: string): Set<string> {
+    const segments = norm.split('/');
+    const set = new Set<string>();
+    const len = segments.length;
+    for (let i = 0; i < len; i++) {
+        let current = segments[i];
+        set.add(current);
+        addStrippedExtension(current, set);
+        for (let j = i + 1; j < len; j++) {
+            current = `${current}/${segments[j]}`;
+            set.add(current);
+            addStrippedExtension(current, set);
+        }
+    }
+    return set;
+}
+
+function addStrippedExtension(item: string, set: Set<string>): void {
+    const dotIdx = item.lastIndexOf('.');
+    if (dotIdx > 0) {
+        set.add(item.slice(0, dotIdx));
+    }
+}
+
 function matchUserLayer(
     norm: string,
     layers?: Record<string, ArchitectureLayer>,
 ): ArchitectureLayer | null {
     if (!layers) return null;
+    const pathSet = buildPathSegmentSet(norm);
     for (const [pattern, layer] of Object.entries(layers)) {
-        if (norm.includes(pattern)) return layer;
+        if (pathSet.has(pattern)) return layer;
     }
     return null;
+}
+
+function buildDirectorySegmentSet(norm: string): Set<string> {
+    const segments = norm.split('/');
+    const dirSet = new Set<string>();
+    const count = segments.length;
+    for (let i = 0; i < count; i++) {
+        let current = segments[i];
+        if (i < count - 1) {
+            dirSet.add(current);
+        }
+        for (let j = i + 1; j < count - 1; j++) {
+            current = `${current}/${segments[j]}`;
+            dirSet.add(current);
+        }
+    }
+    return dirSet;
 }
 
 function matchDirectorySemantics(
@@ -128,8 +170,9 @@ function matchDirectorySemantics(
     semantics?: Record<string, ArchitectureLayer>,
 ): ArchitectureLayer | null {
     if (!semantics) return null;
+    const dirSet = buildDirectorySegmentSet(norm);
     for (const [dir, layer] of Object.entries(semantics)) {
-        if (norm.startsWith(dir + '/') || norm.includes('/' + dir + '/')) {
+        if (dirSet.has(dir)) {
             return layer;
         }
     }
@@ -222,26 +265,28 @@ export class ArchitectureAnalyzer implements Analyzer {
         const customHeadlessSet = customHeadless ? new Set(customHeadless) : undefined;
 
         const len = content.length;
+        if (len === 0) return;
+
         let lineStart = 0;
         let lineIdx = 0;
 
-        while (lineStart < len) {
-            let lineEnd = content.indexOf('\n', lineStart);
-            let nextStart: number;
-            if (lineEnd === -1) {
-                lineEnd = len;
-                nextStart = len;
-            } else {
-                nextStart = lineEnd + 1;
-                if (
-                    lineEnd > lineStart &&
-                    content.charCodeAt(lineEnd - 1) === CARRIAGE_RETURN_CHAR_CODE
-                ) {
-                    lineEnd--;
-                }
+        for (let i = 0; i <= len; i++) {
+            const isEnd = i === len;
+            if (!isEnd && content.charCodeAt(i) !== 10) {
+                continue;
+            }
+            if (isEnd && lineStart >= len) {
+                break;
+            }
+            let sliceEnd = i;
+            if (
+                sliceEnd > lineStart &&
+                content.charCodeAt(sliceEnd - 1) === CARRIAGE_RETURN_CHAR_CODE
+            ) {
+                sliceEnd--;
             }
 
-            const lineText = content.slice(lineStart, lineEnd);
+            const lineText = content.slice(lineStart, sliceEnd);
             const trimmed = lineText.trim();
 
             this.checkDtoLeakage(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
@@ -269,7 +314,7 @@ export class ArchitectureAnalyzer implements Analyzer {
             );
 
             lineIdx++;
-            lineStart = nextStart;
+            lineStart = i + 1;
         }
     }
 

@@ -7,11 +7,12 @@
  *     from ../../multilang; runs on scan, CI or daemon passes with governance node rules.
  * Responsibilities: calculateMaxNesting computes maximum control-flow depth with an explicit stack,
  *     skipping nested function scopes; GOV-LOG-001 rejects depth above maxNestingDepth (default 5);
- *     GOV-LOG-002 flags self-forwarding wrappers whose source span is at most three lines.
- * Exit Semantics & Design Rationale: checkNode returns null when clean and a violation list when a
- *     rule fires; it never throws, and both rules are advisory and non-fixable. The iterative scan
- *     avoids recursion overhead on deep ASTs; guard clauses and extraction are advocated because
- *     deep nesting raises cognitive load and pass-through wrappers add indirection.
+ *     GOV-LOG-002 flags self-forwarding wrappers whose source span is at most three lines;
+ *     NUM-PREC-001 detects low-precision rounding and mismatched scaling calculations.
+ * Exit Semantics & Design Rationale: checkNode and checkFile return null when clean and a violation
+ *     list when a rule fires; never throws, findings are advisory and non-fixable. The iterative
+ *     scan avoids recursion overhead on deep ASTs; guard clauses and extraction are advocated
+ *     because deep nesting raises cognitive load and pass-through wrappers add indirection.
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { isToolOrTestScript } from '../pathScope';
@@ -30,6 +31,43 @@ const PASSTHROUGH_RE = /return\s+(_?[a-zA-Z0-9_$]+)\.([a-zA-Z0-9_$]+)\s*\(([^)]*
 const SCRATCH_NODE_STACK: NormalizedNode[] = [];
 const SCRATCH_DEPTH_STACK: number[] = [];
 
+/** Node kinds targeted by trivial pass-through wrapper detection. */
+const TARGET_WRAPPER_KINDS: ReadonlySet<string> = new Set([
+    NodeKind.Function,
+    NodeKind.Method,
+]);
+
+/** Return keyword library for pass-through wrapper verification. */
+const RETURN_KEYWORDS: ReadonlySet<string> = new Set(['return']);
+
+/** File basenames exempted from lossy precision rounding checks. */
+const EXEMPT_PRECISION_FILENAMES: ReadonlySet<string> = new Set([
+    'compact-ledger-store.ts',
+]);
+
+/** Keywords and identifiers triggering lossy precision checks. */
+const PRECISION_TRIGGER_TOKENS: ReadonlySet<string> = new Set([
+    'Math',
+    'toFixed',
+]);
+
+const KEYWORD_RETURN = 'return';
+
+const LOSSY_ROUNDING_RE =
+    /\bMath\.(?:round|floor|ceil)\s*\([^()]*(?:\([^()]*\)[^()]*)*\*\s*10(?:\.0)?\s*\)\s*\/\s*10(?:\.0)?\b/;
+const MISMATCHED_SCALING_RE =
+    /\bMath\.(?:round|floor|ceil)\s*\([^()]*(?:\([^()]*\)[^()]*)*\*\s*100(?:\.0)?\s*\)\s*\/\s*10(?:\.0)?\b/;
+const LOSSY_NUMBER_TOFIXED_RE =
+    /(?:Number|\+)?\s*(?:[a-zA-Z0-9_.]+|\([^)]*\))\s*\.toFixed\s*\(\s*1\s*\)/;
+
+/**
+ * Evaluates whether a node contributes to control-flow nesting depth.
+ */
+function isNestingNode(child: NormalizedNode): boolean {
+    if (child.kind === NodeKind.ControlFlow) return true;
+    return Boolean(child.increasesNesting) && child.kind !== NodeKind.Block;
+}
+
 /**
  * Pushes non-function child nodes and their computed control-flow depths onto the stack.
  */
@@ -37,10 +75,7 @@ function pushChildrenToStack(children: NormalizedNode[], currentDepth: number): 
     for (let i = 0; i < children.length; i++) {
         const child = children[i];
         if (child.functionLike) continue;
-        const isNestingControl =
-            child.kind === NodeKind.ControlFlow ||
-            (Boolean(child.increasesNesting) && child.kind !== NodeKind.Block);
-        const nextDepth = currentDepth + (isNestingControl ? 1 : 0);
+        const nextDepth = currentDepth + (isNestingNode(child) ? 1 : 0);
         SCRATCH_NODE_STACK.push(child);
         SCRATCH_DEPTH_STACK.push(nextDepth);
     }
@@ -65,7 +100,9 @@ function calculateMaxNesting(rootNode: NormalizedNode): number {
     while (nodeStack.length > 0) {
         const currentNode = nodeStack.pop()!;
         const currentDepth = depthStack.pop()!;
-        if (currentDepth > max) max = currentDepth;
+        if (currentDepth > max) {
+            max = currentDepth;
+        }
 
         if (currentNode.children) {
             pushChildrenToStack(currentNode.children, currentDepth);
@@ -95,35 +132,42 @@ export const ExcessiveNestingRule: GovernanceRule = {
 
         const maxNesting = calculateMaxNesting(ctx.node);
         const threshold = ctx.ctx.options?.maxNestingDepth ?? DEFAULT_MAX_NESTING_DEPTH;
+        if (maxNesting <= threshold) return null;
 
-        if (maxNesting > threshold) {
-            const fnName = ctx.node.name ?? ctx.binding ?? 'anonymous';
-            return [
-                {
-                    ruleId: 'GOV-LOG-001',
-                    message: `Function \`${fnName}\` has excessive control flow nesting depth of ${maxNesting} (threshold: ${threshold}).`,
-                    line: ctx.node.start?.line ?? 1,
-                    column: ctx.node.start?.column ?? 1,
-                    suggestion:
-                        'Refactor with guard clauses (early returns) or extract nested logic into sub-functions.',
-                    fixable: false,
-                    customDetail: { maxNesting, threshold },
-                },
-            ];
-        }
-        return null;
+        const fnName = ctx.node.name ?? ctx.binding ?? 'anonymous';
+        return [
+            {
+                ruleId: 'GOV-LOG-001',
+                message: `Function \`${fnName}\` has excessive control flow nesting depth of ${maxNesting} (threshold: ${threshold}).`,
+                line: ctx.node.start?.line ?? 1,
+                column: ctx.node.start?.column ?? 1,
+                suggestion:
+                    'Refactor with guard clauses (early returns) or extract nested logic into sub-functions.',
+                fixable: false,
+                customDetail: { maxNesting, threshold },
+            },
+        ];
     },
 };
 
-const KEYWORD_RETURN = 'return';
+/**
+ * Checks whether a line contains the return keyword token using library lookup.
+ */
+function lineHasReturnKeyword(line: string): boolean {
+    const tokens = line.split(/[^a-zA-Z0-9_$]+/);
+    for (let i = 0; i < tokens.length; i++) {
+        if (RETURN_KEYWORDS.has(tokens[i])) return true;
+    }
+    return false;
+}
 
 /**
- * Checks whether any line in the given span contains the return keyword.
+ * Checks whether any line in the given span contains the return keyword token.
  */
 function hasReturnInSpan(lines: string[], startLine: number, endLine: number): boolean {
     const limit = Math.min(endLine, lines.length);
     for (let i = startLine - 1; i < limit; i++) {
-        if (lines[i].includes(KEYWORD_RETURN)) return true;
+        if (lineHasReturnKeyword(lines[i])) return true;
     }
     return false;
 }
@@ -139,17 +183,16 @@ function extractPassThroughViolation(
 ): GovernanceViolation | null {
     const body = masked.slice(startLine - 1, endLine).join(' ');
     const m = body.match(PASSTHROUGH_RE);
-    if (m && node.name && m[2] === node.name) {
-        return {
-            ruleId: 'GOV-LOG-002',
-            message: `Method \`${node.name}\` appears to be a trivial pass-through wrapper forwarding directly to \`${m[1]}.${m[2]}\`.`,
-            line: startLine,
-            column: node.start?.column ?? 1,
-            suggestion: 'Consider inline usage or document the explicit interception rationale.',
-            fixable: false,
-        };
-    }
-    return null;
+    if (!m || !node.name || m[2] !== node.name) return null;
+
+    return {
+        ruleId: 'GOV-LOG-002',
+        message: `Method \`${node.name}\` appears to be a trivial pass-through wrapper forwarding directly to \`${m[1]}.${m[2]}\`.`,
+        line: startLine,
+        column: node.start?.column ?? 1,
+        suggestion: 'Consider inline usage or document the explicit interception rationale.',
+        fixable: false,
+    };
 }
 
 /**
@@ -168,7 +211,7 @@ export const VacuousWrapperRule: GovernanceRule = {
     targetKinds: [NodeKind.Function, NodeKind.Method],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes(KEYWORD_RETURN)) return null;
-        if (ctx.node.kind !== NodeKind.Method && ctx.node.kind !== NodeKind.Function) return null;
+        if (!TARGET_WRAPPER_KINDS.has(ctx.node.kind)) return null;
 
         const startLine = ctx.node.start?.line;
         const endLine = ctx.node.end?.line;
@@ -183,12 +226,87 @@ export const VacuousWrapperRule: GovernanceRule = {
     },
 };
 
-const LOSSY_ROUNDING_RE =
-    /\bMath\.(?:round|floor|ceil)\s*\([^()]*(?:\([^()]*\)[^()]*)*\*\s*10(?:\.0)?\s*\)\s*\/\s*10(?:\.0)?\b/;
-const MISMATCHED_SCALING_RE =
-    /\bMath\.(?:round|floor|ceil)\s*\([^()]*(?:\([^()]*\)[^()]*)*\*\s*100(?:\.0)?\s*\)\s*\/\s*10(?:\.0)?\b/;
-const LOSSY_NUMBER_TOFIXED_RE =
-    /(?:Number|\+)?\s*(?:[a-zA-Z0-9_.]+|\([^)]*\))\s*\.toFixed\s*\(\s*1\s*\)/;
+/**
+ * Determines whether a file path is exempted from precision rounding verification.
+ */
+function isExemptPrecisionFilePath(filePath: string): boolean {
+    const normalized = filePath.replace(/\\/g, '/');
+    const fileName = normalized.slice(normalized.lastIndexOf('/') + 1);
+    return EXEMPT_PRECISION_FILENAMES.has(fileName);
+}
+
+/**
+ * Detects presence of precision calculation triggers via token library lookup.
+ */
+function lineHasPrecisionTrigger(line: string): { hasMath: boolean; hasToFixed: boolean } {
+    let hasMath = false;
+    let hasToFixed = false;
+    const tokens = line.split(/[^a-zA-Z0-9_$]+/);
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        if (PRECISION_TRIGGER_TOKENS.has(token)) {
+            if (token === 'Math') hasMath = true;
+            if (token === 'toFixed') hasToFixed = true;
+        }
+    }
+    return { hasMath, hasToFixed };
+}
+
+/**
+ * Matches candidate lossy precision rounding expressions against a single line.
+ */
+function evaluatePrecisionMatch(
+    line: string,
+    hasMath: boolean,
+    hasToFixed: boolean,
+): RegExpExecArray | null {
+    if (hasMath) {
+        const match = LOSSY_ROUNDING_RE.exec(line) ?? MISMATCHED_SCALING_RE.exec(line);
+        if (match) return match;
+    }
+    if (hasToFixed) {
+        return LOSSY_NUMBER_TOFIXED_RE.exec(line);
+    }
+    return null;
+}
+
+/**
+ * Inspects a single masked code line for lossy precision truncation violations.
+ */
+function checkPrecisionLine(line: string, lineIndex: number): GovernanceViolation | null {
+    const { hasMath, hasToFixed } = lineHasPrecisionTrigger(line);
+    if (!hasMath && !hasToFixed) return null;
+
+    const match = evaluatePrecisionMatch(line, hasMath, hasToFixed);
+    if (!match) return null;
+
+    return {
+        ruleId: 'NUM-PREC-001',
+        message:
+            `Lossy precision rounding \`${match[0]}\` detected. Calculation path` +
+            ' truncates to 0.1 precision or exhibits mismatched scaling.',
+        line: lineIndex + 1,
+        column: match.index + 1,
+        suggestion:
+            'Use standard 0.01 precision rounding (such as SCORE_ROUNDING = 100)' +
+            ' or explicit tolerance bound.',
+        fixable: false,
+        customDetail: {
+            matchedExpression: match[0],
+        },
+        actionable: {
+            action: 'align_numeric_precision',
+            code: CODE_NUM_PRECISION_LOSSY,
+            taxonomy: 'NUM_PREC',
+            safeToAutomate: true,
+            templateSnippet: 'Math.round(val * 100) / 100 + 0',
+            targetArguments: {
+                matchedExpression: match[0],
+                standardPrecision: 0.01,
+            },
+        },
+    };
+}
 
 /**
  * NUM-PREC-001: Lossy Precision Truncation Governance.
@@ -207,56 +325,15 @@ export const LossyPrecisionRoundingRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (isToolOrTestScript(ctx.filePath)) return null;
-        if (ctx.filePath.includes('compact-ledger-store.ts')) return null;
+        if (isExemptPrecisionFilePath(ctx.filePath)) return null;
         if (!ctx.content.includes('Math.') && !ctx.content.includes('toFixed')) return null;
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const hasMath = line.includes('Math.');
-            const hasToFixed = line.includes('toFixed');
-            if (!hasMath && !hasToFixed) continue;
-
-            let match: RegExpExecArray | null = null;
-            if (hasMath) {
-                match = LOSSY_ROUNDING_RE.exec(line);
-                if (!match) {
-                    match = MISMATCHED_SCALING_RE.exec(line);
-                }
-            }
-            if (!match && hasToFixed) {
-                match = LOSSY_NUMBER_TOFIXED_RE.exec(line);
-            }
-            if (match) {
-                violations.push({
-                    ruleId: 'NUM-PREC-001',
-                    message:
-                        `Lossy precision rounding \`${match[0]}\` detected. Calculation path` +
-                        ' truncates to 0.1 precision or exhibits mismatched scaling.',
-                    line: i + 1,
-                    column: match.index + 1,
-                    suggestion:
-                        'Use standard 0.01 precision rounding (such as SCORE_ROUNDING = 100)' +
-                        ' or explicit tolerance bound.',
-                    fixable: false,
-                    customDetail: {
-                        matchedExpression: match[0],
-                    },
-                    actionable: {
-                        action: 'align_numeric_precision',
-                        code: CODE_NUM_PRECISION_LOSSY,
-                        taxonomy: 'NUM_PREC',
-                        safeToAutomate: true,
-                        templateSnippet: 'Math.round(val * 100) / 100 + 0',
-                        targetArguments: {
-                            matchedExpression: match[0],
-                            standardPrecision: 0.01,
-                        },
-                    },
-                });
-            }
+            const violation = checkPrecisionLine(lines[i], i);
+            if (violation) violations.push(violation);
         }
 
         return violations.length > 0 ? violations : null;

@@ -21,11 +21,15 @@ import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { globToRegExp } from '../core/file-discovery';
 import { auditTerminologyProse } from '../core/governance/terminology-engine';
 
+function matchesExemptPathPattern(normalized: string, pattern: string): boolean {
+    return new RegExp(pattern, 'i').test(normalized);
+}
+
 function isExemptDocsPath(filePath: string, options?: DocsOptions): boolean {
     const normalized = filePath.replace(/\\/g, '/');
     if (options?.exemptPathPatterns) {
         for (const pattern of options.exemptPathPatterns) {
-            if (new RegExp(pattern, 'i').test(normalized)) return true;
+            if (matchesExemptPathPattern(normalized, pattern)) return true;
         }
     }
     return (
@@ -44,6 +48,7 @@ const PATH_TARGET_RE =
     /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+\.(?:py|md|ya?ml|json|sh|ps1|ts|js|css|html|gd|rs|toml|txt|cfg|ini|mjs|cjs)$/;
 const DUP_MIN_LENGTH = 24;
 const DUP_IGNORED_PREFIXES = ['>', '|', '#'];
+const DUP_IGNORED_PREFIX_CHARS: ReadonlySet<string> = new Set(DUP_IGNORED_PREFIXES);
 const DUP_MAX_REPORTED = 5;
 /** Maximum characters of the duplicated prose sample embedded in the DOC-DUP-001 message. */
 const DUP_MESSAGE_SAMPLE_CHARS = 60;
@@ -176,12 +181,18 @@ export class DocsAnalyzer implements Analyzer {
         const exemptMarkers = options.exemptMarkers
             ? [...DEFAULT_EXEMPT_MARKERS, ...options.exemptMarkers]
             : DEFAULT_EXEMPT_MARKERS;
+        const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const exemptMarkersRe = new RegExp(exemptMarkers.map(escapeRegex).join('|'));
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (exemptMarkers.some((marker) => line.includes(marker))) continue;
+            if (exemptMarkersRe.test(line)) continue;
             for (const target of this.extractTargets(line, exempt)) {
-                const candidates = [path.resolve(root, target), path.resolve(docDir, target)];
-                if (candidates.some((candidate) => fs.existsSync(candidate))) continue;
+                if (
+                    fs.existsSync(path.resolve(root, target)) ||
+                    fs.existsSync(path.resolve(docDir, target))
+                ) {
+                    continue;
+                }
                 emit(
                     i,
                     'DOC-LNK-001',
@@ -230,7 +241,7 @@ export class DocsAnalyzer implements Analyzer {
         for (let i = 0; i < lines.length; i++) {
             const text = lines[i].trim();
             if (text.length < DUP_MIN_LENGTH) continue;
-            if (DUP_IGNORED_PREFIXES.some((prefix) => text.startsWith(prefix))) continue;
+            if (DUP_IGNORED_PREFIX_CHARS.has(text[0])) continue;
             const current = lineCounts.get(text) || 0;
             lineCounts.set(text, current + 1);
             if (current === 0) {

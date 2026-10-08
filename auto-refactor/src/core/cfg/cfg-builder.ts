@@ -185,9 +185,12 @@ function extractDefinedVariableNames(trimmed: string): string[] {
  */
 function extractUsedVariableNames(trimmed: string, defined: readonly string[]): string[] {
     const usedVars: string[] = [];
+    const usedSet = new Set<string>();
+    const definedSet: ReadonlySet<string> = new Set(defined);
     const rawTokens = trimmed.match(IDENT_EXTRACT_RE) || [];
     for (const token of rawTokens) {
-        if (!KEYWORDS.has(token) && !defined.includes(token) && !usedVars.includes(token)) {
+        if (!KEYWORDS.has(token) && !definedSet.has(token) && !usedSet.has(token)) {
+            usedSet.add(token);
             usedVars.push(token);
         }
     }

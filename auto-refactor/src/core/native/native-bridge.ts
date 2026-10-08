@@ -50,7 +50,7 @@ import { computeDominatorTreeShim, solveDataflowShim } from './native-flow-shim'
 
 export { HASH_COEFFS };
 
-const EMPTY_NEIGHBOR_SET = new Set<string>();
+const EMPTY_NEIGHBOR_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
 
 interface TarjanState {
     indexCounter: number;
@@ -173,9 +173,11 @@ function computeTopologicalOrder(
     queue.sort();
 
     const topologicalOrder: string[] = [];
+    const orderedSet = new Set<string>();
     while (queue.length > 0) {
         const current = queue.shift()!;
         topologicalOrder.push(current);
+        orderedSet.add(current);
 
         const neighbors = adjacency.get(current) || EMPTY_NEIGHBOR_SET;
         for (const next of neighbors) {
@@ -189,11 +191,26 @@ function computeTopologicalOrder(
     }
 
     for (const node of allNodes) {
-        if (!topologicalOrder.includes(node)) {
+        if (!orderedSet.has(node)) {
+            orderedSet.add(node);
             topologicalOrder.push(node);
         }
     }
     return topologicalOrder;
+}
+
+function isPatternMatchAt(
+    line: string,
+    pattern: string,
+    offset: number,
+    patternLen: number,
+): boolean {
+    for (let patternIdx = 0; patternIdx < patternLen; patternIdx++) {
+        if (line.charCodeAt(offset + patternIdx) !== pattern.charCodeAt(patternIdx)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 function findPatternMatchesInLine(
@@ -202,17 +219,26 @@ function findPatternMatchesInLine(
     lineNum: number,
     results: NativePatternMatch[],
 ): void {
-    let startCol = 0;
-    while (startCol < line.length) {
-        const matchIndex = line.indexOf(pattern, startCol);
-        if (matchIndex === -1) break;
-        results.push({
-            pattern,
-            line: lineNum,
-            column: matchIndex + 1,
-            matchText: pattern,
-        });
-        startCol = matchIndex + Math.max(1, pattern.length);
+    const patternLen = pattern.length;
+    const maxStart = line.length - patternLen;
+    if (patternLen === 0 || maxStart < 0) {
+        return;
+    }
+
+    const step = Math.max(1, patternLen);
+    let colIdx = 0;
+    while (colIdx <= maxStart) {
+        if (isPatternMatchAt(line, pattern, colIdx, patternLen)) {
+            results.push({
+                pattern,
+                line: lineNum,
+                column: colIdx + 1,
+                matchText: pattern,
+            });
+            colIdx += step;
+        } else {
+            colIdx++;
+        }
     }
 }
 

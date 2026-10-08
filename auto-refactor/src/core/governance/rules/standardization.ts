@@ -1,9 +1,9 @@
 /**
  * Module: Core Engine - Governance Rules - Standardization
  * File Path: src/core/governance/rules/standardization.ts
- * Architecture Role: Rule provider exporting the file-level RedundantBooleanRule (GOV-STD-001)
- *     and ModernConstructRule (GOV-STD-002); the governance registry wires both
- *     into the shared GovernanceAnalyzer pipeline.
+ * Architecture Role: Rule provider exporting the file-level RedundantBooleanRule (GOV-STD-001),
+ *     ModernConstructRule (GOV-STD-002), and RuleCatalogIntegrityRule (GOV-RUL-001); the
+ *     governance registry wires them into the shared GovernanceAnalyzer pipeline.
  * Dependencies & Triggers: Imports GovernanceRule, GovernanceViolation and
  *     RuleEvaluationContext from ../types; checkFile runs from finalize during
  *     any governance-enabled CLI, CI or daemon scan.
@@ -11,8 +11,9 @@
  *     `if (...) return true; else return false;` and Python/GDScript `if x: return true` plus
  *     `else: return false` pairs, emitting fixable simplifications; GOV-STD-002 flags TS/JS
  *     `var` declarations and GDScript `pass` lines left after a non-colon statement, skipping
- *     comment lines, and proposes let/const or removal.
- * Exit Semantics & Design Rationale: both hooks return null when clean and a violation array
+ *     comment lines, and proposes let/const or removal; GOV-RUL-001 guarantees referenced rule
+ *     identifiers exist in the single-source rule catalog.
+ * Exit Semantics & Design Rationale: All hooks return null when clean and a violation array
  *     otherwise, never throwing or mutating input; findings carry 1-based positions and
  *     suggested patches so callers can auto-fix safely. Fewer boolean branches and dead
  *     constructs lower cognitive load and keep the codebase idiomatic, which is why these two
@@ -28,6 +29,55 @@ const TS_IF_TRUE_RE =
     /^\s*if\s*\((.+?)\)\s*(?:\{\s*)?return\s+true;?\s*\}?\s*else\s*(?:\{\s*)?return\s+false;?\s*\}?/i;
 const VAR_RE = /^\s*\bvar\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/;
 const RETURN_TRUE_RE = /return\s+[Tt]rue/;
+
+const KEYWORD_PASS = 'pass';
+
+/** Languages supported for modern JavaScript/TypeScript construct checks. */
+const JS_TS_LANGUAGES: ReadonlySet<string> = new Set([
+    'typescript',
+    'javascript',
+]);
+
+/** GDScript pass keyword set library. */
+const GDSCRIPT_PASS_KEYWORDS: ReadonlySet<string> = new Set(['pass']);
+
+const CANDIDATE_RULE_RE = /\b([A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3})\b/g;
+
+const EXEMPT_RULE_CATALOG_RE =
+    /(?:standardization|registry|dimensionLiterals|rule-catalog|builtin-rules|DOCS|dictionaries|def-use-chain|src\/core\/types)/i;
+const EXEMPT_DIR_RE = /(?:^|\/)(?:rules|reports)(?:\/|$)/i;
+
+/** Path segments and tokens that exempt a source file from rule ID catalog verification. */
+const EXEMPT_PATH_TOKENS: ReadonlySet<string> = new Set([
+    'standardization',
+    'registry',
+    'dimensionLiterals',
+    'rule-catalog',
+    'builtin-rules',
+    'DOCS',
+    'dictionaries',
+    'def-use-chain',
+    'types',
+]);
+
+/** Directory segments exempted from rule ID catalog verification. */
+const EXEMPT_DIRECTORIES: ReadonlySet<string> = new Set([
+    'rules',
+    'reports',
+]);
+
+/** Identifiers on lines to skip when inspecting for rule references. */
+const RULE_INTEGRITY_SKIP_IDENTIFIERS: ReadonlySet<string> = new Set([
+    'CANDIDATE_RULE_RE',
+    'GOV-RUL-001',
+    'RuleCatalogIntegrityRule',
+]);
+
+/** Rule family prefixes from partner projects exempted from local registry resolution. */
+const EXEMPT_RULE_FAMILY_PREFIXES: ReadonlySet<string> = new Set([
+    'ADV',
+    'WT',
+]);
 
 /**
  * Checks a line for redundant boolean return patterns.
@@ -104,8 +154,6 @@ export const RedundantBooleanRule: GovernanceRule = {
     },
 };
 
-const KEYWORD_PASS = 'pass';
-
 /**
  * Checks a TypeScript/JavaScript line for outdated `var` declarations.
  */
@@ -140,7 +188,12 @@ function checkGdscriptPassLine(
 ): void {
     const line = lines[i].trim();
     const prevLine = lines[i - 1].trim();
-    if (line === KEYWORD_PASS && prevLine && !prevLine.endsWith(':') && !prevLine.startsWith('#')) {
+    if (
+        GDSCRIPT_PASS_KEYWORDS.has(line) &&
+        prevLine &&
+        !prevLine.endsWith(':') &&
+        !prevLine.startsWith('#')
+    ) {
         violations.push({
             ruleId: 'GOV-STD-002',
             message: 'Redundant `pass` statement in non-empty code block.',
@@ -153,6 +206,9 @@ function checkGdscriptPassLine(
     }
 }
 
+/**
+ * Scans masked lines for outdated var declarations in JavaScript/TypeScript.
+ */
 function collectModernJsTsViolations(
     ctx: RuleEvaluationContext,
     violations: GovernanceViolation[],
@@ -164,6 +220,9 @@ function collectModernJsTsViolations(
     }
 }
 
+/**
+ * Scans masked lines for redundant pass statements in GDScript.
+ */
 function collectGdscriptViolations(
     ctx: RuleEvaluationContext,
     violations: GovernanceViolation[],
@@ -192,7 +251,7 @@ export const ModernConstructRule: GovernanceRule = {
         const violations: GovernanceViolation[] = [];
         const lang = ctx.capabilities.languageId;
 
-        if (lang === 'typescript' || lang === 'javascript') {
+        if (JS_TS_LANGUAGES.has(lang)) {
             collectModernJsTsViolations(ctx, violations);
         } else if (lang === 'gdscript') {
             collectGdscriptViolations(ctx, violations);
@@ -202,19 +261,74 @@ export const ModernConstructRule: GovernanceRule = {
     },
 };
 
-const CANDIDATE_RULE_RE = /\b([A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3})\b/g;
-
-const EXEMPT_RULE_CATALOG_RE =
-    /(?:standardization|registry|dimensionLiterals|rule-catalog|builtin-rules|DOCS|dictionaries|def-use-chain|src\/core\/types)/i;
-const EXEMPT_DIR_RE = /(?:^|\/)(?:rules|reports)(?:\/|$)/i;
-
+/**
+ * Determines whether a file path is exempted from rule catalog validation.
+ */
 function isExemptRuleCatalogPath(filePath: string): boolean {
+    if (isToolOrTestScript(filePath)) return true;
     const normalized = filePath.replace(/\\/g, '/');
-    return (
-        EXEMPT_RULE_CATALOG_RE.test(normalized) ||
-        EXEMPT_DIR_RE.test(normalized) ||
-        isToolOrTestScript(filePath)
-    );
+    const segments = normalized.split('/');
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        if (EXEMPT_DIRECTORIES.has(seg)) return true;
+        const nameWithoutExt = seg.split('.')[0];
+        if (EXEMPT_PATH_TOKENS.has(nameWithoutExt) || EXEMPT_PATH_TOKENS.has(seg)) {
+            return true;
+        }
+    }
+    return EXEMPT_RULE_CATALOG_RE.test(normalized) || EXEMPT_DIR_RE.test(normalized);
+}
+
+/**
+ * Checks whether a line contains identifiers that should skip catalog integrity checking.
+ */
+function lineContainsIntegritySkipIdentifier(line: string): boolean {
+    const tokens = line.split(/[^a-zA-Z0-9_$-]+/);
+    for (let i = 0; i < tokens.length; i++) {
+        if (RULE_INTEGRITY_SKIP_IDENTIFIERS.has(tokens[i])) return true;
+    }
+    return false;
+}
+
+/**
+ * Checks whether a candidate rule ID belongs to an exempted partner project family.
+ */
+function isExemptRuleFamily(candidateId: string): boolean {
+    const dash = candidateId.indexOf('-');
+    if (dash === -1) return false;
+    const family = candidateId.slice(0, dash);
+    return EXEMPT_RULE_FAMILY_PREFIXES.has(family);
+}
+
+/**
+ * Evaluates candidate rule identifiers on a single source line against the rule registry.
+ */
+function inspectRuleCatalogLine(
+    line: string,
+    lineIndex: number,
+    violations: GovernanceViolation[],
+): void {
+    if (lineContainsIntegritySkipIdentifier(line)) return;
+
+    CANDIDATE_RULE_RE.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = CANDIDATE_RULE_RE.exec(line)) !== null) {
+        const candidateId = match[1];
+        if (isExemptRuleFamily(candidateId)) continue;
+
+        const registered = getRule(candidateId);
+        if (!registered) {
+            violations.push({
+                ruleId: 'GOV-RUL-001',
+                message: `Reference to unregistered rule ID \`${candidateId}\` detected. Possible rule drift or hallucination.`,
+                line: lineIndex + 1,
+                column: match.index + 1,
+                suggestion:
+                    'Verify rule ID against scripts/common/rule-catalog.json and use registered rules only.',
+                fixable: false,
+            });
+        }
+    }
 }
 
 /**
@@ -238,34 +352,7 @@ export const RuleCatalogIntegrityRule: GovernanceRule = {
         const lines = ctx.lines;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (
-                line.includes('CANDIDATE_RULE_RE') ||
-                line.includes('GOV-RUL-001') ||
-                line.includes('RuleCatalogIntegrityRule')
-            ) {
-                continue;
-            }
-            let match: RegExpExecArray | null;
-            CANDIDATE_RULE_RE.lastIndex = 0;
-            while ((match = CANDIDATE_RULE_RE.exec(line)) !== null) {
-                const candidateId = match[1];
-                if (candidateId.startsWith('ADV-') || candidateId.startsWith('WT-')) {
-                    continue;
-                }
-                const registered = getRule(candidateId);
-                if (!registered) {
-                    violations.push({
-                        ruleId: 'GOV-RUL-001',
-                        message: `Reference to unregistered rule ID \`${candidateId}\` detected. Possible rule drift or hallucination.`,
-                        line: i + 1,
-                        column: match.index + 1,
-                        suggestion:
-                            'Verify rule ID against scripts/common/rule-catalog.json and use registered rules only.',
-                        fixable: false,
-                    });
-                }
-            }
+            inspectRuleCatalogLine(lines[i], i, violations);
         }
 
         return violations.length > 0 ? violations : null;

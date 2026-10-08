@@ -41,7 +41,33 @@ const PY_FUNC_START_RE = /^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
 const PY_RETURN_TYPE_RE = /\)\s*->\s*[^:]+:/;
 const ANY_RE = /:\s*\bany\b|\bas\s+any\b/;
 
-const EXPORT_KEYWORD = 'export';
+/** Opening parenthesis character set for function signature scanning. */
+const OPEN_PAREN_CHARS: ReadonlySet<string> = new Set(['(']);
+
+/** Export keywords targeted by exported declaration return-type enforcement. */
+const EXPORT_KEYWORDS: ReadonlySet<string> = new Set(['export']);
+
+/**
+ * Evaluates whether a string contains an opening parenthesis character using Set lookup.
+ */
+function containsOpenParen(part: string): boolean {
+    for (let k = 0; k < part.length; k++) {
+        if (OPEN_PAREN_CHARS.has(part[k])) return true;
+    }
+    return false;
+}
+
+/**
+ * Evaluates whether a line contains an export keyword token using Set lookup.
+ */
+function lineHasExportKeyword(line: string): boolean {
+    const tokens = line.split(/[^a-zA-Z0-9_$]+/);
+    for (let i = 0; i < tokens.length; i++) {
+        if (EXPORT_KEYWORDS.has(tokens[i])) return true;
+    }
+    return false;
+}
+
 const MAX_SIGNATURE_SCAN_LINES = 40;
 const BLOCK_OR_SEMI_RE = /[{;]/;
 const ARROW_BODY_RE = /=>/;
@@ -244,7 +270,7 @@ function extractDeclarationSignature(
         const part = masked[j];
         depth += computeParenDelta(part);
         sig += ' ' + part.trim();
-        if (part.includes('(')) foundParen = true;
+        if (containsOpenParen(part)) foundParen = true;
         if (foundParen && depth <= 0 && terminatorRe.test(part)) {
             break;
         }
@@ -339,7 +365,7 @@ export function checkExportedFunctionReturnTypes(
 
     for (let i = 0; i < masked.length; i++) {
         const line = masked[i];
-        if (!line.includes(EXPORT_KEYWORD)) continue;
+        if (!lineHasExportKeyword(line)) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
         if (ESLINT_DISABLE_RE.test(line)) continue;

@@ -95,24 +95,45 @@ function categorizeSymbolToModule(name: string): string {
 
 /**
  * Determine if a file path is already part of a recognized constant library structure.
+ * Matches directories containing constants/tokens/dictionary and filenames ending
+ * with constants or tokens.
+ *
+ * @param filePath - System or relative file path to inspect.
+ * @returns True if the path is already identified as a constant/token repository.
  */
-function isAlreadyInConstantLibrary(filePath: string): boolean {
+export function isAlreadyInConstantLibrary(filePath: string): boolean {
     const posix = filePath.replace(/\\/g, '/').toLowerCase();
     return (
         posix.includes('/constants/') ||
         posix.includes('/tokens/') ||
-        posix.endsWith('/constants.ts') ||
-        posix.endsWith('/tokens.ts')
+        posix.includes('/dictionary/') ||
+        posix.includes('/dictionaries/') ||
+        posix.endsWith('constants.ts') ||
+        posix.endsWith('constants.js') ||
+        posix.endsWith('tokens.ts') ||
+        posix.endsWith('tokens.js') ||
+        posix.endsWith('dictionary.ts') ||
+        posix.endsWith('dictionary.js')
     );
 }
+
+/** Canonical domain module filenames for constant library topology. */
+const CANONICAL_MODULE_NAMES: readonly string[] = Object.freeze([
+    'ast-tokens.ts',
+    'rule-codes.ts',
+    'system-tokens.ts',
+    'diagnostic-tokens.ts',
+    'config-tokens.ts',
+    'domain-tokens.ts',
+]);
 
 /**
  * Derives the optimal base directory for the centralized constant library.
  */
 function deriveTargetDirectory(filePaths: string[]): string {
-    const posixPaths = filePaths.map((f) => f.replace(/\\/g, '/'));
-    const isUnderSrc = posixPaths.some((p) => p.startsWith('src/'));
-    const isUnderCore = posixPaths.some((p) => p.startsWith('src/core/'));
+    const posixPaths = filePaths.map((filePath) => filePath.replace(/\\/g, '/'));
+    const isUnderSrc = posixPaths.some((posixPath) => posixPath.startsWith('src/'));
+    const isUnderCore = posixPaths.some((posixPath) => posixPath.startsWith('src/core/'));
 
     if (isUnderCore) return 'src/core/constants';
     if (isUnderSrc) return 'src/constants';
@@ -129,8 +150,8 @@ function deriveTargetDirectory(filePaths: string[]): string {
 export function auditConstantLibraryTopology(
     declarations: ObservedConstantDeclaration[],
 ): ConstantLibraryTopologyVerdict {
-    const scattered = declarations.filter((d) => !isAlreadyInConstantLibrary(d.filePath));
-    const uniqueFiles = new Set(scattered.map((d) => d.filePath));
+    const scattered = declarations.filter((decl) => !isAlreadyInConstantLibrary(decl.filePath));
+    const uniqueFiles = new Set(scattered.map((decl) => decl.filePath));
 
     const needsCentralizedLibrary =
         scattered.length >= MIN_SCATTERED_CONSTANTS_THRESHOLD &&
@@ -147,20 +168,34 @@ export function auditConstantLibraryTopology(
     }
 
     const targetDir = deriveTargetDirectory(Array.from(uniqueFiles));
-    const moduleGroups = new Map<string, string[]>();
 
-    for (const d of scattered) {
-        const modName = categorizeSymbolToModule(d.name);
-        const list = moduleGroups.get(modName) || [];
-        if (!list.includes(d.name)) list.push(d.name);
-        moduleGroups.set(modName, list);
+    // Pre-allocated domain symbol sets pool declared outside loop to eliminate transient heap allocation
+    const moduleNameToSymbolSetMap = new Map<string, Set<string>>([
+        ['ast-tokens.ts', new Set<string>()],
+        ['rule-codes.ts', new Set<string>()],
+        ['system-tokens.ts', new Set<string>()],
+        ['diagnostic-tokens.ts', new Set<string>()],
+        ['config-tokens.ts', new Set<string>()],
+        ['domain-tokens.ts', new Set<string>()],
+    ]);
+
+    // Populate pre-allocated domain sets without any inline allocations in the hot loop
+    for (const decl of scattered) {
+        const modName = categorizeSymbolToModule(decl.name);
+        const symbolSet = moduleNameToSymbolSetMap.get(modName);
+        if (symbolSet !== undefined) {
+            symbolSet.add(decl.name);
+        }
     }
 
     const suggestedModules: SuggestedConstantModule[] = [];
-    for (const [modFile, symbols] of moduleGroups.entries()) {
+    for (const [modFile, symbolSet] of moduleNameToSymbolSetMap.entries()) {
+        if (symbolSet.size === 0) {
+            continue;
+        }
         suggestedModules.push({
             file: `${targetDir}/${modFile}`,
-            symbols: symbols.sort(),
+            symbols: Array.from(symbolSet).sort(),
         });
     }
 

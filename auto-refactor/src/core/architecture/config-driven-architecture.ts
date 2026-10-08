@@ -124,6 +124,19 @@ const SCALE_SCORE_STANDARD_PROJECT = 80;
 
 const DOMAIN_SEGMENT = '/domain/';
 const CORE_SEGMENT = '/core/';
+const DOMAIN_OR_CORE_RE = /\/(?:domain|core)\//;
+
+/** Immutable set of standard structural keys ignored during config key extraction. */
+const IGNORED_CONFIG_KEYS: ReadonlySet<string> = new Set(['type', 'id', 'name', 'version']);
+
+/** Fast pre-compiled pattern matching routing or test paths. */
+const ROUTER_OR_TEST_PATH_RE = /(?:router|config_router|test|tests)/;
+
+/** Fast pre-compiled pattern matching sanctioned unrouted router invocations. */
+const UNROUTED_CALL_RE = /(?:get_subtable|ConfigRouter|config_router|routes\.|router\.)/;
+
+/** Fast pre-compiled pattern matching configuration override suffixes. */
+const OVERRIDE_SEGMENT_RE = /\.override\./;
 
 /**
  * Extracts configuration keys from JSON or structured object literals.
@@ -151,7 +164,7 @@ function extractDeclaredKeys(content: string): Set<string> {
     let match: RegExpExecArray | null;
     while ((match = keyRegex.exec(content)) !== null) {
         const key = match[1];
-        if (key && key.length >= 2 && !['type', 'id', 'name', 'version'].includes(key)) {
+        if (key && key.length >= 2 && !IGNORED_CONFIG_KEYS.has(key)) {
             keys.add(key);
         }
     }
@@ -165,7 +178,7 @@ function collectObjectKeys(obj: unknown, keys: Set<string>, depth = 0): void {
             k &&
             k.length >= 2 &&
             isNaN(Number(k)) &&
-            !['type', 'id', 'name', 'version'].includes(k)
+            !IGNORED_CONFIG_KEYS.has(k)
         ) {
             keys.add(k);
         }
@@ -182,6 +195,13 @@ function collectObjectKeys(obj: unknown, keys: Set<string>, depth = 0): void {
  * @param patterns - Regular expressions identifying configuration file paths.
  * @returns Divided arrays of configuration files and source files.
  */
+function matchesConfigFile(normPath: string, patterns: readonly RegExp[]): boolean {
+    for (let i = 0; i < patterns.length; i++) {
+        if (patterns[i].test(normPath)) return true;
+    }
+    return false;
+}
+
 function partitionScanFiles(
     files: ConfigScanFile[],
     patterns: RegExp[],
@@ -190,7 +210,7 @@ function partitionScanFiles(
     const sourceFiles: ConfigScanFile[] = [];
     for (const file of files) {
         const normPath = file.filePath.replace(/\\/g, '/');
-        if (patterns.some((p) => p.test(normPath))) {
+        if (matchesConfigFile(normPath, patterns)) {
             configFiles.push(file);
         } else {
             sourceFiles.push(file);
@@ -217,10 +237,19 @@ function collectDeclaredConfigKeys(configFiles: ConfigScanFile[]): {
     return { declaredKeys, keyOrigins };
 }
 
+function hasOverrideSource(origins: readonly string[]): boolean {
+    for (let i = 0; i < origins.length; i++) {
+        if (OVERRIDE_SEGMENT_RE.test(origins[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function detectDuplicateConfigs(keyOrigins: Map<string, string[]>, issues: Issue[]): number {
     let duplicateKeyCount = 0;
     for (const [key, origins] of keyOrigins.entries()) {
-        if (origins.length > 1 && !origins.some((o) => o.includes('.override.'))) {
+        if (origins.length > 1 && !hasOverrideSource(origins)) {
             duplicateKeyCount++;
             issues.push({
                 id: `architecture:${RULE_ARCH_CFG_003}:${origins[0]}:${key}`,
@@ -358,10 +387,7 @@ function scanSourceFiles(
 
     for (const src of sourceFiles) {
         const normPath = src.filePath.replace(/\\/g, '/');
-        const isDomain =
-            src.isDomainCore ||
-            normPath.includes(DOMAIN_SEGMENT) ||
-            normPath.includes(CORE_SEGMENT);
+        const isDomain = src.isDomainCore || DOMAIN_OR_CORE_RE.test(normPath);
 
         collectReferencedTokens(src.content, declaredKeys, referencedKeys);
 
@@ -468,6 +494,11 @@ function detectOverAbstraction(
     });
 }
 
+function extractFileDirectory(normPath: string): string {
+    const slashIdx = normPath.lastIndexOf('/');
+    return slashIdx >= 0 ? normPath.slice(0, slashIdx) : '.';
+}
+
 function detectFlatConfigSprawl(
     configFiles: ConfigScanFile[],
     issues: Issue[],
@@ -476,8 +507,7 @@ function detectFlatConfigSprawl(
     const dirMap = new Map<string, string[]>();
     for (const f of configFiles) {
         const norm = f.filePath.replace(/\\/g, '/');
-        const lastSlash = norm.lastIndexOf('/');
-        const dir = lastSlash >= 0 ? norm.slice(0, lastSlash) : '.';
+        const dir = extractFileDirectory(norm);
         const list = dirMap.get(dir) ?? [];
         list.push(norm);
         dirMap.set(dir, list);
@@ -515,56 +545,49 @@ function detectFlatConfigSprawl(
 
 const SUBTABLE_PATH_RE =
     /(?:load|read|readFile|readFileSync|open)\s*\(\s*['"][^'"]*[/\\](?:domains|config)[/\\]([a-zA-Z0-9_-]+)[/\\]((?!core\b)[a-zA-Z0-9_-]+)\.json['"]/i;
-const UNROUTED_CALL_KEYWORDS = [
-    'get_subtable',
-    'ConfigRouter',
-    'config_router',
-    'routes.',
-    'router.',
-];
+
+function scanFileForUnroutedSubtables(src: ConfigScanFile, issues: Issue[]): number {
+    const normPath = src.filePath.replace(/\\/g, '/');
+    if (ROUTER_OR_TEST_PATH_RE.test(normPath)) {
+        return 0;
+    }
+
+    let fileUnroutedCount = 0;
+    const lines = src.content.split('\n');
+    for (let idx = 0; idx < lines.length; idx++) {
+        const line = lines[idx];
+        const match = SUBTABLE_PATH_RE.exec(line);
+        if (!match || UNROUTED_CALL_RE.test(line)) {
+            continue;
+        }
+
+        fileUnroutedCount++;
+        const domain = match[1];
+        const subtable = match[2];
+        issues.push({
+            id: `architecture:${RULE_ARCH_CFG_009}:${src.filePath}:${idx + 1}`,
+            analyzer: ANALYZER_ARCHITECTURE,
+            rule: RULE_ARCH_CFG_009,
+            severity: SEVERITY_WARNING,
+            message:
+                `Direct subtable access bypasses router contract: Subtable '${domain}/${subtable}.json' ` +
+                `is loaded directly via physical path instead of unified config router or dotted notation.`,
+            location: {
+                file: src.filePath,
+                start: { line: idx + 1, column: 1 },
+                end: { line: idx + 1, column: line.length || 1 },
+            },
+            detail: { domain, subtable, line: idx + 1 },
+            suggestion: `Use unified config router (e.g. get_subtable("${domain}.${subtable}") or dotted path) to access subtable.`,
+        });
+    }
+    return fileUnroutedCount;
+}
 
 function detectUnroutedSubtables(sourceFiles: ConfigScanFile[], issues: Issue[]): number {
     let unroutedCount = 0;
     for (const src of sourceFiles) {
-        const normPath = src.filePath.replace(/\\/g, '/');
-        if (
-            normPath.includes('router') ||
-            normPath.includes('config_router') ||
-            normPath.includes('test') ||
-            normPath.includes('tests')
-        ) {
-            continue;
-        }
-
-        const lines = src.content.split('\n');
-        for (let idx = 0; idx < lines.length; idx++) {
-            const line = lines[idx];
-            const match = SUBTABLE_PATH_RE.exec(line);
-            if (match) {
-                if (UNROUTED_CALL_KEYWORDS.some((kw) => line.includes(kw))) {
-                    continue;
-                }
-                unroutedCount++;
-                const domain = match[1];
-                const subtable = match[2];
-                issues.push({
-                    id: `architecture:${RULE_ARCH_CFG_009}:${src.filePath}:${idx + 1}`,
-                    analyzer: ANALYZER_ARCHITECTURE,
-                    rule: RULE_ARCH_CFG_009,
-                    severity: SEVERITY_WARNING,
-                    message:
-                        `Direct subtable access bypasses router contract: Subtable '${domain}/${subtable}.json' ` +
-                        `is loaded directly via physical path instead of unified config router or dotted notation.`,
-                    location: {
-                        file: src.filePath,
-                        start: { line: idx + 1, column: 1 },
-                        end: { line: idx + 1, column: line.length || 1 },
-                    },
-                    detail: { domain, subtable, line: idx + 1 },
-                    suggestion: `Use unified config router (e.g. get_subtable("${domain}.${subtable}") or dotted path) to access subtable.`,
-                });
-            }
-        }
+        unroutedCount += scanFileForUnroutedSubtables(src, issues);
     }
     return unroutedCount;
 }

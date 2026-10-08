@@ -436,7 +436,8 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         weight: 3.5,
         isSecurityFamily: true,
         fallback: FALLBACK_BLOCK,
-        description: 'Client exposure risk, internal API leaks, CSS auth bypass, and route exposure',
+        description:
+            'Client exposure risk, internal API leaks, CSS auth bypass, and route exposure',
     },
 ];
 

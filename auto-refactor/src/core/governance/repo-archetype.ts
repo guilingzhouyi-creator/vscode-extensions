@@ -17,6 +17,7 @@
  */
 
 import * as fs from 'fs';
+import { readFileSync } from 'fs';
 import * as path from 'path';
 
 /** Supported repository archetype classifications. */
@@ -101,11 +102,53 @@ export interface RepoArchetypeContext {
     };
 }
 
+interface ArchetypeCacheEntry {
+    mtimeMs: number;
+    size: number;
+    content: string;
+}
+
+/** Maximum memoized entries in archetype file content cache. */
+const MAX_CACHE_ENTRIES = 256;
+
+/**
+ * In-memory cache for synchronous file content reads within archetype inspection passes.
+ * Eliminates repeated disk I/O on hot manifests (e.g. package.json, Cargo.toml).
+ */
+const FILE_CONTENT_CACHE = new Map<string, ArchetypeCacheEntry | undefined>();
+
+/**
+ * Clears archetype in-memory file content cache.
+ */
+export function clearArchetypeFileCache(): void {
+    FILE_CONTENT_CACHE.clear();
+}
+
+/**
+ * Safely reads file text content with memoization.
+ *
+ * @param filePath - Path to file to read.
+ * @returns UTF-8 file content or undefined on missing/non-file/read failure.
+ */
 function safeReadFile(filePath: string): string | undefined {
     try {
-        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-            return fs.readFileSync(filePath, 'utf8');
+        if (!fs.existsSync(filePath)) {
+            return undefined;
         }
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile()) {
+            return undefined;
+        }
+        const cached = FILE_CONTENT_CACHE.get(filePath);
+        if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+            return cached.content;
+        }
+        const content = readFileSync(filePath, 'utf8');
+        if (FILE_CONTENT_CACHE.size >= MAX_CACHE_ENTRIES) {
+            FILE_CONTENT_CACHE.clear();
+        }
+        FILE_CONTENT_CACHE.set(filePath, { mtimeMs: stat.mtimeMs, size: stat.size, content });
+        return content;
     } catch {
         // Ignored on permission or read failure
     }
@@ -304,6 +347,45 @@ function detectHooks(root: string): RepoArchetypeContext['hooks'] {
 }
 
 /**
+ * Records a single candidate CI configuration file if present.
+ */
+function recordCiWorkflow(
+    root: string,
+    relPath: string,
+    platform: CiPlatform,
+    result: RepoArchetypeContext['ci'],
+): void {
+    const fullPath = path.join(root, relPath);
+    if (!fs.existsSync(fullPath)) return;
+    if (!result.platform) result.platform = platform;
+    const content = safeReadFile(fullPath);
+    if (content !== undefined) {
+        result.workflowFiles.push(relPath);
+        result.workflowContents[relPath] = content;
+    }
+}
+
+/**
+ * Detects GitHub Actions workflow definitions in .github/workflows.
+ */
+function detectGithubActions(root: string, result: RepoArchetypeContext['ci']): void {
+    const ghWorkflowsDir = path.join(root, '.github', 'workflows');
+    if (!fs.existsSync(ghWorkflowsDir)) return;
+    result.platform = 'github';
+    const files = safeReadDir(ghWorkflowsDir);
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file.endsWith('.yml') && !file.endsWith('.yaml')) continue;
+        const rel = `.github/workflows/${file}`;
+        const content = safeReadFile(path.join(ghWorkflowsDir, file));
+        if (content !== undefined) {
+            result.workflowFiles.push(rel);
+            result.workflowContents[rel] = content;
+        }
+    }
+}
+
+/**
  * Discover CI configuration files.
  */
 function detectCi(root: string): RepoArchetypeContext['ci'] {
@@ -312,44 +394,9 @@ function detectCi(root: string): RepoArchetypeContext['ci'] {
         workflowContents: {},
     };
 
-    // GitHub Actions
-    const ghWorkflowsDir = path.join(root, '.github', 'workflows');
-    if (fs.existsSync(ghWorkflowsDir)) {
-        result.platform = 'github';
-        const files = safeReadDir(ghWorkflowsDir).filter(
-            (f) => f.endsWith('.yml') || f.endsWith('.yaml'),
-        );
-        for (const file of files) {
-            const filePath = path.join(ghWorkflowsDir, file);
-            const content = safeReadFile(filePath);
-            if (content !== undefined) {
-                result.workflowFiles.push(`.github/workflows/${file}`);
-                result.workflowContents[`.github/workflows/${file}`] = content;
-            }
-        }
-    }
-
-    // GitLab CI
-    const gitlabCiPath = path.join(root, '.gitlab-ci.yml');
-    if (fs.existsSync(gitlabCiPath)) {
-        if (!result.platform) result.platform = 'gitlab';
-        const content = safeReadFile(gitlabCiPath);
-        if (content !== undefined) {
-            result.workflowFiles.push('.gitlab-ci.yml');
-            result.workflowContents['.gitlab-ci.yml'] = content;
-        }
-    }
-
-    // CircleCI
-    const circleCiPath = path.join(root, '.circleci', 'config.yml');
-    if (fs.existsSync(circleCiPath)) {
-        if (!result.platform) result.platform = 'circleci';
-        const content = safeReadFile(circleCiPath);
-        if (content !== undefined) {
-            result.workflowFiles.push('.circleci/config.yml');
-            result.workflowContents['.circleci/config.yml'] = content;
-        }
-    }
+    detectGithubActions(root, result);
+    recordCiWorkflow(root, '.gitlab-ci.yml', 'gitlab', result);
+    recordCiWorkflow(root, '.circleci/config.yml', 'circleci', result);
 
     return result;
 }
@@ -368,6 +415,37 @@ function isCandidateGateFileName(entry: string): boolean {
 }
 
 /**
+ * Evaluates whether a directory entry should be ignored during gate file discovery.
+ */
+function isIgnoredGateEntry(entry: string): boolean {
+    return entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__';
+}
+
+/**
+ * Inspects a candidate gate directory entry and collects matching file paths.
+ */
+function processCandidateGateEntry(
+    dirPath: string,
+    entry: string,
+    depth: number,
+    maxDepth: number,
+    files: string[],
+): void {
+    if (isIgnoredGateEntry(entry)) return;
+    const full = path.join(dirPath, entry);
+    try {
+        const stat = fs.statSync(full);
+        if (stat.isDirectory()) {
+            files.push(...collectCandidateGateFiles(full, depth + 1, maxDepth));
+        } else if (stat.isFile() && isCandidateGateFileName(entry)) {
+            files.push(full);
+        }
+    } catch {
+        // Ignored on stat permission failure
+    }
+}
+
+/**
  * Recursively collect candidate gate script paths up to bounded depth.
  *
  * @param dirPath - Current directory path.
@@ -380,21 +458,8 @@ function collectCandidateGateFiles(dirPath: string, depth = 0, maxDepth = 2): st
     const files: string[] = [];
     const entries = safeReadDir(dirPath);
 
-    for (const entry of entries) {
-        if (entry.startsWith('.') || entry === 'node_modules' || entry === '__pycache__') {
-            continue;
-        }
-        const full = path.join(dirPath, entry);
-        try {
-            const stat = fs.statSync(full);
-            if (stat.isDirectory()) {
-                files.push(...collectCandidateGateFiles(full, depth + 1, maxDepth));
-            } else if (stat.isFile() && isCandidateGateFileName(entry)) {
-                files.push(full);
-            }
-        } catch {
-            // Ignored on stat permission failure
-        }
+    for (let i = 0; i < entries.length; i++) {
+        processCandidateGateEntry(dirPath, entries[i], depth, maxDepth, files);
     }
     return files;
 }
@@ -457,6 +522,34 @@ const TOPOLOGY_IGNORED_DIRS = new Set([
     'scratch',
 ]);
 
+/** Mapping between candidate manifest file names and archetype classifications. */
+interface ManifestArchetypeMapping {
+    fileName: string;
+    archetype: ProjectArchetype;
+}
+
+const MANIFEST_ARCHETYPE_MAPPINGS: readonly ManifestArchetypeMapping[] = [
+    { fileName: 'Cargo.toml', archetype: 'rust' },
+    { fileName: 'project.godot', archetype: 'godot' },
+    { fileName: 'pyproject.toml', archetype: 'python' },
+    { fileName: 'requirements.txt', archetype: 'python' },
+    { fileName: 'go.mod', archetype: 'go' },
+];
+
+/**
+ * Safely extracts package name from package.json manifest.
+ */
+function extractPackageName(pkgPath: string): string | undefined {
+    const content = safeReadFile(pkgPath);
+    if (!content) return undefined;
+    try {
+        const parsed = JSON.parse(content);
+        return typeof parsed.name === 'string' && parsed.name ? parsed.name : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * Sniff directory archetype and manifest path.
  */
@@ -465,39 +558,19 @@ function sniffDirectoryArchetype(
 ): { archetype: ProjectArchetype; manifestPath: string; name?: string } | undefined {
     const pkgPath = path.join(dirPath, 'package.json');
     if (fs.existsSync(pkgPath)) {
-        let name: string | undefined;
-        const content = safeReadFile(pkgPath);
-        if (content) {
-            try {
-                const parsed = JSON.parse(content);
-                if (typeof parsed.name === 'string' && parsed.name) {
-                    name = parsed.name;
-                }
-            } catch {
-                // ignore JSON parse failure
-            }
+        return {
+            archetype: 'node',
+            manifestPath: pkgPath,
+            name: extractPackageName(pkgPath),
+        };
+    }
+
+    for (let i = 0; i < MANIFEST_ARCHETYPE_MAPPINGS.length; i++) {
+        const mapping = MANIFEST_ARCHETYPE_MAPPINGS[i];
+        const manifestPath = path.join(dirPath, mapping.fileName);
+        if (fs.existsSync(manifestPath)) {
+            return { archetype: mapping.archetype, manifestPath };
         }
-        return { archetype: 'node', manifestPath: pkgPath, name };
-    }
-    const cargoPath = path.join(dirPath, 'Cargo.toml');
-    if (fs.existsSync(cargoPath)) {
-        return { archetype: 'rust', manifestPath: cargoPath };
-    }
-    const godotPath = path.join(dirPath, 'project.godot');
-    if (fs.existsSync(godotPath)) {
-        return { archetype: 'godot', manifestPath: godotPath };
-    }
-    const pyprojectPath = path.join(dirPath, 'pyproject.toml');
-    if (fs.existsSync(pyprojectPath)) {
-        return { archetype: 'python', manifestPath: pyprojectPath };
-    }
-    const reqPath = path.join(dirPath, 'requirements.txt');
-    if (fs.existsSync(reqPath)) {
-        return { archetype: 'python', manifestPath: reqPath };
-    }
-    const goModPath = path.join(dirPath, 'go.mod');
-    if (fs.existsSync(goModPath)) {
-        return { archetype: 'go', manifestPath: goModPath };
     }
     return undefined;
 }
@@ -579,31 +652,57 @@ function sniffExplicitWorkspaceSubprojects(
     };
 }
 
+interface SimpleWorkspaceMapping {
+    file: string;
+    type: MonorepoType;
+}
+
+const SIMPLE_WORKSPACE_FILES: readonly SimpleWorkspaceMapping[] = [
+    { file: 'pnpm-workspace.yaml', type: 'pnpm-workspaces' },
+    { file: 'go.work', type: 'go-work' },
+    { file: 'turbo.json', type: 'turbo' },
+    { file: 'lerna.json', type: 'lerna' },
+    { file: 'nx.json', type: 'nx' },
+];
+
+/**
+ * Checks whether root package.json defines npm workspaces.
+ */
+function hasNpmWorkspaces(absRoot: string): boolean {
+    const pkgPath = path.join(absRoot, 'package.json');
+    if (!fs.existsSync(pkgPath)) return false;
+    const content = safeReadFile(pkgPath);
+    if (!content) return false;
+    try {
+        return Boolean(JSON.parse(content).workspaces);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Checks whether root Cargo.toml defines cargo workspaces.
+ */
+function hasCargoWorkspace(absRoot: string): boolean {
+    const cargoPath = path.join(absRoot, 'Cargo.toml');
+    if (!fs.existsSync(cargoPath)) return false;
+    const content = safeReadFile(cargoPath);
+    return Boolean(content && /^\s*\[workspace\]/m.test(content));
+}
+
 /**
  * Detect explicit workspace configuration manifest files.
  */
 function detectExplicitWorkspaceManifest(absRoot: string): MonorepoType | null {
-    const pkgPath = path.join(absRoot, 'package.json');
-    if (fs.existsSync(pkgPath)) {
-        const pkgContent = safeReadFile(pkgPath);
-        if (pkgContent) {
-            try {
-                if (JSON.parse(pkgContent).workspaces) return 'npm-workspaces';
-            } catch {
-                // ignore
-            }
+    if (hasNpmWorkspaces(absRoot)) return 'npm-workspaces';
+    if (hasCargoWorkspace(absRoot)) return 'cargo-workspace';
+
+    for (let i = 0; i < SIMPLE_WORKSPACE_FILES.length; i++) {
+        const entry = SIMPLE_WORKSPACE_FILES[i];
+        if (fs.existsSync(path.join(absRoot, entry.file))) {
+            return entry.type;
         }
     }
-    if (fs.existsSync(path.join(absRoot, 'pnpm-workspace.yaml'))) return 'pnpm-workspaces';
-    const cargoPath = path.join(absRoot, 'Cargo.toml');
-    if (fs.existsSync(cargoPath)) {
-        const cargoContent = safeReadFile(cargoPath);
-        if (cargoContent && /^\s*\[workspace\]/m.test(cargoContent)) return 'cargo-workspace';
-    }
-    if (fs.existsSync(path.join(absRoot, 'go.work'))) return 'go-work';
-    if (fs.existsSync(path.join(absRoot, 'turbo.json'))) return 'turbo';
-    if (fs.existsSync(path.join(absRoot, 'lerna.json'))) return 'lerna';
-    if (fs.existsSync(path.join(absRoot, 'nx.json'))) return 'nx';
     return null;
 }
 
@@ -682,6 +781,7 @@ export function detectRepoTopology(absRoot: string): RepoTopology {
  * @returns Comprehensive RepoArchetypeContext.
  */
 export function inspectRepoArchetype(root: string): RepoArchetypeContext {
+    clearArchetypeFileCache();
     const absRoot = path.resolve(root);
     const { archetypes, manifests, packageManager, scriptsAvailable } = detectArchetypes(absRoot);
 

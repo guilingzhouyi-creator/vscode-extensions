@@ -233,15 +233,133 @@ export function areSemanticallyEqual(
     );
 }
 
+/** Directory pattern matching constant, token, or dictionary directories. */
+const RE_CONSTANT_DIR = /(?:^|[\\/])(?:constants?|tokens?|dictionary|dictionaries)[\\/]/;
+
+/** File pattern matching constant, token, or dictionary module names. */
+const RE_CONSTANT_FILE =
+    /(?:^|[\\/]|[-_.])(?:[a-z0-9-_]*[-_.])?(?:constants?|tokens?|dictionar(?:y|ies))\.[a-z0-9]+$/;
+
+/** File pattern matching rule, status, or error code file names. */
+const RE_CODE_FILE = /(?:^|[\\/]|[-_.])(?:[a-z0-9-_]*[-_.])?codes?\.[a-z0-9]+$/;
+
+/** Matches control flow statement keywords. */
+const RE_CONTROL_FLOW = /\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g;
+
+/** Matches function declaration or arrow function boundaries. */
+const RE_FN_LIKE = /\bfunction\s+\w+|=>\s*\{/g;
+
+/** Matches top-level export const declarations. */
+const RE_EXPORT_CONST = /\bexport\s+const\s+[A-Za-z0-9_$]+\s*[:=]/g;
+
 /**
- * Detect if a file path is a dedicated constant definition module.
+ * Checks if a file path belongs to a recognized constant directory or filename pattern.
+ *
+ * @param filePath - File path to inspect.
+ * @returns True if path matches constant catalog conventions.
+ */
+function isConstantPath(filePath: string): boolean {
+    const norm = filePath.replace(/\\/g, '/').toLowerCase();
+    if (RE_CONSTANT_DIR.test(norm)) {
+        return true;
+    }
+    return RE_CONSTANT_FILE.test(norm) || RE_CODE_FILE.test(norm);
+}
+
+/**
+ * Counts non-overlapping regex matches in a given text.
+ *
+ * @param text - Input string to search.
+ * @param regex - Regular expression with global flag.
+ * @returns Total match occurrences.
+ */
+function countRegexMatches(text: string, regex: RegExp): number {
+    const matches = text.match(regex);
+    return matches ? matches.length : 0;
+}
+
+/**
+ * Checks whether content lines are predominantly constant or enum definitions.
+ *
+ * @param lines - Non-empty, non-import lines.
+ * @returns True if constant definitions make up at least half of the content lines.
+ */
+function isConstantContentDominant(lines: string[]): boolean {
+    if (lines.length === 0) return false;
+    let constLineCount = 0;
+    for (const l of lines) {
+        if (
+            l.startsWith('export const ') ||
+            l.startsWith('export enum ') ||
+            l.startsWith('enum ') ||
+            l.includes('as const') ||
+            /^[A-Za-z0-9_$]+:\s*['"`0-9]/.test(l) ||
+            /^[A-Za-z0-9_$]+\s*=\s*['"`0-9]/.test(l)
+        ) {
+            constLineCount++;
+        }
+    }
+    return constLineCount / lines.length >= 0.5;
+}
+
+/**
+ * Determines whether file content exhibits high-cohesion constant table characteristics.
+ *
+ * @param content - Source code text to analyze.
+ * @returns True if content is a dedicated constant catalog.
+ */
+function hasConstantTableCharacteristics(content: string): boolean {
+    if (!content || content.length < 20) return false;
+    const stripped = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    if (/\bclass\s+\w+/.test(stripped)) return false;
+
+    const fnCount = countRegexMatches(stripped, RE_FN_LIKE);
+    if (fnCount > 2) return false;
+
+    const cfCount = countRegexMatches(stripped, RE_CONTROL_FLOW);
+    if (cfCount > 2) return false;
+
+    const hasEnum = /\b(?:export\s+)?enum\s+[A-Za-z0-9_$]+/.test(stripped);
+    const hasAsConst = /\bas\s+const\b/.test(stripped);
+    const exportConstCount = countRegexMatches(stripped, RE_EXPORT_CONST);
+
+    const hasSufficientConstants =
+        exportConstCount >= 3 || hasEnum || (hasAsConst && exportConstCount >= 1);
+    if (!hasSufficientConstants) {
+        return false;
+    }
+
+    const lines = stripped
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(
+            (l) =>
+                l.length > 0 &&
+                !l.startsWith('import ') &&
+                !l.startsWith('export type ') &&
+                !l.startsWith('type ') &&
+                !l.startsWith('export interface ') &&
+                !l.startsWith('interface '),
+        );
+
+    return isConstantContentDominant(lines);
+}
+
+/**
+ * Detect if a file path or content represents a dedicated constant definition module.
  *
  * @param filePath - Path to inspect.
- * @returns True if the file name or folder designates a dedicated constant catalog.
+ * @param content - Optional source code content for semantic detection.
+ * @returns True if the file name, folder, or content designates a dedicated constant catalog.
  */
-export function isConstantDefinitionFile(filePath: string): boolean {
-    const norm = filePath.replace(/\\/g, '/').toLowerCase();
-    return /(?:^|[\\/])constant(?:s)?\.[a-z0-9]+$/.test(norm) || /[\\/]constants?[\\/]/.test(norm);
+export function isConstantDefinitionFile(filePath: string, content?: string): boolean {
+    if (isConstantPath(filePath)) {
+        return true;
+    }
+    if (content && hasConstantTableCharacteristics(content)) {
+        return true;
+    }
+    return false;
 }
 
 /**

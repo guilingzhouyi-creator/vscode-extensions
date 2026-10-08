@@ -148,6 +148,16 @@ const SINGLE_QUOTE = "'";
 
 /** Frozen singleton of comment prefix markers to eliminate transient allocations in commentBody */
 const COMMENT_MARKERS: readonly string[] = Object.freeze(['//', '/*', '*/', '#', '*']);
+const CHAR_CODE_LF = 10;
+const CHAR_CODE_CR = 13;
+const COMMENT_URL_OR_INLINE_CODE_RE = /https?:\/\/\S+|`[^`]{20,}`/;
+const HEADER_COMMENT_PREFIX_RE = /^\s*(\/\/|\/\*|\*|#|##|""")/ ;
+const SIX_FIELD_PATTERNS: ReadonlyArray<{ readonly en: string; readonly zh: string; readonly regex: RegExp }> =
+    Object.freeze(SIX_FIELD_HEADERS_EN.map((en, i) => {
+        const zh = SIX_FIELD_HEADERS_ZH[i];
+        const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return Object.freeze({ en, zh, regex: new RegExp(`${esc(en)}|${esc(zh)}`) });
+    }));
 
 /**
  * Self-referential analyzer that enforces this repository's comment and header contract.
@@ -214,9 +224,11 @@ export class CommentAnalyzer implements Analyzer {
         // dedicated `docs` analyzer, so header/doc rules must not fire on .md files.
         if (file.endsWith('.md')) return [];
 
+        const lines = content.split('\n');
+
         this.auditFileHeader(content, len, file, level, opts, ctx, issues);
-        this.auditPublicApi(content, len, file, level, opts, ctx, issues);
-        this.auditCommentHygiene(content, file, level, opts, ctx, issues);
+        this.auditPublicApi(lines, file, level, opts, ctx, issues);
+        this.auditCommentHygiene(lines, content, file, level, opts, ctx, issues);
 
         if (shouldRunSubAudit(opts.enableLanguageGovernance, level)) {
             auditCommentLanguage(content, opts, ctx, issues, (c, l, r, m, s, d, sug) =>
@@ -245,6 +257,7 @@ export class CommentAnalyzer implements Analyzer {
      * upward because encoding damage is a correctness defect; the stylistic rules start at
      * `standard`.
      *
+     * @param lines - Pre-split line array of the file content.
      * @param content - Full source text of the file.
      * @param file - Normalized (forward-slash) file path used in issue ids and locations.
      * @param level - Effective comment level; controls which rule families run.
@@ -253,6 +266,7 @@ export class CommentAnalyzer implements Analyzer {
      * @param issues - Accumulator for the emitted issues.
      */
     private auditCommentHygiene(
+        lines: string[],
         content: string,
         file: string,
         level: CommentLevel,
@@ -260,7 +274,6 @@ export class CommentAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        const lines = content.split('\n');
         const lineCount = lines.length;
         const directiveRe = buildDirectiveRe(opts.directiveTokens);
         const shouldCheckTerminology =
@@ -373,70 +386,63 @@ export class CommentAnalyzer implements Analyzer {
         longLines: number[],
         shouldCheckTerminology = true,
     ): void {
-        const body = this.commentBody(trimmed);
-        const lineNo = lineIdx + 1;
-
         if (level === 'basic') return;
+        const body = this.commentBody(trimmed);
+        this.auditCommentWidth(line, body, lineIdx, file, directiveRe, ctx, issues);
+        this.recordSeparatorLine(body, lineIdx + 1, shortLines, longLines);
+        this.auditBannerSmallFile(body, lineIdx, lineCount, file, ctx, issues);
+        if (shouldCheckTerminology) this.auditCommentTerminology(body, lineIdx, file, ctx, issues);
+    }
 
-        const containsUrlOrInlineCode = /https?:\/\/\S+|`[^`]{20,}`/.test(body);
-        if (
-            line.length > MAX_COMMENT_WIDTH &&
-            !directiveRe.test(body) &&
-            !containsUrlOrInlineCode
-        ) {
-            const desc = CommentMessages.COMMENT_WIDTH(line.length, MAX_COMMENT_WIDTH);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    'CMT-WID-001',
-                    desc.message,
-                    SEVERITY_WARNING,
-                    { file, width: line.length, limit: MAX_COMMENT_WIDTH },
-                    desc.suggestion,
-                ),
-            );
+    private auditCommentWidth(
+        line: string,
+        body: string,
+        lineIdx: number,
+        file: string,
+        directiveRe: RegExp,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (line.length <= MAX_COMMENT_WIDTH || directiveRe.test(body) || COMMENT_URL_OR_INLINE_CODE_RE.test(body)) {
+            return;
         }
+        const desc = CommentMessages.COMMENT_WIDTH(line.length, MAX_COMMENT_WIDTH);
+        issues.push(this.mkIssue(ctx, lineIdx, 'CMT-WID-001', desc.message, SEVERITY_WARNING,
+            { file, width: line.length, limit: MAX_COMMENT_WIDTH }, desc.suggestion));
+    }
 
-        if (!BARE_SEPARATOR_RE.test(body)) {
-            if (SHORT_SEPARATOR_RE.test(body)) shortLines.push(lineNo);
-            else if (LONG_SEPARATOR_RE.test(body)) longLines.push(lineNo);
-        }
+    private recordSeparatorLine(body: string, lineNo: number, shortLines: number[], longLines: number[]): void {
+        if (BARE_SEPARATOR_RE.test(body)) return;
+        if (SHORT_SEPARATOR_RE.test(body)) shortLines.push(lineNo);
+        else if (LONG_SEPARATOR_RE.test(body)) longLines.push(lineNo);
+    }
 
-        if (lineCount < BANNER_LINE_LIMIT && body.startsWith('═')) {
-            const desc = CommentMessages.BANNER_SMALL_FILE(lineCount, BANNER_LINE_LIMIT);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    'CMT-BAN-001',
-                    desc.message,
-                    SEVERITY_WARNING,
-                    { file, lineCount, limit: BANNER_LINE_LIMIT },
-                    desc.suggestion,
-                ),
-            );
-        }
+    private auditBannerSmallFile(
+        body: string,
+        lineIdx: number,
+        lineCount: number,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (lineCount >= BANNER_LINE_LIMIT || !body.startsWith('═')) return;
+        const desc = CommentMessages.BANNER_SMALL_FILE(lineCount, BANNER_LINE_LIMIT);
+        issues.push(this.mkIssue(ctx, lineIdx, 'CMT-BAN-001', desc.message, SEVERITY_WARNING,
+            { file, lineCount, limit: BANNER_LINE_LIMIT }, desc.suggestion));
+    }
 
-        if (
-            shouldCheckTerminology &&
-            !isExemptCommentTerminologyPath(file) &&
-            DEFAULT_RULES_FAST_CANDIDATE_RE.test(body)
-        ) {
-            for (const finding of auditTerminologyProse(body)) {
-                const desc = CommentMessages.BANNED_TERMINOLOGY(finding.term, finding.message);
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'CMT-TRM-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        { file, term: finding.term, category: finding.category, line: lineIdx + 1 },
-                        desc.suggestion,
-                    ),
-                );
-            }
+    private auditCommentTerminology(
+        body: string,
+        lineIdx: number,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (isExemptCommentTerminologyPath(file) || !DEFAULT_RULES_FAST_CANDIDATE_RE.test(body)) return;
+        for (const finding of auditTerminologyProse(body)) {
+            const desc = CommentMessages.BANNED_TERMINOLOGY(finding.term, finding.message);
+            issues.push(this.mkIssue(ctx, lineIdx, 'CMT-TRM-001', desc.message, SEVERITY_WARNING,
+                { file, term: finding.term, category: finding.category, line: lineIdx + 1 }, desc.suggestion));
         }
     }
 
@@ -515,54 +521,54 @@ export class CommentAnalyzer implements Analyzer {
         len: number,
     ): { headerText: string; hasAnyHeaderComment: boolean } {
         let headerLinesCount = 0;
+        let lineStart = 0;
         let headerCursor = 0;
         let hasAnyHeaderComment = false;
 
-        while (headerCursor < len && headerLinesCount < HEADER_SCAN_LINES) {
-            const nextNl = content.indexOf('\n', headerCursor);
-            const lineEnd = nextNl === -1 ? len : nextNl;
-            let line = content.slice(headerCursor, lineEnd);
-            if (line.endsWith('\r')) line = line.slice(0, -1);
-            const trimmed = line.trim();
+        for (let i = 0; i < len && headerLinesCount < HEADER_SCAN_LINES; i++) {
+            if (content.charCodeAt(i) === CHAR_CODE_LF) {
+                if (this.checkHeaderSlice(content, lineStart, i)) {
+                    hasAnyHeaderComment = true;
+                }
+                headerLinesCount++;
+                headerCursor = i + 1;
+                lineStart = i + 1;
+            }
+        }
 
-            if (!trimmed.startsWith('#!') && /^\s*(\/\/|\/\*|\*|#|##|""")/.test(trimmed)) {
+        if (headerLinesCount < HEADER_SCAN_LINES && lineStart < len) {
+            if (this.checkHeaderSlice(content, lineStart, len)) {
                 hasAnyHeaderComment = true;
             }
-
-            headerLinesCount++;
-            if (nextNl === -1) {
-                headerCursor = len;
-                break;
-            }
-            headerCursor = nextNl + 1;
+            headerCursor = len;
         }
 
         return { headerText: content.slice(0, headerCursor), hasAnyHeaderComment };
     }
 
-    private auditSixFields(
-        headerText: string,
-        file: string,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        for (let i = 0; i < SIX_FIELD_HEADERS_EN.length; i++) {
-            const enMarker = SIX_FIELD_HEADERS_EN[i];
-            const zhMarker = SIX_FIELD_HEADERS_ZH[i];
-            if (headerText.includes(enMarker) || headerText.includes(zhMarker)) continue;
+    private trimCr(content: string, start: number, end: number): number {
+        if (end > start && content.charCodeAt(end - 1) === CHAR_CODE_CR) {
+            return end - 1;
+        }
+        return end;
+    }
 
-            const desc = CommentMessages.MISSING_HEADER_FIELD(`${enMarker} / ${zhMarker}`);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    0,
-                    'CMT-HDR-002',
-                    desc.message,
-                    SEVERITY_WARNING,
-                    { file, missingField: `${enMarker} (${zhMarker})` },
-                    desc.suggestion,
-                ),
-            );
+    private checkHeaderSlice(content: string, start: number, end: number): boolean {
+        const lineEnd = this.trimCr(content, start, end);
+        return this.isHeaderCommentLine(content.slice(start, lineEnd).trim());
+    }
+
+    private isHeaderCommentLine(trimmed: string): boolean {
+        return !trimmed.startsWith('#!') && HEADER_COMMENT_PREFIX_RE.test(trimmed);
+    }
+
+    private auditSixFields(headerText: string, file: string, ctx: AnalyzerContext, issues: Issue[]): void {
+        for (let i = 0; i < SIX_FIELD_PATTERNS.length; i++) {
+            const field = SIX_FIELD_PATTERNS[i];
+            if (field.regex.test(headerText)) continue;
+            const desc = CommentMessages.MISSING_HEADER_FIELD(`${field.en} / ${field.zh}`);
+            issues.push(this.mkIssue(ctx, 0, 'CMT-HDR-002', desc.message, SEVERITY_WARNING,
+                { file, missingField: `${field.en} (${field.zh})` }, desc.suggestion));
         }
     }
 
@@ -593,24 +599,20 @@ export class CommentAnalyzer implements Analyzer {
     }
 
     private auditPublicApi(
-        content: string,
-        len: number,
+        lines: string[],
         file: string,
         level: CommentLevel,
         opts: CommentOptions,
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        let cursor = 0;
-        let lineIdx = 0;
+        const lineCount = lines.length;
         const recentCommentLines: Array<{ line: number; text: string }> = [];
         const state = { hadBlankLineSinceComment: false };
         let inTemplateLiteral = false;
 
-        while (cursor < len) {
-            const nextNl = content.indexOf('\n', cursor);
-            const lineEnd = nextNl === -1 ? len : nextNl;
-            let line = content.slice(cursor, lineEnd);
+        for (let lineIdx = 0; lineIdx < lineCount; lineIdx++) {
+            let line = lines[lineIdx];
             if (line.endsWith('\r')) line = line.slice(0, -1);
             const trimmed = line.trim();
 
@@ -624,10 +626,8 @@ export class CommentAnalyzer implements Analyzer {
 
             if (isCode && !wasInTemplate) {
                 this.processCodeLineForPublicApi(
-                    content,
-                    len,
+                    lines,
                     file,
-                    nextNl,
                     trimmed,
                     lineIdx,
                     level,
@@ -639,10 +639,6 @@ export class CommentAnalyzer implements Analyzer {
                 recentCommentLines.length = 0;
                 state.hadBlankLineSinceComment = false;
             }
-
-            lineIdx++;
-            if (nextNl === -1) break;
-            cursor = nextNl + 1;
         }
     }
 
@@ -674,10 +670,8 @@ export class CommentAnalyzer implements Analyzer {
     }
 
     private processCodeLineForPublicApi(
-        content: string,
-        len: number,
+        lines: string[],
         file: string,
-        nextNl: number,
         trimmed: string,
         lineIdx: number,
         level: CommentLevel,
@@ -693,10 +687,8 @@ export class CommentAnalyzer implements Analyzer {
         if (symbol.startsWith('_')) return;
 
         const docInfo = this.resolveSymbolDoc(
-            content,
-            len,
+            lines,
             file,
-            nextNl,
             lineIdx,
             recentCommentLines,
             hadBlankLineSinceComment,
@@ -711,10 +703,8 @@ export class CommentAnalyzer implements Analyzer {
     }
 
     private resolveSymbolDoc(
-        content: string,
-        len: number,
+        lines: string[],
         file: string,
-        nextNl: number,
         lineIdx: number,
         recentCommentLines: Array<{ line: number; text: string }>,
         hadBlankLineSinceComment: boolean,
@@ -727,27 +717,23 @@ export class CommentAnalyzer implements Analyzer {
             };
         }
 
-        if ((file.endsWith('.py') || file.endsWith('.gd')) && nextNl !== -1) {
-            return this.scanInlineDocstring(content, len, nextNl + 1, lineIdx);
+        if ((file.endsWith('.py') || file.endsWith('.gd')) && lineIdx + 1 < lines.length) {
+            return this.scanInlineDocstring(lines, lineIdx);
         }
 
         return { foundDoc: false, docText: '', commentLine: lineIdx };
     }
 
     private scanInlineDocstring(
-        content: string,
-        len: number,
-        startPos: number,
+        lines: string[],
         lineIdx: number,
     ): { foundDoc: boolean; docText: string; commentLine: number } {
-        let bodyPos = startPos;
-        let scanLines = 0;
-        while (bodyPos < len && scanLines < MAX_DOCSTRING_SCAN_LINES) {
-            const nextNl2 = content.indexOf('\n', bodyPos);
-            const rawLine = content.slice(bodyPos, nextNl2 === -1 ? len : nextNl2).trim();
+        const total = lines.length;
+        for (let scanLines = 0; scanLines < MAX_DOCSTRING_SCAN_LINES; scanLines++) {
+            const targetIdx = lineIdx + 1 + scanLines;
+            if (targetIdx >= total) break;
+            const rawLine = lines[targetIdx].trim();
             if (rawLine === '') {
-                bodyPos = nextNl2 === -1 ? len : nextNl2 + 1;
-                scanLines++;
                 continue;
             }
             if (
@@ -758,7 +744,7 @@ export class CommentAnalyzer implements Analyzer {
                 return {
                     foundDoc: true,
                     docText: rawLine,
-                    commentLine: lineIdx + 1 + scanLines,
+                    commentLine: targetIdx,
                 };
             }
             break;

@@ -53,11 +53,37 @@ interface StatementVariableInfo {
 }
 
 const JS_GLOBALS = new Set([
-    'console', 'Math', 'JSON', 'Object', 'Array', 'Promise', 'Error',
-    'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Map', 'Set',
-    'WeakMap', 'WeakSet', 'Symbol', 'Proxy', 'Reflect', 'process',
-    'window', 'document', 'globalThis', 'Buffer', 'setTimeout', 'clearTimeout',
-    'setInterval', 'clearInterval', 'require', 'exports', 'module',
+    'console',
+    'Math',
+    'JSON',
+    'Object',
+    'Array',
+    'Promise',
+    'Error',
+    'String',
+    'Number',
+    'Boolean',
+    'Date',
+    'RegExp',
+    'Map',
+    'Set',
+    'WeakMap',
+    'WeakSet',
+    'Symbol',
+    'Proxy',
+    'Reflect',
+    'process',
+    'window',
+    'document',
+    'globalThis',
+    'Buffer',
+    'setTimeout',
+    'clearTimeout',
+    'setInterval',
+    'clearInterval',
+    'require',
+    'exports',
+    'module',
 ]);
 
 function capitalize(s: string): string {
@@ -196,7 +222,9 @@ function buildExtractSignature(
         ``,
         `// Call site:`,
         callSite,
-    ].filter(Boolean).join('\n');
+    ]
+        .filter(Boolean)
+        .join('\n');
 
     return { signature, template };
 }
@@ -244,6 +272,63 @@ function resolveLineSpan(
     return { startLine: startPos.line + 1, endLine: endPos.line + 1 };
 }
 
+function isSliceInputVariable(
+    variable: string,
+    paramNames: ReadonlySet<string>,
+    writesBefore: ReadonlySet<string>,
+    sliceWrites: ReadonlySet<string>,
+): boolean {
+    if (JS_GLOBALS.has(variable)) return false;
+    if (paramNames.has(variable)) return true;
+    if (writesBefore.has(variable)) return true;
+    return !sliceWrites.has(variable);
+}
+
+function collectInputVariables(
+    sliceReads: ReadonlySet<string>,
+    paramNames: ReadonlySet<string>,
+    writesBefore: ReadonlySet<string>,
+    sliceWrites: ReadonlySet<string>,
+): string[] {
+    const inputs: string[] = [];
+    for (const varName of sliceReads) {
+        if (isSliceInputVariable(varName, paramNames, writesBefore, sliceWrites)) {
+            inputs.push(varName);
+        }
+    }
+    return inputs;
+}
+
+function collectOutputVariables(
+    sliceWrites: ReadonlySet<string>,
+    readsAfter: ReadonlySet<string>,
+): string[] {
+    const outputs: string[] = [];
+    for (const varName of sliceWrites) {
+        if (readsAfter.has(varName)) {
+            outputs.push(varName);
+        }
+    }
+    return outputs;
+}
+
+function computeDependencyScore(inputCount: number, outputCount: number): number {
+    return inputCount + (outputCount > 1 ? outputCount * 2 : outputCount);
+}
+
+function populateSliceVariables(
+    i: number,
+    j: number,
+    stmtInfos: StatementVariableInfo[],
+    outReads: Set<string>,
+    outWrites: Set<string>,
+): void {
+    for (let k = i; k <= j; k++) {
+        for (const r of stmtInfos[k].reads) outReads.add(r);
+        for (const w of stmtInfos[k].writes) outWrites.add(w);
+    }
+}
+
 function evaluateSliceRange(
     statements: readonly ts.Statement[],
     i: number,
@@ -256,32 +341,22 @@ function evaluateSliceRange(
     suffixReads?: Set<string>[],
     stmtStartLines?: Int32Array,
     stmtEndLines?: Int32Array,
+    scratchReads?: Set<string>,
+    scratchWrites?: Set<string>,
 ): FunctionSliceCandidate {
-    const sliceReads = new Set<string>();
-    const sliceWrites = new Set<string>();
-    for (let k = i; k <= j; k++) {
-        for (const r of stmtInfos[k].reads) sliceReads.add(r);
-        for (const w of stmtInfos[k].writes) sliceWrites.add(w);
-    }
+    const sliceReads = scratchReads ?? new Set<string>();
+    const sliceWrites = scratchWrites ?? new Set<string>();
+    sliceReads.clear();
+    sliceWrites.clear();
+
+    populateSliceVariables(i, j, stmtInfos, sliceReads, sliceWrites);
 
     const writesBefore = resolveWritesBefore(i, stmtInfos, prefixWrites);
     const readsAfter = resolveReadsAfter(j, statements.length, stmtInfos, suffixReads);
 
-    const inputVars: string[] = [];
-    for (const v of sliceReads) {
-        if (!JS_GLOBALS.has(v) && (paramNames.has(v) || writesBefore.has(v) || !sliceWrites.has(v))) {
-            inputVars.push(v);
-        }
-    }
-
-    const outputVars: string[] = [];
-    for (const v of sliceWrites) {
-        if (readsAfter.has(v)) {
-            outputVars.push(v);
-        }
-    }
-
-    const dependencyCount = inputVars.length + (outputVars.length > 1 ? outputVars.length * 2 : outputVars.length);
+    const inputVars = collectInputVariables(sliceReads, paramNames, writesBefore, sliceWrites);
+    const outputVars = collectOutputVariables(sliceWrites, readsAfter);
+    const dependencyCount = computeDependencyScore(inputVars.length, outputVars.length);
     const sliceRange = resolveLineSpan(i, j, statements, sf, stmtStartLines, stmtEndLines);
     const { signature, template } = buildExtractSignature(helperName, inputVars, outputVars);
 
@@ -299,6 +374,12 @@ function evaluateSliceRange(
     };
 }
 
+function copyAndExtendSet(base: ReadonlySet<string>, additions: ReadonlySet<string>): Set<string> {
+    const next = new Set<string>(base);
+    for (const item of additions) next.add(item);
+    return next;
+}
+
 function precomputePrefixWrites(n: number, stmtInfos: StatementVariableInfo[]): Set<string>[] {
     const prefixWrites: Set<string>[] = new Array(n + 1);
     prefixWrites[0] = new Set<string>();
@@ -306,9 +387,7 @@ function precomputePrefixWrites(n: number, stmtInfos: StatementVariableInfo[]): 
         if (stmtInfos[k].writes.size === 0) {
             prefixWrites[k + 1] = prefixWrites[k];
         } else {
-            const next = new Set<string>(prefixWrites[k]);
-            for (const w of stmtInfos[k].writes) next.add(w);
-            prefixWrites[k + 1] = next;
+            prefixWrites[k + 1] = copyAndExtendSet(prefixWrites[k], stmtInfos[k].writes);
         }
     }
     return prefixWrites;
@@ -321,9 +400,7 @@ function precomputeSuffixReads(n: number, stmtInfos: StatementVariableInfo[]): S
         if (stmtInfos[k].reads.size === 0) {
             suffixReads[k] = suffixReads[k + 1];
         } else {
-            const next = new Set<string>(suffixReads[k + 1]);
-            for (const r of stmtInfos[k].reads) next.add(r);
-            suffixReads[k] = next;
+            suffixReads[k] = copyAndExtendSet(suffixReads[k + 1], stmtInfos[k].reads);
         }
     }
     return suffixReads;
@@ -375,12 +452,27 @@ export function computeFunctionSlices(
 
     const prefixWrites = precomputePrefixWrites(n, stmtInfos);
     const suffixReads = precomputeSuffixReads(n, stmtInfos);
+    const scratchReads = new Set<string>();
+    const scratchWrites = new Set<string>();
 
     if (n === 1) {
-        candidates.push(evaluateSliceRange(
-            statements, 0, 0, sf, paramNames, stmtInfos, helperName,
-            prefixWrites, suffixReads, stmtStartLines, stmtEndLines
-        ));
+        candidates.push(
+            evaluateSliceRange(
+                statements,
+                0,
+                0,
+                sf,
+                paramNames,
+                stmtInfos,
+                helperName,
+                prefixWrites,
+                suffixReads,
+                stmtStartLines,
+                stmtEndLines,
+                scratchReads,
+                scratchWrites,
+            ),
+        );
         return createSliceAnalysis(candidates);
     }
 
@@ -388,18 +480,44 @@ export function computeFunctionSlices(
     for (let len = 2; len <= maxLen; len++) {
         for (let i = 0; i <= n - len; i++) {
             const j = i + len - 1;
-            candidates.push(evaluateSliceRange(
-                statements, i, j, sf, paramNames, stmtInfos, helperName,
-                prefixWrites, suffixReads, stmtStartLines, stmtEndLines
-            ));
+            candidates.push(
+                evaluateSliceRange(
+                    statements,
+                    i,
+                    j,
+                    sf,
+                    paramNames,
+                    stmtInfos,
+                    helperName,
+                    prefixWrites,
+                    suffixReads,
+                    stmtStartLines,
+                    stmtEndLines,
+                    scratchReads,
+                    scratchWrites,
+                ),
+            );
         }
     }
 
     if (candidates.length === 0) {
-        candidates.push(evaluateSliceRange(
-            statements, 0, n - 1, sf, paramNames, stmtInfos, helperName,
-            prefixWrites, suffixReads, stmtStartLines, stmtEndLines
-        ));
+        candidates.push(
+            evaluateSliceRange(
+                statements,
+                0,
+                n - 1,
+                sf,
+                paramNames,
+                stmtInfos,
+                helperName,
+                prefixWrites,
+                suffixReads,
+                stmtStartLines,
+                stmtEndLines,
+                scratchReads,
+                scratchWrites,
+            ),
+        );
     }
 
     candidates.sort((a, b) => {
@@ -416,20 +534,31 @@ export function computeFunctionSlices(
 
 function invertBinaryOperator(kind: ts.SyntaxKind): string | null {
     switch (kind) {
-        case ts.SyntaxKind.EqualsEqualsEqualsToken: return '!==';
-        case ts.SyntaxKind.ExclamationEqualsEqualsToken: return '===';
-        case ts.SyntaxKind.EqualsEqualsToken: return '!=';
-        case ts.SyntaxKind.ExclamationEqualsToken: return '==';
-        case ts.SyntaxKind.GreaterThanToken: return '<=';
-        case ts.SyntaxKind.GreaterThanEqualsToken: return '<';
-        case ts.SyntaxKind.LessThanToken: return '>=';
-        case ts.SyntaxKind.LessThanEqualsToken: return '>';
-        default: return null;
+        case ts.SyntaxKind.EqualsEqualsEqualsToken:
+            return '!==';
+        case ts.SyntaxKind.ExclamationEqualsEqualsToken:
+            return '===';
+        case ts.SyntaxKind.EqualsEqualsToken:
+            return '!=';
+        case ts.SyntaxKind.ExclamationEqualsToken:
+            return '==';
+        case ts.SyntaxKind.GreaterThanToken:
+            return '<=';
+        case ts.SyntaxKind.GreaterThanEqualsToken:
+            return '<';
+        case ts.SyntaxKind.LessThanToken:
+            return '>=';
+        case ts.SyntaxKind.LessThanEqualsToken:
+            return '>';
+        default:
+            return null;
     }
 }
 
 /**
  * Invert a conditional expression into its complementary guard form.
+ * @param expr
+ * @param sf
  */
 export function invertConditionExpression(expr: ts.Expression, sf: ts.SourceFile): string {
     if (ts.isBinaryExpression(expr)) {
@@ -490,6 +619,8 @@ function collectNestedIfConditions(
 
 /**
  * Generate flattened early-return guard clauses from deeply nested if conditions.
+ * @param node
+ * @param sf
  */
 export function generateInvertedConditionSnippet(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression,
@@ -525,6 +656,8 @@ export function generateInvertedConditionSnippet(
 
 /**
  * Generate a refactoring template encapsulating multiple parameters into a typed options object.
+ * @param functionName
+ * @param params
  */
 export function generateParameterObjectSnippet(
     functionName: string,
@@ -548,11 +681,20 @@ export function generateParameterObjectSnippet(
 
 const functionLineCache = new WeakMap<
     ts.SourceFile,
-    Map<number, ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression | null>
+    Map<
+        number,
+        | ts.FunctionDeclaration
+        | ts.MethodDeclaration
+        | ts.ArrowFunction
+        | ts.FunctionExpression
+        | null
+    >
 >();
 
 /**
  * Find the function-like AST node located closest to a specified line number.
+ * @param sf
+ * @param targetLine
  */
 export function findTsFunctionAtLine(
     sf: ts.SourceFile,
@@ -566,7 +708,12 @@ export function findTsFunctionAtLine(
         return sfCache.get(targetLine)!;
     }
 
-    let bestMatch: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression | null = null;
+    let bestMatch:
+        | ts.FunctionDeclaration
+        | ts.MethodDeclaration
+        | ts.ArrowFunction
+        | ts.FunctionExpression
+        | null = null;
     let minDistance = Infinity;
 
     const lineStarts = sf.getLineStarts();

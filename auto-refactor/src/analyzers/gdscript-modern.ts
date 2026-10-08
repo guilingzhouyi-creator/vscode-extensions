@@ -148,6 +148,32 @@ function makeIssue(
     };
 }
 
+const FSM_EXEMPT_PATH_TOKENS: ReadonlySet<string> = new Set(['fsm', 'state_machine']);
+const FSM_STATE_MUTATION_RE = /^\s*(?:self\.)?_current_state\s*=\s*(?:State\.|STATE_|[A-Z0-9_]+)/;
+const WEAKREF_SAFE_CALLS: ReadonlySet<string> = new Set(['weakref']);
+const WEAKREF_TOKEN_RE = /\b(weakref)\s*\(/;
+const OBSERVER_APPEND_RE =
+    /\b(?:_observers|_listeners|_bindings|_subscribers)\.append\s*\(\s*(?:node|listener|control|view|target)\s*\)/;
+
+function isFsmExemptPath(file: string): boolean {
+    const normalized = file.toLowerCase();
+    if (normalized.includes('/fsm/') || normalized.includes('state_machine')) {
+        return true;
+    }
+    const segments = normalized.split(/[\\/._-]+/);
+    for (const segment of segments) {
+        if (FSM_EXEMPT_PATH_TOKENS.has(segment)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function hasWeakRefCall(line: string): boolean {
+    const match = WEAKREF_TOKEN_RE.exec(line);
+    return match !== null && WEAKREF_SAFE_CALLS.has(match[1]);
+}
+
 /** GDScript modernization pack: seven rules over a masked view of the file. */
 export class GdscriptModernAnalyzer implements Analyzer {
     name = ANALYZER_GDSCRIPT_MODERN;
@@ -317,13 +343,10 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
+        if (isFsmExemptPath(file)) return;
         for (let index = 0; index < masked.length; index += 1) {
             const line = masked[index];
-            if (
-                /^\s*(?:self\.)?_current_state\s*=\s*(?:State\.|STATE_|[A-Z0-9_]+)/.test(line) &&
-                !file.includes('/fsm/') &&
-                !file.includes('state_machine')
-            ) {
+            if (FSM_STATE_MUTATION_RE.test(line)) {
                 out.push(
                     makeIssue(
                         file,
@@ -349,12 +372,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             return;
         for (let index = 0; index < masked.length; index += 1) {
             const line = masked[index];
-            if (
-                /\b(?:_observers|_listeners|_bindings|_subscribers)\.append\s*\(\s*(?:node|listener|control|view|target)\s*\)/.test(
-                    line,
-                ) &&
-                !line.includes('weakref')
-            ) {
+            if (OBSERVER_APPEND_RE.test(line) && !hasWeakRefCall(line)) {
                 out.push(
                     makeIssue(
                         file,

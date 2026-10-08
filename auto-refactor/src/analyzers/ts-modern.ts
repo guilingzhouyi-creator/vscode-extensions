@@ -60,6 +60,9 @@ const SUBSTR_RE = /\.\s*substr\s*\(/;
 /** `replace('literal', …)`: a string pattern rewrites only the first occurrence. */
 const REPLACE_LITERAL_RE = /\.\s*replace\s*\(\s*(['"`])/;
 
+/** Fast guard pattern matching `.replace(` before applying detailed literal extraction. */
+const REPLACE_CALL_RE = /\.replace\(/;
+
 /** Explicit `any` in a type position, where `unknown` keeps the same call sites type-safe. */
 const ANY_TYPE_RE = /(?::\s*any\b)|(?:\bas\s+any\b)|(?:<\s*any\s*>)|(?:\bany\s*\[\s*\])/;
 
@@ -277,23 +280,21 @@ export class TsModernAnalyzer implements Analyzer {
             if (trimmed.length === 0) continue;
 
             const isStartOfDisposable = ISOLATED_DISPOSABLE_RE.test(line);
-            if (isStartOfDisposable && openParenDepth === 0) {
-                if (!isPassedAsArgPreviousLine(masked, i)) {
-                    const m = line.match(ISOLATED_DISPOSABLE_RE)!;
-                    const col = line.indexOf(m[0].trimStart()) + 1;
-                    out.push(
-                        makeIssue(
-                            file,
-                            i,
-                            'TSM-DISP-001',
-                            SEVERITY_WARNING,
-                            'Disposable resource/listener created in isolated statement without tracking in subscriptions.',
-                            'Pass to `context.subscriptions.push(...)` or store in a Disposable collection to prevent memory leaks.',
-                            { matched: m[0].trim() },
-                            col,
-                        ),
-                    );
-                }
+            if (isStartOfDisposable && openParenDepth === 0 && !isPassedAsArgPreviousLine(masked, i)) {
+                const m = line.match(ISOLATED_DISPOSABLE_RE)!;
+                const col = findFirstNonWhitespaceColumn(line);
+                out.push(
+                    makeIssue(
+                        file,
+                        i,
+                        'TSM-DISP-001',
+                        SEVERITY_WARNING,
+                        'Disposable resource/listener created in isolated statement without tracking in subscriptions.',
+                        'Pass to `context.subscriptions.push(...)` or store in a Disposable collection to prevent memory leaks.',
+                        { matched: m[0].trim() },
+                        col,
+                    ),
+                );
             }
 
             openParenDepth = updateOpenParenDepth(line, openParenDepth);
@@ -405,7 +406,7 @@ export class TsModernAnalyzer implements Analyzer {
         out: Issue[],
     ): void {
         for (let index = 0; index < masked.length; index += 1) {
-            if (!masked[index].includes('.replace(')) continue;
+            if (!REPLACE_CALL_RE.test(masked[index])) continue;
             const match = REPLACE_LITERAL_RE.exec(raw[index]);
             if (!match) continue;
             out.push(
@@ -471,32 +472,37 @@ export class TsModernAnalyzer implements Analyzer {
         for (let index = 0; index < masked.length; index += 1) {
             if (NAMED_IMPORT_RE.test(masked[index])) importLines.add(index);
         }
-        for (const index of importLines) {
-            const clause = NAMED_IMPORT_RE.exec(masked[index]);
-            if (!clause) continue;
-            const names = clause[1]
-                .split(',')
-                .map(
-                    (binding) =>
-                        binding
-                            .trim()
-                            .split(/\s+as\s+/)
-                            .pop() ?? '',
-                )
-                .map((name) => name.trim())
-                .filter((name) => /^[A-Za-z_$][\w$]*$/.test(name));
-            const typeOnly = names.filter((name) => this.isTypeOnlyName(name, masked, importLines));
+        if (importLines.size === 0) return;
+
+        const clauses = collectImportClauses(masked, importLines);
+        const lineIndexByWord = buildCandidateLineIndex(masked, importLines, clauses);
+        const typeOnlyCache = new Map<string, boolean>();
+
+        for (let c = 0; c < clauses.length; c++) {
+            const { lineIndex, names } = clauses[c];
+            const typeOnly: string[] = [];
+            for (let n = 0; n < names.length; n++) {
+                const name = names[n];
+                let isType = typeOnlyCache.get(name);
+                if (isType === undefined) {
+                    isType = this.isTypeOnlyName(name, masked, importLines, lineIndexByWord);
+                    typeOnlyCache.set(name, isType);
+                }
+                if (isType) {
+                    typeOnly.push(name);
+                }
+            }
             if (typeOnly.length === 0) continue;
             const label = typeOnly.length > 1 ? 'imports' : 'import';
             out.push(
                 makeIssue(
                     file,
-                    index,
+                    lineIndex,
                     'TSM-TYPE-001',
                     SEVERITY_INFO,
                     `Named ${label} used only as a type: ${typeOnly.join(', ')}.`,
                     'Mark the clause `import type { … }` so the binding is erased at compile time.',
-                    { line: raw[index].trim(), names: typeOnly },
+                    { line: raw[lineIndex].trim(), names: typeOnly },
                     1,
                 ),
             );
@@ -509,11 +515,21 @@ export class TsModernAnalyzer implements Analyzer {
      * @param name - Imported local identifier.
      * @param masked - Masked lines.
      * @param importLines - Line indexes holding import clauses, excluded from the usage scan.
+     * @param lineIndexByWord - Pre-indexed line occurrences per candidate identifier.
      * @returns True when the identifier appears at least once and never in a value position.
      */
-    private isTypeOnlyName(name: string, masked: string[], importLines: Set<number>): boolean {
+    private isTypeOnlyName(
+        name: string,
+        masked: string[],
+        importLines: Set<number>,
+        lineIndexByWord?: Map<string, Set<number>>,
+    ): boolean {
+        const matchingLines = lineIndexByWord?.get(name);
+        if (matchingLines && matchingLines.size === 0) return false;
+
         const escaped = escapeRegExp(name);
         const word = new RegExp(`\\b${escaped}\\b`, 'g');
+        const fallbackWord = matchingLines ? null : new RegExp(`\\b${escaped}\\b`);
         const typePatterns = [
             new RegExp(`:\\s*${escaped}\\b`, 'g'),
             new RegExp(`\\bas\\s+${escaped}\\b`, 'g'),
@@ -528,13 +544,104 @@ export class TsModernAnalyzer implements Analyzer {
         let typed = 0;
         for (let index = 0; index < masked.length; index += 1) {
             if (importLines.has(index)) continue;
+            if (matchingLines ? !matchingLines.has(index) : !fallbackWord!.test(masked[index])) {
+                continue;
+            }
             const code = masked[index];
-            if (!code.includes(name)) continue;
             total += countMatches(code, word);
-            for (const pattern of typePatterns) typed += countMatches(code, pattern);
+            for (let p = 0; p < typePatterns.length; p++) {
+                typed += countMatches(code, typePatterns[p]);
+            }
         }
         return total > 0 && typed >= total;
     }
+}
+
+function findFirstNonWhitespaceColumn(line: string): number {
+    for (let c = 0; c < line.length; c++) {
+        const code = line.charCodeAt(c);
+        if (code !== 32 && code !== 9 && code !== 13 && code !== 10) {
+            return c + 1;
+        }
+    }
+    return 1;
+}
+
+const IDENT_NAME_RE = /^[A-Za-z_$][\w$]*$/;
+
+function parseClauseImportNames(clauseText: string): string[] {
+    const rawTokens = clauseText.split(',');
+    const names: string[] = [];
+    for (let i = 0; i < rawTokens.length; i++) {
+        const parts = rawTokens[i].trim().split(/\s+as\s+/);
+        const name = (parts.pop() ?? '').trim();
+        if (IDENT_NAME_RE.test(name)) {
+            names.push(name);
+        }
+    }
+    return names;
+}
+
+interface ImportClauseRecord {
+    lineIndex: number;
+    names: string[];
+}
+
+function collectImportClauses(
+    masked: string[],
+    importLines: Set<number>,
+): ImportClauseRecord[] {
+    const records: ImportClauseRecord[] = [];
+    for (const index of importLines) {
+        const clause = NAMED_IMPORT_RE.exec(masked[index]);
+        if (!clause) continue;
+        const names = parseClauseImportNames(clause[1]);
+        if (names.length > 0) {
+            records.push({ lineIndex: index, names });
+        }
+    }
+    return records;
+}
+
+function initializeWordSetEntry(map: Map<string, Set<number>>, word: string): void {
+    if (!map.has(word)) {
+        map.set(word, new Set<number>());
+    }
+}
+
+function compileWordPattern(word: string): RegExp {
+    return new RegExp(`\\b${escapeRegExp(word)}\\b`);
+}
+
+function buildCandidateLineIndex(
+    masked: string[],
+    importLines: Set<number>,
+    records: ImportClauseRecord[],
+): Map<string, Set<number>> {
+    const lineIndexByWord = new Map<string, Set<number>>();
+    for (let r = 0; r < records.length; r++) {
+        const names = records[r].names;
+        for (let n = 0; n < names.length; n++) {
+            initializeWordSetEntry(lineIndexByWord, names[n]);
+        }
+    }
+    if (lineIndexByWord.size === 0) return lineIndexByWord;
+
+    const matchers = new Map<string, RegExp>();
+    for (const word of lineIndexByWord.keys()) {
+        matchers.set(word, compileWordPattern(word));
+    }
+
+    for (let index = 0; index < masked.length; index += 1) {
+        if (importLines.has(index)) continue;
+        const line = masked[index];
+        for (const [word, matcher] of matchers) {
+            if (matcher.test(line)) {
+                lineIndexByWord.get(word)!.add(index);
+            }
+        }
+    }
+    return lineIndexByWord;
 }
 
 function isPassedAsArgPreviousLine(masked: string[], start: number): boolean {

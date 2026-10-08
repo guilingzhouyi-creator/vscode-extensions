@@ -55,7 +55,11 @@ import type {
     NormalizedNode,
 } from './ast/multilang';
 import { encodeResults, BINARY_RESULT_ENABLED } from './result-codec';
-import { collectSymbols, type SymbolDefinition, type SymbolReference } from './intelligence/symbolIndex';
+import {
+    collectSymbols,
+    type SymbolDefinition,
+    type SymbolReference,
+} from './intelligence/symbolIndex';
 
 type LineStats = ReturnType<typeof countLineStats>;
 

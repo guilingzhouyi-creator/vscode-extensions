@@ -28,6 +28,9 @@ import {
 /** Pattern detecting remote URLs. */
 const REMOTE_URL_RE = /['"](https?:\/\/[A-Za-z0-9_./?=&%-]+)['"]/g;
 
+/** Pattern detecting exempted/placeholder URLs (schemas, test hosts, local addresses). */
+const EXEMPTED_REMOTE_URL_RE = /(?:json-schema\.org|example\.com|localhost|127\.0\.0\.1)/;
+
 /** Patterns for polyglot import extraction */
 const PY_IMPORT_RE = /^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0-9_.]+))/;
 const RUST_USE_RE = /^\s*use\s+([A-Za-z0-9_:]+)/;
@@ -271,12 +274,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
 
             while ((urlMatch = REMOTE_URL_RE.exec(line)) !== null) {
                 const url = urlMatch[1];
-                if (
-                    !url.includes('json-schema.org') &&
-                    !url.includes('example.com') &&
-                    !url.includes('localhost') &&
-                    !url.includes('127.0.0.1')
-                ) {
+                if (!EXEMPTED_REMOTE_URL_RE.test(url)) {
                     resources.push({
                         file: ctx.filePath,
                         line: lineNum,

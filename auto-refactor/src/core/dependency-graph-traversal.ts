@@ -41,7 +41,14 @@ export function globToRegex(glob: string): RegExp {
 }
 
 /**
- * Detect import cycles with an iterative three-color DFS (WHITE/GRAY/BLACK).
+ * Detects import cycles using an iterative three-color DFS (WHITE=0, GRAY=1, BLACK=2).
+ *
+ * Algorithm Invariants & Complexity Bounds:
+ *   - Precondition: `edges` keys and values must be normalized POSIX relative file paths.
+ *   - Invariant: Traversal is strictly iterative; stack depth is physically bounded by the total
+ *     unique module count (|V|), completely eliminating call-stack overflow hazards.
+ *   - Degradation Guard: Emitted cycles are downstream bounded during pass execution to prevent
+ *     diagnostic explosion on densely cyclic graphs.
  *
  * @param edges - Forward adjacency map from a normalized file to its normalized imports.
  * @returns Every cycle found, each as a node path whose last element repeats the first.

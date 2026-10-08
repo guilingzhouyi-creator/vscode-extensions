@@ -405,6 +405,37 @@ function evaluateCoverageQuality(sites: TestSite[]): {
     return { freshness, effectiveness };
 }
 
+function hasCaseInsensitiveSubstring(text: string, search: string): boolean {
+    return text.indexOf(search) !== -1;
+}
+
+function indexMatchingSitesBySymbol(
+    testSites: TestSite[],
+    businessNodes: SemanticNode[],
+): Map<string, TestSite[]> {
+    const siteMap = new Map<string, TestSite[]>();
+    for (let b = 0; b < businessNodes.length; b++) {
+        siteMap.set(businessNodes[b].name.toLowerCase(), []);
+    }
+
+    for (let s = 0; s < testSites.length; s++) {
+        const site = testSites[s];
+        const testedLower = site.testedSymbol ? site.testedSymbol.toLowerCase() : null;
+        const testNameLower = site.testName.toLowerCase();
+
+        for (let b = 0; b < businessNodes.length; b++) {
+            const lowerName = businessNodes[b].name.toLowerCase();
+            const matches =
+                testedLower === lowerName || hasCaseInsensitiveSubstring(testNameLower, lowerName);
+            if (matches) {
+                siteMap.get(lowerName)!.push(site);
+            }
+        }
+    }
+
+    return siteMap;
+}
+
 /**
  * Maps production symbols in a SemanticGraph to test coverage sites and calculates
  * the five-dimensional test quality metrics (EMTD, CBCR, TF, AU, RS).
@@ -433,17 +464,14 @@ export function mapBusinessToTests(
         return !isTestFilePath(file);
     });
 
+    const matchingSitesMap = indexMatchingSitesBySymbol(testSites, businessNodes);
+
     for (const node of businessNodes) {
         const lowerName = node.name.toLowerCase();
         const pathLower = (node.location?.file ?? '').toLowerCase();
         const riskWeight = inferSymbolRiskWeight(node.name);
 
-        const matchingSites = testSites.filter((s) => {
-            if (s.testedSymbol && s.testedSymbol.toLowerCase() === lowerName) {
-                return true;
-            }
-            return s.testName.toLowerCase().includes(lowerName);
-        });
+        const matchingSites = matchingSitesMap.get(lowerName) ?? [];
 
         const isCovered = matchingSites.length > 0;
         if (!isCovered) {

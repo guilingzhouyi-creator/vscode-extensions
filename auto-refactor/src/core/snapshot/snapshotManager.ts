@@ -121,8 +121,14 @@ export function createAuditSnapshot(
     };
 }
 
+/**
+ * Configuration options governing audit snapshot integrity verification.
+ */
 export interface VerifySnapshotOptions {
-    /** Whether to allow rule count/digest drift against current runtime (e.g. for historic frozen baselines). */
+    /**
+     * Whether to allow rule count/digest drift against current runtime
+     * (e.g. for historic frozen baselines).
+     */
     allowDrift?: boolean;
 }
 

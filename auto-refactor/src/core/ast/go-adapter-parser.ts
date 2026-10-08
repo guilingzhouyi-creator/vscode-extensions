@@ -22,6 +22,7 @@ const KEYWORD_STRUCT = 'struct';
 const BLOCK_COMMENT_START = '/*';
 const BLOCK_COMMENT_END = '*/';
 const LINE_COMMENT_PREFIX = '//';
+const EMPTY_NUMERIC_POSITION_SET: ReadonlySet<number> = Object.freeze(new Set<number>());
 
 // --- Regex patterns for Go syntax detection ---
 
@@ -80,33 +81,10 @@ const NAMED_LITERAL_RE = /\b(true|false|nil|iota)\b/g;
 /** Function call expression: `name(` — heuristic, matches identifier followed by open paren */
 const CALL_EXPR_RE = /([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\(/g;
 
-/** Keywords and builtins that look like calls but are not user-defined function calls. */
 const CALL_KEYWORD_EXCLUSIONS = new Set([
-    'if',
-    'for',
-    'switch',
-    'select',
-    'func',
-    'return',
-    'go',
-    'defer',
-    'case',
-    'type',
-    'var',
-    'const',
-    'package',
-    'import',
-    'range',
-    'make',
-    'new',
-    'len',
-    'cap',
-    'append',
-    'copy',
-    'delete',
-    'close',
-    'panic',
-    'recover',
+    'if', 'for', 'switch', 'select', 'func', 'return', 'go', 'defer', 'case', 'type',
+    'var', 'const', 'package', 'import', 'range', 'make', 'new', 'len', 'cap',
+    'append', 'copy', 'delete', 'close', 'panic', 'recover',
 ]);
 
 /** Struct field: `Name Type` inside a struct (detected by indentation context) */
@@ -381,6 +359,25 @@ function parseSimpleStatement(
  * @param lineNum - 1-based line number.
  * @param out - Output array to append nodes to.
  */
+/**
+ * Build an index lookup set of character positions occupied by float literals.
+ *
+ * @param floatMatches - Array of RegExp match objects for float literals on the line.
+ * @returns Immutable ReadonlySet of 0-based character indices covered by float literals.
+ */
+function collectFloatOccupiedPositions(
+    floatMatches: RegExpMatchArray[],
+): ReadonlySet<number> {
+    if (floatMatches.length === 0) return EMPTY_NUMERIC_POSITION_SET;
+    const occupied = new Set<number>();
+    for (const fm of floatMatches) {
+        const start = fm.index ?? 0;
+        const end = start + (fm[0]?.length ?? 0);
+        for (let pos = start; pos < end; pos++) occupied.add(pos);
+    }
+    return occupied;
+}
+
 function parseNumericLiterals(
     codeOnly: string,
     line: string,
@@ -402,14 +399,14 @@ function parseNumericLiterals(
     }
 
     // Integer literals — skip positions that overlap with float matches
+    const coveredPositions = collectFloatOccupiedPositions(floatMatches);
     const intMatches = [...codeOnly.matchAll(INT_LITERAL_RE)];
     for (const m of intMatches) {
         const idx = m.index ?? 0;
         // Skip if this int overlaps with a float match
-        const overlaps = floatMatches.some(
-            (fm) => idx >= (fm.index ?? 0) && idx < (fm.index ?? 0) + (fm[0]?.length ?? 0),
-        );
-        if (overlaps) continue;
+        if (coveredPositions.has(idx)) {
+            continue;
+        }
         out.push({
             kind: NodeKind.NumericLiteral,
             text: m[0],
@@ -419,6 +416,25 @@ function parseNumericLiterals(
             end: { line: lineNum, column: idx + m[0].length + 1 },
         });
     }
+}
+
+/**
+ * Compute the 0-based column offset of a trimmed code segment within its raw source line.
+ *
+ * @param rawLine - Raw un-trimmed source line.
+ * @param segment - Trimmed code segment to locate.
+ * @returns 0-based starting character offset.
+ */
+function computeSegmentOffset(rawLine: string, segment: string): number {
+    const directIdx = rawLine.indexOf(segment);
+    if (directIdx >= 0) {
+        return directIdx;
+    }
+    let lead = 0;
+    while (lead < rawLine.length && (rawLine[lead] === ' ' || rawLine[lead] === '\t')) {
+        lead++;
+    }
+    return lead;
 }
 
 /**
@@ -437,11 +453,12 @@ function parseStringLiterals(
     out: NormalizedNode[],
     inImport: boolean,
 ): void {
+    const baseOffset = computeSegmentOffset(line, trimmed);
     STRING_LITERAL_RE.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = STRING_LITERAL_RE.exec(trimmed)) !== null) {
         const rawVal = match[2];
-        const colOffset = line.indexOf(match[0]);
+        const colOffset = baseOffset + (match.index ?? 0);
         out.push({
             kind: NodeKind.StringLiteral,
             text: rawVal,

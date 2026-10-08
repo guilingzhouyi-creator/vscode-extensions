@@ -52,6 +52,9 @@ const OBSOLETE_CONTRACT_RE =
 const FRAGILE_FLOAT_ASSERT_RE =
     /\b(?:expect\([^)]+\)\.to(?:Be|Equal|toStrictEqual)\s*\(\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\([^,)]+,\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\(\s*([0-9]+\.[0-9]+)\s*,|assert_true\s*\([^,)]*==\s*([0-9]+\.[0-9]+))/;
 
+/** Pattern identifying block comment closure. */
+const BLOCK_COMMENT_CLOSE_RE = /\*\//;
+
 /** Test block names recognized during AST traversal. */
 const TEST_BLOCK_NAMES = new Set([
     'it',
@@ -270,18 +273,35 @@ export class TestModernityAnalyzer implements Analyzer {
 
         visit(sf);
 
-        // Evaluate whether any case is mock-only overall
-        for (const c of caseRecords) {
-            if (c.assertionsCount > 0 && c.mockAssertionsCount === c.assertionsCount) {
-                // All assertions were mock-only
-                const alreadyReported = sites.some(
-                    (s) => s.line === c.line && s.testName === c.name && s.isMockOnly,
-                );
-                if (!alreadyReported) {
+        this.appendMockOnlySites(caseRecords, ctx, sites);
+    }
+
+    /**
+     * Appends mock-only test sites with O(1) deduplication against pre-existing sites.
+     */
+    private appendMockOnlySites(
+        caseRecords: CaseRecord[],
+        ctx: AnalyzerContext,
+        sites: TestSite[],
+    ): void {
+        const reportedMockKeys = new Set<string>();
+        for (let i = 0; i < sites.length; i++) {
+            const s = sites[i];
+            if (s.isMockOnly) {
+                reportedMockKeys.add(`${s.line}:${s.testName}`);
+            }
+        }
+
+        for (let c = 0; c < caseRecords.length; c++) {
+            const record = caseRecords[c];
+            if (record.assertionsCount > 0 && record.mockAssertionsCount === record.assertionsCount) {
+                const key = `${record.line}:${record.name}`;
+                if (!reportedMockKeys.has(key)) {
+                    reportedMockKeys.add(key);
                     sites.push({
                         file: ctx.filePath,
-                        line: c.line,
-                        testName: c.name,
+                        line: record.line,
+                        testName: record.name,
                         isSkipped: false,
                         isTautological: false,
                         isMockOnly: true,
@@ -637,11 +657,11 @@ export class TestModernityAnalyzer implements Analyzer {
             const trimmed = line.trim();
             if (!trimmed) continue;
             if (inBlockComment) {
-                if (trimmed.includes('*/')) inBlockComment = false;
+                if (BLOCK_COMMENT_CLOSE_RE.test(trimmed)) inBlockComment = false;
                 continue;
             }
             if (trimmed.startsWith('/*')) {
-                if (!trimmed.includes('*/')) inBlockComment = true;
+                if (!BLOCK_COMMENT_CLOSE_RE.test(trimmed)) inBlockComment = true;
                 continue;
             }
             if (trimmed.startsWith('//') || trimmed.startsWith('#')) {

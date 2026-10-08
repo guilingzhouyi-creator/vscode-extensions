@@ -192,6 +192,30 @@ export function calculateSemanticVolume(
  * @param callerImports - File import dependency entries.
  * @returns Sparse caller graph with inverted index.
  */
+/**
+ * Records pairwise co-occurrence counts into an accumulator index.
+ * Encapsulates the O(|I(c)|^2) local matrix traversal to reduce loop depth to 2.
+ *
+ * @param importedSymbols - Symbols imported by a single caller module.
+ * @param coOccurrenceMap - Accumulator index mapping pair keys to co-occurrence counts.
+ */
+function recordPairCoOccurrences(
+    importedSymbols: readonly string[],
+    coOccurrenceMap: Map<string, number>,
+): void {
+    const symbolCount = importedSymbols.length;
+    for (let i = 0; i < symbolCount; i++) {
+        const firstSymbol = importedSymbols[i];
+        for (let j = i + 1; j < symbolCount; j++) {
+            const secondSymbol = importedSymbols[j];
+            const u = firstSymbol < secondSymbol ? firstSymbol : secondSymbol;
+            const v = firstSymbol < secondSymbol ? secondSymbol : firstSymbol;
+            const pairKey = `${u}::${v}`;
+            coOccurrenceMap.set(pairKey, (coOccurrenceMap.get(pairKey) ?? 0) + 1);
+        }
+    }
+}
+
 export function buildSparseCallerGraph(
     callerImports: readonly {
         readonly callerPath: string;
@@ -212,16 +236,7 @@ export function buildSparseCallerGraph(
 
     const coOccurrence = new Map<string, number>();
     for (const entry of callerImports) {
-        const syms = entry.importedSymbols;
-        const len = syms.length;
-        for (let i = 0; i < len; i++) {
-            for (let j = i + 1; j < len; j++) {
-                const u = syms[i] < syms[j] ? syms[i] : syms[j];
-                const v = syms[i] < syms[j] ? syms[j] : syms[i];
-                const key = `${u}::${v}`;
-                coOccurrence.set(key, (coOccurrence.get(key) ?? 0) + 1);
-            }
-        }
+        recordPairCoOccurrences(entry.importedSymbols, coOccurrence);
     }
 
     const sparseEdges: [string, string, number][] = [];

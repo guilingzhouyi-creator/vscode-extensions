@@ -19,8 +19,7 @@ import type { DiagnosticDescriptor } from './types';
 export const ExposureMessages = {
     /** SEC-EXP-001: Internal or administrative API endpoints exposed to client bundles. */
     INTERNAL_API_EXPOSED: {
-        message:
-            'Internal or administrative API endpoint exposed in client-facing bundle',
+        message: 'Internal or administrative API endpoint exposed in client-facing bundle',
         suggestion:
             'Move administrative and internal operations behind a secure backend gateway proxy',
         rationale:
@@ -30,8 +29,7 @@ export const ExposureMessages = {
 
     /** SEC-EXP-002: Frontend visual or CSS concealment used instead of real authorization. */
     CLIENT_CSS_AUTH_BYPASS: {
-        message:
-            'Frontend element hiding or button disabling used as sole authorization guard',
+        message: 'Frontend element hiding or button disabling used as sole authorization guard',
         suggestion:
             'Enforce authorization checks on backend APIs and avoid rendering privileged components',
         rationale:
@@ -41,8 +39,7 @@ export const ExposureMessages = {
 
     /** SEC-EXP-003: Inactive feature flags still bundling full privileged code. */
     DISABLED_FLAG_LEAKAGE: {
-        message:
-            'Disabled feature flag still delivers full implementation code to client bundle',
+        message: 'Disabled feature flag still delivers full implementation code to client bundle',
         suggestion:
             'Use build-time dead-code elimination or dynamic import code splitting for flags',
         rationale:
@@ -52,12 +49,10 @@ export const ExposureMessages = {
 
     /** SEC-EXP-004: Unreleased or test routes packaged into production builds. */
     UNRELEASED_ROUTE_EXPOSED: {
-        message:
-            'Unreleased, debug, or internal staging route packaged into production router',
+        message: 'Unreleased, debug, or internal staging route packaged into production router',
         suggestion:
             'Gate test and unreleased routes with environment flags or separate test builds',
-        rationale:
-            'Test routes in production can lead to unexpected exposure and data leaks.',
+        rationale: 'Test routes in production can lead to unexpected exposure and data leaks.',
         risk: 'High',
     } as const satisfies DiagnosticDescriptor,
 
@@ -74,8 +69,7 @@ export const ExposureMessages = {
 
     /** PROD-HYG-002: Source map files or mapping URLs exposed in production output. */
     PROD_SOURCE_MAP_LEAK: {
-        message:
-            'Production build exposes source map references or unmapped original source files',
+        message: 'Production build exposes source map references or unmapped original source files',
         suggestion:
             'Upload source maps to private crash-reporting tools instead of public deployments',
         rationale:
@@ -85,8 +79,7 @@ export const ExposureMessages = {
 
     /** PROD-HYG-003: Backend secret environment variables leaked into client code. */
     PROD_ENV_SECRET_LEAK: {
-        message:
-            'Sensitive backend environment variable referenced in client-facing bundle',
+        message: 'Sensitive backend environment variable referenced in client-facing bundle',
         suggestion:
             'Prefix client variables with public namespaces and keep private secrets on server',
         rationale:
@@ -107,8 +100,7 @@ export const ExposureMessages = {
 
     /** UI-ENG-002: Excessive DOM nesting depth or reflow-triggering CSS transitions. */
     UI_DOM_DEPTH_REFLOW: {
-        message:
-            'Deeply nested DOM structure or layout-reflowing CSS animation property detected',
+        message: 'Deeply nested DOM structure or layout-reflowing CSS animation property detected',
         suggestion:
             'Flatten DOM hierarchy and use composite properties (transform, opacity) for animations',
         rationale:
@@ -129,8 +121,7 @@ export const ExposureMessages = {
 
     /** UI-ENG-004: Frontend hook or event handler naming convention violations. */
     UI_NAMING_STATE: {
-        message:
-            'Frontend hook or event handler violates standard prefix conventions',
+        message: 'Frontend hook or event handler violates standard prefix conventions',
         suggestion:
             'Prefix custom hooks with "use" and event handler functions with "on" or "handle"',
         rationale:
@@ -138,4 +129,3 @@ export const ExposureMessages = {
         risk: 'Low',
     } as const satisfies DiagnosticDescriptor,
 };
-

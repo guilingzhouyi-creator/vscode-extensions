@@ -72,3 +72,25 @@ export const EVIDENCE_SPECULATIVE = 0.3;
 
 /** Sentinel token indicating dynamic evidence requirement. */
 export const NEED_RUNTIME_EVIDENCE = 'NEED_RUNTIME_EVIDENCE';
+
+// ============================================================================
+// Diagnostic Status Tokens
+// ============================================================================
+
+/** Diagnostic status token for clean / passed state. */
+export const DIAG_STATUS_PASS = 'pass';
+/** Diagnostic status token for warning state. */
+export const DIAG_STATUS_WARN = 'warn';
+/** Diagnostic status token for error / block state. */
+export const DIAG_STATUS_FAIL = 'fail';
+
+// ============================================================================
+// Actionable Remediation Markers
+// ============================================================================
+
+/** Action marker token for scaffolding a centralized constant library topology. */
+export const ACTION_SCAFFOLD_CONSTANT_LIBRARY = 'scaffold_constant_library';
+/** Action marker token for replacing inline token with constant reference. */
+export const ACTION_REPLACE_TOKEN = 'replace_token';
+/** Action marker token for extracting inline literal to constant declaration. */
+export const ACTION_EXTRACT_CONSTANT = 'extract_constant';

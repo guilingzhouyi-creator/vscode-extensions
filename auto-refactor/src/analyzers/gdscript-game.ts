@@ -107,6 +107,14 @@ function isExemptPath(file: string): boolean {
     );
 }
 
+const POOL_ACQUIRE_NAMES: ReadonlySet<string> = new Set(['acquire', 'get_obj']);
+const POOL_RESET_NAMES: ReadonlySet<string> = new Set(['reset_state']);
+
+const FUNC_DEF_RE = /^\s*func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
+const RESET_STATE_CALL_RE = /(?:\.|\b)(reset_state)\s*\(/;
+const SIGNAL_CONNECT_RE = /\.connect\s*\(/;
+const SIGNAL_DISCONNECT_RE = /\.disconnect\s*\(/;
+
 function auditPoolContracts(file: string, raw: readonly string[], issues: Issue[]): void {
     const isPoolFile = file.includes('pool') || file.includes('factory');
     if (!isPoolFile) return;
@@ -115,10 +123,12 @@ function auditPoolContracts(file: string, raw: readonly string[], issues: Issue[
     let hasResetInvocation = false;
 
     for (const line of raw) {
-        if (line.includes('func acquire(') || line.includes('func get_obj(')) {
+        const funcDef = FUNC_DEF_RE.exec(line);
+        if (funcDef && POOL_ACQUIRE_NAMES.has(funcDef[1])) {
             hasAcquireOrGet = true;
         }
-        if (line.includes('.reset_state(') || line.includes('reset_state()')) {
+        const resetCall = RESET_STATE_CALL_RE.exec(line);
+        if (resetCall && POOL_RESET_NAMES.has(resetCall[1])) {
             hasResetInvocation = true;
         }
     }
@@ -143,8 +153,8 @@ function auditSignalConnections(file: string, masked: readonly string[], issues:
     let disconnectCount = 0;
 
     for (const line of masked) {
-        if (line.includes('.connect(')) connectCount++;
-        if (line.includes('.disconnect(')) disconnectCount++;
+        if (SIGNAL_CONNECT_RE.test(line)) connectCount++;
+        if (SIGNAL_DISCONNECT_RE.test(line)) disconnectCount++;
     }
 
     if (connectCount > disconnectCount + 2) {

@@ -25,6 +25,9 @@ import {
     DIMENSION_MODERNITY,
     DIMENSION_STANDARDIZATION,
     DIMENSION_COMMENT_QUALITY,
+    DIMENSION_CODE_SECURITY,
+    DIMENSION_SEMANTIC_PURITY,
+    DIMENSION_DUPLICATION,
     FRAGMENT_ERROR,
     FRAGMENT_WARNING,
 } from './dimensionLiterals';
@@ -60,12 +63,19 @@ export const DIMENSION_BIT_MAP: Record<QualityDimension, number> = {
     techDebtRisk: 1 << 9,
 };
 
-/** Convert QualityDimension identifier to its bitmask flag. */
+/**
+ * Convert QualityDimension identifier to its bitmask flag.
+ * @param dim
+ */
 export function dimensionToBit(dim: QualityDimension): number {
     return DIMENSION_BIT_MAP[dim] || 0;
 }
 
-/** Check whether a bitmask contains the specified QualityDimension flag. */
+/**
+ * Check whether a bitmask contains the specified QualityDimension flag.
+ * @param mask
+ * @param dim
+ */
 export function bitmaskHasDimension(mask: number, dim: QualityDimension): boolean {
     return (mask & (DIMENSION_BIT_MAP[dim] || 0)) !== 0;
 }
@@ -160,6 +170,37 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     'GOM-ERR': DIMENSION_MODERNITY,
     'GOM-STYLE': DIMENSION_MODERNITY,
     GOM: DIMENSION_MODERNITY,
+    // Naming & Standardization Governance
+    NAM: DIMENSION_STANDARDIZATION,
+    'NAM-DEC': DIMENSION_ARCHITECTURE_CONSISTENCY,
+    // TypeScript Modern Language Pack
+    TSM: DIMENSION_MODERNITY,
+    // Constants & Duplication Governance
+    CONST: DIMENSION_DUPLICATION,
+    'duplicate-literal': DIMENSION_DUPLICATION,
+    'nested-constant': DIMENSION_DUPLICATION,
+    'magic-number': DIMENSION_DUPLICATION,
+    'hardcoded-string': DIMENSION_DUPLICATION,
+    // Security & Client Exposure Governance
+    SEC: DIMENSION_CODE_SECURITY,
+    'SEC-EXP': DIMENSION_CODE_SECURITY,
+    // Production Build Hygiene
+    'PROD-HYG': DIMENSION_MAINTAINABILITY,
+    // Frontend UI Engineering & Accessibility
+    'UI-ENG': DIMENSION_STANDARDIZATION,
+    'UI-ENG-002': DIMENSION_PERFORMANCE_EFFICIENCY,
+    'UI-ENG-003': DIMENSION_MAINTAINABILITY,
+    // Hygiene Rules
+    'HYG-CLN': DIMENSION_DUPLICATION,
+    'HYG-NAM': DIMENSION_STANDARDIZATION,
+    'HYG-DED': DIMENSION_SEMANTIC_PURITY,
+    'HYG-WRAP': DIMENSION_SEMANTIC_PURITY,
+    'HYG-EMP': DIMENSION_STANDARDIZATION,
+    // Governance Rules
+    'GOV-DAT': DIMENSION_MAINTAINABILITY,
+    'GOV-STD': DIMENSION_MODERNITY,
+    // File Dimension Governance
+    'large-file': DIMENSION_MAINTAINABILITY,
 };
 
 /**
@@ -217,7 +258,7 @@ export function applyQualityDimensionDeductions(
         claimedMask = seedClaimed;
     } else if (seedClaimed) {
         for (const dim of seedClaimed) {
-            claimedMask |= (DIMENSION_BIT_MAP[dim] || 0);
+            claimedMask |= DIMENSION_BIT_MAP[dim] || 0;
         }
     }
 
@@ -279,18 +320,23 @@ export type DebtTier = 1 | 2 | 3;
 const TIER1_PREFIXES = ['SEC', 'ARCH', 'DEP-INV'];
 const TIER1_KEYWORDS = ['LEAK', 'CIRCULAR'];
 
-function isTier1CriticalDebt(rule: string, analyzer: string, severity: string): boolean {
-    if (severity === FRAGMENT_ERROR) return true;
-    if (analyzer.includes('security')) return true;
-    if (TIER1_PREFIXES.some((p) => rule.startsWith(p))) return true;
-    return TIER1_KEYWORDS.some((k) => rule.includes(k));
+export function isTier1CriticalDebt(rule: string, analyzer: string, severity: string): boolean {
+    const r = (rule ?? '').toUpperCase();
+    const a = (analyzer ?? '').toLowerCase();
+    const s = severity ?? '';
+    if (s === FRAGMENT_ERROR) return true;
+    if (a.includes('security')) return true;
+    if (TIER1_PREFIXES.some((p) => r.startsWith(p))) return true;
+    return TIER1_KEYWORDS.some((k) => r.includes(k));
 }
 
 const TIER2_PREFIXES = ['CPX', 'CMP', 'DAT', 'TST-DBT'];
 
-function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean {
-    if (analyzer.includes('complexity') || analyzer.includes('maintainability')) return true;
-    return TIER2_PREFIXES.some((p) => rule.startsWith(p));
+export function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean {
+    const r = (rule ?? '').toUpperCase();
+    const a = (analyzer ?? '').toLowerCase();
+    if (a.includes('complexity') || a.includes('maintainability')) return true;
+    return TIER2_PREFIXES.some((p) => r.startsWith(p));
 }
 
 /**
@@ -342,10 +388,9 @@ function applySeverityDeductions(
     // then belongs to debt rather than to a second quality axis.
     const hasPriorClaim =
         typeof claimed === 'number' ? claimed !== 0 : Boolean(claimed && claimed.size > 0);
-    const debtDimension =
-        hasPriorClaim
-            ? DIMENSION_TECH_DEBT_RISK
-            : (familyDimensionOf(issue.rule ?? '') ?? DIMENSION_TECH_DEBT_RISK);
+    const debtDimension = hasPriorClaim
+        ? DIMENSION_TECH_DEBT_RISK
+        : (familyDimensionOf(issue.rule ?? '') ?? DIMENSION_TECH_DEBT_RISK);
 
     // Tiered debt isolation for techDebtRisk
     if (debtDimension === DIMENSION_TECH_DEBT_RISK) {
@@ -461,7 +506,7 @@ export function applyIssueDeductions(
     // guard is per dimension, not per finding.
     let claimedByFamilyMask = 0;
     const recordFamilyClaim: DeductionApplier = (dim, points, reason, rule, line) => {
-        claimedByFamilyMask |= (DIMENSION_BIT_MAP[dim] || 0);
+        claimedByFamilyMask |= DIMENSION_BIT_MAP[dim] || 0;
         apply(dim, points, reason, rule, line);
     };
 

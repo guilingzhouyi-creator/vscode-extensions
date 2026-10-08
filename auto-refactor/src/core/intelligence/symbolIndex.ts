@@ -280,7 +280,9 @@ export class SymbolIndex {
         if (!sorted) {
             const raw = this.references.get(name);
             if (!raw || raw.length === 0) return [];
-            sorted = [...raw].sort((a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0));
+            sorted = [...raw].sort(
+                (a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0),
+            );
             this.sortedReferences.set(name, sorted);
         }
         return sorted.filter((reference) => reference.file !== home);

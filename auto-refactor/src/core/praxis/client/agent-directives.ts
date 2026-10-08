@@ -131,9 +131,7 @@ function extractIssueCrossFileContext(
     return clarification?.crossFileUsageContext;
 }
 
-function formatClarificationOptions(
-    clarification: AgentClarificationRequest,
-): string[] {
+function formatClarificationOptions(clarification: AgentClarificationRequest): string[] {
     const lines: string[] = [];
     if (!clarification.candidateOptions || clarification.candidateOptions.length === 0) {
         return lines;
@@ -149,9 +147,7 @@ function formatClarificationOptions(
     return lines;
 }
 
-function formatCrossFileContextLines(
-    crossFileContext: CrossFileUsageContext,
-): string[] {
+function formatCrossFileContextLines(crossFileContext: CrossFileUsageContext): string[] {
     const lines: string[] = [
         '  * Cross-File Impact:',
         `    - Exported Symbol: ${crossFileContext.isExportedSymbol ? 'Yes' : 'No'}`,

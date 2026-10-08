@@ -11,11 +11,10 @@
  * Exit Semantics & Design Rationale: Pure, fail-safe scanner returning Issue[]. Zero throw.
  */
 
-import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
-
+/** Canonical analyzer identifier for production bundle artifact and secret hygiene audits. */
 export const ANALYZER_PRODUCTION_HYGIENE_ID = 'production-hygiene';
 
 const PROD_OUTPUT_DIRS = ['/dist/', '/build/', '/out/', '/release/'];
@@ -52,7 +51,11 @@ function makeProdHygieneIssue(
  */
 function isProductionArtifact(filePath: string): boolean {
     const normalized = ('/' + filePath.replace(/\\/g, '/')).toLowerCase();
-    if (normalized.endsWith('.min.js') || normalized.endsWith('.min.css') || normalized.endsWith('.map')) {
+    if (
+        normalized.endsWith('.min.js') ||
+        normalized.endsWith('.min.css') ||
+        normalized.endsWith('.map')
+    ) {
         return true;
     }
     return PROD_OUTPUT_DIRS.some((dir) => normalized.includes(dir));
@@ -61,11 +64,7 @@ function isProductionArtifact(filePath: string): boolean {
 /**
  * Audits production build artifacts for debug leftovers, TODOs, and absolute paths (PROD-HYG-001).
  */
-function auditDebugResidueAndPaths(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditDebugResidueAndPaths(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (/\bconsole\.(?:debug|trace)\s*\(/.test(line)) {
@@ -81,7 +80,11 @@ function auditDebugResidueAndPaths(
                 ),
             );
         }
-        if (/\b(?:TODO|FIXME)\b/.test(line) && !line.includes('// license') && !line.includes('/*')) {
+        if (
+            /\b(?:TODO|FIXME)\b/.test(line) &&
+            !line.includes('// license') &&
+            !line.includes('/*')
+        ) {
             issues.push(
                 makeProdHygieneIssue(
                     file,
@@ -113,11 +116,7 @@ function auditDebugResidueAndPaths(
 /**
  * Audits production output for public Source Map leakage (PROD-HYG-002).
  */
-function auditSourceMapLeakage(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditSourceMapLeakage(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (line.includes('sourceMappingURL=') && !line.includes('data:application/json')) {
@@ -140,11 +139,7 @@ function auditSourceMapLeakage(
 /**
  * Audits client-facing files for backend environment secret leakage (PROD-HYG-003).
  */
-function auditBackendEnvSecrets(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditBackendEnvSecrets(file: string, rawLines: string[], issues: Issue[]): void {
     const isClientFacing =
         file.includes('/src/presentation/') ||
         file.includes('/src/client/') ||

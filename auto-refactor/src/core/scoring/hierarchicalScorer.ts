@@ -47,6 +47,7 @@ export interface FileQualityScore {
     effectiveDensity: number;
     functions: FunctionQualityScore[];
     issues: Issue[];
+    loc?: number;
 }
 
 /**
@@ -146,6 +147,7 @@ export function scoreFileQuality(
         effectiveDensity: densityResult.effectiveDensity,
         functions: [],
         issues: allIssues,
+        loc: Math.max(1, content ? content.split('\n').length : 1),
     };
 }
 
@@ -284,7 +286,8 @@ function buildDomainScores(
             number
         >;
         for (const p of ALL_PRIMARY_PILLARS) {
-            domainPillars[p] = Math.round((pillarSums[p] / mCount) * SCORE_ROUNDING) / SCORE_ROUNDING;
+            domainPillars[p] =
+                Math.round((pillarSums[p] / mCount) * SCORE_ROUNDING) / SCORE_ROUNDING;
         }
 
         const domainDims: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
@@ -356,12 +359,12 @@ function computeProjectPillars(
  */
 export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQualityScore {
     if (fileScores.length === 0) {
-        const emptyPillars = synthesizeEightPillars({} as Record<QualityDimension, number>);
         const emptyDimensions: Record<QualityDimension, number> = {} as Record<
             QualityDimension,
             number
         >;
         for (const d of ALL_QUALITY_DIMENSIONS) emptyDimensions[d] = 100.0;
+        const emptyPillars = synthesizeEightPillars(emptyDimensions);
         return {
             compositeScore: 100.0,
             grade: 'A+',
@@ -397,31 +400,51 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
     const domains = buildDomainScores(domainMap);
     const projectPillars = computeProjectPillars(fileScores, fatalCount);
 
+    const projectDimSums: Record<QualityDimension, number> = {} as Record<
+        QualityDimension,
+        number
+    >;
+    for (const d of ALL_QUALITY_DIMENSIONS) {
+        projectDimSums[d] = 0;
+    }
+    let totalLoc = 0;
+    const fileCount = fileScores.length;
+    for (let i = 0; i < fileCount; i++) {
+        const file = fileScores[i];
+        const fileLoc = Math.max(
+            1,
+            typeof file.loc === 'number' && Number.isFinite(file.loc) ? file.loc : 1,
+        );
+        totalLoc += fileLoc;
+        const fDims = file.tenDimensions;
+        for (const d of ALL_QUALITY_DIMENSIONS) {
+            const dimScore = fDims?.[d] ?? 100;
+            projectDimSums[d] += dimScore * fileLoc;
+        }
+    }
+
+    const safeTotalLoc = Math.max(1, totalLoc);
     const projectDimensions: Record<QualityDimension, number> = {} as Record<
         QualityDimension,
         number
     >;
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        const avgD =
-            fileScores.reduce((sum, f) => sum + (f.tenDimensions?.[d] ?? 100), 0) /
-            fileScores.length;
-        projectDimensions[d] = Math.round(avgD * SCORE_ROUNDING) / SCORE_ROUNDING;
+        projectDimensions[d] =
+            Math.round((projectDimSums[d] / safeTotalLoc) * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
 
     const synthesized = synthesizeEightPillars(
-        {} as Record<QualityDimension, number>,
+        projectDimensions,
         projectPillars.data,
         projectPillars.testing,
         [],
     );
     synthesized.pillars = projectPillars;
-    const finalComposite =
-        Math.round(
-            ALL_PRIMARY_PILLARS.reduce(
-                (sum, p) => sum + projectPillars[p] * synthesized.weights[p],
-                0,
-            ) * SCORE_ROUNDING,
-        ) / SCORE_ROUNDING;
+    let finalCompositeSum = 0;
+    for (const p of ALL_PRIMARY_PILLARS) {
+        finalCompositeSum += projectPillars[p] * synthesized.weights[p];
+    }
+    const finalComposite = Math.round(finalCompositeSum * SCORE_ROUNDING) / SCORE_ROUNDING;
     synthesized.compositeScore = finalComposite;
 
     return {

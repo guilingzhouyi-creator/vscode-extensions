@@ -308,6 +308,7 @@ function buildBaselineReport(params) {
   return {
     snapshotId: snapshot.snapshotId,
     timestamp: new Date().toISOString(),
+    cai: scanReport.autonomy?.compositeAutonomyIndex ?? null,
     versions: snapshot.versions,
     rulesDigest: snapshot.rulesDigest,
     configDigest: snapshot.configDigest,
@@ -319,6 +320,7 @@ function buildBaselineReport(params) {
     metrics: {
       compositeScore: projectScore.compositeScore,
       grade: projectScore.grade,
+      autonomyRate: scanReport.autonomy?.compositeAutonomyIndex ?? null,
       effectiveCodeDensity: projectScore.effectiveCodeDensity,
       totalIssues: issues.length,
       suppressedIssues: scanReport.summary.suppressedCount || 0,
@@ -386,6 +388,16 @@ async function runSelfAudit(options = {}) {
 
   // 3. Classify Technical Debt Ledger
   const { debtByTier, criticalItems, highItems, fileIssuesMap } = buildDebtLedger(issues);
+
+  // 补全无缺陷文件：遍历 scanReport.fileMetrics，使 0 缺陷文件全部参与 computeFileScores，根除平均分幸存者偏差
+  if (Array.isArray(scanReport.fileMetrics)) {
+    for (const m of scanReport.fileMetrics) {
+      const file = m.file || m.filePath;
+      if (file && !fileIssuesMap.has(file)) {
+        fileIssuesMap.set(file, []);
+      }
+    }
+  }
 
   // 4. File-Level and Hierarchical Eight-Pillar Scoring
   const fileScores = computeFileScores(fileIssuesMap);

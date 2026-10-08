@@ -102,14 +102,11 @@ export function formatCompactRecord(params: {
  */
 export function serializeNdjsonLine(record: CompactTrajectoryRecord): string {
     let serialized = JSON.stringify(record);
-    if (Buffer.byteLength(serialized, 'utf8') >= 348) {
+    if (Buffer.byteLength(serialized, 'utf8') >= 350) {
         const compacted: CompactTrajectoryRecord = {
             ...record,
-            score: {
-                ...record.score,
-                bef: Math.round(record.score.bef * 10) / 10,
-                aft: Math.round(record.score.aft * 10) / 10,
-            },
+            mod: record.mod.slice(0, 8),
+            agent: record.agent.slice(0, 8),
         };
         serialized = JSON.stringify(compacted);
     }

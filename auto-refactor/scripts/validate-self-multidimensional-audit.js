@@ -18,8 +18,9 @@
  *      finite reproducibility, and domain-specific bias asymmetry for frontend, backend,
  *      and composite review profiles.
  *   6. Gate 6 (Ten-Dimensional Trajectory Fidelity Guard): Asserts that .refactor-trajectory
- *      records full 10-dimensional dynamic scores with zero mock padding and
- *      at least 3 reactive dimensions.
+ *      and reports/self-audit-baseline.json record full 10-dimensional dynamic scores with zero
+ *      mock padding, reactive dimension count in credible interval [4, 8] (eliminating fake 100
+ *      illusions), and vector consistency between baseline and trajectory.
  * Exit Semantics & Design Rationale: Modular function decomposition (< 10 cyclomatic complexity per
  *   function); process exits 0 if all 6 gates pass, 1 on regression.
  */
@@ -333,6 +334,95 @@ function auditProfileScoringPrecision() {
   return true;
 }
 
+const REQUIRED_TEN_DIMENSIONS = [
+  'architectureConsistency',
+  'semanticPurity',
+  'codeSecurity',
+  'performanceEfficiency',
+  'standardization',
+  'modernity',
+  'maintainability',
+  'commentQuality',
+  'duplication',
+  'techDebtRisk',
+];
+
+const MIN_REACTIVE_DIMENSIONS = 4;
+const MAX_REACTIVE_DIMENSIONS = 10;
+
+function validateTrajectoryVector(vec) {
+  if (!Array.isArray(vec) || vec.length !== REQUIRED_TEN_DIMENSIONS.length) {
+    return {
+      valid: false,
+      reason: `score.vec must be an array of length ${REQUIRED_TEN_DIMENSIONS.length}`,
+    };
+  }
+  for (let i = 0; i < vec.length; i++) {
+    const val = vec[i];
+    if (typeof val !== 'number' || Number.isNaN(val) || val < 0 || val > 100) {
+      return { valid: false, reason: `Dimension index ${i} has invalid score: ${val}` };
+    }
+  }
+  const reactiveDimensions = vec.filter((v) => v < 100.0);
+  if (
+    reactiveDimensions.length < MIN_REACTIVE_DIMENSIONS ||
+    reactiveDimensions.length > MAX_REACTIVE_DIMENSIONS
+  ) {
+    return {
+      valid: false,
+      reason: `Reactive dimension count (${reactiveDimensions.length}) outside credible interval [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}] (eliminating fake 100 illusions)`,
+    };
+  }
+  return { valid: true, reactiveCount: reactiveDimensions.length };
+}
+
+function validateBaselineTenDimensions(baseline) {
+  if (!baseline || typeof baseline.tenDimensions !== 'object' || baseline.tenDimensions === null) {
+    return { valid: false, reason: 'Baseline report missing tenDimensions object' };
+  }
+  const keys = Object.keys(baseline.tenDimensions);
+  if (keys.length !== REQUIRED_TEN_DIMENSIONS.length) {
+    return {
+      valid: false,
+      reason: `tenDimensions key count mismatch: expected ${REQUIRED_TEN_DIMENSIONS.length}, got ${keys.length}`,
+    };
+  }
+  for (const dim of REQUIRED_TEN_DIMENSIONS) {
+    const val = baseline.tenDimensions[dim];
+    if (typeof val !== 'number' || Number.isNaN(val) || val < 0 || val > 100) {
+      return { valid: false, reason: `Dimension '${dim}' missing or invalid score: ${val}` };
+    }
+  }
+  const baselineReactive = REQUIRED_TEN_DIMENSIONS.filter(
+    (dim) => baseline.tenDimensions[dim] < 100.0,
+  );
+  if (
+    baselineReactive.length < MIN_REACTIVE_DIMENSIONS ||
+    baselineReactive.length > MAX_REACTIVE_DIMENSIONS
+  ) {
+    return {
+      valid: false,
+      reason: `Baseline reactive dimension count (${baselineReactive.length}) outside credible interval [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}]`,
+    };
+  }
+  return { valid: true, reactiveCount: baselineReactive.length };
+}
+
+function validateVectorConsistency(baselineDimensions, trajectoryVec) {
+  for (let i = 0; i < REQUIRED_TEN_DIMENSIONS.length; i++) {
+    const dim = REQUIRED_TEN_DIMENSIONS[i];
+    const baseScore = baselineDimensions[dim];
+    const trajScore = trajectoryVec[i];
+    if (Math.abs(baseScore - trajScore) > 0.01) {
+      return {
+        consistent: false,
+        reason: `Dimension '${dim}' mismatch: baseline=${baseScore}, trajectory=${trajScore}`,
+      };
+    }
+  }
+  return { consistent: true };
+}
+
 function auditTenDimensionalFidelity() {
   console.log('[Gate 6] Ten-Dimensional Trajectory & Score Fidelity Guard');
   const trajectoryFile = path.join(ROOT, '.refactor-trajectory', 'active-runs.ndjson');
@@ -353,39 +443,44 @@ function auditTenDimensionalFidelity() {
     return false;
   }
 
-  const vec = latestRun.score.vec;
-  if (vec.length !== 10) {
-    console.error(`  ❌ [FAIL] score.vec has length ${vec.length}, expected 10 dimensions`);
-    return false;
-  }
-
-  for (let i = 0; i < vec.length; i++) {
-    const val = vec[i];
-    if (typeof val !== 'number' || Number.isNaN(val) || val < 0 || val > 100) {
-      console.error(`  ❌ [FAIL] Dimension index ${i} has invalid score: ${val}`);
-      return false;
-    }
-  }
-
-  const reactiveDimensions = vec.filter((v) => v < 100.0);
-  if (reactiveDimensions.length < 3) {
-    console.error(
-      `  ❌ [FAIL] Insufficient dynamic dimension reaction: only ${reactiveDimensions.length} < 100.0 (minimum 3 required for real ten-dimensional measurement)`,
-    );
+  const vecResult = validateTrajectoryVector(latestRun.score.vec);
+  if (!vecResult.valid) {
+    console.error(`  ❌ [FAIL] ${vecResult.reason}`);
     return false;
   }
 
   const baselineFile = path.join(ROOT, 'reports', 'self-audit-baseline.json');
-  if (fs.existsSync(baselineFile)) {
-    const baseline = JSON.parse(fs.readFileSync(baselineFile, 'utf8'));
-    if (!baseline.tenDimensions || Object.keys(baseline.tenDimensions).length !== 10) {
-      console.error('  ❌ [FAIL] Baseline report missing complete tenDimensions map');
-      return false;
-    }
+  if (!fs.existsSync(baselineFile)) {
+    console.error(`  ❌ [FAIL] Baseline report not found at ${baselineFile}`);
+    return false;
+  }
+
+  const baseline = JSON.parse(fs.readFileSync(baselineFile, 'utf8'));
+  const baselineResult = validateBaselineTenDimensions(baseline);
+  if (!baselineResult.valid) {
+    console.error(`  ❌ [FAIL] ${baselineResult.reason}`);
+    return false;
+  }
+
+  const consistency = validateVectorConsistency(baseline.tenDimensions, latestRun.score.vec);
+  if (!consistency.consistent) {
+    console.error(`  ❌ [FAIL] ${consistency.reason}`);
+    return false;
+  }
+
+  if (
+    typeof latestRun.score.aft === 'number' &&
+    typeof baseline.metrics?.compositeScore === 'number' &&
+    Math.abs(latestRun.score.aft - baseline.metrics.compositeScore) > 0.01
+  ) {
+    console.error(
+      `  ❌ [FAIL] Composite score mismatch: baseline=${baseline.metrics.compositeScore}, trajectory=${latestRun.score.aft}`,
+    );
+    return false;
   }
 
   console.log(
-    `  ✔ [PASS] 10-dimensional vector confirmed (10 dims, ${reactiveDimensions.length} reactive dimensions, vector: [${vec.join(', ')}])\n`,
+    `  ✔ [PASS] 10-dimensional vector confirmed (10 dims complete, ${vecResult.reactiveCount} reactive dimensions in [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}], baseline vector consistent: [${latestRun.score.vec.join(', ')}])\n`,
   );
   return true;
 }

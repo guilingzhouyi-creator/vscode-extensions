@@ -168,6 +168,103 @@ export function deriveDomainProposal(
     return { suggestedDomainDirectory, suggestedSymbol };
 }
 
+function isTypeSymbol(kind: SymbolDeclarationKind): boolean {
+    return kind === 'type' || kind === 'class' || kind === 'interface';
+}
+
+interface ViolationVerdict {
+    readonly severity: 'warning' | 'error';
+    readonly reason: 'excessive_length' | 'excessive_segments';
+}
+
+function evaluateThresholdViolation(
+    len: number,
+    segmentCount: number,
+    isType: boolean,
+    config: NamingDecouplingConfig,
+): ViolationVerdict | null {
+    if (isType) {
+        if (len >= config.typeErrorLength) {
+            return { severity: 'error', reason: 'excessive_length' };
+        }
+        if (segmentCount >= config.typeErrorSegments) {
+            return { severity: 'error', reason: 'excessive_segments' };
+        }
+        if (len >= config.typeWarningLength) {
+            return { severity: 'warning', reason: 'excessive_length' };
+        }
+        if (segmentCount >= config.typeWarningSegments) {
+            return { severity: 'warning', reason: 'excessive_segments' };
+        }
+        return null;
+    }
+    if (len >= config.valueErrorLength) {
+        return { severity: 'error', reason: 'excessive_length' };
+    }
+    if (len >= config.valueWarningLength) {
+        return { severity: 'warning', reason: 'excessive_length' };
+    }
+    return null;
+}
+
+function extractPrefixKey(
+    entry: SymbolEntry,
+    minSegments: number,
+    minLength: number,
+): string | null {
+    const segments = splitIdentifierTokens(entry.name);
+    if (segments.length < minSegments) {
+        return null;
+    }
+    const isUpperSnake = /^[A-Z0-9_]+$/.test(entry.name);
+    const prefixSegments = segments.slice(0, 2);
+    const separator = isUpperSnake ? '_' : '';
+    const prefixKey = prefixSegments.map((seg) => seg.toLowerCase()).join(separator);
+    if (prefixKey.length < minLength) {
+        return null;
+    }
+    return prefixKey;
+}
+
+function createClusterFinding(
+    item: SymbolEntry,
+    prefix: string,
+    clusterSize: number,
+    suggestedDir: string,
+): NamingDecouplingFinding {
+    const isUpperSnake = /^[A-Z0-9_]+$/.test(item.name);
+    const segments = splitIdentifierTokens(item.name);
+    const proposal = deriveDomainProposal(item.name, segments, isUpperSnake);
+    const rationale =
+        `${clusterSize} symbols share prefix '${prefix}'. ` +
+        `Submerge into '${suggestedDir}' to achieve architectural encapsulation.`;
+
+    return {
+        symbol: item.name,
+        kind: item.kind,
+        line: item.line,
+        column: item.column,
+        length: item.name.length,
+        segments,
+        severity: 'warning',
+        reason: 'domain_prefix_clustering',
+        suggestedDomainDirectory: suggestedDir,
+        suggestedSymbol: proposal.suggestedSymbol,
+        actionableProposal: {
+            action: 'decompose_module',
+            rule: RULE_NAM_DEC_001,
+            targetSymbol: item.name,
+            suggestedDomainDirectory: suggestedDir,
+            suggestedSymbol: proposal.suggestedSymbol,
+            rationale,
+        },
+        message:
+            `Symbol '${item.name}' belongs to a flat prefix cluster ` +
+            `('${prefix}', ${clusterSize} symbols). Extract into ` +
+            `module '${suggestedDir}'.`,
+    };
+}
+
 /**
  * Auditor implementing NAM-DEC-001 checks.
  */
@@ -189,37 +286,16 @@ export class NamingDecouplingAuditor {
     ): NamingDecouplingFinding | null {
         if (!symbol || symbol.length === 0) return null;
 
-        const isType = kind === 'type' || kind === 'class' || kind === 'interface';
-        const isUpperSnake = /^[A-Z0-9_]+$/.test(symbol) && symbol.includes('_');
+        const isType = isTypeSymbol(kind);
         const segments = splitIdentifierTokens(symbol);
         const len = symbol.length;
 
-        const warnLen = isType ? this.config.typeWarningLength : this.config.valueWarningLength;
-        const errLen = isType ? this.config.typeErrorLength : this.config.valueErrorLength;
-        const warnSeg = this.config.typeWarningSegments;
-        const errSeg = this.config.typeErrorSegments;
-
-        let severity: 'warning' | 'error' | null = null;
-        let reason: 'excessive_length' | 'excessive_segments' | null = null;
-
-        if (len >= errLen) {
-            severity = 'error';
-            reason = 'excessive_length';
-        } else if (isType && segments.length >= errSeg) {
-            severity = 'error';
-            reason = 'excessive_segments';
-        } else if (len >= warnLen) {
-            severity = 'warning';
-            reason = 'excessive_length';
-        } else if (isType && segments.length >= warnSeg) {
-            severity = 'warning';
-            reason = 'excessive_segments';
-        }
-
-        if (!severity || !reason) {
+        const verdict = evaluateThresholdViolation(len, segments.length, isType, this.config);
+        if (!verdict) {
             return null;
         }
 
+        const isUpperSnake = /^[A-Z0-9_]+$/.test(symbol) && symbol.includes('_');
         const proposal = deriveDomainProposal(symbol, segments, isUpperSnake);
         const rationale =
             `Identifier '${symbol}' has ${len} chars (${segments.length} segments). ` +
@@ -247,8 +323,8 @@ export class NamingDecouplingAuditor {
             column,
             length: len,
             segments,
-            severity,
-            reason,
+            severity: verdict.severity,
+            reason: verdict.reason,
             suggestedDomainDirectory: proposal.suggestedDomainDirectory,
             suggestedSymbol: proposal.suggestedSymbol,
             actionableProposal,
@@ -264,23 +340,21 @@ export class NamingDecouplingAuditor {
             return [];
         }
 
-        // Map token prefix pairs to matching symbols
         const prefixMap = new Map<string, SymbolEntry[]>();
-
         for (const entry of symbols) {
-            const isUpperSnake = /^[A-Z0-9_]+$/.test(entry.name);
-            const segments = splitIdentifierTokens(entry.name);
-            if (segments.length >= this.config.clusterMinPrefixSegments) {
-                // Examine 2-segment prefixes
-                const prefixKey = segments
-                    .slice(0, 2)
-                    .map((s) => s.toLowerCase())
-                    .join(isUpperSnake ? '_' : '');
-                if (prefixKey.length >= this.config.clusterMinPrefixLength) {
-                    const list = prefixMap.get(prefixKey) || [];
-                    list.push(entry);
-                    prefixMap.set(prefixKey, list);
-                }
+            const prefixKey = extractPrefixKey(
+                entry,
+                this.config.clusterMinPrefixSegments,
+                this.config.clusterMinPrefixLength,
+            );
+            if (prefixKey === null) {
+                continue;
+            }
+            const existing = prefixMap.get(prefixKey);
+            if (existing !== undefined) {
+                existing.push(entry);
+            } else {
+                prefixMap.set(prefixKey, [entry]);
             }
         }
 
@@ -288,46 +362,18 @@ export class NamingDecouplingAuditor {
         const seenSymbols = new Set<string>();
 
         for (const [prefix, grouped] of prefixMap.entries()) {
-            if (grouped.length >= this.config.clusterMinSymbols) {
-                const prefixSegments = splitIdentifierTokens(grouped[0].name).slice(0, 2);
-                const suggestedDir = `domain/${toKebabPath(prefixSegments)}`;
+            if (grouped.length < this.config.clusterMinSymbols) {
+                continue;
+            }
+            const prefixSegments = splitIdentifierTokens(grouped[0].name).slice(0, 2);
+            const suggestedDir = `domain/${toKebabPath(prefixSegments)}`;
 
-                for (const item of grouped) {
-                    if (seenSymbols.has(item.name)) continue;
-                    seenSymbols.add(item.name);
-
-                    const isUpperSnake = /^[A-Z0-9_]+$/.test(item.name);
-                    const segments = splitIdentifierTokens(item.name);
-                    const proposal = deriveDomainProposal(item.name, segments, isUpperSnake);
-                    const rationale =
-                        `${grouped.length} symbols share prefix '${prefix}'. ` +
-                        `Submerge into '${suggestedDir}' to achieve architectural encapsulation.`;
-
-                    findings.push({
-                        symbol: item.name,
-                        kind: item.kind,
-                        line: item.line,
-                        column: item.column,
-                        length: item.name.length,
-                        segments,
-                        severity: 'warning',
-                        reason: 'domain_prefix_clustering',
-                        suggestedDomainDirectory: suggestedDir,
-                        suggestedSymbol: proposal.suggestedSymbol,
-                        actionableProposal: {
-                            action: 'decompose_module',
-                            rule: RULE_NAM_DEC_001,
-                            targetSymbol: item.name,
-                            suggestedDomainDirectory: suggestedDir,
-                            suggestedSymbol: proposal.suggestedSymbol,
-                            rationale,
-                        },
-                        message:
-                            `Symbol '${item.name}' belongs to a flat prefix cluster ` +
-                            `('${prefix}', ${grouped.length} symbols). Extract into ` +
-                            `module '${suggestedDir}'.`,
-                    });
+            for (const item of grouped) {
+                if (seenSymbols.has(item.name)) {
+                    continue;
                 }
+                seenSymbols.add(item.name);
+                findings.push(createClusterFinding(item, prefix, grouped.length, suggestedDir));
             }
         }
 

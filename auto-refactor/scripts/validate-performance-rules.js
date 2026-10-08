@@ -35,11 +35,8 @@ export function processItems(items: number[]): void {
 `;
   const tsAllocIssues = defaultPerformanceEvaluator.auditSource('src/worker.ts', tsAllocationCode);
   assert.ok(tsAllocIssues.length >= 2, 'Must detect new Object() and spread array allocations');
-  const allocRules = tsAllocIssues.map((i) => i.rule);
-  assert.ok(
-    allocRules.includes('loop-transient-allocation'),
-    'Must emit loop-transient-allocation',
-  );
+  const allocRules = new Set(tsAllocIssues.map((i) => i.rule));
+  assert.ok(allocRules.has('loop-transient-allocation'), 'Must emit loop-transient-allocation');
   console.log('✔ TypeScript loop transient allocation detected correctly.');
 
   // 2. Test Algorithmic Complexity: Double & Triple Loop Nesting

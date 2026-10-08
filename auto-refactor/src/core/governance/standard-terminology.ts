@@ -289,7 +289,8 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
                 'Group multiple related function parameters into a cohesive parameter object or options interface.',
             zhDescription: '将过多的关联函数参数归拢封装为参数对象或选项接口。',
             safeToAutomateDefault: false,
-            typicalFixTemplate: 'interface Options { ... }\nfunction target(options: Options): void;',
+            typicalFixTemplate:
+                'interface Options { ... }\nfunction target(options: Options): void;',
         }),
         decompose_module: Object.freeze({
             verb: 'decompose_module',

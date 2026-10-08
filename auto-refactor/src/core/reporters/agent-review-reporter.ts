@@ -190,7 +190,8 @@ function extractIssueStandardizationProposal(
     const raw =
         (issue as unknown as Record<string, unknown>).standardizationProposal ??
         issue.detail?.standardizationProposal ??
-        (issue.actionable as unknown as Record<string, unknown> | undefined)?.standardizationProposal;
+        (issue.actionable as unknown as Record<string, unknown> | undefined)
+            ?.standardizationProposal;
     if (raw && typeof raw === 'object') {
         return raw as AgentStandardizationProposal;
     }
@@ -212,8 +213,7 @@ function resolveDirectiveTrack(
     standardizationProposal?: AgentStandardizationProposal,
 ): AgentDirectiveTrack | undefined {
     const explicit = (issue as unknown as Record<string, unknown>).directiveTrack as
-        | AgentDirectiveTrack
-        | undefined;
+        AgentDirectiveTrack | undefined;
     if (explicit === 'clarification_request' || explicit === 'standardization_proposal') {
         return explicit;
     }
@@ -324,11 +324,12 @@ export function toStructuredAgentDirectives(
         const hasClarify = Boolean(d.clarificationRequest);
         const action = hasClarify
             ? 'request_clarification'
-            : (d.remediationRecipe.actionVerb || 'refactor');
+            : d.remediationRecipe.actionVerb || 'refactor';
         const safeToAutomate = hasClarify ? false : d.remediationRecipe.safeToAutomate;
-        const instruction = hasClarify && d.clarificationRequest
-            ? `[Awaiting Clarification] ${d.clarificationRequest.promptQuestion}`
-            : d.remediationRecipe.remediationSummary;
+        const instruction =
+            hasClarify && d.clarificationRequest
+                ? `[Awaiting Clarification] ${d.clarificationRequest.promptQuestion}`
+                : d.remediationRecipe.remediationSummary;
 
         return {
             directiveId: d.directiveId,
@@ -411,9 +412,7 @@ export function toStructuredAgentDirectivesJson(
     return JSON.stringify(payload, null, 2);
 }
 
-function formatDirectiveClarification(
-    req: AgentClarificationRequest,
-): string[] {
+function formatDirectiveClarification(req: AgentClarificationRequest): string[] {
     const lines: string[] = [
         '- Clarification Request:',
         `  * Question: ${req.promptQuestion} (Type: \`${req.questionType}\`)`,
@@ -429,9 +428,7 @@ function formatDirectiveClarification(
     return lines;
 }
 
-function formatDirectiveCrossFileImpact(
-    ctx: CrossFileUsageContext,
-): string[] {
+function formatDirectiveCrossFileImpact(ctx: CrossFileUsageContext): string[] {
     const lines: string[] = [
         '- Cross-File Impact:',
         `  * Exported: ${ctx.isExportedSymbol}, References: ${ctx.referenceCount}, Coordinated Rename: ${ctx.requiresCoordinatedRename}`,

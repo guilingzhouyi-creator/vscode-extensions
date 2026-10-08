@@ -101,8 +101,7 @@ function createNamingFactory(config: NamingFactoryConfig): NamingDescriptorFacto
 const identifierTooShortFactory = createNamingFactory({
     ruleId: 'NAM-LEN-001',
     defaultMessage: 'Variable identifier is too short; semantic intent is obscured.',
-    suggestion:
-        'Choose a descriptive, balanced variable name communicating clear semantic intent.',
+    suggestion: 'Choose a descriptive, balanced variable name communicating clear semantic intent.',
     rationale:
         'Excessively short identifiers obscure variable semantics and increase cognitive burden.',
     risk: 'Low',

@@ -135,10 +135,7 @@ import {
     DEDUCTION_SIMPLIFY_STANDARDIZATION,
     DEDUCTION_GO_MODERNITY,
 } from './dimensionLiterals';
-import {
-    FRONTEND_DIMENSION_RULES,
-    type DimensionRule,
-} from './dimension-rule-table-frontend';
+import { FRONTEND_DIMENSION_RULES, type DimensionRule } from './dimension-rule-table-frontend';
 export type { DimensionRule };
 import type { QualityDimension } from './scoringTypes';
 
@@ -736,7 +733,17 @@ export const DIMENSION_RULES: DimensionRule[] = [
                 'SIM-FLAT-002',
                 'SIM-ARGS-001',
             ],
-            ['ternary', 'boolean', 'condition', 'return', 'guard', 'function', 'else', 'parameter', 'argument'],
+            [
+                'ternary',
+                'boolean',
+                'condition',
+                'return',
+                'guard',
+                'function',
+                'else',
+                'parameter',
+                'argument',
+            ],
         ),
         dimension: DIMENSION_MAINTAINABILITY,
         points: DEDUCTION_SIMPLIFY_MAINTAINABILITY,
@@ -804,4 +811,3 @@ for (const rule of DIMENSION_RULES) {
 export function getDimensionRulesForAnalyzer(analyzer: string): readonly DimensionRule[] {
     return RULES_BY_ANALYZER.get(analyzer) ?? [];
 }
-

@@ -26,7 +26,10 @@ const EVENT_ERROR = 'error';
 /** Scale factor turning a 0-1 elapsed-time ratio into a whole percentage (AR-TIMING). */
 const TIMING_PERCENT_SCALE = 100;
 
-/** Maximum worker count auto mode (`workers <= 0`) starts, dynamically scaling with available cores. */
+/**
+ * Maximum worker count auto mode (`workers <= 0`) starts, dynamically scaling
+ * with available hardware cores.
+ */
 export const AUTO_WORKER_MAX = Math.min(
     16,
     Math.max(8, (os.availableParallelism ? os.availableParallelism() : os.cpus().length || 8) - 1),
@@ -52,7 +55,7 @@ export const WORKER_BATCH_SIZE = 32;
  * import `typescript` (~223ms dead time per fresh isolate). K is parser-aware because the
  * optimal offload volume depends on the WORKER-side per-file cost:
  *   - parser='typescript': worker parse+materialize ~1.10-1.38ms/file (slow) -> K=500 is best
- *     (~-9% on 1500-file corpus, w4); larger K regresses (main thread saturates, starves
+ *     (~-9% on 1500-file corpus, 4 workers); larger K regresses (main thread saturates, starves
  *     worker dispatch/read-ahead).
  *   - parser='oxc': worker parse+materialize ~0.90ms/file (fast) -> less offloading needed;
  *     K=200-300 is best, K=500 measured ~zero benefit (oxc worker speedup is inside the worker
@@ -339,9 +342,8 @@ export async function dispatchBatches(
     const n = Math.max(1, Math.min(numWorkers, files.length));
     const idxByFile = new Map<string, number>();
     files.forEach((f, i) => idxByFile.set(f, i));
-    const results: ({ issues: Issue[]; metric: FileMetric | null; symbols?: any } | null)[] = new Array(
-        files.length,
-    );
+    const results: ({ issues: Issue[]; metric: FileMetric | null; symbols?: any } | null)[] =
+        new Array(files.length);
 
     // AR_TIMING state: per-stage / per-batch pipeline instrumentation (no-op when disabled).
     const T = AR_TIMING
@@ -528,7 +530,9 @@ export async function dispatchBatches(
                             } catch {
                                 /* ignore */
                             }
-                    resolve(results as { issues: Issue[]; metric: FileMetric | null; symbols?: any }[]);
+                    resolve(
+                        results as { issues: Issue[]; metric: FileMetric | null; symbols?: any }[],
+                    );
                 });
             }
             return true;
@@ -682,7 +686,12 @@ export async function dispatchBatches(
                 });
             }
             const onMessage = (res: {
-                results: { file: string; issues: Issue[]; metric: FileMetric | null; symbols?: any }[];
+                results: {
+                    file: string;
+                    issues: Issue[];
+                    metric: FileMetric | null;
+                    symbols?: any;
+                }[];
                 symbolsMap?: { file: string; symbols?: any }[];
             }) => {
                 const workerArrivalTimestampMs = T ? nowMs() : 0;
@@ -695,7 +704,11 @@ export async function dispatchBatches(
                     const i = idxByFile.get(r.file);
                     if (i !== undefined) {
                         const sym = (r as any).symbols ?? res.symbolsMap?.[k]?.symbols;
-                        results[i] = { issues: r.issues || [], metric: r.metric || null, symbols: sym };
+                        results[i] = {
+                            issues: r.issues || [],
+                            metric: r.metric || null,
+                            symbols: sym,
+                        };
                     }
                 }
                 completed += resArr.length;

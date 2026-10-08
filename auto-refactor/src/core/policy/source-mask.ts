@@ -545,4 +545,3 @@ function maskLine(line: string, state: MaskState, config: SourceMaskConfig): str
     }
     return pieces.join('');
 }
-

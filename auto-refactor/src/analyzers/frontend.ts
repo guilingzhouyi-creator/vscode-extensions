@@ -8,7 +8,8 @@
  *   1. UI-ENG-001: Guard against HTML semantic and accessibility (A11y) violations.
  *   2. UI-ENG-002: Guard against excessive DOM nesting (>12) and reflow-inducing CSS transitions.
  *   3. UI-ENG-003: Guard against God components (>10 props) and repetitive DOM templates.
- *   4. UI-ENG-004: Enforce frontend hook (use*) and event handler (on* or handle*) naming conventions.
+ *   4. UI-ENG-004: Enforce frontend hook (use*) and event handler (on* or handle*)
+ *      naming conventions.
  * Exit Semantics & Design Rationale: Pure, fail-safe scanner returning Issue[]. Zero throw.
  */
 
@@ -17,6 +18,7 @@ import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_INFO, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
 
+/** Canonical analyzer identifier for frontend UI/UX, A11y, and component architecture audits. */
 export const ANALYZER_FRONTEND_ID = 'frontend';
 
 const FRONTEND_EXTENSIONS = new Set([
@@ -42,7 +44,8 @@ const HAS_ROLE_RE = /\brole\s*=\s*(?:['"][^'"]+['"]|\{[^}]+\})/i;
 const HAS_TABINDEX_RE = /\btabindex\s*=\s*(?:['"]?[-\d]+['"]?|\{[^}]+\})/i;
 
 const HOOK_DECLARATION_RE = /\bfunction\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{/g;
-const HANDLER_DECLARATION_RE = /\b(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/g;
+const HANDLER_DECLARATION_RE =
+    /\b(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/g;
 
 function makeFrontendIssue(
     file: string,
@@ -68,11 +71,7 @@ function makeFrontendIssue(
 /**
  * Checks for accessibility and semantic HTML violations (UI-ENG-001).
  */
-function auditAccessibilityAndSemantics(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditAccessibilityAndSemantics(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (IMG_TAG_WITHOUT_ALT_RE.test(line)) {
@@ -111,11 +110,7 @@ function auditAccessibilityAndSemantics(
 /**
  * Audits CSS and DOM nesting depth for reflow performance (UI-ENG-002).
  */
-function auditDomDepthAndAnimationReflow(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditDomDepthAndAnimationReflow(file: string, rawLines: string[], issues: Issue[]): void {
     let currentDepth = 0;
     let maxDepth = 0;
     let maxDepthLine = 1;
@@ -171,11 +166,7 @@ function auditDomDepthAndAnimationReflow(
 /**
  * Audits component complexity and duplication patterns (UI-ENG-003).
  */
-function auditComponentPropsAndReuse(
-    file: string,
-    content: string,
-    issues: Issue[],
-): void {
+function auditComponentPropsAndReuse(file: string, content: string, issues: Issue[]): void {
     const interfaceMatches = content.match(/interface\s+([A-Za-z0-9_]*Props)\s*\{([^}]+)\}/g);
     if (!interfaceMatches) return;
 
@@ -203,11 +194,7 @@ function auditComponentPropsAndReuse(
 /**
  * Audits hook and event handler naming conventions (UI-ENG-004).
  */
-function auditFrontendNaming(
-    file: string,
-    content: string,
-    issues: Issue[],
-): void {
+function auditFrontendNaming(file: string, content: string, issues: Issue[]): void {
     if (!file.endsWith('.tsx') && !file.endsWith('.jsx') && !file.endsWith('.ts')) return;
 
     HOOK_DECLARATION_RE.lastIndex = 0;
@@ -232,7 +219,11 @@ function auditFrontendNaming(
     HANDLER_DECLARATION_RE.lastIndex = 0;
     while ((match = HANDLER_DECLARATION_RE.exec(content)) !== null) {
         const varName = match[1];
-        if (varName.endsWith('Handler') && !varName.startsWith('on') && !varName.startsWith('handle')) {
+        if (
+            varName.endsWith('Handler') &&
+            !varName.startsWith('on') &&
+            !varName.startsWith('handle')
+        ) {
             issues.push(
                 makeFrontendIssue(
                     file,
@@ -264,7 +255,13 @@ export class FrontendAnalyzer implements Analyzer {
         const issues: Issue[] = [];
         const rawLines = context.content.split('\n');
 
-        if (context.content.includes('<') || ext === '.html' || ext === '.htm' || ext === '.vue' || ext === '.svelte') {
+        if (
+            context.content.includes('<') ||
+            ext === '.html' ||
+            ext === '.htm' ||
+            ext === '.vue' ||
+            ext === '.svelte'
+        ) {
             auditAccessibilityAndSemantics(file, rawLines, issues);
             auditDomDepthAndAnimationReflow(file, rawLines, issues);
         } else if (ext === '.css' || ext === '.scss' || ext === '.less') {

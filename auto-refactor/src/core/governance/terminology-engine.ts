@@ -314,7 +314,9 @@ function buildDefaultRulesCandidateRegex(): RegExp {
     for (const rule of DEFAULT_TERMINOLOGY_RULES) {
         for (const pattern of rule.patterns) {
             if (pattern) {
-                chinesePatterns.push(pattern.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&'));
+                chinesePatterns.push(
+                    pattern.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&'),
+                );
             }
         }
     }
@@ -340,10 +342,11 @@ const QUOTE_SPAN_DOUBLE_RE = /"[^"]+"/g;
 const QUOTE_SPAN_SMART_RE = /“[^”]+”/g;
 const QUOTE_SPAN_SINGLE_TOKEN_RE = /'(?:[a-zA-Z0-9_\-\.\*\/]+|(?:\([^\)]+\)))'/g;
 const INLINE_FORMULA_RE = /\$[^$]+\$/g;
+const LEADING_COMMENT_RE = /^\s*(?:\/\/|#|--|\*+)\s*/;
 
 function buildCompiledWhitelistRegexes(whitelist: readonly string[]): {
-    asciiRe: RegExp;
-    nonAsciiRe: RegExp;
+    asciiRe: RegExp | null;
+    nonAsciiRe: RegExp | null;
 } {
     const asciiTerms: string[] = [];
     const nonAsciiTerms: string[] = [];
@@ -360,13 +363,19 @@ function buildCompiledWhitelistRegexes(whitelist: readonly string[]): {
         }
     }
 
-    const asciiRe = new RegExp(`\\b(?:${asciiTerms.join('|')})s?\\b`, 'gi');
-    const nonAsciiRe = new RegExp(`(?:${nonAsciiTerms.join('|')})`, 'gi');
+    const asciiRe =
+        asciiTerms.length > 0 ? new RegExp(`\\b(?:${asciiTerms.join('|')})s?\\b`, 'gi') : null;
+    const nonAsciiRe =
+        nonAsciiTerms.length > 0 ? new RegExp(`(?:${nonAsciiTerms.join('|')})`, 'gi') : null;
     return { asciiRe, nonAsciiRe };
 }
 
 const DEFAULT_WHITELIST_COMPILED = buildCompiledWhitelistRegexes(DEFAULT_TECHNICAL_WHITELIST);
 const ASCII_PATTERN_RE_CACHE = new Map<string, RegExp>();
+const CUSTOM_WHITELIST_CACHE = new Map<
+    string,
+    { asciiRe: RegExp | null; nonAsciiRe: RegExp | null }
+>();
 
 function getOrCompileAsciiPattern(asciiPat: string): RegExp {
     let re = ASCII_PATTERN_RE_CACHE.get(asciiPat);
@@ -380,6 +389,151 @@ function getOrCompileAsciiPattern(asciiPat: string): RegExp {
     return re;
 }
 
+interface CompiledRuleLexicon {
+    readonly patternRe: RegExp | null;
+    readonly patternSet: ReadonlySet<string>;
+}
+
+const RULE_LEXICON_CACHE = new WeakMap<TerminologyRule, CompiledRuleLexicon>();
+
+function getOrCompileRuleLexicon(rule: TerminologyRule): CompiledRuleLexicon {
+    let lexicon = RULE_LEXICON_CACHE.get(rule);
+    if (!lexicon) {
+        const validPatterns = rule.patterns.filter((p): p is string => Boolean(p && p.length > 0));
+        if (validPatterns.length === 0) {
+            lexicon = { patternRe: null, patternSet: new Set() };
+        } else {
+            // Sort by descending length so longer compound phrases match first
+            const sorted = [...validPatterns].sort((a, b) => b.length - a.length);
+            const escaped = sorted.map((p) =>
+                p.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&'),
+            );
+            lexicon = {
+                patternRe: new RegExp(escaped.join('|'), 'g'),
+                patternSet: new Set(validPatterns),
+            };
+        }
+        RULE_LEXICON_CACHE.set(rule, lexicon);
+    }
+    return lexicon;
+}
+
+// Pre-warm the lexicon cache for all default terminology rules
+for (const defaultRule of DEFAULT_TERMINOLOGY_RULES) {
+    getOrCompileRuleLexicon(defaultRule);
+}
+
+/**
+ * Strips leading line comment markers (//, #, --, block comment markers) from a line.
+ *
+ * @param line - Raw prose line
+ * @returns Clean line with leading comment syntax stripped
+ */
+export function stripLineComments(line: string): string {
+    if (!line) return '';
+    return line.replace(LEADING_COMMENT_RE, '');
+}
+
+/**
+ * Strips or masks quoted literal string spans within a line.
+ *
+ * @param line - Candidate line
+ * @returns Line with quoted literals masked
+ */
+export function stripQuotedLiterals(line: string): string {
+    if (!line) return '';
+    let sanitized = line;
+    if (sanitized.includes('"')) {
+        sanitized = sanitized.replace(QUOTE_SPAN_DOUBLE_RE, ' __QUOTE_SPAN__ ');
+    }
+    if (sanitized.includes('“')) {
+        sanitized = sanitized.replace(QUOTE_SPAN_SMART_RE, ' __QUOTE_SPAN__ ');
+    }
+    if (sanitized.includes("'")) {
+        sanitized = sanitized.replace(QUOTE_SPAN_SINGLE_TOKEN_RE, ' __QUOTE_SPAN__ ');
+    }
+    return sanitized;
+}
+
+/**
+ * Masks technical code spans, formulas, and rule identifiers.
+ *
+ * @param line - Candidate line
+ * @returns Line with technical spans masked
+ */
+export function maskTechnicalSpans(line: string): string {
+    if (!line) return '';
+    let sanitized = line;
+    if (sanitized.includes('`')) {
+        sanitized = sanitized.replace(CODE_SPAN_RE, ' __CODE_SPAN__ ');
+    }
+    if (sanitized.includes('$')) {
+        sanitized = sanitized.replace(INLINE_FORMULA_RE, ' __FORMULA_SPAN__ ');
+    }
+    if (sanitized.includes('-')) {
+        sanitized = sanitized.replace(RULE_ID_RE, ' __RULE_ID__ ');
+    }
+    return sanitized;
+}
+
+/**
+ * Masks default technical whitelist terms using precompiled regexes.
+ *
+ * @param line - Partially sanitized line
+ * @returns Line with default whitelist terms masked
+ */
+function maskDefaultWhitelist(line: string): string {
+    let sanitized = line;
+    if (DEFAULT_WHITELIST_COMPILED.asciiRe) {
+        sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.asciiRe, ' __WHITELIST_TERM__ ');
+    }
+    if (DEFAULT_WHITELIST_COMPILED.nonAsciiRe) {
+        sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.nonAsciiRe, ' __WHITELIST_TERM__ ');
+    }
+    return sanitized;
+}
+
+function getOrCompileCustomWhitelist(whitelist: readonly string[]): {
+    asciiRe: RegExp | null;
+    nonAsciiRe: RegExp | null;
+} {
+    const key = whitelist.join('\u0000');
+    let compiled = CUSTOM_WHITELIST_CACHE.get(key);
+    if (!compiled) {
+        compiled = buildCompiledWhitelistRegexes(whitelist);
+        if (CUSTOM_WHITELIST_CACHE.size >= 50) {
+            CUSTOM_WHITELIST_CACHE.clear();
+        }
+        CUSTOM_WHITELIST_CACHE.set(key, compiled);
+    }
+    return compiled;
+}
+
+/**
+ * Masks custom whitelist expressions on a sanitized line.
+ *
+ * @param line - Pre-masked line
+ * @param customWhitelist - Optional whitelist entries to mask
+ * @returns Line with custom whitelisted terms masked
+ */
+export function maskCustomWhitelist(
+    line: string,
+    customWhitelist?: readonly string[],
+): string {
+    if (!line || !customWhitelist || customWhitelist.length === 0) {
+        return line;
+    }
+    const compiled = getOrCompileCustomWhitelist(customWhitelist);
+    let sanitized = line;
+    if (compiled.asciiRe) {
+        sanitized = sanitized.replace(compiled.asciiRe, ' __WHITELIST_TERM__ ');
+    }
+    if (compiled.nonAsciiRe) {
+        sanitized = sanitized.replace(compiled.nonAsciiRe, ' __WHITELIST_TERM__ ');
+    }
+    return sanitized;
+}
+
 /**
  * Mask explicit technical spans, rule codes, formulas, and whitelisted terms.
  *
@@ -391,37 +545,57 @@ export function sanitizeLineForTerminology(
     line: string,
     customWhitelist: readonly string[] = [],
 ): string {
-    let sanitized = line;
+    if (!line) return '';
 
-    // Stage 1: Mask code spans, formulas, and rule IDs (short-circuited via substring pre-check)
-    if (sanitized.includes('`')) sanitized = sanitized.replace(CODE_SPAN_RE, ' __CODE_SPAN__ ');
-    if (sanitized.includes('$')) sanitized = sanitized.replace(INLINE_FORMULA_RE, ' __FORMULA_SPAN__ ');
-    if (sanitized.includes('-')) sanitized = sanitized.replace(RULE_ID_RE, ' __RULE_ID__ ');
+    // Stage 1: Mask code spans, formulas, and rule IDs
+    let sanitized = maskTechnicalSpans(line);
 
-    // Stage 2: Mask explicit quotation marks (short-circuited via substring pre-check)
-    if (sanitized.includes('"')) sanitized = sanitized.replace(QUOTE_SPAN_DOUBLE_RE, ' __QUOTE_SPAN__ ');
-    if (sanitized.includes('“')) sanitized = sanitized.replace(QUOTE_SPAN_SMART_RE, ' __QUOTE_SPAN__ ');
-    if (sanitized.includes("'")) sanitized = sanitized.replace(QUOTE_SPAN_SINGLE_TOKEN_RE, ' __QUOTE_SPAN__ ');
+    // Stage 2: Mask explicit quotation marks
+    sanitized = stripQuotedLiterals(sanitized);
 
     // Stage 3: Mask whitelisted technical compound terms using precompiled regexes
-    sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.asciiRe, ' __WHITELIST_TERM__ ');
-    sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.nonAsciiRe, ' __WHITELIST_TERM__ ');
+    sanitized = maskDefaultWhitelist(sanitized);
 
     // Stage 4: Process custom whitelist if provided
-    if (customWhitelist && customWhitelist.length > 0) {
-        for (const term of customWhitelist) {
-            if (!term) continue;
-            const escaped = term
-                .replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&')
-                .replace(/\s+/g, '\\s+');
-            const pattern = /^[a-zA-Z\s\-]+$/.test(term)
-                ? `\\b${escaped}s?\\b`
-                : escaped;
-            sanitized = sanitized.replace(new RegExp(pattern, 'gi'), ' __WHITELIST_TERM__ ');
+    return maskCustomWhitelist(sanitized, customWhitelist);
+}
+
+/**
+ * Resolves column index in raw line with fast prefix/boundary probe.
+ */
+function resolveRawColumn(rawLine: string, term: string, hintIndex: number): number {
+    const termLen = term.length;
+    if (hintIndex >= 0 && hintIndex + termLen <= rawLine.length) {
+        if (rawLine.startsWith(term, hintIndex)) {
+            return hintIndex;
+        }
+    }
+    const col = rawLine.indexOf(term);
+    return col >= 0 ? col : hintIndex;
+}
+
+/**
+ * Resolves case-insensitive column index in raw line with single boundary probe.
+ */
+function resolveAsciiRawColumn(
+    rawLine: string,
+    term: string,
+    hintIndex: number,
+    lowerRawLine: string,
+): number {
+    const termLen = term.length;
+    const lowerTerm = term.toLowerCase();
+
+    // 1. Fast prefix/boundary probe at hintIndex (O(termLen), zero full-string scan)
+    if (hintIndex >= 0 && hintIndex + termLen <= rawLine.length) {
+        if (lowerRawLine.startsWith(lowerTerm, hintIndex)) {
+            return hintIndex;
         }
     }
 
-    return sanitized;
+    // 2. Fallback single scan on pre-lowercased line
+    const col = lowerRawLine.indexOf(lowerTerm);
+    return col >= 0 ? col : hintIndex;
 }
 
 /** Check pattern match on a single line appending directly into accumulator */
@@ -432,11 +606,29 @@ function collectLinePatterns(
     lineNum: number,
     rule: TerminologyRule,
 ): void {
-    for (const pattern of rule.patterns) {
-        if (!pattern || !sanitized.includes(pattern)) continue;
-        if (isVocabularyEnumeration(sanitized, sanitized.indexOf(pattern), pattern)) continue;
-        const col = rawLine.indexOf(pattern);
-        if (col >= 0 && isVocabularyEnumeration(rawLine, col, pattern)) continue;
+    const lexicon = getOrCompileRuleLexicon(rule);
+    if (!lexicon.patternRe) return;
+
+    lexicon.patternRe.lastIndex = 0;
+    const seenTerms = new Set<string>();
+    let match: RegExpExecArray | null;
+
+    while ((match = lexicon.patternRe.exec(sanitized)) !== null) {
+        const pattern = match[0];
+        if (!lexicon.patternSet.has(pattern) || seenTerms.has(pattern)) {
+            continue;
+        }
+        seenTerms.add(pattern);
+
+        const sanitizedCol = match.index;
+        if (isVocabularyEnumeration(sanitized, sanitizedCol, pattern)) {
+            continue;
+        }
+
+        const col = resolveRawColumn(rawLine, pattern, sanitizedCol);
+        if (col >= 0 && isVocabularyEnumeration(rawLine, col, pattern)) {
+            continue;
+        }
 
         outFindings.push({
             category: rule.category,
@@ -470,17 +662,23 @@ function collectLineAsciiPatterns(
     rawLine: string,
     lineNum: number,
     rule: TerminologyRule,
+    lowerRawLine?: string,
 ): void {
+    const lowerRaw = lowerRawLine ?? rawLine.toLowerCase();
     for (const asciiPat of rule.asciiPatterns) {
         const re = getOrCompileAsciiPattern(asciiPat);
         re.lastIndex = 0;
         let match: RegExpExecArray | null;
         while ((match = re.exec(sanitized)) !== null) {
             const term = match[0];
-            if (isVocabularyEnumeration(sanitized, match.index, term)) continue;
-            const col = rawLine.toLowerCase().indexOf(term.toLowerCase());
-            const actualCol = col >= 0 ? col : match.index;
-            if (isVocabularyEnumeration(rawLine, actualCol, term)) continue;
+            if (isVocabularyEnumeration(sanitized, match.index, term)) {
+                continue;
+            }
+
+            const actualCol = resolveAsciiRawColumn(rawLine, term, match.index, lowerRaw);
+            if (isVocabularyEnumeration(rawLine, actualCol, term)) {
+                continue;
+            }
 
             outFindings.push({
                 category: rule.category,
@@ -515,18 +713,26 @@ function auditLineAgainstRules(
     lineNum: number,
     rules: readonly TerminologyRule[],
     options: TerminologyAuditOptions,
+    allowedCategorySet: ReadonlySet<TerminologyCategory> | null,
+    lowerRawLine: string,
 ): void {
     for (const rule of rules) {
-        if (options.allowedCategories && !options.allowedCategories.includes(rule.category)) {
+        if (allowedCategorySet && !allowedCategorySet.has(rule.category)) {
             continue;
         }
         if (options.checkPatterns !== false) {
             collectLinePatterns(findings, sanitized, rawLine, lineNum, rule);
         }
         if (options.checkAscii !== false) {
-            collectLineAsciiPatterns(findings, sanitized, rawLine, lineNum, rule);
+            collectLineAsciiPatterns(findings, sanitized, rawLine, lineNum, rule, lowerRawLine);
         }
     }
+}
+
+function isEligibleProseLine(line: string, isDefaultRules: boolean): boolean {
+    if (!line || line.trim().length === 0) return false;
+    if (isDefaultRules && !DEFAULT_RULES_FAST_CANDIDATE_RE.test(line)) return false;
+    return true;
 }
 
 /**
@@ -552,14 +758,26 @@ export function auditTerminologyProse(
     const lines = content.split('\n');
     const findings: TerminologyFinding[] = [];
     const customWhitelist = options.customWhitelist || [];
+    const allowedCategorySet = options.allowedCategories
+        ? new Set<TerminologyCategory>(options.allowedCategories)
+        : null;
 
     for (let i = 0; i < lines.length; i++) {
         const rawLine = lines[i];
-        if (!rawLine || rawLine.trim().length === 0) continue;
-        if (isDefaultRules && !DEFAULT_RULES_FAST_CANDIDATE_RE.test(rawLine)) continue;
+        if (!isEligibleProseLine(rawLine, isDefaultRules)) continue;
 
         const sanitized = sanitizeLineForTerminology(rawLine, customWhitelist);
-        auditLineAgainstRules(findings, sanitized, rawLine, i + 1, rules, options);
+        const lowerRawLine = rawLine.toLowerCase();
+        auditLineAgainstRules(
+            findings,
+            sanitized,
+            rawLine,
+            i + 1,
+            rules,
+            options,
+            allowedCategorySet,
+            lowerRawLine,
+        );
     }
 
     return findings.length === 0 ? EMPTY_TERMINOLOGY_FINDINGS : Object.freeze(findings);

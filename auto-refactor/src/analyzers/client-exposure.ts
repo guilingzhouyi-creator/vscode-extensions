@@ -15,7 +15,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
-
+/** Canonical analyzer identifier for client-side exposure and credential security audits. */
 export const ANALYZER_CLIENT_EXPOSURE_ID = 'client-exposure';
 
 const INTERNAL_ENDPOINT_PATTERNS = [
@@ -56,11 +56,7 @@ function makeExposureIssue(
 /**
  * Audits client code for internal administrative endpoint exposure (SEC-EXP-001).
  */
-function auditInternalApiEndpoints(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditInternalApiEndpoints(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         for (const pattern of INTERNAL_ENDPOINT_PATTERNS) {
@@ -85,11 +81,7 @@ function auditInternalApiEndpoints(
 /**
  * Audits client markup for CSS visual hiding in lieu of server auth (SEC-EXP-002).
  */
-function auditCssAuthorizationBypass(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditCssAuthorizationBypass(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (CSS_AUTH_BYPASS_RE.test(line)) {
@@ -111,11 +103,7 @@ function auditCssAuthorizationBypass(
 /**
  * Audits feature flag usage for full implementation code delivery (SEC-EXP-003).
  */
-function auditFeatureFlagCodeSplitting(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditFeatureFlagCodeSplitting(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (DISABLED_FEATURE_FLAG_RE.test(line)) {
@@ -137,11 +125,7 @@ function auditFeatureFlagCodeSplitting(
 /**
  * Audits router definitions for unreleased and debug routes (SEC-EXP-004).
  */
-function auditUnreleasedRoutes(
-    file: string,
-    rawLines: string[],
-    issues: Issue[],
-): void {
+function auditUnreleasedRoutes(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (UNRELEASED_ROUTE_RE.test(line)) {

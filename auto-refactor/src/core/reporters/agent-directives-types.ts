@@ -114,7 +114,8 @@ export interface AgentVerificationDirective {
 }
 
 /**
- * Directive execution track distinguishing direct standardization proposals from interactive clarification requests.
+ * Directive execution track distinguishing direct standardization proposals
+ * from interactive clarification requests.
  */
 export type AgentDirectiveTrack = 'standardization_proposal' | 'clarification_request';
 
@@ -230,7 +231,10 @@ export interface AgentActionableDirective {
     readonly remediationRecipe: AgentRemediationRecipe;
     /** ⑤ Precise verification command recommendation and qualitative criteria */
     readonly verificationDirective: AgentVerificationDirective;
-    /** Directive execution track distinguishing direct standardization proposal vs clarification request */
+    /**
+     * Directive execution track distinguishing direct standardization proposal
+     * vs clarification request.
+     */
     readonly directiveTrack?: AgentDirectiveTrack;
     /** Standardization proposal payload carrying exact patch or transformation */
     readonly standardizationProposal?: AgentStandardizationProposal;

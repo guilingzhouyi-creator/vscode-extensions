@@ -14,7 +14,7 @@
  */
 
 import type { ProjectProfile } from '../types';
-import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
+import type { QualityDimension, QualityScoreBreakdown } from '../scoring/scoringTypes';
 import type { UnifiedQualityAssessment } from '../scoring/fusion-scorer';
 import type { AutonomyEvaluation } from '../scoring/autonomy-scorer';
 
@@ -111,9 +111,12 @@ export function printQualityScoreAssessment(
             `(Confidence: ${(q.confidence * PERCENT_SCALE).toFixed(0)}%)\n`,
     );
     process.stdout.write(`-------------------------------------------\n`);
+    const notEvaluatedSet = new Set<QualityDimension>(q.notEvaluated ?? []);
     for (const [dim, val] of Object.entries(q.indices)) {
+        const isNotEvaluated = notEvaluatedSet.has(dim as QualityDimension);
+        const valText = isNotEvaluated ? 'N/A [NOT EVALUATED]' : (val as number).toFixed(1);
         process.stdout.write(
-            `  • ${dim.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${(val as number).toFixed(1)}\n`,
+            `  • ${dim.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${valText}\n`,
         );
     }
     if (triPlane) {

@@ -37,10 +37,35 @@ import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
 import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
 import { evaluateRoleElasticBudget } from '../core/intelligence/elastic-budget-matrix';
 import { partitionFileZones } from '../core/intelligence/zone-partitioner';
+import { isConstantDefinitionFile } from '../core/intelligence/constant-identity';
+
+/** Architectural token representing benign constant library classification. */
+export const ARCH_BENIGN_CONSTANT_LIBRARY = 'ARCH_BENIGN_CONSTANT_LIBRARY';
 
 function firstWord(name: string): string {
     const m = name.match(/^[a-z]+|^[A-Z]+/) || ['misc'];
     return m[0].toLowerCase();
+}
+
+/**
+ * Determines whether a file qualifies as a benign large constant library.
+ *
+ * @param filePath - Source file path.
+ * @param content - Source file full content.
+ * @param m - Accumulated file metrics.
+ * @returns True if file is a pure constant catalog with minimal logic.
+ */
+function isBenignConstantLibrary(filePath: string, content: string, m: FileMetric): boolean {
+    if (!isConstantDefinitionFile(filePath, content)) {
+        return false;
+    }
+    if (m.functions > 2 || m.maxNestingDepth > 3) {
+        return false;
+    }
+    const stripped = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const cfMatches =
+        stripped.match(/\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g) || [];
+    return cfMatches.length <= 2;
 }
 
 function shouldExemptElastic(
@@ -49,7 +74,12 @@ function shouldExemptElastic(
     elasticEvaluation: any,
     zoneProfile: any,
     functionsCount: number,
+    isBenignConstant = false,
+    lines = 0,
 ): boolean {
+    if (isBenignConstant && lines <= 3000) {
+        return true;
+    }
     if (!t.enableElasticBudget && !density.isLowDensityDocumented) {
         return false;
     }
@@ -124,7 +154,20 @@ function evaluateThresholdSeverity(
     t: Record<string, any>,
     density: any,
     zoneProfile: any,
+    isBenignConstant = false,
 ): { severity: Severity | null; reasons: string[] } {
+    if (isBenignConstant) {
+        if (m.lines <= 3000) {
+            return { severity: null, reasons: [] };
+        }
+        return {
+            severity: 'error',
+            reasons: [
+                `constant library lines ${m.lines} >= relaxed limit 3000 (${ARCH_BENIGN_CONSTANT_LIBRARY})`,
+            ],
+        };
+    }
+
     const failReason = checkFailThreshold(m, t, density, zoneProfile);
     if (failReason) {
         return { severity: 'error', reasons: [failReason] };
@@ -258,8 +301,19 @@ export class LargeFileAnalyzer implements Analyzer {
             t.effectiveLocWarn,
         );
         const zoneProfile = partitionFileZones(ctx.content, ctx.filePath, density, ctx.root);
+        const isBenignConstant = isBenignConstantLibrary(ctx.filePath, ctx.content || '', m);
 
-        if (shouldExemptElastic(t, density, elasticEvaluation, zoneProfile, m.functions)) {
+        if (
+            shouldExemptElastic(
+                t,
+                density,
+                elasticEvaluation,
+                zoneProfile,
+                m.functions,
+                isBenignConstant,
+                m.lines,
+            )
+        ) {
             return [];
         }
 
@@ -267,7 +321,13 @@ export class LargeFileAnalyzer implements Analyzer {
             return [];
         }
 
-        const { severity, reasons } = evaluateThresholdSeverity(m, t, density, zoneProfile);
+        const { severity, reasons } = evaluateThresholdSeverity(
+            m,
+            t,
+            density,
+            zoneProfile,
+            isBenignConstant,
+        );
         if (!severity) return [];
 
         const modules = [...this.modules];
@@ -278,6 +338,10 @@ export class LargeFileAnalyzer implements Analyzer {
             reasons,
             inferredModules: modules,
         };
+        if (isBenignConstant) {
+            detailPayload.ARCH_BENIGN_CONSTANT_LIBRARY = true;
+            detailPayload.architecturalCategory = ARCH_BENIGN_CONSTANT_LIBRARY;
+        }
         if (t.enableElasticBudget === true || t.flagZonePartitioner === true) {
             detailPayload.densityMetrics = density;
             detailPayload.fileRole = roleInference.role;

@@ -22,13 +22,14 @@ import { safeRegexMatch } from '../../../utils/safe-regex';
 /** Category shared by every compression lower bounds rule. */
 const MAINTAINABILITY_CATEGORY = 'maintainability';
 
-/**
- * Languages this family is declared for.
- *
- * Narrower than `ALL_LANGUAGES` on purpose: the detectors below key on C-family syntax, so
- * declaring Python/GDScript/Rust would advertise coverage the implementation cannot deliver.
- */
-const CMP_LANGUAGES: string[] = ['typescript', 'javascript'];
+/** Languages this family is declared for as an immutable set library. */
+const CMP_SUPPORTED_LANGUAGES: ReadonlySet<string> = new Set([
+    'typescript',
+    'javascript',
+]);
+
+/** Languages this family is declared for in the GovernanceRule SPI contract. */
+const CMP_LANGUAGES: string[] = Array.from(CMP_SUPPORTED_LANGUAGES);
 
 /** Branch count at which a ternary chain is considered unreadable. */
 const MAX_TERNARY_BRANCHES = 3;
@@ -51,14 +52,7 @@ const DENSITY_THRESHOLD = 0.22;
 /** Operator count below which density is not considered. */
 const DENSITY_MIN_OPERATORS = 8;
 
-/**
- * Operators that unambiguously perform bit manipulation.
- *
- * Bare `&` and `|` are deliberately excluded: in TypeScript they also spell intersection/union
- * types and in Rust they spell pattern alternation, so requiring a strong operator keeps type-level
- * syntax out of the rule. Accepted cost: a line whose only bitwise work is `&`/`|` is not reported;
- * a missed match is preferred over a wrong suggestion.
- */
+/** Strong bitwise operator characters counted toward density pre-gating. */
 const STRONG_BITWISE_RE = /<<|>>|\^|~/;
 
 /** Any operator character or digraph counted toward cognitive density. */
@@ -70,6 +64,48 @@ const DECLARATION_PREFIX_RE =
 
 const MULTI_TERNARY_RE = /\?[^:]+\?[^:]+:/;
 
+const CALLBACK_KEYWORD_RE = /=>|\bfunction\b/;
+const DECLARED_FUNCTION_RE =
+    /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s+[a-zA-Z0-9_$]+|(?:public|private|protected|static)\s+[a-zA-Z0-9_$]+\s*\()/;
+const CALLBACK_OPEN_RE =
+    /(?:(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>\s*\{|\bfunction\s*(?:[a-zA-Z0-9_$]+)?\s*\([^)]*\)\s*\{)/;
+
+const CHAR_SEMICOLON = 59;
+const CHAR_OPEN_BRACE = 123;
+const CHAR_CLOSE_BRACE = 125;
+const SEMICOLON_RE = /;/;
+
+/** Operator trigger characters for giant expressions. */
+const GIANT_TRIGGER_CHARS: ReadonlySet<string> = new Set(['?', '&', '|']);
+
+/** Reserved executable statement keywords targeting packed single-line statements. */
+const EXECUTABLE_STATEMENT_KEYWORDS: ReadonlySet<string> = new Set([
+    'const',
+    'let',
+    'var',
+    'return',
+    'throw',
+    'if',
+    'while',
+    'await',
+    'yield',
+]);
+
+const CALL_EXPRESSION_RE = /[a-zA-Z0-9_$]+\s*\(/;
+
+/**
+ * Evaluates whether a line contains candidate giant expression operators via set lookup.
+ */
+function hasGiantTriggerChar(line: string): boolean {
+    for (let j = 0; j < line.length; j++) {
+        if (GIANT_TRIGGER_CHARS.has(line[j])) return true;
+    }
+    return false;
+}
+
+/**
+ * Checks whether operator counts on a line cross the minimum heuristic thresholds.
+ */
 function hasCandidateOperatorCounts(code: string): boolean {
     let qCount = 0;
     let hasColon = false;
@@ -83,7 +119,12 @@ function hasCandidateOperatorCounts(code: string): boolean {
     return (qCount >= 2 && hasColon) || logicalOpChars >= MAX_LOGICAL_OPERATORS;
 }
 
-function classifyGiantExpression(code: string): { isNestedTernary: boolean; isUnboundedLogical: boolean } | null {
+/**
+ * Categorizes whether a giant expression is a nested ternary or unbounded logical chain.
+ */
+function classifyGiantExpression(
+    code: string,
+): { isNestedTernary: boolean; isUnboundedLogical: boolean } | null {
     const withoutOptional = code.replace(/\?\./g, '  ').replace(/\?\?/g, '  ');
     const clean = withoutOptional.replace(/[a-zA-Z0-9_$]+\s*\?\s*:/g, '  ');
 
@@ -99,6 +140,9 @@ function classifyGiantExpression(code: string): { isNestedTernary: boolean; isUn
     return { isNestedTernary, isUnboundedLogical };
 }
 
+/**
+ * Evaluates a single code line for giant nested ternary or boolean chain violations.
+ */
 function evaluateGiantExpressionLine(
     raw: string,
     code: string,
@@ -147,8 +191,7 @@ export const GiantExpressionRule: GovernanceRule = {
 
         for (let i = 0; i < len; i++) {
             const line = masked[i];
-            if (!line) continue;
-            if (!line.includes('?') && !line.includes('&') && !line.includes('|')) continue;
+            if (!line || !hasGiantTriggerChar(line)) continue;
             const code = line.trim();
             if (!code || DECLARATION_PREFIX_RE.test(code)) continue;
 
@@ -161,28 +204,65 @@ export const GiantExpressionRule: GovernanceRule = {
 };
 
 /**
- * Checks a masked code line for multi-statement packing on a single line.
+ * Scans code line for semicolon frequency and bounding indices.
  */
-function checkSingleLineStatement(
+function countSemicolons(code: string): { count: number; firstIndex: number; lastIndex: number } {
+    let count = 0;
+    let firstIndex = -1;
+    let lastIndex = -1;
+    for (let i = 0; i < code.length; i++) {
+        if (code.charCodeAt(i) === CHAR_SEMICOLON) {
+            if (firstIndex === -1) firstIndex = i;
+            lastIndex = i;
+            count++;
+        }
+    }
+    return { count, firstIndex, lastIndex };
+}
+
+/**
+ * Checks whether a semicolon-delimited segment constitutes an executable statement.
+ */
+function isExecutableStatementPart(part: string): boolean {
+    if (CALL_EXPRESSION_RE.test(part)) return true;
+    const tokens = part.match(/\b[a-zA-Z_$][a-zA-Z0-9_$]*\b/);
+    if (!tokens) return false;
+    for (let i = 0; i < tokens.length; i++) {
+        if (EXECUTABLE_STATEMENT_KEYWORDS.has(tokens[i])) return true;
+    }
+    return false;
+}
+
+/**
+ * Checks whether all parts of a packed line are case/default labels.
+ */
+function areAllSwitchClauses(parts: string[]): boolean {
+    for (let i = 0; i < parts.length; i++) {
+        if (!/^(case\s+|default:)/.test(parts[i])) return false;
+    }
+    return true;
+}
+
+/**
+ * Evaluates a masked code line for multi-statement packing on a single line.
+ */
+function evaluateSingleLineStatement(
     raw: string,
     code: string,
     lineIndex: number,
-    violations: GovernanceViolation[],
-): void {
-    if (!code) return;
+): GovernanceViolation | null {
+    if (!code) return null;
 
-    const firstSemi = code.indexOf(';');
-    if (firstSemi === -1) return;
+    const semi = countSemicolons(code);
+    if (semi.count === 0) return null;
     const hasMultiple =
-        firstSemi !== code.lastIndexOf(';') || code.slice(firstSemi + 1).trim().length > 0;
-    if (!hasMultiple) return;
+        semi.firstIndex !== semi.lastIndex || code.slice(semi.firstIndex + 1).trim().length > 0;
+    if (!hasMultiple) return null;
 
-    // A `for` header carries two semicolons by design; the body is what the rule targets.
-    if (/^for\s*(?:await\s*)?\(/.test(code)) return;
-    if (DECLARATION_PREFIX_RE.test(code)) return;
+    if (/^for\s*(?:await\s*)?\(/.test(code)) return null;
+    if (DECLARATION_PREFIX_RE.test(code)) return null;
 
-    // Strip inner type/object bodies like { a: string; b: number } before splitting.
-    const statementCode = (code.includes('{') ? code.replace(/\{[^}]*\}/g, '{}') : code)
+    const statementCode = (code.indexOf('{') !== -1 ? code.replace(/\{[^}]*\}/g, '{}') : code)
         .trim()
         .replace(/;$/, '');
     const semiParts = statementCode
@@ -190,28 +270,30 @@ function checkSingleLineStatement(
         .map((s) => s.trim())
         .filter(Boolean);
 
-    if (semiParts.length < 2 || semiParts.every((p) => /^(case\s+|default:)/.test(p))) {
-        return;
-    }
+    if (semiParts.length < 2) return null;
+    if (areAllSwitchClauses(semiParts)) return null;
 
-    const executableParts = semiParts.filter((p) =>
-        /\b(?:const|let|var|return|throw|if|while|await|yield)\b|[a-zA-Z0-9_$]+\s*\(/.test(p),
-    );
-    if (executableParts.length >= 2) {
-        violations.push({
-            ruleId: 'CMP-LIN-001',
-            message: 'Single line packs multiple executable statements or side effects.',
-            line: lineIndex + 1,
-            column: raw.search(/\S/) + 1,
-            suggestion:
-                'Split multiple executable statements or side-effects onto separate lines following single responsibility per line.',
-            fixable: false,
-            evidence: {
-                confidence: 0.95,
-                requiresRuntime: false,
-            },
-        });
+    let executableCount = 0;
+    for (let i = 0; i < semiParts.length; i++) {
+        if (isExecutableStatementPart(semiParts[i])) {
+            executableCount++;
+        }
     }
+    if (executableCount < 2) return null;
+
+    return {
+        ruleId: 'CMP-LIN-001',
+        message: 'Single line packs multiple executable statements or side effects.',
+        line: lineIndex + 1,
+        column: raw.search(/\S/) + 1,
+        suggestion:
+            'Split multiple executable statements or side-effects onto separate lines following single responsibility per line.',
+        fixable: false,
+        evidence: {
+            confidence: 0.95,
+            requiresRuntime: false,
+        },
+    };
 }
 
 /**
@@ -235,17 +317,66 @@ export const SingleLineMultiSemanticRule: GovernanceRule = {
 
         for (let i = 0; i < len; i++) {
             const line = masked[i];
-            if (!line || !line.includes(';')) continue;
+            if (!line || !SEMICOLON_RE.test(line)) continue;
             const code = line.trim();
             if (!code) continue;
-            checkSingleLineStatement(ctx.lines[i], code, i, violations);
+
+            const violation = evaluateSingleLineStatement(ctx.lines[i], code, i);
+            if (violation) violations.push(violation);
         }
 
         return violations.length > 0 ? violations : null;
     },
 };
 
-const CALLBACK_KEYWORD_RE = /=>|\bfunction\b/;
+/**
+ * Determines whether a code line initiates a nested inline callback closure.
+ */
+function opensCallbackClosure(code: string): boolean {
+    if (!CALLBACK_KEYWORD_RE.test(code)) return false;
+    if (DECLARED_FUNCTION_RE.test(code)) return false;
+    return CALLBACK_OPEN_RE.test(code);
+}
+
+/**
+ * Calculates net indentation and scope balance adjustments from braces.
+ */
+function calculateNetBraceDepth(code: string, currentDepth: number): number {
+    let opens = 0;
+    let closes = 0;
+    for (let j = 0; j < code.length; j++) {
+        const c = code.charCodeAt(j);
+        if (c === CHAR_CLOSE_BRACE) closes++;
+        else if (c === CHAR_OPEN_BRACE) opens++;
+    }
+    if (closes > opens && currentDepth > 0) {
+        return Math.max(0, currentDepth - (closes - opens));
+    }
+    return currentDepth;
+}
+
+/**
+ * Formats a callback nesting depth violation record.
+ */
+function createCallbackDepthViolation(
+    raw: string,
+    lineIndex: number,
+    depth: number,
+): GovernanceViolation {
+    return {
+        ruleId: 'CMP-CAL-001',
+        message: `Callback nesting depth (${depth}) exceeds lower maintainability bounds.`,
+        line: lineIndex + 1,
+        column: raw.search(/\S/) + 1,
+        suggestion:
+            'Reduce callback nesting depth: convert to async/await, flatten Promise chains, or extract named functions.',
+        fixable: false,
+        evidence: {
+            confidence: 0.85,
+            requiresRuntime: false,
+        },
+    };
+}
 
 /**
  * Evaluates a masked code line for callback chain opening or closing.
@@ -258,51 +389,13 @@ function evaluateCallbackLine(
     violations: GovernanceViolation[],
 ): number {
     let depth = currentDepth;
-    const mayOpenCallback = CALLBACK_KEYWORD_RE.test(code);
-    if (mayOpenCallback) {
-        const isDeclaredFunction =
-            /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s+[a-zA-Z0-9_$]+|(?:public|private|protected|static)\s+[a-zA-Z0-9_$]+\s*\()/.test(
-                code,
-            );
-        const opensCallback =
-            !isDeclaredFunction &&
-            /(?:(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>\s*\{|\bfunction\s*(?:[a-zA-Z0-9_$]+)?\s*\([^)]*\)\s*\{)/.test(
-                code,
-            );
-
-        if (opensCallback) {
-            depth++;
-            if (depth >= MAX_CALLBACK_DEPTH) {
-                violations.push({
-                    ruleId: 'CMP-CAL-001',
-                    message: `Callback nesting depth (${depth}) exceeds lower maintainability bounds.`,
-                    line: lineIndex + 1,
-                    column: raw.search(/\S/) + 1,
-                    suggestion:
-                        'Reduce callback nesting depth: convert to async/await, flatten Promise chains, or extract named functions.',
-                    fixable: false,
-                    evidence: {
-                        confidence: 0.85,
-                        requiresRuntime: false,
-                    },
-                });
-            }
+    if (opensCallbackClosure(code)) {
+        depth++;
+        if (depth >= MAX_CALLBACK_DEPTH) {
+            violations.push(createCallbackDepthViolation(raw, lineIndex, depth));
         }
     }
-
-    if (code.includes('}') || code.includes('{')) {
-        let opens = 0;
-        let closes = 0;
-        for (let j = 0; j < code.length; j++) {
-            const c = code.charCodeAt(j);
-            if (c === 125) closes++;
-            else if (c === 123) opens++;
-        }
-        if (closes > opens && depth > 0) {
-            depth -= Math.min(depth, closes - opens);
-        }
-    }
-    return depth;
+    return calculateNetBraceDepth(code, depth);
 }
 
 /**
@@ -328,7 +421,7 @@ export const CallbackDepthRule: GovernanceRule = {
         for (let i = 0; i < len; i++) {
             const line = masked[i];
             if (!line) continue;
-            if (callbackDepth === 0 && !line.includes('=>') && !line.includes('function')) {
+            if (callbackDepth === 0 && !CALLBACK_KEYWORD_RE.test(line)) {
                 continue;
             }
             const code = line.trim();

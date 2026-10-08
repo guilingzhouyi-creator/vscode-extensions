@@ -122,6 +122,28 @@ export const SCHEMA_PROPERTY_TOKENS = new Set([
     'data',
 ]);
 
+/** Benign default mapping tokens exempt from duplicate-literal flagging in constant catalogs. */
+export const CONSTANT_DEFAULT_MAPPING_TOKENS = new Set([
+    'default',
+    'none',
+    'unknown',
+    'auto',
+    'all',
+    'misc',
+    'empty',
+    'undefined',
+    'null',
+    'na',
+    'n/a',
+    'other',
+    'general',
+    'normal',
+    'standard',
+    'custom',
+    'initial',
+    'reset',
+]);
+
 /** Character code for ASCII single quote. */
 export const CHAR_CODE_SINGLE_QUOTE = 39;
 /** Character code for ASCII double quote. */
@@ -287,14 +309,17 @@ export function resolveLiteralIssueData(
  * @param base - Base threshold from options.
  * @param isTest - Whether file is a test suite.
  * @param isDataOrConfig - Whether file is data or config.
+ * @param isConstantFile - Whether file is a constant catalog.
  * @returns Threshold count.
  */
 export function resolveDuplicateThreshold(
     base: number,
     isTest: boolean,
     isDataOrConfig: boolean,
+    isConstantFile = false,
 ): number {
     if (isTest) return Math.max(base * 3, 12);
+    if (isConstantFile) return Math.max(base * 3, 12);
     if (isDataOrConfig) return Math.max(base * 2, 8);
     return base;
 }
@@ -304,14 +329,15 @@ export function resolveDuplicateThreshold(
  *
  * @param role - Inferred file role.
  * @param filePath - Path to source file.
+ * @param content - Optional full source code text.
  * @returns True when file represents data or config.
  */
-export function isDataOrConfigFile(role: string, filePath: string): boolean {
+export function isDataOrConfigFile(role: string, filePath: string, content?: string): boolean {
     return (
         role === 'config_constant' ||
         role === 'rules_registry' ||
         filePath.endsWith('.json') ||
-        isConstantDefinitionFile(filePath)
+        isConstantDefinitionFile(filePath, content)
     );
 }
 
@@ -365,6 +391,7 @@ export function isNumericDuplicateCandidate(value: string, magicNumberMin: numbe
  * @param isTest - Whether test suite.
  * @param isDataOrConfig - Whether data/config.
  * @param isAlgorithm - Whether algorithm code.
+ * @param isConstantFile - Whether dedicated constant catalog.
  * @returns True when string qualifies.
  */
 export function isStringDuplicateCandidate(
@@ -373,6 +400,7 @@ export function isStringDuplicateCandidate(
     isTest: boolean,
     isDataOrConfig: boolean,
     isAlgorithm = false,
+    isConstantFile = false,
 ): boolean {
     const str = stripQuotes(value).trim();
     if (str.length === 0 || ignoreSet.has(value) || ignoreSet.has(str)) return false;
@@ -380,6 +408,7 @@ export function isStringDuplicateCandidate(
     if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return false;
     if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return false;
     if (isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lower)) return false;
+    if (isConstantFile && CONSTANT_DEFAULT_MAPPING_TOKENS.has(lower)) return false;
     return true;
 }
 
@@ -393,6 +422,7 @@ export function isStringDuplicateCandidate(
  * @param isTest - Whether test suite.
  * @param isDataOrConfig - Whether data/config.
  * @param isAlgorithm - Whether algorithm file.
+ * @param isConstantFile - Whether dedicated constant catalog.
  * @returns True when candidate.
  */
 export function isDuplicateCandidate(
@@ -403,11 +433,19 @@ export function isDuplicateCandidate(
     isTest = false,
     isDataOrConfig = false,
     isAlgorithm = false,
+    isConstantFile = false,
 ): boolean {
     if (lit.isConstBound || lit.tolerated) return false;
     const candidate = lit.numeric
         ? isNumericDuplicateCandidate(lit.value, magicNumberMin)
-        : isStringDuplicateCandidate(lit.value, ignoreSet, isTest, isDataOrConfig, isAlgorithm);
+        : isStringDuplicateCandidate(
+              lit.value,
+              ignoreSet,
+              isTest,
+              isDataOrConfig,
+              isAlgorithm,
+              isConstantFile,
+          );
     if (!candidate) return false;
     return !(classify && classifyLiteral(lit.value, lit.numeric).isReasonable);
 }
@@ -422,6 +460,7 @@ export function isDuplicateCandidate(
  * @param isTest - Whether file is test suite.
  * @param isDataOrConfig - Whether file is data/config.
  * @param isAlgorithm - Whether file is algorithm/parser.
+ * @param isConstantFile - Whether dedicated constant catalog.
  * @returns Map of literal key to array of occurrences.
  */
 export function groupDuplicates(
@@ -432,6 +471,7 @@ export function groupDuplicates(
     isTest = false,
     isDataOrConfig = false,
     isAlgorithm = false,
+    isConstantFile = false,
 ): Map<string, LiteralRecord[]> {
     const groups = new Map<string, LiteralRecord[]>();
     for (const lit of literals) {
@@ -444,6 +484,7 @@ export function groupDuplicates(
                 isTest,
                 isDataOrConfig,
                 isAlgorithm,
+                isConstantFile,
             )
         ) {
             continue;

@@ -33,7 +33,10 @@ export interface DiffOp {
         | typeof DIFF_OP_DELETE
         | typeof DIFF_OP_INSERT
         | typeof DIFF_OP_EQUAL_SPAN;
-    /** Index into the OLD line array (for 'equal'/'delete'); insertion point for 'insert'; start index for 'equal_span'. */
+    /**
+     * Index into OLD line array (for 'equal'/'delete'); insertion point for 'insert';
+     * start index for 'equal_span'.
+     */
     aIdx: number;
     /** Index into the NEW line array (for 'equal'/'insert'); start index for 'equal_span'. */
     bIdx: number;
@@ -54,13 +57,13 @@ export interface TrimmedSpans {
 }
 
 /**
- * Trim common prefix and suffix from two hashed line arrays.
+ * Computes length of identical common prefix between two hashed line arrays.
  *
  * @param a - Old lines.
  * @param b - New lines.
  * @param hashA - Hashes of old lines.
  * @param hashB - Hashes of new lines.
- * @returns Trimmed spans and middle slices.
+ * @returns Matching prefix length in lines.
  */
 function computeCommonPrefixLength(
     a: string[],
@@ -196,8 +199,9 @@ function advanceSnake(
 }
 
 /**
- * Execute forward diagonal trace for Myers greedy search with inlined diagonal snake advancement.
- * Employs a single contiguous flatTrace Int32Array buffer, eliminating transient row slice allocations.
+ * Execute forward diagonal trace for Myers greedy search with inlined diagonal
+ * snake advancement. Employs a single contiguous flatTrace Int32Array buffer,
+ * eliminating transient row slice allocations.
  */
 function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
     const { midA, midB, midHA, midHB, midN, midM } = ctx;
@@ -453,6 +457,13 @@ export function myersDiff(
  * Core engine for Myers line diff operating on pre-trimmed middle slices.
  * Directly reuses precomputed hashes and prefixes without duplicate scanning,
  * and maintains pruning benefits if degrading to histogram diff.
+ *
+ * Algorithm Invariants & Degradation Bounds:
+ *   - Invariant: `prefix` and `suffix` must strictly bound valid indices in `midHA` / `midHB`.
+ *   - Degradation Threshold: When middle section length `max = midN + midM > MYERS_MAX_MID_LINES`
+ *     (1,500 lines) or trace matrix size `(max + 1) * (2 * max + 1) > 2,000,000`, execution
+ *     automatically degrades and falls back to `histogramDiff` to guarantee O(ND) bounds and
+ *     eliminate OOM risks.
  *
  * @param prefix - Length of identical common prefix.
  * @param suffix - Length of identical common suffix.

@@ -357,14 +357,15 @@ export function calculateConfidence(
 export const SATURATION_HALFPOINT = 30;
 
 /**
- * Computes scores across all dimensions, applying scale-normalized density dampening for
- * large files.
+ * Computes scores across all dimensions, applying scale-normalized hyperbolic density
+ * dampening across non-absolute dimensions to eliminate discontinuous step-cliffs.
  *
- * `absolute` dimensions (currently only codeSecurity) score by absolute defect count: one
+ * `absolute` dimensions (such as codeSecurity) score by absolute defect count: one
  * hard-coded credential is one defect whether the file is 20 or 500 lines, so scaling its
- * penalty by size would understate it. The rest score by defect density, so a 500-line file
- * is not punished five times harder than a 100-line one for the same defect count. The
- * per-dimension choice is declared in `DIMENSION_SCALE_MODE`, not hardcoded at the branch.
+ * penalty by size would understate it. All other dimensions uniformly adopt hyperbolic
+ * density decay using `effectiveScale = Math.max(1, safeScale)` rather than switching
+ * modes at `scaleFactor <= 1`, ensuring continuous behavior across all file sizes.
+ * Numeric guards ensure non-finite inputs resolve cleanly to valid scores.
  *
  * @param deductionPoints - Net penalty points per dimension.
  * @param scaleFactor - Ratio of file lines to baseline (100 LOC).
@@ -375,18 +376,29 @@ export function applyScaleDampedScores(
     scaleFactor: number,
 ): Record<QualityDimension, number> {
     const rawScores = {} as Record<QualityDimension, number>;
+    const safeScale =
+        typeof scaleFactor === 'number' && Number.isFinite(scaleFactor) && scaleFactor > 0
+            ? scaleFactor
+            : 1;
+    const effectiveScale = Math.max(1, safeScale);
+
     for (const dim of ALL_QUALITY_DIMENSIONS) {
-        const rawPoints = deductionPoints[dim];
+        const raw = deductionPoints[dim];
+        const rawPoints = typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, raw) : 0;
         if (rawPoints <= 0) {
             rawScores[dim] = DIMENSION_MAX_SCORE;
             continue;
         }
-        if (scaleFactor <= 1 || DIMENSION_SCALE_MODE[dim] === 'absolute') {
-            rawScores[dim] = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
+        if (DIMENSION_SCALE_MODE[dim] === 'absolute') {
+            const absoluteScore = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
+            rawScores[dim] = Number.isFinite(absoluteScore) ? absoluteScore : DIMENSION_MAX_SCORE;
         } else {
-            const density = rawPoints / scaleFactor;
-            rawScores[dim] =
+            const density = rawPoints / effectiveScale;
+            const score =
                 (DIMENSION_MAX_SCORE * SATURATION_HALFPOINT) / (SATURATION_HALFPOINT + density);
+            rawScores[dim] = Number.isFinite(score)
+                ? Math.max(0, Math.min(DIMENSION_MAX_SCORE, score))
+                : DIMENSION_MAX_SCORE;
         }
     }
     return rawScores;

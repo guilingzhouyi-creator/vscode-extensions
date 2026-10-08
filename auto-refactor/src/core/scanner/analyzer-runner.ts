@@ -368,7 +368,8 @@ export async function runFileAnalyzers(
     const partition = partitionPlan(host.plan, activeAnalyzers);
     seedDependencyGraph(host, rel, content);
     const parse = prepareParse(adapter, content, rel, seed, partition);
-    const sourceFile = parse.ast?.sourceFile ?? materializeSourceFile(rel, content, partition.legacy, adapter);
+    const sourceFile =
+        parse.ast?.sourceFile ?? materializeSourceFile(rel, content, partition.legacy, adapter);
     // Compute line stats ONCE per file so every analyzer shares a single pass: the metric
     // collector always needs them, and large-file reads them when enabled.
     const base: FileContextBase = {

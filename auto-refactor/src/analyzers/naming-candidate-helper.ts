@@ -18,7 +18,6 @@ import * as ts from 'typescript';
 import type { AgentActionablePayload, AnalyzerContext, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import type { DiagnosticDescriptor } from '../core/messages/types';
-import { splitIdentifierTokens } from '../core/architecture/naming-decoupling-auditor';
 
 export interface NamingCandidate {
     readonly name: string;
@@ -68,8 +67,13 @@ export const RULE_NAM_LEN_001 = 'NAM-LEN-001';
 export const RULE_NAM_LEN_002 = 'NAM-LEN-002';
 export const RULE_NAM_ABR_001 = 'NAM-ABR-001';
 
-export const VAR_LENGTH_WHITELIST = new Set([
+export const MAX_VARIABLE_NAME_LENGTH = 42;
+export const MAX_FUNCTION_NAME_LENGTH = 50;
+
+export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set([
     'x', 'y', 'z', 'dx', 'dy', 'w', 'h', 'id', 'ip', 'i', 'j', 'k', '_',
+    'ts', 'fs', 'cp', 'vm', 'db', 'fd', 'fn', 'cb', 'el', 'sf', 'ns', 'op',
+    're', 'ex', 'ev', 'ok', 'no', 'ch', 'tx', 'rx',
 ]);
 
 /**
@@ -106,43 +110,19 @@ export const COMMON_ABBREVIATIONS: Readonly<Record<string, string>> = Object.fre
  * Unapproved abbreviations triggering NAM-ABR-001 warnings.
  */
 export const UNAPPROVED_ABBREVIATION_SET = new Set([
-    'usr',
-    'mgr',
-    'btn',
-    'cnt',
-    'ptr',
-    'cur',
-    'auth_mgr',
-    'tbl',
-    'chk',
-    'cb',
+    'usr', 'mgr', 'btn', 'cnt', 'ptr', 'cur', 'auth_mgr', 'tbl', 'chk', 'cb',
 ]);
 
 /**
  * Polysemic abbreviations that introduce semantic ambiguity.
  */
 export const POLYSEMIC_ABBREVIATIONS = new Set([
-    'cur',
-    'res',
-    'sec',
-    'auth',
-    'doc',
-    'cnt',
+    'cur', 'res', 'sec', 'auth', 'doc', 'cnt',
 ]);
 
 const PRIMITIVE_TYPE_NAMES = new Set([
-    'string',
-    'number',
-    'boolean',
-    'any',
-    'unknown',
-    'void',
-    'never',
-    'symbol',
-    'bigint',
-    'object',
-    'undefined',
-    'null',
+    'string', 'number', 'boolean', 'any', 'unknown', 'void',
+    'never', 'symbol', 'bigint', 'object', 'undefined', 'null',
 ]);
 
 /**
@@ -156,7 +136,7 @@ export const NamingMessages = {
         risk: 'Low',
     }),
     FUNCTION_NAME_TOO_LONG: (name: string): DiagnosticDescriptor => ({
-        message: `Function or method name '${name}' is excessively long (>= 38 characters); consider simplifying or decomposing.`,
+        message: `Function or method name '${name}' is excessively long (>= ${MAX_FUNCTION_NAME_LENGTH} characters); consider simplifying or decomposing.`,
         suggestion: `Refactor '${name}' to reduce verbosity or decompose responsibilities into smaller procedures.`,
         rationale: 'Overly long function names indicate procedural clutter and responsibility bloat.',
         risk: 'Low',
@@ -168,7 +148,7 @@ export const NamingMessages = {
         risk: 'Low',
     }),
     VARIABLE_NAME_TOO_LONG: (name: string): DiagnosticDescriptor => ({
-        message: `Variable name '${name}' is overly qualified or verbose (>= 30 characters).`,
+        message: `Variable name '${name}' is overly qualified or verbose (>= ${MAX_VARIABLE_NAME_LENGTH} characters).`,
         suggestion: `Simplify '${name}' to focus on core semantic domain entity.`,
         rationale: 'Excessive variable length creates line noise and typically signals missing module scope boundaries.',
         risk: 'Low',
@@ -187,29 +167,50 @@ export const NamingMessages = {
     }),
 };
 
+type TypeWrapperHandler = (arg: ts.TypeNode) => { typeName: string; isArray: boolean } | null;
+
+const TYPE_WRAPPER_HANDLERS: Readonly<Record<string, TypeWrapperHandler>> = Object.freeze({
+    Array: (arg: ts.TypeNode) => {
+        const inner = extractTypeName(arg);
+        return inner ? { typeName: inner.typeName, isArray: true } : null;
+    },
+    ReadonlyArray: (arg: ts.TypeNode) => {
+        const inner = extractTypeName(arg);
+        return inner ? { typeName: inner.typeName, isArray: true } : null;
+    },
+    Promise: (arg: ts.TypeNode) => extractTypeName(arg),
+});
+
+function resolveEntityNameText(name: ts.EntityName): string {
+    if (ts.isIdentifier(name)) return name.text;
+    if (ts.isQualifiedName(name)) return name.right.text;
+    return '';
+}
+
+function extractTypeReferenceNode(
+    typeNode: ts.TypeReferenceNode,
+): { typeName: string; isArray: boolean } | null {
+    const rawName = resolveEntityNameText(typeNode.typeName);
+    if (!rawName) return null;
+
+    const firstArg = typeNode.typeArguments?.[0];
+    if (firstArg) {
+        const handler = TYPE_WRAPPER_HANDLERS[rawName];
+        if (handler) {
+            return handler(firstArg);
+        }
+    }
+
+    return { typeName: rawName, isArray: false };
+}
+
 function extractTypeName(typeNode: ts.TypeNode): { typeName: string; isArray: boolean } | null {
     if (ts.isArrayTypeNode(typeNode)) {
         const inner = extractTypeName(typeNode.elementType);
         return inner ? { typeName: inner.typeName, isArray: true } : null;
     }
     if (ts.isTypeReferenceNode(typeNode)) {
-        let rawName = '';
-        if (ts.isIdentifier(typeNode.typeName)) {
-            rawName = typeNode.typeName.text;
-        } else if (ts.isQualifiedName(typeNode.typeName)) {
-            rawName = typeNode.typeName.right.text;
-        }
-        if (!rawName) return null;
-
-        const isArrayWrapper = rawName === 'Array' || rawName === 'ReadonlyArray';
-        if (isArrayWrapper && typeNode.typeArguments?.length) {
-            const inner = extractTypeName(typeNode.typeArguments[0]);
-            return inner ? { typeName: inner.typeName, isArray: true } : null;
-        }
-        if (rawName === 'Promise' && typeNode.typeArguments?.length) {
-            return extractTypeName(typeNode.typeArguments[0]);
-        }
-        return { typeName: rawName, isArray: false };
+        return extractTypeReferenceNode(typeNode);
     }
     return null;
 }
@@ -315,6 +316,54 @@ export function inferFromInitializerCall(node: ts.Node | undefined): NamingCandi
     };
 }
 
+const TOKEN_SPLIT_PATTERN = /([A-Z]+(?=[A-Z][a-z0-9]|$)|[A-Z]?[a-z0-9]+)/g;
+
+function extractMorphemeTokens(text: string): string[] {
+    TOKEN_SPLIT_PATTERN.lastIndex = 0;
+    const tokens: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = TOKEN_SPLIT_PATTERN.exec(text)) !== null) {
+        if (match[0].length > 0) {
+            tokens.push(match[0]);
+        }
+    }
+    return tokens;
+}
+
+function appendSegmentTokens(segment: string, target: string[]): void {
+    if (!segment) return;
+    const matchedTokens = extractMorphemeTokens(segment);
+    if (matchedTokens.length > 0) {
+        for (const token of matchedTokens) target.push(token);
+    } else {
+        target.push(segment);
+    }
+}
+
+function hasSegmentSeparators(name: string): boolean {
+    return name.includes('_') || name.includes('-');
+}
+
+/**
+ * Tokenize an identifier into discrete semantic morpheme tokens.
+ * Accurately parses camelCase, PascalCase, snake_case, and UPPER_SNAKE_CASE.
+ */
+export function tokenizeIdentifier(name: string): string[] {
+    if (!name) return [];
+
+    if (!hasSegmentSeparators(name)) {
+        const singleTokens = extractMorphemeTokens(name);
+        return singleTokens.length > 0 ? singleTokens : [name];
+    }
+
+    const segments = name.split(/[_-]+/);
+    const tokens: string[] = [];
+    for (const segment of segments) {
+        appendSegmentTokens(segment, tokens);
+    }
+    return tokens.length > 0 ? tokens : [name];
+}
+
 /**
  * Infer naming candidate from abbreviation expansion dictionary (Stage 3).
  */
@@ -331,7 +380,7 @@ export function inferFromAbbreviationDictionary(name: string): NamingCandidate |
         };
     }
 
-    const tokens = splitIdentifierTokens(name);
+    const tokens = tokenizeIdentifier(name);
     if (tokens.length === 0) return null;
 
     let hasExpanded = false;
@@ -400,15 +449,11 @@ export function findUnapprovedAbbreviation(name: string): { unapproved: string; 
     if (!name) return null;
     const lower = name.toLowerCase();
 
-    if (lower === 'auth_mgr' || lower.includes('auth_mgr')) {
-        return { unapproved: 'auth_mgr', expanded: 'authManager' };
-    }
-
     if (UNAPPROVED_ABBREVIATION_SET.has(lower)) {
         return { unapproved: name, expanded: COMMON_ABBREVIATIONS[lower] };
     }
 
-    const tokens = splitIdentifierTokens(name);
+    const tokens = tokenizeIdentifier(name);
     for (const token of tokens) {
         const tokenLower = token.toLowerCase();
         if (UNAPPROVED_ABBREVIATION_SET.has(tokenLower)) {
@@ -476,7 +521,7 @@ export function evaluateNamingAmbiguity(
         return { hasAmbiguity: true, reasons };
     }
 
-    const tokens = splitIdentifierTokens(name);
+    const tokens = tokenizeIdentifier(name);
     for (const t of tokens) {
         if (POLYSEMIC_ABBREVIATIONS.has(t.toLowerCase())) {
             reasons.push(`Token '${t}' has multiple domain interpretations`);
@@ -501,6 +546,21 @@ export function evaluateNamingAmbiguity(
     };
 }
 
+/** Immutable set of syntax kinds identifying export modifiers. */
+const EXPORT_MODIFIER_KINDS: ReadonlySet<ts.SyntaxKind> = new Set([
+    ts.SyntaxKind.ExportKeyword,
+]);
+
+function hasExportModifier(modifiers?: readonly ts.ModifierLike[]): boolean {
+    if (!modifiers) return false;
+    for (const modifier of modifiers) {
+        if (EXPORT_MODIFIER_KINDS.has(modifier.kind)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * Determine if an AST node has an export modifier.
  */
@@ -509,8 +569,8 @@ export function isNodeExported(node?: ts.Node): boolean {
     let curr: ts.Node | undefined = node;
     while (curr) {
         if (ts.canHaveModifiers(curr)) {
-            const mods = ts.getModifiers(curr);
-            if (mods?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+            const modifiers = ts.getModifiers(curr);
+            if (hasExportModifier(modifiers)) {
                 return true;
             }
         }
@@ -643,7 +703,7 @@ export function auditFunctionNameLengthsAndAbbreviations(
                 desc.suggestion,
                 actionable,
             );
-        } else if (name.length >= 38) {
+        } else if (name.length >= MAX_FUNCTION_NAME_LENGTH) {
             const desc = NamingMessages.FUNCTION_NAME_TOO_LONG(name);
             const actionable = buildNamingActionable(name, node, RULE_NAM_LEN_002, ctx, pos, symbolIndex);
             emitIssue(
@@ -693,7 +753,7 @@ export function auditVariableNameLengthsAndAbbreviations(
     emitIssue: NamingIssueEmitter,
 ): void {
     if (opts.checkLengths !== false) {
-        if (!isTopLevel && name.length <= 2 && !VAR_LENGTH_WHITELIST.has(name)) {
+        if (!isTopLevel && name.length <= 2 && !ALLOWED_SHORT_NAMES.has(name)) {
             const desc = NamingMessages.VARIABLE_NAME_TOO_SHORT(name);
             const actionable = buildNamingActionable(name, decl, RULE_NAM_LEN_001, ctx, pos, symbolIndex);
             emitIssue(
@@ -706,7 +766,7 @@ export function auditVariableNameLengthsAndAbbreviations(
                 desc.suggestion,
                 actionable,
             );
-        } else if (name.length >= 30 && (!isTopLevel || !/^[A-Z][A-Z0-9_]*$/.test(name))) {
+        } else if (name.length >= MAX_VARIABLE_NAME_LENGTH && (!isTopLevel || !/^[A-Z][A-Z0-9_]*$/.test(name))) {
             const desc = NamingMessages.VARIABLE_NAME_TOO_LONG(name);
             const actionable = buildNamingActionable(name, decl, RULE_NAM_LEN_001, ctx, pos, symbolIndex);
             emitIssue(
@@ -770,3 +830,59 @@ export function auditMemberAbbreviation(
         );
     }
 }
+
+const SCALAR_SYNTAX_KINDS = new Set<ts.SyntaxKind>([
+    ts.SyntaxKind.NumericLiteral, ts.SyntaxKind.StringLiteral, ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+    ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.BigIntLiteral, ts.SyntaxKind.RegularExpressionLiteral,
+]);
+
+/**
+ * Strips type assertions and parenthesization from a constant initializer.
+ */
+export function unwrapConstantInitializer(expr: ts.Expression): ts.Expression {
+    let current = expr;
+    while (
+        ts.isAsExpression(current) ||
+        ts.isTypeAssertionExpression(current) ||
+        ts.isParenthesizedExpression(current) ||
+        ts.isNonNullExpression(current)
+    ) {
+        current = current.expression;
+    }
+    return current;
+}
+
+/**
+ * Checks whether an expression represents a composite collection/object literal.
+ */
+export function isCompositeLiteral(expr: ts.Expression): boolean {
+    const unwrapped = unwrapConstantInitializer(expr);
+    return ts.isObjectLiteralExpression(unwrapped) || ts.isArrayLiteralExpression(unwrapped);
+}
+
+/**
+ * Checks whether an expression is a scalar primitive literal.
+ */
+export function isScalarLiteral(expr: ts.Expression): boolean {
+    let unwrapped = unwrapConstantInitializer(expr);
+    if (
+        ts.isPrefixUnaryExpression(unwrapped) &&
+        (unwrapped.operator === ts.SyntaxKind.PlusToken || unwrapped.operator === ts.SyntaxKind.MinusToken)
+    ) {
+        unwrapped = unwrapped.operand;
+    }
+    return SCALAR_SYNTAX_KINDS.has(unwrapped.kind);
+}
+
+/**
+ * Checks whether an AST node is a single-line or single-expression arrow function.
+ */
+export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean {
+    if (!ts.isArrowFunction(node)) return false;
+    const startLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
+    const endLine = sf.getLineAndCharacterOfPosition(node.getEnd()).line;
+    if (startLine !== endLine) return false;
+    if (!ts.isBlock(node.body)) return true;
+    return node.body.statements.length <= 1;
+}
+

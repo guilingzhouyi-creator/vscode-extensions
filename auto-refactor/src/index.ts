@@ -13,7 +13,7 @@
  *     subcommand's code; usage errors exit 2; the top-level catch logs FATAL to stderr and
  *     exits 2. Compile-cache setup is best-effort so an unwritable cache never breaks a scan.
  */
-// C1: enable Node's V8 bytecode compile cache for the CLI process. MUST run before any
+// Enable Node's V8 bytecode compile cache for the CLI process. MUST run before any
 // other require so the CLI's own module graph gets cached on disk (30-50% faster
 // cold-start module compilation on Node >= 22.8). CLI-only by design — library consumers
 // (api.ts / analyzer.ts) are intentionally NOT affected. Best-effort: any failure (old

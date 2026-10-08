@@ -28,13 +28,24 @@ import { auditPythonSourceHelper } from './naming-python-helper';
 import { auditFileAndDirectoryPaths, hasTransientJargon } from './naming-path-helper';
 import {
     NamingMessages,
+    ALLOWED_SHORT_NAMES,
+    MAX_VARIABLE_NAME_LENGTH,
+    MAX_FUNCTION_NAME_LENGTH,
     auditFunctionNameLengthsAndAbbreviations,
     auditVariableNameLengthsAndAbbreviations,
     auditMemberAbbreviation,
+    isCompositeLiteral,
+    isScalarLiteral,
+    isSimpleArrowFunction,
     type NamingActionablePayload,
 } from './naming-candidate-helper';
 
-export { NamingMessages };
+export {
+    NamingMessages,
+    ALLOWED_SHORT_NAMES,
+    MAX_VARIABLE_NAME_LENGTH,
+    MAX_FUNCTION_NAME_LENGTH,
+};
 
 /**
  * Tunable options for NamingAnalyzer.
@@ -276,17 +287,20 @@ export class NamingAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         if (!decl.initializer) return;
-        const isFn =
-            ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer);
-        const isClass = ts.isClassExpression(decl.initializer);
-        const isPrimitive =
-            ts.isNumericLiteral(decl.initializer) ||
-            ts.isStringLiteral(decl.initializer) ||
-            decl.initializer.kind === ts.SyntaxKind.TrueKeyword ||
-            decl.initializer.kind === ts.SyntaxKind.FalseKeyword ||
-            ts.isRegularExpressionLiteral(decl.initializer);
+        const init = decl.initializer;
+        const isFn = ts.isArrowFunction(init) || ts.isFunctionExpression(init);
+        const isClass = ts.isClassExpression(init);
+        if (isFn || isClass) return;
 
-        if (isPrimitive && !isFn && !isClass && !/^[A-Z][A-Z0-9_]*$/.test(name)) {
+        // Composite object dictionaries (ObjectLiteralExpression, ArrayLiteralExpression, or with as const)
+        // are permitted to use camelCase (or UPPER_SNAKE_CASE).
+        if (isCompositeLiteral(init)) {
+            return;
+        }
+
+        // Only scalar constants enforce UPPER_SNAKE_CASE
+        const isScalar = isScalarLiteral(init);
+        if (isScalar && !/^[A-Z][A-Z0-9_]*$/.test(name)) {
             issues.push(
                 this.mkIssue(
                     ctx,
@@ -543,12 +557,15 @@ export class NamingAnalyzer implements Analyzer {
             }
             this.checkDecouplingSymbol(node.name.text, 'function', pos, opts, ctx, issues, symbols);
         }
+        const isExemptVague = isSimpleArrowFunction(node, sf);
         for (const param of fn.parameters) {
             if (ts.isIdentifier(param.name)) {
                 const paramName = param.name.text;
                 const pos = sf.getLineAndCharacterOfPosition(param.name.getStart(sf));
                 this.checkVariableName(paramName, param, false, pos, ctx, issues, opts);
-                this.checkIdentifierVagueness(paramName, pos, vagueSet, ctx, issues, opts);
+                if (!isExemptVague) {
+                    this.checkIdentifierVagueness(paramName, pos, vagueSet, ctx, issues, opts);
+                }
                 this.checkSingleLetter(paramName, pos, false, singleAllowed, ctx, issues, opts);
                 if (opts.checkJargon !== false) {
                     this.checkSymbolJargon(paramName, pos, ctx, issues);

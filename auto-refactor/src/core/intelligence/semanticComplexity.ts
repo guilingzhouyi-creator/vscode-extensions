@@ -192,137 +192,174 @@ export function detectUnboundedRecursion(
  *   the allocation counterpart of the same policy.
  * @returns Issues for complexity amplification (CPX-AMP-001 and CPX-SPACE-001).
  */
+/**
+ * Compile an array of regular expressions into a single union pattern.
+ *
+ * @param patterns - Candidate path matching patterns.
+ * @returns Combined RegExp or null if patterns array is empty.
+ */
+function compileUnionPattern(patterns: readonly RegExp[]): RegExp | null {
+    if (patterns.length === 0) return null;
+    if (patterns.length === 1) return patterns[0];
+    let hasI = false;
+    let hasU = false;
+    let hasS = false;
+    const sources: string[] = [];
+    for (let i = 0; i < patterns.length; i++) {
+        const p = patterns[i];
+        if (p.ignoreCase) hasI = true;
+        if (p.unicode) hasU = true;
+        if (p.dotAll) hasS = true;
+        sources.push(`(?:${p.source})`);
+    }
+    let flags = '';
+    if (hasI) flags += 'i';
+    if (hasU) flags += 'u';
+    if (hasS) flags += 's';
+    return new RegExp(sources.join('|'), flags || undefined);
+}
+
+function buildAmplificationIoIssue(symbol: string, site: LoopSite): Issue {
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'loop',
+            description: `Iteration over dynamic scale variable '${site.scaleVariable}'`,
+            file: site.file,
+            line: site.line,
+            symbol,
+        },
+        {
+            kind: 'io',
+            description: 'Synchronous I/O or network call triggered per iteration',
+            file: site.file,
+            line: site.line,
+            symbol,
+        },
+    ];
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'core',
+        symbol,
+        codeDomain: 'io-amplification',
+        currentBehavior: `Executing synchronous blocking I/O or serialization per loop iteration over '${site.scaleVariable}'.`,
+        semanticEvidenceChain: evidence,
+        triggerCondition: 'I/O operation located inside unbounded iteration body',
+        risk: 'Multiplies disk/network latency by collection cardinality N, freezing worker thread.',
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix:
+            'Batch I/O operations outside the loop or buffer into a batch write.',
+        impactedCallers: [],
+        impactedTests: [],
+        verificationMethod:
+            'Profile I/O operation count under varying collection sizes.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    return {
+        id: `complexity:CPX-AMP-001:${site.file}:${site.line}`,
+        analyzer: 'complexity',
+        rule: 'CPX-AMP-001',
+        severity: 'warning',
+        message: `Complexity amplification hazard: synchronous I/O executed inside loop over '${site.scaleVariable}'.`,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: MAX_SCORE_CAP },
+        },
+        detail,
+        suggestion: 'Refactor to batch read/write before or after the loop.',
+        evidence: {
+            confidence: 0.95,
+            requiresRuntime: false,
+        },
+    };
+}
+
+function buildAmplificationAllocIssue(symbol: string, site: LoopSite): Issue {
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: 'loop',
+            description: `Unbounded iteration over '${site.scaleVariable}'`,
+            file: site.file,
+            line: site.line,
+            symbol,
+        },
+        {
+            kind: 'allocation',
+            description: 'Transient heap object or collection cloned inside loop',
+            file: site.file,
+            line: site.line,
+            symbol,
+        },
+    ];
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: 'core',
+        symbol,
+        codeDomain: 'memory-allocation',
+        currentBehavior: `Repeated transient object/array allocation in hot loop over '${site.scaleVariable}'.`,
+        semanticEvidenceChain: evidence,
+        triggerCondition: 'Heap allocation inside unbounded loop path',
+        risk: 'Excessive garbage collection thrashing and memory retention spikes.',
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix: 'Hoist buffer/object allocation outside loop and reset in-place.',
+        impactedCallers: [],
+        impactedTests: [],
+        verificationMethod: 'Check heap allocations with memory profiler.',
+        ruleVersion: '1.0.0',
+        configVersion: '0.3.0',
+        canAutofix: false,
+    };
+
+    return {
+        id: `complexity:CPX-SPACE-001:${site.file}:${site.line}`,
+        analyzer: 'complexity',
+        rule: 'CPX-SPACE-001',
+        severity: 'warning',
+        message: `Unbounded transient allocation: heap memory allocated repeatedly in loop over '${site.scaleVariable}'.`,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: MAX_SCORE_CAP },
+        },
+        detail,
+        suggestion: 'Hoist allocation outside the loop and clear/reuse the instance.',
+        evidence: {
+            confidence: 0.9,
+            requiresRuntime: false,
+        },
+    };
+}
+
 export function detectComplexityAmplification(
     loopSites: Map<string, LoopSite[]>,
     ioAllowPatterns: RegExp[] = [],
     allocationAllowPatterns: RegExp[] = [],
 ): Issue[] {
     const issues: Issue[] = [];
+    const ioUnionPattern = compileUnionPattern(ioAllowPatterns);
+    const allocUnionPattern = compileUnionPattern(allocationAllowPatterns);
 
     for (const [symbol, sites] of loopSites.entries()) {
         for (const site of sites) {
             if (site.isBounded) continue;
-            const ioExempt = ioAllowPatterns.some((re) => re.test(site.file));
-            const allocExempt = allocationAllowPatterns.some((re) => re.test(site.file));
+            const ioExempt = ioUnionPattern !== null && ioUnionPattern.test(site.file);
+            const allocExempt = allocUnionPattern !== null && allocUnionPattern.test(site.file);
 
             if (site.hasBlockingIo && !ioExempt) {
-                const evidence: SemanticEvidenceStep[] = [
-                    {
-                        kind: 'loop',
-                        description: `Iteration over dynamic scale variable '${site.scaleVariable}'`,
-                        file: site.file,
-                        line: site.line,
-                        symbol,
-                    },
-                    {
-                        kind: 'io',
-                        description: 'Synchronous I/O or network call triggered per iteration',
-                        file: site.file,
-                        line: site.line,
-                        symbol,
-                    },
-                ];
-
-                const detail: SemanticReviewDetail = {
-                    language: 'typescript',
-                    module: 'core',
-                    symbol,
-                    codeDomain: 'io-amplification',
-                    currentBehavior: `Executing synchronous blocking I/O or serialization per loop iteration over '${site.scaleVariable}'.`,
-                    semanticEvidenceChain: evidence,
-                    triggerCondition: 'I/O operation located inside unbounded iteration body',
-                    risk: 'Multiplies disk/network latency by collection cardinality N, freezing worker thread.',
-                    blastRadius: [site.file],
-                    isDeterministic: true,
-                    requiresManualConfirm: false,
-                    suggestedFix:
-                        'Batch I/O operations outside the loop or buffer into a batch write.',
-                    impactedCallers: [],
-                    impactedTests: [],
-                    verificationMethod:
-                        'Profile I/O operation count under varying collection sizes.',
-                    ruleVersion: '1.0.0',
-                    configVersion: '0.3.0',
-                    canAutofix: false,
-                };
-
-                issues.push({
-                    id: `complexity:CPX-AMP-001:${site.file}:${site.line}`,
-                    analyzer: 'complexity',
-                    rule: 'CPX-AMP-001',
-                    severity: 'warning',
-                    message: `Complexity amplification hazard: synchronous I/O executed inside loop over '${site.scaleVariable}'.`,
-                    location: {
-                        file: site.file,
-                        start: { line: site.line, column: 1 },
-                        end: { line: site.line, column: MAX_SCORE_CAP },
-                    },
-                    detail,
-                    suggestion: 'Refactor to batch read/write before or after the loop.',
-                    evidence: {
-                        confidence: 0.95,
-                        requiresRuntime: false,
-                    },
-                });
+                issues.push(buildAmplificationIoIssue(symbol, site));
             }
 
             if (site.hasTransientAllocation && !allocExempt) {
-                const evidence: SemanticEvidenceStep[] = [
-                    {
-                        kind: 'loop',
-                        description: `Unbounded iteration over '${site.scaleVariable}'`,
-                        file: site.file,
-                        line: site.line,
-                        symbol,
-                    },
-                    {
-                        kind: 'allocation',
-                        description: 'Transient heap object or collection cloned inside loop',
-                        file: site.file,
-                        line: site.line,
-                        symbol,
-                    },
-                ];
-
-                const detail: SemanticReviewDetail = {
-                    language: 'typescript',
-                    module: 'core',
-                    symbol,
-                    codeDomain: 'memory-allocation',
-                    currentBehavior: `Repeated transient object/array allocation in hot loop over '${site.scaleVariable}'.`,
-                    semanticEvidenceChain: evidence,
-                    triggerCondition: 'Heap allocation inside unbounded loop path',
-                    risk: 'Excessive garbage collection thrashing and memory retention spikes.',
-                    blastRadius: [site.file],
-                    isDeterministic: true,
-                    requiresManualConfirm: false,
-                    suggestedFix: 'Hoist buffer/object allocation outside loop and reset in-place.',
-                    impactedCallers: [],
-                    impactedTests: [],
-                    verificationMethod: 'Check heap allocations with memory profiler.',
-                    ruleVersion: '1.0.0',
-                    configVersion: '0.3.0',
-                    canAutofix: false,
-                };
-
-                issues.push({
-                    id: `complexity:CPX-SPACE-001:${site.file}:${site.line}`,
-                    analyzer: 'complexity',
-                    rule: 'CPX-SPACE-001',
-                    severity: 'warning',
-                    message: `Unbounded transient allocation: heap memory allocated repeatedly in loop over '${site.scaleVariable}'.`,
-                    location: {
-                        file: site.file,
-                        start: { line: site.line, column: 1 },
-                        end: { line: site.line, column: MAX_SCORE_CAP },
-                    },
-                    detail,
-                    suggestion: 'Hoist allocation outside the loop and clear/reuse the instance.',
-                    evidence: {
-                        confidence: 0.9,
-                        requiresRuntime: false,
-                    },
-                });
+                issues.push(buildAmplificationAllocIssue(symbol, site));
             }
         }
     }

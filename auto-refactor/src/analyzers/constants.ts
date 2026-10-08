@@ -33,7 +33,10 @@ import { inspectConstantLibraryTopology } from '../core/architecture/constant-li
 import { detectConstantDrift } from '../core/architecture/constant-drift-guard';
 import { arbitrateConstantOwnership } from '../core/architecture/constant-ownership-arbiter';
 import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
-import { formatConstantDeclarationSuggestion } from '../core/intelligence/constant-identity';
+import {
+    formatConstantDeclarationSuggestion,
+    isConstantDefinitionFile,
+} from '../core/intelligence/constant-identity';
 
 import {
     ANALYZER_CONSTANTS,
@@ -91,6 +94,11 @@ const RE_LEADING_DIGIT = /^[0-9]/;
 /** Regular expression detecting redundant uppercase constant aliases. */
 const RE_CONSTANT_ALIAS =
     /^(?:export\s+)?const\s+([A-Z][A-Z0-9_]{2,})\s*(?::\s*[^=]+)?\s*=\s*([A-Z][A-Z0-9_]{2,})\s*;?$/;
+
+function isAlgorithmContext(role: string, filePath: string): boolean {
+    if (role === 'algorithm_computation') return true;
+    return filePath.includes('/ast/') || filePath.includes('\\ast\\');
+}
 
 /**
  * Detect inline literals that should be promoted to named constants.
@@ -172,43 +180,66 @@ export class ConstantsAnalyzer implements Analyzer {
         state.setLiteralRecords(this.literals);
     }
 
-    private runExtendedGovernancePasses(ctx: AnalyzerContext, issues: Issue[]): void {
+    private passNestedConstants(ctx: AnalyzerContext, issues: Issue[]): void {
         const flagNested = ctx.options?.flagNestedConstants !== false;
-        if (flagNested && ctx.content) {
-            this.detectNestedConstants(ctx, issues);
-        }
+        if (!flagNested || !ctx.content) return;
+        this.detectNestedConstants(ctx, issues);
+    }
 
-        if (ctx.options?.checkConstantClusters || ctx.options?.constantGovernance) {
-            issues.push(...scanNearLiteralClusters(this.literals, ctx.filePath));
-        }
+    private passLiteralClusters(ctx: AnalyzerContext, issues: Issue[]): void {
+        const enabled = Boolean(ctx.options?.checkConstantClusters || ctx.options?.constantGovernance);
+        if (!enabled) return;
+        issues.push(...scanNearLiteralClusters(this.literals, ctx.filePath));
+    }
 
-        if ((ctx.options?.checkConstantLayout || ctx.options?.constantGovernance) && ctx.content) {
-            issues.push(...checkConstantLayoutAndScope(ctx.content, ctx.filePath));
-        }
+    private passConstantLayout(ctx: AnalyzerContext, issues: Issue[]): void {
+        const enabled = Boolean(ctx.options?.checkConstantLayout || ctx.options?.constantGovernance);
+        if (!enabled || !ctx.content) return;
+        issues.push(...checkConstantLayoutAndScope(ctx.content, ctx.filePath));
+    }
 
-        const checkTopology = ctx.options?.checkConstantTopology || ctx.options?.constantGovernance;
-        if (checkTopology && ctx.content) {
-            const entities = extractConstantEntities(ctx.content, ctx.filePath);
-            const observed = entities.map((e) => ({
-                name: e.identity.name,
-                normalizedValue: e.fingerprint?.normalizedValue ?? '',
-                filePath: ctx.filePath,
-                line: e.identity.line ?? 1,
-                isExported: e.identity.isExported,
-            }));
-            issues.push(...inspectConstantLibraryTopology(observed, ctx.filePath));
-            issues.push(...detectConstantDrift(observed));
-            for (const item of observed) {
-                const { issue } = arbitrateConstantOwnership(
-                    item.name,
-                    item.normalizedValue,
-                    item.filePath,
-                    item.line,
-                    [item.filePath],
-                );
-                if (issue) issues.push(issue);
-            }
+    private arbitrateObservedOwnership(
+        observed: Array<{ name: string; normalizedValue: string; filePath: string; line: number }>,
+        issues: Issue[],
+    ): void {
+        for (const item of observed) {
+            const { issue } = arbitrateConstantOwnership(
+                item.name,
+                item.normalizedValue,
+                item.filePath,
+                item.line,
+                [item.filePath],
+            );
+            if (issue) issues.push(issue);
         }
+    }
+
+    private executeTopologyPass(ctx: AnalyzerContext, issues: Issue[]): void {
+        if (!ctx.content) return;
+        const entities = extractConstantEntities(ctx.content, ctx.filePath);
+        const observed = entities.map((e) => ({
+            name: e.identity.name,
+            normalizedValue: e.fingerprint?.normalizedValue ?? '',
+            filePath: ctx.filePath,
+            line: e.identity.line ?? 1,
+            isExported: e.identity.isExported,
+        }));
+        issues.push(...inspectConstantLibraryTopology(observed, ctx.filePath));
+        issues.push(...detectConstantDrift(observed));
+        this.arbitrateObservedOwnership(observed, issues);
+    }
+
+    private passConstantTopology(ctx: AnalyzerContext, issues: Issue[]): void {
+        const enabled = Boolean(ctx.options?.checkConstantTopology || ctx.options?.constantGovernance);
+        if (!enabled || !ctx.content) return;
+        this.executeTopologyPass(ctx, issues);
+    }
+
+    private runExtendedGovernancePasses(ctx: AnalyzerContext, issues: Issue[]): void {
+        this.passNestedConstants(ctx, issues);
+        this.passLiteralClusters(ctx, issues);
+        this.passConstantLayout(ctx, issues);
+        this.passConstantTopology(ctx, issues);
     }
 
     private detectMagicNumbers(
@@ -224,13 +255,25 @@ export class ConstantsAnalyzer implements Analyzer {
         const isStyle = ctx.filePath.includes('-styles.') || RE_STYLE_FILE_EXT.test(ctx.filePath);
         if (isTest || isStyle) return;
 
-        const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
+        const isConstLib = isConstantDefinitionFile(ctx.filePath, ctx.content);
+        const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath, ctx.content);
         const min = ctx.options.magicNumberMin;
         const classify = !!ctx.options.classifyLiterals;
         const granular = !!ctx.options.granularRules;
 
         for (const lit of this.literals) {
-            if (this.shouldSkipMagicNumber(lit, min, suppress, isDataOrConfig)) continue;
+            if (
+                this.shouldSkipMagicNumber(
+                    lit,
+                    min,
+                    suppress,
+                    isDataOrConfig,
+                    isConstLib,
+                    ctx.content,
+                )
+            ) {
+                continue;
+            }
 
             const issue = this.buildMagicNumberIssue(lit, ctx, classify, granular);
             if (issue) out.push(issue);
@@ -242,15 +285,34 @@ export class ConstantsAnalyzer implements Analyzer {
         min: number,
         suppress: Set<NormalizedNode>,
         isDataOrConfig = false,
+        isConstLib = false,
+        content?: string,
     ): boolean {
         if (!lit.numeric || lit.isConstBound || lit.tolerated) return true;
         if (suppress.has(lit.node)) return true;
+        if (isConstLib && !this.isInComplexLogicFunction(lit.parent, content)) {
+            return true;
+        }
         if (isDataOrConfig && !lit.parent?.functionLike) {
             return true;
         }
         const num = Number(lit.value);
         if (!isFinite(num) || TRIVIAL_NUMBERS.has(lit.value)) return true;
         return Math.abs(num) < min;
+    }
+
+    private isInComplexLogicFunction(
+        parent: NormalizedNode | undefined,
+        content?: string,
+    ): boolean {
+        if (!parent || !parent.functionLike) return false;
+        if (!content || !parent.start || !parent.end) return false;
+        const lines = content.split(/\r?\n/).slice(parent.start.line - 1, parent.end.line);
+        if (lines.length > 20) return true;
+        const body = lines.join('\n');
+        const cfMatches =
+            body.match(/\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g) || [];
+        return cfMatches.length >= 2;
     }
 
     private buildMagicNumberIssue(
@@ -309,15 +371,16 @@ export class ConstantsAnalyzer implements Analyzer {
         suppress: Set<NormalizedNode>,
         out: Issue[],
     ): void {
+        if (isConstantDefinitionFile(ctx.filePath, ctx.content)) {
+            return;
+        }
+
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
         const isTest = isTestFile(roleInference.role, ctx.filePath);
         const isI18n = isI18nFile(roleInference.role, ctx.filePath);
         if (isTest || isI18n) return;
 
-        const isDataOrConfig =
-            roleInference.role === 'config_constant' ||
-            roleInference.role === 'rules_registry' ||
-            ctx.filePath.endsWith('.json');
+        const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath, ctx.content);
         const isAlgorithm =
             roleInference.role === 'algorithm_computation' ||
             ctx.filePath.includes('/ast/') ||
@@ -450,29 +513,60 @@ export class ConstantsAnalyzer implements Analyzer {
         };
     }
 
+    private emitDuplicateIssues(
+        ctx: AnalyzerContext,
+        groups: Map<string, LiteralRecord[]>,
+        threshold: number,
+        suppress: Set<NormalizedNode>,
+        out: Issue[],
+    ): void {
+        for (const [, arr] of groups) {
+            this.processDuplicateGroup(ctx, arr, threshold, suppress, out);
+        }
+    }
+
+    private processDuplicateGroup(
+        ctx: AnalyzerContext,
+        arr: LiteralRecord[],
+        threshold: number,
+        suppress: Set<NormalizedNode>,
+        out: Issue[],
+    ): void {
+        if (arr.length < threshold) return;
+        for (const item of arr) suppress.add(item.node);
+
+        const first = arr[0];
+        if (!first) return;
+        const valText = first.value.trim();
+        if (!first.numeric && valText.length === 0) return;
+
+        const kind = first.numeric ? NUM_KIND : STR_KIND;
+        const suggested = this.suggestName(first.value, kind);
+        out.push(buildDuplicateIssue(ctx, arr, suggested));
+    }
+
     private detectDuplicates(
         ctx: AnalyzerContext,
         suppress: Set<NormalizedNode>,
         out: Issue[],
     ): void {
+        const isConstLib = isConstantDefinitionFile(ctx.filePath, ctx.content);
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
         const isTest = isTestFile(roleInference.role, ctx.filePath);
         const isI18n = isI18nFile(roleInference.role, ctx.filePath);
         if (isTest || isI18n) return;
 
-        const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath);
-        const isAlgorithm =
-            roleInference.role === 'algorithm_computation' ||
-            ctx.filePath.includes('/ast/') ||
-            ctx.filePath.includes('\\ast\\');
+        const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath, ctx.content);
+        const isAlgorithm = isAlgorithmContext(roleInference.role, ctx.filePath);
         const threshold = resolveDuplicateThreshold(
             ctx.options.duplicateLiteralThreshold ?? 4,
             isTest,
             isDataOrConfig,
+            isConstLib,
         );
 
         const ignoreSet = new Set<string>(ctx.options.ignoreLiterals || []);
-        const classify = !!ctx.options.classifyLiterals;
+        const classify = Boolean(ctx.options.classifyLiterals);
         const groups = groupDuplicates(
             this.literals,
             ctx.options.magicNumberMin,
@@ -481,17 +575,10 @@ export class ConstantsAnalyzer implements Analyzer {
             isTest,
             isDataOrConfig,
             isAlgorithm,
+            isConstLib,
         );
 
-        for (const [, arr] of groups) {
-            if (arr.length < threshold) continue;
-            for (const l of arr) suppress.add(l.node);
-            const first = arr[0];
-            const valText = first.value.trim();
-            if (!first.numeric && valText.length === 0) continue;
-            const suggested = this.suggestName(first.value, first.numeric ? NUM_KIND : STR_KIND);
-            out.push(buildDuplicateIssue(ctx, arr, suggested));
-        }
+        this.emitDuplicateIssues(ctx, groups, threshold, suppress, out);
     }
 
     private suggestName(value: string, kind: typeof NUM_KIND | typeof STR_KIND): string {

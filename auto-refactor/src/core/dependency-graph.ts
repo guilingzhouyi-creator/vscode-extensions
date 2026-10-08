@@ -15,12 +15,6 @@
  *                    false yields an empty result, reads are chunked for large reports, and
  *                    output is capped; regex indexing avoids a TypeScript AST dependency so
  *                    the pass stays cheap on large reports and safe in post-scan reuse.
- *
- * Module Dependency Graph & Reverse Impact Analyzer.
- * Constructs an in-memory Directed Acyclic Graph (DAG) over source file imports/exports:
- * - Maps which files import symbols from other files (reverse dependency lookup)
- * - Computes transitive impact sets when a file or exported symbol changes
- * - Operates in < 0.5ms query time for 1000+ files to supply Review Cell impact analysis.
  */
 
 import * as path from 'path';
@@ -108,6 +102,62 @@ function parsePythonFromImportStatement(
     out.push({ module: fromMatch[1], names });
 }
 
+const TRIPLE_QUOTE_DOUBLE = '"""';
+const TRIPLE_QUOTE_SINGLE = "'''";
+const PYTHON_TRIPLE_QUOTES: ReadonlySet<string> = Object.freeze(
+    new Set([TRIPLE_QUOTE_DOUBLE, TRIPLE_QUOTE_SINGLE]),
+);
+const PYTHON_ROOT_IMPORT_KEYWORDS: ReadonlySet<string> = Object.freeze(
+    new Set(['import', 'from']),
+);
+const PYTHON_TRIPLE_QUOTE_PATTERN = /"""|'''/;
+
+function countMarkerOccurrences(line: string, marker: string): number {
+    let count = 0;
+    const maxIdx = line.length - 3;
+    let idx = 0;
+    while (idx <= maxIdx) {
+        if (
+            line.charCodeAt(idx) === marker.charCodeAt(0) &&
+            line.charCodeAt(idx + 1) === marker.charCodeAt(1) &&
+            line.charCodeAt(idx + 2) === marker.charCodeAt(2)
+        ) {
+            count++;
+            idx += 3;
+        } else {
+            idx++;
+        }
+    }
+    return count;
+}
+
+function updatePythonTripleQuoteState(
+    line: string,
+    currentTriple: string | null,
+): { nextTriple: string | null; skipLine: boolean } {
+    if (currentTriple !== null) {
+        const occurrences = countMarkerOccurrences(line, currentTriple);
+        const closed = occurrences % 2 === 1;
+        return {
+            nextTriple: closed ? null : currentTriple,
+            skipLine: true,
+        };
+    }
+
+    const match = PYTHON_TRIPLE_QUOTE_PATTERN.exec(line);
+    if (!match || !PYTHON_TRIPLE_QUOTES.has(match[0])) {
+        return { nextTriple: null, skipLine: false };
+    }
+
+    const marker = match[0];
+    const occurrences = countMarkerOccurrences(line, marker);
+    if (occurrences % 2 === 1) {
+        return { nextTriple: marker, skipLine: true };
+    }
+
+    return { nextTriple: null, skipLine: false };
+}
+
 /**
  * Extract module-level Python import targets: `import a.b, c.d` and `from .pkg import name`.
  *
@@ -125,14 +175,14 @@ function collectPythonImports(content: string): Array<{ module: string; names: s
     let inTriple: string | null = null;
     for (const rawLine of content.split('\n')) {
         const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
-        const marker = line.includes('"""') ? '"""' : line.includes("'''") ? "'''" : null;
-        const markerCount = marker ? line.split(marker).length - 1 : 0;
-        if (inTriple !== null) {
-            if (marker === inTriple && markerCount % 2 === 1) inTriple = null;
+        const state = updatePythonTripleQuoteState(line, inTriple);
+        inTriple = state.nextTriple;
+        if (state.skipLine) {
             continue;
         }
-        if (marker && markerCount % 2 === 1) {
-            inTriple = marker;
+
+        const leadWord = line.split(/[ \t]/, 1)[0];
+        if (!PYTHON_ROOT_IMPORT_KEYWORDS.has(leadWord)) {
             continue;
         }
 

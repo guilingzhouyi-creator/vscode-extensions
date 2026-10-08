@@ -13,7 +13,11 @@
 import type { Issue } from '../types';
 import type { PillarCeilingConstraint, PrimaryQualityPillar } from './eightPillarModel';
 import type { QualityDimension } from './scoringTypes';
-import { familyDimensionOf } from './dimensionDeductions';
+import {
+    familyDimensionOf,
+    isTier1CriticalDebt,
+    isTier2EvolutionaryDebt,
+} from './dimensionDeductions';
 
 /**
  * Reach / blast radius scope of an issue.
@@ -70,10 +74,17 @@ const PREFIX_SEC = 'SEC-';
 const PREFIX_CPX = 'CPX-';
 const PREFIX_BIG = 'BIG-';
 const PREFIX_DEP = 'DEP-';
+const PREFIX_NAM = 'NAM-';
+const PREFIX_HYG_NAM = 'HYG-NAM-';
+const PREFIX_CONST = 'CONST-';
 
 const RULE_CLEAN_LAYER = 'clean-layer-violation';
 const RULE_HIGH_COMPLEXITY = 'high-complexity';
 const RULE_IMPORT_CYCLE = 'import-cycle';
+const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
+const RULE_MAGIC_NUMBER = 'magic-number';
+const RULE_NESTED_CONSTANT = 'nested-constant';
+const RULE_HARDCODED_STRING = 'hardcoded-string';
 
 const KEYWORD_ALGORITHMIC = 'algorithmic';
 const KEYWORD_TRANSIENT = 'transient';
@@ -86,6 +97,10 @@ const EXACT_RULE_TO_PILLAR: Readonly<Record<string, PrimaryQualityPillar>> = {
     [RULE_CLEAN_LAYER]: PILLAR_ARCHITECTURE,
     [RULE_HIGH_COMPLEXITY]: PILLAR_MAINTAINABILITY,
     [RULE_IMPORT_CYCLE]: PILLAR_RELIABILITY,
+    [RULE_DUPLICATE_LITERAL]: PILLAR_MAINTAINABILITY,
+    [RULE_MAGIC_NUMBER]: PILLAR_MAINTAINABILITY,
+    [RULE_NESTED_CONSTANT]: PILLAR_MAINTAINABILITY,
+    [RULE_HARDCODED_STRING]: PILLAR_MAINTAINABILITY,
 };
 
 const PREFIX_TO_PILLAR: ReadonlyArray<readonly [string, PrimaryQualityPillar]> = [
@@ -97,6 +112,9 @@ const PREFIX_TO_PILLAR: ReadonlyArray<readonly [string, PrimaryQualityPillar]> =
     [PREFIX_CPX, PILLAR_MAINTAINABILITY],
     [PREFIX_BIG, PILLAR_MAINTAINABILITY],
     [PREFIX_DEP, PILLAR_RELIABILITY],
+    [PREFIX_NAM, PILLAR_EXTENSIBILITY],
+    [PREFIX_HYG_NAM, PILLAR_EXTENSIBILITY],
+    [PREFIX_CONST, PILLAR_MAINTAINABILITY],
 ];
 
 const KEYWORD_TO_PILLAR_MAP: Readonly<Record<string, PrimaryQualityPillar>> = {
@@ -194,7 +212,7 @@ export function mapRuleToPrimaryPillar(ruleId: string): PrimaryQualityPillar {
         return KEYWORD_TO_PILLAR_MAP[m[1]];
     }
 
-    return PILLAR_EXTENSIBILITY;
+    return PILLAR_MAINTAINABILITY;
 }
 
 /**
@@ -269,6 +287,30 @@ function evaluateSingleIssue(issue: Issue, ruleCount: number): SingleIssueEvalua
 }
 
 /**
+ * Penetrates critical and evolutionary debt into techDebtRisk dimension.
+ */
+function applyTechDebtPenetration(
+    dimensionPenalties: Record<QualityDimension, number>,
+    issue: Issue,
+    effectivePenalty: number,
+    dim: QualityDimension,
+): void {
+    if (dim === 'techDebtRisk') return;
+
+    const ruleNorm = (issue.rule ?? '').toUpperCase();
+    const analyzerNorm = (issue.analyzer ?? '').toLowerCase();
+    const sevNorm = issue.severity ?? '';
+
+    if (isTier1CriticalDebt(ruleNorm, analyzerNorm, sevNorm)) {
+        dimensionPenalties.techDebtRisk += effectivePenalty;
+        return;
+    }
+    if (isTier2EvolutionaryDebt(ruleNorm, analyzerNorm)) {
+        dimensionPenalties.techDebtRisk += effectivePenalty * 0.5;
+    }
+}
+
+/**
  * Calculates non-linear risk-weighted penalties and fatal ceiling constraints.
  *
  * @param issues - Collection of detected issues to evaluate.
@@ -312,13 +354,16 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
         const issue = issues[i];
         const count = ruleFrequencies.get(issue.rule) || 1;
         const result = evaluateSingleIssue(issue, count);
+        const effectivePenalty = result.assessment.effectivePenalty;
 
-        pillarPenalties[result.assessment.affectedPillar] += result.assessment.effectivePenalty;
+        pillarPenalties[result.assessment.affectedPillar] += effectivePenalty;
         const dim =
             familyDimensionOf(issue.rule) ||
             PILLAR_TO_DIMENSION_MAP[result.assessment.affectedPillar] ||
             'maintainability';
-        dimensionPenalties[dim] += result.assessment.effectivePenalty;
+        dimensionPenalties[dim] += effectivePenalty;
+
+        applyTechDebtPenetration(dimensionPenalties, issue, effectivePenalty, dim);
 
         assessments.push(result.assessment);
         if (result.isFatal) fatalIssueCount++;

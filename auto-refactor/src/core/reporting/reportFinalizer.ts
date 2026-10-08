@@ -34,6 +34,7 @@ import {
     computeUnifiedQualityScore,
     type GovernanceProjectProfile,
 } from '../scoring/fusion-scorer';
+import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
 
@@ -407,6 +408,15 @@ function refreshQualityScores(
         dynamicVector,
         100.0,
         resolveGovernanceProfile(config),
+    );
+    report.autonomy = evaluateProjectAutonomy(
+        fileMetrics,
+        report.issues,
+        config,
+        undefined,
+        reportScanner && typeof reportScanner.getSymbolIndex === 'function'
+            ? reportScanner.getSymbolIndex()
+            : undefined,
     );
 }
 

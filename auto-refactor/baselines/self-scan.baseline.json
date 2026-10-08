@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-28T06:33:22.275Z",
+  "timestamp": "2026-10-07T11:32:30.404Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -236,10 +236,9 @@
     },
     {
       "key": "complexity|high-complexity|crates/ops-graph/src/lib.rs",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 3,
-        "error": 1
+        "warning": 3
       }
     },
     {
@@ -251,9 +250,9 @@
     },
     {
       "key": "complexity|CPX-SPACE-001|crates/ops-graph/src/lib.rs",
-      "count": 12,
+      "count": 11,
       "severities": {
-        "warning": 12
+        "warning": 11
       }
     },
     {
@@ -265,13 +264,6 @@
     },
     {
       "key": "simplify|SIM-LONG-001|crates/ops-graph/src/lib.rs",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "complexity|CPX-NEST-002|crates/ops-graph/src/lib.rs",
       "count": 1,
       "severities": {
         "warning": 1
@@ -418,13 +410,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/bench-asymmetric.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/bench-asymmetric.js",
       "count": 1,
       "severities": {
@@ -432,35 +417,7 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/bench-asymmetric.js",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/bench-baselines.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/bench-baselines.js",
-      "count": 78,
-      "severities": {
-        "warning": 78
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/bench-baselines.js",
-      "count": 60,
-      "severities": {
-        "warning": 60
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|scripts/bench-baselines.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -481,20 +438,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/bench-deep-stress.js",
-      "count": 23,
-      "severities": {
-        "warning": 23
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/bench-deep-stress.js",
-      "count": 35,
-      "severities": {
-        "warning": 35
-      }
-    },
-    {
       "key": "complexity|high-complexity|scripts/bench-deep-stress.js",
       "count": 1,
       "severities": {
@@ -506,20 +449,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/bench-diff.js",
-      "count": 20,
-      "severities": {
-        "warning": 20
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/bench-diff.js",
-      "count": 22,
-      "severities": {
-        "warning": 22
       }
     },
     {
@@ -544,45 +473,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/bench-fastpath.js",
-      "count": 60,
-      "severities": {
-        "warning": 60
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/bench-fastpath.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/bench-fastpath.js",
-      "count": 52,
-      "severities": {
-        "warning": 52
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/bench-fastpath.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/bench-hot-paths.js",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/bench-hot-paths.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
       }
     },
     {
@@ -600,45 +494,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/bench-oxc-modea.js",
-      "count": 29,
-      "severities": {
-        "warning": 29
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/bench-oxc-modea.js",
-      "count": 12,
-      "severities": {
-        "warning": 12
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/bench-quant.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/bench-quant.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/bench-quant.js",
-      "count": 72,
-      "severities": {
-        "warning": 72
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|scripts/bench-quant.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -649,28 +508,7 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/bench-warm.js",
-      "count": 29,
-      "severities": {
-        "warning": 29
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/bench-warm.js",
-      "count": 19,
-      "severities": {
-        "warning": 19
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/bench-warm.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|scripts/bench-warm.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -685,16 +523,16 @@
     },
     {
       "key": "constants|magic-number|scripts/benchmark.js",
-      "count": 11,
+      "count": 7,
       "severities": {
-        "warning": 11
+        "warning": 7
       }
     },
     {
       "key": "constants|hardcoded-string|scripts/build-native.js",
-      "count": 33,
+      "count": 13,
       "severities": {
-        "warning": 33
+        "warning": 13
       }
     },
     {
@@ -754,13 +592,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/migrate-core-m2.js",
-      "count": 32,
-      "severities": {
-        "warning": 32
-      }
-    },
-    {
       "key": "constants|hardcoded-string|scripts/run-self-audit.js",
       "count": 12,
       "severities": {
@@ -772,13 +603,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/run-self-audit.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -796,45 +620,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/sample-expert-weights.js",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/sample-expert-weights.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/test-parallel.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/test-parallel.js",
-      "count": 150,
-      "severities": {
-        "warning": 150
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/test-parallel.js",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/test-result-codec.js",
-      "count": 24,
-      "severities": {
-        "warning": 24
       }
     },
     {
@@ -845,31 +634,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/test-result-codec.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/test-result-codec.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/test-rust.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-agent-actionable.js",
-      "count": 7,
-      "severities": {
-        "warning": 7
       }
     },
     {
@@ -887,38 +655,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-agent-quota-gateway.js",
-      "count": 27,
-      "severities": {
-        "warning": 27
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-agent-quota-gateway.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
       "key": "governance|GOV-PRF-003|scripts/validate-agent-quota-gateway.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-archetype-weight-tuner.js",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-asymmetric-routing.js",
-      "count": 51,
-      "severities": {
-        "warning": 51
       }
     },
     {
@@ -929,38 +669,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-asymmetric-routing.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-autonomy-scorer.js",
-      "count": 45,
-      "severities": {
-        "warning": 45
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-autonomy-scorer.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-autonomy-scorer.js",
-      "count": 27,
-      "severities": {
-        "warning": 27
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-baseline-freeze.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
       }
     },
     {
@@ -971,87 +683,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-baseline-freeze.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|scripts/validate-baseline-freeze.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-baseline-ratchet.js",
-      "count": 32,
-      "severities": {
-        "warning": 32
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-baseline-ratchet.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-batch-git-history.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-batch-git-history.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-boundary-discipline-engine.js",
-      "count": 33,
-      "severities": {
-        "warning": 33
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-boundary-discipline-engine.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-call-graph.js",
-      "count": 22,
-      "severities": {
-        "warning": 22
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-call-graph.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-call-graph.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-capabilities.js",
-      "count": 36,
-      "severities": {
-        "warning": 36
       }
     },
     {
@@ -1062,38 +697,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-capabilities.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
       "key": "simplify|SIM-EMPTY-001|scripts/validate-capabilities.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-capp-protocol.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-capp-protocol.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-change-quality-arbiter.js",
-      "count": 4,
-      "severities": {
-        "warning": 4
       }
     },
     {
@@ -1104,66 +711,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-change-quality-arbiter.js",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-code-density.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-code-density.js",
-      "count": 15,
-      "severities": {
-        "warning": 15
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-code-evolution-scoring.js",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-code-evolution-scoring.js",
-      "count": 49,
-      "severities": {
-        "warning": 49
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-code-evolution-scoring.js",
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-codemod-engine.js",
-      "count": 15,
-      "severities": {
-        "warning": 15
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-codemod-engine.js",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-cognitive-cost-anti-gaming.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
       }
     },
     {
@@ -1181,27 +732,6 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-cognitive-cost-anti-gaming.js",
-      "count": 21,
-      "severities": {
-        "warning": 21
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-comment-governance.js",
-      "count": 21,
-      "severities": {
-        "warning": 21
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-comment-governance.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "hygiene|HYG-STB-001|scripts/validate-comment-governance.js",
       "count": 2,
       "severities": {
@@ -1216,31 +746,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-comment-hygiene.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-comment-hygiene.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-comment-hygiene.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-compression-bounds.js",
-      "count": 12,
-      "severities": {
-        "warning": 12
       }
     },
     {
@@ -1251,87 +760,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-compression-bounds.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/validate-compression-bounds.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-config-driven-architecture.js",
-      "count": 20,
-      "severities": {
-        "warning": 20
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-config-driven-architecture.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-config-driven-architecture.js",
-      "count": 12,
-      "severities": {
-        "warning": 12
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-constant-governance.js",
-      "count": 49,
-      "severities": {
-        "warning": 49
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-constant-governance.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-constant-library-topology.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-constant-library-topology.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-constants-ssot.js",
-      "count": 12,
-      "severities": {
-        "warning": 12
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-constants-ssot.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-consumer-runner.js",
-      "count": 23,
-      "severities": {
-        "warning": 23
       }
     },
     {
@@ -1342,73 +774,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-consumer-runner.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-context-slice.js",
-      "count": 29,
-      "severities": {
-        "warning": 29
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-context-slice.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-context-slice.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-control-flow-graph.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-control-flow-graph.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-control-flow-nesting-tolerance.js",
-      "count": 12,
-      "severities": {
-        "warning": 12
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-control-flow-nesting-tolerance.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-coverage-telemetry-fusion.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-coverage-telemetry-fusion.js",
-      "count": 35,
-      "severities": {
-        "warning": 35
       }
     },
     {
@@ -1419,24 +788,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-data-architecture.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-data-architecture.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-data-architecture.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
       }
     },
     {
@@ -1451,20 +806,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-data-flow.js",
-      "count": 57,
-      "severities": {
-        "warning": 57
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-data-flow.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
       }
     },
     {
@@ -1489,13 +830,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-diff-interface.js",
-      "count": 26,
-      "severities": {
-        "warning": 26
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-diff-interface.js",
       "count": 1,
       "severities": {
@@ -1503,45 +837,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-diff-interface.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-diff-score.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-diff-score.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-diff.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-diff.js",
-      "count": 39,
-      "severities": {
-        "warning": 39
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-diff.js",
-      "count": 22,
-      "severities": {
-        "warning": 22
       }
     },
     {
@@ -1559,45 +858,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-dimension-consistency.js",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-docs.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-domain-adapters.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-dual-track-test-topology.js",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-dual-track-test-topology.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-dual-track-test-topology.js",
-      "count": 7,
-      "severities": {
-        "warning": 7
       }
     },
     {
@@ -1608,24 +872,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-dynamic-quality-model.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-dynamic-quality-model.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-dynamic-quality-model.js",
-      "count": 50,
-      "severities": {
-        "warning": 50
       }
     },
     {
@@ -1643,45 +893,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-e2e-stress.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-e2e-stress.js",
-      "count": 40,
-      "severities": {
-        "warning": 40
-      }
-    },
-    {
       "key": "hygiene|HYG-STB-002|scripts/validate-e2e-stress.js",
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-effective-loc.js",
-      "count": 15,
-      "severities": {
-        "warning": 15
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-effective-loc.js",
-      "count": 29,
-      "severities": {
-        "warning": 29
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-elastic-complexity-budget.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
       }
     },
     {
@@ -1692,24 +907,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-elastic-complexity-budget.js",
-      "count": 52,
-      "severities": {
-        "warning": 52
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-equivalence.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-equivalence.js",
-      "count": 46,
-      "severities": {
-        "warning": 46
       }
     },
     {
@@ -1720,94 +921,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-equivalence.js",
-      "count": 26,
-      "severities": {
-        "warning": 26
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/validate-equivalence.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-error-flow.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-error-flow.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-expert-manifest.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-expert-manifest.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-fail-closed.js",
-      "count": 34,
-      "severities": {
-        "warning": 34
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-feedback-adaptive-supervisor.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-feedback-adaptive-supervisor.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-feedback-adaptive-supervisor.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-file-taxonomy-ontology.js",
-      "count": 23,
-      "severities": {
-        "warning": 23
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-file-taxonomy-ontology.js",
-      "count": 39,
-      "severities": {
-        "warning": 39
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-five-core-capabilities.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
       }
     },
     {
@@ -1818,45 +935,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-framework-lifecycle-guards.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-framework-lifecycle-guards.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-function-cohesion-skeleton.js",
-      "count": 20,
-      "severities": {
-        "warning": 20
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-function-cohesion-skeleton.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-function-cohesion-skeleton.js",
-      "count": 20,
-      "severities": {
-        "warning": 20
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-gdscript-adapter-tolerance.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
       }
     },
     {
@@ -1871,20 +953,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-generalized.js",
-      "count": 50,
-      "severities": {
-        "warning": 50
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-generalized.js",
-      "count": 23,
-      "severities": {
-        "warning": 23
       }
     },
     {
@@ -1923,28 +991,7 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-go-support.js",
-      "count": 45,
-      "severities": {
-        "warning": 45
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-go-support.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-go-support.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-governance-exemptions.js",
       "count": 2,
       "severities": {
         "warning": 2
@@ -1955,13 +1002,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-governance.js",
-      "count": 19,
-      "severities": {
-        "warning": 19
       }
     },
     {
@@ -1986,27 +1026,6 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-governance.js",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-i18n-cleanliness.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-language-adapters.js",
-      "count": 20,
-      "severities": {
-        "warning": 20
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-language-adapters.js",
       "count": 1,
       "severities": {
@@ -2018,20 +1037,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-language-adapters.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-language-matrix.js",
-      "count": 17,
-      "severities": {
-        "warning": 17
       }
     },
     {
@@ -2049,59 +1054,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-language-matrix.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-language-support.js",
-      "count": 32,
-      "severities": {
-        "warning": 32
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|scripts/validate-language-support.js",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-language-support.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-language-support.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/validate-language-support.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-latency-metrics.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-literal-index.js",
-      "count": 30,
-      "severities": {
-        "warning": 30
       }
     },
     {
@@ -2112,34 +1068,6 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-literal-index.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-literal-policy-declarative.js",
-      "count": 25,
-      "severities": {
-        "warning": 25
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-literal-policy-declarative.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-literal-policy.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-literal-policy.js",
       "count": 1,
       "severities": {
@@ -2147,52 +1075,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-literal-policy.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-logistic-deduction-curve.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-logistic-deduction-curve.js",
-      "count": 21,
-      "severities": {
-        "warning": 21
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|scripts/validate-logistic-deduction-curve.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-marker-scope.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
       "key": "hygiene|HYG-STB-002|scripts/validate-marker-scope.js",
       "count": 7,
       "severities": {
         "warning": 7
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-meta-architecture.js",
-      "count": 28,
-      "severities": {
-        "warning": 28
       }
     },
     {
@@ -2210,24 +1096,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-mit-corpus.js",
-      "count": 41,
-      "severities": {
-        "warning": 41
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-mit-corpus.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-mit-corpus.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
       }
     },
     {
@@ -2238,24 +1110,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-modern-packs.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-multi-agent.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-multi-agent.js",
-      "count": 59,
-      "severities": {
-        "warning": 59
       }
     },
     {
@@ -2266,31 +1124,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-multi-agent.js",
-      "count": 65,
-      "severities": {
-        "warning": 65
-      }
-    },
-    {
       "key": "hygiene|HYG-STB-002|scripts/validate-multi-agent.js",
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-naming-decoupling-architecture.js",
-      "count": 43,
-      "severities": {
-        "warning": 43
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-naming-decoupling-architecture.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
       }
     },
     {
@@ -2315,45 +1152,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-naming-suite.js",
-      "count": 32,
-      "severities": {
-        "warning": 32
-      }
-    },
-    {
       "key": "hygiene|HYG-STB-002|scripts/validate-naming-suite.js",
       "count": 4,
       "severities": {
         "warning": 4
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-naming-suite.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-native-benchmark.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-native-benchmark.js",
-      "count": 26,
-      "severities": {
-        "warning": 26
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-native-bridge.js",
-      "count": 23,
-      "severities": {
-        "warning": 23
       }
     },
     {
@@ -2364,24 +1166,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-native-bridge.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-native-operator.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-native-operator.js",
-      "count": 71,
-      "severities": {
-        "warning": 71
       }
     },
     {
@@ -2399,20 +1187,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-001|scripts/validate-native-operator.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-native-operator.js",
-      "count": 22,
-      "severities": {
-        "warning": 22
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|scripts/validate-native-operator.js",
       "count": 1,
       "severities": {
@@ -2427,52 +1201,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-native-parity.js",
-      "count": 26,
-      "severities": {
-        "warning": 26
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-native-parity.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-native-parity.js",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-nested-constant-cleanliness.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/validate-nested-constant-cleanliness.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-oxc-keypoints.js",
-      "count": 30,
-      "severities": {
-        "warning": 30
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-oxc-keypoints.js",
-      "count": 27,
-      "severities": {
-        "warning": 27
       }
     },
     {
@@ -2497,45 +1229,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-pattern-kernel.js",
-      "count": 27,
-      "severities": {
-        "warning": 27
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-pattern-kernel.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-performance-rules.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-performance-rules.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-physical-naming.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-postscan-parity.js",
-      "count": 19,
-      "severities": {
-        "warning": 19
       }
     },
     {
@@ -2546,31 +1243,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-postscan-parity.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-praxis-foundation.js",
-      "count": 22,
-      "severities": {
-        "warning": 22
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-praxis-foundation.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-praxis-foundation.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
       }
     },
     {
@@ -2581,13 +1257,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-praxis-presentation.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-praxis-presentation.js",
       "count": 1,
       "severities": {
@@ -2595,59 +1264,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-praxis-presentation.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-project-governance-evaluator.js",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-project-governance-evaluator.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-project-neutrality.js",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/validate-project-neutrality.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-python-imports.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-python-imports.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-python-modern.js",
-      "count": 48,
-      "severities": {
-        "warning": 48
       }
     },
     {
@@ -2665,24 +1285,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-python.js",
-      "count": 27,
-      "severities": {
-        "warning": 27
-      }
-    },
-    {
       "key": "hygiene|HYG-DED-001|scripts/validate-python.js",
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-python.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
       }
     },
     {
@@ -2707,13 +1313,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-quality-quantification.js",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-quality-quantification.js",
       "count": 1,
       "severities": {
@@ -2721,66 +1320,17 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-quality-quantification.js",
-      "count": 26,
-      "severities": {
-        "warning": 26
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-redos-security.js",
-      "count": 24,
-      "severities": {
-        "warning": 24
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-redos-security.js",
-      "count": 19,
-      "severities": {
-        "warning": 19
-      }
-    },
-    {
       "key": "hygiene|HYG-STB-001|scripts/validate-redos-security.js",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "info": 2
+        "info": 1
       }
     },
     {
       "key": "hygiene|HYG-STB-002|scripts/validate-redos-security.js",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-refactoring-roi-arbiter.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-refactoring-roi-arbiter.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-report-schema.js",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-report-schema.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -2791,31 +1341,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-resource-pooling-auditor.js",
-      "count": 35,
-      "severities": {
-        "warning": 35
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-resource-pooling-auditor.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-review-memory.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-review-memory.js",
-      "count": 98,
-      "severities": {
-        "warning": 98
       }
     },
     {
@@ -2840,59 +1369,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-review-memory.js",
-      "count": 42,
-      "severities": {
-        "warning": 42
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-ring-buffer-bus.js",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-ring-buffer-bus.js",
-      "count": 21,
-      "severities": {
-        "warning": 21
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|scripts/validate-ring-buffer-bus.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-risk-fusion-engine.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-risk-fusion-engine.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-risk-fusion-engine.js",
-      "count": 34,
-      "severities": {
-        "warning": 34
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-role-aware-deduplication.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
       }
     },
     {
@@ -2903,45 +1383,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-role-inference.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-role-inference.js",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-rule-aliases.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-rule-generalization.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-rule-generalization.js",
-      "count": 26,
-      "severities": {
-        "warning": 26
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-rule-generalization.js",
-      "count": 12,
-      "severities": {
-        "warning": 12
       }
     },
     {
@@ -2980,31 +1425,10 @@
       }
     },
     {
-      "key": "large-file|large-file|scripts/validate-rules-registry.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-rules-registry.js",
-      "count": 12,
-      "severities": {
-        "warning": 12
-      }
-    },
-    {
       "key": "governance|GOV-PRF-005|scripts/validate-rules-registry.js",
       "count": 2,
       "severities": {
         "info": 2
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/validate-rules-registry.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -3015,31 +1439,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-rules-registry.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-scalable-e2e.js",
-      "count": 12,
-      "severities": {
-        "warning": 12
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-scalable-e2e.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-scalable-e2e.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
       }
     },
     {
@@ -3054,20 +1457,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-scheduler-pools.js",
-      "count": 36,
-      "severities": {
-        "warning": 36
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-scheduler-pools.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
       }
     },
     {
@@ -3092,20 +1481,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|scripts/validate-scope-graph-streaming.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-scope-graph-streaming.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|scripts/validate-scope-graph-streaming.js",
       "count": 1,
       "severities": {
@@ -3113,38 +1488,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-scope-graph-streaming.js",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-scope-graph.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|scripts/validate-scope-graph.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-scope-graph.js",
-      "count": 20,
-      "severities": {
-        "warning": 20
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-scope-graph.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
       }
     },
     {
@@ -3162,31 +1509,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-scoring-coverage.js",
-      "count": 29,
-      "severities": {
-        "warning": 29
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-scoring-coverage.js",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-scoring-coverage.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-security-levels.js",
-      "count": 25,
-      "severities": {
-        "warning": 25
       }
     },
     {
@@ -3197,73 +1523,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-security-levels.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-self-audit.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-self-audit.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-self-audit.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-self-norms.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|scripts/validate-self-norms.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-self-norms.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|scripts/validate-self-norms.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-self-refactor.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-self-refactor.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
       }
     },
     {
@@ -3281,38 +1544,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-self-slice-audit.js",
-      "count": 20,
-      "severities": {
-        "warning": 20
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-self-slice-audit.js",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-semantic-domain-detector.js",
-      "count": 94,
-      "severities": {
-        "warning": 94
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|scripts/validate-semantic-domain-detector.js",
       "count": 3,
       "severities": {
         "info": 3
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-semantic-domain-detector.js",
-      "count": 38,
-      "severities": {
-        "warning": 38
       }
     },
     {
@@ -3323,13 +1558,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-semantic-ir.js",
-      "count": 25,
-      "severities": {
-        "warning": 25
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-semantic-ir.js",
       "count": 1,
       "severities": {
@@ -3337,24 +1565,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-semantic-ir.js",
-      "count": 19,
-      "severities": {
-        "warning": 19
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-shadowing.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-shadowing.js",
-      "count": 30,
-      "severities": {
-        "warning": 30
       }
     },
     {
@@ -3372,21 +1586,7 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-shell-lint.js",
-      "count": 43,
-      "severities": {
-        "warning": 43
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-shell-lint.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-shell-lint.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -3397,20 +1597,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-simplify.js",
-      "count": 47,
-      "severities": {
-        "warning": 47
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-simplify.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
       }
     },
     {
@@ -3435,13 +1621,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-slice-audit.js",
-      "count": 23,
-      "severities": {
-        "warning": 23
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-slice-audit.js",
       "count": 1,
       "severities": {
@@ -3456,34 +1635,6 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-slice-audit.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-sparse-scheduler.js",
-      "count": 16,
-      "severities": {
-        "warning": 16
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-sparse-scheduler.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-static-quality-model.js",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-static-quality-model.js",
       "count": 1,
       "severities": {
@@ -3491,38 +1642,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-static-quality-model.js",
-      "count": 57,
-      "severities": {
-        "warning": 57
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-stdlib-profile.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-stdlib-profile.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-stdlib-profile.js",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-suite-manifest.js",
-      "count": 25,
-      "severities": {
-        "warning": 25
       }
     },
     {
@@ -3540,13 +1663,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-symbol-index.js",
-      "count": 21,
-      "severities": {
-        "warning": 21
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|scripts/validate-symbol-index.js",
       "count": 1,
       "severities": {
@@ -3561,38 +1677,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-symbol-index.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-tensor-partitions.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-tensor-partitions.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-tensor-partitions.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-test-modernity.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
       }
     },
     {
@@ -3603,59 +1691,10 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/validate-test-modernity.js",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-topological-churn-scoring.js",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-topological-churn-scoring.js",
-      "count": 41,
-      "severities": {
-        "warning": 41
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-topology-cache.js",
-      "count": 36,
-      "severities": {
-        "warning": 36
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-topology-cache.js",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-trajectory-learning.js",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-trajectory-learning.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-trajectory-learning.js",
-      "count": 10,
-      "severities": {
-        "warning": 10
       }
     },
     {
@@ -3666,31 +1705,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-triplane-cross-project.js",
-      "count": 54,
-      "severities": {
-        "warning": 54
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-triplane-cross-project.js",
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-triplane-cross-project.js",
-      "count": 77,
-      "severities": {
-        "warning": 77
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|scripts/validate-triplane-cross-project.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -3701,38 +1719,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|scripts/validate-ts-modern.js",
-      "count": 21,
-      "severities": {
-        "warning": 21
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|scripts/validate-ts-modern.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-universal-rules.js",
-      "count": 32,
-      "severities": {
-        "warning": 32
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-universal-rules.js",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-universal-rules.js",
-      "count": 14,
-      "severities": {
-        "warning": 14
       }
     },
     {
@@ -3747,20 +1737,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/validate-warm.js",
-      "count": 40,
-      "severities": {
-        "warning": 40
-      }
-    },
-    {
-      "key": "constants|magic-number|scripts/validate-warm.js",
-      "count": 23,
-      "severities": {
-        "warning": 23
       }
     },
     {
@@ -3904,24 +1880,17 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/analyzers/constants.ts",
-      "count": 34,
-      "severities": {
-        "warning": 34
-      }
-    },
-    {
       "key": "simplify|SIM-BOOL-001|src/analyzers/constants.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "info": 2
+        "info": 1
       }
     },
     {
       "key": "simplify|SIM-TRN-001|src/analyzers/constants.ts",
-      "count": 3,
+      "count": 1,
       "severities": {
-        "info": 3
+        "info": 1
       }
     },
     {
@@ -3940,16 +1909,9 @@
     },
     {
       "key": "hygiene|HYG-DED-001|src/analyzers/constants.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/analyzers/constants.ts",
-      "count": 4,
-      "severities": {
-        "info": 4
+        "warning": 1
       }
     },
     {
@@ -4142,13 +2104,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|src/analyzers/hygiene.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|magic-number|src/analyzers/hygiene.ts",
       "count": 1,
       "severities": {
@@ -4156,17 +2111,10 @@
       }
     },
     {
-      "key": "constants|duplicate-literal|src/analyzers/hygiene.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/hygiene.ts",
-      "count": 13,
+      "count": 10,
       "severities": {
-        "warning": 13
+        "warning": 10
       }
     },
     {
@@ -4324,13 +2272,6 @@
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|src/analyzers/naming.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/performance.ts",
       "count": 3,
       "severities": {
@@ -4366,13 +2307,6 @@
       }
     },
     {
-      "key": "simplify|SIM-TRN-001|src/analyzers/python-modern.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|src/analyzers/rust-modern.ts",
       "count": 1,
       "severities": {
@@ -4384,13 +2318,6 @@
       "count": 15,
       "severities": {
         "warning": 15
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|src/analyzers/secrets.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -4436,38 +2363,17 @@
       }
     },
     {
-      "key": "simplify|SIM-TRN-001|src/analyzers/shell-lint.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/shell-lint.ts",
-      "count": 50,
-      "severities": {
-        "warning": 50
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/analyzers/shell-lint.ts",
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/analyzers/shell-lint.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
       "key": "constants|magic-number|src/analyzers/shell-lint.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -4618,24 +2524,10 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-001|src/analyzers/stdlib.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/analyzers/test-modernity.ts",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/analyzers/test-modernity.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
       }
     },
     {
@@ -4724,9 +2616,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/cli/selfTestCmd.ts",
-      "count": 16,
+      "count": 14,
       "severities": {
-        "warning": 16
+        "warning": 14
       }
     },
     {
@@ -4829,13 +2721,6 @@
     },
     {
       "key": "simplify|SIM-TRN-001|src/core/architecture/constant-library-auditor.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|src/core/architecture/constant-library-auditor.ts",
       "count": 1,
       "severities": {
         "info": 1
@@ -5073,20 +2958,6 @@
       }
     },
     {
-      "key": "governance|GOV-SAN-001|src/core/ast/go-adapter-parser.ts",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/core/ast/go-adapter-parser.ts",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/ast/language-support.ts",
       "count": 2,
       "severities": {
@@ -5098,13 +2969,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-001|src/core/ast/multilang.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -5241,20 +3105,6 @@
       }
     },
     {
-      "key": "governance|GOV-SAN-001|src/core/ast/scope-graph.ts",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/core/ast/scope-graph.ts",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
       "key": "constants|duplicate-literal|src/core/ast/scope-graph.ts",
       "count": 1,
       "severities": {
@@ -5311,13 +3161,6 @@
       }
     },
     {
-      "key": "simplify|SIM-TRN-001|src/core/ast/traverse.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/ast/traverse.ts",
       "count": 10,
       "severities": {
@@ -5329,13 +3172,6 @@
       "count": 5,
       "severities": {
         "info": 5
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/ast/traverse.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -5438,9 +3274,9 @@
     },
     {
       "key": "governance|GOV-PRF-004|src/core/cache.ts",
-      "count": 8,
+      "count": 2,
       "severities": {
-        "warning": 8
+        "warning": 2
       }
     },
     {
@@ -5455,13 +3291,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|src/core/cache.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -5542,34 +3371,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-001|src/core/cfg/def-use-chain.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "performance|PRF-MEM-001|src/core/cfg/def-use-chain.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/cfg/def-use-chain.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/cfg/def-use-chain.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/cfg/types.ts",
       "count": 24,
       "severities": {
@@ -5623,13 +3424,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/codemod/transforms/extract-constant.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
       }
     },
     {
@@ -5872,16 +3666,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/dependency-graph.ts",
-      "count": 9,
+      "count": 1,
       "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/dependency-graph.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
+        "warning": 1
       }
     },
     {
@@ -6019,13 +3806,6 @@
     },
     {
       "key": "complexity|high-complexity|src/core/diff/myers-algorithm.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "performance|PRF-ALG-001|src/core/diff/myers-algorithm.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -6047,9 +3827,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/dynamic/dynamic-quality-scorer.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 4
+        "warning": 3
       }
     },
     {
@@ -6064,13 +3844,6 @@
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/dynamic/dynamic-quality-scorer.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -6285,9 +4058,9 @@
     },
     {
       "key": "complexity|high-complexity|src/core/governance/rules/compressionBounds.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -6383,9 +4156,9 @@
     },
     {
       "key": "hygiene|HYG-STB-002|src/core/governance/rules/sanitization.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -6676,13 +4449,6 @@
       }
     },
     {
-      "key": "constants|magic-number|src/core/intelligence/cross-file-clone-detector.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/intelligence/crossFunctionComplexity.ts",
       "count": 1,
       "severities": {
@@ -6732,13 +4498,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/intelligence/dataArchitecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/intelligence/dataArchitecture.ts",
       "count": 1,
       "severities": {
@@ -6761,13 +4520,6 @@
     },
     {
       "key": "hygiene|HYG-WRAP-001|src/core/intelligence/dataFlow.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-001|src/core/intelligence/dataFlow.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -6894,9 +4646,9 @@
     },
     {
       "key": "constants|magic-number|src/core/intelligence/elastic-budget-matrix.ts",
-      "count": 39,
+      "count": 36,
       "severities": {
-        "warning": 39
+        "warning": 36
       }
     },
     {
@@ -7174,13 +4926,6 @@
     },
     {
       "key": "complexity|high-complexity|src/core/intelligence/symbolIndex.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/intelligence/testModernity.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -7544,13 +5289,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-STB-002|src/core/native/native-clone-shim.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/native/native-flow-shim.ts",
       "count": 1,
       "severities": {
@@ -7625,13 +5363,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-LOG-001|src/core/patterns/pattern-matcher.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -7733,13 +5464,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-001|src/core/policy/gitignore.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "constants|duplicate-literal|src/core/policy/source-mask.ts",
       "count": 2,
       "severities": {
@@ -7825,9 +5549,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/praxis/feedback-adaptive-supervisor.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 4
+        "warning": 3
       }
     },
     {
@@ -7842,13 +5566,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|src/core/praxis/feedback-adaptive-supervisor.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
       }
     },
     {
@@ -7884,20 +5601,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/praxis/presentation/dictionaries/en.ts",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/praxis/presentation/dictionaries/zh-cn.ts",
-      "count": 5,
-      "severities": {
-        "warning": 5
       }
     },
     {
@@ -7944,9 +5647,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/praxis/semanticEnricher.ts",
-      "count": 6,
+      "count": 4,
       "severities": {
-        "warning": 6
+        "warning": 4
       }
     },
     {
@@ -7954,13 +5657,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/praxis/semanticEnricher.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -8195,20 +5891,6 @@
       }
     },
     {
-      "key": "governance|GOV-SAN-001|src/core/result-codec.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/core/result-codec.ts",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/result-codec.ts",
       "count": 5,
       "severities": {
@@ -8241,13 +5923,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/router/diffClassifier.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -8321,13 +5996,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-005|src/core/router/sparseMoEGate.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/router/sparseRuleRouter.ts",
       "count": 1,
       "severities": {
@@ -8371,34 +6039,6 @@
     },
     {
       "key": "hygiene|HYG-STB-002|src/core/rules/entries/analyzers.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/rules/entries/analyzersModern.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/rules/entries/analyzersModern.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/rules/entries/analyzersModern.ts",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/rules/entries/analyzersModern.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -8472,20 +6112,6 @@
       "count": 34,
       "severities": {
         "warning": 34
-      }
-    },
-    {
-      "key": "governance|GOV-SAN-001|src/core/rules/evolution/generalizationPipeline.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/core/rules/evolution/generalizationPipeline.ts",
-      "count": 4,
-      "severities": {
-        "warning": 4
       }
     },
     {
@@ -8605,13 +6231,6 @@
       "count": 5,
       "severities": {
         "warning": 5
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-001|src/core/rules/types.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -8770,9 +6389,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scanner/worker-scheduler.ts",
-      "count": 8,
+      "count": 5,
       "severities": {
-        "warning": 8
+        "warning": 5
       }
     },
     {
@@ -8965,13 +6584,6 @@
       }
     },
     {
-      "key": "complexity|CPX-NEST-001|src/core/scheduler/topology-cache-manager.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/scheduler/worker-pool-manager.ts",
       "count": 1,
       "severities": {
@@ -8980,9 +6592,9 @@
     },
     {
       "key": "constants|magic-number|src/core/scheduler/worker-pool-manager.ts",
-      "count": 13,
+      "count": 7,
       "severities": {
-        "warning": 13
+        "warning": 7
       }
     },
     {
@@ -9050,9 +6662,9 @@
     },
     {
       "key": "constants|magic-number|src/core/scoring/autonomy-scorer.ts",
-      "count": 16,
+      "count": 13,
       "severities": {
-        "warning": 16
+        "warning": 13
       }
     },
     {
@@ -9064,9 +6676,9 @@
     },
     {
       "key": "governance|GOV-PRF-004|src/core/scoring/autonomy-scorer.ts",
-      "count": 3,
+      "count": 2,
       "severities": {
-        "warning": 3
+        "warning": 2
       }
     },
     {
@@ -9120,9 +6732,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/scoring/change-quality-arbiter.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -9179,13 +6791,6 @@
       "count": 8,
       "severities": {
         "warning": 8
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/scoring/dimensionDeductions.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -9330,9 +6935,9 @@
     },
     {
       "key": "constants|magic-number|src/core/scoring/fusion-scorer.ts",
-      "count": 4,
+      "count": 2,
       "severities": {
-        "warning": 4
+        "warning": 2
       }
     },
     {
@@ -9358,9 +6963,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/scoring/hierarchicalScorer.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -9413,13 +7018,6 @@
       }
     },
     {
-      "key": "constants|magic-number|src/core/scoring/patchQuality.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/scoring/project-governance-evaluator.ts",
       "count": 7,
       "severities": {
@@ -9428,9 +7026,9 @@
     },
     {
       "key": "constants|magic-number|src/core/scoring/project-governance-evaluator.ts",
-      "count": 9,
+      "count": 5,
       "severities": {
-        "warning": 9
+        "warning": 5
       }
     },
     {
@@ -9445,13 +7043,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/scoring/qualityScorer.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -9505,9 +7096,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/scoring/risk-fusion-engine.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -9547,9 +7138,9 @@
     },
     {
       "key": "simplify|SIM-TRN-001|src/core/scoring/scorer-formulas.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "info": 2
+        "info": 1
       }
     },
     {
@@ -9582,9 +7173,9 @@
     },
     {
       "key": "constants|magic-number|src/core/scoring/static-quality-model.ts",
-      "count": 11,
+      "count": 9,
       "severities": {
-        "warning": 11
+        "warning": 9
       }
     },
     {
@@ -9785,9 +7376,9 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/trajectory/agentAttribution.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -9823,13 +7414,6 @@
       "count": 8,
       "severities": {
         "warning": 8
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|src/core/trajectory/anomalyDetector.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -9883,9 +7467,9 @@
     },
     {
       "key": "constants|magic-number|src/core/trajectory/patchArbiter.ts",
-      "count": 7,
+      "count": 5,
       "severities": {
-        "warning": 7
+        "warning": 5
       }
     },
     {
@@ -9904,23 +7488,9 @@
     },
     {
       "key": "constants|magic-number|src/core/trajectory/recipeExtractor.ts",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/trajectory/recipeExtractor.ts",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/trajectory/recipeExtractor.ts",
-      "count": 27,
-      "severities": {
-        "warning": 27
       }
     },
     {
@@ -9960,9 +7530,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/types.ts",
-      "count": 56,
+      "count": 50,
       "severities": {
-        "warning": 56
+        "warning": 50
       }
     },
     {

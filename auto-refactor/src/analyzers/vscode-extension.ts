@@ -234,7 +234,8 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
-        // 7. VSC-UI-003: Webview interactive form controls missing accessible labels (A11y WCAG 4.1.2)
+        // 7. VSC-UI-003: Webview interactive form controls missing accessible labels
+        //    conforming to WCAG 4.1.2 requirements.
         const a11yViolations = this.detectInaccessibleFormControls(raw);
         for (const a of a11yViolations) {
             issues.push(

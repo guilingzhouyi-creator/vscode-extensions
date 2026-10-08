@@ -46,9 +46,6 @@ const DRIVER_CALL_RE = /\b(?:db\.query|pool\.execute|client\.query|execSql|rawQu
 const LOOP_HEADER_RE = /\b(?:for\s*\(|for\s+[a-zA-Z0-9_$]+\s+in|while\s*\(|do\s*\{)\b/;
 const ITERATION_METHOD_RE = /\.(?:map|forEach|filter|flatMap)\s*\(/;
 
-/**
- * Determine whether the analyzed file belongs to an online request/response path.
- */
 /** Default keyword indicators for online request/response paths. */
 const DEFAULT_ONLINE_KEYWORDS = [
     'api',
@@ -100,9 +97,7 @@ function isOnlineExecutionContext(
     );
 }
 
-/**
- * Analyzer detecting database access antipatterns and data architecture violations.
- */
+/** Pattern matching function, class, or async procedure declaration signatures. */
 const FN_DECL_RE = /\b(?:function|class|async\s+function|def|func)\s+([A-Za-z0-9_$]+)/;
 const METHOD_DECL_RE = /\b(?:async\s+)?([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/;
 const CONTROL_KEYWORD_RE = /^(?:if|for|while|switch|catch)$/;
@@ -228,10 +223,10 @@ export class DataArchitectureAnalyzer implements Analyzer {
     }
 
     /**
-     * Shared streaming traversal finalizer; delegates to standard analyze without requiring SourceFile.
+     * Shared streaming traversal finalizer; delegates to standard analyze without
+     * requiring an explicit SourceFile AST instance.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
         return this.analyze(ctx.sourceFile, ctx);
     }
 }
-

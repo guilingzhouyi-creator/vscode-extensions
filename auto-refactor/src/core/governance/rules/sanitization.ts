@@ -215,6 +215,24 @@ export const DiagnosticMessageRule: GovernanceRule = {
 const DOSSIER_JARGON_RE =
     /\b(st_[0-9]+[a-z0-9_]*|phase[\s_]*[0-9]+|p[0-9]{2,}|milestone[\s_]*[0-9]+)\b/i;
 
+/** Identifiers on lines to skip when inspecting for historical dossier references. */
+const DOSSIER_SELF_REF_IDENTIFIERS: ReadonlySet<string> = new Set([
+    'DOSSIER_JARGON_RE',
+    'GOV-ARC-001',
+    'DossierBoundaryIsolationRule',
+]);
+
+/**
+ * Checks whether a line references dossier self-governance identifiers using Set lookup.
+ */
+function isDossierSelfReference(line: string): boolean {
+    const tokens = line.split(/[^a-zA-Z0-9_$-]+/);
+    for (let i = 0; i < tokens.length; i++) {
+        if (DOSSIER_SELF_REF_IDENTIFIERS.has(tokens[i])) return true;
+    }
+    return false;
+}
+
 function isExemptDossierPath(filePath: string): boolean {
     const normalized = filePath.replace(/\\/g, '/').toLowerCase();
     return (
@@ -222,6 +240,26 @@ function isExemptDossierPath(filePath: string): boolean {
         normalized.startsWith('archive/') ||
         fileNameEndsWith(filePath, ['sanitization.ts'])
     );
+}
+
+/**
+ * Evaluates a single source line for historical dossier nomenclature violations.
+ */
+function checkDossierLine(line: string, lineIndex: number): GovernanceViolation | null {
+    if (isDossierSelfReference(line)) return null;
+
+    const match = DOSSIER_JARGON_RE.exec(line);
+    if (!match) return null;
+
+    return {
+        ruleId: 'GOV-ARC-001',
+        message: `Historical dossier nomenclature or batch tag \`${match[0]}\` found outside archived directory white-list.`,
+        line: lineIndex + 1,
+        column: match.index != null ? match.index + 1 : 1,
+        suggestion:
+            'Remove milestone/batch tags from active code; use canonical product features and functional domain naming.',
+        fixable: false,
+    };
 }
 
 /**
@@ -245,26 +283,8 @@ export const DossierBoundaryIsolationRule: GovernanceRule = {
         const lines = ctx.lines;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (
-                line.includes('DOSSIER_JARGON_RE') ||
-                line.includes('GOV-ARC-001') ||
-                line.includes('DossierBoundaryIsolationRule')
-            ) {
-                continue;
-            }
-            const match = DOSSIER_JARGON_RE.exec(line);
-            if (match) {
-                violations.push({
-                    ruleId: 'GOV-ARC-001',
-                    message: `Historical dossier nomenclature or batch tag \`${match[0]}\` found outside archived directory white-list.`,
-                    line: i + 1,
-                    column: match.index != null ? match.index + 1 : 1,
-                    suggestion:
-                        'Remove milestone/batch tags from active code; use canonical product features and functional domain naming.',
-                    fixable: false,
-                });
-            }
+            const hit = checkDossierLine(lines[i], i);
+            if (hit) violations.push(hit);
         }
 
         return violations.length > 0 ? violations : null;
