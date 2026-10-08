@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791475423130",
-  "timestamp": "2026-10-08T16:03:52.130Z",
+  "snapshotId": "snapshot-v0.4.0-1791475879186",
+  "timestamp": "2026-10-08T16:11:26.964Z",
   "cai": 86.93,
   "versions": {
     "engineVersion": "0.4.0",
@@ -14,25 +14,25 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 614,
-    "durationMs": 7481
+    "durationMs": 6499
   },
   "metrics": {
     "compositeScore": 98.75,
     "grade": "A+",
     "autonomyRate": 86.93,
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 12201,
+    "totalIssues": 12204,
     "suppressedIssues": 502,
-    "unsuppressedIssues": 11699,
+    "unsuppressedIssues": 11702,
     "bySeverity": {
       "info": 1234,
-      "warning": 10967,
+      "warning": 10970,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 77,
-      "medium": 6065,
+      "high": 76,
+      "medium": 6069,
       "low": 6059
     }
   },
@@ -67,10 +67,10 @@
     "performanceEfficiency": 99.4,
     "standardization": 88.06,
     "modernity": 98.97,
-    "maintainability": 95.92,
+    "maintainability": 95.91,
     "commentQuality": 99.99,
     "duplication": 89.79,
-    "techDebtRisk": 99.87
+    "techDebtRisk": 99.88
   },
   "topHotspots": [
     {
@@ -167,8 +167,8 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 77,
-      "medium": 6065,
+      "high": 76,
+      "medium": 6069,
       "low": 6059
     },
     "criticalItems": [],
@@ -334,15 +334,6 @@
         "file": "src/analyzers/large-file.ts",
         "line": 123,
         "message": "Function \"collectWarnReasons\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/analyzers/performance.ts:133",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/performance.ts",
-        "line": 133,
-        "message": "Function \"PerformanceAnalyzer.scanLineContent\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
         "id": "performance:PRF-ALG-002:src/analyzers/simplify-linecheck.ts:505",
@@ -622,6 +613,15 @@
         "file": "src/core/rollback.ts",
         "line": 183,
         "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/router/sparseRuleRouter.ts:328",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/router/sparseRuleRouter.ts",
+        "line": 328,
+        "message": "Function \"routeDiffToAnalyzers\" has cyclomatic complexity 12 (threshold 12)."
       }
     ]
   },
@@ -647,11 +647,11 @@
         "compositeScore": 97.81,
         "pillars": {
           "architecture": 98.4,
-          "maintainability": 93.25,
+          "maintainability": 93.21,
           "performance": 99.7,
           "data": 99.28,
           "testing": 100,
-          "reliability": 99.22,
+          "reliability": 99.23,
           "security": 100,
           "extensibility": 92.59
         },
@@ -1351,8 +1351,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 129961,
-      "unique": 104719,
+      "processed": 129985,
+      "unique": 104844,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -1365,13 +1365,13 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791475423128,
+      "endMs": 1791475879184,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 18751983,
-        "uniqueTotal": 104719,
-        "changedTotal": 129549,
-        "semanticTotal": 103642
+        "processedTotal": 18775204,
+        "uniqueTotal": 104844,
+        "changedTotal": 126391,
+        "semanticTotal": 101115
       },
       "qed": {
         "mean": -0.0009,
@@ -1379,8 +1379,8 @@
         "max": 0.11
       },
       "debt": {
-        "totalAdded": 985,
-        "totalResolved": 1113,
+        "totalAdded": 986,
+        "totalResolved": 1119,
         "totalRegressions": 0,
         "netYield": 0.01
       },
