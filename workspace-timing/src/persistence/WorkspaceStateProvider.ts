@@ -33,8 +33,6 @@ export class WorkspaceStateProvider implements IStorageProvider {
             if (!raw) return null;
 
             const data: WorkspaceTimingData = JSON.parse(raw);
-
-            // 基本校验
             if (typeof data.totalMs !== 'number' || typeof data.version !== 'number') {
                 log(LogLevel.Warn, 'WorkspaceStateProvider: invalid data format, ignoring');
                 return null;

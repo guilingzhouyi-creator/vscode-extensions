@@ -44,6 +44,5 @@ export function createEmptyGlobalData(): GlobalTimingData {
  * 用于跨会话标识同一个工作区
  */
 export function normalizeWorkspaceId(uri: string): string {
-    // 统一小写 + 去除末尾斜杠
     return uri.toLowerCase().replace(/\/+$/, '');
 }

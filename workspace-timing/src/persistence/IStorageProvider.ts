@@ -3,9 +3,9 @@
  *
  * 实现此接口可接入自定义存储后端。
  * 默认实现：
- *   - WorkspaceStateProvider (VS Code workspaceState)
- *   - FileStorageProvider (.vscode/workspace-timing.json)
- *   - JournalStorageProvider (.vscode/workspace-timing.journal)
+ *   - WorkspaceStateProvider (VS Code workspaceState 主存储)
+ *   - FileStorageProvider (.vscode/workspace-timing.json 文件级容灾备份)
+ * 注：增量日志落盘由 IJournalStore 倒置端口由 JournalStorageProvider 承载。
  */
 
 import { WorkspaceTimingData } from '../domain/models';

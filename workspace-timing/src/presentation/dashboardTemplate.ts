@@ -7,7 +7,7 @@
  * 3. 统计数字采用等宽对齐与数值单位分层排版（Tabular figures + Unit typography）。
  * 4. 周活跃曲线升级为渐变区域填充（SVG LinearGradient Mask + 发光曲线描边 + 交互悬浮圆点）。
  * 5. 柱状图与进度条增加平滑渐变与悬浮微光（Glow & Elevation）。
- * 6. 12 周热力图增加悬浮缩放动效与更细腻的色阶。
+ * 6. 24 周活动热力图增加悬浮缩放动效与更细腻的色阶。
  * 7. 完全兼容 VS Code Dark / Light / High Contrast 所有官方与第三方主题。
  * 8. 保持 100% 原有 DOM ID、事件绑定、消息通信与 i18n 完整性。
  */

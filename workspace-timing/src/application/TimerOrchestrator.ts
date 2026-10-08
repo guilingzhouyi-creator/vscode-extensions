@@ -261,7 +261,12 @@ export class TimerOrchestrator {
         });
     }
 
-    /** 从面板更新配置（策略映射表驱动，CC <= 3） */
+    /**
+     * 批量应用来自仪表盘面板的配置项更新：
+     * 基于字段映射表驱动，统一执行数据格式清洗与运行时热更新分发。
+     *
+     * @param partial - 面板提交的差异化配置数据集
+     */
     applyDashboardConfig(partial: Partial<DashboardData>): void {
         const cfg: Partial<TimingConfig> = {};
         for (const [dashKey, cfgKey] of DASHBOARD_CONFIG_DIRECT_MAP) {

@@ -73,14 +73,11 @@ function foldSessionsIntoTotals(sessions: readonly TimeSession[], totals: DailyT
 }
 
 /**
- * 将过期及超容量会话折叠进日桶（双阈值无损回收）。
- * @param sessions 当前全部原始会话
- * @param existingTotals 既有沉淀桶（可为 undefined）
- * @param cutoffStartMs 折叠截止点（当日零点时刻戳）；0 = 不按时间折叠
- * @param maxSessions 原始会话最大保留条数；0 = 不按条数折叠
- */
-/**
- * 依据时间窗过滤会话，清洗脏数据并划分保留与折叠会话
+ * 依据时间窗过滤会话，清洗脏数据并划分保留与折叠会话。
+ *
+ * @param sessions - 原始会话集合
+ * @param cutoffStartMs - 时间截止时间戳
+ * @returns 划分后的保留会话与待折叠会话元组
  */
 function filterSessionsByCutoff(
     sessions: readonly TimeSession[],

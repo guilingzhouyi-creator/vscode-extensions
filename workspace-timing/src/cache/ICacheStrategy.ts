@@ -43,7 +43,6 @@ export class TimeBasedCacheStrategy implements ICacheStrategy {
         return context.count > 0 && context.elapsedSinceLastFlushMs >= this.intervalMs;
     }
 
-    onFlushComplete(_writtenCount: number): void {
-        // no-op
-    }
+    /** 基于时间的策略无需处理刷盘后统计，此处保持空实现以满足接口契约 */
+    onFlushComplete(_writtenCount: number): void {}
 }

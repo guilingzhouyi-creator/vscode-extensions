@@ -130,7 +130,8 @@ export class SessionManager {
     }
 
     /**
-     * 今日累计缓存失效通知（TimerEngine 内部已自动置脏维护，本方法作为向后兼容空调用保留）。
+     * 今日累计缓存失效通知。
+     * @deprecated TimerEngine 内部已自动置脏维护，本方法作为向后兼容空调用保留。
      */
     invalidateTodayCache(): void {}
 

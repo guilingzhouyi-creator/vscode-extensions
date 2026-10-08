@@ -122,7 +122,10 @@ export class Scheduler {
     }
 
     /**
-     * 运行期热更新调度间隔（拆解原子更新，CC <= 2）
+     * 运行期热更新定时器调度间隔：
+     * 分别原子化校验并应用 Journal 刷盘间隔与全量快照存盘间隔。
+     *
+     * @param patch - 包含目标调度周期的差异化配置片段
      */
     updateIntervals(patch: Partial<Pick<SchedulerOptions, 'journalFlushIntervalMs' | 'fullSaveIntervalMs'>>): void {
         const jChanged = this.updateJournalInterval(patch.journalFlushIntervalMs);

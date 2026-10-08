@@ -33,7 +33,7 @@ const en: I18nStrings = {
   'export.filter.all': 'All Files',
   'toast.cloudSyncPlaceholder': '☁️ Cloud sync is coming soon — stay tuned!',
 
-  // 报表导出（Markdown）
+  // Report export (Markdown)
   'report.daily.title': '📅 Daily Report · {0}',
   'report.daily.todayDuration': "Today's Duration",
   'report.daily.sessionCount': 'Session Count',

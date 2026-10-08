@@ -3,7 +3,7 @@
  *
  * 职责：start / stop / elapsed 计算
  * 边界：不关心存储、不关心 UI、不关心禁用策略
- * 依赖：仅依赖 models.ts
+ * 依赖：domain/models.ts, domain/TimeAggregator.ts
  */
 
 import { WorkspaceTimingData, ReadonlyTimingData, TimeSession, MS_PER_DAY, createEmptyTimingData } from './models';

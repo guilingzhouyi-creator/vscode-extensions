@@ -109,7 +109,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 fileStorageProvider,
                 journalStorageProvider,
             );
-            // 缓存层：capacity 与 flush 策略从配置读取（此前被忽略，形同虚设）
+            // 缓存层：根据用户配置注入环形缓冲区容量与基于时间的刷盘策略
             const journal = new JournalWriter(
                 journalStorageProvider,
                 cfg.ringBufferCapacity,
@@ -194,8 +194,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         // ─── 无论有无工作区，命令必须注册 ───
         commandRegistrar = new CommandRegistrar();
-        // 修复：此前此处传入 null，导致 reset 命令永远命中"无工作区"守卫而失效。
-        // globalAggregatorRef 传入：命令面板 reset/clearGlobal 与面板 reset 语义对齐（都清全局聚合）。
+        // 注册全局与工作区级命令：注入 orchestrator 与 globalAggregatorRef 支持无工作区降级处理与全局数据重置
         commandRegistrar.register(context, orchestrator, statusBar, globalAggregatorRef);
 
         const elapsed = Date.now() - startTime;

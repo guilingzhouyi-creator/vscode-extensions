@@ -34,7 +34,10 @@ type MessageStrategy<T extends DashboardMessage['type']> = (
     msg: Extract<DashboardMessage, { type: T }>
 ) => void | Promise<void>;
 
-/** 策略分发字典：消除集中式 switch-case，圈复杂度降至 CC <= 3 */
+/**
+ * 消息策略分发表：采用声明式字典路由映射替代集中式条件分支，
+ * 确保各类面板事件处理具有独立的单向数据流与清晰的关注点隔离。
+ */
 const MESSAGE_STRATEGIES: {
     [K in DashboardMessage['type']]: MessageStrategy<K>;
 } = {

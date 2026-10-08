@@ -24,13 +24,11 @@ export class CsvExporter {
     async export(data: WorkspaceTimingData, workspaceName: string): Promise<string> {
         const lines: string[] = [];
 
-        // 头部
         lines.push(`# Workspace Timing Export: ${workspaceName}`);
         lines.push(`# Generated: ${localDateTime(Date.now())}`);
         lines.push(`# Total: ${data.totalMs}ms`);
         lines.push('');
 
-        // 会话记录
         lines.push('Session Start,Session End,Duration (ms)');
         for (const session of data.sessions) {
             const start = localDateTime(session.startMs);
