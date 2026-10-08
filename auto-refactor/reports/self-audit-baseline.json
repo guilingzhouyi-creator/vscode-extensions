@@ -1,7 +1,7 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791474411406",
-  "timestamp": "2026-10-08T15:46:59.915Z",
-  "cai": 86.91,
+  "snapshotId": "snapshot-v0.4.0-1791475423130",
+  "timestamp": "2026-10-08T16:03:52.130Z",
+  "cai": 86.93,
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -14,40 +14,40 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 614,
-    "durationMs": 7151
+    "durationMs": 7481
   },
   "metrics": {
-    "compositeScore": 98.74,
+    "compositeScore": 98.75,
     "grade": "A+",
-    "autonomyRate": 86.91,
+    "autonomyRate": 86.93,
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 12219,
+    "totalIssues": 12201,
     "suppressedIssues": 502,
-    "unsuppressedIssues": 11717,
+    "unsuppressedIssues": 11699,
     "bySeverity": {
-      "info": 1228,
-      "warning": 10991,
+      "info": 1234,
+      "warning": 10967,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 95,
-      "medium": 6080,
-      "low": 6044
+      "high": 77,
+      "medium": 6065,
+      "low": 6059
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.71,
-      "maintainability": 97.44,
-      "performance": 99.55,
+      "maintainability": 97.47,
+      "performance": 99.59,
       "data": 99.74,
       "testing": 100,
-      "reliability": 99.68,
+      "reliability": 99.69,
       "security": 100,
       "extensibility": 94.45
     },
-    "compositeScore": 98.74,
+    "compositeScore": 98.75,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -61,16 +61,16 @@
     "ceilingsApplied": []
   },
   "tenDimensions": {
-    "architectureConsistency": 98.13,
+    "architectureConsistency": 98.14,
     "semanticPurity": 99.2,
     "codeSecurity": 100,
-    "performanceEfficiency": 99.35,
-    "standardization": 88.05,
+    "performanceEfficiency": 99.4,
+    "standardization": 88.06,
     "modernity": 98.97,
-    "maintainability": 95.89,
+    "maintainability": 95.92,
     "commentQuality": 99.99,
     "duplication": 89.79,
-    "techDebtRisk": 99.85
+    "techDebtRisk": 99.87
   },
   "topHotspots": [
     {
@@ -167,9 +167,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 95,
-      "medium": 6080,
-      "low": 6044
+      "high": 77,
+      "medium": 6065,
+      "low": 6059
     },
     "criticalItems": [],
     "highItems": [
@@ -309,22 +309,13 @@
         "message": "Function \"auditTenDimensionalFidelity\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/constants-literal-helper.ts:397",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/constants-literal-helper.ts",
-        "line": 397,
-        "message": "Function \"isStringDuplicateCandidate\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/analyzers/frontend.ts:176",
+        "id": "performance:PRF-ALG-002:src/analyzers/frontend.ts:177",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/frontend.ts",
-        "line": 176,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'filter()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+        "line": 177,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
         "id": "complexity:high-complexity:src/analyzers/governance.ts:290",
@@ -345,24 +336,6 @@
         "message": "Function \"collectWarnReasons\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/naming-path-helper.ts:195",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/naming-path-helper.ts",
-        "line": 195,
-        "message": "Function \"auditFileName\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/analyzers/naming.ts:627",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/naming.ts",
-        "line": 627,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
         "id": "complexity:high-complexity:src/analyzers/performance.ts:133",
         "rule": "high-complexity",
         "tier": "high",
@@ -370,15 +343,6 @@
         "file": "src/analyzers/performance.ts",
         "line": 133,
         "message": "Function \"PerformanceAnalyzer.scanLineContent\" has cyclomatic complexity 14 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/analyzers/production-hygiene.ts:122",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/production-hygiene.ts",
-        "line": 122,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
         "id": "performance:PRF-ALG-002:src/analyzers/simplify-linecheck.ts:505",
@@ -408,12 +372,12 @@
         "message": "Function \"applySpecialValueFlag\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-002:src/core/ast/gdscript-adapter.ts:379",
+        "id": "performance:PRF-ALG-002:src/core/ast/gdscript-adapter.ts:117",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/gdscript-adapter.ts",
-        "line": 379,
+        "line": 117,
         "message": "Nested collection linear lookup anti-pattern: Calling 'lastIndexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
@@ -444,58 +408,13 @@
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
       },
       {
-        "id": "complexity:CPX-NEST-001:src/core/codemod/transforms/extract-constant.ts:38",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/codemod/transforms/extract-constant.ts",
-        "line": 38,
-        "message": "Unbounded control-flow nesting: function 'createExtractConstantFix' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/comments/project-comment-profiler.ts:42",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/comments/project-comment-profiler.ts",
-        "line": 42,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/config/metric-parser.ts:44",
+        "id": "complexity:high-complexity:src/core/comments/project-comment-profiler.ts:109",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/core/config/metric-parser.ts",
-        "line": 44,
-        "message": "Function \"parseHumanMetric\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/dependency-graph-traversal.ts:218",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/dependency-graph-traversal.ts",
-        "line": 218,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/file-discovery.ts:149",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/file-discovery.ts",
-        "line": 149,
-        "message": "Unbounded control-flow nesting: function 'collectFiles' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/governance/gate-governance.ts:496",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/governance/gate-governance.ts",
-        "line": 496,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+        "file": "src/core/comments/project-comment-profiler.ts",
+        "line": 109,
+        "message": "Function \"extractRawCommentText\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/governance/rules/fileStructure.ts:303",
@@ -516,76 +435,13 @@
         "message": "Function \"formatCompactGuardDirective\" has cyclomatic complexity 19 (exceeds relaxed threshold 18 for shallow structure)."
       },
       {
-        "id": "performance:PRF-ALG-002:src/core/intelligence/constant-identity.ts:295",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/constant-identity.ts",
-        "line": 295,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/contextSlice.ts:132",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/contextSlice.ts",
-        "line": 132,
-        "message": "Function \"buildContextSlice\" has cyclomatic complexity 22 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/intelligence/dataAccessContext.ts:57",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/dataAccessContext.ts",
-        "line": 57,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/dependency-provenance.ts:176",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/dependency-provenance.ts",
-        "line": 176,
-        "message": "Function \"parsePythonManifests\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
         "id": "performance:PRF-ALG-002:src/core/intelligence/dependencyLayoutHelpers.ts:152",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/intelligence/dependencyLayoutHelpers.ts",
         "line": 152,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/semanticArchitecture.ts:69",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/semanticArchitecture.ts",
-        "line": 69,
-        "message": "Function \"inferSemanticLayer\" has cyclomatic complexity 23 (exceeds relaxed threshold 18 for shallow structure)."
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/intelligence/semanticComplexity.ts:97",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/semanticComplexity.ts",
-        "line": 97,
-        "message": "Unbounded control-flow nesting: function 'dfs' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/symbolIndex.ts:116",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/symbolIndex.ts",
-        "line": 116,
-        "message": "Function \"processSymbolFrame\" has cyclomatic complexity 14 (threshold 12)."
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
         "id": "complexity:high-complexity:src/core/intelligence/testModernityAuditor.ts:241",
@@ -606,22 +462,166 @@
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.appendFileSync' inside critical execution stream"
       },
       {
-        "id": "complexity:high-complexity:src/core/memory/semanticMatcher.ts:41",
+        "id": "performance:PRF-MEM-001:src/core/patterns/pattern-matcher.ts:106",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/patterns/pattern-matcher.ts",
+        "line": 106,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/pipeline/cycle-detector.ts:173",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/core/memory/semanticMatcher.ts",
-        "line": 41,
-        "message": "Function \"matchDomains\" has cyclomatic complexity 16 (threshold 12)."
+        "file": "src/core/pipeline/cycle-detector.ts",
+        "line": 173,
+        "message": "Function \"detectDependencyCyclesAsync\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-002:src/core/memory/trainingExporter.ts:189",
+        "id": "performance:PRF-ALG-002:src/core/pipeline/dualTrackPipeline.ts:413",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
-        "file": "src/core/memory/trainingExporter.ts",
-        "line": 189,
+        "file": "src/core/pipeline/dualTrackPipeline.ts",
+        "line": 413,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/policy/source-mask.ts:320",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/policy/source-mask.ts",
+        "line": 320,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/policy/source-mask.ts:354",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/policy/source-mask.ts",
+        "line": 354,
+        "message": "Unbounded control-flow nesting: function 'scanRegexSpan' has nesting depth 5 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/praxis/client/agent-directives.ts:199",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/praxis/client/agent-directives.ts",
+        "line": 199,
+        "message": "Function \"formatFindingItem\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/praxis/diff-topology.ts:416",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/praxis/diff-topology.ts",
+        "line": 416,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/praxis/feedback-adaptive-supervisor.ts:615",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/praxis/feedback-adaptive-supervisor.ts",
+        "line": 615,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/praxis/feedback-adaptive-supervisor.ts:629",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/praxis/feedback-adaptive-supervisor.ts",
+        "line": 629,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/preflight/expansion-tracer.ts:62",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/preflight/expansion-tracer.ts",
+        "line": 62,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/preflight/expansion-tracer.ts:117",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/preflight/expansion-tracer.ts",
+        "line": 117,
+        "message": "Unbounded control-flow nesting: function 'expandSecondOrder' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/preflight/preflight-controller.ts:191",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/preflight/preflight-controller.ts",
+        "line": 191,
+        "message": "Function \"PreflightAuditController.finalizeAudit\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/preflight/scope-normalizer.ts:133",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/preflight/scope-normalizer.ts",
+        "line": 133,
+        "message": "Function \"normalizeScopeQuality\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/preflight/slice-partitioner.ts:164",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/preflight/slice-partitioner.ts",
+        "line": 164,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 2) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/profiler/maturityClassifier.ts:179",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/profiler/maturityClassifier.ts",
+        "line": 179,
+        "message": "Unbounded control-flow nesting: function 'detectMaturityTier' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/reporters.ts:83",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/reporters.ts",
+        "line": 83,
+        "message": "Function \"toText\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/rollback.ts:182",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/rollback.ts",
+        "line": 182,
         "message": "Nested collection linear lookup anti-pattern: Calling 'filter()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/rollback.ts:183",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/rollback.ts",
+        "line": 183,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       }
     ]
   },
@@ -644,16 +644,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 97.77,
+        "compositeScore": 97.81,
         "pillars": {
           "architecture": 98.4,
-          "maintainability": 93.16,
-          "performance": 99.56,
+          "maintainability": 93.25,
+          "performance": 99.7,
           "data": 99.28,
           "testing": 100,
-          "reliability": 99.18,
+          "reliability": 99.22,
           "security": 100,
-          "extensibility": 92.53
+          "extensibility": 92.59
         },
         "moduleCount": 1
       },
@@ -689,14 +689,14 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 98.32,
+        "compositeScore": 98.36,
         "pillars": {
           "architecture": 99.68,
-          "maintainability": 96.45,
-          "performance": 97.95,
+          "maintainability": 96.52,
+          "performance": 98.1,
           "data": 99.71,
           "testing": 100,
-          "reliability": 99.59,
+          "reliability": 99.63,
           "security": 100,
           "extensibility": 92.77
         },
@@ -719,10 +719,10 @@
       },
       {
         "domainName": "ast",
-        "compositeScore": 98.69,
+        "compositeScore": 98.67,
         "pillars": {
           "architecture": 99.55,
-          "maintainability": 96.26,
+          "maintainability": 96.13,
           "performance": 99.87,
           "data": 99.74,
           "testing": 100,
@@ -764,14 +764,14 @@
       },
       {
         "domainName": "transforms",
-        "compositeScore": 99.72,
+        "compositeScore": 99.85,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.25,
+          "maintainability": 100,
           "performance": 100,
           "data": 100,
           "testing": 100,
-          "reliability": 99.81,
+          "reliability": 100,
           "security": 100,
           "extensibility": 98.5
         },
@@ -779,31 +779,31 @@
       },
       {
         "domainName": "comments",
-        "compositeScore": 99.07,
+        "compositeScore": 98.97,
         "pillars": {
           "architecture": 98.18,
-          "maintainability": 98.91,
-          "performance": 99.5,
+          "maintainability": 98.41,
+          "performance": 100,
           "data": 100,
           "testing": 100,
-          "reliability": 100,
+          "reliability": 99.88,
           "security": 100,
-          "extensibility": 95.8
+          "extensibility": 94.97
         },
         "moduleCount": 1
       },
       {
         "domainName": "config",
-        "compositeScore": 98.19,
+        "compositeScore": 98.31,
         "pillars": {
           "architecture": 97,
-          "maintainability": 96.75,
+          "maintainability": 97.63,
           "performance": 98.5,
           "data": 100,
           "testing": 100,
-          "reliability": 99.81,
+          "reliability": 100,
           "security": 100,
-          "extensibility": 93.7
+          "extensibility": 93.45
         },
         "moduleCount": 1
       },
@@ -869,11 +869,11 @@
       },
       {
         "domainName": "governance",
-        "compositeScore": 98.27,
+        "compositeScore": 98.3,
         "pillars": {
           "architecture": 98.22,
           "maintainability": 97.32,
-          "performance": 98.73,
+          "performance": 98.93,
           "data": 99.36,
           "testing": 100,
           "reliability": 99.36,
@@ -914,31 +914,31 @@
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 98.32,
+        "compositeScore": 98.41,
         "pillars": {
           "architecture": 97.97,
-          "maintainability": 96.95,
-          "performance": 99.71,
+          "maintainability": 97.26,
+          "performance": 99.89,
           "data": 99.79,
           "testing": 100,
-          "reliability": 99.66,
+          "reliability": 99.76,
           "security": 100,
-          "extensibility": 91.77
+          "extensibility": 91.87
         },
         "moduleCount": 1
       },
       {
         "domainName": "memory",
-        "compositeScore": 98.4,
+        "compositeScore": 98.6,
         "pillars": {
           "architecture": 99.4,
-          "maintainability": 98.1,
-          "performance": 96.67,
+          "maintainability": 98.7,
+          "performance": 97.27,
           "data": 99.58,
           "testing": 100,
-          "reliability": 99.43,
+          "reliability": 99.58,
           "security": 100,
-          "extensibility": 93.71
+          "extensibility": 93.75
         },
         "moduleCount": 1
       },
@@ -1351,8 +1351,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 129560,
-      "unique": 104373,
+      "processed": 129961,
+      "unique": 104719,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -1365,13 +1365,13 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791474411404,
+      "endMs": 1791475423128,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 18717157,
-        "uniqueTotal": 104373,
-        "changedTotal": 132465,
-        "semanticTotal": 105974
+        "processedTotal": 18751983,
+        "uniqueTotal": 104719,
+        "changedTotal": 129549,
+        "semanticTotal": 103642
       },
       "qed": {
         "mean": -0.0009,
@@ -1379,12 +1379,12 @@
         "max": 0.11
       },
       "debt": {
-        "totalAdded": 996,
-        "totalResolved": 1051,
+        "totalAdded": 985,
+        "totalResolved": 1113,
         "totalRegressions": 0,
-        "netYield": 0
+        "netYield": 0.01
       },
-      "meanCompositeScore": 98.9,
+      "meanCompositeScore": 98.89,
       "gatePassRate": 98
     },
     "isFirstBaseline": false
