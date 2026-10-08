@@ -481,32 +481,23 @@ export function auditBooleanReturn(
 
 const GUARD_SUGGESTION = 'Invert the condition and return early to reduce nesting depth.';
 
-function isGuardIfBlock(lines: string[], idx: number): boolean {
+function resolveGuardIfSpan(lines: string[], idx: number): number {
     const trimmed = lines[idx].trim();
     // Single line: `if (cond) return/throw ...;`
-    if (/^if\s*\([^)]*\)\s*(?:return|throw)\b/.test(trimmed)) return true;
+    if (/^if\s*\([^)]*\)\s*(?:return|throw)\b/.test(trimmed)) return idx;
     // Multi-line block: `if (cond) {` with a single return/throw inside
     if (/^if\s*\([^)]*\)\s*\{\s*$/.test(trimmed)) {
         const closeIdx = findMatchingBrace(lines, idx);
-        if (closeIdx === -1) return false;
+        if (closeIdx === -1) return -1;
         const stmts = countMeaningfulStmts(lines, idx + 1, closeIdx);
-        if (stmts !== 1) return false;
+        if (stmts !== 1) return -1;
         const lastIdx = findLastMeaningfulLine(lines, idx + 1, closeIdx - 1);
-        if (lastIdx === -1) return false;
-        return /^(?:return|throw)\b/.test(lines[lastIdx].trim());
+        if (lastIdx === -1) return -1;
+        if (/^(?:return|throw)\b/.test(lines[lastIdx].trim())) {
+            return closeIdx;
+        }
     }
-    return false;
-}
-
-function getGuardIfEndLine(lines: string[], idx: number): number {
-    const trimmed = lines[idx].trim();
-    if (/^if\s*\([^)]*\)\s*(?:return|throw)\b/.test(trimmed)) {
-        return idx;
-    }
-    if (/^if\s*\([^)]*\)\s*\{\s*$/.test(trimmed)) {
-        return findMatchingBrace(lines, idx);
-    }
-    return idx;
+    return -1;
 }
 
 function findFunctionOpeningBrace(lines: string[], start: number): number {
@@ -529,10 +520,11 @@ function countConsecutiveGuardClauses(
             cur++;
             continue;
         }
-        if (isGuardIfBlock(lines, cur)) {
+        const guardEnd = resolveGuardIfSpan(lines, cur);
+        if (guardEnd !== -1) {
             if (firstIfLine === -1) firstIfLine = cur;
             count++;
-            cur = getGuardIfEndLine(lines, cur) + 1;
+            cur = guardEnd + 1;
             continue;
         }
         break;
