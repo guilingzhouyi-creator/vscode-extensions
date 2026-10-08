@@ -39,9 +39,10 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 $failed = $false
 
 # 1. 物理卫生与零空文件看守
-if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生与零空文件..." -ForegroundColor Gray }
+if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本与零空文件..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -NoNewWindow -PassThru -Wait
-if ($res.ExitCode -ne 0) {
+$resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -NoNewWindow -PassThru -Wait
+if ($res.ExitCode -ne 0 -or $resIso.ExitCode -ne 0) {
     $statusHygiene = "FAIL"
     $failed = $true
 } else {
@@ -77,7 +78,7 @@ $logWg = Join-Path $transientDir "audit-wg-$randSuffix.log"
 $arScript = if ($Fast) {
     "& '$nodeCmd' scripts/validate-self-multidimensional-audit.js *>&1"
 } else {
-    "& '$npmCmd' test *>&1"
+    "& '$npmCmd' test *>&1; if (`$LASTEXITCODE -eq 0) { & '$nodeCmd' scripts/gate-self.js *>&1 }"
 }
 $wtScript = "& '$npmCmd' run review *>&1"
 $wgScript = "& '$pythonCmd' WebGames/scripts/py/audit_config.py --strict *>&1"
@@ -191,11 +192,17 @@ try {
             if ($null -ne $tenDimensions) {
                 $baseline = $baselineData
             }
+
+            $notEvaluatedDims = Get-SafeProp $baselineData 'notEvaluated'
+            if ($null -eq $notEvaluatedDims -and $null -ne $metricsData) {
+                $notEvaluatedDims = Get-SafeProp $metricsData 'notEvaluated'
+            }
         }
     }
 } catch {
     $baseline = $null
     $tenDimensions = $null
+    $notEvaluatedDims = $null
 }
 
 $dimDefinitions = @(
@@ -213,18 +220,17 @@ $dimDefinitions = @(
 
 if ($Json) {
     $qualityVectorObj = if ($null -ne $tenDimensions) {
-        [ordered]@{
-            architectureConsistency = [double](Get-SafeProp $tenDimensions 'architectureConsistency')
-            semanticPurity = [double](Get-SafeProp $tenDimensions 'semanticPurity')
-            codeSecurity = [double](Get-SafeProp $tenDimensions 'codeSecurity')
-            performanceEfficiency = [double](Get-SafeProp $tenDimensions 'performanceEfficiency')
-            standardization = [double](Get-SafeProp $tenDimensions 'standardization')
-            modernity = [double](Get-SafeProp $tenDimensions 'modernity')
-            maintainability = [double](Get-SafeProp $tenDimensions 'maintainability')
-            commentQuality = [double](Get-SafeProp $tenDimensions 'commentQuality')
-            duplication = [double](Get-SafeProp $tenDimensions 'duplication')
-            techDebtRisk = [double](Get-SafeProp $tenDimensions 'techDebtRisk')
+        $qObj = [ordered]@{}
+        foreach ($d in $dimDefinitions) {
+            $rawScore = Get-SafeProp $tenDimensions $d.key
+            $parsedScore = 0.0
+            if ($null -ne $rawScore -and [double]::TryParse([string]$rawScore, [ref]$parsedScore) -and -not [double]::IsNaN($parsedScore) -and $parsedScore -gt 0) {
+                $qObj[$d.key] = $parsedScore
+            } else {
+                $qObj[$d.key] = $null
+            }
         }
+        $qObj
     } else {
         $null
     }
@@ -284,14 +290,35 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
     Write-Host "├───────────────────────────────────────────────────────────────┤" -ForegroundColor Cyan
 
     foreach ($d in $dimDefinitions) {
-        $score = [double](Get-SafeProp $tenDimensions $d.key)
-        $filled = [math]::Round(($score / 100.0) * 20)
-        if ($filled -lt 0) { $filled = 0 } elseif ($filled -gt 20) { $filled = 20 }
-        $empty = 20 - $filled
-        $bar = ("█" * $filled) + ("░" * $empty)
-        $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
-        $paddedScore = $scoreStr.PadLeft(5)
-        $lineColor = if ($score -ge 90) { "Green" } elseif ($score -ge 75) { "Yellow" } else { "Red" }
+        $rawScore = Get-SafeProp $tenDimensions $d.key
+        $isNotEvaluated = $false
+        if ($null -ne $notEvaluatedDims -and $notEvaluatedDims -contains $d.key) {
+            $isNotEvaluated = $true
+        } elseif ($null -eq $rawScore) {
+            $isNotEvaluated = $true
+        } elseif ([string]$rawScore -match '^(?i:notEvaluated|N/?A|null|none|undefined)$') {
+            $isNotEvaluated = $true
+        } else {
+            $parsedScore = 0.0
+            if (-not [double]::TryParse([string]$rawScore, [ref]$parsedScore) -or [double]::IsNaN($parsedScore) -or $parsedScore -le 0.0) {
+                $isNotEvaluated = $true
+            }
+        }
+
+        if ($isNotEvaluated) {
+            $bar = " " * 20
+            $paddedScore = "  N/A"
+            $lineColor = "DarkGray"
+        } else {
+            $score = $parsedScore
+            $filled = [math]::Round(($score / 100.0) * 20)
+            if ($filled -lt 0) { $filled = 0 } elseif ($filled -gt 20) { $filled = 20 }
+            $empty = 20 - $filled
+            $bar = ("█" * $filled) + ("░" * $empty)
+            $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
+            $paddedScore = $scoreStr.PadLeft(5)
+            $lineColor = if ($score -ge 90) { "Green" } elseif ($score -ge 75) { "Yellow" } else { "Red" }
+        }
         Write-Host ("│ {0,-4}{1}{2}[{3}] {4}{5} │" -f $d.num, $d.name, $d.pad, $bar, $paddedScore, (" " * 17)) -ForegroundColor $lineColor
     }
     Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
@@ -335,12 +362,32 @@ if ($env:GITHUB_STEP_SUMMARY) {
             [void]$md.AppendLine("| 序号 | 质量维度 | 得分 | 进度可视化 |")
             [void]$md.AppendLine("| :---: | :--- | :---: | :--- |")
             foreach ($d in $dimDefinitions) {
-                $score = [double](Get-SafeProp $tenDimensions $d.key)
-                $filled = [math]::Round(($score / 100.0) * 20)
-                if ($filled -lt 0) { $filled = 0 } elseif ($filled -gt 20) { $filled = 20 }
-                $empty = 20 - $filled
-                $bar = ("█" * $filled) + ("░" * $empty)
-                $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
+                $rawScore = Get-SafeProp $tenDimensions $d.key
+                $isNotEvaluated = $false
+                if ($null -ne $notEvaluatedDims -and $notEvaluatedDims -contains $d.key) {
+                    $isNotEvaluated = $true
+                } elseif ($null -eq $rawScore) {
+                    $isNotEvaluated = $true
+                } elseif ([string]$rawScore -match '^(?i:notEvaluated|N/?A|null|none|undefined)$') {
+                    $isNotEvaluated = $true
+                } else {
+                    $parsedScore = 0.0
+                    if (-not [double]::TryParse([string]$rawScore, [ref]$parsedScore) -or [double]::IsNaN($parsedScore) -or $parsedScore -le 0.0) {
+                        $isNotEvaluated = $true
+                    }
+                }
+
+                if ($isNotEvaluated) {
+                    $bar = " " * 20
+                    $scoreStr = "N/A"
+                } else {
+                    $score = $parsedScore
+                    $filled = [math]::Round(($score / 100.0) * 20)
+                    if ($filled -lt 0) { $filled = 0 } elseif ($filled -gt 20) { $filled = 20 }
+                    $empty = 20 - $filled
+                    $bar = ("█" * $filled) + ("░" * $empty)
+                    $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
+                }
                 [void]$md.AppendLine(("| {0} | {1} | {2} | `[{3}]` |" -f $d.num.TrimEnd('.'), $d.labelEn, $scoreStr, $bar))
             }
         } else {

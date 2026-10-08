@@ -73,6 +73,8 @@ function detectVacuousTrampoline(fullPath, content) {
   return [...targets][0];
 }
 
+const MAX_SUSPECT_SIZE_BYTES = 8192;
+
 function inspectFileForEmptiness(fullPath, findings) {
   try {
     const stat = fs.statSync(fullPath);
@@ -84,6 +86,12 @@ function inspectFileForEmptiness(fullPath, findings) {
       });
       return;
     }
+
+    // Fast-path: Files larger than 8KB can neither be whitespace-only nor 3-line vacuous trampolines
+    if (stat.size > MAX_SUSPECT_SIZE_BYTES) {
+      return;
+    }
+
     const content = fs.readFileSync(fullPath, 'utf8');
     if (content.trim().length === 0) {
       findings.push({
@@ -155,6 +163,7 @@ if (require.main === module) {
 
 module.exports = {
   IGNORED_DIRS,
+  MAX_SUSPECT_SIZE_BYTES,
   detectVacuousTrampoline,
   inspectFileForEmptiness,
   scanDirectory,

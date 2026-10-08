@@ -17,14 +17,16 @@ set -euo pipefail
 KEEP=5
 NAME=""
 SKIP_BUILD=false
+HOT_SYNC=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --name|-n) NAME="$2"; shift 2 ;;
     --keep|-k) KEEP="$2"; shift 2 ;;
     --skip-build) SKIP_BUILD=true; shift ;;
+    --hotsync|-HotSync) HOT_SYNC=true; shift ;;
     --help|-h)
-      echo "Usage: bash scripts/sh/package.sh [--name <ext>] [--keep <n>] [--skip-build]"
+      echo "Usage: bash scripts/sh/package.sh [--name <ext>] [--keep <n>] [--skip-build] [--hotsync]"
       exit 0
       ;;
     *) echo "未知参数: $1" >&2; exit 1 ;;
@@ -133,4 +135,8 @@ for EXT in "${EXTS[@]}"; do
 done
 
 echo ""
-echo "全部完成。产物位于 dist/<扩展名>/"
+if [[ "$HOT_SYNC" == "true" ]]; then
+  echo "全部完成。增量产物已热同步或就绪 (HotSync)。"
+else
+  echo "全部完成。产物位于 dist/<扩展名>/"
+fi

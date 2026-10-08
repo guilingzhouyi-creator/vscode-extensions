@@ -54,8 +54,8 @@ FAILED=0
 START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
 # 1. 物理卫生与零空文件看守
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生与零空文件..."; fi
-if ! "$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1; then
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生、同构脚本与零空文件..."; fi
+if ! "$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1 || ! "$NODE_BIN" scripts/common/validate-script-isomorphism.js >/dev/null 2>&1; then
     STATUS_HYGIENE="FAIL"
     FAILED=1
 else

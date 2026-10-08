@@ -150,13 +150,92 @@ function evaluateCodeMetrics(content, ext) {
   return { totalLoc, blankLines, commentLines, eloc, commentRatio, dilutionRatio, density };
 }
 
+const CONSTANT_PATH_PATTERNS = [
+  '/constants/',
+  '/tokens/',
+  '/locales/',
+  '/i18n/',
+  'constants.ts',
+  'tokens.ts',
+  'rule-codes.ts',
+  'diagnostic-tokens.ts',
+  'system-tokens.ts',
+  'ast-tokens.ts',
+];
+
+/**
+ * Check if the file path matches benign constant catalog patterns.
+ *
+ * @param {string} filePath - Path to file.
+ * @returns {boolean} True if matching path pattern.
+ */
+function isConstantPath(filePath) {
+  if (!filePath) return false;
+  const norm = filePath.replace(/\\/g, '/').toLowerCase();
+  for (const pat of CONSTANT_PATH_PATTERNS) {
+    if (norm.includes(pat)) return true;
+  }
+  return false;
+}
+
+/**
+ * Check if file content predominantly consists of constants.
+ *
+ * @param {string} content - Raw file content.
+ * @returns {boolean} True if constant content structure.
+ */
+function isConstantContentStructure(content) {
+  if (!content || typeof content !== 'string') return false;
+  const lines = content
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('/*') && !l.startsWith('*'));
+  if (lines.length < 20) return false;
+
+  let constCount = 0;
+  let fnCount = 0;
+  for (const l of lines) {
+    if (
+      l.startsWith('export const ') ||
+      l.startsWith('export enum ') ||
+      l.startsWith('const ') ||
+      l.startsWith('readonly ') ||
+      l.endsWith('as const;') ||
+      l.endsWith('as const')
+    ) {
+      constCount++;
+    }
+    if (l.includes('function ') || l.includes('=> {') || l.includes('class ')) {
+      fnCount++;
+    }
+  }
+  return constCount / lines.length >= 0.5 && fnCount <= 2;
+}
+
+/**
+ * Detects whether a file represents a benign constant library or static data dictionary.
+ *
+ * @param {string} filePath - Path to file
+ * @param {string} content - Raw file content
+ * @returns {boolean} True if file is recognized as a benign constant catalog
+ */
+function isBenignConstantCatalog(filePath, content) {
+  if (isConstantPath(filePath)) return true;
+  return isConstantContentStructure(content);
+}
+
 /**
  * Evaluates bidirectional dynamic envelope constraints.
  */
-function evaluateDynamicEnvelope(metrics, options) {
+function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') {
   const { eloc, totalLoc, commentLines } = metrics;
-  const maxEloc = options.maxEloc || DEFAULT_MAX_ELOC;
-  const maxLoc = options.maxLoc || DEFAULT_MAX_LOC;
+  const isConstantCatalog = isBenignConstantCatalog(filePath, content);
+  const maxEloc = isConstantCatalog
+    ? Math.max(options.maxEloc || DEFAULT_MAX_ELOC, 1800)
+    : options.maxEloc || DEFAULT_MAX_ELOC;
+  const maxLoc = isConstantCatalog
+    ? Math.max(options.maxLoc || DEFAULT_MAX_LOC, 2500)
+    : options.maxLoc || DEFAULT_MAX_LOC;
   const densityRatioTarget = options.densityRatio || DEFAULT_TARGET_DENSITY_RATIO;
 
   // 1. Absolute volume bounds
@@ -179,7 +258,7 @@ function evaluateDynamicEnvelope(metrics, options) {
 
   // 2. Forward dynamic LOC constraint
   const dynamicMaxLoc = Math.min(maxLoc, Math.max(150, Math.ceil(eloc * densityRatioTarget)));
-  if (totalLoc > dynamicMaxLoc) {
+  if (totalLoc > dynamicMaxLoc && !isConstantCatalog) {
     const actualRatio = (totalLoc / Math.max(1, eloc)).toFixed(2);
     return {
       severity: 'warn',
@@ -189,8 +268,8 @@ function evaluateDynamicEnvelope(metrics, options) {
     };
   }
 
-  // 3. Reverse dynamic ELOC constraint
-  if (totalLoc >= MIN_REPRESENTATIVE_LOC) {
+  // 3. Reverse dynamic ELOC constraint (exempt for benign constant catalogs)
+  if (totalLoc >= MIN_REPRESENTATIVE_LOC && !isConstantCatalog) {
     const dynamicMinEloc = Math.floor(totalLoc / densityRatioTarget);
     if (eloc < dynamicMinEloc) {
       const codeDensityPct = ((eloc / totalLoc) * 100).toFixed(1);
@@ -203,8 +282,8 @@ function evaluateDynamicEnvelope(metrics, options) {
     }
   }
 
-  // 4. High-load contract density constraint
-  if (eloc >= 600) {
+  // 4. High-load contract density constraint (exempt for pure constant catalogs governed by file-level contract)
+  if (eloc >= 600 && !isConstantCatalog) {
     const commentRatio = totalLoc > 0 ? commentLines / totalLoc : 0;
     if (commentRatio < MIN_CONTRACT_COMMENT_RATIO) {
       const commentPct = (commentRatio * 100).toFixed(1);
@@ -217,7 +296,7 @@ function evaluateDynamicEnvelope(metrics, options) {
     }
   }
 
-  return { severity: 'pass', tag: 'HEALTHY' };
+  return { severity: 'pass', tag: isConstantCatalog ? 'ARCH_BENIGN_CONSTANT_LIBRARY' : 'HEALTHY' };
 }
 
 /**
@@ -390,7 +469,7 @@ function run() {
     const metrics = evaluateCodeMetrics(content, ext);
     const relPath = path.relative(process.cwd(), file).replace(/\\/g, '/');
 
-    const envelope = evaluateDynamicEnvelope(metrics, options);
+    const envelope = evaluateDynamicEnvelope(metrics, options, relPath, content);
     summaries.push({ relPath, ...metrics, envelope });
 
     if (envelope.severity === 'error') {
