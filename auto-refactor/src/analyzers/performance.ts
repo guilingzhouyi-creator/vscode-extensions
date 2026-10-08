@@ -154,55 +154,80 @@ export class PerformanceAnalyzer implements Analyzer {
             issues,
         );
 
+        this.auditAllocations(nextLine.trimmed, lineIdx, ctx, scanConfig, loopStack, issues);
+        this.auditLinearLookups(nextLine.trimmed, lineIdx, ctx, scanConfig, loopStack, issues);
+        this.auditIo(nextLine.trimmed, nextLine.lineText, lineIdx, scanConfig, scanState, ctx, issues);
+        this.auditBraces(nextLine.trimmed, scanConfig, loopStack);
+    }
+
+    private auditAllocations(
+        trimmed: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        scanConfig: PerformanceScanConfig,
+        loopStack: LoopScope[],
+        issues: Issue[],
+    ): void {
         if (loopStack.length > 0 && scanConfig.checkAlloc && !scanConfig.allocAllowlisted) {
-            this.checkTransientAllocation(nextLine.trimmed, lineIdx, ctx, loopStack.length, issues);
-        }
-
-        if (
-            loopStack.length > 0 &&
-            scanConfig.checkLinearLookups &&
-            !LOOP_KEYWORD_RE.test(nextLine.trimmed)
-        ) {
-            this.checkLinearCollectionLookup(
-                nextLine.trimmed,
-                lineIdx,
-                ctx,
-                loopStack.length,
-                issues,
-            );
-        }
-
-        if (scanConfig.checkIO && !scanConfig.syncIoAllowlisted) {
-            this.checkBlockingIo(
-                nextLine.trimmed,
-                nextLine.lineText,
-                lineIdx,
-                scanState.inAsyncFunction,
-                ctx,
-                issues,
-            );
-        }
-
-        if (!scanConfig.isIndentBased) {
-            updateBraceLoops(nextLine.trimmed, loopStack);
-            if (
-                loopStack.length > 0 &&
-                !loopStack[loopStack.length - 1].usesBrace &&
-                nextLine.trimmed.endsWith(';')
-            ) {
-                loopStack.pop();
-            }
+            this.checkTransientAllocation(trimmed, lineIdx, ctx, loopStack.length, issues);
         }
     }
 
-    private isAsyncDeclaration(trimmed: string): boolean {
+    private auditLinearLookups(
+        trimmed: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        scanConfig: PerformanceScanConfig,
+        loopStack: LoopScope[],
+        issues: Issue[],
+    ): void {
+        if (
+            loopStack.length > 0 &&
+            scanConfig.checkLinearLookups &&
+            !LOOP_KEYWORD_RE.test(trimmed)
+        ) {
+            this.checkLinearCollectionLookup(trimmed, lineIdx, ctx, loopStack.length, issues);
+        }
+    }
+
+    private auditIo(
+        trimmed: string,
+        lineText: string,
+        lineIdx: number,
+        scanConfig: PerformanceScanConfig,
+        scanState: LineScanState,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (scanConfig.checkIO && !scanConfig.syncIoAllowlisted) {
+            this.checkBlockingIo(trimmed, lineText, lineIdx, scanState.inAsyncFunction, ctx, issues);
+        }
+    }
+
+    private auditBraces(
+        trimmed: string,
+        scanConfig: PerformanceScanConfig,
+        loopStack: LoopScope[],
+    ): void {
+        if (scanConfig.isIndentBased) return;
+        updateBraceLoops(trimmed, loopStack);
+        if (
+            loopStack.length > 0 &&
+            !loopStack[loopStack.length - 1].usesBrace &&
+            trimmed.endsWith(';')
+        ) {
+            loopStack.pop();
+        }
+    }
+
+    isAsyncDeclaration(trimmed: string): boolean {
         return (
             /\basync\s+(?:function|[A-Za-z0-9_$]+\s*\(|\()/.test(trimmed) ||
             /^async\s+def\b/.test(trimmed)
         );
     }
 
-    private checkLoopNesting(
+    checkLoopNesting(
         trimmed: string,
         lineText: string,
         maxNesting: number,
@@ -237,7 +262,7 @@ export class PerformanceAnalyzer implements Analyzer {
         }
     }
 
-    private checkTransientAllocation(
+    checkTransientAllocation(
         trimmed: string,
         lineIdx: number,
         ctx: AnalyzerContext,
@@ -279,7 +304,7 @@ export class PerformanceAnalyzer implements Analyzer {
         }
     }
 
-    private checkBlockingIo(
+    checkBlockingIo(
         trimmed: string,
         lineText: string,
         lineIdx: number,
@@ -308,7 +333,7 @@ export class PerformanceAnalyzer implements Analyzer {
         }
     }
 
-    private checkLinearCollectionLookup(
+    checkLinearCollectionLookup(
         trimmed: string,
         lineIdx: number,
         ctx: AnalyzerContext,
@@ -384,3 +409,5 @@ export class PerformanceAnalyzer implements Analyzer {
         };
     }
 }
+
+
