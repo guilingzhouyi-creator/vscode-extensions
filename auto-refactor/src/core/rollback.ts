@@ -52,6 +52,35 @@ export interface CardRollbackResult {
 }
 
 /**
+ * Extract original old lines carried by delete and context entries in a diff hunk.
+ */
+function extractOldLines(lines: ReviewDiffHunk['lines']): string[] {
+    const oldLines: string[] = [];
+    for (const line of lines) {
+        if (line.type === 'delete' || line.type === 'context') {
+            oldLines.push(line.content);
+        }
+    }
+    return oldLines;
+}
+
+/**
+ * Format inverse unified diff patch text for a hunk with swapped insert/delete markers.
+ */
+function formatReversalPatch(hunk: ReviewDiffHunk): string {
+    return (
+        `--- current\n+++ reverted\n${hunk.header}\n` +
+        hunk.lines
+            .map((l) => {
+                if (l.type === 'insert') return `-${l.content}`;
+                if (l.type === 'delete') return `+${l.content}`;
+                return ` ${l.content}`;
+            })
+            .join('\n')
+    );
+}
+
+/**
  * Revert a specific diff hunk from content by applying its inverse edit operations.
  * The hunk's new span is replaced positionally with the old lines carried by `delete` and
  * `context` entries, and a unified patch is emitted with the insert/delete markers swapped.
@@ -67,31 +96,18 @@ export function revertDiffHunk(currentContent: string, hunk: ReviewDiffHunk): Ro
         const lines = linesOf(currentContent, starts);
 
         // Validate that the target range matches the hunk's new lines
-        const startLineIdx = hunk.newSpan.startLine - 1;
+        const startLineIdx = Math.max(0, hunk.newSpan.startLine - 1);
         const newCount = hunk.newSpan.lineCount;
 
         // Collect the original old lines from the hunk
-        const oldLines: string[] = [];
-        for (const line of hunk.lines) {
-            if (line.type === 'delete' || line.type === 'context') {
-                oldLines.push(line.content);
-            }
-        }
+        const oldLines = extractOldLines(hunk.lines);
 
         // Splice out the modified lines and restore old lines
         const resultLines = [...lines];
         resultLines.splice(startLineIdx, newCount, ...oldLines);
 
         const updatedContent = resultLines.join('\n');
-        const patch =
-            `--- current\n+++ reverted\n${hunk.header}\n` +
-            hunk.lines
-                .map((l) => {
-                    if (l.type === 'insert') return `-${l.content}`;
-                    if (l.type === 'delete') return `+${l.content}`;
-                    return ` ${l.content}`;
-                })
-                .join('\n');
+        const patch = formatReversalPatch(hunk);
 
         return {
             success: true,
@@ -123,16 +139,23 @@ function applySortedHunksToFile(
     sortedHunks: ReviewDiffHunk[],
     rolledBackCheckpoints: Set<string>,
 ): { success: boolean; content: string } {
-    let content = initialContent;
-    for (const hunk of sortedHunks) {
-        const res = revertDiffHunk(content, hunk);
-        if (!res.success || res.updatedContent === undefined) {
-            return { success: false, content: initialContent };
+    try {
+        const starts = computeLineStarts(initialContent);
+        const lines = linesOf(initialContent, starts);
+        const resultLines = [...lines];
+
+        for (const hunk of sortedHunks) {
+            const startLineIdx = Math.max(0, hunk.newSpan.startLine - 1);
+            const newCount = hunk.newSpan.lineCount;
+            const oldLines = extractOldLines(hunk.lines);
+            resultLines.splice(startLineIdx, newCount, ...oldLines);
+            recordHunkCheckpoints(rolledBackCheckpoints, hunk.lines);
         }
-        content = res.updatedContent;
-        recordHunkCheckpoints(rolledBackCheckpoints, hunk.lines);
+
+        return { success: true, content: resultLines.join('\n') };
+    } catch {
+        return { success: false, content: initialContent };
     }
-    return { success: true, content };
 }
 
 /**

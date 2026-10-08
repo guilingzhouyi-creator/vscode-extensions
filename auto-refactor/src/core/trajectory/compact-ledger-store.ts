@@ -217,6 +217,20 @@ export async function appendTrajectoryRecord(
 }
 
 /**
+ * Safely parse a single NDJSON line into a CompactTrajectoryRecord.
+ *
+ * @param line - Raw NDJSON record line.
+ * @returns Parsed record or null if malformed.
+ */
+export function parseCompactRecordSafe(line: string): CompactTrajectoryRecord | null {
+    try {
+        return JSON.parse(line) as CompactTrajectoryRecord;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Reads recent trajectory records from active NDJSON file.
  * Reentrant and idempotent async read-only routine.
  *
@@ -243,22 +257,14 @@ export async function readRecentRecords(
         const records: CompactTrajectoryRecord[] = [];
 
         for (const line of targetLines) {
-            try {
-                const parsed = JSON.parse(line) as CompactTrajectoryRecord;
+            const parsed = parseCompactRecordSafe(line);
+            if (parsed !== null) {
                 records.push(parsed);
-            } catch (err: unknown) {
-                // Ignore malformed line
-                if (err instanceof Error) {
-                    // Handled gracefully
-                }
             }
         }
 
         return records;
-    } catch (err: unknown) {
-        if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-            return [];
-        }
+    } catch {
         return [];
     }
 }

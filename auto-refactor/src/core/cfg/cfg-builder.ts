@@ -231,6 +231,38 @@ function checkFloatingPromiseCall(trimmed: string): boolean {
 }
 
 /**
+ * Scans for the matching closing parenthesis corresponding to openIndex.
+ * Depth-controlled scan with early return to maintain shallow nesting (CPX-NEST-001).
+ *
+ * @param text - Source line text.
+ * @param openIndex - Index of the opening '('.
+ * @returns Index of matching ')', or -1 if unbalanced.
+ */
+function findMatchingParen(text: string, openIndex: number): number {
+    let depth = 0;
+    for (let i = openIndex; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '(') {
+            depth++;
+            continue;
+        }
+        if (ch === ')' && --depth === 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+function isTerminatorStatement(body: string): boolean {
+    return (
+        body.startsWith('return') ||
+        body.startsWith('throw') ||
+        body.startsWith('break') ||
+        body.startsWith('continue')
+    );
+}
+
+/**
  * Builder creating function-level control flow graphs with branch and loop awareness.
  */
 export class CfgBuilder {
@@ -269,27 +301,15 @@ export class CfgBuilder {
         if (open === -1) {
             return false;
         }
-        let depth = 0;
-        for (let i = open; i < trimmed.length; i++) {
-            const ch = trimmed[i];
-            if (ch === '(') depth++;
-            else if (ch === ')') {
-                depth--;
-                if (depth === 0) {
-                    const body = trimmed.slice(i + 1).trim();
-                    if (body === '' || body === '{}' || body === '{') {
-                        return false;
-                    }
-                    return (
-                        body.startsWith('return') ||
-                        body.startsWith('throw') ||
-                        body.startsWith('break') ||
-                        body.startsWith('continue')
-                    );
-                }
-            }
+        const close = findMatchingParen(trimmed, open);
+        if (close === -1) {
+            return false;
         }
-        return false;
+        const body = trimmed.slice(close + 1).trim();
+        if (body === '' || body === '{}' || body === '{') {
+            return false;
+        }
+        return isTerminatorStatement(body);
     }
 
     /**
@@ -363,6 +383,9 @@ export class CfgBuilder {
                 // `x.field` read was reported as an unguarded dereference.
                 if (CfgBuilder.inlineTerminator(trimmed)) {
                     condBlock.addSuccessor(exit, 'true-branch');
+                    const fallthroughBlock = this.createBlock('normal');
+                    condBlock.addSuccessor(fallthroughBlock, 'false-branch');
+                    currentBlock = fallthroughBlock;
                 } else {
                     const thenBlock = this.createBlock('normal');
                     const elseBlock = this.createBlock('normal');

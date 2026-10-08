@@ -16,7 +16,10 @@
  */
 
 import * as path from 'path';
-import type { IntraFileZoneProfile } from '../intelligence/zone-partitioner';
+import type {
+    IntraFileZoneProfile,
+    SemanticZoneSegment,
+} from '../intelligence/zone-partitioner';
 import { ZONE_EMBEDDED_TEST } from '../intelligence/zone-partitioner';
 import { RULE_TST_TOP_001 } from './dimensionLiterals';
 
@@ -66,6 +69,22 @@ const GDSCRIPT_TEST_PATTERN = /(?:^|\/|\\)tests?\/.*\.gd$/i;
 
 /** Languages permitted to house embedded unit test zones in production source files. */
 const PERMITTED_EMBEDDED_LANGUAGES = new Set(['.rs', '.py']);
+
+/**
+ * Fast newline counter to compute line count without regex or array allocations.
+ */
+function countContentLines(content: string): number {
+    if (content.length === 0) {
+        return 1;
+    }
+    let count = 1;
+    for (let i = 0; i < content.length; i++) {
+        if (content.charCodeAt(i) === 10) {
+            count++;
+        }
+    }
+    return count;
+}
 
 /**
  * Multi-Language Dual-Track Test Topology Evaluator.
@@ -136,7 +155,6 @@ export class DualTrackTestEvaluator {
         zoneProfile?: IntraFileZoneProfile,
     ): DualTrackTestEvaluationResult {
         const findings: TestTopologyFinding[] = [];
-        const lines = content.split(/\r\n|\n/);
 
         const hasEmbeddedMarker =
             content.includes('#[cfg(test)]') ||
@@ -146,7 +164,9 @@ export class DualTrackTestEvaluator {
             (ext === '.py' && content.includes('if __name__ == "__main__":'));
 
         const embeddedLines = zoneProfile ? zoneProfile.embeddedTestLines : 0;
-        const productionLoc = zoneProfile ? zoneProfile.productionEffectiveLoc : lines.length;
+        const productionLoc = zoneProfile
+            ? zoneProfile.productionEffectiveLoc
+            : countContentLines(content);
 
         // No embedded tests present
         if (!hasEmbeddedMarker && embeddedLines === 0) {
@@ -162,9 +182,18 @@ export class DualTrackTestEvaluator {
             };
         }
 
+        let lazyLines: string[] | null = null;
+        const getLines = (): string[] => {
+            if (lazyLines === null) {
+                lazyLines = content.split(/\r\n|\n/);
+            }
+            return lazyLines;
+        };
+
         // Embedded tests detected! Check cross-language discipline (TST-TOP-001)
         if (!PERMITTED_EMBEDDED_LANGUAGES.has(ext)) {
             // TypeScript/JavaScript/GDScript: embedded test in production is forbidden!
+            const lines = getLines();
             const testLineIdx = lines.findIndex(
                 (l) => l.includes('describe(') || l.includes('test(') || l.includes('it('),
             );
@@ -207,30 +236,10 @@ export class DualTrackTestEvaluator {
 
         // Contract 1: Zone Partitioning — Embedded tests must be tail-isolated
         if (zoneProfile && zoneProfile.segments.length > 0) {
-            const segs = zoneProfile.segments;
-            const testIdx = segs.findIndex((s) => s.zone === ZONE_EMBEDDED_TEST);
-            if (testIdx >= 0 && testIdx < segs.length - 1) {
-                // There is production code after the test block!
+            const tailFinding = this.checkTailIsolation(filePath, zoneProfile.segments);
+            if (tailFinding !== null) {
                 zoneScore -= 25;
-                findings.push({
-                    rule: RULE_TST_TOP_001,
-                    filePath,
-                    line: segs[testIdx].startLine,
-                    column: 1,
-                    severity: 'warning',
-                    reason: 'embedded_zone_not_tail_isolated',
-                    message:
-                        `Embedded test zone is interleaved before production code. ` +
-                        `Move embedded test zone to the end of the file.`,
-                    actionableProposal: {
-                        action: 'relocate_test_zone',
-                        rule: RULE_TST_TOP_001,
-                        targetFile: filePath,
-                        rationale:
-                            `Relocate test block to file tail to maintain modern zone ` +
-                            `partitioning discipline.`,
-                    },
-                });
+                findings.push(tailFinding);
             }
         }
 
@@ -288,5 +297,46 @@ export class DualTrackTestEvaluator {
             isCompliant: findings.length === 0,
             findings,
         };
+    }
+
+    private checkTailIsolation(
+        filePath: string,
+        segs: readonly SemanticZoneSegment[],
+    ): TestTopologyFinding | null {
+        let firstTestIdx = -1;
+        for (let i = 0; i < segs.length; i++) {
+            if (segs[i].zone === ZONE_EMBEDDED_TEST) {
+                firstTestIdx = i;
+                break;
+            }
+        }
+        if (firstTestIdx < 0) {
+            return null;
+        }
+
+        for (let i = firstTestIdx + 1; i < segs.length; i++) {
+            if (segs[i].zone !== ZONE_EMBEDDED_TEST) {
+                return {
+                    rule: RULE_TST_TOP_001,
+                    filePath,
+                    line: segs[firstTestIdx].startLine,
+                    column: 1,
+                    severity: 'warning',
+                    reason: 'embedded_zone_not_tail_isolated',
+                    message:
+                        `Embedded test zone is interleaved before production code. ` +
+                        `Move embedded test zone to the end of the file.`,
+                    actionableProposal: {
+                        action: 'relocate_test_zone',
+                        rule: RULE_TST_TOP_001,
+                        targetFile: filePath,
+                        rationale:
+                            `Relocate test block to file tail to maintain modern zone ` +
+                            `partitioning discipline.`,
+                    },
+                };
+            }
+        }
+        return null;
     }
 }

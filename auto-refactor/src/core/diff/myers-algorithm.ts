@@ -199,27 +199,63 @@ function advanceSnake(
 }
 
 /**
+ * Module-level reusable scratch buffer pool for Myers greedy trace.
+ * Eliminates transient typed array allocations in hot search loops (CPX-SPACE-001).
+ */
+export class MyersScratchPool {
+    private vBuffer: Int32Array = new Int32Array(4096);
+    private traceBuffer: Int32Array = new Int32Array(65536);
+
+    /**
+     * Acquire or expand the working diagonal vector v with size rowSize (2 * max + 1).
+     * Automatically zeroes out the active region [0, minCapacity).
+     */
+    acquireV(minCapacity: number): Int32Array {
+        if (this.vBuffer.length < minCapacity) {
+            const nextCap = Math.max(minCapacity, this.vBuffer.length * 2);
+            this.vBuffer = new Int32Array(nextCap);
+        }
+        this.vBuffer.fill(0, 0, minCapacity);
+        return this.vBuffer;
+    }
+
+    /**
+     * Acquire or expand the contiguous flatTrace buffer with capacity (max + 1)^2.
+     */
+    acquireTrace(minCapacity: number): Int32Array {
+        if (this.traceBuffer.length < minCapacity) {
+            const nextCap = Math.max(minCapacity, this.traceBuffer.length * 2);
+            this.traceBuffer = new Int32Array(nextCap);
+        }
+        return this.traceBuffer;
+    }
+
+    /**
+     * Reset the pool buffers to default sizes.
+     */
+    reset(): void {
+        this.vBuffer = new Int32Array(4096);
+        this.traceBuffer = new Int32Array(65536);
+    }
+}
+
+export const myersScratchPool = new MyersScratchPool();
+
+/**
  * Execute forward diagonal trace for Myers greedy search with inlined diagonal
- * snake advancement. Employs a single contiguous flatTrace Int32Array buffer,
- * eliminating transient row slice allocations.
+ * snake advancement. Employs MyersScratchPool to eliminate loop-body allocations (CPX-SPACE-001).
  */
 function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
     const { midA, midB, midHA, midHB, midN, midM } = ctx;
     const offset = max;
     const rowSize = 2 * max + 1;
-    const v = new Int32Array(rowSize);
-    let flatTrace = new Int32Array(Math.min(1024, (max + 1) * (max + 1)));
+    const requiredTraceCapacity = (max + 1) * (max + 1);
+
+    const v = myersScratchPool.acquireV(rowSize);
+    const flatTrace = myersScratchPool.acquireTrace(requiredTraceCapacity);
     let d = 0;
 
     for (d = 0; d <= max; d++) {
-        const requiredCapacity = (d + 1) * (d + 1);
-        if (requiredCapacity > flatTrace.length) {
-            const nextCapacity = Math.max(requiredCapacity, flatTrace.length * 2);
-            const nextTrace = new Int32Array(nextCapacity);
-            nextTrace.set(flatTrace);
-            flatTrace = nextTrace;
-        }
-
         const base = d * d + d;
         for (let k = -d; k <= d; k++) {
             flatTrace[base + k] = v[offset + k];
@@ -307,6 +343,63 @@ function backtrackMyersTrace(
  * @param midOps - Diff operations for the middle modified section.
  * @returns Complete list of diff operations for the full file.
  */
+const COMPACT_DIFF_ENABLED = process.env.AR_COMPACT_DIFF !== '0';
+const CONTEXT_MARGIN = 3;
+
+/**
+ * Emits a contiguous run of equal diff operations.
+ */
+export function emitEqualRun(target: DiffOp[], startA: number, startB: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+        target.push({ type: DIFF_OP_EQUAL, aIdx: startA + i, bIdx: startB + i });
+    }
+}
+
+/**
+ * Emits prefix diff operations with optional span compaction.
+ */
+function emitPrefixOps(target: DiffOp[], prefix: number): void {
+    const compactThreshold = CONTEXT_MARGIN * 2;
+    if (COMPACT_DIFF_ENABLED && prefix > compactThreshold) {
+        const spanLen = prefix - CONTEXT_MARGIN;
+        target.push({ type: DIFF_OP_EQUAL_SPAN, aIdx: 0, bIdx: 0, length: spanLen });
+        emitEqualRun(target, spanLen, spanLen, CONTEXT_MARGIN);
+        return;
+    }
+    emitEqualRun(target, 0, 0, prefix);
+}
+
+/**
+ * Emits suffix diff operations with optional span compaction.
+ */
+function emitSuffixOps(target: DiffOp[], suffix: number, n: number, m: number): void {
+    const compactThreshold = CONTEXT_MARGIN * 2;
+    const baseA = n - suffix;
+    const baseB = m - suffix;
+    if (COMPACT_DIFF_ENABLED && suffix > compactThreshold) {
+        emitEqualRun(target, baseA, baseB, CONTEXT_MARGIN);
+        const spanLen = suffix - CONTEXT_MARGIN;
+        target.push({
+            type: DIFF_OP_EQUAL_SPAN,
+            aIdx: n - spanLen,
+            bIdx: m - spanLen,
+            length: spanLen,
+        });
+        return;
+    }
+    emitEqualRun(target, baseA, baseB, suffix);
+}
+
+/**
+ * Assemble prefix, middle operations, and suffix into unified edit script.
+ *
+ * @param prefix - Length of matching common prefix lines.
+ * @param suffix - Length of matching common suffix lines.
+ * @param n - Total lines in old content.
+ * @param m - Total lines in new content.
+ * @param midOps - Diff operations for the middle modified section.
+ * @returns Complete list of diff operations for the full file.
+ */
 export function assembleDiffOps(
     prefix: number,
     suffix: number,
@@ -314,60 +407,12 @@ export function assembleDiffOps(
     m: number,
     midOps: DiffOp[],
 ): DiffOp[] {
-    const compactEnabled = process.env.AR_COMPACT_DIFF !== '0';
-    const contextMargin = 3;
-
-    if (!compactEnabled || (prefix <= contextMargin * 2 && suffix <= contextMargin * 2)) {
-        const total = prefix + midOps.length + suffix;
-        const fullOps: DiffOp[] = new Array(total);
-        let idx = 0;
-        for (let i = 0; i < prefix; i++) {
-            fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
-        }
-        for (let i = 0; i < midOps.length; i++) {
-            fullOps[idx++] = midOps[i];
-        }
-        for (let i = 0; i < suffix; i++) {
-            fullOps[idx++] = { type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i };
-        }
-        return fullOps;
-    }
-
     const ops: DiffOp[] = [];
-
-    if (prefix > contextMargin * 2) {
-        const spanLen = prefix - contextMargin;
-        ops.push({ type: DIFF_OP_EQUAL_SPAN, aIdx: 0, bIdx: 0, length: spanLen });
-        for (let i = spanLen; i < prefix; i++) {
-            ops.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
-        }
-    } else {
-        for (let i = 0; i < prefix; i++) {
-            ops.push({ type: DIFF_OP_EQUAL, aIdx: i, bIdx: i });
-        }
-    }
-
+    emitPrefixOps(ops, prefix);
     for (let i = 0; i < midOps.length; i++) {
         ops.push(midOps[i]);
     }
-
-    if (suffix > contextMargin * 2) {
-        for (let i = 0; i < contextMargin; i++) {
-            ops.push({ type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i });
-        }
-        const spanLen = suffix - contextMargin;
-        ops.push({
-            type: DIFF_OP_EQUAL_SPAN,
-            aIdx: n - spanLen,
-            bIdx: m - spanLen,
-            length: spanLen,
-        });
-    } else {
-        for (let i = 0; i < suffix; i++) {
-            ops.push({ type: DIFF_OP_EQUAL, aIdx: n - suffix + i, bIdx: m - suffix + i });
-        }
-    }
-
+    emitSuffixOps(ops, suffix, n, m);
     return ops;
 }
 

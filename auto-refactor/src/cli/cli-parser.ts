@@ -98,222 +98,153 @@ function applyListFlag(
     opt[arg] = opt[arg] ? [...opt[arg], ...items] : items;
 }
 
-/**
- * Handles boolean flags mapped directly to properties on CliOptions.
- */
+const BOOLEAN_FLAG_PROPS: Record<string, keyof CliOptions> = {
+    'fail-on-issue': 'failOnIssue',
+    'fail-on-analyzer-error': 'failOnAnalyzerError',
+    'respect-gitignore': 'respectGitignore',
+    cache: 'cache',
+    diff: 'diff',
+    'auto-tune': 'autoTuneScale',
+    profile: 'showProfile',
+    score: 'showScore',
+    memory: 'memory',
+    'record-trajectory': 'recordTrajectory',
+};
+
+function isBooleanFlag(arg: string): boolean {
+    return arg === DAEMON_FLAG || Object.prototype.hasOwnProperty.call(BOOLEAN_FLAG_PROPS, arg);
+}
+
 function applyBooleanFlag(opt: CliOptions, arg: string, enabled: boolean): boolean {
-    switch (arg) {
-        case 'fail-on-issue':
-            opt.failOnIssue = enabled;
-            return true;
-        case 'fail-on-analyzer-error':
-            opt.failOnAnalyzerError = enabled;
-            return true;
-        case 'respect-gitignore':
-            opt.respectGitignore = enabled;
-            return true;
-        case 'cache':
-            opt.cache = enabled;
-            return true;
-        case DAEMON_FLAG:
-            opt.daemon = enabled ? MODE_ON : DAEMON_MODE_OFF;
-            return true;
-        case 'diff':
-            opt.diff = enabled;
-            return true;
-        case 'auto-tune':
-            opt.autoTuneScale = enabled;
-            return true;
-        case 'profile':
-            opt.showProfile = enabled;
-            return true;
-        case 'score':
-            opt.showScore = enabled;
-            return true;
-        case 'memory':
-            opt.memory = enabled;
-            return true;
-        case 'record-trajectory':
-            opt.recordTrajectory = enabled;
-            return true;
-        default:
-            return false;
+    if (arg === DAEMON_FLAG) {
+        opt.daemon = enabled ? MODE_ON : DAEMON_MODE_OFF;
+        return true;
     }
+    const prop = BOOLEAN_FLAG_PROPS[arg];
+    if (prop) {
+        (opt as Record<string, unknown>)[prop] = enabled;
+        return true;
+    }
+    return false;
 }
 
-/**
- * Handles standalone zero-argument flags.
- */
+const STANDALONE_BOOLEAN_PROPS: Record<string, [keyof CliOptions, boolean]> = {
+    'no-cache': ['cache', false],
+    'cache-clear': ['cacheClear', true],
+    'cache-custom': ['cacheCustom', true],
+    'no-memory': ['memory', false],
+    'baseline-ratchet-down': ['baselineRatchetDown', true],
+    'force-baseline-expand': ['forceBaselineExpand', true],
+    fix: ['fix', true],
+    'fix-dry-run': ['fixDryRun', true],
+};
+
 function applyStandaloneFlag(opt: CliOptions, arg: string): boolean {
-    switch (arg) {
-        case 'no-cache':
-            opt.cache = false;
-            return true;
-        case 'cache-clear':
-            opt.cacheClear = true;
-            return true;
-        case 'cache-custom':
-            opt.cacheCustom = true;
-            return true;
-        case 'no-daemon':
-            opt.daemon = DAEMON_MODE_OFF;
-            return true;
-        case 'no-memory':
-            opt.memory = false;
-            return true;
-        case 'baseline-ratchet-down':
-            opt.baselineRatchetDown = true;
-            return true;
-        case 'force-baseline-expand':
-            opt.forceBaselineExpand = true;
-            return true;
-        case 'fix':
-            opt.fix = true;
-            return true;
-        case 'fix-dry-run':
-            opt.fixDryRun = true;
-            return true;
-        case 'help':
-        case 'h':
-            printUsage();
-            process.exit(0);
-            return true;
-        default:
-            return false;
+    if (arg === 'help' || arg === 'h') {
+        printUsage();
+        process.exit(0);
     }
+    if (arg === 'no-daemon') {
+        opt.daemon = DAEMON_MODE_OFF;
+        return true;
+    }
+    const entry = STANDALONE_BOOLEAN_PROPS[arg];
+    if (entry) {
+        (opt as Record<string, unknown>)[entry[0]] = entry[1];
+        return true;
+    }
+    return false;
 }
 
-/**
- * Handles string list and path value flags.
- */
-function applyGeneralValueFlag(opt: CliOptions, arg: string, val: string): boolean {
-    switch (arg) {
-        case STR_INCLUDE:
-            applyListFlag(opt, STR_INCLUDE, val);
-            return true;
-        case STR_EXCLUDE:
-            applyListFlag(opt, STR_EXCLUDE, val);
-            return true;
-        case 'analyzers':
-            opt.analyzers = val
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean);
-            return true;
-        case 'out':
-        case 'output':
-            opt.out = val;
-            return true;
-        case 'root':
-            opt.root = val;
-            return true;
-        case 'config':
-            opt.configFile = val;
-            return true;
-        case 'baseline':
-            opt.baseline = val;
-            return true;
-        case 'update-baseline':
-            opt.updateBaseline = val;
-            return true;
-        case 'cache-dir':
-            opt.cacheDir = val;
-            return true;
-        case 'agent-uid':
-            opt.agentUid = val;
-            return true;
-        case 'telemetry':
-            opt.telemetry = val;
-            return true;
-        case 'log-file':
-            opt.logFile = val;
-            return true;
-        case 'fix-rules':
-            opt.fixRules = val
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean);
-            return true;
-        default:
-            return false;
+const STRING_VALUE_PROPS: Record<string, keyof CliOptions> = {
+    out: 'out',
+    output: 'out',
+    root: 'root',
+    config: 'configFile',
+    baseline: 'baseline',
+    'update-baseline': 'updateBaseline',
+    'cache-dir': 'cacheDir',
+    'agent-uid': 'agentUid',
+    telemetry: 'telemetry',
+    'log-file': 'logFile',
+};
+
+const METRIC_VALUE_PROPS: Record<string, keyof CliOptions> = {
+    'effective-loc': 'effectiveLoc',
+    'max-sloc': 'effectiveLoc',
+    'file-lines-warn': 'fileLinesWarn',
+    'file-lines-fail': 'fileLinesFail',
+};
+
+const NUMBER_VALUE_PROPS: Record<string, keyof CliOptions> = {
+    concurrency: 'concurrency',
+    workers: 'workers',
+};
+
+function applyListValueFlag(opt: CliOptions, arg: string, val: string): boolean {
+    if (arg === STR_INCLUDE || arg === STR_EXCLUDE) {
+        applyListFlag(opt, arg, val);
+        return true;
     }
+    if (arg === 'analyzers' || arg === 'fix-rules') {
+        const items = val.split(',').map((s) => s.trim()).filter(Boolean);
+        if (arg === 'analyzers') opt.analyzers = items;
+        else opt.fixRules = items;
+        return true;
+    }
+    return false;
 }
 
-/**
- * Handles numeric and parser/log-level CLI options.
- */
-function applyNumericOrPathFlag(opt: CliOptions, arg: string, val: string): boolean {
-    switch (arg) {
-        case 'concurrency':
-            opt.concurrency = Number(val);
-            return true;
-        case 'workers':
-            opt.workers = Number(val);
-            return true;
-        case 'parser':
-            opt.parser = val === STR_OXC ? STR_OXC : LANGUAGE_TYPESCRIPT;
-            return true;
-        case 'log-level':
-            opt.logLevel = val as LogLevel;
-            return true;
-        case 'effective-loc':
-        case 'max-sloc':
-            opt.effectiveLoc = parseHumanMetric(val);
-            return true;
-        case 'file-lines-warn':
-            opt.fileLinesWarn = parseHumanMetric(val);
-            return true;
-        case 'file-lines-fail':
-            opt.fileLinesFail = parseHumanMetric(val);
-            return true;
-        default:
-            return false;
+function applySpecialValueFlag(opt: CliOptions, arg: string, val: string): boolean {
+    if (arg === 'parser') {
+        opt.parser = val === STR_OXC ? STR_OXC : LANGUAGE_TYPESCRIPT;
+        return true;
     }
+    if (arg === 'log-level') {
+        opt.logLevel = val as LogLevel;
+        return true;
+    }
+    if (arg === 'comment-level') {
+        if (VALID_COMMENT_LEVELS.has(val)) opt.commentLevel = val as CommentLevel;
+        return true;
+    }
+    if (arg === 'security-level') {
+        if (VALID_SECURITY_LEVELS.has(val)) opt.securityLevel = val as SecurityLevel;
+        return true;
+    }
+    if (arg === 'fail-on-severity') {
+        if (VALID_SEVERITIES.has(val)) opt.failOnSeverity = val as Severity;
+        return true;
+    }
+    if (arg === 'baseline-granularity') {
+        if (val === STR_ID || val === STR_GROUPED) opt.baselineGranularity = val;
+        return true;
+    }
+    if (arg === 'format') {
+        if (VALID_FORMATS.has(val)) opt.format = val as OutputFormat;
+        return true;
+    }
+    return false;
 }
 
-/**
- * Handles audit level CLI options.
- */
-function applyAuditLevelFlag(opt: CliOptions, arg: string, val: string): boolean {
-    switch (arg) {
-        case 'comment-level':
-            if (VALID_COMMENT_LEVELS.has(val)) opt.commentLevel = val as CommentLevel;
-            return true;
-        case 'security-level':
-            if (VALID_SECURITY_LEVELS.has(val)) opt.securityLevel = val as SecurityLevel;
-            return true;
-        default:
-            return false;
-    }
-}
-
-/**
- * Handles format and severity/baseline enum CLI options.
- */
-function applyEnumFlag(opt: CliOptions, arg: string, val: string): boolean {
-    switch (arg) {
-        case 'fail-on-severity':
-            if (VALID_SEVERITIES.has(val)) opt.failOnSeverity = val as Severity;
-            return true;
-        case 'baseline-granularity':
-            if (val === STR_ID || val === STR_GROUPED) opt.baselineGranularity = val;
-            return true;
-        case 'format':
-            if (VALID_FORMATS.has(val)) opt.format = val as OutputFormat;
-            return true;
-        default:
-            return false;
-    }
-}
-
-/**
- * Dispatches a value flag to either general, numeric, audit or enum flag handlers.
- */
 function applyValueFlag(opt: CliOptions, arg: string, val: string): void {
-    if (applyGeneralValueFlag(opt, arg, val)) return;
-    if (applyNumericOrPathFlag(opt, arg, val)) return;
-    if (applyAuditLevelFlag(opt, arg, val)) return;
-    applyEnumFlag(opt, arg, val);
+    const strProp = STRING_VALUE_PROPS[arg];
+    if (strProp) {
+        (opt as Record<string, unknown>)[strProp] = val;
+        return;
+    }
+    const metricProp = METRIC_VALUE_PROPS[arg];
+    if (metricProp) {
+        (opt as Record<string, unknown>)[metricProp] = parseHumanMetric(val);
+        return;
+    }
+    const numProp = NUMBER_VALUE_PROPS[arg];
+    if (numProp) {
+        (opt as Record<string, unknown>)[numProp] = Number(val);
+        return;
+    }
+    if (applyListValueFlag(opt, arg, val)) return;
+    applySpecialValueFlag(opt, arg, val);
 }
 
 /**
@@ -372,6 +303,30 @@ const KNOWN_CLI_SUBCOMMANDS = new Set([
     'stats',
 ]);
 
+function tryCollectPositional(arg: string, positionalPaths: string[]): boolean {
+    if (arg.startsWith('--')) return false;
+    if (!KNOWN_CLI_SUBCOMMANDS.has(arg) && !arg.startsWith('-')) {
+        positionalPaths.push(arg);
+    }
+    return true;
+}
+
+function resolveNextValue(
+    hasInline: boolean,
+    value: string,
+    nextToken: string | undefined,
+): { val: string; consumedNext: boolean } {
+    if (hasInline) return { val: value, consumedNext: false };
+    if (nextToken === undefined || nextToken.startsWith('--')) return { val: '', consumedNext: false };
+    return { val: nextToken, consumedNext: true };
+}
+
+function finalizeRootPath(opt: CliOptions, positionalPaths: string[]): void {
+    if (!opt.root && positionalPaths.length > 0) {
+        opt.root = positionalPaths[0];
+    }
+}
+
 /**
  * Minimal argv parser: supports `--key value`, `--key=value`, repeated `--include`,
  * and positional scan target directory path.
@@ -385,10 +340,7 @@ export function parseArgs(argv: string[]): CliOptions {
 
     for (let i = 0; i < argv.length; i++) {
         let arg = argv[i];
-        if (!arg.startsWith('--')) {
-            if (!KNOWN_CLI_SUBCOMMANDS.has(arg) && !arg.startsWith('-')) {
-                positionalPaths.push(arg);
-            }
+        if (tryCollectPositional(arg, positionalPaths)) {
             continue;
         }
         arg = arg.slice(2);
@@ -406,9 +358,7 @@ export function parseArgs(argv: string[]): CliOptions {
             continue;
         }
 
-        if (applyBooleanFlag(opt, arg, true)) {
-            // Probing matched a valid boolean flag; resolve explicit inline or
-            // positional boolean override and commit final state
+        if (isBooleanFlag(arg)) {
             const { enabled, consumedNext } = resolveBooleanFlagValue(
                 hasInline,
                 value,
@@ -423,21 +373,12 @@ export function parseArgs(argv: string[]): CliOptions {
             continue;
         }
 
-        const takeValue = (): string => {
-            if (hasInline) return value;
-            const nxt = argv[i + 1];
-            if (nxt === undefined || nxt.startsWith('--')) return '';
-            i++;
-            return nxt;
-        };
-
-        applyValueFlag(opt, arg, takeValue());
+        const { val, consumedNext } = resolveNextValue(hasInline, value, argv[i + 1]);
+        if (consumedNext) i++;
+        applyValueFlag(opt, arg, val);
     }
 
-    if (!opt.root && positionalPaths.length > 0) {
-        opt.root = positionalPaths[0];
-    }
-
+    finalizeRootPath(opt, positionalPaths);
     return opt;
 }
 

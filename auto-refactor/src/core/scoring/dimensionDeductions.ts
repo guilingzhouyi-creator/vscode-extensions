@@ -65,7 +65,9 @@ export const DIMENSION_BIT_MAP: Record<QualityDimension, number> = {
 
 /**
  * Convert QualityDimension identifier to its bitmask flag.
- * @param dim
+ *
+ * @param dim - Target quality dimension identifier.
+ * @returns Bitmask flag integer for the dimension.
  */
 export function dimensionToBit(dim: QualityDimension): number {
     return DIMENSION_BIT_MAP[dim] || 0;
@@ -73,8 +75,10 @@ export function dimensionToBit(dim: QualityDimension): number {
 
 /**
  * Check whether a bitmask contains the specified QualityDimension flag.
- * @param mask
- * @param dim
+ *
+ * @param mask - Bitmask integer to inspect.
+ * @param dim - Target quality dimension identifier.
+ * @returns True if the mask contains the dimension flag.
  */
 export function bitmaskHasDimension(mask: number, dim: QualityDimension): boolean {
     return (mask & (DIMENSION_BIT_MAP[dim] || 0)) !== 0;
@@ -203,6 +207,16 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     'large-file': DIMENSION_MAINTAINABILITY,
 };
 
+const MAX_FAMILY_CACHE_SIZE = 256;
+const FAMILY_DIMENSION_CACHE = new Map<string, QualityDimension | null>();
+
+/**
+ * Pre-sorted family prefixes descending by length to guarantee longest-prefix match.
+ */
+const SORTED_FAMILY_PREFIXES: readonly string[] = Object.keys(FAMILY_DIMENSIONS).sort(
+    (a, b) => b.length - a.length,
+);
+
 /**
  * Resolve a rule id to its explicitly routed dimension.
  *
@@ -213,16 +227,29 @@ export function familyDimensionOf(rule: string): QualityDimension | null {
     if (typeof rule !== 'string' || rule.length === 0) {
         return null;
     }
-    let best: string | null = null;
-    for (const prefix of Object.keys(FAMILY_DIMENSIONS)) {
+    const cached = FAMILY_DIMENSION_CACHE.get(rule);
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    let resolved: QualityDimension | null = null;
+    for (const prefix of SORTED_FAMILY_PREFIXES) {
         // Exact-family ids (e.g. a bare "ARCH") carry no trailing segment, so a plain
         // prefix test would drop them and silently route the finding to techDebtRisk.
-        const matches = rule === prefix || rule.startsWith(prefix + '-');
-        if (matches && (best === null || prefix.length > best.length)) {
-            best = prefix;
+        if (rule === prefix || rule.startsWith(prefix + '-')) {
+            resolved = FAMILY_DIMENSIONS[prefix];
+            break;
         }
     }
-    return best === null ? null : FAMILY_DIMENSIONS[best];
+
+    if (FAMILY_DIMENSION_CACHE.size >= MAX_FAMILY_CACHE_SIZE) {
+        const oldest = FAMILY_DIMENSION_CACHE.keys().next().value;
+        if (oldest !== undefined) {
+            FAMILY_DIMENSION_CACHE.delete(oldest);
+        }
+    }
+    FAMILY_DIMENSION_CACHE.set(rule, resolved);
+    return resolved;
 }
 
 /**
@@ -317,26 +344,45 @@ export function dimensionDeductionSources(): Record<QualityDimension, string[]> 
  */
 export type DebtTier = 1 | 2 | 3;
 
-const TIER1_PREFIXES = ['SEC', 'ARCH', 'DEP-INV'];
-const TIER1_KEYWORDS = ['LEAK', 'CIRCULAR'];
+const TIER1_PREFIXES = ['SEC', 'ARCH', 'DEP-INV'] as const;
+const TIER1_KEYWORDS = ['LEAK', 'CIRCULAR'] as const;
 
 export function isTier1CriticalDebt(rule: string, analyzer: string, severity: string): boolean {
-    const r = (rule ?? '').toUpperCase();
+    if (severity === FRAGMENT_ERROR) {
+        return true;
+    }
     const a = (analyzer ?? '').toLowerCase();
-    const s = severity ?? '';
-    if (s === FRAGMENT_ERROR) return true;
-    if (a.includes('security')) return true;
-    if (TIER1_PREFIXES.some((p) => r.startsWith(p))) return true;
-    return TIER1_KEYWORDS.some((k) => r.includes(k));
+    if (a.includes('security')) {
+        return true;
+    }
+    const r = (rule ?? '').toUpperCase();
+    for (const prefix of TIER1_PREFIXES) {
+        if (r.startsWith(prefix)) {
+            return true;
+        }
+    }
+    for (const keyword of TIER1_KEYWORDS) {
+        if (r.includes(keyword)) {
+            return true;
+        }
+    }
+    return false;
 }
 
-const TIER2_PREFIXES = ['CPX', 'CMP', 'DAT', 'TST-DBT'];
+const TIER2_PREFIXES = ['CPX', 'CMP', 'DAT', 'TST-DBT'] as const;
 
 export function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean {
-    const r = (rule ?? '').toUpperCase();
     const a = (analyzer ?? '').toLowerCase();
-    if (a.includes('complexity') || a.includes('maintainability')) return true;
-    return TIER2_PREFIXES.some((p) => r.startsWith(p));
+    if (a.includes('complexity') || a.includes('maintainability')) {
+        return true;
+    }
+    const r = (rule ?? '').toUpperCase();
+    for (const prefix of TIER2_PREFIXES) {
+        if (r.startsWith(prefix)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -346,16 +392,37 @@ export function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean
  * @returns Technical debt tier (1 = critical, 2 = evolutionary, 3 = smell).
  */
 export function classifyDebtTier(issue: Issue): DebtTier {
-    const rule = (issue.rule ?? '').toUpperCase();
-    const analyzer = (issue.analyzer ?? '').toLowerCase();
     const severity = issue.severity ?? '';
-
-    if (isTier1CriticalDebt(rule, analyzer, severity)) {
+    if (severity === FRAGMENT_ERROR) {
         return 1;
     }
-    if (isTier2EvolutionaryDebt(rule, analyzer)) {
+
+    const analyzer = (issue.analyzer ?? '').toLowerCase();
+    if (analyzer.includes('security')) {
+        return 1;
+    }
+
+    const rule = (issue.rule ?? '').toUpperCase();
+    for (const prefix of TIER1_PREFIXES) {
+        if (rule.startsWith(prefix)) {
+            return 1;
+        }
+    }
+    for (const keyword of TIER1_KEYWORDS) {
+        if (rule.includes(keyword)) {
+            return 1;
+        }
+    }
+
+    if (analyzer.includes('complexity') || analyzer.includes('maintainability')) {
         return 2;
     }
+    for (const prefix of TIER2_PREFIXES) {
+        if (rule.startsWith(prefix)) {
+            return 2;
+        }
+    }
+
     return 3;
 }
 
