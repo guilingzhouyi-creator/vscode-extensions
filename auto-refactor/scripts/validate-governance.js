@@ -236,8 +236,21 @@ export class MilestoneService {
   // Rule catalog drift and hallucination violation (GOV-RUL-001)
   write(
     'src/domain/rule_drift.ts',
-    `// Referencing unregistered rule FAKE-RUL-001
+    `// Referencing unregistered rule FAKE-XYZ-999
 export class DriftRuleService {
+    public run(): void {}
+}
+`,
+  );
+
+  // Valid 3-letter canonical aliases and exempted cross-project rule prefixes
+  write(
+    'src/domain/rule_valid_aliases.ts',
+    `// Standard 3-letter canonical alias forms (registered rules: ARCH-DISP-001, GDM-ONREADY-001):
+// ARCH-DSP-001 and GDM-RDY-001 must not trigger GOV-RUL-001
+// Exempt partner / global gate rule prefixes:
+// GATE-AST-001, CMG-PRJ-001, ADV-PRF-002, WT-REV-001 must not trigger GOV-RUL-001
+export class ValidAliasRuleService {
     public run(): void {}
 }
 `,
@@ -563,6 +576,37 @@ function verifyModernGovernanceEnhancements(govIssues) {
   const rulIssues = govIssues.filter((i) => i.rule === 'GOV-RUL-001');
   assert(rulIssues.length >= 1, 'Must detect GOV-RUL-001 for unregistered rule ID drift');
   assert(rulIssues[0]?.severity === 'error', 'GOV-RUL-001 must have error severity');
+
+  const fakeRuleIssue = rulIssues.find(
+    (i) => i.location?.file?.endsWith('rule_drift.ts') && i.message?.includes('FAKE-XYZ-999'),
+  );
+  assert(
+    Boolean(fakeRuleIssue),
+    'GOV-RUL-001 must specifically flag uncataloged rule ID `FAKE-XYZ-999` as error',
+  );
+
+  const validAliasIssues = rulIssues.filter(
+    (i) =>
+      i.message?.includes('ARCH-DSP-001') ||
+      i.message?.includes('GDM-RDY-001') ||
+      (i.location?.file && i.location.file.endsWith('rule_valid_aliases.ts')),
+  );
+  assert(
+    validAliasIssues.length === 0,
+    'Standard 3-letter canonical aliases (`ARCH-DSP-001`, `GDM-RDY-001`) must not trigger GOV-RUL-001 false positives',
+  );
+
+  const exemptPrefixIssues = rulIssues.filter(
+    (i) =>
+      i.message?.includes('GATE-AST-001') ||
+      i.message?.includes('CMG-PRJ-001') ||
+      i.message?.includes('ADV-PRF-002') ||
+      i.message?.includes('WT-REV-001'),
+  );
+  assert(
+    exemptPrefixIssues.length === 0,
+    'Exempted rule family prefixes (`GATE`, `CMG`, `ADV`, `WT`) must not trigger GOV-RUL-001 false positives',
+  );
 
   const blsIssues = govIssues.filter((i) => i.rule === 'GOV-BLS-001');
   assert(blsIssues.length >= 1, 'Must detect GOV-BLS-001 for cross-tier monolithic blast radius');

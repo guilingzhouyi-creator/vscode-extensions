@@ -5,14 +5,16 @@
  *     ModernConstructRule (GOV-STD-002), and RuleCatalogIntegrityRule (GOV-RUL-001); the
  *     governance registry wires them into the shared GovernanceAnalyzer pipeline.
  * Dependencies & Triggers: Imports GovernanceRule, GovernanceViolation and
- *     RuleEvaluationContext from ../types; checkFile runs from finalize during
- *     any governance-enabled CLI, CI or daemon scan.
+ *     RuleEvaluationContext from ../types, getRule and RULE_REGISTRY from ../../rules/registry,
+ *     and canonicalRuleId, toCanonicalRuleId, areAliasForms from ../../rules/aliases;
+ *     checkFile runs from finalize during any governance-enabled CLI, CI or daemon scan.
  * Responsibilities: GOV-STD-001 scans a file's lines for single-line TS/JS
  *     `if (...) return true; else return false;` and Python/GDScript `if x: return true` plus
  *     `else: return false` pairs, emitting fixable simplifications; GOV-STD-002 flags TS/JS
  *     `var` declarations and GDScript `pass` lines left after a non-colon statement, skipping
  *     comment lines, and proposes let/const or removal; GOV-RUL-001 guarantees referenced rule
- *     identifiers exist in the single-source rule catalog.
+ *     identifiers exist in the single-source rule catalog, resolving canonical 3-letter forms,
+ *     legacy aliases, and exempting partner project families.
  * Exit Semantics & Design Rationale: All hooks return null when clean and a violation array
  *     otherwise, never throwing or mutating input; findings carry 1-based positions and
  *     suggested patches so callers can auto-fix safely. Fewer boolean branches and dead
@@ -21,7 +23,8 @@
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { isToolOrTestScript } from '../pathScope';
-import { getRule } from '../../rules/registry';
+import { getRule, RULE_REGISTRY } from '../../rules/registry';
+import { canonicalRuleId, toCanonicalRuleId, areAliasForms } from '../../rules/aliases';
 
 const IF_TRUE_RE = /^\s*if\s+(.+?)\s*:\s*return\s+true\s*$/i;
 const ELSE_FALSE_RE = /^\s*else\s*:\s*return\s+false\s*$/i;
@@ -73,10 +76,14 @@ const RULE_INTEGRITY_SKIP_IDENTIFIERS: ReadonlySet<string> = new Set([
     'RuleCatalogIntegrityRule',
 ]);
 
-/** Rule family prefixes from partner projects exempted from local registry resolution. */
+/** Rule family prefixes from partner projects and global gates exempted from local registry resolution. */
 const EXEMPT_RULE_FAMILY_PREFIXES: ReadonlySet<string> = new Set([
     'ADV',
     'WT',
+    'GATE',
+    'CMG',
+    'RCFG',
+    'LINK',
 ]);
 
 /**
@@ -301,6 +308,50 @@ function isExemptRuleFamily(candidateId: string): boolean {
 }
 
 /**
+ * Cached canonical forms of all registered rules for O(1) canonical equivalence resolution.
+ */
+let cachedRegistryLength = 0;
+let registeredCanonicalFormsCache: Set<string> | null = null;
+
+/**
+ * Returns the set of canonical 3-letter forms of registered rules, refreshing if registry size changed.
+ */
+function getRegisteredCanonicalForms(): Set<string> {
+    if (registeredCanonicalFormsCache === null || cachedRegistryLength !== RULE_REGISTRY.length) {
+        const set = new Set<string>();
+        for (let i = 0; i < RULE_REGISTRY.length; i++) {
+            set.add(toCanonicalRuleId(RULE_REGISTRY[i].id));
+        }
+        registeredCanonicalFormsCache = set;
+        cachedRegistryLength = RULE_REGISTRY.length;
+    }
+    return registeredCanonicalFormsCache;
+}
+
+/**
+ * Checks whether candidateId matches a registered rule directly, via legacy alias,
+ * or through canonical 3-letter alias equivalence.
+ */
+function isRegisteredOrAliasRule(candidateId: string): boolean {
+    if (getRule(candidateId)) return true;
+
+    const legacyResolved = canonicalRuleId(candidateId);
+    if (legacyResolved !== candidateId && getRule(legacyResolved)) return true;
+
+    const canonicalCandidate = toCanonicalRuleId(candidateId);
+    if (getRegisteredCanonicalForms().has(canonicalCandidate)) return true;
+
+    for (let i = 0; i < RULE_REGISTRY.length; i++) {
+        if (areAliasForms(RULE_REGISTRY[i].id, candidateId)) {
+            registeredCanonicalFormsCache?.add(canonicalCandidate);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Evaluates candidate rule identifiers on a single source line against the rule registry.
  */
 function inspectRuleCatalogLine(
@@ -315,19 +366,17 @@ function inspectRuleCatalogLine(
     while ((match = CANDIDATE_RULE_RE.exec(line)) !== null) {
         const candidateId = match[1];
         if (isExemptRuleFamily(candidateId)) continue;
+        if (isRegisteredOrAliasRule(candidateId)) continue;
 
-        const registered = getRule(candidateId);
-        if (!registered) {
-            violations.push({
-                ruleId: 'GOV-RUL-001',
-                message: `Reference to unregistered rule ID \`${candidateId}\` detected. Possible rule drift or hallucination.`,
-                line: lineIndex + 1,
-                column: match.index + 1,
-                suggestion:
-                    'Verify rule ID against scripts/common/rule-catalog.json and use registered rules only.',
-                fixable: false,
-            });
-        }
+        violations.push({
+            ruleId: 'GOV-RUL-001',
+            message: `Reference to unregistered rule ID \`${candidateId}\` detected. Possible rule drift or hallucination.`,
+            line: lineIndex + 1,
+            column: match.index + 1,
+            suggestion:
+                'Verify rule ID against scripts/common/rule-catalog.json and use registered rules only.',
+            fixable: false,
+        });
     }
 }
 
