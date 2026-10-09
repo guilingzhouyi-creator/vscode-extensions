@@ -11,9 +11,9 @@ export function buildDashboardScript(labels: Record<string, string>): string {
     return /* javascript */ `
     (function() {
       const vscode = acquireVsCodeApi();
-      // 词条表（渲染时由扩展宿主按当前语言序列化注入）
+      // 国际化契约：词条表（渲染时由扩展宿主按当前语言序列化注入）
       const L = ${JSON.stringify(labels)};
-      // {0}/{1} 占位符格式化（与宿主 i18n format 语义一致）
+      // 格式化契约：{0}/{1} 占位符格式化（与宿主 i18n format 语义一致）
       function fmt(tpl) {
         const args = Array.prototype.slice.call(arguments, 1);
         return String(tpl).replace(/{([0-9]+)}/g, function(_, idx) {
@@ -67,15 +67,15 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         });
       }
 
-      // ---- 更新 UI ----
+      // 渲染契约：更新 UI 主视图各卡片组件 (View update pipeline)
       function updateUI(data) {
-        // 读写分离预读：在批量写 DOM 之前预先读取曲线容器宽度，彻底消除强制同步布局 (FSL)
+        // 性能契约：读写分离预读，在批量写 DOM 之前预先读取曲线容器宽度，彻底消除强制同步布局 (FSL)
         const acEl = document.getElementById('activeCurve');
         if (!cachedActiveCurveWidth && acEl && acEl.clientWidth > 0) {
           cachedActiveCurveWidth = acEl.clientWidth;
         }
 
-        // 统计卡片
+        // 视图契约：统计概览卡片更新
         document.getElementById('statToday').textContent = formatDuration(data.todayMs);
         document.getElementById('statWeek').textContent = formatDuration(data.weekTotalMs || 0);
         document.getElementById('statTotal').textContent = formatDuration(data.totalMs);
@@ -91,7 +91,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           statusEl.innerHTML = '<span class="status-badge status-running">' + L['panel.js.badgeRunning'] + '</span>';
         }
 
-        // 设置项
+        // 表单契约：设置项控件同步
         setChecked('chkEnabled', data.isEnabled);
         setChecked('chkGlobalDisabled', data.globalDisabled);
         setChecked('chkStatusBar', data.statusBarEnabled);
@@ -105,17 +105,17 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         setChecked('chkWeeklyLimit', data.weeklyLimitEnabled);
         setValue('numWeeklyLimitHours', data.weeklyLimitHours || 40);
 
-        // 跨工作区对比视图
+        // 对比契约：跨工作区对比视图渲染
         renderWorkspaceCompare(data.workspaceList, data.workspaceCount, data.globalTotalMs);
 
-        // 周报指标（日均/活跃天/最活跃日） + 多周趋势 + 今日明细
+        // 指标契约：周报关键指标（日均/活跃天/最活跃日） + 多周趋势 + 今日明细
         renderWeeklySummary(data.weeklySummary, data.weeklyTrend, data.weeklyLimitEnabled, data.weeklyLimitHours);
         renderTodayDetail(data.todayDetail);
 
-        // 活动时间线热力图
+        // 矩阵契约：活动时间线热力图矩阵渲染
         renderHeatmap(data.heatmap);
 
-        // 周报曲线（常驻展示，细化 Y 轴刻度）
+        // 算法契约：周报活跃曲线常驻渲染（5 级精细 Y 轴刻度）
         renderActiveCurve(data.dailyStats);
 
         pendingData = data;
@@ -400,7 +400,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             '<text class="ac-grid-label" fill="#ffffff" x="' + (PAD_LEFT - 16) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end">' + valText + '</text>';
         }
 
-        // 7 组悬浮胶囊数值标签 + 同心圆节点 + 底部双层 X 轴标尺，流式拼接消除 map 临时数组 (CPX-SPACE-001)
+        // 性能契约：7 组悬浮胶囊数值标签 + 同心圆节点 + 底部双层 X 轴标尺，流式拼接消除中间堆数组分配 (CPX-SPACE-001)
         let elementsSvg = '';
         for (let i = 0; i < data.length; i++) {
           const d = data[i];
@@ -823,7 +823,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         }
       }
 
-      // ---- 消息通信 ----
+      // 通信契约：Webview 与扩展宿主双向 postMessage 通信管道
       window.addEventListener('message', event => {
         const msg = event.data;
         if (msg.type === 'updateData' && msg.payload) {
@@ -831,24 +831,24 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         }
       });
 
-      // ---- 发送配置变更 ----
+      // 配置契约：向扩展宿主分发实时配置变更消息 (updateConfig)
       function sendUpdate(key, value) {
         vscode.postMessage({ type: 'updateConfig', payload: { [key]: value } });
       }
 
-      // 复选框变更
+      // 表单契约：布尔开关状态变更事件绑定与即时同步
       document.querySelectorAll('.toggle input[type="checkbox"]').forEach(el => {
         el.addEventListener('change', () => {
           sendUpdate(el.dataset.key, el.checked);
         });
       });
 
-      // 语言选择变更（显式 i18n 切换；宿主收到后热生效并重建面板）
+      // 语言契约：语言下拉菜单变更（显式热切换并触发宿主重新渲染面板）
       document.getElementById('selLocale').addEventListener('change', (e) => {
         sendUpdate('locale', e.target.value);
       });
 
-      // 数字输入变更（按输入框 min/max 钳制；空/非法输入不发送，宿主端亦有下限兜底）
+      // 数值契约：数字输入防抖钳制变更（遵循 min/max 区间合法域不变量）
       document.querySelectorAll('.number-input').forEach(el => {
         let timeout = null;
         el.addEventListener('input', () => {
@@ -863,7 +863,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         });
       });
 
-      // ---- 操作按钮 ----
+      // 交互契约：面板核心破坏性与导出动作按钮事件绑定
       document.getElementById('btnNewPeriod').addEventListener('click', () => {
         vscode.postMessage({ type: 'newPeriod' });
         showToast(L['panel.toast.newPeriodRequested']);
@@ -881,7 +881,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         }
       });
 
-      // 清除历史（保留累计数字）
+      // 清理契约：清除历史明细（保留累计时间总计与今日工时）
       document.getElementById('btnClearHistory').addEventListener('click', () => {
         if (confirm(L['confirm.clearHistory'])) {
           vscode.postMessage({ type: 'clearHistory' });
@@ -889,13 +889,13 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         }
       });
 
-      // 导出聚合数据（全历史日报 CSV）
+      // 报表契约：导出多维全历史日报聚合 CSV 数据流水
       document.getElementById('btnExportAggregated').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportAggregated' });
         showToast(L['panel.toast.exportAggregatedRequested']);
       });
 
-      // 导出日报 / 周报
+      // 报表契约：按需导出结构化 Markdown 日报或周报
       document.getElementById('btnExportDaily').addEventListener('click', () => {
         vscode.postMessage({ type: 'exportReport', payload: { kind: 'daily' } });
         showToast(L['panel.toast.exportDailyRequested']);
@@ -913,7 +913,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         }
       });
 
-      // ---- Toast 提示 ----
+      // 通知契约：面板内非阻塞浮动 Toast 提示组件
       function showToast(msg) {
         const toast = document.getElementById('statusToast');
         toast.textContent = msg;

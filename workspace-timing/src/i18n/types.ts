@@ -11,18 +11,18 @@ export type Locale = 'zh-CN' | 'en';
 
 export interface I18nStrings {
 
-    // 状态栏
+    /** 状态栏渲染契约：用于实时展示今日累计与全局工时 (StatusBar presentation contracts) */
     'statusBar.todayTotal': string;
     'statusBar.totalToday': string;
     'statusBar.tooltip': string;
     'statusBar.tooltipWithMode': string;
 
-    // Toast
+    /** 交互通知契约：操作完成与配置变更的即时反馈提示 (Toast notification contracts) */
     'toast.newPeriod': string;
     'toast.exportCSV': string;
     'toast.reset': string;
     'toast.configUpdated': string;
-    // 导出相关
+    /** 导出对话框动作标签与状态提示契约 (Export file picker and status contracts) */
     'toast.exportSaveLabel': string;
     'toast.exportCancelled': string;
     'toast.exportSuccess': string;
@@ -30,17 +30,17 @@ export interface I18nStrings {
     'toast.exportNoWorkspace': string;
     'toast.exportReportDaily': string;
     'toast.exportReportWeekly': string;
-    // 导出文件名前缀（随语言变化）
+    /** 导出文件名前缀契约：随语言环境动态生成规范化文件名 */
     'export.filename.daily': string;
     'export.filename.weekly': string;
     'export.filename.aggregated': string;
-    // 导出对话框文件类型过滤器标签
+    /** 导出对话框文件类型过滤器契约 (File type filter labels) */
     'export.filter.csv': string;
     'export.filter.md': string;
     'export.filter.json': string;
     'export.filter.all': string;
 
-    // 报表导出（Markdown）
+    /** Markdown 报表排版契约：定义日报与周报各节标题与明细表头 (Report layout contracts) */
     'report.daily.title': string;
     'report.daily.todayDuration': string;
     'report.daily.sessionCount': string;
@@ -66,7 +66,7 @@ export interface I18nStrings {
     'report.table.sessionCount': string;
     'report.generatedAt': string;
 
-    // 确认弹窗
+    /** 弹窗确认与安全回滚契约：防止用户误触清空操作 (Confirmation modal contracts) */
     'confirm.newPeriod': string;
     'confirm.newPeriod.title': string;
     'confirm.reset': string;
@@ -74,7 +74,7 @@ export interface I18nStrings {
     'confirm.clearGlobal': string;
     'confirm.clearGlobal.title': string;
     'toast.clearGlobal': string;
-    // 清除历史 / 还原
+    /** 历史数据清理与快照还原通知契约 (History cleanup and restore contracts) */
     'confirm.clearHistory': string;
     'confirm.clearHistory.title': string;
     'toast.clearHistoryDone': string;
@@ -83,7 +83,7 @@ export interface I18nStrings {
     'toast.restored': string;
     'toast.restoreFailed': string;
 
-    // 命令
+    /** 命令面板执行反馈契约：响应扩展命令调度与状态切换 (Command execution feedback contracts) */
     'cmd.modeSwitched': string;
     'cmd.enabled': string;
     'cmd.disabled': string;
@@ -91,17 +91,17 @@ export interface I18nStrings {
     'cmd.globalDisabled': string;
     'cmd.noWorkspace': string;
     'cmd.debugSaved': string;
-    // 手动存盘结果文案（saveNow 返回值经 cmd.debugSaved 直出 toast）
+    /** 手动存盘操作结果文案契约 (Manual debug save status contracts) */
     'debugSave.notRunning': string;
     'debugSave.done': string;
     'debugSave.failed': string;
 
-    // 状态栏显示模式名（命令提示与 tooltip 共用）
+    /** 状态栏显示模式切换标签契约 (StatusBar display mode label contracts) */
     'statusBar.mode.today-total': string;
     'statusBar.mode.total-today': string;
     'statusBar.mode.compact': string;
 
-    // ─── 面板（DashboardPanel webview）───
+    /** Webview 面板主视图与统计概览卡片契约 (Dashboard main view and KPI card contracts) */
     'panel.title': string;
     'panel.label.today': string;
     'panel.label.week': string;
@@ -206,7 +206,7 @@ export interface I18nStrings {
     'panel.toast.exportAggregatedRequested': string;
     'panel.toast.clearHistoryRequested': string;
 
-    // 活动模式与状态
+    /** 动态活动感知与智能协作状态契约 (Activity mode and AI collaboration contracts) */
     'activity.mode.manual': string;
     'activity.mode.ai': string;
     'activity.mode.idle': string;
@@ -216,11 +216,11 @@ export interface I18nStrings {
     'statusBar.ai': string;
     'statusBar.tooltipWithActivity': string;
 
-    // 面板徽标
+    /** Webview 面板状态指示徽标文案契约 (Dashboard status badge contracts) */
     'panel.js.badgeIdle': string;
     'panel.js.badgeAi': string;
 
-    // 配置项：空闲超时与 AI 协作检测
+    /** 空闲超时与 AI 协作检测表单项契约 (Configuration form field contracts) */
     'panel.set.idleTimeout.name': string;
     'panel.set.idleTimeout.tip': string;
     'panel.set.idleTimeout.desc': string;

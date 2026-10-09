@@ -118,7 +118,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       border: 1px solid var(--vscode-contrastBorder, currentColor);
     }
 
-    /* 页面入场交错动画 */
+    /* 视觉契约：页面入场交错动画，增强 Webview 初次呈现的层次感 */
     @keyframes fadeInUp {
       from {
         opacity: 0;
@@ -226,7 +226,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       margin-bottom: 8px;
     }
 
-    /* 统计卡片网格 */
+    /* 布局契约：统计卡片响应式网格 (CSS Grid)，自适应面板宽度变化 */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -291,7 +291,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       letter-spacing: 0.2px;
     }
 
-    /* 运行状态呼吸灯 Badge */
+    /* 状态契约：运行状态呼吸灯 Badge，提供高可见度活跃感知 */
     @keyframes pulseGlow {
       0% { box-shadow: 0 0 0 0 var(--success-glow); }
       70% { box-shadow: 0 0 0 6px rgba(78, 201, 176, 0); }
@@ -340,7 +340,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       background: var(--danger);
     }
 
-    /* 卡片容器 */
+    /* 容器契约：毛玻璃卡片容器规范 (Glassmorphism card layout specifications) */
     .card-panel {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -350,7 +350,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       backdrop-filter: blur(8px);
     }
 
-    /* 设置列表行 */
+    /* 交互契约：设置列表行与对齐规范 */
     .setting-row {
       display: flex;
       justify-content: space-between;
@@ -375,7 +375,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       line-height: 1.4;
     }
 
-    /* 帮助提示图标与 Tooltip 微组件规范 */
+    /* 提示契约：帮助提示图标与 Tooltip 微组件规范 */
     .help-icon {
       display: inline-flex;
       align-items: center;
@@ -441,7 +441,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       border-top-color: var(--card-border);
     }
 
-    /* 现代开关 Toggle switch */
+    /* 表单契约：现代开关 Toggle switch 状态过渡与无障碍焦点 */
     .toggle {
       position: relative;
       width: 38px;
@@ -488,7 +488,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       outline-offset: 2px;
     }
 
-    /* 输入框与选择器 */
+    /* 控件契约：输入框与下拉选择器原生风格适配与状态聚焦 */
     .number-input, .select-input {
       padding: 5px 10px;
       background: var(--input-bg);
@@ -518,7 +518,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       border-color: var(--focus);
     }
 
-    /* 按钮系统 */
+    /* 交互契约：按钮系统分级规范 (主要/次要/危险操作语义) */
     .btn-row {
       display: flex;
       gap: 8px;
@@ -577,7 +577,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       border-color: var(--danger);
     }
 
-    /* 图表工具栏 */
+    /* 工具栏契约：图表控制区自适应布局容器规范 */
     .chart-container {
       margin: 10px 0 8px 0;
       padding: 14px;
@@ -586,7 +586,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       border-radius: var(--radius);
       box-shadow: var(--shadow-sm);
     }
-    /* 周报卡片头部工具栏与集成指标（日均/活跃天数/最活跃日 + 导出操作） */
+    /* 聚合契约：周报卡片头部工具栏与集成指标（日均/活跃天数/最活跃日 + 导出操作） */
     .weekly-curve-header {
       display: flex;
       justify-content: space-between;

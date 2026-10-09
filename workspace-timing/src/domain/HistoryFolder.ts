@@ -4,7 +4,8 @@
  * Architecture Role: Domain layer stateless folding and memory-bounded recycling engine
  * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts; triggered by SessionManager
  * Responsibilities: Fold expired and overflow work/idle sessions into dailyTotals buckets, recycle old week data, enforce bounded memory
- * Exit Semantics & Design Rationale: Pure calculation with zero I/O and zero VS Code dependencies; idempotent; preserves total durations and session counts across raw and aggregated layers
+ * Exit Semantics & Design Rationale: Pure calculation with zero I/O and zero VS Code dependencies; idempotent; preserves total durations and session counts across raw and aggregated layers.
+ * Contract Invariant & Boundary: Conservation of Duration — sum(folded durations) + sum(kept durations) === original duration; never truncates valid time during bucket folding; fallback: non-positive or inverted slices (endMs <= startMs) pruned safely.
  */
 
 import {
@@ -17,28 +18,40 @@ import {
 } from './models';
 import { TimeAggregator, localDateStr, parseLocalDate } from './TimeAggregator';
 
+/**
+ * 契约参数：历史折叠与容量裁剪配置选项 (HistoryFoldOptions)
+ * 边界契约：各容量与天数上限字段为 0 时表示不设限；不变量：不修改既有历史日桶。
+ */
 export interface HistoryFoldOptions {
-    /** 原始会话保留天数（0 = 不限天数） */
+    /** 契约天数：原始会话保留天数（0 = 不限天数） */
     retentionDays?: number;
-    /** 原始会话最大保留条数（0 = 不限条数） */
+    /** 契约容量：原始会话最大保留条数（0 = 不限条数） */
     maxSessions?: number;
-    /** 单日最大保留条数（0 = 不限） */
+    /** 契约容量：单日最大保留条数（0 = 不限） */
     maxPerDay?: number;
-    /** 是否清理旧周会话（每周归零） */
+    /** 策略契约：是否清理旧周会话（每周归零） */
     pruneWeekly?: boolean;
-    /** 当前时间戳，默认 Date.now() */
+    /** 边界基准：当前时间戳，默认 Date.now() */
     now?: number;
 }
 
+/**
+ * 契约输出：工作会话折叠计算结果 (FoldResult)
+ * 不变量保证：keptSessions 与 updatedDailyTotals 满足时长守恒律。
+ */
 export interface FoldResult {
-    /** 保留在原始层的会话（未过期且未超容量） */
+    /** 契约集合：保留在原始层的会话（未过期且未超容量） */
     keptSessions: TimeSession[];
-    /** 合并后的完整日桶表（既有桶 + 本次折叠增量） */
+    /** 契约日桶：合并后的完整日桶表（既有桶 + 本次折叠增量） */
     updatedDailyTotals: DailyTotalsMap;
-    /** 本次实际折叠的会话条数（0 = 无事发生，调用方可跳过写回） */
+    /** 计数契约：本次实际折叠的会话条数（0 = 无事发生，调用方可跳过写回） */
     foldedSessionCount: number;
 }
 
+/**
+ * 契约输出：空闲会话折叠计算结果 (IdleFoldResult)
+ * 不变量保证：保留空闲集合与日桶空闲累计满足时长守恒律。
+ */
 export interface IdleFoldResult {
     keptIdleSessions: IdleSession[];
     updatedDailyTotals: DailyTotalsMap;

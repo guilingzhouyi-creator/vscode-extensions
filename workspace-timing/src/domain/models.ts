@@ -5,9 +5,10 @@
  * Dependencies & Triggers: 纯 TypeScript 实现，零外部依赖；在扩展激活、配置变更、时间切片生成与落盘校验全链路贯穿触发。
  * Responsibilities: 定义时间单位常数与状态机枚举；定义 WorkspaceTimingData 及日桶、会话数据结构；提供配置范围合法域 clamp 净化器。
  * Exit Semantics & Design Rationale: 统一毫秒物理量纲与不可变类型视图 (ReadonlyTimingData)；数值净化器杜绝 NaN/越界引发状态机异常。
+ * Contract Invariant & Boundary: 强类型不变量保证：所有工时量度均为物理量纲非负毫秒数 (*Ms)；各配置边界上下界在 clamp 净化器中严格闭合；状态机转换仅允许 ORCHESTRATOR_STATES 定义的确定性状态。
  */
 
-/** 数据格式当前版本：数据存储格式版本 3（双轨模式 manual/ai、idleSessions 与沉淀层） */
+/** 契约版本：数据存储格式版本 3（双轨模式 manual/ai、idleSessions 与沉淀层，满足向前兼容） */
 export const LATEST_VERSION = 3;
 
 /** 计时活动模式枚举：手动编码 vs AI 辅助协作 */
@@ -25,7 +26,7 @@ export const JOURNAL_WARN_MB = 5;
 export const SLEEP_DETECT_GAP_SECONDS = 15;
 export const RADIX_DECIMAL = 10;
 
-// ─── 计时状态机枚举（单一真源）────────────────────────
+// ─── 计时状态机枚举（单一真源契约）───────────────────
 export const ORCHESTRATOR_STATES = {
     IDLE: 'idle',
     RUNNING: 'running',
@@ -106,8 +107,13 @@ export const DEFAULT_AI_COOLDOWN_SECONDS = 120;
 export const DEFAULT_AI_DETECTION_ENABLED = true;
 
 /**
- * 数值净化器：非法输入（非数字/NaN/Infinity）回退 fallback，合法输入钳制到 [min, max]。
- * 供配置读取（ConfigWatcher）与热更新（Scheduler）共用，杜绝双真源漂移。
+ * 契约算法：数值净化器与安全钳制器 (clampNumber)
+ * 边界保证：非法输入（非数字/NaN/Infinity/空字符串/布尔值）确定性回退至 fallback，合法数值闭合钳制到 [min, max] 区间。
+ * @param val 输入待校验值
+ * @param min 下限闭界
+ * @param max 上限闭界
+ * @param fallback 越界或非法类型时的回退默认值
+ * @returns 净化后的安全整数不变量
  */
 export function clampNumber(
     val: unknown,
@@ -198,62 +204,79 @@ export function sanitizeWeeklyLimitEnabled(val: unknown): boolean {
     return val === true || val === 'true';
 }
 
-/** 单日聚合沉淀（折叠层）：某自然日的时长与会话数 */
+/**
+ * 架构契约模型：单日聚合沉淀（折叠层）(DailyTotal)
+ * 不变量契约：该自然日内工时满足非负性 (totalMs >= 0) 与单调累加性；口径与 TimeAggregator 完全一致。
+ */
 export interface DailyTotal {
-    /** 该日累计时长 (ms) */
+    /** 契约工时：该日累计时长毫秒数 (ms) */
     totalMs: number;
-    /** 该日会话数（会话归属其起始自然日，与 TimeAggregator 口径一致） */
+    /** 契约计数：该日独立会话数（会话归属其起始自然日） */
     sessionCount: number;
-    /** 该日手动编码累计时长 (ms) */
+    /** 契约工时：该日手动编码累计时长 (ms) */
     manualMs?: number;
-    /** 该日 AI 辅助累计时长 (ms) */
+    /** 契约工时：该日 AI 辅助累计时长 (ms) */
     aiMs?: number;
-    /** 该日空闲累计总时长 (ms) */
+    /** 契约工时：该日空闲离开累计总时长 (ms) */
     idleTotalMs?: number;
-    /** 该日空闲段总次数 */
+    /** 契约计数：该日空闲段总次数 */
     idleSessionCount?: number;
 }
 
-/** 日桶表：key = 本地日期 "YYYY-MM-DD" */
+/** 架构契约：日桶表映射，key 必须为规范的本地日期格式 "YYYY-MM-DD" */
 export type DailyTotalsMap = Record<string, DailyTotal>;
 
-/** 一条原子时间片 — 用于缓存层和 journal */
+/**
+ * 架构契约模型：原子物理时间切片 (TimeSlice)
+ * 设计依据：用于 RingBuffer 内存缓冲与追加式 Journal 崩溃防护，保证原子提交。
+ * 不变量契约：deltaMs 必须大于 0，timestamp 保持时间戳单调递增。
+ */
 export interface TimeSlice {
-    /** 时间片结束时间戳 (Date.now()) */
+    /** 契约时间戳：时间片采样结束时间戳 (Date.now()) */
     timestamp: number;
-    /** 本片时长 (ms)，通常是 1000（1 秒） */
+    /** 契约时长：本片离散时长 (ms)，通常为 1000ms */
     deltaMs: number;
-    /** 时间片活动模式 */
+    /** 模式契约：时间片活动模式 */
     mode?: ActivityMode;
 }
 
-/** 空闲段记录 */
+/**
+ * 架构契约模型：系统离开/空闲段记录 (IdleSession)
+ * 不变量契约：endMs >= startMs，且 durationMs === endMs - startMs。
+ */
 export interface IdleSession {
-    /** 空闲开始时间戳 */
+    /** 契约时间戳：空闲开始时间戳 */
     startMs: number;
-    /** 空闲结束时间戳 */
+    /** 契约时间戳：空闲结束时间戳 */
     endMs: number;
-    /** 空闲历时 (ms) */
+    /** 契约时长：空闲历时 (ms) */
     durationMs: number;
-    /** 空闲原因描述 */
+    /** 状态原因：空闲判定原因描述 */
     reason?: string;
 }
 
-/** 单次会话记录 */
+/**
+ * 架构契约模型：单次有效工作会话记录 (TimeSession)
+ * 不变量契约：endMs >= startMs，durationMs === endMs - startMs，且 manualMs 与 aiMs 之和满足时长守恒律。
+ */
 export interface TimeSession {
-    /** 会话开始时间戳 (Date.now()) */
+    /** 契约时间戳：会话开始时间戳 (Date.now()) */
     startMs: number;
-    /** 会话结束时间戳 */
+    /** 契约时间戳：会话结束时间戳 */
     endMs: number;
-    /** 本次会话时长 (ms) */
+    /** 契约时长：本次会话总工时 (ms) */
     durationMs: number;
-    /** 手动编码时长 (ms) */
+    /** 契约时长：手动编码工时 (ms) */
     manualMs?: number;
-    /** AI 辅助时长 (ms) */
+    /** 契约时长：AI 辅助工时 (ms) */
     aiMs?: number;
 }
 
-/** 工作区计时主数据 */
+/**
+ * 架构契约模型：工作区计时主数据结构 (WorkspaceTimingData SSOT)
+ * 设计依据：单一真实源持久化载体，承载版本元数据、总工时与双层会话存储（原始明细层 + 沉淀日桶层）。
+ * 不变量契约：totalMs 满足时间守恒律：等于原始会话历时与历史沉淀日桶工时之和。
+ */
 export interface WorkspaceTimingData {
     /** 持久化数据结构演进版本号（当前版本：LATEST_VERSION） */
     version: number;

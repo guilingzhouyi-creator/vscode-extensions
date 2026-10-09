@@ -4,7 +4,8 @@
  * Architecture Role: Domain layer timing state machine and duration calculation core
  * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts; triggered by SessionManager / Scheduler
  * Responsibilities: Track active durations across manual/ai activity modes, manage idle pause and retroactive resume, calculate O(1) today metrics
- * Exit Semantics & Design Rationale: Pure TypeScript domain entity with zero VS Code / I/O dependencies; maintains mathematical conservation law totalMs = manualTotalMs + aiTotalMs
+ * Exit Semantics & Design Rationale: Pure TypeScript domain entity with zero VS Code / I/O dependencies; maintains mathematical conservation law totalMs = manualTotalMs + aiTotalMs.
+ * Contract Invariant & Boundary: Conservation of Duration — totalMs === manualTotalMs + aiTotalMs; todayOverlap algorithm strictly bounded to [0, MS_PER_DAY]; idle transition preserves atomic continuity without dropping elapsed work seconds.
  */
 
 import {
@@ -22,6 +23,10 @@ import { localDateStr, parseLocalDate, splitByNaturalDay } from './TimeAggregato
 const MODE_MANUAL: ActivityMode = 'manual';
 const MODE_AI: ActivityMode = 'ai';
 
+/**
+ * 契约模型：当前计时器状态快照 (TimerSnapshot)
+ * 不变量契约：所有工时字段严格非负；currentTotalMs === totalMs + sessionElapsedMs 严格满足守恒律。
+ */
 export interface TimerSnapshot {
     totalMs: number;
     manualTotalMs: number;
@@ -45,7 +50,7 @@ export class TimerEngine {
     private _idleStartMs: number = 0;
     private _currentMode: ActivityMode = MODE_MANUAL;
 
-    // ── 今日累计增量计数器（O(1) 状态栏路径）──
+    // ── 性能契约：今日累计增量计数器（O(1) 状态栏极速查询路径）──
     private _todayKey: string = '';
     private _todayEndedMs: number = 0;
     private _todayEndedManualMs: number = 0;
@@ -68,7 +73,13 @@ export class TimerEngine {
         return parseLocalDate(this._todayKey);
     }
 
-    /** O(1)：区间 [s,e) 与「今日」的重叠毫秒 */
+    /**
+     * 算法契约：计算时间区间 [s, e) 与今日自然日窗口的物理重叠毫秒数 (O(1))
+     * 边界契约：返回值严格在 [0, MS_PER_DAY] 闭区间内，无重叠时确定性返回 0。
+     * @param s 区间起始时间戳
+     * @param e 区间结束时间戳
+     * @returns 重叠毫秒数不变量
+     */
     private todayOverlap(s: number, e: number): number {
         const dayStart = this.todayStartMs;
         return Math.max(0, Math.min(e, dayStart + MS_PER_DAY) - Math.max(s, dayStart));

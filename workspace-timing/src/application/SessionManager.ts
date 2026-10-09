@@ -4,7 +4,8 @@
  * Architecture Role: Application layer session state coordinator and persistence bridge
  * Dependencies & Triggers: domain/TimerEngine, persistence/StorageCoordinator, cache/JournalWriter, RecoveryService, domain/HistoryFolder; driven by TimerOrchestrator and Scheduler
  * Responsibilities: Manage start/stop session lifecycles, coordinate crash recovery and checkpoints, execute history folding into daily buckets, and handle idle pause/resume and midnight transitions
- * Exit Semantics & Design Rationale: Guarantees synchronous flush and journal truncate upon session termination; maintains O(1) today metric readouts and atomic watermark updates
+ * Exit Semantics & Design Rationale: Guarantees synchronous flush and journal truncate upon session termination; maintains O(1) today metric readouts and atomic watermark updates.
+ * Contract Invariant & Boundary: Lifecycle guarantee: endSession enforces two-phase commit — in-memory buffer commit followed by storage sync before journal truncation; crash invariant: journal replay recovers uncheckpointed deltas on restart without double counting.
  */
 
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
@@ -23,12 +24,16 @@ import { JournalWriter } from '../cache/JournalWriter';
 import { RecoveryService } from './RecoveryService';
 import { LogLevel, log } from '../integration/Logger';
 
+/**
+ * 契约模型：会话结束落盘计算结果 (SessionResult)
+ * 不变量契约：elapsedMs >= 0 且总工时 totalMs 满足单调非递减性。
+ */
 export interface SessionResult {
-    /** 本次会话历时 (ms) */
+    /** 契约时长：本次会话历时 (ms) */
     elapsedMs: number;
-    /** 累计总时长 (ms) */
+    /** 契约时长：累计总时长 (ms) */
     totalMs: number;
-    /** 会话记录数 */
+    /** 契约计数：历史会话记录总数 */
     sessionCount: number;
 }
 
@@ -132,7 +137,9 @@ export class SessionManager {
     }
 
     /**
-     * 执行崩溃恢复流程并开启当前工作区新会话。
+     * 生命周期契约：执行崩溃恢复流程并开启当前工作区新会话。
+     * 设计依据：先回放 Journal 未入库切片，再原子注入 TimerEngine 内存态，保证重启不丢时间。
+     * @returns 恢复并启动后的工作区最新计时数据快照
      */
     async startSession(): Promise<WorkspaceTimingData> {
         log(LogLevel.Info, 'SessionManager: starting session');
@@ -152,8 +159,9 @@ export class SessionManager {
     }
 
     /**
-     * 结束当前会话
-     * 执行最终存盘并清空 journal
+     * 生命周期契约：正常终止当前会话并执行全量持久化。
+     * 崩溃安全保证：执行两阶段落盘（flushAll 缓存 -> 全量落盘 JSON -> 原子清空 Journal），不变量：落盘成功前绝不截断 Journal。
+     * @returns 会话终止计算结果
      */
     async endSession(): Promise<SessionResult> {
         if (!this._sessionActive) {

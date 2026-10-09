@@ -7,31 +7,37 @@
  * Exit Semantics & Design Rationale: 纯 TypeScript 类型定义与重导出，无运行时开销；通过单向分层依赖保障展示层与应用层解耦。
  */
 
-/** 柱状图每日一条 */
+/**
+ * 契约模型：柱状图每日工时渲染条目 (DailyChartEntry)
+ * 不变量契约：所有工时字段均以物理量纲非负毫秒 (*Ms) 表达，保证数值守恒与时间确定性。
+ */
 export interface DailyChartEntry {
-    /** 显示标签，如 "06-10" */
+    /** 契约标签：显示日期，如 "06-10" */
     label: string;
-    /** 星期，如 "一" */
+    /** 契约标签：本地星期显示，如 "一" */
     weekday: string;
-    /** 当日毫秒数 */
+    /** 契约时长：当日总工时毫秒数 (>= 0) */
     totalMs: number;
-    /** 当日手动编码毫秒数 */
+    /** 契约时长：当日手动编码毫秒数 (>= 0) */
     manualMs?: number;
-    /** 当日 AI 辅助毫秒数 */
+    /** 契约时长：当日 AI 辅助毫秒数 (>= 0) */
     aiMs?: number;
 }
 
-/** 周报趋势一条（每周） */
+/**
+ * 契约模型：周报趋势多周条目 (WeeklyTrendEntry)
+ * 设计依据：按周切分工时汇总，周起始严格对齐本地自然周一 (Monday 00:00:00)。
+ */
 export interface WeeklyTrendEntry {
-    /** 周起始日期 YYYY-MM-DD（周一） */
+    /** 契约范围：周起始日期 YYYY-MM-DD（周一） */
     weekStart: string;
-    /** 周截止日期 YYYY-MM-DD（周日） */
+    /** 契约范围：周截止日期 YYYY-MM-DD（周日） */
     weekEnd: string;
-    /** 显示标签，如 "06-10 ~ 06-16" */
+    /** 契约标签：区间显示标签，如 "06-10 ~ 06-16" */
     label: string;
-    /** 本周时长 (ms) */
+    /** 契约时长：本周累计工时 (ms) */
     totalMs: number;
-    /** 本周会话数 */
+    /** 契约计数：本周有效会话总数 */
     sessionCount: number;
 }
 
@@ -40,21 +46,27 @@ import type { WeeklySummary } from './aggregator/weekly-aggregator';
 
 export type { DailyDetail, WeeklySummary };
 
-/** 热力图单个格子（活动时间线） */
+/**
+ * 契约模型：活动时间线热力图矩阵单元格 (HeatmapDay)
+ * 不变量契约：level 在 0~4 之间按分位数单调递增，future 标记未来自然日。
+ */
 export interface HeatmapDay {
-    /** 完整日期 YYYY-MM-DD */
+    /** 契约日期：完整日期 YYYY-MM-DD */
     dateStr: string;
-    /** 星期索引：0=周一 … 6=周日 */
+    /** 契约索引：星期索引 0=周一 … 6=周日 */
     weekday: number;
-    /** 当日累计毫秒 */
+    /** 契约时长：当日累计工时毫秒数 */
     totalMs: number;
-    /** 着色等级 0~4（0=无记录） */
+    /** 契约分级：着色深度等级 0~4（0 为无工时底色） */
     level: 0 | 1 | 2 | 3 | 4;
-    /** 是否为未来日期（当前周尚未到达的天） */
+    /** 边界标记：是否为未来尚未到来的日期 */
     future: boolean;
 }
 
-/** 面板展示数据 */
+/**
+ * 架构契约：面板全量展示 DTO 快照模型 (DashboardData Snapshot)
+ * 设计依据：封装 Webview 所需的只读展示数据与可变配置项，保证单向数据流与界面渲染纯粹性。
+ */
 export interface DashboardData {
     totalMs: number;
     todayMs: number;
@@ -116,7 +128,10 @@ export interface DashboardData {
     aiCooldownSeconds?: number;
 }
 
-/** 面板消息协议 */
+/**
+ * 协议契约：Webview 与扩展宿主双向 postMessage 通信消息联合 (DashboardMessage)
+ * 不变量契约：所有消息类型均携带不可变鉴别属性 type，通过模式匹配进行类型安全派发。
+ */
 export type DashboardMessage =
     | { type: 'updateConfig'; payload: Partial<DashboardData> }
     | { type: 'newPeriod' }

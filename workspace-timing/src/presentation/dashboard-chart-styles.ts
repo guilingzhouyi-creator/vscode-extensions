@@ -14,8 +14,8 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     }
 
     /* ==============================================================================
-     * 1. 活跃曲线层 (Active Curve Canvas & Grids)
-     * 职责：承载动态 SVG 样条平滑曲线、毛玻璃背景、Y 轴参考刻度线与悬浮同心发光锚点。
+     * 1. 活跃曲线层架构契约 (Active Curve Canvas & Grids)
+     * 职责契约：承载动态 SVG 样条平滑曲线、毛玻璃背景、Y 轴参考刻度线与悬浮同心发光锚点。
      * ============================================================================== */
     .active-curve {
       display: block;
@@ -39,18 +39,18 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       height: 100%;
       overflow: visible;
     }
-    /* 标尺虚线：水平分档等分刻度线，辅以暗色高对比度半透明纯白 */
+    /* 标尺契约：水平分档等分刻度线，辅以暗色高对比度半透明纯白 */
     .ac-grid-line {
       stroke: rgba(255, 255, 255, 0.08);
       stroke-dasharray: 4 4;
       stroke-width: 1;
     }
-    /* 基准轴线：0刻度底部坚实基线，界定图表下界 */
+    /* 边界契约：0刻度底部坚实基线，界定图表下界不变量 */
     .ac-grid-base {
       stroke: rgba(255, 255, 255, 0.18);
       stroke-width: 1;
     }
-    /* Y轴标签：高对比度等宽数字字体，支持暗色主题高可读性 */
+    /* 标尺契约：高对比度等宽数字字体，支持暗色主题高可读性 */
     .ac-grid-label {
       font-size: 10.5px;
       font-weight: 500;
@@ -58,7 +58,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       fill: #ffffff;
       opacity: 0.85;
     }
-    /* 曲线描边：单调三次样条拟合路径，搭配青蓝向亮绿渐变与发光微阴影 */
+    /* 算法契约：单调三次样条拟合路径，搭配青蓝向亮绿渐变与发光微阴影 */
     .ac-line {
       fill: none;
       stroke: url(#acLineGradient);
@@ -67,11 +67,11 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       stroke-linecap: round;
       filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.45));
     }
-    /* 渐变面积填充：自曲线向下衰减至透明底的 SVG LinearGradient Mask */
+    /* 视觉契约：自曲线向下衰减至透明底的 SVG LinearGradient Mask */
     .ac-area {
       fill: url(#acGradient);
     }
-    /* 微型同心发光数据节点：仅在非零活跃日展示，零值平原无噪点 */
+    /* 节点契约：微型同心发光数据节点，仅在非零活跃日展示，零值平原无噪点 */
     .ac-dot-halo {
       fill: rgba(56, 189, 248, 0.22);
       stroke: rgba(56, 189, 248, 0.75);
@@ -102,7 +102,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       fill: rgba(16, 185, 129, 0.28);
       filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.65));
     }
-    /* 悬浮胶囊药丸气泡标签 */
+    /* 交互契约：悬浮胶囊药丸气泡标签，展示工时与日期 */
     .ac-pill-bg {
       fill: rgba(15, 23, 42, 0.92);
       stroke: rgba(255, 255, 255, 0.22);
@@ -135,7 +135,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       stroke: #38bdf8;
       fill: rgba(15, 23, 42, 0.98);
     }
-    /* 底部双层 X 轴对齐标尺 */
+    /* 标尺契约：底部双层 X 轴对齐标尺，展示周次与日期 */
     .ac-axis-date {
       font-size: 12px;
       font-weight: 600;
@@ -162,8 +162,8 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     }
 
     /* ==============================================================================
-     * 2. 活动热力图层 (Heatmap Activity Matrix)
-     * 职责：GitHub 风格现代化 24 周全宽活动矩阵、色阶浓度等级与弹性留白自适应。
+     * 2. 活动热力图层架构契约 (Heatmap Activity Matrix)
+     * 职责契约：GitHub 风格现代化 24 周全宽活动矩阵、色阶浓度等级与弹性留白自适应。
      * ============================================================================== */
     .heatmap-range {
       font-size: 11px;
@@ -249,7 +249,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       height: 11px;
     }
 
-    /* 摘要小卡片与列表 */
+    /* 布局契约：热力图底部摘要卡片与明细列表规范 */
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -300,8 +300,8 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     }
 
     /* ==============================================================================
-     * 3. 今日明细与小时活跃分布 (Today Detail & Hourly Distribution)
-     * 职责：24小时槽位骨架、峰值小时微光指示、今日会话列表与有界折叠容器。
+     * 3. 今日明细与小时活跃分布架构契约 (Today Detail & Hourly Distribution)
+     * 职责契约：24小时槽位骨架、峰值小时微光指示、今日会话列表与有界折叠容器。
      * ============================================================================== */
     .hourly-wrapper {
       position: relative;
@@ -413,7 +413,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       box-shadow: 0 0 4px #10b981;
     }
 
-    /* 物理标尺刻度线与时间标签 */
+    /* 标尺契约：物理标尺刻度线与时间标签 */
     .hourly-axis {
       position: relative;
       height: 22px;
@@ -471,7 +471,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       font-weight: 600;
     }
 
-    /* 多周趋势条 */
+    /* 趋势契约：多周工时对比趋势条与超限告警标记 */
     .trend-row {
       display: flex;
       align-items: center;
@@ -533,8 +533,8 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     }
 
     /* ==============================================================================
-     * 4. 跨工作区对比视图 (Cross-Workspace Comparison View)
-     * 职责：各工作区工时横向对比条、占比比例、进度微光及有界折叠展开机制。
+     * 4. 跨工作区对比视图架构契约 (Cross-Workspace Comparison View)
+     * 职责契约：各工作区工时横向对比条、占比比例、进度微光及有界折叠展开机制。
      * ============================================================================== */
     .ws-compare-row {
       padding: 8px 0;
@@ -605,7 +605,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       display: none;
     }
 
-    /* 通用折叠切换条 */
+    /* 折叠契约：通用折叠切换条规范 */
     .fold-toggle {
       display: flex;
       align-items: center;
@@ -629,7 +629,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transition: transform 0.2s ease;
     }
 
-    /* 帮助提示图标 Tooltip */
+    /* 提示契约：帮助提示图标与 Tooltip 浮层规范 */
     .help-icon {
       display: inline-flex;
       align-items: center;
@@ -672,7 +672,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       pointer-events: none;
       backdrop-filter: blur(10px);
     }
-    /* 气泡提示入场动画与同名动画隔离保护 */
+    /* 动画契约：气泡提示入场动画与同名动画隔离保护 */
     @keyframes fadeInUp {
       from {
         opacity: 0;
@@ -684,7 +684,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       }
     }
 
-    /* 页面主要卡片防横移隔离保护（避免被包含 translate(-50%) 的 fadeInUp 误伤） */
+    /* 隔离契约：主要卡片防横移隔离保护，确保居中定位不变量 */
     .main-header,
     .section,
     .settings-card {
@@ -705,7 +705,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       border-top-color: var(--card-border);
     }
 
-    /* 导出操作防重态 */
+    /* 防重契约：导出操作防重复点击禁用态 */
     button.is-busy,
     .btn.is-busy {
       opacity: 0.6;
@@ -713,7 +713,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       cursor: not-allowed;
     }
 
-    /* Toast 浮动通知 */
+    /* 通知契约：Toast 浮动即时通知规范 */
     #statusToast {
       position: fixed;
       bottom: 20px;

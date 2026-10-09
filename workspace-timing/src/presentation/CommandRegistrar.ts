@@ -42,7 +42,7 @@ export class CommandRegistrar {
         orchestrator: TimerOrchestrator | null,
         statusBar: StatusBarController | null,
     ): void {
-        // 启用
+        /** 注册启用计时命令契约：更新工作区配置并驱动状态机恢复就绪态 */
         this.registerCommand('workspaceTiming.enable', async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             orchestrator.disable.updateConfig({ enabled: true, globalDisabled: false });
@@ -53,7 +53,7 @@ export class CommandRegistrar {
             vscode.window.showInformationMessage(t()['cmd.enabled']);
         });
 
-        // 禁用
+        /** 注册工作区禁用计时命令契约：暂挂活动采集并持久化停用状态 */
         this.registerCommand('workspaceTiming.disable', async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             orchestrator.disable.updateConfig({ enabled: false });
@@ -64,7 +64,7 @@ export class CommandRegistrar {
             vscode.window.showInformationMessage(t()['cmd.disabled']);
         });
 
-        // 全局开关
+        /** 注册跨工作区全局禁用开关契约：在所有打开的窗口中全局屏蔽计时采集 */
         this.registerCommand('workspaceTiming.toggleGlobal', async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             const current = orchestrator.disable.config.globalDisabled;
@@ -78,7 +78,7 @@ export class CommandRegistrar {
                 !current ? t()['cmd.globalDisabled'] : t()['cmd.globalEnabled']);
         });
 
-        // 切换状态栏显示模式（循环切换后持久化，重载窗口后保持用户选择）
+        /** 注册状态栏显示模式循环切换契约：轮转显示今日/总计/紧凑样式并落盘配置 */
         this.registerCommand('workspaceTiming.showStatus', () => {
             if (!statusBar) { this.noWorkspaceMsg(); return; }
             const nextMode = statusBar.cycleMode();
@@ -96,14 +96,14 @@ export class CommandRegistrar {
         statusBar: StatusBarController | null,
         globalAggregator: GlobalAggregator | null,
     ): void {
-        // 调试：手动存盘
+        /** 注册立即强制存盘调试契约：绕过定时降频窗口，触发全量同步落盘 */
         this.registerCommand('workspaceTiming.debugSave', async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             await orchestrator.saveNow();
             vscode.window.showInformationMessage(format(t()['cmd.debugSaved'], 'OK'));
         });
 
-        // 新建计时周期（重置累计，保留历史）
+        /** 注册新建周期命令契约：弹出破坏性模态确认框后重置累计工时并保留历史切片 */
         this.registerCommand('workspaceTiming.newPeriod', async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.newPeriod'];
@@ -115,7 +115,7 @@ export class CommandRegistrar {
             }
         });
 
-        // 重置数据（业务编排委托 orchestrator.resetAllData：清数据→清全局→重启计时）
+        /** 注册全量数据重置命令契约：业务编排委托 orchestrator.resetAllData 清空并重启计时 */
         this.registerCommand('workspaceTiming.reset', async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.reset'];
@@ -129,7 +129,7 @@ export class CommandRegistrar {
             }
         });
 
-        // 清除跨工作区累计（仅清全局聚合，不影响各工作区本地计时）
+        /** 注册清除跨工作区累计契约：仅清理全局聚合存储，严格隔离各本地工作区数据 */
         this.registerCommand('workspaceTiming.clearGlobal', async () => {
             if (!globalAggregator) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.clearGlobal'];
@@ -141,7 +141,7 @@ export class CommandRegistrar {
             }
         });
 
-        // 清除历史明细（保留累计数字；编排委托 orchestrator.clearHistory）
+        /** 注册清除历史明细契约：保留累计汇总指标，安全裁剪细粒度历史会话切片 */
         this.registerCommand('workspaceTiming.clearHistory', async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.clearHistory'];
@@ -154,7 +154,7 @@ export class CommandRegistrar {
             }
         });
 
-        // 从备份文件还原（默认定位 .vscode/workspace-timing.json；还原前自动安全快照）
+        /** 注册从备份文件还原契约：引导用户选择历史快照并在比对后安全覆盖恢复 */
         this.registerCommand('workspaceTiming.restore', async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             await this.handleRestoreCommand(orchestrator, statusBar);
@@ -166,12 +166,12 @@ export class CommandRegistrar {
         orchestrator: TimerOrchestrator | null,
         statusBar: StatusBarController | null,
     ): void {
-        // 打开配置面板
+        /** 注册打开可视化配置与统计仪表盘 Webview 命令契约 */
         this.registerCommand('workspaceTiming.openDashboard', () => {
             DashboardPanel.createOrShow(context.extensionUri);
         });
 
-        // 导出 CSV（与 Dashboard 导出按钮共用逻辑）
+        /** 注册导出原始会话流水 CSV 报表命令契约：复用 Dashboard 管道实现异步落盘 */
         this.registerCommand('workspaceTiming.export', () => {
             void exportTimingToFile({
                 getOrchestrator: () => orchestrator,
@@ -180,7 +180,7 @@ export class CommandRegistrar {
             });
         });
 
-        // 导出全历史聚合日报 CSV（与 Dashboard 导出按钮共用管道）
+        /** 注册导出多维聚合日报 CSV 报表命令契约：按天对工时及 AI 辅助时长汇总导出 */
         this.registerCommand('workspaceTiming.exportAggregated', () => {
             void exportAggregatedToFile({
                 getOrchestrator: () => orchestrator,

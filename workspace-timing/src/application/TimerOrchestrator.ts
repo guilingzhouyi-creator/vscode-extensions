@@ -4,7 +4,8 @@
  * Architecture Role: Application layer central coordinator and business orchestration facade
  * Dependencies & Triggers: TimerEngine, StorageCoordinator, JournalWriter, SessionManager, DisableManager, Scheduler, GlobalAggregator; invoked by extension entry, commands, and webview messages
  * Responsibilities: Orchestrate session state machine lifecycles (start, stop, idle, activity); manage destructive operations via serialized FIFO queue; dispatch configuration updates; generate dashboard DTOs and reports
- * Exit Semantics & Design Rationale: Coordinates graceful shutdown across Scheduler and SessionManager; enforces serialized execution queue (_opQueue) to prevent concurrent state corruption during reset/restore/newPeriod
+ * Exit Semantics & Design Rationale: Coordinates graceful shutdown across Scheduler and SessionManager; enforces serialized execution queue (_opQueue) to prevent concurrent state corruption during reset/restore/newPeriod.
+ * Contract Invariant & Boundary: Serialized execution invariant: all destructive mutating operations (reset, restore, newPeriod, clearHistory) are sequenced through a strictly ordered FIFO promise queue (_opQueue); state machine transitions adhere to deterministic ORCHESTRATOR_STATES.
  */
 
 import { TimerEngine } from '../domain/TimerEngine';
@@ -385,7 +386,9 @@ export class TimerOrchestrator {
     }
 
     /**
-     * 新建计时周期：结束当前会话 → 重置 totalMs → 重新开始（历史会话保留）
+     * 契约编排：新建计时周期。
+     * 架构契约：结束当前会话 -> 重置 totalMs -> 重新启动计时器（保留既有历史会话与沉淀层）。
+     * 不变量保证：通过 _opQueue 串行化执行，杜绝与后台 checkpoint 产生竞态条件。
      */
     async newPeriod(): Promise<void> {
         log(LogLevel.Info, 'TimerOrchestrator: new period requested');
@@ -411,7 +414,10 @@ export class TimerOrchestrator {
     }
 
     /**
-     * 重置本工作区计时数据并立即重新开始计时
+     * 契约编排：重置当前工作区全部计时数据。
+     * 架构契约：安全快照优先备份 -> 停止计时器 -> 物理清理持久化文件 -> 重启空白计时。
+     * @param purgeGlobal 是否同步重置跨工作区全局聚合工时
+     * @returns 重置后的初始面板 DTO 数据快照
      */
     async resetAllData(purgeGlobal = true): Promise<DashboardData> {
         log(LogLevel.Info, 'TimerOrchestrator: resetAllData requested');
@@ -433,9 +439,15 @@ export class TimerOrchestrator {
         });
     }
 
-    /** 重操作串行队列 */
+    /** 架构契约：重操作串行队列 */
     private _opQueue: Promise<unknown> = Promise.resolve();
 
+    /**
+     * 算法契约：破坏性操作严格 FIFO 串行化 Promise 队列。
+     * 架构定位：保证 reset/restore/newPeriod 绝对互斥，杜绝并发调用导致脏写或文件损毁。
+     * @param fn 待串行执行的异步任务
+     * @returns 任务执行结果 Promise
+     */
     private enqueue<T>(fn: () => Promise<T>): Promise<T> {
         const run = this._opQueue.then(fn, fn);
         this._opQueue = run.catch((err) => {
@@ -445,7 +457,9 @@ export class TimerOrchestrator {
     }
 
     /**
-     * 清除历史明细（保留累计数字）
+     * 契约编排：清除细粒度历史会话明细。
+     * 架构契约：清空 sessions/idleSessions/dailyTotals 列表，严格保留 totalMs 与今日工时累加总量不变量。
+     * @returns 清除历史后的工作区最新主数据
      */
     async clearHistory(): Promise<DashboardData> {
         log(LogLevel.Info, 'TimerOrchestrator: clearHistory requested');

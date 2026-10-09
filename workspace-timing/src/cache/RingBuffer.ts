@@ -5,6 +5,7 @@
  * Dependencies & Triggers: 依赖 domain/models 默认容量；作为 JournalWriter 与高频采集器的核心内存缓冲容器。
  * Responsibilities: 定长循环队列管理；满载覆盖淘汰最旧元素；两阶段只读窥探 (peekAll/peekLast) 与原子推进 (advance)；内存槽位清理防泄漏。
  * Exit Semantics & Design Rationale: 构造时预分配定长数组消除循环内堆分配；严格模运算指针步进；槽位清退置 undefined 协助 GC 垃圾回收。
+ * Contract Invariant & Boundary: 容量有界不变量：0 <= count <= capacity，读写指针 tail/head 严格在 [0, capacity) 闭区间循环移动；满载策略：写入满缓冲区时原子淘汰最旧数据；peekAll 与 advance 构成两阶段消费不变量。
  */
 
 import { DEFAULT_RING_BUFFER_CAP } from '../domain/models';

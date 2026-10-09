@@ -4,7 +4,8 @@
  * Architecture Role: Integration layer observer detecting user interactions, external file changes, and Git events
  * Dependencies & Triggers: Consumes vscode editor/workspace events and vscode.git extension API; notifies ActivityWatcherListener
  * Responsibilities: Monitor keyboard/editor input, detect AI agent filesystem/git modifications, manage activity modes (manual/ai/idle), and enforce cooldown windows
- * Exit Semantics & Design Rationale: Pure listener and event dispatcher with zero storage or UI side effects; encapsulates host event subscriptions and releases all listeners cleanly on dispose
+ * Exit Semantics & Design Rationale: Pure listener and event dispatcher with zero storage or UI side effects; encapsulates host event subscriptions and releases all listeners cleanly on dispose.
+ * Contract Invariant & Boundary: Event debounce invariant: debounced heartbeats clamp high-frequency keyboard/fs bursts to minimum intervals; lifecycle ownership: 100% of VS Code Disposables are registered to subscriptions and cleared on dispose.
  */
 
 import * as vscode from 'vscode';
@@ -34,17 +35,23 @@ const MSG_GIT_READ_API_FAILED = 'ActivityWatcher: failed to read git api';
 const MSG_REPO_BIND_FAILED = 'ActivityWatcher: failed to bind repo';
 const MSG_WATCHER_DISPOSED = 'ActivityWatcher: disposed';
 
-/** 活动监听观察者回调端口（消费方按需实现） */
+/**
+ * 架构契约：活动监听观察者回调端口 (ActivityWatcherListener)
+ * 职责契约：向应用层 Scheduler / Orchestrator 发送活动感知心跳与空闲切片通知。
+ */
 export interface ActivityWatcherListener {
-    /** 活跃心跳通知（人工操作或 AI 协作中） */
+    /** 契约通知：活跃心跳通知（人工操作或 AI 协作中） */
     onActivity(mode: ActivityMode, timestampMs: number): void;
-    /** 空闲超时触发 */
+    /** 契约通知：空闲超时触发 */
     onIdle(timestampMs: number): void;
-    /** 活动模式切换通知（可选） */
+    /** 契约通知：活动模式切换通知（可选） */
     onModeChange?(mode: WatcherMode, previousMode: WatcherMode, timestampMs: number): void;
 }
 
-/** 活动检测配置项 */
+/**
+ * 架构契约：活动检测参数配置项 (ActivityWatcherOptions)
+ * 边界保证：超时与冷却数值受领域模型 models.ts 中合法域约束保护。
+ */
 export interface ActivityWatcherOptions {
     /** 空闲判定超时时间（分钟，0 表示不启用） */
     idleTimeoutMinutes: number;
@@ -91,8 +98,9 @@ interface GitExtension {
 }
 
 /**
- * 活动监测器：监听 VS Code 编辑器操作、源码文件变动与 Git 状态，
- * 判定工作区当前处于 manual（人工）、ai（AI 协作）或 idle（空闲）状态。
+ * 架构契约：活动监测器 (ActivityWatcher)
+ * 设计依据：监听 VS Code 编辑器操作、源码文件变动与 Git 状态，判定工作区处于 manual/ai/idle 状态。
+ * 不变量保证：保证在 dispose 时 100% 释放所有宿主订阅事件与定时器。
  */
 export class ActivityWatcher implements vscode.Disposable {
     private readonly subscriptions: vscode.Disposable[] = [];
@@ -271,7 +279,7 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 记录人工活动并做 1000ms 窗口防抖心跳聚合 */
+    /** 算法契约：记录人工活动并做 1000ms 窗口防抖心跳聚合 (Debounced heartbeat) */
     private recordManualActivity(): void {
         const now = Date.now();
         this._lastManualActivityMs = now;
@@ -298,7 +306,7 @@ export class ActivityWatcher implements vscode.Disposable {
         }, MS_PER_SECOND);
     }
 
-    /** 处理外部信号（文件系统写入或 Git 变更，经 1000ms 窗口防抖节流） */
+    /** 算法契约：处理外部信号（文件系统写入或 Git 变更，经 1000ms 窗口防抖节流） */
     private handleExternalSignal(): void {
         if (!this._options.aiDetectionEnabled) {
             return;
@@ -332,7 +340,7 @@ export class ActivityWatcher implements vscode.Disposable {
         }, MS_PER_SECOND);
     }
 
-    /** 周期性检测空闲超时与 AI 冷却窗口 */
+    /** 算法契约：周期性检测空闲超时阈值与 AI 冷却窗口 */
     private tick(): void {
         const now = Date.now();
         if (this._mode === WATCHER_MODE_MANUAL) {
@@ -342,7 +350,7 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 检查人工编码是否达到空闲超时 */
+    /** 边界契约：检查人工编码是否达到配置的空闲超时阈值 */
     private checkManualIdle(now: number): void {
         if (this._options.idleTimeoutMinutes <= 0) {
             return;
@@ -355,7 +363,7 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 检查 AI 协作冷却窗口 */
+    /** 边界契约：检查 AI 协作冷却观察窗口 (Cooldown observation window) */
     private checkAiCooldown(now: number): void {
         const cooldownMs = this._options.aiCooldownSeconds * MS_PER_SECOND;
         if (now - this._lastAiActivityMs < cooldownMs) {
@@ -368,7 +376,7 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 切换当前模式并触发事件 */
+    /** 架构契约：切换当前工作区活动模式并触发事件通知 */
     private setMode(newMode: WatcherMode, timestampMs: number): void {
         if (this._mode === newMode) {
             return;
@@ -379,12 +387,12 @@ export class ActivityWatcher implements vscode.Disposable {
         this._listener?.onModeChange?.(newMode, previous, timestampMs);
     }
 
-    /** 触发活跃心跳通知 */
+    /** 架构契约：向监听方派发活跃心跳通知 */
     private notifyActivity(mode: ActivityMode, timestampMs: number): void {
         this._listener?.onActivity(mode, timestampMs);
     }
 
-    /** 释放所有监听器与计时器 */
+    /** 生命周期契约：释放所有宿主事件监听器与周期性计时器 */
     public dispose(): void {
         if (this._debounceTimer !== null) {
             clearTimeout(this._debounceTimer);
