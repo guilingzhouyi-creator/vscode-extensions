@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791542671338",
-  "timestamp": "2026-10-09T10:44:40.444Z",
+  "snapshotId": "snapshot-v0.4.0-1791543453893",
+  "timestamp": "2026-10-09T10:57:42.798Z",
   "cai": 86.8,
   "versions": {
     "engineVersion": "0.4.0",
@@ -14,18 +14,18 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 616,
-    "durationMs": 7410
+    "durationMs": 7421
   },
   "metrics": {
     "compositeScore": 98.78,
     "grade": "A+",
     "autonomyRate": 86.8,
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11510,
+    "totalIssues": 11511,
     "suppressedIssues": 362,
-    "unsuppressedIssues": 11148,
+    "unsuppressedIssues": 11149,
     "bySeverity": {
-      "info": 1251,
+      "info": 1252,
       "warning": 10259,
       "error": 0
     },
@@ -33,7 +33,7 @@
       "critical": 0,
       "high": 1,
       "medium": 5244,
-      "low": 6265
+      "low": 6266
     }
   },
   "eightPillars": {
@@ -169,7 +169,7 @@
       "critical": 0,
       "high": 1,
       "medium": 5244,
-      "low": 6265
+      "low": 6266
     },
     "criticalItems": [],
     "highItems": [
@@ -910,27 +910,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 132716,
+      "processed": 132717,
       "unique": 107223,
-      "changed": 3340,
-      "semantic": 2672,
+      "changed": 0,
+      "semantic": 0,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 1670,
+      "added": 0,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791542671336,
+      "endMs": 1791543453891,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 19043003,
+        "processedTotal": 19060196,
         "uniqueTotal": 107223,
-        "changedTotal": 179978,
-        "semanticTotal": 143985
+        "changedTotal": 192658,
+        "semanticTotal": 154130
       },
       "qed": {
         "mean": 0.0001,
@@ -939,12 +939,12 @@
       },
       "debt": {
         "totalAdded": 393,
-        "totalResolved": 1264,
+        "totalResolved": 1207,
         "totalRegressions": 0,
-        "netYield": 0.05
+        "netYield": 0.04
       },
-      "meanCompositeScore": 98.9,
-      "gatePassRate": 97.34
+      "meanCompositeScore": 98.91,
+      "gatePassRate": 96.66
     },
     "isFirstBaseline": false
   }

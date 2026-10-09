@@ -264,7 +264,12 @@ async function main() {
     }
 
     const defaultBaseline = path.join(projectDir, '.auto-refactor', 'baseline.json');
-    const baseline = path.resolve(opts.baseline || defaultBaseline);
+    const targetBaseline =
+        (typeof opts['update-baseline'] === 'string' && opts['update-baseline']) ||
+        opts.baseline ||
+        defaultBaseline;
+    const baseline = path.resolve(targetBaseline);
+    fs.mkdirSync(path.dirname(baseline), { recursive: true });
     const out = path.resolve(
         opts.out || path.join(projectDir, '.auto-refactor', `report.${format}`),
     );

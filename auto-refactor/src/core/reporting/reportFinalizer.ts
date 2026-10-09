@@ -26,6 +26,7 @@ import {
     handleBaselineUpdate,
     handleBaselineRatchet,
 } from './baselineManager';
+import { areAliasForms } from '../rules/aliases';
 import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
 import { QualityScorer } from '../scoring/qualityScorer';
 import { synthesizeStaticQualityVector } from '../scoring/static-quality-model';
@@ -285,7 +286,7 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
         (s) =>
             (!s.matchFile ||
                 index.fileMatchers.get(s)!.test(issue.location.file.replace(/\\/g, '/'))) &&
-            (!s.matchRule || issue.rule === s.matchRule) &&
+            (!s.matchRule || areAliasForms(issue.rule, s.matchRule)) &&
             (!s.matchSymbol || symbol === s.matchSymbol || symbol.endsWith('.' + s.matchSymbol)),
     );
 }
