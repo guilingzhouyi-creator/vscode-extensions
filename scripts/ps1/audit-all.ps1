@@ -20,6 +20,48 @@ Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
 
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
+$PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
+
+function Get-DisplayWidth {
+    [CmdletBinding()]
+    param(
+        [string]$Text = ''
+    )
+    if ([string]::IsNullOrEmpty($Text)) { return 0 }
+    $w = 0
+    foreach ($ch in $Text.ToCharArray()) {
+        if ([int]$ch -gt 127) {
+            $w += 2
+        } else {
+            $w += 1
+        }
+    }
+    return $w
+}
+
+function Format-AlignedCell {
+    [CmdletBinding()]
+    param(
+        [string]$Text = '',
+        [Parameter(Mandatory)][int]$Width = 0,
+        [ValidateSet('Left', 'Right', 'Center')][string]$Align = 'Left'
+    )
+    $dw = Get-DisplayWidth $Text
+    $pad = [math]::Max(0, $Width - $dw)
+    if ($Align -eq 'Right') {
+        return (" " * $pad) + $Text
+    } elseif ($Align -eq 'Center') {
+        $left = [math]::Floor($pad / 2)
+        $right = $pad - $left
+        return (" " * $left) + $Text + (" " * $right)
+    } else {
+        return $Text + (" " * $pad)
+    }
+}
+
 if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
 if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
 if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
@@ -71,53 +113,72 @@ if (-not $Json) {
 
 $transientDir = [System.IO.Path]::GetTempPath()
 $randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
-$logAr = Join-Path $transientDir "audit-ar-$randSuffix.log"
-$logWt = Join-Path $transientDir "audit-wt-$randSuffix.log"
-$logWg = Join-Path $transientDir "audit-wg-$randSuffix.log"
+$logArOut = Join-Path $transientDir "audit-ar-$randSuffix.out.log"
+$logArErr = Join-Path $transientDir "audit-ar-$randSuffix.err.log"
+$logArSelfOut = Join-Path $transientDir "audit-ar-self-$randSuffix.out.log"
+$logArSelfErr = Join-Path $transientDir "audit-ar-self-$randSuffix.err.log"
+$logWtOut = Join-Path $transientDir "audit-wt-$randSuffix.out.log"
+$logWtErr = Join-Path $transientDir "audit-wt-$randSuffix.err.log"
+$logWgOut = Join-Path $transientDir "audit-wg-$randSuffix.out.log"
+$logWgErr = Join-Path $transientDir "audit-wg-$randSuffix.err.log"
 
-$arScript = if ($Fast) {
-    "& '$nodeCmd' scripts/validate-self-multidimensional-audit.js *>&1"
+$procAr = if ($Fast) {
+    Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 } else {
-    "& '$npmCmd' test *>&1; if (`$LASTEXITCODE -eq 0) { & '$nodeCmd' scripts/gate-self.js *>&1 }"
+    Start-Process -FilePath $npmCmd -ArgumentList @("test") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 }
-$wtScript = "& '$npmCmd' run review *>&1"
-$wgScript = "& '$pythonCmd' WebGames/scripts/py/audit_config.py --strict *>&1"
-
-$procAr = Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $arScript) -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logAr -PassThru
-$procWt = Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $wtScript) -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWt -PassThru
-$procWg = Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", $wgScript) -WorkingDirectory $repoRoot -RedirectStandardOutput $logWg -PassThru
+$procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru
+$procWg = Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_config.py", "--strict") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru
 
 $procAr.WaitForExit()
 $procWt.WaitForExit()
 $procWg.WaitForExit()
 
 $statusAr = if ($procAr.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+if (-not $Fast -and $statusAr -eq "PASS") {
+    $procGateSelf = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru -Wait
+    if ($procGateSelf.ExitCode -ne 0) {
+        $statusAr = "FAIL"
+    }
+}
 $statusWt = if ($procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
 $statusWg = if ($procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
 
 if ($statusAr -ne "PASS") {
     $failed = $true
-    if (-not $Json -and (Test-Path $logAr)) {
+    if (-not $Json) {
         Write-Host "❌ auto-refactor 审查未通过:" -ForegroundColor Red
-        Get-Content $logAr | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+        foreach ($logFile in @($logArOut, $logArErr, $logArSelfOut, $logArSelfErr)) {
+            if (Test-Path $logFile) {
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+            }
+        }
     }
 }
 if ($statusWt -ne "PASS") {
     $failed = $true
-    if (-not $Json -and (Test-Path $logWt)) {
+    if (-not $Json) {
         Write-Host "❌ workspace-timing 审查未通过:" -ForegroundColor Red
-        Get-Content $logWt | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+        foreach ($logFile in @($logWtOut, $logWtErr)) {
+            if (Test-Path $logFile) {
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+            }
+        }
     }
 }
 if ($statusWg -ne "PASS") {
     $failed = $true
-    if (-not $Json -and (Test-Path $logWg)) {
+    if (-not $Json) {
         Write-Host "❌ WebGames 审查未通过:" -ForegroundColor Red
-        Get-Content $logWg | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+        foreach ($logFile in @($logWgOut, $logWgErr)) {
+            if (Test-Path $logFile) {
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+            }
+        }
     }
 }
 
-Remove-Item -Path $logAr, $logWt, $logWg -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $logArOut, $logArErr, $logArSelfOut, $logArSelfErr, $logWtOut, $logWtErr, $logWgOut, $logWgErr -Force -ErrorAction SilentlyContinue
 
 $startTime.Stop()
 $elapsedSec = [math]::Round($startTime.Elapsed.TotalSeconds, 2)
@@ -256,17 +317,18 @@ if ($Json) {
 
 Write-Host ""
 Write-Host "┌───────────────────────────────────────────────────────────────┐" -ForegroundColor Cyan
-Write-Host "│              全工作区统一审查报告与质量看板                   │" -ForegroundColor Cyan
+Write-Host ("│" + (Format-AlignedCell "              全工作区统一审查报告与质量看板" 63) + "│") -ForegroundColor Cyan
 Write-Host "├─────────────────────────────┬─────────────┬───────────────────┤" -ForegroundColor Cyan
-Write-Host "│ 审查检查项 / 子系统         │ 判定结果    │ 覆盖范围          │" -ForegroundColor Cyan
+Write-Host ("│" + (Format-AlignedCell " 审查检查项 / 子系统" 29) + "│" + (Format-AlignedCell " 判定结果" 13) + "│" + (Format-AlignedCell " 覆盖范围" 19) + "│") -ForegroundColor Cyan
 Write-Host "├─────────────────────────────┼─────────────┼───────────────────┤" -ForegroundColor Cyan
-Write-Host ("│ 1. 工作区零空文件物理卫生   │ {0,-11} │ 全仓代码/脚本/配置│" -f $statusHygiene) -ForegroundColor $cHygiene
-Write-Host ("│ 2. 单源规则目录一致性 (SSOT)│ {0,-11} │ 单源规则总目录    │" -f $statusRules) -ForegroundColor $cRules
-Write-Host ("│ 3. auto-refactor 质量基线   │ {0,-11} │ 质量模型 / 并行自审│" -f $statusAr) -ForegroundColor $cAr
-Write-Host ("│ 4. workspace-timing 审查门禁│ {0,-11} │ L0~L5 / 并行门禁  │" -f $statusWt) -ForegroundColor $cWt
-Write-Host ("│ 5. WebGames 配置架构审查    │ {0,-11} │ 领域配置 / 并行审查│" -f $statusWg) -ForegroundColor $cWg
+Write-Host ("│" + (Format-AlignedCell " 1. 工作区零空文件物理卫生" 29) + "│" + (Format-AlignedCell (" " + $statusHygiene) 13) + "│" + (Format-AlignedCell " 全仓代码/脚本/配置" 19) + "│") -ForegroundColor $cHygiene
+Write-Host ("│" + (Format-AlignedCell " 2. 单源规则目录一致性 (SSOT)" 29) + "│" + (Format-AlignedCell (" " + $statusRules) 13) + "│" + (Format-AlignedCell " 单源规则总目录" 19) + "│") -ForegroundColor $cRules
+Write-Host ("│" + (Format-AlignedCell " 3. auto-refactor 质量基线" 29) + "│" + (Format-AlignedCell (" " + $statusAr) 13) + "│" + (Format-AlignedCell " 质量模型/并行自审" 19) + "│") -ForegroundColor $cAr
+Write-Host ("│" + (Format-AlignedCell " 4. workspace-timing 审查门禁" 29) + "│" + (Format-AlignedCell (" " + $statusWt) 13) + "│" + (Format-AlignedCell " L0~L5 / 并行门禁" 19) + "│") -ForegroundColor $cWt
+Write-Host ("│" + (Format-AlignedCell " 5. WebGames 配置架构审查" 29) + "│" + (Format-AlignedCell (" " + $statusWg) 13) + "│" + (Format-AlignedCell " 领域配置/并行审查" 19) + "│") -ForegroundColor $cWg
 Write-Host "├─────────────────────────────┴─────────────┴───────────────────┤" -ForegroundColor Cyan
-Write-Host ("│ 耗时: {0}s  |  全局状态: {1}           │" -f $elapsedSec, $globalStatus) -ForegroundColor $globalColor
+$bottomSummary = " 耗时: {0}s  |  全局状态: {1}" -f $elapsedSec, $globalStatus
+Write-Host ("│" + (Format-AlignedCell $bottomSummary 63) + "│") -ForegroundColor $globalColor
 Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
 
 # 全工作区十维工程质量看板
@@ -281,12 +343,7 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
     if ($autonomyRate) { $summaryText += "  |  自研率: {0}%" -f $autonomyRate }
     if ($null -ne $totalDebt) { $summaryText += "  |  技术债总量: {0} 项" -f $totalDebt }
 
-    $sw = 0
-    foreach ($ch in $summaryText.ToCharArray()) {
-        if ([int]$ch -gt 127) { $sw += 2 } else { $sw += 1 }
-    }
-    $rightPad = [math]::Max(0, 61 - $sw)
-    Write-Host ("│ {0}{1} │" -f $summaryText, (" " * $rightPad)) -ForegroundColor White
+    Write-Host ("│" + (Format-AlignedCell (" " + $summaryText) 63) + "│") -ForegroundColor White
     Write-Host "├───────────────────────────────────────────────────────────────┤" -ForegroundColor Cyan
 
     foreach ($d in $dimDefinitions) {
@@ -323,7 +380,7 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
     }
     Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
 } else {
-    Write-Host ("│ [离线基线快照未就绪 - 优雅降级模式]{0} │" -f (" " * 26)) -ForegroundColor Yellow
+    Write-Host ("│" + (Format-AlignedCell " [离线基线快照未就绪 - 优雅降级模式]" 63) + "│") -ForegroundColor Yellow
     Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
 }
 

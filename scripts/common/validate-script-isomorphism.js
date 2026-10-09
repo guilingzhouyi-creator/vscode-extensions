@@ -38,7 +38,7 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
  * Key parameter flags that must be supported identically across dual implementations.
  */
 const REQUIRED_FLAG_ALIGNMENTS = {
-  'audit-all': ['Fast'],
+  'audit-all': ['Fast', 'Json'],
   package: ['HotSync'],
 };
 

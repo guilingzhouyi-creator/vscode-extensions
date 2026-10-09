@@ -24,6 +24,11 @@ Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
 
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
+$PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
+
 if (-not (Test-Path $ExtDir)) {
     Write-Host "❌ [$Mode] 扩展目录不存在: $ExtDir" -ForegroundColor Red
     exit 2
@@ -39,7 +44,7 @@ if (-not (Test-Path $pkgPath)) {
 $refAssets = [System.Collections.Generic.HashSet[string]]::new()
 
 try {
-    $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
+    $pkg = Get-Content $pkgPath -Raw -Encoding utf8 | ConvertFrom-Json
     if ($pkg.PSObject.Properties['icon'] -and -not [string]::IsNullOrWhiteSpace($pkg.icon)) {
         $iconVal = $pkg.icon.Trim().Replace('\', '/').TrimStart('./')
         $null = $refAssets.Add($iconVal)
@@ -50,7 +55,7 @@ try {
 
 $readmePath = Join-Path $ExtDir "README.md"
 if (Test-Path $readmePath) {
-    $readmeContent = Get-Content $readmePath -Raw
+    $readmeContent = Get-Content $readmePath -Raw -Encoding utf8
     $matches = [regex]::Matches($readmeContent, '\]\(\.?/?(images/[^)]+)\)')
     foreach ($m in $matches) {
         $img = $m.Groups[1].Value.Replace('\', '/').TrimStart('./')
@@ -70,7 +75,7 @@ if ($Mode -eq 'post') {
         exit 2
     }
     if (-not (Test-Path $VsixPath -PathType Leaf)) {
-        Write-Host "❌ [post] vsix 产物不存在: $VSIX" -ForegroundColor Red
+        Write-Host "❌ [post] vsix 产物不存在: $VsixPath" -ForegroundColor Red
         exit 1
     }
 }

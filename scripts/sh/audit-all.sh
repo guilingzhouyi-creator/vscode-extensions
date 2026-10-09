@@ -31,14 +31,14 @@ JSON_MODE=0
 
 for arg in "$@"; do
     case "$arg" in
-        --fast|-f) FAST_MODE=1 ;;
-        --json|-j) JSON_MODE=1 ;;
-        --help|-h)
+        --fast|-f|-Fast) FAST_MODE=1 ;;
+        --json|-j|-Json) JSON_MODE=1 ;;
+        --help|-h|-Help)
             echo "用法: bash scripts/sh/audit-all.sh [选项]"
             echo "选项:"
-            echo "  --fast, -f    快速审查模式 (跳过耗时深层自审)"
-            echo "  --json, -j    以 JSON 格式输出审查摘要"
-            echo "  --help, -h    显示此帮助信息"
+            echo "  --fast, -f, -Fast    快速审查模式 (跳过耗时深层自审)"
+            echo "  --json, -j, -Json    以 JSON 格式输出审查摘要"
+            echo "  --help, -h, -Help    显示此帮助信息"
             exit 0
             ;;
     esac
@@ -84,7 +84,7 @@ trap 'rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"' EXIT
 if [[ "$FAST_MODE" -eq 1 ]]; then
     (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1 & PID_AR=$!
 else
-    (cd auto-refactor && "$NPM_BIN" test) >"$LOG_AR" 2>&1 & PID_AR=$!
+    (cd auto-refactor && "$NPM_BIN" test && "$NODE_BIN" scripts/gate-self.js) >"$LOG_AR" 2>&1 & PID_AR=$!
 fi
 
 (cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1 & PID_WT=$!
@@ -110,85 +110,130 @@ if ! wait "$PID_WG"; then
     FAILED=1
 fi
 
-rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
-
-END_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
-ELAPSED_SEC=$("$NODE_BIN" -e "console.log((($END_TIME - $START_TIME) / 1000).toFixed(2))")
-
-if [[ "$JSON_MODE" -eq 1 ]]; then
-    "$NODE_BIN" -e '
-      const fs = require("fs");
-      const baselineFile = process.argv[1];
-      const failed = process.argv[2] === "1";
-      const elapsedSec = Number(process.argv[3]);
-      const statusHygiene = process.argv[4];
-      const statusRules = process.argv[5];
-      const statusAr = process.argv[6];
-      const statusWt = process.argv[7];
-      const statusWg = process.argv[8];
-
-      let compositeScore = null;
-      let tenDimensions = null;
-      let qualityVector = null;
-
-      try {
-        if (fs.existsSync(baselineFile)) {
-          const b = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
-          const m = b.metrics || {};
-          compositeScore = m.compositeScore ?? b.compositeScore ?? null;
-          if (b.tenDimensions) {
-            tenDimensions = b.tenDimensions;
-            qualityVector = b.tenDimensions;
-          }
-        }
-      } catch (_) {}
-
-      const summary = {
-        timestamp: new Date().toISOString(),
-        status: failed ? "FAIL" : "PASS",
-        elapsedSeconds: elapsedSec,
-        projects: {
-          hygiene: statusHygiene,
-          rulesCatalog: statusRules,
-          autoRefactor: statusAr,
-          workspaceTiming: statusWt,
-          webGames: statusWg
-        },
-        compositeScore,
-        tenDimensions,
-        qualityVector
-      };
-      console.log(JSON.stringify(summary, null, 2));
-    ' "$ROOT_DIR/auto-refactor/reports/self-audit-baseline.json" "$FAILED" "$ELAPSED_SEC" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG"
-    exit "$FAILED"
+# 日志输出与清理：子进程失败后回显末尾 15 行日志
+if [[ "$STATUS_AR" != "PASS" ]]; then
+    if [[ "$JSON_MODE" -eq 0 && -s "$LOG_AR" ]]; then
+        echo "❌ auto-refactor 审查未通过:"
+        tail -n 15 "$LOG_AR" | sed 's/^/   /'
+    fi
 fi
 
-FMT_HYGIENE=$(printf '%-11s' "$STATUS_HYGIENE")
-FMT_RULES=$(printf '%-11s' "$STATUS_RULES")
-FMT_AR=$(printf '%-11s' "$STATUS_AR")
-FMT_WT=$(printf '%-11s' "$STATUS_WT")
-FMT_WG=$(printf '%-11s' "$STATUS_WG")
+if [[ "$STATUS_WT" != "PASS" ]]; then
+    if [[ "$JSON_MODE" -eq 0 && -s "$LOG_WT" ]]; then
+        echo "❌ workspace-timing 审查未通过:"
+        tail -n 15 "$LOG_WT" | sed 's/^/   /'
+    fi
+fi
 
-echo ""
-echo "┌───────────────────────────────────────────────────────────────┐"
-echo "│              全工作区统一审查报告与质量看板                   │"
-echo "├─────────────────────────────┬─────────────┬───────────────────┤"
-echo "│ 审查检查项 / 子系统         │ 判定结果    │ 覆盖范围          │"
-echo "├─────────────────────────────┼─────────────┼───────────────────┤"
-echo "│ 1. 工作区零空文件物理卫生   │ $FMT_HYGIENE │ 全仓代码/脚本/配置│"
-echo "│ 2. 单源规则目录一致性 (SSOT)│ $FMT_RULES │ 单源规则总目录    │"
-echo "│ 3. auto-refactor 质量基线   │ $FMT_AR │ 质量模型 / 并行自审│"
-echo "│ 4. workspace-timing 审查门禁│ $FMT_WT │ L0~L5 / 并行门禁  │"
-echo "│ 5. WebGames 配置架构审查    │ $FMT_WG │ 领域配置 / 并行审查│"
-echo "├─────────────────────────────┴─────────────┴───────────────────┤"
-echo "│ 耗时: ${ELAPSED_SEC}s  |  全局状态: $([[ $FAILED -eq 0 ]] && echo '✅ 检查通过' || echo '❌ 检查未通过')           │"
-echo "└───────────────────────────────────────────────────────────────┘"
+if [[ "$STATUS_WG" != "PASS" ]]; then
+    if [[ "$JSON_MODE" -eq 0 && -s "$LOG_WG" ]]; then
+        echo "❌ WebGames 审查未通过:"
+        tail -n 15 "$LOG_WG" | sed 's/^/   /'
+    fi
+fi
 
-# 全工作区十维工程质量看板
-echo ""
+rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
+
+# 统一合并执行报告、十维质量看板与步骤摘要生成（消除多进程重复启动）
 "$NODE_BIN" -e '
   const fs = require("fs");
-  const p = process.argv[1];
+  const startTime = Number(process.argv[1]);
+  const failed = process.argv[2] === "1";
+  const jsonMode = process.argv[3] === "1";
+  const statusHygiene = process.argv[4];
+  const statusRules = process.argv[5];
+  const statusAr = process.argv[6];
+  const statusWt = process.argv[7];
+  const statusWg = process.argv[8];
+  const baselineFile = process.argv[9];
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+
+  const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(2);
+
+  let compositeScore = null;
+  let grade = null;
+  let totalDebt = null;
+  let autonomyRate = null;
+  let tenDimensions = null;
+  let qualityVector = null;
+
+  try {
+    if (fs.existsSync(baselineFile)) {
+      const b = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
+      const m = b.metrics || {};
+      compositeScore = m.compositeScore ?? b.compositeScore ?? null;
+      grade = m.grade || null;
+      totalDebt = m.totalIssues ?? m.unsuppressedIssues ?? null;
+      autonomyRate = b.autonomyRate ?? m.autonomyRate ?? b.cai ?? null;
+      if (b.tenDimensions) {
+        tenDimensions = b.tenDimensions;
+        qualityVector = b.tenDimensions;
+      }
+    }
+  } catch (_) {}
+
+  if (jsonMode) {
+    const summary = {
+      timestamp: new Date().toISOString(),
+      status: failed ? "FAIL" : "PASS",
+      elapsedSeconds: Number(elapsedSec),
+      projects: {
+        hygiene: statusHygiene,
+        rulesCatalog: statusRules,
+        autoRefactor: statusAr,
+        workspaceTiming: statusWt,
+        webGames: statusWg
+      },
+      compositeScore,
+      tenDimensions,
+      qualityVector
+    };
+    console.log(JSON.stringify(summary, null, 2));
+    process.exit(0);
+  }
+
+  function isWide(code) {
+    if (code >= 0x4e00 && code <= 0x9fff) return true;
+    if (code >= 0x3400 && code <= 0x4dbf) return true;
+    if (code >= 0x20000 && code <= 0x2a6df) return true;
+    if (code >= 0xff01 && code <= 0xff60) return true;
+    if (code >= 0xffe0 && code <= 0xffe6) return true;
+    if (code >= 0x1f300 && code <= 0x1f9ff) return true;
+    if (code === 0x2705 || code === 0x274c) return true;
+    return false;
+  }
+
+  function strWidth(str) {
+    let w = 0;
+    for (const ch of str) {
+      const code = ch.codePointAt(0);
+      w += isWide(code) ? 2 : 1;
+    }
+    return w;
+  }
+
+  const fmtStatus = (s) => (s + "       ").slice(0, 9);
+  const globalStatus = failed ? "❌ 检查未通过" : "✅ 检查通过";
+  const bottomText = `耗时: ${elapsedSec}s  |  全局状态: ${globalStatus}`;
+  const bottomW = strWidth(bottomText);
+  const bottomPad = Math.max(0, 61 - bottomW);
+
+  console.log("");
+  console.log("┌───────────────────────────────────────────────────────────────┐");
+  console.log("│              全工作区统一审查报告与质量看板                   │");
+  console.log("├─────────────────────────────┬───────────┬─────────────────────┤");
+  console.log("│ 审查检查项 / 子系统         │ 判定结果  │ 覆盖范围            │");
+  console.log("├─────────────────────────────┼───────────┼─────────────────────┤");
+  console.log(`│ 1. 工作区零空文件物理卫生   │ ${fmtStatus(statusHygiene)} │ 全仓代码/脚本/配置  │`);
+  console.log(`│ 2. 单源规则目录一致性 (SSOT)│ ${fmtStatus(statusRules)} │ 单源规则总目录      │`);
+  console.log(`│ 3. auto-refactor 质量基线   │ ${fmtStatus(statusAr)} │ 质量模型 / 并行自审 │`);
+  console.log(`│ 4. workspace-timing 审查门禁│ ${fmtStatus(statusWt)} │ L0~L5 / 并行门禁    │`);
+  console.log(`│ 5. WebGames 配置架构审查    │ ${fmtStatus(statusWg)} │ 领域配置 / 并行审查 │`);
+  console.log("├─────────────────────────────┴───────────┴─────────────────────┤");
+  console.log(`│ ${bottomText}${" ".repeat(bottomPad)} │`);
+  console.log("└───────────────────────────────────────────────────────────────┘");
+
+  // 全工作区十维工程质量看板
   const dims = [
     { num: "1.", name: "架构一致", pad: "    ", key: "architectureConsistency" },
     { num: "2.", name: "语义纯度", pad: "    ", key: "semanticPurity" },
@@ -202,88 +247,36 @@ echo ""
     { num: "10.", name: "技术债风险", pad: "  ", key: "techDebtRisk" }
   ];
 
+  console.log("");
   console.log("┌───────────────────────────────────────────────────────────────┐");
   console.log("│                   全工作区十维工程质量看板                    │");
   console.log("├───────────────────────────────────────────────────────────────┤");
 
-  let loaded = false;
-  try {
-    if (fs.existsSync(p)) {
-      const b = JSON.parse(fs.readFileSync(p, "utf8"));
-      const m = b.metrics || {};
-      const compositeScore = m.compositeScore ?? b.compositeScore ?? null;
-      const grade = m.grade || null;
-      const totalDebt = m.totalIssues ?? m.unsuppressedIssues ?? null;
-      const autonomyRate = b.autonomyRate ?? m.autonomyRate ?? b.cai ?? null;
-      const tenDimensions = b.tenDimensions || null;
+  if (tenDimensions && compositeScore !== null) {
+    let summaryText = `综合健康分: ${compositeScore}` + (grade ? ` (${grade})` : "");
+    if (autonomyRate) summaryText += `  |  自研率: ${autonomyRate}%`;
+    if (totalDebt !== null) summaryText += `  |  技术债总量: ${totalDebt} 项`;
 
-      if (tenDimensions && compositeScore !== null) {
-        loaded = true;
-        let summaryText = `综合健康分: ${compositeScore}` + (grade ? ` (${grade})` : "");
-        if (autonomyRate) summaryText += `  |  自研率: ${autonomyRate}%`;
-        if (totalDebt !== null) summaryText += `  |  技术债总量: ${totalDebt} 项`;
+    const rightPad = Math.max(0, 61 - strWidth(summaryText));
+    console.log(`│ ${summaryText}${" ".repeat(rightPad)} │`);
+    console.log("├───────────────────────────────────────────────────────────────┤");
 
-        let w = 0;
-        for (const ch of summaryText) w += ch.charCodeAt(0) > 127 ? 2 : 1;
-        const rightPad = Math.max(0, 61 - w);
-        console.log(`│ ${summaryText}${" ".repeat(rightPad)} │`);
-        console.log("├───────────────────────────────────────────────────────────────┤");
-
-        for (const d of dims) {
-          const score = Number(tenDimensions[d.key] ?? 0);
-          const filled = Math.max(0, Math.min(20, Math.round((score / 100) * 20)));
-          const empty = 20 - filled;
-          const bar = "█".repeat(filled) + "░".repeat(empty);
-          const scoreStr = (score % 1 === 0 ? score.toFixed(1) : String(Math.round(score * 100) / 100)).padStart(5);
-          console.log(`│ ${d.num.padEnd(4)}${d.name}${d.pad}[${bar}] ${scoreStr}${" ".repeat(17)} │`);
-        }
-        console.log("└───────────────────────────────────────────────────────────────┘");
-      }
+    for (const d of dims) {
+      const score = Number(tenDimensions[d.key] ?? 0);
+      const filled = Math.max(0, Math.min(20, Math.round((score / 100) * 20)));
+      const empty = 20 - filled;
+      const bar = "█".repeat(filled) + "░".repeat(empty);
+      const scoreStr = (score % 1 === 0 ? score.toFixed(1) : String(Math.round(score * 100) / 100)).padStart(5);
+      console.log(`│ ${d.num.padEnd(4)}${d.name}${d.pad}[${bar}] ${scoreStr}${" ".repeat(17)} │`);
     }
-  } catch (_) {}
-
-  if (!loaded) {
+    console.log("└───────────────────────────────────────────────────────────────┘");
+  } else {
     console.log(`│ [离线基线快照未就绪 - 优雅降级模式]${" ".repeat(26)} │`);
     console.log("└───────────────────────────────────────────────────────────────┘");
   }
-' "$ROOT_DIR/auto-refactor/reports/self-audit-baseline.json"
 
-if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-  "$NODE_BIN" -e '
-    const fs = require("fs");
-    const baselineFile = process.argv[1];
-    const failed = process.argv[2] === "1";
-    const elapsedSec = process.argv[3];
-    const statusHygiene = process.argv[4];
-    const statusRules = process.argv[5];
-    const statusAr = process.argv[6];
-    const statusWt = process.argv[7];
-    const statusWg = process.argv[8];
-    const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-
-    let compositeScore = "N/A";
-    let grade = "";
-    let totalDebt = "N/A";
-    let autonomyRate = "";
-    let tenDims = null;
-
-    try {
-      if (fs.existsSync(baselineFile)) {
-        const b = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
-        const m = b.metrics || {};
-        compositeScore = m.compositeScore ?? b.compositeScore ?? "N/A";
-        grade = m.grade ? ` (Grade: **${m.grade}**)` : "";
-        totalDebt = m.totalIssues ?? m.unsuppressedIssues ?? "N/A";
-        if (b.autonomyRate || m.autonomyRate || b.cai) {
-          autonomyRate = ` &nbsp;|&nbsp; **自研率**: **${b.autonomyRate || m.autonomyRate || b.cai}%**`;
-        }
-        tenDims = b.tenDimensions || null;
-      }
-    } catch (_) {}
-
+  if (summaryFile) {
     const passBadge = (s) => (s === "PASS" ? "✅ PASS" : "❌ FAIL");
-    const globalStatus = failed ? "❌ 检查未通过" : "✅ 检查通过";
-
     let md = "## 🌐 全工作区跨项目统一审查与十维质量看板\n\n";
     md += "### 📊 审查检查项 / 子系统判定\n\n";
     md += "| 审查检查项 / 子系统 | 判定结果 | 覆盖范围 |\n";
@@ -296,11 +289,14 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     md += `> **耗时**: ${elapsedSec}s &nbsp;|&nbsp; **全局状态**: ${globalStatus}\n\n`;
 
     md += "### 🎯 全工作区十维工程质量看板\n\n";
-    if (tenDims) {
-      md += `> **综合健康分**: **${compositeScore}**${grade} &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**${autonomyRate}\n\n`;
+    if (tenDimensions && compositeScore !== null) {
+      const gText = grade ? ` (Grade: **${grade}**)` : "";
+      const aText = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
+      const dText = totalDebt !== null ? ` &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**` : "";
+      md += `> **综合健康分**: **${compositeScore}**${gText}${dText}${aText}\n\n`;
       md += "| 序号 | 质量维度 | 得分 | 进度可视化 |\n";
       md += "| :---: | :--- | :---: | :--- |\n";
-      const dims = [
+      const dimsEn = [
         { num: "1", name: "架构一致 (Architecture Consistency)", key: "architectureConsistency" },
         { num: "2", name: "语义纯度 (Semantic Purity)", key: "semanticPurity" },
         { num: "3", name: "代码安全 (Code Security)", key: "codeSecurity" },
@@ -312,8 +308,8 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
         { num: "9", name: "重复率 (Duplication)", key: "duplication" },
         { num: "10", name: "技术债风险 (Tech Debt Risk)", key: "techDebtRisk" }
       ];
-      for (const d of dims) {
-        const score = Number(tenDims[d.key] ?? 0);
+      for (const d of dimsEn) {
+        const score = Number(tenDimensions[d.key] ?? 0);
         const filled = Math.max(0, Math.min(20, Math.round((score / 100) * 20)));
         const empty = 20 - filled;
         const bar = "█".repeat(filled) + "░".repeat(empty);
@@ -327,7 +323,11 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     try {
       fs.appendFileSync(summaryFile, md, "utf8");
     } catch (_) {}
-  ' "$ROOT_DIR/auto-refactor/reports/self-audit-baseline.json" "$FAILED" "$ELAPSED_SEC" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" 2>/dev/null || true
+  }
+' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR/auto-refactor/reports/self-audit-baseline.json"
+
+if [[ "$JSON_MODE" -eq 1 ]]; then
+    exit "$FAILED"
 fi
 
 # 6. 汇流记录工作区统一质量轨迹

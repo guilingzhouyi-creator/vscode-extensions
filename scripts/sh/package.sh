@@ -10,6 +10,8 @@
 # 用法示例:
 #   bash scripts/sh/package.sh
 #   bash scripts/sh/package.sh --name workspace-timing
+#   bash scripts/sh/package.sh --name workspace-timing --hotsync
+#   bash scripts/sh/package.sh --name workspace-timing --install
 #   bash scripts/sh/package.sh --keep 3
 # ==============================================================================
 set -euo pipefail
@@ -18,20 +20,128 @@ KEEP=5
 NAME=""
 SKIP_BUILD=false
 HOT_SYNC=false
+INSTALL=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --name|-n) NAME="$2"; shift 2 ;;
-    --keep|-k) KEEP="$2"; shift 2 ;;
-    --skip-build) SKIP_BUILD=true; shift ;;
-    --hotsync|-HotSync) HOT_SYNC=true; shift ;;
-    --help|-h)
-      echo "Usage: bash scripts/sh/package.sh [--name <ext>] [--keep <n>] [--skip-build] [--hotsync]"
+    --name|-n|-Name) NAME="$2"; shift 2 ;;
+    --keep|-k|-Keep) KEEP="$2"; shift 2 ;;
+    --skip-build|-SkipBuild|--SkipBuild) SKIP_BUILD=true; shift ;;
+    --hotsync|-HotSync|--HotSync) HOT_SYNC=true; shift ;;
+    --install|-Install|--Install|-i) INSTALL=true; shift ;;
+    --help|-h|-Help)
+      echo "用法: bash scripts/sh/package.sh [选项]"
+      echo "选项:"
+      echo "  --name, -n, -Name <ext>     指定扩展名称 (如 workspace-timing)"
+      echo "  --keep, -k, -Keep <n>       保留最近历史版本数量 (默认: 5)"
+      echo "  --skip-build, -SkipBuild    跳过 npm ci 与编译阶段"
+      echo "  --hotsync, -HotSync         增量编译并热同步至本机 IDE 扩展目录 (跳过 vsce 打包)"
+      echo "  --install, -Install, -i     打包完成后自动安装至 VS Code / Cursor"
+      echo "  --help, -h                  显示此帮助信息"
       exit 0
       ;;
     *) echo "未知参数: $1" >&2; exit 1 ;;
   esac
 done
+
+# ─── 扩展注册表自愈与热同步辅助函数 ───
+repair_extension_registry() {
+  local full_ext_id="$1"
+  node -e '
+    const fs = require("fs");
+    const path = require("path");
+    const fullExtId = process.argv[1];
+    const candidateBases = [];
+    if (process.env.USERPROFILE) candidateBases.push(process.env.USERPROFILE);
+    if (process.env.HOME) candidateBases.push(process.env.HOME);
+
+    for (const base of Array.from(new Set(candidateBases))) {
+      for (const ide of [".vscode", ".cursor"]) {
+        const ideDir = path.join(base, ide, "extensions");
+        const extJsonPath = path.join(ideDir, "extensions.json");
+        if (!fs.existsSync(extJsonPath)) continue;
+        try {
+          const raw = fs.readFileSync(extJsonPath, "utf8");
+          const entries = JSON.parse(raw);
+          if (!Array.isArray(entries)) continue;
+          const valid = entries.filter((entry) => {
+            if (entry && entry.identifier && entry.identifier.id === fullExtId) {
+              const relLoc = entry.relativeLocation || "";
+              const targetDir = path.join(ideDir, relLoc);
+              return fs.existsSync(targetDir);
+            }
+            return true;
+          });
+          if (valid.length !== entries.length) {
+            fs.writeFileSync(extJsonPath, JSON.stringify(valid), "utf8");
+            console.log(`  已清理悬空扩展注册项 (${ideDir})`);
+          }
+        } catch (_) {}
+      }
+    }
+  ' "$full_ext_id" 2>/dev/null || true
+}
+
+sync_installed_extension_files() {
+  local source_dir="$1"
+  local full_ext_id="$2"
+  node -e '
+    const fs = require("fs");
+    const path = require("path");
+    const sourceDir = process.argv[1];
+    const fullExtId = process.argv[2];
+    let syncedCount = 0;
+
+    const candidateBases = [];
+    if (process.env.USERPROFILE) candidateBases.push(process.env.USERPROFILE);
+    if (process.env.HOME) candidateBases.push(process.env.HOME);
+
+    function copyDirRecursive(src, dest) {
+      fs.mkdirSync(dest, { recursive: true });
+      const entries = fs.readdirSync(src, { withFileTypes: true });
+      for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+        if (entry.isDirectory()) {
+          copyDirRecursive(srcPath, destPath);
+        } else {
+          fs.copyFileSync(srcPath, destPath);
+        }
+      }
+    }
+
+    for (const base of Array.from(new Set(candidateBases))) {
+      for (const ide of [".vscode", ".cursor"]) {
+        const ideDir = path.join(base, ide, "extensions");
+        if (!fs.existsSync(ideDir)) continue;
+        let subdirs = [];
+        try {
+          subdirs = fs.readdirSync(ideDir, { withFileTypes: true });
+        } catch (_) {
+          continue;
+        }
+        for (const sd of subdirs) {
+          if (!sd.isDirectory() || !sd.name.startsWith(fullExtId + "-")) continue;
+          const targetExtDir = path.join(ideDir, sd.name);
+          const srcOut = path.join(sourceDir, "out");
+          const destOut = path.join(targetExtDir, "out");
+          if (fs.existsSync(srcOut)) {
+            copyDirRecursive(srcOut, destOut);
+          }
+          for (const meta of ["package.json", "package.nls.json", "package.nls.zh-CN.json"]) {
+            const metaSrc = path.join(sourceDir, meta);
+            if (fs.existsSync(metaSrc)) {
+              fs.copyFileSync(metaSrc, path.join(targetExtDir, meta));
+            }
+          }
+          syncedCount++;
+          console.log(`  ⚡ 已热同步至: ${targetExtDir}`);
+        }
+      }
+    }
+    process.stdout.write(syncedCount.toString());
+  ' "$source_dir" "$full_ext_id"
+}
 
 # ─── 根目录解析：本脚本位于 <根>/scripts/sh/，上溯两级 ───
 # 不变量自检：脚本被移动到新目录（如 scripts/ 重构为 scripts/sh/）时，
@@ -81,10 +191,16 @@ for EXT in "${EXTS[@]}"; do
     echo "跳过 $EXT：无法读取 package.json version" >&2
     continue
   fi
+  PUBLISHER=$(node -e "const p=require(process.argv[1]).publisher; process.stdout.write(p||'')" "$DIR/package.json" 2>/dev/null || echo "")
+  FULL_EXT_ID="${PUBLISHER}.${EXT}"
   OUT_DIR="$ROOT/dist/$EXT"
   mkdir -p "$OUT_DIR"
 
-  echo "── 打包 $EXT@$PKG_VER ──────────────────────────"
+  if [[ "$HOT_SYNC" == "true" ]]; then
+    echo "── 增量编译并热同步 $EXT@$PKG_VER ──────────────────────────"
+  else
+    echo "── 打包 $EXT@$PKG_VER ──────────────────────────"
+  fi
 
   if [[ "$SKIP_BUILD" != "true" ]]; then
     LOCK="$DIR/package-lock.json"
@@ -110,6 +226,15 @@ for EXT in "${EXTS[@]}"; do
     bash "$ROOT/scripts/sh/check-display-assets.sh" "$DIR" pre
   fi
 
+  if [[ "$HOT_SYNC" == "true" ]]; then
+    repair_extension_registry "$FULL_EXT_ID"
+    SYNCED_CNT=$(sync_installed_extension_files "$DIR" "$FULL_EXT_ID")
+    if [[ "$SYNCED_CNT" == "0" ]]; then
+      echo "::warning::未检测到已安装目录 ($FULL_EXT_ID)，请先使用 --install 执行首次安装。" >&2
+    fi
+    continue
+  fi
+
   VSIX="$OUT_DIR/$EXT-$PKG_VER.vsix"
   echo "  vsce package → $EXT-$PKG_VER.vsix ..."
   (cd "$DIR" && npx --yes @vscode/vsce package -o "$VSIX")
@@ -120,15 +245,63 @@ for EXT in "${EXTS[@]}"; do
     bash "$ROOT/scripts/sh/check-display-assets.sh" "$DIR" post "$VSIX"
   fi
 
-  # ─── SHA256 校验和 ───
-  HASH=$(sha256sum "$VSIX" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
-  VSIX_NAME=$(basename "$VSIX")
-  echo "$HASH  $VSIX_NAME" > "$OUT_DIR/SHA256SUMS.txt"
-
   # ─── 清理旧版本：语义化版本排序保留最近 KEEP 个 ───
   # shellcheck disable=SC2012
   mapfile -t STALE < <(ls -1 "$OUT_DIR"/"$EXT"-*.vsix 2>/dev/null | sort -V | head -n -"$KEEP" || true)
   for f in "${STALE[@]}"; do rm -f "$f"; done
+
+  # ─── 全量 SHA256 校验和（包含当前保留包与 legacy 归档包）───
+  node -e '
+    const fs = require("fs");
+    const path = require("path");
+    const crypto = require("crypto");
+    const outDir = process.argv[1];
+    const ext = process.argv[2];
+
+    function hashFile(p) {
+      const buf = fs.readFileSync(p);
+      return crypto.createHash("sha256").update(buf).digest("hex").toLowerCase();
+    }
+
+    const shaLines = [];
+    const files = fs.readdirSync(outDir).filter((f) => f.startsWith(ext + "-") && f.endsWith(".vsix")).sort();
+    for (const f of files) {
+      shaLines.push(`${hashFile(path.join(outDir, f))}  ${f}`);
+    }
+    const legacyDir = path.join(outDir, "legacy");
+    if (fs.existsSync(legacyDir)) {
+      const legFiles = fs.readdirSync(legacyDir).filter((f) => f.startsWith(ext + "-") && f.endsWith(".vsix")).sort().reverse();
+      for (const lf of legFiles) {
+        shaLines.push(`${hashFile(path.join(legacyDir, lf))}  legacy/${lf}`);
+      }
+    }
+    fs.writeFileSync(path.join(outDir, "SHA256SUMS.txt"), shaLines.join("\n") + "\n", "utf8");
+  ' "$OUT_DIR" "$EXT"
+
+  # ─── 自动安装至 VS Code / Cursor (--install) ───
+  if [[ "$INSTALL" == "true" ]]; then
+    repair_extension_registry "$FULL_EXT_ID"
+    VSCODE_CLI=""
+    if command -v code >/dev/null 2>&1; then
+      VSCODE_CLI="code"
+    elif [[ -n "${LOCALAPPDATA:-}" && -f "$LOCALAPPDATA/Programs/Microsoft VS Code/bin/code.cmd" ]]; then
+      VSCODE_CLI="$LOCALAPPDATA/Programs/Microsoft VS Code/bin/code.cmd"
+    elif [[ -n "${LOCALAPPDATA:-}" && -f "$LOCALAPPDATA/Programs/Microsoft VS Code/bin/code" ]]; then
+      VSCODE_CLI="$LOCALAPPDATA/Programs/Microsoft VS Code/bin/code"
+    fi
+
+    if [[ -n "$VSCODE_CLI" ]]; then
+      echo "  正在安装至 Microsoft VS Code ..."
+      "$VSCODE_CLI" --install-extension "$VSIX" --force || true
+    fi
+
+    if command -v cursor >/dev/null 2>&1; then
+      echo "  正在安装至 Cursor ..."
+      cursor --install-extension "$VSIX" --force || true
+    fi
+
+    sync_installed_extension_files "$DIR" "$FULL_EXT_ID" >/dev/null || true
+  fi
 
   COUNT=$(ls -1 "$OUT_DIR"/"$EXT"-*.vsix 2>/dev/null | wc -l | tr -d ' ')
   echo "  ✔ 完成（保留 $COUNT 个版本）→ $VSIX"
@@ -136,7 +309,7 @@ done
 
 echo ""
 if [[ "$HOT_SYNC" == "true" ]]; then
-  echo "全部完成。增量产物已热同步或就绪 (HotSync)。"
+  echo "全部完成。增量产物已热同步至本机 IDE 扩展目录。"
 else
   echo "全部完成。产物位于 dist/<扩展名>/"
 fi

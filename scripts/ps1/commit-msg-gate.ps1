@@ -18,6 +18,11 @@ Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
 
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
+$PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
+
 if (-not (Test-Path $MsgFile -PathType Leaf)) {
     Write-Host "❌ [FAIL] 提交信息文件不存在: $MsgFile" -ForegroundColor Red
     exit 1
@@ -56,7 +61,7 @@ Write-Host "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # 读取所有行并过滤掉以 # 开头的注释行
-$rawLines = Get-Content $MsgFile
+$rawLines = Get-Content $MsgFile -Encoding utf8
 $cleanLines = @()
 foreach ($l in $rawLines) {
     $trimmed = $l.TrimEnd()
