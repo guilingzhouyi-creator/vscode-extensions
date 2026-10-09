@@ -3,12 +3,13 @@ name: auto-refactor-dev
 description: >-
   auto-refactor 静态分析重构引擎、Rust+TS 双轨内核与 Praxis 客户端 SDK 开发规范。指导 Agent 在
   auto-refactor 项目中维护 30 内置分析器与 321 条规则体系、保证 Rust 算子与纯 TS 桥接 100% 字节等价、
-  落实 Praxis SDK 调用范式、一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化协议、高精度时间戳与暂存分流原子落盘。
+  落实四阶段分析器流水线拓扑 (Stage 0~3) 与有序装配意义、Praxis 表现层语义聚合引擎与 correlatedRules 消费规范、
+  一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化协议、高精度时间戳与暂存分流原子落盘。
 ---
 
 # auto-refactor-dev — 静态重构引擎与双轨算子开发规范
 
-本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器与 321 条规则治理体系、Praxis 客户端 SDK 调用范式、一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化指令协议、高精度时间戳规范以及暂存分流原子落盘机制。
+本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）与有序装配意义、321 条规则治理体系、Praxis 客户端 SDK 与表现层语义聚合引擎（`semantic-correlation.ts`）、一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化指令协议、高精度时间戳规范以及暂存分流原子落盘机制。
 
 ---
 
@@ -40,51 +41,63 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
 
 ---
 
-## 三、 30 内置分析器与 321 规则金字塔体系
+## 三、 30 内置分析器与四阶段流水线拓扑
 
-### 1. 30 个内置分析器全景清单
-所有分析器均统一在 `src/core/analyzer-registry.ts` 的 `BUILTIN_FACTORIES` 与 `BUILTIN_MODULE_PATHS` 中显式登记，支持单进程调度与 Worker 多线程并行实例化：
+### 1. 四阶段分析器流水线拓扑 (Stage 0 ~ Stage 3)
+引擎的 30 个内置分析器统一在 `src/core/analyzer-registry.ts` 登记，并严格按照 Stage 0 至 Stage 3 四阶段执行流水线进行拓扑分层调度：
 
-| 分类 | 分析器名称 (`AnalyzerId`) | 核心职责与检测范围 |
-| :--- | :--- | :--- |
-| **基础与卫生** | `constants` | 硬编码魔法字面量提取、常量集中化与免检作用域判定 |
-| | `large-file` | 单文件双轨代码行（ELOC/LOC）与物理包络超限检测 |
-| | `complexity` | 控制流嵌套深度（Depth <= 4）与函数圈复杂度（CC <= 15）抑制 |
-| | `comments` | 无效注释、废弃代码段、TODO 漂移与注释代码比率分析 |
-| | `hygiene` | 物理空文件、尾随空白符、行尾序列与跨平台换行守卫 |
-| | `naming` | 符号命名风格、保留前缀、抽象泄露与命名语义一致性 |
-| | `simplify` | 冗余条件分支、无效三元运算符与逻辑表达式平铺 |
-| | `production-hygiene` | 生产代码物理卫生、测试代码泄露与调试残留拦截 |
-| **架构与拓扑** | `architecture` | 门面模式承载、分层依赖单向性、跨层透传与不可变封装 |
-| | `data-architecture` | 实体模型解耦、查询下沉、无状态服务与数据边界治理 |
-| | `dependency-graph` | 模块循环依赖（Tarjan SCC 强连通分量）、扇入扇出失衡分析 |
-| | `dependency-layout` | 目录结构依赖拓扑、孤岛模块识别与物理路径组织合理性 |
-| | `gate-architecture` | 门禁分流规范、子进程上下文隔离、脚本探测深度约束 |
-| | `client-exposure` | 客户端对外暴露面、敏感内部 API 导出与跨域泄露守卫 |
-| **安全与治理** | `secrets` | 高熵密钥、API Token、硬编码凭证与脱敏状态机 |
-| | `security` | 动态代码执行（eval/Function）、反序列化漏洞与注入防范 |
-| | `governance` | 工作区协议契约、单源规则引用核验与黑话拦截 |
-| **性能与现代性** | `performance` | 循环内瞬态堆分配、昂贵正则、高频对象浅拷贝与内存泄漏 |
-| | `test-modernity` | 单元测试现代断言、覆盖率契约、TAU/EMTD/CBCR 指标 |
-| | `stdlib` | 现代标准库 API 替换过时废弃工具与原生算子优先 |
-| | `docs` | API 文档契约完备性、JSDoc/Docstring 真实性与同步性 |
-| **语言与生态** | `ts-modern` | TypeScript 现代语法（satisfies、const 类型参数、类型收窄） |
-| | `python-modern` | Python 3.12+ 模式匹配、类型提示、生成器与上下文管理器 |
-| | `rust-modern` | Rust 所有权范式、生命周期标注、零拷贝与错误处理惯例 |
-| | `go-modern` | Go 泛型、通道缓冲、goroutine 泄漏防范与上下文传递 |
-| | `shell-lint` | Shell/Bash 脚本严谨性、pipefail 标志与变量引用引号闭合 |
-| | `gdscript-modern` | GDScript 4 静态类型推断、注解规范与节点引用安全 |
-| | `gdscript-game` | 游戏循环（_process/_physics_process）性能与节点树拓扑 |
-| | `vscode-extension` | VS Code 扩展生命周期、Disposable 资源释放与 UI 线程解耦 |
-| | `frontend` | 前端组件解耦、JSX/TSX 复杂度与 Props 膨胀分析 |
+| 流水线阶段 | 分析器名称 (`AnalyzerId`) | 核心职责与检测范围 | 阶段计算特征与输入输出 |
+| :--- | :--- | :--- | :--- |
+| **Stage 0: 物理底线与紧急安全** | `hygiene` | 物理空文件、尾随空白符、行尾序列与跨平台换行守卫 | 纯文本与字节流快速扫描； |
+| | `shell-lint` | Shell/Bash 脚本严谨性、pipefail 标志与变量引用引号闭合 | 毫秒级短路中断； |
+| | `large-file` | 单文件双轨代码行（ELOC/LOC）与物理包络超限检测 | 拦截安全凭证与巨石文件 |
+| | `secrets` | 高熵密钥、API Token、硬编码凭证与脱敏状态机 | |
+| | `security` | 动态代码执行（eval/Function）、反序列化漏洞与注入防范 | |
+| **Stage 1: 文本规范、词法符号与文档** | `comments` | 无效注释、废弃代码段、TODO 漂移与注释代码比率分析 | 词法 Token 状态机流式处理； |
+| | `naming` | 符号命名风格、保留前缀、抽象泄露与命名语义一致性 | 无需构建全语法树； |
+| | `constants` | 硬编码魔法字面量提取、常量集中化与免检作用域判定 | 规范注释与常量约束 |
+| | `docs` | API 文档契约完备性、JSDoc/Docstring 真实性与同步性 | |
+| | `production-hygiene` | 生产代码物理卫生、测试代码泄露与调试残留拦截 | |
+| **Stage 2: 单文件语法 AST、控制流与语言现代化** | `simplify` | 冗余条件分支、无效三元运算符与逻辑表达式平铺 | 单文件语法 AST 与控制流图； |
+| | `complexity` | 控制流嵌套深度（Depth <= 4）与函数圈复杂度（CC <= 15）抑制 | `<10ms` 局部 AST 切片； |
+| | `stdlib` | 现代标准库 API 替换过时废弃工具与原生算子优先 | 现代语言特性与复杂度平铺 |
+| | `ts-modern` | TypeScript 现代语法（satisfies、const 类型参数、类型收窄） | |
+| | `python-modern` | Python 3.12+ 模式匹配、类型提示、生成器与上下文管理器 | |
+| | `rust-modern` | Rust 所有权范式、生命周期标注、零拷贝与错误处理惯例 | |
+| | `gdscript-modern` | GDScript 4 静态类型推断、注解规范与节点引用安全 | |
+| | `go-modern` | Go 泛型、通道缓冲、goroutine 泄漏防范与上下文传递 | |
+| | `frontend` | 前端组件解耦、JSX/TSX 复杂度与 Props 膨胀分析 | |
+| **Stage 3: 领域架构契约、数据流与全工程拓扑** | `performance` | 循环内瞬态堆分配、昂贵正则、高频对象浅拷贝与内存泄漏 | 跨文件多语言语义图 (`SemanticGraph`)； |
+| | `architecture` | 门面模式承载、分层依赖单向性、跨层透传与不可变封装 | Tarjan SCC 强连通分量； |
+| | `data-architecture` | 实体模型解耦、查询下沉、无状态服务与数据边界治理 | 支配树、数据流与生态契约审查 |
+| | `dependency-layout` | 目录结构依赖拓扑、孤岛模块识别与物理路径组织合理性 | |
+| | `dependency-graph` | 模块循环依赖（Tarjan 环路）、扇入扇出失衡分析 | |
+| | `gate-architecture` | 门禁分流规范、子进程上下文隔离、脚本探测深度约束 | |
+| | `gdscript-game` | 游戏循环（_process/_physics_process）性能与节点树拓扑 | |
+| | `vscode-extension` | VS Code 扩展生命周期、Disposable 资源释放与 UI 线程解耦 | |
+| | `client-exposure` | 客户端对外暴露面、敏感内部 API 导出与跨域泄露守卫 | |
+| | `test-modernity` | 单元测试现代断言、覆盖率契约、TAU/EMTD/CBCR 指标 | |
+| | `governance` | 工作区协议契约、单源规则引用核验与黑话拦截 | |
 
-### 2. 四层规则金字塔治理 (321 条内置规则)
+### 2. 四阶段有序装配与调度的深远意义
+流水线在底层配置与调度器中实现了三位一体的单源对齐：
+- **调度拓扑对齐**：`analyzer-registry.ts`（工厂与模块映射）、`config/config.ts`（默认规则与阶段定义）、`router/sparseRuleRouter.ts`（`ALL_BUILTIN_ANALYZERS` 与路由计算）严格按 Stage 0~3 物理次序单调有序装配；
+- **快速短路熔断 (Fail-Fast Early Triage)**：
+  * Stage 0 仅依赖快速字符扫描即可识别空文件、代码体积爆炸或敏感凭证泄漏，在未消耗任何 AST 解析资源前即可即时短路并报错；
+  * Stage 1 抽取词法符号与文档，完成前置过滤；
+  * Stage 2 仅针对语法有效代码启动 AST 切片，局部化计算圈复杂度与控制流；
+  * Stage 3 最昂贵，执行跨模块拓扑图与支配树分析，仅在单文件语法完备时才会执行跨文件关联分析；
+- **增量执行与内存常驻控制 (Memory Footprint Control)**：
+  * Sparse MoE 稀疏路由器依据文件变更熵及文件角色，按需激活特定阶段分析器，将增量分析耗时压缩至 `<100ms`；
+  * 分析器采用按需工厂实例化，杜绝全量 30 个分析器在引擎冷启动时同时吃满 V8 堆内存，彻底消除常驻后台服务内存泄漏。
+
+### 3. 四层规则金字塔治理 (321 条内置规则)
 - **Layer 1（通用基础）**：格式、命名、注释、死代码、物理卫生；
 - **Layer 2（工程架构）**：分层依赖、门面承载、不可变封装、数据解耦；
 - **Layer 3（语言进阶）**：TS/Rust/Python/Go/GDScript 现代特性、资源安全；
 - **Layer 4（演化自治）**：代码自治度（CAI）、重构收益判定（ROI）、防刷分去抖。
 
-### 3. 命名规范与扣分预算红线
+### 4. 命名规范与扣分预算红线
 - **规则 ID 规范**：遵循 Canonical 格式 `FAMILY-TOPIC-NNN`（如 `ARCH-FAC-001`、`GATE-AST-001`、`ADV-PRF-002`）；
 - **单源登记**：新增规则必须在 `src/core/rules/` 导出，在 `src/core/scoring/dimensionRuleTable.ts` 绑定权重，并同步在 `scripts/common/rule-catalog.json` 全局真源中完成注册；
 - **单 Finding 扣分预算红线**：单个 Finding 扣分维度上限严格受限：$$\text{AxesPerFinding} \le 4$$ 严禁单一违规向全维度大面积滥扣分。
@@ -183,7 +196,47 @@ export interface AgentDirectivesBundle {
 
 ---
 
-## 七、 高精度时间戳规范与暂存分流原子落盘
+## 七、 Praxis 表现层语义聚合引擎 (`semantic-correlation.ts`) 与 `correlatedRules` 消费规范
+
+在静态扫描完成并向客户端输出时，Praxis 表现层适配器（`src/core/praxis/presentation/`）承担了从「底层全量诊断」到「人类/前端友好展现」的语义转化中枢职责：
+
+### 1. 并查集语义去重与主卡片选举
+当底层扫描在相同物理位置（同一文件路径与同一行号）命中多条规则时，表现层并不粗暴丢弃任何诊断，而是通过并查集（Disjoint Set）对 11 组重叠规则族（`SEMANTIC_OVERLAP_GROUPS`）进行等价聚类：
+- **11 组已知语义重叠规则族**：
+  * 命名与卫生重叠（如 `HYG-STB-002` 与 `GOV-SAN-001`）；
+  * 门面承载与抽象约束（如 `ARCH-FAC-001` 与 `ARCH-ABS-001`）；
+  * 控制流嵌套与扁平化（如 `SIM-FLAT-002`、`SIM-GUARD-001`、`CPX-NEST-001`、`CPX-NEST-002`）；
+  * 内存缓存与对象池（如 `GDM-POOL-001`、`PRF-MEM-001`、`PRF-MEM-002`）等；
+- **严重度权重主卡片选举 (`electPrimaryCard`)**：
+  依照严重级别权重进行主卡片选举：
+  $$\text{Severity Weight: } \text{block (4)} > \text{warn (3)} > \text{info (2)} > \text{pass (1)}$$
+  权重最高者当选为主卡片（`primaryCard`）；同级权重保留原始发射顺序稳定性。
+
+### 2. 次级规则聚合与 `correlatedRules` 元数据封装
+- **关联规则收拢**：聚类中其余卡片的规则代号被抽取并去重，写入主卡片的 `correlatedRules: string[]` 字段，同时记录关联条目总数 `correlationCount: number`；
+- **完整诊断卡片数据结构**：
+  ```typescript
+  export interface PraxisDiagnosticCard {
+    cardId: string;
+    ruleId: string;              // 主选举规则 ID (如 SIM-FLAT-002)
+    severity: PraxisPresentationSeverity; // block | warn | info | pass
+    file: string;
+    line: number;
+    title: string;
+    rationale: string;
+    correlatedRules?: string[];   // 次级重叠规则 (如 ["CPX-NEST-001"])
+    correlationCount?: number;   // 关联规则数量
+    // ...
+  }
+  ```
+
+### 3. 消费端渲染与 Agent 交互契约
+- **IDE 侧边栏与 Webview 呈现**：在 UI 上仅渲染单张主卡片，并在卡片头部渲染关联徽章（如 `+1 correlated rule`），点击可展开查看次级规则与触发原因，从根源消除开发者的信息轰炸与认知疲劳；
+- **AgentDirectives 机器消费**：AI Agent 优先针对主卡片提供的模板与指令进行单一原子修复，修复主规则后通常会自动顺带消融次级关联规则，大幅降低重构补丁的冲突率与试错步数。
+
+---
+
+## 八、 高精度时间戳规范与暂存分流原子落盘
 
 ### 1. 高精度时间戳命名契约 (*Ms)
 - 测量与调度中所有时间字段必须以 `*Ms` 结尾，显式声明毫秒物理量纲，如：
@@ -205,7 +258,7 @@ export interface AgentDirectivesBundle {
 
 ---
 
-## 八、 基线自审报告复用机制与增量切片快轨
+## 九、 基线自审报告复用机制与增量切片快轨
 
 1. **消除无谓重复开销**：全仓全量自审（`runSelfAudit()`）涉及 30 个分析器与 321 条规则遍历，执行耗时约 14s。在常规门禁与增量校验时，禁止重复运行全量 `runSelfAudit()`；
 2. **基线报告快照复用**：
@@ -217,7 +270,7 @@ export interface AgentDirectivesBundle {
 
 ---
 
-## 九、 项目中立性守卫与零孤儿单测契约
+## 十、 项目中立性守卫与零孤儿单测契约
 
 1. **项目中立性守卫 (`validate-project-neutrality.js`)**：
    - `auto-refactor` 定位为通用多语言分析与治理引擎，分析器代码中严禁写入特定业务仓库路径（如硬编码某个业务子项目名或专属目录路径）；
@@ -228,7 +281,7 @@ export interface AgentDirectivesBundle {
 
 ---
 
-## 十、 三平面质量模型与长期演化账本 (CAI 2.0)
+## 十一、 三平面质量模型与长期演化账本 (CAI 2.0)
 
 1. **静态度量平面**：十维质量模型（格式纯净度、类型健全度、架构拓扑度、认知复杂度等），采用倒数型密度饱和曲线与短板加权模型；
 2. **从 0 客观统计原则**：
@@ -245,7 +298,7 @@ export interface AgentDirectivesBundle {
 
 ---
 
-## 十一、 静态分析器上下文感知与假告警抑制规范
+## 十二、 静态分析器上下文感知与假告警抑制规范
 
 1. **基于文件角色（FileRole）的语义免检**：
    - 测试套件（`test_suite`、`*.test.*`、`*.spec.*`）豁免字面量和魔法数字抽取规则，保护单测断言清晰度；
@@ -256,7 +309,7 @@ export interface AgentDirectivesBundle {
 
 ---
 
-## 十二、 专属构建、测试与门禁命令矩阵
+## 十三、 专属构建、测试与门禁命令矩阵
 
 在 `auto-refactor` 目录中作业时，遵循以下执行步骤：
 
@@ -279,7 +332,7 @@ npm run benchmark
 
 ---
 
-## 十三、 高并发调度、图算法降阶与内存治理工程范式
+## 十四、 高并发调度、图算法降阶与内存治理工程范式
 
 针对大型工程与常驻守护进程场景，`auto-refactor` 固化了以下 9 项刚性性能与内存治理范式：
 
