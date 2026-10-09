@@ -1,9 +1,10 @@
 /**
- * WorkspaceStateProvider — 主存储提供者
- *
- * 通过 VS Code 的 workspaceState 进行存储。
- * 优点是自动按工作区隔离、无需额外文件、读写快速。
- * 缺点是数据不直观可见。
+ * Module: Workspace State Provider (工作区状态主持久化提供者)
+ * File Path: src/persistence/WorkspaceStateProvider.ts
+ * Architecture Role: 持久化层一级主存储驱动，通过 VS Code ExtensionContext.workspaceState 机制实现高性能、隔离的工作区状态持久化。
+ * Dependencies & Triggers: 依赖 vscode.ExtensionContext、domain/models 与 Logger；被 StorageCoordinator 选为一级主存首选驱动。
+ * Responsibilities: 实现 IStorageProvider 接口；基于 JSON 字符串存储与读取 WorkspaceTimingData；管理存储可用性与错误隔离。
+ * Exit Semantics & Design Rationale: 利用 VS Code 原生工作区存储实现自然的数据隔离与快速存取；遇脏数据或解析异常时安全熔断，返回 null。
  */
 
 import * as vscode from 'vscode';

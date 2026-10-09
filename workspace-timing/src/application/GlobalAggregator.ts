@@ -1,13 +1,10 @@
 /**
- * GlobalAggregator — 跨工作区累计同步服务
- *
- * 职责：在每次 fullSave 后将当前工作区的计时数据同步到 globalState。
- * 实现跨工作区时长汇总。
- *
- * 边界：不直接依赖 VS Code API —— 工作区信息由构造函数注入
- *       （workspaceInfo 解析器），因此可脱离 VS Code 做纯 Node 单测。
- *
- * 调用方：Scheduler 周期全量存盘回调（onFullSaved）、TimerOrchestrator.saveNow()/newPeriod()
+ * Module: GlobalAggregator — 跨工作区计时聚合服务
+ * File Path: src/application/GlobalAggregator.ts
+ * Architecture Role: Application layer multi-workspace synchronizer and global statistics aggregator
+ * Dependencies & Triggers: domain/global-types.ts, domain/models.ts, GlobalStore port; triggered by Scheduler onFullSaved and TimerOrchestrator
+ * Responsibilities: Synchronize current workspace durations into global state storage; prune stale workspaces exceeding TTL; project aggregated snapshots across workspaces
+ * Exit Semantics & Design Rationale: Injected workspace identity port eliminates direct VS Code API coupling; re-entrancy lock and delta-check prevent redundant disk I/O
  */
 
 import { GlobalTimingData, WorkspaceRecord } from '../domain/global-types';

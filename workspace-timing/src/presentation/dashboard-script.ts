@@ -1,8 +1,10 @@
 /**
- * 模块归属: presentation (仪表盘前端交互运行时脚本)
- * 文件路径: workspace-timing/src/presentation/dashboard-script.ts
- * 架构定位: 面板 Webview 客户端交互与图表渲染脚本生成器
- * 职责说明: 负责动态 SVG 曲线生成、热力图矩阵渲染、跨工作区对比与双向事件调度。
+ * Module: DashboardScript — 仪表盘前端交互运行时脚本生成器
+ * File Path: src/presentation/dashboard-script.ts
+ * Architecture Role: Presentation layer Webview client-side controller and vector graphics renderer
+ * Dependencies & Triggers: Injected into Webview HTML template by dashboardTemplate.ts; runs within isolated VS Code Webview context
+ * Responsibilities: Render dynamic SVG spline active curves, 24-week activity heatmaps, and hourly distribution bars; manage bidirectional postMessage protocol with extension host; bind UI form controls
+ * Exit Semantics & Design Rationale: Bundled as an IIFE with CSP nonce protection; communicates exclusively via acquireVsCodeApi postMessage with zero external CDN dependencies
  */
 
 export function buildDashboardScript(labels: Record<string, string>): string {

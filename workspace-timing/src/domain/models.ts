@@ -1,9 +1,10 @@
 /**
- * WorkspaceTiming — Domain 层数据模型
- *
- * 所有时间单位统一为毫秒 (ms)。
- * 时间戳使用 Date.now() (UTC 毫秒)。
- * 零外部依赖。
+ * Module: Domain Models & Constants (领域核心实体、常量与配置净化)
+ * File Path: src/domain/models.ts
+ * Architecture Role: 领域模型层核心单源真相（SSOT），定义时间片、会话、持久化实体结构、配置界限及数值净化守卫。
+ * Dependencies & Triggers: 纯 TypeScript 实现，零外部依赖；在扩展激活、配置变更、时间切片生成与落盘校验全链路贯穿触发。
+ * Responsibilities: 定义时间单位常数与状态机枚举；定义 WorkspaceTimingData 及日桶、会话数据结构；提供配置范围合法域 clamp 净化器。
+ * Exit Semantics & Design Rationale: 统一毫秒物理量纲与不可变类型视图 (ReadonlyTimingData)；数值净化器杜绝 NaN/越界引发状态机异常。
  */
 
 /** 数据格式当前版本：数据存储格式版本 3（双轨模式 manual/ai、idleSessions 与沉淀层） */

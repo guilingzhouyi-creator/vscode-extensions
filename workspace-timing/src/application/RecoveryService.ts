@@ -1,13 +1,10 @@
 /**
- * RecoveryService — 崩溃恢复编排（应用层）
- *
- * 职责：把"加载主数据 → 迁移折叠 → 回放 journal → 补偿未完成会话"的
- *       恢复算法从持久化层上移到应用层——持久化层只提供原始读写原语，
- *       领域规则（自然日切段、日桶归并、折叠迁移、水位线去重）全部由
- *       应用层与领域层持有。
- *
- * 边界：不依赖 VS Code API；数据加载与最终落盘经 IRecoveryStore 端口注入，
- *       journal 读写经 IJournalStore 端口注入。
+ * Module: RecoveryService — 崩溃恢复与日志回放编排服务
+ * File Path: src/application/RecoveryService.ts
+ * Architecture Role: Application layer crash recovery orchestrator and state reconstruction pipeline
+ * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts, domain/HistoryFolder.ts, cache/IJournalStore, IRecoveryStore; triggered on extension activation
+ * Responsibilities: Orchestrate primary data loading with fallback, idempotent journal replay with watermark deduplication, unfinished session compensation, and history folding
+ * Exit Semantics & Design Rationale: Guarantees zero data loss across abrupt IDE termination; decouples recovery algorithms from storage primitives; forces immediate snapshot save upon recovery completion
  */
 
 import {

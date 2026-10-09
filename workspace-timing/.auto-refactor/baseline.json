@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-09T08:10:13.494Z",
+  "timestamp": "2026-10-09T11:48:03.559Z",
   "groups": [
     {
       "key": "governance|GOV-FIL-001|src/application/DashboardDataAssembler.ts",
@@ -89,9 +89,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/integration/ConfigWatcher.ts",
-      "count": 14,
+      "count": 11,
       "severities": {
-        "warning": 14
+        "warning": 11
       }
     },
     {

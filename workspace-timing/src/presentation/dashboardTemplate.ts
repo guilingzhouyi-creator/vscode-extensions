@@ -1,15 +1,10 @@
 /**
- * dashboardTemplate — 面板 HTML 模板（纯数据，零逻辑）
- *
- * 现代化 UI 深度美化版：
- * 1. 采用毛玻璃（Glassmorphism）与微层次卡片设计（微边框 + 柔和阴影 + 8px 圆角）。
- * 2. 运行中状态徽章增加 🟢 呼吸灯发光脉冲动效（Live Pulse Ring）。
- * 3. 统计数字采用等宽对齐与数值单位分层排版（Tabular figures + Unit typography）。
- * 4. 周活跃曲线升级为渐变区域填充（SVG LinearGradient Mask + 发光曲线描边 + 交互悬浮圆点）。
- * 5. 柱状图与进度条增加平滑渐变与悬浮微光（Glow & Elevation）。
- * 6. 24 周活动热力图增加悬浮缩放动效与更细腻的色阶。
- * 7. 完全兼容 VS Code Dark / Light / High Contrast 所有官方与第三方主题。
- * 8. 保持 100% 原有 DOM ID、事件绑定、消息通信与 i18n 完整性。
+ * Module: DashboardTemplate — 仪表盘 Webview HTML 页面结构组装器
+ * File Path: src/presentation/dashboardTemplate.ts
+ * Architecture Role: Presentation layer HTML document builder and static template generator
+ * Dependencies & Triggers: dashboard-base-styles.ts, dashboard-chart-styles.ts, dashboard-script.ts; invoked by DashboardPanel._getHtml()
+ * Responsibilities: Assemble HTML shell with strict CSP meta headers; embed base CSS and chart styles; render static card layouts, setting rows, and metric widgets; inject client bootstrap script
+ * Exit Semantics & Design Rationale: Pure functional template generator without runtime side effects; guarantees strict CSP nonce isolation preventing inline script injection attacks
  */
 
 import { DASHBOARD_BASE_STYLES } from './dashboard-base-styles';

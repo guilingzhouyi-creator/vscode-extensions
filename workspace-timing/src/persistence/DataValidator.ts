@@ -1,9 +1,10 @@
 /**
- * DataValidator — 外部计时数据校验器
- *
- * 职责：还原（restore）前对不可信 JSON 做结构/数值校验与净化。
- * 边界：纯函数；拒绝整体结构非法的文件，过滤条目级脏数据——
- *       校验未通过时保持只读阻断，杜绝向持久层写入不合规数据。
+ * Module: Data Validator (持久化数据深度校验与净化器)
+ * File Path: src/persistence/DataValidator.ts
+ * Architecture Role: 持久化层输入防护与反腐化层（ACL），在备份还原与外部导入时实施严格类型与数值守卫。
+ * Dependencies & Triggers: 依赖 domain/models 核心模型与版本常量；在从外部文件或备份恢复计时数据时触发执行。
+ * Responsibilities: 顶层结构完整性检查；会话条目时长守恒约束修复与排序；历史折叠日桶规范化；双轨时长配比合规性裁决。
+ * Exit Semantics & Design Rationale: 纯函数设计，只读阻断异常数据；自动修复与净化向前兼容 v3 模式，确保流入持久层的数据结构绝对可信。
  */
 
 import {

@@ -1,12 +1,10 @@
 /**
- * StorageCoordinator — 存储协调器
- *
- * 职责：
- *   1. 协调三级存储：workspaceState（主）→ JSON 文件（备）→ journal（崩溃恢复）
- *   2. 级联写入主 + 备，主存异常时自动触发紧急降级全量备份
- *
- * 崩溃恢复算法已上移至应用层 RecoveryService（领域规则不属于持久化层），
- * 本类只保留原始读写原语：load / save / restore / snapshot / deleteAll。
+ * Module: Storage Coordinator (三级级联存储总协调器)
+ * File Path: src/persistence/StorageCoordinator.ts
+ * Architecture Role: 持久化层协调总枢纽，统一调度 VS Code workspaceState（主）、文件备份（备）与增量日志（恢复），编排容灾降级。
+ * Dependencies & Triggers: 依赖 IStorageProvider、ISnapshotStorageProvider、IJournalStore 与 models；由 TimerEngine 全生命周期驱动。
+ * Responsibilities: 执行三级级联读写与主备自动容灾降级；实施 JSON 文件备份降频写入（降低磁盘抖动）；支持安全快照与整库原子还原。
+ * Exit Semantics & Design Rationale: 读操作主存优先、备存兜底；主存写失败时触发紧急降级全量落备；深复制盖戳保障调用方原数据无副作用。
  */
 
 import { WorkspaceTimingData } from '../domain/models';

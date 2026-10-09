@@ -1,10 +1,10 @@
 /**
- * WorkspaceTiming — VS Code Extension Entry
- *
- * 插件入口：activate / deactivate
- * 职责：组装所有模块，启动计时流程
- * 严格遵循"先地基后上层"原则：
- *   1. Logger → 2. Storage → 3. Cache → 4. Domain → 5. Application → 6. Presentation
+ * Module: ExtensionEntry — VS Code 扩展生命周期入口与组合根
+ * File Path: src/extension.ts
+ * Architecture Role: Composition root for VS Code extension lifecycle, dependency wiring, and runtime activation/deactivation
+ * Dependencies & Triggers: VS Code extension runtime events (onStartupFinished); wires Domain, Cache, Persistence, Application, Presentation, and Integration layers
+ * Responsibilities: Initialize logging and i18n subsystem; assemble storage coordinator and cache pipelines; construct orchestrator, status bar, and command registrars; manage workspace activation and graceful deactivation teardown
+ * Exit Semantics & Design Rationale: Follows strict bottom-up bootstrap (Logger -> Storage -> Cache -> Domain -> Application -> Presentation); ensures zero data loss on deactivation via orchestrator.stop() synchronous flushing and subscription disposal
  */
 
 import * as vscode from 'vscode';

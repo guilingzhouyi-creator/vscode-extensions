@@ -1,7 +1,10 @@
 /**
- * duration-formatter — 时长与时间排版纯函数
- *
- * 职责：将毫秒数转换为人类可读字符串或紧凑标签。
+ * Module: Duration Formatter (时长与绝对时间排版格式化器)
+ * File Path: src/domain/aggregator/duration-formatter.ts
+ * Architecture Role: 领域模型层表示格式化纯函数，负责将毫秒物理量纲转换为可读时长字符串与本地时间标签。
+ * Dependencies & Triggers: 依赖 domain/models 时间转换常数；供状态栏、仪表盘、图表轴及日志展示调用。
+ * Responsibilities: 格式化毫秒为完整易读文本 (formatDuration)；格式化为紧凑双单位文本 (formatDurationCompact)；格式化为本地 HH:mm 格式 (formatTime)。
+ * Exit Semantics & Design Rationale: 纯函数零副作用；整除取模保证单位进位严格正确；高位优先渲染消除无效单位冗余。
  */
 
 import { MS_PER_SECOND, SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from '../models';

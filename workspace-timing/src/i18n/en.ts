@@ -1,4 +1,13 @@
 /**
+ * Module: I18nEnglish — English Localization Dictionary
+ * File Path: src/i18n/en.ts
+ * Architecture Role: Internationalization layer language resource pack for English
+ * Dependencies & Triggers: src/i18n/types.ts; loaded by i18n index during initialization and locale switching
+ * Responsibilities: Provide 100% complete English localized translation mappings for all status bar, toast, export, report, and dashboard strings
+ * Exit Semantics & Design Rationale: Type-checked against I18nStrings interface; ensures complete parity with Chinese locale dictionary with zero unmapped keys
+ */
+
+/**
  * en — English language pack
  */
 

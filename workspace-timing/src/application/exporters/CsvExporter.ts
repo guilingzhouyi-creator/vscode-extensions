@@ -1,11 +1,10 @@
 /**
- * CsvExporter — CSV 导出器
- *
- * 将 WorkspaceTimingData 导出为 CSV：会话记录 + 按日统计。
- *
- * ⚠️ 时间戳统一使用**本地时区**格式化（YYYY-MM-DD HH:MM:SS），
- *    与聚合层的本地时区归桶口径一致——禁止使用 toISOString()（UTC），
- *    否则 UTC+8 用户早上 8 点前的会话会被归到前一天。
+ * Module: CsvExporter — 工作区明细会话与日汇总 CSV 导出器
+ * File Path: src/application/exporters/CsvExporter.ts
+ * Architecture Role: Application layer exporter converting raw session timings into CSV representations
+ * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts; invoked via exporters facade
+ * Responsibilities: Format session-level durations and natural day aggregated buckets into CSV text with metadata headers
+ * Exit Semantics & Design Rationale: Uses local timezone timestamps (YYYY-MM-DD HH:MM:SS) rather than UTC to guarantee bucket alignment with daily aggregator views
  */
 
 import { WorkspaceTimingData } from '../../domain/models';

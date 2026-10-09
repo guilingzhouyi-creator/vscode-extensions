@@ -1,8 +1,10 @@
 /**
- * SessionManager — 会话生命周期管理
- *
- * 职责：开始/结束会话、持久化、崩溃恢复入口协调
- * 边界：不关心禁用策略，由 TimerOrchestrator 控制调用时机
+ * Module: SessionManager — 会话生命周期与历史折叠管理器
+ * File Path: src/application/SessionManager.ts
+ * Architecture Role: Application layer session state coordinator and persistence bridge
+ * Dependencies & Triggers: domain/TimerEngine, persistence/StorageCoordinator, cache/JournalWriter, RecoveryService, domain/HistoryFolder; driven by TimerOrchestrator and Scheduler
+ * Responsibilities: Manage start/stop session lifecycles, coordinate crash recovery and checkpoints, execute history folding into daily buckets, and handle idle pause/resume and midnight transitions
+ * Exit Semantics & Design Rationale: Guarantees synchronous flush and journal truncate upon session termination; maintains O(1) today metric readouts and atomic watermark updates
  */
 
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';

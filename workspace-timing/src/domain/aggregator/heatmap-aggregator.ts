@@ -1,7 +1,10 @@
 /**
- * heatmap-aggregator — 24 周活动热力图纯函数
- *
- * 职责：构建自然周网格矩阵并聚合会话与折叠日桶。
+ * Module: Heatmap Aggregator (活动时间线热力图网格聚合器)
+ * File Path: src/domain/aggregator/heatmap-aggregator.ts
+ * Architecture Role: 领域模型层矩阵计算引擎，负责构建 24 周完整自然周网格，并将混合数据源映射为离散活跃度等级。
+ * Dependencies & Triggers: 依赖 models、constants-chart、date-utils；在面板打开或数据变更时计算热力图数据。
+ * Responsibilities: 生成以当前周为基准的 weeks*7 矩形时间单元；多源融合历史折叠日桶 (dailyTotals)、原始会话与活跃尾部；计算 5 档热力等级 (0~4)。
+ * Exit Semantics & Design Rationale: 网格向左自然周对齐（周一开始）；未来日期与无记录格子标记清晰；纯计算无副作用。
  */
 
 import { DailyTotalsMap, MS_PER_DAY, MS_PER_HOUR, TimeSession } from '../models';

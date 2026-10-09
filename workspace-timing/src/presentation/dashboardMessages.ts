@@ -1,11 +1,10 @@
 /**
- * dashboardMessages — 面板消息路由与导出流程
- *
- * 职责：接收 DashboardPanel 的 postMessage 并分发到 application 层；
- *       CSV / 日报 / 周报导出的「选路径 → 写文件 → 提示」流程集中于此。
- * 边界：只做消息分发与导出编排，不直接操作存储；
- *       业务入口一律委托 TimerOrchestrator（如 reset 走 resetAllData）。
- *       依赖经 MessageRouterContext 注入，避免模块级可变状态。
+ * Module: DashboardMessages — 仪表盘消息路由与导出交互编排
+ * File Path: src/presentation/dashboardMessages.ts
+ * Architecture Role: Presentation layer message handler and export interaction pipeline
+ * Dependencies & Triggers: vscode API, TimerOrchestrator, StatusBarController, i18n subsystem; triggered by Webview onDidReceiveMessage events
+ * Responsibilities: Route Webview client actions to application services; orchestrate CSV and Markdown export dialogs, file writing, and toast feedback; update configurations
+ * Exit Semantics & Design Rationale: Declarative strategy table (MessageStrategy map) eliminates switch-case complexity; context injection via MessageRouterContext ensures testability and loose coupling
  */
 
 import * as vscode from 'vscode';

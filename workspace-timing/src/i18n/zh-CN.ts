@@ -1,4 +1,13 @@
 /**
+ * Module: I18nChinese — 简体中文语言包资源
+ * File Path: src/i18n/zh-CN.ts
+ * Architecture Role: Internationalization layer language resource pack for Simplified Chinese
+ * Dependencies & Triggers: src/i18n/types.ts; loaded by i18n index during bootstrap and locale switching
+ * Responsibilities: Provide 100% complete Simplified Chinese localized translation mappings for status bar, commands, toast notifications, reports, and dashboard elements
+ * Exit Semantics & Design Rationale: Type-checked against I18nStrings interface; serves as baseline source of truth for all user-facing Chinese copy in the extension
+ */
+
+/**
  * zh-CN — 简体中文语言包
  */
 

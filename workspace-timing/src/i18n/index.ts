@@ -1,10 +1,10 @@
 /**
- * i18n — 国际化入口
- *
- * 纯模块：不依赖 VS Code API（可被纯 Node 单测加载）。
- * 语言来源由调用方注入：默认根据 VS Code 显示语言自动选择；
- * 支持通过 workspaceTiming.locale 设置强制指定（auto / zh-CN / en），
- * 运行期变更由 ConfigWatcher 调 setLocale 热切换（面板重建后生效）。
+ * Module: I18nService — 国际化解析与语言包管理服务
+ * File Path: src/i18n/index.ts
+ * Architecture Role: Internationalization layer runtime dispatcher and string lookup service
+ * Dependencies & Triggers: src/i18n/types.ts, src/i18n/zh-CN.ts, src/i18n/en.ts; initialized at bootstrap and hot-swapped via ConfigWatcher
+ * Responsibilities: Resolve effective locale based on VS Code environment and configuration overrides; manage active dictionary lookup; format placeholder tokens ({0}, {1}); slice prefix-filtered labels for webviews
+ * Exit Semantics & Design Rationale: Pure Node.js module with zero VS Code API imports; guarantees fallback to English dictionary if requested locale is unsupported; supports runtime hot-switching without restart
  */
 
 import { I18nStrings, Locale } from './types';

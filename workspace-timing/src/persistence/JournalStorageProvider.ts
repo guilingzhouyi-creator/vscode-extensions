@@ -1,11 +1,10 @@
 /**
- * JournalStorageProvider — 增量日志存储
- *
- * 将时间片写入 .vscode/workspace-timing.journal（NDJSON 格式）。
- * 每行一个 JSON 对象：{"t": timestamp, "d": deltaMs}
- *
- * 统一采用 Node.js 原生 fs.promises 执行直接文件 I/O，杜绝混合使用
- * vscode.workspace.fs 带来的句柄竞态与锁定问题。
+ * Module: Journal Storage Provider (增量日志文件系统持久化提供者)
+ * File Path: src/persistence/JournalStorageProvider.ts
+ * Architecture Role: 持久化层增量日志物理实现，履行 cache/IJournalStore 契约，以流式 NDJSON 格式提供纳秒级高频落盘防护。
+ * Dependencies & Triggers: 依赖 Node.js fs.promises、path 与 cache/IJournalStore；被 JournalWriter 在批处理刷盘及截断时调用。
+ * Responsibilities: 格式化时间片并流式追加到 journal 文件；读取并校验全量历史切片；截断清空日志文件；文件及目录自愈创建。
+ * Exit Semantics & Design Rationale: 采用 Node 原生 fs.promises 避免 VS Code 文件系统句柄死锁；逐行校验过滤损坏记录，单行崩溃不影响整体解析。
  */
 
 import * as vscode from 'vscode';

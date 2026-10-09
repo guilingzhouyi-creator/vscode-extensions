@@ -1,8 +1,10 @@
 /**
- * 模块归属: presentation (仪表盘基础视觉样式)
- * 文件路径: workspace-timing/src/presentation/dashboard-base-styles.ts
- * 架构定位: 面板 Webview 基础样式与 CSS 变量定义
- * 职责说明: 提供 :root 变量、网格布局、卡片、设置表单与按钮的基础样式规范。
+ * Module: DashboardBaseStyles — 仪表盘基础视觉样式与主题变量规范
+ * File Path: src/presentation/dashboard-base-styles.ts
+ * Architecture Role: Presentation layer CSS design token specifications and base styles
+ * Dependencies & Triggers: Consumed by src/presentation/dashboardTemplate.ts during Webview HTML synthesis
+ * Responsibilities: Declare CSS custom properties (:root variables), layout grids, glassmorphism cards, form controls, and responsive breakpoints
+ * Exit Semantics & Design Rationale: Immutable CSS string literal matching VS Code theme variables (--vscode-*); operates with zero runtime dependencies and zero DOM execution overhead
  */
 
 export const DASHBOARD_BASE_STYLES = /* css */ `

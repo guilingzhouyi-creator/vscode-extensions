@@ -1,7 +1,10 @@
 /**
- * weekly-aggregator — 周报统计与多周趋势纯函数
- *
- * 职责：按周汇总、最近 7 天柱状/曲线序列、多周趋势聚合以及周报文字摘要。
+ * Module: Weekly Aggregator (周报统计与多周趋势纯函数)
+ * File Path: src/domain/aggregator/weekly-aggregator.ts
+ * Architecture Role: 领域模型层周期度量聚合器，负责按自然周汇总会话、提取近 7 日趋势序列及生成周度文本摘要指标。
+ * Dependencies & Triggers: 依赖 models、constants-chart、date-utils、daily-aggregator；在周报渲染、柱状图绘制与报告导出时触发。
+ * Responsibilities: 计算全历史周汇总 weeklyStats；生成近 7 日柱状图序列 last7Days；生成近 N 周趋势序列 weeklyTrend；提取周峰值与活跃天数 weeklySummary。
+ * Exit Semantics & Design Rationale: 跨周日跨午夜会话按切分片段精确归属自然周；多源合并（折叠日桶 + 原始会话 + 进行中会话）确保时长绝对守恒。
  */
 
 import { DailyTotalsMap, TimeSession } from '../models';

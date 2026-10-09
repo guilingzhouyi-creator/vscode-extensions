@@ -1,8 +1,10 @@
 /**
- * DashboardPanel — 配置面板 Webview
- *
- * 使用 VS Code Webview API 创建配置 + 统计面板。
- * 样式使用 VS Code CSS 变量，保证原生外观。
+ * Module: DashboardPanel — 统计与配置仪表盘 Webview 面板控制器
+ * File Path: src/presentation/DashboardPanel.ts
+ * Architecture Role: Presentation layer Webview panel lifecycle manager and host-client message bridge
+ * Dependencies & Triggers: vscode API, domain/dashboard-types.ts, dashboardTemplate.ts, i18n subsystem; triggered by openDashboard command or status bar click
+ * Responsibilities: Manage singleton WebviewPanel creation, focus reveal, and destruction; enforce strict Content Security Policy (CSP) with dynamic nonces; dispatch two-way messages; handle locale recreation
+ * Exit Semantics & Design Rationale: Implements idempotent disposal to break cyclic cleanup references; retains context when hidden while throttling background render ticks (isVisible check)
  */
 
 import * as vscode from 'vscode';

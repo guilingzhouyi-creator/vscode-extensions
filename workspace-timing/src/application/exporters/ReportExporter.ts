@@ -1,8 +1,10 @@
 /**
- * ReportExporter — Markdown 报告导出器
- *
- * 将日报 / 周报导出为 Markdown 文本报告，便于提交周会或留档。
- * 复用 TimeAggregator 的领域统计方法，并结合 i18n 词条实现多语言 Markdown 输出。
+ * Module: ReportExporter — Markdown 周期报表导出器
+ * File Path: src/application/exporters/ReportExporter.ts
+ * Architecture Role: Application layer report formatter producing structured Markdown documents
+ * Dependencies & Triggers: domain/TimeAggregator.ts, domain/dashboard-types.ts, i18n subsystem; invoked by exporters facade
+ * Responsibilities: Render daily and weekly timing summaries, session details, and multi-week trends into localized Markdown documents
+ * Exit Semantics & Design Rationale: Pure presentation formatting with zero external disk I/O; integrates i18n dictionaries to ensure complete bilingual report generation
  */
 
 import { TimeAggregator, DailyDetail, WeeklySummary } from '../../domain/TimeAggregator';

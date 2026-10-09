@@ -1,7 +1,10 @@
 /**
- * date-utils — 本地时区日期计算纯函数
- *
- * 职责：提供统一的本地时区日期转换、展开与切分，确保跨自然日统计口径一致。
+ * Module: Date Utilities (本地时区日期计算纯函数)
+ * File Path: src/domain/aggregator/date-utils.ts
+ * Architecture Role: 领域模型层基础时间算法库，提供一致的本地时区日期转换、周期对齐与跨天段切分服务。
+ * Dependencies & Triggers: 依赖 domain/models；供所有聚合器（daily、weekly、heatmap）及门面高频调用。
+ * Responsibilities: 生成本地时区 YYYY-MM-DD 字符串；解析本地零点时间戳；计算周一基准对齐日期；按本地自然日分段迭代 eachDaySegment。
+ * Exit Semantics & Design Rationale: 统一本地时区口径，杜绝 UTC 导致的午夜偏离；MAX_EXPANSION_SEGMENTS (4000) 边界守卫阻断死循环。
  */
 
 import { TimeSession } from '../models';

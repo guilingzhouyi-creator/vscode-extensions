@@ -1,18 +1,10 @@
 /**
- * RingBuffer — 泛型环形缓冲区
- *
- * 固定容量，O(1) 读写，支持两阶段提交批量消费。
- * 用于缓存 TimeSlice，支持：
- *   1. 两阶段提交（peekAll + advance）：落盘失败不丢失、不破坏时序
- *   2. 实时读取最近 N 条记录供 UI 展示活跃曲线
- *   3. 固定容量控制内存上限
- *
- * 数学不变量：
- *   - 容量：capacity >= 1 且不可变
- *   - 条目数：0 <= count <= capacity
- *   - 指针范围：0 <= head, tail < capacity
- *   - 环形跨度：当 count < capacity 时，head = (tail + count) % capacity；
- *              当 count == capacity 时，head == tail 且 isFull == true。
+ * Module: Ring Buffer (泛型定长环形缓冲区)
+ * File Path: src/cache/RingBuffer.ts
+ * Architecture Role: 缓存层高吞吐基础数据结构，提供 O(1) 无动态内存分配的先进先出（FIFO）队列与两阶段消费支持。
+ * Dependencies & Triggers: 依赖 domain/models 默认容量；作为 JournalWriter 与高频采集器的核心内存缓冲容器。
+ * Responsibilities: 定长循环队列管理；满载覆盖淘汰最旧元素；两阶段只读窥探 (peekAll/peekLast) 与原子推进 (advance)；内存槽位清理防泄漏。
+ * Exit Semantics & Design Rationale: 构造时预分配定长数组消除循环内堆分配；严格模运算指针步进；槽位清退置 undefined 协助 GC 垃圾回收。
  */
 
 import { DEFAULT_RING_BUFFER_CAP } from '../domain/models';

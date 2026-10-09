@@ -1,8 +1,10 @@
 /**
- * 模块归属: presentation (仪表盘图表与可视化样式)
- * 文件路径: workspace-timing/src/presentation/dashboard-chart-styles.ts
- * 架构定位: 面板 Webview 高级可视化图表专用样式
- * 职责说明: 提供活跃曲线 SVG、24周热力图、小时时间线标尺及气泡提示动画样式。
+ * Module: DashboardChartStyles — 仪表盘图表与可视化专用样式规范
+ * File Path: src/presentation/dashboard-chart-styles.ts
+ * Architecture Role: Presentation layer specialized CSS styling for Webview charting and data visualizations
+ * Dependencies & Triggers: Consumed by src/presentation/dashboardTemplate.ts during Webview HTML construction
+ * Responsibilities: Define styles for SVG spline active curves, 24-week activity heatmaps, hourly timeline rulers, bar charts, and interactive tooltip transitions
+ * Exit Semantics & Design Rationale: High-performance hardware-accelerated CSS animations and theme-adaptive vector colors; zero JavaScript dependencies
  */
 
 export const DASHBOARD_CHART_STYLES = /* css */ `

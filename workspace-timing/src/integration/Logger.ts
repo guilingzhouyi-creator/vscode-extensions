@@ -1,8 +1,10 @@
 /**
- * Logger — 跨层日志工具
- *
- * 按等级分层输出，生产环境可关闭 Debug 级别。
- * 不依赖 VS Code API，可在 Domain/Persistence 等下层使用。
+ * Module: Logger — 跨层无依赖统一日志工具
+ * File Path: src/integration/Logger.ts
+ * Architecture Role: Integration layer foundational logging utility with zero external runtime dependencies
+ * Dependencies & Triggers: domain/models.ts; used across all layers (Domain, Cache, Persistence, Application, Presentation)
+ * Responsibilities: Filter and format structured log entries by LogLevel severity; extract Error object stack traces; provide immutable frozen logger facade
+ * Exit Semantics & Design Rationale: Pure console wrapper with zero VS Code API imports, allowing safe execution within unit tests and deep domain services
  */
 
 import { ISO_TIME_START, ISO_TIME_END } from '../domain/models';

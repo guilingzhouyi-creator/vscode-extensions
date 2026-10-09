@@ -1,11 +1,10 @@
 /**
- * i18n types — 国际化字符串 key 定义
- *
- * 约定：按 UI 区域分层命名
- *   panel.xxx   → 配置面板
- *   status.xxx  → 状态栏
- *   cmd.xxx     → 命令
- *   common.xxx  → 通用
+ * Module: I18nTypes — 国际化类型与词条契约定义
+ * File Path: src/i18n/types.ts
+ * Architecture Role: Internationalization layer type system and translation key contract
+ * Dependencies & Triggers: Consumed by src/i18n/zh-CN.ts, src/i18n/en.ts, and src/i18n/index.ts
+ * Responsibilities: Define strongly-typed I18nStrings mapping and supported Locale union ('zh-CN' | 'en')
+ * Exit Semantics & Design Rationale: Single source of truth for UI string keys; TypeScript compilation guarantees compile-time completeness and parity across all localized language packs
  */
 
 export type Locale = 'zh-CN' | 'en';

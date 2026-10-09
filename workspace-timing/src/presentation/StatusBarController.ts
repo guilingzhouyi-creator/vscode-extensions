@@ -1,12 +1,10 @@
 /**
- * StatusBarController — 状态栏渲染
- *
- * 三种显示模式，点击循环切换：
- *   1. today-total  → "今日 30m · 累计 2h"
- *   2. total-today  → "累计 2h · 今日 30m"
- *   3. compact      → "30m"（仅今日）
- *
- * 边界：不关心计时逻辑，只负责显示
+ * Module: StatusBarController — VS Code 状态栏计时渲染控制器
+ * File Path: src/presentation/StatusBarController.ts
+ * Architecture Role: Presentation layer status bar widget and accessibility manager
+ * Dependencies & Triggers: vscode API, domain/models.ts, domain/TimeAggregator.ts, i18n subsystem; triggered by Scheduler tick and command palette
+ * Responsibilities: Render real-time today/total durations across 3 display modes; display dynamic activity icons (manual watch, AI sparkle, idle pause); manage a11y labels and tooltips; debounce UI re-renders
+ * Exit Semantics & Design Rationale: Compares against cached _lastText to prevent high-frequency DOM jitter and CPU thrashing; guarantees proper resource disposal on extension shutdown
  */
 
 import * as vscode from 'vscode';

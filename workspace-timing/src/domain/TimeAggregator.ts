@@ -1,12 +1,10 @@
 /**
- * TimeAggregator — 时间聚合领域统一门面（Facade）
- *
- * 职责：作为时间聚合领域的对外统一入口与聚合出口，聚合子领域模块：
- *   - date-utils: 本地时区日期解析、展开与切分
- *   - duration-formatter: 人类可读与紧凑时长排版
- *   - daily-aggregator: 日报统计、小时分布与会话裁剪
- *   - weekly-aggregator: 周报统计、多周趋势与全历史日报序列
- *   - heatmap-aggregator: 24 周活动热力图网格构建与聚合
+ * Module: Time Aggregator Facade (时间聚合领域门面)
+ * File Path: src/domain/TimeAggregator.ts
+ * Architecture Role: 领域模型层门面（Facade），聚合日期计算、时长排版、日报、周报与热力图五个子领域纯函数模块。
+ * Dependencies & Triggers: 聚合 models 及 aggregator/* 子模块；由应用层 TimerEngine、RecoveryService 及展示层交互驱动。
+ * Responsibilities: 对外统一暴露日期与时长计算接口；提供跨自然日切分 splitByNaturalDay 算法并保障时长守恒；不可变冻结门面对象。
+ * Exit Semantics & Design Rationale: Object.freeze 确保门面对象运行时不可变；跨午夜切分严格保障 manualMs + aiMs 比例分配与总时长精确守恒。
  */
 
 import { TimeSession } from './models';

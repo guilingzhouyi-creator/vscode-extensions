@@ -1,13 +1,10 @@
 /**
- * exporters/index — 数据与报表导出统一门面（Facade）
- *
- * 职责：聚合 CSV、聚合全量 CSV 以及 Markdown 日报/周报导出能力，
- *       向应用编排层提供统一的纯逻辑服务出口。
- *
- * 架构契约（ARCH-FAC-001）：
- *   - 聚合 CsvExporter、AggregatedCsvExporter、ReportExporter 3 个子领域；
- *   - 承载输入清洗、数据校验与日志审计；
- *   - 消除孤立目录与单文件透传跳板。
+ * Module: ExportersFacade — 数据与报表导出统一门面
+ * File Path: src/application/exporters/index.ts
+ * Architecture Role: Application layer facade encapsulating data and report export subsystems
+ * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts, CsvExporter, AggregatedCsvExporter, ReportExporter; invoked by TimerOrchestrator and CommandRegistrar
+ * Responsibilities: Aggregate and expose unified export entry points for raw CSV, aggregated CSV, and Markdown daily/weekly reports with input sanitation and logging
+ * Exit Semantics & Design Rationale: Complies with ARCH-FAC-001 by aggregating 3 sub-domain exporters with substantive input validation and logging, eliminating pass-through springboard overhead
  */
 
 import { ReadonlyTimingData, WorkspaceTimingData } from '../../domain/models';

@@ -1,9 +1,10 @@
 /**
- * DisableManager — 禁用策略控制
- *
- * 职责：全局开关 + 工作区开关 + 优先级仲裁
- * 规则：全局禁用时无视工作区设置；全局启用时以工作区设置为准
- * 边界：不关心计时逻辑，只回答"当前是否应该计时"
+ * Module: DisableManager — 计时启用/禁用策略仲裁器
+ * File Path: src/application/DisableManager.ts
+ * Architecture Role: Application layer policy arbiter for timing execution eligibility
+ * Dependencies & Triggers: domain/models.ts; managed by TimerOrchestrator and mutated via ConfigWatcher or VS Code commands
+ * Responsibilities: Maintain timing switch state; arbitrate hierarchical precedence between global kill-switch and workspace-level enable flag
+ * Exit Semantics & Design Rationale: Deterministic priority rule (globalDisabled strictly overrides workspace enabled); provides atomic state snapshots with zero I/O side effects
  */
 
 import { TimingConfig, DEFAULT_CONFIG } from '../domain/models';

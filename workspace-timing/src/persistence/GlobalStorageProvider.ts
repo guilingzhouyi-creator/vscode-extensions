@@ -1,8 +1,10 @@
 /**
- * GlobalStorageProvider — 全局存储提供者
- *
- * 通过 VS Code 的 ExtensionContext.globalState 实现跨工作区数据共享。
- * 用于跨工作区累计时长汇总。
+ * Module: Global Storage Provider (跨工作区全局状态持久化提供者)
+ * File Path: src/persistence/GlobalStorageProvider.ts
+ * Architecture Role: 持久化层全局状态控制器，封装 VS Code globalState 提供跨所有工作区的计时统计聚合存储。
+ * Dependencies & Triggers: 依赖 vscode.ExtensionContext、domain/global-types 与 Logger；在跨工作区汇总同步及清除时被调用。
+ * Responsibilities: 读取与解析跨工作区汇总 GlobalTimingData；安全序列化与更新 globalState；版本不匹配自愈兜底与异常隔离。
+ * Exit Semantics & Design Rationale: 内部捕获解析异常并安全回退空数据，避免损坏的全局键破坏单工作区会话；更新前自动打标 lastUpdatedAt 时间戳。
  */
 
 import * as vscode from 'vscode';

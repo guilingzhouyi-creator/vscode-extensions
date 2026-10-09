@@ -1,8 +1,10 @@
 /**
- * dashboard-types — 面板数据共享类型
- *
- * 存放在 domain 层以确保所有上层（application、presentation）都能引用，
- * 不违反"上层可依赖下层"的单向依赖规则。
+ * Module: Dashboard Types (仪表盘共享类型与消息协议)
+ * File Path: src/domain/dashboard-types.ts
+ * Architecture Role: 领域模型层与展示层（Webview/面板）的跨边界数据契约，规范聚合数据结构与双向消息通信协议。
+ * Dependencies & Triggers: 依赖 daily-aggregator 与 weekly-aggregator 类型；由 TimerEngine、DashboardProvider、Webview 交互触发。
+ * Responsibilities: 声明柱状图、热力图单元格、周趋势图等前端渲染模型；声明 DashboardData 全景展示快照；定义 DashboardMessage 消息联合。
+ * Exit Semantics & Design Rationale: 纯 TypeScript 类型定义与重导出，无运行时开销；通过单向分层依赖保障展示层与应用层解耦。
  */
 
 /** 柱状图每日一条 */
@@ -75,17 +77,17 @@ export interface DashboardData {
     heatmap: HeatmapDay[];
     /** 本周合计 (ms) */
     weekTotalMs: number;
-    /** 周报多周趋势（近 4 周）★ */
+    /** 周报多周趋势（近 4 周） */
     weeklyTrend: WeeklyTrendEntry[];
-    /** 周报文字摘要 ★ */
+    /** 周报文字摘要 */
     weeklySummary: WeeklySummary | null;
-    /** 今日会话明细 ★ */
+    /** 今日会话明细 */
     todayDetail: DailyDetail | null;
-    /** 跨工作区累计 ★ */
+    /** 跨工作区累计 */
     globalTotalMs: number;
-    /** 工作区数量 ★ */
+    /** 工作区数量 */
     workspaceCount: number;
-    /** 各工作区列表 ★ */
+    /** 各工作区列表 */
     workspaceList: Array<{ name: string; totalMs: number }>;
     isEnabled: boolean;
     globalDisabled: boolean;

@@ -1,7 +1,10 @@
 /**
- * global-types — 跨工作区累计数据模型
- *
- * 存放在 domain 层，供 persistence 和 application 层引用。
+ * Module: Global Timing Types (跨工作区全局统计数据模型)
+ * File Path: src/domain/global-types.ts
+ * Architecture Role: 领域模型层全局状态定义，规范跨多个 VS Code 工作区的累计时长汇总模型、工作区标识规范化与空状态工厂。
+ * Dependencies & Triggers: 纯领域层定义，零外部依赖；供 GlobalStorageProvider 持久化与 TimerEngine 汇总时调用。
+ * Responsibilities: 声明 WorkspaceRecord 与 GlobalTimingData 接口；提供 createEmptyGlobalData 空数据工厂；提供 normalizeWorkspaceId URI 稳定规范化。
+ * Exit Semantics & Design Rationale: 数据结构通过 GLOBAL_VERSION 实现模式演化；normalizeWorkspaceId 保证跨平台大小写不敏感且尾部斜杠无关。
  */
 
 export const GLOBAL_VERSION = 1;

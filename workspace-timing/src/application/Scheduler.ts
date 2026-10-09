@@ -1,13 +1,10 @@
 /**
- * Scheduler — 周期任务调度器
- *
- * 职责：
- *   1. 每秒心跳：推入 1 条时间片到 RingBuffer + 尝试 journal flush + 更新状态栏
- *      —— flush 只是"尝试"，是否真正落盘由 JournalWriter 的缓存策略裁决；
- *   2. 每 fullSaveIntervalMs 执行全量存盘（checkpoint 固化历史累计，不清 journal）；
- *   3. 优雅停止：等待在途保存任务完成，防止退出竞态导致文件损坏。
- *
- * 所有间隔可通过 TimingConfig 配置。
+ * Module: Scheduler — 周期任务与心跳调度器
+ * File Path: src/application/Scheduler.ts
+ * Architecture Role: Application layer timer coordinator and background task scheduler
+ * Dependencies & Triggers: cache/JournalWriter, SessionManager, domain/models.ts; triggered by Node.js setInterval timers
+ * Responsibilities: Drive 1-second heartbeat for RingBuffer slice ingestion, sleep detection, and status bar notification; drive periodic full-save checkpoints; coordinate graceful async teardown
+ * Exit Semantics & Design Rationale: Provides non-overlapping re-entrancy locks (_saving, _flushing) and in-flight Promise tracking to prevent concurrent disk writes and corruption on shutdown
  */
 
 import { JournalWriter } from '../cache/JournalWriter';

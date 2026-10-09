@@ -1,7 +1,10 @@
 /**
- * ICacheStrategy — 缓存策略接口
- *
- * 决定 flush 的触发时机，支持可插拔策略。
+ * Module: Cache Strategy (缓存刷盘决策策略接口与实现)
+ * File Path: src/cache/ICacheStrategy.ts
+ * Architecture Role: 缓存控制层策略模式契约，解耦内存缓冲数据量、时间跨度判定与具体日志刷盘动作。
+ * Dependencies & Triggers: 依赖 domain/models 常量；被 JournalWriter 在周期性调度检查点中求值触发。
+ * Responsibilities: 声明 FlushContext 缓冲度量上下文；声明 ICacheStrategy 决策接口；实现基于时间间隔的 TimeBasedCacheStrategy 默认策略。
+ * Exit Semantics & Design Rationale: 策略对象无内部可变状态；shouldFlush 基于时间戳与条目数判定，空缓冲严格短路拒绝刷盘。
  */
 
 import { DEFAULT_JOURNAL_FLUSH_MS } from '../domain/models';

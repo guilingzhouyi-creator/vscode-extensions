@@ -1,7 +1,10 @@
 /**
- * Module: Domain Constants — Visualization and Charts
+ * Module: Domain Constants — Visualization and Charts (图表与可视化常量)
  * File Path: src/domain/constants-chart.ts
- * Architecture Role: Single source of truth for dashboard layout, chart dimensions and heatmap thresholds.
+ * Architecture Role: 领域模型层可视化布局与度量常数单源定义，向展示层与聚合器提供无副作用的几何尺度与时间跨度基准。
+ * Dependencies & Triggers: 纯无依赖常量定义模块；被 DateUtils、HeatmapAggregator、WeeklyAggregator 与仪表盘视图消费。
+ * Responsibilities: 统一定义热力图窗口跨度、自然周换算系数、趋势图回溯周期及日期切片偏移基准。
+ * Exit Semantics & Design Rationale: 模块仅包含只读常量声明，编译期内联优化，运行时无副作用；变更需与图表前端网格对齐。
  */
 
 /** 一周天数 */

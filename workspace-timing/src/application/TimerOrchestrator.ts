@@ -1,12 +1,10 @@
 /**
- * TimerOrchestrator — 计时总控
- *
- * 职责：协调 SessionManager + DisableManager + Scheduler
- * 边界：不直接操作存储、不渲染 UI
- * 调用链：
- *   ExtensionEntry → TimerOrchestrator → SessionManager → TimerEngine
- *                                       → DisableManager
- *                                       → Scheduler
+ * Module: TimerOrchestrator — 计时核心业务编排总控
+ * File Path: src/application/TimerOrchestrator.ts
+ * Architecture Role: Application layer central coordinator and business orchestration facade
+ * Dependencies & Triggers: TimerEngine, StorageCoordinator, JournalWriter, SessionManager, DisableManager, Scheduler, GlobalAggregator; invoked by extension entry, commands, and webview messages
+ * Responsibilities: Orchestrate session state machine lifecycles (start, stop, idle, activity); manage destructive operations via serialized FIFO queue; dispatch configuration updates; generate dashboard DTOs and reports
+ * Exit Semantics & Design Rationale: Coordinates graceful shutdown across Scheduler and SessionManager; enforces serialized execution queue (_opQueue) to prevent concurrent state corruption during reset/restore/newPeriod
  */
 
 import { TimerEngine } from '../domain/TimerEngine';

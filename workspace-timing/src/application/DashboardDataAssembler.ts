@@ -1,9 +1,10 @@
 /**
- * DashboardDataAssembler — 面板 DTO 组装器（应用层纯函数）
- *
- * 职责：把计时器只读快照 + 配置 + 跨工作区快照组装为 DashboardData 视图模型。
- * 边界：纯组装，无 I/O、无状态；供导出与面板两条路径共用同一组装逻辑，
- *       消除 weeklyTrend 等字段的重复拼装。
+ * Module: DashboardDataAssembler — 面板数据传输对象组装器
+ * File Path: src/application/DashboardDataAssembler.ts
+ * Architecture Role: Application layer pure projection engine and view model assembler
+ * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts, domain/dashboard-types.ts, GlobalAggregator; invoked by TimerOrchestrator and exporters
+ * Responsibilities: Assemble ReadonlyTimingData, configuration options, and GlobalSnapshot into unified DashboardData; project 7-day stats, heatmaps, and weekly trends
+ * Exit Semantics & Design Rationale: Pure deterministic function without I/O or mutable state; ensures mathematical consistency across webview UI and export subsystems
  */
 
 import {

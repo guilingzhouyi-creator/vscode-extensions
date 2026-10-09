@@ -1,10 +1,10 @@
 /**
- * IJournalStore — journal 存储端口（依赖倒置）
- *
- * JournalWriter 只依赖此窄接口，不感知具体落盘实现（当前为 persistence/JournalStorageProvider）。
- * 目的：
- *   1. 消除 cache → persistence 具体类的反向依赖；
- *   2. 单测可用纯 Node 假实现替换，脱离 VS Code 文件系统。
+ * Module: Journal Store Interface (增量日志存储端口)
+ * File Path: src/cache/IJournalStore.ts
+ * Architecture Role: 缓存与持久化边界的依赖倒置端口（DIP），使高层缓存控制器与底层文件系统落盘介质解耦。
+ * Dependencies & Triggers: 仅依赖 domain/models 的 TimeSlice 数据结构；由 JournalWriter 驱动落盘与截断。
+ * Responsibilities: 声明批量追加 appendBatch、全量回读 readJournal、安全截断 truncate 及存在性探针接口。
+ * Exit Semantics & Design Rationale: 异步 Promise 契约保证非阻塞 I/O；消除缓存层对持久层具体实现的依赖，提升单测可测试性。
  */
 
 import { TimeSlice } from '../domain/models';

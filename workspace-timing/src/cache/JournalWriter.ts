@@ -1,15 +1,10 @@
 /**
- * JournalWriter — 日志写入器
- *
- * 职责：将 RingBuffer 中的 TimeSlice 批量追加到 journal 文件。
- * 边界：只写日志，不关心完整存储；落盘细节通过 IJournalStore 端口抽象（依赖倒置）。
- * 依赖：domain/models.ts, cache/RingBuffer.ts, cache/IJournalStore.ts
- *
- * 崩溃安全与两阶段提交：
- *   1. 预读（peekAll）：不推进 tail 指针，底层 I/O 失败时内存缓冲完好无损，严格保持原有时间戳升序；
- *   2. 确认（advance）：落盘成功后原子清退已写槽位；
- *   3. 截断安全（truncate）：清空 journal 文件时同步调用 ringBuffer.clear()，根除数据复活；
- *   4. 互斥保护（_flushingMutex）：防止 tryFlush 与 truncate 发生异步时序竞态。
+ * Module: Journal Writer (增量追加日志写入控制器)
+ * File Path: src/cache/JournalWriter.ts
+ * Architecture Role: 缓存层事务协调者，将内存环形队列中的高频时间片批量持久化为磁盘增量日志，抵御宿主异常崩溃。
+ * Dependencies & Triggers: 依赖 models、RingBuffer、ICacheStrategy、IJournalStore 及 Logger；由调度器心跳周期性触发。
+ * Responsibilities: 缓冲时间切片；两阶段提交批量刷盘 (peekAll -> appendBatch -> advance)；截断清理与内存防数据复活；异步互斥保护。
+ * Exit Semantics & Design Rationale: 两阶段提交保证底层 I/O 异常时缓冲无损并支持重试；截断时同步清空内存队列彻底消除脏数据复活。
  */
 
 import {

@@ -1,9 +1,10 @@
 /**
- * FileStorageProvider — JSON 文件备份存储
- *
- * 将计时数据写入 .vscode/workspace-timing.json。
- * 用户可见、可版本控制、可移植。
- * 配合 workspaceState 作为双重保障。
+ * Module: File Storage Provider (文件级冗余备份持久化提供者)
+ * File Path: src/persistence/FileStorageProvider.ts
+ * Architecture Role: 持久化层二级冗余备份驱动，通过工作区本地 JSON 文件实现人机可读、版本可控的本地容灾存储。
+ * Dependencies & Triggers: 依赖 vscode.workspace.fs、domain/models 与 Logger；由 StorageCoordinator 级联或快照机制调用。
+ * Responsibilities: 实现 IStorageProvider 接口；加载与解析本地 JSON 数据；原子写入 (stagingUri -> rename) 规避断电截断损坏；生成指定命名前置快照。
+ * Exit Semantics & Design Rationale: 两步原子写入保障崩溃一致性；异常捕获降级标记可用性状态，防止二级备份故障阻塞主扩展生命周期。
  */
 
 import * as vscode from 'vscode';

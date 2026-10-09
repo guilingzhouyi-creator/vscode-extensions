@@ -1,7 +1,10 @@
 /**
- * daily-aggregator — 日报统计与按日明细纯函数
- *
- * 职责：计算今日累计、按日汇总列表以及指定日期的会话切分与小时分布明细。
+ * Module: Daily Aggregator (日报统计与按日明细纯函数)
+ * File Path: src/domain/aggregator/daily-aggregator.ts
+ * Architecture Role: 领域模型层纯计算聚合器，负责当日时长累计、多日会话归桶分段及 24 小时分布分析。
+ * Dependencies & Triggers: 依赖 models、date-utils、duration-formatter；在状态栏更新、面板刷新及导出报告时按需执行。
+ * Responsibilities: 计算今日累计时长 todayMs（含未闭合活跃会话）；按日汇总会话 dailyStats；计算单日 24 小时分布与高峰时段 dailyDetail。
+ * Exit Semantics & Design Rationale: 纯函数设计，无副作用；按本地自然日严格裁剪边界，规避夏令时/跨午夜引起的重复计算与死循环。
  */
 
 import { TimeSession, MS_PER_HOUR } from '../models';

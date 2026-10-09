@@ -1,9 +1,10 @@
 /**
- * CommandRegistrar — 命令注册中心
- *
- * 职责：管理所有 VS Code command 的注册与释放
- * 边界：只负责注册/注销与交互确认；业务编排一律委托 application 层
- *       （如 reset 走 TimerOrchestrator.resetAllData，不在此处拼装存储操作）
+ * Module: CommandRegistrar — VS Code 命令注册与交互调度中心
+ * File Path: src/presentation/CommandRegistrar.ts
+ * Architecture Role: Presentation layer command dispatcher bridging VS Code command palette and application services
+ * Dependencies & Triggers: vscode API, TimerOrchestrator, StatusBarController, GlobalAggregator, i18n subsystem; invoked during extension activate
+ * Responsibilities: Register VS Code commands (enable, disable, toggleGlobal, showStatus, reset, export, newPeriod, restore); handle confirmation dialogs and file pickers; coordinate graceful command unregistration
+ * Exit Semantics & Design Rationale: Encapsulates user interactions and confirmation modals while delegating actual state mutations to TimerOrchestrator; manages subscriptions for clean disposal
  */
 
 import * as vscode from 'vscode';
