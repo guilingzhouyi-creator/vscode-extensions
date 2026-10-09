@@ -138,39 +138,41 @@ export function pipeNameFor(projectHash: string): string {
     return path.join(base, `auto-refactor-warmscan-${projectHash}.sock`);
 }
 
-/**
- * Persist the daemon rendezvous record with an atomic tmp-file + rename, so readers never
- * observe a partially written JSON document. Best-effort by contract: any filesystem failure
- * is swallowed and clients simply degrade to a cold scan.
- *
- * @param projectHash - 24-hex project identity produced by projectHashFor.
- * @param info - Full daemon metadata snapshot to publish.
- */
-export function writeRegistry(projectHash: string, info: RegistryInfo): void {
-    try {
-        fs.mkdirSync(registryDir(), { recursive: true });
-        const file = registryPath(projectHash);
-        const stagingRegistryPath = `${file}.tmp-${process.pid}-${Math.random()
-            .toString(RANDOM_SUFFIX_RADIX)
-            .slice(2, REGISTRY_STAGING_SUFFIX_END)}`;
-        fs.writeFileSync(stagingRegistryPath, JSON.stringify(info, null, 2), 'utf8');
-        fs.renameSync(stagingRegistryPath, file);
-    } catch {
-        /* Best-effort: registry write failure is non-fatal (client degrades to cold) */
-    }
+/** Short TTL for in-memory registry snapshot caching (in milliseconds). */
+export const REGISTRY_CACHE_TTL_MS = 500;
+
+/** Shorter negative TTL when no registry file is found (in milliseconds). */
+export const REGISTRY_NEGATIVE_CACHE_TTL_MS = 50;
+
+interface CachedRegistrySnapshot {
+    info: RegistryInfo | null;
+    timestamp: number;
+    negative: boolean;
 }
 
-/**
- * Read and minimally validate the daemon rendezvous record. Missing files, malformed JSON, and
- * records lacking numeric `pid`/`protocol` or a string `pipe` all mean "no daemon": failing
- * soft lets callers fall back to a cold scan instead of aborting.
- *
- * @param projectHash - 24-hex project identity produced by projectHashFor.
- * @returns Parsed metadata, or null when the record is absent, unreadable, or shape-invalid.
- */
-export function readRegistry(projectHash: string): RegistryInfo | null {
+const registryMemoryCache = new Map<string, CachedRegistrySnapshot>();
+
+function getCachedSnapshot(projectHash: string): RegistryInfo | null | undefined {
+    const cached = registryMemoryCache.get(projectHash);
+    if (!cached) return undefined;
+    const now = Date.now();
+    const ttl = cached.negative ? REGISTRY_NEGATIVE_CACHE_TTL_MS : REGISTRY_CACHE_TTL_MS;
+    if (now - cached.timestamp < ttl) {
+        return cached.info;
+    }
+    return undefined;
+}
+
+function setCachedSnapshot(projectHash: string, info: RegistryInfo | null): void {
+    registryMemoryCache.set(projectHash, {
+        info,
+        timestamp: Date.now(),
+        negative: info === null,
+    });
+}
+
+function parseRegistryContent(raw: string): RegistryInfo | null {
     try {
-        const raw = fs.readFileSync(registryPath(projectHash), 'utf8');
         const o = JSON.parse(raw);
         if (
             o &&
@@ -186,6 +188,80 @@ export function readRegistry(projectHash: string): RegistryInfo | null {
     }
 }
 
+const syncFsWriteText = fs.writeFileSync.bind(fs);
+const syncFsReadText = fs.readFileSync.bind(fs);
+
+/**
+ * Synchronous I/O barrier isolating blocking filesystem operations for registry persistence.
+ */
+export const RegistrySyncIoBarrier = {
+    writeSync: (filePath: string, data: string): void => {
+        syncFsWriteText(filePath, data, 'utf8');
+    },
+    readSync: (filePath: string): string => {
+        return syncFsReadText(filePath, 'utf8');
+    },
+};
+
+/**
+ * Persist the daemon rendezvous record with an atomic tmp-file + rename, so readers never
+ * observe a partially written JSON document. Best-effort by contract: any filesystem failure
+ * is swallowed and clients simply degrade to a cold scan.
+ *
+ * @param projectHash - 24-hex project identity produced by projectHashFor.
+ * @param info - Full daemon metadata snapshot to publish.
+ */
+export function writeRegistry(projectHash: string, info: RegistryInfo): void {
+    const stagingRegistryPath = `${registryPath(projectHash)}.tmp-${process.pid}-${Math.random()
+        .toString(RANDOM_SUFFIX_RADIX)
+        .slice(2, REGISTRY_STAGING_SUFFIX_END)}`;
+    try {
+        fs.mkdirSync(registryDir(), { recursive: true });
+        const file = registryPath(projectHash);
+        RegistrySyncIoBarrier.writeSync(stagingRegistryPath, JSON.stringify(info, null, 2));
+        try {
+            fs.renameSync(stagingRegistryPath, file);
+            setCachedSnapshot(projectHash, info);
+        } catch {
+            try {
+                fs.rmSync(stagingRegistryPath, { force: true });
+            } catch {
+                /* ignore staging cleanup */
+            }
+        }
+    } catch {
+        try {
+            fs.rmSync(stagingRegistryPath, { force: true });
+        } catch {
+            /* Best-effort: registry write failure is non-fatal (client degrades to cold) */
+        }
+    }
+}
+
+/**
+ * Read and minimally validate the daemon rendezvous record. Missing files, malformed JSON, and
+ * records lacking numeric `pid`/`protocol` or a string `pipe` all mean "no daemon": failing
+ * soft lets callers fall back to a cold scan instead of aborting.
+ *
+ * @param projectHash - 24-hex project identity produced by projectHashFor.
+ * @returns Parsed metadata, or null when the record is absent, unreadable, or shape-invalid.
+ */
+export function readRegistry(projectHash: string): RegistryInfo | null {
+    const cached = getCachedSnapshot(projectHash);
+    if (cached !== undefined) {
+        return cached;
+    }
+    try {
+        const raw = RegistrySyncIoBarrier.readSync(registryPath(projectHash));
+        const info = parseRegistryContent(raw);
+        setCachedSnapshot(projectHash, info);
+        return info;
+    } catch {
+        setCachedSnapshot(projectHash, null);
+        return null;
+    }
+}
+
 /**
  * Best-effort removal of the daemon rendezvous record, called on graceful stop or shutdown. If
  * `rmSync` is blocked (for example by a Windows file lock or a read-only directory), the record
@@ -194,6 +270,7 @@ export function readRegistry(projectHash: string): RegistryInfo | null {
  * @param projectHash - 24-hex project identity produced by projectHashFor.
  */
 export function clearRegistry(projectHash: string): void {
+    registryMemoryCache.delete(projectHash);
     const file = registryPath(projectHash);
     try {
         fs.rmSync(file, { force: true });
@@ -222,4 +299,82 @@ export function clearRegistry(projectHash: string): void {
  */
 export function logFilePath(projectHash: string): string {
     return path.join(registryDir(), `${projectHash}-daemon.log`);
+}
+
+/**
+ * Asynchronously persist the daemon rendezvous record with atomic tmp-file + rename.
+ *
+ * @param projectHash - 24-hex project identity produced by projectHashFor.
+ * @param info - Full daemon metadata snapshot to publish.
+ */
+export async function writeRegistryAsync(projectHash: string, info: RegistryInfo): Promise<void> {
+    const stagingRegistryPath = `${registryPath(projectHash)}.tmp-${process.pid}-${Math.random()
+        .toString(RANDOM_SUFFIX_RADIX)
+        .slice(2, REGISTRY_STAGING_SUFFIX_END)}`;
+    try {
+        await fs.promises.mkdir(registryDir(), { recursive: true });
+        const file = registryPath(projectHash);
+        await fs.promises.writeFile(stagingRegistryPath, JSON.stringify(info, null, 2), 'utf8');
+        try {
+            await fs.promises.rename(stagingRegistryPath, file);
+            setCachedSnapshot(projectHash, info);
+        } catch {
+            try {
+                await fs.promises.unlink(stagingRegistryPath);
+            } catch {
+                /* ignore staging cleanup */
+            }
+        }
+    } catch {
+        try {
+            await fs.promises.unlink(stagingRegistryPath);
+        } catch {
+            /* Best-effort: registry write failure is non-fatal */
+        }
+    }
+}
+
+/**
+ * Asynchronously read and validate the daemon rendezvous record.
+ *
+ * @param projectHash - 24-hex project identity produced by projectHashFor.
+ * @returns Parsed metadata, or null when the record is absent, unreadable, or shape-invalid.
+ */
+export async function readRegistryAsync(projectHash: string): Promise<RegistryInfo | null> {
+    const cached = getCachedSnapshot(projectHash);
+    if (cached !== undefined) {
+        return cached;
+    }
+    try {
+        const raw = await fs.promises.readFile(registryPath(projectHash), 'utf8');
+        const info = parseRegistryContent(raw);
+        setCachedSnapshot(projectHash, info);
+        return info;
+    } catch {
+        setCachedSnapshot(projectHash, null);
+        return null;
+    }
+}
+
+/**
+ * Asynchronously remove the daemon rendezvous record on graceful stop or shutdown.
+ * If unlink fails, it attempts to rename the record aside as a best-effort fallback.
+ *
+ * @param projectHash - 24-hex project identity produced by projectHashFor.
+ */
+export async function clearRegistryAsync(projectHash: string): Promise<void> {
+    registryMemoryCache.delete(projectHash);
+    const file = registryPath(projectHash);
+    try {
+        await fs.promises.unlink(file);
+    } catch {
+        try {
+            const stale = `${file}.stale-${Date.now()}-${Math.random()
+                .toString(RANDOM_SUFFIX_RADIX)
+                .slice(2, STALE_SUFFIX_END_INDEX)}`;
+            await fs.promises.rename(file, stale);
+        } catch {
+            /* ignore */
+        }
+    }
 }

@@ -60,6 +60,37 @@ const CHAR_IDEOGRAPHIC_SPACE = 0x3000;
 /** U+FEFF ZERO WIDTH NO-BREAK SPACE (byte-order mark). */
 const CHAR_ZERO_WIDTH_NO_BREAK_SPACE = 0xfeff;
 
+/** Upper bound of the Latin-1 character range (0x00..0xFF). */
+const LATIN1_RANGE_LIMIT = 256;
+
+/** Fast-path lookup table for Latin-1 whitespace code points (0x00..0xFF). */
+export const LATIN1_TRIM_WHITESPACE: Uint8Array = (() => {
+    const table = new Uint8Array(LATIN1_RANGE_LIMIT);
+    for (let c = CHAR_TAB; c <= CHAR_CARRIAGE_RETURN; c++) {
+        table[c] = 1;
+    }
+    table[CHAR_SPACE] = 1;
+    table[CHAR_NO_BREAK_SPACE] = 1;
+    return table;
+})();
+
+/** Unicode whitespace code points outside the Latin-1 range. */
+export const UNICODE_TRIM_WHITESPACE: ReadonlySet<number> = (() => {
+    const set = new Set<number>([
+        CHAR_OGHAM_SPACE_MARK,
+        CHAR_LINE_SEPARATOR,
+        CHAR_PARAGRAPH_SEPARATOR,
+        CHAR_NARROW_NO_BREAK_SPACE,
+        CHAR_MEDIUM_MATHEMATICAL_SPACE,
+        CHAR_IDEOGRAPHIC_SPACE,
+        CHAR_ZERO_WIDTH_NO_BREAK_SPACE,
+    ]);
+    for (let c = CHAR_EN_QUAD; c <= CHAR_HAIR_SPACE; c++) {
+        set.add(c);
+    }
+    return set;
+})();
+
 /**
  * Architectural design: single-pass line statistics, computed ONCE per file and shared by
  * every consumer (FileMetricCollector + large-file analyzer) — replacing 2–3 whole-string
@@ -79,19 +110,10 @@ const CHAR_ZERO_WIDTH_NO_BREAK_SPACE = 0xfeff;
  * whitespace; `false` for every other code point.
  */
 function isTrimWhitespace(ch: number): boolean {
-    return (
-        (ch >= CHAR_TAB && ch <= CHAR_CARRIAGE_RETURN) || // \t \n \v \f \r
-        ch === CHAR_SPACE || // space
-        ch === CHAR_NO_BREAK_SPACE || // no-break space
-        ch === CHAR_OGHAM_SPACE_MARK || // ogham space mark
-        (ch >= CHAR_EN_QUAD && ch <= CHAR_HAIR_SPACE) || // en quad … hair space
-        ch === CHAR_LINE_SEPARATOR || // line separator
-        ch === CHAR_PARAGRAPH_SEPARATOR || // paragraph separator
-        ch === CHAR_NARROW_NO_BREAK_SPACE || // narrow no-break space
-        ch === CHAR_MEDIUM_MATHEMATICAL_SPACE || // medium mathematical space
-        ch === CHAR_IDEOGRAPHIC_SPACE || // ideographic space
-        ch === CHAR_ZERO_WIDTH_NO_BREAK_SPACE // zero-width no-break space
-    );
+    if (ch < LATIN1_RANGE_LIMIT) {
+        return LATIN1_TRIM_WHITESPACE[ch] === 1;
+    }
+    return UNICODE_TRIM_WHITESPACE.has(ch);
 }
 
 /**

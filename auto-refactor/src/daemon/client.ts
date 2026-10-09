@@ -2,7 +2,13 @@ import * as net from 'net';
 import type { ScanConfig, ScanReport, WarmStats } from '../core/types';
 import type { RegistryInfo } from './registry';
 import { readRegistry, projectHashFor } from './registry';
-import type { DaemonMessage, HelloAckMessage } from './protocol';
+import type {
+    DaemonMessage,
+    HelloAckMessage,
+    ScanDoneMessage,
+    ErrorMessage,
+    PongMessage,
+} from './protocol';
 import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
 
 /**
@@ -382,53 +388,66 @@ export class DaemonClient {
         }
     }
 
+    private handleHelloAck(msg: HelloAckMessage): void {
+        if (msg.protocol !== PROTOCOL_VERSION || msg.version !== PROTOCOL_SOFTWARE_VERSION) {
+            this.pendingHello?.reject(
+                new Error(
+                    `VERSION_DRIFT: daemon ${msg.version}/p${msg.protocol} != client ${PROTOCOL_SOFTWARE_VERSION}/p${PROTOCOL_VERSION}`,
+                ),
+            );
+        } else {
+            this.caps = msg.caps;
+            this.pendingHello?.resolve(msg);
+        }
+        this.pendingHello = null;
+    }
+
+    private handleScanDone(msg: ScanDoneMessage): void {
+        if (this.pendingScanDiff) {
+            this.pendingScanDiff.resolve({ report: msg.report, stats: msg.stats });
+            this.pendingScanDiff = null;
+            return;
+        }
+        if (this.pendingScan) {
+            this.pendingScan.resolve({
+                report: msg.report as unknown as ScanReport,
+                stats: msg.stats as unknown as WarmStats,
+            });
+            this.pendingScan = null;
+        }
+    }
+
+    private handleError(msg: ErrorMessage): void {
+        if (msg.requestId) {
+            if (this.pendingScanDiff) {
+                this.pendingScanDiff.reject(new Error(`DAEMON_ERROR(${msg.code}): ${msg.message}`));
+            }
+            if (this.pendingScan) {
+                this.pendingScan.reject(new Error(`DAEMON_ERROR(${msg.code}): ${msg.message}`));
+            }
+        }
+        this.pendingScanDiff = null;
+        this.pendingScan = null;
+    }
+
+    private handlePong(_msg: PongMessage): void {
+        this.pendingPong?.resolve();
+        this.pendingPong = null;
+    }
+
     private onMessage(msg: DaemonMessage): void {
         switch (msg.type) {
             case 'hello_ack':
-                if (
-                    msg.protocol !== PROTOCOL_VERSION ||
-                    msg.version !== PROTOCOL_SOFTWARE_VERSION
-                ) {
-                    this.pendingHello?.reject(
-                        new Error(
-                            `VERSION_DRIFT: daemon ${msg.version}/p${msg.protocol} != client ${PROTOCOL_SOFTWARE_VERSION}/p${PROTOCOL_VERSION}`,
-                        ),
-                    );
-                } else {
-                    this.caps = msg.caps;
-                    this.pendingHello?.resolve(msg);
-                }
-                this.pendingHello = null;
+                this.handleHelloAck(msg);
                 break;
             case 'scan_done':
-                if (this.pendingScanDiff) {
-                    this.pendingScanDiff.resolve({ report: msg.report, stats: msg.stats });
-                    this.pendingScanDiff = null;
-                } else if (this.pendingScan) {
-                    this.pendingScan.resolve({
-                        report: msg.report as unknown as ScanReport,
-                        stats: msg.stats as unknown as WarmStats,
-                    });
-                    this.pendingScan = null;
-                }
+                this.handleScanDone(msg);
                 break;
             case 'error':
-                if (msg.requestId) {
-                    if (this.pendingScanDiff)
-                        this.pendingScanDiff.reject(
-                            new Error(`DAEMON_ERROR(${msg.code}): ${msg.message}`),
-                        );
-                    if (this.pendingScan)
-                        this.pendingScan.reject(
-                            new Error(`DAEMON_ERROR(${msg.code}): ${msg.message}`),
-                        );
-                }
-                this.pendingScanDiff = null;
-                this.pendingScan = null;
+                this.handleError(msg);
                 break;
             case 'pong':
-                this.pendingPong?.resolve();
-                this.pendingPong = null;
+                this.handlePong(msg);
                 break;
             default:
                 break;

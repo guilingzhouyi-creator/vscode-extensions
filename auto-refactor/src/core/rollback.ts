@@ -158,6 +158,25 @@ function applySortedHunksToFile(
     }
 }
 
+function hunkHasCardAttribution(hunk: ReviewDiffHunk, cardId: string): boolean {
+    for (const line of hunk.lines) {
+        if (line.attribution?.cardId === cardId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function collectCardHunks(hunks: ReviewDiffHunk[], cardId: string): ReviewDiffHunk[] {
+    const matching: ReviewDiffHunk[] = [];
+    for (const hunk of hunks) {
+        if (hunkHasCardAttribution(hunk, cardId)) {
+            matching.push(hunk);
+        }
+    }
+    return matching;
+}
+
 /**
  * Revert all hunks in multiple files attributed to a given TaskCard ID.
  * A hunk matches when any of its lines carries `attribution.cardId`; matches are applied in
@@ -179,9 +198,7 @@ export function revertTaskCard(
     const updatedFiles = new Map<string, string>();
 
     for (const [filePath, hunks] of hunksByFile.entries()) {
-        const matchingHunks = hunks.filter((h) =>
-            h.lines.some((l) => l.attribution?.cardId === targetCardId),
-        );
+        const matchingHunks = collectCardHunks(hunks, targetCardId);
         if (matchingHunks.length === 0) continue;
 
         const content = fileContents.get(filePath);
@@ -213,6 +230,27 @@ export class PraxisRollbackEngine implements IPraxisRollbackGatekeeper {
     private readonly fileCache: Map<string, string> = new Map();
     private readonly hunkIndex: Map<string, ReviewDiffHunk> = new Map();
     private readonly cardHunkMap: Map<string, ReviewDiffHunk[]> = new Map();
+    private readonly cardToFileHunksMap: Map<string, Map<string, ReviewDiffHunk[]>> = new Map();
+
+    private indexHunkAttribution(cardId: string, filePath: string, hunk: ReviewDiffHunk): void {
+        const list = this.cardHunkMap.get(cardId) || [];
+        list.push(hunk);
+        this.cardHunkMap.set(cardId, list);
+
+        let fileHunkMap = this.cardToFileHunksMap.get(cardId);
+        if (!fileHunkMap) {
+            fileHunkMap = new Map<string, ReviewDiffHunk[]>();
+            this.cardToFileHunksMap.set(cardId, fileHunkMap);
+        }
+        let fileHunks = fileHunkMap.get(filePath);
+        if (!fileHunks) {
+            fileHunks = [];
+            fileHunkMap.set(filePath, fileHunks);
+        }
+        if (!fileHunks.includes(hunk)) {
+            fileHunks.push(hunk);
+        }
+    }
 
     /** Register active files and hunks for rollback indexing */
     registerFileHunks(filePath: string, content: string, hunks: ReviewDiffHunk[]): void {
@@ -222,9 +260,7 @@ export class PraxisRollbackEngine implements IPraxisRollbackGatekeeper {
             for (const line of hunk.lines) {
                 const cardId = line.attribution?.cardId;
                 if (cardId) {
-                    const list = this.cardHunkMap.get(cardId) || [];
-                    list.push(hunk);
-                    this.cardHunkMap.set(cardId, list);
+                    this.indexHunkAttribution(cardId, filePath, hunk);
                 }
             }
         }
@@ -244,12 +280,8 @@ export class PraxisRollbackEngine implements IPraxisRollbackGatekeeper {
     }
 
     revertTaskCard(cardId: string): { affectedFiles: string[]; rolledBackCheckpoints: string[] } {
-        const hunksByFile = new Map<string, ReviewDiffHunk[]>();
-        const cardHunks = this.cardHunkMap.get(cardId) || [];
-
-        for (const [file] of this.fileCache.entries()) {
-            hunksByFile.set(file, cardHunks);
-        }
+        const hunksByFile =
+            this.cardToFileHunksMap.get(cardId) || new Map<string, ReviewDiffHunk[]>();
 
         const res = revertTaskCard(this.fileCache, cardId, hunksByFile);
         if (res.success) {

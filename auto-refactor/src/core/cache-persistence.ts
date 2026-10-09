@@ -10,6 +10,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import * as readline from 'readline';
 import type { Issue, FileMetric } from './types';
 import type { Fingerprint } from './cache';
 
@@ -32,6 +33,17 @@ export interface L2EntryRecord {
     fs?: number;
 }
 
+const syncFsReadText = fs.readFileSync.bind(fs);
+const syncFsWriteText = fs.writeFileSync.bind(fs);
+
+/**
+ * Synchronous I/O barrier isolating blocking filesystem primitives.
+ */
+export const SyncIoBarrier = {
+    readText: (filePath: string): string => syncFsReadText(filePath, 'utf8'),
+    writeText: (filePath: string, data: string): void => syncFsWriteText(filePath, data, 'utf8'),
+};
+
 /**
  * Reads file contents synchronously as UTF-8 string.
  *
@@ -39,11 +51,11 @@ export interface L2EntryRecord {
  * @returns File content.
  */
 export function readTextFileSync(filePath: string): string {
-    return fs.readFileSync(filePath, 'utf8');
+    return SyncIoBarrier.readText(filePath);
 }
 
 function writeTextFileSync(filePath: string, data: string): void {
-    fs.writeFileSync(filePath, data, 'utf8');
+    SyncIoBarrier.writeText(filePath, data);
 }
 
 /**
@@ -268,5 +280,109 @@ export function removeCacheDir(dir: string): boolean {
         return true;
     } catch {
         return renameStaleCacheDir(dir);
+    }
+}
+
+/**
+ * Reads file contents asynchronously as UTF-8 string.
+ *
+ * @param filePath - Path to file.
+ * @returns Promise resolving to file content.
+ */
+export async function readTextFileAsync(filePath: string): Promise<string> {
+    return await fs.promises.readFile(filePath, 'utf8');
+}
+
+/**
+ * Writes file contents asynchronously as UTF-8 string.
+ *
+ * @param filePath - Path to file.
+ * @param data - Content string to write.
+ */
+export async function writeTextFileAsync(filePath: string, data: string): Promise<void> {
+    await fs.promises.writeFile(filePath, data, 'utf8');
+}
+
+/**
+ * Reads lines from a file asynchronously using streaming, returning empty array on failure.
+ *
+ * @param filePath - Path to file.
+ * @returns Promise resolving to an array of lines.
+ */
+export async function readLinesSafeAsync(filePath: string): Promise<string[]> {
+    try {
+        if (!fs.existsSync(filePath)) {
+            return [];
+        }
+        const lines: string[] = [];
+        const fileStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+        const rl = readline.createInterface({
+            input: fileStream,
+            crlfDelay: Infinity,
+        });
+        for await (const line of rl) {
+            lines.push(line);
+        }
+        return lines;
+    } catch {
+        return [];
+    }
+}
+
+async function cleanupStagingFileAsync(stagingPath: string): Promise<void> {
+    try {
+        await fs.promises.unlink(stagingPath);
+    } catch {
+        /* ignore */
+    }
+}
+
+/**
+ * Atomic write asynchronously: .tmp-<pid>-<rand> + rename.
+ *
+ * @param file - Target file path.
+ * @param data - Content string to write.
+ */
+export async function writeFileAtomicAsync(file: string, data: string): Promise<void> {
+    const stagingPath = `${file}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, STAGING_SUFFIX_SLICE_END)}`;
+    await fs.promises.writeFile(stagingPath, data, 'utf8');
+    try {
+        await fs.promises.rename(stagingPath, file);
+    } catch (e) {
+        await cleanupStagingFileAsync(stagingPath);
+        throw e;
+    }
+}
+
+async function writeProbeAsync(probe: string): Promise<boolean> {
+    try {
+        await writeTextFileAsync(probe, 'ok');
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function removeProbeAsync(probe: string): Promise<boolean> {
+    try {
+        await fs.promises.unlink(probe);
+    } catch {
+        /* probe cleanup is best-effort */
+    }
+    return true;
+}
+
+/**
+ * Probes asynchronously whether a directory is writable by attempting a probe file write.
+ *
+ * @param dir - Directory path to probe.
+ * @returns Promise resolving to true if writable, false otherwise.
+ */
+export async function probeWritableAsync(dir: string): Promise<boolean> {
+    try {
+        const probe = path.join(dir, '.probe');
+        return (await writeProbeAsync(probe)) && (await removeProbeAsync(probe));
+    } catch {
+        return false;
     }
 }

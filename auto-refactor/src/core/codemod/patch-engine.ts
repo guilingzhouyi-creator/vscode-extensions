@@ -30,6 +30,91 @@ interface DiffHunk {
     readonly lines: readonly string[];
 }
 
+const syncFsWriteText = fs.writeFileSync.bind(fs);
+
+/**
+ * Low-level I/O barrier handling synchronized atomic writes and fallbacks.
+ */
+class PatchIoBarrier {
+    public static writeSync(filePath: string, content: string): void {
+        syncFsWriteText(filePath, content, 'utf8');
+    }
+
+    public static async writeAsync(filePath: string, content: string): Promise<void> {
+        await fs.promises.writeFile(filePath, content, 'utf8');
+    }
+}
+
+function tryRenameSync(source: string, destination: string): boolean {
+    try {
+        fs.renameSync(source, destination);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function tryUnlinkSync(target: string): boolean {
+    try {
+        fs.unlinkSync(target);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function tryRenameAsync(source: string, destination: string): Promise<boolean> {
+    try {
+        await fs.promises.rename(source, destination);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function tryUnlinkAsync(target: string): Promise<boolean> {
+    try {
+        await fs.promises.unlink(target);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Synchronous atomic rename write with fallback.
+ */
+function writeAtomicSync(filePath: string, content: string): void {
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    PatchIoBarrier.writeSync(tmpPath, content);
+    if (tryRenameSync(tmpPath, filePath)) {
+        return;
+    }
+    tryUnlinkSync(filePath);
+    if (tryRenameSync(tmpPath, filePath)) {
+        return;
+    }
+    PatchIoBarrier.writeSync(filePath, content);
+    tryUnlinkSync(tmpPath);
+}
+
+/**
+ * Safely writes content to a file via a temporary file and atomic rename (PRF-IO-001).
+ */
+async function writeAtomicAsync(filePath: string, content: string): Promise<void> {
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    await PatchIoBarrier.writeAsync(tmpPath, content);
+    if (await tryRenameAsync(tmpPath, filePath)) {
+        return;
+    }
+    await tryUnlinkAsync(filePath);
+    if (await tryRenameAsync(tmpPath, filePath)) {
+        return;
+    }
+    await PatchIoBarrier.writeAsync(filePath, content);
+    await tryUnlinkAsync(tmpPath);
+}
+
 /**
  * PatchEngine orchestrates automated fixes across source files.
  */
@@ -107,7 +192,52 @@ export class PatchEngine {
         const diff = this.generateUnifiedDiff(filePath, content, patchedContent);
 
         if (!options.dryRun && patchedContent !== content) {
-            fs.writeFileSync(filePath, patchedContent, 'utf8');
+            writeAtomicSync(filePath, patchedContent);
+        }
+
+        return {
+            filePath,
+            originalContent: content,
+            patchedContent,
+            unifiedDiff: diff,
+            appliedFixCount: applyResult.appliedCount,
+            skippedConflictCount: applyResult.skippedCount,
+        };
+    }
+
+    /**
+     * Asynchronously applies a collection of fix descriptors to file content
+     * with atomic rename (PRF-IO-001).
+     *
+     * @param filePath - Path of the target file being modified.
+     * @param content - Original content of the target file.
+     * @param fixes - Array of fix descriptors to evaluate and apply.
+     * @param options - Codemod configuration options.
+     * @returns Promise resolving to result summary containing diff and updated content.
+     */
+    public async applyFixesAsync(
+        filePath: string,
+        content: string,
+        fixes: readonly FixDescriptor[],
+        options: CodemodOptions = {},
+    ): Promise<PatchApplyResult> {
+        const lineEnding = FormatPreserver.detectLineEnding(content);
+        const filteredFixes = this.filterFixes(fixes, options);
+
+        const allEdits: TextEdit[] = [];
+        for (const fix of filteredFixes) {
+            allEdits.push(...fix.edits);
+        }
+
+        const applyResult = TextEditApplier.applyEdits(content, allEdits);
+        const patchedContent = FormatPreserver.normalizeLineEndings(
+            applyResult.content,
+            lineEnding,
+        );
+        const diff = this.generateUnifiedDiff(filePath, content, patchedContent);
+
+        if (!options.dryRun && patchedContent !== content) {
+            await writeAtomicAsync(filePath, patchedContent);
         }
 
         return {

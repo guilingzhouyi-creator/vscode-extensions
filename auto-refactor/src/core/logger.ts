@@ -85,6 +85,17 @@ export class AutoRefactorError extends Error {
     }
 }
 
+const syncFsAppendText = fs.appendFileSync.bind(fs);
+
+/**
+ * Synchronous log I/O barrier isolating synchronous disk writes for emergency exit semantics.
+ */
+export const LogIoBarrier = {
+    appendSync: (filePath: string, data: string): void => {
+        syncFsAppendText(filePath, data);
+    },
+};
+
 /**
  * Minimal, dependency-free logger.
  *
@@ -104,6 +115,7 @@ export class LogRingBuffer {
     private readonly filePath: string;
     private timer: NodeJS.Timeout | null = null;
     private isFlushing: boolean = false;
+    private isSyncFlushing: boolean = false;
 
     /**
      * Create a ring buffer for batching log disk appends.
@@ -119,6 +131,7 @@ export class LogRingBuffer {
 
     /**
      * Push a formatted log line into the in-memory circular buffer.
+     * Maintains async-first priority while respecting the sync flush barrier.
      *
      * @param line - Fully formatted log line string.
      */
@@ -129,6 +142,10 @@ export class LogRingBuffer {
             this.count++;
         } else {
             this.tail = (this.tail + 1) % this.capacity;
+        }
+
+        if (this.isSyncFlushing) {
+            return;
         }
 
         if (this.count >= 128) {
@@ -146,23 +163,29 @@ export class LogRingBuffer {
 
     /**
      * Synchronously flush all buffered log lines to disk immediately.
+     * Enforces a barrier against race appends and releases resources safely.
      */
     public flushSync(): void {
         if (this.timer) {
             clearTimeout(this.timer);
             this.timer = null;
         }
-        if (this.count === 0) return;
-        const linesToFlush: string[] = [];
-        while (this.count > 0) {
-            linesToFlush.push(this.buffer[this.tail]);
-            this.tail = (this.tail + 1) % this.capacity;
-            this.count--;
-        }
+        this.isSyncFlushing = true;
         try {
-            fs.appendFileSync(this.filePath, linesToFlush.join('\n') + '\n');
-        } catch (e) {
-            process.stderr.write(`[auto-refactor] WARN sync log flush failed: ${String(e)}\n`);
+            if (this.count === 0) return;
+            const linesToFlush: string[] = [];
+            while (this.count > 0) {
+                linesToFlush.push(this.buffer[this.tail]);
+                this.tail = (this.tail + 1) % this.capacity;
+                this.count--;
+            }
+            try {
+                LogIoBarrier.appendSync(this.filePath, linesToFlush.join('\n') + '\n');
+            } catch (e) {
+                process.stderr.write(`[auto-refactor] WARN sync log flush failed: ${String(e)}\n`);
+            }
+        } finally {
+            this.isSyncFlushing = false;
         }
     }
 
@@ -172,17 +195,17 @@ export class LogRingBuffer {
      * @returns Promise resolving when flush completes.
      */
     public async flushAsync(): Promise<void> {
-        if (this.count === 0 || this.isFlushing) return;
+        if (this.count === 0 || this.isFlushing || this.isSyncFlushing) return;
         this.isFlushing = true;
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
         const linesToFlush: string[] = [];
         while (this.count > 0) {
             linesToFlush.push(this.buffer[this.tail]);
             this.tail = (this.tail + 1) % this.capacity;
             this.count--;
-        }
-        if (this.timer) {
-            clearTimeout(this.timer);
-            this.timer = null;
         }
         try {
             await fs.promises.appendFile(this.filePath, linesToFlush.join('\n') + '\n');
@@ -298,6 +321,17 @@ export class Logger {
     close(): void {
         if (this.ringBuffer) {
             this.ringBuffer.flushSync();
+        }
+    }
+
+    /**
+     * Asynchronously flushes all pending logs to disk and releases file resources.
+     *
+     * @returns Promise resolving when flush completes.
+     */
+    async closeAsync(): Promise<void> {
+        if (this.ringBuffer) {
+            await this.ringBuffer.flushAsync();
         }
     }
 

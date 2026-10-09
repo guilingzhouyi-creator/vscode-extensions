@@ -80,7 +80,13 @@ export function toJson(report: ScanReport): string {
  * @returns A newline-joined plain-text block; each issue contributes one severity line and an
  *   optional indented suggestion line, with a blank line closing every file group.
  */
-export function toText(report: ScanReport): string {
+/**
+ * Renders the plain-text report header block containing summary totals and notes.
+ *
+ * @param report - Scan result report to inspect.
+ * @returns Array of rendered header lines.
+ */
+function renderReportHeader(report: ScanReport): string[] {
     const lines: string[] = [];
     lines.push(`auto-refactor v${report.version}`);
     lines.push(`root: ${report.root}`);
@@ -102,20 +108,32 @@ export function toText(report: ScanReport): string {
         lines.push(`  note: ${warning}`);
     }
     lines.push('');
+    return lines;
+}
 
-    if (report.issues.length === 0) {
-        lines.push('No issues found.');
-        return lines.join('\n');
-    }
-
-    // group by file
+/**
+ * Groups issue findings by their target file path.
+ *
+ * @param issues - Flat array of issues.
+ * @returns Map from file path to issues in that file.
+ */
+function groupIssuesByFile(issues: readonly Issue[]): Map<string, Issue[]> {
     const byFile = new Map<string, Issue[]>();
-    for (const it of report.issues) {
+    for (const it of issues) {
         const arr = byFile.get(it.location.file) || [];
         arr.push(it);
         byFile.set(it.location.file, arr);
     }
+    return byFile;
+}
 
+/**
+ * Appends formatted file blocks and issue details to output lines.
+ *
+ * @param lines - Target array of output strings.
+ * @param byFile - Issues grouped by file path.
+ */
+function appendFileIssueBlocks(lines: string[], byFile: Map<string, Issue[]>): void {
     for (const [file, items] of byFile) {
         lines.push(`■ ${file}`);
         for (const it of items) {
@@ -127,6 +145,30 @@ export function toText(report: ScanReport): string {
         }
         lines.push('');
     }
+}
+
+/**
+ * Render a human-readable summary followed by the issues grouped by file.
+ *
+ * The header always carries version, root and generatedAt plus per-severity and per-analyzer
+ * totals; when the report holds no issues the body collapses to a single "No issues found."
+ * line, so CLI consumers always receive printable output.
+ *
+ * @param report - Scan result to format; only `summary`, `issues` and the header fields are
+ *   read, so extra properties are ignored.
+ * @returns A newline-joined plain-text block; each issue contributes one severity line and an
+ *   optional indented suggestion line, with a blank line closing every file group.
+ */
+export function toText(report: ScanReport): string {
+    const lines = renderReportHeader(report);
+
+    if (report.issues.length === 0) {
+        lines.push('No issues found.');
+        return lines.join('\n');
+    }
+
+    const byFile = groupIssuesByFile(report.issues);
+    appendFileIssueBlocks(lines, byFile);
     return lines.join('\n');
 }
 
