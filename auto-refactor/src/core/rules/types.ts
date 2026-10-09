@@ -12,6 +12,12 @@
 
 /** Canonical rule-id shape: FAMILY-TOPIC-NNN (upper-case family, short topic, 3 digits). */
 export const RULE_ID_PATTERN = /^[A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3}$/;
+
+/** Authoritative 3-letter topic glossary mapping shape. */
+export type TopicGlossary = Readonly<Record<string, string>>;
+
+/** Canonical topic code representation, strictly 3 upper-case alphanumeric letters. */
+export type CanonicalTopicCode = string;
 import type { Severity } from '../types';
 
 export {

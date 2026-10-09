@@ -8,12 +8,14 @@
  * Responsibilities:
  *   1. Declare CANONICAL_TOPIC_CATALOG mapping rule families to recognized domain topics;
  *   2. Lock HISTORICAL_SEQUENCE_ANOMALIES documenting the 5 historical starting-002 pairs;
- *   3. Provide auditTopicAndSequenceContinuity() verification helper.
+ *   3. Declare CANONICAL_3LETTER_GLOSSARY mapping non-standard topics to 3-letter codes;
+ *   4. Provide normalizeTopicCode and toCanonicalRuleId normalization helpers;
+ *   5. Provide auditTopicAndSequenceContinuity verification helper.
  * Exit Semantics & Design Rationale: Immutable, pure declarative metadata ensuring zero
  *   drift for rule topic taxonomy and preventing accidental numbering sequence gaps.
  */
 
-import type { RuleDefinition } from './types';
+import type { RuleDefinition, TopicGlossary } from './types';
 
 /**
  * Metadata descriptor for a canonical rule topic.
@@ -286,6 +288,163 @@ const CANONICAL_TOPIC_SETS: Readonly<Record<string, ReadonlySet<string>>> = Obje
 );
 
 /**
+ * Authoritative glossary mapping non-standard topic codes (4+ letters or historical abbreviations)
+ * across all 30 rule families and legacy rules to canonical 3-letter codes.
+ */
+export const CANONICAL_3LETTER_GLOSSARY: TopicGlossary = Object.freeze({
+    ALIAS: 'ALS',
+    ALLOC: 'ALC',
+    ARGS: 'ARG',
+    ARRAY: 'ARR',
+    ASSERT: 'AST',
+    ASYNC: 'ASY',
+    BIND: 'BND',
+    BOOL: 'BOL',
+    BUDGET: 'BDG',
+    CALL: 'CLL',
+    CLON: 'CLN',
+    CLONE: 'CLN',
+    CMDLET: 'CMD',
+    COMC: 'CMC',
+    COND: 'CND',
+    CONNECT: 'CNT',
+    CONST: 'CST',
+    CTOR: 'CTR',
+    CYCLE: 'CYC',
+    DATETIME: 'DTT',
+    DEAD: 'DED',
+    DEFAULT: 'DFT',
+    DEPR: 'DPR',
+    DISP: 'DSP',
+    ECHO: 'ECH',
+    ELSE: 'ELS',
+    EMPTY: 'EMP',
+    ERROR: 'ERR',
+    EXIT: 'EXT',
+    EXPORT: 'EXP',
+    EXTERN: 'EXT',
+    FLAT: 'FLT',
+    FLOAT: 'FLT',
+    FORMAT: 'FMT',
+    FSTRING: 'FST',
+    GENERIC: 'GNR',
+    GUARD: 'GRD',
+    HOOK: 'HOK',
+    I18N: 'ITN',
+    IMPORT: 'IMP',
+    INCLUDES: 'INC',
+    INIT: 'INT',
+    IO: 'IOP',
+    LEAK: 'LEK',
+    LIFECYCLE: 'LFC',
+    LONG: 'LNG',
+    LOOP: 'LOP',
+    MACRO: 'MCR',
+    MATCH: 'MTC',
+    MOJI: 'MOJ',
+    MUTATE: 'MUT',
+    NEST: 'NST',
+    ONREADY: 'RDY',
+    OPEN: 'OPN',
+    PAIR: 'PAR',
+    PANIC: 'PNC',
+    PARAM: 'PRM',
+    PARSE: 'PRS',
+    PATH: 'PTH',
+    PERF: 'PRF',
+    POOL: 'POL',
+    PORT: 'PRT',
+    PREC: 'PRC',
+    PRNT: 'PNT',
+    PROC: 'PCS',
+    PROP: 'PRP',
+    QUOTE: 'QTE',
+    RAISE: 'RSE',
+    READ: 'RED',
+    RECURSION: 'REC',
+    REPLACE: 'RPL',
+    REQUIRE: 'REQ',
+    RESOURCE: 'RSC',
+    ROUTE: 'RTE',
+    RULE: 'RUL',
+    SAFE: 'SFE',
+    SECRET: 'TOK',
+    SHADOW: 'SHD',
+    SIZE: 'SZE',
+    SLOT: 'SLT',
+    SLOTS: 'SLT',
+    SPACE: 'SPC',
+    SPREAD: 'SPD',
+    SSOT: 'SST',
+    STRUCT: 'STR',
+    STYLE: 'STY',
+    SUBSTR: 'SUB',
+    SUPER: 'SPR',
+    SYNC: 'SNC',
+    TASK: 'TSK',
+    TIME: 'TME',
+    TOOL: 'TOL',
+    TRAN: 'TRN',
+    TRAP: 'TRP',
+    TYPE: 'TYP',
+    UI: 'GUI',
+    UNION: 'UNN',
+    UNSAFE: 'UNS',
+    UNWRAP: 'UNW',
+    VERB: 'VRB',
+    VOID: 'VOD',
+    WEAK: 'WEK',
+    WRAP: 'WRP',
+    YIELD: 'YLD',
+});
+
+/**
+ * Normalize an arbitrary topic code to its canonical 3-letter standard.
+ *
+ * @param topic - Input topic string (case-insensitive).
+ * @returns Standard 3-letter uppercase code if mapped or already 3 letters, otherwise original uppercase.
+ */
+export function normalizeTopicCode(topic: string): string {
+    if (!topic) {
+        return topic;
+    }
+    const upper = topic.toUpperCase();
+    const mapped = CANONICAL_3LETTER_GLOSSARY[upper];
+    if (mapped) {
+        return mapped;
+    }
+    if (upper.length === 3) {
+        return upper;
+    }
+    return upper;
+}
+
+/**
+ * Convert a rule ID into its canonical 3-letter topic form.
+ *
+ * @param ruleId - Tri-part rule ID string (e.g. "ARCH-DISP-001").
+ * @returns Normalized canonical rule ID (e.g. "ARCH-DSP-001"), or original string if not matching tri-part shape.
+ */
+export function toCanonicalRuleId(ruleId: string): string {
+    if (typeof ruleId !== 'string') {
+        return ruleId;
+    }
+    const parts = ruleId.split('-');
+    if (parts.length !== 3) {
+        return ruleId;
+    }
+    const [family, topic, seq] = parts;
+    if (!family || !topic || !seq) {
+        return ruleId;
+    }
+    if (!/^[A-Za-z][A-Za-z0-9]{1,5}$/.test(family) || !/^\d+$/.test(seq)) {
+        return ruleId;
+    }
+    const canonicalTopic = normalizeTopicCode(topic);
+    return `${family.toUpperCase()}-${canonicalTopic}-${seq}`;
+}
+
+/**
  * Result of topic and sequence continuity audit.
  */
 export interface SequenceAuditResult {
@@ -395,3 +554,9 @@ export function auditTopicAndSequenceContinuity(
         unexpectedGaps,
     };
 }
+
+/**
+ * Validator harness alias for auditTopicAndSequenceContinuity.
+ */
+export const validateTopicAndSequenceContinuity = auditTopicAndSequenceContinuity;
+

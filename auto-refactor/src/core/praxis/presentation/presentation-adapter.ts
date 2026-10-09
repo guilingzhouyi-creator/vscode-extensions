@@ -23,6 +23,7 @@ import type { IPraxisSliceAuditService } from '../sliceAuditService';
 import { defaultPraxisSliceAuditService } from '../sliceAuditService';
 import type { IPraxisI18nProvider, PraxisLocale } from './i18n-types';
 import { defaultPraxisI18nProvider } from './i18n-provider';
+import { aggregateSemanticOverlappingCards } from './semantic-correlation';
 import type { ScanReport } from '../../types';
 import { resolveRuleTaxonomy } from '../../governance/standard-terminology';
 import type {
@@ -227,9 +228,12 @@ export class PraxisPresentationAdapter implements IPraxisPresentationService {
         options?: PraxisPresentationOptions,
     ): PraxisPresentationPayload {
         const locale = options?.locale ?? this.i18n.getLocale();
-        const cards = agentPrompt.directives.map((d) =>
+        let cards = agentPrompt.directives.map((d) =>
             buildDiagnosticCard(d, this.i18n, locale, options),
         );
+        if (options?.aggregateOverlaps !== false) {
+            cards = aggregateSemanticOverlappingCards(cards);
+        }
         const metrics = computeMetrics(cards, agentPrompt.tokenSavingsRatio);
         const overallVerdict = agentPrompt.verdict;
         const summaryText = buildSummaryText(overallVerdict, metrics, this.i18n, locale);

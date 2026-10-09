@@ -20,6 +20,8 @@ const {
   createPraxisI18nProvider,
   defaultPraxisPresentationService,
   formatCompactAgentPrompt,
+  aggregateSemanticOverlappingCards,
+  SEMANTIC_OVERLAP_GROUPS,
 } = require('../dist/api');
 
 async function testI18nProvider() {
@@ -181,11 +183,74 @@ async function testAuditAndPresentEndToEnd() {
   );
 }
 
+async function testSemanticOverlapAggregation() {
+  console.log('\n4. Testing semantic overlap aggregation and diagnostic deduplication...');
+
+  assert.ok(Array.isArray(SEMANTIC_OVERLAP_GROUPS), 'SEMANTIC_OVERLAP_GROUPS should be an array');
+  assert.strictEqual(SEMANTIC_OVERLAP_GROUPS.length, 11, 'Expected exactly 11 overlap groups');
+  assert.strictEqual(typeof aggregateSemanticOverlappingCards, 'function');
+
+  const issues = [
+    {
+      id: 'issue-hyg-stb',
+      analyzer: 'hygiene',
+      rule: 'HYG-STB-002',
+      severity: 'error',
+      message: 'Empty stub placeholder found',
+      location: { file: 'src/modules/order.ts', start: { line: 15, column: 4 } },
+      suggestion: 'Implement concrete business logic',
+    },
+    {
+      id: 'issue-gov-san',
+      analyzer: 'governance',
+      rule: 'GOV-SAN-001',
+      severity: 'warning',
+      message: 'Missing input sanitization guard',
+      location: { file: 'src/modules/order.ts', start: { line: 15, column: 4 } },
+      suggestion: 'Sanitize untrusted input',
+    },
+  ];
+
+  const agentPrompt = formatCompactAgentPrompt('src/modules/order.ts#L15', issues);
+
+  // 1. Aggregation enabled (default behavior)
+  const payloadAggregated = defaultPraxisPresentationService.toPresentation(agentPrompt);
+  assert.strictEqual(payloadAggregated.cards.length, 1, 'Expected 2 issues to be aggregated into 1 card');
+  const primaryCard = payloadAggregated.cards[0];
+  assert.strictEqual(primaryCard.ruleId, 'HYG-STB-002', 'Error severity should be elected as primary card');
+  assert.strictEqual(primaryCard.severity, 'block');
+  assert.deepStrictEqual(primaryCard.correlatedRules, ['GOV-SAN-001']);
+  assert.strictEqual(primaryCard.correlationCount, 1);
+  assert.strictEqual(payloadAggregated.metrics.totalDirectives, 1);
+  assert.strictEqual(payloadAggregated.metrics.blockCount, 1);
+  assert.strictEqual(payloadAggregated.metrics.warnCount, 0);
+
+  // 2. Aggregation disabled via options
+  const payloadDisabled = defaultPraxisPresentationService.toPresentation(agentPrompt, {
+    aggregateOverlaps: false,
+  });
+  assert.strictEqual(payloadDisabled.cards.length, 2, 'Expected 2 cards when aggregateOverlaps is false');
+  assert.strictEqual(payloadDisabled.cards[0].ruleId, 'HYG-STB-002');
+  assert.strictEqual(payloadDisabled.cards[1].ruleId, 'GOV-SAN-001');
+  assert.strictEqual(payloadDisabled.cards[0].correlatedRules, undefined);
+  assert.strictEqual(payloadDisabled.cards[1].correlatedRules, undefined);
+  assert.strictEqual(payloadDisabled.metrics.totalDirectives, 2);
+  assert.strictEqual(payloadDisabled.metrics.blockCount, 1);
+  assert.strictEqual(payloadDisabled.metrics.warnCount, 1);
+
+  // 3. Direct function edge cases
+  assert.deepStrictEqual(aggregateSemanticOverlappingCards([]), []);
+  assert.strictEqual(aggregateSemanticOverlappingCards([primaryCard]).length, 1);
+
+  console.log('  ✔ Semantic overlap successfully aggregated cards by severity and collected correlated rules');
+}
+
 async function runAll() {
   console.log('=== Starting Praxis Presentation & i18n Verification Suite ===\n');
   await testI18nProvider();
   await testToPresentation();
   await testAuditAndPresentEndToEnd();
+  await testSemanticOverlapAggregation();
   console.log('\n=== All Praxis Presentation & i18n tests passed successfully! ===');
 }
 

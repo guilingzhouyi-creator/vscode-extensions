@@ -8,7 +8,7 @@
  *     consumed by the suppression matcher, by consumers migrating a baseline, and by
  *     scripts/validate-rule-aliases.js in `npm test`
  * Responsibilities: Publish `LEGACY_RULE_ALIASES` (legacy id -> canonical id) plus
- *     `canonicalRuleId()` / `areAliasForms()`; keep the mapping complete (every `canonical: false`
+ *     `canonicalRuleId()` / `toCanonicalRuleId()` / `areAliasForms()`; keep the mapping complete (every `canonical: false`
  *     registry entry), one-to-one and shape-valid, so flipping the emitted id later cannot orphan
  *     a baseline row or a `matchRule` suppression
  * Exit Semantics & Design Rationale: Pure data plus pure lookups; an unknown id resolves to itself,
@@ -18,6 +18,7 @@
  *     matching until a major version retires the legacy form.
  */
 import { getRule, RULE_REGISTRY } from './registry';
+import { toCanonicalRuleId as normalizeToCanonicalRuleId } from './topic-catalog';
 import { RULE_ID_PATTERN } from './types';
 
 /**
@@ -53,6 +54,19 @@ export const LEGACY_RULE_ALIASES: Readonly<Record<string, string>> = Object.free
 export function canonicalRuleId(id: string): string {
     return LEGACY_RULE_ALIASES[id] ?? id;
 }
+
+/**
+ * Resolve any rule id to its standard canonical 3-letter form,
+ * integrating legacy alias resolution.
+ *
+ * @param id - Rule id as emitted, written in a config/baseline, or historical 4+ letter form.
+ * @returns Standard 3-letter canonical rule id.
+ */
+export function toCanonicalRuleId(id: string): string {
+    const legacyResolved = canonicalRuleId(id);
+    return normalizeToCanonicalRuleId(legacyResolved);
+}
+
 
 /**
  * Report whether two spellings name the same rule.

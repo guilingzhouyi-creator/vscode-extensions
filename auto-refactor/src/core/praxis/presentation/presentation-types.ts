@@ -63,6 +63,10 @@ export interface PraxisDiagnosticCard {
     safeToAutomate?: boolean;
     /** Standardized execution arguments for automation engines */
     targetArguments?: Record<string, unknown>;
+    /** Correlated secondary rule IDs merged via presentation layer deduplication */
+    correlatedRules?: string[];
+    /** Count of correlated secondary rules merged into this card */
+    correlationCount?: number;
     /** Underlying machine-oriented CAPP directive for bidirectional traceability */
     sourceAgentDirective: string;
 }
@@ -107,6 +111,8 @@ export interface PraxisPresentationOptions {
     includeQuickFix?: boolean;
     /** Base URL for rule documentation links */
     docsBaseUrl?: string;
+    /** Whether to aggregate semantically overlapping cards at presentation level (defaults to true) */
+    aggregateOverlaps?: boolean;
 }
 
 /** Praxis presentation service SPI contract */
