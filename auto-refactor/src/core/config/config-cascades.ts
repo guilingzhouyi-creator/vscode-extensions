@@ -278,7 +278,7 @@ function resolveNumber<B extends number | undefined>(
 }
 
 function cacheOverrideDisabled(overrides: ConfigOverrides): boolean {
-    return (overrides as { cache?: boolean }).cache === false;
+    return overrides.cache === false;
 }
 
 /**
@@ -296,9 +296,9 @@ export function assembleGlobalThresholds(
     overrideThresholds?: Partial<ScanConfig['thresholds']>,
     overrides?: ConfigOverrides,
 ): Record<string, unknown> {
-    const cliEffectiveLoc = (overrides as { effectiveLoc?: number } | undefined)?.effectiveLoc;
-    const cliFileLinesWarn = (overrides as { fileLinesWarn?: number } | undefined)?.fileLinesWarn;
-    const cliFileLinesFail = (overrides as { fileLinesFail?: number } | undefined)?.fileLinesFail;
+    const cliEffectiveLoc = overrides?.effectiveLoc;
+    const cliFileLinesWarn = overrides?.fileLinesWarn;
+    const cliFileLinesFail = overrides?.fileLinesFail;
 
     const res: Record<string, unknown> = {
         ...baseThresholds,

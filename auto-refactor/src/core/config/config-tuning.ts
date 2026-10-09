@@ -124,6 +124,10 @@ type MaturityTier = NonNullable<ScanConfig['maturityTier']>;
 export type ConfigOverrides = Partial<Omit<ScanConfig, 'analyzers'>> & {
     configFile?: string;
     analyzers?: string[];
+    cache?: boolean;
+    effectiveLoc?: number;
+    fileLinesWarn?: number;
+    fileLinesFail?: number;
 };
 
 /** Everything the tuning stage hands back to the assembly stage. */
@@ -287,8 +291,8 @@ export function applyAutoTuning(
     const hasExplicitThresholds = Boolean(
         fileCfg.thresholds ||
         overrides.thresholds ||
-        (overrides as { effectiveLoc?: number }).effectiveLoc !== undefined ||
-        (overrides as { fileLinesWarn?: number }).fileLinesWarn !== undefined,
+        overrides.effectiveLoc !== undefined ||
+        overrides.fileLinesWarn !== undefined,
     );
     let tunedThresholds = mergeThresholds(baseThresholds, fileCfg, overrides);
     let scaleGrade = fileCfg.scaleGrade || overrides.scaleGrade;

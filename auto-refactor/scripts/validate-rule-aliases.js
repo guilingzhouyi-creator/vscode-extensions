@@ -23,6 +23,7 @@ const {
   areAliasForms,
   auditAliasWindow,
   canonicalRuleId,
+  isCanonical3LetterForm,
   legacyRuleIds,
   toCanonicalRuleId,
 } = require('../dist/core/rules/aliases');
@@ -96,7 +97,10 @@ async function main() {
   console.log('  [PASS] the alias table is frozen against runtime mutation');
 
   // ── 6. Canonical 3-letter glossary is frozen, non-empty, and sampled accurately ──
-  assert.ok(Object.isFrozen(CANONICAL_3LETTER_GLOSSARY), 'CANONICAL_3LETTER_GLOSSARY must be frozen');
+  assert.ok(
+    Object.isFrozen(CANONICAL_3LETTER_GLOSSARY),
+    'CANONICAL_3LETTER_GLOSSARY must be frozen',
+  );
   assert.ok(Object.keys(CANONICAL_3LETTER_GLOSSARY).length > 0, 'glossary must be non-empty');
   assert.strictEqual(CANONICAL_3LETTER_GLOSSARY['DISP'], 'DSP');
   assert.strictEqual(CANONICAL_3LETTER_GLOSSARY['CONNECT'], 'CNT');
@@ -105,18 +109,25 @@ async function main() {
   assert.strictEqual(CANONICAL_3LETTER_GLOSSARY['INCLUDES'], 'INC');
   console.log('  [PASS] CANONICAL_3LETTER_GLOSSARY is frozen and samples match specifications');
 
-  // ── 7. normalizeTopicCode produces 3-letter uppercase for all known non-3 topics and preserves 3-letter ──
+  // ── 7. normalizeTopicCode produces 3-letter uppercase for all known non-3 topics
+  // and preserves 3-letter ──
   for (const [topic, expected] of Object.entries(CANONICAL_3LETTER_GLOSSARY)) {
     const normalized = normalizeTopicCode(topic);
     assert.strictEqual(normalized, expected, `normalizeTopicCode(${topic}) mismatch`);
     assert.strictEqual(normalized.length, 3, `normalized length of ${topic} must be 3`);
-    assert.strictEqual(normalized, normalized.toUpperCase(), `normalized ${topic} must be uppercase`);
+    assert.strictEqual(
+      normalized,
+      normalized.toUpperCase(),
+      `normalized ${topic} must be uppercase`,
+    );
   }
   assert.strictEqual(normalizeTopicCode('DSP'), 'DSP');
   assert.strictEqual(normalizeTopicCode('SEC'), 'SEC');
   assert.strictEqual(normalizeTopicCode('MEM'), 'MEM');
   assert.strictEqual(normalizeTopicCode('CYC'), 'CYC');
-  console.log('  [PASS] normalizeTopicCode normalizes non-3-letter topics and preserves 3-letter topics');
+  console.log(
+    '  [PASS] normalizeTopicCode normalizes non-3-letter topics and preserves 3-letter topics',
+  );
 
   // ── 8. toCanonicalRuleId maps family-topic-seq correctly ──
   assert.strictEqual(pureToCanonicalRuleId('ARCH-DISP-001'), 'ARCH-DSP-001');
@@ -129,6 +140,27 @@ async function main() {
   assert.strictEqual(pureToCanonicalRuleId('not-a-rule'), 'not-a-rule');
   assert.strictEqual(toCanonicalRuleId('not-a-rule'), 'not-a-rule');
   console.log('  [PASS] toCanonicalRuleId converts rules to canonical 3-letter format');
+
+  // ── 9. areAliasForms cross-version equivalence & isCanonical3LetterForm verification ──
+  assert.strictEqual(areAliasForms('ARCH-DISP-001', 'ARCH-DSP-001'), true);
+  assert.strictEqual(areAliasForms('TSM-INCLUDES-001', 'TSM-INC-001'), true);
+  assert.strictEqual(areAliasForms('large-file', 'BIG-SZE-001'), true);
+  assert.strictEqual(areAliasForms('GDM-ONREADY-001', 'GDM-RDY-001'), true);
+  assert.strictEqual(areAliasForms('ARCH-DISP-001', 'TSM-INC-001'), false);
+
+  assert.strictEqual(isCanonical3LetterForm('TSM-INC-001'), true);
+  assert.strictEqual(isCanonical3LetterForm('BIG-SZE-001'), true);
+  assert.strictEqual(isCanonical3LetterForm('GDM-RDY-001'), true);
+  assert.strictEqual(isCanonical3LetterForm('SH-CMD-001'), true);
+  assert.strictEqual(isCanonical3LetterForm('PS-CMD-001'), true);
+  assert.strictEqual(isCanonical3LetterForm('TSM-INCLUDES-001'), false);
+  assert.strictEqual(isCanonical3LetterForm('large-file'), false);
+  assert.strictEqual(isCanonical3LetterForm('ARCH-DISP-001'), false);
+  assert.strictEqual(isCanonical3LetterForm(''), false);
+  assert.strictEqual(isCanonical3LetterForm(null), false);
+  console.log(
+    '  [PASS] areAliasForms cross-version equivalence and isCanonical3LetterForm verified',
+  );
 }
 
 main()

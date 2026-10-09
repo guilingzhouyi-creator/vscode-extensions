@@ -35,6 +35,7 @@ const {
   HISTORICAL_SEQUENCE_ANOMALIES,
 } = require('../dist/core/rules/registry');
 
+const { auditNonStandardTopicCoverage } = require('../dist/core/rules/topic-catalog');
 const { LEGACY_RULE_ALIASES } = require('../dist/core/rules/aliases');
 const { BUILTIN_FACTORIES } = require('../dist/core/analyzer-registry');
 const { BUILTIN_ANALYZERS } = require('../dist/core/config/config');
@@ -166,6 +167,18 @@ function validateTopicAndSequenceContinuity() {
   );
 }
 
+function validateTopicGlossaryCoverage() {
+  const coverage = auditNonStandardTopicCoverage(RULE_REGISTRY);
+  assert.deepStrictEqual(
+    coverage.missingGlossaryEntries,
+    [],
+    'all non-3-letter topics must have canonical 3-letter glossary entries',
+  );
+  console.log(
+    `  [PASS] non-3-letter topics glossary coverage: ${coverage.nonStandardTopics.length} topics 100% mapped to standard 3-letter codes`,
+  );
+}
+
 function validateEmittedRules(ids) {
   const aliasTargets = new Set(Object.values(LEGACY_RULE_ALIASES));
   const aliasSource = 'src/core/rules/aliases.ts'; // stored repo-relative, POSIX separators
@@ -254,17 +267,18 @@ function validateNamingAndDocs(ids) {
   }
 }
 
-function run() {
+function runAll() {
   const ids = RULE_REGISTRY.map((rule) => rule.id);
   validateRegistryIntegrity(ids);
   validateTopicAndSequenceContinuity();
+  validateTopicGlossaryCoverage();
   validateEmittedRules(ids);
   validateAnalyzerRegistries();
   validateNamingAndDocs(ids);
 }
 
 try {
-  run();
+  runAll();
   console.log('\n ALL RULE REGISTRY CONSISTENCY CHECKS PASSED SUCCESSFULLY!');
 } catch (error) {
   console.error('\n[FAIL]', error && error.message ? error.message : error);

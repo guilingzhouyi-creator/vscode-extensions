@@ -10,7 +10,9 @@
  *   2. Lock HISTORICAL_SEQUENCE_ANOMALIES documenting the 5 historical starting-002 pairs;
  *   3. Declare CANONICAL_3LETTER_GLOSSARY mapping non-standard topics to 3-letter codes;
  *   4. Provide normalizeTopicCode and toCanonicalRuleId normalization helpers;
- *   5. Provide auditTopicAndSequenceContinuity verification helper.
+ *   5. Provide auditTopicAndSequenceContinuity verification helper;
+ *   6. Provide isStandard333RuleId topology validator and
+ *      auditNonStandardTopicCoverage glossary check.
  * Exit Semantics & Design Rationale: Immutable, pure declarative metadata ensuring zero
  *   drift for rule topic taxonomy and preventing accidental numbering sequence gaps.
  */
@@ -402,7 +404,8 @@ export const CANONICAL_3LETTER_GLOSSARY: TopicGlossary = Object.freeze({
  * Normalize an arbitrary topic code to its canonical 3-letter standard.
  *
  * @param topic - Input topic string (case-insensitive).
- * @returns Standard 3-letter uppercase code if mapped or already 3 letters, otherwise original uppercase.
+ * @returns Standard 3-letter uppercase code if mapped or already 3 letters,
+ *   otherwise original uppercase.
  */
 export function normalizeTopicCode(topic: string): string {
     if (!topic) {
@@ -423,7 +426,8 @@ export function normalizeTopicCode(topic: string): string {
  * Convert a rule ID into its canonical 3-letter topic form.
  *
  * @param ruleId - Tri-part rule ID string (e.g. "ARCH-DISP-001").
- * @returns Normalized canonical rule ID (e.g. "ARCH-DSP-001"), or original string if not matching tri-part shape.
+ * @returns Normalized canonical rule ID (e.g. "ARCH-DSP-001"), or original
+ *   string if not matching tri-part shape.
  */
 export function toCanonicalRuleId(ruleId: string): string {
     if (typeof ruleId !== 'string') {
@@ -560,3 +564,74 @@ export function auditTopicAndSequenceContinuity(
  */
 export const validateTopicAndSequenceContinuity = auditTopicAndSequenceContinuity;
 
+/**
+ * Regular expression matching standard 3-3-3 rule IDs
+ * (3-letter family, 3-letter topic, 3-digit sequence).
+ */
+export const STANDARD_333_RULE_ID_PATTERN = /^[A-Z]{3}-[A-Z]{3}-\d{3}$/;
+
+/**
+ * Determine whether a given rule identifier conforms to the strict 3-3-3 topological convention
+ * (3-letter uppercase family, 3-letter uppercase topic, 3-digit zero-padded sequence).
+ *
+ * @param ruleId - Candidate rule identifier string.
+ * @returns True if ruleId matches FAMILY-TOPIC-NNN where all three segments have length 3.
+ */
+export function isStandard333RuleId(ruleId: string): boolean {
+    if (typeof ruleId !== 'string') {
+        return false;
+    }
+    return STANDARD_333_RULE_ID_PATTERN.test(ruleId);
+}
+
+/**
+ * Result of auditing canonical rules for non-standard topic code glossary coverage.
+ */
+export interface NonStandardTopicAuditResult {
+    /** Unique list of non-3-letter topic codes observed in canonical rules. */
+    nonStandardTopics: string[];
+    /** Any observed non-3-letter topic codes lacking a mapping in CANONICAL_3LETTER_GLOSSARY. */
+    missingGlossaryEntries: string[];
+}
+
+/**
+ * Audit canonical rule definitions to verify that all non-3-letter topic codes have authoritative
+ * entries registered in CANONICAL_3LETTER_GLOSSARY.
+ *
+ * @param rules - List of rule definitions to audit.
+ * @returns Non-standard topic list and any missing glossary entries.
+ */
+export function auditNonStandardTopicCoverage(
+    rules: readonly RuleDefinition[],
+): NonStandardTopicAuditResult {
+    const nonStandardSet = new Set<string>();
+    const missingSet = new Set<string>();
+
+    for (const rule of rules) {
+        const info = extractRuleKey(rule);
+        if (!info) {
+            continue;
+        }
+
+        const { topic } = info;
+        if (topic.length === 3) {
+            continue;
+        }
+
+        nonStandardSet.add(topic);
+        const mapped = CANONICAL_3LETTER_GLOSSARY[topic.toUpperCase()];
+        if (!mapped) {
+            missingSet.add(topic);
+        }
+    }
+
+    return {
+        nonStandardTopics: Array.from(nonStandardSet).sort(),
+        missingGlossaryEntries: Array.from(missingSet).sort(),
+    };
+}
+
+/**
+ * Validator harness alias for auditNonStandardTopicCoverage.
+ */
+export const validateNonStandardTopicCoverage = auditNonStandardTopicCoverage;

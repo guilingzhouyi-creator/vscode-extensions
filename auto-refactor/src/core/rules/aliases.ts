@@ -8,7 +8,8 @@
  *     consumed by the suppression matcher, by consumers migrating a baseline, and by
  *     scripts/validate-rule-aliases.js in `npm test`
  * Responsibilities: Publish `LEGACY_RULE_ALIASES` (legacy id -> canonical id) plus
- *     `canonicalRuleId()` / `toCanonicalRuleId()` / `areAliasForms()`; keep the mapping complete (every `canonical: false`
+ *     `canonicalRuleId()` / `toCanonicalRuleId()` / `areAliasForms()` /
+ *     `isCanonical3LetterForm()`; keep the mapping complete (every `canonical: false`
  *     registry entry), one-to-one and shape-valid, so flipping the emitted id later cannot orphan
  *     a baseline row or a `matchRule` suppression
  * Exit Semantics & Design Rationale: Pure data plus pure lookups; an unknown id resolves to itself,
@@ -67,6 +68,26 @@ export function toCanonicalRuleId(id: string): string {
     return normalizeToCanonicalRuleId(legacyResolved);
 }
 
+/**
+ * Regular expression matching standard 3-3-3 rule IDs (3-letter family, 3-letter topic,
+ * 3-digit sequence) or 2-letter script families (2-letter family, 3-letter topic,
+ * 3-digit sequence).
+ */
+export const CANONICAL_3LETTER_FORM_PATTERN = /^[A-Z]{2,3}-[A-Z]{3}-\d{3}$/;
+
+/**
+ * Determine whether a rule identifier is composed of the standard 3-3-3 canonical format
+ * (or 2-letter script family format).
+ *
+ * @param id - Candidate rule identifier string.
+ * @returns True if id conforms to standard 3-3-3 or 2-letter script family canonical shape.
+ */
+export function isCanonical3LetterForm(id: string): boolean {
+    if (typeof id !== 'string') {
+        return false;
+    }
+    return CANONICAL_3LETTER_FORM_PATTERN.test(id);
+}
 
 /**
  * Report whether two spellings name the same rule.
@@ -74,12 +95,23 @@ export function toCanonicalRuleId(id: string): string {
  * Used by suppression and baseline matching so a config written against the legacy id keeps
  * working with a canonical report (and the other way round) during the alias window.
  *
+ * Evaluates equivalences across legacy, canonical, and 3-letter canonical normalized forms:
+ * 1. Exact string identity (left === right)
+ * 2. Legacy alias resolution identity (canonicalRuleId(left) === canonicalRuleId(right))
+ * 3. 3-letter canonical normalized identity (toCanonicalRuleId(left) === toCanonicalRuleId(right))
+ *
  * @param left - First rule id, legacy or canonical.
  * @param right - Second rule id, legacy or canonical.
  * @returns True when both resolve to the same canonical id.
  */
 export function areAliasForms(left: string, right: string): boolean {
-    return canonicalRuleId(left) === canonicalRuleId(right);
+    if (left === right) {
+        return true;
+    }
+    if (canonicalRuleId(left) === canonicalRuleId(right)) {
+        return true;
+    }
+    return toCanonicalRuleId(left) === toCanonicalRuleId(right);
 }
 
 /**

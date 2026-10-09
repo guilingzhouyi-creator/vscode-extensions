@@ -23,14 +23,34 @@
 - **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
-### 1.3 主题码 (Topic) 标准缩写与编号序列连续性契约
+### 1.3 主题码 (Topic) 标准缩写、标准 3-3-3 拓扑规划与编号序列连续性契约
 
-规则标识符严格遵循 `FAMILY-TOPIC-NNN` 三段式定长结构（`RULE_ID_PATTERN`），其中：
-- **`FAMILY`**：规则族前缀（2~6 位大写字母，对应 32 个受控领域族）；
-- **`TOPIC`**：领域主题码（推荐标准 3 位大写字母，少数历史特例如 `DISP`、`FLAT`、`SIZE`、`WRAP` 为 4 位），单源登记于 `src/core/rules/topic-catalog.ts` 的 `CANONICAL_TOPIC_CATALOG` 词典中；
+规则标识符严格遵循 `FAMILY-TOPIC-NNN` 三段式结构（`RULE_ID_PATTERN`），其中：
+- **`FAMILY`**：规则族前缀（2~6 位大写字母，对应 30 个受控领域族）；
+- **`TOPIC`**：领域主题码（推荐标准 3 位大写字母，存量历史包含部分 4~9 位扩展主题码），单源登记于 `src/core/rules/topic-catalog.ts` 的 `CANONICAL_TOPIC_CATALOG` 词典中；
 - **`NNN`**：三位定长十进制整数序列（`001` ~ `999`）。
 
-#### 编号序列连续性公理（Sequence Continuity Invariant）
+#### 1.3.1 标准 3-3-3 拓扑规划愿景（Standard 3-3-3 Topology Vision）
+为了在 CLI 控制台日志、富文本诊断卡片与 SARIF 输出中保持高度一致的定长等宽排版、提升机器正则匹配效率并消除视觉参差，引擎确立了 **标准 3-3-3 定长拓扑规范愿景**（`^[A-Z]{3}-[A-Z]{3}-\d{3}$`）：
+- **规则族段（Family, 3 位字母）**：如 `NAM`、`CMT`、`SIM`、`HYG`、`PRF`、`SEC`、`GDM`、`DOC`、`ERR`、`TST` 等核心领域族；
+- **主题码段（Topic, 3 位字母）**：严格采用定长 3 字母权威标准主题码（如 `JRG`、`DOC`、`FLT`、`DSP`、`BLT`、`POL` 等）；
+- **数字序号段（Sequence, 3 位数字）**：三位零填充十进制序号（`001` ~ `999`）。
+
+纯函数 `isStandard333RuleId(ruleId)` 作为全库统一的拓扑判据，以零额外开销实现对规则 ID 是否满足标准 3-3-3 拓扑的确定性断言。
+
+#### 1.3.2 权威三字母映射机制（CANONICAL_3LETTER_GLOSSARY）
+当前规则库处于现代化规范演进阶段，存量规则中尚存 80 个因历史演进保留的非 3 字母主题码（例如 `ARGS`、`FLAT`、`DISP`、`RECURSION`、`DATETIME`、`ONREADY` 等，涉及 96 条规则）。为保障分类学平滑收敛，引擎建立了以下刚性机制：
+1. **单一真源映射词典**：`src/core/rules/topic-catalog.ts` 声明并冻结 `CANONICAL_3LETTER_GLOSSARY`，为全部存量非标主题码预先分配确切的 3 字母权威映射（如 `FLAT -> FLT`、`DISP -> DSP`、`RECURSION -> REC`、`DATETIME -> DTT`、`ONREADY -> RDY`、`CONNECT -> CNT`、`WRAP -> WRP` 等）；
+2. **门禁 100% 覆盖率断言**：门禁脚本 `scripts/validate-rules-registry.js` 新增 `validateTopicGlossaryCoverage()` 校验环节，通过纯函数 `auditNonStandardTopicCoverage(RULE_REGISTRY)` 强制断言：所有已注册的 canonical 规则中长度 != 3 的主题码，必须在 `CANONICAL_3LETTER_GLOSSARY` 中保持 100% 完备映射（`missingGlossaryEntries === []`），杜绝任何未经收敛规划的非标主题逃逸入库；
+3. **单源投影工具**：提供 `toCanonicalRuleId()` 与 `normalizeTopicCode()` 纯函数，确保多源输入与历史 ID 能够单向确定性投影为规范三字母形态。
+
+#### 1.3.3 双轨别名平滑演进策略（Dual-Track Alias Evolution Strategy）
+规则 ID 是工程配置、基线压制清单（Baseline Ratchet）以及存量 SARIF 报告的持久化契约锚点。引擎恪守「平滑演进、零静默破坏」的设计底线：
+1. **存量规则零破坏**：当前发版中，所有已分配的规范规则 ID 保持既有行为与标识符绝对稳定，严禁执行破坏性的静默重命名；
+2. **双轨别名过渡窗口**：当规则从扩展主题码向 3-3-3 拓扑标准码演进时，必须通过 `src/core/rules/aliases.ts`（`LEGACY_RULE_ALIASES`）注册平滑别名，维持至少一个主版本的双轨兼容窗口，引擎内核与 CLI 在解析旧规则 ID 时自动重定向至标准目标；
+3. **双轨验证闭环**：通过 `validate-rules-registry.js`（验证发射集与注册集双向一致）与 `validate-rule-aliases.js`（验证别名目标唯一性与注册表存在性），共同保障双轨演进期间零孤儿规则、零虚构 ID。
+
+#### 1.3.4 编号序列连续性公理（Sequence Continuity Invariant）
 1. **默认单调自增起点**：除受控豁免外，所有规则族的主题序列必须严格以 `001` 作为首条规则，且同一 `FAMILY-TOPIC` 内部必须连续递增，严禁存在序列空洞（如出现 `001`、`003` 跳跃）；
 2. **历史特例单源锁定（Historical Sequence Anomalies）**：全库目前锁定唯 5 处由于跨域配对或主题码演进由 `002` 起跳的历史特例，已全量记录于 `HISTORICAL_SEQUENCE_ANOMALIES` 中，并由门禁脚本 `validate-rules-registry.js` 常态化严格校验：
    - `ARCH-DEC-002`：解耦规则跨域配对（与命名解耦 `NAM-DEC-001` 配对，区分 AST 解析器解耦与符号命名解耦）；
