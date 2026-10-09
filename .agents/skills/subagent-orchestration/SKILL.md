@@ -4,7 +4,7 @@ description: >-
   全工作区通用泛化 SubAgent 动态装配、四重防线契约注入与多智能体调度工作流。
   在用户提及 SubAgent、并行任务、委派施工、后台审查或多智能体协作时激活本技能。
   指导主 Agent 基于 (Archetype x Posture) 正交派生专员、全量同构继承模型、
-  通过独占文件 Path Jail 物理防冲突、只读与写入协同流及主 Agent 交叉全量复审 SOP 安全闭环调度。
+  独占 Zero-Intersection Path Jail 物理防冲突机制、只读与写入协同流及主 Agent 8 步交叉复审闭环 SOP。
 ---
 
 # subagent-orchestration — 全工作区泛化 SubAgent 调度规范
@@ -64,20 +64,28 @@ description: >-
 
 ---
 
-## 三、 独占文件 Path Jail 物理防冲突与只读/写入协同流
+## 三、 独占 Zero-Intersection Path Jail 物理防冲突机制与只读/写入协同流
 
 多智能体协作的核心是**严格的物理隔离**与**有序的读写协同**，避免多 Agent 并发写入导致代码被踩踏或越界修改：
 
-### 1. 独占文件集合 Path Jail 物理防冲突机制
-- **显式独占授权**：向具有写权限的 SubAgent 下发任务时，主 Agent 必须在 Task Scope 中声明绝对严密的独占文件列表（Exclusive File List）：
+### 1. 独占 Zero-Intersection Path Jail 物理防冲突机制
+- **显式独占授权**：向具有写权限的 SubAgent 下发任务时，主 Agent 必须在 Task Scope 中声明绝对严密、颗粒度到具体文件路径的独占文件列表（Exclusive File List）：
   ```markdown
-  [Task Scope & Path Jail]
-  - 授权独占文件列表（严格禁止触碰其它文件）：
+  [Task Scope & Zero-Intersection Path Jail]
+  - 授权独占文件列表（严格两两互斥，禁止触碰任何其它文件）：
     1. path/to/fileA.ts
     2. path/to/fileB.ts
+  - 严禁触碰路径前缀（越界操作立即阻断）：
+    - auto-refactor/
+    - workspace-timing/
+    - WebGames/
+    - scripts/
   ```
-- **禁止交叉重叠**：并行派生多个写专员时，各 SubAgent 的 Path Jail 文件集合必须两两正交，交集必须为空集（$\text{Jail}_A \cap \text{Jail}_B = \emptyset$）；
-- **系统契约硬绑定**：SubAgent 的 System Prompt Layer 1 强制注入 Path Jail Guard，越界修改任何文件将直接视为致命违规。
+- **两两完全正交公理 ($\text{Jail}_A \cap \text{Jail}_B = \emptyset$)**：
+  并行派发多个写专员时，各 SubAgent 的 Path Jail 文件集合必须两两正交，交集必须严格为空集：
+  $$\forall i \ne j, \quad \text{Jail}_i \cap \text{Jail}_j = \emptyset$$
+  严禁任何重叠文件授权或模糊目录宽泛授权，从根源消除并发写入踩踏与代码冲突；
+- **系统契约刚性硬绑定**：SubAgent 的 System Prompt Layer 1 强制注入 Path Jail Guard，越界修改任何非授权文件将触发一票阻断，主 Agent 在复审阶段执行强制回滚。
 
 ### 2. 只读审查与施工重构协同工作流
 在大型特性演进或复杂重构中，推荐实施 **Explore/Review 先行 $\rightarrow$ Construct/Refactor 施工 $\rightarrow$ Guardian 复核** 闭环流：
@@ -142,16 +150,16 @@ invoke_subagent({
 });
 ```
 
-### 步骤 4：主 Agent 交叉全量复审 SOP (Cross-Review 8 步闭环)
+### 步骤 4：主 Agent 8 步交叉复审闭环 SOP (Cross-Review Closed-Loop)
 SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格独立执行 8 步交叉复审闭环：
-1. **物理范围与 Path Jail 契约核验**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表；严禁发生越界修改；
-2. **物理卫生与排版契约审计**：检查新增与修改文件，零 0 字节文件，PowerShell 脚本严格保持 CRLF 换行，其余文件严格保持 LF 换行；
-3. **AST 切片复杂度与双轨体积预审**：运行 `node scripts/common/evaluate-eloc-budget.js`，核实函数单切片 $\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$，单文件 $\text{ELOC} \le 900, \text{LOC} \le 1400$；
-4. **代码注释与架构契约审查**：核查模块头部是否具备六字段 JSDoc，零敏捷过程黑话代号（如 `p[0-9]+`、`W1-W9`），零幽灵假逻辑分支；
-5. **门面实质承载与跳板消融核验**：针对重构与导出入口，核查是否满足 $\text{ELOC} \ge 15$ 或不可变封装，彻底消融单行空包跳板；
-6. **项目专属构建与全量测试回归**：主 Agent 在主会话中亲自执行领域编译与回归测试（如 `npm run build && node scripts/gate-self.js && npm test`），确保 153/153 套测试套件 100% 通过；
-7. **全工作区统一审查终审**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，确认工作区五大核心子系统基石得分 100% 绿色通行；
-8. **零高危技术债与防反弹核验**：确认改动未引入任何新的 High/Critical 技术债务，全仓技术债务保持 0 项历史刚性基线（一票否决）。
+1. **① 沙箱隔离审计 (Path Jail Guard Audit)**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表，严禁发生越界修改；
+2. **② TypeScript 静态编译 (Static Typecheck & Build Gate)**：在受影响项目执行 `npm run build` 或 `npm run compile`，确保 TypeScript 编译器 100% 静态编译通过，0 编译错误，0 类型告警；
+3. **③ 领域微门禁自检 (Domain Micro-Gate Checks)**：针对涉及子域执行专属微门禁脚本（如 `node scripts/common/validate-skills.js`、`node scripts/common/sync-skills.js --check`、`node workspace-timing/scripts/check-i18n.js`），确保领域专有契约完备；
+4. **④ 规则与单源目录防虚构校验 (Rule Catalog Anti-Hallucination Gate)**：执行 `node scripts/common/generate-rule-catalog.js` 与 `node scripts/common/validate-commit-msg-rules.js`，核实 402 条规则目录计数零漂移，提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
+5. **⑤ 门面实质承载与跳板排查 (Facade Substance & Anti-Trampoline Guard)**：执行 `node auto-refactor/scripts/validate-facade-governance.js`，核查门面导出满足 $\text{ELOC} \ge 15$ 或具备 `Object.freeze` 不可变封装，彻底消融空包跳板（`ARCH-ABS-001`）；
+6. **⑥ 自审棘轮基线防反弹 (Self-Audit Monotonic Ratchet Baseline Gate)**：执行 `node auto-refactor/scripts/gate-self.js`，确保 `0 newBlocking error`，全仓历史基线单调收敛，零 High/Critical 技术债务反弹（一票否决）；
+7. **⑦ 全量自动化测试套件 (Comprehensive Test Suite Regression)**：执行 `npm test`，确保 153/153 套测试套件并发绿色通过，0 挂起，纯 TS 回退与 Rust 原生算子 100% 字节等价；
+8. **⑧ 工作区五大支柱统一审查 (Workspace Five-Pillar Unified Audit)**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，全工作区五大基石（架构、质量、门禁、类型、卫生）综合评分必须 $\ge 98$ 分，全绿通行。
 
 ---
 
