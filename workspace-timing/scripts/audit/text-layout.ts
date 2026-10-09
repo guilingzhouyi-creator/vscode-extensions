@@ -260,14 +260,13 @@ if (rdText === null) {
 } else {
   const rdLines = rdText.split(/\r?\n/);
 
-  // DOC-RD-001：必需节存在（双语标头按实际锚点匹配）
+  // DOC-RD-001：必需节存在（双语标头按实际锚点匹配，产品发布页核心结构）
   const REQUIRED_SECTIONS: Array<{ anchor: string; label: string }> = [
     { anchor: '# Workspace Timing', label: 'H1 标题' },
     { anchor: '## ✨ 功能亮点', label: '功能亮点' },
     { anchor: '## 💻 命令清单', label: '命令清单' },
     { anchor: '## 🗄️ 存储架构', label: '存储架构' },
     { anchor: '## ⚙️ 扩展设置', label: '扩展设置' },
-    { anchor: '## 🗺️ 路线图', label: '路线图' },
     { anchor: '## 📄 许可证', label: '许可证' },
   ];
   for (const { anchor, label } of REQUIRED_SECTIONS) {
@@ -279,11 +278,12 @@ if (rdText === null) {
     }
   }
 
-  // DOC-RD-002：package.json 版本必须在路线图行中登记，且不得仍标 🚧 规划中
-  // （路线图顶行允许存在 🚧 的未来版本——那是规划项，不与当前发布版本硬比）
+  // DOC-RD-002：若存在路线图节，package.json 版本必须在路线图行中登记，且不得仍标 🚧 规划中
+  // （纯产品发布页模式下不设内部施工路线图，无需版本行硬比）
   const pkgRes = await loadJson<{ version?: string }>(path.join(root, 'package.json'));
   const pkgVersion = pkgRes.ok ? pkgRes.data?.version : undefined;
-  if (pkgVersion) {
+  const hasRoadmapSection = rdLines.some((l) => l.startsWith('## 🗺️ 路线图'));
+  if (hasRoadmapSection && pkgVersion) {
     const roadmapRows = rdLines
       .map((l, idx) => ({ l, idx }))
       .filter(({ l }) => /^\|\s*\*\*v\d+\.\d+\.\d+\*\*/.test(l))
@@ -291,7 +291,7 @@ if (rdText === null) {
     if (roadmapRows.length === 0) {
       findings.push(finding({
         ruleId: 'DOC-RD-002', severity: 'error', module: 'docs', file: 'README.md',
-        message: '路线图节无任何版本行（`| **vX.Y.Z** |`），路线图表失去版本索引作用',
+        message: '路线图节存在但无任何版本行（`| **vX.Y.Z** |`），路线图表失去版本索引作用',
       }));
     } else {
       const shipped = roadmapRows.find((r) => r.ver === pkgVersion);

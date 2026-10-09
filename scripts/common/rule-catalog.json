@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-09T12:11:39.791Z",
-  "totalRules": 406,
+  "generatedAt": "2026-10-09T12:17:46.007Z",
+  "totalRules": 410,
   "counts": {
-    "autoRefactor": 321,
+    "autoRefactor": 325,
     "workspaceTiming": 49,
     "webGames": 56,
     "globalTooling": 7
@@ -2201,11 +2201,25 @@
       "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-RESP-MISMATCH)"
     },
     {
+      "id": "RSM-CAST-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "info",
+      "summary": "Naked numeric as cast can cause silent truncation or wrapping."
+    },
+    {
       "id": "RSM-CLONE-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
       "summary": "clone() result is used solely for comparison or length check."
+    },
+    {
+      "id": "RSM-ELSE-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "warning",
+      "summary": "Single-branch early exit in if-let should migrate to let-else."
     },
     {
       "id": "RSM-EXTERN-001",
@@ -2215,11 +2229,25 @@
       "summary": "Obsolete extern crate declaration detected."
     },
     {
+      "id": "RSM-FIND-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "info",
+      "summary": "Manual for loop search with early return detected."
+    },
+    {
       "id": "RSM-FORMAT-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
       "summary": "Format macro uses positional argument {}."
+    },
+    {
+      "id": "RSM-LOCK-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "warning",
+      "summary": "std::sync lock guard held across .await in async function."
     },
     {
       "id": "RSM-MACRO-001",
