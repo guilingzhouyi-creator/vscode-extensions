@@ -343,6 +343,10 @@ const PARALLEL_SUITES = [
     name: 'validate-elastic-staged-slice',
     script: 'scripts/validate-elastic-staged-slice.js',
   },
+  {
+    name: 'validate-security-preflight',
+    script: 'scripts/validate-security.js',
+  },
 ];
 
 // Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)

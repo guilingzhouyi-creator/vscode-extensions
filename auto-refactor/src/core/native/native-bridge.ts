@@ -51,6 +51,7 @@ import { computeDominatorTreeShim, solveDataflowShim } from './native-flow-shim'
 export { HASH_COEFFS };
 
 const EMPTY_NEIGHBOR_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
+const MICRO_SOURCE_MASK_THRESHOLD = 256;
 
 interface TarjanState {
     indexCounter: number;
@@ -685,11 +686,15 @@ function probeNativeBinding(): INativeCore | null {
                     return binding.analyzeDependencyGraph(edges);
                 },
                 fastPatternMatch: binding.fastPatternMatch,
-                // The N-API binding takes `(content, config)`. Passing `binding.maskSourceCode`
-                // straight through dropped `config`, so every native masking call threw
-                // "Cannot convert undefined or null to object" at runtime.
-                maskSourceCode: (content: string, config: NativeMaskConfig) =>
-                    binding.maskSourceCode(content, config),
+                // Adaptive micro-threshold dispatch: delegate tiny inputs to pure JS shim
+                // to avoid cross-boundary N-API serialization overhead; route normal/large files
+                // to Rust SIMD acceleration kernel.
+                maskSourceCode: (content: string, config: NativeMaskConfig) => {
+                    if (content.length < MICRO_SOURCE_MASK_THRESHOLD) {
+                        return jsShim.maskSourceCode(content, config);
+                    }
+                    return binding.maskSourceCode(content, config);
+                },
                 countDuplicateLines: binding.countDuplicateLines,
                 detectCloneBlocks: binding.detectCloneBlocks,
                 computeMinHash: binding.computeMinHash || binding.computeMinhash,

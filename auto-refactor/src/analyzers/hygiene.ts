@@ -137,6 +137,64 @@ function checkSnakeNaming(
 }
 
 /**
+ * Module: Static Analysis — Hygiene Duplicate Block Detection Fallback
+ * File Path: src/analyzers/hygiene.ts
+ * Architecture Role: Defensive pure fallback utility computing 32-bit FNV-1a hashes
+ *   of meaningful source lines when native clone detection is unavailable or fails.
+ * Dependencies & Triggers: Triggered only inside the catch block of HygieneAnalyzer.auditCloneBlocks.
+ * Responsibilities:
+ *   1. Extract individual lines from raw file content.
+ *   2. Filter out blank lines, comments (// and #), and solitary braces ({ and }).
+ *   3. Hash each meaningful line using 32-bit FNV-1a and record line indices.
+ * Exit Semantics & Design Rationale: Pure deterministic helper returning parallel arrays
+ *   of 32-bit hashes and line numbers without persistent state.
+ *
+ * @param content - Source file raw text.
+ * @returns Object with lineHashes array and meaningfulLineIndices array.
+ */
+function computeLineHashesFallback(content: string): {
+    lineHashes: number[];
+    meaningfulLineIndices: number[];
+} {
+    const lineHashes: number[] = [];
+    const meaningfulLineIndices: number[] = [];
+    const len = content.length;
+    let lineStart = 0;
+    let lineIdx = 0;
+
+    while (lineStart < len) {
+        let lineEnd = content.indexOf('\n', lineStart);
+        let nextStart: number;
+        if (lineEnd === -1) {
+            lineEnd = len;
+            nextStart = len;
+        } else {
+            nextStart = lineEnd + 1;
+            if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
+                lineEnd--;
+            }
+        }
+
+        const trimmed = content.slice(lineStart, lineEnd).trim();
+        if (
+            trimmed &&
+            !trimmed.startsWith('//') &&
+            !trimmed.startsWith('#') &&
+            trimmed !== '{' &&
+            trimmed !== '}'
+        ) {
+            lineHashes.push(hashString32(trimmed));
+            meaningfulLineIndices.push(lineIdx);
+        }
+
+        lineIdx++;
+        lineStart = nextStart;
+    }
+
+    return { lineHashes, meaningfulLineIndices };
+}
+
+/**
  * Report hygiene and maintainability findings from a raw file content scan.
  *
  * The analyzer detects naming drift, statements after a terminal statement, stub markers
@@ -191,25 +249,22 @@ export class HygieneAnalyzer implements Analyzer {
             if (file.endsWith('.py')) this.auditPythonNaming(content, file, ctx, issues);
         }
 
-        const { lineHashes, meaningfulLineIndices } = this.auditLineHygiene(
+        this.auditLineHygiene(
             content,
             len,
             file,
             checkDead,
             checkStubs,
-            checkClones,
             ctx,
             issues,
         );
 
-        if (checkClones && lineHashes.length >= minCloneLines * 2) {
+        if (checkClones) {
             this.auditCloneBlocks(
-                lineHashes,
-                meaningfulLineIndices,
+                content,
                 minCloneLines,
                 ctx,
                 issues,
-                content,
             );
         }
 
@@ -309,18 +364,14 @@ export class HygieneAnalyzer implements Analyzer {
         file: string,
         checkDead: boolean,
         checkStubs: boolean,
-        checkClones: boolean,
         ctx: AnalyzerContext,
         issues: Issue[],
-    ): { lineHashes: number[]; meaningfulLineIndices: number[] } {
+    ): void {
         const isIndentBased = file.endsWith('.py') || file.endsWith('.gd');
         const jargonRe = buildJargonRe((ctx.options as HygieneOptions | undefined)?.jargonPatterns);
         let lineStart = 0;
         let lineIdx = 0;
         const deadState = { hadTerminalStmt: false, lastTerminalIndent: 0 };
-
-        const lineHashes: number[] = [];
-        const meaningfulLineIndices: number[] = [];
 
         while (lineStart < len) {
             const { lineText, nextStart } = this.extractLine(content, lineStart, len);
@@ -335,15 +386,9 @@ export class HygieneAnalyzer implements Analyzer {
                 this.auditStubsAndJargon(trimmed, lineIdx, jargonRe, ctx, issues);
             }
 
-            if (checkClones) {
-                this.recordCloneCandidate(trimmed, lineIdx, lineHashes, meaningfulLineIndices);
-            }
-
             lineIdx++;
             lineStart = nextStart;
         }
-
-        return { lineHashes, meaningfulLineIndices };
     }
 
     private extractLine(
@@ -497,62 +542,45 @@ export class HygieneAnalyzer implements Analyzer {
         }
     }
 
-    private recordCloneCandidate(
-        trimmed: string,
-        lineIdx: number,
-        lineHashes: number[],
-        meaningfulLineIndices: number[],
-    ): void {
-        if (
-            trimmed &&
-            !trimmed.startsWith('//') &&
-            !trimmed.startsWith('#') &&
-            trimmed !== '{' &&
-            trimmed !== '}'
-        ) {
-            lineHashes.push(hashString32(trimmed));
-            meaningfulLineIndices.push(lineIdx);
-        }
-    }
-
     private auditCloneBlocks(
-        lineHashes: number[],
-        meaningfulLineIndices: number[],
+        content: string,
         minCloneLines: number,
         ctx: AnalyzerContext,
         issues: Issue[],
-        content?: string,
     ): void {
-        if (content) {
-            try {
-                const clones = nativeCore.detectCloneBlocks(content, minCloneLines);
-                if (clones.length > 0) {
-                    const clone = clones[0];
-                    const desc = HygieneMessages.DUPLICATE_CODE_CLONE(
-                        clone.lineSpan,
-                        clone.originalLine,
-                    );
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            clone.startLine - 1,
-                            'HYG-CLN-001',
-                            desc.message,
-                            SEVERITY_WARNING,
-                            {
-                                startLine: clone.startLine,
-                                originalLine: clone.originalLine,
-                                lineSpan: clone.lineSpan,
-                            },
-                            desc.suggestion,
-                        ),
-                    );
-                    return;
-                }
-            } catch (_err) {
-                // Fall through to pure JS line-hash rolling loop on error
-                void _err;
+        try {
+            const clones = nativeCore.detectCloneBlocks(content, minCloneLines);
+            if (clones.length > 0) {
+                const clone = clones[0];
+                const desc = HygieneMessages.DUPLICATE_CODE_CLONE(
+                    clone.lineSpan,
+                    clone.originalLine,
+                );
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        clone.startLine - 1,
+                        'HYG-CLN-001',
+                        desc.message,
+                        SEVERITY_WARNING,
+                        {
+                            startLine: clone.startLine,
+                            originalLine: clone.originalLine,
+                            lineSpan: clone.lineSpan,
+                        },
+                        desc.suggestion,
+                    ),
+                );
             }
+            return;
+        } catch (_err) {
+            // Fall through to pure JS line-hash rolling loop on error
+            void _err;
+        }
+
+        const { lineHashes, meaningfulLineIndices } = computeLineHashesFallback(content);
+        if (lineHashes.length < minCloneLines * 2) {
+            return;
         }
 
         const blockMap = new Map<number, number>();

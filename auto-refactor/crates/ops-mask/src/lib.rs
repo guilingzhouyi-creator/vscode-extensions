@@ -54,8 +54,9 @@ pub fn is_ecma_whitespace(ch: u32) -> bool {
 /// Masks comments and string literals in source code according to the language profile.
 /// Returns both raw and masked line buffers alongside non-blank line counts.
 pub fn mask_source_code(content: &str, config: &MaskConfig) -> MaskResult {
-    let mut raw = Vec::new();
-    let mut masked = Vec::new();
+    let initial_capacity = content.lines().count().max(16);
+    let mut raw = Vec::with_capacity(initial_capacity);
+    let mut masked = Vec::with_capacity(initial_capacity);
     let mut non_blank_lines = 0u32;
     let mut state = MaskState::default();
 
