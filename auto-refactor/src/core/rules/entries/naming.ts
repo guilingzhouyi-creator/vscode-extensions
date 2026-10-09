@@ -16,7 +16,6 @@ import {
     SEVERITY_WARNING,
     SEVERITY_INFO,
     RULE_FAMILY_NAMING,
-    LEGACY_REASON_ID_NOT_CANONICAL,
 } from '../types';
 import {
     ANALYZER_NAMING,
@@ -30,17 +29,43 @@ import {
  */
 export const NAMING_RULES: readonly RuleDefinition[] = [
     defineRule({
-        id: 'NAM-FIL-001',
+        id: RULE_NAM_ABR_001,
         family: RULE_FAMILY_NAMING,
         analyzer: ANALYZER_NAMING,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'File names must follow target language conventions (kebab-case for TS/JS, snake_case for Python/Rust/GDScript) and contain no temporary construction jargon.',
+            'Identifier contains cryptic, incomplete, or non-standard abbreviations harming code readability.',
         remediation:
-            'Rename file to follow standard language conventions (e.g., foo-bar.ts or foo_bar.py) without temporary phase tags.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-fil-001',
+            'Expand cryptic abbreviations to standard unabbreviated domain terms or approved domain acronyms.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-abr-001',
+    }),
+    defineRule({
+        id: 'NAM-COL-001',
+        family: RULE_FAMILY_NAMING,
+        analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_INFO,
+        summary:
+            'Collections (Array/Set) should use plural nouns or List suffixes; mappings (Map/Dict) should express key-to-value relationships.',
+        remediation:
+            'Pluralize array collections and name mappings using *To* or *By* to clarify associations.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-col-001',
+    }),
+    defineRule({
+        id: 'NAM-DEC-001',
+        canonical: true,
+        defaultSeverity: SEVERITY_WARNING,
+        family: RULE_FAMILY_NAMING,
+        languages: ALL_LANGUAGES,
+        analyzer: ANALYZER_NAMING,
+        summary:
+            'Identifier length inflation (30-40+ characters) or multiple symbols sharing long prefixes indicates insufficient modular decomposition.',
+        remediation:
+            'Extract shared domain modules or subdirectories, turning redundant prefixes into module namespaces and reducing individual symbol length.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-dec-001',
     }),
     defineRule({
         id: 'NAM-DIR-001',
@@ -53,6 +78,19 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
             'Source directory names must be lowercase kebab-case or single words; CamelCase, spaces, and temporary phase words are prohibited.',
         remediation: 'Rename directory to lowercase hyphenated style (e.g., ast-utils, pipeline).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-dir-001',
+    }),
+    defineRule({
+        id: 'NAM-FIL-001',
+        family: RULE_FAMILY_NAMING,
+        analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'File names must follow target language conventions (kebab-case for TS/JS, snake_case for Python/Rust/GDScript) and contain no temporary construction jargon.',
+        remediation:
+            'Rename file to follow standard language conventions (e.g., foo-bar.ts or foo_bar.py) without temporary phase tags.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-fil-001',
     }),
     defineRule({
         id: 'NAM-GLB-001',
@@ -81,70 +119,6 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-glb-002',
     }),
     defineRule({
-        id: 'NAM-TYP-001',
-        family: RULE_FAMILY_NAMING,
-        analyzer: ANALYZER_NAMING,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Type definitions, interfaces, and class declarations must follow PascalCase naming conventions.',
-        remediation:
-            'Rename classes, interfaces, type aliases, and enums to PascalCase (e.g., Scanner, RuleDefinition).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-typ-001',
-    }),
-    defineRule({
-        id: 'NAM-MBR-001',
-        family: RULE_FAMILY_NAMING,
-        analyzer: ANALYZER_NAMING,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Class properties, object fields, and methods must follow camelCase naming conventions.',
-        remediation: 'Adjust property and method names to clear, descriptive camelCase.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-mbr-001',
-    }),
-    defineRule({
-        id: 'NAM-VAG-001',
-        family: RULE_FAMILY_NAMING,
-        analyzer: ANALYZER_NAMING,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Vague or meaningless generic variable names (such as bare data, res, ret, tmp, item) are prohibited.',
-        remediation:
-            'Append domain-specific prefixes or suffixes reflecting semantic intent (e.g., parseResult, tokenPayload, ruleEntry).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-vag-001',
-    }),
-    defineRule({
-        id: 'NAM-SGL-001',
-        family: RULE_FAMILY_NAMING,
-        analyzer: ANALYZER_NAMING,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard symbols).',
-        remediation:
-            'Use descriptive identifiers communicating intent; reserve single letters strictly for loop indices (i, j) or discard (_).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-sgl-001',
-    }),
-    defineRule({
-        id: 'NAM-COL-001',
-        family: RULE_FAMILY_NAMING,
-        analyzer: ANALYZER_NAMING,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_INFO,
-        summary:
-            'Collections (Array/Set) should use plural nouns or List suffixes; mappings (Map/Dict) should express key-to-value relationships.',
-        remediation:
-            'Pluralize array collections and name mappings using *To* or *By* to clarify associations.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-col-001',
-    }),
-    defineRule({
         id: 'NAM-JRG-002',
         canonical: true,
         defaultSeverity: SEVERITY_WARNING,
@@ -158,17 +132,42 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-jrg-002',
     }),
     defineRule({
-        id: 'NAM-DEC-001',
-        canonical: true,
-        defaultSeverity: SEVERITY_WARNING,
+        id: RULE_NAM_LEN_001,
         family: RULE_FAMILY_NAMING,
-        languages: ALL_LANGUAGES,
         analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Identifier length inflation (30-40+ characters) or multiple symbols sharing long prefixes indicates insufficient modular decomposition.',
+            'Variable identifier length is outside acceptable bounds (excessively short or excessively long).',
         remediation:
-            'Extract shared domain modules or subdirectories, turning redundant prefixes into module namespaces and reducing individual symbol length.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-dec-001',
+            'Choose a descriptive, balanced variable name communicating clear semantic intent without extreme brevity or verbosity.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-len-001',
+    }),
+    defineRule({
+        id: RULE_NAM_LEN_002,
+        family: RULE_FAMILY_NAMING,
+        analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Function or method identifier length is too short to communicate its operational responsibility.',
+        remediation:
+            'Rename function with an expressive verb-noun phrase clearly describing its operation and side effects.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-len-002',
+    }),
+    defineRule({
+        id: 'NAM-MBR-001',
+        family: RULE_FAMILY_NAMING,
+        analyzer: ANALYZER_NAMING,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Class properties, object fields, and methods must follow camelCase naming conventions.',
+        remediation: 'Adjust property and method names to clear, descriptive camelCase.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-mbr-001',
     }),
     defineRule({
         id: 'NAM-RES-001',
@@ -236,42 +235,42 @@ export const NAMING_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-res-005',
     }),
     defineRule({
-        id: RULE_NAM_LEN_001,
+        id: 'NAM-SGL-001',
         family: RULE_FAMILY_NAMING,
         analyzer: ANALYZER_NAMING,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Variable identifier length is outside acceptable bounds (excessively short or excessively long).',
+            'Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard symbols).',
         remediation:
-            'Choose a descriptive, balanced variable name communicating clear semantic intent without extreme brevity or verbosity.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-len-001',
+            'Use descriptive identifiers communicating intent; reserve single letters strictly for loop indices (i, j) or discard (_).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-sgl-001',
     }),
     defineRule({
-        id: RULE_NAM_LEN_002,
+        id: 'NAM-TYP-001',
         family: RULE_FAMILY_NAMING,
         analyzer: ANALYZER_NAMING,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Function or method identifier length is too short to communicate its operational responsibility.',
+            'Type definitions, interfaces, and class declarations must follow PascalCase naming conventions.',
         remediation:
-            'Rename function with an expressive verb-noun phrase clearly describing its operation and side effects.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-len-002',
+            'Rename classes, interfaces, type aliases, and enums to PascalCase (e.g., Scanner, RuleDefinition).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-typ-001',
     }),
     defineRule({
-        id: RULE_NAM_ABR_001,
+        id: 'NAM-VAG-001',
         family: RULE_FAMILY_NAMING,
         analyzer: ANALYZER_NAMING,
         canonical: true,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Identifier contains cryptic, incomplete, or non-standard abbreviations harming code readability.',
+            'Vague or meaningless generic variable names (such as bare data, res, ret, tmp, item) are prohibited.',
         remediation:
-            'Expand cryptic abbreviations to standard unabbreviated domain terms or approved domain acronyms.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-abr-001',
+            'Append domain-specific prefixes or suffixes reflecting semantic intent (e.g., parseResult, tokenPayload, ruleEntry).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nam-vag-001',
     }),
 ];

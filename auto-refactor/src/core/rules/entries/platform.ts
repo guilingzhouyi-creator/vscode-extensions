@@ -59,6 +59,32 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#analyzer-error',
     }),
     defineRule({
+        id: 'ARCH-BND-001',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Cross-domain internal penetration: bypassing public export facade contracts to directly access private internal implementations.',
+        remediation:
+            'Access domain capabilities exclusively through public export facade APIs; avoid direct imports from /internal/ or /private/.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-bnd-001',
+    }),
+    defineRule({
+        id: 'ARCH-CFG-001',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_INFO,
+        summary:
+            'Environment configuration leak: pure domain models directly read environment variables or disk configuration files.',
+        remediation:
+            'Parse environment configurations at the application assembly layer and inject strongly-typed values into domain models.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-001',
+    }),
+    defineRule({
         id: 'ARCH-DIR-001',
         family: RULE_FAMILY_ARCHITECTURE,
         analyzer: ANALYZER_ARCHITECTURE,
@@ -85,71 +111,6 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dir-002',
     }),
     defineRule({
-        id: 'ARCH-LEAK-001',
-        family: RULE_FAMILY_ARCHITECTURE,
-        analyzer: ANALYZER_ARCHITECTURE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Responsibility leak: pure domain models directly reference or leak external frameworks (Express, Vue, Godot, ORM).',
-        remediation:
-            'Use POJO or native language entities for domain models, isolating external framework types via adapters.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-leak-001',
-    }),
-    defineRule({
-        id: 'ARCH-LEAK-002',
-        family: RULE_FAMILY_ARCHITECTURE,
-        analyzer: ANALYZER_ARCHITECTURE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Layer boundary breach: outer implementations are directly referenced by inner layers (Clean/DDD inverted hierarchy).',
-        remediation:
-            'Restore unidirectional dependencies (inner declares interface, outer implements) or move file to appropriate layer.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-leak-002',
-    }),
-    defineRule({
-        id: 'ARCH-HDL-001',
-        family: RULE_FAMILY_ARCHITECTURE,
-        analyzer: ANALYZER_ARCHITECTURE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_ERROR,
-        summary:
-            'Headless architecture breach: core business logic or calculation modules directly bind to UI/IDE view frameworks.',
-        remediation:
-            'Decouple core logic from display frameworks, maintaining headless standalone execution and testability.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-hdl-001',
-    }),
-    defineRule({
-        id: 'ARCH-BND-001',
-        family: RULE_FAMILY_ARCHITECTURE,
-        analyzer: ANALYZER_ARCHITECTURE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Cross-domain internal penetration: bypassing public export facade contracts to directly access private internal implementations.',
-        remediation:
-            'Access domain capabilities exclusively through public export facade APIs; avoid direct imports from /internal/ or /private/.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-bnd-001',
-    }),
-    defineRule({
-        id: 'ARCH-GLB-001',
-        family: RULE_FAMILY_ARCHITECTURE,
-        analyzer: ANALYZER_ARCHITECTURE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Implicit global mutable state: modules are tightly coupled via top-level global variables or static singletons.',
-        remediation:
-            'Refactor to dependency injection or on-demand instances, eliminating shared mutable static singletons.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-glb-001',
-    }),
-    defineRule({
         id: 'ARCH-DIR-003',
         family: RULE_FAMILY_ARCHITECTURE,
         analyzer: ANALYZER_ARCHITECTURE,
@@ -161,19 +122,6 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         remediation:
             'Align call dependency flows so inner domain defines contracts and outer infrastructure implements them.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dir-003',
-    }),
-    defineRule({
-        id: 'ARCH-CFG-001',
-        family: RULE_FAMILY_ARCHITECTURE,
-        analyzer: ANALYZER_ARCHITECTURE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_INFO,
-        summary:
-            'Environment configuration leak: pure domain models directly read environment variables or disk configuration files.',
-        remediation:
-            'Parse environment configurations at the application assembly layer and inject strongly-typed values into domain models.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-cfg-001',
     }),
     defineRule({
         id: 'ARCH-DISP-001',
@@ -200,6 +148,58 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         remediation:
             'Refactor into cohesive switch dispatchers (CC <= 10) or top-level named handler functions to eliminate closure fragmentation.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dsp-002',
+    }),
+    defineRule({
+        id: 'ARCH-GLB-001',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Implicit global mutable state: modules are tightly coupled via top-level global variables or static singletons.',
+        remediation:
+            'Refactor to dependency injection or on-demand instances, eliminating shared mutable static singletons.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-glb-001',
+    }),
+    defineRule({
+        id: 'ARCH-HDL-001',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Headless architecture breach: core business logic or calculation modules directly bind to UI/IDE view frameworks.',
+        remediation:
+            'Decouple core logic from display frameworks, maintaining headless standalone execution and testability.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-hdl-001',
+    }),
+    defineRule({
+        id: 'ARCH-LEAK-001',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Responsibility leak: pure domain models directly reference or leak external frameworks (Express, Vue, Godot, ORM).',
+        remediation:
+            'Use POJO or native language entities for domain models, isolating external framework types via adapters.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-leak-001',
+    }),
+    defineRule({
+        id: 'ARCH-LEAK-002',
+        family: RULE_FAMILY_ARCHITECTURE,
+        analyzer: ANALYZER_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Layer boundary breach: outer implementations are directly referenced by inner layers (Clean/DDD inverted hierarchy).',
+        remediation:
+            'Restore unidirectional dependencies (inner declares interface, outer implements) or move file to appropriate layer.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-leak-002',
     }),
     defineRule({
         id: 'ARCH-TMP-001',
@@ -255,18 +255,32 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#duplicate-literal',
     }),
     defineRule({
-        id: 'nested-constant',
-        family: RULE_FAMILY_CONSTANTS,
-        analyzer: ANALYZER_CONSTANTS,
+        id: 'expensive-loop-operation',
+        family: RULE_FAMILY_PERFORMANCE,
+        analyzer: ANALYZER_PERFORMANCE,
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop.',
+        remediation:
+            'Eliminate deep copies on hot paths; use read-only views or lightweight references instead.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#expensive-loop-operation',
+    }),
+    defineRule({
+        id: 'high-algorithmic-complexity',
+        family: RULE_FAMILY_PERFORMANCE,
+        analyzer: ANALYZER_PERFORMANCE,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary:
-            'Redundant constant nesting: indirect constant aliases, deep constant objects, or pseudo-constants in nested scopes.',
+            'Multiple nested loops create potential O(N^2)/O(N^3) complexity hotspots or implicit linear searches.',
         remediation:
-            'Inline redundant aliases or hoist constants to module-level single sources of truth, eliminating deep object nesting.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nested-constant',
+            'Refactor nested loops or pre-build Map/Set indexes to reduce lookups to O(1).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#high-algorithmic-complexity',
     }),
     defineRule({
         id: 'high-complexity',
@@ -323,6 +337,34 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#large-file',
     }),
     defineRule({
+        id: 'loop-transient-allocation',
+        family: RULE_FAMILY_PERFORMANCE,
+        analyzer: ANALYZER_PERFORMANCE,
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract.',
+        remediation:
+            'Hoist object instantiation outside the loop or utilize object pool patterns (ADV-POOL-001).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#loop-transient-allocation',
+    }),
+    defineRule({
+        id: 'nested-constant',
+        family: RULE_FAMILY_CONSTANTS,
+        analyzer: ANALYZER_CONSTANTS,
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Redundant constant nesting: indirect constant aliases, deep constant objects, or pseudo-constants in nested scopes.',
+        remediation:
+            'Inline redundant aliases or hoist constants to module-level single sources of truth, eliminating deep object nesting.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#nested-constant',
+    }),
+    defineRule({
         id: 'secret-detected',
         family: RULE_FAMILY_SECURITY,
         analyzer: ANALYZER_SECRETS,
@@ -358,47 +400,5 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         summary: 'Module is never imported by any other file (outside entry whitelist).',
         remediation: 'Delete the dead module or add its entry pattern to entryGlobs.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#unused-module',
-    }),
-    defineRule({
-        id: 'expensive-loop-operation',
-        family: RULE_FAMILY_PERFORMANCE,
-        analyzer: ANALYZER_PERFORMANCE,
-        canonical: false,
-        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_ERROR,
-        summary:
-            'Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop.',
-        remediation:
-            'Eliminate deep copies on hot paths; use read-only views or lightweight references instead.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#expensive-loop-operation',
-    }),
-    defineRule({
-        id: 'high-algorithmic-complexity',
-        family: RULE_FAMILY_PERFORMANCE,
-        analyzer: ANALYZER_PERFORMANCE,
-        canonical: false,
-        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Multiple nested loops create potential O(N^2)/O(N^3) complexity hotspots or implicit linear searches.',
-        remediation:
-            'Refactor nested loops or pre-build Map/Set indexes to reduce lookups to O(1).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#high-algorithmic-complexity',
-    }),
-    defineRule({
-        id: 'loop-transient-allocation',
-        family: RULE_FAMILY_PERFORMANCE,
-        analyzer: ANALYZER_PERFORMANCE,
-        canonical: false,
-        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract.',
-        remediation:
-            'Hoist object instantiation outside the loop or utilize object pool patterns (ADV-POOL-001).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#loop-transient-allocation',
     }),
 ];

@@ -93,36 +93,6 @@ function defineExposureRule(
  * Array of modern frontend, production hygiene, and client exposure rule definitions.
  */
 export const ANALYZER_MODERN_FRONTEND_RULES: readonly RuleDefinition[] = [
-    // ── Frontend Engineering Rules (UI-ENG) ───────────────────────────────────
-    defineUiRule(
-        'UI-ENG-001',
-        SEVERITY_WARNING,
-        'HTML semantic structure and accessibility attributes must be present on interactive elements',
-        'Provide alt attributes for images, accessible labels for inputs, and explicit roles for custom controls',
-        'ui-eng-001',
-    ),
-    defineUiRule(
-        'UI-ENG-002',
-        SEVERITY_WARNING,
-        'DOM hierarchy nesting depth must not exceed 12 and CSS animations must avoid reflow properties',
-        'Flatten DOM tree structure and use composite properties (transform, opacity) for transitions',
-        'ui-eng-002',
-    ),
-    defineUiRule(
-        'UI-ENG-003',
-        SEVERITY_WARNING,
-        'Component must not exceed 10 props or duplicate complex DOM subtrees without reuse',
-        'Decompose large multi-purpose components into focused single-responsibility micro-components',
-        'ui-eng-003',
-    ),
-    defineUiRule(
-        'UI-ENG-004',
-        SEVERITY_INFO,
-        'Frontend hooks must start with "use" and event handler callbacks must start with "on" or "handle"',
-        'Align hook identifiers with use* and event handler callbacks with handle* or on*',
-        'ui-eng-004',
-    ),
-
     // ── Production Hygiene Rules (PROD-HYG) ───────────────────────────────────
     defineProdHygieneRule(
         'PROD-HYG-001',
@@ -174,5 +144,35 @@ export const ANALYZER_MODERN_FRONTEND_RULES: readonly RuleDefinition[] = [
         'Unreleased, experimental, or test preview routes must not be packaged into production routes',
         'Exclude development and staging routes from production bundles using build-time environment checks',
         'sec-exp-004',
+    ),
+
+    // ── Frontend Engineering Rules (UI-ENG) ───────────────────────────────────
+    defineUiRule(
+        'UI-ENG-001',
+        SEVERITY_WARNING,
+        'HTML semantic structure and accessibility attributes must be present on interactive elements',
+        'Provide alt attributes for images, accessible labels for inputs, and explicit roles for custom controls',
+        'ui-eng-001',
+    ),
+    defineUiRule(
+        'UI-ENG-002',
+        SEVERITY_WARNING,
+        'DOM hierarchy nesting depth must not exceed 12 and CSS animations must avoid reflow properties',
+        'Flatten DOM tree structure and use composite properties (transform, opacity) for transitions',
+        'ui-eng-002',
+    ),
+    defineUiRule(
+        'UI-ENG-003',
+        SEVERITY_WARNING,
+        'Component must not exceed 10 props or duplicate complex DOM subtrees without reuse',
+        'Decompose large multi-purpose components into focused single-responsibility micro-components',
+        'ui-eng-003',
+    ),
+    defineUiRule(
+        'UI-ENG-004',
+        SEVERITY_INFO,
+        'Frontend hooks must start with "use" and event handler callbacks must start with "on" or "handle"',
+        'Align hook identifiers with use* and event handler callbacks with handle* or on*',
+        'ui-eng-004',
     ),
 ];

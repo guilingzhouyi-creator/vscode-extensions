@@ -81,6 +81,40 @@ function defineCmp(
 
 /** governance rules. */
 export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
+    defineCmp(
+        'CMP-CAL-001',
+        SEVERITY_WARNING,
+        'Deeply nested inline callback chains create callback hell, complicate exception' +
+            'propagation, and mask race conditions.',
+        'Flatten callback chains using async/await, Promise chaining, or extract named top-level functions.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#cmp-cal-001',
+    ),
+    defineCmp(
+        'CMP-DEN-001',
+        SEVERITY_WARNING,
+        'Dense syntactic packing of bitwise, arithmetic and conditional operators without naming' +
+            'or spacing exceeds human cognitive chunking capacity.',
+        'Reduce cognitive density: add spacing and named intermediate variables to break down complex expressions.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#cmp-den-001',
+    ),
+    defineCmp(
+        'CMP-EXP-001',
+        SEVERITY_WARNING,
+        'Giant expressions with deeply nested ternaries or unbounded logical chains create' +
+            'cognitive overload and obscure branching logic.',
+        'Break complex nested ternaries or long boolean chains into named intermediate constants' +
+            'or explicit if-else statements.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#cmp-exp-001',
+    ),
+    defineCmp(
+        'CMP-LIN-001',
+        SEVERITY_WARNING,
+        'Cramming multiple distinct statements or side-effects onto a single line impairs stack' +
+            'traces, debug stepping, and code readability.',
+        'Split multiple statements or side-effects on a single line across multiple lines,' +
+            'adhering to single responsibility per line.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#cmp-lin-001',
+    ),
     defineGov(
         'GOV-AGN-001',
         ALL_LANGUAGES,
@@ -92,24 +126,34 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-agn-001',
     ),
     defineGov(
-        'GOV-SLC-001',
+        'GOV-ARC-001',
         ALL_LANGUAGES,
-        SEVERITY_ERROR,
-        'AST slice mutation introduces breaking signature drift or uncontained side-effects' +
-            'propagating across external call chains.',
-        'Ensure slice edits are strictly backward-compatible or synchronously refactor all' +
-            'external call sites across affected chains.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-slc-001',
+        SEVERITY_WARNING,
+        'Historical dossier nomenclature leaks into production sources, tests, or commit headers' +
+            'outside the archived directory white-list.',
+        'Restrict historical dossier nomenclature strictly to archive white-list paths; express' +
+            'user-facing docs and commit messages in terms of product features.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-arc-001',
     ),
     defineGov(
-        'GOV-TRJ-001',
+        'GOV-BLS-001',
         ALL_LANGUAGES,
-        SEVERITY_ERROR,
-        'Historical trajectory exhibits cyclic regressions, flip-flop oscillations, or' +
-            're-introduces previously eliminated architectural anti-patterns.',
-        'Maintain monotonic quality improvement in refactor trajectories; prevent re-introducing' +
-            'architectural anti-patterns previously eliminated by recipes.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-trj-001',
+        SEVERITY_WARNING,
+        'Cross-tier monolithic change blast radius breaches atomic staging boundaries across' +
+            'docs, contracts, config, domains, and tooling.',
+        'Decompose monolithic blast radius into atomic commits ordered by architectural' +
+            'dependency (docs -> core -> infra -> config -> business -> refactor).',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-bls-001',
+    ),
+    defineGov(
+        'GOV-DAT-001',
+        ALL_LANGUAGES,
+        SEVERITY_INFO,
+        'Functions declaring excessive discrete scalar parameters (>= 5) exhibit Data Clumps' +
+            'smell; parameters should be aggregated into a named Context or Options interface.',
+        'Aggregate discrete parameters into a strongly-typed structured context model (such as a' +
+            'Context or Options interface).',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-dat-001',
     ),
     defineGov(
         'GOV-DBG-001',
@@ -119,28 +163,6 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'degrade I/O throughput.',
         'Remove debugging print statements or migrate to structured logging with appropriate log levels.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-dbg-001',
-    ),
-    defineGov(
-        'GOV-MSG-001',
-        ALL_LANGUAGES,
-        SEVERITY_WARNING,
-        'Underlying diagnostic messages and remediations must use standard English centrally' +
-            'managed by constant dictionaries, prohibiting hardcoded non-ASCII or inline strings' +
-            'at emitter sites.',
-        'Extract inline error messages to centralized constant pools under src/core/messages/ and' +
-            'ensure phrasing conforms to industry technical English.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-msg-001',
-    ),
-    defineGov(
-        'GOV-RTC-002',
-        ALL_LANGUAGES,
-        SEVERITY_WARNING,
-        'Baseline debt entries must track physical file rename operations without artificial' +
-            'inflation or false positive churn. Monotonic downward ratchets must remap prior' +
-            'baselines to new paths upon refactoring.',
-        'Apply pathRemap normalization during baseline updates and gate convergence to ensure' +
-            'continuous inheritance of legacy debt and prevent false inflation.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-rtc-002',
     ),
     defineGov(
         'GOV-EXC-001',
@@ -191,6 +213,16 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-fil-002',
     ),
     defineGov(
+        'GOV-GAM-001',
+        ALL_LANGUAGES,
+        SEVERITY_WARNING,
+        'Anti-gaming violation: artificial function splitting, tautological test padding, or' +
+            'empty boilerplate gaming quality metrics.',
+        'Maintain cohesive business logic and write substantive test assertions; eliminate empty' +
+            'boilerplate and tautological tests.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-gam-001',
+    ),
+    defineGov(
         'GOV-LOG-001',
         ALL_LANGUAGES,
         SEVERITY_WARNING,
@@ -207,16 +239,6 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'unnecessary indirection.',
         'Remove passthrough forwarders so callers invoke target directly, or merge cohesive responsibilities.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-log-002',
-    ),
-    defineGov(
-        'GOV-GAM-001',
-        ALL_LANGUAGES,
-        SEVERITY_WARNING,
-        'Anti-gaming violation: artificial function splitting, tautological test padding, or' +
-            'empty boilerplate gaming quality metrics.',
-        'Maintain cohesive business logic and write substantive test assertions; eliminate empty' +
-            'boilerplate and tautological tests.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-gam-001',
     ),
     defineGov(
         'GOV-MNT-001',
@@ -237,6 +259,17 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         'Invert dependencies: declare ports/interfaces within the domain layer and implement them' +
             'in outer presentation/infrastructure layers.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-mnt-002',
+    ),
+    defineGov(
+        'GOV-MSG-001',
+        ALL_LANGUAGES,
+        SEVERITY_WARNING,
+        'Underlying diagnostic messages and remediations must use standard English centrally' +
+            'managed by constant dictionaries, prohibiting hardcoded non-ASCII or inline strings' +
+            'at emitter sites.',
+        'Extract inline error messages to centralized constant pools under src/core/messages/ and' +
+            'ensure phrasing conforms to industry technical English.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-msg-001',
     ),
     defineGov(
         'GOV-PRF-001',
@@ -287,14 +320,25 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-prf-005',
     ),
     defineGov(
-        'GOV-DAT-001',
+        'GOV-RTC-002',
         ALL_LANGUAGES,
-        SEVERITY_INFO,
-        'Functions declaring excessive discrete scalar parameters (>= 5) exhibit Data Clumps' +
-            'smell; parameters should be aggregated into a named Context or Options interface.',
-        'Aggregate discrete parameters into a strongly-typed structured context model (such as a' +
-            'Context or Options interface).',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-dat-001',
+        SEVERITY_WARNING,
+        'Baseline debt entries must track physical file rename operations without artificial' +
+            'inflation or false positive churn. Monotonic downward ratchets must remap prior' +
+            'baselines to new paths upon refactoring.',
+        'Apply pathRemap normalization during baseline updates and gate convergence to ensure' +
+            'continuous inheritance of legacy debt and prevent false inflation.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-rtc-002',
+    ),
+    defineGov(
+        'GOV-RUL-001',
+        ALL_LANGUAGES,
+        SEVERITY_ERROR,
+        'Static review rule identifier drift or hallucination: mentioned rule ID is not' +
+            'registered in the single-source rule catalog.',
+        'Verify rule catalog single source of truth and reference registered rule IDs; never' +
+            'invent hallucinated rule codes.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-rul-001',
     ),
     defineGov(
         'GOV-SAN-001',
@@ -305,6 +349,26 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         'Remove temporary ticket, phase, or batch jargon and replace with enduring domain and' +
             'architectural terminology.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-san-001',
+    ),
+    defineGov(
+        'GOV-SAN-002',
+        ALL_LANGUAGES,
+        SEVERITY_WARNING,
+        'Objective technical language guard: text contains promotional rhetoric, absolute claims,' +
+            'emotional disparagement, or process buzzwords.',
+        'Replace promotional rhetoric and absolute assertions with objective technical' +
+            'descriptions and reproducible verification facts.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-san-002',
+    ),
+    defineGov(
+        'GOV-SLC-001',
+        ALL_LANGUAGES,
+        SEVERITY_ERROR,
+        'AST slice mutation introduces breaking signature drift or uncontained side-effects' +
+            'propagating across external call chains.',
+        'Ensure slice edits are strictly backward-compatible or synchronously refactor all' +
+            'external call sites across affected chains.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-slc-001',
     ),
     defineGov(
         'GOV-STD-001',
@@ -321,6 +385,16 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         'Legacy constructs (e.g. `var` in modern TS/JS, dead `pass` in GDScript) violate language idiomatic standards.',
         'Replace deprecated language constructs (such as var or legacy keys) with modern idioms.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-std-002',
+    ),
+    defineGov(
+        'GOV-TRJ-001',
+        ALL_LANGUAGES,
+        SEVERITY_ERROR,
+        'Historical trajectory exhibits cyclic regressions, flip-flop oscillations, or' +
+            're-introduces previously eliminated architectural anti-patterns.',
+        'Maintain monotonic quality improvement in refactor trajectories; prevent re-introducing' +
+            'architectural anti-patterns previously eliminated by recipes.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-trj-001',
     ),
     defineGov(
         'GOV-TYP-001',
@@ -377,80 +451,6 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'preserve API contract stability.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-typ-006',
     ),
-    defineCmp(
-        'CMP-EXP-001',
-        SEVERITY_WARNING,
-        'Giant expressions with deeply nested ternaries or unbounded logical chains create' +
-            'cognitive overload and obscure branching logic.',
-        'Break complex nested ternaries or long boolean chains into named intermediate constants' +
-            'or explicit if-else statements.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#cmp-exp-001',
-    ),
-    defineCmp(
-        'CMP-LIN-001',
-        SEVERITY_WARNING,
-        'Cramming multiple distinct statements or side-effects onto a single line impairs stack' +
-            'traces, debug stepping, and code readability.',
-        'Split multiple statements or side-effects on a single line across multiple lines,' +
-            'adhering to single responsibility per line.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#cmp-lin-001',
-    ),
-    defineCmp(
-        'CMP-CAL-001',
-        SEVERITY_WARNING,
-        'Deeply nested inline callback chains create callback hell, complicate exception' +
-            'propagation, and mask race conditions.',
-        'Flatten callback chains using async/await, Promise chaining, or extract named top-level functions.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#cmp-cal-001',
-    ),
-    defineCmp(
-        'CMP-DEN-001',
-        SEVERITY_WARNING,
-        'Dense syntactic packing of bitwise, arithmetic and conditional operators without naming' +
-            'or spacing exceeds human cognitive chunking capacity.',
-        'Reduce cognitive density: add spacing and named intermediate variables to break down complex expressions.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#cmp-den-001',
-    ),
-    defineGov(
-        'GOV-BLS-001',
-        ALL_LANGUAGES,
-        SEVERITY_WARNING,
-        'Cross-tier monolithic change blast radius breaches atomic staging boundaries across' +
-            'docs, contracts, config, domains, and tooling.',
-        'Decompose monolithic blast radius into atomic commits ordered by architectural' +
-            'dependency (docs -> core -> infra -> config -> business -> refactor).',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-bls-001',
-    ),
-    defineGov(
-        'GOV-RUL-001',
-        ALL_LANGUAGES,
-        SEVERITY_ERROR,
-        'Static review rule identifier drift or hallucination: mentioned rule ID is not' +
-            'registered in the single-source rule catalog.',
-        'Verify rule catalog single source of truth and reference registered rule IDs; never' +
-            'invent hallucinated rule codes.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-rul-001',
-    ),
-    defineGov(
-        'GOV-ARC-001',
-        ALL_LANGUAGES,
-        SEVERITY_WARNING,
-        'Historical dossier nomenclature leaks into production sources, tests, or commit headers' +
-            'outside the archived directory white-list.',
-        'Restrict historical dossier nomenclature strictly to archive white-list paths; express' +
-            'user-facing docs and commit messages in terms of product features.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-arc-001',
-    ),
-    defineGov(
-        'GOV-SAN-002',
-        ALL_LANGUAGES,
-        SEVERITY_WARNING,
-        'Objective technical language guard: text contains promotional rhetoric, absolute claims,' +
-            'emotional disparagement, or process buzzwords.',
-        'Replace promotional rhetoric and absolute assertions with objective technical' +
-            'descriptions and reproducible verification facts.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-san-002',
-    ),
     defineRule({
         id: 'NUM-PREC-001',
         family: RULE_FAMILY_NUMERIC,
@@ -460,10 +460,10 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Lossy precision rounding or mismatched scaling detected in mathematical calculation' +
-                'path, risking IEEE 754 drift.',
+            'path, risking IEEE 754 drift.',
         remediation:
             'Use standard 0.01 precision rounding (e.g. * 100 / 100) or explicit tolerance bounds' +
-                'to preserve precision.',
+            'to preserve precision.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#num-prec-001',
     }),
 ];
