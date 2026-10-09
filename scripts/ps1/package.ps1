@@ -93,8 +93,9 @@ function Sync-InstalledExtensionFiles {
 }
 
 # ─── 发现扩展：顶层含 package.json 且声明 engines.vscode 的目录 ───
-$exts = @(Get-ChildItem $root -Directory -Exclude 'dist', 'scripts', 'node_modules' |
+$exts = @(Get-ChildItem -LiteralPath $root -Directory |
     Where-Object {
+        if ($_.Name -in @('dist', 'scripts', 'node_modules')) { return $false }
         $pkgPath = Join-Path $_.FullName 'package.json'
         if (-not (Test-Path $pkgPath)) { return $false }
         $pkg = [System.IO.File]::ReadAllText($pkgPath, [System.Text.UTF8Encoding]::new($false)) | ConvertFrom-Json
