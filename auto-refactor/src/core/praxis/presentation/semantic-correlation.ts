@@ -162,11 +162,13 @@ function electPrimaryCard(cluster: PraxisDiagnosticCard[]): PraxisDiagnosticCard
 function mergeCluster(cluster: PraxisDiagnosticCard[]): PraxisDiagnosticCard {
     const primary = electPrimaryCard(cluster);
     const correlatedRules: string[] = [];
+    const seen = new Set<string>();
 
     for (let i = 0; i < cluster.length; i++) {
         const secondary = cluster[i];
         const rule = secondary.ruleId;
-        if (secondary !== primary && rule !== primary.ruleId && !correlatedRules.includes(rule)) {
+        if (secondary !== primary && rule !== primary.ruleId && !seen.has(rule)) {
+            seen.add(rule);
             correlatedRules.push(rule);
         }
     }

@@ -38,15 +38,14 @@ import {
 interface PatternDef {
     name: string;
     source: string;
-    trigger?: string;
 }
 
 const DEFAULT_PATTERNS: PatternDef[] = [
-    { name: 'private-key', source: 'BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY', trigger: 'BEGIN ' },
-    { name: 'github-token', source: 'ghp_[A-Za-z0-9]{20,}', trigger: 'ghp_' },
-    { name: 'github-pat', source: 'github_pat_[A-Za-z0-9_]{20,}', trigger: 'github_pat_' },
-    { name: 'openai-style-key', source: 'sk-[A-Za-z0-9]{20,}', trigger: 'sk-' },
-    { name: 'aws-access-key', source: 'AKIA[0-9A-Z]{16}', trigger: 'AKIA' },
+    { name: 'private-key', source: 'BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY' },
+    { name: 'github-token', source: 'ghp_[A-Za-z0-9]{20,}' },
+    { name: 'github-pat', source: 'github_pat_[A-Za-z0-9_]{20,}' },
+    { name: 'openai-style-key', source: 'sk-[A-Za-z0-9]{20,}' },
+    { name: 'aws-access-key', source: 'AKIA[0-9A-Z]{16}' },
 ];
 
 /** Default minimum token length for optional high-entropy secret detection. */
@@ -118,42 +117,9 @@ function shannonEntropy(s: string): number {
     return h;
 }
 
-/**
- * Module: Static Analysis — Secrets Detection Literal Prefix Extractor
- * File Path: src/analyzers/secrets.ts
- * Architecture Role: Static analysis preflight parser extracting leading literal triggers.
- * Dependencies & Triggers: Called by compileSecretPatterns for fast-path secret scanning.
- * Responsibilities:
- *   1. Scan leading ASCII characters until an active regex meta-character is encountered.
- *   2. Require a minimum trigger length of 3 to avoid high-frequency short token collisions.
- *   3. Return undefined when no distinct literal prefix can be safely inferred.
- * Exit Semantics & Design Rationale: Pure deterministic helper; returns string or undefined.
- *
- * @param patternSource - Raw regular expression pattern source.
- * @returns Literal prefix substring of length >= 3, or undefined.
- */
-function extractLiteralPrefix(patternSource: string): string | undefined {
-    let prefix = '';
-    for (let i = 0; i < patternSource.length; i++) {
-        const ch = patternSource[i];
-        if (/[a-zA-Z0-9_\- ]/.test(ch)) {
-            prefix += ch;
-        } else {
-            break;
-        }
-    }
-    return prefix.length >= 3 ? prefix : undefined;
-}
-
 interface CompiledSecretPattern {
     name: string;
     re: RegExp;
-    trigger?: string;
-}
-
-interface CompiledSecretsTable {
-    patterns: CompiledSecretPattern[];
-    hasOnlyTriggeredPatterns: boolean;
 }
 
 interface ResolvedEntropyConfig {
@@ -170,13 +136,9 @@ function shouldSkipSecrets(normPath: string, level: SecurityLevel, opts: Secrets
     return isTestOrFixture && ignoreInTests;
 }
 
-function compileSecretPatterns(opts: SecretsOptions): CompiledSecretsTable {
+function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
     const base = opts.patterns
-        ? opts.patterns.map((source, i) => ({
-              name: `custom-${i + 1}`,
-              source,
-              trigger: extractLiteralPrefix(source),
-          }))
+        ? opts.patterns.map((source, i) => ({ name: `custom-${i + 1}`, source }))
         : DEFAULT_PATTERNS;
 
     // Validate user-supplied patterns for ReDoS risk. Patterns with known
@@ -191,7 +153,7 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretsTable {
             console.warn(`[secrets] Skipping unsafe pattern "${p.name}": ${warnings.join('; ')}`);
             continue;
         }
-        compiled.push({ name: p.name, re: new RegExp(p.source), trigger: p.trigger });
+        compiled.push({ name: p.name, re: new RegExp(p.source) });
     }
 
     for (const source of opts.extraPatterns ?? []) {
@@ -202,58 +164,10 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretsTable {
             );
             continue;
         }
-        compiled.push({
-            name: 'custom-extra',
-            re: new RegExp(source),
-            trigger: extractLiteralPrefix(source),
-        });
+        compiled.push({ name: 'custom-extra', re: new RegExp(source) });
     }
 
-    const hasOnlyTriggeredPatterns =
-        compiled.length > 0 && compiled.every((p) => Boolean(p.trigger));
-    return { patterns: compiled, hasOnlyTriggeredPatterns };
-}
-
-function resolveEntropyConfig(opts: SecretsOptions, level: SecurityLevel): ResolvedEntropyConfig {
-    return {
-        enabled: opts.entropy?.enabled !== undefined ? opts.entropy.enabled : level === 'full',
-        minLength: opts.entropy?.minLength ?? DEFAULT_ENTROPY_MIN_LENGTH,
-        threshold: opts.entropy?.threshold ?? DEFAULT_ENTROPY_THRESHOLD,
-        severity: (opts.entropy?.severity ?? 'warning') as Severity,
-    };
-}
-
-/**
- * Module: Static Analysis — Secrets Candidate Fast Preflight Check
- * File Path: src/analyzers/secrets.ts
- * Architecture Role: High-throughput pre-filter eliminating redundant regex state machines.
- * Dependencies & Triggers: Invoked per source line in SecretsAnalyzer.checkSecretPatterns.
- * Responsibilities:
- *   1. Bypasses check if any active pattern lacks a deterministic literal trigger.
- *   2. Checks for substring presence using efficient indexOf scanning.
- *   3. Returns true immediately upon first matching feature to minimize work.
- * Exit Semantics & Design Rationale: Pure boolean query with zero heap allocations.
- *
- * @param lineText - Current source line text being inspected.
- * @param patterns - Array of compiled secret patterns with optional triggers.
- * @param hasOnlyTriggeredPatterns - True if every compiled pattern defines a trigger.
- * @returns True if the line may contain a secret; false if guaranteed clean.
- */
-function hasCandidateSecretFeature(
-    lineText: string,
-    patterns: CompiledSecretPattern[],
-    hasOnlyTriggeredPatterns: boolean,
-): boolean {
-    if (!hasOnlyTriggeredPatterns) {
-        return true;
-    }
-    for (let i = 0; i < patterns.length; i++) {
-        const trigger = patterns[i].trigger;
-        if (trigger && lineText.indexOf(trigger) !== -1) {
-            return true;
-        }
-    }
-    return false;
+    return compiled;
 }
 
 /**
@@ -263,6 +177,15 @@ function hasCandidateSecretFeature(
  * across files without locks. Each call rebuilds its pattern list from the merged options; invalid
  * caller-supplied expressions therefore fail the current call rather than corrupting later ones.
  */
+function resolveEntropyConfig(opts: SecretsOptions, level: SecurityLevel): ResolvedEntropyConfig {
+    return {
+        enabled: opts.entropy?.enabled !== undefined ? opts.entropy.enabled : level === 'full',
+        minLength: opts.entropy?.minLength ?? DEFAULT_ENTROPY_MIN_LENGTH,
+        threshold: opts.entropy?.threshold ?? DEFAULT_ENTROPY_THRESHOLD,
+        severity: (opts.entropy?.severity ?? 'warning') as Severity,
+    };
+}
+
 export class SecretsAnalyzer implements Analyzer {
     name = 'secrets' as const;
 
@@ -283,7 +206,7 @@ export class SecretsAnalyzer implements Analyzer {
             return [];
         }
 
-        const { patterns, hasOnlyTriggeredPatterns } = compileSecretPatterns(opts);
+        const patterns = compileSecretPatterns(opts);
         const entropy = resolveEntropyConfig(opts, level);
         const cap = opts.maxIssuesPerFile ?? DEFAULT_MAX_ISSUES_PER_FILE;
 
@@ -301,7 +224,6 @@ export class SecretsAnalyzer implements Analyzer {
             const matchedSecret = this.checkSecretPatterns(
                 lineText,
                 patterns,
-                hasOnlyTriggeredPatterns,
                 line,
                 ctx,
                 issues,
@@ -334,19 +256,11 @@ export class SecretsAnalyzer implements Analyzer {
     private checkSecretPatterns(
         lineText: string,
         patterns: CompiledSecretPattern[],
-        hasOnlyTriggeredPatterns: boolean,
         line: number,
         ctx: AnalyzerContext,
         issues: Issue[],
     ): boolean {
-        if (!hasCandidateSecretFeature(lineText, patterns, hasOnlyTriggeredPatterns)) {
-            return false;
-        }
-
         for (const p of patterns) {
-            if (p.trigger && lineText.indexOf(p.trigger) === -1) {
-                continue;
-            }
             // Use safeRegexTest: direct for short lines, bounded for long lines
             // (e.g. minified content on a single line). All secret patterns are
             // keyword-level triggers, so truncating long lines is safe.

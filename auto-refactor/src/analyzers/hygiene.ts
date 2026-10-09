@@ -158,24 +158,14 @@ function computeLineHashesFallback(content: string): {
 } {
     const lineHashes: number[] = [];
     const meaningfulLineIndices: number[] = [];
-    const len = content.length;
-    let lineStart = 0;
-    let lineIdx = 0;
+    const lines = content.split('\n');
 
-    while (lineStart < len) {
-        let lineEnd = content.indexOf('\n', lineStart);
-        let nextStart: number;
-        if (lineEnd === -1) {
-            lineEnd = len;
-            nextStart = len;
-        } else {
-            nextStart = lineEnd + 1;
-            if (lineEnd > lineStart && content.charCodeAt(lineEnd - 1) === CHAR_CODE_CR) {
-                lineEnd--;
-            }
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+        let rawLine = lines[lineIdx];
+        if (rawLine.endsWith('\r')) {
+            rawLine = rawLine.slice(0, -1);
         }
-
-        const trimmed = content.slice(lineStart, lineEnd).trim();
+        const trimmed = rawLine.trim();
         if (
             trimmed &&
             !trimmed.startsWith('//') &&
@@ -186,9 +176,6 @@ function computeLineHashesFallback(content: string): {
             lineHashes.push(hashString32(trimmed));
             meaningfulLineIndices.push(lineIdx);
         }
-
-        lineIdx++;
-        lineStart = nextStart;
     }
 
     return { lineHashes, meaningfulLineIndices };

@@ -1,4 +1,4 @@
-# 01. 四层规则金字塔、30 个内置分析器与 321 条全量规则字典
+# 01. 四层规则金字塔、30 个内置分析器与 325 条全量规则字典
 
 > **所属层级**：L4 规则引擎与内置分析器 (`docs/04-analyzers-and-rules/`)  
 > **对应代码真源**：`src/core/rules/registry.ts`、`src/core/rules/entries/*.ts`、`src/core/analyzer-registry.ts`、`src/analyzers/*.ts`
@@ -7,7 +7,7 @@
 
 ## 1. 四层规则金字塔与双轨文案架构
 
-`auto-refactor` 将全部 **321 条内置规则**（含 **306 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（321/321）」。
+`auto-refactor` 将全部 **325 条内置规则**（含 **310 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（325/325）」。
 
 ### 1.1 四层规则金字塔拓扑
 
@@ -69,7 +69,7 @@
 
 ---
 
-## 3. 全量 321 条内置规则权威字典（由门禁自动核验）
+## 3. 全量 325 条内置规则权威字典（由门禁自动核验）
 
 ### Layer 1 — 全域安全、密钥与卫生底线层 (Universal Safety & Hygiene)
 
@@ -175,9 +175,13 @@
 | `PYM-SHADOW-001` | <a id="pym-shadow-001"></a>`python-modern` | `PYM` | `warning` | `python` | 变量或参数遮蔽了 Python 核心内置标识符。 | 重命名变量以避免与内置函数或类型发生命名冲突。 |
 | `PYM-SLOTS-001` | <a id="pym-slots-001"></a>`python-modern` | `PYM` | `warning` | `python` | 无继承的 @dataclass 未声明 slots=True。 | 加 slots=True；确需 __dict__ 时显式 slots=False。 |
 | `PYM-UNION-001` | <a id="pym-union-001"></a>`python-modern` | `PYM` | `error` | `python` | 注解或类型别名位置使用 Optional[...]/Union[...]。 | 改用 PEP 604 写法 X \| None。 |
+| `RSM-CAST-001` | <a id="rsm-cast-001"></a>`rust-modern` | `RSM` | `info` | `rust` | 易引起静默溢出或数值截断的裸 as 强转。 | 改用 TryFrom/try_into() 显式处理溢出或使用 From/from()。 |
 | `RSM-CLONE-001` | <a id="rsm-clone-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | clone() 结果只用于比较或取长度。 | 改为借用比较，避免不可见复制。 |
+| `RSM-ELSE-001` | <a id="rsm-else-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | if let ... else { return/break; } 单分支提前退出。 | 迁移至 Rust 1.65+ 的扁平 let ... else 语法。 |
 | `RSM-EXTERN-001` | <a id="rsm-extern-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | 使用 extern crate 声明。 | 2018 edition 起删除，直接按路径 use 依赖。 |
+| `RSM-FIND-001` | <a id="rsm-find-001"></a>`rust-modern` | `RSM` | `info` | `rust` | 手动 for 循环遍历查找后立即 return 的模式。 | 改用迭代器内置惯用法 .find() / .any() / .position()。 |
 | `RSM-FORMAT-001` | <a id="rsm-format-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | 格式化宏使用位置参数 {}。 | 改用内联捕获 "{value}"，由编译器校验名称。 |
+| `RSM-LOCK-001` | <a id="rsm-lock-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | async fn 作用域内持有同步锁守卫跨 .await 挂起。 | 缩窄锁作用域在 await 前释放，或改用 tokio::sync::Mutex。 |
 | `RSM-MACRO-001` | <a id="rsm-macro-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | 使用 #[macro_use] 文本导入宏。 | 显式 use 目标宏，保留可追溯来源。 |
 | `RSM-STR-001` | <a id="rsm-str-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | 签名使用 &String 参数。 | 改用 &str（或 impl AsRef<str>）。 |
 | `RSM-TRY-001` | <a id="rsm-try-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | 使用 try! 宏。 | 改用 ? 运算符，可嵌入更大的表达式。 |

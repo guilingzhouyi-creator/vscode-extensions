@@ -448,6 +448,10 @@ export class PureJsNativeShim implements INativeCore {
             }
         }
 
+        if (patterns.length > 1) {
+            results.sort((a, b) => a.line - b.line || a.column - b.column);
+        }
+
         return results;
     }
 

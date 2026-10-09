@@ -11,7 +11,8 @@
  *   3. Assert Tarjan strongly connected components and cycle detection;
  *   4. Assert topological ordering on acyclic directed dependency graphs;
  *   5. Assert multi-pattern textual scanning line/column precision;
- *   6. Assert performance latency under burst analysis loads.
+ *   6. Assert Rust raw string literals dual-track masking byte parity;
+ *   7. Assert performance latency under burst analysis loads.
  * Exit Semantics & Design Rationale: Exits 0 on success,
  *   throws AssertionError and exits 1 on failure.
  */
@@ -24,6 +25,7 @@ const {
   nativeHistogramDiff,
   nativeAnalyzeDependencyGraph,
   nativeFastPatternMatch,
+  nativeMaskSourceCode,
   PureJsNativeShim,
 } = require('../dist/api');
 
@@ -146,8 +148,113 @@ function compute() {
   console.log('  ✔ Fast multi-pattern scanner locates exact 1-based lines and columns');
 }
 
+async function testRustRawStringMaskingDualTrack() {
+  console.log('\n5. Testing Rust raw string literals dual-track masking parity...');
+  const shim = new PureJsNativeShim();
+  let nativeEngine = null;
+  try {
+    nativeEngine = require('../crates/auto-refactor-core/index.node');
+  } catch (err) {
+    nativeEngine = null;
+    assert.ok(err, 'Native core fallback triggered');
+  }
+
+  const rustMaskConfig = {
+    lineComment: '//',
+    blockCommentOpen: '/*',
+    blockCommentClose: '*/',
+    quoteChars: '"',
+    multilineTemplates: false,
+    regexLiterals: false,
+  };
+
+  const testCases = [
+    {
+      name: 'Single-line raw string with hash',
+      source: 'let s = r#"hello try!()"#; const next = 10;',
+    },
+    {
+      name: 'Single-line raw string without hash',
+      source: 'let s = r"plain raw string without hashes";',
+    },
+    {
+      name: 'Single-line raw string with nested quotes and hashes',
+      source: 'let s = r##"nested "quote" and "# hash inside"##; let done = true;',
+    },
+    {
+      name: 'Multiline raw string with try!()',
+      source: 'let s = r#"\nmultiline\nhello try!()\nend"#; let a = 1;',
+    },
+    {
+      name: 'Multiline raw string with internal comments and quotes',
+      source: 'const R = r#"/* not a comment */\nline 2 // still inside\nend"#; // real comment\nconst B = 2;',
+    },
+    {
+      name: 'Lifetimes and raw identifiers preservation',
+      source: "fn verify<'a>(r#type: &'a str) -> &str {\n    r#\"hello try!()\"#\n}",
+    },
+    {
+      name: 'Byte and C-string raw string literals',
+      source: 'let b = br#"byte raw"#; let c = cr"c string";',
+    },
+  ];
+
+  for (const tc of testCases) {
+    const shimResult = shim.maskSourceCode(tc.source, rustMaskConfig);
+
+    // Verify raw strings are actually masked out
+    const maskedConcat = shimResult.masked.join('\n');
+    assert.ok(
+      !/try!\(\)/.test(maskedConcat),
+      `Pure JS shim must mask out string content 'try!()' in "${tc.name}"`,
+    );
+
+    // Verify line count and non-blank line count
+    assert.strictEqual(
+      shimResult.raw.length,
+      shimResult.masked.length,
+      `Raw and masked line counts must match in "${tc.name}"`,
+    );
+
+    // Verify identical length per line
+    for (let i = 0; i < shimResult.raw.length; i++) {
+      assert.strictEqual(
+        shimResult.raw[i].length,
+        shimResult.masked[i].length,
+        `Line length must be 100% preserved at line ${i + 1} in "${tc.name}"`,
+      );
+    }
+
+    if (nativeEngine && typeof nativeEngine.maskSourceCode === 'function') {
+      const nativeResult = nativeEngine.maskSourceCode(tc.source, rustMaskConfig);
+      assert.deepStrictEqual(
+        shimResult.masked,
+        nativeResult.masked,
+        `Pure JS shim and Native Rust kernel must produce byte-identical masked output for "${tc.name}"`,
+      );
+      assert.deepStrictEqual(
+        shimResult.raw,
+        nativeResult.raw,
+        `Pure JS shim and Native Rust kernel must produce identical raw lines for "${tc.name}"`,
+      );
+      assert.strictEqual(
+        shimResult.lines,
+        nativeResult.lines,
+        `Total lines metric must match for "${tc.name}"`,
+      );
+      assert.strictEqual(
+        shimResult.nonBlankLines,
+        nativeResult.nonBlankLines,
+        `Non-blank lines metric must match for "${tc.name}"`,
+      );
+    }
+  }
+
+  console.log('  ✔ Rust raw string literals masked with 100% byte equivalence between pure TS and native Rust');
+}
+
 async function testMicroBenchmark() {
-  console.log('\n5. Running burst throughput micro-benchmark (1,000 graph and diff cycles)...');
+  console.log('\n6. Running burst throughput micro-benchmark (1,000 graph and diff cycles)...');
   const shim = new PureJsNativeShim();
   const iterations = 1000;
   const start = Date.now();
@@ -173,6 +280,7 @@ async function runAll() {
   await testHistogramDiff();
   await testGraphAnalysisAndCycleDetection();
   await testFastPatternMatching();
+  await testRustRawStringMaskingDualTrack();
   await testMicroBenchmark();
   console.log('\n=== All Native Acceleration Bridge tests passed successfully! ===');
 }

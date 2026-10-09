@@ -61,6 +61,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-python-modern', script: 'scripts/validate-python-modern.js' },
   { name: 'validate-ts-modern', script: 'scripts/validate-ts-modern.js' },
   { name: 'validate-modern-packs', script: 'scripts/validate-modern-packs.js' },
+  { name: 'validate-rust-modern', script: 'scripts/validate-rust-modern.js' },
   { name: 'validate-naming-suite', script: 'scripts/validate-naming-suite.js' },
   {
     name: 'validate-naming-standardization-clarification',

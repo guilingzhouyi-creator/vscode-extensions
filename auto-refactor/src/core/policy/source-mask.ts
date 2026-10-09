@@ -41,6 +41,8 @@ export interface SourceMaskConfig {
     regexLiterals?: boolean;
     /** True to also blank HTML comments (<!-- ... -->). */
     htmlComment?: boolean;
+    /** True to recognize Rust raw string literals (r"...", r#"..."#). */
+    rawStrings?: boolean;
 }
 
 import { nativeCore } from '../native/native-bridge';
@@ -100,6 +102,7 @@ export const SOURCE_MASK_PRESETS: Record<string, SourceMaskConfig> = {
         lineComment: '//',
         blockComment: { open: '/*', close: '*/' },
         quoteChars: '"',
+        rawStrings: true,
     },
     [MASK_LANGUAGE_GO]: {
         lineComment: '//',
@@ -169,7 +172,7 @@ export function maskSourceTextJs(content: string, config: SourceMaskConfig): Mas
     const len = lines.length;
     const raw: string[] = new Array(len);
     const masked: string[] = new Array(len);
-    const state: MaskState = { inBlockComment: false, quote: null };
+    const state: MaskState = { inBlockComment: false, quote: null, rawString: null };
     for (let i = 0; i < len; i++) {
         let line = lines[i];
         if (line.endsWith('\r')) line = line.slice(0, -1);
@@ -268,6 +271,8 @@ interface MaskState {
     inHtmlComment?: boolean;
     /** Active quote character, or null when scanning ordinary code. */
     quote: string | null;
+    /** Active raw string hash count, or null when scanning ordinary code. */
+    rawString?: number | null;
 }
 
 /** Trigger-character matcher per config, built once because presets are module constants. */
@@ -451,6 +456,92 @@ function scanQuoteOrRegex(
 }
 
 /**
+ * Check whether closing hashes match the expected count after a quote.
+ */
+function matchesClosingHashes(line: string, start: number, count: number): boolean {
+    if (start + count > line.length) return false;
+    for (let k = 0; k < count; k++) {
+        if (line[start + k] !== '#') return false;
+    }
+    return true;
+}
+
+/**
+ * Scan forward through a raw string body looking for the closing quote and hashes.
+ */
+function scanRawStringBody(
+    line: string,
+    startIndex: number,
+    hashes: number,
+    state: MaskState,
+): number {
+    let cursor = startIndex;
+    const len = line.length;
+    while (cursor < len) {
+        if (line[cursor] === '"' && matchesClosingHashes(line, cursor + 1, hashes)) {
+            state.rawString = null;
+            return cursor + 1 + hashes;
+        }
+        cursor++;
+    }
+    state.rawString = hashes;
+    return len;
+}
+
+/**
+ * Check whether character at index is preceded by an identifier character.
+ */
+function isPrecededByIdentChar(line: string, index: number): boolean {
+    if (index === 0) return false;
+    const prev = line.charCodeAt(index - 1);
+    return (
+        (prev >= 48 && prev <= 57) || // 0-9
+        (prev >= 65 && prev <= 90) || // A-Z
+        (prev >= 97 && prev <= 122) || // a-z
+        prev === 95 // _
+    );
+}
+
+/**
+ * Check and advance past an opening raw string literal if present.
+ */
+function scanOpeningRawString(
+    line: string,
+    index: number,
+    config: SourceMaskConfig,
+    state: MaskState,
+): number {
+    if (!config.quoteChars.includes('"') && !config.rawStrings) {
+        return -1;
+    }
+
+    const char = line[index];
+    let rPos = index;
+    if ((char === 'b' || char === 'c') && index + 1 < line.length && line[index + 1] === 'r') {
+        rPos = index + 1;
+    } else if (char !== 'r') {
+        return -1;
+    }
+
+    if (isPrecededByIdentChar(line, index)) {
+        return -1;
+    }
+
+    let pos = rPos + 1;
+    let hashes = 0;
+    while (pos < line.length && line[pos] === '#') {
+        hashes++;
+        pos++;
+    }
+
+    if (pos >= line.length || line[pos] !== '"') {
+        return -1;
+    }
+
+    return scanRawStringBody(line, pos + 1, hashes, state);
+}
+
+/**
  * Scans the next masked span starting at `index`.
  * Returns the end index of the span, or -1 if the current character is unmasked.
  */
@@ -463,6 +554,9 @@ function scanNextMaskSpan(
 ): number {
     if (state.quote) {
         return scanQuotedSpan(line, index, state.quote, state);
+    }
+    if (state.rawString != null) {
+        return scanRawStringBody(line, index, state.rawString, state);
     }
     if (state.inBlockComment) {
         return scanBlockCommentContinuation(line, index, close, state);
@@ -491,6 +585,10 @@ function scanNextMaskSpan(
         }
         return line.length;
     }
+    const rawEnd = scanOpeningRawString(line, index, config, state);
+    if (rawEnd !== -1) {
+        return rawEnd;
+    }
     return scanQuoteOrRegex(line, index, config, state);
 }
 
@@ -498,7 +596,9 @@ function scanNextMaskSpan(
  * Decides whether line masking can be skipped entirely.
  */
 function shouldSkipMasking(line: string, state: MaskState, config: SourceMaskConfig): boolean {
-    if (state.quote || state.inBlockComment || state.inHtmlComment) return false;
+    if (state.quote || state.inBlockComment || state.inHtmlComment || state.rawString != null) {
+        return false;
+    }
     return !triggerRegex(config).test(line);
 }
 
@@ -508,6 +608,9 @@ function shouldSkipMasking(line: string, state: MaskState, config: SourceMaskCon
 function isFullyCommentedLine(line: string, state: MaskState, close: string): boolean {
     if (state.quote) return false;
     if (state.inBlockComment && close.length > 0 && !line.includes(close)) {
+        return true;
+    }
+    if (state.rawString != null && !line.includes('"')) {
         return true;
     }
     return Boolean(state.inHtmlComment && !line.includes('-->'));
