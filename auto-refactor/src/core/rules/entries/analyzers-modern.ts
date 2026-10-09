@@ -1,9 +1,9 @@
 /**
  * Module: Core Rules — Modern Rule Entries Facade
- * File Path: src/core/rules/entries/analyzersModern.ts
+ * File Path: src/core/rules/entries/analyzers-modern.ts
  * Architecture Role: Facade aggregating language, GDScript, and architecture rules.
  * Dependencies & Triggers: ./analyzers-modern-languages, ./analyzers-modern-gdscript,
- *   ./analyzers-modern-architecture.
+ *   ./analyzers-modern-architecture, ./analyzers-modern-frontend.
  * Responsibilities: Re-export ANALYZER_MODERN_RULES to maintain backwards compatibility.
  * Exit Semantics & Design Rationale: Pure re-export facade keeping all files < 900 LOC.
  */

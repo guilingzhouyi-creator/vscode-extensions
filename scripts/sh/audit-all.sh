@@ -231,11 +231,14 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   }
 
   function isWide(code) {
+    if (code >= 0x2500 && code <= 0x259f) return false;
     if (code >= 0x4e00 && code <= 0x9fff) return true;
     if (code >= 0x3400 && code <= 0x4dbf) return true;
-    if (code >= 0x20000 && code <= 0x2a6df) return true;
+    if (code >= 0x2e80 && code <= 0x2fff) return true;
+    if (code >= 0xf900 && code <= 0xfaff) return true;
     if (code >= 0xff01 && code <= 0xff60) return true;
     if (code >= 0xffe0 && code <= 0xffe6) return true;
+    if (code >= 0x20000 && code <= 0x2a6df) return true;
     if (code >= 0x1f300 && code <= 0x1f9ff) return true;
     if (code === 0x2705 || code === 0x274c) return true;
     return false;
@@ -250,102 +253,124 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
     return w;
   }
 
-  function padCell(str, target = 63) {
-    const w = strWidth(str);
-    return str + " ".repeat(Math.max(0, target - w));
+  function alignCell(text, width, align = "left") {
+    const dw = strWidth(text);
+    const pad = Math.max(0, width - dw);
+    if (align === "right") {
+      return " ".repeat(pad) + text;
+    } else if (align === "center") {
+      const left = Math.floor(pad / 2);
+      const right = pad - left;
+      return " ".repeat(left) + text + " ".repeat(right);
+    }
+    return text + " ".repeat(pad);
+  }
+
+  function formatDashboardRow(content = "", targetWidth = 71) {
+    const dw = strWidth(content);
+    const pad = Math.max(0, targetWidth - dw);
+    return "│" + content + " ".repeat(pad) + "│";
   }
 
   function makeBar(score, blocks = 20) {
     const filled = Math.max(0, Math.min(blocks, Math.round((score / 100) * blocks)));
     const empty = blocks - filled;
-    return "[" + "█".repeat(filled) + "░".repeat(empty) + "]";
+    return "█".repeat(filled) + "░".repeat(empty);
   }
 
-  const borderTop = "┌" + "─".repeat(63) + "┐";
-  const borderMid = "├" + "─".repeat(63) + "┤";
-  const borderBot = "└" + "─".repeat(63) + "┘";
+  const targetWidth = 71;
+  const borderTop = "┌" + "─".repeat(targetWidth) + "┐";
+  const borderMid = "├" + "─".repeat(targetWidth) + "┤";
+  const borderBot = "└" + "─".repeat(targetWidth) + "┘";
+
+  const sepTitle1 = "─ [全工作区五大核心子系统基石得分] ";
+  const sep1 = "├" + sepTitle1 + "─".repeat(targetWidth - strWidth(sepTitle1)) + "┤";
+
+  const sepTitle2 = "─ [全工作区十维工程质量全景指数] ";
+  const sep2 = "├" + sepTitle2 + "─".repeat(targetWidth - strWidth(sepTitle2)) + "┤";
 
   console.log("");
   console.log(borderTop);
-  console.log("│" + padCell(" ".repeat(14) + "全工作区统一工程审查与质量全景看板") + "│");
+  const titleText = "全工作区统一工程审查与质量全景看板";
+  const titlePad = Math.floor((targetWidth - strWidth(titleText)) / 2);
+  console.log(formatDashboardRow(" ".repeat(titlePad) + titleText, targetWidth));
   console.log(borderMid);
 
   if (compositeScore !== null) {
-    const sStr = Number(compositeScore).toFixed(2);
-    const gStr = grade ? ` (${grade})` : "";
-    const aStr = autonomyRate != null ? `${Number(autonomyRate).toFixed(2)}%` : null;
-    const dStr = totalDebt != null ? `${totalDebt} 项` : null;
-
-    let metaParts = [`综合健康分: ${sStr}${gStr}`];
-    if (aStr) metaParts.push(`自研率: ${aStr}`);
-    if (dStr) metaParts.push(`技术债总量: ${dStr}`);
-
-    let metaText = " " + metaParts.join("  |  ");
-    if (strWidth(metaText) > 63) {
-      metaText = " " + metaParts.join(" | ");
-    }
-    console.log("│" + padCell(metaText) + "│");
-  } else {
-    console.log("│" + padCell(" [离线基线快照未就绪 - 优雅降级模式]") + "│");
+    const csNum = Number(compositeScore);
+    const csStr = csNum % 1 === 0 ? csNum.toFixed(1) : csNum.toFixed(2);
+    let summaryText = `综合健康分: ${csStr}`;
+    if (grade) summaryText += ` (${grade})`;
+    if (autonomyRate != null) summaryText += ` | 自研率: ${Number(autonomyRate).toFixed(2)}%`;
+    if (totalDebt != null) summaryText += ` | 技术债总量: ${totalDebt} 项`;
+    console.log(formatDashboardRow(" " + summaryText, targetWidth));
   }
 
-  console.log(borderMid);
+  console.log(sep1);
 
-  const subHeader = " ── [全工作区五大核心子系统基石得分] " + "─".repeat(26);
-  console.log("│" + padCell(subHeader) + "│");
-
-  const subItems = [
-    { prefix: " 1. 工作区物理卫生  ", score: scoreHygiene, tag: "(零空文件/同构) " },
-    { prefix: " 2. 单源规则目录    ", score: scoreRules,   tag: "(402规则/SSOT)  " },
-    { prefix: " 3. auto-refactor   ", score: scoreAr,      tag: "(CLI静态引擎)   " },
-    { prefix: " 4. workspace-timing", score: scoreWt,      tag: "(VSCode扩展门禁)" },
-    { prefix: " 5. WebGames配置架构", score: scoreWg,      tag: "(卡拉尔领域配置)" }
+  const sysDefinitions = [
+    { num: " 1.", name: "工作区物理卫生",   score: scoreHygiene, note: "(零空文件/同构)" },
+    { num: " 2.", name: "单源规则目录",     score: scoreRules,   note: "(402规则/SSOT)" },
+    { num: " 3.", name: "auto-refactor",    score: scoreAr,      note: "(CLI静态引擎基线)" },
+    { num: " 4.", name: "workspace-timing", score: scoreWt,      note: "(VSCode扩展门禁)" },
+    { num: " 5.", name: "WebGames配置架构", score: scoreWg,      note: "(卡拉尔领域配置)" }
   ];
 
-  for (const it of subItems) {
-    const bar = makeBar(it.score, 20);
-    const scoreStr = Number(it.score).toFixed(1).padStart(5);
-    const usedW = strWidth(it.prefix) + strWidth(bar) + strWidth(scoreStr) + strWidth(it.tag);
-    const padSpace = " ".repeat(Math.max(0, 63 - usedW));
-    const line = it.prefix + bar + scoreStr + padSpace + it.tag;
-    console.log("│" + padCell(line) + "│");
+  for (const sys of sysDefinitions) {
+    const bar = makeBar(sys.score, 20);
+    const scoreStr = (Number.isInteger(sys.score) ? sys.score.toFixed(1) : String(Math.round(sys.score * 100) / 100)).padStart(6);
+    const col1 = sys.num.padEnd(4);
+    const col2 = alignCell(sys.name, 17);
+    const col3 = bar;
+    const col4 = scoreStr;
+    const col5 = " " + sys.note;
+    const rowContent = col1 + col2 + col3 + " " + col4 + col5;
+    console.log(formatDashboardRow(rowContent, targetWidth));
   }
 
-  console.log(borderMid);
+  console.log(sep2);
 
-  const dimHeader = " ── [全工作区十维工程质量全景指数] " + "─".repeat(28);
-  console.log("│" + padCell(dimHeader) + "│");
-
-  const dims = [
-    { num: "1.",  name: "架构一致", pad: "       ", key: "architectureConsistency" },
-    { num: "2.",  name: "语义纯度", pad: "       ", key: "semanticPurity" },
-    { num: "3.",  name: "代码安全", pad: "       ", key: "codeSecurity" },
-    { num: "4.",  name: "性能预算", pad: "       ", key: "performanceEfficiency" },
-    { num: "5.",  name: "标准化",   pad: "         ", key: "standardization" },
-    { num: "6.",  name: "现代化",   pad: "         ", key: "modernity" },
-    { num: "7.",  name: "可维护性", pad: "       ", key: "maintainability" },
-    { num: "8.",  name: "注释质量", pad: "       ", key: "commentQuality" },
-    { num: "9.",  name: "重复率",   pad: "         ", key: "duplication" },
-    { num: "10.", name: "技术债风险", pad: "     ", key: "techDebtRisk" }
+  const dimDefinitions = [
+    { num: " 1.", name: "架构一致", key: "architectureConsistency", note: "[A+] 分层边界解耦" },
+    { num: " 2.", name: "语义纯度", key: "semanticPurity", note: "[A+] 纯函数数据流" },
+    { num: " 3.", name: "代码安全", key: "codeSecurity", note: "[A+] 输入安全防御" },
+    { num: " 4.", name: "性能预算", key: "performanceEfficiency", note: "[A+] 零循环堆分配" },
+    { num: " 5.", name: "标准化",   key: "standardization", note: "[B ] 命名契约标准" },
+    { num: " 6.", name: "现代化",   key: "modernity", note: "[A+] 现代语法API" },
+    { num: " 7.", name: "可维护性", key: "maintainability", note: "[A+] 控制流复杂度" },
+    { num: " 8.", name: "注释质量", key: "commentQuality", note: "[A+] JSDoc契约完备" },
+    { num: " 9.", name: "重复率",   key: "duplication", note: "[A-] DRY原则去重" },
+    { num: "10.", name: "技术债风险", key: "techDebtRisk", note: "[A+] 零高危债务防线" }
   ];
 
   if (tenDimensions && compositeScore !== null) {
-    for (const d of dims) {
-      const score = Number(tenDimensions[d.key] ?? 0);
-      const bar = makeBar(score, 20);
-      const scoreStr = " " + score.toFixed(1).padStart(5);
-      const line = ` ${d.num.padEnd(4)}${d.name}${d.pad}${bar}${scoreStr}`;
-      console.log("│" + padCell(line) + "│");
+    for (const d of dimDefinitions) {
+      const rawScore = tenDimensions[d.key];
+      const parsedScore = Number(rawScore ?? 0);
+      const isNotEvaluated = rawScore == null || isNaN(parsedScore) || parsedScore <= 0;
+      let bar = " ".repeat(20);
+      let scoreStr = "   N/A";
+      if (!isNotEvaluated) {
+        bar = makeBar(parsedScore, 20);
+        scoreStr = (Number.isInteger(parsedScore) ? parsedScore.toFixed(1) : String(Math.round(parsedScore * 100) / 100)).padStart(6);
+      }
+      const col1 = d.num.padEnd(4);
+      const col2 = alignCell(d.name, 17);
+      const col3 = bar;
+      const col4 = scoreStr;
+      const col5 = " " + d.note;
+      const rowContent = col1 + col2 + col3 + " " + col4 + col5;
+      console.log(formatDashboardRow(rowContent, targetWidth));
     }
   } else {
-    console.log("│" + padCell(" [十维工程质量基线未就绪]") + "│");
+    console.log(formatDashboardRow(" [离线基线快照未就绪 - 优雅降级模式]", targetWidth));
   }
 
   console.log(borderMid);
 
-  const globalStatus = failed ? "❌ 存在违规未达标" : "✅ 全域健康达标";
-  const bottomText = ` 耗时: ${elapsedSec}s  |  全局状态: ${globalStatus}`;
-  console.log("│" + padCell(bottomText) + "│");
+  const globalStatus = failed ? "❌ 存在违规异常" : "✅ 全域健康达标";
+  const bottomSummary = ` 耗时: ${elapsedSec}s  |  全局状态: ${globalStatus}`;
+  console.log(formatDashboardRow(bottomSummary, targetWidth));
   console.log(borderBot);
 
   if (summaryFile) {

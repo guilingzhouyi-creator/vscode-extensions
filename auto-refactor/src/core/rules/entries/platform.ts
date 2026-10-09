@@ -24,6 +24,9 @@ import {
     RULE_FAMILY_COMPLEXITY,
     RULE_FAMILY_LARGE_FILE,
     RULE_FAMILY_PERFORMANCE,
+    RULE_FAMILY_CONSTANTS,
+    RULE_FAMILY_SECURITY,
+    RULE_FAMILY_ENGINE,
     LEGACY_REASON_ID_NOT_CANONICAL,
 } from '../types';
 import {
@@ -43,7 +46,7 @@ const ANALYZER_ENGINE = 'engine';
 export const PLATFORM_RULES: readonly RuleDefinition[] = [
     defineRule({
         id: 'analyzer-error',
-        family: RULE_FAMILY_LANG,
+        family: RULE_FAMILY_ENGINE,
         analyzer: ANALYZER_ENGINE,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
@@ -240,7 +243,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'duplicate-literal',
-        family: RULE_FAMILY_LEGACY,
+        family: RULE_FAMILY_CONSTANTS,
         analyzer: ANALYZER_CONSTANTS,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
@@ -253,7 +256,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'nested-constant',
-        family: RULE_FAMILY_LEGACY,
+        family: RULE_FAMILY_CONSTANTS,
         analyzer: ANALYZER_CONSTANTS,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
@@ -280,7 +283,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'high-entropy-token',
-        family: RULE_FAMILY_LEGACY,
+        family: RULE_FAMILY_SECURITY,
         analyzer: ANALYZER_SECRETS,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
@@ -321,7 +324,7 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
     }),
     defineRule({
         id: 'secret-detected',
-        family: RULE_FAMILY_LEGACY,
+        family: RULE_FAMILY_SECURITY,
         analyzer: ANALYZER_SECRETS,
         canonical: false,
         legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,

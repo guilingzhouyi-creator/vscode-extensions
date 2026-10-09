@@ -3,7 +3,7 @@
  * File Path: src/core/rules/entries/analyzers-modern-architecture.ts
  * Architecture Role: Modular rule catalog for cyclomatic complexity, data architecture,
  *   test modernity, dependency structure, architecture discipline, and performance.
- * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzersModern facade.
+ * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzers-modern facade.
  * Responsibilities: Export rule definitions for architectural rules within LOC budget (< 900 LOC).
  * Exit Semantics & Design Rationale: Immutable rule catalog array; zero runtime side-effects.
  */

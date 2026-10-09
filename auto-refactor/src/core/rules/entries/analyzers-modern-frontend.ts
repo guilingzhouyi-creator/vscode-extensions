@@ -3,7 +3,7 @@
  * File Path: src/core/rules/entries/analyzers-modern-frontend.ts
  * Architecture Role: Modular rule catalog for frontend engineering, production build hygiene,
  *   and client exposure risk rules.
- * Dependencies & Triggers: ../types; consumed by analyzersModern facade.
+ * Dependencies & Triggers: ../types; consumed by analyzers-modern facade.
  * Responsibilities: Export rule definitions for UI, PROD, and client exposure rules.
  * Exit Semantics & Design Rationale: Immutable rule catalog array; zero runtime side-effects.
  */

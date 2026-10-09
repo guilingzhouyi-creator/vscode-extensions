@@ -21,7 +21,7 @@ function mapRuleEntry(r) {
     id: r.id,
     project: 'auto-refactor',
     family: r.family || 'general',
-    severity: r.severity || 'error',
+    severity: r.defaultSeverity || r.severity || 'error',
     summary: r.summary || '',
   };
 }

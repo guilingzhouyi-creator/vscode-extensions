@@ -3,7 +3,7 @@
  * File Path: src/core/rules/entries/analyzers-modern-languages.ts
  * Architecture Role: Modular rule catalog for TS/JS, Rust, Go, PowerShell,
  *   Python, Shell, and VSCode extension rules.
- * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzersModern facade.
+ * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzers-modern facade.
  * Responsibilities: Export rule definitions for language modernizers within LOC budget (< 900 LOC).
  * Exit Semantics & Design Rationale: Immutable rule catalog array; zero runtime side-effects.
  */

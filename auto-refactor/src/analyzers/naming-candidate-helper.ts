@@ -263,21 +263,21 @@ function unwrapExpression(expr: ts.Expression): ts.Expression {
     return current;
 }
 
-function transformCallName(fnName: string): string | null {
-    const verbRules: Array<{ pattern: RegExp; replace: (rest: string) => string }> = [
-        { pattern: /^parse([A-Z].*)$/, replace: (rest) => `parsed${rest}` },
-        { pattern: /^fetch([A-Z].*)$/, replace: (rest) => `fetched${rest}` },
-        { pattern: /^build([A-Z].*)$/, replace: (rest) => `built${rest}` },
-        { pattern: /^load([A-Z].*)$/, replace: (rest) => `loaded${rest}` },
-        { pattern: /^create([A-Z].*)$/, replace: (rest) => rest.charAt(0).toLowerCase() + rest.slice(1) },
-        { pattern: /^get([A-Z].*)$/, replace: (rest) => rest.charAt(0).toLowerCase() + rest.slice(1) },
-        { pattern: /^find([A-Z].*)$/, replace: (rest) => `found${rest}` },
-        { pattern: /^calculate([A-Z].*)$/, replace: (rest) => `calculated${rest}` },
-        { pattern: /^generate([A-Z].*)$/, replace: (rest) => `generated${rest}` },
-        { pattern: /^resolve([A-Z].*)$/, replace: (rest) => `resolved${rest}` },
-    ];
+const STATIC_VERB_RULES: ReadonlyArray<{ pattern: RegExp; replace: (rest: string) => string }> = [
+    { pattern: /^parse([A-Z].*)$/, replace: (rest) => `parsed${rest}` },
+    { pattern: /^fetch([A-Z].*)$/, replace: (rest) => `fetched${rest}` },
+    { pattern: /^build([A-Z].*)$/, replace: (rest) => `built${rest}` },
+    { pattern: /^load([A-Z].*)$/, replace: (rest) => `loaded${rest}` },
+    { pattern: /^create([A-Z].*)$/, replace: (rest) => rest.charAt(0).toLowerCase() + rest.slice(1) },
+    { pattern: /^get([A-Z].*)$/, replace: (rest) => rest.charAt(0).toLowerCase() + rest.slice(1) },
+    { pattern: /^find([A-Z].*)$/, replace: (rest) => `found${rest}` },
+    { pattern: /^calculate([A-Z].*)$/, replace: (rest) => `calculated${rest}` },
+    { pattern: /^generate([A-Z].*)$/, replace: (rest) => `generated${rest}` },
+    { pattern: /^resolve([A-Z].*)$/, replace: (rest) => `resolved${rest}` },
+];
 
-    for (const rule of verbRules) {
+function transformCallName(fnName: string): string | null {
+    for (const rule of STATIC_VERB_RULES) {
         const match = rule.pattern.exec(fnName);
         if (match && match[1]) {
             return rule.replace(match[1]);

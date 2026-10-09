@@ -123,6 +123,13 @@ export class NamingAnalyzer implements Analyzer {
             this.auditPythonSource(ctx.content || '', opts, ctx, issues);
         }
 
+        issues.sort(
+            (a, b) =>
+                a.location.start.line - b.location.start.line ||
+                a.location.start.column - b.location.start.column ||
+                a.rule.localeCompare(b.rule),
+        );
+
         return issues;
     }
 
@@ -274,8 +281,7 @@ export class NamingAnalyzer implements Analyzer {
         return (
             ts.isFunctionDeclaration(node) ||
             ts.isArrowFunction(node) ||
-            ts.isFunctionExpression(node) ||
-            ts.isMethodDeclaration(node)
+            ts.isFunctionExpression(node)
         );
     }
 
@@ -481,6 +487,8 @@ export class NamingAnalyzer implements Analyzer {
         node: ts.Node,
         sf: ts.SourceFile,
         opts: NamingOptions,
+        vagueSet: Set<string>,
+        singleAllowed: Set<string>,
         ctx: AnalyzerContext,
         issues: Issue[],
         symbols?: SymbolEntry[],
@@ -507,13 +515,16 @@ export class NamingAnalyzer implements Analyzer {
             }
             if (ts.isMethodDeclaration(member)) {
                 this.checkFunctionName(memberName, member, pos, ctx, issues, opts);
-                for (const param of member.parameters) {
-                    if (ts.isIdentifier(param.name)) {
-                        const paramName = param.name.text;
-                        const pPos = sf.getLineAndCharacterOfPosition(param.name.getStart(sf));
-                        this.checkVariableName(paramName, param, false, pPos, ctx, issues, opts);
-                    }
-                }
+                this.checkFunctionParameters(
+                    member,
+                    sf,
+                    opts,
+                    vagueSet,
+                    singleAllowed,
+                    ctx,
+                    issues,
+                    symbols,
+                );
             } else {
                 auditMemberAbbreviation(
                     memberName,
@@ -686,7 +697,16 @@ export class NamingAnalyzer implements Analyzer {
         } else if (this.isTypeDecl(node)) {
             this.checkTypeDeclaration(node, sf, opts, ctx, issues, symbols);
         } else if (this.isMemberDecl(node)) {
-            this.checkMemberDeclaration(node, sf, opts, ctx, issues, symbols);
+            this.checkMemberDeclaration(
+                node,
+                sf,
+                opts,
+                vagueSet,
+                singleAllowed,
+                ctx,
+                issues,
+                symbols,
+            );
         } else if (this.isFunctionDecl(node)) {
             this.checkFunctionParameters(
                 node,

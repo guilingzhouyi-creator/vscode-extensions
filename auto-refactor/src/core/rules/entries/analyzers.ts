@@ -33,12 +33,12 @@ import {
     ANALYZER_PYTHON_MODERN,
     RULE_SIM_ARGS_001,
 } from '../../scoring/dimensionLiterals';
-import { REMEDIATION_STANDARD_AND_ABOVE, ANALYZER_MODERN_RULES } from './analyzersModern';
+import { REMEDIATION_STANDARD_AND_ABOVE, ANALYZER_MODERN_RULES } from './analyzers-modern';
 
 /**
  * Analyzer rule table: every rule whose owner is a built-in analyzer pack.
  *
- * The modernization and architecture families live in ./analyzersModern and are spread here,
+ * The modernization and architecture families live in ./analyzers-modern and are spread here,
  * so this list stays the single ordered entry point the registry consumes.
  */
 export const ANALYZER_RULES: readonly RuleDefinition[] = [

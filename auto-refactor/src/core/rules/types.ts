@@ -62,7 +62,15 @@ export type RuleFamily =
     | 'LEGACY'
     | 'VSC'
     | 'UI'
-    | 'PROD';
+    | 'PROD'
+    | 'ENG'
+    | 'CST';
+
+/** Canonical rule-family prefix for engine execution and runtime error rules. */
+export const RULE_FAMILY_ENGINE = 'ENG';
+
+/** Canonical rule-family prefix for legacy constant aliases. */
+export const RULE_FAMILY_CST = 'CST';
 
 /** Canonical rule-family prefix for repository gate architecture governance. */
 export const RULE_FAMILY_GATE = 'GATE';
@@ -124,7 +132,7 @@ export const RULE_FAMILY_NUMERIC = 'NUM';
 /**
  * Rule family owning VS Code extension host contracts (host lifecycle, extension
  * performance budgets, and the bilingual dictionary contract). Kept in this file so
- * `entries/analyzersModern.ts` can declare `VSC-*` rules against a declared family
+ * `entries/analyzers-modern.ts` can declare `VSC-*` rules against a declared family
  * rather than an inline string literal.
  */
 export const RULE_FAMILY_VSCODE_EXTENSION = 'VSC';

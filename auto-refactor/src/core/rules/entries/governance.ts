@@ -365,7 +365,7 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'indicates missing type narrowing guards.',
         'Use standard type narrowing predicates (e.g., ts.canHaveModifiers or isXxx) to guard' +
             'property access instead of any casts.',
-        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-typ-004',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#gov-typ-005',
     ),
     defineGov(
         'GOV-TYP-006',

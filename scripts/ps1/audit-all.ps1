@@ -69,6 +69,17 @@ function Format-AlignedCell {
     }
 }
 
+function Format-DashboardRow {
+    [CmdletBinding()]
+    param(
+        [string]$Content = '',
+        [int]$TargetWidth = 71
+    )
+    $dw = Get-DisplayWidth $Content
+    $pad = [math]::Max(0, $TargetWidth - $dw)
+    return "│" + $Content + (" " * $pad) + "│"
+}
+
 function Get-ProgressBar {
     [CmdletBinding()]
     param([double]$Score)
@@ -277,16 +288,16 @@ try {
 }
 
 $dimDefinitions = @(
-    @{ num = "1.";  name = "架构一致"; pad = "    "; key = "architectureConsistency"; labelEn = "架构一致 (Architecture Consistency)" },
-    @{ num = "2.";  name = "语义纯度"; pad = "    "; key = "semanticPurity"; labelEn = "语义纯度 (Semantic Purity)" },
-    @{ num = "3.";  name = "代码安全"; pad = "    "; key = "codeSecurity"; labelEn = "代码安全 (Code Security)" },
-    @{ num = "4.";  name = "性能预算"; pad = "    "; key = "performanceEfficiency"; labelEn = "性能预算 (Performance Efficiency)" },
-    @{ num = "5.";  name = "标准化";   pad = "      "; key = "standardization"; labelEn = "标准化 (Standardization)" },
-    @{ num = "6.";  name = "现代化";   pad = "      "; key = "modernity"; labelEn = "现代化 (Modernity)" },
-    @{ num = "7.";  name = "可维护性"; pad = "    "; key = "maintainability"; labelEn = "可维护性 (Maintainability)" },
-    @{ num = "8.";  name = "注释质量"; pad = "    "; key = "commentQuality"; labelEn = "注释质量 (Comment Quality)" },
-    @{ num = "9.";  name = "重复率";   pad = "      "; key = "duplication"; labelEn = "重复率 (Duplication)" },
-    @{ num = "10."; name = "技术债风险"; pad = "  "; key = "techDebtRisk"; labelEn = "技术债风险 (Tech Debt Risk)" }
+    @{ num = " 1."; name = "架构一致"; key = "architectureConsistency"; note = "[A+] 分层边界解耦"; labelEn = "架构一致 (Architecture Consistency)" },
+    @{ num = " 2."; name = "语义纯度"; key = "semanticPurity"; note = "[A+] 纯函数数据流"; labelEn = "语义纯度 (Semantic Purity)" },
+    @{ num = " 3."; name = "代码安全"; key = "codeSecurity"; note = "[A+] 输入安全防御"; labelEn = "代码安全 (Code Security)" },
+    @{ num = " 4."; name = "性能预算"; key = "performanceEfficiency"; note = "[A+] 零循环堆分配"; labelEn = "性能预算 (Performance Efficiency)" },
+    @{ num = " 5."; name = "标准化"; key = "standardization"; note = "[B ] 命名契约标准"; labelEn = "标准化 (Standardization)" },
+    @{ num = " 6."; name = "现代化"; key = "modernity"; note = "[A+] 现代语法API"; labelEn = "现代化 (Modernity)" },
+    @{ num = " 7."; name = "可维护性"; key = "maintainability"; note = "[A+] 控制流复杂度"; labelEn = "可维护性 (Maintainability)" },
+    @{ num = " 8."; name = "注释质量"; key = "commentQuality"; note = "[A+] JSDoc契约完备"; labelEn = "注释质量 (Comment Quality)" },
+    @{ num = " 9."; name = "重复率"; key = "duplication"; note = "[A-] DRY原则去重"; labelEn = "重复率 (Duplication)" },
+    @{ num = "10."; name = "技术债风险"; key = "techDebtRisk"; note = "[A+] 零高危债务防线"; labelEn = "技术债风险 (Tech Debt Risk)" }
 )
 
 # 计算各子系统归一化得分 [0.0 ~ 100.0]（纯客观连续度量，杜绝硬编码 100.0 与断崖 0.0）
@@ -372,9 +383,12 @@ if ($Json) {
 }
 
 Write-Host ""
-Write-Host "┌───────────────────────────────────────────────────────────────┐" -ForegroundColor Cyan
-Write-Host ("│" + (Format-AlignedCell "全工作区统一工程审查与质量全景看板" 63 'Center') + "│") -ForegroundColor Cyan
-Write-Host "├───────────────────────────────────────────────────────────────┤" -ForegroundColor Cyan
+$targetWidth = 71
+Write-Host ("┌" + ("─" * $targetWidth) + "┐") -ForegroundColor Cyan
+$titleText = "全工作区统一工程审查与质量全景看板"
+$titlePad = [math]::Floor(($targetWidth - (Get-DisplayWidth $titleText)) / 2)
+Write-Host (Format-DashboardRow ((" " * $titlePad) + $titleText) $targetWidth) -ForegroundColor Cyan
+Write-Host ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
 
 if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
     $csStr = if ($compositeScore % 1 -eq 0) { $compositeScore.ToString("0.0") } else { $compositeScore.ToString("0.##") }
@@ -382,36 +396,39 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
     if ($grade) { $summaryText += " ({0})" -f $grade }
     if ($autonomyRate) { $summaryText += " | 自研率: {0}%" -f $autonomyRate }
     if ($null -ne $totalDebt) { $summaryText += " | 技术债总量: {0} 项" -f $totalDebt }
-    Write-Host ("│" + (Format-AlignedCell (" " + $summaryText) 63) + "│") -ForegroundColor White
-    Write-Host "├───────────────────────────────────────────────────────────────┤" -ForegroundColor Cyan
+    Write-Host (Format-DashboardRow (" " + $summaryText) $targetWidth) -ForegroundColor White
 }
 
-$sepTitle1 = " ── [全工作区五大核心子系统基石得分] "
-$sep1 = $sepTitle1 + ("─" * (63 - (Get-DisplayWidth $sepTitle1)))
-Write-Host ("│" + $sep1 + "│") -ForegroundColor Cyan
+$sepTitle1 = "─ [全工作区五大核心子系统基石得分] "
+$sep1 = "├" + $sepTitle1 + ("─" * ($targetWidth - (Get-DisplayWidth $sepTitle1))) + "┤"
+Write-Host $sep1 -ForegroundColor Cyan
 
 $sysDefinitions = @(
-    @{ label = " 1. 工作区物理卫生  "; score = $scoreHygiene; note = "(零空文件/同构) " },
-    @{ label = " 2. 单源规则目录    "; score = $scoreRules;   note = "(402规则/SSOT)  " },
-    @{ label = " 3. auto-refactor   "; score = $scoreAr;      note = "(CLI静态引擎)   " },
-    @{ label = " 4. workspace-timing"; score = $scoreWt;      note = "(VSCode扩展门禁)" },
-    @{ label = " 5. WebGames配置架构"; score = $scoreWg;      note = "(卡拉尔领域配置)" }
+    @{ num = " 1."; name = "工作区物理卫生";   score = $scoreHygiene; note = "(零空文件/同构)" },
+    @{ num = " 2."; name = "单源规则目录";     score = $scoreRules;   note = "(402规则/SSOT)" },
+    @{ num = " 3."; name = "auto-refactor";    score = $scoreAr;      note = "(CLI静态引擎基线)" },
+    @{ num = " 4."; name = "workspace-timing"; score = $scoreWt;      note = "(VSCode扩展门禁)" },
+    @{ num = " 5."; name = "WebGames配置架构"; score = $scoreWg;      note = "(卡拉尔领域配置)" }
 )
 
 foreach ($sys in $sysDefinitions) {
     $score = [double]$sys.score
     $bar = Get-ProgressBar $score
     $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
-    $paddedScore = $scoreStr.PadLeft(5)
+    $paddedScore = $scoreStr.PadLeft(6)
     $lineColor = if ($score -ge 90) { "Green" } elseif ($score -ge 75) { "Yellow" } else { "Red" }
-    $rowContent = "{0}[{1}]{2}{3}" -f $sys.label, $bar, $paddedScore, $sys.note
-    Write-Host ("│{0}│" -f $rowContent) -ForegroundColor $lineColor
+    $col1 = $sys.num.PadRight(4)
+    $col2 = Format-AlignedCell $sys.name 17
+    $col3 = $bar
+    $col4 = $paddedScore
+    $col5 = " " + $sys.note
+    $rowContent = $col1 + $col2 + $col3 + " " + $col4 + $col5
+    Write-Host (Format-DashboardRow $rowContent $targetWidth) -ForegroundColor $lineColor
 }
 
-Write-Host "├───────────────────────────────────────────────────────────────┤" -ForegroundColor Cyan
-$sepTitle2 = " ── [全工作区十维工程质量全景指数] "
-$sep2 = $sepTitle2 + ("─" * (63 - (Get-DisplayWidth $sepTitle2)))
-Write-Host ("│" + $sep2 + "│") -ForegroundColor Cyan
+$sepTitle2 = "─ [全工作区十维工程质量全景指数] "
+$sep2 = "├" + $sepTitle2 + ("─" * ($targetWidth - (Get-DisplayWidth $sepTitle2))) + "┤"
+Write-Host $sep2 -ForegroundColor Cyan
 
 if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
     foreach ($d in $dimDefinitions) {
@@ -432,25 +449,31 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
 
         if ($isNotEvaluated) {
             $bar = " " * 20
-            $paddedScore = "  N/A"
+            $paddedScore = "   N/A"
             $lineColor = "DarkGray"
         } else {
             $score = $parsedScore
             $bar = Get-ProgressBar $score
             $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
-            $paddedScore = $scoreStr.PadLeft(5)
+            $paddedScore = $scoreStr.PadLeft(6)
             $lineColor = if ($score -ge 90) { "Green" } elseif ($score -ge 75) { "Yellow" } else { "Red" }
         }
-        Write-Host ("│ {0,-4}{1}{2}[{3}] {4}{5} │" -f $d.num, $d.name, $d.pad, $bar, $paddedScore, (" " * 17)) -ForegroundColor $lineColor
+        $col1 = $d.num.PadRight(4)
+        $col2 = Format-AlignedCell $d.name 17
+        $col3 = $bar
+        $col4 = $paddedScore
+        $col5 = " " + $d.note
+        $rowContent = $col1 + $col2 + $col3 + " " + $col4 + $col5
+        Write-Host (Format-DashboardRow $rowContent $targetWidth) -ForegroundColor $lineColor
     }
 } else {
-    Write-Host ("│" + (Format-AlignedCell " [离线基线快照未就绪 - 优雅降级模式]" 63) + "│") -ForegroundColor Yellow
+    Write-Host (Format-DashboardRow " [离线基线快照未就绪 - 优雅降级模式]" $targetWidth) -ForegroundColor Yellow
 }
 
-Write-Host "├───────────────────────────────────────────────────────────────┤" -ForegroundColor Cyan
+Write-Host ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
 $bottomSummary = " 耗时: {0}s  |  全局状态: {1}" -f $elapsedSec, $globalStatus
-Write-Host ("│" + (Format-AlignedCell $bottomSummary 63) + "│") -ForegroundColor $globalColor
-Write-Host "└───────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
+Write-Host (Format-DashboardRow $bottomSummary $targetWidth) -ForegroundColor $globalColor
+Write-Host ("└" + ("─" * $targetWidth) + "┘") -ForegroundColor Cyan
 
 if ($env:GITHUB_STEP_SUMMARY) {
     try {

@@ -3,7 +3,7 @@
  * File Path: src/core/rules/entries/analyzers-modern-gdscript.ts
  * Architecture Role: Modular rule catalog for GDScript modernization, frontend architecture,
  *   and game domain rules.
- * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzersModern facade.
+ * Dependencies & Triggers: ../types, dimensionLiterals; consumed by analyzers-modern facade.
  * Responsibilities: Export rule definitions for GDScript rules within LOC budget (< 900 LOC).
  * Exit Semantics & Design Rationale: Immutable rule catalog array; zero runtime side-effects.
  */
