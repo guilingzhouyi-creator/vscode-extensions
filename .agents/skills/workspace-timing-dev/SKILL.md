@@ -28,7 +28,7 @@ description: >-
 
 项目严格划分为五大架构层次，依赖必须保持严格的自顶向下单向流动：
 
-```
+```text
 [UI 表现层] (Webview Dashboard, Status Bar Manager, Modal Dialogs)
      │
      ▼
@@ -103,18 +103,19 @@ description: >-
 当修改触及 `workspace-timing/**` 路径时，门禁系统触发三阶递进校验：
 1. **增量极速编译**：`npm run compile`（严格基于 `tsconfig.json` 的 `isolatedModules` 与无 `declaration` 快速发射）；
 2. **单元测试与回归套件**：`npm run test:fast`（执行 90+ 单元测试，重点看守会话折叠、跨日切分、时长守恒与崩溃回放）；
-3. **专有规则审查门禁**：`npm run review`（执行 `scripts/review.js` 检查 L0~L5 六层共 38 条规则）。
+3. **专有规则审查门禁**：`npm run review`（执行 `scripts/review.js` 检查 L0~L5 六层共 45 条规则）。
 
-### 2. 38 条审查规则单一真源对齐 (SSOT)
+### 2. 45 条审查规则单一真源对齐 (SSOT)
 - 审查规则单一真源登记于 `workspace-timing/scripts/config/review-rules.json`，并自动聚合至全仓 `scripts/common/rule-catalog.json`；
 - 规则严格划分为六层前缀：
   - `L0-COMPILE`：代码必须 100% 编译通过；
   - `L1-STORAGE-CRASH`：原子替换、快照前置与崩溃安全防护；
   - `L2-TIMING-CONSERVATION`：跨日拆分与时长守恒契约；
   - `L3-I18N-COVERAGE`：中英文双语字典 100% 镜像与硬编码字面量拦截；
-  - `L4-PERF-RESOURCE`：定时器无泄漏清理与 Disposable 资源解耦；
+  - `L4-PERF-RESOURCE`：定时器无泄漏清理、高频循环零瞬态堆分配与 Disposable 资源解耦；
   - `L5-UI-CONTRAST`：主题 CSS 变量驱动与暗色高对比度视觉合规；
-- 严禁在审查脚本或提交说明中发射未在规则库登记的规则代号。
+- 严禁在审查脚本或提交说明中发射未在规则库登记的规则代号；
+- 核心源码文件受单文件双轨体积（ELOC <= 900 / LOC <= 1400）与 1:3 动态包络约束，模块入口首行必须规范呈现六字段 JSDoc 架构契约。
 
 ---
 
@@ -132,7 +133,7 @@ npm run compile
 # 2. 运行快速单元测试套件（90+ 用例，包含折叠/聚合/i18n契约）
 npm run test:fast
 
-# 3. 运行扩展 L0~L5 六层权重审查门禁（38 规则看守）
+# 3. 运行扩展 L0~L5 六层权重审查门禁（45 规则看守）
 npm run review
 
 # 4. 同步 Webview 静态资源

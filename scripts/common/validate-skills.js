@@ -203,6 +203,50 @@ function validateMarkdownFile(filePath, registeredRules) {
 }
 
 /**
+ * Validate workspace-governance plugin bundle integrity and byte parity.
+ *
+ * @param {string} repoRoot - Workspace repository root.
+ * @returns {string[]} List of detected plugin errors.
+ */
+function validatePluginBundle(repoRoot) {
+  const pluginDir = path.join(repoRoot, '.agents/plugins/workspace-governance');
+  if (!fs.existsSync(pluginDir)) return [];
+
+  const errors = [];
+  const pluginJsonPath = path.join(pluginDir, 'plugin.json');
+  if (!fs.existsSync(pluginJsonPath)) {
+    errors.push(`${pluginDir}: Missing plugin.json`);
+  } else {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(pluginJsonPath, 'utf8'));
+      if (!manifest.name || !manifest.version || !manifest.description) {
+        errors.push(`${pluginJsonPath}: plugin.json must declare 'name', 'version', and 'description'`);
+      }
+    } catch (e) {
+      errors.push(`${pluginJsonPath}: Invalid JSON syntax (${e.message})`);
+    }
+  }
+
+  const rulesAgentsMd = path.join(pluginDir, 'rules/AGENTS.md');
+  if (!fs.existsSync(rulesAgentsMd)) {
+    errors.push(`${pluginDir}: Missing plugin rules/AGENTS.md mirror`);
+  }
+
+  const pluginSkillsDir = path.join(pluginDir, 'skills');
+  const rootSkillsDir = path.join(repoRoot, '.agents/skills');
+  if (fs.existsSync(pluginSkillsDir) && fs.existsSync(rootSkillsDir)) {
+    const syncUtil = require('./sync-skills');
+    const diff = syncUtil.compareDirectories(rootSkillsDir, pluginSkillsDir);
+    const totalDrift = diff.missing.length + diff.modified.length + diff.extra.length;
+    if (totalDrift > 0) {
+      errors.push(`Plugin skills drift detected (${totalDrift} items out of sync). Run 'node scripts/common/sync-skills.js' to heal.`);
+    }
+  }
+
+  return errors;
+}
+
+/**
  * Main validator entrypoint.
  *
  * @returns {number} Exit code (0 for success, 1 for failure).
@@ -247,6 +291,8 @@ function main() {
     allErrors.push(...validateMarkdownFile(mdFile, registeredRules));
   }
 
+  allErrors.push(...validatePluginBundle(repoRoot));
+
   if (allErrors.length > 0) {
     process.stderr.write(`\n❌ [REJECT] Skills validation detected ${allErrors.length} violation(s):\n`);
     for (const err of allErrors) {
@@ -255,7 +301,7 @@ function main() {
     return 1;
   }
 
-  process.stdout.write(`\n✔ [PASS] All ${skillFolders.length} skills (${allMdFiles.length} markdown documents) verified successfully.\n`);
+  process.stdout.write(`\n✔ [PASS] All ${skillFolders.length} skills (${allMdFiles.length} markdown documents) verified successfully with plugin parity.\n`);
   return 0;
 }
 

@@ -11,7 +11,18 @@
 const fs = require('fs');
 const path = require('path');
 
-const REPO_ROOT = path.resolve(__dirname, '../../../../');
+function findRepoRoot(startDir) {
+  let curr = path.resolve(startDir);
+  while (curr !== path.dirname(curr)) {
+    if (fs.existsSync(path.join(curr, 'AGENTS.md')) && fs.existsSync(path.join(curr, '.agents'))) {
+      return curr;
+    }
+    curr = path.dirname(curr);
+  }
+  return path.resolve(startDir, '../../../../');
+}
+
+const REPO_ROOT = findRepoRoot(__dirname);
 const SUBAGENTS_ROOT = path.join(REPO_ROOT, '.agents/subagents');
 const CATALOG_PATH = path.join(SUBAGENTS_ROOT, 'subagent-catalog.json');
 
@@ -27,7 +38,9 @@ function resolveIntent(intent) {
   let archKey = null;
   let postKey = null;
 
-  if (/workspace-timing|timing|\bwt\b|vscode|扩展|插件/.test(text)) {
+  if (/skill|技能|skills/.test(text)) {
+    archKey = 'skill-governance';
+  } else if (/workspace-timing|timing|\bwt\b|vscode|扩展|插件/.test(text)) {
     archKey = 'vs-extension';
   } else if (/auto-refactor|\bar\b|cli|分析器|静态分析/.test(text)) {
     archKey = 'cli-engine';
@@ -117,7 +130,8 @@ function buildSystemPrompt(archetypeObj, postureObj) {
 1. 物理卫生：全仓严禁创建或遗留 0 字节空文件；脚本必须严格保持换行契约（.ps1 CRLF，其他 LF）；
 2. 复杂度预算：圈复杂度 CC <= 15，控制流深度 Depth <= 4，单文件双轨体积 ELOC <= 900 / LOC <= 1400；
 3. 门面设计：门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，严禁 <= 3 行空包跳板 (ARCH-ABS-001)；
-4. 真实性纪律：严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话。
+4. 真实性纪律：严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
+5. 零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入任何技术债务反弹 (一票否决)。
 
 ## 🛡️ Layer 1: 物理路径沙箱约束 (Path Jail Guard)
 * 授权操作路径前缀：
@@ -152,7 +166,8 @@ ${goalText}
 [Quality & Discipline Checklist]
 1. 严禁创建 0 字节物理空文件或未实现占位符；
 2. 单函数圈复杂度 CC <= 15，嵌套深度 Depth <= 4，消除循环内瞬态堆分配；
-3. 提交与汇报严禁使用施工批次代号与非客观黑话，保持纯客观技术事实。
+3. 提交与汇报严禁使用施工批次代号与非客观黑话，保持纯客观技术事实；
+4. 严禁引入任何 High/Critical 技术债务反弹，保持 0 项刚性基线。
 
 [Pre-Delivery Verification]
 完成改动后，在提交工作前必须自行执行并通过以下本地自检：

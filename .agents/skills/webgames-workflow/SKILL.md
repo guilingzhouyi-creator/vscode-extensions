@@ -92,7 +92,8 @@ description: >-
    - `tests/unit/infrastructure/`（底层基础设施测试）
 3. **统一基类与入口契约**：所有测试套件必须继承 `TestCase`（`tests/support/test_case.gd`），统一通过 `static func run_all_tests() -> Dictionary` 执行并经 `TestCase.pack_results` 打包交付；
 4. **双向领域对齐**：新增后端领域测试必须在 `config/infrastructure/domains.json` 与 `test_registry.gd` 中双向注册；
-5. **排版契约**：GDScript 源码严格采用 LF 换行符、`snake_case` 命名风格与标准缩进。
+5. **排版契约与体积预算**：GDScript 源码严格采用 LF 换行符、`snake_case` 命名风格与标准缩进；核心脚本受单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）与 1:3 动态包络约束；
+6. **模块头部文档契约**：核心后端求解器与视图控制器入口必须在首行呈现对齐工作区六字段标准的文档块（`Module`, `File Path`, `Architecture Role`, `Dependencies & Triggers`, `Responsibilities`, `Exit Semantics & Design Rationale`）。
 
 ---
 

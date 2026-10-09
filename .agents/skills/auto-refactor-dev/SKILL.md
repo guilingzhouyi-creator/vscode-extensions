@@ -83,8 +83,6 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
 - **Layer 2（工程架构）**：分层依赖、门面承载、不可变封装、数据解耦；
 - **Layer 3（语言进阶）**：TS/Rust/Python/Go/GDScript 现代特性、资源安全；
 - **Layer 4（演化自治）**：代码自治度（CAI）、重构收益判定（ROI）、防刷分去抖。
-- **Layer 3（语言进阶）**：TS/Rust/Python/Go/GDScript 现代特性、资源安全；
-- **Layer 4（演化自治）**：代码自治度（CAI）、重构收益判定（ROI）、防刷分去抖。
 
 ### 3. 命名规范与扣分预算红线
 - **规则 ID 规范**：遵循 Canonical 格式 `FAMILY-TOPIC-NNN`（如 `ARCH-FAC-001`、`GATE-AST-001`、`ADV-PRF-002`）；

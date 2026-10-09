@@ -18,11 +18,11 @@ description: >-
 
 在 VS Code Antigravity (Agy) 体系中，约束**绝不仅是一段普通的提示词**，而是层层递进的四重立体防御：
 
-```
+```text
 ┌────────────────────────────────────────────────────────┐
 │ 防线 1: Agy 平台级工作区规则 (Workspace Rule Injection) │
 │ • AGENTS.md 自动由 Agy 内核无条件注入到所有 Agent/SubAgent│
-│ • 刚性确立 SUB-AGENT 约束与 11 项一票否决红线          │
+│ • 刚性确立 SUB-AGENT 约束与 12 项一票否决红线          │
 ├────────────────────────────────────────────────────────┤
 │ 防线 2: Runtime 工具链物理门控 (Tool Gating)           │
 │ • 审查 (review) / 探索 (explore) 姿态物理关闭写工具    │
@@ -52,6 +52,7 @@ description: >-
 | **`game-engine`** | `WebGames/` (Godot 4 游戏引擎与配置驱动) | `webgames-workflow` | `python3.12 WebGames/scripts/py/audit_config.py --strict` |
 | **`infra-tool`** | `scripts/` (全仓跨平台门禁与打包脚本) | `gate-governance` | `pwsh -File scripts/ps1/audit-all.ps1 -Fast` |
 | **`workspace-meta`** | 全仓顶层元治理、单源规则总目录、物理卫生 | `rule-catalog-governance` | `node scripts/common/generate-rule-catalog.js` |
+| **`skill-governance`** | `.agents/skills/`, 插件包 `skills/` | `rule-catalog-governance` | `node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check` |
 
 | 作业姿态 (`posture`) | 姿态意图与权限控制 | 核心行为准则 | 推荐工具开关 |
 | :--- | :--- | :--- | :--- |
@@ -106,12 +107,13 @@ node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --pres
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
 ```
 
-常用预置别名速查矩阵（20 个预置）：
+常用预置别名速查矩阵（23 个预置）：
 * **`vs-extension`**：`wt-construct` / `wt-review` / `wt-refactor` / `wt-explore`
 * **`cli-engine`**：`ar-construct` / `ar-review` / `ar-refactor` / `ar-explore`
 * **`game-engine`**：`wg-construct` / `wg-review` / `wg-refactor` / `wg-explore`
 * **`infra-tool`**：`infra-construct` / `infra-review` / `infra-refactor` / `infra-explore` / `infra-guardian`
 * **`workspace-meta`**：`workspace-review` / `workspace-refactor` / `workspace-guardian`
+* **`skill-governance`**：`skill-construct` / `skill-review` / `skill-refactor`
 
 ### 步骤 2：注册定义动态 SubAgent (`define_subagent`)
 使用脚本输出的 `defineArgs` 调用 `define_subagent` 工具：
@@ -140,15 +142,16 @@ invoke_subagent({
 });
 ```
 
-### 步骤 4：主 Agent 交叉全量复审 SOP (Cross-Review 7 步闭环)
-SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格独立执行 7 步交叉复审闭环：
+### 步骤 4：主 Agent 交叉全量复审 SOP (Cross-Review 8 步闭环)
+SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格独立执行 8 步交叉复审闭环：
 1. **物理范围与 Path Jail 契约核验**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表；严禁发生越界修改；
 2. **物理卫生与排版契约审计**：检查新增与修改文件，零 0 字节文件，PowerShell 脚本严格保持 CRLF 换行，其余文件严格保持 LF 换行；
 3. **AST 切片复杂度与双轨体积预审**：运行 `node scripts/common/evaluate-eloc-budget.js`，核实函数单切片 $\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$，单文件 $\text{ELOC} \le 900, \text{LOC} \le 1400$；
 4. **代码注释与架构契约审查**：核查模块头部是否具备六字段 JSDoc，零敏捷过程黑话代号（如 `p[0-9]+`、`W1-W9`），零幽灵假逻辑分支；
 5. **门面实质承载与跳板消融核验**：针对重构与导出入口，核查是否满足 $\text{ELOC} \ge 15$ 或不可变封装，彻底消融单行空包跳板；
 6. **项目专属构建与全量测试回归**：主 Agent 在主会话中亲自执行领域编译与回归测试（如 `npm run build && node scripts/gate-self.js && npm test`），确保 153/153 套测试套件 100% 通过；
-7. **全工作区统一审查终审**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，确认工作区五大核心子系统基石得分 100% 绿色通行后方可交割。
+7. **全工作区统一审查终审**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，确认工作区五大核心子系统基石得分 100% 绿色通行；
+8. **零高危技术债与防反弹核验**：确认改动未引入任何新的 High/Critical 技术债务，全仓技术债务保持 0 项历史刚性基线（一票否决）。
 
 ---
 

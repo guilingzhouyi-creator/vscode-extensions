@@ -11,7 +11,18 @@
 const fs = require('fs');
 const path = require('path');
 
-const REPO_ROOT = path.resolve(__dirname, '../../../../');
+function findRepoRoot(startDir) {
+  let curr = path.resolve(startDir);
+  while (curr !== path.dirname(curr)) {
+    if (fs.existsSync(path.join(curr, 'AGENTS.md')) && fs.existsSync(path.join(curr, '.agents'))) {
+      return curr;
+    }
+    curr = path.dirname(curr);
+  }
+  return path.resolve(startDir, '../../../../');
+}
+
+const REPO_ROOT = findRepoRoot(__dirname);
 const SUBAGENTS_ROOT = path.join(REPO_ROOT, '.agents/subagents');
 const CATALOG_PATH = path.join(SUBAGENTS_ROOT, 'subagent-catalog.json');
 const SKILLS_ROOT = path.join(REPO_ROOT, '.agents/skills');

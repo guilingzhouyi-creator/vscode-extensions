@@ -25,7 +25,7 @@ description: >-
 
 分批规划必须严格遵守自底向上、解耦可读、自洽闭环的 6 层拓扑依赖顺序：
 
-```
+```text
 [第 1 批: Layer 1 底层契约与存储协议] (refactor/feat: contract, persistence, types)
                     │
                     ▼
@@ -72,7 +72,7 @@ git add path/to/contract.ts path/to/storage.ts
 
 #### 2. 正文首区块：受控四大项目显式归属 (`CMG-PRJ-001`)
 关键生产级提交（feat/fix/refactor）正文首个结构化区块必须显式声明项目归属，枚举严格受限四大项目：
-```
+```markdown
 [Project]
 - <workspace-timing | auto-refactor | WebGames | governance>
 ```

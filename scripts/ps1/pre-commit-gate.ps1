@@ -62,6 +62,18 @@ if ($touchesRules) {
     }
 }
 
+$touchesSkills = $stagedFiles | Where-Object { $_ -match "^\.agents/(skills|plugins)/" }
+if ($touchesSkills) {
+    Write-Host "  ▶ 触发工作区技能集规范与插件同构校验..." -ForegroundColor Cyan
+    $resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+    if ($resSkills.ExitCode -ne 0) {
+        Write-Host "❌ [FAIL] Gate 7: 技能集规范或插件同构校验未通过！" -ForegroundColor Red
+        $failed = $true
+    } else {
+        Write-Host "  ✔ [PASS] 技能集规范与插件同构校验通过" -ForegroundColor Green
+    }
+}
+
 # --- Gate 8: 项目增量编译与语法验证 (精准增量触发) ---
 Write-Host "[8/9] 检查相关项目增量编译与语法..." -ForegroundColor Gray
 $hasWtCompile = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(src/.+\.ts|tsconfig.*\.json)" }

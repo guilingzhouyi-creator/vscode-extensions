@@ -26,7 +26,7 @@
    ```markdown
    [领域服务规范](../domain/service-guide.md)
    ```
-3. **跨多级目录跳转至仓库顶层文档**（以 `WebGames/docs/路线图/01_短期施工区/Phase_01/doc.md` 为例）：
+3. **跨多级目录跳转至仓库顶层文档**（以 `WebGames/docs/路线图/01_短期施工区/blueprint_combat/doc.md` 为例）：
    ```markdown
    [工作区总规](../../../../AGENTS.md)
    [顶层蓝图](../../../../docs/agent-native-system-blueprint.md)

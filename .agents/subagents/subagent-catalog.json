@@ -7,7 +7,8 @@
     "cli-engine": "./archetypes/cli-engine.json",
     "game-engine": "./archetypes/game-engine.json",
     "infra-tool": "./archetypes/infra-tool.json",
-    "workspace-meta": "./archetypes/workspace-meta.json"
+    "workspace-meta": "./archetypes/workspace-meta.json",
+    "skill-governance": "./archetypes/skill-governance.json"
   },
   "postures": {
     "construct": "./postures/construct.json",
@@ -154,6 +155,27 @@
       "archetype": "workspace-meta",
       "posture": "guardian",
       "description": "全仓五大支柱统一审查 (audit-all)、单源规则目录与物理卫生总看守",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "skill-construct": {
+      "archetype": "skill-governance",
+      "posture": "construct",
+      "description": "技能集增量编写、样板实现与参考指南扩充专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "skill-review": {
+      "archetype": "skill-governance",
+      "posture": "review",
+      "description": "技能集元数据、相对死链、402 规则引用与滞后项审查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "skill-refactor": {
+      "archetype": "skill-governance",
+      "posture": "refactor",
+      "description": "技能集结构消融、冗余清理与双目录同构治理重构专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     }

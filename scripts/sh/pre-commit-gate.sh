@@ -55,6 +55,17 @@ if echo "$STAGED_FILES" | grep -qE "auto-refactor/src/core/rules/|auto-refactor/
     fi
 fi
 
+TOUCHED_SKILLS=$(echo "$STAGED_FILES" | grep -E '^\.agents/(skills|plugins)/' || true)
+if [[ -n "$TOUCHED_SKILLS" ]]; then
+    echo "  ▶ 触发工作区技能集规范与插件同构校验..."
+    if ! "$NODE_BIN" scripts/common/validate-skills.js; then
+        echo "❌ [FAIL] Gate 7: 技能集规范或插件同构校验未通过！"
+        FAILED=1
+    else
+        echo "  ✔ [PASS] 技能集规范与插件同构校验通过"
+    fi
+fi
+
 # --- Gate 8: 项目增量编译与语法验证 (精准增量触发) ---
 echo "[8/9] 检查相关项目增量编译与语法..."
 TOUCHED_WT_COMPILE=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(src/.+\.ts|tsconfig.*\.json)' || true)
