@@ -9,7 +9,7 @@ import { parseArgs, helpFromHeader } from '../common/cli.js';
 import { createLogger } from '../common/logger.js';
 import { ROOT, SCRIPTS_DIR } from '../common/paths.js';
 import { loadJson, ReviewRules } from '../common/config.js';
-import { readFileSafe } from '../common/scan.js';
+import { readFileSafe, collectFiles } from '../common/scan.js';
 import { finding, envelope, printEnvelope, STATUS, verdict, Finding } from '../common/result.js';
 
 const args = parseArgs(process.argv.slice(2));
@@ -94,7 +94,7 @@ if (clText === null) {
     if (!l.startsWith('### ')) return;
     if (!SECTION_RE.test(l)) {
       findings.push(finding({
-        ruleId: 'DOC-CL-004', severity: 'warning', module: 'docs', file: 'CHANGELOG.md', line: idx + 1,
+        ruleId: 'DOC-CL-004', severity: 'error', module: 'docs', file: 'CHANGELOG.md', line: idx + 1,
         message: `分类标题偏离标准表: ${l.trim()}`,
         evidence: l,
         suggestedFix: `改用标准分类之一：${STANDARD_TOKENS.join(' / ')}`,
@@ -134,6 +134,118 @@ if (clText === null) {
         message: `版本日期超前于今日（${v.date} > ${todayStr}）`,
       }));
     }
+  }
+
+  // DOC-CL-007 与 DOC-CL-008：最新发布版本条目真实性、代码符号防虚构与产品文本纪律
+  if (versions.length > 0) {
+    const latestVer = versions[0];
+    const nextVerLine = versions.length > 1 ? versions[1].line : clLines.length + 1;
+    const latestLines = clLines.slice(latestVer.line - 1, nextVerLine - 1);
+
+    const configKeys = new Set<string>();
+    if (pkgRes.ok && (pkgRes.data as any)?.contributes?.configuration) {
+      const configs = (pkgRes.data as any).contributes.configuration;
+      const configList = Array.isArray(configs) ? configs : [configs];
+      for (const c of configList) {
+        if (c?.properties) {
+          Object.keys(c.properties).forEach((k) => configKeys.add(k));
+        }
+      }
+    }
+
+    const srcFiles = await collectFiles({ root: path.join(root, 'src'), include: ['**/*.ts'] });
+    const allSrcTextArr = await Promise.all(srcFiles.map((f) => readFileSafe(path.join(root, 'src', f))));
+    const allSrcText = allSrcTextArr.filter(Boolean).join('\n');
+    const allSrcBasenames = new Set(srcFiles.map((f) => path.basename(f, '.ts')));
+
+    const FORBIDDEN_JARGON_PATTERNS: Array<{ regex: RegExp; desc: string }> = [
+      { regex: /\$[^$]+\$/, desc: 'LaTeX 数学公式符号（破坏通用 Markdown 渲染）' },
+      { regex: /\b(p[0-9]+|phase[0-9]+|st[0-9]+|wip)\b/i, desc: '敏捷冲刺/临时过程代号' },
+      { regex: /(圈复杂度|三元嵌套|AST\s*切片|ELOC|单行噪声比)/, desc: '代码分析器内部度量技术黑话' },
+    ];
+
+    latestLines.forEach((l, idx) => {
+      if (!l.trim().startsWith('- ')) return;
+      const lineNum = latestVer.line + idx;
+
+      // DOC-CL-007: 真实性防虚构
+      const codeTokens = [...l.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+      for (const token of codeTokens) {
+        if (token.startsWith('workspaceTiming.')) {
+          if (!configKeys.has(token)) {
+            findings.push(finding({
+              ruleId: 'DOC-CL-007', severity: 'error', module: 'docs', file: 'CHANGELOG.md', line: lineNum,
+              message: `变更日志引用了不存在的扩展配置项 \`${token}\`（虚构配置/日志幻觉）`,
+              evidence: l.trim(),
+              suggestedFix: `核对 package.json contributes.configuration 中实际声明的配置项`,
+            }));
+          }
+        } else if (/^[A-Z][a-zA-Z0-9]+$/.test(token)) {
+          const EXEMPT_PASCAL = new Set([
+            'Promise', 'Map', 'Set', 'Array', 'Date', 'RegExp', 'Error', 'JSON', 'CSV',
+            'Markdown', 'VSIX', 'FIFO', 'HTML', 'URI', 'UTC', 'JSDoc', 'TypeScript', 'Node',
+          ]);
+          if (!EXEMPT_PASCAL.has(token)) {
+            const hasFile = allSrcBasenames.has(token);
+            const hasSymbol = new RegExp(`\\b${token}\\b`).test(allSrcText);
+            if (!hasFile && !hasSymbol) {
+              findings.push(finding({
+                ruleId: 'DOC-CL-007', severity: 'error', module: 'docs', file: 'CHANGELOG.md', line: lineNum,
+                message: `变更日志引用了代码库中不存在的代码符号 \`${token}\`（虚构类或模块/日志幻觉）`,
+                evidence: l.trim(),
+                suggestedFix: `核对 src/ 中实际存在的文件名、类名或接口定义`,
+              }));
+            }
+          }
+        }
+      }
+
+      // DOC-CL-008: 文本纪律与防黑话
+      for (const { regex, desc } of FORBIDDEN_JARGON_PATTERNS) {
+        if (regex.test(l)) {
+          findings.push(finding({
+            ruleId: 'DOC-CL-008', severity: 'error', module: 'docs', file: 'CHANGELOG.md', line: lineNum,
+            message: `变更日志包含非面向用户的内部技术黑话: ${desc}`,
+            evidence: l.trim(),
+            suggestedFix: '以面向终端用户的客观产品功能和稳定性价值重构表述，消除内部实现细节与度量指标',
+          }));
+        }
+      }
+
+      // DOC-CL-009: 产品更新日志边界守卫与内部工程事务隔离
+      const FORBIDDEN_ENGINEERING_TERMS = [
+        { regex: /JSDoc/i, term: 'JSDoc' },
+        { regex: /六字段/, term: '六字段契约' },
+        { regex: /(代码注释|注释契约|注释规范|注释治理)/, term: '代码注释事务' },
+        { regex: /package\.(ps1|sh)/i, term: 'package.ps1/sh 脚本' },
+        { regex: /(打包脚本|构建脚本|构建流水线|CI\s*流水线)/, term: '构建/打包流水线' },
+        { regex: /(tsconfig|eslint|门禁系统|pre-commit)/i, term: '内部工具配置/门禁' },
+      ];
+      for (const { regex, term } of FORBIDDEN_ENGINEERING_TERMS) {
+        if (regex.test(l)) {
+          findings.push(finding({
+            ruleId: 'DOC-CL-009', severity: 'error', module: 'docs', file: 'CHANGELOG.md', line: lineNum,
+            message: `产品更新日志混入内部代码注释或工程构建事务词汇: ${term}`,
+            evidence: l.trim(),
+            suggestedFix: 'CHANGELOG 是面向最终用户的产品更新日志，严禁混入内部 JSDoc 注释、构建脚本或工程治理事务，请仅保留面向用户的产品功能、体验与稳定性提升',
+          }));
+        }
+      }
+    });
+
+    // DOC-CL-009: 分类标题工程事务隔离（产品发布中不得出现纯工程基础设施或内部文档节）
+    latestLines.forEach((l, idx) => {
+      if (!l.startsWith('### ')) return;
+      const lineNum = latestVer.line + idx;
+      if (/^### (Engineering Infrastructure|Docs)/.test(l)) {
+        findings.push(finding({
+          ruleId: 'DOC-CL-009', severity: 'error', module: 'docs', file: 'CHANGELOG.md', line: lineNum,
+          message: `产品更新日志分类标题不得使用内部工程分类: ${l.trim()}`,
+          evidence: l.trim(),
+          suggestedFix: '产品更新日志仅允许用户可感知的分类：Added（新功能）、Changed（功能与体验优化）、Fixed（缺陷修复）、Performance & Optimization（性能与稳定性优化）等',
+        }));
+      }
+    });
   }
   CL_NOTES.push(`CHANGELOG 布局契约: 版本节 ${versions.length} 个，列表风格与日期校验完成`);
 }
@@ -195,6 +307,45 @@ if (rdText === null) {
           message: `路线图中 v${pkgVersion} 仍标记为 🚧 规划中，与已发布状态矛盾`,
           suggestedFix: '将该行状态改为 ✅ 并补一句成果摘要',
         }));
+      }
+
+      // DOC-RD-003：路线图已发布版本成果摘要真实性与反虚构核验
+      if (shipped) {
+        const configKeys = new Set<string>();
+        if (pkgRes.ok && (pkgRes.data as any)?.contributes?.configuration) {
+          const configs = (pkgRes.data as any).contributes.configuration;
+          const configList = Array.isArray(configs) ? configs : [configs];
+          for (const c of configList) {
+            if (c?.properties) {
+              Object.keys(c.properties).forEach((k) => configKeys.add(k));
+            }
+          }
+        }
+        const codeTokens = [...shipped.raw.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+        for (const token of codeTokens) {
+          if (token.startsWith('workspaceTiming.') && !configKeys.has(token)) {
+            findings.push(finding({
+              ruleId: 'DOC-RD-003', severity: 'error', module: 'docs', file: 'README.md', line: shipped.line,
+              message: `路线图表项引用了不存在的配置项 \`${token}\`（虚构配置）`,
+              evidence: shipped.raw.trim(),
+            }));
+          }
+        }
+        if (/(圈复杂度|三元嵌套|AST\s*切片|\$[^$]+\$)/.test(shipped.raw)) {
+          findings.push(finding({
+            ruleId: 'DOC-RD-003', severity: 'error', module: 'docs', file: 'README.md', line: shipped.line,
+            message: '路线图表项包含内部度量黑话或 LaTeX 公式',
+            evidence: shipped.raw.trim(),
+          }));
+        }
+        if (/(JSDoc|六字段|代码注释|注释契约|package\.(ps1|sh)|构建脚本|打包脚本)/i.test(shipped.raw)) {
+          findings.push(finding({
+            ruleId: 'DOC-RD-003', severity: 'error', module: 'docs', file: 'README.md', line: shipped.line,
+            message: '路线图表项混入内部代码注释或工程构建事务词汇',
+            evidence: shipped.raw.trim(),
+            suggestedFix: '路线图成果摘要必须是面向用户的产品交付价值，严禁混入内部代码注释或构建脚本',
+          }));
+        }
       }
     }
   }

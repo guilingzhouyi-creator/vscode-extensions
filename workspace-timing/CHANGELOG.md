@@ -8,18 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [0.5.2] — 2026-10-09
 
 ### Added（新功能）
-- **开发者与外部智能体双轨工时智能感知**：新增 `ActivityWatcher` 宿主交互与文件变更监听器，实时感知键盘/编辑器输入（手动编码）与外部 AI Agent 文件写入事件，在运行期动态切换 `manual`（手动工时）与 `ai`（AI 协作工时）工作模式。
-- **自适应空闲超时暂停与追溯截断**：新增空闲检测能力（配置项 `workspaceTiming.idleTimeoutMinutes`），在开发者离开键盘且无文件变更超出阈值时，自动将计时状态切入空闲暂停态并追溯截断离开前的时间段，空闲工时独立沉淀至 `idleSessions`，确保在工时守恒律 $T_{total} = T_{manual} + T_{ai}$ 下精准剔除无效等待时长。
-- **状态栏实时协作模式指示与双语适配**：状态栏新增协作模式图标与运行态标识（手动模式、AI 模式、空闲暂停态），支持双语字典热切换与动态提示。
+- **开发者与 AI 协作双轨工时智能感知**：新增宿主交互与文件变更监听器，实时感知开发者键盘/编辑器输入与外部 AI Agent 文件改动事件，在运行期动态识别手动编码与 AI 协作两种工作模式。
+- **自适应空闲超时暂停与有效时长截断**：新增空闲检测能力（配置项 `workspaceTiming.idleTimeoutMinutes`），当无活动超出设定阈值时自动切入空闲暂停状态，并在恢复活动时智能截断离开期间的无效等待时长，保证工时记录真实客观。
+- **状态栏协作模式指示与运行态展示**：状态栏实时指示当前工作模式图标与运行状态，支持手动模式、AI 模式与空闲暂停态热更新显示及双语交互提示。
 
 ### Changed（功能与体验优化）
-- **数据结构 v3 平滑迁移与双轨统计持久化**：升级 `DataValidator`，自动为存量历史记录补齐多维工时（`manualMs`、`aiMs`、`manualTotalMs`、`aiTotalMs`）与空闲历史数组，保证向后兼容性与数据无损迁移。
-- **配置边界单一真源约束扩展**：在 `ConfigBounds` 中纳入空闲超时（0~120 分钟）、AI 检测开关及观察冷却窗口（10~600 秒）合法值域边界校验，杜绝非法畸形参数。
+- **历史数据平滑无损兼容与多维工时持久化**：升级历史数据校验与加载机制，自动为存量历史记录无损升级多维工时与空闲明细，保障向后兼容性与数据无损迁移。
+- **空闲超时与观察冷却窗口个性化配置**：新增空闲判定阈值（`workspaceTiming.idleTimeoutMinutes`）与 AI 协作活跃冷却观察窗口（`workspaceTiming.aiCooldownSeconds`）配置项，支持在扩展设置中灵活调整。
 
-### Refactoring & Architecture（架构重构与规范化契约）
-- **全仓六字段 JSDoc 模块头部契约落地**：全量 50 个 TypeScript 源码文件统一落实六字段 JSDoc 标准模块头部（`Module`, `File Path`, `Architecture Role`, `Dependencies & Triggers`, `Responsibilities`, `Exit Semantics & Design Rationale`），消除未结构化注释，代码自解释性与有效注释率大幅提升。
-- **核心算法边界与数学不变量显式声明**：在 `RingBuffer`（无锁循环队列指针与崩溃一致性）、`TimeAggregator`（本地时区跨午夜切分与时长守恒）、`StorageCoordinator`（三级存储降频与紧急兜底备份）等核心算法中显式声明退化保护阈值与前置不变式约束。
-- **TimerEngine 圈复杂度平铺重构**：重构 `recomputeTodayEnded` 函数，抽离日桶提取与模式分摊纯函数辅助方法，控制流平铺并消除三元嵌套，使单函数圈复杂度严格控制在合法包络内。
+### Performance & Optimization（性能与稳定性优化）
+- **计时核心与数据恢复容错加固**：全面强化高频时间片计算与异常容错边界，保障高强度编码与突发异常退出时的数据一致性与防丢保护。
 
 ## [0.5.1] — 2026-10-05
 
