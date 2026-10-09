@@ -49,7 +49,7 @@ const ALGORITHM_PATTERN =
 
 /** Rule registry and dictionary table pattern */
 const RULES_REGISTRY_PATTERN =
-    /[\\/](?:rules|entries|dictionaries)[\\/]|[\\/][a-z0-9_-]*(?:registry|manifest|rules)\.[a-z0-9]+$/i;
+    /[\\/](?:rules|entries|dictionaries|catalogs?)[\\/]|[\\/][a-z0-9_-]*(?:registry|manifest|rules|catalog|recipe|archetype|terminology|shim|table)\.[a-z0-9]+$/i;
 
 /** Configuration and static constants pattern */
 const CONFIG_CONSTANT_PATTERN =

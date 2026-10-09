@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-09T02:56:31.317Z",
+  "generatedAt": "2026-10-09T05:41:34.320Z",
   "totalRules": 402,
   "counts": {
     "autoRefactor": 321,
@@ -168,14 +168,14 @@
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Over-abstraction and redundant indirection: introducing cross-layer forwarding trampolines, inverted dependencies, or cycles for trivial commonalities."
+      "summary": "Over-abstraction and redundant indirection: introducing cross-layer forwardingtrampolines, inverted dependencies, or cycles for trivial commonalities."
     },
     {
       "id": "ARCH-BLR-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "File boundary imbalance: multiple high-complexity functions in a single file lack semantic cohesion, abnormally aggregating responsibilities."
+      "summary": "File boundary imbalance: multiple high-complexity functions in a single file lacksemantic cohesion, abnormally aggregating responsibilities."
     },
     {
       "id": "ARCH-BND-001",
@@ -196,7 +196,7 @@
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Declared configuration property is never referenced in decisions, control flow, or calculations across the codebase (dead configuration)."
+      "summary": "Declared configuration property is never referenced in decisions, control flow, orcalculations across the codebase (dead configuration)."
     },
     {
       "id": "ARCH-CFG-003",
@@ -217,42 +217,42 @@
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Unstructured configuration access: accessing configuration in an unstructured, arbitrary manner across layers without a centralized registry."
+      "summary": "Unstructured configuration access: accessing configuration in an unstructured,arbitrary manner across layers without a centralized registry."
     },
     {
       "id": "ARCH-CFG-006",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Configuration tightly coupled with domain logic: domain models directly bind to specific config file formats or disk parsers."
+      "summary": "Configuration tightly coupled with domain logic: domain models directly bind tospecific config file formats or disk parsers."
     },
     {
       "id": "ARCH-CFG-007",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Configuration over-abstraction: simple static configuration introduces excessive unnecessary indirection and forwarding layers."
+      "summary": "Configuration over-abstraction: simple static configuration introduces excessiveunnecessary indirection and forwarding layers."
     },
     {
       "id": "ARCH-CFG-008",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Flat configuration sprawl antipattern: large volume of configuration files sprawled across root directory without domain isomorphic hierarchy."
+      "summary": "Flat configuration sprawl antipattern: large volume of configuration files sprawledacross root directory without domain isomorphic hierarchy."
     },
     {
       "id": "ARCH-CFG-009",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Configuration sub-table routing contract breach: unregistered sub-table detached from core routing contract, lacking dot-notation routing."
+      "summary": "Configuration sub-table routing contract breach: unregistered sub-table detached fromcore routing contract, lacking dot-notation routing."
     },
     {
       "id": "ARCH-DEC-002",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Polyglot AST parsing and adapter logic must be decoupled into independent adapter modules; analyzer core must not mix AST construction details."
+      "summary": "Polyglot AST parsing and adapter logic must be decoupled into independent adaptermodules; analyzer core must not mix AST construction details."
     },
     {
       "id": "ARCH-DIR-001",
@@ -294,7 +294,7 @@
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Hollow facade payload and insufficient density: facade module lacks substantive domain orchestration, schema validation, or immutability contracts."
+      "summary": "Hollow facade payload and insufficient density: facade module lacks substantive domainorchestration, schema validation, or immutability contracts."
     },
     {
       "id": "ARCH-GLB-001",
@@ -329,21 +329,21 @@
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "File entity role imbalance and pseudo-shared library: file carries excessive mutable state or coupled logic but is heavily imported as a shared library."
+      "summary": "File entity role imbalance and pseudo-shared library: file carries excessive mutablestate or coupled logic but is heavily imported as a shared library."
     },
     {
       "id": "ARCH-ROL-002",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Business module harboring unbounded common capabilities: domain module internally hosts and exports general infrastructure or utilities."
+      "summary": "Business module harboring unbounded common capabilities: domain module internally hostsand exports general infrastructure or utilities."
     },
     {
       "id": "ARCH-SKL-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Strategy skeleton candidate: detected complex workflows sharing isomorphic pre-validation and post-execution teardown steps."
+      "summary": "Strategy skeleton candidate: detected complex workflows sharing isomorphicpre-validation and post-execution teardown steps."
     },
     {
       "id": "ARCH-TMP-001",
@@ -357,7 +357,7 @@
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Kitchen-sink utility antipattern: detected utils/common dumping ground file accumulating heterogeneous unstructured logic."
+      "summary": "Kitchen-sink utility antipattern: detected utils/common dumping ground file accumulatingheterogeneous unstructured logic."
     },
     {
       "id": "ARF-*",
@@ -427,28 +427,28 @@
       "project": "auto-refactor",
       "family": "CMP",
       "severity": "error",
-      "summary": "Deeply nested inline callback chains create callback hell, complicate exception propagation, and mask race conditions."
+      "summary": "Deeply nested inline callback chains create callback hell, complicate exceptionpropagation, and mask race conditions."
     },
     {
       "id": "CMP-DEN-001",
       "project": "auto-refactor",
       "family": "CMP",
       "severity": "error",
-      "summary": "Dense syntactic packing of bitwise, arithmetic and conditional operators without naming or spacing exceeds human cognitive chunking capacity."
+      "summary": "Dense syntactic packing of bitwise, arithmetic and conditional operators without namingor spacing exceeds human cognitive chunking capacity."
     },
     {
       "id": "CMP-EXP-001",
       "project": "auto-refactor",
       "family": "CMP",
       "severity": "error",
-      "summary": "Giant expressions with deeply nested ternaries or unbounded logical chains create cognitive overload and obscure branching logic."
+      "summary": "Giant expressions with deeply nested ternaries or unbounded logical chains createcognitive overload and obscure branching logic."
     },
     {
       "id": "CMP-LIN-001",
       "project": "auto-refactor",
       "family": "CMP",
       "severity": "error",
-      "summary": "Cramming multiple distinct statements or side-effects onto a single line impairs stack traces, debug stepping, and code readability."
+      "summary": "Cramming multiple distinct statements or side-effects onto a single line impairs stacktraces, debug stepping, and code readability."
     },
     {
       "id": "CMT-BAN-001",
@@ -609,7 +609,7 @@
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "Complexity amplification trap: blocking I/O or serialization implicitly nested in iteration or hot call chains."
+      "summary": "Complexity amplification trap: blocking I/O or serialization implicitly nested initeration or hot call chains."
     },
     {
       "id": "CPX-BUD-001",
@@ -623,28 +623,28 @@
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "Artificial splitting gaming: artificially deflating complexity by generating excessive single-line pass-through forwarding functions."
+      "summary": "Artificial splitting gaming: artificially deflating complexity by generatingexcessive single-line pass-through forwarding functions."
     },
     {
       "id": "CPX-JST-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "Uncontrolled complexity without architectural justification: high complexity originates from chaotic nesting and responsibility piling."
+      "summary": "Uncontrolled complexity without architectural justification: high complexityoriginates from chaotic nesting and responsibility piling."
     },
     {
       "id": "CPX-NEST-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "Uncontrolled deep control flow nesting: control flow nesting level exceeds elastic budget for context type (business > 3, state machine > 5)."
+      "summary": "Uncontrolled deep control flow nesting: control flow nesting level exceeds elasticbudget for context type (business > 3, state machine > 5)."
     },
     {
       "id": "CPX-NEST-002",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "Deep long-span control flow escape: unstructured control flow escape (return/break/throw) executed in deep nesting (>= 4) far from function header."
+      "summary": "Deep long-span control flow escape: unstructured control flow escape(return/break/throw) executed in deep nesting (>= 4) far from function header."
     },
     {
       "id": "CPX-REC-001",
@@ -658,7 +658,7 @@
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "Distributed redundant complexity: highly similar algorithms, calculations, or validations scattered across multiple files creating latent complexity."
+      "summary": "Distributed redundant complexity: highly similar algorithms, calculations, orvalidations scattered across multiple files creating latent complexity."
     },
     {
       "id": "CPX-SPACE-001",
@@ -672,14 +672,14 @@
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "State machine dispatch structure standard: single branch within state machine branches exceeds 30 LOC, degrading dispatch skeleton clarity."
+      "summary": "State machine dispatch structure standard: single branch within state machinebranches exceeds 30 LOC, degrading dispatch skeleton clarity."
     },
     {
       "id": "CPX-TIME-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "Unbounded polynomial time complexity across function/file boundaries: nested iteration call chains incur prohibitive overhead."
+      "summary": "Unbounded polynomial time complexity across function/file boundaries: nestediteration call chains incur prohibitive overhead."
     },
     {
       "id": "DAT-DEF-001",
@@ -714,7 +714,7 @@
       "project": "auto-refactor",
       "family": "DAT",
       "severity": "error",
-      "summary": "Resource registry bidirectional mapping inconsistency or dangling asset: resource center contains empty paths or dangling references."
+      "summary": "Resource registry bidirectional mapping inconsistency or dangling asset: resourcecenter contains empty paths or dangling references."
     },
     {
       "id": "DAT-SER-001",
@@ -728,7 +728,7 @@
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "error",
-      "summary": "Dependency inversion violation: lower-level infrastructure or common modules inversely depend on high-level business modules."
+      "summary": "Dependency inversion violation: lower-level infrastructure or common modulesinversely depend on high-level business modules."
     },
     {
       "id": "DEP-LAZ-001",
@@ -1190,42 +1190,42 @@
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Concurrent modifications by multiple agents produce architectural boundary breaches, cross-module dependency cycles, or contract incompatibilities."
+      "summary": "Concurrent modifications by multiple agents produce architectural boundary breaches,cross-module dependency cycles, or contract incompatibilities."
     },
     {
       "id": "GOV-ARC-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Historical dossier nomenclature leaks into production sources, tests, or commit headers outside the archived directory white-list."
+      "summary": "Historical dossier nomenclature leaks into production sources, tests, or commit headersoutside the archived directory white-list."
     },
     {
       "id": "GOV-BLS-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Cross-tier monolithic change blast radius breaches atomic staging boundaries across docs, contracts, config, domains, and tooling."
+      "summary": "Cross-tier monolithic change blast radius breaches atomic staging boundaries acrossdocs, contracts, config, domains, and tooling."
     },
     {
       "id": "GOV-DAT-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Functions declaring excessive discrete scalar parameters (>= 5) exhibit Data Clumps smell; parameters should be aggregated into a named Context or Options interface."
+      "summary": "Functions declaring excessive discrete scalar parameters (>= 5) exhibit Data Clumpssmell; parameters should be aggregated into a named Context or Options interface."
     },
     {
       "id": "GOV-DBG-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Debug and console print statements clutter standard outputs, leak diagnostics, and can degrade I/O throughput."
+      "summary": "Debug and console print statements clutter standard outputs, leak diagnostics, and candegrade I/O throughput."
     },
     {
       "id": "GOV-EXC-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Empty catch blocks silently swallow exceptions, causing silent data corruption or masking critical failures. A catch whose body carries an explicit rationale marker (best-effort / ignore / intentional / expected) is treated as a documented decision instead of a silent swallow."
+      "summary": "Empty catch blocks silently swallow exceptions, causing silent data corruption ormasking critical failures. A catch whose body carries an explicit rationale marker(best-effort / ignore / intentional / expected) is treated as a documented decisioninstead of a silent swallow."
     },
     {
       "id": "GOV-EXC-002",
@@ -1239,7 +1239,7 @@
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Pseudo-catch blocks containing only dummy non-handling statements (void 0, dead assignment) silently swallow exceptions without logging or documented rationale."
+      "summary": "Pseudo-catch blocks containing only dummy non-handling statements (void 0, deadassignment) silently swallow exceptions without logging or documented rationale."
     },
     {
       "id": "GOV-FIL-001",
@@ -1260,7 +1260,7 @@
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Anti-gaming violation: artificial function splitting, tautological test padding, or empty boilerplate gaming quality metrics."
+      "summary": "Anti-gaming violation: artificial function splitting, tautological test padding, orempty boilerplate gaming quality metrics."
     },
     {
       "id": "GOV-HOK-001",
@@ -1281,49 +1281,49 @@
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Vacuous wrapper methods that purely forward calls without validation or translation add unnecessary indirection."
+      "summary": "Vacuous wrapper methods that purely forward calls without validation or translation addunnecessary indirection."
     },
     {
       "id": "GOV-MNT-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Deep class inheritance hierarchies (> 2 levels) introduce fragile base class problems; composition is preferred."
+      "summary": "Deep class inheritance hierarchies (> 2 levels) introduce fragile base class problems;composition is preferred."
     },
     {
       "id": "GOV-MNT-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Domain layer must remain clean and portable; importing UI or CLI presentation frameworks introduces severe coupling."
+      "summary": "Domain layer must remain clean and portable; importing UI or CLI presentation frameworksintroduces severe coupling."
     },
     {
       "id": "GOV-MSG-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Underlying diagnostic messages and remediations must use standard English centrally managed by constant dictionaries, prohibiting hardcoded non-ASCII or inline strings at emitter sites."
+      "summary": "Underlying diagnostic messages and remediations must use standard English centrallymanaged by constant dictionaries, prohibiting hardcoded non-ASCII or inline stringsat emitter sites."
     },
     {
       "id": "GOV-PRF-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Performing invariant I/O, regex construction, or repetitive configuration lookups in loops incurs severe CPU/throughput penalties."
+      "summary": "Performing invariant I/O, regex construction, or repetitive configuration lookups inloops incurs severe CPU/throughput penalties."
     },
     {
       "id": "GOV-PRF-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M); pre-indexing in Map/Set optimizes to O(N)."
+      "summary": "Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M);pre-indexing in Map/Set optimizes to O(N)."
     },
     {
       "id": "GOV-PRF-003",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Numeric timer delays bypass centralized clamping; a literal of <=0 triggers a ~1ms busy loop (CPU/IO hotspot)."
+      "summary": "Numeric timer delays bypass centralized clamping; a literal of <=0 triggers a ~1ms busyloop (CPU/IO hotspot)."
     },
     {
       "id": "GOV-PRF-004",
@@ -1337,42 +1337,42 @@
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Calling array linear lookups (.includes / .indexOf) inside loops creates quadratic O(N*M) overhead; pre-indexing into a Set hoisted outside the loop optimizes membership tests to O(1)."
+      "summary": "Calling array linear lookups (.includes / .indexOf) inside loops creates quadraticO(N*M) overhead; pre-indexing into a Set hoisted outside the loop optimizesmembership tests to O(1)."
     },
     {
       "id": "GOV-RTC-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Baseline debt entries must track physical file rename operations without artificial inflation or false positive churn. Monotonic downward ratchets must remap prior baselines to new paths upon refactoring."
+      "summary": "Baseline debt entries must track physical file rename operations without artificialinflation or false positive churn. Monotonic downward ratchets must remap priorbaselines to new paths upon refactoring."
     },
     {
       "id": "GOV-RUL-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Static review rule identifier drift or hallucination: mentioned rule ID is not registered in the single-source rule catalog."
+      "summary": "Static review rule identifier drift or hallucination: mentioned rule ID is notregistered in the single-source rule catalog."
     },
     {
       "id": "GOV-SAN-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architectural longevity and create documentation drift."
+      "summary": "Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architecturallongevity and create documentation drift."
     },
     {
       "id": "GOV-SAN-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Objective technical language guard: text contains promotional rhetoric, absolute claims, emotional disparagement, or process buzzwords."
+      "summary": "Objective technical language guard: text contains promotional rhetoric, absolute claims,emotional disparagement, or process buzzwords."
     },
     {
       "id": "GOV-SLC-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "AST slice mutation introduces breaking signature drift or uncontained side-effects propagating across external call chains."
+      "summary": "AST slice mutation introduces breaking signature drift or uncontained side-effectspropagating across external call chains."
     },
     {
       "id": "GOV-STD-001",
@@ -1393,7 +1393,7 @@
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Historical trajectory exhibits cyclic regressions, flip-flop oscillations, or re-introduces previously eliminated architectural anti-patterns."
+      "summary": "Historical trajectory exhibits cyclic regressions, flip-flop oscillations, orre-introduces previously eliminated architectural anti-patterns."
     },
     {
       "id": "GOV-TYP-001",
@@ -1421,21 +1421,21 @@
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Passing or assigning `undefined as any` or `null as any` indicates an Interface Segregation Principle (ISP) violation."
+      "summary": "Passing or assigning `undefined as any` or `null as any` indicates an InterfaceSegregation Principle (ISP) violation."
     },
     {
       "id": "GOV-TYP-005",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Accessing properties via `(expr as any).prop` bypasses compiler type safety and indicates missing type narrowing guards."
+      "summary": "Accessing properties via `(expr as any).prop` bypasses compiler type safety andindicates missing type narrowing guards."
     },
     {
       "id": "GOV-TYP-006",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Exported functions, classes, and public methods must specify explicit return types to protect public API contracts."
+      "summary": "Exported functions, classes, and public methods must specify explicit return types toprotect public API contracts."
     },
     {
       "id": "HC-ABS-PATH",
@@ -1841,7 +1841,7 @@
       "project": "auto-refactor",
       "family": "NUM",
       "severity": "error",
-      "summary": "Lossy precision rounding or mismatched scaling detected in mathematical calculation path, risking IEEE 754 drift."
+      "summary": "Lossy precision rounding or mismatched scaling detected in mathematical calculationpath, risking IEEE 754 drift."
     },
     {
       "id": "PRF-ALG-001",
@@ -1855,7 +1855,7 @@
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "error",
-      "summary": "Linear collection scan antipattern in loop: performing linear searches (find/includes/has/in list) inside loops degrading complexity to O(N*M)."
+      "summary": "Linear collection scan antipattern in loop: performing linear searches(find/includes/has/in list) inside loops degrading complexity to O(N*M)."
     },
     {
       "id": "PRF-DUP-001",
@@ -1897,28 +1897,28 @@
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "error",
-      "summary": "Hot path expensive resources lack reuse pooling: frequent allocation of heavy objects, buffers, or connections in loops or hot calls."
+      "summary": "Hot path expensive resources lack reuse pooling: frequent allocation of heavy objects,buffers, or connections in loops or hot calls."
     },
     {
       "id": "PRF-POL-002",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "error",
-      "summary": "Resource pool lacks state reset contract or capacity ceiling: missing reset_state contract or unbounded growth causes data corruption and leaks."
+      "summary": "Resource pool lacks state reset contract or capacity ceiling: missing reset_statecontract or unbounded growth causes data corruption and leaks."
     },
     {
       "id": "PRF-POL-003",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "error",
-      "summary": "Negative-return excessive pooling: introducing pooling overhead for tiny, lightweight value objects or cold paths."
+      "summary": "Negative-return excessive pooling: introducing pooling overhead for tiny, lightweightvalue objects or cold paths."
     },
     {
       "id": "PRF-POL-004",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "error",
-      "summary": "Streaming chunk loading lacks ring buffer reuse: repeated instantiation of temporary buffers during streaming I/O or chunked reading."
+      "summary": "Streaming chunk loading lacks ring buffer reuse: repeated instantiation of temporarybuffers during streaming I/O or chunked reading."
     },
     {
       "id": "PROD-HYG-001",
@@ -2688,21 +2688,21 @@
       "project": "auto-refactor",
       "family": "TST",
       "severity": "error",
-      "summary": "Effective Modern Test Density (EMTD) or Current Business Coverage Ratio (CBCR) below threshold in critical business modules."
+      "summary": "Effective Modern Test Density (EMTD) or Current Business Coverage Ratio (CBCR) belowthreshold in critical business modules."
     },
     {
       "id": "TST-FLT-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "error",
-      "summary": "Fragile floating-point assertion: test directly asserts equality on raw float literals without tolerance or formula derivation."
+      "summary": "Fragile floating-point assertion: test directly asserts equality on raw floatliterals without tolerance or formula derivation."
     },
     {
       "id": "TST-ILS-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "error",
-      "summary": "Test completeness illusion: tests solely verify mock configurations or bind to deprecated business contracts."
+      "summary": "Test completeness illusion: tests solely verify mock configurations or bind todeprecated business contracts."
     },
     {
       "id": "TST-SKP-001",
@@ -2723,7 +2723,7 @@
       "project": "auto-refactor",
       "family": "TST",
       "severity": "error",
-      "summary": "Polyglot test topology dual-track discipline: embedding test code blocks in TS/GDScript production files is strictly prohibited."
+      "summary": "Polyglot test topology dual-track discipline: embedding test code blocks inTS/GDScript production files is strictly prohibited."
     },
     {
       "id": "UI-ENG-001",

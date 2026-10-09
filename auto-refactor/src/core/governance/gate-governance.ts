@@ -115,13 +115,13 @@ function auditMissingGates(context: RepoArchetypeContext, issues: Issue[]): bool
                     : context.manifests.cargoToml
                       ? 'Cargo.toml'
                       : '.',
-                1,
-                SEVERITY_ERROR,
-                'critical',
-                'architecture',
-                `Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected for ${context.primaryArchetype} project).`,
-                'Scaffold a standardized 2-tier gate system with pre-commit, commit-msg, pre-push hooks and CI workflow.',
-                'Unchecked repositories accumulate syntax errors, broken builds, and technical debt that delay developer feedback loops.',
+                1, SEVERITY_ERROR, 'critical', 'architecture',
+                `Repository completely lacks a gate defense system (no Git hooks and no CI` +
+                    `pipeline detected for ${context.primaryArchetype} project).`,
+                'Scaffold a standardized 2-tier gate system with pre-commit, commit-msg, pre-push' +
+                    'hooks and CI workflow.',
+                'Unchecked repositories accumulate syntax errors, broken builds, and technical' +
+                    'debt that delay developer feedback loops.',
                 scaffold,
             ),
         );
@@ -135,13 +135,13 @@ function auditMissingGates(context: RepoArchetypeContext, issues: Issue[]): bool
             createGateIssue(
                 'GATE-HOOK-001',
                 context.ci.workflowFiles[0] || '.',
-                1,
-                SEVERITY_WARNING,
-                'high',
-                'architecture',
-                'Repository lacks local left-shift Git hooks (Tier 1 Gate missing); all quality validation is deferred to remote CI.',
-                'Install local Git hooks (.githooks or .husky) to catch hygiene and regression defects prior to git commit.',
-                'Waiting for remote CI to catch trivial formatting or syntax errors incurs significant feedback latency and pollutes Git commit history.',
+                1, SEVERITY_WARNING, 'high', 'architecture',
+                'Repository lacks local left-shift Git hooks (Tier 1 Gate missing); all quality' +
+                    'validation is deferred to remote CI.',
+                'Install local Git hooks (.githooks or .husky) to catch hygiene and regression' +
+                    'defects prior to git commit.',
+                'Waiting for remote CI to catch trivial formatting or syntax errors incurs' +
+                    'significant feedback latency and pollutes Git commit history.',
                 scaffold,
             ),
         );
@@ -159,13 +159,13 @@ function auditMissingGates(context: RepoArchetypeContext, issues: Issue[]): bool
                     : context.manifests.cargoToml
                       ? 'Cargo.toml'
                       : '.',
-                1,
-                SEVERITY_WARNING,
-                'high',
-                'architecture',
-                `Repository has local Git hooks but lacks a remote CI pipeline (Tier 2 Remote Gate missing for ${context.primaryArchetype} project).`,
-                'Set up a remote CI workflow (e.g. .github/workflows/ci.yml) to mirror local gate checks on pull requests and pushes.',
-                'Relying solely on local hooks cannot enforce quality standards against bypassed commits (--no-verify) or external contributions.',
+                1, SEVERITY_WARNING, 'high', 'architecture',
+                `Repository has local Git hooks but lacks a remote CI pipeline (Tier 2 Remote` +
+                    `Gate missing for ${context.primaryArchetype} project).`,
+                'Set up a remote CI workflow (e.g. .github/workflows/ci.yml) to mirror local gate' +
+                    'checks on pull requests and pushes.',
+                'Relying solely on local hooks cannot enforce quality standards against bypassed' +
+                    'commits (--no-verify) or external contributions.',
                 scaffold,
             ),
         );
@@ -220,13 +220,13 @@ function auditIsomorphism(context: RepoArchetypeContext, issues: Issue[]): void 
                 createGateIssue(
                     'GATE-ISO-001',
                     context.ci.workflowFiles[0],
-                    1,
-                    SEVERITY_WARNING,
-                    'high',
-                    'architecture',
-                    `Dual-tier gate boundary is not isomorphic: remote CI enforces '${sig.name}', but local Git hooks lack corresponding validation.`,
-                    `Mirror the '${sig.name}' check in local pre-commit or pre-push gates to ensure local and remote defense parity.`,
-                    'Discrepancies between local gates and remote CI lead to unexpected PR failures and developer friction.',
+                    1, SEVERITY_WARNING, 'high', 'architecture',
+                    `Dual-tier gate boundary is not isomorphic: remote CI enforces '${sig.name}',` +
+                        `but local Git hooks lack corresponding validation.`,
+                    `Mirror the '${sig.name}' check in local pre-commit or pre-push gates to` +
+                        `ensure local and remote defense parity.`,
+                    'Discrepancies between local gates and remote CI lead to unexpected PR' +
+                        'failures and developer friction.',
                     undefined,
                     {
                         action: 'sync_gate_parity',
@@ -261,13 +261,13 @@ function auditRoutingSafety(context: RepoArchetypeContext, issues: Issue[]): voi
                 createGateIssue(
                     'GATE-ROUTE-001',
                     relPath,
-                    1,
-                    SEVERITY_ERROR,
-                    'high',
-                    'reliability',
-                    `Hook router '${hook.name}' invokes Windows PowerShell 5.1 (powershell.exe) directly instead of cross-platform 'pwsh'.`,
-                    'Prioritize cross-platform pwsh and fall back gracefully to bash to prevent Windows PS 5.1 UTF-8 BOM encoding issues.',
-                    'Windows PowerShell 5.1 misinterprets UTF-8 files without BOM, leading to silent script syntax failures in automated environments.',
+                    1, SEVERITY_ERROR, 'high', 'reliability',
+                    `Hook router '${hook.name}' invokes Windows PowerShell 5.1 (powershell.exe)` +
+                        `directly instead of cross-platform 'pwsh'.`,
+                    'Prioritize cross-platform pwsh and fall back gracefully to bash to prevent' +
+                        'Windows PS 5.1 UTF-8 BOM encoding issues.',
+                    'Windows PowerShell 5.1 misinterprets UTF-8 files without BOM, leading to' +
+                        'silent script syntax failures in automated environments.',
                     undefined,
                     {
                         action: 'harden_hook_router',
@@ -284,13 +284,12 @@ function auditRoutingSafety(context: RepoArchetypeContext, issues: Issue[]): voi
                 createGateIssue(
                     'GATE-ROUTE-001',
                     relPath,
-                    1,
-                    SEVERITY_ERROR,
-                    'high',
-                    'reliability',
+                    1, SEVERITY_ERROR, 'high', 'reliability',
                     `Hook router '${hook.name}' declares #!/bin/sh shebang but contains non-portable Bash syntax.`,
-                    'Change shebang to #!/usr/bin/env bash or remove bashisms to prevent execution failures on Debian/Ubuntu dash.',
-                    'On many Linux distributions /bin/sh points to dash, which fails immediately on bash-specific syntax constructs.',
+                    'Change shebang to #!/usr/bin/env bash or remove bashisms to prevent' +
+                        'execution failures on Debian/Ubuntu dash.',
+                    'On many Linux distributions /bin/sh points to dash, which fails immediately' +
+                        'on bash-specific syntax constructs.',
                 ),
             );
         }
@@ -308,13 +307,13 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
             createGateIssue(
                 'GATE-MSG-001',
                 context.hooks.hookDir || '.githooks',
-                1,
-                SEVERITY_WARNING,
-                'medium',
-                'standardization',
-                'Gate system lacks a commit-msg hook; commit messages are not verified for Conventional Commits or structural contracts.',
-                'Introduce a commit-msg gate script to enforce standard conventional commits prefix and structured sections.',
-                'Unvalidated commit messages lead to unsearchable Git history, breaking automated changelog and semantic release tooling.',
+                1, SEVERITY_WARNING, 'medium', 'standardization',
+                'Gate system lacks a commit-msg hook; commit messages are not verified for' +
+                    'Conventional Commits or structural contracts.',
+                'Introduce a commit-msg gate script to enforce standard conventional commits' +
+                    'prefix and structured sections.',
+                'Unvalidated commit messages lead to unsearchable Git history, breaking automated' +
+                    'changelog and semantic release tooling.',
                 undefined,
                 {
                     action: 'add_commit_msg_gate',
@@ -340,10 +339,7 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
             createGateIssue(
                 'GATE-MSG-001',
                 relPath,
-                1,
-                SEVERITY_WARNING,
-                'medium',
-                'standardization',
+                1, SEVERITY_WARNING, 'medium', 'standardization',
                 'Existing commit-msg gate does not enforce Conventional Commits (<type>(<scope>): <summary>) format.',
                 'Enforce Conventional Commits regex validation in commit-msg gate script.',
                 'Standardized commit message prefixes are required for automated auditing and semantic versioning.',
@@ -371,13 +367,13 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
                 createGateIssue(
                     'GATE-MSG-003',
                     relPath,
-                    1,
-                    SEVERITY_ERROR,
-                    'high',
-                    'standardization',
-                    'Monorepo commit-msg gate lacks [Project / 项目归属] format section and subproject whitelist validation.',
-                    'Implement [Project] format section validation in commit-msg gate to demarcate subproject attribution.',
-                    'In multi-project repositories, unattributed commits blur architecture boundaries and cause cross-project contamination.',
+                    1, SEVERITY_ERROR, 'high', 'standardization',
+                    'Monorepo commit-msg gate lacks [Project / 项目归属] format section and' +
+                        'subproject whitelist validation.',
+                    'Implement [Project] format section validation in commit-msg gate to' +
+                        'demarcate subproject attribution.',
+                    'In multi-project repositories, unattributed commits blur architecture' +
+                        'boundaries and cause cross-project contamination.',
                     undefined,
                     {
                         action: 'add_project_scope_gate',
@@ -414,10 +410,7 @@ function auditHygieneGuard(context: RepoArchetypeContext, issues: Issue[]): void
             createGateIssue(
                 'GATE-HYG-001',
                 relPath,
-                1,
-                SEVERITY_ERROR,
-                'high',
-                'hygiene',
+                1, SEVERITY_ERROR, 'high', 'hygiene',
                 'Pre-commit gate does not enforce physical hygiene: lacks zero-byte (0-byte) empty file detection.',
                 'Add zero-byte empty file detection to pre-commit gate to block accidental empty file commits.',
                 'Zero-byte empty files pollute the codebase, break module resolution, and bypass AST static analysis.',
@@ -460,13 +453,13 @@ function auditBudgetTiering(context: RepoArchetypeContext, issues: Issue[]): voi
             createGateIssue(
                 'GATE-BUDGET-001',
                 relPath,
-                1,
-                SEVERITY_WARNING,
-                'medium',
-                'performance',
-                'Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun.',
-                'Tier gate performance: restrict pre-commit to fast staged-slice checks (< 2s) and defer full regressions to pre-push.',
-                'Slow pre-commit gates disrupt developer flow and encourage bypassing gates via git commit --no-verify.',
+                1, SEVERITY_WARNING, 'medium', 'performance',
+                'Pre-commit gate runs unconstrained whole-repo test suites without staged-file' +
+                    'filtering, risking budget overrun.',
+                'Tier gate performance: restrict pre-commit to fast staged-slice checks (< 2s)' +
+                    'and defer full regressions to pre-push.',
+                'Slow pre-commit gates disrupt developer flow and encourage bypassing gates via' +
+                    'git commit --no-verify.',
             ),
         );
     }
@@ -505,13 +498,13 @@ function auditStrictErrorDiscipline(context: RepoArchetypeContext, issues: Issue
                     createGateIssue(
                         'GATE-ERR-001',
                         relPath,
-                        1,
-                        SEVERITY_ERROR,
-                        'high',
-                        'reliability',
-                        `Gate script '${path.basename(relPath)}' lacks strict error mode ('set -euo pipefail' or 'set -e').`,
-                        'Add set -euo pipefail near script start to prevent silent failures and false-positive gate passes.',
-                        'Without set -e, command failures inside gate scripts are ignored, leading to catastrophic false-pass gate releases.',
+                        1, SEVERITY_ERROR, 'high', 'reliability',
+                        `Gate script '${path.basename(relPath)}' lacks strict error mode ('set` +
+                            `-euo pipefail' or 'set -e').`,
+                        'Add set -euo pipefail near script start to prevent silent failures and' +
+                            'false-positive gate passes.',
+                        'Without set -e, command failures inside gate scripts are ignored,' +
+                            'leading to catastrophic false-pass gate releases.',
                         undefined,
                         {
                             action: 'add_strict_mode',
@@ -528,13 +521,12 @@ function auditStrictErrorDiscipline(context: RepoArchetypeContext, issues: Issue
                     createGateIssue(
                         'GATE-ERR-001',
                         relPath,
-                        1,
-                        SEVERITY_ERROR,
-                        'high',
-                        'reliability',
-                        `Gate script '${path.basename(relPath)}' lacks strict error preference ('$ErrorActionPreference = "Stop"').`,
+                        1, SEVERITY_ERROR, 'high', 'reliability',
+                        `Gate script '${path.basename(relPath)}' lacks strict error preference` +
+                            `('$ErrorActionPreference = "Stop"').`,
                         "Declare $ErrorActionPreference = 'Stop' at the top of PowerShell gate script.",
-                        'PowerShell by default continues execution after non-terminating errors, resulting in false-positive gate passes.',
+                        'PowerShell by default continues execution after non-terminating errors,' +
+                            'resulting in false-positive gate passes.',
                         undefined,
                         {
                             action: 'add_strict_error_preference',
@@ -570,13 +562,13 @@ function auditSsotSync(context: RepoArchetypeContext, issues: Issue[]): void {
                 createGateIssue(
                     'GATE-SSOT-001',
                     'scripts',
-                    1,
-                    SEVERITY_WARNING,
-                    'medium',
-                    'architecture',
-                    'Gate system references rule catalog verification but single-source catalog file is missing or unregistered.',
-                    'Maintain a single source of truth catalog (e.g. scripts/common/rule-catalog.json) and verify gate rules against it.',
-                    'Hardcoding rule IDs across multiple gate scripts leads to rule drift, phantom rules, and gate inconsistency.',
+                    1, SEVERITY_WARNING, 'medium', 'architecture',
+                    'Gate system references rule catalog verification but single-source catalog' +
+                        'file is missing or unregistered.',
+                    'Maintain a single source of truth catalog (e.g.' +
+                        'scripts/common/rule-catalog.json) and verify gate rules against it.',
+                    'Hardcoding rule IDs across multiple gate scripts leads to rule drift,' +
+                        'phantom rules, and gate inconsistency.',
                 ),
             );
         }
@@ -607,13 +599,13 @@ function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue[]): vo
             createGateIssue(
                 'GATE-MSG-002',
                 relHookPath,
-                1,
-                SEVERITY_WARNING,
-                'medium',
-                'standardization',
-                'Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired).',
-                'Wire validate-commit-msg-style.js or commit-msg-forbidden-terms.json into commit-msg-gate to intercept temporary and non-factual language.',
-                'Unchecked commit style leads to casual jargon, hyperbolic exaggerations, and circumvented quality constraints.',
+                1, SEVERITY_WARNING, 'medium', 'standardization',
+                'Commit-msg gate does not enforce bidirectional bilingual style terms constraints' +
+                    '(commit-msg-forbidden-terms.json unwired).',
+                'Wire validate-commit-msg-style.js or commit-msg-forbidden-terms.json into' +
+                    'commit-msg-gate to intercept temporary and non-factual language.',
+                'Unchecked commit style leads to casual jargon, hyperbolic exaggerations, and' +
+                    'circumvented quality constraints.',
             ),
         );
         return;
@@ -633,13 +625,13 @@ function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue[]): vo
                 createGateIssue(
                     'GATE-MSG-002',
                     'scripts/common/commit-msg-forbidden-terms.json',
-                    1,
-                    SEVERITY_WARNING,
-                    'medium',
-                    'standardization',
-                    'Forbidden terms dictionary lacks bidirectional bilingual coverage (must contain both English and Chinese constraints).',
-                    'Include both asciiPatterns (English) and patterns (Chinese) in forbidden terms dictionary to prevent language bypass.',
-                    'Agents or contributors can bypass single-language filters by substituting equivalent foreign terms.',
+                    1, SEVERITY_WARNING, 'medium', 'standardization',
+                    'Forbidden terms dictionary lacks bidirectional bilingual coverage (must' +
+                        'contain both English and Chinese constraints).',
+                    'Include both asciiPatterns (English) and patterns (Chinese) in forbidden' +
+                        'terms dictionary to prevent language bypass.',
+                    'Agents or contributors can bypass single-language filters by substituting' +
+                        'equivalent foreign terms.',
                 ),
             );
         }
@@ -672,13 +664,12 @@ function auditAstSliceGuard(context: RepoArchetypeContext, issues: Issue[]): voi
             createGateIssue(
                 'GATE-AST-001',
                 relPath,
-                1,
-                SEVERITY_ERROR,
-                'high',
-                'maintainability',
+                1, SEVERITY_ERROR, 'high', 'maintainability',
                 'Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4).',
-                'Integrate validate-staged-slice.js into pre-commit gate to reject over-complex staged functions prior to commit.',
-                'Allowing complex methods to be committed defers technical debt detection to late-stage full regression reviews.',
+                'Integrate validate-staged-slice.js into pre-commit gate to reject over-complex' +
+                    'staged functions prior to commit.',
+                'Allowing complex methods to be committed defers technical debt detection to' +
+                    'late-stage full regression reviews.',
             ),
         );
     }
@@ -709,13 +700,13 @@ function auditFacadeDisciplineGuard(context: RepoArchetypeContext, issues: Issue
                           .relative(context.root, context.hooks.prePush.filePath)
                           .replace(/\\/g, '/')
                     : 'scripts',
-                1,
-                SEVERITY_ERROR,
-                'high',
-                'architecture',
-                'Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination.',
-                'Incorporate facade discipline verification into pre-push or self-audit gates to eliminate pass-through shims.',
-                'Vacuous forwarding shims add unnecessary indirection layers without domain logic, increasing maintenance overhead.',
+                1, SEVERITY_ERROR, 'high', 'architecture',
+                'Gate pipeline lacks static validation for facade substantive bearing (ELOC >=' +
+                    '15) and vacuous forwarding elimination.',
+                'Incorporate facade discipline verification into pre-push or self-audit gates to' +
+                    'eliminate pass-through shims.',
+                'Vacuous forwarding shims add unnecessary indirection layers without domain' +
+                    'logic, increasing maintenance overhead.',
             ),
         );
     }
@@ -739,13 +730,13 @@ function auditProcessInteractiveSafety(context: RepoArchetypeContext, issues: Is
                     createGateIssue(
                         'GATE-PROC-001',
                         relPath,
-                        1,
-                        SEVERITY_ERROR,
-                        'medium',
-                        'reliability',
-                        `PowerShell gate script '${path.basename(relPath)}' uses interactive prompts without output redirection guard.`,
-                        'Wrap interactive prompt blocks with: if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected).',
-                        'Interactive prompts in headless CI or Agent child processes cause silent hangs and pipeline timeouts.',
+                        1, SEVERITY_ERROR, 'medium', 'reliability',
+                        `PowerShell gate script '${path.basename(relPath)}' uses interactive` +
+                            `prompts without output redirection guard.`,
+                        'Wrap interactive prompt blocks with: if ([Environment]::UserInteractive' +
+                            '-and -not [Console]::IsOutputRedirected).',
+                        'Interactive prompts in headless CI or Agent child processes cause silent' +
+                            'hangs and pipeline timeouts.',
                     ),
                 );
             }
@@ -779,10 +770,7 @@ function auditDualPlatformPairing(context: RepoArchetypeContext, issues: Issue[]
                 createGateIssue(
                     'GATE-PAIR-001',
                     `scripts/sh/${base}.sh`,
-                    1,
-                    SEVERITY_WARNING,
-                    'medium',
-                    'reliability',
+                    1, SEVERITY_WARNING, 'medium', 'reliability',
                     `Shell gate script 'scripts/sh/${base}.sh' lacks matching 'scripts/ps1/${base}.ps1'.`,
                     `Provide isomorphic 'scripts/ps1/${base}.ps1' script for cross-platform parity.`,
                     'Asymmetric gate scripts cause validation discrepancies across developer platforms.',
@@ -797,10 +785,7 @@ function auditDualPlatformPairing(context: RepoArchetypeContext, issues: Issue[]
                 createGateIssue(
                     'GATE-PAIR-001',
                     `scripts/ps1/${base}.ps1`,
-                    1,
-                    SEVERITY_WARNING,
-                    'medium',
-                    'reliability',
+                    1, SEVERITY_WARNING, 'medium', 'reliability',
                     `PowerShell gate script 'scripts/ps1/${base}.ps1' lacks matching 'scripts/sh/${base}.sh'.`,
                     `Provide isomorphic 'scripts/sh/${base}.sh' script for cross-platform parity.`,
                     'Asymmetric gate scripts cause validation discrepancies across developer platforms.',
