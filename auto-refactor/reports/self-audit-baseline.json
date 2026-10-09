@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791543453893",
-  "timestamp": "2026-10-09T10:57:42.798Z",
+  "snapshotId": "snapshot-v0.4.0-1791543892804",
+  "timestamp": "2026-10-09T11:05:01.721Z",
   "cai": 86.8,
   "versions": {
     "engineVersion": "0.4.0",
@@ -14,32 +14,32 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 616,
-    "durationMs": 7421
+    "durationMs": 7445
   },
   "metrics": {
     "compositeScore": 98.78,
     "grade": "A+",
     "autonomyRate": 86.8,
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11511,
+    "totalIssues": 11517,
     "suppressedIssues": 362,
-    "unsuppressedIssues": 11149,
+    "unsuppressedIssues": 11155,
     "bySeverity": {
       "info": 1252,
-      "warning": 10259,
+      "warning": 10265,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 1,
-      "medium": 5244,
-      "low": 6266
+      "medium": 5245,
+      "low": 6271
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.68,
-      "maintainability": 97.52,
+      "maintainability": 97.51,
       "performance": 99.75,
       "data": 99.73,
       "testing": 100,
@@ -67,7 +67,7 @@
     "performanceEfficiency": 99.62,
     "standardization": 87.74,
     "modernity": 98.95,
-    "maintainability": 95.99,
+    "maintainability": 95.98,
     "commentQuality": 99.99,
     "duplication": 90.6,
     "techDebtRisk": 99.99
@@ -168,8 +168,8 @@
     "summary": {
       "critical": 0,
       "high": 1,
-      "medium": 5244,
-      "low": 6266
+      "medium": 5245,
+      "low": 6271
     },
     "criticalItems": [],
     "highItems": [
@@ -443,10 +443,10 @@
       },
       {
         "domainName": "rules",
-        "compositeScore": 98.88,
+        "compositeScore": 98.81,
         "pillars": {
           "architecture": 98.52,
-          "maintainability": 97.83,
+          "maintainability": 97.35,
           "performance": 100,
           "data": 100,
           "testing": 100,
@@ -910,8 +910,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 132717,
-      "unique": 107223,
+      "processed": 132783,
+      "unique": 107284,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -924,13 +924,13 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791543453891,
+      "endMs": 1791543892802,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 19060196,
-        "uniqueTotal": 107223,
-        "changedTotal": 192658,
-        "semanticTotal": 154130
+        "processedTotal": 19065008,
+        "uniqueTotal": 107284,
+        "changedTotal": 195374,
+        "semanticTotal": 156303
       },
       "qed": {
         "mean": 0.0001,
@@ -938,13 +938,13 @@
         "max": 0.03
       },
       "debt": {
-        "totalAdded": 393,
+        "totalAdded": 394,
         "totalResolved": 1207,
         "totalRegressions": 0,
         "netYield": 0.04
       },
       "meanCompositeScore": 98.91,
-      "gatePassRate": 96.66
+      "gatePassRate": 97.34
     },
     "isFirstBaseline": false
   }
